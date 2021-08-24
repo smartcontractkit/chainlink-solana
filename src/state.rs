@@ -30,9 +30,12 @@ pub struct Aggregator {
     /// Set to true after initialization.
     pub is_initialized: bool,
 
+    /// Version of the state
     pub version: u32,
 
+    /// The configuration for this aggregator
     pub config: Config,
+
     /// When the config was last updated.
     pub updated_at: Timestamp,
 
@@ -41,6 +44,7 @@ pub struct Aggregator {
 
     /// A set of current submissions, one per oracle. Array index corresponds to oracle index.
     pub submissions: [Submission; MAX_ORACLES],
+
     /// The current median answer.
     pub answer: Option<Value>,
 }
@@ -55,9 +59,13 @@ impl IsInitialized for Aggregator {
 pub struct Config {
     /// A list of oracles allowed to submit answers.
     pub oracles: Vec<Pubkey>,
+
     /// Number of submissions required to produce an answer. Must be larger than 0.
     pub min_answer_threshold: u8,
+
     /// Offset in number of seconds before a submission is considered stale.
     pub staleness_threshold: u8,
+
+    /// Decimal places for value representations
     pub decimals: u8,
 }
