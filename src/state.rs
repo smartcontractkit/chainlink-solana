@@ -40,7 +40,7 @@ pub struct Aggregator {
     pub owner: Pubkey,
 
     /// A set of current submissions, one per oracle. Array index corresponds to oracle index.
-    pub submissions: [Submission; MAX_ORACLES], // TODO: submissions needs to be config.oracles sized
+    pub submissions: [Submission; MAX_ORACLES],
     /// The current median answer.
     pub answer: Option<Value>,
 }
@@ -54,7 +54,7 @@ impl IsInitialized for Aggregator {
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct Config {
     /// A list of oracles allowed to submit answers.
-    pub oracles: Vec<Pubkey>, // TODO: maintain a MAX_ORACLES
+    pub oracles: Vec<Pubkey>,
     /// Number of submissions required to produce an answer. Must be larger than 0.
     pub min_answer_threshold: u8,
     /// Offset in number of seconds before a submission is considered stale.

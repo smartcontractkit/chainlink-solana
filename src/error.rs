@@ -48,16 +48,3 @@ impl<T> DecodeError<T> for Error {
         "Error"
     }
 }
-
-// impl PrintProgramError for Error {
-//     fn print<E>(&self)
-//     where
-//         E: 'static
-//             + std::error::Error
-//             + DecodeError<E>
-//             + PrintProgramError
-//             + num_traits::FromPrimitive,
-//     {
-//         msg!("{}", self)
-//     }
-// }

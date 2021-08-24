@@ -30,7 +30,6 @@ pub fn initialize(
     owner: &Pubkey,
     config: Config,
 ) -> Result<Instruction, ProgramError> {
-    // TODO: check_program_account(program_id)?;
     let instruction_data = AggregatorInstruction::Initialize(config);
 
     let data = instruction_data.try_to_vec().unwrap();
@@ -56,7 +55,6 @@ pub fn submit(
     timestamp: Timestamp,
     value: Value,
 ) -> Result<Instruction, ProgramError> {
-    // TODO: check_program_account(program_id)?;
     let instruction_data = AggregatorInstruction::Submit { timestamp, value };
 
     let data = instruction_data.try_to_vec().unwrap();

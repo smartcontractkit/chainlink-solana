@@ -19,7 +19,6 @@ pub fn get_price(
     program_id: &Pubkey,
     account_info: &AccountInfo,
 ) -> Result<Option<state::Value>, ProgramError> {
-    // TODO: use bytemuck with offset to avoid deserializing the whole account
     processor::get_account_data::<state::Aggregator>(account_info, program_id)
         .map(|state| state.answer)
 }

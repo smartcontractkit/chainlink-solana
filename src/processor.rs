@@ -58,7 +58,6 @@ pub fn get_rounds_from_data<'a>(data: &mut [u8]) -> (&mut u64, &mut [Submission]
     let size = std::mem::size_of::<Submission>();
     let rounds = &mut rounds[..(len / size) * size];
     let rounds = bytemuck::try_cast_slice_mut::<_, Submission>(rounds).unwrap();
-    // TODO: this stalls if it fails
     (pos, rounds)
 }
 
@@ -137,8 +136,6 @@ pub fn process_initialize(
         Err(err) => return Err(err),
     };
 
-    // TODO: ensure we have enough space to serialize the whole struct (& Box heap)
-
     state.serialize(&mut aggregator.data.borrow_mut().as_mut())?;
 
     Ok(())
@@ -185,11 +182,8 @@ pub fn process_submit(
             *timestamp != 0 &&
             // skip stale submissions
             clock.unix_timestamp.saturating_sub(*timestamp) <= state.config.staleness_threshold as i64
-            // TODO: what if the clock here drifts too far from submission timestamps?
-            // a) use the current submission timestamp and/or the highest timestamp we see
-            // b) use the unix_timestamp available when the value is submitted
         })
-        .map(|Submission(_, value)| value) // TODO: maybe filter_map
+        .map(|Submission(_, value)| value)
         .collect();
 
     if submissions.len() >= state.config.min_answer_threshold as usize {

@@ -275,7 +275,7 @@ async fn test_it_works() {
             &aggregator_pubkey,
             &oracle1.pubkey(),
             clock.unix_timestamp,
-            decimal(5, config.decimals), // TODO: if this sends 4 again it generates an identical transaction to earlier an no-ops without failing..
+            decimal(5, config.decimals),
         )
         .unwrap()],
         Some(&context.payer.pubkey()),
