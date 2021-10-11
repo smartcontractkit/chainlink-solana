@@ -14,12 +14,12 @@ no-entrypoint = []
 [dependencies]
 borsh = "0.9.1"
 borsh-derive = "0.9.1"
-solana-program = "=1.7.4"
+solana-program = "~1.7.4"
 chainlink = { git = "https://github.com/smartcontractkit/chainlink-solana", package = "chainlink-solana" }
 
 [dev-dependencies]
-solana-program-test = "=1.7.4"
-solana-sdk = "=1.7.4"
+solana-program-test = "~1.7.4"
+solana-sdk = "~1.7.4"
 
 [lib]
 name = "helloworld"
