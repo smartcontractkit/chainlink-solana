@@ -1,0 +1,278 @@
+use anchor_lang::prelude::*;
+
+mod arrayvec;
+
+pub use crate::arrayvec::ArrayVec;
+
+declare_id!("HJmKEmXD9bcCH8UuncvoHD8RVCo7UHSWarRffy1go9X4");
+
+static THRESHOLD_MULTIPLIER: u128 = 100000;
+
+pub type Flags = ArrayVec<Pubkey, 128>;
+
+#[account(zero_copy)] // TODO: force repr(C) here
+pub struct Validator {
+    pub owner: Pubkey,
+    pub proposed_owner: Pubkey,
+    pub raising_access_controller: Pubkey,
+    pub lowering_access_controller: Pubkey,
+
+    pub flags: [Pubkey; 128],
+    pub len: u32,
+}
+
+#[program]
+pub mod deviation_flagging_validator {
+    use super::*;
+
+    pub fn initialize(ctx: Context<Initialize>) -> ProgramResult {
+        let mut state = ctx.accounts.state.load_init()?;
+        state.owner = ctx.accounts.owner.key();
+        state.raising_access_controller = ctx.accounts.raising_access_controller.key();
+        state.lowering_access_controller = ctx.accounts.lowering_access_controller.key();
+        Ok(())
+    }
+
+    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
+    pub fn transfer_ownership(
+        ctx: Context<TransferOwnership>,
+        proposed_owner: Pubkey,
+    ) -> ProgramResult {
+        require!(proposed_owner != Pubkey::default(), InvalidInput);
+        let state = &mut *ctx.accounts.state.load_mut()?;
+        state.proposed_owner = proposed_owner;
+        Ok(())
+    }
+
+    pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> ProgramResult {
+        let state = &mut *ctx.accounts.state.load_mut()?;
+        require!(
+            ctx.accounts.authority.key == &state.proposed_owner,
+            Unauthorized
+        );
+        state.owner = std::mem::take(&mut state.proposed_owner);
+        Ok(())
+    }
+
+    pub fn validate(
+        ctx: Context<Validate>,
+        flagging_threshold: u32,
+        _previous_round_id: u32,
+        previous_answer: i128,
+        _round_id: u32,
+        answer: i128,
+    ) -> ProgramResult {
+        anchor_lang::solana_program::log::sol_log_compute_units();
+        let mut state = ctx.accounts.state.load_mut()?;
+        has_raising_access(
+            &state,
+            &ctx.accounts.access_controller,
+            &ctx.accounts.authority,
+        )?;
+        let is_valid = is_valid(flagging_threshold, previous_answer, answer);
+        let address = ctx.accounts.address.key();
+
+        if is_valid {
+            // raise flag if not raised yet
+            let found = state.flags[..state.len as usize]
+                .iter()
+                .any(|flag| flag == &address);
+
+            if !found {
+                let i = state.len as usize;
+                state.flags[i] = address;
+                state.len += 1;
+            }
+        }
+
+        anchor_lang::solana_program::log::sol_log_compute_units();
+        Ok(())
+    }
+
+    pub fn lower_flags(ctx: Context<SetFlag>, flags: Vec<Pubkey>) -> ProgramResult {
+        let mut state = ctx.accounts.state.load_mut()?;
+        has_lowering_access(
+            &state,
+            &ctx.accounts.access_controller,
+            &ctx.accounts.authority,
+        )?;
+
+        // TODO: can probably be improved
+        let positions: Vec<_> = state.flags[..state.len as usize]
+            .iter()
+            .enumerate()
+            .filter_map(|(i, flag)| flags.contains(flag).then(|| i))
+            .collect();
+        for index in positions {
+            let len = state.len as usize;
+            state.flags.copy_within(index + 1..len, index);
+            state.len -= 1;
+        }
+        Ok(())
+    }
+
+    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
+    pub fn set_raising_access_controller(ctx: Context<SetAccessController>) -> ProgramResult {
+        let mut state = ctx.accounts.state.load_mut()?;
+        state.raising_access_controller = ctx.accounts.access_controller.key();
+        Ok(())
+    }
+
+    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
+    pub fn set_lowering_access_controller(ctx: Context<SetAccessController>) -> ProgramResult {
+        let mut state = ctx.accounts.state.load_mut()?;
+        state.lowering_access_controller = ctx.accounts.access_controller.key();
+        Ok(())
+    }
+}
+
+fn is_valid(flagging_threshold: u32, previous_answer: i128, answer: i128) -> bool {
+    if previous_answer == 0i128 {
+        return true;
+    }
+
+    // https://github.com/rust-lang/rust/issues/89492
+    fn abs_diff(slf: i128, other: i128) -> u128 {
+        if slf < other {
+            (other as u128).wrapping_sub(slf as u128)
+        } else {
+            (slf as u128).wrapping_sub(other as u128)
+        }
+    }
+    let change = abs_diff(previous_answer, answer);
+    let ratio_numerator = match change.checked_mul(THRESHOLD_MULTIPLIER) {
+        Some(ratio_numerator) => ratio_numerator,
+        None => return false,
+    };
+    let ratio = ratio_numerator / previous_answer.unsigned_abs();
+    ratio <= u128::from(flagging_threshold)
+}
+
+// Only owner access
+fn owner<'info>(state: &Loader<'info, Validator>, signer: &'_ AccountInfo) -> ProgramResult {
+    require!(signer.key.eq(&state.load()?.owner), Unauthorized);
+    Ok(())
+}
+
+fn has_raising_access(
+    // state: &Loader<Validator>,
+    state: &Validator,
+    controller: &AccountInfo,
+    authority: &AccountInfo,
+) -> ProgramResult {
+    // let state = state.load()?;
+
+    require!(
+        state.raising_access_controller == controller.key(),
+        InvalidInput
+    );
+
+    let is_owner = state.owner == authority.key();
+
+    let has_access = is_owner
+        || access_controller::has_access(
+            &Loader::try_from(&access_controller::ID, controller)?,
+            authority.key,
+        )
+        // TODO: better mapping, maybe InvalidInput?
+        .map_err(|_| ErrorCode::Unauthorized)?;
+
+    require!(has_access, Unauthorized);
+    Ok(())
+}
+
+fn has_lowering_access(
+    state: &Validator,
+    controller: &AccountInfo,
+    authority: &AccountInfo,
+) -> ProgramResult {
+    require!(
+        state.lowering_access_controller == controller.key(),
+        InvalidInput
+    );
+
+    let is_owner = state.owner == authority.key();
+
+    let has_access = is_owner
+        || access_controller::has_access(
+            &Loader::try_from(&access_controller::ID, controller)?,
+            authority.key,
+        )
+        // TODO: better mapping, maybe InvalidInput?
+        .map_err(|_| ErrorCode::Unauthorized)?;
+
+    require!(has_access, Unauthorized);
+    Ok(())
+}
+
+#[error]
+pub enum ErrorCode {
+    #[msg("Unauthorized")]
+    Unauthorized = 0,
+
+    #[msg("Invalid input")]
+    InvalidInput = 1,
+}
+
+#[derive(Accounts)]
+pub struct Initialize<'info> {
+    #[account(zero)]
+    pub state: Loader<'info, Validator>,
+    #[account(signer)]
+    pub owner: AccountInfo<'info>,
+
+    #[account(owner = access_controller::ID)]
+    pub raising_access_controller: AccountInfo<'info>,
+    #[account(owner = access_controller::ID)]
+    pub lowering_access_controller: AccountInfo<'info>,
+}
+
+#[derive(Accounts)]
+pub struct TransferOwnership<'info> {
+    #[account(mut)]
+    pub state: Loader<'info, Validator>,
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct AcceptOwnership<'info> {
+    #[account(mut)]
+    pub state: Loader<'info, Validator>,
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct SetFlag<'info> {
+    #[account(mut)]
+    pub state: Loader<'info, Validator>,
+    pub authority: Signer<'info>,
+    #[account(owner = access_controller::ID)]
+    pub access_controller: AccountInfo<'info>,
+}
+
+#[derive(Accounts)]
+pub struct SetFlaggingThreshold<'info> {
+    #[account(mut, has_one = owner)]
+    pub state: Loader<'info, Validator>,
+    pub owner: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct SetAccessController<'info> {
+    #[account(mut)]
+    pub state: Loader<'info, Validator>,
+    pub authority: Signer<'info>,
+    #[account(owner = access_controller::ID)]
+    pub access_controller: AccountInfo<'info>,
+}
+
+#[derive(Accounts)]
+pub struct Validate<'info> {
+    #[account(mut)]
+    pub state: Loader<'info, Validator>,
+    pub authority: Signer<'info>,
+    #[account(owner = access_controller::ID)]
+    pub access_controller: AccountInfo<'info>,
+
+    pub address: AccountInfo<'info>,
+}

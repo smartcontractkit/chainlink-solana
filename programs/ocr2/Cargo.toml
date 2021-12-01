@@ -1,0 +1,23 @@
+[package]
+name = "ocr2"
+version = "0.1.0"
+description = "Created with Anchor"
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "ocr2"
+
+[features]
+no-entrypoint = []
+no-idl = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.18.2"
+anchor-spl = "0.18.2"
+static_assertions = "1.1.0"
+access-controller = { version = "0.1.0", path = "../access-controller", default-features = false, features = ["cpi"] }
+deviation-flagging-validator = { version = "0.1.0", path = "../deviation-flagging-validator", default-features = false, features = ["cpi"] }
+arrayref = "0.3.6"
