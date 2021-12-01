@@ -1,0 +1,33 @@
+{
+  "name": "@chainlink/gauntlet-solana-contracts",
+  "version": "0.0.1",
+  "description": "Gauntlet Solana Contracts",
+  "keywords": [
+    "typescript",
+    "cli"
+  ],
+  "main": "./dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*",
+    "!dist/**/*.test.js"
+  ],
+  "scripts": {
+    "gauntlet": "ts-node ./src/index.ts",
+    "lint": "tsc",
+    "test": "SKIP_PROMPTS=true jest --runInBand",
+    "test:coverage": "yarn test --collectCoverage",
+    "test:ci": "yarn test --ci",
+    "lint:format": "yarn prettier --check ./src",
+    "format": "yarn prettier --write ./src",
+    "formatStaged": "node ./scripts/formatStaged.js",
+    "clean": "rm -rf ./dist/ ./bin/",
+    "build": "yarn clean && tsc",
+    "bundle": "yarn build && pkg ."
+  },
+  "dependencies": {
+    "@chainlink/gauntlet-core": "0.0.6",
+    "@chainlink/gauntlet-solana": "*",
+    "@solana/web3.js": "^1.30.2"
+  }
+}

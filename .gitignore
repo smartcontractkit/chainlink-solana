@@ -1,1 +1,21 @@
-/target/
+.direnv
+target/
+.anchor
+.DS_Store
+target
+**/*.rs.bk
+
+# ignore relay build
+pkg/bin
+
+# TS
+node_modules
+**/tsconfig.tsbuildinfo
+dist
+.env
+flow-report.json
+report.json
+bin
+# Gauntlet artifacts
+packages-ts/gauntlet-solana-contracts/artifacts/programId
+packages-ts/gauntlet-solana-contracts/artifacts/bin

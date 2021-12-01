@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.base.json",
+  "files": [],
+  "include": [],
+  "references": [
+    {
+      "path": "./packages-ts/gauntlet-solana"
+    },
+    {
+      "path": "./packages-ts/gauntlet-solana-contracts"
+    }
+  ]
+}
