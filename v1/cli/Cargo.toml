@@ -1,0 +1,54 @@
+[package]
+name = "cli"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1"
+bigdecimal = { version = "0.2", features = ["serde"] }
+rand = "0.8"
+url = "2"
+
+# Base 58/64 encoding for convenience
+bs58 = "0.4"
+base64 = "0.13"
+
+# Config
+clap = { version = "3.0.0-beta.5", features = ["derive", "color"] }
+
+# Express intervals as human-readable, e.g. "1m"
+humantime = "2.1"
+
+# Lazy constructors for static values
+once_cell = "1.8"
+pretty_env_logger = "0.4"
+
+# For async
+tokio = { version = "1", features = ["full"] }
+
+# Trace logging
+tracing = "0.1"
+tracing-subscriber = "0.2.0"
+
+# Deserializing chainlink requests, serializing responses
+serde = { version = "1", features = ["derive"] }
+serde_json = "*"
+
+# For RPC comms with a Solana node
+solana-client = "1.7"
+solana-sdk = { version = "1.7", features = [] }
+solana-cli-config = "1.7"
+
+# Metrics collection and reporting
+prometheus = "0.13"
+
+program = { path = "../flux-aggregator", features = ["no-entrypoint"], package = "flux-aggregator" }
+
+# Use warp to serve JSON RPC for chainlink
+warp = "0.3"
+
+# Async HTTP client + TLS support
+hyper = "0.14"
+hyper-tls = "0.5"

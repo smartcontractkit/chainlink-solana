@@ -1,0 +1,26 @@
+
+[package]
+name = "chainlink-helloworld"
+version = "0.0.1"
+description = "Example template program written in Rust"
+authors = []
+repository = "https://github.com/smartcontractkit/solana-example"
+license = "Apache-2.0"
+edition = "2018"
+
+[features]
+no-entrypoint = []
+
+[dependencies]
+borsh = "0.9.1"
+borsh-derive = "0.9.1"
+solana-program = "~1.7.11"
+chainlink = { path = "../programs/flux-aggregator", package = "flux-aggregator" } # TODO: use github import
+
+[dev-dependencies]
+solana-program-test = "~1.7.11"
+solana-sdk = "~1.7.11"
+
+[lib]
+name = "helloworld"
+crate-type = ["cdylib", "lib"]

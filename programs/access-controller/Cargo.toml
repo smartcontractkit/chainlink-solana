@@ -1,0 +1,20 @@
+[package]
+name = "access-controller"
+version = "0.1.0"
+description = "Created with Anchor"
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "access_controller"
+
+[features]
+no-entrypoint = []
+no-idl = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.18.2"
+static_assertions = "1.1.0"
+arrayvec = { version = "0.1.0", path = "../../crates/arrayvec" }

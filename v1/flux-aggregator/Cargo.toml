@@ -1,0 +1,30 @@
+[package]
+name = "flux-aggregator"
+version = "0.1.0"
+authors = ["Blaž Hrastnik <blaz@mxxn.io>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "flux_aggregator"
+crate-type = ["cdylib", "lib"]
+
+[features]
+no-entrypoint = []
+
+[dependencies]
+borsh = "0.9"
+borsh-derive = "0.8.1"
+solana-program = "~1.7.11"
+thiserror = "1.0"
+num-derive = "0.3"
+num-traits = "0.2"
+uint = "0.9"
+bytemuck = "1.7"
+
+[dev-dependencies]
+solana-program-test = "~1.7.11"
+solana-sdk = "~1.7.11"
+serde = "1"
+bincode = "1.3"
