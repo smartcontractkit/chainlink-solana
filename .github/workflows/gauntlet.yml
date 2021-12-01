@@ -1,0 +1,74 @@
+name: Gauntlet
+
+on:
+  push:
+    branches:
+      - develop
+
+  pull_request:
+    branches:
+      - "*"
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        platform: [ubuntu-latest]
+        node-version: [14.x]
+    env:
+      CI: true
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: |
+          npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
+          ${{ matrix.env }} yarn install
+      - run: ${{ matrix.env }} yarn build
+
+  format:
+    strategy:
+      matrix:
+        platform: [ubuntu-latest]
+        node-version: [14.x]
+    env:
+      CI: true
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: |
+          npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
+          ${{ matrix.env }} yarn install
+      - run: ${{ matrix.env }} yarn lint:format
+
+  test:
+    strategy:
+      matrix:
+        platform: [ubuntu-latest]
+        node-version: [14.x]
+    env:
+      CI: true
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: |
+          npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
+          ${{ matrix.env }} yarn install
+      - run: ${{ matrix.env }} yarn test:ci

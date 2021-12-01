@@ -1,0 +1,9 @@
+type                = "cron"
+schemaVersion       = 1
+schedule            = "CRON_TZ=UTC */15 * * * * *"
+observationSource   = """
+fetch       [type=http method=GET url="http://localhost:9090/ETH-USD"];
+parse       [type=jsonparse path="data,price"];
+record      [type=http method=POST requestData="{\\"value\\": $(parse)}" url="http://localhost:9090/submit"]
+fetch -> parse -> record;
+"""
