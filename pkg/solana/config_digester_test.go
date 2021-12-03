@@ -14,6 +14,10 @@ import (
 func TestConfigDigester(t *testing.T) {
 	programID, err := solana.PublicKeyFromBase58("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS")
 	require.NoError(t, err)
+	digester := OffchainConfigDigester{
+		ProgramID: programID,
+	}
+
 	signers, transmitters, err := sortOraclesBySigningKey(
 		[]types.OnchainPublicKey{
 			[]byte{
@@ -140,9 +144,7 @@ func TestConfigDigester(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	contract := ContractTracker{
-		programAccount: programID,
-	}
+
 	config := types.ContractConfig{
 		ConfigCount:           1,
 		Signers:               signers,
@@ -152,7 +154,7 @@ func TestConfigDigester(t *testing.T) {
 		OffchainConfigVersion: 1,
 		OffchainConfig:        []byte{4, 5, 6},
 	}
-	actualDigest, err := contract.ConfigDigest(config)
+	actualDigest, err := digester.ConfigDigest(config)
 	require.NoError(t, err)
 	expectedDigest := [32]byte{
 		0, 3, 177, 128, 128, 180, 135,
@@ -184,6 +186,7 @@ func sortOraclesBySigningKey(
 			"number of signers (%d) and transmitters (%d) is different",
 			len(signers), len(transmitters))
 	}
+
 	oracles := []tmpOracleKeys{}
 	for i := 0; i < len(signers); i++ {
 		oracles = append(oracles, tmpOracleKeys{
@@ -200,5 +203,6 @@ func sortOraclesBySigningKey(
 		newSigners = append(newSigners, oracles[i].signerKey)
 		newTransmitters = append(newTransmitters, oracles[i].transmitter)
 	}
+
 	return newSigners, newTransmitters, nil
 }

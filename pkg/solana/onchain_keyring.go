@@ -3,14 +3,12 @@ package solana
 import (
 	"bytes"
 	"crypto/ecdsa"
-	"crypto/sha256"
 	"fmt"
 	"log"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
-	"github.com/smartcontractkit/libocr/offchainreporting2/chains/evmutil"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
@@ -44,7 +42,7 @@ func (kr OnchainKeyring) PublicKey() types.OnchainPublicKey {
 }
 
 func (kr OnchainKeyring) Sign(reportCtx types.ReportContext, report types.Report) (signature []byte, err error) {
-	sigDataHash, err := reportHash(reportCtx, report)
+	sigDataHash, err := HashReport(reportCtx, report)
 	if err != nil {
 		return []byte{}, err
 	}
@@ -52,7 +50,7 @@ func (kr OnchainKeyring) Sign(reportCtx types.ReportContext, report types.Report
 }
 
 func (kr OnchainKeyring) Verify(key types.OnchainPublicKey, reportCtx types.ReportContext, report types.Report, signature []byte) bool {
-	sigDataHash, err := reportHash(reportCtx, report)
+	sigDataHash, err := HashReport(reportCtx, report)
 	if err != nil {
 		log.Printf("error generating hash data: %s", err)
 		return false
@@ -69,17 +67,4 @@ func (kr OnchainKeyring) Verify(key types.OnchainPublicKey, reportCtx types.Repo
 
 func (kr OnchainKeyring) MaxSignatureLength() int {
 	return 64 + 1 // 64 byte signature + 1 byte recovery id
-}
-
-func reportHash(reportCtx types.ReportContext, report types.Report) ([]byte, error) {
-	// create report digest using SHA256 hash
-	rawReportContext := evmutil.RawReportContext(reportCtx)
-
-	buf := sha256.New()
-	for _, v := range [][]byte{report[:], rawReportContext[0][:], rawReportContext[1][:], rawReportContext[2][:]} {
-		if _, err := buf.Write(v); err != nil {
-			return []byte{}, err
-		}
-	}
-	return buf.Sum(nil), nil
 }

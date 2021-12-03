@@ -3,17 +3,18 @@ package solana
 import (
 	"bytes"
 	"context"
-	"fmt"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	confirm "github.com/gagliardetto/solana-go/rpc/sendAndConfirmTransaction"
+	"github.com/pkg/errors"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2/chains/evmutil"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
-var OCR2ProgramID solana.PublicKey = solana.PublicKeyFromBytes([]byte("test"))
+var _ types.ContractTransmitter = (*ContractTracker)(nil)
+
+// TODO: Blaz where do we get this info from, contract?
 var ValidatorProgramID solana.PublicKey = solana.PublicKeyFromBytes([]byte("test"))
 
 // Transmit sends the report to the on-chain OCR2Aggregator smart contract's Transmit method
@@ -28,37 +29,31 @@ func (c ContractTracker) Transmit(
 		return err
 	}
 
-	// TODO: fetch from somewhere on contract tracker
-	transmitter, err := solana.NewRandomPrivateKey()
-	if err != nil {
-		return err
-	}
-
 	// Determine validator authority
-	seeds := [][]byte{[]byte("validator"), c.stateAccount.Bytes()}
-	validatorAuthority, validatorNonce, err := solana.FindProgramAddress(seeds, OCR2ProgramID)
+	seeds := [][]byte{[]byte("validator"), c.StateID.Bytes()}
+	validatorAuthority, validatorNonce, err := solana.FindProgramAddress(seeds, c.ProgramID)
 	if err != nil {
 		return err
 	}
 
 	// Resolve validator's access controller
 	var validator Validator
-	if err = c.client.rpc.GetAccountDataInto(ctx, c.state.Config.Validator, &validator); err != nil {
+	if err := c.client.rpc.GetAccountDataInto(ctx, c.state.Config.Validator, &validator); err != nil {
 		return err
 	}
 
 	accounts := []*solana.AccountMeta{
 		// state, transmitter, transmissions, validator_program, validator, validator_authority, validator_access_controller
-		{PublicKey: c.stateAccount, IsWritable: true, IsSigner: false},
-		{PublicKey: transmitter.PublicKey(), IsWritable: true, IsSigner: true},
-		{PublicKey: c.transmissionsAccount, IsWritable: true, IsSigner: false},
+		{PublicKey: c.StateID, IsWritable: true, IsSigner: false},
+		{PublicKey: c.Transmitter.PublicKey(), IsWritable: true, IsSigner: true},
+		{PublicKey: c.TransmissionsID, IsWritable: true, IsSigner: false},
 		{PublicKey: ValidatorProgramID, IsWritable: false, IsSigner: false},
 		{PublicKey: c.state.Config.Validator, IsWritable: true, IsSigner: false},
 		{PublicKey: validatorAuthority, IsWritable: false, IsSigner: false},
 		{PublicKey: validator.RaisingAccessController, IsWritable: false, IsSigner: false},
 	}
 
-	reportContext := evmutil.RawReportContext(reportCtx)
+	reportContext := RawReportContext(reportCtx)
 
 	// Construct the instruction payload
 	data := new(bytes.Buffer) // validator_nonce || report_context || raw_report || raw_signatures
@@ -74,24 +69,23 @@ func (c ContractTracker) Transmit(
 
 	tx, err := solana.NewTransaction(
 		[]solana.Instruction{
-			solana.NewInstruction(OCR2ProgramID, accounts, data.Bytes()),
+			solana.NewInstruction(c.ProgramID, accounts, data.Bytes()),
 		},
 		recent.Value.Blockhash,
-		solana.TransactionPayer(transmitter.PublicKey()),
+		solana.TransactionPayer(c.Transmitter.PublicKey()),
 	)
 	if err != nil {
 		return err
 	}
 
 	pkGetter := func(key solana.PublicKey) *solana.PrivateKey {
-		if transmitter.PublicKey().Equals(key) {
-			return &transmitter
+		if c.Transmitter.PublicKey().Equals(key) {
+			return &c.Transmitter
 		}
 		return nil
 	}
-	_, err = tx.Sign(pkGetter)
-	if err != nil {
-		return fmt.Errorf("unable to sign transaction: %w", err)
+	if _, err = tx.Sign(pkGetter); err != nil {
+		return errors.Wrap(err, "error on transaction sign")
 	}
 
 	// Send transaction, and wait for confirmation:
@@ -117,5 +111,5 @@ func (c ContractTracker) LatestConfigDigestAndEpoch(
 }
 
 func (c ContractTracker) FromAccount() types.Account {
-	return "placeholder"
+	return types.Account(c.Transmitter.PublicKey().String())
 }

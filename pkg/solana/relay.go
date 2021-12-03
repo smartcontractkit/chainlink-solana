@@ -3,6 +3,7 @@ package solana
 import (
 	"errors"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	uuid "github.com/satori/go.uuid"
 	"gopkg.in/guregu/null.v4"
@@ -53,13 +54,24 @@ func (r relayer) Healthy() error {
 }
 
 type OCR2Spec struct {
-	ID                 int32
-	ContractAddress    string
-	KeyBundleID        null.String
-	TransmitterAddress string
-	ChainID            *utils.Big
-	NodeEndpointRPC    string
-	NodeEndpointWS     string
+	ID          int32
+	IsBootstrap bool
+
+	// network data
+	ChainID         *utils.Big
+	NodeEndpointRPC string
+	NodeEndpointWS  string
+
+	// on-chain program + 2x state accounts (state + transmissions)
+	ProgramID       solana.PublicKey
+	StateID         solana.PublicKey
+	TransmissionsID solana.PublicKey
+
+	// private key for the transmission signing
+	Transmitter solana.PrivateKey
+
+	// OCR key bundle (off/on-chain keys) id
+	KeyBundleID null.String
 }
 
 // TODO [relay]: import from smartcontractkit/chainlink-solana impl
@@ -75,17 +87,36 @@ func (r relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay.
 		return nil, err
 	}
 
+	offchainConfigDigester := OffchainConfigDigester{
+		// TODO: copy the ProgramID from the OCR2 spec
+		ProgramID: solana.PublicKeyFromBytes([]byte("mock")),
+	}
+
+	if spec.IsBootstrap {
+		// Return early if bootstrap node (doesn't require the full OCR2 provider)
+		return &ocr2Provider{
+			// TODO: tracker:                tracker,
+			offchainConfigDigester: offchainConfigDigester,
+		}, nil
+	}
+
+	reportCodec := ReportCodec{}
+
 	return &ocr2Provider{
-		client:    rpc.New(spec.NodeEndpointRPC),
-		keyBundle: kb,
+		client:                 rpc.New(spec.NodeEndpointRPC),
+		offchainConfigDigester: offchainConfigDigester,
+		reportCodec:            reportCodec,
+		keyBundle:              kb,
 	}, nil
 }
 
 var _ service.Service = (*ocr2Provider)(nil)
 
 type ocr2Provider struct {
-	client    *rpc.Client
-	keyBundle ocr2key.KeyBundle
+	client                 *rpc.Client
+	offchainConfigDigester OffchainConfigDigester
+	reportCodec            ReportCodec
+	keyBundle              ocr2key.KeyBundle
 }
 
 func (p ocr2Provider) Start() error {
@@ -125,11 +156,11 @@ func (p ocr2Provider) ContractConfigTracker() types.ContractConfigTracker {
 }
 
 func (p ocr2Provider) OffchainConfigDigester() types.OffchainConfigDigester {
-	return nil
+	return p.offchainConfigDigester
 }
 
 func (p ocr2Provider) ReportCodec() median.ReportCodec {
-	return nil
+	return p.reportCodec
 }
 
 func (p ocr2Provider) MedianContract() median.MedianContract {

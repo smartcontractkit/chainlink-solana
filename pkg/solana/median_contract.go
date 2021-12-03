@@ -18,12 +18,11 @@ func (c ContractTracker) LatestTransmissionDetails(
 	latestTimestamp time.Time,
 	err error,
 ) {
-	err = fetchWrap(ctx, c.fetchState, &c.lockStateChan)
-	if err != nil {
+	if err := fetchWrap(ctx, c.fetchState, &c.lockStateChan); err != nil {
 		return types.ConfigDigest{}, 0, 0, big.NewInt(0), time.Unix(0, 0), err
 	}
-	err = fetchWrap(ctx, c.fetchTransmissions, &c.lockTransmissionsChan)
-	if err != nil {
+
+	if err := fetchWrap(ctx, c.fetchTransmissions, &c.lockTransmissionsChan); err != nil {
 		return types.ConfigDigest{}, 0, 0, big.NewInt(0), time.Unix(0, 0), err
 	}
 

@@ -6,7 +6,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/gagliardetto/solana-go/rpc/ws"
 
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
+	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
 // Client implements the Blockchain interface and contains other needed pieces
@@ -31,7 +31,7 @@ func (c Client) Close() {
 	c.ws.Close()
 }
 
-func (c Client) OCR() ocrtypes.OnchainKeyring {
+func (c Client) OCR() types.OnchainKeyring {
 	return &OnchainKeyring{}
 }
 

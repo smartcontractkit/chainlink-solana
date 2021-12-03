@@ -1,7 +1,7 @@
 [programs.localnet]
-ocr2 = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
-access_controller = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnA"
-deviation_flagging_validator = "Cg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+ocr2 = "3PWYU38zBeeh1fKDYx9diGPK6TVyFrtUpFT6UHiAEoJ5"
+access_controller = "AZcv5u98RVGB6p5DtchiC8TVqMaSsiqbufxWAZEAcDpo"
+deviation_flagging_validator = "HJmKEmXD9bcCH8UuncvoHD8RVCo7UHSWarRffy1go9X4"
 
 [registry]
 url = "https://anchor.projectserum.com"

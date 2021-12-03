@@ -7,8 +7,22 @@ import (
 	"github.com/gagliardetto/solana-go"
 )
 
-// TransmissionsSize indicates how many transmissions are stored
-const TransmissionsSize uint32 = 8096
+const (
+	// TransmissionsSize indicates how many transmissions are stored
+	TransmissionsSize uint32 = 8096
+
+	// answer (int128, 16 bytes), timestamp (uint32, 4 bytes)
+	TransmissionLen uint64 = 16 + 4
+
+	// AccountDiscriminator (8 bytes), RoundID (uint32, 4 bytes), Cursor (uint32, 4 bytes)
+	CursorOffset uint64 = 8 + 4
+	CursorLen    uint64 = 4
+
+	// Report data (68 bytes)
+	MedianLen uint64 = 16
+	JuelsLen  uint64 = 16
+	ReportLen uint64 = 4 + 32 + MedianLen + JuelsLen // TODO: explain all
+)
 
 // State is the struct representing the contract state
 type State struct {
@@ -94,4 +108,15 @@ type Validator struct {
 
 	Flags [128]solana.PublicKey
 	Len   uint8
+}
+
+// CL Core OCR2 job spec RelayConfig member for Solana
+type RelayConfig struct {
+	// network data
+	NodeEndpointRPC string `json:"nodeEndpointRPC"`
+	NodeEndpointWS  string `json:"nodeEndpointWS"`
+
+	// on-chain program + 2x state accounts (state + transmissions)
+	StateID         string `json:"stateID"`
+	TransmissionsID string `json:"transmissionsID"`
 }

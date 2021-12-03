@@ -3,7 +3,6 @@ package solana
 import (
 	"context"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"log"
 	"math/big"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/pkg/errors"
 	"go.uber.org/atomic"
 )
 
@@ -23,9 +23,14 @@ var (
 )
 
 type ContractTracker struct {
-	programAccount        solana.PublicKey // solana public key for the onchain program
-	stateAccount          solana.PublicKey // public key for the state account
-	transmissionsAccount  solana.PublicKey // public key for the transmission account
+	// on-chain program + 2x state accounts (state + transmissions)
+	ProgramID       solana.PublicKey
+	StateID         solana.PublicKey
+	TransmissionsID solana.PublicKey
+
+	// private key for the transmission signing
+	Transmitter solana.PrivateKey
+
 	client                *Client
 	state                 State
 	answer                Answer
@@ -49,13 +54,20 @@ func NewTracker(address string, jobID string, client *Client) (*ContractTracker,
 		pubKeys = append(pubKeys, pubKey)
 	}
 
+	// TODO: @Blaz/@Ryan the solana-go requires a private key (?)
+	transmitter, err := solana.NewRandomPrivateKey()
+	if err != nil {
+		return nil, err
+	}
+
 	return &ContractTracker{
-		programAccount:       pubKeys[0],
-		stateAccount:         pubKeys[1],
-		transmissionsAccount: pubKeys[2],
-		client:               client,
-		lockState:            atomic.NewBool(false), // initialize to unlocked
-		lockTransmissions:    atomic.NewBool(false), // initialize to unlocked
+		ProgramID:         pubKeys[0],
+		StateID:           pubKeys[1],
+		TransmissionsID:   pubKeys[2],
+		Transmitter:       transmitter,
+		client:            client,
+		lockState:         atomic.NewBool(false), // initialize to unlocked
+		lockTransmissions: atomic.NewBool(false), // initialize to unlocked
 	}, nil
 }
 
@@ -109,9 +121,9 @@ func (c *ContractTracker) fetchState(ctx context.Context) error {
 	defer close(c.lockStateChan)
 
 	// fetch + decode + store raw state
-	log.Printf("fetch state account: %s", c.stateAccount.String())
+	log.Printf("fetch state account: %s", c.StateID.String())
 
-	if err := c.client.rpc.GetAccountDataInto(ctx, c.stateAccount, &c.state); err != nil {
+	if err := c.client.rpc.GetAccountDataInto(ctx, c.StateID, &c.state); err != nil {
 		return err
 	}
 
@@ -133,26 +145,26 @@ func (c *ContractTracker) fetchTransmissions(ctx context.Context) error {
 	c.lockTransmissionsChan = make(chan struct{})
 	defer close(c.lockTransmissionsChan)
 
-	log.Printf("fetch transmissions account: %s", c.transmissionsAccount.String())
-	a, err := fetchTransmissionsState(ctx, c.client.rpc, c.transmissionsAccount)
+	log.Printf("fetch transmissions account: %s", c.TransmissionsID.String())
+	a, err := fetchTransmissionsState(ctx, c.client.rpc, c.TransmissionsID)
 	c.answer = a
 	return err
 }
 
 func fetchTransmissionsState(ctx context.Context, client *rpc.Client, account solana.PublicKey) (Answer, error) {
-	var cursorStart uint64 = 8 + 4 // AccountDiscriminator (8 bytes), RoundID (uint32, 4 bytes), Cursor (uint32, 4 bytes)
-	var cursorLen uint64 = 4
-	var transmissionLen uint64 = 16 + 4 // answer (int128, 16 bytes), timestamp (uint32, 4 bytes)
+	cursorOffset := CursorOffset
+	cursorLen := CursorLen
+	transmissionLen := TransmissionLen
 
 	// query for cursor
 	res, err := client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		DataSlice: &rpc.DataSlice{
-			Offset: &cursorStart,
+			Offset: &cursorOffset,
 			Length: &cursorLen,
 		},
 	})
 	if err != nil {
-		return Answer{}, fmt.Errorf("[fetch cursor] %w", err)
+		return Answer{}, errors.Wrap(err, "error on rpc.GetAccountInfo [cursor]")
 	}
 
 	// parse little endian cursor value
@@ -167,21 +179,22 @@ func fetchTransmissionsState(ctx context.Context, client *rpc.Client, account so
 	cursor-- // cursor indicates index for new answer, latest answer is in previous index
 
 	// fetch transmission
-	var transmissionStart uint64 = 8 + 4 + 4 + uint64(cursor)*transmissionLen
+	var transmissionOffset uint64 = CursorOffset + CursorLen + (uint64(cursor) * transmissionLen)
 	res, err = client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		DataSlice: &rpc.DataSlice{
-			Offset: &transmissionStart,
+			Offset: &transmissionOffset,
 			Length: &transmissionLen,
 		},
 	})
 	if err != nil {
-		return Answer{}, fmt.Errorf("[fetch transmission] %w", err)
+		return Answer{}, errors.Wrap(err, "error on rpc.GetAccountInfo [transmission]")
 	}
 
 	t := res.Value.Data.GetBinary()
 	if len(t) != int(transmissionLen) { // validate length
 		return Answer{}, errTransmissionLength
 	}
+
 	// reverse slice to change from little endian to big endian
 	for i, j := 0, len(t)-1; i < j; i, j = i+1, j-1 {
 		t[i], t[j] = t[j], t[i]

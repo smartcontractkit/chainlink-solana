@@ -11,7 +11,9 @@ export default class Initialize extends SolanaCommand {
   static id = 'ocr2:initialize'
   static category = CONTRACT_LIST.OCR_2
 
-  static examples = ['yarn gauntlet ocr2:initialize --network=devnet GMoHmLj8FiBP4XtWBcZVTkVs99DrzQbarLf3bRayfYDg']
+  static examples = [
+    'yarn gauntlet ocr2:initialize --network=devnet --requesterAccessController=[ADDRESS] --billingAccessController=[ADDRESS]',
+  ]
 
   constructor(flags, args) {
     super(flags, args)
@@ -37,6 +39,12 @@ export default class Initialize extends SolanaCommand {
       program.programId,
     )
 
+    const [validatorAuthority] = await PublicKey.findProgramAddress(
+      [Buffer.from(utils.bytes.utf8.encode('validator')), state.publicKey.toBuffer()],
+      program.programId,
+    )
+
+    // TODO: This should come from RDD
     const minAnswer = new BN(this.flags.minAnswer)
     const maxAnswer = new BN(this.flags.maxAnswer)
     const decimals = Number(this.flags.decimals || 18)
@@ -88,14 +96,23 @@ export default class Initialize extends SolanaCommand {
     console.log(`
       STATE ACCOUNTS:
         - State: ${state.publicKey}
+        - Transmissions: ${transmissions.publicKey}
         - Payer: ${this.provider.wallet.publicKey}
         - Owner: ${owner.publicKey}
     `)
 
     return {
+      data: {
+        state: state.publicKey.toString(),
+        transmissions: transmissions.publicKey.toString(),
+        validatorAuthority: validatorAuthority.toString(),
+      },
       responses: [
         {
-          tx: this.wrapResponse(txHash, address!, { state: state.publicKey.toString() }),
+          tx: this.wrapResponse(txHash, address, {
+            state: state.publicKey.toString(),
+            transmissions: transmissions.publicKey.toString(),
+          }),
           contract: state.publicKey.toString(),
         },
       ],

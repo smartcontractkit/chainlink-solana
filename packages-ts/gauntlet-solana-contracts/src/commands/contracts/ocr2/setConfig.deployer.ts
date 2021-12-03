@@ -50,7 +50,7 @@ export default class SetConfigDeployer extends SolanaCommand {
       }
       if (operators.length === 0) throw new Error('Expected list of operators')
       const validOperators = operators.every(_isValidOperator)
-      if (!validOperators) throw new Error('Unexpected operators format')
+      // if (!validOperators) throw new Error('Unexpected operators format')
       return operators
     } catch (e) {
       logger.error(`Error parsing operators: ${e.message}`)
@@ -62,8 +62,6 @@ export default class SetConfigDeployer extends SolanaCommand {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const address = ocr2.programId.publicKey.toString()
     const program = this.loadProgram(ocr2.idl, address)
-
-    console.log(this.flags.keys)
 
     const operators: Operator[] = this.parseOperators(this.flags.keys)
     this.require(operators.length > 0, 'Provide valid operators')
@@ -78,27 +76,27 @@ export default class SetConfigDeployer extends SolanaCommand {
       signer: Buffer.from(OCROnchainPublicKey),
       transmitter: new PublicKey(NodeAddress),
     }))
-    const max = new BN(this.flags.max || '9223372036854775807').toBuffer()
+    const max = new BN(this.flags.max || '10000000000').toBuffer()
     const min = new BN(this.flags.min || 0).toBuffer()
     const onchainConfig = Buffer.from([1, ...max, ...min])
 
     // TODO: set offchain config details
-    const offchainConfig = {
-      deltaProgress: Second.mul(new BN(2)),
-      DeltaResend: Second.mul(new BN(5)),
-      DeltaRound: Second.mul(new BN(1)),
-      DeltaGrace: Millisecond.mul(new BN(500)),
-      DeltaStage: Second.mul(new BN(5)),
-      rMax: 3,
-      s: operators.length,
-      offchainPublicKeys: operators.map(({ OCROffchainPublicKey }) => OCROffchainPublicKey),
-      peerIds: operators.map(({ P2PID }) => P2PID),
-      MaxDurationQuery: Millisecond.mul(new BN(500)),
-      MaxDurationObservation: Millisecond.mul(new BN(500)),
-      MaxDurationReport: Millisecond.mul(new BN(500)),
-      MaxDurationShouldAcceptFinalizedReport: Millisecond.mul(new BN(500)),
-      MaxDurationShouldTransmitAcceptedReport: Millisecond.mul(new BN(500)),
-    }
+    // const offchainConfig = {
+    //   deltaProgress: Second.mul(new BN(2)),
+    //   DeltaResend: Second.mul(new BN(5)),
+    //   DeltaRound: Second.mul(new BN(1)),
+    //   DeltaGrace: Millisecond.mul(new BN(500)),
+    //   DeltaStage: Second.mul(new BN(5)),
+    //   rMax: 3,
+    //   s: operators.length,
+    //   offchainPublicKeys: operators.map(({ OCROffchainPublicKey }) => OCROffchainPublicKey),
+    //   peerIds: operators.map(({ P2PID }) => P2PID),
+    //   MaxDurationQuery: Millisecond.mul(new BN(500)),
+    //   MaxDurationObservation: Millisecond.mul(new BN(500)),
+    //   MaxDurationReport: Millisecond.mul(new BN(500)),
+    //   MaxDurationShouldAcceptFinalizedReport: Millisecond.mul(new BN(500)),
+    //   MaxDurationShouldTransmitAcceptedReport: Millisecond.mul(new BN(500)),
+    // }
 
     console.log(`Setting config on ${state.toString()}...`)
     const tx = await program.rpc.setConfig(

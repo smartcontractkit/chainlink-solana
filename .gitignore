@@ -16,5 +16,6 @@ dist
 flow-report.json
 report.json
 bin
-# Programs Keypairs
+# Gauntlet artifacts
 packages-ts/gauntlet-solana-contracts/artifacts/programId
+packages-ts/gauntlet-solana-contracts/artifacts/bin
