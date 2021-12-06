@@ -594,10 +594,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
     let config = &state.config;
 
     // Either newer epoch, or same epoch but higher round ID
-    require!(
-        config.epoch < epoch || (config.epoch == epoch && config.round < round),
-        StaleReport
-    );
+    require!((config.epoch, config.round) < (epoch, round), StaleReport);
 
     // validate transmitter
     let oracle_idx = state
