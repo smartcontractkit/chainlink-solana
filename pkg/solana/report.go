@@ -57,6 +57,9 @@ func (c ReportCodec) BuildReport(oo []median.ParsedAttributedObservation) (types
 	binary.BigEndian.PutUint32(time, timestamp)
 	report = append(report, time[:]...)
 
+	observersCount := uint8(len(observers))
+	report = append(report, observersCount)
+
 	report = append(report, observers[:]...)
 
 	mBytes := make([]byte, MedianLen)
@@ -75,7 +78,7 @@ func (c ReportCodec) MedianFromReport(report types.Report) (*big.Int, error) {
 	}
 
 	// unpack median observation
-	start := 4 + 32
+	start := 4 + 1 + 32
 	end := start + int(MedianLen)
 	median := report[start:end]
 	return big.NewInt(0).SetBytes(median), nil
