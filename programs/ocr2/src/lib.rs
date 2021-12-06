@@ -657,8 +657,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
 
     let report = Report::unpack(raw_report)?;
 
-    // TODO: how do we still validate observers?
-    // require!(usize::from(config.f) < len, InvalidInput);
+    require!(config.f < report.observer_count, InvalidInput);
 
     require!(
         report.median >= state.config.min_answer && report.median <= state.config.max_answer,
@@ -747,6 +746,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
 
 struct Report {
     pub median: i128,
+    pub observer_count: u8,
     #[allow(dead_code)] // make clippy happy - allows unused observers
     pub observers: [u8; MAX_ORACLES], // observer index
     pub observations_timestamp: u32,
@@ -754,23 +754,26 @@ struct Report {
 }
 
 impl Report {
-    // (uint32, bytes32, int128, uint128)
-    pub const LEN: usize = size_of::<u32>() + 32 + size_of::<i128>() + size_of::<u64>();
+    // (uint32, u8, bytes32, int128, uint128)
+    pub const LEN: usize =
+        size_of::<u32>() + size_of::<u8>() + 32 + size_of::<i128>() + size_of::<u64>();
 
     pub fn unpack(raw_report: &[u8]) -> Result<Self> {
         require!(raw_report.len() == Self::LEN, InvalidInput);
 
         let data = array_ref![raw_report, 0, Report::LEN];
-        let (observations_timestamp, observers, median, juels_per_lamport) =
-            array_refs![data, 4, 32, 16, 8];
+        let (observations_timestamp, observer_count, observers, median, juels_per_lamport) =
+            array_refs![data, 4, 1, 32, 16, 8];
 
         let observations_timestamp = u32::from_be_bytes(*observations_timestamp);
+        let observer_count = observer_count[0];
         let observers = observers[..MAX_ORACLES].try_into().unwrap();
         let median = i128::from_be_bytes(*median);
         let juels_per_lamport = u64::from_be_bytes(*juels_per_lamport);
 
         Ok(Self {
             median,
+            observer_count,
             observers,
             observations_timestamp,
             juels_per_lamport,
