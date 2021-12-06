@@ -51,7 +51,7 @@ func TestBuildReport(t *testing.T) {
 	assert.Equal(t, oo[0].Value.FillBytes(make([]byte, 16)), []byte(report[index:index+16]), "validate median observation")
 
 	// validate juelsToEth
-	assert.Equal(t, v.FillBytes(make([]byte, 16)), []byte(report[ReportLen-16:ReportLen]), "validate juelsToEth")
+	assert.Equal(t, v.FillBytes(make([]byte, 8)), []byte(report[ReportLen-8:ReportLen]), "validate juelsToEth")
 }
 
 func TestMedianFromReport(t *testing.T) {
@@ -61,7 +61,7 @@ func TestMedianFromReport(t *testing.T) {
 		97, 91, 43, 83, // observations_timestamp
 		0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // observers
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 73, 150, 2, 210, // observation 2
-		0, 0, 0, 0, 0, 0, 0, 0, 13, 224, 182, 179, 167, 100, 0, 0, // juels per luna (1 with 18 decimal places)
+		13, 224, 182, 179, 167, 100, 0, 0, // juels per luna (1 with 18 decimal places)
 	}
 
 	res, err := c.MedianFromReport(report)
@@ -88,7 +88,7 @@ func TestHashReport(t *testing.T) {
 		97, 91, 43, 83, // observations_timestamp
 		0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // observers
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 210, // median
-		0, 0, 0, 0, 0, 0, 0, 0, 13, 224, 182, 179, 167, 100, 0, 0, // juels per sol (1 with 18 decimal places)
+		13, 224, 182, 179, 167, 100, 0, 0, // juels per sol (1 with 18 decimal places)
 	}
 
 	var mockHash = []byte{
