@@ -142,7 +142,7 @@ describe('ocr2', async () => {
       TOKEN_PROGRAM_ID,
       token.publicKey,
       vaultAuthority,
-      true, // allowOwnerOffCurve, is this safe?
+      true, // allowOwnerOffCurve: seems required since a PDA isn't a valid keypair
     );
 
     console.log("Initializing");
@@ -366,6 +366,7 @@ describe('ocr2', async () => {
 
     const raw_report = [
       97, 91, 43, 83, // observations_timestamp
+      7, // observer_count
       0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // observers
       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 210, // median
       0, 0, 0, 0, 0, 0, 0, 2, // juels per lamport (2)

@@ -43,11 +43,15 @@ func TestBuildReport(t *testing.T) {
 	// validate timestamp
 	assert.Equal(t, oo[0].Timestamp, binary.BigEndian.Uint32(report[0:4]), "validate timestamp")
 
+	// validate observer count
+	assert.Equal(t, len(observers), report[4], "validate observer count")
+
 	// validate observers
-	assert.Equal(t, observers, []byte(report[4:4+32]), "validate observers")
+	index := 4 + 1
+	assert.Equal(t, observers, []byte(report[index:index+32]), "validate observers")
 
 	// validate median observation
-	index := 4 + 32
+	index = 4 + 1 + 32
 	assert.Equal(t, oo[0].Value.FillBytes(make([]byte, 16)), []byte(report[index:index+16]), "validate median observation")
 
 	// validate juelsToEth
@@ -59,6 +63,7 @@ func TestMedianFromReport(t *testing.T) {
 
 	report := types.Report{
 		97, 91, 43, 83, // observations_timestamp
+		2,                                                                                              // observer_count
 		0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // observers
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 73, 150, 2, 210, // observation 2
 		13, 224, 182, 179, 167, 100, 0, 0, // juels per luna (1 with 18 decimal places)
@@ -86,6 +91,7 @@ func TestHashReport(t *testing.T) {
 
 	var mockReport = types.Report{
 		97, 91, 43, 83, // observations_timestamp
+		2,                                                                                              // observer_count
 		0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // observers
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 210, // median
 		13, 224, 182, 179, 167, 100, 0, 0, // juels per sol (1 with 18 decimal places)
