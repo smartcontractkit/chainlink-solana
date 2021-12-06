@@ -13,7 +13,7 @@ mod state;
 use crate::context::*;
 use crate::state::{Config, LeftoverPayment, Oracle, SigningKey, State, Transmission, MAX_ORACLES};
 
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use std::mem::size_of;
 
 use access_controller::AccessController;
@@ -750,24 +750,24 @@ struct Report {
     #[allow(dead_code)] // make clippy happy - allows unused observers
     pub observers: [u8; MAX_ORACLES], // observer index
     pub observations_timestamp: u32,
-    pub juels_per_lamport: u128,
+    pub juels_per_lamport: u64,
 }
 
 impl Report {
     // (uint32, bytes32, int128, uint128)
-    pub const LEN: usize = size_of::<u32>() + 32 + size_of::<i128>() + size_of::<u128>();
+    pub const LEN: usize = size_of::<u32>() + 32 + size_of::<i128>() + size_of::<u64>();
 
     pub fn unpack(raw_report: &[u8]) -> Result<Self> {
         require!(raw_report.len() == Self::LEN, InvalidInput);
 
         let data = array_ref![raw_report, 0, Report::LEN];
         let (observations_timestamp, observers, median, juels_per_lamport) =
-            array_refs![data, 4, 32, 16, 16];
+            array_refs![data, 4, 32, 16, 8];
 
         let observations_timestamp = u32::from_be_bytes(*observations_timestamp);
         let observers = observers[..MAX_ORACLES].try_into().unwrap();
         let median = i128::from_be_bytes(*median);
-        let juels_per_lamport = u128::from_be_bytes(*juels_per_lamport);
+        let juels_per_lamport = u64::from_be_bytes(*juels_per_lamport);
 
         Ok(Self {
             median,
@@ -778,15 +778,14 @@ impl Report {
     }
 }
 
-fn calculate_reimbursement(juels_per_lamport: u128, signature_count: usize) -> Result<u64> {
+fn calculate_reimbursement(juels_per_lamport: u64, signature_count: usize) -> Result<u64> {
     const SIGNERS: u64 = 1; // TODO: probably needs to include signing the validator call
     let fees = Fees::get()?;
     let lamports_per_signature = fees.fee_calculator.lamports_per_signature;
     // num of signatures + const based on how many signers we have
     let signature_count = signature_count as u64 + SIGNERS;
     let lamports = lamports_per_signature * signature_count;
-    // TODO: use u64 instead of u128 for juels_per_lamport
-    let juels = lamports * u64::try_from(juels_per_lamport).map_err(|_| ErrorCode::Overflow)?;
+    let juels = lamports * juels_per_lamport;
     Ok(juels)
 }
 
