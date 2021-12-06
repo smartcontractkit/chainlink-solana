@@ -18,10 +18,10 @@ const (
 	CursorOffset uint64 = 8 + 4
 	CursorLen    uint64 = 4
 
-	// Report data (60 bytes)
+	// Report data (61 bytes)
 	MedianLen uint64 = 16
 	JuelsLen  uint64 = 8
-	ReportLen uint64 = 4 + 32 + MedianLen + JuelsLen // TODO: explain all
+	ReportLen uint64 = 4 + 1 + 32 + MedianLen + JuelsLen // TODO: explain all
 )
 
 // State is the struct representing the contract state
