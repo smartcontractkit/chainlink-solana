@@ -5,7 +5,6 @@ import { PublicKey } from '@solana/web3.js'
 import BN from 'bn.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 
-// TODO: Depends on RDD info
 export default class SetConfig extends SolanaCommand {
   static id = 'ocr2:set_config'
   static category = CONTRACT_LIST.ACCESS_CONTROLLER
