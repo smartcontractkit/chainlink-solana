@@ -1,14 +1,39 @@
 encryptionsalt: v1:VLVXZInIcZM=:v1:VFmbM7uWyfbgZrth:RIHQzgnpFyY6SvvNiqkiaByQdFXaDw==
 config:
   # chainlink node configs
-  solana-env:CL-NODE_VERSION: 1.0.0 # development version can be found at https://gallery.ecr.aws/chainlink/chainlink
+  solana-env:CL-COUNT: 4 # not counting bootstrap, minimum 4
+  solana-env:CL-PORT-START: 6688 # start port to expose lite client port
+  solana-env:CL-P2P_PORT-START: 5050 # start port to expose lite client P2P ports
+  # solana-env:CL-NODE_VERSION: develop.5deb066ba202f6bc765785781e456e92508890fb # development version can be found at https://gallery.ecr.aws/chainlink/chainlink
+  solana-env:CL-BUILD_LOCALLY: true # (overrides NODE_VERSION) BUILD_CONTEXT and BUILD_DOCKERFILE must be set if this is enabled
+  solana-env:CL-BUILD_CONTEXT: ../../chainlink
+  solana-env:CL-BUILD_DOCKERFILE: ../../chainlink/core/chainlink.Dockerfile
   solana-env:CL-ENV_VARS: # specify which chainlink env variables to include, and define below
     - CHAINLINK_DEV
     - ETH_DISABLED
-    - FEATURE_EXTERNAL_INITIATORS
+    - USE_LEGACY_ETH_ENV_VARS
+    - FEATURE_OFFCHAIN_REPORTING2
+    - P2P_NETWORKING_STACK
+    - P2P_LISTEN_PORT
   solana-env:CL-CHAINLINK_DEV: true
   solana-env:CL-ETH_DISABLED: true
-  solana-env:CL-FEATURE_EXTERNAL_INITIATORS: true
+  solana-env:CL-USE_LEGACY_ETH_ENV_VARS: false
+  solana-env:CL-FEATURE_OFFCHAIN_REPORTING2: true
+  solana-env:CL-P2P_NETWORKING_STACK: "V2"
+  solana-env:CL-P2P_LISTEN_PORT: 0
+  # chainlink node configs (unique to each node - usually not needed, example shown)
+  # solana-env:CL_X-ENV_VARS:
+  #   - MNEMONIC
+  # # terra1fmcjjt6yc9wqup2r06urnrd928jhrde6gcld6n
+  # solana-env:CL_BOOTSTRAP-MNEMONIC: prefer forget visit mistake mixture feel eyebrow autumn shop pair address airport diesel street pass vague innocent poem method awful require hurry unhappy shoulder
+  # # terra1333veey879eeqcff8j3gfcgwt8cfrg9mq20v6f
+  # solana-env:CL_0-MNEMONIC: index light average senior silent limit usual local involve delay update rack cause inmate wall render magnet common feature laundry exact casual resource hundred
+  # # terra1lkccuqgj6sjwjn8gsa9xlklqv4pmrqg9dx2fxc
+  # solana-env:CL_1-MNEMONIC: cream sport mango believe inhale text fish rely elegant below earth april wall rug ritual blossom cherry detail length blind digital proof identify ride
+  # # terra17tv2hvwpg0ukqgd2y5ct2w54fyan7z0zxrm2f9
+  # solana-env:CL_2-MNEMONIC: noble width taxi input there patrol clown public spell aunt wish punch moment will misery eight excess arena pen turtle minimum grain vague inmate
+  # # terra1e8ryd9ezefuucd4mje33zdms9m2s90m57878v9
+  # solana-env:CL_3-MNEMONIC: spatial forest elevator battle also spoon fun skirt flight initial nasty transfer glory palm drama gossip remove fan joke shove label dune debate quick
   # external adapter configs
   solana-env:EA-PORT: 8080 # OPTIONAL: defaults to 8080
   solana-env:EA-NAMES: # specify which EAs to pull and use
@@ -22,32 +47,3 @@ config:
   # postgres configs
   solana-env:PG-PORT: 6600 # OPTIONAL: defaults to 5432
   solana-env:PG-HEALTH-TIMEOUT: 120 # seconds, max wait for postgres to start, default 30
-  # relay configs
-  solana-env:R-VERSION: 0.0.1 # docker container tag
-  solana-env:R-CONTEXT: .. # define build context
-  solana-env:R-DOCKERFILE: ./Dockerfile # define path to dockerfile
-  solana-env:R-COUNT: 4 # not counting bootstrap, minimum 4
-  solana-env:R-P2P_LISTEN_PORT-START: 5050 # start port to expose lite client P2P ports
-  solana-env:R-PORT-START: 5000 # start port to expose lite client port
-  solana-env:R-ENV_VARS:
-    - ETH_URL
-    - MOCK_SERVICE
-    - KEYSTORE_PASSWORD
-  solana-env:R-ETH_URL: ws://localhost:8900
-  solana-env:R-MOCK_SERVICE: false
-  solana-env:R-KEYSTORE_PASSWORD: hello
-  # solana-env:R-ETH_HTTP_URL: http://localhost:8899
-  # solana-env:R-CHAIN_ID: localterra
-  # solana-env:R_X-ENV_VARS:
-  #   - MNEMONIC
-  # # terra1fmcjjt6yc9wqup2r06urnrd928jhrde6gcld6n
-  # solana-env:R_BOOTSTRAP-MNEMONIC: prefer forget visit mistake mixture feel eyebrow autumn shop pair address airport diesel street pass vague innocent poem method awful require hurry unhappy shoulder
-  # # terra1333veey879eeqcff8j3gfcgwt8cfrg9mq20v6f
-  # solana-env:R_0-MNEMONIC: index light average senior silent limit usual local involve delay update rack cause inmate wall render magnet common feature laundry exact casual resource hundred
-  # # terra1lkccuqgj6sjwjn8gsa9xlklqv4pmrqg9dx2fxc
-  # solana-env:R_1-MNEMONIC: cream sport mango believe inhale text fish rely elegant below earth april wall rug ritual blossom cherry detail length blind digital proof identify ride
-  # # terra17tv2hvwpg0ukqgd2y5ct2w54fyan7z0zxrm2f9
-  # solana-env:R_2-MNEMONIC: noble width taxi input there patrol clown public spell aunt wish punch moment will misery eight excess arena pen turtle minimum grain vague inmate
-  # # terra1e8ryd9ezefuucd4mje33zdms9m2s90m57878v9
-  # solana-env:R_3-MNEMONIC: spatial forest elevator battle also spoon fun skirt flight initial nasty transfer glory palm drama gossip remove fan joke shove label dune debate quick
-  # solana-env:TERRA-DEPLOYER: localterra-deployer

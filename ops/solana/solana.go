@@ -48,6 +48,11 @@ func New(ctx *pulumi.Context) (Deployer, error) {
 	cwd, _ := os.Getwd()
 	os.Chdir(filepath.Join(cwd, "../gauntlet"))
 
+	fmt.Println("Installing dependencies")
+	if _, err = exec.Command(yarn).Output(); err != nil {
+		return Deployer{}, errors.New("error install dependencies")
+	}
+
 	// Generate Gauntlet Binary
 	fmt.Println("Generating Gauntlet binary...")
 	_, err = exec.Command(yarn, "bundle").Output()
@@ -64,8 +69,8 @@ func New(ctx *pulumi.Context) (Deployer, error) {
 	}
 
 	// Check gauntlet works
-	cwd, _ = os.Getwd()
-	gauntletBin := filepath.Join(cwd, "./bin/gauntlet-") + version
+	os.Chdir(cwd) // move back into ops folder
+	gauntletBin := filepath.Join(cwd, "../bin/chainlink-solana-") + version
 	gauntlet, err := relayUtils.NewGauntlet(gauntletBin)
 
 	if err != nil {
