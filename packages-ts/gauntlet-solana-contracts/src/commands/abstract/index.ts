@@ -74,17 +74,7 @@ const parseInstruction = async (instruction: string, version: string): Promise<A
     }
   }
 
-  // TODO: Calls to contract functions not supported yet
   return
-
-  // const functionName = isValidFunction(contract.abi, command[1]) && command[1]
-  // if (!functionName) throw new Error(`Abstract: Function ${command[1]} for contract ${contract.id} not found`)
-
-  // return {
-  //   contract,
-  //   function: functionName,
-  //   action: isQueryFunction(contract.abi, functionName) ? SOLANA_OPERATIONS.QUERY : SOLANA_OPERATIONS.EXECUTE,
-  // }
 }
 
 const parseParams = (commandOpts: AbstractOpts, params: any): AbstractParams | undefined => {
@@ -104,9 +94,8 @@ export default class GeneratorCommand extends SolanaCommand {
   opts: AbstractOpts
   params: AbstractParams
 
-  // abstractDeploy: AbstractExecute
   abstractQuery: AbstractExecute
-  // abstractExecute: AbstractExecute
+  abstractExecute: AbstractExecute
   abstractHelp: AbstractExecute
 
   constructor(flags, args, opts, params) {
@@ -150,21 +139,6 @@ export default class GeneratorCommand extends SolanaCommand {
     } as Result<TransactionResponse>
   }
 
-  abstractExecute: AbstractExecute = async (params, address) => {
-    // Dt77xc3sAd5kwJiyWdJpbr4vxQNUwgsK9RmRZnqeGjwP
-    console.log('SENDING TX')
-    const tx = await this.executeProgram(address!, this.opts.contract.idl, this.opts.function, params.args)
-    console.log('TX EXECUTED:', tx)
-    return {
-      responses: [
-        {
-          tx: {},
-          contract: {},
-        },
-      ],
-    } as Result<TransactionResponse>
-  }
-
   execute = async () => {
     const operations = {
       [SOLANA_OPERATIONS.DEPLOY]: this.abstractDeploy,
@@ -177,23 +151,5 @@ export default class GeneratorCommand extends SolanaCommand {
 
     const address = this.args[0]
     return operations[this.opts.action](this.params, address)
-  }
-}
-
-// IF SolanaCommand extends Generator (which extends WriteCommand), implementing the Generator interface, should give support for any chain interaction
-interface Generator {
-  execution: {
-    deploy: AbstractExecute
-    query: AbstractExecute
-    write: AbstractExecute
-    help: AbstractExecute
-  }
-  validation: {
-    isValidFunction: () => {}
-    isQueryFunction: () => {}
-    parseParams: () => {}
-  }
-  contracts: {
-    getContract: () => {}
   }
 }

@@ -4,7 +4,10 @@ import { Provider, Wallet } from '@project-serum/anchor'
 import { Connection, Keypair } from '@solana/web3.js'
 import SolanaCommand from './internal/solana'
 
-const isValidURL = (a) => true
+const isValidURL = (url: string) => {
+  var pattern = new RegExp('^(https?)://')
+  return pattern.test(url)
+}
 export const withProvider: Middleware = (c: SolanaCommand, next: Next) => {
   const nodeURL = process.env.NODE_URL
   assertions.assert(

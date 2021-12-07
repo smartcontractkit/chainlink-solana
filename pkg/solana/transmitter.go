@@ -7,15 +7,10 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	confirm "github.com/gagliardetto/solana-go/rpc/sendAndConfirmTransaction"
-	"github.com/pkg/errors"
-
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
 var _ types.ContractTransmitter = (*ContractTracker)(nil)
-
-// TODO: Blaz where do we get this info from, contract?
-var ValidatorProgramID solana.PublicKey = solana.PublicKeyFromBytes([]byte("test"))
 
 // Transmit sends the report to the on-chain OCR2Aggregator smart contract's Transmit method
 func (c ContractTracker) Transmit(
@@ -47,7 +42,7 @@ func (c ContractTracker) Transmit(
 		{PublicKey: c.StateID, IsWritable: true, IsSigner: false},
 		{PublicKey: c.Transmitter.PublicKey(), IsWritable: true, IsSigner: true},
 		{PublicKey: c.TransmissionsID, IsWritable: true, IsSigner: false},
-		{PublicKey: ValidatorProgramID, IsWritable: false, IsSigner: false},
+		{PublicKey: c.ValidatorProgramID, IsWritable: false, IsSigner: false},
 		{PublicKey: c.state.Config.Validator, IsWritable: true, IsSigner: false},
 		{PublicKey: validatorAuthority, IsWritable: false, IsSigner: false},
 		{PublicKey: validator.RaisingAccessController, IsWritable: false, IsSigner: false},
@@ -78,15 +73,17 @@ func (c ContractTracker) Transmit(
 		return err
 	}
 
-	pkGetter := func(key solana.PublicKey) *solana.PrivateKey {
-		if c.Transmitter.PublicKey().Equals(key) {
-			return &c.Transmitter
-		}
-		return nil
+	msgToSign, err := tx.MarshalBinary()
+	if err != nil {
+		return err
 	}
-	if _, err = tx.Sign(pkGetter); err != nil {
-		return errors.Wrap(err, "error on transaction sign")
+	finalSigBytes, err := c.Transmitter.Sign(msgToSign)
+	if err != nil {
+		return err
 	}
+	var finalSig [64]byte
+	copy(finalSig[:], finalSigBytes)
+	tx.Signatures = append(tx.Signatures, finalSig)
 
 	// Send transaction, and wait for confirmation:
 	_, err = confirm.SendAndConfirmTransaction(
