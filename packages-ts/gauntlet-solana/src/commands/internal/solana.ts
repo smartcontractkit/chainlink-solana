@@ -1,19 +1,9 @@
 import { Result, WriteCommand } from '@chainlink/gauntlet-core'
-import {
-  BpfLoader,
-  BPF_LOADER_PROGRAM_ID,
-  Keypair,
-  LAMPORTS_PER_SOL,
-  PublicKey,
-  sendAndConfirmTransaction,
-  Transaction,
-  TransactionInstruction,
-} from '@solana/web3.js'
+import { BpfLoader, BPF_LOADER_PROGRAM_ID, Keypair, LAMPORTS_PER_SOL } from '@solana/web3.js'
 import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { TransactionResponse } from '../types'
-import { Coder, Idl, Program, Provider, Wallet } from '@project-serum/anchor'
+import { Idl, Program, Provider, Wallet } from '@project-serum/anchor'
 
-const BPF_LOADER_PROGRAM_ID_UPGRADEABLE = new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111')
 export default abstract class SolanaCommand extends WriteCommand<TransactionResponse> {
   wallet: Wallet
   provider: Provider
@@ -49,7 +39,6 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       bytecode,
       BPF_LOADER_PROGRAM_ID,
     )
-    // TODO: How to get deployment hash transaction
     return {
       hash: '',
       address: programId.publicKey.toString(),
@@ -57,33 +46,5 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
         success: success,
       }),
     }
-  }
-
-  // UNUSED
-  executeProgram = async (
-    contractAddress: string,
-    idl: Idl,
-    functionName: string,
-    params: any,
-  ): Promise<TransactionResponse> => {
-    const coder = new Coder(idl)
-    const encode = (ixName, ix) => coder.instruction.encodeState(ixName, ix)
-    /** 
-     * An account's public key 
-      pubkey: PublicKey;
-      /** True if an instruction requires a transaction signature matching `pubkey`
-      isSigner: boolean;
-      /** True if the `pubkey` can be loaded as a read-write account.
-      isWritable: boolean;
-      */
-    const instruction = new TransactionInstruction({
-      keys: [{ pubkey: this.wallet.publicKey, isSigner: false, isWritable: true }],
-      programId: new PublicKey(contractAddress),
-      data: encode(functionName, params),
-    })
-    const txHash = await sendAndConfirmTransaction(this.provider.connection, new Transaction().add(instruction), [
-      this.wallet.payer,
-    ])
-    return this.wrapResponse(txHash, contractAddress)
   }
 }

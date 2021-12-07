@@ -9,52 +9,25 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"gopkg.in/guregu/null.v4"
 
-	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/service"
-	"github.com/smartcontractkit/chainlink/core/services/keystore"
-	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/core/services/relay"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
-var _ service.Service = (*relayer)(nil)
-var _ relay.Relayer = (*relayer)(nil)
-
-type relayer struct {
-	keystore    keystore.Master
-	lggr        logger.Logger
-	connections Connections
+type Logger interface {
+	Tracef(format string, values ...interface{})
+	Debugf(format string, values ...interface{})
+	Infof(format string, values ...interface{})
+	Warnf(format string, values ...interface{})
+	Errorf(format string, values ...interface{})
+	Criticalf(format string, values ...interface{})
+	Panicf(format string, values ...interface{})
+	Fatalf(format string, values ...interface{})
 }
 
-func NewRelayer(config relay.Config) *relayer {
-	return &relayer{
-		keystore:    config.Keystore,
-		lggr:        config.Lggr,
-		connections: Connections{},
-	}
-}
-
-func (r relayer) Start() error {
-	// No subservices started on relay start, but when the first job is started
-	return nil
-}
-
-// Close will close all open subservices
-func (r *relayer) Close() error {
-	// close all open network client connections
-	return r.connections.Close()
-}
-
-func (r relayer) Ready() error {
-	// always ready
-	return nil
-}
-
-// Healthy only if all subservices are healthy
-func (r relayer) Healthy() error {
-	// TODO: are all open WS connections healthy?
-	return nil
+type TransmissionSigner interface {
+	Sign(msg []byte) ([]byte, error)
+	PublicKey() solana.PublicKey
 }
 
 type OCR2Spec struct {
@@ -65,29 +38,59 @@ type OCR2Spec struct {
 	NodeEndpointRPC string
 	NodeEndpointWS  string
 
-	// on-chain program + 2x state accounts (state + transmissions)
-	ProgramID       solana.PublicKey
-	StateID         solana.PublicKey
-	TransmissionsID solana.PublicKey
+	// on-chain program + 2x state accounts (state + transmissions) + validator program
+	ProgramID          solana.PublicKey
+	StateID            solana.PublicKey
+	ValidatorProgramID solana.PublicKey
+	TransmissionsID    solana.PublicKey
 
-	// private key for the transmission signing
-	Transmitter solana.PrivateKey
+	TransmissionSigner TransmissionSigner
 
 	// OCR key bundle (off/on-chain keys) id
 	KeyBundleID null.String
 }
 
+type Relayer struct {
+	lggr        Logger
+	connections Connections
+}
+
+// Note: constructed in core
+func NewRelayer(lggr Logger) *Relayer {
+	return &Relayer{
+		lggr:        lggr,
+		connections: Connections{},
+	}
+}
+
+func (r *Relayer) Start() error {
+	// No subservices started on relay start, but when the first job is started
+	return nil
+}
+
+// Close will close all open subservices
+func (r *Relayer) Close() error {
+	// close all open network client connections
+	return r.connections.Close()
+}
+
+func (r *Relayer) Ready() error {
+	// always ready
+	return nil
+}
+
+// Healthy only if all subservices are healthy
+func (r *Relayer) Healthy() error {
+	// TODO: are all open WS connections healthy?
+	return nil
+}
+
 // TODO [relay]: import from smartcontractkit/solana-integration impl
-func (r relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay.OCR2Provider, error) {
+func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay.OCR2Provider, error) {
+	var provider ocr2Provider
 	spec, ok := s.(OCR2Spec)
 	if !ok {
-		return nil, errors.New("unsuccessful cast to 'solana.OCR2Spec'")
-	}
-
-	// TODO [relay]: solana OCR2 keys ('ocr2key.KeyBundle' is Ethereum specific)
-	kb, err := r.keystore.OCR2().Get(spec.KeyBundleID.ValueOrZero())
-	if err != nil {
-		return nil, err
+		return provider, errors.New("unsuccessful cast to 'solana.OCR2Spec'")
 	}
 
 	offchainConfigDigester := OffchainConfigDigester{
@@ -99,20 +102,14 @@ func (r relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay.
 	// establish network connection RPC + WS (reuses existing WS client if available)
 	client, err := r.connections.NewConnectedClient(ctx, spec.NodeEndpointRPC, spec.NodeEndpointWS)
 	if err != nil {
-		return &ocr2Provider{}, err
+		return provider, err
 	}
 
-	// TODO: @Blaz/@Ryan the solana-go requires a private key (?)
-	transmitter, err := solana.NewRandomPrivateKey()
-	if err != nil {
-		return &ocr2Provider{}, err
-	}
-
-	contractTracker := NewTracker(spec, client, transmitter, r.lggr)
+	contractTracker := NewTracker(spec, client, spec.TransmissionSigner, r.lggr)
 
 	if spec.IsBootstrap {
 		// Return early if bootstrap node (doesn't require the full OCR2 provider)
-		return &ocr2Provider{
+		return ocr2Provider{
 			offchainConfigDigester: offchainConfigDigester,
 			tracker:                &contractTracker,
 		}, nil
@@ -120,20 +117,16 @@ func (r relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay.
 
 	reportCodec := ReportCodec{}
 
-	return &ocr2Provider{
+	return ocr2Provider{
 		offchainConfigDigester: offchainConfigDigester,
 		reportCodec:            reportCodec,
-		keyBundle:              kb,
 		tracker:                &contractTracker,
 	}, nil
 }
 
-var _ service.Service = (*ocr2Provider)(nil)
-
 type ocr2Provider struct {
 	offchainConfigDigester OffchainConfigDigester
 	reportCodec            ReportCodec
-	keyBundle              ocr2key.KeyBundle
 	tracker                *ContractTracker
 }
 
@@ -156,14 +149,6 @@ func (p ocr2Provider) Ready() error {
 func (p ocr2Provider) Healthy() error {
 	// TODO: only if all subservices are healthy
 	return nil
-}
-
-func (p ocr2Provider) OffchainKeyring() types.OffchainKeyring {
-	return &p.keyBundle.OffchainKeyring
-}
-
-func (p ocr2Provider) OnchainKeyring() types.OnchainKeyring {
-	return &p.keyBundle.OnchainKeyring
 }
 
 func (p ocr2Provider) ContractTransmitter() types.ContractTransmitter {

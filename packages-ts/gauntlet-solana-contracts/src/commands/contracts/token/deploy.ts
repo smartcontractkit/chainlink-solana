@@ -15,7 +15,6 @@ export default class DeployToken extends SolanaCommand {
   }
 
   execute = async () => {
-    // Mint authority is the current wallet. Is it possible to transfer it later? Should minting be locked?
     const mintAuthority = this.wallet.payer
 
     logger.loading('Creating token...')
@@ -31,7 +30,6 @@ export default class DeployToken extends SolanaCommand {
     )
 
     const tokenVault = await token.createAssociatedTokenAccount(this.wallet.publicKey)
-    // TODO: What should be the initial minting amount?
     const mintAmount = new BN(['1'].concat(new Array(decimals).fill('0')).join(''))
     logger.log('Minting', mintAmount.toString())
 
