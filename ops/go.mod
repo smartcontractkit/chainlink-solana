@@ -1,4 +1,4 @@
-module github.com/smartcontractkit/solana-integration/ops
+module github.com/smartcontractkit/chainlink-solana/ops
 
 go 1.17
 

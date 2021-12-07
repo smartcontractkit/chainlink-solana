@@ -5,7 +5,7 @@ import (
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	opsCore "github.com/smartcontractkit/chainlink-relay/ops"
-	"github.com/smartcontractkit/solana-integration/ops/solana"
+	"github.com/smartcontractkit/chainlink-solana/ops/solana"
 )
 
 func main() {
