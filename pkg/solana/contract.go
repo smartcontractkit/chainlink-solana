@@ -11,7 +11,6 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
 var (
@@ -24,12 +23,13 @@ var (
 
 type ContractTracker struct {
 	// on-chain program + 2x state accounts (state + transmissions)
-	ProgramID       solana.PublicKey
-	StateID         solana.PublicKey
-	TransmissionsID solana.PublicKey
+	ProgramID          solana.PublicKey
+	StateID            solana.PublicKey
+	TransmissionsID    solana.PublicKey
+	ValidatorProgramID solana.PublicKey
 
 	// private key for the transmission signing
-	Transmitter solana.PrivateKey
+	Transmitter Transmitter
 
 	// tracked contract state
 	state  State
@@ -37,22 +37,22 @@ type ContractTracker struct {
 
 	// dependencies
 	client *Client
-	lggr   logger.Logger
+	lggr   Logger
 
 	// provides a duplicate function call suppression mechanism
 	requestGroup *singleflight.Group
 }
 
-// TODO: re/name logger
-func NewTracker(spec OCR2Spec, client *Client, transmitter solana.PrivateKey, lggr logger.Logger) ContractTracker {
+func NewTracker(spec OCR2Spec, client *Client, transmitter Transmitter, lggr Logger) ContractTracker {
 	return ContractTracker{
-		ProgramID:       spec.ProgramID,
-		StateID:         spec.StateID,
-		TransmissionsID: spec.TransmissionsID,
-		Transmitter:     transmitter,
-		client:          client,
-		lggr:            lggr,
-		requestGroup:    &singleflight.Group{},
+		ProgramID:          spec.ProgramID,
+		StateID:            spec.StateID,
+		ValidatorProgramID: spec.ValidatorProgramID,
+		TransmissionsID:    spec.TransmissionsID,
+		Transmitter:        transmitter,
+		client:             client,
+		lggr:               lggr,
+		requestGroup:       &singleflight.Group{},
 	}
 }
 

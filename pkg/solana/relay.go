@@ -9,28 +9,29 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"gopkg.in/guregu/null.v4"
 
-	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/service"
-	"github.com/smartcontractkit/chainlink/core/services/keystore"
-	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/ocr2key"
-	"github.com/smartcontractkit/chainlink/core/services/relay"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
-var _ service.Service = (*relayer)(nil)
-var _ relay.Relayer = (*relayer)(nil)
+type Logger interface {
+	Tracef(format string, values ...interface{})
+	Debugf(format string, values ...interface{})
+	Infof(format string, values ...interface{})
+	Warnf(format string, values ...interface{})
+	Errorf(format string, values ...interface{})
+	Criticalf(format string, values ...interface{})
+	Panicf(format string, values ...interface{})
+	Fatalf(format string, values ...interface{})
+}
 
 type relayer struct {
-	keystore    keystore.Master
-	lggr        logger.Logger
+	lggr        Logger
 	connections Connections
 }
 
-func NewRelayer(config relay.Config) *relayer {
+func NewRelayer(lggr Logger) *relayer {
 	return &relayer{
-		keystore:    config.Keystore,
-		lggr:        config.Lggr,
+		lggr:        lggr,
 		connections: Connections{},
 	}
 }
@@ -57,6 +58,11 @@ func (r relayer) Healthy() error {
 	return nil
 }
 
+type Transmitter interface {
+	Sign(msg []byte) ([]byte, error)
+	PublicKey() solana.PublicKey
+}
+
 type OCR2Spec struct {
 	ID          int32
 	IsBootstrap bool
@@ -65,29 +71,23 @@ type OCR2Spec struct {
 	NodeEndpointRPC string
 	NodeEndpointWS  string
 
-	// on-chain program + 2x state accounts (state + transmissions)
-	ProgramID       solana.PublicKey
-	StateID         solana.PublicKey
-	TransmissionsID solana.PublicKey
+	// on-chain program + 2x state accounts (state + transmissions) + validator program
+	ProgramID          solana.PublicKey
+	StateID            solana.PublicKey
+	ValidatorProgramID solana.PublicKey
+	TransmissionsID    solana.PublicKey
 
-	// private key for the transmission signing
-	Transmitter solana.PrivateKey
+	Transmitter Transmitter
 
 	// OCR key bundle (off/on-chain keys) id
 	KeyBundleID null.String
 }
 
 // TODO [relay]: import from smartcontractkit/solana-integration impl
-func (r relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay.OCR2Provider, error) {
+func (r relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (*ocr2Provider, error) {
 	spec, ok := s.(OCR2Spec)
 	if !ok {
 		return nil, errors.New("unsuccessful cast to 'solana.OCR2Spec'")
-	}
-
-	// TODO [relay]: solana OCR2 keys ('ocr2key.KeyBundle' is Ethereum specific)
-	kb, err := r.keystore.OCR2().Get(spec.KeyBundleID.ValueOrZero())
-	if err != nil {
-		return nil, err
 	}
 
 	offchainConfigDigester := OffchainConfigDigester{
@@ -102,13 +102,7 @@ func (r relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay.
 		return &ocr2Provider{}, err
 	}
 
-	// TODO: @Blaz/@Ryan the solana-go requires a private key (?)
-	transmitter, err := solana.NewRandomPrivateKey()
-	if err != nil {
-		return &ocr2Provider{}, err
-	}
-
-	contractTracker := NewTracker(spec, client, transmitter, r.lggr)
+	contractTracker := NewTracker(spec, client, spec.Transmitter, r.lggr)
 
 	if spec.IsBootstrap {
 		// Return early if bootstrap node (doesn't require the full OCR2 provider)
@@ -123,17 +117,13 @@ func (r relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay.
 	return &ocr2Provider{
 		offchainConfigDigester: offchainConfigDigester,
 		reportCodec:            reportCodec,
-		keyBundle:              kb,
 		tracker:                &contractTracker,
 	}, nil
 }
 
-var _ service.Service = (*ocr2Provider)(nil)
-
 type ocr2Provider struct {
 	offchainConfigDigester OffchainConfigDigester
 	reportCodec            ReportCodec
-	keyBundle              ocr2key.KeyBundle
 	tracker                *ContractTracker
 }
 
@@ -156,14 +146,6 @@ func (p ocr2Provider) Ready() error {
 func (p ocr2Provider) Healthy() error {
 	// TODO: only if all subservices are healthy
 	return nil
-}
-
-func (p ocr2Provider) OffchainKeyring() types.OffchainKeyring {
-	return &p.keyBundle.OffchainKeyring
-}
-
-func (p ocr2Provider) OnchainKeyring() types.OnchainKeyring {
-	return &p.keyBundle.OnchainKeyring
 }
 
 func (p ocr2Provider) ContractTransmitter() types.ContractTransmitter {
