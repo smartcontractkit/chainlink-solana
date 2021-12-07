@@ -8,6 +8,8 @@ config:
   solana-env:CL-BUILD_LOCALLY: true # (overrides NODE_VERSION) BUILD_CONTEXT and BUILD_DOCKERFILE must be set if this is enabled
   solana-env:CL-BUILD_CONTEXT: ../../chainlink
   solana-env:CL-BUILD_DOCKERFILE: ../../chainlink/core/chainlink.Dockerfile
+  solana-env:CL-RELAY_NAME: solana
+  solana-env:CL-RELAY_CONFIG: {}
   solana-env:CL-ENV_VARS: # specify which chainlink env variables to include, and define below
     - CHAINLINK_DEV
     - ETH_DISABLED
@@ -25,6 +27,7 @@ config:
   # solana-env:CL_X-ENV_VARS:
   #   - MNEMONIC
   # # terra1fmcjjt6yc9wqup2r06urnrd928jhrde6gcld6n
+  # note: these mnemonics are exposed at https://github.com/terra-money/LocalTerra
   # solana-env:CL_BOOTSTRAP-MNEMONIC: prefer forget visit mistake mixture feel eyebrow autumn shop pair address airport diesel street pass vague innocent poem method awful require hurry unhappy shoulder
   # # terra1333veey879eeqcff8j3gfcgwt8cfrg9mq20v6f
   # solana-env:CL_0-MNEMONIC: index light average senior silent limit usual local involve delay update rack cause inmate wall render magnet common feature laundry exact casual resource hundred
