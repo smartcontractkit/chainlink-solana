@@ -25,7 +25,7 @@ type Logger interface {
 	Fatalf(format string, values ...interface{})
 }
 
-type Transmitter interface {
+type TransmissionSigner interface {
 	Sign(msg []byte) ([]byte, error)
 	PublicKey() solana.PublicKey
 }
@@ -44,12 +44,11 @@ type OCR2Spec struct {
 	ValidatorProgramID solana.PublicKey
 	TransmissionsID    solana.PublicKey
 
-	Transmitter Transmitter
+	TransmissionSigner TransmissionSigner
 
 	// OCR key bundle (off/on-chain keys) id
 	KeyBundleID null.String
 }
-
 
 type Relayer struct {
 	lggr        Logger
@@ -106,7 +105,7 @@ func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay
 		return provider, err
 	}
 
-	contractTracker := NewTracker(spec, client, spec.Transmitter, r.lggr)
+	contractTracker := NewTracker(spec, client, spec.TransmissionSigner, r.lggr)
 
 	if spec.IsBootstrap {
 		// Return early if bootstrap node (doesn't require the full OCR2 provider)
@@ -124,7 +123,6 @@ func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay
 		tracker:                &contractTracker,
 	}, nil
 }
-
 
 type ocr2Provider struct {
 	offchainConfigDigester OffchainConfigDigester

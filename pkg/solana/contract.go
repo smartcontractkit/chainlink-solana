@@ -29,7 +29,7 @@ type ContractTracker struct {
 	ValidatorProgramID solana.PublicKey
 
 	// private key for the transmission signing
-	Transmitter Transmitter
+	Transmitter TransmissionSigner
 
 	// tracked contract state
 	state  State
@@ -43,7 +43,7 @@ type ContractTracker struct {
 	requestGroup *singleflight.Group
 }
 
-func NewTracker(spec OCR2Spec, client *Client, transmitter Transmitter, lggr Logger) ContractTracker {
+func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, lggr Logger) ContractTracker {
 	return ContractTracker{
 		ProgramID:          spec.ProgramID,
 		StateID:            spec.StateID,

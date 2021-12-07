@@ -139,7 +139,7 @@ type RelayConfig struct {
 	NodeEndpointWS  string `json:"nodeEndpointWS"`
 
 	// on-chain program + 2x state accounts (state + transmissions) + validator programID
-	StateID         string `json:"stateID"`
-	TransmissionsID string `json:"transmissionsID"`
+	StateID            string `json:"stateID"`
+	TransmissionsID    string `json:"transmissionsID"`
 	ValidatorProgramID string `json:"validatorProgramID"`
 }
