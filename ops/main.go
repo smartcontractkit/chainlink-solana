@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	opsCore "github.com/smartcontractkit/chainlink-relay/ops"
 	"github.com/smartcontractkit/chainlink-solana/ops/solana"
 )
@@ -16,12 +17,25 @@ func main() {
 		}
 
 		// start creating environment and use deployer interface for deploying contracts
-		if err := opsCore.New(ctx, &solanaClient, ObservationSource, JuelsSource); err != nil {
+		if err := opsCore.New(ctx, &solanaClient, ObservationSource, JuelsSource, RelayConfig); err != nil {
 			return err
 		}
 
 		return nil
 	})
+}
+
+func RelayConfig(ctx *pulumi.Context, addresses map[int]string) (string, error) {
+	httpURL := config.Require(ctx, "CL-RELAY_HTTP")
+	wsURL := config.Require(ctx, "CL-RELAY_WS")
+
+	return fmt.Sprintf("{\"nodeEndpointRPC\": \"%s\",\"nodeEndpointWS\": \"%s\",\"stateID\":\"%s\",\"transmissionsID\":\"%s\",\"validatorProgramID\":\"%s\"}",
+		httpURL,
+		wsURL,
+		addresses[solana.OCRFeed], // TODO: fix/verify
+		addresses[solana.OCRFeed], // TODO: fix/verify
+		addresses[solana.OCRFeed], // TODO: fix/verify
+	), nil
 }
 
 func ObservationSource(priceAdapter string) string {

@@ -9,7 +9,8 @@ config:
   solana-env:CL-BUILD_CONTEXT: ../../chainlink
   solana-env:CL-BUILD_DOCKERFILE: ../../chainlink/core/chainlink.Dockerfile
   solana-env:CL-RELAY_NAME: solana
-  solana-env:CL-RELAY_CONFIG: {}
+  solana-env:CL-RELAY_HTTP: http://127.0.0.1:8899
+  solana-env:CL-RELAY_WS: ws://127.0.0.1:8900
   solana-env:CL-ENV_VARS: # specify which chainlink env variables to include, and define below
     - CHAINLINK_DEV
     - ETH_DISABLED

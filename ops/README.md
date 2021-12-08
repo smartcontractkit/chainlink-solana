@@ -17,6 +17,11 @@ Blockchain <-> Relay <-> CL node <-> price adapters
 - [Pulumi](#pulumi-installation-instruction)
 - [Solana Test Validator](#local-solana-testnet)
 
+## Prep
+```
+solana-keygen new -o ./packages-ts/gauntlet-solana-contracts/artifacts/programId/*.json
+```
+
 ## Usage
 ```bash
 # start up the environment
