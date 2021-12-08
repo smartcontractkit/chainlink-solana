@@ -1,4 +1,4 @@
-name: relay
+name: Relay
 
 on:
   push:
