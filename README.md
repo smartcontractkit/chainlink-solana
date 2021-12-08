@@ -25,6 +25,12 @@ Start a dockerized shell that contains Solana and Anchor:
 tools/shell
 ```
 
+Next, generate a keypair for anchor:
+
+```
+solana-keygen new -o id.json
+```
+
 Run anchor tests (automatically tests against a local node).
 
 ```
