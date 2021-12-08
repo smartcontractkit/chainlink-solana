@@ -9,14 +9,11 @@ jobs:
       env:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1
-        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     steps:
     - uses: actions/checkout@v2
     - run: echo $HOME
     - run: echo $PATH
-    - run: |
-        npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
-        yarn install --frozen-lockfile
     - run: solana-keygen new -o id.json
+    - run: yarn install --frozen-lockfile
     - run: anchor test
