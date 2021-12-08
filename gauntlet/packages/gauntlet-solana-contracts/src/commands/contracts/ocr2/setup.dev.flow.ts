@@ -11,12 +11,13 @@ import SetPayees from './setPayees'
 import SetValidatorConfig from './setValidatorConfig'
 import Trasmit from './transmit.dev'
 import AddAccess from '../accessController/addAccess'
+import SetOffchainConfigFlow from './offchainConfig/setOffchainConfig.flow'
 
 // TODO: Remove. Not necessary. Useful for dev testing
 export default class SetupFlow extends FlowCommand<TransactionResponse> {
   static id = 'ocr2:setup:flow'
   static category = CONTRACT_LIST.OCR_2
-  static examples = ['yarn gauntlet ocr2:setup:flow --network=local']
+  static examples = ['yarn gauntlet ocr2:setup:flow --network=local --version=1 --input=[OFFCHAIN_CONFIG]']
 
   constructor(flags, args) {
     super(flags, args, waitExecute, makeAbstractCommand)
@@ -79,11 +80,10 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         id: this.stepIds.OCR_2,
       },
       {
-        name: 'Set Config',
-        command: SetConfigDeployer,
+        name: 'Set Offchain Config',
+        command: SetOffchainConfigFlow,
         flags: {
           state: ID.contract(this.stepIds.OCR_2),
-          keys: OPERATORS,
         },
       },
       {

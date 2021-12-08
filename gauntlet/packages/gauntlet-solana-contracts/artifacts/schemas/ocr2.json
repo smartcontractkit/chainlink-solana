@@ -1,5 +1,5 @@
 {
-  "version": "0.0.0",
+  "version": "0.1.0",
   "name": "ocr2",
   "instructions": [
     {
@@ -132,6 +132,64 @@
       "args": []
     },
     {
+      "name": "beginOffchainConfig",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "offchainConfigVersion",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "writeOffchainConfig",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "offchainConfig",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "commitOffchainConfig",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "setConfig",
       "accounts": [
         {
@@ -157,18 +215,6 @@
         {
           "name": "f",
           "type": "u8"
-        },
-        {
-          "name": "onchainConfig",
-          "type": "bytes"
-        },
-        {
-          "name": "offchainConfigVersion",
-          "type": "u64"
-        },
-        {
-          "name": "offchainConfig",
-          "type": "bytes"
         }
       ]
     },
@@ -541,12 +587,7 @@
           {
             "name": "oracles",
             "type": {
-              "array": [
-                {
-                  "defined": "Oracle"
-                },
-                19
-              ]
+              "defined": "Oracles"
             }
           },
           {
@@ -650,6 +691,29 @@
       }
     },
     {
+      "name": "Oracles",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "xs",
+            "type": {
+              "array": [
+                {
+                  "defined": "Oracle"
+                },
+                19
+              ]
+            }
+          },
+          {
+            "name": "len",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "Config",
       "type": {
         "kind": "struct",
@@ -708,10 +772,6 @@
             "type": "u8"
           },
           {
-            "name": "n",
-            "type": "u8"
-          },
-          {
             "name": "configCount",
             "type": "u32"
           },
@@ -753,6 +813,40 @@
           {
             "name": "flaggingThreshold",
             "type": "u32"
+          },
+          {
+            "name": "offchainConfigVersion",
+            "type": "u64"
+          },
+          {
+            "name": "configLen",
+            "type": "u64"
+          },
+          {
+            "name": "offchainConfig",
+            "type": {
+              "array": [
+                "u8",
+                4096
+              ]
+            }
+          },
+          {
+            "name": "pendingLen",
+            "type": "u64"
+          },
+          {
+            "name": "pendingOffchainConfigVersion",
+            "type": "u64"
+          },
+          {
+            "name": "pendingOffchainConfig",
+            "type": {
+              "array": [
+                "u8",
+                4096
+              ]
+            }
           }
         ]
       }

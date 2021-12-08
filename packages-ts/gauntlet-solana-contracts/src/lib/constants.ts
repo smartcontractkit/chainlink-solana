@@ -1,0 +1,1 @@
+export const MAX_TRANSACTION_BYTES = 996
