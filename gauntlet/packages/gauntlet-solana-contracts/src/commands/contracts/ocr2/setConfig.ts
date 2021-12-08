@@ -1,8 +1,10 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { io, logger } from '@chainlink/gauntlet-core/dist/utils'
+import { logger } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { Keypair, PublicKey } from '@solana/web3.js'
+import { PublicKey } from '@solana/web3.js'
+import BN from 'bn.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
+import { getRDD } from '../../../lib/rdd'
 
 export default class SetConfig extends SolanaCommand {
   static id = 'ocr2:set_config'
@@ -10,12 +12,22 @@ export default class SetConfig extends SolanaCommand {
 
   static examples = [
     'yarn gauntlet ocr2:set_config --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
-    'yarn gauntlet ocr2:set_config --network=devnet --state=5oMNhuuRmxPGEk8ymvzJRAJFJGs7jaHsaxQ3Q2m6PVTR EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
 
-  makeInput = (): Operator[] => {
-    if (this.flags.input) return this.flags.input as Operator[]
-    return []
+  makeInput = (userInput): Input => {
+    if (userInput) return userInput as Input
+    const rdd = getRDD(this.flags.rdd)
+    const aggregator = rdd.contracts[this.flags.state]
+    const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
+    const oracles = aggregatorOperators.map((operator) => ({
+      transmitter: rdd.operators[operator].nodeAddress[0],
+      signer: rdd.operators[operator].ocrSigningAddress[0],
+    }))
+    const threshold = aggregator.config.maxFaultyNodeCount
+    return {
+      oracles,
+      threshold,
+    }
   }
 
   constructor(flags, args) {
@@ -30,29 +42,16 @@ export default class SetConfig extends SolanaCommand {
     const program = this.loadProgram(ocr2.idl, address)
 
     const state = new PublicKey(this.flags.state)
+    const input = this.makeInput(this.flags.input)
     const owner = this.wallet.payer
 
     console.log(`Setting config on ${state.toString()}...`)
 
-    const oracles = [
-      {
-        signer: Buffer.from('some_address'),
-        transmitter: Keypair.generate().publicKey,
-      },
-      {
-        signer: Buffer.from('some_address_2'),
-        transmitter: Keypair.generate().publicKey,
-      },
-      {
-        signer: Buffer.from('some_address_3'),
-        transmitter: Keypair.generate().publicKey,
-      },
-      {
-        signer: Buffer.from('some_address_4'),
-        transmitter: Keypair.generate().publicKey,
-      },
-    ]
-    const threshhold = 1 // rdd.config.maxFaultyNodeCount
+    const oracles = input.oracles.map(({ signer, transmitter }) => ({
+      signer: new PublicKey(signer),
+      transmitter: new PublicKey(transmitter),
+    }))
+    const threshhold = new BN(input.threshold)
 
     // oracles.length > 3 * threshold
     const tx = await program.rpc.setConfig(oracles, threshhold, {

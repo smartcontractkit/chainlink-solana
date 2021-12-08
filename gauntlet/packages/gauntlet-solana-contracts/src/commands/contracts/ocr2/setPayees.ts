@@ -1,27 +1,43 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
+import { getRDD } from '../../../lib/rdd'
+
+type Input = {
+  operators: {
+    transmitter: string
+    payee: string
+  }[]
+}
 
 export default class SetPayees extends SolanaCommand {
   static id = 'ocr2:set_payees'
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:set_payees --network=local --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --keys=[OPERATORS]',
+    'yarn gauntlet ocr2:set_payees --network=local --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
+
+  makeInput = (userInput: any): Input => {
+    if (userInput) return userInput as Input
+    const rdd = getRDD(this.flags.rdd)
+    const aggregator = rdd.contracts[this.flags.state]
+    const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
+    const operators = aggregatorOperators.map((operator) => ({
+      transmitter: rdd.operators[operator].nodeAddress[0],
+      payee: rdd.operators[operator].payeeAddress,
+    }))
+    return {
+      operators,
+    }
+  }
 
   constructor(flags, args) {
     super(flags, args)
 
     this.requireFlag('state', 'Provide a valid state address')
-    this.requireFlag('keys', 'Provide payees info')
-  }
-
-  getPayableAddress = async (token, payee) => {
-    return (await token.getOrCreateAssociatedAccountInfo(new PublicKey(payee))).address
   }
 
   execute = async () => {
@@ -30,24 +46,11 @@ export default class SetPayees extends SolanaCommand {
     const program = this.loadProgram(ocr2.idl, address)
 
     const owner = this.wallet.payer
-    const operators = this.flags.keys
+    const input = this.makeInput(this.flags.input)
     const state = new PublicKey(this.flags.state)
 
-    const token = new Token(
-      this.provider.connection,
-      new PublicKey(this.flags.link),
-      TOKEN_PROGRAM_ID,
-      this.wallet.payer,
-    )
-
     const info = await program.account.state.fetch(state)
-    const payeeByTransmitter = ((await Promise.all(
-      operators.map(async ({ NodeAddress, payeeAddress }) => ({
-        transmitter: NodeAddress,
-        // TODO: Will we receive an already payable address? If so, we don't need to get the associated account
-        payee: await this.getPayableAddress(token, payeeAddress),
-      })),
-    )) as any[]).reduce(
+    const payeeByTransmitter = input.operators.reduce(
       (agg, operator) => ({
         ...agg,
         [new PublicKey(operator.transmitter).toString()]: operator.payee,

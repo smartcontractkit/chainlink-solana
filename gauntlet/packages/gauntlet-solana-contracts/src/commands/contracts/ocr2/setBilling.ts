@@ -4,21 +4,34 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import BN from 'bn.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
+import { getRDD } from '../../../lib/rdd'
+
+type Input = {
+  observationPayment: number | string
+}
 
 export default class SetBilling extends SolanaCommand {
   static id = 'ocr2:set_billing'
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:set_billing --network=local --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --payment=1',
-    'yarn gauntlet ocr2:set_billing --network=local --state=5oMNhuuRmxPGEk8ymvzJRAJFJGs7jaHsaxQ3Q2m6PVTR --payment=1 EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet ocr2:set_billing --network=local --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
+
+  makeInput = (userInput: any): Input => {
+    if (userInput) return userInput as Input
+    const rdd = getRDD(this.flags.rdd)
+    const billingInfo = rdd.contracts[this.flags.state]?.billing
+    this.require(!!billingInfo?.observationPaymentLinkGwei, 'Billing information not found')
+    return {
+      observationPayment: billingInfo.observationPaymentLinkGwei,
+    }
+  }
 
   constructor(flags, args) {
     super(flags, args)
 
     this.requireFlag('state', 'Provide a valid state address')
-    this.requireFlag('payment', 'Provide a observation payment amount')
   }
 
   execute = async () => {
@@ -28,11 +41,13 @@ export default class SetBilling extends SolanaCommand {
 
     const state = new PublicKey(this.flags.state)
 
+    const input = this.makeInput(this.flags.input)
+
     const info = await program.account.state.fetch(state)
     const billingAC = new PublicKey(info.config.billingAccessController)
 
     logger.loading('Setting billing...')
-    const tx = await program.rpc.setBilling(new BN(this.flags.payment), {
+    const tx = await program.rpc.setBilling(new BN(input.observationPayment), {
       accounts: {
         state: state,
         authority: this.wallet.payer.publicKey,
