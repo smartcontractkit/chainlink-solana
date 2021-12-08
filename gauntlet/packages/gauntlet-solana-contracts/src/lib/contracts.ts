@@ -29,14 +29,14 @@ export const getContract = (name: CONTRACT_LIST, version: string): Contract => (
 
 // TODO: Get it from GH Releases
 const getContractCode = (name: CONTRACT_LIST, version: string) => {
-  return readFileSync(join(process.cwd(), 'packages-ts/gauntlet-solana-contracts/artifacts/bin', `${name}.so`))
+  return readFileSync(join(process.cwd(), 'packages/gauntlet-solana-contracts/artifacts/bin', `${name}.so`))
 }
 
 const getContractSchema = (name: CONTRACT_LIST, version: string) => {
-  return io.readJSON(join(process.cwd(), 'packages-ts/gauntlet-solana-contracts/artifacts/schemas', `${name}`))
+  return io.readJSON(join(process.cwd(), 'packages/gauntlet-solana-contracts/artifacts/schemas', `${name}`))
 }
 
 const getProgramId = (name: CONTRACT_LIST, version: string) => {
-  const rawPK = io.readJSON(join(process.cwd(), 'packages-ts/gauntlet-solana-contracts/artifacts/programId', `${name}`))
+  const rawPK = io.readJSON(join(process.cwd(), 'packages/gauntlet-solana-contracts/artifacts/programId', `${name}`))
   return Keypair.fromSecretKey(Uint8Array.from(rawPK))
 }

@@ -1,13 +1,10 @@
 {
-  "extends": "./tsconfig.base.json",
-  "files": [],
-  "include": [],
-  "references": [
-    {
-      "path": "./packages-ts/gauntlet-solana"
-    },
-    {
-      "path": "./packages-ts/gauntlet-solana-contracts"
-    }
-  ]
+  "compilerOptions": {
+    "types": ["mocha", "chai", "node"],
+    "typeRoots": ["./node_modules/@types"],
+    "lib": ["es2015"],
+    "module": "commonjs",
+    "target": "es6",
+    "esModuleInterop": true
+  }
 }
