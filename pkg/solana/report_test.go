@@ -44,7 +44,7 @@ func TestBuildReport(t *testing.T) {
 	assert.Equal(t, oo[0].Timestamp, binary.BigEndian.Uint32(report[0:4]), "validate timestamp")
 
 	// validate observer count
-	assert.Equal(t, len(observers), report[4], "validate observer count")
+	assert.Equal(t, uint8(len(observers)), report[4], "validate observer count")
 
 	// validate observers
 	index := 4 + 1
@@ -98,11 +98,10 @@ func TestHashReport(t *testing.T) {
 	}
 
 	var mockHash = []byte{
-		124, 158, 204, 40, 181, 54, 124,
-		38, 196, 146, 13, 14, 178, 47,
-		254, 150, 111, 21, 42, 181, 191,
-		132, 111, 236, 216, 151, 233, 110,
-		86, 216, 154, 169,
+		0x9a, 0xe0, 0xc3, 0x7d, 0x9d, 0x45, 0x58, 0xdc,
+		0x1e, 0x8b, 0xbc, 0xf4, 0x7d, 0x6b, 0xc8, 0xb0,
+		0x5, 0xbe, 0xbe, 0x5f, 0xd, 0x28, 0x33, 0x3b,
+		0x27, 0x11, 0x33, 0x5f, 0xed, 0x43, 0x91, 0x60,
 	}
 
 	h, err := HashReport(mockReportCtx, mockReport)
