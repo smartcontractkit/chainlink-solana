@@ -8,6 +8,9 @@ target
 # ignore relay build
 pkg/bin
 
+# keypair used by anchor/anchor test
+id.json
+
 # TS
 node_modules
 **/tsconfig.tsbuildinfo

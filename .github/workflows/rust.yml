@@ -18,4 +18,5 @@ jobs:
     - run: |
         npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
         yarn install --frozen-lockfile
+    - run: solana-keygen new -o id.json
     - run: anchor test
