@@ -3,11 +3,8 @@ name: Gauntlet
 on:
   push:
     branches:
-      - develop
-
+      - main
   pull_request:
-    branches:
-      - "*"
 
 jobs:
   build:
@@ -28,8 +25,11 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - run: |
           npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
+          cd gauntlet
           ${{ matrix.env }} yarn install
-      - run: ${{ matrix.env }} yarn build
+      - run: |
+          cd gauntlet
+          ${{ matrix.env }} yarn build
 
   format:
     strategy:
@@ -49,8 +49,11 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - run: |
           npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
+          cd gauntlet
           ${{ matrix.env }} yarn install
-      - run: ${{ matrix.env }} yarn lint:format
+      - run: |
+          cd gauntlet
+          ${{ matrix.env }} yarn lint:format
 
   test:
     strategy:
@@ -70,5 +73,8 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - run: |
           npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
+          cd gauntlet
           ${{ matrix.env }} yarn install
-      - run: ${{ matrix.env }} yarn test:ci
+      - run: |
+          cd gauntlet
+          ${{ matrix.env }} yarn test:ci
