@@ -4,7 +4,7 @@ use anchor_spl::token;
 
 use arrayref::{array_ref, array_refs};
 
-declare_id!("3PWYU38zBeeh1fKDYx9diGPK6TVyFrtUpFT6UHiAEoJ5");
+declare_id!("My11111111111111111111111111111111111111111");
 
 mod context;
 pub mod event;
