@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -363,6 +364,20 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	// 	return ghErrors.Wrap(err, "setting OCR 2 payees failed")
 	// }
 
+	return nil
+}
+
+func (d Deployer) Fund(addresses []string) error {
+	if _, err := exec.LookPath("solana"); err != nil {
+		return errors.New("'solana' is not available in commandline")
+	}
+	for _, a := range addresses {
+		// TODO: do addresses need to parsed into base58 form?
+		msg := relayUtils.LogStatus(fmt.Sprintf("funded %s", a))
+		if _, err := exec.Command("solana", "airdrop", "100", a).Output(); msg.Check(err) != nil {
+			return err
+		}
+	}
 	return nil
 }
 
