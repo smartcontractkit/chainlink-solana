@@ -44,11 +44,11 @@ export const offchainDescriptor = {
         },
         sharedSecretHash: {
           type: 'bytes',
-          id: 1,
+          id: 2,
         },
         encryptions: {
           type: 'bytes',
-          id: 1,
+          id: 3,
         },
       },
     },

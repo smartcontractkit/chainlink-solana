@@ -44,6 +44,8 @@ export default class SetValidatorConfig extends SolanaCommand {
     const input = this.makeInput(this.flags.input)
     const owner = this.wallet.payer
 
+    console.log('INPUT', input)
+
     const validator = new PublicKey(input.validator)
     const threshhold = new BN(input.threshold)
 

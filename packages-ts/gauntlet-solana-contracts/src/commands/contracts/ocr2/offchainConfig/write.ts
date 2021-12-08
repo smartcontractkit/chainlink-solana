@@ -63,9 +63,9 @@ export default class WriteOffchainConfig extends SolanaCommand {
       const rdd = JSON.parse(buffer.toString())
       const aggregator = rdd.contracts[this.flags.state]
       const config = aggregator.config
-      const aggregatorOperators: string[] = aggregator.oracles.map(o => o.operator)
-      const operatorsPublicKeys = aggregatorOperators.map(o => rdd.operators[o].ocrOffchainPublicKey[0])
-      const operatorsPeerIds = aggregatorOperators.map(o => rdd.operators[o].peerId[0])
+      const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
+      const operatorsPublicKeys = aggregatorOperators.map((o) => rdd.operators[o].ocrOffchainPublicKey[0])
+      const operatorsPeerIds = aggregatorOperators.map((o) => rdd.operators[o].peerId[0])
 
       const input: Input = {
         deltaProgressNanoseconds: durationToNanoseconds(config.badEpochTimeout).toNumber(),
@@ -100,6 +100,7 @@ export default class WriteOffchainConfig extends SolanaCommand {
     const proto = new Protobuf(offchainDescriptor)
     const reportingPluginConfigProto = proto.encode('reporting_plugin_config', input.reportingPluginConfig)
     const sharedSecretEncryptions = await this.generateSecretEncryptions(input.offchainPublicKeys)
+    console.log('SHARED S ENC:', sharedSecretEncryptions)
     const sharedSecretEncryptionsProto = proto.encode('shared_secret_encryptions', sharedSecretEncryptions)
     const offchainConfig = {
       ...input,

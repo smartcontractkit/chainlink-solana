@@ -53,14 +53,14 @@ export default class SetPayees extends SolanaCommand {
     const payeeByTransmitter = input.operators.reduce(
       (agg, operator) => ({
         ...agg,
-        [new PublicKey(operator.transmitter).toString()]: operator.payee,
+        [new PublicKey(operator.transmitter).toString()]: new PublicKey(operator.payee),
       }),
       {},
     )
     // Set the payees in the same order the oracles are saved in the contract. The length of the payees need to be same as the oracles saved
-    const payees = info.oracles
+    const payees = info.oracles.xs
+      .slice(0, info.oracles.len)
       .map(({ transmitter }) => payeeByTransmitter[new PublicKey(transmitter).toString()])
-      .slice(0, info.config.n)
 
     logger.loading('Setting payees...')
     const tx = await program.rpc.setPayees(payees, {
