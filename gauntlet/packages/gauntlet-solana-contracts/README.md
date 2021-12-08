@@ -64,15 +64,15 @@ yarn gauntlet <contract_name>:<contract_function> --help
 
 ### Preparation
 
-- Include program keypairs under `/packages-ts/gauntlet-solana-contracts/artifacts/programId/*.json`, resulting in:
+- Include program keypairs under `/packages/gauntlet-solana-contracts/artifacts/programId/*.json`, resulting in:
 ```
-packages-ts/gauntlet-solana-contracts/artifacts/programId
+packages/gauntlet-solana-contracts/artifacts/programId
 |  access_controller.json
 |  deviation_flagging_validator.json
 |  ocr2.json
 ```
 
-- Make sure these accounts public keys correspond to the ones declared on each contract `declare_id`. If they don't, compile the contracts (`anchor build`) with the correct `declare_id` and move the generated binaries from `/target/deploy/*.so` to `/packages-ts/gauntlet-solana-contracts/artifacts/bin/*.so`
+- Make sure these accounts public keys correspond to the ones declared on each contract `declare_id`. If they don't, compile the contracts (`anchor build`) with the correct `declare_id` and move the generated binaries from `/target/deploy/*.so` to `/packages/gauntlet-solana-contracts/artifacts/bin/*.so`
 
 
 - Run a local validator node

@@ -16,7 +16,7 @@ const commands = {
 }
 ;(async () => {
   try {
-    const networkPossiblePaths = ['./networks', './packages-ts/gauntlet-solana-contracts/networks']
+    const networkPossiblePaths = ['./networks', './packages/gauntlet-solana-contracts/networks']
     const networkPath = networkPossiblePaths.filter((networkPath) =>
       existsSync(path.join(process.cwd(), networkPath)),
     )[0]
