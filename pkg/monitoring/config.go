@@ -17,6 +17,8 @@ type Config struct {
 	SchemaRegistry SchemaRegistryConfig `json:"schema_registry,omitempty"`
 	Feeds          []FeedConfig         `json:"feeds,omitempty"`
 	Http           HttpConfig           `json:"http,omitempty"`
+	FeedsURL       string               `json:"feedsUrl,omitempty"`
+	FeedsFilePath  string               `json:"feedsFilePath,omitempty"`
 }
 
 type SolanaConfig struct {
@@ -92,14 +94,14 @@ func ParseConfig() (Config, error) {
 	flag.StringVar(&cfg.SchemaRegistry.Username, "schema_registry.username", "", "")
 	flag.StringVar(&cfg.SchemaRegistry.Password, "schema_registry.password", "", "")
 
-	var feedsFilePath string
-	var feedsRDDURL string
-	flag.StringVar(&feedsFilePath, "feeds.file_path", "", "")
-	flag.StringVar(&feedsRDDURL, "feeds.rdd_url", "", "")
+	flag.StringVar(&cfg.FeedsFilePath, "feeds.file_path", "", "")
+	flag.StringVar(&cfg.FeedsURL, "feeds.feeds_url", "", "")
 
 	flag.StringVar(&cfg.Http.Address, "http.address", "", "")
 
 	flag.Parse()
+
+	parseEnvVars(&cfg)
 
 	for flagName, value := range map[string]string{
 		"-solana.rpc_endpoint": cfg.Solana.RPCEndpoint,
@@ -117,42 +119,26 @@ func ParseConfig() (Config, error) {
 		}
 	}
 
-	if value, isPresent := os.LookupEnv("KAFKA_TOPIC"); isPresent {
-		cfg.Kafka.Topic = value
-	}
-	if value, isPresent := os.LookupEnv("KAFKA_SASL_USERNAME"); isPresent {
-		cfg.Kafka.SaslUsername = value
-	}
-	if value, isPresent := os.LookupEnv("KAFKA_SASL_PASSWORD"); isPresent {
-		cfg.Kafka.SaslPassword = value
-	}
-	if value, isPresent := os.LookupEnv("SCHEMA_REGISTRY_USERNAME"); isPresent {
-		cfg.SchemaRegistry.Username = value
-	}
-	if value, isPresent := os.LookupEnv("SCHEMA_REGISTRY_PASSWORD"); isPresent {
-		cfg.SchemaRegistry.Password = value
-	}
-
 	var feeds = []jsonFeedConfig{}
-	if feedsFilePath == "" && feedsRDDURL == "" {
+	if cfg.FeedsFilePath == "" && cfg.FeedsURL == "" {
 		return cfg, fmt.Errorf("feeds configuration missing, either '-feeds.file_path' or '-feeds.rdd_url' must be set")
-	} else if feedsRDDURL != "" {
-		res, err := http.Get(feedsRDDURL)
+	} else if cfg.FeedsURL != "" {
+		res, err := http.Get(cfg.FeedsURL)
 		if err != nil {
-			return cfg, fmt.Errorf("unable to contact RDD URL %s: %w", feedsRDDURL, err)
+			return cfg, fmt.Errorf("unable to contact RDD URL %s: %w", cfg.FeedsURL, err)
 		}
 		defer res.Body.Close()
 		decoder := json.NewDecoder(res.Body)
 		if err := decoder.Decode(&feeds); err != nil {
-			return cfg, fmt.Errorf("unable to unmarshal feeds config from RDD URL %s: %w", feedsRDDURL, err)
+			return cfg, fmt.Errorf("unable to unmarshal feeds config from RDD URL %s: %w", cfg.FeedsURL, err)
 		}
-	} else if feedsFilePath != "" {
-		contents, err := os.ReadFile(feedsFilePath)
+	} else if cfg.FeedsFilePath != "" {
+		contents, err := os.ReadFile(cfg.FeedsFilePath)
 		if err != nil {
-			return cfg, fmt.Errorf("unable to read feeds file %s: %w", feedsFilePath, err)
+			return cfg, fmt.Errorf("unable to read feeds file %s: %w", cfg.FeedsFilePath, err)
 		}
 		if err = json.Unmarshal(contents, &feeds); err != nil {
-			return cfg, fmt.Errorf("unable to unmarshal feeds config from file %s: %w", feedsFilePath, err)
+			return cfg, fmt.Errorf("unable to unmarshal feeds config from file %s: %w", cfg.FeedsFilePath, err)
 		}
 	}
 
@@ -189,6 +175,64 @@ func ParseConfig() (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func parseEnvVars(cfg *Config) {
+	if value, isPresent := os.LookupEnv("SOLANA_RPC_ENDPOINT"); isPresent {
+		cfg.Solana.RPCEndpoint = value
+	}
+	if value, isPresent := os.LookupEnv("SOLANA_NETWORK_NAME"); isPresent {
+		cfg.Solana.NetworkName = value
+	}
+	if value, isPresent := os.LookupEnv("SOLANA_NETWORK_ID"); isPresent {
+		cfg.Solana.NetworkID = value
+	}
+	if value, isPresent := os.LookupEnv("SOLANA_CHAIN_ID"); isPresent {
+		cfg.Solana.ChainID = value
+	}
+
+	if value, isPresent := os.LookupEnv("KAFKA_TOPIC"); isPresent {
+		cfg.Kafka.Topic = value
+	}
+	if value, isPresent := os.LookupEnv("KAFKA_BROKERS"); isPresent {
+		cfg.Kafka.Brokers = value
+	}
+	if value, isPresent := os.LookupEnv("KAFKA_CLIENT_ID"); isPresent {
+		cfg.Kafka.ClientID = value
+	}
+	if value, isPresent := os.LookupEnv("KAFKA_SECURITY_PROTOCOL"); isPresent {
+		cfg.Kafka.SecurityProtocol = value
+	}
+	if value, isPresent := os.LookupEnv("KAFKA_SASL_MECHANISM"); isPresent {
+		cfg.Kafka.SaslUsername = value
+	}
+	if value, isPresent := os.LookupEnv("KAFKA_SASL_USERNAME"); isPresent {
+		cfg.Kafka.SaslUsername = value
+	}
+	if value, isPresent := os.LookupEnv("KAFKA_SASL_PASSWORD"); isPresent {
+		cfg.Kafka.SaslPassword = value
+	}
+
+	if value, isPresent := os.LookupEnv("SCHEMA_REGISTRY_URL"); isPresent {
+		cfg.SchemaRegistry.URL = value
+	}
+	if value, isPresent := os.LookupEnv("SCHEMA_REGISTRY_USERNAME"); isPresent {
+		cfg.SchemaRegistry.Username = value
+	}
+	if value, isPresent := os.LookupEnv("SCHEMA_REGISTRY_PASSWORD"); isPresent {
+		cfg.SchemaRegistry.Password = value
+	}
+
+	if value, isPresent := os.LookupEnv("HTTP_ADDRESS"); isPresent {
+		cfg.Http.Address = value
+	}
+
+	if value, isPresent := os.LookupEnv("FEEDS_FILE_PATH"); isPresent {
+		cfg.FeedsFilePath = value
+	}
+	if value, isPresent := os.LookupEnv("FEEDS_URL"); isPresent {
+		cfg.FeedsURL = value
+	}
 }
 
 type jsonFeedConfig struct {
