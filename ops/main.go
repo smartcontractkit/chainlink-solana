@@ -32,9 +32,9 @@ func RelayConfig(ctx *pulumi.Context, addresses map[int]string) (string, error) 
 	return fmt.Sprintf("{\"nodeEndpointRPC\": \"%s\",\"nodeEndpointWS\": \"%s\",\"stateID\":\"%s\",\"transmissionsID\":\"%s\",\"validatorProgramID\":\"%s\"}",
 		httpURL,
 		wsURL,
-		addresses[solana.OCRFeed], // TODO: fix/verify
-		addresses[solana.OCRFeed], // TODO: fix/verify
-		addresses[solana.OCRFeed], // TODO: fix/verify
+		addresses[solana.OCRFeed],
+		addresses[solana.OCRTransmissions],
+		addresses[solana.OCRFeed], // validator is not deployed, so this is just set randomly (contract ignores it if validator is not set)
 	), nil
 }
 

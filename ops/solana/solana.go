@@ -39,27 +39,27 @@ type Deployer struct {
 
 func New(ctx *pulumi.Context) (Deployer, error) {
 
-	// yarn, err := exec.LookPath("yarn")
-	// if err != nil {
-	// 	return Deployer{}, errors.New("'yarn' is not installed")
-	// }
-	// fmt.Printf("yarn is available at %s\n", yarn)
-	//
-	// // Change path to root directory
+	yarn, err := exec.LookPath("yarn")
+	if err != nil {
+		return Deployer{}, errors.New("'yarn' is not installed")
+	}
+	fmt.Printf("yarn is available at %s\n", yarn)
+
+	// Change path to root directory
 	cwd, _ := os.Getwd()
-	// os.Chdir(filepath.Join(cwd, ".."))
-	//
-	// fmt.Println("Installing dependencies")
-	// if _, err = exec.Command(yarn).Output(); err != nil {
-	// 	return Deployer{}, errors.New("error install dependencies")
-	// }
-	//
-	// // Generate Gauntlet Binary
-	// fmt.Println("Generating Gauntlet binary...")
-	// _, err = exec.Command(yarn, "bundle").Output()
-	// if err != nil {
-	// 	return Deployer{}, errors.New("error generating gauntlet binary")
-	// }
+	os.Chdir(filepath.Join(cwd, ".."))
+
+	fmt.Println("Installing dependencies")
+	if _, err = exec.Command(yarn).Output(); err != nil {
+		return Deployer{}, errors.New("error install dependencies")
+	}
+
+	// Generate Gauntlet Binary
+	fmt.Println("Generating Gauntlet binary...")
+	_, err = exec.Command(yarn, "bundle").Output()
+	if err != nil {
+		return Deployer{}, errors.New("error generating gauntlet binary")
+	}
 
 	// TODO: Should come from pulumi context
 	os.Setenv("SKIP_PROMPTS", "true")
