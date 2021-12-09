@@ -26,6 +26,12 @@ let ethereumAddress = (publicKey: Buffer) => {
   return keccak256(publicKey).slice(12)
 };
 
+const Scope = {
+  LatestConfig: { latestConfig: {} },
+  LinkAvailableForPayment: { linkAvailableForPayment: {} },
+  LatestRoundData: { latestroundData: {} },
+};
+
 describe('ocr2', async () => {
 
   // Configure the client to use the local cluster.
@@ -495,9 +501,30 @@ describe('ocr2', async () => {
 
     account = await program.account.state.fetch(state.publicKey);
     assert.ok(account.leftoverPaymentsLen == 0);
-
-		// log raw transmissions account data
-		// let rawTransmissions = await provider.connection.getAccountInfo(transmissions.publicKey);
-		// console.log([...rawTransmissions.data])
+  });
+  
+  it('Can call query', async () => {
+    
+    let buffer = Keypair.generate();
+    await program.rpc.query(
+      Scope.LatestConfig,
+      {
+        accounts: {
+          state: state.publicKey,
+          transmissions: transmissions.publicKey,
+          buffer: buffer.publicKey,
+        },
+        instructions: [
+          SystemProgram.createAccount({
+            fromPubkey: provider.wallet.publicKey,
+            newAccountPubkey: buffer.publicKey,
+            lamports: await provider.connection.getMinimumBalanceForRentExemption(256),
+            space: 256,
+            programId: program.programId,
+          })
+        ],
+        signers: [buffer]
+      }
+    )
   });
 });
