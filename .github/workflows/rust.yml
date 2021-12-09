@@ -3,6 +3,7 @@ on: [push]
 
 jobs:
   test:
+    name: Test
     runs-on: ubuntu-latest
     container:
       image: projectserum/build:v0.18.0
@@ -17,3 +18,17 @@ jobs:
     - run: solana-keygen new -o id.json
     - run: yarn install --frozen-lockfile
     - run: anchor test
+  
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    container:
+      image: projectserum/build:v0.18.0
+      env:
+        RUSTUP_HOME: "/root/.rustup"
+        FORCE_COLOR: 1
+
+    steps:
+    - uses: actions/checkout@v2
+    - run: cargo check
+    - run: cargo clippy -- -D warnings
