@@ -49,7 +49,7 @@ func New(ctx *pulumi.Context) (Deployer, error) {
 
 	// Change path to root directory
 	cwd, _ := os.Getwd()
-	os.Chdir(filepath.Join(cwd, ".."))
+	os.Chdir(filepath.Join(cwd, "../gauntlet"))
 
 	fmt.Println("Installing dependencies")
 	if _, err = exec.Command(yarn).Output(); err != nil {
@@ -73,7 +73,7 @@ func New(ctx *pulumi.Context) (Deployer, error) {
 
 	// Check gauntlet works
 	os.Chdir(cwd) // move back into ops folder
-	gauntletBin := filepath.Join(cwd, "../bin/chainlink-solana-") + version
+	gauntletBin := filepath.Join(cwd, "../gauntlet/bin/gauntlet-") + version
 	gauntlet, err := relayUtils.NewGauntlet(gauntletBin)
 
 	if err != nil {
@@ -92,7 +92,7 @@ func (d *Deployer) Load() error {
 	// TODO: remove this - temporarily needed as artifacts are read directly from the root directory
 	// won't be needed once it reads from release artifacts?
 	cwd, _ := os.Getwd()
-	os.Chdir(filepath.Join(cwd, "..")) // go from ops folder to root
+	os.Chdir(filepath.Join(cwd, "../gauntlet")) // go from ops folder to gauntlet folder
 
 	// Access Controller contract deployment
 	fmt.Println("Deploying Access Controller...")
