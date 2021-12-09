@@ -2,13 +2,12 @@ import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import { readFileSync } from 'fs'
-import { join } from 'path'
 import { MAX_TRANSACTION_BYTES } from '../../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import { Protobuf } from '../../../../lib/protobuf'
 import { offchainDescriptor } from '../../../../lib/protoSchemas'
 import { generateSecretWords } from '../../../../lib/random'
+import { getRDD } from '../../../../lib/rdd'
 import { makeSharedSecretEncryptions, SharedSecretEncryptions } from '../../../../lib/sharedSecretEncryptions'
 import { durationToNanoseconds } from '../../../../lib/time'
 import { divideIntoChunks } from '../../../../lib/utils'
@@ -58,49 +57,47 @@ export default class WriteOffchainConfig extends SolanaCommand {
   makeInput = (userInput: any): Input => {
     // TODO: Some format validation for user input
     if (userInput) return userInput as Input
-    const buffer = readFileSync(join(process.cwd(), this.flags.rdd), 'utf8')
-    try {
-      const rdd = JSON.parse(buffer.toString())
-      const aggregator = rdd.contracts[this.flags.state]
-      const config = aggregator.config
-      const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
-      const operatorsPublicKeys = aggregatorOperators.map((o) => rdd.operators[o].ocrOffchainPublicKey[0])
-      const operatorsPeerIds = aggregatorOperators.map((o) => rdd.operators[o].peerId[0])
+    const rdd = getRDD(this.flags.rdd)
+    const aggregator = rdd.contracts[this.flags.state]
+    const config = aggregator.config
+    const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
+    const operatorsPublicKeys = aggregatorOperators.map((o) => rdd.operators[o].ocrOffchainPublicKey[0])
+    const operatorsPeerIds = aggregatorOperators.map((o) => rdd.operators[o].peerId[0])
 
-      const input: Input = {
-        deltaProgressNanoseconds: durationToNanoseconds(config.badEpochTimeout).toNumber(),
-        deltaResendNanoseconds: durationToNanoseconds(config.resendInterval).toNumber(),
-        deltaRoundNanoseconds: durationToNanoseconds(config.roundInterval).toNumber(),
-        deltaGraceNanoseconds: durationToNanoseconds(config.observationGracePeriod).toNumber(),
-        deltaStageNanoseconds: durationToNanoseconds(config.transmissionStageTimeout).toNumber(),
-        rMax: config.maxRoundCount,
-        s: config.transmissionStages,
-        offchainPublicKeys: operatorsPublicKeys,
-        peerIds: operatorsPeerIds,
-        reportingPluginConfig: {
-          alphaReportInfinite: true, // bool
-          alphaReportPpb: config.relativeDeviationThresholdPPB, // ??
-          alphaAcceptInfinite: true, // bool
-          alphaAcceptPpb: 1, // bool
-          deltaCNanoseconds: durationToNanoseconds(config.maxContractValueAge).toNumber(),
-        },
-        maxDurationQueryNanoseconds: 1, // number (ns)
-        maxDurationObservationNanoseconds: 1, // number (ns)
-        maxDurationReportNanoseconds: 1, // number (ns)
-        maxDurationShouldAcceptFinalizedReportNanoseconds: 1, // number (ns)
-        maxDurationShouldTransmitAcceptedReportNanoseconds: 1, // number (ns)
-      }
-      return input
-    } catch (e) {
-      throw new Error('An error ocurred while parsing the RDD. Make sure you provided a valid RDD path')
+    const input: Input = {
+      deltaProgressNanoseconds: durationToNanoseconds(config.deltaProgress).toNumber(),
+      deltaResendNanoseconds: durationToNanoseconds(config.deltaResend).toNumber(),
+      deltaRoundNanoseconds: durationToNanoseconds(config.deltaRound).toNumber(),
+      deltaGraceNanoseconds: durationToNanoseconds(config.deltaGrace).toNumber(),
+      deltaStageNanoseconds: durationToNanoseconds(config.deltaStage).toNumber(),
+      rMax: config.rMax,
+      s: config.s,
+      offchainPublicKeys: operatorsPublicKeys,
+      peerIds: operatorsPeerIds,
+      reportingPluginConfig: {
+        alphaReportInfinite: config.reportingPluginConfig.alphaReportInfinite,
+        alphaReportPpb: config.reportingPluginConfig.alphaReportPpb,
+        alphaAcceptInfinite: config.reportingPluginConfig.alphaAcceptInfinite,
+        alphaAcceptPpb: config.reportingPluginConfig.alphaAcceptPpb,
+        deltaCNanoseconds: durationToNanoseconds(config.reportingPluginConfig.deltaCNanoseconds).toNumber(),
+      },
+      maxDurationQueryNanoseconds: durationToNanoseconds(config.maxDurationQuery).toNumber(),
+      maxDurationObservationNanoseconds: durationToNanoseconds(config.maxDurationObservation).toNumber(),
+      maxDurationReportNanoseconds: durationToNanoseconds(config.maxDurationReport).toNumber(),
+      maxDurationShouldAcceptFinalizedReportNanoseconds: durationToNanoseconds(
+        config.maxDurationShouldAcceptFinalizedReport,
+      ).toNumber(),
+      maxDurationShouldTransmitAcceptedReportNanoseconds: durationToNanoseconds(
+        config.maxDurationShouldTransmitAcceptedReport,
+      ).toNumber(),
     }
+    return input
   }
 
   serializeOffchainConfig = async (input: Input): Promise<Buffer> => {
     const proto = new Protobuf(offchainDescriptor)
     const reportingPluginConfigProto = proto.encode('reporting_plugin_config', input.reportingPluginConfig)
     const sharedSecretEncryptions = await this.generateSecretEncryptions(input.offchainPublicKeys)
-    console.log('SHARED S ENC:', sharedSecretEncryptions)
     const sharedSecretEncryptionsProto = proto.encode('shared_secret_encryptions', sharedSecretEncryptions)
     const offchainConfig = {
       ...input,
@@ -129,7 +126,7 @@ export default class WriteOffchainConfig extends SolanaCommand {
     const input = this.makeInput(this.flags.input)
 
     const offchainConfig = await this.serializeOffchainConfig(input)
-    console.log('offchain config size:', offchainConfig.byteLength)
+    logger.info(`Offchain config size: ${offchainConfig.byteLength}`)
     this.require(offchainConfig.byteLength < 4096, 'Offchain config must be lower than 4096 bytes')
 
     // There's a byte limit per transaction. Write the config in chunks
