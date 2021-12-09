@@ -114,7 +114,7 @@ describe('ocr2', async () => {
         systemProgram: SystemProgram.programId,
       },
       signers: [billingAccessController],
-      instructions: [
+      preInstructions: [
         await accessController.account.accessController.createInstruction(billingAccessController),
       ],
     });
@@ -127,7 +127,7 @@ describe('ocr2', async () => {
         systemProgram: SystemProgram.programId,
       },
       signers: [requesterAccessController],
-      instructions: [
+      preInstructions: [
         await accessController.account.accessController.createInstruction(requesterAccessController),
       ],
     });
@@ -147,7 +147,7 @@ describe('ocr2', async () => {
         loweringAccessController: billingAccessController.publicKey,
       },
       signers: [validator],
-      instructions: [
+      preInstructions: [
         await deviationFlaggingValidator.account.validator.createInstruction(validator),
       ],
     });
@@ -198,7 +198,7 @@ describe('ocr2', async () => {
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       },
       signers: [state, transmissions],
-      instructions: [
+      preInstructions: [
         await program.account.state.createInstruction(state),
         await program.account.transmissions.createInstruction(transmissions),
       ],
@@ -514,7 +514,7 @@ describe('ocr2', async () => {
           transmissions: transmissions.publicKey,
           buffer: buffer.publicKey,
         },
-        instructions: [
+        preInstructions: [
           SystemProgram.createAccount({
             fromPubkey: provider.wallet.publicKey,
             newAccountPubkey: buffer.publicKey,
