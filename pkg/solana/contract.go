@@ -80,7 +80,8 @@ func (c *ContractTracker) fetchLatestTransmission(ctx context.Context) error {
 
 	// make single flight request
 	v, err, shared := c.requestGroup.Do("transmissions.latest", func() (interface{}, error) {
-		return getLatestTransmission(ctx, c.client.rpc, c.TransmissionsID)
+		answer, _, err := GetLatestTransmission(ctx, c.client.rpc, c.TransmissionsID)
+		return answer, err
 	})
 
 	if err != nil {
@@ -107,7 +108,7 @@ func getState(ctx context.Context, client *rpc.Client, account solana.PublicKey)
 	return state, nil
 }
 
-func getLatestTransmission(ctx context.Context, client *rpc.Client, account solana.PublicKey) (Answer, error) {
+func GetLatestTransmission(ctx context.Context, client *rpc.Client, account solana.PublicKey) (Answer, uint64, error) {
 	cursorOffset := CursorOffset
 	cursorLen := CursorLen
 	transmissionLen := TransmissionLen
@@ -120,13 +121,13 @@ func getLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 		},
 	})
 	if err != nil {
-		return Answer{}, errors.Wrap(err, "error on rpc.GetAccountInfo [cursor]")
+		return Answer{}, 0, errors.Wrap(err, "error on rpc.GetAccountInfo [cursor]")
 	}
 
 	// parse little endian cursor value
 	c := res.Value.Data.GetBinary()
 	if len(c) != int(cursorLen) { // validate length
-		return Answer{}, errCursorLength
+		return Answer{}, 0, errCursorLength
 	}
 	cursor := binary.LittleEndian.Uint32(c)
 	if cursor == 0 { // handle array wrap
@@ -143,12 +144,12 @@ func getLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 		},
 	})
 	if err != nil {
-		return Answer{}, errors.Wrap(err, "error on rpc.GetAccountInfo [transmission]")
+		return Answer{}, 0, errors.Wrap(err, "error on rpc.GetAccountInfo [transmission]")
 	}
 
 	t := res.Value.Data.GetBinary()
 	if len(t) != int(transmissionLen) { // validate length
-		return Answer{}, errTransmissionLength
+		return Answer{}, 0, errTransmissionLength
 	}
 
 	// reverse slice to change from little endian to big endian
@@ -159,5 +160,5 @@ func getLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 	return Answer{
 		Data:      big.NewInt(0).SetBytes(t[4:]),
 		Timestamp: binary.BigEndian.Uint32(t[:4]),
-	}, nil
+	}, res.RPCContext.Context.Slot, nil
 }
