@@ -27,16 +27,16 @@ go run ./cmd/monitoring/*.go \
 -kafka.topic="solana-devnet" \
 -kafka.brokers="localhost:29029" \
 -kafka.client_id="monitoring" \
--kafka.security_protocol="PLAINTEST" \
+-kafka.security_protocol="PLAINTEXT" \
 -kafka.sasl_mechanism="PLAIN" \
 -kafka.sasl_username="" \
 -kafka.sasl_password="" \
 
--schema_registry.url="localhost:8989" \
+-schema_registry.url="http://localhost:8989" \
 -schema_registry.username="" \
 -schema_registry.password="" \
 
--feeds.file-path="/tmp/feeds.json" \
+-feeds.file_path="/tmp/feeds.json" \
 
 -http.address="localhost:3000"
 ```
