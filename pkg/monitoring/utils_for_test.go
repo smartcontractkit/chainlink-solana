@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"log"
 	"math/big"
 	"time"
 
@@ -197,6 +198,30 @@ type fakeReader struct {
 func (f *fakeReader) Read(ctx context.Context, _ solana.PublicKey) (interface{}, error) {
 	ans := <-f.readCh
 	return ans, nil
+}
+
+// runGenerateRandomData should be executed as a goroutine.
+// This method publishes random data as fast as the reader asks for it.
+// Only run this if you're not using f.readCh dirrectly!
+func (f *fakeReader) runGenerateRandomData(ctx context.Context, typ string) {
+	log.Printf("generating fake data for account reader of type %s", typ)
+	for {
+		var payload interface{}
+		if typ == "state" {
+			state, _, _ := generateState()
+			payload = StateEnvelope{state, 100}
+		} else if typ == "transmission" {
+			payload = generateTransmissionEnvelope(42)
+		} else {
+			panic(fmt.Errorf("unknown reader type %s", typ))
+		}
+		select {
+		case f.readCh <- payload:
+			log.Printf("send payload of type %s", typ)
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 func generateTransmissionEnvelope(seed int) TransmissionEnvelope {
