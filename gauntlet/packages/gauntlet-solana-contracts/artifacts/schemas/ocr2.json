@@ -566,9 +566,86 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "query",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "transmissions",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "buffer",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "scope",
+          "type": {
+            "defined": "Scope"
+          }
+        }
+      ]
     }
   ],
   "accounts": [
+    {
+      "name": "LatestConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "configCount",
+            "type": "u32"
+          },
+          {
+            "name": "configDigest",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "blockNumber",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LinkAvailableForPayment",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "availableBalance",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OracleObservationCount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "count",
+            "type": "u32"
+          }
+        ]
+      }
+    },
     {
       "name": "State",
       "type": {
@@ -714,6 +791,31 @@
       }
     },
     {
+      "name": "OffchainConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u64"
+          },
+          {
+            "name": "xs",
+            "type": {
+              "array": [
+                "u8",
+                4096
+              ]
+            }
+          },
+          {
+            "name": "len",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "Config",
       "type": {
         "kind": "struct",
@@ -793,6 +895,10 @@
             "type": "u32"
           },
           {
+            "name": "latestTransmitter",
+            "type": "publicKey"
+          },
+          {
             "name": "epoch",
             "type": "u32"
           },
@@ -815,37 +921,15 @@
             "type": "u32"
           },
           {
-            "name": "offchainConfigVersion",
-            "type": "u64"
-          },
-          {
-            "name": "configLen",
-            "type": "u64"
-          },
-          {
             "name": "offchainConfig",
             "type": {
-              "array": [
-                "u8",
-                4096
-              ]
+              "defined": "OffchainConfig"
             }
-          },
-          {
-            "name": "pendingLen",
-            "type": "u64"
-          },
-          {
-            "name": "pendingOffchainConfigVersion",
-            "type": "u64"
           },
           {
             "name": "pendingOffchainConfig",
             "type": {
-              "array": [
-                "u8",
-                4096
-              ]
+              "defined": "OffchainConfig"
             }
           }
         ]
@@ -914,6 +998,23 @@
           {
             "name": "timestamp",
             "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Scope",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "LatestConfig"
+          },
+          {
+            "name": "LinkAvailableForPayment"
+          },
+          {
+            "name": "LatestRoundData"
           }
         ]
       }

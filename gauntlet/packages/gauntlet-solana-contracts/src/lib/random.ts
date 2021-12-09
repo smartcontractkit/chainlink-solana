@@ -8,7 +8,7 @@ export async function generateSecretWords(sampleSize: number = 12): Promise<stri
   }
 
   const fileStream = fs.createReadStream(
-    join(process.cwd(), 'packages-ts/gauntlet-solana-contracts/artifacts/words', 'words.txt'),
+    join(process.cwd(), 'packages/gauntlet-solana-contracts/artifacts/words', 'words.txt'),
   )
   const rl = readline.createInterface({
     input: fileStream,
