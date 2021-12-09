@@ -176,4 +176,8 @@ func init() {
 	if err != nil {
 		panic(fmt.Errorf("failed to parse Avro schema for the latest transmission: %w", err))
 	}
+
+	// These codecs are used in tests but not in main, so the linter complains.
+	_ = configSetCodec
+	_ = transmissionCodec
 }
