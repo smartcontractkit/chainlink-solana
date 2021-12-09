@@ -19,7 +19,7 @@ Blockchain <-> Relay <-> CL node <-> price adapters
 
 ## Prep
 ```
-solana-keygen new -o ./packages-ts/gauntlet-solana-contracts/artifacts/programId/*.json
+solana-keygen new -o ./gauntlet/packages/gauntlet-solana-contracts/artifacts/programId/*.json
 ```
 
 ## Usage

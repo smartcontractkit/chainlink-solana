@@ -3,6 +3,7 @@ module github.com/smartcontractkit/chainlink-solana/ops
 go 1.17
 
 require (
+	github.com/gagliardetto/solana-go v1.0.2
 	github.com/pulumi/pulumi/sdk/v3 v3.17.0
 	github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20211209102114-09b8c96ef963
 )
@@ -56,7 +57,6 @@ require (
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/fvbommel/sortorder v1.0.1 // indirect
 	github.com/gagliardetto/binary v0.5.0 // indirect
-	github.com/gagliardetto/solana-go v1.0.2 // indirect
 	github.com/gagliardetto/treeout v0.1.4 // indirect
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
@@ -157,7 +157,7 @@ require (
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/smartcontractkit/helmenv v1.0.17 // indirect
-	github.com/smartcontractkit/integrations-framework v0.10.13-0.20211209165847-97e3b3998b97 // indirect
+	github.com/smartcontractkit/integrations-framework v0.10.13-0.20211209210730-be0fc64293cb // indirect
 	github.com/spf13/afero v1.6.0 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/spf13/cobra v1.2.1 // indirect

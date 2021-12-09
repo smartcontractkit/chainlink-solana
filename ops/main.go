@@ -25,17 +25,14 @@ func main() {
 	})
 }
 
-func RelayConfig(ctx *pulumi.Context, addresses map[int]string) (string, error) {
-	httpURL := config.Require(ctx, "CL-RELAY_HTTP")
-	wsURL := config.Require(ctx, "CL-RELAY_WS")
-
-	return fmt.Sprintf("{\\\"nodeEndpointRPC\\\": \\\"%s\\\",\\\"nodeEndpointWS\\\": \\\"%s\\\",\\\"stateID\\\":\\\"%s\\\",\\\"transmissionsID\\\":\\\"%s\\\",\\\"validatorProgramID\\\":\\\"%s\\\"}",
-		httpURL,
-		wsURL,
-		addresses[solana.OCRFeed],
-		addresses[solana.OCRTransmissions],
-		addresses[solana.OCRFeed], // validator is not deployed, so this is just set randomly (contract ignores it if validator is not set)
-	), nil
+func RelayConfig(ctx *pulumi.Context, addresses map[int]string) (map[string]string, error) {
+	return map[string]string{
+		"nodeEndpointRPC":    config.Require(ctx, "CL-RELAY_HTTP"),
+		"nodeEndpointWS":     config.Require(ctx, "CL-RELAY_WS"),
+		"stateID":            addresses[solana.OCRFeed],
+		"transmissionsID":    addresses[solana.OCRTransmissions],
+		"validatorProgramID": addresses[solana.OCRFeed], // validator is not deployed, so this is just set randomly (contract ignores it if validator is not set)
+	}, nil
 }
 
 func ObservationSource(priceAdapter string) string {
