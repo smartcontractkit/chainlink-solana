@@ -131,7 +131,7 @@ pub struct WithdrawFunds<'info> {
 }
 
 impl<'info> WithdrawFunds<'info> {
-    pub fn into_transfer(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
+    pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
         CpiContext::new(
             self.token_program.to_account_info(),
             Transfer {
@@ -159,7 +159,7 @@ pub struct WithdrawPayment<'info> {
 }
 
 impl<'info> WithdrawPayment<'info> {
-    pub fn into_transfer(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
+    pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
         CpiContext::new(
             self.token_program.to_account_info(),
             Transfer {
