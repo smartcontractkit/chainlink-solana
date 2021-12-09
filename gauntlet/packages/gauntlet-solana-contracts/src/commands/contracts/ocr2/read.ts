@@ -40,7 +40,7 @@ export default class ReadState extends SolanaCommand {
           return { value: value.toString(), timestamp }
         }
       })
-      .filter(v => !!v)
+      .filter((v) => !!v)
     console.log('DATA:', data)
     // Get the necessary bytes
     const offchainBuffer = Buffer.from(data.config.offchainConfig).slice(0, new BN(data.config.configLen).toNumber())
