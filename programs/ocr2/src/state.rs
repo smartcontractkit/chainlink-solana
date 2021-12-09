@@ -7,6 +7,7 @@ pub use anchor_lang::solana_program::secp256k1_recover::Secp256k1Pubkey;
 use arrayvec::arrayvec;
 
 // 19 is what we can achieve with Solana's resource constraints
+#[constant]
 pub const MAX_ORACLES: usize = 19;
 // OCR2 is designed for a maximum of 31 oracles, and there are various assumptions made around this value.
 const_assert!(MAX_ORACLES <= 31);
