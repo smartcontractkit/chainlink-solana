@@ -28,6 +28,7 @@
   "dependencies": {
     "@chainlink/gauntlet-core": "0.0.6",
     "@chainlink/gauntlet-solana": "*",
+    "@solana/spl-token": "^0.1.8",
     "@solana/web3.js": "^1.30.2"
   }
 }
