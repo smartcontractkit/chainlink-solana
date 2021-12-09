@@ -2,6 +2,7 @@ package monitoring
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/riferrei/srclient"
 )
@@ -28,15 +29,17 @@ func NewSchemaRegistry(cfg SchemaRegistryConfig) SchemaRegistry {
 
 func (s *schemaRegistry) EnsureSchema(subject, spec string) (Schema, error) {
 	registeredSchema, err := s.backend.GetLatestSchema(subject)
-	if err != nil {
+	if err != nil && !isNotFoundErr(err) {
 		return nil, fmt.Errorf("failed to read schema for subject '%s': %w", subject, err)
 	}
-	if registeredSchema.Schema() == spec {
+	if err == nil && registeredSchema.Schema() == spec {
+		fmt.Printf("using existing schema for subject '%s'\n", subject)
 		return wrapSchema{registeredSchema}, nil
 	}
+	fmt.Printf("creating new schema for subject '%s'\n", subject)
 	newSchema, err := s.backend.CreateSchema(subject, spec, srclient.Avro)
 	if err != nil {
-		return nil, fmt.Errorf("unale to create new schema with subject '%s': %w", subject, err)
+		return nil, fmt.Errorf("unable to create new schema with subject '%s': %w", subject, err)
 	}
 	return wrapSchema{newSchema}, nil
 }
@@ -57,4 +60,10 @@ func (w wrapSchema) Encode(value interface{}) ([]byte, error) {
 func (w wrapSchema) Decode(buf []byte) (interface{}, error) {
 	value, _, err := w.Schema.Codec().NativeFromBinary(buf)
 	return value, err
+}
+
+// Helpers
+
+func isNotFoundErr(err error) bool {
+	return strings.HasPrefix(err.Error(), "404 Not Found")
 }
