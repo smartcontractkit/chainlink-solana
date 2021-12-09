@@ -29,7 +29,7 @@ func RelayConfig(ctx *pulumi.Context, addresses map[int]string) (string, error) 
 	httpURL := config.Require(ctx, "CL-RELAY_HTTP")
 	wsURL := config.Require(ctx, "CL-RELAY_WS")
 
-	return fmt.Sprintf("{\"nodeEndpointRPC\": \"%s\",\"nodeEndpointWS\": \"%s\",\"stateID\":\"%s\",\"transmissionsID\":\"%s\",\"validatorProgramID\":\"%s\"}",
+	return fmt.Sprintf("{\\\"nodeEndpointRPC\\\": \\\"%s\\\",\\\"nodeEndpointWS\\\": \\\"%s\\\",\\\"stateID\\\":\\\"%s\\\",\\\"transmissionsID\\\":\\\"%s\\\",\\\"validatorProgramID\\\":\\\"%s\\\"}",
 		httpURL,
 		wsURL,
 		addresses[solana.OCRFeed],

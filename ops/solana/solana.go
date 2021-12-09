@@ -1,6 +1,7 @@
 package solana
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
 	ghErrors "github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
@@ -372,7 +374,13 @@ func (d Deployer) Fund(addresses []string) error {
 		return errors.New("'solana' is not available in commandline")
 	}
 	for _, a := range addresses {
-		// TODO: do addresses need to parsed into base58 form?
+		// parse hex encoded pubkey to base58 encoded account
+		keyByte, err := hex.DecodeString(a)
+		if err != nil {
+			return err
+		}
+		a = solana.PublicKeyFromBytes(keyByte).String()
+
 		msg := relayUtils.LogStatus(fmt.Sprintf("funded %s", a))
 		if _, err := exec.Command("solana", "airdrop", "100", a).Output(); msg.Check(err) != nil {
 			return err
