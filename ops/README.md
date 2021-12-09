@@ -17,12 +17,52 @@ Blockchain <-> Relay <-> CL node <-> price adapters
 - [Pulumi](#pulumi-installation-instruction)
 - [Solana Test Validator](#local-solana-testnet)
 
-## Prep
+## Usage
+Set a `.env` file inside of `chainlink-solana/gauntlet`. The private key can be generated the same way as the program accounts (`solana-keygen`) then copied into the env file.
 ```
-solana-keygen new -o ./gauntlet/packages/gauntlet-solana-contracts/artifacts/programId/*.json
+# .env
+PRIVATE_KEY=[96,13,...]
+SECRET=some random local testing secret
 ```
 
-## Usage
+Generate keypairs for program accounts (usually only need to be done once)
+```bash
+solana-keygen new -o <path>
+
+# examples
+solana-keygen new -o ../gauntlet/packages/gauntlet-solana-contracts/artifacts/programId/access_controller.json
+solana-keygen new -o ../gauntlet/packages/gauntlet-solana-contracts/artifacts/programId/deviation_flagging_validator.json
+solana-keygen new -o ../gauntlet/packages/gauntlet-solana-contracts/artifacts/programId/ocr2.json
+```
+
+Add the pubkeys to the their respective program (do for each program)
+```rust
+// example in programs/ocr2/src/lib.rs
+declare_id!("CF6b2XF6BZw65aznGzXwzF5A8iGhDBoeNYQiXyH4MWdQ");
+```
+
+Compile program artifacts (do each time contract changes)
+```bash
+# from root
+./tools/shell
+anchor build
+
+# then exit environment
+cp target/deploy/access_controller.so gauntlet/packages/gauntlet-solana-contracts/artifacts/bin/access_controller.so
+cp target/deploy/deviation_flagging_validator.so gauntlet/packages/gauntlet-solana-contracts/artifacts/bin/deviation_flagging_validator.so
+cp target/deploy/ocr2.so gauntlet/packages/gauntlet-solana-contracts/artifacts/bin/ocr2.so
+```
+
+Start up the solana test validator (recommend always using `-r` for a clean slate, runs into deployment issues otherwise)
+```bash
+# start validator
+solana-test-validator -r
+
+# in another terminal airdrop funds to your gauntlet deployer account (see below if need to configure CLI for local validator)
+solana airdrop 100 2CbCTf2V95kMfNA31yYaqJ9oVX7MN71RU6zvvg27PgSz
+```
+
+Start up the pulumi environment (tweak the `Pulumi.localnet.yaml` file if necessary)
 ```bash
 # start up the environment
 pulumi up -y -s localnet

@@ -194,6 +194,7 @@ func (d *Deployer) DeployOCR() error {
 	}
 
 	fmt.Println("Step 3: Init OCR 2 Feed")
+	// TODO: command doesn't throw an error in go if it fails
 	err = d.gauntlet.ExecCommand(
 		"ocr2:initialize",
 		d.gauntlet.Flag("network", d.network),
