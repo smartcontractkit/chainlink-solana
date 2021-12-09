@@ -168,10 +168,11 @@ func ParseConfig() (Config, error) {
 		}
 		stateAccount, err := solana.PublicKeyFromBase58(feed.StateAccountBase58)
 		if err != nil {
-			return cfg, fmt.Errorf("failed to parse state account '%s' from JSON at index i=%d: %w", feed.TransmissionsAccountBase58, i, err)
+			return cfg, fmt.Errorf("failed to parse state account '%s' from JSON at index i=%d: %w", feed.StateAccountBase58, i, err)
 		}
-		if feed.PollInterval.Nanoseconds() == 0 {
-			feed.PollInterval = DefaultPollInterval
+		pollInterval := DefaultPollInterval
+		if feed.PollIntervalMilliseconds != 0 {
+			pollInterval = time.Duration(feed.PollIntervalMilliseconds) * time.Millisecond
 		}
 		cfg.Feeds[i] = FeedConfig{
 			feed.FeedName,
@@ -183,7 +184,7 @@ func ParseConfig() (Config, error) {
 			contractAddress,
 			transmissionsAccount,
 			stateAccount,
-			feed.PollInterval,
+			pollInterval,
 		}
 	}
 
@@ -195,12 +196,12 @@ type jsonFeedConfig struct {
 	FeedPath       string `json:"path,omitempty"`
 	Symbol         string `json:"symbol,omitempty"`
 	Heartbeat      int64  `json:"heartbeat,omitempty"`
-	ContractType   string `json:"contractType,omitempty"`
+	ContractType   string `json:"contract_type,omitempty"`
 	ContractStatus string `json:"status,omitempty"`
 
-	ContractAddressBase58      string `json:"contractAddress,omitempty"`
-	TransmissionsAccountBase58 string `json:"transmissionsAccount,omitempty"`
-	StateAccountBase58         string `json:"stateAccount,omitempty"`
+	ContractAddressBase58      string `json:"contract_address_base58,omitempty"`
+	TransmissionsAccountBase58 string `json:"transmissions_account_base58,omitempty"`
+	StateAccountBase58         string `json:"state_account_base58,omitempty"`
 
-	PollInterval time.Duration `json:"poll_interval,omitempty"`
+	PollIntervalMilliseconds int64 `json:"poll_interval_milliseconds,omitempty"`
 }
