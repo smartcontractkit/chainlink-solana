@@ -20,5 +20,5 @@ flow-report.json
 report.json
 bin
 # Gauntlet artifacts
-packages-ts/gauntlet-solana-contracts/artifacts/programId
-packages-ts/gauntlet-solana-contracts/artifacts/bin
+gauntlet/packages/gauntlet-solana-contracts/artifacts/programId
+gauntlet/packages/gauntlet-solana-contracts/artifacts/bin
