@@ -601,7 +601,10 @@ pub mod ocr2 {
                     config_digest: config.latest_config_digest,
                     block_number: config.latest_config_block_number,
                 };
-                data.serialize(ctx.accounts.buffer.try_borrow_mut_data()?.deref_mut())?;
+                // TODO: use an enum to wrap all possible response types?
+
+                // try_serialize will also write the account discriminator, serialize doesn't
+                data.try_serialize(ctx.accounts.buffer.try_borrow_mut_data()?.deref_mut())?;
             }
         }
         Ok(())
@@ -974,19 +977,19 @@ pub enum ErrorCode {
 pub mod query {
     use super::*;
 
-    #[derive(AnchorSerialize, AnchorDeserialize)]
+    #[account]
     pub struct LatestConfig {
         pub config_count: u32,
         pub config_digest: [u8; 32],
         pub block_number: u64,
     }
 
-    #[derive(AnchorSerialize, AnchorDeserialize)]
+    #[account]
     pub struct LinkAvailableForPayment {
         pub available_balance: u64,
     }
 
-    #[derive(AnchorSerialize, AnchorDeserialize)]
+    #[account]
     pub struct OracleObservationCount {
         pub count: u32,
     }

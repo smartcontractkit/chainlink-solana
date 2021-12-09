@@ -33,7 +33,6 @@ const Scope = {
 };
 
 describe('ocr2', async () => {
-
   // Configure the client to use the local cluster.
   const provider = anchor.Provider.env();
   anchor.setProvider(provider);
@@ -74,10 +73,8 @@ describe('ocr2', async () => {
   // NOTE: 17 is the most we can fit into one setConfig if we use a different payer
   // if the owner == payer then we can fit 19
   const n = 19; // min: 3 * f + 1;
-
-
+  
   it('Funds the payer', async () => {
-    // Fund the payer
     await provider.connection.confirmTransaction(
       await provider.connection.requestAirdrop(payer.publicKey, 10000000000),
       "confirmed"
@@ -85,7 +82,6 @@ describe('ocr2', async () => {
   });
   
   it('Creates the LINK token', async () => {
-    // Create the LINK token
     token = await Token.createMint(
       provider.connection,
       payer,
@@ -279,26 +275,6 @@ describe('ocr2', async () => {
     assert.ok(config.offchainConfig.len == 6);
     assert.deepEqual(config.offchainConfig.xs.slice(0, config.offchainConfig.len), [4,5,6,4,5,6]);
 
-    // 3 byte header + 32+32 addresses + 64 program_id + 64 byte signature + 32 byte block hash + 897 bytes
-    // 17 = 897
-    // 18 = 949 => serializes to 1249
-    // so 300 byte overhead -> 73 bytes unaccounted (64 + 9?)
-    // if we ensure owner == feePayer we save some space
-    // let i = await program.instruction.setConfig(oracles.map((oracle) => ({
-    //     signer: ethereumAddress(Buffer.from(oracle.signer.publicKey)),
-    //     transmitter: oracle.transmitter.publicKey,
-    //   })),
-    //   f, 
-    //   {
-    //     accounts: {
-    //       state: state.publicKey,
-    //       authority: owner.publicKey,
-    //     },
-    //     signers: [],
-    // });
-    // console.log(i.data.length);
-    // console.log(Array.from(i.data));
-
     // Call setConfig
     console.log("setConfig");
     await program.rpc.setConfig(oracles.map((oracle) => ({
@@ -359,10 +335,6 @@ describe('ocr2', async () => {
   
   it('Transmits a round', async () => {
     let account = await program.account.state.fetch(state.publicKey);
-
-		// // log raw state account data
-		// let rawAccount = await provider.connection.getAccountInfo(state.publicKey);
-		// console.dir([...rawAccount.data], {'maxArrayLength': null})
 
     // Generate and transmit a report
     let report_context = [];
@@ -457,7 +429,6 @@ describe('ocr2', async () => {
       }
     );
 
-    let acc = await tokenClient.getAccountInfo(tokenVault);
     recipientTokenAccount = await tokenClient.getOrCreateAssociatedAccountInfo(recipient);
     assert.ok(recipientTokenAccount.amount.toNumber() === 1);
   });
@@ -504,7 +475,6 @@ describe('ocr2', async () => {
   });
   
   it('Can call query', async () => {
-    
     let buffer = Keypair.generate();
     await program.rpc.query(
       Scope.LatestConfig,
@@ -525,6 +495,10 @@ describe('ocr2', async () => {
         ],
         signers: [buffer]
       }
-    )
+    );
+    
+    // let account = await program.account.latestConfig.fetch(buffer.publicKey);
+    let account = await program.account.latestConfig.fetch(buffer.publicKey);
+    console.log(account);
   });
 });
