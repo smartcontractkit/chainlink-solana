@@ -88,6 +88,7 @@ pub struct Config {
     pub latest_config_block_number: u64,
 
     pub latest_aggregator_round_id: u32,
+    pub latest_transmitter: Pubkey,
     pub epoch: u32,
     pub round: u8,
 
@@ -99,7 +100,7 @@ pub struct Config {
     // a staging area which will swap onto data on commit
     pub pending_offchain_config: OffchainConfig,
 }
-const_assert!(mem::size_of::<Config>() == 352 + 4096 + 8 + 4096 + 8 + 8 + 8); // bytes
+const_assert!(mem::size_of::<Config>() == 384 + 4096 + 8 + 4096 + 8 + 8 + 8); // bytes
 
 impl Config {
     pub fn config_digest_from_data(
