@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-docker run --rm -it -v $(pwd):/workdir --entrypoint bash projectserum/build:v0.18.2
+docker run --rm -it -v $(pwd):/workdir --entrypoint bash projectserum/build:v0.19.0
