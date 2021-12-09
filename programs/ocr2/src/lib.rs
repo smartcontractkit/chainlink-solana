@@ -712,6 +712,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
         .latest_aggregator_round_id
         .checked_add(1)
         .ok_or(ErrorCode::Overflow)?; // this should never occur, but let's check for it anyway
+    state.config.latest_transmitter = ctx.accounts.transmitter.key();
 
     let mut transmissions = ctx.accounts.transmissions.load_mut()?;
     transmissions.store_round(Transmission {
