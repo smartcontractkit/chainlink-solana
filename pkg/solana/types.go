@@ -68,6 +68,7 @@ type Config struct {
 	LatestConfigDigest        [32]byte
 	LatestConfigBlockNumber   uint64
 	LatestAggregatorRoundID   uint32
+	LatestTransmitter         solana.PublicKey
 	Epoch                     uint32
 	Round                     uint8
 	Billing                   Billing
