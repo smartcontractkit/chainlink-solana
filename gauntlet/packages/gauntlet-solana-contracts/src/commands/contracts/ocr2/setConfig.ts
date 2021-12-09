@@ -6,6 +6,13 @@ import BN from 'bn.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
 
+type Input = {
+  oracles: {
+    signer: string
+    transmitter: string
+  }[]
+  threshold: number | string
+}
 export default class SetConfig extends SolanaCommand {
   static id = 'ocr2:set_config'
   static category = CONTRACT_LIST.OCR_2
