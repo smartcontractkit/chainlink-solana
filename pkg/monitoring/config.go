@@ -80,7 +80,7 @@ func ParseConfig() (Config, error) {
 	flag.StringVar(&cfg.Solana.NetworkID, "solana.network_id", "", "")
 	flag.StringVar(&cfg.Solana.ChainID, "solana.chain_id", "", "")
 
-	flag.StringVar(&cfg.Kafka.Topic, "kafka.topic", "", "solana-mainnet")
+	flag.StringVar(&cfg.Kafka.Topic, "kafka.topic", "", "")
 	flag.StringVar(&cfg.Kafka.Brokers, "kafka.brokers", "", "")
 	flag.StringVar(&cfg.Kafka.ClientID, "kafka.client_id", "", "")
 	flag.StringVar(&cfg.Kafka.SecurityProtocol, "kafka.security_protocol", "", "")
