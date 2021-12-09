@@ -7,23 +7,25 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	relayUtils "github.com/smartcontractkit/chainlink-relay/ops/utils"
 )
 
-// Contracts
+// Programs
 const (
 	AccessController = iota
 	OCR2
 )
 
-// Contract States
+// Program accounts
 const (
 	BillingAccessController = iota
 	RequesterAccessController
 	OCRFeed
+	OCRTransmissions
 	LINK
 )
 
@@ -35,7 +37,6 @@ type Deployer struct {
 }
 
 func New(ctx *pulumi.Context) (Deployer, error) {
-
 	yarn, err := exec.LookPath("yarn")
 	if err != nil {
 		return Deployer{}, errors.New("'yarn' is not installed")
@@ -137,28 +138,67 @@ func (d *Deployer) DeployLINK() error {
 }
 
 func (d *Deployer) DeployOCR() error {
-	fmt.Println("Initializing OCR Feed...")
+	fmt.Println("Deploying OCR Feed:")
+	fmt.Println("Step 1: Init Requester Access Controller")
 	err := d.gauntlet.ExecCommand(
-		"ocr2:initialize:flow",
+		"access_controller:initialize",
 		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("description", "ETH/USD"),
-		d.gauntlet.Flag("decimals", "8"),
-		d.gauntlet.Flag("maxAnswer", "100000"),
-		d.gauntlet.Flag("minAnswer", "0"),
+	)
+	if err != nil {
+		return errors.New("AC initialization failed")
+	}
+	report, err := d.gauntlet.ReadCommandReport()
+	if err != nil {
+		return err
+	}
+	d.States[RequesterAccessController] = report.Responses[0].Contract
+
+	fmt.Println("Step 2: Init Billing Access Controller")
+	err = d.gauntlet.ExecCommand(
+		"access_controller:initialize",
+		d.gauntlet.Flag("network", d.network),
+	)
+	if err != nil {
+		return errors.New("AC initialization failed")
+	}
+	report, err = d.gauntlet.ReadCommandReport()
+	if err != nil {
+		return err
+	}
+	d.States[BillingAccessController] = report.Responses[0].Contract
+
+	input := map[string]interface{}{
+		"minAnswer":   "0",
+		"maxAnswer":   "10000000000",
+		"decimals":    9,
+		"description": "Test",
+	}
+
+	jsonInput, err := json.Marshal(input)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Step 3: Init OCR 2 Feed")
+	err = d.gauntlet.ExecCommand(
+		"ocr2:initialize",
+		d.gauntlet.Flag("network", d.network),
+		d.gauntlet.Flag("requesterAccessController", d.States[RequesterAccessController]),
+		d.gauntlet.Flag("billingAccessController", d.States[BillingAccessController]),
 		d.gauntlet.Flag("link", d.States[LINK]),
+		d.gauntlet.Flag("input", string(jsonInput)),
 	)
 	if err != nil {
 		return errors.New("feed initialization failed")
 	}
 
-	report, err := d.gauntlet.ReadCommandFlowReport()
+	report, err = d.gauntlet.ReadCommandReport()
 	if err != nil {
 		return err
 	}
 
-	d.States[BillingAccessController] = report[0].Txs[0].Contract
-	d.States[RequesterAccessController] = report[1].Txs[0].Contract
-	d.States[OCRFeed] = report[2].Txs[0].Contract
+	d.States[OCRFeed] = report.Data["state"]
+	d.States[OCRTransmissions] = report.Data["transmissions"]
 
 	return nil
 }
@@ -180,21 +220,80 @@ func (d Deployer) TransferLINK() error {
 
 func (d Deployer) InitOCR(keys []map[string]string) error {
 
-	jsonKeys, err := json.Marshal(keys)
+	fmt.Println("Setting up OCR Feed:")
+
+	fmt.Println("Begin set config...")
+	err := d.gauntlet.ExecCommand(
+		"ocr2:begin_offchain_config",
+		d.gauntlet.Flag("network", d.network),
+		d.gauntlet.Flag("version", "1"),
+		d.gauntlet.Flag("state", d.States[OCRFeed]),
+	)
+	if err != nil {
+		return errors.New("begin OCR 2 set config failed")
+	}
+
+	S := []int{}
+	offChainPublicKeys := []string{}
+	peerIDs := []string{}
+	for _, k := range keys {
+		S = append(S, 1)
+		offChainPublicKeys = append(offChainPublicKeys, k["OCROffchainPublicKey"])
+		peerIDs = append(peerIDs, k["P2PID"])
+	}
+
+	input := map[string]interface{}{
+		"deltaProgressNanoseconds": 2 * time.Second,
+		"deltaResendNanoseconds":   5 * time.Second,
+		"deltaRoundNanoseconds":    1 * time.Second,
+		"deltaGraceNanoseconds":    500 * time.Millisecond,
+		"deltaStageNanoseconds":    5 * time.Second,
+		"rMax":                     3,
+		"s":                        S,
+		"offchainPublicKeys":       offChainPublicKeys,
+		"peerIds":                  peerIDs,
+		"reportingPluginConfig": map[string]interface{}{
+			"alphaReportInfinite": false,
+			"alphaReportPpb":      uint64(1000000),
+			"alphaAcceptInfinite": false,
+			"alphaAcceptPpb":      uint64(1000000),
+			"deltaCNanoseconds":   15 * time.Second,
+		},
+		"maxDurationQueryNanoseconds":                        2 * time.Second,
+		"maxDurationObservationNanoseconds":                  2 * time.Second,
+		"maxDurationReportNanoseconds":                       2 * time.Second,
+		"maxDurationShouldAcceptFinalizedReportNanoseconds":  2 * time.Second,
+		"maxDurationShouldTransmitAcceptedReportNanoseconds": 2 * time.Second,
+	}
+
+	jsonInput, err := json.Marshal(input)
 	if err != nil {
 		return err
 	}
 
+	fmt.Println("Writing set config...")
 	err = d.gauntlet.ExecCommand(
-		"ocr2:set_config:deployer",
+		"ocr2:write_offchain_config",
 		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("keys", string(jsonKeys)),
+		d.gauntlet.Flag("state", d.States[OCRFeed]),
+		d.gauntlet.Flag("input", string(jsonInput)),
+	)
+
+	if err != nil {
+		return errors.New("writing OCR 2 set config failed")
+	}
+
+	fmt.Println("Committing set config...")
+	err = d.gauntlet.ExecCommand(
+		"ocr2:commit_offchain_config",
+		d.gauntlet.Flag("network", d.network),
 		d.gauntlet.Flag("state", d.States[OCRFeed]),
 	)
 
 	if err != nil {
-		return errors.New("OCR 2 set config failed")
+		return errors.New("committing OCR 2 set config failed")
 	}
+
 	return nil
 }
 
