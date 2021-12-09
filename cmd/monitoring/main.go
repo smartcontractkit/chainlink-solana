@@ -38,7 +38,7 @@ func main() {
 	}
 	stSchema, err := schemaRegistry.EnsureSchema("config_set", monitoring.ConfigSetAvroSchema)
 	if err != nil {
-		log.Fatalf("failed to prepare transmission schema with error: %v", err)
+		log.Fatalf("failed to prepare config_set schema with error: %v", err)
 	}
 
 	producer, err := monitoring.NewProducer(ctx, cfg.Kafka)
