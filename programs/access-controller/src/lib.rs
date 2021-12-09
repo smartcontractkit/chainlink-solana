@@ -7,7 +7,8 @@ use arrayvec::arrayvec;
 
 declare_id!("My11111111111111111111111111111111111111112");
 
-const MAX_ADDRS: usize = 32;
+#[constant]
+pub const MAX_ADDRS: usize = 32;
 
 #[zero_copy]
 pub struct AccessList {
