@@ -101,7 +101,7 @@ pub mod ocr2 {
         let config = &mut state.config;
         // disallow begin if we already started writing
         require!(config.pending_offchain_config.version == 0, InvalidInput);
-        require!(config.pending_offchain_config.len() == 0, InvalidInput);
+        require!(config.pending_offchain_config.is_empty(), InvalidInput);
         // The new config version has to be newer
         require!(
             offchain_config_version > config.offchain_config.version,
@@ -134,7 +134,7 @@ pub mod ocr2 {
 
         // Require that at least some data was written
         require!(config.pending_offchain_config.version > 0, InvalidInput);
-        require!(config.pending_offchain_config.len() > 0, InvalidInput);
+        require!(!config.pending_offchain_config.is_empty(), InvalidInput);
 
         // move staging area onto actual config
         config.offchain_config = config.pending_offchain_config; // this also resets the pending area
@@ -315,7 +315,7 @@ pub mod ocr2 {
         let available = balance.saturating_sub(link_due);
 
         token::transfer(
-            ctx.accounts.into_transfer().with_signer(&[&[
+            ctx.accounts.transfer_ctx().with_signer(&[&[
                 b"vault".as_ref(),
                 ctx.accounts.state.key().as_ref(),
                 &[state.nonce],
@@ -363,7 +363,7 @@ pub mod ocr2 {
 
         // transfer funds
         token::transfer(
-            ctx.accounts.into_transfer().with_signer(&[&[
+            ctx.accounts.transfer_ctx().with_signer(&[&[
                 b"vault".as_ref(),
                 ctx.accounts.state.key().as_ref(),
                 &[*nonce],
@@ -628,6 +628,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
     let raw_report: [u8; RAW_REPORT_LEN] = raw_report.try_into().unwrap();
 
     // Parse the report context
+    #[allow(clippy::ptr_offset_with_cast)] // complains about arrayref internals
     let (report_context, raw_report) = array_refs![&raw_report, CONTEXT_LEN, Report::LEN];
     let (config_digest, _padding, epoch, round, _extra_hash) =
         array_refs![report_context, 32, 27, 4, 1, 32];
