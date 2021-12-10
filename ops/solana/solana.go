@@ -45,7 +45,7 @@ func New(ctx *pulumi.Context) (Deployer, error) {
 
 	// Change path to root directory
 	cwd, _ := os.Getwd()
-	os.Chdir(filepath.Join(cwd, ".."))
+	os.Chdir(filepath.Join(cwd, "../gauntlet"))
 
 	// Generate Gauntlet Binary
 	fmt.Println("Generating Gauntlet binary...")
@@ -64,7 +64,7 @@ func New(ctx *pulumi.Context) (Deployer, error) {
 
 	// Check gauntlet works
 	cwd, _ = os.Getwd()
-	gauntletBin := filepath.Join(cwd, "./bin/chainlink-solana-") + version
+	gauntletBin := filepath.Join(cwd, "./bin/gauntlet-") + version
 	gauntlet, err := relayUtils.NewGauntlet(gauntletBin)
 
 	if err != nil {
@@ -222,7 +222,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 
 	fmt.Println("Setting up OCR Feed:")
 
-	fmt.Println("Begin set config...")
+	fmt.Println("Begin set offchain config...")
 	err := d.gauntlet.ExecCommand(
 		"ocr2:begin_offchain_config",
 		d.gauntlet.Flag("network", d.network),
@@ -230,16 +230,22 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 		d.gauntlet.Flag("state", d.States[OCRFeed]),
 	)
 	if err != nil {
-		return errors.New("begin OCR 2 set config failed")
+		return errors.New("begin OCR 2 set offchain config failed")
 	}
 
 	S := []int{}
 	offChainPublicKeys := []string{}
 	peerIDs := []string{}
+	oracles := []map[string]string{}
+	threshold := 1
 	for _, k := range keys {
 		S = append(S, 1)
 		offChainPublicKeys = append(offChainPublicKeys, k["OCROffchainPublicKey"])
 		peerIDs = append(peerIDs, k["P2PID"])
+		oracles = append(oracles, map[string]string{
+			"signer":      k["OCROnchainPublicKey"],
+			"transmitter": k["NodeAddress"],
+		})
 	}
 
 	input := map[string]interface{}{
@@ -271,7 +277,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 		return err
 	}
 
-	fmt.Println("Writing set config...")
+	fmt.Println("Writing set offchain config...")
 	err = d.gauntlet.ExecCommand(
 		"ocr2:write_offchain_config",
 		d.gauntlet.Flag("network", d.network),
@@ -280,10 +286,10 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	)
 
 	if err != nil {
-		return errors.New("writing OCR 2 set config failed")
+		return errors.New("writing OCR 2 set offchain config failed")
 	}
 
-	fmt.Println("Committing set config...")
+	fmt.Println("Committing set offchain config...")
 	err = d.gauntlet.ExecCommand(
 		"ocr2:commit_offchain_config",
 		d.gauntlet.Flag("network", d.network),
@@ -291,7 +297,30 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	)
 
 	if err != nil {
-		return errors.New("committing OCR 2 set config failed")
+		return errors.New("committing OCR 2 set offchain config failed")
+	}
+
+	input = map[string]interface{}{
+		"oracles":   oracles,
+		"threshold": threshold,
+	}
+
+	jsonInput, err = json.Marshal(input)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Setting config...")
+	err = d.gauntlet.ExecCommand(
+		"ocr2:set_config",
+		d.gauntlet.Flag("network", d.network),
+		d.gauntlet.Flag("state", d.States[OCRFeed]),
+		d.gauntlet.Flag("input", string(jsonInput)),
+		d.gauntlet.Flag("link", d.States[LINK]),
+	)
+
+	if err != nil {
+		return errors.New("setting OCR 2 config failed")
 	}
 
 	return nil
