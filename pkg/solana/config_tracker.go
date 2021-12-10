@@ -18,27 +18,31 @@ func (c ContractTracker) LatestConfigDetails(ctx context.Context) (changedInBloc
 	return c.state.Config.LatestConfigBlockNumber, c.state.Config.LatestConfigDigest, err
 }
 
-// LatestConfig returns the latest configuration.
-func (c ContractTracker) LatestConfig(ctx context.Context, changedInBlock uint64) (types.ContractConfig, error) {
-	err := c.fetchState(ctx)
-
+func configFromState(state State) types.ContractConfig {
 	pubKeys := []types.OnchainPublicKey{}
 	accounts := []types.Account{}
-	for _, o := range c.state.Oracles.Data() {
+	for _, o := range state.Oracles.Data() {
+		o := o //  https://github.com/golang/go/wiki/CommonMistakes#using-reference-to-loop-iterator-variable
 		pubKeys = append(pubKeys, o.Signer.Key[:])
 		accounts = append(accounts, types.Account(o.Transmitter.String()))
 	}
 
 	return types.ContractConfig{
-		ConfigDigest:          c.state.Config.LatestConfigDigest,
-		ConfigCount:           uint64(c.state.Config.ConfigCount),
+		ConfigDigest:          state.Config.LatestConfigDigest,
+		ConfigCount:           uint64(state.Config.ConfigCount),
 		Signers:               pubKeys,
 		Transmitters:          accounts,
-		F:                     c.state.Config.F,
+		F:                     state.Config.F,
 		OnchainConfig:         []byte{}, // TODO: where to fetch?
-		OffchainConfigVersion: c.state.Config.OffchainConfig.Version,
-		OffchainConfig:        c.state.Config.OffchainConfig.Data(),
-	}, err
+		OffchainConfigVersion: state.Config.OffchainConfig.Version,
+		OffchainConfig:        state.Config.OffchainConfig.Data(),
+	}
+}
+
+// LatestConfig returns the latest configuration.
+func (c ContractTracker) LatestConfig(ctx context.Context, changedInBlock uint64) (types.ContractConfig, error) {
+	err := c.fetchState(ctx)
+	return configFromState(c.state), err
 }
 
 // LatestBlockHeight returns the height of the most recent block in the chain.
