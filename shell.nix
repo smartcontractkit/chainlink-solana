@@ -28,6 +28,5 @@ pkgs.mkShell {
   GOROOT="${pkgs.go_1_17}/share/go";
   
   # Avoids issues with delve
-  CGO_CPPFLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0"  
+  CGO_CPPFLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0";
 }
-
