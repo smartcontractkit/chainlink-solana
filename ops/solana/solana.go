@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	ghErrors "github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	relayUtils "github.com/smartcontractkit/chainlink-relay/ops/utils"
@@ -87,12 +88,12 @@ func (d *Deployer) Load() error {
 		d.gauntlet.Flag("network", d.network),
 	)
 	if err != nil {
-		return errors.New("access controller contract deployment failed")
+		return ghErrors.Wrap(err, "access controller contract deployment failed")
 	}
 
 	report, err := d.gauntlet.ReadCommandReport()
 	if err != nil {
-		return errors.New("report not available")
+		return ghErrors.Wrap(err, "report not available")
 	}
 
 	d.Contracts[AccessController] = report.Responses[0].Contract
@@ -104,12 +105,12 @@ func (d *Deployer) Load() error {
 		d.gauntlet.Flag("network", d.network),
 	)
 	if err != nil {
-		return errors.New("ocr 2 contract deployment failed")
+		return ghErrors.Wrap(err, "ocr 2 contract deployment failed")
 	}
 
 	report, err = d.gauntlet.ReadCommandReport()
 	if err != nil {
-		return errors.New("report not available")
+		return ghErrors.Wrap(err, "report not available")
 	}
 	d.Contracts[OCR2] = report.Responses[0].Contract
 
@@ -123,12 +124,12 @@ func (d *Deployer) DeployLINK() error {
 		d.gauntlet.Flag("network", d.network),
 	)
 	if err != nil {
-		return errors.New("LINK contract deployment failed")
+		return ghErrors.Wrap(err, "LINK contract deployment failed")
 	}
 
 	report, err := d.gauntlet.ReadCommandReport()
 	if err != nil {
-		return errors.New("report not available")
+		return ghErrors.Wrap(err, "report not available")
 	}
 
 	linkAddress := report.Responses[0].Contract
@@ -145,7 +146,7 @@ func (d *Deployer) DeployOCR() error {
 		d.gauntlet.Flag("network", d.network),
 	)
 	if err != nil {
-		return errors.New("AC initialization failed")
+		return ghErrors.Wrap(err, "AC initialization failed")
 	}
 	report, err := d.gauntlet.ReadCommandReport()
 	if err != nil {
@@ -159,7 +160,7 @@ func (d *Deployer) DeployOCR() error {
 		d.gauntlet.Flag("network", d.network),
 	)
 	if err != nil {
-		return errors.New("AC initialization failed")
+		return ghErrors.Wrap(err, "AC initialization failed")
 	}
 	report, err = d.gauntlet.ReadCommandReport()
 	if err != nil {
@@ -189,7 +190,7 @@ func (d *Deployer) DeployOCR() error {
 		d.gauntlet.Flag("input", string(jsonInput)),
 	)
 	if err != nil {
-		return errors.New("feed initialization failed")
+		return ghErrors.Wrap(err, "feed initialization failed")
 	}
 
 	report, err = d.gauntlet.ReadCommandReport()
@@ -212,12 +213,13 @@ func (d Deployer) TransferLINK() error {
 		d.States[LINK],
 	)
 	if err != nil {
-		return errors.New("LINK transfer failed")
+		return ghErrors.Wrap(err, "LINK transfer failed")
 	}
 
 	return nil
 }
 
+// TODO: InitOCR should cover almost the whole workflow of the OCR setup, including inspection
 func (d Deployer) InitOCR(keys []map[string]string) error {
 
 	fmt.Println("Setting up OCR Feed:")
@@ -230,7 +232,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 		d.gauntlet.Flag("state", d.States[OCRFeed]),
 	)
 	if err != nil {
-		return errors.New("begin OCR 2 set offchain config failed")
+		return ghErrors.Wrap(err, "begin OCR 2 set offchain config failed")
 	}
 
 	S := []int{}
@@ -238,6 +240,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	peerIDs := []string{}
 	oracles := []map[string]string{}
 	threshold := 1
+	// operators := []map[string]string{}
 	for _, k := range keys {
 		S = append(S, 1)
 		offChainPublicKeys = append(offChainPublicKeys, k["OCROffchainPublicKey"])
@@ -246,8 +249,13 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 			"signer":      k["OCROnchainPublicKey"],
 			"transmitter": k["NodeAddress"],
 		})
+		// operators = append(operators, map[string]string{
+		// 	"payee":       k["OCRPayeeAddress"],
+		// 	"transmitter": k["NodeAddress"],
+		// })
 	}
 
+	// TODO: Should this inputs have their own struct?
 	input := map[string]interface{}{
 		"deltaProgressNanoseconds": 2 * time.Second,
 		"deltaResendNanoseconds":   5 * time.Second,
@@ -286,7 +294,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	)
 
 	if err != nil {
-		return errors.New("writing OCR 2 set offchain config failed")
+		return ghErrors.Wrap(err, "writing OCR 2 set offchain config failed")
 	}
 
 	fmt.Println("Committing set offchain config...")
@@ -297,7 +305,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	)
 
 	if err != nil {
-		return errors.New("committing OCR 2 set offchain config failed")
+		return ghErrors.Wrap(err, "committing OCR 2 set offchain config failed")
 	}
 
 	input = map[string]interface{}{
@@ -316,12 +324,34 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 		d.gauntlet.Flag("network", d.network),
 		d.gauntlet.Flag("state", d.States[OCRFeed]),
 		d.gauntlet.Flag("input", string(jsonInput)),
-		d.gauntlet.Flag("link", d.States[LINK]),
 	)
 
 	if err != nil {
-		return errors.New("setting OCR 2 config failed")
+		return ghErrors.Wrap(err, "setting OCR 2 config failed")
 	}
+
+	// SET PAYEES
+	// TODO: Uncomment if needed
+	// input = map[string]interface{}{
+	// 	"operators": operators,
+	// }
+
+	// jsonInput, err = json.Marshal(input)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// fmt.Println("Setting Payees...")
+	// err = d.gauntlet.ExecCommand(
+	// 	"ocr2:set_payees",
+	// 	d.gauntlet.Flag("network", d.network),
+	// 	d.gauntlet.Flag("state", d.States[OCRFeed]),
+	// 	d.gauntlet.Flag("input", string(jsonInput)),
+	// )
+
+	// if err != nil {
+	// 	return ghErrors.Wrap(err, "setting OCR 2 payees failed")
+	// }
 
 	return nil
 }
