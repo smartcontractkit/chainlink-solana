@@ -27,17 +27,28 @@ const (
 // State is the struct representing the contract state
 type State struct {
 	AccountDiscriminator [8]byte // first 8 bytes of the SHA256 of the account’s Rust ident, https://docs.rs/anchor-lang/0.18.2/anchor_lang/attr.account.html
+	Version              uint8
 	Nonce                uint8
+	Padding0             uint16
+	Padding1             uint32
 	Config               Config
 	Oracles              Oracles
-	LeftoverPayment      [19]LeftoverPayment
-	LeftoverPaymentLen   uint8
+	LeftoverPayments     LeftoverPayments
 	Transmissions        solana.PublicKey
 }
 
 // SigningKey represents the report signing key
 type SigningKey struct {
 	Key [20]byte
+}
+
+type LeftoverPayments struct {
+	Raw [19]LeftoverPayment
+	Len uint64
+}
+
+func (lp LeftoverPayments) Data() []LeftoverPayment {
+	return lp.Raw[:lp.Len]
 }
 
 type OffchainConfig struct {
@@ -52,7 +63,6 @@ func (oc OffchainConfig) Data() []byte {
 
 // Config contains the configuration of the contract
 type Config struct {
-	Version                   uint8
 	Owner                     solana.PublicKey
 	ProposedOwner             solana.PublicKey
 	TokenMint                 solana.PublicKey
@@ -61,16 +71,17 @@ type Config struct {
 	BillingAccessController   solana.PublicKey
 	MinAnswer                 bin.Int128
 	MaxAnswer                 bin.Int128
-	Decimals                  uint8
 	Description               [32]byte
+	Decimals                  uint8
 	F                         uint8
+	Round                     uint8
+	Padding0                  uint8
+	Epoch                     uint32
+	LatestAggregatorRoundID   uint32
+	LatestTransmitter         solana.PublicKey
 	ConfigCount               uint32
 	LatestConfigDigest        [32]byte
 	LatestConfigBlockNumber   uint64
-	LatestAggregatorRoundID   uint32
-	LatestTransmitter         solana.PublicKey
-	Epoch                     uint32
-	Round                     uint8
 	Billing                   Billing
 	Validator                 solana.PublicKey
 	FlaggingThreshold         uint32
@@ -81,7 +92,7 @@ type Config struct {
 // Oracles contains the list of oracles
 type Oracles struct {
 	Raw [19]Oracle
-	Len uint8
+	Len uint64
 }
 
 func (o Oracles) Data() []Oracle {
@@ -94,8 +105,8 @@ type Oracle struct {
 	Signer        SigningKey
 	Payee         solana.PublicKey
 	ProposedPayee solana.PublicKey
-	Payment       uint64
 	FromRoundID   uint32
+	Payment       uint64
 }
 
 // LeftoverPayment contains the remaining payment for each oracle
@@ -118,8 +129,8 @@ type Answer struct {
 // Access controller state
 type AccessController struct {
 	Owner  solana.PublicKey
-	Len    uint8
 	Access [32]solana.PublicKey
+	Len    uint64
 }
 
 // Validator state
@@ -130,7 +141,7 @@ type Validator struct {
 	LoweringAccessController solana.PublicKey
 
 	Flags [128]solana.PublicKey
-	Len   uint8
+	Len   uint64
 }
 
 // CL Core OCR2 job spec RelayConfig member for Solana
