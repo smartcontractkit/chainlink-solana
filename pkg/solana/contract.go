@@ -100,8 +100,8 @@ func getState(ctx context.Context, client *rpc.Client, account solana.PublicKey)
 	}
 
 	// validation for config version
-	if configVersion != state.Config.Version {
-		return State{}, fmt.Errorf("decoded config version (%d) does not match expected config version (%d)", state.Config.Version, configVersion)
+	if configVersion != state.Version {
+		return State{}, fmt.Errorf("decoded config version (%d) does not match expected config version (%d)", state.Version, configVersion)
 	}
 
 	return state, nil
