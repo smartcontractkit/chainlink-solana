@@ -1,5 +1,5 @@
 {
-  "version": "0.0.0",
+  "version": "0.1.0",
   "name": "deviation_flagging_validator",
   "instructions": [
     {
@@ -208,6 +208,22 @@
           {
             "name": "flags",
             "type": {
+              "defined": "Flags"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "Flags",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "xs",
+            "type": {
               "array": [
                 "publicKey",
                 128
@@ -216,7 +232,7 @@
           },
           {
             "name": "len",
-            "type": "u32"
+            "type": "u8"
           }
         ]
       }
@@ -232,6 +248,11 @@
       "code": 301,
       "name": "InvalidInput",
       "msg": "Invalid input"
+    },
+    {
+      "code": 302,
+      "name": "Full",
+      "msg": "Flags list is full"
     }
   ]
 }

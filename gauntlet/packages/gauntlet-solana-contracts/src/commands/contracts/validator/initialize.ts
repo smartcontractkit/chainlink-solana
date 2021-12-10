@@ -30,7 +30,7 @@ export default class Initialize extends SolanaCommand {
         raisingAccessController: accessController,
         loweringAccessController: accessController,
       },
-      signers: [owner, state],
+      signers: [state],
       instructions: [await program.account.validator.createInstruction(state)],
     })
 
