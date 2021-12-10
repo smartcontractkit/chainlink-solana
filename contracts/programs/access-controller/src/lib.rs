@@ -13,12 +13,14 @@ pub const MAX_ADDRS: usize = 32;
 #[zero_copy]
 pub struct AccessList {
     xs: [Pubkey; 32], // sadly we can't use const https://github.com/project-serum/anchor/issues/632
-    len: u8,
+    len: u64,
 }
-arrayvec!(AccessList, Pubkey, u8);
-const_assert!(mem::size_of::<AccessList>() == 1 + mem::size_of::<Pubkey>() * MAX_ADDRS);
+arrayvec!(AccessList, Pubkey, u64);
+const_assert!(
+    mem::size_of::<AccessList>() == mem::size_of::<u64>() + mem::size_of::<Pubkey>() * MAX_ADDRS
+);
 
-#[account(zero_copy)] // TODO: force repr(C) here
+#[account(zero_copy)]
 pub struct AccessController {
     pub owner: Pubkey,
     pub access_list: AccessList,

@@ -1,6 +1,10 @@
 name: rust
 on: [push]
 
+defaults:
+  run:
+    working-directory: contracts
+
 jobs:
   test:
     name: Test
@@ -13,8 +17,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - run: echo $HOME
-    - run: echo $PATH
     - run: solana-keygen new -o id.json
     - run: yarn install --frozen-lockfile
     - run: anchor test

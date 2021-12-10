@@ -1,15 +1,14 @@
 .direnv
-target/
-.anchor
 .DS_Store
-target
 **/*.rs.bk
 
 # ignore relay build
 pkg/bin
 
+contracts/target
+contracts/.anchor
 # keypair used by anchor/anchor test
-id.json
+contracts/id.json
 
 # TS
 node_modules

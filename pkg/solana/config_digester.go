@@ -26,7 +26,7 @@ func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.Co
 	digest := types.ConfigDigest{}
 	buf := sha256.New()
 
-	if _, err := buf.Write(d.ProgramID[:]); err != nil {
+	if _, err := buf.Write(d.ProgramID.Bytes()); err != nil {
 		return digest, err
 	}
 
@@ -48,7 +48,7 @@ func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.Co
 		if err != nil {
 			return digest, errors.Wrapf(err, "error on parsing base58 encoded public key %s", transmitter)
 		}
-		if _, err := buf.Write(pubKey[:]); err != nil {
+		if _, err := buf.Write(pubKey.Bytes()); err != nil {
 			return digest, err
 		}
 	}

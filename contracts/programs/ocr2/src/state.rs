@@ -1,10 +1,11 @@
 use anchor_lang::prelude::*;
 use static_assertions::const_assert;
-use std::mem;
 
 pub use anchor_lang::solana_program::secp256k1_recover::Secp256k1Pubkey;
 
 use arrayvec::arrayvec;
+
+// NOTE: ALL types in this file have to be verified to contain no padding via `cargo rustc -- -Zprint-type-sizes`!
 
 // 19 is what we can achieve with Solana's resource constraints
 #[constant]
@@ -27,29 +28,28 @@ pub struct LeftoverPayment {
 #[zero_copy]
 pub struct Oracles {
     xs: [Oracle; 19], // sadly we can't use const https://github.com/project-serum/anchor/issues/632
-    len: u8,
+    len: u64,
 }
-arrayvec!(Oracles, Oracle, u8);
+arrayvec!(Oracles, Oracle, u64);
 
-#[account(zero_copy)] // TODO: force repr(C) here
+#[zero_copy]
+pub struct LeftoverPayments {
+    xs: [LeftoverPayment; 19], // sadly we can't use const https://github.com/project-serum/anchor/issues/632
+    len: u64,
+}
+arrayvec!(LeftoverPayments, LeftoverPayment, u64);
+
+#[account(zero_copy)]
 pub struct State {
+    pub version: u8,
     pub nonce: u8,
+    _padding0: u16,
+    _padding1: u32,
     pub config: Config,
     pub oracles: Oracles,
-    pub leftover_payments: [LeftoverPayment; 19],
-    pub leftover_payments_len: u8,
+    pub leftover_payments: LeftoverPayments,
     pub transmissions: Pubkey,
 }
-const_assert!(
-    mem::size_of::<State>()
-        == mem::size_of::<Config>()
-            + 1
-            + 1
-            + mem::size_of::<Oracle>() * MAX_ORACLES
-            + mem::size_of::<(Pubkey, u64)>() * MAX_ORACLES
-            + 1
-            + mem::size_of::<Pubkey>()
-);
 
 #[zero_copy]
 pub struct OffchainConfig {
@@ -61,8 +61,6 @@ arrayvec!(OffchainConfig, u8, u64);
 
 #[zero_copy]
 pub struct Config {
-    pub version: u8,
-
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
 
@@ -78,20 +76,20 @@ pub struct Config {
     pub min_answer: i128,
     pub max_answer: i128,
 
-    pub decimals: u8,
     /// Raw UTF-8 byte string
     pub description: [u8; 32],
 
+    pub decimals: u8,
     pub f: u8,
+    pub round: u8,
+    _padding0: u8,
+    pub epoch: u32,
+    pub latest_aggregator_round_id: u32,
+    pub latest_transmitter: Pubkey,
 
     pub config_count: u32,
     pub latest_config_digest: [u8; 32],
     pub latest_config_block_number: u64,
-
-    pub latest_aggregator_round_id: u32,
-    pub latest_transmitter: Pubkey,
-    pub epoch: u32,
-    pub round: u8,
 
     pub billing: Billing,
     pub validator: Pubkey,
@@ -101,7 +99,6 @@ pub struct Config {
     // a staging area which will swap onto data on commit
     pub pending_offchain_config: OffchainConfig,
 }
-const_assert!(mem::size_of::<Config>() == 384 + 4096 + 8 + 4096 + 8 + 8 + 8); // bytes
 
 impl Config {
     pub fn config_digest_from_data(
@@ -162,12 +159,12 @@ pub struct Oracle {
     /// will be zeroed out if empty
     pub proposed_payee: Pubkey,
 
-    /// `transmit()` reimbursements
-    pub payment: u64,
     /// Rewards from round_id up until now
     pub from_round_id: u32,
+
+    /// `transmit()` reimbursements
+    pub payment: u64,
 }
-const_assert!(mem::size_of::<Oracle>() == 128); // bytes
 
 impl Default for Oracle {
     fn default() -> Self {
@@ -176,8 +173,8 @@ impl Default for Oracle {
             signer: SigningKey { key: [0u8; 20] },
             payee: Pubkey::default(),
             proposed_payee: Pubkey::default(),
-            payment: 0,
             from_round_id: 0,
+            payment: 0,
         }
     }
 }
@@ -186,11 +183,10 @@ impl Default for Oracle {
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Transmission {
     pub answer: i128,
-    pub timestamp: u32,
+    pub timestamp: u64,
 }
-const_assert!(mem::size_of::<Transmission>() == 20); // bytes
 
-#[account(zero_copy)] // TODO: force repr(C) here
+#[account(zero_copy)]
 pub struct Transmissions {
     pub latest_round_id: u32,
     // Current offset
