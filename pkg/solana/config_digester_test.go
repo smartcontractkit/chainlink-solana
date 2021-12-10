@@ -21,14 +21,14 @@ func TestConfigDigester(t *testing.T) {
 
 	// Test ConfigDigester by using a known raw state account + known expected digest
 	var state State
-	err = bin.NewBorshDecoder(mockRawState).Decode(&state)
+	err = bin.NewBorshDecoder(mockState.Raw).Decode(&state)
 	require.NoError(t, err)
 	config := configFromState(state)
 
 	actualDigest, err := digester.ConfigDigest(config)
 	require.NoError(t, err)
 
-	expectedDigest := "00039ad1eaa13649831b4cc02f5437bf556910037c6833f87249edbeceab2828"
+	expectedDigest := mockState.ConfigDigestHex
 	require.Equal(t, expectedDigest, actualDigest.Hex())
 }
 
