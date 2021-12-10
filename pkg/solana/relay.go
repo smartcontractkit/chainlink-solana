@@ -9,7 +9,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"gopkg.in/guregu/null.v4"
 
-	"github.com/smartcontractkit/chainlink/core/services/relay"
+	relaytypes "github.com/smartcontractkit/chainlink/core/services/relay/types"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
@@ -86,7 +86,7 @@ func (r *Relayer) Healthy() error {
 }
 
 // TODO [relay]: import from smartcontractkit/solana-integration impl
-func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay.OCR2Provider, error) {
+func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relaytypes.OCR2Provider, error) {
 	var provider ocr2Provider
 	spec, ok := s.(OCR2Spec)
 	if !ok {
