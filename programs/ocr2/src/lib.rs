@@ -47,7 +47,7 @@ pub mod ocr2 {
         description: String,
     ) -> ProgramResult {
         let mut state = ctx.accounts.state.load_init()?;
-        state.config.version = 1;
+        state.version = 1;
         state.nonce = nonce;
         state.transmissions = ctx.accounts.transmissions.key();
 
@@ -170,7 +170,6 @@ pub mod ocr2 {
             ref mut config,
             ref mut oracles,
             ref mut leftover_payments,
-            ref mut leftover_payments_len,
             ..
         } = &mut *ctx.accounts.state.load_mut()?;
 
@@ -181,13 +180,12 @@ pub mod ocr2 {
         require!(!leftovers, PaymentsRemaining);
 
         // Move current balances to leftover payments
-        for (i, oracle) in oracles.iter().enumerate() {
-            leftover_payments[i] = LeftoverPayment {
+        for oracle in oracles.iter() {
+            leftover_payments.push(LeftoverPayment {
                 payee: oracle.payee,
                 amount: calculate_owed_payment(config, oracle)?,
-            };
+            })
         }
-        *leftover_payments_len = oracles.len() as u8;
 
         // Clear out old oracles
         oracles.clear();
@@ -305,11 +303,8 @@ pub mod ocr2 {
     pub fn withdraw_funds(ctx: Context<WithdrawFunds>, amount: u64) -> ProgramResult {
         let state = &ctx.accounts.state.load()?;
 
-        let link_due = calculate_total_link_due(
-            &state.config,
-            &state.oracles,
-            &state.leftover_payments[..state.leftover_payments_len as usize],
-        )?;
+        let link_due =
+            calculate_total_link_due(&state.config, &state.oracles, &state.leftover_payments)?;
 
         let balance = token::accessor::amount(&ctx.accounts.token_vault.to_account_info())?;
         let available = balance.saturating_sub(link_due);
@@ -380,18 +375,17 @@ pub mod ocr2 {
     ) -> ProgramResult {
         let State {
             ref mut leftover_payments,
-            ref mut leftover_payments_len,
             ref nonce,
             ..
         } = &mut *ctx.accounts.state.load_mut()?;
 
         require!(
-            ctx.remaining_accounts.len() == *leftover_payments_len as usize,
+            ctx.remaining_accounts.len() == leftover_payments.len(),
             InvalidInput
         );
 
         let payments: Vec<(u64, CpiContext<'_, '_, '_, 'info, token::Transfer<'info>>)> =
-            leftover_payments[..*leftover_payments_len as usize]
+            leftover_payments
                 .iter_mut()
                 .zip(ctx.remaining_accounts)
                 .map(|(leftover, account)| {
@@ -412,8 +406,7 @@ pub mod ocr2 {
                 .collect::<Result<_>>()?;
 
         // Clear leftover payments
-        *leftover_payments_len = 0;
-        *leftover_payments = [LeftoverPayment::default(); MAX_ORACLES];
+        leftover_payments.clear();
 
         let nonce = *nonce;
 
@@ -721,7 +714,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
     let mut transmissions = ctx.accounts.transmissions.load_mut()?;
     transmissions.store_round(Transmission {
         answer: report.median,
-        timestamp: report.observations_timestamp,
+        timestamp: u64::from(report.observations_timestamp),
     });
 
     // calculate and pay reimbursement
@@ -1021,11 +1014,8 @@ pub mod query {
         let balance = token::accessor::amount(token_vault)?;
 
         // get total due based on state inputs
-        let link_due = calculate_total_link_due(
-            &state.config,
-            &state.oracles,
-            &state.leftover_payments[..state.leftover_payments_len as usize],
-        )?;
+        let link_due =
+            calculate_total_link_due(&state.config, &state.oracles, &state.leftover_payments)?;
 
         // amount available is the current balance minus amount due
         let available_balance = balance.saturating_sub(link_due);

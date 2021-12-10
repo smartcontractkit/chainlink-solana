@@ -11,12 +11,12 @@ static THRESHOLD_MULTIPLIER: u128 = 100000;
 #[zero_copy]
 pub struct Flags {
     xs: [Pubkey; 128], // sadly we can't use const https://github.com/project-serum/anchor/issues/632
-    len: u8,
+    len: u64,
 }
 
-arrayvec!(Flags, Pubkey, u8);
+arrayvec!(Flags, Pubkey, u64);
 
-#[account(zero_copy)] // TODO: force repr(C) here
+#[account(zero_copy)]
 pub struct Validator {
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,

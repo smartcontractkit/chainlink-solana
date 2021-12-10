@@ -447,7 +447,7 @@ describe('ocr2', async () => {
         signers: [],
     });
     let account = await program.account.state.fetch(state.publicKey);
-    let leftovers = account.leftoverPayments.slice(0, account.leftoverPaymentsLen);
+    let leftovers = account.leftoverPayments.slice(0, account.leftoverPayments.Len);
     for (let leftover of leftovers) {
       assert.ok(leftover.amount.toNumber() !== 0);
     }
@@ -471,7 +471,7 @@ describe('ocr2', async () => {
     );
 
     account = await program.account.state.fetch(state.publicKey);
-    assert.ok(account.leftoverPaymentsLen == 0);
+    assert.ok(account.leftoverPayments.Len == 0);
   });
   
   it('Can call query', async () => {
