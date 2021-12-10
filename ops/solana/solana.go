@@ -17,15 +17,13 @@ import (
 	relayUtils "github.com/smartcontractkit/chainlink-relay/ops/utils"
 )
 
-// Programs
 const (
+	// program accounts
 	AccessController = iota
 	OCR2
-)
 
-// Program accounts
-const (
-	BillingAccessController = iota
+	// program state accounts
+	BillingAccessController
 	RequesterAccessController
 	OCRFeed
 	OCRTransmissions
@@ -33,10 +31,9 @@ const (
 )
 
 type Deployer struct {
-	gauntlet  relayUtils.Gauntlet
-	network   string
-	Contracts map[int]string
-	States    map[int]string
+	gauntlet relayUtils.Gauntlet
+	network  string
+	Account  map[int]string
 }
 
 func New(ctx *pulumi.Context) (Deployer, error) {
@@ -81,10 +78,9 @@ func New(ctx *pulumi.Context) (Deployer, error) {
 	}
 
 	return Deployer{
-		gauntlet:  gauntlet,
-		network:   "local",
-		Contracts: make(map[int]string),
-		States:    make(map[int]string),
+		gauntlet: gauntlet,
+		network:  "local",
+		Account:  make(map[int]string),
 	}, nil
 }
 
@@ -109,7 +105,7 @@ func (d *Deployer) Load() error {
 		return errors.Wrap(err, "report not available")
 	}
 
-	d.Contracts[AccessController] = report.Responses[0].Contract
+	d.Account[AccessController] = report.Responses[0].Contract
 
 	// OCR2 contract deployment
 	fmt.Println("Deploying OCR 2...")
@@ -125,7 +121,7 @@ func (d *Deployer) Load() error {
 	if err != nil {
 		return errors.Wrap(err, "report not available")
 	}
-	d.Contracts[OCR2] = report.Responses[0].Contract
+	d.Account[OCR2] = report.Responses[0].Contract
 
 	return nil
 }
@@ -146,7 +142,7 @@ func (d *Deployer) DeployLINK() error {
 	}
 
 	linkAddress := report.Responses[0].Contract
-	d.States[LINK] = linkAddress
+	d.Account[LINK] = linkAddress
 
 	return nil
 }
@@ -165,7 +161,7 @@ func (d *Deployer) DeployOCR() error {
 	if err != nil {
 		return err
 	}
-	d.States[RequesterAccessController] = report.Responses[0].Contract
+	d.Account[RequesterAccessController] = report.Responses[0].Contract
 
 	fmt.Println("Step 2: Init Billing Access Controller")
 	err = d.gauntlet.ExecCommand(
@@ -179,7 +175,7 @@ func (d *Deployer) DeployOCR() error {
 	if err != nil {
 		return err
 	}
-	d.States[BillingAccessController] = report.Responses[0].Contract
+	d.Account[BillingAccessController] = report.Responses[0].Contract
 
 	input := map[string]interface{}{
 		"minAnswer":   "0",
@@ -198,9 +194,9 @@ func (d *Deployer) DeployOCR() error {
 	err = d.gauntlet.ExecCommand(
 		"ocr2:initialize",
 		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("requesterAccessController", d.States[RequesterAccessController]),
-		d.gauntlet.Flag("billingAccessController", d.States[BillingAccessController]),
-		d.gauntlet.Flag("link", d.States[LINK]),
+		d.gauntlet.Flag("requesterAccessController", d.Account[RequesterAccessController]),
+		d.gauntlet.Flag("billingAccessController", d.Account[BillingAccessController]),
+		d.gauntlet.Flag("link", d.Account[LINK]),
 		d.gauntlet.Flag("input", string(jsonInput)),
 	)
 	if err != nil {
@@ -212,8 +208,8 @@ func (d *Deployer) DeployOCR() error {
 		return err
 	}
 
-	d.States[OCRFeed] = report.Data["state"]
-	d.States[OCRTransmissions] = report.Data["transmissions"]
+	d.Account[OCRFeed] = report.Data["state"]
+	d.Account[OCRTransmissions] = report.Data["transmissions"]
 
 	return nil
 }
@@ -222,9 +218,9 @@ func (d Deployer) TransferLINK() error {
 	err := d.gauntlet.ExecCommand(
 		"token:transfer",
 		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("to", d.States[OCRFeed]),
+		d.gauntlet.Flag("to", d.Account[OCRFeed]),
 		d.gauntlet.Flag("amount", "10000"),
-		d.States[LINK],
+		d.Account[LINK],
 	)
 	if err != nil {
 		return errors.Wrap(err, "LINK transfer failed")
@@ -243,7 +239,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 		"ocr2:begin_offchain_config",
 		d.gauntlet.Flag("network", d.network),
 		d.gauntlet.Flag("version", "1"),
-		d.gauntlet.Flag("state", d.States[OCRFeed]),
+		d.gauntlet.Flag("state", d.Account[OCRFeed]),
 	)
 	if err != nil {
 		return errors.Wrap(err, "begin OCR 2 set offchain config failed")
@@ -272,8 +268,8 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 		// 	"transmitter": k["OCRTransmitter"],
 		// })
 		oracles = append(oracles, map[string]string{
-			"signer":      strings.TrimPrefix(k["OCROnchainPublicKey"], "0x"), 		// TODO: temporary parsing of 0x... hex key to hex key
-			"transmitter": solana.PublicKeyFromBytes(keyByte).String(), 		// TODO: temporary parsing from hex encoded to base58 encoded
+			"signer":      strings.TrimPrefix(k["OCROnchainPublicKey"], "0x"), // TODO: temporary parsing of 0x... hex key to hex key
+			"transmitter": solana.PublicKeyFromBytes(keyByte).String(),        // TODO: temporary parsing from hex encoded to base58 encoded
 		})
 		// operators = append(operators, map[string]string{
 		// 	"payee":       k["OCRPayeeAddress"],
@@ -315,7 +311,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	err = d.gauntlet.ExecCommand(
 		"ocr2:write_offchain_config",
 		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("state", d.States[OCRFeed]),
+		d.gauntlet.Flag("state", d.Account[OCRFeed]),
 		d.gauntlet.Flag("input", string(jsonInput)),
 	)
 
@@ -327,7 +323,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	err = d.gauntlet.ExecCommand(
 		"ocr2:commit_offchain_config",
 		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("state", d.States[OCRFeed]),
+		d.gauntlet.Flag("state", d.Account[OCRFeed]),
 	)
 
 	if err != nil {
@@ -348,7 +344,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	err = d.gauntlet.ExecCommand(
 		"ocr2:set_config",
 		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("state", d.States[OCRFeed]),
+		d.gauntlet.Flag("state", d.Account[OCRFeed]),
 		d.gauntlet.Flag("input", string(jsonInput)),
 	)
 
@@ -371,7 +367,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	// err = d.gauntlet.ExecCommand(
 	// 	"ocr2:set_payees",
 	// 	d.gauntlet.Flag("network", d.network),
-	// 	d.gauntlet.Flag("state", d.States[OCRFeed]),
+	// 	d.gauntlet.Flag("state", d.Account[OCRFeed]),
 	// 	d.gauntlet.Flag("input", string(jsonInput)),
 	// )
 
@@ -403,9 +399,9 @@ func (d Deployer) Fund(addresses []string) error {
 }
 
 func (d Deployer) OCR2Address() string {
-	return d.States[OCRFeed]
+	return d.Account[OCR2]
 }
 
 func (d Deployer) Addresses() map[int]string {
-	return d.States
+	return d.Account
 }
