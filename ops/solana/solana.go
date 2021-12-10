@@ -238,7 +238,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	err := d.gauntlet.ExecCommand(
 		"ocr2:begin_offchain_config",
 		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("version", "1"),
+		d.gauntlet.Flag("version", "2"),
 		d.gauntlet.Flag("state", d.Account[OCRFeed]),
 	)
 	if err != nil {
