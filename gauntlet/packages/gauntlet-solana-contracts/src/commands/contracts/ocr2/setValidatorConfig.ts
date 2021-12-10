@@ -4,6 +4,12 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import BN from 'bn.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
+import { getRDD } from '../../../lib/rdd'
+
+type Input = {
+  validator: string
+  threshold: number | string
+}
 
 export default class SetValidatorConfig extends SolanaCommand {
   static id = 'ocr2:set_validator_config'
@@ -12,6 +18,17 @@ export default class SetValidatorConfig extends SolanaCommand {
   static examples = [
     'yarn gauntlet ocr2:set_validator_config --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --threshold=1000 --validator=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
+
+  makeInput = (userInput): Input => {
+    if (userInput) return userInput as Input
+    const rdd = getRDD(this.flags.rdd)
+    const aggregator = rdd.contracts[this.flags.state]
+    return {
+      validator: aggregator.validator,
+      threshold: this.flags.threshold,
+    }
+  }
+
   constructor(flags, args) {
     super(flags, args)
 
@@ -24,13 +41,17 @@ export default class SetValidatorConfig extends SolanaCommand {
     const program = this.loadProgram(ocr2.idl, address)
 
     const state = new PublicKey(this.flags.state)
-    const validator = new PublicKey(this.flags.validator)
-    const threshhold = new BN(this.flags.threshold || 80000)
+    const input = this.makeInput(this.flags.input)
     const owner = this.wallet.payer
+
+    console.log('INPUT', input)
+
+    const validator = new PublicKey(input.validator)
+    const threshhold = new BN(input.threshold)
 
     console.log(`Setting validator config on ${state.toString()}...`)
 
-    const tx = await program.rpc.setValidatorConfig(threshhold.toNumber(), {
+    const tx = await program.rpc.setValidatorConfig(threshhold, {
       accounts: {
         state: state,
         authority: owner.publicKey,

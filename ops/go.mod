@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/pulumi/pulumi/sdk/v3 v3.17.0
-	github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20211125105423-65e283a1b3ef
+	github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20211209102114-09b8c96ef963
 )
 
 require (

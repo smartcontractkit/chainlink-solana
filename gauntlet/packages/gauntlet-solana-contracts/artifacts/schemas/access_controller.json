@@ -1,5 +1,5 @@
 {
-  "version": "0.0.0",
+  "version": "0.1.0",
   "name": "access_controller",
   "instructions": [
     {
@@ -87,17 +87,33 @@
             "type": "publicKey"
           },
           {
-            "name": "len",
-            "type": "u8"
-          },
+            "name": "accessList",
+            "type": {
+              "defined": "AccessList"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "AccessList",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            "name": "access",
+            "name": "xs",
             "type": {
               "array": [
                 "publicKey",
                 32
               ]
             }
+          },
+          {
+            "name": "len",
+            "type": "u8"
           }
         ]
       }

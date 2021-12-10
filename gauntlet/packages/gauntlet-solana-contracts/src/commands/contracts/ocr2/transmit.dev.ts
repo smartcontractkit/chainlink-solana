@@ -5,7 +5,6 @@ import { Keypair, PublicKey, Transaction, TransactionInstruction } from '@solana
 import { createHash } from 'crypto'
 import * as secp256k1 from 'secp256k1'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { OPERATORS } from './setup.dev.flow'
 
 export default class Transmit extends SolanaCommand {
   static id = 'ocr2:transmit'
@@ -57,6 +56,7 @@ export default class Transmit extends SolanaCommand {
 
     let hash = createHash('sha256').update(Buffer.from(rawReport)).update(Buffer.from(reportContext)).digest()
 
+    const OPERATORS: any[] = []
     const rawSignatures: any[] = []
     for (let oracle of OPERATORS.slice(0, 3 * info.config.f + 1)) {
       const { signature, recid } = secp256k1.ecdsaSign(hash, Buffer.from(oracle.signer.secretKey))

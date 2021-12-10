@@ -1782,6 +1782,8 @@ github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20211125102828-e5e65b3912
 github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20211125102828-e5e65b39125c/go.mod h1:ZTL129dr+RmbWbjhQEXp1OHYt1yST965QHRsB8eCVt0=
 github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20211125105423-65e283a1b3ef h1:6qp/DhZq1cq8RXAc3WTvbS3pxtCbL3c9lgj1PWknNKo=
 github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20211125105423-65e283a1b3ef/go.mod h1:ZTL129dr+RmbWbjhQEXp1OHYt1yST965QHRsB8eCVt0=
+github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20211209102114-09b8c96ef963 h1:wX0xi/0yrfl1TsrLmCq1vGb/NLgE5KaAm32nK+MbzgA=
+github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20211209102114-09b8c96ef963/go.mod h1:ZTL129dr+RmbWbjhQEXp1OHYt1yST965QHRsB8eCVt0=
 github.com/smartcontractkit/integrations-framework v0.10.12 h1:dzrQf+S8UOuQ1wg8SWz0SJwWaH630q5pJ9S8osnKHDk=
 github.com/smartcontractkit/integrations-framework v0.10.12/go.mod h1:jNWoj8zHmuBBTqMl9PjZPO0KKfW59No9janpWzKHORE=
 github.com/smartcontractkit/libocr v0.0.0-20201203233047-5d9b24f0cbb5/go.mod h1:bfdSuLnBWCkafDvPGsQ1V6nrXhg046gh227MKi4zkpc=

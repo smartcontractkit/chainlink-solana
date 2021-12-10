@@ -1,5 +1,5 @@
 {
-  "version": "0.0.0",
+  "version": "0.1.0",
   "name": "ocr2",
   "instructions": [
     {
@@ -132,6 +132,64 @@
       "args": []
     },
     {
+      "name": "beginOffchainConfig",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "offchainConfigVersion",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "writeOffchainConfig",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "offchainConfig",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "commitOffchainConfig",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "setConfig",
       "accounts": [
         {
@@ -157,18 +215,6 @@
         {
           "name": "f",
           "type": "u8"
-        },
-        {
-          "name": "onchainConfig",
-          "type": "bytes"
-        },
-        {
-          "name": "offchainConfigVersion",
-          "type": "u64"
-        },
-        {
-          "name": "offchainConfig",
-          "type": "bytes"
         }
       ]
     },
@@ -520,9 +566,86 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "query",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "transmissions",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "buffer",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "scope",
+          "type": {
+            "defined": "Scope"
+          }
+        }
+      ]
     }
   ],
   "accounts": [
+    {
+      "name": "LatestConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "configCount",
+            "type": "u32"
+          },
+          {
+            "name": "configDigest",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "blockNumber",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LinkAvailableForPayment",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "availableBalance",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OracleObservationCount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "count",
+            "type": "u32"
+          }
+        ]
+      }
+    },
     {
       "name": "State",
       "type": {
@@ -541,12 +664,7 @@
           {
             "name": "oracles",
             "type": {
-              "array": [
-                {
-                  "defined": "Oracle"
-                },
-                19
-              ]
+              "defined": "Oracles"
             }
           },
           {
@@ -650,6 +768,54 @@
       }
     },
     {
+      "name": "Oracles",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "xs",
+            "type": {
+              "array": [
+                {
+                  "defined": "Oracle"
+                },
+                19
+              ]
+            }
+          },
+          {
+            "name": "len",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OffchainConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u64"
+          },
+          {
+            "name": "xs",
+            "type": {
+              "array": [
+                "u8",
+                4096
+              ]
+            }
+          },
+          {
+            "name": "len",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "Config",
       "type": {
         "kind": "struct",
@@ -708,10 +874,6 @@
             "type": "u8"
           },
           {
-            "name": "n",
-            "type": "u8"
-          },
-          {
             "name": "configCount",
             "type": "u32"
           },
@@ -731,6 +893,10 @@
           {
             "name": "latestAggregatorRoundId",
             "type": "u32"
+          },
+          {
+            "name": "latestTransmitter",
+            "type": "publicKey"
           },
           {
             "name": "epoch",
@@ -753,6 +919,18 @@
           {
             "name": "flaggingThreshold",
             "type": "u32"
+          },
+          {
+            "name": "offchainConfig",
+            "type": {
+              "defined": "OffchainConfig"
+            }
+          },
+          {
+            "name": "pendingOffchainConfig",
+            "type": {
+              "defined": "OffchainConfig"
+            }
           }
         ]
       }
@@ -820,6 +998,23 @@
           {
             "name": "timestamp",
             "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Scope",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "LatestConfig"
+          },
+          {
+            "name": "LinkAvailableForPayment"
+          },
+          {
+            "name": "LatestRoundData"
           }
         ]
       }
