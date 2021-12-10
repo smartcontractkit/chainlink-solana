@@ -31,6 +31,13 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     },
   })
 
+  wrapInspectResponse = (success: boolean, address: string, states?: Record<string, string>): TransactionResponse => ({
+    hash: '',
+    address,
+    states,
+    wait: async () => ({ success }),
+  })
+
   deploy = async (bytecode: Buffer | Uint8Array | Array<number>, programId: Keypair): Promise<TransactionResponse> => {
     const success = await BpfLoader.load(
       this.provider.connection,
