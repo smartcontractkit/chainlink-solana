@@ -6,6 +6,7 @@
 pkg/bin
 
 contracts/target
+v1/target
 contracts/.anchor
 # keypair used by anchor/anchor test
 contracts/id.json
