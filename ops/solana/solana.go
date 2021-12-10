@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
@@ -255,12 +256,24 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	threshold := 1
 	// operators := []map[string]string{}
 	for _, k := range keys {
+
+		// TODO: temporary parsing from hex encoded to base58 encoded
+		keyByte, err := hex.DecodeString(k["OCRTransmitter"])
+		if err != nil {
+			return err
+		}
+
 		S = append(S, 1)
 		offChainPublicKeys = append(offChainPublicKeys, k["OCROffchainPublicKey"])
 		peerIDs = append(peerIDs, k["P2PID"])
+		// original oracle structure
+		// oracles = append(oracles, map[string]string{
+		// 	"signer":      k["OCROnchainPublicKey"],
+		// 	"transmitter": k["OCRTransmitter"],
+		// })
 		oracles = append(oracles, map[string]string{
-			"signer":      k["OCROnchainPublicKey"],
-			"transmitter": k["NodeAddress"],
+			"signer":      strings.TrimPrefix(k["OCROnchainPublicKey"], "0x"), 		// TODO: temporary parsing of 0x... hex key to hex key
+			"transmitter": solana.PublicKeyFromBytes(keyByte).String(), 		// TODO: temporary parsing from hex encoded to base58 encoded
 		})
 		// operators = append(operators, map[string]string{
 		// 	"payee":       k["OCRPayeeAddress"],
@@ -374,7 +387,7 @@ func (d Deployer) Fund(addresses []string) error {
 		return errors.New("'solana' is not available in commandline")
 	}
 	for _, a := range addresses {
-		// parse hex encoded pubkey to base58 encoded account
+		// TODO: to be removed in the future, parse hex encoded pubkey to base58 encoded account
 		keyByte, err := hex.DecodeString(a)
 		if err != nil {
 			return err
