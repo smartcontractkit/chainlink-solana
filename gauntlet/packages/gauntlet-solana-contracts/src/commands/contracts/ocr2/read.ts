@@ -3,8 +3,8 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import BN from 'bn.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { Protobuf } from '../../../lib/protobuf'
-import { offchainDescriptor } from '../../../lib/protoSchemas'
+import { Protobuf } from '../../../core/protobuf'
+import { offchainDescriptor } from '../../../core/protoSchemas'
 
 export default class ReadState extends SolanaCommand {
   static id = 'ocr2:read_state'

@@ -186,7 +186,6 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         command: SetConfig,
         flags: {
           state: ID.contract(this.stepIds.OCR_2),
-          link: ID.contract(this.stepIds.TOKEN),
           input: configInput,
         },
       },

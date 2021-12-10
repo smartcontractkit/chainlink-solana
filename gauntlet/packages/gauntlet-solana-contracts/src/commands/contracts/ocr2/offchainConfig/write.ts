@@ -4,13 +4,12 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { MAX_TRANSACTION_BYTES } from '../../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
-import { Protobuf } from '../../../../lib/protobuf'
-import { offchainDescriptor } from '../../../../lib/protoSchemas'
-import { generateSecretWords } from '../../../../lib/random'
+import { Protobuf } from '../../../../core/protobuf'
+import { offchainDescriptor } from '../../../../core/protoSchemas'
 import { getRDD } from '../../../../lib/rdd'
-import { makeSharedSecretEncryptions, SharedSecretEncryptions } from '../../../../lib/sharedSecretEncryptions'
-import { durationToNanoseconds } from '../../../../lib/time'
-import { divideIntoChunks } from '../../../../lib/utils'
+import { makeSharedSecretEncryptions, SharedSecretEncryptions } from '../../../../core/sharedSecretEncryptions'
+import { durationToNanoseconds } from '../../../../core/time'
+import { divideIntoChunks } from '../../../../core/utils'
 
 type Input = {
   deltaProgressNanoseconds: number
@@ -111,8 +110,7 @@ export default class WriteOffchainConfig extends SolanaCommand {
   // a set of SharedSecretEncryptionPublicKeys, the sharedSecret, and a cryptographic randomness source
   generateSecretEncryptions = async (operatorsPublicKeys: string[]): Promise<SharedSecretEncryptions> => {
     const gauntletSecret = process.env.SECRET
-    const signerSecret = await generateSecretWords()
-    return makeSharedSecretEncryptions(gauntletSecret!, signerSecret, operatorsPublicKeys)
+    return makeSharedSecretEncryptions(gauntletSecret!, operatorsPublicKeys)
   }
 
   execute = async () => {

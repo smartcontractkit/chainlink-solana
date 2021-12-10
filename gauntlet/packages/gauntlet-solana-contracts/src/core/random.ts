@@ -1,35 +1,5 @@
-import * as readline from 'readline'
-import * as fs from 'fs'
-import { join } from 'path'
-
-export async function generateSecretWords(sampleSize: number = 12): Promise<string> {
-  if (sampleSize <= 0) {
-    throw new RangeError('Requested 0 or less words')
-  }
-
-  const fileStream = fs.createReadStream(
-    join(process.cwd(), 'packages/gauntlet-solana-contracts/artifacts/words', 'words.txt'),
-  )
-  const rl = readline.createInterface({
-    input: fileStream,
-    crlfDelay: Infinity,
-  })
-  const wordList: string[] = []
-  for await (const line of rl) {
-    const word = line.trim()
-    if (word.length > 0) wordList.push(word)
-  }
-
-  const n = wordList.length
-  if (n < sampleSize) {
-    throw new RangeError(`Requested ${sampleSize} words, but wordlist only has ${n} words`)
-  }
-
-  return sample(wordList, sampleSize).join(' ')
-}
-
 // Python's `.sample` ported over to TS: https://stackoverflow.com/a/45556840/8605244
-function sample<T>(population: T[], k: number): T[] {
+export function sample<T>(population: T[], k: number): T[] {
   const n = population.length
 
   if (k < 0 || k > n) throw new RangeError('Sample size larger than population or is negative')
