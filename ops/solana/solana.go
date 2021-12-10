@@ -3,7 +3,6 @@ package solana
 import (
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,7 +10,7 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
-	ghErrors "github.com/pkg/errors"
+	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	relayUtils "github.com/smartcontractkit/chainlink-relay/ops/utils"
@@ -101,12 +100,12 @@ func (d *Deployer) Load() error {
 		d.gauntlet.Flag("network", d.network),
 	)
 	if err != nil {
-		return ghErrors.Wrap(err, "access controller contract deployment failed")
+		return errors.Wrap(err, "access controller contract deployment failed")
 	}
 
 	report, err := d.gauntlet.ReadCommandReport()
 	if err != nil {
-		return ghErrors.Wrap(err, "report not available")
+		return errors.Wrap(err, "report not available")
 	}
 
 	d.Contracts[AccessController] = report.Responses[0].Contract
@@ -118,12 +117,12 @@ func (d *Deployer) Load() error {
 		d.gauntlet.Flag("network", d.network),
 	)
 	if err != nil {
-		return ghErrors.Wrap(err, "ocr 2 contract deployment failed")
+		return errors.Wrap(err, "ocr 2 contract deployment failed")
 	}
 
 	report, err = d.gauntlet.ReadCommandReport()
 	if err != nil {
-		return ghErrors.Wrap(err, "report not available")
+		return errors.Wrap(err, "report not available")
 	}
 	d.Contracts[OCR2] = report.Responses[0].Contract
 
@@ -137,12 +136,12 @@ func (d *Deployer) DeployLINK() error {
 		d.gauntlet.Flag("network", d.network),
 	)
 	if err != nil {
-		return ghErrors.Wrap(err, "LINK contract deployment failed")
+		return errors.Wrap(err, "LINK contract deployment failed")
 	}
 
 	report, err := d.gauntlet.ReadCommandReport()
 	if err != nil {
-		return ghErrors.Wrap(err, "report not available")
+		return errors.Wrap(err, "report not available")
 	}
 
 	linkAddress := report.Responses[0].Contract
@@ -159,7 +158,7 @@ func (d *Deployer) DeployOCR() error {
 		d.gauntlet.Flag("network", d.network),
 	)
 	if err != nil {
-		return ghErrors.Wrap(err, "AC initialization failed")
+		return errors.Wrap(err, "AC initialization failed")
 	}
 	report, err := d.gauntlet.ReadCommandReport()
 	if err != nil {
@@ -173,7 +172,7 @@ func (d *Deployer) DeployOCR() error {
 		d.gauntlet.Flag("network", d.network),
 	)
 	if err != nil {
-		return ghErrors.Wrap(err, "AC initialization failed")
+		return errors.Wrap(err, "AC initialization failed")
 	}
 	report, err = d.gauntlet.ReadCommandReport()
 	if err != nil {
@@ -204,7 +203,7 @@ func (d *Deployer) DeployOCR() error {
 		d.gauntlet.Flag("input", string(jsonInput)),
 	)
 	if err != nil {
-		return ghErrors.Wrap(err, "feed initialization failed")
+		return errors.Wrap(err, "feed initialization failed")
 	}
 
 	report, err = d.gauntlet.ReadCommandReport()
@@ -227,7 +226,7 @@ func (d Deployer) TransferLINK() error {
 		d.States[LINK],
 	)
 	if err != nil {
-		return ghErrors.Wrap(err, "LINK transfer failed")
+		return errors.Wrap(err, "LINK transfer failed")
 	}
 
 	return nil
@@ -246,7 +245,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 		d.gauntlet.Flag("state", d.States[OCRFeed]),
 	)
 	if err != nil {
-		return ghErrors.Wrap(err, "begin OCR 2 set offchain config failed")
+		return errors.Wrap(err, "begin OCR 2 set offchain config failed")
 	}
 
 	S := []int{}
@@ -308,7 +307,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	)
 
 	if err != nil {
-		return ghErrors.Wrap(err, "writing OCR 2 set offchain config failed")
+		return errors.Wrap(err, "writing OCR 2 set offchain config failed")
 	}
 
 	fmt.Println("Committing set offchain config...")
@@ -319,7 +318,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	)
 
 	if err != nil {
-		return ghErrors.Wrap(err, "committing OCR 2 set offchain config failed")
+		return errors.Wrap(err, "committing OCR 2 set offchain config failed")
 	}
 
 	input = map[string]interface{}{
@@ -341,7 +340,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	)
 
 	if err != nil {
-		return ghErrors.Wrap(err, "setting OCR 2 config failed")
+		return errors.Wrap(err, "setting OCR 2 config failed")
 	}
 
 	// SET PAYEES
@@ -364,7 +363,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	// )
 
 	// if err != nil {
-	// 	return ghErrors.Wrap(err, "setting OCR 2 payees failed")
+	// 	return errors.Wrap(err, "setting OCR 2 payees failed")
 	// }
 
 	return nil
