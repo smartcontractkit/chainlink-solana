@@ -158,6 +158,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/smartcontractkit/helmenv v1.0.17 // indirect
 	github.com/smartcontractkit/integrations-framework v0.10.13-0.20211209210730-be0fc64293cb // indirect
+	github.com/smartcontractkit/libocr v0.0.0-20211210213233-5443fb9db7f7 // indirect
 	github.com/spf13/afero v1.6.0 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/spf13/cobra v1.2.1 // indirect

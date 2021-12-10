@@ -15,6 +15,9 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	relayUtils "github.com/smartcontractkit/chainlink-relay/ops/utils"
+	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
+	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
+	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
 const (
@@ -246,65 +249,126 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	}
 
 	S := []int{}
-	offChainPublicKeys := []string{}
-	peerIDs := []string{}
+	// offChainPublicKeys := []string{}
+	// configPublicKeys := []string{}
+	// peerIDs := []string{}
 	oracles := []map[string]string{}
 	threshold := 1
 	// operators := []map[string]string{}
+	helperOracles := []confighelper.OracleIdentityExtra{}
 	for _, k := range keys {
 
 		// TODO: temporary parsing from hex encoded to base58 encoded
-		keyByte, err := hex.DecodeString(k["OCRTransmitter"])
+		transmitKeyByte, err := hex.DecodeString(k["OCRTransmitter"])
 		if err != nil {
 			return err
 		}
 
 		S = append(S, 1)
-		offChainPublicKeys = append(offChainPublicKeys, k["OCROffchainPublicKey"])
-		peerIDs = append(peerIDs, k["P2PID"])
+		// offChainPublicKeys = append(offChainPublicKeys, k["OCROffchainPublicKey"])
+		// configPublicKeys = append(configPublicKeys, k["OCRConfigPublicKey"])
+		// peerIDs = append(peerIDs, k["P2PID"])
 		// original oracle structure
 		// oracles = append(oracles, map[string]string{
 		// 	"signer":      k["OCROnchainPublicKey"],
 		// 	"transmitter": k["OCRTransmitter"],
 		// })
-		oracles = append(oracles, map[string]string{
-			"signer":      strings.TrimPrefix(k["OCROnchainPublicKey"], "0x"), // TODO: temporary parsing of 0x... hex key to hex key
-			"transmitter": solana.PublicKeyFromBytes(keyByte).String(),        // TODO: temporary parsing from hex encoded to base58 encoded
-		})
+		// oracle := map[string]string{
+		// 	"signer":      strings.TrimPrefix(k["OCROnchainPublicKey"], "0x"),  // TODO: temporary parsing of 0x... hex key to hex key
+		// 	"transmitter": solana.PublicKeyFromBytes(transmitKeyByte).String(), // TODO: temporary parsing from hex encoded to base58 encoded
+		// }
+		// oracles = append(oracles, oracle)
 		// operators = append(operators, map[string]string{
 		// 	"payee":       k["OCRPayeeAddress"],
 		// 	"transmitter": k["NodeAddress"],
 		// })
+
+		offchainPKByte, err := hex.DecodeString(k["OCROffchainPublicKey"])
+		if err != nil {
+			return err
+		}
+		onchainPKByte, err := hex.DecodeString(strings.TrimPrefix(k["OCROnchainPublicKey"], "0x"))
+		if err != nil {
+			return err
+		}
+		configPKByteTemp, err := hex.DecodeString(k["OCRConfigPublicKey"])
+		if err != nil {
+			return err
+		}
+		configPKByte := [32]byte{}
+		copy(configPKByte[:], configPKByteTemp)
+		helperOracles = append(helperOracles, confighelper.OracleIdentityExtra{
+			OracleIdentity: confighelper.OracleIdentity{
+				OffchainPublicKey: types.OffchainPublicKey(offchainPKByte),
+				OnchainPublicKey:  types.OnchainPublicKey(onchainPKByte),
+				PeerID:            k["P2PID"],
+				TransmitAccount:   types.Account(solana.PublicKeyFromBytes(transmitKeyByte).String()),
+			},
+			ConfigEncryptionPublicKey: types.ConfigEncryptionPublicKey(configPKByte),
+		})
 	}
 
-	// TODO: Should this inputs have their own struct?
-	input := map[string]interface{}{
-		"deltaProgressNanoseconds": 2 * time.Second,
-		"deltaResendNanoseconds":   5 * time.Second,
-		"deltaRoundNanoseconds":    1 * time.Second,
-		"deltaGraceNanoseconds":    500 * time.Millisecond,
-		"deltaStageNanoseconds":    5 * time.Second,
-		"rMax":                     3,
-		"s":                        S,
-		"offchainPublicKeys":       offChainPublicKeys,
-		"peerIds":                  peerIDs,
-		"reportingPluginConfig": map[string]interface{}{
-			"alphaReportInfinite": false,
-			"alphaReportPpb":      uint64(1000000),
-			"alphaAcceptInfinite": false,
-			"alphaAcceptPpb":      uint64(1000000),
-			"deltaCNanoseconds":   15 * time.Second,
-		},
-		"maxDurationQueryNanoseconds":                        2 * time.Second,
-		"maxDurationObservationNanoseconds":                  2 * time.Second,
-		"maxDurationReportNanoseconds":                       2 * time.Second,
-		"maxDurationShouldAcceptFinalizedReportNanoseconds":  2 * time.Second,
-		"maxDurationShouldTransmitAcceptedReportNanoseconds": 2 * time.Second,
-	}
+	// // TODO: Should this inputs have their own struct?
+	// input := map[string]interface{}{
+	// 	"deltaProgressNanoseconds": 2 * time.Second,
+	// 	"deltaResendNanoseconds":   5 * time.Second,
+	// 	"deltaRoundNanoseconds":    1 * time.Second,
+	// 	"deltaGraceNanoseconds":    500 * time.Millisecond,
+	// 	"deltaStageNanoseconds":    5 * time.Second,
+	// 	"rMax":                     3,
+	// 	"s":                        S,
+	// 	"offchainPublicKeys":       offChainPublicKeys,
+	// 	"peerIds":                  peerIDs,
+	// 	"reportingPluginConfig": map[string]interface{}{
+	// 		"alphaReportInfinite": false,
+	// 		"alphaReportPpb":      uint64(1000000),
+	// 		"alphaAcceptInfinite": false,
+	// 		"alphaAcceptPpb":      uint64(1000000),
+	// 		"deltaCNanoseconds":   15 * time.Second,
+	// 	},
+	// 	"maxDurationQueryNanoseconds":                        2 * time.Second,
+	// 	"maxDurationObservationNanoseconds":                  2 * time.Second,
+	// 	"maxDurationReportNanoseconds":                       2 * time.Second,
+	// 	"maxDurationShouldAcceptFinalizedReportNanoseconds":  2 * time.Second,
+	// 	"maxDurationShouldTransmitAcceptedReportNanoseconds": 2 * time.Second,
+	// 	"configPublicKeys":                                   configPublicKeys,
+	// }
+	//
+	// jsonInput, err := json.Marshal(input)
+	// if err != nil {
+	// 	return err
+	// }
 
-	jsonInput, err := json.Marshal(input)
-	if err != nil {
-		return err
+	alphaPPB := uint64(1000000)
+	signers, transmitters, _, _, _, onchainConfig, err := confighelper.ContractSetConfigArgsForTests(
+		2*time.Second,        // deltaProgress time.Duration,
+		5*time.Second,        // deltaResend time.Duration,
+		1*time.Second,        // deltaRound time.Duration,
+		500*time.Millisecond, // deltaGrace time.Duration,
+		5*time.Second,        // deltaStage time.Duration,
+		3,                    // rMax uint8,
+		S,                    // s []int,
+		helperOracles,        // oracles []OracleIdentityExtra,
+		median.OffchainConfig{
+			false,
+			alphaPPB,
+			false,
+			alphaPPB,
+			0,
+		}.Encode(), //reportingPluginConfig []byte,
+		500*time.Millisecond, // maxDurationQuery time.Duration,
+		500*time.Millisecond, // maxDurationObservation time.Duration,
+		500*time.Millisecond, // maxDurationReport time.Duration,
+		2*time.Second,        // maxDurationShouldAcceptFinalizedReport time.Duration,
+		2*time.Second,        // maxDurationShouldTransmitAcceptedReport time.Duration,
+		1,                    // f int,
+		[]byte{},             // onchainConfig []byte
+	)
+	for i := 0; i < len(signers); i++ {
+		oracles = append(oracles, map[string]string{
+			"signer": hex.EncodeToString(signers[i]),
+			"transmitter": string(transmitters[i]),
+		})
 	}
 
 	fmt.Println("Writing set offchain config...")
@@ -312,7 +376,8 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 		"ocr2:write_offchain_config",
 		d.gauntlet.Flag("network", d.network),
 		d.gauntlet.Flag("state", d.Account[OCRFeed]),
-		d.gauntlet.Flag("input", string(jsonInput)),
+		// d.gauntlet.Flag("input", string(jsonInput)),
+		d.gauntlet.Flag("raw", hex.EncodeToString(onchainConfig)),
 	)
 
 	if err != nil {
@@ -330,12 +395,12 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 		return errors.Wrap(err, "committing OCR 2 set offchain config failed")
 	}
 
-	input = map[string]interface{}{
+	input := map[string]interface{}{
 		"oracles":   oracles,
 		"threshold": threshold,
 	}
 
-	jsonInput, err = json.Marshal(input)
+	jsonInput, err := json.Marshal(input)
 	if err != nil {
 		return err
 	}
