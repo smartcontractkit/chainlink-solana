@@ -7,10 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/gagliardetto/solana-go"
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
@@ -257,13 +255,6 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	// operators := []map[string]string{}
 	helperOracles := []confighelper.OracleIdentityExtra{}
 	for _, k := range keys {
-
-		// TODO: temporary parsing from hex encoded to base58 encoded
-		transmitKeyByte, err := hex.DecodeString(k["OCRTransmitter"])
-		if err != nil {
-			return err
-		}
-
 		S = append(S, 1)
 		// offChainPublicKeys = append(offChainPublicKeys, k["OCROffchainPublicKey"])
 		// configPublicKeys = append(configPublicKeys, k["OCRConfigPublicKey"])
@@ -287,7 +278,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 		if err != nil {
 			return err
 		}
-		onchainPKByte, err := hex.DecodeString(strings.TrimPrefix(k["OCROnchainPublicKey"], "0x"))
+		onchainPKByte, err := hex.DecodeString(k["OCROnchainPublicKey"])
 		if err != nil {
 			return err
 		}
@@ -302,7 +293,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 				OffchainPublicKey: types.OffchainPublicKey(offchainPKByte),
 				OnchainPublicKey:  types.OnchainPublicKey(onchainPKByte),
 				PeerID:            k["P2PID"],
-				TransmitAccount:   types.Account(solana.PublicKeyFromBytes(transmitKeyByte).String()),
+				TransmitAccount:   types.Account(k["OCRTransmitter"]),
 			},
 			ConfigEncryptionPublicKey: types.ConfigEncryptionPublicKey(configPKByte),
 		})
@@ -366,7 +357,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	)
 	for i := 0; i < len(signers); i++ {
 		oracles = append(oracles, map[string]string{
-			"signer": hex.EncodeToString(signers[i]),
+			"signer":      hex.EncodeToString(signers[i]),
 			"transmitter": string(transmitters[i]),
 		})
 	}
@@ -448,13 +439,6 @@ func (d Deployer) Fund(addresses []string) error {
 		return errors.New("'solana' is not available in commandline")
 	}
 	for _, a := range addresses {
-		// TODO: to be removed in the future, parse hex encoded pubkey to base58 encoded account
-		keyByte, err := hex.DecodeString(a)
-		if err != nil {
-			return err
-		}
-		a = solana.PublicKeyFromBytes(keyByte).String()
-
 		msg := relayUtils.LogStatus(fmt.Sprintf("funded %s", a))
 		if _, err := exec.Command("solana", "airdrop", "100", a).Output(); msg.Check(err) != nil {
 			return err
