@@ -1,12 +1,14 @@
 package solana
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/pkg/errors"
@@ -329,6 +331,11 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	// if err != nil {
 	// 	return err
 	// }
+
+	// program sorts oracles (need to pre-sort to allow correct onchainConfig generation)
+	sort.Slice(helperOracles, func(i, j int) bool {
+		return bytes.Compare(helperOracles[i].OracleIdentity.OnchainPublicKey, helperOracles[j].OracleIdentity.OnchainPublicKey) < 0
+	})
 
 	alphaPPB := uint64(1000000)
 	signers, transmitters, _, _, _, onchainConfig, err := confighelper.ContractSetConfigArgsForTests(
