@@ -7,6 +7,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	confirm "github.com/gagliardetto/solana-go/rpc/sendAndConfirmTransaction"
+	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
@@ -21,20 +22,24 @@ func (c ContractTracker) Transmit(
 ) error {
 	recent, err := c.client.rpc.GetRecentBlockhash(ctx, rpc.CommitmentFinalized)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error on Transmit.GetRecentBlock")
 	}
 
 	// Determine validator authority
 	seeds := [][]byte{[]byte("validator"), c.StateID.Bytes()}
 	validatorAuthority, validatorNonce, err := solana.FindProgramAddress(seeds, c.ProgramID)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error on Transmit.FindProgramAddress")
 	}
 
 	// Resolve validator's access controller
 	var validator Validator
-	if err := c.client.rpc.GetAccountDataInto(ctx, c.state.Config.Validator, &validator); err != nil {
-		return err
+	// only fetch state if validator is set
+	// contract skips validator parts if none is set
+	if (c.state.Config.Validator != solana.PublicKey{}) {
+		if err := c.client.rpc.GetAccountDataInto(ctx, c.state.Config.Validator, &validator); err != nil {
+			return errors.Wrap(err, "error on Transmit.GetAccountDataInto.Validator")
+		}
 	}
 
 	accounts := []*solana.AccountMeta{
@@ -70,16 +75,16 @@ func (c ContractTracker) Transmit(
 		solana.TransactionPayer(c.Transmitter.PublicKey()),
 	)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error on Transmit.NewTransaction")
 	}
 
 	msgToSign, err := tx.MarshalBinary()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error on Transmit.MarshalBinary")
 	}
 	finalSigBytes, err := c.Transmitter.Sign(msgToSign)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error on Transmit.Sign")
 	}
 	var finalSig [64]byte
 	copy(finalSig[:], finalSigBytes)
@@ -93,7 +98,7 @@ func (c ContractTracker) Transmit(
 		tx,
 	)
 
-	return err
+	return errors.Wrap(err, "error on Transmit.SendAndConfirmTransaction")
 }
 
 func (c ContractTracker) LatestConfigDigestAndEpoch(
