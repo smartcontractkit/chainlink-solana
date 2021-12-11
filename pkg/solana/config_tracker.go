@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
@@ -18,7 +19,7 @@ func (c ContractTracker) LatestConfigDetails(ctx context.Context) (changedInBloc
 	return c.state.Config.LatestConfigBlockNumber, c.state.Config.LatestConfigDigest, err
 }
 
-func configFromState(state State) types.ContractConfig {
+func configFromState(state State) (types.ContractConfig, error) {
 	pubKeys := []types.OnchainPublicKey{}
 	accounts := []types.Account{}
 	for _, o := range state.Oracles.Data() {
@@ -27,22 +28,34 @@ func configFromState(state State) types.ContractConfig {
 		accounts = append(accounts, types.Account(o.Transmitter.String()))
 	}
 
+	// calculate OnchainConfig (currently not calculated onchain, but required for libocr)
+	onchainConfigStruct := median.OnchainConfig{
+		Min: state.Config.MinAnswer.BigInt(),
+		Max: state.Config.MaxAnswer.BigInt(),
+	}
+	onchainConfig, err := onchainConfigStruct.Encode()
+	if err != nil {
+		return types.ContractConfig{}, err
+	}
+
 	return types.ContractConfig{
 		ConfigDigest:          state.Config.LatestConfigDigest,
 		ConfigCount:           uint64(state.Config.ConfigCount),
 		Signers:               pubKeys,
 		Transmitters:          accounts,
 		F:                     state.Config.F,
-		OnchainConfig:         []byte{}, // TODO: where to fetch?
+		OnchainConfig:         onchainConfig,
 		OffchainConfigVersion: state.Config.OffchainConfig.Version,
 		OffchainConfig:        state.Config.OffchainConfig.Data(),
-	}
+	}, nil
 }
 
 // LatestConfig returns the latest configuration.
 func (c ContractTracker) LatestConfig(ctx context.Context, changedInBlock uint64) (types.ContractConfig, error) {
-	err := c.fetchState(ctx)
-	return configFromState(c.state), err
+	if err := c.fetchState(ctx); err != nil {
+		return types.ContractConfig{}, err
+	}
+	return configFromState(c.state)
 }
 
 // LatestBlockHeight returns the height of the most recent block in the chain.
