@@ -73,24 +73,3 @@ func sortOraclesBySigningKey(
 
 	return newSigners, newTransmitters, nil
 }
-
-// func TestConfigDigester_DeployedContract(t *testing.T) {
-// 	tracker := ContractTracker{
-// 		StateID:         solana.MustPublicKeyFromBase58("33Y9gByW9aFEsLVruiu2QVBnGuxDhY218Z31sCBiRQ5D"),
-// 		TransmissionsID: solana.MustPublicKeyFromBase58("7CgAwVHe7SaTCqwUpMT8QtWc4wSkaVnoFXLaF5fa8qHr"),
-// 		client:          NewClient(rpc.LocalNet_RPC, &ws.Client{}),
-// 		lggr:            logger.NullLogger,
-// 		requestGroup:    &singleflight.Group{},
-// 	}
-//
-// 	digester := OffchainConfigDigester{
-// 		ProgramID: solana.MustPublicKeyFromBase58("CF6b2XF6BZw65aznGzXwzF5A8iGhDBoeNYQiXyH4MWdQ"),
-// 	}
-//
-// 	cfg, err := tracker.LatestConfig(context.TODO(), 0)
-// 	require.NoError(t, err)
-//
-// 	digest, err := digester.ConfigDigest(cfg)
-// 	require.NoError(t, err)
-// 	assert.Equal(t, cfg.ConfigDigest, digest)
-// }
