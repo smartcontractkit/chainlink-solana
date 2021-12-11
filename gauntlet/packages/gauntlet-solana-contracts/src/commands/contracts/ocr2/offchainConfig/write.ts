@@ -33,7 +33,7 @@ type Input = {
   maxDurationReportNanoseconds: number
   maxDurationShouldAcceptFinalizedReportNanoseconds: number
   maxDurationShouldTransmitAcceptedReportNanoseconds: number
-  configPublicKeys: string[],
+  configPublicKeys: string[]
 }
 
 export default class WriteOffchainConfig extends SolanaCommand {
@@ -128,7 +128,7 @@ export default class WriteOffchainConfig extends SolanaCommand {
 
     // allow to pass raw onchainConfig as hex encoded
     let offchainConfig: Buffer = Buffer.from(this.flags.raw, 'hex')
-    if (this.flags.raw == "") {
+    if (this.flags.raw == '') {
       const input = this.makeInput(this.flags.input)
       offchainConfig = await this.serializeOffchainConfig(input)
     }
