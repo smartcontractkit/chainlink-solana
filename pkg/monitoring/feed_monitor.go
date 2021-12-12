@@ -62,14 +62,12 @@ func (f *feedMonitor) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		}
-		// Map the payload.
-		var mapping map[string]interface{}
 		var err error
 		switch typed := update.(type) {
 		case StateEnvelope:
-			mapping, err = MakeConfigSetMapping(typed, f.solanaConfig, f.feedConfig)
+			err = f.processState(typed)
 		case TransmissionEnvelope:
-			mapping, err = MakeTransmissionMapping(typed, f.solanaConfig, f.feedConfig)
+			err = f.processTransmission(typed)
 		default:
 			err = fmt.Errorf("unknown update type %T", update)
 		}
@@ -77,44 +75,54 @@ func (f *feedMonitor) Start(ctx context.Context) {
 			log.Printf("failed to map update %T: %v", update, err)
 			continue
 		}
-		// Encode the payload
-		var value []byte
-		switch update.(type) {
-		case StateEnvelope:
-			value, err = f.stateSchema.Encode(mapping)
-		case TransmissionEnvelope:
-			value, err = f.transmissionSchema.Encode(mapping)
-		default:
-			err = fmt.Errorf("unknown update type %T", update)
-		}
-		if err != nil {
-			log.Printf("failed to encode message %v in Avro: %v", mapping, err)
-			continue
-		}
-		// Push to kafka
-		var key = f.feedConfig.StateAccount.Bytes()
-		if err = f.producer.Produce(key, value); err != nil {
-			log.Printf("failed to publish message %v: %v", update, err)
-			continue
-		}
-		// Publish metrics to prometheus
-		switch typed := update.(type) {
-		case TransmissionEnvelope:
-			f.metrics.SetHeadTrackerCurrentHead(typed.BlockNumber, f.solanaConfig.NetworkName,
-				f.solanaConfig.ChainID, f.solanaConfig.NetworkID)
-			f.metrics.SetOffchainAggregatorAnswers(typed.Answer.Data, f.feedConfig.ContractAddress.String(),
-				f.solanaConfig.ChainID, f.feedConfig.ContractStatus, f.feedConfig.ContractType,
-				f.feedConfig.FeedName, f.feedConfig.FeedPath, f.solanaConfig.NetworkID,
-				f.solanaConfig.NetworkName)
-			f.metrics.IncOffchainAggregatorAnswersTotal(f.feedConfig.ContractAddress.String(),
-				f.solanaConfig.ChainID, f.feedConfig.ContractStatus, f.feedConfig.ContractType,
-				f.feedConfig.FeedName, f.feedConfig.FeedPath, f.solanaConfig.NetworkID,
-				f.solanaConfig.NetworkName)
-			isLateAnswer := time.Since(time.Unix(int64(typed.Answer.Timestamp), 0)).Seconds() > float64(f.feedConfig.HeartbeatSec)
-			f.metrics.SetOffchainAggregatorAnswerStalled(isLateAnswer, f.feedConfig.ContractAddress.String(),
-				f.solanaConfig.ChainID, f.feedConfig.ContractStatus, f.feedConfig.ContractType,
-				f.feedConfig.FeedName, f.feedConfig.FeedPath, f.solanaConfig.NetworkID,
-				f.solanaConfig.NetworkName)
-		}
 	}
+}
+
+func (f *feedMonitor) processState(envelope StateEnvelope) error {
+	var mapping map[string]interface{}
+	mapping, err := MakeConfigSetMapping(envelope, f.solanaConfig, f.feedConfig)
+	if err != nil {
+		return fmt.Errorf("failed to map message %v: %w", envelope, err)
+	}
+	value, err := f.stateSchema.Encode(mapping)
+	if err != nil {
+		return fmt.Errorf("failed to enconde message %v: %w", envelope, err)
+	}
+	var key = f.feedConfig.StateAccount.Bytes()
+	if err = f.producer.Produce(key, value); err != nil {
+		return fmt.Errorf("failed to publish message %v: %w", envelope, err)
+	}
+	return nil
+}
+
+func (f *feedMonitor) processTransmission(envelope TransmissionEnvelope) error {
+	var mapping map[string]interface{}
+	mapping, err := MakeTransmissionMapping(envelope, f.solanaConfig, f.feedConfig)
+	if err != nil {
+		return fmt.Errorf("failed to map message %v: %w", envelope, err)
+	}
+	value, err := f.transmissionSchema.Encode(mapping)
+	if err != nil {
+		return fmt.Errorf("failed to enconde message %v: %w", envelope, err)
+	}
+	var key = f.feedConfig.StateAccount.Bytes()
+	if err = f.producer.Produce(key, value); err != nil {
+		return fmt.Errorf("failed to publish message %v: %w", envelope, err)
+	}
+	f.metrics.SetHeadTrackerCurrentHead(envelope.BlockNumber, f.solanaConfig.NetworkName,
+		f.solanaConfig.ChainID, f.solanaConfig.NetworkID)
+	f.metrics.SetOffchainAggregatorAnswers(envelope.Answer.Data, f.feedConfig.ContractAddress.String(),
+		f.solanaConfig.ChainID, f.feedConfig.ContractStatus, f.feedConfig.ContractType,
+		f.feedConfig.FeedName, f.feedConfig.FeedPath, f.solanaConfig.NetworkID,
+		f.solanaConfig.NetworkName)
+	f.metrics.IncOffchainAggregatorAnswersTotal(f.feedConfig.ContractAddress.String(),
+		f.solanaConfig.ChainID, f.feedConfig.ContractStatus, f.feedConfig.ContractType,
+		f.feedConfig.FeedName, f.feedConfig.FeedPath, f.solanaConfig.NetworkID,
+		f.solanaConfig.NetworkName)
+	isLateAnswer := time.Since(time.Unix(int64(envelope.Answer.Timestamp), 0)).Seconds() > float64(f.feedConfig.HeartbeatSec)
+	f.metrics.SetOffchainAggregatorAnswerStalled(isLateAnswer, f.feedConfig.ContractAddress.String(),
+		f.solanaConfig.ChainID, f.feedConfig.ContractStatus, f.feedConfig.ContractType,
+		f.feedConfig.FeedName, f.feedConfig.FeedPath, f.solanaConfig.NetworkID,
+		f.solanaConfig.NetworkName)
+	return nil
 }
