@@ -78,9 +78,9 @@ func (c ContractTracker) Transmit(
 		return errors.Wrap(err, "error on Transmit.NewTransaction")
 	}
 
-	msgToSign, err := tx.MarshalBinary()
+	msgToSign, err := tx.Message.MarshalBinary()
 	if err != nil {
-		return errors.Wrap(err, "error on Transmit.MarshalBinary")
+		return errors.Wrap(err, "error on Transmit.Message.MarshalBinary")
 	}
 	finalSigBytes, err := c.Transmitter.Sign(msgToSign)
 	if err != nil {
