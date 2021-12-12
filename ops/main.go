@@ -31,7 +31,7 @@ func RelayConfig(ctx *pulumi.Context, addresses map[int]string) (map[string]stri
 		"nodeEndpointWS":     config.Require(ctx, "CL-RELAY_WS"),
 		"stateID":            addresses[solana.OCRFeed],
 		"transmissionsID":    addresses[solana.OCRTransmissions],
-		"validatorProgramID": addresses[solana.OCRFeed], // validator is not deployed, so this is just set randomly (contract ignores it if validator is not set)
+		"validatorProgramID": addresses[solana.Validator],
 	}, nil
 }
 

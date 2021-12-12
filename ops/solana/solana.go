@@ -11,6 +11,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
@@ -24,10 +25,12 @@ const (
 	// program accounts
 	AccessController = iota
 	OCR2
+	Validator
 
 	// program state accounts
 	BillingAccessController
 	RequesterAccessController
+	ValidatorAccount
 	OCRFeed
 	OCRTransmissions
 	LINK
@@ -110,6 +113,23 @@ func (d *Deployer) Load() error {
 
 	d.Account[AccessController] = report.Responses[0].Contract
 
+	// Access Controller contract deployment
+	fmt.Println("Deploying Validator...")
+	err = d.gauntlet.ExecCommand(
+		"deviation_flagging_validator:deploy",
+		d.gauntlet.Flag("network", d.network),
+	)
+	if err != nil {
+		return errors.Wrap(err, "validator contract deployment failed")
+	}
+
+	report, err = d.gauntlet.ReadCommandReport()
+	if err != nil {
+		return errors.Wrap(err, "report not available")
+	}
+
+	d.Account[Validator] = report.Responses[0].Contract
+
 	// OCR2 contract deployment
 	fmt.Println("Deploying OCR 2...")
 	err = d.gauntlet.ExecCommand(
@@ -158,7 +178,7 @@ func (d *Deployer) DeployOCR() error {
 		d.gauntlet.Flag("network", d.network),
 	)
 	if err != nil {
-		return errors.Wrap(err, "AC initialization failed")
+		return errors.Wrap(err, "Request AC initialization failed")
 	}
 	report, err := d.gauntlet.ReadCommandReport()
 	if err != nil {
@@ -172,13 +192,28 @@ func (d *Deployer) DeployOCR() error {
 		d.gauntlet.Flag("network", d.network),
 	)
 	if err != nil {
-		return errors.Wrap(err, "AC initialization failed")
+		return errors.Wrap(err, "Billing AC initialization failed")
 	}
 	report, err = d.gauntlet.ReadCommandReport()
 	if err != nil {
 		return err
 	}
 	d.Account[BillingAccessController] = report.Responses[0].Contract
+
+	fmt.Println("Step 3: Init Validator")
+	err = d.gauntlet.ExecCommand(
+		"deviation_flagging_validator:initialize",
+		d.gauntlet.Flag("network", d.network),
+		d.gauntlet.Flag("accessController", d.Account[BillingAccessController]),
+	)
+	if err != nil {
+		return errors.Wrap(err, "Validator initialization failed")
+	}
+	report, err = d.gauntlet.ReadCommandReport()
+	if err != nil {
+		return err
+	}
+	d.Account[ValidatorAccount] = report.Responses[0].Contract
 
 	input := map[string]interface{}{
 		"minAnswer":   "0",
@@ -192,7 +227,7 @@ func (d *Deployer) DeployOCR() error {
 		return err
 	}
 
-	fmt.Println("Step 3: Init OCR 2 Feed")
+	fmt.Println("Step 4: Init OCR 2 Feed")
 	// TODO: command doesn't throw an error in go if it fails
 	err = d.gauntlet.ExecCommand(
 		"ocr2:initialize",
@@ -254,7 +289,7 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	// peerIDs := []string{}
 	oracles := []map[string]string{}
 	threshold := 1
-	// operators := []map[string]string{}
+	operators := []map[string]string{}
 	helperOracles := []confighelper.OracleIdentityExtra{}
 	for _, k := range keys {
 		S = append(S, 1)
@@ -367,6 +402,11 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 			"signer":      hex.EncodeToString(signers[i]),
 			"transmitter": string(transmitters[i]),
 		})
+
+		operators = append(operators, map[string]string{
+			"payee":       string(transmitters[i]), // payee is the same as transmitter
+			"transmitter": string(transmitters[i]),
+		})
 	}
 
 	fmt.Println("Writing set offchain config...")
@@ -415,28 +455,88 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 		return errors.Wrap(err, "setting OCR 2 config failed")
 	}
 
-	// SET PAYEES
-	// TODO: Uncomment if needed
-	// input = map[string]interface{}{
-	// 	"operators": operators,
-	// }
+	input = map[string]interface{}{
+		"operators": operators,
+	}
 
-	// jsonInput, err = json.Marshal(input)
-	// if err != nil {
-	// 	return err
-	// }
+	jsonInput, err = json.Marshal(input)
+	if err != nil {
+		return err
+	}
 
-	// fmt.Println("Setting Payees...")
-	// err = d.gauntlet.ExecCommand(
-	// 	"ocr2:set_payees",
-	// 	d.gauntlet.Flag("network", d.network),
-	// 	d.gauntlet.Flag("state", d.Account[OCRFeed]),
-	// 	d.gauntlet.Flag("input", string(jsonInput)),
-	// )
+	fmt.Println("Setting Payees...")
+	err = d.gauntlet.ExecCommand(
+		"ocr2:set_payees",
+		d.gauntlet.Flag("network", d.network),
+		d.gauntlet.Flag("state", d.Account[OCRFeed]),
+		d.gauntlet.Flag("input", string(jsonInput)),
+	)
 
-	// if err != nil {
-	// 	return errors.Wrap(err, "setting OCR 2 payees failed")
-	// }
+	if err != nil {
+		return errors.Wrap(err, "setting OCR 2 payees failed")
+	}
+
+	input = map[string]interface{}{
+		"observationPayment":  1,
+		"transmissionPayment": 1,
+	}
+
+	jsonInput, err = json.Marshal(input)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Setting Billing...")
+	err = d.gauntlet.ExecCommand(
+		"ocr2:set_billing",
+		d.gauntlet.Flag("network", d.network),
+		d.gauntlet.Flag("state", d.Account[OCRFeed]),
+		d.gauntlet.Flag("input", string(jsonInput)),
+	)
+
+	if err != nil {
+		return errors.Wrap(err, "setting OCR 2 billing failed")
+	}
+
+	input = map[string]interface{}{
+		"validator": d.Account[ValidatorAccount],
+		"threshold": 8000,
+	}
+
+	jsonInput, err = json.Marshal(input)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Setting OCR 2 validator config...")
+	err = d.gauntlet.ExecCommand(
+		"ocr2:set_validator_config",
+		d.gauntlet.Flag("network", d.network),
+		d.gauntlet.Flag("state", d.Account[OCRFeed]),
+		d.gauntlet.Flag("input", string(jsonInput)),
+	)
+
+	if err != nil {
+		return errors.Wrap(err, "setting OCR 2 validator config failed")
+	}
+
+	fmt.Println("Adding feed to validator access list...")
+	seeds := [][]byte{[]byte("validator"), solana.MustPublicKeyFromBase58(d.Account[OCRFeed]).Bytes()}
+	validatorAuthority, _, err := solana.FindProgramAddress(seeds, solana.MustPublicKeyFromBase58(d.Account[OCR2]))
+	if err != nil {
+		return errors.Wrap(err, "fetching validator authority failed")
+	}
+
+	err = d.gauntlet.ExecCommand(
+		"access_controller:add_access",
+		d.gauntlet.Flag("network", d.network),
+		d.gauntlet.Flag("state", d.Account[BillingAccessController]),
+		d.gauntlet.Flag("address", validatorAuthority.String()),
+	)
+
+	if err != nil {
+		return errors.Wrap(err, "adding feed to validator access list failed")
+	}
 
 	return nil
 }
