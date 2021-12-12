@@ -16,6 +16,7 @@ const_assert!(MAX_ORACLES <= 31);
 #[zero_copy]
 pub struct Billing {
     pub observation_payment: u32,
+    pub transmission_payment: u32,
 }
 
 #[zero_copy]
