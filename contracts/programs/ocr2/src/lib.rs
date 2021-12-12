@@ -729,6 +729,9 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
 
     // validate answer
     if state.config.validator != Pubkey::default() {
+        // we only validate owner if a validator is set
+        require!(ctx.accounts.validator.owner == &validator::ID, InvalidInput);
+
         let round_id = state.config.latest_aggregator_round_id;
         let previous_round_id = round_id - 1;
         let previous_answer = transmissions
