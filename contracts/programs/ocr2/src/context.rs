@@ -73,8 +73,8 @@ pub struct Transmit<'info> {
 
     #[account(address = validator::ID)]
     pub validator_program: AccountInfo<'info>,
-    #[account(mut, owner = validator::ID, address = state.load()?.config.validator)]
-    pub validator: AccountLoader<'info, Validator>,
+    #[account(mut, address = state.load()?.config.validator)]
+    pub validator: AccountInfo<'info>,
     pub validator_authority: AccountInfo<'info>,
     #[account(owner = access_controller::ID)]
     pub validator_access_controller: AccountInfo<'info>,
@@ -102,7 +102,7 @@ pub struct SetValidatorConfig<'info> {
     #[account(mut)]
     pub state: AccountLoader<'info, State>,
     pub authority: Signer<'info>,
-    #[account(owner = validator::ID)]
+    #[account(owner = validator::ID)] // TODO: allow setting Pubkey::default() to disable
     pub validator: AccountLoader<'info, Validator>,
 }
 
