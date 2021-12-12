@@ -302,6 +302,7 @@ describe('ocr2', async () => {
     console.log("setBilling")
     await program.rpc.setBilling(
       new BN(1),
+      new BN(1),
       {
         accounts: {
           state: state.publicKey,

@@ -293,9 +293,14 @@ pub mod ocr2 {
     }
 
     #[access_control(has_billing_access(&ctx.accounts.state, &ctx.accounts.access_controller, &ctx.accounts.authority))]
-    pub fn set_billing(ctx: Context<SetBilling>, observation_payment: u32) -> ProgramResult {
+    pub fn set_billing(
+        ctx: Context<SetBilling>,
+        observation_payment: u32,
+        transmission_payment: u32,
+    ) -> ProgramResult {
         let mut state = ctx.accounts.state.load_mut()?;
         state.config.billing.observation_payment = observation_payment;
+        state.config.billing.transmission_payment = transmission_payment;
         Ok(())
     }
 
@@ -719,7 +724,8 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
 
     // calculate and pay reimbursement
     let reimbursement = calculate_reimbursement(report.juels_per_lamport, signature_count)?;
-    state.oracles[oracle_idx].payment += reimbursement;
+    let amount = reimbursement + state.config.billing.transmission_payment as u64;
+    state.oracles[oracle_idx].payment += amount;
 
     // validate answer
     if state.config.validator != Pubkey::default() {
