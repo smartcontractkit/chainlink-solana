@@ -45,7 +45,7 @@ func (c ContractTracker) Transmit(
 	accounts := []*solana.AccountMeta{
 		// state, transmitter, transmissions, validator_program, validator, validator_authority, validator_access_controller
 		{PublicKey: c.StateID, IsWritable: true, IsSigner: false},
-		{PublicKey: c.Transmitter.PublicKey(), IsWritable: true, IsSigner: true},
+		{PublicKey: c.Transmitter.PublicKey(), IsWritable: false, IsSigner: true},
 		{PublicKey: c.TransmissionsID, IsWritable: true, IsSigner: false},
 		{PublicKey: c.ValidatorProgramID, IsWritable: false, IsSigner: false},
 		{PublicKey: c.state.Config.Validator, IsWritable: true, IsSigner: false},
