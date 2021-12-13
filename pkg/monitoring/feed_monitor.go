@@ -42,14 +42,11 @@ type feedMonitor struct {
 
 // Start should be executed as a goroutine
 func (f *feedMonitor) Start(ctx context.Context) {
-	log.Printf("starting feed monitor for feed %v", f.feedConfig)
+	f.log.Info("starting feed monitor")
 	f.metrics.SetFeedContractMetadata(f.solanaConfig.ChainID, f.feedConfig.ContractAddress.String(),
 		f.feedConfig.ContractStatus, f.feedConfig.ContractType, f.feedConfig.FeedName,
 		f.feedConfig.FeedPath, f.solanaConfig.NetworkID, f.solanaConfig.NetworkName,
 		f.feedConfig.Symbol)
-
-	go f.transmissionPoller.Start(ctx)
-	go f.statePoller.Start(ctx)
 
 	for {
 		// Wait for an update.

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/gagliardetto/solana-go/rpc"
@@ -14,15 +15,26 @@ import (
 )
 
 func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	bgCtx, cancelBgCtx := context.WithCancel(context.Background())
+	defer cancelBgCtx()
+	var wg sync.WaitGroup
 
-	cfg, err := monitoring.ParseConfig()
+	log := logger.NewLogger(loggerConfig{})
+
+	cfg, err := monitoring.ParseConfig(bgCtx)
 	if err != nil {
 		log.Fatalf("failed to parse configuration: %v", err)
 	}
 
-	http.Handle("/metrics", promhttp.Handler())
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	server := &http.Server{
+		Addr:        cfg.Http.Address,
+		Handler:     mux,
+		BaseContext: func(_ net.Listener) context.Context { return bgCtx },
+	}
+	defer server.Close()
+	wg.Add(1)
 	go func() {
 		if err := http.ListenAndServe(cfg.Http.Address, nil); err != nil {
 			log.Fatalf("failed to start http server with address %s: error %v", cfg.Http.Address, err)

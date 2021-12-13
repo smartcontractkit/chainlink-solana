@@ -1,6 +1,7 @@
 package monitoring
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -17,7 +18,7 @@ type Config struct {
 	SchemaRegistry SchemaRegistryConfig `json:"schema_registry,omitempty"`
 	Feeds          []FeedConfig         `json:"feeds,omitempty"`
 	Http           HttpConfig           `json:"http,omitempty"`
-	FeedsURL       string               `json:"feedsUrl,omitempty"`
+	FeedsRddURL    string               `json:"feedsRddUrl,omitempty"`
 	FeedsFilePath  string               `json:"feedsFilePath,omitempty"`
 }
 
@@ -74,7 +75,7 @@ const (
 // - username and passwords can be overriden by environment variables.
 // - feeds configuration can be passed by an RDD url or a local file (useful for testing).
 // ParseConfig also validates and parses some of these inputs and returns an error for the first input that is found incorrect.
-func ParseConfig() (Config, error) {
+func ParseConfig(ctx context.Context) (Config, error) {
 
 	cfg := Config{}
 	flag.StringVar(&cfg.Solana.RPCEndpoint, "solana.rpc_endpoint", "", "")
@@ -95,7 +96,7 @@ func ParseConfig() (Config, error) {
 	flag.StringVar(&cfg.SchemaRegistry.Password, "schema_registry.password", "", "")
 
 	flag.StringVar(&cfg.FeedsFilePath, "feeds.file_path", "", "")
-	flag.StringVar(&cfg.FeedsURL, "feeds.feeds_url", "", "")
+	flag.StringVar(&cfg.FeedsRddURL, "feeds.rdd_url", "", "")
 
 	flag.StringVar(&cfg.Http.Address, "http.address", "", "")
 
@@ -120,25 +121,30 @@ func ParseConfig() (Config, error) {
 	}
 
 	var feeds = []jsonFeedConfig{}
-	if cfg.FeedsFilePath == "" && cfg.FeedsURL == "" {
+	if cfg.FeedsFilePath == "" && cfg.FeedsRddURL == "" {
 		return cfg, fmt.Errorf("feeds configuration missing, either '-feeds.file_path' or '-feeds.rdd_url' must be set")
-	} else if cfg.FeedsURL != "" {
-		res, err := http.Get(cfg.FeedsURL)
+	} else if cfg.FeedsRddURL != "" {
+		readFeedsReq, err := http.NewRequestWithContext(ctx, http.MethodGet, cfg.FeedsRddURL, nil)
 		if err != nil {
-			return cfg, fmt.Errorf("unable to contact RDD URL %s: %w", cfg.FeedsURL, err)
+			return cfg, fmt.Errorf("unable to build a request to the RDD URL '%s': %w", cfg.FeedsRddURL, err)
+		}
+		httpClient := &http.Client{}
+		res, err := httpClient.Do(readFeedsReq)
+		if err != nil {
+			return cfg, fmt.Errorf("unable to fetch RDD data from URL '%s': %w", cfg.FeedsRddURL, err)
 		}
 		defer res.Body.Close()
 		decoder := json.NewDecoder(res.Body)
 		if err := decoder.Decode(&feeds); err != nil {
-			return cfg, fmt.Errorf("unable to unmarshal feeds config from RDD URL %s: %w", cfg.FeedsURL, err)
+			return cfg, fmt.Errorf("unable to unmarshal feeds config from RDD URL '%s': %w", cfg.FeedsRddURL, err)
 		}
 	} else if cfg.FeedsFilePath != "" {
 		contents, err := os.ReadFile(cfg.FeedsFilePath)
 		if err != nil {
-			return cfg, fmt.Errorf("unable to read feeds file %s: %w", cfg.FeedsFilePath, err)
+			return cfg, fmt.Errorf("unable to read feeds file '%s': %w", cfg.FeedsFilePath, err)
 		}
 		if err = json.Unmarshal(contents, &feeds); err != nil {
-			return cfg, fmt.Errorf("unable to unmarshal feeds config from file %s: %w", cfg.FeedsFilePath, err)
+			return cfg, fmt.Errorf("unable to unmarshal feeds config from file '%s': %w", cfg.FeedsFilePath, err)
 		}
 	}
 
@@ -231,7 +237,7 @@ func parseEnvVars(cfg *Config) {
 		cfg.FeedsFilePath = value
 	}
 	if value, isPresent := os.LookupEnv("FEEDS_URL"); isPresent {
-		cfg.FeedsURL = value
+		cfg.FeedsRddURL = value
 	}
 }
 
