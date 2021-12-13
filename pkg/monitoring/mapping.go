@@ -159,7 +159,7 @@ func MakeTransmissionMapping(
 
 func uint64ToBeBytes(input uint64) []byte {
 	buf := make([]byte, 8)
-	_ = binary.PutUvarint(buf, input)
+	binary.BigEndian.PutUint64(buf, input)
 	return buf
 }
 
