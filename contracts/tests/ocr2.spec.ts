@@ -74,6 +74,75 @@ describe('ocr2', async () => {
   // if the owner == payer then we can fit 19
   const n = 19; // min: 3 * f + 1;
   
+  // transmits a single round
+  let transmit = async (epoch: number, round: number) => {
+    let account = await program.account.state.fetch(state.publicKey);
+
+    // Generate and transmit a report
+    let report_context = Buffer.alloc(96);
+    report_context.set(account.config.latestConfigDigest, 0); // 32 byte config digest
+    // 27 byte padding
+    report_context.writeUInt32BE(epoch, 32+27); // 4 byte epoch
+    report_context.writeUInt8(round, 32+27+4); // 1 byte round
+    // 32 byte extra_hash
+    
+    const raw_report = Buffer.from([
+      97, 91, 43, 83, // observations_timestamp
+      7, // observer_count
+      0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // observers
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 210, // median
+      0, 0, 0, 0, 0, 0, 0, 2, // juels per lamport (2)
+    ]);
+
+    let hash = createHash('sha256')
+      .update(raw_report)
+      .update(report_context)
+      .digest();
+
+    let raw_signatures = [];
+    for (let oracle of oracles.slice(0, 3 * f + 1)) { // sign with `f` * 3 + 1 oracles
+      let { signature, recid } = secp256k1.ecdsaSign(hash, oracle.signer.secretKey);
+      raw_signatures.push(...signature);
+      raw_signatures.push(recid);
+    }
+
+    const transmitter = oracles[0].transmitter;
+
+    const tx = new Transaction();
+    tx.add(
+      new TransactionInstruction({
+        programId: anchor.translateAddress(program.programId),
+        keys: [
+          { pubkey: state.publicKey, isWritable: true, isSigner: false },
+          { pubkey: transmitter.publicKey, isWritable: false, isSigner: true },
+          { pubkey: transmissions.publicKey, isWritable: true, isSigner: false },
+          { pubkey: deviationFlaggingValidator.programId, isWritable: false, isSigner: false },
+          { pubkey: account.config.validator, isWritable: true, isSigner: false },
+          { pubkey: validatorAuthority, isWritable: false, isSigner: false },
+          { pubkey: billingAccessController.publicKey, isWritable: false, isSigner: false }, // TODO: pass in a separate controller
+      ],
+      data: Buffer.concat([
+          Buffer.from([validatorNonce]),
+          report_context,
+          raw_report,
+          Buffer.from(raw_signatures),
+        ]),
+      })
+    );
+    
+    try {
+      await provider.send(tx, [transmitter]);
+    } catch (err) {
+      // Translate IDL error
+      const idlErrors = anchor.parseIdlErrors(program.idl);
+      let translatedErr = ProgramError.parse(err, idlErrors);
+      if (translatedErr === null) {
+        throw err;
+      }
+      throw translatedErr;
+    }
+  }
+  
   it('Funds the payer', async () => {
     await provider.connection.confirmTransaction(
       await provider.connection.requestAirdrop(payer.publicKey, 10000000000),
@@ -311,7 +380,13 @@ describe('ocr2', async () => {
         },
         signers: [],
     });
-    console.log("setValidatorConfig");
+  });
+  
+  it('Transmits a round with no validator set', async () => {
+    await transmit(1, 1)
+  });
+  
+  it('Sets a validator', async () => {
     await program.rpc.setValidatorConfig(flaggingThreshold,
       {
         accounts: {
@@ -335,79 +410,7 @@ describe('ocr2', async () => {
   });
   
   it('Transmits a round', async () => {
-    let account = await program.account.state.fetch(state.publicKey);
-
-    // Generate and transmit a report
-    let report_context = [];
-    report_context.push(...account.config.latestConfigDigest);
-    report_context.push(0, 0, 0, 0, 0, 0, 0, 0);
-    report_context.push(0, 0, 0, 0, 0, 0, 0, 0);
-    report_context.push(0, 0, 0, 0, 0, 0, 0, 0);
-    report_context.push(0, 0, 0) // 27 byte padding
-    report_context.push(0, 0, 0, 1) // epoch 1
-    report_context.push(1); //  round 1
-    // extra_hash 32 bytes
-    report_context.push(0, 0, 0, 0, 0, 0, 0, 0);
-    report_context.push(0, 0, 0, 0, 0, 0, 0, 0);
-    report_context.push(0, 0, 0, 0, 0, 0, 0, 0);
-    report_context.push(0, 0, 0, 0, 0, 0, 0, 0);
-
-    const raw_report = [
-      97, 91, 43, 83, // observations_timestamp
-      7, // observer_count
-      0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // observers
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 210, // median
-      0, 0, 0, 0, 0, 0, 0, 2, // juels per lamport (2)
-    ];
-
-    let hash = createHash('sha256')
-      .update(Buffer.from(raw_report))
-      .update(Buffer.from(report_context))
-      .digest();
-
-    let raw_signatures = [];
-    for (let oracle of oracles.slice(0, 3 * f + 1)) { // sign with `f` * 3 + 1 oracles
-      // console.log("signer", oracle.signer.publicKey);
-      let { signature, recid } = secp256k1.ecdsaSign(hash, oracle.signer.secretKey);
-      raw_signatures.push(...signature);
-      raw_signatures.push(recid);
-    }
-
-    const transmitter = oracles[0].transmitter;
-
-    const tx = new Transaction();
-    tx.add(
-      new TransactionInstruction({
-        programId: anchor.translateAddress(program.programId),
-        keys: [
-          { pubkey: state.publicKey, isWritable: true, isSigner: false },
-          { pubkey: transmitter.publicKey, isWritable: false, isSigner: true },
-          { pubkey: transmissions.publicKey, isWritable: true, isSigner: false },
-          { pubkey: deviationFlaggingValidator.programId, isWritable: false, isSigner: false },
-          { pubkey: validator.publicKey, isWritable: true, isSigner: false },
-          { pubkey: validatorAuthority, isWritable: false, isSigner: false },
-          { pubkey: billingAccessController.publicKey, isWritable: false, isSigner: false },
-      ],
-      data: Buffer.concat([
-          Buffer.from([validatorNonce]),
-          Buffer.from(report_context),
-          Buffer.from(raw_report),
-          Buffer.from(raw_signatures),
-        ]),
-      })
-    );
-
-    try {
-      await provider.send(tx, [transmitter]);
-    } catch (err) {
-      // Translate IDL error
-      const idlErrors = anchor.parseIdlErrors(program.idl);
-      let translatedErr = ProgramError.parse(err, idlErrors);
-      if (translatedErr === null) {
-        throw err;
-      }
-      throw translatedErr;
-    }
+    await transmit(1, 2)
   });
 
   it('Withdraws funds', async () => {
