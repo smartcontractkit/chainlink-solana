@@ -4,6 +4,7 @@ import { PublicKey } from '@solana/web3.js'
 import BN from 'bn.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { Protobuf } from '../../../core/proto'
+import { descriptor as OCR2Descriptor } from '../../../core/proto/ocr2Proto'
 
 export default class ReadState extends SolanaCommand {
   static id = 'ocr2:read_state'
@@ -16,8 +17,7 @@ export default class ReadState extends SolanaCommand {
   }
 
   deserializeConfig = async (buffer: Buffer): Promise<any> => {
-    const root = await Protobuf.makeRootFromProto('ocr2Proto.proto')
-    const proto = new Protobuf({ root })
+    const proto = new Protobuf({ descriptor: OCR2Descriptor })
     const offchain = proto.decode('offchainreporting2_config.OffchainConfigProto', buffer)
     const reportingPluginConfig = proto.decode(
       'offchainreporting2_config.ReportingPluginConfig',

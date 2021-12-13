@@ -5,6 +5,7 @@ import { PublicKey } from '@solana/web3.js'
 import { MAX_TRANSACTION_BYTES } from '../../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import { Protobuf } from '../../../../core/proto'
+import { descriptor as OCR2Descriptor } from '../../../../core/proto/ocr2Proto'
 import { getRDD } from '../../../../lib/rdd'
 import { makeSharedSecretEncryptions, SharedSecretEncryptions } from '../../../../core/sharedSecretEncryptions'
 import { durationToNanoseconds } from '../../../../core/time'
@@ -93,9 +94,7 @@ export default class WriteOffchainConfig extends SolanaCommand {
   }
 
   serializeOffchainConfig = async (input: Input): Promise<Buffer> => {
-    const root = await Protobuf.makeRootFromProto('ocr2Proto.proto')
-    const proto = new Protobuf({ root })
-
+    const proto = new Protobuf({ descriptor: OCR2Descriptor })
     const reportingPluginConfigProto = proto.encode(
       'offchainreporting2_config.ReportingPluginConfig',
       input.reportingPluginConfig,

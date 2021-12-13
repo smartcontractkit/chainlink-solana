@@ -1,6 +1,5 @@
 import { join } from 'path'
 import Proto from 'protobufjs'
-
 export class Protobuf {
   root: Proto.Root
 
@@ -36,5 +35,9 @@ export class Protobuf {
   decode = (type: string, buffer: Buffer | Uint8Array): any => {
     const protoType = this.root.lookupType(type)
     return protoType.decode(buffer)
+  }
+
+  toJSON = () => {
+    return this.root.toJSON()
   }
 }
