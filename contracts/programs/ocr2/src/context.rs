@@ -73,10 +73,9 @@ pub struct Transmit<'info> {
 
     #[account(address = validator::ID)]
     pub validator_program: AccountInfo<'info>,
-    #[account(mut, address = state.load()?.config.validator)]
+    #[account(address = state.load()?.config.validator)]
     pub validator: AccountInfo<'info>,
     pub validator_authority: AccountInfo<'info>,
-    #[account(owner = access_controller::ID)]
     pub validator_access_controller: AccountInfo<'info>,
 }
 
