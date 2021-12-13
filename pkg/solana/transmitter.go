@@ -3,6 +3,7 @@ package solana
 import (
 	"bytes"
 	"context"
+	"fmt"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -89,6 +90,8 @@ func (c ContractTracker) Transmit(
 	var finalSig [64]byte
 	copy(finalSig[:], finalSigBytes)
 	tx.Signatures = append(tx.Signatures, finalSig)
+
+	fmt.Printf("TX data: %+v\n", tx)
 
 	// Send transaction, and wait for confirmation:
 	_, err = confirm.SendAndConfirmTransaction(
