@@ -25,9 +25,11 @@ func TestFeedMonitor(t *testing.T) {
 	statePoller := NewPoller(stateAccount, stateReader, fetchInterval, bufferCapacity)
 
 	producer := fakeProducer{make(chan producedMessage)}
+	telemetryProducer := fakeProducer{make(chan producedMessage)}
 
 	transmissionSchema := fakeSchema{transmissionCodec}
 	stateSchema := fakeSchema{configSetCodec}
+	telemetrySchema := fakeSchema{telemetryCodec}
 
 	solanaConfig := SolanaConfig{}
 	feedConfig := FeedConfig{
@@ -39,8 +41,8 @@ func TestFeedMonitor(t *testing.T) {
 		solanaConfig,
 		feedConfig,
 		transmissionPoller, statePoller,
-		transmissionSchema, stateSchema,
-		producer,
+		transmissionSchema, stateSchema, telemetrySchema,
+		producer, telemetryProducer,
 		&devnullMetrics{},
 	)
 	go monitor.Start(ctx)

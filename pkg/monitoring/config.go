@@ -36,6 +36,7 @@ type KafkaConfig struct {
 	SaslUsername     string `json:"sasl_username,omitempty"`
 	SaslPassword     string `json:"sasl_password,omitempty"`
 	Topic            string `json:"topic,omitempty"`
+	TelemetryTopic   string `json:"telemetry_topic,omitempty"`
 }
 
 type SchemaRegistryConfig struct {
@@ -83,6 +84,7 @@ func ParseConfig() (Config, error) {
 	flag.StringVar(&cfg.Solana.ChainID, "solana.chain_id", "", "")
 
 	flag.StringVar(&cfg.Kafka.Topic, "kafka.topic", "", "")
+	flag.StringVar(&cfg.Kafka.Topic, "kafka.telemetry.topic", "", "")
 	flag.StringVar(&cfg.Kafka.Brokers, "kafka.brokers", "", "")
 	flag.StringVar(&cfg.Kafka.ClientID, "kafka.client_id", "", "")
 	flag.StringVar(&cfg.Kafka.SecurityProtocol, "kafka.security_protocol", "", "")
@@ -193,6 +195,9 @@ func parseEnvVars(cfg *Config) {
 
 	if value, isPresent := os.LookupEnv("KAFKA_TOPIC"); isPresent {
 		cfg.Kafka.Topic = value
+	}
+	if value, isPresent := os.LookupEnv("KAFKA_TELEMETRY_TOPIC"); isPresent {
+		cfg.Kafka.TelemetryTopic = value
 	}
 	if value, isPresent := os.LookupEnv("KAFKA_BROKERS"); isPresent {
 		cfg.Kafka.Brokers = value

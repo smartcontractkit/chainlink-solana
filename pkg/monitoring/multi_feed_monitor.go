@@ -12,16 +12,16 @@ type MultiFeedMonitor interface {
 func NewMultiFeedMonitor(
 	solanaConfig SolanaConfig,
 	transmissionReader, stateReader AccountReader,
-	transmissionSchema, stateSchema Schema,
-	producer Producer,
+	transmissionSchema, stateSchema, telemetrySchema Schema,
+	producer, telemetryProducer Producer,
 	feeds []FeedConfig,
 	metrics Metrics,
 ) MultiFeedMonitor {
 	return &multiFeedMonitor{
 		solanaConfig,
 		transmissionReader, stateReader,
-		transmissionSchema, stateSchema,
-		producer,
+		transmissionSchema, stateSchema, telemetrySchema,
+		producer, telemetryProducer,
 		feeds,
 		metrics,
 	}
@@ -33,7 +33,9 @@ type multiFeedMonitor struct {
 	stateReader        AccountReader
 	transmissionSchema Schema
 	stateSchema        Schema
+	telemetrySchema    Schema
 	producer           Producer
+	telemetryProducer  Producer
 	feeds              []FeedConfig
 	metrics            Metrics
 }
@@ -55,8 +57,8 @@ func (m *multiFeedMonitor) Start(ctx context.Context) {
 				m.solanaConfig,
 				feedConfig,
 				transmissionPoller, statePoller,
-				m.transmissionSchema, m.stateSchema,
-				m.producer,
+				m.transmissionSchema, m.stateSchema, m.telemetrySchema,
+				m.producer, m.telemetryProducer,
 				m.metrics,
 			)
 			feedMonitor.Start(ctx)

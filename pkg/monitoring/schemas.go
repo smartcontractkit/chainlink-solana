@@ -160,10 +160,35 @@ const TransmissionAvroSchema = `
 }
 `
 
+const TelemetryAvroSchema = `
+{
+  "namespace": "link.chain.ocr2",
+  "type": "record",
+  "name": "telemetry_config_set",
+  "fields": [
+    {"name": "config_digest", "type": "string", "doc": "hexadecimal "},
+    {"name": "block_number", "type": "bytes", "doc": "uint64 big endian"},
+    {"name": "signers", "type": "string"},
+    {"name": "transmitters", "type": "string"},
+    {"name": "f", "type": "int", "doc": "uint8"},
+    {"name": "delta_progress", "type": "bytes", "doc": "uint64 big endian"},
+    {"name": "delta_resend", "type": "bytes", "doc": "uint64 big endian"},
+    {"name": "delta_round", "type": "bytes", "doc": "uint64 big endian"},
+    {"name": "delta_grace", "type": "bytes", "doc": "uint64 big endian"},
+    {"name": "delta_stage", "type": "bytes", "doc": "uint64 big endian"},
+    {"name": "r_max", "type": "long", "doc": "uint32"},
+    {"name": "s", "type": "string"},
+    {"name": "oracles", "type": "string"},
+    {"name": "feed_contract_status", "type": "string"}
+  ]
+}
+`
+
 // These codecs are used in tests
 var (
 	configSetCodec    *goavro.Codec
 	transmissionCodec *goavro.Codec
+	telemetryCodec    *goavro.Codec
 )
 
 func init() {
@@ -177,7 +202,12 @@ func init() {
 		panic(fmt.Errorf("failed to parse Avro schema for the latest transmission: %w", err))
 	}
 
+	telemetryCodec, err = goavro.NewCodec(TelemetryAvroSchema)
+	if err != nil {
+		panic(fmt.Errorf("failed to parse Avro schema for the latest telemetry: %w", err))
+	}
 	// These codecs are used in tests but not in main, so the linter complains.
 	_ = configSetCodec
 	_ = transmissionCodec
+	_ = telemetryCodec
 }

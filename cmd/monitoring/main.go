@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -41,7 +42,16 @@ func main() {
 		log.Fatalf("failed to prepare config_set schema with error: %v", err)
 	}
 
-	producer, err := monitoring.NewProducer(ctx, cfg.Kafka)
+	producer, err := monitoring.NewProducer(ctx, cfg.Kafka, cfg.Kafka.Topic)
+	if err != nil {
+		log.Fatalf("failed to create kafka producer with error: %v", err)
+	}
+
+	telSchema, err := schemaRegistry.EnsureSchema(fmt.Sprintf("%s-value", cfg.Kafka.TelemetryTopic), monitoring.TelemetryAvroSchema)
+	if err != nil {
+		log.Fatalf("failed to prepare telemetry_config_set schema with error: %v", err)
+	}
+	telemetryProducer, err := monitoring.NewProducer(ctx, cfg.Kafka, cfg.Kafka.TelemetryTopic)
 	if err != nil {
 		log.Fatalf("failed to create kafka producer with error: %v", err)
 	}
@@ -52,8 +62,8 @@ func main() {
 	monitor := monitoring.NewMultiFeedMonitor(
 		cfg.Solana,
 		trReader, stReader,
-		trSchema, stSchema,
-		producer,
+		trSchema, stSchema, telSchema,
+		producer, telemetryProducer,
 		cfg.Feeds,
 		monitoring.DefaultMetrics,
 	)

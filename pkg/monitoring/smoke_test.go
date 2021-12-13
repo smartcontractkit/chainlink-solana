@@ -23,8 +23,10 @@ func TestSmokeTest(t *testing.T) {
 
 	transmissionSchema := fakeSchema{transmissionCodec}
 	stateSchema := fakeSchema{configSetCodec}
+	telemetrySchema := fakeSchema{telemetryCodec}
 
 	producer := fakeProducer{make(chan producedMessage)}
+	telemetryProducer := fakeProducer{make(chan producedMessage)}
 
 	transmissionReader := &fakeReader{make(chan interface{})}
 	stateReader := &fakeReader{make(chan interface{})}
@@ -32,8 +34,8 @@ func TestSmokeTest(t *testing.T) {
 	monitor := NewMultiFeedMonitor(
 		cfg.Solana,
 		transmissionReader, stateReader,
-		transmissionSchema, stateSchema,
-		producer,
+		transmissionSchema, stateSchema, telemetrySchema,
+		producer, telemetryProducer,
 		cfg.Feeds,
 		&devnullMetrics{},
 	)

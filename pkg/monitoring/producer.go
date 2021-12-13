@@ -16,10 +16,10 @@ type Producer interface {
 type producer struct {
 	backend      *kafka.Producer
 	deliveryChan chan kafka.Event
-	cfg          KafkaConfig
+	topic        string
 }
 
-func NewProducer(ctx context.Context, cfg KafkaConfig) (Producer, error) {
+func NewProducer(ctx context.Context, cfg KafkaConfig, topic string) (Producer, error) {
 	backend, err := kafka.NewProducer(&kafka.ConfigMap{
 		"bootstrap.servers": cfg.Brokers,
 		"client.id":         cfg.ClientID,
@@ -29,12 +29,12 @@ func NewProducer(ctx context.Context, cfg KafkaConfig) (Producer, error) {
 		"sasl.password":     cfg.SaslPassword,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create kafka producer: %w", err)
+		return nil, fmt.Errorf("failed to create kafka envelopeProducer: %w", err)
 	}
 	p := &producer{
 		backend,
 		make(chan kafka.Event),
-		cfg,
+		topic,
 	}
 	go p.run(ctx)
 	return p, nil
@@ -56,7 +56,7 @@ func (p *producer) run(ctx context.Context) {
 func (p *producer) Produce(key, value []byte) error {
 	return p.backend.Produce(&kafka.Message{
 		TopicPartition: kafka.TopicPartition{
-			Topic:     &p.cfg.Topic,
+			Topic:     &p.topic,
 			Partition: kafka.PartitionAny,
 		},
 		Key:   key,

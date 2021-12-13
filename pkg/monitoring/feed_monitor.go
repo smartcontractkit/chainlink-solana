@@ -16,15 +16,18 @@ func NewFeedMonitor(
 	feedConfig FeedConfig,
 	transmissionPoller, statePoller Poller,
 	transmissionSchema, stateSchema Schema,
+	telemetrySchema Schema,
 	producer Producer,
+	telemetryProducer Producer,
 	metrics Metrics,
+
 ) FeedMonitor {
 	return &feedMonitor{
 		solanaConfig,
 		feedConfig,
 		transmissionPoller, statePoller,
-		transmissionSchema, stateSchema,
-		producer,
+		transmissionSchema, stateSchema, telemetrySchema,
+		producer, telemetryProducer,
 		metrics,
 	}
 }
@@ -36,7 +39,9 @@ type feedMonitor struct {
 	statePoller        Poller
 	transmissionSchema Schema
 	stateSchema        Schema
-	producer           Producer
+	telemetrySchema    Schema
+	envelopeProducer   Producer
+	telemetryProducer  Producer
 	metrics            Metrics
 }
 
@@ -66,13 +71,17 @@ func (f *feedMonitor) Start(ctx context.Context) {
 		switch typed := update.(type) {
 		case StateEnvelope:
 			err = f.processState(typed)
+			if err != nil {
+				break
+			}
+			err = f.processTelemetry(typed)
 		case TransmissionEnvelope:
 			err = f.processTransmission(typed)
 		default:
 			err = fmt.Errorf("unknown update type %T", update)
 		}
 		if err != nil {
-			log.Printf("failed to map update %T: %v", update, err)
+			log.Printf("failed to send message %T: %v", update, err)
 			continue
 		}
 	}
@@ -89,7 +98,7 @@ func (f *feedMonitor) processState(envelope StateEnvelope) error {
 		return fmt.Errorf("failed to enconde message %v: %w", envelope, err)
 	}
 	var key = f.feedConfig.StateAccount.Bytes()
-	if err = f.producer.Produce(key, value); err != nil {
+	if err = f.envelopeProducer.Produce(key, value); err != nil {
 		return fmt.Errorf("failed to publish message %v: %w", envelope, err)
 	}
 	return nil
@@ -106,7 +115,7 @@ func (f *feedMonitor) processTransmission(envelope TransmissionEnvelope) error {
 		return fmt.Errorf("failed to enconde message %v: %w", envelope, err)
 	}
 	var key = f.feedConfig.StateAccount.Bytes()
-	if err = f.producer.Produce(key, value); err != nil {
+	if err = f.envelopeProducer.Produce(key, value); err != nil {
 		return fmt.Errorf("failed to publish message %v: %w", envelope, err)
 	}
 	f.metrics.SetHeadTrackerCurrentHead(envelope.BlockNumber, f.solanaConfig.NetworkName,
@@ -124,5 +133,22 @@ func (f *feedMonitor) processTransmission(envelope TransmissionEnvelope) error {
 		f.solanaConfig.ChainID, f.feedConfig.ContractStatus, f.feedConfig.ContractType,
 		f.feedConfig.FeedName, f.feedConfig.FeedPath, f.solanaConfig.NetworkID,
 		f.solanaConfig.NetworkName)
+	return nil
+}
+
+func (f *feedMonitor) processTelemetry(envelope StateEnvelope) error {
+	var mapping map[string]interface{}
+	mapping, err := MakeTelemetryConfigSetMapping(envelope, f.solanaConfig, f.feedConfig)
+	if err != nil {
+		return fmt.Errorf("failed to map message %v: %w", envelope, err)
+	}
+	value, err := f.telemetrySchema.Encode(mapping)
+	if err != nil {
+		return fmt.Errorf("failed to enconde message %v: %w", envelope, err)
+	}
+	var key = f.feedConfig.StateAccount.Bytes()
+	if err = f.telemetryProducer.Produce(key, value); err != nil {
+		return fmt.Errorf("failed to publish message %v: %w", envelope, err)
+	}
 	return nil
 }
