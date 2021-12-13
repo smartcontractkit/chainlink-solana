@@ -137,8 +137,8 @@ pub mod ocr2 {
         require!(!config.pending_offchain_config.is_empty(), InvalidInput);
 
         // move staging area onto actual config
-        config.offchain_config = config.pending_offchain_config; // this also resets the pending area
-                                                                 // reset staging area
+        config.offchain_config = config.pending_offchain_config;
+        // reset staging area
         config.pending_offchain_config.clear();
         config.pending_offchain_config.version = 0;
 
@@ -322,7 +322,6 @@ pub mod ocr2 {
             ]]),
             amount.min(available),
         )?;
-        // anchor_lang::solana_program::log::sol_log_compute_units(); // 184994, 185707 if unchecked, about 800 savings
         Ok(())
     }
 
@@ -778,29 +777,10 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
     Ok(())
 }
 
-/// (sender_id, signature, recovery_id)
-// type Signature<'a> = (u8, &'a [u8], u8);
-//
-// fn decode_signatures(raw_signatures: &[u8]) -> Result<impl Iterator<Item = Option<Signature>>> {
-//     use anchor_lang::solana_program::secp256k1_recover::*;
-//     // 1 byte sender ID + 64 byte signature + 1 byte recovery id
-//     const SIGNATURE_LEN: usize = 1 + SECP256K1_SIGNATURE_LENGTH + 1;
-//
-//     // raw_signatures is exactly sized
-//     require!(raw_signatures.len() % SIGNATURE_LEN == 0, InvalidInput);
-//
-//     let iterator = raw_signatures.chunks(SIGNATURE_LEN).map(|raw| match raw {
-//         [sender_id, signature @ .., recovery_id] => Some((*sender_id, signature, *recovery_id)),
-//         _ => None,
-//     });
-//
-//     Ok(iterator)
-// }
-
 struct Report {
     pub median: i128,
     pub observer_count: u8,
-    #[allow(dead_code)] // make clippy happy - allows unused observers
+    #[allow(dead_code)]
     pub observers: [u8; MAX_ORACLES], // observer index
     pub observations_timestamp: u32,
     pub juels_per_lamport: u64,
@@ -1020,21 +1000,16 @@ pub mod query {
         account: &AccountInfo,
         token_vault: &AccountInfo,
     ) -> Result<LinkAvailableForPayment> {
-        // load in our programs state from account
         let loader = AccountLoader::<State>::try_from(account)?;
         let state = loader.load()?;
 
-        // it might be possible to derive this token_vault AccountInfo?
         let balance = token::accessor::amount(token_vault)?;
 
-        // get total due based on state inputs
         let link_due =
             calculate_total_link_due(&state.config, &state.oracles, &state.leftover_payments)?;
 
-        // amount available is the current balance minus amount due
         let available_balance = balance.saturating_sub(link_due);
 
-        // return data
         Ok(LinkAvailableForPayment { available_balance })
     }
 
@@ -1045,24 +1020,20 @@ pub mod query {
         account: &AccountInfo,
         transmitter: &AccountInfo,
     ) -> Result<OracleObservationCount> {
-        // load in our programs state from account
         let loader = AccountLoader::<State>::try_from(account)?;
         let state = loader.load()?;
 
-        // filter oracles for the one that contains the transmitter of interest
         let oracle = &state
             .oracles
             .iter()
             .find(|oracle| &oracle.transmitter == transmitter.key)
             .ok_or(ErrorCode::InvalidInput)?;
 
-        // get remaining observations by subtracting current from last round id
         let count = state
             .config
             .latest_aggregator_round_id
             .saturating_sub(oracle.from_round_id);
 
-        // return data
         Ok(OracleObservationCount { count })
     }
 }
