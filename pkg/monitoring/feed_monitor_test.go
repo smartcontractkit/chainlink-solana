@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,10 +22,10 @@ func TestFeedMonitor(t *testing.T) {
 	fetchInterval := time.Second
 	var bufferCapacity uint32 = 0 // no buffering
 
-	transmissionPoller := NewPoller(transmissionAccount, transmissionReader, fetchInterval, bufferCapacity)
-	statePoller := NewPoller(stateAccount, stateReader, fetchInterval, bufferCapacity)
+	transmissionPoller := NewPoller(logger.NewNullLogger(), transmissionAccount, transmissionReader, fetchInterval, bufferCapacity)
+	statePoller := NewPoller(logger.NewNullLogger(), stateAccount, stateReader, fetchInterval, bufferCapacity)
 
-	producer := fakeProducer{make(chan producedMessage)}
+	producer := fakeProducer{make(chan producerMessage)}
 
 	transmissionSchema := fakeSchema{transmissionCodec}
 	stateSchema := fakeSchema{configSetCodec}
@@ -36,6 +37,7 @@ func TestFeedMonitor(t *testing.T) {
 	}
 
 	monitor := NewFeedMonitor(
+		logger.NewNullLogger(),
 		solanaConfig,
 		feedConfig,
 		transmissionPoller, statePoller,

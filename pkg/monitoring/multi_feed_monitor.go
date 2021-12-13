@@ -3,13 +3,16 @@ package monitoring
 import (
 	"context"
 	"sync"
+
+	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
 type MultiFeedMonitor interface {
-	Start(ctx context.Context)
+	Start(ctx context.Context, wg sync.WaitGroup)
 }
 
 func NewMultiFeedMonitor(
+	log logger.Logger,
 	solanaConfig SolanaConfig,
 	transmissionReader, stateReader AccountReader,
 	transmissionSchema, stateSchema Schema,
@@ -18,6 +21,7 @@ func NewMultiFeedMonitor(
 	metrics Metrics,
 ) MultiFeedMonitor {
 	return &multiFeedMonitor{
+		log,
 		solanaConfig,
 		transmissionReader, stateReader,
 		transmissionSchema, stateSchema,
@@ -28,6 +32,7 @@ func NewMultiFeedMonitor(
 }
 
 type multiFeedMonitor struct {
+	log                logger.Logger
 	solanaConfig       SolanaConfig
 	transmissionReader AccountReader
 	stateReader        AccountReader

@@ -2,10 +2,10 @@ package monitoring
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
 type Poller interface {
@@ -14,12 +14,14 @@ type Poller interface {
 }
 
 func NewPoller(
+	log logger.Logger,
 	account solana.PublicKey,
 	reader AccountReader,
 	fetchInterval time.Duration,
 	bufferCapacity uint32,
 ) Poller {
 	return &solanaPollerImpl{
+		log,
 		account,
 		reader,
 		fetchInterval,
@@ -29,6 +31,7 @@ func NewPoller(
 }
 
 type solanaPollerImpl struct {
+	log            logger.Logger
 	account        solana.PublicKey
 	reader         AccountReader
 	fetchInterval  time.Duration
@@ -38,10 +41,11 @@ type solanaPollerImpl struct {
 
 // Start should be executed as a goroutine
 func (s *solanaPollerImpl) Start(ctx context.Context) {
+	s.log.Debug("poller started")
 	// Fetch initial data
 	data, err := s.reader.Read(ctx, s.account)
 	if err != nil {
-		log.Printf("failed initial read of the account contents for address '%s': %v", s.account.String(), err)
+		s.log.Errorw("failed initial fetch of account contents", "error", err)
 	} else {
 		s.updates <- data
 	}
@@ -52,7 +56,7 @@ func (s *solanaPollerImpl) Start(ctx context.Context) {
 		case <-timer.C:
 			data, err := s.reader.Read(ctx, s.account)
 			if err != nil {
-				log.Printf("failed to read account contents for addredd '%s': %v", s.account.String(), err)
+				s.log.Errorw("failed to read account contents", "error", err)
 				continue
 			}
 			s.updates <- data
@@ -60,6 +64,7 @@ func (s *solanaPollerImpl) Start(ctx context.Context) {
 			if !timer.Stop() {
 				<-timer.C
 			}
+			s.log.Debug("poller closed")
 			return
 		}
 	}
