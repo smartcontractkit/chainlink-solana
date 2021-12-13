@@ -1,6 +1,7 @@
 package monitoring
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -8,10 +9,11 @@ import (
 
 func TestMapping(t *testing.T) {
 	t.Run("MakeConfigSetMapping", func(t *testing.T) {
-		state, offchainConfig, numericalMedianOffchainConfig := generateState()
+		state, offchainConfig, numericalMedianOffchainConfig, err := generateState()
+		require.NoError(t, err)
 		envelope := StateEnvelope{
 			State:       state,
-			BlockNumber: 100,
+			BlockNumber: rand.Uint64(),
 		}
 		solanaConfig := generateSolanaConfig()
 		feedConfig := generateFeedConfig()
@@ -121,7 +123,7 @@ func TestMapping(t *testing.T) {
 		require.Equal(t, config["epoch"], int32(state.Config.Epoch))
 		require.Equal(t, config["round"], int32(state.Config.Round))
 		require.Equal(t, config["validator"], state.Config.Validator.Bytes())
-		require.Equal(t, config["flagging_threshold"], int32(state.Config.FlaggingThreshold))
+		require.Equal(t, config["flagging_threshold"], int64(state.Config.FlaggingThreshold))
 
 		billing, ok := config["billing"].(map[string]interface{})
 		require.True(t, ok, "billing is a map")
@@ -176,7 +178,7 @@ func TestMapping(t *testing.T) {
 	})
 
 	t.Run("MakeTransmissionMapping", func(t *testing.T) {
-		initial := generateTransmissionEnvelope(100)
+		initial := generateTransmissionEnvelope()
 		solanaConfig := generateSolanaConfig()
 		feedConfig := generateFeedConfig()
 
