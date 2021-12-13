@@ -46,15 +46,21 @@ func TestFeedMonitor(t *testing.T) {
 	go monitor.Start(ctx)
 
 	trCount, stCount := 0, 0
-	messages := []producedMessage{}
+	messages := []producerMessage{}
+	newStateEnv, err := generateStateEnvelope()
+	require.NoError(t, err)
+	newTransmissionEnv := generateTransmissionEnvelope()
+
 LOOP:
 	for {
-		newState, _, _ := generateState()
 		select {
-		case transmissionReader.readCh <- generateTransmissionEnvelope(trCount):
+		case transmissionReader.readCh <- newTransmissionEnv:
 			trCount += 1
-		case stateReader.readCh <- StateEnvelope{newState, 100}:
+			newTransmissionEnv = generateTransmissionEnvelope()
+		case stateReader.readCh <- newStateEnv:
 			stCount += 1
+			newStateEnv, err = generateStateEnvelope()
+			require.NoError(t, err)
 		case message := <-producer.sendCh:
 			messages = append(messages, message)
 		case <-ctx.Done():
