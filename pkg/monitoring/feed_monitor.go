@@ -3,8 +3,9 @@ package monitoring
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
+
+	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
 type FeedMonitor interface {
@@ -12,6 +13,7 @@ type FeedMonitor interface {
 }
 
 func NewFeedMonitor(
+	log logger.Logger,
 	solanaConfig SolanaConfig,
 	feedConfig FeedConfig,
 	transmissionPoller, statePoller Poller,
@@ -20,6 +22,7 @@ func NewFeedMonitor(
 	metrics Metrics,
 ) FeedMonitor {
 	return &feedMonitor{
+		log,
 		solanaConfig,
 		feedConfig,
 		transmissionPoller, statePoller,
@@ -30,6 +33,7 @@ func NewFeedMonitor(
 }
 
 type feedMonitor struct {
+	log                logger.Logger
 	solanaConfig       SolanaConfig
 	feedConfig         FeedConfig
 	transmissionPoller Poller
@@ -71,7 +75,7 @@ func (f *feedMonitor) Start(ctx context.Context) {
 			err = fmt.Errorf("unknown update type %T", update)
 		}
 		if err != nil {
-			log.Printf("failed to map update %T: %v", update, err)
+			f.log.Errorw("failed to map update", "error", err)
 			continue
 		}
 		// Encode the payload
@@ -85,13 +89,13 @@ func (f *feedMonitor) Start(ctx context.Context) {
 			err = fmt.Errorf("unknown update type %T", update)
 		}
 		if err != nil {
-			log.Printf("failed to encode message %v in Avro: %v", mapping, err)
+			f.log.Errorw("failed to encode to Avro", "payload", mapping, "error", err)
 			continue
 		}
 		// Push to kafka
 		var key = f.feedConfig.StateAccount.Bytes()
 		if err = f.producer.Produce(key, value); err != nil {
-			log.Printf("failed to publish message %v: %v", update, err)
+			f.log.Errorw("failed to publish to kafka", "message", mapping, "error", err)
 			continue
 		}
 		// Publish metrics to prometheus

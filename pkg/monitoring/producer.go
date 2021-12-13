@@ -3,9 +3,9 @@ package monitoring
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
 // Producer is an abstraction on top of Kafka to aid with tests.
@@ -14,12 +14,13 @@ type Producer interface {
 }
 
 type producer struct {
+	log          logger.Logger
 	backend      *kafka.Producer
 	deliveryChan chan kafka.Event
 	cfg          KafkaConfig
 }
 
-func NewProducer(ctx context.Context, cfg KafkaConfig) (Producer, error) {
+func NewProducer(ctx context.Context, log logger.Logger, cfg KafkaConfig) (Producer, error) {
 	backend, err := kafka.NewProducer(&kafka.ConfigMap{
 		"bootstrap.servers": cfg.Brokers,
 		"client.id":         cfg.ClientID,
@@ -32,6 +33,7 @@ func NewProducer(ctx context.Context, cfg KafkaConfig) (Producer, error) {
 		return nil, fmt.Errorf("failed to create kafka producer: %w", err)
 	}
 	p := &producer{
+		log,
 		backend,
 		make(chan kafka.Event),
 		cfg,
@@ -45,7 +47,7 @@ func (p *producer) run(ctx context.Context) {
 	for {
 		select {
 		case event := <-p.deliveryChan:
-			log.Printf("received response event for a message delivery: %s", event.String())
+			p.log.Debugf("received delivery event: %s", event.String())
 		case <-ctx.Done():
 			p.backend.Close()
 			return

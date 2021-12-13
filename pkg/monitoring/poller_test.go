@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -56,7 +57,7 @@ func TestPoller(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), testCase.duration)
 			defer cancel()
 			reader := fakeReaderWithWait{testCase.waitOnRead}
-			poller := NewPoller(account, reader, testCase.fetchInterval, testCase.bufferCapacity)
+			poller := NewPoller(logger.NewNullLogger(), account, reader, testCase.fetchInterval, testCase.bufferCapacity)
 			go poller.Start(ctx)
 			readCount := 0
 
