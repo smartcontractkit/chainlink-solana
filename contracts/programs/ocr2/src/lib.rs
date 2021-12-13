@@ -664,7 +664,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
         .map(|raw| raw.split_last());
 
     // Verify signatures attached to report
-    let hash = hash::hashv(&[raw_report, report_context]).to_bytes();
+    let hash = hash::hashv(&[&[raw_report.len() as u8], raw_report, report_context]).to_bytes();
 
     // this fits MAX_ORACLES
     let mut uniques: u32 = 0;
