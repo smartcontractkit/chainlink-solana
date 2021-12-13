@@ -276,10 +276,11 @@ describe('ocr2', async () => {
     assert.ok(config.decimals == 18);
 
     console.log(`Generating ${n} oracles...`);
-    for (let i = 0; i < n; i++) {
+    let futures = [];
+    let generateOracle = async () => {
       let secretKey = randomBytes(32);
       let transmitter = Keypair.generate();
-      oracles.push({
+      return {
         signer: {
           secretKey,
           publicKey: secp256k1.publicKeyCreate(secretKey, false).slice(1), // compressed = false, skip first byte (0x04)
@@ -287,8 +288,12 @@ describe('ocr2', async () => {
         transmitter,
         // Initialize a token account
         payee: await token.getOrCreateAssociatedAccountInfo(transmitter.publicKey),
-      });
+      }
     }
+    for (let i = 0; i < n; i++) {
+      futures.push(generateOracle())
+    }
+    oracles = await Promise.all(futures);
 
     const onchain_config = Buffer.from([1, 2, 3]);
     const offchain_config_version = 1;
