@@ -656,7 +656,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
     require!(raw_signatures.len() % SIGNATURE_LEN == 0, InvalidInput);
     let signature_count = raw_signatures.len() / SIGNATURE_LEN;
     require!(
-        signature_count == 3 * usize::from(config.f) + 1,
+        signature_count == usize::from(config.f) + 1,
         WrongNumberOfSignatures
     );
     let raw_signatures = raw_signatures
