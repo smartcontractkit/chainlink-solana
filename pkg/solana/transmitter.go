@@ -60,6 +60,8 @@ func (c *ContractTracker) Transmit(
 
 	reportContext := RawReportContext(reportCtx)
 
+	fmt.Println(validatorNonce, reportContext, report, sigs)
+
 	// Construct the instruction payload
 	data := new(bytes.Buffer) // validator_nonce || report_context || raw_report || raw_signatures
 	data.WriteByte(validatorNonce)
