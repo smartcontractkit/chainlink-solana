@@ -2,17 +2,20 @@ package monitoring
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/require"
 )
 
 const numFeeds = 10
 
-func TestSmokeTest(t *testing.T) {
+func TestMultiFeedMonitor(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
+	var wg sync.WaitGroup
 
 	cfg := Config{}
 	for i := 0; i < numFeeds; i++ {
@@ -24,12 +27,13 @@ func TestSmokeTest(t *testing.T) {
 	transmissionSchema := fakeSchema{transmissionCodec}
 	stateSchema := fakeSchema{configSetCodec}
 
-	producer := fakeProducer{make(chan producedMessage)}
+	producer := fakeProducer{make(chan producerMessage)}
 
 	transmissionReader := &fakeReader{make(chan interface{})}
 	stateReader := &fakeReader{make(chan interface{})}
 
 	monitor := NewMultiFeedMonitor(
+		logger.NewNullLogger(),
 		cfg.Solana,
 		transmissionReader, stateReader,
 		transmissionSchema, stateSchema,
@@ -37,15 +41,16 @@ func TestSmokeTest(t *testing.T) {
 		cfg.Feeds,
 		&devnullMetrics{},
 	)
-	go monitor.Start(ctx)
+	go monitor.Start(ctx, wg)
 
 	trCount, stCount := 0, 0
-	messages := []producedMessage{}
+	messages := []producerMessage{}
 LOOP:
 	for {
-		newState, _, _ := generateState()
+		newState, _, _, err := generateState()
+		require.NoError(t, err)
 		select {
-		case transmissionReader.readCh <- generateTransmissionEnvelope(trCount):
+		case transmissionReader.readCh <- generateTransmissionEnvelope():
 			trCount += 1
 		case stateReader.readCh <- StateEnvelope{newState, 100}:
 			stCount += 1
@@ -56,6 +61,7 @@ LOOP:
 		}
 	}
 
+	wg.Wait()
 	require.Equal(t, trCount, 10, "should only be able to do initial read of the latest transmission")
 	require.Equal(t, stCount, 10, "should only be able to do initial read of the state account")
 	require.Equal(t, len(messages), 20)
