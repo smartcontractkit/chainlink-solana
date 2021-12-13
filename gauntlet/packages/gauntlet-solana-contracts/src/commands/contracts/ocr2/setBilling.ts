@@ -8,6 +8,7 @@ import { getRDD } from '../../../lib/rdd'
 
 type Input = {
   observationPayment: number | string
+  transmissionPayment: number | string
 }
 
 export default class SetBilling extends SolanaCommand {
@@ -22,9 +23,10 @@ export default class SetBilling extends SolanaCommand {
     if (userInput) return userInput as Input
     const rdd = getRDD(this.flags.rdd)
     const billingInfo = rdd.contracts[this.flags.state]?.billing
-    this.require(!!billingInfo?.observationPaymentLinkGwei, 'Billing information not found')
+    this.require(!!billingInfo, 'Billing information not found')
     return {
-      observationPayment: billingInfo.observationPaymentLinkGwei,
+      observationPayment: billingInfo.observationPaymentGjuels,
+      transmissionPayment: billingInfo.transmissionPaymentGjuels,
     }
   }
 
@@ -40,14 +42,13 @@ export default class SetBilling extends SolanaCommand {
     const program = this.loadProgram(ocr2.idl, address)
 
     const state = new PublicKey(this.flags.state)
-
     const input = this.makeInput(this.flags.input)
 
     const info = await program.account.state.fetch(state)
     const billingAC = new PublicKey(info.config.billingAccessController)
 
     logger.loading('Setting billing...')
-    const tx = await program.rpc.setBilling(new BN(input.observationPayment), {
+    const tx = await program.rpc.setBilling(new BN(input.observationPayment), new BN(input.transmissionPayment), {
       accounts: {
         state: state,
         authority: this.wallet.payer.publicKey,

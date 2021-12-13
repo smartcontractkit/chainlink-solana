@@ -330,6 +330,10 @@
         {
           "name": "observationPayment",
           "type": "u32"
+        },
+        {
+          "name": "transmissionPayment",
+          "type": "u32"
         }
       ]
     },
@@ -652,8 +656,20 @@
         "kind": "struct",
         "fields": [
           {
+            "name": "version",
+            "type": "u8"
+          },
+          {
             "name": "nonce",
             "type": "u8"
+          },
+          {
+            "name": "padding0",
+            "type": "u16"
+          },
+          {
+            "name": "padding1",
+            "type": "u32"
           },
           {
             "name": "config",
@@ -670,17 +686,8 @@
           {
             "name": "leftoverPayments",
             "type": {
-              "array": [
-                {
-                  "defined": "LeftoverPayment"
-                },
-                19
-              ]
+              "defined": "LeftoverPayments"
             }
-          },
-          {
-            "name": "leftoverPaymentsLen",
-            "type": "u8"
           },
           {
             "name": "transmissions",
@@ -747,6 +754,10 @@
           {
             "name": "observationPayment",
             "type": "u32"
+          },
+          {
+            "name": "transmissionPayment",
+            "type": "u32"
           }
         ]
       }
@@ -785,7 +796,30 @@
           },
           {
             "name": "len",
-            "type": "u8"
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LeftoverPayments",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "xs",
+            "type": {
+              "array": [
+                {
+                  "defined": "LeftoverPayment"
+                },
+                19
+              ]
+            }
+          },
+          {
+            "name": "len",
+            "type": "u64"
           }
         ]
       }
@@ -821,10 +855,6 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "version",
-            "type": "u8"
-          },
-          {
             "name": "owner",
             "type": "publicKey"
           },
@@ -857,10 +887,6 @@
             "type": "i128"
           },
           {
-            "name": "decimals",
-            "type": "u8"
-          },
-          {
             "name": "description",
             "type": {
               "array": [
@@ -870,8 +896,32 @@
             }
           },
           {
+            "name": "decimals",
+            "type": "u8"
+          },
+          {
             "name": "f",
             "type": "u8"
+          },
+          {
+            "name": "round",
+            "type": "u8"
+          },
+          {
+            "name": "padding0",
+            "type": "u8"
+          },
+          {
+            "name": "epoch",
+            "type": "u32"
+          },
+          {
+            "name": "latestAggregatorRoundId",
+            "type": "u32"
+          },
+          {
+            "name": "latestTransmitter",
+            "type": "publicKey"
           },
           {
             "name": "configCount",
@@ -889,22 +939,6 @@
           {
             "name": "latestConfigBlockNumber",
             "type": "u64"
-          },
-          {
-            "name": "latestAggregatorRoundId",
-            "type": "u32"
-          },
-          {
-            "name": "latestTransmitter",
-            "type": "publicKey"
-          },
-          {
-            "name": "epoch",
-            "type": "u32"
-          },
-          {
-            "name": "round",
-            "type": "u8"
           },
           {
             "name": "billing",
@@ -976,12 +1010,12 @@
             "type": "publicKey"
           },
           {
-            "name": "payment",
-            "type": "u64"
-          },
-          {
             "name": "fromRoundId",
             "type": "u32"
+          },
+          {
+            "name": "payment",
+            "type": "u64"
           }
         ]
       }
@@ -997,7 +1031,7 @@
           },
           {
             "name": "timestamp",
-            "type": "u32"
+            "type": "u64"
           }
         ]
       }
