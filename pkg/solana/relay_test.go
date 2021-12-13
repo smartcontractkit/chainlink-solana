@@ -16,8 +16,8 @@ package solana
 //
 // func Test_DeployedContract(t *testing.T) {
 // 	tracker := ContractTracker{
-// 		StateID:         solana.MustPublicKeyFromBase58("CMmiUyge4ruTLfNPeUfmvd9VoQQH4eXozX7rxpVCwsQm"),
-// 		TransmissionsID: solana.MustPublicKeyFromBase58("HQ5hzVL2Dm3gVpTYUcMMghio7WBaHf3rVRitguUAg22w"),
+// 		StateID:         solana.MustPublicKeyFromBase58("FYN2Exo7xNPS3i7WXM97QmeRj39z9qRqMYGSc31AtNG8"),
+// 		TransmissionsID: solana.MustPublicKeyFromBase58("365VmdRjJGtAhwmPnw6LTSvctVoTNa7boAYCQFsFQcVr"),
 // 		client:          NewClient(rpc.LocalNet_RPC, &ws.Client{}),
 // 		lggr:            logger.NullLogger,
 // 		requestGroup:    &singleflight.Group{},
