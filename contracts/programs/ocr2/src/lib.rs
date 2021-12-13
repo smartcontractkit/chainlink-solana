@@ -643,7 +643,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
         .oracles
         .iter()
         .position(|oracle| &oracle.transmitter == ctx.accounts.transmitter.key)
-        .ok_or(ErrorCode::Unauthorized)?;
+        .ok_or(ErrorCode::UnauthorizedTransmitter)?;
 
     require!(
         config.latest_config_digest == *config_digest,
@@ -685,7 +685,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
         let index = state
             .oracles
             .binary_search_by_key(&address, |oracle| &oracle.signer.key)
-            .map_err(|_| ErrorCode::Unauthorized)?;
+            .map_err(|_| ErrorCode::UnauthorizedSigner)?;
 
         uniques |= 1 << index;
     }
@@ -960,6 +960,12 @@ pub enum ErrorCode {
 
     #[msg("Invalid Token Account")]
     InvalidTokenAccount,
+
+    #[msg("Oracle signer key not found")]
+    UnauthorizedSigner,
+
+    #[msg("Oracle transmitter key not found")]
+    UnauthorizedTransmitter,
 }
 
 pub mod query {

@@ -77,6 +77,10 @@ Documentation:
 * https://docs.solana.com/developing/test-validator
 * https://docs.solana.com/developing/clients/jsonrpc-api
 
+Note:
+`Program failed to complete: ELF error: Unresolved symbol (sol_secp256k1_recover) at instruction #53009 (ELF file offset 0x677a0)`
+* Resolved by updating to the latest solana CLI `solana-install update`
+
 ```bash
 # start up local test validator
 solana-test-validator

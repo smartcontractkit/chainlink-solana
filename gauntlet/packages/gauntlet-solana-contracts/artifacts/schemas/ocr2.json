@@ -1180,6 +1180,16 @@
       "code": 6012,
       "name": "InvalidTokenAccount",
       "msg": "Invalid Token Account"
+    },
+    {
+      "code": 6013,
+      "name": "UnauthorizedSigner",
+      "msg": "Oracle signer key not found"
+    },
+    {
+      "code": 6014,
+      "name": "UnauthorizedTransmitter",
+      "msg": "Oracle transmitter key not found"
     }
   ]
 }
