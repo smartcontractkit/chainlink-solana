@@ -21,6 +21,10 @@ func (c ContractTracker) Transmit(
 	report types.Report,
 	sigs []types.AttributedOnchainSignature,
 ) error {
+	if err := c.fetchState(ctx); err != nil {
+		return errors.Wrap(err, "error on Transmit.FetchState")
+	}
+
 	recent, err := c.client.rpc.GetRecentBlockhash(ctx, rpc.CommitmentFinalized)
 	if err != nil {
 		return errors.Wrap(err, "error on Transmit.GetRecentBlock")
