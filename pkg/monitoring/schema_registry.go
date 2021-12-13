@@ -1,10 +1,12 @@
 package monitoring
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/riferrei/srclient"
+	"github.com/stretchr/testify/assert"
 )
 
 type SchemaRegistry interface {
@@ -32,7 +34,11 @@ func (s *schemaRegistry) EnsureSchema(subject, spec string) (Schema, error) {
 	if err != nil && !isNotFoundErr(err) {
 		return nil, fmt.Errorf("failed to read schema for subject '%s': %w", subject, err)
 	}
-	if err == nil && registeredSchema.Schema() == spec {
+	isEqualSchemas, errInIsEqualJSON := isEqualJSON(registeredSchema.Schema(), spec)
+	if errInIsEqualJSON != nil {
+		return nil, fmt.Errorf("failed to compare schama in registry with local schema: %w", errInIsEqualJSON)
+	}
+	if err == nil && isEqualSchemas {
 		fmt.Printf("using existing schema for subject '%s'\n", subject)
 		return wrapSchema{registeredSchema}, nil
 	}
@@ -66,4 +72,17 @@ func (w wrapSchema) Decode(buf []byte) (interface{}, error) {
 
 func isNotFoundErr(err error) bool {
 	return strings.HasPrefix(err.Error(), "404 Not Found")
+}
+
+func isEqualJSON(a, b string) (bool, error) {
+	var aUntyped, bUntyped interface{}
+
+	if err := json.Unmarshal([]byte(a), &aUntyped); err != nil {
+		return false, fmt.Errorf("failed to unmarshal first avro schema: %w", err)
+	}
+	if err := json.Unmarshal([]byte(b), &bUntyped); err != nil {
+		return false, fmt.Errorf("failed to unmarshal second avro schema: %w", err)
+	}
+
+	return assert.ObjectsAreEqual(aUntyped, bUntyped), nil
 }
