@@ -5,11 +5,9 @@ go 1.17
 require (
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi/sdk/v3 v3.17.0
-	github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20211209102114-09b8c96ef963
+	github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20211211143034-b4e0b9fc17b1
 	github.com/smartcontractkit/libocr v0.0.0-20211210213233-5443fb9db7f7
 )
-
-replace github.com/smartcontractkit/chainlink-relay/ops => ../../chainlink-relay/ops
 
 require (
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.4 // indirect

@@ -95,11 +95,13 @@ func (c *ContractTracker) Transmit(
 	tx.Signatures = append(tx.Signatures, finalSig)
 
 	// Send transaction, and wait for confirmation:
-	_, err = confirm.SendAndConfirmTransaction(
+	_, err = confirm.SendAndConfirmTransactionWithOpts(
 		ctx,
 		c.client.rpc,
 		c.client.ws,
 		tx,
+		false, // skip preflight
+		rpc.CommitmentConfirmed,
 	)
 
 	return errors.Wrap(err, "error on Transmit.SendAndConfirmTransaction")
