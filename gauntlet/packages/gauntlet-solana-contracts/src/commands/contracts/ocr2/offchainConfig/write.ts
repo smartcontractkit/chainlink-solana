@@ -4,8 +4,7 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { MAX_TRANSACTION_BYTES } from '../../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
-import { Protobuf } from '../../../../core/protobuf'
-import { offchainDescriptor } from '../../../../core/protoSchemas'
+import { Protobuf } from '../../../../core/proto'
 import { getRDD } from '../../../../lib/rdd'
 import { makeSharedSecretEncryptions, SharedSecretEncryptions } from '../../../../core/sharedSecretEncryptions'
 import { durationToNanoseconds } from '../../../../core/time'
@@ -94,16 +93,20 @@ export default class WriteOffchainConfig extends SolanaCommand {
   }
 
   serializeOffchainConfig = async (input: Input): Promise<Buffer> => {
-    const proto = new Protobuf(offchainDescriptor)
-    const reportingPluginConfigProto = proto.encode('reporting_plugin_config', input.reportingPluginConfig)
+    const root = await Protobuf.makeRootFromProto('ocr2Proto.proto')
+    const proto = new Protobuf({ root })
+
+    const reportingPluginConfigProto = proto.encode(
+      'offchainreporting2_config.ReportingPluginConfig',
+      input.reportingPluginConfig,
+    )
     const sharedSecretEncryptions = await this.generateSecretEncryptions(input.offchainPublicKeys)
-    const sharedSecretEncryptionsProto = proto.encode('shared_secret_encryptions', sharedSecretEncryptions)
     const offchainConfig = {
       ...input,
       reportingPluginConfig: reportingPluginConfigProto,
-      sharedSecretEncryptions: sharedSecretEncryptionsProto,
+      sharedSecretEncryptions,
     }
-    return Buffer.from(proto.encode('offchain_config', offchainConfig))
+    return Buffer.from(proto.encode('offchainreporting2_config.OffchainConfigProto', offchainConfig))
   }
 
   // constructs a SharedSecretEncryptions from

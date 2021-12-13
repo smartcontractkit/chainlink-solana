@@ -3,8 +3,7 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import BN from 'bn.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { Protobuf } from '../../../core/protobuf'
-import { offchainDescriptor } from '../../../core/protoSchemas'
+import { Protobuf } from '../../../core/proto'
 
 export default class ReadState extends SolanaCommand {
   static id = 'ocr2:read_state'
@@ -16,11 +15,15 @@ export default class ReadState extends SolanaCommand {
     this.require(!!this.flags.state, 'Please provide flags with "state""')
   }
 
-  deserializeConfig = (buffer: Buffer): any => {
-    const proto = new Protobuf(offchainDescriptor)
-    const offchain = proto.decode('offchain_config', buffer)
-    const reportingPluginConfig = proto.decode('reporting_plugin_config', offchain.reportingPluginConfig)
-    return { ...offchain, reportingPluginConfig: reportingPluginConfig }
+  deserializeConfig = async (buffer: Buffer): Promise<any> => {
+    const root = await Protobuf.makeRootFromProto('ocr2Proto.proto')
+    const proto = new Protobuf({ root })
+    const offchain = proto.decode('offchainreporting2_config.OffchainConfigProto', buffer)
+    const reportingPluginConfig = proto.decode(
+      'offchainreporting2_config.ReportingPluginConfig',
+      offchain.reportingPluginConfig,
+    )
+    return { ...offchain, reportingPluginConfig }
   }
 
   execute = async () => {
@@ -43,8 +46,11 @@ export default class ReadState extends SolanaCommand {
       .filter((v) => !!v)
     console.log('DATA:', data)
     // Get the necessary bytes
-    const offchainBuffer = Buffer.from(data.config.offchainConfig).slice(0, new BN(data.config.configLen).toNumber())
-    const offchainConfig = this.deserializeConfig(offchainBuffer)
+    const offchainBuffer = Buffer.from(data.config.offchainConfig.xs).slice(
+      0,
+      new BN(data.config.offchainConfig.len).toNumber(),
+    )
+    const offchainConfig = await this.deserializeConfig(offchainBuffer)
     console.log('OFFCHAIN CONFIG:', offchainConfig)
     console.log('TRANSMISSIONS:', validTransmissions)
     return {} as Result<TransactionResponse>
