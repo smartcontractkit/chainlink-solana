@@ -15,7 +15,7 @@ import (
 var _ types.ContractTransmitter = (*ContractTracker)(nil)
 
 // Transmit sends the report to the on-chain OCR2Aggregator smart contract's Transmit method
-func (c ContractTracker) Transmit(
+func (c *ContractTracker) Transmit(
 	ctx context.Context,
 	reportCtx types.ReportContext,
 	report types.Report,
@@ -108,7 +108,7 @@ func (c ContractTracker) Transmit(
 	return errors.Wrap(err, "error on Transmit.SendAndConfirmTransaction")
 }
 
-func (c ContractTracker) LatestConfigDigestAndEpoch(
+func (c *ContractTracker) LatestConfigDigestAndEpoch(
 	ctx context.Context,
 ) (
 	configDigest types.ConfigDigest,
