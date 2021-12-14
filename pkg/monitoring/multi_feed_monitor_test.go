@@ -15,7 +15,7 @@ const numFeeds = 10
 func TestMultiFeedMonitor(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	var wg sync.WaitGroup
+	wg := &sync.WaitGroup{}
 
 	cfg := Config{}
 	for i := 0; i < numFeeds; i++ {

@@ -249,7 +249,7 @@ type fakeReader struct {
 }
 
 // NewRandomDataReader produces an AccountReader that generates random data for "state" and "transmission" types.
-func NewRandomDataReader(ctx context.Context, wg sync.WaitGroup, typ string, log logger.Logger) AccountReader {
+func NewRandomDataReader(ctx context.Context, wg *sync.WaitGroup, typ string, log logger.Logger) AccountReader {
 	f := &fakeReader{make(chan interface{})}
 	wg.Add(1)
 	go func() {

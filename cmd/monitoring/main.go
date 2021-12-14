@@ -19,7 +19,7 @@ import (
 func main() {
 	bgCtx, cancelBgCtx := context.WithCancel(context.Background())
 	defer cancelBgCtx()
-	var wg sync.WaitGroup
+	wg := &sync.WaitGroup{}
 
 	log := logger.NewLogger(loggerConfig{})
 
