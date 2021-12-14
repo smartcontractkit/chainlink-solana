@@ -109,7 +109,7 @@ func GetState(ctx context.Context, client *rpc.Client, account solana.PublicKey)
 
 	// validation for config version
 	if configVersion != state.Version {
-		return State{}, fmt.Errorf("decoded config version (%d) does not match expected config version (%d)", state.Version, configVersion)
+		return State{}, 0, fmt.Errorf("decoded config version (%d) does not match expected config version (%d)", state.Version, configVersion)
 	}
 
 	blockNum := res.RPCContext.Context.Slot
