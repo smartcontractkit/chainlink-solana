@@ -68,6 +68,8 @@ type HttpConfig struct {
 
 const (
 	DefaultPollInterval = 5 * time.Second
+
+	rddHttpCallTimeout = 5 * time.Second
 )
 
 // ParseConfig populates a configuration object from various sources:
@@ -124,7 +126,9 @@ func ParseConfig(ctx context.Context) (Config, error) {
 	if cfg.FeedsFilePath == "" && cfg.FeedsRddURL == "" {
 		return cfg, fmt.Errorf("feeds configuration missing, either '-feeds.file_path' or '-feeds.rdd_url' must be set")
 	} else if cfg.FeedsRddURL != "" {
-		readFeedsReq, err := http.NewRequestWithContext(ctx, http.MethodGet, cfg.FeedsRddURL, nil)
+		rddCtx, cancel := context.WithTimeout(ctx, rddHttpCallTimeout)
+		defer cancel()
+		readFeedsReq, err := http.NewRequestWithContext(rddCtx, http.MethodGet, cfg.FeedsRddURL, nil)
 		if err != nil {
 			return cfg, fmt.Errorf("unable to build a request to the RDD URL '%s': %w", cfg.FeedsRddURL, err)
 		}
