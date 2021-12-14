@@ -17,6 +17,24 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Cache cargo registry
+      uses: actions/cache@v2.1.7
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-v2-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo index
+      uses: actions/cache@v2.1.7
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-v2-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo target dir
+      uses: actions/cache@v2.1.7
+      with:
+        path: contracts/target
+        key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
     - run: solana-keygen new -o id.json
     - run: yarn install --frozen-lockfile
     - run: anchor test
@@ -32,5 +50,23 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Cache cargo registry
+      uses: actions/cache@v2.1.7
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-v2-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo index
+      uses: actions/cache@v2.1.7
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-v2-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo target dir
+      uses: actions/cache@v2.1.7
+      with:
+        path: contracts/target
+        key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
     - run: cargo check
     - run: cargo clippy -- -D warnings
