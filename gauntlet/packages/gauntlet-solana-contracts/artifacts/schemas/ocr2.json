@@ -1,6 +1,15 @@
 {
   "version": "0.1.0",
   "name": "ocr2",
+  "constants": [
+    {
+      "name": "MAX_ORACLES",
+      "type": {
+        "defined": "usize"
+      },
+      "value": "19"
+    }
+  ],
   "instructions": [
     {
       "name": "initialize",
@@ -1108,69 +1117,79 @@
   ],
   "errors": [
     {
-      "code": 300,
+      "code": 6000,
       "name": "Unauthorized",
       "msg": "Unauthorized"
     },
     {
-      "code": 301,
+      "code": 6001,
       "name": "InvalidInput",
       "msg": "Invalid input"
     },
     {
-      "code": 302,
+      "code": 6002,
       "name": "TooManyOracles",
       "msg": "Too many oracles"
     },
     {
-      "code": 303,
+      "code": 6003,
       "name": "StaleReport",
       "msg": "Stale report"
     },
     {
-      "code": 304,
+      "code": 6004,
       "name": "DigestMismatch",
       "msg": "Digest mismatch"
     },
     {
-      "code": 305,
+      "code": 6005,
       "name": "WrongNumberOfSignatures",
       "msg": "Wrong number of signatures"
     },
     {
-      "code": 306,
+      "code": 6006,
       "name": "Overflow",
       "msg": "Overflow"
     },
     {
-      "code": 307,
+      "code": 6007,
       "name": "MedianOutOfRange",
       "msg": "Median out of range"
     },
     {
-      "code": 308,
+      "code": 6008,
       "name": "DuplicateSigner",
       "msg": "Duplicate signer"
     },
     {
-      "code": 309,
+      "code": 6009,
       "name": "PayeeAlreadySet",
       "msg": "Payee already set"
     },
     {
-      "code": 310,
+      "code": 6010,
       "name": "PaymentsRemaining",
       "msg": "Leftover payments remaining, please call payRemaining first"
     },
     {
-      "code": 311,
+      "code": 6011,
       "name": "PayeeOracleMismatch",
       "msg": "Payee and Oracle lenght mismatch"
     },
     {
-      "code": 312,
+      "code": 6012,
       "name": "InvalidTokenAccount",
       "msg": "Invalid Token Account"
+    },
+    {
+      "code": 6013,
+      "name": "UnauthorizedSigner",
+      "msg": "Oracle signer key not found"
+    },
+    {
+      "code": 6014,
+      "name": "UnauthorizedTransmitter",
+      "msg": "Oracle transmitter key not found"
     }
   ]
 }

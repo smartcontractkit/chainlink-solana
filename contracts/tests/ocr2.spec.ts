@@ -59,21 +59,21 @@ describe('ocr2', async () => {
 
   const minAnswer = 1;
   const maxAnswer = 1000;
-  
+
   const program = anchor.workspace.Ocr2;
   const accessController = anchor.workspace.AccessController;
   const deviationFlaggingValidator = anchor.workspace.DeviationFlaggingValidator;
-  
+
   let token: Token, tokenClient: Token;
   let validatorAuthority: PublicKey, validatorNonce: number;
   let tokenVault: PublicKey, vaultAuthority: PublicKey, vaultNonce: number;
-  
+
   let oracles = [];
   const f = 2;
   // NOTE: 17 is the most we can fit into one setConfig if we use a different payer
   // if the owner == payer then we can fit 19
   const n = 19; // min: 3 * f + 1;
-  
+
   // transmits a single round
   let transmit = async (epoch: number, round: number) => {
     let account = await program.account.state.fetch(state.publicKey);
@@ -85,7 +85,7 @@ describe('ocr2', async () => {
     report_context.writeUInt32BE(epoch, 32+27); // 4 byte epoch
     report_context.writeUInt8(round, 32+27+4); // 1 byte round
     // 32 byte extra_hash
-    
+
     const raw_report = Buffer.from([
       97, 91, 43, 83, // observations_timestamp
       7, // observer_count
@@ -95,12 +95,13 @@ describe('ocr2', async () => {
     ]);
 
     let hash = createHash('sha256')
+			.update(Buffer.from([raw_report.length]))
       .update(raw_report)
       .update(report_context)
       .digest();
 
     let raw_signatures = [];
-    for (let oracle of oracles.slice(0, 3 * f + 1)) { // sign with `f` * 3 + 1 oracles
+    for (let oracle of oracles.slice(0, f + 1)) { // sign with `f` + 1 oracles
       let { signature, recid } = secp256k1.ecdsaSign(hash, oracle.signer.secretKey);
       raw_signatures.push(...signature);
       raw_signatures.push(recid);
@@ -129,7 +130,7 @@ describe('ocr2', async () => {
         ]),
       })
     );
-    
+
     try {
       await provider.send(tx, [transmitter]);
     } catch (err) {
@@ -142,14 +143,14 @@ describe('ocr2', async () => {
       throw translatedErr;
     }
   }
-  
+
   it('Funds the payer', async () => {
     await provider.connection.confirmTransaction(
       await provider.connection.requestAirdrop(payer.publicKey, 10000000000),
       "confirmed"
     );
   });
-  
+
   it('Creates the LINK token', async () => {
     token = await Token.createMint(
       provider.connection,
@@ -168,7 +169,7 @@ describe('ocr2', async () => {
       program.provider.wallet.payer
     );
   });
-  
+
   it('Creates access controllers', async () => {
     await accessController.rpc.initialize({
       accounts: {
@@ -217,7 +218,7 @@ describe('ocr2', async () => {
       ],
     });
   });
-  
+
   it('Creates the token vault', async () => {
     [vaultAuthority, vaultNonce] = await PublicKey.findProgramAddress(
       [Buffer.from(anchor.utils.bytes.utf8.encode("vault")), state.publicKey.toBuffer()],
@@ -233,7 +234,7 @@ describe('ocr2', async () => {
       true, // allowOwnerOffCurve: seems required since a PDA isn't a valid keypair
     );
   });
-  
+
   it('Initializes the OCR2 feed', async () => {
     console.log("Initializing...");
 
@@ -308,9 +309,9 @@ describe('ocr2', async () => {
     );
 
     // TODO: listen for SetConfig event
-    
+
     console.log("beginOffchainConfig");
-    await program.rpc.beginOffchainConfig( 
+    await program.rpc.beginOffchainConfig(
       new BN(offchain_config_version),
       {
         accounts: {
@@ -319,7 +320,7 @@ describe('ocr2', async () => {
         },
     });
     console.log("writeOffchainConfig");
-    await program.rpc.writeOffchainConfig( 
+    await program.rpc.writeOffchainConfig(
       offchain_config,
       {
         accounts: {
@@ -328,7 +329,7 @@ describe('ocr2', async () => {
         },
     });
     console.log("writeOffchainConfig");
-    await program.rpc.writeOffchainConfig( 
+    await program.rpc.writeOffchainConfig(
       offchain_config,
       {
         accounts: {
@@ -337,7 +338,7 @@ describe('ocr2', async () => {
         },
     });
     console.log("commitOffchainConfig");
-    await program.rpc.commitOffchainConfig( 
+    await program.rpc.commitOffchainConfig(
       {
         accounts: {
           state: state.publicKey,
@@ -386,11 +387,11 @@ describe('ocr2', async () => {
         signers: [],
     });
   });
-  
+
   it('Transmits a round with no validator set', async () => {
     await transmit(1, 1)
   });
-  
+
   it('Sets a validator', async () => {
     await program.rpc.setValidatorConfig(flaggingThreshold,
       {
@@ -413,7 +414,7 @@ describe('ocr2', async () => {
       signers: [],
     });
   });
-  
+
   it('Transmits a round', async () => {
     await transmit(1, 2)
   });
@@ -482,7 +483,7 @@ describe('ocr2', async () => {
     account = await program.account.state.fetch(state.publicKey);
     assert.ok(account.leftoverPayments.len == 0);
   });
-  
+
   it('Can call query', async () => {
     let buffer = Keypair.generate();
     await program.rpc.query(
@@ -505,7 +506,7 @@ describe('ocr2', async () => {
         signers: [buffer]
       }
     );
-    
+
     // let account = await program.account.latestConfig.fetch(buffer.publicKey);
     let account = await program.account.latestConfig.fetch(buffer.publicKey);
     console.log(account);

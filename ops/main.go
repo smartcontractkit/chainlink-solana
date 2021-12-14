@@ -4,8 +4,9 @@ import (
 	"fmt"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 	opsCore "github.com/smartcontractkit/chainlink-relay/ops"
-	"github.com/smartcontractkit/solana-integration/ops/solana"
+	"github.com/smartcontractkit/chainlink-solana/ops/solana"
 )
 
 func main() {
@@ -16,7 +17,7 @@ func main() {
 		}
 
 		// start creating environment and use deployer interface for deploying contracts
-		if err := opsCore.New(ctx, &solanaClient, ObservationSource); err != nil {
+		if err := opsCore.New(ctx, &solanaClient, ObservationSource, JuelsSource, RelayConfig); err != nil {
 			return err
 		}
 
@@ -24,28 +25,42 @@ func main() {
 	})
 }
 
-// calculates juelsToX as juelsToLamports (1 LINK = 1e18 juels, 1 SOL = 1e9 lamports)
-func ObservationSource(priceAdapter, relay string) string {
+func RelayConfig(ctx *pulumi.Context, addresses map[int]string) (map[string]string, error) {
+	return map[string]string{
+		"nodeEndpointRPC":    config.Require(ctx, "CL-RELAY_HTTP"),
+		"nodeEndpointWS":     config.Require(ctx, "CL-RELAY_WS"),
+		"stateID":            addresses[solana.OCRFeed],
+		"transmissionsID":    addresses[solana.OCRTransmissions],
+		"validatorProgramID": addresses[solana.Validator],
+	}, nil
+}
+
+func ObservationSource(priceAdapter string) string {
 	return fmt.Sprintf(`
 	 ea  [type=bridge name=%s requestData=<{"data":{"from":"LINK", "to":"USD"}}>]
 	 parse [type="jsonparse" path="result"]
 	 multiply [type="multiply" times=100000000]
 
+	 ea -> parse -> multiply
+	 `,
+		priceAdapter)
+}
+
+// calculates juelsToX as juelsToLamports (1 LINK = 1e18 juels, 1 SOL = 1e9 lamports)
+func JuelsSource(priceAdapter string) string {
+	return fmt.Sprintf(`
 	 link2usd [type=bridge name=%s requestData=<{"data":{"from":"LINK", "to":"USD"}}>]
 	 parseL [type="jsonparse" path="result"]
 
-	 luna2usd [type=bridge name=%s requestData=<{"data":{"from":"SOL", "to":"USD"}}>]
+	 sol2usd [type=bridge name=%s requestData=<{"data":{"from":"SOL", "to":"USD"}}>]
 	 parseT [type="jsonparse" path="result"]
 
 	 divide [type="divide" input="$(parseL)" divisor="$(parseT)" precision="9"]
    scale [type="multiply" times=1000000000]
 
-	 return [type=bridge name="%s" requestData=<{"jobID":$(jobSpec.externalJobID), "data":{"result":$(multiply), "juelsToX":$(scale)}}>]
-
-	 ea -> parse -> multiply -> return
 	 link2usd -> parseL -> divide
-	 luna2usd -> parseT -> divide
-	 divide -> scale -> return
+	 sol2usd -> parseT -> divide
+	 divide -> scale
 	 `,
-		priceAdapter, priceAdapter, priceAdapter, relay)
+		priceAdapter, priceAdapter)
 }

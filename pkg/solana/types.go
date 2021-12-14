@@ -117,7 +117,8 @@ type LeftoverPayment struct {
 
 // Billing contains the payment information
 type Billing struct {
-	ObservationPayment uint32
+	ObservationPayment  uint32
+	TransmissionPayment uint32
 }
 
 // Answer contains the current price answer

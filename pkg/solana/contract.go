@@ -114,6 +114,7 @@ func getLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 
 	// query for cursor
 	res, err := client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
+		Encoding: "base64",
 		DataSlice: &rpc.DataSlice{
 			Offset: &cursorOffset,
 			Length: &cursorLen,
@@ -137,6 +138,7 @@ func getLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 	// fetch transmission
 	var transmissionOffset uint64 = CursorOffset + CursorLen + (uint64(cursor) * transmissionLen)
 	res, err = client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
+		Encoding: "base64",
 		DataSlice: &rpc.DataSlice{
 			Offset: &transmissionOffset,
 			Length: &transmissionLen,

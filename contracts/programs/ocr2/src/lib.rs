@@ -643,7 +643,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
         .oracles
         .iter()
         .position(|oracle| &oracle.transmitter == ctx.accounts.transmitter.key)
-        .ok_or(ErrorCode::Unauthorized)?;
+        .ok_or(ErrorCode::UnauthorizedTransmitter)?;
 
     require!(
         config.latest_config_digest == *config_digest,
@@ -656,7 +656,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
     require!(raw_signatures.len() % SIGNATURE_LEN == 0, InvalidInput);
     let signature_count = raw_signatures.len() / SIGNATURE_LEN;
     require!(
-        signature_count == 3 * usize::from(config.f) + 1,
+        signature_count == usize::from(config.f) + 1,
         WrongNumberOfSignatures
     );
     let raw_signatures = raw_signatures
@@ -664,7 +664,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
         .map(|raw| raw.split_last());
 
     // Verify signatures attached to report
-    let hash = hash::hashv(&[raw_report, report_context]).to_bytes();
+    let hash = hash::hashv(&[&[raw_report.len() as u8], raw_report, report_context]).to_bytes();
 
     // this fits MAX_ORACLES
     let mut uniques: u32 = 0;
@@ -685,7 +685,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
         let index = state
             .oracles
             .binary_search_by_key(&address, |oracle| &oracle.signer.key)
-            .map_err(|_| ErrorCode::Unauthorized)?;
+            .map_err(|_| ErrorCode::UnauthorizedSigner)?;
 
         uniques |= 1 << index;
     }
@@ -960,6 +960,12 @@ pub enum ErrorCode {
 
     #[msg("Invalid Token Account")]
     InvalidTokenAccount,
+
+    #[msg("Oracle signer key not found")]
+    UnauthorizedSigner,
+
+    #[msg("Oracle transmitter key not found")]
+    UnauthorizedTransmitter,
 }
 
 pub mod query {

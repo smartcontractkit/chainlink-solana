@@ -55,7 +55,7 @@ export default class SetConfig extends SolanaCommand {
     console.log(`Setting config on ${state.toString()}...`)
 
     const oracles = input.oracles.map(({ signer, transmitter }) => ({
-      signer: Buffer.from(signer),
+      signer: Buffer.from(signer, 'hex'),
       transmitter: new PublicKey(transmitter),
     }))
     const threshhold = new BN(input.threshold)
