@@ -125,25 +125,27 @@ func generateState() (
 
 	state := pkgSolana.State{
 		AccountDiscriminator: [8]byte{'0', '1', '2', '3', '4', '5', '6', '7'},
+		Version:              uint8(rand.Intn(256)),
 		Nonce:                uint8(rand.Intn(256)),
 		Config: pkgSolana.Config{
-			Version:                   uint8(rand.Intn(256)),
 			Owner:                     generatePublicKey(),
+			ProposedOwner:             generatePublicKey(),
 			TokenMint:                 generatePublicKey(),
 			TokenVault:                generatePublicKey(),
 			RequesterAccessController: generatePublicKey(),
 			BillingAccessController:   generatePublicKey(),
 			MinAnswer:                 gbinary.Int128{Lo: rand.Uint64(), Hi: rand.Uint64()},
 			MaxAnswer:                 gbinary.Int128{Lo: rand.Uint64(), Hi: rand.Uint64()},
-			Decimals:                  uint8(rand.Intn(256)),
 			Description:               generate32ByteArr(),
-			F:                         10,
+			Decimals:                  uint8(rand.Intn(256)),
+			F:                         uint8(10),
+			Round:                     uint8(rand.Intn(256)),
+			Epoch:                     rand.Uint32(),
+			LatestAggregatorRoundID:   rand.Uint32(),
+			LatestTransmitter:         generatePublicKey(),
 			ConfigCount:               rand.Uint32(),
 			LatestConfigDigest:        generate32ByteArr(),
 			LatestConfigBlockNumber:   rand.Uint64(),
-			LatestAggregatorRoundID:   rand.Uint32(),
-			Epoch:                     rand.Uint32(),
-			Round:                     uint8(rand.Intn(256)),
 			Billing: pkgSolana.Billing{
 				ObservationPayment: rand.Uint32(),
 			},
@@ -157,11 +159,13 @@ func generateState() (
 		},
 		Oracles: pkgSolana.Oracles{
 			Raw: oracles,
-			Len: uint8(numOracles),
+			Len: uint64(numOracles),
 		},
-		LeftoverPayment:    leftovers,
-		LeftoverPaymentLen: uint8(numLeftovers),
-		Transmissions:      generatePublicKey(),
+		LeftoverPayments: pkgSolana.LeftoverPayments{
+			Raw: leftovers,
+			Len: uint64(numLeftovers),
+		},
+		Transmissions: generatePublicKey(),
 	}
 	return state, offchainConfig, numericalMedianConfig, nil
 }
