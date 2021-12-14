@@ -23,10 +23,11 @@ export default class SetBilling extends SolanaCommand {
     if (userInput) return userInput as Input
     const rdd = getRDD(this.flags.rdd)
     const billingInfo = rdd.contracts[this.flags.state]?.billing
-    this.require(!!billingInfo, 'Billing information not found')
+    this.require(!!billingInfo?.observationPaymentLinkGwei, 'Billing information not found')
+    this.require(!!billingInfo?.transmissionPaymentLinkGwei, 'Billing information not found')
     return {
-      observationPayment: billingInfo.observationPaymentGjuels,
-      transmissionPayment: billingInfo.transmissionPaymentGjuels,
+      observationPayment: billingInfo.observationPaymentLinkGwei,
+      transmissionPayment: billingInfo.transmissionPaymentLinkGwei,
     }
   }
 
