@@ -19,15 +19,29 @@ import (
 )
 
 var mockTransmission = []byte{
-	96, 179, 69, 66, 128, 129, 73, 117, 1, 0, 0, 0,
-	1, 0, 0, 0, 210, 2, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 83, 43, 91, 97,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0,
+	96, 179, 69, 66, 128, 129, 73, 117, // account discriminator 8 byte
+	8, 0, 0, 0, // latest round id u32, 4 byte
+	8, 0, 0, 0, // cursor u32, 4 byte
+	0, 255, 122, 108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // answer i128, 16 byte
+	240, 181, 184, 97, 0, 0, 0, 0, // timestamp u64, 8 bytes
+	192, 197, 168, 108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	255, 184, 184, 97, 0, 0, 0, 0,
+	192, 197, 168, 108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	18, 185, 184, 97, 0, 0, 0, 0,
+	64, 92, 65, 109, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	67, 187, 184, 97, 0, 0, 0, 0,
+	192, 206, 229, 108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	19, 189, 184, 97, 0, 0, 0, 0,
+	128, 149, 19, 109, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	193, 189, 184, 97, 0, 0, 0, 0,
+	64, 56, 77, 108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	30, 191, 184, 97, 0, 0, 0, 0,
+	64, 20, 89, 107, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	35, 192, 184, 97, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
 }
 
 type mockRequest struct {
@@ -37,7 +51,7 @@ type mockRequest struct {
 	JSONRPC string
 }
 
-func TestgetLatestTransmissionRaw(t *testing.T) {
+func TestGetLatestTransmissionRaw(t *testing.T) {
 	// each getLatestTransmission submits two API requests
 	// 0 + 0: everything passes
 	// 1 + 0: return too short cursor (fail on first API request)
@@ -69,8 +83,8 @@ func TestgetLatestTransmissionRaw(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	expectedTime := binary.BigEndian.Uint32([]byte{97, 91, 43, 83})
-	expectedAns := big.NewInt(0).SetBytes([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 210}).String()
+	expectedTime := binary.BigEndian.Uint64([]byte{0, 0, 0, 0, 97, 184, 192, 35})
+	expectedAns := big.NewInt(0).SetBytes([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 107, 89, 20, 64}).String()
 
 	a, err := getLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{})
 	assert.NoError(t, err)
