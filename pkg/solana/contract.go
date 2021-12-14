@@ -8,6 +8,7 @@ import (
 
 	"golang.org/x/sync/singleflight"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
@@ -62,7 +63,8 @@ func (c *ContractTracker) fetchState(ctx context.Context) error {
 
 	// make single flight request
 	v, err, shared := c.requestGroup.Do("state", func() (interface{}, error) {
-		return getState(ctx, c.client.rpc, c.StateID)
+		state, _, err := GetState(ctx, c.client.rpc, c.StateID)
+		return state, err
 	})
 
 	if err != nil {
@@ -94,10 +96,15 @@ func (c *ContractTracker) fetchLatestTransmission(ctx context.Context) error {
 	return nil
 }
 
-func getState(ctx context.Context, client *rpc.Client, account solana.PublicKey) (State, error) {
+func GetState(ctx context.Context, client *rpc.Client, account solana.PublicKey) (State, uint64, error) {
+	res, err := client.GetAccountInfo(ctx, account)
+	if err != nil {
+		return State{}, 0, fmt.Errorf("failed to fetch state account at address '%s': %w", account.String(), err)
+	}
+
 	var state State
-	if err := client.GetAccountDataInto(ctx, account, &state); err != nil {
-		return state, err
+	if err := bin.NewBinDecoder(res.Value.Data.GetBinary()).Decode(state); err != nil {
+		return State{}, 0, fmt.Errorf("failed to decode state account data: %w", err)
 	}
 
 	// validation for config version
@@ -105,7 +112,8 @@ func getState(ctx context.Context, client *rpc.Client, account solana.PublicKey)
 		return State{}, fmt.Errorf("decoded config version (%d) does not match expected config version (%d)", state.Version, configVersion)
 	}
 
-	return state, nil
+	blockNum := res.RPCContext.Context.Slot
+	return state, blockNum, nil
 }
 
 func GetLatestTransmission(ctx context.Context, client *rpc.Client, account solana.PublicKey) (Answer, uint64, error) {
