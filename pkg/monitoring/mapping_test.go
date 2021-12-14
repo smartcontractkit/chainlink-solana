@@ -33,6 +33,7 @@ func TestMapping(t *testing.T) {
 		contractConfig, ok := configSet["contract_config"].(map[string]interface{})
 		require.True(t, ok)
 		require.Equal(t, contractConfig["config_digest"], state.Config.LatestConfigDigest[:], "contract_config.config_digest")
+		require.Equal(t, contractConfig["config_count"], int64(state.Config.ConfigCount), "contract_config.config_count")
 		require.Equal(t, contractConfig["signers"], extractSigners(state.Oracles), "contract_config.signers")
 		require.Equal(t, contractConfig["transmitters"], extractTransmitters(state.Oracles), "contract_config.transmitters")
 		require.Equal(t, contractConfig["f"], int32(state.Config.F), "contract_config.F")
@@ -101,11 +102,11 @@ func TestMapping(t *testing.T) {
 		require.True(t, ok)
 
 		require.Equal(t, solanaProgramState["account_discriminator"], state.AccountDiscriminator[:])
+		require.Equal(t, solanaProgramState["version"], int32(state.Version))
 		require.Equal(t, solanaProgramState["nonce"], int32(state.Nonce))
 
 		config, ok := solanaProgramState["config"].(map[string]interface{})
 		require.True(t, ok, "solana_program_state.config should be a map")
-		require.Equal(t, config["version"], int32(state.Config.Version))
 		require.Equal(t, config["owner"], state.Config.Owner.Bytes())
 		require.Equal(t, config["token_mint"], state.Config.TokenMint.Bytes())
 		require.Equal(t, config["token_vault"], state.Config.TokenVault.Bytes())
@@ -113,21 +114,23 @@ func TestMapping(t *testing.T) {
 		require.Equal(t, config["billing_access_controller"], state.Config.BillingAccessController.Bytes())
 		require.Equal(t, config["min_answer"], state.Config.MinAnswer.BigInt().Bytes())
 		require.Equal(t, config["max_answer"], state.Config.MaxAnswer.BigInt().Bytes())
-		require.Equal(t, config["decimals"], int32(state.Config.Decimals))
 		require.Equal(t, config["description"], state.Config.Description[:])
+		require.Equal(t, config["decimals"], int32(state.Config.Decimals))
 		require.Equal(t, config["f"], int32(state.Config.F))
-		require.Equal(t, config["config_count"], int32(state.Config.ConfigCount))
-		require.Equal(t, config["latest_config_digest"], state.Config.LatestConfigDigest[:])
-		require.Equal(t, config["latest_config_block_number"], int64(state.Config.LatestConfigBlockNumber))
-		require.Equal(t, config["latest_aggregator_round_id"], int32(state.Config.LatestAggregatorRoundID))
-		require.Equal(t, config["epoch"], int32(state.Config.Epoch))
 		require.Equal(t, config["round"], int32(state.Config.Round))
-		require.Equal(t, config["validator"], state.Config.Validator.Bytes())
-		require.Equal(t, config["flagging_threshold"], int64(state.Config.FlaggingThreshold))
+		require.Equal(t, config["epoch"], int64(state.Config.Epoch))
+		require.Equal(t, config["latest_aggregator_round_id"], int64(state.Config.LatestAggregatorRoundID))
+		require.Equal(t, config["latest_transmitter"], state.Config.LatestTransmitter.Bytes())
+		require.Equal(t, config["config_count"], int64(state.Config.ConfigCount))
+		require.Equal(t, config["latest_config_digest"], state.Config.LatestConfigDigest[:])
+		require.Equal(t, config["latest_config_block_number"], uint64ToBeBytes(state.Config.LatestConfigBlockNumber))
 
 		billing, ok := config["billing"].(map[string]interface{})
 		require.True(t, ok, "billing is a map")
-		require.Equal(t, billing["observation_payment"], int32(state.Config.Billing.ObservationPayment))
+		require.Equal(t, billing["observation_payment"], int64(state.Config.Billing.ObservationPayment))
+
+		require.Equal(t, config["validator"], state.Config.Validator.Bytes())
+		require.Equal(t, config["flagging_threshold"], int64(state.Config.FlaggingThreshold))
 
 		oracles, ok := solanaProgramState["oracles"].([]interface{})
 		require.True(t, ok, "oracles is an array")
@@ -136,14 +139,14 @@ func TestMapping(t *testing.T) {
 			oracle, ok := oracles[i].(map[string]interface{})
 			require.True(t, ok, "oracle is a map")
 			require.Equal(t, oracle["transmitter"], state.Oracles.Raw[i].Transmitter.Bytes())
-			require.Equal(t, oracle["payee"], state.Oracles.Raw[i].Payee.Bytes())
-			require.Equal(t, oracle["proposed_payee"], state.Oracles.Raw[i].ProposedPayee.Bytes())
-			require.Equal(t, oracle["payment"], int64(state.Oracles.Raw[i].Payment))
-			require.Equal(t, oracle["from_round_id"], int32(state.Oracles.Raw[i].FromRoundID))
 
 			signer, ok := oracle["signer"].(map[string]interface{})
 			require.True(t, ok, "signer needs to be a map")
 			require.Equal(t, signer["key"], state.Oracles.Raw[i].Signer.Key[:])
+
+			require.Equal(t, oracle["payee"], state.Oracles.Raw[i].Payee.Bytes())
+			require.Equal(t, oracle["from_round_id"], int64(state.Oracles.Raw[i].FromRoundID))
+			require.Equal(t, oracle["payment"], uint64ToBeBytes(state.Oracles.Raw[i].Payment))
 		}
 
 		leftovers, ok := solanaProgramState["leftover_payment"].([]interface{})
@@ -151,11 +154,10 @@ func TestMapping(t *testing.T) {
 		for i := 0; i < len(leftovers); i++ {
 			leftover, ok := leftovers[i].(map[string]interface{})
 			require.True(t, ok, "leftover_payment is a map")
-			require.Equal(t, leftover["payee"], state.LeftoverPayment[i].Payee.Bytes())
-			require.Equal(t, leftover["amount"], int64(state.LeftoverPayment[i].Amount))
+			require.Equal(t, leftover["payee"], state.LeftoverPayments.Raw[i].Payee.Bytes())
+			require.Equal(t, leftover["amount"], uint64ToBeBytes(state.LeftoverPayments.Raw[i].Amount))
 		}
 
-		require.Equal(t, solanaProgramState["leftover_payment_len"], int32(state.LeftoverPaymentLen))
 		require.Equal(t, solanaProgramState["transmissions"], state.Transmissions.Bytes())
 
 		solanaChainConfig, ok := configSet["solana_chain_config"].(map[string]interface{})

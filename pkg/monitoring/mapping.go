@@ -72,10 +72,10 @@ func MakeConfigSetMapping(
 			},
 		},
 		"solana_program_state": map[string]interface{}{
-			"account_discriminator": state.AccountDiscriminator[:],
+			"account_discriminator": state.AccountDiscriminator[:8],
+			"version":               int32(state.Version),
 			"nonce":                 int32(state.Nonce),
 			"config": map[string]interface{}{
-				"version":                     int32(state.Config.Version),
 				"owner":                       state.Config.Owner[:],
 				"token_mint":                  state.Config.TokenMint[:],
 				"token_vault":                 state.Config.TokenVault[:],
@@ -83,25 +83,25 @@ func MakeConfigSetMapping(
 				"billing_access_controller":   state.Config.BillingAccessController[:],
 				"min_answer":                  state.Config.MinAnswer.BigInt().Bytes(),
 				"max_answer":                  state.Config.MaxAnswer.BigInt().Bytes(),
-				"decimals":                    int32(state.Config.Decimals),
 				"description":                 state.Config.Description[:],
+				"decimals":                    int32(state.Config.Decimals),
 				"f":                           int32(state.Config.F),
-				"config_count":                int32(state.Config.ConfigCount),
-				"latest_config_digest":        state.Config.LatestConfigDigest[:],
-				"latest_config_block_number":  int64(state.Config.LatestConfigBlockNumber),
-				"latest_aggregator_round_id":  int32(state.Config.LatestAggregatorRoundID),
-				"epoch":                       int32(state.Config.Epoch),
 				"round":                       int32(state.Config.Round),
+				"epoch":                       int64(state.Config.Epoch),
+				"latest_aggregator_round_id":  int64(state.Config.LatestAggregatorRoundID),
+				"latest_transmitter":          state.Config.LatestTransmitter[:],
+				"config_count":                int64(state.Config.ConfigCount),
+				"latest_config_digest":        state.Config.LatestConfigDigest[:],
+				"latest_config_block_number":  uint64ToBeBytes(state.Config.LatestConfigBlockNumber),
 				"billing": map[string]interface{}{
-					"observation_payment": int32(state.Config.Billing.ObservationPayment),
+					"observation_payment": int64(state.Config.Billing.ObservationPayment),
 				},
 				"validator":          state.Config.Validator[:],
 				"flagging_threshold": int64(state.Config.FlaggingThreshold),
 			},
-			"oracles":              formatOracles(state.Oracles),
-			"leftover_payment":     formatLeftovers(state.LeftoverPayment, state.LeftoverPaymentLen),
-			"leftover_payment_len": int32(state.LeftoverPaymentLen),
-			"transmissions":        state.Transmissions[:],
+			"oracles":          formatOracles(state.Oracles),
+			"leftover_payment": formatLeftovers(state.LeftoverPayments),
+			"transmissions":    state.Transmissions[:],
 		},
 		"solana_chain_config": map[string]interface{}{
 			"network_name": solanaConfig.NetworkName,
@@ -165,7 +165,7 @@ func uint64ToBeBytes(input uint64) []byte {
 
 func extractSigners(oracles pkgSolana.Oracles) []interface{} {
 	out := []interface{}{}
-	var i uint8
+	var i uint64
 	for i = 0; i < oracles.Len; i++ {
 		oracle := oracles.Raw[i]
 		out = append(out, oracle.Signer.Key[:])
@@ -175,7 +175,7 @@ func extractSigners(oracles pkgSolana.Oracles) []interface{} {
 
 func extractTransmitters(oracles pkgSolana.Oracles) []interface{} {
 	out := []interface{}{}
-	var i uint8
+	var i uint64
 	for i = 0; i < oracles.Len; i++ {
 		oracle := oracles.Raw[i]
 		out = append(out, oracle.Transmitter.Bytes())
@@ -197,7 +197,7 @@ func parseNumericalMedianOffchainConfig(buf []byte) (*pb.NumericalMedianConfigPr
 
 func formatOracles(oracles pkgSolana.Oracles) []interface{} {
 	out := []interface{}{}
-	var i uint8
+	var i uint64
 	for i = 0; i < oracles.Len; i++ {
 		oracle := oracles.Raw[i]
 		out = append(out, map[string]interface{}{
@@ -205,23 +205,22 @@ func formatOracles(oracles pkgSolana.Oracles) []interface{} {
 			"signer": map[string]interface{}{
 				"key": oracle.Signer.Key[:],
 			},
-			"payee":          oracle.Payee[:],
-			"proposed_payee": oracle.ProposedPayee[:],
-			"payment":        int64(oracle.Payment),
-			"from_round_id":  int32(oracle.FromRoundID),
+			"payee":         oracle.Payee[:],
+			"from_round_id": int64(oracle.FromRoundID),
+			"payment":       uint64ToBeBytes(oracle.Payment),
 		})
 	}
 	return out
 }
 
-func formatLeftovers(leftovers [19]pkgSolana.LeftoverPayment, leftoversLen uint8) []interface{} {
+func formatLeftovers(leftovers pkgSolana.LeftoverPayments) []interface{} {
 	out := []interface{}{}
-	var i uint8
-	for i = 0; i < leftoversLen && i < 19; i++ {
-		leftover := leftovers[i]
+	var i uint64
+	for i = 0; i < leftovers.Len; i++ {
+		leftover := leftovers.Raw[i]
 		out = append(out, map[string]interface{}{
 			"payee":  leftover.Payee[:],
-			"amount": int64(leftover.Amount),
+			"amount": uint64ToBeBytes(leftover.Amount),
 		})
 	}
 	return out
