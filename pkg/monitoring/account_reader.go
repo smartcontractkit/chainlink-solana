@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 )
 
-const solanaAccountReadTimeout = 5 * time.Second
+const solanaAccountReadTimeout = 2 * time.Second
 
 // AccountReader is a wrapper on top of *rpc.Client
 type AccountReader interface {
@@ -54,16 +53,10 @@ type StateEnvelope struct {
 func (s *stReader) Read(ctx context.Context, stateAccount solana.PublicKey) (interface{}, error) {
 	ctx, cancel := context.WithTimeout(ctx, solanaAccountReadTimeout)
 	defer cancel()
-	res, err := s.client.GetAccountInfo(ctx, stateAccount)
+
+	state, blockNum, err := pkgSolana.GetState(ctx, s.client, stateAccount)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch state account: %w", err)
+		return nil, fmt.Errorf("failed to fetch state : %w", err)
 	}
-
-	state := pkgSolana.State{}
-	if err := bin.NewBinDecoder(res.Value.Data.GetBinary()).Decode(state); err != nil {
-		return nil, fmt.Errorf("failed to decode state account contents: %w", err)
-	}
-
-	blockNum := res.RPCContext.Context.Slot
 	return StateEnvelope{state, blockNum}, nil
 }
