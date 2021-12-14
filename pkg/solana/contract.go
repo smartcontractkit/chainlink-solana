@@ -159,7 +159,7 @@ func getLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 	}
 
 	return Answer{
-		Data:      big.NewInt(0).SetBytes(t[4:]),
-		Timestamp: binary.BigEndian.Uint32(t[:4]),
+		Data:      big.NewInt(0).SetBytes(t[TimestampLen:]),
+		Timestamp: binary.BigEndian.Uint64(t[:TimestampLen]),
 	}, nil
 }

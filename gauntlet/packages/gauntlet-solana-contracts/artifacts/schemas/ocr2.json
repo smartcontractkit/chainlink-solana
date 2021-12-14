@@ -337,11 +337,11 @@
       ],
       "args": [
         {
-          "name": "observationPayment",
+          "name": "observationPaymentGjuels",
           "type": "u32"
         },
         {
-          "name": "transmissionPayment",
+          "name": "transmissionPaymentGjuels",
           "type": "u32"
         }
       ]
@@ -761,11 +761,11 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "observationPayment",
+            "name": "observationPaymentGjuels",
             "type": "u32"
           },
           {
-            "name": "transmissionPayment",
+            "name": "transmissionPaymentGjuels",
             "type": "u32"
           }
         ]
@@ -1163,31 +1163,36 @@
     },
     {
       "code": 6009,
+      "name": "DuplicateTransmitter",
+      "msg": "Duplicate transmitter"
+    },
+    {
+      "code": 6010,
       "name": "PayeeAlreadySet",
       "msg": "Payee already set"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "PaymentsRemaining",
       "msg": "Leftover payments remaining, please call payRemaining first"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "PayeeOracleMismatch",
       "msg": "Payee and Oracle lenght mismatch"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "InvalidTokenAccount",
       "msg": "Invalid Token Account"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "UnauthorizedSigner",
       "msg": "Oracle signer key not found"
     },
     {
-      "code": 6014,
+      "code": 6015,
       "name": "UnauthorizedTransmitter",
       "msg": "Oracle transmitter key not found"
     }
