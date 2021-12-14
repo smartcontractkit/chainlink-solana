@@ -57,7 +57,7 @@ func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.Co
 		return digest, err
 	}
 
-	cfg.OnchainConfig = []byte{} // TODO: on chain config digest does not implement onchainConfig
+	cfg.OnchainConfig = []byte{} // on chain config digest does not use onchainConfig inside digest hash
 	if err := binary.Write(buf, binary.BigEndian, uint32(len(cfg.OnchainConfig))); err != nil {
 		return digest, err
 	}

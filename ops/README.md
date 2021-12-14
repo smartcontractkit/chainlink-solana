@@ -48,7 +48,7 @@ Compile program artifacts (do each time contract changes)
 cd contracts
 anchor build
 
-# then exit environment
+# then copy build artifacts to Gauntlet
 cp contracts/target/deploy/access_controller.so gauntlet/packages/gauntlet-solana-contracts/artifacts/bin/access_controller.so
 cp contracts/target/deploy/deviation_flagging_validator.so gauntlet/packages/gauntlet-solana-contracts/artifacts/bin/deviation_flagging_validator.so
 cp contracts/target/deploy/ocr2.so gauntlet/packages/gauntlet-solana-contracts/artifacts/bin/ocr2.so
