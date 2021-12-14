@@ -156,7 +156,7 @@ describe('ocr2', async () => {
       payer,
       mintAuthority.publicKey,
       null,
-      decimals,
+      9, // SPL tokens use a u64, we can fit enough total supply in 9 decimals. Smallest unit is Gjuels
       TOKEN_PROGRAM_ID,
     );
 
