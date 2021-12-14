@@ -13,6 +13,7 @@ import BeginOffchainConfig from './offchainConfig/begin'
 import WriteOffchainConfig from './offchainConfig/write'
 import CommitOffchainConfig from './offchainConfig/commit'
 import SetConfig from './setConfig'
+import SetBilling from './setBilling'
 
 // TODO: Remove. Useful for dev testing
 export default class SetupFlow extends FlowCommand<TransactionResponse> {
@@ -196,6 +197,17 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
           state: ID.contract(this.stepIds.OCR_2),
           input: payeesInput,
           link: ID.contract(this.stepIds.TOKEN),
+        },
+      },
+      {
+        name: 'Set Billing',
+        command: SetBilling,
+        flags: {
+          state: ID.contract(this.stepIds.OCR_2),
+          input: {
+            observationPayment: '1',
+            transmissionPayment: '1',
+          },
         },
       },
       {
