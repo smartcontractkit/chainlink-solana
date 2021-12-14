@@ -5,6 +5,7 @@
 # ignore relay build
 pkg/bin
 
+v1/target
 contracts/target
 v1/target
 contracts/.anchor
