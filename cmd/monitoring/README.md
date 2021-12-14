@@ -4,7 +4,7 @@
 ## Run locally
 
 The monitor requires a schema registry, a kafka instance and a zookeper.
-You can use the docker-compose.yml file in `smartcontractkit/gokit` to start these up.
+You can use the `./ops/monitoring/docker-compose.yml`
 
 The contracts needs to be deployed and the required accounts created.
 You can follow the gauntlet instructions in `smartcontractkit/chainlink-solana`.
@@ -14,12 +14,12 @@ An example of a compatible json encoded feeds configuration is:
 ```json
 [
   {
-    "feed_name": "sol/usd",
-    "feed_path": "sol-usd",
+    "name": "sol/usd",
+    "path": "sol-usd",
     "symbol": "$",
     "heartbeat": 1,
     "contract_type": "ocr2",
-    "contract_status": "live",
+    "status": "live",
 
     "contract_address_base58": "2jVYiZgQ5disuAUMxrF1LkUyhZuqvRCrx1LfB555XUUv",
     "transmissions_account_base58": "2jVYiZgQ5disuAUMxrF1LkUyhZuqvRCrx1LfB555XUUv",
@@ -28,12 +28,12 @@ An example of a compatible json encoded feeds configuration is:
     "poll_interval_milliseconds": 1000
   },
   {
-    "feed_name": "link/usd",
-    "feed_path": "link-usd",
+    "name": "link/usd",
+    "path": "link-usd",
     "symbol": "L",
     "heartbeat": 1,
     "contract_type": "ocr2",
-    "contract_status": "live",
+    "status": "live",
 
     "contract_address_base58": "GUnMZPbhxkimy9ssXyPG8rVTPBPFzL24W4vFuxyEZm66",
     "transmissions_account_base58": "GUnMZPbhxkimy9ssXyPG8rVTPBPFzL24W4vFuxyEZm66",
@@ -68,8 +68,10 @@ go run ./cmd/monitoring/*.go \
 
 See `go run ./cmd/monitoring/*.go -help` for details.
 
+To generate random data instead of reading from the chain, use the env var `TEST_MODE=enabled`.
+
 ## Build docker image
 
 ```bash
-docker build -f monitoring.Dockerfile -t solana-onchain-monitor:0.1.0 .
+docker build -f ./ops/monitoring/Dockerfile -t solana-onchain-monitor:0.1.0 .
 ```
