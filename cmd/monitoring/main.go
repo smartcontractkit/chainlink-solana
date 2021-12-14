@@ -112,7 +112,7 @@ func (l loggerConfig) RootDir() string {
 }
 
 func (l loggerConfig) JSONConsole() bool {
-	return false //true // Logs lines are JSON formatted
+	return false // Logs lines are JSON formatted
 }
 
 func (l loggerConfig) LogToDisk() bool {
