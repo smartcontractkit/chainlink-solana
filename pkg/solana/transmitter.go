@@ -20,10 +20,6 @@ func (c *ContractTracker) Transmit(
 	report types.Report,
 	sigs []types.AttributedOnchainSignature,
 ) error {
-	if err := c.fetchState(ctx); err != nil {
-		return errors.Wrap(err, "error on Transmit.FetchState")
-	}
-
 	recent, err := c.client.rpc.GetRecentBlockhash(ctx, rpc.CommitmentFinalized)
 	if err != nil {
 		return errors.Wrap(err, "error on Transmit.GetRecentBlock")
@@ -95,16 +91,19 @@ func (c *ContractTracker) Transmit(
 	tx.Signatures = append(tx.Signatures, finalSig)
 
 	// Send transaction, and wait for confirmation:
-	_, err = confirm.SendAndConfirmTransactionWithOpts(
-		ctx,
-		c.client.rpc,
-		c.client.ws,
-		tx,
-		false, // skip preflight
-		rpc.CommitmentConfirmed,
-	)
+	go func(){
+		_, err := confirm.SendAndConfirmTransactionWithOpts(
+			ctx,
+			c.client.rpc,
+			c.client.ws,
+			tx,
+			true, // skip preflight
+			rpc.CommitmentConfirmed,
+		)
+		c.lggr.Errorf("error on Transmit.SendAndConfirmTransaction: %w", err)
+	}()
 
-	return errors.Wrap(err, "error on Transmit.SendAndConfirmTransaction")
+	return nil
 }
 
 func (c *ContractTracker) LatestConfigDigestAndEpoch(
