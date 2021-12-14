@@ -15,8 +15,8 @@ const_assert!(MAX_ORACLES <= 31);
 
 #[zero_copy]
 pub struct Billing {
-    pub observation_payment: u32,
-    pub transmission_payment: u32,
+    pub observation_payment_gjuels: u32,
+    pub transmission_payment_gjuels: u32,
 }
 
 #[zero_copy]
@@ -117,7 +117,7 @@ impl Config {
         data.push(&addr);
         let count = self.config_count.to_be_bytes();
         data.push(&count);
-        let n = [oracles.len() as u8];
+        let n = [oracles.len() as u8]; // safe because it will always fit in MAX_ORACLES
         data.push(&n);
         for oracle in oracles {
             data.push(&oracle.signer.key);
