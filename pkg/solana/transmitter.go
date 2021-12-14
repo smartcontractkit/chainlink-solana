@@ -91,7 +91,7 @@ func (c *ContractTracker) Transmit(
 	tx.Signatures = append(tx.Signatures, finalSig)
 
 	// Send transaction, and wait for confirmation:
-	go func(){
+	go func() {
 		_, err := confirm.SendAndConfirmTransactionWithOpts(
 			ctx,
 			c.client.rpc,
