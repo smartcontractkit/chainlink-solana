@@ -3,6 +3,7 @@ package monitoring
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -52,6 +53,8 @@ func (f *feedMonitor) Start(ctx context.Context) {
 		f.feedConfig.FeedPath, f.solanaConfig.NetworkID, f.solanaConfig.NetworkName,
 		f.feedConfig.Symbol)
 
+	latestTransmitter := ""
+	var latestAnswer *big.Int = nil
 	for {
 		// Wait for an update.
 		var update interface{}
@@ -101,9 +104,10 @@ func (f *feedMonitor) Start(ctx context.Context) {
 		// Publish metrics to prometheus
 		switch typed := update.(type) {
 		case TransmissionEnvelope:
+			latestAnswer = typed.Answer.Data
 			f.metrics.SetHeadTrackerCurrentHead(typed.BlockNumber, f.solanaConfig.NetworkName,
 				f.solanaConfig.ChainID, f.solanaConfig.NetworkID)
-			f.metrics.SetOffchainAggregatorAnswers(typed.Answer.Data, f.feedConfig.ContractAddress.String(),
+			f.metrics.SetOffchainAggregatorAnswers(latestAnswer, f.feedConfig.ContractAddress.String(),
 				f.solanaConfig.ChainID, f.feedConfig.ContractStatus, f.feedConfig.ContractType,
 				f.feedConfig.FeedName, f.feedConfig.FeedPath, f.solanaConfig.NetworkID,
 				f.solanaConfig.NetworkName)
@@ -116,6 +120,16 @@ func (f *feedMonitor) Start(ctx context.Context) {
 				f.solanaConfig.ChainID, f.feedConfig.ContractStatus, f.feedConfig.ContractType,
 				f.feedConfig.FeedName, f.feedConfig.FeedPath, f.solanaConfig.NetworkID,
 				f.solanaConfig.NetworkName)
+		case StateEnvelope:
+			latestTransmitter = typed.State.Config.LatestTransmitter.String()
+			f.metrics.SetNodeMetadata(f.solanaConfig.ChainID, f.solanaConfig.NetworkID,
+				f.solanaConfig.NetworkName, "n/a", latestTransmitter)
+			if latestAnswer != nil {
+				f.metrics.SetOffchainAggregatorSubmissionReceivedValues(latestAnswer,
+					f.feedConfig.ContractAddress.String(), latestTransmitter, f.solanaConfig.ChainID,
+					f.feedConfig.ContractStatus, f.feedConfig.ContractType, f.feedConfig.FeedName,
+					f.feedConfig.FeedPath, f.solanaConfig.NetworkID, f.solanaConfig.NetworkName)
+			}
 		}
 	}
 }
