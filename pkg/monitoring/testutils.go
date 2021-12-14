@@ -343,3 +343,13 @@ func (d *devnullMetrics) SetOffchainAggregatorSubmissionReceivedValues(value *bi
 
 func (d *devnullMetrics) SetOffchainAggregatorAnswerStalled(isSet bool, contractAddress, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string) {
 }
+
+// This utilities are used primarely in tests but are present in the monitoring package because they are not inside a file ending in _test.go.
+// This is done in order to expose NewRandomDataReader for use in cmd/monitoring.
+// The following code is added to comply with the "unused" linter:
+var (
+	_ = generateSolanaConfig
+	_ = generateFeedConfig
+	_ = fakeProducer{}
+	_ = fakeSchema{}
+)
