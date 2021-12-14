@@ -13,6 +13,7 @@ mod state;
 use crate::context::*;
 use crate::state::{Config, LeftoverPayment, Oracle, SigningKey, State, Transmission, MAX_ORACLES};
 
+use std::collections::BTreeSet;
 use std::convert::TryInto;
 use std::mem::size_of;
 
@@ -206,9 +207,14 @@ pub mod ocr2 {
         let duplicate_signer = oracles
             .windows(2)
             .any(|pair| pair[0].signer.key == pair[1].signer.key);
-        require!(!duplicate_signer, ErrorCode::DuplicateSigner);
+        require!(!duplicate_signer, DuplicateSigner);
 
-        // TODO: check for transmitter duplicates
+        let mut transmitters = BTreeSet::new();
+        // check for transmitter duplicates
+        for oracle in oracles.iter() {
+            let inserted = transmitters.insert(oracle.transmitter);
+            require!(inserted, DuplicateTransmitter);
+        }
 
         // Update config
         config.f = f;
@@ -948,6 +954,9 @@ pub enum ErrorCode {
 
     #[msg("Duplicate signer")]
     DuplicateSigner,
+
+    #[msg("Duplicate transmitter")]
+    DuplicateTransmitter,
 
     #[msg("Payee already set")]
     PayeeAlreadySet,
