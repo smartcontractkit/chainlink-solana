@@ -21,7 +21,7 @@ import (
 func BenchmarkMultichainMonitor(b *testing.B) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	var wg sync.WaitGroup
+	wg := &sync.WaitGroup{}
 	defer wg.Wait()
 
 	feed := generateFeedConfig()
