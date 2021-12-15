@@ -26,6 +26,7 @@ export default class SetPayees extends SolanaCommand {
     const aggregator = rdd.contracts[this.flags.state]
     const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
     const operators = aggregatorOperators.map((operator) => ({
+      // Check this too RDD
       transmitter: rdd.operators[operator].nodeAddress[0],
       payee: rdd.operators[operator].payeeAddress,
     }))
@@ -50,6 +51,8 @@ export default class SetPayees extends SolanaCommand {
     const state = new PublicKey(this.flags.state)
 
     const info = await program.account.state.fetch(state)
+
+    // TODO: check that is a  valid payable address: new PublicKey(operator.payee),
     const payeeByTransmitter = input.operators.reduce(
       (agg, operator) => ({
         ...agg,
@@ -57,6 +60,7 @@ export default class SetPayees extends SolanaCommand {
       }),
       {},
     )
+    // TODO: Check keys format
     // Set the payees in the same order the oracles are saved in the contract. The length of the payees need to be same as the oracles saved
     const payees = info.oracles.xs
       .slice(0, info.oracles.len)

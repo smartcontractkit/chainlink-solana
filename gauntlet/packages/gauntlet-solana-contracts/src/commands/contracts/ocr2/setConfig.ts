@@ -11,7 +11,7 @@ type Input = {
     signer: string
     transmitter: string
   }[]
-  threshold: number | string
+  f: number | string
 }
 export default class SetConfig extends SolanaCommand {
   static id = 'ocr2:set_config'
@@ -27,13 +27,15 @@ export default class SetConfig extends SolanaCommand {
     const aggregator = rdd.contracts[this.flags.state]
     const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
     const oracles = aggregatorOperators.map((operator) => ({
+      // Same here
       transmitter: rdd.operators[operator].nodeAddress[0],
-      signer: rdd.operators[operator].ocrSigningAddress[0],
+      // Signer should be onchainPublicKey. Check if we can support it with latest RDD changes
+      signer: rdd.operators[operator].ocrSigningAddress[0].replace('0x', ''),
     }))
-    const threshold = aggregator.config.maxFaultyNodeCount
+    const f = aggregator.config.f
     return {
       oracles,
-      threshold,
+      f,
     }
   }
 
@@ -50,18 +52,22 @@ export default class SetConfig extends SolanaCommand {
 
     const state = new PublicKey(this.flags.state)
     const input = this.makeInput(this.flags.input)
+
     const owner = this.wallet.payer
 
     console.log(`Setting config on ${state.toString()}...`)
 
+    // TODO: Check valid keys
     const oracles = input.oracles.map(({ signer, transmitter }) => ({
       signer: Buffer.from(signer, 'hex'),
       transmitter: new PublicKey(transmitter),
     }))
-    const threshhold = new BN(input.threshold)
+    const f = new BN(input.f)
 
-    // oracles.length > 3 * threshold
-    const tx = await program.rpc.setConfig(oracles, threshhold, {
+    // Must be = oracles.length > 3 * threshold
+    // TODO: Check here too
+    // MAX oracles = 19
+    const tx = await program.rpc.setConfig(oracles, f, {
       accounts: {
         state: state,
         authority: owner.publicKey,

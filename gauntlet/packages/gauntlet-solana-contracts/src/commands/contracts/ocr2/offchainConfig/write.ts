@@ -1,4 +1,4 @@
-import { Result } from '@chainlink/gauntlet-core'
+import { Result, utils } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
@@ -77,10 +77,10 @@ export default class WriteOffchainConfig extends SolanaCommand {
       peerIds: operatorsPeerIds,
       reportingPluginConfig: {
         alphaReportInfinite: config.reportingPluginConfig.alphaReportInfinite,
-        alphaReportPpb: config.reportingPluginConfig.alphaReportPpb,
+        alphaReportPpb: Number(config.reportingPluginConfig.alphaReportPpb),
         alphaAcceptInfinite: config.reportingPluginConfig.alphaAcceptInfinite,
-        alphaAcceptPpb: config.reportingPluginConfig.alphaAcceptPpb,
-        deltaCNanoseconds: durationToNanoseconds(config.reportingPluginConfig.deltaCNanoseconds).toNumber(),
+        alphaAcceptPpb: Number(config.reportingPluginConfig.alphaAcceptPpb),
+        deltaCNanoseconds: durationToNanoseconds(config.reportingPluginConfig.deltaC).toNumber(),
       },
       maxDurationQueryNanoseconds: durationToNanoseconds(config.maxDurationQuery).toNumber(),
       maxDurationObservationNanoseconds: durationToNanoseconds(config.maxDurationObservation).toNumber(),
@@ -97,14 +97,16 @@ export default class WriteOffchainConfig extends SolanaCommand {
   }
 
   serializeOffchainConfig = async (input: Input): Promise<Buffer> => {
+    const { configPublicKeys, ...validInput } = input
     const proto = new Protobuf({ descriptor: OCR2Descriptor })
     const reportingPluginConfigProto = proto.encode(
       'offchainreporting2_config.ReportingPluginConfig',
-      input.reportingPluginConfig,
+      validInput.reportingPluginConfig,
     )
-    const sharedSecretEncryptions = await this.generateSecretEncryptions(input.offchainPublicKeys)
+    const sharedSecretEncryptions = await this.generateSecretEncryptions(configPublicKeys)
     const offchainConfig = {
-      ...input,
+      ...validInput,
+      offchainPublicKeys: validInput.offchainPublicKeys.map((key) => Buffer.from(key, 'hex')),
       reportingPluginConfig: reportingPluginConfigProto,
       sharedSecretEncryptions,
     }
@@ -126,12 +128,11 @@ export default class WriteOffchainConfig extends SolanaCommand {
     const state = new PublicKey(this.flags.state)
     const owner = this.wallet.payer
 
-    // allow to pass raw onchainConfig as hex encoded
-    let offchainConfig: Buffer = Buffer.from(this.flags.raw, 'hex')
-    if (this.flags.raw == '') {
-      const input = this.makeInput(this.flags.input)
-      offchainConfig = await this.serializeOffchainConfig(input)
-    }
+    const input = this.makeInput(this.flags.input)
+    // TODO: Add validation https://github.com/smartcontractkit/offchain-reporting/blob/master/lib/offchainreporting2/internal/config/public_config.go#L248
+    // MORE: https://github.com/smartcontractkit/offchain-reporting/blob/master/lib/offchainreporting2/internal/config/public_config.go#L152
+    // Check correct format OCR Keys
+    const offchainConfig = await this.serializeOffchainConfig(input)
 
     logger.info(`Offchain config size: ${offchainConfig.byteLength}`)
     this.require(offchainConfig.byteLength < 4096, 'Offchain config must be lower than 4096 bytes')
