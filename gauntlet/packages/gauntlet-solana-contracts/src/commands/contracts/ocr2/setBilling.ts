@@ -7,8 +7,8 @@ import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
 
 type Input = {
-  observationPayment: number | string
-  transmissionPayment: number | string
+  observationPaymentGjuels: number | string
+  transmissionPaymentGjuels: number | string
 }
 
 export default class SetBilling extends SolanaCommand {
@@ -23,11 +23,11 @@ export default class SetBilling extends SolanaCommand {
     if (userInput) return userInput as Input
     const rdd = getRDD(this.flags.rdd)
     const billingInfo = rdd.contracts[this.flags.state]?.billing
-    this.require(!!billingInfo?.observationPaymentLinkGwei, 'Billing information not found')
-    this.require(!!billingInfo?.transmissionPaymentLinkGwei, 'Billing information not found')
+    this.require(!!billingInfo?.observationPaymentGjuels, 'Billing information not found')
+    this.require(!!billingInfo?.transmissionPaymentGjuels, 'Billing information not found')
     return {
-      observationPayment: billingInfo.observationPaymentLinkGwei,
-      transmissionPayment: billingInfo.transmissionPaymentLinkGwei,
+      observationPaymentGjuels: billingInfo.observationPaymentGjuels,
+      transmissionPaymentGjuels: billingInfo.transmissionPaymentGjuels,
     }
   }
 
@@ -49,14 +49,18 @@ export default class SetBilling extends SolanaCommand {
     const billingAC = new PublicKey(info.config.billingAccessController)
 
     logger.loading('Setting billing...')
-    const tx = await program.rpc.setBilling(new BN(input.observationPayment), new BN(input.transmissionPayment), {
-      accounts: {
-        state: state,
-        authority: this.wallet.payer.publicKey,
-        accessController: billingAC,
+    const tx = await program.rpc.setBilling(
+      new BN(input.observationPaymentGjuels),
+      new BN(input.transmissionPaymentGjuels),
+      {
+        accounts: {
+          state: state,
+          authority: this.wallet.payer.publicKey,
+          accessController: billingAC,
+        },
+        signers: [this.wallet.payer],
       },
-      signers: [this.wallet.payer],
-    })
+    )
 
     return {
       responses: [

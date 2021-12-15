@@ -10,6 +10,7 @@ import SetBilling from './setBilling'
 import SetConfig from './setConfig'
 import SetPayees from './setPayees'
 import SetupFlow from './setup.dev.flow'
+import SetupRDDFlow from './setup.dev.rdd.flow'
 import SetValidatorConfig from './setValidatorConfig'
 import Transmit from './transmit.dev'
 
@@ -29,4 +30,5 @@ export default [
   // ONLY DEV
   Transmit,
   SetupFlow,
+  SetupRDDFlow,
 ]
