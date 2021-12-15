@@ -64,5 +64,5 @@ LOOP:
 	wg.Wait()
 	require.Equal(t, trCount, 10, "should only be able to do initial read of the latest transmission")
 	require.Equal(t, stCount, 10, "should only be able to do initial read of the state account")
-	require.Equal(t, len(messages), 20)
+	require.Equal(t, len(messages), 30)
 }
