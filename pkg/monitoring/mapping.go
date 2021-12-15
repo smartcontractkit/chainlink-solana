@@ -178,7 +178,7 @@ func MakeSimplifiedConfigSetMapping(
 		return nil, fmt.Errorf("failed to parse s: %w", err)
 	}
 
-	oracles, err := createTelemetryOracles(offchainConfig.OffchainPublicKeys, offchainConfig.PeerIds, state.Oracles)
+	oracles, err := createConfigSetSimplifiedOracles(offchainConfig.OffchainPublicKeys, offchainConfig.PeerIds, state.Oracles)
 	if err != nil {
 		return nil, fmt.Errorf("failed to oracles s: %w", err)
 	}
@@ -282,7 +282,7 @@ func int32ArrToInt64Arr(in []uint32) []int64 {
 	return out
 }
 
-func createTelemetryOracles(offchainPublicKeys [][]byte, peerId []string, oracles pkgSolana.Oracles) ([]byte, error) {
+func createConfigSetSimplifiedOracles(offchainPublicKeys [][]byte, peerId []string, oracles pkgSolana.Oracles) ([]byte, error) {
 	if len(offchainPublicKeys) != len(peerId) && oracles.Len != uint64(len(peerId)) {
 		return nil, fmt.Errorf("length missmatch len(offchainPublicKeys)=%d , oracles.Len=%d, len(peerId)=%d", len(offchainPublicKeys), oracles.Len, len(peerId))
 	}

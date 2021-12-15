@@ -75,7 +75,7 @@ func (f *feedMonitor) Start(ctx context.Context) {
 			if err != nil {
 				break
 			}
-			err = f.processTelemetry(typed)
+			err = f.processConfigSetSimplified(typed)
 			latestTransmitter = typed.State.Config.LatestTransmitter.String()
 			f.metrics.SetNodeMetadata(f.config.Solana.ChainID, f.config.Solana.NetworkID,
 				f.config.Solana.NetworkName, "n/a", latestTransmitter)
@@ -147,7 +147,7 @@ func (f *feedMonitor) processTransmission(envelope TransmissionEnvelope) error {
 	return nil
 }
 
-func (f *feedMonitor) processTelemetry(envelope StateEnvelope) error {
+func (f *feedMonitor) processConfigSetSimplified(envelope StateEnvelope) error {
 	var mapping map[string]interface{}
 	mapping, err := MakeSimplifiedConfigSetMapping(envelope, f.feedConfig)
 	if err != nil {

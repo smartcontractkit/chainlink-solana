@@ -240,7 +240,7 @@ func TestMapping(t *testing.T) {
 		configSetSimplified, ok := deserialized.(map[string]interface{})
 		require.True(t, ok)
 
-		oracles, err := createTelemetryOracles(offchainConfig.OffchainPublicKeys, offchainConfig.PeerIds, state.Oracles)
+		oracles, err := createConfigSetSimplifiedOracles(offchainConfig.OffchainPublicKeys, offchainConfig.PeerIds, state.Oracles)
 		require.NoError(t, err)
 		require.Equal(t, configSetSimplified["block_number"], uint64ToBeBytes(envelope.BlockNumber))
 		require.Equal(t, configSetSimplified["delta_progress"], uint64ToBeBytes(offchainConfig.DeltaProgressNanoseconds))
