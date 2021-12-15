@@ -99,8 +99,8 @@ export default class Initialize extends SolanaCommand {
 
     Object.entries(accounts).map(([k, v]) => console.log('KEY:', k, '=', v.toString()))
     console.log(`
-      - Min Answer: ${minAnswer.toNumber()}
-      - Max Answer: ${maxAnswer.toNumber()}
+      - Min Answer: ${minAnswer.toString()}
+      - Max Answer: ${maxAnswer.toString()}
       - Decimals: ${decimals}
       - Description: ${description}
       - Nonce: ${nonce}

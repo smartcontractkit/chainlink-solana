@@ -7,13 +7,14 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	confirm "github.com/gagliardetto/solana-go/rpc/sendAndConfirmTransaction"
+	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
 var _ types.ContractTransmitter = (*ContractTracker)(nil)
 
 // Transmit sends the report to the on-chain OCR2Aggregator smart contract's Transmit method
-func (c ContractTracker) Transmit(
+func (c *ContractTracker) Transmit(
 	ctx context.Context,
 	reportCtx types.ReportContext,
 	report types.Report,
@@ -21,26 +22,30 @@ func (c ContractTracker) Transmit(
 ) error {
 	recent, err := c.client.rpc.GetRecentBlockhash(ctx, rpc.CommitmentFinalized)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error on Transmit.GetRecentBlock")
 	}
 
 	// Determine validator authority
 	seeds := [][]byte{[]byte("validator"), c.StateID.Bytes()}
 	validatorAuthority, validatorNonce, err := solana.FindProgramAddress(seeds, c.ProgramID)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error on Transmit.FindProgramAddress")
 	}
 
 	// Resolve validator's access controller
 	var validator Validator
-	if err := c.client.rpc.GetAccountDataInto(ctx, c.state.Config.Validator, &validator); err != nil {
-		return err
+	// only fetch state if validator is set
+	// contract skips validator parts if none is set
+	if (c.state.Config.Validator != solana.PublicKey{}) {
+		if err := c.client.rpc.GetAccountDataInto(ctx, c.state.Config.Validator, &validator); err != nil {
+			return errors.Wrap(err, "error on Transmit.GetAccountDataInto.Validator")
+		}
 	}
 
 	accounts := []*solana.AccountMeta{
 		// state, transmitter, transmissions, validator_program, validator, validator_authority, validator_access_controller
 		{PublicKey: c.StateID, IsWritable: true, IsSigner: false},
-		{PublicKey: c.Transmitter.PublicKey(), IsWritable: true, IsSigner: true},
+		{PublicKey: c.Transmitter.PublicKey(), IsWritable: false, IsSigner: true},
 		{PublicKey: c.TransmissionsID, IsWritable: true, IsSigner: false},
 		{PublicKey: c.ValidatorProgramID, IsWritable: false, IsSigner: false},
 		{PublicKey: c.state.Config.Validator, IsWritable: true, IsSigner: false},
@@ -70,33 +75,39 @@ func (c ContractTracker) Transmit(
 		solana.TransactionPayer(c.Transmitter.PublicKey()),
 	)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error on Transmit.NewTransaction")
 	}
 
-	msgToSign, err := tx.MarshalBinary()
+	msgToSign, err := tx.Message.MarshalBinary()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error on Transmit.Message.MarshalBinary")
 	}
 	finalSigBytes, err := c.Transmitter.Sign(msgToSign)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error on Transmit.Sign")
 	}
 	var finalSig [64]byte
 	copy(finalSig[:], finalSigBytes)
 	tx.Signatures = append(tx.Signatures, finalSig)
 
 	// Send transaction, and wait for confirmation:
-	_, err = confirm.SendAndConfirmTransaction(
-		ctx,
-		c.client.rpc,
-		c.client.ws,
-		tx,
-	)
+	go func() {
+		if _, err := confirm.SendAndConfirmTransactionWithOpts(
+			context.Background(), // does not use libocr transmit context
+			c.client.rpc,
+			c.client.ws,
+			tx,
+			true, // skip preflight
+			rpc.CommitmentConfirmed,
+		); err != nil {
+			c.lggr.Errorf("error on Transmit.SendAndConfirmTransaction: %s", err.Error())
+		}
+	}()
 
-	return err
+	return nil
 }
 
-func (c ContractTracker) LatestConfigDigestAndEpoch(
+func (c *ContractTracker) LatestConfigDigestAndEpoch(
 	ctx context.Context,
 ) (
 	configDigest types.ConfigDigest,

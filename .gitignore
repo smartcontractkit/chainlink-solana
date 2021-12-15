@@ -5,7 +5,10 @@
 # ignore relay build
 pkg/bin
 
+v1/target
 contracts/target
+contracts/programs/*/target
+v1/target
 contracts/.anchor
 # keypair used by anchor/anchor test
 contracts/id.json

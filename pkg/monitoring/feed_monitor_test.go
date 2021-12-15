@@ -32,6 +32,7 @@ func TestFeedMonitor(t *testing.T) {
 	configSetSimplifiedSchema := fakeSchema{configSetCodec}
 
 	cfg := Config{}
+
 	feedConfig := FeedConfig{
 		TransmissionsAccount: transmissionAccount,
 		StateAccount:         stateAccount,

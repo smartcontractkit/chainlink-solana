@@ -328,11 +328,11 @@
       ],
       "args": [
         {
-          "name": "observationPayment",
+          "name": "observationPaymentGjuels",
           "type": "u32"
         },
         {
-          "name": "transmissionPayment",
+          "name": "transmissionPaymentGjuels",
           "type": "u32"
         }
       ]
@@ -613,10 +613,7 @@
           {
             "name": "configDigest",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           },
           {
@@ -733,10 +730,7 @@
           {
             "name": "signer",
             "type": {
-              "array": [
-                "u8",
-                20
-              ]
+              "array": ["u8", 20]
             }
           },
           {
@@ -752,11 +746,11 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "observationPayment",
+            "name": "observationPaymentGjuels",
             "type": "u32"
           },
           {
-            "name": "transmissionPayment",
+            "name": "transmissionPaymentGjuels",
             "type": "u32"
           }
         ]
@@ -836,10 +830,7 @@
           {
             "name": "xs",
             "type": {
-              "array": [
-                "u8",
-                4096
-              ]
+              "array": ["u8", 4096]
             }
           },
           {
@@ -889,10 +880,7 @@
           {
             "name": "description",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           },
           {
@@ -930,10 +918,7 @@
           {
             "name": "latestConfigDigest",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           },
           {
@@ -977,10 +962,7 @@
           {
             "name": "key",
             "type": {
-              "array": [
-                "u8",
-                20
-              ]
+              "array": ["u8", 20]
             }
           }
         ]
@@ -1066,10 +1048,7 @@
         {
           "name": "latestConfigDigest",
           "type": {
-            "array": [
-              "u8",
-              32
-            ]
+            "array": ["u8", 32]
           },
           "index": false
         }
@@ -1086,10 +1065,7 @@
         {
           "name": "configDigest",
           "type": {
-            "array": [
-              "u8",
-              32
-            ]
+            "array": ["u8", 32]
           },
           "index": false
         },
@@ -1154,23 +1130,38 @@
     },
     {
       "code": 309,
+      "name": "DuplicateTransmitter",
+      "msg": "Duplicate transmitter"
+    },
+    {
+      "code": 310,
       "name": "PayeeAlreadySet",
       "msg": "Payee already set"
     },
     {
-      "code": 310,
+      "code": 311,
       "name": "PaymentsRemaining",
       "msg": "Leftover payments remaining, please call payRemaining first"
     },
     {
-      "code": 311,
+      "code": 312,
       "name": "PayeeOracleMismatch",
       "msg": "Payee and Oracle lenght mismatch"
     },
     {
-      "code": 312,
+      "code": 313,
       "name": "InvalidTokenAccount",
       "msg": "Invalid Token Account"
+    },
+    {
+      "code": 314,
+      "name": "UnauthorizedSigner",
+      "msg": "Oracle signer key not found"
+    },
+    {
+      "code": 315,
+      "name": "UnauthorizedTransmitter",
+      "msg": "Oracle transmitter key not found"
     }
   ]
 }

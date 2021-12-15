@@ -8,7 +8,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
-func (c ContractTracker) LatestTransmissionDetails(
+func (c *ContractTracker) LatestTransmissionDetails(
 	ctx context.Context,
 ) (
 	configDigest types.ConfigDigest,

@@ -221,7 +221,7 @@ func TestMapping(t *testing.T) {
 		require.Equal(t, decodedFeedConfig["transmissions_account"], feedConfig.TransmissionsAccount.Bytes())
 		require.Equal(t, decodedFeedConfig["state_account"], feedConfig.StateAccount.Bytes())
 	})
-	t.Run("MakeTransmissionMapping", func(t *testing.T) {
+	t.Run("MakeSimplifiedConfigSetMapping", func(t *testing.T) {
 		state, offchainConfig, _, err := generateState()
 		envelope := StateEnvelope{
 			State:       state,

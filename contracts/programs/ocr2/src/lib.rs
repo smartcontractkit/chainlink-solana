@@ -13,6 +13,7 @@ mod state;
 use crate::context::*;
 use crate::state::{Config, LeftoverPayment, Oracle, SigningKey, State, Transmission, MAX_ORACLES};
 
+use std::collections::BTreeSet;
 use std::convert::TryInto;
 use std::mem::size_of;
 
@@ -206,9 +207,14 @@ pub mod ocr2 {
         let duplicate_signer = oracles
             .windows(2)
             .any(|pair| pair[0].signer.key == pair[1].signer.key);
-        require!(!duplicate_signer, ErrorCode::DuplicateSigner);
+        require!(!duplicate_signer, DuplicateSigner);
 
-        // TODO: check for transmitter duplicates
+        let mut transmitters = BTreeSet::new();
+        // check for transmitter duplicates
+        for oracle in oracles.iter() {
+            let inserted = transmitters.insert(oracle.transmitter);
+            require!(inserted, DuplicateTransmitter);
+        }
 
         // Update config
         config.f = f;
@@ -295,12 +301,12 @@ pub mod ocr2 {
     #[access_control(has_billing_access(&ctx.accounts.state, &ctx.accounts.access_controller, &ctx.accounts.authority))]
     pub fn set_billing(
         ctx: Context<SetBilling>,
-        observation_payment: u32,
-        transmission_payment: u32,
+        observation_payment_gjuels: u32,
+        transmission_payment_gjuels: u32,
     ) -> ProgramResult {
         let mut state = ctx.accounts.state.load_mut()?;
-        state.config.billing.observation_payment = observation_payment;
-        state.config.billing.transmission_payment = transmission_payment;
+        state.config.billing.observation_payment_gjuels = observation_payment_gjuels;
+        state.config.billing.transmission_payment_gjuels = transmission_payment_gjuels;
         Ok(())
     }
 
@@ -643,7 +649,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
         .oracles
         .iter()
         .position(|oracle| &oracle.transmitter == ctx.accounts.transmitter.key)
-        .ok_or(ErrorCode::Unauthorized)?;
+        .ok_or(ErrorCode::UnauthorizedTransmitter)?;
 
     require!(
         config.latest_config_digest == *config_digest,
@@ -656,7 +662,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
     require!(raw_signatures.len() % SIGNATURE_LEN == 0, InvalidInput);
     let signature_count = raw_signatures.len() / SIGNATURE_LEN;
     require!(
-        signature_count == 3 * usize::from(config.f) + 1,
+        signature_count == usize::from(config.f) + 1,
         WrongNumberOfSignatures
     );
     let raw_signatures = raw_signatures
@@ -664,7 +670,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
         .map(|raw| raw.split_last());
 
     // Verify signatures attached to report
-    let hash = hash::hashv(&[raw_report, report_context]).to_bytes();
+    let hash = hash::hashv(&[&[raw_report.len() as u8], raw_report, report_context]).to_bytes();
 
     // this fits MAX_ORACLES
     let mut uniques: u32 = 0;
@@ -685,7 +691,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
         let index = state
             .oracles
             .binary_search_by_key(&address, |oracle| &oracle.signer.key)
-            .map_err(|_| ErrorCode::Unauthorized)?;
+            .map_err(|_| ErrorCode::UnauthorizedSigner)?;
 
         uniques |= 1 << index;
     }
@@ -723,7 +729,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
 
     // calculate and pay reimbursement
     let reimbursement = calculate_reimbursement(report.juels_per_lamport, signature_count)?;
-    let amount = reimbursement + state.config.billing.transmission_payment as u64;
+    let amount = reimbursement + u64::from(state.config.billing.transmission_payment_gjuels);
     state.oracles[oracle_idx].payment += amount;
 
     // validate answer
@@ -827,7 +833,7 @@ fn calculate_reimbursement(juels_per_lamport: u64, signature_count: usize) -> Re
 
 fn calculate_owed_payment(config: &Config, oracle: &Oracle) -> Result<u64> {
     let rounds = config.latest_aggregator_round_id - oracle.from_round_id;
-    let amount = u64::from(config.billing.observation_payment)
+    let amount = u64::from(config.billing.observation_payment_gjuels)
         .checked_mul(rounds.into())
         .ok_or(ErrorCode::Overflow)?
         .checked_add(oracle.payment)
@@ -856,7 +862,7 @@ fn calculate_total_link_due(
         .map(|leftover| leftover.amount)
         .sum();
 
-    let amount = u64::from(config.billing.observation_payment)
+    let amount = u64::from(config.billing.observation_payment_gjuels)
         .checked_mul(u64::from(rounds))
         .ok_or(ErrorCode::Overflow)?
         .checked_add(reimbursements)
@@ -949,6 +955,9 @@ pub enum ErrorCode {
     #[msg("Duplicate signer")]
     DuplicateSigner,
 
+    #[msg("Duplicate transmitter")]
+    DuplicateTransmitter,
+
     #[msg("Payee already set")]
     PayeeAlreadySet,
 
@@ -960,6 +969,12 @@ pub enum ErrorCode {
 
     #[msg("Invalid Token Account")]
     InvalidTokenAccount,
+
+    #[msg("Oracle signer key not found")]
+    UnauthorizedSigner,
+
+    #[msg("Oracle transmitter key not found")]
+    UnauthorizedTransmitter,
 }
 
 pub mod query {

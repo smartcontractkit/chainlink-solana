@@ -50,16 +50,16 @@ func main() {
 	client := rpc.New(cfg.Solana.RPCEndpoint)
 
 	schemaRegistry := monitoring.NewSchemaRegistry(cfg.SchemaRegistry)
-	trSchema, err := schemaRegistry.EnsureSchema(cfg.TransmissionTopic+"-value", monitoring.TransmissionAvroSchema)
+	trSchema, err := schemaRegistry.EnsureSchema(cfg.Kafka.TransmissionTopic+"-value", monitoring.TransmissionAvroSchema)
 	if err != nil {
 		log.Fatalw("failed to prepare transmission schema", "error", err)
 	}
-	stSchema, err := schemaRegistry.EnsureSchema(cfg.ConfigSetTopic+"-value", monitoring.ConfigSetAvroSchema)
+	stSchema, err := schemaRegistry.EnsureSchema(cfg.Kafka.ConfigSetTopic+"-value", monitoring.ConfigSetAvroSchema)
 	if err != nil {
 		log.Fatalf("failed to prepare config_set schema", "error", err)
 	}
 
-	csSimplifiedSchema, err := schemaRegistry.EnsureSchema(cfg.ConfigSetSimplifiedTopic+"-value", monitoring.ConfigSetSimplifiedAvroSchema)
+	csSimplifiedSchema, err := schemaRegistry.EnsureSchema(cfg.Kafka.ConfigSetSimplifiedTopic+"-value", monitoring.ConfigSetSimplifiedAvroSchema)
 	if err != nil {
 		log.Fatalf("failed to prepare config_set schema", "error", err)
 	}
