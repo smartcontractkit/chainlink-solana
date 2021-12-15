@@ -28,9 +28,9 @@ export default class SetConfig extends SolanaCommand {
     const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
     const oracles = aggregatorOperators.map((operator) => ({
       transmitter: rdd.operators[operator].nodeAddress[0],
-      signer: rdd.operators[operator].ocrSigningAddress[0],
+      signer: rdd.operators[operator].ocrSigningAddress[0].replace('0x', ''),
     }))
-    const threshold = aggregator.config.maxFaultyNodeCount
+    const threshold = aggregator.config.f
     return {
       oracles,
       threshold,
@@ -50,6 +50,7 @@ export default class SetConfig extends SolanaCommand {
 
     const state = new PublicKey(this.flags.state)
     const input = this.makeInput(this.flags.input)
+
     const owner = this.wallet.payer
 
     console.log(`Setting config on ${state.toString()}...`)

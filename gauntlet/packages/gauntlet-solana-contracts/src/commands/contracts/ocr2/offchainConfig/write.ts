@@ -77,10 +77,10 @@ export default class WriteOffchainConfig extends SolanaCommand {
       peerIds: operatorsPeerIds,
       reportingPluginConfig: {
         alphaReportInfinite: config.reportingPluginConfig.alphaReportInfinite,
-        alphaReportPpb: config.reportingPluginConfig.alphaReportPpb,
+        alphaReportPpb: Number(config.reportingPluginConfig.alphaReportPpb),
         alphaAcceptInfinite: config.reportingPluginConfig.alphaAcceptInfinite,
-        alphaAcceptPpb: config.reportingPluginConfig.alphaAcceptPpb,
-        deltaCNanoseconds: durationToNanoseconds(config.reportingPluginConfig.deltaCNanoseconds).toNumber(),
+        alphaAcceptPpb: Number(config.reportingPluginConfig.alphaAcceptPpb),
+        deltaCNanoseconds: durationToNanoseconds(config.reportingPluginConfig.deltaC).toNumber(),
       },
       maxDurationQueryNanoseconds: durationToNanoseconds(config.maxDurationQuery).toNumber(),
       maxDurationObservationNanoseconds: durationToNanoseconds(config.maxDurationObservation).toNumber(),
@@ -126,12 +126,8 @@ export default class WriteOffchainConfig extends SolanaCommand {
     const state = new PublicKey(this.flags.state)
     const owner = this.wallet.payer
 
-    // allow to pass raw onchainConfig as hex encoded
-    let offchainConfig: Buffer = Buffer.from(this.flags.raw, 'hex')
-    if (this.flags.raw == '') {
-      const input = this.makeInput(this.flags.input)
-      offchainConfig = await this.serializeOffchainConfig(input)
-    }
+    const input = this.makeInput(this.flags.input)
+    const offchainConfig = await this.serializeOffchainConfig(input)
 
     logger.info(`Offchain config size: ${offchainConfig.byteLength}`)
     this.require(offchainConfig.byteLength < 4096, 'Offchain config must be lower than 4096 bytes')

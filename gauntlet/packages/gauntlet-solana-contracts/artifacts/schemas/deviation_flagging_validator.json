@@ -240,17 +240,17 @@
   ],
   "errors": [
     {
-      "code": 6000,
+      "code": 300,
       "name": "Unauthorized",
       "msg": "Unauthorized"
     },
     {
-      "code": 6001,
+      "code": 301,
       "name": "InvalidInput",
       "msg": "Invalid input"
     },
     {
-      "code": 6002,
+      "code": 302,
       "name": "Full",
       "msg": "Flags list is full"
     }

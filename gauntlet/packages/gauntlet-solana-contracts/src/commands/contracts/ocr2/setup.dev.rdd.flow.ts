@@ -16,8 +16,8 @@ import SetConfig from './setConfig'
 import SetBilling from './setBilling'
 
 // TODO: Remove. Useful for dev testing
-export default class SetupFlow extends FlowCommand<TransactionResponse> {
-  static id = 'ocr2:setup:flow'
+export default class SetupRDDFlow extends FlowCommand<TransactionResponse> {
+  static id = 'ocr2:setup:rdd:flow'
   static category = CONTRACT_LIST.OCR_2
   static examples = ['yarn gauntlet ocr2:setup:flow --network=local --version=1']
 
@@ -32,94 +32,19 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
       VALIDATOR: 5,
     }
 
-    const offchainConfigInput = {
-      deltaProgressNanoseconds: 30,
-      deltaResendNanoseconds: 30,
-      deltaRoundNanoseconds: 30,
-      deltaGraceNanoseconds: 30,
-      deltaStageNanoseconds: 30,
-      rMax: 30,
-      s: [1, 1, 1, 1],
-      offchainPublicKeys: [
-        '5cd10bf991c8b0db7bee3ec371c7795a69297b6bccf7b4d738e0920b56131772',
-        'd58a9b179d5ac550376734ce1da5ee4572718fd6d315e0541b1da1d1671d0d71',
-        'ef104fe8812c2c73d4c1b57dc82a15f8dd5a23149bd91917abad295f305ed21a',
-      ],
-      peerIds: [
-        'DxRwKpwNBuMzKf5YEG1vLpnRbWeKo1Z4tKHfFGt8vUkj',
-        '8sdUrh9LQdAXhrgFEBDxnUauJTTLfEq5PNsJbn9Pw19K',
-        '9n1sSGA5rhfsQyaX3tHz3ZU1ffR6V8KffvWtFPBcFrJw',
-      ],
-      reportingPluginConfig: {
-        alphaReportInfinite: true,
-        alphaReportPpb: 30,
-        alphaAcceptInfinite: true,
-        alphaAcceptPpb: 30,
-        deltaCNanoseconds: 30,
-      },
-      maxDurationQueryNanoseconds: 30,
-      maxDurationObservationNanoseconds: 30,
-      maxDurationReportNanoseconds: 30,
-      maxDurationShouldAcceptFinalizedReportNanoseconds: 30,
-      maxDurationShouldTransmitAcceptedReportNanoseconds: 30,
-    }
-
-    const payeesInput = {
-      operators: [
-        {
-          transmitter: 'DxRwKpwNBuMzKf5YEG1vLpnRbWeKo1Z4tKHfFGt8vUkj',
-          payee: 'DxRwKpwNBuMzKf5YEG1vLpnRbWeKo1Z4tKHfFGt8vUkj',
-        },
-        {
-          transmitter: '8sdUrh9LQdAXhrgFEBDxnUauJTTLfEq5PNsJbn9Pw19K',
-          payee: '8sdUrh9LQdAXhrgFEBDxnUauJTTLfEq5PNsJbn9Pw19K',
-        },
-        {
-          transmitter: '9n1sSGA5rhfsQyaX3tHz3ZU1ffR6V8KffvWtFPBcFrJw',
-          payee: '9n1sSGA5rhfsQyaX3tHz3ZU1ffR6V8KffvWtFPBcFrJw',
-        },
-        {
-          transmitter: 'G5LdWMvWoQQ787iPgWbCSTrkPB5Li9e2CWi6jYuAUHUH',
-          payee: 'G5LdWMvWoQQ787iPgWbCSTrkPB5Li9e2CWi6jYuAUHUH',
-        },
-      ],
-    }
-
-    const configInput = {
-      oracles: [
-        {
-          transmitter: 'DxRwKpwNBuMzKf5YEG1vLpnRbWeKo1Z4tKHfFGt8vUkj',
-          signer: '0cAFF71b6Dbb4f9Ebc862F8E9C124E737C917e80',
-        },
-        {
-          transmitter: '8sdUrh9LQdAXhrgFEBDxnUauJTTLfEq5PNsJbn9Pw19K',
-          signer: '6b211EdeF015C9931eA7D65CD326472891ecf501',
-        },
-        {
-          transmitter: '9n1sSGA5rhfsQyaX3tHz3ZU1ffR6V8KffvWtFPBcFrJw',
-          signer: 'C6CD7e27Ea7653362906A7C9923c15602dC04F41',
-        },
-        {
-          transmitter: 'G5LdWMvWoQQ787iPgWbCSTrkPB5Li9e2CWi6jYuAUHUH',
-          signer: '1b7c57E22a4D4B6c94365A73AD5FF743DBE9c55E',
-        },
-      ],
-      threshold: 1,
-    }
-
     this.flow = [
-      {
-        name: 'Deploy AC',
-        command: 'access_controller:deploy',
-      },
-      {
-        name: 'Deploy OCR',
-        command: 'ocr2:deploy',
-      },
-      {
-        name: 'Deploy Validator',
-        command: 'deviation_flagging_validator:deploy',
-      },
+      // {
+      //   name: 'Deploy AC',
+      //   command: 'access_controller:deploy',
+      // },
+      // {
+      //   name: 'Deploy OCR',
+      //   command: 'ocr2:deploy',
+      // },
+      // {
+      //   name: 'Deploy Validator',
+      //   command: 'deviation_flagging_validator:deploy',
+      // },
       {
         name: 'Deploy LINK',
         command: DeployToken,
@@ -150,12 +75,6 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
           billingAccessController: ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
           requesterAccessController: ID.contract(this.stepIds.REQUEST_ACCESS_CONTROLLER),
           link: ID.contract(this.stepIds.TOKEN),
-          input: {
-            minAnswer: 0,
-            maxAnswer: 1000000000,
-            decimals: 9,
-            description: 'TEST',
-          },
         },
         id: this.stepIds.OCR_2,
       },
@@ -172,7 +91,6 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         command: WriteOffchainConfig,
         flags: {
           state: ID.contract(this.stepIds.OCR_2),
-          input: offchainConfigInput,
         },
       },
       {
@@ -187,7 +105,6 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         command: SetConfig,
         flags: {
           state: ID.contract(this.stepIds.OCR_2),
-          input: configInput,
         },
       },
       {
@@ -195,7 +112,6 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         command: SetPayees,
         flags: {
           state: ID.contract(this.stepIds.OCR_2),
-          input: payeesInput,
           link: ID.contract(this.stepIds.TOKEN),
         },
       },
