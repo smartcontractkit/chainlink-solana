@@ -51,8 +51,8 @@ type mockRequest struct {
 	JSONRPC string
 }
 
-func TestGetLatestTransmissionRaw(t *testing.T) {
-	// each getLatestTransmission submits two API requests
+func TestGetLatestTransmission(t *testing.T) {
+	// each GetLatestTransmission submits two API requests
 	// 0 + 0: everything passes
 	// 1 + 0: return too short cursor (fail on first API request)
 	// 0 + 1: return too short transmission
@@ -86,16 +86,16 @@ func TestGetLatestTransmissionRaw(t *testing.T) {
 	expectedTime := binary.BigEndian.Uint64([]byte{0, 0, 0, 0, 97, 184, 192, 35})
 	expectedAns := big.NewInt(0).SetBytes([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 107, 89, 20, 64}).String()
 
-	a, err := getLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{})
+	a, _, err := GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{})
 	assert.NoError(t, err)
 	assert.Equal(t, expectedTime, a.Timestamp)
 	assert.Equal(t, expectedAns, a.Data.String())
 
 	// fail if returned cursor is too short
-	_, err = getLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{})
+	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{})
 	assert.ErrorIs(t, err, errCursorLength)
 
 	// fail if returned transmission is too short
-	_, err = getLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{})
+	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{})
 	assert.ErrorIs(t, err, errTransmissionLength)
 }
