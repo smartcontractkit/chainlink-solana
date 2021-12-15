@@ -29,8 +29,10 @@ func TestFeedMonitor(t *testing.T) {
 
 	transmissionSchema := fakeSchema{transmissionCodec}
 	stateSchema := fakeSchema{configSetCodec}
+	configSetSimplifiedSchema := fakeSchema{configSetSimplifiedCodec}
 
-	solanaConfig := SolanaConfig{}
+	cfg := Config{}
+
 	feedConfig := FeedConfig{
 		TransmissionsAccount: transmissionAccount,
 		StateAccount:         stateAccount,
@@ -38,17 +40,17 @@ func TestFeedMonitor(t *testing.T) {
 
 	monitor := NewFeedMonitor(
 		logger.NewNullLogger(),
-		solanaConfig,
+		cfg,
 		feedConfig,
 		transmissionPoller, statePoller,
-		transmissionSchema, stateSchema,
+		transmissionSchema, stateSchema, configSetSimplifiedSchema,
 		producer,
 		&devnullMetrics{},
 	)
 	go monitor.Start(ctx)
 
 	trCount, stCount := 0, 0
-	messages := []producerMessage{}
+	var messages []producerMessage
 	newStateEnv, err := generateStateEnvelope()
 	require.NoError(t, err)
 	newTransmissionEnv := generateTransmissionEnvelope()

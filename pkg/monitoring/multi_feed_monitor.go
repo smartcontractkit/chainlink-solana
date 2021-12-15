@@ -13,42 +13,40 @@ type MultiFeedMonitor interface {
 
 func NewMultiFeedMonitor(
 	log logger.Logger,
-	solanaConfig SolanaConfig,
+	config Config,
 	transmissionReader, stateReader AccountReader,
-	transmissionSchema, stateSchema Schema,
+	transmissionSchema, stateSchema, configSetSimplifiedSchema Schema,
 	producer Producer,
-	feeds []FeedConfig,
 	metrics Metrics,
 ) MultiFeedMonitor {
 	return &multiFeedMonitor{
 		log,
-		solanaConfig,
+		config,
 		transmissionReader, stateReader,
-		transmissionSchema, stateSchema,
+		transmissionSchema, stateSchema, configSetSimplifiedSchema,
 		producer,
-		feeds,
 		metrics,
 	}
 }
 
 type multiFeedMonitor struct {
-	log                logger.Logger
-	solanaConfig       SolanaConfig
-	transmissionReader AccountReader
-	stateReader        AccountReader
-	transmissionSchema Schema
-	stateSchema        Schema
-	producer           Producer
-	feeds              []FeedConfig
-	metrics            Metrics
+	log                       logger.Logger
+	config                    Config
+	transmissionReader        AccountReader
+	stateReader               AccountReader
+	transmissionSchema        Schema
+	stateSchema               Schema
+	configSetSimplifiedSchema Schema
+	producer                  Producer
+	metrics                   Metrics
 }
 
 const bufferCapacity = 100
 
 // Start should be executed as a goroutine.
 func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup) {
-	wg.Add(len(m.feeds))
-	for _, feedConfig := range m.feeds {
+	wg.Add(len(m.config.Feeds))
+	for _, feedConfig := range m.config.Feeds {
 		go func(feedConfig FeedConfig) {
 			defer wg.Done()
 
@@ -78,11 +76,11 @@ func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup) {
 			}()
 
 			feedMonitor := NewFeedMonitor(
-				m.log.With("name", feedConfig.FeedName, "network", m.solanaConfig.NetworkName),
-				m.solanaConfig,
+				m.log.With("name", feedConfig.FeedName, "network", m.config.Solana.NetworkName),
+				m.config,
 				feedConfig,
 				transmissionPoller, statePoller,
-				m.transmissionSchema, m.stateSchema,
+				m.transmissionSchema, m.stateSchema, m.configSetSimplifiedSchema,
 				m.producer,
 				m.metrics,
 			)

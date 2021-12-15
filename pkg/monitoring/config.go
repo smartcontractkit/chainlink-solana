@@ -30,13 +30,15 @@ type SolanaConfig struct {
 }
 
 type KafkaConfig struct {
-	Brokers          string `json:"brokers,omitempty"`
-	ClientID         string `json:"client_id,omitempty"`
-	SecurityProtocol string `json:"security_protocol,omitempty"`
-	SaslMechanism    string `json:"sasl_mechanism,omitempty"`
-	SaslUsername     string `json:"sasl_username,omitempty"`
-	SaslPassword     string `json:"sasl_password,omitempty"`
-	Topic            string `json:"topic,omitempty"`
+	Brokers                  string `json:"brokers,omitempty"`
+	ClientID                 string `json:"client_id,omitempty"`
+	SecurityProtocol         string `json:"security_protocol,omitempty"`
+	SaslMechanism            string `json:"sasl_mechanism,omitempty"`
+	SaslUsername             string `json:"sasl_username,omitempty"`
+	SaslPassword             string `json:"sasl_password,omitempty"`
+	TransmissionTopic        string `json:"transmission_topic,omitempty"`
+	ConfigSetTopic           string `json:"config_set_topic,omitempty"`
+	ConfigSetSimplifiedTopic string `json:"config_set_simplified_topic,omitempty"`
 }
 
 type SchemaRegistryConfig struct {
@@ -85,7 +87,9 @@ func ParseConfig(ctx context.Context) (Config, error) {
 	flag.StringVar(&cfg.Solana.NetworkID, "solana.network_id", "", "")
 	flag.StringVar(&cfg.Solana.ChainID, "solana.chain_id", "", "")
 
-	flag.StringVar(&cfg.Kafka.Topic, "kafka.topic", "", "")
+	flag.StringVar(&cfg.Kafka.ConfigSetTopic, "kafka.config_set_topic", "", "")
+	flag.StringVar(&cfg.Kafka.ConfigSetSimplifiedTopic, "kafka.config_set_simplified_topic", "", "")
+	flag.StringVar(&cfg.Kafka.TransmissionTopic, "kafka.transmission_topic", "", "")
 	flag.StringVar(&cfg.Kafka.Brokers, "kafka.brokers", "", "")
 	flag.StringVar(&cfg.Kafka.ClientID, "kafka.client_id", "", "")
 	flag.StringVar(&cfg.Kafka.SecurityProtocol, "kafka.security_protocol", "", "")
@@ -200,9 +204,14 @@ func parseEnvVars(cfg *Config) {
 	if value, isPresent := os.LookupEnv("SOLANA_CHAIN_ID"); isPresent {
 		cfg.Solana.ChainID = value
 	}
-
-	if value, isPresent := os.LookupEnv("KAFKA_TOPIC"); isPresent {
-		cfg.Kafka.Topic = value
+	if value, isPresent := os.LookupEnv("KAFKA_TRANSMISSION_TOPIC"); isPresent {
+		cfg.Kafka.TransmissionTopic = value
+	}
+	if value, isPresent := os.LookupEnv("KAFKA_CONFIG_SET_TOPIC"); isPresent {
+		cfg.Kafka.ConfigSetTopic = value
+	}
+	if value, isPresent := os.LookupEnv("KAFKA_CONFIG_SET_SIMPLIFIED_TOPIC"); isPresent {
+		cfg.Kafka.ConfigSetSimplifiedTopic = value
 	}
 	if value, isPresent := os.LookupEnv("KAFKA_BROKERS"); isPresent {
 		cfg.Kafka.Brokers = value
