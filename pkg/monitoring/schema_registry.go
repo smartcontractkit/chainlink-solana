@@ -36,18 +36,26 @@ func (s *schemaRegistry) EnsureSchema(subject, spec string) (Schema, error) {
 	if err != nil && !isNotFoundErr(err) {
 		return nil, fmt.Errorf("failed to read schema for subject '%s': %w", subject, err)
 	}
+	if err != nil && isNotFoundErr(err) {
+		s.log.Infof("creating new schema for subject '%s'\n", subject)
+		newSchema, err := s.backend.CreateSchema(subject, spec, srclient.Avro)
+		if err != nil {
+			return nil, fmt.Errorf("unable to create new schema with subject '%s': %w", subject, err)
+		}
+		return wrapSchema{newSchema}, nil
+	}
 	isEqualSchemas, errInIsEqualJSON := isEqualJSON(registeredSchema.Schema(), spec)
 	if errInIsEqualJSON != nil {
 		return nil, fmt.Errorf("failed to compare schama in registry with local schema: %w", errInIsEqualJSON)
 	}
-	if err == nil && isEqualSchemas {
-		fmt.Printf("using existing schema for subject '%s'\n", subject)
+	if isEqualSchemas {
+		s.log.Infof("using existing schema for subject '%s'\n", subject)
 		return wrapSchema{registeredSchema}, nil
 	}
 	s.log.Infof("updating schema for subject '%s'\n", subject)
 	newSchema, err := s.backend.CreateSchema(subject, spec, srclient.Avro)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create new schema with subject '%s': %w", subject, err)
+		return nil, fmt.Errorf("unable to update schema with subject '%s': %w", subject, err)
 	}
 	return wrapSchema{newSchema}, nil
 }
