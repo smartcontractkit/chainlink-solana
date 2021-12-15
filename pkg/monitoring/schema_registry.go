@@ -1,6 +1,7 @@
 package monitoring
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -70,10 +71,22 @@ type wrapSchema struct {
 }
 
 func (w wrapSchema) Encode(value interface{}) ([]byte, error) {
-	return w.Schema.Codec().BinaryFromNative(nil, value)
+	payload, err := w.Schema.Codec().BinaryFromNative(nil, value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode value in avro: %w", err)
+	}
+	schemaIDBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(schemaIDBytes, uint32(w.Schema.ID()))
+
+	// Magic 0 byte + 4 bytes of schema ID + the data bytes
+	bytes := []byte{0}
+	bytes = append(bytes, schemaIDBytes...)
+	bytes = append(bytes, payload...)
+	return bytes, nil
 }
 
 func (w wrapSchema) Decode(buf []byte) (interface{}, error) {
+	// TODO add the decode for tests later
 	value, _, err := w.Schema.Codec().NativeFromBinary(buf)
 	return value, err
 }
