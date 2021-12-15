@@ -2,6 +2,7 @@ import { logger } from '@chainlink/gauntlet-core/dist/utils'
 import { PublicKey } from '@solana/web3.js'
 import BN from 'bn.js'
 import { assert } from './assert'
+import { Protobuf } from './proto'
 
 export type Inspection = {
   value: any
@@ -25,6 +26,8 @@ export const inspect = (inspections: Inspection[]): boolean => {
 }
 
 export const toComparableNumber = (v: string | number) => new BN(v).toString()
+export const toComparableLongNumber = (v: Long) => new BN(Protobuf.longToString(v)).toString()
+
 export const toComparablePubKey = (v: string) => {
   try {
     return new PublicKey(v).toString()
