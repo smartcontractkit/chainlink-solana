@@ -214,7 +214,7 @@ func parseEnvVars(cfg *Config) {
 		cfg.Kafka.SecurityProtocol = value
 	}
 	if value, isPresent := os.LookupEnv("KAFKA_SASL_MECHANISM"); isPresent {
-		cfg.Kafka.SaslUsername = value
+		cfg.Kafka.SaslMechanism = value
 	}
 	if value, isPresent := os.LookupEnv("KAFKA_SASL_USERNAME"); isPresent {
 		cfg.Kafka.SaslUsername = value
