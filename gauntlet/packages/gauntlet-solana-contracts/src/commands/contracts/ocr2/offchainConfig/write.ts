@@ -11,7 +11,7 @@ import { makeSharedSecretEncryptions, SharedSecretEncryptions } from '../../../.
 import { durationToNanoseconds } from '../../../../core/time'
 import { divideIntoChunks } from '../../../../core/utils'
 
-type Input = {
+export type Input = {
   deltaProgressNanoseconds: number
   deltaResendNanoseconds: number
   deltaRoundNanoseconds: number
@@ -54,11 +54,8 @@ export default class WriteOffchainConfig extends SolanaCommand {
     )
   }
 
-  makeInput = (userInput: any): Input => {
-    // TODO: Some format validation for user input
-    if (userInput) return userInput as Input
-    const rdd = getRDD(this.flags.rdd)
-    const aggregator = rdd.contracts[this.flags.state]
+  static makeInputFromRDD = (rdd: any, stateAddress: string): Input => {
+    const aggregator = rdd.contracts[stateAddress]
     const config = aggregator.config
     const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
     const operatorsPublicKeys = aggregatorOperators.map((o) => rdd.operators[o].ocrOffchainPublicKey[0])
@@ -94,6 +91,13 @@ export default class WriteOffchainConfig extends SolanaCommand {
       configPublicKeys: operatorConfigPublicKeys,
     }
     return input
+  }
+
+  makeInput = (userInput: any): Input => {
+    // TODO: Some format validation for user input
+    if (userInput) return userInput as Input
+    const rdd = getRDD(this.flags.rdd)
+    return WriteOffchainConfig.makeInputFromRDD(rdd, this.flags.state)
   }
 
   serializeOffchainConfig = async (input: Input): Promise<Buffer> => {
