@@ -51,6 +51,22 @@ type mockRequest struct {
 	JSONRPC string
 }
 
+func TestGetState(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// create response
+		value := base64.StdEncoding.EncodeToString(mockState.Raw)
+		res := fmt.Sprintf(`{"jsonrpc":"2.0","result":{"context": {"slot":1},"value": {"data":["%s","base64"],"executable": false,"lamports": 1000000000,"owner": "11111111111111111111111111111111","rentEpoch":2}},"id":1}`, value)
+
+		_, err := w.Write([]byte(res))
+		require.NoError(t, err)
+	}))
+	defer mockServer.Close()
+
+	// happy path does not error (actual state decoding handled in types_test)
+	_, _, err := GetState(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{})
+	require.NoError(t, err)
+}
+
 func TestGetLatestTransmission(t *testing.T) {
 	// each GetLatestTransmission submits two API requests
 	// 0 + 0: everything passes

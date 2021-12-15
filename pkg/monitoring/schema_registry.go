@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/riferrei/srclient"
+	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,14 +20,15 @@ type SchemaRegistry interface {
 
 type schemaRegistry struct {
 	backend *srclient.SchemaRegistryClient
+	log     logger.Logger
 }
 
-func NewSchemaRegistry(cfg SchemaRegistryConfig) SchemaRegistry {
+func NewSchemaRegistry(cfg SchemaRegistryConfig, log logger.Logger) SchemaRegistry {
 	backend := srclient.CreateSchemaRegistryClient(cfg.URL)
 	if cfg.Username != "" && cfg.Password != "" {
 		backend.SetCredentials(cfg.Username, cfg.Password)
 	}
-	return &schemaRegistry{backend}
+	return &schemaRegistry{backend, log}
 }
 
 func (s *schemaRegistry) EnsureSchema(subject, spec string) (Schema, error) {
@@ -34,18 +36,26 @@ func (s *schemaRegistry) EnsureSchema(subject, spec string) (Schema, error) {
 	if err != nil && !isNotFoundErr(err) {
 		return nil, fmt.Errorf("failed to read schema for subject '%s': %w", subject, err)
 	}
+	if err != nil && isNotFoundErr(err) {
+		s.log.Infof("creating new schema for subject '%s'\n", subject)
+		newSchema, err := s.backend.CreateSchema(subject, spec, srclient.Avro)
+		if err != nil {
+			return nil, fmt.Errorf("unable to create new schema with subject '%s': %w", subject, err)
+		}
+		return wrapSchema{newSchema}, nil
+	}
 	isEqualSchemas, errInIsEqualJSON := isEqualJSON(registeredSchema.Schema(), spec)
 	if errInIsEqualJSON != nil {
 		return nil, fmt.Errorf("failed to compare schama in registry with local schema: %w", errInIsEqualJSON)
 	}
-	if err == nil && isEqualSchemas {
-		fmt.Printf("using existing schema for subject '%s'\n", subject)
+	if isEqualSchemas {
+		s.log.Infof("using existing schema for subject '%s'\n", subject)
 		return wrapSchema{registeredSchema}, nil
 	}
-	fmt.Printf("creating new schema for subject '%s'\n", subject)
+	s.log.Infof("updating schema for subject '%s'\n", subject)
 	newSchema, err := s.backend.CreateSchema(subject, spec, srclient.Avro)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create new schema with subject '%s': %w", subject, err)
+		return nil, fmt.Errorf("unable to update schema with subject '%s': %w", subject, err)
 	}
 	return wrapSchema{newSchema}, nil
 }
