@@ -103,7 +103,7 @@ func GetState(ctx context.Context, client *rpc.Client, account solana.PublicKey)
 	}
 
 	var state State
-	if err := bin.NewBinDecoder(res.Value.Data.GetBinary()).Decode(state); err != nil {
+	if err := bin.NewBinDecoder(res.Value.Data.GetBinary()).Decode(&state); err != nil {
 		return State{}, 0, fmt.Errorf("failed to decode state account data: %w", err)
 	}
 
