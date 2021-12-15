@@ -50,7 +50,7 @@ func main() {
 
 	client := rpc.New(cfg.Solana.RPCEndpoint)
 
-	schemaRegistry := monitoring.NewSchemaRegistry(cfg.SchemaRegistry)
+	schemaRegistry := monitoring.NewSchemaRegistry(cfg.SchemaRegistry, log)
 	trSchema, err := schemaRegistry.EnsureSchema("transmission-value", monitoring.TransmissionAvroSchema)
 	if err != nil {
 		log.Fatalw("failed to prepare transmission schema", "error", err)
