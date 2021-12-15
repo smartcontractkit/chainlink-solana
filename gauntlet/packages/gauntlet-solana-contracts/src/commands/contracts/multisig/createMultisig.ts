@@ -12,7 +12,7 @@ export default class MultisigCreate extends SolanaCommand {
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet multisig:create --network=local',
+    'yarn gauntlet multisig:create --network=local --threshold=1 653SW42RnZ3aebVBqkHxDie4WUP6iVuHtM3nj4XoTafx 3yviqE7SeYUbiN8L4q9QcPKSiAKFN2BNqNKUTdxTTbpP',
   ]
 
   constructor(flags, args) {
@@ -21,50 +21,39 @@ export default class MultisigCreate extends SolanaCommand {
   }
 
   execute = async () => {
-    this.require(this.args.length > 0, "Please provide at least one owner as an argument")
+    this.require(this.args.length > 0, 'Please provide at least one owner as an argument')
     const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
     const address = multisig.programId.publicKey.toString()
     const program = this.loadProgram(multisig.idl, address)
 
-    const multisigAccount = new Account();
+    const multisigAccount = new Account()
 
-    const [, nonce] = await PublicKey.findProgramAddress(
-      [multisigAccount.publicKey.toBuffer()],
-      program.programId
-    );
+    const [, nonce] = await PublicKey.findProgramAddress([multisigAccount.publicKey.toBuffer()], program.programId)
     //TODO: check that all args are valid addresses
-    const owners = this.args.map(a => new PublicKey(a))
-    
+    const owners = this.args.map((a) => new PublicKey(a))
+
     const threshold = this.flags.threshold
-    
+
     const maxParticipantLength = this.flags.maxParticipantLength || DEFAULT_MAX_PARTICIPANTS_LENGTH
     //TODO: copied from multisig's UI, need to see if these fit our needs
-    const baseSize = 8 + 8 + 1 + 4;
+    const baseSize = 8 + 8 + 1 + 4
     // Add enough for 2 more participants, in case the user changes one's
     /// mind later.
-    const fudge = 64;
+    const fudge = 64
     // Can only grow the participant set by 2x the initialized value.
-    const ownerSize = maxParticipantLength * 32 + 8;
-    const multisigSize = baseSize + ownerSize + fudge;
-    await prompt(`Create new multisig with owners: ${this.args}, threshold: ${this.flags.threshold} and max owners length: ${maxParticipantLength}?`)
-    const tx = await program.rpc.createMultisig(
-      owners,
-      new BN(threshold),
-      nonce,
-      {
-        accounts: {
-          multisig: multisigAccount.publicKey,
-          rent: SYSVAR_RENT_PUBKEY,
-        },
-        signers: [multisigAccount],
-        instructions: [
-          await program.account.multisig.createInstruction(
-            multisigAccount,
-            multisigSize
-          ),
-        ],
-      }
-    );
+    const ownerSize = maxParticipantLength * 32 + 8
+    const multisigSize = baseSize + ownerSize + fudge
+    await prompt(
+      `Create new multisig with owners: ${this.args}, threshold: ${this.flags.threshold} and max owners length: ${maxParticipantLength}?`,
+    )
+    const tx = await program.rpc.createMultisig(owners, new BN(threshold), nonce, {
+      accounts: {
+        multisig: multisigAccount.publicKey,
+        rent: SYSVAR_RENT_PUBKEY,
+      },
+      signers: [multisigAccount],
+      instructions: [await program.account.multisig.createInstruction(multisigAccount, multisigSize)],
+    })
     logger.info(`Multisig address: ${multisigAccount.publicKey}`)
 
     return {

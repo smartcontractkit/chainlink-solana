@@ -1,6 +1,3 @@
-
 import MultisigCreate from './createMultisig'
 
-export default [
-  MultisigCreate,
-]
+export default [MultisigCreate]
