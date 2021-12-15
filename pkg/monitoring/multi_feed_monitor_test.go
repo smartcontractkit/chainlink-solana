@@ -26,6 +26,7 @@ func TestMultiFeedMonitor(t *testing.T) {
 
 	transmissionSchema := fakeSchema{transmissionCodec}
 	stateSchema := fakeSchema{configSetCodec}
+	configSetSimplifiedSchema := fakeSchema{configSetCodec}
 
 	producer := fakeProducer{make(chan producerMessage)}
 
@@ -34,11 +35,10 @@ func TestMultiFeedMonitor(t *testing.T) {
 
 	monitor := NewMultiFeedMonitor(
 		logger.NewNullLogger(),
-		cfg.Solana,
+		cfg,
 		transmissionReader, stateReader,
-		transmissionSchema, stateSchema,
+		transmissionSchema, stateSchema, configSetSimplifiedSchema,
 		producer,
-		cfg.Feeds,
 		&devnullMetrics{},
 	)
 	go monitor.Start(ctx, wg)

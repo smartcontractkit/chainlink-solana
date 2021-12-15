@@ -142,14 +142,33 @@ var transmissionAvroSchema = Record("transmission", Opts{Namespace: "link.chain.
 	})),
 })
 
+var configSimplifiedSetAvroSchema = Record("config_set_simplified", Opts{Namespace: "link.chain.ocr2"}, Fields{
+	Field("config_digest", Opts{}, String),
+	Field("block_number", Opts{Doc: "uint64 big endian"}, Bytes),
+	Field("signers", Opts{}, String),
+	Field("transmitters", Opts{}, String),
+	Field("f", Opts{Doc: "uint8"}, Int),
+	Field("delta_progress_nanoseconds", Opts{Doc: "uint64 big endian"}, Bytes),
+	Field("delta_resend_nanoseconds", Opts{Doc: "uint64 big endian"}, Bytes),
+	Field("delta_round_nanoseconds", Opts{Doc: "uint64 big endian"}, Bytes),
+	Field("delta_grace_nanoseconds", Opts{Doc: "uint64 big endian"}, Bytes),
+	Field("delta_stage_nanoseconds", Opts{Doc: "uint64 big endian"}, Bytes),
+	Field("r_max", Opts{Doc: "uint32"}, Long),
+	Field("s", Opts{Doc: ""}, String),
+	Field("oracles", Opts{Doc: ""}, String),
+	Field("feed_state_account", Opts{Doc: ""}, String),
+})
+
 var (
 	// Avro schemas to sync with the registry
-	ConfigSetAvroSchema    string
-	TransmissionAvroSchema string
+	ConfigSetAvroSchema           string
+	TransmissionAvroSchema        string
+	ConfigSetSimplifiedAvroSchema string
 
 	// These codecs are used in tests
-	configSetCodec    *goavro.Codec
-	transmissionCodec *goavro.Codec
+	configSetCodec           *goavro.Codec
+	transmissionCodec        *goavro.Codec
+	configSetSimplifiedCodec *goavro.Codec
 )
 
 func init() {
@@ -166,6 +185,12 @@ func init() {
 	}
 	TransmissionAvroSchema = string(buf)
 
+	buf, err = json.Marshal(configSimplifiedSetAvroSchema)
+	if err != nil {
+		panic(fmt.Errorf("failed to generate Avro schema for configSimplified: %w", err))
+	}
+	ConfigSetSimplifiedAvroSchema = string(buf)
+
 	configSetCodec, err = goavro.NewCodec(ConfigSetAvroSchema)
 	if err != nil {
 		panic(fmt.Errorf("failed to parse Avro schema for the config set: %w", err))
@@ -176,9 +201,15 @@ func init() {
 		panic(fmt.Errorf("failed to parse Avro schema for the latest transmission: %w", err))
 	}
 
+	configSetSimplifiedCodec, err = goavro.NewCodec(ConfigSetSimplifiedAvroSchema)
+	if err != nil {
+		panic(fmt.Errorf("failed to parse Avro schema for the latest configSimplified: %w", err))
+	}
+
 	// These codecs are used in tests but not in main, so the linter complains.
 	_ = configSetCodec
 	_ = transmissionCodec
+	_ = configSetSimplifiedCodec
 }
 
 /* Keeping the original schemas here for reference.

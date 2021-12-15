@@ -301,7 +301,7 @@ type fakeProducer struct {
 	sendCh chan producerMessage
 }
 
-func (f fakeProducer) Produce(key, value []byte) error {
+func (f fakeProducer) Produce(key, value []byte, topic string) error {
 	f.sendCh <- producerMessage{key, value}
 	return nil
 }

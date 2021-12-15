@@ -10,7 +10,7 @@ import (
 
 // Producer is an abstraction on top of Kafka to aid with tests.
 type Producer interface {
-	Produce(key, value []byte) error
+	Produce(key, value []byte, topic string) error
 }
 
 type producer struct {
@@ -55,10 +55,11 @@ func (p *producer) run(ctx context.Context) {
 	}
 }
 
-func (p *producer) Produce(key, value []byte) error {
+func (p *producer) Produce(key, value []byte, topic string) error {
+
 	return p.backend.Produce(&kafka.Message{
 		TopicPartition: kafka.TopicPartition{
-			Topic:     &p.cfg.Topic,
+			Topic:     &topic,
 			Partition: kafka.PartitionAny,
 		},
 		Key:   key,

@@ -2,7 +2,9 @@ package monitoring
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
+	"github.com/mr-tron/base58"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/pb"
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
@@ -155,6 +157,53 @@ func MakeTransmissionMapping(
 	return out, nil
 }
 
+func MakeTelemetryConfigSetMapping(
+	envelope StateEnvelope,
+	feedConfig FeedConfig,
+) (map[string]interface{}, error) {
+	state := envelope.State
+	offchainConfig, err := parseOffchainConfig(state.Config.OffchainConfig.Raw[:state.Config.OffchainConfig.Len])
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse OffchainConfig blob from the program state: %w", err)
+	}
+	signers, err := json.Marshal(extractSigners(state.Oracles))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse signers: %w", err)
+	}
+	transmitters, err := json.Marshal(extractTransmitters(state.Oracles))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse transmitters: %w", err)
+	}
+	s, err := json.Marshal(int32ArrToInt64Arr(offchainConfig.S))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse s: %w", err)
+	}
+
+	oracles, err := createTelemetryOracles(offchainConfig.OffchainPublicKeys, offchainConfig.PeerIds, state.Oracles)
+	if err != nil {
+		return nil, fmt.Errorf("failed to oracles s: %w", err)
+	}
+
+	out := map[string]interface{}{
+		"config_digest":      base58.Encode(state.Config.LatestConfigDigest[:]),
+		"block_number":       uint64ToBeBytes(envelope.BlockNumber),
+		"signers":            signers,
+		"transmitters":       transmitters,
+		"f":                  int32(state.Config.F),
+		"delta_progress":     uint64ToBeBytes(offchainConfig.DeltaProgressNanoseconds),
+		"delta_resend":       uint64ToBeBytes(offchainConfig.DeltaResendNanoseconds),
+		"delta_round":        uint64ToBeBytes(offchainConfig.DeltaRoundNanoseconds),
+		"delta_grace":        uint64ToBeBytes(offchainConfig.DeltaGraceNanoseconds),
+		"delta_stage":        uint64ToBeBytes(offchainConfig.DeltaStageNanoseconds),
+		"r_max":              int64(offchainConfig.RMax),
+		"s":                  s,
+		"oracles":            oracles,
+		"feed_state_account": base58.Encode(feedConfig.StateAccount[:]),
+	}
+	return out, nil
+
+}
+
 // Helpers
 
 func uint64ToBeBytes(input uint64) []byte {
@@ -232,4 +281,24 @@ func int32ArrToInt64Arr(in []uint32) []int64 {
 		out = append(out, int64(i))
 	}
 	return out
+}
+
+func createTelemetryOracles(offchainPublicKeys [][]byte, peerId []string, oracles pkgSolana.Oracles) (interface{}, error) {
+	if len(offchainPublicKeys) != len(peerId) && oracles.Len != uint64(len(peerId)) {
+		return nil, fmt.Errorf("length missmatch len(offchainPublicKeys)=%d , oracles.Len=%d, len(peerId)=%d", len(offchainPublicKeys), oracles.Len, len(peerId))
+	}
+	var out []interface{}
+	var i uint64
+	for i = 0; i < oracles.Len; i++ {
+		out = append(out, map[string]interface{}{
+			"transmitter":         oracles.Raw[i].Transmitter,
+			"peer_id":             peerId[i],
+			"offchain_public_key": offchainPublicKeys[i],
+		})
+	}
+	s, err := json.Marshal(out)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse oracles: %w", err)
+	}
+	return s, nil
 }
