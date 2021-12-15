@@ -13,6 +13,7 @@ import SetupFlow from './setup.dev.flow'
 import SetupRDDFlow from './setup.dev.rdd.flow'
 import SetValidatorConfig from './setValidatorConfig'
 import Transmit from './transmit.dev'
+import Inspection from './inspection'
 
 export default [
   Initialize,
@@ -27,6 +28,8 @@ export default [
   BeginOffchainConfig,
   WriteOffchainConfig,
   CommitOffchainConfig,
+  // Inspection
+  ...Inspection,
   // ONLY DEV
   Transmit,
   SetupFlow,
