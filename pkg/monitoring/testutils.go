@@ -240,7 +240,7 @@ func generateTransmissionEnvelope() TransmissionEnvelope {
 	return TransmissionEnvelope{
 		pkgSolana.Answer{
 			Data:      big.NewInt(rand.Int63()),
-			Timestamp: uint32(time.Now().Unix()),
+			Timestamp: uint64(time.Now().Unix()), // We're not recording any answers on a negative Unix timestamp.
 		},
 		rand.Uint64(), // BlockNumber
 	}
