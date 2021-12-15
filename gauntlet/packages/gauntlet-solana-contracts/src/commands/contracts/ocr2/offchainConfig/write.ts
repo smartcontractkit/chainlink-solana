@@ -102,7 +102,7 @@ export default class WriteOffchainConfig extends SolanaCommand {
       'offchainreporting2_config.ReportingPluginConfig',
       input.reportingPluginConfig,
     )
-    const sharedSecretEncryptions = await this.generateSecretEncryptions(input.offchainPublicKeys)
+    const sharedSecretEncryptions = await this.generateSecretEncryptions(input.configPublicKeys)
     const offchainConfig = {
       ...input,
       reportingPluginConfig: reportingPluginConfigProto,
