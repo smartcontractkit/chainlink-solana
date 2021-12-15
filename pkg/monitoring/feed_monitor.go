@@ -71,11 +71,15 @@ func (f *feedMonitor) Start(ctx context.Context) {
 		var err error
 		switch typed := update.(type) {
 		case StateEnvelope:
+			err = f.processConfigSetSimplified(typed)
+			if err != nil {
+				break
+			}
+
 			err = f.processState(typed)
 			if err != nil {
 				break
 			}
-			err = f.processConfigSetSimplified(typed)
 			latestTransmitter = typed.State.Config.LatestTransmitter.String()
 			f.metrics.SetNodeMetadata(f.config.Solana.ChainID, f.config.Solana.NetworkID,
 				f.config.Solana.NetworkName, "n/a", latestTransmitter)

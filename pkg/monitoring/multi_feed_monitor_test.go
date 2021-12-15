@@ -26,7 +26,7 @@ func TestMultiFeedMonitor(t *testing.T) {
 
 	transmissionSchema := fakeSchema{transmissionCodec}
 	stateSchema := fakeSchema{configSetCodec}
-	configSetSimplifiedSchema := fakeSchema{configSetCodec}
+	configSetSimplifiedSchema := fakeSchema{configSetSimplifiedCodec}
 
 	producer := fakeProducer{make(chan producerMessage)}
 

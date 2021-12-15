@@ -29,7 +29,7 @@ func TestFeedMonitor(t *testing.T) {
 
 	transmissionSchema := fakeSchema{transmissionCodec}
 	stateSchema := fakeSchema{configSetCodec}
-	configSetSimplifiedSchema := fakeSchema{configSetCodec}
+	configSetSimplifiedSchema := fakeSchema{configSetSimplifiedCodec}
 
 	cfg := Config{}
 
@@ -50,7 +50,7 @@ func TestFeedMonitor(t *testing.T) {
 	go monitor.Start(ctx)
 
 	trCount, stCount := 0, 0
-	messages := []producerMessage{}
+	var messages []producerMessage
 	newStateEnv, err := generateStateEnvelope()
 	require.NoError(t, err)
 	newTransmissionEnv := generateTransmissionEnvelope()

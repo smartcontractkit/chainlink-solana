@@ -36,7 +36,7 @@ type KafkaConfig struct {
 	SaslMechanism            string `json:"sasl_mechanism,omitempty"`
 	SaslUsername             string `json:"sasl_username,omitempty"`
 	SaslPassword             string `json:"sasl_password,omitempty"`
-	TransmissionTopic        string `json:"kafka_transmission_topic,omitempty"`
+	TransmissionTopic        string `json:"transmission_topic,omitempty"`
 	ConfigSetTopic           string `json:"config_set_topic,omitempty"`
 	ConfigSetSimplifiedTopic string `json:"config_set_simplified_topic,omitempty"`
 }

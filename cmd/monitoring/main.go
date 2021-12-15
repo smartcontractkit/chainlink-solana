@@ -62,7 +62,7 @@ func main() {
 
 	csSimplifiedSchema, err := schemaRegistry.EnsureSchema(cfg.Kafka.ConfigSetSimplifiedTopic+"-value", monitoring.ConfigSetSimplifiedAvroSchema)
 	if err != nil {
-		log.Fatalf("failed to prepare config_set schema", "error", err)
+		log.Fatalf("failed to prepare config_set_simplified schema", "error", err)
 	}
 	producer, err := monitoring.NewProducer(bgCtx, log.With("component", "producer"), cfg.Kafka)
 	if err != nil {
