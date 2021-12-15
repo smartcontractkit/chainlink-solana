@@ -205,8 +205,8 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         flags: {
           state: ID.contract(this.stepIds.OCR_2),
           input: {
-            observationPayment: '1',
-            transmissionPayment: '1',
+            observationPaymentGjuels: '1',
+            transmissionPaymentGjuels: '1',
           },
         },
       },

@@ -19,7 +19,7 @@ import SetBilling from './setBilling'
 export default class SetupRDDFlow extends FlowCommand<TransactionResponse> {
   static id = 'ocr2:setup:rdd:flow'
   static category = CONTRACT_LIST.OCR_2
-  static examples = ['yarn gauntlet ocr2:setup:flow --network=local --version=1']
+  static examples = ['yarn gauntlet ocr2:setup:rdd:flow --network=local --version=1']
 
   constructor(flags, args) {
     super(flags, args, waitExecute, makeAbstractCommand)
@@ -121,8 +121,8 @@ export default class SetupRDDFlow extends FlowCommand<TransactionResponse> {
         flags: {
           state: ID.contract(this.stepIds.OCR_2),
           input: {
-            observationPayment: '1',
-            transmissionPayment: '1',
+            observationPaymentGjuels: '1',
+            transmissionPaymentGjuels: '1',
           },
         },
       },
