@@ -51,16 +51,20 @@ func main() {
 	client := rpc.New(cfg.Solana.RPCEndpoint)
 
 	schemaRegistry := monitoring.NewSchemaRegistry(cfg.SchemaRegistry)
-	trSchema, err := schemaRegistry.EnsureSchema("transmission-value", monitoring.TransmissionAvroSchema)
+	trSchema, err := schemaRegistry.EnsureSchema(cfg.Kafka.TransmissionTopic+"-value", monitoring.TransmissionAvroSchema)
 	if err != nil {
 		log.Fatalw("failed to prepare transmission schema", "error", err)
 	}
-	stSchema, err := schemaRegistry.EnsureSchema("config_set-value", monitoring.ConfigSetAvroSchema)
+	stSchema, err := schemaRegistry.EnsureSchema(cfg.Kafka.ConfigSetTopic+"-value", monitoring.ConfigSetAvroSchema)
 	if err != nil {
 		log.Fatalf("failed to prepare config_set schema", "error", err)
 	}
 
-	producer, err := monitoring.NewProducer(bgCtx, log.With("component", "producer", "topic", cfg.Kafka.Topic), cfg.Kafka)
+	csSimplifiedSchema, err := schemaRegistry.EnsureSchema(cfg.Kafka.ConfigSetSimplifiedTopic+"-value", monitoring.ConfigSetSimplifiedAvroSchema)
+	if err != nil {
+		log.Fatalf("failed to prepare config_set schema", "error", err)
+	}
+	producer, err := monitoring.NewProducer(bgCtx, log.With("component", "producer"), cfg.Kafka)
 	if err != nil {
 		log.Fatalf("failed to create kafka producer", "error", err)
 	}
@@ -76,11 +80,10 @@ func main() {
 
 	monitor := monitoring.NewMultiFeedMonitor(
 		log,
-		cfg.Solana,
+		cfg,
 		trReader, stReader,
-		trSchema, stSchema,
+		trSchema, stSchema, csSimplifiedSchema,
 		producer,
-		cfg.Feeds,
 		monitoring.DefaultMetrics,
 	)
 	wg.Add(1)
