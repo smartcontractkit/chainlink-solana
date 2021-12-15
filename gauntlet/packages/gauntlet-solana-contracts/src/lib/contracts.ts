@@ -22,6 +22,8 @@ export enum CONTRACT_LIST {
   FLAGS = 'flags',
   DEVIATION_FLAGGING_VALIDATOR = 'deviation_flagging_validator',
   TOKEN = 'token',
+  MULTISIG = 'serum_multisig',
+
 }
 
 export const CONTRACT_ENV_NAMES = {
