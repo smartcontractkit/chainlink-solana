@@ -124,7 +124,7 @@ func (f *feedMonitor) processState(envelope StateEnvelope) error {
 		return fmt.Errorf("failed to enconde message %v: %w", envelope, err)
 	}
 	var key = f.feedConfig.StateAccount.Bytes()
-	if err = f.producer.Produce(key, value, f.config.ConfigSetTopic); err != nil {
+	if err = f.producer.Produce(key, value, f.config.Kafka.ConfigSetTopic); err != nil {
 		return fmt.Errorf("failed to publish message %v: %w", envelope, err)
 	}
 	return nil
@@ -141,7 +141,7 @@ func (f *feedMonitor) processTransmission(envelope TransmissionEnvelope) error {
 		return fmt.Errorf("failed to enconde message %v: %w", envelope, err)
 	}
 	var key = f.feedConfig.StateAccount.Bytes()
-	if err = f.producer.Produce(key, value, f.config.TransmissionTopic); err != nil {
+	if err = f.producer.Produce(key, value, f.config.Kafka.TransmissionTopic); err != nil {
 		return fmt.Errorf("failed to publish message %v: %w", envelope, err)
 	}
 	return nil
@@ -149,7 +149,7 @@ func (f *feedMonitor) processTransmission(envelope TransmissionEnvelope) error {
 
 func (f *feedMonitor) processTelemetry(envelope StateEnvelope) error {
 	var mapping map[string]interface{}
-	mapping, err := MakeTelemetryConfigSetMapping(envelope, f.feedConfig)
+	mapping, err := MakeSimplifiedConfigSetMapping(envelope, f.feedConfig)
 	if err != nil {
 		return fmt.Errorf("failed to map message %v: %w", envelope, err)
 	}
@@ -158,7 +158,7 @@ func (f *feedMonitor) processTelemetry(envelope StateEnvelope) error {
 		return fmt.Errorf("failed to enconde message %v: %w", envelope, err)
 	}
 	var key = f.feedConfig.StateAccount.Bytes()
-	if err = f.producer.Produce(key, value, f.config.ConfigSetSimplifiedTopic); err != nil {
+	if err = f.producer.Produce(key, value, f.config.Kafka.ConfigSetSimplifiedTopic); err != nil {
 		return fmt.Errorf("failed to publish message %v: %w", envelope, err)
 	}
 	return nil

@@ -1,11 +1,10 @@
 package monitoring
 
 import (
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/mr-tron/base58"
-
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/pb"
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	"google.golang.org/protobuf/proto"
@@ -157,7 +156,7 @@ func MakeTransmissionMapping(
 	return out, nil
 }
 
-func MakeTelemetryConfigSetMapping(
+func MakeSimplifiedConfigSetMapping(
 	envelope StateEnvelope,
 	feedConfig FeedConfig,
 ) (map[string]interface{}, error) {
@@ -185,10 +184,10 @@ func MakeTelemetryConfigSetMapping(
 	}
 
 	out := map[string]interface{}{
-		"config_digest":      base58.Encode(state.Config.LatestConfigDigest[:]),
+		"config_digest":      base64.StdEncoding.EncodeToString(state.Config.LatestConfigDigest[:]),
 		"block_number":       uint64ToBeBytes(envelope.BlockNumber),
-		"signers":            signers,
-		"transmitters":       transmitters,
+		"signers":            string(signers),
+		"transmitters":       string(transmitters),
 		"f":                  int32(state.Config.F),
 		"delta_progress":     uint64ToBeBytes(offchainConfig.DeltaProgressNanoseconds),
 		"delta_resend":       uint64ToBeBytes(offchainConfig.DeltaResendNanoseconds),
@@ -196,9 +195,9 @@ func MakeTelemetryConfigSetMapping(
 		"delta_grace":        uint64ToBeBytes(offchainConfig.DeltaGraceNanoseconds),
 		"delta_stage":        uint64ToBeBytes(offchainConfig.DeltaStageNanoseconds),
 		"r_max":              int64(offchainConfig.RMax),
-		"s":                  s,
-		"oracles":            oracles,
-		"feed_state_account": base58.Encode(feedConfig.StateAccount[:]),
+		"s":                  string(s),
+		"oracles":            string(oracles),
+		"feed_state_account": base64.StdEncoding.EncodeToString(feedConfig.StateAccount[:]),
 	}
 	return out, nil
 
@@ -283,7 +282,7 @@ func int32ArrToInt64Arr(in []uint32) []int64 {
 	return out
 }
 
-func createTelemetryOracles(offchainPublicKeys [][]byte, peerId []string, oracles pkgSolana.Oracles) (interface{}, error) {
+func createTelemetryOracles(offchainPublicKeys [][]byte, peerId []string, oracles pkgSolana.Oracles) ([]byte, error) {
 	if len(offchainPublicKeys) != len(peerId) && oracles.Len != uint64(len(peerId)) {
 		return nil, fmt.Errorf("length missmatch len(offchainPublicKeys)=%d , oracles.Len=%d, len(peerId)=%d", len(offchainPublicKeys), oracles.Len, len(peerId))
 	}

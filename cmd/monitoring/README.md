@@ -52,7 +52,9 @@ go run ./cmd/monitoring/*.go \
 -solana.network_name="solana-devnet" \
 -solana.network_id="solana-devnet" \
 -solana.chain_id="1" \
--kafka.topic="solana-devnet" \
+-kafka.config.set.topic="solana-devnet" \
+-kafka.config.set.simplified.topic="solana-devnet" \
+-kafka.transmission.topic="solana-devnet" \
 -kafka.brokers="localhost:29092" \
 -kafka.client_id="solana" \
 -kafka.security_protocol="PLAINTEXT" \
