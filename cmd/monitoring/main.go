@@ -50,7 +50,7 @@ func main() {
 
 	client := rpc.New(cfg.Solana.RPCEndpoint)
 
-	schemaRegistry := monitoring.NewSchemaRegistry(cfg.SchemaRegistry)
+	schemaRegistry := monitoring.NewSchemaRegistry(cfg.SchemaRegistry, log)
 	trSchema, err := schemaRegistry.EnsureSchema("transmission-value", monitoring.TransmissionAvroSchema)
 	if err != nil {
 		log.Fatalw("failed to prepare transmission schema", "error", err)
@@ -95,7 +95,7 @@ func main() {
 	log.Infof("received signal '%v'. Stopping", sig)
 
 	cancelBgCtx()
-	if err := server.Shutdown(bgCtx); err != nil && errors.Is(err, context.Canceled) {
+	if err := server.Shutdown(bgCtx); err != nil && !errors.Is(err, context.Canceled) {
 		log.Errorw("failed to shut http server down", "error", err)
 	}
 	wg.Wait()
