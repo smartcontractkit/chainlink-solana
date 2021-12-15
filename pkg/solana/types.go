@@ -137,6 +137,7 @@ type AccessController struct {
 
 // Validator state
 type Validator struct {
+	AccountDiscriminator     [8]byte // first 8 bytes of the SHA256 of the account’s Rust ident, https://docs.rs/anchor-lang/0.18.2/anchor_lang/attr.account.html
 	Owner                    solana.PublicKey
 	ProposedOwner            solana.PublicKey
 	RaisingAccessController  solana.PublicKey
