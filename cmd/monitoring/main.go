@@ -50,7 +50,6 @@ func main() {
 
 	client := rpc.New(cfg.Solana.RPCEndpoint)
 
-
 	schemaRegistry := monitoring.NewSchemaRegistry(cfg.SchemaRegistry, log)
 	trSchema, err := schemaRegistry.EnsureSchema("transmission-value", monitoring.TransmissionAvroSchema)
 
