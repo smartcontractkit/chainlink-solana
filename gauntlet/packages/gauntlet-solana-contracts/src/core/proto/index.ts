@@ -1,5 +1,6 @@
 import { join } from 'path'
-import Proto from 'protobufjs'
+import Proto, { util, Long } from 'protobufjs'
+
 export class Protobuf {
   root: Proto.Root
 
@@ -35,6 +36,10 @@ export class Protobuf {
   decode = (type: string, buffer: Buffer | Uint8Array): any => {
     const protoType = this.root.lookupType(type)
     return protoType.decode(buffer)
+  }
+
+  static longToString = (n: Long): string => {
+    return new util.Long(n.low, n.high, n.unsigned).toString()
   }
 
   toJSON = () => {

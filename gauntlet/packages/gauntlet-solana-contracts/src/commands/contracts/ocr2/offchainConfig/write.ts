@@ -1,4 +1,4 @@
-import { Result } from '@chainlink/gauntlet-core'
+import { Result, utils } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
@@ -97,14 +97,16 @@ export default class WriteOffchainConfig extends SolanaCommand {
   }
 
   serializeOffchainConfig = async (input: Input): Promise<Buffer> => {
+    const { configPublicKeys, ...validInput } = input
     const proto = new Protobuf({ descriptor: OCR2Descriptor })
     const reportingPluginConfigProto = proto.encode(
       'offchainreporting2_config.ReportingPluginConfig',
-      input.reportingPluginConfig,
+      validInput.reportingPluginConfig,
     )
-    const sharedSecretEncryptions = await this.generateSecretEncryptions(input.configPublicKeys)
+    const sharedSecretEncryptions = await this.generateSecretEncryptions(configPublicKeys)
     const offchainConfig = {
-      ...input,
+      ...validInput,
+      offchainPublicKeys: validInput.offchainPublicKeys.map((key) => Buffer.from(key, 'hex')),
       reportingPluginConfig: reportingPluginConfigProto,
       sharedSecretEncryptions,
     }
@@ -127,6 +129,9 @@ export default class WriteOffchainConfig extends SolanaCommand {
     const owner = this.wallet.payer
 
     const input = this.makeInput(this.flags.input)
+    // TODO: Add validation https://github.com/smartcontractkit/offchain-reporting/blob/master/lib/offchainreporting2/internal/config/public_config.go#L248
+    // MORE: https://github.com/smartcontractkit/offchain-reporting/blob/master/lib/offchainreporting2/internal/config/public_config.go#L152
+    // Check correct format OCR Keys
     const offchainConfig = await this.serializeOffchainConfig(input)
 
     logger.info(`Offchain config size: ${offchainConfig.byteLength}`)
