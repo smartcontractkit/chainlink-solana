@@ -20,7 +20,6 @@
     "test:ci": "yarn test --ci",
     "lint:format": "yarn prettier --check ./src",
     "format": "yarn prettier --write ./src",
-    "formatStaged": "node ./scripts/formatStaged.js",
     "clean": "rm -rf ./dist/ ./bin/",
     "build": "yarn clean && tsc",
     "bundle": "yarn build && pkg ."
