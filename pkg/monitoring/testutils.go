@@ -310,6 +310,18 @@ type fakeSchema struct {
 	codec *goavro.Codec
 }
 
+func (f fakeSchema) ID() int {
+	return 1
+}
+
+func (f fakeSchema) Version() int {
+	return 1
+}
+
+func (f fakeSchema) Subject() string {
+	return "n/a"
+}
+
 func (f fakeSchema) Encode(value interface{}) ([]byte, error) {
 	return f.codec.BinaryFromNative(nil, value)
 }
