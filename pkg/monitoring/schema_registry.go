@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/riferrei/srclient"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/assert"
 )
@@ -24,7 +25,7 @@ type schemaRegistry struct {
 	log     logger.Logger
 }
 
-func NewSchemaRegistry(cfg SchemaRegistryConfig, log logger.Logger) SchemaRegistry {
+func NewSchemaRegistry(cfg config.SchemaRegistry, log logger.Logger) SchemaRegistry {
 	backend := srclient.CreateSchemaRegistryClient(cfg.URL)
 	if cfg.Username != "" && cfg.Password != "" {
 		backend.SetCredentials(cfg.Username, cfg.Password)

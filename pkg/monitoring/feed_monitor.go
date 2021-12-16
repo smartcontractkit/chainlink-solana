@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
@@ -16,8 +17,9 @@ type FeedMonitor interface {
 
 func NewFeedMonitor(
 	log logger.Logger,
-	config Config,
-	feedConfig FeedConfig,
+	solanaConfig config.Solana,
+	feedConfig config.Feed,
+	configSetTopic, configSetSimplifiedTopic, transmissionTopic string,
 	transmissionPoller, statePoller Poller,
 	transmissionSchema, stateSchema, configSetSimplified Schema,
 	producer Producer,
@@ -25,8 +27,9 @@ func NewFeedMonitor(
 ) FeedMonitor {
 	return &feedMonitor{
 		log,
-		config,
+		solanaConfig,
 		feedConfig,
+		configSetTopic, configSetSimplifiedTopic, transmissionTopic,
 		transmissionPoller, statePoller,
 		transmissionSchema, stateSchema, configSetSimplified,
 		producer,
@@ -36,8 +39,11 @@ func NewFeedMonitor(
 
 type feedMonitor struct {
 	log                       logger.Logger
-	config                    Config
-	feedConfig                FeedConfig
+	solanaConfig              config.Solana
+	feedConfig                config.Feed
+	configSetTopic            string
+	configSetSimplifiedTopic  string
+	transmissionTopic         string
 	transmissionPoller        Poller
 	statePoller               Poller
 	transmissionSchema        Schema
@@ -50,9 +56,9 @@ type feedMonitor struct {
 // Start should be executed as a goroutine
 func (f *feedMonitor) Start(ctx context.Context) {
 	f.log.Info("starting feed monitor")
-	f.metrics.SetFeedContractMetadata(f.config.Solana.ChainID, f.feedConfig.ContractAddress.String(),
+	f.metrics.SetFeedContractMetadata(f.solanaConfig.ChainID, f.feedConfig.ContractAddress.String(),
 		f.feedConfig.ContractStatus, f.feedConfig.ContractType, f.feedConfig.FeedName,
-		f.feedConfig.FeedPath, f.config.Solana.NetworkID, f.config.Solana.NetworkName,
+		f.feedConfig.FeedPath, f.solanaConfig.NetworkID, f.solanaConfig.NetworkName,
 		f.feedConfig.Symbol)
 
 	latestTransmitter := ""
@@ -81,32 +87,32 @@ func (f *feedMonitor) Start(ctx context.Context) {
 				break
 			}
 			latestTransmitter = typed.State.Config.LatestTransmitter.String()
-			f.metrics.SetNodeMetadata(f.config.Solana.ChainID, f.config.Solana.NetworkID,
-				f.config.Solana.NetworkName, "n/a", latestTransmitter)
+			f.metrics.SetNodeMetadata(f.solanaConfig.ChainID, f.solanaConfig.NetworkID,
+				f.solanaConfig.NetworkName, "n/a", latestTransmitter)
 			if latestAnswer != nil {
 				f.metrics.SetOffchainAggregatorSubmissionReceivedValues(latestAnswer,
-					f.feedConfig.ContractAddress.String(), latestTransmitter, f.config.Solana.ChainID,
+					f.feedConfig.ContractAddress.String(), latestTransmitter, f.solanaConfig.ChainID,
 					f.feedConfig.ContractStatus, f.feedConfig.ContractType, f.feedConfig.FeedName,
-					f.feedConfig.FeedPath, f.config.Solana.NetworkID, f.config.Solana.NetworkName)
+					f.feedConfig.FeedPath, f.solanaConfig.NetworkID, f.solanaConfig.NetworkName)
 			}
 		case TransmissionEnvelope:
 			err = f.processTransmission(typed)
 			latestAnswer = typed.Answer.Data
-			f.metrics.SetHeadTrackerCurrentHead(typed.BlockNumber, f.config.Solana.NetworkName,
-				f.config.Solana.ChainID, f.config.Solana.NetworkID)
+			f.metrics.SetHeadTrackerCurrentHead(typed.BlockNumber, f.solanaConfig.NetworkName,
+				f.solanaConfig.ChainID, f.solanaConfig.NetworkID)
 			f.metrics.SetOffchainAggregatorAnswers(latestAnswer, f.feedConfig.ContractAddress.String(),
-				f.config.Solana.ChainID, f.feedConfig.ContractStatus, f.feedConfig.ContractType,
-				f.feedConfig.FeedName, f.feedConfig.FeedPath, f.config.Solana.NetworkID,
-				f.config.Solana.NetworkName)
+				f.solanaConfig.ChainID, f.feedConfig.ContractStatus, f.feedConfig.ContractType,
+				f.feedConfig.FeedName, f.feedConfig.FeedPath, f.solanaConfig.NetworkID,
+				f.solanaConfig.NetworkName)
 			f.metrics.IncOffchainAggregatorAnswersTotal(f.feedConfig.ContractAddress.String(),
-				f.config.Solana.ChainID, f.feedConfig.ContractStatus, f.feedConfig.ContractType,
-				f.feedConfig.FeedName, f.feedConfig.FeedPath, f.config.Solana.NetworkID,
-				f.config.Solana.NetworkName)
+				f.solanaConfig.ChainID, f.feedConfig.ContractStatus, f.feedConfig.ContractType,
+				f.feedConfig.FeedName, f.feedConfig.FeedPath, f.solanaConfig.NetworkID,
+				f.solanaConfig.NetworkName)
 			isLateAnswer := time.Since(time.Unix(int64(typed.Answer.Timestamp), 0)).Seconds() > float64(f.feedConfig.HeartbeatSec)
 			f.metrics.SetOffchainAggregatorAnswerStalled(isLateAnswer, f.feedConfig.ContractAddress.String(),
-				f.config.Solana.ChainID, f.feedConfig.ContractStatus, f.feedConfig.ContractType,
-				f.feedConfig.FeedName, f.feedConfig.FeedPath, f.config.Solana.NetworkID,
-				f.config.Solana.NetworkName)
+				f.solanaConfig.ChainID, f.feedConfig.ContractStatus, f.feedConfig.ContractType,
+				f.feedConfig.FeedName, f.feedConfig.FeedPath, f.solanaConfig.NetworkID,
+				f.solanaConfig.NetworkName)
 		default:
 			err = fmt.Errorf("unknown update type %T", update)
 		}
@@ -119,7 +125,7 @@ func (f *feedMonitor) Start(ctx context.Context) {
 
 func (f *feedMonitor) processState(envelope StateEnvelope) error {
 	var mapping map[string]interface{}
-	mapping, err := MakeConfigSetMapping(envelope, f.config.Solana, f.feedConfig)
+	mapping, err := MakeConfigSetMapping(envelope, f.solanaConfig, f.feedConfig)
 	if err != nil {
 		return fmt.Errorf("failed to map message %v: %w", envelope, err)
 	}
@@ -128,7 +134,7 @@ func (f *feedMonitor) processState(envelope StateEnvelope) error {
 		return fmt.Errorf("failed to enconde message %v: %w", envelope, err)
 	}
 	var key = f.feedConfig.StateAccount.Bytes()
-	if err = f.producer.Produce(key, value, f.config.Kafka.ConfigSetTopic); err != nil {
+	if err = f.producer.Produce(key, value, f.configSetTopic); err != nil {
 		return fmt.Errorf("failed to publish message %v: %w", envelope, err)
 	}
 	return nil
@@ -136,7 +142,7 @@ func (f *feedMonitor) processState(envelope StateEnvelope) error {
 
 func (f *feedMonitor) processTransmission(envelope TransmissionEnvelope) error {
 	var mapping map[string]interface{}
-	mapping, err := MakeTransmissionMapping(envelope, f.config.Solana, f.feedConfig)
+	mapping, err := MakeTransmissionMapping(envelope, f.solanaConfig, f.feedConfig)
 	if err != nil {
 		return fmt.Errorf("failed to map message %v: %w", envelope, err)
 	}
@@ -145,7 +151,7 @@ func (f *feedMonitor) processTransmission(envelope TransmissionEnvelope) error {
 		return fmt.Errorf("failed to enconde message %v: %w", envelope, err)
 	}
 	var key = f.feedConfig.StateAccount.Bytes()
-	if err = f.producer.Produce(key, value, f.config.Kafka.TransmissionTopic); err != nil {
+	if err = f.producer.Produce(key, value, f.transmissionTopic); err != nil {
 		return fmt.Errorf("failed to publish message %v: %w", envelope, err)
 	}
 	return nil
@@ -162,7 +168,7 @@ func (f *feedMonitor) processConfigSetSimplified(envelope StateEnvelope) error {
 		return fmt.Errorf("failed to enconde message %v: %w", envelope, err)
 	}
 	var key = f.feedConfig.StateAccount.Bytes()
-	if err = f.producer.Produce(key, value, f.config.Kafka.ConfigSetSimplifiedTopic); err != nil {
+	if err = f.producer.Produce(key, value, f.configSetSimplifiedTopic); err != nil {
 		return fmt.Errorf("failed to publish message %v: %w", envelope, err)
 	}
 	return nil

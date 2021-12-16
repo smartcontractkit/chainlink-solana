@@ -13,6 +13,7 @@ import (
 	gbinary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/linkedin/goavro"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/pb"
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -168,19 +169,21 @@ func generateState() (
 	return state, offchainConfig, numericalMedianConfig, nil
 }
 
-func generateSolanaConfig() SolanaConfig {
-	return SolanaConfig{
-		RPCEndpoint: "http://solana:6969",
-		NetworkName: "solana-mainnet-beta",
-		NetworkID:   "1",
-		ChainID:     "solana-mainnet-beta",
+func generateSolanaConfig() config.Solana {
+	return config.Solana{
+		RPCEndpoint:  "http://solana:6969",
+		NetworkName:  "solana-mainnet-beta",
+		NetworkID:    "1",
+		ChainID:      "solana-mainnet-beta",
+		ReadTimeout:  100 * time.Millisecond,
+		PollInterval: time.Duration(1+rand.Intn(5)) * time.Second,
 	}
 }
 
-func generateFeedConfig() FeedConfig {
+func generateFeedConfig() config.Feed {
 	coins := []string{"btc", "eth", "matic", "link", "avax", "ftt", "srm", "usdc", "sol", "ray"}
 	coin := coins[rand.Intn(len(coins))]
-	return FeedConfig{
+	return config.Feed{
 		FeedName:       fmt.Sprintf("%s / usd", coin),
 		FeedPath:       fmt.Sprintf("%s-usd", coin),
 		Symbol:         "$",
@@ -191,8 +194,6 @@ func generateFeedConfig() FeedConfig {
 		ContractAddress:      generatePublicKey(),
 		TransmissionsAccount: generatePublicKey(),
 		StateAccount:         generatePublicKey(),
-
-		PollInterval: time.Duration(1+rand.Intn(5)) * time.Second,
 	}
 }
 
