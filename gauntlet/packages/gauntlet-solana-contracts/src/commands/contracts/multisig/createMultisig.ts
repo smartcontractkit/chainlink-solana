@@ -9,7 +9,7 @@ const DEFAULT_MAX_PARTICIPANTS_LENGTH = 30
 
 export default class MultisigCreate extends SolanaCommand {
   static id = 'multisig:create'
-  static category = CONTRACT_LIST.OCR_2
+  static category = CONTRACT_LIST.MULTISIG
 
   static examples = [
     'yarn gauntlet multisig:create --network=local --threshold=1 653SW42RnZ3aebVBqkHxDie4WUP6iVuHtM3nj4XoTafx 3yviqE7SeYUbiN8L4q9QcPKSiAKFN2BNqNKUTdxTTbpP',
