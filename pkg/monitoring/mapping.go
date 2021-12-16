@@ -197,7 +197,7 @@ func MakeSimplifiedConfigSetMapping(
 		"r_max":              int64(offchainConfig.RMax),
 		"s":                  string(s),
 		"oracles":            string(oracles),
-		"feed_state_account": base64.StdEncoding.EncodeToString(feedConfig.StateAccount[:]),
+		"feed_state_account": base58.Encode(feedConfig.StateAccount[:]),
 	}
 	return out, nil
 
