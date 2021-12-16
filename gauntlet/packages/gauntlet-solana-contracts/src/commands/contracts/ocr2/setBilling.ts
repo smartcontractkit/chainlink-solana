@@ -1,7 +1,8 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { PublicKey } from '@solana/web3.js'
+import { parseIdlErrors, ProgramError } from '@project-serum/anchor'
+import { AccountMeta, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js'
 import BN from 'bn.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
@@ -11,15 +12,9 @@ type Input = {
   transmissionPaymentGjuels: number | string
 }
 
-type TxAccount = {
-  pubkey: PublicKey
-  is_signer: boolean
-  is_writable: boolean
-}
-
 type SolanaRawTransaction = {
   data: Buffer
-  accounts: TxAccount[]
+  accounts: AccountMeta[]
   programId: PublicKey
 }
 
@@ -55,48 +50,39 @@ export default class SetBilling extends SolanaCommand {
     const program = this.loadProgram(ocr2.idl, address)
 
     const state = new PublicKey(this.flags.state)
-    const input = this.makeInput(this.flags.input)
+
+    const input = this.makeInput(
+      ({
+        observationPaymentGjuels: '10',
+        transmissionPaymentGjuels: '20',
+      } as Input) || this.flags.input,
+    )
 
     const info = await program.account.state.fetch(state)
     const billingAC = new PublicKey(info.config.billingAccessController)
 
-    logger.loading('Setting billing...')
-
-    // DIRECT EXECUTION
-    // const tx = await program.rpc.setBilling(
-    //   new BN(input.observationPaymentGjuels),
-    //   new BN(input.transmissionPaymentGjuels),
-    //   {
-    //     accounts: {
-    //       state: state,
-    //       authority: this.wallet.payer.publicKey,
-    //       accessController: billingAC,
-    //     },
-    //     signers: [this.wallet.payer],
-    //   },
-    // )
-    // */
+    logger.loading('Generating billing tx information...')
 
     const data = program.coder.instruction.encode('set_billing', {
       observation_payment_gjuels: new BN(input.observationPaymentGjuels),
       transmission_payment_gjuels: new BN(input.transmissionPaymentGjuels),
     })
 
-    const accounts: TxAccount[] = [
+    const accounts: AccountMeta[] = [
       {
         pubkey: state,
-        is_signer: false,
-        is_writable: true,
+        isSigner: false,
+        isWritable: true,
       },
       {
         pubkey: this.wallet.payer.publicKey,
-        is_signer: true,
-        is_writable: false,
+        isSigner: true,
+        isWritable: false,
       },
       {
         pubkey: billingAC,
-        is_signer: false,
-        is_writable: false,
+        isSigner: false,
+        isWritable: false,
       },
     ]
 
@@ -109,14 +95,23 @@ export default class SetBilling extends SolanaCommand {
 
   execute = async () => {
     const rawTx = await this.makeRawTransaction()
-    // How can we send this rawTx
-    // multisig.execute(rawTx)
-    this.wallet.execute(rawTx)
+
+    const tx = new Transaction()
+    tx.add(
+      new TransactionInstruction({
+        programId: rawTx.programId,
+        keys: rawTx.accounts,
+        data: rawTx.data,
+      }),
+    )
+
+    let txhash = await this.provider.send(tx, [this.wallet.payer])
+
     return {
       responses: [
         {
-          tx: this.wrapResponse(tx, state.toString()),
-          contract: state.toString(),
+          tx: this.wrapResponse(txhash, this.flags.state),
+          contract: this.flags.state,
         },
       ],
     } as Result<TransactionResponse>
