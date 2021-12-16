@@ -122,7 +122,8 @@ export default class GeneratorCommand extends SolanaCommand {
     )
     await prompt(`Deployment cost is ${SolanaCommand.lamportsToSol(balanceRequired)} SOL, continue?`)
     logger.loading(`Deploying ${this.opts.contract.id}...`)
-    const tx = await this.deploy(this.opts.contract.bytecode, this.opts.contract.programId)
+    this.require(!!this.opts.contract.programKeypair, `Program keypair is necessary for deploying a program`)
+    const tx = await this.deploy(this.opts.contract.bytecode, this.opts.contract.programKeypair!)
     const { success } = await tx.wait('')
     if (!success) {
       logger.error('Error deploying contract')
