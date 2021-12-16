@@ -11,6 +11,18 @@ type Input = {
   transmissionPaymentGjuels: number | string
 }
 
+type TxAccount = {
+  pubkey: PublicKey
+  is_signer: boolean
+  is_writable: boolean
+}
+
+type SolanaRawTransaction = {
+  data: Buffer
+  accounts: TxAccount[]
+  programId: PublicKey
+}
+
 export default class SetBilling extends SolanaCommand {
   static id = 'ocr2:set_billing'
   static category = CONTRACT_LIST.OCR_2
@@ -37,7 +49,7 @@ export default class SetBilling extends SolanaCommand {
     this.requireFlag('state', 'Provide a valid state address')
   }
 
-  execute = async () => {
+  makeRawTransaction = async (): Promise<SolanaRawTransaction> => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const address = ocr2.programId.publicKey.toString()
     const program = this.loadProgram(ocr2.idl, address)
@@ -49,19 +61,57 @@ export default class SetBilling extends SolanaCommand {
     const billingAC = new PublicKey(info.config.billingAccessController)
 
     logger.loading('Setting billing...')
-    const tx = await program.rpc.setBilling(
-      new BN(input.observationPaymentGjuels),
-      new BN(input.transmissionPaymentGjuels),
-      {
-        accounts: {
-          state: state,
-          authority: this.wallet.payer.publicKey,
-          accessController: billingAC,
-        },
-        signers: [this.wallet.payer],
-      },
-    )
 
+    // DIRECT EXECUTION
+    // const tx = await program.rpc.setBilling(
+    //   new BN(input.observationPaymentGjuels),
+    //   new BN(input.transmissionPaymentGjuels),
+    //   {
+    //     accounts: {
+    //       state: state,
+    //       authority: this.wallet.payer.publicKey,
+    //       accessController: billingAC,
+    //     },
+    //     signers: [this.wallet.payer],
+    //   },
+    // )
+    // */
+
+    const data = program.coder.instruction.encode('set_billing', {
+      observation_payment_gjuels: new BN(input.observationPaymentGjuels),
+      transmission_payment_gjuels: new BN(input.transmissionPaymentGjuels),
+    })
+
+    const accounts: TxAccount[] = [
+      {
+        pubkey: state,
+        is_signer: false,
+        is_writable: true,
+      },
+      {
+        pubkey: this.wallet.payer.publicKey,
+        is_signer: true,
+        is_writable: false,
+      },
+      {
+        pubkey: billingAC,
+        is_signer: false,
+        is_writable: false,
+      },
+    ]
+
+    return {
+      data,
+      accounts,
+      programId: ocr2.programId.publicKey,
+    }
+  }
+
+  execute = async () => {
+    const rawTx = await this.makeRawTransaction()
+    // How can we send this rawTx
+    // multisig.execute(rawTx)
+    this.wallet.execute(rawTx)
     return {
       responses: [
         {
