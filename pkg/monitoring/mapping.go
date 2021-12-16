@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/mr-tron/base58"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/pb"
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
@@ -175,7 +176,7 @@ func MakeConfigSetSimplifiedMapping(
 		"r_max":              int64(offchainConfig.RMax),
 		"s":                  string(s),
 		"oracles":            string(oracles),
-		"feed_state_account": base64.StdEncoding.EncodeToString(feedConfig.StateAccount[:]),
+		"feed_state_account": base58.Encode(feedConfig.StateAccount[:]),
 	}
 	return out, nil
 }
