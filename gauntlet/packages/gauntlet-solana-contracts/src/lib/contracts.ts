@@ -5,7 +5,7 @@ import { join } from 'path'
 
 export type Contract = {
   id: CONTRACT_LIST
-  bytecode: Buffer
+  bytecode: Buffer | undefined
   version: string
   idl: any
   programId: PublicKey | undefined
@@ -31,7 +31,12 @@ export const getContract = (name: CONTRACT_LIST, version: string): Contract => (
 
 // TODO: Get it from GH Releases
 const getContractCode = (name: CONTRACT_LIST, version: string) => {
-  return readFileSync(join(process.cwd(), 'packages/gauntlet-solana-contracts/artifacts/bin', `${name}.so`))
+  try {
+    return readFileSync(join(process.cwd(), 'packages/gauntlet-solana-contracts/artifacts/bin', `${name}.so`))
+  } catch (e) {
+    logger.warn(`No program binary found for ${name} contract`)
+    return
+  }
 }
 
 const getContractSchema = (name: CONTRACT_LIST, version: string) => {
