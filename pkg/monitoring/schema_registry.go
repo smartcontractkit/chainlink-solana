@@ -20,7 +20,7 @@ type SchemaRegistry interface {
 }
 
 type schemaRegistry struct {
-	backend *srclient.SchemaRegistryClient
+	backend srclient.ISchemaRegistryClient
 	log     logger.Logger
 }
 
@@ -43,7 +43,7 @@ func (s *schemaRegistry) EnsureSchema(subject, spec string) (Schema, error) {
 		if err != nil {
 			return nil, fmt.Errorf("unable to create new schema with subject '%s': %w", subject, err)
 		}
-		return wrapSchema{newSchema}, nil
+		return wrapSchema{subject, newSchema}, nil
 	}
 	isEqualSchemas, errInIsEqualJSON := isEqualJSON(registeredSchema.Schema(), spec)
 	if errInIsEqualJSON != nil {
@@ -51,23 +51,38 @@ func (s *schemaRegistry) EnsureSchema(subject, spec string) (Schema, error) {
 	}
 	if isEqualSchemas {
 		s.log.Infof("using existing schema for subject '%s'\n", subject)
-		return wrapSchema{registeredSchema}, nil
+		return wrapSchema{subject, registeredSchema}, nil
 	}
 	s.log.Infof("updating schema for subject '%s'\n", subject)
 	newSchema, err := s.backend.CreateSchema(subject, spec, srclient.Avro)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update schema with subject '%s': %w", subject, err)
 	}
-	return wrapSchema{newSchema}, nil
+	return wrapSchema{subject, newSchema}, nil
 }
 
 type Schema interface {
+	ID() int
+	Version() int
+	Subject() string
 	Encode(interface{}) ([]byte, error)
 	Decode([]byte) (interface{}, error)
 }
 
 type wrapSchema struct {
+	subject string
 	*srclient.Schema
+}
+
+func (w wrapSchema) ID() int {
+	return w.Schema.ID()
+}
+func (w wrapSchema) Version() int {
+	return w.Schema.Version()
+}
+
+func (w wrapSchema) Subject() string {
+	return w.subject
 }
 
 func (w wrapSchema) Encode(value interface{}) ([]byte, error) {
@@ -86,9 +101,19 @@ func (w wrapSchema) Encode(value interface{}) ([]byte, error) {
 }
 
 func (w wrapSchema) Decode(buf []byte) (interface{}, error) {
-	// TODO add the decode for tests later
-	value, _, err := w.Schema.Codec().NativeFromBinary(buf)
+	if buf[0] != 0 {
+		return nil, fmt.Errorf("magic byte not 0, instead is %d", buf[0])
+	}
+	schemaID := int(binary.BigEndian.Uint32(buf[1:5]))
+	if schemaID != w.ID() {
+		return nil, fmt.Errorf("decoding message for a different schema, found schema id is %d but expected %d", schemaID, w.ID())
+	}
+	value, _, err := w.Schema.Codec().NativeFromBinary(buf[5:])
 	return value, err
+}
+
+func (w wrapSchema) String() string {
+	return fmt.Sprintf("schema(subject=%s,id=%d,version=%d)", w.subject, w.Schema.ID(), w.Schema.Version())
 }
 
 // Helpers
