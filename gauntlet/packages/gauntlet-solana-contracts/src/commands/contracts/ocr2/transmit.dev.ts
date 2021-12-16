@@ -79,7 +79,7 @@ export default class Transmit extends SolanaCommand {
           { pubkey: state, isWritable: true, isSigner: false },
           { pubkey: transmitter.publicKey, isWritable: false, isSigner: true },
           { pubkey: transmissions, isWritable: true, isSigner: false },
-          { pubkey: validatorProgram.programId!, isWritable: false, isSigner: false },
+          { pubkey: validatorProgram.programId, isWritable: false, isSigner: false },
           { pubkey: validator, isWritable: true, isSigner: false },
           { pubkey: validatorAuthority, isWritable: false, isSigner: false },
           { pubkey: accessController, isWritable: false, isSigner: false },

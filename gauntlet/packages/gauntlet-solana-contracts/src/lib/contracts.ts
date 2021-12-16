@@ -5,11 +5,11 @@ import { join } from 'path'
 
 export type Contract = {
   id: CONTRACT_LIST
-  bytecode: Buffer | undefined
   version: string
   idl: any
   programId: PublicKey
-  programKeypair: Keypair | undefined
+  bytecode?: Buffer
+  programKeypair?: Keypair
 }
 
 export enum CONTRACT_LIST {
