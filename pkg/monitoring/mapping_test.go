@@ -2,6 +2,7 @@ package monitoring
 
 import (
 	"encoding/json"
+	"github.com/mr-tron/base58"
 	"math/rand"
 	"strings"
 	"testing"
@@ -254,7 +255,7 @@ func TestMapping(t *testing.T) {
 		require.Equal(t, configSetSimplified["transmitters"], jsonMarshalToString(t, extractTransmitters(state.Oracles)))
 		require.Equal(t, configSetSimplified["s"], jsonMarshalToString(t, offchainConfig.S))
 		require.Equal(t, configSetSimplified["oracles"], string(oracles))
-		require.Equal(t, configSetSimplified["feed_state_account"], strings.Replace(jsonMarshalToString(t, feedConfig.StateAccount.Bytes()), "\"", "", -1))
+		require.Equal(t, configSetSimplified["feed_state_account"], strings.Replace(jsonMarshalToString(t, base58.Encode(feedConfig.StateAccount.Bytes())), "\"", "", -1))
 
 	})
 }

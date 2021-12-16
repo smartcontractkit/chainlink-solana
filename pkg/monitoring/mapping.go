@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"github.com/mr-tron/base58"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/pb"
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	"google.golang.org/protobuf/proto"
