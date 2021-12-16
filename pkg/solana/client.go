@@ -66,8 +66,8 @@ func (cc Connections) Close() error {
 // GetBlockHeight returns the height of the most recent processed block in the chain, coalescing requests.
 func (c Client) GetBlockHeight(ctx context.Context, commitment rpc.CommitmentType) (blockHeight uint64, err error) {
 	// do single flight request
-	v, err, _ := c.requestGroup.Do("GetBlockHeight", func() (interface{}, error) {
-		return c.rpc.GetBlockHeight(ctx, commitment)
+	v, err, _ := c.requestGroup.Do("GetSlotHeight", func() (interface{}, error) {
+		return c.rpc.GetSlot(ctx, commitment)
 	})
 
 	if err != nil {
