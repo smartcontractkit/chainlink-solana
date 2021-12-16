@@ -42,7 +42,7 @@ export class Protobuf {
     const noFalsyPayload = this.falsyToNullProperties(payload)
     let err = protoType.verify(noFalsyPayload)
     if (err) {
-      throw new Error(`Protobuf: Payload does not match descriptor ${type}`)
+      throw new Error(`Protobuf encoding error: ${err}`)
     }
 
     return protoType.encode(protoType.create(noFalsyPayload)).finish()
