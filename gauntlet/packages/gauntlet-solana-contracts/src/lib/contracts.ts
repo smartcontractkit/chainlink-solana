@@ -8,7 +8,7 @@ export type Contract = {
   bytecode: Buffer | undefined
   version: string
   idl: any
-  programId: PublicKey | undefined
+  programId: PublicKey
   programKeypair: Keypair | undefined
 }
 
@@ -53,17 +53,16 @@ const getProgramKeypair = (name: CONTRACT_LIST, version: string): Keypair | unde
   }
 }
 
-const getProgramId = (name: CONTRACT_LIST): PublicKey | undefined => {
+const getProgramId = (name: CONTRACT_LIST): PublicKey => {
   const envNames = {
-    [CONTRACT_LIST.ACCESS_CONTROLLER]: 'ACCESS_CONTROLLER',
-    [CONTRACT_LIST.OCR_2]: 'OCR2',
-    [CONTRACT_LIST.DEVIATION_FLAGGING_VALIDATOR]: 'DEVIATION_FLAGGING_VALIDATOR',
+    [CONTRACT_LIST.ACCESS_CONTROLLER]: 'PROGRAM_ID_ACCESS_CONTROLLER',
+    [CONTRACT_LIST.OCR_2]: 'PROGRAM_ID_OCR2',
+    [CONTRACT_LIST.DEVIATION_FLAGGING_VALIDATOR]: 'PROGRAM_ID_DEVIATION_FLAGGING_VALIDATOR',
   }
 
   try {
     return new PublicKey(process.env[envNames[name]]!)
   } catch (e) {
-    logger.warn(`No program id set for program ${name}`)
-    return
+    throw new Error(`No program id set for program ${name}. Set it in as env var with name ${envNames[name]}`)
   }
 }

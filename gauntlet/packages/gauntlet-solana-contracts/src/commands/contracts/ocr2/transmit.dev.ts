@@ -22,7 +22,7 @@ export default class Transmit extends SolanaCommand {
 
   execute = async () => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
-    const address = ocr2.programId!.toString()
+    const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
 
     const validatorProgram = getContract(CONTRACT_LIST.DEVIATION_FLAGGING_VALIDATOR, '')

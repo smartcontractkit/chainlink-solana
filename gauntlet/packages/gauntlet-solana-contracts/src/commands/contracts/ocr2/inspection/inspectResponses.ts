@@ -24,7 +24,7 @@ export default class OCR2InspectResponses extends SolanaCommand {
 
   execute = async () => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
-    const program = this.loadProgram(ocr2.idl, ocr2.programId!.toString())
+    const program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
 
     const state = new PublicKey(this.flags.state)
     const input = this.makeInput(this.flags.input)

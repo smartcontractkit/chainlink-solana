@@ -15,7 +15,7 @@ export default class Initialize extends SolanaCommand {
 
   execute = async () => {
     const validator = getContract(CONTRACT_LIST.DEVIATION_FLAGGING_VALIDATOR, '')
-    const address = validator.programId!.toString()
+    const address = validator.programId.toString()
     const program = this.loadProgram(validator.idl, address)
 
     const state = Keypair.generate()
