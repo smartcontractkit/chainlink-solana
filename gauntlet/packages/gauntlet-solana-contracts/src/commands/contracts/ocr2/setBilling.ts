@@ -64,8 +64,8 @@ export default class SetBilling extends SolanaCommand {
     logger.loading('Generating billing tx information...')
 
     const data = program.coder.instruction.encode('set_billing', {
-      observation_payment_gjuels: new BN(input.observationPaymentGjuels),
-      transmission_payment_gjuels: new BN(input.transmissionPaymentGjuels),
+      observationPaymentGjuels: new BN(input.observationPaymentGjuels),
+      transmissionPaymentGjuels: new BN(input.transmissionPaymentGjuels),
     })
 
     const accounts: AccountMeta[] = [
@@ -105,7 +105,8 @@ export default class SetBilling extends SolanaCommand {
       }),
     )
 
-    let txhash = await this.provider.send(tx, [this.wallet.payer])
+    logger.loading('Sending tx...')
+    const txhash = await this.provider.send(tx, [this.wallet.payer])
 
     return {
       responses: [
