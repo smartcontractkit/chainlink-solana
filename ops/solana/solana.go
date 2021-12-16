@@ -11,6 +11,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
@@ -430,45 +431,45 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 		return errors.Wrap(err, "setting OCR 2 billing failed")
 	}
 
-	// input = map[string]interface{}{
-	// 	"validator": d.Account[ValidatorAccount],
-	// 	"threshold": 8000,
-	// }
-	//
-	// jsonInput, err = json.Marshal(input)
-	// if err != nil {
-	// 	return err
-	// }
-	//
-	// fmt.Println("Setting OCR 2 validator config...")
-	// err = d.gauntlet.ExecCommand(
-	// 	"ocr2:set_validator_config",
-	// 	d.gauntlet.Flag("network", d.network),
-	// 	d.gauntlet.Flag("state", d.Account[OCRFeed]),
-	// 	d.gauntlet.Flag("input", string(jsonInput)),
-	// )
-	//
-	// if err != nil {
-	// 	return errors.Wrap(err, "setting OCR 2 validator config failed")
-	// }
-	//
-	// fmt.Println("Adding feed to validator access list...")
-	// seeds := [][]byte{[]byte("validator"), solana.MustPublicKeyFromBase58(d.Account[OCRFeed]).Bytes()}
-	// validatorAuthority, _, err := solana.FindProgramAddress(seeds, solana.MustPublicKeyFromBase58(d.Account[OCR2]))
-	// if err != nil {
-	// 	return errors.Wrap(err, "fetching validator authority failed")
-	// }
-	//
-	// err = d.gauntlet.ExecCommand(
-	// 	"access_controller:add_access",
-	// 	d.gauntlet.Flag("network", d.network),
-	// 	d.gauntlet.Flag("state", d.Account[BillingAccessController]),
-	// 	d.gauntlet.Flag("address", validatorAuthority.String()),
-	// )
-	//
-	// if err != nil {
-	// 	return errors.Wrap(err, "adding feed to validator access list failed")
-	// }
+	input = map[string]interface{}{
+		"validator": d.Account[ValidatorAccount],
+		"threshold": 8000,
+	}
+
+	jsonInput, err = json.Marshal(input)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Setting OCR 2 validator config...")
+	err = d.gauntlet.ExecCommand(
+		"ocr2:set_validator_config",
+		d.gauntlet.Flag("network", d.network),
+		d.gauntlet.Flag("state", d.Account[OCRFeed]),
+		d.gauntlet.Flag("input", string(jsonInput)),
+	)
+
+	if err != nil {
+		return errors.Wrap(err, "setting OCR 2 validator config failed")
+	}
+
+	fmt.Println("Adding feed to validator access list...")
+	seeds := [][]byte{[]byte("validator"), solana.MustPublicKeyFromBase58(d.Account[OCRFeed]).Bytes()}
+	validatorAuthority, _, err := solana.FindProgramAddress(seeds, solana.MustPublicKeyFromBase58(d.Account[OCR2]))
+	if err != nil {
+		return errors.Wrap(err, "fetching validator authority failed")
+	}
+
+	err = d.gauntlet.ExecCommand(
+		"access_controller:add_access",
+		d.gauntlet.Flag("network", d.network),
+		d.gauntlet.Flag("state", d.Account[BillingAccessController]),
+		d.gauntlet.Flag("address", validatorAuthority.String()),
+	)
+
+	if err != nil {
+		return errors.Wrap(err, "adding feed to validator access list failed")
+	}
 
 	return nil
 }
