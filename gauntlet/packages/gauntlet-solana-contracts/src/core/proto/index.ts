@@ -37,7 +37,8 @@ export class Protobuf {
 
   encode = (type: string, payload: any): Uint8Array => {
     const protoType = this.root.lookupType(type)
-    // Proto encoding should ignore falsy values. In protobuf.js we need to assign null to falsy to be ignored
+    // Proto encoding should ignore falsy values. In protobuf.js we need to assign them to to be ignored
+    // https://docs.cosmos.network/master/architecture/adr-027-deterministic-protobuf-serialization.html#implementation
     const noFalsyPayload = this.falsyToNullProperties(payload)
     let err = protoType.verify(noFalsyPayload)
     if (err) {
