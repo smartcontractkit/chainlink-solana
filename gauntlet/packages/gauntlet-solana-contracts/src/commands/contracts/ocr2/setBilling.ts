@@ -60,7 +60,6 @@ export default class SetBilling extends SolanaCommand {
 
     const info = await program.account.state.fetch(state)
     const billingAC = new PublicKey(info.config.billingAccessController)
-    logger.loading(info.config.billingAccessController)
     logger.loading('Generating billing tx information...')
 
     const data = program.coder.instruction.encode('set_billing', {
