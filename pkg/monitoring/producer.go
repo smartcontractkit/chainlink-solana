@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
@@ -17,10 +18,10 @@ type producer struct {
 	log          logger.Logger
 	backend      *kafka.Producer
 	deliveryChan chan kafka.Event
-	cfg          KafkaConfig
+	cfg          config.Kafka
 }
 
-func NewProducer(ctx context.Context, log logger.Logger, cfg KafkaConfig) (Producer, error) {
+func NewProducer(ctx context.Context, log logger.Logger, cfg config.Kafka) (Producer, error) {
 	backend, err := kafka.NewProducer(&kafka.ConfigMap{
 		"bootstrap.servers": cfg.Brokers,
 		"client.id":         cfg.ClientID,
@@ -56,7 +57,6 @@ func (p *producer) run(ctx context.Context) {
 }
 
 func (p *producer) Produce(key, value []byte, topic string) error {
-
 	return p.backend.Produce(&kafka.Message{
 		TopicPartition: kafka.TopicPartition{
 			Topic:     &topic,

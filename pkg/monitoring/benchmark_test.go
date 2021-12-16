@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
@@ -24,13 +25,12 @@ func BenchmarkMultichainMonitor(b *testing.B) {
 	wg := &sync.WaitGroup{}
 	defer wg.Wait()
 
-	feed := generateFeedConfig()
-	feed.PollInterval = 0 // poll as quickly as possible.
-	cfg := Config{}
-	cfg.Feeds = []FeedConfig{feed}
+	cfg := config.Config{}
+	cfg.Solana.PollInterval = 0 // poll as quickly as possible.
+	cfg.Feeds.Feeds = []config.Feed{generateFeedConfig()}
 
 	transmissionSchema := fakeSchema{transmissionCodec}
-	stateSchema := fakeSchema{configSetCodec}
+	configSetSchema := fakeSchema{configSetCodec}
 	configSetSimplifiedSchema := fakeSchema{configSetCodec}
 
 	producer := fakeProducer{make(chan producerMessage)}
@@ -40,9 +40,13 @@ func BenchmarkMultichainMonitor(b *testing.B) {
 
 	monitor := NewMultiFeedMonitor(
 		logger.NewNullLogger(),
-		cfg,
+		cfg.Solana,
+		cfg.Feeds.Feeds,
+		cfg.Kafka.ConfigSetTopic,
+		cfg.Kafka.ConfigSetSimplifiedTopic,
+		cfg.Kafka.TransmissionTopic,
 		transmissionReader, stateReader,
-		transmissionSchema, stateSchema, configSetSimplifiedSchema,
+		transmissionSchema, configSetSchema, configSetSimplifiedSchema,
 		producer,
 		&devnullMetrics{},
 	)

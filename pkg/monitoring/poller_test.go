@@ -16,7 +16,8 @@ func TestPoller(t *testing.T) {
 		name           string
 		duration       time.Duration
 		waitOnRead     time.Duration
-		fetchInterval  time.Duration
+		pollInterval   time.Duration
+		readTimeout    time.Duration
 		processingTime time.Duration
 		bufferCapacity uint32
 		countLower     int
@@ -25,6 +26,7 @@ func TestPoller(t *testing.T) {
 		{
 			"non-overlapping polls, no buffering",
 			1 * time.Second,
+			100 * time.Millisecond,
 			100 * time.Millisecond,
 			100 * time.Millisecond,
 			0,
@@ -37,15 +39,17 @@ func TestPoller(t *testing.T) {
 			1 * time.Second,
 			300 * time.Millisecond,
 			10 * time.Millisecond,
+			10 * time.Millisecond,
 			0,
 			0,
-			3,
-			4,
+			28,
+			30,
 		},
 		{
 			"fast fetch, fast polling, insufficient buffering, tons of backpressure",
 			1 * time.Second,
 			10 * time.Millisecond, // Producer will make 1000/(10+10)=50 messages in a second.
+			10 * time.Millisecond,
 			10 * time.Millisecond,
 			200 * time.Millisecond, // time it gets the "consumer" to process a message. It will only be able to process 1000/200=5 updates per second.
 			5,
@@ -57,7 +61,12 @@ func TestPoller(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), testCase.duration)
 			defer cancel()
 			reader := fakeReaderWithWait{testCase.waitOnRead}
-			poller := NewPoller(logger.NewNullLogger(), account, reader, testCase.fetchInterval, testCase.bufferCapacity)
+			poller := NewPoller(
+				logger.NewNullLogger(),
+				account, reader,
+				testCase.pollInterval,
+				testCase.readTimeout,
+				testCase.bufferCapacity)
 			go poller.Start(ctx)
 			readCount := 0
 

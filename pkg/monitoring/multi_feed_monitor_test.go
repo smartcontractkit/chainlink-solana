@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/require"
 )
@@ -17,15 +18,15 @@ func TestMultiFeedMonitor(t *testing.T) {
 	defer cancel()
 	wg := &sync.WaitGroup{}
 
-	cfg := Config{}
+	cfg := config.Config{}
+	cfg.Solana.PollInterval = 5 * time.Second
+	feeds := []config.Feed{}
 	for i := 0; i < numFeeds; i++ {
-		feedConfig := generateFeedConfig()
-		feedConfig.PollInterval = 5 * time.Second
-		cfg.Feeds = append(cfg.Feeds, feedConfig)
+		feeds = append(feeds, generateFeedConfig())
 	}
 
 	transmissionSchema := fakeSchema{transmissionCodec}
-	stateSchema := fakeSchema{configSetCodec}
+	configSetSchema := fakeSchema{configSetCodec}
 	configSetSimplifiedSchema := fakeSchema{configSetSimplifiedCodec}
 
 	producer := fakeProducer{make(chan producerMessage)}
@@ -35,9 +36,11 @@ func TestMultiFeedMonitor(t *testing.T) {
 
 	monitor := NewMultiFeedMonitor(
 		logger.NewNullLogger(),
-		cfg,
+		cfg.Solana,
+		feeds,
+		cfg.Kafka.ConfigSetTopic, cfg.Kafka.ConfigSetSimplifiedTopic, cfg.Kafka.TransmissionTopic,
 		transmissionReader, stateReader,
-		transmissionSchema, stateSchema, configSetSimplifiedSchema,
+		transmissionSchema, configSetSchema, configSetSimplifiedSchema,
 		producer,
 		&devnullMetrics{},
 	)

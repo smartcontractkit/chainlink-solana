@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/pb"
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	"google.golang.org/protobuf/proto"
@@ -12,8 +14,8 @@ import (
 
 func MakeConfigSetMapping(
 	envelope StateEnvelope,
-	solanaConfig SolanaConfig,
-	feedConfig FeedConfig,
+	solanaConfig config.Solana,
+	feedConfig config.Feed,
 ) (map[string]interface{}, error) {
 	state := envelope.State
 	offchainConfig, err := parseOffchainConfig(state.Config.OffchainConfig.Raw[:state.Config.OffchainConfig.Len])
@@ -126,8 +128,8 @@ func MakeConfigSetMapping(
 
 func MakeTransmissionMapping(
 	envelope TransmissionEnvelope,
-	solanaConfig SolanaConfig,
-	feedConfig FeedConfig,
+	solanaConfig config.Solana,
+	feedConfig config.Feed,
 ) (map[string]interface{}, error) {
 	answer := envelope.Answer
 	out := map[string]interface{}{
@@ -158,7 +160,7 @@ func MakeTransmissionMapping(
 
 func MakeSimplifiedConfigSetMapping(
 	envelope StateEnvelope,
-	feedConfig FeedConfig,
+	feedConfig config.Feed,
 ) (map[string]interface{}, error) {
 	state := envelope.State
 	offchainConfig, err := parseOffchainConfig(state.Config.OffchainConfig.Raw[:state.Config.OffchainConfig.Len])

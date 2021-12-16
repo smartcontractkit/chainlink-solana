@@ -24,8 +24,6 @@ An example of a compatible json encoded feeds configuration is:
     "contract_address_base58": "2jVYiZgQ5disuAUMxrF1LkUyhZuqvRCrx1LfB555XUUv",
     "transmissions_account_base58": "2jVYiZgQ5disuAUMxrF1LkUyhZuqvRCrx1LfB555XUUv",
     "state_account_base58": "2jVYiZgQ5disuAUMxrF1LkUyhZuqvRCrx1LfB555XUUv",
-
-    "poll_interval_milliseconds": 1000
   },
   {
     "name": "link/usd",
@@ -38,8 +36,6 @@ An example of a compatible json encoded feeds configuration is:
     "contract_address_base58": "GUnMZPbhxkimy9ssXyPG8rVTPBPFzL24W4vFuxyEZm66",
     "transmissions_account_base58": "GUnMZPbhxkimy9ssXyPG8rVTPBPFzL24W4vFuxyEZm66",
     "state_account_base58": "GUnMZPbhxkimy9ssXyPG8rVTPBPFzL24W4vFuxyEZm66",
-
-    "poll_interval_milliseconds": 1000
   }
 ]
 ```
@@ -47,25 +43,28 @@ An example of a compatible json encoded feeds configuration is:
 To build and execute the monitor locally, run:
 
 ```bash
-go run ./cmd/monitoring/*.go \
--solana.rpc_endpoint="http://127.0.0.1:8899" \
--solana.network_name="solana-devnet" \
--solana.network_id="solana-devnet" \
--solana.chain_id="1" \
--kafka.config_set_topic="solana-devnet" \
--kafka.config_set_simplified_topic="solana-devnet" \
--kafka.transmission_topic="solana-devnet" \
--kafka.brokers="localhost:29092" \
--kafka.client_id="solana" \
--kafka.security_protocol="PLAINTEXT" \
--kafka.sasl_mechanism="PLAIN" \
--kafka.sasl_username="" \
--kafka.sasl_password="" \
--schema_registry.url="http://localhost:8989" \
--schema_registry.username="" \
--schema_registry.password="" \
--feeds.file_path="/tmp/feeds.json" \
--http.address="localhost:3000"
+SOLANA_RPC_ENDPOINT="http://127.0.0.1:8899" \
+SOLANA_NETWORK_NAME="solana-devnet" \
+SOLANA_NETWORK_ID="solana-devnet" \
+SOLANA_CHAIN_ID="1" \
+SOLANA_READ_TIMEOUT="2s" \
+SOLANA_POLL_INTERVAL="5s" \
+KAFKA_BROKERS="localhost:29092" \
+KAFKA_CLIENT_ID="solana" \
+KAFKA_SECURITY_PROTOCOL="PLAINTEXT" \
+KAFKA_SASL_MECHANISM="PLAIN" \
+KAFKA_SASL_USERNAME="" \
+KAFKA_SASL_PASSWORD="" \
+KAFKA_CONFIG_SET_TOPIC="config_set" \
+KAFKA_CONFIG_SET_SIMPLIFIED_TOPIC="config_set_simplified" \
+KAFKA_TRANSMISSION_TOPIC="transmission_topic" \
+SCHEMA_REGISTRY_URL="http://localhost:8989" \
+SCHEMA_REGISTRY_USERNAME="" \
+SCHEMA_REGISTRY_PASSWORD="" \
+FEEDS_FILE_PATH="/tmp/feeds.json" \
+HTTP_ADDRESS="localhost:3000" \
+FEATURE_TEST_MODE=true \
+go run ./cmd/monitoring/main.go
 ```
 
 See `go run ./cmd/monitoring/*.go -help` for details.

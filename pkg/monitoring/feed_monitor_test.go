@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/require"
 )
@@ -19,31 +20,40 @@ func TestFeedMonitor(t *testing.T) {
 	transmissionAccount := generatePublicKey()
 	stateAccount := generatePublicKey()
 
-	fetchInterval := time.Second
+	pollInterval := 1 * time.Second
+	readTimeout := 1 * time.Second
 	var bufferCapacity uint32 = 0 // no buffering
 
-	transmissionPoller := NewPoller(logger.NewNullLogger(), transmissionAccount, transmissionReader, fetchInterval, bufferCapacity)
-	statePoller := NewPoller(logger.NewNullLogger(), stateAccount, stateReader, fetchInterval, bufferCapacity)
+	transmissionPoller := NewPoller(
+		logger.NewNullLogger(),
+		transmissionAccount, transmissionReader,
+		pollInterval, readTimeout,
+		bufferCapacity,
+	)
+	statePoller := NewPoller(
+		logger.NewNullLogger(),
+		stateAccount, stateReader,
+		pollInterval, readTimeout,
+		bufferCapacity,
+	)
 
 	producer := fakeProducer{make(chan producerMessage)}
 
 	transmissionSchema := fakeSchema{transmissionCodec}
-	stateSchema := fakeSchema{configSetCodec}
+	configSetSchema := fakeSchema{configSetCodec}
 	configSetSimplifiedSchema := fakeSchema{configSetSimplifiedCodec}
 
-	cfg := Config{}
-
-	feedConfig := FeedConfig{
-		TransmissionsAccount: transmissionAccount,
-		StateAccount:         stateAccount,
-	}
-
+	cfg := config.Config{}
 	monitor := NewFeedMonitor(
 		logger.NewNullLogger(),
-		cfg,
-		feedConfig,
+		cfg.Solana,
+		config.Feed{
+			TransmissionsAccount: transmissionAccount,
+			StateAccount:         stateAccount,
+		},
+		cfg.Kafka.ConfigSetTopic, cfg.Kafka.ConfigSetSimplifiedTopic, cfg.Kafka.TransmissionTopic,
 		transmissionPoller, statePoller,
-		transmissionSchema, stateSchema, configSetSimplifiedSchema,
+		transmissionSchema, configSetSchema, configSetSimplifiedSchema,
 		producer,
 		&devnullMetrics{},
 	)

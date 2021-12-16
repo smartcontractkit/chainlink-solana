@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
@@ -13,17 +14,21 @@ type MultiFeedMonitor interface {
 
 func NewMultiFeedMonitor(
 	log logger.Logger,
-	config Config,
+	solanaConfig config.Solana,
+	feeds []config.Feed,
+	configSetTopic, configSetSimplifiedTopic, transmissionTopic string,
 	transmissionReader, stateReader AccountReader,
-	transmissionSchema, stateSchema, configSetSimplifiedSchema Schema,
+	transmissionSchema, configSetSchema, configSetSimplifiedSchema Schema,
 	producer Producer,
 	metrics Metrics,
 ) MultiFeedMonitor {
 	return &multiFeedMonitor{
 		log,
-		config,
+		solanaConfig,
+		feeds,
+		configSetTopic, configSetSimplifiedTopic, transmissionTopic,
 		transmissionReader, stateReader,
-		transmissionSchema, stateSchema, configSetSimplifiedSchema,
+		transmissionSchema, configSetSchema, configSetSimplifiedSchema,
 		producer,
 		metrics,
 	}
@@ -31,11 +36,15 @@ func NewMultiFeedMonitor(
 
 type multiFeedMonitor struct {
 	log                       logger.Logger
-	config                    Config
+	solanaConfig              config.Solana
+	feeds                     []config.Feed
+	configSetTopic            string
+	configSetSimplifiedTopic  string
+	transmissionTopic         string
 	transmissionReader        AccountReader
 	stateReader               AccountReader
 	transmissionSchema        Schema
-	stateSchema               Schema
+	configSetSchema           Schema
 	configSetSimplifiedSchema Schema
 	producer                  Producer
 	metrics                   Metrics
@@ -45,23 +54,25 @@ const bufferCapacity = 100
 
 // Start should be executed as a goroutine.
 func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup) {
-	wg.Add(len(m.config.Feeds))
-	for _, feedConfig := range m.config.Feeds {
-		go func(feedConfig FeedConfig) {
+	wg.Add(len(m.feeds))
+	for _, feedConfig := range m.feeds {
+		go func(feedConfig config.Feed) {
 			defer wg.Done()
 
 			transmissionPoller := NewPoller(
 				m.log.With("account", "transmissions", "address", feedConfig.TransmissionsAccount.String()),
 				feedConfig.TransmissionsAccount,
 				m.transmissionReader,
-				feedConfig.PollInterval,
+				m.solanaConfig.PollInterval,
+				m.solanaConfig.ReadTimeout,
 				bufferCapacity,
 			)
 			statePoller := NewPoller(
 				m.log.With("account", "state", "address", feedConfig.StateAccount.String()),
 				feedConfig.StateAccount,
 				m.stateReader,
-				feedConfig.PollInterval,
+				m.solanaConfig.PollInterval,
+				m.solanaConfig.ReadTimeout,
 				bufferCapacity,
 			)
 
@@ -76,11 +87,12 @@ func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup) {
 			}()
 
 			feedMonitor := NewFeedMonitor(
-				m.log.With("name", feedConfig.FeedName, "network", m.config.Solana.NetworkName),
-				m.config,
+				m.log.With("feed", feedConfig.FeedName, "network", m.solanaConfig.NetworkName),
+				m.solanaConfig,
 				feedConfig,
+				m.configSetTopic, m.configSetSimplifiedTopic, m.transmissionTopic,
 				transmissionPoller, statePoller,
-				m.transmissionSchema, m.stateSchema, m.configSetSimplifiedSchema,
+				m.transmissionSchema, m.configSetSchema, m.configSetSimplifiedSchema,
 				m.producer,
 				m.metrics,
 			)
