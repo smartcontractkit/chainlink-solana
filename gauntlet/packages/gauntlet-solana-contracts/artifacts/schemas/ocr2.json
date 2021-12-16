@@ -1,15 +1,6 @@
 {
   "version": "0.1.0",
   "name": "ocr2",
-  "constants": [
-    {
-      "name": "MAX_ORACLES",
-      "type": {
-        "defined": "usize"
-      },
-      "value": "19"
-    }
-  ],
   "instructions": [
     {
       "name": "initialize",
@@ -1117,82 +1108,82 @@
   ],
   "errors": [
     {
-      "code": 6000,
+      "code": 300,
       "name": "Unauthorized",
       "msg": "Unauthorized"
     },
     {
-      "code": 6001,
+      "code": 301,
       "name": "InvalidInput",
       "msg": "Invalid input"
     },
     {
-      "code": 6002,
+      "code": 302,
       "name": "TooManyOracles",
       "msg": "Too many oracles"
     },
     {
-      "code": 6003,
+      "code": 303,
       "name": "StaleReport",
       "msg": "Stale report"
     },
     {
-      "code": 6004,
+      "code": 304,
       "name": "DigestMismatch",
       "msg": "Digest mismatch"
     },
     {
-      "code": 6005,
+      "code": 305,
       "name": "WrongNumberOfSignatures",
       "msg": "Wrong number of signatures"
     },
     {
-      "code": 6006,
+      "code": 306,
       "name": "Overflow",
       "msg": "Overflow"
     },
     {
-      "code": 6007,
+      "code": 307,
       "name": "MedianOutOfRange",
       "msg": "Median out of range"
     },
     {
-      "code": 6008,
+      "code": 308,
       "name": "DuplicateSigner",
       "msg": "Duplicate signer"
     },
     {
-      "code": 6009,
+      "code": 309,
       "name": "DuplicateTransmitter",
       "msg": "Duplicate transmitter"
     },
     {
-      "code": 6010,
+      "code": 310,
       "name": "PayeeAlreadySet",
       "msg": "Payee already set"
     },
     {
-      "code": 6011,
+      "code": 311,
       "name": "PaymentsRemaining",
       "msg": "Leftover payments remaining, please call payRemaining first"
     },
     {
-      "code": 6012,
+      "code": 312,
       "name": "PayeeOracleMismatch",
       "msg": "Payee and Oracle lenght mismatch"
     },
     {
-      "code": 6013,
+      "code": 313,
       "name": "InvalidTokenAccount",
       "msg": "Invalid Token Account"
     },
     {
-      "code": 6014,
+      "code": 314,
       "name": "UnauthorizedSigner",
       "msg": "Oracle signer key not found"
     },
     {
-      "code": 6015,
+      "code": 315,
       "name": "UnauthorizedTransmitter",
       "msg": "Oracle transmitter key not found"
     }

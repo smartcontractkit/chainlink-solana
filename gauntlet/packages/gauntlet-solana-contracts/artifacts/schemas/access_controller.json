@@ -1,15 +1,6 @@
 {
   "version": "0.1.0",
   "name": "access_controller",
-  "constants": [
-    {
-      "name": "MAX_ADDRS",
-      "type": {
-        "defined": "usize"
-      },
-      "value": "32"
-    }
-  ],
   "instructions": [
     {
       "name": "initialize",
@@ -130,12 +121,12 @@
   ],
   "errors": [
     {
-      "code": 6000,
+      "code": 300,
       "name": "Unauthorized",
       "msg": "Unauthorized"
     },
     {
-      "code": 6001,
+      "code": 301,
       "name": "Full",
       "msg": "Access list is full"
     }
