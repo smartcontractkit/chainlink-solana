@@ -1,6 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
@@ -10,6 +11,8 @@ type Input = {
     transmitter: string
     payee: string
   }[]
+  // Allows to set payees that do not have a token generated address
+  allowFundRecipient?: boolean
 }
 
 export default class SetPayees extends SolanaCommand {
@@ -26,12 +29,13 @@ export default class SetPayees extends SolanaCommand {
     const aggregator = rdd.contracts[this.flags.state]
     const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
     const operators = aggregatorOperators.map((operator) => ({
-      // Check this too RDD
+      // TODO: Update to latest RDD
       transmitter: rdd.operators[operator].nodeAddress[0],
       payee: rdd.operators[operator].payeeAddress,
     }))
     return {
       operators,
+      allowFundRecipient: false,
     }
   }
 
@@ -51,8 +55,31 @@ export default class SetPayees extends SolanaCommand {
     const state = new PublicKey(this.flags.state)
 
     const info = await program.account.state.fetch(state)
+    const token = new Token(
+      this.provider.connection,
+      new PublicKey(this.flags.link),
+      TOKEN_PROGRAM_ID,
+      this.wallet.payer,
+    )
 
-    // TODO: check that is a  valid payable address: new PublicKey(operator.payee),
+    const areValidPayees = (
+      await Promise.all(
+        input.operators.map(async ({ payee }) => {
+          try {
+            const info = await token.getAccountInfo(new PublicKey(payee))
+            return !!info.address
+          } catch (e) {
+            logger.error(`Payee with address ${payee} does not have a valid Token recipient address`)
+            return false
+          }
+        }),
+      )
+    ).every((isValid) => isValid)
+
+    this.require(
+      areValidPayees || !!input.allowFundRecipient,
+      'Every payee needs to have a valid token recipient address',
+    )
     const payeeByTransmitter = input.operators.reduce(
       (agg, operator) => ({
         ...agg,
