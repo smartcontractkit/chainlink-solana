@@ -109,6 +109,7 @@ func (d *Deployer) Load() error {
 	}
 
 	d.Account[AccessController] = report.Responses[0].Contract
+	os.Setenv("PROGRAM_ID_ACCESS_CONTROLLER", d.Account[AccessController])
 
 	// Access Controller contract deployment
 	fmt.Println("Deploying Validator...")
@@ -126,6 +127,7 @@ func (d *Deployer) Load() error {
 	}
 
 	d.Account[Validator] = report.Responses[0].Contract
+	os.Setenv("PROGRAM_ID_DEVIATION_FLAGGING_VALIDATOR", d.Account[Validator])
 
 	// OCR2 contract deployment
 	fmt.Println("Deploying OCR 2...")
@@ -142,6 +144,7 @@ func (d *Deployer) Load() error {
 		return errors.Wrap(err, "report not available")
 	}
 	d.Account[OCR2] = report.Responses[0].Contract
+	os.Setenv("PROGRAM_ID_OCR2", d.Account[OCR2])
 
 	return nil
 }
