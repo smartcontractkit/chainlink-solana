@@ -16,7 +16,7 @@ pub struct Initialize<'info> {
     #[account(zero)]
     pub state: AccountLoader<'info, State>,
     #[account(zero)]
-    pub transmissions: AccountLoader<'info, Transmissions>,
+    pub transmissions: Account<'info, Transmissions>,
     pub payer: AccountInfo<'info>,
     pub owner: Signer<'info>,
 
@@ -69,7 +69,7 @@ pub struct Transmit<'info> {
     pub state: AccountLoader<'info, State>,
     pub transmitter: Signer<'info>,
     #[account(mut, address = state.load()?.transmissions)]
-    pub transmissions: AccountLoader<'info, Transmissions>,
+    pub transmissions: Account<'info, Transmissions>,
 
     #[account(address = validator::ID)]
     pub validator_program: AccountInfo<'info>,
@@ -215,7 +215,7 @@ pub struct AcceptPayeeship<'info> {
 #[derive(Accounts)]
 pub struct Query<'info> {
     pub state: AccountLoader<'info, State>,
-    pub transmissions: AccountLoader<'info, Transmissions>,
+    pub transmissions: Account<'info, Transmissions>,
     // TODO: we could allow reusing query buffers if we also required an authority and marked the buffer with it.
     // That way someone else couldn't hijack the buffer and use it instead.
     #[account(zero)]

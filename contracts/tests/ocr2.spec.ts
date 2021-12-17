@@ -12,7 +12,6 @@ import {
   Token,
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
-  u64,
 } from '@solana/spl-token';
 import { assert } from "chai";
 
@@ -266,7 +265,7 @@ describe('ocr2', async () => {
       signers: [state, transmissions],
       preInstructions: [
         await program.account.state.createInstruction(state),
-        await program.account.transmissions.createInstruction(transmissions),
+        await program.account.transmissions.createInstruction(transmissions, 8+128+8096*24),
       ],
     });
 
@@ -296,7 +295,6 @@ describe('ocr2', async () => {
     }
     oracles = await Promise.all(futures);
 
-    const onchain_config = Buffer.from([1, 2, 3]);
     const offchain_config_version = 1;
     const offchain_config = Buffer.from([4, 5, 6]);
 
@@ -416,7 +414,9 @@ describe('ocr2', async () => {
   });
 
   it('Transmits a round', async () => {
-    await transmit(1, 2)
+    await transmit(1, 2);
+    let store = await provider.connection.getAccountInfo(transmissions.publicKey);
+    console.log(store);
   });
 
   it('Withdraws funds', async () => {

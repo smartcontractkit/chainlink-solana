@@ -95,6 +95,7 @@ pub struct Config {
     pub billing: Billing,
     pub validator: Pubkey,
     pub flagging_threshold: u32,
+    _padding1: u32,
 
     pub offchain_config: OffchainConfig,
     // a staging area which will swap onto data on commit
@@ -180,48 +181,130 @@ impl Default for Oracle {
     }
 }
 
-#[zero_copy]
-#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(C)]
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, bytemuck::Pod, bytemuck::Zeroable,
+)]
 pub struct Transmission {
-    pub answer: i128,
     pub timestamp: u64,
+    pub answer: i128,
 }
 
-#[account(zero_copy)]
+use std::cell::RefMut;
+use std::mem::size_of;
+
+/// Two ringbuffers
+/// - Live one that has a day's worth of data that's updated every second
+/// - Historical one that stores historical data
+pub struct Store<'a> {
+    header: &'a mut Transmissions,
+    live: RefMut<'a, [Transmission]>,
+    historical: RefMut<'a, [Transmission]>,
+}
+
+// TODO: the modulus and initial ringbuffer size to be configurable
+#[account]
 pub struct Transmissions {
-    pub latest_round_id: u32,
-    // Current offset
-    pub cursor: u32,
-    // 524_280 = approx. 10MB ~= 10485760 / 20
-    pub transmissions: [Transmission; 8192], // temporarily lowered for devnet
+    latest_round_id: u32,
+    pub granularity: u8,
+    pub live_length: u32,
+    live_cursor: u32,
+    historical_cursor: u32,
 }
 
-impl Transmissions {
-    pub fn store_round(&mut self, round: Transmission) {
-        self.latest_round_id += 1;
-        self.transmissions[self.cursor as usize] = round;
-        self.cursor = (self.cursor + 1) % self.transmissions.len() as u32;
+pub fn with_store<'a, 'info: 'a, F, T>(
+    account: &'a mut Account<'info, Transmissions>,
+    f: F,
+) -> Result<T, ProgramError>
+where
+    F: FnOnce(&mut Store) -> T,
+{
+    let n = account.live_length as usize;
+
+    let info = account.to_account_info();
+    let data = info.try_borrow_mut_data()?;
+
+    // two ringbuffers, live data and historical with smaller granularity
+    let (live, historical) = RefMut::map_split(data, |data| {
+        // skip the header
+        let (_header, data) = data.split_at_mut(8 + 128); // discriminator + header size
+        let (live, historical) = data.split_at_mut(n * size_of::<Transmission>());
+        // NOTE: no try_map_split available..
+        let live = bytemuck::try_cast_slice_mut::<_, Transmission>(live).unwrap();
+        let historical = bytemuck::try_cast_slice_mut::<_, Transmission>(historical).unwrap();
+        (live, historical)
+    });
+
+    let mut store = Store {
+        header: account,
+        live,
+        historical,
+    };
+
+    Ok(f(&mut store))
+}
+
+impl<'a> Store<'a> {
+    pub fn insert(&mut self, round: Transmission) {
+        self.header.latest_round_id += 1;
+
+        // insert into live data
+        self.live[self.header.live_cursor as usize] = round;
+        self.header.live_cursor = (self.header.live_cursor + 1) % self.live.len() as u32;
+
+        if self.header.latest_round_id % self.header.granularity as u32 == 0 {
+            // insert into historical data
+            self.historical[self.header.historical_cursor as usize] = round;
+            self.header.historical_cursor =
+                (self.header.historical_cursor + 1) % self.historical.len() as u32;
+        }
     }
 
-    pub fn fetch_round(&self, round_id: u32) -> Option<Transmission> {
-        if self.latest_round_id < round_id {
+    pub fn fetch(&self, round_id: u32) -> Option<Transmission> {
+        if self.header.latest_round_id < round_id {
             return None;
         }
 
-        let diff = self.latest_round_id - round_id;
+        let latest_round_id = self.header.latest_round_id;
+        let granularity = self.header.granularity as u32;
 
-        if diff as usize > self.transmissions.len() {
-            return None;
+        // if in live range, fetch from live set
+        let live_start = latest_round_id.saturating_sub((self.live.len() as u32).saturating_sub(1));
+        // if in historical range, fetch from closest
+        let historical_end = latest_round_id - (latest_round_id % granularity);
+        let historical_start = historical_end
+            .saturating_sub(granularity * (self.historical.len() as u32).saturating_sub(1));
+
+        if (live_start..=latest_round_id).contains(&round_id) {
+            // live data
+            let offset = latest_round_id - round_id;
+            let offset = offset + 1; // + 1 because we're looking for the element before the cursor
+
+            let index = self
+                .header
+                .live_cursor
+                .checked_sub(offset)
+                .unwrap_or_else(|| self.live.len() as u32 - (offset - self.header.live_cursor));
+
+            Some(self.live[index as usize])
+        } else if (historical_start..=historical_end).contains(&round_id) {
+            // historical data
+            let round_id = round_id - (round_id % granularity);
+            let offset = (historical_end - round_id) / granularity;
+            let offset = offset + 1; // + 1 because we're looking for the element before the cursor
+
+            let index = self
+                .header
+                .historical_cursor
+                .checked_sub(offset)
+                .unwrap_or_else(|| {
+                    self.historical.len() as u32 - (offset - self.header.historical_cursor)
+                });
+
+            Some(self.historical[index as usize])
+        } else {
+            None
         }
-
-        let diff = diff + 1; // + 1 because we're looking for the element before the cursor
-        let index = self
-            .cursor
-            .checked_sub(diff)
-            .unwrap_or_else(|| self.transmissions.len() as u32 - (diff - self.cursor));
-
-        let transmission = &self.transmissions[index as usize];
-        (transmission.timestamp != 0).then(|| *transmission)
     }
 }
 
@@ -231,48 +314,93 @@ mod tests {
 
     #[test]
     fn transmissions() {
-        let layout = std::alloc::Layout::new::<Transmissions>();
-        let mut data: Box<Transmissions> = unsafe {
-            let ptr = std::alloc::alloc_zeroed(layout).cast();
-            Box::from_raw(ptr)
-        };
+        let mut data = vec![0; 8 + 128 + (2 + 3) * size_of::<Transmission>()];
+        // TODO: ensure this is how it works with the actual feed
+        let mut s = &mut data[0..8 + 128];
 
-        // manipulate the data so that the first round is placed on the other end of the circular buffer
-        data.transmissions[8191] = Transmission {
-            answer: 1,
-            timestamp: 1,
-        };
-        data.latest_round_id += 1;
+        // insert the initial header with some granularity
+        Transmissions {
+            latest_round_id: 0,
+            granularity: 5,
+            live_length: 2,
+            live_cursor: 0,
+            historical_cursor: 0,
+        }
+        .try_serialize(&mut s)
+        .unwrap();
 
-        data.store_round(Transmission {
-            answer: 2,
-            timestamp: 2,
-        });
-        data.store_round(Transmission {
-            answer: 3,
-            timestamp: 3,
-        });
+        let mut lamports = 0u64;
 
-        assert_eq!(
-            data.fetch_round(1),
-            Some(Transmission {
-                answer: 1,
-                timestamp: 1
-            })
+        let pubkey = Pubkey::default();
+        let owner = Transmissions::owner();
+        let info = AccountInfo::new(
+            &pubkey,
+            false,
+            false,
+            &mut lamports,
+            &mut data,
+            &owner,
+            false,
+            0,
         );
-        assert_eq!(
-            data.fetch_round(2),
-            Some(Transmission {
-                answer: 2,
-                timestamp: 2
-            })
-        );
-        assert_eq!(
-            data.fetch_round(3),
-            Some(Transmission {
-                answer: 3,
-                timestamp: 3
-            })
-        );
+        let mut account = Account::try_from(&info).unwrap();
+
+        with_store(&mut account, |store| {
+            for i in 1..=20 {
+                store.insert(Transmission {
+                    answer: i128::from(i),
+                    timestamp: i,
+                });
+            }
+
+            assert_eq!(store.fetch(21), None);
+            // Live range returns precise round
+            assert_eq!(
+                store.fetch(20),
+                Some(Transmission {
+                    answer: 20,
+                    timestamp: 20
+                })
+            );
+            assert_eq!(
+                store.fetch(19),
+                Some(Transmission {
+                    answer: 19,
+                    timestamp: 19
+                })
+            );
+            // Historical range rounds down
+            assert_eq!(
+                store.fetch(18),
+                Some(Transmission {
+                    answer: 15,
+                    timestamp: 15
+                })
+            );
+            assert_eq!(
+                store.fetch(15),
+                Some(Transmission {
+                    answer: 15,
+                    timestamp: 15
+                })
+            );
+            assert_eq!(
+                store.fetch(14),
+                Some(Transmission {
+                    answer: 10,
+                    timestamp: 10
+                })
+            );
+            assert_eq!(
+                store.fetch(10),
+                Some(Transmission {
+                    answer: 10,
+                    timestamp: 10
+                })
+            );
+            // Out of range
+            assert_eq!(store.fetch(9), None);
+        })
+        .unwrap();
     }
 }

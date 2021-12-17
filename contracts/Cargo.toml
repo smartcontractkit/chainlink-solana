@@ -6,6 +6,9 @@ members = [
 
 # exclude = ["programs/flux-aggregator"]
 
+# [patch.crates-io]
+# anchor-lang = { path = '../../anchor/lang' }
+
 [profile.dev]
 overflow-checks = true
 
