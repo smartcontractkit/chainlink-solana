@@ -43,14 +43,14 @@ export default class SetOwners extends SolanaCommand {
         isSigner: true,
       },
     ]
-    const rawTx : SolanaRawTransaction = {
+    const rawTx: SolanaRawTransaction = {
       data,
       accounts,
       programId: multisig.programId.publicKey,
     }
-    const cmd = new AbstractTransaction({...this.flags, rawTx},[])
+    const cmd = new AbstractTransaction({ ...this.flags, rawTx }, [])
     // TODO: is there another way to pass middlewares in order not to invoke them 2 times?
     await cmd.invokeMiddlewares(cmd, this.middlewares)
-    return cmd.execute()  
+    return cmd.execute()
   }
 }

@@ -24,7 +24,7 @@ export default class ChangeOwners extends SolanaCommand {
     const address = multisig.programId.publicKey.toString()
     const program = this.loadProgram(multisig.idl, address)
     const data = program.coder.instruction.encode('set_owners', {
-      owners: this.args.map(a => new PublicKey(a)),
+      owners: this.args.map((a) => new PublicKey(a)),
     })
 
     const [multisigSigner] = await PublicKey.findProgramAddress([multisigAddress.toBuffer()], program.programId)
@@ -41,13 +41,13 @@ export default class ChangeOwners extends SolanaCommand {
         isSigner: true,
       },
     ]
-    const rawTx : SolanaRawTransaction = {
+    const rawTx: SolanaRawTransaction = {
       data,
       accounts,
       programId: multisig.programId.publicKey,
     }
-    const cmd = new AbstractTransaction({...this.flags, rawTx},[])
+    const cmd = new AbstractTransaction({ ...this.flags, rawTx }, [])
     await cmd.invokeMiddlewares(cmd, this.middlewares)
-    return cmd.execute()  
+    return cmd.execute()
   }
 }

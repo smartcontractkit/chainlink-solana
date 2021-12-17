@@ -90,7 +90,7 @@ export default class SetBilling extends SolanaCommand {
     const rawTx = await this.makeRawTransaction()
     if (this.flags.multisig != undefined) {
       if (this.flags.file != undefined) {
-        console.info("Write below tx data to JSON file, to be parsed by multisig:tx command")
+        console.info('Write below tx data to JSON file, to be parsed by multisig:tx command')
         console.info(JSON.stringify(rawTx))
         return {
           responses: [
@@ -101,7 +101,7 @@ export default class SetBilling extends SolanaCommand {
           ],
         } as Result<TransactionResponse>
       }
-      const cmd = new AbstractTransaction({...this.flags, rawTx},[])
+      const cmd = new AbstractTransaction({ ...this.flags, rawTx }, [])
       await cmd.invokeMiddlewares(cmd, this.middlewares)
       return cmd.execute()
     }

@@ -30,7 +30,7 @@ export default class AbstractTransaction extends SolanaCommand {
     const multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS || '')
     const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
     const address = multisig.programId.publicKey.toString()
-  
+
     const program = this.loadProgram(multisig.idl, address)
     let rawTx: SolanaRawTransaction
     if (this.flags.rawTx != null) {
@@ -39,18 +39,19 @@ export default class AbstractTransaction extends SolanaCommand {
       //load and parse data from json file
       const txInfo = io.readJSON(join(process.cwd(), this.flags.txFilePath))
       const pid = new PublicKey(new BN(txInfo.programId._bn, 16))
-      const accounts = txInfo.accounts.map(a => {
-        return {...a, pubkey : new PublicKey(new BN(a.pubkey._bn, 16))}})
+      const accounts = txInfo.accounts.map((a) => {
+        return { ...a, pubkey: new PublicKey(new BN(a.pubkey._bn, 16)) }
+      })
       const data = Buffer.from(txInfo.data)
       rawTx = {} as SolanaRawTransaction
       rawTx.programId = pid
       rawTx.accounts = accounts
       rawTx.data = data
     } else {
-      //TODO: require the above flags 
+      //TODO: require the above flags
       process.exit(0)
     }
-   
+
     const [multisigSigner] = await PublicKey.findProgramAddress([multisigAddress.toBuffer()], program.programId)
 
     let txPublicKey: PublicKey
