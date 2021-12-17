@@ -6,18 +6,13 @@ import { AccountMeta, PublicKey, Transaction, TransactionInstruction } from '@so
 import BN from 'bn.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
+import { SolanaRawTransaction } from '../multisig/abstractTransaction'
+import AbstractTransaction from '../multisig/abstractTransaction'
 
 type Input = {
   observationPaymentGjuels: number | string
   transmissionPaymentGjuels: number | string
 }
-
-type SolanaRawTransaction = {
-  data: Buffer
-  accounts: AccountMeta[]
-  programId: PublicKey
-}
-
 export default class SetBilling extends SolanaCommand {
   static id = 'ocr2:set_billing'
   static category = CONTRACT_LIST.OCR_2
@@ -48,7 +43,6 @@ export default class SetBilling extends SolanaCommand {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
-
     const state = new PublicKey(this.flags.state)
 
     const input = this.makeInput(
@@ -95,16 +89,21 @@ export default class SetBilling extends SolanaCommand {
   execute = async () => {
     const rawTx = await this.makeRawTransaction()
     if (this.flags.multisig != undefined) {
-      console.info("Write below tx data to JSON file, to be parsed by multisig:tx command")
-      console.info(JSON.stringify(rawTx))
-      return {
-        responses: [
-          {
-            tx: this.wrapResponse('multisig', this.flags.state),
-            contract: this.flags.state,
-          },
-        ],
-      } as Result<TransactionResponse>
+      if (this.flags.file != undefined) {
+        console.info("Write below tx data to JSON file, to be parsed by multisig:tx command")
+        console.info(JSON.stringify(rawTx))
+        return {
+          responses: [
+            {
+              tx: this.wrapResponse('multisig', this.flags.state),
+              contract: this.flags.state,
+            },
+          ],
+        } as Result<TransactionResponse>
+      }
+      const cmd = new AbstractTransaction({...this.flags, rawTx},[])
+      await cmd.invokeMiddlewares(cmd, this.middlewares)
+      return cmd.execute()
     }
 
     const tx = new Transaction()

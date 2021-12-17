@@ -1,5 +1,7 @@
 import MultisigCreate from './createMultisig'
-import ChangeThreshold from './changeThreshold'
+import SetThreshold from './setThreshold'
+import SetOwners from './setOwners'
+
 import AbstractTransaction from './abstractTransaction'
 
-export default [MultisigCreate, ChangeThreshold, AbstractTransaction]
+export default [MultisigCreate, SetThreshold, SetOwners, AbstractTransaction]

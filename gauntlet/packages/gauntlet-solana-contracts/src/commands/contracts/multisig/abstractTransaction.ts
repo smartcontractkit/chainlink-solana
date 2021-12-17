@@ -4,22 +4,25 @@ import { join } from 'path'
 
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { PublicKey, SYSVAR_RENT_PUBKEY, Account, Keypair } from '@solana/web3.js'
+import { AccountMeta, PublicKey, SYSVAR_RENT_PUBKEY, Account, Keypair } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-
 import BN from 'bn.js'
 
+export type SolanaRawTransaction = {
+  data: Buffer
+  accounts: AccountMeta[]
+  programId: PublicKey
+}
 export default class AbstractTransaction extends SolanaCommand {
   static id = 'multisig:tx'
   static category = CONTRACT_LIST.MULTISIG
 
   static examples = [
-    'yarn gauntlet multisig:tx --network=local --txDataPath=tx --approve --tx=9Vck9Gdk8o9WhxT8bgNcfJ5gbvFBN1zPuXpf8yu8o2aq --execute',
+    'yarn gauntlet multisig:tx --network=local --txFilePath=tx --approve --tx=9Vck9Gdk8o9WhxT8bgNcfJ5gbvFBN1zPuXpf8yu8o2aq --execute',
   ]
 
   constructor(flags, args) {
     super(flags, args)
-    this.requireFlag('txDataPath', 'Please provide transaction info path')
   }
 
   execute = async () => {
@@ -27,18 +30,27 @@ export default class AbstractTransaction extends SolanaCommand {
     const multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS || '')
     const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
     const address = multisig.programId.publicKey.toString()
+  
     const program = this.loadProgram(multisig.idl, address)
-
-    //load and parse data from json file
-    const txInfo = io.readJSON(join(process.cwd(), this.flags.txDataPath))
-    const pid = new PublicKey(new BN(txInfo.programId._bn, 16))
-    const accounts = txInfo.accounts.map(a => {
-      return {...a, pubkey : new PublicKey(new BN(a.pubkey._bn, 16))}})
-    const data = Buffer.from(txInfo.data)
-    console.log(pid)
-    console.log(accounts)
-    console.log(data)
-
+    let rawTx: SolanaRawTransaction
+    if (this.flags.rawTx != null) {
+      rawTx = this.flags.rawTx
+    } else if (this.flags.txFilePath != null) {
+      //load and parse data from json file
+      const txInfo = io.readJSON(join(process.cwd(), this.flags.txFilePath))
+      const pid = new PublicKey(new BN(txInfo.programId._bn, 16))
+      const accounts = txInfo.accounts.map(a => {
+        return {...a, pubkey : new PublicKey(new BN(a.pubkey._bn, 16))}})
+      const data = Buffer.from(txInfo.data)
+      rawTx = {} as SolanaRawTransaction
+      rawTx.programId = pid
+      rawTx.accounts = accounts
+      rawTx.data = data
+    } else {
+      //TODO: require the above flags 
+      process.exit(0)
+    }
+   
     const [multisigSigner] = await PublicKey.findProgramAddress([multisigAddress.toBuffer()], program.programId)
 
     let txPublicKey: PublicKey
@@ -49,7 +61,7 @@ export default class AbstractTransaction extends SolanaCommand {
       const transaction = Keypair.generate()
       txPublicKey = transaction.publicKey
       logger.info(`TX Account: ${txPublicKey}`)
-      const tx = await program.rpc.createTransaction(pid, accounts, data, {
+      const tx = await program.rpc.createTransaction(rawTx.programId, rawTx.accounts, rawTx.data, {
         accounts: {
           multisig: multisigAddress,
           transaction: txPublicKey,
