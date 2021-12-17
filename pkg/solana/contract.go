@@ -16,6 +16,7 @@ import (
 
 var (
 	configVersion uint8 = 1
+	rpcCommitment       = rpc.CommitmentConfirmed
 
 	// error declarations
 	errCursorLength       = errors.New("incorrect cursor length")
@@ -97,7 +98,10 @@ func (c *ContractTracker) fetchLatestTransmission(ctx context.Context) error {
 }
 
 func GetState(ctx context.Context, client *rpc.Client, account solana.PublicKey) (State, uint64, error) {
-	res, err := client.GetAccountInfo(ctx, account)
+	res, err := client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
+		Encoding:   "base64",
+		Commitment: rpcCommitment,
+	})
 	if err != nil {
 		return State{}, 0, fmt.Errorf("failed to fetch state account at address '%s': %w", account.String(), err)
 	}
@@ -123,7 +127,8 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 
 	// query for cursor
 	res, err := client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
-		Encoding: "base64",
+		Encoding:   "base64",
+		Commitment: rpcCommitment,
 		DataSlice: &rpc.DataSlice{
 			Offset: &cursorOffset,
 			Length: &cursorLen,
@@ -147,7 +152,8 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 	// fetch transmission
 	var transmissionOffset uint64 = CursorOffset + CursorLen + (uint64(cursor) * transmissionLen)
 	res, err = client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
-		Encoding: "base64",
+		Encoding:   "base64",
+		Commitment: rpcCommitment,
 		DataSlice: &rpc.DataSlice{
 			Offset: &transmissionOffset,
 			Length: &transmissionLen,
