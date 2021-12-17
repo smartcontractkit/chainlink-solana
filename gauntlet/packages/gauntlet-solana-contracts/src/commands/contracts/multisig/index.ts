@@ -1,4 +1,4 @@
 import MultisigCreate from './createMultisig'
-// import ChangeThreshold from './changeThreshold'
+import ChangeThreshold from './changeThreshold'
 
-export default [MultisigCreate]
+export default [MultisigCreate, ChangeThreshold]
