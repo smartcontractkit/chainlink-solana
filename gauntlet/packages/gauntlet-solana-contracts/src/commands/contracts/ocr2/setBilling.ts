@@ -94,6 +94,18 @@ export default class SetBilling extends SolanaCommand {
 
   execute = async () => {
     const rawTx = await this.makeRawTransaction()
+    if (this.flags.multisig != undefined) {
+      console.info("Write below tx data to JSON file, to be parsed by multisig:tx command")
+      console.info(JSON.stringify(rawTx))
+      return {
+        responses: [
+          {
+            tx: this.wrapResponse('multisig', this.flags.state),
+            contract: this.flags.state,
+          },
+        ],
+      } as Result<TransactionResponse>
+    }
 
     const tx = new Transaction()
     tx.add(
