@@ -26,6 +26,20 @@ func MakeConfigSetMapping(
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ReportingPluginConfig from OffchainConfig: %w", err)
 	}
+	var sharedSecredEncryptions map[string]interface{}
+	if offchainConfig.SharedSecretEncryptions != nil {
+		sharedSecredEncryptions = map[string]interface{}{
+			"diffie_hellman_point": offchainConfig.SharedSecretEncryptions.DiffieHellmanPoint,
+			"shared_secret_hash":   offchainConfig.SharedSecretEncryptions.SharedSecretHash,
+			"encryptions":          offchainConfig.SharedSecretEncryptions.Encryptions,
+		}
+	} else {
+		sharedSecredEncryptions = map[string]interface{}{
+			"diffie_hellman_point": []byte{},
+			"shared_secret_hash":   []byte{},
+			"encryptions":          []byte{},
+		}
+	}
 	out := map[string]interface{}{
 		"block_number": uint64ToBeBytes(envelope.BlockNumber),
 		"contract_config": map[string]interface{}{
@@ -66,11 +80,7 @@ func MakeConfigSetMapping(
 					"max_duration_report_nanoseconds":                          uint64ToBeBytes(offchainConfig.MaxDurationReportNanoseconds),
 					"max_duration_should_accept_finalized_report_nanoseconds":  uint64ToBeBytes(offchainConfig.MaxDurationShouldAcceptFinalizedReportNanoseconds),
 					"max_duration_should_transmit_accepted_report_nanoseconds": uint64ToBeBytes(offchainConfig.MaxDurationShouldTransmitAcceptedReportNanoseconds),
-					"shared_secret_encryptions": map[string]interface{}{
-						"diffie_hellman_point": offchainConfig.SharedSecretEncryptions.DiffieHellmanPoint,
-						"shared_secret_hash":   offchainConfig.SharedSecretEncryptions.SharedSecretHash,
-						"encryptions":          offchainConfig.SharedSecretEncryptions.Encryptions,
-					},
+					"shared_secret_encryptions":                                sharedSecredEncryptions,
 				},
 			},
 		},
@@ -124,39 +134,7 @@ func MakeConfigSetMapping(
 	return out, nil
 }
 
-func MakeTransmissionMapping(
-	envelope TransmissionEnvelope,
-	solanaConfig config.Solana,
-	feedConfig config.Feed,
-) (map[string]interface{}, error) {
-	answer := envelope.Answer
-	out := map[string]interface{}{
-		"block_number": uint64ToBeBytes(envelope.BlockNumber),
-		"answer": map[string]interface{}{
-			"data":      answer.Data.Bytes(),
-			"timestamp": int64(answer.Timestamp),
-		},
-		"solana_chain_config": map[string]interface{}{
-			"network_name": solanaConfig.NetworkName,
-			"network_id":   solanaConfig.NetworkID,
-			"chain_id":     solanaConfig.ChainID,
-		},
-		"feed_config": map[string]interface{}{
-			"feed_name":             feedConfig.FeedName,
-			"feed_path":             feedConfig.FeedPath,
-			"symbol":                feedConfig.Symbol,
-			"heartbeat_sec":         int64(feedConfig.HeartbeatSec),
-			"contract_type":         feedConfig.ContractType,
-			"contract_status":       feedConfig.ContractStatus,
-			"contract_address":      feedConfig.ContractAddress.Bytes(),
-			"transmissions_account": feedConfig.TransmissionsAccount.Bytes(),
-			"state_account":         feedConfig.StateAccount.Bytes(),
-		},
-	}
-	return out, nil
-}
-
-func MakeSimplifiedConfigSetMapping(
+func MakeConfigSetSimplifiedMapping(
 	envelope StateEnvelope,
 	feedConfig config.Feed,
 ) (map[string]interface{}, error) {
@@ -177,12 +155,10 @@ func MakeSimplifiedConfigSetMapping(
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse s: %w", err)
 	}
-
 	oracles, err := createConfigSetSimplifiedOracles(offchainConfig.OffchainPublicKeys, offchainConfig.PeerIds, state.Oracles)
 	if err != nil {
 		return nil, fmt.Errorf("failed to oracles s: %w", err)
 	}
-
 	out := map[string]interface{}{
 		"config_digest":      base64.StdEncoding.EncodeToString(state.Config.LatestConfigDigest[:]),
 		"block_number":       uint64ToBeBytes(envelope.BlockNumber),
@@ -200,7 +176,42 @@ func MakeSimplifiedConfigSetMapping(
 		"feed_state_account": base64.StdEncoding.EncodeToString(feedConfig.StateAccount[:]),
 	}
 	return out, nil
+}
 
+func MakeTransmissionMapping(
+	envelope TransmissionEnvelope,
+	solanaConfig config.Solana,
+	feedConfig config.Feed,
+) (map[string]interface{}, error) {
+	answer := envelope.Answer
+	data := []byte{}
+	if answer.Data != nil {
+		data = answer.Data.Bytes()
+	}
+	out := map[string]interface{}{
+		"block_number": uint64ToBeBytes(envelope.BlockNumber),
+		"answer": map[string]interface{}{
+			"data":      data,
+			"timestamp": int64(answer.Timestamp),
+		},
+		"solana_chain_config": map[string]interface{}{
+			"network_name": solanaConfig.NetworkName,
+			"network_id":   solanaConfig.NetworkID,
+			"chain_id":     solanaConfig.ChainID,
+		},
+		"feed_config": map[string]interface{}{
+			"feed_name":             feedConfig.FeedName,
+			"feed_path":             feedConfig.FeedPath,
+			"symbol":                feedConfig.Symbol,
+			"heartbeat_sec":         int64(feedConfig.HeartbeatSec),
+			"contract_type":         feedConfig.ContractType,
+			"contract_status":       feedConfig.ContractStatus,
+			"contract_address":      feedConfig.ContractAddress.Bytes(),
+			"transmissions_account": feedConfig.TransmissionsAccount.Bytes(),
+			"state_account":         feedConfig.StateAccount.Bytes(),
+		},
+	}
+	return out, nil
 }
 
 // Helpers

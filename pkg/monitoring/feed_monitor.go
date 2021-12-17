@@ -159,7 +159,7 @@ func (f *feedMonitor) processTransmission(envelope TransmissionEnvelope) error {
 
 func (f *feedMonitor) processConfigSetSimplified(envelope StateEnvelope) error {
 	var mapping map[string]interface{}
-	mapping, err := MakeSimplifiedConfigSetMapping(envelope, f.feedConfig)
+	mapping, err := MakeConfigSetSimplifiedMapping(envelope, f.feedConfig)
 	if err != nil {
 		return fmt.Errorf("failed to map message %v: %w", envelope, err)
 	}
