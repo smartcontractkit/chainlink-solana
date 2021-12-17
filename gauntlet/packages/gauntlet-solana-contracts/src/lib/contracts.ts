@@ -24,6 +24,12 @@ export enum CONTRACT_LIST {
   TOKEN = 'token',
 }
 
+export const CONTRACT_ENV_NAMES = {
+  [CONTRACT_LIST.ACCESS_CONTROLLER]: 'PROGRAM_ID_ACCESS_CONTROLLER',
+  [CONTRACT_LIST.OCR_2]: 'PROGRAM_ID_OCR2',
+  [CONTRACT_LIST.DEVIATION_FLAGGING_VALIDATOR]: 'PROGRAM_ID_DEVIATION_FLAGGING_VALIDATOR',
+}
+
 export const getContract = (name: CONTRACT_LIST, version: string): Contract => ({
   id: name,
   version,
@@ -60,15 +66,9 @@ const getProgramKeypair = (name: CONTRACT_LIST, version: string): Keypair => {
 }
 
 const getProgramId = (name: CONTRACT_LIST): PublicKey => {
-  const envNames = {
-    [CONTRACT_LIST.ACCESS_CONTROLLER]: 'PROGRAM_ID_ACCESS_CONTROLLER',
-    [CONTRACT_LIST.OCR_2]: 'PROGRAM_ID_OCR2',
-    [CONTRACT_LIST.DEVIATION_FLAGGING_VALIDATOR]: 'PROGRAM_ID_DEVIATION_FLAGGING_VALIDATOR',
-  }
-
   try {
-    return new PublicKey(process.env[envNames[name]]!)
+    return new PublicKey(process.env[CONTRACT_ENV_NAMES[name]]!)
   } catch (e) {
-    throw new Error(`No program id set for program ${name}. Set it in as env var with name ${envNames[name]}`)
+    throw new Error(`No program id set for program ${name}. Set it in as env var with name ${CONTRACT_ENV_NAMES[name]}`)
   }
 }
