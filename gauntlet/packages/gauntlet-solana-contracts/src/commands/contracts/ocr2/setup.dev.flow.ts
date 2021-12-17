@@ -1,6 +1,6 @@
 import { FlowCommand } from '@chainlink/gauntlet-core'
 import { TransactionResponse, waitExecute } from '@chainlink/gauntlet-solana'
-import { CONTRACT_LIST } from '../../../lib/contracts'
+import { CONTRACT_ENV_NAMES, CONTRACT_LIST, getDeploymentContract } from '../../../lib/contracts'
 import { makeAbstractCommand } from '../../abstract'
 import Initialize from './initialize'
 import InitializeAC from '../accessController/initialize'
@@ -14,6 +14,7 @@ import WriteOffchainConfig from './offchainConfig/write'
 import CommitOffchainConfig from './offchainConfig/commit'
 import SetConfig from './setConfig'
 import SetBilling from './setBilling'
+import { logger } from '@chainlink/gauntlet-core/dist/utils'
 
 // TODO: Remove. Useful for dev testing
 export default class SetupFlow extends FlowCommand<TransactionResponse> {
@@ -131,6 +132,10 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         id: this.stepIds.TOKEN,
       },
       {
+        name: 'Set Environment',
+        exec: this.setEnvironment,
+      },
+      {
         name: 'Initialize Billing AC',
         command: InitializeAC,
         id: this.stepIds.BILLING_ACCESS_CONTROLLER,
@@ -235,6 +240,25 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         },
       },
     ]
+  }
+
+  setEnvironment = async () => {
+    const programsPublicKeys = await Promise.all(
+      [
+        CONTRACT_LIST.ACCESS_CONTROLLER,
+        CONTRACT_LIST.OCR_2,
+        CONTRACT_LIST.DEVIATION_FLAGGING_VALIDATOR,
+      ].map(async (name) => (await getDeploymentContract(name, '')).programKeypair.publicKey.toString()),
+    )
+    logger.info(`
+      Setting the following env variables. Include them into .env.${this.flags.network} for future runs
+        ${CONTRACT_ENV_NAMES[CONTRACT_LIST.ACCESS_CONTROLLER]}=${programsPublicKeys[0]}
+        ${CONTRACT_ENV_NAMES[CONTRACT_LIST.OCR_2]}=${programsPublicKeys[1]}
+        ${CONTRACT_ENV_NAMES[CONTRACT_LIST.DEVIATION_FLAGGING_VALIDATOR]}=${programsPublicKeys[2]}
+      `)
+    process.env[CONTRACT_ENV_NAMES[CONTRACT_LIST.ACCESS_CONTROLLER]] = programsPublicKeys[0]
+    process.env[CONTRACT_ENV_NAMES[CONTRACT_LIST.OCR_2]] = programsPublicKeys[1]
+    process.env[CONTRACT_ENV_NAMES[CONTRACT_LIST.DEVIATION_FLAGGING_VALIDATOR]] = programsPublicKeys[2]
   }
 }
 

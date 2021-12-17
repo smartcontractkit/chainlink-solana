@@ -1,7 +1,7 @@
 import { ICommand, Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { Contract, CONTRACT_LIST, getContract } from '../../lib/contracts'
+import { Contract, CONTRACT_LIST, DeploymentContract, getDeploymentContract } from '../../lib/contracts'
 
 enum SOLANA_OPERATIONS {
   DEPLOY = 'deploy',
@@ -10,7 +10,7 @@ enum SOLANA_OPERATIONS {
   HELP = 'help',
 }
 interface AbstractOpts {
-  contract: Contract
+  contract: DeploymentContract
   function: string
   action: SOLANA_OPERATIONS.DEPLOY | SOLANA_OPERATIONS.EXECUTE | SOLANA_OPERATIONS.QUERY | SOLANA_OPERATIONS.HELP
 }
@@ -55,7 +55,7 @@ const parseInstruction = async (instruction: string, version: string): Promise<A
   const command = instruction.split(':')
   if (!command.length || command.length > 2) return
 
-  const contract = isValidContract(command[0]) && (await getContract(command[0] as CONTRACT_LIST, version))
+  const contract = isValidContract(command[0]) && (await getDeploymentContract(command[0] as CONTRACT_LIST, version))
   if (!contract) throw new Error(`Abstract: Contract ${command[0]} not found`)
 
   if (command[1] === SOLANA_OPERATIONS.HELP) {
@@ -111,7 +111,7 @@ export default class GeneratorCommand extends SolanaCommand {
 
   abstractDeploy: AbstractExecute = async () => {
     const balanceRequired = await this.provider.connection.getMinimumBalanceForRentExemption(
-      this.opts.contract.bytecode.length,
+      this.opts.contract.bytecode!.length,
     )
     const walletBalance = await this.provider.connection.getAccountInfo(this.wallet.publicKey)
     this.require(
@@ -122,7 +122,7 @@ export default class GeneratorCommand extends SolanaCommand {
     )
     await prompt(`Deployment cost is ${SolanaCommand.lamportsToSol(balanceRequired)} SOL, continue?`)
     logger.loading(`Deploying ${this.opts.contract.id}...`)
-    const tx = await this.deploy(this.opts.contract.bytecode, this.opts.contract.programId)
+    const tx = await this.deploy(this.opts.contract.bytecode!, this.opts.contract.programKeypair!)
     const { success } = await tx.wait('')
     if (!success) {
       logger.error('Error deploying contract')
