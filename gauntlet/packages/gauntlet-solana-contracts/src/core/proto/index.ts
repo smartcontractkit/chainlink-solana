@@ -22,14 +22,30 @@ export class Protobuf {
     this.root = Proto.Root.fromJSON(descriptor)
   }
 
+  falsyToNullProperties = (payload: any): any => {
+    const copy = { ...payload }
+    Object.keys(copy).forEach((key) => {
+      if (typeof copy[key] === 'object') {
+        this.falsyToNullProperties(copy[key])
+      } else {
+        const noFalsyValue = copy[key] || null
+        copy[key] = noFalsyValue
+      }
+    })
+    return copy
+  }
+
   encode = (type: string, payload: any): Uint8Array => {
     const protoType = this.root.lookupType(type)
-    let err = protoType.verify(payload)
+    // Proto encoding should ignore falsy values. In protobuf.js we need to assign them to to be ignored
+    // https://docs.cosmos.network/master/architecture/adr-027-deterministic-protobuf-serialization.html#implementation
+    const noFalsyPayload = this.falsyToNullProperties(payload)
+    let err = protoType.verify(noFalsyPayload)
     if (err) {
-      throw new Error(`Protobuf: Payload does not match descriptor ${type}`)
+      throw new Error(`Protobuf encoding error: ${err}`)
     }
 
-    return protoType.encode(protoType.create(payload)).finish()
+    return protoType.encode(protoType.create(noFalsyPayload)).finish()
   }
 
   // Throws if invalid buffer for this type

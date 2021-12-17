@@ -51,9 +51,9 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         '9n1sSGA5rhfsQyaX3tHz3ZU1ffR6V8KffvWtFPBcFrJw',
       ],
       reportingPluginConfig: {
-        alphaReportInfinite: true,
-        alphaReportPpb: 30,
-        alphaAcceptInfinite: true,
+        alphaReportInfinite: false,
+        alphaReportPpb: 0,
+        alphaAcceptInfinite: false,
         alphaAcceptPpb: 30,
         deltaCNanoseconds: 30,
       },
@@ -62,6 +62,11 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
       maxDurationReportNanoseconds: 30,
       maxDurationShouldAcceptFinalizedReportNanoseconds: 30,
       maxDurationShouldTransmitAcceptedReportNanoseconds: 30,
+      configPublicKeys: [
+        '5cd10bf991c8b0db7bee3ec371c7795a69297b6bccf7b4d738e0920b56131772',
+        'd58a9b179d5ac550376734ce1da5ee4572718fd6d315e0541b1da1d1671d0d71',
+        'ef104fe8812c2c73d4c1b57dc82a15f8dd5a23149bd91917abad295f305ed21a',
+      ],
     }
 
     const payeesInput = {
@@ -104,7 +109,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
           signer: '1b7c57E22a4D4B6c94365A73AD5FF743DBE9c55E',
         },
       ],
-      threshold: 1,
+      f: 1,
     }
 
     this.flow = [
