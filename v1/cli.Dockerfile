@@ -3,7 +3,7 @@ FROM rust:1.54.0 AS build
 # Solana RPC client links against these
 RUN apt-get update && apt-get install -y libhidapi-dev libudev-dev
 
-WORKDIR /usr/src/solana-integration
+WORKDIR /usr/src/chainlink-solana
 # XXX: You need a new for each member in the workspace for this trick to work
 RUN USER=root cargo new cli
 RUN USER=root cargo new program
@@ -19,6 +19,6 @@ RUN cargo build --bin cli --release
 
 FROM debian:buster-slim
 RUN apt-get update && apt-get install -y libssl1.1 ca-certificates
-COPY --from=build /usr/src/solana-integration/target/release/cli .
+COPY --from=build /usr/src/chainlink-solana/target/release/cli .
 USER 1000
 ENTRYPOINT ["./cli"]

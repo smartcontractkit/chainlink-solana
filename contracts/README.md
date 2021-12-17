@@ -36,3 +36,9 @@ Run anchor tests (automatically tests against a local node).
 ```
 anchor test
 ```
+
+### `anchor-go` bindings generation
+Install `https://github.com/gagliardetto/anchor-go`
+```
+./anchor-generate.sh
+```
