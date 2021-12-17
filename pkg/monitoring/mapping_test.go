@@ -229,7 +229,7 @@ func TestMapping(t *testing.T) {
 		}
 		feedConfig := generateFeedConfig()
 
-		mapping, err := MakeSimplifiedConfigSetMapping(envelope, feedConfig)
+		mapping, err := MakeConfigSetSimplifiedMapping(envelope, feedConfig)
 		require.NoError(t, err)
 		var output []byte
 		serialized, err := configSetSimplifiedCodec.BinaryFromNative(output, mapping)
