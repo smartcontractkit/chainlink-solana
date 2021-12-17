@@ -26,3 +26,4 @@ access-controller = { version = "0.1.0", path = "../access-controller", default-
 deviation-flagging-validator = { version = "0.1.0", path = "../deviation-flagging-validator", default-features = false, features = ["cpi"] }
 arrayref = "0.3.6"
 arrayvec = { version = "0.1.0", path = "../../crates/arrayvec" }
+bytemuck = "1.7"

@@ -59,6 +59,10 @@ pub mod ocr2 {
         state.nonce = nonce;
         state.transmissions = ctx.accounts.transmissions.key();
 
+        let store = &mut ctx.accounts.transmissions;
+        store.granularity = 30;
+        store.live_length = 1024;
+
         let config = &mut state.config;
 
         config.owner = ctx.accounts.owner.key();
@@ -723,11 +727,12 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
         .ok_or(ErrorCode::Overflow)?; // this should never occur, but let's check for it anyway
     state.config.latest_transmitter = ctx.accounts.transmitter.key();
 
-    let mut transmissions = ctx.accounts.transmissions.load_mut()?;
-    transmissions.store_round(Transmission {
-        answer: report.median,
-        timestamp: u64::from(report.observations_timestamp),
-    });
+    state::with_store(&mut ctx.accounts.transmissions, |store| {
+        store.insert(Transmission {
+            answer: report.median,
+            timestamp: report.observations_timestamp as u64,
+        });
+    })?;
 
     // calculate and pay reimbursement
     let reimbursement = calculate_reimbursement(report.juels_per_lamport, signature_count)?;
@@ -746,10 +751,12 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
 
         let round_id = state.config.latest_aggregator_round_id;
         let previous_round_id = round_id - 1;
-        let previous_answer = transmissions
-            .fetch_round(previous_round_id)
-            .map(|transmission| transmission.answer)
-            .unwrap_or(0);
+        let previous_answer = state::with_store(&mut ctx.accounts.transmissions, |store| {
+            store.fetch(previous_round_id)
+        })?
+        .map(|transmission| transmission.answer)
+        .unwrap_or(0);
+
         let flagging_threshold = state.config.flagging_threshold;
 
         let cpi_ctx = CpiContext::new(

@@ -755,6 +755,7 @@ dependencies = [
  "anchor-spl",
  "arrayref",
  "arrayvec 0.1.0",
+ "bytemuck",
  "deviation-flagging-validator",
  "static_assertions",
 ]
