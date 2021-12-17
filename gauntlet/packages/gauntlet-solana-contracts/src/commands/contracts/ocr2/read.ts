@@ -28,7 +28,7 @@ export default class ReadState extends SolanaCommand {
 
   execute = async () => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
-    const program = this.loadProgram(ocr2.idl, ocr2.programId.publicKey.toString())
+    const program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
 
     const state = new PublicKey(this.flags.state)
     // read could be abstract. account.accessController is just the name of the account that can be got form the camelcase(schema.accounts[x].name)

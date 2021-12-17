@@ -20,7 +20,7 @@ export default class AddAccess extends SolanaCommand {
 
   execute = async () => {
     const accessController = getContract(CONTRACT_LIST.ACCESS_CONTROLLER, '')
-    const address = accessController.programId.publicKey.toString()
+    const address = accessController.programId.toString()
     const program = this.loadProgram(accessController.idl, address)
 
     const state = new PublicKey(this.flags.state)

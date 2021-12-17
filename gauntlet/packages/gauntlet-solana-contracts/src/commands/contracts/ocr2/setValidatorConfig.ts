@@ -37,7 +37,7 @@ export default class SetValidatorConfig extends SolanaCommand {
 
   execute = async () => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
-    const address = ocr2.programId.publicKey.toString()
+    const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
 
     const state = new PublicKey(this.flags.state)

@@ -22,7 +22,7 @@ export default class Transmit extends SolanaCommand {
 
   execute = async () => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
-    const address = ocr2.programId.publicKey.toString()
+    const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
 
     const validatorProgram = getContract(CONTRACT_LIST.DEVIATION_FLAGGING_VALIDATOR, '')
@@ -79,7 +79,7 @@ export default class Transmit extends SolanaCommand {
           { pubkey: state, isWritable: true, isSigner: false },
           { pubkey: transmitter.publicKey, isWritable: false, isSigner: true },
           { pubkey: transmissions, isWritable: true, isSigner: false },
-          { pubkey: validatorProgram.programId.publicKey, isWritable: false, isSigner: false },
+          { pubkey: validatorProgram.programId, isWritable: false, isSigner: false },
           { pubkey: validator, isWritable: true, isSigner: false },
           { pubkey: validatorAuthority, isWritable: false, isSigner: false },
           { pubkey: accessController, isWritable: false, isSigner: false },
