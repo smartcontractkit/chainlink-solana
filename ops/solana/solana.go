@@ -413,8 +413,8 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	}
 
 	input = map[string]interface{}{
-		"observationPayment":  1,
-		"transmissionPayment": 1,
+		"observationPaymentGjuels":  1,
+		"transmissionPaymentGjuels": 1,
 	}
 
 	jsonInput, err = json.Marshal(input)
