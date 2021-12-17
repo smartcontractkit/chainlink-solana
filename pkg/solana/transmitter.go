@@ -3,6 +3,7 @@ package solana
 import (
 	"bytes"
 	"context"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -79,7 +80,17 @@ func (c *ContractTracker) Transmit(
 	copy(finalSig[:], finalSigBytes)
 	tx.Signatures = append(tx.Signatures, finalSig)
 
+	// set up timeout to exit before context so libocr won't error with context cancelled
+	deadline, ok := ctx.Deadline()
+	if !ok { // this should never happen normally
+		return errors.New("context does not have a deadline")
+	}
+	d := time.Now().Sub(deadline)
+	exit := time.NewTimer(d - 50*time.Millisecond) // shorten to exit before context cancelled
+	defer exit.Stop()
+
 	// Send transaction, and wait for confirmation:
+	errChan := make(chan error)
 	go func() {
 		txSig, err := confirm.SendAndConfirmTransactionWithOpts(
 			context.Background(), // does not use libocr transmit context
@@ -89,12 +100,26 @@ func (c *ContractTracker) Transmit(
 			true, // skip preflight
 			rpc.CommitmentConfirmed,
 		)
+
+		// if there is an error and context not yet cancelled, return error
+		if err != nil && ctx.Err() == nil {
+			errChan <- err
+			return
+		}
+
 		if err != nil {
 			c.lggr.Errorf("error on Transmit.SendAndConfirmTransaction: %s", err.Error())
 		}
 		c.lggr.Debugf("tx signature from Transmit.SendAndConfirmTransaction: %s", txSig.String())
 	}()
 
+	select {
+	case err := <-errChan:
+		return errors.Wrap(err, "error on Transmit.SendAndConfirmTransaction before ctx cancel")
+	case <-ctx.Done():
+		return errors.New("context cancelled on transmit")
+	case <-exit.C:
+	}
 	return nil
 }
 
