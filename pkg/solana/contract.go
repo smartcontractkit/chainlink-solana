@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 
@@ -74,9 +75,8 @@ func (c *ContractTracker) fetchState(ctx context.Context) error {
 		return err
 	}
 
-	c.lggr.Debugf("state fetched for account: %s, shared: %t, result: %v", c.StateID, shared, v)
-
 	c.state = v.(State)
+	c.lggr.Debugf("state fetched for account: %s, shared: %t, result (config digest): %v", c.StateID, shared, hex.EncodeToString(c.state.Config.LatestConfigDigest[:]))
 
 	// Fetch the store address associated to the feed
 	offset := uint64(8 + 1) // Discriminator (8 bytes) + Version (u8)
