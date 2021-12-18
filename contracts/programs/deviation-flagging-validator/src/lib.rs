@@ -4,6 +4,13 @@ use arrayvec::arrayvec;
 
 use access_controller::AccessController;
 
+#[cfg(feature = "mainnet")]
+declare_id!("My11111111111111111111111111111111111111113");
+#[cfg(feature = "testnet")]
+declare_id!("My11111111111111111111111111111111111111113");
+#[cfg(feature = "devnet")]
+declare_id!("My11111111111111111111111111111111111111113");
+#[cfg(not(any(feature = "mainnet", feature = "testnet", feature = "devnet")))]
 declare_id!("My11111111111111111111111111111111111111113");
 
 static THRESHOLD_MULTIPLIER: u128 = 100000;

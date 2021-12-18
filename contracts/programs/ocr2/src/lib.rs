@@ -4,6 +4,13 @@ use anchor_spl::token;
 
 use arrayref::{array_ref, array_refs};
 
+#[cfg(feature = "mainnet")]
+declare_id!("My11111111111111111111111111111111111111111");
+#[cfg(feature = "testnet")]
+declare_id!("My11111111111111111111111111111111111111111");
+#[cfg(feature = "devnet")]
+declare_id!("My11111111111111111111111111111111111111111");
+#[cfg(not(any(feature = "mainnet", feature = "testnet", feature = "devnet")))]
 declare_id!("My11111111111111111111111111111111111111111");
 
 mod context;
