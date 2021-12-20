@@ -12,7 +12,11 @@ name = "ocr2"
 no-entrypoint = []
 no-idl = []
 cpi = ["no-entrypoint"]
-default = []
+mainnet = ["access-controller/mainnet", "deviation-flagging-validator/mainnet"]
+testnet = ["access-controller/testnet", "deviation-flagging-validator/testnet"]
+devnet = ["access-controller/devnet", "deviation-flagging-validator/devnet"]
+localnet = ["access-controller/localnet", "deviation-flagging-validator/localnet"]
+default = ["localnet"]
 
 [dependencies]
 anchor-lang = "0.19.0"
