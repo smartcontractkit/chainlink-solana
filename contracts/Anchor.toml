@@ -1,7 +1,4 @@
-[programs.localnet]
-ocr2 = "My11111111111111111111111111111111111111111"
-access_controller = "My11111111111111111111111111111111111111112"
-deviation_flagging_validator = "My11111111111111111111111111111111111111113"
+anchor_version = "0.19.0"
 
 [registry]
 url = "https://anchor.projectserum.com"
@@ -13,3 +10,20 @@ wallet = "id.json"
 
 [scripts]
 test = "yarn run test"
+
+[programs.mainnet]
+# TODO: add mainnet pubkeys
+
+[programs.testnet]
+# TODO: add testnet pubkeys
+
+[programs.devnet]
+# TODO: add devnet pubkeys
+ocr2 = "My11111111111111111111111111111111111111111"
+access_controller = "My11111111111111111111111111111111111111112"
+deviation_flagging_validator = "My11111111111111111111111111111111111111113"
+
+[programs.localnet]
+ocr2 = "CF13pnKGJ1WJZeEgVAtFdUi4MMndXm9hneiHs8azUaZt"
+access_controller = "2F5NEkMnCRkmahEAcQfTQcZv1xtGgrWFfjENtTwHLuKg"
+deviation_flagging_validator = "A7Jh2nb1hZHwqEofm4N8SXbKTj82rx7KUfjParQXUyMQ"

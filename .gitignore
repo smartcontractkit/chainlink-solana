@@ -6,11 +6,15 @@
 pkg/bin
 
 v1/target
+
 contracts/target
 contracts/programs/*/target
 contracts/.anchor
 # keypair used by anchor/anchor test
 contracts/id.json
+# ignore all except shared localnet keys
+contracts/artifacts/*
+!contracts/artifacts/localnet/
 
 # TS
 node_modules

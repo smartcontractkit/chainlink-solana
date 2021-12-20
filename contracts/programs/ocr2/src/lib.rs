@@ -11,7 +11,7 @@ declare_id!("My11111111111111111111111111111111111111111");
 #[cfg(feature = "devnet")]
 declare_id!("My11111111111111111111111111111111111111111");
 #[cfg(not(any(feature = "mainnet", feature = "testnet", feature = "devnet")))]
-declare_id!("My11111111111111111111111111111111111111111");
+declare_id!("CF13pnKGJ1WJZeEgVAtFdUi4MMndXm9hneiHs8azUaZt");
 
 mod context;
 pub mod event;

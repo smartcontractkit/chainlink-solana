@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 for idl_path_str in "target/idl"/*
 do
   IFS='/' read -r -a idl_path <<< "${idl_path_str}"
