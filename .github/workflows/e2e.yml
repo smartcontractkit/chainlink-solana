@@ -17,9 +17,6 @@ jobs:
       - run: |
           npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
           NPM_TOKEN=${NPM_TOKEN} yarn install --frozen-lockfile
-      - name: set key ids
-        run: bash set_declare_ids.sh
-        working-directory: contracts
       - run: anchor build
         working-directory: contracts
       - uses: actions/upload-artifact@master
@@ -75,7 +72,7 @@ jobs:
           name: target
           path: contracts/target/deploy
       - name: cp static deploy keys
-        run: cp tests/e2e/keys/*.json contracts/target/deploy
+        run: ./scripts/programs-keys-cp.sh
       - name: Run Tests
         env:
           SELECTED_NETWORKS: solana
@@ -87,7 +84,7 @@ jobs:
         uses: mikepenz/action-junit-report@v2
         if: always()
         with:
-          report_paths: './tests-smoke-report.xml'
+          report_paths: "./tests-smoke-report.xml"
           github_token: ${{ secrets.GITHUB_TOKEN }}
           check_name: Smoke Test Results
       - name: Publish Artifacts
