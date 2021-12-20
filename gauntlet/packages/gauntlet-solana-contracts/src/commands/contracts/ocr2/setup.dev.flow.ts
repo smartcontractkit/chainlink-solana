@@ -89,6 +89,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
           payee: 'G5LdWMvWoQQ787iPgWbCSTrkPB5Li9e2CWi6jYuAUHUH',
         },
       ],
+      allowFundRecipient: false,
     }
 
     const configInput = {
