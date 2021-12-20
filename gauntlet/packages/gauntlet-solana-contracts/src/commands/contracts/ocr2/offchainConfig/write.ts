@@ -1,15 +1,16 @@
-import { Result, utils } from '@chainlink/gauntlet-core'
+import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import { MAX_TRANSACTION_BYTES } from '../../../../lib/constants'
+import { MAX_TRANSACTION_BYTES, ORACLES_MAX_LENGTH } from '../../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import { Protobuf } from '../../../../core/proto'
 import { descriptor as OCR2Descriptor } from '../../../../core/proto/ocr2Proto'
 import { getRDD } from '../../../../lib/rdd'
 import { makeSharedSecretEncryptions, SharedSecretEncryptions } from '../../../../core/sharedSecretEncryptions'
-import { durationToNanoseconds } from '../../../../core/time'
+import { durationToNanoseconds, Millisecond } from '../../../../core/time'
 import { divideIntoChunks } from '../../../../core/utils'
+import BN from 'bn.js'
 
 export type Input = {
   deltaProgressNanoseconds: number
@@ -124,6 +125,59 @@ export default class WriteOffchainConfig extends SolanaCommand {
     return makeSharedSecretEncryptions(gauntletSecret!, operatorsPublicKeys)
   }
 
+  validateInput = (input: Input): boolean => {
+    const _isNegative = (v: number): boolean => new BN(v).lt(new BN(0))
+    const nonNegativeValues = [
+      'deltaProgressNanoseconds',
+      'deltaResendNanoseconds',
+      'deltaRoundNanoseconds',
+      'deltaGraceNanoseconds',
+      'deltaStageNanoseconds',
+      'maxDurationQueryNanoseconds',
+      'maxDurationObservationNanoseconds',
+      'maxDurationReportNanoseconds',
+      'maxDurationShouldAcceptFinalizedReportNanoseconds',
+      'maxDurationShouldTransmitAcceptedReportNanoseconds',
+    ]
+    for (let prop in nonNegativeValues) {
+      if (_isNegative(input[prop])) throw new Error(`${prop} must be non-negative`)
+    }
+    const safeIntervalNanoseconds = new BN(200).mul(Millisecond).toNumber()
+    if (input.deltaProgressNanoseconds < safeIntervalNanoseconds)
+      throw new Error(
+        `deltaProgressNanoseconds (${input.deltaProgressNanoseconds} ns)  is set below the resource exhaustion safe interval (${safeIntervalNanoseconds} ns)`,
+      )
+    if (input.deltaResendNanoseconds < safeIntervalNanoseconds)
+      throw new Error(
+        `deltaResendNanoseconds (${input.deltaResendNanoseconds} ns) is set below the resource exhaustion safe interval (${safeIntervalNanoseconds} ns)`,
+      )
+
+    if (input.deltaRoundNanoseconds < input.deltaProgressNanoseconds)
+      throw new Error(
+        `deltaRoundNanoseconds (${input.deltaRoundNanoseconds}) must be less than deltaProgressNanoseconds (${input.deltaProgressNanoseconds})`,
+      )
+    const sumMaxDurationsReportGeneration = new BN(input.maxDurationQueryNanoseconds)
+      .add(new BN(input.maxDurationObservationNanoseconds))
+      .add(new BN(input.maxDurationReportNanoseconds))
+
+    if (sumMaxDurationsReportGeneration.gte(new BN(input.deltaProgressNanoseconds)))
+      throw new Error(
+        `sum of MaxDurationQuery/Observation/Report (${sumMaxDurationsReportGeneration}) must be less than deltaProgressNanoseconds (${input.deltaProgressNanoseconds})`,
+      )
+
+    if (input.rMax <= 0 || input.rMax >= 255)
+      throw new Error(`rMax (${input.rMax}) must be greater than zero and less than 255`)
+
+    if (input.s.length >= 1000) throw new Error(`Length of S (${input.s.length}) must be less than 1000`)
+    for (let i = 0; i < input.s.length; i++) {
+      const s = input.s[i]
+      if (s < 0 || s > ORACLES_MAX_LENGTH)
+        throw new Error(`S[${i}] (${s}) must be between 0 and Max Oracles (${ORACLES_MAX_LENGTH})`)
+    }
+
+    return true
+  }
+
   execute = async () => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const address = ocr2.programId.publicKey.toString()
@@ -132,9 +186,10 @@ export default class WriteOffchainConfig extends SolanaCommand {
     const state = new PublicKey(this.flags.state)
     const owner = this.wallet.payer
 
+    // Throws on invalid input
     const input = this.makeInput(this.flags.input)
-    // TODO: Add validation https://github.com/smartcontractkit/offchain-reporting/blob/master/lib/offchainreporting2/internal/config/public_config.go#L248
-    // MORE: https://github.com/smartcontractkit/offchain-reporting/blob/master/lib/offchainreporting2/internal/config/public_config.go#L152
+    this.validateInput(input)
+
     // Check correct format OCR Keys
     const offchainConfig = await this.serializeOffchainConfig(input)
 

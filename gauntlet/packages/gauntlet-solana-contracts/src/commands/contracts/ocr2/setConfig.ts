@@ -58,7 +58,6 @@ export default class SetConfig extends SolanaCommand {
 
     console.log(`Setting config on ${state.toString()}...`)
 
-    // TODO: Check valid keys
     const oracles = input.oracles.map(({ signer, transmitter }) => ({
       signer: Buffer.from(signer, 'hex'),
       transmitter: new PublicKey(transmitter),

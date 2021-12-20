@@ -87,7 +87,7 @@ export default class SetPayees extends SolanaCommand {
       }),
       {},
     )
-    // TODO: Check keys format
+
     // Set the payees in the same order the oracles are saved in the contract. The length of the payees need to be same as the oracles saved
     const payees = info.oracles.xs
       .slice(0, info.oracles.len)
