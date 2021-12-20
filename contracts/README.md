@@ -34,7 +34,7 @@ Make sure to run `yarn install` to fetch mocha and other test dependencies.
 Start a dockerized shell that contains Solana and Anchor:
 
 ```bash
-tools/shell
+./scripts/anchor-shell.sh
 ```
 
 Next, generate a keypair for anchor:
@@ -54,5 +54,5 @@ anchor test
 Install `https://github.com/gagliardetto/anchor-go`
 
 ```bash
-./anchor-generate.sh
+./scripts/anchor-go-gen.sh
 ```

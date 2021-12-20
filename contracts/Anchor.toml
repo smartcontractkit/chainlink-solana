@@ -11,17 +11,14 @@ wallet = "id.json"
 [scripts]
 test = "yarn run test"
 
-[programs.mainnet]
-# TODO: add mainnet pubkeys
+# [programs.mainnet]
+# TODO: add pubkeys
 
-[programs.testnet]
-# TODO: add testnet pubkeys
+# [programs.testnet]
+# TODO: add pubkeys
 
-[programs.devnet]
-# TODO: add devnet pubkeys
-ocr2 = "My11111111111111111111111111111111111111111"
-access_controller = "My11111111111111111111111111111111111111112"
-deviation_flagging_validator = "My11111111111111111111111111111111111111113"
+# [programs.devnet]
+# TODO: add pubkeys
 
 [programs.localnet]
 ocr2 = "CF13pnKGJ1WJZeEgVAtFdUi4MMndXm9hneiHs8azUaZt"

@@ -7,18 +7,12 @@
   - [Local Solana Testnet](#local-solana-testnet)
   - [Pulumi Installation Instruction](#pulumi-installation-instruction)
 
-Using `pulumi` spin up a local testing environment using docker containers.
+Using `pulumi` spin up a local testing environment using docker containers:
 
-- Deploy the necessary relay components (relay, CL node, psql DB, price feed adapters)
+- Deploy the necessary relay components (CL node, psql DB, price feed adapters)
 - Connect the components together
-
-```
-Blockchain <-> Relay <-> CL node <-> price adapters
-                |<-> DB <->|
-```
-
 - Deploy and configure the necessary contracts (LINK token, aggregator contract)
-- Create the expected job specs for reporting to the aggregator contrac
+- Create the expected job specs for reporting to the aggregator contract
 
 ## Usage
 
@@ -70,7 +64,7 @@ Compile program artifacts (do each time contract changes)
 
 ```bash
 # from root
-./tools/shell
+./scripts/anchor-shell.sh
 cd contracts
 anchor build
 
