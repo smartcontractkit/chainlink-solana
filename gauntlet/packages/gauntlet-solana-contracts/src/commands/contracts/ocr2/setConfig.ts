@@ -3,6 +3,7 @@ import { logger } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import BN from 'bn.js'
+import { ORACLES_MAX_LENGTH } from '../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
 
@@ -57,16 +58,19 @@ export default class SetConfig extends SolanaCommand {
 
     console.log(`Setting config on ${state.toString()}...`)
 
-    // TODO: Check valid keys
     const oracles = input.oracles.map(({ signer, transmitter }) => ({
       signer: Buffer.from(signer, 'hex'),
       transmitter: new PublicKey(transmitter),
     }))
     const f = new BN(input.f)
 
-    // Must be = oracles.length > 3 * threshold
-    // TODO: Check here too
-    // MAX oracles = 19
+    const minOracleLength = f.mul(new BN(3)).toNumber()
+    this.require(oracles.length > minOracleLength, `Number of oracles should be higher than ${minOracleLength}`)
+    this.require(
+      oracles.length <= ORACLES_MAX_LENGTH,
+      `Oracles max length is ${ORACLES_MAX_LENGTH}, currently ${oracles.length}`,
+    )
+
     const tx = await program.rpc.setConfig(oracles, f, {
       accounts: {
         state: state,
