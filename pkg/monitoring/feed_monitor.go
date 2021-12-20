@@ -131,7 +131,7 @@ func (f *feedMonitor) processState(envelope StateEnvelope) error {
 	}
 	value, err := f.stateSchema.Encode(mapping)
 	if err != nil {
-		return fmt.Errorf("failed to enconde message %v: %w", envelope, err)
+		return fmt.Errorf("failed to encode message %v: %w", envelope, err)
 	}
 	var key = f.feedConfig.StateAccount.Bytes()
 	if err = f.producer.Produce(key, value, f.configSetTopic); err != nil {
@@ -148,7 +148,7 @@ func (f *feedMonitor) processTransmission(envelope TransmissionEnvelope) error {
 	}
 	value, err := f.transmissionSchema.Encode(mapping)
 	if err != nil {
-		return fmt.Errorf("failed to enconde message %v: %w", envelope, err)
+		return fmt.Errorf("failed to encode message %v: %w", envelope, err)
 	}
 	var key = f.feedConfig.StateAccount.Bytes()
 	if err = f.producer.Produce(key, value, f.transmissionTopic); err != nil {
@@ -165,7 +165,7 @@ func (f *feedMonitor) processConfigSetSimplified(envelope StateEnvelope) error {
 	}
 	value, err := f.configSetSimplifiedSchema.Encode(mapping)
 	if err != nil {
-		return fmt.Errorf("failed to enconde message %v: %w", envelope, err)
+		return fmt.Errorf("failed to encode message %v: %w", envelope, err)
 	}
 	var key = f.feedConfig.StateAccount.Bytes()
 	if err = f.producer.Produce(key, value, f.configSetSimplifiedTopic); err != nil {
