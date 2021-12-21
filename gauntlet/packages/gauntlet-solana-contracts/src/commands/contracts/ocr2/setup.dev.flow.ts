@@ -35,8 +35,8 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
     }
 
     const offchainConfigInput = {
-      deltaProgressNanoseconds: 30,
-      deltaResendNanoseconds: 30,
+      deltaProgressNanoseconds: 300000000,
+      deltaResendNanoseconds: 300000000,
       deltaRoundNanoseconds: 30,
       deltaGraceNanoseconds: 30,
       deltaStageNanoseconds: 30,
@@ -90,7 +90,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
           payee: 'G5LdWMvWoQQ787iPgWbCSTrkPB5Li9e2CWi6jYuAUHUH',
         },
       ],
-      allowFundRecipient: false,
+      allowFundRecipient: true,
     }
 
     const configInput = {
