@@ -39,6 +39,8 @@ export default class DeployToken extends SolanaCommand {
 
     await token.mintTo(tokenVault, this.wallet.payer, [], mintAmount)
 
+    // To disable minting https://github.com/solana-labs/solana-program-library/blob/36e886392b8c6619b275f6681aed6d8aae6e70f9/token/js/client/token.js#L985
+
     logger.info(`
       TOKEN:
         - Address: ${token.publicKey}
