@@ -1,36 +1,12 @@
-import { Result } from '@chainlink/gauntlet-core'
 import { commands } from '@chainlink/gauntlet-solana-contracts'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { executeCLI } from '@chainlink/gauntlet-core'
 import { existsSync } from 'fs'
 import path from 'path'
 import { io } from '@chainlink/gauntlet-core/dist/utils'
+import { wrapCommand } from './commands/multisig'
 
 export const multisigCommands = {
-  custom: commands.custom.map((command) => {
-    return class Multisig extends SolanaCommand {
-      command: SolanaCommand
-
-      static id = `${command.id}`
-
-      constructor(flags, args, command) {
-        super(flags, args)
-
-        const instance = new command(flags, args)
-        this.command = instance.invokeMiddlewares(this.command, this.command.middlewares)
-      }
-
-      createProposal = () => {}
-      approveProposal = () => {}
-      executeProposal = () => {}
-
-      execute = async () => {
-        const rawTx = await this.command.makeRawTransaction()
-        console.log(rawTx)
-        return {} as Result<TransactionResponse>
-      }
-    }
-  }),
+  custom: commands.custom.map(wrapCommand),
   loadDefaultFlags: () => ({}),
   abstract: {
     findPolymorphic: () => undefined,
