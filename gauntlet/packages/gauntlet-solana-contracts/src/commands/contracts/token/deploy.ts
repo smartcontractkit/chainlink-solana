@@ -1,8 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, prompt, BN } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
-import BN from 'bn.js'
 import { CONTRACT_LIST } from '../../../lib/contracts'
 
 export default class DeployToken extends SolanaCommand {

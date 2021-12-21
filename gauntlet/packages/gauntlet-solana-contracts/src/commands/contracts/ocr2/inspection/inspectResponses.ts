@@ -2,7 +2,7 @@ import { Result } from '@chainlink/gauntlet-core'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
-import { inspect, Inspection } from '../../../../core/inspection'
+import { inspection } from '@chainlink/gauntlet-core/dist/utils'
 
 type Input = {}
 
@@ -30,9 +30,9 @@ export default class OCR2InspectResponses extends SolanaCommand {
     const input = this.makeInput(this.flags.input)
     const data = await program.account.state.fetch(state)
 
-    const inspections: Inspection[] = []
+    const inspections: inspection.Inspection[] = []
 
-    const successfulInspection = inspect(inspections)
+    const successfulInspection = inspection.inspect(inspections)
 
     return {
       responses: [

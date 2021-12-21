@@ -35,8 +35,8 @@ export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse>
         name: 'Initialize OCR 2',
         command: Initialize,
         flags: {
-          billingAccessController: ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
-          requesterAccessController: ID.contract(this.stepIds.REQUEST_ACCESS_CONTROLLER),
+          billingAccessController: FlowCommand.ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
+          requesterAccessController: FlowCommand.ID.contract(this.stepIds.REQUEST_ACCESS_CONTROLLER),
           link: this.flags.link || process.env.LINK_ADDRESS,
           decimals: Number(this.flags.decimals),
         },
@@ -44,9 +44,4 @@ export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse>
       },
     ]
   }
-}
-
-const ID = {
-  contract: (id: number, index = 0): string => `ID.${id}.txs.${index}.contract`,
-  tx: (id: number, index = 0): string => `ID.${id}.txs.${index}.tx`,
 }

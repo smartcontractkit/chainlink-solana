@@ -1,5 +1,7 @@
 import { FlowCommand } from '@chainlink/gauntlet-core'
 import { TransactionResponse, waitExecute } from '@chainlink/gauntlet-solana'
+import { logger } from '@chainlink/gauntlet-core/dist/utils'
+
 import { CONTRACT_ENV_NAMES, CONTRACT_LIST, getDeploymentContract } from '../../../lib/contracts'
 import { makeAbstractCommand } from '../../abstract'
 import Initialize from './initialize'
@@ -14,7 +16,6 @@ import WriteOffchainConfig from './offchainConfig/write'
 import CommitOffchainConfig from './offchainConfig/commit'
 import SetConfig from './setConfig'
 import SetBilling from './setBilling'
-import { logger } from '@chainlink/gauntlet-core/dist/utils'
 
 // TODO: Remove. Useful for dev testing
 export default class SetupFlow extends FlowCommand<TransactionResponse> {
@@ -151,16 +152,16 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         command: InitializeValidator,
         id: this.stepIds.VALIDATOR,
         flags: {
-          accessController: ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
+          accessController: FlowCommand.ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
         },
       },
       {
         name: 'Initialize OCR 2',
         command: Initialize,
         flags: {
-          billingAccessController: ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
-          requesterAccessController: ID.contract(this.stepIds.REQUEST_ACCESS_CONTROLLER),
-          link: ID.contract(this.stepIds.TOKEN),
+          billingAccessController: FlowCommand.ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
+          requesterAccessController: FlowCommand.ID.contract(this.stepIds.REQUEST_ACCESS_CONTROLLER),
+          link: FlowCommand.ID.contract(this.stepIds.TOKEN),
           input: {
             minAnswer: 0,
             maxAnswer: 1000000000,
@@ -174,7 +175,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         name: 'Begin Offchain Config',
         command: BeginOffchainConfig,
         flags: {
-          state: ID.contract(this.stepIds.OCR_2),
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
           version: this.flags.version || 1,
         },
       },
@@ -182,7 +183,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         name: 'Write Offchain Config',
         command: WriteOffchainConfig,
         flags: {
-          state: ID.contract(this.stepIds.OCR_2),
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
           input: offchainConfigInput,
         },
       },
@@ -190,14 +191,14 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         name: 'Commit Offchain Config',
         command: CommitOffchainConfig,
         flags: {
-          state: ID.contract(this.stepIds.OCR_2),
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
         },
       },
       {
         name: 'Set Config',
         command: SetConfig,
         flags: {
-          state: ID.contract(this.stepIds.OCR_2),
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
           input: configInput,
         },
       },
@@ -205,16 +206,16 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         name: 'Set Payees',
         command: SetPayees,
         flags: {
-          state: ID.contract(this.stepIds.OCR_2),
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
           input: payeesInput,
-          link: ID.contract(this.stepIds.TOKEN),
+          link: FlowCommand.ID.contract(this.stepIds.TOKEN),
         },
       },
       {
         name: 'Set Billing',
         command: SetBilling,
         flags: {
-          state: ID.contract(this.stepIds.OCR_2),
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
           input: {
             observationPaymentGjuels: '1',
             transmissionPaymentGjuels: '1',
@@ -225,9 +226,9 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         name: 'Set Validator Config',
         command: SetValidatorConfig,
         flags: {
-          state: ID.contract(this.stepIds.OCR_2),
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
           input: {
-            validator: this.getReportStepDataById(ID.contract(this.stepIds.VALIDATOR)),
+            validator: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.VALIDATOR)),
             threshold: 1,
           },
         },
@@ -236,8 +237,8 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         name: 'Add access to validator on AC',
         command: AddAccess,
         flags: {
-          state: ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
-          address: ID.data(this.stepIds.OCR_2, 'validatorAuthority'),
+          state: FlowCommand.ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
+          address: FlowCommand.ID.data(this.stepIds.OCR_2, 'validatorAuthority'),
         },
       },
     ]
@@ -261,10 +262,4 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
     process.env[CONTRACT_ENV_NAMES[CONTRACT_LIST.OCR_2]] = programsPublicKeys[1]
     process.env[CONTRACT_ENV_NAMES[CONTRACT_LIST.DEVIATION_FLAGGING_VALIDATOR]] = programsPublicKeys[2]
   }
-}
-
-const ID = {
-  contract: (id: number, index = 0): string => `ID.${id}.txs.${index}.contract`,
-  tx: (id: number, index = 0): string => `ID.${id}.txs.${index}.tx`,
-  data: (id: number, key = ''): string => `ID.${id}.data.${key}`,
 }

@@ -1,7 +1,6 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import { access } from 'fs'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 
 export default class ReadState extends SolanaCommand {
