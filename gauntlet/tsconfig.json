@@ -8,6 +8,9 @@
     },
     {
       "path": "./packages/gauntlet-solana-contracts"
+    },
+    {
+      "path": "./packages/gauntlet-serum-multisig"
     }
   ]
 }

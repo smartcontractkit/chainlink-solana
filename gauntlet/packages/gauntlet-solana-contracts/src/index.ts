@@ -6,7 +6,7 @@ import Solana from './commands'
 import { makeAbstractCommand } from './commands/abstract'
 import { defaultFlags } from './lib/args'
 
-const commands = {
+export const commands = {
   custom: [...Solana],
   loadDefaultFlags: () => defaultFlags,
   abstract: {

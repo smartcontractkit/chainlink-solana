@@ -1,13 +1,10 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { parseIdlErrors, ProgramError } from '@project-serum/anchor'
 import { AccountMeta, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js'
 import BN from 'bn.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
-import { SolanaRawTransaction } from '../multisig/abstractTransaction'
-import AbstractTransaction from '../multisig/abstractTransaction'
 
 type Input = {
   observationPaymentGjuels: number | string
@@ -39,7 +36,7 @@ export default class SetBilling extends SolanaCommand {
     this.requireFlag('state', 'Provide a valid state address')
   }
 
-  makeRawTransaction = async (): Promise<SolanaRawTransaction> => {
+  makeRawTransaction = async () => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
@@ -79,40 +76,27 @@ export default class SetBilling extends SolanaCommand {
       },
     ]
 
-    return {
-      data,
-      accounts,
-      programId: ocr2.programId.publicKey,
-    }
+    return [
+      {
+        data,
+        accounts,
+        programId: ocr2.programId.publicKey,
+      },
+    ]
   }
 
   execute = async () => {
     const rawTx = await this.makeRawTransaction()
-    if (this.flags.multisig != undefined) {
-      if (this.flags.file != undefined) {
-        console.info('Write below tx data to JSON file, to be parsed by multisig:tx command')
-        console.info(JSON.stringify(rawTx))
-        return {
-          responses: [
-            {
-              tx: this.wrapResponse('multisig', this.flags.state),
-              contract: this.flags.state,
-            },
-          ],
-        } as Result<TransactionResponse>
-      }
-      const cmd = new AbstractTransaction({ ...this.flags, rawTx }, [])
-      await cmd.invokeMiddlewares(cmd, this.middlewares)
-      return cmd.execute()
-    }
-
-    const tx = new Transaction()
-    tx.add(
-      new TransactionInstruction({
-        programId: rawTx.programId,
-        keys: rawTx.accounts,
-        data: rawTx.data,
-      }),
+    const tx = rawTx.reduce(
+      (tx, meta) =>
+        tx.add(
+          new TransactionInstruction({
+            programId: meta.programId,
+            keys: meta.accounts,
+            data: meta.data,
+          }),
+        ),
+      new Transaction(),
     )
 
     logger.loading('Sending tx...')
