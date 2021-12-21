@@ -32,7 +32,7 @@ export default class MultisigCreate extends SolanaCommand {
   execute = async () => {
     this.require(this.args.length > 0, 'Please provide at least one owner as an argument')
     const contract = getContract(CONTRACT_LIST.MULTISIG, '')
-    const address = contract.programId.publicKey.toString()
+    const address = contract.programId.toString()
     const program = this.loadProgram(contract.idl, address)
 
     const input = this.makeInput(this.flags.input)

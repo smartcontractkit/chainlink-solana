@@ -80,7 +80,7 @@ export default class SetBilling extends SolanaCommand {
       {
         data,
         accounts,
-        programId: ocr2.programId.publicKey,
+        programId: ocr2.programId,
       },
     ]
   }
