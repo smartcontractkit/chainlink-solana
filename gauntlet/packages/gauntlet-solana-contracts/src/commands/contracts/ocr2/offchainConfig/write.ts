@@ -152,7 +152,7 @@ export default class WriteOffchainConfig extends SolanaCommand {
         `deltaResendNanoseconds (${input.deltaResendNanoseconds} ns) is set below the resource exhaustion safe interval (${safeIntervalNanoseconds} ns)`,
       )
 
-    if (input.deltaRoundNanoseconds < input.deltaProgressNanoseconds)
+    if (input.deltaRoundNanoseconds >= input.deltaProgressNanoseconds)
       throw new Error(
         `deltaRoundNanoseconds (${input.deltaRoundNanoseconds}) must be less than deltaProgressNanoseconds (${input.deltaProgressNanoseconds})`,
       )
