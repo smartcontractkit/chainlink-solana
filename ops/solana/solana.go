@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
+	opsChainlink "github.com/smartcontractkit/chainlink-relay/ops/chainlink"
 	relayUtils "github.com/smartcontractkit/chainlink-relay/ops/utils"
 )
 
@@ -268,7 +269,7 @@ func (d Deployer) TransferLINK() error {
 }
 
 // TODO: InitOCR should cover almost the whole workflow of the OCR setup, including inspection
-func (d Deployer) InitOCR(keys []map[string]string) error {
+func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 
 	fmt.Println("Setting up OCR Feed:")
 
@@ -286,8 +287,8 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	// program sorts oracles (need to pre-sort to allow correct onchainConfig generation)
 	keys = keys
 	sort.Slice(keys, func(i, j int) bool {
-		hI, _ := hex.DecodeString(keys[i]["OCROnchainPublicKey"])
-		hJ, _ := hex.DecodeString(keys[j]["OCROnchainPublicKey"])
+		hI, _ := hex.DecodeString(keys[i].OCR2OnchainPublicKey)
+		hJ, _ := hex.DecodeString(keys[j].OCR2OnchainPublicKey)
 		return bytes.Compare(hI, hJ) < 0
 	})
 
@@ -300,18 +301,18 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	operators := []map[string]string{}
 	for _, k := range keys {
 		S = append(S, 1)
-		offChainPublicKeys = append(offChainPublicKeys, k["OCROffchainPublicKey"])
-		configPublicKeys = append(configPublicKeys, k["OCRConfigPublicKey"])
-		peerIDs = append(peerIDs, k["P2PID"])
+		offChainPublicKeys = append(offChainPublicKeys, k.OCR2OffchainPublicKey)
+		configPublicKeys = append(configPublicKeys, k.OCR2ConfigPublicKey)
+		peerIDs = append(peerIDs, k.P2PID)
 		// original oracle structure
 		oracles = append(oracles, map[string]string{
-			"signer":      k["OCROnchainPublicKey"],
-			"transmitter": k["OCRTransmitter"],
+			"signer":      k.OCR2OnchainPublicKey,
+			"transmitter": k.OCR2Transmitter,
 		})
 
 		operators = append(operators, map[string]string{
-			"payee":       k["OCRTransmitter"], // payee is the same as transmitter
-			"transmitter": k["OCRTransmitter"],
+			"payee":       k.OCR2Transmitter, // payee is the same as transmitter
+			"transmitter": k.OCR2Transmitter,
 		})
 	}
 
