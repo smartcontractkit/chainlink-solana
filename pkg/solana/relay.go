@@ -7,7 +7,6 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	uuid "github.com/satori/go.uuid"
-	"gopkg.in/guregu/null.v4"
 
 	relaytypes "github.com/smartcontractkit/chainlink/core/services/relay/types"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
@@ -45,9 +44,6 @@ type OCR2Spec struct {
 	TransmissionsID    solana.PublicKey
 
 	TransmissionSigner TransmissionSigner
-
-	// OCR key bundle (off/on-chain keys) id
-	KeyBundleID null.String
 }
 
 type Relayer struct {
