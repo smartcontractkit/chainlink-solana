@@ -150,8 +150,8 @@ type Validator struct {
 // CL Core OCR2 job spec RelayConfig member for Solana
 type RelayConfig struct {
 	// network data
-	NodeEndpointRPC string `json:"nodeEndpointRPC"`
-	NodeEndpointWS  string `json:"nodeEndpointWS"`
+	NodeEndpointHTTP string `json:"nodeEndpointHTTP"`
+	NodeEndpointWS   string `json:"nodeEndpointWS"`
 
 	// on-chain program + 2x state accounts (state + transmissions) + validator programID
 	StateID            string `json:"stateID"`
