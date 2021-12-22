@@ -1,14 +1,10 @@
 package solana
 
 import (
-	"bytes"
-	"fmt"
-	"sort"
 	"testing"
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
-	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/stretchr/testify/require"
 )
 
