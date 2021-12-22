@@ -37,6 +37,7 @@ func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.Co
 	if err := binary.Write(buf, binary.BigEndian, uint8(len(cfg.Signers))); err != nil {
 		return digest, err
 	}
+
 	for _, signer := range cfg.Signers {
 		if _, err := buf.Write(signer); err != nil {
 			return digest, err
@@ -84,12 +85,12 @@ func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.Co
 	}
 
 	digest[0] = 0x00
-	digest[1] = uint8(ConfigDigestPrefixSolana)
+	digest[1] = uint8(d.ConfigDigestPrefix())
 
 	return digest, nil
 }
 
 // This should return the same constant value on every invocation
-func (d OffchainConfigDigester) ConfigDigestPrefix() types.ConfigDigestPrefix {
+func (_ OffchainConfigDigester) ConfigDigestPrefix() types.ConfigDigestPrefix {
 	return ConfigDigestPrefixSolana
 }

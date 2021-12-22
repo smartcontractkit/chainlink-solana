@@ -10,17 +10,21 @@ pkgs.mkShell {
     libudev
     openssl
 
+    # Solana
     solana-full
     spl-token-cli
     anchor
-    nodePackages.typescript-language-server
-    nodejs-14_x
-    (yarn.override { nodejs = nodejs-14_x; })
 
+    # Golang
     go_1_17
     gopls
     delve
     golangci-lint
+
+    # NodeJS + TS
+    nodePackages.typescript-language-server
+    nodejs-14_x
+    (yarn.override { nodejs = nodejs-14_x; })
   ];
   RUST_BACKTRACE = "1";
   # https://github.com/rust-lang/rust/issues/55979
