@@ -1,0 +1,43 @@
+type                                   = "offchainreporting2"
+schemaVersion                          = 1
+blockchainTimeout                      = "20s"
+contractConfigConfirmations            = 3
+contractConfigTrackerPollInterval      = "1m"
+contractConfigTrackerSubscribeInterval = "2m"
+name                                   = "<insert job name here>"
+relay                                  = "solana"
+contractID                             = "<insert solana ocr2 program ID>"
+p2pBootstrapPeers                      = ["somep2pkey@localhost-tcp:port"]
+isBootstrapPeer                        = false
+p2pPeerID                              = "<insert p2p id>"
+ocrKeyBundleID                         = "<insert ocr2 key bundle id>"
+monitoringEndpoint                     = "<insert monitoring endpoint>"
+transmitterID                          = "<insert solana transmitter key id>"
+observationSource                      = """
+    ea       [type=bridge name=coingecko requestData=<{"data":{"from":"LINK", "to":"USD"}}>]
+    parse    [type="jsonparse" path="result"]
+    multiply [type="multiply" times=100000000]
+
+    ea -> parse -> multiply
+"""
+juelsPerFeeCoinSource                  = """
+    link2usd [type=bridge name=coingecko requestData=<{"data":{"from":"LINK", "to":"USD"}}>]
+    parseL   [type="jsonparse" path="result"]
+
+    sol2usd [type=bridge name=coingecko requestData=<{"data":{"from":"SOL", "to":"USD"}}>]
+    parseT  [type="jsonparse" path="result"]
+
+    divide [type="divide" input="$(parseL)" divisor="$(parseT)" precision="9"]
+    scale  [type="multiply" times=1000000000]
+
+    link2usd -> parseL -> divide
+    sol2usd  -> parseT -> divide
+    divide   -> scale
+"""
+
+[relayConfig]
+nodeEndpointHTTP   = "http:..."
+nodeEndpointWS     = "ws:..."
+stateID            = "<insert ocr2 state account>"
+transmissionsID    = "<insert ocr2 transmissions account>"
+validatorProgramID = "<insert validator program id>"
