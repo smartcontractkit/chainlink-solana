@@ -1,5 +1,5 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { PublicKey } from '@solana/web3.js'
@@ -29,9 +29,8 @@ export default class SetPayees extends SolanaCommand {
     const aggregator = rdd.contracts[this.flags.state]
     const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
     const operators = aggregatorOperators.map((operator) => ({
-      // TODO: Update to latest RDD
-      transmitter: rdd.operators[operator].nodeAddress[0],
-      payee: rdd.operators[operator].payeeAddress,
+      transmitter: rdd.operators[operator].ocrNodeAddress[0],
+      payee: rdd.operators[operator].adminAddress,
     }))
     return {
       operators,
@@ -93,7 +92,9 @@ export default class SetPayees extends SolanaCommand {
       .slice(0, info.oracles.len)
       .map(({ transmitter }) => payeeByTransmitter[new PublicKey(transmitter).toString()])
 
-    logger.loading('Setting payees...')
+    logger.log('Payees information:', input)
+    await prompt('Continue setting payees?')
+
     const tx = await program.rpc.setPayees(payees, {
       accounts: {
         state: state,

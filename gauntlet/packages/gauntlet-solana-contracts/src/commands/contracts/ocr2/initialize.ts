@@ -4,7 +4,7 @@ import { Keypair, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from '@solana/w
 import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { utils } from '@project-serum/anchor'
-import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { getRDD } from '../../../lib/rdd'
 
 type Input = {
@@ -105,7 +105,9 @@ export default class Initialize extends SolanaCommand {
       - Nonce: ${nonce}
     `)
 
-    logger.loading('Initializing OCR 2 program...')
+    logger.log('Feed information:', input)
+    await prompt('Continue initializing OCR 2 feed?')
+
     const txHash = await program.rpc.initialize(nonce, minAnswer, maxAnswer, decimals, description, {
       accounts,
       signers: [owner, state, transmissions],

@@ -1,5 +1,5 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
@@ -47,7 +47,9 @@ export default class SetBilling extends SolanaCommand {
     const info = await program.account.state.fetch(state)
     const billingAC = new PublicKey(info.config.billingAccessController)
 
-    logger.loading('Setting billing...')
+    logger.log('Billing information:', input)
+    await prompt('Continue setting billing?')
+
     const tx = await program.rpc.setBilling(
       new BN(input.observationPaymentGjuels),
       new BN(input.transmissionPaymentGjuels),
