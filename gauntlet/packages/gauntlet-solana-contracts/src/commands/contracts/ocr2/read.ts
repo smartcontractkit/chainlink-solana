@@ -1,10 +1,11 @@
 import { Result } from '@chainlink/gauntlet-core'
+import { Proto } from '@chainlink/gauntlet-core/dist/crypto'
+import { BN } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import BN from 'bn.js'
+
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { Protobuf } from '../../../core/proto'
-import { descriptor as OCR2Descriptor } from '../../../core/proto/ocr2Proto'
+import { descriptor as OCR2Descriptor } from '../../../lib/ocr2Proto'
 
 export default class ReadState extends SolanaCommand {
   static id = 'ocr2:read_state'
@@ -17,7 +18,7 @@ export default class ReadState extends SolanaCommand {
   }
 
   deserializeConfig = async (buffer: Buffer): Promise<any> => {
-    const proto = new Protobuf({ descriptor: OCR2Descriptor })
+    const proto = new Proto.Protobuf({ descriptor: OCR2Descriptor })
     const offchain = proto.decode('offchainreporting2_config.OffchainConfigProto', buffer)
     const reportingPluginConfig = proto.decode(
       'offchainreporting2_config.ReportingPluginConfig',
