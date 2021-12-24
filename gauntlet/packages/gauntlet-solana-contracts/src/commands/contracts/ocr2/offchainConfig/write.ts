@@ -57,10 +57,21 @@ export default class WriteOffchainConfig extends SolanaCommand {
   static makeInputFromRDD = (rdd: any, stateAddress: string): Input => {
     const aggregator = rdd.contracts[stateAddress]
     const config = aggregator.config
-    const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
-    const operatorsPublicKeys = aggregatorOperators.map((o) => rdd.operators[o].ocrOffchainPublicKey[0])
-    const operatorsPeerIds = aggregatorOperators.map((o) => rdd.operators[o].peerId[0])
-    const operatorConfigPublicKeys = aggregatorOperators.map((o) => rdd.operators[o].ocrConfigPublicKey[0])
+
+    const aggregatorOperators: any[] = aggregator.oracles
+      .map((o) => rdd.operators[o.operator])
+      .sort((a, b) => {
+        if (a.ocr2OnchainPublicKey[0] > b.ocr2OnchainPublicKey[0]) return 1
+        if (a.ocr2OnchainPublicKey[0] < b.ocr2OnchainPublicKey[0]) return -1
+        return 0
+      })
+    const operatorsPublicKeys = aggregatorOperators.map((o) =>
+      o.ocr2OffchainPublicKey[0].replace('ocr2off_solana_', ''),
+    )
+    const operatorsPeerIds = aggregatorOperators.map((o) => o.peerId[0])
+    const operatorConfigPublicKeys = aggregatorOperators.map((o) =>
+      o.ocr2ConfigPublicKey[0].replace('ocr2cfg_solana_', ''),
+    )
 
     const input: Input = {
       deltaProgressNanoseconds: time.durationToNanoseconds(config.deltaProgress).toNumber(),
@@ -207,6 +218,7 @@ export default class WriteOffchainConfig extends SolanaCommand {
       )
     }
 
+    logger.log('Offchain info:', input)
     await prompt('Start writing offchain config?')
 
     const txs: string[] = []
