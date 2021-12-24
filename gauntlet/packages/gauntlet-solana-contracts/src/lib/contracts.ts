@@ -20,7 +20,7 @@ export enum CONTRACT_LIST {
   ACCESS_CONTROLLER = 'access_controller',
   OCR_2 = 'ocr2',
   FLAGS = 'flags',
-  DEVIATION_FLAGGING_VALIDATOR = 'deviation_flagging_validator',
+  DEVIATION_FLAGGING_VALIDATOR = 'store',
   TOKEN = 'token',
 }
 

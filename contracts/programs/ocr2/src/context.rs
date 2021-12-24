@@ -3,10 +3,10 @@ use anchor_lang::solana_program::sysvar;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{Mint, Token, TokenAccount, Transfer};
 
-use crate::state::{State, Transmissions};
+use crate::state::State;
 
 use access_controller::AccessController;
-use deviation_flagging_validator::{self as validator, Validator};
+use store::Transmissions;
 
 // NOTE: (has_one = name) is equivalent to a custom access_control
 
@@ -15,8 +15,7 @@ use deviation_flagging_validator::{self as validator, Validator};
 pub struct Initialize<'info> {
     #[account(zero)]
     pub state: AccountLoader<'info, State>,
-    #[account(zero)]
-    pub transmissions: Account<'info, Transmissions>,
+    pub transmissions: AccountInfo<'info>,
     pub payer: AccountInfo<'info>,
     pub owner: Signer<'info>,
 
@@ -71,9 +70,9 @@ pub struct Transmit<'info> {
     #[account(mut, address = state.load()?.transmissions)]
     pub transmissions: Account<'info, Transmissions>,
 
-    #[account(address = validator::ID)]
+    #[account(address = store::ID)]
     pub validator_program: AccountInfo<'info>,
-    #[account(address = state.load()?.config.validator)]
+    // #[account(address = state.load()?.config.validator)]
     pub validator: AccountInfo<'info>,
     pub validator_authority: AccountInfo<'info>,
     pub validator_access_controller: AccountInfo<'info>,
@@ -94,15 +93,6 @@ pub struct RequestNewRound<'info> {
     pub state: AccountLoader<'info, State>,
     pub authority: Signer<'info>,
     pub access_controller: AccountLoader<'info, AccessController>,
-}
-
-#[derive(Accounts)]
-pub struct SetValidatorConfig<'info> {
-    #[account(mut)]
-    pub state: AccountLoader<'info, State>,
-    pub authority: Signer<'info>,
-    #[account(owner = validator::ID)] // TODO: allow setting Pubkey::default() to disable
-    pub validator: AccountLoader<'info, Validator>,
 }
 
 #[derive(Accounts)]

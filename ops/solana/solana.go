@@ -113,7 +113,7 @@ func (d *Deployer) Load() error {
 	// Access Controller contract deployment
 	fmt.Println("Deploying Validator...")
 	err = d.gauntlet.ExecCommand(
-		"deviation_flagging_validator:deploy",
+		"store:deploy",
 		d.gauntlet.Flag("network", d.network),
 	)
 	if err != nil {
@@ -199,7 +199,7 @@ func (d *Deployer) DeployOCR() error {
 
 	fmt.Println("Step 3: Init Validator")
 	err = d.gauntlet.ExecCommand(
-		"deviation_flagging_validator:initialize",
+		"store:initialize",
 		d.gauntlet.Flag("network", d.network),
 		d.gauntlet.Flag("accessController", d.Account[BillingAccessController]),
 	)

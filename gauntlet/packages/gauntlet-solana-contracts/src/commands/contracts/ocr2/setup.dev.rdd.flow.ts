@@ -43,7 +43,7 @@ export default class SetupRDDFlow extends FlowCommand<TransactionResponse> {
       // },
       // {
       //   name: 'Deploy Validator',
-      //   command: 'deviation_flagging_validator:deploy',
+      //   command: 'store:deploy',
       // },
       {
         name: 'Deploy LINK',

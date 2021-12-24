@@ -126,7 +126,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
       },
       {
         name: 'Deploy Validator',
-        command: 'deviation_flagging_validator:deploy',
+        command: 'store:deploy',
       },
       {
         name: 'Deploy LINK',
