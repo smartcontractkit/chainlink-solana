@@ -4,10 +4,10 @@ import { Keypair, PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 
 export default class Initialize extends SolanaCommand {
-  static id = 'deviation_flagging_validator:initialize'
+  static id = 'store:initialize'
   static category = CONTRACT_LIST.DEVIATION_FLAGGING_VALIDATOR
 
-  static examples = ['yarn gauntlet deviation_flagging_validator:initialize --network=devnet']
+  static examples = ['yarn gauntlet store:initialize --network=devnet']
 
   constructor(flags, args) {
     super(flags, args)

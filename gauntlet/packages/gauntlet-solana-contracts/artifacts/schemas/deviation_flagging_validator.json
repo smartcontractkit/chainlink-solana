@@ -1,6 +1,6 @@
 {
   "version": "0.1.0",
-  "name": "deviation_flagging_validator",
+  "name": "store",
   "instructions": [
     {
       "name": "initialize",

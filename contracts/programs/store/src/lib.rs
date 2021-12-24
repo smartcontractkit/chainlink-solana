@@ -1,8 +1,11 @@
 use anchor_lang::prelude::*;
 
-use arrayvec::arrayvec;
-
 use access_controller::AccessController;
+
+mod state;
+
+use crate::state::with_store;
+pub use crate::state::{Transmission, Transmissions, Validator};
 
 #[cfg(feature = "mainnet")]
 declare_id!("My11111111111111111111111111111111111111113");
@@ -15,33 +18,43 @@ declare_id!("A7Jh2nb1hZHwqEofm4N8SXbKTj82rx7KUfjParQXUyMQ");
 
 static THRESHOLD_MULTIPLIER: u128 = 100000;
 
-#[zero_copy]
-pub struct Flags {
-    xs: [Pubkey; 128], // sadly we can't use const https://github.com/project-serum/anchor/issues/632
-    len: u64,
-}
-
-arrayvec!(Flags, Pubkey, u64);
-
-#[account(zero_copy)]
-pub struct Validator {
-    pub owner: Pubkey,
-    pub proposed_owner: Pubkey,
-    pub raising_access_controller: Pubkey,
-    pub lowering_access_controller: Pubkey,
-
-    pub flags: Flags,
-}
-
 #[program]
-pub mod deviation_flagging_validator {
+pub mod store {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>) -> ProgramResult {
         let mut state = ctx.accounts.state.load_init()?;
         state.owner = ctx.accounts.owner.key();
-        state.raising_access_controller = ctx.accounts.raising_access_controller.key();
         state.lowering_access_controller = ctx.accounts.lowering_access_controller.key();
+        Ok(())
+    }
+
+    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
+    pub fn create_feed(
+        ctx: Context<CreateFeed>,
+        granularity: u8,
+        live_length: u32,
+    ) -> ProgramResult {
+        let store = &mut ctx.accounts.store;
+        store.version = 1;
+        store.granularity = granularity;
+        store.live_length = live_length;
+        store.writer = Pubkey::default();
+        Ok(())
+    }
+
+    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
+    pub fn set_validator_config(
+        ctx: Context<SetValidatorConfig>,
+        flagging_threshold: u32,
+    ) -> ProgramResult {
+        ctx.accounts.store.flagging_threshold = flagging_threshold;
+        Ok(())
+    }
+
+    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
+    pub fn set_writer(ctx: Context<SetValidatorConfig>, writer: Pubkey) -> ProgramResult {
+        ctx.accounts.store.writer = writer;
         Ok(())
     }
 
@@ -66,36 +79,43 @@ pub mod deviation_flagging_validator {
         Ok(())
     }
 
-    pub fn validate(
-        ctx: Context<Validate>,
-        flagging_threshold: u32,
-        _previous_round_id: u32,
-        previous_answer: i128,
-        _round_id: u32,
-        answer: i128,
-    ) -> ProgramResult {
-        anchor_lang::solana_program::log::sol_log_compute_units();
+    pub fn submit(ctx: Context<Submit>, round: Transmission) -> ProgramResult {
         let mut state = ctx.accounts.state.load_mut()?;
-        has_raising_access(
-            &state,
-            &ctx.accounts.access_controller,
-            &ctx.accounts.authority,
-        )?;
-        let is_valid = is_valid(flagging_threshold, previous_answer, answer);
-        let address = ctx.accounts.address.key();
+
+        // check if this particular ocr2 cluster is allowed to write to the feed
+        require!(
+            ctx.accounts.authority.key == &ctx.accounts.store.writer,
+            Unauthorized
+        );
+
+        let previous_round = with_store(&mut ctx.accounts.store, |store| {
+            let previous = store.latest();
+            store.insert(round);
+            previous
+        })?;
+
+        let flagging_threshold = ctx.accounts.store.flagging_threshold;
+
+        let is_valid = if let Some(previous_round) = previous_round {
+            is_valid(flagging_threshold, previous_round.answer, round.answer)
+        } else {
+            true
+        };
+        let store_address = ctx.accounts.store.key();
 
         if is_valid {
             // raise flag if not raised yet
-            let found = state.flags.iter().any(|flag| flag == &address);
 
+            // TODO: use binary search here
+            let found = state.flags.iter().any(|flag| flag == &store_address);
             if !found {
                 // if the len reaches array len, we're at capacity
                 require!(state.flags.remaining_capacity() > 0, Full);
-                state.flags.push(address);
+                // TODO insert via binary search
+                state.flags.push(store_address);
             }
         }
 
-        anchor_lang::solana_program::log::sol_log_compute_units();
         Ok(())
     }
 
@@ -118,13 +138,6 @@ pub mod deviation_flagging_validator {
             // reverse so that subsequent positions aren't affected
             state.flags.remove(*index);
         }
-        Ok(())
-    }
-
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
-    pub fn set_raising_access_controller(ctx: Context<SetAccessController>) -> ProgramResult {
-        let mut state = ctx.accounts.state.load_mut()?;
-        state.raising_access_controller = ctx.accounts.access_controller.key();
         Ok(())
     }
 
@@ -161,30 +174,6 @@ fn is_valid(flagging_threshold: u32, previous_answer: i128, answer: i128) -> boo
 // Only owner access
 fn owner<'info>(state: &AccountLoader<'info, Validator>, signer: &'_ AccountInfo) -> ProgramResult {
     require!(signer.key.eq(&state.load()?.owner), Unauthorized);
-    Ok(())
-}
-
-fn has_raising_access(
-    // state: &AccountLoader<Validator>,
-    state: &Validator,
-    controller: &AccountLoader<AccessController>,
-    authority: &AccountInfo,
-) -> ProgramResult {
-    // let state = state.load()?;
-
-    require!(
-        state.raising_access_controller == controller.key(),
-        InvalidInput
-    );
-
-    let is_owner = state.owner == authority.key();
-
-    let has_access = is_owner
-        || access_controller::has_access(controller, authority.key)
-            // TODO: better mapping, maybe InvalidInput?
-            .map_err(|_| ErrorCode::Unauthorized)?;
-
-    require!(has_access, Unauthorized);
     Ok(())
 }
 
@@ -228,8 +217,15 @@ pub struct Initialize<'info> {
     #[account(signer)]
     pub owner: AccountInfo<'info>,
 
-    pub raising_access_controller: AccountLoader<'info, AccessController>,
     pub lowering_access_controller: AccountLoader<'info, AccessController>,
+}
+
+#[derive(Accounts)]
+pub struct CreateFeed<'info> {
+    pub state: AccountLoader<'info, Validator>,
+    #[account(zero)]
+    pub store: Account<'info, Transmissions>, // TODO: use (init with payer)
+    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -255,10 +251,11 @@ pub struct SetFlag<'info> {
 }
 
 #[derive(Accounts)]
-pub struct SetFlaggingThreshold<'info> {
-    #[account(mut, has_one = owner)]
+pub struct SetValidatorConfig<'info> {
     pub state: AccountLoader<'info, Validator>,
-    pub owner: Signer<'info>,
+    pub authority: Signer<'info>,
+    #[account(mut)]
+    pub store: Account<'info, Transmissions>,
 }
 
 #[derive(Accounts)]
@@ -270,11 +267,13 @@ pub struct SetAccessController<'info> {
 }
 
 #[derive(Accounts)]
-pub struct Validate<'info> {
+pub struct Submit<'info> {
     #[account(mut)]
     pub state: AccountLoader<'info, Validator>,
     pub authority: Signer<'info>,
     pub access_controller: AccountLoader<'info, AccessController>,
 
-    pub address: AccountInfo<'info>,
+    /// The OCR2 feed
+    #[account(mut)]
+    pub store: Account<'info, Transmissions>,
 }

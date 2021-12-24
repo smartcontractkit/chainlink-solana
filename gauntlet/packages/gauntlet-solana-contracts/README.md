@@ -25,7 +25,7 @@ yarn bundle
 - Access Controller: `access_controller`
 - OCR2: `ocr2`
 - Flags: `flags`,
-- Deviation flagging validator: `deviation_flagging_validator`
+- Deviation flagging validator: `store`
 
 ### Commands
 
@@ -68,7 +68,7 @@ yarn gauntlet <contract_name>:<contract_function> --help
 ```
 packages/gauntlet-solana-contracts/artifacts/programId
 |  access_controller.json
-|  deviation_flagging_validator.json
+|  store.json
 |  ocr2.json
 ```
 

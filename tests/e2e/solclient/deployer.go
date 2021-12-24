@@ -7,8 +7,8 @@ import (
 	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/rs/zerolog/log"
 	access_controller2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/access_controller"
-	deviation_flagging_validator2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/deviation_flagging_validator"
 	"github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr2"
+	store2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/store"
 	utils2 "github.com/smartcontractkit/chainlink-solana/tests/e2e/utils"
 	"github.com/smartcontractkit/helmenv/environment"
 	"github.com/smartcontractkit/integrations-framework/client"
@@ -48,7 +48,7 @@ type ContractDeployer struct {
 }
 
 func (c *ContractDeployer) DeployOCRv2DeviationFlaggingValidator(billingAC string) (contracts.OCRv2DeviationFlaggingValidator, error) {
-	programWallet := c.Client.ProgramWallets["deviation_flagging_validator-keypair.json"]
+	programWallet := c.Client.ProgramWallets["store-keypair.json"]
 	payer := c.Client.DefaultWallet
 	stateAcc := solana.NewWallet()
 	accInstruction, err := c.Client.CreateAccInstr(stateAcc, DeviationFlaggingValidatorAccountSize, programWallet.PublicKey())
@@ -63,7 +63,7 @@ func (c *ContractDeployer) DeployOCRv2DeviationFlaggingValidator(billingAC strin
 		"Deploy deviation flagging validator",
 		[]solana.Instruction{
 			accInstruction,
-			deviation_flagging_validator2.NewInitializeInstruction(
+			store2.NewInitializeInstruction(
 				stateAcc.PublicKey(),
 				c.Client.Accounts.Owner.PublicKey(),
 				bacPublicKey,
@@ -369,7 +369,7 @@ func (c *ContractDeployer) DeployBlockhashStore() (contracts.BlockHashStore, err
 
 func (c *ContractDeployer) registerAnchorPrograms() {
 	access_controller2.SetProgramID(c.Client.ProgramWallets["access_controller-keypair.json"].PublicKey())
-	deviation_flagging_validator2.SetProgramID(c.Client.ProgramWallets["deviation_flagging_validator-keypair.json"].PublicKey())
+	store2.SetProgramID(c.Client.ProgramWallets["store-keypair.json"].PublicKey())
 	ocr_2.SetProgramID(c.Client.ProgramWallets["ocr2-keypair.json"].PublicKey())
 }
 

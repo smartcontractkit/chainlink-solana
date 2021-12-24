@@ -18,14 +18,15 @@ pub mod event;
 mod state;
 
 use crate::context::*;
-use crate::state::{Config, LeftoverPayment, Oracle, SigningKey, State, Transmission, MAX_ORACLES};
+use crate::state::{Config, LeftoverPayment, Oracle, SigningKey, State, MAX_ORACLES};
 
 use std::collections::BTreeSet;
 use std::convert::TryInto;
 use std::mem::size_of;
 
 use access_controller::AccessController;
-use deviation_flagging_validator as validator;
+use store as validator;
+use validator::Transmission;
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct NewOracle {
@@ -58,10 +59,6 @@ pub mod ocr2 {
         state.version = 1;
         state.nonce = nonce;
         state.transmissions = ctx.accounts.transmissions.key();
-
-        let store = &mut ctx.accounts.transmissions;
-        store.granularity = 30;
-        store.live_length = 1024;
 
         let config = &mut state.config;
 
@@ -261,17 +258,6 @@ pub mod ocr2 {
             epoch: config.epoch,
         });
         // NOTE: can't really return round_id + 1, assume it on the client side
-        Ok(())
-    }
-
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
-    pub fn set_validator_config(
-        ctx: Context<SetValidatorConfig>,
-        flagging_threshold: u32,
-    ) -> ProgramResult {
-        let mut state = ctx.accounts.state.load_mut()?;
-        state.config.validator = ctx.accounts.validator.key();
-        state.config.flagging_threshold = flagging_threshold;
         Ok(())
     }
 
@@ -727,67 +713,46 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
         .ok_or(ErrorCode::Overflow)?; // this should never occur, but let's check for it anyway
     state.config.latest_transmitter = ctx.accounts.transmitter.key();
 
-    state::with_store(&mut ctx.accounts.transmissions, |store| {
-        store.insert(Transmission {
-            answer: report.median,
-            timestamp: report.observations_timestamp as u64,
-        });
-    })?;
+    let round = Transmission {
+        answer: report.median,
+        timestamp: report.observations_timestamp as u64,
+    };
 
     // calculate and pay reimbursement
     let reimbursement = calculate_reimbursement(report.juels_per_lamport, signature_count)?;
     let amount = reimbursement + u64::from(state.config.billing.transmission_payment_gjuels);
     state.oracles[oracle_idx].payment += amount;
 
-    // validate answer
-    if state.config.validator != Pubkey::default() {
-        // we only validate these accounts if a validator is set
-        require!(ctx.accounts.validator.owner == &validator::ID, InvalidInput);
-        require!(ctx.accounts.validator.is_writable, InvalidInput);
-        require!(
-            ctx.accounts.validator_access_controller.owner == &access_controller::ID,
-            InvalidInput
-        );
+    // store and validate answer
+    // we only validate these accounts if a validator is set
+    require!(ctx.accounts.validator.owner == &validator::ID, InvalidInput);
+    require!(ctx.accounts.validator.is_writable, InvalidInput);
+    require!(
+        ctx.accounts.validator_access_controller.owner == &access_controller::ID,
+        InvalidInput
+    );
 
-        let round_id = state.config.latest_aggregator_round_id;
-        let previous_round_id = round_id - 1;
-        let previous_answer = state::with_store(&mut ctx.accounts.transmissions, |store| {
-            store.fetch(previous_round_id)
-        })?
-        .map(|transmission| transmission.answer)
-        .unwrap_or(0);
+    let cpi_ctx = CpiContext::new(
+        ctx.accounts.validator_program.clone(),
+        validator::cpi::accounts::Submit {
+            state: ctx.accounts.validator.to_account_info(),
+            authority: ctx.accounts.validator_authority.to_account_info(),
+            access_controller: ctx.accounts.validator_access_controller.to_account_info(),
+            store: ctx.accounts.transmissions.to_account_info(), // TODO: what about passing accounts.state?
+        },
+    );
 
-        let flagging_threshold = state.config.flagging_threshold;
+    drop(state);
 
-        let cpi_ctx = CpiContext::new(
-            ctx.accounts.validator_program.clone(),
-            validator::cpi::accounts::Validate {
-                state: ctx.accounts.validator.to_account_info(),
-                authority: ctx.accounts.validator_authority.to_account_info(),
-                access_controller: ctx.accounts.validator_access_controller.to_account_info(),
-                address: ctx.accounts.state.to_account_info(),
-            },
-        );
+    let seeds = &[
+        b"store",
+        ctx.accounts.state.to_account_info().key.as_ref(),
+        &[*nonce],
+    ];
 
-        drop(state);
+    validator::cpi::submit(cpi_ctx.with_signer(&[&seeds[..]]), round)?;
 
-        let seeds = &[
-            b"validator",
-            ctx.accounts.state.to_account_info().key.as_ref(),
-            &[*nonce],
-        ];
-
-        let _ = validator::cpi::validate(
-            cpi_ctx.with_signer(&[&seeds[..]]),
-            flagging_threshold,
-            previous_round_id,
-            previous_answer,
-            round_id,
-            report.median,
-        ); // ignore result, validate should not stop transmit()
-
-        // TODO: use _unchecked to save some instructions
-    }
+    // TODO: use _unchecked to save some instructions
 
     Ok(())
 }
