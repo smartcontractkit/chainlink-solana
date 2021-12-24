@@ -39,3 +39,36 @@ func (obj *Flags) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	}
 	return nil
 }
+
+type Transmission struct {
+	Timestamp uint64
+	Answer    ag_binary.Int128
+}
+
+func (obj Transmission) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Timestamp` param:
+	err = encoder.Encode(obj.Timestamp)
+	if err != nil {
+		return err
+	}
+	// Serialize `Answer` param:
+	err = encoder.Encode(obj.Answer)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Transmission) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Timestamp`:
+	err = decoder.Decode(&obj.Timestamp)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Answer`:
+	err = decoder.Decode(&obj.Answer)
+	if err != nil {
+		return err
+	}
+	return nil
+}

@@ -19,7 +19,7 @@ func SetProgramID(pubkey ag_solanago.PublicKey) {
 	ag_solanago.RegisterInstructionDecoder(ProgramID, registryDecodeInstruction)
 }
 
-const ProgramName = "DeviationFlaggingValidator"
+const ProgramName = "Store"
 
 func init() {
 	if !ProgramID.IsZero() {
@@ -30,15 +30,19 @@ func init() {
 var (
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
+	Instruction_CreateFeed = ag_binary.TypeID([8]byte{173, 86, 95, 94, 13, 193, 67, 180})
+
+	Instruction_SetValidatorConfig = ag_binary.TypeID([8]byte{87, 248, 224, 193, 17, 41, 80, 250})
+
+	Instruction_SetWriter = ag_binary.TypeID([8]byte{174, 36, 177, 122, 86, 142, 32, 109})
+
 	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
 
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
-	Instruction_Validate = ag_binary.TypeID([8]byte{60, 252, 90, 66, 246, 253, 232, 139})
+	Instruction_Submit = ag_binary.TypeID([8]byte{88, 166, 102, 181, 162, 127, 170, 48})
 
 	Instruction_LowerFlags = ag_binary.TypeID([8]byte{254, 119, 153, 185, 135, 158, 115, 23})
-
-	Instruction_SetRaisingAccessController = ag_binary.TypeID([8]byte{27, 91, 3, 184, 67, 181, 92, 2})
 
 	Instruction_SetLoweringAccessController = ag_binary.TypeID([8]byte{207, 68, 147, 34, 164, 94, 189, 113})
 )
@@ -48,16 +52,20 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
 	case Instruction_Initialize:
 		return "Initialize"
+	case Instruction_CreateFeed:
+		return "CreateFeed"
+	case Instruction_SetValidatorConfig:
+		return "SetValidatorConfig"
+	case Instruction_SetWriter:
+		return "SetWriter"
 	case Instruction_TransferOwnership:
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
-	case Instruction_Validate:
-		return "Validate"
+	case Instruction_Submit:
+		return "Submit"
 	case Instruction_LowerFlags:
 		return "LowerFlags"
-	case Instruction_SetRaisingAccessController:
-		return "SetRaisingAccessController"
 	case Instruction_SetLoweringAccessController:
 		return "SetLoweringAccessController"
 	default:
@@ -84,19 +92,25 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"initialize", (*Initialize)(nil),
 		},
 		{
+			"create_feed", (*CreateFeed)(nil),
+		},
+		{
+			"set_validator_config", (*SetValidatorConfig)(nil),
+		},
+		{
+			"set_writer", (*SetWriter)(nil),
+		},
+		{
 			"transfer_ownership", (*TransferOwnership)(nil),
 		},
 		{
 			"accept_ownership", (*AcceptOwnership)(nil),
 		},
 		{
-			"validate", (*Validate)(nil),
+			"submit", (*Submit)(nil),
 		},
 		{
 			"lower_flags", (*LowerFlags)(nil),
-		},
-		{
-			"set_raising_access_controller", (*SetRaisingAccessController)(nil),
 		},
 		{
 			"set_lowering_access_controller", (*SetLoweringAccessController)(nil),

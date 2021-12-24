@@ -237,8 +237,6 @@ type Config struct {
 	LatestConfigDigest        [32]uint8
 	LatestConfigBlockNumber   uint64
 	Billing                   Billing
-	Validator                 ag_solanago.PublicKey
-	FlaggingThreshold         uint32
 	OffchainConfig            OffchainConfig
 	PendingOffchainConfig     OffchainConfig
 }
@@ -341,16 +339,6 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `Billing` param:
 	err = encoder.Encode(obj.Billing)
-	if err != nil {
-		return err
-	}
-	// Serialize `Validator` param:
-	err = encoder.Encode(obj.Validator)
-	if err != nil {
-		return err
-	}
-	// Serialize `FlaggingThreshold` param:
-	err = encoder.Encode(obj.FlaggingThreshold)
 	if err != nil {
 		return err
 	}
@@ -468,16 +456,6 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `Validator`:
-	err = decoder.Decode(&obj.Validator)
-	if err != nil {
-		return err
-	}
-	// Deserialize `FlaggingThreshold`:
-	err = decoder.Decode(&obj.FlaggingThreshold)
-	if err != nil {
-		return err
-	}
 	// Deserialize `OffchainConfig`:
 	err = decoder.Decode(&obj.OffchainConfig)
 	if err != nil {
@@ -584,39 +562,6 @@ func (obj *Oracle) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	}
 	// Deserialize `Payment`:
 	err = decoder.Decode(&obj.Payment)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type Transmission struct {
-	Answer    ag_binary.Int128
-	Timestamp uint64
-}
-
-func (obj Transmission) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Answer` param:
-	err = encoder.Encode(obj.Answer)
-	if err != nil {
-		return err
-	}
-	// Serialize `Timestamp` param:
-	err = encoder.Encode(obj.Timestamp)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *Transmission) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Answer`:
-	err = decoder.Decode(&obj.Answer)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Timestamp`:
-	err = decoder.Decode(&obj.Timestamp)
 	if err != nil {
 		return err
 	}
