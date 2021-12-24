@@ -20,7 +20,7 @@ type Initialize struct {
 
 	// [0] = [WRITE] state
 	//
-	// [1] = [WRITE] transmissions
+	// [1] = [] transmissions
 	//
 	// [2] = [] payer
 	//
@@ -97,7 +97,7 @@ func (inst *Initialize) GetStateAccount() *ag_solanago.AccountMeta {
 
 // SetTransmissionsAccount sets the "transmissions" account.
 func (inst *Initialize) SetTransmissionsAccount(transmissions ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(transmissions).WRITE()
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(transmissions)
 	return inst
 }
 

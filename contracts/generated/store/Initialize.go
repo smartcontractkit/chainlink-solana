@@ -17,16 +17,14 @@ type Initialize struct {
 	//
 	// [1] = [SIGNER] owner
 	//
-	// [2] = [] raisingAccessController
-	//
-	// [3] = [] loweringAccessController
+	// [2] = [] loweringAccessController
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
 func NewInitializeInstructionBuilder() *Initialize {
 	nd := &Initialize{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
@@ -53,26 +51,15 @@ func (inst *Initialize) GetOwnerAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
-// SetRaisingAccessControllerAccount sets the "raisingAccessController" account.
-func (inst *Initialize) SetRaisingAccessControllerAccount(raisingAccessController ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(raisingAccessController)
-	return inst
-}
-
-// GetRaisingAccessControllerAccount gets the "raisingAccessController" account.
-func (inst *Initialize) GetRaisingAccessControllerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
-}
-
 // SetLoweringAccessControllerAccount sets the "loweringAccessController" account.
 func (inst *Initialize) SetLoweringAccessControllerAccount(loweringAccessController ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(loweringAccessController)
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(loweringAccessController)
 	return inst
 }
 
 // GetLoweringAccessControllerAccount gets the "loweringAccessController" account.
 func (inst *Initialize) GetLoweringAccessControllerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice[2]
 }
 
 func (inst Initialize) Build() *Instruction {
@@ -102,9 +89,6 @@ func (inst *Initialize) Validate() error {
 			return errors.New("accounts.Owner is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.RaisingAccessController is not set")
-		}
-		if inst.AccountMetaSlice[3] == nil {
 			return errors.New("accounts.LoweringAccessController is not set")
 		}
 	}
@@ -123,11 +107,10 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("                   state", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("                   owner", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta(" raisingAccessController", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("loweringAccessController", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("loweringAccessController", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
@@ -145,11 +128,9 @@ func NewInitializeInstruction(
 	// Accounts:
 	state ag_solanago.PublicKey,
 	owner ag_solanago.PublicKey,
-	raisingAccessController ag_solanago.PublicKey,
 	loweringAccessController ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
 		SetStateAccount(state).
 		SetOwnerAccount(owner).
-		SetRaisingAccessControllerAccount(raisingAccessController).
 		SetLoweringAccessControllerAccount(loweringAccessController)
 }
