@@ -158,37 +158,42 @@ func (m *OCRv2) DumpState() error {
 	return nil
 }
 
-// SetValidatorConfig sets validator config
+// // SetValidatorConfig sets validator config
+// func (m *OCRv2) SetValidatorConfig(flaggingThreshold uint32, validatorAddr string) error {
+// 	payer := m.Client.DefaultWallet
+// 	validatorPubKey, err := solana.PublicKeyFromBase58(validatorAddr)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	err = m.Client.TXAsync(
+// 		"Set validator config",
+// 		[]solana.Instruction{
+// 			ocr_2.NewSetValidatorConfigInstruction(
+// 				flaggingThreshold,
+// 				m.Client.Accounts.OCR.PublicKey(),
+// 				m.Client.Accounts.Owner.PublicKey(),
+// 				validatorPubKey,
+// 			).Build(),
+// 		},
+// 		func(key solana.PublicKey) *solana.PrivateKey {
+// 			if key.Equals(m.Client.Accounts.Owner.PublicKey()) {
+// 				return &m.Client.Accounts.Owner.PrivateKey
+// 			}
+// 			if key.Equals(payer.PublicKey()) {
+// 				return &payer.PrivateKey
+// 			}
+// 			return nil
+// 		},
+// 		payer.PublicKey(),
+// 	)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
+
+// TODO: doesn't exist anymore
 func (m *OCRv2) SetValidatorConfig(flaggingThreshold uint32, validatorAddr string) error {
-	payer := m.Client.DefaultWallet
-	validatorPubKey, err := solana.PublicKeyFromBase58(validatorAddr)
-	if err != nil {
-		return err
-	}
-	err = m.Client.TXAsync(
-		"Set validator config",
-		[]solana.Instruction{
-			ocr_2.NewSetValidatorConfigInstruction(
-				flaggingThreshold,
-				m.Client.Accounts.OCR.PublicKey(),
-				m.Client.Accounts.Owner.PublicKey(),
-				validatorPubKey,
-			).Build(),
-		},
-		func(key solana.PublicKey) *solana.PrivateKey {
-			if key.Equals(m.Client.Accounts.Owner.PublicKey()) {
-				return &m.Client.Accounts.Owner.PrivateKey
-			}
-			if key.Equals(payer.PublicKey()) {
-				return &payer.PrivateKey
-			}
-			return nil
-		},
-		payer.PublicKey(),
-	)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 

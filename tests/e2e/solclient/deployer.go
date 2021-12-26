@@ -67,7 +67,6 @@ func (c *ContractDeployer) DeployOCRv2DeviationFlaggingValidator(billingAC strin
 				stateAcc.PublicKey(),
 				c.Client.Accounts.Owner.PublicKey(),
 				bacPublicKey,
-				bacPublicKey,
 			).Build(),
 		},
 		func(key solana.PublicKey) *solana.PrivateKey {
