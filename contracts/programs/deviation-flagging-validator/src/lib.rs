@@ -107,17 +107,13 @@ pub mod deviation_flagging_validator {
             &ctx.accounts.authority,
         )?;
 
-        // TODO: can probably be improved
-        let positions: Vec<_> = state
-            .flags
-            .iter()
-            .enumerate()
-            .filter_map(|(i, flag)| flags.contains(flag).then(|| i))
-            .collect();
-        for index in positions.iter().rev() {
-            // reverse so that subsequent positions aren't affected
-            state.flags.remove(*index);
-        }
+        // This method operates in place, visiting each element exactly once in the original order,
+        // and preserves the order of the retained elements.
+        //
+        // For each of our state flags, we check if its in the input flag vec
+        // retain all the flags that are NOT lowered
+        state.flags.retain(|flag| !flags.contains(flag));
+
         Ok(())
     }
 

@@ -62,11 +62,10 @@ pub mod access_controller {
         let mut state = ctx.accounts.state.load_mut()?;
         let address = ctx.accounts.address.key();
 
-        let index = state.access_list.iter().position(|key| key == &address);
-        if let Some(index) = index {
-            state.access_list.remove(index);
-            // we don't need to sort again since the list is still sorted
-        }
+        // This method operates in place, visiting each element exactly once in the original order,
+        // and preserves the order of the retained elements.
+        state.access_list.retain(|key| key != &address);
+
         Ok(())
     }
 }
