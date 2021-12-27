@@ -283,7 +283,7 @@
           "isSigner": true
         },
         {
-          "name": "validator",
+          "name": "store",
           "isMut": false,
           "isSigner": false
         }
@@ -956,7 +956,7 @@
             }
           },
           {
-            "name": "validator",
+            "name": "store",
             "type": "publicKey"
           },
           {

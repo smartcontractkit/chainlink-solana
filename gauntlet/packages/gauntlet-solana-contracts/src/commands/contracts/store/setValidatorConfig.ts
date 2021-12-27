@@ -6,7 +6,7 @@ import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
 
 type Input = {
-  validator: string
+  store: string
   threshold: number | string
 }
 
@@ -15,7 +15,7 @@ export default class SetValidatorConfig extends SolanaCommand {
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:set_validator_config --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --threshold=1000 --validator=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet ocr2:set_validator_config --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --threshold=1000 --store=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
 
   makeInput = (userInput): Input => {
@@ -23,7 +23,7 @@ export default class SetValidatorConfig extends SolanaCommand {
     const rdd = getRDD(this.flags.rdd)
     const aggregator = rdd.contracts[this.flags.state]
     return {
-      validator: aggregator.validator,
+      store: aggregator.store,
       threshold: this.flags.threshold,
     }
   }
@@ -45,16 +45,16 @@ export default class SetValidatorConfig extends SolanaCommand {
 
     console.log('INPUT', input)
 
-    const validator = new PublicKey(input.validator)
+    const store = new PublicKey(input.store)
     const threshhold = new BN(input.threshold)
 
-    console.log(`Setting validator config on ${state.toString()}...`)
+    console.log(`Setting store config on ${state.toString()}...`)
 
     const tx = await program.rpc.setValidatorConfig(threshhold, {
       accounts: {
         state: state,
         authority: owner.publicKey,
-        validator: validator,
+        store: store,
       },
       signers: [owner],
     })

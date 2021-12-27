@@ -4,10 +4,10 @@ import { CONTRACT_LIST } from '../../../lib/contracts'
 import { makeAbstractCommand } from '../../abstract'
 import Initialize from './initialize'
 import InitializeAC from '../accessController/initialize'
-import InitializeValidator from '../validator/initialize'
+import InitializeValidator from '../store/initialize'
 import DeployToken from '../token/deploy'
 import SetPayees from './setPayees'
-import SetValidatorConfig from './setValidatorConfig'
+import SetValidatorConfig from '../store/setValidatorConfig'
 import AddAccess from '../accessController/addAccess'
 import BeginOffchainConfig from './offchainConfig/begin'
 import WriteOffchainConfig from './offchainConfig/write'
@@ -29,7 +29,7 @@ export default class SetupRDDFlow extends FlowCommand<TransactionResponse> {
       REQUEST_ACCESS_CONTROLLER: 2,
       OCR_2: 3,
       TOKEN: 4,
-      VALIDATOR: 5,
+      STORE: 5,
     }
 
     this.flow = [
@@ -63,7 +63,7 @@ export default class SetupRDDFlow extends FlowCommand<TransactionResponse> {
       {
         name: 'Initialize Validator',
         command: InitializeValidator,
-        id: this.stepIds.VALIDATOR,
+        id: this.stepIds.STORE,
         flags: {
           accessController: FlowCommand.ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
         },
@@ -132,17 +132,17 @@ export default class SetupRDDFlow extends FlowCommand<TransactionResponse> {
         flags: {
           state: FlowCommand.ID.contract(this.stepIds.OCR_2),
           input: {
-            validator: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.VALIDATOR)),
+            store: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.STORE)),
             threshold: 1,
           },
         },
       },
       {
-        name: 'Add access to validator on AC',
+        name: 'Add access to store on AC',
         command: AddAccess,
         flags: {
           state: FlowCommand.ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
-          address: FlowCommand.ID.data(this.stepIds.OCR_2, 'validatorAuthority'),
+          address: FlowCommand.ID.data(this.stepIds.OCR_2, 'storeAuthority'),
         },
       },
     ]

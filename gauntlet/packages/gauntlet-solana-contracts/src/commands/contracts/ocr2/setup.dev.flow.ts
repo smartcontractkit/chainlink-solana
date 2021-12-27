@@ -6,10 +6,10 @@ import { CONTRACT_ENV_NAMES, CONTRACT_LIST, getDeploymentContract } from '../../
 import { makeAbstractCommand } from '../../abstract'
 import Initialize from './initialize'
 import InitializeAC from '../accessController/initialize'
-import InitializeValidator from '../validator/initialize'
+import InitializeValidator from '../store/initialize'
 import DeployToken from '../token/deploy'
 import SetPayees from './setPayees'
-import SetValidatorConfig from './setValidatorConfig'
+import SetValidatorConfig from '../store/setValidatorConfig'
 import AddAccess from '../accessController/addAccess'
 import BeginOffchainConfig from './offchainConfig/begin'
 import WriteOffchainConfig from './offchainConfig/write'
@@ -31,7 +31,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
       REQUEST_ACCESS_CONTROLLER: 2,
       OCR_2: 3,
       TOKEN: 4,
-      VALIDATOR: 5,
+      STORE: 5,
     }
 
     const offchainConfigInput = {
@@ -150,7 +150,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
       {
         name: 'Initialize Validator',
         command: InitializeValidator,
-        id: this.stepIds.VALIDATOR,
+        id: this.stepIds.STORE,
         flags: {
           accessController: FlowCommand.ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
         },
@@ -228,17 +228,17 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         flags: {
           state: FlowCommand.ID.contract(this.stepIds.OCR_2),
           input: {
-            validator: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.VALIDATOR)),
+            store: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.STORE)),
             threshold: 1,
           },
         },
       },
       {
-        name: 'Add access to validator on AC',
+        name: 'Add access to store on AC',
         command: AddAccess,
         flags: {
           state: FlowCommand.ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
-          address: FlowCommand.ID.data(this.stepIds.OCR_2, 'validatorAuthority'),
+          address: FlowCommand.ID.data(this.stepIds.OCR_2, 'storeAuthority'),
         },
       },
     ]
@@ -249,17 +249,17 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
       [
         CONTRACT_LIST.ACCESS_CONTROLLER,
         CONTRACT_LIST.OCR_2,
-        CONTRACT_LIST.DEVIATION_FLAGGING_VALIDATOR,
+        CONTRACT_LIST.STORE,
       ].map(async (name) => (await getDeploymentContract(name, '')).programKeypair.publicKey.toString()),
     )
     logger.info(`
       Setting the following env variables. Include them into .env.${this.flags.network} for future runs
         ${CONTRACT_ENV_NAMES[CONTRACT_LIST.ACCESS_CONTROLLER]}=${programsPublicKeys[0]}
         ${CONTRACT_ENV_NAMES[CONTRACT_LIST.OCR_2]}=${programsPublicKeys[1]}
-        ${CONTRACT_ENV_NAMES[CONTRACT_LIST.DEVIATION_FLAGGING_VALIDATOR]}=${programsPublicKeys[2]}
+        ${CONTRACT_ENV_NAMES[CONTRACT_LIST.STORE]}=${programsPublicKeys[2]}
       `)
     process.env[CONTRACT_ENV_NAMES[CONTRACT_LIST.ACCESS_CONTROLLER]] = programsPublicKeys[0]
     process.env[CONTRACT_ENV_NAMES[CONTRACT_LIST.OCR_2]] = programsPublicKeys[1]
-    process.env[CONTRACT_ENV_NAMES[CONTRACT_LIST.DEVIATION_FLAGGING_VALIDATOR]] = programsPublicKeys[2]
+    process.env[CONTRACT_ENV_NAMES[CONTRACT_LIST.STORE]] = programsPublicKeys[2]
   }
 }
