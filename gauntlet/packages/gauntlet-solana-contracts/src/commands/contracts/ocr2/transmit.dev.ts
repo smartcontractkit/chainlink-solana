@@ -11,7 +11,7 @@ export default class Transmit extends SolanaCommand {
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:transmit --network=local --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --transmissions=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --validator=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --accessController=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --round=2',
+    'yarn gauntlet ocr2:transmit --network=local --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --transmissions=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --store=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --accessController=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --round=2',
   ]
 
   constructor(flags, args) {
@@ -25,11 +25,11 @@ export default class Transmit extends SolanaCommand {
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
 
-    const validatorProgram = getContract(CONTRACT_LIST.DEVIATION_FLAGGING_VALIDATOR, '')
+    const storeProgram = getContract(CONTRACT_LIST.STORE, '')
 
     const state = new PublicKey(this.flags.state)
     const transmissions = new PublicKey(this.flags.transmissions)
-    const validator = new PublicKey(this.flags.validator)
+    const store = new PublicKey(this.flags.store)
     const accessController = new PublicKey(this.flags.accessController)
     const round = Number(this.flags.round) || 1
     const info = await program.account.state.fetch(state)
@@ -66,8 +66,8 @@ export default class Transmit extends SolanaCommand {
 
     const transmitter = Keypair.fromSecretKey(Uint8Array.from(OPERATORS[0].transmitter))
 
-    const [validatorAuthority, validatorNonce] = await PublicKey.findProgramAddress(
-      [Buffer.from(utils.bytes.utf8.encode('validator')), state.toBuffer()],
+    const [storeAuthority, storeNonce] = await PublicKey.findProgramAddress(
+      [Buffer.from(utils.bytes.utf8.encode('store')), state.toBuffer()],
       program.programId,
     )
 
@@ -79,13 +79,13 @@ export default class Transmit extends SolanaCommand {
           { pubkey: state, isWritable: true, isSigner: false },
           { pubkey: transmitter.publicKey, isWritable: false, isSigner: true },
           { pubkey: transmissions, isWritable: true, isSigner: false },
-          { pubkey: validatorProgram.programId, isWritable: false, isSigner: false },
-          { pubkey: validator, isWritable: true, isSigner: false },
-          { pubkey: validatorAuthority, isWritable: false, isSigner: false },
+          { pubkey: storeProgram.programId, isWritable: false, isSigner: false },
+          { pubkey: store, isWritable: true, isSigner: false },
+          { pubkey: storeAuthority, isWritable: false, isSigner: false },
           { pubkey: accessController, isWritable: false, isSigner: false },
         ],
         data: Buffer.concat([
-          Buffer.from([validatorNonce]),
+          Buffer.from([storeNonce]),
           Buffer.from(reportContext),
           Buffer.from(rawReport),
           Buffer.from(rawSignatures),
