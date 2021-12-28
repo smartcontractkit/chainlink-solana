@@ -1,5 +1,5 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import BN from 'bn.js'
@@ -26,6 +26,8 @@ export default class BeginOffchainConfig extends SolanaCommand {
 
     const state = new PublicKey(this.flags.state)
     const owner = this.wallet.payer
+
+    await prompt(`Begin setting Offchain config version ${this.flags.version}?`)
 
     const tx = await program.rpc.beginOffchainConfig(new BN(this.flags.version), {
       accounts: {

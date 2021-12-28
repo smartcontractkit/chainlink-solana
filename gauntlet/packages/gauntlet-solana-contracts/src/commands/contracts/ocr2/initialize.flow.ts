@@ -10,12 +10,11 @@ import CommitOffchainConfig from './offchainConfig/commit'
 import SetConfig from './setConfig'
 import SetBilling from './setBilling'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import OCR2Inspect from './inspection/inspect'
 export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse> {
   static id = 'ocr2:initialize:flow'
   static category = CONTRACT_LIST.OCR_2
-  static examples = [
-    'yarn gauntlet ocr2:initialize:flow --network=local --id=[ID] --rdd=[PATH_TO_RDD] --version=[OFFCHAIN_CONFIG_VERSION(optional)]',
-  ]
+  static examples = ['yarn gauntlet ocr2:initialize:flow --network=local --id=[ID] --rdd=[PATH_TO_RDD]']
 
   constructor(flags, args) {
     super(flags, args, waitExecute, makeAbstractCommand)
@@ -44,7 +43,7 @@ export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse>
         command: BeginOffchainConfig,
         flags: {
           state: FlowCommand.ID.contract(this.stepIds.OCR_2),
-          version: this.flags.version || 1,
+          version: 2,
         },
       },
       {
@@ -81,6 +80,16 @@ export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse>
         command: SetBilling,
         flags: {
           state: FlowCommand.ID.contract(this.stepIds.OCR_2),
+        },
+      },
+      {
+        name: 'Inspection',
+        command: OCR2Inspect,
+        flags: {
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
+          billingAccessController: process.env.BILLING_ACCESS_CONTROLLER || this.flags.billingAccessController,
+          requesterAccessController: process.env.REQUESTER_ACCESS_CONTROLLER || this.flags.requesterAccessController,
+          link: process.env.LINK || this.flags.link,
         },
       },
     ]
