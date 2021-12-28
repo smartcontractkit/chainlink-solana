@@ -31,12 +31,10 @@ export default class OCR2Inspect extends SolanaCommand {
     const rdd = getRDD(this.flags.rdd)
     const info = rdd.contracts[this.flags.state]
     const aggregatorOperators: string[] = info.oracles.map((o) => o.operator)
-    const transmitters = aggregatorOperators.map((operator) => rdd.operators[operator].nodeAddress[0])
-    const billingAccessController =
-      this.flags.billingAccessController || process.env.BILLING_ADMIN_ACCESS_CONTROLLER_ADDRESS
-    const requesterAccessController =
-      this.flags.requesterAccessController || process.env.REQUESTER_ADMIN_ACCESS_CONTROLLER_ADDRESS
-    const link = this.flags.link || process.env.LINK_ADDRESS
+    const transmitters = aggregatorOperators.map((operator) => rdd.operators[operator].ocrNodeAddress[0])
+    const billingAccessController = this.flags.billingAccessController || process.env.BILLING_ACCESS_CONTROLLER
+    const requesterAccessController = this.flags.requesterAccessController || process.env.REQUESTER_ACCESS_CONTROLLER
+    const link = this.flags.link || process.env.LINK
     const offchainConfig = WriteOffchainConfig.makeInputFromRDD(rdd, this.flags.state)
     return {
       description: info.name,
@@ -80,6 +78,11 @@ export default class OCR2Inspect extends SolanaCommand {
     )
 
     const onChainOCRConfig = this.deserializeConfig(bufferedConfig)
+    const wrappedComparableLongNumber = (v: any) => {
+      // Proto encoding will ignore falsy values.
+      if (!v) return '0'
+      return toComparableLongNumber(v)
+    }
     const longNumberInspections = [
       'deltaProgressNanoseconds',
       'deltaResendNanoseconds',
@@ -93,7 +96,7 @@ export default class OCR2Inspect extends SolanaCommand {
       'maxDurationShouldTransmitAcceptedReportNanoseconds',
     ].map((prop) =>
       inspection.makeInspection(
-        toComparableLongNumber(onChainOCRConfig[prop]),
+        wrappedComparableLongNumber(onChainOCRConfig[prop]),
         toComparableNumber(input.offchainConfig[prop]),
         `Offchain Config "${prop}"`,
       ),
@@ -129,7 +132,7 @@ export default class OCR2Inspect extends SolanaCommand {
       inspection.makeInspection(
         toComparablePubKey(onChainState.config.billingAccessController),
         toComparablePubKey(input.billingAccessController),
-        'Requester access controller',
+        'Billing access controller',
       ),
       inspection.makeInspection(
         onChainState.oracles.xs
@@ -158,17 +161,17 @@ export default class OCR2Inspect extends SolanaCommand {
         'Offchain Config "reportingPluginConfig.alphaAcceptInfinite"',
       ),
       inspection.makeInspection(
-        toComparableLongNumber(onChainOCRConfig.reportingPluginConfig.alphaReportPpb),
+        wrappedComparableLongNumber(onChainOCRConfig.reportingPluginConfig.alphaReportPpb),
         toComparableNumber(input.offchainConfig.reportingPluginConfig.alphaReportPpb),
         `Offchain Config "reportingPluginConfig.alphaReportPpb"`,
       ),
       inspection.makeInspection(
-        toComparableLongNumber(onChainOCRConfig.reportingPluginConfig.alphaAcceptPpb),
+        wrappedComparableLongNumber(onChainOCRConfig.reportingPluginConfig.alphaAcceptPpb),
         toComparableNumber(input.offchainConfig.reportingPluginConfig.alphaAcceptPpb),
         `Offchain Config "reportingPluginConfig.alphaAcceptPpb"`,
       ),
       inspection.makeInspection(
-        toComparableLongNumber(onChainOCRConfig.reportingPluginConfig.deltaCNanoseconds),
+        wrappedComparableLongNumber(onChainOCRConfig.reportingPluginConfig.deltaCNanoseconds),
         toComparableNumber(input.offchainConfig.reportingPluginConfig.deltaCNanoseconds),
         `Offchain Config "reportingPluginConfig.deltaCNanoseconds"`,
       ),

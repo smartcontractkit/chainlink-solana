@@ -9,7 +9,7 @@ import CommitOffchainConfig from './commit'
 export default class SetOffchainConfigFlow extends FlowCommand<TransactionResponse> {
   static id = 'ocr2:set_offchain_config:flow'
   static category = CONTRACT_LIST.OCR_2
-  static examples = ['yarn gauntlet ocr2:set_offchain_config:flow --network=local --version=1 --rdd=[PATH_TO_RDD]']
+  static examples = ['yarn gauntlet ocr2:set_offchain_config:flow --network=local --rdd=[PATH_TO_RDD]']
 
   constructor(flags, args) {
     super(flags, args, waitExecute, makeAbstractCommand)
@@ -20,6 +20,9 @@ export default class SetOffchainConfigFlow extends FlowCommand<TransactionRespon
       {
         name: 'Begin Offchain Config',
         command: BeginOffchainConfig,
+        flags: {
+          version: 2,
+        },
       },
       {
         name: 'Write Offchain Config',
