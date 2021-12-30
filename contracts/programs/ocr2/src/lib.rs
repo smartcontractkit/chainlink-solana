@@ -794,13 +794,11 @@ impl Report {
     }
 }
 
-fn calculate_reimbursement(juels_per_lamport: u64, signature_count: usize) -> Result<u64> {
+fn calculate_reimbursement(juels_per_lamport: u64, _signature_count: usize) -> Result<u64> {
     const SIGNERS: u64 = 1; // TODO: probably needs to include signing the validator call
     let fees = Fees::get()?;
     let lamports_per_signature = fees.fee_calculator.lamports_per_signature;
-    // num of signatures + const based on how many signers we have
-    let signature_count = signature_count as u64 + SIGNERS;
-    let lamports = lamports_per_signature * signature_count;
+    let lamports = lamports_per_signature * SIGNERS;
     let juels = lamports * juels_per_lamport;
     Ok(juels)
 }
