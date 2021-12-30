@@ -55,6 +55,7 @@ pub struct Store<'a> {
 #[account]
 pub struct Transmissions {
     pub version: u8,
+    pub state: Pubkey,
     pub writer: Pubkey,
     pub flagging_threshold: u32,
     latest_round_id: u32,
@@ -182,6 +183,7 @@ mod tests {
         // insert the initial header with some granularity
         Transmissions {
             version: 1,
+            state: Pubkey::default(),
             writer: Pubkey::default(),
             flagging_threshold: 1000,
             latest_round_id: 0,

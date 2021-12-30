@@ -37,6 +37,7 @@ pub mod store {
     ) -> ProgramResult {
         let store = &mut ctx.accounts.store;
         store.version = 1;
+        store.state = ctx.accounts.state.key();
         store.granularity = granularity;
         store.live_length = live_length;
         store.writer = Pubkey::default();
@@ -48,12 +49,22 @@ pub mod store {
         ctx: Context<SetValidatorConfig>,
         flagging_threshold: u32,
     ) -> ProgramResult {
+        // Check that the store is owned by the state
+        require!(
+            ctx.accounts.state.key() == ctx.accounts.store.state,
+            Unauthorized
+        );
         ctx.accounts.store.flagging_threshold = flagging_threshold;
         Ok(())
     }
 
     #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
     pub fn set_writer(ctx: Context<SetValidatorConfig>, writer: Pubkey) -> ProgramResult {
+        // Check that the store is owned by the state
+        require!(
+            ctx.accounts.state.key() == ctx.accounts.store.state,
+            Unauthorized
+        );
         ctx.accounts.store.writer = writer;
         Ok(())
     }
