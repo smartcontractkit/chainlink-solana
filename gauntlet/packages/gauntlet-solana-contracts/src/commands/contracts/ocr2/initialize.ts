@@ -57,12 +57,12 @@ export default class Initialize extends SolanaCommand {
     const billingAccessController = new PublicKey(this.flags.billingAccessController)
 
     // ARGS
-    const [vaultAuthority, nonce] = await PublicKey.findProgramAddress(
+    const [vaultAuthority, vaultNonce] = await PublicKey.findProgramAddress(
       [Buffer.from(utils.bytes.utf8.encode('vault')), state.publicKey.toBuffer()],
       program.programId,
     )
 
-    const [storeAuthority] = await PublicKey.findProgramAddress(
+    const [storeAuthority, _storeNonce] = await PublicKey.findProgramAddress(
       [Buffer.from(utils.bytes.utf8.encode('store')), state.publicKey.toBuffer()],
       program.programId,
     )
@@ -102,13 +102,13 @@ export default class Initialize extends SolanaCommand {
       - Max Answer: ${maxAnswer.toString()}
       - Decimals: ${decimals}
       - Description: ${description}
-      - Nonce: ${nonce}
+      - Vault Nonce: ${vaultNonce}
     `)
 
     logger.log('Feed information:', input)
     await prompt('Continue initializing OCR 2 feed?')
 
-    const txHash = await program.rpc.initialize(nonce, minAnswer, maxAnswer, decimals, description, {
+    const txHash = await program.rpc.initialize(vaultNonce, minAnswer, maxAnswer, decimals, description, {
       accounts,
       signers: [owner, state, transmissions],
       instructions: [
