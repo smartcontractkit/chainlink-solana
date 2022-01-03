@@ -117,13 +117,16 @@ pub mod store {
         if is_valid {
             // raise flag if not raised yet
 
-            // TODO: use binary search here
-            let found = state.flags.iter().any(|flag| flag == &store_address);
-            if !found {
-                // if the len reaches array len, we're at capacity
-                require!(state.flags.remaining_capacity() > 0, Full);
-                // TODO insert via binary search
-                state.flags.push(store_address);
+            // if the len reaches array len, we're at capacity
+            require!(state.flags.remaining_capacity() > 0, Full);
+
+            match state.flags.binary_search(&store_address) {
+                // already present
+                Ok(_i) => (),
+                // not found, raise flag
+                Err(i) => {
+                    state.flags.insert(i, store_address);
+                }
             }
         }
 

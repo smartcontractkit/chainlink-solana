@@ -51,9 +51,14 @@ pub mod access_controller {
         // if the len reaches array len, we're at capacity
         require!(state.access_list.remaining_capacity() > 0, Full);
 
-        state.access_list.push(ctx.accounts.address.key());
-        // keep the access list sorted so we can use binary search
-        state.access_list.sort_unstable();
+        let address = ctx.accounts.address.key();
+
+        match state.access_list.binary_search(&address) {
+            // already present
+            Ok(_i) => (),
+            // not found, insert
+            Err(i) => state.access_list.insert(i, address),
+        }
         Ok(())
     }
 
@@ -62,8 +67,8 @@ pub mod access_controller {
         let mut state = ctx.accounts.state.load_mut()?;
         let address = ctx.accounts.address.key();
 
-        let index = state.access_list.iter().position(|key| key == &address);
-        if let Some(index) = index {
+        let index = state.access_list.binary_search(&address);
+        if let Ok(index) = index {
             state.access_list.remove(index);
             // we don't need to sort again since the list is still sorted
         }
