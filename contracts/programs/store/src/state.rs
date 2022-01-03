@@ -10,7 +10,7 @@ pub struct Flags {
 arrayvec!(Flags, Pubkey, u64);
 
 #[account(zero_copy)]
-pub struct Validator {
+pub struct Store {
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
     pub raising_access_controller: Pubkey,
@@ -45,7 +45,7 @@ use std::mem::size_of;
 /// Two ringbuffers
 /// - Live one that has a day's worth of data that's updated every second
 /// - Historical one that stores historical data
-pub struct Store<'a> {
+pub struct Feed<'a> {
     pub header: &'a mut Transmissions,
     live: RefMut<'a, [Transmission]>,
     historical: RefMut<'a, [Transmission]>,
@@ -54,7 +54,7 @@ pub struct Store<'a> {
 #[account]
 pub struct Transmissions {
     pub version: u8,
-    pub state: Pubkey,
+    pub store: Pubkey,
     pub writer: Pubkey,
     pub flagging_threshold: u32,
     latest_round_id: u32,
@@ -70,7 +70,7 @@ pub fn with_store<'a, 'info: 'a, F, T>(
     f: F,
 ) -> Result<T, ProgramError>
 where
-    F: FnOnce(&mut Store) -> T,
+    F: FnOnce(&mut Feed) -> T,
 {
     let n = account.live_length as usize;
 
@@ -88,7 +88,7 @@ where
         (live, historical)
     });
 
-    let mut store = Store {
+    let mut store = Feed {
         header: account,
         live,
         historical,
@@ -97,7 +97,7 @@ where
     Ok(f(&mut store))
 }
 
-impl<'a> Store<'a> {
+impl<'a> Feed<'a> {
     pub fn insert(&mut self, round: Transmission) {
         self.header.latest_round_id += 1;
 
@@ -182,7 +182,7 @@ mod tests {
         // insert the initial header with some granularity
         Transmissions {
             version: 1,
-            state: Pubkey::default(),
+            store: Pubkey::default(),
             writer: Pubkey::default(),
             flagging_threshold: 1000,
             latest_round_id: 0,

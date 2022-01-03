@@ -735,10 +735,10 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
     let cpi_ctx = CpiContext::new(
         ctx.accounts.validator_program.clone(),
         validator::cpi::accounts::Submit {
-            state: ctx.accounts.validator.to_account_info(),
+            store: ctx.accounts.validator.to_account_info(),
+            feed: ctx.accounts.transmissions.to_account_info(),
             authority: ctx.accounts.validator_authority.to_account_info(),
             access_controller: ctx.accounts.validator_access_controller.to_account_info(),
-            store: ctx.accounts.transmissions.to_account_info(), // TODO: what about passing accounts.state?
         },
     );
 
