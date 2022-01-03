@@ -96,6 +96,7 @@ func (obj *Validator) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 
 type Transmissions struct {
 	Version           uint8
+	State             ag_solanago.PublicKey
 	Writer            ag_solanago.PublicKey
 	FlaggingThreshold uint32
 	LatestRoundId     uint32
@@ -115,6 +116,11 @@ func (obj Transmissions) MarshalWithEncoder(encoder *ag_binary.Encoder) (err err
 	}
 	// Serialize `Version` param:
 	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `State` param:
+	err = encoder.Encode(obj.State)
 	if err != nil {
 		return err
 	}
@@ -172,6 +178,11 @@ func (obj *Transmissions) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err 
 	}
 	// Deserialize `Version`:
 	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `State`:
+	err = decoder.Decode(&obj.State)
 	if err != nil {
 		return err
 	}

@@ -7,7 +7,7 @@ require (
 	github.com/gagliardetto/solana-go v1.0.2
 	github.com/smartcontractkit/chainlink v1.0.1-0.20211209223503-68928efa429a
 	github.com/smartcontractkit/helmenv v1.0.20
-	github.com/smartcontractkit/integrations-framework v0.10.18
+	github.com/smartcontractkit/integrations-framework v1.0.21
 	github.com/smartcontractkit/libocr v0.0.0-20211210213233-5443fb9db7f7
 	github.com/stretchr/testify v1.7.0
 )
