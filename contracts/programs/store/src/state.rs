@@ -51,7 +51,6 @@ pub struct Store<'a> {
     historical: RefMut<'a, [Transmission]>,
 }
 
-// TODO: the modulus and initial ringbuffer size to be configurable
 #[account]
 pub struct Transmissions {
     pub version: u8,
