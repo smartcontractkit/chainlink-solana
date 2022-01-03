@@ -15,11 +15,11 @@ declare_id!("My11111111111111111111111111111111111111112");
 declare_id!("2F5NEkMnCRkmahEAcQfTQcZv1xtGgrWFfjENtTwHLuKg");
 
 #[constant]
-pub const MAX_ADDRS: usize = 32;
+pub const MAX_ADDRS: usize = 64;
 
 #[zero_copy]
 pub struct AccessList {
-    xs: [Pubkey; 32], // sadly we can't use const https://github.com/project-serum/anchor/issues/632
+    xs: [Pubkey; 64], // sadly we can't use const https://github.com/project-serum/anchor/issues/632
     len: u64,
 }
 arrayvec!(AccessList, Pubkey, u64);
