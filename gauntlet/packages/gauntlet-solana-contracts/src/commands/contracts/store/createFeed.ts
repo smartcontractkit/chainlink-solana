@@ -7,15 +7,16 @@ import { getRDD } from '../../../lib/rdd'
 
 type Input = {
   store: string
-  threshold: number | string
+  granularity: number
+  liveLength: number,
 }
 
-export default class SetValidatorConfig extends SolanaCommand {
-  static id = 'store:set_validator_config'
+export default class CreateFeed extends SolanaCommand {
+  static id = 'store:create_feed'
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet store:set_validator_config --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --threshold=1000 --feed=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet store:create_feed --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --granularity=30 --live-length 86400 --store=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
 
   makeInput = (userInput): Input => {
@@ -24,7 +25,8 @@ export default class SetValidatorConfig extends SolanaCommand {
     const aggregator = rdd.contracts[this.flags.state]
     return {
       store: aggregator.store,
-      threshold: this.flags.threshold,
+      granularity: this.flags.granularity,
+      liveLength: this.flags.liveLength,
     }
   }
 
@@ -40,26 +42,29 @@ export default class SetValidatorConfig extends SolanaCommand {
     const program = this.loadProgram(store.idl, address)
 
     const state = new PublicKey(this.flags.state)
+    const feed = Keypair.generate()
     const input = this.makeInput(this.flags.input)
     const owner = this.wallet.payer
 
     console.log('INPUT', input)
 
     const store = new PublicKey(input.store)
-    const threshold = new BN(input.threshold)
 
-    console.log(`Setting store config on ${state.toString()}...`)
-
-    const tx = await program.rpc.setValidatorConfig(threshold, {
+    console.log(`Creating feed...`)
+    
+    // TODO: assert length >= liveLength
+    
+    const tx = await program.rpc.createFeed(granularity, liveLength, {
       accounts: {
-        state: store.publicKey,
-        store: feed.publicKey,
+        state: state,
+        store: store,
         authority: owner.publicKey,
       },
-      signers: [owner],
+      signers: [owner, feed],
+      preInstructions: [
+        await program.account.transmissions.createInstruction(feed, 8+128+length*24),
+      ],
     })
-
-    logger.success(`Validator config on tx ${tx}`)
 
     return {
       responses: [
