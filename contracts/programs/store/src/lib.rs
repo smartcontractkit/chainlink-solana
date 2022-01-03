@@ -141,12 +141,9 @@ pub mod store {
             &ctx.accounts.authority,
         )?;
 
-        // TODO: can probably be improved
-        let positions: Vec<_> = state
-            .flags
+        let positions: Vec<_> = flags
             .iter()
-            .enumerate()
-            .filter_map(|(i, flag)| flags.contains(flag).then(|| i))
+            .filter_map(|flag| state.flags.binary_search(flag).ok())
             .collect();
         for index in positions.iter().rev() {
             // reverse so that subsequent positions aren't affected
@@ -238,7 +235,7 @@ pub struct Initialize<'info> {
 pub struct CreateFeed<'info> {
     pub state: AccountLoader<'info, Validator>,
     #[account(zero)]
-    pub store: Account<'info, Transmissions>, // TODO: use (init with payer)
+    pub store: Account<'info, Transmissions>,
     pub authority: Signer<'info>,
 }
 

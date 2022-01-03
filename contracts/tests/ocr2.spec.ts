@@ -254,7 +254,7 @@ describe('ocr2', async () => {
         store: transmissions.publicKey,
         authority: owner.publicKey,
       },
-      signers: [transmissions ],
+      signers: [transmissions],
       preInstructions: [
         await workspace.Store.account.transmissions.createInstruction(transmissions, 8+128+8096*24),
       ],
