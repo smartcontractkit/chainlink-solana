@@ -5,7 +5,7 @@ use access_controller::AccessController;
 mod state;
 
 use crate::state::with_store;
-pub use crate::state::{Transmission, Transmissions, Validator};
+pub use crate::state::{Store, Transmission, Transmissions};
 
 #[cfg(feature = "mainnet")]
 declare_id!("My11111111111111111111111111111111111111113");
@@ -23,109 +23,109 @@ pub mod store {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>) -> ProgramResult {
-        let mut state = ctx.accounts.state.load_init()?;
-        state.owner = ctx.accounts.owner.key();
-        state.lowering_access_controller = ctx.accounts.lowering_access_controller.key();
+        let mut store = ctx.accounts.store.load_init()?;
+        store.owner = ctx.accounts.owner.key();
+        store.lowering_access_controller = ctx.accounts.lowering_access_controller.key();
         Ok(())
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
+    #[access_control(owner(&ctx.accounts.store, &ctx.accounts.authority))]
     pub fn create_feed(
         ctx: Context<CreateFeed>,
         granularity: u8,
         live_length: u32,
     ) -> ProgramResult {
-        let store = &mut ctx.accounts.store;
-        store.version = 1;
-        store.state = ctx.accounts.state.key();
-        store.granularity = granularity;
-        store.live_length = live_length;
-        store.writer = Pubkey::default();
+        let feed = &mut ctx.accounts.feed;
+        feed.version = 1;
+        feed.store = ctx.accounts.store.key();
+        feed.granularity = granularity;
+        feed.live_length = live_length;
+        feed.writer = Pubkey::default();
         Ok(())
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
+    #[access_control(owner(&ctx.accounts.store, &ctx.accounts.authority))]
     pub fn set_validator_config(
         ctx: Context<SetValidatorConfig>,
         flagging_threshold: u32,
     ) -> ProgramResult {
-        // Check that the store is owned by the state
+        // Check that the feed is owned by the store
         require!(
-            ctx.accounts.state.key() == ctx.accounts.store.state,
+            ctx.accounts.store.key() == ctx.accounts.feed.store,
             Unauthorized
         );
-        ctx.accounts.store.flagging_threshold = flagging_threshold;
+        ctx.accounts.feed.flagging_threshold = flagging_threshold;
         Ok(())
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
+    #[access_control(owner(&ctx.accounts.store, &ctx.accounts.authority))]
     pub fn set_writer(ctx: Context<SetValidatorConfig>, writer: Pubkey) -> ProgramResult {
-        // Check that the store is owned by the state
+        // Check that the feed is owned by the store
         require!(
-            ctx.accounts.state.key() == ctx.accounts.store.state,
+            ctx.accounts.store.key() == ctx.accounts.feed.store,
             Unauthorized
         );
-        ctx.accounts.store.writer = writer;
+        ctx.accounts.feed.writer = writer;
         Ok(())
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
+    #[access_control(owner(&ctx.accounts.store, &ctx.accounts.authority))]
     pub fn transfer_ownership(
         ctx: Context<TransferOwnership>,
         proposed_owner: Pubkey,
     ) -> ProgramResult {
         require!(proposed_owner != Pubkey::default(), InvalidInput);
-        let state = &mut *ctx.accounts.state.load_mut()?;
-        state.proposed_owner = proposed_owner;
+        let store = &mut *ctx.accounts.store.load_mut()?;
+        store.proposed_owner = proposed_owner;
         Ok(())
     }
 
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> ProgramResult {
-        let state = &mut *ctx.accounts.state.load_mut()?;
+        let store = &mut *ctx.accounts.store.load_mut()?;
         require!(
-            ctx.accounts.authority.key == &state.proposed_owner,
+            ctx.accounts.authority.key == &store.proposed_owner,
             Unauthorized
         );
-        state.owner = std::mem::take(&mut state.proposed_owner);
+        store.owner = std::mem::take(&mut store.proposed_owner);
         Ok(())
     }
 
     pub fn submit(ctx: Context<Submit>, round: Transmission) -> ProgramResult {
-        let mut state = ctx.accounts.state.load_mut()?;
+        let mut store = ctx.accounts.store.load_mut()?;
 
         // check if this particular ocr2 cluster is allowed to write to the feed
         require!(
-            ctx.accounts.authority.key == &ctx.accounts.store.writer,
+            ctx.accounts.authority.key == &ctx.accounts.feed.writer,
             Unauthorized
         );
 
-        let previous_round = with_store(&mut ctx.accounts.store, |store| {
+        let previous_round = with_store(&mut ctx.accounts.feed, |store| {
             let previous = store.latest();
             store.insert(round);
             previous
         })?;
 
-        let flagging_threshold = ctx.accounts.store.flagging_threshold;
+        let flagging_threshold = ctx.accounts.feed.flagging_threshold;
 
         let is_valid = if let Some(previous_round) = previous_round {
             is_valid(flagging_threshold, previous_round.answer, round.answer)
         } else {
             true
         };
-        let store_address = ctx.accounts.store.key();
+        let feed_address = ctx.accounts.feed.key();
 
         if is_valid {
             // raise flag if not raised yet
 
             // if the len reaches array len, we're at capacity
-            require!(state.flags.remaining_capacity() > 0, Full);
+            require!(store.flags.remaining_capacity() > 0, Full);
 
-            match state.flags.binary_search(&store_address) {
+            match store.flags.binary_search(&feed_address) {
                 // already present
                 Ok(_i) => (),
                 // not found, raise flag
                 Err(i) => {
-                    state.flags.insert(i, store_address);
+                    store.flags.insert(i, feed_address);
                 }
             }
         }
@@ -134,28 +134,28 @@ pub mod store {
     }
 
     pub fn lower_flags(ctx: Context<SetFlag>, flags: Vec<Pubkey>) -> ProgramResult {
-        let mut state = ctx.accounts.state.load_mut()?;
+        let mut store = ctx.accounts.store.load_mut()?;
         has_lowering_access(
-            &state,
+            &store,
             &ctx.accounts.access_controller,
             &ctx.accounts.authority,
         )?;
 
         let positions: Vec<_> = flags
             .iter()
-            .filter_map(|flag| state.flags.binary_search(flag).ok())
+            .filter_map(|flag| store.flags.binary_search(flag).ok())
             .collect();
         for index in positions.iter().rev() {
             // reverse so that subsequent positions aren't affected
-            state.flags.remove(*index);
+            store.flags.remove(*index);
         }
         Ok(())
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
+    #[access_control(owner(&ctx.accounts.store, &ctx.accounts.authority))]
     pub fn set_lowering_access_controller(ctx: Context<SetAccessController>) -> ProgramResult {
-        let mut state = ctx.accounts.state.load_mut()?;
-        state.lowering_access_controller = ctx.accounts.access_controller.key();
+        let mut store = ctx.accounts.store.load_mut()?;
+        store.lowering_access_controller = ctx.accounts.access_controller.key();
         Ok(())
     }
 }
@@ -183,13 +183,13 @@ fn is_valid(flagging_threshold: u32, previous_answer: i128, answer: i128) -> boo
 }
 
 // Only owner access
-fn owner<'info>(state: &AccountLoader<'info, Validator>, signer: &'_ AccountInfo) -> ProgramResult {
+fn owner<'info>(state: &AccountLoader<'info, Store>, signer: &'_ AccountInfo) -> ProgramResult {
     require!(signer.key.eq(&state.load()?.owner), Unauthorized);
     Ok(())
 }
 
 fn has_lowering_access(
-    state: &Validator,
+    state: &Store,
     controller: &AccountLoader<AccessController>,
     authority: &AccountInfo,
 ) -> ProgramResult {
@@ -224,7 +224,7 @@ pub enum ErrorCode {
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(zero)]
-    pub state: AccountLoader<'info, Validator>,
+    pub store: AccountLoader<'info, Store>,
     #[account(signer)]
     pub owner: AccountInfo<'info>,
 
@@ -233,46 +233,46 @@ pub struct Initialize<'info> {
 
 #[derive(Accounts)]
 pub struct CreateFeed<'info> {
-    pub state: AccountLoader<'info, Validator>,
+    pub store: AccountLoader<'info, Store>,
     #[account(zero)]
-    pub store: Account<'info, Transmissions>,
+    pub feed: Account<'info, Transmissions>,
     pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
 pub struct TransferOwnership<'info> {
     #[account(mut)]
-    pub state: AccountLoader<'info, Validator>,
+    pub store: AccountLoader<'info, Store>,
     pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
 pub struct AcceptOwnership<'info> {
     #[account(mut)]
-    pub state: AccountLoader<'info, Validator>,
+    pub store: AccountLoader<'info, Store>,
     pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
 pub struct SetFlag<'info> {
     #[account(mut)]
-    pub state: AccountLoader<'info, Validator>,
+    pub store: AccountLoader<'info, Store>,
     pub authority: Signer<'info>,
     pub access_controller: AccountLoader<'info, AccessController>,
 }
 
 #[derive(Accounts)]
 pub struct SetValidatorConfig<'info> {
-    pub state: AccountLoader<'info, Validator>,
+    pub store: AccountLoader<'info, Store>,
     pub authority: Signer<'info>,
     #[account(mut)]
-    pub store: Account<'info, Transmissions>,
+    pub feed: Account<'info, Transmissions>,
 }
 
 #[derive(Accounts)]
 pub struct SetAccessController<'info> {
     #[account(mut)]
-    pub state: AccountLoader<'info, Validator>,
+    pub store: AccountLoader<'info, Store>,
     pub authority: Signer<'info>,
     pub access_controller: AccountLoader<'info, AccessController>,
 }
@@ -280,11 +280,11 @@ pub struct SetAccessController<'info> {
 #[derive(Accounts)]
 pub struct Submit<'info> {
     #[account(mut)]
-    pub state: AccountLoader<'info, Validator>,
+    pub store: AccountLoader<'info, Store>,
     pub authority: Signer<'info>,
     pub access_controller: AccountLoader<'info, AccessController>,
 
     /// The OCR2 feed
     #[account(mut)]
-    pub store: Account<'info, Transmissions>,
+    pub feed: Account<'info, Transmissions>,
 }

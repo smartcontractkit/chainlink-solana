@@ -250,8 +250,8 @@ describe('ocr2', async () => {
       liveLength,
     {
       accounts: {
-        state: store.publicKey,
-        store: transmissions.publicKey,
+        store: store.publicKey,
+        feed: transmissions.publicKey,
         authority: owner.publicKey,
       },
       signers: [transmissions],
@@ -265,8 +265,8 @@ describe('ocr2', async () => {
     await workspace.Store.rpc.setValidatorConfig(flaggingThreshold,
       {
         accounts: {
-          state: store.publicKey,
-          store: transmissions.publicKey,
+          store: store.publicKey,
+          feed: transmissions.publicKey,
           authority: owner.publicKey,
         },
         signers: [],
@@ -436,8 +436,8 @@ describe('ocr2', async () => {
       storeAuthority,
       {
         accounts: {
-          state: store.publicKey,
-          store: transmissions.publicKey,
+          store: store.publicKey,
+          feed: transmissions.publicKey,
           authority: owner.publicKey,
         },
       });
@@ -445,8 +445,8 @@ describe('ocr2', async () => {
 
   it('Transmits a round', async () => {
     await transmit(1, 2);
-    let store = await provider.connection.getAccountInfo(transmissions.publicKey);
-    console.log(store);
+    let feed = await provider.connection.getAccountInfo(transmissions.publicKey);
+    console.log(feed);
   });
 
   it('Withdraws funds', async () => {
