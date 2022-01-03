@@ -7,7 +7,6 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr2"
-	relaySol "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/utils"
 	"github.com/smartcontractkit/integrations-framework/contracts"
 )
@@ -15,26 +14,13 @@ import (
 type OCRv2 struct {
 	Client        *Client
 	State         *solana.Wallet
-	Transmissions *solana.Wallet
 	Authorities   map[string]*Authority
 	Payees        []*solana.Wallet
 	ProgramWallet *solana.Wallet
 }
 
-func (m *OCRv2) GetLatestRoundData() (uint64, error) {
-	a, _, err := relaySol.GetLatestTransmission(context.Background(), m.Client.RPC, m.Transmissions.PublicKey())
-	if err != nil {
-		return 0, err
-	}
-	return a.Data.Uint64(), nil
-}
-
 func (m *OCRv2) ProgramAddress() string {
 	return m.ProgramWallet.PublicKey().String()
-}
-
-func (m *OCRv2) TransmissionsAddr() string {
-	return m.Transmissions.PublicKey().String()
 }
 
 func (m *OCRv2) writeOffChainConfig(ocConfigBytes []byte) error {

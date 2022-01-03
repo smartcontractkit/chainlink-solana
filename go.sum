@@ -1939,8 +1939,8 @@ github.com/smartcontractkit/chainlink v1.0.1-0.20211209223503-68928efa429a h1:no
 github.com/smartcontractkit/chainlink v1.0.1-0.20211209223503-68928efa429a/go.mod h1:PSKo1vbT0/cUSbgH/rKNTDwWJyX8bc6M9/YVRe/nrXU=
 github.com/smartcontractkit/helmenv v1.0.20 h1:ws14fZK7C58NqFBob+WTvs2s3emzD5zqpRISLXsdMt4=
 github.com/smartcontractkit/helmenv v1.0.20/go.mod h1:oFDq/QeOcHMJ8Cl+UEOA3tAmYMHo2ONxOsMYvbzg91E=
-github.com/smartcontractkit/integrations-framework v0.10.18 h1:U1/TpQzixMRA54lSRGRHd/cLM5GQ4TbV6QazEZtCTA0=
-github.com/smartcontractkit/integrations-framework v0.10.18/go.mod h1:mceWG89OYgDkqIVD64Ocp2pn1utqoHAC4ycVV33JOTo=
+github.com/smartcontractkit/integrations-framework v1.0.21 h1:aw7Skb3YNu6qNJxSpQsrrY1t1+VpdwtkLgYJT0ZYy7U=
+github.com/smartcontractkit/integrations-framework v1.0.21/go.mod h1:mceWG89OYgDkqIVD64Ocp2pn1utqoHAC4ycVV33JOTo=
 github.com/smartcontractkit/libocr v0.0.0-20201203233047-5d9b24f0cbb5/go.mod h1:bfdSuLnBWCkafDvPGsQ1V6nrXhg046gh227MKi4zkpc=
 github.com/smartcontractkit/libocr v0.0.0-20211210213233-5443fb9db7f7 h1:RkwDW6gxsfhKqPvaxm3Qxfw/6l2QWgC0YrA6zgEXT2k=
 github.com/smartcontractkit/libocr v0.0.0-20211210213233-5443fb9db7f7/go.mod h1:nq3crM3wVqnyMlM/4ZydTuJ/WyCapAsOt7P94oRgSPg=
