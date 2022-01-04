@@ -2,7 +2,6 @@ package monitoring
 
 import (
 	"context"
-	"math/big"
 	"testing"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
@@ -53,22 +52,4 @@ func TestPrometheusExporter(t *testing.T) {
 
 		require.Equal(t, metrics.latestTransmitter, envelope1.State.Config.LatestTransmitter.String())
 	})
-}
-
-type keepLatestMetrics struct {
-	*devnullMetrics
-
-	latestTransmission *big.Int
-	latestTransmitter  string
-}
-
-func (k *keepLatestMetrics) SetOffchainAggregatorAnswers(answer *big.Int, contractAddress, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string) {
-	k.latestTransmission = &big.Int{}
-	k.latestTransmission.Set(answer)
-}
-
-func (k *keepLatestMetrics) SetOffchainAggregatorSubmissionReceivedValues(value *big.Int, contractAddress, sender, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string) {
-	k.latestTransmission = &big.Int{}
-	k.latestTransmission.Set(value)
-	k.latestTransmitter = sender
 }
