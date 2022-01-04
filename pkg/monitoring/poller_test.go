@@ -43,7 +43,7 @@ func TestPoller(t *testing.T) {
 			0,
 			0,
 			28,
-			30,
+			33,
 		},
 		{
 			"fast fetch, fast polling, insufficient buffering, tons of backpressure",

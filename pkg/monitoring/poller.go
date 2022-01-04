@@ -53,10 +53,10 @@ func (s *solanaPollerImpl) Start(ctx context.Context) {
 		s.updates <- data
 	}
 
+	reusedTimer := time.NewTimer(s.pollInterval)
 	for {
-		timer := time.NewTimer(s.pollInterval)
 		select {
-		case <-timer.C:
+		case <-reusedTimer.C:
 			var data interface{}
 			var err error
 			func() {
@@ -69,9 +69,10 @@ func (s *solanaPollerImpl) Start(ctx context.Context) {
 				continue
 			}
 			s.updates <- data
+			reusedTimer.Reset(s.pollInterval)
 		case <-ctx.Done():
-			if !timer.Stop() {
-				<-timer.C
+			if !reusedTimer.Stop() {
+				<-reusedTimer.C
 			}
 			s.log.Debug("poller closed")
 			return
