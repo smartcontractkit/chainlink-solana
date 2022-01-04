@@ -1,6 +1,7 @@
 package solana
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
@@ -150,7 +151,8 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 	cursor-- // cursor indicates index for new answer, latest answer is in previous index
 
 	// fetch transmission
-	var transmissionOffset uint64 = CursorOffset + CursorLen + (uint64(cursor) * transmissionLen)
+	var transmissionOffset uint64 = 8 + 128 + (uint64(cursor) * transmissionLen)
+
 	res, err = client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
 		Commitment: rpcCommitment,
@@ -168,13 +170,27 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 		return Answer{}, 0, errTransmissionLength
 	}
 
+	var timestamp uint64
+	raw := make([]byte, 16)
+
+	buf := bytes.NewReader(t)
+	err = binary.Read(buf, binary.LittleEndian, &timestamp)
+	if err != nil {
+		return Answer{}, 0, err
+	}
+
+	// TODO: we could use ag_binary.Int128 instead
+	err = binary.Read(buf, binary.LittleEndian, &raw)
+	if err != nil {
+		return Answer{}, 0, err
+	}
 	// reverse slice to change from little endian to big endian
-	for i, j := 0, len(t)-1; i < j; i, j = i+1, j-1 {
-		t[i], t[j] = t[j], t[i]
+	for i, j := 0, len(raw)-1; i < j; i, j = i+1, j-1 {
+		raw[i], raw[j] = raw[j], raw[i]
 	}
 
 	return Answer{
-		Data:      big.NewInt(0).SetBytes(t[TimestampLen:]),
-		Timestamp: binary.BigEndian.Uint64(t[:TimestampLen]),
+		Data:      big.NewInt(0).SetBytes(raw[:]),
+		Timestamp: timestamp,
 	}, res.RPCContext.Context.Slot, nil
 }
