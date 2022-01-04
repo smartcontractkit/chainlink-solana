@@ -1,14 +1,14 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { PublicKey } from '@solana/web3.js'
+import { Keypair, PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
 
 type Input = {
   store: string
   granularity: number
-  liveLength: number,
+  liveLength: number
 }
 
 export default class CreateFeed extends SolanaCommand {
@@ -16,7 +16,7 @@ export default class CreateFeed extends SolanaCommand {
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet store:create_feed --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --granularity=30 --live-length 86400 --store=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet store:create_feed --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --granularity=30 --liveLength 86400 --store=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
 
   makeInput = (userInput): Input => {
@@ -37,23 +37,29 @@ export default class CreateFeed extends SolanaCommand {
   }
 
   execute = async () => {
-    const store = getContract(CONTRACT_LIST.STORE, '')
-    const address = store.programId.toString()
-    const program = this.loadProgram(store.idl, address)
+    const storeProgram = getContract(CONTRACT_LIST.STORE, '')
+    const address = storeProgram.programId.toString()
+    const program = this.loadProgram(storeProgram.idl, address)
 
-    const state = new PublicKey(this.flags.state)
-    const feed = Keypair.generate()
     const input = this.makeInput(this.flags.input)
     const owner = this.wallet.payer
 
-    console.log('INPUT', input)
-
     const store = new PublicKey(input.store)
+    const state = new PublicKey(this.flags.state)
+    const feed = Keypair.generate()
+
+    const granularity = new BN(input.granularity)
+    const liveLength = new BN(input.liveLength)
+    const length = new BN(8096)
+    const feedAccountLength = new BN(8 + 128 + length.toNumber() * 24)
 
     console.log(`Creating feed...`)
-    
-    // TODO: assert length >= liveLength
-    
+
+    this.require(
+      length.gte(liveLength),
+      `Length (${length.toNumber()}) must be greater than liveLength (${liveLength.toNumber()})`,
+    )
+
     const tx = await program.rpc.createFeed(granularity, liveLength, {
       accounts: {
         state: state,
@@ -61,9 +67,7 @@ export default class CreateFeed extends SolanaCommand {
         authority: owner.publicKey,
       },
       signers: [owner, feed],
-      preInstructions: [
-        await program.account.transmissions.createInstruction(feed, 8+128+length*24),
-      ],
+      instructions: [await program.account.transmissions.createInstruction(feed, feedAccountLength.toNumber())],
     })
 
     return {

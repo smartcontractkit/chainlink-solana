@@ -3,11 +3,10 @@ import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { getRDD } from '../../../lib/rdd'
 
 type Input = {
-  store: string
   threshold: number | string
+  feed: string
 }
 
 export default class SetValidatorConfig extends SolanaCommand {
@@ -20,11 +19,11 @@ export default class SetValidatorConfig extends SolanaCommand {
 
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
-    const rdd = getRDD(this.flags.rdd)
-    const aggregator = rdd.contracts[this.flags.state]
+    // Can this come from rdd?
+    // const rdd = getRDD(this.flags.rdd)
     return {
-      store: aggregator.store,
       threshold: this.flags.threshold,
+      feed: this.flags.feed,
     }
   }
 
@@ -35,25 +34,23 @@ export default class SetValidatorConfig extends SolanaCommand {
   }
 
   execute = async () => {
-    const store = getContract(CONTRACT_LIST.STORE, '')
-    const address = store.programId.toString()
-    const program = this.loadProgram(store.idl, address)
+    const storeProgram = getContract(CONTRACT_LIST.STORE, '')
+    const address = storeProgram.programId.toString()
+    const program = this.loadProgram(storeProgram.idl, address)
 
-    const state = new PublicKey(this.flags.state)
     const input = this.makeInput(this.flags.input)
     const owner = this.wallet.payer
 
-    console.log('INPUT', input)
-
-    const store = new PublicKey(input.store)
+    const state = new PublicKey(this.flags.state)
     const threshold = new BN(input.threshold)
+    const feed = new PublicKey(input.feed)
 
     console.log(`Setting store config on ${state.toString()}...`)
 
     const tx = await program.rpc.setValidatorConfig(threshold, {
       accounts: {
-        state: store.publicKey,
-        store: feed.publicKey,
+        state,
+        store: feed,
         authority: owner.publicKey,
       },
       signers: [owner],
