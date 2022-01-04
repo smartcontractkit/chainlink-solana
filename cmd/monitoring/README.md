@@ -24,7 +24,7 @@ An example of a compatible json encoded feeds configuration is:
     "contract_address_base58": "2jVYiZgQ5disuAUMxrF1LkUyhZuqvRCrx1LfB555XUUv",
     "transmissions_account_base58": "2jVYiZgQ5disuAUMxrF1LkUyhZuqvRCrx1LfB555XUUv",
     "state_account_base58": "2jVYiZgQ5disuAUMxrF1LkUyhZuqvRCrx1LfB555XUUv",
-  },
+  }
   {
     "name": "link/usd",
     "path": "link-usd",

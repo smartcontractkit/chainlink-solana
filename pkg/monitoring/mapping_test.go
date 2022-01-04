@@ -14,8 +14,8 @@ func TestMapping(t *testing.T) {
 		state, offchainConfig, numericalMedianOffchainConfig, err := generateState()
 		require.NoError(t, err)
 		envelope := StateEnvelope{
-			State:       state,
-			BlockNumber: rand.Uint64(),
+			state,         // State:
+			rand.Uint64(), // BlockNumber:
 		}
 		solanaConfig := generateSolanaConfig()
 		feedConfig := generateFeedConfig()
@@ -178,6 +178,42 @@ func TestMapping(t *testing.T) {
 		require.Equal(t, decodedFeedConfig["state_account"], feedConfig.StateAccount.Bytes())
 	})
 
+	t.Run("MakeSimplifiedConfigSetMapping", func(t *testing.T) {
+		state, offchainConfig, _, err := generateState()
+		envelope := StateEnvelope{
+			state,         // State:
+			rand.Uint64(), // BlockNumber:
+		}
+		feedConfig := generateFeedConfig()
+
+		mapping, err := MakeConfigSetSimplifiedMapping(envelope, feedConfig)
+		require.NoError(t, err)
+		var output []byte
+		serialized, err := configSetSimplifiedCodec.BinaryFromNative(output, mapping)
+		require.NoError(t, err)
+		deserialized, _, err := configSetSimplifiedCodec.NativeFromBinary(serialized)
+		require.NoError(t, err)
+
+		configSetSimplified, ok := deserialized.(map[string]interface{})
+		require.True(t, ok)
+
+		oracles, err := createConfigSetSimplifiedOracles(offchainConfig.OffchainPublicKeys, offchainConfig.PeerIds, state.Oracles)
+		require.NoError(t, err)
+		require.Equal(t, configSetSimplified["block_number"], uint64ToBeBytes(envelope.BlockNumber))
+		require.Equal(t, configSetSimplified["delta_progress"], uint64ToBeBytes(offchainConfig.DeltaProgressNanoseconds))
+		require.Equal(t, configSetSimplified["delta_resend"], uint64ToBeBytes(offchainConfig.DeltaResendNanoseconds))
+		require.Equal(t, configSetSimplified["delta_round"], uint64ToBeBytes(offchainConfig.DeltaRoundNanoseconds))
+		require.Equal(t, configSetSimplified["delta_grace"], uint64ToBeBytes(offchainConfig.DeltaGraceNanoseconds))
+		require.Equal(t, configSetSimplified["delta_stage"], uint64ToBeBytes(offchainConfig.DeltaStageNanoseconds))
+		require.Equal(t, configSetSimplified["r_max"], int64(offchainConfig.RMax))
+		require.Equal(t, configSetSimplified["f"], int32(state.Config.F))
+		require.Equal(t, configSetSimplified["signers"], jsonMarshalToString(t, extractSigners(state.Oracles)))
+		require.Equal(t, configSetSimplified["transmitters"], jsonMarshalToString(t, extractTransmitters(state.Oracles)))
+		require.Equal(t, configSetSimplified["s"], jsonMarshalToString(t, offchainConfig.S))
+		require.Equal(t, configSetSimplified["oracles"], string(oracles))
+		require.Equal(t, configSetSimplified["feed_state_account"], strings.Replace(jsonMarshalToString(t, feedConfig.StateAccount.Bytes()), "\"", "", -1))
+	})
+
 	t.Run("MakeTransmissionMapping", func(t *testing.T) {
 		initial := generateTransmissionEnvelope()
 		solanaConfig := generateSolanaConfig()
@@ -217,42 +253,6 @@ func TestMapping(t *testing.T) {
 		require.Equal(t, decodedFeedConfig["contract_address"], feedConfig.ContractAddress.Bytes())
 		require.Equal(t, decodedFeedConfig["transmissions_account"], feedConfig.TransmissionsAccount.Bytes())
 		require.Equal(t, decodedFeedConfig["state_account"], feedConfig.StateAccount.Bytes())
-	})
-	t.Run("MakeSimplifiedConfigSetMapping", func(t *testing.T) {
-		state, offchainConfig, _, err := generateState()
-		envelope := StateEnvelope{
-			State:       state,
-			BlockNumber: rand.Uint64(),
-		}
-		feedConfig := generateFeedConfig()
-
-		mapping, err := MakeConfigSetSimplifiedMapping(envelope, feedConfig)
-		require.NoError(t, err)
-		var output []byte
-		serialized, err := configSetSimplifiedCodec.BinaryFromNative(output, mapping)
-		require.NoError(t, err)
-		deserialized, _, err := configSetSimplifiedCodec.NativeFromBinary(serialized)
-		require.NoError(t, err)
-
-		configSetSimplified, ok := deserialized.(map[string]interface{})
-		require.True(t, ok)
-
-		oracles, err := createConfigSetSimplifiedOracles(offchainConfig.OffchainPublicKeys, offchainConfig.PeerIds, state.Oracles)
-		require.NoError(t, err)
-		require.Equal(t, configSetSimplified["block_number"], uint64ToBeBytes(envelope.BlockNumber))
-		require.Equal(t, configSetSimplified["delta_progress"], uint64ToBeBytes(offchainConfig.DeltaProgressNanoseconds))
-		require.Equal(t, configSetSimplified["delta_resend"], uint64ToBeBytes(offchainConfig.DeltaResendNanoseconds))
-		require.Equal(t, configSetSimplified["delta_round"], uint64ToBeBytes(offchainConfig.DeltaRoundNanoseconds))
-		require.Equal(t, configSetSimplified["delta_grace"], uint64ToBeBytes(offchainConfig.DeltaGraceNanoseconds))
-		require.Equal(t, configSetSimplified["delta_stage"], uint64ToBeBytes(offchainConfig.DeltaStageNanoseconds))
-		require.Equal(t, configSetSimplified["r_max"], int64(offchainConfig.RMax))
-		require.Equal(t, configSetSimplified["f"], int32(state.Config.F))
-		require.Equal(t, configSetSimplified["signers"], jsonMarshalToString(t, extractSigners(state.Oracles)))
-		require.Equal(t, configSetSimplified["transmitters"], jsonMarshalToString(t, extractTransmitters(state.Oracles)))
-		require.Equal(t, configSetSimplified["s"], jsonMarshalToString(t, offchainConfig.S))
-		require.Equal(t, configSetSimplified["oracles"], string(oracles))
-		require.Equal(t, configSetSimplified["feed_state_account"], strings.Replace(jsonMarshalToString(t, feedConfig.StateAccount.Bytes()), "\"", "", -1))
-
 	})
 }
 

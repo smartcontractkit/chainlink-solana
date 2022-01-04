@@ -56,16 +56,18 @@ func generateOffchainConfig(oracles [19]pkgSolana.Oracle, numOracles int) (
 		peerIDs = append(peerIDs, fmt.Sprintf("peer#%d", i))
 	}
 	config := &pb.OffchainConfigProto{
-		DeltaProgressNanoseconds:          rand.Uint64(),
-		DeltaResendNanoseconds:            rand.Uint64(),
-		DeltaRoundNanoseconds:             rand.Uint64(),
-		DeltaGraceNanoseconds:             rand.Uint64(),
-		DeltaStageNanoseconds:             rand.Uint64(),
-		RMax:                              rand.Uint32(),
-		S:                                 schedule,
-		OffchainPublicKeys:                offchainPublicKeys,
-		PeerIds:                           peerIDs,
-		ReportingPluginConfig:             encodedNumericalMedianOffchainConfig,
+		DeltaProgressNanoseconds: rand.Uint64(),
+		DeltaResendNanoseconds:   rand.Uint64(),
+		DeltaRoundNanoseconds:    rand.Uint64(),
+		DeltaGraceNanoseconds:    rand.Uint64(),
+		DeltaStageNanoseconds:    rand.Uint64(),
+
+		RMax:                  rand.Uint32(),
+		S:                     schedule,
+		OffchainPublicKeys:    offchainPublicKeys,
+		PeerIds:               peerIDs,
+		ReportingPluginConfig: encodedNumericalMedianOffchainConfig,
+
 		MaxDurationQueryNanoseconds:       rand.Uint64(),
 		MaxDurationObservationNanoseconds: rand.Uint64(),
 		MaxDurationReportNanoseconds:      rand.Uint64(),
@@ -263,7 +265,11 @@ func NewRandomDataReader(ctx context.Context, wg *sync.WaitGroup, typ string, lo
 }
 
 func (f *fakeReader) Read(ctx context.Context, _ solana.PublicKey) (interface{}, error) {
-	ans := <-f.readCh
+	var ans interface{}
+	select {
+	case ans = <-f.readCh:
+	case <-ctx.Done():
+	}
 	return ans, nil
 }
 
@@ -298,10 +304,14 @@ type producerMessage struct{ key, value []byte }
 
 type fakeProducer struct {
 	sendCh chan producerMessage
+	ctx    context.Context
 }
 
 func (f fakeProducer) Produce(key, value []byte, topic string) error {
-	f.sendCh <- producerMessage{key, value}
+	select {
+	case f.sendCh <- producerMessage{key, value}:
+	case <-f.ctx.Done():
+	}
 	return nil
 }
 
