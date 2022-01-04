@@ -50,8 +50,7 @@ type ContractDeployer struct {
 func (c *ContractDeployer) DeployOCRv2Store(billingAC string) (contracts.OCRv2Store, error) {
 	programWallet := c.Client.ProgramWallets["store-keypair.json"]
 	payer := c.Client.DefaultWallet
-	stateAcc := solana.NewWallet()
-	accInstruction, err := c.Client.CreateAccInstr(stateAcc, StoreAccountSize, programWallet.PublicKey())
+	accInstruction, err := c.Client.CreateAccInstr(c.Client.Accounts.Store, StoreAccountSize, programWallet.PublicKey())
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +63,7 @@ func (c *ContractDeployer) DeployOCRv2Store(billingAC string) (contracts.OCRv2St
 		[]solana.Instruction{
 			accInstruction,
 			store2.NewInitializeInstruction(
-				stateAcc.PublicKey(),
+				c.Client.Accounts.Store.PublicKey(),
 				c.Client.Accounts.Owner.PublicKey(),
 				bacPublicKey,
 			).Build(),
@@ -73,8 +72,8 @@ func (c *ContractDeployer) DeployOCRv2Store(billingAC string) (contracts.OCRv2St
 			if key.Equals(c.Client.Accounts.Owner.PublicKey()) {
 				return &c.Client.Accounts.Owner.PrivateKey
 			}
-			if key.Equals(stateAcc.PublicKey()) {
-				return &stateAcc.PrivateKey
+			if key.Equals(c.Client.Accounts.Store.PublicKey()) {
+				return &c.Client.Accounts.Store.PrivateKey
 			}
 			if key.Equals(payer.PublicKey()) {
 				return &payer.PrivateKey
@@ -88,8 +87,8 @@ func (c *ContractDeployer) DeployOCRv2Store(billingAC string) (contracts.OCRv2St
 	}
 	return &Store{
 		Client:        c.Client,
-		State:         stateAcc,
-		Transmissions: c.Client.Accounts.Transmissions,
+		Store:         c.Client.Accounts.Store,
+		Feed:          c.Client.Accounts.Feed,
 		ProgramWallet: programWallet,
 	}, nil
 }
@@ -217,7 +216,7 @@ func (c *ContractDeployer) DeployOCRv2(billingControllerAddr string, requesterCo
 				SetDecimals(9).
 				SetDescription("OCRv2").
 				SetStateAccount(c.Client.Accounts.OCR.PublicKey()).
-				SetTransmissionsAccount(c.Client.Accounts.Transmissions.PublicKey()).
+				SetTransmissionsAccount(c.Client.Accounts.Feed.PublicKey()).
 				SetPayerAccount(payer.PublicKey()).
 				SetOwnerAccount(c.Client.Accounts.Owner.PublicKey()).
 				SetTokenMintAccount(linkTokenMintPubKey).
