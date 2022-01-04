@@ -201,13 +201,13 @@ describe('ocr2', async () => {
   it('Creates a store', async () => {
     await workspace.Store.rpc.initialize({
       accounts: {
-        state: store.publicKey,
+        store: store.publicKey,
         owner: owner.publicKey,
         loweringAccessController: billingAccessController.publicKey,
       },
       signers: [store],
       preInstructions: [
-        await workspace.Store.account.validator.createInstruction(store),
+        await workspace.Store.account.store.createInstruction(store),
       ],
     });
 
