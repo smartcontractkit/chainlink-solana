@@ -16,7 +16,7 @@ const (
 	TransmissionLen uint64 = 16 + TimestampLen
 
 	// AccountDiscriminator (8 bytes), RoundID (uint32, 4 bytes), Cursor (uint32, 4 bytes)
-	CursorOffset uint64 = 8 + 4
+	CursorOffset uint64 = 8 + 1 + 32 + 32 + 4 + 4 + 1 + 4
 	CursorLen    uint64 = 4
 
 	// Report data (61 bytes)
