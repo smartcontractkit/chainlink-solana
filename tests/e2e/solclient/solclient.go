@@ -38,10 +38,12 @@ type NetworkConfig struct {
 type Accounts struct {
 	// OCR OCR program state account
 	OCR *solana.Wallet
+	// Store store program state account
+	Store *solana.Wallet
 	// OCRVault OCR program account to hold LINK
 	OCRVault *solana.Wallet
 	// Transmissions OCR transmissions state account
-	Transmissions *solana.Wallet
+	Feed *solana.Wallet
 	// Authorities authorities used to sign on-chain, used by programs
 	Authorities map[string]*Authority
 	// Owner is the owner of all programs
@@ -144,7 +146,8 @@ func NewClient(cfg *NetworkConfig) (*Client, error) {
 func (c *Client) initSharedState() {
 	c.Accounts = &Accounts{
 		OCR:           solana.NewWallet(),
-		Transmissions: solana.NewWallet(),
+		Store:         solana.NewWallet(),
+		Feed:          solana.NewWallet(),
 		Owner:         solana.NewWallet(),
 		Mint:          solana.NewWallet(),
 		MintAuthority: solana.NewWallet(),

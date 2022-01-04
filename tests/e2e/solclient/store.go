@@ -9,13 +9,13 @@ import (
 
 type Store struct {
 	Client        *Client
-	State         *solana.Wallet
-	Transmissions *solana.Wallet
+	Store         *solana.Wallet
+	Feed          *solana.Wallet
 	ProgramWallet *solana.Wallet
 }
 
 func (m *Store) GetLatestRoundData() (uint64, error) {
-	a, _, err := relaySol.GetLatestTransmission(context.Background(), m.Client.RPC, m.Transmissions.PublicKey())
+	a, _, err := relaySol.GetLatestTransmission(context.Background(), m.Client.RPC, m.Feed.PublicKey())
 	if err != nil {
 		return 0, err
 	}
@@ -23,7 +23,7 @@ func (m *Store) GetLatestRoundData() (uint64, error) {
 }
 
 func (m *Store) TransmissionsAddress() string {
-	return m.Transmissions.PublicKey().String()
+	return m.Feed.PublicKey().String()
 }
 
 func (m *Store) SetValidatorConfig(flaggingThreshold uint32) error {
@@ -41,9 +41,9 @@ func (m *Store) SetWriter(writerAuthority string) error {
 		[]solana.Instruction{
 			store.NewSetWriterInstruction(
 				writerAuthPubKey,
-				m.State.PublicKey(),
+				m.Store.PublicKey(),
 				m.Client.Accounts.Owner.PublicKey(),
-				m.Transmissions.PublicKey(),
+				m.Feed.PublicKey(),
 			).Build(),
 		},
 		func(key solana.PublicKey) *solana.PrivateKey {
@@ -66,19 +66,19 @@ func (m *Store) SetWriter(writerAuthority string) error {
 func (m *Store) CreateFeed(granularity int, liveLength int) error {
 	payer := m.Client.DefaultWallet
 	programWallet := m.Client.ProgramWallets["store-keypair.json"]
-	ocrTransmissionsAccInstruction, err := m.Client.CreateAccInstr(m.Client.Accounts.Transmissions, OCRTransmissionsAccountSize, programWallet.PublicKey())
+	feedAccInstruction, err := m.Client.CreateAccInstr(m.Client.Accounts.Feed, OCRTransmissionsAccountSize, programWallet.PublicKey())
 	if err != nil {
 		return err
 	}
 	err = m.Client.TXAsync(
 		"Create feed",
 		[]solana.Instruction{
-			ocrTransmissionsAccInstruction,
+			feedAccInstruction,
 			store.NewCreateFeedInstruction(
 				uint8(granularity),
 				uint32(liveLength),
-				m.State.PublicKey(),
-				m.Transmissions.PublicKey(),
+				m.Store.PublicKey(),
+				m.Feed.PublicKey(),
 				m.Client.Accounts.Owner.PublicKey(),
 			).Build(),
 		},
@@ -86,8 +86,8 @@ func (m *Store) CreateFeed(granularity int, liveLength int) error {
 			if key.Equals(m.Client.Accounts.Owner.PublicKey()) {
 				return &m.Client.Accounts.Owner.PrivateKey
 			}
-			if key.Equals(m.Transmissions.PublicKey()) {
-				return &m.Transmissions.PrivateKey
+			if key.Equals(m.Feed.PublicKey()) {
+				return &m.Feed.PrivateKey
 			}
 			if key.Equals(payer.PublicKey()) {
 				return &payer.PrivateKey
@@ -107,5 +107,5 @@ func (m *Store) ProgramAddress() string {
 }
 
 func (m *Store) Address() string {
-	return m.State.PublicKey().String()
+	return m.Store.PublicKey().String()
 }
