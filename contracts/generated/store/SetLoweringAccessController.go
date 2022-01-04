@@ -13,7 +13,7 @@ import (
 // SetLoweringAccessController is the `setLoweringAccessController` instruction.
 type SetLoweringAccessController struct {
 
-	// [0] = [WRITE] state
+	// [0] = [WRITE] store
 	//
 	// [1] = [SIGNER] authority
 	//
@@ -29,14 +29,14 @@ func NewSetLoweringAccessControllerInstructionBuilder() *SetLoweringAccessContro
 	return nd
 }
 
-// SetStateAccount sets the "state" account.
-func (inst *SetLoweringAccessController) SetStateAccount(state ag_solanago.PublicKey) *SetLoweringAccessController {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(state).WRITE()
+// SetStoreAccount sets the "store" account.
+func (inst *SetLoweringAccessController) SetStoreAccount(store ag_solanago.PublicKey) *SetLoweringAccessController {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(store).WRITE()
 	return inst
 }
 
-// GetStateAccount gets the "state" account.
-func (inst *SetLoweringAccessController) GetStateAccount() *ag_solanago.AccountMeta {
+// GetStoreAccount gets the "store" account.
+func (inst *SetLoweringAccessController) GetStoreAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
@@ -83,7 +83,7 @@ func (inst *SetLoweringAccessController) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.State is not set")
+			return errors.New("accounts.Store is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Authority is not set")
@@ -108,7 +108,7 @@ func (inst *SetLoweringAccessController) EncodeToTree(parent ag_treeout.Branches
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("           state", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("           store", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("accessController", inst.AccountMetaSlice[2]))
 					})
@@ -126,11 +126,11 @@ func (obj *SetLoweringAccessController) UnmarshalWithDecoder(decoder *ag_binary.
 // NewSetLoweringAccessControllerInstruction declares a new SetLoweringAccessController instruction with the provided parameters and accounts.
 func NewSetLoweringAccessControllerInstruction(
 	// Accounts:
-	state ag_solanago.PublicKey,
+	store ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	accessController ag_solanago.PublicKey) *SetLoweringAccessController {
 	return NewSetLoweringAccessControllerInstructionBuilder().
-		SetStateAccount(state).
+		SetStoreAccount(store).
 		SetAuthorityAccount(authority).
 		SetAccessControllerAccount(accessController)
 }

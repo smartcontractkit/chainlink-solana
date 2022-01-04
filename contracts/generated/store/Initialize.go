@@ -13,7 +13,7 @@ import (
 // Initialize is the `initialize` instruction.
 type Initialize struct {
 
-	// [0] = [WRITE] state
+	// [0] = [WRITE] store
 	//
 	// [1] = [SIGNER] owner
 	//
@@ -29,14 +29,14 @@ func NewInitializeInstructionBuilder() *Initialize {
 	return nd
 }
 
-// SetStateAccount sets the "state" account.
-func (inst *Initialize) SetStateAccount(state ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(state).WRITE()
+// SetStoreAccount sets the "store" account.
+func (inst *Initialize) SetStoreAccount(store ag_solanago.PublicKey) *Initialize {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(store).WRITE()
 	return inst
 }
 
-// GetStateAccount gets the "state" account.
-func (inst *Initialize) GetStateAccount() *ag_solanago.AccountMeta {
+// GetStoreAccount gets the "store" account.
+func (inst *Initialize) GetStoreAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
@@ -83,7 +83,7 @@ func (inst *Initialize) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.State is not set")
+			return errors.New("accounts.Store is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Owner is not set")
@@ -108,7 +108,7 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("                   state", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("                   store", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("                   owner", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("loweringAccessController", inst.AccountMetaSlice[2]))
 					})
@@ -126,11 +126,11 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 // NewInitializeInstruction declares a new Initialize instruction with the provided parameters and accounts.
 func NewInitializeInstruction(
 	// Accounts:
-	state ag_solanago.PublicKey,
+	store ag_solanago.PublicKey,
 	owner ag_solanago.PublicKey,
 	loweringAccessController ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
-		SetStateAccount(state).
+		SetStoreAccount(store).
 		SetOwnerAccount(owner).
 		SetLoweringAccessControllerAccount(loweringAccessController)
 }

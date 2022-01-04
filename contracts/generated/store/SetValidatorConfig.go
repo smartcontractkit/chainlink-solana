@@ -14,11 +14,11 @@ import (
 type SetValidatorConfig struct {
 	FlaggingThreshold *uint32
 
-	// [0] = [] state
+	// [0] = [] store
 	//
 	// [1] = [SIGNER] authority
 	//
-	// [2] = [WRITE] store
+	// [2] = [WRITE] feed
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
@@ -36,14 +36,14 @@ func (inst *SetValidatorConfig) SetFlaggingThreshold(flaggingThreshold uint32) *
 	return inst
 }
 
-// SetStateAccount sets the "state" account.
-func (inst *SetValidatorConfig) SetStateAccount(state ag_solanago.PublicKey) *SetValidatorConfig {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(state)
+// SetStoreAccount sets the "store" account.
+func (inst *SetValidatorConfig) SetStoreAccount(store ag_solanago.PublicKey) *SetValidatorConfig {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(store)
 	return inst
 }
 
-// GetStateAccount gets the "state" account.
-func (inst *SetValidatorConfig) GetStateAccount() *ag_solanago.AccountMeta {
+// GetStoreAccount gets the "store" account.
+func (inst *SetValidatorConfig) GetStoreAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
@@ -58,14 +58,14 @@ func (inst *SetValidatorConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
-// SetStoreAccount sets the "store" account.
-func (inst *SetValidatorConfig) SetStoreAccount(store ag_solanago.PublicKey) *SetValidatorConfig {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(store).WRITE()
+// SetFeedAccount sets the "feed" account.
+func (inst *SetValidatorConfig) SetFeedAccount(feed ag_solanago.PublicKey) *SetValidatorConfig {
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(feed).WRITE()
 	return inst
 }
 
-// GetStoreAccount gets the "store" account.
-func (inst *SetValidatorConfig) GetStoreAccount() *ag_solanago.AccountMeta {
+// GetFeedAccount gets the "feed" account.
+func (inst *SetValidatorConfig) GetFeedAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
@@ -97,13 +97,13 @@ func (inst *SetValidatorConfig) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.State is not set")
+			return errors.New("accounts.Store is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.Store is not set")
+			return errors.New("accounts.Feed is not set")
 		}
 	}
 	return nil
@@ -124,9 +124,9 @@ func (inst *SetValidatorConfig) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("    store", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("    store", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("     feed", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
@@ -154,12 +154,12 @@ func NewSetValidatorConfigInstruction(
 	// Parameters:
 	flaggingThreshold uint32,
 	// Accounts:
-	state ag_solanago.PublicKey,
+	store ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
-	store ag_solanago.PublicKey) *SetValidatorConfig {
+	feed ag_solanago.PublicKey) *SetValidatorConfig {
 	return NewSetValidatorConfigInstructionBuilder().
 		SetFlaggingThreshold(flaggingThreshold).
-		SetStateAccount(state).
+		SetStoreAccount(store).
 		SetAuthorityAccount(authority).
-		SetStoreAccount(store)
+		SetFeedAccount(feed)
 }
