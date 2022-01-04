@@ -13,7 +13,7 @@
     "!dist/**/*.test.js"
   ],
   "scripts": {
-    "gauntlet": "ts-node ./src/index.ts",
+    "gauntlet": "ts-node ./src/cli.ts",
     "lint": "tsc",
     "test": "SKIP_PROMPTS=true jest --runInBand",
     "test:coverage": "yarn test --collectCoverage",
