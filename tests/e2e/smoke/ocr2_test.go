@@ -78,6 +78,9 @@ var _ = Describe("Solana OCRv2", func() {
 			err = nets.Default.WaitForEvents()
 			Expect(err).ShouldNot(HaveOccurred())
 
+			err = store.CreateFeed(10, 1024)
+			Expect(err).ShouldNot(HaveOccurred())
+
 			err = ocr2.SetBilling(uint32(1), uint32(1), billingAC.Address())
 			Expect(err).ShouldNot(HaveOccurred())
 			storeAuth, err := ocr2.AuthorityAddr("store")
@@ -86,12 +89,12 @@ var _ = Describe("Solana OCRv2", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			err = ocr2.SetOracles(ocConfig)
 			Expect(err).ShouldNot(HaveOccurred())
-			err = store.CreateFeed(10, 1024)
-			Expect(err).ShouldNot(HaveOccurred())
 			err = nets.Default.WaitForEvents()
 			Expect(err).ShouldNot(HaveOccurred())
 
 			err = store.SetWriter(storeAuth)
+			Expect(err).ShouldNot(HaveOccurred())
+			err = store.SetValidatorConfig(80000)
 			Expect(err).ShouldNot(HaveOccurred())
 			err = nets.Default.WaitForEvents()
 			Expect(err).ShouldNot(HaveOccurred())

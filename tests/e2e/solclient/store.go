@@ -27,7 +27,32 @@ func (m *Store) TransmissionsAddress() string {
 }
 
 func (m *Store) SetValidatorConfig(flaggingThreshold uint32) error {
-	panic("implement me")
+	payer := m.Client.DefaultWallet
+	err := m.Client.TXAsync(
+		"Set validator config",
+		[]solana.Instruction{
+			store.NewSetValidatorConfigInstruction(
+				flaggingThreshold,
+				m.Store.PublicKey(),
+				m.Client.Accounts.Owner.PublicKey(),
+				m.Feed.PublicKey(),
+			).Build(),
+		},
+		func(key solana.PublicKey) *solana.PrivateKey {
+			if key.Equals(m.Client.Accounts.Owner.PublicKey()) {
+				return &m.Client.Accounts.Owner.PrivateKey
+			}
+			if key.Equals(payer.PublicKey()) {
+				return &payer.PrivateKey
+			}
+			return nil
+		},
+		payer.PublicKey(),
+	)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (m *Store) SetWriter(writerAuthority string) error {
