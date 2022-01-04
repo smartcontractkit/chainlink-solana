@@ -13,7 +13,7 @@ import (
 
 const numFeeds = 10
 
-func TestMultiFeedMonitor(t *testing.T) {
+func TestMultiFeedMonitorToMakeSureAllGoroutinesTerminate(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	wg := &sync.WaitGroup{}
@@ -25,24 +25,31 @@ func TestMultiFeedMonitor(t *testing.T) {
 		feeds = append(feeds, generateFeedConfig())
 	}
 
-	transmissionSchema := fakeSchema{transmissionCodec}
 	configSetSchema := fakeSchema{configSetCodec}
 	configSetSimplifiedSchema := fakeSchema{configSetSimplifiedCodec}
+	transmissionSchema := fakeSchema{transmissionCodec}
 
-	producer := fakeProducer{make(chan producerMessage)}
+	producer := fakeProducer{make(chan producerMessage), ctx}
 
 	transmissionReader := &fakeReader{make(chan interface{})}
 	stateReader := &fakeReader{make(chan interface{})}
 
 	monitor := NewMultiFeedMonitor(
-		logger.NewNullLogger(),
 		cfg.Solana,
 		feeds,
-		cfg.Kafka.ConfigSetTopic, cfg.Kafka.ConfigSetSimplifiedTopic, cfg.Kafka.TransmissionTopic,
+
+		logger.NewNullLogger(),
 		transmissionReader, stateReader,
-		transmissionSchema, configSetSchema, configSetSimplifiedSchema,
 		producer,
 		&devnullMetrics{},
+
+		cfg.Kafka.ConfigSetTopic,
+		cfg.Kafka.ConfigSetSimplifiedTopic,
+		cfg.Kafka.TransmissionTopic,
+
+		configSetSchema,
+		configSetSimplifiedSchema,
+		transmissionSchema,
 	)
 	go monitor.Start(ctx, wg)
 
@@ -57,6 +64,10 @@ LOOP:
 			trCount += 1
 		case stateReader.readCh <- StateEnvelope{newState, 100}:
 			stCount += 1
+		case <-ctx.Done():
+			break LOOP
+		}
+		select {
 		case message := <-producer.sendCh:
 			messages = append(messages, message)
 		case <-ctx.Done():
@@ -65,7 +76,7 @@ LOOP:
 	}
 
 	wg.Wait()
-	require.Equal(t, trCount, 10, "should only be able to do initial read of the latest transmission")
-	require.Equal(t, stCount, 10, "should only be able to do initial read of the state account")
-	require.Equal(t, len(messages), 30)
+	require.Equal(t, 10, trCount, "should only be able to do initial read of the latest transmission")
+	require.Equal(t, 10, stCount, "should only be able to do initial read of the state account")
+	require.Equal(t, 20, len(messages))
 }

@@ -2,6 +2,7 @@ package monitoring
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -37,27 +38,49 @@ func TestFeedMonitor(t *testing.T) {
 		bufferCapacity,
 	)
 
-	producer := fakeProducer{make(chan producerMessage)}
+	producer := fakeProducer{make(chan producerMessage), ctx}
 
-	transmissionSchema := fakeSchema{transmissionCodec}
 	configSetSchema := fakeSchema{configSetCodec}
 	configSetSimplifiedSchema := fakeSchema{configSetSimplifiedCodec}
+	transmissionSchema := fakeSchema{transmissionCodec}
 
 	cfg := config.Config{}
-	monitor := NewFeedMonitor(
-		logger.NewNullLogger(),
-		cfg.Solana,
-		config.Feed{
+	cfg.Feeds.Feeds = []config.Feed{
+		{
 			TransmissionsAccount: transmissionAccount,
 			StateAccount:         stateAccount,
 		},
-		cfg.Kafka.ConfigSetTopic, cfg.Kafka.ConfigSetSimplifiedTopic, cfg.Kafka.TransmissionTopic,
+	}
+
+	exporters := []Exporter{
+		NewPrometheusExporter(
+			cfg.Solana,
+			cfg.Feeds.Feeds[0],
+			logger.NewNullLogger(),
+			&devnullMetrics{},
+		),
+		NewKafkaExporter(
+			cfg.Solana,
+			cfg.Feeds.Feeds[0],
+			logger.NewNullLogger(),
+			producer,
+
+			configSetSchema,
+			configSetSimplifiedSchema,
+			transmissionSchema,
+
+			cfg.Kafka.ConfigSetTopic,
+			cfg.Kafka.ConfigSetSimplifiedTopic,
+			cfg.Kafka.TransmissionTopic,
+		),
+	}
+
+	monitor := NewFeedMonitor(
+		logger.NewNullLogger(),
 		transmissionPoller, statePoller,
-		transmissionSchema, configSetSchema, configSetSimplifiedSchema,
-		producer,
-		&devnullMetrics{},
+		exporters,
 	)
-	go monitor.Start(ctx)
+	go monitor.Start(ctx, &sync.WaitGroup{})
 
 	trCount, stCount := 0, 0
 	var messages []producerMessage

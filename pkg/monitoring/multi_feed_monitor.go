@@ -13,41 +13,53 @@ type MultiFeedMonitor interface {
 }
 
 func NewMultiFeedMonitor(
-	log logger.Logger,
 	solanaConfig config.Solana,
 	feeds []config.Feed,
-	configSetTopic, configSetSimplifiedTopic, transmissionTopic string,
+
+	log logger.Logger,
 	transmissionReader, stateReader AccountReader,
-	transmissionSchema, configSetSchema, configSetSimplifiedSchema Schema,
 	producer Producer,
 	metrics Metrics,
+
+	configSetTopic string,
+	configSetSimplifiedTopic string,
+	transmissionTopic string,
+
+	configSetSchema Schema,
+	configSetSimplifiedSchema Schema,
+	transmissionSchema Schema,
 ) MultiFeedMonitor {
 	return &multiFeedMonitor{
-		log,
 		solanaConfig,
 		feeds,
-		configSetTopic, configSetSimplifiedTopic, transmissionTopic,
+
+		log,
 		transmissionReader, stateReader,
-		transmissionSchema, configSetSchema, configSetSimplifiedSchema,
 		producer,
 		metrics,
+
+		configSetTopic, configSetSimplifiedTopic, transmissionTopic,
+		configSetSchema, configSetSimplifiedSchema, transmissionSchema,
 	}
 }
 
 type multiFeedMonitor struct {
-	log                       logger.Logger
-	solanaConfig              config.Solana
-	feeds                     []config.Feed
-	configSetTopic            string
-	configSetSimplifiedTopic  string
-	transmissionTopic         string
-	transmissionReader        AccountReader
-	stateReader               AccountReader
-	transmissionSchema        Schema
+	solanaConfig config.Solana
+	feeds        []config.Feed
+
+	log                logger.Logger
+	transmissionReader AccountReader
+	stateReader        AccountReader
+	producer           Producer
+	metrics            Metrics
+
+	configSetTopic           string
+	configSetSimplifiedTopic string
+	transmissionTopic        string
+
 	configSetSchema           Schema
 	configSetSimplifiedSchema Schema
-	producer                  Producer
-	metrics                   Metrics
+	transmissionSchema        Schema
 }
 
 const bufferCapacity = 100
@@ -59,8 +71,13 @@ func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup) {
 		go func(feedConfig config.Feed) {
 			defer wg.Done()
 
+			feedLogger := m.log.With(
+				"feed", feedConfig.FeedName,
+				"network", m.solanaConfig.NetworkName,
+			)
+
 			transmissionPoller := NewPoller(
-				m.log.With("account", "transmissions", "address", feedConfig.TransmissionsAccount.String()),
+				feedLogger.With("component", "transmissions-poller", "address", feedConfig.TransmissionsAccount.String()),
 				feedConfig.TransmissionsAccount,
 				m.transmissionReader,
 				m.solanaConfig.PollInterval,
@@ -68,7 +85,7 @@ func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup) {
 				bufferCapacity,
 			)
 			statePoller := NewPoller(
-				m.log.With("account", "state", "address", feedConfig.StateAccount.String()),
+				feedLogger.With("component", "state-poller", "address", feedConfig.StateAccount.String()),
 				feedConfig.StateAccount,
 				m.stateReader,
 				m.solanaConfig.PollInterval,
@@ -86,17 +103,35 @@ func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup) {
 				statePoller.Start(ctx)
 			}()
 
+			exporters := []Exporter{
+				NewPrometheusExporter(
+					m.solanaConfig,
+					feedConfig,
+					feedLogger.With("component", "prometheus-exporter"),
+					m.metrics,
+				),
+				NewKafkaExporter(
+					m.solanaConfig,
+					feedConfig,
+					feedLogger.With("component", "kafka-exporter"),
+					m.producer,
+
+					m.configSetSchema,
+					m.configSetSimplifiedSchema,
+					m.transmissionSchema,
+
+					m.configSetTopic,
+					m.configSetSimplifiedTopic,
+					m.transmissionTopic,
+				),
+			}
+
 			feedMonitor := NewFeedMonitor(
-				m.log.With("feed", feedConfig.FeedName, "network", m.solanaConfig.NetworkName),
-				m.solanaConfig,
-				feedConfig,
-				m.configSetTopic, m.configSetSimplifiedTopic, m.transmissionTopic,
+				feedLogger,
 				transmissionPoller, statePoller,
-				m.transmissionSchema, m.configSetSchema, m.configSetSimplifiedSchema,
-				m.producer,
-				m.metrics,
+				exporters,
 			)
-			feedMonitor.Start(ctx)
+			feedMonitor.Start(ctx, wg)
 		}(feedConfig)
 	}
 }

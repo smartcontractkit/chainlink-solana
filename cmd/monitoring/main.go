@@ -80,14 +80,21 @@ func main() {
 	}
 
 	monitor := monitoring.NewMultiFeedMonitor(
-		log.With("component", "multi-feed-monitor"),
 		cfg.Solana,
 		cfg.Feeds.Feeds,
-		cfg.Kafka.ConfigSetTopic, cfg.Kafka.ConfigSetSimplifiedTopic, cfg.Kafka.TransmissionTopic,
+
+		log.With("component", "multi-feed-monitor"),
 		transmissionReader, stateReader,
-		transmissionSchema, configSetSchema, configSetSimplifiedSchema,
 		producer,
 		monitoring.DefaultMetrics,
+
+		cfg.Kafka.ConfigSetTopic,
+		cfg.Kafka.ConfigSetSimplifiedTopic,
+		cfg.Kafka.TransmissionTopic,
+
+		transmissionSchema,
+		configSetSchema,
+		configSetSimplifiedSchema,
 	)
 	wg.Add(1)
 	go func() {
