@@ -14,13 +14,13 @@ import (
 type Submit struct {
 	Round *Transmission
 
-	// [0] = [WRITE] state
+	// [0] = [WRITE] store
 	//
 	// [1] = [SIGNER] authority
 	//
 	// [2] = [] accessController
 	//
-	// [3] = [WRITE] store
+	// [3] = [WRITE] feed
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
@@ -38,14 +38,14 @@ func (inst *Submit) SetRound(round Transmission) *Submit {
 	return inst
 }
 
-// SetStateAccount sets the "state" account.
-func (inst *Submit) SetStateAccount(state ag_solanago.PublicKey) *Submit {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(state).WRITE()
+// SetStoreAccount sets the "store" account.
+func (inst *Submit) SetStoreAccount(store ag_solanago.PublicKey) *Submit {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(store).WRITE()
 	return inst
 }
 
-// GetStateAccount gets the "state" account.
-func (inst *Submit) GetStateAccount() *ag_solanago.AccountMeta {
+// GetStoreAccount gets the "store" account.
+func (inst *Submit) GetStoreAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
@@ -71,14 +71,14 @@ func (inst *Submit) GetAccessControllerAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
-// SetStoreAccount sets the "store" account.
-func (inst *Submit) SetStoreAccount(store ag_solanago.PublicKey) *Submit {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(store).WRITE()
+// SetFeedAccount sets the "feed" account.
+func (inst *Submit) SetFeedAccount(feed ag_solanago.PublicKey) *Submit {
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(feed).WRITE()
 	return inst
 }
 
-// GetStoreAccount gets the "store" account.
-func (inst *Submit) GetStoreAccount() *ag_solanago.AccountMeta {
+// GetFeedAccount gets the "feed" account.
+func (inst *Submit) GetFeedAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[3]
 }
 
@@ -110,7 +110,7 @@ func (inst *Submit) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.State is not set")
+			return errors.New("accounts.Store is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Authority is not set")
@@ -119,7 +119,7 @@ func (inst *Submit) Validate() error {
 			return errors.New("accounts.AccessController is not set")
 		}
 		if inst.AccountMetaSlice[3] == nil {
-			return errors.New("accounts.Store is not set")
+			return errors.New("accounts.Feed is not set")
 		}
 	}
 	return nil
@@ -140,10 +140,10 @@ func (inst *Submit) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("           state", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("           store", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("accessController", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("           store", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("            feed", inst.AccountMetaSlice[3]))
 					})
 				})
 		})
@@ -171,14 +171,14 @@ func NewSubmitInstruction(
 	// Parameters:
 	round Transmission,
 	// Accounts:
-	state ag_solanago.PublicKey,
+	store ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	accessController ag_solanago.PublicKey,
-	store ag_solanago.PublicKey) *Submit {
+	feed ag_solanago.PublicKey) *Submit {
 	return NewSubmitInstructionBuilder().
 		SetRound(round).
-		SetStateAccount(state).
+		SetStoreAccount(store).
 		SetAuthorityAccount(authority).
 		SetAccessControllerAccount(accessController).
-		SetStoreAccount(store)
+		SetFeedAccount(feed)
 }

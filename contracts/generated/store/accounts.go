@@ -8,7 +8,7 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type Validator struct {
+type Store struct {
 	Owner                    ag_solanago.PublicKey
 	ProposedOwner            ag_solanago.PublicKey
 	RaisingAccessController  ag_solanago.PublicKey
@@ -16,11 +16,11 @@ type Validator struct {
 	Flags                    Flags
 }
 
-var ValidatorDiscriminator = [8]byte{108, 40, 172, 51, 190, 198, 22, 15}
+var StoreDiscriminator = [8]byte{130, 48, 247, 244, 182, 191, 30, 26}
 
-func (obj Validator) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj Store) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(ValidatorDiscriminator[:], false)
+	err = encoder.WriteBytes(StoreDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -52,17 +52,17 @@ func (obj Validator) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) 
 	return nil
 }
 
-func (obj *Validator) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *Store) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(ValidatorDiscriminator[:]) {
+		if !discriminator.Equal(StoreDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
-				"[108 40 172 51 190 198 22 15]",
+				"[130 48 247 244 182 191 30 26]",
 				fmt.Sprint(discriminator[:]))
 		}
 	}
@@ -96,7 +96,7 @@ func (obj *Validator) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 
 type Transmissions struct {
 	Version           uint8
-	State             ag_solanago.PublicKey
+	Store             ag_solanago.PublicKey
 	Writer            ag_solanago.PublicKey
 	FlaggingThreshold uint32
 	LatestRoundId     uint32
@@ -119,8 +119,8 @@ func (obj Transmissions) MarshalWithEncoder(encoder *ag_binary.Encoder) (err err
 	if err != nil {
 		return err
 	}
-	// Serialize `State` param:
-	err = encoder.Encode(obj.State)
+	// Serialize `Store` param:
+	err = encoder.Encode(obj.Store)
 	if err != nil {
 		return err
 	}
@@ -181,8 +181,8 @@ func (obj *Transmissions) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err 
 	if err != nil {
 		return err
 	}
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
+	// Deserialize `Store`:
+	err = decoder.Decode(&obj.Store)
 	if err != nil {
 		return err
 	}

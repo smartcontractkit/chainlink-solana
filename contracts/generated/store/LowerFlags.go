@@ -14,7 +14,7 @@ import (
 type LowerFlags struct {
 	Flags *[]ag_solanago.PublicKey
 
-	// [0] = [WRITE] state
+	// [0] = [WRITE] store
 	//
 	// [1] = [SIGNER] authority
 	//
@@ -36,14 +36,14 @@ func (inst *LowerFlags) SetFlags(flags []ag_solanago.PublicKey) *LowerFlags {
 	return inst
 }
 
-// SetStateAccount sets the "state" account.
-func (inst *LowerFlags) SetStateAccount(state ag_solanago.PublicKey) *LowerFlags {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(state).WRITE()
+// SetStoreAccount sets the "store" account.
+func (inst *LowerFlags) SetStoreAccount(store ag_solanago.PublicKey) *LowerFlags {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(store).WRITE()
 	return inst
 }
 
-// GetStateAccount gets the "state" account.
-func (inst *LowerFlags) GetStateAccount() *ag_solanago.AccountMeta {
+// GetStoreAccount gets the "store" account.
+func (inst *LowerFlags) GetStoreAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
@@ -97,7 +97,7 @@ func (inst *LowerFlags) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.State is not set")
+			return errors.New("accounts.Store is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Authority is not set")
@@ -124,7 +124,7 @@ func (inst *LowerFlags) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("           state", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("           store", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("accessController", inst.AccountMetaSlice[2]))
 					})
@@ -154,12 +154,12 @@ func NewLowerFlagsInstruction(
 	// Parameters:
 	flags []ag_solanago.PublicKey,
 	// Accounts:
-	state ag_solanago.PublicKey,
+	store ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	accessController ag_solanago.PublicKey) *LowerFlags {
 	return NewLowerFlagsInstructionBuilder().
 		SetFlags(flags).
-		SetStateAccount(state).
+		SetStoreAccount(store).
 		SetAuthorityAccount(authority).
 		SetAccessControllerAccount(accessController)
 }
