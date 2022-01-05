@@ -26,9 +26,10 @@ let ethereumAddress = (publicKey: Buffer) => {
 };
 
 const Scope = {
-  LatestConfig: { latestConfig: {} },
-  LinkAvailableForPayment: { linkAvailableForPayment: {} },
-  LatestRoundData: { latestroundData: {} },
+  Version: { version: {} },
+  // RoundData: { roundData: { roundId } },
+  LatestRoundData: { latestRoundData: {} },
+  Aggregator: { aggregator: {} },
 };
 
 describe('ocr2', async () => {
@@ -515,12 +516,11 @@ describe('ocr2', async () => {
 
   it('Can call query', async () => {
     let buffer = Keypair.generate();
-    await program.rpc.query(
-      Scope.LatestConfig,
+    await workspace.Store.rpc.query(
+      Scope.Version,
       {
         accounts: {
-          state: state.publicKey,
-          transmissions: transmissions.publicKey,
+          feed: transmissions.publicKey,
           buffer: buffer.publicKey,
         },
         preInstructions: [
@@ -529,7 +529,7 @@ describe('ocr2', async () => {
             newAccountPubkey: buffer.publicKey,
             lamports: await provider.connection.getMinimumBalanceForRentExemption(256),
             space: 256,
-            programId: program.programId,
+            programId: workspace.Store.programId,
           })
         ],
         signers: [buffer]
@@ -537,7 +537,7 @@ describe('ocr2', async () => {
     );
 
     // let account = await program.account.latestConfig.fetch(buffer.publicKey);
-    let account = await program.account.latestConfig.fetch(buffer.publicKey);
+    let account = await workspace.Store.account.version.fetch(buffer.publicKey);
     console.log(account);
   });
 });

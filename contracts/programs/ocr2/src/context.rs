@@ -200,13 +200,3 @@ pub struct AcceptPayeeship<'info> {
     pub transmitter: AccountInfo<'info>,
     pub proposed_payee: Account<'info, TokenAccount>,
 }
-
-#[derive(Accounts)]
-pub struct Query<'info> {
-    pub state: AccountLoader<'info, State>,
-    pub transmissions: Account<'info, Transmissions>,
-    // TODO: we could allow reusing query buffers if we also required an authority and marked the buffer with it.
-    // That way someone else couldn't hijack the buffer and use it instead.
-    #[account(zero)]
-    pub buffer: AccountInfo<'info>,
-}

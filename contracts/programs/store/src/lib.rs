@@ -18,6 +18,41 @@ declare_id!("A7Jh2nb1hZHwqEofm4N8SXbKTj82rx7KUfjParQXUyMQ");
 
 static THRESHOLD_MULTIPLIER: u128 = 100000;
 
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub enum Scope {
+    // Decimals,
+    Version,
+    // Description,
+    RoundData { round_id: u32 },
+    LatestRoundData,
+    Aggregator,
+    // ProposedAggregator
+    // Owner
+}
+
+#[account]
+pub struct Round {
+    pub round_id: u32,
+    pub timestamp: u64,
+    pub answer: i128,
+}
+#[account]
+pub struct Decimals {
+    pub decimals: u8,
+}
+#[account]
+pub struct Version {
+    pub version: u8,
+}
+#[account]
+pub struct Description {
+    pub description: String,
+}
+#[account]
+pub struct Address {
+    pub address: Pubkey,
+}
+
 #[program]
 pub mod store {
     use super::*;
@@ -158,6 +193,59 @@ pub mod store {
         store.lowering_access_controller = ctx.accounts.access_controller.key();
         Ok(())
     }
+
+    /// The query instruction takes a `Query` and serializes the response in a fixed format. That way queries
+    /// are not bound to the underlying layout.
+    pub fn query(ctx: Context<Query>, scope: Scope) -> ProgramResult {
+        use std::ops::DerefMut;
+        // NOTE: try_serialize will also write the account discriminator, serialize doesn't
+
+        match scope {
+            Scope::Version => {
+                let header = &ctx.accounts.feed;
+
+                let data = Version {
+                    version: header.version,
+                };
+                data.try_serialize(ctx.accounts.buffer.try_borrow_mut_data()?.deref_mut())?;
+            }
+            Scope::RoundData { round_id } => {
+                let round = with_store(&mut ctx.accounts.feed, |store| store.fetch(round_id))?
+                    .ok_or(ErrorCode::NotFound)?;
+
+                let data = Round {
+                    round_id,
+                    answer: round.answer,
+                    timestamp: round.timestamp,
+                };
+                data.try_serialize(ctx.accounts.buffer.try_borrow_mut_data()?.deref_mut())?;
+            }
+            Scope::LatestRoundData => {
+                let round = with_store(&mut ctx.accounts.feed, |store| store.latest())?
+                    .ok_or(ErrorCode::NotFound)?;
+
+                let header = &ctx.accounts.feed;
+
+                let data = Round {
+                    round_id: header.latest_round_id,
+                    answer: round.answer,
+                    timestamp: round.timestamp,
+                };
+                // TODO: use an enum to wrap all possible response types?
+
+                data.try_serialize(ctx.accounts.buffer.try_borrow_mut_data()?.deref_mut())?;
+            }
+            Scope::Aggregator => {
+                let header = &ctx.accounts.feed;
+
+                let data = Address {
+                    address: header.writer,
+                };
+                data.try_serialize(ctx.accounts.buffer.try_borrow_mut_data()?.deref_mut())?;
+            }
+        }
+        Ok(())
+    }
 }
 
 fn is_valid(flagging_threshold: u32, previous_answer: i128, answer: i128) -> bool {
@@ -219,6 +307,8 @@ pub enum ErrorCode {
 
     #[msg("Flags list is full")]
     Full = 2,
+
+    NotFound = 3,
 }
 
 #[derive(Accounts)]
@@ -285,4 +375,13 @@ pub struct Submit<'info> {
     /// The OCR2 feed
     #[account(mut)]
     pub feed: Account<'info, Transmissions>,
+}
+
+#[derive(Accounts)]
+pub struct Query<'info> {
+    pub feed: Account<'info, Transmissions>,
+    // TODO: we could allow reusing query buffers if we also required an authority and marked the buffer with it.
+    // That way someone else couldn't hijack the buffer and use it instead.
+    #[account(zero)]
+    pub buffer: AccountInfo<'info>,
 }
