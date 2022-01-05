@@ -26,16 +26,17 @@ var (
 
 type ContractTracker struct {
 	// on-chain program + 2x state accounts (state + transmissions)
-	ProgramID          solana.PublicKey
-	StateID            solana.PublicKey
-	TransmissionsID    solana.PublicKey
-	ValidatorProgramID solana.PublicKey
+	ProgramID       solana.PublicKey
+	StateID         solana.PublicKey
+	TransmissionsID solana.PublicKey
+	StoreProgramID  solana.PublicKey
 
 	// private key for the transmission signing
 	Transmitter TransmissionSigner
 
 	// tracked contract state
 	state  State
+	store  solana.PublicKey
 	answer Answer
 
 	// dependencies
@@ -48,14 +49,14 @@ type ContractTracker struct {
 
 func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, lggr Logger) ContractTracker {
 	return ContractTracker{
-		ProgramID:          spec.ProgramID,
-		StateID:            spec.StateID,
-		ValidatorProgramID: spec.ValidatorProgramID,
-		TransmissionsID:    spec.TransmissionsID,
-		Transmitter:        transmitter,
-		client:             client,
-		lggr:               lggr,
-		requestGroup:       &singleflight.Group{},
+		ProgramID:       spec.ProgramID,
+		StateID:         spec.StateID,
+		StoreProgramID:  spec.ValidatorProgramID,
+		TransmissionsID: spec.TransmissionsID,
+		Transmitter:     transmitter,
+		client:          client,
+		lggr:            lggr,
+		requestGroup:    &singleflight.Group{},
 	}
 }
 
@@ -76,6 +77,24 @@ func (c *ContractTracker) fetchState(ctx context.Context) error {
 	c.lggr.Debugf("state fetched for account: %s, shared: %t, result: %v", c.StateID, shared, v)
 
 	c.state = v.(State)
+
+	// Fetch the store address associated to the feed
+	offset := uint64(8 + 1) // Discriminator (8 bytes) + Version (u8)
+	length := uint64(solana.PublicKeyLength)
+	res, err := c.client.rpc.GetAccountInfoWithOpts(ctx, c.state.Transmissions, &rpc.GetAccountInfoOpts{
+		Encoding:   "base64",
+		Commitment: rpcCommitment,
+		DataSlice: &rpc.DataSlice{
+			Offset: &offset,
+			Length: &length,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	c.store = solana.PublicKeyFromBytes(res.Value.Data.GetBinary())
+	c.lggr.Debugf("store fetched for feed: %s", c.store)
+
 	return nil
 }
 
@@ -122,8 +141,8 @@ func GetState(ctx context.Context, client *rpc.Client, account solana.PublicKey)
 }
 
 func GetLatestTransmission(ctx context.Context, client *rpc.Client, account solana.PublicKey) (Answer, uint64, error) {
-	cursorOffset := CursorOffset
-	cursorLen := CursorLen
+	offset := CursorOffset
+	length := CursorLen * 2
 	transmissionLen := TransmissionLen
 
 	// query for cursor
@@ -131,8 +150,8 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 		Encoding:   "base64",
 		Commitment: rpcCommitment,
 		DataSlice: &rpc.DataSlice{
-			Offset: &cursorOffset,
-			Length: &cursorLen,
+			Offset: &offset,
+			Length: &length,
 		},
 	})
 	if err != nil {
