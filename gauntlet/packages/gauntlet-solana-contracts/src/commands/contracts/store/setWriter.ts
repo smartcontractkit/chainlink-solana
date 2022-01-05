@@ -4,28 +4,13 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 
-type Input = {
-  threshold: number | string
-  feed: string
-}
-
-export default class SetValidatorConfig extends SolanaCommand {
-  static id = 'store:set_validator_config'
+export default class SetWriter extends SolanaCommand {
+  static id = 'store:set_writer'
   static category = CONTRACT_LIST.STORE
 
   static examples = [
-    'yarn gauntlet store:set_validator_config --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --threshold=1000 --feed=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet store:set_writer --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --threshold=1000 --feed=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
-
-  makeInput = (userInput): Input => {
-    if (userInput) return userInput as Input
-    // Can this come from rdd?
-    // const rdd = getRDD(this.flags.rdd)
-    return {
-      threshold: this.flags.threshold,
-      feed: this.flags.feed,
-    }
-  }
 
   constructor(flags, args) {
     super(flags, args)
@@ -38,16 +23,15 @@ export default class SetValidatorConfig extends SolanaCommand {
     const address = storeProgram.programId.toString()
     const program = this.loadProgram(storeProgram.idl, address)
 
-    const input = this.makeInput(this.flags.input)
     const owner = this.wallet.payer
 
     const state = new PublicKey(this.flags.state)
-    const threshold = new BN(input.threshold)
-    const feed = new PublicKey(input.feed)
+    const feed = new PublicKey(this.flags.feed)
+    const storeAuthority = new PublicKey(this.flags.storeAuthority)
 
-    console.log(`Setting store config on ${state.toString()}...`)
+    console.log(`Setting store writer on ${state.toString()} and ${feed.toString()}`)
 
-    const tx = await program.rpc.setValidatorConfig(threshold, {
+    const tx = await program.rpc.setValidatorConfig(storeAuthority, {
       accounts: {
         store: state,
         feed: feed,
@@ -56,7 +40,7 @@ export default class SetValidatorConfig extends SolanaCommand {
       signers: [owner],
     })
 
-    logger.success(`Validator config on tx ${tx}`)
+    logger.success(`Set writer on tx ${tx}`)
 
     return {
       responses: [

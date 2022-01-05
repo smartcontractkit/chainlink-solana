@@ -42,6 +42,7 @@ export default class SetPayees extends SolanaCommand {
     super(flags, args)
 
     this.requireFlag('state', 'Provide a valid state address')
+    this.requireFlag('link', 'Provide a valid link address')
   }
 
   execute = async () => {
@@ -61,24 +62,29 @@ export default class SetPayees extends SolanaCommand {
       this.wallet.payer,
     )
 
-    const areValidPayees = (
-      await Promise.all(
-        input.operators.map(async ({ payee }) => {
-          try {
-            const info = await token.getAccountInfo(new PublicKey(payee))
-            return !!info.address
-          } catch (e) {
-            logger.error(`Payee with address ${payee} does not have a valid Token recipient address`)
-            return false
-          }
-        }),
-      )
-    ).every((isValid) => isValid)
+    this.flags.TESTING_ONLY_IGNORE_PAYEE_VALIDATION &&
+      logger.warn('TESTING_ONLY_IGNORE_PAYEE_VALIDATION flag is enabled')
 
-    this.require(
-      areValidPayees || !!input.allowFundRecipient,
-      'Every payee needs to have a valid token recipient address',
-    )
+    if (!this.flags.TESTING_ONLY_IGNORE_PAYEE_VALIDATION) {
+      const areValidPayees = (
+        await Promise.all(
+          input.operators.map(async ({ payee }) => {
+            try {
+              const info = await token.getAccountInfo(new PublicKey(payee))
+              return !!info.address
+            } catch (e) {
+              logger.error(`Payee with address ${payee} does not have a valid Token recipient address`)
+              return false
+            }
+          }),
+        )
+      ).every((isValid) => isValid)
+
+      this.require(
+        areValidPayees || !!input.allowFundRecipient,
+        'Every payee needs to have a valid token recipient address',
+      )
+    }
     const payeeByTransmitter = input.operators.reduce(
       (agg, operator) => ({
         ...agg,

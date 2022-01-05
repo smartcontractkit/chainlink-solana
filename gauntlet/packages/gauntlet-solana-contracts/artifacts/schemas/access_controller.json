@@ -7,7 +7,7 @@
       "type": {
         "defined": "usize"
       },
-      "value": "32"
+      "value": "64"
     }
   ],
   "instructions": [
@@ -116,7 +116,7 @@
             "type": {
               "array": [
                 "publicKey",
-                32
+                64
               ]
             }
           },
@@ -139,5 +139,8 @@
       "name": "Full",
       "msg": "Access list is full"
     }
-  ]
+  ],
+  "metadata": {
+    "address": "2F5NEkMnCRkmahEAcQfTQcZv1xtGgrWFfjENtTwHLuKg"
+  }
 }

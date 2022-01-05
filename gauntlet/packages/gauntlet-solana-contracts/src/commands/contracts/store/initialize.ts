@@ -25,9 +25,8 @@ export default class Initialize extends SolanaCommand {
     console.log(`Initializing store contract with State at ${state.publicKey}...`)
     const txHash = await program.rpc.initialize({
       accounts: {
-        state: state.publicKey,
+        store: state.publicKey,
         owner: owner.publicKey,
-        raisingAccessController: accessController,
         loweringAccessController: accessController,
       },
       signers: [state],

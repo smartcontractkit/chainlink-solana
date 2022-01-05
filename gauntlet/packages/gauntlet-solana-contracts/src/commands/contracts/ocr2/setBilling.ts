@@ -63,6 +63,7 @@ export default class SetBilling extends SolanaCommand {
       },
     )
 
+    logger.success(`Billing set on tx ${tx}`)
     return {
       responses: [
         {
