@@ -71,11 +71,10 @@ pub struct Transmit<'info> {
     pub transmissions: Account<'info, Transmissions>,
 
     #[account(address = store::ID)]
-    pub validator_program: AccountInfo<'info>,
-    // #[account(address = state.load()?.config.validator)]
-    pub validator: AccountInfo<'info>,
-    pub validator_authority: AccountInfo<'info>,
-    pub validator_access_controller: AccountInfo<'info>,
+    pub store_program: AccountInfo<'info>,
+    // #[account(address = state.load()?.config.store)]
+    pub store: AccountInfo<'info>,
+    pub store_authority: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]
