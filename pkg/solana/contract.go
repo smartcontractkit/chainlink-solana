@@ -139,14 +139,23 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 		return Answer{}, 0, errors.Wrap(err, "error on rpc.GetAccountInfo [cursor]")
 	}
 
-	// parse little endian cursor value
+	// parse little endian length & cursor
 	c := res.Value.Data.GetBinary()
-	if len(c) != int(cursorLen) { // validate length
+	buf := bytes.NewReader(c)
+
+	var cursor uint32
+	var liveLength uint32
+	err = binary.Read(buf, binary.LittleEndian, &liveLength)
+	if err != nil {
 		return Answer{}, 0, errCursorLength
 	}
-	cursor := binary.LittleEndian.Uint32(c)
+	err = binary.Read(buf, binary.LittleEndian, &cursor)
+	if err != nil {
+		return Answer{}, 0, errCursorLength
+	}
+
 	if cursor == 0 { // handle array wrap
-		cursor = TransmissionsSize
+		cursor = liveLength
 	}
 	cursor-- // cursor indicates index for new answer, latest answer is in previous index
 
@@ -173,7 +182,7 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 	var timestamp uint64
 	raw := make([]byte, 16)
 
-	buf := bytes.NewReader(t)
+	buf = bytes.NewReader(t)
 	err = binary.Read(buf, binary.LittleEndian, &timestamp)
 	if err != nil {
 		return Answer{}, 0, err
