@@ -84,8 +84,6 @@ type Config struct {
 	LatestConfigDigest        [32]byte
 	LatestConfigBlockNumber   uint64
 	Billing                   Billing
-	Validator                 solana.PublicKey
-	FlaggingThreshold         uint32
 	OffchainConfig            OffchainConfig
 	PendingOffchainConfig     OffchainConfig
 }
@@ -135,18 +133,6 @@ type AccessController struct {
 	Len    uint64
 }
 
-// Validator state
-type Validator struct {
-	AccountDiscriminator     [8]byte // first 8 bytes of the SHA256 of the account’s Rust ident, https://docs.rs/anchor-lang/0.18.2/anchor_lang/attr.account.html
-	Owner                    solana.PublicKey
-	ProposedOwner            solana.PublicKey
-	RaisingAccessController  solana.PublicKey
-	LoweringAccessController solana.PublicKey
-
-	Flags [128]solana.PublicKey
-	Len   uint64
-}
-
 // CL Core OCR2 job spec RelayConfig member for Solana
 type RelayConfig struct {
 	// network data
@@ -154,7 +140,7 @@ type RelayConfig struct {
 	NodeEndpointWS   string `json:"nodeEndpointWS"`
 
 	// on-chain program + 2x state accounts (state + transmissions) + validator programID
-	StateID            string `json:"stateID"`
-	TransmissionsID    string `json:"transmissionsID"`
-	ValidatorProgramID string `json:"validatorProgramID"`
+	StateID         string `json:"stateID"`
+	TransmissionsID string `json:"transmissionsID"`
+	StoreProgramID  string `json:"storeProgramID"`
 }
