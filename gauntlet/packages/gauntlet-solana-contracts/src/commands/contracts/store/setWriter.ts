@@ -31,7 +31,7 @@ export default class SetWriter extends SolanaCommand {
 
     console.log(`Setting store writer on ${state.toString()} and ${feed.toString()}`)
 
-    const tx = await program.rpc.setValidatorConfig(storeAuthority, {
+    const tx = await program.rpc.setWriter(storeAuthority, {
       accounts: {
         store: state,
         feed: feed,
