@@ -246,11 +246,9 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
 
   setEnvironment = async () => {
     const programsPublicKeys = await Promise.all(
-      [
-        CONTRACT_LIST.ACCESS_CONTROLLER,
-        CONTRACT_LIST.OCR_2,
-        CONTRACT_LIST.STORE,
-      ].map(async (name) => (await getDeploymentContract(name, '')).programKeypair.publicKey.toString()),
+      [CONTRACT_LIST.ACCESS_CONTROLLER, CONTRACT_LIST.OCR_2, CONTRACT_LIST.STORE].map(async (name) =>
+        (await getDeploymentContract(name, '')).programKeypair.publicKey.toString(),
+      ),
     )
     logger.info(`
       Setting the following env variables. Include them into .env.${this.flags.network} for future runs
