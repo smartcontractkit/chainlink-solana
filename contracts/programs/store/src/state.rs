@@ -35,7 +35,7 @@ pub struct Store {
     AnchorDeserialize,
 )]
 pub struct Transmission {
-    pub timestamp: u64,
+    pub timestamp: u64, // TODO: size back down to u32 and add padding?
     pub answer: i128,
 }
 
@@ -57,7 +57,7 @@ pub struct Transmissions {
     pub store: Pubkey,
     pub writer: Pubkey,
     pub flagging_threshold: u32,
-    latest_round_id: u32,
+    pub latest_round_id: u32,
     pub granularity: u8,
     pub live_length: u32,
     live_cursor: u32,

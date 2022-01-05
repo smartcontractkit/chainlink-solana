@@ -33,16 +33,6 @@ pub struct NewOracle {
     pub transmitter: Pubkey,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize)]
-pub enum Scope {
-    LatestConfig,
-    LinkAvailableForPayment,
-    // Description
-    // Decimals
-    // RoundData(round_id)
-    LatestRoundData,
-}
-
 #[program]
 pub mod ocr2 {
     use super::*;
@@ -567,40 +557,6 @@ pub mod ocr2 {
         );
 
         oracle.payee = std::mem::take(&mut oracle.proposed_payee);
-        Ok(())
-    }
-
-    /// The query instruction takes a `Query` and serializes the response in a fixed format. That way queries
-    /// are not bound to the underlying layout.
-    pub fn query(ctx: Context<Query>, scope: Scope) -> ProgramResult {
-        use std::ops::DerefMut;
-
-        let state = ctx.accounts.state.load()?;
-        // let transmissions = ctx.accounts.transmissions.load()?;
-
-        match scope {
-            Scope::LatestRoundData => {
-                unimplemented!()
-            }
-            Scope::LinkAvailableForPayment => {
-                // TODO: this needs the token_vault passed in
-                unimplemented!()
-            }
-            Scope::LatestConfig => {
-                use crate::query::LatestConfig;
-                let config = state.config;
-
-                let data = LatestConfig {
-                    config_count: config.config_count,
-                    config_digest: config.latest_config_digest,
-                    block_number: config.latest_config_block_number,
-                };
-                // TODO: use an enum to wrap all possible response types?
-
-                // try_serialize will also write the account discriminator, serialize doesn't
-                data.try_serialize(ctx.accounts.buffer.try_borrow_mut_data()?.deref_mut())?;
-            }
-        }
         Ok(())
     }
 }
