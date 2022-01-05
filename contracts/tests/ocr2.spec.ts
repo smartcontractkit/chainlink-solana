@@ -119,7 +119,6 @@ describe('ocr2', async () => {
           { pubkey: workspace.Store.programId, isWritable: false, isSigner: false },
           { pubkey: store.publicKey, isWritable: true, isSigner: false },
           { pubkey: storeAuthority, isWritable: false, isSigner: false },
-          { pubkey: billingAccessController.publicKey, isWritable: false, isSigner: false }, // TODO: pass in a separate controller
       ],
       data: Buffer.concat([
           Buffer.from([storeNonce]),

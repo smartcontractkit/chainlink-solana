@@ -282,8 +282,6 @@ pub struct Submit<'info> {
     #[account(mut)]
     pub store: AccountLoader<'info, Store>,
     pub authority: Signer<'info>,
-    pub access_controller: AccountLoader<'info, AccessController>,
-
     /// The OCR2 feed
     #[account(mut)]
     pub feed: Account<'info, Transmissions>,

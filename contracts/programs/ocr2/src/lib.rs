@@ -25,8 +25,7 @@ use std::convert::TryInto;
 use std::mem::size_of;
 
 use access_controller::AccessController;
-use store as validator;
-use validator::Transmission;
+use store::Transmission;
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct NewOracle {
@@ -724,21 +723,15 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
     state.oracles[oracle_idx].payment += amount;
 
     // store and validate answer
-    // we only validate these accounts if a validator is set
-    require!(ctx.accounts.validator.owner == &validator::ID, InvalidInput);
-    require!(ctx.accounts.validator.is_writable, InvalidInput);
-    require!(
-        ctx.accounts.validator_access_controller.owner == &access_controller::ID,
-        InvalidInput
-    );
+    require!(ctx.accounts.store.owner == &store::ID, InvalidInput);
+    require!(ctx.accounts.store.is_writable, InvalidInput);
 
     let cpi_ctx = CpiContext::new(
-        ctx.accounts.validator_program.clone(),
-        validator::cpi::accounts::Submit {
-            store: ctx.accounts.validator.to_account_info(),
+        ctx.accounts.store_program.clone(),
+        store::cpi::accounts::Submit {
+            store: ctx.accounts.store.to_account_info(),
             feed: ctx.accounts.transmissions.to_account_info(),
-            authority: ctx.accounts.validator_authority.to_account_info(),
-            access_controller: ctx.accounts.validator_access_controller.to_account_info(),
+            authority: ctx.accounts.store_authority.to_account_info(),
         },
     );
 
@@ -750,7 +743,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
         &[*nonce],
     ];
 
-    validator::cpi::submit(cpi_ctx.with_signer(&[&seeds[..]]), round)?;
+    store::cpi::submit(cpi_ctx.with_signer(&[&seeds[..]]), round)?;
 
     // TODO: use _unchecked to save some instructions
 

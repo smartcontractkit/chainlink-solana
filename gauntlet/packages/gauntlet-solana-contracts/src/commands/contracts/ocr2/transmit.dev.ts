@@ -11,7 +11,7 @@ export default class Transmit extends SolanaCommand {
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:transmit --network=local --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --transmissions=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --store=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --accessController=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --round=2',
+    'yarn gauntlet ocr2:transmit --network=local --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --transmissions=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --store=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --round=2',
   ]
 
   constructor(flags, args) {
@@ -30,7 +30,6 @@ export default class Transmit extends SolanaCommand {
     const state = new PublicKey(this.flags.state)
     const transmissions = new PublicKey(this.flags.transmissions)
     const store = new PublicKey(this.flags.store)
-    const accessController = new PublicKey(this.flags.accessController)
     const round = Number(this.flags.round) || 1
     const info = await program.account.state.fetch(state)
 
@@ -82,7 +81,6 @@ export default class Transmit extends SolanaCommand {
           { pubkey: storeProgram.programId, isWritable: false, isSigner: false },
           { pubkey: store, isWritable: true, isSigner: false },
           { pubkey: storeAuthority, isWritable: false, isSigner: false },
-          { pubkey: accessController, isWritable: false, isSigner: false },
         ],
         data: Buffer.concat([
           Buffer.from([storeNonce]),
