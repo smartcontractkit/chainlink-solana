@@ -104,14 +104,14 @@ func parseEnvVars(cfg *Config) error {
 		if err != nil {
 			return fmt.Errorf("failed to parse env var FEEDS_RDD_READ_TIMEOUT, see https://pkg.go.dev/time#ParseDuration: %w", err)
 		}
-		cfg.Feeds.RddReadTimeout = readTimeout
+		cfg.Feeds.RDDReadTimeout = readTimeout
 	}
 	if value, isPresent := os.LookupEnv("FEEDS_RDD_POLL_INTERVAL"); isPresent {
 		pollInterval, err := time.ParseDuration(value)
 		if err != nil {
 			return fmt.Errorf("failed to parse env var FEEDS_RDD_POLL_INTERVAL, see https://pkg.go.dev/time#ParseDuration: %w", err)
 		}
-		cfg.Feeds.RddPollInterval = pollInterval
+		cfg.Feeds.RDDPollInterval = pollInterval
 	}
 
 	if value, isPresent := os.LookupEnv("HTTP_ADDRESS"); isPresent {
