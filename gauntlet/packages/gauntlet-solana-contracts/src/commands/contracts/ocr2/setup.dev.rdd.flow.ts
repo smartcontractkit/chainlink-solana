@@ -4,7 +4,7 @@ import { CONTRACT_LIST } from '../../../lib/contracts'
 import { makeAbstractCommand } from '../../abstract'
 import Initialize from './initialize'
 import InitializeAC from '../accessController/initialize'
-import InitializeValidator from '../store/initialize'
+import InitializeStore from '../store/initialize'
 import DeployToken from '../token/deploy'
 import SetPayees from './setPayees'
 import SetValidatorConfig from '../store/setValidatorConfig'
@@ -61,8 +61,8 @@ export default class SetupRDDFlow extends FlowCommand<TransactionResponse> {
         id: this.stepIds.REQUEST_ACCESS_CONTROLLER,
       },
       {
-        name: 'Initialize Validator',
-        command: InitializeValidator,
+        name: 'Initialize Store',
+        command: InitializeStore,
         id: this.stepIds.STORE,
         flags: {
           accessController: FlowCommand.ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
