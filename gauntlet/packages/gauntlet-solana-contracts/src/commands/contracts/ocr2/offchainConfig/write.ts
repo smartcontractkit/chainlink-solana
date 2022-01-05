@@ -219,11 +219,12 @@ export default class WriteOffchainConfig extends SolanaCommand {
     }
 
     logger.log('Offchain info:', input)
-    await prompt('Start writing offchain config?')
+    const startingPoint = new BN(this.flags.chunk || 0).toNumber()
+    await prompt(`Start writing offchain config from ${startingPoint}/${offchainConfigChunks.length - 1}?`)
 
     const txs: string[] = []
-    for (let i = 0; i < offchainConfigChunks.length; i++) {
-      logger.loading(`Sending ${i + 1}/${offchainConfigChunks.length}...`)
+    for (let i = startingPoint; i < offchainConfigChunks.length; i++) {
+      logger.loading(`Sending ${i}/${offchainConfigChunks.length - 1}...`)
       const tx = await program.rpc.writeOffchainConfig(offchainConfigChunks[i], {
         accounts: {
           state: state,
