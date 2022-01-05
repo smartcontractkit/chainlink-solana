@@ -52,7 +52,7 @@ func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, l
 	return ContractTracker{
 		ProgramID:       spec.ProgramID,
 		StateID:         spec.StateID,
-		StoreProgramID:  spec.ValidatorProgramID,
+		StoreProgramID:  spec.StoreProgramID,
 		TransmissionsID: spec.TransmissionsID,
 		Transmitter:     transmitter,
 		client:          client,
