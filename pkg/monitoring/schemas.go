@@ -82,8 +82,6 @@ var configSetAvroSchema = Record("config_set", Opts{Namespace: "link.chain.ocr2"
 			Field("billing", Opts{}, Record("billing", Opts{}, Fields{
 				Field("observation_payment", Opts{Doc: "uint32"}, Long),
 			})),
-			Field("validator", Opts{Doc: "[32]byte"}, Bytes),
-			Field("flagging_threshold", Opts{Doc: "uint32"}, Long),
 		})),
 		Field("oracles", Opts{}, Array(Record("oracle", Opts{}, Fields{
 			Field("transmitter", Opts{Doc: "[32]byte"}, Bytes),

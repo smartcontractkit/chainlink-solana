@@ -131,9 +131,6 @@ func TestMapping(t *testing.T) {
 		require.True(t, ok, "billing is a map")
 		require.Equal(t, billing["observation_payment"], int64(state.Config.Billing.ObservationPayment))
 
-		require.Equal(t, config["validator"], state.Config.Validator.Bytes())
-		require.Equal(t, config["flagging_threshold"], int64(state.Config.FlaggingThreshold))
-
 		oracles, ok := solanaProgramState["oracles"].([]interface{})
 		require.True(t, ok, "oracles is an array")
 		require.Equal(t, len(oracles), int(state.Oracles.Len))
