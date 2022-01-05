@@ -149,8 +149,6 @@ func generateState() (
 			Billing: pkgSolana.Billing{
 				ObservationPayment: rand.Uint32(),
 			},
-			Validator:         generatePublicKey(),
-			FlaggingThreshold: rand.Uint32(),
 			OffchainConfig: pkgSolana.OffchainConfig{
 				Version: rand.Uint64(),
 				Raw:     enlargedOffchainConfig,

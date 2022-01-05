@@ -97,8 +97,6 @@ func MakeConfigSetMapping(
 				"billing": map[string]interface{}{
 					"observation_payment": int64(state.Config.Billing.ObservationPayment),
 				},
-				"validator":          state.Config.Validator[:],
-				"flagging_threshold": int64(state.Config.FlaggingThreshold),
 			},
 			"oracles":          formatOracles(state.Oracles),
 			"leftover_payment": formatLeftovers(state.LeftoverPayments),
