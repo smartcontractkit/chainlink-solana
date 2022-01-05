@@ -1,6 +1,6 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
 import { AccountMeta, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js'
 import BN from 'bn.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
@@ -76,12 +76,14 @@ export default class SetBilling extends SolanaCommand {
       },
     ]
 
+    const rawTx: RawTransaction  = {
+      data,
+      accounts,
+      programId: ocr2.programId,
+    }
+
     return [
-      {
-        data,
-        accounts,
-        programId: ocr2.programId,
-      },
+      rawTx
     ]
   }
 
@@ -101,6 +103,7 @@ export default class SetBilling extends SolanaCommand {
 
     logger.loading('Sending tx...')
     const txhash = await this.provider.send(tx, [this.wallet.payer])
+    logger.debug(`TX hash: ${txhash}`)
 
     return {
       responses: [
