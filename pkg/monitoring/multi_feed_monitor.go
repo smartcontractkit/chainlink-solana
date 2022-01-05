@@ -81,18 +81,22 @@ func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup) {
 				"network", m.solanaConfig.NetworkName,
 			)
 
-			transmissionPoller := NewPoller(
+			transmissionPoller := NewSourcePoller(
+				NewSolanaSource(
+					feedConfig.TransmissionsAccount,
+					m.transmissionReader,
+				),
 				feedLogger.With("component", "transmissions-poller", "address", feedConfig.TransmissionsAccount.String()),
-				feedConfig.TransmissionsAccount,
-				m.transmissionReader,
 				m.solanaConfig.PollInterval,
 				m.solanaConfig.ReadTimeout,
 				bufferCapacity,
 			)
-			statePoller := NewPoller(
+			statePoller := NewSourcePoller(
+				NewSolanaSource(
+					feedConfig.StateAccount,
+					m.stateReader,
+				),
 				feedLogger.With("component", "state-poller", "address", feedConfig.StateAccount.String()),
-				feedConfig.StateAccount,
-				m.stateReader,
 				m.solanaConfig.PollInterval,
 				m.solanaConfig.ReadTimeout,
 				bufferCapacity,

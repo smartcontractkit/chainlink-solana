@@ -25,15 +25,21 @@ func TestFeedMonitor(t *testing.T) {
 	readTimeout := 1 * time.Second
 	var bufferCapacity uint32 = 0 // no buffering
 
-	transmissionPoller := NewPoller(
+	transmissionPoller := NewSourcePoller(
+		NewSolanaSource(
+			transmissionAccount,
+			transmissionReader,
+		),
 		logger.NewNullLogger(),
-		transmissionAccount, transmissionReader,
 		pollInterval, readTimeout,
 		bufferCapacity,
 	)
-	statePoller := NewPoller(
+	statePoller := NewSourcePoller(
+		NewSolanaSource(
+			stateAccount,
+			stateReader,
+		),
 		logger.NewNullLogger(),
-		stateAccount, stateReader,
 		pollInterval, readTimeout,
 		bufferCapacity,
 	)

@@ -4,51 +4,53 @@ import (
 	"context"
 	"time"
 
-	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
 type Poller interface {
 	Start(context.Context)
+	// You should never close the channel returned by Updates()!
+	// You should always read from the channel returned by Updates() in a select statement with the same context you passed to Start()
 	Updates() <-chan interface{}
 }
 
-func NewPoller(
+type Source interface {
+	Name() string
+	Fetch(context.Context) (interface{}, error)
+}
+
+func NewSourcePoller(
+	source Source,
 	log logger.Logger,
-	account solana.PublicKey,
-	reader AccountReader,
 	pollInterval time.Duration,
-	readTimeout time.Duration,
+	fetchTimeout time.Duration,
 	bufferCapacity uint32,
 ) Poller {
-	return &solanaPollerImpl{
-		log,
-		account,
-		reader,
-		pollInterval,
-		readTimeout,
-		bufferCapacity,
+	return &sourcePoller{
+		log.With("source", source.Name()),
+		source,
 		make(chan interface{}, bufferCapacity),
+		pollInterval,
+		fetchTimeout,
 	}
 }
 
-type solanaPollerImpl struct {
-	log            logger.Logger
-	account        solana.PublicKey
-	reader         AccountReader
-	pollInterval   time.Duration
-	readTimeout    time.Duration
-	bufferCapacity uint32
-	updates        chan interface{}
+type sourcePoller struct {
+	log     logger.Logger
+	source  Source
+	updates chan interface{}
+
+	pollInterval time.Duration
+	fetchTimeout time.Duration
 }
 
 // Start should be executed as a goroutine
-func (s *solanaPollerImpl) Start(ctx context.Context) {
+func (s *sourcePoller) Start(ctx context.Context) {
 	s.log.Debug("poller started")
-	// Fetch initial data
-	data, err := s.reader.Read(ctx, s.account)
+	// Initial fetch.
+	data, err := s.source.Fetch(ctx)
 	if err != nil {
-		s.log.Errorw("failed initial fetch of account contents", "error", err)
+		s.log.Errorw("failed initial fetch", "error", err)
 	} else {
 		s.updates <- data
 	}
@@ -60,12 +62,12 @@ func (s *solanaPollerImpl) Start(ctx context.Context) {
 			var data interface{}
 			var err error
 			func() {
-				ctx, cancel := context.WithTimeout(ctx, s.readTimeout)
+				ctx, cancel := context.WithTimeout(ctx, s.fetchTimeout)
 				defer cancel()
-				data, err = s.reader.Read(ctx, s.account)
+				data, err = s.source.Fetch(ctx)
 			}()
 			if err != nil {
-				s.log.Errorw("failed to read account contents", "error", err)
+				s.log.Errorw("failed to fetch from source", "error", err)
 				continue
 			}
 			s.updates <- data
@@ -80,6 +82,6 @@ func (s *solanaPollerImpl) Start(ctx context.Context) {
 	}
 }
 
-func (s *solanaPollerImpl) Updates() <-chan interface{} {
+func (s *sourcePoller) Updates() <-chan interface{} {
 	return s.updates
 }
