@@ -76,15 +76,13 @@ export default class SetBilling extends SolanaCommand {
       },
     ]
 
-    const rawTx: RawTransaction  = {
+    const rawTx: RawTransaction = {
       data,
       accounts,
       programId: ocr2.programId,
     }
 
-    return [
-      rawTx
-    ]
+    return [rawTx]
   }
 
   execute = async () => {

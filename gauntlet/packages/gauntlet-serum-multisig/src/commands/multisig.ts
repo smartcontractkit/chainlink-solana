@@ -31,7 +31,7 @@ export const wrapCommand = (command) => {
 
       this.command = new command(flags, args)
       this.command.invokeMiddlewares(this.command, this.command.middlewares)
-  }
+    }
 
     createProposal = async (rawTx: RawTransaction) => {
       logger.loading(`Creating proposal`)
@@ -48,49 +48,52 @@ export const wrapCommand = (command) => {
         instructions: [await this.program.account.transaction.createInstruction(transaction, txSize)],
         signers: [transaction, this.wallet.payer],
       })
-      return {tx, txPublicKey}
+      return { tx, txPublicKey }
     }
 
     approveProposal = async (txAccount) => {
       logger.loading(`Approving proposal`)
       const tx = await this.program.rpc.approve({
-          accounts: {
-            multisig: this.multisigAddress,
-            transaction: txAccount ,
-            owner: this.wallet.publicKey,
-          },
-        })
+        accounts: {
+          multisig: this.multisigAddress,
+          transaction: txAccount,
+          owner: this.wallet.publicKey,
+        },
+      })
       return tx
     }
 
     executeProposal = async (txAccount) => {
       logger.loading(`Executing proposal`)
-      this.require(this.flags.tx != null, "Please set the TX account to execute, using --tx= flag")
-      const [multisigSigner] = await PublicKey.findProgramAddress([this.multisigAddress.toBuffer()], this.program.programId)
+      this.require(this.flags.tx != null, 'Please set the TX account to execute, using --tx= flag')
+      const [multisigSigner] = await PublicKey.findProgramAddress(
+        [this.multisigAddress.toBuffer()],
+        this.program.programId,
+      )
       const txAccountData = await this.program.account.transaction.fetch(this.flags.tx)
       const tx = await this.program.rpc.executeTransaction({
-          accounts: {
-            multisig: this.multisigAddress,
-            multisigSigner,
-            transaction: txAccount,
-          },
-          remainingAccounts: txAccountData.accounts
-            .map((t: any) => {
-              if (t.pubkey.equals(multisigSigner)) {
-                return { ...t, isSigner: false }
-              }
-              return t
-            })
-            .concat({
-              pubkey: txAccountData.programId,
-              isWritable: false,
-              isSigner: false,
-            }),
-        })
-        logger.debug(`TX hash: ${tx.toString()}`)
+        accounts: {
+          multisig: this.multisigAddress,
+          multisigSigner,
+          transaction: txAccount,
+        },
+        remainingAccounts: txAccountData.accounts
+          .map((t: any) => {
+            if (t.pubkey.equals(multisigSigner)) {
+              return { ...t, isSigner: false }
+            }
+            return t
+          })
+          .concat({
+            pubkey: txAccountData.programId,
+            isWritable: false,
+            isSigner: false,
+          }),
+      })
+      logger.debug(`TX hash: ${tx.toString()}`)
 
-        return tx
-      }
+      return tx
+    }
 
     execute = async () => {
       this.multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS || '')
@@ -103,26 +106,30 @@ export const wrapCommand = (command) => {
         const rawTxs = await this.command.makeRawTransaction()
         const { tx, txPublicKey } = await this.createProposal(rawTxs[0])
         this.flags.tx = txPublicKey
-        logger.info(`TX Account: ${txPublicKey}. This should be used in approve and execute actions by supplying --tx=${txPublicKey} flag`)
+        logger.info(
+          `TX Account: ${txPublicKey}. This should be used in approve and execute actions by supplying --tx=${txPublicKey} flag`,
+        )
         txResults.push(tx)
       }
 
       if (this.flags.approve) {
         const tx = await this.approveProposal(this.flags.tx)
         txResults.push(tx)
-       }
+      }
 
       if (this.flags.execute) {
-        const tx = await this.executeProposal(this.flags.tx) 
+        const tx = await this.executeProposal(this.flags.tx)
         txResults.push(tx)
       }
 
-      const responses: WriteResponse<TransactionResponse>[] = txResults.map(r => Object.assign({
-        tx: this.wrapResponse(r.toString(), this.flags.tx.toString()),
-        contract: this.flags.tx.toString(),
-      }))
+      const responses: WriteResponse<TransactionResponse>[] = txResults.map((r) =>
+        Object.assign({
+          tx: this.wrapResponse(r.toString(), this.flags.tx.toString()),
+          contract: this.flags.tx.toString(),
+        }),
+      )
 
-      return { responses } as Result<TransactionResponse> 
+      return { responses } as Result<TransactionResponse>
 
       // const actions = {
       //   [ACTIONS.create]: this.createProposal,
@@ -134,6 +141,3 @@ export const wrapCommand = (command) => {
     }
   }
 }
-
-    
-

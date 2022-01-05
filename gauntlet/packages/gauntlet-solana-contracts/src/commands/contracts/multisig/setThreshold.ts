@@ -3,7 +3,6 @@ import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { Result } from '@chainlink/gauntlet-core'
 
-
 import BN from 'bn.js'
 
 export default class SetThreshold extends SolanaCommand {
