@@ -9,12 +9,11 @@ import (
 )
 
 type MultiFeedMonitor interface {
-	Start(ctx context.Context, wg *sync.WaitGroup)
+	Start(ctx context.Context, wg *sync.WaitGroup, feeds []config.Feed)
 }
 
 func NewMultiFeedMonitor(
 	solanaConfig config.Solana,
-	feeds []config.Feed,
 
 	log logger.Logger,
 	transmissionReader, stateReader AccountReader,
@@ -31,7 +30,6 @@ func NewMultiFeedMonitor(
 ) MultiFeedMonitor {
 	return &multiFeedMonitor{
 		solanaConfig,
-		feeds,
 
 		log,
 		transmissionReader, stateReader,
@@ -50,7 +48,6 @@ func NewMultiFeedMonitor(
 
 type multiFeedMonitor struct {
 	solanaConfig config.Solana
-	feeds        []config.Feed
 
 	log                logger.Logger
 	transmissionReader AccountReader
@@ -70,9 +67,9 @@ type multiFeedMonitor struct {
 const bufferCapacity = 100
 
 // Start should be executed as a goroutine.
-func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup) {
-	wg.Add(len(m.feeds))
-	for _, feedConfig := range m.feeds {
+func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup, feeds []config.Feed) {
+	wg.Add(len(feeds))
+	for _, feedConfig := range feeds {
 		go func(feedConfig config.Feed) {
 			defer wg.Done()
 

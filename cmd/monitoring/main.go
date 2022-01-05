@@ -81,7 +81,6 @@ func main() {
 
 	monitor := monitoring.NewMultiFeedMonitor(
 		cfg.Solana,
-		cfg.Feeds.Feeds,
 
 		log,
 		transmissionReader, stateReader,
@@ -96,11 +95,31 @@ func main() {
 		configSetSimplifiedSchema,
 		transmissionSchema,
 	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		monitor.Start(bgCtx, wg)
-	}()
+
+	if cfg.Feeds.FilePath != "" {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			monitor.Start(bgCtx, wg, cfg.Feeds.Feeds)
+		}()
+	} else if cfg.Feeds.URL != "" {
+		rddPoller := monitoring.NewSourcePoller(
+			monitoring.NewRDDSource(cfg.Feeds.URL),
+			log.With("component", "rdd-poller"),
+			cfg.Feeds.RDDPollInterval,
+			cfg.Feeds.RDDReadTimeout,
+			0, // no buffering!
+		)
+		manager := monitoring.NewManager(
+			log.With("component", "manager"),
+			rddPoller,
+		)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			manager.Start(bgCtx, wg, monitor.Start)
+		}()
+	} // the config package makes sure there is either a FilePath or a URL set!
 
 	osSignalsCh := make(chan os.Signal, 1)
 	signal.Notify(osSignalsCh, syscall.SIGINT, syscall.SIGTERM)
