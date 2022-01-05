@@ -37,6 +37,7 @@ export default class Initialize extends SolanaCommand {
   constructor(flags, args) {
     super(flags, args)
 
+    this.requireFlag('transmissions', 'Provide a --transmissions flag with a valid address')
     this.requireFlag('requesterAccessController', 'Provide a --requesterAccessController flag with a valid address')
     this.requireFlag('billingAccessController', 'Provide a --requesterAccessController flag with a valid address')
   }
@@ -48,10 +49,10 @@ export default class Initialize extends SolanaCommand {
 
     // STATE ACCOUNTS
     const state = Keypair.generate()
-    const transmissions = Keypair.generate()
     const owner = this.wallet.payer
     const input = this.makeInput(this.flags.input)
 
+    const transmissions = new PublicKey(this.flags.transmissions)
     const linkPublicKey = new PublicKey(this.flags.link)
     const requesterAccessController = new PublicKey(this.flags.requesterAccessController)
     const billingAccessController = new PublicKey(this.flags.billingAccessController)
@@ -82,7 +83,7 @@ export default class Initialize extends SolanaCommand {
 
     const accounts = {
       state: state.publicKey,
-      transmissions: transmissions.publicKey,
+      transmissions: transmissions,
       payer: this.provider.wallet.publicKey,
       owner: owner.publicKey,
       tokenMint: linkPublicKey,
@@ -110,17 +111,14 @@ export default class Initialize extends SolanaCommand {
 
     const txHash = await program.rpc.initialize(vaultNonce, minAnswer, maxAnswer, decimals, description, {
       accounts,
-      signers: [owner, state, transmissions],
-      instructions: [
-        await program.account.state.createInstruction(state),
-        await program.account.transmissions.createInstruction(transmissions),
-      ],
+      signers: [owner, state],
+      instructions: [await program.account.state.createInstruction(state)],
     })
 
     console.log(`
       STATE ACCOUNTS:
         - State: ${state.publicKey}
-        - Transmissions: ${transmissions.publicKey}
+        - Transmissions: ${transmissions}
         - Payer: ${this.provider.wallet.publicKey}
         - Owner: ${owner.publicKey}
     `)
@@ -128,14 +126,14 @@ export default class Initialize extends SolanaCommand {
     return {
       data: {
         state: state.publicKey.toString(),
-        transmissions: transmissions.publicKey.toString(),
+        transmissions: transmissions.toString(),
         storeAuthority: storeAuthority.toString(),
       },
       responses: [
         {
           tx: this.wrapResponse(txHash, address, {
             state: state.publicKey.toString(),
-            transmissions: transmissions.publicKey.toString(),
+            transmissions: transmissions.toString(),
           }),
           contract: state.publicKey.toString(),
         },

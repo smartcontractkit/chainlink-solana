@@ -81,18 +81,20 @@ func (c *ContractTracker) Transmit(
 
 	// Send transaction, and wait for confirmation:
 	go func() {
-		if _, err := confirm.SendAndConfirmTransactionWithOpts(
+		txSig, err := confirm.SendAndConfirmTransactionWithOpts(
 			context.Background(), // does not use libocr transmit context
 			c.client.rpc,
 			c.client.ws,
 			tx,
 			true, // skip preflight
 			rpc.CommitmentConfirmed,
-		); err != nil {
+		)
+
+		if err != nil {
 			c.lggr.Errorf("error on Transmit.SendAndConfirmTransaction: %s", err.Error())
 		}
+		c.lggr.Debugf("tx signature from Transmit.SendAndConfirmTransaction: %s", txSig.String())
 	}()
-
 	return nil
 }
 

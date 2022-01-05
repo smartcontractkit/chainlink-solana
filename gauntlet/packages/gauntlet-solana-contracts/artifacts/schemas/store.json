@@ -6,7 +6,7 @@
       "name": "initialize",
       "accounts": [
         {
-          "name": "state",
+          "name": "store",
           "isMut": true,
           "isSigner": false
         },
@@ -14,11 +14,6 @@
           "name": "owner",
           "isMut": false,
           "isSigner": true
-        },
-        {
-          "name": "raisingAccessController",
-          "isMut": false,
-          "isSigner": false
         },
         {
           "name": "loweringAccessController",
@@ -29,10 +24,92 @@
       "args": []
     },
     {
+      "name": "createFeed",
+      "accounts": [
+        {
+          "name": "store",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feed",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "granularity",
+          "type": "u8"
+        },
+        {
+          "name": "liveLength",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "setValidatorConfig",
+      "accounts": [
+        {
+          "name": "store",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "feed",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "flaggingThreshold",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "setWriter",
+      "accounts": [
+        {
+          "name": "store",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "feed",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "writer",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "transferOwnership",
       "accounts": [
         {
-          "name": "state",
+          "name": "store",
           "isMut": true,
           "isSigner": false
         },
@@ -53,7 +130,7 @@
       "name": "acceptOwnership",
       "accounts": [
         {
-          "name": "state",
+          "name": "store",
           "isMut": true,
           "isSigner": false
         },
@@ -66,10 +143,10 @@
       "args": []
     },
     {
-      "name": "validate",
+      "name": "submit",
       "accounts": [
         {
-          "name": "state",
+          "name": "store",
           "isMut": true,
           "isSigner": false
         },
@@ -79,36 +156,17 @@
           "isSigner": true
         },
         {
-          "name": "accessController",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "address",
-          "isMut": false,
+          "name": "feed",
+          "isMut": true,
           "isSigner": false
         }
       ],
       "args": [
         {
-          "name": "flaggingThreshold",
-          "type": "u32"
-        },
-        {
-          "name": "previousRoundId",
-          "type": "u32"
-        },
-        {
-          "name": "previousAnswer",
-          "type": "i128"
-        },
-        {
-          "name": "roundId",
-          "type": "u32"
-        },
-        {
-          "name": "answer",
-          "type": "i128"
+          "name": "round",
+          "type": {
+            "defined": "Transmission"
+          }
         }
       ]
     },
@@ -116,7 +174,7 @@
       "name": "lowerFlags",
       "accounts": [
         {
-          "name": "state",
+          "name": "store",
           "isMut": true,
           "isSigner": false
         },
@@ -141,10 +199,10 @@
       ]
     },
     {
-      "name": "setRaisingAccessController",
+      "name": "setLoweringAccessController",
       "accounts": [
         {
-          "name": "state",
+          "name": "store",
           "isMut": true,
           "isSigner": false
         },
@@ -162,30 +220,100 @@
       "args": []
     },
     {
-      "name": "setLoweringAccessController",
+      "name": "query",
       "accounts": [
         {
-          "name": "state",
-          "isMut": true,
+          "name": "feed",
+          "isMut": false,
           "isSigner": false
         },
         {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "accessController",
-          "isMut": false,
+          "name": "buffer",
+          "isMut": true,
           "isSigner": false
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "scope",
+          "type": {
+            "defined": "Scope"
+          }
+        }
+      ]
     }
   ],
   "accounts": [
     {
-      "name": "Validator",
+      "name": "Round",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "roundId",
+            "type": "u32"
+          },
+          {
+            "name": "timestamp",
+            "type": "u64"
+          },
+          {
+            "name": "answer",
+            "type": "i128"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Decimals",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "decimals",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Version",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Description",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "description",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Address",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "address",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Store",
       "type": {
         "kind": "struct",
         "fields": [
@@ -213,6 +341,50 @@
           }
         ]
       }
+    },
+    {
+      "name": "Transmissions",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "store",
+            "type": "publicKey"
+          },
+          {
+            "name": "writer",
+            "type": "publicKey"
+          },
+          {
+            "name": "flaggingThreshold",
+            "type": "u32"
+          },
+          {
+            "name": "latestRoundId",
+            "type": "u32"
+          },
+          {
+            "name": "granularity",
+            "type": "u8"
+          },
+          {
+            "name": "liveLength",
+            "type": "u32"
+          },
+          {
+            "name": "liveCursor",
+            "type": "u32"
+          },
+          {
+            "name": "historicalCursor",
+            "type": "u32"
+          }
+        ]
+      }
     }
   ],
   "types": [
@@ -236,6 +408,48 @@
           }
         ]
       }
+    },
+    {
+      "name": "Transmission",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "timestamp",
+            "type": "u64"
+          },
+          {
+            "name": "answer",
+            "type": "i128"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Scope",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Version"
+          },
+          {
+            "name": "RoundData",
+            "fields": [
+              {
+                "name": "round_id",
+                "type": "u32"
+              }
+            ]
+          },
+          {
+            "name": "LatestRoundData"
+          },
+          {
+            "name": "Aggregator"
+          }
+        ]
+      }
     }
   ],
   "errors": [
@@ -253,6 +467,13 @@
       "code": 6002,
       "name": "Full",
       "msg": "Flags list is full"
+    },
+    {
+      "code": 6003,
+      "name": "NotFound"
     }
-  ]
+  ],
+  "metadata": {
+    "address": "A7Jh2nb1hZHwqEofm4N8SXbKTj82rx7KUfjParQXUyMQ"
+  }
 }

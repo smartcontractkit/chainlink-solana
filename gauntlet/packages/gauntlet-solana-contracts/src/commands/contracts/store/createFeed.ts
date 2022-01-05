@@ -13,7 +13,7 @@ type Input = {
 
 export default class CreateFeed extends SolanaCommand {
   static id = 'store:create_feed'
-  static category = CONTRACT_LIST.OCR_2
+  static category = CONTRACT_LIST.STORE
 
   static examples = [
     'yarn gauntlet store:create_feed --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --granularity=30 --liveLength 86400 --store=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
@@ -62,18 +62,32 @@ export default class CreateFeed extends SolanaCommand {
 
     const tx = await program.rpc.createFeed(granularity, liveLength, {
       accounts: {
-        state: state,
         store: store,
+        feed: feed.publicKey,
         authority: owner.publicKey,
       },
       signers: [owner, feed],
       instructions: [await program.account.transmissions.createInstruction(feed, feedAccountLength.toNumber())],
     })
 
+    logger.success(`Created feed on tx ${tx}`)
+    console.log(`
+    STATE ACCOUNTS:
+      - Store: ${store}
+      - Feed/Transmissions: ${feed.publicKey}
+    `)
+
     return {
+      data: {
+        state: state.toString(),
+        transmissions: feed.publicKey.toString(),
+      },
       responses: [
         {
-          tx: this.wrapResponse(tx, state.toString(), { state: state.toString() }),
+          tx: this.wrapResponse(tx, state.toString(), {
+            state: state.toString(),
+            transmissions: feed.publicKey.toString(),
+          }),
           contract: state.toString(),
         },
       ],

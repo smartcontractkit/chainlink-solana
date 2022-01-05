@@ -6,7 +6,8 @@ require (
 	github.com/gagliardetto/solana-go v1.0.2
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi/sdk/v3 v3.17.0
-	github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20211215192527-583f627029d9
+	github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20211222163115-1600fedc937b
+	github.com/stretchr/testify v1.7.0
 )
 
 require (
@@ -164,7 +165,6 @@ require (
 	github.com/spf13/viper v1.9.0 // indirect
 	github.com/src-d/gcfg v1.4.0 // indirect
 	github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48 // indirect
-	github.com/stretchr/testify v1.7.0 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/teris-io/shortid v0.0.0-20201117134242-e59966efd125 // indirect
 	github.com/texttheater/golang-levenshtein v0.0.0-20191208221605-eb6844b05fc6 // indirect

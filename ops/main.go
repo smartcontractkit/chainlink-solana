@@ -27,11 +27,11 @@ func main() {
 
 func RelayConfig(ctx *pulumi.Context, addresses map[int]string) (map[string]string, error) {
 	return map[string]string{
-		"nodeEndpointHTTP":   config.Require(ctx, "CL-RELAY_HTTP"),
-		"nodeEndpointWS":     config.Require(ctx, "CL-RELAY_WS"),
-		"stateID":            addresses[solana.OCRFeed],
-		"transmissionsID":    addresses[solana.OCRTransmissions],
-		"validatorProgramID": addresses[solana.Validator],
+		"nodeEndpointHTTP": config.Require(ctx, "CL-RELAY_HTTP"),
+		"nodeEndpointWS":   config.Require(ctx, "CL-RELAY_WS"),
+		"stateID":          addresses[solana.OCRFeed],
+		"transmissionsID":  addresses[solana.OCRTransmissions],
+		"storeProgramID":   addresses[solana.Store],
 	}, nil
 }
 
