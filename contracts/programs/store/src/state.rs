@@ -59,7 +59,6 @@ pub struct Transmissions {
     pub flagging_threshold: u32,
     latest_round_id: u32,
     pub granularity: u8,
-    // _padding: u16
     pub live_length: u32,
     live_cursor: u32,
     historical_cursor: u32,
