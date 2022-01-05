@@ -38,10 +38,10 @@ type OCR2Spec struct {
 	NodeEndpointWS   string
 
 	// on-chain program + 2x state accounts (state + transmissions) + store program
-	ProgramID          solana.PublicKey
-	StateID            solana.PublicKey
-	StoreProgramID solana.PublicKey
-	TransmissionsID    solana.PublicKey
+	ProgramID       solana.PublicKey
+	StateID         solana.PublicKey
+	StoreProgramID  solana.PublicKey
+	TransmissionsID solana.PublicKey
 
 	TransmissionSigner TransmissionSigner
 }
