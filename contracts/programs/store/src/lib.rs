@@ -67,6 +67,7 @@ pub mod store {
     #[access_control(owner(&ctx.accounts.store, &ctx.accounts.authority))]
     pub fn create_feed(
         ctx: Context<CreateFeed>,
+        decimals: u8,
         granularity: u8,
         live_length: u32,
     ) -> ProgramResult {
@@ -76,6 +77,8 @@ pub mod store {
         feed.granularity = granularity;
         feed.live_length = live_length;
         feed.writer = Pubkey::default();
+
+        feed.decimals = decimals;
         Ok(())
     }
 

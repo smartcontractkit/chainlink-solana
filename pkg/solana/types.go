@@ -16,7 +16,7 @@ const (
 	TransmissionLen uint64 = 16 + TimestampLen
 
 	// AccountDiscriminator (8 bytes), RoundID (uint32, 4 bytes), Cursor (uint32, 4 bytes)
-	CursorOffset uint64 = 8 + 1 + 32 + 32 + 4 + 4 + 1
+	CursorOffset uint64 = 8 + 1 + 32 + 32 + 1 + 4 + 4 + 1
 	CursorLen    uint64 = 4
 
 	// Report data (61 bytes)
@@ -73,10 +73,9 @@ type Config struct {
 	MinAnswer                 bin.Int128
 	MaxAnswer                 bin.Int128
 	Description               [32]byte
-	Decimals                  uint8
 	F                         uint8
 	Round                     uint8
-	Padding0                  uint8
+	Padding0                  uint16
 	Epoch                     uint32
 	LatestAggregatorRoundID   uint32
 	LatestTransmitter         solana.PublicKey

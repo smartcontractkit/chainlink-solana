@@ -248,6 +248,7 @@ describe('ocr2', async () => {
     const granularity = 30;
     const liveLength = 3;
     await workspace.Store.rpc.createFeed(
+      decimals,
       granularity,
       liveLength,
     {
@@ -282,7 +283,7 @@ describe('ocr2', async () => {
   });
     
   it('Initializes the OCR2 config', async () => {
-    await program.rpc.initialize(vaultNonce, new BN(minAnswer), new BN(maxAnswer), decimals, description, {
+    await program.rpc.initialize(vaultNonce, new BN(minAnswer), new BN(maxAnswer), description, {
       accounts: {
         state: state.publicKey,
         transmissions: transmissions.publicKey,
@@ -310,7 +311,7 @@ describe('ocr2', async () => {
     let config = account.config;
     assert.ok(config.minAnswer.toNumber() == minAnswer);
     assert.ok(config.maxAnswer.toNumber() == maxAnswer);
-    assert.ok(config.decimals == 18);
+    // assert.ok(config.decimals == 18);
 
     console.log(`Generating ${n} oracles...`);
     let futures = [];

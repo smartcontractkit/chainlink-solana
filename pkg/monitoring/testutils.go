@@ -140,7 +140,6 @@ func generateState() (
 			MinAnswer:                 gbinary.Int128{Lo: rand.Uint64(), Hi: rand.Uint64()},
 			MaxAnswer:                 gbinary.Int128{Lo: rand.Uint64(), Hi: rand.Uint64()},
 			Description:               generate32ByteArr(),
-			Decimals:                  uint8(rand.Intn(256)),
 			F:                         uint8(10),
 			Round:                     uint8(rand.Intn(256)),
 			Epoch:                     rand.Uint32(),

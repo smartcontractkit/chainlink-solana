@@ -70,7 +70,6 @@ var configSetAvroSchema = Record("config_set", Opts{Namespace: "link.chain.ocr2"
 			Field("min_answer", Opts{Doc: "big.Int"}, Bytes),
 			Field("max_answer", Opts{Doc: "big.Int"}, Bytes),
 			Field("description", Opts{Doc: "[32]byte"}, Bytes),
-			Field("decimals", Opts{Doc: "uint8"}, Int),
 			Field("f", Opts{Doc: "uint8"}, Int),
 			Field("round", Opts{Doc: "uint8"}, Int),
 			Field("epoch", Opts{Doc: "uint32"}, Long),

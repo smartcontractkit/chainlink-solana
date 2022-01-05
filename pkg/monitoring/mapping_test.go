@@ -119,7 +119,6 @@ func TestMapping(t *testing.T) {
 		require.Equal(t, config["min_answer"], state.Config.MinAnswer.BigInt().Bytes())
 		require.Equal(t, config["max_answer"], state.Config.MaxAnswer.BigInt().Bytes())
 		require.Equal(t, config["description"], state.Config.Description[:])
-		require.Equal(t, config["decimals"], int32(state.Config.Decimals))
 		require.Equal(t, config["f"], int32(state.Config.F))
 		require.Equal(t, config["round"], int32(state.Config.Round))
 		require.Equal(t, config["epoch"], int64(state.Config.Epoch))

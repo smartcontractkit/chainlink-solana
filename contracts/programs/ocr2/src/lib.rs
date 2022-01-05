@@ -41,7 +41,6 @@ pub mod ocr2 {
         nonce: u8,
         min_answer: i128,
         max_answer: i128,
-        decimals: u8,
         description: String,
     ) -> ProgramResult {
         let mut state = ctx.accounts.state.load_init()?;
@@ -60,7 +59,6 @@ pub mod ocr2 {
 
         config.min_answer = min_answer;
         config.max_answer = max_answer;
-        config.decimals = decimals;
 
         let description = description.as_bytes();
         require!(description.len() <= 32, InvalidInput);

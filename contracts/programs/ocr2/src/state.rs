@@ -80,10 +80,9 @@ pub struct Config {
     /// Raw UTF-8 byte string
     pub description: [u8; 32],
 
-    pub decimals: u8,
     pub f: u8,
     pub round: u8,
-    _padding0: u8,
+    _padding0: u16,
     pub epoch: u32,
     pub latest_aggregator_round_id: u32,
     pub latest_transmitter: Pubkey,

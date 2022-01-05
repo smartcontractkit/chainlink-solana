@@ -95,7 +95,6 @@ func MakeConfigSetMapping(
 				"min_answer":                  envelope.State.Config.MinAnswer.BigInt().Bytes(),
 				"max_answer":                  envelope.State.Config.MaxAnswer.BigInt().Bytes(),
 				"description":                 envelope.State.Config.Description[:],
-				"decimals":                    int32(envelope.State.Config.Decimals),
 				"f":                           int32(envelope.State.Config.F),
 				"round":                       int32(envelope.State.Config.Round),
 				"epoch":                       int64(envelope.State.Config.Epoch),

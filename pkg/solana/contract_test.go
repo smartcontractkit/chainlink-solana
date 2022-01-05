@@ -30,6 +30,7 @@ var mockTransmission = []byte{
 	71, 192, 69, 231, 146, 55, 106,
 	174, 33, 124, 218, 253, 229, 182, 236, 61, 80, 206, 74,
 	121, 148, 151, 4, 63, 154, 142, 206, 234, 134, 108, 73, 141, // writer, 32 bytes
+	18,            // decimals
 	128, 56, 1, 0, // flagging_threshold, 4 bytes
 	1, 0, 0, 0, // latest_round_id, 4 bytes
 	30,         // granularity, 1 byte
@@ -37,7 +38,7 @@ var mockTransmission = []byte{
 	1, 0, 0, 0, // live_cursor, 4 bytes
 	0, 0, 0, 0, // historical_cursor, 4 bytes
 
-	0, 0,
+	0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
