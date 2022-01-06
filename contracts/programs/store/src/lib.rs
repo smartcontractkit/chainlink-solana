@@ -67,6 +67,7 @@ pub mod store {
     #[access_control(owner(&ctx.accounts.store, &ctx.accounts.authority))]
     pub fn create_feed(
         ctx: Context<CreateFeed>,
+        description: String,
         decimals: u8,
         granularity: u8,
         live_length: u32,
@@ -79,6 +80,10 @@ pub mod store {
         feed.writer = Pubkey::default();
 
         feed.decimals = decimals;
+        let description = description.as_bytes();
+        require!(description.len() <= 32, InvalidInput);
+        feed.description[..description.len()].copy_from_slice(description);
+
         Ok(())
     }
 

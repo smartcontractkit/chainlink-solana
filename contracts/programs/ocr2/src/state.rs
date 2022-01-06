@@ -77,9 +77,6 @@ pub struct Config {
     pub min_answer: i128,
     pub max_answer: i128,
 
-    /// Raw UTF-8 byte string
-    pub description: [u8; 32],
-
     pub f: u8,
     pub round: u8,
     _padding0: u16,

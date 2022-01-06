@@ -18,10 +18,6 @@ import (
 )
 
 var mockTransmission = []byte{
-	// 96, 179, 69, 66, 128, 129, 73, 117, // account discriminator 8 byte
-	// 8, 0, 0, 0, // latest round id u32, 4 byte
-	// 8, 0, 0, 0, // cursor u32, 4 byte
-
 	96, 179, 69, 66, 128, 129, 73, 117, // account discriminator
 	1, // version
 	60, 231, 89, 57, 209, 16, 239, 36, 134, 61, 118, 182, 240, 207, 143,
@@ -30,7 +26,11 @@ var mockTransmission = []byte{
 	71, 192, 69, 231, 146, 55, 106,
 	174, 33, 124, 218, 253, 229, 182, 236, 61, 80, 206, 74,
 	121, 148, 151, 4, 63, 154, 142, 206, 234, 134, 108, 73, 141, // writer, 32 bytes
-	18,            // decimals
+	18, // decimals, 1 byte
+	69, 84, 72, 47, 66, 84, 67, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, // description, 32 bytes
 	128, 56, 1, 0, // flagging_threshold, 4 bytes
 	1, 0, 0, 0, // latest_round_id, 4 bytes
 	30,         // granularity, 1 byte
@@ -38,11 +38,8 @@ var mockTransmission = []byte{
 	1, 0, 0, 0, // live_cursor, 4 bytes
 	0, 0, 0, 0, // historical_cursor, 4 bytes
 
+	0, 0, 0, 0, 0, 0, 0, 0,
 	0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0,
 	// -- end of header
 	83, 43, 91, 97, 0, 0, 0, 0,
 	210, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

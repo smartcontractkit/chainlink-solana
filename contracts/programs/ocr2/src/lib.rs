@@ -41,7 +41,6 @@ pub mod ocr2 {
         nonce: u8,
         min_answer: i128,
         max_answer: i128,
-        description: String,
     ) -> ProgramResult {
         let mut state = ctx.accounts.state.load_init()?;
         state.version = 1;
@@ -59,10 +58,6 @@ pub mod ocr2 {
 
         config.min_answer = min_answer;
         config.max_answer = max_answer;
-
-        let description = description.as_bytes();
-        require!(description.len() <= 32, InvalidInput);
-        config.description[..description.len()].copy_from_slice(description);
 
         Ok(())
     }

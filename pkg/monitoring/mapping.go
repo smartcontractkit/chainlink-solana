@@ -94,7 +94,6 @@ func MakeConfigSetMapping(
 				"billing_access_controller":   envelope.State.Config.BillingAccessController[:],
 				"min_answer":                  envelope.State.Config.MinAnswer.BigInt().Bytes(),
 				"max_answer":                  envelope.State.Config.MaxAnswer.BigInt().Bytes(),
-				"description":                 envelope.State.Config.Description[:],
 				"f":                           int32(envelope.State.Config.F),
 				"round":                       int32(envelope.State.Config.Round),
 				"epoch":                       int64(envelope.State.Config.Epoch),
@@ -106,10 +105,12 @@ func MakeConfigSetMapping(
 				"billing": map[string]interface{}{
 					"observation_payment": int64(envelope.State.Config.Billing.ObservationPayment),
 				},
-				// These two fields (validator, flagging_threshold) have been removed from the program's
+				// These fields (validator, flagging_threshold, decimals, description) have been removed from the program's
 				// state but they have been kept here to preserve backwards compatibility.
 				"validator":          []byte{},
 				"flagging_threshold": 0,
+				"decimals":           0,
+				"description":        []byte{},
 			},
 			"oracles":          formatOracles(envelope.State.Oracles),
 			"leftover_payment": formatLeftovers(envelope.State.LeftoverPayments),

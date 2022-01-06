@@ -56,6 +56,8 @@ pub struct Transmissions {
     pub version: u8,
     pub store: Pubkey,
     pub writer: Pubkey,
+    /// Raw UTF-8 byte string
+    pub description: [u8; 32],
     pub decimals: u8,
     pub flagging_threshold: u32,
     pub latest_round_id: u32,
@@ -188,6 +190,7 @@ mod tests {
             version: 1,
             store: Pubkey::default(),
             writer: Pubkey::default(),
+            description: [0; 32],
             decimals: 18,
             flagging_threshold: 1000,
             latest_round_id: 0,
