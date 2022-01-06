@@ -38,8 +38,13 @@ func NewMultiFeedMonitor(
 		producer,
 		metrics,
 
-		configSetTopic, configSetSimplifiedTopic, transmissionTopic,
-		configSetSchema, configSetSimplifiedSchema, transmissionSchema,
+		configSetTopic,
+		configSetSimplifiedTopic,
+		transmissionTopic,
+
+		configSetSchema,
+		configSetSimplifiedSchema,
+		transmissionSchema,
 	}
 }
 
@@ -127,7 +132,7 @@ func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup) {
 			}
 
 			feedMonitor := NewFeedMonitor(
-				feedLogger,
+				feedLogger.With("component", "feed-monitor"),
 				transmissionPoller, statePoller,
 				exporters,
 			)

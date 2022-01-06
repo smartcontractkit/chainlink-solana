@@ -293,7 +293,7 @@ func (f *fakeReader) runRandomDataGenerator(ctx context.Context, typ string, log
 		}
 		select {
 		case f.readCh <- payload:
-			log.Infof("sent payload of type %s", typ)
+			log.Infof("generate data for account of type %s", typ)
 		case <-ctx.Done():
 			return
 		}

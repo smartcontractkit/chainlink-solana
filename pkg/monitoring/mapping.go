@@ -26,18 +26,16 @@ func MakeConfigSetMapping(
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ReportingPluginConfig from OffchainConfig: %w", err)
 	}
-	var sharedSecredEncryptions map[string]interface{}
+	sharedSecredEncryptions := map[string]interface{}{
+		"diffie_hellman_point": []byte{},
+		"shared_secret_hash":   []byte{},
+		"encryptions":          []byte{},
+	}
 	if offchainConfig.SharedSecretEncryptions != nil {
 		sharedSecredEncryptions = map[string]interface{}{
 			"diffie_hellman_point": offchainConfig.SharedSecretEncryptions.DiffieHellmanPoint,
 			"shared_secret_hash":   offchainConfig.SharedSecretEncryptions.SharedSecretHash,
 			"encryptions":          offchainConfig.SharedSecretEncryptions.Encryptions,
-		}
-	} else {
-		sharedSecredEncryptions = map[string]interface{}{
-			"diffie_hellman_point": []byte{},
-			"shared_secret_hash":   []byte{},
-			"encryptions":          []byte{},
 		}
 	}
 	out := map[string]interface{}{
@@ -144,19 +142,19 @@ func MakeConfigSetSimplifiedMapping(
 	}
 	signers, err := json.Marshal(extractSigners(envelope.State.Oracles))
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse signers: %w", err)
+		return nil, fmt.Errorf("failed to marshal signers: %w", err)
 	}
 	transmitters, err := json.Marshal(extractTransmitters(envelope.State.Oracles))
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse transmitters: %w", err)
+		return nil, fmt.Errorf("failed to marshal transmitters: %w", err)
 	}
 	s, err := json.Marshal(int32ArrToInt64Arr(offchainConfig.S))
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse s: %w", err)
+		return nil, fmt.Errorf("failed to marshal schedule: %w", err)
 	}
 	oracles, err := createConfigSetSimplifiedOracles(offchainConfig.OffchainPublicKeys, offchainConfig.PeerIds, envelope.State.Oracles)
 	if err != nil {
-		return nil, fmt.Errorf("failed to oracles s: %w", err)
+		return nil, fmt.Errorf("failed to encode oracle set: %w", err)
 	}
 	out := map[string]interface{}{
 		"config_digest":      base64.StdEncoding.EncodeToString(envelope.State.Config.LatestConfigDigest[:]),
@@ -301,8 +299,5 @@ func createConfigSetSimplifiedOracles(offchainPublicKeys [][]byte, peerIDs []str
 		}
 	}
 	s, err := json.Marshal(out)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse oracles: %w", err)
-	}
-	return s, nil
+	return s, err
 }

@@ -48,7 +48,7 @@ func parseEnvVars(cfg *Config) error {
 	if value, isPresent := os.LookupEnv("SOLANA_POLL_INTERVAL"); isPresent {
 		pollInterval, err := time.ParseDuration(value)
 		if err != nil {
-			return fmt.Errorf("failed to parse env var FEEDS_CHAIN_POLL_INTERVAL, see https://pkg.go.dev/time#ParseDuration: %w", err)
+			return fmt.Errorf("failed to parse env var SOLANA_POLL_INTERVAL, see https://pkg.go.dev/time#ParseDuration: %w", err)
 		}
 		cfg.Solana.PollInterval = pollInterval
 	}
@@ -171,7 +171,7 @@ func validateConfig(cfg Config) error {
 			continue
 		}
 		if _, err := url.ParseRequestURI(currentValue); err != nil {
-			return fmt.Errorf("%s=%s is not a valid URL: %w", envVarName, currentValue, err)
+			return fmt.Errorf("%s='%s' is not a valid URL: %w", envVarName, currentValue, err)
 		}
 	}
 	return nil

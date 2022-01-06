@@ -1,6 +1,7 @@
 package monitoring
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"math/rand"
 	"strings"
@@ -200,6 +201,8 @@ func TestMapping(t *testing.T) {
 
 		oracles, err := createConfigSetSimplifiedOracles(offchainConfig.OffchainPublicKeys, offchainConfig.PeerIds, state.Oracles)
 		require.NoError(t, err)
+
+		require.Equal(t, configSetSimplified["config_digest"], base64.StdEncoding.EncodeToString(state.Config.LatestConfigDigest[:]))
 		require.Equal(t, configSetSimplified["block_number"], uint64ToBeBytes(envelope.BlockNumber))
 		require.Equal(t, configSetSimplified["delta_progress"], uint64ToBeBytes(offchainConfig.DeltaProgressNanoseconds))
 		require.Equal(t, configSetSimplified["delta_resend"], uint64ToBeBytes(offchainConfig.DeltaResendNanoseconds))

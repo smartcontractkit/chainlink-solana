@@ -83,7 +83,7 @@ func main() {
 		cfg.Solana,
 		cfg.Feeds.Feeds,
 
-		log.With("component", "multi-feed-monitor"),
+		log,
 		transmissionReader, stateReader,
 		producer,
 		monitoring.DefaultMetrics,
