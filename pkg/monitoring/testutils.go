@@ -391,4 +391,5 @@ var (
 	_ = generateFeedConfig
 	_ = fakeProducer{}
 	_ = fakeSchema{}
+	_ = keepLatestMetrics{}
 )
