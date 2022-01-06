@@ -16,9 +16,15 @@ func NewPrometheusExporter(
 	metrics Metrics,
 ) Exporter {
 	metrics.SetFeedContractMetadata(
-		solanaConfig.ChainID, feedConfig.ContractAddress.String(),
-		feedConfig.ContractStatus, feedConfig.ContractType, feedConfig.FeedName,
-		feedConfig.FeedPath, solanaConfig.NetworkID, solanaConfig.NetworkName,
+		solanaConfig.ChainID,
+		feedConfig.ContractAddress.String(),
+		feedConfig.StateAccount.String(),
+		feedConfig.ContractStatus,
+		feedConfig.ContractType,
+		feedConfig.FeedName,
+		feedConfig.FeedPath,
+		solanaConfig.NetworkID,
+		solanaConfig.NetworkName,
 		feedConfig.Symbol,
 	)
 
@@ -50,8 +56,10 @@ func (p *prometheusExporter) Export(ctx context.Context, data interface{}) {
 	switch typed := data.(type) {
 	case StateEnvelope:
 		p.metrics.SetNodeMetadata(
-			p.solanaConfig.ChainID, p.solanaConfig.NetworkID,
-			p.solanaConfig.NetworkName, "n/a",
+			p.solanaConfig.ChainID,
+			p.solanaConfig.NetworkID,
+			p.solanaConfig.NetworkName,
+			"n/a",
 			typed.State.Config.LatestTransmitter.String(),
 		)
 
@@ -62,30 +70,46 @@ func (p *prometheusExporter) Export(ctx context.Context, data interface{}) {
 		}()
 	case TransmissionEnvelope:
 		p.metrics.SetHeadTrackerCurrentHead(
-			typed.BlockNumber, p.solanaConfig.NetworkName,
-			p.solanaConfig.ChainID, p.solanaConfig.NetworkID,
+			typed.BlockNumber,
+			p.solanaConfig.NetworkName,
+			p.solanaConfig.ChainID,
+			p.solanaConfig.NetworkID,
 		)
 		p.metrics.SetOffchainAggregatorAnswers(
-			typed.Answer.Data, p.feedConfig.ContractAddress.String(),
-			p.solanaConfig.ChainID, p.feedConfig.ContractStatus,
-			p.feedConfig.ContractType, p.feedConfig.FeedName,
-			p.feedConfig.FeedPath, p.solanaConfig.NetworkID,
+			typed.Answer.Data,
+			p.feedConfig.ContractAddress.String(),
+			p.feedConfig.StateAccount.String(),
+			p.solanaConfig.ChainID,
+			p.feedConfig.ContractStatus,
+			p.feedConfig.ContractType,
+			p.feedConfig.FeedName,
+			p.feedConfig.FeedPath,
+			p.solanaConfig.NetworkID,
 			p.solanaConfig.NetworkName,
 		)
 		p.metrics.IncOffchainAggregatorAnswersTotal(
 			p.feedConfig.ContractAddress.String(),
-			p.solanaConfig.ChainID, p.feedConfig.ContractStatus,
-			p.feedConfig.ContractType, p.feedConfig.FeedName,
-			p.feedConfig.FeedPath, p.solanaConfig.NetworkID,
+			p.feedConfig.StateAccount.String(),
+			p.solanaConfig.ChainID,
+			p.feedConfig.ContractStatus,
+			p.feedConfig.ContractType,
+			p.feedConfig.FeedName,
+			p.feedConfig.FeedPath,
+			p.solanaConfig.NetworkID,
 			p.solanaConfig.NetworkName,
 		)
 
 		isLateAnswer := time.Since(time.Unix(int64(typed.Answer.Timestamp), 0)).Seconds() > float64(p.feedConfig.HeartbeatSec)
 		p.metrics.SetOffchainAggregatorAnswerStalled(
-			isLateAnswer, p.feedConfig.ContractAddress.String(),
-			p.solanaConfig.ChainID, p.feedConfig.ContractStatus,
-			p.feedConfig.ContractType, p.feedConfig.FeedName,
-			p.feedConfig.FeedPath, p.solanaConfig.NetworkID,
+			isLateAnswer,
+			p.feedConfig.ContractAddress.String(),
+			p.feedConfig.StateAccount.String(),
+			p.solanaConfig.ChainID,
+			p.feedConfig.ContractStatus,
+			p.feedConfig.ContractType,
+			p.feedConfig.FeedName,
+			p.feedConfig.FeedPath,
+			p.solanaConfig.NetworkID,
 			p.solanaConfig.NetworkName,
 		)
 
@@ -93,11 +117,17 @@ func (p *prometheusExporter) Export(ctx context.Context, data interface{}) {
 			p.latestTransmitterMu.Lock()
 			defer p.latestTransmitterMu.Unlock()
 			p.metrics.SetOffchainAggregatorSubmissionReceivedValues(
-				typed.Answer.Data, p.feedConfig.ContractAddress.String(),
-				p.latestTransmitter, p.solanaConfig.ChainID,
-				p.feedConfig.ContractStatus, p.feedConfig.ContractType,
-				p.feedConfig.FeedName, p.feedConfig.FeedPath,
-				p.solanaConfig.NetworkID, p.solanaConfig.NetworkName,
+				typed.Answer.Data,
+				p.feedConfig.ContractAddress.String(),
+				p.feedConfig.StateAccount.String(),
+				p.latestTransmitter,
+				p.solanaConfig.ChainID,
+				p.feedConfig.ContractStatus,
+				p.feedConfig.ContractType,
+				p.feedConfig.FeedName,
+				p.feedConfig.FeedPath,
+				p.solanaConfig.NetworkID,
+				p.solanaConfig.NetworkName,
 			)
 		}()
 	default:
