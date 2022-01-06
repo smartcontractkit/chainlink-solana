@@ -52,7 +52,7 @@ func main() {
 	client := rpc.New(cfg.Solana.RPCEndpoint)
 
 	schemaRegistry := monitoring.NewSchemaRegistry(cfg.SchemaRegistry, log)
-	transmissionSchema, err := schemaRegistry.EnsureSchema("transmission-value", monitoring.TransmissionAvroSchema)
+	transmissionSchema, err := schemaRegistry.EnsureSchema(cfg.Kafka.TransmissionTopic+"-value", monitoring.TransmissionAvroSchema)
 	if err != nil {
 		log.Fatalw("failed to prepare transmission schema", "error", err)
 	}
@@ -92,9 +92,9 @@ func main() {
 		cfg.Kafka.ConfigSetSimplifiedTopic,
 		cfg.Kafka.TransmissionTopic,
 
-		transmissionSchema,
 		configSetSchema,
 		configSetSimplifiedSchema,
+		transmissionSchema,
 	)
 	wg.Add(1)
 	go func() {
