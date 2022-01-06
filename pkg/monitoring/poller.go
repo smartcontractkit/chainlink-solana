@@ -17,14 +17,16 @@ func NewPoller(
 	log logger.Logger,
 	account solana.PublicKey,
 	reader AccountReader,
-	fetchInterval time.Duration,
+	pollInterval time.Duration,
+	readTimeout time.Duration,
 	bufferCapacity uint32,
 ) Poller {
 	return &solanaPollerImpl{
 		log,
 		account,
 		reader,
-		fetchInterval,
+		pollInterval,
+		readTimeout,
 		bufferCapacity,
 		make(chan interface{}, bufferCapacity),
 	}
@@ -34,7 +36,8 @@ type solanaPollerImpl struct {
 	log            logger.Logger
 	account        solana.PublicKey
 	reader         AccountReader
-	fetchInterval  time.Duration
+	pollInterval   time.Duration
+	readTimeout    time.Duration
 	bufferCapacity uint32
 	updates        chan interface{}
 }
@@ -50,19 +53,26 @@ func (s *solanaPollerImpl) Start(ctx context.Context) {
 		s.updates <- data
 	}
 
+	reusedTimer := time.NewTimer(s.pollInterval)
 	for {
-		timer := time.NewTimer(s.fetchInterval)
 		select {
-		case <-timer.C:
-			data, err := s.reader.Read(ctx, s.account)
+		case <-reusedTimer.C:
+			var data interface{}
+			var err error
+			func() {
+				ctx, cancel := context.WithTimeout(ctx, s.readTimeout)
+				defer cancel()
+				data, err = s.reader.Read(ctx, s.account)
+			}()
 			if err != nil {
 				s.log.Errorw("failed to read account contents", "error", err)
 				continue
 			}
 			s.updates <- data
+			reusedTimer.Reset(s.pollInterval)
 		case <-ctx.Done():
-			if !timer.Stop() {
-				<-timer.C
+			if !reusedTimer.Stop() {
+				<-reusedTimer.C
 			}
 			s.log.Debug("poller closed")
 			return

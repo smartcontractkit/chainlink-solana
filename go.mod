@@ -21,6 +21,7 @@ require (
 	github.com/gagliardetto/treeout v0.1.4
 	github.com/golang/protobuf v1.5.2
 	github.com/linkedin/goavro v2.1.0+incompatible
+	github.com/mr-tron/base58 v1.2.0
 	github.com/onsi/ginkgo/v2 v2.0.0-rc2
 	github.com/onsi/gomega v1.17.0
 	github.com/pkg/errors v0.9.1
@@ -145,7 +146,6 @@ require (
 	github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/mostynb/zstdpool-freelist v0.0.0-20201229113212-927304c0c3b1 // indirect
-	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.2 // indirect

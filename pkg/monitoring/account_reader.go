@@ -3,14 +3,11 @@ package monitoring
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 )
-
-const solanaAccountReadTimeout = 2 * time.Second
 
 // AccountReader is a wrapper on top of *rpc.Client
 type AccountReader interface {
@@ -31,8 +28,6 @@ type trReader struct {
 }
 
 func (t *trReader) Read(ctx context.Context, transmissionsAccount solana.PublicKey) (interface{}, error) {
-	ctx, cancel := context.WithTimeout(ctx, solanaAccountReadTimeout)
-	defer cancel()
 	answer, blockNum, err := pkgSolana.GetLatestTransmission(ctx, t.client, transmissionsAccount)
 	return TransmissionEnvelope{answer, blockNum}, err
 }
@@ -51,9 +46,6 @@ type StateEnvelope struct {
 }
 
 func (s *stReader) Read(ctx context.Context, stateAccount solana.PublicKey) (interface{}, error) {
-	ctx, cancel := context.WithTimeout(ctx, solanaAccountReadTimeout)
-	defer cancel()
-
 	state, blockNum, err := pkgSolana.GetState(ctx, s.client, stateAccount)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch state : %w", err)

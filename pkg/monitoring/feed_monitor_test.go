@@ -2,9 +2,11 @@ package monitoring
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/require"
 )
@@ -19,35 +21,66 @@ func TestFeedMonitor(t *testing.T) {
 	transmissionAccount := generatePublicKey()
 	stateAccount := generatePublicKey()
 
-	fetchInterval := time.Second
+	pollInterval := 1 * time.Second
+	readTimeout := 1 * time.Second
 	var bufferCapacity uint32 = 0 // no buffering
 
-	transmissionPoller := NewPoller(logger.NewNullLogger(), transmissionAccount, transmissionReader, fetchInterval, bufferCapacity)
-	statePoller := NewPoller(logger.NewNullLogger(), stateAccount, stateReader, fetchInterval, bufferCapacity)
+	transmissionPoller := NewPoller(
+		logger.NewNullLogger(),
+		transmissionAccount, transmissionReader,
+		pollInterval, readTimeout,
+		bufferCapacity,
+	)
+	statePoller := NewPoller(
+		logger.NewNullLogger(),
+		stateAccount, stateReader,
+		pollInterval, readTimeout,
+		bufferCapacity,
+	)
 
-	producer := fakeProducer{make(chan producerMessage)}
+	producer := fakeProducer{make(chan producerMessage), ctx}
 
-	transmissionSchema := fakeSchema{transmissionCodec}
-	stateSchema := fakeSchema{configSetCodec}
+	configSetSchema := fakeSchema{configSetCodec}
 	configSetSimplifiedSchema := fakeSchema{configSetSimplifiedCodec}
+	transmissionSchema := fakeSchema{transmissionCodec}
 
-	cfg := Config{}
+	cfg := config.Config{}
+	cfg.Feeds.Feeds = []config.Feed{
+		{
+			TransmissionsAccount: transmissionAccount,
+			StateAccount:         stateAccount,
+		},
+	}
 
-	feedConfig := FeedConfig{
-		TransmissionsAccount: transmissionAccount,
-		StateAccount:         stateAccount,
+	exporters := []Exporter{
+		NewPrometheusExporter(
+			cfg.Solana,
+			cfg.Feeds.Feeds[0],
+			logger.NewNullLogger(),
+			&devnullMetrics{},
+		),
+		NewKafkaExporter(
+			cfg.Solana,
+			cfg.Feeds.Feeds[0],
+			logger.NewNullLogger(),
+			producer,
+
+			configSetSchema,
+			configSetSimplifiedSchema,
+			transmissionSchema,
+
+			cfg.Kafka.ConfigSetTopic,
+			cfg.Kafka.ConfigSetSimplifiedTopic,
+			cfg.Kafka.TransmissionTopic,
+		),
 	}
 
 	monitor := NewFeedMonitor(
 		logger.NewNullLogger(),
-		cfg,
-		feedConfig,
 		transmissionPoller, statePoller,
-		transmissionSchema, stateSchema, configSetSimplifiedSchema,
-		producer,
-		&devnullMetrics{},
+		exporters,
 	)
-	go monitor.Start(ctx)
+	go monitor.Start(ctx, &sync.WaitGroup{})
 
 	trCount, stCount := 0, 0
 	var messages []producerMessage
