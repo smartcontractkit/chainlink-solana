@@ -6,7 +6,7 @@ contractConfigTrackerPollInterval      = "1m"
 contractConfigTrackerSubscribeInterval = "2m"
 name                                   = "<insert job name here>"
 relay                                  = "solana"
-contractID                             = "<insert solana ocr2 program ID>"
+contractID                             = "<insert solana ocr2 state account>"
 p2pBootstrapPeers                      = ["somep2pkey@localhost-tcp:port"]
 isBootstrapPeer                        = false
 p2pPeerID                              = "<insert p2p id>"
@@ -38,6 +38,6 @@ juelsPerFeeCoinSource                  = """
 [relayConfig]
 nodeEndpointHTTP   = "http:..."
 nodeEndpointWS     = "ws:..."
-stateID            = "<insert ocr2 state account>"
+ocr2ProgramID      = "<insert ocr2 program id>"
 transmissionsID    = "<insert ocr2 transmissions account>"
 validatorProgramID = "<insert validator program id>"
