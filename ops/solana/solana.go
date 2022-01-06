@@ -523,7 +523,7 @@ func (d Deployer) Fund(addresses []string) error {
 }
 
 func (d Deployer) OCR2Address() string {
-	return d.Account[OCR2]
+	return d.Account[OCRFeed]
 }
 
 func (d Deployer) Addresses() map[int]string {

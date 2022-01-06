@@ -29,7 +29,7 @@ func RelayConfig(ctx *pulumi.Context, addresses map[int]string) (map[string]stri
 	return map[string]string{
 		"nodeEndpointHTTP": config.Require(ctx, "CL-RELAY_HTTP"),
 		"nodeEndpointWS":   config.Require(ctx, "CL-RELAY_WS"),
-		"stateID":          addresses[solana.OCRFeed],
+		"ocr2ProgramID":    addresses[solana.OCR2],
 		"transmissionsID":  addresses[solana.OCRTransmissions],
 		"storeProgramID":   addresses[solana.Store],
 	}, nil
