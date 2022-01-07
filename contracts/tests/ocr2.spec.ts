@@ -75,7 +75,7 @@ describe('ocr2', async () => {
   const n = 19; // min: 3 * f + 1;
 
   // transmits a single round
-  let transmit = async (epoch: number, round: number) => {
+  let transmit = async (epoch: number, round: number, answer: BN) => {
     let account = await program.account.state.fetch(state.publicKey);
 
     // Generate and transmit a report
@@ -86,12 +86,14 @@ describe('ocr2', async () => {
     report_context.writeUInt8(round, 32+27+4); // 1 byte round
     // 32 byte extra_hash
 
-    const raw_report = Buffer.from([
-      97, 91, 43, 83, // observations_timestamp
-      7, // observer_count
-      0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // observers
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 210, // median
-      0, 0, 0, 0, 0, 0, 0, 2, // juels per lamport (2)
+    const raw_report = Buffer.concat([
+      Buffer.from([
+        97, 91, 43, 83, // observations_timestamp
+        7, // observer_count
+        0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 // observers
+      ]),
+      Buffer.from(answer.toArray('be', 16)), // median (i128)
+      Buffer.from([0, 0, 0, 0, 0, 0, 0, 2]), // juels per lamport (2)
     ]);
 
     let hash = createHash('sha256')
@@ -423,7 +425,7 @@ describe('ocr2', async () => {
 
   it("Can't transmit a round if not the writer", async () => {
     try {
-      await transmit(1, 1);
+      await transmit(1, 1, new BN(1));
       assert.fail("transmit() shouldn't have succeeded!");
     } catch {
       // transmit should fail
@@ -444,7 +446,7 @@ describe('ocr2', async () => {
   });
 
   it('Transmits a round', async () => {
-    await transmit(1, 2);
+    await transmit(1, 2, new BN(3));
     let feed = await provider.connection.getAccountInfo(transmissions.publicKey);
     console.log(feed);
   });
@@ -543,7 +545,7 @@ describe('ocr2', async () => {
   it("Transmit a bunch of rounds to check ringbuffer wraparound", async () => {
     for (let i = 3; i < 15; i++) {
       console.log(`Transmitting...${i}`);
-      await transmit(i, i);
+      await transmit(i, i, new BN(i));
 
       let buffer = Keypair.generate();
       await workspace.Store.rpc.query(
