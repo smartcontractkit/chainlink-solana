@@ -63,8 +63,6 @@ var (
 	Instruction_TransferPayeeship = ag_binary.TypeID([8]byte{116, 68, 213, 225, 193, 225, 171, 206})
 
 	Instruction_AcceptPayeeship = ag_binary.TypeID([8]byte{142, 208, 219, 62, 82, 13, 189, 70})
-
-	Instruction_Query = ag_binary.TypeID([8]byte{39, 251, 130, 159, 46, 136, 164, 169})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -106,8 +104,6 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "TransferPayeeship"
 	case Instruction_AcceptPayeeship:
 		return "AcceptPayeeship"
-	case Instruction_Query:
-		return "Query"
 	default:
 		return ""
 	}
@@ -181,9 +177,6 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"accept_payeeship", (*AcceptPayeeship)(nil),
-		},
-		{
-			"query", (*Query)(nil),
 		},
 	},
 )

@@ -225,11 +225,9 @@ type Config struct {
 	BillingAccessController   ag_solanago.PublicKey
 	MinAnswer                 ag_binary.Int128
 	MaxAnswer                 ag_binary.Int128
-	Description               [32]uint8
-	Decimals                  uint8
 	F                         uint8
 	Round                     uint8
-	Padding0                  uint8
+	Padding0                  uint16
 	Epoch                     uint32
 	LatestAggregatorRoundId   uint32
 	LatestTransmitter         ag_solanago.PublicKey
@@ -279,16 +277,6 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `MaxAnswer` param:
 	err = encoder.Encode(obj.MaxAnswer)
-	if err != nil {
-		return err
-	}
-	// Serialize `Description` param:
-	err = encoder.Encode(obj.Description)
-	if err != nil {
-		return err
-	}
-	// Serialize `Decimals` param:
-	err = encoder.Encode(obj.Decimals)
 	if err != nil {
 		return err
 	}
@@ -393,16 +381,6 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	}
 	// Deserialize `MaxAnswer`:
 	err = decoder.Decode(&obj.MaxAnswer)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Description`:
-	err = decoder.Decode(&obj.Description)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Decimals`:
-	err = decoder.Decode(&obj.Decimals)
 	if err != nil {
 		return err
 	}
@@ -566,25 +544,4 @@ func (obj *Oracle) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 		return err
 	}
 	return nil
-}
-
-type Scope ag_binary.BorshEnum
-
-const (
-	LatestConfig_Scope Scope = iota
-	LinkAvailableForPayment_Scope
-	LatestRoundData_Scope
-)
-
-func (value Scope) String() string {
-	switch value {
-	case LatestConfig_Scope:
-		return "LatestConfig"
-	case LinkAvailableForPayment_Scope:
-		return "LinkAvailableForPayment"
-	case LatestRoundData_Scope:
-		return "LatestRoundData"
-	default:
-		return ""
-	}
 }

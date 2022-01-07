@@ -20,9 +20,9 @@ static THRESHOLD_MULTIPLIER: u128 = 100000;
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub enum Scope {
-    // Decimals,
     Version,
-    // Description,
+    Decimals,
+    Description,
     RoundData { round_id: u32 },
     LatestRoundData,
     Aggregator,
@@ -67,6 +67,8 @@ pub mod store {
     #[access_control(owner(&ctx.accounts.store, &ctx.accounts.authority))]
     pub fn create_feed(
         ctx: Context<CreateFeed>,
+        description: String,
+        decimals: u8,
         granularity: u8,
         live_length: u32,
     ) -> ProgramResult {
@@ -76,6 +78,12 @@ pub mod store {
         feed.granularity = granularity;
         feed.live_length = live_length;
         feed.writer = Pubkey::default();
+
+        feed.decimals = decimals;
+        let description = description.as_bytes();
+        require!(description.len() <= 32, InvalidInput);
+        feed.description[..description.len()].copy_from_slice(description);
+
         Ok(())
     }
 
@@ -207,6 +215,30 @@ pub mod store {
                 let data = Version {
                     version: header.version,
                 };
+                data.try_serialize(ctx.accounts.buffer.try_borrow_mut_data()?.deref_mut())?;
+            }
+            Scope::Decimals => {
+                let header = &ctx.accounts.feed;
+
+                let data = Decimals {
+                    decimals: header.decimals,
+                };
+                data.try_serialize(ctx.accounts.buffer.try_borrow_mut_data()?.deref_mut())?;
+            }
+            Scope::Description => {
+                let header = &ctx.accounts.feed;
+
+                // Look for the first null byte
+                let end = header
+                    .description
+                    .iter()
+                    .position(|byte| byte == &0)
+                    .unwrap_or_else(|| header.description.len());
+
+                let description = String::from_utf8(header.description[..end].to_vec())
+                    .map_err(|_err| ErrorCode::InvalidInput)?;
+
+                let data = Description { description };
                 data.try_serialize(ctx.accounts.buffer.try_borrow_mut_data()?.deref_mut())?;
             }
             Scope::RoundData { round_id } => {

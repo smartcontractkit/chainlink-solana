@@ -45,6 +45,8 @@ var (
 	Instruction_LowerFlags = ag_binary.TypeID([8]byte{254, 119, 153, 185, 135, 158, 115, 23})
 
 	Instruction_SetLoweringAccessController = ag_binary.TypeID([8]byte{207, 68, 147, 34, 164, 94, 189, 113})
+
+	Instruction_Query = ag_binary.TypeID([8]byte{39, 251, 130, 159, 46, 136, 164, 169})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -68,6 +70,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "LowerFlags"
 	case Instruction_SetLoweringAccessController:
 		return "SetLoweringAccessController"
+	case Instruction_Query:
+		return "Query"
 	default:
 		return ""
 	}
@@ -114,6 +118,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"set_lowering_access_controller", (*SetLoweringAccessController)(nil),
+		},
+		{
+			"query", (*Query)(nil),
 		},
 	},
 )

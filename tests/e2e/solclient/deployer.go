@@ -27,13 +27,13 @@ const (
 	TokenAccountSize                 = uint64(165)
 	AccessControllerStateAccountSize = uint64(8 + 32 + 8 + 32*64)
 	StoreAccountSize                 = uint64(8 + 32*4 + 32*128 + 8)
-	OCRTransmissionsAccountSize      = uint64(8 + 4 + 4 + 8192*24)
+	OCRTransmissionsAccountSize      = uint64(8 + 128 + 8192*24)
 	OCRLeftoverPaymentSize           = uint64(32 + 8)
 	OCRLeftoverPaymentsSize          = OCRLeftoverPaymentSize*19 + 8
 	OCROracle                        = uint64(32 + 20 + 32 + 32 + 4 + 8)
 	OCROraclesSize                   = OCROracle*19 + 8
 	OCROffChainConfigSize            = uint64(8 + 4096 + 8)
-	OCRConfigSize                    = 32 + 32 + 32 + 32 + 32 + 32 + 16 + 16 + 32 + (1 + 1 + 1 + 1 + 4 + 4 + 32) + (4 + 32 + 8) + (4 + 4) + 2*OCROffChainConfigSize
+	OCRConfigSize                    = 32 + 32 + 32 + 32 + 32 + 32 + 16 + 16 + (1 + 1 + 2 + 4 + 4 + 32) + (4 + 32 + 8) + (4 + 4) + 2*OCROffChainConfigSize
 	OCRAccountAccountSize            = 8 + 1 + 1 + 2 + 4 + OCRConfigSize + OCROraclesSize + OCRLeftoverPaymentsSize + 32
 )
 
@@ -45,6 +45,22 @@ type Authority struct {
 type ContractDeployer struct {
 	Client *Client
 	Env    *environment.Environment
+}
+
+func (c *ContractDeployer) DeployOCRv2Proxy(addr string) (contracts.OCRv2Proxy, error) {
+	panic("implement me")
+}
+
+func (c *ContractDeployer) DeployOCRv2ValidatorProxy(addr string) (contracts.OCRv2Proxy, error) {
+	panic("implement me")
+}
+
+func (c *ContractDeployer) DeployOCRv2Flags(lowAccessController string, raiseAccessController string) (contracts.OCRv2Flags, error) {
+	panic("implement me")
+}
+
+func (c *ContractDeployer) DeployOCRv2Validator(threshold uint32, flags string) (contracts.OCRv2Flags, error) {
+	panic("implement me")
 }
 
 func (c *ContractDeployer) DeployOCRv2Store(billingAC string) (contracts.OCRv2Store, error) {
@@ -213,8 +229,6 @@ func (c *ContractDeployer) DeployOCRv2(billingControllerAddr string, requesterCo
 					Lo: 1000000,
 					Hi: 0,
 				}).
-				SetDecimals(9).
-				SetDescription("OCRv2").
 				SetStateAccount(c.Client.Accounts.OCR.PublicKey()).
 				SetTransmissionsAccount(c.Client.Accounts.Feed.PublicKey()).
 				SetPayerAccount(payer.PublicKey()).

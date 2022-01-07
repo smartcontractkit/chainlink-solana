@@ -8,6 +8,238 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
+type Round struct {
+	RoundId   uint32
+	Timestamp uint64
+	Answer    ag_binary.Int128
+}
+
+var RoundDiscriminator = [8]byte{87, 127, 165, 51, 73, 78, 116, 174}
+
+func (obj Round) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(RoundDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `RoundId` param:
+	err = encoder.Encode(obj.RoundId)
+	if err != nil {
+		return err
+	}
+	// Serialize `Timestamp` param:
+	err = encoder.Encode(obj.Timestamp)
+	if err != nil {
+		return err
+	}
+	// Serialize `Answer` param:
+	err = encoder.Encode(obj.Answer)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Round) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(RoundDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[87 127 165 51 73 78 116 174]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `RoundId`:
+	err = decoder.Decode(&obj.RoundId)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Timestamp`:
+	err = decoder.Decode(&obj.Timestamp)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Answer`:
+	err = decoder.Decode(&obj.Answer)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type Decimals struct {
+	Decimals uint8
+}
+
+var DecimalsDiscriminator = [8]byte{253, 194, 3, 180, 138, 94, 7, 187}
+
+func (obj Decimals) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(DecimalsDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Decimals` param:
+	err = encoder.Encode(obj.Decimals)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Decimals) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(DecimalsDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[253 194 3 180 138 94 7 187]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Decimals`:
+	err = decoder.Decode(&obj.Decimals)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type Version struct {
+	Version uint8
+}
+
+var VersionDiscriminator = [8]byte{234, 4, 254, 42, 242, 196, 136, 199}
+
+func (obj Version) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(VersionDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Version) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(VersionDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[234 4 254 42 242 196 136 199]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type Description struct {
+	Description string
+}
+
+var DescriptionDiscriminator = [8]byte{193, 246, 248, 165, 137, 194, 190, 15}
+
+func (obj Description) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(DescriptionDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Description` param:
+	err = encoder.Encode(obj.Description)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Description) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(DescriptionDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[193 246 248 165 137 194 190 15]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Description`:
+	err = decoder.Decode(&obj.Description)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type Address struct {
+	Address ag_solanago.PublicKey
+}
+
+var AddressDiscriminator = [8]byte{33, 141, 133, 70, 148, 151, 68, 172}
+
+func (obj Address) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(AddressDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Address` param:
+	err = encoder.Encode(obj.Address)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Address) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(AddressDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[33 141 133 70 148 151 68 172]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Address`:
+	err = decoder.Decode(&obj.Address)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type Store struct {
 	Owner                    ag_solanago.PublicKey
 	ProposedOwner            ag_solanago.PublicKey
@@ -98,6 +330,8 @@ type Transmissions struct {
 	Version           uint8
 	Store             ag_solanago.PublicKey
 	Writer            ag_solanago.PublicKey
+	Description       [32]uint8
+	Decimals          uint8
 	FlaggingThreshold uint32
 	LatestRoundId     uint32
 	Granularity       uint8
@@ -126,6 +360,16 @@ func (obj Transmissions) MarshalWithEncoder(encoder *ag_binary.Encoder) (err err
 	}
 	// Serialize `Writer` param:
 	err = encoder.Encode(obj.Writer)
+	if err != nil {
+		return err
+	}
+	// Serialize `Description` param:
+	err = encoder.Encode(obj.Description)
+	if err != nil {
+		return err
+	}
+	// Serialize `Decimals` param:
+	err = encoder.Encode(obj.Decimals)
 	if err != nil {
 		return err
 	}
@@ -188,6 +432,16 @@ func (obj *Transmissions) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err 
 	}
 	// Deserialize `Writer`:
 	err = decoder.Decode(&obj.Writer)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Description`:
+	err = decoder.Decode(&obj.Description)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Decimals`:
+	err = decoder.Decode(&obj.Decimals)
 	if err != nil {
 		return err
 	}

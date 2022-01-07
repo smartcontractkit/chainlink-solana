@@ -69,8 +69,6 @@ var configSetAvroSchema = Record("config_set", Opts{Namespace: "link.chain.ocr2"
 			Field("billing_access_controller", Opts{Doc: "[32]byte"}, Bytes),
 			Field("min_answer", Opts{Doc: "big.Int"}, Bytes),
 			Field("max_answer", Opts{Doc: "big.Int"}, Bytes),
-			Field("description", Opts{Doc: "[32]byte"}, Bytes),
-			Field("decimals", Opts{Doc: "uint8"}, Int),
 			Field("f", Opts{Doc: "uint8"}, Int),
 			Field("round", Opts{Doc: "uint8"}, Int),
 			Field("epoch", Opts{Doc: "uint32"}, Long),
@@ -82,10 +80,12 @@ var configSetAvroSchema = Record("config_set", Opts{Namespace: "link.chain.ocr2"
 			Field("billing", Opts{}, Record("billing", Opts{}, Fields{
 				Field("observation_payment", Opts{Doc: "uint32"}, Long),
 			})),
-			// These two fields (validator, flagging_threshold) have been removed from the program's
+			// These fields (validator, flagging_threshold, decimals, description) have been removed from the program's
 			// state but they have been kept here to preserve backwards compatibility.
 			Field("validator", Opts{Doc: "[32]byte"}, Bytes),
 			Field("flagging_threshold", Opts{Doc: "uint32"}, Long),
+			Field("decimals", Opts{Doc: "uint8"}, Int),
+			Field("description", Opts{Doc: "[32]byte"}, Bytes),
 		})),
 		Field("oracles", Opts{}, Array(Record("oracle", Opts{}, Fields{
 			Field("transmitter", Opts{Doc: "[32]byte"}, Bytes),

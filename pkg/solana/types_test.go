@@ -21,7 +21,7 @@ func TestState_Decode(t *testing.T) {
 	assert.Equal(t, uint8(2), state.Config.F)
 	assert.Equal(t, "1", state.Config.MinAnswer.DecimalString())
 	assert.Equal(t, "1000", state.Config.MaxAnswer.DecimalString())
-	assert.Equal(t, "ETH/BTC", string(bytes.Trim(state.Config.Description[:], "\x00")))
+	// assert.Equal(t, "ETH/BTC", string(bytes.Trim(state.Config.Description[:], "\x00")))
 	assert.Equal(t, uint32(0), state.Config.Epoch)
 	assert.Equal(t, uint8(0), state.Config.Round)
 	assert.Equal(t, mockState.ConfigDigestHex,
@@ -62,9 +62,7 @@ var mockState = struct {
 		240, 193, 237, 171, 1, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 232, 3, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		69, 84, 72, 47, 66, 84, 67, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 18, 2, 0, 0,
+		2, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

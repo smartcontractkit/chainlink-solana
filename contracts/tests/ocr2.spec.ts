@@ -27,6 +27,8 @@ let ethereumAddress = (publicKey: Buffer) => {
 
 const Scope = {
   Version: { version: {} },
+  Decimals: { decimals: {} },
+  Description: { description: {} },
   // RoundData: { roundData: { roundId } },
   LatestRoundData: { latestRoundData: {} },
   Aggregator: { aggregator: {} },
@@ -242,12 +244,14 @@ describe('ocr2', async () => {
     console.log("tokenVault", tokenVault.toBase58());
     console.log("vaultAuthority", vaultAuthority.toBase58());
     console.log("placeholder", placeholder.toBase58());
-    
+
     // TODO: I wasn't able to build a createFeed instruction + createInstruction(transmissions) to do an atomic rpc.initialize call
     // let createFeed = store.instruction.createFeed({
     const granularity = 30;
     const liveLength = 3;
     await workspace.Store.rpc.createFeed(
+      description,
+      decimals,
       granularity,
       liveLength,
     {
@@ -280,9 +284,9 @@ describe('ocr2', async () => {
       program.programId
     );
   });
-    
+
   it('Initializes the OCR2 config', async () => {
-    await program.rpc.initialize(vaultNonce, new BN(minAnswer), new BN(maxAnswer), decimals, description, {
+    await program.rpc.initialize(vaultNonce, new BN(minAnswer), new BN(maxAnswer), {
       accounts: {
         state: state.publicKey,
         transmissions: transmissions.publicKey,
@@ -310,7 +314,7 @@ describe('ocr2', async () => {
     let config = account.config;
     assert.ok(config.minAnswer.toNumber() == minAnswer);
     assert.ok(config.maxAnswer.toNumber() == maxAnswer);
-    assert.ok(config.decimals == 18);
+    // assert.ok(config.decimals == 18);
 
     console.log(`Generating ${n} oracles...`);
     let futures = [];
@@ -540,6 +544,29 @@ describe('ocr2', async () => {
 
     let account = await workspace.Store.account.version.fetch(buffer.publicKey);
     assert.ok(account.version == 1);
+
+		buffer = Keypair.generate();
+    await workspace.Store.rpc.query(
+      Scope.Description,
+      {
+        accounts: {
+          feed: transmissions.publicKey,
+          buffer: buffer.publicKey,
+        },
+        preInstructions: [
+          SystemProgram.createAccount({
+            fromPubkey: provider.wallet.publicKey,
+            newAccountPubkey: buffer.publicKey,
+            lamports: await provider.connection.getMinimumBalanceForRentExemption(256),
+            space: 256,
+            programId: workspace.Store.programId,
+          })
+        ],
+        signers: [buffer]
+      }
+    );
+    account = await workspace.Store.account.description.fetch(buffer.publicKey);
+    assert.ok(account.description == 'ETH/BTC');
   });
 
   it("Transmit a bunch of rounds to check ringbuffer wraparound", async () => {
