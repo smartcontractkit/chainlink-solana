@@ -244,7 +244,7 @@ describe('ocr2', async () => {
     // TODO: I wasn't able to build a createFeed instruction + createInstruction(transmissions) to do an atomic rpc.initialize call
     // let createFeed = store.instruction.createFeed({
     const granularity = 30;
-    const liveLength = 1024;
+    const liveLength = 3;
     await workspace.Store.rpc.createFeed(
       granularity,
       liveLength,
@@ -256,7 +256,7 @@ describe('ocr2', async () => {
       },
       signers: [transmissions],
       preInstructions: [
-        await workspace.Store.account.transmissions.createInstruction(transmissions, 8+128+8096*24),
+        await workspace.Store.account.transmissions.createInstruction(transmissions, 8+128+6*24),
       ],
     });
     // Program log: panicked at 'range end index 8 out of range for slice of length 0', store/src/lib.rs:476:10
@@ -536,8 +536,38 @@ describe('ocr2', async () => {
       }
     );
 
-    // let account = await program.account.latestConfig.fetch(buffer.publicKey);
     let account = await workspace.Store.account.version.fetch(buffer.publicKey);
-    console.log(account);
+    assert.ok(account.version == 1);
+  });
+
+  it("Transmit a bunch of rounds to check ringbuffer wraparound", async () => {
+    for (let i = 3; i < 15; i++) {
+      console.log(`Transmitting...${i}`);
+      await transmit(i, i);
+
+      let buffer = Keypair.generate();
+      await workspace.Store.rpc.query(
+        Scope.LatestRoundData,
+        {
+          accounts: {
+            feed: transmissions.publicKey,
+            buffer: buffer.publicKey,
+          },
+          preInstructions: [
+            SystemProgram.createAccount({
+              fromPubkey: provider.wallet.publicKey,
+              newAccountPubkey: buffer.publicKey,
+              lamports: await provider.connection.getMinimumBalanceForRentExemption(256),
+              space: 256,
+              programId: workspace.Store.programId,
+            })
+          ],
+          signers: [buffer]
+        }
+      );
+
+      let account = await workspace.Store.account.round.fetch(buffer.publicKey);
+      assert.ok(account.answer.toNumber() == i)
+    }
   });
 });
