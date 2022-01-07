@@ -50,9 +50,9 @@ var _ = Describe("Solana OCRv2", func() {
 			)
 			nets, err = networkRegistry.GetNetworks(e)
 			Expect(err).ShouldNot(HaveOccurred())
-			mockserver, err = client.NewMockServerClientFromEnv(e)
+			mockserver, err = client.ConnectMockServer(e)
 			Expect(err).ShouldNot(HaveOccurred())
-			chainlinkNodes, err = client.NewChainlinkClients(e)
+			chainlinkNodes, err = client.ConnectChainlinkNodes(e)
 			Expect(err).ShouldNot(HaveOccurred())
 			ocConfig, nkb, err = DefaultOffChainConfigParamsFromNodes(chainlinkNodes)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -78,7 +78,7 @@ var _ = Describe("Solana OCRv2", func() {
 			err = nets.Default.WaitForEvents()
 			Expect(err).ShouldNot(HaveOccurred())
 
-			err = store.CreateFeed(10, 1024)
+			err = store.CreateFeed("Feed", uint8(9), 10, 1024)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			err = ocr2.SetBilling(uint32(1), uint32(1), billingAC.Address())

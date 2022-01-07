@@ -47,6 +47,22 @@ type ContractDeployer struct {
 	Env    *environment.Environment
 }
 
+func (c *ContractDeployer) DeployOCRv2Proxy(addr string) (contracts.OCRv2Proxy, error) {
+	panic("implement me")
+}
+
+func (c *ContractDeployer) DeployOCRv2ValidatorProxy(addr string) (contracts.OCRv2Proxy, error) {
+	panic("implement me")
+}
+
+func (c *ContractDeployer) DeployOCRv2Flags(lowAccessController string, raiseAccessController string) (contracts.OCRv2Flags, error) {
+	panic("implement me")
+}
+
+func (c *ContractDeployer) DeployOCRv2Validator(threshold uint32, flags string) (contracts.OCRv2Flags, error) {
+	panic("implement me")
+}
+
 func (c *ContractDeployer) DeployOCRv2Store(billingAC string) (contracts.OCRv2Store, error) {
 	programWallet := c.Client.ProgramWallets["store-keypair.json"]
 	payer := c.Client.DefaultWallet
