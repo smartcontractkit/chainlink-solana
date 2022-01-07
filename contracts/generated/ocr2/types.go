@@ -567,24 +567,3 @@ func (obj *Oracle) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	}
 	return nil
 }
-
-type Scope ag_binary.BorshEnum
-
-const (
-	LatestConfig_Scope Scope = iota
-	LinkAvailableForPayment_Scope
-	LatestRoundData_Scope
-)
-
-func (value Scope) String() string {
-	switch value {
-	case LatestConfig_Scope:
-		return "LatestConfig"
-	case LinkAvailableForPayment_Scope:
-		return "LinkAvailableForPayment"
-	case LatestRoundData_Scope:
-		return "LatestRoundData"
-	default:
-		return ""
-	}
-}

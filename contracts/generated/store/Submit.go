@@ -18,16 +18,14 @@ type Submit struct {
 	//
 	// [1] = [SIGNER] authority
 	//
-	// [2] = [] accessController
-	//
-	// [3] = [WRITE] feed
+	// [2] = [WRITE] feed
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewSubmitInstructionBuilder creates a new `Submit` instruction builder.
 func NewSubmitInstructionBuilder() *Submit {
 	nd := &Submit{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
@@ -60,26 +58,15 @@ func (inst *Submit) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
-// SetAccessControllerAccount sets the "accessController" account.
-func (inst *Submit) SetAccessControllerAccount(accessController ag_solanago.PublicKey) *Submit {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(accessController)
-	return inst
-}
-
-// GetAccessControllerAccount gets the "accessController" account.
-func (inst *Submit) GetAccessControllerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
-}
-
 // SetFeedAccount sets the "feed" account.
 func (inst *Submit) SetFeedAccount(feed ag_solanago.PublicKey) *Submit {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(feed).WRITE()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(feed).WRITE()
 	return inst
 }
 
 // GetFeedAccount gets the "feed" account.
 func (inst *Submit) GetFeedAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice[2]
 }
 
 func (inst Submit) Build() *Instruction {
@@ -116,9 +103,6 @@ func (inst *Submit) Validate() error {
 			return errors.New("accounts.Authority is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.AccessController is not set")
-		}
-		if inst.AccountMetaSlice[3] == nil {
 			return errors.New("accounts.Feed is not set")
 		}
 	}
@@ -139,11 +123,10 @@ func (inst *Submit) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("           store", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("accessController", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("            feed", inst.AccountMetaSlice[3]))
+					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("    store", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("     feed", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
@@ -173,12 +156,10 @@ func NewSubmitInstruction(
 	// Accounts:
 	store ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
-	accessController ag_solanago.PublicKey,
 	feed ag_solanago.PublicKey) *Submit {
 	return NewSubmitInstructionBuilder().
 		SetRound(round).
 		SetStoreAccount(store).
 		SetAuthorityAccount(authority).
-		SetAccessControllerAccount(accessController).
 		SetFeedAccount(feed)
 }
