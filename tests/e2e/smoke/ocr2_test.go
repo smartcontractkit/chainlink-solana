@@ -78,7 +78,7 @@ var _ = Describe("Solana OCRv2", func() {
 			err = nets.Default.WaitForEvents()
 			Expect(err).ShouldNot(HaveOccurred())
 
-			err = store.CreateFeed("Feed", uint8(9), 10, 1024)
+			err = store.CreateFeed("Feed", uint8(18), 10, 1024)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			err = ocr2.SetBilling(uint32(1), uint32(1), billingAC.Address())

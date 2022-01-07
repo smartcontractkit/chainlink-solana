@@ -37,6 +37,40 @@ func TestEncodeDecode_Query(t *testing.T) {
 						params := new(Query)
 						fu.Fuzz(params)
 						params.AccountMetaSlice = nil
+						tmp := new(Decimals)
+						fu.Fuzz(tmp)
+						params.SetScope(tmp)
+						buf := new(bytes.Buffer)
+						err := encodeT(*params, buf)
+						ag_require.NoError(t, err)
+						//
+						got := new(Query)
+						err = decodeT(got, buf.Bytes())
+						got.AccountMetaSlice = nil
+						ag_require.NoError(t, err)
+						ag_require.Equal(t, params, got)
+					}
+					{
+						params := new(Query)
+						fu.Fuzz(params)
+						params.AccountMetaSlice = nil
+						tmp := new(Description)
+						fu.Fuzz(tmp)
+						params.SetScope(tmp)
+						buf := new(bytes.Buffer)
+						err := encodeT(*params, buf)
+						ag_require.NoError(t, err)
+						//
+						got := new(Query)
+						err = decodeT(got, buf.Bytes())
+						got.AccountMetaSlice = nil
+						ag_require.NoError(t, err)
+						ag_require.Equal(t, params, got)
+					}
+					{
+						params := new(Query)
+						fu.Fuzz(params)
+						params.AccountMetaSlice = nil
 						tmp := new(RoundData)
 						fu.Fuzz(tmp)
 						params.SetScope(tmp)

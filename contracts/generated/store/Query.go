@@ -124,14 +124,20 @@ func (obj Query) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 		case *Version_:
 			tmp.Enum = 0
 			tmp.Version = *realvalue
-		case *RoundData:
+		case *Decimals_:
 			tmp.Enum = 1
+			tmp.Decimals = *realvalue
+		case *Description_:
+			tmp.Enum = 2
+			tmp.Description = *realvalue
+		case *RoundData:
+			tmp.Enum = 3
 			tmp.RoundData = *realvalue
 		case *LatestRoundData:
-			tmp.Enum = 2
+			tmp.Enum = 4
 			tmp.LatestRoundData = *realvalue
 		case *Aggregator:
-			tmp.Enum = 3
+			tmp.Enum = 5
 			tmp.Aggregator = *realvalue
 		}
 		err := encoder.Encode(tmp)
@@ -153,10 +159,14 @@ func (obj *Query) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 		case 0:
 			obj.Scope = (*Version_)(&tmp.Enum)
 		case 1:
-			obj.Scope = &tmp.RoundData
+			obj.Scope = (*Decimals_)(&tmp.Enum)
 		case 2:
-			obj.Scope = (*LatestRoundData)(&tmp.Enum)
+			obj.Scope = (*Description_)(&tmp.Enum)
 		case 3:
+			obj.Scope = &tmp.RoundData
+		case 4:
+			obj.Scope = (*LatestRoundData)(&tmp.Enum)
+		case 5:
 			obj.Scope = (*Aggregator)(&tmp.Enum)
 		default:
 			return fmt.Errorf("unknown enum index: %v", tmp.Enum)

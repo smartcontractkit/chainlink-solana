@@ -229,8 +229,6 @@ func (c *ContractDeployer) DeployOCRv2(billingControllerAddr string, requesterCo
 					Lo: 1000000,
 					Hi: 0,
 				}).
-				SetDecimals(9).
-				SetDescription("OCRv2").
 				SetStateAccount(c.Client.Accounts.OCR.PublicKey()).
 				SetTransmissionsAccount(c.Client.Accounts.Feed.PublicKey()).
 				SetPayerAccount(payer.PublicKey()).

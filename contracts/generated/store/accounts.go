@@ -330,6 +330,8 @@ type Transmissions struct {
 	Version           uint8
 	Store             ag_solanago.PublicKey
 	Writer            ag_solanago.PublicKey
+	Description       [32]uint8
+	Decimals          uint8
 	FlaggingThreshold uint32
 	LatestRoundId     uint32
 	Granularity       uint8
@@ -358,6 +360,16 @@ func (obj Transmissions) MarshalWithEncoder(encoder *ag_binary.Encoder) (err err
 	}
 	// Serialize `Writer` param:
 	err = encoder.Encode(obj.Writer)
+	if err != nil {
+		return err
+	}
+	// Serialize `Description` param:
+	err = encoder.Encode(obj.Description)
+	if err != nil {
+		return err
+	}
+	// Serialize `Decimals` param:
+	err = encoder.Encode(obj.Decimals)
 	if err != nil {
 		return err
 	}
@@ -420,6 +432,16 @@ func (obj *Transmissions) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err 
 	}
 	// Deserialize `Writer`:
 	err = decoder.Decode(&obj.Writer)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Description`:
+	err = decoder.Decode(&obj.Description)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Decimals`:
+	err = decoder.Decode(&obj.Decimals)
 	if err != nil {
 		return err
 	}
