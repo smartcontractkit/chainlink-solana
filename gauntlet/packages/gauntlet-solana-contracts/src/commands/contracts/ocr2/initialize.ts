@@ -10,8 +10,6 @@ import { getRDD } from '../../../lib/rdd'
 type Input = {
   minAnswer: number | string
   maxAnswer: number | string
-  decimals: number | string
-  description: string
 }
 export default class Initialize extends SolanaCommand {
   static id = 'ocr2:initialize'
@@ -29,8 +27,6 @@ export default class Initialize extends SolanaCommand {
     return {
       maxAnswer: aggregator.maxSubmissionValue,
       minAnswer: aggregator.minSubmissionValue,
-      decimals: aggregator.decimals,
-      description: aggregator.name,
     }
   }
 
@@ -70,8 +66,6 @@ export default class Initialize extends SolanaCommand {
 
     const minAnswer = new BN(input.minAnswer)
     const maxAnswer = new BN(input.maxAnswer)
-    const decimals = new BN(input.decimals)
-    const description = input.description || ''
 
     const tokenVault = await Token.getAssociatedTokenAddress(
       ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -101,15 +95,13 @@ export default class Initialize extends SolanaCommand {
     console.log(`
       - Min Answer: ${minAnswer.toString()}
       - Max Answer: ${maxAnswer.toString()}
-      - Decimals: ${decimals}
-      - Description: ${description}
       - Vault Nonce: ${vaultNonce}
     `)
 
     logger.log('Feed information:', input)
     await prompt('Continue initializing OCR 2 feed?')
 
-    const txHash = await program.rpc.initialize(vaultNonce, minAnswer, maxAnswer, decimals, description, {
+    const txHash = await program.rpc.initialize(vaultNonce, minAnswer, maxAnswer, {
       accounts,
       signers: [owner, state],
       instructions: [await program.account.state.createInstruction(state)],

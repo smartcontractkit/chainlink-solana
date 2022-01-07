@@ -44,6 +44,14 @@
       ],
       "args": [
         {
+          "name": "decimals",
+          "type": "u8"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
           "name": "granularity",
           "type": "u8"
         },
