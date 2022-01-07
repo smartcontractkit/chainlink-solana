@@ -27,13 +27,13 @@ const (
 	TokenAccountSize                 = uint64(165)
 	AccessControllerStateAccountSize = uint64(8 + 32 + 8 + 32*64)
 	StoreAccountSize                 = uint64(8 + 32*4 + 32*128 + 8)
-	OCRTransmissionsAccountSize      = uint64(8 + 4 + 4 + 8192*24)
+	OCRTransmissionsAccountSize      = uint64(8 + 128 + 8192*24)
 	OCRLeftoverPaymentSize           = uint64(32 + 8)
 	OCRLeftoverPaymentsSize          = OCRLeftoverPaymentSize*19 + 8
 	OCROracle                        = uint64(32 + 20 + 32 + 32 + 4 + 8)
 	OCROraclesSize                   = OCROracle*19 + 8
 	OCROffChainConfigSize            = uint64(8 + 4096 + 8)
-	OCRConfigSize                    = 32 + 32 + 32 + 32 + 32 + 32 + 16 + 16 + 32 + (1 + 1 + 1 + 1 + 4 + 4 + 32) + (4 + 32 + 8) + (4 + 4) + 2*OCROffChainConfigSize
+	OCRConfigSize                    = 32 + 32 + 32 + 32 + 32 + 32 + 16 + 16 + (1 + 1 + 2 + 4 + 4 + 32) + (4 + 32 + 8) + (4 + 4) + 2*OCROffChainConfigSize
 	OCRAccountAccountSize            = 8 + 1 + 1 + 2 + 4 + OCRConfigSize + OCROraclesSize + OCRLeftoverPaymentsSize + 32
 )
 
