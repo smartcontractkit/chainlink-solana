@@ -37,7 +37,6 @@ juelsPerFeeCoinSource                  = """
 
 [relayConfig]
 nodeEndpointHTTP   = "http:..."
-nodeEndpointWS     = "ws:..."
 ocr2ProgramID      = "<insert ocr2 program id>"
 transmissionsID    = "<insert ocr2 transmissions account>"
 storeProgramID     = "<insert validator program id>"

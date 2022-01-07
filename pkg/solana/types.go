@@ -135,7 +135,6 @@ type AccessController struct {
 type RelayConfig struct {
 	// network data
 	NodeEndpointHTTP string `json:"nodeEndpointHTTP"`
-	NodeEndpointWS   string `json:"nodeEndpointWS"`
 
 	// state account passed as the ContractID in main job spec
 	// on-chain program + transmissions account + store programID
