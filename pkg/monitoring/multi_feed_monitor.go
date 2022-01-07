@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
@@ -12,56 +13,88 @@ type MultiFeedMonitor interface {
 }
 
 func NewMultiFeedMonitor(
+	solanaConfig config.Solana,
+	feeds []config.Feed,
+
 	log logger.Logger,
-	config Config,
 	transmissionReader, stateReader AccountReader,
-	transmissionSchema, stateSchema, configSetSimplifiedSchema Schema,
 	producer Producer,
 	metrics Metrics,
+
+	configSetTopic string,
+	configSetSimplifiedTopic string,
+	transmissionTopic string,
+
+	configSetSchema Schema,
+	configSetSimplifiedSchema Schema,
+	transmissionSchema Schema,
 ) MultiFeedMonitor {
 	return &multiFeedMonitor{
+		solanaConfig,
+		feeds,
+
 		log,
-		config,
 		transmissionReader, stateReader,
-		transmissionSchema, stateSchema, configSetSimplifiedSchema,
 		producer,
 		metrics,
+
+		configSetTopic,
+		configSetSimplifiedTopic,
+		transmissionTopic,
+
+		configSetSchema,
+		configSetSimplifiedSchema,
+		transmissionSchema,
 	}
 }
 
 type multiFeedMonitor struct {
-	log                       logger.Logger
-	config                    Config
-	transmissionReader        AccountReader
-	stateReader               AccountReader
-	transmissionSchema        Schema
-	stateSchema               Schema
+	solanaConfig config.Solana
+	feeds        []config.Feed
+
+	log                logger.Logger
+	transmissionReader AccountReader
+	stateReader        AccountReader
+	producer           Producer
+	metrics            Metrics
+
+	configSetTopic           string
+	configSetSimplifiedTopic string
+	transmissionTopic        string
+
+	configSetSchema           Schema
 	configSetSimplifiedSchema Schema
-	producer                  Producer
-	metrics                   Metrics
+	transmissionSchema        Schema
 }
 
 const bufferCapacity = 100
 
 // Start should be executed as a goroutine.
 func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup) {
-	wg.Add(len(m.config.Feeds))
-	for _, feedConfig := range m.config.Feeds {
-		go func(feedConfig FeedConfig) {
+	wg.Add(len(m.feeds))
+	for _, feedConfig := range m.feeds {
+		go func(feedConfig config.Feed) {
 			defer wg.Done()
 
+			feedLogger := m.log.With(
+				"feed", feedConfig.FeedName,
+				"network", m.solanaConfig.NetworkName,
+			)
+
 			transmissionPoller := NewPoller(
-				m.log.With("account", "transmissions", "address", feedConfig.TransmissionsAccount.String()),
+				feedLogger.With("component", "transmissions-poller", "address", feedConfig.TransmissionsAccount.String()),
 				feedConfig.TransmissionsAccount,
 				m.transmissionReader,
-				feedConfig.PollInterval,
+				m.solanaConfig.PollInterval,
+				m.solanaConfig.ReadTimeout,
 				bufferCapacity,
 			)
 			statePoller := NewPoller(
-				m.log.With("account", "state", "address", feedConfig.StateAccount.String()),
+				feedLogger.With("component", "state-poller", "address", feedConfig.StateAccount.String()),
 				feedConfig.StateAccount,
 				m.stateReader,
-				feedConfig.PollInterval,
+				m.solanaConfig.PollInterval,
+				m.solanaConfig.ReadTimeout,
 				bufferCapacity,
 			)
 
@@ -75,16 +108,35 @@ func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup) {
 				statePoller.Start(ctx)
 			}()
 
+			exporters := []Exporter{
+				NewPrometheusExporter(
+					m.solanaConfig,
+					feedConfig,
+					feedLogger.With("component", "prometheus-exporter"),
+					m.metrics,
+				),
+				NewKafkaExporter(
+					m.solanaConfig,
+					feedConfig,
+					feedLogger.With("component", "kafka-exporter"),
+					m.producer,
+
+					m.configSetSchema,
+					m.configSetSimplifiedSchema,
+					m.transmissionSchema,
+
+					m.configSetTopic,
+					m.configSetSimplifiedTopic,
+					m.transmissionTopic,
+				),
+			}
+
 			feedMonitor := NewFeedMonitor(
-				m.log.With("name", feedConfig.FeedName, "network", m.config.Solana.NetworkName),
-				m.config,
-				feedConfig,
+				feedLogger.With("component", "feed-monitor"),
 				transmissionPoller, statePoller,
-				m.transmissionSchema, m.stateSchema, m.configSetSimplifiedSchema,
-				m.producer,
-				m.metrics,
+				exporters,
 			)
-			feedMonitor.Start(ctx)
+			feedMonitor.Start(ctx, wg)
 		}(feedConfig)
 	}
 }

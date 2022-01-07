@@ -1,16 +1,15 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, prompt, time, BN } from '@chainlink/gauntlet-core/dist/utils'
+import { Proto, sharedSecretEncryptions } from '@chainlink/gauntlet-core/dist/crypto'
+
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { MAX_TRANSACTION_BYTES, ORACLES_MAX_LENGTH } from '../../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
-import { Protobuf } from '../../../../core/proto'
-import { descriptor as OCR2Descriptor } from '../../../../core/proto/ocr2Proto'
+import { descriptor as OCR2Descriptor } from '../../../../lib/ocr2Proto'
 import { getRDD } from '../../../../lib/rdd'
-import { makeSharedSecretEncryptions, SharedSecretEncryptions } from '../../../../core/sharedSecretEncryptions'
-import { durationToNanoseconds, Millisecond } from '../../../../core/time'
-import { divideIntoChunks } from '../../../../core/utils'
-import BN from 'bn.js'
+import { divideIntoChunks } from '../../../../lib/utils'
+import { join } from 'path'
 
 export type Input = {
   deltaProgressNanoseconds: number
@@ -58,17 +57,28 @@ export default class WriteOffchainConfig extends SolanaCommand {
   static makeInputFromRDD = (rdd: any, stateAddress: string): Input => {
     const aggregator = rdd.contracts[stateAddress]
     const config = aggregator.config
-    const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
-    const operatorsPublicKeys = aggregatorOperators.map((o) => rdd.operators[o].ocrOffchainPublicKey[0])
-    const operatorsPeerIds = aggregatorOperators.map((o) => rdd.operators[o].peerId[0])
-    const operatorConfigPublicKeys = aggregatorOperators.map((o) => rdd.operators[o].ocrConfigPublicKey[0])
+
+    const aggregatorOperators: any[] = aggregator.oracles
+      .map((o) => rdd.operators[o.operator])
+      .sort((a, b) => {
+        if (a.ocr2OnchainPublicKey[0] > b.ocr2OnchainPublicKey[0]) return 1
+        if (a.ocr2OnchainPublicKey[0] < b.ocr2OnchainPublicKey[0]) return -1
+        return 0
+      })
+    const operatorsPublicKeys = aggregatorOperators.map((o) =>
+      o.ocr2OffchainPublicKey[0].replace('ocr2off_solana_', ''),
+    )
+    const operatorsPeerIds = aggregatorOperators.map((o) => o.peerId[0])
+    const operatorConfigPublicKeys = aggregatorOperators.map((o) =>
+      o.ocr2ConfigPublicKey[0].replace('ocr2cfg_solana_', ''),
+    )
 
     const input: Input = {
-      deltaProgressNanoseconds: durationToNanoseconds(config.deltaProgress).toNumber(),
-      deltaResendNanoseconds: durationToNanoseconds(config.deltaResend).toNumber(),
-      deltaRoundNanoseconds: durationToNanoseconds(config.deltaRound).toNumber(),
-      deltaGraceNanoseconds: durationToNanoseconds(config.deltaGrace).toNumber(),
-      deltaStageNanoseconds: durationToNanoseconds(config.deltaStage).toNumber(),
+      deltaProgressNanoseconds: time.durationToNanoseconds(config.deltaProgress).toNumber(),
+      deltaResendNanoseconds: time.durationToNanoseconds(config.deltaResend).toNumber(),
+      deltaRoundNanoseconds: time.durationToNanoseconds(config.deltaRound).toNumber(),
+      deltaGraceNanoseconds: time.durationToNanoseconds(config.deltaGrace).toNumber(),
+      deltaStageNanoseconds: time.durationToNanoseconds(config.deltaStage).toNumber(),
       rMax: config.rMax,
       s: config.s,
       offchainPublicKeys: operatorsPublicKeys,
@@ -78,17 +88,17 @@ export default class WriteOffchainConfig extends SolanaCommand {
         alphaReportPpb: Number(config.reportingPluginConfig.alphaReportPpb),
         alphaAcceptInfinite: config.reportingPluginConfig.alphaAcceptInfinite,
         alphaAcceptPpb: Number(config.reportingPluginConfig.alphaAcceptPpb),
-        deltaCNanoseconds: durationToNanoseconds(config.reportingPluginConfig.deltaC).toNumber(),
+        deltaCNanoseconds: time.durationToNanoseconds(config.reportingPluginConfig.deltaC).toNumber(),
       },
-      maxDurationQueryNanoseconds: durationToNanoseconds(config.maxDurationQuery).toNumber(),
-      maxDurationObservationNanoseconds: durationToNanoseconds(config.maxDurationObservation).toNumber(),
-      maxDurationReportNanoseconds: durationToNanoseconds(config.maxDurationReport).toNumber(),
-      maxDurationShouldAcceptFinalizedReportNanoseconds: durationToNanoseconds(
-        config.maxDurationShouldAcceptFinalizedReport,
-      ).toNumber(),
-      maxDurationShouldTransmitAcceptedReportNanoseconds: durationToNanoseconds(
-        config.maxDurationShouldTransmitAcceptedReport,
-      ).toNumber(),
+      maxDurationQueryNanoseconds: time.durationToNanoseconds(config.maxDurationQuery).toNumber(),
+      maxDurationObservationNanoseconds: time.durationToNanoseconds(config.maxDurationObservation).toNumber(),
+      maxDurationReportNanoseconds: time.durationToNanoseconds(config.maxDurationReport).toNumber(),
+      maxDurationShouldAcceptFinalizedReportNanoseconds: time
+        .durationToNanoseconds(config.maxDurationShouldAcceptFinalizedReport)
+        .toNumber(),
+      maxDurationShouldTransmitAcceptedReportNanoseconds: time
+        .durationToNanoseconds(config.maxDurationShouldTransmitAcceptedReport)
+        .toNumber(),
       configPublicKeys: operatorConfigPublicKeys,
     }
     return input
@@ -103,7 +113,7 @@ export default class WriteOffchainConfig extends SolanaCommand {
 
   serializeOffchainConfig = async (input: Input): Promise<Buffer> => {
     const { configPublicKeys, ...validInput } = input
-    const proto = new Protobuf({ descriptor: OCR2Descriptor })
+    const proto = new Proto.Protobuf({ descriptor: OCR2Descriptor })
     const reportingPluginConfigProto = proto.encode(
       'offchainreporting2_config.ReportingPluginConfig',
       validInput.reportingPluginConfig,
@@ -120,9 +130,13 @@ export default class WriteOffchainConfig extends SolanaCommand {
 
   // constructs a SharedSecretEncryptions from
   // a set of SharedSecretEncryptionPublicKeys, the sharedSecret, and a cryptographic randomness source
-  generateSecretEncryptions = async (operatorsPublicKeys: string[]): Promise<SharedSecretEncryptions> => {
+  generateSecretEncryptions = async (
+    operatorsPublicKeys: string[],
+  ): Promise<sharedSecretEncryptions.SharedSecretEncryptions> => {
     const gauntletSecret = process.env.SECRET
-    return makeSharedSecretEncryptions(gauntletSecret!, operatorsPublicKeys)
+    const path = join(process.cwd(), 'packages/gauntlet-solana-contracts/artifacts/bip-0039', 'english.txt')
+    const randomSecret = await sharedSecretEncryptions.generateSecretWords(path)
+    return sharedSecretEncryptions.makeSharedSecretEncryptions(gauntletSecret!, operatorsPublicKeys, randomSecret)
   }
 
   validateInput = (input: Input): boolean => {
@@ -142,7 +156,7 @@ export default class WriteOffchainConfig extends SolanaCommand {
     for (let prop in nonNegativeValues) {
       if (_isNegative(input[prop])) throw new Error(`${prop} must be non-negative`)
     }
-    const safeIntervalNanoseconds = new BN(200).mul(Millisecond).toNumber()
+    const safeIntervalNanoseconds = new BN(200).mul(time.Millisecond).toNumber()
     if (input.deltaProgressNanoseconds < safeIntervalNanoseconds)
       throw new Error(
         `deltaProgressNanoseconds (${input.deltaProgressNanoseconds} ns)  is set below the resource exhaustion safe interval (${safeIntervalNanoseconds} ns)`,
@@ -204,6 +218,7 @@ export default class WriteOffchainConfig extends SolanaCommand {
       )
     }
 
+    logger.log('Offchain info:', input)
     await prompt('Start writing offchain config?')
 
     const txs: string[] = []

@@ -1,8 +1,8 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import BN from 'bn.js'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import BN from 'bn.js'
 import { ORACLES_MAX_LENGTH } from '../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
@@ -26,12 +26,11 @@ export default class SetConfig extends SolanaCommand {
     if (userInput) return userInput as Input
     const rdd = getRDD(this.flags.rdd)
     const aggregator = rdd.contracts[this.flags.state]
-    const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
+    const aggregatorOperators: any[] = aggregator.oracles.map((o) => rdd.operators[o.operator])
     const oracles = aggregatorOperators.map((operator) => ({
       // Same here
-      transmitter: rdd.operators[operator].nodeAddress[0],
-      // Signer should be onchainPublicKey. Check if we can support it with latest RDD changes
-      signer: rdd.operators[operator].ocrSigningAddress[0].replace('0x', ''),
+      transmitter: operator.ocrNodeAddress[0],
+      signer: operator.ocr2OnchainPublicKey[0].replace('ocr2on_solana_', ''),
     }))
     const f = aggregator.config.f
     return {
@@ -56,8 +55,6 @@ export default class SetConfig extends SolanaCommand {
 
     const owner = this.wallet.payer
 
-    console.log(`Setting config on ${state.toString()}...`)
-
     const oracles = input.oracles.map(({ signer, transmitter }) => ({
       signer: Buffer.from(signer, 'hex'),
       transmitter: new PublicKey(transmitter),
@@ -70,6 +67,9 @@ export default class SetConfig extends SolanaCommand {
       oracles.length <= ORACLES_MAX_LENGTH,
       `Oracles max length is ${ORACLES_MAX_LENGTH}, currently ${oracles.length}`,
     )
+
+    logger.log('Config information:', input)
+    await prompt(`Continue setting config on ${state.toString()}?`)
 
     const tx = await program.rpc.setConfig(oracles, f, {
       accounts: {

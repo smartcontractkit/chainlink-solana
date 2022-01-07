@@ -8,7 +8,7 @@ import (
 )
 
 type AccessList struct {
-	Xs  [32]ag_solanago.PublicKey
+	Xs  [64]ag_solanago.PublicKey
 	Len uint64
 }
 

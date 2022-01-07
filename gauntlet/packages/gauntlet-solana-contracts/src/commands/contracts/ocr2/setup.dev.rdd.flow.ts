@@ -4,10 +4,10 @@ import { CONTRACT_LIST } from '../../../lib/contracts'
 import { makeAbstractCommand } from '../../abstract'
 import Initialize from './initialize'
 import InitializeAC from '../accessController/initialize'
-import InitializeValidator from '../validator/initialize'
+import InitializeStore from '../store/initialize'
 import DeployToken from '../token/deploy'
 import SetPayees from './setPayees'
-import SetValidatorConfig from './setValidatorConfig'
+import SetValidatorConfig from '../store/setValidatorConfig'
 import AddAccess from '../accessController/addAccess'
 import BeginOffchainConfig from './offchainConfig/begin'
 import WriteOffchainConfig from './offchainConfig/write'
@@ -29,7 +29,7 @@ export default class SetupRDDFlow extends FlowCommand<TransactionResponse> {
       REQUEST_ACCESS_CONTROLLER: 2,
       OCR_2: 3,
       TOKEN: 4,
-      VALIDATOR: 5,
+      STORE: 5,
     }
 
     this.flow = [
@@ -43,7 +43,7 @@ export default class SetupRDDFlow extends FlowCommand<TransactionResponse> {
       // },
       // {
       //   name: 'Deploy Validator',
-      //   command: 'deviation_flagging_validator:deploy',
+      //   command: 'store:deploy',
       // },
       {
         name: 'Deploy LINK',
@@ -61,20 +61,20 @@ export default class SetupRDDFlow extends FlowCommand<TransactionResponse> {
         id: this.stepIds.REQUEST_ACCESS_CONTROLLER,
       },
       {
-        name: 'Initialize Validator',
-        command: InitializeValidator,
-        id: this.stepIds.VALIDATOR,
+        name: 'Initialize Store',
+        command: InitializeStore,
+        id: this.stepIds.STORE,
         flags: {
-          accessController: ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
+          accessController: FlowCommand.ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
         },
       },
       {
         name: 'Initialize OCR 2',
         command: Initialize,
         flags: {
-          billingAccessController: ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
-          requesterAccessController: ID.contract(this.stepIds.REQUEST_ACCESS_CONTROLLER),
-          link: ID.contract(this.stepIds.TOKEN),
+          billingAccessController: FlowCommand.ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
+          requesterAccessController: FlowCommand.ID.contract(this.stepIds.REQUEST_ACCESS_CONTROLLER),
+          link: FlowCommand.ID.contract(this.stepIds.TOKEN),
         },
         id: this.stepIds.OCR_2,
       },
@@ -82,7 +82,7 @@ export default class SetupRDDFlow extends FlowCommand<TransactionResponse> {
         name: 'Begin Offchain Config',
         command: BeginOffchainConfig,
         flags: {
-          state: ID.contract(this.stepIds.OCR_2),
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
           version: this.flags.version || 1,
         },
       },
@@ -90,36 +90,36 @@ export default class SetupRDDFlow extends FlowCommand<TransactionResponse> {
         name: 'Write Offchain Config',
         command: WriteOffchainConfig,
         flags: {
-          state: ID.contract(this.stepIds.OCR_2),
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
         },
       },
       {
         name: 'Commit Offchain Config',
         command: CommitOffchainConfig,
         flags: {
-          state: ID.contract(this.stepIds.OCR_2),
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
         },
       },
       {
         name: 'Set Config',
         command: SetConfig,
         flags: {
-          state: ID.contract(this.stepIds.OCR_2),
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
         },
       },
       {
         name: 'Set Payees',
         command: SetPayees,
         flags: {
-          state: ID.contract(this.stepIds.OCR_2),
-          link: ID.contract(this.stepIds.TOKEN),
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
+          link: FlowCommand.ID.contract(this.stepIds.TOKEN),
         },
       },
       {
         name: 'Set Billing',
         command: SetBilling,
         flags: {
-          state: ID.contract(this.stepIds.OCR_2),
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
           input: {
             observationPaymentGjuels: '1',
             transmissionPaymentGjuels: '1',
@@ -130,27 +130,21 @@ export default class SetupRDDFlow extends FlowCommand<TransactionResponse> {
         name: 'Set Validator Config',
         command: SetValidatorConfig,
         flags: {
-          state: ID.contract(this.stepIds.OCR_2),
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
           input: {
-            validator: this.getReportStepDataById(ID.contract(this.stepIds.VALIDATOR)),
+            store: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.STORE)),
             threshold: 1,
           },
         },
       },
       {
-        name: 'Add access to validator on AC',
+        name: 'Add access to store on AC',
         command: AddAccess,
         flags: {
-          state: ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
-          address: ID.data(this.stepIds.OCR_2, 'validatorAuthority'),
+          state: FlowCommand.ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
+          address: FlowCommand.ID.data(this.stepIds.OCR_2, 'storeAuthority'),
         },
       },
     ]
   }
-}
-
-const ID = {
-  contract: (id: number, index = 0): string => `ID.${id}.txs.${index}.contract`,
-  tx: (id: number, index = 0): string => `ID.${id}.txs.${index}.tx`,
-  data: (id: number, key = ''): string => `ID.${id}.data.${key}`,
 }

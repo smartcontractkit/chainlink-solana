@@ -16,7 +16,7 @@ const (
 	TransmissionLen uint64 = 16 + TimestampLen
 
 	// AccountDiscriminator (8 bytes), RoundID (uint32, 4 bytes), Cursor (uint32, 4 bytes)
-	CursorOffset uint64 = 8 + 4
+	CursorOffset uint64 = 8 + 1 + 32 + 32 + 4 + 4 + 1
 	CursorLen    uint64 = 4
 
 	// Report data (61 bytes)
@@ -84,8 +84,6 @@ type Config struct {
 	LatestConfigDigest        [32]byte
 	LatestConfigBlockNumber   uint64
 	Billing                   Billing
-	Validator                 solana.PublicKey
-	FlaggingThreshold         uint32
 	OffchainConfig            OffchainConfig
 	PendingOffchainConfig     OffchainConfig
 }
@@ -135,26 +133,15 @@ type AccessController struct {
 	Len    uint64
 }
 
-// Validator state
-type Validator struct {
-	AccountDiscriminator     [8]byte // first 8 bytes of the SHA256 of the account’s Rust ident, https://docs.rs/anchor-lang/0.18.2/anchor_lang/attr.account.html
-	Owner                    solana.PublicKey
-	ProposedOwner            solana.PublicKey
-	RaisingAccessController  solana.PublicKey
-	LoweringAccessController solana.PublicKey
-
-	Flags [128]solana.PublicKey
-	Len   uint64
-}
-
 // CL Core OCR2 job spec RelayConfig member for Solana
 type RelayConfig struct {
 	// network data
-	NodeEndpointRPC string `json:"nodeEndpointRPC"`
-	NodeEndpointWS  string `json:"nodeEndpointWS"`
+	NodeEndpointHTTP string `json:"nodeEndpointHTTP"`
+	NodeEndpointWS   string `json:"nodeEndpointWS"`
 
-	// on-chain program + 2x state accounts (state + transmissions) + validator programID
-	StateID            string `json:"stateID"`
-	TransmissionsID    string `json:"transmissionsID"`
-	ValidatorProgramID string `json:"validatorProgramID"`
+	// state account passed as the ContractID in main job spec
+	// on-chain program + transmissions account + store programID
+	OCR2ProgramID   string `json:"ocr2ProgramID"`
+	TransmissionsID string `json:"transmissionsID"`
+	StoreProgramID  string `json:"storeProgramID"`
 }

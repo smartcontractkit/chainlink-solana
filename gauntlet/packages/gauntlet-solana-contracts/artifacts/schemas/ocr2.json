@@ -21,7 +21,7 @@
         },
         {
           "name": "transmissions",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -268,32 +268,6 @@
         }
       ],
       "args": []
-    },
-    {
-      "name": "setValidatorConfig",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "validator",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "flaggingThreshold",
-          "type": "u32"
-        }
-      ]
     },
     {
       "name": "setBillingAccessController",
@@ -579,34 +553,6 @@
         }
       ],
       "args": []
-    },
-    {
-      "name": "query",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "transmissions",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "buffer",
-          "isMut": true,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "scope",
-          "type": {
-            "defined": "Scope"
-          }
-        }
-      ]
     }
   ],
   "accounts": [
@@ -701,33 +647,6 @@
           {
             "name": "transmissions",
             "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Transmissions",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "latestRoundId",
-            "type": "u32"
-          },
-          {
-            "name": "cursor",
-            "type": "u32"
-          },
-          {
-            "name": "transmissions",
-            "type": {
-              "array": [
-                {
-                  "defined": "Transmission"
-                },
-                8192
-              ]
-            }
           }
         ]
       }
@@ -956,14 +875,6 @@
             }
           },
           {
-            "name": "validator",
-            "type": "publicKey"
-          },
-          {
-            "name": "flaggingThreshold",
-            "type": "u32"
-          },
-          {
             "name": "offchainConfig",
             "type": {
               "defined": "OffchainConfig"
@@ -1025,39 +936,6 @@
           {
             "name": "payment",
             "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Transmission",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "answer",
-            "type": "i128"
-          },
-          {
-            "name": "timestamp",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Scope",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "LatestConfig"
-          },
-          {
-            "name": "LinkAvailableForPayment"
-          },
-          {
-            "name": "LatestRoundData"
           }
         ]
       }
@@ -1196,5 +1074,8 @@
       "name": "UnauthorizedTransmitter",
       "msg": "Oracle transmitter key not found"
     }
-  ]
+  ],
+  "metadata": {
+    "address": "CF13pnKGJ1WJZeEgVAtFdUi4MMndXm9hneiHs8azUaZt"
+  }
 }

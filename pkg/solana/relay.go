@@ -7,7 +7,6 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	uuid "github.com/satori/go.uuid"
-	"gopkg.in/guregu/null.v4"
 
 	relaytypes "github.com/smartcontractkit/chainlink/core/services/relay/types"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
@@ -35,19 +34,16 @@ type OCR2Spec struct {
 	IsBootstrap bool
 
 	// network data
-	NodeEndpointRPC string
-	NodeEndpointWS  string
+	NodeEndpointHTTP string
+	NodeEndpointWS   string
 
-	// on-chain program + 2x state accounts (state + transmissions) + validator program
-	ProgramID          solana.PublicKey
-	StateID            solana.PublicKey
-	ValidatorProgramID solana.PublicKey
-	TransmissionsID    solana.PublicKey
+	// on-chain program + 2x state accounts (state + transmissions) + store program
+	ProgramID       solana.PublicKey
+	StateID         solana.PublicKey
+	StoreProgramID  solana.PublicKey
+	TransmissionsID solana.PublicKey
 
 	TransmissionSigner TransmissionSigner
-
-	// OCR key bundle (off/on-chain keys) id
-	KeyBundleID null.String
 }
 
 type Relayer struct {
@@ -100,7 +96,7 @@ func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	// establish network connection RPC + WS (reuses existing WS client if available)
-	client, err := r.connections.NewConnectedClient(ctx, spec.NodeEndpointRPC, spec.NodeEndpointWS)
+	client, err := r.connections.NewConnectedClient(ctx, spec.NodeEndpointHTTP, spec.NodeEndpointWS)
 	if err != nil {
 		return provider, err
 	}

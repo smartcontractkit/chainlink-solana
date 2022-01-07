@@ -64,6 +64,16 @@ macro_rules! arrayvec {
                 element
             }
 
+            pub fn insert(&mut self, index: usize, element: $ty) {
+                assert!(self.len() < self.capacity());
+                debug_assert!(index <= self.len());
+
+                // move index..len forward by one
+                self.xs.copy_within(index..self.len as usize, index + 1);
+                self.len += 1;
+                self.xs[index] = element;
+            }
+
             #[inline]
             pub fn as_slice(&self) -> &[$ty] {
                 &self.xs[..self.len as usize]
@@ -132,5 +142,24 @@ mod tests {
         assert_eq!(el, 1);
         assert_eq!(vec.len(), 1);
         assert_eq!(vec.as_slice(), &[2]);
+    }
+
+    #[test]
+    fn insert() {
+        let mut vec = ArrayVec::new();
+        vec.insert(0, 3);
+        vec.insert(0, 1);
+        vec.insert(1, 2);
+        assert_eq!(vec.as_slice(), &[1, 2, 3]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn insert_overflow() {
+        let mut vec = ArrayVec::new();
+        vec.push(1);
+        vec.push(2);
+        vec.push(3);
+        vec.insert(3, 4);
     }
 }

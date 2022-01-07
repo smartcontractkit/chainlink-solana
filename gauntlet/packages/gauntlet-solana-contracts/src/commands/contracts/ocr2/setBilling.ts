@@ -1,8 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
 import { AccountMeta, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js'
-import BN from 'bn.js'
+import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
 
@@ -52,7 +51,8 @@ export default class SetBilling extends SolanaCommand {
     const info = await program.account.state.fetch(state)
     const billingAC = new PublicKey(info.config.billingAccessController)
     logger.loading('Generating billing tx information...')
-
+    logger.log('Billing information:', input)
+    await prompt('Continue setting billing?')
     const data = program.coder.instruction.encode('set_billing', {
       observationPaymentGjuels: new BN(input.observationPaymentGjuels),
       transmissionPaymentGjuels: new BN(input.transmissionPaymentGjuels),
@@ -101,7 +101,7 @@ export default class SetBilling extends SolanaCommand {
 
     logger.loading('Sending tx...')
     const txhash = await this.provider.send(tx, [this.wallet.payer])
-    logger.debug(`TX hash: ${txhash}`)
+    logger.success(`Billing set on tx hash: ${txhash}`)
 
     return {
       responses: [

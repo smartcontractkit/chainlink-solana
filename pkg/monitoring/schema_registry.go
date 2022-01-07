@@ -1,12 +1,12 @@
 package monitoring
 
 import (
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/riferrei/srclient"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/assert"
 )
@@ -20,11 +20,11 @@ type SchemaRegistry interface {
 }
 
 type schemaRegistry struct {
-	backend *srclient.SchemaRegistryClient
+	backend srclient.ISchemaRegistryClient
 	log     logger.Logger
 }
 
-func NewSchemaRegistry(cfg SchemaRegistryConfig, log logger.Logger) SchemaRegistry {
+func NewSchemaRegistry(cfg config.SchemaRegistry, log logger.Logger) SchemaRegistry {
 	backend := srclient.CreateSchemaRegistryClient(cfg.URL)
 	if cfg.Username != "" && cfg.Password != "" {
 		backend.SetCredentials(cfg.Username, cfg.Password)
@@ -43,7 +43,7 @@ func (s *schemaRegistry) EnsureSchema(subject, spec string) (Schema, error) {
 		if err != nil {
 			return nil, fmt.Errorf("unable to create new schema with subject '%s': %w", subject, err)
 		}
-		return wrapSchema{newSchema}, nil
+		return wrapSchema{subject, newSchema}, nil
 	}
 	isEqualSchemas, errInIsEqualJSON := isEqualJSON(registeredSchema.Schema(), spec)
 	if errInIsEqualJSON != nil {
@@ -51,44 +51,14 @@ func (s *schemaRegistry) EnsureSchema(subject, spec string) (Schema, error) {
 	}
 	if isEqualSchemas {
 		s.log.Infof("using existing schema for subject '%s'\n", subject)
-		return wrapSchema{registeredSchema}, nil
+		return wrapSchema{subject, registeredSchema}, nil
 	}
 	s.log.Infof("updating schema for subject '%s'\n", subject)
 	newSchema, err := s.backend.CreateSchema(subject, spec, srclient.Avro)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update schema with subject '%s': %w", subject, err)
 	}
-	return wrapSchema{newSchema}, nil
-}
-
-type Schema interface {
-	Encode(interface{}) ([]byte, error)
-	Decode([]byte) (interface{}, error)
-}
-
-type wrapSchema struct {
-	*srclient.Schema
-}
-
-func (w wrapSchema) Encode(value interface{}) ([]byte, error) {
-	payload, err := w.Schema.Codec().BinaryFromNative(nil, value)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode value in avro: %w", err)
-	}
-	schemaIDBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(schemaIDBytes, uint32(w.Schema.ID()))
-
-	// Magic 0 byte + 4 bytes of schema ID + the data bytes
-	bytes := []byte{0}
-	bytes = append(bytes, schemaIDBytes...)
-	bytes = append(bytes, payload...)
-	return bytes, nil
-}
-
-func (w wrapSchema) Decode(buf []byte) (interface{}, error) {
-	// TODO add the decode for tests later
-	value, _, err := w.Schema.Codec().NativeFromBinary(buf)
-	return value, err
+	return wrapSchema{subject, newSchema}, nil
 }
 
 // Helpers

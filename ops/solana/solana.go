@@ -11,10 +11,10 @@ import (
 	"sort"
 	"time"
 
-	"github.com/gagliardetto/solana-go"
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
+	opsChainlink "github.com/smartcontractkit/chainlink-relay/ops/chainlink"
 	relayUtils "github.com/smartcontractkit/chainlink-relay/ops/utils"
 )
 
@@ -22,15 +22,16 @@ const (
 	// program accounts
 	AccessController = iota
 	OCR2
-	Validator
+	Store
 
 	// program state accounts
 	BillingAccessController
 	RequesterAccessController
-	ValidatorAccount
+	StoreAccount
 	OCRFeed
 	OCRTransmissions
 	LINK
+	StoreAuthority
 )
 
 type Deployer struct {
@@ -111,13 +112,13 @@ func (d *Deployer) Load() error {
 	d.Account[AccessController] = report.Responses[0].Contract
 
 	// Access Controller contract deployment
-	fmt.Println("Deploying Validator...")
+	fmt.Println("Deploying Store...")
 	err = d.gauntlet.ExecCommand(
-		"deviation_flagging_validator:deploy",
+		"store:deploy",
 		d.gauntlet.Flag("network", d.network),
 	)
 	if err != nil {
-		return errors.Wrap(err, "validator contract deployment failed")
+		return errors.Wrap(err, "store contract deployment failed")
 	}
 
 	report, err = d.gauntlet.ReadCommandReport()
@@ -125,7 +126,7 @@ func (d *Deployer) Load() error {
 		return errors.Wrap(err, "report not available")
 	}
 
-	d.Account[Validator] = report.Responses[0].Contract
+	d.Account[Store] = report.Responses[0].Contract
 
 	// OCR2 contract deployment
 	fmt.Println("Deploying OCR 2...")
@@ -197,26 +198,26 @@ func (d *Deployer) DeployOCR() error {
 	}
 	d.Account[BillingAccessController] = report.Responses[0].Contract
 
-	fmt.Println("Step 3: Init Validator")
+	fmt.Println("Step 3: Init Store")
 	err = d.gauntlet.ExecCommand(
-		"deviation_flagging_validator:initialize",
+		"store:initialize",
 		d.gauntlet.Flag("network", d.network),
 		d.gauntlet.Flag("accessController", d.Account[BillingAccessController]),
 	)
 	if err != nil {
-		return errors.Wrap(err, "Validator initialization failed")
+		return errors.Wrap(err, "Store initialization failed")
 	}
 	report, err = d.gauntlet.ReadCommandReport()
 	if err != nil {
 		return err
 	}
-	d.Account[ValidatorAccount] = report.Responses[0].Contract
+	d.Account[StoreAccount] = report.Responses[0].Contract
 
+	fmt.Println("Step 4: Create Feed in Store")
 	input := map[string]interface{}{
-		"minAnswer":   "0",
-		"maxAnswer":   "10000000000",
-		"decimals":    9,
-		"description": "Test",
+		"store":       d.Account[StoreAccount],
+		"granularity": 30,
+		"liveLength":  1024,
 	}
 
 	jsonInput, err := json.Marshal(input)
@@ -224,11 +225,52 @@ func (d *Deployer) DeployOCR() error {
 		return err
 	}
 
-	fmt.Println("Step 4: Init OCR 2 Feed")
+	err = d.gauntlet.ExecCommand(
+		"store:create_feed",
+		d.gauntlet.Flag("network", d.network),
+		d.gauntlet.Flag("state", d.Account[StoreAccount]), // why is this needed in gauntlet?
+		d.gauntlet.Flag("input", string(jsonInput)),
+	)
+	if err != nil {
+		return errors.Wrap(err, "feed creation failed")
+	}
+
+	report, err = d.gauntlet.ReadCommandReport()
+	if err != nil {
+		return err
+	}
+	d.Account[OCRTransmissions] = report.Data["transmissions"]
+
+	fmt.Println("Step 5: Set Validator Config in Store")
+	err = d.gauntlet.ExecCommand(
+		"store:set_validator_config",
+		d.gauntlet.Flag("network", d.network),
+		d.gauntlet.Flag("state", d.Account[StoreAccount]),
+		d.gauntlet.Flag("feed", d.Account[OCRTransmissions]),
+		d.gauntlet.Flag("threshold", "8000"),
+	)
+	if err != nil {
+		return errors.Wrap(err, "set validator config failed")
+	}
+
+	fmt.Println("Step 6: Init OCR 2 Feed")
+	input = map[string]interface{}{
+		"minAnswer":   "0",
+		"maxAnswer":   "10000000000",
+		"decimals":    8,
+		"description": "Test LINK/USD",
+	}
+
+	jsonInput, err = json.Marshal(input)
+	if err != nil {
+		return err
+	}
+
 	// TODO: command doesn't throw an error in go if it fails
 	err = d.gauntlet.ExecCommand(
 		"ocr2:initialize",
 		d.gauntlet.Flag("network", d.network),
+		d.gauntlet.Flag("transmissions", d.Account[OCRTransmissions]),
 		d.gauntlet.Flag("requesterAccessController", d.Account[RequesterAccessController]),
 		d.gauntlet.Flag("billingAccessController", d.Account[BillingAccessController]),
 		d.gauntlet.Flag("link", d.Account[LINK]),
@@ -244,8 +286,7 @@ func (d *Deployer) DeployOCR() error {
 	}
 
 	d.Account[OCRFeed] = report.Data["state"]
-	d.Account[OCRTransmissions] = report.Data["transmissions"]
-
+	d.Account[StoreAuthority] = report.Data["storeAuthority"]
 	return nil
 }
 
@@ -265,7 +306,7 @@ func (d Deployer) TransferLINK() error {
 }
 
 // TODO: InitOCR should cover almost the whole workflow of the OCR setup, including inspection
-func (d Deployer) InitOCR(keys []map[string]string) error {
+func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 
 	fmt.Println("Setting up OCR Feed:")
 
@@ -283,8 +324,8 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	// program sorts oracles (need to pre-sort to allow correct onchainConfig generation)
 	keys = keys
 	sort.Slice(keys, func(i, j int) bool {
-		hI, _ := hex.DecodeString(keys[i]["OCROnchainPublicKey"])
-		hJ, _ := hex.DecodeString(keys[j]["OCROnchainPublicKey"])
+		hI, _ := hex.DecodeString(keys[i].OCR2OnchainPublicKey)
+		hJ, _ := hex.DecodeString(keys[j].OCR2OnchainPublicKey)
 		return bytes.Compare(hI, hJ) < 0
 	})
 
@@ -297,18 +338,18 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	operators := []map[string]string{}
 	for _, k := range keys {
 		S = append(S, 1)
-		offChainPublicKeys = append(offChainPublicKeys, k["OCROffchainPublicKey"])
-		configPublicKeys = append(configPublicKeys, k["OCRConfigPublicKey"])
-		peerIDs = append(peerIDs, k["P2PID"])
+		offChainPublicKeys = append(offChainPublicKeys, k.OCR2OffchainPublicKey)
+		configPublicKeys = append(configPublicKeys, k.OCR2ConfigPublicKey)
+		peerIDs = append(peerIDs, k.P2PID)
 		// original oracle structure
 		oracles = append(oracles, map[string]string{
-			"signer":      k["OCROnchainPublicKey"],
-			"transmitter": k["OCRTransmitter"],
+			"signer":      k.OCR2OnchainPublicKey,
+			"transmitter": k.OCR2Transmitter,
 		})
 
 		operators = append(operators, map[string]string{
-			"payee":       k["OCRTransmitter"], // payee is the same as transmitter
-			"transmitter": k["OCRTransmitter"],
+			"payee":       k.OCR2Transmitter, // payee is the same as transmitter
+			"transmitter": k.OCR2Transmitter,
 		})
 	}
 
@@ -402,6 +443,8 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 		"ocr2:set_payees",
 		d.gauntlet.Flag("network", d.network),
 		d.gauntlet.Flag("state", d.Account[OCRFeed]),
+		d.gauntlet.Flag("link", d.Account[LINK]),
+		d.gauntlet.Flag("TESTING_ONLY_IGNORE_PAYEE_VALIDATION", "true"),
 		d.gauntlet.Flag("input", string(jsonInput)),
 	)
 
@@ -410,8 +453,8 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 	}
 
 	input = map[string]interface{}{
-		"observationPayment":  1,
-		"transmissionPayment": 1,
+		"observationPaymentGjuels":  1,
+		"transmissionPaymentGjuels": 1,
 	}
 
 	jsonInput, err = json.Marshal(input)
@@ -431,45 +474,37 @@ func (d Deployer) InitOCR(keys []map[string]string) error {
 		return errors.Wrap(err, "setting OCR 2 billing failed")
 	}
 
-	input = map[string]interface{}{
-		"validator": d.Account[ValidatorAccount],
-		"threshold": 8000,
-	}
-
-	jsonInput, err = json.Marshal(input)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("Setting OCR 2 validator config...")
+	fmt.Println("Add writer to feed")
 	err = d.gauntlet.ExecCommand(
-		"ocr2:set_validator_config",
+		"store:set_writer",
 		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("state", d.Account[OCRFeed]),
-		d.gauntlet.Flag("input", string(jsonInput)),
+		d.gauntlet.Flag("state", d.Account[StoreAccount]),
+		d.gauntlet.Flag("feed", d.Account[OCRTransmissions]),
+		d.gauntlet.Flag("storeAuthority", d.Account[StoreAuthority]),
 	)
 
 	if err != nil {
-		return errors.Wrap(err, "setting OCR 2 validator config failed")
+		return errors.Wrap(err, "setting writer on store failed")
 	}
 
-	fmt.Println("Adding feed to validator access list...")
-	seeds := [][]byte{[]byte("validator"), solana.MustPublicKeyFromBase58(d.Account[OCRFeed]).Bytes()}
-	validatorAuthority, _, err := solana.FindProgramAddress(seeds, solana.MustPublicKeyFromBase58(d.Account[OCR2]))
-	if err != nil {
-		return errors.Wrap(err, "fetching validator authority failed")
-	}
-
-	err = d.gauntlet.ExecCommand(
-		"access_controller:add_access",
-		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("state", d.Account[BillingAccessController]),
-		d.gauntlet.Flag("address", validatorAuthority.String()),
-	)
-
-	if err != nil {
-		return errors.Wrap(err, "adding feed to validator access list failed")
-	}
+	// // Not Needed?
+	// fmt.Println("Adding feed to store access list...")
+	// seeds := [][]byte{[]byte("store"), solana.MustPublicKeyFromBase58(d.Account[OCRFeed]).Bytes()}
+	// storeAuthority, _, err := solana.FindProgramAddress(seeds, solana.MustPublicKeyFromBase58(d.Account[OCR2]))
+	// if err != nil {
+	// 	return errors.Wrap(err, "fetching store authority failed")
+	// }
+	//
+	// err = d.gauntlet.ExecCommand(
+	// 	"access_controller:add_access",
+	// 	d.gauntlet.Flag("network", d.network),
+	// 	d.gauntlet.Flag("state", d.Account[BillingAccessController]),
+	// 	d.gauntlet.Flag("address", storeAuthority.String()),
+	// )
+	//
+	// if err != nil {
+	// 	return errors.Wrap(err, "adding feed to store access list failed")
+	// }
 
 	return nil
 }
@@ -488,7 +523,7 @@ func (d Deployer) Fund(addresses []string) error {
 }
 
 func (d Deployer) OCR2Address() string {
-	return d.Account[OCR2]
+	return d.Account[OCRFeed]
 }
 
 func (d Deployer) Addresses() map[int]string {

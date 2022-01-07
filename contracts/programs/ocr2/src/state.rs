@@ -93,8 +93,6 @@ pub struct Config {
     pub latest_config_block_number: u64,
 
     pub billing: Billing,
-    pub validator: Pubkey,
-    pub flagging_threshold: u32,
 
     pub offchain_config: OffchainConfig,
     // a staging area which will swap onto data on commit
@@ -177,102 +175,5 @@ impl Default for Oracle {
             from_round_id: 0,
             payment: 0,
         }
-    }
-}
-
-#[zero_copy]
-#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Transmission {
-    pub answer: i128,
-    pub timestamp: u64,
-}
-
-#[account(zero_copy)]
-pub struct Transmissions {
-    pub latest_round_id: u32,
-    // Current offset
-    pub cursor: u32,
-    // 524_280 = approx. 10MB ~= 10485760 / 20
-    pub transmissions: [Transmission; 8192], // temporarily lowered for devnet
-}
-
-impl Transmissions {
-    pub fn store_round(&mut self, round: Transmission) {
-        self.latest_round_id += 1;
-        self.transmissions[self.cursor as usize] = round;
-        self.cursor = (self.cursor + 1) % self.transmissions.len() as u32;
-    }
-
-    pub fn fetch_round(&self, round_id: u32) -> Option<Transmission> {
-        if self.latest_round_id < round_id {
-            return None;
-        }
-
-        let diff = self.latest_round_id - round_id;
-
-        if diff as usize > self.transmissions.len() {
-            return None;
-        }
-
-        let diff = diff + 1; // + 1 because we're looking for the element before the cursor
-        let index = self
-            .cursor
-            .checked_sub(diff)
-            .unwrap_or_else(|| self.transmissions.len() as u32 - (diff - self.cursor));
-
-        let transmission = &self.transmissions[index as usize];
-        (transmission.timestamp != 0).then(|| *transmission)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn transmissions() {
-        let layout = std::alloc::Layout::new::<Transmissions>();
-        let mut data: Box<Transmissions> = unsafe {
-            let ptr = std::alloc::alloc_zeroed(layout).cast();
-            Box::from_raw(ptr)
-        };
-
-        // manipulate the data so that the first round is placed on the other end of the circular buffer
-        data.transmissions[8191] = Transmission {
-            answer: 1,
-            timestamp: 1,
-        };
-        data.latest_round_id += 1;
-
-        data.store_round(Transmission {
-            answer: 2,
-            timestamp: 2,
-        });
-        data.store_round(Transmission {
-            answer: 3,
-            timestamp: 3,
-        });
-
-        assert_eq!(
-            data.fetch_round(1),
-            Some(Transmission {
-                answer: 1,
-                timestamp: 1
-            })
-        );
-        assert_eq!(
-            data.fetch_round(2),
-            Some(Transmission {
-                answer: 2,
-                timestamp: 2
-            })
-        );
-        assert_eq!(
-            data.fetch_round(3),
-            Some(Transmission {
-                answer: 3,
-                timestamp: 3
-            })
-        );
     }
 }

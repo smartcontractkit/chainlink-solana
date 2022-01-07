@@ -12,7 +12,6 @@ import {
   Token,
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
-  u64,
 } from '@solana/spl-token';
 import { assert } from "chai";
 
@@ -27,9 +26,10 @@ let ethereumAddress = (publicKey: Buffer) => {
 };
 
 const Scope = {
-  LatestConfig: { latestConfig: {} },
-  LinkAvailableForPayment: { linkAvailableForPayment: {} },
-  LatestRoundData: { latestroundData: {} },
+  Version: { version: {} },
+  // RoundData: { roundData: { roundId } },
+  LatestRoundData: { latestRoundData: {} },
+  Aggregator: { aggregator: {} },
 };
 
 describe('ocr2', async () => {
@@ -39,7 +39,7 @@ describe('ocr2', async () => {
 
   const billingAccessController = Keypair.generate();
   const requesterAccessController = Keypair.generate();
-  const validator = Keypair.generate();
+  const store = Keypair.generate();
   const flaggingThreshold = 80000;
 
   const observationPayment = 1;
@@ -60,12 +60,12 @@ describe('ocr2', async () => {
   const minAnswer = 1;
   const maxAnswer = 1000;
 
+  const workspace = anchor.workspace;
   const program = anchor.workspace.Ocr2;
   const accessController = anchor.workspace.AccessController;
-  const deviationFlaggingValidator = anchor.workspace.DeviationFlaggingValidator;
 
   let token: Token, tokenClient: Token;
-  let validatorAuthority: PublicKey, validatorNonce: number;
+  let storeAuthority: PublicKey, storeNonce: number;
   let tokenVault: PublicKey, vaultAuthority: PublicKey, vaultNonce: number;
 
   let oracles = [];
@@ -117,13 +117,12 @@ describe('ocr2', async () => {
           { pubkey: state.publicKey, isWritable: true, isSigner: false },
           { pubkey: transmitter.publicKey, isWritable: false, isSigner: true },
           { pubkey: transmissions.publicKey, isWritable: true, isSigner: false },
-          { pubkey: deviationFlaggingValidator.programId, isWritable: false, isSigner: false },
-          { pubkey: account.config.validator, isWritable: true, isSigner: false },
-          { pubkey: validatorAuthority, isWritable: false, isSigner: false },
-          { pubkey: billingAccessController.publicKey, isWritable: false, isSigner: false }, // TODO: pass in a separate controller
+          { pubkey: workspace.Store.programId, isWritable: false, isSigner: false },
+          { pubkey: store.publicKey, isWritable: true, isSigner: false },
+          { pubkey: storeAuthority, isWritable: false, isSigner: false },
       ],
       data: Buffer.concat([
-          Buffer.from([validatorNonce]),
+          Buffer.from([storeNonce]),
           report_context,
           raw_report,
           Buffer.from(raw_signatures),
@@ -199,24 +198,19 @@ describe('ocr2', async () => {
     });
   });
 
-  it('Creates a validator', async () => {
-    [validatorAuthority, validatorNonce] = await PublicKey.findProgramAddress(
-      [Buffer.from(anchor.utils.bytes.utf8.encode("validator")), state.publicKey.toBuffer()],
-      program.programId
-    );
-
-    await deviationFlaggingValidator.rpc.initialize({
+  it('Creates a store', async () => {
+    await workspace.Store.rpc.initialize({
       accounts: {
-        state: validator.publicKey,
+        store: store.publicKey,
         owner: owner.publicKey,
-        raisingAccessController: billingAccessController.publicKey,
         loweringAccessController: billingAccessController.publicKey,
       },
-      signers: [validator],
+      signers: [store],
       preInstructions: [
-        await deviationFlaggingValidator.account.validator.createInstruction(validator),
+        await workspace.Store.account.store.createInstruction(store),
       ],
     });
+
   });
 
   it('Creates the token vault', async () => {
@@ -246,7 +240,46 @@ describe('ocr2', async () => {
     console.log("tokenVault", tokenVault.toBase58());
     console.log("vaultAuthority", vaultAuthority.toBase58());
     console.log("placeholder", placeholder.toBase58());
+    
+    // TODO: I wasn't able to build a createFeed instruction + createInstruction(transmissions) to do an atomic rpc.initialize call
+    // let createFeed = store.instruction.createFeed({
+    const granularity = 30;
+    const liveLength = 1024;
+    await workspace.Store.rpc.createFeed(
+      granularity,
+      liveLength,
+    {
+      accounts: {
+        store: store.publicKey,
+        feed: transmissions.publicKey,
+        authority: owner.publicKey,
+      },
+      signers: [transmissions],
+      preInstructions: [
+        await workspace.Store.account.transmissions.createInstruction(transmissions, 8+128+8096*24),
+      ],
+    });
+    // Program log: panicked at 'range end index 8 out of range for slice of length 0', store/src/lib.rs:476:10
 
+    // Configure threshold for the feed
+    await workspace.Store.rpc.setValidatorConfig(flaggingThreshold,
+      {
+        accounts: {
+          store: store.publicKey,
+          feed: transmissions.publicKey,
+          authority: owner.publicKey,
+        },
+        signers: [],
+    });
+
+    // store authority for our ocr2 config
+    [storeAuthority, storeNonce] = await PublicKey.findProgramAddress(
+      [Buffer.from(anchor.utils.bytes.utf8.encode("store")), state.publicKey.toBuffer()],
+      program.programId
+    );
+  });
+    
+  it('Initializes the OCR2 config', async () => {
     await program.rpc.initialize(vaultNonce, new BN(minAnswer), new BN(maxAnswer), decimals, description, {
       accounts: {
         state: state.publicKey,
@@ -263,10 +296,11 @@ describe('ocr2', async () => {
         tokenProgram: TOKEN_PROGRAM_ID,
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       },
-      signers: [state, transmissions],
+      signers: [state],
       preInstructions: [
         await program.account.state.createInstruction(state),
-        await program.account.transmissions.createInstruction(transmissions),
+        // await store.account.transmissions.createInstruction(transmissions, 8+128+8096*24),
+        // createFeed,
       ],
     });
 
@@ -296,7 +330,6 @@ describe('ocr2', async () => {
     }
     oracles = await Promise.all(futures);
 
-    const onchain_config = Buffer.from([1, 2, 3]);
     const offchain_config_version = 1;
     const offchain_config = Buffer.from([4, 5, 6]);
 
@@ -388,35 +421,32 @@ describe('ocr2', async () => {
     });
   });
 
-  it('Transmits a round with no validator set', async () => {
-    await transmit(1, 1)
+  it("Can't transmit a round if not the writer", async () => {
+    try {
+      await transmit(1, 1);
+      assert.fail("transmit() shouldn't have succeeded!");
+    } catch {
+      // transmit should fail
+    }
   });
 
-  it('Sets a validator', async () => {
-    await program.rpc.setValidatorConfig(flaggingThreshold,
+  it('Sets the cluster as the feed writer', async () => {
+    console.log("Adding cluster to feed");
+    await workspace.Store.rpc.setWriter(
+      storeAuthority,
       {
         accounts: {
-          state: state.publicKey,
+          store: store.publicKey,
+          feed: transmissions.publicKey,
           authority: owner.publicKey,
-          validator: validator.publicKey,
         },
-        signers: [],
-    });
-
-    // add the feed to the validator
-    console.log("Adding feed to validator access list");
-    await accessController.rpc.addAccess({
-      accounts: {
-        state: billingAccessController.publicKey,
-        owner: owner.publicKey,
-        address: validatorAuthority,
-      },
-      signers: [],
-    });
+      });
   });
 
   it('Transmits a round', async () => {
-    await transmit(1, 2)
+    await transmit(1, 2);
+    let feed = await provider.connection.getAccountInfo(transmissions.publicKey);
+    console.log(feed);
   });
 
   it('Withdraws funds', async () => {
@@ -486,12 +516,11 @@ describe('ocr2', async () => {
 
   it('Can call query', async () => {
     let buffer = Keypair.generate();
-    await program.rpc.query(
-      Scope.LatestConfig,
+    await workspace.Store.rpc.query(
+      Scope.Version,
       {
         accounts: {
-          state: state.publicKey,
-          transmissions: transmissions.publicKey,
+          feed: transmissions.publicKey,
           buffer: buffer.publicKey,
         },
         preInstructions: [
@@ -500,7 +529,7 @@ describe('ocr2', async () => {
             newAccountPubkey: buffer.publicKey,
             lamports: await provider.connection.getMinimumBalanceForRentExemption(256),
             space: 256,
-            programId: program.programId,
+            programId: workspace.Store.programId,
           })
         ],
         signers: [buffer]
@@ -508,7 +537,7 @@ describe('ocr2', async () => {
     );
 
     // let account = await program.account.latestConfig.fetch(buffer.publicKey);
-    let account = await program.account.latestConfig.fetch(buffer.publicKey);
+    let account = await workspace.Store.account.version.fetch(buffer.publicKey);
     console.log(account);
   });
 });

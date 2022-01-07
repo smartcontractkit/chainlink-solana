@@ -1,5 +1,5 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { PublicKey } from '@solana/web3.js'
@@ -29,9 +29,8 @@ export default class SetPayees extends SolanaCommand {
     const aggregator = rdd.contracts[this.flags.state]
     const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
     const operators = aggregatorOperators.map((operator) => ({
-      // TODO: Update to latest RDD
-      transmitter: rdd.operators[operator].nodeAddress[0],
-      payee: rdd.operators[operator].payeeAddress,
+      transmitter: rdd.operators[operator].ocrNodeAddress[0],
+      payee: rdd.operators[operator].adminAddress,
     }))
     return {
       operators,
@@ -43,6 +42,7 @@ export default class SetPayees extends SolanaCommand {
     super(flags, args)
 
     this.requireFlag('state', 'Provide a valid state address')
+    this.requireFlag('link', 'Provide a valid link address')
   }
 
   execute = async () => {
@@ -62,24 +62,29 @@ export default class SetPayees extends SolanaCommand {
       this.wallet.payer,
     )
 
-    const areValidPayees = (
-      await Promise.all(
-        input.operators.map(async ({ payee }) => {
-          try {
-            const info = await token.getAccountInfo(new PublicKey(payee))
-            return !!info.address
-          } catch (e) {
-            logger.error(`Payee with address ${payee} does not have a valid Token recipient address`)
-            return false
-          }
-        }),
-      )
-    ).every((isValid) => isValid)
+    this.flags.TESTING_ONLY_IGNORE_PAYEE_VALIDATION &&
+      logger.warn('TESTING_ONLY_IGNORE_PAYEE_VALIDATION flag is enabled')
 
-    this.require(
-      areValidPayees || !!input.allowFundRecipient,
-      'Every payee needs to have a valid token recipient address',
-    )
+    if (!this.flags.TESTING_ONLY_IGNORE_PAYEE_VALIDATION) {
+      const areValidPayees = (
+        await Promise.all(
+          input.operators.map(async ({ payee }) => {
+            try {
+              const info = await token.getAccountInfo(new PublicKey(payee))
+              return !!info.address
+            } catch (e) {
+              logger.error(`Payee with address ${payee} does not have a valid Token recipient address`)
+              return false
+            }
+          }),
+        )
+      ).every((isValid) => isValid)
+
+      this.require(
+        areValidPayees || !!input.allowFundRecipient,
+        'Every payee needs to have a valid token recipient address',
+      )
+    }
     const payeeByTransmitter = input.operators.reduce(
       (agg, operator) => ({
         ...agg,
@@ -93,7 +98,9 @@ export default class SetPayees extends SolanaCommand {
       .slice(0, info.oracles.len)
       .map(({ transmitter }) => payeeByTransmitter[new PublicKey(transmitter).toString()])
 
-    logger.loading('Setting payees...')
+    logger.log('Payees information:', input)
+    await prompt('Continue setting payees?')
+
     const tx = await program.rpc.setPayees(payees, {
       accounts: {
         state: state,

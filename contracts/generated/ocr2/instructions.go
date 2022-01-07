@@ -46,8 +46,6 @@ var (
 
 	Instruction_RequestNewRound = ag_binary.TypeID([8]byte{79, 230, 6, 173, 193, 109, 226, 61})
 
-	Instruction_SetValidatorConfig = ag_binary.TypeID([8]byte{87, 248, 224, 193, 17, 41, 80, 250})
-
 	Instruction_SetBillingAccessController = ag_binary.TypeID([8]byte{176, 167, 195, 39, 175, 182, 51, 23})
 
 	Instruction_SetBilling = ag_binary.TypeID([8]byte{58, 131, 213, 166, 230, 120, 88, 95})
@@ -90,8 +88,6 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "SetRequesterAccessController"
 	case Instruction_RequestNewRound:
 		return "RequestNewRound"
-	case Instruction_SetValidatorConfig:
-		return "SetValidatorConfig"
 	case Instruction_SetBillingAccessController:
 		return "SetBillingAccessController"
 	case Instruction_SetBilling:
@@ -158,9 +154,6 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"request_new_round", (*RequestNewRound)(nil),
-		},
-		{
-			"set_validator_config", (*SetValidatorConfig)(nil),
 		},
 		{
 			"set_billing_access_controller", (*SetBillingAccessController)(nil),

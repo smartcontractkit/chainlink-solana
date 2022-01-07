@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
@@ -17,38 +18,50 @@ import (
 //    48993	     35111 ns/op	   44373 B/op	     251 allocs/op
 // (13 Dec 2021)
 //    47331	     34285 ns/op	   41074 B/op	     235 allocs/op
+// (3 Jan 2022)
+//    6985	    162187 ns/op	  114802 B/op	    1506 allocs/op
+// (4 Jan 2022)
+//    9332	    166275 ns/op	  157078 B/op	    1590 allocs/op
 
-func BenchmarkMultichainMonitor(b *testing.B) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+func BenchmarkMultichainMonitorStatePath(b *testing.B) {
 	wg := &sync.WaitGroup{}
 	defer wg.Wait()
 
-	feed := generateFeedConfig()
-	feed.PollInterval = 0 // poll as quickly as possible.
-	cfg := Config{}
-	cfg.Feeds = []FeedConfig{feed}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cfg := config.Config{}
+	cfg.Solana.PollInterval = 0 // poll as quickly as possible.
+	cfg.Feeds.Feeds = []config.Feed{generateFeedConfig()}
 
 	transmissionSchema := fakeSchema{transmissionCodec}
-	stateSchema := fakeSchema{configSetCodec}
+	configSetSchema := fakeSchema{configSetCodec}
 	configSetSimplifiedSchema := fakeSchema{configSetCodec}
 
-	producer := fakeProducer{make(chan producerMessage)}
+	producer := fakeProducer{make(chan producerMessage), ctx}
 
 	transmissionReader := &fakeReader{make(chan interface{})}
 	stateReader := &fakeReader{make(chan interface{})}
 
 	monitor := NewMultiFeedMonitor(
+		cfg.Solana,
+		cfg.Feeds.Feeds,
+
 		logger.NewNullLogger(),
-		cfg,
 		transmissionReader, stateReader,
-		transmissionSchema, stateSchema, configSetSimplifiedSchema,
 		producer,
 		&devnullMetrics{},
+
+		cfg.Kafka.ConfigSetTopic,
+		cfg.Kafka.ConfigSetSimplifiedTopic,
+		cfg.Kafka.TransmissionTopic,
+
+		configSetSchema,
+		configSetSimplifiedSchema,
+		transmissionSchema,
 	)
 	go monitor.Start(ctx, wg)
 
-	transmission := generateTransmissionEnvelope()
 	state, err := generateStateEnvelope()
 	if err != nil {
 		b.Fatalf("failed to generate state: %v", err)
@@ -58,15 +71,78 @@ func BenchmarkMultichainMonitor(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		select {
-		case transmissionReader.readCh <- transmission:
 		case stateReader.readCh <- state:
 		case <-ctx.Done():
-			break
+			continue
 		}
 		select {
 		case <-producer.sendCh:
 		case <-ctx.Done():
-			break
+			continue
+		}
+	}
+}
+
+// Results:
+// goos: darwin
+// goarch: amd64
+// pkg: github.com/smartcontractkit/chainlink-solana/pkg/monitoring
+// cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
+// (4 Jan 2022)
+//    61338	     18841 ns/op	    6606 B/op	     137 allocs/op
+func BenchmarkMultichainMonitorTransmissionPath(b *testing.B) {
+	wg := &sync.WaitGroup{}
+	defer wg.Wait()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cfg := config.Config{}
+	cfg.Solana.PollInterval = 0 // poll as quickly as possible.
+	cfg.Feeds.Feeds = []config.Feed{generateFeedConfig()}
+
+	transmissionSchema := fakeSchema{transmissionCodec}
+	configSetSchema := fakeSchema{configSetCodec}
+	configSetSimplifiedSchema := fakeSchema{configSetCodec}
+
+	producer := fakeProducer{make(chan producerMessage), ctx}
+
+	transmissionReader := &fakeReader{make(chan interface{})}
+	stateReader := &fakeReader{make(chan interface{})}
+
+	monitor := NewMultiFeedMonitor(
+		cfg.Solana,
+		cfg.Feeds.Feeds,
+
+		logger.NewNullLogger(),
+		transmissionReader, stateReader,
+		producer,
+		&devnullMetrics{},
+
+		cfg.Kafka.ConfigSetTopic,
+		cfg.Kafka.ConfigSetSimplifiedTopic,
+		cfg.Kafka.TransmissionTopic,
+
+		configSetSchema,
+		configSetSimplifiedSchema,
+		transmissionSchema,
+	)
+	go monitor.Start(ctx, wg)
+
+	transmission := generateTransmissionEnvelope()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		select {
+		case transmissionReader.readCh <- transmission:
+		case <-ctx.Done():
+			continue
+		}
+		select {
+		case <-producer.sendCh:
+		case <-ctx.Done():
+			continue
 		}
 	}
 }

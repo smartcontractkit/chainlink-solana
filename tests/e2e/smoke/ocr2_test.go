@@ -18,7 +18,7 @@ var _ = Describe("Solana OCRv2", func() {
 		e              *environment.Environment
 		chainlinkNodes []client.Chainlink
 		cd             contracts.ContractDeployer
-		validator      contracts.OCRv2DeviationFlaggingValidator
+		store          contracts.OCRv2Store
 		billingAC      contracts.OCRv2AccessController
 		requesterAC    contracts.OCRv2AccessController
 		ocr2           contracts.OCRv2
@@ -71,22 +71,31 @@ var _ = Describe("Solana OCRv2", func() {
 			err = nets.Default.WaitForEvents()
 			Expect(err).ShouldNot(HaveOccurred())
 
-			validator, err = cd.DeployOCRv2DeviationFlaggingValidator(billingAC.Address())
+			store, err = cd.DeployOCRv2Store(billingAC.Address())
 			Expect(err).ShouldNot(HaveOccurred())
 			ocr2, err = cd.DeployOCRv2(billingAC.Address(), requesterAC.Address(), lt.Address())
 			Expect(err).ShouldNot(HaveOccurred())
 			err = nets.Default.WaitForEvents()
 			Expect(err).ShouldNot(HaveOccurred())
 
+			err = store.CreateFeed(10, 1024)
+			Expect(err).ShouldNot(HaveOccurred())
+
 			err = ocr2.SetBilling(uint32(1), uint32(1), billingAC.Address())
 			Expect(err).ShouldNot(HaveOccurred())
-			validatorAuth, err := ocr2.AuthorityAddr("validator")
+			storeAuth, err := ocr2.AuthorityAddr("store")
 			Expect(err).ShouldNot(HaveOccurred())
-			err = billingAC.AddAccess(validatorAuth)
+			err = billingAC.AddAccess(storeAuth)
 			Expect(err).ShouldNot(HaveOccurred())
 			err = ocr2.SetOracles(ocConfig)
 			Expect(err).ShouldNot(HaveOccurred())
+			err = nets.Default.WaitForEvents()
+			Expect(err).ShouldNot(HaveOccurred())
 
+			err = store.SetWriter(storeAuth)
+			Expect(err).ShouldNot(HaveOccurred())
+			err = store.SetValidatorConfig(80000)
+			Expect(err).ShouldNot(HaveOccurred())
 			err = nets.Default.WaitForEvents()
 			Expect(err).ShouldNot(HaveOccurred())
 
@@ -107,7 +116,7 @@ var _ = Describe("Solana OCRv2", func() {
 				nkb,
 				mockserver,
 				ocr2,
-				validator,
+				store,
 			)
 			Expect(err).ShouldNot(HaveOccurred())
 		})
@@ -118,7 +127,7 @@ var _ = Describe("Solana OCRv2", func() {
 			err = TriggerNewRound(mockserver, 1, 2, 10)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(func(g Gomega) {
-				a, err := ocr2.GetLatestRoundData()
+				a, err := store.GetLatestRoundData()
 				g.Expect(err).ShouldNot(HaveOccurred())
 				log.Debug().Interface("Answer", a).Msg("OCR Round answer")
 				g.Expect(a).Should(Equal(uint64(10)))

@@ -3,10 +3,10 @@ use anchor_lang::solana_program::sysvar;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{Mint, Token, TokenAccount, Transfer};
 
-use crate::state::{State, Transmissions};
+use crate::state::State;
 
 use access_controller::AccessController;
-use deviation_flagging_validator::{self as validator, Validator};
+use store::Transmissions;
 
 // NOTE: (has_one = name) is equivalent to a custom access_control
 
@@ -15,8 +15,7 @@ use deviation_flagging_validator::{self as validator, Validator};
 pub struct Initialize<'info> {
     #[account(zero)]
     pub state: AccountLoader<'info, State>,
-    #[account(zero)]
-    pub transmissions: AccountLoader<'info, Transmissions>,
+    pub transmissions: AccountInfo<'info>,
     pub payer: AccountInfo<'info>,
     pub owner: Signer<'info>,
 
@@ -69,14 +68,13 @@ pub struct Transmit<'info> {
     pub state: AccountLoader<'info, State>,
     pub transmitter: Signer<'info>,
     #[account(mut, address = state.load()?.transmissions)]
-    pub transmissions: AccountLoader<'info, Transmissions>,
+    pub transmissions: Account<'info, Transmissions>,
 
-    #[account(address = validator::ID)]
-    pub validator_program: AccountInfo<'info>,
-    #[account(address = state.load()?.config.validator)]
-    pub validator: AccountInfo<'info>,
-    pub validator_authority: AccountInfo<'info>,
-    pub validator_access_controller: AccountInfo<'info>,
+    #[account(address = store::ID)]
+    pub store_program: AccountInfo<'info>,
+    // #[account(address = state.load()?.config.store)]
+    pub store: AccountInfo<'info>,
+    pub store_authority: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]
@@ -94,15 +92,6 @@ pub struct RequestNewRound<'info> {
     pub state: AccountLoader<'info, State>,
     pub authority: Signer<'info>,
     pub access_controller: AccountLoader<'info, AccessController>,
-}
-
-#[derive(Accounts)]
-pub struct SetValidatorConfig<'info> {
-    #[account(mut)]
-    pub state: AccountLoader<'info, State>,
-    pub authority: Signer<'info>,
-    #[account(owner = validator::ID)] // TODO: allow setting Pubkey::default() to disable
-    pub validator: AccountLoader<'info, Validator>,
 }
 
 #[derive(Accounts)]
@@ -210,14 +199,4 @@ pub struct AcceptPayeeship<'info> {
     pub authority: Signer<'info>,
     pub transmitter: AccountInfo<'info>,
     pub proposed_payee: Account<'info, TokenAccount>,
-}
-
-#[derive(Accounts)]
-pub struct Query<'info> {
-    pub state: AccountLoader<'info, State>,
-    pub transmissions: AccountLoader<'info, Transmissions>,
-    // TODO: we could allow reusing query buffers if we also required an authority and marked the buffer with it.
-    // That way someone else couldn't hijack the buffer and use it instead.
-    #[account(zero)]
-    pub buffer: AccountInfo<'info>,
 }

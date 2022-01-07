@@ -23,4 +23,4 @@ test = "yarn run test"
 [programs.localnet]
 ocr2 = "CF13pnKGJ1WJZeEgVAtFdUi4MMndXm9hneiHs8azUaZt"
 access_controller = "2F5NEkMnCRkmahEAcQfTQcZv1xtGgrWFfjENtTwHLuKg"
-deviation_flagging_validator = "A7Jh2nb1hZHwqEofm4N8SXbKTj82rx7KUfjParQXUyMQ"
+store = "A7Jh2nb1hZHwqEofm4N8SXbKTj82rx7KUfjParQXUyMQ"

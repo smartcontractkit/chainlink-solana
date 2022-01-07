@@ -316,12 +316,15 @@
   resolved "https://registry.yarnpkg.com/@bcoe/v8-coverage/-/v8-coverage-0.2.3.tgz#75a2e8b51cb758a7553d6804a5932d7aace75c39"
   integrity sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==
 
-"@chainlink/gauntlet-core@0.0.6":
-  version "0.0.6"
-  resolved "https://registry.yarnpkg.com/@chainlink/gauntlet-core/-/gauntlet-core-0.0.6.tgz#81ccdb82e14cbe04d27b849f31303ddd2f1c4c69"
-  integrity sha512-mpUYEG8Q6qZXeoPQ4Eov1gfc2m4Yk9H6MqcMFLZgxMOs+3FEjZgyQ2FaWI30uFomSYX6qEsMLGTgbEvoIMCnew==
+"@chainlink/gauntlet-core@0.0.7":
+  version "0.0.7"
+  resolved "https://registry.yarnpkg.com/@chainlink/gauntlet-core/-/gauntlet-core-0.0.7.tgz#ecf407a712994bd487dd78911cfe6d51e2e1597d"
+  integrity sha512-20iTq9t8KlVKqhdRUte3dR9Q9lh3URvVIHjufg28dgHmMMNXDGF/iI8CseMyOLytTaHEv8wIlD/uVfLNG0eKfg==
   dependencies:
+    "@ethersproject/keccak256" "^5.5.0"
     axios "^0.24.0"
+    bn.js "^5.2.0"
+    protobufjs "^6.11.2"
 
 "@changesets/apply-release-plan@^5.0.2":
   version "5.0.2"
@@ -1420,7 +1423,7 @@ bn.js@^4.11.9:
   resolved "https://registry.yarnpkg.com/bn.js/-/bn.js-4.12.0.tgz#775b3f278efbb9718eec7361f483fb36fbbfea88"
   integrity sha512-c98Bf3tPniI+scsdk237ku1Dc3ujXQTSgyiPUDEOe7tRkhrqridvh8klBv0HCEso1OLOYcHuCv/cS6DNxKH+ZA==
 
-bn.js@^5.0.0, bn.js@^5.1.0, bn.js@^5.1.2:
+bn.js@^5.0.0, bn.js@^5.1.0, bn.js@^5.1.2, bn.js@^5.2.0:
   version "5.2.0"
   resolved "https://registry.yarnpkg.com/bn.js/-/bn.js-5.2.0.tgz#358860674396c6997771a9d051fcc1b57d4ae002"
   integrity sha512-D7iWRBvnZE8ecXiLj/9wbxH7Tk79fAh8IHaTNq1RWRixsS02W+5qS+iE9yq6RYl0asXx5tw0bLhmT5pIfbSquw==

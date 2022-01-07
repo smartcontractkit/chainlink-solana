@@ -25,39 +25,28 @@ func (c *ContractTracker) Transmit(
 		return errors.Wrap(err, "error on Transmit.GetRecentBlock")
 	}
 
-	// Determine validator authority
-	seeds := [][]byte{[]byte("validator"), c.StateID.Bytes()}
-	validatorAuthority, validatorNonce, err := solana.FindProgramAddress(seeds, c.ProgramID)
+	// Determine store authority
+	seeds := [][]byte{[]byte("store"), c.StateID.Bytes()}
+	storeAuthority, storeNonce, err := solana.FindProgramAddress(seeds, c.ProgramID)
 	if err != nil {
 		return errors.Wrap(err, "error on Transmit.FindProgramAddress")
 	}
 
-	// Resolve validator's access controller
-	var validator Validator
-	// only fetch state if validator is set
-	// contract skips validator parts if none is set
-	if (c.state.Config.Validator != solana.PublicKey{}) {
-		if err := c.client.rpc.GetAccountDataInto(ctx, c.state.Config.Validator, &validator); err != nil {
-			return errors.Wrap(err, "error on Transmit.GetAccountDataInto.Validator")
-		}
-	}
-
 	accounts := []*solana.AccountMeta{
-		// state, transmitter, transmissions, validator_program, validator, validator_authority, validator_access_controller
+		// state, transmitter, transmissions, store_program, store, store_authority
 		{PublicKey: c.StateID, IsWritable: true, IsSigner: false},
 		{PublicKey: c.Transmitter.PublicKey(), IsWritable: false, IsSigner: true},
 		{PublicKey: c.TransmissionsID, IsWritable: true, IsSigner: false},
-		{PublicKey: c.ValidatorProgramID, IsWritable: false, IsSigner: false},
-		{PublicKey: c.state.Config.Validator, IsWritable: true, IsSigner: false},
-		{PublicKey: validatorAuthority, IsWritable: false, IsSigner: false},
-		{PublicKey: validator.RaisingAccessController, IsWritable: false, IsSigner: false},
+		{PublicKey: c.StoreProgramID, IsWritable: false, IsSigner: false},
+		{PublicKey: c.store, IsWritable: true, IsSigner: false},
+		{PublicKey: storeAuthority, IsWritable: false, IsSigner: false},
 	}
 
 	reportContext := RawReportContext(reportCtx)
 
 	// Construct the instruction payload
-	data := new(bytes.Buffer) // validator_nonce || report_context || raw_report || raw_signatures
-	data.WriteByte(validatorNonce)
+	data := new(bytes.Buffer) // store_nonce || report_context || raw_report || raw_signatures
+	data.WriteByte(storeNonce)
 	data.Write(reportContext[0][:])
 	data.Write(reportContext[1][:])
 	data.Write(reportContext[2][:])
@@ -92,18 +81,20 @@ func (c *ContractTracker) Transmit(
 
 	// Send transaction, and wait for confirmation:
 	go func() {
-		if _, err := confirm.SendAndConfirmTransactionWithOpts(
+		txSig, err := confirm.SendAndConfirmTransactionWithOpts(
 			context.Background(), // does not use libocr transmit context
 			c.client.rpc,
 			c.client.ws,
 			tx,
 			true, // skip preflight
 			rpc.CommitmentConfirmed,
-		); err != nil {
+		)
+
+		if err != nil {
 			c.lggr.Errorf("error on Transmit.SendAndConfirmTransaction: %s", err.Error())
 		}
+		c.lggr.Debugf("tx signature from Transmit.SendAndConfirmTransaction: %s", txSig.String())
 	}()
-
 	return nil
 }
 

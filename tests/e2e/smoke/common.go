@@ -4,6 +4,11 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"math/big"
+	"sort"
+	"strings"
+	"time"
+
 	uuid "github.com/satori/go.uuid"
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/utils"
 	"github.com/smartcontractkit/helmenv/environment"
@@ -13,10 +18,6 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"golang.org/x/crypto/curve25519"
-	"math/big"
-	"sort"
-	"strings"
-	"time"
 )
 
 const (
@@ -132,13 +133,13 @@ func CreateOCR2Jobs(
 	nkb []NodeKeysBundle,
 	mockserver *client.MockserverClient,
 	ocr2 contracts.OCRv2,
-	validator contracts.OCRv2DeviationFlaggingValidator) error {
+	store contracts.OCRv2Store) error {
 	relayConfig := map[string]string{
-		"nodeEndpointRPC":    "http://sol:8899",
-		"nodeEndpointWS":     "ws://sol:8900",
-		"stateID":            ocr2.Address(),
-		"transmissionsID":    ocr2.TransmissionsAddr(),
-		"validatorProgramID": validator.ProgramAddress(),
+		"nodeEndpointHTTP": "http://sol:8899",
+		"nodeEndpointWS":   "ws://sol:8900",
+		"stateID":          ocr2.Address(),
+		"transmissionsID":  store.TransmissionsAddress(),
+		"storeProgramID":   store.ProgramAddress(),
 	}
 	bootstrapPeers := []client.P2PData{
 		{

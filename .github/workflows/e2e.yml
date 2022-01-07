@@ -92,4 +92,4 @@ jobs:
         uses: actions/upload-artifact@v2.2.4
         with:
           name: test-logs
-          path: ./logs
+          path: ./tests/e2e/smoke/logs

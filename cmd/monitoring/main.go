@@ -13,6 +13,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"go.uber.org/zap/zapcore"
 )
@@ -24,7 +25,7 @@ func main() {
 
 	log := logger.NewLogger(loggerConfig{})
 
-	cfg, err := monitoring.ParseConfig(bgCtx)
+	cfg, err := config.Parse()
 	if err != nil {
 		log.Fatalw("failed to parse configuration", "error", err)
 	}
@@ -51,41 +52,49 @@ func main() {
 	client := rpc.New(cfg.Solana.RPCEndpoint)
 
 	schemaRegistry := monitoring.NewSchemaRegistry(cfg.SchemaRegistry, log)
-	trSchema, err := schemaRegistry.EnsureSchema("transmission-value", monitoring.TransmissionAvroSchema)
-
+	transmissionSchema, err := schemaRegistry.EnsureSchema(cfg.Kafka.TransmissionTopic+"-value", monitoring.TransmissionAvroSchema)
 	if err != nil {
 		log.Fatalw("failed to prepare transmission schema", "error", err)
 	}
-	stSchema, err := schemaRegistry.EnsureSchema(cfg.Kafka.ConfigSetTopic+"-value", monitoring.ConfigSetAvroSchema)
+	configSetSchema, err := schemaRegistry.EnsureSchema(cfg.Kafka.ConfigSetTopic+"-value", monitoring.ConfigSetAvroSchema)
 	if err != nil {
 		log.Fatalf("failed to prepare config_set schema", "error", err)
 	}
-
-	csSimplifiedSchema, err := schemaRegistry.EnsureSchema(cfg.Kafka.ConfigSetSimplifiedTopic+"-value", monitoring.ConfigSetSimplifiedAvroSchema)
+	configSetSimplifiedSchema, err := schemaRegistry.EnsureSchema(cfg.Kafka.ConfigSetSimplifiedTopic+"-value", monitoring.ConfigSetSimplifiedAvroSchema)
 	if err != nil {
 		log.Fatalf("failed to prepare config_set_simplified schema", "error", err)
 	}
+
 	producer, err := monitoring.NewProducer(bgCtx, log.With("component", "producer"), cfg.Kafka)
 	if err != nil {
 		log.Fatalf("failed to create kafka producer", "error", err)
 	}
 
-	var trReader, stReader monitoring.AccountReader
-	if testMode, envVarPresent := os.LookupEnv("TEST_MODE"); envVarPresent && testMode == "enabled" {
-		trReader = monitoring.NewRandomDataReader(bgCtx, wg, "transmission", log.With("component", "rand-reader", "account", "transmissions"))
-		stReader = monitoring.NewRandomDataReader(bgCtx, wg, "state", log.With("component", "rand-reader", "account", "state"))
+	var transmissionReader, stateReader monitoring.AccountReader
+	if cfg.Feature.TestMode {
+		transmissionReader = monitoring.NewRandomDataReader(bgCtx, wg, "transmission", log.With("component", "rand-reader", "account", "transmissions"))
+		stateReader = monitoring.NewRandomDataReader(bgCtx, wg, "state", log.With("component", "rand-reader", "account", "state"))
 	} else {
-		trReader = monitoring.NewTransmissionReader(client)
-		stReader = monitoring.NewStateReader(client)
+		transmissionReader = monitoring.NewTransmissionReader(client)
+		stateReader = monitoring.NewStateReader(client)
 	}
 
 	monitor := monitoring.NewMultiFeedMonitor(
+		cfg.Solana,
+		cfg.Feeds.Feeds,
+
 		log,
-		cfg,
-		trReader, stReader,
-		trSchema, stSchema, csSimplifiedSchema,
+		transmissionReader, stateReader,
 		producer,
 		monitoring.DefaultMetrics,
+
+		cfg.Kafka.ConfigSetTopic,
+		cfg.Kafka.ConfigSetSimplifiedTopic,
+		cfg.Kafka.TransmissionTopic,
+
+		configSetSchema,
+		configSetSimplifiedSchema,
+		transmissionSchema,
 	)
 	wg.Add(1)
 	go func() {

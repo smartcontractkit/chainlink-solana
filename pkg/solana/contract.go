@@ -1,8 +1,10 @@
 package solana
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 
@@ -25,16 +27,17 @@ var (
 
 type ContractTracker struct {
 	// on-chain program + 2x state accounts (state + transmissions)
-	ProgramID          solana.PublicKey
-	StateID            solana.PublicKey
-	TransmissionsID    solana.PublicKey
-	ValidatorProgramID solana.PublicKey
+	ProgramID       solana.PublicKey
+	StateID         solana.PublicKey
+	TransmissionsID solana.PublicKey
+	StoreProgramID  solana.PublicKey
 
 	// private key for the transmission signing
 	Transmitter TransmissionSigner
 
 	// tracked contract state
 	state  State
+	store  solana.PublicKey
 	answer Answer
 
 	// dependencies
@@ -47,14 +50,14 @@ type ContractTracker struct {
 
 func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, lggr Logger) ContractTracker {
 	return ContractTracker{
-		ProgramID:          spec.ProgramID,
-		StateID:            spec.StateID,
-		ValidatorProgramID: spec.ValidatorProgramID,
-		TransmissionsID:    spec.TransmissionsID,
-		Transmitter:        transmitter,
-		client:             client,
-		lggr:               lggr,
-		requestGroup:       &singleflight.Group{},
+		ProgramID:       spec.ProgramID,
+		StateID:         spec.StateID,
+		StoreProgramID:  spec.StoreProgramID,
+		TransmissionsID: spec.TransmissionsID,
+		Transmitter:     transmitter,
+		client:          client,
+		lggr:            lggr,
+		requestGroup:    &singleflight.Group{},
 	}
 }
 
@@ -72,9 +75,26 @@ func (c *ContractTracker) fetchState(ctx context.Context) error {
 		return err
 	}
 
-	c.lggr.Debugf("state fetched for account: %s, shared: %t, result: %v", c.StateID, shared, v)
-
 	c.state = v.(State)
+	c.lggr.Debugf("state fetched for account: %s, shared: %t, result (config digest): %v", c.StateID, shared, hex.EncodeToString(c.state.Config.LatestConfigDigest[:]))
+
+	// Fetch the store address associated to the feed
+	offset := uint64(8 + 1) // Discriminator (8 bytes) + Version (u8)
+	length := uint64(solana.PublicKeyLength)
+	res, err := c.client.rpc.GetAccountInfoWithOpts(ctx, c.state.Transmissions, &rpc.GetAccountInfoOpts{
+		Encoding:   "base64",
+		Commitment: rpcCommitment,
+		DataSlice: &rpc.DataSlice{
+			Offset: &offset,
+			Length: &length,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	c.store = solana.PublicKeyFromBytes(res.Value.Data.GetBinary())
+	c.lggr.Debugf("store fetched for feed: %s", c.store)
+
 	return nil
 }
 
@@ -121,8 +141,8 @@ func GetState(ctx context.Context, client *rpc.Client, account solana.PublicKey)
 }
 
 func GetLatestTransmission(ctx context.Context, client *rpc.Client, account solana.PublicKey) (Answer, uint64, error) {
-	cursorOffset := CursorOffset
-	cursorLen := CursorLen
+	offset := CursorOffset
+	length := CursorLen * 2
 	transmissionLen := TransmissionLen
 
 	// query for cursor
@@ -130,27 +150,37 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 		Encoding:   "base64",
 		Commitment: rpcCommitment,
 		DataSlice: &rpc.DataSlice{
-			Offset: &cursorOffset,
-			Length: &cursorLen,
+			Offset: &offset,
+			Length: &length,
 		},
 	})
 	if err != nil {
 		return Answer{}, 0, errors.Wrap(err, "error on rpc.GetAccountInfo [cursor]")
 	}
 
-	// parse little endian cursor value
+	// parse little endian length & cursor
 	c := res.Value.Data.GetBinary()
-	if len(c) != int(cursorLen) { // validate length
+	buf := bytes.NewReader(c)
+
+	var cursor uint32
+	var liveLength uint32
+	err = binary.Read(buf, binary.LittleEndian, &liveLength)
+	if err != nil {
 		return Answer{}, 0, errCursorLength
 	}
-	cursor := binary.LittleEndian.Uint32(c)
+	err = binary.Read(buf, binary.LittleEndian, &cursor)
+	if err != nil {
+		return Answer{}, 0, errCursorLength
+	}
+
 	if cursor == 0 { // handle array wrap
-		cursor = TransmissionsSize
+		cursor = liveLength
 	}
 	cursor-- // cursor indicates index for new answer, latest answer is in previous index
 
 	// fetch transmission
-	var transmissionOffset uint64 = CursorOffset + CursorLen + (uint64(cursor) * transmissionLen)
+	var transmissionOffset uint64 = 8 + 128 + (uint64(cursor) * transmissionLen)
+
 	res, err = client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
 		Commitment: rpcCommitment,
@@ -168,13 +198,27 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 		return Answer{}, 0, errTransmissionLength
 	}
 
+	var timestamp uint64
+	raw := make([]byte, 16)
+
+	buf = bytes.NewReader(t)
+	err = binary.Read(buf, binary.LittleEndian, &timestamp)
+	if err != nil {
+		return Answer{}, 0, err
+	}
+
+	// TODO: we could use ag_binary.Int128 instead
+	err = binary.Read(buf, binary.LittleEndian, &raw)
+	if err != nil {
+		return Answer{}, 0, err
+	}
 	// reverse slice to change from little endian to big endian
-	for i, j := 0, len(t)-1; i < j; i, j = i+1, j-1 {
-		t[i], t[j] = t[j], t[i]
+	for i, j := 0, len(raw)-1; i < j; i, j = i+1, j-1 {
+		raw[i], raw[j] = raw[j], raw[i]
 	}
 
 	return Answer{
-		Data:      big.NewInt(0).SetBytes(t[TimestampLen:]),
-		Timestamp: binary.BigEndian.Uint64(t[:TimestampLen]),
+		Data:      big.NewInt(0).SetBytes(raw[:]),
+		Timestamp: timestamp,
 	}, res.RPCContext.Context.Slot, nil
 }

@@ -13,6 +13,7 @@ import (
 	gbinary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/linkedin/goavro"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/pb"
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -55,16 +56,18 @@ func generateOffchainConfig(oracles [19]pkgSolana.Oracle, numOracles int) (
 		peerIDs = append(peerIDs, fmt.Sprintf("peer#%d", i))
 	}
 	config := &pb.OffchainConfigProto{
-		DeltaProgressNanoseconds:          rand.Uint64(),
-		DeltaResendNanoseconds:            rand.Uint64(),
-		DeltaRoundNanoseconds:             rand.Uint64(),
-		DeltaGraceNanoseconds:             rand.Uint64(),
-		DeltaStageNanoseconds:             rand.Uint64(),
-		RMax:                              rand.Uint32(),
-		S:                                 schedule,
-		OffchainPublicKeys:                offchainPublicKeys,
-		PeerIds:                           peerIDs,
-		ReportingPluginConfig:             encodedNumericalMedianOffchainConfig,
+		DeltaProgressNanoseconds: rand.Uint64(),
+		DeltaResendNanoseconds:   rand.Uint64(),
+		DeltaRoundNanoseconds:    rand.Uint64(),
+		DeltaGraceNanoseconds:    rand.Uint64(),
+		DeltaStageNanoseconds:    rand.Uint64(),
+
+		RMax:                  rand.Uint32(),
+		S:                     schedule,
+		OffchainPublicKeys:    offchainPublicKeys,
+		PeerIds:               peerIDs,
+		ReportingPluginConfig: encodedNumericalMedianOffchainConfig,
+
 		MaxDurationQueryNanoseconds:       rand.Uint64(),
 		MaxDurationObservationNanoseconds: rand.Uint64(),
 		MaxDurationReportNanoseconds:      rand.Uint64(),
@@ -149,8 +152,6 @@ func generateState() (
 			Billing: pkgSolana.Billing{
 				ObservationPayment: rand.Uint32(),
 			},
-			Validator:         generatePublicKey(),
-			FlaggingThreshold: rand.Uint32(),
 			OffchainConfig: pkgSolana.OffchainConfig{
 				Version: rand.Uint64(),
 				Raw:     enlargedOffchainConfig,
@@ -170,19 +171,21 @@ func generateState() (
 	return state, offchainConfig, numericalMedianConfig, nil
 }
 
-func generateSolanaConfig() SolanaConfig {
-	return SolanaConfig{
-		RPCEndpoint: "http://solana:6969",
-		NetworkName: "solana-mainnet-beta",
-		NetworkID:   "1",
-		ChainID:     "solana-mainnet-beta",
+func generateSolanaConfig() config.Solana {
+	return config.Solana{
+		RPCEndpoint:  "http://solana:6969",
+		NetworkName:  "solana-mainnet-beta",
+		NetworkID:    "1",
+		ChainID:      "solana-mainnet-beta",
+		ReadTimeout:  100 * time.Millisecond,
+		PollInterval: time.Duration(1+rand.Intn(5)) * time.Second,
 	}
 }
 
-func generateFeedConfig() FeedConfig {
+func generateFeedConfig() config.Feed {
 	coins := []string{"btc", "eth", "matic", "link", "avax", "ftt", "srm", "usdc", "sol", "ray"}
 	coin := coins[rand.Intn(len(coins))]
-	return FeedConfig{
+	return config.Feed{
 		FeedName:       fmt.Sprintf("%s / usd", coin),
 		FeedPath:       fmt.Sprintf("%s-usd", coin),
 		Symbol:         "$",
@@ -193,8 +196,6 @@ func generateFeedConfig() FeedConfig {
 		ContractAddress:      generatePublicKey(),
 		TransmissionsAccount: generatePublicKey(),
 		StateAccount:         generatePublicKey(),
-
-		PollInterval: time.Duration(1+rand.Intn(5)) * time.Second,
 	}
 }
 
@@ -264,7 +265,11 @@ func NewRandomDataReader(ctx context.Context, wg *sync.WaitGroup, typ string, lo
 }
 
 func (f *fakeReader) Read(ctx context.Context, _ solana.PublicKey) (interface{}, error) {
-	ans := <-f.readCh
+	var ans interface{}
+	select {
+	case ans = <-f.readCh:
+	case <-ctx.Done():
+	}
 	return ans, nil
 }
 
@@ -288,7 +293,7 @@ func (f *fakeReader) runRandomDataGenerator(ctx context.Context, typ string, log
 		}
 		select {
 		case f.readCh <- payload:
-			log.Infof("sent payload of type %s", typ)
+			log.Infof("generate data for account of type %s", typ)
 		case <-ctx.Done():
 			return
 		}
@@ -299,15 +304,31 @@ type producerMessage struct{ key, value []byte }
 
 type fakeProducer struct {
 	sendCh chan producerMessage
+	ctx    context.Context
 }
 
 func (f fakeProducer) Produce(key, value []byte, topic string) error {
-	f.sendCh <- producerMessage{key, value}
+	select {
+	case f.sendCh <- producerMessage{key, value}:
+	case <-f.ctx.Done():
+	}
 	return nil
 }
 
 type fakeSchema struct {
 	codec *goavro.Codec
+}
+
+func (f fakeSchema) ID() int {
+	return 1
+}
+
+func (f fakeSchema) Version() int {
+	return 1
+}
+
+func (f fakeSchema) Subject() string {
+	return "n/a"
 }
 
 func (f fakeSchema) Encode(value interface{}) ([]byte, error) {
@@ -326,22 +347,40 @@ var _ Metrics = (*devnullMetrics)(nil)
 func (d *devnullMetrics) SetHeadTrackerCurrentHead(blockNumber uint64, networkName, chainID, networkID string) {
 }
 
-func (d *devnullMetrics) SetFeedContractMetadata(chainID, contractAddress, contractStatus, contractType, feedName, feedPath, networkID, networkName, symbol string) {
+func (d *devnullMetrics) SetFeedContractMetadata(chainID, contractAddress, feedID, contractStatus, contractType, feedName, feedPath, networkID, networkName, symbol string) {
 }
 
 func (d *devnullMetrics) SetNodeMetadata(chainID, networkID, networkName, oracleName, sender string) {
 }
 
-func (d *devnullMetrics) SetOffchainAggregatorAnswers(answer *big.Int, contractAddress, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string) {
+func (d *devnullMetrics) SetOffchainAggregatorAnswers(answer *big.Int, contractAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string) {
 }
 
-func (d *devnullMetrics) IncOffchainAggregatorAnswersTotal(contractAddress, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string) {
+func (d *devnullMetrics) IncOffchainAggregatorAnswersTotal(contractAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string) {
 }
 
-func (d *devnullMetrics) SetOffchainAggregatorSubmissionReceivedValues(value *big.Int, contractAddress, sender, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string) {
+func (d *devnullMetrics) SetOffchainAggregatorSubmissionReceivedValues(value *big.Int, contractAddress, feedID, sender, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string) {
 }
 
-func (d *devnullMetrics) SetOffchainAggregatorAnswerStalled(isSet bool, contractAddress, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string) {
+func (d *devnullMetrics) SetOffchainAggregatorAnswerStalled(isSet bool, contractAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string) {
+}
+
+type keepLatestMetrics struct {
+	*devnullMetrics
+
+	latestTransmission *big.Int
+	latestTransmitter  string
+}
+
+func (k *keepLatestMetrics) SetOffchainAggregatorAnswers(answer *big.Int, contractAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string) {
+	k.latestTransmission = &big.Int{}
+	k.latestTransmission.Set(answer)
+}
+
+func (k *keepLatestMetrics) SetOffchainAggregatorSubmissionReceivedValues(value *big.Int, contractAddress, feedID, sender, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string) {
+	k.latestTransmission = &big.Int{}
+	k.latestTransmission.Set(value)
+	k.latestTransmitter = sender
 }
 
 // This utilities are used primarely in tests but are present in the monitoring package because they are not inside a file ending in _test.go.
@@ -352,4 +391,5 @@ var (
 	_ = generateFeedConfig
 	_ = fakeProducer{}
 	_ = fakeSchema{}
+	_ = keepLatestMetrics{}
 )

@@ -1,12 +1,9 @@
-import { Result, WriteResponse } from '@chainlink/gauntlet-core'
+import { Result, WriteResponse, BN } from '@chainlink/gauntlet-core'
 import { TransactionResponse, SolanaCommand, RawTransaction } from '@chainlink/gauntlet-solana'
-import { io } from '@chainlink/gauntlet-core/dist/utils'
-import { join } from 'path'
 
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
-import { AccountMeta, PublicKey, SYSVAR_RENT_PUBKEY, Account, Keypair } from '@solana/web3.js'
-import { CONTRACT_LIST, getContract } from '../../../gauntlet-solana-contracts/dist/lib/contracts'
-import BN from 'bn.js'
+import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair } from '@solana/web3.js'
+import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
 
 // enum ACTIONS {
 //   create = 'create',
