@@ -173,7 +173,6 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 		return Answer{}, 0, errCursorLength
 	}
 
-	fmt.Printf("%v %v\n", cursor, liveLength)
 	if cursor == 0 { // handle array wrap
 		cursor = liveLength
 	}
