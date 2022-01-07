@@ -79,23 +79,23 @@ type Scope interface {
 
 type scopeContainer struct {
 	Enum            ag_binary.BorshEnum `borsh_enum:"true"`
-	Version         Version
+	Version         Version_
 	RoundData       RoundData
 	LatestRoundData LatestRoundData
 	Aggregator      Aggregator
 }
 
-type Version uint8
+type Version_ uint8
 
-func (obj Version) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj Version_) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 
-func (obj *Version) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *Version_) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	return nil
 }
 
-func (_ *Version) isScope() {}
+func (_ *Version_) isScope() {}
 
 type RoundData struct {
 	RoundId uint32
