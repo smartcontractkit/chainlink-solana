@@ -75,5 +75,8 @@ type Http struct {
 }
 
 type Feature struct {
-	TestMode bool
+	// If set, the monitor will not read from a chain instead from a source of random state snapshots.
+	TestOnlyFakeReaders bool
+	// If set, the monitor will not read from the RDD, instead it will get data from a local source of random feeds configurations.
+	TestOnlyFakeRdd bool
 }

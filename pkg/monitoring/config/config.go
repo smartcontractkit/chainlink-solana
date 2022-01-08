@@ -118,12 +118,19 @@ func parseEnvVars(cfg *Config) error {
 		cfg.Http.Address = value
 	}
 
-	if value, isPresent := os.LookupEnv("FEATURE_TEST_MODE"); isPresent {
+	if value, isPresent := os.LookupEnv("FEATURE_TEST_ONLY_FAKE_READERS"); isPresent {
 		isTestMode, err := strconv.ParseBool(value)
 		if err != nil {
-			return fmt.Errorf("failed to parse boolean env var '%s'. See https://pkg.go.dev/strconv#ParseBool", "FEATURE_TEST_MODE")
+			return fmt.Errorf("failed to parse boolean env var '%s'. See https://pkg.go.dev/strconv#ParseBool", "FEATURE_TEST_ONLY_FAKE_READERS")
 		}
-		cfg.Feature.TestMode = isTestMode
+		cfg.Feature.TestOnlyFakeReaders = isTestMode
+	}
+	if value, isPresent := os.LookupEnv("FEATURE_TEST_ONLY_FAKE_RDD"); isPresent {
+		isTestMode, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("failed to parse boolean env var '%s'. See https://pkg.go.dev/strconv#ParseBool", "FEATURE_TEST_ONLY_FAKE_RDD")
+		}
+		cfg.Feature.TestOnlyFakeRdd = isTestMode
 	}
 
 	return nil
