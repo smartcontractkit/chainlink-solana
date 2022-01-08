@@ -9,12 +9,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Manager restarts the multi feed monitor with a new list of feeds whenever something changed.
+// Manager restarts the managed function with a new list of updates whenever something changed.
 type Manager interface {
-	Start(ctx context.Context, wg *sync.WaitGroup, callback ManagerCallback)
+	Start(backgroundCtx context.Context, backgroundWg *sync.WaitGroup, managed ManagedFunc)
 }
 
-type ManagerCallback func(ctx context.Context, wg *sync.WaitGroup, feeds []config.Feed)
+type ManagedFunc func(localCtx context.Context, localWg *sync.WaitGroup, feeds []config.Feed)
 
 func NewManager(
 	log logger.Logger,
@@ -36,10 +36,10 @@ type managerImpl struct {
 	currentFeedsMu sync.Mutex
 }
 
-func (m *managerImpl) Start(ctx context.Context, _ *sync.WaitGroup, callback ManagerCallback) {
-	localCtx, localCtxCancel := context.WithCancel(ctx)
-	defer localCtxCancel()
-	localWg := new(sync.WaitGroup)
+func (m *managerImpl) Start(backgroundCtx context.Context, backgroundWg *sync.WaitGroup, managed ManagedFunc) {
+	var localCtx context.Context
+	var localCtxCancel context.CancelFunc
+	var localWg *sync.WaitGroup
 	for {
 		select {
 		case rawUpdatedFeeds := <-m.rddPoller.Updates():
@@ -60,19 +60,28 @@ func (m *managerImpl) Start(ctx context.Context, _ *sync.WaitGroup, callback Man
 			if !shouldRestartMonitor {
 				continue
 			}
-			// Terminate previous callback.
-			localCtxCancel()
-			localWg.Wait()
-
-			// Start new callback.
-			localCtx, localCtxCancel = context.WithCancel(ctx)
+			m.log.Infow("change in feeds configuration detected", "feeds", updatedFeeds)
+			// Terminate previous managed function if not the first run.
+			if localCtxCancel != nil && localWg != nil {
+				localCtxCancel()
+				localWg.Wait()
+			}
+			// Start new managed function
+			localCtx, localCtxCancel = context.WithCancel(backgroundCtx)
 			localWg = new(sync.WaitGroup)
-			localWg.Add(1)
+			backgroundWg.Add(1)
 			go func() {
-				defer localWg.Done()
-				callback(localCtx, localWg, updatedFeeds)
+				defer backgroundWg.Done()
+				managed(localCtx, localWg, updatedFeeds)
 			}()
-		case <-ctx.Done():
+		case <-backgroundCtx.Done():
+			if localCtxCancel != nil {
+				localCtxCancel()
+			}
+			if localWg != nil {
+				localWg.Wait()
+			}
+			m.log.Info("manager closed")
 			return
 		}
 	}
@@ -80,5 +89,5 @@ func (m *managerImpl) Start(ctx context.Context, _ *sync.WaitGroup, callback Man
 
 // isDifferentFeeds checks whether there is a difference between the current list of feeds and the new feeds - Manager
 func isDifferentFeeds(current, updated []config.Feed) bool {
-	return assert.ObjectsAreEqual(current, updated)
+	return !assert.ObjectsAreEqual(current, updated)
 }

@@ -404,6 +404,27 @@ func (f *fakeRddSource) Fetch(_ context.Context) (interface{}, error) {
 	return feeds, nil
 }
 
+type fakePoller struct {
+	numUpdates int
+	ch         chan interface{}
+}
+
+func (f *fakePoller) Start(ctx context.Context) {
+	source := &fakeRddSource{1, 2}
+	for i := 0; i < f.numUpdates; i++ {
+		updates, _ := source.Fetch(ctx)
+		select {
+		case f.ch <- updates:
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (f *fakePoller) Updates() <-chan interface{} {
+	return f.ch
+}
+
 // This utilities are used primarely in tests but are present in the monitoring package because they are not inside a file ending in _test.go.
 // This is done in order to expose NewRandomDataReader for use in cmd/monitoring.
 // The following code is added to comply with the "unused" linter:
