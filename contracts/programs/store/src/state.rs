@@ -1,9 +1,11 @@
 use anchor_lang::prelude::*;
 use arrayvec::arrayvec;
 
+const MAX_FLAGS: usize = 128;
+
 #[zero_copy]
 pub struct Flags {
-    xs: [Pubkey; 128], // sadly we can't use const https://github.com/project-serum/anchor/issues/632
+    xs: [Pubkey; MAX_FLAGS],
     len: u64,
 }
 
