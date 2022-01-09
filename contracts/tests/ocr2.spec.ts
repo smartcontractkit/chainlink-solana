@@ -599,4 +599,53 @@ describe('ocr2', async () => {
       assert.ok(account.answer.toNumber() == i)
     }
   });
+
+  it("Reclaims rent exempt deposit when closing down a feed", async () => {
+   let beforeBalance = (
+      await provider.connection.getAccountInfo(provider.wallet.publicKey)
+    ).lamports;
+
+    await workspace.Store.rpc.closeFeed({
+      accounts: {
+        store: store.publicKey,
+        feed: transmissions.publicKey,
+        receiver: provider.wallet.publicKey,
+        authority: owner.publicKey,
+      },
+    });
+
+    let afterBalance = (
+      await provider.connection.getAccountInfo(provider.wallet.publicKey)
+    ).lamports;
+
+    // Retrieved rent exemption sol.
+    assert.ok(afterBalance > beforeBalance);
+
+    const closedAccount = await provider.connection.getAccountInfo(transmissions.publicKey);
+    assert.ok(closedAccount === null);
+  });
+
+  it("Reclaims rent exempt deposit when closing down an aggregator", async () => {
+   let beforeBalance = (
+      await provider.connection.getAccountInfo(provider.wallet.publicKey)
+    ).lamports;
+
+    await program.rpc.close({
+      accounts: {
+        state: state.publicKey,
+        receiver: provider.wallet.publicKey,
+        authority: owner.publicKey,
+      },
+    });
+
+    let afterBalance = (
+      await provider.connection.getAccountInfo(provider.wallet.publicKey)
+    ).lamports;
+
+    // Retrieved rent exemption sol.
+    assert.ok(afterBalance > beforeBalance);
+
+    const closedAccount = await provider.connection.getAccountInfo(transmissions.publicKey);
+    assert.ok(closedAccount === null);
+  });
 });
