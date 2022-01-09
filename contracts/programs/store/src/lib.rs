@@ -88,6 +88,18 @@ pub mod store {
     }
 
     #[access_control(owner(&ctx.accounts.store, &ctx.accounts.authority))]
+    pub fn close_feed(ctx: Context<CloseFeed>) -> ProgramResult {
+        // Check that the feed is owned by the store
+        require!(
+            ctx.accounts.store.key() == ctx.accounts.feed.store,
+            Unauthorized
+        );
+
+        // NOTE: Close is handled by anchor on exit due to the `close` attribute
+        Ok(())
+    }
+
+    #[access_control(owner(&ctx.accounts.store, &ctx.accounts.authority))]
     pub fn set_validator_config(
         ctx: Context<SetValidatorConfig>,
         flagging_threshold: u32,
@@ -358,6 +370,16 @@ pub struct CreateFeed<'info> {
     pub store: AccountLoader<'info, Store>,
     #[account(zero)]
     pub feed: Account<'info, Transmissions>,
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct CloseFeed<'info> {
+    pub store: AccountLoader<'info, Store>,
+    #[account(mut, close = receiver)]
+    pub feed: Account<'info, Transmissions>,
+    #[account(mut)]
+    pub receiver: SystemAccount<'info>,
     pub authority: Signer<'info>,
 }
 
