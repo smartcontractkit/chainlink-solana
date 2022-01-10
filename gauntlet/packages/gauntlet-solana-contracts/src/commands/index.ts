@@ -4,5 +4,4 @@ import Token from './contracts/token'
 import Validator from './contracts/store'
 import Multisig from './contracts/multisig'
 
-
 export default [...AccessController, ...OCR2, ...Token, ...Validator, ...Multisig]
