@@ -69,9 +69,9 @@ func (m *managerImpl) Start(backgroundCtx context.Context, backgroundWg *sync.Wa
 			// Start new managed function
 			localCtx, localCtxCancel = context.WithCancel(backgroundCtx)
 			localWg = new(sync.WaitGroup)
-			backgroundWg.Add(1)
+			localWg.Add(1)
 			go func() {
-				defer backgroundWg.Done()
+				defer localWg.Done()
 				managed(localCtx, localWg, updatedFeeds)
 			}()
 		case <-backgroundCtx.Done():

@@ -50,7 +50,6 @@ func TestManager(t *testing.T) {
 					atomic.AddInt64(&goRoutineCounter, -1)
 				}(i, ctx)
 			}
-			localWg.Wait()
 		}
 		wg.Add(1)
 		go func() {
