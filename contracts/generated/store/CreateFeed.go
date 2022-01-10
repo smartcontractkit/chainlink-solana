@@ -12,6 +12,8 @@ import (
 
 // CreateFeed is the `createFeed` instruction.
 type CreateFeed struct {
+	Description *string
+	Decimals    *uint8
 	Granularity *uint8
 	LiveLength  *uint32
 
@@ -29,6 +31,18 @@ func NewCreateFeedInstructionBuilder() *CreateFeed {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
+}
+
+// SetDescription sets the "description" parameter.
+func (inst *CreateFeed) SetDescription(description string) *CreateFeed {
+	inst.Description = &description
+	return inst
+}
+
+// SetDecimals sets the "decimals" parameter.
+func (inst *CreateFeed) SetDecimals(decimals uint8) *CreateFeed {
+	inst.Decimals = &decimals
+	return inst
 }
 
 // SetGranularity sets the "granularity" parameter.
@@ -96,6 +110,12 @@ func (inst CreateFeed) ValidateAndBuild() (*Instruction, error) {
 func (inst *CreateFeed) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
+		if inst.Description == nil {
+			return errors.New("Description parameter is not set")
+		}
+		if inst.Decimals == nil {
+			return errors.New("Decimals parameter is not set")
+		}
 		if inst.Granularity == nil {
 			return errors.New("Granularity parameter is not set")
 		}
@@ -128,7 +148,9 @@ func (inst *CreateFeed) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("Description", *inst.Description))
+						paramsBranch.Child(ag_format.Param("   Decimals", *inst.Decimals))
 						paramsBranch.Child(ag_format.Param("Granularity", *inst.Granularity))
 						paramsBranch.Child(ag_format.Param(" LiveLength", *inst.LiveLength))
 					})
@@ -144,6 +166,16 @@ func (inst *CreateFeed) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj CreateFeed) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Description` param:
+	err = encoder.Encode(obj.Description)
+	if err != nil {
+		return err
+	}
+	// Serialize `Decimals` param:
+	err = encoder.Encode(obj.Decimals)
+	if err != nil {
+		return err
+	}
 	// Serialize `Granularity` param:
 	err = encoder.Encode(obj.Granularity)
 	if err != nil {
@@ -157,6 +189,16 @@ func (obj CreateFeed) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	return nil
 }
 func (obj *CreateFeed) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Description`:
+	err = decoder.Decode(&obj.Description)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Decimals`:
+	err = decoder.Decode(&obj.Decimals)
+	if err != nil {
+		return err
+	}
 	// Deserialize `Granularity`:
 	err = decoder.Decode(&obj.Granularity)
 	if err != nil {
@@ -173,6 +215,8 @@ func (obj *CreateFeed) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 // NewCreateFeedInstruction declares a new CreateFeed instruction with the provided parameters and accounts.
 func NewCreateFeedInstruction(
 	// Parameters:
+	description string,
+	decimals uint8,
 	granularity uint8,
 	liveLength uint32,
 	// Accounts:
@@ -180,6 +224,8 @@ func NewCreateFeedInstruction(
 	feed ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *CreateFeed {
 	return NewCreateFeedInstructionBuilder().
+		SetDescription(description).
+		SetDecimals(decimals).
 		SetGranularity(granularity).
 		SetLiveLength(liveLength).
 		SetStoreAccount(store).

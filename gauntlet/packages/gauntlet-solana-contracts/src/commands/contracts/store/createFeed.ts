@@ -9,6 +9,8 @@ type Input = {
   store: string
   granularity: number
   liveLength: number
+  decimals: number | string
+  description: string
 }
 
 export default class CreateFeed extends SolanaCommand {
@@ -27,6 +29,8 @@ export default class CreateFeed extends SolanaCommand {
       store: aggregator.store,
       granularity: this.flags.granularity,
       liveLength: this.flags.liveLength,
+      decimals: aggregator.decimals,
+      description: aggregator.name,
     }
   }
 
@@ -52,6 +56,8 @@ export default class CreateFeed extends SolanaCommand {
     const liveLength = new BN(input.liveLength)
     const length = new BN(8096)
     const feedAccountLength = new BN(8 + 128 + length.toNumber() * 24)
+    const decimals = new BN(input.decimals)
+    const description = input.description || ''
 
     console.log(`Creating feed...`)
 
@@ -60,7 +66,12 @@ export default class CreateFeed extends SolanaCommand {
       `Length (${length.toNumber()}) must be greater than liveLength (${liveLength.toNumber()})`,
     )
 
-    const tx = await program.rpc.createFeed(granularity, liveLength, {
+    console.log(`
+      - Decimals: ${decimals}
+      - Description: ${description}
+    `)
+
+    const tx = await program.rpc.createFeed(description, decimals, granularity, liveLength, {
       accounts: {
         store: store,
         feed: feed.publicKey,

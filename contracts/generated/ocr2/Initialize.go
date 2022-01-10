@@ -12,11 +12,9 @@ import (
 
 // Initialize is the `initialize` instruction.
 type Initialize struct {
-	Nonce       *uint8
-	MinAnswer   *ag_binary.Int128
-	MaxAnswer   *ag_binary.Int128
-	Decimals    *uint8
-	Description *string
+	Nonce     *uint8
+	MinAnswer *ag_binary.Int128
+	MaxAnswer *ag_binary.Int128
 
 	// [0] = [WRITE] state
 	//
@@ -69,18 +67,6 @@ func (inst *Initialize) SetMinAnswer(minAnswer ag_binary.Int128) *Initialize {
 // SetMaxAnswer sets the "maxAnswer" parameter.
 func (inst *Initialize) SetMaxAnswer(maxAnswer ag_binary.Int128) *Initialize {
 	inst.MaxAnswer = &maxAnswer
-	return inst
-}
-
-// SetDecimals sets the "decimals" parameter.
-func (inst *Initialize) SetDecimals(decimals uint8) *Initialize {
-	inst.Decimals = &decimals
-	return inst
-}
-
-// SetDescription sets the "description" parameter.
-func (inst *Initialize) SetDescription(description string) *Initialize {
-	inst.Description = &description
 	return inst
 }
 
@@ -256,12 +242,6 @@ func (inst *Initialize) Validate() error {
 		if inst.MaxAnswer == nil {
 			return errors.New("MaxAnswer parameter is not set")
 		}
-		if inst.Decimals == nil {
-			return errors.New("Decimals parameter is not set")
-		}
-		if inst.Description == nil {
-			return errors.New("Description parameter is not set")
-		}
 	}
 
 	// Check whether all (required) accounts are set:
@@ -318,12 +298,10 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("      Nonce", *inst.Nonce))
-						paramsBranch.Child(ag_format.Param("  MinAnswer", *inst.MinAnswer))
-						paramsBranch.Child(ag_format.Param("  MaxAnswer", *inst.MaxAnswer))
-						paramsBranch.Child(ag_format.Param("   Decimals", *inst.Decimals))
-						paramsBranch.Child(ag_format.Param("Description", *inst.Description))
+					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("    Nonce", *inst.Nonce))
+						paramsBranch.Child(ag_format.Param("MinAnswer", *inst.MinAnswer))
+						paramsBranch.Child(ag_format.Param("MaxAnswer", *inst.MaxAnswer))
 					})
 
 					// Accounts of the instruction:
@@ -362,16 +340,6 @@ func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	if err != nil {
 		return err
 	}
-	// Serialize `Decimals` param:
-	err = encoder.Encode(obj.Decimals)
-	if err != nil {
-		return err
-	}
-	// Serialize `Description` param:
-	err = encoder.Encode(obj.Description)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
@@ -390,16 +358,6 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	if err != nil {
 		return err
 	}
-	// Deserialize `Decimals`:
-	err = decoder.Decode(&obj.Decimals)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Description`:
-	err = decoder.Decode(&obj.Description)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -409,8 +367,6 @@ func NewInitializeInstruction(
 	nonce uint8,
 	minAnswer ag_binary.Int128,
 	maxAnswer ag_binary.Int128,
-	decimals uint8,
-	description string,
 	// Accounts:
 	state ag_solanago.PublicKey,
 	transmissions ag_solanago.PublicKey,
@@ -429,8 +385,6 @@ func NewInitializeInstruction(
 		SetNonce(nonce).
 		SetMinAnswer(minAnswer).
 		SetMaxAnswer(maxAnswer).
-		SetDecimals(decimals).
-		SetDescription(description).
 		SetStateAccount(state).
 		SetTransmissionsAccount(transmissions).
 		SetPayerAccount(payer).

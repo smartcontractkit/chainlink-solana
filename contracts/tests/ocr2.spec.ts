@@ -27,6 +27,8 @@ let ethereumAddress = (publicKey: Buffer) => {
 
 const Scope = {
   Version: { version: {} },
+  Decimals: { decimals: {} },
+  Description: { description: {} },
   // RoundData: { roundData: { roundId } },
   LatestRoundData: { latestRoundData: {} },
   Aggregator: { aggregator: {} },
@@ -75,7 +77,7 @@ describe('ocr2', async () => {
   const n = 19; // min: 3 * f + 1;
 
   // transmits a single round
-  let transmit = async (epoch: number, round: number) => {
+  let transmit = async (epoch: number, round: number, answer: BN) => {
     let account = await program.account.state.fetch(state.publicKey);
 
     // Generate and transmit a report
@@ -86,12 +88,14 @@ describe('ocr2', async () => {
     report_context.writeUInt8(round, 32+27+4); // 1 byte round
     // 32 byte extra_hash
 
-    const raw_report = Buffer.from([
-      97, 91, 43, 83, // observations_timestamp
-      7, // observer_count
-      0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // observers
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 210, // median
-      0, 0, 0, 0, 0, 0, 0, 2, // juels per lamport (2)
+    const raw_report = Buffer.concat([
+      Buffer.from([
+        97, 91, 43, 83, // observations_timestamp
+        7, // observer_count
+        0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 // observers
+      ]),
+      Buffer.from(answer.toArray('be', 16)), // median (i128)
+      Buffer.from([0, 0, 0, 0, 0, 0, 0, 2]), // juels per lamport (2)
     ]);
 
     let hash = createHash('sha256')
@@ -240,12 +244,14 @@ describe('ocr2', async () => {
     console.log("tokenVault", tokenVault.toBase58());
     console.log("vaultAuthority", vaultAuthority.toBase58());
     console.log("placeholder", placeholder.toBase58());
-    
+
     // TODO: I wasn't able to build a createFeed instruction + createInstruction(transmissions) to do an atomic rpc.initialize call
     // let createFeed = store.instruction.createFeed({
     const granularity = 30;
-    const liveLength = 1024;
+    const liveLength = 3;
     await workspace.Store.rpc.createFeed(
+      description,
+      decimals,
       granularity,
       liveLength,
     {
@@ -256,7 +262,7 @@ describe('ocr2', async () => {
       },
       signers: [transmissions],
       preInstructions: [
-        await workspace.Store.account.transmissions.createInstruction(transmissions, 8+128+8096*24),
+        await workspace.Store.account.transmissions.createInstruction(transmissions, 8+128+6*24),
       ],
     });
     // Program log: panicked at 'range end index 8 out of range for slice of length 0', store/src/lib.rs:476:10
@@ -278,9 +284,9 @@ describe('ocr2', async () => {
       program.programId
     );
   });
-    
+
   it('Initializes the OCR2 config', async () => {
-    await program.rpc.initialize(vaultNonce, new BN(minAnswer), new BN(maxAnswer), decimals, description, {
+    await program.rpc.initialize(vaultNonce, new BN(minAnswer), new BN(maxAnswer), {
       accounts: {
         state: state.publicKey,
         transmissions: transmissions.publicKey,
@@ -308,7 +314,7 @@ describe('ocr2', async () => {
     let config = account.config;
     assert.ok(config.minAnswer.toNumber() == minAnswer);
     assert.ok(config.maxAnswer.toNumber() == maxAnswer);
-    assert.ok(config.decimals == 18);
+    // assert.ok(config.decimals == 18);
 
     console.log(`Generating ${n} oracles...`);
     let futures = [];
@@ -423,7 +429,7 @@ describe('ocr2', async () => {
 
   it("Can't transmit a round if not the writer", async () => {
     try {
-      await transmit(1, 1);
+      await transmit(1, 1, new BN(1));
       assert.fail("transmit() shouldn't have succeeded!");
     } catch {
       // transmit should fail
@@ -444,7 +450,7 @@ describe('ocr2', async () => {
   });
 
   it('Transmits a round', async () => {
-    await transmit(1, 2);
+    await transmit(1, 2, new BN(3));
     let feed = await provider.connection.getAccountInfo(transmissions.publicKey);
     console.log(feed);
   });
@@ -536,8 +542,61 @@ describe('ocr2', async () => {
       }
     );
 
-    // let account = await program.account.latestConfig.fetch(buffer.publicKey);
     let account = await workspace.Store.account.version.fetch(buffer.publicKey);
-    console.log(account);
+    assert.ok(account.version == 1);
+
+		buffer = Keypair.generate();
+    await workspace.Store.rpc.query(
+      Scope.Description,
+      {
+        accounts: {
+          feed: transmissions.publicKey,
+          buffer: buffer.publicKey,
+        },
+        preInstructions: [
+          SystemProgram.createAccount({
+            fromPubkey: provider.wallet.publicKey,
+            newAccountPubkey: buffer.publicKey,
+            lamports: await provider.connection.getMinimumBalanceForRentExemption(256),
+            space: 256,
+            programId: workspace.Store.programId,
+          })
+        ],
+        signers: [buffer]
+      }
+    );
+    account = await workspace.Store.account.description.fetch(buffer.publicKey);
+    assert.ok(account.description == 'ETH/BTC');
+  });
+
+  it("Transmit a bunch of rounds to check ringbuffer wraparound", async () => {
+    for (let i = 3; i < 15; i++) {
+      console.log(`Transmitting...${i}`);
+      await transmit(i, i, new BN(i));
+
+      let buffer = Keypair.generate();
+      await workspace.Store.rpc.query(
+        Scope.LatestRoundData,
+        {
+          accounts: {
+            feed: transmissions.publicKey,
+            buffer: buffer.publicKey,
+          },
+          preInstructions: [
+            SystemProgram.createAccount({
+              fromPubkey: provider.wallet.publicKey,
+              newAccountPubkey: buffer.publicKey,
+              lamports: await provider.connection.getMinimumBalanceForRentExemption(256),
+              space: 256,
+              programId: workspace.Store.programId,
+            })
+          ],
+          signers: [buffer]
+        }
+      );
+
+      let account = await workspace.Store.account.round.fetch(buffer.publicKey);
+      assert.ok(account.answer.toNumber() == i)
+    }
   });
 });

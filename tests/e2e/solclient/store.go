@@ -88,7 +88,7 @@ func (m *Store) SetWriter(writerAuthority string) error {
 	return nil
 }
 
-func (m *Store) CreateFeed(granularity int, liveLength int) error {
+func (m *Store) CreateFeed(desc string, decimals uint8, granularity int, liveLength int) error {
 	payer := m.Client.DefaultWallet
 	programWallet := m.Client.ProgramWallets["store-keypair.json"]
 	feedAccInstruction, err := m.Client.CreateAccInstr(m.Client.Accounts.Feed, OCRTransmissionsAccountSize, programWallet.PublicKey())
@@ -100,6 +100,8 @@ func (m *Store) CreateFeed(granularity int, liveLength int) error {
 		[]solana.Instruction{
 			feedAccInstruction,
 			store.NewCreateFeedInstruction(
+				desc,
+				decimals,
 				uint8(granularity),
 				uint32(liveLength),
 				m.Store.PublicKey(),

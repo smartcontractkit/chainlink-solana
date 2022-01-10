@@ -56,6 +56,9 @@ pub struct Transmissions {
     pub version: u8,
     pub store: Pubkey,
     pub writer: Pubkey,
+    /// Raw UTF-8 byte string
+    pub description: [u8; 32],
+    pub decimals: u8,
     pub flagging_threshold: u32,
     pub latest_round_id: u32,
     pub granularity: u8,
@@ -117,7 +120,11 @@ impl<'a> Feed<'a> {
             return None;
         }
 
-        Some(self.live[self.header.live_cursor as usize - 1])
+        let len = self.header.live_length;
+        // Handle wraparound
+        let i = ((self.header.live_cursor + len.saturating_sub(1)) % len) % len;
+
+        Some(self.live[i as usize])
     }
 
     pub fn fetch(&self, round_id: u32) -> Option<Transmission> {
@@ -175,14 +182,16 @@ mod tests {
     #[test]
     fn transmissions() {
         let mut data = vec![0; 8 + 128 + (2 + 3) * size_of::<Transmission>()];
-        // TODO: ensure this is how it works with the actual feed
-        let mut s = &mut data[0..8 + 128];
+        let header = &mut data[..8 + 128]; // use a subslice to ensure the header fits into 128 bytes
+        let mut cursor = std::io::Cursor::new(header);
 
         // insert the initial header with some granularity
         Transmissions {
             version: 1,
             store: Pubkey::default(),
             writer: Pubkey::default(),
+            description: [0; 32],
+            decimals: 18,
             flagging_threshold: 1000,
             latest_round_id: 0,
             granularity: 5,
@@ -190,7 +199,7 @@ mod tests {
             live_cursor: 0,
             historical_cursor: 0,
         }
-        .try_serialize(&mut s)
+        .try_serialize(&mut cursor)
         .unwrap();
 
         let mut lamports = 0u64;
