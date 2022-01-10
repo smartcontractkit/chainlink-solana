@@ -91,7 +91,6 @@ func (c *ContractTracker) Transmit(
 			c.lggr.Errorf("error on Transmit.SendAndConfirmTransaction: %s", err.Error())
 		}
 		// TODO: poll rpc for tx confirmation (WS connection unreliable)
-		// TODO: see if SendTransactionWithOpts returns quickly enough to be used outside of goroutine
 		c.lggr.Debugf("tx signature from Transmit.SendAndConfirmTransaction: %s", txSig.String())
 	}()
 	return nil
