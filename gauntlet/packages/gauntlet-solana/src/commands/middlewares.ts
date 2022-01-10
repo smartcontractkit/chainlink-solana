@@ -1,8 +1,9 @@
 import { Middleware, Next } from '@chainlink/gauntlet-core'
 import { assertions } from '@chainlink/gauntlet-core/dist/utils'
-import { Provider, Wallet } from '@project-serum/anchor'
+import { Provider } from '@project-serum/anchor'
 import { Connection, Keypair } from '@solana/web3.js'
 import SolanaCommand from './internal/solana'
+const { Wallet } = require('@project-serum/anchor') // module exported dynamically from anchor
 
 const isValidURL = (url: string) => {
   var pattern = new RegExp('^(https?)://')
