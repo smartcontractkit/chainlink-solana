@@ -3,8 +3,8 @@ module github.com/smartcontractkit/chainlink-solana
 go 1.17
 
 require (
-	github.com/gagliardetto/binary v0.5.0
-	github.com/gagliardetto/solana-go v1.0.2
+	github.com/gagliardetto/binary v0.5.2
+	github.com/gagliardetto/solana-go v1.0.4
 	github.com/smartcontractkit/chainlink v1.0.1-0.20211209223503-68928efa429a
 	github.com/smartcontractkit/helmenv v1.0.20
 	github.com/smartcontractkit/integrations-framework v1.0.24
