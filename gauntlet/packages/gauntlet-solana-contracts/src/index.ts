@@ -6,6 +6,7 @@ import Solana from './commands'
 import { makeAbstractCommand } from './commands/abstract'
 import { defaultFlags } from './lib/args'
 import { SolanaCommand } from '@chainlink/gauntlet-solana'
+export { CONTRACT_LIST, getContract } from './lib/contracts'
 
 export const commands = {
   custom: [...Solana] as any[],
@@ -15,6 +16,7 @@ export const commands = {
     makeCommand: makeAbstractCommand,
   },
 }
+
 // TODO: This should be at cli.ts
 // ;(async () => {
 //   try {

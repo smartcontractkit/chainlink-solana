@@ -1,4 +1,4 @@
-import { Result, WriteResponse, BN } from '@chainlink/gauntlet-core'
+import { Result, WriteResponse } from '@chainlink/gauntlet-core'
 import { TransactionResponse, SolanaCommand, RawTransaction } from '@chainlink/gauntlet-solana'
 
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
