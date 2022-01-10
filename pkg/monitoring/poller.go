@@ -52,7 +52,11 @@ func (s *sourcePoller) Start(ctx context.Context) {
 	if err != nil {
 		s.log.Errorw("failed initial fetch", "error", err)
 	} else {
-		s.updates <- data
+		select {
+		case s.updates <- data:
+		case <-ctx.Done():
+			return
+		}
 	}
 
 	reusedTimer := time.NewTimer(s.pollInterval)
@@ -70,7 +74,11 @@ func (s *sourcePoller) Start(ctx context.Context) {
 				s.log.Errorw("failed to fetch from source", "error", err)
 				continue
 			}
-			s.updates <- data
+			select {
+			case s.updates <- data:
+			case <-ctx.Done():
+				return
+			}
 			reusedTimer.Reset(s.pollInterval)
 		case <-ctx.Done():
 			if !reusedTimer.Stop() {
