@@ -136,7 +136,6 @@ func CreateOCR2Jobs(
 	store contracts.OCRv2Store) error {
 	relayConfig := map[string]string{
 		"nodeEndpointHTTP": "http://sol:8899",
-		"nodeEndpointWS":   "ws://sol:8900",
 		"stateID":          ocr2.Address(),
 		"transmissionsID":  store.TransmissionsAddress(),
 		"storeProgramID":   store.ProgramAddress(),

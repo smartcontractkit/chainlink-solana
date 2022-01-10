@@ -25,7 +25,7 @@ func NewChainlinkSolOCRv2() *environment.Config {
 					"chainlink": map[string]interface{}{
 						"image": map[string]interface{}{
 							"image":   "public.ecr.aws/chainlink/chainlink",
-							"version": "develop.426eb924464697f714f14e1e0c7804fca09977b8",
+							"version": "develop.f20690e8ede0cfead9df7f808f56a14f26469aaa",
 						},
 					},
 					"env": map[string]interface{}{
