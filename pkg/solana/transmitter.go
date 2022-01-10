@@ -6,7 +6,6 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	confirm "github.com/gagliardetto/solana-go/rpc/sendAndConfirmTransaction"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
@@ -81,18 +80,17 @@ func (c *ContractTracker) Transmit(
 
 	// Send transaction, and wait for confirmation:
 	go func() {
-		txSig, err := confirm.SendAndConfirmTransactionWithOpts(
+		txSig, err := c.client.rpc.SendTransactionWithOpts(
 			context.Background(), // does not use libocr transmit context
-			c.client.rpc,
-			c.client.ws,
 			tx,
-			true, // skip preflight
+			false, // use preflight as first check
 			rpc.CommitmentConfirmed,
 		)
 
 		if err != nil {
 			c.lggr.Errorf("error on Transmit.SendAndConfirmTransaction: %s", err.Error())
 		}
+		// TODO: poll rpc for tx confirmation (WS connection unreliable)
 		c.lggr.Debugf("tx signature from Transmit.SendAndConfirmTransaction: %s", txSig.String())
 	}()
 	return nil

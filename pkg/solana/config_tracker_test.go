@@ -5,14 +5,13 @@ import (
 	"testing"
 
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/gagliardetto/solana-go/rpc/ws"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestLatestBlockHeight(t *testing.T) {
 	ctx := context.Background()
 	c := &ContractTracker{
-		client: NewClient(rpc.DevNet_RPC, &ws.Client{}),
+		client: NewClient(rpc.DevNet_RPC),
 	}
 
 	h, err := c.LatestBlockHeight(ctx)

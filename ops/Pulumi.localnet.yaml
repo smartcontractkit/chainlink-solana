@@ -10,7 +10,6 @@ config:
   solana-env:CL-BUILD_DOCKERFILE: ../../chainlink/core/chainlink.Dockerfile
   solana-env:CL-RELAY_NAME: solana
   solana-env:CL-RELAY_HTTP: http://127.0.0.1:8899
-  solana-env:CL-RELAY_WS: ws://127.0.0.1:8900
   solana-env:CL-ENV_VARS: # specify which chainlink env variables to include, and define below
     - CHAINLINK_DEV
     - ETH_DISABLED
@@ -18,12 +17,21 @@ config:
     - FEATURE_OFFCHAIN_REPORTING2
     - P2P_NETWORKING_STACK
     - P2P_LISTEN_PORT
+    # these next vars are used for debugging and should be excluded from production deployments
+    - AUTO_PPROF_ENABLED
+    - AUTO_PPROF_MEM_THRESHOLD
+    - AUTO_PPROF_GOROUTINE_THRESHOLD
+    - LOG_LEVEL
   solana-env:CL-CHAINLINK_DEV: true
   solana-env:CL-ETH_DISABLED: true
   solana-env:CL-USE_LEGACY_ETH_ENV_VARS: false
   solana-env:CL-FEATURE_OFFCHAIN_REPORTING2: true
   solana-env:CL-P2P_NETWORKING_STACK: "V2"
   solana-env:CL-P2P_LISTEN_PORT: 0
+  solana-env:CL-AUTO_PPROF_ENABLED: true
+  solana-env:CL-AUTO_PPROF_MEM_THRESHOLD: 500mb
+  solana-env:CL-AUTO_PPROF_GOROUTINE_THRESHOLD: 500
+  solana-env:CL-LOG_LEVEL: debug
   # chainlink node configs (unique to each node - usually not needed, example shown)
   # solana-env:CL_X-ENV_VARS:
   #   - TEST_ENV
