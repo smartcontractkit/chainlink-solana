@@ -40,5 +40,5 @@ func NewOCR2ConfigChunks(cfg contracts.OffChainAggregatorV2Config) (
 	if err != nil {
 		return 0, nil, err
 	}
-	return version, chunkSlice(cfgBytes, 830), nil
+	return version, chunkSlice(cfgBytes, 1000), nil
 }

@@ -5,7 +5,7 @@ import (
 )
 
 // NewChainlinkSolOCRv2 returns a cluster config with Solana test validator
-func NewChainlinkSolOCRv2() *environment.Config {
+func NewChainlinkSolOCRv2(nodes int) *environment.Config {
 	return &environment.Config{
 		NamespacePrefix: "chainlink-sol",
 		Charts: environment.Charts{
@@ -21,7 +21,7 @@ func NewChainlinkSolOCRv2() *environment.Config {
 			"chainlink": {
 				Index: 4,
 				Values: map[string]interface{}{
-					"replicas": 5,
+					"replicas": nodes,
 					"chainlink": map[string]interface{}{
 						"image": map[string]interface{}{
 							"image":   "public.ecr.aws/chainlink/chainlink",

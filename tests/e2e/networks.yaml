@@ -1,4 +1,5 @@
 solana:
+  contracts_deployed: false
   name: "solana"
   type: solana
   private_keys:
