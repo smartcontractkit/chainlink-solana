@@ -16,6 +16,6 @@ transmitterID                          = "<insert solana transmitter key id>"
 
 [relayConfig]
 nodeEndpointHTTP   = "http:..."
-ocr2ProgramID      = "<insert ocr2 program id>"
-transmissionsID    = "<insert ocr2 transmissions account>"
-storeProgramID     = "<insert store program id>"
+ocr2ProgramID      = "<insert solana ocr2 program ID>"
+transmissionsID    = "<insert solana ocr2 transmissions account>"
+storeProgramID     = "<insert solana ocr2 store account>"
