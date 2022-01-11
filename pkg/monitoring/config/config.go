@@ -104,26 +104,33 @@ func parseEnvVars(cfg *Config) error {
 		if err != nil {
 			return fmt.Errorf("failed to parse env var FEEDS_RDD_READ_TIMEOUT, see https://pkg.go.dev/time#ParseDuration: %w", err)
 		}
-		cfg.Feeds.RddReadTimeout = readTimeout
+		cfg.Feeds.RDDReadTimeout = readTimeout
 	}
 	if value, isPresent := os.LookupEnv("FEEDS_RDD_POLL_INTERVAL"); isPresent {
 		pollInterval, err := time.ParseDuration(value)
 		if err != nil {
 			return fmt.Errorf("failed to parse env var FEEDS_RDD_POLL_INTERVAL, see https://pkg.go.dev/time#ParseDuration: %w", err)
 		}
-		cfg.Feeds.RddPollInterval = pollInterval
+		cfg.Feeds.RDDPollInterval = pollInterval
 	}
 
 	if value, isPresent := os.LookupEnv("HTTP_ADDRESS"); isPresent {
 		cfg.Http.Address = value
 	}
 
-	if value, isPresent := os.LookupEnv("FEATURE_TEST_MODE"); isPresent {
+	if value, isPresent := os.LookupEnv("FEATURE_TEST_ONLY_FAKE_READERS"); isPresent {
 		isTestMode, err := strconv.ParseBool(value)
 		if err != nil {
-			return fmt.Errorf("failed to parse boolean env var '%s'. See https://pkg.go.dev/strconv#ParseBool", "FEATURE_TEST_MODE")
+			return fmt.Errorf("failed to parse boolean env var '%s'. See https://pkg.go.dev/strconv#ParseBool", "FEATURE_TEST_ONLY_FAKE_READERS")
 		}
-		cfg.Feature.TestMode = isTestMode
+		cfg.Feature.TestOnlyFakeReaders = isTestMode
+	}
+	if value, isPresent := os.LookupEnv("FEATURE_TEST_ONLY_FAKE_RDD"); isPresent {
+		isTestMode, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("failed to parse boolean env var '%s'. See https://pkg.go.dev/strconv#ParseBool", "FEATURE_TEST_ONLY_FAKE_RDD")
+		}
+		cfg.Feature.TestOnlyFakeRdd = isTestMode
 	}
 
 	return nil
