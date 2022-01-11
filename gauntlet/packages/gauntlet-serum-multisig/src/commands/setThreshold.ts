@@ -1,12 +1,12 @@
 import { SolanaCommand, RawTransaction, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
+import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
 import { Result } from '@chainlink/gauntlet-core'
 
 import BN from 'bn.js'
 
 export default class SetThreshold extends SolanaCommand {
-  static id = 'multisig:set:threshold'
+  static id = 'set:threshold'
   static category = CONTRACT_LIST.MULTISIG
 
   static examples = [
@@ -19,7 +19,6 @@ export default class SetThreshold extends SolanaCommand {
   }
 
   makeRawTransaction = async () => {
-    // TODO: make this required
     const multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS || '')
     const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
     const address = multisig.programId.toString()

@@ -1,12 +1,12 @@
 import { SolanaCommand, RawTransaction, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
+import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
 import { Result } from '@chainlink/gauntlet-core'
 
 import BN from 'bn.js'
 
 export default class SetOwners extends SolanaCommand {
-  static id = 'multisig:set:owners'
+  static id = 'set:owners'
   static category = CONTRACT_LIST.MULTISIG
 
   static examples = [
@@ -17,7 +17,6 @@ export default class SetOwners extends SolanaCommand {
     super(flags, args)
   }
   makeRawTransaction = async () => {
-    // TODO: make this required
     const multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS || '')
     const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
     const address = multisig.programId.toString()
