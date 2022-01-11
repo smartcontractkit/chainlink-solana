@@ -153,6 +153,7 @@ func (c *ContractDeployer) addMintToAccInstr(instr *[]solana.Instruction, dest *
 }
 
 func (c *ContractDeployer) DeployLinkTokenContract() (contracts.LinkToken, error) {
+	var err error
 	payer := c.Client.DefaultWallet
 
 	instr := make([]solana.Instruction, 0)
@@ -160,13 +161,17 @@ func (c *ContractDeployer) DeployLinkTokenContract() (contracts.LinkToken, error
 		return nil, err
 	}
 	vaultAuthority := c.Client.Accounts.Authorities["vault"]
+	c.Client.Accounts.OCRVaultAssociatedPubKey, _, err = solana.FindAssociatedTokenAddress(vaultAuthority.PublicKey, c.Client.Accounts.Mint.PublicKey())
+	if err != nil {
+		return nil, err
+	}
 	if err := c.Client.addNewAssociatedAccInstr(c.Client.Accounts.OCRVault, vaultAuthority.PublicKey, &instr); err != nil {
 		return nil, err
 	}
 	if err := c.addMintToAccInstr(&instr, c.Client.Accounts.OCRVault, 1e18); err != nil {
 		return nil, err
 	}
-	err := c.Client.TXAsync(
+	err = c.Client.TXAsync(
 		"Createing LINK Token and associated accounts",
 		instr,
 		func(key solana.PublicKey) *solana.PrivateKey {
@@ -234,7 +239,7 @@ func (c *ContractDeployer) DeployOCRv2(billingControllerAddr string, requesterCo
 				SetPayerAccount(payer.PublicKey()).
 				SetOwnerAccount(c.Client.Accounts.Owner.PublicKey()).
 				SetTokenMintAccount(linkTokenMintPubKey).
-				SetTokenVaultAccount(c.Client.Accounts.OCRVault.PublicKey()).
+				SetTokenVaultAccount(c.Client.Accounts.OCRVaultAssociatedPubKey).
 				SetVaultAuthorityAccount(vault.PublicKey).
 				SetRequesterAccessControllerAccount(racPubKey).
 				SetBillingAccessControllerAccount(bacPubKey).
