@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/gagliardetto/solana-go"
+	associatedtokenaccount "github.com/gagliardetto/solana-go/programs/associated-token-account"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -41,7 +42,8 @@ type Accounts struct {
 	// Store store program state account
 	Store *solana.Wallet
 	// OCRVault OCR program account to hold LINK
-	OCRVault *solana.Wallet
+	OCRVault                 *solana.Wallet
+	OCRVaultAssociatedPubKey solana.PublicKey
 	// Transmissions OCR transmissions state account
 	Feed *solana.Wallet
 	// Authorities authorities used to sign on-chain, used by programs
@@ -201,12 +203,20 @@ func (c *Client) addNewAssociatedAccInstr(acc *solana.Wallet, ownerPubKey solana
 	if err != nil {
 		return err
 	}
-	*instr = append(*instr, accInstr, token.NewInitializeAccountInstruction(
-		acc.PublicKey(),
-		c.Accounts.Mint.PublicKey(),
-		ownerPubKey,
-		solana.SysVarRentPubkey,
-	).Build())
+	*instr = append(*instr,
+		accInstr,
+		token.NewInitializeAccountInstruction(
+			acc.PublicKey(),
+			c.Accounts.Mint.PublicKey(),
+			ownerPubKey,
+			solana.SysVarRentPubkey,
+		).Build(),
+		associatedtokenaccount.NewCreateInstruction(
+			c.DefaultWallet.PublicKey(),
+			acc.PublicKey(),
+			c.Accounts.Mint.PublicKey(),
+		).Build(),
+	)
 	return nil
 }
 
