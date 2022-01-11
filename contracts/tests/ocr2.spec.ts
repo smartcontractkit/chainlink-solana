@@ -45,6 +45,7 @@ describe('ocr2', async () => {
   const flaggingThreshold = 80000;
 
   const observationPayment = 1;
+  const transmissionPayment = 1;
 
   const state = Keypair.generate();
   // const stateSize = 8 + ;
@@ -245,8 +246,6 @@ describe('ocr2', async () => {
     console.log("vaultAuthority", vaultAuthority.toBase58());
     console.log("placeholder", placeholder.toBase58());
 
-    // TODO: I wasn't able to build a createFeed instruction + createInstruction(transmissions) to do an atomic rpc.initialize call
-    // let createFeed = store.instruction.createFeed({
     const granularity = 30;
     const liveLength = 3;
     await workspace.Store.rpc.createFeed(
@@ -415,8 +414,8 @@ describe('ocr2', async () => {
     });
     console.log("setBilling")
     await program.rpc.setBilling(
-      new BN(1),
-      new BN(1),
+      new BN(observationPayment),
+      new BN(transmissionPayment),
       {
         accounts: {
           state: state.publicKey,
@@ -437,7 +436,6 @@ describe('ocr2', async () => {
   });
 
   it('Sets the cluster as the feed writer', async () => {
-    console.log("Adding cluster to feed");
     await workspace.Store.rpc.setWriter(
       storeAuthority,
       {
@@ -452,7 +450,6 @@ describe('ocr2', async () => {
   it('Transmits a round', async () => {
     await transmit(1, 2, new BN(3));
     let feed = await provider.connection.getAccountInfo(transmissions.publicKey);
-    console.log(feed);
   });
 
   it('Withdraws funds', async () => {
@@ -571,7 +568,6 @@ describe('ocr2', async () => {
 
   it("Transmit a bunch of rounds to check ringbuffer wraparound", async () => {
     for (let i = 3; i < 15; i++) {
-      console.log(`Transmitting...${i}`);
       await transmit(i, i, new BN(i));
 
       let buffer = Keypair.generate();
