@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
+import { Token, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
@@ -70,7 +70,13 @@ export default class SetPayees extends SolanaCommand {
         await Promise.all(
           input.operators.map(async ({ payee }) => {
             try {
-              const info = await token.getAccountInfo(new PublicKey(payee))
+              const to = await Token.getAssociatedTokenAddress(
+                ASSOCIATED_TOKEN_PROGRAM_ID,
+                TOKEN_PROGRAM_ID,
+                token.publicKey,
+                new PublicKey(payee),
+              )
+              const info = await token.getAccountInfo(to)
               return !!info.address
             } catch (e) {
               logger.error(`Payee with address ${payee} does not have a valid Token recipient address`)

@@ -26,7 +26,7 @@ export default class CreateFeed extends SolanaCommand {
     const rdd = getRDD(this.flags.rdd)
     const aggregator = rdd.contracts[this.flags.state]
     return {
-      store: aggregator.store,
+      store: aggregator.storeAccount,
       granularity: this.flags.granularity,
       liveLength: this.flags.liveLength,
       decimals: aggregator.decimals,
