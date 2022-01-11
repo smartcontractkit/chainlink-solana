@@ -4,13 +4,12 @@ config:
   solana-env:CL-COUNT: 4 # not counting bootstrap, minimum 4
   solana-env:CL-PORT-START: 6688 # start port to expose lite client port
   solana-env:CL-P2P_PORT-START: 5050 # start port to expose lite client P2P ports
-  # solana-env:CL-NODE_VERSION: develop.426eb924464697f714f14e1e0c7804fca09977b8 # development version can be found at https://gallery.ecr.aws/chainlink/chainlink
+  # solana-env:CL-NODE_VERSION: develop.f20690e8ede0cfead9df7f808f56a14f26469aaa # development version can be found at https://gallery.ecr.aws/chainlink/chainlink
   solana-env:CL-BUILD_LOCALLY: true # (overrides NODE_VERSION) BUILD_CONTEXT and BUILD_DOCKERFILE must be set if this is enabled
   solana-env:CL-BUILD_CONTEXT: ../../chainlink
   solana-env:CL-BUILD_DOCKERFILE: ../../chainlink/core/chainlink.Dockerfile
   solana-env:CL-RELAY_NAME: solana
   solana-env:CL-RELAY_HTTP: http://127.0.0.1:8899
-  solana-env:CL-RELAY_WS: ws://127.0.0.1:8900
   solana-env:CL-ENV_VARS: # specify which chainlink env variables to include, and define below
     - CHAINLINK_DEV
     - ETH_DISABLED
@@ -18,12 +17,21 @@ config:
     - FEATURE_OFFCHAIN_REPORTING2
     - P2P_NETWORKING_STACK
     - P2P_LISTEN_PORT
+    # these next vars are used for debugging and should be excluded from production deployments
+    - AUTO_PPROF_ENABLED
+    - AUTO_PPROF_MEM_THRESHOLD
+    - AUTO_PPROF_GOROUTINE_THRESHOLD
+    - LOG_LEVEL
   solana-env:CL-CHAINLINK_DEV: true
   solana-env:CL-ETH_DISABLED: true
   solana-env:CL-USE_LEGACY_ETH_ENV_VARS: false
   solana-env:CL-FEATURE_OFFCHAIN_REPORTING2: true
   solana-env:CL-P2P_NETWORKING_STACK: "V2"
   solana-env:CL-P2P_LISTEN_PORT: 0
+  solana-env:CL-AUTO_PPROF_ENABLED: true
+  solana-env:CL-AUTO_PPROF_MEM_THRESHOLD: 500mb
+  solana-env:CL-AUTO_PPROF_GOROUTINE_THRESHOLD: 500
+  solana-env:CL-LOG_LEVEL: debug
   # chainlink node configs (unique to each node - usually not needed, example shown)
   # solana-env:CL_X-ENV_VARS:
   #   - TEST_ENV

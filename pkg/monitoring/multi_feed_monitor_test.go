@@ -3,6 +3,7 @@ package monitoring
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -121,7 +122,7 @@ func TestMultiFeedMonitorForPerformance(t *testing.T) {
 	)
 	go monitor.Start(ctx, wg)
 
-	trCount, stCount := 0, 0
+	var trCount, stCount int64 = 0, 0
 	messages := []producerMessage{}
 
 	wg.Add(1)
@@ -133,9 +134,9 @@ func TestMultiFeedMonitorForPerformance(t *testing.T) {
 			require.NoError(t, err)
 			select {
 			case transmissionReader.readCh <- generateTransmissionEnvelope():
-				trCount += 1
+				_ = atomic.AddInt64(&trCount, 1)
 			case stateReader.readCh <- StateEnvelope{newState, 100}:
-				stCount += 1
+				_ = atomic.AddInt64(&stCount, 1)
 			case <-ctx.Done():
 				break LOOP
 			}
@@ -156,7 +157,7 @@ func TestMultiFeedMonitorForPerformance(t *testing.T) {
 	}()
 
 	wg.Wait()
-	require.Equal(t, 10, trCount, "should only be able to do initial read of the latest transmission")
-	require.Equal(t, 10, stCount, "should only be able to do initial read of the state account")
+	require.Equal(t, int64(10), trCount, "should only be able to do initial read of the latest transmission")
+	require.Equal(t, int64(10), stCount, "should only be able to do initial read of the state account")
 	require.Equal(t, 30, len(messages))
 }

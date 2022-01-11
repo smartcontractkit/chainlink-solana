@@ -218,6 +218,8 @@ func (d *Deployer) DeployOCR() error {
 		"store":       d.Account[StoreAccount],
 		"granularity": 30,
 		"liveLength":  1024,
+		"decimals":    8,
+		"description": "Test LINK/USD",
 	}
 
 	jsonInput, err := json.Marshal(input)
@@ -257,8 +259,6 @@ func (d *Deployer) DeployOCR() error {
 	input = map[string]interface{}{
 		"minAnswer":   "0",
 		"maxAnswer":   "10000000000",
-		"decimals":    8,
-		"description": "Test LINK/USD",
 	}
 
 	jsonInput, err = json.Marshal(input)

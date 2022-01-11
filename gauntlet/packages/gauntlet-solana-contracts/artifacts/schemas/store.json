@@ -44,12 +44,12 @@
       ],
       "args": [
         {
-          "name": "decimals",
-          "type": "u8"
-        },
-        {
           "name": "description",
           "type": "string"
+        },
+        {
+          "name": "decimals",
+          "type": "u8"
         },
         {
           "name": "granularity",
@@ -368,6 +368,19 @@
             "type": "publicKey"
           },
           {
+            "name": "description",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "decimals",
+            "type": "u8"
+          },
+          {
             "name": "flaggingThreshold",
             "type": "u32"
           },
@@ -442,6 +455,12 @@
             "name": "Version"
           },
           {
+            "name": "Decimals"
+          },
+          {
+            "name": "Description"
+          },
+          {
             "name": "RoundData",
             "fields": [
               {
@@ -480,8 +499,5 @@
       "code": 6003,
       "name": "NotFound"
     }
-  ],
-  "metadata": {
-    "address": "A7Jh2nb1hZHwqEofm4N8SXbKTj82rx7KUfjParQXUyMQ"
-  }
+  ]
 }

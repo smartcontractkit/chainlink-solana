@@ -19,6 +19,8 @@ jobs:
         run: go build -v ./pkg/...
       - name: Test
         run: go test ./pkg/... -v
+      - name: Test with the race detector enabled
+        run: go test ./pkg/... -v -race -count=10
 
   lint:
     runs-on: ubuntu-latest

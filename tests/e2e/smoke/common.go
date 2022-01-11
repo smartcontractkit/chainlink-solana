@@ -136,8 +136,7 @@ func CreateOCR2Jobs(
 	store contracts.OCRv2Store) error {
 	relayConfig := map[string]string{
 		"nodeEndpointHTTP": "http://sol:8899",
-		"nodeEndpointWS":   "ws://sol:8900",
-		"stateID":          ocr2.Address(),
+		"ocr2ProgramID":    ocr2.ProgramAddress(),
 		"transmissionsID":  store.TransmissionsAddress(),
 		"storeProgramID":   store.ProgramAddress(),
 	}
@@ -174,7 +173,7 @@ func CreateOCR2Jobs(
 		}
 		jobSpec := &client.OCR2TaskJobSpec{
 			Name:                  fmt.Sprintf("sol-OCRv2-%d-%s", nIdx, uuid.NewV4().String()),
-			ContractID:            ocr2.ProgramAddress(),
+			ContractID:            ocr2.Address(),
 			Relay:                 ChainName,
 			RelayConfig:           relayConfig,
 			P2PPeerID:             nkb[nIdx].PeerID,

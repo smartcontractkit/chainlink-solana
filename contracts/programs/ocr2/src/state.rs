@@ -28,14 +28,14 @@ pub struct LeftoverPayment {
 
 #[zero_copy]
 pub struct Oracles {
-    xs: [Oracle; 19], // sadly we can't use const https://github.com/project-serum/anchor/issues/632
+    xs: [Oracle; MAX_ORACLES],
     len: u64,
 }
 arrayvec!(Oracles, Oracle, u64);
 
 #[zero_copy]
 pub struct LeftoverPayments {
-    xs: [LeftoverPayment; 19], // sadly we can't use const https://github.com/project-serum/anchor/issues/632
+    xs: [LeftoverPayment; MAX_ORACLES],
     len: u64,
 }
 arrayvec!(LeftoverPayments, LeftoverPayment, u64);

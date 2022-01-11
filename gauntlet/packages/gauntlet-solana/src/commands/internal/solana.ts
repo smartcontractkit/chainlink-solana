@@ -5,7 +5,7 @@ import { RawTransaction, TransactionResponse } from '../types'
 import { Idl, Program, Provider, Wallet } from '@project-serum/anchor'
 
 export default abstract class SolanaCommand extends WriteCommand<TransactionResponse> {
-  wallet: Wallet
+  wallet: typeof Wallet
   provider: Provider
   abstract execute: () => Promise<Result<TransactionResponse>>
   makeRawTransaction: () => Promise<RawTransaction[]>
