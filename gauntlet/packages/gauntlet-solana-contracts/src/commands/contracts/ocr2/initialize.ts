@@ -10,6 +10,7 @@ import { getRDD } from '../../../lib/rdd'
 type Input = {
   minAnswer: number | string
   maxAnswer: number | string
+  transmissions: string
 }
 export default class Initialize extends SolanaCommand {
   static id = 'ocr2:initialize'
@@ -27,13 +28,13 @@ export default class Initialize extends SolanaCommand {
     return {
       maxAnswer: aggregator.maxSubmissionValue,
       minAnswer: aggregator.minSubmissionValue,
+      transmissions: aggregator.transmissionsAccount,
     }
   }
 
   constructor(flags, args) {
     super(flags, args)
 
-    this.requireFlag('transmissions', 'Provide a --transmissions flag with a valid address')
     this.requireFlag('requesterAccessController', 'Provide a --requesterAccessController flag with a valid address')
     this.requireFlag('billingAccessController', 'Provide a --requesterAccessController flag with a valid address')
   }
@@ -48,11 +49,6 @@ export default class Initialize extends SolanaCommand {
     const owner = this.wallet.payer
     const input = this.makeInput(this.flags.input)
 
-    const transmissions = new PublicKey(this.flags.transmissions)
-    const linkPublicKey = new PublicKey(this.flags.link)
-    const requesterAccessController = new PublicKey(this.flags.requesterAccessController)
-    const billingAccessController = new PublicKey(this.flags.billingAccessController)
-
     // ARGS
     const [vaultAuthority, vaultNonce] = await PublicKey.findProgramAddress(
       [Buffer.from(utils.bytes.utf8.encode('vault')), state.publicKey.toBuffer()],
@@ -64,8 +60,13 @@ export default class Initialize extends SolanaCommand {
       program.programId,
     )
 
+    const linkPublicKey = new PublicKey(this.flags.link)
+    const requesterAccessController = new PublicKey(this.flags.requesterAccessController)
+    const billingAccessController = new PublicKey(this.flags.billingAccessController)
+
     const minAnswer = new BN(input.minAnswer)
     const maxAnswer = new BN(input.maxAnswer)
+    const transmissions = new PublicKey(input.transmissions)
 
     const tokenVault = await Token.getAssociatedTokenAddress(
       ASSOCIATED_TOKEN_PROGRAM_ID,
