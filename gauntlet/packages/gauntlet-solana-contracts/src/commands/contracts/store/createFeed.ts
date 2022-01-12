@@ -1,5 +1,5 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { Keypair, PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
@@ -26,7 +26,7 @@ export default class CreateFeed extends SolanaCommand {
     const rdd = getRDD(this.flags.rdd)
     const aggregator = rdd.contracts[this.flags.state]
     return {
-      store: aggregator.store,
+      store: aggregator.storeAccount,
       granularity: this.flags.granularity,
       liveLength: this.flags.liveLength,
       decimals: aggregator.decimals,
@@ -54,7 +54,7 @@ export default class CreateFeed extends SolanaCommand {
 
     const granularity = new BN(input.granularity)
     const liveLength = new BN(input.liveLength)
-    const length = new BN(8096)
+    const length = new BN(this.flags.length || 8096)
     const feedAccountLength = new BN(8 + 128 + length.toNumber() * 24)
     const decimals = new BN(input.decimals)
     const description = input.description || ''
@@ -69,7 +69,13 @@ export default class CreateFeed extends SolanaCommand {
     console.log(`
       - Decimals: ${decimals}
       - Description: ${description}
+      - Live Length: ${liveLength.toNumber()}
+      - Granularity (historical): ${granularity.toNumber()}
+      - Historical Length: ${length.toNumber() - liveLength.toNumber()}
+      - Total Length: ${length.toNumber()}
     `)
+
+    await prompt('Continue creating new OCR 2 feed?')
 
     const tx = await program.rpc.createFeed(description, decimals, granularity, liveLength, {
       accounts: {

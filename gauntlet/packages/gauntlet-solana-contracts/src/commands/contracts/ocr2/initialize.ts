@@ -111,6 +111,7 @@ export default class Initialize extends SolanaCommand {
       STATE ACCOUNTS:
         - State: ${state.publicKey}
         - Transmissions: ${transmissions}
+        - StoreAuthority: ${storeAuthority.toString()}
         - Payer: ${this.provider.wallet.publicKey}
         - Owner: ${owner.publicKey}
     `)
