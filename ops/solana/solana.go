@@ -257,8 +257,9 @@ func (d *Deployer) DeployOCR() error {
 
 	fmt.Println("Step 6: Init OCR 2 Feed")
 	input = map[string]interface{}{
-		"minAnswer":   "0",
-		"maxAnswer":   "10000000000",
+		"minAnswer":     "0",
+		"maxAnswer":     "10000000000",
+		"transmissions": d.Account[OCRTransmissions],
 	}
 
 	jsonInput, err = json.Marshal(input)
@@ -270,7 +271,6 @@ func (d *Deployer) DeployOCR() error {
 	err = d.gauntlet.ExecCommand(
 		"ocr2:initialize",
 		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("transmissions", d.Account[OCRTransmissions]),
 		d.gauntlet.Flag("requesterAccessController", d.Account[RequesterAccessController]),
 		d.gauntlet.Flag("billingAccessController", d.Account[BillingAccessController]),
 		d.gauntlet.Flag("link", d.Account[LINK]),
@@ -474,13 +474,22 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 		return errors.Wrap(err, "setting OCR 2 billing failed")
 	}
 
+	input = map[string]interface{}{
+		"transmissions": d.Account[OCRTransmissions],
+		"store":         d.Account[StoreAccount],
+	}
+
+	jsonInput, err = json.Marshal(input)
+	if err != nil {
+		return err
+	}
+
 	fmt.Println("Add writer to feed")
 	err = d.gauntlet.ExecCommand(
 		"store:set_writer",
 		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("state", d.Account[StoreAccount]),
-		d.gauntlet.Flag("feed", d.Account[OCRTransmissions]),
-		d.gauntlet.Flag("storeAuthority", d.Account[StoreAuthority]),
+		d.gauntlet.Flag("ocrState", d.Account[OCRFeed]),
+		d.gauntlet.Flag("input", string(jsonInput)),
 	)
 
 	if err != nil {

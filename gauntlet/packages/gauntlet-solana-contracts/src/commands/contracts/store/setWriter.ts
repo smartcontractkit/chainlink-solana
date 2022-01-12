@@ -38,9 +38,10 @@ export default class SetWriter extends SolanaCommand {
   execute = async () => {
     const store = getContract(CONTRACT_LIST.STORE, '')
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
-    const address = store.programId.toString()
-    const storeProgram = this.loadProgram(store.idl, address)
-    const ocr2Program = this.loadProgram(ocr2.idl, address)
+    const storeAddress = store.programId.toString()
+    const ocr2Address = ocr2.programId.toString()
+    const storeProgram = this.loadProgram(store.idl, storeAddress)
+    const ocr2Program = this.loadProgram(ocr2.idl, ocr2Address)
 
     const input = this.makeInput(this.flags.input)
     const owner = this.wallet.payer
