@@ -126,9 +126,10 @@ type Answer struct {
 
 // Access controller state
 type AccessController struct {
-	Owner  solana.PublicKey
-	Access [32]solana.PublicKey
-	Len    uint64
+	Owner         solana.PublicKey
+	ProposedOwner solana.PublicKey
+	Access        [32]solana.PublicKey
+	Len           uint64
 }
 
 // CL Core OCR2 job spec RelayConfig member for Solana
