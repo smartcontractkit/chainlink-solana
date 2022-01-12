@@ -43,6 +43,43 @@
       "args": []
     },
     {
+      "name": "transferOwnership",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "proposedOwner",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "acceptOwnership",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "addAccess",
       "accounts": [
         {
@@ -96,6 +133,10 @@
             "type": "publicKey"
           },
           {
+            "name": "proposedOwner",
+            "type": "publicKey"
+          },
+          {
             "name": "accessList",
             "type": {
               "defined": "AccessList"
@@ -136,6 +177,11 @@
     },
     {
       "code": 6001,
+      "name": "InvalidInput",
+      "msg": "Invalid input"
+    },
+    {
+      "code": 6002,
       "name": "Full",
       "msg": "Access list is full"
     }

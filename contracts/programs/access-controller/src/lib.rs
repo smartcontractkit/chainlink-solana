@@ -19,7 +19,7 @@ pub const MAX_ADDRS: usize = 64;
 
 #[zero_copy]
 pub struct AccessList {
-    xs: [Pubkey; 64], // sadly we can't use const https://github.com/project-serum/anchor/issues/632
+    xs: [Pubkey; MAX_ADDRS],
     len: u64,
 }
 arrayvec!(AccessList, Pubkey, u64);
@@ -30,11 +30,9 @@ const_assert!(
 #[account(zero_copy)]
 pub struct AccessController {
     pub owner: Pubkey,
+    pub proposed_owner: Pubkey,
     pub access_list: AccessList,
 }
-
-// IDEA: use a PDA with seeds = [account()], bump = ? to check for proof that account exists
-// the tradeoff would be that we would have to calculate the PDA and pass it as an account everywhere
 
 #[program]
 pub mod access_controller {
@@ -42,6 +40,27 @@ pub mod access_controller {
     pub fn initialize(ctx: Context<Initialize>) -> ProgramResult {
         let mut state = ctx.accounts.state.load_init()?;
         state.owner = ctx.accounts.owner.key();
+        Ok(())
+    }
+
+    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
+    pub fn transfer_ownership(
+        ctx: Context<TransferOwnership>,
+        proposed_owner: Pubkey,
+    ) -> ProgramResult {
+        require!(proposed_owner != Pubkey::default(), InvalidInput);
+        let state = &mut *ctx.accounts.state.load_mut()?;
+        state.proposed_owner = proposed_owner;
+        Ok(())
+    }
+
+    pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> ProgramResult {
+        let state = &mut *ctx.accounts.state.load_mut()?;
+        require!(
+            ctx.accounts.authority.key == &state.proposed_owner,
+            Unauthorized
+        );
+        state.owner = std::mem::take(&mut state.proposed_owner);
         Ok(())
     }
 
@@ -93,8 +112,11 @@ pub enum ErrorCode {
     #[msg("Unauthorized")]
     Unauthorized = 0,
 
+    #[msg("Invalid input")]
+    InvalidInput = 1,
+
     #[msg("Access list is full")]
-    Full = 1,
+    Full = 2,
 }
 
 #[derive(Accounts)]
@@ -109,6 +131,20 @@ pub struct Initialize<'info> {
     pub rent: Sysvar<'info, Rent>,
     #[account(address = system_program::ID)]
     pub system_program: AccountInfo<'info>,
+}
+
+#[derive(Accounts)]
+pub struct TransferOwnership<'info> {
+    #[account(mut)]
+    pub state: AccountLoader<'info, AccessController>,
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct AcceptOwnership<'info> {
+    #[account(mut)]
+    pub state: AccountLoader<'info, AccessController>,
+    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
