@@ -50,7 +50,7 @@ export default class CreateFeed extends SolanaCommand {
     const granularity = new BN(input.granularity)
     const liveLength = new BN(input.liveLength)
     const length = new BN(this.flags.length || 8096)
-    const feedAccountLength = new BN(8 + 128 + length.toNumber() * 24)
+    const feedAccountLength = new BN(8 + 128 + length.toNumber() * 48)
     const decimals = new BN(input.decimals)
     const description = input.description || ''
 

@@ -306,16 +306,27 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 	if len(t) != int(transmissionLen) { // validate length
 		return Answer{}, 0, errTransmissionLength
 	}
-
-	var timestamp uint64
-	raw := make([]byte, 16)
-
 	buf = bytes.NewReader(t)
+
+	var slot uint64
+	err = binary.Read(buf, binary.LittleEndian, &slot)
+	if err != nil {
+		return Answer{}, 0, err
+	}
+
+	var timestamp uint32
 	err = binary.Read(buf, binary.LittleEndian, &timestamp)
 	if err != nil {
 		return Answer{}, 0, err
 	}
 
+	var padding uint32
+	err = binary.Read(buf, binary.LittleEndian, &padding)
+	if err != nil {
+		return Answer{}, 0, err
+	}
+
+	raw := make([]byte, 16)
 	// TODO: we could use ag_binary.Int128 instead
 	err = binary.Read(buf, binary.LittleEndian, &raw)
 	if err != nil {
