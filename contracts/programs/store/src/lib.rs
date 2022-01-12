@@ -35,7 +35,8 @@ pub enum Scope {
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct Round {
     pub round_id: u32,
-    pub timestamp: u64,
+    pub slot: u64,
+    pub timestamp: u32,
     pub answer: i128,
 }
 
@@ -237,6 +238,7 @@ pub mod store {
 
                 let data = Round {
                     round_id,
+                    slot: round.slot,
                     answer: round.answer,
                     timestamp: round.timestamp,
                 };
@@ -250,6 +252,7 @@ pub mod store {
 
                 let data = Round {
                     round_id: header.latest_round_id,
+                    slot: round.slot,
                     answer: round.answer,
                     timestamp: round.timestamp,
                 };

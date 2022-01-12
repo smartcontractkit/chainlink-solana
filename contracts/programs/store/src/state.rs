@@ -37,8 +37,12 @@ pub struct Store {
     AnchorDeserialize,
 )]
 pub struct Transmission {
-    pub timestamp: u64, // TODO: size back down to u32 and add padding?
+    pub slot: u64,
+    pub timestamp: u32,
+    pub _padding0: u32,
     pub answer: i128,
+    pub _padding1: u64,
+    pub _padding2: u64,
 }
 
 use std::cell::RefMut;
@@ -223,8 +227,10 @@ mod tests {
         with_store(&mut account, |store| {
             for i in 1..=20 {
                 store.insert(Transmission {
+                    slot: u64::from(i),
                     answer: i128::from(i),
                     timestamp: i,
+                    ..Default::default()
                 });
             }
 
@@ -233,44 +239,56 @@ mod tests {
             assert_eq!(
                 store.fetch(20),
                 Some(Transmission {
+                    slot: 20,
                     answer: 20,
-                    timestamp: 20
+                    timestamp: 20,
+                    ..Default::default()
                 })
             );
             assert_eq!(
                 store.fetch(19),
                 Some(Transmission {
+                    slot: 19,
                     answer: 19,
-                    timestamp: 19
+                    timestamp: 19,
+                    ..Default::default()
                 })
             );
             // Historical range rounds down
             assert_eq!(
                 store.fetch(18),
                 Some(Transmission {
+                    slot: 15,
                     answer: 15,
-                    timestamp: 15
+                    timestamp: 15,
+                    ..Default::default()
                 })
             );
             assert_eq!(
                 store.fetch(15),
                 Some(Transmission {
+                    slot: 15,
                     answer: 15,
-                    timestamp: 15
+                    timestamp: 15,
+                    ..Default::default()
                 })
             );
             assert_eq!(
                 store.fetch(14),
                 Some(Transmission {
+                    slot: 10,
                     answer: 10,
-                    timestamp: 10
+                    timestamp: 10,
+                    ..Default::default()
                 })
             );
             assert_eq!(
                 store.fetch(10),
                 Some(Transmission {
+                    slot: 10,
                     answer: 10,
-                    timestamp: 10
+                    timestamp: 10,
+                    ..Default::default()
                 })
             );
             // Out of range
