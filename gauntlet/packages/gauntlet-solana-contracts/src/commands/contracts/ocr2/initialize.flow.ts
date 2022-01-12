@@ -12,6 +12,7 @@ import SetBilling from './setBilling'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import OCR2Inspect from './inspection/inspect'
 import CreateFeed from '../store/createFeed'
+import SetWriter from '../store/setWriter'
 
 export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse> {
   static id = 'ocr2:initialize:flow'
@@ -51,6 +52,13 @@ export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse>
       {
         name: 'Change RDD Identifier',
         exec: this.showRddIdentifierInstructions,
+      },
+      {
+        name: 'Set writer on Store',
+        command: SetWriter,
+        flags: {
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
+        },
       },
       {
         name: 'Begin Offchain Config',

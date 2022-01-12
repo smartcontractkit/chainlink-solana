@@ -16,6 +16,7 @@ import CommitOffchainConfig from './offchainConfig/commit'
 import SetConfig from './setConfig'
 import SetBilling from './setBilling'
 import CreateFeed from '../store/createFeed'
+import SetWriter from '../store/setWriter'
 
 // TODO: Remove. Useful for dev testing
 export default class SetupFlow extends FlowCommand<TransactionResponse> {
@@ -186,6 +187,17 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
           },
         },
         id: this.stepIds.OCR_2,
+      },
+      {
+        name: 'Set writer on Store',
+        command: SetWriter,
+        flags: {
+          input: {
+            store: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.STORE)),
+            transmissions: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.FEED, 'transmissions')),
+          },
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
+        },
       },
       {
         name: 'Begin Offchain Config',
