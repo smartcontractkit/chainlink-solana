@@ -193,10 +193,10 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         command: SetWriter,
         flags: {
           input: {
-            store: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.STORE)),
             transmissions: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.FEED, 'transmissions')),
           },
-          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
+          ocrState: FlowCommand.ID.contract(this.stepIds.OCR_2),
+          state: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.STORE)),
         },
       },
       {

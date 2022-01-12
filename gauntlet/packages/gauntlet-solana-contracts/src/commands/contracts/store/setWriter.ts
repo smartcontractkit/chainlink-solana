@@ -8,6 +8,7 @@ import { getRDD } from '../../../lib/rdd'
 
 type Input = {
   transmissions: string
+  store: string
 }
 
 export default class SetWriter extends SolanaCommand {
@@ -21,16 +22,16 @@ export default class SetWriter extends SolanaCommand {
   constructor(flags, args) {
     super(flags, args)
 
-    this.require(!!this.flags.state, 'Please provide flags with "state"')
     this.require(!!this.flags.ocrState, 'Please provide flags with "ocrState"')
   }
 
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
     const rdd = getRDD(this.flags.rdd)
-    const agg = rdd[this.flags.ocrState]
+    const agg = rdd.contracts[this.flags.ocrState]
     return {
       transmissions: agg.transmissionsAccount,
+      store: agg.storeAccount,
     }
   }
 
@@ -44,7 +45,7 @@ export default class SetWriter extends SolanaCommand {
     const input = this.makeInput(this.flags.input)
     const owner = this.wallet.payer
 
-    const storeState = new PublicKey(this.flags.state)
+    const storeState = new PublicKey(input.store || this.flags.state)
     const ocr2State = new PublicKey(this.flags.ocrState)
     const feedState = new PublicKey(input.transmissions)
 
@@ -53,7 +54,7 @@ export default class SetWriter extends SolanaCommand {
       ocr2Program.programId,
     )
 
-    console.log(`Setting store writer on ${storeState.toString()} and ${feedState.toString()}`)
+    console.log(`Setting store writer on Store (${storeState.toString()}) and Feed (${feedState.toString()})`)
 
     const tx = await storeProgram.rpc.setWriter(storeAuthority, {
       accounts: {

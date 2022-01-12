@@ -57,7 +57,7 @@ export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse>
         name: 'Set writer on Store',
         command: SetWriter,
         flags: {
-          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
+          ocrState: FlowCommand.ID.contract(this.stepIds.OCR_2),
         },
       },
       {

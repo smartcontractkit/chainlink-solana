@@ -26,7 +26,7 @@ export default class CreateFeed extends SolanaCommand {
     const rdd = getRDD(this.flags.rdd)
     const aggregator = rdd.contracts[this.flags.id]
     return {
-      store: aggregator.store,
+      store: aggregator.storeAccount,
       granularity: aggregator.granularity,
       liveLength: aggregator.liveLength,
       decimals: aggregator.decimals,
@@ -66,11 +66,11 @@ export default class CreateFeed extends SolanaCommand {
       - Description: ${description}
       - Live Length: ${liveLength.toNumber()}
       - Granularity (historical): ${granularity.toNumber()}
-      - Historical Length: ${length.toNumber() - liveLength.toNumber()}
-      - Total Length: ${length.toNumber()}
+      - Historical Length: ${feedAccountLength.toNumber() - liveLength.toNumber()}
+      - Total Length: ${feedAccountLength.toNumber()}
     `)
 
-    await prompt('Continue creating new OCR 2 feed?')
+    await prompt('Continue creating new Transmissions Feed?')
     logger.loading(`Creating feed...`)
 
     const tx = await program.rpc.createFeed(description, decimals, granularity, liveLength, {
