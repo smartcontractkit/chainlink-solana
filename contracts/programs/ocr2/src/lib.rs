@@ -73,6 +73,12 @@ pub mod ocr2 {
     }
 
     #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
+    pub fn close(ctx: Context<Close>) -> ProgramResult {
+        // NOTE: Close is handled by anchor on exit due to the `close` attribute
+        Ok(())
+    }
+
+    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
     pub fn transfer_ownership(
         ctx: Context<TransferOwnership>,
         proposed_owner: Pubkey,
