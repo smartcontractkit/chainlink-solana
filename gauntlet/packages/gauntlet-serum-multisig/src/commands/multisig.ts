@@ -6,7 +6,7 @@ import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
 import { boolean } from '@chainlink/gauntlet-core/dist/lib/args'
 
-export const wrapCommand = (command) => {
+export const wrapCommand: any = (command) => {
   return class Multisig extends SolanaCommand {
     command: SolanaCommand
     multisigAddress
@@ -70,7 +70,9 @@ export const wrapCommand = (command) => {
       logger.debug('Proposal state:')
       logger.debug(JSON.stringify(proposalState, null, 4))
 
-      if (proposalState.signers.every((s) => s === true)) {
+      const remainingApprovalsNeeded = Number(multisigState.threshold) - proposalState.signers.filter(Boolean).length
+
+      if (remainingApprovalsNeeded <= 0) {
         try {
           const executeTx = await this.executeProposal(proposal)
           txResults.push(executeTx)
@@ -84,10 +86,12 @@ export const wrapCommand = (command) => {
         }
       } else {
         // inverting the signers boolean array and filtering owners by it
-        const remainingSigners = multisigState.owners.filter((_, i) => proposalState.signers.map((s) => !s)[i])
-        logger.info(`Other owners should sign this proposal, using the same command with flag --proposal=${proposal}`)
-        logger.info(`Remaining owners to sign: `)
-        logger.info(remainingSigners)
+        const remainingEligibleSigners = multisigState.owners.filter((_, i) => proposalState.signers.map((s) => !s)[i])
+        logger.info(
+          `${remainingApprovalsNeeded} more owners should sign this proposal, using the same command with flag --proposal=${proposal}`,
+        )
+        logger.info(`Eligible owners to sign: `)
+        logger.info(remainingEligibleSigners)
       }
 
       const responses: WriteResponse<TransactionResponse>[] = txResults.map((r) =>
