@@ -70,13 +70,7 @@ export default class SetPayees extends SolanaCommand {
         await Promise.all(
           input.operators.map(async ({ payee }) => {
             try {
-              const to = await Token.getAssociatedTokenAddress(
-                ASSOCIATED_TOKEN_PROGRAM_ID,
-                TOKEN_PROGRAM_ID,
-                token.publicKey,
-                new PublicKey(payee),
-              )
-              const info = await token.getAccountInfo(to)
+              const info = await token.getAccountInfo(new PublicKey(payee))
               return !!info.address
             } catch (e) {
               logger.error(`Payee with address ${payee} does not have a valid Token recipient address`)

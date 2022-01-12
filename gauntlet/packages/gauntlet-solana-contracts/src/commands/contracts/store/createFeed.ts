@@ -71,6 +71,7 @@ export default class CreateFeed extends SolanaCommand {
       - Description: ${description}
       - Live Length: ${liveLength.toNumber()}
       - Granularity (historical): ${granularity.toNumber()}
+      - Historical Length: ${length.toNumber()-liveLength.toNumber()}
       - Total Length: ${length.toNumber()}
     `)
 
