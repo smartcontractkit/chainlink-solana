@@ -21,7 +21,7 @@ func (m *Store) GetLatestRoundData() (uint64, uint64, uint64, error) {
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	return a.Data.Uint64(), a.Timestamp, 0, nil
+	return a.Data.Uint64(), uint64(a.Timestamp), 0, nil
 }
 
 func (m *Store) TransmissionsAddress() string {

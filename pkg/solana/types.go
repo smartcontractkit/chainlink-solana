@@ -12,8 +12,8 @@ const (
 	TransmissionsSize uint32 = 8096
 
 	// answer (int128, 16 bytes), timestamp (uint32, 4 bytes)
-	TimestampLen    uint64 = 8
-	TransmissionLen uint64 = 16 + TimestampLen
+	TimestampLen    uint64 = 4
+	TransmissionLen uint64 = 48
 
 	// AccountDiscriminator (8 bytes), RoundID (uint32, 4 bytes), Cursor (uint32, 4 bytes)
 	CursorOffset uint64 = 8 + 1 + 32 + 32 + 32 + 1 + 4 + 4 + 1
@@ -121,7 +121,7 @@ type Billing struct {
 // Answer contains the current price answer
 type Answer struct {
 	Data      *big.Int
-	Timestamp uint64
+	Timestamp uint32
 }
 
 // Access controller state
