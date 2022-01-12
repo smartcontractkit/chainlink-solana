@@ -19,8 +19,8 @@ pub const MAX_ADDRS: usize = 64;
 
 #[zero_copy]
 pub struct AccessList {
-    xs: [Pubkey; MAX_ADDRS],
     len: u64,
+    xs: [Pubkey; MAX_ADDRS],
 }
 arrayvec!(AccessList, Pubkey, u64);
 const_assert!(
@@ -33,9 +33,6 @@ pub struct AccessController {
     pub proposed_owner: Pubkey,
     pub access_list: AccessList,
 }
-
-// IDEA: use a PDA with seeds = [account()], bump = ? to check for proof that account exists
-// the tradeoff would be that we would have to calculate the PDA and pass it as an account everywhere
 
 #[program]
 pub mod access_controller {
