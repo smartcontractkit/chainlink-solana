@@ -1,8 +1,8 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { inspection, BN } from '@chainlink/gauntlet-core/dist/utils'
+import { inspection, BN, logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { Proto } from '@chainlink/gauntlet-core/dist/crypto'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { PublicKey } from '@solana/web3.js'
+import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js'
 
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import { getRDD } from '../../../../lib/rdd'
@@ -16,10 +16,10 @@ type Input = {
   minAnswer: string | number
   maxAnswer: string | number
   transmitters: string[]
+  offchainConfig: OffchainConfigInput
   billingAccessController: string
   requesterAccessController: string
   link: string
-  offchainConfig: OffchainConfigInput
 }
 
 export default class OCR2Inspect extends SolanaCommand {
@@ -64,13 +64,61 @@ export default class OCR2Inspect extends SolanaCommand {
     return { ...offchain, reportingPluginConfig }
   }
 
+  makeFeedInspections = async (bufferedInfo: Keypair, input: Input): Promise<inspection.Inspection[]> => {
+    const store = getContract(CONTRACT_LIST.STORE, '')
+    const storeProgram = this.loadProgram(store.idl, store.programId.toString())
+    const account = await storeProgram.account.description.fetch(bufferedInfo.publicKey)
+    return [
+      inspection.makeInspection(
+        // Description comes with some empty bytes
+        Buffer.from(account.description.filter((v) => v !== 0)).toString(),
+        input.description,
+        'Description',
+      ),
+      inspection.makeInspection(
+        toComparableNumber(account.config.decimals),
+        toComparableNumber(input.decimals),
+        'Decimals',
+      ),
+    ]
+  }
+
+  getTranmissionsStateAccount = async (tranmissions: PublicKey): Promise<Keypair> => {
+    const store = getContract(CONTRACT_LIST.STORE, '')
+    const storeProgram = this.loadProgram(store.idl, store.programId.toString())
+
+    let buffer = Keypair.generate()
+    await storeProgram.rpc.query(
+      { version: {} },
+      {
+        accounts: {
+          feed: tranmissions,
+          buffer: buffer.publicKey,
+        },
+        preInstructions: [
+          SystemProgram.createAccount({
+            fromPubkey: this.provider.wallet.publicKey,
+            newAccountPubkey: buffer.publicKey,
+            lamports: await this.provider.connection.getMinimumBalanceForRentExemption(256),
+            space: 256,
+            programId: store.programId,
+          }),
+        ],
+        signers: [buffer],
+      },
+    )
+
+    return buffer
+  }
+
   execute = async () => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
-    const program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
+    const ocr2program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
+
+    const input = this.makeInput(this.flags.input)
 
     const state = new PublicKey(this.flags.state)
-    const input = this.makeInput(this.flags.input)
-    const onChainState = await program.account.state.fetch(state)
+    const onChainState = await ocr2program.account.state.fetch(state)
 
     const bufferedConfig = Buffer.from(onChainState.config.offchainConfig.xs).slice(
       0,
@@ -112,17 +160,6 @@ export default class OCR2Inspect extends SolanaCommand {
         toComparableNumber(onChainState.config.maxAnswer),
         toComparableNumber(input.maxAnswer),
         'Max Answer',
-      ),
-      inspection.makeInspection(
-        toComparableNumber(onChainState.config.decimals),
-        toComparableNumber(input.decimals),
-        'Decimals',
-      ),
-      inspection.makeInspection(
-        // Description comes with some empty bytes
-        Buffer.from(onChainState.config.description.filter((v) => v !== 0)).toString(),
-        input.description,
-        'Description',
       ),
       inspection.makeInspection(
         toComparablePubKey(onChainState.config.requesterAccessController),
@@ -176,6 +213,17 @@ export default class OCR2Inspect extends SolanaCommand {
         `Offchain Config "reportingPluginConfig.deltaCNanoseconds"`,
       ),
     ]
+
+    // Fetching tranmissions involves a tx. Give the option to the user to choose whether to fetch it or not.
+    // Deactivated until we find a more efficient way to fetch this info
+    // const withTransmissionsInfo = !!this.flags.withTransmissions
+    // if (withTransmissionsInfo) {
+    //   prompt('Fetching transmissions information involves sending a transaction. Continue?')
+    //   const trasmissions = new PublicKey(onChainState.transmissions)
+    //   const accountInfo = await this.getTranmissionsStateAccount(trasmissions)
+    //   const tranmissionsInspections = await this.makeFeedInspections(accountInfo, input)
+    //   inspections.push(...tranmissionsInspections)
+    // }
 
     const isSuccessfulInspection = inspection.inspect(inspections)
 
