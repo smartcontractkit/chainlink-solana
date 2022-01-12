@@ -19,7 +19,7 @@ pub const MAX_ADDRS: usize = 64;
 
 #[zero_copy]
 pub struct AccessList {
-    xs: [Pubkey; 64], // sadly we can't use const https://github.com/project-serum/anchor/issues/632
+    xs: [Pubkey; MAX_ADDRS],
     len: u64,
 }
 arrayvec!(AccessList, Pubkey, u64);
