@@ -19,8 +19,8 @@ pub const MAX_ADDRS: usize = 64;
 
 #[zero_copy]
 pub struct AccessList {
-    len: u64,
     xs: [Pubkey; MAX_ADDRS],
+    len: u64,
 }
 arrayvec!(AccessList, Pubkey, u64);
 const_assert!(
