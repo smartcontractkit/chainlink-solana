@@ -25,7 +25,7 @@ const (
 	// TokenMintAccountSize default size of data required for a new mint account
 	TokenMintAccountSize             = uint64(82)
 	TokenAccountSize                 = uint64(165)
-	AccessControllerStateAccountSize = uint64(8 + 32 + 8 + 32*64)
+	AccessControllerStateAccountSize = uint64(8 + 32 + 32 + 8 + 32*64)
 	StoreAccountSize                 = uint64(8 + 32*4 + 32*128 + 8)
 	OCRTransmissionsAccountSize      = uint64(8 + 128 + 8192*24)
 	OCRLeftoverPaymentSize           = uint64(32 + 8)
