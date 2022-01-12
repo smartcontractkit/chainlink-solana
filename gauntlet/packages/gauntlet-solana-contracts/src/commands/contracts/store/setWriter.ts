@@ -8,7 +8,6 @@ import { getRDD } from '../../../lib/rdd'
 
 type Input = {
   transmissions: string
-  store: string
 }
 
 export default class SetWriter extends SolanaCommand {
@@ -16,21 +15,21 @@ export default class SetWriter extends SolanaCommand {
   static category = CONTRACT_LIST.STORE
 
   static examples = [
-    'yarn gauntlet store:set_writer --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet store:set_writer --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --ocrState=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
 
   constructor(flags, args) {
     super(flags, args)
 
     this.require(!!this.flags.state, 'Please provide flags with "state"')
+    this.require(!!this.flags.ocrState, 'Please provide flags with "ocrState"')
   }
 
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
     const rdd = getRDD(this.flags.rdd)
-    const agg = rdd[this.flags.state]
+    const agg = rdd[this.flags.ocrState]
     return {
-      store: agg.storeAccount,
       transmissions: agg.transmissionsAccount,
     }
   }
@@ -45,9 +44,9 @@ export default class SetWriter extends SolanaCommand {
     const input = this.makeInput(this.flags.input)
     const owner = this.wallet.payer
 
-    const ocr2State = new PublicKey(this.flags.state)
+    const storeState = new PublicKey(this.flags.state)
+    const ocr2State = new PublicKey(this.flags.ocrState)
     const feedState = new PublicKey(input.transmissions)
-    const storeState = new PublicKey(input.store)
 
     const [storeAuthority, _storeNonce] = await PublicKey.findProgramAddress(
       [Buffer.from(utils.bytes.utf8.encode('store')), ocr2State.toBuffer()],
