@@ -37,7 +37,6 @@ func TestMultiFeedMonitorToMakeSureAllGoroutinesTerminate(t *testing.T) {
 
 	monitor := NewMultiFeedMonitor(
 		cfg.Solana,
-		feeds,
 
 		logger.NewNullLogger(),
 		transmissionReader, stateReader,
@@ -52,7 +51,7 @@ func TestMultiFeedMonitorToMakeSureAllGoroutinesTerminate(t *testing.T) {
 		configSetSimplifiedSchema,
 		transmissionSchema,
 	)
-	go monitor.Start(ctx, wg)
+	go monitor.Start(ctx, wg, feeds)
 
 	trCount, stCount := 0, 0
 	messages := []producerMessage{}
@@ -105,7 +104,6 @@ func TestMultiFeedMonitorForPerformance(t *testing.T) {
 
 	monitor := NewMultiFeedMonitor(
 		cfg.Solana,
-		feeds,
 
 		logger.NewNullLogger(),
 		transmissionReader, stateReader,
@@ -120,7 +118,7 @@ func TestMultiFeedMonitorForPerformance(t *testing.T) {
 		configSetSimplifiedSchema,
 		transmissionSchema,
 	)
-	go monitor.Start(ctx, wg)
+	go monitor.Start(ctx, wg, feeds)
 
 	var trCount, stCount int64 = 0, 0
 	messages := []producerMessage{}

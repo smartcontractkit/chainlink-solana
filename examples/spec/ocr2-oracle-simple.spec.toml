@@ -1,0 +1,46 @@
+type                                   = "offchainreporting2"
+schemaVersion                          = 1
+blockchainTimeout                      = "20s"
+contractConfigConfirmations            = 3
+contractConfigTrackerPollInterval      = "1m"
+contractConfigTrackerSubscribeInterval = "2m"
+name                                   = "<insert job name here>"
+relay                                  = "solana"
+contractID                             = "<insert solana ocr2 state account>"
+p2pBootstrapPeers                      = ["somep2pkey@localhost-tcp:port"]
+isBootstrapPeer                        = false
+p2pPeerID                              = "<insert p2p id>"
+ocrKeyBundleID                         = "<insert ocr2 key bundle id>"
+monitoringEndpoint                     = "<insert monitoring endpoint>"
+transmitterID                          = "<insert solana transmitter key id>"
+observationSource                      = """
+    // data source 1
+    ds1          [type="bridge" name="bridge-coingecko" requestData="<{"data": {"from":"LINK","to":"USD"}}>"]
+    ds1_parse    [type="jsonparse" path="result"]
+    ds1_multiply [type="multiply" times=100000000]
+    ds1 -> ds1_parse -> ds1_multiply
+"""
+juelsPerFeeCoinSource                  = """
+    // Fetch the LINK price from a data source
+    // data source 1
+    ds1_link       [type="bridge" name="bridge-coingecko" requestData="<{"data": {"from":"LINK","to":"USD"}}>"]
+    ds1_link_parse [type="jsonparse" path="result"]
+    ds1_link -> ds1_link_parse -> divide
+
+    // Fetch the SOL price from a data source
+    // data source 1
+    ds1_coin       [type="bridge" name="bridge-coingecko" requestData="<{"data": {"from":"SOL","to":"USD"}}."]
+    ds1_coin_parse [type="jsonparse" path="result"]
+    ds1_coin -> ds1_coin_parse -> divide
+
+    divide [type="divide" input="$(ds1_link_parse)" divisor="$(ds1_coin_parse)" precision="9"]
+    scale  [type="multiply" times=1000000000]
+
+    divide -> scale
+"""
+
+[relayConfig]
+nodeEndpointHTTP   = "http:..."
+ocr2ProgramID      = "<insert solana ocr2 program ID>"
+transmissionsID    = "<insert solana ocr2 transmissions account>"
+storeProgramID     = "<insert solana ocr2 store account>"

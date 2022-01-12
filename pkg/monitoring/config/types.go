@@ -47,11 +47,12 @@ type SchemaRegistry struct {
 }
 
 type Feeds struct {
-	URL             string
+	// If URL is set, the RDD tracker will start and override any feed configs extracted from FilePath!
 	FilePath        string
+	URL             string
+	RDDReadTimeout  time.Duration
+	RDDPollInterval time.Duration
 	Feeds           []Feed
-	RddReadTimeout  time.Duration
-	RddPollInterval time.Duration
 }
 
 type Feed struct {
@@ -74,5 +75,8 @@ type Http struct {
 }
 
 type Feature struct {
-	TestMode bool
+	// If set, the monitor will not read from a chain instead from a source of random state snapshots.
+	TestOnlyFakeReaders bool
+	// If set, the monitor will not read from the RDD, instead it will get data from a local source of random feeds configurations.
+	TestOnlyFakeRdd bool
 }

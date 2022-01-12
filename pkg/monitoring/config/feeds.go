@@ -1,74 +1,65 @@
 package config
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 
 	"github.com/gagliardetto/solana-go"
 )
 
 func populateFeeds(cfg *Config) error {
-	feeds := []jsonFeedConfig{}
-	if cfg.Feeds.URL != "" {
-		rddCtx, cancel := context.WithTimeout(context.Background(), cfg.Feeds.RddReadTimeout)
-		defer cancel()
-		readFeedsReq, err := http.NewRequestWithContext(rddCtx, http.MethodGet, cfg.Feeds.URL, nil)
-		if err != nil {
-			return fmt.Errorf("unable to build a request to the RDD URL '%s': %w", cfg.Feeds.URL, err)
-		}
-		httpClient := &http.Client{}
-		res, err := httpClient.Do(readFeedsReq)
-		if err != nil {
-			return fmt.Errorf("unable to fetch RDD data from URL '%s': %w", cfg.Feeds.URL, err)
-		}
-		defer res.Body.Close()
-		decoder := json.NewDecoder(res.Body)
-		if err := decoder.Decode(&feeds); err != nil {
-			return fmt.Errorf("unable to unmarshal feeds config from RDD URL '%s': %w", cfg.Feeds.URL, err)
-		}
-	} else if cfg.Feeds.FilePath != "" {
-		contents, err := os.ReadFile(cfg.Feeds.FilePath)
-		if err != nil {
-			return fmt.Errorf("unable to read feeds file '%s': %w", cfg.Feeds.FilePath, err)
-		}
-		if err = json.Unmarshal(contents, &feeds); err != nil {
-			return fmt.Errorf("unable to unmarshal feeds config from file '%s': %w", cfg.Feeds.FilePath, err)
-		}
+	if cfg.Feeds.FilePath == "" {
+		return nil
 	}
+	contents, err := os.ReadFile(cfg.Feeds.FilePath)
+	if err != nil {
+		return fmt.Errorf("unable to read feeds file '%s': %w", cfg.Feeds.FilePath, err)
+	}
+	rawFeeds := []RawFeedConfig{}
+	if err = json.Unmarshal(contents, &rawFeeds); err != nil {
+		return fmt.Errorf("unable to unmarshal feeds config from file '%s': %w", cfg.Feeds.FilePath, err)
+	}
+	feeds, err := NewFeeds(rawFeeds)
+	if err != nil {
+		return err
+	}
+	cfg.Feeds.Feeds = feeds
+	return nil
+}
 
-	cfg.Feeds.Feeds = make([]Feed, len(feeds))
-	for i, feed := range feeds {
-		contractAddress, err := solana.PublicKeyFromBase58(feed.ContractAddressBase58)
+func NewFeeds(rawFeeds []RawFeedConfig) ([]Feed, error) {
+	feeds := make([]Feed, len(rawFeeds))
+	for i, rawFeed := range rawFeeds {
+		contractAddress, err := solana.PublicKeyFromBase58(rawFeed.ContractAddressBase58)
 		if err != nil {
-			return fmt.Errorf("failed to parse program id '%s' from JSON at index i=%d: %w", feed.ContractAddressBase58, i, err)
+			return nil, fmt.Errorf("failed to parse program id '%s' from JSON at index i=%d: %w", rawFeed.ContractAddressBase58, i, err)
 		}
-		transmissionsAccount, err := solana.PublicKeyFromBase58(feed.TransmissionsAccountBase58)
+		transmissionsAccount, err := solana.PublicKeyFromBase58(rawFeed.TransmissionsAccountBase58)
 		if err != nil {
-			return fmt.Errorf("failed to parse transmission account '%s' from JSON at index i=%d: %w", feed.TransmissionsAccountBase58, i, err)
+			return nil, fmt.Errorf("failed to parse transmission account '%s' from JSON at index i=%d: %w", rawFeed.TransmissionsAccountBase58, i, err)
 		}
-		stateAccount, err := solana.PublicKeyFromBase58(feed.StateAccountBase58)
+		stateAccount, err := solana.PublicKeyFromBase58(rawFeed.StateAccountBase58)
 		if err != nil {
-			return fmt.Errorf("failed to parse state account '%s' from JSON at index i=%d: %w", feed.StateAccountBase58, i, err)
+			return nil, fmt.Errorf("failed to parse state account '%s' from JSON at index i=%d: %w", rawFeed.StateAccountBase58, i, err)
 		}
-		cfg.Feeds.Feeds[i] = Feed{
-			feed.FeedName,
-			feed.FeedPath,
-			feed.Symbol,
-			feed.Heartbeat,
-			feed.ContractType,
-			feed.ContractStatus,
+		feeds[i] = Feed{
+			rawFeed.FeedName,
+			rawFeed.FeedPath,
+			rawFeed.Symbol,
+			rawFeed.Heartbeat,
+			rawFeed.ContractType,
+			rawFeed.ContractStatus,
 			contractAddress,
 			transmissionsAccount,
 			stateAccount,
 		}
 	}
-	return nil
+	return feeds, nil
 }
 
-type jsonFeedConfig struct {
+// RawFeedConfig should only be used for deserializing responses from the RDD.
+type RawFeedConfig struct {
 	FeedName       string `json:"name,omitempty"`
 	FeedPath       string `json:"path,omitempty"`
 	Symbol         string `json:"symbol,omitempty"`

@@ -61,9 +61,9 @@ func TestPoller(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), testCase.duration)
 			defer cancel()
 			reader := fakeReaderWithWait{testCase.waitOnRead}
-			poller := NewPoller(
+			poller := NewSourcePoller(
+				NewSolanaSource(account, reader),
 				logger.NewNullLogger(),
-				account, reader,
 				testCase.pollInterval,
 				testCase.readTimeout,
 				testCase.bufferCapacity)

@@ -61,9 +61,10 @@ KAFKA_TRANSMISSION_TOPIC="transmission_topic" \
 SCHEMA_REGISTRY_URL="http://localhost:8989" \
 SCHEMA_REGISTRY_USERNAME="" \
 SCHEMA_REGISTRY_PASSWORD="" \
-FEEDS_FILE_PATH="/tmp/feeds.json" \
 HTTP_ADDRESS="localhost:3000" \
-FEATURE_TEST_MODE=true \
+FEEDS_URL="http://localhost:4000" \
+FEATURE_TEST_ONLY_FAKE_READERS=true \
+FEATURE_TEST_ONLY_FAKE_RDD=true \
 go run ./cmd/monitoring/main.go
 ```
 

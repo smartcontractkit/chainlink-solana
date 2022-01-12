@@ -381,6 +381,48 @@ func (k *keepLatestMetrics) SetOffchainAggregatorSubmissionReceivedValues(value 
 	k.latestTransmitter = sender
 }
 
+func NewFakeRDDSource(minFeeds, maxFeeds uint8) Source {
+	return &fakeRddSource{minFeeds, maxFeeds}
+}
+
+type fakeRddSource struct {
+	minFeeds, maxFeeds uint8
+}
+
+func (f *fakeRddSource) Name() string {
+	return "fake-rdd"
+}
+
+func (f *fakeRddSource) Fetch(_ context.Context) (interface{}, error) {
+	numFeeds := int(f.minFeeds) + rand.Intn(int(f.maxFeeds-f.minFeeds))
+	feeds := make([]config.Feed, numFeeds)
+	for i := 0; i < numFeeds; i++ {
+		feeds[i] = generateFeedConfig()
+	}
+	return feeds, nil
+}
+
+type fakePoller struct {
+	numUpdates int
+	ch         chan interface{}
+}
+
+func (f *fakePoller) Start(ctx context.Context) {
+	source := &fakeRddSource{1, 2}
+	for i := 0; i < f.numUpdates; i++ {
+		updates, _ := source.Fetch(ctx)
+		select {
+		case f.ch <- updates:
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (f *fakePoller) Updates() <-chan interface{} {
+	return f.ch
+}
+
 // This utilities are used primarely in tests but are present in the monitoring package because they are not inside a file ending in _test.go.
 // This is done in order to expose NewRandomDataReader for use in cmd/monitoring.
 // The following code is added to comply with the "unused" linter:
@@ -390,4 +432,5 @@ var (
 	_ = fakeProducer{}
 	_ = fakeSchema{}
 	_ = keepLatestMetrics{}
+	_ = fakePoller{}
 )

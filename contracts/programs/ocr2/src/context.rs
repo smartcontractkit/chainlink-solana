@@ -42,6 +42,15 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
+pub struct Close<'info> {
+    #[account(mut, close = receiver)]
+    pub state: AccountLoader<'info, State>,
+    #[account(mut)]
+    pub receiver: SystemAccount<'info>,
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
 pub struct TransferOwnership<'info> {
     #[account(mut)]
     pub state: AccountLoader<'info, State>,
