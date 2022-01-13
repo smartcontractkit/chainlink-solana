@@ -9,7 +9,7 @@ export default class SetAccessController extends SolanaCommand {
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:set_access_controller --network=local --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --type=billing --accessController=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet ocr2:set_access_controller --network=local --state=[STATE_ACC] --type=[AC_TYPE] --accessController=[AC_ACC]',
   ]
 
   constructor(flags, args) {

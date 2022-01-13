@@ -4,12 +4,12 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 
-export default class SetAccessController extends SolanaCommand {
+export default class SetLoweringAccessController extends SolanaCommand {
   static id = 'store:set_lowering_access_controller'
   static category = CONTRACT_LIST.STORE
 
   static examples = [
-    'yarn gauntlet store:set_lowering_access_controller --network=local --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --accessController=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet store:set_lowering_access_controller --network=local --state=[STATE_ACC] --accessController=[AC_ACC]',
   ]
 
   constructor(flags, args) {
@@ -27,7 +27,6 @@ export default class SetAccessController extends SolanaCommand {
     const state = new PublicKey(this.flags.state)
     const ac = new PublicKey(this.flags.accessController)
 
-    // console.log(program.account.store.fetch(state))
     const info = await program.account.store.fetch(state)
     const oldAC = info.loweringAccessController
 
