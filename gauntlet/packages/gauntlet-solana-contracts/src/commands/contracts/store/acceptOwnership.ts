@@ -14,7 +14,6 @@ export default class AcceptOwnership extends SolanaCommand {
     super(flags, args)
 
     this.require(!!this.flags.state, 'Please provide flags with "state"')
-    this.require(!!this.flags.to, 'Please provide flags with "to"')
   }
 
   execute = async () => {
@@ -25,11 +24,10 @@ export default class AcceptOwnership extends SolanaCommand {
     const owner = this.wallet.payer
 
     const storeState = new PublicKey(this.flags.state)
-    const proposedOwner = new PublicKey(this.flags.to)
 
     await prompt(`Accepting ownership of store state (${storeState.toString()}). Continue?`)
 
-    const tx = await storeProgram.rpc.acceptOwnership(proposedOwner, {
+    const tx = await storeProgram.rpc.acceptOwnership({
       accounts: {
         store: storeState,
         authority: owner.publicKey,
@@ -37,7 +35,7 @@ export default class AcceptOwnership extends SolanaCommand {
       signers: [owner],
     })
 
-    logger.success(`Set writer on tx ${tx}`)
+    logger.success(`Accepted ownership on tx ${tx}`)
 
     return {
       responses: [
