@@ -1,5 +1,5 @@
 import { Result, WriteCommand } from '@chainlink/gauntlet-core'
-import { BpfLoader, BPF_LOADER_PROGRAM_ID, Keypair, LAMPORTS_PER_SOL } from '@solana/web3.js'
+import { BpfLoader, BPF_LOADER_PROGRAM_ID, Keypair, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js'
 import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { RawTransaction, TransactionResponse } from '../types'
 import { Idl, Program, Provider, Wallet } from '@project-serum/anchor'
@@ -8,7 +8,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
   wallet: typeof Wallet
   provider: Provider
   abstract execute: () => Promise<Result<TransactionResponse>>
-  makeRawTransaction: () => Promise<RawTransaction[]>
+  makeRawTransaction: (signer: PublicKey) => Promise<RawTransaction[]>
 
   constructor(flags, args) {
     super(flags, args)

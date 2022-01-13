@@ -18,7 +18,7 @@ export default class SetThreshold extends SolanaCommand {
     this.requireFlag('threshold', 'Please provide multisig threshold')
   }
 
-  makeRawTransaction = async () => {
+  makeRawTransaction = async (signer: PublicKey) => {
     const multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS || '')
     const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
     const address = multisig.programId.toString()

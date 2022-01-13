@@ -43,7 +43,7 @@ export default class MultisigCreate extends SolanaCommand {
 
     const multisig = Keypair.generate()
 
-    const [_, nonce] = await PublicKey.findProgramAddress([multisig.publicKey.toBuffer()], program.programId)
+    const [multisigSigner, nonce] = await PublicKey.findProgramAddress([multisig.publicKey.toBuffer()], program.programId)
     const maximumSize = this.flags.maximumSize || DEFAULT_MAXIMUM_SIZE
     const owners = input.owners.map((key) => new PublicKey(key))
 
@@ -56,7 +56,8 @@ export default class MultisigCreate extends SolanaCommand {
       instructions: [await program.account.multisig.createInstruction(multisig, maximumSize)],
     })
     logger.info(`Multisig address: ${multisig.publicKey}`)
-
+    logger.info(`Multisig Signer: ${multisigSigner.toString()}`)
+    
     return {
       responses: [
         {

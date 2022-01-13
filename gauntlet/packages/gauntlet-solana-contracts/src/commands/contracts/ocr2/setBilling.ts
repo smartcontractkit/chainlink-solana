@@ -35,7 +35,7 @@ export default class SetBilling extends SolanaCommand {
     this.requireFlag('state', 'Provide a valid state address')
   }
 
-  makeRawTransaction = async () => {
+  makeRawTransaction = async (signer: PublicKey) => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
@@ -65,7 +65,7 @@ export default class SetBilling extends SolanaCommand {
         isWritable: true,
       },
       {
-        pubkey: this.wallet.payer.publicKey,
+        pubkey: signer,
         isSigner: true,
         isWritable: false,
       },
@@ -86,7 +86,7 @@ export default class SetBilling extends SolanaCommand {
   }
 
   execute = async () => {
-    const rawTx = await this.makeRawTransaction()
+    const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
     const tx = rawTx.reduce(
       (tx, meta) =>
         tx.add(

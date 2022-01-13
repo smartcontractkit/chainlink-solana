@@ -14,6 +14,7 @@ export const wrapCommand = (command) => {
     address
     program
     rawTx
+    multisigSigner
 
     static id = `${command.id}`
 
@@ -32,7 +33,12 @@ export const wrapCommand = (command) => {
       this.address = this.multisig.programId.toString()
       this.program = this.loadProgram(this.multisig.idl, this.address)
       logger.info(`Multisig Address: ${process.env.MULTISIG_ADDRESS}`)
-
+      const [multisigSigner] = await PublicKey.findProgramAddress(
+        [this.multisigAddress.toBuffer()],
+        this.program.programId,
+      )
+      logger.info(`Multisig Signer: ${multisigSigner.toString()}`)
+      this.multisigSigner = multisigSigner
       let multisigState
       let proposalState
       let proposal
@@ -61,7 +67,7 @@ export const wrapCommand = (command) => {
         txResults.push(approveTx)
       } else {
         // Else create a new proposal TX account. Creator approves it automatically.
-        const rawTxs = await this.command.makeRawTransaction()
+        const rawTxs = await this.command.makeRawTransaction(this.multisigSigner)
         const { createTx, proposalTxAccount } = await this.createProposal(rawTxs[0])
         proposal = proposalTxAccount
         txResults.push(createTx)
@@ -138,21 +144,18 @@ export const wrapCommand = (command) => {
 
     executeProposal = async (proposal: PublicKey): Promise<string> => {
       logger.loading(`Executing proposal`)
-      const [multisigSigner] = await PublicKey.findProgramAddress(
-        [this.multisigAddress.toBuffer()],
-        this.program.programId,
-      )
+   
       const proposalData = await this.program.account.transaction.fetch(proposal)
       let executeTx
       executeTx = await this.program.rpc.executeTransaction({
         accounts: {
           multisig: this.multisigAddress,
-          multisigSigner,
+          multisigSigner: this.multisigSigner,
           transaction: proposal,
         },
         remainingAccounts: proposalData.accounts
           .map((t: any) => {
-            if (t.pubkey.equals(multisigSigner)) {
+            if (t.pubkey.equals(this.multisigSigner)) {
               return { ...t, isSigner: false }
             }
             return t

@@ -16,7 +16,7 @@ export default class SetOwners extends SolanaCommand {
   constructor(flags, args) {
     super(flags, args)
   }
-  makeRawTransaction = async () => {
+  makeRawTransaction = async (signer: PublicKey) => {
     const multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS || '')
     const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
     const address = multisig.programId.toString()
