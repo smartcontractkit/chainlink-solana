@@ -32,6 +32,8 @@ var (
 
 	Instruction_CreateFeed = ag_binary.TypeID([8]byte{173, 86, 95, 94, 13, 193, 67, 180})
 
+	Instruction_CloseFeed = ag_binary.TypeID([8]byte{153, 14, 92, 89, 19, 78, 211, 46})
+
 	Instruction_SetValidatorConfig = ag_binary.TypeID([8]byte{87, 248, 224, 193, 17, 41, 80, 250})
 
 	Instruction_SetWriter = ag_binary.TypeID([8]byte{174, 36, 177, 122, 86, 142, 32, 109})
@@ -56,6 +58,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "Initialize"
 	case Instruction_CreateFeed:
 		return "CreateFeed"
+	case Instruction_CloseFeed:
+		return "CloseFeed"
 	case Instruction_SetValidatorConfig:
 		return "SetValidatorConfig"
 	case Instruction_SetWriter:
@@ -97,6 +101,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"create_feed", (*CreateFeed)(nil),
+		},
+		{
+			"close_feed", (*CloseFeed)(nil),
 		},
 		{
 			"set_validator_config", (*SetValidatorConfig)(nil),

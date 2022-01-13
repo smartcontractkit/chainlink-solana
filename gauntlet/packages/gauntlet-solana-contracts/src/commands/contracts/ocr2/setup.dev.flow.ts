@@ -1,12 +1,11 @@
 import { FlowCommand } from '@chainlink/gauntlet-core'
 import { TransactionResponse, waitExecute } from '@chainlink/gauntlet-solana'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
-
 import { CONTRACT_ENV_NAMES, CONTRACT_LIST, getDeploymentContract } from '../../../lib/contracts'
 import { makeAbstractCommand } from '../../abstract'
 import Initialize from './initialize'
 import InitializeAC from '../accessController/initialize'
-import InitializeValidator from '../store/initialize'
+import InitializeStore from '../store/initialize'
 import DeployToken from '../token/deploy'
 import SetPayees from './setPayees'
 import SetValidatorConfig from '../store/setValidatorConfig'
@@ -16,6 +15,8 @@ import WriteOffchainConfig from './offchainConfig/write'
 import CommitOffchainConfig from './offchainConfig/commit'
 import SetConfig from './setConfig'
 import SetBilling from './setBilling'
+import CreateFeed from '../store/createFeed'
+import SetWriter from '../store/setWriter'
 
 // TODO: Remove. Useful for dev testing
 export default class SetupFlow extends FlowCommand<TransactionResponse> {
@@ -32,6 +33,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
       OCR_2: 3,
       TOKEN: 4,
       STORE: 5,
+      FEED: 6,
     }
 
     const offchainConfigInput = {
@@ -125,7 +127,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         command: 'ocr2:deploy',
       },
       {
-        name: 'Deploy Validator',
+        name: 'Deploy Store',
         command: 'store:deploy',
       },
       {
@@ -137,6 +139,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         name: 'Set Environment',
         exec: this.setEnvironment,
       },
+      // Constant Contracts
       {
         name: 'Initialize Billing AC',
         command: InitializeAC,
@@ -148,11 +151,26 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         id: this.stepIds.REQUEST_ACCESS_CONTROLLER,
       },
       {
-        name: 'Initialize Validator',
-        command: InitializeValidator,
+        name: 'Initialize Store',
+        command: InitializeStore,
         id: this.stepIds.STORE,
         flags: {
           accessController: FlowCommand.ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
+        },
+      },
+      // Feed deployment. Unique
+      {
+        name: 'Create Feed',
+        command: CreateFeed,
+        id: this.stepIds.FEED,
+        flags: {
+          input: {
+            store: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.STORE)),
+            granularity: 30,
+            liveLength: 86400,
+            decimals: 9,
+            description: 'TEST',
+          },
         },
       },
       {
@@ -165,18 +183,28 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
           input: {
             minAnswer: 0,
             maxAnswer: 1000000000,
-            decimals: 9,
-            description: 'TEST',
+            transmissions: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.FEED, 'transmissions')),
           },
         },
         id: this.stepIds.OCR_2,
+      },
+      {
+        name: 'Set writer on Store',
+        command: SetWriter,
+        flags: {
+          input: {
+            transmissions: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.FEED, 'transmissions')),
+          },
+          ocrState: FlowCommand.ID.contract(this.stepIds.OCR_2),
+          state: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.STORE)),
+        },
       },
       {
         name: 'Begin Offchain Config',
         command: BeginOffchainConfig,
         flags: {
           state: FlowCommand.ID.contract(this.stepIds.OCR_2),
-          version: this.flags.version || 1,
+          version: this.flags.version || 2,
         },
       },
       {

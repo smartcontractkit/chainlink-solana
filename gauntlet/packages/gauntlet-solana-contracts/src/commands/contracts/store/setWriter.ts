@@ -1,40 +1,66 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
+import { logger } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
+import { utils } from '@project-serum/anchor'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
+import { getRDD } from '../../../lib/rdd'
+
+type Input = {
+  transmissions: string
+  store: string
+}
 
 export default class SetWriter extends SolanaCommand {
   static id = 'store:set_writer'
   static category = CONTRACT_LIST.STORE
 
   static examples = [
-    'yarn gauntlet store:set_writer --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --threshold=1000 --feed=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet store:set_writer --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --ocrState=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
 
   constructor(flags, args) {
     super(flags, args)
 
-    this.require(!!this.flags.state, 'Please provide flags with "state"')
+    this.require(!!this.flags.ocrState, 'Please provide flags with "ocrState"')
+  }
+
+  makeInput = (userInput): Input => {
+    if (userInput) return userInput as Input
+    const rdd = getRDD(this.flags.rdd)
+    const agg = rdd.contracts[this.flags.ocrState]
+    return {
+      transmissions: agg.transmissionsAccount,
+      store: agg.storeAccount,
+    }
   }
 
   execute = async () => {
-    const storeProgram = getContract(CONTRACT_LIST.STORE, '')
-    const address = storeProgram.programId.toString()
-    const program = this.loadProgram(storeProgram.idl, address)
+    const store = getContract(CONTRACT_LIST.STORE, '')
+    const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
+    const storeAddress = store.programId.toString()
+    const ocr2Address = ocr2.programId.toString()
+    const storeProgram = this.loadProgram(store.idl, storeAddress)
+    const ocr2Program = this.loadProgram(ocr2.idl, ocr2Address)
 
+    const input = this.makeInput(this.flags.input)
     const owner = this.wallet.payer
 
-    const state = new PublicKey(this.flags.state)
-    const feed = new PublicKey(this.flags.feed)
-    const storeAuthority = new PublicKey(this.flags.storeAuthority)
+    const storeState = new PublicKey(input.store || this.flags.state)
+    const ocr2State = new PublicKey(this.flags.ocrState)
+    const feedState = new PublicKey(input.transmissions)
 
-    console.log(`Setting store writer on ${state.toString()} and ${feed.toString()}`)
+    const [storeAuthority, _storeNonce] = await PublicKey.findProgramAddress(
+      [Buffer.from(utils.bytes.utf8.encode('store')), ocr2State.toBuffer()],
+      ocr2Program.programId,
+    )
 
-    const tx = await program.rpc.setWriter(storeAuthority, {
+    console.log(`Setting store writer on Store (${storeState.toString()}) and Feed (${feedState.toString()})`)
+
+    const tx = await storeProgram.rpc.setWriter(storeAuthority, {
       accounts: {
-        store: state,
-        feed: feed,
+        store: storeState,
+        feed: feedState,
         authority: owner.publicKey,
       },
       signers: [owner],
@@ -45,8 +71,8 @@ export default class SetWriter extends SolanaCommand {
     return {
       responses: [
         {
-          tx: this.wrapResponse(tx, state.toString(), { state: state.toString() }),
-          contract: state.toString(),
+          tx: this.wrapResponse(tx, storeState.toString(), { state: storeState.toString() }),
+          contract: storeState.toString(),
         },
       ],
     } as Result<TransactionResponse>

@@ -1,5 +1,5 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
@@ -25,6 +25,8 @@ export default class CommitOffchainConfig extends SolanaCommand {
 
     const state = new PublicKey(this.flags.state)
     const owner = this.wallet.payer
+
+    await prompt(`Commit Offchain config?`)
 
     const tx = await program.rpc.commitOffchainConfig({
       accounts: {

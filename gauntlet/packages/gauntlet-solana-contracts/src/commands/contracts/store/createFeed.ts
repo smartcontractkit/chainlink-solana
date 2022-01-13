@@ -1,5 +1,5 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { Keypair, PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
@@ -18,17 +18,17 @@ export default class CreateFeed extends SolanaCommand {
   static category = CONTRACT_LIST.STORE
 
   static examples = [
-    'yarn gauntlet store:create_feed --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --granularity=30 --liveLength 86400 --store=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet store:create_feed --network=devnet --store=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
 
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
     const rdd = getRDD(this.flags.rdd)
-    const aggregator = rdd.contracts[this.flags.state]
+    const aggregator = rdd.contracts[this.flags.id]
     return {
-      store: aggregator.store,
-      granularity: this.flags.granularity,
-      liveLength: this.flags.liveLength,
+      store: aggregator.storeAccount,
+      granularity: aggregator.granularity,
+      liveLength: aggregator.liveLength,
       decimals: aggregator.decimals,
       description: aggregator.name,
     }
@@ -36,8 +36,6 @@ export default class CreateFeed extends SolanaCommand {
 
   constructor(flags, args) {
     super(flags, args)
-
-    this.require(!!this.flags.state, 'Please provide flags with "state"')
   }
 
   execute = async () => {
@@ -49,27 +47,31 @@ export default class CreateFeed extends SolanaCommand {
     const owner = this.wallet.payer
 
     const store = new PublicKey(input.store)
-    const state = new PublicKey(this.flags.state)
     const feed = Keypair.generate()
 
     const granularity = new BN(input.granularity)
     const liveLength = new BN(input.liveLength)
-    const length = new BN(8096)
+    const length = new BN(this.flags.length || 8096)
     const feedAccountLength = new BN(8 + 128 + length.toNumber() * 24)
     const decimals = new BN(input.decimals)
     const description = input.description || ''
 
-    console.log(`Creating feed...`)
-
     this.require(
-      length.gte(liveLength),
-      `Length (${length.toNumber()}) must be greater than liveLength (${liveLength.toNumber()})`,
+      feedAccountLength.gte(liveLength),
+      `Feed account Length (${feedAccountLength.toNumber()}) must be greater than liveLength (${liveLength.toNumber()})`,
     )
 
-    console.log(`
+    logger.info(`
       - Decimals: ${decimals}
       - Description: ${description}
+      - Live Length: ${liveLength.toNumber()}
+      - Granularity (historical): ${granularity.toNumber()}
+      - Historical Length: ${feedAccountLength.toNumber() - liveLength.toNumber()}
+      - Total Length: ${feedAccountLength.toNumber()}
     `)
+
+    await prompt('Continue creating new Transmissions Feed?')
+    logger.loading(`Creating feed...`)
 
     const tx = await program.rpc.createFeed(description, decimals, granularity, liveLength, {
       accounts: {
@@ -82,24 +84,23 @@ export default class CreateFeed extends SolanaCommand {
     })
 
     logger.success(`Created feed on tx ${tx}`)
-    console.log(`
-    STATE ACCOUNTS:
-      - Store: ${store}
-      - Feed/Transmissions: ${feed.publicKey}
+    logger.info(`
+      STATE ACCOUNTS:
+        - Store: ${store}
+        - Feed/Transmissions: ${feed.publicKey}
     `)
 
     return {
       data: {
-        state: state.toString(),
         transmissions: feed.publicKey.toString(),
       },
       responses: [
         {
-          tx: this.wrapResponse(tx, state.toString(), {
-            state: state.toString(),
+          tx: this.wrapResponse(tx, feed.publicKey.toString(), {
+            state: feed.toString(),
             transmissions: feed.publicKey.toString(),
           }),
-          contract: state.toString(),
+          contract: feed.publicKey.toString(),
         },
       ],
     } as Result<TransactionResponse>
