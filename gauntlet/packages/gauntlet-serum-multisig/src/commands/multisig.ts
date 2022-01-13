@@ -6,7 +6,7 @@ import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
 import { boolean } from '@chainlink/gauntlet-core/dist/lib/args'
 
-export const wrapCommand: any = (command) => {
+export const wrapCommand = (command) => {
   return class Multisig extends SolanaCommand {
     command: SolanaCommand
     multisigAddress

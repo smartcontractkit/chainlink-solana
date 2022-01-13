@@ -6,7 +6,7 @@ import { io } from '@chainlink/gauntlet-core/dist/utils'
 import { wrapCommand } from './commands/multisig'
 import multisigSpecificCommands from './commands'
 
-export const multisigCommands: any = {
+export const multisigCommands = {
   custom: commands.custom.concat(multisigSpecificCommands).map(wrapCommand),
   loadDefaultFlags: () => ({}),
   abstract: {
