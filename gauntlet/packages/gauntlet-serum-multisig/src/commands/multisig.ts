@@ -31,6 +31,8 @@ export const wrapCommand = (command) => {
       this.multisig = getContract(CONTRACT_LIST.MULTISIG, '')
       this.address = this.multisig.programId.toString()
       this.program = this.loadProgram(this.multisig.idl, this.address)
+      logger.info(`Multisig Address: ${process.env.MULTISIG_ADDRESS}`)
+
       let multisigState
       let proposalState
       let proposal

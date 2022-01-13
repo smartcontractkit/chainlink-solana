@@ -3,17 +3,20 @@ import { logger } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair } from '@solana/web3.js'
 import BN from 'bn.js'
-import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
+import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
 
 type Input = {
   owners: string[]
   threshold: number | string
 }
+
+const DEFAULT_MAXIMUM_SIZE = 200
+
 export default class MultisigCreate extends SolanaCommand {
-  static id = 'multisig:create'
+  static id = 'create'
   static category = CONTRACT_LIST.MULTISIG
 
-  static examples = ['yarn gauntlet multisig:create --network=local']
+  static examples = ['yarn gauntlet-serum-multisig create --network=local']
 
   constructor(flags, args) {
     super(flags, args)
@@ -24,8 +27,9 @@ export default class MultisigCreate extends SolanaCommand {
     if (userInput) return userInput as Input
 
     return {
-      owners: [this.wallet.publicKey.toString()],
-      threshold: 1,
+      //TODO: validate args. Maybe wrap them int PublicKey?
+      owners: this.args,
+      threshold: this.flags.threshold,
     }
   }
 
@@ -40,7 +44,7 @@ export default class MultisigCreate extends SolanaCommand {
     const multisig = Keypair.generate()
 
     const [_, nonce] = await PublicKey.findProgramAddress([multisig.publicKey.toBuffer()], program.programId)
-    const multisigSize = 200 // TODO: Come back here
+    const maximumSize = this.flags.maximumSize || DEFAULT_MAXIMUM_SIZE
     const owners = input.owners.map((key) => new PublicKey(key))
 
     const tx = await program.rpc.createMultisig(owners, new BN(input.threshold), nonce, {
@@ -49,7 +53,7 @@ export default class MultisigCreate extends SolanaCommand {
         rent: SYSVAR_RENT_PUBKEY,
       },
       signers: [multisig],
-      instructions: [await program.account.multisig.createInstruction(multisig, multisigSize)],
+      instructions: [await program.account.multisig.createInstruction(multisig, maximumSize)],
     })
     logger.info(`Multisig address: ${multisig.publicKey}`)
 
