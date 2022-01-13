@@ -36,7 +36,7 @@ export default class Initialize extends SolanaCommand {
     super(flags, args)
 
     this.requireFlag('requesterAccessController', 'Provide a --requesterAccessController flag with a valid address')
-    this.requireFlag('billingAccessController', 'Provide a --requesterAccessController flag with a valid address')
+    this.requireFlag('billingAccessController', 'Provide a --billingAccessController flag with a valid address')
   }
 
   execute = async () => {
