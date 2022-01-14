@@ -26,10 +26,11 @@ export default class BeginOffchainConfig extends SolanaCommand {
 
     const state = new PublicKey(this.flags.state)
     const owner = this.wallet.payer
+    const version = new BN(2)
 
-    await prompt(`Begin setting Offchain config version ${this.flags.version}?`)
+    await prompt(`Begin setting Offchain config version ${version.toString()}?`)
 
-    const tx = await program.rpc.beginOffchainConfig(new BN(this.flags.version), {
+    const tx = await program.rpc.beginOffchainConfig(version, {
       accounts: {
         state: state,
         authority: owner.publicKey,
