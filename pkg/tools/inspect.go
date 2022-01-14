@@ -12,8 +12,8 @@ func main() {
 		"5mfAsrt5MLU1q1ZWWVi68KoSSZGwCQBvLqYdpjEdHdpe", // state
 		"5zzLD6uuEkZjQmGGQ3kxjpBvjussTp3WkgzthtgfdjCj", // transmissions
 		"CF13pnKGJ1WJZeEgVAtFdUi4MMndXm9hneiHs8azUaZt", // ocr2 program
-		rpc.LocalNet_RPC, // localnet
-		true,             // print data
+		rpc.LocalNet_RPC,   // localnet
+		solana.XXXLogBasic, // print data
 	)
 
 	if err != nil {
