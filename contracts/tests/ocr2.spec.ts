@@ -426,6 +426,22 @@ describe('ocr2', async () => {
     });
   });
 
+	it("Can't begin offchain config if version is 0", async () => {
+		try {
+			await program.rpc.beginOffchainConfig(
+	      new BN(0),
+	      {
+	        accounts: {
+	          state: state.publicKey,
+	          authority: owner.publicKey,
+	        },
+	    });
+			assert.fail("beginOffchainConfig shouldn't have succeeded!")
+		} catch {
+			// beginOffchainConfig should fail
+		}
+	});
+
   it("Can't transmit a round if not the writer", async () => {
     try {
       await transmit(1, 1, new BN(1));
