@@ -41,12 +41,7 @@ export default class SetBilling extends SolanaCommand {
     const program = this.loadProgram(ocr2.idl, address)
     const state = new PublicKey(this.flags.state)
 
-    const input = this.makeInput(
-      ({
-        observationPaymentGjuels: '10',
-        transmissionPaymentGjuels: '20',
-      } as Input) || this.flags.input,
-    )
+    const input = this.makeInput(this.flags.input)
 
     const info = await program.account.state.fetch(state)
     const billingAC = new PublicKey(info.config.billingAccessController)
