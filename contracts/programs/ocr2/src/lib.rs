@@ -99,6 +99,7 @@ pub mod ocr2 {
         // disallow begin if we already started writing
         require!(config.pending_offchain_config.version == 0, InvalidInput);
         require!(config.pending_offchain_config.is_empty(), InvalidInput);
+        require!(offchain_config_version != 0, InvalidInput);
 
         config.pending_offchain_config.version = offchain_config_version;
         Ok(())
