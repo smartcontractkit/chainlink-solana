@@ -161,12 +161,7 @@ export const wrapCommand = (command) => {
           transaction: proposal,
         },
         remainingAccounts: context.proposalState.accounts
-          .map((t) => {
-            if (t.pubkey.equals(context.multisigSigner)) {
-              return { ...t, isSigner: false }
-            }
-            return t
-          })
+          .map((t) => (t.pubkey.equals(context.multisigSigner) ? { ...t, isSigner: false } : t))
           .concat({
             pubkey: context.proposalState.programId,
             isWritable: false,
