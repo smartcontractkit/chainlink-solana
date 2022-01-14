@@ -1,7 +1,7 @@
 {
-  "name": "@chainlink/gauntlet-solana-contracts",
+  "name": "@chainlink/gauntlet-serum-multisig",
   "version": "0.0.1",
-  "description": "Gauntlet Solana Contracts",
+  "description": "Gauntlet Serum Multisig",
   "keywords": [
     "typescript",
     "cli"
@@ -13,7 +13,7 @@
     "!dist/**/*.test.js"
   ],
   "scripts": {
-    "gauntlet": "ts-node ./src/cli.ts",
+    "gauntlet": "ts-node ./src/index.ts",
     "lint": "tsc",
     "test": "SKIP_PROMPTS=true jest --runInBand",
     "test:coverage": "yarn test --collectCoverage",
@@ -27,9 +27,8 @@
   "dependencies": {
     "@chainlink/gauntlet-core": "0.0.7",
     "@chainlink/gauntlet-solana": "*",
-    "@ethersproject/keccak256": "^5.5.0",
-    "@solana/spl-token": "^0.1.8",
-    "@solana/web3.js": "^1.30.2",
-    "protobufjs": "^6.11.2"
+    "@chainlink/gauntlet-solana-contracts": "*",
+    "@project-serum/anchor": "^0.20.0",
+    "@solana/web3.js": "^1.30.2"
   }
 }

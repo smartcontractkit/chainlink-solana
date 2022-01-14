@@ -7,7 +7,9 @@ export default class Initialize extends SolanaCommand {
   static id = 'access_controller:initialize'
   static category = CONTRACT_LIST.ACCESS_CONTROLLER
 
-  static examples = ['yarn gauntlet access_controller:initialize --network=devnet']
+  static examples = [
+    'yarn gauntlet access_controller:initialize --network=devnet 8cMfJYzeFS2ELDSCMZK65ib9zF6DmtEqFS7sNe9dZzct',
+  ]
 
   constructor(flags, args) {
     super(flags, args)
