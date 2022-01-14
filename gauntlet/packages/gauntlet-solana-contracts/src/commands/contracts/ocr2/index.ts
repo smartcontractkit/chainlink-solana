@@ -15,6 +15,9 @@ import SetupFlow from './setup.dev.flow'
 import SetupRDDFlow from './setup.dev.rdd.flow'
 import Transmit from './transmit.dev'
 import Inspection from './inspection'
+import { makeAcceptOwnershipCommand } from '../ownership/acceptOwnership'
+import { CONTRACT_LIST } from '../../../lib/contracts'
+import { makeTransferOwnershipCommand } from '../ownership/transferOwnership'
 
 export default [
   Initialize,
@@ -36,4 +39,6 @@ export default [
   Transmit,
   SetupFlow,
   SetupRDDFlow,
+  makeAcceptOwnershipCommand(CONTRACT_LIST.OCR_2),
+  makeTransferOwnershipCommand(CONTRACT_LIST.OCR_2),
 ]
