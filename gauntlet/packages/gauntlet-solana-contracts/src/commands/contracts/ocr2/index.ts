@@ -6,6 +6,8 @@ import SetOffchainConfigFlow from './offchainConfig/setOffchainConfig.flow'
 import WriteOffchainConfig from './offchainConfig/write'
 import PayRemaining from './payRemaining'
 import ReadState from './read'
+import SetBillingAccessController from './setBillingAccessController'
+import SetRequesterAccessController from './setRequesterAccessController'
 import SetBilling from './setBilling'
 import SetConfig from './setConfig'
 import SetPayees from './setPayees'
@@ -26,6 +28,8 @@ export default [
   BeginOffchainConfig,
   WriteOffchainConfig,
   CommitOffchainConfig,
+  SetBillingAccessController,
+  SetRequesterAccessController,
   // Inspection
   ...Inspection,
   // ONLY DEV
