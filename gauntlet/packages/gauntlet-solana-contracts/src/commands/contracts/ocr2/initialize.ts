@@ -4,8 +4,7 @@ import { Keypair, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from '@solana/w
 import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { utils } from '@project-serum/anchor'
-import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import BN from 'bn.js'
+import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { getRDD } from '../../../lib/rdd'
 
 type Input = {
