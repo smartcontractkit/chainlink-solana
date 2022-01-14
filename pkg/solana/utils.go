@@ -68,7 +68,7 @@ func XXXInspectStates(state, transmission, program, rpc string, log int) (answer
 	}
 
 	nodeLen := len(tracker.state.Oracles.Data())
-	if log == XXXLogBasic || log == XXXLogAll {
+	if log > XXXLogNone {
 		fmt.Println("LatestBlockHeight", bh)
 		fmt.Println("LatestTransmissionDetails", digest, epoch, round, answer, timestamp)
 		fmt.Println("LatestConfigBlockNumber", tracker.state.Config.LatestConfigBlockNumber)
@@ -85,7 +85,7 @@ func XXXInspectStates(state, transmission, program, rpc string, log int) (answer
 		fmt.Println("Parsed Description:", string(txs.Description[:]))
 	}
 
-	if log == XXXLogAll {
+	if log > XXXLogBasic {
 		// parsed config data
 		config, err := confighelper.PublicConfigFromContractConfig(false, types.ContractConfig{
 			OffchainConfig:        tracker.state.Config.OffchainConfig.Data(),
