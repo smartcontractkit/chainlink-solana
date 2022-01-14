@@ -27,21 +27,20 @@ export const wrapCommand = (command) => {
 
       this.command = new command(flags, args)
       this.command.invokeMiddlewares(this.command, this.command.middlewares)
-
-      this.require(!!process.env.MULTISIG_ADDRESS, 'Please set MULTISIG_ADDRESS env var')
-      this.multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS)
-      const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
-      this.program = this.loadProgram(multisig.idl, multisig.programId.toString())
     }
 
     getRemainingSigners = (proposalState: any, threshold: number): number =>
       Number(threshold) - proposalState.signers.filter(Boolean).length
 
     isReadyForExecution = (proposalState: any, threshold: number): boolean => {
-      return this.getRemainingSigners(proposalState, threshold) > 0
+      return this.getRemainingSigners(proposalState, threshold) <= 0
     }
 
     execute = async () => {
+      this.require(!!process.env.MULTISIG_ADDRESS, 'Please set MULTISIG_ADDRESS env var')
+      this.multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS)
+      const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
+      this.program = this.loadProgram(multisig.idl, multisig.programId.toString())
       const [multisigSigner] = await PublicKey.findProgramAddress(
         [this.multisigAddress.toBuffer()],
         this.program.programId,
@@ -53,15 +52,11 @@ export const wrapCommand = (command) => {
       logger.info(`Multisig Info:
         - Address: ${this.multisigAddress.toString()}
         - Signer: ${multisigSigner.toString()}
-        - Threshold: ${new BN(threshold).toString}
-        - Owners: ${owners}
-      `)
-
-      logger.log('Multisig State:', multisigState)
+        - Threshold: ${threshold.toString()}
+        - Owners: ${owners}`)
 
       // TODO: Should we support many txs?
-      const rawTx = await this.command.makeRawTransaction(multisigSigner)[0]
-
+      const rawTx = (await this.command.makeRawTransaction(multisigSigner))[0]
       const isCreation = !this.flags.proposal
       if (isCreation) {
         const proposal = Keypair.generate()
@@ -91,12 +86,12 @@ export const wrapCommand = (command) => {
       }
 
       if (!this.isReadyForExecution(proposalState, threshold)) {
-        const result = this.wrapAction(this.approveProposal)(proposal, proposalContext)
+        const result = await this.wrapAction(this.approveProposal)(proposal, proposalContext)
         this.inspectProposalState(proposal, threshold, owners)
         return result
       }
 
-      const result = this.wrapAction(this.executeProposal)(proposal, proposalContext)
+      const result = await this.wrapAction(this.executeProposal)(proposal, proposalContext)
       this.inspectProposalState(proposal, threshold, owners)
       return result
     }
@@ -119,6 +114,7 @@ export const wrapCommand = (command) => {
         } else {
           logger.error(e)
         }
+        return {} as Result<TransactionResponse>
       }
     }
 
@@ -165,9 +161,14 @@ export const wrapCommand = (command) => {
           transaction: proposal,
         },
         remainingAccounts: context.proposalState.accounts
-          .map((t) => (t.pubkey.equals(context.multisigSigner) ? { ...t, isSigner: false } : t))
+          .map((t) => {
+            if (t.pubkey.equals(context.multisigSigner)) {
+              return { ...t, isSigner: false }
+            }
+            return t
+          })
           .concat({
-            pubkey: this.program.programId,
+            pubkey: context.proposalState.programId,
             isWritable: false,
             isSigner: false,
           }),

@@ -27,8 +27,6 @@ export default class SetThreshold extends SolanaCommand {
       threshold: new BN(this.flags.threshold),
     })
 
-    const [multisigSigner] = await PublicKey.findProgramAddress([multisigAddress.toBuffer()], program.programId)
-
     const accounts = [
       {
         pubkey: multisigAddress,
@@ -36,7 +34,7 @@ export default class SetThreshold extends SolanaCommand {
         isSigner: false,
       },
       {
-        pubkey: multisigSigner,
+        pubkey: signer,
         isWritable: false,
         isSigner: true,
       },
