@@ -27,6 +27,8 @@ export const wrapCommand = (command) => {
 
       this.command = new command(flags, args)
       this.command.invokeMiddlewares(this.command, this.command.middlewares)
+      this.require(!!process.env.MULTISIG_ADDRESS, 'Please set MULTISIG_ADDRESS env var')
+      this.multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS)
     }
 
     getRemainingSigners = (proposalState: any, threshold: number): number =>
@@ -37,8 +39,6 @@ export const wrapCommand = (command) => {
     }
 
     execute = async () => {
-      this.require(!!process.env.MULTISIG_ADDRESS, 'Please set MULTISIG_ADDRESS env var')
-      this.multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS)
       const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
       this.program = this.loadProgram(multisig.idl, multisig.programId.toString())
       const [multisigSigner] = await PublicKey.findProgramAddress(
