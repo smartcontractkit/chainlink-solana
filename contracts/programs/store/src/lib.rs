@@ -323,6 +323,69 @@ fn has_lowering_access(
     Ok(())
 }
 
+#[cfg(feature = "cpi")]
+pub mod accessors {
+    use crate::cpi::{self, accounts::Query};
+    use crate::{Round, Scope};
+    use anchor_lang::prelude::*;
+    use anchor_lang::solana_program;
+
+    fn query<'info, T: AnchorDeserialize>(
+        program_id: AccountInfo<'info>,
+        feed: AccountInfo<'info>,
+        scope: Scope,
+    ) -> Result<T, ProgramError> {
+        let cpi = CpiContext::new(program_id, Query { feed });
+        cpi::query(cpi, scope)?;
+        let (_key, data) = solana_program::program::get_return_data().unwrap();
+        let data = T::try_from_slice(&data)?;
+        Ok(data)
+    }
+
+    pub fn version<'info>(
+        program_id: AccountInfo<'info>,
+        feed: AccountInfo<'info>,
+    ) -> Result<u8, ProgramError> {
+        query(program_id, feed, Scope::Version)
+    }
+
+    pub fn decimals<'info>(
+        program_id: AccountInfo<'info>,
+        feed: AccountInfo<'info>,
+    ) -> Result<u8, ProgramError> {
+        query(program_id, feed, Scope::Decimals)
+    }
+
+    pub fn description<'info>(
+        program_id: AccountInfo<'info>,
+        feed: AccountInfo<'info>,
+    ) -> Result<String, ProgramError> {
+        query(program_id, feed, Scope::Description)
+    }
+
+    pub fn round_data<'info>(
+        program_id: AccountInfo<'info>,
+        feed: AccountInfo<'info>,
+        round_id: u32,
+    ) -> Result<Round, ProgramError> {
+        query(program_id, feed, Scope::RoundData { round_id })
+    }
+
+    pub fn latest_round_data<'info>(
+        program_id: AccountInfo<'info>,
+        feed: AccountInfo<'info>,
+    ) -> Result<Round, ProgramError> {
+        query(program_id, feed, Scope::LatestRoundData)
+    }
+
+    pub fn aggregator<'info>(
+        program_id: AccountInfo<'info>,
+        feed: AccountInfo<'info>,
+    ) -> Result<Pubkey, ProgramError> {
+        query(program_id, feed, Scope::Aggregator)
+    }
+}
+
 #[error]
 pub enum ErrorCode {
     #[msg("Unauthorized")]
