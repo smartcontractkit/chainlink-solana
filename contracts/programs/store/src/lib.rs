@@ -169,7 +169,7 @@ pub mod store {
         };
         let feed_address = ctx.accounts.feed.key();
 
-        if is_valid {
+        if !is_valid {
             // raise flag if not raised yet
 
             // if the len reaches array len, we're at capacity
