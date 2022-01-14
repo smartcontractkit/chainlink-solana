@@ -1,20 +1,23 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { TransactionResponse, SolanaCommand, RawTransaction } from '@chainlink/gauntlet-solana'
-
 import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
 import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
 import { Idl, Program } from '@project-serum/anchor'
 
+type ProposalContext = {
+  rawTx: RawTransaction
+  multisigSigner: PublicKey
+  proposalState: any
+}
+
+type ProposalAction = (proposal: Keypair | PublicKey, context: ProposalContext) => Promise<string>
+
 export const wrapCommand = (command) => {
   return class Multisig extends SolanaCommand {
     command: SolanaCommand
     program: Program<Idl>
-    proposal: PublicKey
     multisigAddress: PublicKey
-    multisigSigner: PublicKey
-    owners: [PublicKey]
-    threshold: number
 
     static id = `${command.id}`
 
@@ -24,60 +27,88 @@ export const wrapCommand = (command) => {
 
       this.command = new command(flags, args)
       this.command.invokeMiddlewares(this.command, this.command.middlewares)
+
+      this.require(!!process.env.MULTISIG_ADDRESS, 'Please set MULTISIG_ADDRESS env var')
+      this.multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS)
+      const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
+      this.program = this.loadProgram(multisig.idl, multisig.programId.toString())
+    }
+
+    getRemainingSigners = (proposalState: any, threshold: number): number =>
+      Number(threshold) - proposalState.signers.filter(Boolean).length
+
+    isReadyForExecution = (proposalState: any, threshold: number): boolean => {
+      return this.getRemainingSigners(proposalState, threshold) > 0
     }
 
     execute = async () => {
-      this.require(process.env.MULTISIG_ADDRESS != null, 'Please set MULTISIG_ADDRESS env var')
-      this.multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS || '')
-      const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
-      this.program = this.loadProgram(multisig.idl, multisig.programId.toString())
-      logger.info(`Multisig Address: ${process.env.MULTISIG_ADDRESS}`)
       const [multisigSigner] = await PublicKey.findProgramAddress(
         [this.multisigAddress.toBuffer()],
         this.program.programId,
       )
-      this.multisigSigner = multisigSigner
-      logger.info(`Multisig Signer: ${multisigSigner.toString()}`)
       const multisigState = await this.program.account.multisig.fetch(process.env.MULTISIG_ADDRESS)
-      logger.debug('Multisig state:')
-      logger.debug(JSON.stringify(multisigState, null, 4))
-      this.threshold = multisigState.threshold
-      this.owners = multisigState.owners
+      const threshold = multisigState.threshold
+      const owners = multisigState.owners
+
+      logger.info(`Multisig Info:
+        - Address: ${this.multisigAddress.toString()}
+        - Signer: ${multisigSigner.toString()}
+        - Threshold: ${new BN(threshold).toString}
+        - Owners: ${owners}
+      `)
+
+      logger.log('Multisig State:', multisigState)
+
+      // TODO: Should we support many txs?
+      const rawTx = await this.command.makeRawTransaction(multisigSigner)[0]
 
       const isCreation = !this.flags.proposal
       if (isCreation) {
-        const rawTxs = await this.command.makeRawTransaction(this.multisigSigner)
-        return this.wrapAction(this.createProposal(rawTxs[0]))
+        const proposal = Keypair.generate()
+        const result = await this.wrapAction(this.createProposal)(proposal, {
+          rawTx,
+          multisigSigner,
+          proposalState: {},
+        })
+        this.inspectProposalState(proposal.publicKey, threshold, owners)
+        return result
       }
 
-      const proposalState = await this.program.account.transaction.fetch(this.flags.proposal)
-      logger.debug('Proposal state:')
-      logger.debug(JSON.stringify(proposalState, null, 4))
+      const proposal = new PublicKey(this.flags.proposal)
+      const proposalState = await this.program.account.transaction.fetch(proposal)
+      const proposalContext = {
+        rawTx,
+        multisigSigner,
+        proposalState,
+      }
+
+      logger.debug(`Proposal state: ${JSON.stringify(proposalState, null, 4)}`)
 
       const isAlreadyExecuted = proposalState.didExecute
-      if (isAlreadyExecuted == true) {
+      if (isAlreadyExecuted) {
         logger.info(`Proposal is already executed`)
         return {} as Result<TransactionResponse>
       }
 
-      const remainingApprovalsNeeded = this.remainingApprovalsNeeded(proposalState, this.threshold)
-      const isReadyForExecution = remainingApprovalsNeeded > 0 ? false : true
-      if (isReadyForExecution) {
-        return this.wrapAction(this.executeProposal(proposalState))
+      if (!this.isReadyForExecution(proposalState, threshold)) {
+        const result = this.wrapAction(this.approveProposal)(proposal, proposalContext)
+        this.inspectProposalState(proposal, threshold, owners)
+        return result
       }
 
-      return this.wrapAction(this.approveProposal())
+      const result = this.wrapAction(this.executeProposal)(proposal, proposalContext)
+      this.inspectProposalState(proposal, threshold, owners)
+      return result
     }
 
-    wrapAction = async (action) => {
+    wrapAction = (action: ProposalAction) => async (proposal: Keypair | PublicKey, context: ProposalContext) => {
       try {
-        const tx = await action
-        this.inspectProposalState(this.flags.proposal)
+        const tx = await action(proposal, context)
         return {
           responses: [
             {
-              tx: this.wrapResponse(tx, this.flags.proposal.toString()),
-              contract: this.flags.proposal.toString(),
+              tx: this.wrapResponse(tx, proposal.toString()),
+              contract: proposal.toString(),
             },
           ],
         } as Result<TransactionResponse>
@@ -91,54 +122,52 @@ export const wrapCommand = (command) => {
       }
     }
 
-    createProposal = async (rawTx: RawTransaction): Promise<string> => {
+    createProposal: ProposalAction = async (proposal: Keypair, context): Promise<string> => {
       logger.loading(`Creating proposal`)
       const txSize = 1000
-      const transaction = Keypair.generate()
-      this.flags.proposal = transaction.publicKey
-      const tx = await this.program.rpc.createTransaction(rawTx.programId, rawTx.accounts, rawTx.data, {
-        accounts: {
-          multisig: this.multisigAddress,
-          transaction: this.flags.proposal,
-          proposer: this.wallet.payer.publicKey,
-          rent: SYSVAR_RENT_PUBKEY,
+      const tx = await this.program.rpc.createTransaction(
+        context.rawTx.programId,
+        context.rawTx.accounts,
+        context.rawTx.data,
+        {
+          accounts: {
+            multisig: this.multisigAddress,
+            transaction: proposal.publicKey,
+            proposer: this.wallet.payer.publicKey,
+            rent: SYSVAR_RENT_PUBKEY,
+          },
+          instructions: [await this.program.account.transaction.createInstruction(proposal, txSize)],
+          signers: [proposal, this.wallet.payer],
         },
-        instructions: [await this.program.account.transaction.createInstruction(transaction, txSize)],
-        signers: [transaction, this.wallet.payer],
-      })
+      )
       return tx
     }
 
-    approveProposal = async (): Promise<string> => {
+    approveProposal: ProposalAction = async (proposal: PublicKey): Promise<string> => {
       logger.loading(`Approving proposal`)
       const tx = await this.program.rpc.approve({
         accounts: {
           multisig: this.multisigAddress,
-          transaction: this.flags.proposal,
+          transaction: proposal,
           owner: this.wallet.publicKey,
         },
       })
       return tx
     }
 
-    executeProposal = async (proposalState): Promise<string> => {
+    executeProposal: ProposalAction = async (proposal: PublicKey, context): Promise<string> => {
       logger.loading(`Executing proposal`)
 
       const tx = await this.program.rpc.executeTransaction({
         accounts: {
           multisig: this.multisigAddress,
-          multisigSigner: this.multisigSigner,
-          transaction: this.flags.proposal,
+          multisigSigner: context.multisigSigner,
+          transaction: proposal,
         },
-        remainingAccounts: proposalState.accounts
-          .map((t) => {
-            if (t.pubkey.equals(this.multisigSigner)) {
-              return { ...t, isSigner: false }
-            }
-            return t
-          })
+        remainingAccounts: context.proposalState.accounts
+          .map((t) => (t.pubkey.equals(context.multisigSigner) ? { ...t, isSigner: false } : t))
           .concat({
-            pubkey: proposalState.programId,
+            pubkey: this.program.programId,
             isWritable: false,
             isSigner: false,
           }),
@@ -147,11 +176,7 @@ export const wrapCommand = (command) => {
       return tx
     }
 
-    remainingApprovalsNeeded = (proposalState, threshold: number): number => {
-      return Number(threshold) - proposalState.signers.filter(Boolean).length
-    }
-
-    inspectProposalState = async (proposal) => {
+    inspectProposalState = async (proposal, threshold, owners) => {
       const proposalState = await this.program.account.transaction.fetch(proposal)
       logger.debug('Proposal state after action:')
       logger.debug(JSON.stringify(proposalState, null, 4))
@@ -160,18 +185,19 @@ export const wrapCommand = (command) => {
         return
       }
 
-      const remainingApprovalsNeeded = this.remainingApprovalsNeeded(proposalState, this.threshold)
-
-      if (remainingApprovalsNeeded <= 0) {
+      if (this.isReadyForExecution(proposalState, threshold)) {
         logger.info(
           `Threshold has been met, an owner needs to run the command once more in order to execute it, with flag --proposal=${proposal}`,
         )
         return
       }
       // inverting the signers boolean array and filtering owners by it
-      const remainingEligibleSigners = this.owners.filter((_, i) => proposalState.signers.map((s) => !s)[i])
+      const remainingEligibleSigners = owners.filter((_, i) => proposalState.signers.map((s) => !s)[i])
       logger.info(
-        `${remainingApprovalsNeeded} more owners should sign this proposal, using the same command with flag --proposal=${proposal}`,
+        `${this.getRemainingSigners(
+          proposalState,
+          threshold,
+        )} more owners should sign this proposal, using the same command with flag --proposal=${proposal}`,
       )
       logger.info(`Eligible owners to sign: `)
       logger.info(remainingEligibleSigners.toString())
