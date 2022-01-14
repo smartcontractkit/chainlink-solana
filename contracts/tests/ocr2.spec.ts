@@ -1,5 +1,6 @@
 import * as anchor from "@project-serum/anchor";
 import { ProgramError, BN } from "@project-serum/anchor";
+import * as borsh from "borsh";
 import {
 	SYSVAR_RENT_PUBKEY,
 	PublicKey,
@@ -33,6 +34,17 @@ const Scope = {
   LatestRoundData: { latestRoundData: {} },
   Aggregator: { aggregator: {} },
 };
+
+
+class Assignable {
+    constructor(properties) {
+        Object.keys(properties).map((key) => {
+            this[key] = properties[key];
+        });
+    }
+}
+class Round extends Assignable {
+}
 
 describe('ocr2', async () => {
   // Configure the client to use the local cluster.
@@ -76,6 +88,29 @@ describe('ocr2', async () => {
   // NOTE: 17 is the most we can fit into one setConfig if we use a different payer
   // if the owner == payer then we can fit 19
   const n = 19; // min: 3 * f + 1;
+
+  let query = async (feed: PublicKey, scope: any, schema: borsh.Schema, classType: any): Promise<any> => {
+    let tx = await workspace.Store.rpc.query(
+      scope,
+      {
+        accounts: { feed },
+        options: { commitment: "confirmed" },
+      }
+    );
+    // await provider.connection.confirmTransaction(tx);
+    let t = await provider.connection.getConfirmedTransaction(tx, "confirmed");
+  
+    // "Program return: <key> <val>"
+    const prefix =  "Program return: ";
+    let log = t.meta.logMessages.find((log) => log.startsWith(prefix));
+    log = log.slice(prefix.length);
+    let [_key, data] = log.split(" ", 2);
+    // TODO: validate key
+    let buf = Buffer.from(data, "base64");
+    console.log(buf);
+  
+    return borsh.deserialize(schema, classType, buf);
+  };
 
   // transmits a single round
   let transmit = async (epoch: number, round: number, answer: BN) => {
@@ -603,52 +638,27 @@ describe('ocr2', async () => {
   });
 
   it('Can call query', async () => {
-    let buffer = Keypair.generate();
-    await workspace.Store.rpc.query(
-      Scope.Version,
-      {
-        accounts: {
-          feed: transmissions.publicKey,
-          buffer: buffer.publicKey,
-        },
-        preInstructions: [
-          SystemProgram.createAccount({
-            fromPubkey: provider.wallet.publicKey,
-            newAccountPubkey: buffer.publicKey,
-            lamports: await provider.connection.getMinimumBalanceForRentExemption(256),
-            space: 256,
-            programId: workspace.Store.programId,
-          })
-        ],
-        signers: [buffer]
-      }
-    );
+    const roundSchema = new Map([[Round, { kind: 'struct', fields: [
+      ['roundId', 'u32'],
+      // ['slot', 'u64'],
+      // ['timestamp', 'u32'],
+      ['timestamp', 'u64'],
+      ['answer', [16]], // i128
+    ]}]]);
+    let round = await query(transmissions.publicKey, Scope.LatestRoundData, roundSchema, Round);
+    console.log(round);
 
-    let account = await workspace.Store.account.version.fetch(buffer.publicKey);
-    assert.ok(account.version == 1);
+    const versionSchema = new Map([[Round, { kind: 'struct', fields: [
+      ['version', 'u8'],
+    ]}]]);
+    let data = await query(transmissions.publicKey, Scope.Version, versionSchema, Round);
+    assert.ok(data.version == 1);
 
-		buffer = Keypair.generate();
-    await workspace.Store.rpc.query(
-      Scope.Description,
-      {
-        accounts: {
-          feed: transmissions.publicKey,
-          buffer: buffer.publicKey,
-        },
-        preInstructions: [
-          SystemProgram.createAccount({
-            fromPubkey: provider.wallet.publicKey,
-            newAccountPubkey: buffer.publicKey,
-            lamports: await provider.connection.getMinimumBalanceForRentExemption(256),
-            space: 256,
-            programId: workspace.Store.programId,
-          })
-        ],
-        signers: [buffer]
-      }
-    );
-    account = await workspace.Store.account.description.fetch(buffer.publicKey);
-    assert.ok(account.description == 'ETH/BTC');
+    const descriptionSchema = new Map([[Round, { kind: 'struct', fields: [
+      ['description', 'string'],
+    ]}]]);
+    data = await query(transmissions.publicKey, Scope.Description, descriptionSchema, Round);
+    assert.ok(data.description == 'ETH/BTC');
   });
 
   it("Transmit a bunch of rounds to check ringbuffer wraparound", async () => {

@@ -1,4 +1,4 @@
-//! This is a tiny arrayvec implementation (https://docs.rs/arrayvec/) that efficiently implements a few common operations
+//! This is a tiny arrayvec implementation <https://docs.rs/arrayvec/> that efficiently implements a few common operations
 //! We're able to simplify the code significantly due to the elements being Pod/Zeroable.
 
 // use anchor_lang::prelude::*;

@@ -45,22 +45,6 @@ pub struct Round {
     pub timestamp: u64,
     pub answer: i128,
 }
-#[account]
-pub struct Decimals {
-    pub decimals: u8,
-}
-#[account]
-pub struct Version {
-    pub version: u8,
-}
-#[account]
-pub struct Description {
-    pub description: String,
-}
-#[account]
-pub struct Address {
-    pub address: Pubkey,
-}
 
 #[program]
 pub mod store {
@@ -226,29 +210,21 @@ pub mod store {
     /// The query instruction takes a `Query` and serializes the response in a fixed format. That way queries
     /// are not bound to the underlying layout.
     pub fn query(ctx: Context<Query>, scope: Scope) -> ProgramResult {
-        use std::ops::DerefMut;
-        // NOTE: try_serialize will also write the account discriminator, serialize doesn't
+        use std::io::Cursor;
+
+        let mut buf = Cursor::new(Vec::with_capacity(128)); // TODO: calculate max size
+        let header = &ctx.accounts.feed;
 
         match scope {
             Scope::Version => {
-                let header = &ctx.accounts.feed;
-
-                let data = Version {
-                    version: header.version,
-                };
-                data.try_serialize(ctx.accounts.buffer.try_borrow_mut_data()?.deref_mut())?;
+                let data = header.version;
+                data.serialize(&mut buf)?;
             }
             Scope::Decimals => {
-                let header = &ctx.accounts.feed;
-
-                let data = Decimals {
-                    decimals: header.decimals,
-                };
-                data.try_serialize(ctx.accounts.buffer.try_borrow_mut_data()?.deref_mut())?;
+                let data = header.decimals;
+                data.serialize(&mut buf)?;
             }
             Scope::Description => {
-                let header = &ctx.accounts.feed;
-
                 // Look for the first null byte
                 let end = header
                     .description
@@ -259,8 +235,8 @@ pub mod store {
                 let description = String::from_utf8(header.description[..end].to_vec())
                     .map_err(|_err| ErrorCode::InvalidInput)?;
 
-                let data = Description { description };
-                data.try_serialize(ctx.accounts.buffer.try_borrow_mut_data()?.deref_mut())?;
+                let data = description;
+                data.serialize(&mut buf)?;
             }
             Scope::RoundData { round_id } => {
                 let round = with_store(&mut ctx.accounts.feed, |store| store.fetch(round_id))?
@@ -271,7 +247,7 @@ pub mod store {
                     answer: round.answer,
                     timestamp: round.timestamp,
                 };
-                data.try_serialize(ctx.accounts.buffer.try_borrow_mut_data()?.deref_mut())?;
+                data.serialize(&mut buf)?;
             }
             Scope::LatestRoundData => {
                 let round = with_store(&mut ctx.accounts.feed, |store| store.latest())?
@@ -284,19 +260,16 @@ pub mod store {
                     answer: round.answer,
                     timestamp: round.timestamp,
                 };
-                // TODO: use an enum to wrap all possible response types?
 
-                data.try_serialize(ctx.accounts.buffer.try_borrow_mut_data()?.deref_mut())?;
+                data.serialize(&mut buf)?;
             }
             Scope::Aggregator => {
-                let header = &ctx.accounts.feed;
-
-                let data = Address {
-                    address: header.writer,
-                };
-                data.try_serialize(ctx.accounts.buffer.try_borrow_mut_data()?.deref_mut())?;
+                let data = header.writer;
+                data.serialize(&mut buf)?;
             }
         }
+
+        anchor_lang::solana_program::program::set_return_data(buf.get_ref());
         Ok(())
     }
 }
@@ -443,8 +416,4 @@ pub struct Submit<'info> {
 #[derive(Accounts)]
 pub struct Query<'info> {
     pub feed: Account<'info, Transmissions>,
-    // TODO: we could allow reusing query buffers if we also required an authority and marked the buffer with it.
-    // That way someone else couldn't hijack the buffer and use it instead.
-    #[account(zero)]
-    pub buffer: AccountInfo<'info>,
 }
