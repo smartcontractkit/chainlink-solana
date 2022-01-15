@@ -6,7 +6,7 @@ use anchor_spl::token::{Mint, Token, TokenAccount, Transfer};
 use crate::state::State;
 
 use access_controller::AccessController;
-use store::Transmissions;
+use store::{Store, Transmissions};
 
 // NOTE: (has_one = name) is equivalent to a custom access_control
 
@@ -79,8 +79,7 @@ pub struct Transmit<'info> {
     #[account(mut, address = state.load()?.transmissions)]
     pub transmissions: Account<'info, Transmissions>,
 
-    #[account(address = store::ID)]
-    pub store_program: AccountInfo<'info>,
+    pub store_program: Program<'info, Store>,
     // #[account(address = state.load()?.config.store)]
     pub store: AccountInfo<'info>,
     pub store_authority: AccountInfo<'info>,
