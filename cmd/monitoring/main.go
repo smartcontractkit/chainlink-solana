@@ -73,40 +73,33 @@ func main() {
 		transmissionSchema,
 	)
 
-	if cfg.Feeds.FilePath != "" {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			monitor.Start(bgCtx, wg, cfg.Feeds.Feeds)
-		}()
-	} else if cfg.Feeds.URL != "" {
-		source := monitoring.NewRDDSource(cfg.Feeds.URL)
-		if cfg.Feature.TestOnlyFakeRdd {
-			source = monitoring.NewFakeRDDSource(2, 10)
-		}
-		rddPoller := monitoring.NewSourcePoller(
-			source,
-			log.With("component", "rdd-poller"),
-			cfg.Feeds.RDDPollInterval,
-			cfg.Feeds.RDDReadTimeout,
-			0, // no buffering!
-		)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			rddPoller.Start(bgCtx)
-		}()
-		manager := monitoring.NewManager(
-			log.With("component", "manager"),
-			rddPoller,
-		)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			manager.Start(bgCtx, wg, monitor.Start)
-		}()
-	} // the config package makes sure there is either a FilePath or a URL set!
+	source := monitoring.NewRDDSource(cfg.Feeds.URL)
+	if cfg.Feature.TestOnlyFakeRdd {
+		// Generate between 2 and 10 random feeds every RDDPollInterval.
+		source = monitoring.NewFakeRDDSource(2, 10)
+	}
+	rddPoller := monitoring.NewSourcePoller(
+		source,
+		log.With("component", "rdd-poller"),
+		cfg.Feeds.RDDPollInterval,
+		cfg.Feeds.RDDReadTimeout,
+		0, // no buffering!
+	)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		rddPoller.Start(bgCtx)
+	}()
 
+	manager := monitoring.NewManager(
+		log.With("component", "manager"),
+		rddPoller,
+	)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		manager.Start(bgCtx, wg, monitor.Start)
+	}()
 
 	// Configure HTTP server
 	http := monitoring.NewHttpServer(bgCtx, cfg.Http.Address, log.With("component", "http-server"))
