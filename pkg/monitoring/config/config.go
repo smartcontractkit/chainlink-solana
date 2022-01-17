@@ -17,11 +17,7 @@ func Parse() (Config, error) {
 
 	applyDefaults(&cfg)
 
-	if err := validateConfig(cfg); err != nil {
-		return cfg, err
-	}
-
-	err := populateFeeds(&cfg)
+	err := validateConfig(cfg)
 	return cfg, err
 }
 
@@ -96,9 +92,6 @@ func parseEnvVars(cfg *Config) error {
 	if value, isPresent := os.LookupEnv("FEEDS_URL"); isPresent {
 		cfg.Feeds.URL = value
 	}
-	if value, isPresent := os.LookupEnv("FEEDS_FILE_PATH"); isPresent {
-		cfg.Feeds.FilePath = value
-	}
 	if value, isPresent := os.LookupEnv("FEEDS_RDD_READ_TIMEOUT"); isPresent {
 		readTimeout, err := time.ParseDuration(value)
 		if err != nil {
@@ -155,18 +148,13 @@ func validateConfig(cfg Config) error {
 
 		"SCHEMA_REGISTRY_URL": cfg.SchemaRegistry.URL,
 
+		"FEEDS_URL": cfg.Feeds.URL,
+
 		"HTTP_ADDRESS": cfg.Http.Address,
 	} {
 		if currentValue == "" {
 			return fmt.Errorf("'%s' env var is required", envVarName)
 		}
-	}
-	// Validate feeds.
-	if cfg.Feeds.URL == "" && cfg.Feeds.FilePath == "" {
-		return fmt.Errorf("must set one of 'FEEDS_URL' or 'FEEDS_FILE_PATH'")
-	}
-	if cfg.Feeds.URL != "" && cfg.Feeds.FilePath != "" {
-		return fmt.Errorf("can't set both 'FEEDS_URL' and 'FEEDS_FILE_PATH'. Only one allowed")
 	}
 	// Validate URLs.
 	for envVarName, currentValue := range map[string]string{
@@ -174,9 +162,6 @@ func validateConfig(cfg Config) error {
 		"SCHEMA_REGISTRY_URL": cfg.SchemaRegistry.URL,
 		"FEEDS_URL":           cfg.Feeds.URL,
 	} {
-		if currentValue == "" {
-			continue
-		}
 		if _, err := url.ParseRequestURI(currentValue); err != nil {
 			return fmt.Errorf("%s='%s' is not a valid URL: %w", envVarName, currentValue, err)
 		}
