@@ -9,7 +9,7 @@ import (
 
 func NewKafkaExporter(
 	solanaConfig config.Solana,
-	feedConfig config.Feed,
+	feedConfig Feed,
 
 	log logger.Logger,
 	producer Producer,
@@ -41,7 +41,7 @@ func NewKafkaExporter(
 
 type kafkaExporter struct {
 	solanaConfig config.Solana
-	feedConfig   config.Feed
+	feedConfig   Feed
 
 	log      logger.Logger
 	producer Producer

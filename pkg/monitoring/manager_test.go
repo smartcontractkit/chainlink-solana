@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/require"
 )
@@ -40,7 +39,7 @@ func TestManager(t *testing.T) {
 			logger.NewNullLogger(),
 			poller,
 		)
-		managed := func(ctx context.Context, localWg *sync.WaitGroup, _ []config.Feed) {
+		managed := func(ctx context.Context, localWg *sync.WaitGroup, _ []Feed) {
 			localWg.Add(numGoroutinesPerManaged)
 			for i := 0; i < numGoroutinesPerManaged; i++ {
 				go func(i int, ctx context.Context) {

@@ -4,8 +4,6 @@ package config
 
 import (
 	"time"
-
-	"github.com/gagliardetto/solana-go"
 )
 
 type Config struct {
@@ -50,22 +48,6 @@ type Feeds struct {
 	URL             string
 	RDDReadTimeout  time.Duration
 	RDDPollInterval time.Duration
-	Feeds           []Feed
-}
-
-type Feed struct {
-	// Data extracted from the RDD
-	FeedName       string
-	FeedPath       string
-	Symbol         string
-	HeartbeatSec   int64
-	ContractType   string
-	ContractStatus string
-
-	// Equivalent to ProgramID in Solana
-	ContractAddress      solana.PublicKey
-	TransmissionsAccount solana.PublicKey
-	StateAccount         solana.PublicKey
 }
 
 type Http struct {
