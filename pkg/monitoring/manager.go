@@ -2,9 +2,10 @@ package monitoring
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
 	"sync"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/assert"
 )
@@ -69,7 +70,7 @@ func (m *managerImpl) Start(backgroundCtx context.Context, backgroundWg *sync.Wa
 			}
 			// Start new managed function
 			localCtx, localCtxCancel = context.WithCancel(backgroundCtx)
-			localWg = new(sync.WaitGroup)
+			localWg = &sync.WaitGroup{}
 			localWg.Add(1)
 			go func() {
 				defer localWg.Done()
@@ -82,10 +83,26 @@ func (m *managerImpl) Start(backgroundCtx context.Context, backgroundWg *sync.Wa
 			if localWg != nil {
 				localWg.Wait()
 			}
-			m.log.Info("manager closed")
+			m.log.Info("manager stopped")
 			return
 		}
 	}
+}
+
+func (m *managerImpl) HTTPHandler() http.Handler {
+	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var currentFeeds []Feed
+		func() { // take a snaphost of the current feeds
+			m.currentFeedsMu.Lock()
+			defer m.currentFeedsMu.Unlock()
+			currentFeeds = m.currentFeeds
+		}()
+		writer.Header().Set("content-type", "application/json")
+		encoder := json.NewEncoder(writer)
+		if err := encoder.Encode(currentFeeds); err != nil {
+			m.log.Errorw("failed to write current feeds to the http handler", "error", err)
+		}
+	})
 }
 
 // isDifferentFeeds checks whether there is a difference between the current list of feeds and the new feeds - Manager
