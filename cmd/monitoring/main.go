@@ -47,10 +47,10 @@ func main() {
 		log.Fatalf("failed to create kafka producer", "error", err)
 	}
 
-	var transmissionReader, stateReader monitoring.AccountReader
+	var transmissionReader, stateReader monitoring.ChainReader
 	if cfg.Feature.TestOnlyFakeReaders {
-		transmissionReader = monitoring.NewRandomDataReader(bgCtx, wg, "transmission", log.With("component", "rand-reader", "account", "transmissions"))
-		stateReader = monitoring.NewRandomDataReader(bgCtx, wg, "state", log.With("component", "rand-reader", "account", "state"))
+		transmissionReader = monitoring.NewRandomDataReader(bgCtx, wg, "transmission", log.With("component", "rand-transmission-reader"))
+		stateReader = monitoring.NewRandomDataReader(bgCtx, wg, "state", log.With("component", "rand-config-reader"))
 	} else {
 		transmissionReader = monitoring.NewTransmissionReader(client)
 		stateReader = monitoring.NewStateReader(client)

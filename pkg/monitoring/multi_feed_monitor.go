@@ -16,7 +16,8 @@ func NewMultiFeedMonitor(
 	solanaConfig config.Solana,
 
 	log logger.Logger,
-	transmissionReader, stateReader AccountReader,
+	transmissionReader ChainReader,
+	stateReader ChainReader,
 	producer Producer,
 	metrics Metrics,
 
@@ -50,8 +51,8 @@ type multiFeedMonitor struct {
 	solanaConfig config.Solana
 
 	log                logger.Logger
-	transmissionReader AccountReader
-	stateReader        AccountReader
+	transmissionReader ChainReader
+	stateReader        ChainReader
 	producer           Producer
 	metrics            Metrics
 

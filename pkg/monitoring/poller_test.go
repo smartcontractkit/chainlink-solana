@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/require"
 )
@@ -94,7 +93,7 @@ type fakeReaderWithWait struct {
 	waitOnRead time.Duration
 }
 
-func (f fakeReaderWithWait) Read(ctx context.Context, _ solana.PublicKey) (interface{}, error) {
+func (f fakeReaderWithWait) Read(ctx context.Context, _ []byte) (interface{}, error) {
 	select {
 	case <-time.After(f.waitOnRead):
 		return 1, nil

@@ -8,10 +8,10 @@ import (
 
 type solanaSource struct {
 	account solana.PublicKey
-	reader  AccountReader
+	reader  ChainReader
 }
 
-func NewSolanaSource(account solana.PublicKey, reader AccountReader) Source {
+func NewSolanaSource(account solana.PublicKey, reader ChainReader) Source {
 	return &solanaSource{account, reader}
 }
 
@@ -20,5 +20,5 @@ func (s *solanaSource) Name() string {
 }
 
 func (s *solanaSource) Fetch(ctx context.Context) (interface{}, error) {
-	return s.reader.Read(ctx, s.account)
+	return s.reader.Read(ctx, s.account.Bytes())
 }
