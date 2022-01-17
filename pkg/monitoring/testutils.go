@@ -180,10 +180,10 @@ func generateSolanaConfig() config.Solana {
 	}
 }
 
-func generateFeedConfig() config.Feed {
+func generateFeedConfig() Feed {
 	coins := []string{"btc", "eth", "matic", "link", "avax", "ftt", "srm", "usdc", "sol", "ray"}
 	coin := coins[rand.Intn(len(coins))]
-	return config.Feed{
+	return Feed{
 		FeedName:       fmt.Sprintf("%s / usd", coin),
 		FeedPath:       fmt.Sprintf("%s-usd", coin),
 		Symbol:         "$",
@@ -395,7 +395,7 @@ func (f *fakeRddSource) Name() string {
 
 func (f *fakeRddSource) Fetch(_ context.Context) (interface{}, error) {
 	numFeeds := int(f.minFeeds) + rand.Intn(int(f.maxFeeds-f.minFeeds))
-	feeds := make([]config.Feed, numFeeds)
+	feeds := make([]Feed, numFeeds)
 	for i := 0; i < numFeeds; i++ {
 		feeds[i] = generateFeedConfig()
 	}

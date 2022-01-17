@@ -12,9 +12,10 @@ import (
 // Manager restarts the managed function with a new list of updates whenever something changed.
 type Manager interface {
 	Start(backgroundCtx context.Context, backgroundWg *sync.WaitGroup, managed ManagedFunc)
+	HTTPHandler() http.Handler
 }
 
-type ManagedFunc func(localCtx context.Context, localWg *sync.WaitGroup, feeds []config.Feed)
+type ManagedFunc func(localCtx context.Context, localWg *sync.WaitGroup, feeds []Feed)
 
 func NewManager(
 	log logger.Logger,
@@ -23,7 +24,7 @@ func NewManager(
 	return &managerImpl{
 		log,
 		rddPoller,
-		[]config.Feed{},
+		[]Feed{},
 		sync.Mutex{},
 	}
 }
@@ -32,7 +33,7 @@ type managerImpl struct {
 	log       logger.Logger
 	rddPoller Poller
 
-	currentFeeds   []config.Feed
+	currentFeeds   []Feed
 	currentFeedsMu sync.Mutex
 }
 
@@ -43,7 +44,7 @@ func (m *managerImpl) Start(backgroundCtx context.Context, backgroundWg *sync.Wa
 	for {
 		select {
 		case rawUpdatedFeeds := <-m.rddPoller.Updates():
-			updatedFeeds, ok := rawUpdatedFeeds.([]config.Feed)
+			updatedFeeds, ok := rawUpdatedFeeds.([]Feed)
 			if !ok {
 				m.log.Errorf("unexpected type (%T) for rdd updates", updatedFeeds)
 				continue
@@ -88,6 +89,6 @@ func (m *managerImpl) Start(backgroundCtx context.Context, backgroundWg *sync.Wa
 }
 
 // isDifferentFeeds checks whether there is a difference between the current list of feeds and the new feeds - Manager
-func isDifferentFeeds(current, updated []config.Feed) bool {
+func isDifferentFeeds(current, updated []Feed) bool {
 	return !assert.ObjectsAreEqual(current, updated)
 }

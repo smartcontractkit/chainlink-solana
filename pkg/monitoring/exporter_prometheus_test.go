@@ -14,11 +14,9 @@ func TestPrometheusExporter(t *testing.T) {
 	stateAccount := generatePublicKey()
 
 	cfg := config.Config{}
-	cfg.Feeds.Feeds = []config.Feed{
-		{
-			TransmissionsAccount: transmissionAccount,
-			StateAccount:         stateAccount,
-		},
+	feed := Feed{
+		TransmissionsAccount: transmissionAccount,
+		StateAccount:         stateAccount,
 	}
 
 	ctx := context.Background()
@@ -26,7 +24,7 @@ func TestPrometheusExporter(t *testing.T) {
 	t.Run("should still publish new transmissions even if a transmitter is not set", func(t *testing.T) {
 		metrics := &keepLatestMetrics{}
 		exporter := NewPrometheusExporter(
-			cfg.Solana, cfg.Feeds.Feeds[0],
+			cfg.Solana, feed,
 			logger.NewNullLogger(),
 			metrics,
 		)
@@ -38,7 +36,7 @@ func TestPrometheusExporter(t *testing.T) {
 	t.Run("should publish a new transmission with latest transmitter", func(t *testing.T) {
 		metrics := &keepLatestMetrics{}
 		exporter := NewPrometheusExporter(
-			cfg.Solana, cfg.Feeds.Feeds[0],
+			cfg.Solana, feed,
 			logger.NewNullLogger(),
 			metrics,
 		)
