@@ -56,13 +56,15 @@ func main() {
 		stateReader = monitoring.NewStateReader(client)
 	}
 
+	metrics := monitoring.DefaultMetrics
+
 	monitor := monitoring.NewMultiFeedMonitor(
 		cfg.Solana,
 
 		log,
 		transmissionReader, stateReader,
 		producer,
-		monitoring.DefaultMetrics,
+		metrics,
 
 		cfg.Kafka.ConfigSetTopic,
 		cfg.Kafka.ConfigSetSimplifiedTopic,
