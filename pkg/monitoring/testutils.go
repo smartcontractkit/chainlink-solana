@@ -253,8 +253,8 @@ type fakeReader struct {
 	readCh chan interface{}
 }
 
-// NewRandomDataReader produces an AccountReader that generates random data for "state" and "transmission" types.
-func NewRandomDataReader(ctx context.Context, wg *sync.WaitGroup, typ string, log logger.Logger) AccountReader {
+// NewRandomDataReader produces an ChainReader that generates random data for "state" and "transmission" types.
+func NewRandomDataReader(ctx context.Context, wg *sync.WaitGroup, typ string, log logger.Logger) ChainReader {
 	f := &fakeReader{make(chan interface{})}
 	wg.Add(1)
 	go func() {
@@ -264,7 +264,7 @@ func NewRandomDataReader(ctx context.Context, wg *sync.WaitGroup, typ string, lo
 	return f
 }
 
-func (f *fakeReader) Read(ctx context.Context, _ solana.PublicKey) (interface{}, error) {
+func (f *fakeReader) Read(ctx context.Context, _ []byte) (interface{}, error) {
 	var ans interface{}
 	select {
 	case ans = <-f.readCh:
