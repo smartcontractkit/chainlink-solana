@@ -47,8 +47,6 @@ type SchemaRegistry struct {
 }
 
 type Feeds struct {
-	// If URL is set, the RDD tracker will start and override any feed configs extracted from FilePath!
-	FilePath        string
 	URL             string
 	RDDReadTimeout  time.Duration
 	RDDPollInterval time.Duration
