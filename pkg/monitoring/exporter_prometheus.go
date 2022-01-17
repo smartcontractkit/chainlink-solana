@@ -11,7 +11,7 @@ import (
 
 func NewPrometheusExporter(
 	solanaConfig config.Solana,
-	feedConfig config.Feed,
+	feedConfig Feed,
 	log logger.Logger,
 	metrics Metrics,
 ) Exporter {
@@ -40,7 +40,7 @@ func NewPrometheusExporter(
 
 type prometheusExporter struct {
 	solanaConfig config.Solana
-	feedConfig   config.Feed
+	feedConfig   Feed
 
 	log     logger.Logger
 	metrics Metrics

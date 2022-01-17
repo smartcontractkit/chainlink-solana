@@ -51,23 +51,21 @@ func TestFeedMonitor(t *testing.T) {
 	transmissionSchema := fakeSchema{transmissionCodec}
 
 	cfg := config.Config{}
-	cfg.Feeds.Feeds = []config.Feed{
-		{
-			TransmissionsAccount: transmissionAccount,
-			StateAccount:         stateAccount,
-		},
+	feed := Feed{
+		TransmissionsAccount: transmissionAccount,
+		StateAccount:         stateAccount,
 	}
 
 	exporters := []Exporter{
 		NewPrometheusExporter(
 			cfg.Solana,
-			cfg.Feeds.Feeds[0],
+			feed,
 			logger.NewNullLogger(),
 			&devnullMetrics{},
 		),
 		NewKafkaExporter(
 			cfg.Solana,
-			cfg.Feeds.Feeds[0],
+			feed,
 			logger.NewNullLogger(),
 			producer,
 

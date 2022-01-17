@@ -9,7 +9,7 @@ import (
 
 func TestSchemas(t *testing.T) {
 	solanaConfig := config.Solana{}
-	feedConfig := config.Feed{}
+	feedConfig := Feed{}
 	transmission := TransmissionEnvelope{}
 	state := StateEnvelope{}
 	t.Run("encode an empty configSet message", func(t *testing.T) {

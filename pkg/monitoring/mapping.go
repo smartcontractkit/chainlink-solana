@@ -16,7 +16,7 @@ import (
 func MakeConfigSetMapping(
 	envelope StateEnvelope,
 	solanaConfig config.Solana,
-	feedConfig config.Feed,
+	feedConfig Feed,
 ) (map[string]interface{}, error) {
 	offchainConfig, err := parseOffchainConfig(envelope.State.Config.OffchainConfig.Raw[:envelope.State.Config.OffchainConfig.Len])
 	if err != nil {
@@ -138,7 +138,7 @@ func MakeConfigSetMapping(
 
 func MakeConfigSetSimplifiedMapping(
 	envelope StateEnvelope,
-	feedConfig config.Feed,
+	feedConfig Feed,
 ) (map[string]interface{}, error) {
 	offchainConfig, err := parseOffchainConfig(envelope.State.Config.OffchainConfig.Raw[:envelope.State.Config.OffchainConfig.Len])
 	if err != nil {
@@ -182,7 +182,7 @@ func MakeConfigSetSimplifiedMapping(
 func MakeTransmissionMapping(
 	envelope TransmissionEnvelope,
 	solanaConfig config.Solana,
-	feedConfig config.Feed,
+	feedConfig Feed,
 ) (map[string]interface{}, error) {
 	data := []byte{}
 	if envelope.Answer.Data != nil {
