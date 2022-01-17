@@ -2,16 +2,12 @@ package main
 
 import (
 	"context"
-	"errors"
-	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -29,25 +25,6 @@ func main() {
 	if err != nil {
 		log.Fatalw("failed to parse configuration", "error", err)
 	}
-
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
-	server := &http.Server{
-		Addr:        cfg.Http.Address,
-		Handler:     mux,
-		BaseContext: func(_ net.Listener) context.Context { return bgCtx },
-	}
-	defer server.Close()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		log := log.With("component", "http")
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalw("failed to start http server", "address", cfg.Http.Address, "error", err)
-		} else {
-			log.Info("http server stopped")
-		}
-	}()
 
 	client := rpc.New(cfg.Solana.RPCEndpoint)
 
@@ -130,15 +107,24 @@ func main() {
 		}()
 	} // the config package makes sure there is either a FilePath or a URL set!
 
+
+	// Configure HTTP server
+	http := monitoring.NewHttpServer(bgCtx, cfg.Http.Address, log.With("component", "http-server"))
+	http.Handle("/metrics", metrics.HTTPHandler())
+	http.Handle("/debug", manager.HTTPHandler())
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		http.Start(bgCtx, wg)
+	}()
+
+	// Handle signals from the OS
 	osSignalsCh := make(chan os.Signal, 1)
 	signal.Notify(osSignalsCh, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-osSignalsCh
 	log.Infof("received signal '%v'. Stopping", sig)
 
 	cancelBgCtx()
-	if err := server.Shutdown(bgCtx); err != nil && !errors.Is(err, context.Canceled) {
-		log.Errorw("failed to shut http server down", "error", err)
-	}
 	wg.Wait()
 	log.Info("process stopped")
 }
