@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"net/http"
 	"sync"
 	"time"
 
 	gbinary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/linkedin/goavro"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/pb"
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
@@ -361,6 +363,13 @@ func (d *devnullMetrics) SetOffchainAggregatorSubmissionReceivedValues(value *bi
 }
 
 func (d *devnullMetrics) SetOffchainAggregatorAnswerStalled(isSet bool, contractAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string) {
+}
+
+func (d *devnullMetrics) Cleanup(networkName, networkID, chainID, oracleName, sender, feedName, feedPath, symbol, contractType, contractStatus, contractAddress, feedID string) {
+}
+
+func (d *devnullMetrics) HTTPHandler() http.Handler {
+	return promhttp.Handler()
 }
 
 type keepLatestMetrics struct {

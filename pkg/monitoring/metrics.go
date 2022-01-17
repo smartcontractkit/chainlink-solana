@@ -2,8 +2,10 @@ package monitoring
 
 import (
 	"math/big"
+	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type Metrics interface {
@@ -14,6 +16,10 @@ type Metrics interface {
 	IncOffchainAggregatorAnswersTotal(contractAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string)
 	SetOffchainAggregatorSubmissionReceivedValues(value *big.Int, contractAddress, feedID, sender, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string)
 	SetOffchainAggregatorAnswerStalled(isSet bool, contractAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string)
+	// Cleanup deletes all the metrics
+	Cleanup(networkName, networkID, chainID, oracleName, sender, feedName, feedPath, symbol, contractType, contractStatus, contractAddress, feedID string)
+	// Exposes the accumulated metrics to HTTP.
+	HTTPHandler() http.Handler
 }
 
 var (
@@ -114,4 +120,23 @@ func (d *defaultMetrics) SetOffchainAggregatorAnswerStalled(isSet bool, contract
 		value = 1
 	}
 	offchainAggregatorAnswerStalled.WithLabelValues(contractAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName).Set(value)
+}
+
+func (d *defaultMetrics) Cleanup(
+	networkName, networkID, chainID, oracleName, sender string,
+	feedName, feedPath, symbol, contractType, contractStatus string,
+	contractAddress, feedID string,
+) {
+	// TODO (dru) post error message id delete fails
+	_ = headTrackerCurrentHead.DeleteLabelValues(networkName, chainID, networkID)
+	_ = feedContractMetadata.DeleteLabelValues(chainID, contractAddress, feedID, contractStatus, contractType, feedName, feedPath, networkID, networkName, symbol)
+	_ = nodeMetadata.DeleteLabelValues(chainID, networkID, networkName, oracleName, sender)
+	_ = offchainAggregatorAnswers.DeleteLabelValues(contractAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName)
+	_ = offchainAggregatorAnswersTotal.DeleteLabelValues(contractAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName)
+	_ = offchainAggregatorSubmissionReceivedValues.DeleteLabelValues(contractAddress, feedID, sender, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName)
+	_ = offchainAggregatorAnswerStalled.DeleteLabelValues(contractAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName)
+}
+
+func (d *defaultMetrics) HTTPHandler() http.Handler {
+	return promhttp.Handler()
 }
