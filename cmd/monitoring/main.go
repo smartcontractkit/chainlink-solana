@@ -73,7 +73,7 @@ func main() {
 		transmissionSchema,
 	)
 
-	source := monitoring.NewRDDSource(cfg.Feeds.URL)
+	source := monitoring.NewRDDSource(cfg.Feeds.URL, monitoring.SolanaFeedParser)
 	if cfg.Feature.TestOnlyFakeRdd {
 		// Generate between 2 and 10 random feeds every RDDPollInterval.
 		source = monitoring.NewFakeRDDSource(2, 10)

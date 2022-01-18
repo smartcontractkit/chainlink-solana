@@ -2,30 +2,29 @@ package monitoring
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
-
-	"github.com/gagliardetto/solana-go"
 )
+
+type FeedParser func(buf io.ReadCloser) ([]FeedConfig, error)
 
 // rddSource produces a list of feeds to monitor.
 type rddSource struct {
 	rddURL     string
 	httpClient *http.Client
+	feedParser FeedParser
 }
 
 func NewRDDSource(
 	rddURL string,
+	feedParser FeedParser,
 ) Source {
 	return &rddSource{
 		rddURL,
 		&http.Client{},
+		feedParser,
 	}
-}
-
-func (r *rddSource) Name() string {
-	return "rdd"
 }
 
 func (r *rddSource) Fetch(ctx context.Context) (interface{}, error) {
@@ -38,64 +37,24 @@ func (r *rddSource) Fetch(ctx context.Context) (interface{}, error) {
 		return nil, fmt.Errorf("unable to fetch RDD data: %w", err)
 	}
 	defer res.Body.Close()
-	rawFeeds := []rawFeedConfig{}
-	decoder := json.NewDecoder(res.Body)
-	if err := decoder.Decode(&rawFeeds); err != nil {
-		return nil, fmt.Errorf("unable to unmarshal feeds config data: %w", err)
-	}
-	feeds := make([]Feed, len(rawFeeds))
-	for i, rawFeed := range rawFeeds {
-		contractAddress, err := solana.PublicKeyFromBase58(rawFeed.ContractAddressBase58)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse program id '%s' from JSON at index i=%d: %w", rawFeed.ContractAddressBase58, i, err)
-		}
-		transmissionsAccount, err := solana.PublicKeyFromBase58(rawFeed.TransmissionsAccountBase58)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse transmission account '%s' from JSON at index i=%d: %w", rawFeed.TransmissionsAccountBase58, i, err)
-		}
-		stateAccount, err := solana.PublicKeyFromBase58(rawFeed.StateAccountBase58)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse state account '%s' from JSON at index i=%d: %w", rawFeed.StateAccountBase58, i, err)
-		}
-		feeds[i] = Feed{
-			rawFeed.FeedName,
-			rawFeed.FeedPath,
-			rawFeed.Symbol,
-			rawFeed.Heartbeat,
-			rawFeed.ContractType,
-			rawFeed.ContractStatus,
-			contractAddress,
-			transmissionsAccount,
-			stateAccount,
-		}
+	feeds, err := r.feedParser(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse RDD data into an array of feed configurations: %w", err)
 	}
 	return feeds, nil
 }
 
-type rawFeedConfig struct {
-	FeedName       string `json:"name,omitempty"`
-	FeedPath       string `json:"path,omitempty"`
-	Symbol         string `json:"symbol,omitempty"`
-	Heartbeat      int64  `json:"heartbeat,omitempty"`
-	ContractType   string `json:"contract_type,omitempty"`
-	ContractStatus string `json:"status,omitempty"`
-
-	ContractAddressBase58      string `json:"contract_address_base58,omitempty"`
-	TransmissionsAccountBase58 string `json:"transmissions_account_base58,omitempty"`
-	StateAccountBase58         string `json:"state_account_base58,omitempty"`
-}
-
-type Feed struct {
-	// Data extracted from the RDD
-	FeedName       string
-	FeedPath       string
-	Symbol         string
-	HeartbeatSec   int64
-	ContractType   string
-	ContractStatus string
-
-	// Equivalent to ProgramID in Solana
-	ContractAddress      solana.PublicKey
-	TransmissionsAccount solana.PublicKey
-	StateAccount         solana.PublicKey
+// FeedConfig is the interface for feed configurations extracted from the RDD.
+type FeedConfig interface {
+	GetName() string
+	GetPath() string
+	GetSymbol() string
+	GetHeartbeatSec() int64
+	GetContractType() string
+	GetContractStatus() string
+	// This functions as a feed identifier.
+	GetContractAddress() string
+	GetContractAddressBytes() []byte
+	// Useful for mapping to kafka messages.
+	ToMapping() map[string]interface{}
 }

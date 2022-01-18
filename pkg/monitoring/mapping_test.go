@@ -3,10 +3,8 @@ package monitoring
 import (
 	"encoding/base64"
 	"encoding/json"
-	"strings"
 	"testing"
 
-	"github.com/mr-tron/base58"
 	"github.com/stretchr/testify/require"
 )
 
@@ -45,7 +43,7 @@ func TestMapping(t *testing.T) {
 		require.Equal(t, configSetSimplified["transmitters"], jsonMarshalToString(t, config.Transmitters))
 		require.Equal(t, configSetSimplified["s"], jsonMarshalToString(t, offchainConfig.S))
 		require.Equal(t, configSetSimplified["oracles"], string(oracles))
-		require.Equal(t, configSetSimplified["feed_state_account"], strings.Replace(jsonMarshalToString(t, base58.Encode(feedConfig.StateAccount.Bytes())), "\"", "", -1))
+		require.Equal(t, configSetSimplified["feed_state_account"], feedConfig.GetContractAddress())
 	})
 
 	t.Run("MakeTransmissionMapping", func(t *testing.T) {
@@ -78,15 +76,7 @@ func TestMapping(t *testing.T) {
 
 		decodedFeedConfig, ok := transmission["feed_config"].(map[string]interface{})
 		require.True(t, ok)
-		require.Equal(t, decodedFeedConfig["feed_name"], feedConfig.FeedName)
-		require.Equal(t, decodedFeedConfig["feed_path"], feedConfig.FeedPath)
-		require.Equal(t, decodedFeedConfig["symbol"], feedConfig.Symbol)
-		require.Equal(t, decodedFeedConfig["heartbeat_sec"], int64(feedConfig.HeartbeatSec))
-		require.Equal(t, decodedFeedConfig["contract_type"], feedConfig.ContractType)
-		require.Equal(t, decodedFeedConfig["contract_status"], feedConfig.ContractStatus)
-		require.Equal(t, decodedFeedConfig["contract_address"], feedConfig.ContractAddress.Bytes())
-		require.Equal(t, decodedFeedConfig["transmissions_account"], feedConfig.TransmissionsAccount.Bytes())
-		require.Equal(t, decodedFeedConfig["state_account"], feedConfig.StateAccount.Bytes())
+		require.Equal(t, decodedFeedConfig, feedConfig.ToMapping())
 	})
 }
 

@@ -8,7 +8,7 @@ import (
 
 func TestSchemas(t *testing.T) {
 	solanaCfg := SolanaConfig{}
-	feedConfig := Feed{}
+	feedConfig := generateFeedConfig()
 	transmissionEnvelope := TransmissionEnvelope{}
 	configEnvelope := ConfigEnvelope{}
 	t.Run("encode an empty configSetSimplified message", func(t *testing.T) {
