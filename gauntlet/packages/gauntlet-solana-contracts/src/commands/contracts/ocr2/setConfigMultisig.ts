@@ -13,7 +13,7 @@ type Input = {
   }[]
   f: number | string
 }
-export default class SetConfigNew extends SolanaCommand {
+export default class SetConfigMultisig extends SolanaCommand {
   static id = 'multisig:ocr2:set_config'
   static category = CONTRACT_LIST.OCR_2
 
@@ -68,7 +68,7 @@ export default class SetConfigNew extends SolanaCommand {
     logger.log('Config information:', input)
     await prompt(`Continue setting config on ${state.toString()}?`)
       console.log(oracles)
-    const data = program.coder.instruction.encode('set_config', { new_oracles: oracles, f })
+    const data = program.coder.instruction.encode('set_config', { newOracles: oracles, f })
 
     const accounts: AccountMeta[] = [
       {
@@ -78,7 +78,7 @@ export default class SetConfigNew extends SolanaCommand {
       },
       {
         pubkey: owner,
-        isSigner: false,
+        isSigner: true,
         isWritable: false,
       },
     ]
