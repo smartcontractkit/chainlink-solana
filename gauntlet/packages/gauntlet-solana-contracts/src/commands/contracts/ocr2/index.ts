@@ -1,11 +1,9 @@
 import Initialize from './initialize'
 import OCR2InitializeFlow from './initialize.flow'
 import BeginOffchainConfig from './offchainConfig/begin'
-import BeginOffchainConfigMultisig from './offchainConfig/beginMultisig'
 import CommitOffchainConfig from './offchainConfig/commit'
 import SetOffchainConfigFlow from './offchainConfig/setOffchainConfig.flow'
 import WriteOffchainConfig from './offchainConfig/write'
-import WriteOffchainConfigMultisig from './offchainConfig/writeMultisig'
 import PayRemaining from './payRemaining'
 import ReadState from './read'
 import SetBillingAccessController from './setBillingAccessController'
@@ -30,9 +28,7 @@ export default [
   ReadState,
   SetOffchainConfigFlow,
   BeginOffchainConfig,
-  BeginOffchainConfigMultisig,
   WriteOffchainConfig,
-  WriteOffchainConfigMultisig,
   CommitOffchainConfig,
   SetBillingAccessController,
   SetRequesterAccessController,
