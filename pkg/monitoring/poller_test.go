@@ -10,7 +10,6 @@ import (
 )
 
 func TestPoller(t *testing.T) {
-	account := generatePublicKey()
 	for _, testCase := range []struct {
 		name           string
 		duration       time.Duration
@@ -59,9 +58,9 @@ func TestPoller(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), testCase.duration)
 			defer cancel()
-			reader := fakeReaderWithWait{testCase.waitOnRead}
+			source := &fakeSourceWithWait{testCase.waitOnRead}
 			poller := NewSourcePoller(
-				NewSolanaSource(account, reader),
+				source,
 				logger.NewNullLogger(),
 				testCase.pollInterval,
 				testCase.readTimeout,
@@ -89,11 +88,11 @@ func TestPoller(t *testing.T) {
 	}
 }
 
-type fakeReaderWithWait struct {
+type fakeSourceWithWait struct {
 	waitOnRead time.Duration
 }
 
-func (f fakeReaderWithWait) Read(ctx context.Context, _ []byte) (interface{}, error) {
+func (f *fakeSourceWithWait) Fetch(ctx context.Context) (interface{}, error) {
 	select {
 	case <-time.After(f.waitOnRead):
 		return 1, nil

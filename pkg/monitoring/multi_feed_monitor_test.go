@@ -3,7 +3,6 @@ package monitoring
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -32,14 +31,16 @@ func TestMultiFeedMonitorToMakeSureAllGoroutinesTerminate(t *testing.T) {
 
 	producer := fakeProducer{make(chan producerMessage), ctx}
 
-	transmissionReader := &fakeReader{make(chan interface{})}
-	stateReader := &fakeReader{make(chan interface{})}
+	factory := &fakeRandomDataSourceFactory{
+		make(chan TransmissionEnvelope),
+		make(chan ConfigEnvelope),
+	}
 
 	monitor := NewMultiFeedMonitor(
 		cfg.Solana,
 
 		logger.NewNullLogger(),
-		transmissionReader, stateReader,
+		factory,
 		producer,
 		&devnullMetrics{},
 
@@ -53,17 +54,21 @@ func TestMultiFeedMonitorToMakeSureAllGoroutinesTerminate(t *testing.T) {
 	)
 	go monitor.Start(ctx, wg, feeds)
 
-	trCount, stCount := 0, 0
+	trCount, cfgCount := 0, 0
 	messages := []producerMessage{}
+
+	configEnvelope, err := generateConfigEnvelope()
+	require.NoError(t, err)
+
 LOOP:
 	for {
-		newState, _, _, err := generateState()
-		require.NoError(t, err)
 		select {
-		case transmissionReader.readCh <- generateTransmissionEnvelope():
+		case factory.transmissions <- generateTransmissionEnvelope():
 			trCount += 1
-		case stateReader.readCh <- StateEnvelope{newState, 100}:
-			stCount += 1
+		case factory.configs <- configEnvelope:
+			cfgCount += 1
+			configEnvelope, err = generateConfigEnvelope()
+			require.NoError(t, err)
 		case <-ctx.Done():
 			break LOOP
 		}
@@ -77,7 +82,7 @@ LOOP:
 
 	wg.Wait()
 	require.Equal(t, 10, trCount, "should only be able to do initial read of the latest transmission")
-	require.Equal(t, 10, stCount, "should only be able to do initial read of the state account")
+	require.Equal(t, 10, cfgCount, "should only be able to do initial read of the state account")
 	require.Equal(t, 20, len(messages))
 }
 
@@ -99,14 +104,16 @@ func TestMultiFeedMonitorForPerformance(t *testing.T) {
 
 	producer := fakeProducer{make(chan producerMessage), ctx}
 
-	transmissionReader := &fakeReader{make(chan interface{})}
-	stateReader := &fakeReader{make(chan interface{})}
+	factory := &fakeRandomDataSourceFactory{
+		make(chan TransmissionEnvelope),
+		make(chan ConfigEnvelope),
+	}
 
 	monitor := NewMultiFeedMonitor(
 		cfg.Solana,
 
 		logger.NewNullLogger(),
-		transmissionReader, stateReader,
+		factory,
 		producer,
 		&devnullMetrics{},
 
@@ -120,21 +127,24 @@ func TestMultiFeedMonitorForPerformance(t *testing.T) {
 	)
 	go monitor.Start(ctx, wg, feeds)
 
-	var trCount, stCount int64 = 0, 0
+	var trCount, cfgCount int64 = 0, 0
 	messages := []producerMessage{}
+
+	configEnvelope, err := generateConfigEnvelope()
+	require.NoError(t, err)
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 	LOOP:
 		for {
-			newState, _, _, err := generateState()
-			require.NoError(t, err)
 			select {
-			case transmissionReader.readCh <- generateTransmissionEnvelope():
-				_ = atomic.AddInt64(&trCount, 1)
-			case stateReader.readCh <- StateEnvelope{newState, 100}:
-				_ = atomic.AddInt64(&stCount, 1)
+			case factory.transmissions <- generateTransmissionEnvelope():
+				trCount += 1
+			case factory.configs <- configEnvelope:
+				cfgCount += 1
+				configEnvelope, err = generateConfigEnvelope()
+				require.NoError(t, err)
 			case <-ctx.Done():
 				break LOOP
 			}
@@ -156,6 +166,6 @@ func TestMultiFeedMonitorForPerformance(t *testing.T) {
 
 	wg.Wait()
 	require.Equal(t, int64(10), trCount, "should only be able to do initial read of the latest transmission")
-	require.Equal(t, int64(10), stCount, "should only be able to do initial read of the state account")
-	require.Equal(t, 30, len(messages))
+	require.Equal(t, int64(10), cfgCount, "should only be able to do initial read of the state account")
+	require.Equal(t, 20, len(messages))
 }

@@ -2,7 +2,6 @@ package monitoring
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
@@ -33,8 +32,6 @@ func NewPrometheusExporter(
 		feedConfig,
 		log,
 		metrics,
-		"n/a",
-		sync.Mutex{},
 	}
 }
 
@@ -44,39 +41,27 @@ type prometheusExporter struct {
 
 	log     logger.Logger
 	metrics Metrics
-
-	// The transmissions account does not record the latest transmitter node.
-	// Instead, the state account stores the latest transmitter node's public key.
-	// We store the latest transmitter in memory to be used to associate the latest update.
-	latestTransmitter   string
-	latestTransmitterMu sync.Mutex
 }
 
 func (p *prometheusExporter) Export(ctx context.Context, data interface{}) {
 	switch typed := data.(type) {
-	case StateEnvelope:
+	case ConfigEnvelope:
 		p.metrics.SetNodeMetadata(
 			p.solanaConfig.ChainID,
 			p.solanaConfig.NetworkID,
 			p.solanaConfig.NetworkName,
-			"n/a",
-			typed.State.Config.LatestTransmitter.String(),
+			"n/a", // oracleName
+			"n/a", // sender
 		)
-
-		func() {
-			p.latestTransmitterMu.Lock()
-			defer p.latestTransmitterMu.Unlock()
-			p.latestTransmitter = typed.State.Config.LatestTransmitter.String()
-		}()
 	case TransmissionEnvelope:
 		p.metrics.SetHeadTrackerCurrentHead(
-			typed.BlockNumber,
+			0, // block number
 			p.solanaConfig.NetworkName,
 			p.solanaConfig.ChainID,
 			p.solanaConfig.NetworkID,
 		)
 		p.metrics.SetOffchainAggregatorAnswers(
-			typed.Answer.Data,
+			typed.LatestAnswer,
 			p.feedConfig.ContractAddress.String(),
 			p.feedConfig.StateAccount.String(),
 			p.solanaConfig.ChainID,
@@ -99,7 +84,7 @@ func (p *prometheusExporter) Export(ctx context.Context, data interface{}) {
 			p.solanaConfig.NetworkName,
 		)
 
-		isLateAnswer := time.Since(time.Unix(int64(typed.Answer.Timestamp), 0)).Seconds() > float64(p.feedConfig.HeartbeatSec)
+		isLateAnswer := time.Since(typed.LatestTimestamp).Seconds() > float64(p.feedConfig.HeartbeatSec)
 		p.metrics.SetOffchainAggregatorAnswerStalled(
 			isLateAnswer,
 			p.feedConfig.ContractAddress.String(),
@@ -112,24 +97,19 @@ func (p *prometheusExporter) Export(ctx context.Context, data interface{}) {
 			p.solanaConfig.NetworkID,
 			p.solanaConfig.NetworkName,
 		)
-
-		func() {
-			p.latestTransmitterMu.Lock()
-			defer p.latestTransmitterMu.Unlock()
-			p.metrics.SetOffchainAggregatorSubmissionReceivedValues(
-				typed.Answer.Data,
-				p.feedConfig.ContractAddress.String(),
-				p.feedConfig.StateAccount.String(),
-				p.latestTransmitter,
-				p.solanaConfig.ChainID,
-				p.feedConfig.ContractStatus,
-				p.feedConfig.ContractType,
-				p.feedConfig.FeedName,
-				p.feedConfig.FeedPath,
-				p.solanaConfig.NetworkID,
-				p.solanaConfig.NetworkName,
-			)
-		}()
+		p.metrics.SetOffchainAggregatorSubmissionReceivedValues(
+			typed.LatestAnswer,
+			p.feedConfig.ContractAddress.String(),
+			p.feedConfig.StateAccount.String(),
+			"n/a", // sender
+			p.solanaConfig.ChainID,
+			p.feedConfig.ContractStatus,
+			p.feedConfig.ContractType,
+			p.feedConfig.FeedName,
+			p.feedConfig.FeedPath,
+			p.solanaConfig.NetworkID,
+			p.solanaConfig.NetworkName,
+		)
 	default:
 		p.log.Errorf("unexpected type %T for export", data)
 	}

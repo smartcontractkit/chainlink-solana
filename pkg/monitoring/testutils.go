@@ -11,16 +11,142 @@ import (
 	"sync"
 	"time"
 
-	gbinary "github.com/gagliardetto/binary"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/gagliardetto/solana-go"
 	"github.com/linkedin/goavro"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/pb"
-	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
+	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"google.golang.org/protobuf/proto"
 )
+
+// Sources
+
+func NewFakeRDDSource(minFeeds, maxFeeds uint8) Source {
+	return &fakeRddSource{minFeeds, maxFeeds}
+}
+
+type fakeRddSource struct {
+	minFeeds, maxFeeds uint8
+}
+
+func (f *fakeRddSource) Name() string {
+	return "fake-rdd"
+}
+
+func (f *fakeRddSource) Fetch(_ context.Context) (interface{}, error) {
+	numFeeds := int(f.minFeeds) + rand.Intn(int(f.maxFeeds-f.minFeeds))
+	feeds := make([]Feed, numFeeds)
+	for i := 0; i < numFeeds; i++ {
+		feeds[i] = generateFeedConfig()
+	}
+	return feeds, nil
+}
+
+func NewRandomDataSourceFactory(ctx context.Context, wg *sync.WaitGroup, log logger.Logger) *fakeRandomDataSourceFactory {
+	f := &fakeRandomDataSourceFactory{
+		make(chan TransmissionEnvelope),
+		make(chan ConfigEnvelope),
+	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		config, err := generateConfigEnvelope()
+		if err != nil {
+			log.Errorw("failed to generate state", "error", err)
+		}
+		for {
+			select {
+			case f.transmissions <- generateTransmissionEnvelope():
+				log.Infof("generate transmission")
+			case f.configs <- config:
+				log.Infof("generate config")
+				config, err = generateConfigEnvelope()
+				if err != nil {
+					log.Errorw("failed to generate state", "error", err)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return f
+}
+
+type fakeRandomDataSourceFactory struct {
+	transmissions chan TransmissionEnvelope
+	configs       chan ConfigEnvelope
+}
+
+func (f *fakeRandomDataSourceFactory) NewSources(chainConfig config.Solana, feedConfig Feed) (Sources, error) {
+	return &fakeSources{f}, nil
+}
+
+type fakeSources struct {
+	factory *fakeRandomDataSourceFactory
+}
+
+func (f *fakeSources) NewTransmissionsSource() Source {
+	return &fakeTransmissionSource{f.factory}
+}
+
+func (f *fakeSources) NewConfigSource() Source {
+	return &fakeConfigSource{f.factory}
+}
+
+type fakeTransmissionSource struct {
+	factory *fakeRandomDataSourceFactory
+}
+
+func (f *fakeTransmissionSource) Fetch(ctx context.Context) (interface{}, error) {
+	return <-f.factory.transmissions, nil
+}
+
+type fakeConfigSource struct {
+	factory *fakeRandomDataSourceFactory
+}
+
+func (f *fakeConfigSource) Fetch(ctx context.Context) (interface{}, error) {
+	return <-f.factory.configs, nil
+}
+
+// Generators
+
+func generate32ByteArr() [32]byte {
+	buf := make([]byte, 32)
+	_, err := rand.Read(buf)
+	if err != nil {
+		panic("unable to generate [32]byte from rand")
+	}
+	var out [32]byte
+	copy(out[:], buf[:32])
+	return out
+}
+
+func generatePublicKey() solana.PublicKey {
+	arr := generate32ByteArr()
+	return solana.PublicKeyFromBytes(arr[:])
+}
+
+func generateFeedConfig() Feed {
+	coins := []string{"btc", "eth", "matic", "link", "avax", "ftt", "srm", "usdc", "sol", "ray"}
+	coin := coins[rand.Intn(len(coins))]
+	return Feed{
+		FeedName:       fmt.Sprintf("%s / usd", coin),
+		FeedPath:       fmt.Sprintf("%s-usd", coin),
+		Symbol:         "$",
+		HeartbeatSec:   1,
+		ContractType:   "ocr2",
+		ContractStatus: "status",
+
+		ContractAddress:      generatePublicKey(),
+		TransmissionsAccount: generatePublicKey(),
+		StateAccount:         generatePublicKey(),
+	}
+}
 
 func generateNumericalMedianOffchainConfig() (*pb.NumericalMedianConfigProto, []byte, error) {
 	out := &pb.NumericalMedianConfigProto{
@@ -37,8 +163,11 @@ func generateNumericalMedianOffchainConfig() (*pb.NumericalMedianConfigProto, []
 	return out, buf, nil
 }
 
-func generateOffchainConfig(oracles [19]pkgSolana.Oracle, numOracles int) (
-	*pb.OffchainConfigProto, *pb.NumericalMedianConfigProto, []byte, error,
+func generateOffchainConfig(numOracles int) (
+	*pb.OffchainConfigProto,
+	*pb.NumericalMedianConfigProto,
+	[]byte,
+	error,
 ) {
 	numericalMedianOffchainConfig, encodedNumericalMedianOffchainConfig, err := generateNumericalMedianOffchainConfig()
 	if err != nil {
@@ -90,85 +219,62 @@ func generateOffchainConfig(oracles [19]pkgSolana.Oracle, numOracles int) (
 	return config, numericalMedianOffchainConfig, encodedConfig, nil
 }
 
-func generateState() (
-	pkgSolana.State,
+func generateContractConfig(n int) (
+	types.ContractConfig,
+	median.OnchainConfig,
 	*pb.OffchainConfigProto,
 	*pb.NumericalMedianConfigProto,
 	error,
 ) {
-	numOracles := 1 + rand.Intn(18) // At least one oracle.
-	var oracles [19]pkgSolana.Oracle
-	for i := 0; i < numOracles; i++ {
-		oracles[i] = pkgSolana.Oracle{
-			Transmitter: generatePublicKey(),
-			Signer: pkgSolana.SigningKey{
-				Key: generate20ByteArr(),
-			},
-			Payee:         generatePublicKey(),
-			ProposedPayee: generatePublicKey(),
-			Payment:       rand.Uint64(),
-			FromRoundID:   rand.Uint32(),
-		}
+	signers := make([]types.OnchainPublicKey, n)
+	transmitters := make([]types.Account, n)
+	for i := 0; i < n; i++ {
+		randArr := generate32ByteArr()
+		signers[i] = types.OnchainPublicKey(randArr[:])
+		transmitters[i] = types.Account(hexutil.Encode([]byte{
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, uint8(i),
+		}))
 	}
-
-	var numLeftovers = rand.Intn(numOracles)
-	var leftovers [19]pkgSolana.LeftoverPayment
-	for i := 0; i < numLeftovers; i++ {
-		leftovers[i] = pkgSolana.LeftoverPayment{
-			Payee:  generatePublicKey(),
-			Amount: rand.Uint64(),
-		}
+	onchainConfig := median.OnchainConfig{
+		Min: big.NewInt(rand.Int63()),
+		Max: big.NewInt(rand.Int63()),
 	}
-
-	offchainConfig, numericalMedianConfig, encodedOffchainConfig, err := generateOffchainConfig(oracles, numOracles)
+	onchainConfigEncoded, err := onchainConfig.Encode()
 	if err != nil {
-		return pkgSolana.State{}, nil, nil, err
+		return types.ContractConfig{}, median.OnchainConfig{}, nil, nil, err
 	}
-
-	var enlargedOffchainConfig [4096]byte
-	copy(enlargedOffchainConfig[:len(encodedOffchainConfig)], encodedOffchainConfig[:])
-
-	state := pkgSolana.State{
-		AccountDiscriminator: [8]byte{'0', '1', '2', '3', '4', '5', '6', '7'},
-		Version:              uint8(rand.Intn(256)),
-		Nonce:                uint8(rand.Intn(256)),
-		Config: pkgSolana.Config{
-			Owner:                     generatePublicKey(),
-			ProposedOwner:             generatePublicKey(),
-			TokenMint:                 generatePublicKey(),
-			TokenVault:                generatePublicKey(),
-			RequesterAccessController: generatePublicKey(),
-			BillingAccessController:   generatePublicKey(),
-			MinAnswer:                 gbinary.Int128{Lo: rand.Uint64(), Hi: rand.Uint64()},
-			MaxAnswer:                 gbinary.Int128{Lo: rand.Uint64(), Hi: rand.Uint64()},
-			F:                         uint8(10),
-			Round:                     uint8(rand.Intn(256)),
-			Epoch:                     rand.Uint32(),
-			LatestAggregatorRoundID:   rand.Uint32(),
-			LatestTransmitter:         generatePublicKey(),
-			ConfigCount:               rand.Uint32(),
-			LatestConfigDigest:        generate32ByteArr(),
-			LatestConfigBlockNumber:   rand.Uint64(),
-			Billing: pkgSolana.Billing{
-				ObservationPayment: rand.Uint32(),
-			},
-			OffchainConfig: pkgSolana.OffchainConfig{
-				Version: rand.Uint64(),
-				Raw:     enlargedOffchainConfig,
-				Len:     uint64(len(encodedOffchainConfig)),
-			},
-		},
-		Oracles: pkgSolana.Oracles{
-			Raw: oracles,
-			Len: uint64(numOracles),
-		},
-		LeftoverPayments: pkgSolana.LeftoverPayments{
-			Raw: leftovers,
-			Len: uint64(numLeftovers),
-		},
-		Transmissions: generatePublicKey(),
+	offchainConfig, pluginOffchainConfig, offchainConfigEncoded, err := generateOffchainConfig(n)
+	if err != nil {
+		return types.ContractConfig{}, median.OnchainConfig{}, nil, nil, err
 	}
-	return state, offchainConfig, numericalMedianConfig, nil
+	contractConfig := types.ContractConfig{
+		ConfigDigest:          generate32ByteArr(),
+		ConfigCount:           rand.Uint64(),
+		Signers:               signers,
+		Transmitters:          transmitters,
+		F:                     uint8(10),
+		OnchainConfig:         onchainConfigEncoded,
+		OffchainConfigVersion: rand.Uint64(),
+		OffchainConfig:        offchainConfigEncoded,
+	}
+	return contractConfig, onchainConfig, offchainConfig, pluginOffchainConfig, nil
+}
+
+func generateConfigEnvelope() (ConfigEnvelope, error) {
+	generated, _, _, _, err := generateContractConfig(31)
+	return ConfigEnvelope{
+		ContractConfig: generated,
+	}, err
+}
+
+func generateTransmissionEnvelope() TransmissionEnvelope {
+	return TransmissionEnvelope{
+		ConfigDigest:    generate32ByteArr(),
+		Round:           uint8(rand.Intn(256)),
+		Epoch:           rand.Uint32(),
+		LatestAnswer:    big.NewInt(rand.Int63()),
+		LatestTimestamp: time.Now(),
+	}
 }
 
 func generateSolanaConfig() config.Solana {
@@ -182,163 +288,7 @@ func generateSolanaConfig() config.Solana {
 	}
 }
 
-func generateFeedConfig() Feed {
-	coins := []string{"btc", "eth", "matic", "link", "avax", "ftt", "srm", "usdc", "sol", "ray"}
-	coin := coins[rand.Intn(len(coins))]
-	return Feed{
-		FeedName:       fmt.Sprintf("%s / usd", coin),
-		FeedPath:       fmt.Sprintf("%s-usd", coin),
-		Symbol:         "$",
-		HeartbeatSec:   1,
-		ContractType:   "ocr2",
-		ContractStatus: "status",
-
-		ContractAddress:      generatePublicKey(),
-		TransmissionsAccount: generatePublicKey(),
-		StateAccount:         generatePublicKey(),
-	}
-}
-
-func generate20ByteArr() [20]byte {
-	buf := make([]byte, 20)
-	_, err := rand.Read(buf)
-	if err != nil {
-		panic("unable to generate [32]byte from rand")
-	}
-	var out [20]byte
-	copy(out[:], buf[:20])
-	return out
-}
-
-func generate32ByteArr() [32]byte {
-	buf := make([]byte, 32)
-	_, err := rand.Read(buf)
-	if err != nil {
-		panic("unable to generate [32]byte from rand")
-	}
-	var out [32]byte
-	copy(out[:], buf[:32])
-	return out
-}
-
-func generatePublicKey() solana.PublicKey {
-	arr := generate32ByteArr()
-	return solana.PublicKeyFromBytes(arr[:])
-}
-
-func generateStateEnvelope() (StateEnvelope, error) {
-	state, _, _, err := generateState()
-	if err != nil {
-		return StateEnvelope{}, err
-	}
-	return StateEnvelope{
-		state,
-		rand.Uint64(), // block number
-	}, nil
-}
-
-func generateTransmissionEnvelope() TransmissionEnvelope {
-	return TransmissionEnvelope{
-		pkgSolana.Answer{
-			Data:      big.NewInt(rand.Int63()),
-			Timestamp: uint64(time.Now().Unix()), // We're not recording any answers on a negative Unix timestamp.
-		},
-		rand.Uint64(), // BlockNumber
-	}
-}
-
-// Test implementations of interfaces in monitoring.
-
-type fakeReader struct {
-	readCh chan interface{}
-}
-
-// NewRandomDataReader produces an ChainReader that generates random data for "state" and "transmission" types.
-func NewRandomDataReader(ctx context.Context, wg *sync.WaitGroup, typ string, log logger.Logger) ChainReader {
-	f := &fakeReader{make(chan interface{})}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		f.runRandomDataGenerator(ctx, typ, log)
-	}()
-	return f
-}
-
-func (f *fakeReader) Read(ctx context.Context, _ []byte) (interface{}, error) {
-	var ans interface{}
-	select {
-	case ans = <-f.readCh:
-	case <-ctx.Done():
-	}
-	return ans, nil
-}
-
-// RunRandomDataGenerator should be executed as a goroutine.
-// This method publishes random data as fast as the reader asks for it.
-// Only run this if you're not using f.readCh dirrectly!
-func (f *fakeReader) runRandomDataGenerator(ctx context.Context, typ string, log logger.Logger) {
-	var err error
-	for {
-		var payload interface{}
-		if typ == "state" {
-			payload, err = generateStateEnvelope()
-			if err != nil {
-				log.Errorw("failed to generate state", "error", err)
-				continue
-			}
-		} else if typ == "transmission" {
-			payload = generateTransmissionEnvelope()
-		} else {
-			log.Critical(fmt.Errorf("unknown reader type %s", typ))
-		}
-		select {
-		case f.readCh <- payload:
-			log.Infof("generate data for account of type %s", typ)
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-type producerMessage struct{ key, value []byte }
-
-type fakeProducer struct {
-	sendCh chan producerMessage
-	ctx    context.Context
-}
-
-func (f fakeProducer) Produce(key, value []byte, topic string) error {
-	select {
-	case f.sendCh <- producerMessage{key, value}:
-	case <-f.ctx.Done():
-	}
-	return nil
-}
-
-type fakeSchema struct {
-	codec *goavro.Codec
-}
-
-func (f fakeSchema) ID() int {
-	return 1
-}
-
-func (f fakeSchema) Version() int {
-	return 1
-}
-
-func (f fakeSchema) Subject() string {
-	return "n/a"
-}
-
-func (f fakeSchema) Encode(value interface{}) ([]byte, error) {
-	return f.codec.BinaryFromNative(nil, value)
-}
-
-func (f fakeSchema) Decode(buf []byte) (interface{}, error) {
-	value, _, err := f.codec.NativeFromBinary(buf)
-	return value, err
-}
+// Metrics
 
 type devnullMetrics struct{}
 
@@ -390,26 +340,51 @@ func (k *keepLatestMetrics) SetOffchainAggregatorSubmissionReceivedValues(value 
 	k.latestTransmitter = sender
 }
 
-func NewFakeRDDSource(minFeeds, maxFeeds uint8) Source {
-	return &fakeRddSource{minFeeds, maxFeeds}
+// Producer
+
+type producerMessage struct{ key, value []byte }
+
+type fakeProducer struct {
+	sendCh chan producerMessage
+	ctx    context.Context
 }
 
-type fakeRddSource struct {
-	minFeeds, maxFeeds uint8
-}
-
-func (f *fakeRddSource) Name() string {
-	return "fake-rdd"
-}
-
-func (f *fakeRddSource) Fetch(_ context.Context) (interface{}, error) {
-	numFeeds := int(f.minFeeds) + rand.Intn(int(f.maxFeeds-f.minFeeds))
-	feeds := make([]Feed, numFeeds)
-	for i := 0; i < numFeeds; i++ {
-		feeds[i] = generateFeedConfig()
+func (f fakeProducer) Produce(key, value []byte, topic string) error {
+	select {
+	case f.sendCh <- producerMessage{key, value}:
+	case <-f.ctx.Done():
 	}
-	return feeds, nil
+	return nil
 }
+
+// Schema
+
+type fakeSchema struct {
+	codec *goavro.Codec
+}
+
+func (f fakeSchema) ID() int {
+	return 1
+}
+
+func (f fakeSchema) Version() int {
+	return 1
+}
+
+func (f fakeSchema) Subject() string {
+	return "n/a"
+}
+
+func (f fakeSchema) Encode(value interface{}) ([]byte, error) {
+	return f.codec.BinaryFromNative(nil, value)
+}
+
+func (f fakeSchema) Decode(buf []byte) (interface{}, error) {
+	value, _, err := f.codec.NativeFromBinary(buf)
+	return value, err
+}
+
+// Poller
 
 type fakePoller struct {
 	numUpdates int

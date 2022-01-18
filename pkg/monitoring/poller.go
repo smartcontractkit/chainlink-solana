@@ -14,11 +14,6 @@ type Poller interface {
 	Updates() <-chan interface{}
 }
 
-type Source interface {
-	Name() string
-	Fetch(context.Context) (interface{}, error)
-}
-
 func NewSourcePoller(
 	source Source,
 	log logger.Logger,
@@ -27,7 +22,7 @@ func NewSourcePoller(
 	bufferCapacity uint32,
 ) Poller {
 	return &sourcePoller{
-		log.With("source", source.Name()),
+		log,
 		source,
 		make(chan interface{}, bufferCapacity),
 		pollInterval,
