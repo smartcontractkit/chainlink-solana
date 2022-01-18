@@ -4,7 +4,6 @@ import (
 	"context"
 	"sync"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
@@ -13,7 +12,7 @@ type MultiFeedMonitor interface {
 }
 
 func NewMultiFeedMonitor(
-	solanaConfig config.Solana,
+	solanaConfig SolanaConfig,
 
 	log logger.Logger,
 	sourceFactory SourceFactory,
@@ -47,7 +46,7 @@ func NewMultiFeedMonitor(
 }
 
 type multiFeedMonitor struct {
-	solanaConfig config.Solana
+	solanaConfig SolanaConfig
 
 	log           logger.Logger
 	sourceFactory SourceFactory

@@ -15,7 +15,6 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/linkedin/goavro"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/pb"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
@@ -81,7 +80,7 @@ type fakeRandomDataSourceFactory struct {
 	configs       chan ConfigEnvelope
 }
 
-func (f *fakeRandomDataSourceFactory) NewSources(chainConfig config.Solana, feedConfig Feed) (Sources, error) {
+func (f *fakeRandomDataSourceFactory) NewSources(chainConfig SolanaConfig, feedConfig Feed) (Sources, error) {
 	return &fakeSources{f}, nil
 }
 
@@ -277,8 +276,8 @@ func generateTransmissionEnvelope() TransmissionEnvelope {
 	}
 }
 
-func generateSolanaConfig() config.Solana {
-	return config.Solana{
+func generateSolanaConfig() SolanaConfig {
+	return SolanaConfig{
 		RPCEndpoint:  "http://solana:6969",
 		NetworkName:  "solana-mainnet-beta",
 		NetworkID:    "1",

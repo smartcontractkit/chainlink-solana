@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
@@ -18,7 +17,7 @@ type sourceFactory struct {
 }
 
 func (s *sourceFactory) NewSources(
-	chainConfig config.Solana,
+	chainConfig SolanaConfig,
 	feedConfig Feed,
 ) (Sources, error) {
 	spec := pkgSolana.OCR2Spec{
@@ -36,7 +35,7 @@ func (s *sourceFactory) NewSources(
 
 type sources struct {
 	tracker     *pkgSolana.ContractTracker
-	chainConfig config.Solana
+	chainConfig SolanaConfig
 	feedConfig  Feed
 }
 
@@ -50,7 +49,7 @@ func (s *sources) NewConfigSource() Source {
 
 type transmissionsSource struct {
 	tracker     *pkgSolana.ContractTracker
-	chainConfig config.Solana
+	chainConfig SolanaConfig
 	feedConfig  Feed
 }
 
@@ -64,7 +63,7 @@ func (t *transmissionsSource) Fetch(ctx context.Context) (interface{}, error) {
 
 type configSource struct {
 	tracker     *pkgSolana.ContractTracker
-	chainConfig config.Solana
+	chainConfig SolanaConfig
 	feedConfig  Feed
 }
 

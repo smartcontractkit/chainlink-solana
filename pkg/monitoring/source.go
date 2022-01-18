@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
@@ -19,7 +18,7 @@ type Sources interface {
 }
 
 type SourceFactory interface {
-	NewSources(chainConfig config.Solana, feedConfig Feed) (Sources, error)
+	NewSources(chainConfig SolanaConfig, feedConfig Feed) (Sources, error)
 }
 
 type TransmissionEnvelope struct {

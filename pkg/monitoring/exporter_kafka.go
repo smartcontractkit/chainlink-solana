@@ -3,12 +3,11 @@ package monitoring
 import (
 	"context"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
 func NewKafkaExporter(
-	solanaConfig config.Solana,
+	solanaConfig SolanaConfig,
 	feedConfig Feed,
 
 	log logger.Logger,
@@ -40,7 +39,7 @@ func NewKafkaExporter(
 }
 
 type kafkaExporter struct {
-	solanaConfig config.Solana
+	solanaConfig SolanaConfig
 	feedConfig   Feed
 
 	log      logger.Logger
