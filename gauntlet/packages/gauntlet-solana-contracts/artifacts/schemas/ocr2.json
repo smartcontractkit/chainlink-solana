@@ -212,6 +212,22 @@
       "args": []
     },
     {
+      "name": "resetPendingOffchainConfig",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "setConfig",
       "accounts": [
         {
