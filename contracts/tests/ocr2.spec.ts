@@ -436,19 +436,38 @@ describe('ocr2', async () => {
 	          authority: owner.publicKey,
 	        },
 	    });
-			assert.fail("beginOffchainConfig shouldn't have succeeded!")
 		} catch {
 			// beginOffchainConfig should fail
+			return
 		}
+		assert.fail("beginOffchainConfig shouldn't have succeeded!")
+	});
+
+	it("Can't write offchain config if version if begin has not been called", async () => {
+		try {
+			await program.rpc.writeOffchainConfig(
+				Buffer.from([4, 5, 6]),
+				{
+					accounts: {
+						state: state.publicKey,
+						authority: owner.publicKey,
+					},
+			});
+		} catch {
+			// writeOffchainConfig should fail
+			return
+		}
+		assert.fail("writeOffchainConfig shouldn't have succeeded!")
 	});
 
   it("Can't transmit a round if not the writer", async () => {
     try {
       await transmit(1, 1, new BN(1));
-      assert.fail("transmit() shouldn't have succeeded!");
     } catch {
       // transmit should fail
+			return
     }
+		assert.fail("transmit() shouldn't have succeeded!");
   });
 
   it('Sets the cluster as the feed writer', async () => {

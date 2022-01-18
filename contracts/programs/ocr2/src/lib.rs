@@ -116,6 +116,7 @@ pub mod ocr2 {
             offchain_config.len() < config.pending_offchain_config.remaining_capacity(),
             InvalidInput
         );
+        require!(config.pending_offchain_config.version != 0, InvalidInput);
         config.pending_offchain_config.extend(&offchain_config);
         Ok(())
     }
