@@ -46,15 +46,6 @@ export default class SetValidatorConfig extends SolanaCommand {
 
     console.log(`Setting store config on ${state.toString()}...`)
 
-    // const tx = await program.rpc.setValidatorConfig(threshold, {
-    //   accounts: {
-    //     store: state,
-    //     feed: feed,
-    //     authority: owner.publicKey,
-    //   },
-    //   signers: [owner],
-    // })
-
     const data = program.coder.instruction.encode('set_validator_config', {
       flaggingThreshold: threshold,
     })
