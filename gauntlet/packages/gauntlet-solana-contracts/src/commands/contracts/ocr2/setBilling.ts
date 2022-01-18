@@ -93,8 +93,8 @@ export default class SetBilling extends SolanaCommand {
         ),
       new Transaction(),
     )
-
     logger.loading('Sending tx...')
+    logger.debug(tx)
     const txhash = await this.provider.send(tx, [this.wallet.payer])
     logger.success(`Billing set on tx hash: ${txhash}`)
 
