@@ -101,7 +101,7 @@ export default class SetPayees extends SolanaCommand {
     logger.log('Payees information:', input)
     await prompt('Continue setting payees?')
     const data = program.coder.instruction.encode('set_payees', {
-      payees
+      payees,
     })
 
     const accounts: AccountMeta[] = [
@@ -114,7 +114,7 @@ export default class SetPayees extends SolanaCommand {
         pubkey: signer,
         isSigner: true,
         isWritable: false,
-      }
+      },
     ]
 
     const rawTx: RawTransaction = {

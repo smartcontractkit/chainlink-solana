@@ -233,10 +233,10 @@ export default class WriteOffchainConfig extends SolanaCommand {
     //   })
     //   txs.push(tx)
     // }
-    
+
     const data = program.coder.instruction.encode('write_offchain_config', {
       // TODO: add all chunks. Add multiple TX support on multisig
-      offchainConfig: offchainConfigChunks[0]
+      offchainConfig: offchainConfigChunks[0],
     })
 
     const accounts: AccountMeta[] = [
@@ -289,4 +289,3 @@ export default class WriteOffchainConfig extends SolanaCommand {
     } as Result<TransactionResponse>
   }
 }
-

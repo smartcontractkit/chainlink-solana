@@ -44,7 +44,7 @@ export default class SetConfig extends SolanaCommand {
     this.require(!!this.flags.state, 'Please provide flags with "state"')
   }
 
-  makeRawTransaction = async (owner: PublicKey) => {
+  makeRawTransaction = async (signer: PublicKey) => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
@@ -67,12 +67,12 @@ export default class SetConfig extends SolanaCommand {
 
     logger.log('Config information:', input)
     await prompt(`Continue setting config on ${state.toString()}?`)
-      console.log(oracles)
-      const data = program.coder.instruction.encode('set_config', {
-        newOracles: oracles,
-        f,
-      })
-      
+    console.log(oracles)
+    const data = program.coder.instruction.encode('set_config', {
+      newOracles: oracles,
+      f,
+    })
+
     const accounts: AccountMeta[] = [
       {
         pubkey: state,
@@ -80,7 +80,7 @@ export default class SetConfig extends SolanaCommand {
         isWritable: true,
       },
       {
-        pubkey: owner,
+        pubkey: signer,
         isSigner: true,
         isWritable: false,
       },

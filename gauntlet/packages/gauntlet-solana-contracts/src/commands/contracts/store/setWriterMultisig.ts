@@ -68,19 +68,19 @@ export default class SetWriterMultisig extends SolanaCommand {
 
     // logger.success(`Set writer on tx ${tx}`)
     const data = storeProgram.coder.instruction.encode('set_writer', {
-      writer: storeAuthority
+      writer: storeAuthority,
     })
 
     const accounts: AccountMeta[] = [
       {
         pubkey: storeState,
         isSigner: false,
-        isWritable: false,
+        isWritable: true,
       },
       {
         pubkey: feedState,
         isSigner: false,
-        isWritable: false,
+        isWritable: true,
       },
       {
         pubkey: signer,

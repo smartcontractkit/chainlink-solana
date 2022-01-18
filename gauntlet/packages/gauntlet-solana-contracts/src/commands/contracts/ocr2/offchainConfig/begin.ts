@@ -83,4 +83,3 @@ export default class BeginOffchainConfig extends SolanaCommand {
     } as Result<TransactionResponse>
   }
 }
-
