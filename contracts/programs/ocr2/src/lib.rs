@@ -149,6 +149,24 @@ pub mod ocr2 {
     }
 
     #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
+    pub fn reset_pending_offchain_config(ctx: Context<SetConfig>) -> ProgramResult {
+        let state = &mut *ctx.accounts.state.load_mut()?;
+        let config = &mut state.config;
+
+        // Require that at least some data was written
+        require!(
+            config.pending_offchain_config.version > 0
+                || !config.pending_offchain_config.is_empty(),
+            InvalidInput
+        );
+
+        // reset staging area
+        config.pending_offchain_config.clear();
+        config.pending_offchain_config.version = 0;
+        Ok(())
+    }
+
+    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
     pub fn set_config(
         ctx: Context<SetConfig>,
         new_oracles: Vec<NewOracle>,
