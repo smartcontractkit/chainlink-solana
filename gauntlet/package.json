@@ -11,7 +11,7 @@
     "cli"
   ],
   "main": "packages/gauntlet-solana-contracts/dist/index.js",
-  "bin": "packages/gauntlet-solana-contracts/dist/index.js",
+  "bin": "packages/gauntlet-solana-contracts/dist/cli.js",
   "scripts": {
     "gauntlet": "yarn build && node ./packages/gauntlet-solana-contracts/dist/cli.js",
     "gauntlet-serum-multisig": "yarn build && node ./packages/gauntlet-serum-multisig/dist/index.js",
