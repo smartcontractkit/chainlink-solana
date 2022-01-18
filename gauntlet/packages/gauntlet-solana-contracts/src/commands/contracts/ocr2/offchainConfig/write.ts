@@ -222,43 +222,35 @@ export default class WriteOffchainConfig extends SolanaCommand {
     const startingPoint = new BN(this.flags.chunk || 0).toNumber()
     await prompt(`Start writing offchain config from ${startingPoint}/${offchainConfigChunks.length - 1}?`)
 
-    // const txs: string[] = []
-    // for (let i = startingPoint; i < offchainConfigChunks.length; i++) {
-    //   logger.loading(`Sending ${i}/${offchainConfigChunks.length - 1}...`)
-    //   const tx = await program.rpc.writeOffchainConfig(offchainConfigChunks[i], {
-    //     accounts: {
-    //       state: state,
-    //       authority: owner.publicKey,
-    //     },
-    //   })
-    //   txs.push(tx)
-    // }
+    const txs: RawTransaction[] = []
+    for (let i = startingPoint; i < offchainConfigChunks.length; i++) {
+      logger.loading(`Sending ${i + 1}/${offchainConfigChunks.length}...`)
+      const data = program.coder.instruction.encode('write_offchain_config', {
+        offchainConfig: offchainConfigChunks[i],
+      })
 
-    const data = program.coder.instruction.encode('write_offchain_config', {
-      // TODO: add all chunks. Add multiple TX support on multisig
-      offchainConfig: offchainConfigChunks[0],
-    })
+      const accounts: AccountMeta[] = [
+        {
+          pubkey: state,
+          isSigner: false,
+          isWritable: true,
+        },
+        {
+          pubkey: signer,
+          isSigner: false,
+          isWritable: false,
+        },
+      ]
 
-    const accounts: AccountMeta[] = [
-      {
-        pubkey: state,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: signer,
-        isSigner: false,
-        isWritable: false,
-      },
-    ]
+      const rawTx: RawTransaction = {
+        data,
+        accounts,
+        programId: ocr2.programId,
+      }
 
-    const rawTx: RawTransaction = {
-      data,
-      accounts,
-      programId: ocr2.programId,
+      txs.push(rawTx)
     }
-
-    return [rawTx]
+    return txs
   }
 
   execute = async () => {
