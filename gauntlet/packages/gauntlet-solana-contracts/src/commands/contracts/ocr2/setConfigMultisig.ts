@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
-import { AccountMeta, PublicKey, TransactionInstruction, Transaction } from '@solana/web3.js'
+import { AccountMeta, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js'
 import { ORACLES_MAX_LENGTH } from '../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
