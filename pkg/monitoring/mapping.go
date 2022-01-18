@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/mr-tron/base58"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/pb"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"google.golang.org/protobuf/proto"
@@ -14,7 +13,7 @@ import (
 
 func MakeConfigSetSimplifiedMapping(
 	envelope ConfigEnvelope,
-	feedConfig Feed,
+	feedConfig FeedConfig,
 ) (map[string]interface{}, error) {
 	offchainConfig, err := parseOffchainConfig(envelope.ContractConfig.OffchainConfig)
 	if err != nil {
@@ -50,7 +49,7 @@ func MakeConfigSetSimplifiedMapping(
 		"r_max":              int64(offchainConfig.RMax),
 		"s":                  string(s),
 		"oracles":            string(oracles),
-		"feed_state_account": base58.Encode(feedConfig.StateAccount[:]),
+		"feed_state_account": feedConfig.GetContractAddress(),
 	}
 	return out, nil
 }
@@ -58,7 +57,7 @@ func MakeConfigSetSimplifiedMapping(
 func MakeTransmissionMapping(
 	envelope TransmissionEnvelope,
 	solanaConfig SolanaConfig,
-	feedConfig Feed,
+	feedConfig FeedConfig,
 ) (map[string]interface{}, error) {
 	data := []byte{}
 	if envelope.LatestAnswer != nil {
@@ -78,17 +77,7 @@ func MakeTransmissionMapping(
 			"network_id":   solanaConfig.NetworkID,
 			"chain_id":     solanaConfig.ChainID,
 		},
-		"feed_config": map[string]interface{}{
-			"feed_name":             feedConfig.FeedName,
-			"feed_path":             feedConfig.FeedPath,
-			"symbol":                feedConfig.Symbol,
-			"heartbeat_sec":         int64(feedConfig.HeartbeatSec),
-			"contract_type":         feedConfig.ContractType,
-			"contract_status":       feedConfig.ContractStatus,
-			"contract_address":      feedConfig.ContractAddress.Bytes(),
-			"transmissions_account": feedConfig.TransmissionsAccount.Bytes(),
-			"state_account":         feedConfig.StateAccount.Bytes(),
-		},
+		"feed_config": feedConfig.ToMapping(),
 	}
 	return out, nil
 }

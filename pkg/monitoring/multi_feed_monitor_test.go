@@ -22,7 +22,7 @@ func TestMultiFeedMonitorToMakeSureAllGoroutinesTerminate(t *testing.T) {
 	solanaCfg := SolanaConfig{
 		PollInterval: 5 * time.Second,
 	}
-	feeds := []Feed{}
+	feeds := []FeedConfig{}
 	for i := 0; i < numFeeds; i++ {
 		feeds = append(feeds, generateFeedConfig())
 	}
@@ -97,7 +97,7 @@ func TestMultiFeedMonitorForPerformance(t *testing.T) {
 	solanaCfg := SolanaConfig{
 		PollInterval: 5 * time.Second,
 	}
-	feeds := []Feed{}
+	feeds := []FeedConfig{}
 	for i := 0; i < numFeeds; i++ {
 		feeds = append(feeds, generateFeedConfig())
 	}
