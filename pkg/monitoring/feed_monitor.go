@@ -44,8 +44,8 @@ func (f *feedMonitor) Start(ctx context.Context, wg *sync.WaitGroup) {
 		case <-ctx.Done():
 			return
 		}
+		wg.Add(len(f.exporters))
 		for _, exp := range f.exporters {
-			wg.Add(1)
 			go func(exp Exporter) {
 				defer wg.Done()
 				exp.Export(ctx, update)

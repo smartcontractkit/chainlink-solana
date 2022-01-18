@@ -16,8 +16,7 @@ func NewMultiFeedMonitor(
 	solanaConfig config.Solana,
 
 	log logger.Logger,
-	transmissionReader ChainReader,
-	stateReader ChainReader,
+	sourceFactory SourceFactory,
 	producer Producer,
 	metrics Metrics,
 
@@ -33,7 +32,7 @@ func NewMultiFeedMonitor(
 		solanaConfig,
 
 		log,
-		transmissionReader, stateReader,
+		sourceFactory,
 		producer,
 		metrics,
 
@@ -50,11 +49,10 @@ func NewMultiFeedMonitor(
 type multiFeedMonitor struct {
 	solanaConfig config.Solana
 
-	log                logger.Logger
-	transmissionReader ChainReader
-	stateReader        ChainReader
-	producer           Producer
-	metrics            Metrics
+	log           logger.Logger
+	sourceFactory SourceFactory
+	producer      Producer
+	metrics       Metrics
 
 	configSetTopic           string
 	configSetSimplifiedTopic string
@@ -79,21 +77,21 @@ func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup, feeds 
 				"network", m.solanaConfig.NetworkName,
 			)
 
+			sources, err := m.sourceFactory.NewSources(m.solanaConfig, feedConfig)
+			if err != nil {
+				feedLogger.Errorw("failed to create new sources", "error", err)
+				return
+			}
+
 			transmissionPoller := NewSourcePoller(
-				NewSolanaSource(
-					feedConfig.TransmissionsAccount,
-					m.transmissionReader,
-				),
+				sources.NewTransmissionsSource(),
 				feedLogger.With("component", "transmissions-poller", "address", feedConfig.TransmissionsAccount.String()),
 				m.solanaConfig.PollInterval,
 				m.solanaConfig.ReadTimeout,
 				bufferCapacity,
 			)
 			statePoller := NewSourcePoller(
-				NewSolanaSource(
-					feedConfig.StateAccount,
-					m.stateReader,
-				),
+				sources.NewConfigSource(),
 				feedLogger.With("component", "state-poller", "address", feedConfig.StateAccount.String()),
 				m.solanaConfig.PollInterval,
 				m.solanaConfig.ReadTimeout,

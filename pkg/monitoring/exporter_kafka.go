@@ -58,24 +58,7 @@ type kafkaExporter struct {
 func (k *kafkaExporter) Export(ctx context.Context, data interface{}) {
 	key := k.feedConfig.StateAccount.Bytes()
 	switch typed := data.(type) {
-	case StateEnvelope:
-		func() {
-			configSetMapping, err := MakeConfigSetMapping(typed, k.solanaConfig, k.feedConfig)
-			if err != nil {
-				k.log.Errorw("failed to map config_set", "error", err)
-				return
-			}
-			configSetEncoded, err := k.configSetSchema.Encode(configSetMapping)
-			if err != nil {
-				k.log.Errorw("failed to encode config_set to Avro", "payload", configSetMapping, "error", err)
-				return
-			}
-			if err := k.producer.Produce(key, configSetEncoded, k.configSetTopic); err != nil {
-				k.log.Errorw("failed to publish config_set", "payload", configSetMapping, "error", err)
-				return
-			}
-		}()
-
+	case ConfigEnvelope:
 		func() {
 			configSetSimplifiedMapping, err := MakeConfigSetSimplifiedMapping(typed, k.feedConfig)
 			if err != nil {

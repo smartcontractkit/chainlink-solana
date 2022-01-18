@@ -42,14 +42,16 @@ func BenchmarkMultichainMonitorStatePath(b *testing.B) {
 
 	producer := fakeProducer{make(chan producerMessage), ctx}
 
-	transmissionReader := &fakeReader{make(chan interface{})}
-	stateReader := &fakeReader{make(chan interface{})}
+	factory := &fakeRandomDataSourceFactory{
+		make(chan TransmissionEnvelope),
+		make(chan ConfigEnvelope),
+	}
 
 	monitor := NewMultiFeedMonitor(
 		cfg.Solana,
 
 		logger.NewNullLogger(),
-		transmissionReader, stateReader,
+		factory,
 		producer,
 		&devnullMetrics{},
 
@@ -63,16 +65,16 @@ func BenchmarkMultichainMonitorStatePath(b *testing.B) {
 	)
 	go monitor.Start(ctx, wg, feeds)
 
-	state, err := generateStateEnvelope()
+	configEnvelope, err := generateConfigEnvelope()
 	if err != nil {
-		b.Fatalf("failed to generate state: %v", err)
+		b.Fatalf("failed to generate config: %v", err)
 	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		select {
-		case stateReader.readCh <- state:
+		case factory.configs <- configEnvelope:
 		case <-ctx.Done():
 			continue
 		}
@@ -111,14 +113,16 @@ func BenchmarkMultichainMonitorTransmissionPath(b *testing.B) {
 
 	producer := fakeProducer{make(chan producerMessage), ctx}
 
-	transmissionReader := &fakeReader{make(chan interface{})}
-	stateReader := &fakeReader{make(chan interface{})}
+	factory := &fakeRandomDataSourceFactory{
+		make(chan TransmissionEnvelope),
+		make(chan ConfigEnvelope),
+	}
 
 	monitor := NewMultiFeedMonitor(
 		cfg.Solana,
 
 		logger.NewNullLogger(),
-		transmissionReader, stateReader,
+		factory,
 		producer,
 		&devnullMetrics{},
 
@@ -132,13 +136,13 @@ func BenchmarkMultichainMonitorTransmissionPath(b *testing.B) {
 	)
 	go monitor.Start(ctx, wg, feeds)
 
-	transmission := generateTransmissionEnvelope()
+	transmissionEnvelope := generateTransmissionEnvelope()
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		select {
-		case transmissionReader.readCh <- transmission:
+		case factory.transmissions <- transmissionEnvelope:
 		case <-ctx.Done():
 			continue
 		}

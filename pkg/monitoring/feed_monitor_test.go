@@ -12,33 +12,31 @@ import (
 )
 
 func TestFeedMonitor(t *testing.T) {
+	wg := &sync.WaitGroup{}
+	defer wg.Wait()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	transmissionReader := &fakeReader{make(chan interface{})}
-	stateReader := &fakeReader{make(chan interface{})}
+	chainConfig := generateSolanaConfig()
+	feedConfig := generateFeedConfig()
 
-	transmissionAccount := generatePublicKey()
-	stateAccount := generatePublicKey()
+	factory := NewRandomDataSourceFactory(ctx, wg, logger.NewNullLogger())
+	sources, err := factory.NewSources(chainConfig, feedConfig)
+	require.NoError(t, err)
 
 	pollInterval := 1 * time.Second
 	readTimeout := 1 * time.Second
 	var bufferCapacity uint32 = 0 // no buffering
 
 	transmissionPoller := NewSourcePoller(
-		NewSolanaSource(
-			transmissionAccount,
-			transmissionReader,
-		),
+		sources.NewTransmissionsSource(),
 		logger.NewNullLogger(),
 		pollInterval, readTimeout,
 		bufferCapacity,
 	)
 	statePoller := NewSourcePoller(
-		NewSolanaSource(
-			stateAccount,
-			stateReader,
-		),
+		sources.NewConfigSource(),
 		logger.NewNullLogger(),
 		pollInterval, readTimeout,
 		bufferCapacity,
@@ -51,21 +49,17 @@ func TestFeedMonitor(t *testing.T) {
 	transmissionSchema := fakeSchema{transmissionCodec}
 
 	cfg := config.Config{}
-	feed := Feed{
-		TransmissionsAccount: transmissionAccount,
-		StateAccount:         stateAccount,
-	}
 
 	exporters := []Exporter{
 		NewPrometheusExporter(
-			cfg.Solana,
-			feed,
+			chainConfig,
+			feedConfig,
 			logger.NewNullLogger(),
 			&devnullMetrics{},
 		),
 		NewKafkaExporter(
-			cfg.Solana,
-			feed,
+			chainConfig,
+			feedConfig,
 			logger.NewNullLogger(),
 			producer,
 
@@ -86,21 +80,21 @@ func TestFeedMonitor(t *testing.T) {
 	)
 	go monitor.Start(ctx, &sync.WaitGroup{})
 
-	trCount, stCount := 0, 0
+	trCount, cfgCount := 0, 0
 	var messages []producerMessage
-	newStateEnv, err := generateStateEnvelope()
+	configEnvelope, err := generateConfigEnvelope()
 	require.NoError(t, err)
-	newTransmissionEnv := generateTransmissionEnvelope()
+	transmissionEnvelope := generateTransmissionEnvelope()
 
 LOOP:
 	for {
 		select {
-		case transmissionReader.readCh <- newTransmissionEnv:
+		case factory.transmissions <- transmissionEnvelope:
 			trCount += 1
-			newTransmissionEnv = generateTransmissionEnvelope()
-		case stateReader.readCh <- newStateEnv:
-			stCount += 1
-			newStateEnv, err = generateStateEnvelope()
+			transmissionEnvelope = generateTransmissionEnvelope()
+		case factory.configs <- configEnvelope:
+			cfgCount += 1
+			configEnvelope, err = generateConfigEnvelope()
 			require.NoError(t, err)
 		case message := <-producer.sendCh:
 			messages = append(messages, message)
@@ -110,6 +104,6 @@ LOOP:
 	}
 
 	// The last update from each poller can potentially be missed by context being cancelled.
-	require.GreaterOrEqual(t, len(messages), trCount+stCount-2)
-	require.LessOrEqual(t, len(messages), trCount+stCount)
+	require.GreaterOrEqual(t, len(messages), trCount+cfgCount-2)
+	require.LessOrEqual(t, len(messages), trCount+cfgCount)
 }
