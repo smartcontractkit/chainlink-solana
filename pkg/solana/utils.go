@@ -61,6 +61,9 @@ func XXXInspectStates(state, transmission, program, rpc string, log int) (answer
 
 	var txs TransmissionsPartial
 	err = tracker.client.rpc.GetAccountDataInto(context.TODO(), tracker.state.Transmissions, &txs)
+	if err != nil {
+		return answer, timestamp, errors.Wrap(err, "error in rpc.GetAccountDataInto")
+	}
 	seeds := [][]byte{[]byte("store"), tracker.StateID.Bytes()}
 	storeAuthority, _, err := solana.FindProgramAddress(seeds, tracker.ProgramID)
 	if err != nil {
