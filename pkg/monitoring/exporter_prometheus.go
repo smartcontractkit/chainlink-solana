@@ -4,12 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
 func NewPrometheusExporter(
-	solanaConfig config.Solana,
+	solanaConfig SolanaConfig,
 	feedConfig Feed,
 	log logger.Logger,
 	metrics Metrics,
@@ -36,7 +35,7 @@ func NewPrometheusExporter(
 }
 
 type prometheusExporter struct {
-	solanaConfig config.Solana
+	solanaConfig SolanaConfig
 	feedConfig   Feed
 
 	log     logger.Logger
