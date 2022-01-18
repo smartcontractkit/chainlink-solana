@@ -10,7 +10,6 @@ import SetBillingAccessController from './setBillingAccessController'
 import SetRequesterAccessController from './setRequesterAccessController'
 import SetBilling from './setBilling'
 import SetConfig from './setConfig'
-import SetConfigMultisig from './setConfigMultisig'
 import SetPayees from './setPayees'
 import SetPayeesMultisig from './setPayeesMultisig'
 import SetupFlow from './setup.dev.flow'
@@ -32,7 +31,6 @@ export default [
   CommitOffchainConfig,
   SetBillingAccessController,
   SetRequesterAccessController,
-  SetConfigMultisig,
   SetPayeesMultisig,
   // Inspection
   ...Inspection,
