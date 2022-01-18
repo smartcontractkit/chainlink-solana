@@ -22,6 +22,8 @@ import (
 //    5719	    184623 ns/op	   91745 B/op	    1482 allocs/op
 // (17 jan 2022)
 //    6679	    180862 ns/op	   92230 B/op	    1493 allocs/op
+// (18 jan 2022)
+//   16504	     71478 ns/op	   77515 B/op	     963 allocs/op
 func BenchmarkManager(b *testing.B) {
 	wg := &sync.WaitGroup{}
 	defer wg.Wait()
@@ -43,14 +45,13 @@ func BenchmarkManager(b *testing.B) {
 
 	producer := fakeProducer{make(chan producerMessage), ctx}
 
-	transmissionReader := NewRandomDataReader(ctx, wg, "transmission", log)
-	stateReader := NewRandomDataReader(ctx, wg, "state", log)
+	factory := NewRandomDataSourceFactory(ctx, wg, log)
 
 	monitor := NewMultiFeedMonitor(
 		cfg.Solana,
 
 		log,
-		transmissionReader, stateReader,
+		factory,
 		producer,
 		&devnullMetrics{},
 

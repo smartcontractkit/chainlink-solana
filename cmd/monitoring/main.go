@@ -7,7 +7,6 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -25,8 +24,6 @@ func main() {
 	if err != nil {
 		log.Fatalw("failed to parse configuration", "error", err)
 	}
-
-	client := rpc.New(cfg.Solana.RPCEndpoint)
 
 	schemaRegistry := monitoring.NewSchemaRegistry(cfg.SchemaRegistry, log)
 	transmissionSchema, err := schemaRegistry.EnsureSchema(cfg.Kafka.TransmissionTopic+"-value", monitoring.TransmissionAvroSchema)
@@ -47,13 +44,9 @@ func main() {
 		log.Fatalf("failed to create kafka producer", "error", err)
 	}
 
-	var transmissionReader, stateReader monitoring.ChainReader
+	sourceFactory := monitoring.NewSolanaSourceFactory(log.With("component", "source"))
 	if cfg.Feature.TestOnlyFakeReaders {
-		transmissionReader = monitoring.NewRandomDataReader(bgCtx, wg, "transmission", log.With("component", "rand-transmission-reader"))
-		stateReader = monitoring.NewRandomDataReader(bgCtx, wg, "state", log.With("component", "rand-config-reader"))
-	} else {
-		transmissionReader = monitoring.NewTransmissionReader(client)
-		stateReader = monitoring.NewStateReader(client)
+		sourceFactory = monitoring.NewRandomDataSourceFactory(bgCtx, wg, log.With("component", "rand-source"))
 	}
 
 	metrics := monitoring.DefaultMetrics
@@ -62,7 +55,7 @@ func main() {
 		cfg.Solana,
 
 		log,
-		transmissionReader, stateReader,
+		sourceFactory,
 		producer,
 		metrics,
 

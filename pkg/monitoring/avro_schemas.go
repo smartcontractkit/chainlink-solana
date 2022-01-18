@@ -140,6 +140,9 @@ var configSetSimplifiedAvroSchema = Record("config_set_simplified", Opts{Namespa
 var transmissionAvroSchema = Record("transmission", Opts{Namespace: "link.chain.ocr2"}, Fields{
 	Field("block_number", Opts{Doc: "uint64 big endian"}, Bytes),
 	Field("answer", Opts{}, Record("answer", Opts{}, Fields{
+		Field("config_digest", Opts{Doc: "[32]byte encoded as base64"}, String),
+		Field("epoch", Opts{Doc: "uint32"}, Long),
+		Field("round", Opts{Doc: "uint8"}, Int),
 		Field("data", Opts{Doc: "*big.Int"}, Bytes),
 		Field("timestamp", Opts{Doc: "uint32"}, Long),
 	})),
