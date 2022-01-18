@@ -18,7 +18,7 @@ type Sources interface {
 }
 
 type SourceFactory interface {
-	NewSources(chainConfig SolanaConfig, feedConfig Feed) (Sources, error)
+	NewSources(chainConfig SolanaConfig, feedConfig FeedConfig) (Sources, error)
 }
 
 type TransmissionEnvelope struct {

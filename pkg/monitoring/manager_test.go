@@ -39,7 +39,7 @@ func TestManager(t *testing.T) {
 			logger.NewNullLogger(),
 			poller,
 		)
-		managed := func(ctx context.Context, localWg *sync.WaitGroup, _ []Feed) {
+		managed := func(ctx context.Context, localWg *sync.WaitGroup, _ []FeedConfig) {
 			localWg.Add(numGoroutinesPerManaged)
 			for i := 0; i < numGoroutinesPerManaged; i++ {
 				go func(i int, ctx context.Context) {

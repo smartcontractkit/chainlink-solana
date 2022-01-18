@@ -8,7 +8,7 @@ import (
 
 func NewKafkaExporter(
 	solanaConfig SolanaConfig,
-	feedConfig Feed,
+	feedConfig FeedConfig,
 
 	log logger.Logger,
 	producer Producer,
@@ -40,7 +40,7 @@ func NewKafkaExporter(
 
 type kafkaExporter struct {
 	solanaConfig SolanaConfig
-	feedConfig   Feed
+	feedConfig   FeedConfig
 
 	log      logger.Logger
 	producer Producer
@@ -55,7 +55,7 @@ type kafkaExporter struct {
 }
 
 func (k *kafkaExporter) Export(ctx context.Context, data interface{}) {
-	key := k.feedConfig.StateAccount.Bytes()
+	key := k.feedConfig.GetContractAddressBytes()
 	switch typed := data.(type) {
 	case ConfigEnvelope:
 		func() {

@@ -38,7 +38,7 @@ func (f *fakeRddSource) Name() string {
 
 func (f *fakeRddSource) Fetch(_ context.Context) (interface{}, error) {
 	numFeeds := int(f.minFeeds) + rand.Intn(int(f.maxFeeds-f.minFeeds))
-	feeds := make([]Feed, numFeeds)
+	feeds := make([]FeedConfig, numFeeds)
 	for i := 0; i < numFeeds; i++ {
 		feeds[i] = generateFeedConfig()
 	}
@@ -80,7 +80,7 @@ type fakeRandomDataSourceFactory struct {
 	configs       chan ConfigEnvelope
 }
 
-func (f *fakeRandomDataSourceFactory) NewSources(chainConfig SolanaConfig, feedConfig Feed) (Sources, error) {
+func (f *fakeRandomDataSourceFactory) NewSources(chainConfig SolanaConfig, feedConfig FeedConfig) (Sources, error) {
 	return &fakeSources{f}, nil
 }
 
@@ -130,21 +130,26 @@ func generatePublicKey() solana.PublicKey {
 	return solana.PublicKeyFromBytes(arr[:])
 }
 
-func generateFeedConfig() Feed {
+func generateFeedConfig() FeedConfig {
 	coins := []string{"btc", "eth", "matic", "link", "avax", "ftt", "srm", "usdc", "sol", "ray"}
 	coin := coins[rand.Intn(len(coins))]
-	return Feed{
-		FeedName:       fmt.Sprintf("%s / usd", coin),
-		FeedPath:       fmt.Sprintf("%s-usd", coin),
+	contract, transmissions, state := generatePublicKey(), generatePublicKey(), generatePublicKey()
+	return FeedConfig(SolanaFeedConfig{
+		Name:           fmt.Sprintf("%s / usd", coin),
+		Path:           fmt.Sprintf("%s-usd", coin),
 		Symbol:         "$",
 		HeartbeatSec:   1,
 		ContractType:   "ocr2",
 		ContractStatus: "status",
 
-		ContractAddress:      generatePublicKey(),
-		TransmissionsAccount: generatePublicKey(),
-		StateAccount:         generatePublicKey(),
-	}
+		ContractAddressBase58:      contract.String(),
+		TransmissionsAccountBase58: transmissions.String(),
+		StateAccountBase58:         state.String(),
+
+		ContractAddress:      contract,
+		TransmissionsAccount: transmissions,
+		StateAccount:         state,
+	})
 }
 
 func generateNumericalMedianOffchainConfig() (*pb.NumericalMedianConfigProto, []byte, error) {

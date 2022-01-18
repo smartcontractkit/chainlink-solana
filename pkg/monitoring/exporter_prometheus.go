@@ -9,21 +9,21 @@ import (
 
 func NewPrometheusExporter(
 	solanaConfig SolanaConfig,
-	feedConfig Feed,
+	feedConfig FeedConfig,
 	log logger.Logger,
 	metrics Metrics,
 ) Exporter {
 	metrics.SetFeedContractMetadata(
 		solanaConfig.ChainID,
-		feedConfig.ContractAddress.String(),
-		feedConfig.StateAccount.String(),
-		feedConfig.ContractStatus,
-		feedConfig.ContractType,
-		feedConfig.FeedName,
-		feedConfig.FeedPath,
+		feedConfig.GetContractAddress(),
+		feedConfig.GetContractAddress(),
+		feedConfig.GetContractStatus(),
+		feedConfig.GetContractType(),
+		feedConfig.GetName(),
+		feedConfig.GetPath(),
 		solanaConfig.NetworkID,
 		solanaConfig.NetworkName,
-		feedConfig.Symbol,
+		feedConfig.GetSymbol(),
 	)
 
 	return &prometheusExporter{
@@ -36,7 +36,7 @@ func NewPrometheusExporter(
 
 type prometheusExporter struct {
 	solanaConfig SolanaConfig
-	feedConfig   Feed
+	feedConfig   FeedConfig
 
 	log     logger.Logger
 	metrics Metrics
@@ -61,51 +61,51 @@ func (p *prometheusExporter) Export(ctx context.Context, data interface{}) {
 		)
 		p.metrics.SetOffchainAggregatorAnswers(
 			typed.LatestAnswer,
-			p.feedConfig.ContractAddress.String(),
-			p.feedConfig.StateAccount.String(),
+			p.feedConfig.GetContractAddress(),
+			p.feedConfig.GetContractAddress(),
 			p.solanaConfig.ChainID,
-			p.feedConfig.ContractStatus,
-			p.feedConfig.ContractType,
-			p.feedConfig.FeedName,
-			p.feedConfig.FeedPath,
+			p.feedConfig.GetContractStatus(),
+			p.feedConfig.GetContractType(),
+			p.feedConfig.GetName(),
+			p.feedConfig.GetPath(),
 			p.solanaConfig.NetworkID,
 			p.solanaConfig.NetworkName,
 		)
 		p.metrics.IncOffchainAggregatorAnswersTotal(
-			p.feedConfig.ContractAddress.String(),
-			p.feedConfig.StateAccount.String(),
+			p.feedConfig.GetContractAddress(),
+			p.feedConfig.GetContractAddress(),
 			p.solanaConfig.ChainID,
-			p.feedConfig.ContractStatus,
-			p.feedConfig.ContractType,
-			p.feedConfig.FeedName,
-			p.feedConfig.FeedPath,
+			p.feedConfig.GetContractStatus(),
+			p.feedConfig.GetContractType(),
+			p.feedConfig.GetName(),
+			p.feedConfig.GetPath(),
 			p.solanaConfig.NetworkID,
 			p.solanaConfig.NetworkName,
 		)
 
-		isLateAnswer := time.Since(typed.LatestTimestamp).Seconds() > float64(p.feedConfig.HeartbeatSec)
+		isLateAnswer := time.Since(typed.LatestTimestamp).Seconds() > float64(p.feedConfig.GetHeartbeatSec())
 		p.metrics.SetOffchainAggregatorAnswerStalled(
 			isLateAnswer,
-			p.feedConfig.ContractAddress.String(),
-			p.feedConfig.StateAccount.String(),
+			p.feedConfig.GetContractAddress(),
+			p.feedConfig.GetContractAddress(),
 			p.solanaConfig.ChainID,
-			p.feedConfig.ContractStatus,
-			p.feedConfig.ContractType,
-			p.feedConfig.FeedName,
-			p.feedConfig.FeedPath,
+			p.feedConfig.GetContractStatus(),
+			p.feedConfig.GetContractType(),
+			p.feedConfig.GetName(),
+			p.feedConfig.GetPath(),
 			p.solanaConfig.NetworkID,
 			p.solanaConfig.NetworkName,
 		)
 		p.metrics.SetOffchainAggregatorSubmissionReceivedValues(
 			typed.LatestAnswer,
-			p.feedConfig.ContractAddress.String(),
-			p.feedConfig.StateAccount.String(),
+			p.feedConfig.GetContractAddress(),
+			p.feedConfig.GetContractAddress(),
 			"n/a", // sender
 			p.solanaConfig.ChainID,
-			p.feedConfig.ContractStatus,
-			p.feedConfig.ContractType,
-			p.feedConfig.FeedName,
-			p.feedConfig.FeedPath,
+			p.feedConfig.GetContractStatus(),
+			p.feedConfig.GetContractType(),
+			p.feedConfig.GetName(),
+			p.feedConfig.GetPath(),
 			p.solanaConfig.NetworkID,
 			p.solanaConfig.NetworkName,
 		)

@@ -8,7 +8,7 @@ import (
 )
 
 type MultiFeedMonitor interface {
-	Start(ctx context.Context, wg *sync.WaitGroup, feeds []Feed)
+	Start(ctx context.Context, wg *sync.WaitGroup, feeds []FeedConfig)
 }
 
 func NewMultiFeedMonitor(
@@ -65,14 +65,14 @@ type multiFeedMonitor struct {
 const bufferCapacity = 100
 
 // Start should be executed as a goroutine.
-func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup, feeds []Feed) {
+func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup, feeds []FeedConfig) {
 	wg.Add(len(feeds))
 	for _, feedConfig := range feeds {
-		go func(feedConfig Feed) {
+		go func(feedConfig FeedConfig) {
 			defer wg.Done()
 
 			feedLogger := m.log.With(
-				"feed", feedConfig.FeedName,
+				"feed", feedConfig.GetName(),
 				"network", m.solanaConfig.NetworkName,
 			)
 
@@ -84,14 +84,14 @@ func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup, feeds 
 
 			transmissionPoller := NewSourcePoller(
 				sources.NewTransmissionsSource(),
-				feedLogger.With("component", "transmissions-poller", "address", feedConfig.TransmissionsAccount.String()),
+				feedLogger.With("component", "transmissions-poller"),
 				m.solanaConfig.PollInterval,
 				m.solanaConfig.ReadTimeout,
 				bufferCapacity,
 			)
 			statePoller := NewSourcePoller(
 				sources.NewConfigSource(),
-				feedLogger.With("component", "state-poller", "address", feedConfig.StateAccount.String()),
+				feedLogger.With("component", "config-poller"),
 				m.solanaConfig.PollInterval,
 				m.solanaConfig.ReadTimeout,
 				bufferCapacity,
