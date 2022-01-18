@@ -11,7 +11,6 @@ import SetRequesterAccessController from './setRequesterAccessController'
 import SetBilling from './setBilling'
 import SetConfig from './setConfig'
 import SetPayees from './setPayees'
-import SetPayeesMultisig from './setPayeesMultisig'
 import SetupFlow from './setup.dev.flow'
 import SetupRDDFlow from './setup.dev.rdd.flow'
 import Transmit from './transmit.dev'
@@ -31,7 +30,6 @@ export default [
   CommitOffchainConfig,
   SetBillingAccessController,
   SetRequesterAccessController,
-  SetPayeesMultisig,
   // Inspection
   ...Inspection,
   // ONLY DEV

@@ -1,8 +1,8 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
+import { AccountMeta, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js'
 import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
-import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
 
@@ -45,7 +45,7 @@ export default class SetPayees extends SolanaCommand {
     this.requireFlag('link', 'Provide a valid link address')
   }
 
-  execute = async () => {
+  makeRawTransaction = async (signer: PublicKey) => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
@@ -100,20 +100,55 @@ export default class SetPayees extends SolanaCommand {
 
     logger.log('Payees information:', input)
     await prompt('Continue setting payees?')
-
-    const tx = await program.rpc.setPayees(payees, {
-      accounts: {
-        state: state,
-        authority: owner.publicKey,
-      },
-      signers: [owner],
+    const data = program.coder.instruction.encode('set_payees', {
+      payees
     })
+
+    const accounts: AccountMeta[] = [
+      {
+        pubkey: state,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: signer,
+        isSigner: true,
+        isWritable: false,
+      }
+    ]
+
+    const rawTx: RawTransaction = {
+      data,
+      accounts,
+      programId: ocr2.programId,
+    }
+
+    return [rawTx]
+  }
+
+  execute = async () => {
+    const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
+    const tx = rawTx.reduce(
+      (tx, meta) =>
+        tx.add(
+          new TransactionInstruction({
+            programId: meta.programId,
+            keys: meta.accounts,
+            data: meta.data,
+          }),
+        ),
+      new Transaction(),
+    )
+
+    logger.loading('Sending tx...')
+    const txhash = await this.provider.send(tx, [this.wallet.payer])
+    logger.success(`Payees set on tx hash: ${txhash}`)
 
     return {
       responses: [
         {
-          tx: this.wrapResponse(tx, state.toString()),
-          contract: state.toString(),
+          tx: this.wrapResponse(txhash, this.flags.state),
+          contract: this.flags.state,
         },
       ],
     } as Result<TransactionResponse>
