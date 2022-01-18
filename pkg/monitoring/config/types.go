@@ -7,21 +7,11 @@ import (
 )
 
 type Config struct {
-	Solana         Solana
 	Kafka          Kafka
 	SchemaRegistry SchemaRegistry
 	Feeds          Feeds
 	Http           Http
 	Feature        Feature
-}
-
-type Solana struct {
-	RPCEndpoint  string
-	NetworkName  string
-	NetworkID    string
-	ChainID      string
-	ReadTimeout  time.Duration
-	PollInterval time.Duration
 }
 
 type Kafka struct {

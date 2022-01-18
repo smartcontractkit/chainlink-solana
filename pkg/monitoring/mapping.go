@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/mr-tron/base58"
-	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/pb"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"google.golang.org/protobuf/proto"
@@ -58,7 +57,7 @@ func MakeConfigSetSimplifiedMapping(
 
 func MakeTransmissionMapping(
 	envelope TransmissionEnvelope,
-	solanaConfig config.Solana,
+	solanaConfig SolanaConfig,
 	feedConfig Feed,
 ) (map[string]interface{}, error) {
 	data := []byte{}

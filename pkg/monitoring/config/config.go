@@ -22,33 +22,6 @@ func Parse() (Config, error) {
 }
 
 func parseEnvVars(cfg *Config) error {
-	if value, isPresent := os.LookupEnv("SOLANA_RPC_ENDPOINT"); isPresent {
-		cfg.Solana.RPCEndpoint = value
-	}
-	if value, isPresent := os.LookupEnv("SOLANA_NETWORK_NAME"); isPresent {
-		cfg.Solana.NetworkName = value
-	}
-	if value, isPresent := os.LookupEnv("SOLANA_NETWORK_ID"); isPresent {
-		cfg.Solana.NetworkID = value
-	}
-	if value, isPresent := os.LookupEnv("SOLANA_CHAIN_ID"); isPresent {
-		cfg.Solana.ChainID = value
-	}
-	if value, isPresent := os.LookupEnv("SOLANA_READ_TIMEOUT"); isPresent {
-		readTimeout, err := time.ParseDuration(value)
-		if err != nil {
-			return fmt.Errorf("failed to parse env var SOLANA_READ_TIMEOUT, see https://pkg.go.dev/time#ParseDuration: %w", err)
-		}
-		cfg.Solana.ReadTimeout = readTimeout
-	}
-	if value, isPresent := os.LookupEnv("SOLANA_POLL_INTERVAL"); isPresent {
-		pollInterval, err := time.ParseDuration(value)
-		if err != nil {
-			return fmt.Errorf("failed to parse env var SOLANA_POLL_INTERVAL, see https://pkg.go.dev/time#ParseDuration: %w", err)
-		}
-		cfg.Solana.PollInterval = pollInterval
-	}
-
 	if value, isPresent := os.LookupEnv("KAFKA_BROKERS"); isPresent {
 		cfg.Kafka.Brokers = value
 	}
@@ -129,14 +102,18 @@ func parseEnvVars(cfg *Config) error {
 	return nil
 }
 
+func applyDefaults(cfg *Config) {
+	if cfg.Feeds.RDDReadTimeout == 0 {
+		cfg.Feeds.RDDReadTimeout = 1 * time.Second
+	}
+	if cfg.Feeds.RDDPollInterval == 0 {
+		cfg.Feeds.RDDPollInterval = 10 * time.Second
+	}
+}
+
 func validateConfig(cfg Config) error {
 	// Required config
 	for envVarName, currentValue := range map[string]string{
-		"SOLANA_RPC_ENDPOINT": cfg.Solana.RPCEndpoint,
-		"SOLANA_NETWORK_NAME": cfg.Solana.NetworkName,
-		"SOLANA_NETWORK_ID":   cfg.Solana.NetworkID,
-		"SOLANA_CHAIN_ID":     cfg.Solana.ChainID,
-
 		"KAFKA_BROKERS":           cfg.Kafka.Brokers,
 		"KAFKA_CLIENT_ID":         cfg.Kafka.ClientID,
 		"KAFKA_SECURITY_PROTOCOL": cfg.Kafka.SecurityProtocol,
@@ -158,7 +135,6 @@ func validateConfig(cfg Config) error {
 	}
 	// Validate URLs.
 	for envVarName, currentValue := range map[string]string{
-		"SOLANA_RPC_ENDPOINT": cfg.Solana.RPCEndpoint,
 		"SCHEMA_REGISTRY_URL": cfg.SchemaRegistry.URL,
 		"FEEDS_URL":           cfg.Feeds.URL,
 	} {

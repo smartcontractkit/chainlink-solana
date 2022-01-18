@@ -34,7 +34,7 @@ func BenchmarkManager(b *testing.B) {
 	log := logger.NewNullLogger()
 
 	cfg := config.Config{}
-	cfg.Solana.PollInterval = 0 // poll as quickly as possible.
+	solanaCfg := SolanaConfig{}
 	cfg.Feeds.URL = "http://some-fake-url-just-to-trigger-rdd-polling.com"
 	cfg.Feeds.RDDPollInterval = 1 * time.Second
 	cfg.Feeds.RDDReadTimeout = 1 * time.Second
@@ -48,7 +48,7 @@ func BenchmarkManager(b *testing.B) {
 	factory := NewRandomDataSourceFactory(ctx, wg, log)
 
 	monitor := NewMultiFeedMonitor(
-		cfg.Solana,
+		solanaCfg,
 
 		log,
 		factory,

@@ -33,7 +33,7 @@ func BenchmarkMultichainMonitorStatePath(b *testing.B) {
 	defer cancel()
 
 	cfg := config.Config{}
-	cfg.Solana.PollInterval = 0 // poll as quickly as possible.
+	solanaCfg := SolanaConfig{}
 	feeds := []Feed{generateFeedConfig()}
 
 	transmissionSchema := fakeSchema{transmissionCodec}
@@ -48,7 +48,7 @@ func BenchmarkMultichainMonitorStatePath(b *testing.B) {
 	}
 
 	monitor := NewMultiFeedMonitor(
-		cfg.Solana,
+		solanaCfg,
 
 		logger.NewNullLogger(),
 		factory,
@@ -104,7 +104,7 @@ func BenchmarkMultichainMonitorTransmissionPath(b *testing.B) {
 	defer cancel()
 
 	cfg := config.Config{}
-	cfg.Solana.PollInterval = 0 // poll as quickly as possible.
+	solanaCfg := SolanaConfig{}
 	feeds := []Feed{generateFeedConfig()}
 
 	transmissionSchema := fakeSchema{transmissionCodec}
@@ -119,7 +119,7 @@ func BenchmarkMultichainMonitorTransmissionPath(b *testing.B) {
 	}
 
 	monitor := NewMultiFeedMonitor(
-		cfg.Solana,
+		solanaCfg,
 
 		logger.NewNullLogger(),
 		factory,

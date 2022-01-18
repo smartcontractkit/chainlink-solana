@@ -19,7 +19,9 @@ func TestMultiFeedMonitorToMakeSureAllGoroutinesTerminate(t *testing.T) {
 	wg := &sync.WaitGroup{}
 
 	cfg := config.Config{}
-	cfg.Solana.PollInterval = 5 * time.Second
+	solanaCfg := SolanaConfig{
+		PollInterval: 5 * time.Second,
+	}
 	feeds := []Feed{}
 	for i := 0; i < numFeeds; i++ {
 		feeds = append(feeds, generateFeedConfig())
@@ -37,7 +39,7 @@ func TestMultiFeedMonitorToMakeSureAllGoroutinesTerminate(t *testing.T) {
 	}
 
 	monitor := NewMultiFeedMonitor(
-		cfg.Solana,
+		solanaCfg,
 
 		logger.NewNullLogger(),
 		factory,
@@ -92,7 +94,9 @@ func TestMultiFeedMonitorForPerformance(t *testing.T) {
 	wg := &sync.WaitGroup{}
 
 	cfg := config.Config{}
-	cfg.Solana.PollInterval = 5 * time.Second
+	solanaCfg := SolanaConfig{
+		PollInterval: 5 * time.Second,
+	}
 	feeds := []Feed{}
 	for i := 0; i < numFeeds; i++ {
 		feeds = append(feeds, generateFeedConfig())
@@ -110,7 +114,7 @@ func TestMultiFeedMonitorForPerformance(t *testing.T) {
 	}
 
 	monitor := NewMultiFeedMonitor(
-		cfg.Solana,
+		solanaCfg,
 
 		logger.NewNullLogger(),
 		factory,

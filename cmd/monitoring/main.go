@@ -22,7 +22,12 @@ func main() {
 
 	cfg, err := config.Parse()
 	if err != nil {
-		log.Fatalw("failed to parse configuration", "error", err)
+		log.Fatalw("failed to parse generic configuration", "error", err)
+	}
+
+	solanaCfg, err := monitoring.ParseSolanaConfig()
+	if err != nil {
+		log.Fatalw("failed to parse chain configuration", "error", err)
 	}
 
 	schemaRegistry := monitoring.NewSchemaRegistry(cfg.SchemaRegistry, log)
@@ -52,7 +57,7 @@ func main() {
 	metrics := monitoring.DefaultMetrics
 
 	monitor := monitoring.NewMultiFeedMonitor(
-		cfg.Solana,
+		solanaCfg,
 
 		log,
 		sourceFactory,
