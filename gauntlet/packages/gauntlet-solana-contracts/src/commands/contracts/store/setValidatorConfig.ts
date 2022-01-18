@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { PublicKey } from '@solana/web3.js'
+import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
+import { AccountMeta, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 
 type Input = {
@@ -33,13 +33,12 @@ export default class SetValidatorConfig extends SolanaCommand {
     this.require(!!this.flags.state, 'Please provide flags with "state"')
   }
 
-  execute = async () => {
+  makeRawTransaction = async (signer: PublicKey) => {
     const storeProgram = getContract(CONTRACT_LIST.STORE, '')
     const address = storeProgram.programId.toString()
     const program = this.loadProgram(storeProgram.idl, address)
 
     const input = this.makeInput(this.flags.input)
-    const owner = this.wallet.payer
 
     const state = new PublicKey(this.flags.state)
     const threshold = new BN(input.threshold)
@@ -47,22 +46,69 @@ export default class SetValidatorConfig extends SolanaCommand {
 
     console.log(`Setting store config on ${state.toString()}...`)
 
-    const tx = await program.rpc.setValidatorConfig(threshold, {
-      accounts: {
-        store: state,
-        feed: feed,
-        authority: owner.publicKey,
-      },
-      signers: [owner],
+    // const tx = await program.rpc.setValidatorConfig(threshold, {
+    //   accounts: {
+    //     store: state,
+    //     feed: feed,
+    //     authority: owner.publicKey,
+    //   },
+    //   signers: [owner],
+    // })
+
+    const data = program.coder.instruction.encode('set_validator_config', {
+      flaggingThreshold: threshold,
     })
 
-    logger.success(`Validator config on tx ${tx}`)
+    const accounts: AccountMeta[] = [
+      {
+        pubkey: state,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: signer,
+        isSigner: true,
+        isWritable: false,
+      },
+      {
+        pubkey: feed,
+        isSigner: false,
+        isWritable: true,
+      },
+    ]
+
+    const rawTx: RawTransaction = {
+      data,
+      accounts,
+      programId: storeProgram.programId,
+    }
+
+    return [rawTx]
+  }
+
+  execute = async () => {
+    const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
+    const tx = rawTx.reduce(
+      (tx, meta) =>
+        tx.add(
+          new TransactionInstruction({
+            programId: meta.programId,
+            keys: meta.accounts,
+            data: meta.data,
+          }),
+        ),
+      new Transaction(),
+    )
+    logger.loading('Sending tx...')
+    logger.debug(tx)
+    const txhash = await this.provider.send(tx, [this.wallet.payer])
+    logger.success(`Validator config on tx ${txhash}`)
 
     return {
       responses: [
         {
-          tx: this.wrapResponse(tx, state.toString(), { state: state.toString() }),
-          contract: state.toString(),
+          tx: this.wrapResponse(txhash, this.flags.state),
+          contract: this.flags.state,
         },
       ],
     } as Result<TransactionResponse>
