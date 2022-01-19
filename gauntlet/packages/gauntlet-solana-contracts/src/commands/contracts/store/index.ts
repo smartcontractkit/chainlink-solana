@@ -11,6 +11,7 @@ import AcceptStoreOwnership from './acceptStoreOwnership'
 import { CONTRACT_LIST } from '../../../lib/contracts'
 import { makeUpgradeProgramCommand } from '../../abstract/upgrade'
 import Inspect from './inspect'
+import { makeCloseCommand } from '../../abstract/close'
 
 export default [
   Initialize,
@@ -25,4 +26,5 @@ export default [
   TransferStoreOwnership,
   AcceptStoreOwnership,
   makeUpgradeProgramCommand(CONTRACT_LIST.STORE),
+  makeCloseCommand(CONTRACT_LIST.STORE),
 ]
