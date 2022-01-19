@@ -16,10 +16,10 @@ type sourceFactory struct {
 	log logger.Logger
 }
 
-func (s *sourceFactory) NewSources(
+func (s *sourceFactory) NewSource(
 	chainConfig ChainConfig,
 	feedConfig FeedConfig,
-) (Sources, error) {
+) (Source, error) {
 	solanaConfig, ok := chainConfig.(SolanaConfig)
 	if !ok {
 		return nil, fmt.Errorf("expected chainConfig to be of type SolanaConfig not %T", chainConfig)
@@ -34,51 +34,44 @@ func (s *sourceFactory) NewSources(
 	}
 	client := pkgSolana.NewClient(solanaConfig.RPCEndpoint)
 	tracker := pkgSolana.NewTracker(spec, client, nil, s.log)
-	return &sources{
+	return &solanaSource{
 		&tracker,
 		solanaConfig,
 		solanaFeedConfig,
 	}, nil
 }
 
-type sources struct {
+type solanaSource struct {
 	tracker      *pkgSolana.ContractTracker
 	solanaConfig SolanaConfig
 	feedConfig   SolanaFeedConfig
 }
 
-func (s *sources) NewTransmissionsSource() Source {
-	return &transmissionsSource{s.tracker, s.solanaConfig, s.feedConfig}
-}
-
-func (s *sources) NewConfigSource() Source {
-	return &configSource{s.tracker, s.solanaConfig, s.feedConfig}
-}
-
-type transmissionsSource struct {
-	tracker      *pkgSolana.ContractTracker
-	solanaConfig SolanaConfig
-	feedConfig   SolanaFeedConfig
-}
-
-func (t *transmissionsSource) Fetch(ctx context.Context) (interface{}, error) {
-	configDigest, epoch, round, latestAnswer, latestTimestamp, err := t.tracker.LatestTransmissionDetails(ctx)
+func (s *solanaSource) Fetch(ctx context.Context) (interface{}, error) {
+	changedInBlock, _, err := s.tracker.LatestConfigDetails(ctx)
 	if err != nil {
-		return TransmissionEnvelope{}, fmt.Errorf("failed to read latest transmission from on-chain for feed '%s'", t.feedConfig.GetName())
+		return Envelope{}, fmt.Errorf("failed to fetch latest config details from on-chain: %w", err)
 	}
-	return TransmissionEnvelope{configDigest, epoch, round, latestAnswer, latestTimestamp}, err
-}
-
-type configSource struct {
-	tracker      *pkgSolana.ContractTracker
-	solanaConfig SolanaConfig
-	feedConfig   SolanaFeedConfig
-}
-
-func (c *configSource) Fetch(ctx context.Context) (interface{}, error) {
-	cfg, err := c.tracker.LatestConfig(ctx, 0)
+	cfg, err := s.tracker.LatestConfig(ctx, changedInBlock)
 	if err != nil {
-		return ConfigEnvelope{}, fmt.Errorf("failed to read transmissions from on-chain for feed '%s'", c.feedConfig.GetName())
+		return Envelope{}, fmt.Errorf("failed to read latest config from on-chain: %w", err)
 	}
-	return ConfigEnvelope{cfg}, nil
+	configDigest, epoch, round, latestAnswer, latestTimestamp, err := s.tracker.LatestTransmissionDetails(ctx)
+	if err != nil {
+		return Envelope{}, fmt.Errorf("failed to read latest transmission from on-chain: %w", err)
+	}
+	transmitter := s.tracker.FromAccount()
+
+	return Envelope{
+		configDigest,
+		epoch,
+		round,
+		latestAnswer,
+		latestTimestamp,
+
+		cfg,
+
+		changedInBlock,
+		transmitter,
+	}, nil
 }

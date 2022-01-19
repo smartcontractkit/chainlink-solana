@@ -127,7 +127,7 @@ func (d *defaultMetrics) Cleanup(
 	feedName, feedPath, symbol, contractType, contractStatus string,
 	contractAddress, feedID string,
 ) {
-	// TODO (dru) post error message id delete fails
+	// TODO (dru) can delete fail?!
 	_ = headTrackerCurrentHead.DeleteLabelValues(networkName, chainID, networkID)
 	_ = feedContractMetadata.DeleteLabelValues(chainID, contractAddress, feedID, contractStatus, contractType, feedName, feedPath, networkID, networkName, symbol)
 	_ = nodeMetadata.DeleteLabelValues(chainID, networkID, networkName, oracleName, sender)

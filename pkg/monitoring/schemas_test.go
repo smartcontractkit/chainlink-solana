@@ -9,16 +9,15 @@ import (
 func TestSchemas(t *testing.T) {
 	chainCfg := SolanaConfig{}
 	feedConfig := generateFeedConfig()
-	transmissionEnvelope := TransmissionEnvelope{}
-	configEnvelope := ConfigEnvelope{}
+	envelope := Envelope{}
 	t.Run("encode an empty configSetSimplified message", func(t *testing.T) {
-		mapping, err := MakeConfigSetSimplifiedMapping(configEnvelope, feedConfig)
+		mapping, err := MakeConfigSetSimplifiedMapping(envelope, feedConfig)
 		require.NoError(t, err)
 		_, err = configSetSimplifiedCodec.BinaryFromNative(nil, mapping)
 		require.NoError(t, err)
 	})
 	t.Run("encode an empty transmission message", func(t *testing.T) {
-		mapping, err := MakeTransmissionMapping(transmissionEnvelope, chainCfg, feedConfig)
+		mapping, err := MakeTransmissionMapping(envelope, chainCfg, feedConfig)
 		require.NoError(t, err)
 		_, err = transmissionCodec.BinaryFromNative(nil, mapping)
 		require.NoError(t, err)

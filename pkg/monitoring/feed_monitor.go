@@ -13,21 +13,20 @@ type FeedMonitor interface {
 
 func NewFeedMonitor(
 	log logger.Logger,
-	transmissionPoller, statePoller Poller,
+	poller Poller,
 	exporters []Exporter,
 ) FeedMonitor {
 	return &feedMonitor{
 		log,
-		transmissionPoller, statePoller,
+		poller,
 		exporters,
 	}
 }
 
 type feedMonitor struct {
-	log                logger.Logger
-	transmissionPoller Poller
-	statePoller        Poller
-	exporters          []Exporter
+	log       logger.Logger
+	poller    Poller
+	exporters []Exporter
 }
 
 // Start should be executed as a goroutine
@@ -37,10 +36,7 @@ func (f *feedMonitor) Start(ctx context.Context, wg *sync.WaitGroup) {
 		// Wait for an update.
 		var update interface{}
 		select {
-		case stateRaw := <-f.statePoller.Updates():
-			update = stateRaw
-		case answerRaw := <-f.transmissionPoller.Updates():
-			update = answerRaw
+		case update = <-f.poller.Updates():
 		case <-ctx.Done():
 			for _, exp := range f.exporters {
 				exp.Cleanup()
