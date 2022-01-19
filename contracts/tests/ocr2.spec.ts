@@ -436,19 +436,88 @@ describe('ocr2', async () => {
 	          authority: owner.publicKey,
 	        },
 	    });
-			assert.fail("beginOffchainConfig shouldn't have succeeded!")
 		} catch {
 			// beginOffchainConfig should fail
+			return
 		}
+		assert.fail("beginOffchainConfig shouldn't have succeeded!")
+	});
+
+	it("Can't write offchain config if begin has not been called", async () => {
+		try {
+			await program.rpc.writeOffchainConfig(
+				Buffer.from([4, 5, 6]),
+				{
+					accounts: {
+						state: state.publicKey,
+						authority: owner.publicKey,
+					},
+			});
+		} catch {
+			// writeOffchainConfig should fail
+			return
+		}
+		assert.fail("writeOffchainConfig shouldn't have succeeded!")
+	});
+
+	it("ResetPendingOffchainConfig clears pending state", async () => {
+
+		await program.rpc.beginOffchainConfig(
+      new BN(2),
+      {
+        accounts: {
+          state: state.publicKey,
+          authority: owner.publicKey,
+        },
+    });
+    await program.rpc.writeOffchainConfig(
+      Buffer.from([4, 5, 6]),
+      {
+        accounts: {
+          state: state.publicKey,
+          authority: owner.publicKey,
+        },
+    });
+		let account = await program.account.state.fetch(state.publicKey);
+		assert.ok(account.config.pendingOffchainConfig.version != 0);
+		assert.ok(account.config.pendingOffchainConfig.len != 0);
+
+		await program.rpc.resetPendingOffchainConfig(
+			{
+				accounts: {
+					state: state.publicKey,
+					authority: owner.publicKey,
+				},
+		});
+		account = await program.account.state.fetch(state.publicKey);
+		assert.ok(account.config.pendingOffchainConfig.version == 0);
+		assert.ok(account.config.pendingOffchainConfig.len == 0);
+	})
+
+	it("Can't reset pending config if already in new state", async () => {
+		try {
+			await program.rpc.resetPendingOffchainConfig(
+				{
+					accounts: {
+						state: state.publicKey,
+						authority: owner.publicKey,
+					},
+			});
+		} catch {
+			// resetPendingOffchainConfig should fail
+			return
+		}
+		assert.fail("resetPendingOffchainConfig shouldn't have succeeded!")
 	});
 
   it("Can't transmit a round if not the writer", async () => {
     try {
       await transmit(1, 1, new BN(1));
-      assert.fail("transmit() shouldn't have succeeded!");
     } catch {
       // transmit should fail
+			return
     }
+		assert.fail("transmit() shouldn't have succeeded!");
   });
 
   it('Sets the cluster as the feed writer', async () => {

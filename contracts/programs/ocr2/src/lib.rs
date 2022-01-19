@@ -116,6 +116,7 @@ pub mod ocr2 {
             offchain_config.len() < config.pending_offchain_config.remaining_capacity(),
             InvalidInput
         );
+        require!(config.pending_offchain_config.version != 0, InvalidInput);
         config.pending_offchain_config.extend(&offchain_config);
         Ok(())
     }
@@ -144,6 +145,24 @@ pub mod ocr2 {
         config.latest_config_block_number = slot;
         config.config_count += 1;
         config.latest_config_digest = config.config_digest_from_data(&crate::id(), &state.oracles);
+        Ok(())
+    }
+
+    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
+    pub fn reset_pending_offchain_config(ctx: Context<SetConfig>) -> ProgramResult {
+        let state = &mut *ctx.accounts.state.load_mut()?;
+        let config = &mut state.config;
+
+        // Require that at least some data was written
+        require!(
+            config.pending_offchain_config.version > 0
+                || !config.pending_offchain_config.is_empty(),
+            InvalidInput
+        );
+
+        // reset staging area
+        config.pending_offchain_config.clear();
+        config.pending_offchain_config.version = 0;
         Ok(())
     }
 
