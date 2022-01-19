@@ -11,6 +11,44 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func MakeTransmissionMapping(
+	envelope Envelope,
+	chainConfig ChainConfig,
+	feedConfig FeedConfig,
+) (map[string]interface{}, error) {
+	data := []byte{}
+	if envelope.LatestAnswer != nil {
+		data = envelope.LatestAnswer.Bytes()
+	}
+	out := map[string]interface{}{
+		"block_number": uint64ToBeBytes(envelope.BlockNumber),
+		"answer": map[string]interface{}{
+			"data":      data,
+			"timestamp": envelope.LatestTimestamp.Unix(),
+			"config_digest": map[string]interface{}{
+				"string": base64.StdEncoding.EncodeToString(envelope.ConfigDigest[:]),
+			},
+			"epoch": map[string]interface{}{
+				"long": int64(envelope.Epoch),
+			},
+			"round": map[string]interface{}{
+				"int": int32(envelope.Round),
+			},
+		},
+		// Deprecated in favour of chain_config.
+		"solana_chain_config": map[string]interface{}{
+			"network_name": "",
+			"network_id":   "",
+			"chain_id":     "",
+		},
+		"chain_config": map[string]interface{}{
+			"link.chain.ocr2.chain_config": chainConfig.ToMapping(),
+		},
+		"feed_config": feedConfig.ToMapping(),
+	}
+	return out, nil
+}
+
 func MakeConfigSetSimplifiedMapping(
 	envelope Envelope,
 	feedConfig FeedConfig,
@@ -50,30 +88,6 @@ func MakeConfigSetSimplifiedMapping(
 		"s":                  string(s),
 		"oracles":            string(oracles),
 		"feed_state_account": feedConfig.GetContractAddress(),
-	}
-	return out, nil
-}
-
-func MakeTransmissionMapping(
-	envelope Envelope,
-	chainConfig ChainConfig,
-	feedConfig FeedConfig,
-) (map[string]interface{}, error) {
-	data := []byte{}
-	if envelope.LatestAnswer != nil {
-		data = envelope.LatestAnswer.Bytes()
-	}
-	out := map[string]interface{}{
-		"block_number": []byte{},
-		"answer": map[string]interface{}{
-			"config_digest": base64.StdEncoding.EncodeToString(envelope.ConfigDigest[:]),
-			"epoch":         int64(envelope.Epoch),
-			"round":         int32(envelope.Round),
-			"data":          data,
-			"timestamp":     envelope.LatestTimestamp.Unix(),
-		},
-		"solana_chain_config": chainConfig.ToMapping(),
-		"feed_config":         feedConfig.ToMapping(),
 	}
 	return out, nil
 }

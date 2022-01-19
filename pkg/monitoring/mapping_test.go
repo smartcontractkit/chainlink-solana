@@ -19,6 +19,57 @@ func TestMapping(t *testing.T) {
 	chainConfig := generateChainConfig()
 	feedConfig := generateFeedConfig()
 
+	t.Run("MakeTransmissionMapping", func(t *testing.T) {
+		mapping, err := MakeTransmissionMapping(envelope, chainConfig, feedConfig)
+		require.NoError(t, err)
+		output := []byte{}
+		serialized, err := transmissionCodec.BinaryFromNative(output, mapping)
+		require.NoError(t, err)
+		deserialized, _, err := transmissionCodec.NativeFromBinary(serialized)
+		require.NoError(t, err)
+
+		transmission, ok := deserialized.(map[string]interface{})
+		require.True(t, ok)
+		require.Equal(t, transmission["block_number"], uint64ToBeBytes(envelope.BlockNumber))
+
+		answer, ok := transmission["answer"].(map[string]interface{})
+		require.True(t, ok)
+		require.Equal(t, answer["data"], envelope.LatestAnswer.Bytes())
+		require.Equal(t, answer["timestamp"].(int64), envelope.LatestTimestamp.Unix())
+
+		configDigest, ok := answer["config_digest"].(map[string]interface{})
+		require.True(t, ok)
+		require.Equal(t, configDigest["string"].(string), base64.StdEncoding.EncodeToString(envelope.ConfigDigest[:]))
+
+		epoch, ok := answer["epoch"].(map[string]interface{})
+		require.True(t, ok)
+		require.Equal(t, epoch["long"].(int64), int64(envelope.Epoch))
+
+		round, ok := answer["round"].(map[string]interface{})
+		require.True(t, ok)
+		require.Equal(t, round["int"].(int32), int32(envelope.Round))
+
+		// Deprecated in favour of chain_config
+		chainConfigUnion, ok := transmission["chain_config"].(map[string]interface{})
+		require.True(t, ok)
+		decodedChainConfig, ok := chainConfigUnion["link.chain.ocr2.chain_config"].(map[string]interface{})
+		require.True(t, ok)
+		require.Equal(t, decodedChainConfig["network_name"], chainConfig.GetNetworkName())
+		require.Equal(t, decodedChainConfig["network_id"], chainConfig.GetNetworkID())
+		require.Equal(t, decodedChainConfig["chain_id"], chainConfig.GetChainID())
+
+		// Deprecated in favour of chain_config
+		solanaChainConfig, ok := transmission["solana_chain_config"].(map[string]interface{})
+		require.True(t, ok)
+		require.Equal(t, solanaChainConfig["network_name"], "")
+		require.Equal(t, solanaChainConfig["network_id"], "")
+		require.Equal(t, solanaChainConfig["chain_id"], "")
+
+		decodedFeedConfig, ok := transmission["feed_config"].(map[string]interface{})
+		require.True(t, ok)
+		require.Equal(t, decodedFeedConfig, feedConfig.ToMapping())
+	})
+
 	t.Run("MakeSimplifiedConfigSetMapping", func(t *testing.T) {
 		mapping, err := MakeConfigSetSimplifiedMapping(envelope, feedConfig)
 		require.NoError(t, err)
@@ -51,39 +102,7 @@ func TestMapping(t *testing.T) {
 		require.Equal(t, configSetSimplified["feed_state_account"], feedConfig.GetContractAddress())
 	})
 
-	t.Run("MakeTransmissionMapping", func(t *testing.T) {
-		mapping, err := MakeTransmissionMapping(envelope, chainConfig, feedConfig)
-		require.NoError(t, err)
-		output := []byte{}
-		serialized, err := transmissionCodec.BinaryFromNative(output, mapping)
-		require.NoError(t, err)
-		deserialized, _, err := transmissionCodec.NativeFromBinary(serialized)
-		require.NoError(t, err)
-
-		transmission, ok := deserialized.(map[string]interface{})
-		require.True(t, ok)
-		require.Equal(t, transmission["block_number"], []byte{})
-
-		answer, ok := transmission["answer"].(map[string]interface{})
-		require.True(t, ok)
-		require.Equal(t, answer["data"], envelope.LatestAnswer.Bytes())
-		require.Equal(t, answer["timestamp"].(int64), envelope.LatestTimestamp.Unix())
-
-		solanaChainConfig, ok := transmission["solana_chain_config"].(map[string]interface{})
-		require.True(t, ok)
-		require.Equal(t, solanaChainConfig["network_name"], chainConfig.GetNetworkName())
-		require.Equal(t, solanaChainConfig["network_id"], chainConfig.GetNetworkID())
-		require.Equal(t, solanaChainConfig["chain_id"], chainConfig.GetChainID())
-
-		decodedFeedConfig, ok := transmission["feed_config"].(map[string]interface{})
-		require.True(t, ok)
-		require.Equal(t, decodedFeedConfig, feedConfig.ToMapping())
-	})
-
 	t.Run("MakeSimplifiedConfigSetMapping works for an empty envelope", func(t *testing.T) {
-		envelope, err := generateEnvelope()
-		require.NoError(t, err)
-		feedConfig := generateFeedConfig()
 		mapping, err := MakeConfigSetSimplifiedMapping(envelope, feedConfig)
 		require.NoError(t, err)
 		_, err = configSetSimplifiedCodec.BinaryFromNative(nil, mapping)
@@ -91,10 +110,6 @@ func TestMapping(t *testing.T) {
 	})
 
 	t.Run("MakeTransmissionMapping works for empty envelope", func(t *testing.T) {
-		envelope, err := generateEnvelope()
-		require.NoError(t, err)
-		chainConfig := generateChainConfig()
-		feedConfig := generateFeedConfig()
 		mapping, err := MakeTransmissionMapping(envelope, chainConfig, feedConfig)
 		require.NoError(t, err)
 		_, err = transmissionCodec.BinaryFromNative(nil, mapping)
