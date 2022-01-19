@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/gagliardetto/solana-go"
 	"github.com/linkedin/goavro"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/pb"
@@ -80,7 +79,7 @@ type fakeRandomDataSourceFactory struct {
 	configs       chan ConfigEnvelope
 }
 
-func (f *fakeRandomDataSourceFactory) NewSources(chainConfig SolanaConfig, feedConfig FeedConfig) (Sources, error) {
+func (f *fakeRandomDataSourceFactory) NewSources(chainConfig ChainConfig, feedConfig FeedConfig) (Sources, error) {
 	return &fakeSources{f}, nil
 }
 
@@ -123,11 +122,6 @@ func generate32ByteArr() [32]byte {
 	var out [32]byte
 	copy(out[:], buf[:32])
 	return out
-}
-
-func generatePublicKey() solana.PublicKey {
-	arr := generate32ByteArr()
-	return solana.PublicKeyFromBytes(arr[:])
 }
 
 func generateFeedConfig() FeedConfig {
@@ -281,14 +275,38 @@ func generateTransmissionEnvelope() TransmissionEnvelope {
 	}
 }
 
-func generateSolanaConfig() SolanaConfig {
-	return SolanaConfig{
-		RPCEndpoint:  "http://solana:6969",
+type fakeChainConfig struct {
+	RPCEndpoint  string
+	NetworkName  string
+	NetworkID    string
+	ChainID      string
+	ReadTimeout  time.Duration
+	PollInterval time.Duration
+}
+
+func generateChainConfig() ChainConfig {
+	return fakeChainConfig{
+		RPCEndpoint:  "http://some-chain-host:6666",
 		NetworkName:  "solana-mainnet-beta",
 		NetworkID:    "1",
 		ChainID:      "solana-mainnet-beta",
 		ReadTimeout:  100 * time.Millisecond,
 		PollInterval: time.Duration(1+rand.Intn(5)) * time.Second,
+	}
+}
+
+func (f fakeChainConfig) GetRPCEndpoint() string         { return f.RPCEndpoint }
+func (f fakeChainConfig) GetNetworkName() string         { return f.NetworkName }
+func (f fakeChainConfig) GetNetworkID() string           { return f.NetworkID }
+func (f fakeChainConfig) GetChainID() string             { return f.ChainID }
+func (f fakeChainConfig) GetReadTimeout() time.Duration  { return f.ReadTimeout }
+func (f fakeChainConfig) GetPollInterval() time.Duration { return f.PollInterval }
+
+func (f fakeChainConfig) ToMapping() map[string]interface{} {
+	return map[string]interface{}{
+		"network_name": f.NetworkName,
+		"network_id":   f.NetworkID,
+		"chain_id":     f.ChainID,
 	}
 }
 
@@ -415,7 +433,7 @@ func (f *fakePoller) Updates() <-chan interface{} {
 // This is done in order to expose NewRandomDataReader for use in cmd/monitoring.
 // The following code is added to comply with the "unused" linter:
 var (
-	_ = generateSolanaConfig
+	_ = generateChainConfig()
 	_ = generateFeedConfig
 	_ = fakeProducer{}
 	_ = fakeSchema{}

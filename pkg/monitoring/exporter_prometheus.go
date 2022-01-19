@@ -8,26 +8,26 @@ import (
 )
 
 func NewPrometheusExporter(
-	solanaConfig SolanaConfig,
+	chainConfig ChainConfig,
 	feedConfig FeedConfig,
 	log logger.Logger,
 	metrics Metrics,
 ) Exporter {
 	metrics.SetFeedContractMetadata(
-		solanaConfig.ChainID,
+		chainConfig.GetChainID(),
 		feedConfig.GetContractAddress(),
 		feedConfig.GetContractAddress(),
 		feedConfig.GetContractStatus(),
 		feedConfig.GetContractType(),
 		feedConfig.GetName(),
 		feedConfig.GetPath(),
-		solanaConfig.NetworkID,
-		solanaConfig.NetworkName,
+		chainConfig.GetNetworkID(),
+		chainConfig.GetNetworkName(),
 		feedConfig.GetSymbol(),
 	)
 
 	return &prometheusExporter{
-		solanaConfig,
+		chainConfig,
 		feedConfig,
 		log,
 		metrics,
@@ -35,8 +35,8 @@ func NewPrometheusExporter(
 }
 
 type prometheusExporter struct {
-	solanaConfig SolanaConfig
-	feedConfig   FeedConfig
+	chainConfig ChainConfig
+	feedConfig  FeedConfig
 
 	log     logger.Logger
 	metrics Metrics
@@ -46,41 +46,41 @@ func (p *prometheusExporter) Export(ctx context.Context, data interface{}) {
 	switch typed := data.(type) {
 	case ConfigEnvelope:
 		p.metrics.SetNodeMetadata(
-			p.solanaConfig.ChainID,
-			p.solanaConfig.NetworkID,
-			p.solanaConfig.NetworkName,
+			p.chainConfig.GetChainID(),
+			p.chainConfig.GetNetworkID(),
+			p.chainConfig.GetNetworkName(),
 			"n/a", // oracleName
 			"n/a", // sender
 		)
 	case TransmissionEnvelope:
 		p.metrics.SetHeadTrackerCurrentHead(
 			0, // block number
-			p.solanaConfig.NetworkName,
-			p.solanaConfig.ChainID,
-			p.solanaConfig.NetworkID,
+			p.chainConfig.GetNetworkName(),
+			p.chainConfig.GetChainID(),
+			p.chainConfig.GetNetworkID(),
 		)
 		p.metrics.SetOffchainAggregatorAnswers(
 			typed.LatestAnswer,
 			p.feedConfig.GetContractAddress(),
 			p.feedConfig.GetContractAddress(),
-			p.solanaConfig.ChainID,
+			p.chainConfig.GetChainID(),
 			p.feedConfig.GetContractStatus(),
 			p.feedConfig.GetContractType(),
 			p.feedConfig.GetName(),
 			p.feedConfig.GetPath(),
-			p.solanaConfig.NetworkID,
-			p.solanaConfig.NetworkName,
+			p.chainConfig.GetNetworkID(),
+			p.chainConfig.GetNetworkName(),
 		)
 		p.metrics.IncOffchainAggregatorAnswersTotal(
 			p.feedConfig.GetContractAddress(),
 			p.feedConfig.GetContractAddress(),
-			p.solanaConfig.ChainID,
+			p.chainConfig.GetChainID(),
 			p.feedConfig.GetContractStatus(),
 			p.feedConfig.GetContractType(),
 			p.feedConfig.GetName(),
 			p.feedConfig.GetPath(),
-			p.solanaConfig.NetworkID,
-			p.solanaConfig.NetworkName,
+			p.chainConfig.GetNetworkID(),
+			p.chainConfig.GetNetworkName(),
 		)
 
 		isLateAnswer := time.Since(typed.LatestTimestamp).Seconds() > float64(p.feedConfig.GetHeartbeatSec())
@@ -88,26 +88,26 @@ func (p *prometheusExporter) Export(ctx context.Context, data interface{}) {
 			isLateAnswer,
 			p.feedConfig.GetContractAddress(),
 			p.feedConfig.GetContractAddress(),
-			p.solanaConfig.ChainID,
+			p.chainConfig.GetChainID(),
 			p.feedConfig.GetContractStatus(),
 			p.feedConfig.GetContractType(),
 			p.feedConfig.GetName(),
 			p.feedConfig.GetPath(),
-			p.solanaConfig.NetworkID,
-			p.solanaConfig.NetworkName,
+			p.chainConfig.GetNetworkID(),
+			p.chainConfig.GetNetworkName(),
 		)
 		p.metrics.SetOffchainAggregatorSubmissionReceivedValues(
 			typed.LatestAnswer,
 			p.feedConfig.GetContractAddress(),
 			p.feedConfig.GetContractAddress(),
 			"n/a", // sender
-			p.solanaConfig.ChainID,
+			p.chainConfig.GetChainID(),
 			p.feedConfig.GetContractStatus(),
 			p.feedConfig.GetContractType(),
 			p.feedConfig.GetName(),
 			p.feedConfig.GetPath(),
-			p.solanaConfig.NetworkID,
-			p.solanaConfig.NetworkName,
+			p.chainConfig.GetNetworkID(),
+			p.chainConfig.GetNetworkName(),
 		)
 	default:
 		p.log.Errorf("unexpected type %T for export", data)

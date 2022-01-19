@@ -94,7 +94,7 @@ func TestMultiFeedMonitorForPerformance(t *testing.T) {
 	wg := &sync.WaitGroup{}
 
 	cfg := config.Config{}
-	solanaCfg := SolanaConfig{
+	chainCfg := SolanaConfig{
 		PollInterval: 5 * time.Second,
 	}
 	feeds := []FeedConfig{}
@@ -114,7 +114,7 @@ func TestMultiFeedMonitorForPerformance(t *testing.T) {
 	}
 
 	monitor := NewMultiFeedMonitor(
-		solanaCfg,
+		chainCfg,
 
 		logger.NewNullLogger(),
 		factory,

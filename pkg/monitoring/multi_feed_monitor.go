@@ -12,7 +12,7 @@ type MultiFeedMonitor interface {
 }
 
 func NewMultiFeedMonitor(
-	solanaConfig SolanaConfig,
+	chainConfig ChainConfig,
 
 	log logger.Logger,
 	sourceFactory SourceFactory,
@@ -28,7 +28,7 @@ func NewMultiFeedMonitor(
 	transmissionSchema Schema,
 ) MultiFeedMonitor {
 	return &multiFeedMonitor{
-		solanaConfig,
+		chainConfig,
 
 		log,
 		sourceFactory,
@@ -46,7 +46,7 @@ func NewMultiFeedMonitor(
 }
 
 type multiFeedMonitor struct {
-	solanaConfig SolanaConfig
+	chainConfig ChainConfig
 
 	log           logger.Logger
 	sourceFactory SourceFactory
@@ -73,10 +73,10 @@ func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup, feeds 
 
 			feedLogger := m.log.With(
 				"feed", feedConfig.GetName(),
-				"network", m.solanaConfig.NetworkName,
+				"network", m.chainConfig.GetNetworkName(),
 			)
 
-			sources, err := m.sourceFactory.NewSources(m.solanaConfig, feedConfig)
+			sources, err := m.sourceFactory.NewSources(m.chainConfig, feedConfig)
 			if err != nil {
 				feedLogger.Errorw("failed to create new sources", "error", err)
 				return
@@ -85,15 +85,15 @@ func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup, feeds 
 			transmissionPoller := NewSourcePoller(
 				sources.NewTransmissionsSource(),
 				feedLogger.With("component", "transmissions-poller"),
-				m.solanaConfig.PollInterval,
-				m.solanaConfig.ReadTimeout,
+				m.chainConfig.GetPollInterval(),
+				m.chainConfig.GetReadTimeout(),
 				bufferCapacity,
 			)
 			statePoller := NewSourcePoller(
 				sources.NewConfigSource(),
 				feedLogger.With("component", "config-poller"),
-				m.solanaConfig.PollInterval,
-				m.solanaConfig.ReadTimeout,
+				m.chainConfig.GetPollInterval(),
+				m.chainConfig.GetReadTimeout(),
 				bufferCapacity,
 			)
 
@@ -109,13 +109,13 @@ func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup, feeds 
 
 			exporters := []Exporter{
 				NewPrometheusExporter(
-					m.solanaConfig,
+					m.chainConfig,
 					feedConfig,
 					feedLogger.With("component", "prometheus-exporter"),
 					m.metrics,
 				),
 				NewKafkaExporter(
-					m.solanaConfig,
+					m.chainConfig,
 					feedConfig,
 					feedLogger.With("component", "kafka-exporter"),
 					m.producer,
