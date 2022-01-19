@@ -79,6 +79,27 @@ func TestMapping(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, decodedFeedConfig, feedConfig.ToMapping())
 	})
+
+	t.Run("MakeSimplifiedConfigSetMapping works for an empty envelope", func(t *testing.T) {
+		envelope, err := generateEnvelope()
+		require.NoError(t, err)
+		feedConfig := generateFeedConfig()
+		mapping, err := MakeConfigSetSimplifiedMapping(envelope, feedConfig)
+		require.NoError(t, err)
+		_, err = configSetSimplifiedCodec.BinaryFromNative(nil, mapping)
+		require.NoError(t, err)
+	})
+
+	t.Run("MakeTransmissionMapping works for empty envelope", func(t *testing.T) {
+		envelope, err := generateEnvelope()
+		require.NoError(t, err)
+		chainConfig := generateChainConfig()
+		feedConfig := generateFeedConfig()
+		mapping, err := MakeTransmissionMapping(envelope, chainConfig, feedConfig)
+		require.NoError(t, err)
+		_, err = transmissionCodec.BinaryFromNative(nil, mapping)
+		require.NoError(t, err)
+	})
 }
 
 // Helpers
