@@ -1,11 +1,10 @@
-package monitoring
+// Package monitoring contains a small DSL to help write more robust Avro schemas
+// by taking advantage of go's type system.
+package avro
 
 import "encoding/json"
 
-// This file contains a small DSL to help write more robust Avro schemas by
-// taking advantage of go's type system.
-
-type AvroSchema interface {
+type Schema interface {
 	IsSchema()
 }
 
@@ -45,7 +44,7 @@ type record struct {
 	Fields    Fields `json:"fields"`
 }
 
-func Record(name string, opts Opts, fields Fields) AvroSchema {
+func Record(name string, opts Opts, fields Fields) Schema {
 	return record{
 		name,
 		"record",
@@ -56,9 +55,9 @@ func Record(name string, opts Opts, fields Fields) AvroSchema {
 }
 
 type field struct {
-	Name string     `json:"name"`
-	Doc  string     `json:"doc,omitempty"`
-	Typ  AvroSchema `json:"type"`
+	Name string `json:"name"`
+	Doc  string `json:"doc,omitempty"`
+	Typ  Schema `json:"type"`
 }
 
 type IField interface {
@@ -67,7 +66,7 @@ type IField interface {
 
 type Fields []IField
 
-func Field(name string, opts Opts, typ AvroSchema) IField {
+func Field(name string, opts Opts, typ Schema) IField {
 	return field{
 		name,
 		opts.Doc,
@@ -76,18 +75,18 @@ func Field(name string, opts Opts, typ AvroSchema) IField {
 }
 
 type array struct {
-	Typ   string     `json:"type"`
-	Items AvroSchema `json:"items"`
+	Typ   string `json:"type"`
+	Items Schema `json:"items"`
 }
 
-func Array(items AvroSchema) AvroSchema {
+func Array(items Schema) Schema {
 	return array{
 		"array",
 		items,
 	}
 }
 
-type Union []AvroSchema
+type Union []Schema
 
 // Type checking
 
