@@ -9,9 +9,8 @@ import (
 )
 
 type AccessController struct {
-	Owner         ag_solanago.PublicKey
-	ProposedOwner ag_solanago.PublicKey
-	AccessList    AccessList
+	Owner      ag_solanago.PublicKey
+	AccessList AccessList
 }
 
 var AccessControllerDiscriminator = [8]byte{143, 45, 12, 204, 220, 20, 114, 87}
@@ -24,11 +23,6 @@ func (obj AccessController) MarshalWithEncoder(encoder *ag_binary.Encoder) (err 
 	}
 	// Serialize `Owner` param:
 	err = encoder.Encode(obj.Owner)
-	if err != nil {
-		return err
-	}
-	// Serialize `ProposedOwner` param:
-	err = encoder.Encode(obj.ProposedOwner)
 	if err != nil {
 		return err
 	}
@@ -56,11 +50,6 @@ func (obj *AccessController) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 	}
 	// Deserialize `Owner`:
 	err = decoder.Decode(&obj.Owner)
-	if err != nil {
-		return err
-	}
-	// Deserialize `ProposedOwner`:
-	err = decoder.Decode(&obj.ProposedOwner)
 	if err != nil {
 		return err
 	}

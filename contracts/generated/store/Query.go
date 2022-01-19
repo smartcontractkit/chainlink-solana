@@ -16,13 +16,15 @@ type Query struct {
 	Scope Scope
 
 	// [0] = [] feed
+	//
+	// [1] = [WRITE] buffer
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewQueryInstructionBuilder creates a new `Query` instruction builder.
 func NewQueryInstructionBuilder() *Query {
 	nd := &Query{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 1),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
 	}
 	return nd
 }
@@ -42,6 +44,17 @@ func (inst *Query) SetFeedAccount(feed ag_solanago.PublicKey) *Query {
 // GetFeedAccount gets the "feed" account.
 func (inst *Query) GetFeedAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
+}
+
+// SetBufferAccount sets the "buffer" account.
+func (inst *Query) SetBufferAccount(buffer ag_solanago.PublicKey) *Query {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(buffer).WRITE()
+	return inst
+}
+
+// GetBufferAccount gets the "buffer" account.
+func (inst *Query) GetBufferAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[1]
 }
 
 func (inst Query) Build() *Instruction {
@@ -74,6 +87,9 @@ func (inst *Query) Validate() error {
 		if inst.AccountMetaSlice[0] == nil {
 			return errors.New("accounts.Feed is not set")
 		}
+		if inst.AccountMetaSlice[1] == nil {
+			return errors.New("accounts.Buffer is not set")
+		}
 	}
 	return nil
 }
@@ -92,8 +108,9 @@ func (inst *Query) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=1]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("feed", inst.AccountMetaSlice[0]))
+					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("  feed", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("buffer", inst.AccountMetaSlice[1]))
 					})
 				})
 		})
@@ -104,13 +121,13 @@ func (obj Query) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	{
 		tmp := scopeContainer{}
 		switch realvalue := obj.Scope.(type) {
-		case *Version:
+		case *Version_:
 			tmp.Enum = 0
 			tmp.Version = *realvalue
-		case *Decimals:
+		case *Decimals_:
 			tmp.Enum = 1
 			tmp.Decimals = *realvalue
-		case *Description:
+		case *Description_:
 			tmp.Enum = 2
 			tmp.Description = *realvalue
 		case *RoundData:
@@ -140,11 +157,11 @@ func (obj *Query) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 		}
 		switch tmp.Enum {
 		case 0:
-			obj.Scope = (*Version)(&tmp.Enum)
+			obj.Scope = (*Version_)(&tmp.Enum)
 		case 1:
-			obj.Scope = (*Decimals)(&tmp.Enum)
+			obj.Scope = (*Decimals_)(&tmp.Enum)
 		case 2:
-			obj.Scope = (*Description)(&tmp.Enum)
+			obj.Scope = (*Description_)(&tmp.Enum)
 		case 3:
 			obj.Scope = &tmp.RoundData
 		case 4:
@@ -163,8 +180,10 @@ func NewQueryInstruction(
 	// Parameters:
 	scope Scope,
 	// Accounts:
-	feed ag_solanago.PublicKey) *Query {
+	feed ag_solanago.PublicKey,
+	buffer ag_solanago.PublicKey) *Query {
 	return NewQueryInstructionBuilder().
 		SetScope(scope).
-		SetFeedAccount(feed)
+		SetFeedAccount(feed).
+		SetBufferAccount(buffer)
 }
