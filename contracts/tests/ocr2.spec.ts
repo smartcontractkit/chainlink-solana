@@ -335,7 +335,7 @@ describe('ocr2', async () => {
     }
     oracles = await Promise.all(futures);
 
-    const offchain_config_version = 1;
+    const offchain_config_version = 2;
     const offchain_config = Buffer.from([4, 5, 6]);
 
     // Fund the owner with LINK tokens
