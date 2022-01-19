@@ -2,7 +2,9 @@ package solclient
 
 import (
 	"context"
+
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-solana/contracts/generated/store"
 	relaySol "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 )
@@ -14,8 +16,8 @@ type Store struct {
 	ProgramWallet *solana.Wallet
 }
 
-func (m *Store) GetLatestRoundData() (uint64, uint64, uint64, error) {
-	a, _, err := relaySol.GetLatestTransmission(context.Background(), m.Client.RPC, m.Feed.PublicKey())
+func (m *Store) GetLatestRoundData() (uint64, error) {
+	a, _, err := relaySol.GetLatestTransmission(context.Background(), m.Client.RPC, m.Feed.PublicKey(), rpc.CommitmentConfirmed)
 	if err != nil {
 		return 0, 0, 0, err
 	}
