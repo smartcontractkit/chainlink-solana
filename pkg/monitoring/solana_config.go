@@ -16,6 +16,23 @@ type SolanaConfig struct {
 	PollInterval time.Duration
 }
 
+var _ ChainConfig = SolanaConfig{}
+
+func (s SolanaConfig) GetRPCEndpoint() string         { return s.RPCEndpoint }
+func (s SolanaConfig) GetNetworkName() string         { return s.NetworkName }
+func (s SolanaConfig) GetNetworkID() string           { return s.NetworkID }
+func (s SolanaConfig) GetChainID() string             { return s.ChainID }
+func (s SolanaConfig) GetReadTimeout() time.Duration  { return s.ReadTimeout }
+func (s SolanaConfig) GetPollInterval() time.Duration { return s.PollInterval }
+
+func (s SolanaConfig) ToMapping() map[string]interface{} {
+	return map[string]interface{}{
+		"network_name": s.NetworkName,
+		"network_id":   s.NetworkID,
+		"chain_id":     s.ChainID,
+	}
+}
+
 func ParseSolanaConfig() (SolanaConfig, error) {
 	cfg := SolanaConfig{}
 

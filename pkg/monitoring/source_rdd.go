@@ -3,11 +3,8 @@ package monitoring
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 )
-
-type FeedParser func(buf io.ReadCloser) ([]FeedConfig, error)
 
 // rddSource produces a list of feeds to monitor.
 type rddSource struct {
@@ -42,19 +39,4 @@ func (r *rddSource) Fetch(ctx context.Context) (interface{}, error) {
 		return nil, fmt.Errorf("unable to parse RDD data into an array of feed configurations: %w", err)
 	}
 	return feeds, nil
-}
-
-// FeedConfig is the interface for feed configurations extracted from the RDD.
-type FeedConfig interface {
-	GetName() string
-	GetPath() string
-	GetSymbol() string
-	GetHeartbeatSec() int64
-	GetContractType() string
-	GetContractStatus() string
-	// This functions as a feed identifier.
-	GetContractAddress() string
-	GetContractAddressBytes() []byte
-	// Useful for mapping to kafka messages.
-	ToMapping() map[string]interface{}
 }

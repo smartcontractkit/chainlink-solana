@@ -56,7 +56,7 @@ func MakeConfigSetSimplifiedMapping(
 
 func MakeTransmissionMapping(
 	envelope TransmissionEnvelope,
-	solanaConfig SolanaConfig,
+	chainConfig ChainConfig,
 	feedConfig FeedConfig,
 ) (map[string]interface{}, error) {
 	data := []byte{}
@@ -72,12 +72,8 @@ func MakeTransmissionMapping(
 			"data":          data,
 			"timestamp":     envelope.LatestTimestamp.Unix(),
 		},
-		"solana_chain_config": map[string]interface{}{
-			"network_name": solanaConfig.NetworkName,
-			"network_id":   solanaConfig.NetworkID,
-			"chain_id":     solanaConfig.ChainID,
-		},
-		"feed_config": feedConfig.ToMapping(),
+		"solana_chain_config": chainConfig.ToMapping(),
+		"feed_config":         feedConfig.ToMapping(),
 	}
 	return out, nil
 }
