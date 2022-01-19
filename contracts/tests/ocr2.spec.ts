@@ -637,14 +637,14 @@ describe('ocr2', async () => {
     assert.ok(account.leftoverPayments.len == 0);
   });
 
+  const roundSchema = new Map([[Round, { kind: 'struct', fields: [
+    ['roundId', 'u32'],
+    // ['slot', 'u64'],
+    // ['timestamp', 'u32'],
+    ['timestamp', 'u64'],
+    ['answer', [16]], // i128
+  ]}]]);
   it('Can call query', async () => {
-    const roundSchema = new Map([[Round, { kind: 'struct', fields: [
-      ['roundId', 'u32'],
-      // ['slot', 'u64'],
-      // ['timestamp', 'u32'],
-      ['timestamp', 'u64'],
-      ['answer', [16]], // i128
-    ]}]]);
     let round = await query(transmissions.publicKey, Scope.LatestRoundData, roundSchema, Round);
     console.log(round);
 
@@ -665,29 +665,8 @@ describe('ocr2', async () => {
     for (let i = 3; i < 15; i++) {
       await transmit(i, i, new BN(i));
 
-      let buffer = Keypair.generate();
-      await workspace.Store.rpc.query(
-        Scope.LatestRoundData,
-        {
-          accounts: {
-            feed: transmissions.publicKey,
-            buffer: buffer.publicKey,
-          },
-          preInstructions: [
-            SystemProgram.createAccount({
-              fromPubkey: provider.wallet.publicKey,
-              newAccountPubkey: buffer.publicKey,
-              lamports: await provider.connection.getMinimumBalanceForRentExemption(256),
-              space: 256,
-              programId: workspace.Store.programId,
-            })
-          ],
-          signers: [buffer]
-        }
-      );
-
-      let account = await workspace.Store.account.round.fetch(buffer.publicKey);
-      assert.ok(account.answer.toNumber() == i)
+      let round = await query(transmissions.publicKey, Scope.LatestRoundData, roundSchema, Round);
+      assert.ok(new BN(round.answer, 10, 'le').toNumber() == i)
     }
   });
 
