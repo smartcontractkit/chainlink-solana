@@ -2,8 +2,8 @@ import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt, time, BN } from '@chainlink/gauntlet-core/dist/utils'
 import { Proto, sharedSecretEncryptions } from '@chainlink/gauntlet-core/dist/crypto'
 
-import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
-import { AccountMeta, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js'
+import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { PublicKey } from '@solana/web3.js'
 import { MAX_TRANSACTION_BYTES, ORACLES_MAX_LENGTH } from '../../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import { descriptor as OCR2Descriptor } from '../../../../lib/ocr2Proto'
@@ -192,7 +192,7 @@ export default class WriteOffchainConfig extends SolanaCommand {
     return true
   }
 
-  makeRawTransaction = async (signer: PublicKey) => {
+  execute = async () => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
@@ -222,60 +222,24 @@ export default class WriteOffchainConfig extends SolanaCommand {
     const startingPoint = new BN(this.flags.chunk || 0).toNumber()
     await prompt(`Start writing offchain config from ${startingPoint}/${offchainConfigChunks.length - 1}?`)
 
-    const txs: RawTransaction[] = []
+    const txs: string[] = []
     for (let i = startingPoint; i < offchainConfigChunks.length; i++) {
-      logger.loading(`Sending ${i + 1}/${offchainConfigChunks.length}...`)
-      const data = program.coder.instruction.encode('write_offchain_config', {
-        offchainConfig: offchainConfigChunks[i],
+      logger.loading(`Sending ${i}/${offchainConfigChunks.length - 1}...`)
+      const tx = await program.rpc.writeOffchainConfig(offchainConfigChunks[i], {
+        accounts: {
+          state: state,
+          authority: owner.publicKey,
+        },
       })
-
-      const accounts: AccountMeta[] = [
-        {
-          pubkey: state,
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          pubkey: signer,
-          isSigner: false,
-          isWritable: false,
-        },
-      ]
-
-      const rawTx: RawTransaction = {
-        data,
-        accounts,
-        programId: ocr2.programId,
-      }
-
-      txs.push(rawTx)
+      txs.push(tx)
     }
-    return txs
-  }
-
-  execute = async () => {
-    const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
-    const tx = rawTx.reduce(
-      (tx, meta) =>
-        tx.add(
-          new TransactionInstruction({
-            programId: meta.programId,
-            keys: meta.accounts,
-            data: meta.data,
-          }),
-        ),
-      new Transaction(),
-    )
-    logger.loading('Sending tx...')
-    logger.debug(tx)
-    const txhash = await this.provider.send(tx, [this.wallet.payer])
-    logger.success(`Offchain config was written on tx hash: ${txhash}`)
+    logger.success(`Last tx Write offchain config set on tx ${txs[txs.length - 1]}`)
 
     return {
       responses: [
         {
-          tx: this.wrapResponse(txhash, this.flags.state),
-          contract: this.flags.state,
+          tx: this.wrapResponse(txs[txs.length - 1], state.toString(), { state: state.toString() }),
+          contract: state.toString(),
         },
       ],
     } as Result<TransactionResponse>

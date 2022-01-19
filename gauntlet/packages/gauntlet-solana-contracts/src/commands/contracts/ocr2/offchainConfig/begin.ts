@@ -27,8 +27,6 @@ export default class BeginOffchainConfig extends SolanaCommand {
     const state = new PublicKey(this.flags.state)
     const version = new BN(2)
 
-    await prompt(`Begin setting Offchain config version ${version.toString()}?`)
-
     const data = program.coder.instruction.encode('begin_offchain_config', {
       offchainConfigVersion: version,
     })
@@ -56,6 +54,8 @@ export default class BeginOffchainConfig extends SolanaCommand {
   }
 
   execute = async () => {
+    const version = new BN(2)
+    await prompt(`Begin setting Offchain config version ${version.toString()}?`)
     const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
     const tx = rawTx.reduce(
       (tx, meta) =>
