@@ -133,7 +133,7 @@ export default class SetPayees extends SolanaCommand {
     const tx = await makeTx(rawTx)
     logger.loading('Sending tx...')
     const txhash = await parseContractErrors(this.provider.send(tx, [this.wallet.payer]), this.idl)
-    
+
     logger.success(`Payees set on tx hash: ${txhash}`)
     return {
       responses: [
