@@ -13,17 +13,27 @@ import (
 var transmissionAvroSchema = avro.Record("transmission", avro.Opts{Namespace: "link.chain.ocr2"}, avro.Fields{
 	avro.Field("block_number", avro.Opts{Doc: "uint64 big endian"}, avro.Bytes),
 	avro.Field("answer", avro.Opts{}, avro.Record("answer", avro.Opts{}, avro.Fields{
-		avro.Field("config_digest", avro.Opts{Doc: "[32]byte encoded as base64"}, avro.String),
-		avro.Field("epoch", avro.Opts{Doc: "uint32"}, avro.Long),
-		avro.Field("round", avro.Opts{Doc: "uint8"}, avro.Int),
 		avro.Field("data", avro.Opts{Doc: "*big.avro.Int"}, avro.Bytes),
 		avro.Field("timestamp", avro.Opts{Doc: "uint32"}, avro.Long),
+		// These fields are made "optional" for backwards compatibility, but they should be set in all cases.
+		avro.Field("config_digest", avro.Opts{Doc: "[32]byte encoded as base64"}, avro.Union{avro.String, avro.Null}),
+		avro.Field("epoch", avro.Opts{Doc: "uint32"}, avro.Union{avro.Long, avro.Null}),
+		avro.Field("round", avro.Opts{Doc: "uint8"}, avro.Union{avro.Int, avro.Null}),
 	})),
-	avro.Field("solana_chain_config", avro.Opts{}, avro.Record("solana_chain_config", avro.Opts{}, avro.Fields{
+	// Deprecated in favour of chain_config.
+	avro.Field("solana_chain_config", avro.Opts{Doc: "deprecated in favour of chain_config"}, avro.Record("solana_chain_config", avro.Opts{}, avro.Fields{
 		avro.Field("network_name", avro.Opts{}, avro.String),
 		avro.Field("network_id", avro.Opts{}, avro.String),
 		avro.Field("chain_id", avro.Opts{}, avro.String),
 	})),
+	avro.Field("chain_config", avro.Opts{}, avro.Union{
+		avro.Record("chain_config", avro.Opts{}, avro.Fields{
+			avro.Field("network_name", avro.Opts{}, avro.String),
+			avro.Field("network_id", avro.Opts{}, avro.String),
+			avro.Field("chain_id", avro.Opts{}, avro.String),
+		}),
+		avro.Null,
+	}),
 	avro.Field("feed_config", avro.Opts{}, avro.Record("feed_config", avro.Opts{}, avro.Fields{
 		avro.Field("feed_name", avro.Opts{}, avro.String),
 		avro.Field("feed_path", avro.Opts{}, avro.String),
@@ -49,8 +59,8 @@ var configSetSimplifiedAvroSchema = avro.Record("config_set_simplified", avro.Op
 	avro.Field("delta_grace", avro.Opts{Doc: "uint64 big endian"}, avro.Bytes),
 	avro.Field("delta_stage", avro.Opts{Doc: "uint64 big endian"}, avro.Bytes),
 	avro.Field("r_max", avro.Opts{Doc: "uint32"}, avro.Long),
-	avro.Field("s", avro.Opts{Doc: "json encoded []int"}, avro.String),
-	avro.Field("oracles", avro.Opts{Doc: "json encoded list of oracles' "}, avro.String),
+	avro.Field("s", avro.Opts{Doc: "json encoded aray of ints"}, avro.String),
+	avro.Field("oracles", avro.Opts{Doc: "json encoded list of oracles"}, avro.String),
 	avro.Field("feed_state_account", avro.Opts{Doc: "[32]byte"}, avro.String),
 })
 
