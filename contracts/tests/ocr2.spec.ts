@@ -72,7 +72,7 @@ describe('ocr2', async () => {
   let tokenVault: PublicKey, vaultAuthority: PublicKey, vaultNonce: number;
 
   let oracles = [];
-  const f = 2;
+  const f = 6;
   // NOTE: 17 is the most we can fit into one setConfig if we use a different payer
   // if the owner == payer then we can fit 19
   const n = 19; // min: 3 * f + 1;
