@@ -10,11 +10,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/singleflight"
 )
 
 var mockTransmission = []byte{
@@ -146,4 +149,21 @@ func TestGetLatestTransmission(t *testing.T) {
 	// fail if returned transmission is too short
 	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
 	assert.ErrorIs(t, err, errTransmissionLength)
+}
+
+func TestStatePolling(t *testing.T) {
+	tracker := ContractTracker{
+		// ProgramID:       spec.ProgramID,
+		// StateID:         spec.StateID,
+		// StoreProgramID:  spec.StoreProgramID,
+		// TransmissionsID: spec.TransmissionsID,
+		client:       NewClient(rpc.LocalNet_RPC, true, ""),
+		lggr:         logger.TestLogger(t),
+		requestGroup: &singleflight.Group{},
+	}
+	require.NoError(t, tracker.Start())
+
+	time.Sleep(10 * time.Second)
+	require.NoError(t, tracker.Close())
+	assert.Equal(t, uint64(10), tracker.answer.Timestamp)
 }

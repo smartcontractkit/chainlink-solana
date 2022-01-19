@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"time"
 
 	"golang.org/x/sync/singleflight"
 
@@ -45,6 +46,9 @@ type ContractTracker struct {
 
 	// provides a duplicate function call suppression mechanism
 	requestGroup *singleflight.Group
+
+	// polling
+	done chan struct{}
 }
 
 func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, lggr Logger) ContractTracker {
@@ -58,6 +62,41 @@ func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, l
 		lggr:            lggr,
 		requestGroup:    &singleflight.Group{},
 	}
+}
+
+func (c *ContractTracker) Start() error {
+	c.done = make(chan struct{})
+	go c.PollState()
+	return nil
+}
+
+func (c *ContractTracker) PollState() {
+	duration := time.Second
+	ticker := time.NewTicker(duration)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-c.done:
+			return
+		case <-ticker.C:
+			ctx, _ := context.WithTimeout(context.Background(), duration)
+			go func(){
+				if err := c.fetchState(ctx); err != nil {
+					c.lggr.Errorf("error in PollState.fetchState %s", err)
+				}
+			}()
+			go func(){
+				if err := c.fetchLatestTransmission(ctx); err != nil {
+					c.lggr.Errorf("error in PollState.fetchLatestTransmission %s", err)
+				}
+			}()
+		}
+	}
+}
+
+func (c *ContractTracker) Close() error {
+	close(c.done)
+	return nil
 }
 
 // fetch + decode + store raw state
