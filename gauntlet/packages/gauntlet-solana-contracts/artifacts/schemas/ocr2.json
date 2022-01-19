@@ -962,18 +962,45 @@
       "name": "SetConfig",
       "fields": [
         {
-          "name": "previousConfigBlockNumber",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "latestConfigDigest",
+          "name": "configDigest",
           "type": {
             "array": [
               "u8",
               32
             ]
           },
+          "index": false
+        },
+        {
+          "name": "f",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "signers",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                20
+              ]
+            }
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "SetBilling",
+      "fields": [
+        {
+          "name": "observationPaymentGjuels",
+          "type": "u32",
+          "index": false
+        },
+        {
+          "name": "transmissionPaymentGjuels",
+          "type": "u32",
           "index": false
         }
       ]
@@ -982,9 +1009,39 @@
       "name": "RoundRequested",
       "fields": [
         {
+          "name": "configDigest",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        },
+        {
           "name": "requester",
           "type": "publicKey",
           "index": false
+        },
+        {
+          "name": "epoch",
+          "type": "u32",
+          "index": false
+        },
+        {
+          "name": "round",
+          "type": "u8",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "NewTransmission",
+      "fields": [
+        {
+          "name": "roundId",
+          "type": "u32",
+          "index": true
         },
         {
           "name": "configDigest",
@@ -997,13 +1054,38 @@
           "index": false
         },
         {
-          "name": "round",
+          "name": "answer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "transmitter",
           "type": "u8",
           "index": false
         },
         {
-          "name": "epoch",
+          "name": "observationsTimestamp",
           "type": "u32",
+          "index": false
+        },
+        {
+          "name": "observers",
+          "type": {
+            "array": [
+              "u8",
+              19
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "juelsPerLamport",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "reimbursement",
+          "type": "u64",
           "index": false
         }
       ]
