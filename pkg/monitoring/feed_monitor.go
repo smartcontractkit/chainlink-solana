@@ -42,6 +42,9 @@ func (f *feedMonitor) Start(ctx context.Context, wg *sync.WaitGroup) {
 		case answerRaw := <-f.transmissionPoller.Updates():
 			update = answerRaw
 		case <-ctx.Done():
+			for _, exp := range f.exporters {
+				exp.Cleanup()
+			}
 			return
 		}
 		wg.Add(len(f.exporters))
