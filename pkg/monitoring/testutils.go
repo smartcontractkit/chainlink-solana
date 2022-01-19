@@ -46,25 +46,23 @@ func (f *fakeRddSource) Fetch(_ context.Context) (interface{}, error) {
 
 func NewRandomDataSourceFactory(ctx context.Context, wg *sync.WaitGroup, log logger.Logger) *fakeRandomDataSourceFactory {
 	f := &fakeRandomDataSourceFactory{
-		make(chan TransmissionEnvelope),
-		make(chan ConfigEnvelope),
+		make(chan Envelope),
+		ctx,
 	}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		config, err := generateConfigEnvelope()
+		update, err := generateEnvelope()
 		if err != nil {
-			log.Errorw("failed to generate state", "error", err)
+			log.Errorw("failed to generate fake read from chain", "error", err)
 		}
 		for {
 			select {
-			case f.transmissions <- generateTransmissionEnvelope():
-				log.Infof("generate transmission")
-			case f.configs <- config:
-				log.Infof("generate config")
-				config, err = generateConfigEnvelope()
+			case f.updates <- update:
+				log.Infof("generate envelope")
+				update, err = generateEnvelope()
 				if err != nil {
-					log.Errorw("failed to generate state", "error", err)
+					log.Errorw("failed to generate fake read from chain", "error", err)
 				}
 			case <-ctx.Done():
 				return
@@ -74,41 +72,29 @@ func NewRandomDataSourceFactory(ctx context.Context, wg *sync.WaitGroup, log log
 	return f
 }
 
+var _ SourceFactory = (*fakeRandomDataSourceFactory)(nil)
+
 type fakeRandomDataSourceFactory struct {
-	transmissions chan TransmissionEnvelope
-	configs       chan ConfigEnvelope
+	updates chan Envelope
+	ctx     context.Context
 }
 
-func (f *fakeRandomDataSourceFactory) NewSources(chainConfig ChainConfig, feedConfig FeedConfig) (Sources, error) {
-	return &fakeSources{f}, nil
+func (f *fakeRandomDataSourceFactory) NewSource(chainConfig ChainConfig, feedConfig FeedConfig) (Source, error) {
+	return &fakeSource{f}, nil
 }
 
-type fakeSources struct {
+type fakeSource struct {
 	factory *fakeRandomDataSourceFactory
 }
 
-func (f *fakeSources) NewTransmissionsSource() Source {
-	return &fakeTransmissionSource{f.factory}
-}
-
-func (f *fakeSources) NewConfigSource() Source {
-	return &fakeConfigSource{f.factory}
-}
-
-type fakeTransmissionSource struct {
-	factory *fakeRandomDataSourceFactory
-}
-
-func (f *fakeTransmissionSource) Fetch(ctx context.Context) (interface{}, error) {
-	return <-f.factory.transmissions, nil
-}
-
-type fakeConfigSource struct {
-	factory *fakeRandomDataSourceFactory
-}
-
-func (f *fakeConfigSource) Fetch(ctx context.Context) (interface{}, error) {
-	return <-f.factory.configs, nil
+func (f *fakeSource) Fetch(ctx context.Context) (interface{}, error) {
+	var update Envelope
+	select {
+	case update = <-f.factory.updates:
+		return update, nil
+	case <-f.factory.ctx.Done():
+		return nil, fmt.Errorf("source closed")
+	}
 }
 
 // Generators
@@ -258,21 +244,25 @@ func generateContractConfig(n int) (
 	return contractConfig, onchainConfig, offchainConfig, pluginOffchainConfig, nil
 }
 
-func generateConfigEnvelope() (ConfigEnvelope, error) {
+func generateEnvelope() (Envelope, error) {
 	generated, _, _, _, err := generateContractConfig(31)
-	return ConfigEnvelope{
-		ContractConfig: generated,
-	}, err
-}
-
-func generateTransmissionEnvelope() TransmissionEnvelope {
-	return TransmissionEnvelope{
-		ConfigDigest:    generate32ByteArr(),
+	if err != nil {
+		return Envelope{}, err
+	}
+	return Envelope{
+		ConfigDigest:    generated.ConfigDigest,
 		Round:           uint8(rand.Intn(256)),
 		Epoch:           rand.Uint32(),
 		LatestAnswer:    big.NewInt(rand.Int63()),
 		LatestTimestamp: time.Now(),
-	}
+
+		ContractConfig: generated,
+
+		BlockNumber: rand.Uint64(),
+		Transmitter: types.Account(hexutil.Encode([]byte{
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, uint8(rand.Intn(32)),
+		})),
+	}, nil
 }
 
 type fakeChainConfig struct {

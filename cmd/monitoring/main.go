@@ -35,10 +35,6 @@ func main() {
 	if err != nil {
 		log.Fatalw("failed to prepare transmission schema", "error", err)
 	}
-	configSetSchema, err := schemaRegistry.EnsureSchema(cfg.Kafka.ConfigSetTopic+"-value", monitoring.ConfigSetAvroSchema)
-	if err != nil {
-		log.Fatalf("failed to prepare config_set schema", "error", err)
-	}
 	configSetSimplifiedSchema, err := schemaRegistry.EnsureSchema(cfg.Kafka.ConfigSetSimplifiedTopic+"-value", monitoring.ConfigSetSimplifiedAvroSchema)
 	if err != nil {
 		log.Fatalf("failed to prepare config_set_simplified schema", "error", err)
@@ -64,13 +60,11 @@ func main() {
 		producer,
 		metrics,
 
-		cfg.Kafka.ConfigSetTopic,
 		cfg.Kafka.ConfigSetSimplifiedTopic,
 		cfg.Kafka.TransmissionTopic,
 
-		configSetSchema,
-		configSetSimplifiedSchema,
 		transmissionSchema,
+		configSetSimplifiedSchema,
 	)
 
 	source := monitoring.NewRDDSource(cfg.Feeds.URL, monitoring.SolanaFeedParser)

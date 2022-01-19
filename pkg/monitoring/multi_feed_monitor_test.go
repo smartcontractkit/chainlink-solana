@@ -27,16 +27,11 @@ func TestMultiFeedMonitorToMakeSureAllGoroutinesTerminate(t *testing.T) {
 		feeds = append(feeds, generateFeedConfig())
 	}
 
-	configSetSchema := fakeSchema{configSetCodec}
-	configSetSimplifiedSchema := fakeSchema{configSetSimplifiedCodec}
 	transmissionSchema := fakeSchema{transmissionCodec}
+	configSetSimplifiedSchema := fakeSchema{configSetSimplifiedCodec}
 
 	producer := fakeProducer{make(chan producerMessage), ctx}
-
-	factory := &fakeRandomDataSourceFactory{
-		make(chan TransmissionEnvelope),
-		make(chan ConfigEnvelope),
-	}
+	factory := &fakeRandomDataSourceFactory{make(chan Envelope), ctx}
 
 	monitor := NewMultiFeedMonitor(
 		solanaCfg,
@@ -46,31 +41,33 @@ func TestMultiFeedMonitorToMakeSureAllGoroutinesTerminate(t *testing.T) {
 		producer,
 		&devnullMetrics{},
 
-		cfg.Kafka.ConfigSetTopic,
-		cfg.Kafka.ConfigSetSimplifiedTopic,
 		cfg.Kafka.TransmissionTopic,
+		cfg.Kafka.ConfigSetSimplifiedTopic,
 
-		configSetSchema,
-		configSetSimplifiedSchema,
 		transmissionSchema,
+		configSetSimplifiedSchema,
 	)
 	go monitor.Start(ctx, wg, feeds)
 
-	trCount, cfgCount := 0, 0
+	count := 0
 	messages := []producerMessage{}
 
-	configEnvelope, err := generateConfigEnvelope()
+	envelope, err := generateEnvelope()
 	require.NoError(t, err)
 
 LOOP:
 	for {
 		select {
-		case factory.transmissions <- generateTransmissionEnvelope():
-			trCount += 1
-		case factory.configs <- configEnvelope:
-			cfgCount += 1
-			configEnvelope, err = generateConfigEnvelope()
+		case factory.updates <- envelope:
+			count += 1
+			envelope, err = generateEnvelope()
 			require.NoError(t, err)
+		case <-ctx.Done():
+			break LOOP
+		}
+		select {
+		case message := <-producer.sendCh:
+			messages = append(messages, message)
 		case <-ctx.Done():
 			break LOOP
 		}
@@ -83,8 +80,7 @@ LOOP:
 	}
 
 	wg.Wait()
-	require.Equal(t, 10, trCount, "should only be able to do initial read of the latest transmission")
-	require.Equal(t, 10, cfgCount, "should only be able to do initial read of the state account")
+	require.Equal(t, 10, count, "should only be able to do initial read of the chain")
 	require.Equal(t, 20, len(messages))
 }
 
@@ -102,16 +98,11 @@ func TestMultiFeedMonitorForPerformance(t *testing.T) {
 		feeds = append(feeds, generateFeedConfig())
 	}
 
-	configSetSchema := fakeSchema{configSetCodec}
-	configSetSimplifiedSchema := fakeSchema{configSetSimplifiedCodec}
 	transmissionSchema := fakeSchema{transmissionCodec}
+	configSetSimplifiedSchema := fakeSchema{configSetSimplifiedCodec}
 
 	producer := fakeProducer{make(chan producerMessage), ctx}
-
-	factory := &fakeRandomDataSourceFactory{
-		make(chan TransmissionEnvelope),
-		make(chan ConfigEnvelope),
-	}
+	factory := &fakeRandomDataSourceFactory{make(chan Envelope), ctx}
 
 	monitor := NewMultiFeedMonitor(
 		chainCfg,
@@ -121,20 +112,18 @@ func TestMultiFeedMonitorForPerformance(t *testing.T) {
 		producer,
 		&devnullMetrics{},
 
-		cfg.Kafka.ConfigSetTopic,
-		cfg.Kafka.ConfigSetSimplifiedTopic,
 		cfg.Kafka.TransmissionTopic,
+		cfg.Kafka.ConfigSetSimplifiedTopic,
 
-		configSetSchema,
-		configSetSimplifiedSchema,
 		transmissionSchema,
+		configSetSimplifiedSchema,
 	)
 	go monitor.Start(ctx, wg, feeds)
 
-	var trCount, cfgCount int64 = 0, 0
+	var count int64 = 0
 	messages := []producerMessage{}
 
-	configEnvelope, err := generateConfigEnvelope()
+	envelope, err := generateEnvelope()
 	require.NoError(t, err)
 
 	wg.Add(1)
@@ -143,11 +132,9 @@ func TestMultiFeedMonitorForPerformance(t *testing.T) {
 	LOOP:
 		for {
 			select {
-			case factory.transmissions <- generateTransmissionEnvelope():
-				trCount += 1
-			case factory.configs <- configEnvelope:
-				cfgCount += 1
-				configEnvelope, err = generateConfigEnvelope()
+			case factory.updates <- envelope:
+				count += 1
+				envelope, err = generateEnvelope()
 				require.NoError(t, err)
 			case <-ctx.Done():
 				break LOOP
@@ -169,7 +156,6 @@ func TestMultiFeedMonitorForPerformance(t *testing.T) {
 	}()
 
 	wg.Wait()
-	require.Equal(t, int64(10), trCount, "should only be able to do initial read of the latest transmission")
-	require.Equal(t, int64(10), cfgCount, "should only be able to do initial read of the state account")
+	require.Equal(t, int64(10), count, "should only be able to do initial reads of the chain")
 	require.Equal(t, 20, len(messages))
 }

@@ -19,13 +19,11 @@ func NewMultiFeedMonitor(
 	producer Producer,
 	metrics Metrics,
 
-	configSetTopic string,
-	configSetSimplifiedTopic string,
 	transmissionTopic string,
+	configSetSimplifiedTopic string,
 
-	configSetSchema Schema,
-	configSetSimplifiedSchema Schema,
 	transmissionSchema Schema,
+	configSetSimplifiedSchema Schema,
 ) MultiFeedMonitor {
 	return &multiFeedMonitor{
 		chainConfig,
@@ -35,13 +33,11 @@ func NewMultiFeedMonitor(
 		producer,
 		metrics,
 
-		configSetTopic,
-		configSetSimplifiedTopic,
 		transmissionTopic,
+		configSetSimplifiedTopic,
 
-		configSetSchema,
-		configSetSimplifiedSchema,
 		transmissionSchema,
+		configSetSimplifiedSchema,
 	}
 }
 
@@ -53,13 +49,11 @@ type multiFeedMonitor struct {
 	producer      Producer
 	metrics       Metrics
 
-	configSetTopic           string
-	configSetSimplifiedTopic string
 	transmissionTopic        string
+	configSetSimplifiedTopic string
 
-	configSetSchema           Schema
-	configSetSimplifiedSchema Schema
 	transmissionSchema        Schema
+	configSetSimplifiedSchema Schema
 }
 
 const bufferCapacity = 100
@@ -75,36 +69,23 @@ func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup, feeds 
 				"feed", feedConfig.GetName(),
 				"network", m.chainConfig.GetNetworkName(),
 			)
-
-			sources, err := m.sourceFactory.NewSources(m.chainConfig, feedConfig)
+			source, err := m.sourceFactory.NewSource(m.chainConfig, feedConfig)
 			if err != nil {
-				feedLogger.Errorw("failed to create new sources", "error", err)
+				feedLogger.Errorw("failed to create new source", "error", err)
 				return
 			}
-
-			transmissionPoller := NewSourcePoller(
-				sources.NewTransmissionsSource(),
-				feedLogger.With("component", "transmissions-poller"),
-				m.chainConfig.GetPollInterval(),
-				m.chainConfig.GetReadTimeout(),
-				bufferCapacity,
-			)
-			statePoller := NewSourcePoller(
-				sources.NewConfigSource(),
-				feedLogger.With("component", "config-poller"),
+			poller := NewSourcePoller(
+				source,
+				feedLogger.With("component", "chain-poller"),
 				m.chainConfig.GetPollInterval(),
 				m.chainConfig.GetReadTimeout(),
 				bufferCapacity,
 			)
 
-			wg.Add(2)
+			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				transmissionPoller.Start(ctx)
-			}()
-			go func() {
-				defer wg.Done()
-				statePoller.Start(ctx)
+				poller.Start(ctx)
 			}()
 
 			exporters := []Exporter{
@@ -120,19 +101,17 @@ func (m *multiFeedMonitor) Start(ctx context.Context, wg *sync.WaitGroup, feeds 
 					feedLogger.With("component", "kafka-exporter"),
 					m.producer,
 
-					m.configSetSchema,
-					m.configSetSimplifiedSchema,
 					m.transmissionSchema,
+					m.configSetSimplifiedSchema,
 
-					m.configSetTopic,
-					m.configSetSimplifiedTopic,
 					m.transmissionTopic,
+					m.configSetSimplifiedTopic,
 				),
 			}
 
 			feedMonitor := NewFeedMonitor(
 				feedLogger.With("component", "feed-monitor"),
-				transmissionPoller, statePoller,
+				poller,
 				exporters,
 			)
 			feedMonitor.Start(ctx, wg)

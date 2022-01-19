@@ -60,6 +60,101 @@ type prometheusExporter struct {
 	labelsMu sync.Mutex
 }
 
+func (p *prometheusExporter) Export(ctx context.Context, data interface{}) {
+	envelope, ok := data.(Envelope)
+	if !ok {
+		p.log.Errorf("unexpected type %T for export", data)
+		return
+	}
+	p.updateLabels(prometheusLabels{
+		oracleName: string(envelope.Transmitter),
+		sender:     string(envelope.Transmitter),
+	})
+	p.metrics.SetNodeMetadata(
+		p.chainConfig.GetChainID(),
+		p.chainConfig.GetNetworkID(),
+		p.chainConfig.GetNetworkName(),
+		string(envelope.Transmitter), // oracleName
+		string(envelope.Transmitter), // sender
+	)
+	p.metrics.SetHeadTrackerCurrentHead(
+		envelope.BlockNumber,
+		p.chainConfig.GetNetworkName(),
+		p.chainConfig.GetChainID(),
+		p.chainConfig.GetNetworkID(),
+	)
+	p.metrics.SetOffchainAggregatorAnswers(
+		envelope.LatestAnswer,
+		p.feedConfig.GetContractAddress(),
+		p.feedConfig.GetContractAddress(),
+		p.chainConfig.GetChainID(),
+		p.feedConfig.GetContractStatus(),
+		p.feedConfig.GetContractType(),
+		p.feedConfig.GetName(),
+		p.feedConfig.GetPath(),
+		p.chainConfig.GetNetworkID(),
+		p.chainConfig.GetNetworkName(),
+	)
+	p.metrics.IncOffchainAggregatorAnswersTotal(
+		p.feedConfig.GetContractAddress(),
+		p.feedConfig.GetContractAddress(),
+		p.chainConfig.GetChainID(),
+		p.feedConfig.GetContractStatus(),
+		p.feedConfig.GetContractType(),
+		p.feedConfig.GetName(),
+		p.feedConfig.GetPath(),
+		p.chainConfig.GetNetworkID(),
+		p.chainConfig.GetNetworkName(),
+	)
+	isLateAnswer := time.Since(envelope.LatestTimestamp).Seconds() > float64(p.feedConfig.GetHeartbeatSec())
+	p.metrics.SetOffchainAggregatorAnswerStalled(
+		isLateAnswer,
+		p.feedConfig.GetContractAddress(),
+		p.feedConfig.GetContractAddress(),
+		p.chainConfig.GetChainID(),
+		p.feedConfig.GetContractStatus(),
+		p.feedConfig.GetContractType(),
+		p.feedConfig.GetName(),
+		p.feedConfig.GetPath(),
+		p.chainConfig.GetNetworkID(),
+		p.chainConfig.GetNetworkName(),
+	)
+	p.metrics.SetOffchainAggregatorSubmissionReceivedValues(
+		envelope.LatestAnswer,
+		p.feedConfig.GetContractAddress(),
+		p.feedConfig.GetContractAddress(),
+		string(envelope.Transmitter),
+		p.chainConfig.GetChainID(),
+		p.feedConfig.GetContractStatus(),
+		p.feedConfig.GetContractType(),
+		p.feedConfig.GetName(),
+		p.feedConfig.GetPath(),
+		p.chainConfig.GetNetworkID(),
+		p.chainConfig.GetNetworkName(),
+	)
+}
+
+func (p *prometheusExporter) Cleanup() {
+	p.labelsMu.Lock()
+	defer p.labelsMu.Unlock()
+	p.metrics.Cleanup(
+		p.labels.networkName,
+		p.labels.networkID,
+		p.labels.chainID,
+		p.labels.oracleName,
+		p.labels.sender,
+		p.labels.feedName,
+		p.labels.feedPath,
+		p.labels.symbol,
+		p.labels.contractType,
+		p.labels.contractStatus,
+		p.labels.contractAddress,
+		p.labels.feedID,
+	)
+}
+
+// Labels
+
 type prometheusLabels struct {
 	networkName     string
 	networkID       string
@@ -114,99 +209,4 @@ func (p *prometheusExporter) updateLabels(newLabels prometheusLabels) {
 	if newLabels.feedID != "" {
 		p.labels.feedID = newLabels.feedID
 	}
-}
-
-func (p *prometheusExporter) Export(ctx context.Context, data interface{}) {
-	switch typed := data.(type) {
-	case ConfigEnvelope:
-		p.metrics.SetNodeMetadata(
-			p.chainConfig.GetChainID(),
-			p.chainConfig.GetNetworkID(),
-			p.chainConfig.GetNetworkName(),
-			"n/a", // oracleName
-			"n/a", // sender
-		)
-		p.updateLabels(prometheusLabels{
-			oracleName: "n/a",
-			sender:     "n/a",
-		})
-	case TransmissionEnvelope:
-		p.metrics.SetHeadTrackerCurrentHead(
-			0, // block number
-			p.chainConfig.GetNetworkName(),
-			p.chainConfig.GetChainID(),
-			p.chainConfig.GetNetworkID(),
-		)
-		p.metrics.SetOffchainAggregatorAnswers(
-			typed.LatestAnswer,
-			p.feedConfig.GetContractAddress(),
-			p.feedConfig.GetContractAddress(),
-			p.chainConfig.GetChainID(),
-			p.feedConfig.GetContractStatus(),
-			p.feedConfig.GetContractType(),
-			p.feedConfig.GetName(),
-			p.feedConfig.GetPath(),
-			p.chainConfig.GetNetworkID(),
-			p.chainConfig.GetNetworkName(),
-		)
-		p.metrics.IncOffchainAggregatorAnswersTotal(
-			p.feedConfig.GetContractAddress(),
-			p.feedConfig.GetContractAddress(),
-			p.chainConfig.GetChainID(),
-			p.feedConfig.GetContractStatus(),
-			p.feedConfig.GetContractType(),
-			p.feedConfig.GetName(),
-			p.feedConfig.GetPath(),
-			p.chainConfig.GetNetworkID(),
-			p.chainConfig.GetNetworkName(),
-		)
-
-		isLateAnswer := time.Since(typed.LatestTimestamp).Seconds() > float64(p.feedConfig.GetHeartbeatSec())
-		p.metrics.SetOffchainAggregatorAnswerStalled(
-			isLateAnswer,
-			p.feedConfig.GetContractAddress(),
-			p.feedConfig.GetContractAddress(),
-			p.chainConfig.GetChainID(),
-			p.feedConfig.GetContractStatus(),
-			p.feedConfig.GetContractType(),
-			p.feedConfig.GetName(),
-			p.feedConfig.GetPath(),
-			p.chainConfig.GetNetworkID(),
-			p.chainConfig.GetNetworkName(),
-		)
-		p.metrics.SetOffchainAggregatorSubmissionReceivedValues(
-			typed.LatestAnswer,
-			p.feedConfig.GetContractAddress(),
-			p.feedConfig.GetContractAddress(),
-			"n/a", // sender
-			p.chainConfig.GetChainID(),
-			p.feedConfig.GetContractStatus(),
-			p.feedConfig.GetContractType(),
-			p.feedConfig.GetName(),
-			p.feedConfig.GetPath(),
-			p.chainConfig.GetNetworkID(),
-			p.chainConfig.GetNetworkName(),
-		)
-	default:
-		p.log.Errorf("unexpected type %T for export", data)
-	}
-}
-
-func (p *prometheusExporter) Cleanup() {
-	p.labelsMu.Lock()
-	defer p.labelsMu.Unlock()
-	p.metrics.Cleanup(
-		p.labels.networkName,
-		p.labels.networkID,
-		p.labels.chainID,
-		p.labels.oracleName,
-		p.labels.sender,
-		p.labels.feedName,
-		p.labels.feedPath,
-		p.labels.symbol,
-		p.labels.contractType,
-		p.labels.contractStatus,
-		p.labels.contractAddress,
-		p.labels.feedID,
-	)
 }

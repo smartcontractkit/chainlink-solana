@@ -24,7 +24,6 @@ type Kafka struct {
 	SaslPassword  string
 
 	TransmissionTopic        string
-	ConfigSetTopic           string
 	ConfigSetSimplifiedTopic string
 }
 

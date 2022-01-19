@@ -9,15 +9,20 @@ import (
 )
 
 func TestMapping(t *testing.T) {
+	config, _, offchainConfig, _, err := generateContractConfig(31)
+	require.NoError(t, err)
+	envelope, err := generateEnvelope()
+	require.NoError(t, err)
+	envelope.ConfigDigest = config.ConfigDigest
+	envelope.ContractConfig = config
+
+	chainConfig := generateChainConfig()
+	feedConfig := generateFeedConfig()
+
 	t.Run("MakeSimplifiedConfigSetMapping", func(t *testing.T) {
-		config, _, offchainConfig, _, err := generateContractConfig(31)
-		require.NoError(t, err)
-		envelope := ConfigEnvelope{config}
-
-		feedConfig := generateFeedConfig()
-
 		mapping, err := MakeConfigSetSimplifiedMapping(envelope, feedConfig)
 		require.NoError(t, err)
+
 		var output []byte
 		serialized, err := configSetSimplifiedCodec.BinaryFromNative(output, mapping)
 		require.NoError(t, err)
@@ -30,8 +35,8 @@ func TestMapping(t *testing.T) {
 		oracles, err := createConfigSetSimplifiedOracles(offchainConfig.OffchainPublicKeys, offchainConfig.PeerIds, config.Transmitters)
 		require.NoError(t, err)
 
-		require.Equal(t, configSetSimplified["config_digest"], base64.StdEncoding.EncodeToString(envelope.ContractConfig.ConfigDigest[:]))
-		require.Equal(t, configSetSimplified["block_number"], []byte{})
+		require.Equal(t, configSetSimplified["config_digest"], base64.StdEncoding.EncodeToString(envelope.ConfigDigest[:]))
+		require.Equal(t, configSetSimplified["block_number"], uint64ToBeBytes(envelope.BlockNumber))
 		require.Equal(t, configSetSimplified["delta_progress"], uint64ToBeBytes(offchainConfig.DeltaProgressNanoseconds))
 		require.Equal(t, configSetSimplified["delta_resend"], uint64ToBeBytes(offchainConfig.DeltaResendNanoseconds))
 		require.Equal(t, configSetSimplified["delta_round"], uint64ToBeBytes(offchainConfig.DeltaRoundNanoseconds))
@@ -47,11 +52,7 @@ func TestMapping(t *testing.T) {
 	})
 
 	t.Run("MakeTransmissionMapping", func(t *testing.T) {
-		initial := generateTransmissionEnvelope()
-		chainConfig := generateChainConfig()
-		feedConfig := generateFeedConfig()
-
-		mapping, err := MakeTransmissionMapping(initial, chainConfig, feedConfig)
+		mapping, err := MakeTransmissionMapping(envelope, chainConfig, feedConfig)
 		require.NoError(t, err)
 		output := []byte{}
 		serialized, err := transmissionCodec.BinaryFromNative(output, mapping)
@@ -65,8 +66,8 @@ func TestMapping(t *testing.T) {
 
 		answer, ok := transmission["answer"].(map[string]interface{})
 		require.True(t, ok)
-		require.Equal(t, answer["data"], initial.LatestAnswer.Bytes())
-		require.Equal(t, answer["timestamp"].(int64), initial.LatestTimestamp.Unix())
+		require.Equal(t, answer["data"], envelope.LatestAnswer.Bytes())
+		require.Equal(t, answer["timestamp"].(int64), envelope.LatestTimestamp.Unix())
 
 		solanaChainConfig, ok := transmission["solana_chain_config"].(map[string]interface{})
 		require.True(t, ok)

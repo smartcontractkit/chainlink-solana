@@ -25,7 +25,7 @@ import (
 // (17 Jan 2022)
 //    7374	    202079 ns/op	  164301 B/op	    1712 allocs/op
 
-func BenchmarkMultichainMonitorStatePath(b *testing.B) {
+func BenchmarkMultichainMonitor(b *testing.B) {
 	wg := &sync.WaitGroup{}
 	defer wg.Wait()
 
@@ -37,15 +37,10 @@ func BenchmarkMultichainMonitorStatePath(b *testing.B) {
 	feeds := []FeedConfig{generateFeedConfig()}
 
 	transmissionSchema := fakeSchema{transmissionCodec}
-	configSetSchema := fakeSchema{configSetCodec}
-	configSetSimplifiedSchema := fakeSchema{configSetCodec}
+	configSetSimplifiedSchema := fakeSchema{configSetSimplifiedCodec}
 
 	producer := fakeProducer{make(chan producerMessage), ctx}
-
-	factory := &fakeRandomDataSourceFactory{
-		make(chan TransmissionEnvelope),
-		make(chan ConfigEnvelope),
-	}
+	factory := &fakeRandomDataSourceFactory{make(chan Envelope), ctx}
 
 	monitor := NewMultiFeedMonitor(
 		chainCfg,
@@ -55,17 +50,15 @@ func BenchmarkMultichainMonitorStatePath(b *testing.B) {
 		producer,
 		&devnullMetrics{},
 
-		cfg.Kafka.ConfigSetTopic,
-		cfg.Kafka.ConfigSetSimplifiedTopic,
 		cfg.Kafka.TransmissionTopic,
+		cfg.Kafka.ConfigSetSimplifiedTopic,
 
-		configSetSchema,
-		configSetSimplifiedSchema,
 		transmissionSchema,
+		configSetSimplifiedSchema,
 	)
 	go monitor.Start(ctx, wg, feeds)
 
-	configEnvelope, err := generateConfigEnvelope()
+	envelope, err := generateEnvelope()
 	if err != nil {
 		b.Fatalf("failed to generate config: %v", err)
 	}
@@ -74,75 +67,14 @@ func BenchmarkMultichainMonitorStatePath(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		select {
-		case factory.configs <- configEnvelope:
+		case factory.updates <- envelope:
 		case <-ctx.Done():
 			continue
 		}
+		// for each update from the chain, the system produces two kafka updates:
+		// transmissions and config_set_simplified.
 		select {
 		case <-producer.sendCh:
-		case <-ctx.Done():
-			continue
-		}
-	}
-}
-
-// Results:
-// goos: darwin
-// goarch: amd64
-// pkg: github.com/smartcontractkit/chainlink-solana/pkg/monitoring
-// cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
-// (4 Jan 2022)
-//    61338	     18841 ns/op	    6606 B/op	     137 allocs/op
-// (17 Jan 2022)
-//    56856	     20759 ns/op	    6866 B/op	     141 allocs/op
-
-func BenchmarkMultichainMonitorTransmissionPath(b *testing.B) {
-	wg := &sync.WaitGroup{}
-	defer wg.Wait()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	cfg := config.Config{}
-	chainCfg := SolanaConfig{}
-	feeds := []FeedConfig{generateFeedConfig()}
-
-	transmissionSchema := fakeSchema{transmissionCodec}
-	configSetSchema := fakeSchema{configSetCodec}
-	configSetSimplifiedSchema := fakeSchema{configSetCodec}
-
-	producer := fakeProducer{make(chan producerMessage), ctx}
-
-	factory := &fakeRandomDataSourceFactory{
-		make(chan TransmissionEnvelope),
-		make(chan ConfigEnvelope),
-	}
-
-	monitor := NewMultiFeedMonitor(
-		chainCfg,
-
-		logger.NewNullLogger(),
-		factory,
-		producer,
-		&devnullMetrics{},
-
-		cfg.Kafka.ConfigSetTopic,
-		cfg.Kafka.ConfigSetSimplifiedTopic,
-		cfg.Kafka.TransmissionTopic,
-
-		configSetSchema,
-		configSetSimplifiedSchema,
-		transmissionSchema,
-	)
-	go monitor.Start(ctx, wg, feeds)
-
-	transmissionEnvelope := generateTransmissionEnvelope()
-
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		select {
-		case factory.transmissions <- transmissionEnvelope:
 		case <-ctx.Done():
 			continue
 		}

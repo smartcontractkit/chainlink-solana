@@ -22,21 +22,15 @@ func TestFeedMonitor(t *testing.T) {
 	feedConfig := generateFeedConfig()
 
 	factory := NewRandomDataSourceFactory(ctx, wg, logger.NewNullLogger())
-	sources, err := factory.NewSources(chainConfig, feedConfig)
+	source, err := factory.NewSource(chainConfig, feedConfig)
 	require.NoError(t, err)
 
 	pollInterval := 1 * time.Second
 	readTimeout := 1 * time.Second
 	var bufferCapacity uint32 = 0 // no buffering
 
-	transmissionPoller := NewSourcePoller(
-		sources.NewTransmissionsSource(),
-		logger.NewNullLogger(),
-		pollInterval, readTimeout,
-		bufferCapacity,
-	)
-	statePoller := NewSourcePoller(
-		sources.NewConfigSource(),
+	poller := NewSourcePoller(
+		source,
 		logger.NewNullLogger(),
 		pollInterval, readTimeout,
 		bufferCapacity,
@@ -44,9 +38,8 @@ func TestFeedMonitor(t *testing.T) {
 
 	producer := fakeProducer{make(chan producerMessage), ctx}
 
-	configSetSchema := fakeSchema{configSetCodec}
-	configSetSimplifiedSchema := fakeSchema{configSetSimplifiedCodec}
 	transmissionSchema := fakeSchema{transmissionCodec}
+	configSetSimplifiedSchema := fakeSchema{configSetSimplifiedCodec}
 
 	cfg := config.Config{}
 
@@ -63,38 +56,32 @@ func TestFeedMonitor(t *testing.T) {
 			logger.NewNullLogger(),
 			producer,
 
-			configSetSchema,
-			configSetSimplifiedSchema,
 			transmissionSchema,
+			configSetSimplifiedSchema,
 
-			cfg.Kafka.ConfigSetTopic,
-			cfg.Kafka.ConfigSetSimplifiedTopic,
 			cfg.Kafka.TransmissionTopic,
+			cfg.Kafka.ConfigSetSimplifiedTopic,
 		),
 	}
 
 	monitor := NewFeedMonitor(
 		logger.NewNullLogger(),
-		transmissionPoller, statePoller,
+		poller,
 		exporters,
 	)
 	go monitor.Start(ctx, &sync.WaitGroup{})
 
-	trCount, cfgCount := 0, 0
+	count := 0
 	var messages []producerMessage
-	configEnvelope, err := generateConfigEnvelope()
+	envelope, err := generateEnvelope()
 	require.NoError(t, err)
-	transmissionEnvelope := generateTransmissionEnvelope()
 
 LOOP:
 	for {
 		select {
-		case factory.transmissions <- transmissionEnvelope:
-			trCount += 1
-			transmissionEnvelope = generateTransmissionEnvelope()
-		case factory.configs <- configEnvelope:
-			cfgCount += 1
-			configEnvelope, err = generateConfigEnvelope()
+		case factory.updates <- envelope:
+			count += 1
+			envelope, err = generateEnvelope()
 			require.NoError(t, err)
 		case message := <-producer.sendCh:
 			messages = append(messages, message)
@@ -103,7 +90,7 @@ LOOP:
 		}
 	}
 
-	// The last update from each poller can potentially be missed by context being cancelled.
-	require.GreaterOrEqual(t, len(messages), trCount+cfgCount-2)
-	require.LessOrEqual(t, len(messages), trCount+cfgCount)
+	// The last update from each poller can potentially be missed by the context being cancelled.
+	require.GreaterOrEqual(t, len(messages), 2*count-2)
+	require.LessOrEqual(t, len(messages), 2*count)
 }
