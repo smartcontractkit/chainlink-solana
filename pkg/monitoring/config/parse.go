@@ -45,9 +45,6 @@ func parseEnvVars(cfg *Config) error {
 	if value, isPresent := os.LookupEnv("KAFKA_TRANSMISSION_TOPIC"); isPresent {
 		cfg.Kafka.TransmissionTopic = value
 	}
-	if value, isPresent := os.LookupEnv("KAFKA_CONFIG_SET_TOPIC"); isPresent {
-		cfg.Kafka.ConfigSetTopic = value
-	}
 	if value, isPresent := os.LookupEnv("KAFKA_CONFIG_SET_SIMPLIFIED_TOPIC"); isPresent {
 		cfg.Kafka.ConfigSetSimplifiedTopic = value
 	}
@@ -119,7 +116,6 @@ func validateConfig(cfg Config) error {
 		"KAFKA_SECURITY_PROTOCOL": cfg.Kafka.SecurityProtocol,
 		"KAFKA_SASL_MECHANISM":    cfg.Kafka.SaslMechanism,
 
-		"KAFKA_CONFIG_SET_TOPIC":            cfg.Kafka.ConfigSetTopic,
 		"KAFKA_TRANSMISSION_TOPIC":          cfg.Kafka.TransmissionTopic,
 		"KAFKA_CONFIG_SET_SIMPLIFIED_TOPIC": cfg.Kafka.ConfigSetSimplifiedTopic,
 

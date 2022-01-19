@@ -12,23 +12,22 @@ type Source interface {
 	Fetch(context.Context) (interface{}, error)
 }
 
-type Sources interface {
-	NewTransmissionsSource() Source
-	NewConfigSource() Source
-}
-
 type SourceFactory interface {
-	NewSources(chainConfig ChainConfig, feedConfig FeedConfig) (Sources, error)
+	NewSource(chainConfig ChainConfig, feedConfig FeedConfig) (Source, error)
 }
 
-type TransmissionEnvelope struct {
+type Envelope struct {
+	// latest transmission details
 	ConfigDigest    types.ConfigDigest
 	Epoch           uint32
 	Round           uint8
 	LatestAnswer    *big.Int
 	LatestTimestamp time.Time
-}
 
-type ConfigEnvelope struct {
-	types.ContractConfig
+	// latest contract config
+	ContractConfig types.ContractConfig
+
+	// extra
+	BlockNumber uint64
+	Transmitter types.Account
 }

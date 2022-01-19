@@ -12,7 +12,7 @@ import (
 )
 
 func MakeConfigSetSimplifiedMapping(
-	envelope ConfigEnvelope,
+	envelope Envelope,
 	feedConfig FeedConfig,
 ) (map[string]interface{}, error) {
 	offchainConfig, err := parseOffchainConfig(envelope.ContractConfig.OffchainConfig)
@@ -36,8 +36,8 @@ func MakeConfigSetSimplifiedMapping(
 		return nil, fmt.Errorf("failed to encode oracle set: %w", err)
 	}
 	out := map[string]interface{}{
-		"config_digest":      base64.StdEncoding.EncodeToString(envelope.ContractConfig.ConfigDigest[:]),
-		"block_number":       []byte{},
+		"config_digest":      base64.StdEncoding.EncodeToString(envelope.ConfigDigest[:]),
+		"block_number":       uint64ToBeBytes(envelope.BlockNumber),
 		"signers":            string(signers),
 		"transmitters":       string(transmitters),
 		"f":                  int32(envelope.ContractConfig.F),
@@ -55,7 +55,7 @@ func MakeConfigSetSimplifiedMapping(
 }
 
 func MakeTransmissionMapping(
-	envelope TransmissionEnvelope,
+	envelope Envelope,
 	chainConfig ChainConfig,
 	feedConfig FeedConfig,
 ) (map[string]interface{}, error) {

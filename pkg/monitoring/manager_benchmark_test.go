@@ -40,11 +40,9 @@ func BenchmarkManager(b *testing.B) {
 	cfg.Feeds.RDDReadTimeout = 1 * time.Second
 
 	transmissionSchema := fakeSchema{transmissionCodec}
-	configSetSchema := fakeSchema{configSetCodec}
-	configSetSimplifiedSchema := fakeSchema{configSetCodec}
+	configSetSimplifiedSchema := fakeSchema{configSetSimplifiedCodec}
 
 	producer := fakeProducer{make(chan producerMessage), ctx}
-
 	factory := NewRandomDataSourceFactory(ctx, wg, log)
 
 	monitor := NewMultiFeedMonitor(
@@ -55,13 +53,11 @@ func BenchmarkManager(b *testing.B) {
 		producer,
 		&devnullMetrics{},
 
-		cfg.Kafka.ConfigSetTopic,
-		cfg.Kafka.ConfigSetSimplifiedTopic,
 		cfg.Kafka.TransmissionTopic,
+		cfg.Kafka.ConfigSetSimplifiedTopic,
 
-		configSetSchema,
-		configSetSimplifiedSchema,
 		transmissionSchema,
+		configSetSimplifiedSchema,
 	)
 
 	source := NewFakeRDDSource(5, 6) // Always produce 5 random feeds.
