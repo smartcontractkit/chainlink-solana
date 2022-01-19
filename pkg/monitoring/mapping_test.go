@@ -48,10 +48,10 @@ func TestMapping(t *testing.T) {
 
 	t.Run("MakeTransmissionMapping", func(t *testing.T) {
 		initial := generateTransmissionEnvelope()
-		solanaConfig := generateSolanaConfig()
+		chainConfig := generateChainConfig()
 		feedConfig := generateFeedConfig()
 
-		mapping, err := MakeTransmissionMapping(initial, solanaConfig, feedConfig)
+		mapping, err := MakeTransmissionMapping(initial, chainConfig, feedConfig)
 		require.NoError(t, err)
 		output := []byte{}
 		serialized, err := transmissionCodec.BinaryFromNative(output, mapping)
@@ -70,9 +70,9 @@ func TestMapping(t *testing.T) {
 
 		solanaChainConfig, ok := transmission["solana_chain_config"].(map[string]interface{})
 		require.True(t, ok)
-		require.Equal(t, solanaChainConfig["network_name"], solanaConfig.NetworkName)
-		require.Equal(t, solanaChainConfig["network_id"], solanaConfig.NetworkID)
-		require.Equal(t, solanaChainConfig["chain_id"], solanaConfig.ChainID)
+		require.Equal(t, solanaChainConfig["network_name"], chainConfig.GetNetworkName())
+		require.Equal(t, solanaChainConfig["network_id"], chainConfig.GetNetworkID())
+		require.Equal(t, solanaChainConfig["chain_id"], chainConfig.GetChainID())
 
 		decodedFeedConfig, ok := transmission["feed_config"].(map[string]interface{})
 		require.True(t, ok)

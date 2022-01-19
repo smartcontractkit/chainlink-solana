@@ -18,7 +18,7 @@ func TestFeedMonitor(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	chainConfig := generateSolanaConfig()
+	chainConfig := generateChainConfig()
 	feedConfig := generateFeedConfig()
 
 	factory := NewRandomDataSourceFactory(ctx, wg, logger.NewNullLogger())

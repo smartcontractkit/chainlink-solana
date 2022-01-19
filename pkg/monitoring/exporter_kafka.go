@@ -7,7 +7,7 @@ import (
 )
 
 func NewKafkaExporter(
-	solanaConfig SolanaConfig,
+	chainConfig ChainConfig,
 	feedConfig FeedConfig,
 
 	log logger.Logger,
@@ -22,7 +22,7 @@ func NewKafkaExporter(
 	transmissionTopic string,
 ) Exporter {
 	return &kafkaExporter{
-		solanaConfig,
+		chainConfig,
 		feedConfig,
 
 		log,
@@ -39,8 +39,8 @@ func NewKafkaExporter(
 }
 
 type kafkaExporter struct {
-	solanaConfig SolanaConfig
-	feedConfig   FeedConfig
+	chainConfig ChainConfig
+	feedConfig  FeedConfig
 
 	log      logger.Logger
 	producer Producer
@@ -75,7 +75,7 @@ func (k *kafkaExporter) Export(ctx context.Context, data interface{}) {
 			}
 		}()
 	case TransmissionEnvelope:
-		transmissionMapping, err := MakeTransmissionMapping(typed, k.solanaConfig, k.feedConfig)
+		transmissionMapping, err := MakeTransmissionMapping(typed, k.chainConfig, k.feedConfig)
 		if err != nil {
 			k.log.Errorw("failed to map transmission", "error", err)
 			return

@@ -17,41 +17,48 @@ type sourceFactory struct {
 }
 
 func (s *sourceFactory) NewSources(
-	chainConfig SolanaConfig,
+	chainConfig ChainConfig,
 	feedConfig FeedConfig,
 ) (Sources, error) {
-	solanaFeedConfig := feedConfig.(SolanaFeedConfig)
+	solanaConfig, ok := chainConfig.(SolanaConfig)
+	if !ok {
+		return nil, fmt.Errorf("expected chainConfig to be of type SolanaConfig not %T", chainConfig)
+	}
+	solanaFeedConfig, ok := feedConfig.(SolanaFeedConfig)
+	if !ok {
+		return nil, fmt.Errorf("expected feedConfig to be of type SolanaFeedConfig not %T", feedConfig)
+	}
 	spec := pkgSolana.OCR2Spec{
 		ProgramID: solanaFeedConfig.ContractAddress,
 		StateID:   solanaFeedConfig.StateAccount,
 	}
-	client := pkgSolana.NewClient(chainConfig.RPCEndpoint)
+	client := pkgSolana.NewClient(solanaConfig.RPCEndpoint)
 	tracker := pkgSolana.NewTracker(spec, client, nil, s.log)
 	return &sources{
 		&tracker,
-		chainConfig,
+		solanaConfig,
 		solanaFeedConfig,
 	}, nil
 }
 
 type sources struct {
-	tracker     *pkgSolana.ContractTracker
-	chainConfig SolanaConfig
-	feedConfig  SolanaFeedConfig
+	tracker      *pkgSolana.ContractTracker
+	solanaConfig SolanaConfig
+	feedConfig   SolanaFeedConfig
 }
 
 func (s *sources) NewTransmissionsSource() Source {
-	return &transmissionsSource{s.tracker, s.chainConfig, s.feedConfig}
+	return &transmissionsSource{s.tracker, s.solanaConfig, s.feedConfig}
 }
 
 func (s *sources) NewConfigSource() Source {
-	return &configSource{s.tracker, s.chainConfig, s.feedConfig}
+	return &configSource{s.tracker, s.solanaConfig, s.feedConfig}
 }
 
 type transmissionsSource struct {
-	tracker     *pkgSolana.ContractTracker
-	chainConfig SolanaConfig
-	feedConfig  SolanaFeedConfig
+	tracker      *pkgSolana.ContractTracker
+	solanaConfig SolanaConfig
+	feedConfig   SolanaFeedConfig
 }
 
 func (t *transmissionsSource) Fetch(ctx context.Context) (interface{}, error) {
@@ -63,9 +70,9 @@ func (t *transmissionsSource) Fetch(ctx context.Context) (interface{}, error) {
 }
 
 type configSource struct {
-	tracker     *pkgSolana.ContractTracker
-	chainConfig SolanaConfig
-	feedConfig  SolanaFeedConfig
+	tracker      *pkgSolana.ContractTracker
+	solanaConfig SolanaConfig
+	feedConfig   SolanaFeedConfig
 }
 
 func (c *configSource) Fetch(ctx context.Context) (interface{}, error) {
