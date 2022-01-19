@@ -5,7 +5,7 @@ use access_controller::AccessController;
 mod state;
 
 use crate::state::with_store;
-pub use crate::state::{Store, Transmission, Transmissions};
+pub use crate::state::{Store as State, Transmission, Transmissions};
 
 #[cfg(feature = "mainnet")]
 declare_id!("My11111111111111111111111111111111111111113");
@@ -17,6 +17,15 @@ declare_id!("My11111111111111111111111111111111111111113");
 declare_id!("A7Jh2nb1hZHwqEofm4N8SXbKTj82rx7KUfjParQXUyMQ");
 
 static THRESHOLD_MULTIPLIER: u128 = 100000;
+
+#[derive(Clone)]
+pub struct Store;
+
+impl anchor_lang::Id for Store {
+    fn id() -> Pubkey {
+        ID
+    }
+}
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub enum Scope {
@@ -315,13 +324,13 @@ fn is_valid(flagging_threshold: u32, previous_answer: i128, answer: i128) -> boo
 }
 
 // Only owner access
-fn owner<'info>(state: &AccountLoader<'info, Store>, signer: &'_ AccountInfo) -> ProgramResult {
+fn owner<'info>(state: &AccountLoader<'info, State>, signer: &'_ AccountInfo) -> ProgramResult {
     require!(signer.key.eq(&state.load()?.owner), Unauthorized);
     Ok(())
 }
 
 fn has_lowering_access(
-    state: &Store,
+    state: &State,
     controller: &AccountLoader<AccessController>,
     authority: &AccountInfo,
 ) -> ProgramResult {
@@ -358,7 +367,7 @@ pub enum ErrorCode {
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(zero)]
-    pub store: AccountLoader<'info, Store>,
+    pub store: AccountLoader<'info, State>,
     #[account(signer)]
     pub owner: AccountInfo<'info>,
 
@@ -367,7 +376,7 @@ pub struct Initialize<'info> {
 
 #[derive(Accounts)]
 pub struct CreateFeed<'info> {
-    pub store: AccountLoader<'info, Store>,
+    pub store: AccountLoader<'info, State>,
     #[account(zero)]
     pub feed: Account<'info, Transmissions>,
     pub authority: Signer<'info>,
@@ -375,7 +384,7 @@ pub struct CreateFeed<'info> {
 
 #[derive(Accounts)]
 pub struct CloseFeed<'info> {
-    pub store: AccountLoader<'info, Store>,
+    pub store: AccountLoader<'info, State>,
     #[account(mut, close = receiver)]
     pub feed: Account<'info, Transmissions>,
     #[account(mut)]
@@ -386,28 +395,28 @@ pub struct CloseFeed<'info> {
 #[derive(Accounts)]
 pub struct TransferOwnership<'info> {
     #[account(mut)]
-    pub store: AccountLoader<'info, Store>,
+    pub store: AccountLoader<'info, State>,
     pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
 pub struct AcceptOwnership<'info> {
     #[account(mut)]
-    pub store: AccountLoader<'info, Store>,
+    pub store: AccountLoader<'info, State>,
     pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
 pub struct SetFlag<'info> {
     #[account(mut)]
-    pub store: AccountLoader<'info, Store>,
+    pub store: AccountLoader<'info, State>,
     pub authority: Signer<'info>,
     pub access_controller: AccountLoader<'info, AccessController>,
 }
 
 #[derive(Accounts)]
 pub struct SetValidatorConfig<'info> {
-    pub store: AccountLoader<'info, Store>,
+    pub store: AccountLoader<'info, State>,
     pub authority: Signer<'info>,
     #[account(mut)]
     pub feed: Account<'info, Transmissions>,
@@ -416,7 +425,7 @@ pub struct SetValidatorConfig<'info> {
 #[derive(Accounts)]
 pub struct SetAccessController<'info> {
     #[account(mut)]
-    pub store: AccountLoader<'info, Store>,
+    pub store: AccountLoader<'info, State>,
     pub authority: Signer<'info>,
     pub access_controller: AccountLoader<'info, AccessController>,
 }
@@ -424,7 +433,7 @@ pub struct SetAccessController<'info> {
 #[derive(Accounts)]
 pub struct Submit<'info> {
     #[account(mut)]
-    pub store: AccountLoader<'info, Store>,
+    pub store: AccountLoader<'info, State>,
     pub authority: Signer<'info>,
     /// The OCR2 feed
     #[account(mut)]

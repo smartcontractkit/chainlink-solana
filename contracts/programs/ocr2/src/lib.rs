@@ -732,7 +732,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
     require!(ctx.accounts.store.is_writable, InvalidInput);
 
     let cpi_ctx = CpiContext::new(
-        ctx.accounts.store_program.clone(),
+        ctx.accounts.store_program.to_account_info(),
         store::cpi::accounts::Submit {
             store: ctx.accounts.store.to_account_info(),
             feed: ctx.accounts.transmissions.to_account_info(),
