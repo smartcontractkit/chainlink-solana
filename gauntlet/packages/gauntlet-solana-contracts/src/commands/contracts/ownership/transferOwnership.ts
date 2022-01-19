@@ -70,7 +70,7 @@ export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaC
 
       logger.loading('Sending tx...')
       const txhash = await parseContractErrors(this.provider.send(tx, [this.wallet.payer]), this.idl)
-  
+
       logger.success(`Ownership transferred to ${new PublicKey(this.flags.to)} on tx ${txhash}`)
 
       return {

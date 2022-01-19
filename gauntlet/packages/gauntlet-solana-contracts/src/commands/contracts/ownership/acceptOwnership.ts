@@ -61,7 +61,7 @@ export const makeAcceptOwnershipCommand = (contractId: CONTRACT_LIST): SolanaCon
 
       logger.loading('Sending tx...')
       const txhash = await parseContractErrors(this.provider.send(tx, [this.wallet.payer]), this.idl)
-  
+
       logger.success(`Accepted ownership on tx ${txhash}`)
 
       return {
