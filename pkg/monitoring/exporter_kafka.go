@@ -93,3 +93,5 @@ func (k *kafkaExporter) Export(ctx context.Context, data interface{}) {
 		k.log.Errorf("unknown type %T to export", data)
 	}
 }
+
+func (k *kafkaExporter) Cleanup() {} // noop
