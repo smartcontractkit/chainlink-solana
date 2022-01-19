@@ -72,7 +72,7 @@ describe('ocr2', async () => {
   let tokenVault: PublicKey, vaultAuthority: PublicKey, vaultNonce: number;
 
   let oracles = [];
-  const f = 2;
+  const f = 6;
   // NOTE: 17 is the most we can fit into one setConfig if we use a different payer
   // if the owner == payer then we can fit 19
   const n = 19; // min: 3 * f + 1;
@@ -335,7 +335,7 @@ describe('ocr2', async () => {
     }
     oracles = await Promise.all(futures);
 
-    const offchain_config_version = 1;
+    const offchain_config_version = 2;
     const offchain_config = Buffer.from([4, 5, 6]);
 
     // Fund the owner with LINK tokens

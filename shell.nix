@@ -11,7 +11,7 @@ pkgs.mkShell {
     openssl
 
     # Solana
-    solana-full
+    solana.solana-full
     spl-token-cli
     anchor
 
