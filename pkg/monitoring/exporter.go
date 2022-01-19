@@ -5,13 +5,8 @@ import (
 )
 
 type Exporter interface {
+	// Export is executed on each update on a monitored feed
 	Export(ctx context.Context, data interface{})
+	// Cleanup is executed one a monitor for a specific feed is terminated.
+	Cleanup()
 }
-
-/*
-// ExporterFactory is a top-level object. Use this to pass global dependencies shared by all Exporters, eg. a logger or a kafka client.
-// This factory will be used to produce a separate Exporter for each feed monitored.
-type ExporterFactory interface {
-	MakeExporter(chainConfig ChainConfig, feedConfig FeedConfig) (Exporter, error)
-}
-*/
