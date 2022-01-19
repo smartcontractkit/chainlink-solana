@@ -95,7 +95,7 @@ func TestGetState(t *testing.T) {
 	defer mockServer.Close()
 
 	// happy path does not error (actual state decoding handled in types_test)
-	_, _, err := GetState(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{})
+	_, _, err := GetState(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
 	require.NoError(t, err)
 }
 
@@ -134,16 +134,16 @@ func TestGetLatestTransmission(t *testing.T) {
 	expectedTime := uint64(1633364819)
 	expectedAns := big.NewInt(0).SetBytes([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 210}).String()
 
-	a, _, err := GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{})
+	a, _, err := GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedTime, a.Timestamp)
 	assert.Equal(t, expectedAns, a.Data.String())
 
 	// fail if returned cursor is too short
-	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{})
+	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
 	assert.ErrorIs(t, err, errCursorLength)
 
 	// fail if returned transmission is too short
-	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{})
+	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
 	assert.ErrorIs(t, err, errTransmissionLength)
 }
