@@ -116,6 +116,7 @@ pub mod ocr2 {
             offchain_config.len() < config.pending_offchain_config.remaining_capacity(),
             InvalidInput
         );
+        require!(config.pending_offchain_config.version != 0, InvalidInput);
         config.pending_offchain_config.extend(&offchain_config);
         Ok(())
     }
@@ -143,7 +144,39 @@ pub mod ocr2 {
         // let previous_config_block_number = config.latest_config_block_number;
         config.latest_config_block_number = slot;
         config.config_count += 1;
-        config.latest_config_digest = config.config_digest_from_data(&crate::id(), &state.oracles);
+        let config_digest = config.config_digest_from_data(&crate::id(), &state.oracles);
+        config.latest_config_digest = config_digest;
+
+        // Generate an event
+        let signers = state
+            .oracles
+            .iter()
+            .map(|oracle| oracle.signer.key)
+            .collect();
+        emit!(event::SetConfig {
+            config_digest,
+            f: config.f,
+            signers
+        });
+
+        Ok(())
+    }
+
+    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
+    pub fn reset_pending_offchain_config(ctx: Context<SetConfig>) -> ProgramResult {
+        let state = &mut *ctx.accounts.state.load_mut()?;
+        let config = &mut state.config;
+
+        // Require that at least some data was written
+        require!(
+            config.pending_offchain_config.version > 0
+                || !config.pending_offchain_config.is_empty(),
+            InvalidInput
+        );
+
+        // reset staging area
+        config.pending_offchain_config.clear();
+        config.pending_offchain_config.version = 0;
         Ok(())
     }
 
@@ -212,18 +245,20 @@ pub mod ocr2 {
         config.f = f;
 
         let slot = Clock::get()?.slot;
-        let previous_config_block_number = config.latest_config_block_number;
         config.latest_config_block_number = slot;
         config.config_count += 1;
-        config.latest_config_digest = config.config_digest_from_data(&crate::id(), oracles);
+        let config_digest = config.config_digest_from_data(&crate::id(), oracles);
+        config.latest_config_digest = config_digest;
         // Reset epoch and round
         config.epoch = 0;
         config.round = 0;
 
-        // TODO: emit full events
+        // Generate an event
+        let signers = oracles.iter().map(|oracle| oracle.signer.key).collect();
         emit!(event::SetConfig {
-            previous_config_block_number,
-            latest_config_digest: config.latest_config_digest,
+            config_digest,
+            f,
+            signers
         });
 
         Ok(())
@@ -288,6 +323,10 @@ pub mod ocr2 {
         let mut state = ctx.accounts.state.load_mut()?;
         state.config.billing.observation_payment_gjuels = observation_payment_gjuels;
         state.config.billing.transmission_payment_gjuels = transmission_payment_gjuels;
+        emit!(event::SetBilling {
+            observation_payment_gjuels,
+            transmission_payment_gjuels,
+        });
         Ok(())
     }
 
@@ -565,7 +604,6 @@ pub mod ocr2 {
 fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramResult {
     let (nonce, data) = data.split_first().ok_or(ErrorCode::InvalidInput)?;
 
-    anchor_lang::solana_program::log::sol_log_compute_units();
     use anchor_lang::solana_program::{hash, keccak, secp256k1_recover::*};
 
     // 32 byte digest, 32 bytes (27 byte padding, 4 byte epoch, 1 byte round), 32 byte extra hash entropy
@@ -668,22 +706,33 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
         .ok_or(ErrorCode::Overflow)?; // this should never occur, but let's check for it anyway
     state.config.latest_transmitter = ctx.accounts.transmitter.key();
 
-    let round = Transmission {
-        answer: report.median,
-        timestamp: report.observations_timestamp as u64,
-    };
-
     // calculate and pay reimbursement
     let reimbursement = calculate_reimbursement(report.juels_per_lamport, signature_count)?;
     let amount = reimbursement + u64::from(state.config.billing.transmission_payment_gjuels);
     state.oracles[oracle_idx].payment += amount;
+
+    emit!(event::NewTransmission {
+        round_id: state.config.latest_aggregator_round_id,
+        config_digest: state.config.latest_config_digest,
+        answer: report.median,
+        transmitter: oracle_idx as u8, // has to fit in u8 because MAX_ORACLES < 255
+        observations_timestamp: report.observations_timestamp,
+        observers: report.observers,
+        juels_per_lamport: report.juels_per_lamport,
+        reimbursement,
+    });
+
+    let round = Transmission {
+        answer: report.median,
+        timestamp: report.observations_timestamp as u64,
+    };
 
     // store and validate answer
     require!(ctx.accounts.store.owner == &store::ID, InvalidInput);
     require!(ctx.accounts.store.is_writable, InvalidInput);
 
     let cpi_ctx = CpiContext::new(
-        ctx.accounts.store_program.clone(),
+        ctx.accounts.store_program.to_account_info(),
         store::cpi::accounts::Submit {
             store: ctx.accounts.store.to_account_info(),
             feed: ctx.accounts.transmissions.to_account_info(),
@@ -709,7 +758,6 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
 struct Report {
     pub median: i128,
     pub observer_count: u8,
-    #[allow(dead_code)]
     pub observers: [u8; MAX_ORACLES], // observer index
     pub observations_timestamp: u32,
     pub juels_per_lamport: u64,

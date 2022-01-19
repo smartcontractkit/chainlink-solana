@@ -1,5 +1,6 @@
 import * as anchor from "@project-serum/anchor";
 import { ProgramError, BN } from "@project-serum/anchor";
+import * as borsh from "borsh";
 import {
 	SYSVAR_RENT_PUBKEY,
 	PublicKey,
@@ -33,6 +34,17 @@ const Scope = {
   LatestRoundData: { latestRoundData: {} },
   Aggregator: { aggregator: {} },
 };
+
+
+class Assignable {
+    constructor(properties) {
+        Object.keys(properties).map((key) => {
+            this[key] = properties[key];
+        });
+    }
+}
+class Round extends Assignable {
+}
 
 describe('ocr2', async () => {
   // Configure the client to use the local cluster.
@@ -72,10 +84,33 @@ describe('ocr2', async () => {
   let tokenVault: PublicKey, vaultAuthority: PublicKey, vaultNonce: number;
 
   let oracles = [];
-  const f = 2;
+  const f = 6;
   // NOTE: 17 is the most we can fit into one setConfig if we use a different payer
   // if the owner == payer then we can fit 19
   const n = 19; // min: 3 * f + 1;
+
+  let query = async (feed: PublicKey, scope: any, schema: borsh.Schema, classType: any): Promise<any> => {
+    let tx = await workspace.Store.rpc.query(
+      scope,
+      {
+        accounts: { feed },
+        options: { commitment: "confirmed" },
+      }
+    );
+    // await provider.connection.confirmTransaction(tx);
+    let t = await provider.connection.getConfirmedTransaction(tx, "confirmed");
+  
+    // "Program return: <key> <val>"
+    const prefix =  "Program return: ";
+    let log = t.meta.logMessages.find((log) => log.startsWith(prefix));
+    log = log.slice(prefix.length);
+    let [_key, data] = log.split(" ", 2);
+    // TODO: validate key
+    let buf = Buffer.from(data, "base64");
+    console.log(buf);
+  
+    return borsh.deserialize(schema, classType, buf);
+  };
 
   // transmits a single round
   let transmit = async (epoch: number, round: number, answer: BN) => {
@@ -335,7 +370,7 @@ describe('ocr2', async () => {
     }
     oracles = await Promise.all(futures);
 
-    const offchain_config_version = 1;
+    const offchain_config_version = 2;
     const offchain_config = Buffer.from([4, 5, 6]);
 
     // Fund the owner with LINK tokens
@@ -436,19 +471,88 @@ describe('ocr2', async () => {
 	          authority: owner.publicKey,
 	        },
 	    });
-			assert.fail("beginOffchainConfig shouldn't have succeeded!")
 		} catch {
 			// beginOffchainConfig should fail
+			return
 		}
+		assert.fail("beginOffchainConfig shouldn't have succeeded!")
+	});
+
+	it("Can't write offchain config if begin has not been called", async () => {
+		try {
+			await program.rpc.writeOffchainConfig(
+				Buffer.from([4, 5, 6]),
+				{
+					accounts: {
+						state: state.publicKey,
+						authority: owner.publicKey,
+					},
+			});
+		} catch {
+			// writeOffchainConfig should fail
+			return
+		}
+		assert.fail("writeOffchainConfig shouldn't have succeeded!")
+	});
+
+	it("ResetPendingOffchainConfig clears pending state", async () => {
+
+		await program.rpc.beginOffchainConfig(
+      new BN(2),
+      {
+        accounts: {
+          state: state.publicKey,
+          authority: owner.publicKey,
+        },
+    });
+    await program.rpc.writeOffchainConfig(
+      Buffer.from([4, 5, 6]),
+      {
+        accounts: {
+          state: state.publicKey,
+          authority: owner.publicKey,
+        },
+    });
+		let account = await program.account.state.fetch(state.publicKey);
+		assert.ok(account.config.pendingOffchainConfig.version != 0);
+		assert.ok(account.config.pendingOffchainConfig.len != 0);
+
+		await program.rpc.resetPendingOffchainConfig(
+			{
+				accounts: {
+					state: state.publicKey,
+					authority: owner.publicKey,
+				},
+		});
+		account = await program.account.state.fetch(state.publicKey);
+		assert.ok(account.config.pendingOffchainConfig.version == 0);
+		assert.ok(account.config.pendingOffchainConfig.len == 0);
+	})
+
+	it("Can't reset pending config if already in new state", async () => {
+		try {
+			await program.rpc.resetPendingOffchainConfig(
+				{
+					accounts: {
+						state: state.publicKey,
+						authority: owner.publicKey,
+					},
+			});
+		} catch {
+			// resetPendingOffchainConfig should fail
+			return
+		}
+		assert.fail("resetPendingOffchainConfig shouldn't have succeeded!")
 	});
 
   it("Can't transmit a round if not the writer", async () => {
     try {
       await transmit(1, 1, new BN(1));
-      assert.fail("transmit() shouldn't have succeeded!");
     } catch {
       // transmit should fail
+			return
     }
+		assert.fail("transmit() shouldn't have succeeded!");
   });
 
   it('Sets the cluster as the feed writer', async () => {
@@ -533,82 +637,36 @@ describe('ocr2', async () => {
     assert.ok(account.leftoverPayments.len == 0);
   });
 
+  const roundSchema = new Map([[Round, { kind: 'struct', fields: [
+    ['roundId', 'u32'],
+    // ['slot', 'u64'],
+    // ['timestamp', 'u32'],
+    ['timestamp', 'u64'],
+    ['answer', [16]], // i128
+  ]}]]);
   it('Can call query', async () => {
-    let buffer = Keypair.generate();
-    await workspace.Store.rpc.query(
-      Scope.Version,
-      {
-        accounts: {
-          feed: transmissions.publicKey,
-          buffer: buffer.publicKey,
-        },
-        preInstructions: [
-          SystemProgram.createAccount({
-            fromPubkey: provider.wallet.publicKey,
-            newAccountPubkey: buffer.publicKey,
-            lamports: await provider.connection.getMinimumBalanceForRentExemption(256),
-            space: 256,
-            programId: workspace.Store.programId,
-          })
-        ],
-        signers: [buffer]
-      }
-    );
+    let round = await query(transmissions.publicKey, Scope.LatestRoundData, roundSchema, Round);
+    console.log(round);
 
-    let account = await workspace.Store.account.version.fetch(buffer.publicKey);
-    assert.ok(account.version == 1);
+    const versionSchema = new Map([[Round, { kind: 'struct', fields: [
+      ['version', 'u8'],
+    ]}]]);
+    let data = await query(transmissions.publicKey, Scope.Version, versionSchema, Round);
+    assert.ok(data.version == 1);
 
-		buffer = Keypair.generate();
-    await workspace.Store.rpc.query(
-      Scope.Description,
-      {
-        accounts: {
-          feed: transmissions.publicKey,
-          buffer: buffer.publicKey,
-        },
-        preInstructions: [
-          SystemProgram.createAccount({
-            fromPubkey: provider.wallet.publicKey,
-            newAccountPubkey: buffer.publicKey,
-            lamports: await provider.connection.getMinimumBalanceForRentExemption(256),
-            space: 256,
-            programId: workspace.Store.programId,
-          })
-        ],
-        signers: [buffer]
-      }
-    );
-    account = await workspace.Store.account.description.fetch(buffer.publicKey);
-    assert.ok(account.description == 'ETH/BTC');
+    const descriptionSchema = new Map([[Round, { kind: 'struct', fields: [
+      ['description', 'string'],
+    ]}]]);
+    data = await query(transmissions.publicKey, Scope.Description, descriptionSchema, Round);
+    assert.ok(data.description == 'ETH/BTC');
   });
 
   it("Transmit a bunch of rounds to check ringbuffer wraparound", async () => {
     for (let i = 3; i < 15; i++) {
       await transmit(i, i, new BN(i));
 
-      let buffer = Keypair.generate();
-      await workspace.Store.rpc.query(
-        Scope.LatestRoundData,
-        {
-          accounts: {
-            feed: transmissions.publicKey,
-            buffer: buffer.publicKey,
-          },
-          preInstructions: [
-            SystemProgram.createAccount({
-              fromPubkey: provider.wallet.publicKey,
-              newAccountPubkey: buffer.publicKey,
-              lamports: await provider.connection.getMinimumBalanceForRentExemption(256),
-              space: 256,
-              programId: workspace.Store.programId,
-            })
-          ],
-          signers: [buffer]
-        }
-      );
-
-      let account = await workspace.Store.account.round.fetch(buffer.publicKey);
-      assert.ok(account.answer.toNumber() == i)
+      let round = await query(transmissions.publicKey, Scope.LatestRoundData, roundSchema, Round);
+      assert.ok(new BN(round.answer, 10, 'le').toNumber() == i)
     }
   });
 
