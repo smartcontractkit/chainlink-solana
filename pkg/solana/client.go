@@ -17,10 +17,10 @@ type Client struct {
 }
 
 // NewClient will bundle the RPC and requestGroup together as a network Client
-func NewClient(rpcEndpoint string) *Client {
+func NewClient(rpcEndpoint string, skipPreflight bool) *Client {
 	return &Client{
 		rpc:           rpc.New(rpcEndpoint),
-		skipPreflight: false,
+		skipPreflight: skipPreflight,
 		requestGroup:  &singleflight.Group{},
 	}
 }

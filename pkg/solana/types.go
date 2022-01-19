@@ -142,4 +142,7 @@ type RelayConfig struct {
 	OCR2ProgramID   string `json:"ocr2ProgramID"`
 	TransmissionsID string `json:"transmissionsID"`
 	StoreProgramID  string `json:"storeProgramID"`
+
+	// transaction + state parameters [OPTIONAL]
+	SkipPreflight bool `json:"skipPreflight"`
 }
