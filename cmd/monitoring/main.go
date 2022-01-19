@@ -2,118 +2,33 @@ package main
 
 import (
 	"context"
-	"os"
-	"os/signal"
-	"sync"
-	"syscall"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring"
-	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"go.uber.org/zap/zapcore"
 )
 
 func main() {
-	bgCtx, cancelBgCtx := context.WithCancel(context.Background())
-	defer cancelBgCtx()
-	wg := &sync.WaitGroup{}
+	ctx := context.Background()
 
 	log := logger.NewLogger(loggerConfig{})
 
-	cfg, err := config.Parse()
+	solanaConfig, err := monitoring.ParseSolanaConfig()
 	if err != nil {
-		log.Fatalw("failed to parse generic configuration", "error", err)
+		log.Fatalw("failed to parse solana specific configuration", "error", err)
 	}
 
-	solanaCfg, err := monitoring.ParseSolanaConfig()
-	if err != nil {
-		log.Fatalw("failed to parse chain configuration", "error", err)
-	}
+	solanaSourceFactory := monitoring.NewSolanaSourceFactory(log.With("component", "source"))
 
-	schemaRegistry := monitoring.NewSchemaRegistry(cfg.SchemaRegistry, log)
-	transmissionSchema, err := schemaRegistry.EnsureSchema(cfg.Kafka.TransmissionTopic+"-value", monitoring.TransmissionAvroSchema)
-	if err != nil {
-		log.Fatalw("failed to prepare transmission schema", "error", err)
-	}
-	configSetSimplifiedSchema, err := schemaRegistry.EnsureSchema(cfg.Kafka.ConfigSetSimplifiedTopic+"-value", monitoring.ConfigSetSimplifiedAvroSchema)
-	if err != nil {
-		log.Fatalf("failed to prepare config_set_simplified schema", "error", err)
-	}
-
-	producer, err := monitoring.NewProducer(bgCtx, log.With("component", "producer"), cfg.Kafka)
-	if err != nil {
-		log.Fatalf("failed to create kafka producer", "error", err)
-	}
-
-	sourceFactory := monitoring.NewSolanaSourceFactory(log.With("component", "source"))
-	if cfg.Feature.TestOnlyFakeReaders {
-		sourceFactory = monitoring.NewRandomDataSourceFactory(bgCtx, wg, log.With("component", "rand-source"))
-	}
-
-	metrics := monitoring.DefaultMetrics
-
-	monitor := monitoring.NewMultiFeedMonitor(
-		solanaCfg,
-
+	monitoring.Facade(
+		ctx,
 		log,
-		sourceFactory,
-		producer,
-		metrics,
-
-		cfg.Kafka.ConfigSetSimplifiedTopic,
-		cfg.Kafka.TransmissionTopic,
-
-		transmissionSchema,
-		configSetSimplifiedSchema,
+		solanaConfig,
+		solanaSourceFactory,
+		monitoring.SolanaFeedParser,
 	)
 
-	source := monitoring.NewRDDSource(cfg.Feeds.URL, monitoring.SolanaFeedParser)
-	if cfg.Feature.TestOnlyFakeRdd {
-		// Generate between 2 and 10 random feeds every RDDPollInterval.
-		source = monitoring.NewFakeRDDSource(2, 10)
-	}
-	rddPoller := monitoring.NewSourcePoller(
-		source,
-		log.With("component", "rdd-poller"),
-		cfg.Feeds.RDDPollInterval,
-		cfg.Feeds.RDDReadTimeout,
-		0, // no buffering!
-	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		rddPoller.Start(bgCtx)
-	}()
-
-	manager := monitoring.NewManager(
-		log.With("component", "manager"),
-		rddPoller,
-	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		manager.Start(bgCtx, wg, monitor.Start)
-	}()
-
-	// Configure HTTP server
-	http := monitoring.NewHttpServer(bgCtx, cfg.Http.Address, log.With("component", "http-server"))
-	http.Handle("/metrics", metrics.HTTPHandler())
-	http.Handle("/debug", manager.HTTPHandler())
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		http.Start(bgCtx, wg)
-	}()
-
-	// Handle signals from the OS
-	osSignalsCh := make(chan os.Signal, 1)
-	signal.Notify(osSignalsCh, syscall.SIGINT, syscall.SIGTERM)
-	sig := <-osSignalsCh
-	log.Infof("received signal '%v'. Stopping", sig)
-
-	cancelBgCtx()
-	wg.Wait()
-	log.Info("process stopped")
+	log.Info("monitor stopped")
 }
 
 // logger config
