@@ -9,7 +9,8 @@ import (
 
 // Client contains the rpc and requestGroup for a given network
 type Client struct {
-	rpc *rpc.Client
+	rpc           *rpc.Client
+	skipPreflight bool // to enable or disable preflight checks
 
 	// provides a duplicate function call suppression mechanism
 	requestGroup *singleflight.Group
@@ -18,8 +19,9 @@ type Client struct {
 // NewClient will bundle the RPC and requestGroup together as a network Client
 func NewClient(rpcEndpoint string) *Client {
 	return &Client{
-		rpc:          rpc.New(rpcEndpoint),
-		requestGroup: &singleflight.Group{},
+		rpc:           rpc.New(rpcEndpoint),
+		skipPreflight: false,
+		requestGroup:  &singleflight.Group{},
 	}
 }
 

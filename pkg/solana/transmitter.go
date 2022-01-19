@@ -5,7 +5,6 @@ import (
 	"context"
 
 	"github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
@@ -19,7 +18,7 @@ func (c *ContractTracker) Transmit(
 	report types.Report,
 	sigs []types.AttributedOnchainSignature,
 ) error {
-	recent, err := c.client.rpc.GetRecentBlockhash(ctx, rpc.CommitmentFinalized)
+	recent, err := c.client.rpc.GetRecentBlockhash(ctx, rpcCommitment)
 	if err != nil {
 		return errors.Wrap(err, "error on Transmit.GetRecentBlock")
 	}
@@ -83,8 +82,8 @@ func (c *ContractTracker) Transmit(
 		txSig, err := c.client.rpc.SendTransactionWithOpts(
 			context.Background(), // does not use libocr transmit context
 			tx,
-			false, // use preflight as first check
-			rpc.CommitmentConfirmed,
+			c.client.skipPreflight,
+			rpcCommitment,
 		)
 
 		if err != nil {

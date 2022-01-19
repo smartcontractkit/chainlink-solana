@@ -61,5 +61,5 @@ func (c *ContractTracker) LatestConfig(ctx context.Context, changedInBlock uint6
 
 // LatestBlockHeight returns the height of the most recent block in the chain.
 func (c *ContractTracker) LatestBlockHeight(ctx context.Context) (blockHeight uint64, err error) {
-	return c.client.GetBlockHeight(ctx, rpc.CommitmentProcessed)
+	return c.client.GetBlockHeight(ctx, rpc.CommitmentProcessed) // this returns the latest height through CommitmentProcessed
 }
