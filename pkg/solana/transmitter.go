@@ -18,7 +18,7 @@ func (c *ContractTracker) Transmit(
 	report types.Report,
 	sigs []types.AttributedOnchainSignature,
 ) error {
-	recent, err := c.client.rpc.GetRecentBlockhash(ctx, rpcCommitment)
+	recent, err := c.client.rpc.GetRecentBlockhash(ctx, c.client.commitment)
 	if err != nil {
 		return errors.Wrap(err, "error on Transmit.GetRecentBlock")
 	}
@@ -83,7 +83,7 @@ func (c *ContractTracker) Transmit(
 			context.Background(), // does not use libocr transmit context
 			tx,
 			c.client.skipPreflight,
-			rpcCommitment,
+			c.client.commitment,
 		)
 
 		if err != nil {

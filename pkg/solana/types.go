@@ -144,5 +144,6 @@ type RelayConfig struct {
 	StoreProgramID  string `json:"storeProgramID"`
 
 	// transaction + state parameters [OPTIONAL]
-	SkipPreflight bool `json:"skipPreflight"`
+	SkipPreflight bool   `json:"skipPreflight"`
+	Commitment    string `json:"commitment"`
 }

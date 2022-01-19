@@ -40,8 +40,9 @@ type OCR2Spec struct {
 	StoreProgramID  solana.PublicKey
 	TransmissionsID solana.PublicKey
 
-	// transaction + state parameters
+	// transaction + state parameters [optional]
 	SkipPreflight bool
+	Commitment    string
 
 	TransmissionSigner TransmissionSigner
 }
@@ -90,7 +91,7 @@ func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay
 	}
 
 	// establish network connection RPC
-	client := NewClient(spec.NodeEndpointHTTP, spec.SkipPreflight)
+	client := NewClient(spec.NodeEndpointHTTP, spec.SkipPreflight, spec.Commitment)
 	contractTracker := NewTracker(spec, client, spec.TransmissionSigner, r.lggr)
 
 	if spec.IsBootstrap {

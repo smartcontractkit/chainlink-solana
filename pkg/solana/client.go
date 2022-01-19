@@ -11,18 +11,30 @@ import (
 type Client struct {
 	rpc           *rpc.Client
 	skipPreflight bool // to enable or disable preflight checks
+	commitment    rpc.CommitmentType
 
 	// provides a duplicate function call suppression mechanism
 	requestGroup *singleflight.Group
 }
 
 // NewClient will bundle the RPC and requestGroup together as a network Client
-func NewClient(rpcEndpoint string, skipPreflight bool) *Client {
-	return &Client{
+func NewClient(rpcEndpoint string, skipPreflight bool, commitment string) *Client {
+	client := &Client{
 		rpc:           rpc.New(rpcEndpoint),
 		skipPreflight: skipPreflight,
 		requestGroup:  &singleflight.Group{},
 	}
+
+	switch commitment {
+	case "processed":
+		client.commitment = rpc.CommitmentProcessed
+	case "finalized":
+		client.commitment = rpc.CommitmentProcessed
+	default:
+		client.commitment = rpc.CommitmentConfirmed
+	}
+
+	return client
 }
 
 // GetBlockHeight returns the height of the most recent processed block in the chain, coalescing requests.

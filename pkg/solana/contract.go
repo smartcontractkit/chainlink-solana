@@ -18,7 +18,6 @@ import (
 
 var (
 	configVersion uint8 = 1
-	rpcCommitment       = rpc.CommitmentConfirmed
 
 	// error declarations
 	errCursorLength       = errors.New("incorrect cursor length")
@@ -67,7 +66,7 @@ func (c *ContractTracker) fetchState(ctx context.Context) error {
 
 	// make single flight request
 	v, err, shared := c.requestGroup.Do("state", func() (interface{}, error) {
-		state, _, err := GetState(ctx, c.client.rpc, c.StateID)
+		state, _, err := GetState(ctx, c.client.rpc, c.StateID, c.client.commitment)
 		return state, err
 	})
 
@@ -83,7 +82,7 @@ func (c *ContractTracker) fetchState(ctx context.Context) error {
 	length := uint64(solana.PublicKeyLength)
 	res, err := c.client.rpc.GetAccountInfoWithOpts(ctx, c.state.Transmissions, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
-		Commitment: rpcCommitment,
+		Commitment: c.client.commitment,
 		DataSlice: &rpc.DataSlice{
 			Offset: &offset,
 			Length: &length,
@@ -103,7 +102,7 @@ func (c *ContractTracker) fetchLatestTransmission(ctx context.Context) error {
 
 	// make single flight request
 	v, err, shared := c.requestGroup.Do("transmissions.latest", func() (interface{}, error) {
-		answer, _, err := GetLatestTransmission(ctx, c.client.rpc, c.TransmissionsID)
+		answer, _, err := GetLatestTransmission(ctx, c.client.rpc, c.TransmissionsID, c.client.commitment)
 		return answer, err
 	})
 
@@ -117,7 +116,7 @@ func (c *ContractTracker) fetchLatestTransmission(ctx context.Context) error {
 	return nil
 }
 
-func GetState(ctx context.Context, client *rpc.Client, account solana.PublicKey) (State, uint64, error) {
+func GetState(ctx context.Context, client *rpc.Client, account solana.PublicKey, rpcCommitment rpc.CommitmentType) (State, uint64, error) {
 	res, err := client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
 		Commitment: rpcCommitment,
@@ -140,7 +139,7 @@ func GetState(ctx context.Context, client *rpc.Client, account solana.PublicKey)
 	return state, blockNum, nil
 }
 
-func GetLatestTransmission(ctx context.Context, client *rpc.Client, account solana.PublicKey) (Answer, uint64, error) {
+func GetLatestTransmission(ctx context.Context, client *rpc.Client, account solana.PublicKey, rpcCommitment rpc.CommitmentType) (Answer, uint64, error) {
 	offset := CursorOffset
 	length := CursorLen * 2
 	transmissionLen := TransmissionLen

@@ -11,7 +11,7 @@ import (
 func TestLatestBlockHeight(t *testing.T) {
 	ctx := context.Background()
 	c := &ContractTracker{
-		client: NewClient(rpc.DevNet_RPC),
+		client: NewClient(rpc.DevNet_RPC, true),
 	}
 
 	h, err := c.LatestBlockHeight(ctx)
