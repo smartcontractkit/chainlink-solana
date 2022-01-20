@@ -22,7 +22,6 @@ pkgs.mkShell {
     golangci-lint
 
     # NodeJS + TS
-    nodePackages.typescript
     nodePackages.typescript-language-server
     nodejs-14_x
     (yarn.override { nodejs = nodejs-14_x; })
