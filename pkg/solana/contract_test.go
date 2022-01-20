@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -160,7 +161,7 @@ func TestGetLatestTransmission(t *testing.T) {
 }
 
 func TestStatePolling(t *testing.T) {
-	i := 0
+	i := atomic.NewInt32(0)
 	wait := 5 * time.Second
 	callsPerSecond := 4 // total number of rpc calls between getState and GetLatestTransmission
 
@@ -168,7 +169,7 @@ func TestStatePolling(t *testing.T) {
 		// create response
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
-		i++            // count calls
+		i.Inc()// count calls
 
 		// state query
 		if bytes.Contains(body, []byte("11111111111111111111111111111111")) {
@@ -195,7 +196,7 @@ func TestStatePolling(t *testing.T) {
 	time.Sleep(wait)
 	require.NoError(t, tracker.Close())
 	require.Error(t, tracker.Close()) // test StopOnce
-	assert.GreaterOrEqual(t, callsPerSecond * int(wait.Seconds()-1), i) // expect minimum number of calls
+	assert.GreaterOrEqual(t, callsPerSecond*int(wait.Seconds()-1), int(i.Load())) // expect minimum number of calls
 	assert.Equal(t, expectedTime, tracker.answer.Timestamp)
 	assert.Equal(t, expectedAns, tracker.answer.Data.String())
 }

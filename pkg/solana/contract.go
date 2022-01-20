@@ -88,15 +88,22 @@ func (c *ContractTracker) PollState() {
 			go func() {
 				ctx, cancel := utils.ContextFromChanWithDeadline(c.done, c.client.contextDuration)
 				defer cancel()
-				if err := c.fetchState(ctx); err != nil {
-					c.lggr.Errorf("error in PollState.fetchState %s", err)
+				_, err, shared := c.requestGroup.Do("state", func() (interface{}, error) {
+					return nil, c.fetchState(ctx)
+				})
+				if err != nil {
+					c.lggr.Errorf("error in PollState.fetchState, shared: %t, error %s", shared, err)
 				}
 			}()
 			go func() {
 				ctx, cancel := utils.ContextFromChanWithDeadline(c.done, c.client.contextDuration)
 				defer cancel()
-				if err := c.fetchLatestTransmission(ctx); err != nil {
-					c.lggr.Errorf("error in PollState.fetchLatestTransmission %s", err)
+				// make single flight request
+				_, err, shared := c.requestGroup.Do("transmissions.latest", func() (interface{}, error) {
+					return nil, c.fetchLatestTransmission(ctx)
+				})
+				if err != nil {
+					c.lggr.Errorf("error in PollState.fetchLatestTransmission, shared: %t, error %s", shared, err)
 				}
 			}()
 		}
@@ -113,24 +120,18 @@ func (c *ContractTracker) Close() error {
 // fetch + decode + store raw state
 func (c *ContractTracker) fetchState(ctx context.Context) error {
 	c.lggr.Debugf("fetch state for account: %s", c.StateID.String())
-
-	// make single flight request
-	v, err, shared := c.requestGroup.Do("state", func() (interface{}, error) {
-		state, _, err := GetState(ctx, c.client.rpc, c.StateID, c.client.commitment)
-		return state, err
-	})
-
+	state, _, err := GetState(ctx, c.client.rpc, c.StateID, c.client.commitment)
 	if err != nil {
 		return err
 	}
 
-	c.state = v.(State)
-	c.lggr.Debugf("state fetched for account: %s, shared: %t, result (config digest): %v", c.StateID, shared, hex.EncodeToString(c.state.Config.LatestConfigDigest[:]))
+	c.state = state
+	c.lggr.Debugf("state fetched for account: %s, result (config digest): %v", c.StateID, hex.EncodeToString(c.state.Config.LatestConfigDigest[:]))
 
 	// Fetch the store address associated to the feed
 	offset := uint64(8 + 1) // Discriminator (8 bytes) + Version (u8)
 	length := uint64(solana.PublicKeyLength)
-	res, err := c.client.rpc.GetAccountInfoWithOpts(ctx, c.state.Transmissions, &rpc.GetAccountInfoOpts{
+	res, err := c.client.rpc.GetAccountInfoWithOpts(ctx, state.Transmissions, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
 		Commitment: c.client.commitment,
 		DataSlice: &rpc.DataSlice{
@@ -149,20 +150,13 @@ func (c *ContractTracker) fetchState(ctx context.Context) error {
 
 func (c *ContractTracker) fetchLatestTransmission(ctx context.Context) error {
 	c.lggr.Debugf("fetch latest transmission for account: %s", c.TransmissionsID)
-
-	// make single flight request
-	v, err, shared := c.requestGroup.Do("transmissions.latest", func() (interface{}, error) {
-		answer, _, err := GetLatestTransmission(ctx, c.client.rpc, c.TransmissionsID, c.client.commitment)
-		return answer, err
-	})
-
+	answer, _, err := GetLatestTransmission(ctx, c.client.rpc, c.TransmissionsID, c.client.commitment)
 	if err != nil {
 		return err
 	}
 
-	c.lggr.Debugf("latest transmission fetched for account: %s, shared: %t, result: %v", c.TransmissionsID, shared, v)
-
-	c.answer = v.(Answer)
+	c.lggr.Debugf("latest transmission fetched for account: %s, result: %v", c.TransmissionsID, answer)
+	c.answer = answer
 	return nil
 }
 
