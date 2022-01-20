@@ -198,8 +198,10 @@ func TestStatePolling(t *testing.T) {
 		requestGroup:    &singleflight.Group{},
 	}
 	require.NoError(t, tracker.Start())
+	require.Error(t, tracker.Start()) // test startOnce
 	time.Sleep(wait)
 	require.NoError(t, tracker.Close())
+	require.Error(t, tracker.Close()) // test StopOnce
 	<-done
 	assert.Equal(t, expectedCalls, i)
 	assert.Equal(t, expectedTime, tracker.answer.Timestamp)

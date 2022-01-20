@@ -15,6 +15,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 var (
@@ -49,6 +50,7 @@ type ContractTracker struct {
 
 	// polling
 	done chan struct{}
+	utils.StartStopOnce
 }
 
 func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, lggr Logger) ContractTracker {
@@ -65,9 +67,11 @@ func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, l
 }
 
 func (c *ContractTracker) Start() error {
-	c.done = make(chan struct{})
-	go c.PollState()
-	return nil
+	return c.StartOnce("pollState", func() error {
+		c.done = make(chan struct{})
+		go c.PollState()
+		return nil
+	})
 }
 
 func (c *ContractTracker) PollState() {
@@ -100,8 +104,10 @@ func (c *ContractTracker) PollState() {
 }
 
 func (c *ContractTracker) Close() error {
-	close(c.done)
-	return nil
+	return c.StopOnce("pollState", func() error {
+		close(c.done)
+		return nil
+	})
 }
 
 // fetch + decode + store raw state

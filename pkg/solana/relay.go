@@ -133,12 +133,12 @@ func (p *ocr2Provider) Close() error {
 
 func (p ocr2Provider) Ready() error {
 	// always ready
-	return nil
+	return p.tracker.Ready()
 }
 
 func (p ocr2Provider) Healthy() error {
 	// TODO: only if all subservices are healthy
-	return nil
+	return p.tracker.Healthy()
 }
 
 func (p ocr2Provider) ContractTransmitter() types.ContractTransmitter {
