@@ -8,7 +8,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
-func (c *ContractTracker) LatestTransmissionDetails(
+func (c ContractTracker) LatestTransmissionDetails(
 	ctx context.Context,
 ) (
 	configDigest types.ConfigDigest,
@@ -18,14 +18,6 @@ func (c *ContractTracker) LatestTransmissionDetails(
 	latestTimestamp time.Time,
 	err error,
 ) {
-	if err := c.fetchState(ctx); err != nil {
-		return types.ConfigDigest{}, 0, 0, big.NewInt(0), time.Unix(0, 0), err
-	}
-
-	if err := c.fetchLatestTransmission(ctx); err != nil {
-		return types.ConfigDigest{}, 0, 0, big.NewInt(0), time.Unix(0, 0), err
-	}
-
 	configDigest = c.state.Config.LatestConfigDigest
 	epoch = c.state.Config.Epoch
 	round = c.state.Config.Round

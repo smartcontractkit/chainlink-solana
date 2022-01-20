@@ -95,14 +95,13 @@ func (c *ContractTracker) Transmit(
 	return nil
 }
 
-func (c *ContractTracker) LatestConfigDigestAndEpoch(
+func (c ContractTracker) LatestConfigDigestAndEpoch(
 	ctx context.Context,
 ) (
 	configDigest types.ConfigDigest,
 	epoch uint32,
 	err error,
 ) {
-	err = c.fetchState(ctx)
 	return c.state.Config.LatestConfigDigest, c.state.Config.Epoch, err
 }
 
