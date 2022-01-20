@@ -16,7 +16,9 @@ export default class MultisigCreate extends SolanaCommand {
   static id = 'create'
   static category = CONTRACT_LIST.MULTISIG
 
-  static examples = ['yarn gauntlet-serum-multisig create --network=local 3W37Aopzbtzczi8XWdkFTvBeSyYgXLuUkaodkq59xBCT ETqajtkz4xcsB397qTBPetprR8jMC3JszkjJJp3cjWJS QMaHW2Fpyet4ZVf7jgrGB6iirZLjwZUjN9vPKcpQrHs --threshold=2']
+  static examples = [
+    'yarn gauntlet-serum-multisig create --network=local 3W37Aopzbtzczi8XWdkFTvBeSyYgXLuUkaodkq59xBCT ETqajtkz4xcsB397qTBPetprR8jMC3JszkjJJp3cjWJS QMaHW2Fpyet4ZVf7jgrGB6iirZLjwZUjN9vPKcpQrHs --threshold=2',
+  ]
 
   constructor(flags, args) {
     super(flags, args)
