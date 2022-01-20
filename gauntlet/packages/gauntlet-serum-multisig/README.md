@@ -1,5 +1,9 @@
 # Gauntlet Serum Multisig
 
+Current version 0.7.0
+
+Artifacts: https://github.com/project-serum/multisig/releases/tag/v0.7.0
+
 ## Creating a Multisig
 
 Example with 3 owners and threshold=2

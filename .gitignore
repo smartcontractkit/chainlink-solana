@@ -27,3 +27,5 @@ bin
 # Gauntlet artifacts
 gauntlet/packages/gauntlet-solana-contracts/artifacts/programId
 gauntlet/packages/gauntlet-solana-contracts/artifacts/bin
+# Multisig local env
+gauntlet/packages/gauntlet-serum-multisig/networks/.env.local
