@@ -1,9 +1,10 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
-import { AccountMeta, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js'
+import { AccountMeta, PublicKey } from '@solana/web3.js'
 import BN from 'bn.js'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
+import { makeTx } from '../../../../lib/utils'
 
 export default class BeginOffchainConfig extends SolanaCommand {
   static id = 'ocr2:begin_offchain_config'
@@ -56,21 +57,12 @@ export default class BeginOffchainConfig extends SolanaCommand {
   execute = async () => {
     const version = new BN(2)
     await prompt(`Begin setting Offchain config version ${version.toString()}?`)
+    const contract = getContract(CONTRACT_LIST.OCR_2, '')
     const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
-    const tx = rawTx.reduce(
-      (tx, meta) =>
-        tx.add(
-          new TransactionInstruction({
-            programId: meta.programId,
-            keys: meta.accounts,
-            data: meta.data,
-          }),
-        ),
-      new Transaction(),
-    )
-    logger.loading('Sending tx...')
+    const tx = makeTx(rawTx)
     logger.debug(tx)
-    const txhash = await this.provider.send(tx, [this.wallet.payer])
+    logger.loading('Sending tx...')
+    const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
     logger.success(`Begin set offchain config on tx hash: ${txhash}`)
 
     return {

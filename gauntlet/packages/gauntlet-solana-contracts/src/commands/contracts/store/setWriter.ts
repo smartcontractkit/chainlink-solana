@@ -1,10 +1,11 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
-import { AccountMeta, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js'
+import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { utils } from '@project-serum/anchor'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
+import { makeTx } from '../../../lib/utils'
 
 type Input = {
   transmissions: string
@@ -44,7 +45,6 @@ export default class SetWriter extends SolanaCommand {
     const ocr2Program = this.loadProgram(ocr2.idl, ocr2Address)
 
     const input = this.makeInput(this.flags.input)
-    // const owner = this.wallet.payer
 
     const storeState = new PublicKey(input.store || this.flags.state)
     const ocr2State = new PublicKey(this.flags.ocrState)
@@ -89,22 +89,12 @@ export default class SetWriter extends SolanaCommand {
   }
 
   execute = async () => {
+    const contract = getContract(CONTRACT_LIST.STORE, '')
     const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
-    const tx = rawTx.reduce(
-      (tx, meta) =>
-        tx.add(
-          new TransactionInstruction({
-            programId: meta.programId,
-            keys: meta.accounts,
-            data: meta.data,
-          }),
-        ),
-      new Transaction(),
-    )
-
-    logger.loading('Sending tx...')
+    const tx = makeTx(rawTx)
     logger.debug(tx)
-    const txhash = await this.provider.send(tx, [this.wallet.payer])
+    logger.loading('Sending tx...')
+    const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
     logger.success(`Writer set on tx hash: ${txhash}`)
 
     return {

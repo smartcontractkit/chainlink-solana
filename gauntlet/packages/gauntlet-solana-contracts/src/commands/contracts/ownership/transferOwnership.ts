@@ -1,17 +1,15 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
-import { Idl } from '@project-serum/anchor'
-import { AccountMeta, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js'
+import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { SolanaConstructor } from '../../../lib/types'
-import { parseContractErrors, makeTx } from '../../../lib/utils'
+import { makeTx } from '../../../lib/utils'
 
 export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaConstructor => {
   return class TransferOwnership extends SolanaCommand {
     static id = `${contractId}:transfer_ownership`
     static category = contractId
-    idl: Idl
 
     static examples = [
       `yarn gauntlet ${contractId}:transfer_ownership --network=devnet --state=[PROGRAM_STATE] --to=[PROPOSED_OWNER]`,
@@ -26,7 +24,6 @@ export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaC
 
     makeRawTransaction = async (signer: PublicKey) => {
       const contract = getContract(contractId, '')
-      this.idl = contract.idl
       const address = contract.programId.toString()
       const program = this.loadProgram(contract.idl, address)
 
@@ -64,11 +61,12 @@ export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaC
     }
 
     execute = async () => {
+      const contract = getContract(contractId, '')
       const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
       const tx = makeTx(rawTx)
       logger.debug(tx)
       logger.loading('Sending tx...')
-      const txhash = await this.sendTx(tx, [this.wallet.payer], this.idl)
+      const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
       logger.success(`Ownership transferred to ${new PublicKey(this.flags.to)} on tx ${txhash}`)
       return {
         responses: [

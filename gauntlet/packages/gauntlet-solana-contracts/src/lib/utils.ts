@@ -1,4 +1,3 @@
-import { ProgramError, parseIdlErrors, Idl } from '@project-serum/anchor'
 import { Transaction, TransactionInstruction, Keypair } from '@solana/web3.js'
 import { RawTransaction } from '@chainlink/gauntlet-solana'
 
@@ -10,20 +9,6 @@ export const divideIntoChunks = (arr: Array<any> | Buffer, chunkSize: number): a
     prevIndex += chunkSize
   }
   return chunks
-}
-
-export const parseContractErrors = (provider) => async (tx: Transaction, payers: Keypair[], idl: Idl) => {
-  try {
-    return await provider.send(tx, payers)
-  } catch (err) {
-    // Translate IDL error
-    const idlErrors = parseIdlErrors(idl)
-    let translatedErr = ProgramError.parse(err, idlErrors)
-    if (translatedErr === null) {
-      throw err
-    }
-    throw translatedErr
-  }
 }
 
 export const makeTx = (rawTx: RawTransaction[]): Transaction => {

@@ -1,10 +1,11 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
-import { AccountMeta, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js'
+import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { ORACLES_MAX_LENGTH } from '../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
+import { makeTx } from '../../../lib/utils'
 
 type Input = {
   oracles: {
@@ -96,20 +97,12 @@ export default class SetConfig extends SolanaCommand {
   }
 
   execute = async () => {
+    const contract = getContract(CONTRACT_LIST.OCR_2, '')
     const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
-    const tx = rawTx.reduce(
-      (tx, meta) =>
-        tx.add(
-          new TransactionInstruction({
-            programId: meta.programId,
-            keys: meta.accounts,
-            data: meta.data,
-          }),
-        ),
-      new Transaction(),
-    )
-
-    const txhash = await this.provider.send(tx, [this.wallet.payer])
+    const tx = makeTx(rawTx)
+    logger.debug(tx)
+    logger.loading('Sending tx...')
+    const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
     logger.success(`Config set on tx ${tx}`)
 
     return {

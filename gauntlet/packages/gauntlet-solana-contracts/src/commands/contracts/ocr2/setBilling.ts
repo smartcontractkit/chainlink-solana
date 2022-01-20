@@ -1,9 +1,10 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
-import { AccountMeta, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js'
+import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
+import { makeTx } from '../../../lib/utils'
 
 type Input = {
   observationPaymentGjuels: number | string
@@ -81,21 +82,12 @@ export default class SetBilling extends SolanaCommand {
   }
 
   execute = async () => {
+    const contract = getContract(CONTRACT_LIST.OCR_2, '')
     const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
-    const tx = rawTx.reduce(
-      (tx, meta) =>
-        tx.add(
-          new TransactionInstruction({
-            programId: meta.programId,
-            keys: meta.accounts,
-            data: meta.data,
-          }),
-        ),
-      new Transaction(),
-    )
-    logger.loading('Sending tx...')
+    const tx = makeTx(rawTx)
     logger.debug(tx)
-    const txhash = await this.provider.send(tx, [this.wallet.payer])
+    logger.loading('Sending tx...')
+    const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
     logger.success(`Billing set on tx hash: ${txhash}`)
 
     return {

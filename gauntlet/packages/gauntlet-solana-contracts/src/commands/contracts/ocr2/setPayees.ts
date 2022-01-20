@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
-import { AccountMeta, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js'
+import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
@@ -19,7 +19,6 @@ type Input = {
 export default class SetPayees extends SolanaCommand {
   static id = 'ocr2:set_payees'
   static category = CONTRACT_LIST.OCR_2
-  idl
   static examples = [
     'yarn gauntlet ocr2:set_payees --network=local --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
@@ -48,11 +47,9 @@ export default class SetPayees extends SolanaCommand {
 
   makeRawTransaction = async (signer: PublicKey) => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
-    this.idl = ocr2.idl
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
 
-    const owner = this.wallet.payer
     const input = this.makeInput(this.flags.input)
     const state = new PublicKey(this.flags.state)
 
@@ -129,11 +126,12 @@ export default class SetPayees extends SolanaCommand {
   }
 
   execute = async () => {
+    const contract = getContract(CONTRACT_LIST.OCR_2, '')
     const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
     const tx = makeTx(rawTx)
     logger.debug(tx)
     logger.loading('Sending tx...')
-    const txhash = await this.sendTx(tx, [this.wallet.payer], this.idl)
+    const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
     logger.success(`Payees set on tx hash: ${txhash}`)
     return {
       responses: [
