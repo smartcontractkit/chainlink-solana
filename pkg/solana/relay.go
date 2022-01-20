@@ -45,7 +45,7 @@ type OCR2Spec struct {
 	Commitment    string
 
 	// polling configuration [optional]
-	PollingInterval string
+	PollingInterval   string
 	PollingCtxTimeout string
 
 	TransmissionSigner TransmissionSigner

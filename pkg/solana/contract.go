@@ -80,14 +80,17 @@ func (c *ContractTracker) PollState() {
 			c.lggr.Debugf("Stopping state polling for state: %s, transmissions: %s", c.StateID, c.TransmissionsID)
 			return
 		case <-ticker.C:
-			ctx, _ := context.WithTimeout(context.Background(), c.client.contextDuration)
 			// async poll both transmisison + ocr2 states
 			go func() {
+				ctx, cancel := context.WithTimeout(context.Background(), c.client.contextDuration)
+				defer cancel()
 				if err := c.fetchState(ctx); err != nil {
 					c.lggr.Errorf("error in PollState.fetchState %s", err)
 				}
 			}()
 			go func() {
+				ctx, cancel := context.WithTimeout(context.Background(), c.client.contextDuration)
+				defer cancel()
 				if err := c.fetchLatestTransmission(ctx); err != nil {
 					c.lggr.Errorf("error in PollState.fetchLatestTransmission %s", err)
 				}
