@@ -71,23 +71,23 @@ func (c *ContractTracker) Start() error {
 }
 
 func (c *ContractTracker) PollState() {
-	duration := time.Second
-	ctxDuration := 5*duration // TODO: how to set this to?
-	ticker := time.NewTicker(duration)
+	c.lggr.Debugf("Starting state polling for state: %s, transmissions: %s", c.StateID, c.TransmissionsID)
+	ticker := time.NewTicker(c.client.pollingInterval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-c.done:
+			c.lggr.Debugf("Stopping state polling for state: %s, transmissions: %s", c.StateID, c.TransmissionsID)
 			return
 		case <-ticker.C:
-			ctx, _ := context.WithTimeout(context.Background(), ctxDuration)
+			ctx, _ := context.WithTimeout(context.Background(), c.client.contextDuration)
 			// async poll both transmisison + ocr2 states
-			go func(){
+			go func() {
 				if err := c.fetchState(ctx); err != nil {
 					c.lggr.Errorf("error in PollState.fetchState %s", err)
 				}
 			}()
-			go func(){
+			go func() {
 				if err := c.fetchLatestTransmission(ctx); err != nil {
 					c.lggr.Errorf("error in PollState.fetchLatestTransmission %s", err)
 				}

@@ -193,7 +193,7 @@ func TestStatePolling(t *testing.T) {
 	tracker := ContractTracker{
 		StateID:         solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
 		TransmissionsID: solana.MustPublicKeyFromBase58("11111111111111111111111111111112"),
-		client:          NewClient(mockServer.URL, true, ""),
+		client:          NewClient(OCR2Spec{NodeEndpointHTTP: mockServer.URL}, logger.TestLogger(t)),
 		lggr:            logger.TestLogger(t),
 		requestGroup:    &singleflight.Group{},
 	}
