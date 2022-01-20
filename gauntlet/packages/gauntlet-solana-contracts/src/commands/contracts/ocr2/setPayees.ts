@@ -5,7 +5,7 @@ import { AccountMeta, PublicKey, Transaction, TransactionInstruction } from '@so
 import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
-import { parseContractErrors, makeTx } from '../../../lib/utils'
+import { makeTx } from '../../../lib/utils'
 
 type Input = {
   operators: {
@@ -130,10 +130,10 @@ export default class SetPayees extends SolanaCommand {
 
   execute = async () => {
     const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
-    const tx = await makeTx(rawTx)
+    const tx = makeTx(rawTx)
+    logger.debug(tx)
     logger.loading('Sending tx...')
-    const txhash = await parseContractErrors(this.provider.send(tx, [this.wallet.payer]), this.idl)
-
+    const txhash = await this.sendTx(tx, [this.wallet.payer], this.idl)
     logger.success(`Payees set on tx hash: ${txhash}`)
     return {
       responses: [
