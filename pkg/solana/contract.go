@@ -86,14 +86,14 @@ func (c *ContractTracker) PollState() {
 		case <-ticker.C:
 			// async poll both transmisison + ocr2 states
 			go func() {
-				ctx, cancel := context.WithTimeout(context.Background(), c.client.contextDuration)
+				ctx, cancel := utils.ContextFromChanWithDeadline(c.done, c.client.contextDuration)
 				defer cancel()
 				if err := c.fetchState(ctx); err != nil {
 					c.lggr.Errorf("error in PollState.fetchState %s", err)
 				}
 			}()
 			go func() {
-				ctx, cancel := context.WithTimeout(context.Background(), c.client.contextDuration)
+				ctx, cancel := utils.ContextFromChanWithDeadline(c.done, c.client.contextDuration)
 				defer cancel()
 				if err := c.fetchLatestTransmission(ctx); err != nil {
 					c.lggr.Errorf("error in PollState.fetchLatestTransmission %s", err)
