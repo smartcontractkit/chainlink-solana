@@ -269,6 +269,8 @@ pub mod store {
             }
         }
 
+        // Temporary workaround since mainnet doesn't have set_return_data enabled yet
+        #[cfg(not(feature = "mainnet"))]
         anchor_lang::solana_program::program::set_return_data(buf.get_ref());
         Ok(())
     }
