@@ -33,7 +33,7 @@ func BenchmarkMultichainMonitor(b *testing.B) {
 	defer cancel()
 
 	cfg := config.Config{}
-	chainCfg := SolanaConfig{}
+	chainCfg := generateChainConfig()
 	feeds := []FeedConfig{generateFeedConfig()}
 
 	transmissionSchema := fakeSchema{transmissionCodec}

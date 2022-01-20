@@ -19,12 +19,11 @@ func TestMultiFeedMonitorToMakeSureAllGoroutinesTerminate(t *testing.T) {
 	wg := &sync.WaitGroup{}
 
 	cfg := config.Config{}
-	solanaCfg := SolanaConfig{
-		PollInterval: 5 * time.Second,
-	}
-	feeds := []FeedConfig{}
+	chainCfg := fakeChainConfig{}
+	chainCfg.PollInterval = 5 * time.Second
+	feeds := make([]FeedConfig, numFeeds)
 	for i := 0; i < numFeeds; i++ {
-		feeds = append(feeds, generateFeedConfig())
+		feeds[i] = generateFeedConfig()
 	}
 
 	transmissionSchema := fakeSchema{transmissionCodec}
@@ -34,7 +33,7 @@ func TestMultiFeedMonitorToMakeSureAllGoroutinesTerminate(t *testing.T) {
 	factory := &fakeRandomDataSourceFactory{make(chan Envelope), ctx}
 
 	monitor := NewMultiFeedMonitor(
-		solanaCfg,
+		chainCfg,
 
 		logger.NewNullLogger(),
 		factory,
@@ -90,9 +89,8 @@ func TestMultiFeedMonitorForPerformance(t *testing.T) {
 	wg := &sync.WaitGroup{}
 
 	cfg := config.Config{}
-	chainCfg := SolanaConfig{
-		PollInterval: 5 * time.Second,
-	}
+	chainCfg := fakeChainConfig{}
+	chainCfg.PollInterval = 5 * time.Second
 	feeds := []FeedConfig{}
 	for i := 0; i < numFeeds; i++ {
 		feeds = append(feeds, generateFeedConfig())

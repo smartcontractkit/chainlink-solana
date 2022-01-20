@@ -4,6 +4,7 @@ package monitoring
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -110,26 +111,55 @@ func generate32ByteArr() [32]byte {
 	return out
 }
 
+type fakeFeedConfig struct {
+	name           string
+	path           string
+	symbol         string
+	heartbeatSec   int64
+	contractType   string
+	contractStatus string
+	// This functions as a feed identifier.
+	contractAddress []byte
+}
+
+func (f fakeFeedConfig) GetName() string           { return f.name }
+func (f fakeFeedConfig) GetPath() string           { return f.path }
+func (f fakeFeedConfig) GetSymbol() string         { return f.symbol }
+func (f fakeFeedConfig) GetHeartbeatSec() int64    { return f.heartbeatSec }
+func (f fakeFeedConfig) GetContractType() string   { return f.contractType }
+func (f fakeFeedConfig) GetContractStatus() string { return f.contractStatus }
+func (f fakeFeedConfig) GetContractAddress() string {
+	return base64.StdEncoding.EncodeToString(f.contractAddress)
+}
+func (f fakeFeedConfig) GetContractAddressBytes() []byte { return f.contractAddress }
+func (f fakeFeedConfig) ToMapping() map[string]interface{} {
+	return map[string]interface{}{
+		"feed_name":        f.name,
+		"feed_path":        f.path,
+		"symbol":           f.symbol,
+		"heartbeat_sec":    int64(f.heartbeatSec),
+		"contract_type":    f.contractType,
+		"contract_status":  f.contractStatus,
+		"contract_address": f.contractAddress,
+		// These are solana specific but are kept here for backwards compatibility in Avro.
+		"transmissions_account": []byte{},
+		"state_account":         []byte{},
+	}
+}
+
 func generateFeedConfig() FeedConfig {
 	coins := []string{"btc", "eth", "matic", "link", "avax", "ftt", "srm", "usdc", "sol", "ray"}
 	coin := coins[rand.Intn(len(coins))]
-	contract, transmissions, state := generatePublicKey(), generatePublicKey(), generatePublicKey()
-	return FeedConfig(SolanaFeedConfig{
-		Name:           fmt.Sprintf("%s / usd", coin),
-		Path:           fmt.Sprintf("%s-usd", coin),
-		Symbol:         "$",
-		HeartbeatSec:   1,
-		ContractType:   "ocr2",
-		ContractStatus: "status",
-
-		ContractAddressBase58:      contract.String(),
-		TransmissionsAccountBase58: transmissions.String(),
-		StateAccountBase58:         state.String(),
-
-		ContractAddress:      contract,
-		TransmissionsAccount: transmissions,
-		StateAccount:         state,
-	})
+	contractAddress := generate32ByteArr()
+	return fakeFeedConfig{
+		name:            fmt.Sprintf("%s / usd", coin),
+		path:            fmt.Sprintf("%s-usd", coin),
+		symbol:          "$",
+		heartbeatSec:    1,
+		contractType:    "ocr2",
+		contractStatus:  "status",
+		contractAddress: contractAddress[:],
+	}
 }
 
 func generateNumericalMedianOffchainConfig() (*pb.NumericalMedianConfigProto, []byte, error) {
@@ -277,9 +307,9 @@ type fakeChainConfig struct {
 func generateChainConfig() ChainConfig {
 	return fakeChainConfig{
 		RPCEndpoint:  "http://some-chain-host:6666",
-		NetworkName:  "solana-mainnet-beta",
+		NetworkName:  "mainnet-beta",
 		NetworkID:    "1",
-		ChainID:      "solana-mainnet-beta",
+		ChainID:      "mainnet-beta",
 		ReadTimeout:  100 * time.Millisecond,
 		PollInterval: time.Duration(1+rand.Intn(5)) * time.Second,
 	}
