@@ -5,6 +5,8 @@ import (
 	"net/url"
 	"os"
 	"time"
+
+	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
 )
 
 type SolanaConfig struct {
@@ -16,7 +18,7 @@ type SolanaConfig struct {
 	PollInterval time.Duration
 }
 
-var _ ChainConfig = SolanaConfig{}
+var _ relayMonitoring.ChainConfig = SolanaConfig{}
 
 func (s SolanaConfig) GetRPCEndpoint() string         { return s.RPCEndpoint }
 func (s SolanaConfig) GetNetworkName() string         { return s.NetworkName }
