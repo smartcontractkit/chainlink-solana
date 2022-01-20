@@ -95,7 +95,7 @@ func (c *ContractTracker) Transmit(
 	return nil
 }
 
-func (c ContractTracker) LatestConfigDigestAndEpoch(
+func (c *ContractTracker) LatestConfigDigestAndEpoch(
 	ctx context.Context,
 ) (
 	configDigest types.ConfigDigest,
@@ -105,6 +105,6 @@ func (c ContractTracker) LatestConfigDigestAndEpoch(
 	return c.state.Config.LatestConfigDigest, c.state.Config.Epoch, err
 }
 
-func (c ContractTracker) FromAccount() types.Account {
+func (c *ContractTracker) FromAccount() types.Account {
 	return types.Account(c.Transmitter.PublicKey().String())
 }

@@ -8,13 +8,13 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
-func (c ContractTracker) Notify() <-chan struct{} {
+func (c *ContractTracker) Notify() <-chan struct{} {
 	return nil // not using websocket, config changes will be handled by polling in libocr
 }
 
 // LatestConfigDetails returns information about the latest configuration,
 // but not the configuration itself.
-func (c ContractTracker) LatestConfigDetails(ctx context.Context) (changedInBlock uint64, configDigest types.ConfigDigest, err error) {
+func (c *ContractTracker) LatestConfigDetails(ctx context.Context) (changedInBlock uint64, configDigest types.ConfigDigest, err error) {
 	return c.state.Config.LatestConfigBlockNumber, c.state.Config.LatestConfigDigest, nil
 }
 
@@ -51,7 +51,7 @@ func configFromState(state State) (types.ContractConfig, error) {
 }
 
 // LatestConfig returns the latest configuration.
-func (c ContractTracker) LatestConfig(ctx context.Context, changedInBlock uint64) (types.ContractConfig, error) {
+func (c *ContractTracker) LatestConfig(ctx context.Context, changedInBlock uint64) (types.ContractConfig, error) {
 	return configFromState(c.state)
 }
 

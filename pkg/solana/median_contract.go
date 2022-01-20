@@ -8,7 +8,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
-func (c ContractTracker) LatestTransmissionDetails(
+func (c *ContractTracker) LatestTransmissionDetails(
 	ctx context.Context,
 ) (
 	configDigest types.ConfigDigest,
@@ -37,7 +37,7 @@ func (c ContractTracker) LatestTransmissionDetails(
 //
 // As an optimization, this function may also return zero values, if no
 // RoundRequested event has been emitted after the latest NewTransmission event.
-func (c ContractTracker) LatestRoundRequested(
+func (c *ContractTracker) LatestRoundRequested(
 	ctx context.Context,
 	lookback time.Duration,
 ) (
