@@ -72,6 +72,7 @@ func (c *ContractTracker) Start() error {
 
 func (c *ContractTracker) PollState() {
 	duration := time.Second
+	ctxDuration := 5*duration // TODO: how to set this to?
 	ticker := time.NewTicker(duration)
 	defer ticker.Stop()
 	for {
@@ -79,7 +80,8 @@ func (c *ContractTracker) PollState() {
 		case <-c.done:
 			return
 		case <-ticker.C:
-			ctx, _ := context.WithTimeout(context.Background(), duration)
+			ctx, _ := context.WithTimeout(context.Background(), ctxDuration)
+			// async poll both transmisison + ocr2 states
 			go func(){
 				if err := c.fetchState(ctx); err != nil {
 					c.lggr.Errorf("error in PollState.fetchState %s", err)

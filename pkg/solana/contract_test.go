@@ -1,6 +1,7 @@
 package solana
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -79,6 +80,11 @@ var mockTransmission = []byte{
 	0, 0, 0, 0, 0, 0, 0, 0,
 }
 
+var (
+	expectedTime = uint64(1633364819)
+	expectedAns  = big.NewInt(0).SetBytes([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 210}).String()
+)
+
 type mockRequest struct {
 	Method  string
 	Params  []json.RawMessage
@@ -86,13 +92,30 @@ type mockRequest struct {
 	JSONRPC string
 }
 
+func testStateResponse() []byte {
+	value := base64.StdEncoding.EncodeToString(mockState.Raw)
+	res := fmt.Sprintf(`{"jsonrpc":"2.0","result":{"context": {"slot":1},"value": {"data":["%s","base64"],"executable": false,"lamports": 1000000000,"owner": "11111111111111111111111111111111","rentEpoch":2}},"id":1}`, value)
+	return []byte(res)
+}
+
+func testTransmissionsResponse(t *testing.T, body []byte, sub uint64) []byte {
+	// parse message
+	var msg mockRequest
+	err := json.Unmarshal(body, &msg)
+	require.NoError(t, err)
+	var opts rpc.GetAccountInfoOpts
+	err = json.Unmarshal(msg.Params[1], &opts)
+	require.NoError(t, err)
+
+	// create response
+	value := base64.StdEncoding.EncodeToString(mockTransmission[*opts.DataSlice.Offset : *opts.DataSlice.Offset+*opts.DataSlice.Length-sub])
+	res := fmt.Sprintf(`{"jsonrpc":"2.0","result":{"context": {"slot":1},"value": {"data":["%s","base64"],"executable": false,"lamports": 1000000000,"owner": "11111111111111111111111111111111","rentEpoch":2}},"id":1}`, value)
+	return []byte(res)
+}
+
 func TestGetState(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// create response
-		value := base64.StdEncoding.EncodeToString(mockState.Raw)
-		res := fmt.Sprintf(`{"jsonrpc":"2.0","result":{"context": {"slot":1},"value": {"data":["%s","base64"],"executable": false,"lamports": 1000000000,"owner": "11111111111111111111111111111111","rentEpoch":2}},"id":1}`, value)
-
-		_, err := w.Write([]byte(res))
+		_, err := w.Write(testStateResponse())
 		require.NoError(t, err)
 	}))
 	defer mockServer.Close()
@@ -117,25 +140,10 @@ func TestGetLatestTransmission(t *testing.T) {
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 
-		// parse message
-		var msg mockRequest
-		err = json.Unmarshal(body, &msg)
-		require.NoError(t, err)
-		var opts rpc.GetAccountInfoOpts
-		err = json.Unmarshal(msg.Params[1], &opts)
-		require.NoError(t, err)
-
-		// create response
-		value := base64.StdEncoding.EncodeToString(mockTransmission[*opts.DataSlice.Offset : *opts.DataSlice.Offset+*opts.DataSlice.Length-sub])
-		res := fmt.Sprintf(`{"jsonrpc":"2.0","result":{"context": {"slot":1},"value": {"data":["%s","base64"],"executable": false,"lamports": 1000000000,"owner": "11111111111111111111111111111111","rentEpoch":2}},"id":1}`, value)
-
-		_, err = w.Write([]byte(res))
+		_, err = w.Write(testTransmissionsResponse(t, body, sub))
 		require.NoError(t, err)
 	}))
 	defer mockServer.Close()
-
-	expectedTime := uint64(1633364819)
-	expectedAns := big.NewInt(0).SetBytes([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 210}).String()
 
 	a, _, err := GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
 	assert.NoError(t, err)
@@ -152,18 +160,48 @@ func TestGetLatestTransmission(t *testing.T) {
 }
 
 func TestStatePolling(t *testing.T) {
+	i := 0
+	wait := 5 * time.Second
+	callsPerSecond := 4 // total number of rpc calls between getState and GetLatestTransmission
+
+	expectedCalls := callsPerSecond * int(wait.Seconds())
+	done := make(chan struct{})
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// create response
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		i++            // count calls
+		defer func() { // close done channel when total number expected calls is reached
+			if i == expectedCalls {
+				close(done)
+			}
+		}()
+
+		// state query
+		if bytes.Contains(body, []byte("11111111111111111111111111111111")) {
+			_, err := w.Write(testStateResponse())
+			require.NoError(t, err)
+			return
+		}
+
+		// transmissions query
+		_, err = w.Write(testTransmissionsResponse(t, body, 0))
+		require.NoError(t, err)
+	}))
+	defer mockServer.Close()
+
 	tracker := ContractTracker{
-		// ProgramID:       spec.ProgramID,
-		// StateID:         spec.StateID,
-		// StoreProgramID:  spec.StoreProgramID,
-		// TransmissionsID: spec.TransmissionsID,
-		client:       NewClient(rpc.LocalNet_RPC, true, ""),
-		lggr:         logger.TestLogger(t),
-		requestGroup: &singleflight.Group{},
+		StateID:         solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
+		TransmissionsID: solana.MustPublicKeyFromBase58("11111111111111111111111111111112"),
+		client:          NewClient(mockServer.URL, true, ""),
+		lggr:            logger.TestLogger(t),
+		requestGroup:    &singleflight.Group{},
 	}
 	require.NoError(t, tracker.Start())
-
-	time.Sleep(10 * time.Second)
+	time.Sleep(wait)
 	require.NoError(t, tracker.Close())
-	assert.Equal(t, uint64(10), tracker.answer.Timestamp)
+	<-done
+	assert.Equal(t, expectedCalls, i)
+	assert.Equal(t, expectedTime, tracker.answer.Timestamp)
+	assert.Equal(t, expectedAns, tracker.answer.Data.String())
 }
