@@ -3,7 +3,7 @@ import { TransactionResponse, SolanaCommand, RawTransaction } from '@chainlink/g
 import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
 import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
-import { Idl, Program } from '@project-serum/anchor'
+import { ProgramError, parseIdlErrors, Idl, Program } from '@project-serum/anchor'
 
 type ProposalContext = {
   rawTx: RawTransaction
@@ -45,6 +45,7 @@ export const wrapCommand = (command) => {
         [this.multisigAddress.toBuffer()],
         this.program.programId,
       )
+
       const multisigState = await this.program.account.multisig.fetch(process.env.MULTISIG_ADDRESS)
       const threshold = multisigState.threshold
       const owners = multisigState.owners
@@ -90,9 +91,10 @@ export const wrapCommand = (command) => {
         this.inspectProposalState(proposal, threshold, owners)
         return result
       }
-
       const result = await this.wrapAction(this.executeProposal)(proposal, proposalContext)
-      this.inspectProposalState(proposal, threshold, owners)
+      if (Object.keys(result).length === 0) {
+        logger.error('Execution failed')
+      }
       return result
     }
 
@@ -153,23 +155,34 @@ export const wrapCommand = (command) => {
 
     executeProposal: ProposalAction = async (proposal: PublicKey, context): Promise<string> => {
       logger.loading(`Executing proposal`)
-
-      const tx = await this.program.rpc.executeTransaction({
-        accounts: {
-          multisig: this.multisigAddress,
-          multisigSigner: context.multisigSigner,
-          transaction: proposal,
-        },
-        remainingAccounts: context.proposalState.accounts
-          .map((t) => (t.pubkey.equals(context.multisigSigner) ? { ...t, isSigner: false } : t))
-          .concat({
-            pubkey: context.proposalState.programId,
-            isWritable: false,
-            isSigner: false,
-          }),
-      })
-      logger.info(`Execution TX hash: ${tx.toString()}`)
-      return tx
+      // get the command's starting word to map it to the respective IDL(ocr2, store etc)
+      const { idl } = getContract(command.id.split(':')[0], '')
+      try {
+        const tx = await this.program.rpc.executeTransaction({
+          accounts: {
+            multisig: this.multisigAddress,
+            multisigSigner: context.multisigSigner,
+            transaction: proposal,
+          },
+          remainingAccounts: context.proposalState.accounts
+            .map((t) => (t.pubkey.equals(context.multisigSigner) ? { ...t, isSigner: false } : t))
+            .concat({
+              pubkey: context.proposalState.programId,
+              isWritable: false,
+              isSigner: false,
+            }),
+        })
+        logger.info(`Execution TX hash: ${tx.toString()}`)
+        return tx
+      } catch (err) {
+        // Translate IDL error
+        const idlErrors = parseIdlErrors(idl)
+        let translatedErr = ProgramError.parse(err, idlErrors)
+        if (translatedErr === null) {
+          throw err
+        }
+        throw translatedErr
+      }
     }
 
     inspectProposalState = async (proposal, threshold, owners) => {
