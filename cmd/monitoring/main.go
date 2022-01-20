@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 
+	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"go.uber.org/zap/zapcore"
@@ -11,16 +12,17 @@ import (
 func main() {
 	ctx := context.Background()
 
-	log := logger.NewLogger(loggerConfig{})
+	coreLog := logger.NewLogger(loggerConfig{})
+	log := logWrapper{coreLog}
 
 	solanaConfig, err := monitoring.ParseSolanaConfig()
 	if err != nil {
 		log.Fatalw("failed to parse solana specific configuration", "error", err)
 	}
 
-	solanaSourceFactory := monitoring.NewSolanaSourceFactory(log.With("component", "source"))
+	solanaSourceFactory := monitoring.NewSolanaSourceFactory(logWrapper{coreLog.With("component", "source")})
 
-	monitoring.Facade(
+	relayMonitoring.Facade(
 		ctx,
 		log,
 		solanaConfig,
@@ -55,4 +57,16 @@ func (l loggerConfig) LogLevel() zapcore.Level {
 
 func (l loggerConfig) LogUnixTimestamps() bool {
 	return false // log timestamp in ISO8601
+}
+
+type logWrapper struct {
+	logger.Logger
+}
+
+func (l logWrapper) Criticalw(format string, values ...interface{}) {
+	l.Logger.CriticalW(format, values...)
+}
+
+func (l logWrapper) With(values ...interface{}) relayMonitoring.Logger {
+	return logWrapper{l.Logger.With(values...)}
 }
