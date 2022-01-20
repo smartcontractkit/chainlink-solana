@@ -146,4 +146,8 @@ type RelayConfig struct {
 	// transaction + state parameters [OPTIONAL]
 	SkipPreflight bool   `json:"skipPreflight"`
 	Commitment    string `json:"commitment"`
+
+	// polling parameters [OPTIONAL]
+	PollingInterval   string `json:"pollingInterval"`
+	PollingCtxTimeout string `json:"pollingCtxTimeout"`
 }
