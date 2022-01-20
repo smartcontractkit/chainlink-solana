@@ -1,0 +1,27 @@
+namespace_prefix: chainlink
+charts:
+  solana-validator:
+    index: 1
+  mockserver-config:
+    index: 2
+  mockserver:
+    index: 3
+  chainlink:
+    index: 4
+    values:
+      replicas: 19
+      chainlink:
+        image:
+          image: "public.ecr.aws/chainlink/chainlink"
+          version: "develop.f20690e8ede0cfead9df7f808f56a14f26469aaa"
+      env:
+        eth_url: "ws://sol:8990"
+        eth_disabled: "true"
+        USE_LEGACY_ETH_ENV_VARS: "true"
+        feature_external_initiators: "true"
+        FEATURE_OFFCHAIN_REPORTING2: "true"
+        P2P_NETWORKING_STACK: "V2"
+        P2PV2_LISTEN_ADDRESSES: "0.0.0.0:6690"
+        P2PV2_DELTA_DIAL: "5s"
+        P2PV2_DELTA_RECONCILE: "5s"
+        p2p_listen_port: "0"
