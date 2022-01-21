@@ -24,7 +24,7 @@ type Client struct {
 func NewClient(spec OCR2Spec, logger Logger) *Client {
 	client := &Client{
 		rpc:           rpc.New(spec.NodeEndpointHTTP),
-		skipPreflight: spec.SkipPreflight,
+		skipPreflight: !spec.UsePreflight,
 		requestGroup:  &singleflight.Group{},
 	}
 

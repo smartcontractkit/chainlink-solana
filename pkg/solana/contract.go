@@ -65,6 +65,13 @@ type ContractTracker struct {
 }
 
 func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, lggr Logger) ContractTracker {
+	// parse poll interval, if errors: use 1 second default
+	staleTimeout, err := time.ParseDuration(spec.StaleTimeout)
+	if err != nil {
+		lggr.Warnf("could not parse stale timeout interval using default 1m")
+		staleTimeout = defaultStaleTimeout
+	}
+
 	return ContractTracker{
 		ProgramID:       spec.ProgramID,
 		StateID:         spec.StateID,
@@ -78,7 +85,7 @@ func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, l
 		ansLock:         &sync.RWMutex{},
 		stateTime:       time.Now(),
 		ansTime:         time.Now(),
-		staleTimeout:    defaultStaleTimeout,
+		staleTimeout:    staleTimeout,
 	}
 }
 

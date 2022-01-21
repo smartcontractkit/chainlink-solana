@@ -41,12 +41,13 @@ type OCR2Spec struct {
 	TransmissionsID solana.PublicKey
 
 	// transaction + state parameters [optional]
-	SkipPreflight bool
-	Commitment    string
+	UsePreflight bool
+	Commitment   string
 
 	// polling configuration [optional]
 	PollingInterval   string
 	PollingCtxTimeout string
+	StaleTimeout      string
 
 	TransmissionSigner TransmissionSigner
 }
