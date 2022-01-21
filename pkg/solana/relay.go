@@ -40,6 +40,15 @@ type OCR2Spec struct {
 	StoreProgramID  solana.PublicKey
 	TransmissionsID solana.PublicKey
 
+	// transaction + state parameters [optional]
+	UsePreflight bool
+	Commitment   string
+
+	// polling configuration [optional]
+	PollingInterval   string
+	PollingCtxTimeout string
+	StaleTimeout      string
+
 	TransmissionSigner TransmissionSigner
 }
 
@@ -79,7 +88,7 @@ func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay
 	var provider ocr2Provider
 	spec, ok := s.(OCR2Spec)
 	if !ok {
-		return provider, errors.New("unsuccessful cast to 'solana.OCR2Spec'")
+		return &provider, errors.New("unsuccessful cast to 'solana.OCR2Spec'")
 	}
 
 	offchainConfigDigester := OffchainConfigDigester{
@@ -87,12 +96,12 @@ func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay
 	}
 
 	// establish network connection RPC
-	client := NewClient(spec.NodeEndpointHTTP)
+	client := NewClient(spec, r.lggr)
 	contractTracker := NewTracker(spec, client, spec.TransmissionSigner, r.lggr)
 
 	if spec.IsBootstrap {
 		// Return early if bootstrap node (doesn't require the full OCR2 provider)
-		return ocr2Provider{
+		return &ocr2Provider{
 			offchainConfigDigester: offchainConfigDigester,
 			tracker:                &contractTracker,
 		}, nil
@@ -100,7 +109,7 @@ func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay
 
 	reportCodec := ReportCodec{}
 
-	return ocr2Provider{
+	return &ocr2Provider{
 		offchainConfigDigester: offchainConfigDigester,
 		reportCodec:            reportCodec,
 		tracker:                &contractTracker,
@@ -113,24 +122,24 @@ type ocr2Provider struct {
 	tracker                *ContractTracker
 }
 
-func (p ocr2Provider) Start() error {
+func (p *ocr2Provider) Start() error {
 	// TODO: start all needed subservices
-	return nil
+	return p.tracker.Start()
 }
 
-func (p ocr2Provider) Close() error {
+func (p *ocr2Provider) Close() error {
 	// TODO: close all subservices
-	return nil
+	return p.tracker.Close()
 }
 
 func (p ocr2Provider) Ready() error {
 	// always ready
-	return nil
+	return p.tracker.Ready()
 }
 
 func (p ocr2Provider) Healthy() error {
 	// TODO: only if all subservices are healthy
-	return nil
+	return p.tracker.Healthy()
 }
 
 func (p ocr2Provider) ContractTransmitter() types.ContractTransmitter {

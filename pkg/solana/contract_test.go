@@ -1,6 +1,7 @@
 package solana
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -9,12 +10,17 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
+	"golang.org/x/sync/singleflight"
 )
 
 var mockTransmission = []byte{
@@ -76,6 +82,11 @@ var mockTransmission = []byte{
 	0, 0, 0, 0, 0, 0, 0, 0,
 }
 
+var (
+	expectedTime = uint64(1633364819)
+	expectedAns  = big.NewInt(0).SetBytes([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 210}).String()
+)
+
 type mockRequest struct {
 	Method  string
 	Params  []json.RawMessage
@@ -83,19 +94,36 @@ type mockRequest struct {
 	JSONRPC string
 }
 
+func testStateResponse() []byte {
+	value := base64.StdEncoding.EncodeToString(mockState.Raw)
+	res := fmt.Sprintf(`{"jsonrpc":"2.0","result":{"context": {"slot":1},"value": {"data":["%s","base64"],"executable": false,"lamports": 1000000000,"owner": "11111111111111111111111111111111","rentEpoch":2}},"id":1}`, value)
+	return []byte(res)
+}
+
+func testTransmissionsResponse(t *testing.T, body []byte, sub uint64) []byte {
+	// parse message
+	var msg mockRequest
+	err := json.Unmarshal(body, &msg)
+	require.NoError(t, err)
+	var opts rpc.GetAccountInfoOpts
+	err = json.Unmarshal(msg.Params[1], &opts)
+	require.NoError(t, err)
+
+	// create response
+	value := base64.StdEncoding.EncodeToString(mockTransmission[*opts.DataSlice.Offset : *opts.DataSlice.Offset+*opts.DataSlice.Length-sub])
+	res := fmt.Sprintf(`{"jsonrpc":"2.0","result":{"context": {"slot":1},"value": {"data":["%s","base64"],"executable": false,"lamports": 1000000000,"owner": "11111111111111111111111111111111","rentEpoch":2}},"id":1}`, value)
+	return []byte(res)
+}
+
 func TestGetState(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// create response
-		value := base64.StdEncoding.EncodeToString(mockState.Raw)
-		res := fmt.Sprintf(`{"jsonrpc":"2.0","result":{"context": {"slot":1},"value": {"data":["%s","base64"],"executable": false,"lamports": 1000000000,"owner": "11111111111111111111111111111111","rentEpoch":2}},"id":1}`, value)
-
-		_, err := w.Write([]byte(res))
+		_, err := w.Write(testStateResponse())
 		require.NoError(t, err)
 	}))
 	defer mockServer.Close()
 
 	// happy path does not error (actual state decoding handled in types_test)
-	_, _, err := GetState(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{})
+	_, _, err := GetState(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
 	require.NoError(t, err)
 }
 
@@ -114,36 +142,68 @@ func TestGetLatestTransmission(t *testing.T) {
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 
-		// parse message
-		var msg mockRequest
-		err = json.Unmarshal(body, &msg)
-		require.NoError(t, err)
-		var opts rpc.GetAccountInfoOpts
-		err = json.Unmarshal(msg.Params[1], &opts)
-		require.NoError(t, err)
-
-		// create response
-		value := base64.StdEncoding.EncodeToString(mockTransmission[*opts.DataSlice.Offset : *opts.DataSlice.Offset+*opts.DataSlice.Length-sub])
-		res := fmt.Sprintf(`{"jsonrpc":"2.0","result":{"context": {"slot":1},"value": {"data":["%s","base64"],"executable": false,"lamports": 1000000000,"owner": "11111111111111111111111111111111","rentEpoch":2}},"id":1}`, value)
-
-		_, err = w.Write([]byte(res))
+		_, err = w.Write(testTransmissionsResponse(t, body, sub))
 		require.NoError(t, err)
 	}))
 	defer mockServer.Close()
 
-	expectedTime := uint64(1633364819)
-	expectedAns := big.NewInt(0).SetBytes([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 210}).String()
-
-	a, _, err := GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{})
+	a, _, err := GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedTime, a.Timestamp)
 	assert.Equal(t, expectedAns, a.Data.String())
 
 	// fail if returned cursor is too short
-	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{})
+	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
 	assert.ErrorIs(t, err, errCursorLength)
 
 	// fail if returned transmission is too short
-	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{})
+	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
 	assert.ErrorIs(t, err, errTransmissionLength)
+}
+
+func TestStatePolling(t *testing.T) {
+	i := atomic.NewInt32(0)
+	wait := 5 * time.Second
+	callsPerSecond := 4 // total number of rpc calls between getState and GetLatestTransmission
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// create response
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		i.Inc() // count calls
+
+		// state query
+		if bytes.Contains(body, []byte("11111111111111111111111111111111")) {
+			_, err := w.Write(testStateResponse())
+			require.NoError(t, err)
+			return
+		}
+
+		// transmissions query
+		_, err = w.Write(testTransmissionsResponse(t, body, 0))
+		require.NoError(t, err)
+	}))
+
+	tracker := ContractTracker{
+		StateID:         solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
+		TransmissionsID: solana.MustPublicKeyFromBase58("11111111111111111111111111111112"),
+		client:          NewClient(OCR2Spec{NodeEndpointHTTP: mockServer.URL}, logger.TestLogger(t)),
+		lggr:            logger.TestLogger(t),
+		requestGroup:    &singleflight.Group{},
+		stateLock:       &sync.RWMutex{},
+		ansLock:         &sync.RWMutex{},
+		staleTimeout:    defaultStaleTimeout,
+	}
+	require.NoError(t, tracker.Start())
+	require.Error(t, tracker.Start()) // test startOnce
+	time.Sleep(wait)
+	require.NoError(t, tracker.Close())
+	require.Error(t, tracker.Close())                                             // test StopOnce
+	mockServer.Close()                                                            // close server once tracker is stopped
+	assert.GreaterOrEqual(t, callsPerSecond*int(wait.Seconds()-1), int(i.Load())) // expect minimum number of calls
+
+	answer, err := tracker.ReadAnswer()
+	assert.NoError(t, err)
+	assert.Equal(t, expectedTime, answer.Timestamp)
+	assert.Equal(t, expectedAns, answer.Data.String())
 }

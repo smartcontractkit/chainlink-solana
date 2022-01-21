@@ -5,7 +5,6 @@ import (
 	"context"
 
 	"github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
@@ -19,7 +18,7 @@ func (c *ContractTracker) Transmit(
 	report types.Report,
 	sigs []types.AttributedOnchainSignature,
 ) error {
-	recent, err := c.client.rpc.GetRecentBlockhash(ctx, rpc.CommitmentFinalized)
+	recent, err := c.client.rpc.GetRecentBlockhash(ctx, c.client.commitment)
 	if err != nil {
 		return errors.Wrap(err, "error on Transmit.GetRecentBlock")
 	}
@@ -31,13 +30,17 @@ func (c *ContractTracker) Transmit(
 		return errors.Wrap(err, "error on Transmit.FindProgramAddress")
 	}
 
+	_, store, err := c.ReadState()
+	if err != nil {
+		return errors.Wrap(err, "error on Transmit.ReadState")
+	}
 	accounts := []*solana.AccountMeta{
 		// state, transmitter, transmissions, store_program, store, store_authority
 		{PublicKey: c.StateID, IsWritable: true, IsSigner: false},
 		{PublicKey: c.Transmitter.PublicKey(), IsWritable: false, IsSigner: true},
 		{PublicKey: c.TransmissionsID, IsWritable: true, IsSigner: false},
 		{PublicKey: c.StoreProgramID, IsWritable: false, IsSigner: false},
-		{PublicKey: c.store, IsWritable: true, IsSigner: false},
+		{PublicKey: store, IsWritable: true, IsSigner: false},
 		{PublicKey: storeAuthority, IsWritable: false, IsSigner: false},
 	}
 
@@ -83,8 +86,8 @@ func (c *ContractTracker) Transmit(
 		txSig, err := c.client.rpc.SendTransactionWithOpts(
 			context.Background(), // does not use libocr transmit context
 			tx,
-			false, // use preflight as first check
-			rpc.CommitmentConfirmed,
+			c.client.skipPreflight,
+			c.client.commitment,
 		)
 
 		if err != nil {
@@ -103,10 +106,10 @@ func (c *ContractTracker) LatestConfigDigestAndEpoch(
 	epoch uint32,
 	err error,
 ) {
-	err = c.fetchState(ctx)
-	return c.state.Config.LatestConfigDigest, c.state.Config.Epoch, err
+	state, _, err := c.ReadState()
+	return state.Config.LatestConfigDigest, state.Config.Epoch, err
 }
 
-func (c ContractTracker) FromAccount() types.Account {
+func (c *ContractTracker) FromAccount() types.Account {
 	return types.Account(c.Transmitter.PublicKey().String())
 }

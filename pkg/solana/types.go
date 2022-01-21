@@ -142,4 +142,13 @@ type RelayConfig struct {
 	OCR2ProgramID   string `json:"ocr2ProgramID"`
 	TransmissionsID string `json:"transmissionsID"`
 	StoreProgramID  string `json:"storeProgramID"`
+
+	// transaction + state parameters [OPTIONAL]
+	UsePreflight bool   `json:"usePreflight"`
+	Commitment   string `json:"commitment"`
+
+	// polling parameters [OPTIONAL]
+	PollingInterval   string `json:"pollingInterval"`
+	PollingCtxTimeout string `json:"pollingCtxTimeout"`
+	StaleTimeout      string `json:"staleTimeout"`
 }

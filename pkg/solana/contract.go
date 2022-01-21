@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"sync"
+	"time"
 
 	"golang.org/x/sync/singleflight"
 
@@ -14,11 +16,12 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 var (
-	configVersion uint8 = 1
-	rpcCommitment       = rpc.CommitmentConfirmed
+	configVersion       uint8 = 1
+	defaultStaleTimeout       = 1 * time.Minute
 
 	// error declarations
 	errCursorLength       = errors.New("incorrect cursor length")
@@ -40,15 +43,36 @@ type ContractTracker struct {
 	store  solana.PublicKey
 	answer Answer
 
+	// read/write mutexes
+	stateLock *sync.RWMutex
+	ansLock   *sync.RWMutex
+
+	// stale state parameters
+	stateTime    time.Time
+	ansTime      time.Time
+	staleTimeout time.Duration
+
 	// dependencies
 	client *Client
 	lggr   Logger
 
 	// provides a duplicate function call suppression mechanism
 	requestGroup *singleflight.Group
+
+	// polling
+	done chan struct{}
+	stop chan struct{}
+	utils.StartStopOnce
 }
 
 func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, lggr Logger) ContractTracker {
+	// parse staleness timeout, if errors: use default timeout (1 min)
+	staleTimeout, err := time.ParseDuration(spec.StaleTimeout)
+	if err != nil {
+		lggr.Warnf("could not parse stale timeout interval using default 1m")
+		staleTimeout = defaultStaleTimeout
+	}
+
 	return ContractTracker{
 		ProgramID:       spec.ProgramID,
 		StateID:         spec.StateID,
@@ -58,32 +82,116 @@ func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, l
 		client:          client,
 		lggr:            lggr,
 		requestGroup:    &singleflight.Group{},
+		stateLock:       &sync.RWMutex{},
+		ansLock:         &sync.RWMutex{},
+		stateTime:       time.Now(),
+		ansTime:         time.Now(),
+		staleTimeout:    staleTimeout,
 	}
+}
+
+// Start polling
+func (c *ContractTracker) Start() error {
+	return c.StartOnce("pollState", func() error {
+		c.done = make(chan struct{})
+		c.stop = make(chan struct{})
+		go c.PollState()
+		return nil
+	})
+}
+
+// PollState contains the state and transmissions polling implementation
+func (c *ContractTracker) PollState() {
+	defer close(c.done)
+	c.lggr.Debugf("Starting state polling for state: %s, transmissions: %s", c.StateID, c.TransmissionsID)
+	ticker := time.NewTicker(utils.WithJitter(c.client.pollingInterval))
+	defer ticker.Stop()
+	for {
+		select {
+		case <-c.stop:
+			c.lggr.Debugf("Stopping state polling for state: %s, transmissions: %s", c.StateID, c.TransmissionsID)
+			return
+		case <-ticker.C:
+			// async poll both transmisison + ocr2 states
+			go func() {
+				ctx, cancel := utils.ContextFromChanWithDeadline(c.done, c.client.contextDuration)
+				defer cancel()
+				_, err, shared := c.requestGroup.Do("state", func() (interface{}, error) {
+					return nil, c.fetchState(ctx)
+				})
+				if err != nil {
+					c.lggr.Errorf("error in PollState.fetchState, shared: %t, error %s", shared, err)
+				}
+			}()
+			go func() {
+				ctx, cancel := utils.ContextFromChanWithDeadline(c.done, c.client.contextDuration)
+				defer cancel()
+				// make single flight request
+				_, err, shared := c.requestGroup.Do("transmissions.latest", func() (interface{}, error) {
+					return nil, c.fetchLatestTransmission(ctx)
+				})
+				if err != nil {
+					c.lggr.Errorf("error in PollState.fetchLatestTransmission, shared: %t, error %s", shared, err)
+				}
+			}()
+
+			// reset ticker with new jitter
+			ticker.Reset(utils.WithJitter(c.client.pollingInterval))
+		}
+	}
+}
+
+// Close stops the polling
+func (c *ContractTracker) Close() error {
+	return c.StopOnce("pollState", func() error {
+		close(c.stop)
+		<-c.done
+		return nil
+	})
+}
+
+// ReadState reads the latest state from memory with mutex and errors if timeout is exceeded
+func (c *ContractTracker) ReadState() (State, solana.PublicKey, error) {
+	c.stateLock.RLock()
+	defer c.stateLock.RUnlock()
+
+	var err error
+	if time.Since(c.stateTime) > c.staleTimeout {
+		err = errors.New("error in ReadState: stale state data, polling is likely experiencing errors")
+	}
+	return c.state, c.store, err
+}
+
+// ReadAnswer reads the latest state from memory with mutex and errors if timeout is exceeded
+func (c *ContractTracker) ReadAnswer() (Answer, error) {
+	c.ansLock.RLock()
+	defer c.ansLock.RUnlock()
+
+	// check if stale timeout
+	var err error
+	if time.Since(c.ansTime) > c.staleTimeout {
+		err = errors.New("error in ReadAnswer: stale answer data, polling is likely experiencing errors")
+	}
+	return c.answer, err
 }
 
 // fetch + decode + store raw state
 func (c *ContractTracker) fetchState(ctx context.Context) error {
+
 	c.lggr.Debugf("fetch state for account: %s", c.StateID.String())
-
-	// make single flight request
-	v, err, shared := c.requestGroup.Do("state", func() (interface{}, error) {
-		state, _, err := GetState(ctx, c.client.rpc, c.StateID)
-		return state, err
-	})
-
+	state, _, err := GetState(ctx, c.client.rpc, c.StateID, c.client.commitment)
 	if err != nil {
 		return err
 	}
 
-	c.state = v.(State)
-	c.lggr.Debugf("state fetched for account: %s, shared: %t, result (config digest): %v", c.StateID, shared, hex.EncodeToString(c.state.Config.LatestConfigDigest[:]))
+	c.lggr.Debugf("state fetched for account: %s, result (config digest): %v", c.StateID, hex.EncodeToString(state.Config.LatestConfigDigest[:]))
 
 	// Fetch the store address associated to the feed
 	offset := uint64(8 + 1) // Discriminator (8 bytes) + Version (u8)
 	length := uint64(solana.PublicKeyLength)
-	res, err := c.client.rpc.GetAccountInfoWithOpts(ctx, c.state.Transmissions, &rpc.GetAccountInfoOpts{
+	res, err := c.client.rpc.GetAccountInfoWithOpts(ctx, state.Transmissions, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
-		Commitment: rpcCommitment,
+		Commitment: c.client.commitment,
 		DataSlice: &rpc.DataSlice{
 			Offset: &offset,
 			Length: &length,
@@ -92,32 +200,36 @@ func (c *ContractTracker) fetchState(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	c.store = solana.PublicKeyFromBytes(res.Value.Data.GetBinary())
-	c.lggr.Debugf("store fetched for feed: %s", c.store)
 
+	store := solana.PublicKeyFromBytes(res.Value.Data.GetBinary())
+	c.lggr.Debugf("store fetched for feed: %s", store)
+
+	// acquire lock and write to state
+	c.stateLock.Lock()
+	defer c.stateLock.Unlock()
+	c.state = state
+	c.store = store
+	c.stateTime = time.Now()
 	return nil
 }
 
 func (c *ContractTracker) fetchLatestTransmission(ctx context.Context) error {
 	c.lggr.Debugf("fetch latest transmission for account: %s", c.TransmissionsID)
-
-	// make single flight request
-	v, err, shared := c.requestGroup.Do("transmissions.latest", func() (interface{}, error) {
-		answer, _, err := GetLatestTransmission(ctx, c.client.rpc, c.TransmissionsID)
-		return answer, err
-	})
-
+	answer, _, err := GetLatestTransmission(ctx, c.client.rpc, c.TransmissionsID, c.client.commitment)
 	if err != nil {
 		return err
 	}
+	c.lggr.Debugf("latest transmission fetched for account: %s, result: %v", c.TransmissionsID, answer)
 
-	c.lggr.Debugf("latest transmission fetched for account: %s, shared: %t, result: %v", c.TransmissionsID, shared, v)
-
-	c.answer = v.(Answer)
+	// acquire lock and write to state
+	c.ansLock.Lock()
+	defer c.ansLock.Unlock()
+	c.answer = answer
+	c.ansTime = time.Now()
 	return nil
 }
 
-func GetState(ctx context.Context, client *rpc.Client, account solana.PublicKey) (State, uint64, error) {
+func GetState(ctx context.Context, client *rpc.Client, account solana.PublicKey, rpcCommitment rpc.CommitmentType) (State, uint64, error) {
 	res, err := client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
 		Commitment: rpcCommitment,
@@ -140,7 +252,7 @@ func GetState(ctx context.Context, client *rpc.Client, account solana.PublicKey)
 	return state, blockNum, nil
 }
 
-func GetLatestTransmission(ctx context.Context, client *rpc.Client, account solana.PublicKey) (Answer, uint64, error) {
+func GetLatestTransmission(ctx context.Context, client *rpc.Client, account solana.PublicKey, rpcCommitment rpc.CommitmentType) (Answer, uint64, error) {
 	offset := CursorOffset
 	length := CursorLen * 2
 	transmissionLen := TransmissionLen

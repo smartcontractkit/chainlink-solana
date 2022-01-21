@@ -9,6 +9,10 @@ import (
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 )
 
+const (
+	commitment = rpc.CommitmentConfirmed
+)
+
 // AccountReader is a wrapper on top of *rpc.Client
 type AccountReader interface {
 	Read(ctx context.Context, account solana.PublicKey) (interface{}, error)
@@ -28,7 +32,7 @@ type trReader struct {
 }
 
 func (t *trReader) Read(ctx context.Context, transmissionsAccount solana.PublicKey) (interface{}, error) {
-	answer, blockNum, err := pkgSolana.GetLatestTransmission(ctx, t.client, transmissionsAccount)
+	answer, blockNum, err := pkgSolana.GetLatestTransmission(ctx, t.client, transmissionsAccount, commitment)
 	return TransmissionEnvelope{answer, blockNum}, err
 }
 
@@ -46,7 +50,7 @@ type StateEnvelope struct {
 }
 
 func (s *stReader) Read(ctx context.Context, stateAccount solana.PublicKey) (interface{}, error) {
-	state, blockNum, err := pkgSolana.GetState(ctx, s.client, stateAccount)
+	state, blockNum, err := pkgSolana.GetState(ctx, s.client, stateAccount, commitment)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch state : %w", err)
 	}
