@@ -67,8 +67,6 @@ export default class SetConfig extends SolanaCommand {
     )
 
     logger.log('Config information:', input)
-    await prompt(`Continue setting config on ${state.toString()}?`)
-    console.log(oracles)
     const data = program.coder.instruction.encode('set_config', {
       newOracles: oracles,
       f,
@@ -101,6 +99,7 @@ export default class SetConfig extends SolanaCommand {
     const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
     const tx = makeTx(rawTx)
     logger.debug(tx)
+    await prompt(`Continue setting config on ${this.flags.state.toString()}?`)
     logger.loading('Sending tx...')
     const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
     logger.success(`Config set on tx ${tx}`)

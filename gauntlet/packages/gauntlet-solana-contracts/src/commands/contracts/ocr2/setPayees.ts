@@ -98,7 +98,6 @@ export default class SetPayees extends SolanaCommand {
       .map(({ transmitter }) => payeeByTransmitter[new PublicKey(transmitter).toString()])
 
     logger.log('Payees information:', input)
-    await prompt('Continue setting payees?')
     const data = program.coder.instruction.encode('set_payees', {
       payees,
     })
@@ -130,6 +129,7 @@ export default class SetPayees extends SolanaCommand {
     const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
     const tx = makeTx(rawTx)
     logger.debug(tx)
+    await prompt('Continue setting payees?')
     logger.loading('Sending tx...')
     const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
     logger.success(`Payees set on tx hash: ${txhash}`)

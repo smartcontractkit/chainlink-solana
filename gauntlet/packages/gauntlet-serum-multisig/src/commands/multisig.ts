@@ -92,9 +92,6 @@ export const wrapCommand = (command) => {
         return result
       }
       const result = await this.wrapAction(this.executeProposal)(proposal, proposalContext)
-      if (Object.keys(result).length === 0) {
-        logger.error('Execution failed')
-      }
       return result
     }
 
@@ -116,7 +113,7 @@ export const wrapCommand = (command) => {
         } else {
           logger.error(e)
         }
-        return {} as Result<TransactionResponse>
+        throw e
       }
     }
 

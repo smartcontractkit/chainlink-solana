@@ -48,7 +48,6 @@ export default class SetBilling extends SolanaCommand {
     const billingAC = new PublicKey(info.config.billingAccessController)
     logger.loading('Generating billing tx information...')
     logger.log('Billing information:', input)
-    await prompt('Continue setting billing?')
     const data = program.coder.instruction.encode('set_billing', {
       observationPaymentGjuels: new BN(input.observationPaymentGjuels),
       transmissionPaymentGjuels: new BN(input.transmissionPaymentGjuels),
@@ -86,6 +85,7 @@ export default class SetBilling extends SolanaCommand {
     const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
     const tx = makeTx(rawTx)
     logger.debug(tx)
+    await prompt('Continue setting billing?')
     logger.loading('Sending tx...')
     const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
     logger.success(`Billing set on tx hash: ${txhash}`)
