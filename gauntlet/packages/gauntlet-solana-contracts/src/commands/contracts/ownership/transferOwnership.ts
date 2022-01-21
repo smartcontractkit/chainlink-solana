@@ -30,10 +30,6 @@ export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaC
       const state = new PublicKey(this.flags.state)
       const proposedOwner = new PublicKey(this.flags.to)
 
-      await prompt(
-        `Transfering ownership of ${contractId} state (${state.toString()}) to: (${proposedOwner.toString()}). Continue?`,
-      )
-
       const data = program.coder.instruction.encode('transfer_ownership', {
         proposedOwner,
       })
@@ -64,6 +60,11 @@ export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaC
       const contract = getContract(contractId, '')
       const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
       const tx = makeTx(rawTx)
+      await prompt(
+        `Transfering ownership of ${contractId} state (${this.flags.state.toString()}) to: (${new PublicKey(
+          this.flags.to,
+        ).toString()}). Continue?`,
+      )
       logger.debug(tx)
       logger.loading('Sending tx...')
       const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)

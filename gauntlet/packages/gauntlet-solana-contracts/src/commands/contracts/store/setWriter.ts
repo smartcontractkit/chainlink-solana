@@ -55,8 +55,6 @@ export default class SetWriter extends SolanaCommand {
       ocr2Program.programId,
     )
 
-    console.log(`Setting store writer on Store (${storeState.toString()}) and Feed (${feedState.toString()})`)
-
     const data = storeProgram.coder.instruction.encode('set_writer', {
       writer: storeAuthority,
     })
@@ -93,6 +91,10 @@ export default class SetWriter extends SolanaCommand {
     const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
     const tx = makeTx(rawTx)
     logger.debug(tx)
+    const input = this.makeInput(this.flags.input)
+    const storeState = new PublicKey(input.store || this.flags.state)
+    const feedState = new PublicKey(input.transmissions)
+    logger.info(`Setting store writer on Store (${storeState.toString()}) and Feed (${feedState.toString()})`)
     logger.loading('Sending tx...')
     const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
     logger.success(`Writer set on tx hash: ${txhash}`)

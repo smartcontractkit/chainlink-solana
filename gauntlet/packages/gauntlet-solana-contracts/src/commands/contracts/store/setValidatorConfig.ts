@@ -45,8 +45,6 @@ export default class SetValidatorConfig extends SolanaCommand {
     const threshold = new BN(input.threshold)
     const feed = new PublicKey(input.feed)
 
-    console.log(`Setting store config on ${state.toString()}...`)
-
     const data = program.coder.instruction.encode('set_validator_config', {
       flaggingThreshold: threshold,
     })
@@ -83,6 +81,7 @@ export default class SetValidatorConfig extends SolanaCommand {
     const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
     const tx = makeTx(rawTx)
     logger.debug(tx)
+    logger.info(`Setting store config on ${this.flags.state.toString()}...`)
     logger.loading('Sending tx...')
     const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
     logger.success(`Validator config on tx ${txhash}`)

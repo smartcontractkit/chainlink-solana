@@ -26,7 +26,6 @@ export const makeAcceptOwnershipCommand = (contractId: CONTRACT_LIST): SolanaCon
 
       const state = new PublicKey(this.flags.state)
 
-      await prompt(`Accepting ownership of ${contractId} state (${state.toString()}). Continue?`)
       const data = program.coder.instruction.encode('accept_ownership', {})
 
       const accounts: AccountMeta[] = [
@@ -56,6 +55,7 @@ export const makeAcceptOwnershipCommand = (contractId: CONTRACT_LIST): SolanaCon
       const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
       const tx = makeTx(rawTx)
       logger.debug(tx)
+      await prompt(`Accepting ownership of ${contractId} state (${this.flags.state.toString()}). Continue?`)
       logger.loading('Sending tx...')
       const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
       logger.success(`Accepted ownership on tx ${txhash}`)
