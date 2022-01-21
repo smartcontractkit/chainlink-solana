@@ -717,6 +717,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
         answer: report.median,
         transmitter: oracle_idx as u8, // has to fit in u8 because MAX_ORACLES < 255
         observations_timestamp: report.observations_timestamp,
+        observer_count: report.observer_count,
         observers: report.observers,
         juels_per_lamport: report.juels_per_lamport,
         reimbursement,
