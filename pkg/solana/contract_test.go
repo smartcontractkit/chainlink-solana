@@ -183,7 +183,6 @@ func TestStatePolling(t *testing.T) {
 		_, err = w.Write(testTransmissionsResponse(t, body, 0))
 		require.NoError(t, err)
 	}))
-	defer mockServer.Close()
 
 	tracker := ContractTracker{
 		StateID:         solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
@@ -200,6 +199,7 @@ func TestStatePolling(t *testing.T) {
 	time.Sleep(wait)
 	require.NoError(t, tracker.Close())
 	require.Error(t, tracker.Close())                                             // test StopOnce
+	mockServer.Close()                                                            // close server once tracker is stopped
 	assert.GreaterOrEqual(t, callsPerSecond*int(wait.Seconds()-1), int(i.Load())) // expect minimum number of calls
 
 	answer, err := tracker.ReadAnswer()

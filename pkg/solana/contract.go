@@ -104,7 +104,7 @@ func (c *ContractTracker) Start() error {
 func (c *ContractTracker) PollState() {
 	defer close(c.done)
 	c.lggr.Debugf("Starting state polling for state: %s, transmissions: %s", c.StateID, c.TransmissionsID)
-	ticker := time.NewTicker(c.client.pollingInterval)
+	ticker := time.NewTicker(utils.WithJitter(c.client.pollingInterval))
 	defer ticker.Stop()
 	for {
 		select {
@@ -134,6 +134,9 @@ func (c *ContractTracker) PollState() {
 					c.lggr.Errorf("error in PollState.fetchLatestTransmission, shared: %t, error %s", shared, err)
 				}
 			}()
+
+			// reset ticker with new jitter
+			ticker.Reset(utils.WithJitter(c.client.pollingInterval))
 		}
 	}
 }
