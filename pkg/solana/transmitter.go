@@ -30,17 +30,19 @@ func (c *ContractTracker) Transmit(
 		return errors.Wrap(err, "error on Transmit.FindProgramAddress")
 	}
 
-	c.stateLock.RLock()
+	_, store, err := c.ReadState()
+	if err != nil {
+		return errors.Wrap(err, "error on Transmit.ReadState")
+	}
 	accounts := []*solana.AccountMeta{
 		// state, transmitter, transmissions, store_program, store, store_authority
 		{PublicKey: c.StateID, IsWritable: true, IsSigner: false},
 		{PublicKey: c.Transmitter.PublicKey(), IsWritable: false, IsSigner: true},
 		{PublicKey: c.TransmissionsID, IsWritable: true, IsSigner: false},
 		{PublicKey: c.StoreProgramID, IsWritable: false, IsSigner: false},
-		{PublicKey: c.store, IsWritable: true, IsSigner: false},
+		{PublicKey: store, IsWritable: true, IsSigner: false},
 		{PublicKey: storeAuthority, IsWritable: false, IsSigner: false},
 	}
-	c.stateLock.RUnlock()
 
 	reportContext := RawReportContext(reportCtx)
 
@@ -104,9 +106,8 @@ func (c *ContractTracker) LatestConfigDigestAndEpoch(
 	epoch uint32,
 	err error,
 ) {
-	c.stateLock.RLock()
-	defer c.stateLock.RUnlock()
-	return c.state.Config.LatestConfigDigest, c.state.Config.Epoch, err
+	state, _, err := c.ReadState()
+	return state.Config.LatestConfigDigest, state.Config.Epoch, err
 }
 
 func (c *ContractTracker) FromAccount() types.Account {

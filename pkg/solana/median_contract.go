@@ -18,16 +18,20 @@ func (c *ContractTracker) LatestTransmissionDetails(
 	latestTimestamp time.Time,
 	err error,
 ) {
-	c.stateLock.RLock()
-	c.ansLock.RLock()
-	defer c.stateLock.RUnlock()
-	defer c.ansLock.RUnlock()
+	state, _, err := c.ReadState()
+	if err != nil {
+		return configDigest, epoch, round, latestAnswer, latestTimestamp, err
+	}
+	answer, err := c.ReadAnswer()
+	if err != nil {
+		return configDigest, epoch, round, latestAnswer, latestTimestamp, err
+	}
 
-	configDigest = c.state.Config.LatestConfigDigest
-	epoch = c.state.Config.Epoch
-	round = c.state.Config.Round
-	latestAnswer = c.answer.Data
-	latestTimestamp = time.Unix(int64(c.answer.Timestamp), 0)
+	configDigest = state.Config.LatestConfigDigest
+	epoch = state.Config.Epoch
+	round = state.Config.Round
+	latestAnswer = answer.Data
+	latestTimestamp = time.Unix(int64(answer.Timestamp), 0)
 	return configDigest, epoch, round, latestAnswer, latestTimestamp, nil
 }
 
@@ -51,7 +55,6 @@ func (c *ContractTracker) LatestRoundRequested(
 	round uint8,
 	err error,
 ) {
-	c.stateLock.RLock()
-	defer c.stateLock.RUnlock()
-	return c.state.Config.LatestConfigDigest, 0, 0, nil
+	state, _, err := c.ReadState()
+	return state.Config.LatestConfigDigest, 0, 0, err
 }

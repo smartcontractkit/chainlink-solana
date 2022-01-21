@@ -21,6 +21,7 @@ import (
 
 var (
 	configVersion uint8 = 1
+	defaultStaleTimeout = 1 * time.Minute
 
 	// error declarations
 	errCursorLength       = errors.New("incorrect cursor length")
@@ -46,6 +47,11 @@ type ContractTracker struct {
 	stateLock *sync.RWMutex
 	ansLock   *sync.RWMutex
 
+	// stale state parameters
+	stateTime    time.Time
+	ansTime      time.Time
+	staleTimeout time.Duration
+
 	// dependencies
 	client *Client
 	lggr   Logger
@@ -70,9 +76,13 @@ func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, l
 		requestGroup:    &singleflight.Group{},
 		stateLock:       &sync.RWMutex{},
 		ansLock:         &sync.RWMutex{},
+		stateTime:       time.Now(),
+		ansTime:         time.Now(),
+		staleTimeout:    defaultStaleTimeout,
 	}
 }
 
+// Start polling
 func (c *ContractTracker) Start() error {
 	return c.StartOnce("pollState", func() error {
 		c.done = make(chan struct{})
@@ -81,6 +91,7 @@ func (c *ContractTracker) Start() error {
 	})
 }
 
+// PollState contains the state and transmissions polling implementation
 func (c *ContractTracker) PollState() {
 	c.lggr.Debugf("Starting state polling for state: %s, transmissions: %s", c.StateID, c.TransmissionsID)
 	ticker := time.NewTicker(c.client.pollingInterval)
@@ -117,11 +128,39 @@ func (c *ContractTracker) PollState() {
 	}
 }
 
+// Close stops the polling
 func (c *ContractTracker) Close() error {
 	return c.StopOnce("pollState", func() error {
 		close(c.done)
 		return nil
 	})
+}
+
+// ReadState reads the latest state from memory with mutex and errors if timeout is exceeded
+func (c *ContractTracker) ReadState() (State, solana.PublicKey, error) {
+	c.stateLock.RLock()
+	defer c.stateLock.RUnlock()
+
+	var err error
+	current := time.Now()
+	if current.After(c.stateTime.Add(c.staleTimeout)) {
+		err = errors.New("error in ReadState: stale state data, polling is likely experiencing errors")
+	}
+	return c.state, c.store, err
+}
+
+// ReadAnswer reads the latest state from memory with mutex and errors if timeout is exceeded
+func (c *ContractTracker) ReadAnswer() (Answer, error) {
+	c.ansLock.RLock()
+	defer c.ansLock.RUnlock()
+
+	// check if stale timeout
+	var err error
+	current := time.Now()
+	if current.After(c.ansTime.Add(c.staleTimeout)) {
+		err = errors.New("error in ReadAnswer: stale answer data, polling is likely experiencing errors")
+	}
+	return c.answer, err
 }
 
 // fetch + decode + store raw state
@@ -133,10 +172,7 @@ func (c *ContractTracker) fetchState(ctx context.Context) error {
 		return err
 	}
 
-	c.stateLock.Lock()
-	c.state = state
-	c.stateLock.Unlock()
-	c.lggr.Debugf("state fetched for account: %s, result (config digest): %v", c.StateID, hex.EncodeToString(c.state.Config.LatestConfigDigest[:]))
+	c.lggr.Debugf("state fetched for account: %s, result (config digest): %v", c.StateID, hex.EncodeToString(state.Config.LatestConfigDigest[:]))
 
 	// Fetch the store address associated to the feed
 	offset := uint64(8 + 1) // Discriminator (8 bytes) + Version (u8)
@@ -152,9 +188,13 @@ func (c *ContractTracker) fetchState(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	// acquire lock and write to state
 	c.stateLock.Lock()
+	defer c.stateLock.Unlock()
+	c.state = state
 	c.store = solana.PublicKeyFromBytes(res.Value.Data.GetBinary())
-	c.stateLock.Unlock()
+	c.stateTime = time.Now()
 	c.lggr.Debugf("store fetched for feed: %s", c.store)
 
 	return nil
@@ -166,11 +206,13 @@ func (c *ContractTracker) fetchLatestTransmission(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
 	c.lggr.Debugf("latest transmission fetched for account: %s, result: %v", c.TransmissionsID, answer)
+
+	// acquire lock and write to state
 	c.ansLock.Lock()
+	defer c.ansLock.Unlock()
 	c.answer = answer
-	c.ansLock.Unlock()
+	c.ansTime = time.Now()
 	return nil
 }
 

@@ -15,9 +15,8 @@ func (c *ContractTracker) Notify() <-chan struct{} {
 // LatestConfigDetails returns information about the latest configuration,
 // but not the configuration itself.
 func (c *ContractTracker) LatestConfigDetails(ctx context.Context) (changedInBlock uint64, configDigest types.ConfigDigest, err error) {
-	c.stateLock.RLock()
-	defer c.stateLock.RUnlock()
-	return c.state.Config.LatestConfigBlockNumber, c.state.Config.LatestConfigDigest, nil
+	state, _, err := c.ReadState()
+	return state.Config.LatestConfigBlockNumber, state.Config.LatestConfigDigest, err
 }
 
 func configFromState(state State) (types.ContractConfig, error) {
@@ -54,9 +53,11 @@ func configFromState(state State) (types.ContractConfig, error) {
 
 // LatestConfig returns the latest configuration.
 func (c *ContractTracker) LatestConfig(ctx context.Context, changedInBlock uint64) (types.ContractConfig, error) {
-	c.stateLock.RLock()
-	defer c.stateLock.RUnlock()
-	return configFromState(c.state)
+	state, _, err := c.ReadState()
+	if err != nil {
+		return types.ContractConfig{}, err
+	}
+	return configFromState(state)
 }
 
 // LatestBlockHeight returns the height of the most recent block in the chain.

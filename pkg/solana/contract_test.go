@@ -193,6 +193,7 @@ func TestStatePolling(t *testing.T) {
 		requestGroup:    &singleflight.Group{},
 		stateLock:       &sync.RWMutex{},
 		ansLock:         &sync.RWMutex{},
+		staleTimeout:    defaultStaleTimeout,
 	}
 	require.NoError(t, tracker.Start())
 	require.Error(t, tracker.Start()) // test startOnce
@@ -201,12 +202,8 @@ func TestStatePolling(t *testing.T) {
 	require.Error(t, tracker.Close())                                             // test StopOnce
 	assert.GreaterOrEqual(t, callsPerSecond*int(wait.Seconds()-1), int(i.Load())) // expect minimum number of calls
 
-	// read locks
-	tracker.stateLock.RLock()
-	tracker.ansLock.RLock()
-	defer tracker.stateLock.RUnlock()
-	defer tracker.ansLock.RUnlock()
-
-	assert.Equal(t, expectedTime, tracker.answer.Timestamp)
-	assert.Equal(t, expectedAns, tracker.answer.Data.String())
+	answer, err := tracker.ReadAnswer()
+	assert.NoError(t, err)
+	assert.Equal(t, expectedTime, answer.Timestamp)
+	assert.Equal(t, expectedAns, answer.Data.String())
 }
