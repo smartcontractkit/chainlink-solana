@@ -12,7 +12,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	coreLog := logger.NewLogger(loggerConfig{})
+	coreLog := logger.NewLogger(loggerConfig{}).With("project", "solana")
 	log := logWrapper{coreLog}
 
 	solanaConfig, err := monitoring.ParseSolanaConfig()
