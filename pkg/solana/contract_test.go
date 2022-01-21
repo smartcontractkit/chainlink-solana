@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -169,7 +170,7 @@ func TestStatePolling(t *testing.T) {
 		// create response
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
-		i.Inc()// count calls
+		i.Inc() // count calls
 
 		// state query
 		if bytes.Contains(body, []byte("11111111111111111111111111111111")) {
@@ -190,13 +191,22 @@ func TestStatePolling(t *testing.T) {
 		client:          NewClient(OCR2Spec{NodeEndpointHTTP: mockServer.URL}, logger.TestLogger(t)),
 		lggr:            logger.TestLogger(t),
 		requestGroup:    &singleflight.Group{},
+		stateLock:       &sync.RWMutex{},
+		ansLock:         &sync.RWMutex{},
 	}
 	require.NoError(t, tracker.Start())
 	require.Error(t, tracker.Start()) // test startOnce
 	time.Sleep(wait)
 	require.NoError(t, tracker.Close())
-	require.Error(t, tracker.Close()) // test StopOnce
+	require.Error(t, tracker.Close())                                             // test StopOnce
 	assert.GreaterOrEqual(t, callsPerSecond*int(wait.Seconds()-1), int(i.Load())) // expect minimum number of calls
+
+	// read locks
+	tracker.stateLock.RLock()
+	tracker.ansLock.RLock()
+	defer tracker.stateLock.RUnlock()
+	defer tracker.ansLock.RUnlock()
+
 	assert.Equal(t, expectedTime, tracker.answer.Timestamp)
 	assert.Equal(t, expectedAns, tracker.answer.Data.String())
 }

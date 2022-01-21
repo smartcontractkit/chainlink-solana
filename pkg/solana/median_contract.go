@@ -18,6 +18,11 @@ func (c *ContractTracker) LatestTransmissionDetails(
 	latestTimestamp time.Time,
 	err error,
 ) {
+	c.stateLock.RLock()
+	c.ansLock.RLock()
+	defer c.stateLock.RUnlock()
+	defer c.ansLock.RUnlock()
+
 	configDigest = c.state.Config.LatestConfigDigest
 	epoch = c.state.Config.Epoch
 	round = c.state.Config.Round
@@ -46,5 +51,7 @@ func (c *ContractTracker) LatestRoundRequested(
 	round uint8,
 	err error,
 ) {
+	c.stateLock.RLock()
+	defer c.stateLock.RUnlock()
 	return c.state.Config.LatestConfigDigest, 0, 0, nil
 }

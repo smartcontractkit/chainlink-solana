@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	"golang.org/x/sync/singleflight"
@@ -41,6 +42,10 @@ type ContractTracker struct {
 	store  solana.PublicKey
 	answer Answer
 
+	// read/write mutexes
+	stateLock *sync.RWMutex
+	ansLock   *sync.RWMutex
+
 	// dependencies
 	client *Client
 	lggr   Logger
@@ -63,6 +68,8 @@ func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, l
 		client:          client,
 		lggr:            lggr,
 		requestGroup:    &singleflight.Group{},
+		stateLock:       &sync.RWMutex{},
+		ansLock:         &sync.RWMutex{},
 	}
 }
 
@@ -119,13 +126,16 @@ func (c *ContractTracker) Close() error {
 
 // fetch + decode + store raw state
 func (c *ContractTracker) fetchState(ctx context.Context) error {
+
 	c.lggr.Debugf("fetch state for account: %s", c.StateID.String())
 	state, _, err := GetState(ctx, c.client.rpc, c.StateID, c.client.commitment)
 	if err != nil {
 		return err
 	}
 
+	c.stateLock.Lock()
 	c.state = state
+	c.stateLock.Unlock()
 	c.lggr.Debugf("state fetched for account: %s, result (config digest): %v", c.StateID, hex.EncodeToString(c.state.Config.LatestConfigDigest[:]))
 
 	// Fetch the store address associated to the feed
@@ -142,7 +152,9 @@ func (c *ContractTracker) fetchState(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	c.stateLock.Lock()
 	c.store = solana.PublicKeyFromBytes(res.Value.Data.GetBinary())
+	c.stateLock.Unlock()
 	c.lggr.Debugf("store fetched for feed: %s", c.store)
 
 	return nil
@@ -156,7 +168,9 @@ func (c *ContractTracker) fetchLatestTransmission(ctx context.Context) error {
 	}
 
 	c.lggr.Debugf("latest transmission fetched for account: %s, result: %v", c.TransmissionsID, answer)
+	c.ansLock.Lock()
 	c.answer = answer
+	c.ansLock.Unlock()
 	return nil
 }
 
