@@ -20,8 +20,8 @@ import (
 )
 
 var (
-	configVersion uint8 = 1
-	defaultStaleTimeout = 1 * time.Minute
+	configVersion       uint8 = 1
+	defaultStaleTimeout       = 1 * time.Minute
 
 	// error declarations
 	errCursorLength       = errors.New("incorrect cursor length")
