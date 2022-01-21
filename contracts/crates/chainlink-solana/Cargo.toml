@@ -1,0 +1,20 @@
+[package]
+name = "chainlink_solana"
+description = "Chainlink client for Solana"
+version = "0.1.0"
+edition = "2018"
+license = "MIT"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "chainlink_solana"
+
+[features]
+default = []
+
+[dependencies]
+solana-program = "1.8.6"
+borsh = "0.9.1"
+borsh-derive = "0.9.1"

@@ -39,7 +39,7 @@ pub enum Scope {
     // Owner
 }
 
-#[account]
+#[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct Round {
     pub round_id: u32,
     pub timestamp: u64,

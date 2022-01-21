@@ -3,15 +3,6 @@
 version = 3
 
 [[package]]
-name = "access-controller"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "arrayvec 0.1.0",
- "static_assertions",
-]
-
-[[package]]
 name = "ahash"
 version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -201,10 +192,6 @@ checksum = "a4c527152e37cf757a3f78aae5a06fbeefdb07ccc535c980a3208ee3060dd544"
 
 [[package]]
 name = "arrayvec"
-version = "0.1.0"
-
-[[package]]
-name = "arrayvec"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8da52d66c7071e2e3fa2a1e5c6d088fec47b593032b254f5e980de8ea54454d6"
@@ -260,7 +247,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "882e99e4a0cb2ae6cb6e442102e8e6b7131718d94110e64c3e6a34ea9b106f37"
 dependencies = [
  "arrayref",
- "arrayvec 0.7.2",
+ "arrayvec",
  "cc",
  "cfg-if",
  "constant_time_eq",
@@ -402,6 +389,15 @@ name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+
+[[package]]
+name = "chainlink-solana"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "borsh-derive",
+ "solana-program",
+]
 
 [[package]]
 name = "console_error_panic_hook"
@@ -569,7 +565,7 @@ name = "hello-world"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
- "store",
+ "chainlink-solana",
 ]
 
 [[package]]
@@ -1105,22 +1101,6 @@ dependencies = [
  "quote",
  "rustversion",
  "syn",
-]
-
-[[package]]
-name = "static_assertions"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
-
-[[package]]
-name = "store"
-version = "0.1.0"
-dependencies = [
- "access-controller",
- "anchor-lang",
- "arrayvec 0.1.0",
- "bytemuck",
 ]
 
 [[package]]

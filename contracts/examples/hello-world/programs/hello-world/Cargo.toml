@@ -13,12 +13,12 @@ no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
-mainnet = ["chainlink-solana/mainnet"]
-testnet = ["chainlink-solana/testnet"]
-devnet = ["chainlink-solana/devnet"]
-localnet = ["chainlink-solana/localnet"]
+mainnet = []
+testnet = []
+devnet = []
+localnet = []
 default = ["localnet"]
 
 [dependencies]
 anchor-lang = "0.20.1"
-chainlink-solana = { version = "0.1.0", package = "store", path = "../../../../programs/store", default-features = false, features = ["cpi"] }
+chainlink_solana = "0.1.0"

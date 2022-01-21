@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use chainlink_solana::accessors as chainlink;
+use chainlink_solana as chainlink;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
