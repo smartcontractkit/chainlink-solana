@@ -1,0 +1,97 @@
+name: chaos
+on:
+  schedule:
+    - cron: '0 */3 * * *'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: projectserum/build:v0.20.0
+      env:
+        RUSTUP_HOME: "/root/.rustup"
+        FORCE_COLOR: 1
+        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v2
+      - run: echo $HOME
+      - run: echo $PATH
+      - run: |
+          npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
+          NPM_TOKEN=${NPM_TOKEN} yarn install --frozen-lockfile
+      - run: anchor build
+        working-directory: contracts
+      - uses: actions/upload-artifact@master
+        with:
+          name: target
+          path: contracts/target/deploy
+  chaos:
+    runs-on: ubuntu-latest
+    needs: build
+    env:
+      CGO_ENABLED: 1
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v2
+      - name: Setup go
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.17
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.QA_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.QA_AWS_SECRET_KEY }}
+          aws-region: ${{ secrets.QA_AWS_REGION }}
+          role-to-assume: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          role-duration-seconds: 3600
+      - name: Set Kubernetes Context
+        uses: azure/k8s-set-context@v1
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.QA_KUBECONFIG }}
+      - name: Cache Vendor Packages
+        uses: actions/cache@v2
+        id: cache-packages
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Download Go Vendor Packages
+        if: steps.cache-packages.outputs.cache-hit != 'true'
+        run: go mod download
+      - name: Install Ginkgo CLI
+        run: |
+          go get github.com/onsi/ginkgo/v2/ginkgo/generators@v2.0.0-rc2
+          go get github.com/onsi/ginkgo/v2/ginkgo/internal@v2.0.0-rc2
+          go get github.com/onsi/ginkgo/v2/ginkgo/labels@v2.0.0-rc2
+          go install github.com/onsi/ginkgo/v2/ginkgo
+      - uses: actions/download-artifact@master
+        with:
+          name: target
+          path: contracts/target/deploy
+      - name: cp static deploy keys
+        run: ./scripts/programs-keys-cp.sh
+      - name: Run Tests
+        env:
+          SELECTED_NETWORKS: solana
+          NETWORK_SETTINGS: /home/runner/work/chainlink-solana/chainlink-solana/tests/e2e/networks.yaml
+        run: |
+          export PATH=$PATH:$(go env GOPATH)/bin
+          ginkgo tests/e2e/chaos
+      - name: Publish Test Results
+        uses: mikepenz/action-junit-report@v2
+        if: always()
+        with:
+          report_paths: "./tests-chaos-report.xml"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          check_name: Chaos Test Results
+      - name: Publish Artifacts
+        if: failure()
+        uses: actions/upload-artifact@v2.2.4
+        with:
+          name: test-logs
+          path: ./tests/e2e/chaos/logs

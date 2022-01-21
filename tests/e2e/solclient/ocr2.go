@@ -226,8 +226,6 @@ func (m *OCRv2) GetContractData(ctx context.Context) (*contracts.OffchainAggrega
 func (m *OCRv2) SetOracles(ocConfig contracts.OffChainAggregatorV2Config) error {
 	log.Info().Str("Program Address", m.ProgramWallet.PublicKey().String()).Msg("Setting oracles")
 	payer := m.Client.DefaultWallet
-	instr := make([]solana.Instruction, 0)
-
 	oracles := make([]ocr_2.NewOracle, 0)
 	for _, oc := range ocConfig.Oracles {
 		oracle := oc.OracleIdentity
@@ -242,7 +240,33 @@ func (m *OCRv2) SetOracles(ocConfig contracts.OffChainAggregatorV2Config) error 
 			Transmitter: transmitter,
 		})
 	}
+	err := m.Client.TXSync(
+		"Set oracles",
+		rpc.CommitmentFinalized,
+		[]solana.Instruction{
+			ocr_2.NewSetConfigInstruction(
+				oracles,
+				uint8(ocConfig.F),
+				m.Client.Accounts.OCR.PublicKey(),
+				m.Client.Accounts.Owner.PublicKey(),
+			).Build(),
+		},
+		func(key solana.PublicKey) *solana.PrivateKey {
+			if key.Equals(m.Client.Accounts.Owner.PublicKey()) {
+				return &m.Client.Accounts.Owner.PrivateKey
+			}
+			if key.Equals(payer.PublicKey()) {
+				return &payer.PrivateKey
+			}
+			return nil
+		},
+		payer.PublicKey(),
+	)
+	if err != nil {
+		return err
+	}
 	// set one payee for all
+	instr := make([]solana.Instruction, 0)
 	payee := solana.NewWallet()
 	if err := m.Client.addNewAssociatedAccInstr(payee, m.Client.Accounts.Owner.PublicKey(), &instr); err != nil {
 		return err
@@ -251,19 +275,14 @@ func (m *OCRv2) SetOracles(ocConfig contracts.OffChainAggregatorV2Config) error 
 	for i := 0; i < len(oracles); i++ {
 		payees = append(payees, payee.PublicKey())
 	}
-	instr = append(instr, ocr_2.NewSetConfigInstruction(
-		oracles,
-		uint8(ocConfig.F),
-		m.Client.Accounts.OCR.PublicKey(),
-		m.Client.Accounts.Owner.PublicKey(),
-	).Build())
 	instr = append(instr, ocr_2.NewSetPayeesInstruction(
 		payees,
 		m.State.PublicKey(),
 		m.Client.Accounts.Owner.PublicKey()).Build(),
 	)
-	err := m.Client.TXAsync(
-		"Set oracles with associated payees",
+	err = m.Client.TXSync(
+		"Set payees",
+		rpc.CommitmentFinalized,
 		instr,
 		func(key solana.PublicKey) *solana.PrivateKey {
 			if key.Equals(payee.PublicKey()) {

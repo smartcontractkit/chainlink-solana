@@ -30,6 +30,10 @@ func init() {
 var (
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
+	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
+
+	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
+
 	Instruction_AddAccess = ag_binary.TypeID([8]byte{151, 189, 105, 24, 113, 60, 99, 138})
 
 	Instruction_RemoveAccess = ag_binary.TypeID([8]byte{92, 172, 70, 124, 83, 45, 88, 22})
@@ -40,6 +44,10 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
 	case Instruction_Initialize:
 		return "Initialize"
+	case Instruction_TransferOwnership:
+		return "TransferOwnership"
+	case Instruction_AcceptOwnership:
+		return "AcceptOwnership"
 	case Instruction_AddAccess:
 		return "AddAccess"
 	case Instruction_RemoveAccess:
@@ -66,6 +74,12 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	[]ag_binary.VariantType{
 		{
 			"initialize", (*Initialize)(nil),
+		},
+		{
+			"transfer_ownership", (*TransferOwnership)(nil),
+		},
+		{
+			"accept_ownership", (*AcceptOwnership)(nil),
 		},
 		{
 			"add_access", (*AddAccess)(nil),

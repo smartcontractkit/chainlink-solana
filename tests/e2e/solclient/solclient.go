@@ -24,15 +24,16 @@ import (
 )
 
 type NetworkConfig struct {
-	External    bool          `mapstructure:"external" yaml:"external"`
-	Name        string        `mapstructure:"name" yaml:"name"`
-	ID          string        `mapstructure:"id" yaml:"id"`
-	ChainID     int64         `mapstructure:"chain_id" yaml:"chain_id"`
-	URL         string        `mapstructure:"url" yaml:"url"`
-	URLs        []string      `mapstructure:"urls" yaml:"urls"`
-	Type        string        `mapstructure:"type" yaml:"type"`
-	PrivateKeys []string      `mapstructure:"private_keys" yaml:"private_keys"`
-	Timeout     time.Duration `mapstructure:"transaction_timeout" yaml:"transaction_timeout"`
+	External          bool          `mapstructure:"external" yaml:"external"`
+	ContractsDeployed bool          `mapstructure:"contracts_deployed" yaml:"contracts_deployed"`
+	Name              string        `mapstructure:"name" yaml:"name"`
+	ID                string        `mapstructure:"id" yaml:"id"`
+	ChainID           int64         `mapstructure:"chain_id" yaml:"chain_id"`
+	URL               string        `mapstructure:"url" yaml:"url"`
+	URLs              []string      `mapstructure:"urls" yaml:"urls"`
+	Type              string        `mapstructure:"type" yaml:"type"`
+	PrivateKeys       []string      `mapstructure:"private_keys" yaml:"private_keys"`
+	Timeout           time.Duration `mapstructure:"transaction_timeout" yaml:"transaction_timeout"`
 }
 
 // Accounts is a shared state between contracts in which data is stored in Solana
@@ -74,6 +75,10 @@ type Client struct {
 }
 
 var _ client.BlockchainClient = (*Client)(nil)
+
+func (c *Client) ContractsDeployed() bool {
+	return c.Config.ContractsDeployed
+}
 
 func (c *Client) GetChainID() int64 {
 	panic("implement me")
