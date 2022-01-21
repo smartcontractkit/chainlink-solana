@@ -16,7 +16,7 @@ type Store struct {
 	ProgramWallet *solana.Wallet
 }
 
-func (m *Store) GetLatestRoundData() (uint64, error) {
+func (m *Store) GetLatestRoundData() (uint64, uint64, uint64, error) {
 	a, _, err := relaySol.GetLatestTransmission(context.Background(), m.Client.RPC, m.Feed.PublicKey(), rpc.CommitmentConfirmed)
 	if err != nil {
 		return 0, 0, 0, err
