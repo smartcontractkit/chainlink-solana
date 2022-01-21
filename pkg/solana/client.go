@@ -33,7 +33,7 @@ func NewClient(spec OCR2Spec, logger Logger) *Client {
 	case "processed":
 		client.commitment = rpc.CommitmentProcessed
 	case "finalized":
-		client.commitment = rpc.CommitmentProcessed
+		client.commitment = rpc.CommitmentFinalized
 	default:
 		client.commitment = rpc.CommitmentConfirmed
 	}
