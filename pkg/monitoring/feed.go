@@ -9,46 +9,6 @@ import (
 	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
 )
 
-func SolanaFeedParser(buf io.ReadCloser) ([]relayMonitoring.FeedConfig, error) {
-	rawFeeds := []SolanaFeedConfig{}
-	decoder := json.NewDecoder(buf)
-	if err := decoder.Decode(&rawFeeds); err != nil {
-		return nil, fmt.Errorf("unable to unmarshal feeds config data: %w", err)
-	}
-	feeds := make([]relayMonitoring.FeedConfig, len(rawFeeds))
-	for i, rawFeed := range rawFeeds {
-		contractAddress, err := solana.PublicKeyFromBase58(rawFeed.ContractAddressBase58)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse program id '%s' from JSON at index i=%d: %w", rawFeed.ContractAddressBase58, i, err)
-		}
-		transmissionsAccount, err := solana.PublicKeyFromBase58(rawFeed.TransmissionsAccountBase58)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse transmission account '%s' from JSON at index i=%d: %w", rawFeed.TransmissionsAccountBase58, i, err)
-		}
-		stateAccount, err := solana.PublicKeyFromBase58(rawFeed.StateAccountBase58)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse state account '%s' from JSON at index i=%d: %w", rawFeed.StateAccountBase58, i, err)
-		}
-		feeds[i] = relayMonitoring.FeedConfig(SolanaFeedConfig{
-			rawFeed.Name,
-			rawFeed.Path,
-			rawFeed.Symbol,
-			rawFeed.HeartbeatSec,
-			rawFeed.ContractType,
-			rawFeed.ContractStatus,
-
-			rawFeed.ContractAddressBase58,
-			rawFeed.TransmissionsAccountBase58,
-			rawFeed.StateAccountBase58,
-
-			contractAddress,
-			transmissionsAccount,
-			stateAccount,
-		})
-	}
-	return feeds, nil
-}
-
 type SolanaFeedConfig struct {
 	Name           string `json:"name,omitempty"`
 	Path           string `json:"path,omitempty"`
@@ -106,14 +66,59 @@ func (s SolanaFeedConfig) GetContractAddressBytes() []byte {
 
 func (s SolanaFeedConfig) ToMapping() map[string]interface{} {
 	return map[string]interface{}{
-		"feed_name":             s.Name,
-		"feed_path":             s.Path,
-		"symbol":                s.Symbol,
-		"heartbeat_sec":         int64(s.HeartbeatSec),
-		"contract_type":         s.ContractType,
-		"contract_status":       s.ContractStatus,
-		"contract_address":      s.ContractAddress.Bytes(),
-		"transmissions_account": s.TransmissionsAccount.Bytes(),
-		"state_account":         s.StateAccount.Bytes(),
+		"feed_name":        s.Name,
+		"feed_path":        s.Path,
+		"symbol":           s.Symbol,
+		"heartbeat_sec":    int64(s.HeartbeatSec),
+		"contract_type":    s.ContractType,
+		"contract_status":  s.ContractStatus,
+		"contract_address": s.ContractAddress.Bytes(),
+
+		"transmissions_account": map[string]interface{}{
+			"bytes": s.TransmissionsAccount.Bytes(),
+		},
+		"state_account": map[string]interface{}{
+			"bytes": s.StateAccount.Bytes(),
+		},
 	}
+}
+
+func SolanaFeedParser(buf io.ReadCloser) ([]relayMonitoring.FeedConfig, error) {
+	rawFeeds := []SolanaFeedConfig{}
+	decoder := json.NewDecoder(buf)
+	if err := decoder.Decode(&rawFeeds); err != nil {
+		return nil, fmt.Errorf("unable to unmarshal feeds config data: %w", err)
+	}
+	feeds := make([]relayMonitoring.FeedConfig, len(rawFeeds))
+	for i, rawFeed := range rawFeeds {
+		contractAddress, err := solana.PublicKeyFromBase58(rawFeed.ContractAddressBase58)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse program id '%s' from JSON at index i=%d: %w", rawFeed.ContractAddressBase58, i, err)
+		}
+		transmissionsAccount, err := solana.PublicKeyFromBase58(rawFeed.TransmissionsAccountBase58)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse transmission account '%s' from JSON at index i=%d: %w", rawFeed.TransmissionsAccountBase58, i, err)
+		}
+		stateAccount, err := solana.PublicKeyFromBase58(rawFeed.StateAccountBase58)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse state account '%s' from JSON at index i=%d: %w", rawFeed.StateAccountBase58, i, err)
+		}
+		feeds[i] = relayMonitoring.FeedConfig(SolanaFeedConfig{
+			rawFeed.Name,
+			rawFeed.Path,
+			rawFeed.Symbol,
+			rawFeed.HeartbeatSec,
+			rawFeed.ContractType,
+			rawFeed.ContractStatus,
+
+			rawFeed.ContractAddressBase58,
+			rawFeed.TransmissionsAccountBase58,
+			rawFeed.StateAccountBase58,
+
+			contractAddress,
+			transmissionsAccount,
+			stateAccount,
+		})
+	}
+	return feeds, nil
 }
