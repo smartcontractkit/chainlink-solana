@@ -111,6 +111,6 @@ describe('hello-world', () => {
     });
     console.log("Your transaction signature", tx);
     let t = await provider.connection.getConfirmedTransaction(tx, "confirmed");
-    console.log(t.logMessages)
+    console.log(t.meta.logMessages)
   });
 });
