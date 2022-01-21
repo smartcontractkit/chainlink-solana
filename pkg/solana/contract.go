@@ -61,11 +61,12 @@ type ContractTracker struct {
 
 	// polling
 	done chan struct{}
+	stop chan struct{}
 	utils.StartStopOnce
 }
 
 func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, lggr Logger) ContractTracker {
-	// parse poll interval, if errors: use 1 second default
+	// parse staleness timeout, if errors: use default timeout (1 min)
 	staleTimeout, err := time.ParseDuration(spec.StaleTimeout)
 	if err != nil {
 		lggr.Warnf("could not parse stale timeout interval using default 1m")
@@ -93,6 +94,7 @@ func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, l
 func (c *ContractTracker) Start() error {
 	return c.StartOnce("pollState", func() error {
 		c.done = make(chan struct{})
+		c.stop = make(chan struct{})
 		go c.PollState()
 		return nil
 	})
@@ -100,12 +102,13 @@ func (c *ContractTracker) Start() error {
 
 // PollState contains the state and transmissions polling implementation
 func (c *ContractTracker) PollState() {
+	defer close(c.done)
 	c.lggr.Debugf("Starting state polling for state: %s, transmissions: %s", c.StateID, c.TransmissionsID)
 	ticker := time.NewTicker(c.client.pollingInterval)
 	defer ticker.Stop()
 	for {
 		select {
-		case <-c.done:
+		case <-c.stop:
 			c.lggr.Debugf("Stopping state polling for state: %s, transmissions: %s", c.StateID, c.TransmissionsID)
 			return
 		case <-ticker.C:
@@ -138,7 +141,8 @@ func (c *ContractTracker) PollState() {
 // Close stops the polling
 func (c *ContractTracker) Close() error {
 	return c.StopOnce("pollState", func() error {
-		close(c.done)
+		close(c.stop)
+		<-c.done
 		return nil
 	})
 }
@@ -149,8 +153,7 @@ func (c *ContractTracker) ReadState() (State, solana.PublicKey, error) {
 	defer c.stateLock.RUnlock()
 
 	var err error
-	current := time.Now()
-	if current.After(c.stateTime.Add(c.staleTimeout)) {
+	if time.Since(c.stateTime) > c.staleTimeout {
 		err = errors.New("error in ReadState: stale state data, polling is likely experiencing errors")
 	}
 	return c.state, c.store, err
@@ -163,8 +166,7 @@ func (c *ContractTracker) ReadAnswer() (Answer, error) {
 
 	// check if stale timeout
 	var err error
-	current := time.Now()
-	if current.After(c.ansTime.Add(c.staleTimeout)) {
+	if time.Since(c.ansTime) > c.staleTimeout {
 		err = errors.New("error in ReadAnswer: stale answer data, polling is likely experiencing errors")
 	}
 	return c.answer, err
@@ -196,14 +198,15 @@ func (c *ContractTracker) fetchState(ctx context.Context) error {
 		return err
 	}
 
+	store := solana.PublicKeyFromBytes(res.Value.Data.GetBinary())
+	c.lggr.Debugf("store fetched for feed: %s", store)
+
 	// acquire lock and write to state
 	c.stateLock.Lock()
 	defer c.stateLock.Unlock()
 	c.state = state
-	c.store = solana.PublicKeyFromBytes(res.Value.Data.GetBinary())
+	c.store = store
 	c.stateTime = time.Now()
-	c.lggr.Debugf("store fetched for feed: %s", c.store)
-
 	return nil
 }
 
