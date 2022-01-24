@@ -78,8 +78,8 @@ func (m *OCRv2TestState) LabelChaosGroups() {
 	m.LabelChaosGroup(10, 19, ChaosGroupRightHalf)
 }
 
-func (m *OCRv2TestState) DeployCluster(nodes int) {
-	m.DeployEnv(nodes)
+func (m *OCRv2TestState) DeployCluster(nodes int, stateful bool) {
+	m.DeployEnv(nodes, stateful)
 	m.SetupClients()
 	if m.Networks.Default.ContractsDeployed() {
 		err := m.LoadContracts()
@@ -110,9 +110,9 @@ func (m *OCRv2TestState) UploadProgramBinaries() {
 	Expect(err).ShouldNot(HaveOccurred())
 }
 
-func (m *OCRv2TestState) DeployEnv(nodes int) {
+func (m *OCRv2TestState) DeployEnv(nodes int, stateful bool) {
 	m.Env, m.err = environment.DeployOrLoadEnvironment(
-		solclient.NewChainlinkSolOCRv2(nodes),
+		solclient.NewChainlinkSolOCRv2(nodes, stateful),
 		tools.ChartsRoot,
 	)
 	Expect(m.err).ShouldNot(HaveOccurred())
