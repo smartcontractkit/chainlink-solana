@@ -12,7 +12,7 @@ var _ = Describe("Solana chaos suite", func() {
 	var state = &common.OCRv2TestState{}
 	BeforeEach(func() {
 		By("Deploying OCRv2 cluster", func() {
-			state.DeployCluster(19)
+			state.DeployCluster(19, true)
 			state.LabelChaosGroups()
 			state.ImitateSource(1*time.Second, 2, 10)
 		})
