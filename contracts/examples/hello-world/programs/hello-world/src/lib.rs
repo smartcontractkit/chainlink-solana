@@ -4,8 +4,6 @@ use chainlink_solana as chainlink;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
-const DECIMALS: u32 = 18;
-
 struct Decimal {
     pub value: i128,
     pub decimals: u32,
@@ -42,8 +40,18 @@ pub mod hello_world {
             ctx.accounts.chainlink_feed.to_account_info(),
         )?;
 
-        let decimal = Decimal::new(round.answer, DECIMALS);
-        msg!("Price is {}", decimal);
+        let description = chainlink::description(
+            ctx.accounts.chainlink_program.to_account_info(),
+            ctx.accounts.chainlink_feed.to_account_info(),
+        )?;
+
+        let decimals = chainlink::decimals(
+            ctx.accounts.chainlink_program.to_account_info(),
+            ctx.accounts.chainlink_feed.to_account_info(),
+        )?;
+
+        let decimal = Decimal::new(round.answer, u32::from(decimals));
+        msg!("{} price is {}", description, decimal);
         Ok(())
     }
 }
