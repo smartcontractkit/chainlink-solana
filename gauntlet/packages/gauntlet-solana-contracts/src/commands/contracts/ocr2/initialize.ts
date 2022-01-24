@@ -6,6 +6,7 @@ import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { utils } from '@project-serum/anchor'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { getRDD } from '../../../lib/rdd'
+import { ADDITIONAL_STATE_BUFFER } from '../../../lib/constants'
 
 type Input = {
   minAnswer: number | string
