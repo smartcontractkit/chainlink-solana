@@ -1,9 +1,16 @@
 import { Result, WriteCommand } from '@chainlink/gauntlet-core'
-import { BpfLoader, BPF_LOADER_PROGRAM_ID, Keypair, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js'
+import {
+  Transaction,
+  BpfLoader,
+  BPF_LOADER_PROGRAM_ID,
+  Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  TransactionSignature,
+} from '@solana/web3.js'
 import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { RawTransaction, TransactionResponse } from '../types'
-import { Idl, Program, Provider, Wallet } from '@project-serum/anchor'
-
+import { ProgramError, parseIdlErrors, Idl, Program, Provider, Wallet } from '@project-serum/anchor'
 export default abstract class SolanaCommand extends WriteCommand<TransactionResponse> {
   wallet: typeof Wallet
   provider: Provider
@@ -53,6 +60,20 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       wait: async (hash) => ({
         success: success,
       }),
+    }
+  }
+
+  sendTx = async (tx: Transaction, signers: Keypair[], idl: Idl): Promise<TransactionSignature> => {
+    try {
+      return await this.provider.send(tx, signers)
+    } catch (err) {
+      // Translate IDL error
+      const idlErrors = parseIdlErrors(idl)
+      let translatedErr = ProgramError.parse(err, idlErrors)
+      if (translatedErr === null) {
+        throw err
+      }
+      throw translatedErr
     }
   }
 }

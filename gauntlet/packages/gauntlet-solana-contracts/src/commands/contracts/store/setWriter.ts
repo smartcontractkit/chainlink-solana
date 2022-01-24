@@ -1,10 +1,11 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { PublicKey } from '@solana/web3.js'
+import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
+import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { utils } from '@project-serum/anchor'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
+import { makeTx } from '../../../lib/utils'
 
 type Input = {
   transmissions: string
@@ -35,7 +36,7 @@ export default class SetWriter extends SolanaCommand {
     }
   }
 
-  execute = async () => {
+  makeRawTransaction = async (signer: PublicKey) => {
     const store = getContract(CONTRACT_LIST.STORE, '')
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const storeAddress = store.programId.toString()
@@ -44,7 +45,6 @@ export default class SetWriter extends SolanaCommand {
     const ocr2Program = this.loadProgram(ocr2.idl, ocr2Address)
 
     const input = this.makeInput(this.flags.input)
-    const owner = this.wallet.payer
 
     const storeState = new PublicKey(input.store || this.flags.state)
     const ocr2State = new PublicKey(this.flags.ocrState)
@@ -55,24 +55,55 @@ export default class SetWriter extends SolanaCommand {
       ocr2Program.programId,
     )
 
-    console.log(`Setting store writer on Store (${storeState.toString()}) and Feed (${feedState.toString()})`)
-
-    const tx = await storeProgram.rpc.setWriter(storeAuthority, {
-      accounts: {
-        store: storeState,
-        feed: feedState,
-        authority: owner.publicKey,
-      },
-      signers: [owner],
+    const data = storeProgram.coder.instruction.encode('set_writer', {
+      writer: storeAuthority,
     })
 
-    logger.success(`Set writer on tx ${tx}`)
+    const accounts: AccountMeta[] = [
+      {
+        pubkey: storeState,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: signer,
+        isSigner: true,
+        isWritable: false,
+      },
+      {
+        pubkey: feedState,
+        isSigner: false,
+        isWritable: true,
+      },
+    ]
+
+    const rawTx: RawTransaction = {
+      data,
+      accounts,
+      programId: storeProgram.programId,
+    }
+
+    return [rawTx]
+  }
+
+  execute = async () => {
+    const contract = getContract(CONTRACT_LIST.STORE, '')
+    const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
+    const tx = makeTx(rawTx)
+    logger.debug(tx)
+    const input = this.makeInput(this.flags.input)
+    const storeState = new PublicKey(input.store || this.flags.state)
+    const feedState = new PublicKey(input.transmissions)
+    logger.info(`Setting store writer on Store (${storeState.toString()}) and Feed (${feedState.toString()})`)
+    logger.loading('Sending tx...')
+    const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
+    logger.success(`Writer set on tx hash: ${txhash}`)
 
     return {
       responses: [
         {
-          tx: this.wrapResponse(tx, storeState.toString(), { state: storeState.toString() }),
-          contract: storeState.toString(),
+          tx: this.wrapResponse(txhash, this.flags.state),
+          contract: this.flags.state,
         },
       ],
     } as Result<TransactionResponse>

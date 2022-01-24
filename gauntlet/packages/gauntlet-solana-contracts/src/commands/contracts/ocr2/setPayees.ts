@@ -1,10 +1,11 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
+import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
-import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
+import { makeTx } from '../../../lib/utils'
 
 type Input = {
   operators: {
@@ -18,7 +19,6 @@ type Input = {
 export default class SetPayees extends SolanaCommand {
   static id = 'ocr2:set_payees'
   static category = CONTRACT_LIST.OCR_2
-
   static examples = [
     'yarn gauntlet ocr2:set_payees --network=local --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
@@ -45,12 +45,11 @@ export default class SetPayees extends SolanaCommand {
     this.requireFlag('link', 'Provide a valid link address')
   }
 
-  execute = async () => {
+  makeRawTransaction = async (signer: PublicKey) => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
 
-    const owner = this.wallet.payer
     const input = this.makeInput(this.flags.input)
     const state = new PublicKey(this.flags.state)
 
@@ -99,21 +98,46 @@ export default class SetPayees extends SolanaCommand {
       .map(({ transmitter }) => payeeByTransmitter[new PublicKey(transmitter).toString()])
 
     logger.log('Payees information:', input)
-    await prompt('Continue setting payees?')
-
-    const tx = await program.rpc.setPayees(payees, {
-      accounts: {
-        state: state,
-        authority: owner.publicKey,
-      },
-      signers: [owner],
+    const data = program.coder.instruction.encode('set_payees', {
+      payees,
     })
 
+    const accounts: AccountMeta[] = [
+      {
+        pubkey: state,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: signer,
+        isSigner: true,
+        isWritable: false,
+      },
+    ]
+
+    const rawTx: RawTransaction = {
+      data,
+      accounts,
+      programId: ocr2.programId,
+    }
+
+    return [rawTx]
+  }
+
+  execute = async () => {
+    const contract = getContract(CONTRACT_LIST.OCR_2, '')
+    const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
+    const tx = makeTx(rawTx)
+    logger.debug(tx)
+    await prompt('Continue setting payees?')
+    logger.loading('Sending tx...')
+    const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
+    logger.success(`Payees set on tx hash: ${txhash}`)
     return {
       responses: [
         {
-          tx: this.wrapResponse(tx, state.toString()),
-          contract: state.toString(),
+          tx: this.wrapResponse(txhash, this.flags.state),
+          contract: this.flags.state,
         },
       ],
     } as Result<TransactionResponse>

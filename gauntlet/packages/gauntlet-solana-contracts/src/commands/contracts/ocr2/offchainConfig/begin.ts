@@ -1,9 +1,10 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { PublicKey } from '@solana/web3.js'
+import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
+import { AccountMeta, PublicKey } from '@solana/web3.js'
 import BN from 'bn.js'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
+import { makeTx } from '../../../../lib/utils'
 
 export default class BeginOffchainConfig extends SolanaCommand {
   static id = 'ocr2:begin_offchain_config'
@@ -19,31 +20,56 @@ export default class BeginOffchainConfig extends SolanaCommand {
     this.require(!!this.flags.state, 'Please provide flags with "state"')
   }
 
-  execute = async () => {
+  makeRawTransaction = async (signer: PublicKey) => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
 
     const state = new PublicKey(this.flags.state)
-    const owner = this.wallet.payer
     const version = new BN(2)
 
-    await prompt(`Begin setting Offchain config version ${version.toString()}?`)
-
-    const tx = await program.rpc.beginOffchainConfig(version, {
-      accounts: {
-        state: state,
-        authority: owner.publicKey,
-      },
+    const data = program.coder.instruction.encode('begin_offchain_config', {
+      offchainConfigVersion: version,
     })
 
-    logger.success(`Begin set offchain config on tx ${tx}`)
+    const accounts: AccountMeta[] = [
+      {
+        pubkey: state,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: signer,
+        isSigner: true,
+        isWritable: false,
+      },
+    ]
+
+    const rawTx: RawTransaction = {
+      data,
+      accounts,
+      programId: ocr2.programId,
+    }
+
+    return [rawTx]
+  }
+
+  execute = async () => {
+    const contract = getContract(CONTRACT_LIST.OCR_2, '')
+    const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
+    const tx = makeTx(rawTx)
+    logger.debug(tx)
+    const version = new BN(2)
+    await prompt(`Begin setting Offchain config version ${version.toString()}?`)
+    logger.loading('Sending tx...')
+    const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
+    logger.success(`Begin set offchain config on tx hash: ${txhash}`)
 
     return {
       responses: [
         {
-          tx: this.wrapResponse(tx, state.toString(), { state: state.toString() }),
-          contract: state.toString(),
+          tx: this.wrapResponse(txhash, this.flags.state),
+          contract: this.flags.state,
         },
       ],
     } as Result<TransactionResponse>

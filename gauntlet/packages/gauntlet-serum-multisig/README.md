@@ -1,10 +1,16 @@
 # Gauntlet Serum Multisig
 
+Current version 0.7.0
+
+Artifacts: https://github.com/project-serum/multisig/releases/tag/v0.7.0
+
 ## Creating a Multisig
 
 Example with 3 owners and threshold=2
 
 `yarn gauntlet-serum-multisig create --network=local 3W37Aopzbtzczi8XWdkFTvBeSyYgXLuUkaodkq59xBCT ETqajtkz4xcsB397qTBPetprR8jMC3JszkjJJp3cjWJS QMaHW2Fpyet4ZVf7jgrGB6iirZLjwZUjN9vPKcpQrHs --threshold=2`
+
+You will get 2 addresses, Multisig address and Multisig Signer. Please keep them both as they will be needed. Signer will be used when granting access/ownership to multisig.
 
 ## Actions
 

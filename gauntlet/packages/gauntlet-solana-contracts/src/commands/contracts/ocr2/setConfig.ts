@@ -1,10 +1,11 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { PublicKey } from '@solana/web3.js'
+import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
+import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { ORACLES_MAX_LENGTH } from '../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
+import { makeTx } from '../../../lib/utils'
 
 type Input = {
   oracles: {
@@ -44,15 +45,13 @@ export default class SetConfig extends SolanaCommand {
     this.require(!!this.flags.state, 'Please provide flags with "state"')
   }
 
-  execute = async () => {
+  makeRawTransaction = async (signer: PublicKey) => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
 
     const state = new PublicKey(this.flags.state)
     const input = this.makeInput(this.flags.input)
-
-    const owner = this.wallet.payer
 
     const oracles = input.oracles.map(({ signer, transmitter }) => ({
       signer: Buffer.from(signer, 'hex'),
@@ -68,22 +67,48 @@ export default class SetConfig extends SolanaCommand {
     )
 
     logger.log('Config information:', input)
-    await prompt(`Continue setting config on ${state.toString()}?`)
-
-    const tx = await program.rpc.setConfig(oracles, f, {
-      accounts: {
-        state: state,
-        authority: owner.publicKey,
-      },
+    const data = program.coder.instruction.encode('set_config', {
+      newOracles: oracles,
+      f,
     })
 
+    const accounts: AccountMeta[] = [
+      {
+        pubkey: state,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: signer,
+        isSigner: true,
+        isWritable: false,
+      },
+    ]
+
+    const rawTx: RawTransaction = {
+      data,
+      accounts,
+      programId: ocr2.programId,
+    }
+
+    return [rawTx]
+  }
+
+  execute = async () => {
+    const contract = getContract(CONTRACT_LIST.OCR_2, '')
+    const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
+    const tx = makeTx(rawTx)
+    logger.debug(tx)
+    await prompt(`Continue setting config on ${this.flags.state.toString()}?`)
+    logger.loading('Sending tx...')
+    const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
     logger.success(`Config set on tx ${tx}`)
 
     return {
       responses: [
         {
-          tx: this.wrapResponse(tx, state.toString(), { state: state.toString() }),
-          contract: state.toString(),
+          tx: this.wrapResponse(txhash, this.flags.state),
+          contract: this.flags.state,
         },
       ],
     } as Result<TransactionResponse>
