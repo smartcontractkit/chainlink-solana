@@ -20,7 +20,10 @@ func main() {
 		log.Fatalw("failed to parse solana specific configuration", "error", err)
 	}
 
-	solanaSourceFactory := monitoring.NewSolanaSourceFactory(logWrapper{coreLog.With("component", "source")})
+	solanaSourceFactory := monitoring.NewSolanaSourceFactory(
+		solanaConfig,
+		logWrapper{coreLog.With("component", "source")},
+	)
 
 	relayMonitoring.Facade(
 		ctx,
