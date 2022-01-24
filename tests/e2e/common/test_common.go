@@ -3,6 +3,10 @@ package common
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
+	"os"
+	"time"
+
 	"github.com/gagliardetto/solana-go"
 	. "github.com/onsi/gomega"
 	"github.com/rs/zerolog/log"
@@ -13,9 +17,6 @@ import (
 	"github.com/smartcontractkit/helmenv/tools"
 	"github.com/smartcontractkit/integrations-framework/client"
 	"github.com/smartcontractkit/integrations-framework/contracts"
-	"math/big"
-	"os"
-	"time"
 )
 
 const (
@@ -267,6 +268,7 @@ func (m *OCRv2TestState) createJobs() {
 			TransmitterID:         m.NodeKeysBundle[nIdx].TXKey.Data.ID,
 			ObservationSource:     observationSource,
 			JuelsPerFeeCoinSource: juelsSource,
+			TrackerPollInterval:   10 * time.Second, // faster config checking
 		}
 		_, err = n.CreateJob(jobSpec)
 		Expect(err).ShouldNot(HaveOccurred())
