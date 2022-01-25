@@ -406,8 +406,7 @@ pub enum ErrorCode {
 pub struct Initialize<'info> {
     #[account(zero)]
     pub store: AccountLoader<'info, State>,
-    #[account(signer)]
-    pub owner: AccountInfo<'info>,
+    pub owner: Signer<'info>,
 
     pub lowering_access_controller: AccountLoader<'info, AccessController>,
 }

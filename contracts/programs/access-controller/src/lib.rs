@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::{system_program, sysvar};
+use anchor_lang::solana_program::sysvar;
 use static_assertions::const_assert;
 use std::mem;
 
@@ -124,13 +124,11 @@ pub struct Initialize<'info> {
     #[account(zero)]
     pub state: AccountLoader<'info, AccessController>,
     pub payer: AccountInfo<'info>,
-    #[account(signer)]
-    pub owner: AccountInfo<'info>,
+    pub owner: Signer<'info>,
 
     #[account(address = sysvar::rent::ID)]
     pub rent: Sysvar<'info, Rent>,
-    #[account(address = system_program::ID)]
-    pub system_program: AccountInfo<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -152,7 +150,7 @@ pub struct AddAccess<'info> {
     #[account(mut, has_one = owner)]
     pub state: AccountLoader<'info, AccessController>,
     pub owner: Signer<'info>,
-    pub address: AccountInfo<'info>,
+    pub address: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]
@@ -160,5 +158,5 @@ pub struct RemoveAccess<'info> {
     #[account(mut, has_one = owner)]
     pub state: AccountLoader<'info, AccessController>,
     pub owner: Signer<'info>,
-    pub address: AccountInfo<'info>,
+    pub address: UncheckedAccount<'info>,
 }
