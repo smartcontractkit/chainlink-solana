@@ -15,7 +15,7 @@ use store::{Store, Transmissions};
 pub struct Initialize<'info> {
     #[account(zero)]
     pub state: AccountLoader<'info, State>,
-    pub transmissions: AccountInfo<'info>,
+    pub transmissions: Account<'info, Transmissions>,
     pub payer: AccountInfo<'info>,
     pub owner: Signer<'info>,
 
@@ -80,8 +80,8 @@ pub struct Transmit<'info> {
     pub transmissions: Account<'info, Transmissions>,
 
     pub store_program: Program<'info, Store>,
-    // #[account(address = state.load()?.config.store)]
-    pub store: AccountInfo<'info>,
+    // Verified by the store program
+    pub store: UncheckedAccount<'info>,
     pub store_authority: AccountInfo<'info>,
 }
 
@@ -90,8 +90,7 @@ pub struct SetAccessController<'info> {
     #[account(mut)]
     pub state: AccountLoader<'info, State>,
     pub authority: Signer<'info>,
-    #[account(owner = access_controller::ID)]
-    pub access_controller: AccountInfo<'info>,
+    pub access_controller: AccountLoader<'info, AccessController>,
 }
 
 #[derive(Accounts)]
@@ -195,7 +194,7 @@ pub struct TransferPayeeship<'info> {
     #[account(mut)]
     pub state: AccountLoader<'info, State>,
     pub authority: Signer<'info>,
-    pub transmitter: AccountInfo<'info>,
+    pub transmitter: UncheckedAccount<'info>,
     pub payee: Account<'info, TokenAccount>,
     pub proposed_payee: Account<'info, TokenAccount>,
 }
@@ -205,6 +204,6 @@ pub struct AcceptPayeeship<'info> {
     #[account(mut)]
     pub state: AccountLoader<'info, State>,
     pub authority: Signer<'info>,
-    pub transmitter: AccountInfo<'info>,
+    pub transmitter: UncheckedAccount<'info>,
     pub proposed_payee: Account<'info, TokenAccount>,
 }
