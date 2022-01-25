@@ -74,6 +74,10 @@ type Client struct {
 	WS *ws.Client
 }
 
+func (c *Client) GetNetworkType() string {
+	return c.Config.Type
+}
+
 var _ client.BlockchainClient = (*Client)(nil)
 
 func (c *Client) ContractsDeployed() bool {
