@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { TransactionResponse, SolanaCommand, RawTransaction } from '@chainlink/gauntlet-solana'
-import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
-import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair } from '@solana/web3.js'
+import { logger } from '@chainlink/gauntlet-core/dist/utils'
+import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair, Transaction } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
 import { ProgramError, parseIdlErrors, Idl, Program } from '@project-serum/anchor'
 
@@ -11,7 +11,7 @@ type ProposalContext = {
   proposalState: any
 }
 
-type ProposalAction = (proposal: Keypair | PublicKey, context: ProposalContext) => Promise<string>
+type ProposalAction = (proposal: PublicKey, context: ProposalContext) => Promise<string>
 
 export const wrapCommand = (command) => {
   return class Multisig extends SolanaCommand {
@@ -60,13 +60,13 @@ export const wrapCommand = (command) => {
       const rawTx = (await this.command.makeRawTransaction(multisigSigner))[0]
       const isCreation = !this.flags.proposal
       if (isCreation) {
-        const proposal = Keypair.generate()
+        const proposal = await this.createProposalAcount()
         const result = await this.wrapAction(this.createProposal)(proposal, {
           rawTx,
           multisigSigner,
           proposalState: {},
         })
-        this.inspectProposalState(proposal.publicKey, threshold, owners)
+        this.inspectProposalState(proposal, threshold, owners)
         return result
       }
 
@@ -83,7 +83,14 @@ export const wrapCommand = (command) => {
       const isAlreadyExecuted = proposalState.didExecute
       if (isAlreadyExecuted) {
         logger.info(`Proposal is already executed`)
-        return {} as Result<TransactionResponse>
+        return {
+          responses: [
+            {
+              tx: this.wrapResponse('', proposal.toString()),
+              contract: proposal.toString(),
+            },
+          ],
+        }
       }
 
       if (!this.isReadyForExecution(proposalState, threshold)) {
@@ -95,31 +102,34 @@ export const wrapCommand = (command) => {
       return result
     }
 
-    wrapAction = (action: ProposalAction) => async (proposal: Keypair | PublicKey, context: ProposalContext) => {
-      try {
-        const tx = await action(proposal, context)
-        return {
-          responses: [
-            {
-              tx: this.wrapResponse(tx, proposal.toString()),
-              contract: proposal.toString(),
-            },
-          ],
-        } as Result<TransactionResponse>
-      } catch (e) {
-        // known errors, defined in multisig contract. see serum_multisig.json
-        if (e.code >= 300 && e.code < 400) {
-          logger.error(e.msg)
-        } else {
-          logger.error(e)
-        }
-        throw e
+    wrapAction = (action: ProposalAction) => async (
+      proposal: PublicKey,
+      context: ProposalContext,
+    ): Promise<Result<TransactionResponse>> => {
+      const tx = await action(proposal, context)
+      return {
+        responses: [
+          {
+            tx: this.wrapResponse(tx, proposal.toString()),
+            contract: proposal.toString(),
+          },
+        ],
       }
     }
 
-    createProposal: ProposalAction = async (proposal: Keypair, context): Promise<string> => {
+    createProposalAcount = async (): Promise<PublicKey> => {
+      logger.log('Creating proposal account')
+      const proposal = Keypair.generate()
+      const txSize = 1300 // Space enough
+      const proposalAccount = await this.program.account.transaction.createInstruction(proposal, txSize)
+      const accountTx = new Transaction().add(proposalAccount)
+      await this.provider.send(accountTx, [proposal, this.wallet.payer])
+      logger.success(`Proposal account created at: ${proposal.publicKey.toString()}`)
+      return proposal.publicKey
+    }
+
+    createProposal: ProposalAction = async (proposal: PublicKey, context): Promise<string> => {
       logger.loading(`Creating proposal`)
-      const txSize = 1000
       const tx = await this.program.rpc.createTransaction(
         context.rawTx.programId,
         context.rawTx.accounts,
@@ -127,12 +137,11 @@ export const wrapCommand = (command) => {
         {
           accounts: {
             multisig: this.multisigAddress,
-            transaction: proposal.publicKey,
+            transaction: proposal,
             proposer: this.wallet.payer.publicKey,
             rent: SYSVAR_RENT_PUBKEY,
           },
-          instructions: [await this.program.account.transaction.createInstruction(proposal, txSize)],
-          signers: [proposal, this.wallet.payer],
+          signers: [this.wallet.payer],
         },
       )
       return tx
