@@ -19,6 +19,7 @@ import Inspection from './inspection'
 import { makeAcceptOwnershipCommand } from '../ownership/acceptOwnership'
 import { CONTRACT_LIST } from '../../../lib/contracts'
 import { makeTransferOwnershipCommand } from '../ownership/transferOwnership'
+import { makeUpgradeProgramCommand } from '../../abstract/upgrade'
 
 export default [
   Initialize,
@@ -43,4 +44,5 @@ export default [
   SetupRDDFlow,
   makeAcceptOwnershipCommand(CONTRACT_LIST.OCR_2),
   makeTransferOwnershipCommand(CONTRACT_LIST.OCR_2),
+  makeUpgradeProgramCommand(CONTRACT_LIST.OCR_2),
 ]
