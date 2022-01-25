@@ -13,7 +13,7 @@ var _ = Describe("Solana OCRv2", func() {
 	var state = &common.OCRv2TestState{}
 	BeforeEach(func() {
 		By("Deploying OCRv2 cluster", func() {
-			state.DeployCluster(5)
+			state.DeployCluster(5, false)
 			state.ImitateSource(common.SourceChangeInterval, 2, 10)
 		})
 	})

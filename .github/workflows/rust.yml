@@ -10,7 +10,7 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     container:
-      image: projectserum/build:v0.20.0
+      image: projectserum/build:v0.20.1
       env:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1
@@ -38,12 +38,16 @@ jobs:
     - run: solana-keygen new -o id.json
     - run: yarn install --frozen-lockfile
     - run: anchor test
-  
+    - run: |
+       cd examples/hello-world
+       yarn install --frozen-lockfile
+       anchor test
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
     container:
-      image: projectserum/build:v0.20.0
+      image: projectserum/build:v0.20.1
       env:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1

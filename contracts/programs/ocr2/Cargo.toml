@@ -19,8 +19,8 @@ localnet = ["access-controller/localnet", "store/localnet"]
 default = ["localnet"]
 
 [dependencies]
-anchor-lang = "0.20.0"
-anchor-spl = "0.20.0"
+anchor-lang = "0.20.1"
+anchor-spl = "0.20.1"
 static_assertions = "1.1.0"
 access-controller = { version = "0.1.0", path = "../access-controller", default-features = false, features = ["cpi"] }
 store = { version = "0.1.0", path = "../store", default-features = false, features = ["cpi"] }

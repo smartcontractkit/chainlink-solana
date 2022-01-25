@@ -19,7 +19,7 @@ localnet = ["access-controller/localnet"]
 default = ["localnet"]
 
 [dependencies]
-anchor-lang = "0.20.0"
+anchor-lang = "0.20.1"
 access-controller = { version = "0.1.0", path = "../access-controller", default-features = false, features = ["cpi"] }
 bytemuck = "1.7.2"
 arrayvec = { version = "0.1.0", path = "../../crates/arrayvec" }

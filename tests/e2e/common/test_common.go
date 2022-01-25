@@ -3,6 +3,10 @@ package common
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
+	"os"
+	"time"
+
 	"github.com/gagliardetto/solana-go"
 	. "github.com/onsi/gomega"
 	"github.com/rs/zerolog/log"
@@ -13,15 +17,12 @@ import (
 	"github.com/smartcontractkit/helmenv/tools"
 	"github.com/smartcontractkit/integrations-framework/client"
 	"github.com/smartcontractkit/integrations-framework/contracts"
-	"math/big"
-	"os"
-	"time"
 )
 
 const (
 	SourcePath                = "/variable"
 	ContractsStateFile        = "contracts-chaos-state.json"
-	NewRoundCheckTimeout      = 1 * time.Minute
+	NewRoundCheckTimeout      = 90 * time.Second
 	NewRoundCheckPollInterval = 1 * time.Second
 	SourceChangeInterval      = 5 * time.Second
 	ChaosAwaitingApply        = 1 * time.Minute
@@ -77,8 +78,8 @@ func (m *OCRv2TestState) LabelChaosGroups() {
 	m.LabelChaosGroup(10, 19, ChaosGroupRightHalf)
 }
 
-func (m *OCRv2TestState) DeployCluster(nodes int) {
-	m.DeployEnv(nodes)
+func (m *OCRv2TestState) DeployCluster(nodes int, stateful bool) {
+	m.DeployEnv(nodes, stateful)
 	m.SetupClients()
 	if m.Networks.Default.ContractsDeployed() {
 		err := m.LoadContracts()
@@ -109,9 +110,9 @@ func (m *OCRv2TestState) UploadProgramBinaries() {
 	Expect(err).ShouldNot(HaveOccurred())
 }
 
-func (m *OCRv2TestState) DeployEnv(nodes int) {
+func (m *OCRv2TestState) DeployEnv(nodes int, stateful bool) {
 	m.Env, m.err = environment.DeployOrLoadEnvironment(
-		solclient.NewChainlinkSolOCRv2(nodes),
+		solclient.NewChainlinkSolOCRv2(nodes, stateful),
 		tools.ChartsRoot,
 	)
 	Expect(m.err).ShouldNot(HaveOccurred())
@@ -186,12 +187,11 @@ func (m *OCRv2TestState) DeployContracts() {
 
 	m.Store, m.err = m.ContractDeployer.DeployOCRv2Store(m.BillingAC.Address())
 	Expect(m.err).ShouldNot(HaveOccurred())
-	m.OCR2, m.err = m.ContractDeployer.DeployOCRv2(m.BillingAC.Address(), m.RequesterAC.Address(), m.LinkToken.Address())
-	Expect(m.err).ShouldNot(HaveOccurred())
-	m.err = m.Networks.Default.WaitForEvents()
-	Expect(m.err).ShouldNot(HaveOccurred())
 
 	m.err = m.Store.CreateFeed("Feed", uint8(18), 10, 1024)
+	Expect(m.err).ShouldNot(HaveOccurred())
+
+	m.OCR2, m.err = m.ContractDeployer.DeployOCRv2(m.BillingAC.Address(), m.RequesterAC.Address(), m.LinkToken.Address())
 	Expect(m.err).ShouldNot(HaveOccurred())
 
 	m.err = m.OCR2.SetBilling(uint32(1), uint32(1), m.BillingAC.Address())
@@ -267,6 +267,7 @@ func (m *OCRv2TestState) createJobs() {
 			TransmitterID:         m.NodeKeysBundle[nIdx].TXKey.Data.ID,
 			ObservationSource:     observationSource,
 			JuelsPerFeeCoinSource: juelsSource,
+			TrackerPollInterval:   10 * time.Second, // faster config checking
 		}
 		_, err = n.CreateJob(jobSpec)
 		Expect(err).ShouldNot(HaveOccurred())

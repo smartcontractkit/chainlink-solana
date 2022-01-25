@@ -717,6 +717,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
         answer: report.median,
         transmitter: oracle_idx as u8, // has to fit in u8 because MAX_ORACLES < 255
         observations_timestamp: report.observations_timestamp,
+        observer_count: report.observer_count,
         observers: report.observers,
         juels_per_lamport: report.juels_per_lamport,
         reimbursement,
@@ -801,7 +802,11 @@ fn calculate_reimbursement(juels_per_lamport: u64, _signature_count: usize) -> R
 }
 
 fn calculate_owed_payment(config: &Config, oracle: &Oracle) -> Result<u64> {
-    let rounds = config.latest_aggregator_round_id - oracle.from_round_id;
+    let rounds = config
+        .latest_aggregator_round_id
+        .checked_sub(oracle.from_round_id)
+        .ok_or(ErrorCode::Overflow)?;
+
     let amount = u64::from(config.billing.observation_payment_gjuels)
         .checked_mul(rounds.into())
         .ok_or(ErrorCode::Overflow)?
@@ -816,15 +821,19 @@ fn calculate_total_link_due(
     oracles: &[Oracle],
     leftover_payments: &[LeftoverPayment],
 ) -> Result<u64> {
-    let (rounds, reimbursements) =
-        oracles
-            .iter()
-            .fold((0, 0), |(rounds, reimbursements), oracle| {
-                (
-                    rounds + (config.latest_aggregator_round_id - oracle.from_round_id),
-                    reimbursements + oracle.payment,
-                )
-            });
+    let (rounds, reimbursements) = oracles
+        .iter()
+        .try_fold((0, 0), |(rounds, reimbursements): (u32, u64), oracle| {
+            let count = config
+                .latest_aggregator_round_id
+                .checked_sub(oracle.from_round_id)?;
+
+            Some((
+                rounds.checked_add(count)?,
+                reimbursements.checked_add(oracle.payment)?,
+            ))
+        })
+        .ok_or(ErrorCode::Overflow)?;
 
     let leftover_payments = leftover_payments
         .iter()

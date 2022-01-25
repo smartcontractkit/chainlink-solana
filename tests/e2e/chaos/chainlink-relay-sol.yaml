@@ -13,7 +13,7 @@ charts:
       chainlink:
         image:
           image: "public.ecr.aws/chainlink/chainlink"
-          version: "develop.f20690e8ede0cfead9df7f808f56a14f26469aaa"
+          version: "develop.f149ecd421a3667dcd4b603fa69bda05e34d602d"
       env:
         eth_url: "ws://sol:8990"
         eth_disabled: "true"

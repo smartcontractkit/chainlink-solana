@@ -1,16 +1,17 @@
 [package]
-name = "access-controller"
+name = "hello-world"
 version = "0.1.0"
 description = "Created with Anchor"
 edition = "2018"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "access_controller"
+name = "hello_world"
 
 [features]
 no-entrypoint = []
 no-idl = []
+no-log-ix-name = []
 cpi = ["no-entrypoint"]
 mainnet = []
 testnet = []
@@ -20,5 +21,4 @@ default = ["localnet"]
 
 [dependencies]
 anchor-lang = "0.20.1"
-static_assertions = "1.1.0"
-arrayvec = { version = "0.1.0", path = "../../crates/arrayvec" }
+chainlink_solana = "0.1.0"
