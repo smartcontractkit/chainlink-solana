@@ -1,5 +1,18 @@
 name: e2e_tests
-on: [push]
+on: 
+  push:
+  workflow_call:
+    secrets:
+      QA_AWS_ACCESS_KEY_ID:
+        required: true
+      QA_AWS_SECRET_KEY:
+        required: true
+      QA_AWS_REGION:
+        required: true
+      QA_AWS_ROLE_TO_ASSUME:
+        required: true
+      QA_KUBECONFIG:
+        required: true
 
 jobs:
   build:
