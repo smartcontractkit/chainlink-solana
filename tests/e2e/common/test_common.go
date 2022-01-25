@@ -22,7 +22,7 @@ import (
 const (
 	SourcePath                = "/variable"
 	ContractsStateFile        = "contracts-chaos-state.json"
-	NewRoundCheckTimeout      = 1 * time.Minute
+	NewRoundCheckTimeout      = 90 * time.Second
 	NewRoundCheckPollInterval = 1 * time.Second
 	SourceChangeInterval      = 5 * time.Second
 	ChaosAwaitingApply        = 1 * time.Minute
@@ -187,12 +187,11 @@ func (m *OCRv2TestState) DeployContracts() {
 
 	m.Store, m.err = m.ContractDeployer.DeployOCRv2Store(m.BillingAC.Address())
 	Expect(m.err).ShouldNot(HaveOccurred())
-	m.OCR2, m.err = m.ContractDeployer.DeployOCRv2(m.BillingAC.Address(), m.RequesterAC.Address(), m.LinkToken.Address())
-	Expect(m.err).ShouldNot(HaveOccurred())
-	m.err = m.Networks.Default.WaitForEvents()
-	Expect(m.err).ShouldNot(HaveOccurred())
 
 	m.err = m.Store.CreateFeed("Feed", uint8(18), 10, 1024)
+	Expect(m.err).ShouldNot(HaveOccurred())
+
+	m.OCR2, m.err = m.ContractDeployer.DeployOCRv2(m.BillingAC.Address(), m.RequesterAC.Address(), m.LinkToken.Address())
 	Expect(m.err).ShouldNot(HaveOccurred())
 
 	m.err = m.OCR2.SetBilling(uint32(1), uint32(1), m.BillingAC.Address())

@@ -97,8 +97,9 @@ func (m *Store) CreateFeed(desc string, decimals uint8, granularity int, liveLen
 	if err != nil {
 		return err
 	}
-	err = m.Client.TXAsync(
+	err = m.Client.TXSync(
 		"Create feed",
+		rpc.CommitmentFinalized,
 		[]solana.Instruction{
 			feedAccInstruction,
 			store.NewCreateFeedInstruction(
