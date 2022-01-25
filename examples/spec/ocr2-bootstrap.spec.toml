@@ -4,8 +4,8 @@ relay                                  = "solana"
 name                                   = "<insert job name here>"
 contractID                             = "<insert solana ocr2 state account>"
 isBootstrapPeer                        = true
-p2pPeerID                              = "<optional, overrides P2P_PEER_ID>"
-ocrKeyBundleID                         = "<optional, overrides OCR2_KEY_BUNDLE_ID (solana)>"
+p2pPeerID                              = "<insert p2p id>"                  # overrides P2P_PEER_ID
+ocrKeyBundleID                         = "<insert ocr2 key bundle id>"      # overrides OCR2_KEY_BUNDLE_ID (solana)
 transmitterID                          = "<insert solana transmitter key id>"
 
 [relayConfig]
@@ -13,3 +13,7 @@ nodeEndpointHTTP   = "http:..."
 ocr2ProgramID      = "<insert solana ocr2 program ID>"
 transmissionsID    = "<insert solana ocr2 transmissions account>"
 storeProgramID     = "<insert solana ocr2 store account>"
+commitment         = "confirmed" # optional, defaults to "confirmed"
+pollingInterval    = "1s"        # optional, defaults to "1s"
+pollingCtxTimeout  = "2s"        # optional, defaults to `2x ${pollingInterval}`
+staleTimeout       = "1m"        # optional, defaults to "1m"
