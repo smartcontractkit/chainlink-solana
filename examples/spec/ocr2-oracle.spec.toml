@@ -1,17 +1,12 @@
 type                                   = "offchainreporting2"
 schemaVersion                          = 1
-blockchainTimeout                      = "20s"
-contractConfigConfirmations            = 3
-contractConfigTrackerPollInterval      = "1m"
-contractConfigTrackerSubscribeInterval = "2m"
-name                                   = "<insert job name here>"
 relay                                  = "solana"
+name                                   = "<insert job name here>"
 contractID                             = "<insert solana ocr2 state account>"
-p2pBootstrapPeers                      = ["somep2pkey@localhost-tcp:port"]
 isBootstrapPeer                        = false
-p2pPeerID                              = "<insert p2p id>"
-ocrKeyBundleID                         = "<insert ocr2 key bundle id>"
-monitoringEndpoint                     = "<insert monitoring endpoint>"
+p2pBootstrapPeers                      = ["<optional, overrides P2PV2_BOOTSTRAPPERS>"]
+p2pPeerID                              = "<optional, overrides P2P_PEER_ID>"
+ocrKeyBundleID                         = "<optional, overrides OCR2_KEY_BUNDLE_ID (solana)>"
 transmitterID                          = "<insert solana transmitter key id>"
 observationSource                      = """
     // data source 1
@@ -61,8 +56,8 @@ juelsPerFeeCoinSource                  = """
     ds3_coin -> ds3_coin_parse -> median_coin
 
     // Compute the medians from all data sources
-    median_link [type="median" values=<[ $(ds1_link_parse), $(ds2_link_parse), $(ds3_link_parse) ]> allowedFaults=1]
-    median_coin [type="median" values=<[ $(ds1_coin_parse), $(ds2_coin_parse), $(ds3_coin_parse) ]> allowedFaults=1]
+    median_link [type="median" values=<[ $(ds1_link_parse), $(ds2_link_parse), $(ds3_link_parse) ]> allowedFaults=2]
+    median_coin [type="median" values=<[ $(ds1_coin_parse), $(ds2_coin_parse), $(ds3_coin_parse) ]> allowedFaults=2]
 
     // Divide and scale appropriately
     divide [type="divide" input="$(median_link)" divisor="$(median_coin)" precision="9"]
@@ -78,3 +73,8 @@ nodeEndpointHTTP   = "http:..."
 ocr2ProgramID      = "<insert solana ocr2 program ID>"
 transmissionsID    = "<insert solana ocr2 transmissions account>"
 storeProgramID     = "<insert solana ocr2 store account>"
+usePreflight       = false
+commitment         = "confirmed"
+pollingInterval    = "1s"
+pollingCtxTimeout  = "2s"
+staleTimeout       = "1m"
