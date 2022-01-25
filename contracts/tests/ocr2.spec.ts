@@ -424,48 +424,21 @@ describe('ocr2', async () => {
     );
 
     // TODO: listen for SetConfig event
+    let proposal = Keypair.generate();
 
-    console.log("beginOffchainConfig");
-    await program.rpc.beginOffchainConfig(
+    console.log("createConfigProposal");
+    await program.rpc.createConfigProposal(
       new BN(offchain_config_version),
       {
         accounts: {
-          state: state.publicKey,
+          proposal: proposal.publicKey,
           authority: owner.publicKey,
         },
+        signers: [proposal],
+        preInstructions: [
+          await program.account.proposal.createInstruction(proposal),
+        ],
     });
-    console.log("writeOffchainConfig");
-    await program.rpc.writeOffchainConfig(
-      offchain_config,
-      {
-        accounts: {
-          state: state.publicKey,
-          authority: owner.publicKey,
-        },
-    });
-    console.log("writeOffchainConfig");
-    await program.rpc.writeOffchainConfig(
-      offchain_config,
-      {
-        accounts: {
-          state: state.publicKey,
-          authority: owner.publicKey,
-        },
-    });
-    console.log("commitOffchainConfig");
-    await program.rpc.commitOffchainConfig(
-      {
-        accounts: {
-          state: state.publicKey,
-          authority: owner.publicKey,
-        },
-    });
-    account = await program.account.state.fetch(state.publicKey);
-    config = account.config;
-    assert.ok(account.offchainConfig.len == 6);
-    assert.deepEqual(account.offchainConfig.xs.slice(0, account.offchainConfig.len), [4,5,6,4,5,6]);
-
-    // Call setConfig
     console.log("setConfig");
     await program.rpc.setConfig(oracles.map((oracle) => ({
         signer: ethereumAddress(Buffer.from(oracle.signer.publicKey)),
@@ -474,11 +447,64 @@ describe('ocr2', async () => {
       f,
       {
         accounts: {
-          state: state.publicKey,
+          proposal: proposal.publicKey,
           authority: owner.publicKey,
         },
         signers: [],
     });
+    console.log("writeOffchainConfig");
+    await program.rpc.writeOffchainConfig(
+      offchain_config,
+      {
+        accounts: {
+          proposal: proposal.publicKey,
+          authority: owner.publicKey,
+        },
+    });
+    console.log("writeOffchainConfig");
+    await program.rpc.writeOffchainConfig(
+      offchain_config,
+      {
+        accounts: {
+          proposal: proposal.publicKey,
+          authority: owner.publicKey,
+        },
+    });
+    console.log("commitConfigProposal");
+    await program.rpc.commitConfigProposal(
+      {
+        accounts: {
+          proposal: proposal.publicKey,
+          authority: owner.publicKey,
+        },
+    });
+
+    console.log("approveConfigProposal");
+    await program.rpc.acceptConfigProposal(
+      {
+        accounts: {
+          state: state.publicKey,
+          proposal: proposal.publicKey,
+          authority: owner.publicKey,
+        },
+    });
+    
+    account = await program.account.state.fetch(state.publicKey);
+    assert.ok(account.offchainConfig.len == 6);
+    assert.deepEqual(account.offchainConfig.xs.slice(0, account.offchainConfig.len), [4,5,6,4,5,6]);
+
+    console.log("closeConfigProposal");
+    await program.rpc.closeConfigProposal(
+      {
+        accounts: {
+          proposal: proposal.publicKey,
+          authority: owner.publicKey,
+          receiver: owner.publicKey,
+        },
+    });
+    
+    // TODO: assert funds came back
+
     console.log("setPayees")
     await program.rpc.setPayees(
       oracles.map((oracle) => oracle.payee.address),
@@ -503,21 +529,23 @@ describe('ocr2', async () => {
     });
   });
 
-	it("Can't begin offchain config if version is 0", async () => {
+  let proposal = Keypair.generate();
+
+	it("Can't begin config proposal if version is 0", async () => {
 		try {
-			await program.rpc.beginOffchainConfig(
+			await program.rpc.createConfigProposal(
 	      new BN(0),
 	      {
 	        accounts: {
-	          state: state.publicKey,
+	          proposal: proposal.publicKey,
 	          authority: owner.publicKey,
 	        },
 	    });
 		} catch {
-			// beginOffchainConfig should fail
+			// createOffchainConfig should fail
 			return
 		}
-		assert.fail("beginOffchainConfig shouldn't have succeeded!")
+		assert.fail("createConfigProposal shouldn't have succeeded!")
 	});
 
 	it("Can't write offchain config if begin has not been called", async () => {
@@ -526,7 +554,7 @@ describe('ocr2', async () => {
 				Buffer.from([4, 5, 6]),
 				{
 					accounts: {
-						state: state.publicKey,
+	          proposal: proposal.publicKey,
 						authority: owner.publicKey,
 					},
 			});
@@ -537,55 +565,54 @@ describe('ocr2', async () => {
 		assert.fail("writeOffchainConfig shouldn't have succeeded!")
 	});
 
-	it("ResetPendingOffchainConfig clears pending state", async () => {
+	// it("ResetPendingOffchainConfig clears pending state", async () => {
 
-		await program.rpc.beginOffchainConfig(
-      new BN(2),
-      {
-        accounts: {
-          state: state.publicKey,
-          authority: owner.publicKey,
-        },
-    });
-    await program.rpc.writeOffchainConfig(
-      Buffer.from([4, 5, 6]),
-      {
-        accounts: {
-          state: state.publicKey,
-          authority: owner.publicKey,
-        },
-    });
-		let account = await program.account.state.fetch(state.publicKey);
-		assert.ok(account.pendingOffchainConfig.version != 0);
-		assert.ok(account.pendingOffchainConfig.len != 0);
+	// 	await program.rpc.createConfigProposal(
+ //      new BN(2),
+ //      {
+ //        accounts: {
+ //          state: state.publicKey,
+ //          authority: owner.publicKey,
+ //        },
+ //    });
+ //    await program.rpc.writeOffchainConfig(
+ //      Buffer.from([4, 5, 6]),
+ //      {
+ //        accounts: {
+ //          state: state.publicKey,
+ //          authority: owner.publicKey,
+ //        },
+ //    });
+	// 	let account = await program.account.state.fetch(state.publicKey);
+	// 	assert.ok(account.pendingOffchainConfig.version != 0);
+	// 	assert.ok(account.pendingOffchainConfig.len != 0);
+	// 	await program.rpc.resetPendingOffchainConfig(
+	// 		{
+	// 			accounts: {
+	// 				state: state.publicKey,
+	// 				authority: owner.publicKey,
+	// 			},
+	// 	});
+	// 	account = await program.account.state.fetch(state.publicKey);
+	// 	assert.ok(account.pendingOffchainConfig.version == 0);
+	// 	assert.ok(account.pendingOffchainConfig.len == 0);
+	// })
 
-		await program.rpc.resetPendingOffchainConfig(
-			{
-				accounts: {
-					state: state.publicKey,
-					authority: owner.publicKey,
-				},
-		});
-		account = await program.account.state.fetch(state.publicKey);
-		assert.ok(account.pendingOffchainConfig.version == 0);
-		assert.ok(account.pendingOffchainConfig.len == 0);
-	})
-
-	it("Can't reset pending config if already in new state", async () => {
-		try {
-			await program.rpc.resetPendingOffchainConfig(
-				{
-					accounts: {
-						state: state.publicKey,
-						authority: owner.publicKey,
-					},
-			});
-		} catch {
-			// resetPendingOffchainConfig should fail
-			return
-		}
-		assert.fail("resetPendingOffchainConfig shouldn't have succeeded!")
-	});
+	// it("Can't reset pending config if already in new state", async () => {
+	// 	try {
+	// 		await program.rpc.resetPendingOffchainConfig(
+	// 			{
+	// 				accounts: {
+	// 					state: state.publicKey,
+	// 					authority: owner.publicKey,
+	// 				},
+	// 		});
+	// 	} catch {
+	// 		// resetPendingOffchainConfig should fail
+	// 		return
+	// 	}
+	// 	assert.fail("resetPendingOffchainConfig shouldn't have succeeded!")
+	// });
 
   it("Can't transmit a round if not the writer", async () => {
     try {

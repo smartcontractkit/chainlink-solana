@@ -3,7 +3,7 @@ use anchor_lang::solana_program::sysvar;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{Mint, Token, TokenAccount, Transfer};
 
-use crate::state::State;
+use crate::state::{Proposal, State};
 
 use access_controller::AccessController;
 use store::{Store, Transmissions};
@@ -65,9 +65,34 @@ pub struct AcceptOwnership<'info> {
 }
 
 #[derive(Accounts)]
+pub struct CreateProposal<'info> {
+    #[account(zero)]
+    pub proposal: AccountLoader<'info, Proposal>,
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct CloseProposal<'info> {
+    #[account(mut)]
+    pub proposal: AccountLoader<'info, Proposal>,
+    #[account(mut)] // TODO: only to reclaim to owner account?
+    pub receiver: SystemAccount<'info>,
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
 pub struct SetConfig<'info> {
     #[account(mut)]
+    pub proposal: AccountLoader<'info, Proposal>,
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct AcceptProposal<'info> {
+    #[account(mut)]
     pub state: AccountLoader<'info, State>,
+    #[account(mut)]
+    pub proposal: AccountLoader<'info, Proposal>,
     pub authority: Signer<'info>,
 }
 

@@ -3,6 +3,7 @@ use anchor_lang::solana_program::sysvar::fees::Fees;
 use anchor_spl::token;
 
 use arrayref::{array_ref, array_refs};
+use state::Proposal;
 
 declare_id!("HW3ipKzeeduJq6f1NqRCw4doknMeWkfrM4WxobtG3o5v");
 
@@ -67,13 +68,13 @@ pub mod ocr2 {
         proposed_owner: Pubkey,
     ) -> ProgramResult {
         require!(proposed_owner != Pubkey::default(), InvalidInput);
-        let state = &mut *ctx.accounts.state.load_mut()?;
+        let mut state = ctx.accounts.state.load_mut()?;
         state.config.proposed_owner = proposed_owner;
         Ok(())
     }
 
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> ProgramResult {
-        let state = &mut *ctx.accounts.state.load_mut()?;
+        let mut state = ctx.accounts.state.load_mut()?;
         require!(
             ctx.accounts.authority.key == &state.config.proposed_owner,
             Unauthorized
@@ -82,67 +83,115 @@ pub mod ocr2 {
         Ok(())
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
-    pub fn begin_offchain_config(
-        ctx: Context<SetConfig>,
+    pub fn create_config_proposal(
+        ctx: Context<CreateProposal>,
         offchain_config_version: u64,
     ) -> ProgramResult {
-        let state = &mut *ctx.accounts.state.load_mut()?;
-        // disallow begin if we already started writing
-        require!(state.pending_offchain_config.version == 0, InvalidInput);
-        require!(state.pending_offchain_config.is_empty(), InvalidInput);
-        require!(offchain_config_version != 0, InvalidInput);
+        let mut proposal = ctx.accounts.proposal.load_init()?;
 
-        state.pending_offchain_config.version = offchain_config_version;
+        // TODO: figure out a good random PDA seed and use PDAs for proposals
+
+        proposal.version = 1;
+        proposal.owner = ctx.accounts.authority.key();
+
+        // TODO: move this into write_ and always pass a version?
+        require!(offchain_config_version != 0, InvalidInput);
+        proposal.offchain_config.version = offchain_config_version;
         Ok(())
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
+    #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
     pub fn write_offchain_config(
         ctx: Context<SetConfig>,
         offchain_config: Vec<u8>,
     ) -> ProgramResult {
-        let state = &mut *ctx.accounts.state.load_mut()?;
+        let mut proposal = ctx.accounts.proposal.load_mut()?;
         require!(
-            offchain_config.len() < state.pending_offchain_config.remaining_capacity(),
+            offchain_config.len() < proposal.offchain_config.remaining_capacity(),
             InvalidInput
         );
-        require!(state.pending_offchain_config.version != 0, InvalidInput);
-        state.pending_offchain_config.extend(&offchain_config);
+        proposal.offchain_config.extend(&offchain_config);
+        Ok(())
+    }
+
+    #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
+    pub fn commit_config_proposal(ctx: Context<SetConfig>) -> ProgramResult {
+        let proposal = ctx.accounts.proposal.load_mut()?;
+
+        // Require that at least some data was written
+        require!(proposal.offchain_config.version > 0, InvalidInput);
+        require!(!proposal.offchain_config.is_empty(), InvalidInput);
+        require!(!proposal.oracles.is_empty(), InvalidInput);
+        // TODO: digest matches
+
+        Ok(())
+    }
+
+    #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
+    pub fn close_config_proposal(ctx: Context<CloseProposal>) -> ProgramResult {
+        // NOTE: Close is handled by anchor on exit due to the `close` attribute
         Ok(())
     }
 
     #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
-    pub fn commit_offchain_config(ctx: Context<SetConfig>) -> ProgramResult {
-        let state = &mut *ctx.accounts.state.load_mut()?;
-        let config = &mut state.config;
+    pub fn accept_config_proposal(ctx: Context<AcceptProposal>) -> ProgramResult {
+        let mut state = ctx.accounts.state.load_mut()?;
+        let mut proposal = ctx.accounts.proposal.load_mut()?;
 
-        // Require that at least some data was written
-        require!(state.pending_offchain_config.version > 0, InvalidInput);
-        require!(!state.pending_offchain_config.is_empty(), InvalidInput);
+        // Ensure no leftover payments
+        let leftovers = state
+            .leftover_payments
+            .iter()
+            .any(|leftover| leftover.amount != 0);
+        require!(!leftovers, PaymentsRemaining);
+        state.leftover_payments.clear();
 
-        // move staging area onto actual config
-        state.offchain_config = state.pending_offchain_config;
-        // reset staging area
-        state.pending_offchain_config.clear();
-        state.pending_offchain_config.version = 0;
+        // Move current balances to leftover payments
+        // for oracle in state.oracles.iter() {
+        //     state.leftover_payments.push(LeftoverPayment {
+        //         payee: oracle.payee,
+        //         amount: calculate_owed_payment(&state.config, oracle)?,
+        //     })
+        // }
+        // TODO: pay oracles here and remove leftover payments!
+        state.oracles.clear();
 
-        // TODO: how does this interact with paying off oracles?
+        // Move staging area onto actual config
+        state.offchain_config = proposal.offchain_config;
+        state.config.f = proposal.f;
 
-        // recalculate digest
-        // TODO: share with setConfig?
+        // Insert new oracles into the state
+        let from_round_id = state.config.latest_aggregator_round_id;
+        for oracle in proposal.oracles.into_iter() {
+            state.oracles.push(Oracle {
+                signer: oracle.signer,
+                transmitter: oracle.transmitter,
+                from_round_id,
+                ..Default::default()
+            })
+        }
+        // NOTE: proposal already sorts the oracles by signer key
+
+        // TODO: validate and check for duplicates yet again?
+
+        // Recalculate digest
         let slot = Clock::get()?.slot;
         // let previous_config_block_number = config.latest_config_block_number;
-        config.latest_config_block_number = slot;
-        config.config_count += 1;
-
-        let config_digest = config.config_digest_from_data(
+        state.config.latest_config_block_number = slot;
+        state.config.config_count += 1;
+        let config_digest = state.config.config_digest_from_data(
             &crate::id(),
             &ctx.accounts.state.key(),
             &state.offchain_config,
             &state.oracles,
         );
-        config.latest_config_digest = config_digest;
+        state.config.latest_config_digest = config_digest;
+
+        // Reset staging area
+        // TODO: close() proposal and reclaim funds onto multisig?
+        // or we could transfer back to the proposer
+        proposal.offchain_config.clear();
+        proposal.offchain_config.version = 0;
 
         // Generate an event
         let signers = state
@@ -152,30 +201,14 @@ pub mod ocr2 {
             .collect();
         emit!(event::SetConfig {
             config_digest,
-            f: config.f,
+            f: state.config.f,
             signers
         });
 
         Ok(())
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
-    pub fn reset_pending_offchain_config(ctx: Context<SetConfig>) -> ProgramResult {
-        let state = &mut *ctx.accounts.state.load_mut()?;
-
-        // Require that at least some data was written
-        require!(
-            state.pending_offchain_config.version > 0 || !state.pending_offchain_config.is_empty(),
-            InvalidInput
-        );
-
-        // reset staging area
-        state.pending_offchain_config.clear();
-        state.pending_offchain_config.version = 0;
-        Ok(())
-    }
-
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
+    #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
     pub fn set_config(
         ctx: Context<SetConfig>,
         new_oracles: Vec<NewOracle>,
@@ -186,82 +219,44 @@ pub mod ocr2 {
         require!(len <= MAX_ORACLES, TooManyOracles);
         require!(3 * usize::from(f) < len, InvalidInput);
 
-        let State {
-            ref mut config,
-            ref mut offchain_config,
-            ref mut oracles,
-            ref mut leftover_payments,
-            ..
-        } = &mut *ctx.accounts.state.load_mut()?;
+        let proposal = &mut *ctx.accounts.proposal.load_mut()?;
 
-        // Ensure no leftover payments
-        let leftovers = leftover_payments
-            .iter()
-            .any(|leftover| leftover.amount != 0);
-        require!(!leftovers, PaymentsRemaining);
-
-        leftover_payments.clear();
-
-        // Move current balances to leftover payments
-        for oracle in oracles.iter() {
-            leftover_payments.push(LeftoverPayment {
-                payee: oracle.payee,
-                amount: calculate_owed_payment(config, oracle)?,
-            })
-        }
+        // begin_config_proposal must be called first
+        require!(proposal.offchain_config.version != 0, InvalidInput);
 
         // Clear out old oracles
-        oracles.clear();
+        proposal.oracles.clear();
 
         // Insert new oracles into the state
         for oracle in new_oracles.into_iter() {
-            oracles.push(Oracle {
+            proposal.oracles.push(Oracle {
                 signer: SigningKey { key: oracle.signer },
                 transmitter: oracle.transmitter,
-                from_round_id: config.latest_aggregator_round_id,
+                from_round_id: 0,
                 ..Default::default()
             })
         }
 
         // Sort oracles so we can use binary search to locate the signer
-        oracles.sort_unstable_by_key(|oracle| oracle.signer.key);
+        proposal
+            .oracles
+            .sort_unstable_by_key(|oracle| oracle.signer.key);
         // check for signer duplicates, we can compare successive keys since the array is now sorted
-        let duplicate_signer = oracles
+        let duplicate_signer = proposal
+            .oracles
             .windows(2)
             .any(|pair| pair[0].signer.key == pair[1].signer.key);
         require!(!duplicate_signer, DuplicateSigner);
 
         let mut transmitters = BTreeSet::new();
         // check for transmitter duplicates
-        for oracle in oracles.iter() {
+        for oracle in proposal.oracles.iter() {
             let inserted = transmitters.insert(oracle.transmitter);
             require!(inserted, DuplicateTransmitter);
         }
 
-        // Update config
-        config.f = f;
-
-        let slot = Clock::get()?.slot;
-        config.latest_config_block_number = slot;
-        config.config_count += 1;
-        let config_digest = config.config_digest_from_data(
-            &crate::id(),
-            &ctx.accounts.state.key(),
-            offchain_config,
-            oracles,
-        );
-        config.latest_config_digest = config_digest;
-        // Reset epoch and round
-        config.epoch = 0;
-        config.round = 0;
-
-        // Generate an event
-        let signers = oracles.iter().map(|oracle| oracle.signer.key).collect();
-        emit!(event::SetConfig {
-            config_digest,
-            f,
-            signers
-        });
+        // Store the new f value
+        proposal.f = f;
 
         Ok(())
     }
@@ -859,6 +854,15 @@ fn calculate_total_link_due(
 fn owner(state_loader: &AccountLoader<State>, signer: &AccountInfo) -> ProgramResult {
     let config = state_loader.load()?.config;
     require!(signer.key.eq(&config.owner), Unauthorized);
+    Ok(())
+}
+
+fn proposal_owner(
+    proposal_loader: &AccountLoader<Proposal>,
+    signer: &AccountInfo,
+) -> ProgramResult {
+    let proposal = proposal_loader.load()?;
+    require!(signer.key.eq(&proposal.owner), Unauthorized);
     Ok(())
 }
 
