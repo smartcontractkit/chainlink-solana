@@ -3,12 +3,12 @@ import { logger, prompt, time, BN } from '@chainlink/gauntlet-core/dist/utils'
 import { Proto, sharedSecretEncryptions } from '@chainlink/gauntlet-core/dist/crypto'
 
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { PublicKey } from '@solana/web3.js'
+import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { MAX_TRANSACTION_BYTES, ORACLES_MAX_LENGTH } from '../../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import { descriptor as OCR2Descriptor } from '../../../../lib/ocr2Proto'
 import { getRDD } from '../../../../lib/rdd'
-import { divideIntoChunks } from '../../../../lib/utils'
+import { divideIntoChunks, makeTx } from '../../../../lib/utils'
 import { join } from 'path'
 
 export type Input = {
@@ -192,46 +192,76 @@ export default class WriteOffchainConfig extends SolanaCommand {
     return true
   }
 
-  execute = async () => {
+  makeRawTransaction = async (signer: PublicKey) => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
 
     const state = new PublicKey(this.flags.state)
-    const owner = this.wallet.payer
-
-    // Throws on invalid input
     const input = this.makeInput(this.flags.input)
+    const maxBufferSize = this.flags.bufferSize || MAX_TRANSACTION_BYTES
+
     this.validateInput(input)
 
-    // Check correct format OCR Keys
     const offchainConfig = await this.serializeOffchainConfig(input)
-
     logger.info(`Offchain config size: ${offchainConfig.byteLength}`)
     this.require(offchainConfig.byteLength < 4096, 'Offchain config must be lower than 4096 bytes')
 
     // There's a byte limit per transaction. Write the config in chunks
-    const offchainConfigChunks = divideIntoChunks(offchainConfig, MAX_TRANSACTION_BYTES)
+    const offchainConfigChunks = divideIntoChunks(offchainConfig, maxBufferSize)
     if (offchainConfigChunks.length > 1) {
       logger.info(
-        `Config size (${offchainConfig.byteLength} bytes) is bigger than transaction limit. It will be configured using ${offchainConfigChunks.length} transactions`,
+        `Config size (${
+          offchainConfig.byteLength
+        } bytes) is bigger than transaction limit. It needs to be configured using ${
+          offchainConfigChunks.length + 1
+        } transactions`,
       )
     }
 
     logger.log('Offchain info:', input)
+
+    const dataInChunks = offchainConfigChunks.map((buffer) =>
+      program.coder.instruction.encode('write_offchain_config', {
+        offchainConfig: buffer,
+      }),
+    )
+
+    const accounts: AccountMeta[] = [
+      {
+        pubkey: state,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: signer,
+        isSigner: true,
+        isWritable: false,
+      },
+    ]
+
+    return dataInChunks.map((data) => ({
+      accounts,
+      data,
+      programId: program.programId,
+    }))
+  }
+
+  execute = async () => {
+    const contract = getContract(CONTRACT_LIST.OCR_2, '')
+    const state = new PublicKey(this.flags.state)
+
+    const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
     const startingPoint = new BN(this.flags.chunk || 0).toNumber()
-    await prompt(`Start writing offchain config from ${startingPoint}/${offchainConfigChunks.length - 1}?`)
+
+    await prompt(`Start writing offchain config from ${startingPoint}/${rawTx.length - 1}?`)
 
     const txs: string[] = []
-    for (let i = startingPoint; i < offchainConfigChunks.length; i++) {
-      logger.loading(`Sending ${i}/${offchainConfigChunks.length - 1}...`)
-      const tx = await program.rpc.writeOffchainConfig(offchainConfigChunks[i], {
-        accounts: {
-          state: state,
-          authority: owner.publicKey,
-        },
-      })
-      txs.push(tx)
+    for (let i = startingPoint; i < rawTx.length; i++) {
+      logger.loading(`Sending ${i}/${rawTx.length - 1}...`)
+      const tx = makeTx([rawTx[i]])
+      const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
+      txs.push(txhash)
     }
     logger.success(`Last tx Write offchain config set on tx ${txs[txs.length - 1]}`)
 
