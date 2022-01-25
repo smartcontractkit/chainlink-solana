@@ -19,6 +19,6 @@ localnet = []
 default = ["localnet"]
 
 [dependencies]
-anchor-lang = "0.20.0"
+anchor-lang = "0.20.1"
 static_assertions = "1.1.0"
 arrayvec = { version = "0.1.0", path = "../../crates/arrayvec" }
