@@ -2,6 +2,11 @@ name: e2e_tests
 on: 
   push:
   workflow_call:
+    inputs:
+      repo_name:
+        required: true
+        default: ${{ github.repository }}
+        type: string
     secrets:
       QA_AWS_ACCESS_KEY_ID:
         required: true
@@ -25,6 +30,8 @@ jobs:
         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v2
+        with:
+          repository: ${{ inputs.repo_name }}
       - run: echo $HOME
       - run: echo $PATH
       - run: |
