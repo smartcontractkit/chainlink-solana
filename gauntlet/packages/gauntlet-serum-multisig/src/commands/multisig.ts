@@ -118,7 +118,6 @@ export const wrapCommand = (command) => {
     }
 
     createProposal: ProposalAction = async (proposal: Keypair, context): Promise<string> => {
-     
       await this.simulateTX(makeTx([context.rawTx]))
       logger.loading(`Creating proposal`)
 
@@ -215,13 +214,13 @@ export const wrapCommand = (command) => {
     simulateTX = async (tx) => {
       logger.loading(`Simulating proposal`)
       const simulationResult = await this.provider.simulate(tx)
-      if(simulationResult.value.err) {
+      if (simulationResult.value.err) {
         logger.error(`Failed to simulate proposal.`)
         const customError = simulationResult.value.err['InstructionError'][1]['Custom']
         if (customError) {
           const { idl } = getContract(command.id.split(':')[0], '')
           const idlErrors = parseIdlErrors(idl)
-          let translatedErr = ProgramError.parse(`custom program error: ${customError}`, idlErrors)
+          const translatedErr = ProgramError.parse(`custom program error: ${customError}`, idlErrors)
           throw translatedErr
         } else {
           throw simulationResult.value.err
@@ -231,5 +230,3 @@ export const wrapCommand = (command) => {
     }
   }
 }
-
-
