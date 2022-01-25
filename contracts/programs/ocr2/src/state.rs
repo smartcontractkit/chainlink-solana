@@ -36,6 +36,17 @@ pub struct Oracles {
 }
 arrayvec!(Oracles, Oracle, u64);
 
+#[account(zero_copy)]
+pub struct Proposal {
+    pub version: u8,
+    pub owner: Pubkey,
+    pub f: u8,
+    _padding0: u16,
+    _padding1: u32,
+    pub oracles: Oracles, // TODO: use Oracles subset with only keys
+    pub offchain_config: OffchainConfig,
+}
+
 #[zero_copy]
 pub struct LeftoverPayments {
     xs: [LeftoverPayment; MAX_ORACLES],
@@ -51,8 +62,6 @@ pub struct State {
     _padding1: u32,
     pub config: Config,
     pub offchain_config: OffchainConfig,
-    // a staging area which will swap onto data on commit
-    pub pending_offchain_config: OffchainConfig,
     pub oracles: Oracles,
     pub leftover_payments: LeftoverPayments,
     pub transmissions: Pubkey,
