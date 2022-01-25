@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { TransactionResponse, SolanaCommand, RawTransaction } from '@chainlink/gauntlet-solana'
-import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
-import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair, Transaction, SystemProgram, Connection, LAMPORTS_PER_SOL } from '@solana/web3.js'
+import { logger } from '@chainlink/gauntlet-core/dist/utils'
+import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract, makeTx } from '@chainlink/gauntlet-solana-contracts'
 import { ProgramError, parseIdlErrors, Idl, Program } from '@project-serum/anchor'
 
@@ -118,28 +118,10 @@ export const wrapCommand = (command) => {
     }
 
     createProposal: ProposalAction = async (proposal: Keypair, context): Promise<string> => {
+     
+      await this.simulateTX(makeTx([context.rawTx]))
       logger.loading(`Creating proposal`)
-      const [multisigSigner] = await PublicKey.findProgramAddress(
-        [this.multisigAddress.toBuffer()],
-        this.program.programId,
-      )
-        const TX = makeTx([context.rawTx])
-        // const TX = new Transaction().add(
-        //   SystemProgram.transfer({
-        //     fromPubkey: this.wallet.payer.publicKey,
-        //     toPubkey: this.wallet.payer.publicKey,
-        //     lamports: LAMPORTS_PER_SOL / 100,
-        //   })
-        // );
-        logger.info(JSON.stringify(TX))
 
-      const txSimulationResult = await this.provider.connection.simulateTransaction(TX, [this.wallet.payer])
-      // const txSimulationResult = await this.provider.connection.simulateTransaction(TX, [this.wallet.payer], [multisigSigner])
-
-      logger.info(JSON.stringify(txSimulationResult, null, 4))
-      // if (txSimulationResult.value.err) {
-      //   throw new Error(JSON.stringify(txSimulationResult.value.err))
-      // }
       const txSize = 1000
       const tx = await this.program.rpc.createTransaction(
         context.rawTx.programId,
@@ -228,6 +210,24 @@ export const wrapCommand = (command) => {
       )
       logger.info(`Eligible owners to sign: `)
       logger.info(remainingEligibleSigners.toString())
+    }
+
+    simulateTX = async (tx) => {
+      logger.loading(`Simulating proposal`)
+      const simulationResult = await this.provider.simulate(tx)
+      if(simulationResult.value.err) {
+        logger.error(`Failed to simulate proposal.`)
+        const customError = simulationResult.value.err['InstructionError'][1]['Custom']
+        if (customError) {
+          const { idl } = getContract(command.id.split(':')[0], '')
+          const idlErrors = parseIdlErrors(idl)
+          let translatedErr = ProgramError.parse(`custom program error: ${customError}`, idlErrors)
+          throw translatedErr
+        } else {
+          throw simulationResult.value.err
+        }
+      }
+      logger.success(`Successful proposal simulation`)
     }
   }
 }
