@@ -38,7 +38,11 @@ jobs:
     - run: solana-keygen new -o id.json
     - run: yarn install --frozen-lockfile
     - run: anchor test
-  
+    - run: |
+       cd examples/hello-world
+       yarn install --frozen-lockfile
+       anchor test
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
