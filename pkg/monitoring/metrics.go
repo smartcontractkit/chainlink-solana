@@ -50,7 +50,7 @@ var (
 			Name: "offchain_aggregator_answers_total",
 			Help: "Bump this metric every time there is a transmission on chain.",
 		},
-		[]string{"contract_address", "feed_id", "chain_id", "contract_status", "contract_type", "feed_name", "feed_path", "network_id", "networks_name"},
+		[]string{"contract_address", "feed_id", "chain_id", "contract_status", "contract_type", "feed_name", "feed_path", "network_id", "network_name"},
 	)
 	offchainAggregatorSubmissionReceivedValues = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
