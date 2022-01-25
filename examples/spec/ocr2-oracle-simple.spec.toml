@@ -1,17 +1,12 @@
 type                                   = "offchainreporting2"
 schemaVersion                          = 1
-blockchainTimeout                      = "20s"
-contractConfigConfirmations            = 3
-contractConfigTrackerPollInterval      = "1m"
-contractConfigTrackerSubscribeInterval = "2m"
-name                                   = "<insert job name here>"
 relay                                  = "solana"
+name                                   = "<insert job name here>"
 contractID                             = "<insert solana ocr2 state account>"
-p2pBootstrapPeers                      = ["somep2pkey@localhost-tcp:port"]
 isBootstrapPeer                        = false
-p2pPeerID                              = "<insert p2p id>"
-ocrKeyBundleID                         = "<insert ocr2 key bundle id>"
-monitoringEndpoint                     = "<insert monitoring endpoint>"
+p2pBootstrapPeers                      = ["<optional, overrides P2PV2_BOOTSTRAPPERS>"]
+p2pPeerID                              = "<optional, overrides P2P_PEER_ID>"
+ocrKeyBundleID                         = "<optional, overrides OCR2_KEY_BUNDLE_ID (solana)>"
 transmitterID                          = "<insert solana transmitter key id>"
 observationSource                      = """
     // data source 1
