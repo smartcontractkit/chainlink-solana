@@ -98,7 +98,7 @@ jobs:
       - name: Run Tests
         env:
           SELECTED_NETWORKS: solana
-          NETWORK_SETTINGS: /home/runner/work/chainlink-solana/chainlink-solana/tests/e2e/networks.yaml
+          NETWORK_SETTINGS: ./tests/e2e/networks.yaml
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
           ginkgo tests/e2e/smoke
