@@ -7,7 +7,7 @@ require (
 	github.com/gagliardetto/solana-go v1.0.4
 	github.com/smartcontractkit/chainlink v1.0.1-0.20211209223503-68928efa429a
 	github.com/smartcontractkit/helmenv v1.0.27
-	github.com/smartcontractkit/libocr v0.0.0-20220121130134-5d2b1d5f424b
+	github.com/smartcontractkit/libocr v0.0.0-20220125200954-5b957c834276
 	github.com/stretchr/testify v1.7.0
 )
 
@@ -27,6 +27,7 @@ require (
 	github.com/prometheus/client_golang v1.11.0
 	github.com/riferrei/srclient v0.4.0
 	github.com/rs/zerolog v1.26.1
+	github.com/smartcontractkit/integrations-framework v1.0.37-0.20220125141905-c76d1f04870f
 	go.uber.org/atomic v1.9.0
 	go.uber.org/zap v1.19.1
 	golang.org/x/crypto v0.0.0-20211215165025-cf75a172585e
@@ -162,7 +163,6 @@ require (
 	github.com/shirou/gopsutil v3.21.10+incompatible // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
-	github.com/smartcontractkit/integrations-framework v1.0.37-0.20220125141905-c76d1f04870f // indirect
 	github.com/smartcontractkit/sqlx v1.3.5-0.20210805004948-4be295aacbeb // indirect
 	github.com/spf13/afero v1.6.0 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
