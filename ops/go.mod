@@ -5,10 +5,8 @@ go 1.17
 require (
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi/sdk/v3 v3.17.0
-	github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20211223175739-8c613380571f
+	github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20220125171236-cd95e892d9cb
 )
-
-replace github.com/smartcontractkit/chainlink-relay/ops => ../../chainlink-relay/ops
 
 require (
 	cloud.google.com/go v0.99.0 // indirect
