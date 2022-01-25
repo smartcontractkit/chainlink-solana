@@ -1,17 +1,17 @@
 encryptionsalt: v1:VLVXZInIcZM=:v1:VFmbM7uWyfbgZrth:RIHQzgnpFyY6SvvNiqkiaByQdFXaDw==
 config:
   # # # testing parameters for updating nodes + mixing node composition
-  # solana-env:ENV-ONLY_BOOT_CONTAINERS: true
-  # # to upgrade all: update CL-NODE_VERSION, enable ONLY_BOOT_CONTAINERS, disable MIX_UPGRADE
-  # solana-env:ENV-MIX_UPGRADE: true
-  # solana-env:ENV-MIX_UPGRADE_IMAGE: develop.f149ecd421a3667dcd4b603fa69bda05e34d602d
-  # solana-env:ENV-MIX_UPGRADE_NODES: [false, false, false, false, true] # nodes to upgrade (first one is bootstrap)
+  solana-env:ENV-ONLY_BOOT_CONTAINERS: true
+  # easiest way to upgrade all: update CL-NODE_VERSION, enable ONLY_BOOT_CONTAINERS, disable MIX_UPGRADE
+  solana-env:ENV-MIX_UPGRADE: true
+  solana-env:ENV-MIX_UPGRADE_IMAGE: develop.f149ecd421a3667dcd4b603fa69bda05e34d602d
+  solana-env:ENV-MIX_UPGRADE_NODES: [true, true, true, true, true] # nodes to upgrade (first one is bootstrap)
   # chainlink node configs
   solana-env:CL-COUNT: 4 # not counting bootstrap, minimum 4
   solana-env:CL-PORT-START: 6688 # start port to expose lite client port
   solana-env:CL-P2P_PORT-START: 5050 # start port to expose lite client P2P ports
-  # solana-env:CL-NODE_VERSION: develop.f20690e8ede0cfead9df7f808f56a14f26469aaa # development version can be found at https://gallery.ecr.aws/chainlink/chainlink
-  solana-env:CL-BUILD_LOCALLY: true # (overrides NODE_VERSION) BUILD_CONTEXT and BUILD_DOCKERFILE must be set if this is enabled
+  solana-env:CL-NODE_VERSION: develop.f20690e8ede0cfead9df7f808f56a14f26469aaa # development version can be found at https://gallery.ecr.aws/chainlink/chainlink
+  # solana-env:CL-BUILD_LOCALLY: true # (overrides NODE_VERSION) BUILD_CONTEXT and BUILD_DOCKERFILE must be set if this is enabled
   solana-env:CL-BUILD_CONTEXT: ../../chainlink
   solana-env:CL-BUILD_DOCKERFILE: ../../chainlink/core/chainlink.Dockerfile
   solana-env:CL-RELAY_NAME: solana

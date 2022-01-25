@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi/sdk/v3 v3.17.0
-	github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20220125171236-cd95e892d9cb
+	github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20220125194834-c07e135ab67e
 )
 
 require (
@@ -146,8 +146,8 @@ require (
 	github.com/shirou/gopsutil v3.21.10+incompatible // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
-	github.com/smartcontractkit/helmenv v1.0.23 // indirect
-	github.com/smartcontractkit/integrations-framework v1.0.29 // indirect
+	github.com/smartcontractkit/helmenv v1.0.25 // indirect
+	github.com/smartcontractkit/integrations-framework v1.0.36-0.20220124220015-0efc5b13cfc6 // indirect
 	github.com/spf13/afero v1.6.0 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/spf13/cobra v1.2.1 // indirect
@@ -185,6 +185,7 @@ require (
 	google.golang.org/grpc v1.43.0 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/gorp.v1 v1.7.2 // indirect
+	gopkg.in/guregu/null.v4 v4.0.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.66.2 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
