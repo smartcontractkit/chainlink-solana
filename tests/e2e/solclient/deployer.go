@@ -5,6 +5,7 @@ import (
 	ag_binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/rs/zerolog/log"
 	access_controller2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/access_controller"
 	"github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr2"
@@ -74,8 +75,9 @@ func (c *ContractDeployer) DeployOCRv2Store(billingAC string) (contracts.OCRv2St
 	if err != nil {
 		return nil, err
 	}
-	err = c.Client.TXAsync(
+	err = c.Client.TXSync(
 		"Deploy store",
+		rpc.CommitmentFinalized,
 		[]solana.Instruction{
 			accInstruction,
 			store2.NewInitializeInstruction(
@@ -220,8 +222,9 @@ func (c *ContractDeployer) DeployOCRv2(billingControllerAddr string, requesterCo
 		return nil, err
 	}
 	vault := c.Client.Accounts.Authorities["vault"]
-	err = c.Client.TXAsync(
+	err = c.Client.TXSync(
 		"Initializing OCRv2",
+		rpc.CommitmentFinalized,
 		[]solana.Instruction{
 			ocrAccInstruction,
 			ocr_2.NewInitializeInstructionBuilder().
