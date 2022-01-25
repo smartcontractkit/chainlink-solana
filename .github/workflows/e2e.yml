@@ -51,6 +51,8 @@ jobs:
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v2
+        with:
+          repository: ${{ inputs.repo_name }}
       - name: Setup go
         uses: actions/setup-go@v1
         with:
