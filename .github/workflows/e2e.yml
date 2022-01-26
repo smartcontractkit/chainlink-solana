@@ -1,5 +1,23 @@
 name: e2e_tests
-on: [push]
+on: 
+  push:
+  workflow_call:
+    inputs:
+      repo_name:
+        required: true
+        default: ${{ github.repository }}
+        type: string
+    secrets:
+      QA_AWS_ACCESS_KEY_ID:
+        required: true
+      QA_AWS_SECRET_KEY:
+        required: true
+      QA_AWS_REGION:
+        required: true
+      QA_AWS_ROLE_TO_ASSUME:
+        required: true
+      QA_KUBECONFIG:
+        required: true
 
 jobs:
   build:
@@ -12,6 +30,8 @@ jobs:
         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v2
+        with:
+          repository: ${{ inputs.repo_name }}
       - run: echo $HOME
       - run: echo $PATH
       - run: |
@@ -31,6 +51,8 @@ jobs:
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v2
+        with:
+          repository: ${{ inputs.repo_name }}
       - name: Setup go
         uses: actions/setup-go@v1
         with:
@@ -76,7 +98,6 @@ jobs:
       - name: Run Tests
         env:
           SELECTED_NETWORKS: solana
-          NETWORK_SETTINGS: /home/runner/work/chainlink-solana/chainlink-solana/tests/e2e/networks.yaml
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
           ginkgo tests/e2e/smoke

@@ -1,9 +1,10 @@
 package utils
 
 import (
-	"github.com/smartcontractkit/integrations-framework/config"
 	"os"
 	"path/filepath"
+
+	"github.com/smartcontractkit/integrations-framework/config"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -20,14 +21,15 @@ func GinkgoSuite() {
 	fConf, err := config.LoadFrameworkConfig(filepath.Join(TestsDir, "framework.yaml"))
 	if err != nil {
 		log.Fatal().
-			Str("Path", ProjectRoot).
+			Str("Path", TestsDir).
+			Err(err).
 			Msg("Failed to load config")
 		return
 	}
 	_, err = config.LoadNetworksConfig(filepath.Join(TestsDir, "networks.yaml"))
 	if err != nil {
 		log.Fatal().
-			Str("Path", ProjectRoot).
+			Str("Path", TestsDir).
 			Err(err).
 			Msg("Failed to load config")
 		return
