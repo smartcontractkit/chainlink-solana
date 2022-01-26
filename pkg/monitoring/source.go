@@ -3,17 +3,33 @@ package monitoring
 import (
 	"context"
 	"fmt"
+	"math/big"
+	"time"
 
+	"github.com/gagliardetto/solana-go/rpc"
 	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
+	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
-func NewSolanaSourceFactory(log relayMonitoring.Logger) relayMonitoring.SourceFactory {
-	return &sourceFactory{log}
+const (
+	commitment = rpc.CommitmentConfirmed
+)
+
+func NewSolanaSourceFactory(
+	solanaConfig SolanaConfig,
+	log relayMonitoring.Logger,
+) relayMonitoring.SourceFactory {
+	client := rpc.New(solanaConfig.RPCEndpoint)
+	return &sourceFactory{
+		client,
+		log,
+	}
 }
 
 type sourceFactory struct {
-	log relayMonitoring.Logger
+	client *rpc.Client
+	log    relayMonitoring.Logger
 }
 
 func (s *sourceFactory) NewSource(
@@ -28,51 +44,58 @@ func (s *sourceFactory) NewSource(
 	if !ok {
 		return nil, fmt.Errorf("expected feedConfig to be of type SolanaFeedConfig not %T", feedConfig)
 	}
-	spec := pkgSolana.OCR2Spec{
-		ProgramID: solanaFeedConfig.ContractAddress,
-		StateID:   solanaFeedConfig.StateAccount,
-	}
-	client := pkgSolana.NewClient(solanaConfig.RPCEndpoint)
-	tracker := pkgSolana.NewTracker(spec, client, nil, &logAdapter{s.log})
 	return &solanaSource{
-		&tracker,
+		s.client,
 		solanaConfig,
 		solanaFeedConfig,
 	}, nil
 }
 
 type solanaSource struct {
-	tracker      *pkgSolana.ContractTracker
+	client       *rpc.Client
 	solanaConfig SolanaConfig
 	feedConfig   SolanaFeedConfig
 }
 
 func (s *solanaSource) Fetch(ctx context.Context) (interface{}, error) {
-	changedInBlock, _, err := s.tracker.LatestConfigDetails(ctx)
+	state, blockNum, err := pkgSolana.GetState(ctx, s.client, s.feedConfig.StateAccount, commitment)
 	if err != nil {
-		return relayMonitoring.Envelope{}, fmt.Errorf("failed to fetch latest config details from on-chain: %w", err)
+		return nil, fmt.Errorf("failed to state from on-chain: %w", err)
 	}
-	cfg, err := s.tracker.LatestConfig(ctx, changedInBlock)
+	contractConfig, err := pkgSolana.ConfigFromState(state)
 	if err != nil {
-		return relayMonitoring.Envelope{}, fmt.Errorf("failed to read latest config from on-chain: %w", err)
+		return nil, fmt.Errorf("failed to decode ContractConfig from on-chain state: %w", err)
 	}
-	configDigest, epoch, round, latestAnswer, latestTimestamp, err := s.tracker.LatestTransmissionDetails(ctx)
+	answer, blockNum, err := pkgSolana.GetLatestTransmission(ctx, s.client, state.Transmissions, commitment)
 	if err != nil {
-		return relayMonitoring.Envelope{}, fmt.Errorf("failed to read latest transmission from on-chain: %w", err)
+		return nil, fmt.Errorf("failed to fetch latest on-chain transmission: %w", err)
 	}
-	transmitter := s.tracker.FromAccount()
-
+	linkBalanceRes, err := s.client.GetTokenAccountBalance(ctx, state.Config.TokenVault, commitment)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read the feed's link balance: %w", err)
+	}
+	if linkBalanceRes.Value == nil {
+		return nil, fmt.Errorf("link balance not found for token vault")
+	}
+	linkBalance, success := big.NewInt(0).SetString(linkBalanceRes.Value.Amount, 10)
+	if !success {
+		return nil, fmt.Errorf("failed to parse link balance value: %s", linkBalanceRes.Value.Amount)
+	}
 	return relayMonitoring.Envelope{
-		configDigest,
-		epoch,
-		round,
-		latestAnswer,
-		latestTimestamp,
+		ConfigDigest: state.Config.LatestConfigDigest,
+		Epoch:        state.Config.Epoch,
+		Round:        state.Config.Round,
 
-		cfg,
+		LatestAnswer:    answer.Data,
+		LatestTimestamp: time.Unix(int64(answer.Timestamp), 0),
 
-		changedInBlock,
-		transmitter,
+		// latest contract config
+		ContractConfig: contractConfig,
+
+		// extra
+		BlockNumber: blockNum,
+		Transmitter: types.Account(state.Config.LatestTransmitter.String()),
+		LinkBalance: linkBalance.Uint64(),
 	}, nil
 }
 

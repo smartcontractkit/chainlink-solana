@@ -28,6 +28,14 @@ type SolanaFeedConfig struct {
 
 var _ relayMonitoring.FeedConfig = SolanaFeedConfig{}
 
+// GetID returns the state account's address as that uniquely
+// identifies a feed on Solana. In Solana, a program is stateless and we
+// use the same program for all feeds so we can't use the program
+// account's address.
+func (s SolanaFeedConfig) GetID() string {
+	return s.StateAccountBase58
+}
+
 func (s SolanaFeedConfig) GetName() string {
 	return s.Name
 }
@@ -56,12 +64,16 @@ func (s SolanaFeedConfig) GetContractStatus() string {
 	return s.ContractStatus
 }
 
+// GetID returns the state account's address as that uniquely
+// identifies a feed on Solana. In Solana, a program is stateless and we
+// use the same program for all feeds so we can't use the program
+// account's address.
 func (s SolanaFeedConfig) GetContractAddress() string {
-	return s.ContractAddress.String()
+	return s.StateAccountBase58
 }
 
 func (s SolanaFeedConfig) GetContractAddressBytes() []byte {
-	return s.ContractAddress.Bytes()
+	return s.StateAccount.Bytes()
 }
 
 func (s SolanaFeedConfig) ToMapping() map[string]interface{} {

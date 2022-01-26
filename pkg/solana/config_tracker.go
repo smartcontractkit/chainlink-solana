@@ -19,7 +19,7 @@ func (c *ContractTracker) LatestConfigDetails(ctx context.Context) (changedInBlo
 	return state.Config.LatestConfigBlockNumber, state.Config.LatestConfigDigest, err
 }
 
-func configFromState(state State) (types.ContractConfig, error) {
+func ConfigFromState(state State) (types.ContractConfig, error) {
 	pubKeys := []types.OnchainPublicKey{}
 	accounts := []types.Account{}
 	for _, o := range state.Oracles.Data() {
@@ -57,7 +57,7 @@ func (c *ContractTracker) LatestConfig(ctx context.Context, changedInBlock uint6
 	if err != nil {
 		return types.ContractConfig{}, err
 	}
-	return configFromState(state)
+	return ConfigFromState(state)
 }
 
 // LatestBlockHeight returns the height of the most recent block in the chain.
