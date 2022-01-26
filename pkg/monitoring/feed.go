@@ -20,15 +20,21 @@ type SolanaFeedConfig struct {
 	ContractAddressBase58      string `json:"contract_address_base58,omitempty"`
 	TransmissionsAccountBase58 string `json:"transmissions_account_base58,omitempty"`
 	StateAccountBase58         string `json:"state_account_base58,omitempty"`
-	SPLTokenAccountBase58      string `json:"spl_token_account_base58,omitempty"`
 
 	ContractAddress      solana.PublicKey `json:"-"`
 	TransmissionsAccount solana.PublicKey `json:"-"`
 	StateAccount         solana.PublicKey `json:"-"`
-	SPLTokenAccount      solana.PublicKey `json:"-"`
 }
 
 var _ relayMonitoring.FeedConfig = SolanaFeedConfig{}
+
+// GetID returns the state account's address as that uniquely
+// identifies a feed on Solana. In Solana, a program is stateless and we
+// use the same program for all feeds so we can't use the program
+// account's address.
+func (s SolanaFeedConfig) GetID() string {
+	return s.StateAccountBase58
+}
 
 func (s SolanaFeedConfig) GetName() string {
 	return s.Name
@@ -58,12 +64,16 @@ func (s SolanaFeedConfig) GetContractStatus() string {
 	return s.ContractStatus
 }
 
+// GetID returns the state account's address as that uniquely
+// identifies a feed on Solana. In Solana, a program is stateless and we
+// use the same program for all feeds so we can't use the program
+// account's address.
 func (s SolanaFeedConfig) GetContractAddress() string {
-	return s.ContractAddress.String()
+	return s.StateAccountBase58
 }
 
 func (s SolanaFeedConfig) GetContractAddressBytes() []byte {
-	return s.ContractAddress.Bytes()
+	return s.StateAccount.Bytes()
 }
 
 func (s SolanaFeedConfig) ToMapping() map[string]interface{} {
@@ -105,10 +115,6 @@ func SolanaFeedParser(buf io.ReadCloser) ([]relayMonitoring.FeedConfig, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse state account '%s' from JSON at index i=%d: %w", rawFeed.StateAccountBase58, i, err)
 		}
-		splTokenAccount, err := solana.PublicKeyFromBase58(rawFeed.SPLTokenAccountBase58)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse SPL token account '%s' from JSON at index i=%d: %w", rawFeed.SPLTokenAccountBase58, i, err)
-		}
 		feeds[i] = relayMonitoring.FeedConfig(SolanaFeedConfig{
 			rawFeed.Name,
 			rawFeed.Path,
@@ -120,12 +126,10 @@ func SolanaFeedParser(buf io.ReadCloser) ([]relayMonitoring.FeedConfig, error) {
 			rawFeed.ContractAddressBase58,
 			rawFeed.TransmissionsAccountBase58,
 			rawFeed.StateAccountBase58,
-			rawFeed.SPLTokenAccountBase58,
 
 			contractAddress,
 			transmissionsAccount,
 			stateAccount,
-			splTokenAccount,
 		})
 	}
 	return feeds, nil

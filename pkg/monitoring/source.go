@@ -81,11 +81,7 @@ func (s *solanaSource) Fetch(ctx context.Context) (interface{}, error) {
 	}
 	transmitter := types.Account(state.Config.LatestTransmitter.String())
 
-	solBalanceRes, err := s.client.GetBalance(ctx, s.feedConfig.ContractAddress, rpc.CommitmentFinalized)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read the feed's sol balance: %w", err)
-	}
-	linkBalanceRes, err := s.client.GetTokenAccountBalance(ctx, s.feedConfig.SPLTokenAccount, rpc.CommitmentFinalized)
+	linkBalanceRes, err := s.client.GetTokenAccountBalance(ctx, state.Config.TokenVault, rpc.CommitmentConfirmed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read the feed's link balance: %w", err)
 	}
@@ -106,8 +102,6 @@ func (s *solanaSource) Fetch(ctx context.Context) (interface{}, error) {
 
 		changedInBlock,
 		transmitter,
-
-		solBalanceRes.Value,
 		linkBalance.Uint64(),
 	}, nil
 }
