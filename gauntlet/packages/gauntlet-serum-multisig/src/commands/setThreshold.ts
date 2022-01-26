@@ -2,8 +2,7 @@ import { SolanaCommand, RawTransaction, TransactionResponse } from '@chainlink/g
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
 import { Result } from '@chainlink/gauntlet-core'
-
-import BN from 'bn.js'
+import { BN } from '@chainlink/gauntlet-core/dist/utils'
 
 export default class SetThreshold extends SolanaCommand {
   static id = 'set:threshold'

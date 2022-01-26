@@ -211,11 +211,7 @@ export default class WriteOffchainConfig extends SolanaCommand {
     const offchainConfigChunks = divideIntoChunks(offchainConfig, maxBufferSize)
     if (offchainConfigChunks.length > 1) {
       logger.info(
-        `Config size (${
-          offchainConfig.byteLength
-        } bytes) is bigger than transaction limit. It needs to be configured using ${
-          offchainConfigChunks.length + 1
-        } transactions`,
+        `Config size (${offchainConfig.byteLength} bytes) is bigger than transaction limit. It needs to be configured using ${offchainConfigChunks.length} transactions`,
       )
     }
 
@@ -252,7 +248,7 @@ export default class WriteOffchainConfig extends SolanaCommand {
     const state = new PublicKey(this.flags.state)
 
     const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
-    const startingPoint = new BN(this.flags.chunk || 0).toNumber()
+    const startingPoint = new BN(this.flags.instruction || 0).toNumber()
 
     await prompt(`Start writing offchain config from ${startingPoint}/${rawTx.length - 1}?`)
 

@@ -1,9 +1,10 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { TransactionResponse, SolanaCommand, RawTransaction } from '@chainlink/gauntlet-solana'
-import { logger } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair, Transaction } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
 import { ProgramError, parseIdlErrors, Idl, Program } from '@project-serum/anchor'
+import { MAX_BUFFER_SIZE } from '../lib/constants'
 
 type ProposalContext = {
   rawTx: RawTransaction
@@ -25,7 +26,7 @@ export const wrapCommand = (command) => {
       super(flags, args)
       logger.info(`Running ${command.id} command using Serum Multisig`)
 
-      this.command = new command(flags, args)
+      this.command = new command({ ...flags, bufferSize: MAX_BUFFER_SIZE }, args)
       this.command.invokeMiddlewares(this.command, this.command.middlewares)
       this.require(!!process.env.MULTISIG_ADDRESS, 'Please set MULTISIG_ADDRESS env var')
       this.multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS)
@@ -56,8 +57,11 @@ export const wrapCommand = (command) => {
         - Threshold: ${threshold.toString()}
         - Owners: ${owners}`)
 
-      // TODO: Should we support many txs?
-      const rawTx = (await this.command.makeRawTransaction(multisigSigner))[0]
+      const instructionIndex = new BN(this.flags.instruction || 0).toNumber()
+      const rawTxs = await this.command.makeRawTransaction(multisigSigner)
+      await this.showExecutionInstructions(rawTxs, instructionIndex)
+      const rawTx = rawTxs[instructionIndex]
+
       const isCreation = !this.flags.proposal
       if (isCreation) {
         const proposal = await this.createProposalAcount()
@@ -129,7 +133,7 @@ export const wrapCommand = (command) => {
     }
 
     createProposal: ProposalAction = async (proposal: PublicKey, context): Promise<string> => {
-      logger.loading(`Creating proposal`)
+      logger.loading(`Creating proposal for ${command.id}`)
       const tx = await this.program.rpc.createTransaction(
         context.rawTx.programId,
         context.rawTx.accounts,
@@ -148,7 +152,7 @@ export const wrapCommand = (command) => {
     }
 
     approveProposal: ProposalAction = async (proposal: PublicKey): Promise<string> => {
-      logger.loading(`Approving proposal`)
+      logger.loading(`Approving proposal for ${command.id}`)
       const tx = await this.program.rpc.approve({
         accounts: {
           multisig: this.multisigAddress,
@@ -160,7 +164,7 @@ export const wrapCommand = (command) => {
     }
 
     executeProposal: ProposalAction = async (proposal: PublicKey, context): Promise<string> => {
-      logger.loading(`Executing proposal`)
+      logger.loading(`Executing proposal for ${command.id}`)
       // get the command's starting word to map it to the respective IDL(ocr2, store etc)
       const { idl } = getContract(command.id.split(':')[0], '')
       try {
@@ -216,6 +220,17 @@ export const wrapCommand = (command) => {
       )
       logger.info(`Eligible owners to sign: `)
       logger.info(remainingEligibleSigners.toString())
+    }
+
+    showExecutionInstructions = async (rawTxs: RawTransaction[], instructionIndex: number) => {
+      logger.info(`Execution Information:
+        The command ${command.id} with multisig takes up to ${rawTxs.length - 1} (${rawTxs.map(
+        (_, i) => i,
+      )}) zero-indexed transactions.
+        Currently running ${instructionIndex} of ${rawTxs.length - 1}.
+      `)
+
+      await prompt('Continue?')
     }
   }
 }

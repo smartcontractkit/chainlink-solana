@@ -59,7 +59,7 @@ export default class CommitOffchainConfig extends SolanaCommand {
     await prompt(`Commit Offchain config?`)
     logger.loading('Sending tx...')
     const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
-    logger.success(`Committing offchain config on tx ${tx}`)
+    logger.success(`Committing offchain config on tx ${txhash}`)
 
     return {
       responses: [

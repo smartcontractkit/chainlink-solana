@@ -102,7 +102,7 @@ export default class SetConfig extends SolanaCommand {
     await prompt(`Continue setting config on ${this.flags.state.toString()}?`)
     logger.loading('Sending tx...')
     const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
-    logger.success(`Config set on tx ${tx}`)
+    logger.success(`Config set on tx ${txhash}`)
 
     return {
       responses: [
