@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi/sdk/v3 v3.17.0
-	github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20220125194834-c07e135ab67e
+	github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20220126171549-56e2a1dd6034
 )
 
 require (
