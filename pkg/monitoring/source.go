@@ -66,7 +66,7 @@ func (s *solanaSource) Fetch(ctx context.Context) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode ContractConfig from on-chain state: %w", err)
 	}
-	answer, blockNum, err := pkgSolana.GetLatestTransmission(ctx, s.client, state.Transmissions, commitment)
+	answer, _, err := pkgSolana.GetLatestTransmission(ctx, s.client, state.Transmissions, commitment)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch latest on-chain transmission: %w", err)
 	}
@@ -130,3 +130,6 @@ func (l *logAdapter) Panicf(format string, values ...interface{}) {
 func (l *logAdapter) Fatalf(format string, values ...interface{}) {
 	l.log.Fatalw(fmt.Sprintf(format, values...))
 }
+
+// Just to silence golangci-lint
+var _ = logAdapter{}
