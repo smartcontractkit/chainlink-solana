@@ -20,6 +20,10 @@ type Input = {
   billingAccessController: string
   requesterAccessController: string
   link: string
+  billing: {
+    observationPaymentGjuels: string
+    transmissionPaymentGjuels: string
+  }
 }
 
 export default class OCR2Inspect extends SolanaCommand {
@@ -46,6 +50,10 @@ export default class OCR2Inspect extends SolanaCommand {
       requesterAccessController,
       link,
       offchainConfig,
+      billing: {
+        observationPaymentGjuels: info.billing.observationPaymentGjuels,
+        transmissionPaymentGjuels: info.billing.transmissionPaymentGjuels,
+      },
     }
   }
 
@@ -160,6 +168,16 @@ export default class OCR2Inspect extends SolanaCommand {
         toComparableNumber(onChainState.config.maxAnswer),
         toComparableNumber(input.maxAnswer),
         'Max Answer',
+      ),
+      inspection.makeInspection(
+        toComparableNumber(onChainState.config.billing.transmissionPaymentGjuels),
+        toComparableNumber(input.billing.transmissionPaymentGjuels),
+        'Transmission Payment',
+      ),
+      inspection.makeInspection(
+        toComparableNumber(onChainState.config.billing.observationPaymentGjuels),
+        toComparableNumber(input.billing.observationPaymentGjuels),
+        'Observation Payment',
       ),
       inspection.makeInspection(
         toComparablePubKey(onChainState.config.requesterAccessController),

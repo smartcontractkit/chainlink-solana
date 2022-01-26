@@ -3,8 +3,6 @@ import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
 import { Result } from '@chainlink/gauntlet-core'
 
-import BN from 'bn.js'
-
 export default class SetOwners extends SolanaCommand {
   static id = 'set:owners'
   static category = CONTRACT_LIST.MULTISIG

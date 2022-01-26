@@ -1,10 +1,11 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { logger, prompt, BN } from '@chainlink/gauntlet-core/dist/utils'
+import { RawTransaction, SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { utils } from '@project-serum/anchor'
 import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
-import { PublicKey } from '@solana/web3.js'
+import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
+import { makeTx } from '../../../lib/utils'
 
 export default class PayRemaining extends SolanaCommand {
   static id = 'ocr2:pay_remaining'
@@ -20,18 +21,15 @@ export default class PayRemaining extends SolanaCommand {
     this.require(!!this.flags.state, 'Please provide flags with "state"')
   }
 
-  execute = async () => {
+  makeRawTransaction = async (signer: PublicKey) => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
 
     const state = new PublicKey(this.flags.state)
-    const owner = this.wallet.payer
-
-    const data = await program.account.state.fetch(state)
-    console.log(data)
-    const billingAC = new PublicKey(data.config.billingAccessController)
-    const link = new PublicKey(this.flags.link)
+    const stateData = await program.account.state.fetch(state)
+    const billingAC = new PublicKey(stateData.config.billingAccessController)
+    const link = new PublicKey(this.flags.link || process.env.LINK)
 
     const [vaultAuthority] = await PublicKey.findProgramAddress(
       [Buffer.from(utils.bytes.utf8.encode('vault')), state.toBuffer()],
@@ -47,7 +45,7 @@ export default class PayRemaining extends SolanaCommand {
     )
 
     // Get remaining non paid oracles. New oracles will be placed at the beginning of leftoverPayments
-    const leftovers = data.leftoverPayments.slice(0, data.leftoverPaymentsLen)
+    const leftovers = stateData.leftoverPayments.xs.slice(0, new BN(stateData.leftoverPayments.len).toNumber())
     const remainingAccounts = leftovers.map((leftover) => ({
       pubkey: new PublicKey(leftover.payee),
       isWritable: true,
@@ -55,30 +53,71 @@ export default class PayRemaining extends SolanaCommand {
     }))
 
     this.require(remainingAccounts.length > 0, 'No remaining oracles to pay')
-
     logger.log(
-      'Paying remaining accounts:',
+      'Remaining accounts to pay:',
       remainingAccounts.map(({ pubkey }) => pubkey.toString()),
     )
-    await prompt('Continue pay remaining oracles?')
-    const tx = await program.rpc.payRemaining({
-      accounts: {
-        state,
-        authority: owner.publicKey,
-        accessController: billingAC,
-        tokenVault,
-        vaultAuthority,
-        tokenProgram: TOKEN_PROGRAM_ID,
+
+    const data = program.coder.instruction.encode('pay_remaining', {})
+
+    const accounts: AccountMeta[] = [
+      {
+        pubkey: state,
+        isWritable: true,
+        isSigner: false,
       },
-      remainingAccounts,
-      signers: [owner],
-    })
+      {
+        pubkey: signer,
+        isWritable: false,
+        isSigner: true,
+      },
+      {
+        pubkey: billingAC,
+        isWritable: false,
+        isSigner: false,
+      },
+      {
+        pubkey: tokenVault,
+        isWritable: true,
+        isSigner: false,
+      },
+      {
+        pubkey: vaultAuthority,
+        isWritable: false,
+        isSigner: false,
+      },
+      {
+        pubkey: TOKEN_PROGRAM_ID,
+        isWritable: false,
+        isSigner: false,
+      },
+      ...remainingAccounts,
+    ]
+
+    const rawTx: RawTransaction = {
+      data,
+      accounts,
+      programId: ocr2.programId,
+    }
+
+    return [rawTx]
+  }
+
+  execute = async () => {
+    const contract = getContract(CONTRACT_LIST.OCR_2, '')
+    const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
+    const tx = makeTx(rawTx)
+    logger.debug(tx)
+    await prompt(`Pay remaining on ${this.flags.state.toString()}?`)
+    logger.loading('Sending tx...')
+    const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
+    logger.success(`Remaining oracles paid on tx ${txhash}`)
 
     return {
       responses: [
         {
-          tx: this.wrapResponse(tx, state.toString()),
-          contract: state.toString(),
+          tx: this.wrapResponse(txhash, this.flags.state.toString()),
+          contract: this.flags.state,
         },
       ],
     } as Result<TransactionResponse>

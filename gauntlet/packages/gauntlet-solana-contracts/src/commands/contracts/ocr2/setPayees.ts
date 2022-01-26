@@ -42,7 +42,6 @@ export default class SetPayees extends SolanaCommand {
     super(flags, args)
 
     this.requireFlag('state', 'Provide a valid state address')
-    this.requireFlag('link', 'Provide a valid link address')
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
@@ -52,14 +51,10 @@ export default class SetPayees extends SolanaCommand {
 
     const input = this.makeInput(this.flags.input)
     const state = new PublicKey(this.flags.state)
+    const link = new PublicKey(this.flags.link || process.env.LINK)
 
     const info = await program.account.state.fetch(state)
-    const token = new Token(
-      this.provider.connection,
-      new PublicKey(this.flags.link),
-      TOKEN_PROGRAM_ID,
-      this.wallet.payer,
-    )
+    const token = new Token(this.provider.connection, link, TOKEN_PROGRAM_ID, this.wallet.payer)
 
     this.flags.TESTING_ONLY_IGNORE_PAYEE_VALIDATION &&
       logger.warn('TESTING_ONLY_IGNORE_PAYEE_VALIDATION flag is enabled')
@@ -98,6 +93,7 @@ export default class SetPayees extends SolanaCommand {
       .map(({ transmitter }) => payeeByTransmitter[new PublicKey(transmitter).toString()])
 
     logger.log('Payees information:', input)
+    logger.log('Setting the following:', payees)
     const data = program.coder.instruction.encode('set_payees', {
       payees,
     })
