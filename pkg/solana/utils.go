@@ -26,7 +26,7 @@ func XXXInspectStates(state, transmission, program, rpc string, log int) (answer
 	tracker := ContractTracker{
 		StateID:         solana.MustPublicKeyFromBase58(state),
 		TransmissionsID: solana.MustPublicKeyFromBase58(transmission),
-		client:          NewClient(rpc),
+		client:          NewClient(OCR2Spec{NodeEndpointHTTP: rpc}, logger.NullLogger),
 		lggr:            logger.NullLogger,
 		requestGroup:    &singleflight.Group{},
 		ProgramID:       solana.MustPublicKeyFromBase58(program),
