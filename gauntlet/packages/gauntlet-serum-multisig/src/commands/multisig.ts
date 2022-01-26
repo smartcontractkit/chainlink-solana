@@ -224,10 +224,10 @@ export const wrapCommand = (command) => {
 
     showExecutionInstructions = async (rawTxs: RawTransaction[], instructionIndex: number) => {
       logger.info(`Execution Information:
-        The command ${command.id} with multisig takes up to ${rawTxs.length - 1} (${rawTxs.map(
+        The command ${command.id} with multisig takes up to ${rawTxs.length} (${rawTxs.map(
         (_, i) => i,
       )}) zero-indexed transactions.
-        Currently running ${instructionIndex} of ${rawTxs.length - 1}.
+        Currently running ${instructionIndex + 1} of ${rawTxs.length}.
       `)
 
       await prompt('Continue?')
