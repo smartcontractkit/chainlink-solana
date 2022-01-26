@@ -19,7 +19,7 @@ func TestConfigDigester(t *testing.T) {
 	var state State
 	err = bin.NewBorshDecoder(mockState.Raw).Decode(&state)
 	require.NoError(t, err)
-	config, err := configFromState(state)
+	config, err := ConfigFromState(state)
 	require.NoError(t, err)
 
 	actualDigest, err := digester.ConfigDigest(config)
