@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 type Metrics interface {
@@ -17,49 +18,49 @@ type Metrics interface {
 }
 
 var (
-	headTrackerCurrentHead = prometheus.NewGaugeVec(
+	headTrackerCurrentHead = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "head_tracker_current_head",
 			Help: "Tracks the current block height that the monitoring instance has processed.",
 		},
 		[]string{"network_name", "chain_id", "network_id"},
 	)
-	feedContractMetadata = prometheus.NewGaugeVec(
+	feedContractMetadata = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "feed_contract_metadata",
 			Help: "Exposes metadata for individual feeds. It should simply be set to 1, as the relevant info is in the labels.",
 		},
 		[]string{"chain_id", "contract_address", "feed_id", "contract_status", "contract_type", "feed_name", "feed_path", "network_id", "network_name", "symbol"},
 	)
-	nodeMetadata = prometheus.NewGaugeVec(
+	nodeMetadata = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "node_metadata",
 			Help: "Exposes metadata for node operators. It should simply be set to 1, as the relevant info is in the labels.",
 		},
 		[]string{"chain_id", "network_id", "network_name", "oracle_name", "sender"},
 	)
-	offchainAggregatorAnswers = prometheus.NewGaugeVec(
+	offchainAggregatorAnswers = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "offchain_aggregator_answers",
 			Help: "Reports the latest answer for a contract.",
 		},
 		[]string{"contract_address", "feed_id", "chain_id", "contract_status", "contract_type", "feed_name", "feed_path", "network_id", "network_name"},
 	)
-	offchainAggregatorAnswersTotal = prometheus.NewCounterVec(
+	offchainAggregatorAnswersTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "offchain_aggregator_answers_total",
 			Help: "Bump this metric every time there is a transmission on chain.",
 		},
 		[]string{"contract_address", "feed_id", "chain_id", "contract_status", "contract_type", "feed_name", "feed_path", "network_id", "network_name"},
 	)
-	offchainAggregatorSubmissionReceivedValues = prometheus.NewGaugeVec(
+	offchainAggregatorSubmissionReceivedValues = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "offchain_aggregator_submission_received_values",
 			Help: "Report individual node observations for the latest transmission on chain. (Should be 1 time series per node per contract)",
 		},
 		[]string{"contract_address", "feed_id", "sender", "chain_id", "contract_status", "contract_type", "feed_name", "feed_path", "network_id", "network_name"},
 	)
-	offchainAggregatorAnswerStalled = prometheus.NewGaugeVec(
+	offchainAggregatorAnswerStalled = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "offchain_aggregator_answer_stalled",
 			Help: "Set to 1 if the heartbeat interval has passed on a feed without a transmission. Set to 0 otherwise.",
@@ -68,19 +69,7 @@ var (
 	)
 )
 
-var DefaultMetrics Metrics
-
-func init() {
-	prometheus.MustRegister(headTrackerCurrentHead)
-	prometheus.MustRegister(feedContractMetadata)
-	prometheus.MustRegister(nodeMetadata)
-	prometheus.MustRegister(offchainAggregatorAnswers)
-	prometheus.MustRegister(offchainAggregatorAnswersTotal)
-	prometheus.MustRegister(offchainAggregatorSubmissionReceivedValues)
-	prometheus.MustRegister(offchainAggregatorAnswerStalled)
-
-	DefaultMetrics = &defaultMetrics{}
-}
+var DefaultMetrics = &defaultMetrics{}
 
 type defaultMetrics struct{}
 
