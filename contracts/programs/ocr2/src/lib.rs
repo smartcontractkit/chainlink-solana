@@ -205,6 +205,8 @@ pub mod ocr2 {
             .any(|leftover| leftover.amount != 0);
         require!(!leftovers, PaymentsRemaining);
 
+        leftover_payments.clear();
+
         // Move current balances to leftover payments
         for oracle in oracles.iter() {
             leftover_payments.push(LeftoverPayment {
