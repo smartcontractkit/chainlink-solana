@@ -45,7 +45,7 @@ export default class PayRemaining extends SolanaCommand {
     )
 
     // Get remaining non paid oracles. New oracles will be placed at the beginning of leftoverPayments
-    const leftovers = stateData.leftoverPayments.xs.slice(new BN(stateData.leftoverPayments.len).toNumber())
+    const leftovers = stateData.leftoverPayments.xs.slice(0, new BN(stateData.leftoverPayments.len).toNumber())
     const remainingAccounts = leftovers.map((leftover) => ({
       pubkey: new PublicKey(leftover.payee),
       isWritable: true,
@@ -91,6 +91,7 @@ export default class PayRemaining extends SolanaCommand {
         isWritable: false,
         isSigner: false,
       },
+      ...remainingAccounts,
     ]
 
     const rawTx: RawTransaction = {
