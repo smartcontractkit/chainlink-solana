@@ -22,19 +22,15 @@ pub struct Store {
 }
 
 #[repr(C)]
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct NewTransmission {
+    pub timestamp: u32,
+    pub answer: i128,
+}
+
+#[repr(C)]
 #[derive(
-    Debug,
-    Default,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    bytemuck::Pod,
-    bytemuck::Zeroable,
-    AnchorSerialize,
-    AnchorDeserialize,
+    Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, bytemuck::Pod, bytemuck::Zeroable,
 )]
 pub struct Transmission {
     pub slot: u64,
