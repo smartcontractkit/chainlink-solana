@@ -5,7 +5,7 @@ use access_controller::AccessController;
 mod state;
 
 use crate::state::with_store;
-pub use crate::state::{Store as State, Transmission, Transmissions};
+pub use crate::state::{NewTransmission, Store as State, Transmission, Transmissions};
 
 declare_id!("CaH12fwNTKJAG8PxEvo9R96Zc2j8qNHZaFj8ZW49yZNT");
 
@@ -140,7 +140,7 @@ pub mod store {
         Ok(())
     }
 
-    pub fn submit(ctx: Context<Submit>, round: Transmission) -> ProgramResult {
+    pub fn submit(ctx: Context<Submit>, round: NewTransmission) -> ProgramResult {
         let mut store = ctx.accounts.store.load_mut()?;
 
         // check if this particular ocr2 cluster is allowed to write to the feed
@@ -148,6 +148,14 @@ pub mod store {
             ctx.accounts.authority.key == &ctx.accounts.feed.writer,
             Unauthorized
         );
+
+        let clock = Clock::get()?;
+        let round = Transmission {
+            slot: clock.slot,
+            answer: round.answer,
+            timestamp: round.timestamp,
+            ..Default::default()
+        };
 
         let previous_round = with_store(&mut ctx.accounts.feed, |store| {
             let previous = store.latest();
