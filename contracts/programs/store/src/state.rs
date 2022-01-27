@@ -79,10 +79,6 @@ where
     let n = account.live_length as usize;
 
     let info = account.to_account_info();
-
-    // migrate the feed account if necessary
-    migrate(account, &info)?;
-
     let data = info.try_borrow_mut_data()?;
 
     // two ringbuffers, live data and historical with smaller granularity
