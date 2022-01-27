@@ -287,6 +287,28 @@ func (d *Deployer) DeployOCR() error {
 
 	d.Account[OCRFeed] = report.Data["state"]
 	d.Account[StoreAuthority] = report.Data["storeAuthority"]
+
+	fmt.Println("Step 7: Add writer to feed")
+	input = map[string]interface{}{
+		"transmissions": d.Account[OCRTransmissions],
+		"store":         d.Account[StoreAccount],
+	}
+
+	jsonInput, err = json.Marshal(input)
+	if err != nil {
+		return err
+	}
+
+	err = d.gauntlet.ExecCommand(
+		"store:set_writer",
+		d.gauntlet.Flag("network", d.network),
+		d.gauntlet.Flag("ocrState", d.Account[OCRFeed]),
+		d.gauntlet.Flag("input", string(jsonInput)),
+	)
+
+	if err != nil {
+		return errors.Wrap(err, "setting writer on store failed")
+	}
 	return nil
 }
 
@@ -473,47 +495,6 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 	if err != nil {
 		return errors.Wrap(err, "setting OCR 2 billing failed")
 	}
-
-	input = map[string]interface{}{
-		"transmissions": d.Account[OCRTransmissions],
-		"store":         d.Account[StoreAccount],
-	}
-
-	jsonInput, err = json.Marshal(input)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("Add writer to feed")
-	err = d.gauntlet.ExecCommand(
-		"store:set_writer",
-		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("ocrState", d.Account[OCRFeed]),
-		d.gauntlet.Flag("input", string(jsonInput)),
-	)
-
-	if err != nil {
-		return errors.Wrap(err, "setting writer on store failed")
-	}
-
-	// // Not Needed?
-	// fmt.Println("Adding feed to store access list...")
-	// seeds := [][]byte{[]byte("store"), solana.MustPublicKeyFromBase58(d.Account[OCRFeed]).Bytes()}
-	// storeAuthority, _, err := solana.FindProgramAddress(seeds, solana.MustPublicKeyFromBase58(d.Account[OCR2]))
-	// if err != nil {
-	// 	return errors.Wrap(err, "fetching store authority failed")
-	// }
-	//
-	// err = d.gauntlet.ExecCommand(
-	// 	"access_controller:add_access",
-	// 	d.gauntlet.Flag("network", d.network),
-	// 	d.gauntlet.Flag("state", d.Account[BillingAccessController]),
-	// 	d.gauntlet.Flag("address", storeAuthority.String()),
-	// )
-	//
-	// if err != nil {
-	// 	return errors.Wrap(err, "adding feed to store access list failed")
-	// }
 
 	return nil
 }
