@@ -1069,6 +1069,11 @@
           "index": false
         },
         {
+          "name": "observerCount",
+          "type": "u8",
+          "index": false
+        },
+        {
           "name": "observers",
           "type": {
             "array": [

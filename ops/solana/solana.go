@@ -94,55 +94,67 @@ func (d *Deployer) Load() error {
 	cwd, _ := os.Getwd()
 	os.Chdir(filepath.Join(cwd, "../gauntlet")) // go from ops folder to gauntlet folder
 
-	// Access Controller contract deployment
-	fmt.Println("Deploying Access Controller...")
-	err := d.gauntlet.ExecCommand(
-		"access_controller:deploy",
-		d.gauntlet.Flag("network", d.network),
-	)
-	if err != nil {
-		return errors.Wrap(err, "access controller contract deployment failed")
-	}
+	// // Access Controller contract deployment
+	// fmt.Println("Deploying Access Controller...")
+	// err := d.gauntlet.ExecCommand(
+	// 	"access_controller:deploy",
+	// 	d.gauntlet.Flag("network", d.network),
+	// )
+	// if err != nil {
+	// 	return errors.Wrap(err, "access controller contract deployment failed")
+	// }
+	//
+	// report, err := d.gauntlet.ReadCommandReport()
+	// if err != nil {
+	// 	return errors.Wrap(err, "report not available")
+	// }
+	//
+	// d.Account[AccessController] = report.Responses[0].Contract
+	//
+	// // Access Controller contract deployment
+	// fmt.Println("Deploying Store...")
+	// err = d.gauntlet.ExecCommand(
+	// 	"store:deploy",
+	// 	d.gauntlet.Flag("network", d.network),
+	// )
+	// if err != nil {
+	// 	return errors.Wrap(err, "store contract deployment failed")
+	// }
+	//
+	// report, err = d.gauntlet.ReadCommandReport()
+	// if err != nil {
+	// 	return errors.Wrap(err, "report not available")
+	// }
+	//
+	// d.Account[Store] = report.Responses[0].Contract
+	//
+	// // OCR2 contract deployment
+	// fmt.Println("Deploying OCR 2...")
+	// err = d.gauntlet.ExecCommand(
+	// 	"ocr2:deploy",
+	// 	d.gauntlet.Flag("network", d.network),
+	// )
+	// if err != nil {
+	// 	return errors.Wrap(err, "ocr 2 contract deployment failed")
+	// }
+	//
+	// report, err = d.gauntlet.ReadCommandReport()
+	// if err != nil {
+	// 	return errors.Wrap(err, "report not available")
+	// }
+	// d.Account[OCR2] = report.Responses[0].Contract
 
-	report, err := d.gauntlet.ReadCommandReport()
-	if err != nil {
-		return errors.Wrap(err, "report not available")
-	}
+	// pause for deployment
+	fmt.Println("programs are manually deployed via solana CLI")
+	d.Account[OCR2] = "CF13pnKGJ1WJZeEgVAtFdUi4MMndXm9hneiHs8azUaZt"
+	d.Account[Store] = "A7Jh2nb1hZHwqEofm4N8SXbKTj82rx7KUfjParQXUyMQ"
+	d.Account[AccessController] = "2F5NEkMnCRkmahEAcQfTQcZv1xtGgrWFfjENtTwHLuKg"
 
-	d.Account[AccessController] = report.Responses[0].Contract
+	// solana program deploy --program-id ./Documents/chainlink-solana/contracts/artifacts/localnet/access_controller-keypair.json ./Documents/chainlink-solana/gauntlet/packages/gauntlet-solana-contracts/artifacts/bin/access_controller.so
+	// solana program deploy --program-id ./Documents/chainlink-solana/contracts/artifacts/localnet/store-keypair.json ./Documents/chainlink-solana/gauntlet/packages/gauntlet-solana-contracts/artifacts/bin/store.so
+	// solana program deploy --program-id ./Documents/chainlink-solana/contracts/artifacts/localnet/ocr2-keypair.json ./Documents/chainlink-solana/gauntlet/packages/gauntlet-solana-contracts/artifacts/bin/ocr2.so
 
-	// Access Controller contract deployment
-	fmt.Println("Deploying Store...")
-	err = d.gauntlet.ExecCommand(
-		"store:deploy",
-		d.gauntlet.Flag("network", d.network),
-	)
-	if err != nil {
-		return errors.Wrap(err, "store contract deployment failed")
-	}
-
-	report, err = d.gauntlet.ReadCommandReport()
-	if err != nil {
-		return errors.Wrap(err, "report not available")
-	}
-
-	d.Account[Store] = report.Responses[0].Contract
-
-	// OCR2 contract deployment
-	fmt.Println("Deploying OCR 2...")
-	err = d.gauntlet.ExecCommand(
-		"ocr2:deploy",
-		d.gauntlet.Flag("network", d.network),
-	)
-	if err != nil {
-		return errors.Wrap(err, "ocr 2 contract deployment failed")
-	}
-
-	report, err = d.gauntlet.ReadCommandReport()
-	if err != nil {
-		return errors.Wrap(err, "report not available")
-	}
-	d.Account[OCR2] = report.Responses[0].Contract
+	// solana program write-buffer ./Documents/chainlink-solana/contracts/target/deploy/store.so 
 
 	return nil
 }
