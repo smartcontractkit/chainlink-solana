@@ -83,6 +83,10 @@ where
     let n = account.live_length as usize;
 
     let info = account.to_account_info();
+
+    // migrate the feed account if necessary
+    migrate(account, &info)?;
+
     let data = info.try_borrow_mut_data()?;
 
     // two ringbuffers, live data and historical with smaller granularity
@@ -103,6 +107,73 @@ where
     };
 
     Ok(f(&mut store))
+}
+
+/// Migrate feed from v1 to v2
+pub fn migrate(header: &mut Transmissions, account: &AccountInfo) -> Result<(), ProgramError> {
+    // check header version
+    if header.version != 1 {
+        return Ok(());
+    }
+
+    let mut data = account.try_borrow_mut_data()?;
+    let storage = &mut data[8 + 128..];
+
+    #[repr(C)]
+    #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+    struct TransmissionV1 {
+        pub timestamp: u64,
+        pub answer: i128,
+    }
+    // using the offsets, parse out latest v1 round
+    let size = std::mem::size_of::<TransmissionV1>();
+    let len = header.live_length;
+    let (live, _historical) = storage.split_at_mut(len as usize * size);
+    let live = bytemuck::cast_slice::<_, TransmissionV1>(live);
+
+    let i = (header.live_cursor + len.saturating_sub(1)) % len;
+    let latest = live[i as usize];
+
+    // memset the storage area
+    anchor_lang::solana_program::program_memory::sol_memset(storage, 0, storage.len());
+
+    // reset cursors
+    header.live_cursor = 0;
+    header.historical_cursor = 0;
+
+    // bump feed version
+    header.version = 2;
+
+    // TODO: validate live_length still valid under new size
+
+    let size = std::mem::size_of::<Transmission>();
+    let (live, historical) = storage.split_at_mut(len as usize * size);
+    let live = bytemuck::from_bytes_mut::<Transmission>(&mut live[..size]);
+
+    // mark round with current slot
+    let slot = Clock::get()?.slot;
+
+    let round = Transmission {
+        slot,
+        timestamp: latest.timestamp as u32,
+        answer: latest.answer,
+        ..Default::default()
+    };
+    // insert back the round
+    *live = round;
+    // move the cursor by 1
+    header.live_cursor += 1;
+
+    // need to also insert into historical ringbuffer if necessary
+    if header.latest_round_id % header.granularity as u32 == 0 {
+        let historical = bytemuck::from_bytes_mut::<Transmission>(&mut historical[..size]);
+        // insert back the round
+        *historical = round;
+        // move the cursor by 1
+        header.historical_cursor += 1;
+    }
+
+    Ok(())
 }
 
 impl<'a> Feed<'a> {
