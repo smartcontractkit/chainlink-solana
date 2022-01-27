@@ -13,6 +13,7 @@ const (
 
 	// answer (int128, 16 bytes), timestamp (uint32, 4 bytes)
 	TransmissionLen uint64 = 48
+	TransmissionLenV1 uint64 = 24
 
 	// AccountDiscriminator (8 bytes), RoundID (uint32, 4 bytes), Cursor (uint32, 4 bytes)
 	HeaderLen uint64 = 1 + 32 + 32 + 32 + 1 + 4 + 4 + 1 + 4 + 4 + 4
@@ -132,17 +133,17 @@ type AccessController struct {
 
 // TransmissionsHeader struct for decoding transmission state header
 type TransmissionsHeader struct {
-	Version              uint8
-	Store                solana.PublicKey
-	Writer               solana.PublicKey
-	Description          [32]byte
-	Decimals             uint8
-	FlaggingThreshold    uint32
-	LatestRoundID        uint32
-	Granularity          uint8
-	LiveLength           uint32
-	LiveCursor           uint32
-	HistoricalCursor     uint32
+	Version           uint8
+	Store             solana.PublicKey
+	Writer            solana.PublicKey
+	Description       [32]byte
+	Decimals          uint8
+	FlaggingThreshold uint32
+	LatestRoundID     uint32
+	Granularity       uint8
+	LiveLength        uint32
+	LiveCursor        uint32
+	HistoricalCursor  uint32
 }
 
 // Transmission struct for decoding individual tranmissions
@@ -153,6 +154,12 @@ type Transmission struct {
 	Answer    bin.Int128
 	Padding1  uint64
 	Padding2  uint64
+}
+
+// TransmissionV1 struct for parsing results pre-migration
+type TransmissionV1 struct {
+	Timestamp uint64
+	Answer    bin.Int128
 }
 
 // CL Core OCR2 job spec RelayConfig member for Solana
