@@ -163,7 +163,7 @@ pub mod store {
         let round = Transmission {
             slot: clock.slot,
             answer: round.answer,
-            timestamp: round.timestamp,
+            timestamp: round.timestamp as u32,
             ..Default::default()
         };
 

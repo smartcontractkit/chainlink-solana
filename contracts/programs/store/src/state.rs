@@ -24,7 +24,7 @@ pub struct Store {
 #[repr(C)]
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct NewTransmission {
-    pub timestamp: u32,
+    pub timestamp: u64,
     pub answer: i128,
 }
 
