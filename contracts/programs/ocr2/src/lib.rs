@@ -718,7 +718,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
 
     let round = NewTransmission {
         answer: report.median,
-        timestamp: report.observations_timestamp,
+        timestamp: report.observations_timestamp as u64,
     };
 
     // store and validate answer
