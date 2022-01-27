@@ -2,7 +2,7 @@ import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt, time, BN } from '@chainlink/gauntlet-core/dist/utils'
 import { Proto, sharedSecretEncryptions } from '@chainlink/gauntlet-core/dist/crypto'
 
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { RawTransaction, SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { MAX_TRANSACTION_BYTES, ORACLES_MAX_LENGTH } from '../../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
@@ -192,7 +192,7 @@ export default class WriteOffchainConfig extends SolanaCommand {
     return true
   }
 
-  makeRawTransaction = async (signer: PublicKey) => {
+  makeRawTransaction = async (signer: PublicKey): Promise<RawTransaction[]> => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
