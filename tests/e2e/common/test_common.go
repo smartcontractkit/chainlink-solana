@@ -44,13 +44,13 @@ const (
 type OCRv2TestState struct {
 	Env              *environment.Environment
 	ChainlinkNodes   []client.Chainlink
-	ContractDeployer contracts.ContractDeployer
+	ContractDeployer *solclient.ContractDeployer
 	LinkToken        contracts.LinkToken
-	Store            contracts.OCRv2Store
+	Store            *solclient.Store
 	StoreAuth        string
-	BillingAC        contracts.OCRv2AccessController
-	RequesterAC      contracts.OCRv2AccessController
-	OCR2             contracts.OCRv2
+	BillingAC        *solclient.AccessController
+	RequesterAC      *solclient.AccessController
+	OCR2             *solclient.OCRv2
 	OffChainConfig   contracts.OffChainAggregatorV2Config
 	NodeKeysBundle   []NodeKeysBundle
 	MockServer       *client.MockserverClient
@@ -137,7 +137,7 @@ func (m *OCRv2TestState) SetupClients() {
 }
 
 func (m *OCRv2TestState) DumpContracts() error {
-	s := ContractsState{Feed: m.Store.(*solclient.Store).Feed.PrivateKey.String()}
+	s := ContractsState{Feed: m.Store.Feed.PrivateKey.String()}
 	d, err := json.Marshal(s)
 	if err != nil {
 		return err

@@ -48,23 +48,7 @@ type ContractDeployer struct {
 	Env    *environment.Environment
 }
 
-func (c *ContractDeployer) DeployOCRv2Proxy(addr string) (contracts.OCRv2Proxy, error) {
-	panic("implement me")
-}
-
-func (c *ContractDeployer) DeployOCRv2ValidatorProxy(addr string) (contracts.OCRv2Proxy, error) {
-	panic("implement me")
-}
-
-func (c *ContractDeployer) DeployOCRv2Flags(lowAccessController string, raiseAccessController string) (contracts.OCRv2Flags, error) {
-	panic("implement me")
-}
-
-func (c *ContractDeployer) DeployOCRv2Validator(threshold uint32, flags string) (contracts.OCRv2Flags, error) {
-	panic("implement me")
-}
-
-func (c *ContractDeployer) DeployOCRv2Store(billingAC string) (contracts.OCRv2Store, error) {
+func (c *ContractDeployer) DeployOCRv2Store(billingAC string) (*Store, error) {
 	programWallet := c.Client.ProgramWallets["store-keypair.json"]
 	payer := c.Client.DefaultWallet
 	accInstruction, err := c.Client.CreateAccInstr(c.Client.Accounts.Store, StoreAccountSize, programWallet.PublicKey())
@@ -111,38 +95,6 @@ func (c *ContractDeployer) DeployOCRv2Store(billingAC string) (contracts.OCRv2St
 	}, nil
 }
 
-func (c *ContractDeployer) Balance() (*big.Float, error) {
-	panic("implement me")
-}
-
-func (c *ContractDeployer) DeployStorageContract() (contracts.Storage, error) {
-	panic("implement me")
-}
-
-func (c *ContractDeployer) DeployAPIConsumer(linkAddr string) (contracts.APIConsumer, error) {
-	panic("implement me")
-}
-
-func (c *ContractDeployer) DeployOracle(linkAddr string) (contracts.Oracle, error) {
-	panic("implement me")
-}
-
-func (c *ContractDeployer) DeployReadAccessController() (contracts.ReadAccessController, error) {
-	panic("implement me")
-}
-
-func (c *ContractDeployer) DeployFlags(rac string) (contracts.Flags, error) {
-	panic("implement me")
-}
-
-func (c *ContractDeployer) DeployDeviationFlaggingValidator(flags string, flaggingThreshold *big.Int) (contracts.DeviationFlaggingValidator, error) {
-	panic("implement me")
-}
-
-func (c *ContractDeployer) DeployFluxAggregatorContract(linkAddr string, fluxOptions contracts.FluxAggregatorOptions) (contracts.FluxAggregator, error) {
-	panic("implement me")
-}
-
 func (c *ContractDeployer) addMintToAccInstr(instr *[]solana.Instruction, dest *solana.Wallet, amount uint64) error {
 	*instr = append(*instr, token.NewMintToInstruction(
 		amount,
@@ -154,7 +106,7 @@ func (c *ContractDeployer) addMintToAccInstr(instr *[]solana.Instruction, dest *
 	return nil
 }
 
-func (c *ContractDeployer) DeployLinkTokenContract() (contracts.LinkToken, error) {
+func (c *ContractDeployer) DeployLinkTokenContract() (*LinkToken, error) {
 	var err error
 	payer := c.Client.DefaultWallet
 
@@ -202,7 +154,7 @@ func (c *ContractDeployer) DeployLinkTokenContract() (contracts.LinkToken, error
 	}, nil
 }
 
-func (c *ContractDeployer) DeployOCRv2(billingControllerAddr string, requesterControllerAddr string, linkTokenAddr string) (contracts.OCRv2, error) {
+func (c *ContractDeployer) DeployOCRv2(billingControllerAddr string, requesterControllerAddr string, linkTokenAddr string) (*OCRv2, error) {
 	programWallet := c.Client.ProgramWallets["ocr2-keypair.json"]
 	payer := c.Client.DefaultWallet
 	ocrAccInstruction, err := c.Client.CreateAccInstr(c.Client.Accounts.OCR, OCRAccountAccountSize, programWallet.PublicKey())
@@ -295,7 +247,7 @@ func (c *ContractDeployer) DeployProgramRemote(programName string) error {
 	return nil
 }
 
-func (c *ContractDeployer) DeployOCRv2AccessController() (contracts.OCRv2AccessController, error) {
+func (c *ContractDeployer) DeployOCRv2AccessController() (*AccessController, error) {
 	programWallet := c.Client.ProgramWallets["access_controller-keypair.json"]
 	payer := c.Client.DefaultWallet
 	stateAcc := solana.NewWallet()
