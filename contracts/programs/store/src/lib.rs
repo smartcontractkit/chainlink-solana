@@ -60,7 +60,7 @@ pub mod store {
         live_length: u32,
     ) -> ProgramResult {
         let feed = &mut ctx.accounts.feed;
-        feed.version = 1;
+        feed.version = 2;
         feed.store = ctx.accounts.store.key();
         feed.granularity = granularity;
         feed.live_length = live_length;

@@ -652,7 +652,7 @@ describe('ocr2', async () => {
       ['version', 'u8'],
     ]}]]);
     let data = await query(transmissions.publicKey, Scope.Version, versionSchema, Round);
-    assert.ok(data.version == 1);
+    assert.ok(data.version == 2);
 
     const descriptionSchema = new Map([[Round, { kind: 'struct', fields: [
       ['description', 'string'],
