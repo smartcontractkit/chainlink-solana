@@ -140,6 +140,16 @@ pub mod store {
         Ok(())
     }
 
+    // migrate the feed accounts from v1 if necessary
+    #[access_control(owner(&ctx.accounts.store, &ctx.accounts.authority))]
+    pub fn migrate(ctx: Context<Migrate>) -> ProgramResult {
+        for info in ctx.remaining_accounts {
+            let mut feed = Account::try_from(&info.clone())?;
+            state::migrate(&mut feed, &info)?;
+        }
+        Ok(())
+    }
+
     pub fn submit(ctx: Context<Submit>, round: NewTransmission) -> ProgramResult {
         let mut store = ctx.accounts.store.load_mut()?;
 
@@ -504,4 +514,12 @@ pub struct Submit<'info> {
 #[derive(Accounts)]
 pub struct Query<'info> {
     pub feed: Account<'info, Transmissions>,
+}
+
+#[derive(Accounts)]
+pub struct Migrate<'info> {
+    #[account(mut)]
+    pub store: AccountLoader<'info, State>,
+    // can't make an empty accounts struct
+    pub authority: Signer<'info>,
 }
