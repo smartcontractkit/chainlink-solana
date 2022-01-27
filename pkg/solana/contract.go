@@ -276,10 +276,13 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 	}
 	cursor-- // cursor indicates index for new answer, latest answer is in previous index
 
-	// fetch transmission
+	// setup transmissionLen
 	transmissionLen := TransmissionLen
-	var transmissionOffset uint64 = 8 + 128 + (uint64(cursor) * transmissionLen)
+	if header.Version == 1 {
+		transmissionLen = TransmissionLenV1
+	}
 
+	var transmissionOffset uint64 = 8 + 128 + (uint64(cursor) * transmissionLen)
 	res, err = client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
 		Commitment: rpcCommitment,
@@ -290,6 +293,19 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 	})
 	if err != nil {
 		return Answer{}, 0, errors.Wrap(err, "error on rpc.GetAccountInfo [transmission]")
+	}
+
+	// parse v1 transmission and return answer
+	if header.Version == 1 {
+		var t TransmissionV1
+		if err := bin.NewBinDecoder(res.Value.Data.GetBinary()).Decode(&t); err != nil {
+			return Answer{}, 0, errors.Wrap(err, "failed to decode v1 transmission")
+		}
+
+		return Answer{
+			Data:      t.Answer.BigInt(),
+			Timestamp: uint32(t.Timestamp), // TODO: not good typing conversion
+		}, res.RPCContext.Context.Slot, nil
 	}
 
 	// parse tranmission
