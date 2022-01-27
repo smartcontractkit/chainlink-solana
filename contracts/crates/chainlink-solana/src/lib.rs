@@ -24,6 +24,7 @@ enum Query {
     RoundData { round_id: u32 },
     LatestRoundData,
     Aggregator,
+    LatestRoundDataV2,
 }
 
 /// Represents a single oracle round.
@@ -31,8 +32,10 @@ enum Query {
 pub struct Round {
     /// The round id.
     pub round_id: u32,
+    /// Slot at the time the report was received on chain.
+    pub slot: u64,
     /// Round timestamp, as reported by the oracle.
-    pub timestamp: u64,
+    pub timestamp: u32,
     /// Current answer, formatted to `decimals` decimal places.
     pub answer: i128,
 }
@@ -97,7 +100,7 @@ pub fn latest_round_data<'info>(
     program_id: AccountInfo<'info>,
     feed: AccountInfo<'info>,
 ) -> Result<Round, ProgramError> {
-    query(program_id, feed, Query::LatestRoundData)
+    query(program_id, feed, Query::LatestRoundDataV2)
 }
 
 /// Returns the address of the underlying OCR2 aggregator.
