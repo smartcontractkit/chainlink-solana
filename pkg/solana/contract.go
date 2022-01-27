@@ -1,12 +1,9 @@
 package solana
 
 import (
-	"bytes"
 	"context"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"math/big"
 	"sync"
 	"time"
 
@@ -250,37 +247,29 @@ func GetState(ctx context.Context, client *rpc.Client, account solana.PublicKey,
 }
 
 func GetLatestTransmission(ctx context.Context, client *rpc.Client, account solana.PublicKey, rpcCommitment rpc.CommitmentType) (Answer, uint64, error) {
-	offset := CursorOffset
-	length := CursorLen * 2
-	transmissionLen := TransmissionLen
-
-	// query for cursor
+	// query for transmission header
+	var headerStart uint64 = 8 // skip account discriminator
+	headerLen := HeaderLen
 	res, err := client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
 		Commitment: rpcCommitment,
 		DataSlice: &rpc.DataSlice{
-			Offset: &offset,
-			Length: &length,
+			Offset: &headerStart,
+			Length: &headerLen,
 		},
 	})
 	if err != nil {
 		return Answer{}, 0, errors.Wrap(err, "error on rpc.GetAccountInfo [cursor]")
 	}
 
-	// parse little endian length & cursor
-	c := res.Value.Data.GetBinary()
-	buf := bytes.NewReader(c)
+	// parse header
+	var header TransmissionsHeader
+	if err := bin.NewBinDecoder(res.Value.Data.GetBinary()).Decode(&header); err != nil {
+		return Answer{}, 0, errors.Wrap(err, "failed to decode transmission account header")
+	}
 
-	var cursor uint32
-	var liveLength uint32
-	err = binary.Read(buf, binary.LittleEndian, &liveLength)
-	if err != nil {
-		return Answer{}, 0, errCursorLength
-	}
-	err = binary.Read(buf, binary.LittleEndian, &cursor)
-	if err != nil {
-		return Answer{}, 0, errCursorLength
-	}
+	cursor := header.LiveCursor
+	liveLength := header.LiveLength
 
 	if cursor == 0 { // handle array wrap
 		cursor = liveLength
@@ -288,6 +277,7 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 	cursor-- // cursor indicates index for new answer, latest answer is in previous index
 
 	// fetch transmission
+	transmissionLen := TransmissionLen
 	var transmissionOffset uint64 = 8 + 128 + (uint64(cursor) * transmissionLen)
 
 	res, err = client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
@@ -302,43 +292,14 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 		return Answer{}, 0, errors.Wrap(err, "error on rpc.GetAccountInfo [transmission]")
 	}
 
-	t := res.Value.Data.GetBinary()
-	if len(t) != int(transmissionLen) { // validate length
-		return Answer{}, 0, errTransmissionLength
-	}
-	buf = bytes.NewReader(t)
-
-	var slot uint64
-	err = binary.Read(buf, binary.LittleEndian, &slot)
-	if err != nil {
-		return Answer{}, 0, err
-	}
-
-	var timestamp uint32
-	err = binary.Read(buf, binary.LittleEndian, &timestamp)
-	if err != nil {
-		return Answer{}, 0, err
-	}
-
-	var padding uint32
-	err = binary.Read(buf, binary.LittleEndian, &padding)
-	if err != nil {
-		return Answer{}, 0, err
-	}
-
-	raw := make([]byte, 16)
-	// TODO: we could use ag_binary.Int128 instead
-	err = binary.Read(buf, binary.LittleEndian, &raw)
-	if err != nil {
-		return Answer{}, 0, err
-	}
-	// reverse slice to change from little endian to big endian
-	for i, j := 0, len(raw)-1; i < j; i, j = i+1, j-1 {
-		raw[i], raw[j] = raw[j], raw[i]
+	// parse tranmission
+	var t Transmission
+	if err := bin.NewBinDecoder(res.Value.Data.GetBinary()).Decode(&t); err != nil {
+		return Answer{}, 0, errors.Wrap(err, "failed to decode transmission")
 	}
 
 	return Answer{
-		Data:      big.NewInt(0).SetBytes(raw[:]),
-		Timestamp: timestamp,
+		Data:      t.Answer.BigInt(),
+		Timestamp: t.Timestamp,
 	}, res.RPCContext.Context.Slot, nil
 }

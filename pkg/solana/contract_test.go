@@ -189,13 +189,13 @@ func TestGetLatestTransmission(t *testing.T) {
 	assert.Equal(t, expectedTime, a.Timestamp)
 	assert.Equal(t, expectedAns, a.Data.String())
 
-	// fail if returned cursor is too short
+	// fail if returned transmission header is too short
 	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
-	assert.ErrorIs(t, err, errCursorLength)
+	assert.Error(t, err)
 
 	// fail if returned transmission is too short
 	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
-	assert.ErrorIs(t, err, errTransmissionLength)
+	assert.Error(t, err)
 }
 
 func TestStatePolling(t *testing.T) {
