@@ -31,7 +31,8 @@ const Scope = {
   Decimals: { decimals: {} },
   Description: { description: {} },
   // RoundData: { roundData: { roundId } },
-  LatestRoundData: { latestRoundData: {} },
+  LatestRoundDataV1: { latestRoundDataV1: {} },
+  LatestRoundDataV2: { latestRoundDataV2: {} },
   Aggregator: { aggregator: {} },
 };
 
@@ -639,13 +640,12 @@ describe('ocr2', async () => {
 
   const roundSchema = new Map([[Round, { kind: 'struct', fields: [
     ['roundId', 'u32'],
-    // ['slot', 'u64'],
-    // ['timestamp', 'u32'],
-    ['timestamp', 'u64'],
+    ['slot', 'u64'],
+    ['timestamp', 'u32'],
     ['answer', [16]], // i128
   ]}]]);
   it('Can call query', async () => {
-    let round = await query(transmissions.publicKey, Scope.LatestRoundData, roundSchema, Round);
+    let round = await query(transmissions.publicKey, Scope.LatestRoundDataV2, roundSchema, Round);
     console.log(round);
 
     const versionSchema = new Map([[Round, { kind: 'struct', fields: [
@@ -665,7 +665,7 @@ describe('ocr2', async () => {
     for (let i = 3; i < 15; i++) {
       await transmit(i, i, new BN(i));
 
-      let round = await query(transmissions.publicKey, Scope.LatestRoundData, roundSchema, Round);
+      let round = await query(transmissions.publicKey, Scope.LatestRoundDataV2, roundSchema, Round);
       assert.ok(new BN(round.answer, 10, 'le').toNumber() == i)
     }
   });
