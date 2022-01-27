@@ -22,7 +22,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.0
 	github.com/rs/zerolog v1.26.1
-	github.com/smartcontractkit/chainlink-relay v0.0.0-20220126142536-3aae7ed1e37c
+	github.com/smartcontractkit/chainlink-relay v0.0.0-20220127054158-7bb490de0ddb
 	github.com/smartcontractkit/integrations-framework v1.0.37-0.20220125141905-c76d1f04870f
 	go.uber.org/atomic v1.9.0
 	go.uber.org/zap v1.19.1
