@@ -1,8 +1,8 @@
 const anchor = require("@project-serum/anchor");
 
-// devnet IDs
+// devnet program ID
 const CHAINLINK_PROGRAM_ID = "DWqYEinRbZWtuq1DiDYvmexAKFoyjSyazZZUvdgPHT5g";
-// SOL/USD
+// SOL/USD feed on devnet
 const CHAINLINK_FEED = "7ndYj66ec3yPS58kRpodch3n8TEkCiaiy8tZ8Szb3BjP";
 
 const provider = anchor.Provider.env();
@@ -11,7 +11,6 @@ const provider = anchor.Provider.env();
 anchor.setProvider(provider);
 
 async function main() {
-  // #region main
   // Read the generated IDL.
   const idl = JSON.parse(
     require("fs").readFileSync("./target/idl/chainlink_solana_demo.json", "utf8")
@@ -24,23 +23,23 @@ async function main() {
   const program = new anchor.Program(idl, programId);
 
   //create an account to store the price data
-  const decimal = anchor.web3.Keypair.generate();
+  const priceFeedAccount = anchor.web3.Keypair.generate();
 
-  console.log('decimal public key: ' + decimal.publicKey);
+  console.log('decimal public key: ' + priceFeedAccount.publicKey);
   console.log('user public key: ' + provider.wallet.publicKey);
   console.log('system program ID:' + anchor.web3.SystemProgram.programId)
 
   // Execute the RPC.
   let tx = await program.rpc.execute({
     accounts: {
-      decimal: decimal.publicKey,
+      decimal: priceFeedAccount.publicKey,
       user: provider.wallet.publicKey,
       chainlinkFeed: CHAINLINK_FEED,
       chainlinkProgram: CHAINLINK_PROGRAM_ID,
       systemProgram: anchor.web3.SystemProgram.programId
     },
     options: { commitment: "confirmed" },
-    signers: [decimal],
+    signers: [priceFeedAccount],
   });
 
   console.log("Fetching transaction logs...");
@@ -49,8 +48,8 @@ async function main() {
   // #endregion main
 
   // Fetch the account details of the account containing the price data
-  const decimalAccount = await program.account.decimal.fetch(decimal.publicKey);
-  console.log('Price Is: ' + decimalAccount.value)
+  const latestPrice = await program.account.decimal.fetch(priceFeedAccount.publicKey);
+  console.log('Price Is: ' + latestPrice.value)
 }
 
 console.log("Running client...");

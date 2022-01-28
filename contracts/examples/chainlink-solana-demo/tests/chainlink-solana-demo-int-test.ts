@@ -28,27 +28,27 @@ describe('chainlink-solana-demo', () => {
     const program = new anchor.Program(idl, programId);
 
     //create an account to store the price data
-    const decimal = anchor.web3.Keypair.generate();
+    const priceFeedAccount = anchor.web3.Keypair.generate();
 
     // Execute the RPC.
     let tx = await program.rpc.execute({
       accounts: {
-        decimal: decimal.publicKey,
+        decimal: priceFeedAccount.publicKey,
         user: provider.wallet.publicKey,
         chainlinkFeed: CHAINLINK_FEED,
         chainlinkProgram: CHAINLINK_PROGRAM_ID,
         systemProgram: anchor.web3.SystemProgram.programId
       },
       options: { commitment: "confirmed" },
-      signers: [decimal],
+      signers: [priceFeedAccount],
     });
 
     // Fetch the account details of the account containing the price data
-    const decimalAccount = await program.account.decimal.fetch(decimal.publicKey);
-    console.log('Price Is: ' + decimalAccount.value)
+    const latestPrice = await program.account.decimal.fetch(priceFeedAccount.publicKey);
+    console.log('Price Is: ' + latestPrice.value)
 
     // Ensure the price returned is a positive value
-    assert.ok(decimalAccount.value > 0);
+    assert.ok(latestPrice.value > 0);
 
   });
 });

@@ -36,7 +36,6 @@ impl std::fmt::Display for Decimal {
 #[program]
 pub mod chainlink_solana_demo {
     use super::*;
-    //pub fn execute(ctx: Context<Execute>) -> Result<String,anchor_lang::prelude::ProgramError> {
         pub fn execute(ctx: Context<Execute>) -> ProgramResult  {
         let round = chainlink::latest_round_data(
             ctx.accounts.chainlink_program.to_account_info(),
@@ -53,22 +52,15 @@ pub mod chainlink_solana_demo {
             ctx.accounts.chainlink_feed.to_account_info(),
         )?;
 
-        //let decimal = Decimal::new(round.answer, u32::from(decimals));
-        //set the account value
+        // Set the account value
         let decimal: &mut Account<Decimal> = &mut ctx.accounts.decimal;
         decimal.value=round.answer;
         decimal.decimals=u32::from(decimals);
 
+        // Also print the value to the program output
         let decimalPrint = Decimal::new(round.answer, u32::from(decimals));
         msg!("{} price is {}", description, decimalPrint);
-
-
-
         Ok(())
-
-        //return Err("The error message".to_string());
-        //Ok(decimal.to_string())
-
     }
 }
 

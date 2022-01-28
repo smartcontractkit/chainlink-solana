@@ -6,7 +6,6 @@ url = "https://anchor.projectserum.com"
 
 [provider]
 cluster = "devnet"
-# wallet = "../../../id.json"
 wallet = "./id.json"
 
 
