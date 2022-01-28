@@ -7,6 +7,7 @@ import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
 import { encodeInstruction, makeTx } from '../../../lib/utils'
 import { UPGRADEABLE_BPF_LOADER_PROGRAM_ID } from '../../../lib/constants'
+import { makeRawUpgradeTransaction } from '../../abstract/upgrade'
 
 type Input = {
   transmissions: string
@@ -35,29 +36,12 @@ export default class Migrate extends SolanaCommand {
     const storeProgram = this.loadProgram(store.idl, storeAddress)
 
     const storeState = new PublicKey(this.flags.state)
-    const bufferAccount = new PublicKey(this.flags.buffer)
-
-    // build deploy buffer instruction
-    const storeProgramId = new PublicKey(store.programId)
-    const [programDataKey, _nonce] = await PublicKey.findProgramAddress(
-      [storeProgramId.toBuffer()],
-      UPGRADEABLE_BPF_LOADER_PROGRAM_ID,
+    // build upgrade transaction
+    const upgradeRawTx: RawTransaction[] = await makeRawUpgradeTransaction(
+      signer,
+      CONTRACT_LIST.STORE,
+      this.flags.buffer,
     )
-    const upgradeData = encodeInstruction({ Upgrade: {} })
-    const upgradeAccounts: AccountMeta[] = [
-      { pubkey: programDataKey, isSigner: false, isWritable: true },
-      { pubkey: storeProgramId, isSigner: false, isWritable: true },
-      { pubkey: bufferAccount, isSigner: false, isWritable: true },
-      { pubkey: signer, isSigner: false, isWritable: true },
-      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
-      { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
-      { pubkey: signer, isSigner: true, isWritable: false },
-    ]
-    const upgradeRawTx: RawTransaction = {
-      data: upgradeData,
-      accounts: upgradeAccounts,
-      programId: UPGRADEABLE_BPF_LOADER_PROGRAM_ID,
-    }
 
     // build transmission migrate instructions
     const transmissionAccounts: AccountMeta[] = this.args.map((a: string) => ({
@@ -85,7 +69,7 @@ export default class Migrate extends SolanaCommand {
       programId: storeProgram.programId,
     }
 
-    return [upgradeRawTx, migrateRawTx]
+    return [...upgradeRawTx, migrateRawTx]
   }
 
   execute = async () => {
@@ -98,7 +82,7 @@ export default class Migrate extends SolanaCommand {
     - store account: ${this.flags.state}
     - buffer account: ${this.flags.buffer}`,
     )
-    logger.info("for each transmission account:")
+    logger.info('for each transmission account:')
     this.args.forEach((a) => console.log(`    - ${a}`))
 
     await prompt(`Continue migrating?`)
