@@ -58,8 +58,8 @@ pub mod chainlink_solana_demo {
         decimal.decimals=u32::from(decimals);
 
         // Also print the value to the program output
-        let decimalPrint = Decimal::new(round.answer, u32::from(decimals));
-        msg!("{} price is {}", description, decimalPrint);
+        let decimal_print = Decimal::new(round.answer, u32::from(decimals));
+        msg!("{} price is {}", description, decimal_print);
         Ok(())
     }
 }

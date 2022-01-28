@@ -1,14 +1,20 @@
+// Parse arguments
+// --program - [Required] The account address for your deployed program.
+// --feed - The account address for the Chainlink data feed to retrieve
+const args = require('minimist')(process.argv.slice(2));
+
+// Initialize Anchor and provider
 const anchor = require("@project-serum/anchor");
-
-// devnet program ID
-const CHAINLINK_PROGRAM_ID = "DWqYEinRbZWtuq1DiDYvmexAKFoyjSyazZZUvdgPHT5g";
-// SOL/USD feed on devnet
-const CHAINLINK_FEED = "7ndYj66ec3yPS58kRpodch3n8TEkCiaiy8tZ8Szb3BjP";
-
 const provider = anchor.Provider.env();
-
 // Configure the cluster.
 anchor.setProvider(provider);
+
+const CHAINLINK_PROGRAM_ID = "DWqYEinRbZWtuq1DiDYvmexAKFoyjSyazZZUvdgPHT5g";
+
+// Data feed account address
+// Default is SOL / USD
+const default_feed = "7ndYj66ec3yPS58kRpodch3n8TEkCiaiy8tZ8Szb3BjP";
+const CHAINLINK_FEED = args['feed'] || default_feed;
 
 async function main() {
   // Read the generated IDL.
@@ -17,7 +23,7 @@ async function main() {
   );
 
   // Address of the deployed program.
-  const programId = new anchor.web3.PublicKey("JC16qi56dgcLoaTVe4BvnCoDL6FhH5NtahA7jmWZFdqm");
+  const programId = new anchor.web3.PublicKey(args['program']);
 
   // Generate the program client from IDL.
   const program = new anchor.Program(idl, programId);
