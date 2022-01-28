@@ -3,7 +3,7 @@ use anchor_lang::solana_program::system_program;
 
 use chainlink_solana as chainlink;
 
-declare_id!("EsYPTcY4Be6GvxojV5kwZ7W2tK2hoVkm9XSN7Lk8HAs8");
+declare_id!("JC16qi56dgcLoaTVe4BvnCoDL6FhH5NtahA7jmWZFdqm");
 
 #[account]
 pub struct Decimal {

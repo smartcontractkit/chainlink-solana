@@ -17,7 +17,7 @@ async function main() {
   );
 
   // Address of the deployed program.
-  const programId = new anchor.web3.PublicKey("EsYPTcY4Be6GvxojV5kwZ7W2tK2hoVkm9XSN7Lk8HAs8");
+  const programId = new anchor.web3.PublicKey("JC16qi56dgcLoaTVe4BvnCoDL6FhH5NtahA7jmWZFdqm");
 
   // Generate the program client from IDL.
   const program = new anchor.Program(idl, programId);
