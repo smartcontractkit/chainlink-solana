@@ -122,6 +122,11 @@ export const wrapCommand = (command) => {
       const isAlreadyExecuted = proposalState.didExecute
       if (isAlreadyExecuted) throw new Error('Proposal is already executed')
 
+      this.require(
+        await this.isSameProposal(proposal, rawTx),
+        'The transaction generated is different from the proposal provided',
+      )
+
       if (!this.isReadyForExecution(proposalState, threshold)) {
         return await this.approveProposal(proposal, signer, proposalContext)
       }
@@ -135,6 +140,18 @@ export const wrapCommand = (command) => {
         logger.info('Proposal state not found')
         return
       }
+    }
+
+    isSameProposal = async (proposal: PublicKey, rawTx: RawTransaction): Promise<boolean> => {
+      const state = await this.fetchState(proposal)
+      if (!state) {
+        logger.error('Proposal state does not exist. Considering the proposal as different')
+        return false
+      }
+      const isSameData = Buffer.compare(state.data, rawTx.data) === 0
+      const isSameProgramId = new PublicKey(state.programId).toString() === rawTx.programId.toString()
+      const isSameAccounts = JSON.stringify(state.accounts) === JSON.stringify(rawTx.accounts)
+      return isSameData && isSameProgramId && isSameAccounts
     }
 
     createProposalAcount = async (): Promise<PublicKey> => {
