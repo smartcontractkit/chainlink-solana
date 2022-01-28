@@ -11,6 +11,8 @@ declare_id!("CaH12fwNTKJAG8PxEvo9R96Zc2j8qNHZaFj8ZW49yZNT");
 
 static THRESHOLD_MULTIPLIER: u128 = 100000;
 
+const FEED_VERSION: u8 = 2;
+
 #[derive(Clone)]
 pub struct Store;
 
@@ -68,7 +70,7 @@ pub mod store {
         live_length: u32,
     ) -> ProgramResult {
         let feed = &mut ctx.accounts.feed;
-        feed.version = 2;
+        feed.version = FEED_VERSION;
         feed.store = ctx.accounts.store.key();
         feed.granularity = granularity;
         feed.live_length = live_length;
@@ -434,6 +436,9 @@ pub enum ErrorCode {
     Full = 2,
 
     NotFound = 3,
+
+    #[msg("Invalid version")]
+    InvalidVersion = 4,
 }
 
 #[derive(Accounts)]
