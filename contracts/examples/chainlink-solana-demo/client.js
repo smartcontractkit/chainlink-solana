@@ -25,9 +25,8 @@ async function main() {
   //create an account to store the price data
   const priceFeedAccount = anchor.web3.Keypair.generate();
 
-  console.log('decimal public key: ' + priceFeedAccount.publicKey);
+  console.log('priceFeedAccount public key: ' + priceFeedAccount.publicKey);
   console.log('user public key: ' + provider.wallet.publicKey);
-  console.log('system program ID:' + anchor.web3.SystemProgram.programId)
 
   // Execute the RPC.
   let tx = await program.rpc.execute({
