@@ -1,5 +1,5 @@
 {
-  "version": "0.0.0",
+  "version": "0.8.0",
   "name": "serum_multisig",
   "instructions": [
     {
@@ -8,12 +8,7 @@
         {
           "name": "multisig",
           "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "rent",
-          "isMut": false,
-          "isSigner": false
+          "isSigner": true
         }
       ],
       "args": [
@@ -50,11 +45,6 @@
           "name": "proposer",
           "isMut": false,
           "isSigner": true
-        },
-        {
-          "name": "rent",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -284,39 +274,49 @@
   ],
   "errors": [
     {
-      "code": 300,
+      "code": 6000,
       "name": "InvalidOwner",
       "msg": "The given owner is not part of this multisig."
     },
     {
-      "code": 301,
+      "code": 6001,
+      "name": "InvalidOwnersLen",
+      "msg": "Owners length must be non zero."
+    },
+    {
+      "code": 6002,
       "name": "NotEnoughSigners",
       "msg": "Not enough owners signed this transaction."
     },
     {
-      "code": 302,
+      "code": 6003,
       "name": "TransactionAlreadySigned",
       "msg": "Cannot delete a transaction that has been signed by an owner."
     },
     {
-      "code": 303,
+      "code": 6004,
       "name": "Overflow",
       "msg": "Overflow when adding."
     },
     {
-      "code": 304,
+      "code": 6005,
       "name": "UnableToDelete",
       "msg": "Cannot delete a transaction the owner did not create."
     },
     {
-      "code": 305,
+      "code": 6006,
       "name": "AlreadyExecuted",
       "msg": "The given transaction has already been executed."
     },
     {
-      "code": 306,
+      "code": 6007,
       "name": "InvalidThreshold",
       "msg": "Threshold must be less than or equal to the number of owners."
+    },
+    {
+      "code": 6008,
+      "name": "UniqueOwners",
+      "msg": "Owners must be unique"
     }
   ]
 }

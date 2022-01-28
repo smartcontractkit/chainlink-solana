@@ -1,5 +1,5 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
@@ -51,6 +51,13 @@ export default class MultisigCreate extends SolanaCommand {
     const maximumSize = this.flags.maximumSize || DEFAULT_MAXIMUM_SIZE
     const owners = input.owners.map((key) => new PublicKey(key))
 
+    const threshold = new BN(input.threshold)
+    await prompt(
+      `A new multisig will be created with threshold ${threshold.toNumber()} and owners ${owners.map((o) =>
+        o.toString(),
+      )}. Continue?`,
+    )
+
     const tx = await program.rpc.createMultisig(owners, new BN(input.threshold), nonce, {
       accounts: {
         multisig: multisig.publicKey,
@@ -59,6 +66,7 @@ export default class MultisigCreate extends SolanaCommand {
       signers: [multisig],
       instructions: [await program.account.multisig.createInstruction(multisig, maximumSize)],
     })
+    logger.success('New multisig created')
     logger.info(`Multisig address: ${multisig.publicKey}`)
     logger.info(`Multisig Signer: ${multisigSigner.toString()}`)
 
