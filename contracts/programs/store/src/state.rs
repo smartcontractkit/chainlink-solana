@@ -1,3 +1,4 @@
+use crate::{ErrorCode, FEED_VERSION};
 use anchor_lang::prelude::*;
 use arrayvec::arrayvec;
 
@@ -76,6 +77,11 @@ pub fn with_store<'a, 'info: 'a, F, T>(
 where
     F: FnOnce(&mut Feed) -> T,
 {
+    // Only try reading feeds matching the current version.
+    if account.version != FEED_VERSION {
+        return Err(ErrorCode::InvalidVersion.into());
+    }
+
     let n = account.live_length as usize;
 
     let info = account.to_account_info();
