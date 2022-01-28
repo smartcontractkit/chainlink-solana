@@ -35,8 +35,10 @@ export const wrapCommand = (command) => {
       const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
       this.program = this.loadProgram(multisig.idl, multisig.programId.toString())
 
-      // Falling back on default wallet is signer is not provided
-      const signer = new PublicKey(this.flags.signer || this.wallet.payer.publicKey)
+      // Falling back on default wallet if signer is not provided or execute flag is provided
+      const signer = this.flags.execute
+        ? this.wallet.payer.publicKey
+        : new PublicKey(this.flags.signer || this.wallet.payer.publicKey)
       const rawTxs = await this.makeRawTransaction(signer)
       // If proposal is not provided, we are at creation time, and a new proposal acc should have been created
       const proposal = new PublicKey(this.flags.proposal || rawTxs[0].accounts[1].pubkey)
@@ -61,21 +63,34 @@ export const wrapCommand = (command) => {
         }
       }
 
-      logger.log(`Transaction generated:
-        ${tx.compileMessage().serialize().toString('base64')}
-      `)
+      const txData = tx.compileMessage().serialize().toString('base64')
+      logger.line()
+      logger.success(
+        `Transaction generated with blockhash ID: ${recentBlock.blockhash.toString()} (${new Date(
+          recentBlock.blockTime * 1000,
+        ).toLocaleString()}). TX DATA:`,
+      )
+      logger.log()
+      logger.log(txData)
+      logger.log()
+      logger.line()
 
       return {
         responses: [
           {
             tx: this.wrapResponse('', this.multisigAddress.toString()),
             contract: this.multisigAddress.toString(),
+            data: {
+              transactionData: txData,
+            },
           },
         ],
       }
     }
 
     makeRawTransaction = async (signer: PublicKey): Promise<RawTransaction[]> => {
+      logger.info(`Generating transaction data using ${signer.toString()} account as signer`)
+
       const multisigState = await this.program.account.multisig.fetch(this.multisigAddress)
       const [multisigSigner] = await PublicKey.findProgramAddress(
         [this.multisigAddress.toBuffer()],
@@ -207,6 +222,7 @@ export const wrapCommand = (command) => {
 
     approveProposal: ProposalAction = async (proposal: PublicKey, signer): Promise<RawTransaction[]> => {
       logger.loading(`Generating proposal APPROVAL data for ${command.id}`)
+
       const data = this.program.coder.instruction.encode('approve', {})
       const accounts: AccountMeta[] = [
         {
@@ -235,6 +251,7 @@ export const wrapCommand = (command) => {
 
     executeProposal: ProposalAction = async (proposal: PublicKey, signer, context): Promise<RawTransaction[]> => {
       logger.loading(`Generating proposal EXECUTION data for ${command.id}`)
+
       const data = this.program.coder.instruction.encode('executeTransaction', {})
       const remainingAccounts = context.proposalState.accounts
         .map((t) => (t.pubkey.equals(context.multisigSigner) ? { ...t, isSigner: false } : t))

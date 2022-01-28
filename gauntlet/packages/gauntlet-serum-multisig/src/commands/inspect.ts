@@ -4,7 +4,7 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
 
-export default class MultisigCreate extends SolanaCommand {
+export default class MultisigInspect extends SolanaCommand {
   static id = 'multisig:inspect'
   static category = CONTRACT_LIST.MULTISIG
 
