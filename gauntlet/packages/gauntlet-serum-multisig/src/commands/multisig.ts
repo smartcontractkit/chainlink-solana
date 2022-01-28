@@ -1,5 +1,5 @@
 import { SolanaCommand, RawTransaction } from '@chainlink/gauntlet-solana'
-import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair, AccountMeta, Transaction } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract, makeTx } from '@chainlink/gauntlet-solana-contracts'
 import { Idl, Program } from '@project-serum/anchor'
@@ -45,6 +45,7 @@ export const wrapCommand = (command) => {
       // Falling back on default wallet is signer is not provided
       const signer = new PublicKey(this.flags.signer || this.wallet.payer.publicKey)
       const rawTxs = await this.makeRawTransaction(signer)
+      // If proposal is not provided, we are at creation time, and a new proposal acc should have been created
       const proposal = new PublicKey(this.flags.proposal || rawTxs[0].accounts[1].pubkey)
       const latestSlot = await this.provider.connection.getSlot()
       const recentBlock = await this.provider.connection.getBlock(latestSlot)
@@ -137,6 +138,7 @@ export const wrapCommand = (command) => {
     }
 
     createProposalAcount = async (): Promise<PublicKey> => {
+      await prompt('A new proposal account will be created. Continue?')
       logger.log('Creating proposal account...')
       const proposal = Keypair.generate()
       const txSize = 1300 // Space enough
