@@ -145,9 +145,14 @@ pub mod store {
     // migrate the feed accounts from v1 if necessary
     #[access_control(owner(&ctx.accounts.store, &ctx.accounts.authority))]
     pub fn migrate(ctx: Context<Migrate>) -> ProgramResult {
+        if ctx.remaining_accounts.is_empty() {
+            return Err(ErrorCode::InvalidInput.into());
+        }
         for info in ctx.remaining_accounts {
             let mut feed = Account::try_from(&info.clone())?;
             state::migrate(&mut feed, &info)?;
+            // write the change back into the header
+            feed.exit(&crate::ID)?;
         }
         Ok(())
     }
