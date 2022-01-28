@@ -20,6 +20,7 @@ import { makeAcceptOwnershipCommand } from '../ownership/acceptOwnership'
 import { CONTRACT_LIST } from '../../../lib/contracts'
 import { makeTransferOwnershipCommand } from '../ownership/transferOwnership'
 import { makeUpgradeProgramCommand } from '../../abstract/upgrade'
+import Fund from './fund'
 
 export default [
   Initialize,
@@ -42,6 +43,7 @@ export default [
   Transmit,
   SetupFlow,
   SetupRDDFlow,
+  Fund,
   makeAcceptOwnershipCommand(CONTRACT_LIST.OCR_2),
   makeTransferOwnershipCommand(CONTRACT_LIST.OCR_2),
   makeUpgradeProgramCommand(CONTRACT_LIST.OCR_2),
