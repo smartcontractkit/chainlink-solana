@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 
 	"github.com/gagliardetto/solana-go"
 	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
@@ -16,6 +17,8 @@ type SolanaFeedConfig struct {
 	HeartbeatSec   int64  `json:"heartbeat,omitempty"`
 	ContractType   string `json:"contract_type,omitempty"`
 	ContractStatus string `json:"status,omitempty"`
+	MultiplyRaw    string `json:"multiply,omitempty"`
+	Multiply       uint64 `json:"-"`
 
 	ContractAddressBase58      string `json:"contract_address_base58,omitempty"`
 	TransmissionsAccountBase58 string `json:"transmissions_account_base58,omitempty"`
@@ -62,6 +65,10 @@ func (s SolanaFeedConfig) GetContractType() string {
 
 func (s SolanaFeedConfig) GetContractStatus() string {
 	return s.ContractStatus
+}
+
+func (s SolanaFeedConfig) GetMultiply() uint64 {
+	return s.Multiply
 }
 
 // GetID returns the state account's address as that uniquely
@@ -113,6 +120,8 @@ func SolanaFeedParser(buf io.ReadCloser) ([]relayMonitoring.FeedConfig, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse state account '%s' from JSON at index i=%d: %w", rawFeed.StateAccountBase58, i, err)
 		}
+		multiply, _ := strconv.ParseUint(rawFeed.MultiplyRaw, 10, 64)
+		// NOTE: multiply is not required so if a parse error occurs, we'll use 0.
 		feeds[i] = relayMonitoring.FeedConfig(SolanaFeedConfig{
 			rawFeed.Name,
 			rawFeed.Path,
@@ -120,7 +129,8 @@ func SolanaFeedParser(buf io.ReadCloser) ([]relayMonitoring.FeedConfig, error) {
 			rawFeed.HeartbeatSec,
 			rawFeed.ContractType,
 			rawFeed.ContractStatus,
-
+			rawFeed.MultiplyRaw,
+			multiply,
 			rawFeed.ContractAddressBase58,
 			rawFeed.TransmissionsAccountBase58,
 			rawFeed.StateAccountBase58,
