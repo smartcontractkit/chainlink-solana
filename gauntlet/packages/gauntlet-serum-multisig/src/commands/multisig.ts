@@ -11,7 +11,7 @@ type ProposalContext = {
   proposalState: any
 }
 
-type ProposalAction = (proposal: PublicKey, context: ProposalContext) => Promise<RawTransaction[]>
+type ProposalAction = (proposal: PublicKey, signer: PublicKey, context: ProposalContext) => Promise<RawTransaction[]>
 
 export const wrapCommand = (command) => {
   return class Multisig extends SolanaCommand {
@@ -41,17 +41,16 @@ export const wrapCommand = (command) => {
     execute = async () => {
       const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
       this.program = this.loadProgram(multisig.idl, multisig.programId.toString())
-      const [multisigSigner] = await PublicKey.findProgramAddress(
-        [this.multisigAddress.toBuffer()],
-        this.program.programId,
-      )
-      const rawTxs = await this.makeRawTransaction(multisigSigner)
+
+      // Falling back on default wallet is signer is not provided
+      const signer = new PublicKey(this.flags.signer || this.wallet.payer.publicKey)
+      const rawTxs = await this.makeRawTransaction(signer)
       const proposal = new PublicKey(this.flags.proposal || rawTxs[0].accounts[1].pubkey)
       const latestSlot = await this.provider.connection.getSlot()
       const recentBlock = await this.provider.connection.getBlock(latestSlot)
       const tx = makeTx(rawTxs, {
         recentBlockhash: recentBlock.blockhash,
-        feePayer: new PublicKey(this.flags.feePayer) || this.wallet.payer.publicKey,
+        feePayer: signer,
       })
       if (this.flags.execute) {
         logger.loading(`Executing action...`)
@@ -83,17 +82,21 @@ export const wrapCommand = (command) => {
 
     makeRawTransaction = async (signer: PublicKey): Promise<RawTransaction[]> => {
       const multisigState = await this.program.account.multisig.fetch(this.multisigAddress)
+      const [multisigSigner] = await PublicKey.findProgramAddress(
+        [this.multisigAddress.toBuffer()],
+        this.program.programId,
+      )
       const threshold = multisigState.threshold
       const owners = multisigState.owners
 
       logger.info(`Multisig Info:
         - Address: ${this.multisigAddress.toString()}
-        - Signer: ${signer.toString()}
+        - Signer: ${multisigSigner.toString()}
         - Threshold: ${threshold.toString()}
         - Owners: ${owners}`)
 
       const instructionIndex = new BN(this.flags.instruction || 0).toNumber()
-      const rawTxs = await this.command.makeRawTransaction(signer)
+      const rawTxs = await this.command.makeRawTransaction(multisigSigner)
       await this.showExecutionInstructions(rawTxs, instructionIndex)
       const rawTx = rawTxs[instructionIndex]
 
@@ -103,15 +106,15 @@ export const wrapCommand = (command) => {
       const proposalState = await this.fetchState(proposal)
       const isCreation = !proposalState
       if (isCreation) {
-        return await this.createProposal(proposal, {
+        return await this.createProposal(proposal, signer, {
           rawTx,
-          multisigSigner: signer,
+          multisigSigner,
           proposalState: {},
         })
       }
       const proposalContext = {
         rawTx,
-        multisigSigner: signer,
+        multisigSigner,
         proposalState,
       }
 
@@ -119,9 +122,9 @@ export const wrapCommand = (command) => {
       if (isAlreadyExecuted) throw new Error('Proposal is already executed')
 
       if (!this.isReadyForExecution(proposalState, threshold)) {
-        return await this.approveProposal(proposal, proposalContext)
+        return await this.approveProposal(proposal, signer, proposalContext)
       }
-      return await this.executeProposal(proposal, proposalContext)
+      return await this.executeProposal(proposal, signer, proposalContext)
     }
 
     fetchState = async (proposal: PublicKey): Promise<any | undefined> => {
@@ -144,7 +147,7 @@ export const wrapCommand = (command) => {
       return proposal.publicKey
     }
 
-    createProposal: ProposalAction = async (proposal: PublicKey, context): Promise<RawTransaction[]> => {
+    createProposal: ProposalAction = async (proposal: PublicKey, signer, context): Promise<RawTransaction[]> => {
       logger.loading(`Generating proposal creation data for ${command.id}`)
 
       const data = this.program.coder.instruction.encode('createTransaction', {
@@ -164,7 +167,7 @@ export const wrapCommand = (command) => {
           isSigner: false,
         },
         {
-          pubkey: this.wallet.payer.publicKey,
+          pubkey: signer,
           isWritable: false,
           isSigner: true,
         },
@@ -182,7 +185,7 @@ export const wrapCommand = (command) => {
       return [rawTx]
     }
 
-    approveProposal: ProposalAction = async (proposal: PublicKey): Promise<RawTransaction[]> => {
+    approveProposal: ProposalAction = async (proposal: PublicKey, signer): Promise<RawTransaction[]> => {
       logger.loading(`Generating proposal approval data for ${command.id}`)
       const data = this.program.coder.instruction.encode('approve', {})
       const accounts: AccountMeta[] = [
@@ -197,7 +200,7 @@ export const wrapCommand = (command) => {
           isSigner: false,
         },
         {
-          pubkey: this.wallet.publicKey,
+          pubkey: signer,
           isWritable: false,
           isSigner: true,
         },
@@ -210,7 +213,7 @@ export const wrapCommand = (command) => {
       return [rawTx]
     }
 
-    executeProposal: ProposalAction = async (proposal: PublicKey, context): Promise<RawTransaction[]> => {
+    executeProposal: ProposalAction = async (proposal: PublicKey, signer, context): Promise<RawTransaction[]> => {
       logger.loading(`Generating proposal execution data for ${command.id}`)
       const data = this.program.coder.instruction.encode('executeTransaction', {})
       const remainingAccounts = context.proposalState.accounts
