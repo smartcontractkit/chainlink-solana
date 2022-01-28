@@ -20,10 +20,8 @@ export default class Fund extends SolanaCommand {
 
   execute = async () => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
-    const address = ocr2.programId.toString()
-    const program = this.loadProgram(ocr2.idl, address)
+    const program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
 
-    const owner = this.wallet.payer
     const state = new PublicKey(this.flags.state)
     const amount = new BN(this.flags.amount)
 
@@ -33,7 +31,7 @@ export default class Fund extends SolanaCommand {
     )
     const linkPublicKey = new PublicKey(this.flags.link || process.env.LINK)
 
-    const token = new Token(this.provider.connection, new PublicKey(address), TOKEN_PROGRAM_ID, this.wallet.payer)
+    const token = new Token(this.provider.connection, linkPublicKey, TOKEN_PROGRAM_ID, this.wallet.payer)
     const tokenVault = await Token.getAssociatedTokenAddress(
       ASSOCIATED_TOKEN_PROGRAM_ID,
       TOKEN_PROGRAM_ID,
@@ -42,13 +40,20 @@ export default class Fund extends SolanaCommand {
       true,
     )
 
+    const from = await Token.getAssociatedTokenAddress(
+      ASSOCIATED_TOKEN_PROGRAM_ID,
+      TOKEN_PROGRAM_ID,
+      token.publicKey,
+      this.wallet.publicKey,
+    )
+
     logger.loading(`Transferring ${amount} tokens to ${state.toString()} token vault ${tokenVault.toString()}...`)
-    const tx = await token.transfer(owner.publicKey, tokenVault, this.wallet.payer, [], amount)
+    const tx = await token.transfer(from, tokenVault, this.wallet.payer, [], amount)
 
     return {
       responses: [
         {
-          tx: this.wrapResponse(tx, address, {
+          tx: this.wrapResponse(tx, state.toString(), {
             state: state.toString(),
           }),
           contract: state.toString(),
