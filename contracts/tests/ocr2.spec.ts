@@ -320,6 +320,48 @@ describe('ocr2', async () => {
     );
   });
 
+  it('Migrates the feed', async () => {
+    let transmissionAccounts = [{
+      pubkey: transmissions.publicKey,
+      isSigner: false,
+      isWritable: true,
+    }];
+    const migrateData = workspace.Store.coder.instruction.encode('migrate', {})
+    const migrateAccounts = [
+      {
+        pubkey: store.publicKey,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: owner.publicKey,
+        isSigner: true,
+        isWritable: false,
+      },
+      ...transmissionAccounts,
+    ];
+    const tx = new Transaction();
+    tx.add(
+      new TransactionInstruction({
+          data: migrateData,
+          keys: migrateAccounts,
+          programId: workspace.Store.programId,
+      })
+    );
+      
+    try {
+      await provider.send(tx, []);
+    } catch (err) {
+      // Translate IDL error
+      const idlErrors = anchor.parseIdlErrors(program.idl);
+      let translatedErr = ProgramError.parse(err, idlErrors);
+      if (translatedErr === null) {
+        throw err;
+      }
+      throw translatedErr;
+    }
+  });
+
   it('Initializes the OCR2 config', async () => {
     await program.rpc.initialize(vaultNonce, new BN(minAnswer), new BN(maxAnswer), {
       accounts: {
@@ -718,4 +760,5 @@ describe('ocr2', async () => {
     const closedAccount = await provider.connection.getAccountInfo(transmissions.publicKey);
     assert.ok(closedAccount === null);
   });
+  
 });
