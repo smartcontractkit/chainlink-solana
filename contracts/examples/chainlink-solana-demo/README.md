@@ -1,7 +1,12 @@
 # Chainlink Solana Demo
-The Chainlink Solana Demo is an [Anchor](https://project-serum.github.io/anchor/getting-started/introduction.html) based library that shows developers how to use interact with [Chainlink Price Feeds on Solana](https://docs.chain.link/solana/). The demo is configured to run on the [Devnet cluster](https://docs.solana.com/clusters#devnet), and is comprised of an on-chain program written in Rust, and an off-chain client written in JavaScript. The program takes paramters and account information from the off-chain client, retrieves the latest price data from the specified Chainlink Price Feed on Devnet, then writes the data out to the specified account, which can then be read by the off-chain client.
+The Chainlink Solana Demo is an [Anchor](https://project-serum.github.io/anchor/getting-started/introduction.html) based library that shows developers how to use and interact with [Chainlink Price Feeds on Solana](https://docs.chain.link/solana/). The demo is configured to run on the [Devnet cluster](https://docs.solana.com/clusters#devnet), and is comprised of an on-chain program written in Rust, and an off-chain client written in JavaScript. The program takes paramters and account information from the off-chain client, retrieves the latest price data from the specified Chainlink Price Feed on Devnet, then writes the data out to the specified account, which can then be read by the off-chain client.
 
 ## Running the example on Devnet
+
+### Requirements
+- [NodeJS 12](https://nodejs.org/en/download/) or higher
+- [Rust](https://www.rust-lang.org/tools/install)
+- [Solana CLI](https://github.com/solana-labs/solana/releases)
 
 ### Building and Deploying the Consumer Program
 To build and deploy the program, first ensure that you're in the 'contracts/examples/chainlink-solana-demo' folder in this repository
@@ -11,7 +16,7 @@ cd contracts/examples/chainlink-solana-demo
 
 Next step is to install all of the required dependencies:
 ```
-sudo npm install
+npm install
 ```
 
 
@@ -26,12 +31,12 @@ You should see the public key in the terminal output. Alternatively, you can fin
 solana-keygen pubkey id.json
 ```
 
-Next, airdrop some tokens into your new account. We will need to call this twice, because the Devnet faucet is limited to 2 SOL, and we need approximately 4 SOL. Be sure to replace both instances of <RECIPIENT_ACCOUNT_ADDRESS> with your wallet's public key from the previous step:
+Next, airdrop some SOL tokens into your new account. We will need to call this twice, because the Devnet faucet is limited to 2 SOL, and we need approximately 4 SOL. Be sure to replace both instances of <RECIPIENT_ACCOUNT_ADDRESS> with your wallet's public key from the previous step:
 ```
-solana airdrop 4 <RECIPIENT_ACCOUNT_ADDRESS> --url https://api.devnet.solana.com && solana airdrop 4 <RECIPIENT_ACCOUNT_ADDRESS> --url https://api.devnet.solana.com
+solana airdrop 2 <RECIPIENT_ACCOUNT_ADDRESS> --url https://api.devnet.solana.com && solana airdrop 2 <RECIPIENT_ACCOUNT_ADDRESS> --url https://api.devnet.solana.com
 ```
 
-Next, build and deploy the contract:
+Next, build and deploy the program:
 
 ```
 anchor build
@@ -49,7 +54,7 @@ Program Id: 39zEiws4s9ffMkr4hK84nqF2nLQFGP8aQpPPgN6H2hWu
 ```
 
 ### Running the Client
-Extract the `program_id` from the previous step, or alternatively you can get the deployed program ID with the following command:
+Copy the `program_id` from the previous step, or alternatively you can get the deployed program ID with the following command:
 ```
 solana-keygen pubkey target/deploy/chainlink_solana_demo-keypair.json
 ```
@@ -60,7 +65,7 @@ Once you have the deployed program ID, insert it into `client.js`, replacing the
 const programId = new anchor.web3.PublicKey("<DEPLOYED_PROGRAM_ID_GOES_HERE>");
 ```
 
-Next, ensure the `CHAINLINK_FEED` variable contains the [account of the price feed you want to query](https://docs.chain.link/docs/solana/data-feeds-solana/). In the demo it's defaulted to the Devnet [SOL/USD feed](https://solscan.io/account/7ndYj66ec3yPS58kRpodch3n8TEkCiaiy8tZ8Szb3BjP?cluster=devnet).
+Next, ensure the `CHAINLINK_FEED` variable in `client.js` contains the [account of the price feed you want to query](https://docs.chain.link/docs/solana/data-feeds-solana/). In the demo it's defaulted to the Devnet [SOL/USD feed](https://solscan.io/account/7ndYj66ec3yPS58kRpodch3n8TEkCiaiy8tZ8Szb3BjP?cluster=devnet).
 
 ```
 const CHAINLINK_FEED = "7ndYj66ec3yPS58kRpodch3n8TEkCiaiy8tZ8Szb3BjP";
@@ -78,6 +83,7 @@ Now you are ready to run the Node.JS client:
 node client.js
 ```
 
+The client will generate a new account and pass it to the deployed program, which will then populate the account with the current price from the specified price feed. The client will then read the price from the account, and output the value to the console.
 ```
 Running client...
 Fetching transaction logs...
@@ -111,7 +117,7 @@ Success
 ```
 
 ### Testing
-Before executing the integration test, first you need to extract the `program_id` from the deploy step, and insert it into the test script `chainlink-solana-demo-int-test.js`, replacing the <DEPLOYED_PROGRAM_ID_GOES_HERE> string with the program ID:
+Before executing the integration test, first you need to extract the `program ID` from the deploying the program step, and insert it into the test script `chainlink-solana-demo-int-test.js`, replacing the <DEPLOYED_PROGRAM_ID_GOES_HERE> string with the program ID:
 
 ```
 const programId = new anchor.web3.PublicKey("<DEPLOYED_PROGRAM_ID_GOES_HERE>");
@@ -122,6 +128,7 @@ Now you can execute the [integration test](./tests/chainlink-solana-demo-int-tes
 ```bash
 anchor test
 ```
+The integration test will check that the value of the SOL/USD price feed on Devnet is greater than 0
 
 ```bash
  chainlink-solana-demo
