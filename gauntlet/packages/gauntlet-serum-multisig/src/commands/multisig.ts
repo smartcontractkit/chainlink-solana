@@ -35,10 +35,10 @@ export const wrapCommand = (command) => {
       const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
       this.program = this.loadProgram(multisig.idl, multisig.programId.toString())
 
-      // Falling back on default wallet if signer is not provided or execute flag is provided
-      const signer = this.flags.execute
-        ? this.wallet.payer.publicKey
-        : new PublicKey(this.flags.signer || this.wallet.payer.publicKey)
+      // If execute flag is provided, a signer cannot, as the Keypair is required
+      const isInvalidSigner = !!this.flags.execute && !!this.flags.signer
+      this.require(!isInvalidSigner, 'To execute the transaction the signer must be loaded from a wallet')
+      const signer = new PublicKey(this.flags.signer || this.wallet.payer.publicKey)
       const rawTxs = await this.makeRawTransaction(signer)
       // If proposal is not provided, we are at creation time, and a new proposal acc should have been created
       const proposal = new PublicKey(this.flags.proposal || rawTxs[0].accounts[1].pubkey)
@@ -63,15 +63,15 @@ export const wrapCommand = (command) => {
         }
       }
 
-      const txData = tx.compileMessage().serialize().toString('base64')
+      const msgData = tx.serializeMessage().toString('base64')
       logger.line()
       logger.success(
-        `Transaction generated with blockhash ID: ${recentBlock.blockhash.toString()} (${new Date(
+        `Message generated with blockhash ID: ${recentBlock.blockhash.toString()} (${new Date(
           recentBlock.blockTime * 1000,
-        ).toLocaleString()}). TX DATA:`,
+        ).toLocaleString()}). MESSAGE DATA:`,
       )
       logger.log()
-      logger.log(txData)
+      logger.log(msgData)
       logger.log()
       logger.line()
 
@@ -81,7 +81,7 @@ export const wrapCommand = (command) => {
             tx: this.wrapResponse('', this.multisigAddress.toString()),
             contract: this.multisigAddress.toString(),
             data: {
-              transactionData: txData,
+              transactionData: msgData,
             },
           },
         ],

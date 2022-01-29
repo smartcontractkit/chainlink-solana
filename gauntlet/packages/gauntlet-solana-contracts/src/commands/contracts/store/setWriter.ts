@@ -50,6 +50,10 @@ export default class SetWriter extends SolanaCommand {
     const ocr2State = new PublicKey(this.flags.ocrState)
     const feedState = new PublicKey(input.transmissions)
 
+    logger.info(
+      `Generating data for setting store writer on Store (${storeState.toString()}) and Feed (${feedState.toString()})`,
+    )
+
     const [storeAuthority, _storeNonce] = await PublicKey.findProgramAddress(
       [Buffer.from(utils.bytes.utf8.encode('store')), ocr2State.toBuffer()],
       ocr2Program.programId,
@@ -87,16 +91,8 @@ export default class SetWriter extends SolanaCommand {
   }
 
   execute = async () => {
-    const contract = getContract(CONTRACT_LIST.STORE, '')
-    const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
-    const tx = makeTx(rawTx)
-    logger.debug(tx)
-    const input = this.makeInput(this.flags.input)
-    const storeState = new PublicKey(input.store || this.flags.state)
-    const feedState = new PublicKey(input.transmissions)
-    logger.info(`Setting store writer on Store (${storeState.toString()}) and Feed (${feedState.toString()})`)
-    logger.loading('Sending tx...')
-    const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
+    const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
+    const txhash = await this.signAndSendRawTx(rawTx)
     logger.success(`Writer set on tx hash: ${txhash}`)
 
     return {

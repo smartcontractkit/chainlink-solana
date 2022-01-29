@@ -1,7 +1,6 @@
-import { Result } from '@chainlink/gauntlet-core'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { Keypair, PublicKey } from '@solana/web3.js'
+import { RawTransaction, SolanaCommand } from '@chainlink/gauntlet-solana'
+import { AccountMeta, Keypair, PublicKey, SystemProgram } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
 
@@ -38,16 +37,15 @@ export default class CreateFeed extends SolanaCommand {
     super(flags, args)
   }
 
-  execute = async () => {
+  makeRawTransaction = async (signer: PublicKey, feed?: PublicKey): Promise<RawTransaction[]> => {
+    if (!feed) throw new Error('Feed account is required')
     const storeProgram = getContract(CONTRACT_LIST.STORE, '')
     const address = storeProgram.programId.toString()
     const program = this.loadProgram(storeProgram.idl, address)
 
     const input = this.makeInput(this.flags.input)
-    const owner = this.wallet.payer
 
     const store = new PublicKey(input.store)
-    const feed = Keypair.generate()
 
     const granularity = new BN(input.granularity)
     const liveLength = new BN(input.liveLength)
@@ -70,25 +68,67 @@ export default class CreateFeed extends SolanaCommand {
       - Total Length: ${feedAccountLength.toNumber()}
     `)
 
-    await prompt('Continue creating new Transmissions Feed?')
-    logger.loading(`Creating feed...`)
-
-    const tx = await program.rpc.createFeed(description, decimals, granularity, liveLength, {
-      accounts: {
-        store: store,
-        feed: feed.publicKey,
-        authority: owner.publicKey,
-      },
-      signers: [owner, feed],
-      instructions: [await program.account.transmissions.createInstruction(feed, feedAccountLength.toNumber())],
+    const data = program.coder.instruction.encode('create_feed', {
+      description,
+      decimals,
+      granularity,
+      liveLength,
     })
 
-    logger.success(`Created feed on tx ${tx}`)
-    logger.info(`
-      STATE ACCOUNTS:
-        - Store: ${store}
-        - Feed/Transmissions: ${feed.publicKey}
-    `)
+    const accounts: AccountMeta[] = [
+      {
+        pubkey: store,
+        isWritable: false,
+        isSigner: false,
+      },
+      {
+        pubkey: feed,
+        isWritable: true,
+        isSigner: false,
+      },
+      {
+        pubkey: signer,
+        isWritable: false,
+        isSigner: true,
+      },
+    ]
+
+    const transmissionsCreationInstruction = await SystemProgram.createAccount({
+      fromPubkey: signer,
+      newAccountPubkey: feed,
+      space: feedAccountLength.toNumber(),
+      lamports: await this.provider.connection.getMinimumBalanceForRentExemption(feedAccountLength.toNumber()),
+      programId: program.programId,
+    })
+
+    console.log(transmissionsCreationInstruction.keys.map((a) => new PublicKey(a.pubkey).toString()))
+
+    return [
+      {
+        data: transmissionsCreationInstruction.data,
+        accounts: transmissionsCreationInstruction.keys,
+        programId: transmissionsCreationInstruction.programId,
+      },
+      {
+        data,
+        accounts,
+        programId: program.programId,
+      },
+    ]
+  }
+
+  execute = async () => {
+    const storeProgram = getContract(CONTRACT_LIST.STORE, '')
+    const address = storeProgram.programId.toString()
+    const program = this.loadProgram(storeProgram.idl, address)
+
+    const feed = Keypair.generate()
+
+    const rawTxs = await this.makeRawTransaction(this.wallet.publicKey, feed.publicKey)
+    await prompt('Continue creating new Transmissions Feed?')
+
+    const txhash = await this.withIDL(this.signAndSendRawTx, program.idl)(rawTxs, [feed])
+    logger.success(`Transmissions feed created on tx ${txhash}`)
 
     return {
       data: {
@@ -96,13 +136,13 @@ export default class CreateFeed extends SolanaCommand {
       },
       responses: [
         {
-          tx: this.wrapResponse(tx, feed.publicKey.toString(), {
+          tx: this.wrapResponse(txhash, feed.toString(), {
             state: feed.toString(),
-            transmissions: feed.publicKey.toString(),
+            transmissions: feed.toString(),
           }),
-          contract: feed.publicKey.toString(),
+          contract: feed.toString(),
         },
       ],
-    } as Result<TransactionResponse>
+    }
   }
 }

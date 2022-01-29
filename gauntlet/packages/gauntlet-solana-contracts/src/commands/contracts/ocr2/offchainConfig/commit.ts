@@ -25,7 +25,6 @@ export default class CommitOffchainConfig extends SolanaCommand {
     const program = this.loadProgram(ocr2.idl, address)
 
     const state = new PublicKey(this.flags.state)
-    const owner = this.wallet.payer
 
     const data = program.coder.instruction.encode('commit_offchain_config', {})
 
@@ -52,13 +51,9 @@ export default class CommitOffchainConfig extends SolanaCommand {
   }
 
   execute = async () => {
-    const contract = getContract(CONTRACT_LIST.OCR_2, '')
-    const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
-    const tx = makeTx(rawTx)
-    logger.debug(tx)
+    const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
     await prompt(`Commit Offchain config?`)
-    logger.loading('Sending tx...')
-    const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
+    const txhash = await this.signAndSendRawTx(rawTx)
     logger.success(`Committing offchain config on tx ${txhash}`)
 
     return {

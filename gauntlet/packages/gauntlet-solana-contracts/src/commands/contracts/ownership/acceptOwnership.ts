@@ -4,7 +4,6 @@ import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/g
 import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { SolanaConstructor } from '../../../lib/types'
-import { makeTx } from '../../../lib/utils'
 
 export const makeAcceptOwnershipCommand = (contractId: CONTRACT_LIST): SolanaConstructor => {
   return class AcceptOwnership extends SolanaCommand {
@@ -51,14 +50,10 @@ export const makeAcceptOwnershipCommand = (contractId: CONTRACT_LIST): SolanaCon
     }
 
     execute = async () => {
-      const contract = getContract(contractId, '')
-      const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
-      const tx = makeTx(rawTx)
-      logger.debug(tx)
+      const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
       await prompt(`Accepting ownership of ${contractId} state (${this.flags.state.toString()}). Continue?`)
-      logger.loading('Sending tx...')
-      const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
-      logger.success(`Accepted ownership on tx ${txhash}`)
+      const txhash = await this.signAndSendRawTx(rawTx)
+      logger.success(`Accepted ownership on tx hash: ${txhash}`)
       return {
         responses: [
           {
