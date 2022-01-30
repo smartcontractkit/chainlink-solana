@@ -1,12 +1,9 @@
 package solana
 
 import (
-	"errors"
-
-	"github.com/gagliardetto/solana-go"
 	uuid "github.com/satori/go.uuid"
+	"github.com/smartcontractkit/chainlink-relay/pkg/plugin"
 
-	relaytypes "github.com/smartcontractkit/chainlink/core/services/relay/types"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
@@ -22,36 +19,6 @@ type Logger interface {
 	Fatalf(format string, values ...interface{})
 }
 
-type TransmissionSigner interface {
-	Sign(msg []byte) ([]byte, error)
-	PublicKey() solana.PublicKey
-}
-
-type OCR2Spec struct {
-	ID          int32
-	IsBootstrap bool
-
-	// network data
-	NodeEndpointHTTP string
-
-	// on-chain program + 2x state accounts (state + transmissions) + store program
-	ProgramID       solana.PublicKey
-	StateID         solana.PublicKey
-	StoreProgramID  solana.PublicKey
-	TransmissionsID solana.PublicKey
-
-	// transaction + state parameters [optional]
-	UsePreflight bool
-	Commitment   string
-
-	// polling configuration [optional]
-	PollingInterval   string
-	PollingCtxTimeout string
-	StaleTimeout      string
-
-	TransmissionSigner TransmissionSigner
-}
-
 type Relayer struct {
 	lggr Logger
 }
@@ -64,12 +31,14 @@ func NewRelayer(lggr Logger) *Relayer {
 }
 
 func (r *Relayer) Start() error {
+	r.lggr.Debugf("Starting...")
 	// No subservices started on relay start, but when the first job is started
 	return nil
 }
 
 // Close will close all open subservices
 func (r *Relayer) Close() error {
+	r.lggr.Debugf("Stopping...")
 	return nil
 }
 
@@ -83,14 +52,7 @@ func (r *Relayer) Healthy() error {
 	return nil
 }
 
-// TODO [relay]: import from smartcontractkit/solana-integration impl
-func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relaytypes.OCR2Provider, error) {
-	var provider ocr2Provider
-	spec, ok := s.(OCR2Spec)
-	if !ok {
-		return &provider, errors.New("unsuccessful cast to 'solana.OCR2Spec'")
-	}
-
+func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, spec plugin.SolanaSpec) (plugin.OCR2Provider, error) {
 	offchainConfigDigester := OffchainConfigDigester{
 		ProgramID: spec.ProgramID,
 	}

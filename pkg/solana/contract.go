@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	relay "github.com/smartcontractkit/chainlink-relay/pkg/plugin"
+
 	"golang.org/x/sync/singleflight"
 
 	bin "github.com/gagliardetto/binary"
@@ -36,7 +38,7 @@ type ContractTracker struct {
 	StoreProgramID  solana.PublicKey
 
 	// private key for the transmission signing
-	Transmitter TransmissionSigner
+	Transmitter relay.TransmissionSigner
 
 	// tracked contract state
 	state  State
@@ -65,7 +67,7 @@ type ContractTracker struct {
 	utils.StartStopOnce
 }
 
-func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, lggr Logger) ContractTracker {
+func NewTracker(spec relay.SolanaSpec, client *Client, transmitter relay.TransmissionSigner, lggr Logger) ContractTracker {
 	// parse staleness timeout, if errors: use default timeout (1 min)
 	staleTimeout, err := time.ParseDuration(spec.StaleTimeout)
 	if err != nil {
@@ -93,6 +95,7 @@ func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, l
 // Start polling
 func (c *ContractTracker) Start() error {
 	return c.StartOnce("pollState", func() error {
+		c.lggr.Debugf("Starting...")
 		c.done = make(chan struct{})
 		c.stop = make(chan struct{})
 		go c.PollState()
@@ -104,14 +107,13 @@ func (c *ContractTracker) Start() error {
 func (c *ContractTracker) PollState() {
 	defer close(c.done)
 	c.lggr.Debugf("Starting state polling for state: %s, transmissions: %s", c.StateID, c.TransmissionsID)
-	ticker := time.NewTicker(utils.WithJitter(c.client.pollingInterval))
-	defer ticker.Stop()
+	tick := time.Tick(0)
 	for {
 		select {
 		case <-c.stop:
 			c.lggr.Debugf("Stopping state polling for state: %s, transmissions: %s", c.StateID, c.TransmissionsID)
 			return
-		case <-ticker.C:
+		case <-tick:
 			// async poll both transmisison + ocr2 states
 			go func() {
 				ctx, cancel := utils.ContextFromChanWithDeadline(c.done, c.client.contextDuration)
@@ -136,7 +138,7 @@ func (c *ContractTracker) PollState() {
 			}()
 
 			// reset ticker with new jitter
-			ticker.Reset(utils.WithJitter(c.client.pollingInterval))
+			tick = time.Tick(utils.WithJitter(c.client.pollingInterval))
 		}
 	}
 }
@@ -144,6 +146,7 @@ func (c *ContractTracker) PollState() {
 // Close stops the polling
 func (c *ContractTracker) Close() error {
 	return c.StopOnce("pollState", func() error {
+		c.lggr.Debugf("Stopping...")
 		close(c.stop)
 		<-c.done
 		return nil

@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	relay "github.com/smartcontractkit/chainlink-relay/pkg/plugin"
+
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -187,7 +189,7 @@ func TestStatePolling(t *testing.T) {
 	tracker := ContractTracker{
 		StateID:         solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
 		TransmissionsID: solana.MustPublicKeyFromBase58("11111111111111111111111111111112"),
-		client:          NewClient(OCR2Spec{NodeEndpointHTTP: mockServer.URL}, logger.TestLogger(t)),
+		client:          NewClient(relay.SolanaSpec{NodeEndpointHTTP: mockServer.URL}, logger.TestLogger(t)),
 		lggr:            logger.TestLogger(t),
 		requestGroup:    &singleflight.Group{},
 		stateLock:       &sync.RWMutex{},
