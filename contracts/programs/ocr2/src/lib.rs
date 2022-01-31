@@ -135,8 +135,13 @@ pub mod ocr2 {
         // let previous_config_block_number = config.latest_config_block_number;
         config.latest_config_block_number = slot;
         config.config_count += 1;
-        let config_digest =
-            config.config_digest_from_data(&crate::id(), &state.offchain_config, &state.oracles);
+
+        let config_digest = config.config_digest_from_data(
+            &crate::id(),
+            &ctx.accounts.state.key(),
+            &state.offchain_config,
+            &state.oracles,
+        );
         config.latest_config_digest = config_digest;
 
         // Generate an event
@@ -240,7 +245,12 @@ pub mod ocr2 {
         let slot = Clock::get()?.slot;
         config.latest_config_block_number = slot;
         config.config_count += 1;
-        let config_digest = config.config_digest_from_data(&crate::id(), offchain_config, oracles);
+        let config_digest = config.config_digest_from_data(
+            &crate::id(),
+            &ctx.accounts.state.key(),
+            offchain_config,
+            oracles,
+        );
         config.latest_config_digest = config_digest;
         // Reset epoch and round
         config.epoch = 0;

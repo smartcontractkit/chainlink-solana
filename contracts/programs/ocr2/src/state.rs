@@ -97,7 +97,8 @@ pub struct Config {
 impl Config {
     pub fn config_digest_from_data(
         &self,
-        contract_address: &Pubkey,
+        program_id: &Pubkey,
+        aggregator_address: &Pubkey,
         offchain_config: &OffchainConfig,
         oracles: &[Oracle],
     ) -> [u8; 32] {
@@ -106,9 +107,11 @@ impl Config {
         // NOTE: keccak256 is also available, but SHA256 is faster
         use anchor_lang::solana_program::hash;
         // NOTE: calling hash::hashv is orders of magnitude cheaper than using Hasher::hashv
-        let mut data: Vec<&[u8]> = Vec::with_capacity(9 + 2 * oracles.len());
-        let addr = contract_address.to_bytes();
-        data.push(&addr);
+        let mut data: Vec<&[u8]> = Vec::with_capacity(10 + 2 * oracles.len());
+        let program_addr = program_id.to_bytes();
+        data.push(&program_addr);
+        let aggregator_addr = aggregator_address.to_bytes();
+        data.push(&aggregator_addr);
         let count = self.config_count.to_be_bytes();
         data.push(&count);
         let n = [oracles.len() as u8]; // safe because it will always fit in MAX_ORACLES

@@ -94,6 +94,7 @@ func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay
 
 	offchainConfigDigester := OffchainConfigDigester{
 		ProgramID: spec.ProgramID,
+		StateID:   spec.StateID,
 	}
 
 	// establish network connection RPC
