@@ -102,15 +102,15 @@ func (c *ContractTracker) Start() error {
 func (c *ContractTracker) PollState() {
 	defer close(c.done)
 	c.lggr.Debugf("Starting state polling for state: %s, transmissions: %s", c.StateID, c.TransmissionsID)
-	ticker := time.NewTicker(utils.WithJitter(c.client.pollingInterval))
-	defer ticker.Stop()
+	tick := time.After(0)
 	for {
 		select {
 		case <-c.ctx.Done():
 			c.lggr.Debugf("Stopping state polling for state: %s, transmissions: %s", c.StateID, c.TransmissionsID)
 			return
-		case <-ticker.C:
+		case <-tick:
 			// async poll both transmisison + ocr2 states
+			start := time.Now()
 			var wg sync.WaitGroup
 			wg.Add(2)
 			go func() {
@@ -132,9 +132,14 @@ func (c *ContractTracker) PollState() {
 				}
 			}()
 			wg.Wait()
+			runTime := time.Now().Sub(start)
 
 			// reset ticker with new jitter
-			ticker.Reset(utils.WithJitter(c.client.pollingInterval))
+			newTick := utils.WithJitter(c.client.pollingInterval) - runTime
+			if newTick < 0 {
+				newTick = 0
+			}
+			tick = time.After(newTick)
 		}
 	}
 }

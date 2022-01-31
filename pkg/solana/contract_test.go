@@ -196,9 +196,9 @@ func TestStatePolling(t *testing.T) {
 	require.Error(t, tracker.Start()) // test startOnce
 	time.Sleep(wait)
 	require.NoError(t, tracker.Close())
-	require.Error(t, tracker.Close())                                             // test StopOnce
-	mockServer.Close()                                                            // close server once tracker is stopped
-	assert.GreaterOrEqual(t, callsPerSecond*int(wait.Seconds()-1), int(i.Load())) // expect minimum number of calls
+	require.Error(t, tracker.Close())                                           // test StopOnce
+	mockServer.Close()                                                          // close server once tracker is stopped
+	assert.GreaterOrEqual(t, callsPerSecond*int(wait.Seconds()), int(i.Load())) // expect minimum number of calls
 
 	answer, err := tracker.ReadAnswer()
 	assert.NoError(t, err)
