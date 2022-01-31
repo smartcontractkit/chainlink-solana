@@ -27,4 +27,4 @@ jobs:
         with:
           files: | 
             contracts/artifacts.tar.gz
-            target/deploy/*.so
+            contracts/target/deploy/*.so
