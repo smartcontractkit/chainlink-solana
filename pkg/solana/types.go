@@ -12,7 +12,7 @@ const (
 	TransmissionsSize uint32 = 8096
 
 	// answer (int128, 16 bytes), timestamp (uint32, 4 bytes)
-	TransmissionLen uint64 = 48
+	TransmissionLen   uint64 = 48
 	TransmissionLenV1 uint64 = 24
 
 	// AccountDiscriminator (8 bytes), RoundID (uint32, 4 bytes), Cursor (uint32, 4 bytes)

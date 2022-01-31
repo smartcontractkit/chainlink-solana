@@ -150,7 +150,7 @@ pub mod store {
         }
         for info in ctx.remaining_accounts {
             let mut feed = Account::try_from(&info.clone())?;
-            state::migrate(&mut feed, &info)?;
+            state::migrate(&mut feed, info)?;
             // write the change back into the header
             feed.exit(&crate::ID)?;
         }

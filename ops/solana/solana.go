@@ -154,7 +154,7 @@ func (d *Deployer) Load() error {
 	// solana program deploy --program-id ./Documents/chainlink-solana/contracts/artifacts/localnet/store-keypair.json ./Documents/chainlink-solana/gauntlet/packages/gauntlet-solana-contracts/artifacts/bin/store.so
 	// solana program deploy --program-id ./Documents/chainlink-solana/contracts/artifacts/localnet/ocr2-keypair.json ./Documents/chainlink-solana/gauntlet/packages/gauntlet-solana-contracts/artifacts/bin/ocr2.so
 
-	// solana program write-buffer ./Documents/chainlink-solana/contracts/target/deploy/store.so 
+	// solana program write-buffer ./Documents/chainlink-solana/contracts/target/deploy/store.so
 
 	return nil
 }
