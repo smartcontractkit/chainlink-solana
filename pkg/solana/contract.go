@@ -10,8 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/sync/singleflight"
-
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -56,12 +54,11 @@ type ContractTracker struct {
 	client *Client
 	lggr   Logger
 
-	// provides a duplicate function call suppression mechanism
-	requestGroup *singleflight.Group
-
 	// polling
 	done chan struct{}
-	stop chan struct{}
+	ctx context.Context
+	cancel context.CancelFunc
+
 	utils.StartStopOnce
 }
 
@@ -81,7 +78,6 @@ func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, l
 		Transmitter:     transmitter,
 		client:          client,
 		lggr:            lggr,
-		requestGroup:    &singleflight.Group{},
 		stateLock:       &sync.RWMutex{},
 		ansLock:         &sync.RWMutex{},
 		stateTime:       time.Now(),
@@ -94,7 +90,9 @@ func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, l
 func (c *ContractTracker) Start() error {
 	return c.StartOnce("pollState", func() error {
 		c.done = make(chan struct{})
-		c.stop = make(chan struct{})
+		ctx, cancel := context.WithCancel(context.Background())
+		c.ctx = ctx
+		c.cancel = cancel
 		go c.PollState()
 		return nil
 	})
@@ -108,32 +106,32 @@ func (c *ContractTracker) PollState() {
 	defer ticker.Stop()
 	for {
 		select {
-		case <-c.stop:
+		case <-c.ctx.Done():
 			c.lggr.Debugf("Stopping state polling for state: %s, transmissions: %s", c.StateID, c.TransmissionsID)
 			return
 		case <-ticker.C:
 			// async poll both transmisison + ocr2 states
+			var wg sync.WaitGroup
+			wg.Add(2)
 			go func() {
-				ctx, cancel := utils.ContextFromChanWithDeadline(c.done, c.client.contextDuration)
+				defer wg.Done()
+				ctx, cancel := context.WithTimeout(c.ctx, c.client.contextDuration)
 				defer cancel()
-				_, err, shared := c.requestGroup.Do("state", func() (interface{}, error) {
-					return nil, c.fetchState(ctx)
-				})
+				err := c.fetchState(ctx)
 				if err != nil {
-					c.lggr.Errorf("error in PollState.fetchState, shared: %t, error %s", shared, err)
+					c.lggr.Errorf("error in PollState.fetchState %s", err)
 				}
 			}()
 			go func() {
-				ctx, cancel := utils.ContextFromChanWithDeadline(c.done, c.client.contextDuration)
+				defer wg.Done()
+				ctx, cancel := context.WithTimeout(c.ctx, c.client.contextDuration)
 				defer cancel()
-				// make single flight request
-				_, err, shared := c.requestGroup.Do("transmissions.latest", func() (interface{}, error) {
-					return nil, c.fetchLatestTransmission(ctx)
-				})
+				err := c.fetchLatestTransmission(ctx)
 				if err != nil {
-					c.lggr.Errorf("error in PollState.fetchLatestTransmission, shared: %t, error %s", shared, err)
+					c.lggr.Errorf("error in PollState.fetchLatestTransmission %s", err)
 				}
 			}()
+			wg.Wait()
 
 			// reset ticker with new jitter
 			ticker.Reset(utils.WithJitter(c.client.pollingInterval))
@@ -144,7 +142,7 @@ func (c *ContractTracker) PollState() {
 // Close stops the polling
 func (c *ContractTracker) Close() error {
 	return c.StopOnce("pollState", func() error {
-		close(c.stop)
+		c.cancel()
 		<-c.done
 		return nil
 	})
