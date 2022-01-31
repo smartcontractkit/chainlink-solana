@@ -55,8 +55,8 @@ type ContractTracker struct {
 	lggr   Logger
 
 	// polling
-	done chan struct{}
-	ctx context.Context
+	done   chan struct{}
+	ctx    context.Context
 	cancel context.CancelFunc
 
 	utils.StartStopOnce
