@@ -142,12 +142,15 @@ impl Config {
     }
 }
 
+// Use a newtype if it becomes possible: https://github.com/project-serum/anchor/issues/607
 #[zero_copy]
+#[derive(Default)]
 pub struct SigningKey {
     pub key: [u8; 20],
 }
 
 #[zero_copy]
+#[derive(Default)]
 pub struct Oracle {
     pub transmitter: Pubkey,
     /// secp256k1 signing key for submissions
@@ -162,17 +165,4 @@ pub struct Oracle {
 
     /// `transmit()` reimbursements
     pub payment: u64,
-}
-
-impl Default for Oracle {
-    fn default() -> Self {
-        Self {
-            transmitter: Pubkey::default(),
-            signer: SigningKey { key: [0u8; 20] },
-            payee: Pubkey::default(),
-            proposed_payee: Pubkey::default(),
-            from_round_id: 0,
-            payment: 0,
-        }
-    }
 }
