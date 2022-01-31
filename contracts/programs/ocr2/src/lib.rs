@@ -184,8 +184,7 @@ pub mod ocr2 {
         let len = new_oracles.len();
         require!(f != 0, InvalidInput);
         require!(len <= MAX_ORACLES, TooManyOracles);
-        let n = len as u8; // safe since it's less than MAX_ORACLES
-        require!(3 * f < n, InvalidInput);
+        require!(3 * usize::from(f) < len, InvalidInput);
 
         let State {
             ref mut config,
