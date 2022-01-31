@@ -45,10 +45,17 @@ export const getDeploymentContract = (name: CONTRACT_LIST, version: string): Dep
   bytecode: getContractCode(name, version),
 })
 
-// TODO: Get it from GH Releases
 const getContractCode = (name: CONTRACT_LIST, version: string) => {
   try {
-    return readFileSync(join(process.cwd(), 'packages/gauntlet-solana-contracts/artifacts/bin', `${name}.so`))
+    if (version === 'local' ) {
+      return readFileSync(join(process.cwd(), 'packages/gauntlet-solana-contracts/artifacts/bin', `${name}.so`))
+    } else {
+      const response = await fetch(
+        `https://github.com/smartcontractkit/chainlink-solana/releases/download/${version}/${name}.so`,
+      )
+      const body = await response.text()
+      return body
+    }
   } catch (e) {
     throw new Error(`No program binary found for ${name} contract`)
   }
