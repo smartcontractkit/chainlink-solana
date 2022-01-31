@@ -11,7 +11,7 @@ pub mod event;
 mod state;
 
 use crate::context::*;
-use crate::state::{Config, LeftoverPayment, Oracle, SigningKey, State, MAX_ORACLES};
+use crate::state::{Config, LeftoverPayment, Oracle, SigningKey, State, DIGEST_SIZE, MAX_ORACLES};
 
 use std::collections::BTreeSet;
 use std::convert::TryInto;
@@ -964,7 +964,7 @@ pub mod query {
     #[account]
     pub struct LatestConfig {
         pub config_count: u32,
-        pub config_digest: [u8; 32],
+        pub config_digest: [u8; DIGEST_SIZE],
         pub block_number: u64,
     }
 

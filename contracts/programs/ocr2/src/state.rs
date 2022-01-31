@@ -13,6 +13,9 @@ pub const MAX_ORACLES: usize = 19;
 // OCR2 is designed for a maximum of 31 oracles, and there are various assumptions made around this value.
 const_assert!(MAX_ORACLES <= 31);
 
+#[constant]
+pub const DIGEST_SIZE: usize = 32;
+
 #[zero_copy]
 pub struct Billing {
     pub observation_payment_gjuels: u32,
@@ -88,7 +91,7 @@ pub struct Config {
     pub latest_transmitter: Pubkey,
 
     pub config_count: u32,
-    pub latest_config_digest: [u8; 32],
+    pub latest_config_digest: [u8; DIGEST_SIZE],
     pub latest_config_block_number: u64,
 
     pub billing: Billing,
@@ -101,7 +104,7 @@ impl Config {
         aggregator_address: &Pubkey,
         offchain_config: &OffchainConfig,
         oracles: &[Oracle],
-    ) -> [u8; 32] {
+    ) -> [u8; DIGEST_SIZE] {
         let onchain_config = Vec::new(); // TODO
 
         // NOTE: keccak256 is also available, but SHA256 is faster
@@ -134,7 +137,7 @@ impl Config {
         data.push(offchain_config);
         let result = hash::hashv(&data);
 
-        let mut result: [u8; 32] = result.to_bytes();
+        let mut result: [u8; DIGEST_SIZE] = result.to_bytes();
         // prefix masking
         result[0] = 0x00;
         result[1] = 0x03;
