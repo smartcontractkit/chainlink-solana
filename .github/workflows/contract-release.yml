@@ -25,4 +25,6 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: contracts/artifacts.tar.gz
+          files: | 
+            contracts/artifacts.tar.gz
+            target/deploy/*.so
