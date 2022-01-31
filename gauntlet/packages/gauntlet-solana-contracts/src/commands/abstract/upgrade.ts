@@ -56,7 +56,7 @@ export const makeUpgradeProgramCommand = (contractId: CONTRACT_LIST): SolanaCons
     }
 
     execute = async () => {
-      const rawTx = await makeRawUpgradeTransaction(this.wallet.payer.publicKey, contractId,  this.flags.buffer)
+      const rawTx = await makeRawUpgradeTransaction(this.wallet.payer.publicKey, contractId, this.flags.buffer)
       await prompt(`Continue upgrading the ${contractId} program?`)
       logger.loading('Upgrading program...')
       const txhash = await this.provider.send(makeTx(rawTx), [this.wallet.payer])
