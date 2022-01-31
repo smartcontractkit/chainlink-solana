@@ -35,14 +35,15 @@ func NewChainlinkSolOCRv2(nodes int, stateful bool) *environment.Config {
 					"replicas": nodes,
 					"chainlink": map[string]interface{}{
 						"image": map[string]interface{}{
-							"image":   "public.ecr.aws/chainlink/chainlink",
-							"version": "develop.4bc99afb22dca23469d9a7bc2bdfa7ea49028ae6",
+							"image":   "795953128386.dkr.ecr.us-west-2.amazonaws.com/chainlink",
+							"version": "develop.latest",
 						},
 					},
 					"db": db,
 					"env": map[string]interface{}{
 						"eth_url":                     "ws://sol:8900",
 						"eth_disabled":                "true",
+						"CHAINLINK_DEV":               "false",
 						"USE_LEGACY_ETH_ENV_VARS":     "false",
 						"FEATURE_OFFCHAIN_REPORTING2": "true",
 						"feature_external_initiators": "true",
