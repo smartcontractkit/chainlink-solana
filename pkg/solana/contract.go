@@ -132,14 +132,9 @@ func (c *ContractTracker) PollState() {
 				}
 			}()
 			wg.Wait()
-			runTime := time.Now().Sub(start)
 
-			// reset ticker with new jitter
-			newTick := utils.WithJitter(c.client.pollingInterval) - runTime
-			if newTick < 0 {
-				newTick = 0
-			}
-			tick = time.After(newTick)
+			// Note negative duration will be immediately ready
+			tick = time.After(utils.WithJitter(c.client.pollingInterval) - time.Since(start))
 		}
 	}
 }
