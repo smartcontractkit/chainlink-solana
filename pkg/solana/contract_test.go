@@ -20,7 +20,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
-	"golang.org/x/sync/singleflight"
 )
 
 var mockTransmission = []byte{
@@ -189,7 +188,6 @@ func TestStatePolling(t *testing.T) {
 		TransmissionsID: solana.MustPublicKeyFromBase58("11111111111111111111111111111112"),
 		client:          NewClient(OCR2Spec{NodeEndpointHTTP: mockServer.URL}, logger.TestLogger(t)),
 		lggr:            logger.TestLogger(t),
-		requestGroup:    &singleflight.Group{},
 		stateLock:       &sync.RWMutex{},
 		ansLock:         &sync.RWMutex{},
 		staleTimeout:    defaultStaleTimeout,
@@ -198,9 +196,9 @@ func TestStatePolling(t *testing.T) {
 	require.Error(t, tracker.Start()) // test startOnce
 	time.Sleep(wait)
 	require.NoError(t, tracker.Close())
-	require.Error(t, tracker.Close())                                             // test StopOnce
-	mockServer.Close()                                                            // close server once tracker is stopped
-	assert.GreaterOrEqual(t, callsPerSecond*int(wait.Seconds()-1), int(i.Load())) // expect minimum number of calls
+	require.Error(t, tracker.Close())                                           // test StopOnce
+	mockServer.Close()                                                          // close server once tracker is stopped
+	assert.GreaterOrEqual(t, callsPerSecond*int(wait.Seconds()), int(i.Load())) // expect minimum number of calls
 
 	answer, err := tracker.ReadAnswer()
 	assert.NoError(t, err)
