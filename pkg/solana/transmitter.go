@@ -83,7 +83,7 @@ func (c *ContractTracker) Transmit(
 
 	// Send transaction, and wait for confirmation:
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), c.client.txDuration)
+		ctx, cancel := context.WithTimeout(context.Background(), c.client.txTimeout)
 		defer cancel()
 		txSig, err := c.client.rpc.SendTransactionWithOpts(
 			ctx, // does not use libocr transmit context

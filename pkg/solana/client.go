@@ -13,7 +13,7 @@ type Client struct {
 	rpc             *rpc.Client
 	skipPreflight   bool // to enable or disable preflight checks
 	commitment      rpc.CommitmentType
-	txDuration       time.Duration
+	txTimeout       time.Duration
 	pollingInterval time.Duration
 	contextDuration time.Duration
 
@@ -54,15 +54,15 @@ func NewClient(spec OCR2Spec, logger Logger) *Client {
 	}
 
 	// parse tx context, if errors use defaultStaleTimeout
-	txCtxDuration, err := time.ParseDuration(spec.TxTimeout)
+	txTimeout, err := time.ParseDuration(spec.TxTimeout)
 	if err != nil {
 		logger.Warnf("could not parse tx context duration using default 1m")
-		txCtxDuration = defaultStaleTimeout
+		txTimeout = defaultStaleTimeout
 	}
 
 	client.pollingInterval = pollInterval
 	client.contextDuration = ctxInterval
-	client.txDuration = txCtxDuration
+	client.txTimeout = txTimeout
 
 	// log client configuration
 	logger.Debugf("NewClient configuration: %+v", client)
