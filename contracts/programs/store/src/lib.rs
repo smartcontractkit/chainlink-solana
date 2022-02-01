@@ -7,14 +7,7 @@ mod state;
 use crate::state::with_store;
 pub use crate::state::{Store as State, Transmission, Transmissions};
 
-#[cfg(feature = "mainnet")]
-declare_id!("My11111111111111111111111111111111111111113");
-#[cfg(feature = "testnet")]
-declare_id!("My11111111111111111111111111111111111111113");
-#[cfg(feature = "devnet")]
-declare_id!("My11111111111111111111111111111111111111113");
-#[cfg(not(any(feature = "mainnet", feature = "testnet", feature = "devnet")))]
-declare_id!("A7Jh2nb1hZHwqEofm4N8SXbKTj82rx7KUfjParQXUyMQ");
+declare_id!("CaH12fwNTKJAG8PxEvo9R96Zc2j8qNHZaFj8ZW49yZNT");
 
 static THRESHOLD_MULTIPLIER: u128 = 100000;
 

@@ -12,11 +12,7 @@ name = "ocr2"
 no-entrypoint = []
 no-idl = []
 cpi = ["no-entrypoint"]
-mainnet = ["access-controller/mainnet", "store/mainnet"]
-testnet = ["access-controller/testnet", "store/testnet"]
-devnet = ["access-controller/devnet", "store/devnet"]
-localnet = ["access-controller/localnet", "store/localnet"]
-default = ["localnet"]
+default = []
 
 [dependencies]
 anchor-lang = "0.20.1"

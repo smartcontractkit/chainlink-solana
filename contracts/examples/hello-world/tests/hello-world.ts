@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import { Program, BN } from '@project-serum/anchor';
 import { HelloWorld } from '../target/types/hello_world';
 
-const CHAINLINK_PROGRAM_ID = "A7Jh2nb1hZHwqEofm4N8SXbKTj82rx7KUfjParQXUyMQ";
+const CHAINLINK_PROGRAM_ID = "CaH12fwNTKJAG8PxEvo9R96Zc2j8qNHZaFj8ZW49yZNT";
 
 describe('hello-world', () => {
   const provider = anchor.Provider.env();
@@ -23,7 +23,7 @@ describe('hello-world', () => {
     const storeProgram = new Program(storeIdl, CHAINLINK_PROGRAM_ID, provider);
 
     let acIdl = JSON.parse(fs.readFileSync('../../target/idl/access_controller.json'));    
-    const accessControllerProgram = new Program(acIdl, "2F5NEkMnCRkmahEAcQfTQcZv1xtGgrWFfjENtTwHLuKg", provider);
+    const accessControllerProgram = new Program(acIdl, "DzzjdPWNfwHZmzPVxnmqkkMJraYQQRCpgFZajqkqmU6G", provider);
 
     await accessControllerProgram.rpc.initialize({
       accounts: {
