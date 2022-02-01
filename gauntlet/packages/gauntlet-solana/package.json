@@ -27,7 +27,7 @@
   "dependencies": {
     "@chainlink/gauntlet-core": "0.0.7",
     "@ledgerhq/hw-app-solana": "^6.20.0",
-    "@ledgerhq/hw-transport-node-hid-singleton": "^6.23.1",
+    "@ledgerhq/hw-transport-node-hid": "^6.20.0",
     "@project-serum/anchor": "^0.20.1",
     "@project-serum/borsh": "^0.2.2",
     "@solana/web3.js": "^1.30.2"

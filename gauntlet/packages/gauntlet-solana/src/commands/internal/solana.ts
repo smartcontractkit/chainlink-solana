@@ -7,8 +7,7 @@ import {
   LAMPORTS_PER_SOL,
   PublicKey,
   TransactionSignature,
-  TransactionInstruction,
-  TransactionCtorFields,
+  sendAndConfirmRawTransaction,
 } from '@solana/web3.js'
 import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { RawTransaction, TransactionResponse } from '../types'
@@ -81,7 +80,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     }
     const signedTx = await this.wallet.signTransaction(tx)
     logger.loading('Sending tx...')
-    return await this.provider.connection.sendRawTransaction(signedTx.serialize())
+    return await sendAndConfirmRawTransaction(this.provider.connection, signedTx.serialize())
   }
 
   withIDL = (action: (...args: any) => Promise<TransactionSignature>, idl: Idl) => async (
@@ -90,6 +89,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     try {
       return await action(...args)
     } catch (e) {
+      console.error(e)
       // Translate IDL error
       const idlErrors = parseIdlErrors(idl)
       let translatedErr = ProgramError.parse(e, idlErrors)

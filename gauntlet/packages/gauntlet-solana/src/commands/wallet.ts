@@ -1,7 +1,7 @@
 const { Wallet } = require('@project-serum/anchor')
 import { Wallet as SerumWallet } from '@project-serum/anchor'
 import { Keypair, PublicKey, Transaction } from '@solana/web3.js'
-import TransportNodeHid from '@ledgerhq/hw-transport-node-hid-singleton'
+import TransportNodeHid from '@ledgerhq/hw-transport-node-hid'
 import Solana from '@ledgerhq/hw-app-solana'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
 
