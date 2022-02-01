@@ -77,8 +77,8 @@ func main() {
 		transmissionSchema,
 		configSetSimplifiedSchema,
 
-		cfg.Kafka.ConfigSetSimplifiedTopic,
 		cfg.Kafka.TransmissionTopic,
+		cfg.Kafka.ConfigSetSimplifiedTopic,
 	)
 
 	balancesPrometheusExporterFactory := monitoring.NewPrometheusExporterFactory(
