@@ -39,10 +39,10 @@ export const getContract = (name: CONTRACT_LIST, version: string): Contract => (
   programId: getProgramId(name),
 })
 
-export const getDeploymentContract = (name: CONTRACT_LIST, version: string): DeploymentContract => ({
+export const getDeploymentContract = async (name: CONTRACT_LIST, version: string): Promise<DeploymentContract> => ({
   id: name,
   programKeypair: getProgramKeypair(name, version),
-  bytecode: getContractCode(name, version),
+  bytecode: await getContractCode(name, version),
 })
 
 const getContractCode = async (name: CONTRACT_LIST, version: string): Promise<Buffer> => {
@@ -54,7 +54,7 @@ const getContractCode = async (name: CONTRACT_LIST, version: string): Promise<Bu
         `https://github.com/smartcontractkit/chainlink-solana/releases/download/${version}/${name}.so`,
       )
       const body = await response.text()
-      return body
+      return Buffer.from(body)
     }
   } catch (e) {
     throw new Error(`No program binary found for ${name} contract with version ${version}`)
