@@ -6,6 +6,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi/sdk/v3 v3.17.0
 	github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20220405205522-cb8e5cd6bb3f
+	github.com/smartcontractkit/integrations-framework v1.0.52-0.20220318155657-306acd34b9c6
 )
 
 require (
@@ -149,7 +150,6 @@ require (
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/smartcontractkit/helmenv v1.0.33 // indirect
-	github.com/smartcontractkit/integrations-framework v1.0.52-0.20220318155657-306acd34b9c6 // indirect
 	github.com/spf13/afero v1.6.0 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/spf13/cobra v1.3.0 // indirect

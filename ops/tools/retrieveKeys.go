@@ -11,7 +11,9 @@ import (
 )
 
 const (
-	ChainName = "solana"
+	ChainName        = "solana"
+	PlaceholderName  = "insert display name here"
+	PlaceholderAdmin = "insert admin address here"
 )
 
 type NodeOutput struct {
@@ -27,9 +29,9 @@ type NodeOutput struct {
 }
 
 type CSAKey struct {
-	NodeAddress string
-	NodeName    string
-	PublicKey   string
+	NodeAddress string `json:"nodeAddress"`
+	NodeName    string `json:"nodeName"`
+	PublicKey   string `json:"publicKey"`
 }
 
 func main() {
@@ -45,7 +47,7 @@ func main() {
 	ocr2Keys, err := cl.ReadOCR2Keys()
 	txKeys, err := cl.ReadTxKeys(ChainName)
 	p2pKeys, err := cl.ReadP2PKeys()
-	// csaKeys, err := cl.ReadCSAKeys() // functionality doesn't exist
+	csaKeys, err := cl.ReadCSAKeys()
 
 	var ocr2Key client.OCR2KeyData
 	for _, k := range ocr2Keys.Data {
@@ -56,9 +58,13 @@ func main() {
 	}
 
 	output := NodeOutput{
-		AdminAddress: "insert admin address here",
-		// CSAKeys: []CSAKey{CSAKey{}},
-		DisplayName:           "insert display name here",
+		AdminAddress: PlaceholderAdmin,
+		CSAKeys: []CSAKey{CSAKey{
+			NodeAddress: txKeys.Data[0].Attributes.PublicKey,
+			NodeName:    PlaceholderName,
+			PublicKey:   csaKeys.Data[0].Attributes.PublicKey,
+		}},
+		DisplayName:           PlaceholderName,
 		OCR2ConfigPublicKey:   []string{ocr2Key.Attributes.ConfigPublicKey},
 		OCR2OffchainPublicKey: []string{ocr2Key.Attributes.OffChainPublicKey},
 		OCR2OnchainPublicKey:  []string{ocr2Key.Attributes.OnChainPublicKey},
