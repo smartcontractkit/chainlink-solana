@@ -12,11 +12,7 @@ name = "access_controller"
 no-entrypoint = []
 no-idl = []
 cpi = ["no-entrypoint"]
-mainnet = []
-testnet = []
-devnet = []
-localnet = []
-default = ["localnet"]
+default = []
 
 [dependencies]
 anchor-lang = "0.20.1"

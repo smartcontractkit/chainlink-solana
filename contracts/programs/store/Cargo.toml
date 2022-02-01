@@ -12,11 +12,7 @@ name = "store"
 no-entrypoint = []
 no-idl = []
 cpi = ["no-entrypoint"]
-mainnet = ["access-controller/mainnet"]
-testnet = ["access-controller/testnet"]
-devnet = ["access-controller/devnet"]
-localnet = ["access-controller/localnet"]
-default = ["localnet"]
+default = []
 
 [dependencies]
 anchor-lang = "0.20.1"

@@ -13,9 +13,9 @@ wallet = "../../id.json"
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
 
 [[test.genesis]]
-address = "A7Jh2nb1hZHwqEofm4N8SXbKTj82rx7KUfjParQXUyMQ"
+address = "CaH12fwNTKJAG8PxEvo9R96Zc2j8qNHZaFj8ZW49yZNT"
 program = "../../target/deploy/store.so"
 
 [[test.genesis]]
-address = "2F5NEkMnCRkmahEAcQfTQcZv1xtGgrWFfjENtTwHLuKg"
+address = "DzzjdPWNfwHZmzPVxnmqkkMJraYQQRCpgFZajqkqmU6G"
 program = "../../target/deploy/access_controller.so"
