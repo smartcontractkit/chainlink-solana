@@ -1,15 +1,10 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { Message, Transaction } from '@solana/web3.js'
-import { CONTRACT_LIST } from '@chainlink/gauntlet-solana-contracts'
+import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { Message, sendAndConfirmRawTransaction, Transaction } from '@solana/web3.js'
+import SolanaCommand from './solana'
+import { TransactionResponse } from '../types'
 
 export default class SendRawTx extends SolanaCommand {
-  static id = 'send_tx'
-  static category = CONTRACT_LIST.MULTISIG
-
-  static examples = ['yarn gauntlet-serum-multisig send_tx --network=local --data=MULTISIG_ACCOUNT']
-
   constructor(flags, args) {
     super(flags, args)
 
@@ -25,12 +20,11 @@ export default class SendRawTx extends SolanaCommand {
     logger.log('Signature:', signature)
     const transaction = Transaction.populate(msg, [signature])
 
-    logger.log('TRANSACTION:', transaction)
+    await prompt('Continue sending transaction?')
+    const txHash = await sendAndConfirmRawTransaction(this.provider.connection, transaction.serialize())
 
-    logger.log('Sending tx...')
-    const txHash = await this.provider.connection.sendRawTransaction(transaction.serialize())
+    logger.success(`Transaction sent with tx hash: ${txHash}`)
 
-    logger.log(txHash)
     return {
       responses: [
         {

@@ -61,7 +61,7 @@ export default class ResetPendingOffchainConfig extends SolanaCommand {
     const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
     await prompt(`Continue Reset pending offchain config?`)
 
-    const txhash = await this.withIDL(this.signAndSendRawTx, program.idl)(rawTx)
+    const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx)
 
     logger.success(`Reset pending offchain config on tx ${txhash}`)
 

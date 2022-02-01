@@ -6,10 +6,9 @@ import { io } from '@chainlink/gauntlet-core/dist/utils'
 import { wrapCommand } from './commands/multisig'
 import multisigSpecificCommands from './commands'
 import CreateMultisig from './commands/create'
-import SendRawTx from './commands/sendRawTx'
 
 export const multisigCommands = {
-  custom: [...commands.custom.concat(multisigSpecificCommands).map(wrapCommand), CreateMultisig, SendRawTx],
+  custom: [...commands.custom.concat(multisigSpecificCommands).map(wrapCommand), CreateMultisig],
   loadDefaultFlags: () => ({}),
   abstract: {
     findPolymorphic: () => undefined,

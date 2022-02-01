@@ -38,10 +38,7 @@ export const wrapCommand = (command) => {
       const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
       this.program = this.loadProgram(multisig.idl, multisig.programId.toString())
 
-      // If execute flag is provided, a signer cannot, as the Keypair is required
-      const isInvalidSigner = !!this.flags.execute && !!this.flags.signer
-      this.require(!isInvalidSigner, 'To execute the transaction the signer must be loaded from a wallet')
-      const signer = new PublicKey(this.flags.signer || this.wallet.publicKey)
+      const signer = this.wallet.publicKey
       const rawTxs = await this.makeRawTransaction(signer)
       // If proposal is not provided, we are at creation time, and a new proposal acc should have been created
       const proposal = new PublicKey(this.flags.proposal || rawTxs[0].accounts[1].pubkey)
@@ -49,7 +46,7 @@ export const wrapCommand = (command) => {
       if (this.flags.execute) {
         await prompt('CREATION,APPROVAL or EXECUTION TX will be executed. Continue?')
         logger.loading(`Executing action...`)
-        const txhash = await this.withIDL(this.signAndSendRawTx, this.program.idl)(rawTxs)
+        const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, this.program.idl)(rawTxs)
         await this.inspectProposalState(proposal)
         return {
           responses: [

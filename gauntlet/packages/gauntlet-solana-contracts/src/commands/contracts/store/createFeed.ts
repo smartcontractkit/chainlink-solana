@@ -127,7 +127,7 @@ export default class CreateFeed extends SolanaCommand {
     const rawTxs = await this.makeRawTransaction(this.wallet.publicKey, feed.publicKey)
     await prompt('Continue creating new Transmissions Feed?')
 
-    const txhash = await this.withIDL(this.signAndSendRawTx, program.idl)(rawTxs, [feed])
+    const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTxs, [feed])
     logger.success(`Transmissions feed created on tx ${txhash}`)
 
     return {

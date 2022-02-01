@@ -187,7 +187,7 @@ export default class Initialize extends SolanaCommand {
     const rawTx = await this.makeRawTransaction(this.wallet.publicKey, state.publicKey)
     await prompt(`Commit Offchain config?`)
 
-    const txhash = await this.withIDL(this.signAndSendRawTx, program.idl)(rawTx, [state])
+    const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx, [state])
     logger.success(`Committing offchain config on tx ${txhash}`)
 
     const transmissions = rawTx[1].accounts[1].pubkey

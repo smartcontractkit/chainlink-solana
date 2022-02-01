@@ -24,7 +24,7 @@ export abstract class SolanaWallet {
 export class LocalWallet extends SolanaWallet {
   wallet: typeof SerumWallet
 
-  constructor(wallet: typeof SerumWallet) {
+  private constructor(wallet: typeof SerumWallet) {
     super()
     this.wallet = wallet
   }
@@ -53,7 +53,7 @@ export class LedgerWallet extends SolanaWallet {
   wallet: Solana
   path: string
 
-  constructor(solanaLW: Solana, pubKey: PublicKey, path: string) {
+  private constructor(solanaLW: Solana, pubKey: PublicKey, path: string) {
     super()
 
     this.wallet = solanaLW
