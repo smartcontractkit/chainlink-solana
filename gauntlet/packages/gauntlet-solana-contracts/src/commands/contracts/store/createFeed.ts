@@ -101,8 +101,6 @@ export default class CreateFeed extends SolanaCommand {
       programId: program.programId,
     })
 
-    console.log(transmissionsCreationInstruction.keys.map((a) => new PublicKey(a.pubkey).toString()))
-
     return [
       {
         data: transmissionsCreationInstruction.data,

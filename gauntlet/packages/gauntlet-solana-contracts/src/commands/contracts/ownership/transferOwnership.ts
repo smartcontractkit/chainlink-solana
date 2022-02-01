@@ -56,9 +56,13 @@ export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaC
     }
 
     execute = async () => {
+      const contract = getContract(contractId, '')
+      const address = contract.programId.toString()
+      const program = this.loadProgram(contract.idl, address)
+
       const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
       await prompt(`Transferring ownership of ${contractId} state (${this.flags.state.toString()}). Continue?`)
-      const txhash = await this.signAndSendRawTx(rawTx)
+      const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx)
       logger.success(`Ownership transferred to ${new PublicKey(this.flags.to)} on tx ${txhash}`)
       return {
         responses: [

@@ -50,9 +50,13 @@ export const makeAcceptOwnershipCommand = (contractId: CONTRACT_LIST): SolanaCon
     }
 
     execute = async () => {
+      const contract = getContract(contractId, '')
+      const address = contract.programId.toString()
+      const program = this.loadProgram(contract.idl, address)
+
       const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
       await prompt(`Accepting ownership of ${contractId} state (${this.flags.state.toString()}). Continue?`)
-      const txhash = await this.signAndSendRawTx(rawTx)
+      const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx)
       logger.success(`Accepted ownership on tx hash: ${txhash}`)
       return {
         responses: [

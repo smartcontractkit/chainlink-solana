@@ -185,10 +185,10 @@ export default class Initialize extends SolanaCommand {
 
     const state = Keypair.generate()
     const rawTx = await this.makeRawTransaction(this.wallet.publicKey, state.publicKey)
-    await prompt(`Commit Offchain config?`)
+    await prompt(`Start initializing ocr2 feed?`)
 
     const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx, [state])
-    logger.success(`Committing offchain config on tx ${txhash}`)
+    logger.success(`Feed initialized on tx ${txhash}`)
 
     const transmissions = rawTx[1].accounts[1].pubkey
 
