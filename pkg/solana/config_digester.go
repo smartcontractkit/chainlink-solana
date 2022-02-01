@@ -11,9 +11,6 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
-// TODO: move this in with the Terra constant
-const ConfigDigestPrefixSolana types.ConfigDigestPrefix = 3
-
 var _ types.OffchainConfigDigester = (*OffchainConfigDigester)(nil)
 
 type OffchainConfigDigester struct {
@@ -84,13 +81,12 @@ func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.Co
 		return digest, fmt.Errorf("incorrect hash size %d, expected %d", n, len(digest))
 	}
 
-	digest[0] = 0x00
-	digest[1] = uint8(d.ConfigDigestPrefix())
+	binary.BigEndian.PutUint16(digest[0:2], uint16(d.ConfigDigestPrefix()))
 
 	return digest, nil
 }
 
 // This should return the same constant value on every invocation
 func (_ OffchainConfigDigester) ConfigDigestPrefix() types.ConfigDigestPrefix {
-	return ConfigDigestPrefixSolana
+	return types.ConfigDigestPrefixSolana
 }
