@@ -420,8 +420,8 @@ describe('ocr2', async () => {
     });
     account = await program.account.state.fetch(state.publicKey);
     config = account.config;
-    assert.ok(config.offchainConfig.len == 6);
-    assert.deepEqual(config.offchainConfig.xs.slice(0, config.offchainConfig.len), [4,5,6,4,5,6]);
+    assert.ok(account.offchainConfig.len == 6);
+    assert.deepEqual(account.offchainConfig.xs.slice(0, account.offchainConfig.len), [4,5,6,4,5,6]);
 
     // Call setConfig
     console.log("setConfig");
@@ -514,8 +514,8 @@ describe('ocr2', async () => {
         },
     });
 		let account = await program.account.state.fetch(state.publicKey);
-		assert.ok(account.config.pendingOffchainConfig.version != 0);
-		assert.ok(account.config.pendingOffchainConfig.len != 0);
+		assert.ok(account.pendingOffchainConfig.version != 0);
+		assert.ok(account.pendingOffchainConfig.len != 0);
 
 		await program.rpc.resetPendingOffchainConfig(
 			{
@@ -525,8 +525,8 @@ describe('ocr2', async () => {
 				},
 		});
 		account = await program.account.state.fetch(state.publicKey);
-		assert.ok(account.config.pendingOffchainConfig.version == 0);
-		assert.ok(account.config.pendingOffchainConfig.len == 0);
+		assert.ok(account.pendingOffchainConfig.version == 0);
+		assert.ok(account.pendingOffchainConfig.len == 0);
 	})
 
 	it("Can't reset pending config if already in new state", async () => {
