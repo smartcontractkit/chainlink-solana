@@ -42,6 +42,8 @@ var (
 
 	Instruction_CommitOffchainConfig = ag_binary.TypeID([8]byte{56, 171, 18, 191, 137, 247, 109, 33})
 
+	Instruction_ResetPendingOffchainConfig = ag_binary.TypeID([8]byte{25, 159, 172, 224, 46, 67, 215, 232})
+
 	Instruction_SetConfig = ag_binary.TypeID([8]byte{108, 158, 154, 175, 212, 98, 52, 66})
 
 	Instruction_SetRequesterAccessController = ag_binary.TypeID([8]byte{182, 229, 210, 202, 190, 116, 92, 236})
@@ -84,6 +86,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "WriteOffchainConfig"
 	case Instruction_CommitOffchainConfig:
 		return "CommitOffchainConfig"
+	case Instruction_ResetPendingOffchainConfig:
+		return "ResetPendingOffchainConfig"
 	case Instruction_SetConfig:
 		return "SetConfig"
 	case Instruction_SetRequesterAccessController:
@@ -148,6 +152,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"commit_offchain_config", (*CommitOffchainConfig)(nil),
+		},
+		{
+			"reset_pending_offchain_config", (*ResetPendingOffchainConfig)(nil),
 		},
 		{
 			"set_config", (*SetConfig)(nil),

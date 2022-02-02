@@ -235,8 +235,6 @@ type Config struct {
 	LatestConfigDigest        [32]uint8
 	LatestConfigBlockNumber   uint64
 	Billing                   Billing
-	OffchainConfig            OffchainConfig
-	PendingOffchainConfig     OffchainConfig
 }
 
 func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -327,16 +325,6 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `Billing` param:
 	err = encoder.Encode(obj.Billing)
-	if err != nil {
-		return err
-	}
-	// Serialize `OffchainConfig` param:
-	err = encoder.Encode(obj.OffchainConfig)
-	if err != nil {
-		return err
-	}
-	// Serialize `PendingOffchainConfig` param:
-	err = encoder.Encode(obj.PendingOffchainConfig)
 	if err != nil {
 		return err
 	}
@@ -431,16 +419,6 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	}
 	// Deserialize `Billing`:
 	err = decoder.Decode(&obj.Billing)
-	if err != nil {
-		return err
-	}
-	// Deserialize `OffchainConfig`:
-	err = decoder.Decode(&obj.OffchainConfig)
-	if err != nil {
-		return err
-	}
-	// Deserialize `PendingOffchainConfig`:
-	err = decoder.Decode(&obj.PendingOffchainConfig)
 	if err != nil {
 		return err
 	}

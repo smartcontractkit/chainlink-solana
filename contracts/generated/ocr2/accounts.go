@@ -157,14 +157,16 @@ func (obj *OracleObservationCount) UnmarshalWithDecoder(decoder *ag_binary.Decod
 }
 
 type State struct {
-	Version          uint8
-	Nonce            uint8
-	Padding0         uint16
-	Padding1         uint32
-	Config           Config
-	Oracles          Oracles
-	LeftoverPayments LeftoverPayments
-	Transmissions    ag_solanago.PublicKey
+	Version               uint8
+	Nonce                 uint8
+	Padding0              uint16
+	Padding1              uint32
+	Config                Config
+	OffchainConfig        OffchainConfig
+	PendingOffchainConfig OffchainConfig
+	Oracles               Oracles
+	LeftoverPayments      LeftoverPayments
+	Transmissions         ag_solanago.PublicKey
 }
 
 var StateDiscriminator = [8]byte{216, 146, 107, 94, 104, 75, 182, 177}
@@ -197,6 +199,16 @@ func (obj State) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `Config` param:
 	err = encoder.Encode(obj.Config)
+	if err != nil {
+		return err
+	}
+	// Serialize `OffchainConfig` param:
+	err = encoder.Encode(obj.OffchainConfig)
+	if err != nil {
+		return err
+	}
+	// Serialize `PendingOffchainConfig` param:
+	err = encoder.Encode(obj.PendingOffchainConfig)
 	if err != nil {
 		return err
 	}
@@ -254,6 +266,16 @@ func (obj *State) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	}
 	// Deserialize `Config`:
 	err = decoder.Decode(&obj.Config)
+	if err != nil {
+		return err
+	}
+	// Deserialize `OffchainConfig`:
+	err = decoder.Decode(&obj.OffchainConfig)
+	if err != nil {
+		return err
+	}
+	// Deserialize `PendingOffchainConfig`:
+	err = decoder.Decode(&obj.PendingOffchainConfig)
 	if err != nil {
 		return err
 	}
