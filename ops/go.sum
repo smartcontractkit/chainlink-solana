@@ -1185,6 +1185,8 @@ github.com/sirupsen/logrus v1.6.0/go.mod h1:7uNnSEd1DgxDLC74fIahvMZmmYsHGZGEOFrf
 github.com/sirupsen/logrus v1.7.0/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
 github.com/sirupsen/logrus v1.8.1 h1:dJKuHgqk1NNQlqoA6BTlM1Wf9DOH3NBjQyu0h9+AZZE=
 github.com/sirupsen/logrus v1.8.1/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
+github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20220126171549-56e2a1dd6034 h1:LxSa+5rlio3GkawyWfL5fllSLK6KABYBBC4eo5cetls=
+github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20220126171549-56e2a1dd6034/go.mod h1:DmGN1H1YWnYUahkZSBM49O0LCD6eU240geaMjlq6iX8=
 github.com/smartcontractkit/helmenv v1.0.25 h1:FxVzDyMa5GjIHAsK9puHbraoSM1Z7IThN6oqEz8cukU=
 github.com/smartcontractkit/helmenv v1.0.25/go.mod h1:ef0doolSZf8ckqaWMIK2M+EPXdIKYVzttd6EXaCgCK4=
 github.com/smartcontractkit/integrations-framework v1.0.36-0.20220124220015-0efc5b13cfc6 h1:sVSSPugf6hkGGjLaYZmsBcs3tyRVRC+orGJG7bbNosI=
