@@ -14,6 +14,9 @@ overflow-checks = true
 
 [profile.release]
 overflow-checks = true
+lto = "fat"
+codegen-units = 1
+# -Znew-llvm-pass-manager
 
 [profile.test]
 overflow-checks = true
