@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
@@ -30,7 +31,18 @@ func XXXInspectStates(state, transmission, program, rpc string, log int) (answer
 		lggr:            logger.NullLogger,
 		requestGroup:    &singleflight.Group{},
 		ProgramID:       solana.MustPublicKeyFromBase58(program),
+		stateLock:       &sync.RWMutex{},
+		ansLock:         &sync.RWMutex{},
+		stateTime:       time.Now(),
+		ansTime:         time.Now(),
+		staleTimeout:    defaultStaleTimeout,
 	}
+
+	if err := tracker.Start(); err != nil {
+		return answer, timestamp, errors.Wrap(err, "error in tracker.Start")
+	}
+	time.Sleep(2*time.Second) // sleep for polling to start
+	defer tracker.Close()
 
 	digester := OffchainConfigDigester{
 		ProgramID: tracker.ProgramID,
