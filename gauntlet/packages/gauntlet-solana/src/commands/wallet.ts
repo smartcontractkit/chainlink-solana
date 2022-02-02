@@ -67,7 +67,7 @@ export class LedgerWallet extends SolanaWallet {
       const solana = new Solana(transport)
       const { address } = await solana.getAddress(path, false)
       const pubkey = new PublicKey(address)
-      logger.info(`Ledger: Using ${pubkey.toString()}`)
+      logger.info(`Ledger: Using ${pubkey.toString()}, derivationPath: ${path} (can be overridden with --ledgerPath)`)
       return new LedgerWallet(solana, pubkey, path)
     } catch (e) {
       logger.error('Ledger: Could not access ledger. Is it unlocked and Solana app open?')
