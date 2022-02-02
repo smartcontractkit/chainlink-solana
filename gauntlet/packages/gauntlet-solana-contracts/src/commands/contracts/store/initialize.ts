@@ -20,13 +20,13 @@ export default class Initialize extends SolanaCommand {
 
     const state = Keypair.generate()
     const accessController = new PublicKey(this.flags.accessController)
-    const owner = this.wallet.payer
+    const owner = this.wallet.publicKey
 
     console.log(`Initializing store contract with State at ${state.publicKey}...`)
     const txHash = await program.rpc.initialize({
       accounts: {
         store: state.publicKey,
-        owner: owner.publicKey,
+        owner: owner,
         loweringAccessController: accessController,
       },
       signers: [state],
@@ -39,7 +39,7 @@ export default class Initialize extends SolanaCommand {
     STATE ACCOUNTS:
       - State: ${state.publicKey}
       - Payer: ${this.provider.wallet.publicKey}
-      - Owner: ${owner.publicKey}
+      - Owner: ${owner}
     `)
 
     return {

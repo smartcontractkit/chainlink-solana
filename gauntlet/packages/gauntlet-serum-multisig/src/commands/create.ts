@@ -9,8 +9,6 @@ type Input = {
   threshold: number | string
 }
 
-const DEFAULT_MAXIMUM_SIZE = 200
-
 export default class MultisigCreate extends SolanaCommand {
   static id = 'create'
   static category = CONTRACT_LIST.MULTISIG
@@ -48,8 +46,17 @@ export default class MultisigCreate extends SolanaCommand {
       [multisig.publicKey.toBuffer()],
       program.programId,
     )
-    const maximumSize = this.flags.maximumSize || DEFAULT_MAXIMUM_SIZE
+    const maxOwners = this.flags.maxOwners || 30
     const owners = input.owners.map((key) => new PublicKey(key))
+
+    // SIZE IN BYTES
+    const OWNER_LENGTH = 32
+    const EXTRA = 2
+    const NONCE_LENGTH = 1
+    const THRESHOLD_LENGTH = 8
+    const SEQ_LENGTH = 4
+
+    const TOTAL_TO_ALLOCATE = (OWNER_LENGTH + EXTRA) * maxOwners + THRESHOLD_LENGTH + NONCE_LENGTH + SEQ_LENGTH
 
     const threshold = new BN(input.threshold)
     await prompt(
@@ -64,7 +71,7 @@ export default class MultisigCreate extends SolanaCommand {
         rent: SYSVAR_RENT_PUBKEY,
       },
       signers: [multisig],
-      instructions: [await program.account.multisig.createInstruction(multisig, maximumSize)],
+      instructions: [await program.account.multisig.createInstruction(multisig, TOTAL_TO_ALLOCATE)],
     })
     logger.success('New multisig created')
     logger.info(`Multisig address: ${multisig.publicKey}`)
