@@ -4,6 +4,7 @@ import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair, AccountMeta, SystemProgram } fr
 import { CONTRACT_LIST, getContract, makeTx } from '@chainlink/gauntlet-solana-contracts'
 import { Idl, Program } from '@project-serum/anchor'
 import { MAX_BUFFER_SIZE } from '../lib/constants'
+import { isDeepEqual } from '../lib/utils'
 
 type ProposalContext = {
   rawTx: RawTransaction
@@ -168,7 +169,7 @@ export const wrapCommand = (command) => {
       }
       const isSameData = Buffer.compare(state.data, rawTx.data) === 0
       const isSameProgramId = new PublicKey(state.programId).toString() === rawTx.programId.toString()
-      const isSameAccounts = JSON.stringify(state.accounts) === JSON.stringify(rawTx.accounts)
+      const isSameAccounts = isDeepEqual(state.accounts, rawTx.accounts)
       return isSameData && isSameProgramId && isSameAccounts
     }
 
