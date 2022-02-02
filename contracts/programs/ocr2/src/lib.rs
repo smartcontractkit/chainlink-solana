@@ -95,13 +95,12 @@ pub mod ocr2 {
         offchain_config_version: u64,
     ) -> ProgramResult {
         let state = &mut *ctx.accounts.state.load_mut()?;
-        let config = &mut state.config;
         // disallow begin if we already started writing
-        require!(config.pending_offchain_config.version == 0, InvalidInput);
-        require!(config.pending_offchain_config.is_empty(), InvalidInput);
+        require!(state.pending_offchain_config.version == 0, InvalidInput);
+        require!(state.pending_offchain_config.is_empty(), InvalidInput);
         require!(offchain_config_version != 0, InvalidInput);
 
-        config.pending_offchain_config.version = offchain_config_version;
+        state.pending_offchain_config.version = offchain_config_version;
         Ok(())
     }
 
@@ -111,13 +110,12 @@ pub mod ocr2 {
         offchain_config: Vec<u8>,
     ) -> ProgramResult {
         let state = &mut *ctx.accounts.state.load_mut()?;
-        let config = &mut state.config;
         require!(
-            offchain_config.len() < config.pending_offchain_config.remaining_capacity(),
+            offchain_config.len() < state.pending_offchain_config.remaining_capacity(),
             InvalidInput
         );
-        require!(config.pending_offchain_config.version != 0, InvalidInput);
-        config.pending_offchain_config.extend(&offchain_config);
+        require!(state.pending_offchain_config.version != 0, InvalidInput);
+        state.pending_offchain_config.extend(&offchain_config);
         Ok(())
     }
 
@@ -127,14 +125,14 @@ pub mod ocr2 {
         let config = &mut state.config;
 
         // Require that at least some data was written
-        require!(config.pending_offchain_config.version > 0, InvalidInput);
-        require!(!config.pending_offchain_config.is_empty(), InvalidInput);
+        require!(state.pending_offchain_config.version > 0, InvalidInput);
+        require!(!state.pending_offchain_config.is_empty(), InvalidInput);
 
         // move staging area onto actual config
-        config.offchain_config = config.pending_offchain_config;
+        state.offchain_config = state.pending_offchain_config;
         // reset staging area
-        config.pending_offchain_config.clear();
-        config.pending_offchain_config.version = 0;
+        state.pending_offchain_config.clear();
+        state.pending_offchain_config.version = 0;
 
         // TODO: how does this interact with paying off oracles?
 
@@ -144,7 +142,8 @@ pub mod ocr2 {
         // let previous_config_block_number = config.latest_config_block_number;
         config.latest_config_block_number = slot;
         config.config_count += 1;
-        let config_digest = config.config_digest_from_data(&crate::id(), &state.oracles);
+        let config_digest =
+            config.config_digest_from_data(&crate::id(), &state.offchain_config, &state.oracles);
         config.latest_config_digest = config_digest;
 
         // Generate an event
@@ -165,18 +164,16 @@ pub mod ocr2 {
     #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
     pub fn reset_pending_offchain_config(ctx: Context<SetConfig>) -> ProgramResult {
         let state = &mut *ctx.accounts.state.load_mut()?;
-        let config = &mut state.config;
 
         // Require that at least some data was written
         require!(
-            config.pending_offchain_config.version > 0
-                || !config.pending_offchain_config.is_empty(),
+            state.pending_offchain_config.version > 0 || !state.pending_offchain_config.is_empty(),
             InvalidInput
         );
 
         // reset staging area
-        config.pending_offchain_config.clear();
-        config.pending_offchain_config.version = 0;
+        state.pending_offchain_config.clear();
+        state.pending_offchain_config.version = 0;
         Ok(())
     }
 
@@ -194,6 +191,7 @@ pub mod ocr2 {
 
         let State {
             ref mut config,
+            ref mut offchain_config,
             ref mut oracles,
             ref mut leftover_payments,
             ..
@@ -249,7 +247,7 @@ pub mod ocr2 {
         let slot = Clock::get()?.slot;
         config.latest_config_block_number = slot;
         config.config_count += 1;
-        let config_digest = config.config_digest_from_data(&crate::id(), oracles);
+        let config_digest = config.config_digest_from_data(&crate::id(), offchain_config, oracles);
         config.latest_config_digest = config_digest;
         // Reset epoch and round
         config.epoch = 0;

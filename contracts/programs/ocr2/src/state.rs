@@ -47,6 +47,9 @@ pub struct State {
     _padding0: u16,
     _padding1: u32,
     pub config: Config,
+    pub offchain_config: OffchainConfig,
+    // a staging area which will swap onto data on commit
+    pub pending_offchain_config: OffchainConfig,
     pub oracles: Oracles,
     pub leftover_payments: LeftoverPayments,
     pub transmissions: Pubkey,
@@ -89,16 +92,13 @@ pub struct Config {
     pub latest_config_block_number: u64,
 
     pub billing: Billing,
-
-    pub offchain_config: OffchainConfig,
-    // a staging area which will swap onto data on commit
-    pub pending_offchain_config: OffchainConfig,
 }
 
 impl Config {
     pub fn config_digest_from_data(
         &self,
         contract_address: &Pubkey,
+        offchain_config: &OffchainConfig,
         oracles: &[Oracle],
     ) -> [u8; 32] {
         let onchain_config = Vec::new(); // TODO
@@ -124,11 +124,11 @@ impl Config {
         let onchain_config_len = (onchain_config.len() as u32).to_be_bytes();
         data.push(&onchain_config_len);
         data.push(&onchain_config);
-        let offchain_version = self.offchain_config.version.to_be_bytes();
+        let offchain_version = offchain_config.version.to_be_bytes();
         data.push(&offchain_version);
-        let offchain_config_len = (self.offchain_config.len() as u32).to_be_bytes();
+        let offchain_config_len = (offchain_config.len() as u32).to_be_bytes();
         data.push(&offchain_config_len);
-        data.push(&self.offchain_config);
+        data.push(offchain_config);
         let result = hash::hashv(&data);
 
         let mut result: [u8; 32] = result.to_bytes();
