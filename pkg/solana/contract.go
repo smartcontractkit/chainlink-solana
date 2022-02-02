@@ -80,8 +80,6 @@ func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, l
 		lggr:            lggr,
 		stateLock:       &sync.RWMutex{},
 		ansLock:         &sync.RWMutex{},
-		stateTime:       time.Now(),
-		ansTime:         time.Now(),
 		staleTimeout:    staleTimeout,
 	}
 }
