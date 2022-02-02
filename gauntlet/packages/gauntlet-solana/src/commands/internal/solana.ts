@@ -7,12 +7,17 @@ import {
   LAMPORTS_PER_SOL,
   PublicKey,
   TransactionSignature,
+  sendAndConfirmRawTransaction,
 } from '@solana/web3.js'
 import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { RawTransaction, TransactionResponse } from '../types'
-import { ProgramError, parseIdlErrors, Idl, Program, Provider, Wallet } from '@project-serum/anchor'
+import { ProgramError, parseIdlErrors, Idl, Program, Provider } from '@project-serum/anchor'
+import { SolanaWallet } from '../wallet'
+import { logger } from '@chainlink/gauntlet-core/dist/utils'
+import { makeTx } from '../../lib/utils'
+
 export default abstract class SolanaCommand extends WriteCommand<TransactionResponse> {
-  wallet: typeof Wallet
+  wallet: SolanaWallet
   provider: Provider
   abstract execute: () => Promise<Result<TransactionResponse>>
   makeRawTransaction: (signer: PublicKey) => Promise<RawTransaction[]>
@@ -60,6 +65,37 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       wait: async (hash) => ({
         success: success,
       }),
+    }
+  }
+
+  signAndSendRawTx = async (rawTxs: RawTransaction[], extraSigners?: Keypair[]): Promise<TransactionSignature> => {
+    const latestSlot = await this.provider.connection.getSlot()
+    const recentBlock = await this.provider.connection.getBlock(latestSlot)
+    const tx = makeTx(rawTxs, {
+      recentBlockhash: recentBlock.blockhash,
+      feePayer: this.wallet.publicKey,
+    })
+    if (extraSigners) {
+      tx.sign(...extraSigners)
+    }
+    const signedTx = await this.wallet.signTransaction(tx)
+    logger.loading('Sending tx...')
+    return await sendAndConfirmRawTransaction(this.provider.connection, signedTx.serialize())
+  }
+
+  sendTxWithIDL = (sendAction: (...args: any) => Promise<TransactionSignature>, idl: Idl) => async (
+    ...args
+  ): Promise<TransactionSignature> => {
+    try {
+      return await sendAction(...args)
+    } catch (e) {
+      // Translate IDL error
+      const idlErrors = parseIdlErrors(idl)
+      let translatedErr = ProgramError.parse(e, idlErrors)
+      if (translatedErr === null) {
+        throw e
+      }
+      throw translatedErr
     }
   }
 

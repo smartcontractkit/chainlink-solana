@@ -104,13 +104,9 @@ export default class PayRemaining extends SolanaCommand {
   }
 
   execute = async () => {
-    const contract = getContract(CONTRACT_LIST.OCR_2, '')
-    const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
-    const tx = makeTx(rawTx)
-    logger.debug(tx)
+    const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
     await prompt(`Pay remaining on ${this.flags.state.toString()}?`)
-    logger.loading('Sending tx...')
-    const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
+    const txhash = await this.signAndSendRawTx(rawTx)
     logger.success(`Remaining oracles paid on tx ${txhash}`)
 
     return {

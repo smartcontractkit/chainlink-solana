@@ -1,6 +1,6 @@
 import { SolanaCommand, RawTransaction } from '@chainlink/gauntlet-solana'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair, AccountMeta, Transaction } from '@solana/web3.js'
+import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair, AccountMeta, SystemProgram } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract, makeTx } from '@chainlink/gauntlet-solana-contracts'
 import { Idl, Program } from '@project-serum/anchor'
 import { MAX_BUFFER_SIZE } from '../lib/constants'
@@ -26,32 +26,27 @@ export const wrapCommand = (command) => {
       logger.info(`Running ${command.id} command using Serum Multisig`)
 
       this.command = new command({ ...flags, bufferSize: MAX_BUFFER_SIZE }, args)
-      this.command.invokeMiddlewares(this.command, this.command.middlewares)
       this.require(!!process.env.MULTISIG_ADDRESS, 'Please set MULTISIG_ADDRESS env var')
       this.multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS)
     }
 
     execute = async () => {
+      // TODO: Command underneath will try to load its own provider and wallet if invoke middlewares, but we should be able to specify which ones to use, in an obvious better way
+      this.command.provider = this.provider
+      this.command.wallet = this.wallet
+
       const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
       this.program = this.loadProgram(multisig.idl, multisig.programId.toString())
 
-      // Falling back on default wallet if signer is not provided or execute flag is provided
-      const signer = this.flags.execute
-        ? this.wallet.payer.publicKey
-        : new PublicKey(this.flags.signer || this.wallet.payer.publicKey)
+      const signer = this.wallet.publicKey
       const rawTxs = await this.makeRawTransaction(signer)
       // If proposal is not provided, we are at creation time, and a new proposal acc should have been created
       const proposal = new PublicKey(this.flags.proposal || rawTxs[0].accounts[1].pubkey)
-      const latestSlot = await this.provider.connection.getSlot()
-      const recentBlock = await this.provider.connection.getBlock(latestSlot)
-      const tx = makeTx(rawTxs, {
-        recentBlockhash: recentBlock.blockhash,
-        feePayer: signer,
-      })
+
       if (this.flags.execute) {
         await prompt('CREATION,APPROVAL or EXECUTION TX will be executed. Continue?')
         logger.loading(`Executing action...`)
-        const txhash = await this.provider.send(tx, [this.wallet.payer])
+        const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, this.program.idl)(rawTxs)
         await this.inspectProposalState(proposal)
         return {
           responses: [
@@ -63,15 +58,22 @@ export const wrapCommand = (command) => {
         }
       }
 
-      const txData = tx.compileMessage().serialize().toString('base64')
+      const latestSlot = await this.provider.connection.getSlot()
+      const recentBlock = await this.provider.connection.getBlock(latestSlot)
+      const tx = makeTx(rawTxs, {
+        recentBlockhash: recentBlock.blockhash,
+        feePayer: signer,
+      })
+
+      const msgData = tx.serializeMessage().toString('base64')
       logger.line()
       logger.success(
-        `Transaction generated with blockhash ID: ${recentBlock.blockhash.toString()} (${new Date(
+        `Message generated with blockhash ID: ${recentBlock.blockhash.toString()} (${new Date(
           recentBlock.blockTime * 1000,
-        ).toLocaleString()}). TX DATA:`,
+        ).toLocaleString()}). MESSAGE DATA:`,
       )
       logger.log()
-      logger.log(txData)
+      logger.log(msgData)
       logger.log()
       logger.line()
 
@@ -81,7 +83,7 @@ export const wrapCommand = (command) => {
             tx: this.wrapResponse('', this.multisigAddress.toString()),
             contract: this.multisigAddress.toString(),
             data: {
-              transactionData: txData,
+              transactionData: msgData,
             },
           },
         ],
@@ -153,7 +155,7 @@ export const wrapCommand = (command) => {
       try {
         return await this.program.account.transaction.fetch(proposal)
       } catch (e) {
-        logger.info('Proposal state not found')
+        logger.info('Proposal state not found. Should be empty at CREATION time')
         return
       }
     }
@@ -175,9 +177,19 @@ export const wrapCommand = (command) => {
       logger.log('Creating proposal account...')
       const proposal = Keypair.generate()
       const txSize = 1300 // Space enough
-      const proposalAccount = await this.program.account.transaction.createInstruction(proposal, txSize)
-      const accountTx = new Transaction().add(proposalAccount)
-      await this.provider.send(accountTx, [proposal, this.wallet.payer])
+      const proposalInstruction = await SystemProgram.createAccount({
+        fromPubkey: this.wallet.publicKey,
+        newAccountPubkey: proposal.publicKey,
+        space: txSize,
+        lamports: await this.provider.connection.getMinimumBalanceForRentExemption(txSize),
+        programId: this.program.programId,
+      })
+      const rawTx: RawTransaction = {
+        data: proposalInstruction.data,
+        accounts: proposalInstruction.keys,
+        programId: proposalInstruction.programId,
+      }
+      await this.signAndSendRawTx([rawTx], [proposal])
       logger.success(`Proposal account created at: ${proposal.publicKey.toString()}`)
       return proposal.publicKey
     }

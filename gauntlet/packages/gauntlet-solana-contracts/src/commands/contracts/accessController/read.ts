@@ -21,7 +21,10 @@ export default class ReadState extends SolanaCommand {
     // read could be abstract. account.accessController is just the name of the account that can be got form the camelcase(schema.accounts[x].name)
     const data = await program.account.accessController.fetch(state)
 
-    console.log(data)
+    console.log(`
+      - Owner: ${new PublicKey(data.owner).toString()}
+      - Proposed Owner: ${new PublicKey(data.proposedOwner).toString()}
+    `)
     return {} as Result<TransactionResponse>
   }
 }

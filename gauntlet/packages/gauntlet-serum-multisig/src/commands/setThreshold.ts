@@ -2,15 +2,13 @@ import { SolanaCommand, RawTransaction, TransactionResponse } from '@chainlink/g
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
 import { Result } from '@chainlink/gauntlet-core'
-import { BN } from '@chainlink/gauntlet-core/dist/utils'
+import { BN, logger } from '@chainlink/gauntlet-core/dist/utils'
 
 export default class SetThreshold extends SolanaCommand {
-  static id = 'set:threshold'
+  static id = 'set_threshold'
   static category = CONTRACT_LIST.MULTISIG
 
-  static examples = [
-    'yarn gauntlet-serum-multisig set:threshold --network=local --threshold=2 --approve --tx=9Vck9Gdk8o9WhxT8bgNcfJ5gbvFBN1zPuXpf8yu8o2aq --execute',
-  ]
+  static examples = ['yarn gauntlet-serum-multisig set_threshold --network=local --threshold=2']
 
   constructor(flags, args) {
     super(flags, args)
@@ -22,8 +20,12 @@ export default class SetThreshold extends SolanaCommand {
     const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
     const address = multisig.programId.toString()
     const program = this.loadProgram(multisig.idl, address)
+
+    const threshold = new BN(this.flags.threshold)
+    logger.info(`Generating data for new threshold: ${threshold.toNumber()}`)
+
     const data = program.coder.instruction.encode('change_threshold', {
-      threshold: new BN(this.flags.threshold),
+      threshold,
     })
 
     const accounts = [
