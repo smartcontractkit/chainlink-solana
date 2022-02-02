@@ -92,15 +92,6 @@ pub fn description<'info>(
     query(program_id, feed, Query::Description)
 }
 
-/// Returns round data for a specific `round_id`.
-pub fn round_data<'info>(
-    program_id: AccountInfo<'info>,
-    feed: AccountInfo<'info>,
-    round_id: u32,
-) -> Result<Round, ProgramError> {
-    query(program_id, feed, Query::RoundData { round_id })
-}
-
 /// Returns round data for the latest round.
 pub fn latest_round_data<'info>(
     program_id: AccountInfo<'info>,
