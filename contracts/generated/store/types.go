@@ -7,6 +7,50 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
+type Round struct {
+	RoundId   uint32
+	Timestamp uint64
+	Answer    ag_binary.Int128
+}
+
+func (obj Round) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `RoundId` param:
+	err = encoder.Encode(obj.RoundId)
+	if err != nil {
+		return err
+	}
+	// Serialize `Timestamp` param:
+	err = encoder.Encode(obj.Timestamp)
+	if err != nil {
+		return err
+	}
+	// Serialize `Answer` param:
+	err = encoder.Encode(obj.Answer)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Round) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `RoundId`:
+	err = decoder.Decode(&obj.RoundId)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Timestamp`:
+	err = decoder.Decode(&obj.Timestamp)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Answer`:
+	err = decoder.Decode(&obj.Answer)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type Flags struct {
 	Xs  [128]ag_solanago.PublicKey
 	Len uint64
