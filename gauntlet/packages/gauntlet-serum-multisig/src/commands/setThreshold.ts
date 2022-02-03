@@ -5,10 +5,10 @@ import { Result } from '@chainlink/gauntlet-core'
 import { BN, logger } from '@chainlink/gauntlet-core/dist/utils'
 
 export default class SetThreshold extends SolanaCommand {
-  static id = 'set_threshold'
+  static id = 'multisig:change_threshold'
   static category = CONTRACT_LIST.MULTISIG
 
-  static examples = ['yarn gauntlet-serum-multisig set_threshold --network=local --threshold=2']
+  static examples = ['yarn gauntlet-serum-multisig multisig:change_threshold --network=local --threshold=2 [OWNERS...]']
 
   constructor(flags, args) {
     super(flags, args)
