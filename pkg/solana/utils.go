@@ -13,7 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
-	"golang.org/x/sync/singleflight"
 )
 
 const (
@@ -29,19 +28,16 @@ func XXXInspectStates(state, transmission, program, rpc string, log int) (answer
 		TransmissionsID: solana.MustPublicKeyFromBase58(transmission),
 		client:          NewClient(OCR2Spec{NodeEndpointHTTP: rpc}, logger.NullLogger),
 		lggr:            logger.NullLogger,
-		requestGroup:    &singleflight.Group{},
 		ProgramID:       solana.MustPublicKeyFromBase58(program),
 		stateLock:       &sync.RWMutex{},
 		ansLock:         &sync.RWMutex{},
-		stateTime:       time.Now(),
-		ansTime:         time.Now(),
 		staleTimeout:    defaultStaleTimeout,
 	}
 
 	if err := tracker.Start(); err != nil {
 		return answer, timestamp, errors.Wrap(err, "error in tracker.Start")
 	}
-	time.Sleep(2*time.Second) // sleep for polling to start
+	time.Sleep(2 * time.Second) // sleep for polling to start
 	defer tracker.Close()
 
 	digester := OffchainConfigDigester{
