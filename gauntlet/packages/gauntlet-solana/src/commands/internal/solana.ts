@@ -69,10 +69,9 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
   }
 
   signAndSendRawTx = async (rawTxs: RawTransaction[], extraSigners?: Keypair[]): Promise<TransactionSignature> => {
-    const latestSlot = await this.provider.connection.getSlot()
-    const recentBlock = await this.provider.connection.getBlock(latestSlot)
+    const recentBlockhash = (await this.provider.connection.getRecentBlockhash()).blockhash
     const tx = makeTx(rawTxs, {
-      recentBlockhash: recentBlock.blockhash,
+      recentBlockhash,
       feePayer: this.wallet.publicKey,
     })
     if (extraSigners) {
