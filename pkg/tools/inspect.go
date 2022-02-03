@@ -123,6 +123,9 @@ func XXXInspectTxs(network string, state string) error {
 			return err
 		}
 		txDetails := txRaw.Transaction.GetParsedTransaction()
+
+		// use first address: https://docs.solana.com/developing/clients/jsonrpc-api#transaction-structure
+		// The first message.header.numRequiredSignatures public keys must sign the transaction (therefore it is the transmitter)
 		reverts[txDetails.Message.AccountKeys[0].String()]++
 	}
 
