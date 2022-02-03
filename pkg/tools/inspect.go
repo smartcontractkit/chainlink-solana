@@ -74,6 +74,8 @@ func main() {
 
 func XXXInspectTxs(network string, state string) error {
 	client := rpc.New(network)
+
+	// fetch 0-999
 	txSigs, err := client.GetSignaturesForAddressWithOpts(
 		context.TODO(),
 		solanaGo.MustPublicKeyFromBase58(state),
@@ -84,6 +86,21 @@ func XXXInspectTxs(network string, state string) error {
 	if err != nil {
 		return err
 	}
+
+	// fetch 1000-1999
+	txSigsNext, err := client.GetSignaturesForAddressWithOpts(
+		context.TODO(),
+		solanaGo.MustPublicKeyFromBase58(state),
+		&rpc.GetSignaturesForAddressOpts{
+			Commitment: rpc.CommitmentConfirmed,
+			Before: txSigs[len(txSigs)-1].Signature,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	txSigs = append(txSigs, txSigsNext...)
 
 	chunkStart := txSigs[len(txSigs)-1].BlockTime.Time()
 	reverts := map[string]int{}
