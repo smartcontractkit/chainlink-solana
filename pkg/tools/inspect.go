@@ -41,7 +41,10 @@ func main() {
 	case "localnet":
 		network = rpc.LocalNet_RPC
 	default:
-		log.Fatal(errors.New("Unknown network"))
+		// allows for option to pass url
+		if network == "" {
+			log.Fatal(errors.New("Unknown network"))
+		}
 	}
 
 	var err error
@@ -83,7 +86,7 @@ func XXXInspectTxs(network string, state string) error {
 	}
 
 	chunkStart := txSigs[len(txSigs)-1].BlockTime.Time()
-	// reverts := map[string]int{}
+	reverts := map[string]int{}
 	var revertCount int
 	var passCount int
 	var pass []int
@@ -108,19 +111,19 @@ func XXXInspectTxs(network string, state string) error {
 		}
 
 		revertCount++
-		// // fetch additional data if revert (hits the rate limit)
-		// txRaw, err := client.GetTransaction(
-		// 	context.TODO(),
-		// 	tx.Signature,
-		// 	&rpc.GetTransactionOpts{
-		// 		Commitment: rpc.CommitmentConfirmed,
-		// 	},
-		// )
-		// if err != nil {
-		// 	return err
-		// }
-		// txDetails := txRaw.Transaction.GetParsedTransaction()
-		// reverts[txDetails.Signatures[0].String()]++
+		// fetch additional data if revert (hits the rate limit)
+		txRaw, err := client.GetTransaction(
+			context.TODO(),
+			tx.Signature,
+			&rpc.GetTransactionOpts{
+				Commitment: rpc.CommitmentConfirmed,
+			},
+		)
+		if err != nil {
+			return err
+		}
+		txDetails := txRaw.Transaction.GetParsedTransaction()
+		reverts[txDetails.Message.AccountKeys[0].String()]++
 	}
 
 	// calculate averages
@@ -136,6 +139,12 @@ func XXXInspectTxs(network string, state string) error {
 	fmt.Printf("Minutes: %d\n", t)
 	fmt.Printf("Success: %d/min\n", avgPass/t)
 	fmt.Printf("Reverts: %d/min\n", avgFail/t)
+
+	fmt.Printf("\n----------REVERTS/ADDRESS---------------\n")
+	for k,v := range reverts {
+		fmt.Printf("%s: %d\n", k, v)
+	}
+
 
 	return nil
 }
