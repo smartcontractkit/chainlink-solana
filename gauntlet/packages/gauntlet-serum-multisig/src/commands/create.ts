@@ -1,5 +1,5 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
@@ -8,8 +8,6 @@ type Input = {
   owners: string[]
   threshold: number | string
 }
-
-const DEFAULT_MAXIMUM_SIZE = 200
 
 export default class MultisigCreate extends SolanaCommand {
   static id = 'create'
@@ -48,8 +46,24 @@ export default class MultisigCreate extends SolanaCommand {
       [multisig.publicKey.toBuffer()],
       program.programId,
     )
-    const maximumSize = this.flags.maximumSize || DEFAULT_MAXIMUM_SIZE
+    const maxOwners = this.flags.maxOwners || 30
     const owners = input.owners.map((key) => new PublicKey(key))
+
+    // SIZE IN BYTES
+    const OWNER_LENGTH = 32
+    const EXTRA = 2
+    const NONCE_LENGTH = 1
+    const THRESHOLD_LENGTH = 8
+    const SEQ_LENGTH = 4
+
+    const TOTAL_TO_ALLOCATE = (OWNER_LENGTH + EXTRA) * maxOwners + THRESHOLD_LENGTH + NONCE_LENGTH + SEQ_LENGTH
+
+    const threshold = new BN(input.threshold)
+    await prompt(
+      `A new multisig will be created with threshold ${threshold.toNumber()} and owners ${owners.map((o) =>
+        o.toString(),
+      )}. Continue?`,
+    )
 
     const tx = await program.rpc.createMultisig(owners, new BN(input.threshold), nonce, {
       accounts: {
@@ -57,8 +71,9 @@ export default class MultisigCreate extends SolanaCommand {
         rent: SYSVAR_RENT_PUBKEY,
       },
       signers: [multisig],
-      instructions: [await program.account.multisig.createInstruction(multisig, maximumSize)],
+      instructions: [await program.account.multisig.createInstruction(multisig, TOTAL_TO_ALLOCATE)],
     })
+    logger.success('New multisig created')
     logger.info(`Multisig address: ${multisig.publicKey}`)
     logger.info(`Multisig Signer: ${multisigSigner.toString()}`)
 

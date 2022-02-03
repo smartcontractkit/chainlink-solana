@@ -35,6 +35,7 @@ export default class ReadState extends SolanaCommand {
     // read could be abstract. account.accessController is just the name of the account that can be got form the camelcase(schema.accounts[x].name)
     const data = await program.account.state.fetch(state)
 
+    console.log('OWNER:', new PublicKey(data.config.owner).toString())
     console.log('DATA:', data)
     // Get the necessary bytes
     const offchainBuffer = Buffer.from(data.config.offchainConfig.xs).slice(

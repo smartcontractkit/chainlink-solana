@@ -54,7 +54,10 @@ export default class SetPayees extends SolanaCommand {
     const link = new PublicKey(this.flags.link || process.env.LINK)
 
     const info = await program.account.state.fetch(state)
-    const token = new Token(this.provider.connection, link, TOKEN_PROGRAM_ID, this.wallet.payer)
+    const token = new Token(this.provider.connection, link, TOKEN_PROGRAM_ID, {
+      publicKey: signer,
+      secretKey: Buffer.from([]),
+    })
 
     this.flags.TESTING_ONLY_IGNORE_PAYEE_VALIDATION &&
       logger.warn('TESTING_ONLY_IGNORE_PAYEE_VALIDATION flag is enabled')
@@ -121,14 +124,11 @@ export default class SetPayees extends SolanaCommand {
   }
 
   execute = async () => {
-    const contract = getContract(CONTRACT_LIST.OCR_2, '')
-    const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
-    const tx = makeTx(rawTx)
-    logger.debug(tx)
+    const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
     await prompt('Continue setting payees?')
-    logger.loading('Sending tx...')
-    const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
+    const txhash = await this.signAndSendRawTx(rawTx)
     logger.success(`Payees set on tx hash: ${txhash}`)
+
     return {
       responses: [
         {

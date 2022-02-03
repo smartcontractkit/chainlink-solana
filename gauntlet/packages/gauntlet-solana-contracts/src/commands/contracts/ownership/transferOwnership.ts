@@ -4,7 +4,6 @@ import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/g
 import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { SolanaConstructor } from '../../../lib/types'
-import { makeTx } from '../../../lib/utils'
 
 export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaConstructor => {
   return class TransferOwnership extends SolanaCommand {
@@ -58,16 +57,12 @@ export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaC
 
     execute = async () => {
       const contract = getContract(contractId, '')
-      const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
-      const tx = makeTx(rawTx)
-      await prompt(
-        `Transfering ownership of ${contractId} state (${this.flags.state.toString()}) to: (${new PublicKey(
-          this.flags.to,
-        ).toString()}). Continue?`,
-      )
-      logger.debug(tx)
-      logger.loading('Sending tx...')
-      const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
+      const address = contract.programId.toString()
+      const program = this.loadProgram(contract.idl, address)
+
+      const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
+      await prompt(`Transferring ownership of ${contractId} state (${this.flags.state.toString()}). Continue?`)
+      const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx)
       logger.success(`Ownership transferred to ${new PublicKey(this.flags.to)} on tx ${txhash}`)
       return {
         responses: [

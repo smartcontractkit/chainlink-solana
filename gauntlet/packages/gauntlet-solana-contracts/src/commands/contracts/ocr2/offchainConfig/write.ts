@@ -2,7 +2,7 @@ import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt, time, BN } from '@chainlink/gauntlet-core/dist/utils'
 import { Proto, sharedSecretEncryptions } from '@chainlink/gauntlet-core/dist/crypto'
 
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { RawTransaction, SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { MAX_TRANSACTION_BYTES, ORACLES_MAX_LENGTH } from '../../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
@@ -192,7 +192,7 @@ export default class WriteOffchainConfig extends SolanaCommand {
     return true
   }
 
-  makeRawTransaction = async (signer: PublicKey) => {
+  makeRawTransaction = async (signer: PublicKey): Promise<RawTransaction[]> => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
@@ -244,10 +244,9 @@ export default class WriteOffchainConfig extends SolanaCommand {
   }
 
   execute = async () => {
-    const contract = getContract(CONTRACT_LIST.OCR_2, '')
     const state = new PublicKey(this.flags.state)
 
-    const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
+    const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
     const startingPoint = new BN(this.flags.instruction || 0).toNumber()
 
     await prompt(`Start writing offchain config from ${startingPoint}/${rawTx.length - 1}?`)
@@ -255,8 +254,7 @@ export default class WriteOffchainConfig extends SolanaCommand {
     const txs: string[] = []
     for (let i = startingPoint; i < rawTx.length; i++) {
       logger.loading(`Sending ${i}/${rawTx.length - 1}...`)
-      const tx = makeTx([rawTx[i]])
-      const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
+      const txhash = await this.signAndSendRawTx([rawTx[i]])
       txs.push(txhash)
     }
     logger.success(`Last tx Write offchain config set on tx ${txs[txs.length - 1]}`)
