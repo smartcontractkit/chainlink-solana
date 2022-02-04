@@ -10,7 +10,7 @@ ocrKeyBundleID                         = "<insert ocr2 key bundle id>"      # ov
 transmitterID                          = "<insert solana transmitter key id>"
 observationSource                      = """
     // data source 1
-    ds1          [type="bridge" name="bridge-coingecko" requestData="<{"data": {"from":"LINK","to":"USD"}}>"]
+    ds1          [type="bridge" name="bridge-coingecko" requestData=<{"data": {"from":"LINK","to":"USD"}}>]
     ds1_parse    [type="jsonparse" path="result"]
     ds1_multiply [type="multiply" times=100000000]
     ds1 -> ds1_parse -> ds1_multiply
@@ -18,13 +18,13 @@ observationSource                      = """
 juelsPerFeeCoinSource                  = """
     // Fetch the LINK price from a data source
     // data source 1
-    ds1_link       [type="bridge" name="bridge-coingecko" requestData="<{"data": {"from":"LINK","to":"USD"}}>"]
+    ds1_link       [type="bridge" name="bridge-coingecko" requestData=<{"data": {"from":"LINK","to":"USD"}}>]
     ds1_link_parse [type="jsonparse" path="result"]
     ds1_link -> ds1_link_parse -> divide
 
     // Fetch the SOL price from a data source
     // data source 1
-    ds1_coin       [type="bridge" name="bridge-coingecko" requestData="<{"data": {"from":"SOL","to":"USD"}}."]
+    ds1_coin       [type="bridge" name="bridge-coingecko" requestData=<{"data": {"from":"SOL","to":"USD"}}>]
     ds1_coin_parse [type="jsonparse" path="result"]
     ds1_coin -> ds1_coin_parse -> divide
 
