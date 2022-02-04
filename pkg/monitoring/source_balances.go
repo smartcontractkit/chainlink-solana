@@ -12,10 +12,9 @@ import (
 )
 
 func NewBalancesSourceFactory(
-	solanaConfig SolanaConfig,
+	client *rpc.Client,
 	log relayMonitoring.Logger,
 ) relayMonitoring.SourceFactory {
-	client := rpc.New(solanaConfig.RPCEndpoint)
 	return &balancesSourceFactory{
 		client,
 		log,
@@ -28,13 +27,9 @@ type balancesSourceFactory struct {
 }
 
 func (s *balancesSourceFactory) NewSource(
-	chainConfig relayMonitoring.ChainConfig,
+	_ relayMonitoring.ChainConfig,
 	feedConfig relayMonitoring.FeedConfig,
 ) (relayMonitoring.Source, error) {
-	solanaConfig, ok := chainConfig.(SolanaConfig)
-	if !ok {
-		return nil, fmt.Errorf("expected chainConfig to be of type SolanaConfig not %T", chainConfig)
-	}
 	solanaFeedConfig, ok := feedConfig.(SolanaFeedConfig)
 	if !ok {
 		return nil, fmt.Errorf("expected feedConfig to be of type SolanaFeedConfig not %T", feedConfig)
@@ -42,16 +37,14 @@ func (s *balancesSourceFactory) NewSource(
 	return &balancesSource{
 		s.client,
 		s.log,
-		solanaConfig,
 		solanaFeedConfig,
 	}, nil
 }
 
 type balancesSource struct {
-	client       *rpc.Client
-	log          relayMonitoring.Logger
-	solanaConfig SolanaConfig
-	feedConfig   SolanaFeedConfig
+	client     *rpc.Client
+	log        relayMonitoring.Logger
+	feedConfig SolanaFeedConfig
 }
 
 type Balances struct {

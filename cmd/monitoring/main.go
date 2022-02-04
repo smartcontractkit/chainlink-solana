@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 
+	"github.com/gagliardetto/solana-go/rpc"
 	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring"
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -18,9 +19,15 @@ func main() {
 		log.Fatalw("failed to parse solana-specific config", "error", err)
 	}
 
-	envelopeSourceFactory := monitoring.NewSolanaSourceFactory(
-		chainConfig,
-		logWrapper{coreLog.With("component", "source")},
+	client := rpc.New(chainConfig.RPCEndpoint)
+
+	envelopeSourceFactory := monitoring.NewEnvelopeSourceFactory(
+		client,
+		logWrapper{coreLog.With("component", "source-envelope")},
+	)
+	txResultsSourceFactory := monitoring.NewTxResultsSourceFactory(
+		client,
+		logWrapper{coreLog.With("component", "source-txresults")},
 	)
 
 	entrypoint, err := relayMonitoring.NewEntrypoint(
@@ -28,6 +35,7 @@ func main() {
 		log,
 		chainConfig,
 		envelopeSourceFactory,
+		txResultsSourceFactory,
 		monitoring.SolanaFeedParser,
 	)
 	if err != nil {
@@ -35,7 +43,10 @@ func main() {
 		return
 	}
 
-	balancesSourceFactory := monitoring.NewBalancesSourceFactory(chainConfig, log.With("component", "balances-source"))
+	balancesSourceFactory := monitoring.NewBalancesSourceFactory(
+		client,
+		log.With("component", "source-balances"),
+	)
 	if entrypoint.Config.Feature.TestOnlyFakeReaders {
 		balancesSourceFactory = monitoring.NewFakeBalancesSourceFactory(log.With("component", "fake-balances-source"))
 	}
