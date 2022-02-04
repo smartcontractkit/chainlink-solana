@@ -18,6 +18,9 @@ config:
   solana-env:CL-RELAY_HTTP: http://127.0.0.1:8899
   solana-env:CL-ENV_VARS: # specify which chainlink env variables to include, and define below
     - CHAINLINK_DEV
+    - EVM_ENABLED
+    - EVM_RPC_ENABLED
+    - SOLANA_ENABLED
     - ETH_DISABLED
     - USE_LEGACY_ETH_ENV_VARS
     - FEATURE_OFFCHAIN_REPORTING2
@@ -29,6 +32,9 @@ config:
     - AUTO_PPROF_GOROUTINE_THRESHOLD
     - LOG_LEVEL
   solana-env:CL-CHAINLINK_DEV: true
+  solana-env:CL-EVM_ENABLED: false
+  solana-env:CL-EVM_RPC_ENABLED: false
+  solana-env:CL-SOLANA_ENABLED: true
   solana-env:CL-ETH_DISABLED: true
   solana-env:CL-USE_LEGACY_ETH_ENV_VARS: false
   solana-env:CL-FEATURE_OFFCHAIN_REPORTING2: true
