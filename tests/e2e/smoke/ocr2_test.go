@@ -1,12 +1,13 @@
 package smoke
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/common"
 	"github.com/smartcontractkit/integrations-framework/actions"
-	"time"
 )
 
 var _ = Describe("Solana OCRv2", func() {
@@ -21,9 +22,9 @@ var _ = Describe("Solana OCRv2", func() {
 		It("performs OCR round", func() {
 			Eventually(func(g Gomega) {
 				a, ts, _, err := state.Store.GetLatestRoundData()
+				log.Debug().Uint64("Answer", a).Time("Time", time.Unix(int64(ts), 0)).Msg("Round data")
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(a).Should(Equal(uint64(10)))
-				log.Debug().Uint64("Answer", a).Time("Time", time.Unix(int64(ts), 0)).Msg("Round data")
 			}, common.NewRoundCheckTimeout, common.NewRoundCheckPollInterval).Should(Succeed())
 		})
 	})

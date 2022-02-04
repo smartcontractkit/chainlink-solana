@@ -41,6 +41,9 @@ func NewChainlinkSolOCRv2(nodes int, stateful bool) *environment.Config {
 					},
 					"db": db,
 					"env": map[string]interface{}{
+						"EVM_ENABLED":                 "false",
+						"EVM_RPC_ENABLED":             "false",
+						"SOLANA_ENABLED":              "true",
 						"eth_url":                     "ws://sol:8900",
 						"eth_disabled":                "true",
 						"CHAINLINK_DEV":               "false",
