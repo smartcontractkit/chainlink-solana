@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/gagliardetto/solana-go/rpc"
 	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
+	"go.uber.org/multierr"
 )
 
 const (
@@ -66,20 +68,43 @@ func (s *solanaSource) Fetch(ctx context.Context) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode ContractConfig from on-chain state: %w", err)
 	}
-	answer, _, err := pkgSolana.GetLatestTransmission(ctx, s.client, state.Transmissions, commitment)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch latest on-chain transmission: %w", err)
-	}
-	linkBalanceRes, err := s.client.GetTokenAccountBalance(ctx, state.Config.TokenVault, commitment)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read the feed's link balance: %w", err)
-	}
-	if linkBalanceRes.Value == nil {
-		return nil, fmt.Errorf("link balance not found for token vault")
-	}
-	linkBalance, success := big.NewInt(0).SetString(linkBalanceRes.Value.Amount, 10)
-	if !success {
-		return nil, fmt.Errorf("failed to parse link balance value: %s", linkBalanceRes.Value.Amount)
+	var (
+		answer      pkgSolana.Answer
+		linkBalance *big.Int
+		envelopeErr error
+	)
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		var err error
+		answer, _, err = pkgSolana.GetLatestTransmission(ctx, s.client, state.Transmissions, commitment)
+		if err != nil {
+			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("failed to fetch latest on-chain transmission: %w", err))
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		linkBalanceRes, err := s.client.GetTokenAccountBalance(ctx, state.Config.TokenVault, commitment)
+		if err != nil {
+			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("failed to read the feed's link balance: %w", err))
+			return
+		}
+		if linkBalanceRes.Value == nil {
+			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("link balance not found for token vault"))
+			return
+		}
+		var success bool
+		linkBalance, success = big.NewInt(0).SetString(linkBalanceRes.Value.Amount, 10)
+		if !success {
+			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("failed to parse link balance value: %s", linkBalanceRes.Value.Amount))
+			return
+		}
+	}()
+	wg.Wait()
+
+	if envelopeErr != nil {
+		return nil, envelopeErr
 	}
 	return relayMonitoring.Envelope{
 		ConfigDigest: state.Config.LatestConfigDigest,
@@ -96,6 +121,9 @@ func (s *solanaSource) Fetch(ctx context.Context) (interface{}, error) {
 		BlockNumber: blockNum,
 		Transmitter: types.Account(state.Config.LatestTransmitter.String()),
 		LinkBalance: linkBalance.Uint64(),
+
+		JuelsPerFeeCoin:   big.NewInt(0), // TODO (dru)
+		AggregatorRoundID: state.Config.LatestAggregatorRoundID,
 	}, nil
 }
 
