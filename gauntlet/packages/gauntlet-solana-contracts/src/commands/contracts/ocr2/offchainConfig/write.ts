@@ -111,32 +111,46 @@ export default class WriteOffchainConfig extends SolanaCommand {
     return WriteOffchainConfig.makeInputFromRDD(rdd, this.flags.state)
   }
 
-  serializeOffchainConfig = async (input: Input): Promise<Buffer> => {
+  serializeOffchainConfig = async (
+    input: Input,
+    secret?: string,
+  ): Promise<{ offchainConfig: Buffer; randomSecret: string }> => {
     const { configPublicKeys, ...validInput } = input
     const proto = new Proto.Protobuf({ descriptor: OCR2Descriptor })
     const reportingPluginConfigProto = proto.encode(
       'offchainreporting2_config.ReportingPluginConfig',
       validInput.reportingPluginConfig,
     )
-    const sharedSecretEncryptions = await this.generateSecretEncryptions(configPublicKeys)
+    const { sharedSecretEncryptions, randomSecret } = await this.generateSecretEncryptions(configPublicKeys, secret)
     const offchainConfig = {
       ...validInput,
       offchainPublicKeys: validInput.offchainPublicKeys.map((key) => Buffer.from(key, 'hex')),
       reportingPluginConfig: reportingPluginConfigProto,
       sharedSecretEncryptions,
     }
-    return Buffer.from(proto.encode('offchainreporting2_config.OffchainConfigProto', offchainConfig))
+    return {
+      offchainConfig: Buffer.from(proto.encode('offchainreporting2_config.OffchainConfigProto', offchainConfig)),
+      randomSecret,
+    }
   }
 
   // constructs a SharedSecretEncryptions from
   // a set of SharedSecretEncryptionPublicKeys, the sharedSecret, and a cryptographic randomness source
   generateSecretEncryptions = async (
     operatorsPublicKeys: string[],
-  ): Promise<sharedSecretEncryptions.SharedSecretEncryptions> => {
+    secret?: string,
+  ): Promise<{ sharedSecretEncryptions: sharedSecretEncryptions.SharedSecretEncryptions; randomSecret: string }> => {
     const gauntletSecret = process.env.SECRET
     const path = join(process.cwd(), 'packages/gauntlet-solana-contracts/artifacts/bip-0039', 'english.txt')
-    const randomSecret = await sharedSecretEncryptions.generateSecretWords(path)
-    return sharedSecretEncryptions.makeSharedSecretEncryptions(gauntletSecret!, operatorsPublicKeys, randomSecret)
+    const randomSecret = secret || (await sharedSecretEncryptions.generateSecretWords(path))
+    return {
+      sharedSecretEncryptions: sharedSecretEncryptions.makeSharedSecretEncryptions(
+        gauntletSecret!,
+        operatorsPublicKeys,
+        randomSecret,
+      ),
+      randomSecret,
+    }
   }
 
   validateInput = (input: Input): boolean => {
@@ -203,7 +217,12 @@ export default class WriteOffchainConfig extends SolanaCommand {
 
     this.validateInput(input)
 
-    const offchainConfig = await this.serializeOffchainConfig(input)
+    const userSecret = this.flags.secret
+    if (!!userSecret) {
+      logger.info(`Using given random secret: ${userSecret}`)
+    }
+
+    const { offchainConfig, randomSecret } = await this.serializeOffchainConfig(input, userSecret)
     logger.info(`Offchain config size: ${offchainConfig.byteLength}`)
     this.require(offchainConfig.byteLength < 4096, 'Offchain config must be lower than 4096 bytes')
 
@@ -216,6 +235,10 @@ export default class WriteOffchainConfig extends SolanaCommand {
     }
 
     logger.log('Offchain info:', input)
+    logger.line()
+    logger.info('Important: If you run this command for the same configuration, use the same RANDOM SECRET')
+    logger.info(`${randomSecret}`)
+    logger.line()
 
     const dataInChunks = offchainConfigChunks.map((buffer) =>
       program.coder.instruction.encode('write_offchain_config', {
