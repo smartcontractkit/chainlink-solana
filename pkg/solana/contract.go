@@ -20,6 +20,7 @@ import (
 var (
 	configVersion       uint8 = 1
 	defaultStaleTimeout       = 1 * time.Minute
+	defaultPollInterval       = 1 * time.Second
 
 	// error declarations
 	errCursorLength       = errors.New("incorrect cursor length")
