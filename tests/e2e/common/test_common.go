@@ -274,7 +274,7 @@ func (m *OCRv2TestState) createJobs() {
 }
 
 func (m *OCRv2TestState) SetAllAdapterResponsesToTheSameValue(response int) {
-	for i, _ := range m.ChainlinkNodes {
+	for i := range m.ChainlinkNodes {
 		path := fmt.Sprintf("/node%d", i)
 		m.err = m.MockServer.SetValuePath(path, response)
 		Expect(m.err).ShouldNot(HaveOccurred())
@@ -283,7 +283,7 @@ func (m *OCRv2TestState) SetAllAdapterResponsesToTheSameValue(response int) {
 
 func (m *OCRv2TestState) SetAllAdapterResponsesToDifferentValues(responses []int) {
 	Expect(len(responses)).Should(BeNumerically("==", len(m.ChainlinkNodes)))
-	for i, _ := range m.ChainlinkNodes {
+	for i := range m.ChainlinkNodes {
 		m.err = m.MockServer.SetValuePath(fmt.Sprintf("/node%d", i), responses[i])
 		Expect(m.err).ShouldNot(HaveOccurred())
 	}
