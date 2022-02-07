@@ -20,7 +20,6 @@ import (
 )
 
 const (
-	SourcePath                = "/variable"
 	ContractsStateFile        = "contracts-chaos-state.json"
 	NewRoundCheckTimeout      = 90 * time.Second
 	NewRoundCheckPollInterval = 1 * time.Second
@@ -240,7 +239,7 @@ func (m *OCRv2TestState) createJobs() {
 		}
 		sourceValueBridge := client.BridgeTypeAttributes{
 			Name:        "variable",
-			URL:         fmt.Sprintf("%s/variable", m.MockServer.Config.ClusterURL),
+			URL:         fmt.Sprintf("%s/node%d", m.MockServer.Config.ClusterURL, nIdx),
 			RequestData: "{}",
 		}
 		observationSource := client.ObservationSourceSpecBridge(sourceValueBridge)
@@ -274,9 +273,24 @@ func (m *OCRv2TestState) createJobs() {
 	}
 }
 
+func (m *OCRv2TestState) SetAllAdapterResponsesToTheSameValue(response int) {
+	for i, _ := range m.ChainlinkNodes {
+		path := fmt.Sprintf("/node%d", i)
+		m.err = m.MockServer.SetValuePath(path, response)
+		Expect(m.err).ShouldNot(HaveOccurred())
+	}
+}
+
+func (m *OCRv2TestState) SetAllAdapterResponsesToDifferentValues(responses []int) {
+	Expect(len(responses)).Should(BeNumerically("==", len(m.ChainlinkNodes)))
+	for i, _ := range m.ChainlinkNodes {
+		m.err = m.MockServer.SetValuePath(fmt.Sprintf("/node%d", i), responses[i])
+		Expect(m.err).ShouldNot(HaveOccurred())
+	}
+}
+
 func (m *OCRv2TestState) CreateJobs() {
-	m.err = m.MockServer.SetValuePath("/variable", 5)
-	Expect(m.err).ShouldNot(HaveOccurred())
+	m.SetAllAdapterResponsesToTheSameValue(5)
 	m.err = m.MockServer.SetValuePath("/juels", 1)
 	Expect(m.err).ShouldNot(HaveOccurred())
 	m.createJobs()
@@ -285,9 +299,9 @@ func (m *OCRv2TestState) CreateJobs() {
 func (m *OCRv2TestState) ImitateSource(changeInterval time.Duration, min int, max int) {
 	go func() {
 		for {
-			_ = m.MockServer.SetValuePath(SourcePath, min)
+			m.SetAllAdapterResponsesToTheSameValue(min)
 			time.Sleep(changeInterval)
-			_ = m.MockServer.SetValuePath(SourcePath, max)
+			m.SetAllAdapterResponsesToTheSameValue(max)
 			time.Sleep(changeInterval)
 		}
 	}()
