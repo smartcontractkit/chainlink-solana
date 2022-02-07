@@ -49,7 +49,7 @@ func NewClient(spec OCR2Spec, logger Logger) *Client {
 	// parse context lenght, if errors, use 2x poll interval
 	ctxInterval, err := time.ParseDuration(spec.PollingCtxTimeout)
 	if err != nil {
-		logger.Warnf("could not parse polling context duration ('%s') using default 2x polling interval (%s)", spec.PollingCtxTimeout, 2 * pollInterval)
+		logger.Warnf("could not parse polling context duration ('%s') using default 2x polling interval (%s)", spec.PollingCtxTimeout, 2*pollInterval)
 		ctxInterval = 2 * pollInterval
 	}
 
