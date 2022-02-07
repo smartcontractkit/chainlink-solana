@@ -66,7 +66,7 @@ func (t *txResultsSource) Fetch(ctx context.Context) (interface{}, error) {
 		return nil, fmt.Errorf("failed to fetch transactions for state account: %w", err)
 	}
 	if len(txSigs) == 0 {
-		return relayMonitoring.TxResults{0, 0}, nil
+		return relayMonitoring.TxResults{NumSucceeded: 0, NumFailed: 0}, nil
 	}
 	var numSucceeded, numFailed uint64 = 0, 0
 	for _, txSig := range txSigs {
@@ -81,5 +81,5 @@ func (t *txResultsSource) Fetch(ctx context.Context) (interface{}, error) {
 		defer t.latestSigMu.Unlock()
 		t.latestSig = txSigs[0].Signature
 	}()
-	return relayMonitoring.TxResults{numSucceeded, numFailed}, nil
+	return relayMonitoring.TxResults{NumSucceeded: numSucceeded, NumFailed: numFailed}, nil
 }
