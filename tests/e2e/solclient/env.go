@@ -6,18 +6,7 @@ import (
 
 // NewChainlinkSolOCRv2 returns a cluster config with Solana test validator
 func NewChainlinkSolOCRv2(nodes int, stateful bool) *environment.Config {
-	var db map[string]interface{}
-	if stateful {
-		db = map[string]interface{}{
-			"stateful": true,
-			"capacity": "2Gi",
-		}
-	} else {
-		db = map[string]interface{}{
-			"stateful": false,
-		}
-	}
-	return &environment.Config{
+	env := &environment.Config{
 		NamespacePrefix: "chainlink-sol",
 		Charts: environment.Charts{
 			"solana-validator": {
@@ -39,7 +28,6 @@ func NewChainlinkSolOCRv2(nodes int, stateful bool) *environment.Config {
 							"version": "develop.latest",
 						},
 					},
-					"db": db,
 					"env": map[string]interface{}{
 						"EVM_ENABLED":                 "false",
 						"EVM_RPC_ENABLED":             "false",
@@ -60,4 +48,11 @@ func NewChainlinkSolOCRv2(nodes int, stateful bool) *environment.Config {
 			},
 		},
 	}
+	if stateful {
+		env.Charts["chainlink"].Values["db"] = map[string]interface{}{
+			"stateful": true,
+			"capacity": "2Gi",
+		}
+	}
+	return env
 }
