@@ -94,6 +94,7 @@ func (c *ContractTracker) Transmit(
 
 		if err != nil {
 			c.lggr.Errorf("error on Transmit.SendAndConfirmTransaction: %s", err.Error())
+			return
 		}
 		// TODO: poll rpc for tx confirmation (WS connection unreliable)
 		c.lggr.Debugf("tx signature from Transmit.SendAndConfirmTransaction: %s", txSig.String())
