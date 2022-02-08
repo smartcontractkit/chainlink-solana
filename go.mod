@@ -22,7 +22,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.0
 	github.com/rs/zerolog v1.26.1
-	github.com/smartcontractkit/chainlink-relay v0.0.0-20220204181714-04bbff42571d
+	github.com/smartcontractkit/chainlink-relay v0.0.0-20220208185145-f90ff8f9d79a
 	github.com/smartcontractkit/integrations-framework v1.0.42
 	go.uber.org/atomic v1.9.0
 	go.uber.org/multierr v1.7.0
@@ -74,7 +74,7 @@ require (
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
-	github.com/ethereum/go-ethereum v1.10.15 // indirect
+	github.com/ethereum/go-ethereum v1.10.11 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
