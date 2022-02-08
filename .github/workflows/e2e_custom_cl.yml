@@ -1,35 +1,13 @@
-name: e2e_workflow_call
-on: 
-  workflow_call:
+name: e2e_tests_custom_cl_image
+on:
+  push:
+  workflow_dispatch:
     inputs:
-      repo_name:
+      cl_branch_ref:
+        description: Chainlink repo branch to integrate with
         required: true
-        default: ${{ github.repository }}
+        default: develop
         type: string
-      ref:
-        required: true
-        default: ${{ github.sha }}
-        type: string
-      cl_repo:
-        required: true
-        default: 795953128386.dkr.ecr.us-west-2.amazonaws.com/chainlink
-        type: string
-      cl_image:
-        required: true
-        default: develop.latest
-        type: string
-    secrets:
-      QA_AWS_ACCESS_KEY_ID:
-        required: true
-      QA_AWS_SECRET_KEY:
-        required: true
-      QA_AWS_REGION:
-        required: true
-      QA_AWS_ROLE_TO_ASSUME:
-        required: true
-      QA_KUBECONFIG:
-        required: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -56,19 +34,34 @@ jobs:
         with:
           name: target
           path: contracts/target/deploy
+  build_custom_cl_image:
+    name: Build custom CL image
+    # target branch can't be set as var, it's from where we getting pipeline code
+    uses: smartcontractkit/chainlink/.github/workflows/build-custom.yml@develop
+    with:
+      cl_repo: smartcontractkit/chainlink
+      # by default we are integrating with develop
+      cl_ref: ${{ github.event.inputs.cl_branch_ref }}
+      # commit of the caller branch
+      dep_solana_sha: ${{ github.sha }}
+    secrets:
+      QA_AWS_ACCESS_KEY_ID: ${{ secrets.QA_AWS_ACCESS_KEY_ID }}
+      QA_AWS_SECRET_KEY: ${{ secrets.QA_AWS_SECRET_KEY }}
+      QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+      QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+      QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
   smoke:
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, build_custom_cl_image]
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v2
-        with:
-          repository: ${{ inputs.repo_name }}
-          ref: ${{ inputs.ref }}
+      - name: go version
+        run: go version
       - name: Setup go
         uses: actions/setup-go@v1
         with:
-          go-version: 1.17
+          go-version: 1.17.2
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -105,15 +98,13 @@ jobs:
         with:
           name: target
           path: contracts/target/deploy
-      - name: Echo inputs
-        run: echo ${{ inputs.cl_repo }} ${{ inputs.cl_image }}
       - name: Env vars
         run: env
       - name: Run Tests
         env:
           SELECTED_NETWORKS: solana
-          CHAINLINK_IMAGE: ${{ inputs.cl_repo }}
-          CHAINLINK_VERSION: ${{ inputs.cl_image }}
+          CHAINLINK_IMAGE: 795953128386.dkr.ecr.us-west-2.amazonaws.com/chainlink
+          CHAINLINK_VERSION: custom.${{ github.sha }}
           CGO_ENABLED: 1
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
