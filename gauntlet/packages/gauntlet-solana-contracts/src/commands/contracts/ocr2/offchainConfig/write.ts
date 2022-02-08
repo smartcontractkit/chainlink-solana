@@ -1,15 +1,12 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt, time, BN } from '@chainlink/gauntlet-core/dist/utils'
-import { Proto, sharedSecretEncryptions } from '@chainlink/gauntlet-core/dist/crypto'
-
 import { RawTransaction, SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { MAX_TRANSACTION_BYTES, ORACLES_MAX_LENGTH } from '../../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
-import { descriptor as OCR2Descriptor } from '../../../../lib/ocr2Proto'
 import { getRDD } from '../../../../lib/rdd'
-import { divideIntoChunks, makeTx } from '../../../../lib/utils'
-import { join } from 'path'
+import { divideIntoChunks } from '../../../../lib/utils'
+import { serializeOffchainConfig } from '../../../../lib/encoding'
 
 export type Input = {
   deltaProgressNanoseconds: number
@@ -111,48 +108,6 @@ export default class WriteOffchainConfig extends SolanaCommand {
     return WriteOffchainConfig.makeInputFromRDD(rdd, this.flags.state)
   }
 
-  serializeOffchainConfig = async (
-    input: Input,
-    secret?: string,
-  ): Promise<{ offchainConfig: Buffer; randomSecret: string }> => {
-    const { configPublicKeys, ...validInput } = input
-    const proto = new Proto.Protobuf({ descriptor: OCR2Descriptor })
-    const reportingPluginConfigProto = proto.encode(
-      'offchainreporting2_config.ReportingPluginConfig',
-      validInput.reportingPluginConfig,
-    )
-    const { sharedSecretEncryptions, randomSecret } = await this.generateSecretEncryptions(configPublicKeys, secret)
-    const offchainConfig = {
-      ...validInput,
-      offchainPublicKeys: validInput.offchainPublicKeys.map((key) => Buffer.from(key, 'hex')),
-      reportingPluginConfig: reportingPluginConfigProto,
-      sharedSecretEncryptions,
-    }
-    return {
-      offchainConfig: Buffer.from(proto.encode('offchainreporting2_config.OffchainConfigProto', offchainConfig)),
-      randomSecret,
-    }
-  }
-
-  // constructs a SharedSecretEncryptions from
-  // a set of SharedSecretEncryptionPublicKeys, the sharedSecret, and a cryptographic randomness source
-  generateSecretEncryptions = async (
-    operatorsPublicKeys: string[],
-    secret?: string,
-  ): Promise<{ sharedSecretEncryptions: sharedSecretEncryptions.SharedSecretEncryptions; randomSecret: string }> => {
-    const gauntletSecret = process.env.SECRET
-    const path = join(process.cwd(), 'packages/gauntlet-solana-contracts/artifacts/bip-0039', 'english.txt')
-    const randomSecret = secret || (await sharedSecretEncryptions.generateSecretWords(path))
-    return {
-      sharedSecretEncryptions: sharedSecretEncryptions.makeSharedSecretEncryptions(
-        gauntletSecret!,
-        operatorsPublicKeys,
-        randomSecret,
-      ),
-      randomSecret,
-    }
-  }
-
   validateInput = (input: Input): boolean => {
     const _isNegative = (v: number): boolean => new BN(v).lt(new BN(0))
     const nonNegativeValues = [
@@ -222,7 +177,9 @@ export default class WriteOffchainConfig extends SolanaCommand {
       logger.info(`Using given random secret: ${userSecret}`)
     }
 
-    const { offchainConfig, randomSecret } = await this.serializeOffchainConfig(input, userSecret)
+    // process.env.SECRET is required on the command
+    const gauntletSecret = process.env.SECRET!
+    const { offchainConfig, randomSecret } = await serializeOffchainConfig(input, gauntletSecret, userSecret)
     logger.info(`Offchain config size: ${offchainConfig.byteLength}`)
     this.require(offchainConfig.byteLength < 4096, 'Offchain config must be lower than 4096 bytes')
 
