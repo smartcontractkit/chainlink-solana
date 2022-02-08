@@ -1,13 +1,11 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { Proto, sharedSecretEncryptions } from '@chainlink/gauntlet-core/dist/crypto'
 import { logger, prompt, BN } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
 import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import { getRDD } from '../../../../lib/rdd'
 import WriteOffchainConfig, { Input } from './write'
-import { descriptor as OCR2Descriptor } from '../../../../lib/ocr2Proto'
-import { join } from 'path'
+import { serializeOffchainConfig } from '../../../../lib/encoding'
 
 export default class CommitOffchainConfig extends SolanaCommand {
   static id = 'ocr2:commit_offchain_config'
@@ -21,54 +19,16 @@ export default class CommitOffchainConfig extends SolanaCommand {
     super(flags, args)
 
     this.require(!!this.flags.state, 'Please provide flags with "state"')
+    this.require(
+      !!process.env.SECRET,
+      'Please specify the Gauntlet secret words e.g. SECRET="awe fluke polygon tonic lilly acuity onyx debra bound gilbert wane"',
+    )
   }
 
   makeInput = (userInput: any): Input => {
     if (userInput) return userInput as Input
     const rdd = getRDD(this.flags.rdd)
     return WriteOffchainConfig.makeInputFromRDD(rdd, this.flags.state)
-  }
-
-  serializeOffchainConfig = async (
-    input: Input,
-    secret?: string,
-  ): Promise<{ offchainConfig: Buffer; randomSecret: string }> => {
-    const { configPublicKeys, ...validInput } = input
-    const proto = new Proto.Protobuf({ descriptor: OCR2Descriptor })
-    const reportingPluginConfigProto = proto.encode(
-      'offchainreporting2_config.ReportingPluginConfig',
-      validInput.reportingPluginConfig,
-    )
-    const { sharedSecretEncryptions, randomSecret } = await this.generateSecretEncryptions(configPublicKeys, secret)
-    const offchainConfig = {
-      ...validInput,
-      offchainPublicKeys: validInput.offchainPublicKeys.map((key) => Buffer.from(key, 'hex')),
-      reportingPluginConfig: reportingPluginConfigProto,
-      sharedSecretEncryptions,
-    }
-    return {
-      offchainConfig: Buffer.from(proto.encode('offchainreporting2_config.OffchainConfigProto', offchainConfig)),
-      randomSecret,
-    }
-  }
-
-  // constructs a SharedSecretEncryptions from
-  // a set of SharedSecretEncryptionPublicKeys, the sharedSecret, and a cryptographic randomness source
-  generateSecretEncryptions = async (
-    operatorsPublicKeys: string[],
-    secret?: string,
-  ): Promise<{ sharedSecretEncryptions: sharedSecretEncryptions.SharedSecretEncryptions; randomSecret: string }> => {
-    const gauntletSecret = process.env.SECRET
-    const path = join(process.cwd(), 'packages/gauntlet-solana-contracts/artifacts/bip-0039', 'english.txt')
-    const randomSecret = secret || (await sharedSecretEncryptions.generateSecretWords(path))
-    return {
-      sharedSecretEncryptions: sharedSecretEncryptions.makeSharedSecretEncryptions(
-        gauntletSecret!,
-        operatorsPublicKeys,
-        randomSecret,
-      ),
-      randomSecret,
-    }
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
@@ -87,7 +47,10 @@ export default class CommitOffchainConfig extends SolanaCommand {
       0,
       new BN(onChainState.config.pendingOffchainConfig.len).toNumber(),
     )
-    const { offchainConfig } = await this.serializeOffchainConfig(input, userSecret)
+
+    // process.env.SECRET is required on the command
+    const gauntletSecret = process.env.SECRET!
+    const { offchainConfig } = await serializeOffchainConfig(input, gauntletSecret, userSecret)
 
     this.require(
       Buffer.compare(bufferedConfig, offchainConfig) === 0,
