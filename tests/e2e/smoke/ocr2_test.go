@@ -30,6 +30,7 @@ var _ = Describe("Solana OCRv2", func() {
 	})
 	AfterEach(func() {
 		By("Tearing down the environment", func() {
+			common.ExitImitateSource <- true
 			err := actions.TeardownSuite(state.Env, nil, "logs")
 			Expect(err).ShouldNot(HaveOccurred())
 		})

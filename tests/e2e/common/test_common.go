@@ -3,6 +3,7 @@ package common
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/onsi/ginkgo/v2"
 	"math/big"
 	"os"
 	"time"
@@ -296,13 +297,21 @@ func (m *OCRv2TestState) CreateJobs() {
 	m.createJobs()
 }
 
+var ExitImitateSource = make(chan bool)
+
 func (m *OCRv2TestState) ImitateSource(changeInterval time.Duration, min int, max int) {
 	go func() {
+		defer ginkgo.GinkgoRecover()
 		for {
-			m.SetAllAdapterResponsesToTheSameValue(min)
-			time.Sleep(changeInterval)
-			m.SetAllAdapterResponsesToTheSameValue(max)
-			time.Sleep(changeInterval)
+			select {
+			case <-ExitImitateSource:
+				return
+			default:
+				m.SetAllAdapterResponsesToTheSameValue(min)
+				time.Sleep(changeInterval)
+				m.SetAllAdapterResponsesToTheSameValue(max)
+				time.Sleep(changeInterval)
+			}
 		}
 	}()
 }
