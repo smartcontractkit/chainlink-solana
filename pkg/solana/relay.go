@@ -43,6 +43,7 @@ type OCR2Spec struct {
 	// transaction + state parameters [optional]
 	UsePreflight bool
 	Commitment   string
+	TxTimeout    string
 
 	// polling configuration [optional]
 	PollingInterval   string

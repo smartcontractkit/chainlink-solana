@@ -13,6 +13,7 @@ type Client struct {
 	rpc             *rpc.Client
 	skipPreflight   bool // to enable or disable preflight checks
 	commitment      rpc.CommitmentType
+	txTimeout       time.Duration
 	pollingInterval time.Duration
 	contextDuration time.Duration
 
@@ -41,19 +42,27 @@ func NewClient(spec OCR2Spec, logger Logger) *Client {
 	// parse poll interval, if errors: use 1 second default
 	pollInterval, err := time.ParseDuration(spec.PollingInterval)
 	if err != nil {
-		logger.Warnf("could not parse polling interval using default 1s")
-		pollInterval = 1 * time.Second
+		logger.Warnf("could not parse polling interval ('%s') using default (%s)", spec.PollingInterval, defaultPollInterval)
+		pollInterval = defaultPollInterval
 	}
 
 	// parse context lenght, if errors, use 2x poll interval
 	ctxInterval, err := time.ParseDuration(spec.PollingCtxTimeout)
 	if err != nil {
-		logger.Warnf("could not parse polling context duration using default 2x polling interval")
+		logger.Warnf("could not parse polling context duration ('%s') using default 2x polling interval (%s)", spec.PollingCtxTimeout, 2*pollInterval)
 		ctxInterval = 2 * pollInterval
+	}
+
+	// parse tx context, if errors use defaultStaleTimeout
+	txTimeout, err := time.ParseDuration(spec.TxTimeout)
+	if err != nil {
+		logger.Warnf("could not parse tx context duration ('%s') using default (%s)", spec.TxTimeout, defaultStaleTimeout)
+		txTimeout = defaultStaleTimeout
 	}
 
 	client.pollingInterval = pollInterval
 	client.contextDuration = ctxInterval
+	client.txTimeout = txTimeout
 
 	// log client configuration
 	logger.Debugf("NewClient configuration: %+v", client)
