@@ -49,6 +49,8 @@ jobs:
       - run: |
           npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
           NPM_TOKEN=${NPM_TOKEN} yarn install --frozen-lockfile
+      - name: Generate program_ids
+        run: ./scripts/programs-keys-gen.sh
       - run: anchor build
         working-directory: contracts
       - uses: actions/upload-artifact@master
@@ -104,8 +106,6 @@ jobs:
         with:
           name: target
           path: contracts/target/deploy
-      - name: cp static deploy keys
-        run: ./scripts/programs-keys-cp.sh
       - name: Echo inputs
         run: echo ${{ inputs.cl_repo }} ${{ inputs.cl_image }}
       - name: Env vars
