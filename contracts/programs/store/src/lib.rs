@@ -444,6 +444,9 @@ pub enum ErrorCode {
 
     #[msg("Invalid version")]
     InvalidVersion = 4,
+
+    #[msg("Insufficient account capacity")]
+    InsufficientAccountCapacity = 5,
 }
 
 #[derive(Accounts)]
