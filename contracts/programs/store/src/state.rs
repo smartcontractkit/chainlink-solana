@@ -142,10 +142,11 @@ pub fn migrate(header: &mut Transmissions, account: &AccountInfo) -> Result<(), 
     // bump feed version
     header.version = 2;
 
-    // TODO: validate live_length still valid under new size
-
     let size = std::mem::size_of::<Transmission>();
-    let (live, historical) = storage.split_at_mut(len as usize * size);
+    let new_live_len = len as usize * size;
+    require!(storage.len() < new_live_len, InsufficientAccountCapacity);
+
+    let (live, historical) = storage.split_at_mut(new_live_len);
     let live = bytemuck::from_bytes_mut::<Transmission>(&mut live[..size]);
 
     // mark round with current slot
@@ -256,13 +257,15 @@ mod tests {
 
     #[test]
     fn transmissions() {
-        let mut data = vec![0; 8 + 128 + (2 + 3) * size_of::<Transmission>()];
+        let live_length = 2;
+        let historical_length = 3;
+        let mut data = vec![0; 8 + 128 + (live_length + historical_length) * size_of::<Transmission>()];
         let header = &mut data[..8 + 128]; // use a subslice to ensure the header fits into 128 bytes
         let mut cursor = std::io::Cursor::new(header);
 
         // insert the initial header with some granularity
         Transmissions {
-            version: 1,
+            version: 2,
             store: Pubkey::default(),
             writer: Pubkey::default(),
             description: [0; 32],
@@ -270,7 +273,7 @@ mod tests {
             flagging_threshold: 1000,
             latest_round_id: 0,
             granularity: 5,
-            live_length: 2,
+            live_length: live_length as u32,
             live_cursor: 0,
             historical_cursor: 0,
         }
