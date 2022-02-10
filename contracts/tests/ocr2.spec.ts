@@ -489,6 +489,7 @@ describe('ocr2', async () => {
         accounts: {
           state: state.publicKey,
           proposal: proposal.publicKey,
+          receiver: owner.publicKey,
           authority: owner.publicKey,
           tokenVault: tokenVault,
           vaultAuthority: vaultAuthority,
@@ -503,15 +504,16 @@ describe('ocr2', async () => {
     assert.ok(account.offchainConfig.len == 6);
     assert.deepEqual(account.offchainConfig.xs.slice(0, account.offchainConfig.len), [4,5,6,4,5,6]);
 
-    console.log("closeConfigProposal");
-    await program.rpc.closeConfigProposal(
-      {
-        accounts: {
-          proposal: proposal.publicKey,
-          authority: owner.publicKey,
-          receiver: owner.publicKey,
-        },
-    });
+    // Proposal already closed by acceptConfigProposal
+    // console.log("closeConfigProposal");
+    // await program.rpc.closeConfigProposal(
+    //   {
+    //     accounts: {
+    //       proposal: proposal.publicKey,
+    //       authority: owner.publicKey,
+    //       receiver: owner.publicKey,
+    //     },
+    // });
     
     // TODO: assert funds came back
 

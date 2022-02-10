@@ -226,11 +226,7 @@ pub mod ocr2 {
         );
         state.config.latest_config_digest = config_digest;
 
-        // Reset staging area
-        // TODO: close() proposal and reclaim funds onto multisig?
-        // or we could transfer back to the proposer
-        proposal.offchain_config.clear();
-        proposal.offchain_config.version = 0;
+        // NOTE: proposal is closed afterwards and the rent deposit is reclaimed
 
         // Generate an event
         let signers = state
