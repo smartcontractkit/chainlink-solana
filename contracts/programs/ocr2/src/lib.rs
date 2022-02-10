@@ -3,7 +3,7 @@ use anchor_lang::solana_program::sysvar::fees::Fees;
 use anchor_spl::token;
 
 use arrayref::{array_ref, array_refs};
-use state::{Billing, Proposal};
+use state::{Billing, Proposal, ProposedOracle};
 
 declare_id!("HW3ipKzeeduJq6f1NqRCw4doknMeWkfrM4WxobtG3o5v");
 
@@ -224,7 +224,7 @@ pub mod ocr2 {
 
         // Insert new oracles into the state
         let from_round_id = state.config.latest_aggregator_round_id;
-        for oracle in proposal.oracles.into_iter() {
+        for oracle in proposal.oracles.iter() {
             state.oracles.push(Oracle {
                 signer: oracle.signer,
                 transmitter: oracle.transmitter,
@@ -288,11 +288,11 @@ pub mod ocr2 {
 
         // Insert new oracles into the state
         for oracle in new_oracles.into_iter() {
-            proposal.oracles.push(Oracle {
+            proposal.oracles.push(ProposedOracle {
                 signer: SigningKey { key: oracle.signer },
                 transmitter: oracle.transmitter,
-                from_round_id: 0,
-                ..Default::default()
+                payee: Pubkey::default(),
+                _padding: 0,
             })
         }
 
