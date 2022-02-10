@@ -114,7 +114,7 @@ describe('ocr2', async () => {
   };
 
   // transmits a single round
-  let transmit = async (epoch: number, round: number, answer: BN) => {
+  let transmit = async (epoch: number, round: number, answer: BN): Promise<string> => {
     let account = await program.account.state.fetch(state.publicKey);
 
     // Generate and transmit a report
@@ -172,7 +172,7 @@ describe('ocr2', async () => {
     );
 
     try {
-      await provider.send(tx, [transmitter]);
+      return await provider.send(tx, [transmitter]);
     } catch (err) {
       // Translate IDL error
       const idlErrors = anchor.parseIdlErrors(program.idl);
@@ -705,7 +705,11 @@ describe('ocr2', async () => {
 
   it("Transmit a bunch of rounds to check ringbuffer wraparound", async () => {
     for (let i = 3; i < 15; i++) {
-      await transmit(i, i, new BN(i));
+      let transmitTx = await transmit(i, i, new BN(i));
+
+      await provider.connection.confirmTransaction(transmitTx);
+      let t = await provider.connection.getTransaction(transmitTx, { commitment: "confirmed" });
+      console.log(t.meta.logMessages);
 
       let round = await query(transmissions.publicKey, Scope.LatestRoundDataV2, roundSchema, Round);
       assert.ok(new BN(round.answer, 10, 'le').toNumber() == i)
