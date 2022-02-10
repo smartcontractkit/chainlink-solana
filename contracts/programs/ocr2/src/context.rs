@@ -217,13 +217,6 @@ pub struct PayOracles<'info> {
 }
 
 #[derive(Accounts)]
-pub struct SetPayees<'info> {
-    #[account(mut)]
-    pub state: AccountLoader<'info, State>,
-    pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
 pub struct TransferPayeeship<'info> {
     #[account(mut)]
     pub state: AccountLoader<'info, State>,

@@ -37,6 +37,8 @@ pub struct Proposal {
     pub f: u8,
     _padding0: u8,
     _padding1: u32,
+    /// Set by set_payees, used to verify payee's token type matches the aggregator token type.
+    pub token_mint: Pubkey,
     pub oracles: Oracles, // TODO: use Oracles subset with only keys
     pub offchain_config: OffchainConfig,
 }

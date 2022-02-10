@@ -470,6 +470,18 @@ describe('ocr2', async () => {
           authority: owner.publicKey,
         },
     });
+
+    console.log("setPayees")
+    await program.rpc.setPayees(
+      token.publicKey,
+      oracles.map((oracle) => oracle.payee.address),
+      {
+        accounts: {
+          proposal: proposal.publicKey,
+          authority: owner.publicKey,
+        },
+    });
+
     console.log("commitConfigProposal");
     await program.rpc.commitConfigProposal(
       {
@@ -517,16 +529,6 @@ describe('ocr2', async () => {
     
     // TODO: assert funds came back
 
-    console.log("setPayees")
-    await program.rpc.setPayees(
-      oracles.map((oracle) => oracle.payee.address),
-      {
-        accounts: {
-          state: state.publicKey,
-          authority: owner.publicKey,
-        },
-        signers: [],
-    });
     console.log("setBilling")
     await program.rpc.setBilling(
       new BN(observationPayment),
