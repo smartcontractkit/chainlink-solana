@@ -75,7 +75,7 @@ pub struct CreateProposal<'info> {
 pub struct CloseProposal<'info> {
     #[account(mut)]
     pub proposal: AccountLoader<'info, Proposal>,
-    #[account(mut)] // TODO: only to reclaim to owner account?
+    #[account(mut)]
     pub receiver: SystemAccount<'info>,
     pub authority: Signer<'info>,
 }
