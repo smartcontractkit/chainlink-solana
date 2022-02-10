@@ -3,7 +3,6 @@ package common
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/onsi/ginkgo/v2"
 	"math/big"
 	"os"
 	"time"
@@ -277,16 +276,14 @@ func (m *OCRv2TestState) createJobs() {
 func (m *OCRv2TestState) SetAllAdapterResponsesToTheSameValue(response int) {
 	for i := range m.ChainlinkNodes {
 		path := fmt.Sprintf("/node%d", i)
-		m.err = m.MockServer.SetValuePath(path, response)
-		Expect(m.err).ShouldNot(HaveOccurred())
+		_ = m.MockServer.SetValuePath(path, response)
 	}
 }
 
 func (m *OCRv2TestState) SetAllAdapterResponsesToDifferentValues(responses []int) {
 	Expect(len(responses)).Should(BeNumerically("==", len(m.ChainlinkNodes)))
 	for i := range m.ChainlinkNodes {
-		m.err = m.MockServer.SetValuePath(fmt.Sprintf("/node%d", i), responses[i])
-		Expect(m.err).ShouldNot(HaveOccurred())
+		_ = m.MockServer.SetValuePath(fmt.Sprintf("/node%d", i), responses[i])
 	}
 }
 
@@ -297,21 +294,13 @@ func (m *OCRv2TestState) CreateJobs() {
 	m.createJobs()
 }
 
-var ExitImitateSource = make(chan bool)
-
 func (m *OCRv2TestState) ImitateSource(changeInterval time.Duration, min int, max int) {
 	go func() {
-		defer ginkgo.GinkgoRecover()
 		for {
-			select {
-			case <-ExitImitateSource:
-				return
-			default:
-				m.SetAllAdapterResponsesToTheSameValue(min)
-				time.Sleep(changeInterval)
-				m.SetAllAdapterResponsesToTheSameValue(max)
-				time.Sleep(changeInterval)
-			}
+			m.SetAllAdapterResponsesToTheSameValue(min)
+			time.Sleep(changeInterval)
+			m.SetAllAdapterResponsesToTheSameValue(max)
+			time.Sleep(changeInterval)
 		}
 	}()
 }
