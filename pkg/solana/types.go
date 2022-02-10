@@ -11,11 +11,12 @@ const (
 	// TransmissionsSize indicates how many transmissions are stored
 	TransmissionsSize uint32 = 8096
 
-	// answer (int128, 16 bytes), timestamp (uint32, 4 bytes)
-	TransmissionLen   uint64 = 48
-	TransmissionLenV1 uint64 = 24
+	// Slot, Timestamp, Padding0, Answer, Padding1, Padding2
+	TransmissionLen uint64 = 8 + 4 + 4 + 16 + 8 + 8
+	// Timestamp(uint64), Answer
+	TransmissionLenV1 uint64 = 8 + 16
 
-	// AccountDiscriminator (8 bytes), RoundID (uint32, 4 bytes), Cursor (uint32, 4 bytes)
+	// Version, Store, Writer, Description, Decimals, FlaggingThreshold, LatestRoundID, Granularity, LiveLength, LiveCursor, HistoricalCursor
 	HeaderLen uint64 = 1 + 32 + 32 + 32 + 1 + 4 + 4 + 1 + 4 + 4 + 4
 
 	// Report data (61 bytes)
