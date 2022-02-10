@@ -561,6 +561,7 @@ describe('ocr2', async () => {
 	});
 
 	it("Can't write offchain config if begin has not been called", async () => {
+    let proposal = Keypair.generate();
 		try {
 			await program.rpc.writeOffchainConfig(
 				Buffer.from([4, 5, 6]),
@@ -568,7 +569,7 @@ describe('ocr2', async () => {
 					accounts: {
 	          proposal: proposal.publicKey,
 						authority: owner.publicKey,
-					},
+          },
 			});
 		} catch {
 			// writeOffchainConfig should fail
