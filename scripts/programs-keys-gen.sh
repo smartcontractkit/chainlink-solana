@@ -22,6 +22,6 @@ mkdir -p ./contracts/target/deploy
 cp ./contracts/artifacts/$network/*.json ./contracts/target/deploy
 
 # Replace existing declare_id!()
-sed -i "s/DzzjdPWNfwHZmzPVxnmqkkMJraYQQRCpgFZajqkqmU6G/$ACCESS_CONTROLLER_PROGRAM_ID/" contracts/programs/access-controller/src/lib.rs
-sed -i "s/CaH12fwNTKJAG8PxEvo9R96Zc2j8qNHZaFj8ZW49yZNT/$STORE_PROGRAM_ID/" contracts/programs/store/src/lib.rs
-sed -i "s/HW3ipKzeeduJq6f1NqRCw4doknMeWkfrM4WxobtG3o5v/$OCR2_PROGRAM_ID/" contracts/programs/ocr2/src/lib.rs
+sed -i.bak "s/DzzjdPWNfwHZmzPVxnmqkkMJraYQQRCpgFZajqkqmU6G/$ACCESS_CONTROLLER_PROGRAM_ID/" contracts/programs/access-controller/src/lib.rs
+sed -i.bak "s/CaH12fwNTKJAG8PxEvo9R96Zc2j8qNHZaFj8ZW49yZNT/$STORE_PROGRAM_ID/" contracts/programs/store/src/lib.rs
+sed -i.bak "s/HW3ipKzeeduJq6f1NqRCw4doknMeWkfrM4WxobtG3o5v/$OCR2_PROGRAM_ID/" contracts/programs/ocr2/src/lib.rs
