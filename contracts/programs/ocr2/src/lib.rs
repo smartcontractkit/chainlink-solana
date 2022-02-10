@@ -3,7 +3,7 @@ use anchor_lang::solana_program::sysvar::fees::Fees;
 use anchor_spl::token;
 
 use arrayref::{array_ref, array_refs};
-use state::Proposal;
+use state::{Billing, Proposal};
 
 declare_id!("HW3ipKzeeduJq6f1NqRCw4doknMeWkfrM4WxobtG3o5v");
 
@@ -12,7 +12,7 @@ pub mod event;
 mod state;
 
 use crate::context::*;
-use crate::state::{Config, LeftoverPayment, Oracle, SigningKey, State, DIGEST_SIZE, MAX_ORACLES};
+use crate::state::{Config, Oracle, SigningKey, State, DIGEST_SIZE, MAX_ORACLES};
 
 use std::collections::BTreeSet;
 use std::convert::TryInto;
@@ -134,26 +134,65 @@ pub mod ocr2 {
     }
 
     #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
-    pub fn accept_config_proposal(ctx: Context<AcceptProposal>) -> ProgramResult {
+    pub fn accept_config_proposal<'info>(
+        ctx: Context<'_, '_, '_, 'info, AcceptProposal<'info>>,
+    ) -> ProgramResult {
         let mut state = ctx.accounts.state.load_mut()?;
         let mut proposal = ctx.accounts.proposal.load_mut()?;
 
-        // Ensure no leftover payments
-        let leftovers = state
-            .leftover_payments
-            .iter()
-            .any(|leftover| leftover.amount != 0);
-        require!(!leftovers, PaymentsRemaining);
-        state.leftover_payments.clear();
+        // TODO: share with pay_oracles
+        require!(
+            ctx.remaining_accounts.len() == state.oracles.len(),
+            InvalidInput
+        );
 
-        // Move current balances to leftover payments
-        // for oracle in state.oracles.iter() {
-        //     state.leftover_payments.push(LeftoverPayment {
-        //         payee: oracle.payee,
-        //         amount: calculate_owed_payment(&state.config, oracle)?,
-        //     })
-        // }
-        // TODO: pay oracles here and remove leftover payments!
+        let nonce = state.nonce;
+        let latest_round_id = state.config.latest_aggregator_round_id;
+        let billing = state.config.billing;
+
+        // NOTE: if multisig supported multi instruction transactions, this could be [pay_oracles, accept_config_proposal]
+        let payments: Vec<(u64, CpiContext<'_, '_, '_, 'info, token::Transfer<'info>>)> = state
+            .oracles
+            .iter_mut()
+            .zip(ctx.remaining_accounts)
+            .map(|(oracle, payee)| {
+                // Ensure specified accounts match the ones inside oracles
+                require!(&oracle.payee == payee.key, InvalidInput);
+
+                let amount = calculate_owed_payment(&billing, oracle, latest_round_id)?;
+                // Reset reward and gas reimbursement
+                oracle.payment = 0;
+                oracle.from_round_id = latest_round_id;
+
+                let cpi = CpiContext::new(
+                    ctx.accounts.token_program.to_account_info(),
+                    token::Transfer {
+                        from: ctx.accounts.token_vault.to_account_info(),
+                        to: payee.to_account_info(),
+                        authority: ctx.accounts.vault_authority.to_account_info(),
+                    },
+                );
+
+                Ok((amount, cpi))
+            })
+            .collect::<Result<_>>()?;
+
+        for (amount, cpi) in payments {
+            if amount == 0 {
+                continue;
+            }
+
+            token::transfer(
+                cpi.with_signer(&[&[
+                    b"vault".as_ref(),
+                    ctx.accounts.state.key().as_ref(),
+                    &[nonce],
+                ]]),
+                amount,
+            )?;
+        }
+        // END: pay_oracles
+
         state.oracles.clear();
 
         // Move staging area onto actual config
@@ -331,8 +370,7 @@ pub mod ocr2 {
     pub fn withdraw_funds(ctx: Context<WithdrawFunds>, amount: u64) -> ProgramResult {
         let state = &ctx.accounts.state.load()?;
 
-        let link_due =
-            calculate_total_link_due(&state.config, &state.oracles, &state.leftover_payments)?;
+        let link_due = calculate_total_link_due(&state.config, &state.oracles)?;
 
         let balance = token::accessor::amount(&ctx.accounts.token_vault.to_account_info())?;
         let available = balance.saturating_sub(link_due);
@@ -349,19 +387,22 @@ pub mod ocr2 {
     }
 
     pub fn withdraw_payment(ctx: Context<WithdrawPayment>) -> ProgramResult {
-        let State {
-            ref config,
-            ref mut oracles,
-            ref nonce,
-            ..
-        } = &mut *ctx.accounts.state.load_mut()?;
+        let mut state = ctx.accounts.state.load_mut()?;
+
+        let nonce = state.nonce;
+        let latest_round_id = state.config.latest_aggregator_round_id;
+        let billing = state.config.billing;
 
         // Validate that the token account is actually for LINK
-        require!(ctx.accounts.payee.mint == config.token_mint, InvalidInput);
+        require!(
+            ctx.accounts.payee.mint == state.config.token_mint,
+            InvalidInput
+        );
 
         let key = ctx.accounts.payee.key();
 
-        let oracle = oracles
+        let oracle = state
+            .oracles
             .iter_mut()
             .find(|oracle| oracle.payee == key)
             .ok_or(ErrorCode::Unauthorized)?;
@@ -374,10 +415,10 @@ pub mod ocr2 {
 
         // -- Pay oracle
 
-        let amount = calculate_owed_payment(config, oracle)?;
+        let amount = calculate_owed_payment(&billing, oracle, latest_round_id)?;
         // Reset reward and gas reimbursement
         oracle.payment = 0;
-        oracle.from_round_id = config.latest_aggregator_round_id;
+        oracle.from_round_id = latest_round_id;
 
         if amount == 0 {
             return Ok(());
@@ -388,69 +429,10 @@ pub mod ocr2 {
             ctx.accounts.transfer_ctx().with_signer(&[&[
                 b"vault".as_ref(),
                 ctx.accounts.state.key().as_ref(),
-                &[*nonce],
+                &[nonce],
             ]]),
             amount,
         )?; // consider using a custom transfer that calls invoke_signed_unchecked instead
-
-        Ok(())
-    }
-
-    #[access_control(has_billing_access(&ctx.accounts.state, &ctx.accounts.access_controller, &ctx.accounts.authority))]
-    pub fn pay_remaining<'info>(
-        ctx: Context<'_, '_, '_, 'info, PayOracles<'info>>,
-    ) -> ProgramResult {
-        let State {
-            ref mut leftover_payments,
-            ref nonce,
-            ..
-        } = &mut *ctx.accounts.state.load_mut()?;
-
-        require!(
-            ctx.remaining_accounts.len() == leftover_payments.len(),
-            InvalidInput
-        );
-
-        let payments: Vec<(u64, CpiContext<'_, '_, '_, 'info, token::Transfer<'info>>)> =
-            leftover_payments
-                .iter_mut()
-                .zip(ctx.remaining_accounts)
-                .map(|(leftover, account)| {
-                    // Ensure specified accounts match the ones inside leftover_payments
-                    require!(&leftover.payee == account.key, InvalidInput);
-
-                    let cpi = CpiContext::new(
-                        ctx.accounts.token_program.to_account_info(),
-                        token::Transfer {
-                            from: ctx.accounts.token_vault.to_account_info(),
-                            to: account.to_account_info(),
-                            authority: ctx.accounts.vault_authority.to_account_info(),
-                        },
-                    );
-
-                    Ok((leftover.amount, cpi))
-                })
-                .collect::<Result<_>>()?;
-
-        // Clear leftover payments
-        leftover_payments.clear();
-
-        let nonce = *nonce;
-
-        for (amount, cpi) in payments {
-            if amount == 0 {
-                continue;
-            }
-
-            token::transfer(
-                cpi.with_signer(&[&[
-                    b"vault".as_ref(),
-                    ctx.accounts.state.key().as_ref(),
-                    &[nonce],
-                ]]),
-                amount,
-            )?;
-        }
 
         Ok(())
     }
@@ -466,17 +448,19 @@ pub mod ocr2 {
 
         require!(ctx.remaining_accounts.len() == oracles.len(), InvalidInput);
 
+        let latest_round_id = config.latest_aggregator_round_id;
+
         let payments: Vec<(u64, CpiContext<'_, '_, '_, 'info, token::Transfer<'info>>)> = oracles
             .iter_mut()
             .zip(ctx.remaining_accounts)
             .map(|(oracle, payee)| {
-                // Ensure specified accounts match the ones inside leftover_payments
+                // Ensure specified accounts match the ones inside oracles
                 require!(&oracle.payee == payee.key, InvalidInput);
 
-                let amount = calculate_owed_payment(config, oracle)?;
+                let amount = calculate_owed_payment(&config.billing, oracle, latest_round_id)?;
                 // Reset reward and gas reimbursement
                 oracle.payment = 0;
-                oracle.from_round_id = config.latest_aggregator_round_id;
+                oracle.from_round_id = latest_round_id;
 
                 let cpi = CpiContext::new(
                     ctx.accounts.token_program.to_account_info(),
@@ -798,13 +782,12 @@ fn calculate_reimbursement(juels_per_lamport: u64, _signature_count: usize) -> R
     Ok(juels)
 }
 
-fn calculate_owed_payment(config: &Config, oracle: &Oracle) -> Result<u64> {
-    let rounds = config
-        .latest_aggregator_round_id
+fn calculate_owed_payment(config: &Billing, oracle: &Oracle, latest_round_id: u32) -> Result<u64> {
+    let rounds = latest_round_id
         .checked_sub(oracle.from_round_id)
         .ok_or(ErrorCode::Overflow)?;
 
-    let amount = u64::from(config.billing.observation_payment_gjuels)
+    let amount = u64::from(config.observation_payment_gjuels)
         .checked_mul(rounds.into())
         .ok_or(ErrorCode::Overflow)?
         .checked_add(oracle.payment)
@@ -813,11 +796,7 @@ fn calculate_owed_payment(config: &Config, oracle: &Oracle) -> Result<u64> {
     Ok(amount)
 }
 
-fn calculate_total_link_due(
-    config: &Config,
-    oracles: &[Oracle],
-    leftover_payments: &[LeftoverPayment],
-) -> Result<u64> {
+fn calculate_total_link_due(config: &Config, oracles: &[Oracle]) -> Result<u64> {
     let (rounds, reimbursements) = oracles
         .iter()
         .try_fold((0, 0), |(rounds, reimbursements): (u32, u64), oracle| {
@@ -832,17 +811,10 @@ fn calculate_total_link_due(
         })
         .ok_or(ErrorCode::Overflow)?;
 
-    let leftover_payments = leftover_payments
-        .iter()
-        .map(|leftover| leftover.amount)
-        .sum();
-
     let amount = u64::from(config.billing.observation_payment_gjuels)
         .checked_mul(u64::from(rounds))
         .ok_or(ErrorCode::Overflow)?
         .checked_add(reimbursements)
-        .ok_or(ErrorCode::Overflow)?
-        .checked_add(leftover_payments)
         .ok_or(ErrorCode::Overflow)?;
 
     Ok(amount)
@@ -945,10 +917,7 @@ pub enum ErrorCode {
     #[msg("Payee already set")]
     PayeeAlreadySet,
 
-    #[msg("Leftover payments remaining, please call payRemaining first")]
-    PaymentsRemaining,
-
-    #[msg("Payee and Oracle lenght mismatch")]
+    #[msg("Payee and Oracle length mismatch")]
     PayeeOracleMismatch,
 
     #[msg("Invalid Token Account")]
@@ -1004,8 +973,7 @@ pub mod query {
 
         let balance = token::accessor::amount(token_vault)?;
 
-        let link_due =
-            calculate_total_link_due(&state.config, &state.oracles, &state.leftover_payments)?;
+        let link_due = calculate_total_link_due(&state.config, &state.oracles)?;
 
         let available_balance = balance.saturating_sub(link_due);
 

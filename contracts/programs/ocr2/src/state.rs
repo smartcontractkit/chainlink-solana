@@ -23,13 +23,6 @@ pub struct Billing {
 }
 
 #[zero_copy]
-#[derive(Default)]
-pub struct LeftoverPayment {
-    pub payee: Pubkey,
-    pub amount: u64,
-}
-
-#[zero_copy]
 pub struct Oracles {
     xs: [Oracle; MAX_ORACLES],
     len: u64,
@@ -47,13 +40,6 @@ pub struct Proposal {
     pub offchain_config: OffchainConfig,
 }
 
-#[zero_copy]
-pub struct LeftoverPayments {
-    xs: [LeftoverPayment; MAX_ORACLES],
-    len: u64,
-}
-arrayvec!(LeftoverPayments, LeftoverPayment, u64);
-
 #[account(zero_copy)]
 pub struct State {
     pub version: u8,
@@ -63,7 +49,6 @@ pub struct State {
     pub config: Config,
     pub offchain_config: OffchainConfig,
     pub oracles: Oracles,
-    pub leftover_payments: LeftoverPayments,
     pub transmissions: Pubkey,
 }
 

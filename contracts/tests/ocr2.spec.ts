@@ -479,6 +479,10 @@ describe('ocr2', async () => {
         },
     });
 
+    account = await program.account.state.fetch(state.publicKey);
+    let currentOracles = account.oracles.xs.slice(0, account.oracles.len);
+    let payees = currentOracles.map((oracle) => { return { pubkey: oracle.payee, isWritable: true, isSigner: false }});
+    
     console.log("approveConfigProposal");
     await program.rpc.acceptConfigProposal(
       {
@@ -486,8 +490,14 @@ describe('ocr2', async () => {
           state: state.publicKey,
           proposal: proposal.publicKey,
           authority: owner.publicKey,
+          tokenVault: tokenVault,
+          vaultAuthority: vaultAuthority,
+          tokenProgram: TOKEN_PROGRAM_ID,
         },
+        remainingAccounts: payees,
     });
+
+    // TODO: validate that payees were paid
     
     account = await program.account.state.fetch(state.publicKey);
     assert.ok(account.offchainConfig.len == 6);
@@ -664,47 +674,6 @@ describe('ocr2', async () => {
     recipientTokenAccount = await tokenClient.getOrCreateAssociatedAccountInfo(recipient);
     assert.ok(recipientTokenAccount.amount.toNumber() === 1);
   });
-
-  // it('Calling setConfig again should move payments over to leftover payments', async () => {
-  //   await program.rpc.setConfig(oracles.map((oracle) => ({
-  //       signer: ethereumAddress(Buffer.from(oracle.signer.publicKey)),
-  //       transmitter: oracle.transmitter.publicKey,
-  //     })),
-  //     f,
-  //     {
-  //       accounts: {
-  //         state: state.publicKey,
-  //         authority: owner.publicKey,
-  //       },
-  //       signers: [],
-  //   });
-  //   let account = await program.account.state.fetch(state.publicKey);
-  //   let leftovers = account.leftoverPayments.xs.slice(0, account.leftoverPayments.len);
-  //   for (let leftover of leftovers) {
-  //     assert.ok(leftover.amount.toNumber() !== 0);
-  //   }
-
-  //   console.log("payRemaining");
-  //   let remaining = leftovers.map((leftover) => { return { pubkey: leftover.payee, isWritable: true, isSigner: false }});
-
-  //   await program.rpc.payRemaining(
-  //     {
-  //       accounts: {
-  //         state: state.publicKey,
-  //         authority: owner.publicKey,
-  //         accessController: billingAccessController.publicKey,
-  //         tokenVault: tokenVault,
-  //         vaultAuthority: vaultAuthority,
-  //         tokenProgram: TOKEN_PROGRAM_ID,
-  //       },
-  //       remainingAccounts: remaining,
-  //       signers: [],
-  //     }
-  //   );
-
-  //   account = await program.account.state.fetch(state.publicKey);
-  //   assert.ok(account.leftoverPayments.len == 0);
-  // });
 
   const roundSchema = new Map([[Round, { kind: 'struct', fields: [
     ['roundId', 'u32'],

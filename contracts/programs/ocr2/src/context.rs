@@ -94,6 +94,13 @@ pub struct AcceptProposal<'info> {
     #[account(mut)]
     pub proposal: AccountLoader<'info, Proposal>,
     pub authority: Signer<'info>,
+
+    #[account(mut, address = state.load()?.config.token_vault)]
+    pub token_vault: Account<'info, TokenAccount>,
+    #[account(seeds = [b"vault", state.key().as_ref()], bump = state.load()?.nonce)]
+    pub vault_authority: AccountInfo<'info>,
+
+    pub token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
