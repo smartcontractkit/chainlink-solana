@@ -1,6 +1,6 @@
 import { SolanaCommand, RawTransaction } from '@chainlink/gauntlet-solana'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair, AccountMeta, SystemProgram } from '@solana/web3.js'
+import { PublicKey, Keypair, AccountMeta, SystemProgram } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract, makeTx } from '@chainlink/gauntlet-solana-contracts'
 import { Idl, Program } from '@project-serum/anchor'
 import { MAX_BUFFER_SIZE } from '../lib/constants'
@@ -218,11 +218,6 @@ export const wrapCommand = (command) => {
           pubkey: signer,
           isWritable: false,
           isSigner: true,
-        },
-        {
-          pubkey: SYSVAR_RENT_PUBKEY,
-          isWritable: false,
-          isSigner: false,
         },
       ]
       const rawTx: RawTransaction = {
