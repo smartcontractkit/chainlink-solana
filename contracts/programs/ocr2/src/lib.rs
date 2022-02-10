@@ -106,6 +106,8 @@ pub mod ocr2 {
         offchain_config: Vec<u8>,
     ) -> ProgramResult {
         let mut proposal = ctx.accounts.proposal.load_mut()?;
+        require!(proposal.state != Proposal::FINALIZED, InvalidInput);
+
         require!(
             offchain_config.len() < proposal.offchain_config.remaining_capacity(),
             InvalidInput
@@ -116,13 +118,17 @@ pub mod ocr2 {
 
     #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
     pub fn commit_config_proposal(ctx: Context<SetConfig>) -> ProgramResult {
-        let proposal = ctx.accounts.proposal.load_mut()?;
+        let mut proposal = ctx.accounts.proposal.load_mut()?;
+
+        require!(proposal.state != Proposal::FINALIZED, InvalidInput);
 
         // Require that at least some data was written
         require!(proposal.offchain_config.version > 0, InvalidInput);
         require!(!proposal.offchain_config.is_empty(), InvalidInput);
         require!(!proposal.oracles.is_empty(), InvalidInput);
         // TODO: digest matches
+
+        proposal.state = Proposal::FINALIZED;
 
         Ok(())
     }
@@ -198,6 +204,9 @@ pub mod ocr2 {
         let mut state = ctx.accounts.state.load_mut()?;
         let proposal = ctx.accounts.proposal.load()?;
 
+        // Proposal has to be finalized
+        require!(proposal.state == Proposal::FINALIZED, InvalidInput);
+
         state.oracles.clear();
 
         // Move staging area onto actual config
@@ -260,7 +269,7 @@ pub mod ocr2 {
         require!(3 * usize::from(f) < len, InvalidInput);
 
         let proposal = &mut *ctx.accounts.proposal.load_mut()?;
-
+        require!(proposal.state != Proposal::FINALIZED, InvalidInput);
         // begin_config_proposal must be called first
         require!(proposal.offchain_config.version != 0, InvalidInput);
 
