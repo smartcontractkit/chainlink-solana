@@ -89,12 +89,9 @@ pub mod ocr2 {
     ) -> ProgramResult {
         let mut proposal = ctx.accounts.proposal.load_init()?;
 
-        // TODO: figure out a good random PDA seed and use PDAs for proposals
-
         proposal.version = 1;
         proposal.owner = ctx.accounts.authority.key();
 
-        // TODO: move this into write_ and always pass a version?
         require!(offchain_config_version != 0, InvalidInput);
         proposal.offchain_config.version = offchain_config_version;
         Ok(())
