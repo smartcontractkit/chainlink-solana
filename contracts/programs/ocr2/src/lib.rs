@@ -265,7 +265,7 @@ pub mod ocr2 {
         require!(len <= MAX_ORACLES, TooManyOracles);
         require!(3 * usize::from(f) < len, InvalidInput);
 
-        let proposal = &mut *ctx.accounts.proposal.load_mut()?;
+        let mut proposal = ctx.accounts.proposal.load_mut()?;
         require!(proposal.state != Proposal::FINALIZED, InvalidInput);
         // begin_config_proposal must be called first
         require!(proposal.offchain_config.version != 0, InvalidInput);
@@ -446,25 +446,26 @@ pub mod ocr2 {
 
     #[access_control(has_billing_access(&ctx.accounts.state, &ctx.accounts.access_controller, &ctx.accounts.authority))]
     pub fn pay_oracles<'info>(ctx: Context<'_, '_, '_, 'info, PayOracles<'info>>) -> ProgramResult {
-        let State {
-            ref config,
-            ref mut oracles,
-            ref nonce,
-            ..
-        } = &mut *ctx.accounts.state.load_mut()?;
+        let mut state = ctx.accounts.state.load_mut()?;
 
-        require!(ctx.remaining_accounts.len() == oracles.len(), InvalidInput);
+        require!(
+            ctx.remaining_accounts.len() == state.oracles.len(),
+            InvalidInput
+        );
 
-        let latest_round_id = config.latest_aggregator_round_id;
+        let nonce = state.nonce;
+        let latest_round_id = state.config.latest_aggregator_round_id;
+        let billing = state.config.billing;
 
-        let payments: Vec<(u64, CpiContext<'_, '_, '_, 'info, token::Transfer<'info>>)> = oracles
+        let payments: Vec<(u64, CpiContext<'_, '_, '_, 'info, token::Transfer<'info>>)> = state
+            .oracles
             .iter_mut()
             .zip(ctx.remaining_accounts)
             .map(|(oracle, payee)| {
                 // Ensure specified accounts match the ones inside oracles
                 require!(&oracle.payee == payee.key, InvalidInput);
 
-                let amount = calculate_owed_payment(&config.billing, oracle, latest_round_id)?;
+                let amount = calculate_owed_payment(&billing, oracle, latest_round_id)?;
                 // Reset reward and gas reimbursement
                 oracle.payment = 0;
                 oracle.from_round_id = latest_round_id;
@@ -481,8 +482,6 @@ pub mod ocr2 {
                 Ok((amount, cpi))
             })
             .collect::<Result<_>>()?;
-
-        let nonce = *nonce;
 
         for (amount, cpi) in payments {
             if amount == 0 {
@@ -504,22 +503,18 @@ pub mod ocr2 {
 
     #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
     pub fn set_payees(ctx: Context<SetPayees>, payees: Vec<Pubkey>) -> ProgramResult {
-        let State {
-            ref config,
-            ref mut oracles,
-            ..
-        } = &mut *ctx.accounts.state.load_mut()?;
+        let mut state = ctx.accounts.state.load_mut()?;
 
         // Need to provide a payee for each oracle
-        require!(oracles.len() == payees.len(), PayeeOracleMismatch);
+        require!(state.oracles.len() == payees.len(), PayeeOracleMismatch);
 
         // Verify that the remaining accounts are valid token accounts.
         for account in ctx.remaining_accounts {
             let account = Account::<'_, token::TokenAccount>::try_from(account)?;
-            require!(account.mint == config.token_mint, InvalidTokenAccount);
+            require!(account.mint == state.config.token_mint, InvalidTokenAccount);
         }
 
-        for (oracle, payee) in oracles.iter_mut().zip(payees.into_iter()) {
+        for (oracle, payee) in state.oracles.iter_mut().zip(payees.into_iter()) {
             // Can't set if already set before
             require!(oracle.payee == Pubkey::default(), PayeeAlreadySet);
             oracle.payee = payee;
@@ -535,19 +530,16 @@ pub mod ocr2 {
             InvalidInput
         );
 
-        let State {
-            ref config,
-            ref mut oracles,
-            ..
-        } = &mut *ctx.accounts.state.load_mut()?;
+        let mut state = ctx.accounts.state.load_mut()?;
 
         // Validate that the token account is actually for LINK
         require!(
-            ctx.accounts.proposed_payee.mint == config.token_mint,
+            ctx.accounts.proposed_payee.mint == state.config.token_mint,
             InvalidInput
         );
 
-        let oracle = oracles
+        let oracle = state
+            .oracles
             .iter_mut()
             .find(|oracle| &oracle.transmitter == ctx.accounts.transmitter.key)
             .ok_or(ErrorCode::InvalidInput)?;
@@ -564,11 +556,10 @@ pub mod ocr2 {
     }
 
     pub fn accept_payeeship(ctx: Context<AcceptPayeeship>) -> ProgramResult {
-        let State {
-            ref mut oracles, ..
-        } = &mut *ctx.accounts.state.load_mut()?;
+        let mut state = ctx.accounts.state.load_mut()?;
 
-        let oracle = oracles
+        let oracle = state
+            .oracles
             .iter_mut()
             .find(|oracle| &oracle.transmitter == ctx.accounts.transmitter.key)
             .ok_or(ErrorCode::InvalidInput)?;
