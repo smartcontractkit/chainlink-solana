@@ -31,8 +31,7 @@ const Scope = {
   Decimals: { decimals: {} },
   Description: { description: {} },
   // RoundData: { roundData: { roundId } },
-  LatestRoundDataV1: { latestRoundDataV1: {} },
-  LatestRoundDataV2: { latestRoundDataV2: {} },
+  LatestRoundData: { latestRoundData: {} },
   Aggregator: { aggregator: {} },
 };
 
@@ -687,7 +686,7 @@ describe('ocr2', async () => {
     ['answer', [16]], // i128
   ]}]]);
   it('Can call query', async () => {
-    let round = await query(transmissions.publicKey, Scope.LatestRoundDataV2, roundSchema, Round);
+    let round = await query(transmissions.publicKey, Scope.LatestRoundData, roundSchema, Round);
     console.log(round);
 
     const versionSchema = new Map([[Round, { kind: 'struct', fields: [
@@ -711,7 +710,7 @@ describe('ocr2', async () => {
       let t = await provider.connection.getTransaction(transmitTx, { commitment: "confirmed" });
       console.log(t.meta.logMessages);
 
-      let round = await query(transmissions.publicKey, Scope.LatestRoundDataV2, roundSchema, Round);
+      let round = await query(transmissions.publicKey, Scope.LatestRoundData, roundSchema, Round);
       assert.ok(new BN(round.answer, 10, 'le').toNumber() == i)
     }
   });

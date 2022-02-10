@@ -28,18 +28,10 @@ pub enum Scope {
     Decimals,
     Description,
     RoundData { round_id: u32 },
-    LatestRoundDataV1,
+    LatestRoundData,
     Aggregator,
-    LatestRoundDataV2,
     // ProposedAggregator
     // Owner
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct RoundV1 {
-    pub round_id: u32,
-    pub timestamp: u64,
-    pub answer: i128,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -277,21 +269,7 @@ pub mod store {
                 };
                 data.serialize(&mut buf)?;
             }
-            Scope::LatestRoundDataV1 => {
-                let round = with_store(&mut ctx.accounts.feed, |store| store.latest())?
-                    .ok_or(ErrorCode::NotFound)?;
-
-                let header = &ctx.accounts.feed;
-
-                let data = RoundV1 {
-                    round_id: header.latest_round_id,
-                    answer: round.answer,
-                    timestamp: u64::from(round.timestamp),
-                };
-
-                data.serialize(&mut buf)?;
-            }
-            Scope::LatestRoundDataV2 => {
+            Scope::LatestRoundData => {
                 let round = with_store(&mut ctx.accounts.feed, |store| store.latest())?
                     .ok_or(ErrorCode::NotFound)?;
 
@@ -418,7 +396,7 @@ pub mod accessors {
         program_id: AccountInfo<'info>,
         feed: AccountInfo<'info>,
     ) -> Result<Round, ProgramError> {
-        query(program_id, feed, Scope::LatestRoundDataV2)
+        query(program_id, feed, Scope::LatestRoundData)
     }
 
     pub fn aggregator<'info>(

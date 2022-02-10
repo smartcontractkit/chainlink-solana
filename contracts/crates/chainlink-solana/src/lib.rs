@@ -24,7 +24,6 @@ enum Query {
     RoundData { round_id: u32 },
     LatestRoundData,
     Aggregator,
-    LatestRoundDataV2,
 }
 
 /// Represents a single oracle round.
@@ -100,7 +99,7 @@ pub fn latest_round_data<'info>(
     program_id: AccountInfo<'info>,
     feed: AccountInfo<'info>,
 ) -> Result<Round, ProgramError> {
-    query(program_id, feed, Query::LatestRoundDataV2)
+    query(program_id, feed, Query::LatestRoundData)
 }
 
 /// Returns the address of the underlying OCR2 aggregator.
