@@ -138,7 +138,6 @@ pub mod ocr2 {
         ctx: Context<'_, '_, '_, 'info, AcceptProposal<'info>>,
     ) -> ProgramResult {
         let mut state = ctx.accounts.state.load_mut()?;
-        let mut proposal = ctx.accounts.proposal.load_mut()?;
 
         // TODO: share with pay_oracles
         require!(
@@ -177,6 +176,9 @@ pub mod ocr2 {
             })
             .collect::<Result<_>>()?;
 
+        // No account can be borrowed during CPI...
+        drop(state);
+
         for (amount, cpi) in payments {
             if amount == 0 {
                 continue;
@@ -192,6 +194,9 @@ pub mod ocr2 {
             )?;
         }
         // END: pay_oracles
+
+        let mut state = ctx.accounts.state.load_mut()?;
+        let proposal = ctx.accounts.proposal.load()?;
 
         state.oracles.clear();
 
