@@ -33,11 +33,17 @@ arrayvec!(Oracles, Oracle, u64);
 pub struct Proposal {
     pub version: u8,
     pub owner: Pubkey,
+    pub state: u8, // NOTE: can't use bool or enum because all bit patterns need to be valid for bytemuck/transmute
     pub f: u8,
-    _padding0: u16,
+    _padding0: u8,
     _padding1: u32,
     pub oracles: Oracles, // TODO: use Oracles subset with only keys
     pub offchain_config: OffchainConfig,
+}
+
+impl Proposal {
+    pub const NEW: u8 = 0;
+    pub const FINALIZED: u8 = 1;
 }
 
 #[account(zero_copy)]
