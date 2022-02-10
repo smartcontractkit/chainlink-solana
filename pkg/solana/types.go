@@ -33,23 +33,14 @@ type State struct {
 	Padding0             uint16
 	Padding1             uint32
 	Config               Config
+	OffchainConfig       OffchainConfig
 	Oracles              Oracles
-	LeftoverPayments     LeftoverPayments
 	Transmissions        solana.PublicKey
 }
 
 // SigningKey represents the report signing key
 type SigningKey struct {
 	Key [20]byte
-}
-
-type LeftoverPayments struct {
-	Raw [19]LeftoverPayment
-	Len uint64
-}
-
-func (lp LeftoverPayments) Data() []LeftoverPayment {
-	return lp.Raw[:lp.Len]
 }
 
 type OffchainConfig struct {
@@ -82,8 +73,6 @@ type Config struct {
 	LatestConfigDigest        [32]byte
 	LatestConfigBlockNumber   uint64
 	Billing                   Billing
-	OffchainConfig            OffchainConfig
-	PendingOffchainConfig     OffchainConfig
 }
 
 // Oracles contains the list of oracles
@@ -104,12 +93,6 @@ type Oracle struct {
 	ProposedPayee solana.PublicKey
 	FromRoundID   uint32
 	Payment       uint64
-}
-
-// LeftoverPayment contains the remaining payment for each oracle
-type LeftoverPayment struct {
-	Payee  solana.PublicKey
-	Amount uint64
 }
 
 // Billing contains the payment information

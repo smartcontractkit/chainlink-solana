@@ -46,8 +46,8 @@ func ConfigFromState(state State) (types.ContractConfig, error) {
 		Transmitters:          accounts,
 		F:                     state.Config.F,
 		OnchainConfig:         onchainConfig,
-		OffchainConfigVersion: state.Config.OffchainConfig.Version,
-		OffchainConfig:        state.Config.OffchainConfig.Data(),
+		OffchainConfigVersion: state.OffchainConfig.Version,
+		OffchainConfig:        state.OffchainConfig.Data(),
 	}, nil
 }
 
