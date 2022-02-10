@@ -39,14 +39,30 @@ pub struct Proposal {
     _padding1: u32,
     /// Set by set_payees, used to verify payee's token type matches the aggregator token type.
     pub token_mint: Pubkey,
-    pub oracles: Oracles, // TODO: use Oracles subset with only keys
+    pub oracles: ProposedOracles,
     pub offchain_config: OffchainConfig,
 }
-
 impl Proposal {
     pub const NEW: u8 = 0;
     pub const FINALIZED: u8 = 1;
 }
+
+#[zero_copy]
+/// A subset of the [Oracles] type to save space.
+pub struct ProposedOracle {
+    pub transmitter: Pubkey,
+    /// secp256k1 signing key for submissions
+    pub signer: SigningKey,
+    pub _padding: u32, // 4 bytes padding to align 20 byte signer
+    /// Payee address to pay out rewards to
+    pub payee: Pubkey,
+}
+#[zero_copy]
+pub struct ProposedOracles {
+    xs: [ProposedOracle; MAX_ORACLES],
+    len: u64,
+}
+arrayvec!(ProposedOracles, ProposedOracle, u64);
 
 #[account(zero_copy)]
 pub struct State {
