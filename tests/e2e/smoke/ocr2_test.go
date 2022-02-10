@@ -1,8 +1,9 @@
 package smoke
 
 import (
-	"github.com/smartcontractkit/integrations-framework/actions"
 	"time"
+
+	"github.com/smartcontractkit/integrations-framework/actions"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -30,7 +31,6 @@ var _ = Describe("Solana OCRv2", func() {
 	})
 	AfterEach(func() {
 		By("Tearing down the environment", func() {
-			common.ExitImitateSource <- true
 			err := actions.TeardownSuite(state.Env, nil, "logs")
 			Expect(err).ShouldNot(HaveOccurred())
 		})
