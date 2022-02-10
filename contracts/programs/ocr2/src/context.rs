@@ -91,8 +91,10 @@ pub struct SetConfig<'info> {
 pub struct AcceptProposal<'info> {
     #[account(mut)]
     pub state: AccountLoader<'info, State>,
-    #[account(mut)]
+    #[account(mut, close = receiver)]
     pub proposal: AccountLoader<'info, Proposal>,
+    #[account(mut)]
+    pub receiver: SystemAccount<'info>,
     pub authority: Signer<'info>,
 
     #[account(mut, address = state.load()?.config.token_vault)]
