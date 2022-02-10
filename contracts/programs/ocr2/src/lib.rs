@@ -116,13 +116,20 @@ pub mod ocr2 {
     #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
     pub fn commit_config_proposal(ctx: Context<SetConfig>) -> ProgramResult {
         let mut proposal = ctx.accounts.proposal.load_mut()?;
-
         require!(proposal.state != Proposal::FINALIZED, InvalidInput);
 
-        // Require that at least some data was written
+        // Require that at least some data was written via setOffchainConfig
         require!(proposal.offchain_config.version > 0, InvalidInput);
         require!(!proposal.offchain_config.is_empty(), InvalidInput);
+        // setConfig must have been called
         require!(!proposal.oracles.is_empty(), InvalidInput);
+        // setPayees must have been called
+        let valid_payees = proposal
+            .oracles
+            .iter()
+            .all(|oracle| oracle.payee != Pubkey::default());
+        require!(valid_payees, InvalidInput);
+
         // TODO: digest matches
 
         proposal.state = Proposal::FINALIZED;
@@ -203,6 +210,11 @@ pub mod ocr2 {
 
         // Proposal has to be finalized
         require!(proposal.state == Proposal::FINALIZED, InvalidInput);
+        // The proposal payees have to use the same mint as the aggregator
+        require!(
+            proposal.token_mint == state.config.token_mint,
+            InvalidTokenAccount
+        );
 
         state.oracles.clear();
 
@@ -216,6 +228,7 @@ pub mod ocr2 {
             state.oracles.push(Oracle {
                 signer: oracle.signer,
                 transmitter: oracle.transmitter,
+                payee: oracle.payee,
                 from_round_id,
                 ..Default::default()
             })
@@ -303,6 +316,32 @@ pub mod ocr2 {
 
         // Store the new f value
         proposal.f = f;
+
+        Ok(())
+    }
+
+    #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
+    pub fn set_payees(
+        ctx: Context<SetConfig>,
+        token_mint: Pubkey,
+        payees: Vec<Pubkey>,
+    ) -> ProgramResult {
+        let mut proposal = ctx.accounts.proposal.load_mut()?;
+        require!(proposal.state != Proposal::FINALIZED, InvalidInput);
+
+        // Need to provide a payee for each oracle
+        require!(proposal.oracles.len() == payees.len(), PayeeOracleMismatch);
+
+        // Verify that the remaining accounts are valid token accounts.
+        for account in ctx.remaining_accounts {
+            let account = Account::<'_, token::TokenAccount>::try_from(account)?;
+            require!(account.mint == token_mint, InvalidTokenAccount);
+        }
+
+        for (oracle, payee) in proposal.oracles.iter_mut().zip(payees.into_iter()) {
+            oracle.payee = payee;
+        }
+        proposal.token_mint = token_mint;
 
         Ok(())
     }
@@ -496,28 +535,6 @@ pub mod ocr2 {
                 ]]),
                 amount,
             )?;
-        }
-
-        Ok(())
-    }
-
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
-    pub fn set_payees(ctx: Context<SetPayees>, payees: Vec<Pubkey>) -> ProgramResult {
-        let mut state = ctx.accounts.state.load_mut()?;
-
-        // Need to provide a payee for each oracle
-        require!(state.oracles.len() == payees.len(), PayeeOracleMismatch);
-
-        // Verify that the remaining accounts are valid token accounts.
-        for account in ctx.remaining_accounts {
-            let account = Account::<'_, token::TokenAccount>::try_from(account)?;
-            require!(account.mint == state.config.token_mint, InvalidTokenAccount);
-        }
-
-        for (oracle, payee) in state.oracles.iter_mut().zip(payees.into_iter()) {
-            // Can't set if already set before
-            require!(oracle.payee == Pubkey::default(), PayeeAlreadySet);
-            oracle.payee = payee;
         }
 
         Ok(())
