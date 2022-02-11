@@ -83,7 +83,7 @@ pub mod ocr2 {
         Ok(())
     }
 
-    pub fn create_config_proposal(
+    pub fn create_proposal(
         ctx: Context<CreateProposal>,
         offchain_config_version: u64,
     ) -> ProgramResult {
@@ -99,7 +99,7 @@ pub mod ocr2 {
 
     #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
     pub fn write_offchain_config(
-        ctx: Context<SetConfig>,
+        ctx: Context<ProposeConfig>,
         offchain_config: Vec<u8>,
     ) -> ProgramResult {
         let mut proposal = ctx.accounts.proposal.load_mut()?;
@@ -114,7 +114,7 @@ pub mod ocr2 {
     }
 
     #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
-    pub fn commit_config_proposal(ctx: Context<SetConfig>) -> ProgramResult {
+    pub fn finalize_proposal(ctx: Context<ProposeConfig>) -> ProgramResult {
         let mut proposal = ctx.accounts.proposal.load_mut()?;
         require!(proposal.state != Proposal::FINALIZED, InvalidInput);
 
@@ -138,13 +138,13 @@ pub mod ocr2 {
     }
 
     #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
-    pub fn close_config_proposal(ctx: Context<CloseProposal>) -> ProgramResult {
+    pub fn close_proposal(ctx: Context<CloseProposal>) -> ProgramResult {
         // NOTE: Close is handled by anchor on exit due to the `close` attribute
         Ok(())
     }
 
     #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
-    pub fn accept_config_proposal<'info>(
+    pub fn accept_proposal<'info>(
         ctx: Context<'_, '_, '_, 'info, AcceptProposal<'info>>,
     ) -> ProgramResult {
         let mut state = ctx.accounts.state.load_mut()?;
@@ -159,7 +159,7 @@ pub mod ocr2 {
         let latest_round_id = state.config.latest_aggregator_round_id;
         let billing = state.config.billing;
 
-        // NOTE: if multisig supported multi instruction transactions, this could be [pay_oracles, accept_config_proposal]
+        // NOTE: if multisig supported multi instruction transactions, this could be [pay_oracles, accept_proposal]
         let payments: Vec<(u64, CpiContext<'_, '_, '_, 'info, token::Transfer<'info>>)> = state
             .oracles
             .iter_mut()
@@ -268,8 +268,8 @@ pub mod ocr2 {
     }
 
     #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
-    pub fn set_config(
-        ctx: Context<SetConfig>,
+    pub fn propose_config(
+        ctx: Context<ProposeConfig>,
         new_oracles: Vec<NewOracle>,
         f: u8,
     ) -> ProgramResult {
@@ -280,7 +280,7 @@ pub mod ocr2 {
 
         let mut proposal = ctx.accounts.proposal.load_mut()?;
         require!(proposal.state != Proposal::FINALIZED, InvalidInput);
-        // begin_config_proposal must be called first
+        // begin_proposal must be called first
         require!(proposal.offchain_config.version != 0, InvalidInput);
 
         // Clear out old oracles
@@ -321,8 +321,8 @@ pub mod ocr2 {
     }
 
     #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
-    pub fn set_payees(
-        ctx: Context<SetConfig>,
+    pub fn propose_payees(
+        ctx: Context<ProposeConfig>,
         token_mint: Pubkey,
         payees: Vec<Pubkey>,
     ) -> ProgramResult {
