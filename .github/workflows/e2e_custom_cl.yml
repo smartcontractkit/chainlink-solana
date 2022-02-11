@@ -45,10 +45,10 @@ jobs:
       # commit of the caller branch
       dep_solana_sha: ${{ github.sha }}
     secrets:
-      QA_AWS_ACCESS_KEY_ID: ${{ secrets.QA_AWS_ACCESS_KEY_ID }}
-      QA_AWS_SECRET_KEY: ${{ secrets.QA_AWS_SECRET_KEY }}
-      QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-      QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.QA_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.QA_AWS_SECRET_KEY }}
+      AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+      AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
   smoke:
     runs-on: ubuntu-latest
