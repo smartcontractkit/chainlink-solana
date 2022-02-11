@@ -1,6 +1,9 @@
 use crate::{ErrorCode, FEED_VERSION};
 use anchor_lang::prelude::*;
 
+#[constant]
+pub const HEADER_SIZE: usize = 192;
+
 #[account(zero_copy)]
 pub struct Store {
     pub owner: Pubkey,
@@ -83,7 +86,7 @@ where
     // two ringbuffers, live data and historical with smaller granularity
     let (live, historical) = RefMut::map_split(data, |data| {
         // skip the header
-        let (_header, data) = data.split_at_mut(8 + 128); // discriminator + header size
+        let (_header, data) = data.split_at_mut(8 + HEADER_SIZE); // discriminator + header size
         let (live, historical) = data.split_at_mut(n * size_of::<Transmission>());
         // NOTE: no try_map_split available..
         let live = bytemuck::try_cast_slice_mut::<_, Transmission>(live).unwrap();
@@ -108,7 +111,7 @@ where
 //     }
 
 //     let mut data = account.try_borrow_mut_data()?;
-//     let storage = &mut data[8 + 128..];
+//     let storage = &mut data[8 + HEADER_SIZE..];
 
 //     #[repr(C)]
 //     #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -252,9 +255,12 @@ mod tests {
     fn transmissions() {
         let live_length = 2;
         let historical_length = 3;
-        let mut data =
-            vec![0; 8 + 128 + (live_length + historical_length) * size_of::<Transmission>()];
-        let header = &mut data[..8 + 128]; // use a subslice to ensure the header fits into 128 bytes
+        let mut data = vec![
+            0;
+            8 + HEADER_SIZE
+                + (live_length + historical_length) * size_of::<Transmission>()
+        ];
+        let header = &mut data[..8 + HEADER_SIZE]; // use a subslice to ensure the header fits into HEADER_SIZE bytes
         let mut cursor = std::io::Cursor::new(header);
 
         // insert the initial header with some granularity
