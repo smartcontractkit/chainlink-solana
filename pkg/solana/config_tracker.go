@@ -28,8 +28,6 @@ func ConfigFromState(state State) (types.ContractConfig, error) {
 		accounts = append(accounts, types.Account(o.Transmitter.String()))
 	}
 
-	// program contains the parameters for generating OnchainConfig in state but does not calculate it
-	// needs to be calculated offchain for libocr (libocr decodes configs from the encoded data)
 	onchainConfigStruct := median.OnchainConfig{
 		Min: state.Config.MinAnswer.BigInt(),
 		Max: state.Config.MaxAnswer.BigInt(),

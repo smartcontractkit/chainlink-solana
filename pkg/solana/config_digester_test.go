@@ -11,7 +11,7 @@ import (
 func TestConfigDigester(t *testing.T) {
 	programID, err := solana.PublicKeyFromBase58("HW3ipKzeeduJq6f1NqRCw4doknMeWkfrM4WxobtG3o5v")
 	require.NoError(t, err)
-	stateID, err := solana.PublicKeyFromBase58("2WyAnfgsovvasZ3kFZEBzqniARbEFTAd1XrToqKoBD5W")
+	stateID, err := solana.PublicKeyFromBase58("ES64UceMzVRQ1t9j7VZKHi7A2cJ4seVmbKNmbtFZUiYz")
 	require.NoError(t, err)
 	digester := OffchainConfigDigester{
 		ProgramID: programID,
