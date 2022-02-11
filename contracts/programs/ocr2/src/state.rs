@@ -67,7 +67,7 @@ arrayvec!(ProposedOracles, ProposedOracle, u64);
 #[account(zero_copy)]
 pub struct State {
     pub version: u8,
-    pub nonce: u8,
+    pub vault_nonce: u8,
     _padding0: u16,
     _padding1: u32,
     pub config: Config,

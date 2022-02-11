@@ -11,7 +11,6 @@ use store::{Store, Transmissions};
 // NOTE: (has_one = name) is equivalent to a custom access_control
 
 #[derive(Accounts)]
-#[instruction(nonce: u8)]
 pub struct Initialize<'info> {
     #[account(zero)]
     pub state: AccountLoader<'info, State>,
@@ -27,7 +26,7 @@ pub struct Initialize<'info> {
         associated_token::authority = vault_authority,
     )]
     pub token_vault: Account<'info, TokenAccount>,
-    #[account(seeds = [b"vault", state.key().as_ref()], bump = nonce)]
+    #[account(seeds = [b"vault", state.key().as_ref()], bump)]
     pub vault_authority: AccountInfo<'info>,
 
     pub requester_access_controller: AccountLoader<'info, AccessController>,
@@ -99,7 +98,7 @@ pub struct AcceptProposal<'info> {
 
     #[account(mut, address = state.load()?.config.token_vault)]
     pub token_vault: Account<'info, TokenAccount>,
-    #[account(seeds = [b"vault", state.key().as_ref()], bump = state.load()?.nonce)]
+    #[account(seeds = [b"vault", state.key().as_ref()], bump = state.load()?.vault_nonce)]
     pub vault_authority: AccountInfo<'info>,
 
     pub token_program: Program<'info, Token>,
@@ -151,7 +150,7 @@ pub struct WithdrawFunds<'info> {
     pub access_controller: AccountLoader<'info, AccessController>,
     #[account(mut, address = state.load()?.config.token_vault)]
     pub token_vault: Account<'info, TokenAccount>,
-    #[account(seeds = [b"vault", state.key().as_ref()], bump = state.load()?.nonce)]
+    #[account(seeds = [b"vault", state.key().as_ref()], bump = state.load()?.vault_nonce)]
     pub vault_authority: AccountInfo<'info>,
     #[account(mut)]
     pub recipient: Account<'info, TokenAccount>,
@@ -179,7 +178,7 @@ pub struct WithdrawPayment<'info> {
     pub authority: Signer<'info>,
     #[account(mut, address = state.load()?.config.token_vault)]
     pub token_vault: Account<'info, TokenAccount>,
-    #[account(seeds = [b"vault", state.key().as_ref()], bump = state.load()?.nonce)]
+    #[account(seeds = [b"vault", state.key().as_ref()], bump = state.load()?.vault_nonce)]
     pub vault_authority: AccountInfo<'info>,
     #[account(mut)]
     pub payee: Account<'info, TokenAccount>,
@@ -210,7 +209,7 @@ pub struct PayOracles<'info> {
 
     #[account(mut, address = state.load()?.config.token_vault)]
     pub token_vault: Account<'info, TokenAccount>,
-    #[account(seeds = [b"vault", state.key().as_ref()], bump = state.load()?.nonce)]
+    #[account(seeds = [b"vault", state.key().as_ref()], bump = state.load()?.vault_nonce)]
     pub vault_authority: AccountInfo<'info>,
 
     pub token_program: Program<'info, Token>,

@@ -72,7 +72,6 @@ export default class Initialize extends SolanaCommand {
     )
 
     const data = program.coder.instruction.encode('initialize', {
-      nonce: vaultNonce,
       minAnswer,
       maxAnswer,
     })
