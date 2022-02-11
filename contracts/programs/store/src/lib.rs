@@ -57,6 +57,7 @@ pub mod store {
     ) -> ProgramResult {
         let feed = &mut ctx.accounts.feed;
         feed.version = FEED_VERSION;
+        feed.state = Transmissions::NORMAL;
         feed.owner = ctx.accounts.authority.key();
         feed.granularity = granularity;
         feed.live_length = live_length;
@@ -81,8 +82,6 @@ pub mod store {
         ctx: Context<TransferFeedOwnership>,
         proposed_owner: Pubkey,
     ) -> ProgramResult {
-        // TODO: handle transfering to a store
-
         require!(proposed_owner != Pubkey::default(), InvalidInput);
         ctx.accounts.feed.proposed_owner = proposed_owner;
         Ok(())
@@ -130,22 +129,14 @@ pub mod store {
     //     Ok(())
     // }
 
-    pub fn lower_flags(ctx: Context<SetFlag>, flags: Vec<Pubkey>) -> ProgramResult {
-        let mut store = ctx.accounts.store.load_mut()?;
-        has_lowering_access(
-            &store,
+    // NOTE: to bulk lower, a batch transaction can be sent with a bunch of lower calls
+    #[access_control(has_lowering_access(
+            &ctx.accounts.owner,
             &ctx.accounts.access_controller,
             &ctx.accounts.authority,
-        )?;
-
-        let positions: Vec<_> = flags
-            .iter()
-            .filter_map(|flag| store.flags.binary_search(flag).ok())
-            .collect();
-        for index in positions.iter().rev() {
-            // reverse so that subsequent positions aren't affected
-            store.flags.remove(*index);
-        }
+    ))]
+    pub fn lower_flag(ctx: Context<LowerFlag>) -> ProgramResult {
+        ctx.accounts.feed.state = Transmissions::NORMAL;
         Ok(())
     }
 
@@ -177,23 +168,10 @@ pub mod store {
         } else {
             true
         };
-        let feed_address = ctx.accounts.feed.key();
 
         if !is_valid {
-            // raise flag if not raised yet
-            let mut store = ctx.accounts.store.load_mut()?;
-
-            // if the len reaches array len, we're at capacity
-            require!(store.flags.remaining_capacity() > 0, Full);
-
-            match store.flags.binary_search(&feed_address) {
-                // already present
-                Ok(_i) => (),
-                // not found, raise flag
-                Err(i) => {
-                    store.flags.insert(i, feed_address);
-                }
-            }
+            // raise flag
+            ctx.accounts.feed.state = Transmissions::FLAGGED;
         }
 
         Ok(())
@@ -327,16 +305,14 @@ fn is_valid(flagging_threshold: u32, previous_answer: i128, answer: i128) -> boo
     ratio <= u128::from(flagging_threshold)
 }
 
-// TODO: add ownership transfer
-
 // Only owner access
 fn owner<'info>(owner: &UncheckedAccount<'info>, authority: &Signer) -> ProgramResult {
-    let state: std::result::Result<AccountLoader<'info, State>, _> =
+    let store: std::result::Result<AccountLoader<'info, State>, _> =
         AccountLoader::try_from(&owner);
 
-    let owner = match state {
+    let owner = match store {
         // if the feed is owned by a store, validate the store's owner signed
-        Ok(state) => state.load()?.owner,
+        Ok(store) => store.load()?.owner,
         // else, it's an individual owner
         Err(_err) => *owner.key,
     };
@@ -345,30 +321,53 @@ fn owner<'info>(owner: &UncheckedAccount<'info>, authority: &Signer) -> ProgramR
     Ok(())
 }
 
-fn store_owner(state_loader: &AccountLoader<State>, signer: &AccountInfo) -> ProgramResult {
-    let state = state_loader.load()?;
-    require!(signer.key.eq(&state.owner), Unauthorized);
+fn store_owner(store_loader: &AccountLoader<State>, signer: &AccountInfo) -> ProgramResult {
+    let store = store_loader.load()?;
+    require!(signer.key.eq(&store.owner), Unauthorized);
     Ok(())
 }
 
 fn has_lowering_access(
-    state: &State,
-    controller: &AccountLoader<AccessController>,
-    authority: &AccountInfo,
+    owner: &UncheckedAccount,
+    controller: &UncheckedAccount,
+    authority: &Signer,
 ) -> ProgramResult {
-    require!(
-        state.lowering_access_controller == controller.key(),
-        InvalidInput
-    );
+    let store: std::result::Result<AccountLoader<State>, _> = AccountLoader::try_from(&owner);
 
-    let is_owner = state.owner == authority.key();
+    match store {
+        // if the feed is owned by a store
+        Ok(store) => {
+            let store = store.load()?;
+            let is_owner = store.owner == authority.key();
 
-    let has_access = is_owner
-        || access_controller::has_access(controller, authority.key)
-            // TODO: better mapping, maybe InvalidInput?
-            .map_err(|_| ErrorCode::Unauthorized)?;
+            // the signer is the store owner, fast path return
+            if is_owner {
+                return Ok(());
+            }
 
-    require!(has_access, Unauthorized);
+            // else, we check the lowering_access_controller
+
+            // The controller account has to match the lowering_access_controller on the store
+            require!(
+                controller.key() == store.lowering_access_controller,
+                InvalidInput
+            );
+
+            let controller: AccountLoader<AccessController> = AccountLoader::try_from(&controller)?;
+
+            // Check if the key is present on the access controller
+            let has_access = access_controller::has_access(&controller, authority.key)
+                // TODO: better mapping, maybe InvalidInput?
+                .map_err(|_| ErrorCode::Unauthorized)?;
+
+            require!(has_access, Unauthorized);
+        }
+        // else, it's an individual owner
+        Err(_err) => {
+            require!(authority.key == owner.key, Unauthorized);
+        }
+    };
+
     Ok(())
 }
 
@@ -443,16 +442,13 @@ pub enum ErrorCode {
     #[msg("Invalid input")]
     InvalidInput = 1,
 
-    #[msg("Flags list is full")]
-    Full = 2,
-
-    NotFound = 3,
+    NotFound = 2,
 
     #[msg("Invalid version")]
-    InvalidVersion = 4,
+    InvalidVersion = 3,
 
     #[msg("Insufficient account capacity")]
-    InsufficientAccountCapacity = 5,
+    InsufficientAccountCapacity = 4,
 }
 
 // Feed methods
@@ -468,7 +464,7 @@ pub struct CreateFeed<'info> {
 pub struct CloseFeed<'info> {
     #[account(mut, close = receiver)]
     pub feed: Account<'info, Transmissions>,
-    // CHECKED: checked through the owner() access_control
+    // CHECKED: through the owner() access_control
     #[account(address = feed.owner)]
     pub owner: UncheckedAccount<'info>,
     #[account(mut)]
@@ -480,25 +476,29 @@ pub struct CloseFeed<'info> {
 pub struct SetFeedConfig<'info> {
     #[account(mut)]
     pub feed: Account<'info, Transmissions>,
-    // CHECKED: checked through the owner() access_control
+    // CHECKED: through the owner() access_control
     #[account(address = feed.owner)]
     pub owner: UncheckedAccount<'info>,
     pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
-pub struct SetFlag<'info> {
+pub struct LowerFlag<'info> {
     #[account(mut)]
-    pub store: AccountLoader<'info, State>,
+    pub feed: Account<'info, Transmissions>,
+    // CHECKED: through the has_lowering_access() access_control
+    #[account(address = feed.owner)]
+    pub owner: UncheckedAccount<'info>,
     pub authority: Signer<'info>,
-    pub access_controller: AccountLoader<'info, AccessController>,
+    // CHECKED: through the has_lowering_access() access_control
+    pub access_controller: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]
 pub struct TransferFeedOwnership<'info> {
     #[account(mut)]
     pub feed: Account<'info, Transmissions>,
-    // CHECKED: checked through the owner() access_control
+    // CHECKED: through the owner() access_control
     #[account(address = feed.owner)]
     pub owner: UncheckedAccount<'info>,
     pub authority: Signer<'info>,
