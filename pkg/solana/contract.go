@@ -244,6 +244,10 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 		return Answer{}, 0, errors.Wrap(err, "failed to decode transmission account header")
 	}
 
+	if header.Version != 2 {
+		return Answer{}, 0, errors.Wrapf(err, "can't parse feed version %v", header.Version)
+	}
+
 	cursor := header.LiveCursor
 	liveLength := header.LiveLength
 
@@ -254,11 +258,10 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 
 	// setup transmissionLen
 	transmissionLen := TransmissionLen
-	if header.Version == 1 {
-		transmissionLen = TransmissionLenV1
-	}
+	headerArea := uint64(192) // area allocated to header
 
-	var transmissionOffset uint64 = 8 + 192 + (uint64(cursor) * transmissionLen)
+	var transmissionOffset uint64 = 8 + headerArea + (uint64(cursor) * transmissionLen)
+
 	res, err = client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
 		Commitment: rpcCommitment,
@@ -269,19 +272,6 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 	})
 	if err != nil {
 		return Answer{}, 0, errors.Wrap(err, "error on rpc.GetAccountInfo [transmission]")
-	}
-
-	// parse v1 transmission and return answer
-	if header.Version == 1 {
-		var t TransmissionV1
-		if err := bin.NewBinDecoder(res.Value.Data.GetBinary()).Decode(&t); err != nil {
-			return Answer{}, 0, errors.Wrap(err, "failed to decode v1 transmission")
-		}
-
-		return Answer{
-			Data:      t.Answer.BigInt(),
-			Timestamp: uint32(t.Timestamp), // TODO: not good typing conversion
-		}, res.RPCContext.Context.Slot, nil
 	}
 
 	// parse tranmission
