@@ -72,7 +72,7 @@ pub struct CreateProposal<'info> {
 
 #[derive(Accounts)]
 pub struct CloseProposal<'info> {
-    #[account(mut)]
+    #[account(mut, close = receiver)]
     pub proposal: AccountLoader<'info, Proposal>,
     #[account(mut)]
     pub receiver: SystemAccount<'info>,
