@@ -1,11 +1,12 @@
 package chaos
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/common"
 	"github.com/smartcontractkit/integrations-framework/actions"
-	"time"
 )
 
 var _ = Describe("Solana chaos suite", func() {
@@ -42,7 +43,6 @@ var _ = Describe("Solana chaos suite", func() {
 	})
 	AfterEach(func() {
 		By("Tearing down the environment", func() {
-			common.ExitImitateSource <- true
 			err := actions.TeardownSuite(state.Env, nil, "logs")
 			Expect(err).ShouldNot(HaveOccurred())
 		})
