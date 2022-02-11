@@ -32,13 +32,13 @@ pub mod ocr2 {
     use super::*;
     pub fn initialize(
         ctx: Context<Initialize>,
-        nonce: u8,
         min_answer: i128,
         max_answer: i128,
     ) -> ProgramResult {
         let mut state = ctx.accounts.state.load_init()?;
         state.version = 1;
-        state.nonce = nonce;
+
+        state.vault_nonce = *ctx.bumps.get("vault_authority").unwrap();
         state.transmissions = ctx.accounts.transmissions.key();
 
         let config = &mut state.config;
@@ -155,7 +155,7 @@ pub mod ocr2 {
             InvalidInput
         );
 
-        let nonce = state.nonce;
+        let vault_nonce = state.vault_nonce;
         let latest_round_id = state.config.latest_aggregator_round_id;
         let billing = state.config.billing;
 
@@ -198,7 +198,7 @@ pub mod ocr2 {
                 cpi.with_signer(&[&[
                     b"vault".as_ref(),
                     ctx.accounts.state.key().as_ref(),
-                    &[nonce],
+                    &[vault_nonce],
                 ]]),
                 amount,
             )?;
@@ -373,15 +373,17 @@ pub mod ocr2 {
         accounts: &[AccountInfo<'info>],
         data: &[u8],
     ) -> ProgramResult {
-        // Based on https://github.com/project-serum/anchor/blob/d1edf2653f13f908a095081ec95d4b2c85a0b2d2/lang/syn/src/codegen/program/handlers.rs#L598-L625
+        // Based on https://github.com/project-serum/anchor/blob/2390a4f16791b40c63efe621ffbd558e354d5303/lang/syn/src/codegen/program/handlers.rs#L696-L737
         // Use a raw instruction to skip data decoding, but keep using Anchor contexts.
 
+        let mut bumps = std::collections::BTreeMap::new();
         // Deserialize accounts.
         let mut remaining_accounts: &[AccountInfo] = accounts;
-        let mut accounts = Transmit::try_accounts(program_id, &mut remaining_accounts, data)?;
+        let mut accounts =
+            Transmit::try_accounts(program_id, &mut remaining_accounts, data, &mut bumps)?;
 
         // Construct a context
-        let ctx = Context::new(program_id, &mut accounts, remaining_accounts);
+        let ctx = Context::new(program_id, &mut accounts, remaining_accounts, bumps);
 
         transmit_impl(ctx, data)?;
 
@@ -425,7 +427,7 @@ pub mod ocr2 {
             ctx.accounts.transfer_ctx().with_signer(&[&[
                 b"vault".as_ref(),
                 ctx.accounts.state.key().as_ref(),
-                &[state.nonce],
+                &[state.vault_nonce],
             ]]),
             amount.min(available),
         )?;
@@ -435,7 +437,7 @@ pub mod ocr2 {
     pub fn withdraw_payment(ctx: Context<WithdrawPayment>) -> ProgramResult {
         let mut state = ctx.accounts.state.load_mut()?;
 
-        let nonce = state.nonce;
+        let vault_nonce = state.vault_nonce;
         let latest_round_id = state.config.latest_aggregator_round_id;
         let billing = state.config.billing;
 
@@ -475,7 +477,7 @@ pub mod ocr2 {
             ctx.accounts.transfer_ctx().with_signer(&[&[
                 b"vault".as_ref(),
                 ctx.accounts.state.key().as_ref(),
-                &[nonce],
+                &[vault_nonce],
             ]]),
             amount,
         )?; // consider using a custom transfer that calls invoke_signed_unchecked instead
@@ -492,7 +494,7 @@ pub mod ocr2 {
             InvalidInput
         );
 
-        let nonce = state.nonce;
+        let vault_nonce = state.vault_nonce;
         let latest_round_id = state.config.latest_aggregator_round_id;
         let billing = state.config.billing;
 
@@ -531,7 +533,7 @@ pub mod ocr2 {
                 cpi.with_signer(&[&[
                     b"vault".as_ref(),
                     ctx.accounts.state.key().as_ref(),
-                    &[nonce],
+                    &[vault_nonce],
                 ]]),
                 amount,
             )?;
@@ -598,7 +600,7 @@ pub mod ocr2 {
 
 #[inline(always)]
 fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramResult {
-    let (nonce, data) = data.split_first().ok_or(ErrorCode::InvalidInput)?;
+    let (store_nonce, data) = data.split_first().ok_or(ErrorCode::InvalidInput)?;
 
     use anchor_lang::solana_program::{hash, keccak, secp256k1_recover::*};
 
@@ -742,7 +744,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
     let seeds = &[
         b"store",
         ctx.accounts.state.to_account_info().key.as_ref(),
-        &[*nonce],
+        &[*store_nonce],
     ];
 
     store::cpi::submit(cpi_ctx.with_signer(&[&seeds[..]]), round)?;

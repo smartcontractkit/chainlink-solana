@@ -427,7 +427,6 @@ describe("ocr2", async () => {
 
   it("Initializes the OCR2 config", async () => {
     await program.rpc.initialize(
-      vaultNonce,
       new BN(minAnswer),
       new BN(maxAnswer),
       {
