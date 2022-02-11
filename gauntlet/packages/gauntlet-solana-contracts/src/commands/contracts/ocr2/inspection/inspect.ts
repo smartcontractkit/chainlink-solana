@@ -3,12 +3,11 @@ import { inspection, BN, logger, prompt } from '@chainlink/gauntlet-core/dist/ut
 import { Proto } from '@chainlink/gauntlet-core/dist/crypto'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js'
-
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
-import { getRDD } from '../../../../lib/rdd'
 import WriteOffchainConfig, { Input as OffchainConfigInput } from '../offchainConfig/write'
 import { descriptor as OCR2Descriptor } from '../../../../lib/ocr2Proto'
 import { toComparableLongNumber, toComparableNumber, toComparablePubKey } from '../../../../lib/inspection'
+import RDD from '../../../lib/rdd'
 
 type Input = {
   description: string
@@ -30,36 +29,43 @@ export default class OCR2Inspect extends SolanaCommand {
   static id = 'ocr2:inspect'
   static category = CONTRACT_LIST.OCR_2
 
+  static examples = [
+    'yarn gauntlet ocr2:inspect --network=devnet --rdd=[PATH_TO_RDD] [AGGREGATOR_ADDRESS]',
+    'yarn gauntlet ocr2:inspect [AGGREGATOR_ADDRESS]',
+  ]
+
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
-    const rdd = getRDD(this.flags.rdd)
-    const info = rdd.contracts[this.flags.state]
-    const aggregatorOperators: string[] = info.oracles.map((o) => o.operator)
-    const transmitters = aggregatorOperators.map((operator) => rdd.operators[operator].ocrNodeAddress[0])
+    const network = this.flags.network || ''
+    const rddPath = this.flags.rdd || ''
     const billingAccessController = this.flags.billingAccessController || process.env.BILLING_ACCESS_CONTROLLER
     const requesterAccessController = this.flags.requesterAccessController || process.env.REQUESTER_ACCESS_CONTROLLER
     const link = this.flags.link || process.env.LINK
+
+    const aggregator = RDD.loadAggregator(network, rddPath, this.args[0])
+    const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
+    const transmitters = aggregatorOperators.map((operator) => rdd.operators[operator].ocrNodeAddress[0])
     const offchainConfig = WriteOffchainConfig.makeInputFromRDD(rdd, this.flags.state)
+
     return {
-      description: info.name,
-      decimals: info.decimals,
-      minAnswer: info.minSubmissionValue,
-      maxAnswer: info.maxSubmissionValue,
+      description: aggregator.name,
+      decimals: aggregator.decimals,
+      minAnswer: aggregator.minSubmissionValue,
+      maxAnswer: aggregator.maxSubmissionValue,
       transmitters,
       billingAccessController,
       requesterAccessController,
       link,
       offchainConfig,
       billing: {
-        observationPaymentGjuels: info.billing.observationPaymentGjuels,
-        transmissionPaymentGjuels: info.billing.transmissionPaymentGjuels,
+        observationPaymentGjuels: aggregator.billing.observationPaymentGjuels,
+        transmissionPaymentGjuels: aggregator.billing.transmissionPaymentGjuels,
       },
     }
   }
 
   constructor(flags, args) {
     super(flags, args)
-    this.require(!!this.flags.state, 'Please provide flags with "state""')
   }
 
   deserializeConfig = (buffer: Buffer): any => {

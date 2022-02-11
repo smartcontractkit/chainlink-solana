@@ -27,6 +27,7 @@ export default class Initialize extends SolanaCommand {
     const network = this.flags.network || ''
     const rddPath = this.flags.rdd || ''
     const aggregator = RDD.loadAggregator(network, rddPath, this.args[0])
+
     return {
       maxAnswer: aggregator.maxSubmissionValue,
       minAnswer: aggregator.minSubmissionValue,
