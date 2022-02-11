@@ -30,8 +30,7 @@ func (c *ContractTracker) Transmit(
 		return errors.Wrap(err, "error on Transmit.FindProgramAddress")
 	}
 
-	_, store, err := c.ReadState()
-	if err != nil {
+	if _, err := c.ReadState(); err != nil {
 		return errors.Wrap(err, "error on Transmit.ReadState")
 	}
 	accounts := []*solana.AccountMeta{
@@ -40,7 +39,6 @@ func (c *ContractTracker) Transmit(
 		{PublicKey: c.Transmitter.PublicKey(), IsWritable: false, IsSigner: true},
 		{PublicKey: c.TransmissionsID, IsWritable: true, IsSigner: false},
 		{PublicKey: c.StoreProgramID, IsWritable: false, IsSigner: false},
-		{PublicKey: store, IsWritable: true, IsSigner: false},
 		{PublicKey: storeAuthority, IsWritable: false, IsSigner: false},
 	}
 
@@ -109,7 +107,7 @@ func (c *ContractTracker) LatestConfigDigestAndEpoch(
 	epoch uint32,
 	err error,
 ) {
-	state, _, err := c.ReadState()
+	state, err := c.ReadState()
 	return state.Config.LatestConfigDigest, state.Config.Epoch, err
 }
 

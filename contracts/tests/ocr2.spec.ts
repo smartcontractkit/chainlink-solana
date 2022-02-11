@@ -208,7 +208,6 @@ describe("ocr2", async () => {
             isWritable: false,
             isSigner: false,
           },
-          { pubkey: store.publicKey, isWritable: true, isSigner: false },
           { pubkey: storeAuthority, isWritable: false, isSigner: false },
         ],
         data: Buffer.concat([

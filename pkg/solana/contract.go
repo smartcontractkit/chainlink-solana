@@ -32,7 +32,6 @@ type ContractTracker struct {
 
 	// tracked contract state
 	state  State
-	store  solana.PublicKey
 	answer Answer
 
 	// read/write mutexes
@@ -141,7 +140,7 @@ func (c *ContractTracker) Close() error {
 }
 
 // ReadState reads the latest state from memory with mutex and errors if timeout is exceeded
-func (c *ContractTracker) ReadState() (State, solana.PublicKey, error) {
+func (c *ContractTracker) ReadState() (State, error) {
 	c.stateLock.RLock()
 	defer c.stateLock.RUnlock()
 
@@ -149,7 +148,7 @@ func (c *ContractTracker) ReadState() (State, solana.PublicKey, error) {
 	if time.Since(c.stateTime) > c.staleTimeout {
 		err = errors.New("error in ReadState: stale state data, polling is likely experiencing errors")
 	}
-	return c.state, c.store, err
+	return c.state, err
 }
 
 // ReadAnswer reads the latest state from memory with mutex and errors if timeout is exceeded
@@ -176,29 +175,10 @@ func (c *ContractTracker) fetchState(ctx context.Context) error {
 
 	c.lggr.Debugf("state fetched for account: %s, result (config digest): %v", c.StateID, hex.EncodeToString(state.Config.LatestConfigDigest[:]))
 
-	// Fetch the store address associated to the feed
-	offset := uint64(8 + 1) // Discriminator (8 bytes) + Version (u8)
-	length := uint64(solana.PublicKeyLength)
-	res, err := c.client.rpc.GetAccountInfoWithOpts(ctx, state.Transmissions, &rpc.GetAccountInfoOpts{
-		Encoding:   "base64",
-		Commitment: c.client.commitment,
-		DataSlice: &rpc.DataSlice{
-			Offset: &offset,
-			Length: &length,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	store := solana.PublicKeyFromBytes(res.Value.Data.GetBinary())
-	c.lggr.Debugf("store fetched for feed: %s", store)
-
 	// acquire lock and write to state
 	c.stateLock.Lock()
 	defer c.stateLock.Unlock()
 	c.state = state
-	c.store = store
 	c.stateTime = time.Now()
 	return nil
 }
