@@ -143,7 +143,26 @@ impl Config {
         offchain_config: &OffchainConfig,
         oracles: &[Oracle],
     ) -> [u8; DIGEST_SIZE] {
-        let onchain_config = Vec::new(); // TODO
+        // calculate onchain_config from stored config
+        let mut onchain_config = vec![1]; // version
+
+        // the ocr plugin expects i192 encoded values, so we need to sign extend to make the digest match
+        if self.min_answer.is_negative() {
+            onchain_config.extend_from_slice(&[0xFF; 8]);
+        } else {
+            // 0 or positive
+            onchain_config.extend_from_slice(&[0x00; 8]);
+        }
+        onchain_config.extend_from_slice(&self.min_answer.to_be_bytes());
+
+        // the ocr plugin expects i192 encoded values, so we need to sign extend to make the digest match
+        if self.max_answer.is_negative() {
+            onchain_config.extend_from_slice(&[0xFF; 8]);
+        } else {
+            // 0 or positive
+            onchain_config.extend_from_slice(&[0x00; 8]);
+        }
+        onchain_config.extend_from_slice(&self.max_answer.to_be_bytes());
 
         // NOTE: keccak256 is also available, but SHA256 is faster
         use anchor_lang::solana_program::hash;
