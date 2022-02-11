@@ -122,3 +122,4 @@ jobs:
         with:
           name: test-logs
           path: ./tests/e2e/smoke/logs
+
