@@ -8,9 +8,6 @@ import (
 )
 
 const (
-	// TransmissionsSize indicates how many transmissions are stored
-	TransmissionsSize uint32 = 8096
-
 	// Slot, Timestamp, Padding0, Answer, Padding1, Padding2
 	TransmissionLen uint64 = 8 + 4 + 4 + 16 + 8 + 8
 	// Timestamp(uint64), Answer
