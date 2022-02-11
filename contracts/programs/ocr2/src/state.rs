@@ -45,6 +45,26 @@ pub struct Proposal {
 impl Proposal {
     pub const NEW: u8 = 0;
     pub const FINALIZED: u8 = 1;
+
+    pub fn digest(&self) -> [u8; DIGEST_SIZE] {
+        use anchor_lang::solana_program::hash;
+        let mut data: Vec<&[u8]> = Vec::with_capacity(3 * self.oracles.len() + 5);
+        for oracle in self.oracles.as_ref() {
+            data.push(&oracle.signer.key);
+            data.push(oracle.transmitter.as_ref());
+            data.push(oracle.payee.as_ref());
+        }
+        let f = &[self.f];
+        data.push(f);
+        data.push(self.token_mint.as_ref());
+        let offchain_version = self.offchain_config.version.to_be_bytes();
+        data.push(&offchain_version);
+        let offchain_config_len = (self.offchain_config.len() as u32).to_be_bytes();
+        data.push(&offchain_config_len);
+        data.push(&self.offchain_config);
+        let result = hash::hashv(&data);
+        result.to_bytes()
+    }
 }
 
 #[zero_copy]

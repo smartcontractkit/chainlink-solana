@@ -146,7 +146,10 @@ pub mod ocr2 {
     #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
     pub fn accept_proposal<'info>(
         ctx: Context<'_, '_, '_, 'info, AcceptProposal<'info>>,
+        digest: Vec<u8>,
     ) -> ProgramResult {
+        require!(digest.len() == DIGEST_SIZE, InvalidInput);
+
         let mut state = ctx.accounts.state.load_mut()?;
 
         // TODO: share with pay_oracles
@@ -210,6 +213,9 @@ pub mod ocr2 {
 
         // Proposal has to be finalized
         require!(proposal.state == Proposal::FINALIZED, InvalidInput);
+        // Digest has to match
+        require!(proposal.digest().as_ref() == digest, DigestMismatch);
+
         // The proposal payees have to use the same mint as the aggregator
         require!(
             proposal.token_mint == state.config.token_mint,
@@ -234,8 +240,6 @@ pub mod ocr2 {
             })
         }
         // NOTE: proposal already sorts the oracles by signer key
-
-        // TODO: validate and check for duplicates yet again?
 
         // Recalculate digest
         let slot = Clock::get()?.slot;
