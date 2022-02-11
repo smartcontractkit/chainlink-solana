@@ -56,7 +56,8 @@ pub struct Feed<'a> {
 #[account]
 pub struct Transmissions {
     pub version: u8,
-    pub store: Pubkey,
+    pub owner: Pubkey,
+    pub proposed_owner: Pubkey,
     pub writer: Pubkey,
     /// Raw UTF-8 byte string
     pub description: [u8; 32],
@@ -266,7 +267,7 @@ mod tests {
         // insert the initial header with some granularity
         Transmissions {
             version: 2,
-            store: Pubkey::default(),
+            owner: Pubkey::default(),
             writer: Pubkey::default(),
             description: [0; 32],
             decimals: 18,
