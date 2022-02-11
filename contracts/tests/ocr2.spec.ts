@@ -744,6 +744,26 @@ describe("ocr2", async () => {
     });
   });
 
+  it("Transfers ownership to the store", async () => {
+    // transfer to the store
+    await workspace.Store.rpc.transferFeedOwnership(store.publicKey, {
+      accounts: {
+        feed: transmissions.publicKey,
+        owner: owner.publicKey,
+        authority: owner.publicKey,
+      },
+    });
+
+    // accept (authority = store.owner)
+    await workspace.Store.rpc.acceptFeedOwnership({
+      accounts: {
+        feed: transmissions.publicKey,
+        proposedOwner: store.publicKey,
+        authority: owner.publicKey,
+      },
+    });
+  });
+
   it("Transmits a round", async () => {
     await transmit(1, 2, new BN(3));
     let feed = await provider.connection.getAccountInfo(
@@ -850,7 +870,7 @@ describe("ocr2", async () => {
     await workspace.Store.rpc.closeFeed({
       accounts: {
         feed: transmissions.publicKey,
-        owner: owner.publicKey,
+        owner: store.publicKey,
         receiver: provider.wallet.publicKey,
         authority: owner.publicKey,
       },

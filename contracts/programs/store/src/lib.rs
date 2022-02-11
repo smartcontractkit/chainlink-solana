@@ -88,13 +88,18 @@ pub mod store {
     }
 
     pub fn accept_feed_ownership(ctx: Context<AcceptFeedOwnership>) -> ProgramResult {
-        // TODO: handle transfering to a store
+        let store: std::result::Result<AccountLoader<State>, _> =
+            AccountLoader::try_from(&ctx.accounts.proposed_owner);
+
+        let proposed_owner = match store {
+            // if the feed is owned by a store, validate the store's owner signed
+            Ok(store) => store.load()?.owner,
+            // else, it's an individual owner
+            Err(_err) => ctx.accounts.proposed_owner.key(),
+        };
+        require!(ctx.accounts.authority.key == &proposed_owner, Unauthorized);
 
         let feed = &mut ctx.accounts.feed;
-        require!(
-            ctx.accounts.authority.key == &feed.proposed_owner,
-            Unauthorized
-        );
         feed.owner = std::mem::take(&mut feed.proposed_owner);
         Ok(())
     }
@@ -508,6 +513,9 @@ pub struct TransferFeedOwnership<'info> {
 pub struct AcceptFeedOwnership<'info> {
     #[account(mut)]
     pub feed: Account<'info, Transmissions>,
+    // CHECKED: we validate this inside accept_feed_ownership
+    #[account(address = feed.proposed_owner)]
+    pub proposed_owner: UncheckedAccount<'info>,
     pub authority: Signer<'info>,
 }
 
