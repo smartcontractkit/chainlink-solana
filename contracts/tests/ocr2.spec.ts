@@ -573,7 +573,6 @@ describe("ocr2", async () => {
     let offchainConfigHeader = Buffer.alloc(8+4);
     offchainConfigHeader.writeBigUInt64BE(BigInt(proposalAccount.offchainConfig.version), 0);
     offchainConfigHeader.writeUInt32BE(proposalAccount.offchainConfig.len, 8);
-    console.log(offchainConfigHeader)
 
     let digest = hasher
       .update(Buffer.from([f]))
