@@ -16,7 +16,6 @@ arrayvec!(Flags, Pubkey, u64);
 pub struct Store {
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
-    pub raising_access_controller: Pubkey,
     pub lowering_access_controller: Pubkey,
 
     pub flags: Flags,
@@ -259,7 +258,8 @@ mod tests {
     fn transmissions() {
         let live_length = 2;
         let historical_length = 3;
-        let mut data = vec![0; 8 + 128 + (live_length + historical_length) * size_of::<Transmission>()];
+        let mut data =
+            vec![0; 8 + 128 + (live_length + historical_length) * size_of::<Transmission>()];
         let header = &mut data[..8 + 128]; // use a subslice to ensure the header fits into 128 bytes
         let mut cursor = std::io::Cursor::new(header);
 

@@ -557,6 +557,32 @@ describe("ocr2", async () => {
       },
     });
 
+    // compute proposal digest
+    let proposalAccount = await program.account.proposal.fetch(proposal.publicKey);
+    console.log(proposalAccount);
+
+    let proposalOracles = proposalAccount.oracles.xs.slice(0, proposalAccount.oracles.len);
+    let proposalOC = proposalAccount.offchainConfig.xs.slice(0, proposalAccount.offchainConfig.len);
+    let hasher = proposalOracles.reduce((hasher, oracle) => {
+      return hasher
+        .update(Buffer.from(oracle.signer.key))
+        .update(oracle.transmitter.toBuffer())
+        .update(oracle.payee.toBuffer())
+    }, createHash("sha256"));
+    
+    let offchainConfigHeader = Buffer.alloc(8+4);
+    offchainConfigHeader.writeBigUInt64BE(BigInt(proposalAccount.offchainConfig.version), 0);
+    offchainConfigHeader.writeUInt32BE(proposalAccount.offchainConfig.len, 8);
+    console.log(offchainConfigHeader)
+
+    let digest = hasher
+      .update(Buffer.from([f]))
+      .update(proposalAccount.tokenMint.toBuffer())
+      .update(offchainConfigHeader)
+      .update(Buffer.from(proposalOC))
+      .digest();
+
+    // fetch payees
     account = await program.account.state.fetch(state.publicKey);
     let currentOracles = account.oracles.xs.slice(0, account.oracles.len);
     let payees = currentOracles.map((oracle) => {
@@ -564,7 +590,7 @@ describe("ocr2", async () => {
     });
 
     console.log("approveProposal");
-    await program.rpc.acceptProposal({
+    await program.rpc.acceptProposal(digest, {
       accounts: {
         state: state.publicKey,
         proposal: proposal.publicKey,
