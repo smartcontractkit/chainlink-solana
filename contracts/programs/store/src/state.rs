@@ -1,24 +1,11 @@
 use crate::{ErrorCode, FEED_VERSION};
 use anchor_lang::prelude::*;
-use arrayvec::arrayvec;
-
-const MAX_FLAGS: usize = 128;
-
-#[zero_copy]
-pub struct Flags {
-    xs: [Pubkey; MAX_FLAGS],
-    len: u64,
-}
-
-arrayvec!(Flags, Pubkey, u64);
 
 #[account(zero_copy)]
 pub struct Store {
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
     pub lowering_access_controller: Pubkey,
-
-    pub flags: Flags,
 }
 
 #[repr(C)]
@@ -56,6 +43,7 @@ pub struct Feed<'a> {
 #[account]
 pub struct Transmissions {
     pub version: u8,
+    pub state: u8,
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
     pub writer: Pubkey,
@@ -68,6 +56,11 @@ pub struct Transmissions {
     pub live_length: u32,
     live_cursor: u32,
     historical_cursor: u32,
+}
+
+impl Transmissions {
+    pub const NORMAL: u8 = 0;
+    pub const FLAGGED: u8 = 1;
 }
 
 pub fn with_store<'a, 'info: 'a, F, T>(
@@ -108,72 +101,72 @@ where
 }
 
 /// Migrate feed from v1 to v2
-pub fn migrate(header: &mut Transmissions, account: &AccountInfo) -> Result<(), ProgramError> {
-    // check header version
-    if header.version != 1 {
-        return Ok(());
-    }
+// pub fn migrate(header: &mut Transmissions, account: &AccountInfo) -> Result<(), ProgramError> {
+//     // check header version
+//     if header.version != 1 {
+//         return Ok(());
+//     }
 
-    let mut data = account.try_borrow_mut_data()?;
-    let storage = &mut data[8 + 128..];
+//     let mut data = account.try_borrow_mut_data()?;
+//     let storage = &mut data[8 + 128..];
 
-    #[repr(C)]
-    #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-    struct TransmissionV1 {
-        pub timestamp: u64,
-        pub answer: i128,
-    }
-    // using the offsets, parse out latest v1 round
-    let size = std::mem::size_of::<TransmissionV1>();
-    let len = header.live_length;
-    let (live, _historical) = storage.split_at_mut(len as usize * size);
-    let live = bytemuck::cast_slice::<_, TransmissionV1>(live);
+//     #[repr(C)]
+//     #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+//     struct TransmissionV1 {
+//         pub timestamp: u64,
+//         pub answer: i128,
+//     }
+//     // using the offsets, parse out latest v1 round
+//     let size = std::mem::size_of::<TransmissionV1>();
+//     let len = header.live_length;
+//     let (live, _historical) = storage.split_at_mut(len as usize * size);
+//     let live = bytemuck::cast_slice::<_, TransmissionV1>(live);
 
-    let i = (header.live_cursor + len.saturating_sub(1)) % len;
-    let latest = live[i as usize];
+//     let i = (header.live_cursor + len.saturating_sub(1)) % len;
+//     let latest = live[i as usize];
 
-    // memset the storage area
-    anchor_lang::solana_program::program_memory::sol_memset(storage, 0, storage.len());
+//     // memset the storage area
+//     anchor_lang::solana_program::program_memory::sol_memset(storage, 0, storage.len());
 
-    // reset cursors
-    header.live_cursor = 0;
-    header.historical_cursor = 0;
+//     // reset cursors
+//     header.live_cursor = 0;
+//     header.historical_cursor = 0;
 
-    // bump feed version
-    header.version = 2;
+//     // bump feed version
+//     header.version = 2;
 
-    let size = std::mem::size_of::<Transmission>();
-    let new_live_len = len as usize * size;
-    require!(storage.len() < new_live_len, InsufficientAccountCapacity);
+//     let size = std::mem::size_of::<Transmission>();
+//     let new_live_len = len as usize * size;
+//     require!(storage.len() < new_live_len, InsufficientAccountCapacity);
 
-    let (live, historical) = storage.split_at_mut(new_live_len);
-    let live = bytemuck::from_bytes_mut::<Transmission>(&mut live[..size]);
+//     let (live, historical) = storage.split_at_mut(new_live_len);
+//     let live = bytemuck::from_bytes_mut::<Transmission>(&mut live[..size]);
 
-    // mark round with current slot
-    let slot = Clock::get()?.slot;
+//     // mark round with current slot
+//     let slot = Clock::get()?.slot;
 
-    let round = Transmission {
-        slot,
-        timestamp: latest.timestamp as u32,
-        answer: latest.answer,
-        ..Default::default()
-    };
-    // insert back the round
-    *live = round;
-    // move the cursor by 1
-    header.live_cursor += 1;
+//     let round = Transmission {
+//         slot,
+//         timestamp: latest.timestamp as u32,
+//         answer: latest.answer,
+//         ..Default::default()
+//     };
+//     // insert back the round
+//     *live = round;
+//     // move the cursor by 1
+//     header.live_cursor += 1;
 
-    // need to also insert into historical ringbuffer if necessary
-    if header.latest_round_id % header.granularity as u32 == 0 {
-        let historical = bytemuck::from_bytes_mut::<Transmission>(&mut historical[..size]);
-        // insert back the round
-        *historical = round;
-        // move the cursor by 1
-        header.historical_cursor += 1;
-    }
+//     // need to also insert into historical ringbuffer if necessary
+//     if header.latest_round_id % header.granularity as u32 == 0 {
+//         let historical = bytemuck::from_bytes_mut::<Transmission>(&mut historical[..size]);
+//         // insert back the round
+//         *historical = round;
+//         // move the cursor by 1
+//         header.historical_cursor += 1;
+//     }
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 impl<'a> Feed<'a> {
     pub fn insert(&mut self, round: Transmission) {
@@ -267,7 +260,9 @@ mod tests {
         // insert the initial header with some granularity
         Transmissions {
             version: 2,
+            state: Transmissions::NORMAL,
             owner: Pubkey::default(),
+            proposed_owner: Pubkey::default(),
             writer: Pubkey::default(),
             description: [0; 32],
             decimals: 18,
