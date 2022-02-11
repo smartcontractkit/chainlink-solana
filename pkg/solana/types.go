@@ -118,7 +118,9 @@ type AccessController struct {
 // TransmissionsHeader struct for decoding transmission state header
 type TransmissionsHeader struct {
 	Version           uint8
-	Store             solana.PublicKey
+	State             uint8
+	Owner             solana.PublicKey
+	ProposedOwner     solana.PublicKey
 	Writer            solana.PublicKey
 	Description       [32]byte
 	Decimals          uint8
