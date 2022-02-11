@@ -9,10 +9,17 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
-var _ types.ContractTransmitter = (*ContractTracker)(nil)
+var _ types.ContractTransmitter = (*ContractTransmitter)(nil)
+
+type ContractTransmitter struct {
+	client *Client
+	cache  *ContractCache
+	signer TransmissionSigner
+	lggr   Logger
+}
 
 // Transmit sends the report to the on-chain OCR2Aggregator smart contract's Transmit method
-func (c *ContractTracker) Transmit(
+func (c *ContractTransmitter) Transmit(
 	ctx context.Context,
 	reportCtx types.ReportContext,
 	report types.Report,
@@ -24,22 +31,22 @@ func (c *ContractTracker) Transmit(
 	}
 
 	// Determine store authority
-	seeds := [][]byte{[]byte("store"), c.StateID.Bytes()}
-	storeAuthority, storeNonce, err := solana.FindProgramAddress(seeds, c.ProgramID)
+	seeds := [][]byte{[]byte("store"), c.cache.StateID.Bytes()}
+	storeAuthority, storeNonce, err := solana.FindProgramAddress(seeds, c.cache.ProgramID)
 	if err != nil {
 		return errors.Wrap(err, "error on Transmit.FindProgramAddress")
 	}
 
-	_, store, err := c.ReadState()
+	_, store, err := c.cache.ReadState()
 	if err != nil {
 		return errors.Wrap(err, "error on Transmit.ReadState")
 	}
 	accounts := []*solana.AccountMeta{
 		// state, transmitter, transmissions, store_program, store, store_authority
-		{PublicKey: c.StateID, IsWritable: true, IsSigner: false},
-		{PublicKey: c.Transmitter.PublicKey(), IsWritable: false, IsSigner: true},
-		{PublicKey: c.TransmissionsID, IsWritable: true, IsSigner: false},
-		{PublicKey: c.StoreProgramID, IsWritable: false, IsSigner: false},
+		{PublicKey: c.cache.StateID, IsWritable: true, IsSigner: false},
+		{PublicKey: c.signer.PublicKey(), IsWritable: false, IsSigner: true},
+		{PublicKey: c.cache.TransmissionsID, IsWritable: true, IsSigner: false},
+		{PublicKey: c.cache.StoreProgramID, IsWritable: false, IsSigner: false},
 		{PublicKey: store, IsWritable: true, IsSigner: false},
 		{PublicKey: storeAuthority, IsWritable: false, IsSigner: false},
 	}
@@ -60,10 +67,10 @@ func (c *ContractTracker) Transmit(
 
 	tx, err := solana.NewTransaction(
 		[]solana.Instruction{
-			solana.NewInstruction(c.ProgramID, accounts, data.Bytes()),
+			solana.NewInstruction(c.cache.ProgramID, accounts, data.Bytes()),
 		},
 		recent.Value.Blockhash,
-		solana.TransactionPayer(c.Transmitter.PublicKey()),
+		solana.TransactionPayer(c.signer.PublicKey()),
 	)
 	if err != nil {
 		return errors.Wrap(err, "error on Transmit.NewTransaction")
@@ -73,7 +80,7 @@ func (c *ContractTracker) Transmit(
 	if err != nil {
 		return errors.Wrap(err, "error on Transmit.Message.MarshalBinary")
 	}
-	finalSigBytes, err := c.Transmitter.Sign(msgToSign)
+	finalSigBytes, err := c.signer.Sign(msgToSign)
 	if err != nil {
 		return errors.Wrap(err, "error on Transmit.Sign")
 	}
@@ -102,17 +109,17 @@ func (c *ContractTracker) Transmit(
 	return nil
 }
 
-func (c *ContractTracker) LatestConfigDigestAndEpoch(
+func (c *ContractTransmitter) LatestConfigDigestAndEpoch(
 	ctx context.Context,
 ) (
 	configDigest types.ConfigDigest,
 	epoch uint32,
 	err error,
 ) {
-	state, _, err := c.ReadState()
+	state, _, err := c.cache.ReadState()
 	return state.Config.LatestConfigDigest, state.Config.Epoch, err
 }
 
-func (c *ContractTracker) FromAccount() types.Account {
-	return types.Account(c.Transmitter.PublicKey().String())
+func (c *ContractTransmitter) FromAccount() types.Account {
+	return types.Account(c.signer.PublicKey().String())
 }

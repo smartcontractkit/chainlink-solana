@@ -85,7 +85,7 @@ func (r *Relayer) Healthy() error {
 }
 
 // TODO [relay]: import from smartcontractkit/solana-integration impl
-func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relaytypes.OCR2Provider, error) {
+func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}, contractReady chan struct{}) (relaytypes.OCR2Provider, error) {
 	var provider ocr2Provider
 	spec, ok := s.(OCR2Spec)
 	if !ok {
@@ -98,53 +98,56 @@ func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay
 
 	// establish network connection RPC
 	client := NewClient(spec, r.lggr)
-	contractTracker := NewTracker(spec, client, spec.TransmissionSigner, r.lggr)
+	contractCache := NewContractCache(spec, client, r.lggr, contractReady)
+	contractConfigTracker := ContractConfigTracker{
+		cache:  contractCache,
+		client: client,
+	}
 
 	if spec.IsBootstrap {
 		// Return early if bootstrap node (doesn't require the full OCR2 provider)
 		return &ocr2Provider{
 			offchainConfigDigester: offchainConfigDigester,
-			tracker:                &contractTracker,
+			tracker:                &contractConfigTracker,
 		}, nil
 	}
 
 	reportCodec := ReportCodec{}
+	transmitter := ContractTransmitter{
+		client: client,
+		cache:  contractCache,
+		signer: spec.TransmissionSigner,
+		lggr:   r.lggr,
+	}
 
 	return &ocr2Provider{
 		offchainConfigDigester: offchainConfigDigester,
 		reportCodec:            reportCodec,
-		tracker:                &contractTracker,
+		tracker:                &contractConfigTracker,
+		medianContract:         &MedianContract{cache: contractCache},
+		transmitter:            &transmitter,
 	}, nil
 }
 
 type ocr2Provider struct {
 	offchainConfigDigester OffchainConfigDigester
 	reportCodec            ReportCodec
-	tracker                *ContractTracker
+	tracker                *ContractConfigTracker
+	transmitter            *ContractTransmitter
+	medianContract         *MedianContract
+	cache                  ContractCache
 }
 
 func (p *ocr2Provider) Start() error {
-	// TODO: start all needed subservices
-	return p.tracker.Start()
+	return p.cache.Start()
 }
 
 func (p *ocr2Provider) Close() error {
-	// TODO: close all subservices
-	return p.tracker.Close()
-}
-
-func (p ocr2Provider) Ready() error {
-	// always ready
-	return p.tracker.Ready()
-}
-
-func (p ocr2Provider) Healthy() error {
-	// TODO: only if all subservices are healthy
-	return p.tracker.Healthy()
+	return p.cache.Close()
 }
 
 func (p ocr2Provider) ContractTransmitter() types.ContractTransmitter {
-	return p.tracker
+	return p.transmitter
 }
 
 func (p ocr2Provider) ContractConfigTracker() types.ContractConfigTracker {
@@ -160,5 +163,5 @@ func (p ocr2Provider) ReportCodec() median.ReportCodec {
 }
 
 func (p ocr2Provider) MedianContract() median.MedianContract {
-	return p.tracker
+	return p.medianContract
 }

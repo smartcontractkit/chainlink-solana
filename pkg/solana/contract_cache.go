@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/atomic"
+
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -20,15 +22,14 @@ var (
 	defaultPollInterval       = 1 * time.Second
 )
 
-type ContractTracker struct {
+type ContractCache struct {
+	utils.StartStopOnce
+
 	// on-chain program + 2x state accounts (state + transmissions)
 	ProgramID       solana.PublicKey
 	StateID         solana.PublicKey
 	TransmissionsID solana.PublicKey
 	StoreProgramID  solana.PublicKey
-
-	// private key for the transmission signing
-	Transmitter TransmissionSigner
 
 	// tracked contract state
 	state  State
@@ -53,10 +54,12 @@ type ContractTracker struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	utils.StartStopOnce
+	// Signal contract config is found
+	contractReady chan struct{}
+	configFound   *atomic.Bool
 }
 
-func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, lggr Logger) ContractTracker {
+func NewContractCache(spec OCR2Spec, client *Client, lggr Logger, contractReady chan struct{}) *ContractCache {
 	// parse staleness timeout, if errors: use default timeout (1 min)
 	staleTimeout, err := time.ParseDuration(spec.StaleTimeout)
 	if err != nil {
@@ -64,22 +67,23 @@ func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, l
 		staleTimeout = defaultStaleTimeout
 	}
 
-	return ContractTracker{
+	return &ContractCache{
 		ProgramID:       spec.ProgramID,
 		StateID:         spec.StateID,
 		StoreProgramID:  spec.StoreProgramID,
 		TransmissionsID: spec.TransmissionsID,
-		Transmitter:     transmitter,
 		client:          client,
 		lggr:            lggr,
 		stateLock:       &sync.RWMutex{},
 		ansLock:         &sync.RWMutex{},
 		staleTimeout:    staleTimeout,
+		contractReady:   contractReady,
+		configFound:     atomic.NewBool(false),
 	}
 }
 
 // Start polling
-func (c *ContractTracker) Start() error {
+func (c *ContractCache) Start() error {
 	return c.StartOnce("pollState", func() error {
 		c.done = make(chan struct{})
 		ctx, cancel := context.WithCancel(context.Background())
@@ -91,7 +95,7 @@ func (c *ContractTracker) Start() error {
 }
 
 // PollState contains the state and transmissions polling implementation
-func (c *ContractTracker) PollState() {
+func (c *ContractCache) PollState() {
 	defer close(c.done)
 	c.lggr.Debugf("Starting state polling for state: %s, transmissions: %s", c.StateID, c.TransmissionsID)
 	tick := time.After(0)
@@ -112,6 +116,14 @@ func (c *ContractTracker) PollState() {
 				err := c.fetchState(ctx)
 				if err != nil {
 					c.lggr.Errorf("error in PollState.fetchState %s", err)
+				} else {
+					// We have successfully read state from the contract
+					// signal that we are ready to start libocr.
+					// Only signal on the first successful fetch.
+					if !c.configFound.Load() {
+						close(c.contractReady)
+						c.configFound.Store(true)
+					}
 				}
 			}()
 			go func() {
@@ -132,7 +144,7 @@ func (c *ContractTracker) PollState() {
 }
 
 // Close stops the polling
-func (c *ContractTracker) Close() error {
+func (c *ContractCache) Close() error {
 	return c.StopOnce("pollState", func() error {
 		c.cancel()
 		<-c.done
@@ -141,7 +153,7 @@ func (c *ContractTracker) Close() error {
 }
 
 // ReadState reads the latest state from memory with mutex and errors if timeout is exceeded
-func (c *ContractTracker) ReadState() (State, solana.PublicKey, error) {
+func (c *ContractCache) ReadState() (State, solana.PublicKey, error) {
 	c.stateLock.RLock()
 	defer c.stateLock.RUnlock()
 
@@ -153,7 +165,7 @@ func (c *ContractTracker) ReadState() (State, solana.PublicKey, error) {
 }
 
 // ReadAnswer reads the latest state from memory with mutex and errors if timeout is exceeded
-func (c *ContractTracker) ReadAnswer() (Answer, error) {
+func (c *ContractCache) ReadAnswer() (Answer, error) {
 	c.ansLock.RLock()
 	defer c.ansLock.RUnlock()
 
@@ -166,7 +178,7 @@ func (c *ContractTracker) ReadAnswer() (Answer, error) {
 }
 
 // fetch + decode + store raw state
-func (c *ContractTracker) fetchState(ctx context.Context) error {
+func (c *ContractCache) fetchState(ctx context.Context) error {
 
 	c.lggr.Debugf("fetch state for account: %s", c.StateID.String())
 	state, _, err := GetState(ctx, c.client.rpc, c.StateID, c.client.commitment)
@@ -203,7 +215,7 @@ func (c *ContractTracker) fetchState(ctx context.Context) error {
 	return nil
 }
 
-func (c *ContractTracker) fetchLatestTransmission(ctx context.Context) error {
+func (c *ContractCache) fetchLatestTransmission(ctx context.Context) error {
 	c.lggr.Debugf("fetch latest transmission for account: %s", c.TransmissionsID)
 	answer, _, err := GetLatestTransmission(ctx, c.client.rpc, c.TransmissionsID, c.client.commitment)
 	if err != nil {

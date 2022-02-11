@@ -11,7 +11,7 @@ import (
 
 func TestLatestBlockHeight(t *testing.T) {
 	ctx := context.Background()
-	c := &ContractTracker{
+	c := &ContractConfigTracker{
 		client: NewClient(OCR2Spec{NodeEndpointHTTP: rpc.DevNet_RPC}, logger.TestLogger(t)),
 	}
 

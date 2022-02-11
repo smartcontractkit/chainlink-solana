@@ -261,7 +261,7 @@ func TestStatePolling(t *testing.T) {
 		require.NoError(t, err)
 	}))
 
-	tracker := ContractTracker{
+	tracker := ContractCache{
 		StateID:         solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
 		TransmissionsID: solana.MustPublicKeyFromBase58("11111111111111111111111111111112"),
 		client:          NewClient(OCR2Spec{NodeEndpointHTTP: mockServer.URL}, logger.TestLogger(t)),
