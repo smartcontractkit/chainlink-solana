@@ -130,8 +130,6 @@ pub mod ocr2 {
             .all(|oracle| oracle.payee != Pubkey::default());
         require!(valid_payees, InvalidInput);
 
-        // TODO: digest matches
-
         proposal.state = Proposal::FINALIZED;
 
         Ok(())
