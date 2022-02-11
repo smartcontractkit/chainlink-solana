@@ -113,8 +113,6 @@ pub struct Transmit<'info> {
     pub transmissions: Account<'info, Transmissions>,
 
     pub store_program: Program<'info, Store>,
-    // Verified by the store program
-    pub store: UncheckedAccount<'info>,
     pub store_authority: AccountInfo<'info>,
 }
 

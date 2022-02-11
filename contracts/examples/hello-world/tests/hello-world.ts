@@ -22,36 +22,6 @@ describe('hello-world', () => {
     let storeIdl = JSON.parse(fs.readFileSync('../../target/idl/store.json'));    
     const storeProgram = new Program(storeIdl, CHAINLINK_PROGRAM_ID, provider);
 
-    let acIdl = JSON.parse(fs.readFileSync('../../target/idl/access_controller.json'));    
-    const accessControllerProgram = new Program(acIdl, "DzzjdPWNfwHZmzPVxnmqkkMJraYQQRCpgFZajqkqmU6G", provider);
-
-    await accessControllerProgram.rpc.initialize({
-      accounts: {
-        state: accessController.publicKey,
-        payer: provider.wallet.publicKey,
-        owner: owner.publicKey,
-        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      },
-      signers: [accessController],
-      preInstructions: [
-        await accessControllerProgram.account.accessController.createInstruction(accessController),
-      ],
-    });
-
-    // Initialize a new store
-    await storeProgram.rpc.initialize({
-      accounts: {
-        store: store.publicKey,
-        owner: owner.publicKey,
-        loweringAccessController: accessController.publicKey,
-      },
-      signers: [store],
-      preInstructions: [
-        await storeProgram.account.store.createInstruction(store),
-      ],
-    });
-
     // Create a feed
     const description = "FOO/BAR";
     const decimals = 18;
@@ -64,13 +34,12 @@ describe('hello-world', () => {
       liveLength,
     {
       accounts: {
-        store: store.publicKey,
         feed: feed.publicKey,
         authority: owner.publicKey,
       },
       signers: [feed],
       preInstructions: [
-        await storeProgram.account.transmissions.createInstruction(feed, 8+128+6*24),
+        await storeProgram.account.transmissions.createInstruction(feed, 8+192+6*24),
       ],
     });
 
@@ -78,8 +47,8 @@ describe('hello-world', () => {
       owner.publicKey,
       {
         accounts: {
-          store: store.publicKey,
           feed: feed.publicKey,
+          owner: owner.publicKey,
           authority: owner.publicKey,
         },
       });

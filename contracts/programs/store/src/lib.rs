@@ -521,12 +521,10 @@ pub struct AcceptFeedOwnership<'info> {
 
 #[derive(Accounts)]
 pub struct Submit<'info> {
-    #[account(mut)]
-    pub store: AccountLoader<'info, State>,
-    pub authority: Signer<'info>,
     /// The OCR2 feed
     #[account(mut)]
     pub feed: Account<'info, Transmissions>,
+    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
