@@ -18,8 +18,8 @@ export default class Initialize extends SolanaCommand {
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:initialize --network=devnet --requesterAccessController=[ADDRESS] --billingAccessController=[ADDRESS]',
-    'yarn gauntlet ocr2:initialize --network=devnet --requesterAccessController=[ADDRESS] --billingAccessController=[ADDRESS] --id=[IDENTIFIER]',
+    'yarn gauntlet ocr2:initialize --network=devnet',
+    'yarn gauntlet ocr2:initialize --network=devnet --id=[IDENTIFIER]',
   ]
 
   makeInput = (userInput: any): Input => {
@@ -35,9 +35,6 @@ export default class Initialize extends SolanaCommand {
 
   constructor(flags, args) {
     super(flags, args)
-
-    this.requireFlag('requesterAccessController', 'Provide a --requesterAccessController flag with a valid address')
-    this.requireFlag('billingAccessController', 'Provide a --billingAccessController flag with a valid address')
   }
 
   makeRawTransaction = async (signer: PublicKey, state?: PublicKey): Promise<TransactionInstruction[]> => {
@@ -57,8 +54,8 @@ export default class Initialize extends SolanaCommand {
     )
 
     const linkPublicKey = new PublicKey(this.flags.link || process.env.LINK)
-    const requesterAccessController = new PublicKey(this.flags.requesterAccessController)
-    const billingAccessController = new PublicKey(this.flags.billingAccessController)
+    const requesterAccessController = new PublicKey(this.flags.requesterAccessController || process.env.REQUESTER_ACCESS_CONTROLLER)
+    const billingAccessController = new PublicKey(this.flags.billingAccessController || process.env.BILLING_ACCESS_CONTROLLER)
 
     const minAnswer = new BN(input.minAnswer)
     const maxAnswer = new BN(input.maxAnswer)
