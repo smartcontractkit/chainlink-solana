@@ -1,4 +1,4 @@
-import { Wallet as SerumWallet } from '@project-serum/anchor'
+import { Wallet } from '@project-serum/anchor'
 import { Keypair, PublicKey, Transaction } from '@solana/web3.js'
 import TransportNodeHid from '@ledgerhq/hw-transport-node-hid'
 import Solana from '@ledgerhq/hw-app-solana'
@@ -21,15 +21,15 @@ export abstract class SolanaWallet {
 }
 
 export class LocalWallet extends SolanaWallet {
-  wallet: SerumWallet
+  wallet: Wallet
 
-  private constructor(wallet: SerumWallet) {
+  private constructor(wallet: Wallet) {
     super()
     this.wallet = wallet
   }
 
   static create = async (keypair: Keypair) => {
-    const wallet = new SerumWallet(keypair)
+    const wallet = new Wallet(keypair)
     return new LocalWallet(wallet)
   }
 
