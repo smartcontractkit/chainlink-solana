@@ -5,27 +5,29 @@ import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from '@solana/sp
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { utils } from '@project-serum/anchor'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { getRDD } from '../../../lib/rdd'
 import { ADDITIONAL_STATE_BUFFER } from '../../../lib/constants'
+import RDD from '../../../lib/rdd'
 
 type Input = {
   minAnswer: number | string
   maxAnswer: number | string
   transmissions: string
 }
+
 export default class Initialize extends SolanaCommand {
   static id = 'ocr2:initialize'
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:initialize --network=devnet',
-    'yarn gauntlet ocr2:initialize --network=devnet --id=[IDENTIFIER]',
+    'yarn gauntlet ocr2:initialize --network=devnet --rdd=[PATH_TO_RDD] [UNDEPLOYED_CONTRACT_ADDRESS]',
+    'yarn gauntlet ocr2:initialize [UNDEPLOYED_CONTRACT_ADDRESS]',
   ]
 
   makeInput = (userInput: any): Input => {
     if (userInput) return userInput as Input
-    const rdd = getRDD(this.flags.rdd)
-    const aggregator = rdd.contracts[this.flags.id]
+    const network = this.flags.network || ''
+    const rddPath = this.flags.rdd || ''
+    const aggregator = RDD.loadAggregator(network, rddPath, this.args[0])
     return {
       maxAnswer: aggregator.maxSubmissionValue,
       minAnswer: aggregator.minSubmissionValue,
