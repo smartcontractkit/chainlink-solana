@@ -80,7 +80,7 @@ pub struct CloseProposal<'info> {
 }
 
 #[derive(Accounts)]
-pub struct SetConfig<'info> {
+pub struct ProposeConfig<'info> {
     #[account(mut)]
     pub proposal: AccountLoader<'info, Proposal>,
     pub authority: Signer<'info>,

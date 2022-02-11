@@ -83,7 +83,7 @@ describe("ocr2", async () => {
 
   let oracles = [];
   const f = 6;
-  // NOTE: 17 is the most we can fit into one setConfig if we use a different payer
+  // NOTE: 17 is the most we can fit into one proposeConfig if we use a different payer
   // if the owner == payer then we can fit 19
   const n = 19; // min: 3 * f + 1;
 
@@ -496,8 +496,8 @@ describe("ocr2", async () => {
     // TODO: listen for SetConfig event
     let proposal = Keypair.generate();
 
-    console.log("createConfigProposal");
-    await program.rpc.createConfigProposal(new BN(offchain_config_version), {
+    console.log("createProposal");
+    await program.rpc.createProposal(new BN(offchain_config_version), {
       accounts: {
         proposal: proposal.publicKey,
         authority: owner.publicKey,
@@ -507,8 +507,8 @@ describe("ocr2", async () => {
         await program.account.proposal.createInstruction(proposal),
       ],
     });
-    console.log("setConfig");
-    await program.rpc.setConfig(
+    console.log("proposeConfig");
+    await program.rpc.proposeConfig(
       oracles.map((oracle) => ({
         signer: ethereumAddress(Buffer.from(oracle.signer.publicKey)),
         transmitter: oracle.transmitter.publicKey,
@@ -537,8 +537,8 @@ describe("ocr2", async () => {
       },
     });
 
-    console.log("setPayees");
-    await program.rpc.setPayees(
+    console.log("proposePayees");
+    await program.rpc.proposePayees(
       token.publicKey,
       oracles.map((oracle) => oracle.payee.address),
       {
@@ -549,8 +549,8 @@ describe("ocr2", async () => {
       }
     );
 
-    console.log("commitConfigProposal");
-    await program.rpc.commitConfigProposal({
+    console.log("finalizeProposal");
+    await program.rpc.finalizeProposal({
       accounts: {
         proposal: proposal.publicKey,
         authority: owner.publicKey,
@@ -563,8 +563,8 @@ describe("ocr2", async () => {
       return { pubkey: oracle.payee, isWritable: true, isSigner: false };
     });
 
-    console.log("approveConfigProposal");
-    await program.rpc.acceptConfigProposal({
+    console.log("approveProposal");
+    await program.rpc.acceptProposal({
       accounts: {
         state: state.publicKey,
         proposal: proposal.publicKey,
@@ -586,9 +586,9 @@ describe("ocr2", async () => {
       [4, 5, 6, 4, 5, 6]
     );
 
-    // Proposal already closed by acceptConfigProposal
-    // console.log("closeConfigProposal");
-    // await program.rpc.closeConfigProposal(
+    // Proposal already closed by acceptProposal
+    // console.log("closeProposal");
+    // await program.rpc.closeProposal(
     //   {
     //     accounts: {
     //       proposal: proposal.publicKey,
@@ -622,7 +622,7 @@ describe("ocr2", async () => {
 
   it("Can't begin config proposal if version is 0", async () => {
     try {
-      await program.rpc.createConfigProposal(new BN(0), {
+      await program.rpc.createProposal(new BN(0), {
         accounts: {
           proposal: proposal.publicKey,
           authority: owner.publicKey,
@@ -632,7 +632,7 @@ describe("ocr2", async () => {
       // createOffchainConfig should fail
       return;
     }
-    assert.fail("createConfigProposal shouldn't have succeeded!");
+    assert.fail("createProposal shouldn't have succeeded!");
   });
 
   it("Can't write offchain config if begin has not been called", async () => {
@@ -653,7 +653,7 @@ describe("ocr2", async () => {
 
   // it("ResetPendingOffchainConfig clears pending state", async () => {
 
-  // 	await program.rpc.createConfigProposal(
+  // 	await program.rpc.createProposal(
   //      new BN(2),
   //      {
   //        accounts: {
