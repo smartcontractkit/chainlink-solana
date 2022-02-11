@@ -9,9 +9,9 @@ import (
 )
 
 func TestConfigDigester(t *testing.T) {
-	programID, err := solana.PublicKeyFromBase58("CF13pnKGJ1WJZeEgVAtFdUi4MMndXm9hneiHs8azUaZt")
+	programID, err := solana.PublicKeyFromBase58("HW3ipKzeeduJq6f1NqRCw4doknMeWkfrM4WxobtG3o5v")
 	require.NoError(t, err)
-	stateID, err := solana.PublicKeyFromBase58("CWhSnpBq3Vkdzfz6ceKBgfdnGegy8XSEXAknVrorFcyW")
+	stateID, err := solana.PublicKeyFromBase58("2WyAnfgsovvasZ3kFZEBzqniARbEFTAd1XrToqKoBD5W")
 	require.NoError(t, err)
 	digester := OffchainConfigDigester{
 		ProgramID: programID,
