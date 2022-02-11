@@ -16,8 +16,8 @@ const (
 	// Timestamp(uint64), Answer
 	TransmissionLenV1 uint64 = 8 + 16
 
-	// Version, Store, Writer, Description, Decimals, FlaggingThreshold, LatestRoundID, Granularity, LiveLength, LiveCursor, HistoricalCursor
-	HeaderLen uint64 = 1 + 32 + 32 + 32 + 1 + 4 + 4 + 1 + 4 + 4 + 4
+	// Version, State, Owner, ProposedOwner, Writer, Description, Decimals, FlaggingThreshold, LatestRoundID, Granularity, LiveLength, LiveCursor, HistoricalCursor
+	HeaderLen uint64 = 1 + 1 + 32 + 32 + 32 + 32 + 1 + 4 + 4 + 1 + 4 + 4 + 4
 
 	// Report data (61 bytes)
 	MedianLen uint64 = 16

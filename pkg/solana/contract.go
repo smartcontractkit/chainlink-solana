@@ -278,7 +278,7 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 		transmissionLen = TransmissionLenV1
 	}
 
-	var transmissionOffset uint64 = 8 + 128 + (uint64(cursor) * transmissionLen)
+	var transmissionOffset uint64 = 8 + 192 + (uint64(cursor) * transmissionLen)
 	res, err = client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
 		Commitment: rpcCommitment,

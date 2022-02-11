@@ -346,7 +346,6 @@ describe("ocr2", async () => {
       liveLength,
       {
         accounts: {
-          store: store.publicKey,
           feed: transmissions.publicKey,
           authority: owner.publicKey,
         },
@@ -354,7 +353,7 @@ describe("ocr2", async () => {
         preInstructions: [
           await workspace.Store.account.transmissions.createInstruction(
             transmissions,
-            8 + 128 + 6 * 24
+            8 + 192 + 6 * 24
           ),
         ],
       }
@@ -364,8 +363,8 @@ describe("ocr2", async () => {
     // Configure threshold for the feed
     await workspace.Store.rpc.setValidatorConfig(flaggingThreshold, {
       accounts: {
-        store: store.publicKey,
         feed: transmissions.publicKey,
+        owner: owner.publicKey,
         authority: owner.publicKey,
       },
       signers: [],
@@ -381,49 +380,49 @@ describe("ocr2", async () => {
     );
   });
 
-  it("Migrates the feed", async () => {
-    let transmissionAccounts = [
-      {
-        pubkey: transmissions.publicKey,
-        isSigner: false,
-        isWritable: true,
-      },
-    ];
-    const migrateData = workspace.Store.coder.instruction.encode("migrate", {});
-    const migrateAccounts = [
-      {
-        pubkey: store.publicKey,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: owner.publicKey,
-        isSigner: true,
-        isWritable: false,
-      },
-      ...transmissionAccounts,
-    ];
-    const tx = new Transaction();
-    tx.add(
-      new TransactionInstruction({
-        data: migrateData,
-        keys: migrateAccounts,
-        programId: workspace.Store.programId,
-      })
-    );
+  // it("Migrates the feed", async () => {
+  //   let transmissionAccounts = [
+  //     {
+  //       pubkey: transmissions.publicKey,
+  //       isSigner: false,
+  //       isWritable: true,
+  //     },
+  //   ];
+  //   const migrateData = workspace.Store.coder.instruction.encode("migrate", {});
+  //   const migrateAccounts = [
+  //     {
+  //       pubkey: store.publicKey,
+  //       isSigner: false,
+  //       isWritable: true,
+  //     },
+  //     {
+  //       pubkey: owner.publicKey,
+  //       isSigner: true,
+  //       isWritable: false,
+  //     },
+  //     ...transmissionAccounts,
+  //   ];
+  //   const tx = new Transaction();
+  //   tx.add(
+  //     new TransactionInstruction({
+  //       data: migrateData,
+  //       keys: migrateAccounts,
+  //       programId: workspace.Store.programId,
+  //     })
+  //   );
 
-    try {
-      await provider.send(tx, []);
-    } catch (err) {
-      // Translate IDL error
-      const idlErrors = anchor.parseIdlErrors(program.idl);
-      let translatedErr = ProgramError.parse(err, idlErrors);
-      if (translatedErr === null) {
-        throw err;
-      }
-      throw translatedErr;
-    }
-  });
+  //   try {
+  //     await provider.send(tx, []);
+  //   } catch (err) {
+  //     // Translate IDL error
+  //     const idlErrors = anchor.parseIdlErrors(program.idl);
+  //     let translatedErr = ProgramError.parse(err, idlErrors);
+  //     if (translatedErr === null) {
+  //       throw err;
+  //     }
+  //     throw translatedErr;
+  //   }
+  // });
 
   it("Initializes the OCR2 config", async () => {
     await program.rpc.initialize(
@@ -448,7 +447,7 @@ describe("ocr2", async () => {
         signers: [state],
         preInstructions: [
           await program.account.state.createInstruction(state),
-          // await store.account.transmissions.createInstruction(transmissions, 8+128+8096*24),
+          // await store.account.transmissions.createInstruction(transmissions, 8+192+8096*24),
           // createFeed,
         ],
       }
@@ -639,8 +638,8 @@ describe("ocr2", async () => {
     );
 
     // log raw state account data
-    let rawAccount = await provider.connection.getAccountInfo(state.publicKey);
-    console.dir([...rawAccount.data], { maxArrayLength: null });
+    // let rawAccount = await provider.connection.getAccountInfo(state.publicKey);
+    // console.dir([...rawAccount.data], { maxArrayLength: null });
   });
 
   let proposal = Keypair.generate();
@@ -738,8 +737,8 @@ describe("ocr2", async () => {
   it("Sets the cluster as the feed writer", async () => {
     await workspace.Store.rpc.setWriter(storeAuthority, {
       accounts: {
-        store: store.publicKey,
         feed: transmissions.publicKey,
+        owner: owner.publicKey,
         authority: owner.publicKey,
       },
     });
@@ -839,7 +838,7 @@ describe("ocr2", async () => {
         roundSchema,
         Round
       );
-      assert.ok(new BN(round.answer, 10, "le").toNumber() == i);
+      assert.equal(new BN(round.answer, 10, "le").toNumber(), i);
     }
   });
 
@@ -850,8 +849,8 @@ describe("ocr2", async () => {
 
     await workspace.Store.rpc.closeFeed({
       accounts: {
-        store: store.publicKey,
         feed: transmissions.publicKey,
+        owner: owner.publicKey,
         receiver: provider.wallet.publicKey,
         authority: owner.publicKey,
       },
