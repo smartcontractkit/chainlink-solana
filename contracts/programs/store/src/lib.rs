@@ -312,8 +312,7 @@ fn is_valid(flagging_threshold: u32, previous_answer: i128, answer: i128) -> boo
 
 // Only owner access
 fn owner<'info>(owner: &UncheckedAccount<'info>, authority: &Signer) -> ProgramResult {
-    let store: std::result::Result<AccountLoader<'info, State>, _> =
-        AccountLoader::try_from(&owner);
+    let store: std::result::Result<AccountLoader<'info, State>, _> = AccountLoader::try_from(owner);
 
     let owner = match store {
         // if the feed is owned by a store, validate the store's owner signed
@@ -337,7 +336,7 @@ fn has_lowering_access(
     controller: &UncheckedAccount,
     authority: &Signer,
 ) -> ProgramResult {
-    let store: std::result::Result<AccountLoader<State>, _> = AccountLoader::try_from(&owner);
+    let store: std::result::Result<AccountLoader<State>, _> = AccountLoader::try_from(owner);
 
     match store {
         // if the feed is owned by a store
@@ -358,7 +357,7 @@ fn has_lowering_access(
                 InvalidInput
             );
 
-            let controller: AccountLoader<AccessController> = AccountLoader::try_from(&controller)?;
+            let controller = AccountLoader::try_from(controller)?;
 
             // Check if the key is present on the access controller
             let has_access = access_controller::has_access(&controller, authority.key)
