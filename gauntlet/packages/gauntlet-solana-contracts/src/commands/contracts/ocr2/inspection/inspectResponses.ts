@@ -10,6 +10,11 @@ export default class OCR2InspectResponses extends SolanaCommand {
   static id = 'ocr2:inspect:responses'
   static category = CONTRACT_LIST.OCR_2
 
+  static examples = [
+    'yarn gauntlet ocr2:inspect:responses --network=devnet --rdd=[PATH_TO_RDD] [AGGREGATOR_ADDRESS]',
+    'yarn gauntlet ocr2:inspect:responses [AGGREGATOR_ADDRESS]',
+  ]
+
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
 
@@ -18,15 +23,13 @@ export default class OCR2InspectResponses extends SolanaCommand {
 
   constructor(flags, args) {
     super(flags, args)
-
-    this.require(!!this.flags.state, 'Please provide flags with "state""')
   }
 
   execute = async () => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
 
-    const state = new PublicKey(this.flags.state)
+    const state = new PublicKey(this.args[0])
     const input = this.makeInput(this.flags.input)
     const data = await program.account.state.fetch(state)
 
