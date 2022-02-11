@@ -48,7 +48,7 @@ export default class Fund extends SolanaCommand {
     )
 
     logger.loading(`Transferring ${amount} tokens to ${state.toString()} token vault ${tokenVault.toString()}...`)
-    const tx = await token.transfer(from, tokenVault, this.wallet.payer, [], amount)
+    const tx = await token.transfer(from, tokenVault, this.wallet.payer, [], amount.toNumber())
 
     return {
       responses: [
