@@ -3,26 +3,26 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { utils } from '@project-serum/anchor'
 import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
 
 export default class Fund extends SolanaCommand {
   static id = 'ocr2:fund'
   static category = CONTRACT_LIST.OCR_2
 
-  static examples = ['yarn gauntlet ocr2:fund --network=devnet --state=[ADDRESS] --amount=[AMOUNT]']
+  static examples = ['yarn gauntlet ocr2:fund --network=devnet --amount=[AMOUNT] [AGGREGATOR_ADDRESS]']
 
   constructor(flags, args) {
     super(flags, args)
 
-    this.requireFlag('state', 'Provide a --state flag with a valid aggregator address')
+    this.requireArgs('Please provide an aggregator address')
+    this.requireFlag('amount', 'Provide an --amount flag')
   }
 
   execute = async () => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
 
-    const state = new PublicKey(this.flags.state)
+    const state = new PublicKey(this.args[0])
     const amount = new BN(this.flags.amount)
 
     const linkPublicKey = new PublicKey(this.flags.link || process.env.LINK)

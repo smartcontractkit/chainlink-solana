@@ -4,9 +4,9 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey, TransactionInstruction } from '@solana/web3.js'
 import { MAX_TRANSACTION_BYTES, ORACLES_MAX_LENGTH } from '../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { getRDD } from '../../../lib/rdd'
 import { divideIntoChunks } from '../../../lib/utils'
 import { serializeOffchainConfig } from '../../../lib/encoding'
+import RDD from '../../../lib/rdd'
 
 export type OffchainConfig = {
   deltaProgressNanoseconds: number
@@ -42,12 +42,13 @@ export default class ProposeOffchainConfig extends SolanaCommand {
   static id = 'ocr2:propose_offchain_config'
   static category = CONTRACT_LIST.OCR_2
 
-  static examples = ['yarn gauntlet ocr2:propose_offchain_config --network=devnet --proposalId=<PROPOSAL_ID>']
+  static examples = ['yarn gauntlet ocr2:propose_offchain_config --network=devnet --rdd=[PATH_TO_RDD] --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC <PROPOSAL_ID>']
 
   constructor(flags, args) {
     super(flags, args)
 
-    this.require(!!this.flags.proposalId, 'Please provide flags with "proposalId"')
+    this.require(!!this.flags.state, 'Please provide flags with "state"')
+    this.requireArgs('Please provide a proposalId')
     this.require(
       !!process.env.SECRET,
       'Please specify the Gauntlet secret words e.g. SECRET="awe fluke polygon tonic lilly acuity onyx debra bound gilbert wane"',
@@ -103,12 +104,14 @@ export default class ProposeOffchainConfig extends SolanaCommand {
   }
 
   makeInput = (userInput: any): Input => {
-    // TODO: Some format validation for user input
     if (userInput) return userInput as Input
-    const rdd = getRDD(this.flags.rdd)
+    const network = this.flags.network || ''
+    const rddPath = this.flags.rdd || ''    
+    const rdd = RDD.load(network, rddPath)
+
     return {
       offchainConfig: ProposeOffchainConfig.makeInputFromRDD(rdd, this.flags.state),
-      proposalId: this.flags.proposalId,
+      proposalId: this.args[0],
     }
   }
 

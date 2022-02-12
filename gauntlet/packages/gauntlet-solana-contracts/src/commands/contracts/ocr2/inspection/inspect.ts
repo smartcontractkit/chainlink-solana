@@ -39,11 +39,12 @@ export default class OCR2Inspect extends SolanaCommand {
     const rddPath = this.flags.rdd || ''
     const billingAccessController = this.flags.billingAccessController || process.env.BILLING_ACCESS_CONTROLLER
     const requesterAccessController = this.flags.requesterAccessController || process.env.REQUESTER_ACCESS_CONTROLLER
+
     const rdd = RDD.load(network, rddPath)
     const aggregator = RDD.loadAggregator(network, rddPath, this.args[0])
     const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
     const transmitters = aggregatorOperators.map((operator) => rdd.operators[operator].ocrNodeAddress[0])
-    const offchainConfig = WriteOffchainConfig.makeInputFromRDD(rdd, this.flags.state)
+    const offchainConfig = WriteOffchainConfig.makeInputFromRDD(rdd, this.args[0])
 
     return {
       description: aggregator.name,
@@ -128,7 +129,7 @@ export default class OCR2Inspect extends SolanaCommand {
 
     const input = this.makeInput(this.flags.input)
 
-    const state = new PublicKey(this.flags.state)
+    const state = new PublicKey(this.args[0])
     const onChainState = await ocr2program.account.state.fetch(state)
 
     const bufferedConfig = Buffer.from(onChainState.offchainConfig.xs).slice(

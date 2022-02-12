@@ -10,7 +10,6 @@ import {
 } from '@solana/web3.js'
 import { utils } from '@project-serum/anchor'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { getRDD } from '../../../lib/rdd'
 import { encodeInstruction, makeTx } from '../../../lib/utils'
 import { UPGRADEABLE_BPF_LOADER_PROGRAM_ID } from '../../../lib/constants'
 import { makeRawUpgradeTransaction } from '../../abstract/upgrade'
