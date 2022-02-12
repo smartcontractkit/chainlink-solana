@@ -8,11 +8,9 @@ export default class ResetPendingOffchainConfig extends SolanaCommand {
   static id = 'ocr2:reset_pending_offchain_config'
   static category = CONTRACT_LIST.OCR_2
 
-  static examples = ['yarn gauntlet ocr2:reset_pending_offchain_config --network=devnet --state=[OCR2_STATE]']
+  static examples = ['yarn gauntlet ocr2:reset_pending_offchain_config --network=devnet [OCR2_STATE]']
   constructor(flags, args) {
     super(flags, args)
-
-    this.require(!!this.flags.state, 'Please provide flags with "state"')
   }
 
   makeRawTransaction = async (signer: PublicKey): Promise<RawTransaction[]> => {
@@ -20,7 +18,7 @@ export default class ResetPendingOffchainConfig extends SolanaCommand {
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
 
-    const state = new PublicKey(this.flags.state)
+    const state = new PublicKey(this.args[0])
 
     const info = await program.account.state.fetch(state)
     console.log(info.config.pendingOffchainConfig)

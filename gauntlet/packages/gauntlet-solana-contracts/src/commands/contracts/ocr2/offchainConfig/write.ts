@@ -4,9 +4,9 @@ import { RawTransaction, SolanaCommand, TransactionResponse } from '@chainlink/g
 import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { MAX_TRANSACTION_BYTES, ORACLES_MAX_LENGTH } from '../../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
-import { getRDD } from '../../../../lib/rdd'
 import { divideIntoChunks } from '../../../../lib/utils'
 import { serializeOffchainConfig } from '../../../../lib/encoding'
+import RDD from '../../../lib/rdd'
 
 export type Input = {
   deltaProgressNanoseconds: number
@@ -38,23 +38,21 @@ export default class WriteOffchainConfig extends SolanaCommand {
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:write_offchain_config --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet ocr2:write_offchain_config --network=devnet --rdd=[PATH_TO_RDD] EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet ocr2:write_offchain_config EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
 
   constructor(flags, args) {
     super(flags, args)
 
-    this.require(!!this.flags.state, 'Please provide flags with "state"')
     this.require(
       !!process.env.SECRET,
       'Please specify the Gauntlet secret words e.g. SECRET="awe fluke polygon tonic lilly acuity onyx debra bound gilbert wane"',
     )
   }
 
-  static makeInputFromRDD = (rdd: any, stateAddress: string): Input => {
-    const aggregator = rdd.contracts[stateAddress]
+  static makeInputFromRDD = (rdd: any, aggregator: any): Input => {
     const config = aggregator.config
-
     const aggregatorOperators: any[] = aggregator.oracles
       .map((o) => rdd.operators[o.operator])
       .sort((a, b) => {
@@ -102,10 +100,12 @@ export default class WriteOffchainConfig extends SolanaCommand {
   }
 
   makeInput = (userInput: any): Input => {
-    // TODO: Some format validation for user input
     if (userInput) return userInput as Input
-    const rdd = getRDD(this.flags.rdd)
-    return WriteOffchainConfig.makeInputFromRDD(rdd, this.flags.state)
+    const network = this.flags.network || ''
+    const rddPath = this.flags.rdd || ''
+    const rdd = RDD.load(network, rddPath)
+    const aggregator = RDD.loadAggregator(network, rddPath, this.args[0])
+    return WriteOffchainConfig.makeInputFromRDD(rdd, aggregator)
   }
 
   validateInput = (input: Input): boolean => {
@@ -166,7 +166,7 @@ export default class WriteOffchainConfig extends SolanaCommand {
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
 
-    const state = new PublicKey(this.flags.state)
+    const state = new PublicKey(this.args[0])
     const input = this.makeInput(this.flags.input)
     const maxBufferSize = this.flags.bufferSize || MAX_TRANSACTION_BYTES
 

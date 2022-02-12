@@ -3,22 +3,21 @@ import { logger, prompt, BN } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
 import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
-import { getRDD } from '../../../../lib/rdd'
 import WriteOffchainConfig, { Input } from './write'
 import { serializeOffchainConfig } from '../../../../lib/encoding'
+import RDD from '../../../lib/rdd'
 
 export default class CommitOffchainConfig extends SolanaCommand {
   static id = 'ocr2:commit_offchain_config'
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:commit_offchain_config --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --rdd=<PATH_TO_RDD>',
-    'yarn gauntlet ocr2:commit_offchain_config --network=devnet --state=5oMNhuuRmxPGEk8ymvzJRAJFJGs7jaHsaxQ3Q2m6PVTR EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet ocr2:commit_offchain_config --network=devnet --rdd=[PATH_TO_RDD] EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet ocr2:commit_offchain_config EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
   constructor(flags, args) {
     super(flags, args)
 
-    this.require(!!this.flags.state, 'Please provide flags with "state"')
     this.require(
       !!process.env.SECRET,
       'Please specify the Gauntlet secret words e.g. SECRET="awe fluke polygon tonic lilly acuity onyx debra bound gilbert wane"',
@@ -27,8 +26,10 @@ export default class CommitOffchainConfig extends SolanaCommand {
 
   makeInput = (userInput: any): Input => {
     if (userInput) return userInput as Input
-    const rdd = getRDD(this.flags.rdd)
-    return WriteOffchainConfig.makeInputFromRDD(rdd, this.flags.state)
+    const network = this.flags.network || ''
+    const rddPath = this.flags.rdd || ''
+    const rdd = RDD.load(network, rddPath)
+    return WriteOffchainConfig.makeInputFromRDD(rdd, this.args[0])
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
@@ -37,7 +38,7 @@ export default class CommitOffchainConfig extends SolanaCommand {
     const program = this.loadProgram(ocr2.idl, address)
 
     const input = this.makeInput(this.flags.input)
-    const state = new PublicKey(this.flags.state)
+    const state = new PublicKey(this.args[0])
     const userSecret = this.flags.secret
     this.require(userSecret, 'Please provide the secret flag with the secret generated at write time')
 
