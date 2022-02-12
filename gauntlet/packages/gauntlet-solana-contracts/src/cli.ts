@@ -10,9 +10,10 @@ import { commands } from '.'
       existsSync(path.join(process.cwd(), networkPath)),
     )[0]
     const result = await executeCLI(commands, networkPath)
-    io.saveJSON(result, 'report')
+    if (result) io.saveJSON(result, 'report')
   } catch (e) {
     console.log(e)
     console.log('Solana Command execution error', e.message)
+    process.exitCode = 1
   }
 })()
