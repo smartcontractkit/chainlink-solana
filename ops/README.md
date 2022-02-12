@@ -7,7 +7,7 @@
   - [Local Solana Testnet](#local-solana-testnet)
   - [Pulumi Installation Instruction](#pulumi-installation-instruction)
 
-Using `pulumi` spin up a local testing environment using docker containers:
+Using `pulumi` spin up a locasl testing environment using docker containers:
 
 - Deploy the necessary relay components (CL node, psql DB, price feed adapters)
 - Connect the components together

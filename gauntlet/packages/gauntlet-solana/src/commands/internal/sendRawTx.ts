@@ -5,6 +5,8 @@ import SolanaCommand from './solana'
 import { TransactionResponse } from '../types'
 
 export default class SendRawTx extends SolanaCommand {
+  static id = 'send_raw_tx'
+
   constructor(flags, args) {
     super(flags, args)
 
