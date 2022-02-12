@@ -2,7 +2,7 @@ import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { RawTransaction, SolanaCommand } from '@chainlink/gauntlet-solana'
 import { AccountMeta, Keypair, PublicKey, SystemProgram } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { getRDD } from '../../../lib/rdd'
+import RDD from '../../../lib/rdd'
 
 type Input = {
   store: string
@@ -17,13 +17,16 @@ export default class CreateFeed extends SolanaCommand {
   static category = CONTRACT_LIST.STORE
 
   static examples = [
-    'yarn gauntlet store:create_feed --network=devnet --store=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet store:create_feed --network=devnet --rdd=[PATH_TO_RDD] [AGGREGATOR_ADDRESS]',
   ]
 
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
-    const rdd = getRDD(this.flags.rdd)
-    const aggregator = rdd.contracts[this.flags.id]
+    const network = this.flags.network || ''
+    const rddPath = this.flags.rdd || ''
+    const rdd = RDD.load(network, rddPath)
+    const aggregator = RDD.loadAggregator(network, rddPath, this.args[0])
+
     return {
       store: aggregator.storeAccount,
       granularity: aggregator.granularity,
