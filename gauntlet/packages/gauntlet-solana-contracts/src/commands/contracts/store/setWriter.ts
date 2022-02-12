@@ -4,8 +4,8 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { utils } from '@project-serum/anchor'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { getRDD } from '../../../lib/rdd'
 import { makeTx } from '../../../lib/utils'
+import RDD from '../../../lib/rdd'
 
 type Input = {
   transmissions: string
@@ -17,22 +17,22 @@ export default class SetWriter extends SolanaCommand {
   static category = CONTRACT_LIST.STORE
 
   static examples = [
-    'yarn gauntlet store:set_writer --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --ocrState=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet store:set_writer --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC [AGGREGATOR_ADDRESS]'
   ]
 
   constructor(flags, args) {
     super(flags, args)
-
-    this.require(!!this.flags.ocrState, 'Please provide flags with "ocrState"')
   }
 
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
-    const rdd = getRDD(this.flags.rdd)
-    const agg = rdd.contracts[this.flags.ocrState]
+    const network = this.flags.network || ''
+    const rddPath = this.flags.rdd || ''
+    const aggregator = RDD.loadAggregator(network, rddPath, this.args[0])
+
     return {
-      transmissions: agg.transmissionsAccount,
-      store: agg.storeAccount,
+      transmissions: aggregator.transmissionsAccount,
+      store: aggregator.storeAccount,
     }
   }
 
@@ -47,7 +47,7 @@ export default class SetWriter extends SolanaCommand {
     const input = this.makeInput(this.flags.input)
 
     const storeState = new PublicKey(input.store || this.flags.state)
-    const ocr2State = new PublicKey(this.flags.ocrState)
+    const ocr2State = new PublicKey(this.args[0])
     const feedState = new PublicKey(input.transmissions)
 
     logger.info(
@@ -75,13 +75,15 @@ export default class SetWriter extends SolanaCommand {
   execute = async () => {
     const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
     const txhash = await this.signAndSendRawTx(rawTx)
+    const input = this.makeInput(this.flags.input)
+    const state = input.store || this.flags.state
     logger.success(`Writer set on tx hash: ${txhash}`)
 
     return {
       responses: [
         {
-          tx: this.wrapResponse(txhash, this.flags.state),
-          contract: this.flags.state,
+          tx: this.wrapResponse(txhash, state),
+          contract: state,
         },
       ],
     } as Result<TransactionResponse>

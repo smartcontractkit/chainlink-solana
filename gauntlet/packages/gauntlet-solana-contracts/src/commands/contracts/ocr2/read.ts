@@ -13,8 +13,6 @@ export default class ReadState extends SolanaCommand {
 
   constructor(flags, args) {
     super(flags, args)
-
-    this.require(!!this.flags.state, 'Please provide flags with "state""')
   }
 
   deserializeConfig = async (buffer: Buffer): Promise<any> => {
@@ -31,7 +29,7 @@ export default class ReadState extends SolanaCommand {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
 
-    const state = new PublicKey(this.flags.state)
+    const state = new PublicKey(this.args[0])
     // read could be abstract. account.accessController is just the name of the account that can be got form the camelcase(schema.accounts[x].name)
     const data = await program.account.state.fetch(state)
 

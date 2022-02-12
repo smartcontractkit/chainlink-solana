@@ -4,7 +4,7 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { ORACLES_MAX_LENGTH } from '../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { getRDD } from '../../../lib/rdd'
+import RDD from '../../../lib/rdd'
 
 type Input = {
   oracles: {
@@ -20,13 +20,15 @@ export default class ProposeConfig extends SolanaCommand {
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:propose_config --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet ocr2:propose_config --network=devnet --rdd=[PATH_TO_RDD] --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC <PROPOSAL_ID>',
   ]
 
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
-    const rdd = getRDD(this.flags.rdd)
-    const aggregator = rdd.contracts[this.flags.state]
+    const network = this.flags.network || ''
+    const rddPath = this.flags.rdd || ''
+    const rdd = RDD.load(network, rddPath)
+    const aggregator = RDD.loadAggregator(network, rddPath, this.flags.state)
     const _toHex = (a: string) => Buffer.from(a, 'hex')
     const aggregatorOperators: any[] = aggregator.oracles.map((o) => rdd.operators[o.operator])
     const oracles = aggregatorOperators
@@ -39,15 +41,14 @@ export default class ProposeConfig extends SolanaCommand {
     return {
       oracles,
       f,
-      proposalId: this.flags.proposalId,
+      proposalId: this.args[0],
     }
   }
 
   constructor(flags, args) {
     super(flags, args)
-
     this.require(!!this.flags.state, 'Please provide flags with "state"')
-    this.require(!!this.flags.proposalId, 'Please provide flags with "proposalId"')
+    this.requireArgs('Please provide a proposalId')
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
@@ -73,7 +74,7 @@ export default class ProposeConfig extends SolanaCommand {
     )
 
     logger.log('Config information:', input)
-    const ix = await program.instruction.proposeConfig(oracles, f, {
+    const ix = program.instruction.proposeConfig(oracles, f, {
       accounts: {
         proposal,
         authority: signer,
@@ -85,15 +86,15 @@ export default class ProposeConfig extends SolanaCommand {
 
   execute = async () => {
     const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
-    await prompt(`Continue setting config on ${this.flags.state.toString()}?`)
+    await prompt(`Continue setting config on ${this.args[0].toString()}?`)
     const txhash = await this.signAndSendRawTx(rawTx)
     logger.success(`Config set on tx ${txhash}`)
 
     return {
       responses: [
         {
-          tx: this.wrapResponse(txhash, this.flags.state),
-          contract: this.flags.state,
+          tx: this.wrapResponse(txhash, this.args[0]),
+          contract: this.args[0],
         },
       ],
     } as Result<TransactionResponse>

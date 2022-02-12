@@ -18,15 +18,13 @@ export default class Inspect extends SolanaCommand {
 
   constructor(flags, args) {
     super(flags, args)
-
-    this.require(!!this.flags.state, 'Please provide flags with "state""')
   }
 
   execute = async () => {
     const store = getContract(CONTRACT_LIST.STORE, '')
     const program = this.loadProgram(store.idl, store.programId.toString())
 
-    const state = new PublicKey(this.flags.state)
+    const state = new PublicKey(this.args[0])
     const data = await program.account.store.fetch(state)
 
     console.log('DATA:', data)

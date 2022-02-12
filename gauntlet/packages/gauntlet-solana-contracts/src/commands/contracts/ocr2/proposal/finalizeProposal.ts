@@ -8,10 +8,11 @@ export default class FinalizeProposal extends SolanaCommand {
   static id = 'ocr2:finalize_proposal'
   static category = CONTRACT_LIST.OCR_2
 
-  static examples = ['yarn gauntlet ocr2:finalize_proposal --network=devnet --proposalId=<PROPOSAL_ID>']
+  static examples = ['yarn gauntlet ocr2:finalize_proposal --network=devnet <PROPOSAL_ID>']
 
   constructor(flags, args) {
     super(flags, args)
+    this.requireArgs('Please provide a proposalId')
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
@@ -19,7 +20,7 @@ export default class FinalizeProposal extends SolanaCommand {
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
 
-    const proposal = new PublicKey(this.flags.proposalId)
+    const proposal = new PublicKey(this.args[0])
     const finalizeIx = program.instruction.finalizeProposal({
       accounts: {
         proposal: proposal,

@@ -9,13 +9,12 @@ export default class SetLoweringAccessController extends SolanaCommand {
   static category = CONTRACT_LIST.STORE
 
   static examples = [
-    'yarn gauntlet store:set_lowering_access_controller --network=local --state=[STATE_ACC] --accessController=[AC_ACC]',
+    'yarn gauntlet store:set_lowering_access_controller --network=devnet --accessController=[AC_ACC] [AGGREGATOR_ADDRESS]',
   ]
 
   constructor(flags, args) {
     super(flags, args)
 
-    this.requireFlag('state', 'Provide a valid state address')
     this.requireFlag('accessController', 'Provide a valid access controller address')
   }
 
@@ -24,7 +23,7 @@ export default class SetLoweringAccessController extends SolanaCommand {
     const address = store.programId.toString()
     const program = this.loadProgram(store.idl, address)
 
-    const state = new PublicKey(this.flags.state)
+    const state = new PublicKey(this.args[0])
     const ac = new PublicKey(this.flags.accessController)
 
     const info = await program.account.store.fetch(state)

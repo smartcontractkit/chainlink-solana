@@ -4,7 +4,7 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { getRDD } from '../../../lib/rdd'
+import RDD from '../../../lib/rdd'
 
 type Input = {
   operators: {
@@ -19,13 +19,16 @@ export default class ProposePayees extends SolanaCommand {
   static id = 'ocr2:propose_payees'
   static category = CONTRACT_LIST.OCR_2
   static examples = [
-    'yarn gauntlet ocr2:propose_payees --network=local --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --proposalId=<PROPOSAL_ID>',
+    'yarn gauntlet ocr2:propose_payees --network=devnet --rdd=[PATH_TO_RDD] --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC <PROPOSAL_ID>',
+    'yarn gauntlet ocr2:propose_payees EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
 
   makeInput = (userInput: any): Input => {
     if (userInput) return userInput as Input
-    const rdd = getRDD(this.flags.rdd)
-    const aggregator = rdd.contracts[this.flags.state]
+    const network = this.flags.network || ''
+    const rddPath = this.flags.rdd || ''
+    const rdd = RDD.load(network, rddPath)
+    const aggregator = RDD.loadAggregator(network, rddPath, this.flags.state)
     const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
     const operators = aggregatorOperators.map((operator) => ({
       transmitter: rdd.operators[operator].ocrNodeAddress[0],
@@ -40,8 +43,8 @@ export default class ProposePayees extends SolanaCommand {
   constructor(flags, args) {
     super(flags, args)
 
-    this.requireFlag('state', 'Provide a valid state address')
-    this.requireFlag('proposalId', 'Provide a valid proposal address')
+    this.require(!!this.flags.state, 'Please provide flags with "state"')
+    this.requireArgs('Please provide a proposalId')
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
@@ -50,7 +53,7 @@ export default class ProposePayees extends SolanaCommand {
     const program = this.loadProgram(ocr2.idl, address)
 
     const input = this.makeInput(this.flags.input)
-    const proposal = new PublicKey(this.flags.proposalId)
+    const proposal = new PublicKey(this.args[0])
     const link = new PublicKey(this.flags.link || process.env.LINK)
 
     const token = new Token(this.provider.connection, link, TOKEN_PROGRAM_ID, {
@@ -112,8 +115,8 @@ export default class ProposePayees extends SolanaCommand {
     return {
       responses: [
         {
-          tx: this.wrapResponse(txhash, this.flags.state),
-          contract: this.flags.state,
+          tx: this.wrapResponse(txhash, this.args[0]),
+          contract: this.args[0],
         },
       ],
     } as Result<TransactionResponse>

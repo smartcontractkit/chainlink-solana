@@ -7,8 +7,8 @@ import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { utils } from '@project-serum/anchor'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import ProposeOffchainConfig, { OffchainConfig } from '../proposeOffchainConfig'
-import { getRDD } from '../../../../lib/rdd'
 import { serializeOffchainConfig } from '../../../../lib/encoding'
+import RDD from '../../../../lib/rdd'
 
 type Input = {
   version: number
@@ -61,13 +61,15 @@ export default class AcceptProposal extends SolanaCommand {
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:accept_proposal --network=devnet --state=<STATE_ADDRESS> --proposalId=<PROPOSAL_ID> --rdd=<PATH_TO_RDD>',
+    'yarn gauntlet ocr2:accept_proposal --network=devnet --state=<STATE_ADDRESS> --rdd=<PATH_TO_RDD> <PROPOSAL_ID>',
   ]
 
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
 
-    const rdd = getRDD(this.flags.rdd)
+    const network = this.flags.network || ''
+    const rddPath = this.flags.rdd || ''
+    const rdd = RDD.load(network, rddPath)
     const aggregator = rdd.contracts[this.flags.state]
     const _toHex = (a: string) => Buffer.from(a, 'hex')
     const aggregatorOperators: any[] = aggregator.oracles.map((o) => rdd.operators[o.operator])
@@ -95,7 +97,7 @@ export default class AcceptProposal extends SolanaCommand {
     super(flags, args)
 
     this.require(!!this.flags.state, 'Please provide flags with "state"')
-    this.require(!!this.flags.proposalId, 'Please provide flags with "proposal"')
+    this.requireArgs('Please provide a proposalId')
     this.require(!!this.flags.secret, 'Please provide flags with "secret"')
     this.require(!!process.env.SECRET, 'Please set the SECRET env var')
   }
@@ -159,7 +161,7 @@ export default class AcceptProposal extends SolanaCommand {
     const program = this.loadProgram(ocr2.idl, address)
 
     const state = new PublicKey(this.flags.state)
-    const proposal = new PublicKey(this.flags.proposalId)
+    const proposal = new PublicKey(this.args[0])
     const input = this.makeInput(this.flags.input)
 
     const proposalInfo = (await program.account.proposal.fetch(proposal)) as Proposal
