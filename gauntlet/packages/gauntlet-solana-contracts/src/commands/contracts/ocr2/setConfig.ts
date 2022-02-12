@@ -4,8 +4,8 @@ import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/g
 import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { ORACLES_MAX_LENGTH } from '../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { getRDD } from '../../../lib/rdd'
 import { makeTx } from '../../../lib/utils'
+import RDD from '../../../lib/rdd'
 
 type Input = {
   oracles: {
@@ -19,13 +19,16 @@ export default class SetConfig extends SolanaCommand {
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:set_config --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet ocr2:set_config --network=devnet --rdd=[PATH_TO_RDD] EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet ocr2:set_config EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
 
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
-    const rdd = getRDD(this.flags.rdd)
-    const aggregator = rdd.contracts[this.flags.state]
+    const network = this.flags.network || ''
+    const rddPath = this.flags.rdd || ''
+    const rdd = RDD.load(network, rddPath)
+    const aggregator = RDD.loadAggregator(network, rddPath, this.args[0])
     const aggregatorOperators: any[] = aggregator.oracles.map((o) => rdd.operators[o.operator])
     const oracles = aggregatorOperators.map((operator) => ({
       // Same here
@@ -41,8 +44,6 @@ export default class SetConfig extends SolanaCommand {
 
   constructor(flags, args) {
     super(flags, args)
-
-    this.require(!!this.flags.state, 'Please provide flags with "state"')
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
@@ -50,7 +51,7 @@ export default class SetConfig extends SolanaCommand {
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
 
-    const state = new PublicKey(this.flags.state)
+    const state = new PublicKey(this.args[0])
     const input = this.makeInput(this.flags.input)
 
     const oracles = input.oracles.map(({ signer, transmitter }) => ({
@@ -96,15 +97,15 @@ export default class SetConfig extends SolanaCommand {
 
   execute = async () => {
     const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
-    await prompt(`Continue setting config on ${this.flags.state.toString()}?`)
+    await prompt(`Continue setting config on ${this.args[0].toString()}?`)
     const txhash = await this.signAndSendRawTx(rawTx)
     logger.success(`Config set on tx ${txhash}`)
 
     return {
       responses: [
         {
-          tx: this.wrapResponse(txhash, this.flags.state),
-          contract: this.flags.state,
+          tx: this.wrapResponse(txhash, this.args[0]),
+          contract: this.args[0],
         },
       ],
     } as Result<TransactionResponse>

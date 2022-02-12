@@ -5,7 +5,7 @@ import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import WriteOffchainConfig, { Input } from './write'
 import { serializeOffchainConfig } from '../../../../lib/encoding'
-import RDD from '../../../lib/rdd'
+import RDD from '../../../../lib/rdd'
 
 export default class CommitOffchainConfig extends SolanaCommand {
   static id = 'ocr2:commit_offchain_config'

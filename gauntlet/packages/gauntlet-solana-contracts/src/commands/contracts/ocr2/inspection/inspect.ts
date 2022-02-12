@@ -7,7 +7,7 @@ import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import WriteOffchainConfig, { Input as OffchainConfigInput } from '../offchainConfig/write'
 import { descriptor as OCR2Descriptor } from '../../../../lib/ocr2Proto'
 import { toComparableLongNumber, toComparableNumber, toComparablePubKey } from '../../../../lib/inspection'
-import RDD from '../../../lib/rdd'
+import RDD from '../../../../lib/rdd'
 
 type Input = {
   description: string

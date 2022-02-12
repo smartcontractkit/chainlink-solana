@@ -4,8 +4,8 @@ import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/g
 import { AccountMeta, PublicKey } from '@solana/web3.js'
 import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { getRDD } from '../../../lib/rdd'
 import { makeTx } from '../../../lib/utils'
+import RDD from '../../../lib/rdd'
 
 type Input = {
   operators: {
@@ -20,13 +20,16 @@ export default class SetPayees extends SolanaCommand {
   static id = 'ocr2:set_payees'
   static category = CONTRACT_LIST.OCR_2
   static examples = [
-    'yarn gauntlet ocr2:set_payees --network=local --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet ocr2:set_payees --network=devnet --rdd=[PATH_TO_RDD] EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet ocr2:set_payees EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
 
   makeInput = (userInput: any): Input => {
     if (userInput) return userInput as Input
-    const rdd = getRDD(this.flags.rdd)
-    const aggregator = rdd.contracts[this.flags.state]
+    const network = this.flags.network || ''
+    const rddPath = this.flags.rdd || ''
+    const rdd = RDD.load(network, rddPath)
+    const aggregator = RDD.loadAggregator(network, rddPath, this.args[0])
     const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
     const operators = aggregatorOperators.map((operator) => ({
       transmitter: rdd.operators[operator].ocrNodeAddress[0],
@@ -40,8 +43,6 @@ export default class SetPayees extends SolanaCommand {
 
   constructor(flags, args) {
     super(flags, args)
-
-    this.requireFlag('state', 'Provide a valid state address')
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
@@ -50,7 +51,7 @@ export default class SetPayees extends SolanaCommand {
     const program = this.loadProgram(ocr2.idl, address)
 
     const input = this.makeInput(this.flags.input)
-    const state = new PublicKey(this.flags.state)
+    const state = new PublicKey(this.args[0])
     const link = new PublicKey(this.flags.link || process.env.LINK)
 
     const info = await program.account.state.fetch(state)
@@ -132,8 +133,8 @@ export default class SetPayees extends SolanaCommand {
     return {
       responses: [
         {
-          tx: this.wrapResponse(txhash, this.flags.state),
-          contract: this.flags.state,
+          tx: this.wrapResponse(txhash, this.args[0]),
+          contract: this.args[0],
         },
       ],
     } as Result<TransactionResponse>

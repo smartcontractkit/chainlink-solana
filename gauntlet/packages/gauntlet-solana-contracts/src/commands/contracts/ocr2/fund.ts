@@ -10,19 +10,17 @@ export default class Fund extends SolanaCommand {
   static id = 'ocr2:fund'
   static category = CONTRACT_LIST.OCR_2
 
-  static examples = ['yarn gauntlet ocr2:fund --network=devnet --state=[ADDRESS] --amount=[AMOUNT]']
+  static examples = ['yarn gauntlet ocr2:fund --network=devnet --amount=[AMOUNT] [AGGREGATOR_ADDRESS]']
 
   constructor(flags, args) {
     super(flags, args)
-
-    this.requireFlag('state', 'Provide a --state flag with a valid address')
   }
 
   execute = async () => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
 
-    const state = new PublicKey(this.flags.state)
+    const state = new PublicKey(this.args[0])
     const amount = new BN(this.flags.amount)
 
     const [vaultAuthority, _vaultNonce] = await PublicKey.findProgramAddress(

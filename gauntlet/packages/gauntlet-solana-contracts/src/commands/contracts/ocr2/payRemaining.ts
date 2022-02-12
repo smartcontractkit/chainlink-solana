@@ -12,13 +12,11 @@ export default class PayRemaining extends SolanaCommand {
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:pay_remaining --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet ocr2:pay_remaining --network=devnet EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
 
   constructor(flags, args) {
     super(flags, args)
-
-    this.require(!!this.flags.state, 'Please provide flags with "state"')
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
@@ -26,7 +24,7 @@ export default class PayRemaining extends SolanaCommand {
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
 
-    const state = new PublicKey(this.flags.state)
+    const state = new PublicKey(this.args[0])
     const stateData = await program.account.state.fetch(state)
     const billingAC = new PublicKey(stateData.config.billingAccessController)
     const link = new PublicKey(this.flags.link || process.env.LINK)
@@ -105,15 +103,15 @@ export default class PayRemaining extends SolanaCommand {
 
   execute = async () => {
     const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
-    await prompt(`Pay remaining on ${this.flags.state.toString()}?`)
+    await prompt(`Pay remaining on ${this.args[0].toString()}?`)
     const txhash = await this.signAndSendRawTx(rawTx)
     logger.success(`Remaining oracles paid on tx ${txhash}`)
 
     return {
       responses: [
         {
-          tx: this.wrapResponse(txhash, this.flags.state.toString()),
-          contract: this.flags.state,
+          tx: this.wrapResponse(txhash, this.args[0].toString()),
+          contract: this.args[0],
         },
       ],
     } as Result<TransactionResponse>

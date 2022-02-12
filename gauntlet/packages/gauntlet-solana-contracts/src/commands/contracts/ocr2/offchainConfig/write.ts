@@ -6,7 +6,7 @@ import { MAX_TRANSACTION_BYTES, ORACLES_MAX_LENGTH } from '../../../../lib/const
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import { divideIntoChunks } from '../../../../lib/utils'
 import { serializeOffchainConfig } from '../../../../lib/encoding'
-import RDD from '../../../lib/rdd'
+import RDD from '../../../../lib/rdd'
 
 export type Input = {
   deltaProgressNanoseconds: number
