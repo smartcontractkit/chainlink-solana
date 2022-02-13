@@ -27,10 +27,7 @@ export default class Initialize extends SolanaCommand {
     const txHash = await program.rpc.initialize({
       accounts: {
         state: state.publicKey,
-        payer: this.provider.wallet.publicKey,
         owner: owner.publicKey,
-        rent: SYSVAR_RENT_PUBKEY,
-        systemProgram: SystemProgram.programId,
       },
       signers: [owner, state],
       instructions: [await program.account.accessController.createInstruction(state)],
@@ -41,7 +38,6 @@ export default class Initialize extends SolanaCommand {
     console.log(`
     STATE ACCOUNTS:
       - State: ${state.publicKey}
-      - Payer: ${this.provider.wallet.publicKey}
       - Owner: ${owner.publicKey}
     `)
 

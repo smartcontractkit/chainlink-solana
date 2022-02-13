@@ -262,10 +262,7 @@ describe("ocr2", async () => {
     await accessController.rpc.initialize({
       accounts: {
         state: billingAccessController.publicKey,
-        payer: provider.wallet.publicKey,
         owner: owner.publicKey,
-        rent: SYSVAR_RENT_PUBKEY,
-        systemProgram: SystemProgram.programId,
       },
       signers: [billingAccessController],
       preInstructions: [
@@ -277,10 +274,7 @@ describe("ocr2", async () => {
     await accessController.rpc.initialize({
       accounts: {
         state: requesterAccessController.publicKey,
-        payer: provider.wallet.publicKey,
         owner: owner.publicKey,
-        rent: SYSVAR_RENT_PUBKEY,
-        systemProgram: SystemProgram.programId,
       },
       signers: [requesterAccessController],
       preInstructions: [
