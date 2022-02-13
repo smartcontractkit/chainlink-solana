@@ -39,7 +39,7 @@ pub mod ocr2 {
         state.version = 1;
 
         state.vault_nonce = *ctx.bumps.get("vault_authority").unwrap();
-        state.transmissions = ctx.accounts.transmissions.key();
+        state.feed = ctx.accounts.feed.key();
 
         let config = &mut state.config;
 
@@ -731,7 +731,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramRe
     let cpi_ctx = CpiContext::new(
         ctx.accounts.store_program.to_account_info(),
         store::cpi::accounts::Submit {
-            feed: ctx.accounts.transmissions.to_account_info(),
+            feed: ctx.accounts.feed.to_account_info(),
             authority: ctx.accounts.store_authority.to_account_info(),
         },
     );

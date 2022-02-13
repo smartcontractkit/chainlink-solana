@@ -14,7 +14,7 @@ use store::{Store, Transmissions};
 pub struct Initialize<'info> {
     #[account(zero)]
     pub state: AccountLoader<'info, State>,
-    pub transmissions: Account<'info, Transmissions>,
+    pub feed: Account<'info, Transmissions>,
     pub payer: AccountInfo<'info>,
     pub owner: Signer<'info>,
 
@@ -109,8 +109,8 @@ pub struct Transmit<'info> {
     #[account(mut)]
     pub state: AccountLoader<'info, State>,
     pub transmitter: Signer<'info>,
-    #[account(mut, address = state.load()?.transmissions)]
-    pub transmissions: Account<'info, Transmissions>,
+    #[account(mut, address = state.load()?.feed)]
+    pub feed: Account<'info, Transmissions>,
 
     pub store_program: Program<'info, Store>,
     pub store_authority: AccountInfo<'info>,
