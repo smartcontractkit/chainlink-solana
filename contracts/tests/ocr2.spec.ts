@@ -59,7 +59,7 @@ describe("ocr2", async () => {
 
   const state = Keypair.generate();
   // const stateSize = 8 + ;
-  const transmissions = Keypair.generate();
+  const feed = Keypair.generate();
   const payer = Keypair.generate();
   // const owner = Keypair.generate();
   const owner = provider.wallet;
@@ -199,7 +199,7 @@ describe("ocr2", async () => {
           { pubkey: state.publicKey, isWritable: true, isSigner: false },
           { pubkey: transmitter.publicKey, isWritable: false, isSigner: true },
           {
-            pubkey: transmissions.publicKey,
+            pubkey: feed.publicKey,
             isWritable: true,
             isSigner: false,
           },
@@ -328,7 +328,7 @@ describe("ocr2", async () => {
     console.log("Initializing...");
 
     console.log("state", state.publicKey.toBase58());
-    console.log("transmissions", transmissions.publicKey.toBase58());
+    console.log("feed", feed.publicKey.toBase58());
     console.log("payer", provider.wallet.publicKey.toBase58());
     console.log("owner", owner.publicKey.toBase58());
     console.log("tokenMint", token.publicKey.toBase58());
@@ -345,13 +345,13 @@ describe("ocr2", async () => {
       liveLength,
       {
         accounts: {
-          feed: transmissions.publicKey,
+          feed: feed.publicKey,
           authority: owner.publicKey,
         },
-        signers: [transmissions],
+        signers: [feed],
         preInstructions: [
           await workspace.Store.account.transmissions.createInstruction(
-            transmissions,
+            feed,
             8 + 192 + 6 * 24
           ),
         ],
@@ -362,7 +362,7 @@ describe("ocr2", async () => {
     // Configure threshold for the feed
     await workspace.Store.rpc.setValidatorConfig(flaggingThreshold, {
       accounts: {
-        feed: transmissions.publicKey,
+        feed: feed.publicKey,
         owner: owner.publicKey,
         authority: owner.publicKey,
       },
@@ -382,7 +382,7 @@ describe("ocr2", async () => {
   // it("Migrates the feed", async () => {
   //   let transmissionAccounts = [
   //     {
-  //       pubkey: transmissions.publicKey,
+  //       pubkey: feed.publicKey,
   //       isSigner: false,
   //       isWritable: true,
   //     },
@@ -430,7 +430,7 @@ describe("ocr2", async () => {
       {
         accounts: {
           state: state.publicKey,
-          transmissions: transmissions.publicKey,
+          feed: feed.publicKey,
           payer: provider.wallet.publicKey,
           owner: owner.publicKey,
           tokenMint: token.publicKey,
@@ -736,7 +736,7 @@ describe("ocr2", async () => {
   it("Sets the cluster as the feed writer", async () => {
     await workspace.Store.rpc.setWriter(storeAuthority, {
       accounts: {
-        feed: transmissions.publicKey,
+        feed: feed.publicKey,
         owner: owner.publicKey,
         authority: owner.publicKey,
       },
@@ -747,7 +747,7 @@ describe("ocr2", async () => {
     // transfer to the store
     await workspace.Store.rpc.transferFeedOwnership(store.publicKey, {
       accounts: {
-        feed: transmissions.publicKey,
+        feed: feed.publicKey,
         owner: owner.publicKey,
         authority: owner.publicKey,
       },
@@ -756,7 +756,7 @@ describe("ocr2", async () => {
     // accept (authority = store.owner)
     await workspace.Store.rpc.acceptFeedOwnership({
       accounts: {
-        feed: transmissions.publicKey,
+        feed: feed.publicKey,
         proposedOwner: store.publicKey,
         authority: owner.publicKey,
       },
@@ -765,9 +765,6 @@ describe("ocr2", async () => {
 
   it("Transmits a round", async () => {
     await transmit(1, 2, new BN(3));
-    let feed = await provider.connection.getAccountInfo(
-      transmissions.publicKey
-    );
   });
 
   it("Withdraws funds", async () => {
@@ -811,7 +808,7 @@ describe("ocr2", async () => {
   ]);
   it("Can call query", async () => {
     let round = await query(
-      transmissions.publicKey,
+      feed.publicKey,
       Scope.LatestRoundData,
       roundSchema,
       Round
@@ -822,7 +819,7 @@ describe("ocr2", async () => {
       [Round, { kind: "struct", fields: [["version", "u8"]] }],
     ]);
     let data = await query(
-      transmissions.publicKey,
+      feed.publicKey,
       Scope.Version,
       versionSchema,
       Round
@@ -833,7 +830,7 @@ describe("ocr2", async () => {
       [Round, { kind: "struct", fields: [["description", "string"]] }],
     ]);
     data = await query(
-      transmissions.publicKey,
+      feed.publicKey,
       Scope.Description,
       descriptionSchema,
       Round
@@ -852,7 +849,7 @@ describe("ocr2", async () => {
       console.log(t.meta.logMessages);
 
       let round = await query(
-        transmissions.publicKey,
+        feed.publicKey,
         Scope.LatestRoundData,
         roundSchema,
         Round
@@ -868,7 +865,7 @@ describe("ocr2", async () => {
 
     await workspace.Store.rpc.closeFeed({
       accounts: {
-        feed: transmissions.publicKey,
+        feed: feed.publicKey,
         owner: store.publicKey,
         receiver: provider.wallet.publicKey,
         authority: owner.publicKey,
@@ -883,7 +880,7 @@ describe("ocr2", async () => {
     assert.ok(afterBalance > beforeBalance);
 
     const closedAccount = await provider.connection.getAccountInfo(
-      transmissions.publicKey
+      feed.publicKey
     );
     assert.ok(closedAccount === null);
   });
@@ -909,7 +906,7 @@ describe("ocr2", async () => {
     assert.ok(afterBalance > beforeBalance);
 
     const closedAccount = await provider.connection.getAccountInfo(
-      transmissions.publicKey
+      feed.publicKey
     );
     assert.ok(closedAccount === null);
   });

@@ -93,7 +93,7 @@ pub struct State {
     pub config: Config,
     pub offchain_config: OffchainConfig,
     pub oracles: Oracles,
-    pub transmissions: Pubkey,
+    pub feed: Pubkey,
 }
 
 #[zero_copy]
