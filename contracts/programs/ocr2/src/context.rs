@@ -15,12 +15,13 @@ pub struct Initialize<'info> {
     #[account(zero)]
     pub state: AccountLoader<'info, State>,
     pub feed: Account<'info, Transmissions>,
-    pub payer: AccountInfo<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
     pub owner: Signer<'info>,
 
     pub token_mint: Account<'info, Mint>,
     #[account(
-        init_if_needed,
+        init,
         payer = payer,
         associated_token::mint = token_mint,
         associated_token::authority = vault_authority,
