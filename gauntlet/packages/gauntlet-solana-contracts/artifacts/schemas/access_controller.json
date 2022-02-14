@@ -20,24 +20,9 @@
           "isSigner": false
         },
         {
-          "name": "payer",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "owner",
           "isMut": false,
           "isSigner": true
-        },
-        {
-          "name": "rent",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": []
@@ -185,5 +170,8 @@
       "name": "Full",
       "msg": "Access list is full"
     }
-  ]
+  ],
+  "metadata": {
+    "address": "DzzjdPWNfwHZmzPVxnmqkkMJraYQQRCpgFZajqkqmU6G"
+  }
 }
