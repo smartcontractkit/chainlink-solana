@@ -10,9 +10,9 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// SetWriter is the `setWriter` instruction.
-type SetWriter struct {
-	Writer *ag_solanago.PublicKey
+// TransferFeedOwnership is the `transferFeedOwnership` instruction.
+type TransferFeedOwnership struct {
+	ProposedOwner *ag_solanago.PublicKey
 
 	// [0] = [WRITE] feed
 	//
@@ -22,75 +22,75 @@ type SetWriter struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewSetWriterInstructionBuilder creates a new `SetWriter` instruction builder.
-func NewSetWriterInstructionBuilder() *SetWriter {
-	nd := &SetWriter{
+// NewTransferFeedOwnershipInstructionBuilder creates a new `TransferFeedOwnership` instruction builder.
+func NewTransferFeedOwnershipInstructionBuilder() *TransferFeedOwnership {
+	nd := &TransferFeedOwnership{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
 
-// SetWriter sets the "writer" parameter.
-func (inst *SetWriter) SetWriter(writer ag_solanago.PublicKey) *SetWriter {
-	inst.Writer = &writer
+// SetProposedOwner sets the "proposedOwner" parameter.
+func (inst *TransferFeedOwnership) SetProposedOwner(proposedOwner ag_solanago.PublicKey) *TransferFeedOwnership {
+	inst.ProposedOwner = &proposedOwner
 	return inst
 }
 
 // SetFeedAccount sets the "feed" account.
-func (inst *SetWriter) SetFeedAccount(feed ag_solanago.PublicKey) *SetWriter {
+func (inst *TransferFeedOwnership) SetFeedAccount(feed ag_solanago.PublicKey) *TransferFeedOwnership {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(feed).WRITE()
 	return inst
 }
 
 // GetFeedAccount gets the "feed" account.
-func (inst *SetWriter) GetFeedAccount() *ag_solanago.AccountMeta {
+func (inst *TransferFeedOwnership) GetFeedAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetOwnerAccount sets the "owner" account.
-func (inst *SetWriter) SetOwnerAccount(owner ag_solanago.PublicKey) *SetWriter {
+func (inst *TransferFeedOwnership) SetOwnerAccount(owner ag_solanago.PublicKey) *TransferFeedOwnership {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(owner)
 	return inst
 }
 
 // GetOwnerAccount gets the "owner" account.
-func (inst *SetWriter) GetOwnerAccount() *ag_solanago.AccountMeta {
+func (inst *TransferFeedOwnership) GetOwnerAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
 // SetAuthorityAccount sets the "authority" account.
-func (inst *SetWriter) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetWriter {
+func (inst *TransferFeedOwnership) SetAuthorityAccount(authority ag_solanago.PublicKey) *TransferFeedOwnership {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
-func (inst *SetWriter) GetAuthorityAccount() *ag_solanago.AccountMeta {
+func (inst *TransferFeedOwnership) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
-func (inst SetWriter) Build() *Instruction {
+func (inst TransferFeedOwnership) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_SetWriter,
+		TypeID: Instruction_TransferFeedOwnership,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst SetWriter) ValidateAndBuild() (*Instruction, error) {
+func (inst TransferFeedOwnership) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *SetWriter) Validate() error {
+func (inst *TransferFeedOwnership) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.Writer == nil {
-			return errors.New("Writer parameter is not set")
+		if inst.ProposedOwner == nil {
+			return errors.New("ProposedOwner parameter is not set")
 		}
 	}
 
@@ -109,17 +109,17 @@ func (inst *SetWriter) Validate() error {
 	return nil
 }
 
-func (inst *SetWriter) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *TransferFeedOwnership) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("SetWriter")).
+			programBranch.Child(ag_format.Instruction("TransferFeedOwnership")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("Writer", *inst.Writer))
+						paramsBranch.Child(ag_format.Param("ProposedOwner", *inst.ProposedOwner))
 					})
 
 					// Accounts of the instruction:
@@ -132,33 +132,33 @@ func (inst *SetWriter) EncodeToTree(parent ag_treeout.Branches) {
 		})
 }
 
-func (obj SetWriter) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Writer` param:
-	err = encoder.Encode(obj.Writer)
+func (obj TransferFeedOwnership) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `ProposedOwner` param:
+	err = encoder.Encode(obj.ProposedOwner)
 	if err != nil {
 		return err
 	}
 	return nil
 }
-func (obj *SetWriter) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Writer`:
-	err = decoder.Decode(&obj.Writer)
+func (obj *TransferFeedOwnership) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `ProposedOwner`:
+	err = decoder.Decode(&obj.ProposedOwner)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// NewSetWriterInstruction declares a new SetWriter instruction with the provided parameters and accounts.
-func NewSetWriterInstruction(
+// NewTransferFeedOwnershipInstruction declares a new TransferFeedOwnership instruction with the provided parameters and accounts.
+func NewTransferFeedOwnershipInstruction(
 	// Parameters:
-	writer ag_solanago.PublicKey,
+	proposedOwner ag_solanago.PublicKey,
 	// Accounts:
 	feed ag_solanago.PublicKey,
 	owner ag_solanago.PublicKey,
-	authority ag_solanago.PublicKey) *SetWriter {
-	return NewSetWriterInstructionBuilder().
-		SetWriter(writer).
+	authority ag_solanago.PublicKey) *TransferFeedOwnership {
+	return NewTransferFeedOwnershipInstructionBuilder().
+		SetProposedOwner(proposedOwner).
 		SetFeedAccount(feed).
 		SetOwnerAccount(owner).
 		SetAuthorityAccount(authority)

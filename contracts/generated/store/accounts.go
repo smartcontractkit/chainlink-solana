@@ -11,9 +11,7 @@ import (
 type Store struct {
 	Owner                    ag_solanago.PublicKey
 	ProposedOwner            ag_solanago.PublicKey
-	RaisingAccessController  ag_solanago.PublicKey
 	LoweringAccessController ag_solanago.PublicKey
-	Flags                    Flags
 }
 
 var StoreDiscriminator = [8]byte{130, 48, 247, 244, 182, 191, 30, 26}
@@ -34,18 +32,8 @@ func (obj Store) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `RaisingAccessController` param:
-	err = encoder.Encode(obj.RaisingAccessController)
-	if err != nil {
-		return err
-	}
 	// Serialize `LoweringAccessController` param:
 	err = encoder.Encode(obj.LoweringAccessController)
-	if err != nil {
-		return err
-	}
-	// Serialize `Flags` param:
-	err = encoder.Encode(obj.Flags)
 	if err != nil {
 		return err
 	}
@@ -76,18 +64,8 @@ func (obj *Store) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Deserialize `RaisingAccessController`:
-	err = decoder.Decode(&obj.RaisingAccessController)
-	if err != nil {
-		return err
-	}
 	// Deserialize `LoweringAccessController`:
 	err = decoder.Decode(&obj.LoweringAccessController)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Flags`:
-	err = decoder.Decode(&obj.Flags)
 	if err != nil {
 		return err
 	}
@@ -96,7 +74,9 @@ func (obj *Store) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 
 type Transmissions struct {
 	Version           uint8
-	Store             ag_solanago.PublicKey
+	State             uint8
+	Owner             ag_solanago.PublicKey
+	ProposedOwner     ag_solanago.PublicKey
 	Writer            ag_solanago.PublicKey
 	Description       [32]uint8
 	Decimals          uint8
@@ -121,8 +101,18 @@ func (obj Transmissions) MarshalWithEncoder(encoder *ag_binary.Encoder) (err err
 	if err != nil {
 		return err
 	}
-	// Serialize `Store` param:
-	err = encoder.Encode(obj.Store)
+	// Serialize `State` param:
+	err = encoder.Encode(obj.State)
+	if err != nil {
+		return err
+	}
+	// Serialize `Owner` param:
+	err = encoder.Encode(obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Serialize `ProposedOwner` param:
+	err = encoder.Encode(obj.ProposedOwner)
 	if err != nil {
 		return err
 	}
@@ -193,8 +183,18 @@ func (obj *Transmissions) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err 
 	if err != nil {
 		return err
 	}
-	// Deserialize `Store`:
-	err = decoder.Decode(&obj.Store)
+	// Deserialize `State`:
+	err = decoder.Decode(&obj.State)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Owner`:
+	err = decoder.Decode(&obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ProposedOwner`:
+	err = decoder.Decode(&obj.ProposedOwner)
 	if err != nil {
 		return err
 	}

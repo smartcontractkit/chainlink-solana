@@ -10,8 +10,8 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// TransferOwnership is the `transferOwnership` instruction.
-type TransferOwnership struct {
+// TransferStoreOwnership is the `transferStoreOwnership` instruction.
+type TransferStoreOwnership struct {
 	ProposedOwner *ag_solanago.PublicKey
 
 	// [0] = [WRITE] store
@@ -20,60 +20,60 @@ type TransferOwnership struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewTransferOwnershipInstructionBuilder creates a new `TransferOwnership` instruction builder.
-func NewTransferOwnershipInstructionBuilder() *TransferOwnership {
-	nd := &TransferOwnership{
+// NewTransferStoreOwnershipInstructionBuilder creates a new `TransferStoreOwnership` instruction builder.
+func NewTransferStoreOwnershipInstructionBuilder() *TransferStoreOwnership {
+	nd := &TransferStoreOwnership{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
 	}
 	return nd
 }
 
 // SetProposedOwner sets the "proposedOwner" parameter.
-func (inst *TransferOwnership) SetProposedOwner(proposedOwner ag_solanago.PublicKey) *TransferOwnership {
+func (inst *TransferStoreOwnership) SetProposedOwner(proposedOwner ag_solanago.PublicKey) *TransferStoreOwnership {
 	inst.ProposedOwner = &proposedOwner
 	return inst
 }
 
 // SetStoreAccount sets the "store" account.
-func (inst *TransferOwnership) SetStoreAccount(store ag_solanago.PublicKey) *TransferOwnership {
+func (inst *TransferStoreOwnership) SetStoreAccount(store ag_solanago.PublicKey) *TransferStoreOwnership {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(store).WRITE()
 	return inst
 }
 
 // GetStoreAccount gets the "store" account.
-func (inst *TransferOwnership) GetStoreAccount() *ag_solanago.AccountMeta {
+func (inst *TransferStoreOwnership) GetStoreAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetAuthorityAccount sets the "authority" account.
-func (inst *TransferOwnership) SetAuthorityAccount(authority ag_solanago.PublicKey) *TransferOwnership {
+func (inst *TransferStoreOwnership) SetAuthorityAccount(authority ag_solanago.PublicKey) *TransferStoreOwnership {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
-func (inst *TransferOwnership) GetAuthorityAccount() *ag_solanago.AccountMeta {
+func (inst *TransferStoreOwnership) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
-func (inst TransferOwnership) Build() *Instruction {
+func (inst TransferStoreOwnership) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_TransferOwnership,
+		TypeID: Instruction_TransferStoreOwnership,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst TransferOwnership) ValidateAndBuild() (*Instruction, error) {
+func (inst TransferStoreOwnership) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *TransferOwnership) Validate() error {
+func (inst *TransferStoreOwnership) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
 		if inst.ProposedOwner == nil {
@@ -93,11 +93,11 @@ func (inst *TransferOwnership) Validate() error {
 	return nil
 }
 
-func (inst *TransferOwnership) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *TransferStoreOwnership) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("TransferOwnership")).
+			programBranch.Child(ag_format.Instruction("TransferStoreOwnership")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
@@ -115,7 +115,7 @@ func (inst *TransferOwnership) EncodeToTree(parent ag_treeout.Branches) {
 		})
 }
 
-func (obj TransferOwnership) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj TransferStoreOwnership) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `ProposedOwner` param:
 	err = encoder.Encode(obj.ProposedOwner)
 	if err != nil {
@@ -123,7 +123,7 @@ func (obj TransferOwnership) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 	}
 	return nil
 }
-func (obj *TransferOwnership) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *TransferStoreOwnership) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `ProposedOwner`:
 	err = decoder.Decode(&obj.ProposedOwner)
 	if err != nil {
@@ -132,14 +132,14 @@ func (obj *TransferOwnership) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	return nil
 }
 
-// NewTransferOwnershipInstruction declares a new TransferOwnership instruction with the provided parameters and accounts.
-func NewTransferOwnershipInstruction(
+// NewTransferStoreOwnershipInstruction declares a new TransferStoreOwnership instruction with the provided parameters and accounts.
+func NewTransferStoreOwnershipInstruction(
 	// Parameters:
 	proposedOwner ag_solanago.PublicKey,
 	// Accounts:
 	store ag_solanago.PublicKey,
-	authority ag_solanago.PublicKey) *TransferOwnership {
-	return NewTransferOwnershipInstructionBuilder().
+	authority ag_solanago.PublicKey) *TransferStoreOwnership {
+	return NewTransferStoreOwnershipInstructionBuilder().
 		SetProposedOwner(proposedOwner).
 		SetStoreAccount(store).
 		SetAuthorityAccount(authority)

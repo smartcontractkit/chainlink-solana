@@ -14,7 +14,7 @@ import (
 type WriteOffchainConfig struct {
 	OffchainConfig *[]byte
 
-	// [0] = [WRITE] state
+	// [0] = [WRITE] proposal
 	//
 	// [1] = [SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
@@ -34,14 +34,14 @@ func (inst *WriteOffchainConfig) SetOffchainConfig(offchainConfig []byte) *Write
 	return inst
 }
 
-// SetStateAccount sets the "state" account.
-func (inst *WriteOffchainConfig) SetStateAccount(state ag_solanago.PublicKey) *WriteOffchainConfig {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(state).WRITE()
+// SetProposalAccount sets the "proposal" account.
+func (inst *WriteOffchainConfig) SetProposalAccount(proposal ag_solanago.PublicKey) *WriteOffchainConfig {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(proposal).WRITE()
 	return inst
 }
 
-// GetStateAccount gets the "state" account.
-func (inst *WriteOffchainConfig) GetStateAccount() *ag_solanago.AccountMeta {
+// GetProposalAccount gets the "proposal" account.
+func (inst *WriteOffchainConfig) GetProposalAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
@@ -84,7 +84,7 @@ func (inst *WriteOffchainConfig) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.State is not set")
+			return errors.New("accounts.Proposal is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Authority is not set")
@@ -108,7 +108,7 @@ func (inst *WriteOffchainConfig) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta(" proposal", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
 					})
 				})
@@ -137,10 +137,10 @@ func NewWriteOffchainConfigInstruction(
 	// Parameters:
 	offchainConfig []byte,
 	// Accounts:
-	state ag_solanago.PublicKey,
+	proposal ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *WriteOffchainConfig {
 	return NewWriteOffchainConfigInstructionBuilder().
 		SetOffchainConfig(offchainConfig).
-		SetStateAccount(state).
+		SetProposalAccount(proposal).
 		SetAuthorityAccount(authority)
 }

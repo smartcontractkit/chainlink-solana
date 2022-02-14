@@ -13,9 +13,9 @@ import (
 // CloseFeed is the `closeFeed` instruction.
 type CloseFeed struct {
 
-	// [0] = [] store
+	// [0] = [WRITE] feed
 	//
-	// [1] = [WRITE] feed
+	// [1] = [] owner
 	//
 	// [2] = [WRITE] receiver
 	//
@@ -31,25 +31,25 @@ func NewCloseFeedInstructionBuilder() *CloseFeed {
 	return nd
 }
 
-// SetStoreAccount sets the "store" account.
-func (inst *CloseFeed) SetStoreAccount(store ag_solanago.PublicKey) *CloseFeed {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(store)
-	return inst
-}
-
-// GetStoreAccount gets the "store" account.
-func (inst *CloseFeed) GetStoreAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
-}
-
 // SetFeedAccount sets the "feed" account.
 func (inst *CloseFeed) SetFeedAccount(feed ag_solanago.PublicKey) *CloseFeed {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(feed).WRITE()
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(feed).WRITE()
 	return inst
 }
 
 // GetFeedAccount gets the "feed" account.
 func (inst *CloseFeed) GetFeedAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[0]
+}
+
+// SetOwnerAccount sets the "owner" account.
+func (inst *CloseFeed) SetOwnerAccount(owner ag_solanago.PublicKey) *CloseFeed {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(owner)
+	return inst
+}
+
+// GetOwnerAccount gets the "owner" account.
+func (inst *CloseFeed) GetOwnerAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
@@ -96,10 +96,10 @@ func (inst *CloseFeed) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Store is not set")
+			return errors.New("accounts.Feed is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Feed is not set")
+			return errors.New("accounts.Owner is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Receiver is not set")
@@ -124,8 +124,8 @@ func (inst *CloseFeed) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    store", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("     feed", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("     feed", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("    owner", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta(" receiver", inst.AccountMetaSlice[2]))
 						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[3]))
 					})
@@ -143,13 +143,13 @@ func (obj *CloseFeed) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 // NewCloseFeedInstruction declares a new CloseFeed instruction with the provided parameters and accounts.
 func NewCloseFeedInstruction(
 	// Accounts:
-	store ag_solanago.PublicKey,
 	feed ag_solanago.PublicKey,
+	owner ag_solanago.PublicKey,
 	receiver ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *CloseFeed {
 	return NewCloseFeedInstructionBuilder().
-		SetStoreAccount(store).
 		SetFeedAccount(feed).
+		SetOwnerAccount(owner).
 		SetReceiverAccount(receiver).
 		SetAuthorityAccount(authority)
 }
