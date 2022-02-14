@@ -85,7 +85,7 @@ func (r *Relayer) Healthy() error {
 }
 
 // TODO [relay]: import from smartcontractkit/solana-integration impl
-func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}, contractReady chan struct{}) (relaytypes.OCR2Provider, error) {
+func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}, contractReady chan<- struct{}) (relaytypes.OCR2Provider, error) {
 	var provider ocr2Provider
 	spec, ok := s.(OCR2Spec)
 	if !ok {

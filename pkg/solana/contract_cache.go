@@ -54,11 +54,11 @@ type ContractCache struct {
 	cancel context.CancelFunc
 
 	// Signal contract config is found
-	contractReady chan struct{}
+	contractReady chan<- struct{}
 	configFound   *atomic.Bool
 }
 
-func NewContractCache(spec OCR2Spec, client *Client, lggr Logger, contractReady chan struct{}) *ContractCache {
+func NewContractCache(spec OCR2Spec, client *Client, lggr Logger, contractReady chan<- struct{}) *ContractCache {
 	// parse staleness timeout, if errors: use default timeout (1 min)
 	staleTimeout, err := time.ParseDuration(spec.StaleTimeout)
 	if err != nil {
