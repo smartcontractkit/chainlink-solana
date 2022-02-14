@@ -90,10 +90,10 @@ pub struct State {
     pub vault_nonce: u8,
     _padding0: u16,
     _padding1: u32,
+    pub feed: Pubkey,
     pub config: Config,
     pub offchain_config: OffchainConfig,
     pub oracles: Oracles,
-    pub feed: Pubkey,
 }
 
 #[zero_copy]

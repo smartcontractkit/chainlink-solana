@@ -29,10 +29,10 @@ type State struct {
 	Nonce                uint8
 	Padding0             uint16
 	Padding1             uint32
+	Transmissions        solana.PublicKey
 	Config               Config
 	OffchainConfig       OffchainConfig
 	Oracles              Oracles
-	Transmissions        solana.PublicKey
 }
 
 // SigningKey represents the report signing key
