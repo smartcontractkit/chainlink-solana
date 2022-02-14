@@ -116,8 +116,8 @@ func (c *ContractCache) PollState() {
 				if err != nil {
 					c.lggr.Errorf("error in PollState.fetchState %s", err)
 				} else {
-					// We have successfully read state from the contract
-					// signal that we are ready to start libocr.
+					// We have successfully read state from the contract.
+					// Signal that we are ready to start libocr.
 					// Only signal on the first successful fetch.
 					if !c.configFound.Load() {
 						close(c.contractReady)
