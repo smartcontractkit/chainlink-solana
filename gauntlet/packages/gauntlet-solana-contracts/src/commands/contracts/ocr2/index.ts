@@ -11,6 +11,7 @@ import SetBillingAccessController from './setBillingAccessController'
 import SetRequesterAccessController from './setRequesterAccessController'
 import SetBilling from './setBilling'
 import SetConfig from './setConfig'
+import AcceptProposal from './proposal/acceptProposal'
 import SetPayees from './setPayees'
 import SetupFlow from './setup.dev.flow'
 import SetupRDDFlow from './setup.dev.rdd.flow'
@@ -29,6 +30,7 @@ export default [
   PayRemaining,
   SetPayees,
   SetConfig,
+  AcceptProposal,
   ReadState,
   SetOffchainConfigFlow,
   BeginOffchainConfig,
