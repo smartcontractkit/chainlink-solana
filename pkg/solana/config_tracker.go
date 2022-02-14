@@ -20,7 +20,7 @@ func (c *ContractConfigTracker) Notify() <-chan struct{} {
 // LatestConfigDetails returns information about the latest configuration,
 // but not the configuration itself.
 func (c *ContractConfigTracker) LatestConfigDetails(ctx context.Context) (changedInBlock uint64, configDigest types.ConfigDigest, err error) {
-	state, _, err := c.cache.ReadState()
+	state, err := c.cache.ReadState()
 	return state.Config.LatestConfigBlockNumber, state.Config.LatestConfigDigest, err
 }
 
@@ -33,8 +33,6 @@ func ConfigFromState(state State) (types.ContractConfig, error) {
 		accounts = append(accounts, types.Account(o.Transmitter.String()))
 	}
 
-	// program contains the parameters for generating OnchainConfig in state but does not calculate it
-	// needs to be calculated offchain for libocr (libocr decodes configs from the encoded data)
 	onchainConfigStruct := median.OnchainConfig{
 		Min: state.Config.MinAnswer.BigInt(),
 		Max: state.Config.MaxAnswer.BigInt(),
@@ -51,14 +49,14 @@ func ConfigFromState(state State) (types.ContractConfig, error) {
 		Transmitters:          accounts,
 		F:                     state.Config.F,
 		OnchainConfig:         onchainConfig,
-		OffchainConfigVersion: state.Config.OffchainConfig.Version,
-		OffchainConfig:        state.Config.OffchainConfig.Data(),
+		OffchainConfigVersion: state.OffchainConfig.Version,
+		OffchainConfig:        state.OffchainConfig.Data(),
 	}, nil
 }
 
 // LatestConfig returns the latest configuration.
 func (c *ContractConfigTracker) LatestConfig(ctx context.Context, changedInBlock uint64) (types.ContractConfig, error) {
-	state, _, err := c.cache.ReadState()
+	state, err := c.cache.ReadState()
 	if err != nil {
 		return types.ContractConfig{}, err
 	}

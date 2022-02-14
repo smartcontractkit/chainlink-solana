@@ -22,7 +22,7 @@ func (c *MedianContract) LatestTransmissionDetails(
 	latestTimestamp time.Time,
 	err error,
 ) {
-	state, _, err := c.cache.ReadState()
+	state, err := c.cache.ReadState()
 	if err != nil {
 		return configDigest, epoch, round, latestAnswer, latestTimestamp, err
 	}
@@ -59,6 +59,6 @@ func (c *MedianContract) LatestRoundRequested(
 	round uint8,
 	err error,
 ) {
-	state, _, err := c.cache.ReadState()
+	state, err := c.cache.ReadState()
 	return state.Config.LatestConfigDigest, 0, 0, err
 }

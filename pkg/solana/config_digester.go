@@ -16,6 +16,9 @@ var _ types.OffchainConfigDigester = (*OffchainConfigDigester)(nil)
 type OffchainConfigDigester struct {
 	// Solana ID for the OCR2 on-chain program
 	ProgramID solana.PublicKey
+
+	// Solana State account address for the OCR2 on-chain program
+	StateID solana.PublicKey
 }
 
 // ConfigDigest is meant to do the same thing as config_digest_from_data from the program.
@@ -24,6 +27,10 @@ func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.Co
 	buf := sha256.New()
 
 	if _, err := buf.Write(d.ProgramID.Bytes()); err != nil {
+		return digest, err
+	}
+
+	if _, err := buf.Write(d.StateID.Bytes()); err != nil {
 		return digest, err
 	}
 
@@ -55,7 +62,6 @@ func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.Co
 		return digest, err
 	}
 
-	cfg.OnchainConfig = []byte{} // on chain config digest does not use onchainConfig inside digest hash
 	if err := binary.Write(buf, binary.BigEndian, uint32(len(cfg.OnchainConfig))); err != nil {
 		return digest, err
 	}

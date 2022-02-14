@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::sysvar;
 use static_assertions::const_assert;
 use std::mem;
 
@@ -116,12 +115,7 @@ pub enum ErrorCode {
 pub struct Initialize<'info> {
     #[account(zero)]
     pub state: AccountLoader<'info, AccessController>,
-    pub payer: AccountInfo<'info>,
     pub owner: Signer<'info>,
-
-    #[account(address = sysvar::rent::ID)]
-    pub rent: Sysvar<'info, Rent>,
-    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]

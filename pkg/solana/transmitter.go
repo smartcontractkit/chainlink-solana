@@ -37,8 +37,7 @@ func (c *ContractTransmitter) Transmit(
 		return errors.Wrap(err, "error on Transmit.FindProgramAddress")
 	}
 
-	_, store, err := c.cache.ReadState()
-	if err != nil {
+	if _, err := c.cache.ReadState(); err != nil {
 		return errors.Wrap(err, "error on Transmit.ReadState")
 	}
 	accounts := []*solana.AccountMeta{
@@ -47,7 +46,6 @@ func (c *ContractTransmitter) Transmit(
 		{PublicKey: c.signer.PublicKey(), IsWritable: false, IsSigner: true},
 		{PublicKey: c.cache.TransmissionsID, IsWritable: true, IsSigner: false},
 		{PublicKey: c.cache.StoreProgramID, IsWritable: false, IsSigner: false},
-		{PublicKey: store, IsWritable: true, IsSigner: false},
 		{PublicKey: storeAuthority, IsWritable: false, IsSigner: false},
 	}
 
@@ -116,7 +114,7 @@ func (c *ContractTransmitter) LatestConfigDigestAndEpoch(
 	epoch uint32,
 	err error,
 ) {
-	state, _, err := c.cache.ReadState()
+	state, err := c.cache.ReadState()
 	return state.Config.LatestConfigDigest, state.Config.Epoch, err
 }
 

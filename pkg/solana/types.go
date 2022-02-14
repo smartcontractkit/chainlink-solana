@@ -8,16 +8,13 @@ import (
 )
 
 const (
-	// TransmissionsSize indicates how many transmissions are stored
-	TransmissionsSize uint32 = 8096
-
 	// Slot, Timestamp, Padding0, Answer, Padding1, Padding2
 	TransmissionLen uint64 = 8 + 4 + 4 + 16 + 8 + 8
 	// Timestamp(uint64), Answer
 	TransmissionLenV1 uint64 = 8 + 16
 
-	// Version, Store, Writer, Description, Decimals, FlaggingThreshold, LatestRoundID, Granularity, LiveLength, LiveCursor, HistoricalCursor
-	HeaderLen uint64 = 1 + 32 + 32 + 32 + 1 + 4 + 4 + 1 + 4 + 4 + 4
+	// Version, State, Owner, ProposedOwner, Writer, Description, Decimals, FlaggingThreshold, LatestRoundID, Granularity, LiveLength, LiveCursor, HistoricalCursor
+	HeaderLen uint64 = 1 + 1 + 32 + 32 + 32 + 32 + 1 + 4 + 4 + 1 + 4 + 4 + 4
 
 	// Report data (61 bytes)
 	MedianLen uint64 = 16
@@ -32,24 +29,15 @@ type State struct {
 	Nonce                uint8
 	Padding0             uint16
 	Padding1             uint32
-	Config               Config
-	Oracles              Oracles
-	LeftoverPayments     LeftoverPayments
 	Transmissions        solana.PublicKey
+	Config               Config
+	OffchainConfig       OffchainConfig
+	Oracles              Oracles
 }
 
 // SigningKey represents the report signing key
 type SigningKey struct {
 	Key [20]byte
-}
-
-type LeftoverPayments struct {
-	Raw [19]LeftoverPayment
-	Len uint64
-}
-
-func (lp LeftoverPayments) Data() []LeftoverPayment {
-	return lp.Raw[:lp.Len]
 }
 
 type OffchainConfig struct {
@@ -82,8 +70,6 @@ type Config struct {
 	LatestConfigDigest        [32]byte
 	LatestConfigBlockNumber   uint64
 	Billing                   Billing
-	OffchainConfig            OffchainConfig
-	PendingOffchainConfig     OffchainConfig
 }
 
 // Oracles contains the list of oracles
@@ -104,12 +90,6 @@ type Oracle struct {
 	ProposedPayee solana.PublicKey
 	FromRoundID   uint32
 	Payment       uint64
-}
-
-// LeftoverPayment contains the remaining payment for each oracle
-type LeftoverPayment struct {
-	Payee  solana.PublicKey
-	Amount uint64
 }
 
 // Billing contains the payment information
@@ -135,7 +115,9 @@ type AccessController struct {
 // TransmissionsHeader struct for decoding transmission state header
 type TransmissionsHeader struct {
 	Version           uint8
-	Store             solana.PublicKey
+	State             uint8
+	Owner             solana.PublicKey
+	ProposedOwner     solana.PublicKey
 	Writer            solana.PublicKey
 	Description       [32]byte
 	Decimals          uint8
