@@ -10,77 +10,77 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// SetConfig is the `setConfig` instruction.
-type SetConfig struct {
+// ProposeConfig is the `proposeConfig` instruction.
+type ProposeConfig struct {
 	NewOracles *[]NewOracle
 	F          *uint8
 
-	// [0] = [WRITE] state
+	// [0] = [WRITE] proposal
 	//
 	// [1] = [SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewSetConfigInstructionBuilder creates a new `SetConfig` instruction builder.
-func NewSetConfigInstructionBuilder() *SetConfig {
-	nd := &SetConfig{
+// NewProposeConfigInstructionBuilder creates a new `ProposeConfig` instruction builder.
+func NewProposeConfigInstructionBuilder() *ProposeConfig {
+	nd := &ProposeConfig{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
 	}
 	return nd
 }
 
 // SetNewOracles sets the "newOracles" parameter.
-func (inst *SetConfig) SetNewOracles(newOracles []NewOracle) *SetConfig {
+func (inst *ProposeConfig) SetNewOracles(newOracles []NewOracle) *ProposeConfig {
 	inst.NewOracles = &newOracles
 	return inst
 }
 
 // SetF sets the "f" parameter.
-func (inst *SetConfig) SetF(f uint8) *SetConfig {
+func (inst *ProposeConfig) SetF(f uint8) *ProposeConfig {
 	inst.F = &f
 	return inst
 }
 
-// SetStateAccount sets the "state" account.
-func (inst *SetConfig) SetStateAccount(state ag_solanago.PublicKey) *SetConfig {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(state).WRITE()
+// SetProposalAccount sets the "proposal" account.
+func (inst *ProposeConfig) SetProposalAccount(proposal ag_solanago.PublicKey) *ProposeConfig {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(proposal).WRITE()
 	return inst
 }
 
-// GetStateAccount gets the "state" account.
-func (inst *SetConfig) GetStateAccount() *ag_solanago.AccountMeta {
+// GetProposalAccount gets the "proposal" account.
+func (inst *ProposeConfig) GetProposalAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetAuthorityAccount sets the "authority" account.
-func (inst *SetConfig) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetConfig {
+func (inst *ProposeConfig) SetAuthorityAccount(authority ag_solanago.PublicKey) *ProposeConfig {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
-func (inst *SetConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
+func (inst *ProposeConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
-func (inst SetConfig) Build() *Instruction {
+func (inst ProposeConfig) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_SetConfig,
+		TypeID: Instruction_ProposeConfig,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst SetConfig) ValidateAndBuild() (*Instruction, error) {
+func (inst ProposeConfig) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *SetConfig) Validate() error {
+func (inst *ProposeConfig) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
 		if inst.NewOracles == nil {
@@ -94,7 +94,7 @@ func (inst *SetConfig) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.State is not set")
+			return errors.New("accounts.Proposal is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Authority is not set")
@@ -103,11 +103,11 @@ func (inst *SetConfig) Validate() error {
 	return nil
 }
 
-func (inst *SetConfig) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *ProposeConfig) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("SetConfig")).
+			programBranch.Child(ag_format.Instruction("ProposeConfig")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
@@ -119,14 +119,14 @@ func (inst *SetConfig) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta(" proposal", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
 					})
 				})
 		})
 }
 
-func (obj SetConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ProposeConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `NewOracles` param:
 	err = encoder.Encode(obj.NewOracles)
 	if err != nil {
@@ -139,7 +139,7 @@ func (obj SetConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) 
 	}
 	return nil
 }
-func (obj *SetConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ProposeConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `NewOracles`:
 	err = decoder.Decode(&obj.NewOracles)
 	if err != nil {
@@ -153,17 +153,17 @@ func (obj *SetConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 	return nil
 }
 
-// NewSetConfigInstruction declares a new SetConfig instruction with the provided parameters and accounts.
-func NewSetConfigInstruction(
+// NewProposeConfigInstruction declares a new ProposeConfig instruction with the provided parameters and accounts.
+func NewProposeConfigInstruction(
 	// Parameters:
 	newOracles []NewOracle,
 	f uint8,
 	// Accounts:
-	state ag_solanago.PublicKey,
-	authority ag_solanago.PublicKey) *SetConfig {
-	return NewSetConfigInstructionBuilder().
+	proposal ag_solanago.PublicKey,
+	authority ag_solanago.PublicKey) *ProposeConfig {
+	return NewProposeConfigInstructionBuilder().
 		SetNewOracles(newOracles).
 		SetF(f).
-		SetStateAccount(state).
+		SetProposalAccount(proposal).
 		SetAuthorityAccount(authority)
 }

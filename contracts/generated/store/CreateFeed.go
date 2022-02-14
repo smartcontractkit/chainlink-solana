@@ -17,18 +17,16 @@ type CreateFeed struct {
 	Granularity *uint8
 	LiveLength  *uint32
 
-	// [0] = [] store
+	// [0] = [WRITE] feed
 	//
-	// [1] = [WRITE] feed
-	//
-	// [2] = [SIGNER] authority
+	// [1] = [SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewCreateFeedInstructionBuilder creates a new `CreateFeed` instruction builder.
 func NewCreateFeedInstructionBuilder() *CreateFeed {
 	nd := &CreateFeed{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
 	}
 	return nd
 }
@@ -57,37 +55,26 @@ func (inst *CreateFeed) SetLiveLength(liveLength uint32) *CreateFeed {
 	return inst
 }
 
-// SetStoreAccount sets the "store" account.
-func (inst *CreateFeed) SetStoreAccount(store ag_solanago.PublicKey) *CreateFeed {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(store)
-	return inst
-}
-
-// GetStoreAccount gets the "store" account.
-func (inst *CreateFeed) GetStoreAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
-}
-
 // SetFeedAccount sets the "feed" account.
 func (inst *CreateFeed) SetFeedAccount(feed ag_solanago.PublicKey) *CreateFeed {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(feed).WRITE()
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(feed).WRITE()
 	return inst
 }
 
 // GetFeedAccount gets the "feed" account.
 func (inst *CreateFeed) GetFeedAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[0]
 }
 
 // SetAuthorityAccount sets the "authority" account.
 func (inst *CreateFeed) SetAuthorityAccount(authority ag_solanago.PublicKey) *CreateFeed {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).SIGNER()
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *CreateFeed) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[1]
 }
 
 func (inst CreateFeed) Build() *Instruction {
@@ -127,12 +114,9 @@ func (inst *CreateFeed) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Store is not set")
-		}
-		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Feed is not set")
 		}
-		if inst.AccountMetaSlice[2] == nil {
+		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
 	}
@@ -156,10 +140,9 @@ func (inst *CreateFeed) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    store", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("     feed", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[2]))
+					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("     feed", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
 					})
 				})
 		})
@@ -220,7 +203,6 @@ func NewCreateFeedInstruction(
 	granularity uint8,
 	liveLength uint32,
 	// Accounts:
-	store ag_solanago.PublicKey,
 	feed ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *CreateFeed {
 	return NewCreateFeedInstructionBuilder().
@@ -228,7 +210,6 @@ func NewCreateFeedInstruction(
 		SetDecimals(decimals).
 		SetGranularity(granularity).
 		SetLiveLength(liveLength).
-		SetStoreAccount(store).
 		SetFeedAccount(feed).
 		SetAuthorityAccount(authority)
 }

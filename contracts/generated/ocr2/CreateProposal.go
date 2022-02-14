@@ -10,70 +10,70 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// BeginOffchainConfig is the `beginOffchainConfig` instruction.
-type BeginOffchainConfig struct {
+// CreateProposal is the `createProposal` instruction.
+type CreateProposal struct {
 	OffchainConfigVersion *uint64
 
-	// [0] = [WRITE] state
+	// [0] = [WRITE] proposal
 	//
 	// [1] = [SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewBeginOffchainConfigInstructionBuilder creates a new `BeginOffchainConfig` instruction builder.
-func NewBeginOffchainConfigInstructionBuilder() *BeginOffchainConfig {
-	nd := &BeginOffchainConfig{
+// NewCreateProposalInstructionBuilder creates a new `CreateProposal` instruction builder.
+func NewCreateProposalInstructionBuilder() *CreateProposal {
+	nd := &CreateProposal{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
 	}
 	return nd
 }
 
 // SetOffchainConfigVersion sets the "offchainConfigVersion" parameter.
-func (inst *BeginOffchainConfig) SetOffchainConfigVersion(offchainConfigVersion uint64) *BeginOffchainConfig {
+func (inst *CreateProposal) SetOffchainConfigVersion(offchainConfigVersion uint64) *CreateProposal {
 	inst.OffchainConfigVersion = &offchainConfigVersion
 	return inst
 }
 
-// SetStateAccount sets the "state" account.
-func (inst *BeginOffchainConfig) SetStateAccount(state ag_solanago.PublicKey) *BeginOffchainConfig {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(state).WRITE()
+// SetProposalAccount sets the "proposal" account.
+func (inst *CreateProposal) SetProposalAccount(proposal ag_solanago.PublicKey) *CreateProposal {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(proposal).WRITE()
 	return inst
 }
 
-// GetStateAccount gets the "state" account.
-func (inst *BeginOffchainConfig) GetStateAccount() *ag_solanago.AccountMeta {
+// GetProposalAccount gets the "proposal" account.
+func (inst *CreateProposal) GetProposalAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetAuthorityAccount sets the "authority" account.
-func (inst *BeginOffchainConfig) SetAuthorityAccount(authority ag_solanago.PublicKey) *BeginOffchainConfig {
+func (inst *CreateProposal) SetAuthorityAccount(authority ag_solanago.PublicKey) *CreateProposal {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
-func (inst *BeginOffchainConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
+func (inst *CreateProposal) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
-func (inst BeginOffchainConfig) Build() *Instruction {
+func (inst CreateProposal) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_BeginOffchainConfig,
+		TypeID: Instruction_CreateProposal,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst BeginOffchainConfig) ValidateAndBuild() (*Instruction, error) {
+func (inst CreateProposal) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *BeginOffchainConfig) Validate() error {
+func (inst *CreateProposal) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
 		if inst.OffchainConfigVersion == nil {
@@ -84,7 +84,7 @@ func (inst *BeginOffchainConfig) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.State is not set")
+			return errors.New("accounts.Proposal is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Authority is not set")
@@ -93,11 +93,11 @@ func (inst *BeginOffchainConfig) Validate() error {
 	return nil
 }
 
-func (inst *BeginOffchainConfig) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *CreateProposal) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("BeginOffchainConfig")).
+			programBranch.Child(ag_format.Instruction("CreateProposal")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
@@ -108,14 +108,14 @@ func (inst *BeginOffchainConfig) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta(" proposal", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
 					})
 				})
 		})
 }
 
-func (obj BeginOffchainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj CreateProposal) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `OffchainConfigVersion` param:
 	err = encoder.Encode(obj.OffchainConfigVersion)
 	if err != nil {
@@ -123,7 +123,7 @@ func (obj BeginOffchainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (e
 	}
 	return nil
 }
-func (obj *BeginOffchainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *CreateProposal) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `OffchainConfigVersion`:
 	err = decoder.Decode(&obj.OffchainConfigVersion)
 	if err != nil {
@@ -132,15 +132,15 @@ func (obj *BeginOffchainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder)
 	return nil
 }
 
-// NewBeginOffchainConfigInstruction declares a new BeginOffchainConfig instruction with the provided parameters and accounts.
-func NewBeginOffchainConfigInstruction(
+// NewCreateProposalInstruction declares a new CreateProposal instruction with the provided parameters and accounts.
+func NewCreateProposalInstruction(
 	// Parameters:
 	offchainConfigVersion uint64,
 	// Accounts:
-	state ag_solanago.PublicKey,
-	authority ag_solanago.PublicKey) *BeginOffchainConfig {
-	return NewBeginOffchainConfigInstructionBuilder().
+	proposal ag_solanago.PublicKey,
+	authority ag_solanago.PublicKey) *CreateProposal {
+	return NewCreateProposalInstructionBuilder().
 		SetOffchainConfigVersion(offchainConfigVersion).
-		SetStateAccount(state).
+		SetProposalAccount(proposal).
 		SetAuthorityAccount(authority)
 }

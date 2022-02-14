@@ -10,19 +10,19 @@ import (
 	"testing"
 )
 
-func TestEncodeDecode_SetConfig(t *testing.T) {
+func TestEncodeDecode_CloseProposal(t *testing.T) {
 	fu := ag_gofuzz.New().NilChance(0)
 	for i := 0; i < 1; i++ {
-		t.Run("SetConfig"+strconv.Itoa(i), func(t *testing.T) {
+		t.Run("CloseProposal"+strconv.Itoa(i), func(t *testing.T) {
 			{
-				params := new(SetConfig)
+				params := new(CloseProposal)
 				fu.Fuzz(params)
 				params.AccountMetaSlice = nil
 				buf := new(bytes.Buffer)
 				err := encodeT(*params, buf)
 				ag_require.NoError(t, err)
 				//
-				got := new(SetConfig)
+				got := new(CloseProposal)
 				err = decodeT(got, buf.Bytes())
 				got.AccountMetaSlice = nil
 				ag_require.NoError(t, err)
