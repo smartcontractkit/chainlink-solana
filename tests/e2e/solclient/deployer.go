@@ -23,19 +23,18 @@ import (
 // All account sizes are calculated from Rust structures, ex. programs/access-controller/src/lib.rs:L80
 // there is some wrapper in "anchor" that creates accounts for programs automatically, but we are doing that explicitly
 const (
+	Discriminator = 8
 	// TokenMintAccountSize default size of data required for a new mint account
 	TokenMintAccountSize             = uint64(82)
 	TokenAccountSize                 = uint64(165)
-	AccessControllerStateAccountSize = uint64(8 + 32 + 32 + 8 + 32*64)
-	StoreAccountSize                 = uint64(8 + 32*4 + 32*128 + 8)
-	OCRTransmissionsAccountSize      = uint64(8 + 128 + 8192*48)
-	OCRLeftoverPaymentSize           = uint64(32 + 8)
-	OCRLeftoverPaymentsSize          = OCRLeftoverPaymentSize*19 + 8
-	OCROracle                        = uint64(32 + 20 + 32 + 32 + 4 + 8)
+	AccessControllerStateAccountSize = uint64(Discriminator + solana.PublicKeyLength + solana.PublicKeyLength + 8 + 32*64)
+	StoreAccountSize                 = uint64(Discriminator + solana.PublicKeyLength*3)
+	OCRTransmissionsAccountSize      = uint64(Discriminator + 196 + 8192*48)
+	OCROracle                        = uint64(solana.PublicKeyLength + 20 + solana.PublicKeyLength + solana.PublicKeyLength + 4 + 8)
 	OCROraclesSize                   = OCROracle*19 + 8
 	OCROffChainConfigSize            = uint64(8 + 4096 + 8)
-	OCRConfigSize                    = 32 + 32 + 32 + 32 + 32 + 32 + 16 + 16 + (1 + 1 + 2 + 4 + 4 + 32) + (4 + 32 + 8) + (4 + 4) + 2*OCROffChainConfigSize
-	OCRAccountAccountSize            = 8 + 1 + 1 + 2 + 4 + OCRConfigSize + OCROraclesSize + OCRLeftoverPaymentsSize + 32
+	OCRConfigSize                    = 32 + 32 + 32 + 32 + 32 + 32 + 16 + 16 + (1 + 1 + 2 + 4 + 4 + 32) + (4 + 32 + 8) + (4 + 4)
+	OCRAccountAccountSize            = Discriminator + 1 + 1 + 2 + 4 + solana.PublicKeyLength + OCRConfigSize + OCROffChainConfigSize + OCROraclesSize
 )
 
 type Authority struct {
