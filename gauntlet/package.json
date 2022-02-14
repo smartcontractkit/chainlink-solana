@@ -24,8 +24,7 @@
     "clean": "tsc -b --clean ./tsconfig.json",
     "build": "yarn clean && tsc -b ./tsconfig.json",
     "bundle": "yarn build && pkg .",
-    "release": "yarn changeset publish",
-    "postinstall": "patch-package"
+    "release": "yarn changeset publish"
   },
   "pkg": {
     "scripts": [
@@ -44,9 +43,7 @@
     "@types/node": "^14.11.2",
     "@types/secp256k1": "^4.0.3",
     "jest": "^26.6.3",
-    "patch-package": "^6.4.7",
     "pkg": "^5.2.1",
-    "postinstall-postinstall": "^2.1.0",
     "prettier": "2.1.1",
     "secp256k1": "^4.0.2",
     "ts-jest": "^26.4.3",
