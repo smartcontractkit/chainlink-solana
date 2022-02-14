@@ -180,7 +180,6 @@ func (c *ContractDeployer) DeployOCRv2(billingControllerAddr string, requesterCo
 		[]solana.Instruction{
 			ocrAccInstruction,
 			ocr_2.NewInitializeInstructionBuilder().
-				SetNonce(vault.Nonce).
 				SetMinAnswer(ag_binary.Int128{
 					Lo: 1,
 					Hi: 0,
@@ -190,7 +189,7 @@ func (c *ContractDeployer) DeployOCRv2(billingControllerAddr string, requesterCo
 					Hi: 0,
 				}).
 				SetStateAccount(c.Client.Accounts.OCR.PublicKey()).
-				SetTransmissionsAccount(c.Client.Accounts.Feed.PublicKey()).
+				SetFeedAccount(c.Client.Accounts.Feed.PublicKey()).
 				SetPayerAccount(payer.PublicKey()).
 				SetOwnerAccount(c.Client.Accounts.Owner.PublicKey()).
 				SetTokenMintAccount(linkTokenMintPubKey).
@@ -261,10 +260,7 @@ func (c *ContractDeployer) DeployOCRv2AccessController() (*AccessController, err
 			accInstruction,
 			access_controller2.NewInitializeInstruction(
 				stateAcc.PublicKey(),
-				payer.PublicKey(),
 				c.Client.Accounts.Owner.PublicKey(),
-				solana.SysVarRentPubkey,
-				solana.SystemProgramID,
 			).Build(),
 		},
 		func(key solana.PublicKey) *solana.PrivateKey {

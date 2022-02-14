@@ -107,7 +107,6 @@ func (m *Store) CreateFeed(desc string, decimals uint8, granularity int, liveLen
 				decimals,
 				uint8(granularity),
 				uint32(liveLength),
-				m.Store.PublicKey(),
 				m.Feed.PublicKey(),
 				m.Client.Accounts.Owner.PublicKey(),
 			).Build(),
