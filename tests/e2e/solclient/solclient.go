@@ -3,6 +3,13 @@ package solclient
 import (
 	"context"
 	"fmt"
+	"io/fs"
+	"math/big"
+	"net/url"
+	"os"
+	"path/filepath"
+	"time"
+
 	"github.com/gagliardetto/solana-go"
 	associatedtokenaccount "github.com/gagliardetto/solana-go/programs/associated-token-account"
 	"github.com/gagliardetto/solana-go/programs/system"
@@ -15,12 +22,6 @@ import (
 	"github.com/smartcontractkit/integrations-framework/client"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
-	"io/fs"
-	"math/big"
-	"net/url"
-	"os"
-	"path/filepath"
-	"time"
 )
 
 type NetworkConfig struct {
@@ -53,6 +54,8 @@ type Accounts struct {
 	Owner *solana.Wallet
 	// Mint LINK mint state account
 	Mint *solana.Wallet
+	// OCR2 Proposal account
+	Proposal *solana.Wallet
 	// MintAuthority LINK mint authority
 	MintAuthority *solana.Wallet
 }
@@ -159,6 +162,7 @@ func (c *Client) initSharedState() {
 		OCR:           solana.NewWallet(),
 		Store:         solana.NewWallet(),
 		Feed:          solana.NewWallet(),
+		Proposal:      solana.NewWallet(),
 		Owner:         solana.NewWallet(),
 		Mint:          solana.NewWallet(),
 		MintAuthority: solana.NewWallet(),

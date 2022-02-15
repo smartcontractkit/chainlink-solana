@@ -63,7 +63,7 @@ impl Proposal {
         data.push(&offchain_version);
         let offchain_config_len = (self.offchain_config.len() as u32).to_be_bytes();
         data.push(&offchain_config_len);
-        data.push(&self.offchain_config);
+        data.push(&self.offchain_config.xs);
         let result = hash::hashv(&data);
         result.to_bytes()
     }

@@ -3,12 +3,11 @@ package smoke
 import (
 	"time"
 
-	"github.com/smartcontractkit/integrations-framework/actions"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/common"
+	"github.com/smartcontractkit/integrations-framework/actions"
 )
 
 var _ = Describe("Solana OCRv2", func() {
@@ -31,7 +30,7 @@ var _ = Describe("Solana OCRv2", func() {
 	})
 	AfterEach(func() {
 		By("Tearing down the environment", func() {
-			err := actions.TeardownSuite(state.Env, nil, "logs")
+			err := actions.TeardownSuite(state.Env, nil, "logs", nil)
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 	})

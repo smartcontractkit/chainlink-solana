@@ -6,7 +6,7 @@ require (
 	github.com/gagliardetto/binary v0.5.2
 	github.com/gagliardetto/solana-go v1.0.4
 	github.com/smartcontractkit/chainlink v1.0.1-0.20211209223503-68928efa429a
-	github.com/smartcontractkit/helmenv v1.0.35
+	github.com/smartcontractkit/helmenv v1.0.36
 	github.com/smartcontractkit/libocr v0.0.0-20220125200954-5b957c834276
 	github.com/stretchr/testify v1.7.0
 )
