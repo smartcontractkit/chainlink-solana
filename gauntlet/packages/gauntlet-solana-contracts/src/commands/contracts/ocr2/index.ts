@@ -13,22 +13,32 @@ import { CONTRACT_LIST } from '../../../lib/contracts'
 import { makeTransferOwnershipCommand } from '../ownership/transferOwnership'
 import { makeUpgradeProgramCommand } from '../../abstract/upgrade'
 import Fund from './fund'
+import CreateProposal from './proposal/createProposal'
+import ProposeConfig from './proposeConfig'
+import ProposeOffchainConfig from './proposeOffchainConfig'
+import ProposePayees from './proposePayees'
+import FinalizeProposal from './proposal/finalizeProposal'
 
 export default [
   Initialize,
   OCR2InitializeFlow,
   SetBilling,
   AcceptProposal,
+  CreateProposal,
+  FinalizeProposal,
+  ProposeConfig,
+  ProposeOffchainConfig,
+  ProposePayees,
   ReadState,
   SetBillingAccessController,
   SetRequesterAccessController,
+  Fund,
+  makeAcceptOwnershipCommand(CONTRACT_LIST.OCR_2),
+  makeTransferOwnershipCommand(CONTRACT_LIST.OCR_2),
+  makeUpgradeProgramCommand(CONTRACT_LIST.OCR_2),
   // Inspection
   ...Inspection,
   // ONLY DEV
   Transmit,
   SetupFlow,
-  Fund,
-  makeAcceptOwnershipCommand(CONTRACT_LIST.OCR_2),
-  makeTransferOwnershipCommand(CONTRACT_LIST.OCR_2),
-  makeUpgradeProgramCommand(CONTRACT_LIST.OCR_2),
 ]
