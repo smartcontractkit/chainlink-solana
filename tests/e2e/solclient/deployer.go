@@ -30,7 +30,7 @@ const (
 	TokenAccountSize                 = uint64(165)
 	AccessControllerStateAccountSize = uint64(Discriminator + solana.PublicKeyLength + solana.PublicKeyLength + 8 + 32*64)
 	StoreAccountSize                 = uint64(Discriminator + solana.PublicKeyLength*3)
-	OCRTransmissionsAccountSize      = uint64(Discriminator + 192 + 8192*48)
+	OCRTransmissionsAccountSize      = uint64(Discriminator + 196 + 8192*48)
 	OCRProposalAccountSize           = Discriminator + 1 + 32 + 1 + 1 + (1 + 4) + 32 + ProposedOraclesSize + OCROffChainConfigSize
 	ProposedOracleSize               = uint64(solana.PublicKeyLength + 20 + 4 + solana.PublicKeyLength)
 	ProposedOraclesSize              = ProposedOracleSize*19 + 8

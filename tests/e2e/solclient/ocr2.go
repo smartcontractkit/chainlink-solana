@@ -142,7 +142,7 @@ func (m *OCRv2) makeDigest() ([]byte, error) {
 	binary.BigEndian.PutUint64(header, proposal.OffchainConfig.Version)
 	binary.BigEndian.PutUint32(header[8:], uint32(proposal.OffchainConfig.Len))
 	hasher.Write(header)
-	hasher.Write(proposal.OffchainConfig.Xs[:proposal.OffchainConfig.Len])
+	hasher.Write(proposal.OffchainConfig.Xs[:])
 	return hasher.Sum(nil), nil
 }
 
