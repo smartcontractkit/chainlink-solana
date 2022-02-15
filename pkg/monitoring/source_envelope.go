@@ -109,7 +109,7 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 		// extra
 		BlockNumber: blockNum,
 		Transmitter: types.Account(state.Config.LatestTransmitter.String()),
-		LinkBalance: linkBalance.Uint64(),
+		LinkBalance: linkBalance,
 
 		JuelsPerFeeCoin:   big.NewInt(0), // TODO (dru)
 		AggregatorRoundID: state.Config.LatestAggregatorRoundID,

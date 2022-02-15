@@ -4,21 +4,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"strconv"
+	"math/big"
 
 	"github.com/gagliardetto/solana-go"
 	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
 )
 
 type SolanaFeedConfig struct {
-	Name           string `json:"name,omitempty"`
-	Path           string `json:"path,omitempty"`
-	Symbol         string `json:"symbol,omitempty"`
-	HeartbeatSec   int64  `json:"heartbeat,omitempty"`
-	ContractType   string `json:"contract_type,omitempty"`
-	ContractStatus string `json:"status,omitempty"`
-	MultiplyRaw    string `json:"multiply,omitempty"`
-	Multiply       uint64 `json:"-"`
+	Name           string   `json:"name,omitempty"`
+	Path           string   `json:"path,omitempty"`
+	Symbol         string   `json:"symbol,omitempty"`
+	HeartbeatSec   int64    `json:"heartbeat,omitempty"`
+	ContractType   string   `json:"contract_type,omitempty"`
+	ContractStatus string   `json:"status,omitempty"`
+	MultiplyRaw    string   `json:"multiply,omitempty"`
+	Multiply       *big.Int `json:"-"`
 
 	ContractAddressBase58      string `json:"contract_address_base58,omitempty"`
 	TransmissionsAccountBase58 string `json:"transmissions_account_base58,omitempty"`
@@ -67,7 +67,7 @@ func (s SolanaFeedConfig) GetContractStatus() string {
 	return s.ContractStatus
 }
 
-func (s SolanaFeedConfig) GetMultiply() uint64 {
+func (s SolanaFeedConfig) GetMultiply() *big.Int {
 	return s.Multiply
 }
 
@@ -120,7 +120,10 @@ func SolanaFeedParser(buf io.ReadCloser) ([]relayMonitoring.FeedConfig, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse state account '%s' from JSON at index i=%d: %w", rawFeed.StateAccountBase58, i, err)
 		}
-		multiply, _ := strconv.ParseUint(rawFeed.MultiplyRaw, 10, 64)
+		multiply, ok := new(big.Int).SetString(rawFeed.MultiplyRaw, 10)
+		if !ok {
+			return nil, fmt.Errorf("failed to parse multiply '%s' into a big.Int", rawFeed.MultiplyRaw)
+		}
 		// NOTE: multiply is not required so if a parse error occurs, we'll use 0.
 		feeds[i] = relayMonitoring.FeedConfig(SolanaFeedConfig{
 			rawFeed.Name,
