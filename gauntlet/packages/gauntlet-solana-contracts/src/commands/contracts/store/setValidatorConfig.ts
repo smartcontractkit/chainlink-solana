@@ -15,7 +15,7 @@ export default class SetValidatorConfig extends SolanaCommand {
   static category = CONTRACT_LIST.STORE
 
   static examples = [
-    'yarn gauntlet store:set_validator_config --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --threshold=1000 --feed=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet store:set_validator_config --network=devnet --threshold=1000 --feed=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
 
   makeInput = (userInput): Input => {
@@ -31,7 +31,7 @@ export default class SetValidatorConfig extends SolanaCommand {
   constructor(flags, args) {
     super(flags, args)
 
-    this.require(!!this.flags.state, 'Please provide flags with "state"')
+    this.require(!!this.flags.feed, 'Please provide flags with "feed"')
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
@@ -41,36 +41,24 @@ export default class SetValidatorConfig extends SolanaCommand {
 
     const input = this.makeInput(this.flags.input)
 
-    const state = new PublicKey(this.flags.state)
     const threshold = new BN(input.threshold)
     const feed = new PublicKey(input.feed)
 
-    const data = program.coder.instruction.encode('set_validator_config', {
-      flaggingThreshold: threshold,
+    // Resolve the current store owner
+    let feedAccount = await program.account.transmissions.fetch(feed)
+
+    const tx = program.instruction.setWriter(threshold, {
+      accounts: {
+        feed: feed,
+        owner: feedAccount.owner,
+        authority: signer,
+      },
     })
 
-    const accounts: AccountMeta[] = [
-      {
-        pubkey: state,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: signer,
-        isSigner: true,
-        isWritable: false,
-      },
-      {
-        pubkey: feed,
-        isSigner: false,
-        isWritable: true,
-      },
-    ]
-
     const rawTx: RawTransaction = {
-      data,
-      accounts,
-      programId: storeProgram.programId,
+      data: tx.data,
+      accounts: tx.keys,
+      programId: tx.programId,
     }
 
     return [rawTx]
@@ -81,7 +69,7 @@ export default class SetValidatorConfig extends SolanaCommand {
     const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
     const tx = makeTx(rawTx)
     logger.debug(tx)
-    logger.info(`Setting store config on ${this.flags.state.toString()}...`)
+    logger.info(`Setting validator config on ${this.flags.feed.toString()}...`)
     logger.loading('Sending tx...')
     const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
     logger.success(`Validator config on tx ${txhash}`)
@@ -89,8 +77,8 @@ export default class SetValidatorConfig extends SolanaCommand {
     return {
       responses: [
         {
-          tx: this.wrapResponse(txhash, this.flags.state),
-          contract: this.flags.state,
+          tx: this.wrapResponse(txhash, this.flags.feed),
+          contract: this.flags.feed,
         },
       ],
     } as Result<TransactionResponse>
