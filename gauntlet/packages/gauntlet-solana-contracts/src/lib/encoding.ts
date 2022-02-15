@@ -1,10 +1,10 @@
 import { Proto, sharedSecretEncryptions } from '@chainlink/gauntlet-core/dist/crypto'
 import { join } from 'path'
-import { Input as OffchainConfigInput } from '../commands/contracts/ocr2/offchainConfig/write'
+import { OffchainConfig } from '../commands/contracts/ocr2/proposeOffchainConfig'
 import { descriptor as OCR2Descriptor } from './ocr2Proto'
 
 export const serializeOffchainConfig = async (
-  input: OffchainConfigInput,
+  input: OffchainConfig,
   gauntletSecret: string,
   secret?: string,
 ): Promise<{ offchainConfig: Buffer; randomSecret: string }> => {

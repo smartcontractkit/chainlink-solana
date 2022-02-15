@@ -1,11 +1,12 @@
+// TODO: REMOVE
+
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
-import { AccountMeta, PublicKey } from '@solana/web3.js'
+import { PublicKey } from '@solana/web3.js'
 import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
-import { makeTx } from '../../../lib/utils'
 
 type Input = {
   operators: {
@@ -16,11 +17,11 @@ type Input = {
   allowFundRecipient?: boolean
 }
 
-export default class SetPayees extends SolanaCommand {
-  static id = 'ocr2:set_payees'
+export default class ProposePayees extends SolanaCommand {
+  static id = 'ocr2:propose_payees'
   static category = CONTRACT_LIST.OCR_2
   static examples = [
-    'yarn gauntlet ocr2:set_payees --network=local --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet ocr2:propose_payees --network=local --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC --proposalId=<PROPOSAL_ID>',
   ]
 
   makeInput = (userInput: any): Input => {
@@ -34,7 +35,7 @@ export default class SetPayees extends SolanaCommand {
     }))
     return {
       operators,
-      allowFundRecipient: false,
+      allowFundRecipient: true,
     }
   }
 
@@ -42,6 +43,7 @@ export default class SetPayees extends SolanaCommand {
     super(flags, args)
 
     this.requireFlag('state', 'Provide a valid state address')
+    this.requireFlag('proposalId', 'Provide a valid proposal address')
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
@@ -51,6 +53,7 @@ export default class SetPayees extends SolanaCommand {
 
     const input = this.makeInput(this.flags.input)
     const state = new PublicKey(this.flags.state)
+    const proposal = new PublicKey(this.flags.proposalId)
     const link = new PublicKey(this.flags.link || process.env.LINK)
 
     const info = await program.account.state.fetch(state)
@@ -95,29 +98,19 @@ export default class SetPayees extends SolanaCommand {
       .slice(0, info.oracles.len)
       .map(({ transmitter }) => payeeByTransmitter[new PublicKey(transmitter).toString()])
 
+    const ix = await program.instruction.proposePayees(token.publicKey, payees, {
+      accounts: {
+        proposal,
+        authority: signer,
+      },
+    })
     logger.log('Payees information:', input)
     logger.log('Setting the following:', payees)
-    const data = program.coder.instruction.encode('set_payees', {
-      payees,
-    })
-
-    const accounts: AccountMeta[] = [
-      {
-        pubkey: state,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: signer,
-        isSigner: true,
-        isWritable: false,
-      },
-    ]
 
     const rawTx: RawTransaction = {
-      data,
-      accounts,
-      programId: ocr2.programId,
+      data: ix.data,
+      accounts: ix.keys,
+      programId: ix.programId,
     }
 
     return [rawTx]

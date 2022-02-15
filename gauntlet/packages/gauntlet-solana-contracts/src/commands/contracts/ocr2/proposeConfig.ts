@@ -1,11 +1,10 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
-import { AccountMeta, PublicKey } from '@solana/web3.js'
+import { PublicKey } from '@solana/web3.js'
 import { ORACLES_MAX_LENGTH } from '../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
-import { makeTx } from '../../../lib/utils'
 
 type Input = {
   oracles: {
@@ -13,13 +12,15 @@ type Input = {
     transmitter: string
   }[]
   f: number | string
+  proposalId: string
 }
-export default class SetConfig extends SolanaCommand {
-  static id = 'ocr2:set_config'
+
+export default class ProposeConfig extends SolanaCommand {
+  static id = 'ocr2:propose_config'
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:set_config --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet ocr2:propose_config --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
 
   makeInput = (userInput): Input => {
@@ -36,6 +37,7 @@ export default class SetConfig extends SolanaCommand {
     return {
       oracles,
       f,
+      proposalId: this.flags.proposal,
     }
   }
 
@@ -43,6 +45,7 @@ export default class SetConfig extends SolanaCommand {
     super(flags, args)
 
     this.require(!!this.flags.state, 'Please provide flags with "state"')
+    this.require(!!this.flags.proposalId, 'Please provide flags with "proposalId"')
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
@@ -50,8 +53,9 @@ export default class SetConfig extends SolanaCommand {
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
 
-    const state = new PublicKey(this.flags.state)
     const input = this.makeInput(this.flags.input)
+
+    const proposal = new PublicKey(input.proposalId)
 
     const oracles = input.oracles.map(({ signer, transmitter }) => ({
       signer: Buffer.from(signer, 'hex'),
@@ -67,28 +71,17 @@ export default class SetConfig extends SolanaCommand {
     )
 
     logger.log('Config information:', input)
-    const data = program.coder.instruction.encode('set_config', {
-      newOracles: oracles,
-      f,
+    const ix = await program.instruction.proposeConfig(oracles, f, {
+      accounts: {
+        proposal,
+        authority: signer,
+      },
     })
 
-    const accounts: AccountMeta[] = [
-      {
-        pubkey: state,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: signer,
-        isSigner: true,
-        isWritable: false,
-      },
-    ]
-
     const rawTx: RawTransaction = {
-      data,
-      accounts,
-      programId: ocr2.programId,
+      data: ix.data,
+      accounts: ix.keys,
+      programId: ix.programId,
     }
 
     return [rawTx]
