@@ -83,7 +83,6 @@ export default class SetBilling extends SolanaCommand {
   execute = async () => {
     const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
     await prompt('Continue setting billing?')
-    logger.loading('Sending tx...')
     const txhash = await this.signAndSendRawTx(rawTx)
     logger.success(`Billing set on tx hash: ${txhash}`)
 

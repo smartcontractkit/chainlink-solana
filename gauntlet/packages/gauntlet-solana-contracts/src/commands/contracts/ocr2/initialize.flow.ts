@@ -3,16 +3,17 @@ import { TransactionResponse, waitExecute } from '@chainlink/gauntlet-solana'
 import { CONTRACT_LIST } from '../../../lib/contracts'
 import { makeAbstractCommand } from '../../abstract'
 import Initialize from './initialize'
-import SetPayees from './setPayees'
-import BeginOffchainConfig from './offchainConfig/begin'
-import WriteOffchainConfig from './offchainConfig/write'
-import CommitOffchainConfig from './offchainConfig/commit'
-import SetConfig from './setConfig'
 import SetBilling from './setBilling'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import OCR2Inspect from './inspection/inspect'
 import CreateFeed from '../store/createFeed'
 import SetWriter from '../store/setWriter'
+import CreateProposal from './proposal/createProposal'
+import ProposeOffchainConfig from './proposeOffchainConfig'
+import ProposeConfig from './proposeConfig'
+import ProposePayees from './proposePayees'
+import FinalizeProposal from './proposal/finalizeProposal'
+import AcceptProposal from './proposal/acceptProposal'
 
 export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse> {
   static id = 'ocr2:initialize:flow'
@@ -25,6 +26,7 @@ export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse>
     this.stepIds = {
       FEED: 1,
       OCR_2: 2,
+      PROPOSAL: 3,
     }
 
     this.requireFlag('rdd', 'This flow only works with information coming from RDD. Please provide the --rdd flag')
@@ -61,47 +63,54 @@ export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse>
         },
       },
       {
-        name: 'Begin Offchain Config',
-        command: BeginOffchainConfig,
-        flags: {
-          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
-          version: 2,
-        },
-      },
-      {
-        name: 'Write Offchain Config',
-        command: WriteOffchainConfig,
-        flags: {
-          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
-        },
-      },
-      {
-        name: 'Commit Offchain Config',
-        command: CommitOffchainConfig,
-        flags: {
-          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
-        },
-      },
-      {
-        name: 'Set Config',
-        command: SetConfig,
-        flags: {
-          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
-        },
-      },
-      {
-        name: 'Set Payees',
-        command: SetPayees,
-        flags: {
-          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
-          link: process.env.LINK || this.flags.link,
-        },
-      },
-      {
         name: 'Set Billing',
         command: SetBilling,
         flags: {
           state: FlowCommand.ID.contract(this.stepIds.OCR_2),
+        },
+      },
+      {
+        id: this.stepIds.PROPOSAL,
+        name: 'Create Proposal',
+        command: CreateProposal,
+      },
+      {
+        name: 'Propose Config',
+        command: ProposeConfig,
+        flags: {
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
+          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
+        },
+      },
+      {
+        name: 'Propose Offchain Config',
+        command: ProposeOffchainConfig,
+        flags: {
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
+          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
+        },
+      },
+      {
+        name: 'Propose Payees',
+        command: ProposePayees,
+        flags: {
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
+          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
+        },
+      },
+      {
+        name: 'Finalize Proposal',
+        command: FinalizeProposal,
+        flags: {
+          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
+        },
+      },
+      {
+        name: 'Accept Proposal',
+        command: AcceptProposal,
+        flags: {
+          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
+          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
         },
       },
       {

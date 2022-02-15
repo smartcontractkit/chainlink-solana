@@ -27,17 +27,19 @@ export default class ProposeConfig extends SolanaCommand {
     if (userInput) return userInput as Input
     const rdd = getRDD(this.flags.rdd)
     const aggregator = rdd.contracts[this.flags.state]
+    const _toHex = (a: string) => Buffer.from(a, 'hex')
     const aggregatorOperators: any[] = aggregator.oracles.map((o) => rdd.operators[o.operator])
-    const oracles = aggregatorOperators.map((operator) => ({
-      // Same here
-      transmitter: operator.ocrNodeAddress[0],
-      signer: operator.ocr2OnchainPublicKey[0].replace('ocr2on_solana_', ''),
-    }))
+    const oracles = aggregatorOperators
+      .map((operator) => ({
+        transmitter: operator.ocrNodeAddress[0],
+        signer: operator.ocr2OnchainPublicKey[0].replace('ocr2on_solana_', ''),
+      }))
+      .sort((a, b) => Buffer.compare(_toHex(a.signer), _toHex(b.signer)))
     const f = aggregator.config.f
     return {
       oracles,
       f,
-      proposalId: this.flags.proposal,
+      proposalId: this.flags.proposalId,
     }
   }
 
