@@ -59,32 +59,20 @@ export default class SetWriter extends SolanaCommand {
       ocr2Program.programId,
     )
 
-    const data = storeProgram.coder.instruction.encode('set_writer', {
-      writer: storeAuthority,
+    // Resolve the current store owner
+    let feedAccount = await storeProgram.account.transmissions.fetch(feedState)
+
+    const tx = storeProgram.instruction.setWriter(storeAuthority, {
+      accounts: {
+        feed: feedState,
+        owner: feedAccount.owner,
+        authority: signer,
+      },
     })
-
-    const accounts: AccountMeta[] = [
-      {
-        pubkey: storeState,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: signer,
-        isSigner: true,
-        isWritable: false,
-      },
-      {
-        pubkey: feedState,
-        isSigner: false,
-        isWritable: true,
-      },
-    ]
-
     const rawTx: RawTransaction = {
-      data,
-      accounts,
-      programId: storeProgram.programId,
+      data: tx.data,
+      accounts: tx.keys,
+      programId: tx.programId,
     }
 
     return [rawTx]
