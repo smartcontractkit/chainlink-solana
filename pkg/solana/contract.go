@@ -32,7 +32,6 @@ type ContractTracker struct {
 
 	// tracked contract state
 	state  State
-	store  solana.PublicKey
 	answer Answer
 
 	// read/write mutexes
@@ -141,7 +140,7 @@ func (c *ContractTracker) Close() error {
 }
 
 // ReadState reads the latest state from memory with mutex and errors if timeout is exceeded
-func (c *ContractTracker) ReadState() (State, solana.PublicKey, error) {
+func (c *ContractTracker) ReadState() (State, error) {
 	c.stateLock.RLock()
 	defer c.stateLock.RUnlock()
 
@@ -149,7 +148,7 @@ func (c *ContractTracker) ReadState() (State, solana.PublicKey, error) {
 	if time.Since(c.stateTime) > c.staleTimeout {
 		err = errors.New("error in ReadState: stale state data, polling is likely experiencing errors")
 	}
-	return c.state, c.store, err
+	return c.state, err
 }
 
 // ReadAnswer reads the latest state from memory with mutex and errors if timeout is exceeded
@@ -176,29 +175,10 @@ func (c *ContractTracker) fetchState(ctx context.Context) error {
 
 	c.lggr.Debugf("state fetched for account: %s, result (config digest): %v", c.StateID, hex.EncodeToString(state.Config.LatestConfigDigest[:]))
 
-	// Fetch the store address associated to the feed
-	offset := uint64(8 + 1) // Discriminator (8 bytes) + Version (u8)
-	length := uint64(solana.PublicKeyLength)
-	res, err := c.client.rpc.GetAccountInfoWithOpts(ctx, state.Transmissions, &rpc.GetAccountInfoOpts{
-		Encoding:   "base64",
-		Commitment: c.client.commitment,
-		DataSlice: &rpc.DataSlice{
-			Offset: &offset,
-			Length: &length,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	store := solana.PublicKeyFromBytes(res.Value.Data.GetBinary())
-	c.lggr.Debugf("store fetched for feed: %s", store)
-
 	// acquire lock and write to state
 	c.stateLock.Lock()
 	defer c.stateLock.Unlock()
 	c.state = state
-	c.store = store
 	c.stateTime = time.Now()
 	return nil
 }
@@ -264,6 +244,10 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 		return Answer{}, 0, errors.Wrap(err, "failed to decode transmission account header")
 	}
 
+	if header.Version != 2 {
+		return Answer{}, 0, errors.Wrapf(err, "can't parse feed version %v", header.Version)
+	}
+
 	cursor := header.LiveCursor
 	liveLength := header.LiveLength
 
@@ -274,11 +258,10 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 
 	// setup transmissionLen
 	transmissionLen := TransmissionLen
-	if header.Version == 1 {
-		transmissionLen = TransmissionLenV1
-	}
+	headerArea := uint64(192) // area allocated to header
 
-	var transmissionOffset uint64 = 8 + 128 + (uint64(cursor) * transmissionLen)
+	var transmissionOffset uint64 = 8 + headerArea + (uint64(cursor) * transmissionLen)
+
 	res, err = client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
 		Commitment: rpcCommitment,
@@ -289,19 +272,6 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 	})
 	if err != nil {
 		return Answer{}, 0, errors.Wrap(err, "error on rpc.GetAccountInfo [transmission]")
-	}
-
-	// parse v1 transmission and return answer
-	if header.Version == 1 {
-		var t TransmissionV1
-		if err := bin.NewBinDecoder(res.Value.Data.GetBinary()).Decode(&t); err != nil {
-			return Answer{}, 0, errors.Wrap(err, "failed to decode v1 transmission")
-		}
-
-		return Answer{
-			Data:      t.Answer.BigInt(),
-			Timestamp: uint32(t.Timestamp), // TODO: not good typing conversion
-		}, res.RPCContext.Context.Slot, nil
 	}
 
 	// parse tranmission

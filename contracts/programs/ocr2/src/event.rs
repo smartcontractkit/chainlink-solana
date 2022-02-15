@@ -2,7 +2,6 @@ use anchor_lang::prelude::*;
 
 // use crate::state::MAX_ORACLES;
 
-// #[index]
 #[event]
 pub struct SetConfig {
     pub config_digest: [u8; 32],

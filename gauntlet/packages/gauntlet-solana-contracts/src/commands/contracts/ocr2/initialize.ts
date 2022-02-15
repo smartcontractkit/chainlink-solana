@@ -5,6 +5,7 @@ import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from '@solana/sp
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { utils } from '@project-serum/anchor'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { ADDITIONAL_STATE_BUFFER } from '../../../lib/constants'
 import RDD from '../../../lib/rdd'
 
 type Input = {
@@ -72,7 +73,6 @@ export default class Initialize extends SolanaCommand {
     )
 
     const data = program.coder.instruction.encode('initialize', {
-      nonce: vaultNonce,
       minAnswer,
       maxAnswer,
     })

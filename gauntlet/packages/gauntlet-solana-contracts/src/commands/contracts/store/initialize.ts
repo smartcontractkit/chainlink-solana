@@ -1,6 +1,8 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { Keypair, PublicKey } from '@solana/web3.js'
+import BN from 'bn.js'
+import { ADDITIONAL_STATE_BUFFER } from '../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 
 export default class Initialize extends SolanaCommand {
@@ -19,6 +21,9 @@ export default class Initialize extends SolanaCommand {
     const program = this.loadProgram(store.idl, address)
 
     const state = Keypair.generate()
+    const defaultAccountSize = new BN(program.account.store.size).toNumber()
+    const accountSize = defaultAccountSize + ADDITIONAL_STATE_BUFFER
+
     const accessController = new PublicKey(this.flags.accessController)
     const owner = this.wallet.publicKey
 

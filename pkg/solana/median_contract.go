@@ -18,7 +18,7 @@ func (c *ContractTracker) LatestTransmissionDetails(
 	latestTimestamp time.Time,
 	err error,
 ) {
-	state, _, err := c.ReadState()
+	state, err := c.ReadState()
 	if err != nil {
 		return configDigest, epoch, round, latestAnswer, latestTimestamp, err
 	}
@@ -55,6 +55,6 @@ func (c *ContractTracker) LatestRoundRequested(
 	round uint8,
 	err error,
 ) {
-	state, _, err := c.ReadState()
+	state, err := c.ReadState()
 	return state.Config.LatestConfigDigest, 0, 0, err
 }
