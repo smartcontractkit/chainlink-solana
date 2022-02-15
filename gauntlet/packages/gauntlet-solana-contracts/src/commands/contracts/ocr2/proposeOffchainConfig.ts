@@ -58,13 +58,11 @@ export default class ProposeOffchainConfig extends SolanaCommand {
     const aggregator = rdd.contracts[stateAddress]
     const config = aggregator.config
 
+    const _toHex = (a: string) => Buffer.from(a, 'hex')
+    const _getSigner = (o) => o.ocr2OnchainPublicKey[0].replace('ocr2on_solana_', '')
     const aggregatorOperators: any[] = aggregator.oracles
       .map((o) => rdd.operators[o.operator])
-      .sort((a, b) => {
-        if (a.ocr2OnchainPublicKey[0] > b.ocr2OnchainPublicKey[0]) return 1
-        if (a.ocr2OnchainPublicKey[0] < b.ocr2OnchainPublicKey[0]) return -1
-        return 0
-      })
+      .sort((a, b) => Buffer.compare(_toHex(_getSigner(a)), _toHex(_getSigner(b))))
     const operatorsPublicKeys = aggregatorOperators.map((o) =>
       o.ocr2OffchainPublicKey[0].replace('ocr2off_solana_', ''),
     )
@@ -204,7 +202,12 @@ export default class ProposeOffchainConfig extends SolanaCommand {
 
     logger.log('Offchain info:', input)
     logger.line()
-    logger.info('Important: If you run this command for the same configuration, use the same RANDOM SECRET')
+    logger.info(
+      `Important: Save this secret
+        - If you run this command for the same configuration, use the same RANDOM SECRET
+        - You will need to provide the secret to approve the config proposal
+      Provide it with --secret flag`,
+    )
     logger.info(`${randomSecret}`)
     logger.line()
 
