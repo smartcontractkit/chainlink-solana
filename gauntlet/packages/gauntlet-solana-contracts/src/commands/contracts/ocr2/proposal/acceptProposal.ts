@@ -41,7 +41,7 @@ export default class AcceptProposal extends SolanaCommand {
     super(flags, args)
 
     this.require(!!this.flags.state, 'Please provide flags with "state"')
-    this.require(!!this.flags.proposal, 'Please provide flags with "proposal"')
+    this.require(!!this.flags.proposalId, 'Please provide flags with "proposal"')
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
@@ -50,7 +50,7 @@ export default class AcceptProposal extends SolanaCommand {
     const program = this.loadProgram(ocr2.idl, address)
 
     const state = new PublicKey(this.flags.state)
-    const proposal = new PublicKey(this.flags.proposal)
+    const proposal = new PublicKey(this.flags.proposalId)
     const input = this.makeInput(this.flags.input)
     const link = new PublicKey(this.flags.link || process.env.LINK)
 
@@ -79,6 +79,7 @@ export default class AcceptProposal extends SolanaCommand {
     let payees = [{ pubkey: Keypair.generate().publicKey, isWritable: true, isSigner: false }]
 
     // TODO: different receiver
+    console.log(payees)
 
     const tx = program.instruction.acceptProposal(input.digest, {
       accounts: {
