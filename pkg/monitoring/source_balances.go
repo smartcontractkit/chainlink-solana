@@ -11,6 +11,11 @@ import (
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 )
 
+type Balances struct {
+	Values    map[string]uint64
+	Addresses map[string]solana.PublicKey
+}
+
 func NewBalancesSourceFactory(
 	client *rpc.Client,
 	log relayMonitoring.Logger,
@@ -45,11 +50,6 @@ type balancesSource struct {
 	client     *rpc.Client
 	log        relayMonitoring.Logger
 	feedConfig SolanaFeedConfig
-}
-
-type Balances struct {
-	Values    map[string]uint64
-	Addresses map[string]solana.PublicKey
 }
 
 func (s *balancesSource) Fetch(ctx context.Context) (interface{}, error) {

@@ -10,12 +10,14 @@ import (
 	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
 )
 
+// Generators
+
 func generatePublicKey() solana.PublicKey {
 	arr := generate32ByteArr()
 	return solana.PublicKeyFromBytes(arr[:])
 }
 
-func generateSolanaConfig() SolanaConfig {
+func generateChainConfig() SolanaConfig {
 	return SolanaConfig{
 		RPCEndpoint:  "http://solana:6969",
 		NetworkName:  "solana-mainnet-beta",
@@ -26,7 +28,7 @@ func generateSolanaConfig() SolanaConfig {
 	}
 }
 
-func generateSolanaFeedConfig() SolanaFeedConfig {
+func generateFeedConfig() SolanaFeedConfig {
 	coins := []string{"btc", "eth", "matic", "link", "avax", "ftt", "srm", "usdc", "sol", "ray"}
 	coin := coins[rand.Intn(len(coins))]
 	contract, transmissions, state := generatePublicKey(), generatePublicKey(), generatePublicKey()
@@ -59,6 +61,20 @@ func generate32ByteArr() [32]byte {
 	return out
 }
 
+func generateBalances() Balances {
+	out := Balances{
+		make(map[string]uint64),
+		make(map[string]solana.PublicKey),
+	}
+	for _, key := range BalanceAccountNames {
+		out.Values[key] = rand.Uint64()
+		out.Addresses[key] = generatePublicKey()
+	}
+	return out
+}
+
+// Sources
+
 func NewFakeRDDSource(minFeeds, maxFeeds uint8) relayMonitoring.Source {
 	return &fakeRddSource{minFeeds, maxFeeds}
 }
@@ -71,7 +87,7 @@ func (f *fakeRddSource) Fetch(_ context.Context) (interface{}, error) {
 	numFeeds := int(f.minFeeds) + rand.Intn(int(f.maxFeeds-f.minFeeds))
 	feeds := make([]relayMonitoring.FeedConfig, numFeeds)
 	for i := 0; i < numFeeds; i++ {
-		feeds[i] = generateSolanaFeedConfig()
+		feeds[i] = generateFeedConfig()
 	}
 	return feeds, nil
 }
@@ -99,25 +115,13 @@ func (f *fakeSource) Fetch(ctx context.Context) (interface{}, error) {
 	return generateBalances(), nil
 }
 
-func generateBalances() Balances {
-	out := Balances{
-		make(map[string]uint64),
-		make(map[string]solana.PublicKey),
-	}
-	for _, key := range BalanceAccountNames {
-		out.Values[key] = rand.Uint64()
-		out.Addresses[key] = generatePublicKey()
-	}
-	return out
-}
-
 // This utilities are used primarely in tests but are present in the monitoring package because they are not inside a file ending in _test.go.
 // This is done in order to expose NewRandomDataReader for use in cmd/monitoring.
 // The following code is added to comply with the "unused" linter:
 var (
-	_ = generateSolanaConfig()
+	_ = generateChainConfig()
 	_ = generatePublicKey()
-	_ = generateSolanaFeedConfig()
+	_ = generateFeedConfig()
 	_ = generate32ByteArr()
 	_ = fakeRddSource{}
 	_ = fakeSourceFactory{}
