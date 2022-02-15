@@ -30,7 +30,6 @@ func RunInAnchorShell(cmd []string, subDir string) error {
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image: "projectserum/build:v0.21.0",
 		Cmd:        cmd,
-		Env: []string{"RUSTUP_HOME=/root/.rustup", "FORCE_COLOR=1"},
 	}, &container.HostConfig{
 		Mounts: []mount.Mount{
 			{
