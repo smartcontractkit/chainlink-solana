@@ -432,6 +432,11 @@ func (c *Client) CalculateTxGas(gasUsedValue *big.Int) (*big.Float, error) {
 	panic("implement me")
 }
 
+// GetDefaultWallet gets the default wallet
+func (c *Client) GetDefaultWallet() *client.EthereumWallet {
+	panic("implement me")
+}
+
 func (c *Client) Get() interface{} {
 	return c
 }
