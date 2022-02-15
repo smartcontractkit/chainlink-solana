@@ -35,9 +35,9 @@ func (m *Store) SetValidatorConfig(flaggingThreshold uint32) error {
 		[]solana.Instruction{
 			store.NewSetValidatorConfigInstruction(
 				flaggingThreshold,
-				m.Store.PublicKey(),
-				m.Client.Accounts.Owner.PublicKey(),
 				m.Feed.PublicKey(),
+				m.Client.Accounts.Owner.PublicKey(),
+				m.Client.Accounts.Owner.PublicKey(),
 			).Build(),
 		},
 		func(key solana.PublicKey) *solana.PrivateKey {
@@ -68,14 +68,17 @@ func (m *Store) SetWriter(writerAuthority string) error {
 		[]solana.Instruction{
 			store.NewSetWriterInstruction(
 				writerAuthPubKey,
-				m.Store.PublicKey(),
-				m.Client.Accounts.Owner.PublicKey(),
 				m.Feed.PublicKey(),
+				m.Client.Accounts.Owner.PublicKey(),
+				m.Client.Accounts.Owner.PublicKey(),
 			).Build(),
 		},
 		func(key solana.PublicKey) *solana.PrivateKey {
 			if key.Equals(m.Client.Accounts.Owner.PublicKey()) {
 				return &m.Client.Accounts.Owner.PrivateKey
+			}
+			if key.Equals(m.Feed.PublicKey()) {
+				return &m.Feed.PrivateKey
 			}
 			if key.Equals(payer.PublicKey()) {
 				return &payer.PrivateKey

@@ -21,7 +21,7 @@ import (
 
 const (
 	ContractsStateFile        = "contracts-chaos-state.json"
-	NewRoundCheckTimeout      = 90 * time.Second
+	NewRoundCheckTimeout      = 20 * time.Minute
 	NewRoundCheckPollInterval = 1 * time.Second
 	SourceChangeInterval      = 5 * time.Second
 	ChaosAwaitingApply        = 1 * time.Minute
@@ -202,9 +202,6 @@ func (m *OCRv2TestState) DeployContracts() {
 	m.err = m.Networks.Default.WaitForEvents()
 	Expect(m.err).ShouldNot(HaveOccurred())
 
-	m.err = m.OCR2.SetOracles(m.OffChainConfig)
-	Expect(m.err).ShouldNot(HaveOccurred())
-
 	m.err = m.Store.SetWriter(m.StoreAuth)
 	Expect(m.err).ShouldNot(HaveOccurred())
 	m.err = m.Store.SetValidatorConfig(80000)
@@ -212,7 +209,7 @@ func (m *OCRv2TestState) DeployContracts() {
 	m.err = m.Networks.Default.WaitForEvents()
 	Expect(m.err).ShouldNot(HaveOccurred())
 
-	m.err = m.OCR2.SetOffChainConfig(m.OffChainConfig)
+	m.err = m.OCR2.Configure(m.OffChainConfig)
 	Expect(m.err).ShouldNot(HaveOccurred())
 	m.err = m.OCR2.DumpState()
 	Expect(m.err).ShouldNot(HaveOccurred())

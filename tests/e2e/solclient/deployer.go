@@ -2,6 +2,10 @@ package solclient
 
 import (
 	"fmt"
+	"math/big"
+	"path/filepath"
+	"strings"
+
 	ag_binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"
@@ -15,9 +19,6 @@ import (
 	"github.com/smartcontractkit/integrations-framework/client"
 	"github.com/smartcontractkit/integrations-framework/contracts"
 	"golang.org/x/sync/errgroup"
-	"math/big"
-	"path/filepath"
-	"strings"
 )
 
 // All account sizes are calculated from Rust structures, ex. programs/access-controller/src/lib.rs:L80
@@ -30,11 +31,14 @@ const (
 	AccessControllerStateAccountSize = uint64(Discriminator + solana.PublicKeyLength + solana.PublicKeyLength + 8 + 32*64)
 	StoreAccountSize                 = uint64(Discriminator + solana.PublicKeyLength*3)
 	OCRTransmissionsAccountSize      = uint64(Discriminator + 196 + 8192*48)
+	OCRProposalAccountSize           = Discriminator + 1 + 32 + 1 + 1 + (1 + 4) + 32 + ProposedOraclesSize + OCROffChainConfigSize
+	ProposedOracleSize               = uint64(solana.PublicKeyLength + 20 + 4 + solana.PublicKeyLength)
+	ProposedOraclesSize              = ProposedOracleSize*19 + 8
 	OCROracle                        = uint64(solana.PublicKeyLength + 20 + solana.PublicKeyLength + solana.PublicKeyLength + 4 + 8)
 	OCROraclesSize                   = OCROracle*19 + 8
 	OCROffChainConfigSize            = uint64(8 + 4096 + 8)
 	OCRConfigSize                    = 32 + 32 + 32 + 32 + 32 + 32 + 16 + 16 + (1 + 1 + 2 + 4 + 4 + 32) + (4 + 32 + 8) + (4 + 4)
-	OCRAccountAccountSize            = Discriminator + 1 + 1 + 2 + 4 + solana.PublicKeyLength + OCRConfigSize + OCROffChainConfigSize + OCROraclesSize
+	OCRAccountSize                   = Discriminator + 1 + 1 + 2 + 4 + solana.PublicKeyLength + OCRConfigSize + OCROffChainConfigSize + OCROraclesSize
 )
 
 type Authority struct {
@@ -156,7 +160,7 @@ func (c *ContractDeployer) DeployLinkTokenContract() (*LinkToken, error) {
 func (c *ContractDeployer) DeployOCRv2(billingControllerAddr string, requesterControllerAddr string, linkTokenAddr string) (*OCRv2, error) {
 	programWallet := c.Client.ProgramWallets["ocr2-keypair.json"]
 	payer := c.Client.DefaultWallet
-	ocrAccInstruction, err := c.Client.CreateAccInstr(c.Client.Accounts.OCR, OCRAccountAccountSize, programWallet.PublicKey())
+	ocrAccInstruction, err := c.Client.CreateAccInstr(c.Client.Accounts.OCR, OCRAccountSize, programWallet.PublicKey())
 	if err != nil {
 		return nil, err
 	}
