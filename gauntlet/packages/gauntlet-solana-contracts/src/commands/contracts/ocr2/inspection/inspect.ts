@@ -1,4 +1,3 @@
-// TODO: FIX "Cannot read property 'xs' of undefined"
 import { Result } from '@chainlink/gauntlet-core'
 import { inspection, BN } from '@chainlink/gauntlet-core/dist/utils'
 import { Proto } from '@chainlink/gauntlet-core/dist/crypto'
@@ -129,9 +128,9 @@ export default class OCR2Inspect extends SolanaCommand {
     const state = new PublicKey(this.flags.state)
     const onChainState = await ocr2program.account.state.fetch(state)
 
-    const bufferedConfig = Buffer.from(onChainState.config.offchainConfig.xs).slice(
+    const bufferedConfig = Buffer.from(onChainState.offchainConfig.xs).slice(
       0,
-      new BN(onChainState.config.offchainConfig.len).toNumber(),
+      new BN(onChainState.offchainConfig.len).toNumber(),
     )
 
     const onChainOCRConfig = this.deserializeConfig(bufferedConfig)

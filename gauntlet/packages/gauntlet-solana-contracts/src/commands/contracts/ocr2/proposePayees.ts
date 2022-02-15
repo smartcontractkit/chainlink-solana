@@ -35,7 +35,7 @@ export default class ProposePayees extends SolanaCommand {
     }))
     return {
       operators,
-      allowFundRecipient: true,
+      allowFundRecipient: false,
     }
   }
 
