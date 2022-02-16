@@ -2047,8 +2047,6 @@ github.com/smartcontractkit/chainlink v0.8.10-0.20200825114219-81dd2fc95bac/go.m
 github.com/smartcontractkit/chainlink v0.9.5-0.20201207211610-6c7fee37d5b7/go.mod h1:kmdLJbVZRCnBLiL6gG+U+1+0ofT3bB48DOF8tjQvcoI=
 github.com/smartcontractkit/chainlink v1.1.1-0.20220215214847-93630cf8c733 h1:98E+/UxVe5dqmke+XsPK9fWiE9nJ35KYFS4JqmEzUV4=
 github.com/smartcontractkit/chainlink v1.1.1-0.20220215214847-93630cf8c733/go.mod h1:ExXVFKbuu8KgU1TVftSy5NuLc1UCxkqeXn2T+IPEG7Q=
-github.com/smartcontractkit/chainlink-relay v0.0.0-20220208185145-f90ff8f9d79a h1:A5dMoZ7vDtiytYw/38wtf1kEVWXds47q3NpQYpD8Huk=
-github.com/smartcontractkit/chainlink-relay v0.0.0-20220208185145-f90ff8f9d79a/go.mod h1:/6gP9XHTQEBeBnXtC9oF1VelYhPMtGDu+6LxLtFP01g=
 github.com/smartcontractkit/chainlink-relay v0.0.0-20220216143252-cf2fe41e5b92 h1:Q3vUQ/eLcsRM7c1FelekSHXRyuokM+XeWqrh9jwpvCU=
 github.com/smartcontractkit/chainlink-relay v0.0.0-20220216143252-cf2fe41e5b92/go.mod h1:/6gP9XHTQEBeBnXtC9oF1VelYhPMtGDu+6LxLtFP01g=
 github.com/smartcontractkit/chainlink-terra v0.0.6-0.20220208194913-255b3c844119 h1:8IElofVjU6ItM0rQUS7TxQaLaaiUjli4K22B3dcHV8Y=
@@ -2131,6 +2129,7 @@ github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+
 github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.2.0/go.mod h1:qt09Ya8vawLte6SNmTgCsAVtYtaKzEcn8ATUoHMkEqE=
 github.com/stretchr/objx v0.3.0 h1:NGXK3lHquSN08v5vWalVI/L8XU9hdzE/G6xsrze47As=
+github.com/stretchr/objx v0.3.0/go.mod h1:qt09Ya8vawLte6SNmTgCsAVtYtaKzEcn8ATUoHMkEqE=
 github.com/stretchr/testify v0.0.0-20170130113145-4d4bfba8f1d1/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/stretchr/testify v0.0.0-20180303142811-b89eecf5ca5d/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/stretchr/testify v1.2.0/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
