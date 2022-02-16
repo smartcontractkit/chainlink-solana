@@ -40,6 +40,11 @@ export default class TransferFeedOwnership extends SolanaCommand {
       },
       {
         pubkey: signer,
+        isSigner: false,
+        isWritable: false,
+      },
+      {
+        pubkey: signer,
         isSigner: true,
         isWritable: false,
       },
@@ -60,7 +65,7 @@ export default class TransferFeedOwnership extends SolanaCommand {
     const program = this.loadProgram(contract.idl, address)
 
     const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
-    await prompt(`Transferring ownership of feed/transmission state (${this.flags.state.toString()}). Continue?`)
+    await prompt(`Transferring ownership of feed/transmission state (${this.flags.state.toString()}) to ${this.flags.to.toString()}. Continue?`)
     const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx)
     logger.success(`Ownership transferred to ${new PublicKey(this.flags.to)} on tx ${txhash}`)
     return {
