@@ -93,6 +93,6 @@ func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.Co
 }
 
 // This should return the same constant value on every invocation
-func (_ OffchainConfigDigester) ConfigDigestPrefix() types.ConfigDigestPrefix {
+func (OffchainConfigDigester) ConfigDigestPrefix() types.ConfigDigestPrefix {
 	return types.ConfigDigestPrefixSolana
 }
