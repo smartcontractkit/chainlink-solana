@@ -68,10 +68,6 @@ type logWrapper struct {
 	logger.Logger
 }
 
-func (l logWrapper) Criticalw(format string, values ...interface{}) {
-	l.Logger.CriticalW(format, values...)
-}
-
 func (l logWrapper) With(values ...interface{}) relayMonitoring.Logger {
 	return logWrapper{l.Logger.With(values...)}
 }
