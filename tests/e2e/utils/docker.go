@@ -2,14 +2,15 @@ package utils
 
 import (
 	"context"
+	"io"
+	"os"
+	"path/filepath"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
-	"io"
-	"os"
-	"path/filepath"
 )
 
 func RunInAnchorShell(cmd []string, subDir string) error {
