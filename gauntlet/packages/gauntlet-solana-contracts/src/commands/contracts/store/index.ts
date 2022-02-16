@@ -4,6 +4,8 @@ import SetValidatorConfig from './setValidatorConfig'
 import SetWriter from './setWriter'
 import SetLoweringAccessController from './setLoweringAccessController'
 import Migrate from './migrate'
+import TransferFeedOwnership from './transferFeedOwnership'
+import AcceptFeedOwnership from './acceptFeedOwnership'
 import { makeAcceptOwnershipCommand } from '../ownership/acceptOwnership'
 import { makeTransferOwnershipCommand } from '../ownership/transferOwnership'
 import { CONTRACT_LIST } from '../../../lib/contracts'
@@ -18,6 +20,8 @@ export default [
   SetLoweringAccessController,
   Inspect,
   Migrate,
+  TransferFeedOwnership,
+  AcceptFeedOwnership,
   makeAcceptOwnershipCommand(CONTRACT_LIST.STORE),
   makeTransferOwnershipCommand(CONTRACT_LIST.STORE),
   makeUpgradeProgramCommand(CONTRACT_LIST.STORE),

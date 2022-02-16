@@ -240,7 +240,7 @@
       "args": []
     },
     {
-      "name": "transferStoreOwnership",
+      "name": "transferOwnership",
       "accounts": [
         {
           "name": "store",
@@ -261,7 +261,7 @@
       ]
     },
     {
-      "name": "acceptStoreOwnership",
+      "name": "acceptOwnership",
       "accounts": [
         {
           "name": "store",
