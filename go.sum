@@ -2049,6 +2049,8 @@ github.com/smartcontractkit/chainlink v1.1.1-0.20220215214847-93630cf8c733 h1:98
 github.com/smartcontractkit/chainlink v1.1.1-0.20220215214847-93630cf8c733/go.mod h1:ExXVFKbuu8KgU1TVftSy5NuLc1UCxkqeXn2T+IPEG7Q=
 github.com/smartcontractkit/chainlink-relay v0.0.0-20220208185145-f90ff8f9d79a h1:A5dMoZ7vDtiytYw/38wtf1kEVWXds47q3NpQYpD8Huk=
 github.com/smartcontractkit/chainlink-relay v0.0.0-20220208185145-f90ff8f9d79a/go.mod h1:/6gP9XHTQEBeBnXtC9oF1VelYhPMtGDu+6LxLtFP01g=
+github.com/smartcontractkit/chainlink-relay v0.0.0-20220216143252-cf2fe41e5b92 h1:Q3vUQ/eLcsRM7c1FelekSHXRyuokM+XeWqrh9jwpvCU=
+github.com/smartcontractkit/chainlink-relay v0.0.0-20220216143252-cf2fe41e5b92/go.mod h1:/6gP9XHTQEBeBnXtC9oF1VelYhPMtGDu+6LxLtFP01g=
 github.com/smartcontractkit/chainlink-terra v0.0.6-0.20220208194913-255b3c844119 h1:8IElofVjU6ItM0rQUS7TxQaLaaiUjli4K22B3dcHV8Y=
 github.com/smartcontractkit/helmenv v1.0.36 h1:RSgEyvWstAuH5BCssPeSeDrxywvAFHP8sqw2Ft55VaQ=
 github.com/smartcontractkit/helmenv v1.0.36/go.mod h1:pkScfFRZM9UhMAqeG+Bfxyy7YjLWh8pY6vmNGdTpKJs=
