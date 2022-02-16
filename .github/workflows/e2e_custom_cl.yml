@@ -121,4 +121,4 @@ jobs:
         uses: actions/upload-artifact@v2.2.4
         with:
           name: test-logs
-          path: ./tests/e2e/smoke/logs
+          path: /home/runner/work/chainlink-solana/chainlink-solana/tests/e2e/logs

@@ -71,9 +71,9 @@ func (t *txResultsSource) Fetch(ctx context.Context) (interface{}, error) {
 	var numSucceeded, numFailed uint64 = 0, 0
 	for _, txSig := range txSigs {
 		if txSig.Err == nil {
-			numSucceeded += 1
+			numSucceeded++
 		} else {
-			numFailed += 1
+			numFailed++
 		}
 	}
 	func() {

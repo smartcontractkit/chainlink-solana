@@ -1,5 +1,6 @@
 package common
 
+//revive:disable:dot-imports
 import (
 	"encoding/json"
 	"fmt"
@@ -21,7 +22,7 @@ import (
 
 const (
 	ContractsStateFile        = "contracts-chaos-state.json"
-	NewRoundCheckTimeout      = 90 * time.Second
+	NewRoundCheckTimeout      = 120 * time.Second
 	NewRoundCheckPollInterval = 1 * time.Second
 	SourceChangeInterval      = 5 * time.Second
 	ChaosAwaitingApply        = 1 * time.Minute
@@ -141,10 +142,7 @@ func (m *OCRv2TestState) DumpContracts() error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(ContractsStateFile, d, os.ModePerm); err != nil {
-		return err
-	}
-	return nil
+	return os.WriteFile(ContractsStateFile, d, os.ModePerm)
 }
 
 func (m *OCRv2TestState) LoadContracts() error {
@@ -153,7 +151,7 @@ func (m *OCRv2TestState) LoadContracts() error {
 		return err
 	}
 	var contractsState *ContractsState
-	if err := json.Unmarshal(d, &contractsState); err != nil {
+	if err = json.Unmarshal(d, &contractsState); err != nil {
 		return err
 	}
 	feedWallet, err := solana.WalletFromPrivateKeyBase58(contractsState.Feed)
@@ -202,9 +200,6 @@ func (m *OCRv2TestState) DeployContracts() {
 	m.err = m.Networks.Default.WaitForEvents()
 	Expect(m.err).ShouldNot(HaveOccurred())
 
-	m.err = m.OCR2.SetOracles(m.OffChainConfig)
-	Expect(m.err).ShouldNot(HaveOccurred())
-
 	m.err = m.Store.SetWriter(m.StoreAuth)
 	Expect(m.err).ShouldNot(HaveOccurred())
 	m.err = m.Store.SetValidatorConfig(80000)
@@ -212,7 +207,7 @@ func (m *OCRv2TestState) DeployContracts() {
 	m.err = m.Networks.Default.WaitForEvents()
 	Expect(m.err).ShouldNot(HaveOccurred())
 
-	m.err = m.OCR2.SetOffChainConfig(m.OffChainConfig)
+	m.err = m.OCR2.Configure(m.OffChainConfig)
 	Expect(m.err).ShouldNot(HaveOccurred())
 	m.err = m.OCR2.DumpState()
 	Expect(m.err).ShouldNot(HaveOccurred())

@@ -48,7 +48,9 @@ impl Proposal {
 
     pub fn digest(&self) -> [u8; DIGEST_SIZE] {
         use anchor_lang::solana_program::hash;
-        let mut data: Vec<&[u8]> = Vec::with_capacity(3 * self.oracles.len() + 5);
+        let mut data: Vec<&[u8]> = Vec::with_capacity(1 + 3 * self.oracles.len() + 5);
+        let n = [self.oracles.len() as u8]; // safe because it will always fit in MAX_ORACLES
+        data.push(&n);
         for oracle in self.oracles.as_ref() {
             data.push(&oracle.signer.key);
             data.push(oracle.transmitter.as_ref());

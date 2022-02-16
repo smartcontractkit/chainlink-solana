@@ -555,12 +555,14 @@ describe("ocr2", async () => {
 
     let proposalOracles = proposalAccount.oracles.xs.slice(0, proposalAccount.oracles.len);
     let proposalOC = proposalAccount.offchainConfig.xs.slice(0, proposalAccount.offchainConfig.len);
-    let hasher = proposalOracles.reduce((hasher, oracle) => {
+
+    let hasher = createHash("sha256").update(Buffer.from([proposalAccount.oracles.len]));
+    hasher = proposalOracles.reduce((hasher, oracle) => {
       return hasher
         .update(Buffer.from(oracle.signer.key))
         .update(oracle.transmitter.toBuffer())
         .update(oracle.payee.toBuffer())
-    }, createHash("sha256"));
+    }, hasher);
     
     let offchainConfigHeader = Buffer.alloc(8+4);
     offchainConfigHeader.writeBigUInt64BE(BigInt(proposalAccount.offchainConfig.version), 0);

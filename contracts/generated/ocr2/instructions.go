@@ -36,15 +36,19 @@ var (
 
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
-	Instruction_BeginOffchainConfig = ag_binary.TypeID([8]byte{124, 77, 17, 185, 6, 147, 219, 60})
+	Instruction_CreateProposal = ag_binary.TypeID([8]byte{132, 116, 68, 174, 216, 160, 198, 22})
 
 	Instruction_WriteOffchainConfig = ag_binary.TypeID([8]byte{171, 64, 173, 138, 151, 188, 68, 168})
 
-	Instruction_CommitOffchainConfig = ag_binary.TypeID([8]byte{56, 171, 18, 191, 137, 247, 109, 33})
+	Instruction_FinalizeProposal = ag_binary.TypeID([8]byte{23, 68, 51, 167, 109, 173, 187, 164})
 
-	Instruction_ResetPendingOffchainConfig = ag_binary.TypeID([8]byte{25, 159, 172, 224, 46, 67, 215, 232})
+	Instruction_CloseProposal = ag_binary.TypeID([8]byte{213, 178, 139, 19, 50, 191, 82, 245})
 
-	Instruction_SetConfig = ag_binary.TypeID([8]byte{108, 158, 154, 175, 212, 98, 52, 66})
+	Instruction_AcceptProposal = ag_binary.TypeID([8]byte{33, 190, 130, 178, 27, 12, 168, 238})
+
+	Instruction_ProposeConfig = ag_binary.TypeID([8]byte{163, 247, 238, 160, 236, 129, 153, 160})
+
+	Instruction_ProposePayees = ag_binary.TypeID([8]byte{76, 228, 45, 220, 157, 7, 182, 228})
 
 	Instruction_SetRequesterAccessController = ag_binary.TypeID([8]byte{182, 229, 210, 202, 190, 116, 92, 236})
 
@@ -58,11 +62,7 @@ var (
 
 	Instruction_WithdrawPayment = ag_binary.TypeID([8]byte{118, 231, 133, 187, 151, 154, 111, 95})
 
-	Instruction_PayRemaining = ag_binary.TypeID([8]byte{183, 66, 188, 183, 187, 154, 20, 99})
-
 	Instruction_PayOracles = ag_binary.TypeID([8]byte{150, 220, 13, 20, 104, 214, 61, 89})
-
-	Instruction_SetPayees = ag_binary.TypeID([8]byte{92, 10, 255, 107, 111, 30, 22, 33})
 
 	Instruction_TransferPayeeship = ag_binary.TypeID([8]byte{116, 68, 213, 225, 193, 225, 171, 206})
 
@@ -80,16 +80,20 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
-	case Instruction_BeginOffchainConfig:
-		return "BeginOffchainConfig"
+	case Instruction_CreateProposal:
+		return "CreateProposal"
 	case Instruction_WriteOffchainConfig:
 		return "WriteOffchainConfig"
-	case Instruction_CommitOffchainConfig:
-		return "CommitOffchainConfig"
-	case Instruction_ResetPendingOffchainConfig:
-		return "ResetPendingOffchainConfig"
-	case Instruction_SetConfig:
-		return "SetConfig"
+	case Instruction_FinalizeProposal:
+		return "FinalizeProposal"
+	case Instruction_CloseProposal:
+		return "CloseProposal"
+	case Instruction_AcceptProposal:
+		return "AcceptProposal"
+	case Instruction_ProposeConfig:
+		return "ProposeConfig"
+	case Instruction_ProposePayees:
+		return "ProposePayees"
 	case Instruction_SetRequesterAccessController:
 		return "SetRequesterAccessController"
 	case Instruction_RequestNewRound:
@@ -102,12 +106,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "WithdrawFunds"
 	case Instruction_WithdrawPayment:
 		return "WithdrawPayment"
-	case Instruction_PayRemaining:
-		return "PayRemaining"
 	case Instruction_PayOracles:
 		return "PayOracles"
-	case Instruction_SetPayees:
-		return "SetPayees"
 	case Instruction_TransferPayeeship:
 		return "TransferPayeeship"
 	case Instruction_AcceptPayeeship:
@@ -145,19 +145,25 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"accept_ownership", (*AcceptOwnership)(nil),
 		},
 		{
-			"begin_offchain_config", (*BeginOffchainConfig)(nil),
+			"create_proposal", (*CreateProposal)(nil),
 		},
 		{
 			"write_offchain_config", (*WriteOffchainConfig)(nil),
 		},
 		{
-			"commit_offchain_config", (*CommitOffchainConfig)(nil),
+			"finalize_proposal", (*FinalizeProposal)(nil),
 		},
 		{
-			"reset_pending_offchain_config", (*ResetPendingOffchainConfig)(nil),
+			"close_proposal", (*CloseProposal)(nil),
 		},
 		{
-			"set_config", (*SetConfig)(nil),
+			"accept_proposal", (*AcceptProposal)(nil),
+		},
+		{
+			"propose_config", (*ProposeConfig)(nil),
+		},
+		{
+			"propose_payees", (*ProposePayees)(nil),
 		},
 		{
 			"set_requester_access_controller", (*SetRequesterAccessController)(nil),
@@ -178,13 +184,7 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"withdraw_payment", (*WithdrawPayment)(nil),
 		},
 		{
-			"pay_remaining", (*PayRemaining)(nil),
-		},
-		{
 			"pay_oracles", (*PayOracles)(nil),
-		},
-		{
-			"set_payees", (*SetPayees)(nil),
 		},
 		{
 			"transfer_payeeship", (*TransferPayeeship)(nil),

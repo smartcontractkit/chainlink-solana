@@ -1,5 +1,6 @@
 package utils
 
+//revive:disable:dot-imports
 import (
 	"os"
 	"path/filepath"

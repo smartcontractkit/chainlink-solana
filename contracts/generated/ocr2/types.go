@@ -73,39 +73,6 @@ func (obj *Billing) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error)
 	return nil
 }
 
-type LeftoverPayment struct {
-	Payee  ag_solanago.PublicKey
-	Amount uint64
-}
-
-func (obj LeftoverPayment) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Payee` param:
-	err = encoder.Encode(obj.Payee)
-	if err != nil {
-		return err
-	}
-	// Serialize `Amount` param:
-	err = encoder.Encode(obj.Amount)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *LeftoverPayment) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Payee`:
-	err = decoder.Decode(&obj.Payee)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Amount`:
-	err = decoder.Decode(&obj.Amount)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 type Oracles struct {
 	Xs  [19]Oracle
 	Len uint64
@@ -139,12 +106,67 @@ func (obj *Oracles) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error)
 	return nil
 }
 
-type LeftoverPayments struct {
-	Xs  [19]LeftoverPayment
+type ProposedOracle struct {
+	Transmitter ag_solanago.PublicKey
+	Signer      SigningKey
+	Padding     uint32
+	Payee       ag_solanago.PublicKey
+}
+
+func (obj ProposedOracle) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Transmitter` param:
+	err = encoder.Encode(obj.Transmitter)
+	if err != nil {
+		return err
+	}
+	// Serialize `Signer` param:
+	err = encoder.Encode(obj.Signer)
+	if err != nil {
+		return err
+	}
+	// Serialize `Padding` param:
+	err = encoder.Encode(obj.Padding)
+	if err != nil {
+		return err
+	}
+	// Serialize `Payee` param:
+	err = encoder.Encode(obj.Payee)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ProposedOracle) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Transmitter`:
+	err = decoder.Decode(&obj.Transmitter)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Signer`:
+	err = decoder.Decode(&obj.Signer)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Padding`:
+	err = decoder.Decode(&obj.Padding)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Payee`:
+	err = decoder.Decode(&obj.Payee)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ProposedOracles struct {
+	Xs  [19]ProposedOracle
 	Len uint64
 }
 
-func (obj LeftoverPayments) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ProposedOracles) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `Xs` param:
 	err = encoder.Encode(obj.Xs)
 	if err != nil {
@@ -158,7 +180,7 @@ func (obj LeftoverPayments) MarshalWithEncoder(encoder *ag_binary.Encoder) (err 
 	return nil
 }
 
-func (obj *LeftoverPayments) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ProposedOracles) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `Xs`:
 	err = decoder.Decode(&obj.Xs)
 	if err != nil {

@@ -2,20 +2,23 @@
 
 package store
 
-import (
-	ag_binary "github.com/gagliardetto/binary"
-	ag_solanago "github.com/gagliardetto/solana-go"
-)
+import ag_binary "github.com/gagliardetto/binary"
 
 type Round struct {
 	RoundId   uint32
-	Timestamp uint64
+	Slot      uint64
+	Timestamp uint32
 	Answer    ag_binary.Int128
 }
 
 func (obj Round) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `RoundId` param:
 	err = encoder.Encode(obj.RoundId)
+	if err != nil {
+		return err
+	}
+	// Serialize `Slot` param:
+	err = encoder.Encode(obj.Slot)
 	if err != nil {
 		return err
 	}
@@ -38,6 +41,11 @@ func (obj *Round) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	if err != nil {
 		return err
 	}
+	// Deserialize `Slot`:
+	err = decoder.Decode(&obj.Slot)
+	if err != nil {
+		return err
+	}
 	// Deserialize `Timestamp`:
 	err = decoder.Decode(&obj.Timestamp)
 	if err != nil {
@@ -51,45 +59,12 @@ func (obj *Round) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	return nil
 }
 
-type Flags struct {
-	Xs  [128]ag_solanago.PublicKey
-	Len uint64
-}
-
-func (obj Flags) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Xs` param:
-	err = encoder.Encode(obj.Xs)
-	if err != nil {
-		return err
-	}
-	// Serialize `Len` param:
-	err = encoder.Encode(obj.Len)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *Flags) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Xs`:
-	err = decoder.Decode(&obj.Xs)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Len`:
-	err = decoder.Decode(&obj.Len)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type Transmission struct {
+type NewTransmission struct {
 	Timestamp uint64
 	Answer    ag_binary.Int128
 }
 
-func (obj Transmission) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj NewTransmission) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `Timestamp` param:
 	err = encoder.Encode(obj.Timestamp)
 	if err != nil {
@@ -103,7 +78,7 @@ func (obj Transmission) MarshalWithEncoder(encoder *ag_binary.Encoder) (err erro
 	return nil
 }
 
-func (obj *Transmission) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *NewTransmission) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `Timestamp`:
 	err = decoder.Decode(&obj.Timestamp)
 	if err != nil {

@@ -12,38 +12,36 @@ import (
 
 // Submit is the `submit` instruction.
 type Submit struct {
-	Round *Transmission
+	Round *NewTransmission
 
-	// [0] = [WRITE] store
+	// [0] = [WRITE] feed
 	//
 	// [1] = [SIGNER] authority
-	//
-	// [2] = [WRITE] feed
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewSubmitInstructionBuilder creates a new `Submit` instruction builder.
 func NewSubmitInstructionBuilder() *Submit {
 	nd := &Submit{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
 	}
 	return nd
 }
 
 // SetRound sets the "round" parameter.
-func (inst *Submit) SetRound(round Transmission) *Submit {
+func (inst *Submit) SetRound(round NewTransmission) *Submit {
 	inst.Round = &round
 	return inst
 }
 
-// SetStoreAccount sets the "store" account.
-func (inst *Submit) SetStoreAccount(store ag_solanago.PublicKey) *Submit {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(store).WRITE()
+// SetFeedAccount sets the "feed" account.
+func (inst *Submit) SetFeedAccount(feed ag_solanago.PublicKey) *Submit {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(feed).WRITE()
 	return inst
 }
 
-// GetStoreAccount gets the "store" account.
-func (inst *Submit) GetStoreAccount() *ag_solanago.AccountMeta {
+// GetFeedAccount gets the "feed" account.
+func (inst *Submit) GetFeedAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
@@ -56,17 +54,6 @@ func (inst *Submit) SetAuthorityAccount(authority ag_solanago.PublicKey) *Submit
 // GetAuthorityAccount gets the "authority" account.
 func (inst *Submit) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
-}
-
-// SetFeedAccount sets the "feed" account.
-func (inst *Submit) SetFeedAccount(feed ag_solanago.PublicKey) *Submit {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(feed).WRITE()
-	return inst
-}
-
-// GetFeedAccount gets the "feed" account.
-func (inst *Submit) GetFeedAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
 }
 
 func (inst Submit) Build() *Instruction {
@@ -97,13 +84,10 @@ func (inst *Submit) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Store is not set")
+			return errors.New("accounts.Feed is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Authority is not set")
-		}
-		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.Feed is not set")
 		}
 	}
 	return nil
@@ -123,10 +107,9 @@ func (inst *Submit) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    store", inst.AccountMetaSlice[0]))
+					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("     feed", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("     feed", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
@@ -152,14 +135,12 @@ func (obj *Submit) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 // NewSubmitInstruction declares a new Submit instruction with the provided parameters and accounts.
 func NewSubmitInstruction(
 	// Parameters:
-	round Transmission,
+	round NewTransmission,
 	// Accounts:
-	store ag_solanago.PublicKey,
-	authority ag_solanago.PublicKey,
-	feed ag_solanago.PublicKey) *Submit {
+	feed ag_solanago.PublicKey,
+	authority ag_solanago.PublicKey) *Submit {
 	return NewSubmitInstructionBuilder().
 		SetRound(round).
-		SetStoreAccount(store).
-		SetAuthorityAccount(authority).
-		SetFeedAccount(feed)
+		SetFeedAccount(feed).
+		SetAuthorityAccount(authority)
 }

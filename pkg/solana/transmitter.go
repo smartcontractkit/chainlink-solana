@@ -30,7 +30,7 @@ func (c *ContractTracker) Transmit(
 		return errors.Wrap(err, "error on Transmit.FindProgramAddress")
 	}
 
-	if _, err := c.ReadState(); err != nil {
+	if _, err = c.ReadState(); err != nil {
 		return errors.Wrap(err, "error on Transmit.ReadState")
 	}
 	accounts := []*solana.AccountMeta{

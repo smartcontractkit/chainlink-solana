@@ -2,8 +2,9 @@ package solclient
 
 import (
 	"context"
-	"github.com/gagliardetto/solana-go"
 	"math/big"
+
+	"github.com/gagliardetto/solana-go"
 )
 
 type LinkToken struct {

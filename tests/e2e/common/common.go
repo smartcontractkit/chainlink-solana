@@ -3,11 +3,12 @@ package common
 import (
 	"bytes"
 	"encoding/hex"
-	"github.com/rs/zerolog/log"
 	"math/big"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/smartcontractkit/integrations-framework/client"
 	"github.com/smartcontractkit/integrations-framework/contracts"

@@ -14,11 +14,11 @@ import (
 type SetWriter struct {
 	Writer *ag_solanago.PublicKey
 
-	// [0] = [] store
+	// [0] = [WRITE] feed
 	//
-	// [1] = [SIGNER] authority
+	// [1] = [] owner
 	//
-	// [2] = [WRITE] feed
+	// [2] = [SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
@@ -36,36 +36,36 @@ func (inst *SetWriter) SetWriter(writer ag_solanago.PublicKey) *SetWriter {
 	return inst
 }
 
-// SetStoreAccount sets the "store" account.
-func (inst *SetWriter) SetStoreAccount(store ag_solanago.PublicKey) *SetWriter {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(store)
-	return inst
-}
-
-// GetStoreAccount gets the "store" account.
-func (inst *SetWriter) GetStoreAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
-}
-
-// SetAuthorityAccount sets the "authority" account.
-func (inst *SetWriter) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetWriter {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).SIGNER()
-	return inst
-}
-
-// GetAuthorityAccount gets the "authority" account.
-func (inst *SetWriter) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
-}
-
 // SetFeedAccount sets the "feed" account.
 func (inst *SetWriter) SetFeedAccount(feed ag_solanago.PublicKey) *SetWriter {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(feed).WRITE()
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(feed).WRITE()
 	return inst
 }
 
 // GetFeedAccount gets the "feed" account.
 func (inst *SetWriter) GetFeedAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[0]
+}
+
+// SetOwnerAccount sets the "owner" account.
+func (inst *SetWriter) SetOwnerAccount(owner ag_solanago.PublicKey) *SetWriter {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(owner)
+	return inst
+}
+
+// GetOwnerAccount gets the "owner" account.
+func (inst *SetWriter) GetOwnerAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[1]
+}
+
+// SetAuthorityAccount sets the "authority" account.
+func (inst *SetWriter) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetWriter {
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).SIGNER()
+	return inst
+}
+
+// GetAuthorityAccount gets the "authority" account.
+func (inst *SetWriter) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
@@ -97,13 +97,13 @@ func (inst *SetWriter) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Store is not set")
+			return errors.New("accounts.Feed is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Authority is not set")
+			return errors.New("accounts.Owner is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.Feed is not set")
+			return errors.New("accounts.Authority is not set")
 		}
 	}
 	return nil
@@ -124,9 +124,9 @@ func (inst *SetWriter) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    store", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("     feed", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("     feed", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("    owner", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
@@ -154,12 +154,12 @@ func NewSetWriterInstruction(
 	// Parameters:
 	writer ag_solanago.PublicKey,
 	// Accounts:
-	store ag_solanago.PublicKey,
-	authority ag_solanago.PublicKey,
-	feed ag_solanago.PublicKey) *SetWriter {
+	feed ag_solanago.PublicKey,
+	owner ag_solanago.PublicKey,
+	authority ag_solanago.PublicKey) *SetWriter {
 	return NewSetWriterInstructionBuilder().
 		SetWriter(writer).
-		SetStoreAccount(store).
-		SetAuthorityAccount(authority).
-		SetFeedAccount(feed)
+		SetFeedAccount(feed).
+		SetOwnerAccount(owner).
+		SetAuthorityAccount(authority)
 }

@@ -109,8 +109,8 @@ func TestGetLatestTransmission(t *testing.T) {
 	offsets := []uint64{0, 0, 1, 0, 1, 0, 0}
 	i := 0
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var sub uint64 = offsets[i] // change offset depending on when called
-		defer func() { i++ }()      // increment
+		var sub = offsets[i]   // change offset depending on when called
+		defer func() { i++ }() // increment
 
 		// read message
 		body, err := io.ReadAll(r.Body)
@@ -148,7 +148,7 @@ func TestStatePolling(t *testing.T) {
 
 		// state query
 		if bytes.Contains(body, []byte("11111111111111111111111111111111")) {
-			_, err := w.Write(testStateResponse())
+			_, err = w.Write(testStateResponse())
 			require.NoError(t, err)
 			return
 		}

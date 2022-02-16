@@ -28,23 +28,27 @@ func init() {
 }
 
 var (
-	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
-
 	Instruction_CreateFeed = ag_binary.TypeID([8]byte{173, 86, 95, 94, 13, 193, 67, 180})
 
 	Instruction_CloseFeed = ag_binary.TypeID([8]byte{153, 14, 92, 89, 19, 78, 211, 46})
+
+	Instruction_TransferFeedOwnership = ag_binary.TypeID([8]byte{181, 58, 251, 37, 147, 180, 70, 227})
+
+	Instruction_AcceptFeedOwnership = ag_binary.TypeID([8]byte{211, 161, 86, 113, 101, 175, 245, 136})
 
 	Instruction_SetValidatorConfig = ag_binary.TypeID([8]byte{87, 248, 224, 193, 17, 41, 80, 250})
 
 	Instruction_SetWriter = ag_binary.TypeID([8]byte{174, 36, 177, 122, 86, 142, 32, 109})
 
-	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
-
-	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
+	Instruction_LowerFlag = ag_binary.TypeID([8]byte{253, 79, 240, 163, 36, 124, 157, 111})
 
 	Instruction_Submit = ag_binary.TypeID([8]byte{88, 166, 102, 181, 162, 127, 170, 48})
 
-	Instruction_LowerFlags = ag_binary.TypeID([8]byte{254, 119, 153, 185, 135, 158, 115, 23})
+	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
+
+	Instruction_TransferStoreOwnership = ag_binary.TypeID([8]byte{186, 90, 25, 87, 17, 175, 57, 109})
+
+	Instruction_AcceptStoreOwnership = ag_binary.TypeID([8]byte{239, 190, 50, 245, 242, 158, 249, 230})
 
 	Instruction_SetLoweringAccessController = ag_binary.TypeID([8]byte{207, 68, 147, 34, 164, 94, 189, 113})
 
@@ -54,24 +58,28 @@ var (
 // InstructionIDToName returns the name of the instruction given its ID.
 func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
-	case Instruction_Initialize:
-		return "Initialize"
 	case Instruction_CreateFeed:
 		return "CreateFeed"
 	case Instruction_CloseFeed:
 		return "CloseFeed"
+	case Instruction_TransferFeedOwnership:
+		return "TransferFeedOwnership"
+	case Instruction_AcceptFeedOwnership:
+		return "AcceptFeedOwnership"
 	case Instruction_SetValidatorConfig:
 		return "SetValidatorConfig"
 	case Instruction_SetWriter:
 		return "SetWriter"
-	case Instruction_TransferOwnership:
-		return "TransferOwnership"
-	case Instruction_AcceptOwnership:
-		return "AcceptOwnership"
+	case Instruction_LowerFlag:
+		return "LowerFlag"
 	case Instruction_Submit:
 		return "Submit"
-	case Instruction_LowerFlags:
-		return "LowerFlags"
+	case Instruction_Initialize:
+		return "Initialize"
+	case Instruction_TransferStoreOwnership:
+		return "TransferStoreOwnership"
+	case Instruction_AcceptStoreOwnership:
+		return "AcceptStoreOwnership"
 	case Instruction_SetLoweringAccessController:
 		return "SetLoweringAccessController"
 	case Instruction_Query:
@@ -97,13 +105,16 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	ag_binary.AnchorTypeIDEncoding,
 	[]ag_binary.VariantType{
 		{
-			"initialize", (*Initialize)(nil),
-		},
-		{
 			"create_feed", (*CreateFeed)(nil),
 		},
 		{
 			"close_feed", (*CloseFeed)(nil),
+		},
+		{
+			"transfer_feed_ownership", (*TransferFeedOwnership)(nil),
+		},
+		{
+			"accept_feed_ownership", (*AcceptFeedOwnership)(nil),
 		},
 		{
 			"set_validator_config", (*SetValidatorConfig)(nil),
@@ -112,16 +123,19 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"set_writer", (*SetWriter)(nil),
 		},
 		{
-			"transfer_ownership", (*TransferOwnership)(nil),
-		},
-		{
-			"accept_ownership", (*AcceptOwnership)(nil),
+			"lower_flag", (*LowerFlag)(nil),
 		},
 		{
 			"submit", (*Submit)(nil),
 		},
 		{
-			"lower_flags", (*LowerFlags)(nil),
+			"initialize", (*Initialize)(nil),
+		},
+		{
+			"transfer_store_ownership", (*TransferStoreOwnership)(nil),
+		},
+		{
+			"accept_store_ownership", (*AcceptStoreOwnership)(nil),
 		},
 		{
 			"set_lowering_access_controller", (*SetLoweringAccessController)(nil),
