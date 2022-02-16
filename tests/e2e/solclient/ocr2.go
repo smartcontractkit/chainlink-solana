@@ -9,7 +9,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/rs/zerolog/log"
-	"github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr2"
+	ocr_2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr2"
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/utils"
 	"github.com/smartcontractkit/integrations-framework/contracts"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
@@ -218,28 +218,25 @@ func (m *OCRv2) Configure(cfg contracts.OffChainAggregatorV2Config) error {
 		return err
 	}
 	chunks := utils.ChunkSlice(cfgBytes, 1000)
-	if err := m.createProposal(version); err != nil {
+	if err = m.createProposal(version); err != nil {
 		return err
 	}
-	if err := m.proposeConfig(cfg); err != nil {
+	if err = m.proposeConfig(cfg); err != nil {
 		return err
 	}
 	for _, cfgChunk := range chunks {
-		if err := m.writeOffChainConfig(cfgChunk); err != nil {
+		if err = m.writeOffChainConfig(cfgChunk); err != nil {
 			return err
 		}
 	}
-	if err := m.finalizeOffChainConfig(); err != nil {
+	if err = m.finalizeOffChainConfig(); err != nil {
 		return err
 	}
 	digest, err := m.makeDigest()
 	if err != nil {
 		return err
 	}
-	if err := m.acceptProposal(digest); err != nil {
-		return err
-	}
-	return nil
+	return m.acceptProposal(digest)
 }
 
 // DumpState dumps all OCR accounts state

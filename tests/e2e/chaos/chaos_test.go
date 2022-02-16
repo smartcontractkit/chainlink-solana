@@ -43,7 +43,7 @@ var _ = Describe("Solana chaos suite", func() {
 	})
 	AfterEach(func() {
 		By("Tearing down the environment", func() {
-			err := actions.TeardownSuite(state.Env, nil, "logs")
+			err := actions.TeardownSuite(state.Env, nil, "logs", nil)
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 	})

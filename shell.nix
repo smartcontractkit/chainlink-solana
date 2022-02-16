@@ -20,13 +20,13 @@ pkgs.mkShell {
     gopls
     delve
     golangci-lint
+    goimports
 
     # NodeJS + TS
     nodePackages.typescript
     nodePackages.typescript-language-server
     nodejs-14_x
     (yarn.override { nodejs = nodejs-14_x; })
-    npm
     python3
   ];
   RUST_BACKTRACE = "1";

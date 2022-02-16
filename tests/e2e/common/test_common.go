@@ -1,5 +1,6 @@
 package common
 
+//revive:disable:dot-imports
 import (
 	"encoding/json"
 	"fmt"
@@ -141,10 +142,7 @@ func (m *OCRv2TestState) DumpContracts() error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(ContractsStateFile, d, os.ModePerm); err != nil {
-		return err
-	}
-	return nil
+	return os.WriteFile(ContractsStateFile, d, os.ModePerm)
 }
 
 func (m *OCRv2TestState) LoadContracts() error {
@@ -153,7 +151,7 @@ func (m *OCRv2TestState) LoadContracts() error {
 		return err
 	}
 	var contractsState *ContractsState
-	if err := json.Unmarshal(d, &contractsState); err != nil {
+	if err = json.Unmarshal(d, &contractsState); err != nil {
 		return err
 	}
 	feedWallet, err := solana.WalletFromPrivateKeyBase58(contractsState.Feed)

@@ -12,7 +12,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/rs/zerolog/log"
 	access_controller2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/access_controller"
-	"github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr2"
+	ocr_2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr2"
 	store2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/store"
 	utils2 "github.com/smartcontractkit/chainlink-solana/tests/e2e/utils"
 	"github.com/smartcontractkit/helmenv/environment"
@@ -114,7 +114,7 @@ func (c *ContractDeployer) DeployLinkTokenContract() (*LinkToken, error) {
 	payer := c.Client.DefaultWallet
 
 	instr := make([]solana.Instruction, 0)
-	if err := c.Client.addMintInstr(&instr); err != nil {
+	if err = c.Client.addMintInstr(&instr); err != nil {
 		return nil, err
 	}
 	vaultAuthority := c.Client.Accounts.Authorities["vault"]
@@ -122,10 +122,10 @@ func (c *ContractDeployer) DeployLinkTokenContract() (*LinkToken, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := c.Client.addNewAssociatedAccInstr(c.Client.Accounts.OCRVault, vaultAuthority.PublicKey, &instr); err != nil {
+	if err = c.Client.addNewAssociatedAccInstr(c.Client.Accounts.OCRVault, vaultAuthority.PublicKey, &instr); err != nil {
 		return nil, err
 	}
-	if err := c.addMintToAccInstr(&instr, c.Client.Accounts.OCRVault, 1e18); err != nil {
+	if err = c.addMintToAccInstr(&instr, c.Client.Accounts.OCRVault, 1e18); err != nil {
 		return nil, err
 	}
 	err = c.Client.TXAsync(
@@ -363,16 +363,10 @@ func (c *ContractDeployer) deployAnchorProgramsRemote() error {
 	for _, bin := range contractBinaries {
 		bin := bin
 		g.Go(func() error {
-			if err := c.DeployProgramRemote(bin); err != nil {
-				return err
-			}
-			return nil
+			return c.DeployProgramRemote(bin)
 		})
 	}
-	if err := g.Wait(); err != nil {
-		return err
-	}
-	return nil
+	return g.Wait()
 }
 
 // generateOCRAuthorities generates authorities so other contracts can access OCR with on-chain calls when signer needed
