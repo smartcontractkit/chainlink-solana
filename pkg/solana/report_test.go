@@ -44,7 +44,7 @@ func TestBuildReport(t *testing.T) {
 	assert.Equal(t, oo[0].Timestamp, binary.BigEndian.Uint32(report[0:4]), "validate timestamp")
 
 	// validate observer count
-	assert.Equal(t, uint8(len(observers)), report[4], "validate observer count")
+	assert.Equal(t, uint8(n), report[4], "validate observer count")
 
 	// validate observers
 	index := 4 + 1

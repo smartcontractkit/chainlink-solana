@@ -57,7 +57,7 @@ func (c ReportCodec) BuildReport(oo []median.ParsedAttributedObservation) (types
 	binary.BigEndian.PutUint32(time, timestamp)
 	report = append(report, time[:]...)
 
-	observersCount := uint8(len(observers))
+	observersCount := uint8(n)
 	report = append(report, observersCount)
 
 	report = append(report, observers[:]...)
