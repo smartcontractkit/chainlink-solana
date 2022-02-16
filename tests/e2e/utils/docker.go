@@ -25,11 +25,14 @@ func RunInAnchorShell(cmd []string, subDir string) error {
 	}
 
 	defer reader.Close()
-	io.Copy(os.Stdout, reader)
+	_, err = io.Copy(os.Stdout, reader)
+	if err != nil {
+		return err
+	}
 
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image: "projectserum/build:v0.21.0",
-		Cmd:        cmd,
+		Cmd:   cmd,
 	}, &container.HostConfig{
 		Mounts: []mount.Mount{
 			{
@@ -61,7 +64,10 @@ func RunInAnchorShell(cmd []string, subDir string) error {
 		return err
 	}
 
-	stdcopy.StdCopy(os.Stdout, os.Stderr, out)
+	_, err = stdcopy.StdCopy(os.Stdout, os.Stderr, out)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
