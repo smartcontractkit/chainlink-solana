@@ -21,7 +21,7 @@ import (
 
 const (
 	ContractsStateFile        = "contracts-chaos-state.json"
-	NewRoundCheckTimeout      = 20 * time.Minute
+	NewRoundCheckTimeout      = 120 * time.Second
 	NewRoundCheckPollInterval = 1 * time.Second
 	SourceChangeInterval      = 5 * time.Second
 	ChaosAwaitingApply        = 1 * time.Minute
