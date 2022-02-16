@@ -46,13 +46,13 @@ func RunInAnchorShell(cmd []string, subDir string) error {
 		return err
 	}
 
-	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+	if err = cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		return err
 	}
 
 	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	select {
-	case err := <-errCh:
+	case err = <-errCh:
 		if err != nil {
 			return err
 		}
