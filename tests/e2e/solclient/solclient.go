@@ -3,6 +3,13 @@ package solclient
 import (
 	"context"
 	"fmt"
+	"io/fs"
+	"math/big"
+	"net/url"
+	"os"
+	"path/filepath"
+	"time"
+
 	"github.com/gagliardetto/solana-go"
 	associatedtokenaccount "github.com/gagliardetto/solana-go/programs/associated-token-account"
 	"github.com/gagliardetto/solana-go/programs/system"
@@ -15,12 +22,6 @@ import (
 	"github.com/smartcontractkit/integrations-framework/client"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
-	"io/fs"
-	"math/big"
-	"net/url"
-	"os"
-	"path/filepath"
-	"time"
 )
 
 type NetworkConfig struct {
@@ -53,6 +54,8 @@ type Accounts struct {
 	Owner *solana.Wallet
 	// Mint LINK mint state account
 	Mint *solana.Wallet
+	// OCR2 Proposal account
+	Proposal *solana.Wallet
 	// MintAuthority LINK mint authority
 	MintAuthority *solana.Wallet
 }
@@ -117,7 +120,7 @@ func ClientInitFunc() func(networkName string, networkConfig map[string]interfac
 			return nil, err
 		}
 		var cfg *NetworkConfig
-		if err := yaml.Unmarshal(d, &cfg); err != nil {
+		if err = yaml.Unmarshal(d, &cfg); err != nil {
 			return nil, err
 		}
 		cfg.ID = networkName
@@ -159,6 +162,7 @@ func (c *Client) initSharedState() {
 		OCR:           solana.NewWallet(),
 		Store:         solana.NewWallet(),
 		Feed:          solana.NewWallet(),
+		Proposal:      solana.NewWallet(),
 		Owner:         solana.NewWallet(),
 		Mint:          solana.NewWallet(),
 		MintAuthority: solana.NewWallet(),
@@ -243,7 +247,7 @@ func (c *Client) TXSync(name string, commitment rpc.CommitmentType, instr []sola
 	if err != nil {
 		return err
 	}
-	if _, err := tx.EncodeTree(text.NewTreeEncoder(os.Stdout, name)); err != nil {
+	if _, err = tx.EncodeTree(text.NewTreeEncoder(os.Stdout, name)); err != nil {
 		return err
 	}
 	if _, err = tx.Sign(signerFunc); err != nil {
@@ -285,17 +289,14 @@ func (c *Client) queueTX(sig solana.Signature, commitment rpc.CommitmentType) {
 			return err
 		}
 		defer sub.Unsubscribe()
-		for {
-			res, err := sub.Recv()
-			if err != nil {
-				return err
-			}
-			if res.Value.Err != nil {
-				return fmt.Errorf("transaction confirmation failed: %v", res.Value.Err)
-			} else {
-				return nil
-			}
+		res, err := sub.Recv()
+		if err != nil {
+			return err
 		}
+		if res.Value.Err != nil {
+			return fmt.Errorf("transaction confirmation failed: %v", res.Value.Err)
+		}
+		return nil
 	})
 }
 
@@ -313,7 +314,7 @@ func (c *Client) TXAsync(name string, instr []solana.Instruction, signerFunc fun
 	if err != nil {
 		return err
 	}
-	if _, err := tx.EncodeTree(text.NewTreeEncoder(os.Stdout, name)); err != nil {
+	if _, err = tx.EncodeTree(text.NewTreeEncoder(os.Stdout, name)); err != nil {
 		return err
 	}
 	if _, err = tx.Sign(signerFunc); err != nil {
@@ -370,10 +371,7 @@ func (c *Client) AirdropAddresses(addr []string, solAmount uint64) error {
 			return err
 		}
 	}
-	if err := c.WaitForEvents(); err != nil {
-		return err
-	}
-	return nil
+	return c.WaitForEvents()
 }
 
 // ListDirFilenamesByExt returns all the filenames inside a dir for file with particular extension, for ex. ".json"
@@ -429,6 +427,11 @@ func (c *Client) CalculateTXSCost(txs int64) (*big.Float, error) {
 }
 
 func (c *Client) CalculateTxGas(gasUsedValue *big.Int) (*big.Float, error) {
+	panic("implement me")
+}
+
+// GetDefaultWallet gets the default wallet
+func (c *Client) GetDefaultWallet() *client.EthereumWallet {
 	panic("implement me")
 }
 

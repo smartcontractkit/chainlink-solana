@@ -1,9 +1,11 @@
 package common
 
+//revive:disable:dot-imports
 import (
+	"time"
+
 	. "github.com/onsi/gomega"
 	"github.com/smartcontractkit/helmenv/chaos/experiments"
-	"time"
 )
 
 func (m *OCRv2TestState) CanRecoverAllNodesValidatorConnectionLoss() {

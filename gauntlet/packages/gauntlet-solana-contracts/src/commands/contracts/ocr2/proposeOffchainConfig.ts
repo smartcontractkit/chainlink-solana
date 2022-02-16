@@ -1,14 +1,15 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt, time, BN } from '@chainlink/gauntlet-core/dist/utils'
 import { RawTransaction, SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { AccountMeta, PublicKey } from '@solana/web3.js'
-import { MAX_TRANSACTION_BYTES, ORACLES_MAX_LENGTH } from '../../../../lib/constants'
-import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
-import { divideIntoChunks } from '../../../../lib/utils'
-import { serializeOffchainConfig } from '../../../../lib/encoding'
+import { PublicKey } from '@solana/web3.js'
+import { MAX_TRANSACTION_BYTES, ORACLES_MAX_LENGTH } from '../../../lib/constants'
+import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
+import { getRDD } from '../../../lib/rdd'
+import { divideIntoChunks } from '../../../lib/utils'
+import { serializeOffchainConfig } from '../../../lib/encoding'
 import RDD from '../../../../lib/rdd'
 
-export type Input = {
+export type OffchainConfig = {
   deltaProgressNanoseconds: number
   deltaResendNanoseconds: number
   deltaRoundNanoseconds: number
@@ -33,18 +34,24 @@ export type Input = {
   configPublicKeys: string[]
 }
 
-export default class WriteOffchainConfig extends SolanaCommand {
-  static id = 'ocr2:write_offchain_config'
+type Input = {
+  proposalId: string
+  offchainConfig: OffchainConfig
+}
+
+export default class ProposeOffchainConfig extends SolanaCommand {
+  static id = 'ocr2:propose_offchain_config'
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:write_offchain_config --network=devnet --rdd=[PATH_TO_RDD] EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
-    'yarn gauntlet ocr2:write_offchain_config EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet ocr2:propose_offchain_config --network=devnet --rdd=[PATH_TO_RDD] --proposalId=<PROPOSAL_ID> EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet ocr2:propose_offchain_config --proposalId=<PROPOSAL_ID> EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
 
   constructor(flags, args) {
     super(flags, args)
 
+    this.require(!!this.flags.proposalId, 'Please provide flags with "proposalId"')
     this.require(
       !!process.env.SECRET,
       'Please specify the Gauntlet secret words e.g. SECRET="awe fluke polygon tonic lilly acuity onyx debra bound gilbert wane"',
@@ -53,13 +60,11 @@ export default class WriteOffchainConfig extends SolanaCommand {
 
   static makeInputFromRDD = (rdd: any, aggregator: any): Input => {
     const config = aggregator.config
+    const _toHex = (a: string) => Buffer.from(a, 'hex')
+    const _getSigner = (o) => o.ocr2OnchainPublicKey[0].replace('ocr2on_solana_', '')
     const aggregatorOperators: any[] = aggregator.oracles
       .map((o) => rdd.operators[o.operator])
-      .sort((a, b) => {
-        if (a.ocr2OnchainPublicKey[0] > b.ocr2OnchainPublicKey[0]) return 1
-        if (a.ocr2OnchainPublicKey[0] < b.ocr2OnchainPublicKey[0]) return -1
-        return 0
-      })
+      .sort((a, b) => Buffer.compare(_toHex(_getSigner(a)), _toHex(_getSigner(b))))
     const operatorsPublicKeys = aggregatorOperators.map((o) =>
       o.ocr2OffchainPublicKey[0].replace('ocr2off_solana_', ''),
     )
@@ -68,7 +73,7 @@ export default class WriteOffchainConfig extends SolanaCommand {
       o.ocr2ConfigPublicKey[0].replace('ocr2cfg_solana_', ''),
     )
 
-    const input: Input = {
+    const input: OffchainConfig = {
       deltaProgressNanoseconds: time.durationToNanoseconds(config.deltaProgress).toNumber(),
       deltaResendNanoseconds: time.durationToNanoseconds(config.deltaResend).toNumber(),
       deltaRoundNanoseconds: time.durationToNanoseconds(config.deltaRound).toNumber(),
@@ -105,10 +110,13 @@ export default class WriteOffchainConfig extends SolanaCommand {
     const rddPath = this.flags.rdd || ''
     const rdd = RDD.load(network, rddPath)
     const aggregator = RDD.loadAggregator(network, rddPath, this.args[0])
-    return WriteOffchainConfig.makeInputFromRDD(rdd, aggregator)
+    return {
+      offchainConfig: ProposeOffchainConfig.makeInputFromRDD(rdd, aggregator),
+      proposalId: this.flags.proposalId,
+    }
   }
 
-  validateInput = (input: Input): boolean => {
+  validateConfig = (input: OffchainConfig): boolean => {
     const _isNegative = (v: number): boolean => new BN(v).lt(new BN(0))
     const nonNegativeValues = [
       'deltaProgressNanoseconds',
@@ -166,11 +174,12 @@ export default class WriteOffchainConfig extends SolanaCommand {
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
 
-    const state = new PublicKey(this.args[0])
     const input = this.makeInput(this.flags.input)
+    const proposal = new PublicKey(input.proposalId)
+
     const maxBufferSize = this.flags.bufferSize || MAX_TRANSACTION_BYTES
 
-    this.validateInput(input)
+    this.validateConfig(input.offchainConfig)
 
     const userSecret = this.flags.secret
     if (!!userSecret) {
@@ -179,7 +188,11 @@ export default class WriteOffchainConfig extends SolanaCommand {
 
     // process.env.SECRET is required on the command
     const gauntletSecret = process.env.SECRET!
-    const { offchainConfig, randomSecret } = await serializeOffchainConfig(input, gauntletSecret, userSecret)
+    const { offchainConfig, randomSecret } = await serializeOffchainConfig(
+      input.offchainConfig,
+      gauntletSecret,
+      userSecret,
+    )
     logger.info(`Offchain config size: ${offchainConfig.byteLength}`)
     this.require(offchainConfig.byteLength < 4096, 'Offchain config must be lower than 4096 bytes')
 
@@ -193,38 +206,35 @@ export default class WriteOffchainConfig extends SolanaCommand {
 
     logger.log('Offchain info:', input)
     logger.line()
-    logger.info('Important: If you run this command for the same configuration, use the same RANDOM SECRET')
+    logger.info(
+      `Important: Save this secret
+        - If you run this command for the same configuration, use the same RANDOM SECRET
+        - You will need to provide the secret to approve the config proposal
+      Provide it with --secret flag`,
+    )
     logger.info(`${randomSecret}`)
     logger.line()
 
-    const dataInChunks = offchainConfigChunks.map((buffer) =>
-      program.coder.instruction.encode('write_offchain_config', {
-        offchainConfig: buffer,
+    const ixs = offchainConfigChunks.map((buffer) =>
+      program.instruction.writeOffchainConfig(buffer, {
+        accounts: {
+          proposal: proposal,
+          authority: signer,
+        },
       }),
     )
 
-    const accounts: AccountMeta[] = [
-      {
-        pubkey: state,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: signer,
-        isSigner: true,
-        isWritable: false,
-      },
-    ]
-
-    return dataInChunks.map((data) => ({
-      accounts,
-      data,
-      programId: program.programId,
+    const rawTxs: RawTransaction[] = ixs.map((ix) => ({
+      accounts: ix.keys,
+      data: ix.data,
+      programId: ix.programId,
     }))
+
+    return rawTxs
   }
 
   execute = async () => {
-    const state = new PublicKey(this.flags.state)
+    const state = new PublicKey(this.args[0])
 
     const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
     const startingPoint = new BN(this.flags.instruction || 0).toNumber()

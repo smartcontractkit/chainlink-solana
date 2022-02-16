@@ -156,17 +156,145 @@ func (obj *OracleObservationCount) UnmarshalWithDecoder(decoder *ag_binary.Decod
 	return nil
 }
 
+type Proposal struct {
+	Version        uint8
+	Owner          ag_solanago.PublicKey
+	State          uint8
+	F              uint8
+	Padding0       uint8
+	Padding1       uint32
+	TokenMint      ag_solanago.PublicKey
+	Oracles        ProposedOracles
+	OffchainConfig OffchainConfig
+}
+
+var ProposalDiscriminator = [8]byte{26, 94, 189, 187, 116, 136, 53, 33}
+
+func (obj Proposal) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(ProposalDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `Owner` param:
+	err = encoder.Encode(obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Serialize `State` param:
+	err = encoder.Encode(obj.State)
+	if err != nil {
+		return err
+	}
+	// Serialize `F` param:
+	err = encoder.Encode(obj.F)
+	if err != nil {
+		return err
+	}
+	// Serialize `Padding0` param:
+	err = encoder.Encode(obj.Padding0)
+	if err != nil {
+		return err
+	}
+	// Serialize `Padding1` param:
+	err = encoder.Encode(obj.Padding1)
+	if err != nil {
+		return err
+	}
+	// Serialize `TokenMint` param:
+	err = encoder.Encode(obj.TokenMint)
+	if err != nil {
+		return err
+	}
+	// Serialize `Oracles` param:
+	err = encoder.Encode(obj.Oracles)
+	if err != nil {
+		return err
+	}
+	// Serialize `OffchainConfig` param:
+	err = encoder.Encode(obj.OffchainConfig)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Proposal) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(ProposalDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[26 94 189 187 116 136 53 33]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Owner`:
+	err = decoder.Decode(&obj.Owner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `State`:
+	err = decoder.Decode(&obj.State)
+	if err != nil {
+		return err
+	}
+	// Deserialize `F`:
+	err = decoder.Decode(&obj.F)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Padding0`:
+	err = decoder.Decode(&obj.Padding0)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Padding1`:
+	err = decoder.Decode(&obj.Padding1)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TokenMint`:
+	err = decoder.Decode(&obj.TokenMint)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Oracles`:
+	err = decoder.Decode(&obj.Oracles)
+	if err != nil {
+		return err
+	}
+	// Deserialize `OffchainConfig`:
+	err = decoder.Decode(&obj.OffchainConfig)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type State struct {
-	Version               uint8
-	Nonce                 uint8
-	Padding0              uint16
-	Padding1              uint32
-	Config                Config
-	OffchainConfig        OffchainConfig
-	PendingOffchainConfig OffchainConfig
-	Oracles               Oracles
-	LeftoverPayments      LeftoverPayments
-	Transmissions         ag_solanago.PublicKey
+	Version        uint8
+	VaultNonce     uint8
+	Padding0       uint16
+	Padding1       uint32
+	Feed           ag_solanago.PublicKey
+	Config         Config
+	OffchainConfig OffchainConfig
+	Oracles        Oracles
 }
 
 var StateDiscriminator = [8]byte{216, 146, 107, 94, 104, 75, 182, 177}
@@ -182,8 +310,8 @@ func (obj State) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `Nonce` param:
-	err = encoder.Encode(obj.Nonce)
+	// Serialize `VaultNonce` param:
+	err = encoder.Encode(obj.VaultNonce)
 	if err != nil {
 		return err
 	}
@@ -197,6 +325,11 @@ func (obj State) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
+	// Serialize `Feed` param:
+	err = encoder.Encode(obj.Feed)
+	if err != nil {
+		return err
+	}
 	// Serialize `Config` param:
 	err = encoder.Encode(obj.Config)
 	if err != nil {
@@ -207,23 +340,8 @@ func (obj State) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `PendingOffchainConfig` param:
-	err = encoder.Encode(obj.PendingOffchainConfig)
-	if err != nil {
-		return err
-	}
 	// Serialize `Oracles` param:
 	err = encoder.Encode(obj.Oracles)
-	if err != nil {
-		return err
-	}
-	// Serialize `LeftoverPayments` param:
-	err = encoder.Encode(obj.LeftoverPayments)
-	if err != nil {
-		return err
-	}
-	// Serialize `Transmissions` param:
-	err = encoder.Encode(obj.Transmissions)
 	if err != nil {
 		return err
 	}
@@ -249,8 +367,8 @@ func (obj *State) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Deserialize `Nonce`:
-	err = decoder.Decode(&obj.Nonce)
+	// Deserialize `VaultNonce`:
+	err = decoder.Decode(&obj.VaultNonce)
 	if err != nil {
 		return err
 	}
@@ -264,6 +382,11 @@ func (obj *State) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	if err != nil {
 		return err
 	}
+	// Deserialize `Feed`:
+	err = decoder.Decode(&obj.Feed)
+	if err != nil {
+		return err
+	}
 	// Deserialize `Config`:
 	err = decoder.Decode(&obj.Config)
 	if err != nil {
@@ -274,23 +397,8 @@ func (obj *State) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Deserialize `PendingOffchainConfig`:
-	err = decoder.Decode(&obj.PendingOffchainConfig)
-	if err != nil {
-		return err
-	}
 	// Deserialize `Oracles`:
 	err = decoder.Decode(&obj.Oracles)
-	if err != nil {
-		return err
-	}
-	// Deserialize `LeftoverPayments`:
-	err = decoder.Decode(&obj.LeftoverPayments)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Transmissions`:
-	err = decoder.Decode(&obj.Transmissions)
 	if err != nil {
 		return err
 	}

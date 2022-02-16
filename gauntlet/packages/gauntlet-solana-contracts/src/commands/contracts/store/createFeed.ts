@@ -71,37 +71,19 @@ export default class CreateFeed extends SolanaCommand {
       - Total Length: ${feedAccountLength.toNumber()}
     `)
 
-    const data = program.coder.instruction.encode('create_feed', {
-      description,
-      decimals,
-      granularity,
-      liveLength,
-    })
-
-    const accounts: AccountMeta[] = [
-      {
-        pubkey: store,
-        isWritable: false,
-        isSigner: false,
-      },
-      {
-        pubkey: feed,
-        isWritable: true,
-        isSigner: false,
-      },
-      {
-        pubkey: signer,
-        isWritable: false,
-        isSigner: true,
-      },
-    ]
-
-    const transmissionsCreationInstruction = await SystemProgram.createAccount({
+    const transmissionsCreationInstruction = SystemProgram.createAccount({
       fromPubkey: signer,
       newAccountPubkey: feed,
       space: feedAccountLength.toNumber(),
       lamports: await this.provider.connection.getMinimumBalanceForRentExemption(feedAccountLength.toNumber()),
       programId: program.programId,
+    })
+
+    const tx = program.instruction.createFeed(description, decimals, granularity, liveLength, {
+      accounts: {
+        feed,
+        authority: signer,
+      },
     })
 
     return [
@@ -111,9 +93,9 @@ export default class CreateFeed extends SolanaCommand {
         programId: transmissionsCreationInstruction.programId,
       },
       {
-        data,
-        accounts,
-        programId: program.programId,
+        data: tx.data,
+        accounts: tx.keys,
+        programId: tx.programId,
       },
     ]
   }

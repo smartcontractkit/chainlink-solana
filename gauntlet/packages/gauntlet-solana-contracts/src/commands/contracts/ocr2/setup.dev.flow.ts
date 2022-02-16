@@ -7,13 +7,8 @@ import Initialize from './initialize'
 import InitializeAC from '../accessController/initialize'
 import InitializeStore from '../store/initialize'
 import DeployToken from '../token/deploy'
-import SetPayees from './setPayees'
 import SetValidatorConfig from '../store/setValidatorConfig'
 import AddAccess from '../accessController/addAccess'
-import BeginOffchainConfig from './offchainConfig/begin'
-import WriteOffchainConfig from './offchainConfig/write'
-import CommitOffchainConfig from './offchainConfig/commit'
-import SetConfig from './setConfig'
 import SetBilling from './setBilling'
 import CreateFeed from '../store/createFeed'
 import SetWriter from '../store/setWriter'
@@ -197,46 +192,6 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
           },
           ocrState: FlowCommand.ID.contract(this.stepIds.OCR_2),
           state: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.STORE)),
-        },
-      },
-      {
-        name: 'Begin Offchain Config',
-        command: BeginOffchainConfig,
-        flags: {
-          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
-          version: this.flags.version || 2,
-        },
-      },
-      {
-        name: 'Write Offchain Config',
-        command: WriteOffchainConfig,
-        flags: {
-          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
-          input: offchainConfigInput,
-        },
-      },
-      {
-        name: 'Commit Offchain Config',
-        command: CommitOffchainConfig,
-        flags: {
-          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
-        },
-      },
-      {
-        name: 'Set Config',
-        command: SetConfig,
-        flags: {
-          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
-          input: configInput,
-        },
-      },
-      {
-        name: 'Set Payees',
-        command: SetPayees,
-        flags: {
-          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
-          input: payeesInput,
-          link: FlowCommand.ID.contract(this.stepIds.TOKEN),
         },
       },
       {

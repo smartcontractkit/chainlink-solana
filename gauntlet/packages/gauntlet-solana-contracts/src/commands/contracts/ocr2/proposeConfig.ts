@@ -1,10 +1,9 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
-import { AccountMeta, PublicKey } from '@solana/web3.js'
+import { PublicKey } from '@solana/web3.js'
 import { ORACLES_MAX_LENGTH } from '../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { makeTx } from '../../../lib/utils'
 import RDD from '../../../lib/rdd'
 
 type Input = {
@@ -13,14 +12,16 @@ type Input = {
     transmitter: string
   }[]
   f: number | string
+  proposalId: string
 }
-export default class SetConfig extends SolanaCommand {
-  static id = 'ocr2:set_config'
+
+export default class ProposeConfig extends SolanaCommand {
+  static id = 'ocr2:propose_config'
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:set_config --network=devnet --rdd=[PATH_TO_RDD] EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
-    'yarn gauntlet ocr2:set_config EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet ocr2:propose_config --network=devnet --rdd=[PATH_TO_RDD] --proposalId=<PROPOSAL_ID> EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
+    'yarn gauntlet ocr2:propose_config --proposalId=<PROPOSAL_ID> EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
 
   makeInput = (userInput): Input => {
@@ -29,21 +30,26 @@ export default class SetConfig extends SolanaCommand {
     const rddPath = this.flags.rdd || ''
     const rdd = RDD.load(network, rddPath)
     const aggregator = RDD.loadAggregator(network, rddPath, this.args[0])
+    const _toHex = (a: string) => Buffer.from(a, 'hex')
     const aggregatorOperators: any[] = aggregator.oracles.map((o) => rdd.operators[o.operator])
-    const oracles = aggregatorOperators.map((operator) => ({
-      // Same here
-      transmitter: operator.ocrNodeAddress[0],
-      signer: operator.ocr2OnchainPublicKey[0].replace('ocr2on_solana_', ''),
-    }))
+    const oracles = aggregatorOperators
+      .map((operator) => ({
+        transmitter: operator.ocrNodeAddress[0],
+        signer: operator.ocr2OnchainPublicKey[0].replace('ocr2on_solana_', ''),
+      }))
+      .sort((a, b) => Buffer.compare(_toHex(a.signer), _toHex(b.signer)))
     const f = aggregator.config.f
     return {
       oracles,
       f,
+      proposalId: this.flags.proposalId,
     }
   }
 
   constructor(flags, args) {
     super(flags, args)
+
+    this.require(!!this.flags.proposalId, 'Please provide flags with "proposalId"')
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
@@ -51,8 +57,9 @@ export default class SetConfig extends SolanaCommand {
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
 
-    const state = new PublicKey(this.args[0])
     const input = this.makeInput(this.flags.input)
+
+    const proposal = new PublicKey(input.proposalId)
 
     const oracles = input.oracles.map(({ signer, transmitter }) => ({
       signer: Buffer.from(signer, 'hex'),
@@ -68,28 +75,17 @@ export default class SetConfig extends SolanaCommand {
     )
 
     logger.log('Config information:', input)
-    const data = program.coder.instruction.encode('set_config', {
-      newOracles: oracles,
-      f,
+    const ix = await program.instruction.proposeConfig(oracles, f, {
+      accounts: {
+        proposal,
+        authority: signer,
+      },
     })
 
-    const accounts: AccountMeta[] = [
-      {
-        pubkey: state,
-        isSigner: false,
-        isWritable: true,
-      },
-      {
-        pubkey: signer,
-        isSigner: true,
-        isWritable: false,
-      },
-    ]
-
     const rawTx: RawTransaction = {
-      data,
-      accounts,
-      programId: ocr2.programId,
+      data: ix.data,
+      accounts: ix.keys,
+      programId: ix.programId,
     }
 
     return [rawTx]

@@ -15,20 +15,14 @@ type Initialize struct {
 
 	// [0] = [WRITE] state
 	//
-	// [1] = [] payer
-	//
-	// [2] = [SIGNER] owner
-	//
-	// [3] = [] rent
-	//
-	// [4] = [] systemProgram
+	// [1] = [SIGNER] owner
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
 func NewInitializeInstructionBuilder() *Initialize {
 	nd := &Initialize{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
 	}
 	return nd
 }
@@ -44,48 +38,15 @@ func (inst *Initialize) GetStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
-// SetPayerAccount sets the "payer" account.
-func (inst *Initialize) SetPayerAccount(payer ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(payer)
-	return inst
-}
-
-// GetPayerAccount gets the "payer" account.
-func (inst *Initialize) GetPayerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
-}
-
 // SetOwnerAccount sets the "owner" account.
 func (inst *Initialize) SetOwnerAccount(owner ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(owner).SIGNER()
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(owner).SIGNER()
 	return inst
 }
 
 // GetOwnerAccount gets the "owner" account.
 func (inst *Initialize) GetOwnerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
-}
-
-// SetRentAccount sets the "rent" account.
-func (inst *Initialize) SetRentAccount(rent ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(rent)
-	return inst
-}
-
-// GetRentAccount gets the "rent" account.
-func (inst *Initialize) GetRentAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
-}
-
-// SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *Initialize) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(systemProgram)
-	return inst
-}
-
-// GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *Initialize) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice[1]
 }
 
 func (inst Initialize) Build() *Instruction {
@@ -112,16 +73,7 @@ func (inst *Initialize) Validate() error {
 			return errors.New("accounts.State is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Payer is not set")
-		}
-		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Owner is not set")
-		}
-		if inst.AccountMetaSlice[3] == nil {
-			return errors.New("accounts.Rent is not set")
-		}
-		if inst.AccountMetaSlice[4] == nil {
-			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
 	return nil
@@ -139,12 +91,9 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("        state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("        payer", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("        owner", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("         rent", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[4]))
+					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("state", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("owner", inst.AccountMetaSlice[1]))
 					})
 				})
 		})
@@ -161,14 +110,8 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 func NewInitializeInstruction(
 	// Accounts:
 	state ag_solanago.PublicKey,
-	payer ag_solanago.PublicKey,
-	owner ag_solanago.PublicKey,
-	rent ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *Initialize {
+	owner ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
 		SetStateAccount(state).
-		SetPayerAccount(payer).
-		SetOwnerAccount(owner).
-		SetRentAccount(rent).
-		SetSystemProgramAccount(systemProgram)
+		SetOwnerAccount(owner)
 }

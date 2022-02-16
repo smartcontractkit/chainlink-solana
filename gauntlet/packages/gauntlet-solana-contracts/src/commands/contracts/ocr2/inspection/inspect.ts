@@ -1,10 +1,10 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { inspection, BN, logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { inspection, BN } from '@chainlink/gauntlet-core/dist/utils'
 import { Proto } from '@chainlink/gauntlet-core/dist/crypto'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
-import WriteOffchainConfig, { Input as OffchainConfigInput } from '../offchainConfig/write'
+import WriteOffchainConfig, { OffchainConfig } from '../proposeOffchainConfig'
 import { descriptor as OCR2Descriptor } from '../../../../lib/ocr2Proto'
 import { toComparableLongNumber, toComparableNumber, toComparablePubKey } from '../../../../lib/inspection'
 import RDD from '../../../../lib/rdd'
@@ -15,7 +15,7 @@ type Input = {
   minAnswer: string | number
   maxAnswer: string | number
   transmitters: string[]
-  offchainConfig: OffchainConfigInput
+  offchainConfig: OffchainConfig
   billingAccessController: string
   requesterAccessController: string
   link: string
@@ -135,9 +135,9 @@ export default class OCR2Inspect extends SolanaCommand {
     const state = new PublicKey(this.args[0])
     const onChainState = await ocr2program.account.state.fetch(state)
 
-    const bufferedConfig = Buffer.from(onChainState.config.offchainConfig.xs).slice(
+    const bufferedConfig = Buffer.from(onChainState.offchainConfig.xs).slice(
       0,
-      new BN(onChainState.config.offchainConfig.len).toNumber(),
+      new BN(onChainState.offchainConfig.len).toNumber(),
     )
 
     const onChainOCRConfig = this.deserializeConfig(bufferedConfig)

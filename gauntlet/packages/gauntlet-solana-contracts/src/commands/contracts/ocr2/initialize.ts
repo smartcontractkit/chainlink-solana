@@ -72,78 +72,23 @@ export default class Initialize extends SolanaCommand {
       true,
     )
 
-    const data = program.coder.instruction.encode('initialize', {
-      minAnswer,
-      maxAnswer,
+    const tx = program.instruction.initialize(minAnswer, maxAnswer, {
+      accounts: {
+        state,
+        feed: transmissions,
+        payer: signer,
+        owner: signer,
+        tokenMint: linkPublicKey,
+        tokenVault,
+        vaultAuthority,
+        requesterAccessController,
+        billingAccessController,
+        rent: SYSVAR_RENT_PUBKEY,
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      },
     })
-
-    const accounts: AccountMeta[] = [
-      {
-        pubkey: state,
-        isWritable: true,
-        isSigner: false,
-      },
-      {
-        pubkey: transmissions,
-        isWritable: false,
-        isSigner: false,
-      },
-      {
-        pubkey: signer,
-        isWritable: false,
-        isSigner: false,
-      },
-      {
-        pubkey: signer,
-        isWritable: false,
-        isSigner: true,
-      },
-      {
-        pubkey: linkPublicKey,
-        isWritable: false,
-        isSigner: false,
-      },
-      {
-        pubkey: tokenVault,
-        isWritable: true,
-        isSigner: false,
-      },
-      {
-        pubkey: vaultAuthority,
-        isWritable: false,
-        isSigner: false,
-      },
-      {
-        pubkey: requesterAccessController,
-        isWritable: false,
-        isSigner: false,
-      },
-      {
-        pubkey: billingAccessController,
-        isWritable: false,
-        isSigner: false,
-      },
-      {
-        pubkey: SYSVAR_RENT_PUBKEY,
-        isWritable: false,
-        isSigner: false,
-      },
-      {
-        pubkey: SystemProgram.programId,
-        isWritable: false,
-        isSigner: false,
-      },
-      {
-        pubkey: TOKEN_PROGRAM_ID,
-        isWritable: false,
-        isSigner: false,
-      },
-      {
-        pubkey: ASSOCIATED_TOKEN_PROGRAM_ID,
-        isWritable: false,
-        isSigner: false,
-      },
-    ]
 
     console.log(`
       STATE ACCOUNTS:
@@ -169,9 +114,9 @@ export default class Initialize extends SolanaCommand {
         programId: feedCreationInstruction.programId,
       },
       {
-        data,
-        accounts,
-        programId: program.programId,
+        data: tx.data,
+        accounts: tx.keys,
+        programId: tx.programId,
       },
     ]
 

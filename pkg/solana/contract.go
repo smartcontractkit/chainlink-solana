@@ -100,7 +100,7 @@ func (c *ContractTracker) PollState() {
 			c.lggr.Debugf("Stopping state polling for state: %s, transmissions: %s", c.StateID, c.TransmissionsID)
 			return
 		case <-tick:
-			// async poll both transmisison + ocr2 states
+			// async poll both transmission + ocr2 states
 			start := time.Now()
 			var wg sync.WaitGroup
 			wg.Add(2)
@@ -240,7 +240,7 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 
 	// parse header
 	var header TransmissionsHeader
-	if err := bin.NewBinDecoder(res.Value.Data.GetBinary()).Decode(&header); err != nil {
+	if err = bin.NewBinDecoder(res.Value.Data.GetBinary()).Decode(&header); err != nil {
 		return Answer{}, 0, errors.Wrap(err, "failed to decode transmission account header")
 	}
 

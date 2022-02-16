@@ -1,36 +1,19 @@
 {
   "version": "0.1.0",
   "name": "store",
-  "instructions": [
+  "constants": [
     {
-      "name": "initialize",
-      "accounts": [
-        {
-          "name": "store",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "loweringAccessController",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
+      "name": "HEADER_SIZE",
+      "type": {
+        "defined": "usize"
+      },
+      "value": "192"
+    }
+  ],
+  "instructions": [
     {
       "name": "createFeed",
       "accounts": [
-        {
-          "name": "store",
-          "isMut": false,
-          "isSigner": false
-        },
         {
           "name": "feed",
           "isMut": true,
@@ -65,13 +48,13 @@
       "name": "closeFeed",
       "accounts": [
         {
-          "name": "store",
-          "isMut": false,
+          "name": "feed",
+          "isMut": true,
           "isSigner": false
         },
         {
-          "name": "feed",
-          "isMut": true,
+          "name": "owner",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -88,10 +71,15 @@
       "args": []
     },
     {
-      "name": "setValidatorConfig",
+      "name": "transferFeedOwnership",
       "accounts": [
         {
-          "name": "store",
+          "name": "feed",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
           "isMut": false,
           "isSigner": false
         },
@@ -99,11 +87,53 @@
           "name": "authority",
           "isMut": false,
           "isSigner": true
-        },
+        }
+      ],
+      "args": [
+        {
+          "name": "proposedOwner",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "acceptFeedOwnership",
+      "accounts": [
         {
           "name": "feed",
           "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "proposedOwner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "setValidatorConfig",
+      "accounts": [
+        {
+          "name": "feed",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
         }
       ],
       "args": [
@@ -117,7 +147,12 @@
       "name": "setWriter",
       "accounts": [
         {
-          "name": "store",
+          "name": "feed",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
           "isMut": false,
           "isSigner": false
         },
@@ -125,11 +160,6 @@
           "name": "authority",
           "isMut": false,
           "isSigner": true
-        },
-        {
-          "name": "feed",
-          "isMut": true,
-          "isSigner": false
         }
       ],
       "args": [
@@ -140,7 +170,77 @@
       ]
     },
     {
-      "name": "transferOwnership",
+      "name": "lowerFlag",
+      "accounts": [
+        {
+          "name": "feed",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "accessController",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "submit",
+      "accounts": [
+        {
+          "name": "feed",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "round",
+          "type": {
+            "defined": "NewTransmission"
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "accounts": [
+        {
+          "name": "store",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "loweringAccessController",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "transferStoreOwnership",
       "accounts": [
         {
           "name": "store",
@@ -161,7 +261,7 @@
       ]
     },
     {
-      "name": "acceptOwnership",
+      "name": "acceptStoreOwnership",
       "accounts": [
         {
           "name": "store",
@@ -175,78 +275,6 @@
         }
       ],
       "args": []
-    },
-    {
-      "name": "migrate",
-      "accounts": [
-        {
-          "name": "store",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "submit",
-      "accounts": [
-        {
-          "name": "store",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "feed",
-          "isMut": true,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "round",
-          "type": {
-            "defined": "NewTransmission"
-          }
-        }
-      ]
-    },
-    {
-      "name": "lowerFlags",
-      "accounts": [
-        {
-          "name": "store",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "accessController",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "flags",
-          "type": {
-            "vec": "publicKey"
-          }
-        }
-      ]
     },
     {
       "name": "setLoweringAccessController",
@@ -303,18 +331,8 @@
             "type": "publicKey"
           },
           {
-            "name": "raisingAccessController",
-            "type": "publicKey"
-          },
-          {
             "name": "loweringAccessController",
             "type": "publicKey"
-          },
-          {
-            "name": "flags",
-            "type": {
-              "defined": "Flags"
-            }
           }
         ]
       }
@@ -329,7 +347,15 @@
             "type": "u8"
           },
           {
-            "name": "store",
+            "name": "state",
+            "type": "u8"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "proposedOwner",
             "type": "publicKey"
           },
           {
@@ -379,26 +405,6 @@
   ],
   "types": [
     {
-      "name": "RoundV1",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "roundId",
-            "type": "u32"
-          },
-          {
-            "name": "timestamp",
-            "type": "u64"
-          },
-          {
-            "name": "answer",
-            "type": "i128"
-          }
-        ]
-      }
-    },
-    {
       "name": "Round",
       "type": {
         "kind": "struct",
@@ -418,27 +424,6 @@
           {
             "name": "answer",
             "type": "i128"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Flags",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "xs",
-            "type": {
-              "array": [
-                "publicKey",
-                128
-              ]
-            }
-          },
-          {
-            "name": "len",
-            "type": "u64"
           }
         ]
       }
@@ -483,13 +468,10 @@
             ]
           },
           {
-            "name": "LatestRoundDataV1"
+            "name": "LatestRoundData"
           },
           {
             "name": "Aggregator"
-          },
-          {
-            "name": "LatestRoundDataV2"
           }
         ]
       }
@@ -508,12 +490,20 @@
     },
     {
       "code": 6002,
-      "name": "Full",
-      "msg": "Flags list is full"
+      "name": "NotFound"
     },
     {
       "code": 6003,
-      "name": "NotFound"
+      "name": "InvalidVersion",
+      "msg": "Invalid version"
+    },
+    {
+      "code": 6004,
+      "name": "InsufficientAccountCapacity",
+      "msg": "Insufficient account capacity"
     }
-  ]
+  ],
+  "metadata": {
+    "address": "CaH12fwNTKJAG8PxEvo9R96Zc2j8qNHZaFj8ZW49yZNT"
+  }
 }
