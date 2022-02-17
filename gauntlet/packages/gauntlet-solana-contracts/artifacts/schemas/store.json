@@ -240,7 +240,7 @@
       "args": []
     },
     {
-      "name": "transferOwnership",
+      "name": "transferStoreOwnership",
       "accounts": [
         {
           "name": "store",
@@ -261,7 +261,7 @@
       ]
     },
     {
-      "name": "acceptOwnership",
+      "name": "acceptStoreOwnership",
       "accounts": [
         {
           "name": "store",
@@ -502,8 +502,5 @@
       "name": "InsufficientAccountCapacity",
       "msg": "Insufficient account capacity"
     }
-  ],
-  "metadata": {
-    "address": "CaH12fwNTKJAG8PxEvo9R96Zc2j8qNHZaFj8ZW49yZNT"
-  }
+  ]
 }
