@@ -28,11 +28,11 @@ export default class Fund extends SolanaCommand {
     const linkPublicKey = new PublicKey(this.flags.link || process.env.LINK)
 
     // Resolve the tokenVault from the aggregator state account
-    const stateAccount = await program.account.state.fetch(state);
-    const tokenVault = stateAccount.config.tokenVault;
-    const tokenMint = stateAccount.config.tokenMint;
+    const stateAccount = await program.account.state.fetch(state)
+    const tokenVault = stateAccount.config.tokenVault
+    const tokenMint = stateAccount.config.tokenMint
 
-    this.require(linkPublicKey === tokenMint, 'LINK does not match aggregator.config.tokenMint');
+    this.require(linkPublicKey === tokenMint, 'LINK does not match aggregator.config.tokenMint')
 
     const token = new Token(this.provider.connection, linkPublicKey, TOKEN_PROGRAM_ID, this.wallet.payer)
 

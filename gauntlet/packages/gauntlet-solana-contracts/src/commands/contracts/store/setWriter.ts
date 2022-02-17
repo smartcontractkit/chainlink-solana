@@ -17,7 +17,7 @@ export default class SetWriter extends SolanaCommand {
   static category = CONTRACT_LIST.STORE
 
   static examples = [
-    'yarn gauntlet store:set_writer --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC [AGGREGATOR_ADDRESS]'
+    'yarn gauntlet store:set_writer --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC [AGGREGATOR_ADDRESS]',
   ]
 
   constructor(flags, args) {

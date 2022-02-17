@@ -7,7 +7,9 @@ const DEFAULT_NETWORK = 'mainnet'
 function load(network: string, path: string) {
   let buffer: any
   if (!path) {
-    const newPath = network ? `${RDD_DIR}/directory-solana-${network}.json` : `${RDD_DIR}/directory-solana-${DEFAULT_NETWORK}.json`
+    const newPath = network
+      ? `${RDD_DIR}/directory-solana-${network}.json`
+      : `${RDD_DIR}/directory-solana-${DEFAULT_NETWORK}.json`
     buffer = readFileSync(join(process.cwd(), newPath), 'utf8')
   }
   buffer = readFileSync(join(process.cwd(), path), 'utf8')

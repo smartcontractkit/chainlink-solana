@@ -42,7 +42,9 @@ export default class ProposeOffchainConfig extends SolanaCommand {
   static id = 'ocr2:propose_offchain_config'
   static category = CONTRACT_LIST.OCR_2
 
-  static examples = ['yarn gauntlet ocr2:propose_offchain_config --network=devnet --rdd=[PATH_TO_RDD] --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC <PROPOSAL_ID>']
+  static examples = [
+    'yarn gauntlet ocr2:propose_offchain_config --network=devnet --rdd=[PATH_TO_RDD] --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC <PROPOSAL_ID>',
+  ]
 
   constructor(flags, args) {
     super(flags, args)
@@ -106,7 +108,7 @@ export default class ProposeOffchainConfig extends SolanaCommand {
   makeInput = (userInput: any): Input => {
     if (userInput) return userInput as Input
     const network = this.flags.network || ''
-    const rddPath = this.flags.rdd || ''    
+    const rddPath = this.flags.rdd || ''
     const rdd = RDD.load(network, rddPath)
 
     return {
