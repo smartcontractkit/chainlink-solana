@@ -79,7 +79,7 @@ export default class AcceptProposal extends SolanaCommand {
       }))
       .sort((a, b) => Buffer.compare(_toHex(a.signer), _toHex(b.signer)))
     const offchainConfig = ProposeOffchainConfig.makeInputFromRDD(rdd, this.flags.state)
-    const tokenMint = process.env.LINK!
+    const tokenMint = aggregator.config.tokenMint
     const f = aggregator.config.f
     return {
       version: 2,
@@ -97,7 +97,6 @@ export default class AcceptProposal extends SolanaCommand {
     this.require(!!this.flags.state, 'Please provide flags with "state"')
     this.require(!!this.flags.proposalId, 'Please provide flags with "proposal"')
     this.require(!!this.flags.secret, 'Please provide flags with "secret"')
-    this.require(!!process.env.LINK, 'Please set the LINK env var')
     this.require(!!process.env.SECRET, 'Please set the SECRET env var')
   }
 

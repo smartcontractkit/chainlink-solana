@@ -19,7 +19,6 @@ type Input = {
   offchainConfig: OffchainConfig
   billingAccessController: string
   requesterAccessController: string
-  link: string
   billing: {
     observationPaymentGjuels: string
     transmissionPaymentGjuels: string
@@ -38,7 +37,6 @@ export default class OCR2Inspect extends SolanaCommand {
     const transmitters = aggregatorOperators.map((operator) => rdd.operators[operator].ocrNodeAddress[0])
     const billingAccessController = this.flags.billingAccessController || process.env.BILLING_ACCESS_CONTROLLER
     const requesterAccessController = this.flags.requesterAccessController || process.env.REQUESTER_ACCESS_CONTROLLER
-    const link = this.flags.link || process.env.LINK
     const offchainConfig = WriteOffchainConfig.makeInputFromRDD(rdd, this.flags.state)
     return {
       description: info.name,
@@ -48,7 +46,6 @@ export default class OCR2Inspect extends SolanaCommand {
       transmitters,
       billingAccessController,
       requesterAccessController,
-      link,
       offchainConfig,
       billing: {
         observationPaymentGjuels: info.billing.observationPaymentGjuels,
