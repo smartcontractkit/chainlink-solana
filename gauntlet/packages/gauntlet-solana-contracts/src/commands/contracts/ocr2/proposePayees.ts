@@ -91,7 +91,7 @@ export default class ProposePayees extends SolanaCommand {
       .slice(0, proposalInfo.oracles.len)
       .map(({ transmitter }) => payeeByTransmitter[new PublicKey(transmitter).toString()])
 
-    const ix = await program.instruction.proposePayees(token.publicKey, payees, {
+    const ix = program.instruction.proposePayees(token.publicKey, payees, {
       accounts: {
         proposal,
         authority: signer,

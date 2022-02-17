@@ -3,13 +3,14 @@ import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { SolanaConstructor } from '../../../lib/types'
 
 export default class AcceptFeedOwnership extends SolanaCommand {
   static id = 'store:accept_feed_ownership'
   static category = CONTRACT_LIST.STORE
 
-  static examples = [`yarn gauntlet store:accept_feed_ownership --network=devnet --state=[PROGRAM_STATE]`]
+  static examples = [
+    `yarn gauntlet store:accept_feed_ownership --network=devnet --state=[PROGRAM_STATE]`,
+  ]
 
   constructor(flags, args) {
     super(flags, args)
@@ -26,7 +27,7 @@ export default class AcceptFeedOwnership extends SolanaCommand {
 
     // Need to resolve feed.proposedOwner. This will either match signer
     // store with store.owner == signer. If not, the instruction will error
-    const feedAccount = await program.account.transmissions.fetch(state)
+    const feedAccount = await program.account.transmissions.fetch(state);
 
     const tx = program.instruction.acceptFeedOwnership({
       accounts: {
