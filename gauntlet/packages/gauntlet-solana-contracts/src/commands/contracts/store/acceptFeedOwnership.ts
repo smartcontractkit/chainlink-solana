@@ -26,30 +26,18 @@ export default class AcceptFeedOwnership extends SolanaCommand {
     const state = new PublicKey(this.flags.state)
     const proposed = new PublicKey(this.flags.to)
 
-    const data = program.coder.instruction.encode('accept_feed_ownership', {})
-
-    const accounts: AccountMeta[] = [
-      {
-        pubkey: state,
-        isSigner: false,
-        isWritable: true,
+    const tx = program.instruction.acceptFeedOwnership({
+      accounts: {
+        feed: state,
+        proposedOwner: proposed,
+        authority: signer,
       },
-      {
-        pubkey: proposed,
-        isSigner: false,
-        isWritable: false,
-      },
-      {
-        pubkey: signer,
-        isSigner: true,
-        isWritable: false,
-      },
-    ]
+    });
 
     const rawTx: RawTransaction = {
-      data,
-      accounts,
-      programId: contract.programId,
+      data: tx.data,
+      accounts: tx.keys,
+      programId: tx.programId,
     }
 
     return [rawTx]

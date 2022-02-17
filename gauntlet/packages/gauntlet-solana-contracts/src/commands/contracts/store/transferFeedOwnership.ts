@@ -28,32 +28,18 @@ export default class TransferFeedOwnership extends SolanaCommand {
     const state = new PublicKey(this.flags.state)
     const proposedOwner = new PublicKey(this.flags.to)
 
-    const data = program.coder.instruction.encode('transfer_feed_ownership', {
-      proposedOwner,
-    })
-
-    const accounts: AccountMeta[] = [
-      {
-        pubkey: state,
-        isSigner: false,
-        isWritable: true,
+    const tx = program.instruction.transferFeedOwnership(proposedOwner, {
+      accounts: {
+        feed: state,
+        owner: signer, // TODO: can be store account
+        authority: signer,
       },
-      {
-        pubkey: signer,
-        isSigner: false,
-        isWritable: false,
-      },
-      {
-        pubkey: signer,
-        isSigner: true,
-        isWritable: false,
-      },
-    ]
+    });
 
     const rawTx: RawTransaction = {
-      data,
-      accounts,
-      programId: contract.programId,
+      data: tx.data,
+      accounts: tx.keys,
+      programId: tx.programId,
     }
 
     return [rawTx]
