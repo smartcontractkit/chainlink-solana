@@ -41,7 +41,7 @@ export default class OCR2Inspect extends SolanaCommand {
     const requesterAccessController = this.flags.requesterAccessController || process.env.REQUESTER_ACCESS_CONTROLLER
 
     const rdd = RDD.load(network, rddPath)
-    const aggregator = RDD.loadAggregator(network, rddPath, this.args[0])
+    const aggregator = RDD.loadAggregator(this.args[0], network, rddPath)
     const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
     const transmitters = aggregatorOperators.map((operator) => rdd.operators[operator].ocrNodeAddress[0])
     const offchainConfig = WriteOffchainConfig.makeInputFromRDD(rdd, this.args[0])

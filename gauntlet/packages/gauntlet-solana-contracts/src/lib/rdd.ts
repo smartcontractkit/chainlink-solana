@@ -10,6 +10,7 @@ function load(network = DEFAULT_NETWORK, path = `${RDD_DIR}/directory-solana-${n
     const rdd = JSON.parse(buffer.toString())
     return rdd
   } catch (e) {
+    console.log(e)
     throw new Error('An error ocurred while parsing the RDD. Make sure you provided a valid RDD path')
   }
 }
