@@ -15,7 +15,7 @@ export default class Fund extends SolanaCommand {
   constructor(flags, args) {
     super(flags, args)
 
-    this.requireFlag('state', 'Provide a --state flag with a valid address')
+    this.requireFlag('state', 'Provide a --state flag with a valid aggregator address')
   }
 
   execute = async () => {
@@ -25,20 +25,16 @@ export default class Fund extends SolanaCommand {
     const state = new PublicKey(this.flags.state)
     const amount = new BN(this.flags.amount)
 
-    const [vaultAuthority, _vaultNonce] = await PublicKey.findProgramAddress(
-      [Buffer.from(utils.bytes.utf8.encode('vault')), state.toBuffer()],
-      program.programId,
-    )
     const linkPublicKey = new PublicKey(this.flags.link || process.env.LINK)
 
+    // Resolve the tokenVault from the aggregator state account
+    const stateAccount = await program.account.state.fetch(state);
+    const tokenVault = stateAccount.config.tokenVault;
+    const tokenMint = stateAccount.config.tokenMint;
+
+    this.require(linkPublicKey === tokenMint, 'LINK does not match aggregator.config.tokenMint');
+
     const token = new Token(this.provider.connection, linkPublicKey, TOKEN_PROGRAM_ID, this.wallet.payer)
-    const tokenVault = await Token.getAssociatedTokenAddress(
-      ASSOCIATED_TOKEN_PROGRAM_ID,
-      TOKEN_PROGRAM_ID,
-      linkPublicKey,
-      vaultAuthority,
-      true,
-    )
 
     const from = await Token.getAssociatedTokenAddress(
       ASSOCIATED_TOKEN_PROGRAM_ID,
