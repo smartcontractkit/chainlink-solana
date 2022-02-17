@@ -24,7 +24,7 @@ export default class AcceptStoreOwnership extends SolanaCommand {
 
     const state = new PublicKey(this.flags.state)
 
-    const tx = program.instruction.acceptOwnership({
+    const tx = program.instruction.acceptStoreOwnership({
       accounts: {
         store: state,
         authority: signer,
