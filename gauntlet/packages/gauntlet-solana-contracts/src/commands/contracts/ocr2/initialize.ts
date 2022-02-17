@@ -57,8 +57,12 @@ export default class Initialize extends SolanaCommand {
     )
 
     const linkPublicKey = new PublicKey(this.flags.link || process.env.LINK)
-    const requesterAccessController = new PublicKey(this.flags.requesterAccessController || process.env.REQUESTER_ACCESS_CONTROLLER)
-    const billingAccessController = new PublicKey(this.flags.billingAccessController || process.env.BILLING_ACCESS_CONTROLLER)
+    const requesterAccessController = new PublicKey(
+      this.flags.requesterAccessController || process.env.REQUESTER_ACCESS_CONTROLLER,
+    )
+    const billingAccessController = new PublicKey(
+      this.flags.billingAccessController || process.env.BILLING_ACCESS_CONTROLLER,
+    )
 
     const minAnswer = new BN(input.minAnswer)
     const maxAnswer = new BN(input.maxAnswer)

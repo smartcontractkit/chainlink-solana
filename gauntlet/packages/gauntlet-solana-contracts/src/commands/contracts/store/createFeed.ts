@@ -16,9 +16,7 @@ export default class CreateFeed extends SolanaCommand {
   static id = 'store:create_feed'
   static category = CONTRACT_LIST.STORE
 
-  static examples = [
-    'yarn gauntlet store:create_feed --network=devnet --rdd=[PATH_TO_RDD] [AGGREGATOR_ADDRESS]',
-  ]
+  static examples = ['yarn gauntlet store:create_feed --network=devnet --rdd=[PATH_TO_RDD] [AGGREGATOR_ADDRESS]']
 
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
