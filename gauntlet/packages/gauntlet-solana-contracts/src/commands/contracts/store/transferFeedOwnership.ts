@@ -1,9 +1,8 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
-import { AccountMeta, PublicKey } from '@solana/web3.js'
+import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { SolanaConstructor } from '../../../lib/types'
 
 export default class TransferFeedOwnership extends SolanaCommand {
   static id = 'store:transfer_feed_ownership'
@@ -34,15 +33,9 @@ export default class TransferFeedOwnership extends SolanaCommand {
         owner: signer, // TODO: can be store account
         authority: signer,
       },
-    });
+    })
 
-    const rawTx: RawTransaction = {
-      data: tx.data,
-      accounts: tx.keys,
-      programId: tx.programId,
-    }
-
-    return [rawTx]
+    return [tx]
   }
 
   execute = async () => {
@@ -51,7 +44,9 @@ export default class TransferFeedOwnership extends SolanaCommand {
     const program = this.loadProgram(contract.idl, address)
 
     const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
-    await prompt(`Transferring ownership of feed/transmission state (${this.flags.state.toString()}) to ${this.flags.to.toString()}. Continue?`)
+    await prompt(
+      `Transferring ownership of feed/transmission state (${this.flags.state.toString()}) to ${this.flags.to.toString()}. Continue?`,
+    )
     const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx)
     logger.success(`Ownership transferred to ${new PublicKey(this.flags.to)} on tx ${txhash}`)
     return {

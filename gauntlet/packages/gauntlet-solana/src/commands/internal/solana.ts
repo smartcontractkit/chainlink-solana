@@ -7,10 +7,11 @@ import {
   LAMPORTS_PER_SOL,
   PublicKey,
   TransactionSignature,
+  TransactionInstruction,
   sendAndConfirmRawTransaction,
 } from '@solana/web3.js'
 import { withProvider, withWallet, withNetwork } from '../middlewares'
-import { RawTransaction, TransactionResponse } from '../types'
+import { TransactionResponse } from '../types'
 import { ProgramError, parseIdlErrors, Idl, Program, Provider } from '@project-serum/anchor'
 import { SolanaWallet } from '../wallet'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
@@ -20,7 +21,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
   wallet: SolanaWallet
   provider: Provider
   abstract execute: () => Promise<Result<TransactionResponse>>
-  makeRawTransaction: (signer: PublicKey) => Promise<RawTransaction[]>
+  makeRawTransaction: (signer: PublicKey) => Promise<TransactionInstruction[]>
 
   constructor(flags, args) {
     super(flags, args)
@@ -68,7 +69,10 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     }
   }
 
-  signAndSendRawTx = async (rawTxs: RawTransaction[], extraSigners?: Keypair[]): Promise<TransactionSignature> => {
+  signAndSendRawTx = async (
+    rawTxs: TransactionInstruction[],
+    extraSigners?: Keypair[],
+  ): Promise<TransactionSignature> => {
     const recentBlockhash = (await this.provider.connection.getRecentBlockhash()).blockhash
     const tx = makeTx(rawTxs, {
       recentBlockhash,

@@ -1,8 +1,6 @@
-// TODO: REMOVE
-
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
@@ -102,13 +100,7 @@ export default class ProposePayees extends SolanaCommand {
     logger.log('Payees information:', input)
     logger.log('Setting the following:', payees)
 
-    const rawTx: RawTransaction = {
-      data: ix.data,
-      accounts: ix.keys,
-      programId: ix.programId,
-    }
-
-    return [rawTx]
+    return [ix]
   }
 
   execute = async () => {

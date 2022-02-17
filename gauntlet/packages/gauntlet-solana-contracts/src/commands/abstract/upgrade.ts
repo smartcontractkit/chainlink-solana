@@ -1,7 +1,13 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
-import { AccountMeta, PublicKey, SYSVAR_RENT_PUBKEY, SYSVAR_CLOCK_PUBKEY } from '@solana/web3.js'
+import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import {
+  AccountMeta,
+  PublicKey,
+  TransactionInstruction,
+  SYSVAR_RENT_PUBKEY,
+  SYSVAR_CLOCK_PUBKEY,
+} from '@solana/web3.js'
 import { UPGRADEABLE_BPF_LOADER_PROGRAM_ID } from '../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../lib/contracts'
 import { SolanaConstructor } from '../../lib/types'
@@ -23,7 +29,7 @@ export const makeRawUpgradeTransaction = async (
   const buffer = new PublicKey(bufferAccount)
   const data = encodeInstruction({ Upgrade: {} })
 
-  const accounts: AccountMeta[] = [
+  const keys: AccountMeta[] = [
     { pubkey: programDataKey, isSigner: false, isWritable: true },
     { pubkey: programId, isSigner: false, isWritable: true },
     { pubkey: buffer, isSigner: false, isWritable: true },
@@ -33,9 +39,9 @@ export const makeRawUpgradeTransaction = async (
     { pubkey: signer, isSigner: true, isWritable: false },
   ]
 
-  const rawTx: RawTransaction = {
+  const rawTx: TransactionInstruction = {
     data,
-    accounts,
+    keys,
     programId: UPGRADEABLE_BPF_LOADER_PROGRAM_ID,
   }
 

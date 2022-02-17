@@ -1,6 +1,6 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { RawTransaction, SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { AccountMeta, Keypair, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from '@solana/web3.js'
+import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { Keypair, PublicKey, TransactionInstruction, SystemProgram, SYSVAR_RENT_PUBKEY } from '@solana/web3.js'
 import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { utils } from '@project-serum/anchor'
@@ -40,7 +40,7 @@ export default class Initialize extends SolanaCommand {
     this.requireFlag('billingAccessController', 'Provide a --billingAccessController flag with a valid address')
   }
 
-  makeRawTransaction = async (signer: PublicKey, state?: PublicKey): Promise<RawTransaction[]> => {
+  makeRawTransaction = async (signer: PublicKey, state?: PublicKey): Promise<TransactionInstruction[]> => {
     if (!state) throw new Error('State account is required')
 
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
@@ -107,20 +107,7 @@ export default class Initialize extends SolanaCommand {
       programId: program.programId,
     })
 
-    const rawTxs: RawTransaction[] = [
-      {
-        data: feedCreationInstruction.data,
-        accounts: feedCreationInstruction.keys,
-        programId: feedCreationInstruction.programId,
-      },
-      {
-        data: tx.data,
-        accounts: tx.keys,
-        programId: tx.programId,
-      },
-    ]
-
-    return rawTxs
+    return [feedCreationInstruction, tx]
   }
 
   execute = async () => {
@@ -135,7 +122,7 @@ export default class Initialize extends SolanaCommand {
     const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx, [state])
     logger.success(`Feed initialized on tx ${txhash}`)
 
-    const transmissions = rawTx[1].accounts[1].pubkey
+    const transmissions = rawTx[1].keys[1].pubkey
 
     const [storeAuthority, _storeNonce] = await PublicKey.findProgramAddress(
       [Buffer.from(utils.bytes.utf8.encode('store')), state.publicKey.toBuffer()],

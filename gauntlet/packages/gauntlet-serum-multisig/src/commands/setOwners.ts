@@ -1,4 +1,4 @@
-import { SolanaCommand, RawTransaction, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
 import { Result } from '@chainlink/gauntlet-core'
@@ -23,28 +23,13 @@ export default class SetOwners extends SolanaCommand {
 
     logger.info(`Generating data for new owners: ${owners.map((o) => o.toString())}`)
 
-    const data = program.coder.instruction.encode('set_owners', {
-      owners,
+    const ix = program.instruction.setOwners(owners, {
+      accounts: {
+        multisig: multisigAddress,
+        muitisigSigner: signer,
+      },
     })
-
-    const accounts = [
-      {
-        pubkey: multisigAddress,
-        isWritable: true,
-        isSigner: false,
-      },
-      {
-        pubkey: signer,
-        isWritable: false,
-        isSigner: true,
-      },
-    ]
-    const rawTx: RawTransaction = {
-      data,
-      accounts,
-      programId: multisig.programId,
-    }
-    return [rawTx]
+    return [ix]
   }
 
   //execute not needed, this command cannot be ran outside of multisig

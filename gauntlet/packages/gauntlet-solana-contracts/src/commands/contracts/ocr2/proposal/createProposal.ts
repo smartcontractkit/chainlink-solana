@@ -1,6 +1,6 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey, Keypair, SystemProgram } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 
@@ -35,7 +35,7 @@ export default class CreateProposal extends SolanaCommand {
       },
     })
     const defaultAccountSize = new BN(program.account.proposal.size)
-    const createAccountIx = await SystemProgram.createAccount({
+    const createAccountIx = SystemProgram.createAccount({
       fromPubkey: signer,
       newAccountPubkey: proposal,
       space: defaultAccountSize.toNumber(),
@@ -43,20 +43,7 @@ export default class CreateProposal extends SolanaCommand {
       programId: program.programId,
     })
 
-    const rawTxs: RawTransaction[] = [
-      {
-        data: createAccountIx.data,
-        accounts: createAccountIx.keys,
-        programId: createAccountIx.programId,
-      },
-      {
-        data: createIx.data,
-        accounts: createIx.keys,
-        programId: createIx.programId,
-      },
-    ]
-
-    return rawTxs
+    return [createAccountIx, createIx]
   }
 
   execute = async () => {

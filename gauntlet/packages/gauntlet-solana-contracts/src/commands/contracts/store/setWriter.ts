@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
-import { AccountMeta, PublicKey } from '@solana/web3.js'
+import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { PublicKey } from '@solana/web3.js'
 import { utils } from '@project-serum/anchor'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
@@ -69,13 +69,7 @@ export default class SetWriter extends SolanaCommand {
         authority: signer,
       },
     })
-    const rawTx: RawTransaction = {
-      data: tx.data,
-      accounts: tx.keys,
-      programId: tx.programId,
-    }
-
-    return [rawTx]
+    return [tx]
   }
 
   execute = async () => {

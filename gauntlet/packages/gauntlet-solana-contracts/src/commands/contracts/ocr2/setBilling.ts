@@ -1,6 +1,6 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
-import { AccountMeta, PublicKey } from '@solana/web3.js'
+import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { PublicKey } from '@solana/web3.js'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
@@ -48,36 +48,19 @@ export default class SetBilling extends SolanaCommand {
     const billingAC = new PublicKey(info.config.billingAccessController)
     logger.loading('Generating billing tx information...')
     logger.log('Billing information:', input)
-    const data = program.coder.instruction.encode('set_billing', {
-      observationPaymentGjuels: new BN(input.observationPaymentGjuels),
-      transmissionPaymentGjuels: new BN(input.transmissionPaymentGjuels),
-    })
-
-    const accounts: AccountMeta[] = [
+    const data = program.instruction.setBilling(
+      new BN(input.observationPaymentGjuels),
+      new BN(input.transmissionPaymentGjuels),
       {
-        pubkey: state,
-        isSigner: false,
-        isWritable: true,
+        accounts: {
+          state,
+          authority: signer,
+          accessController: billingAC,
+        },
       },
-      {
-        pubkey: signer,
-        isSigner: true,
-        isWritable: false,
-      },
-      {
-        pubkey: billingAC,
-        isSigner: false,
-        isWritable: false,
-      },
-    ]
+    )
 
-    const rawTx: RawTransaction = {
-      data,
-      accounts,
-      programId: ocr2.programId,
-    }
-
-    return [rawTx]
+    return [data]
   }
 
   execute = async () => {

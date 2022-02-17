@@ -1,6 +1,6 @@
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { RawTransaction, SolanaCommand } from '@chainlink/gauntlet-solana'
-import { AccountMeta, Keypair, PublicKey, SystemProgram } from '@solana/web3.js'
+import { SolanaCommand } from '@chainlink/gauntlet-solana'
+import { AccountMeta, Keypair, PublicKey, TransactionInstruction, SystemProgram } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
 
@@ -37,7 +37,7 @@ export default class CreateFeed extends SolanaCommand {
     super(flags, args)
   }
 
-  makeRawTransaction = async (signer: PublicKey, feed?: PublicKey): Promise<RawTransaction[]> => {
+  makeRawTransaction = async (signer: PublicKey, feed?: PublicKey): Promise<TransactionInstruction[]> => {
     if (!feed) throw new Error('Feed account is required')
     const storeProgram = getContract(CONTRACT_LIST.STORE, '')
     const address = storeProgram.programId.toString()
@@ -76,25 +76,14 @@ export default class CreateFeed extends SolanaCommand {
       programId: program.programId,
     })
 
-    const tx = program.instruction.createFeed(description, decimals, granularity, liveLength, {
+    const ix = program.instruction.createFeed(description, decimals, granularity, liveLength, {
       accounts: {
         feed,
         authority: signer,
       },
     })
 
-    return [
-      {
-        data: transmissionsCreationInstruction.data,
-        accounts: transmissionsCreationInstruction.keys,
-        programId: transmissionsCreationInstruction.programId,
-      },
-      {
-        data: tx.data,
-        accounts: tx.keys,
-        programId: tx.programId,
-      },
-    ]
+    return [transmissionsCreationInstruction, ix]
   }
 
   execute = async () => {

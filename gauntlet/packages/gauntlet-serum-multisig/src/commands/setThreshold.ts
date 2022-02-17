@@ -1,4 +1,4 @@
-import { SolanaCommand, RawTransaction, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
 import { Result } from '@chainlink/gauntlet-core'
@@ -24,29 +24,14 @@ export default class SetThreshold extends SolanaCommand {
     const threshold = new BN(this.flags.threshold)
     logger.info(`Generating data for new threshold: ${threshold.toNumber()}`)
 
-    const data = program.coder.instruction.encode('change_threshold', {
-      threshold,
+    const ix = program.instruction.changeThreshold(threshold, {
+      accounts: {
+        multisig: multisigAddress,
+        muitisigSigner: signer,
+      },
     })
 
-    const accounts = [
-      {
-        pubkey: multisigAddress,
-        isWritable: true,
-        isSigner: false,
-      },
-      {
-        pubkey: signer,
-        isWritable: false,
-        isSigner: true,
-      },
-    ]
-    const rawTx: RawTransaction = {
-      data,
-      accounts,
-      programId: multisig.programId,
-    }
-
-    return [rawTx]
+    return [ix]
   }
 
   //execute not needed, this command cannot be ran outside of multisig

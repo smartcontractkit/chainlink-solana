@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
-import { PublicKey, Keypair } from '@solana/web3.js'
+import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 
 export default class FinalizeProposal extends SolanaCommand {
@@ -20,22 +20,14 @@ export default class FinalizeProposal extends SolanaCommand {
     const program = this.loadProgram(ocr2.idl, address)
 
     const proposal = new PublicKey(this.flags.proposalId)
-    const finalizeIx = await program.instruction.finalizeProposal({
+    const finalizeIx = program.instruction.finalizeProposal({
       accounts: {
         proposal: proposal,
         authority: signer,
       },
     })
 
-    const rawTxs: RawTransaction[] = [
-      {
-        data: finalizeIx.data,
-        accounts: finalizeIx.keys,
-        programId: finalizeIx.programId,
-      },
-    ]
-
-    return rawTxs
+    return [finalizeIx]
   }
 
   execute = async () => {
