@@ -105,7 +105,7 @@ export default class CreateFeed extends SolanaCommand {
             state: feed.publicKey.toString(),
             transmissions: feed.publicKey.toString(),
           }),
-          contract: feed.publicKey.toString(),
+          contract: this.args[0], // continue with undeployed ID
         },
       ],
     }
