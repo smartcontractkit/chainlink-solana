@@ -43,14 +43,14 @@ export default class ProposeOffchainConfig extends SolanaCommand {
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:propose_offchain_config --network=devnet --rdd=[PATH_TO_RDD] --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC <PROPOSAL_ID>',
+    'yarn gauntlet ocr2:propose_offchain_config --network=devnet --rdd=[PATH_TO_RDD] --proposalId=<PROPOSAL_ID> <AGGREGATOR_ADDRESS>',
   ]
 
   constructor(flags, args) {
     super(flags, args)
 
-    this.require(!!this.flags.state, 'Please provide flags with "state"')
-    this.requireArgs('Please provide a proposalId')
+    this.require(!!this.flags.proposalId, 'Please provide flags with "proposalId"')
+    this.requireArgs('Please provide a valid aggregator address as arg')
     this.require(
       !!process.env.SECRET,
       'Please specify the Gauntlet secret words e.g. SECRET="awe fluke polygon tonic lilly acuity onyx debra bound gilbert wane"',
@@ -107,13 +107,10 @@ export default class ProposeOffchainConfig extends SolanaCommand {
 
   makeInput = (userInput: any): Input => {
     if (userInput) return userInput as Input
-    const network = this.flags.network || ''
-    const rddPath = this.flags.rdd || ''
-    const rdd = RDD.load(network, rddPath)
-
+    const rdd = RDD.load(this.flags.network, this.flags.rdd)
     return {
-      offchainConfig: ProposeOffchainConfig.makeInputFromRDD(rdd, this.flags.state),
-      proposalId: this.args[0],
+      offchainConfig: ProposeOffchainConfig.makeInputFromRDD(rdd, this.args[0]),
+      proposalId: this.flags.proposalId,
     }
   }
 
@@ -229,7 +226,7 @@ export default class ProposeOffchainConfig extends SolanaCommand {
   }
 
   execute = async () => {
-    const state = new PublicKey(this.flags.state)
+    const state = new PublicKey(this.args[0])
 
     const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
     const startingPoint = new BN(this.flags.instruction || 0).toNumber()

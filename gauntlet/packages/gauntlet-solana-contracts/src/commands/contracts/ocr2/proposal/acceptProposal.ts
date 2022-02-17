@@ -13,7 +13,6 @@ import RDD from '../../../../lib/rdd'
 type Input = {
   version: number
   f: number
-  tokenMint: string
   oracles: {
     transmitter: string
     signer: string
@@ -61,16 +60,13 @@ export default class AcceptProposal extends SolanaCommand {
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:accept_proposal --network=devnet --state=<STATE_ADDRESS> --rdd=<PATH_TO_RDD> <PROPOSAL_ID>',
+    'yarn gauntlet ocr2:accept_proposal --network=devnet --proposalId=<PROPOSAL_ID> --rdd=<PATH_TO_RDD> <AGGREGATOR_ADDRESS>',
   ]
 
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
-
-    const network = this.flags.network || ''
-    const rddPath = this.flags.rdd || ''
-    const rdd = RDD.load(network, rddPath)
-    const aggregator = rdd.contracts[this.flags.state]
+    const rdd = RDD.load(this.flags.network, this.flags.rdd)
+    const aggregator = rdd.contracts[this.args[0]]
     const _toHex = (a: string) => Buffer.from(a, 'hex')
     const aggregatorOperators: any[] = aggregator.oracles.map((o) => rdd.operators[o.operator])
     const oracles = aggregatorOperators
@@ -80,13 +76,11 @@ export default class AcceptProposal extends SolanaCommand {
         payee: operator.adminAddress,
       }))
       .sort((a, b) => Buffer.compare(_toHex(a.signer), _toHex(b.signer)))
-    const offchainConfig = ProposeOffchainConfig.makeInputFromRDD(rdd, this.flags.state)
-    const tokenMint = aggregator.config.tokenMint
+    const offchainConfig = ProposeOffchainConfig.makeInputFromRDD(rdd, this.args[0])
     const f = aggregator.config.f
     return {
       version: 2,
       f,
-      tokenMint,
       oracles,
       offchainConfig,
       randomSecret: this.flags.secret,
@@ -96,8 +90,8 @@ export default class AcceptProposal extends SolanaCommand {
   constructor(flags, args) {
     super(flags, args)
 
-    this.require(!!this.flags.state, 'Please provide flags with "state"')
-    this.requireArgs('Please provide a proposalId')
+    this.require(!!this.flags.proposalId, 'Please provide flags with "proposalId"')
+    this.requireArgs('Please provide an aggregator address as argument')
     this.require(!!this.flags.secret, 'Please provide flags with "secret"')
     this.require(!!process.env.SECRET, 'Please set the SECRET env var')
   }
@@ -121,11 +115,11 @@ export default class AcceptProposal extends SolanaCommand {
     }
   }
 
-  makeDigestInput = async (input: Input): Promise<DigestInput> => {
+  makeDigestInput = async (input: Input, tokenMint: PublicKey): Promise<DigestInput> => {
     return {
       version: new BN(2),
       f: new BN(input.f),
-      tokenMint: new PublicKey(input.tokenMint),
+      tokenMint,
       oracles: input.oracles.map((oracle) => {
         return {
           transmitter: new PublicKey(oracle.transmitter),
@@ -160,13 +154,16 @@ export default class AcceptProposal extends SolanaCommand {
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
 
-    const state = new PublicKey(this.flags.state)
-    const proposal = new PublicKey(this.args[0])
+    const state = new PublicKey(this.args[0])
+    const proposal = new PublicKey(this.flags.proposalId)
     const input = this.makeInput(this.flags.input)
 
+    const data = await program.account.state.fetch(state)
     const proposalInfo = (await program.account.proposal.fetch(proposal)) as Proposal
 
-    const offchainDigest = this.calculateProposalDigest(await this.makeDigestInput(input))
+    const offchainDigest = this.calculateProposalDigest(
+      await this.makeDigestInput(input, new PublicKey(data.config.tokenMint)),
+    )
     const isSameDigest =
       Buffer.compare(this.calculateProposalDigest(this.makeDigestInputFromProposal(proposalInfo)), offchainDigest) === 0
 
@@ -206,7 +203,7 @@ export default class AcceptProposal extends SolanaCommand {
     const program = this.loadProgram(ocr2.idl, address)
 
     const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
-    await prompt(`Continue accepting proposal on ${this.flags.state.toString()}?`)
+    await prompt(`Continue accepting proposal of proposal ${this.flags.proposalId} on aggregator ${this.args[0]}?`)
     const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx)
     logger.success(`Accepted proposal on tx ${txhash}`)
 

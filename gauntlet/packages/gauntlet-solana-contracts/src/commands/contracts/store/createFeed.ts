@@ -1,6 +1,6 @@
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand } from '@chainlink/gauntlet-solana'
-import { AccountMeta, Keypair, PublicKey, TransactionInstruction, SystemProgram } from '@solana/web3.js'
+import { Keypair, PublicKey, TransactionInstruction, SystemProgram } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import RDD from '../../../lib/rdd'
 
@@ -20,10 +20,7 @@ export default class CreateFeed extends SolanaCommand {
 
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
-    const network = this.flags.network || ''
-    const rddPath = this.flags.rdd || ''
-    const rdd = RDD.load(network, rddPath)
-    const aggregator = RDD.loadAggregator(network, rddPath, this.args[0])
+    const aggregator = RDD.loadAggregator(this.args[0], this.flags.network, this.flags.rdd)
 
     return {
       store: aggregator.storeAccount,
@@ -45,8 +42,6 @@ export default class CreateFeed extends SolanaCommand {
     const program = this.loadProgram(storeProgram.idl, address)
 
     const input = this.makeInput(this.flags.input)
-
-    const store = new PublicKey(input.store)
 
     const granularity = new BN(input.granularity)
     const liveLength = new BN(input.liveLength)
@@ -106,11 +101,11 @@ export default class CreateFeed extends SolanaCommand {
       },
       responses: [
         {
-          tx: this.wrapResponse(txhash, feed.toString(), {
-            state: feed.toString(),
-            transmissions: feed.toString(),
+          tx: this.wrapResponse(txhash, feed.publicKey.toString(), {
+            state: feed.publicKey.toString(),
+            transmissions: feed.publicKey.toString(),
           }),
-          contract: feed.toString(),
+          contract: feed.publicKey.toString(),
         },
       ],
     }

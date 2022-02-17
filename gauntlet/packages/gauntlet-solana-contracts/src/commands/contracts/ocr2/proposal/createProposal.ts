@@ -8,9 +8,7 @@ export default class CreateProposal extends SolanaCommand {
   static id = 'ocr2:create_proposal'
   static category = CONTRACT_LIST.OCR_2
 
-  static examples = [
-    'yarn gauntlet ocr2:create_proposal --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
-  ]
+  static examples = ['yarn gauntlet ocr2:create_proposal --network=devnet']
 
   constructor(flags, args) {
     super(flags, args)
@@ -60,8 +58,8 @@ export default class CreateProposal extends SolanaCommand {
     return {
       responses: [
         {
-          tx: this.wrapResponse(txhash, this.flags.state),
-          contract: this.flags.state,
+          tx: this.wrapResponse(txhash, ''),
+          contract: '',
         },
       ],
       data: {

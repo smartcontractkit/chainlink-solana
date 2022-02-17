@@ -25,7 +25,7 @@ export const makeAcceptOwnershipCommand = (contractId: CONTRACT_LIST): SolanaCon
 
       const state = new PublicKey(this.flags.state)
 
-      const tx = program.instruction.acceptFeedOwnership({
+      const tx = program.instruction.acceptOwnership({
         accounts: {
           store: state,
           authority: signer,
