@@ -4,7 +4,6 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { utils } from '@project-serum/anchor'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { makeTx } from '../../../lib/utils'
 import RDD from '../../../lib/rdd'
 
 type Input = {
@@ -16,9 +15,7 @@ export default class SetWriter extends SolanaCommand {
   static id = 'store:set_writer'
   static category = CONTRACT_LIST.STORE
 
-  static examples = [
-    'yarn gauntlet store:set_writer --network=devnet --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC [AGGREGATOR_ADDRESS]',
-  ]
+  static examples = ['yarn gauntlet store:set_writer --network=devnet [AGGREGATOR_ADDRESS]']
 
   constructor(flags, args) {
     super(flags, args)
@@ -26,9 +23,7 @@ export default class SetWriter extends SolanaCommand {
 
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
-    const network = this.flags.network || ''
-    const rddPath = this.flags.rdd || ''
-    const aggregator = RDD.loadAggregator(network, rddPath, this.args[0])
+    const aggregator = RDD.loadAggregator(this.args[0], this.flags.network, this.flags.rdd)
 
     return {
       transmissions: aggregator.transmissionsAccount,
@@ -46,7 +41,7 @@ export default class SetWriter extends SolanaCommand {
 
     const input = this.makeInput(this.flags.input)
 
-    const storeState = new PublicKey(input.store || this.flags.state)
+    const storeState = new PublicKey(input.store)
     const ocr2State = new PublicKey(this.args[0])
     const feedState = new PublicKey(input.transmissions)
 
@@ -76,14 +71,13 @@ export default class SetWriter extends SolanaCommand {
     const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
     const txhash = await this.signAndSendRawTx(rawTx)
     const input = this.makeInput(this.flags.input)
-    const state = input.store || this.flags.state
     logger.success(`Writer set on tx hash: ${txhash}`)
 
     return {
       responses: [
         {
-          tx: this.wrapResponse(txhash, state),
-          contract: state,
+          tx: this.wrapResponse(txhash, input.store),
+          contract: input.store,
         },
       ],
     } as Result<TransactionResponse>

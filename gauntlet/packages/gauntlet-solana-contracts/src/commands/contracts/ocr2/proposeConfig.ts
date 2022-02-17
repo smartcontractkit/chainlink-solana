@@ -20,15 +20,13 @@ export default class ProposeConfig extends SolanaCommand {
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:propose_config --network=devnet --rdd=[PATH_TO_RDD] --state=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC <PROPOSAL_ID>',
+    'yarn gauntlet ocr2:propose_config --network=devnet --rdd=[PATH_TO_RDD] --proposalId=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC [AGGREGATOR_ADDRESS]',
   ]
 
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
-    const network = this.flags.network || ''
-    const rddPath = this.flags.rdd || ''
-    const rdd = RDD.load(network, rddPath)
-    const aggregator = RDD.loadAggregator(network, rddPath, this.flags.state)
+    const rdd = RDD.load(this.flags.network, this.flags.rdd)
+    const aggregator = rdd.contracts[this.args[0]]
     const _toHex = (a: string) => Buffer.from(a, 'hex')
     const aggregatorOperators: any[] = aggregator.oracles.map((o) => rdd.operators[o.operator])
     const oracles = aggregatorOperators
@@ -41,14 +39,14 @@ export default class ProposeConfig extends SolanaCommand {
     return {
       oracles,
       f,
-      proposalId: this.args[0],
+      proposalId: this.flags.proposalId,
     }
   }
 
   constructor(flags, args) {
     super(flags, args)
-    this.require(!!this.flags.state, 'Please provide flags with "state"')
-    this.requireArgs('Please provide a proposalId')
+    this.require(!!this.flags.proposalId, 'Please provide flags with "proposalId"')
+    this.requireArgs('Please provide an aggregator address')
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
@@ -57,7 +55,6 @@ export default class ProposeConfig extends SolanaCommand {
     const program = this.loadProgram(ocr2.idl, address)
 
     const input = this.makeInput(this.flags.input)
-
     const proposal = new PublicKey(input.proposalId)
 
     const oracles = input.oracles.map(({ signer, transmitter }) => ({

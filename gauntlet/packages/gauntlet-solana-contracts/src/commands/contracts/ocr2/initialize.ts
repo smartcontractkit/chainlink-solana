@@ -5,7 +5,6 @@ import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from '@solana/sp
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { utils } from '@project-serum/anchor'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { ADDITIONAL_STATE_BUFFER } from '../../../lib/constants'
 import RDD from '../../../lib/rdd'
 
 type Input = {
@@ -25,10 +24,7 @@ export default class Initialize extends SolanaCommand {
 
   makeInput = (userInput: any): Input => {
     if (userInput) return userInput as Input
-    const network = this.flags.network || ''
-    const rddPath = this.flags.rdd || ''
-    const aggregator = RDD.loadAggregator(network, rddPath, this.args[0])
-
+    const aggregator = RDD.loadAggregator(this.args[0], this.flags.network, this.flags.rdd)
     return {
       maxAnswer: aggregator.maxSubmissionValue,
       minAnswer: aggregator.minSubmissionValue,
@@ -51,7 +47,7 @@ export default class Initialize extends SolanaCommand {
     const input = this.makeInput(this.flags.input)
 
     // ARGS
-    const [vaultAuthority, vaultNonce] = await PublicKey.findProgramAddress(
+    const [vaultAuthority] = await PublicKey.findProgramAddress(
       [Buffer.from(utils.bytes.utf8.encode('vault')), state.toBuffer()],
       program.programId,
     )

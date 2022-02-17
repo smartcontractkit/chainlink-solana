@@ -1,23 +1,10 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import {
-  AccountMeta,
-  PublicKey,
-  TransactionInstruction,
-  SYSVAR_RENT_PUBKEY,
-  SYSVAR_CLOCK_PUBKEY,
-} from '@solana/web3.js'
-import { utils } from '@project-serum/anchor'
+import { AccountMeta, PublicKey, TransactionInstruction } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { encodeInstruction, makeTx } from '../../../lib/utils'
-import { UPGRADEABLE_BPF_LOADER_PROGRAM_ID } from '../../../lib/constants'
+import { makeTx } from '../../../lib/utils'
 import { makeRawUpgradeTransaction } from '../../abstract/upgrade'
-
-type Input = {
-  transmissions: string
-  store: string
-}
 
 export default class Migrate extends SolanaCommand {
   static id = 'store:migrate'

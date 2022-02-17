@@ -20,8 +20,6 @@ export default class SetValidatorConfig extends SolanaCommand {
 
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
-    // Can this come from rdd?
-    // const rdd = getRDD(this.flags.rdd)
     return {
       threshold: this.flags.threshold,
       feed: this.flags.feed,

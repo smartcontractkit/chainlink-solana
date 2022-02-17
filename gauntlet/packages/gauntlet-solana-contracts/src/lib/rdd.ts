@@ -4,16 +4,9 @@ import { join } from 'path'
 const RDD_DIR = '../../reference-data-directory'
 const DEFAULT_NETWORK = 'mainnet'
 
-function load(network: string, path: string) {
-  let buffer: any
-  if (!path) {
-    const newPath = network
-      ? `${RDD_DIR}/directory-solana-${network}.json`
-      : `${RDD_DIR}/directory-solana-${DEFAULT_NETWORK}.json`
-    buffer = readFileSync(join(process.cwd(), newPath), 'utf8')
-  }
-  buffer = readFileSync(join(process.cwd(), path), 'utf8')
+function load(network = DEFAULT_NETWORK, path = `${RDD_DIR}/directory-solana-${network}.json`) {
   try {
+    const buffer = readFileSync(join(process.cwd(), path), 'utf8')
     const rdd = JSON.parse(buffer.toString())
     return rdd
   } catch (e) {
@@ -21,9 +14,10 @@ function load(network: string, path: string) {
   }
 }
 
-function loadAggregator(network: string, rddPath: string, contractAddress: string) {
+function loadAggregator(contractAddress: string, network?: string, rddPath?: string) {
+  if (!contractAddress) throw new Error('Could not fetch RDD without a valid aggregator address')
   const rdd = RDD.load(network, rddPath)
-  const aggregator = rdd['contracts'][contractAddress]
+  const aggregator = rdd.contracts[contractAddress]
   if (!aggregator) throw new Error(`Could not load aggregator: ${contractAddress}`)
   return aggregator
 }

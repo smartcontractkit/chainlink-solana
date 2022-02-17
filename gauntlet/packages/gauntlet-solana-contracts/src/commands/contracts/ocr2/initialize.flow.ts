@@ -18,7 +18,9 @@ import AcceptProposal from './proposal/acceptProposal'
 export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse> {
   static id = 'ocr2:initialize:flow'
   static category = CONTRACT_LIST.OCR_2
-  static examples = ['yarn gauntlet ocr2:initialize:flow --network=local --id=[ID] --rdd=[PATH_TO_RDD]']
+  static examples = [
+    'yarn gauntlet ocr2:initialize:flow --network=local --rdd=[PATH_TO_RDD] [UNDEPLOYED_CONTRACT_ADDRESS]',
+  ]
 
   constructor(flags, args) {
     super(flags, args, waitExecute, makeAbstractCommand)
@@ -65,9 +67,7 @@ export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse>
       {
         name: 'Set Billing',
         command: SetBilling,
-        flags: {
-          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
-        },
+        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
       {
         id: this.stepIds.PROPOSAL,
@@ -78,25 +78,25 @@ export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse>
         name: 'Propose Config',
         command: ProposeConfig,
         flags: {
-          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
           proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
         },
+        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
       {
         name: 'Propose Offchain Config',
         command: ProposeOffchainConfig,
         flags: {
-          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
           proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
         },
+        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
       {
         name: 'Propose Payees',
         command: ProposePayees,
         flags: {
-          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
           proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
         },
+        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
       {
         name: 'Finalize Proposal',
@@ -104,24 +104,25 @@ export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse>
         flags: {
           proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
         },
+        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
       {
         name: 'Accept Proposal',
         command: AcceptProposal,
         flags: {
-          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
           proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
         },
+        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
       {
         name: 'Inspection',
         command: OCR2Inspect,
         flags: {
-          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
           billingAccessController: process.env.BILLING_ACCESS_CONTROLLER || this.flags.billingAccessController,
           requesterAccessController: process.env.REQUESTER_ACCESS_CONTROLLER || this.flags.requesterAccessController,
           link: process.env.LINK || this.flags.link,
         },
+        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
     ]
   }

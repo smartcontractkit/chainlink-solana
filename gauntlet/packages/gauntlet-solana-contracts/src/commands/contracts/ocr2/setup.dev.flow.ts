@@ -12,6 +12,12 @@ import AddAccess from '../accessController/addAccess'
 import SetBilling from './setBilling'
 import CreateFeed from '../store/createFeed'
 import SetWriter from '../store/setWriter'
+import CreateProposal from './proposal/createProposal'
+import ProposeOffchainConfig from './proposeOffchainConfig'
+import ProposeConfig from './proposeConfig'
+import ProposePayees from './proposePayees'
+import FinalizeProposal from './proposal/finalizeProposal'
+import AcceptProposal from './proposal/acceptProposal'
 
 // TODO: Remove. Useful for dev testing
 export default class SetupFlow extends FlowCommand<TransactionResponse> {
@@ -29,7 +35,10 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
       TOKEN: 4,
       STORE: 5,
       FEED: 6,
+      PROPOSAL: 7,
     }
+
+    const randomSecret = 'awe fluke polygon tonic lilly acuity onyx debra bound gilbert wane'
 
     const offchainConfigInput = {
       deltaProgressNanoseconds: 300000000,
@@ -90,6 +99,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
       allowFundRecipient: true,
     }
 
+    const _toHex = (a: string) => Buffer.from(a, 'hex')
     const configInput = {
       oracles: [
         {
@@ -108,9 +118,14 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
           transmitter: 'G5LdWMvWoQQ787iPgWbCSTrkPB5Li9e2CWi6jYuAUHUH',
           signer: '1b7c57E22a4D4B6c94365A73AD5FF743DBE9c55E',
         },
-      ],
+      ].sort((a, b) => Buffer.compare(_toHex(a.signer), _toHex(b.signer))),
       f: 1,
     }
+
+    const acceptPropOracles = configInput.oracles.map((o, i) => ({
+      ...o,
+      payee: payeesInput.operators[i].payee,
+    }))
 
     this.flow = [
       {
@@ -189,40 +204,89 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         flags: {
           input: {
             transmissions: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.FEED, 'transmissions')),
+            store: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.STORE)),
           },
-          ocrState: FlowCommand.ID.contract(this.stepIds.OCR_2),
-          state: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.STORE)),
         },
+        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
       {
         name: 'Set Billing',
         command: SetBilling,
         flags: {
-          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
           input: {
             observationPaymentGjuels: '1',
             transmissionPaymentGjuels: '1',
           },
         },
+        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
       {
-        name: 'Set Validator Config',
-        command: SetValidatorConfig,
+        id: this.stepIds.PROPOSAL,
+        name: 'Create Proposal',
+        command: CreateProposal,
+      },
+      {
+        name: 'Propose Config',
+        command: ProposeConfig,
         flags: {
-          state: FlowCommand.ID.contract(this.stepIds.OCR_2),
           input: {
-            store: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.STORE)),
-            threshold: 1,
+            oracles: configInput.oracles,
+            f: configInput.f,
+            proposalId: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal')),
           },
+          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
+        },
+        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
+      },
+      {
+        name: 'Propose Offchain Config',
+        command: ProposeOffchainConfig,
+        flags: {
+          input: {
+            offchainConfig: offchainConfigInput,
+            proposalId: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal')),
+          },
+          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
+          secret: randomSecret,
+        },
+        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
+      },
+      {
+        name: 'Propose Payees',
+        command: ProposePayees,
+        flags: {
+          input: {
+            operators: payeesInput.operators,
+            allowFundRecipient: true,
+            proposalId: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal')),
+          },
+          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
+        },
+        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
+      },
+      {
+        name: 'Finalize Proposal',
+        command: FinalizeProposal,
+        flags: {
+          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
         },
       },
       {
-        name: 'Add access to store on AC',
-        command: AddAccess,
+        name: 'Accept Proposal',
+        command: AcceptProposal,
         flags: {
-          state: FlowCommand.ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
-          address: FlowCommand.ID.data(this.stepIds.OCR_2, 'storeAuthority'),
+          input: {
+            secret: randomSecret,
+            version: 2,
+            f: configInput.f,
+            tokenMint: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.TOKEN)),
+            oracles: acceptPropOracles,
+            offchainConfig: offchainConfigInput,
+          },
+          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
+          secret: randomSecret,
         },
+        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
     ]
   }
