@@ -1,7 +1,13 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
-import { AccountMeta, PublicKey, SYSVAR_RENT_PUBKEY, SYSVAR_CLOCK_PUBKEY } from '@solana/web3.js'
+import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import {
+  AccountMeta,
+  PublicKey,
+  TransactionInstruction,
+  SYSVAR_RENT_PUBKEY,
+  SYSVAR_CLOCK_PUBKEY,
+} from '@solana/web3.js'
 import { utils } from '@project-serum/anchor'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
@@ -37,7 +43,7 @@ export default class Migrate extends SolanaCommand {
 
     const storeState = new PublicKey(this.flags.state)
     // build upgrade transaction
-    const upgradeRawTx: RawTransaction[] = await makeRawUpgradeTransaction(
+    const upgradeRawTx: TransactionInstruction[] = await makeRawUpgradeTransaction(
       signer,
       CONTRACT_LIST.STORE,
       this.flags.buffer,
@@ -49,27 +55,15 @@ export default class Migrate extends SolanaCommand {
       isSigner: false,
       isWritable: true,
     }))
-    const migrateData = storeProgram.coder.instruction.encode('migrate', {})
-    const migrateAccounts: AccountMeta[] = [
-      {
-        pubkey: storeState,
-        isSigner: false,
-        isWritable: true,
+    const migrateTx = storeProgram.instruction.migrate({
+      accounts: {
+        state: storeState,
+        authority: signer,
       },
-      {
-        pubkey: signer,
-        isSigner: true,
-        isWritable: false,
-      },
-      ...transmissionAccounts,
-    ]
-    const migrateRawTx: RawTransaction = {
-      data: migrateData,
-      accounts: migrateAccounts,
-      programId: storeProgram.programId,
-    }
+      remainingAccounts: transmissionAccounts,
+    })
 
-    return [...upgradeRawTx, migrateRawTx]
+    return [...upgradeRawTx, migrateTx]
   }
 
   execute = async () => {

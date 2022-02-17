@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
-import { AccountMeta, PublicKey } from '@solana/web3.js'
+import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { SolanaConstructor } from '../../../lib/types'
 
@@ -9,7 +9,9 @@ export default class AcceptFeedOwnership extends SolanaCommand {
   static id = 'store:accept_feed_ownership'
   static category = CONTRACT_LIST.STORE
 
-  static examples = [`yarn gauntlet store:accept_feed_ownership --network=devnet --state=[PROGRAM_STATE] --to=[PROPOSED_OWNER]`]
+  static examples = [
+    `yarn gauntlet store:accept_feed_ownership --network=devnet --state=[PROGRAM_STATE] --to=[PROPOSED_OWNER]`,
+  ]
 
   constructor(flags, args) {
     super(flags, args)
@@ -32,15 +34,9 @@ export default class AcceptFeedOwnership extends SolanaCommand {
         proposedOwner: proposed,
         authority: signer,
       },
-    });
+    })
 
-    const rawTx: RawTransaction = {
-      data: tx.data,
-      accounts: tx.keys,
-      programId: tx.programId,
-    }
-
-    return [rawTx]
+    return [tx]
   }
 
   execute = async () => {

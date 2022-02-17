@@ -1,18 +1,22 @@
-import { SolanaCommand, RawTransaction } from '@chainlink/gauntlet-solana'
+import { SolanaCommand } from '@chainlink/gauntlet-solana'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { PublicKey, Keypair, AccountMeta, SystemProgram } from '@solana/web3.js'
+import { PublicKey, Keypair, TransactionInstruction, SystemProgram } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract, makeTx } from '@chainlink/gauntlet-solana-contracts'
 import { Idl, Program } from '@project-serum/anchor'
 import { MAX_BUFFER_SIZE } from '../lib/constants'
 import { isDeepEqual } from '../lib/utils'
 
 type ProposalContext = {
-  rawTx: RawTransaction
+  rawTx: TransactionInstruction
   multisigSigner: PublicKey
   proposalState: any
 }
 
-type ProposalAction = (proposal: PublicKey, signer: PublicKey, context: ProposalContext) => Promise<RawTransaction[]>
+type ProposalAction = (
+  proposal: PublicKey,
+  signer: PublicKey,
+  context: ProposalContext,
+) => Promise<TransactionInstruction[]>
 
 export const wrapCommand = (command) => {
   return class Multisig extends SolanaCommand {
@@ -42,7 +46,7 @@ export const wrapCommand = (command) => {
       const signer = this.wallet.publicKey
       const rawTxs = await this.makeRawTransaction(signer)
       // If proposal is not provided, we are at creation time, and a new proposal acc should have been created
-      const proposal = new PublicKey(this.flags.proposal || rawTxs[0].accounts[1].pubkey)
+      const proposal = new PublicKey(this.flags.proposal || rawTxs[0].keys[1].pubkey)
 
       if (this.flags.execute) {
         await prompt('CREATION,APPROVAL or EXECUTION TX will be executed. Continue?')
@@ -91,7 +95,7 @@ export const wrapCommand = (command) => {
       }
     }
 
-    makeRawTransaction = async (signer: PublicKey): Promise<RawTransaction[]> => {
+    makeRawTransaction = async (signer: PublicKey): Promise<TransactionInstruction[]> => {
       logger.info(`Generating transaction data using ${signer.toString()} account as signer`)
 
       const multisigState = await this.program.account.multisig.fetch(this.multisigAddress)
@@ -161,7 +165,7 @@ export const wrapCommand = (command) => {
       }
     }
 
-    isSameProposal = async (proposal: PublicKey, rawTx: RawTransaction): Promise<boolean> => {
+    isSameProposal = async (proposal: PublicKey, rawTx: TransactionInstruction): Promise<boolean> => {
       const state = await this.fetchState(proposal)
       if (!state) {
         logger.error('Proposal state does not exist. Considering the proposal as different')
@@ -169,7 +173,7 @@ export const wrapCommand = (command) => {
       }
       const isSameData = Buffer.compare(state.data, rawTx.data) === 0
       const isSameProgramId = new PublicKey(state.programId).toString() === rawTx.programId.toString()
-      const isSameAccounts = isDeepEqual(state.accounts, rawTx.accounts)
+      const isSameAccounts = isDeepEqual(state.accounts, rawTx.keys)
       return isSameData && isSameProgramId && isSameAccounts
     }
 
@@ -185,82 +189,53 @@ export const wrapCommand = (command) => {
         lamports: await this.provider.connection.getMinimumBalanceForRentExemption(txSize),
         programId: this.program.programId,
       })
-      const rawTx: RawTransaction = {
-        data: proposalInstruction.data,
-        accounts: proposalInstruction.keys,
-        programId: proposalInstruction.programId,
-      }
-      await this.signAndSendRawTx([rawTx], [proposal])
+      await this.signAndSendRawTx([proposalInstruction], [proposal])
       logger.success(`Proposal account created at: ${proposal.publicKey.toString()}`)
       return proposal.publicKey
     }
 
-    createProposal: ProposalAction = async (proposal: PublicKey, signer, context): Promise<RawTransaction[]> => {
+    createProposal: ProposalAction = async (
+      proposal: PublicKey,
+      signer,
+      context,
+    ): Promise<TransactionInstruction[]> => {
       logger.loading(`Generating proposal CREATION data for ${command.id}`)
 
-      const data = this.program.coder.instruction.encode('createTransaction', {
-        pid: context.rawTx.programId,
-        accs: context.rawTx.accounts,
-        data: context.rawTx.data,
-      })
-      const accounts: AccountMeta[] = [
+      const tx = this.program.instruction.createTransaction(
+        context.rawTx.programId,
+        context.rawTx.keys,
+        context.rawTx.data,
         {
-          pubkey: this.multisigAddress,
-          isWritable: false,
-          isSigner: false,
+          accounts: {
+            multisig: this.multisigAddress,
+            transaction: proposal,
+            proposer: signer,
+          },
         },
-        {
-          pubkey: proposal,
-          isWritable: true,
-          isSigner: false,
-        },
-        {
-          pubkey: signer,
-          isWritable: false,
-          isSigner: true,
-        },
-      ]
-      const rawTx: RawTransaction = {
-        data,
-        accounts,
-        programId: this.program.programId,
-      }
-      return [rawTx]
+      )
+      return [tx]
     }
 
-    approveProposal: ProposalAction = async (proposal: PublicKey, signer): Promise<RawTransaction[]> => {
+    approveProposal: ProposalAction = async (proposal: PublicKey, signer): Promise<TransactionInstruction[]> => {
       logger.loading(`Generating proposal APPROVAL data for ${command.id}`)
 
-      const data = this.program.coder.instruction.encode('approve', {})
-      const accounts: AccountMeta[] = [
-        {
-          pubkey: this.multisigAddress,
-          isWritable: false,
-          isSigner: false,
+      const tx = this.program.instruction.approve({
+        accounts: {
+          multisig: this.multisigAddress,
+          transaction: proposal,
+          owner: signer,
         },
-        {
-          pubkey: proposal,
-          isWritable: true,
-          isSigner: false,
-        },
-        {
-          pubkey: signer,
-          isWritable: false,
-          isSigner: true,
-        },
-      ]
-      const rawTx: RawTransaction = {
-        data,
-        accounts,
-        programId: this.program.programId,
-      }
-      return [rawTx]
+      })
+      return [tx]
     }
 
-    executeProposal: ProposalAction = async (proposal: PublicKey, signer, context): Promise<RawTransaction[]> => {
+    executeProposal: ProposalAction = async (
+      proposal: PublicKey,
+      signer,
+      context,
+    ): Promise<TransactionInstruction[]> => {
       logger.loading(`Generating proposal EXECUTION data for ${command.id}`)
 
-      const data = this.program.coder.instruction.encode('executeTransaction', {})
       const remainingAccounts = context.proposalState.accounts
         .map((t) => (t.pubkey.equals(context.multisigSigner) ? { ...t, isSigner: false } : t))
         .concat({
@@ -268,30 +243,16 @@ export const wrapCommand = (command) => {
           isWritable: false,
           isSigner: false,
         })
-      const accounts: AccountMeta[] = [
-        {
-          pubkey: this.multisigAddress,
-          isWritable: false,
-          isSigner: false,
+
+      const tx = this.program.instruction.executeTransaction({
+        accounts: {
+          multisig: this.multisigAddress,
+          transaction: proposal,
+          multisigSigner: context.multisigSigner,
         },
-        {
-          pubkey: context.multisigSigner,
-          isWritable: false,
-          isSigner: false,
-        },
-        {
-          pubkey: proposal,
-          isWritable: true,
-          isSigner: false,
-        },
-        ...remainingAccounts,
-      ]
-      const rawTx: RawTransaction = {
-        data,
-        accounts,
-        programId: this.program.programId,
-      }
-      return [rawTx]
+        remainingAccounts,
+      })
+      return [tx]
     }
 
     inspectProposalState = async (proposal) => {
@@ -325,7 +286,7 @@ export const wrapCommand = (command) => {
       logger.info(remainingEligibleSigners.toString())
     }
 
-    showExecutionInstructions = async (rawTxs: RawTransaction[], instructionIndex: number) => {
+    showExecutionInstructions = async (rawTxs: TransactionInstruction[], instructionIndex: number) => {
       logger.info(`Execution Information:
         The command ${command.id} with multisig takes up to ${rawTxs.length} (${rawTxs.map(
         (_, i) => i,

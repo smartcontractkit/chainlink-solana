@@ -1,5 +1,4 @@
 import { Transaction, TransactionCtorFields, TransactionInstruction } from '@solana/web3.js'
-import { RawTransaction } from '@chainlink/gauntlet-solana'
 import * as BufferLayout from '@solana/buffer-layout'
 
 export const divideIntoChunks = (arr: Array<any> | Buffer, chunkSize: number): any[][] => {
@@ -12,18 +11,8 @@ export const divideIntoChunks = (arr: Array<any> | Buffer, chunkSize: number): a
   return chunks
 }
 
-export const makeTx = (rawTx: RawTransaction[], opts?: TransactionCtorFields): Transaction => {
-  return rawTx.reduce(
-    (tx, meta) =>
-      tx.add(
-        new TransactionInstruction({
-          programId: meta.programId,
-          keys: meta.accounts,
-          data: meta.data,
-        }),
-      ),
-    new Transaction(opts),
-  )
+export const makeTx = (rawTx: TransactionInstruction[], opts?: TransactionCtorFields): Transaction => {
+  return rawTx.reduce((tx, instruction) => tx.add(instruction), new Transaction(opts))
 }
 
 // Source: https://github.com/neonlabsorg/multisig/blob/8f1938c82c8db1251fad48a403487af18ecf5eb0/client/loader.ts#L25

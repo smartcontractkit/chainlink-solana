@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt, time, BN } from '@chainlink/gauntlet-core/dist/utils'
-import { RawTransaction, SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { PublicKey } from '@solana/web3.js'
+import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { PublicKey, TransactionInstruction } from '@solana/web3.js'
 import { MAX_TRANSACTION_BYTES, ORACLES_MAX_LENGTH } from '../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { getRDD } from '../../../lib/rdd'
@@ -165,7 +165,7 @@ export default class ProposeOffchainConfig extends SolanaCommand {
     return true
   }
 
-  makeRawTransaction = async (signer: PublicKey): Promise<RawTransaction[]> => {
+  makeRawTransaction = async (signer: PublicKey): Promise<TransactionInstruction[]> => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
@@ -220,13 +220,7 @@ export default class ProposeOffchainConfig extends SolanaCommand {
       }),
     )
 
-    const rawTxs: RawTransaction[] = ixs.map((ix) => ({
-      accounts: ix.keys,
-      data: ix.data,
-      programId: ix.programId,
-    }))
-
-    return rawTxs
+    return ixs
   }
 
   execute = async () => {

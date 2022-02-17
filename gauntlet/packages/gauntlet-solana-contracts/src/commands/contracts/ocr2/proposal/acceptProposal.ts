@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { createHash } from 'crypto'
 import { logger, prompt, BN } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { utils } from '@project-serum/anchor'
@@ -132,9 +132,8 @@ export default class AcceptProposal extends SolanaCommand {
           payee: new PublicKey(oracle.payee),
         }
       }),
-      offchainConfig: await (
-        await serializeOffchainConfig(input.offchainConfig, process.env.SECRET!, input.randomSecret)
-      ).offchainConfig,
+      offchainConfig: (await serializeOffchainConfig(input.offchainConfig, process.env.SECRET!, input.randomSecret))
+        .offchainConfig,
     }
   }
 
@@ -197,13 +196,7 @@ export default class AcceptProposal extends SolanaCommand {
       remainingAccounts: payees,
     })
 
-    const rawTx: RawTransaction = {
-      data: tx.data,
-      accounts: tx.keys,
-      programId: tx.programId,
-    }
-
-    return [rawTx]
+    return [tx]
   }
 
   execute = async () => {

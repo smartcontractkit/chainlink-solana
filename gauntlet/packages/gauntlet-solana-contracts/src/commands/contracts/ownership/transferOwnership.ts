@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse, RawTransaction } from '@chainlink/gauntlet-solana'
-import { AccountMeta, PublicKey } from '@solana/web3.js'
+import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { SolanaConstructor } from '../../../lib/types'
 
@@ -29,30 +29,14 @@ export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaC
       const state = new PublicKey(this.flags.state)
       const proposedOwner = new PublicKey(this.flags.to)
 
-      const data = program.coder.instruction.encode('transfer_ownership', {
-        proposedOwner,
+      const tx = program.instruction.transferOwnership(proposedOwner, {
+        accounts: {
+          store: state,
+          authority: signer,
+        },
       })
 
-      const accounts: AccountMeta[] = [
-        {
-          pubkey: state,
-          isSigner: false,
-          isWritable: true,
-        },
-        {
-          pubkey: signer,
-          isSigner: true,
-          isWritable: false,
-        },
-      ]
-
-      const rawTx: RawTransaction = {
-        data,
-        accounts,
-        programId: contract.programId,
-      }
-
-      return [rawTx]
+      return [tx]
     }
 
     execute = async () => {
