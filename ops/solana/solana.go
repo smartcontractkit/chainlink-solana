@@ -31,6 +31,11 @@ const (
 	OCRTransmissions
 	LINK
 	StoreAuthority
+	Proposal
+)
+
+const (
+	testingSecret = "this is an testing only secret"
 )
 
 type Deployer struct {
@@ -67,14 +72,14 @@ func (d *Deployer) Load() error {
 	if err != nil {
 		return errors.Wrap(err, "access controller contract deployment failed")
 	}
-	
+
 	report, err := d.gauntlet.ReadCommandReport()
 	if err != nil {
 		return errors.Wrap(err, "report not available")
 	}
-	
+
 	d.Account[AccessController] = report.Responses[0].Contract
-	
+
 	// Access Controller contract deployment
 	fmt.Println("Deploying Store...")
 	err = d.gauntlet.ExecCommand(
@@ -84,14 +89,14 @@ func (d *Deployer) Load() error {
 	if err != nil {
 		return errors.Wrap(err, "store contract deployment failed")
 	}
-	
+
 	report, err = d.gauntlet.ReadCommandReport()
 	if err != nil {
 		return errors.Wrap(err, "report not available")
 	}
-	
+
 	d.Account[Store] = report.Responses[0].Contract
-	
+
 	// OCR2 contract deployment
 	fmt.Println("Deploying OCR 2...")
 	err = d.gauntlet.ExecCommand(
@@ -101,7 +106,7 @@ func (d *Deployer) Load() error {
 	if err != nil {
 		return errors.Wrap(err, "ocr 2 contract deployment failed")
 	}
-	
+
 	report, err = d.gauntlet.ReadCommandReport()
 	if err != nil {
 		return errors.Wrap(err, "report not available")
@@ -162,7 +167,7 @@ func (d *Deployer) DeployOCR() error {
 	}
 	d.Account[BillingAccessController] = report.Responses[0].Contract
 
-	fmt.Println("Step 3: Init Store")
+	fmt.Println("Step 3: Create Store")
 	err = d.gauntlet.ExecCommand(
 		"store:initialize",
 		d.gauntlet.Flag("network", d.network),
@@ -177,7 +182,7 @@ func (d *Deployer) DeployOCR() error {
 	}
 	d.Account[StoreAccount] = report.Responses[0].Contract
 
-	fmt.Println("Step 4: Create Feed in Store")
+	fmt.Println("Step 4: Create Feed")
 	input := map[string]interface{}{
 		"store":       d.Account[StoreAccount],
 		"granularity": 30,
@@ -194,7 +199,6 @@ func (d *Deployer) DeployOCR() error {
 	err = d.gauntlet.ExecCommand(
 		"store:create_feed",
 		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("state", d.Account[StoreAccount]), // why is this needed in gauntlet?
 		d.gauntlet.Flag("input", string(jsonInput)),
 	)
 	if err != nil {
@@ -207,11 +211,10 @@ func (d *Deployer) DeployOCR() error {
 	}
 	d.Account[OCRTransmissions] = report.Data["transmissions"]
 
-	fmt.Println("Step 5: Set Validator Config in Store")
+	fmt.Println("Step 5: Set Validator Config in Feed")
 	err = d.gauntlet.ExecCommand(
 		"store:set_validator_config",
 		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("state", d.Account[StoreAccount]),
 		d.gauntlet.Flag("feed", d.Account[OCRTransmissions]),
 		d.gauntlet.Flag("threshold", "8000"),
 	)
@@ -254,7 +257,6 @@ func (d *Deployer) DeployOCR() error {
 	fmt.Println("Step 7: Add writer to feed")
 	input = map[string]interface{}{
 		"transmissions": d.Account[OCRTransmissions],
-		"store":         d.Account[StoreAccount],
 	}
 
 	jsonInput, err = json.Marshal(input)
@@ -265,23 +267,43 @@ func (d *Deployer) DeployOCR() error {
 	err = d.gauntlet.ExecCommand(
 		"store:set_writer",
 		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("ocrState", d.Account[OCRFeed]),
 		d.gauntlet.Flag("input", string(jsonInput)),
+		d.Account[OCRFeed],
 	)
 
 	if err != nil {
 		return errors.Wrap(err, "setting writer on store failed")
 	}
+
+	fmt.Println("Step 8: Transfer feed ownership to store")
+	if err = d.gauntlet.ExecCommand(
+		"store:transfer_feed_ownership",
+		d.gauntlet.Flag("network", d.network),
+		d.gauntlet.Flag("state", d.Account[OCRTransmissions]),
+		d.gauntlet.Flag("to", d.Account[StoreAccount]),
+	); err != nil {
+		return errors.Wrap(err, "failed to transfer feed ownership")
+	}
+
+	if err = d.gauntlet.ExecCommand(
+		"store:accept_feed_ownership",
+		d.gauntlet.Flag("network", d.network),
+		d.gauntlet.Flag("state", d.Account[OCRTransmissions]),
+		d.gauntlet.Flag("to", d.Account[StoreAccount]),
+	); err != nil {
+		return errors.Wrap(err, "failed to accept feed ownership")
+	}
+
 	return nil
 }
 
 func (d Deployer) TransferLINK() error {
 	err := d.gauntlet.ExecCommand(
-		"token:transfer",
+		"ocr2:fund",
 		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("to", d.Account[OCRFeed]),
 		d.gauntlet.Flag("amount", "10000"),
-		d.Account[LINK],
+		d.gauntlet.Flag("link", d.Account[LINK]),
+		d.Account[OCRFeed],
 	)
 	if err != nil {
 		return errors.Wrap(err, "LINK transfer failed")
@@ -295,16 +317,20 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 
 	fmt.Println("Setting up OCR Feed:")
 
-	fmt.Println("Begin set offchain config...")
-	err := d.gauntlet.ExecCommand(
-		"ocr2:begin_offchain_config",
+	fmt.Println("Begin offchain proposal...")
+	if err := d.gauntlet.ExecCommand(
+		"ocr2:create_proposal",
 		d.gauntlet.Flag("network", d.network),
 		d.gauntlet.Flag("version", "2"),
-		d.gauntlet.Flag("state", d.Account[OCRFeed]),
-	)
-	if err != nil {
-		return errors.Wrap(err, "begin OCR 2 set offchain config failed")
+	); err != nil {
+		return errors.Wrap(err, "create proposal failed")
 	}
+
+	report, err := d.gauntlet.ReadCommandReport()
+	if err != nil {
+		return err
+	}
+	d.Account[Proposal] = report.Data["proposal"]
 
 	// program sorts oracles (need to pre-sort to allow correct onchainConfig generation)
 	keys = keys
@@ -320,7 +346,7 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 	peerIDs := []string{}
 	oracles := []map[string]string{}
 	threshold := 1 // corresponds to F
-	operators := []map[string]string{}
+	// operators := []map[string]string{}
 	for _, k := range keys {
 		S = append(S, 1)
 		offChainPublicKeys = append(offChainPublicKeys, k.OCR2OffchainPublicKey)
@@ -330,16 +356,41 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 		oracles = append(oracles, map[string]string{
 			"signer":      k.OCR2OnchainPublicKey,
 			"transmitter": k.OCR2Transmitter,
+			"payee":       k.OCR2Transmitter, // payee is the same as transmitter
 		})
 
-		operators = append(operators, map[string]string{
-			"payee":       k.OCR2Transmitter, // payee is the same as transmitter
-			"transmitter": k.OCR2Transmitter,
-		})
+		// operators = append(operators, map[string]string{
+		// 	"payee":       k.OCR2Transmitter, // payee is the same as transmitter
+		// 	"transmitter": k.OCR2Transmitter,
+		// })
 	}
 
-	// TODO: Should this inputs have their own struct?
+	fmt.Println("Proposing config...")
 	input := map[string]interface{}{
+		"oracles":    oracles,
+		"f":          threshold,
+		"proposalId": d.Account[Proposal],
+	}
+
+	jsonInput, err := json.Marshal(input)
+	if err != nil {
+		return err
+	}
+
+	err = d.gauntlet.ExecCommand(
+		"ocr2:propose_config",
+		d.gauntlet.Flag("network", d.network),
+		d.gauntlet.Flag("proposalId", d.Account[Proposal]),
+		d.gauntlet.Flag("input", string(jsonInput)),
+		d.Account[OCRFeed],
+	)
+
+	if err != nil {
+		return errors.Wrap(err, "setting OCR 2 config failed")
+	}
+
+	fmt.Println("Proposing offchain config...")
+	offchainConfig := map[string]interface{}{
 		"deltaProgressNanoseconds": 2 * time.Second,        // pacemaker (timeout rotating leaders, can't be too short)
 		"deltaResendNanoseconds":   5 * time.Second,        // resending epoch (help nodes rejoin system)
 		"deltaRoundNanoseconds":    1 * time.Second,        // round time (polling data source)
@@ -364,37 +415,9 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 		"configPublicKeys":                                   configPublicKeys,
 	}
 
-	jsonInput, err := json.Marshal(input)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("Writing set offchain config...")
-	err = d.gauntlet.ExecCommand(
-		"ocr2:write_offchain_config",
-		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("state", d.Account[OCRFeed]),
-		d.gauntlet.Flag("input", string(jsonInput)),
-	)
-
-	if err != nil {
-		return errors.Wrap(err, "writing OCR 2 set offchain config failed")
-	}
-
-	fmt.Println("Committing set offchain config...")
-	err = d.gauntlet.ExecCommand(
-		"ocr2:commit_offchain_config",
-		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("state", d.Account[OCRFeed]),
-	)
-
-	if err != nil {
-		return errors.Wrap(err, "committing OCR 2 set offchain config failed")
-	}
-
 	input = map[string]interface{}{
-		"oracles": oracles,
-		"f":       threshold,
+		"proposalId": d.Account[Proposal],
+		"offchainConfig": offchainConfig,
 	}
 
 	jsonInput, err = json.Marshal(input)
@@ -402,20 +425,22 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 		return err
 	}
 
-	fmt.Println("Setting config...")
-	err = d.gauntlet.ExecCommand(
-		"ocr2:set_config",
+	if err = d.gauntlet.ExecCommand(
+		"ocr2:propose_offchain_config",
 		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("state", d.Account[OCRFeed]),
+		d.gauntlet.Flag("proposalId", d.Account[Proposal]),
+		d.gauntlet.Flag("secret", testingSecret),
 		d.gauntlet.Flag("input", string(jsonInput)),
-	)
-
-	if err != nil {
-		return errors.Wrap(err, "setting OCR 2 config failed")
+		d.Account[OCRFeed],
+	); err != nil {
+		return errors.Wrap(err, "proposing OCR2 offchain config failed")
 	}
 
+	fmt.Println("Proposing Payees...")
 	input = map[string]interface{}{
-		"operators": operators,
+		"operators":          oracles,
+		"proposalId":         d.Account[Proposal],
+		"allowFundRecipient": true,
 	}
 
 	jsonInput, err = json.Marshal(input)
@@ -423,17 +448,14 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 		return err
 	}
 
-	fmt.Println("Setting Payees...")
-	err = d.gauntlet.ExecCommand(
-		"ocr2:set_payees",
+	if err = d.gauntlet.ExecCommand(
+		"ocr2:propose_payees",
 		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("state", d.Account[OCRFeed]),
 		d.gauntlet.Flag("link", d.Account[LINK]),
-		d.gauntlet.Flag("TESTING_ONLY_IGNORE_PAYEE_VALIDATION", "true"),
+		d.gauntlet.Flag("proposalId", d.Account[Proposal]),
 		d.gauntlet.Flag("input", string(jsonInput)),
-	)
-
-	if err != nil {
+		d.Account[OCRFeed],
+	); err != nil {
 		return errors.Wrap(err, "setting OCR 2 payees failed")
 	}
 
@@ -447,15 +469,46 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 		return err
 	}
 
+	fmt.Println("Finalize proposal...")
+	if err = d.gauntlet.ExecCommand(
+		"ocr2:finalize_proposal",
+		d.gauntlet.Flag("network", d.network),
+		d.gauntlet.Flag("proposalId", d.Account[Proposal]),
+	); err != nil {
+		return errors.Wrap(err, "committing OCR 2 set offchain config failed")
+	}
+
+	fmt.Println("Accept proposal...")
+	input = map[string]interface{}{
+		"version":  2,
+		"f": threshold,
+		"oracles": oracles,
+		"offchainConfig": offchainConfig,
+		"randomSecret": testingSecret,
+	}
+
+	jsonInput, err = json.Marshal(input)
+	if err != nil {
+		return err
+	}
+	if err = d.gauntlet.ExecCommand(
+		"ocr2:accept_proposal",
+		d.gauntlet.Flag("network", d.network),
+		d.gauntlet.Flag("proposalId", d.Account[Proposal]),
+		d.gauntlet.Flag("secret", testingSecret),
+		d.gauntlet.Flag("input", string(jsonInput)),
+		d.Account[OCRFeed],
+	); err != nil {
+		return errors.Wrap(err, "failed to accept proposal")
+	}
+
 	fmt.Println("Setting Billing...")
-	err = d.gauntlet.ExecCommand(
+	if err = d.gauntlet.ExecCommand(
 		"ocr2:set_billing",
 		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("state", d.Account[OCRFeed]),
 		d.gauntlet.Flag("input", string(jsonInput)),
-	)
-
-	if err != nil {
+		d.Account[OCRFeed],
+	); err != nil {
 		return errors.Wrap(err, "setting OCR 2 billing failed")
 	}
 

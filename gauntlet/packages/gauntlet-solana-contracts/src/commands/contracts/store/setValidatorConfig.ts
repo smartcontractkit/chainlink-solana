@@ -45,7 +45,7 @@ export default class SetValidatorConfig extends SolanaCommand {
     // Resolve the current store owner
     let feedAccount = await program.account.transmissions.fetch(feed)
 
-    const tx = program.instruction.setWriter(threshold, {
+    const tx = program.instruction.setValidatorConfig(threshold, {
       accounts: {
         feed: feed,
         owner: feedAccount.owner,

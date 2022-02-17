@@ -8,7 +8,6 @@ import RDD from '../../../lib/rdd'
 
 type Input = {
   transmissions: string
-  store: string
 }
 
 export default class SetWriter extends SolanaCommand {
@@ -27,7 +26,6 @@ export default class SetWriter extends SolanaCommand {
 
     return {
       transmissions: aggregator.transmissionsAccount,
-      store: aggregator.storeAccount,
     }
   }
 
@@ -41,12 +39,11 @@ export default class SetWriter extends SolanaCommand {
 
     const input = this.makeInput(this.flags.input)
 
-    const storeState = new PublicKey(input.store)
     const ocr2State = new PublicKey(this.args[0])
     const feedState = new PublicKey(input.transmissions)
 
     logger.info(
-      `Generating data for setting store writer on Store (${storeState.toString()}) and Feed (${feedState.toString()})`,
+      `Generating data for setting feed writer on feed (${feedState.toString()}) and Feed (${feedState.toString()})`,
     )
 
     const [storeAuthority, _storeNonce] = await PublicKey.findProgramAddress(
@@ -76,8 +73,8 @@ export default class SetWriter extends SolanaCommand {
     return {
       responses: [
         {
-          tx: this.wrapResponse(txhash, input.store),
-          contract: input.store,
+          tx: this.wrapResponse(txhash, input.transmissions),
+          contract: input.transmissions,
         },
       ],
     } as Result<TransactionResponse>
