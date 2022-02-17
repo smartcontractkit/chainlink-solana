@@ -9,15 +9,12 @@ export default class AcceptFeedOwnership extends SolanaCommand {
   static id = 'store:accept_feed_ownership'
   static category = CONTRACT_LIST.STORE
 
-  static examples = [
-    `yarn gauntlet store:accept_feed_ownership --network=devnet --state=[PROGRAM_STATE] --to=[PROPOSED_OWNER]`,
-  ]
+  static examples = [`yarn gauntlet store:accept_feed_ownership --network=devnet --state=[PROGRAM_STATE]`]
 
   constructor(flags, args) {
     super(flags, args)
 
     this.require(!!this.flags.state, 'Please provide flags with "state"')
-    this.require(!!this.flags.to, 'Please provide flags with "to"')
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
@@ -26,12 +23,15 @@ export default class AcceptFeedOwnership extends SolanaCommand {
     const program = this.loadProgram(contract.idl, address)
 
     const state = new PublicKey(this.flags.state)
-    const proposed = new PublicKey(this.flags.to)
+
+    // Need to resolve feed.proposedOwner. This will either match signer
+    // store with store.owner == signer. If not, the instruction will error
+    const feedAccount = await program.account.transmissions.fetch(state)
 
     const tx = program.instruction.acceptFeedOwnership({
       accounts: {
         feed: state,
-        proposedOwner: proposed,
+        proposedOwner: feedAccount.proposedOwner,
         authority: signer,
       },
     })
