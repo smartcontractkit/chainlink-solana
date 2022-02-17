@@ -6,8 +6,8 @@ import SetLoweringAccessController from './setLoweringAccessController'
 import Migrate from './migrate'
 import TransferFeedOwnership from './transferFeedOwnership'
 import AcceptFeedOwnership from './acceptFeedOwnership'
-import { makeAcceptOwnershipCommand } from '../ownership/acceptOwnership'
-import { makeTransferOwnershipCommand } from '../ownership/transferOwnership'
+import TransferStoreOwnership from './transferStoreOwnership'
+import AcceptStoreOwnership from './acceptStoreOwnership'
 import { CONTRACT_LIST } from '../../../lib/contracts'
 import { makeUpgradeProgramCommand } from '../../abstract/upgrade'
 import Inspect from './inspect'
@@ -22,7 +22,7 @@ export default [
   Migrate,
   TransferFeedOwnership,
   AcceptFeedOwnership,
-  makeAcceptOwnershipCommand(CONTRACT_LIST.STORE),
-  makeTransferOwnershipCommand(CONTRACT_LIST.STORE),
+  TransferStoreOwnership,
+  AcceptStoreOwnership,
   makeUpgradeProgramCommand(CONTRACT_LIST.STORE),
 ]
