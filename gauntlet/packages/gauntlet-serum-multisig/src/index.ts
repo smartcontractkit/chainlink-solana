@@ -24,7 +24,9 @@ export const multisigCommands = {
     )[0]
 
     const result = await executeCLI(multisigCommands, networkPath)
-    io.saveJSON(result, 'report')
+    if (result) {
+      io.saveJSON(result, process.env['REPORT_NAME'] ? process.env['REPORT_NAME'] : 'report')
+    }
   } catch (e) {
     console.log(e)
     console.log('Solana Command execution error', e.message)
