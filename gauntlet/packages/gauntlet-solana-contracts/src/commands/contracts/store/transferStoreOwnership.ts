@@ -10,7 +10,7 @@ export default class TransferStoreOwnership extends SolanaCommand {
   static category = CONTRACT_LIST.STORE
 
   static examples = [
-    `yarn gauntlet store :transfer_ownership --network=devnet --state=[PROGRAM_STATE] --to=[PROPOSED_OWNER]`,
+    `yarn gauntlet store:transfer_store_ownership --network=devnet --state=[PROGRAM_STATE] --to=[PROPOSED_OWNER]`,
   ]
 
   constructor(flags, args) {
@@ -28,7 +28,7 @@ export default class TransferStoreOwnership extends SolanaCommand {
     const state = new PublicKey(this.flags.state)
     const proposedOwner = new PublicKey(this.flags.to)
 
-    const tx = program.instruction.transferOwnership(proposedOwner, {
+    const tx = program.instruction.transferStoreOwnership(proposedOwner, {
       accounts: {
         store: state,
         authority: signer,
