@@ -346,7 +346,7 @@ describe("ocr2", async () => {
         preInstructions: [
           await workspace.Store.account.transmissions.createInstruction(
             feed,
-            8 + 192 + 6 * 24
+            8 + 192 + 6 * 48
           ),
         ],
       }
@@ -563,7 +563,7 @@ describe("ocr2", async () => {
         .update(oracle.transmitter.toBuffer())
         .update(oracle.payee.toBuffer())
     }, hasher);
-    
+
     let offchainConfigHeader = Buffer.alloc(8+4);
     offchainConfigHeader.writeBigUInt64BE(BigInt(proposalAccount.offchainConfig.version), 0);
     offchainConfigHeader.writeUInt32BE(proposalAccount.offchainConfig.len, 8);
