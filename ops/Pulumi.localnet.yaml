@@ -10,8 +10,8 @@ config:
   solana-env:CL-COUNT: 4 # not counting bootstrap, minimum 4
   solana-env:CL-PORT-START: 6688 # start port to expose lite client port
   solana-env:CL-P2P_PORT-START: 5050 # start port to expose lite client P2P ports
-  solana-env:CL-NODE_VERSION: develop.94ad65a635f2deabe00508ea7695ce53597fa1e5 # development version can be found at https://gallery.ecr.aws/chainlink/chainlink
-  solana-env:CL-BUILD_LOCALLY: false # (overrides NODE_VERSION) BUILD_CONTEXT and BUILD_DOCKERFILE must be set if this is enabled
+  # solana-env:CL-NODE_VERSION: develop.94ad65a635f2deabe00508ea7695ce53597fa1e5 # development version can be found at https://gallery.ecr.aws/chainlink/chainlink
+  solana-env:CL-BUILD_LOCALLY: true # (overrides NODE_VERSION) BUILD_CONTEXT and BUILD_DOCKERFILE must be set if this is enabled
   solana-env:CL-BUILD_CONTEXT: ../../chainlink
   solana-env:CL-BUILD_DOCKERFILE: ../../chainlink/core/chainlink.Dockerfile
   solana-env:CL-RELAY_NAME: solana

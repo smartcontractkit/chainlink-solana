@@ -31,8 +31,7 @@ export default class Fund extends SolanaCommand {
     const stateAccount = await program.account.state.fetch(state)
     const tokenVault = stateAccount.config.tokenVault
     const tokenMint = stateAccount.config.tokenMint
-
-    this.require(linkPublicKey === tokenMint, 'LINK does not match aggregator.config.tokenMint')
+    this.require(tokenMint.equals(linkPublicKey), 'LINK does not match aggregator.config.tokenMint')
 
     const token = new Token(this.provider.connection, linkPublicKey, TOKEN_PROGRAM_ID, this.wallet.payer)
 

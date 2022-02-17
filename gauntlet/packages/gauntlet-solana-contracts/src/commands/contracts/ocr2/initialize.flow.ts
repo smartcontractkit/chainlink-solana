@@ -60,9 +60,7 @@ export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse>
       {
         name: 'Set writer on Store',
         command: SetWriter,
-        flags: {
-          ocrState: FlowCommand.ID.contract(this.stepIds.OCR_2),
-        },
+        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
       {
         name: 'Set Billing',
@@ -130,7 +128,7 @@ export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse>
   showRddIdentifierInstructions = async () => {
     logger.info(
       `
-        Change the RDD ID with the new state address: 
+        Change the RDD ID with the new state address:
           - State Address: ${this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.OCR_2))}
       `,
     )
@@ -141,7 +139,7 @@ export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse>
   showRddTransmissionInstructions = async () => {
     logger.info(
       `
-        Update the RDD Aggregator information with the new transmissions address: 
+        Update the RDD Aggregator information with the new transmissions address:
           - Transmissions address: ${this.getReportStepDataById(
             FlowCommand.ID.data(this.stepIds.FEED, 'transmissions'),
           )}
