@@ -192,7 +192,7 @@ pub mod store {
     }
 
     #[access_control(store_owner(&ctx.accounts.store, &ctx.accounts.authority))]
-    pub fn transfer_ownership(
+    pub fn transfer_store_ownership(
         ctx: Context<TransferStoreOwnership>,
         proposed_owner: Pubkey,
     ) -> ProgramResult {
@@ -202,7 +202,7 @@ pub mod store {
         Ok(())
     }
 
-    pub fn accept_ownership(ctx: Context<AcceptStoreOwnership>) -> ProgramResult {
+    pub fn accept_store_ownership(ctx: Context<AcceptStoreOwnership>) -> ProgramResult {
         let store = &mut *ctx.accounts.store.load_mut()?;
         require!(
             ctx.accounts.authority.key == &store.proposed_owner,
