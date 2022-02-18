@@ -242,6 +242,9 @@ export default class ProposeOffchainConfig extends SolanaCommand {
     logger.success(`Last tx Write offchain config set on tx ${txs[txs.length - 1]}`)
 
     return {
+      data: {
+				secret: randomSecret.toString(),
+      },
       responses: [
         {
           tx: this.wrapResponse(txs[txs.length - 1], state.toString(), { state: state.toString() }),
