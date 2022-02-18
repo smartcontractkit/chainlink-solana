@@ -7,7 +7,7 @@
   - [Local Solana Testnet](#local-solana-testnet)
   - [Pulumi Installation Instruction](#pulumi-installation-instruction)
 
-Using `pulumi` spin up a locasl testing environment using docker containers:
+Using `pulumi` spin up a local testing environment using docker containers:
 
 - Deploy the necessary relay components (CL node, psql DB, price feed adapters)
 - Connect the components together
@@ -30,48 +30,14 @@ PRIVATE_KEY=[96,13,...]
 SECRET=some random local testing secret
 ```
 
-Generate keys for program account IDs (usually only need to be done once):
+From the root of the repo, use the following commands to use localnet keys in the repo to build artifacts and add them to gauntlet:
 
 ```bash
-./scripts/solana-keygen-programs.sh # from root
-```
-
-The script will generate N keys for programs and store them at `./contracts/artifacts/${network]/`.
-**NOTICE:** To improve setup, `localnet` keys are already shared and available at `./contracts/artifacts/localnet/`.
-
-Next, we need to copy keys over to `./contracts/target/deploy/` so Anchor would use them on deploy. Run this helper script to copy keys:
-
-```bash
-./scripts/programs-keys-cp.sh # from root
-```
-
-Add the pubkeys to the their respective program (do for each program)
-
-```rust
-// example in ./contracts/programs/ocr2/src/lib.rs
-declare_id!("CF13pnKGJ1WJZeEgVAtFdUi4MMndXm9hneiHs8azUaZt");
-```
-
-...and to Anchor configuration:
-
-```toml
-# example in ./contracts/Anchor.toml
-[programs.localnet]
-ocr2 = "CF13pnKGJ1WJZeEgVAtFdUi4MMndXm9hneiHs8azUaZt"
-```
-
-Compile program artifacts (do each time contract changes)
-
-```bash
-# from root
+# start up the anchor shell
 ./scripts/anchor-shell.sh
-cd contracts
-anchor build
 
-# then copy build artifacts to Gauntlet
-cp contracts/target/deploy/access_controller.so gauntlet/packages/gauntlet-solana-contracts/artifacts/bin/access_controller.so
-cp contracts/target/deploy/store.so gauntlet/packages/gauntlet-solana-contracts/artifacts/bin/store.so
-cp contracts/target/deploy/ocr2.so gauntlet/packages/gauntlet-solana-contracts/artifacts/bin/ocr2.so
+# build artifacts and copy
+./scripts/setup-local-artifacts.sh
 ```
 
 Start up the solana test validator (recommend always using `-r` for a clean slate, runs into deployment issues otherwise)
