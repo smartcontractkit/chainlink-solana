@@ -1,20 +1,16 @@
 #!/usr/bin/env bash
 
 set -e
+source ./scripts/lib.sh
 
 ACCESS_CONTROLLER_PROGRAM_ID=$(<./contracts/artifacts/localnet/access_controller-keypair.pub)
-STORE_PROGRAM_ID=$(<./contracts/artifacts/localnet/store-keypair.pub)
 OCR2_PROGRAM_ID=$(<./contracts/artifacts/localnet/ocr2-keypair.pub)
+STORE_PROGRAM_ID=$(<./contracts/artifacts/localnet/store-keypair.pub)
 
-# Replace existing declare_id!()
-sed -i "s/DzzjdPWNfwHZmzPVxnmqkkMJraYQQRCpgFZajqkqmU6G/$ACCESS_CONTROLLER_PROGRAM_ID/" contracts/programs/access-controller/src/lib.rs
-sed -i "s/CaH12fwNTKJAG8PxEvo9R96Zc2j8qNHZaFj8ZW49yZNT/$STORE_PROGRAM_ID/" contracts/programs/store/src/lib.rs
-sed -i "s/HW3ipKzeeduJq6f1NqRCw4doknMeWkfrM4WxobtG3o5v/$OCR2_PROGRAM_ID/" contracts/programs/ocr2/src/lib.rs
+modify_program $ACCESS_CONTROLLER_PROGRAM_ID $OCR2_PROGRAM_ID $STORE_PROGRAM_ID
 
 # build artifacts
-cd contracts
-anchor build
-cd ..
+build
 
 # copy build artifacts
 mkdir -p ./gauntlet/packages/gauntlet-solana-contracts/artifacts/bin
