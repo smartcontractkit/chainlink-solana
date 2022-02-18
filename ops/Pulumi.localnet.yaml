@@ -21,8 +21,6 @@ config:
     - EVM_ENABLED
     - EVM_RPC_ENABLED
     - SOLANA_ENABLED
-    - ETH_DISABLED
-    - USE_LEGACY_ETH_ENV_VARS
     - FEATURE_OFFCHAIN_REPORTING2
     - P2P_NETWORKING_STACK
     - P2P_LISTEN_PORT
@@ -37,8 +35,6 @@ config:
   solana-env:CL-EVM_ENABLED: false
   solana-env:CL-EVM_RPC_ENABLED: false
   solana-env:CL-SOLANA_ENABLED: true
-  solana-env:CL-ETH_DISABLED: true
-  solana-env:CL-USE_LEGACY_ETH_ENV_VARS: false
   solana-env:CL-FEATURE_OFFCHAIN_REPORTING2: true
   solana-env:CL-P2P_NETWORKING_STACK: "V2"
   solana-env:CL-P2P_LISTEN_PORT: 0
