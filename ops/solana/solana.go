@@ -70,7 +70,7 @@ func (d *Deployer) Load() error {
 		d.gauntlet.Flag("network", d.network),
 	)
 	if err != nil {
-		return errors.Wrap(err, "access controller contract deployment failed")
+		return errors.Wrap(err, "'access_controller:deploy' call failed")
 	}
 
 	report, err := d.gauntlet.ReadCommandReport()
@@ -87,7 +87,7 @@ func (d *Deployer) Load() error {
 		d.gauntlet.Flag("network", d.network),
 	)
 	if err != nil {
-		return errors.Wrap(err, "store contract deployment failed")
+		return errors.Wrap(err, "'store:deploy' call failed")
 	}
 
 	report, err = d.gauntlet.ReadCommandReport()
@@ -104,7 +104,7 @@ func (d *Deployer) Load() error {
 		d.gauntlet.Flag("network", d.network),
 	)
 	if err != nil {
-		return errors.Wrap(err, "ocr 2 contract deployment failed")
+		return errors.Wrap(err, "'ocr2:deploy' call failed")
 	}
 
 	report, err = d.gauntlet.ReadCommandReport()
@@ -123,7 +123,7 @@ func (d *Deployer) DeployLINK() error {
 		d.gauntlet.Flag("network", d.network),
 	)
 	if err != nil {
-		return errors.Wrap(err, "LINK contract deployment failed")
+		return errors.Wrap(err, "'LINK token:deploy' call failed")
 	}
 
 	report, err := d.gauntlet.ReadCommandReport()
@@ -145,7 +145,7 @@ func (d *Deployer) DeployOCR() error {
 		d.gauntlet.Flag("network", d.network),
 	)
 	if err != nil {
-		return errors.Wrap(err, "Request AC initialization failed")
+		return errors.Wrap(err, "Requester 'access_controller:initialize' call failed")
 	}
 	report, err := d.gauntlet.ReadCommandReport()
 	if err != nil {
@@ -159,7 +159,7 @@ func (d *Deployer) DeployOCR() error {
 		d.gauntlet.Flag("network", d.network),
 	)
 	if err != nil {
-		return errors.Wrap(err, "Billing AC initialization failed")
+		return errors.Wrap(err, "Billing 'access_controller:initialize' call failed")
 	}
 	report, err = d.gauntlet.ReadCommandReport()
 	if err != nil {
@@ -174,7 +174,7 @@ func (d *Deployer) DeployOCR() error {
 		d.gauntlet.Flag("accessController", d.Account[BillingAccessController]),
 	)
 	if err != nil {
-		return errors.Wrap(err, "Store initialization failed")
+		return errors.Wrap(err, "'store:initialize' call failed")
 	}
 	report, err = d.gauntlet.ReadCommandReport()
 	if err != nil {
@@ -202,7 +202,7 @@ func (d *Deployer) DeployOCR() error {
 		d.gauntlet.Flag("input", string(jsonInput)),
 	)
 	if err != nil {
-		return errors.Wrap(err, "feed creation failed")
+		return errors.Wrap(err, "'store:create_feed' call failed")
 	}
 
 	report, err = d.gauntlet.ReadCommandReport()
@@ -219,7 +219,7 @@ func (d *Deployer) DeployOCR() error {
 		d.gauntlet.Flag("threshold", "8000"),
 	)
 	if err != nil {
-		return errors.Wrap(err, "set validator config failed")
+		return errors.Wrap(err, "'store:set_validator_config' call failed")
 	}
 
 	fmt.Println("Step 6: Init OCR 2 Feed")
@@ -244,7 +244,7 @@ func (d *Deployer) DeployOCR() error {
 		d.gauntlet.Flag("input", string(jsonInput)),
 	)
 	if err != nil {
-		return errors.Wrap(err, "feed initialization failed")
+		return errors.Wrap(err, "'ocr2:initialize' call failed")
 	}
 
 	report, err = d.gauntlet.ReadCommandReport()
@@ -272,7 +272,7 @@ func (d *Deployer) DeployOCR() error {
 	)
 
 	if err != nil {
-		return errors.Wrap(err, "setting writer on store failed")
+		return errors.Wrap(err, "'store:set_writer' call failed")
 	}
 
 	fmt.Println("Step 8: Transfer feed ownership to store")
@@ -282,7 +282,7 @@ func (d *Deployer) DeployOCR() error {
 		d.gauntlet.Flag("state", d.Account[OCRTransmissions]),
 		d.gauntlet.Flag("to", d.Account[StoreAccount]),
 	); err != nil {
-		return errors.Wrap(err, "failed to transfer feed ownership")
+		return errors.Wrap(err, "'store:transfer_feed_ownership' call failed")
 	}
 
 	if err = d.gauntlet.ExecCommand(
@@ -291,7 +291,7 @@ func (d *Deployer) DeployOCR() error {
 		d.gauntlet.Flag("state", d.Account[OCRTransmissions]),
 		d.gauntlet.Flag("to", d.Account[StoreAccount]),
 	); err != nil {
-		return errors.Wrap(err, "failed to accept feed ownership")
+		return errors.Wrap(err, "'store:accept_feed_ownership' call failed")
 	}
 
 	return nil
@@ -306,7 +306,7 @@ func (d Deployer) TransferLINK() error {
 		d.Account[OCRFeed],
 	)
 	if err != nil {
-		return errors.Wrap(err, "LINK transfer failed")
+		return errors.Wrap(err, "'ocr2:fund' call failed")
 	}
 
 	return nil
@@ -317,13 +317,13 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 
 	fmt.Println("Setting up OCR Feed:")
 
-	fmt.Println("Begin offchain proposal...")
+	fmt.Println("Create config proposal...")
 	if err := d.gauntlet.ExecCommand(
 		"ocr2:create_proposal",
 		d.gauntlet.Flag("network", d.network),
 		d.gauntlet.Flag("version", "2"),
 	); err != nil {
-		return errors.Wrap(err, "create proposal failed")
+		return errors.Wrap(err, "'ocr2:create_proposal' call failed")
 	}
 
 	report, err := d.gauntlet.ReadCommandReport()
@@ -346,23 +346,16 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 	peerIDs := []string{}
 	oracles := []map[string]string{}
 	threshold := 1 // corresponds to F
-	// operators := []map[string]string{}
 	for _, k := range keys {
 		S = append(S, 1)
 		offChainPublicKeys = append(offChainPublicKeys, k.OCR2OffchainPublicKey)
 		configPublicKeys = append(configPublicKeys, k.OCR2ConfigPublicKey)
 		peerIDs = append(peerIDs, k.P2PID)
-		// original oracle structure
 		oracles = append(oracles, map[string]string{
 			"signer":      k.OCR2OnchainPublicKey,
 			"transmitter": k.OCR2Transmitter,
 			"payee":       k.OCR2Transmitter, // payee is the same as transmitter
 		})
-
-		// operators = append(operators, map[string]string{
-		// 	"payee":       k.OCR2Transmitter, // payee is the same as transmitter
-		// 	"transmitter": k.OCR2Transmitter,
-		// })
 	}
 
 	fmt.Println("Proposing config...")
@@ -386,7 +379,7 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 	)
 
 	if err != nil {
-		return errors.Wrap(err, "setting OCR 2 config failed")
+		return errors.Wrap(err, "'ocr2:propose_config' call failed")
 	}
 
 	fmt.Println("Proposing offchain config...")
@@ -433,7 +426,7 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 		d.gauntlet.Flag("input", string(jsonInput)),
 		d.Account[OCRFeed],
 	); err != nil {
-		return errors.Wrap(err, "proposing OCR2 offchain config failed")
+		return errors.Wrap(err, "'ocr2:propose_offchain_config' call failed")
 	}
 
 	fmt.Println("Proposing Payees...")
@@ -456,7 +449,7 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 		d.gauntlet.Flag("input", string(jsonInput)),
 		d.Account[OCRFeed],
 	); err != nil {
-		return errors.Wrap(err, "setting OCR 2 payees failed")
+		return errors.Wrap(err, "'ocr2:propose_payees' call failed")
 	}
 
 	input = map[string]interface{}{
@@ -475,7 +468,7 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 		d.gauntlet.Flag("network", d.network),
 		d.gauntlet.Flag("proposalId", d.Account[Proposal]),
 	); err != nil {
-		return errors.Wrap(err, "committing OCR 2 set offchain config failed")
+		return errors.Wrap(err, "'ocr2:finalize_proposal' call failed")
 	}
 
 	fmt.Println("Accept proposal...")
@@ -499,7 +492,7 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 		d.gauntlet.Flag("input", string(jsonInput)),
 		d.Account[OCRFeed],
 	); err != nil {
-		return errors.Wrap(err, "failed to accept proposal")
+		return errors.Wrap(err, "'ocr2:accept_proposal' call failed")
 	}
 
 	fmt.Println("Setting Billing...")
@@ -509,7 +502,7 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 		d.gauntlet.Flag("input", string(jsonInput)),
 		d.Account[OCRFeed],
 	); err != nil {
-		return errors.Wrap(err, "setting OCR 2 billing failed")
+		return errors.Wrap(err, "'ocr2:set_billing' call failed")
 	}
 
 	return nil
