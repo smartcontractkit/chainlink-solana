@@ -37,7 +37,7 @@ From the root of the repo, use the following commands to use localnet keys in th
 ./scripts/anchor-shell.sh
 
 # build artifacts and copy
-./scripts/setup-local-artifacts.sh
+./scripts/setup-local.sh
 ```
 
 Start up the solana test validator (recommend always using `-r` for a clean slate, runs into deployment issues otherwise)
