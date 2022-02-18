@@ -24,6 +24,7 @@ config:
     - FEATURE_OFFCHAIN_REPORTING2
     - P2P_NETWORKING_STACK
     - P2P_LISTEN_PORT
+    # these two env vars are included because certificates are not properly set up (these prevent CRIT logs from constantly throwing)
     - CHAINLINK_TLS_PORT
     - SECURE_COOKIES
     # these next vars are used for debugging and should be excluded from production deployments
