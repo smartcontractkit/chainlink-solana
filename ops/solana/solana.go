@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -45,6 +46,19 @@ type Deployer struct {
 }
 
 func New(ctx *pulumi.Context) (Deployer, error) {
+	// check solana CLI configuration
+	if _, err := exec.LookPath("solana"); err != nil {
+		return Deployer{}, errors.New("'solana' is not available in commandline")
+	}
+	out, err := exec.Command("solana", "config", "get", "json_rpc_url").Output()
+	if err != nil {
+		return Deployer{}, errors.Wrap(err, "solana.config.get failed")
+	}
+	// check to make sure pointed at localhost
+	if !strings.Contains(string(out), "localhost") {
+		return Deployer{}, fmt.Errorf("solana cli is not pointed at localnet; currently pointed to %s\nMay need to run 'solana config set --url localhost'", string(out))
+	}
+
 	// TODO: Should come from pulumi context
 	os.Setenv("SKIP_PROMPTS", "true")
 
@@ -409,7 +423,7 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 	}
 
 	input = map[string]interface{}{
-		"proposalId": d.Account[Proposal],
+		"proposalId":     d.Account[Proposal],
 		"offchainConfig": offchainConfig,
 	}
 
@@ -473,11 +487,11 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 
 	fmt.Println("Accept proposal...")
 	input = map[string]interface{}{
-		"version":  2,
-		"f": threshold,
-		"oracles": oracles,
+		"version":        2,
+		"f":              threshold,
+		"oracles":        oracles,
 		"offchainConfig": offchainConfig,
-		"randomSecret": testingSecret,
+		"randomSecret":   testingSecret,
 	}
 
 	jsonInput, err = json.Marshal(input)
@@ -509,9 +523,6 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 }
 
 func (d Deployer) Fund(addresses []string) error {
-	if _, err := exec.LookPath("solana"); err != nil {
-		return errors.New("'solana' is not available in commandline")
-	}
 	for _, a := range addresses {
 		msg := relayUtils.LogStatus(fmt.Sprintf("funded %s", a))
 		if _, err := exec.Command("solana", "airdrop", "100", a).Output(); msg.Check(err) != nil {
