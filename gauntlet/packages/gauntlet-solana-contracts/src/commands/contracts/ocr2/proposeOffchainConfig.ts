@@ -243,7 +243,7 @@ export default class ProposeOffchainConfig extends SolanaCommand {
 
     return {
       data: {
-				secret: randomSecret.toString(),
+        secret: randomSecret.toString(),
       },
       responses: [
         {
