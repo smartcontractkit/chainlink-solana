@@ -231,6 +231,15 @@ export default class ProposeOffchainConfig extends SolanaCommand {
     const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
     const startingPoint = new BN(this.flags.instruction || 0).toNumber()
 
+    const input = this.makeInput(this.flags.input)
+    const gauntletSecret = process.env.SECRET!
+    const userSecret = this.flags.secret
+    const { offchainConfig, randomSecret } = await serializeOffchainConfig(
+      input.offchainConfig,
+      gauntletSecret,
+      userSecret,
+    )
+
     await prompt(`Start writing offchain config from ${startingPoint}/${rawTx.length - 1}?`)
 
     const txs: string[] = []
@@ -243,7 +252,7 @@ export default class ProposeOffchainConfig extends SolanaCommand {
 
     return {
       data: {
-        secret: randomSecret.toString(),
+				secret: randomSecret,
       },
       responses: [
         {
