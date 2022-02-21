@@ -30,11 +30,7 @@ pub struct NewOracle {
 #[program]
 pub mod ocr2 {
     use super::*;
-    pub fn initialize(
-        ctx: Context<Initialize>,
-        min_answer: i128,
-        max_answer: i128,
-    ) -> ProgramResult {
+    pub fn initialize(ctx: Context<Initialize>, min_answer: i128, max_answer: i128) -> Result<()> {
         let mut state = ctx.accounts.state.load_init()?;
         state.version = 1;
 
@@ -57,7 +53,7 @@ pub mod ocr2 {
     }
 
     #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
-    pub fn close(ctx: Context<Close>) -> ProgramResult {
+    pub fn close(ctx: Context<Close>) -> Result<()> {
         // NOTE: Close is handled by anchor on exit due to the `close` attribute
         Ok(())
     }
@@ -66,14 +62,14 @@ pub mod ocr2 {
     pub fn transfer_ownership(
         ctx: Context<TransferOwnership>,
         proposed_owner: Pubkey,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         require!(proposed_owner != Pubkey::default(), InvalidInput);
         let mut state = ctx.accounts.state.load_mut()?;
         state.config.proposed_owner = proposed_owner;
         Ok(())
     }
 
-    pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> ProgramResult {
+    pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
         let mut state = ctx.accounts.state.load_mut()?;
         require!(
             ctx.accounts.authority.key == &state.config.proposed_owner,
@@ -86,7 +82,7 @@ pub mod ocr2 {
     pub fn create_proposal(
         ctx: Context<CreateProposal>,
         offchain_config_version: u64,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         let mut proposal = ctx.accounts.proposal.load_init()?;
 
         proposal.version = 1;
@@ -101,7 +97,7 @@ pub mod ocr2 {
     pub fn write_offchain_config(
         ctx: Context<ProposeConfig>,
         offchain_config: Vec<u8>,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         let mut proposal = ctx.accounts.proposal.load_mut()?;
         require!(proposal.state != Proposal::FINALIZED, InvalidInput);
 
@@ -114,7 +110,7 @@ pub mod ocr2 {
     }
 
     #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
-    pub fn finalize_proposal(ctx: Context<ProposeConfig>) -> ProgramResult {
+    pub fn finalize_proposal(ctx: Context<ProposeConfig>) -> Result<()> {
         let mut proposal = ctx.accounts.proposal.load_mut()?;
         require!(proposal.state != Proposal::FINALIZED, InvalidInput);
 
@@ -136,7 +132,7 @@ pub mod ocr2 {
     }
 
     #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
-    pub fn close_proposal(ctx: Context<CloseProposal>) -> ProgramResult {
+    pub fn close_proposal(ctx: Context<CloseProposal>) -> Result<()> {
         // NOTE: Close is handled by anchor on exit due to the `close` attribute
         Ok(())
     }
@@ -145,7 +141,7 @@ pub mod ocr2 {
     pub fn accept_proposal<'info>(
         ctx: Context<'_, '_, '_, 'info, AcceptProposal<'info>>,
         digest: Vec<u8>,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         require!(digest.len() == DIGEST_SIZE, InvalidInput);
 
         let mut state = ctx.accounts.state.load_mut()?;
@@ -274,7 +270,7 @@ pub mod ocr2 {
         ctx: Context<ProposeConfig>,
         new_oracles: Vec<NewOracle>,
         f: u8,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         let len = new_oracles.len();
         require!(f != 0, InvalidInput);
         require!(len <= MAX_ORACLES, TooManyOracles);
@@ -327,7 +323,7 @@ pub mod ocr2 {
         ctx: Context<ProposeConfig>,
         token_mint: Pubkey,
         payees: Vec<Pubkey>,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         let mut proposal = ctx.accounts.proposal.load_mut()?;
         require!(proposal.state != Proposal::FINALIZED, InvalidInput);
 
@@ -349,14 +345,14 @@ pub mod ocr2 {
     }
 
     #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
-    pub fn set_requester_access_controller(ctx: Context<SetAccessController>) -> ProgramResult {
+    pub fn set_requester_access_controller(ctx: Context<SetAccessController>) -> Result<()> {
         let mut state = ctx.accounts.state.load_mut()?;
         state.config.requester_access_controller = ctx.accounts.access_controller.key();
         Ok(())
     }
 
     #[access_control(has_requester_access(&ctx.accounts.state, &ctx.accounts.access_controller, &ctx.accounts.authority))]
-    pub fn request_new_round(ctx: Context<RequestNewRound>) -> ProgramResult {
+    pub fn request_new_round(ctx: Context<RequestNewRound>) -> Result<()> {
         let config = ctx.accounts.state.load()?.config;
 
         emit!(event::RoundRequested {
@@ -374,7 +370,7 @@ pub mod ocr2 {
         program_id: &Pubkey,
         accounts: &[AccountInfo<'info>],
         data: &[u8],
-    ) -> ProgramResult {
+    ) -> Result<()> {
         // Based on https://github.com/project-serum/anchor/blob/2390a4f16791b40c63efe621ffbd558e354d5303/lang/syn/src/codegen/program/handlers.rs#L696-L737
         // Use a raw instruction to skip data decoding, but keep using Anchor contexts.
 
@@ -394,7 +390,7 @@ pub mod ocr2 {
     }
 
     #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
-    pub fn set_billing_access_controller(ctx: Context<SetAccessController>) -> ProgramResult {
+    pub fn set_billing_access_controller(ctx: Context<SetAccessController>) -> Result<()> {
         let mut state = ctx.accounts.state.load_mut()?;
         state.config.billing_access_controller = ctx.accounts.access_controller.key();
         Ok(())
@@ -405,7 +401,7 @@ pub mod ocr2 {
         ctx: Context<SetBilling>,
         observation_payment_gjuels: u32,
         transmission_payment_gjuels: u32,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         let mut state = ctx.accounts.state.load_mut()?;
         state.config.billing.observation_payment_gjuels = observation_payment_gjuels;
         state.config.billing.transmission_payment_gjuels = transmission_payment_gjuels;
@@ -417,7 +413,7 @@ pub mod ocr2 {
     }
 
     #[access_control(has_billing_access(&ctx.accounts.state, &ctx.accounts.access_controller, &ctx.accounts.authority))]
-    pub fn withdraw_funds(ctx: Context<WithdrawFunds>, amount: u64) -> ProgramResult {
+    pub fn withdraw_funds(ctx: Context<WithdrawFunds>, amount: u64) -> Result<()> {
         let state = &ctx.accounts.state.load()?;
 
         let link_due = calculate_total_link_due(&state.config, &state.oracles)?;
@@ -436,7 +432,7 @@ pub mod ocr2 {
         Ok(())
     }
 
-    pub fn withdraw_payment(ctx: Context<WithdrawPayment>) -> ProgramResult {
+    pub fn withdraw_payment(ctx: Context<WithdrawPayment>) -> Result<()> {
         let mut state = ctx.accounts.state.load_mut()?;
 
         let vault_nonce = state.vault_nonce;
@@ -488,7 +484,7 @@ pub mod ocr2 {
     }
 
     #[access_control(has_billing_access(&ctx.accounts.state, &ctx.accounts.access_controller, &ctx.accounts.authority))]
-    pub fn pay_oracles<'info>(ctx: Context<'_, '_, '_, 'info, PayOracles<'info>>) -> ProgramResult {
+    pub fn pay_oracles<'info>(ctx: Context<'_, '_, '_, 'info, PayOracles<'info>>) -> Result<()> {
         let mut state = ctx.accounts.state.load_mut()?;
 
         require!(
@@ -544,7 +540,7 @@ pub mod ocr2 {
         Ok(())
     }
 
-    pub fn transfer_payeeship(ctx: Context<TransferPayeeship>) -> ProgramResult {
+    pub fn transfer_payeeship(ctx: Context<TransferPayeeship>) -> Result<()> {
         // Can't transfer to self
         require!(
             ctx.accounts.payee.key() != ctx.accounts.proposed_payee.key(),
@@ -576,7 +572,7 @@ pub mod ocr2 {
         Ok(())
     }
 
-    pub fn accept_payeeship(ctx: Context<AcceptPayeeship>) -> ProgramResult {
+    pub fn accept_payeeship(ctx: Context<AcceptPayeeship>) -> Result<()> {
         let mut state = ctx.accounts.state.load_mut()?;
 
         let oracle = state
@@ -601,7 +597,7 @@ pub mod ocr2 {
 }
 
 #[inline(always)]
-fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> ProgramResult {
+fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> Result<()> {
     let (store_nonce, data) = data.split_first().ok_or(ErrorCode::InvalidInput)?;
 
     use anchor_lang::solana_program::{hash, keccak, secp256k1_recover::*};
@@ -837,16 +833,13 @@ fn calculate_total_link_due(config: &Config, oracles: &[Oracle]) -> Result<u64> 
 // -- Access control modifiers
 
 // Only owner access
-fn owner(state_loader: &AccountLoader<State>, signer: &AccountInfo) -> ProgramResult {
+fn owner(state_loader: &AccountLoader<State>, signer: &AccountInfo) -> Result<()> {
     let config = state_loader.load()?.config;
     require!(signer.key.eq(&config.owner), Unauthorized);
     Ok(())
 }
 
-fn proposal_owner(
-    proposal_loader: &AccountLoader<Proposal>,
-    signer: &AccountInfo,
-) -> ProgramResult {
+fn proposal_owner(proposal_loader: &AccountLoader<Proposal>, signer: &AccountInfo) -> Result<()> {
     let proposal = proposal_loader.load()?;
     require!(signer.key.eq(&proposal.owner), Unauthorized);
     Ok(())
@@ -856,7 +849,7 @@ fn has_billing_access(
     state: &AccountLoader<State>,
     controller: &AccountLoader<AccessController>,
     authority: &AccountInfo,
-) -> ProgramResult {
+) -> Result<()> {
     let config = state.load()?.config;
 
     require!(
@@ -878,7 +871,7 @@ fn has_requester_access(
     state: &AccountLoader<State>,
     controller: &AccountLoader<AccessController>,
     authority: &AccountInfo,
-) -> ProgramResult {
+) -> Result<()> {
     let config = state.load()?.config;
 
     require!(
@@ -896,7 +889,7 @@ fn has_requester_access(
     Ok(())
 }
 
-#[error]
+#[error_code]
 pub enum ErrorCode {
     #[msg("Unauthorized")]
     Unauthorized = 0,
@@ -945,6 +938,7 @@ pub enum ErrorCode {
 }
 
 pub mod query {
+    use super::ErrorCode;
     use super::*;
 
     #[account]

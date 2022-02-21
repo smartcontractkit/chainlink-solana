@@ -20,7 +20,7 @@ func RunInAnchorShell(cmd []string, subDir string) error {
 		return err
 	}
 
-	reader, err := cli.ImagePull(ctx, "projectserum/build:v0.21.0", types.ImagePullOptions{})
+	reader, err := cli.ImagePull(ctx, "projectserum/build:v0.22.0", types.ImagePullOptions{})
 	if err != nil {
 		return err
 	}
@@ -32,7 +32,7 @@ func RunInAnchorShell(cmd []string, subDir string) error {
 	}
 
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
-		Image: "projectserum/build:v0.21.0",
+		Image: "projectserum/build:v0.22.0",
 		Cmd:   cmd,
 	}, &container.HostConfig{
 		Mounts: []mount.Mount{

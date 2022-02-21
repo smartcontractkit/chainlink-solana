@@ -54,7 +54,7 @@ pub mod store {
         decimals: u8,
         granularity: u8,
         live_length: u32,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         let feed = &mut ctx.accounts.feed;
         feed.version = FEED_VERSION;
         feed.state = Transmissions::NORMAL;
@@ -72,7 +72,7 @@ pub mod store {
     }
 
     #[access_control(owner(&ctx.accounts.owner, &ctx.accounts.authority))]
-    pub fn close_feed(ctx: Context<CloseFeed>) -> ProgramResult {
+    pub fn close_feed(ctx: Context<CloseFeed>) -> Result<()> {
         // NOTE: Close is handled by anchor on exit due to the `close` attribute
         Ok(())
     }
@@ -81,13 +81,13 @@ pub mod store {
     pub fn transfer_feed_ownership(
         ctx: Context<TransferFeedOwnership>,
         proposed_owner: Pubkey,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         require!(proposed_owner != Pubkey::default(), InvalidInput);
         ctx.accounts.feed.proposed_owner = proposed_owner;
         Ok(())
     }
 
-    pub fn accept_feed_ownership(ctx: Context<AcceptFeedOwnership>) -> ProgramResult {
+    pub fn accept_feed_ownership(ctx: Context<AcceptFeedOwnership>) -> Result<()> {
         let store: std::result::Result<AccountLoader<State>, _> =
             AccountLoader::try_from(&ctx.accounts.proposed_owner);
 
@@ -108,20 +108,20 @@ pub mod store {
     pub fn set_validator_config(
         ctx: Context<SetFeedConfig>,
         flagging_threshold: u32,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         ctx.accounts.feed.flagging_threshold = flagging_threshold;
         Ok(())
     }
 
     #[access_control(owner(&ctx.accounts.owner, &ctx.accounts.authority))]
-    pub fn set_writer(ctx: Context<SetFeedConfig>, writer: Pubkey) -> ProgramResult {
+    pub fn set_writer(ctx: Context<SetFeedConfig>, writer: Pubkey) -> Result<()> {
         ctx.accounts.feed.writer = writer;
         Ok(())
     }
 
     // migrate the feed accounts from v1 if necessary
     // #[access_control(owner(&ctx.accounts.store, &ctx.accounts.authority))]
-    // pub fn migrate(ctx: Context<Migrate>) -> ProgramResult {
+    // pub fn migrate(ctx: Context<Migrate>) -> Result<()> {
     //     if ctx.remaining_accounts.is_empty() {
     //         return Err(ErrorCode::InvalidInput.into());
     //     }
@@ -140,12 +140,12 @@ pub mod store {
             &ctx.accounts.access_controller,
             &ctx.accounts.authority,
     ))]
-    pub fn lower_flag(ctx: Context<LowerFlag>) -> ProgramResult {
+    pub fn lower_flag(ctx: Context<LowerFlag>) -> Result<()> {
         ctx.accounts.feed.state = Transmissions::NORMAL;
         Ok(())
     }
 
-    pub fn submit(ctx: Context<Submit>, round: NewTransmission) -> ProgramResult {
+    pub fn submit(ctx: Context<Submit>, round: NewTransmission) -> Result<()> {
         // check if this particular ocr2 cluster is allowed to write to the feed
         require!(
             ctx.accounts.authority.key == &ctx.accounts.feed.writer,
@@ -184,7 +184,7 @@ pub mod store {
 
     // Store methods
 
-    pub fn initialize(ctx: Context<Initialize>) -> ProgramResult {
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let mut store = ctx.accounts.store.load_init()?;
         store.owner = ctx.accounts.owner.key();
         store.lowering_access_controller = ctx.accounts.lowering_access_controller.key();
@@ -195,14 +195,14 @@ pub mod store {
     pub fn transfer_store_ownership(
         ctx: Context<TransferStoreOwnership>,
         proposed_owner: Pubkey,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         require!(proposed_owner != Pubkey::default(), InvalidInput);
         let store = &mut *ctx.accounts.store.load_mut()?;
         store.proposed_owner = proposed_owner;
         Ok(())
     }
 
-    pub fn accept_store_ownership(ctx: Context<AcceptStoreOwnership>) -> ProgramResult {
+    pub fn accept_store_ownership(ctx: Context<AcceptStoreOwnership>) -> Result<()> {
         let store = &mut *ctx.accounts.store.load_mut()?;
         require!(
             ctx.accounts.authority.key == &store.proposed_owner,
@@ -213,7 +213,7 @@ pub mod store {
     }
 
     #[access_control(store_owner(&ctx.accounts.store, &ctx.accounts.authority))]
-    pub fn set_lowering_access_controller(ctx: Context<SetAccessController>) -> ProgramResult {
+    pub fn set_lowering_access_controller(ctx: Context<SetAccessController>) -> Result<()> {
         let mut store = ctx.accounts.store.load_mut()?;
         store.lowering_access_controller = ctx.accounts.access_controller.key();
         Ok(())
@@ -221,7 +221,7 @@ pub mod store {
 
     /// The query instruction takes a `Query` and serializes the response in a fixed format. That way queries
     /// are not bound to the underlying layout.
-    pub fn query(ctx: Context<Query>, scope: Scope) -> ProgramResult {
+    pub fn query(ctx: Context<Query>, scope: Scope) -> Result<()> {
         use std::io::Cursor;
 
         let mut buf = Cursor::new(Vec::with_capacity(128)); // TODO: calculate max size
@@ -311,7 +311,7 @@ fn is_valid(flagging_threshold: u32, previous_answer: i128, answer: i128) -> boo
 }
 
 // Only owner access
-fn owner<'info>(owner: &UncheckedAccount<'info>, authority: &Signer) -> ProgramResult {
+fn owner<'info>(owner: &UncheckedAccount<'info>, authority: &Signer) -> Result<()> {
     let store: std::result::Result<AccountLoader<'info, State>, _> = AccountLoader::try_from(owner);
 
     let owner = match store {
@@ -325,7 +325,7 @@ fn owner<'info>(owner: &UncheckedAccount<'info>, authority: &Signer) -> ProgramR
     Ok(())
 }
 
-fn store_owner(store_loader: &AccountLoader<State>, signer: &AccountInfo) -> ProgramResult {
+fn store_owner(store_loader: &AccountLoader<State>, signer: &AccountInfo) -> Result<()> {
     let store = store_loader.load()?;
     require!(signer.key.eq(&store.owner), Unauthorized);
     Ok(())
@@ -335,7 +335,7 @@ fn has_lowering_access(
     owner: &UncheckedAccount,
     controller: &UncheckedAccount,
     authority: &Signer,
-) -> ProgramResult {
+) -> Result<()> {
     let store: std::result::Result<AccountLoader<State>, _> = AccountLoader::try_from(owner);
 
     match store {
@@ -386,7 +386,7 @@ pub mod accessors {
         program_id: AccountInfo<'info>,
         feed: AccountInfo<'info>,
         scope: Scope,
-    ) -> Result<T, ProgramError> {
+    ) -> Result<T> {
         let cpi = CpiContext::new(program_id, Query { feed });
         cpi::query(cpi, scope)?;
         let (_key, data) = solana_program::program::get_return_data().unwrap();
@@ -394,24 +394,18 @@ pub mod accessors {
         Ok(data)
     }
 
-    pub fn version<'info>(
-        program_id: AccountInfo<'info>,
-        feed: AccountInfo<'info>,
-    ) -> Result<u8, ProgramError> {
+    pub fn version<'info>(program_id: AccountInfo<'info>, feed: AccountInfo<'info>) -> Result<u8> {
         query(program_id, feed, Scope::Version)
     }
 
-    pub fn decimals<'info>(
-        program_id: AccountInfo<'info>,
-        feed: AccountInfo<'info>,
-    ) -> Result<u8, ProgramError> {
+    pub fn decimals<'info>(program_id: AccountInfo<'info>, feed: AccountInfo<'info>) -> Result<u8> {
         query(program_id, feed, Scope::Decimals)
     }
 
     pub fn description<'info>(
         program_id: AccountInfo<'info>,
         feed: AccountInfo<'info>,
-    ) -> Result<String, ProgramError> {
+    ) -> Result<String> {
         query(program_id, feed, Scope::Description)
     }
 
@@ -419,26 +413,26 @@ pub mod accessors {
         program_id: AccountInfo<'info>,
         feed: AccountInfo<'info>,
         round_id: u32,
-    ) -> Result<Round, ProgramError> {
+    ) -> Result<Round> {
         query(program_id, feed, Scope::RoundData { round_id })
     }
 
     pub fn latest_round_data<'info>(
         program_id: AccountInfo<'info>,
         feed: AccountInfo<'info>,
-    ) -> Result<Round, ProgramError> {
+    ) -> Result<Round> {
         query(program_id, feed, Scope::LatestRoundData)
     }
 
     pub fn aggregator<'info>(
         program_id: AccountInfo<'info>,
         feed: AccountInfo<'info>,
-    ) -> Result<Pubkey, ProgramError> {
+    ) -> Result<Pubkey> {
         query(program_id, feed, Scope::Aggregator)
     }
 }
 
-#[error]
+#[error_code]
 pub enum ErrorCode {
     #[msg("Unauthorized")]
     Unauthorized = 0,
@@ -468,7 +462,7 @@ pub struct CreateFeed<'info> {
 pub struct CloseFeed<'info> {
     #[account(mut, close = receiver)]
     pub feed: Account<'info, Transmissions>,
-    // CHECKED: through the owner() access_control
+    /// CHECK: through the owner() access_control
     #[account(address = feed.owner)]
     pub owner: UncheckedAccount<'info>,
     #[account(mut)]
@@ -480,7 +474,7 @@ pub struct CloseFeed<'info> {
 pub struct SetFeedConfig<'info> {
     #[account(mut)]
     pub feed: Account<'info, Transmissions>,
-    // CHECKED: through the owner() access_control
+    /// CHECK: through the owner() access_control
     #[account(address = feed.owner)]
     pub owner: UncheckedAccount<'info>,
     pub authority: Signer<'info>,
@@ -490,11 +484,11 @@ pub struct SetFeedConfig<'info> {
 pub struct LowerFlag<'info> {
     #[account(mut)]
     pub feed: Account<'info, Transmissions>,
-    // CHECKED: through the has_lowering_access() access_control
+    /// CHECK: through the has_lowering_access() access_control
     #[account(address = feed.owner)]
     pub owner: UncheckedAccount<'info>,
     pub authority: Signer<'info>,
-    // CHECKED: through the has_lowering_access() access_control
+    /// CHECK: through the has_lowering_access() access_control
     pub access_controller: UncheckedAccount<'info>,
 }
 
@@ -502,7 +496,7 @@ pub struct LowerFlag<'info> {
 pub struct TransferFeedOwnership<'info> {
     #[account(mut)]
     pub feed: Account<'info, Transmissions>,
-    // CHECKED: through the owner() access_control
+    /// CHECK: through the owner() access_control
     #[account(address = feed.owner)]
     pub owner: UncheckedAccount<'info>,
     pub authority: Signer<'info>,
@@ -512,7 +506,7 @@ pub struct TransferFeedOwnership<'info> {
 pub struct AcceptFeedOwnership<'info> {
     #[account(mut)]
     pub feed: Account<'info, Transmissions>,
-    // CHECKED: we validate this inside accept_feed_ownership
+    /// CHECK: we validate this inside accept_feed_ownership
     #[account(address = feed.proposed_owner)]
     pub proposed_owner: UncheckedAccount<'info>,
     pub authority: Signer<'info>,
