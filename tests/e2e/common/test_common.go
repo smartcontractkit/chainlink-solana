@@ -228,9 +228,9 @@ func (m *OCRv2TestState) createJobs() {
 		},
 	}
 	for nIdx, n := range m.ChainlinkNodes {
-		var IsBootstrapPeer bool
+		jobType := "offchainreporting2"
 		if nIdx == 0 {
-			IsBootstrapPeer = true
+			jobType = "bootstrap"
 		}
 		sourceValueBridge := client.BridgeTypeAttributes{
 			Name:        "variable",
@@ -251,12 +251,12 @@ func (m *OCRv2TestState) createJobs() {
 		Expect(err).ShouldNot(HaveOccurred())
 		jobSpec := &client.OCR2TaskJobSpec{
 			Name:                  fmt.Sprintf("sol-OCRv2-%d-%s", nIdx, uuid.NewV4().String()),
+			JobType:               jobType,
 			ContractID:            m.OCR2.Address(),
 			Relay:                 ChainName,
 			RelayConfig:           relayConfig,
 			P2PPeerID:             m.NodeKeysBundle[nIdx].PeerID,
 			P2PBootstrapPeers:     bootstrapPeers,
-			IsBootstrapPeer:       IsBootstrapPeer,
 			OCRKeyBundleID:        m.NodeKeysBundle[nIdx].OCR2Key.Data.ID,
 			TransmitterID:         m.NodeKeysBundle[nIdx].TXKey.Data.ID,
 			ObservationSource:     observationSource,

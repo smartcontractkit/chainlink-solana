@@ -24,8 +24,8 @@ func NewChainlinkSolOCRv2(nodes int, stateful bool) *environment.Config {
 					"replicas": nodes,
 					"chainlink": map[string]interface{}{
 						"image": map[string]interface{}{
-							"image":   "795953128386.dkr.ecr.us-west-2.amazonaws.com/chainlink",
-							"version": "develop.latest",
+							"image":   "public.ecr.aws/z0b1w9r9/chainlink",
+							"version": "develop",
 						},
 					},
 					"env": map[string]interface{}{
