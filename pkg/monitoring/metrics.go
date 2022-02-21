@@ -5,6 +5,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
 )
 
 var BalanceAccountNames = []string{
@@ -31,12 +32,16 @@ var labelNames = []string{
 
 var gauges map[string]*prometheus.GaugeVec
 
+func makeMetricName(accountName string) string {
+	return fmt.Sprintf("sol_balance_%s", accountName)
+}
+
 func init() {
 	gauges = map[string]*prometheus.GaugeVec{}
 	for _, name := range BalanceAccountNames {
 		gauges[name] = promauto.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Name: fmt.Sprintf("sol_balance_%s", name),
+				Name: makeMetricName(name),
 			},
 			labelNames,
 		)
@@ -48,9 +53,13 @@ type Metrics interface {
 	Cleanup(accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string)
 }
 
-type defaultMetrics struct{}
+type defaultMetrics struct {
+	log relayMonitoring.Logger
+}
 
-var DefaultMetrics = &defaultMetrics{}
+func NewMetrics(log relayMonitoring.Logger) Metrics {
+	return &defaultMetrics{log}
+}
 
 func (d *defaultMetrics) SetBalance(balance uint64, balanceAccountName, accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string) {
 	gauge, found := gauges[balanceAccountName]
@@ -62,6 +71,9 @@ func (d *defaultMetrics) SetBalance(balance uint64, balanceAccountName, accountA
 
 func (d *defaultMetrics) Cleanup(accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string) {
 	for _, name := range BalanceAccountNames {
-		_ = gauges[name].DeleteLabelValues(accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName)
+		deleted := gauges[name].DeleteLabelValues(accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName)
+		if !deleted {
+			d.log.Errorw("failed to delete balance metric", "metric", makeMetricName(name))
+		}
 	}
 }
