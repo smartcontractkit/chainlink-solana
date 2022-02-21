@@ -2,12 +2,12 @@ import * as anchor from "@project-serum/anchor";
 import { BN } from "@project-serum/anchor";
 import { Connection, PublicKey } from "@solana/web3.js";
 
-export const CHAINLINK_AGGREGATOR_PROGRAM_ID = new PublicKey("test");
-export const CHAINLINK_STORE_PROGRAM_ID = new PublicKey("test");
+export const CHAINLINK_AGGREGATOR_PROGRAM_ID = new PublicKey("HW3ipKzeeduJq6f1NqRCw4doknMeWkfrM4WxobtG3o5v");
+export const CHAINLINK_STORE_PROGRAM_ID = new PublicKey("CaH12fwNTKJAG8PxEvo9R96Zc2j8qNHZaFj8ZW49yZNT");
 
 export class Chainlink {
   private _parser: anchor.EventParser;
-  
+
   /**
    * Constructor for new Chainlink client object
    * @param connection
@@ -20,7 +20,7 @@ export class Chainlink {
   ) {
     this._parser = new anchor.EventParser(aggregatorProgram.programId, aggregatorProgram.coder);
   }
-  
+
   /**
    * Load an onchain Chainlink program.
    *
@@ -36,7 +36,7 @@ export class Chainlink {
     const aggregatorProgram = await anchor.Program.at(programID, provider);
     return new Chainlink(aggregatorProgram, provider);
   }
-  
+
   public onRound(feed: PublicKey, callback: (event: any) => void): number {
     return this.provider.connection.onLogs(feed, (event, ctx) => {
         this._parser.parseLogs(event.logs, (log) => {
@@ -53,7 +53,7 @@ export class Chainlink {
         })
     })
   }
-  
+
   public async removeListener(listener: number): Promise<void> {
     return this.provider.connection.removeOnLogsListener(listener)
   }

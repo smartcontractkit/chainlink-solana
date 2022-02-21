@@ -16,7 +16,6 @@
         "LICENSE",
         "README.md"
     ],
-    "type": "module",
     "sideEffects": false,
     "main": "dist/cjs/index.js",
     "module": "dist/esm/index.js",
@@ -27,7 +26,7 @@
     },
     "scripts": {
         "build": "tsc && tsc -P tsconfig.cjs.json",
-        "clean": "rm -rf dist",        
+        "clean": "rm -rf dist",
         "format": "yarn prettier --write ./src"
     },
     "dependencies": {

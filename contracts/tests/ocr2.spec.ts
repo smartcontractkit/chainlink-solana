@@ -19,6 +19,7 @@ import { assert } from "chai";
 import { randomBytes, createHash } from "crypto";
 import * as secp256k1 from "secp256k1";
 import { keccak256 } from "ethereum-cryptography/keccak";
+import { Chainlink } from "@chainlink/solana-sdk";
 
 // generate a new keypair using `solana-keygen new -o id.json`
 
@@ -914,7 +915,7 @@ describe("ocr2", async () => {
     await transmit(rounds+1, rounds+1, new BN(rounds+1), Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]));
 
     // max value u64 juelsPerFeecoin
-    await transmit(rounds+2, rounds+2, new BN(rounds+2), Buffer.from([127, 127, 127, 127, 127, 127, 127, 127]));  
+    await transmit(rounds+2, rounds+2, new BN(rounds+2), Buffer.from([127, 127, 127, 127, 127, 127, 127, 127]));
   })
 
   it("Reclaims rent exempt deposit when closing down a feed", async () => {
@@ -1020,4 +1021,14 @@ describe("ocr2", async () => {
       assert.fail(`create feed shouldn't have succeeded with account size ${invalidLengths[i]}`);
     }
   });
+
+  it("TS client listens and parses state", async () => {
+    // let cl = new Chainlink(program, provider);
+    // // cl = cl.load();
+    // const feedNum = cl.onRound(state, (event) => {
+    //   console.log(event)
+    // })
+    // let transmitTx = await transmit(16, 16, new BN(16));
+
+  })
 });

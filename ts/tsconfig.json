@@ -3,6 +3,7 @@
     "exclude": ["node_modules"],
     "compilerOptions": {
         "module": "esnext",
+        "skipLibCheck": true /* Skip type checking of declaration files. Requires TypeScript version 2.0 or later. */,
         "target": "esnext",
         "outDir": "dist/esm",
         "noEmit": false,
