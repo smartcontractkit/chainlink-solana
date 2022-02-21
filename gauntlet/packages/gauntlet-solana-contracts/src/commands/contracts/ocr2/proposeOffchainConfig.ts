@@ -46,6 +46,8 @@ export default class ProposeOffchainConfig extends SolanaCommand {
     'yarn gauntlet ocr2:propose_offchain_config --network=devnet --rdd=[PATH_TO_RDD] --proposalId=<PROPOSAL_ID> <AGGREGATOR_ADDRESS>',
   ]
 
+  randomSecret: string
+
   constructor(flags, args) {
     super(flags, args)
 
@@ -191,6 +193,8 @@ export default class ProposeOffchainConfig extends SolanaCommand {
       gauntletSecret,
       userSecret,
     )
+    this.randomSecret = randomSecret
+
     logger.info(`Offchain config size: ${offchainConfig.byteLength}`)
     this.require(offchainConfig.byteLength < 4096, 'Offchain config must be lower than 4096 bytes')
 
@@ -230,16 +234,6 @@ export default class ProposeOffchainConfig extends SolanaCommand {
 
     const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
     const startingPoint = new BN(this.flags.instruction || 0).toNumber()
-
-    const input = this.makeInput(this.flags.input)
-    const gauntletSecret = process.env.SECRET!
-    const userSecret = this.flags.secret
-    const { offchainConfig, randomSecret } = await serializeOffchainConfig(
-      input.offchainConfig,
-      gauntletSecret,
-      userSecret,
-    )
-
     await prompt(`Start writing offchain config from ${startingPoint}/${rawTx.length - 1}?`)
 
     const txs: string[] = []
@@ -252,7 +246,7 @@ export default class ProposeOffchainConfig extends SolanaCommand {
 
     return {
       data: {
-        secret: randomSecret,
+        secret: this.randomSecret,
       },
       responses: [
         {
