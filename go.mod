@@ -18,13 +18,13 @@ require (
 	github.com/docker/docker v20.10.12+incompatible
 	github.com/gagliardetto/gofuzz v1.2.2
 	github.com/gagliardetto/treeout v0.1.4
-	github.com/onsi/ginkgo/v2 v2.0.0
-	github.com/onsi/gomega v1.17.0
+	github.com/onsi/ginkgo/v2 v2.1.2
+	github.com/onsi/gomega v1.18.1
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.12.0
+	github.com/prometheus/client_golang v1.12.1
 	github.com/rs/zerolog v1.26.1
 	github.com/smartcontractkit/chainlink-relay v0.0.0-20220216143252-cf2fe41e5b92
-	github.com/smartcontractkit/integrations-framework v1.0.48
+	github.com/smartcontractkit/integrations-framework v1.0.49
 	go.uber.org/atomic v1.9.0
 	go.uber.org/multierr v1.7.0
 	golang.org/x/crypto v0.0.0-20211215165025-cf75a172585e
