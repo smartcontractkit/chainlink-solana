@@ -51,11 +51,11 @@ func main() {
 	}
 	entrypoint.SourceFactories = append(entrypoint.SourceFactories, balancesSourceFactory)
 
-	balancesExporterFactory := monitoring.NewPrometheusExporterFactory(
-		log.With("component", "balances-prometheus-exporter"),
-		monitoring.DefaultMetrics,
+	promExporterFactory := monitoring.NewPrometheusExporterFactory(
+		log.With("component", "solana-prom-exporter"),
+		monitoring.NewMetrics(log.With("component", "solana-metrics")),
 	)
-	entrypoint.ExporterFactories = append(entrypoint.ExporterFactories, balancesExporterFactory)
+	entrypoint.ExporterFactories = append(entrypoint.ExporterFactories, promExporterFactory)
 
 	entrypoint.Run()
 	log.Infow("monitor stopped")

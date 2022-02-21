@@ -5,9 +5,7 @@ import (
 	"testing"
 	"time"
 
-	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/mocks"
-	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,7 +15,7 @@ func TestPrometheusExporter(t *testing.T) {
 		defer cancel()
 		metrics := new(mocks.Metrics)
 		metrics.Test(t)
-		factory := NewPrometheusExporterFactory(logWrapper{logger.NullLogger}, metrics)
+		factory := NewPrometheusExporterFactory(newNullLogger(), metrics)
 
 		chainConfig := generateChainConfig()
 		feedConfig := generateFeedConfig()
@@ -58,16 +56,4 @@ func TestPrometheusExporter(t *testing.T) {
 		}
 		exporter.Cleanup(ctx)
 	})
-}
-
-// Helpers
-
-// adapt core/logger.Logger to monitoring logger.
-
-type logWrapper struct {
-	logger.Logger
-}
-
-func (l logWrapper) With(values ...interface{}) relayMonitoring.Logger {
-	return logWrapper{l.Logger.With(values...)}
 }
