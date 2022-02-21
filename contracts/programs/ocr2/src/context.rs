@@ -27,6 +27,7 @@ pub struct Initialize<'info> {
         associated_token::authority = vault_authority,
     )]
     pub token_vault: Account<'info, TokenAccount>,
+    /// CHECK: this is a PDA
     #[account(seeds = [b"vault", state.key().as_ref()], bump)]
     pub vault_authority: AccountInfo<'info>,
 
@@ -99,6 +100,7 @@ pub struct AcceptProposal<'info> {
 
     #[account(mut, address = state.load()?.config.token_vault)]
     pub token_vault: Account<'info, TokenAccount>,
+    /// CHECK: This is a PDA
     #[account(seeds = [b"vault", state.key().as_ref()], bump = state.load()?.vault_nonce)]
     pub vault_authority: AccountInfo<'info>,
 
@@ -114,6 +116,7 @@ pub struct Transmit<'info> {
     pub feed: Account<'info, Transmissions>,
 
     pub store_program: Program<'info, Store>,
+    /// CHECK: PDA from the aggregator state, validated by the store program
     pub store_authority: AccountInfo<'info>,
 }
 
@@ -149,6 +152,7 @@ pub struct WithdrawFunds<'info> {
     pub access_controller: AccountLoader<'info, AccessController>,
     #[account(mut, address = state.load()?.config.token_vault)]
     pub token_vault: Account<'info, TokenAccount>,
+    /// CHECK: This is a PDA
     #[account(seeds = [b"vault", state.key().as_ref()], bump = state.load()?.vault_nonce)]
     pub vault_authority: AccountInfo<'info>,
     #[account(mut)]
@@ -177,6 +181,7 @@ pub struct WithdrawPayment<'info> {
     pub authority: Signer<'info>,
     #[account(mut, address = state.load()?.config.token_vault)]
     pub token_vault: Account<'info, TokenAccount>,
+    /// CHECK: This is a PDA
     #[account(seeds = [b"vault", state.key().as_ref()], bump = state.load()?.vault_nonce)]
     pub vault_authority: AccountInfo<'info>,
     #[account(mut)]
@@ -208,6 +213,7 @@ pub struct PayOracles<'info> {
 
     #[account(mut, address = state.load()?.config.token_vault)]
     pub token_vault: Account<'info, TokenAccount>,
+    /// CHECK: This is a PDA
     #[account(seeds = [b"vault", state.key().as_ref()], bump = state.load()?.vault_nonce)]
     pub vault_authority: AccountInfo<'info>,
 
@@ -219,7 +225,8 @@ pub struct TransferPayeeship<'info> {
     #[account(mut)]
     pub state: AccountLoader<'info, State>,
     pub authority: Signer<'info>,
-    pub transmitter: UncheckedAccount<'info>,
+    // Matches one of the oracle's transmitter keys
+    pub transmitter: SystemAccount<'info>,
     pub payee: Account<'info, TokenAccount>,
     pub proposed_payee: Account<'info, TokenAccount>,
 }
@@ -229,6 +236,7 @@ pub struct AcceptPayeeship<'info> {
     #[account(mut)]
     pub state: AccountLoader<'info, State>,
     pub authority: Signer<'info>,
-    pub transmitter: UncheckedAccount<'info>,
+    // Matches one of the oracle's transmitter keys
+    pub transmitter: SystemAccount<'info>,
     pub proposed_payee: Account<'info, TokenAccount>,
 }

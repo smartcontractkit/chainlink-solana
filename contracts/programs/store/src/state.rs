@@ -69,7 +69,7 @@ impl Transmissions {
 pub fn with_store<'a, 'info: 'a, F, T>(
     account: &'a mut Account<'info, Transmissions>,
     f: F,
-) -> Result<T, ProgramError>
+) -> Result<T>
 where
     F: FnOnce(&mut Feed) -> T,
 {

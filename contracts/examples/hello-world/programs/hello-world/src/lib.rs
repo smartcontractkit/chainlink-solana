@@ -34,7 +34,7 @@ impl std::fmt::Display for Decimal {
 #[program]
 pub mod hello_world {
     use super::*;
-    pub fn execute(ctx: Context<Execute>) -> ProgramResult {
+    pub fn execute(ctx: Context<Execute>) -> Result<()> {
         let round = chainlink::latest_round_data(
             ctx.accounts.chainlink_program.to_account_info(),
             ctx.accounts.chainlink_feed.to_account_info(),
@@ -58,6 +58,8 @@ pub mod hello_world {
 
 #[derive(Accounts)]
 pub struct Execute<'info> {
+    /// CHECK:
     pub chainlink_feed: AccountInfo<'info>,
+    /// CHECK: TODO: add Anchor types to chainlink-solana
     pub chainlink_program: AccountInfo<'info>,
 }

@@ -29,7 +29,7 @@ pub struct AccessController {
 #[program]
 pub mod access_controller {
     use super::*;
-    pub fn initialize(ctx: Context<Initialize>) -> ProgramResult {
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let mut state = ctx.accounts.state.load_init()?;
         state.owner = ctx.accounts.owner.key();
         Ok(())
@@ -39,14 +39,14 @@ pub mod access_controller {
     pub fn transfer_ownership(
         ctx: Context<TransferOwnership>,
         proposed_owner: Pubkey,
-    ) -> ProgramResult {
+    ) -> Result<()> {
         require!(proposed_owner != Pubkey::default(), InvalidInput);
         let state = &mut *ctx.accounts.state.load_mut()?;
         state.proposed_owner = proposed_owner;
         Ok(())
     }
 
-    pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> ProgramResult {
+    pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
         let state = &mut *ctx.accounts.state.load_mut()?;
         require!(
             ctx.accounts.authority.key == &state.proposed_owner,
@@ -57,7 +57,7 @@ pub mod access_controller {
     }
 
     #[access_control(owner(&ctx.accounts.state, &ctx.accounts.owner))]
-    pub fn add_access(ctx: Context<AddAccess>) -> ProgramResult {
+    pub fn add_access(ctx: Context<AddAccess>) -> Result<()> {
         let mut state = ctx.accounts.state.load_mut()?;
         // if the len reaches array len, we're at capacity
         require!(state.access_list.remaining_capacity() > 0, Full);
@@ -74,7 +74,7 @@ pub mod access_controller {
     }
 
     #[access_control(owner(&ctx.accounts.state, &ctx.accounts.owner))]
-    pub fn remove_access(ctx: Context<RemoveAccess>) -> ProgramResult {
+    pub fn remove_access(ctx: Context<RemoveAccess>) -> Result<()> {
         let mut state = ctx.accounts.state.load_mut()?;
         let address = ctx.accounts.address.key();
 
@@ -99,7 +99,7 @@ fn owner(state_loader: &AccountLoader<AccessController>, signer: &AccountInfo) -
     Ok(())
 }
 
-#[error]
+#[error_code]
 pub enum ErrorCode {
     #[msg("Unauthorized")]
     Unauthorized = 0,
@@ -137,6 +137,7 @@ pub struct AddAccess<'info> {
     #[account(mut, has_one = owner)]
     pub state: AccountLoader<'info, AccessController>,
     pub owner: Signer<'info>,
+    /// CHECK: We don't impose any limits since this could be any signer.
     pub address: UncheckedAccount<'info>,
 }
 
@@ -145,5 +146,6 @@ pub struct RemoveAccess<'info> {
     #[account(mut, has_one = owner)]
     pub state: AccountLoader<'info, AccessController>,
     pub owner: Signer<'info>,
+    /// CHECK: We don't impose any limits since this could be any signer.
     pub address: UncheckedAccount<'info>,
 }
