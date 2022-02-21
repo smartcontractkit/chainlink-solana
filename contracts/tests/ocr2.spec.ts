@@ -918,6 +918,15 @@ describe("ocr2", async () => {
     await transmit(rounds+2, rounds+2, new BN(rounds+2), Buffer.from([127, 127, 127, 127, 127, 127, 127, 127]));
   })
 
+  it("TS client listens and parses state", async () => {
+    let cl = new Chainlink(program, provider);
+    // causes the tests cases to block finishing
+    // const feedNum = cl.onRound(state, (event) => {
+    //   console.log(event)
+    // })
+    let transmitTx = await transmit(16, 16, new BN(16));
+  })
+
   it("Reclaims rent exempt deposit when closing down a feed", async () => {
     let beforeBalance = (
       await provider.connection.getAccountInfo(provider.wallet.publicKey)
