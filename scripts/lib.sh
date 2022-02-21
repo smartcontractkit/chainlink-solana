@@ -6,13 +6,13 @@ function modify_program {
   store=$3
 
   # Replace existing declare_id!()
-  sed -i "s/DzzjdPWNfwHZmzPVxnmqkkMJraYQQRCpgFZajqkqmU6G/$ac/" contracts/programs/access-controller/src/lib.rs
-  sed -i "s/HW3ipKzeeduJq6f1NqRCw4doknMeWkfrM4WxobtG3o5v/$ocr2/" contracts/programs/ocr2/src/lib.rs
-  sed -i "s/CaH12fwNTKJAG8PxEvo9R96Zc2j8qNHZaFj8ZW49yZNT/$store/" contracts/programs/store/src/lib.rs
+  sed -i "s/DzzjdPWNfwHZmzPVxnmqkkMJraYQQRCpgFZajqkqmU6G/$ac/" "${BASH_SOURCE%/*}/../contracts/programs/access-controller/src/lib.rs"
+  sed -i "s/HW3ipKzeeduJq6f1NqRCw4doknMeWkfrM4WxobtG3o5v/$ocr2/" "${BASH_SOURCE%/*}/../contracts/programs/ocr2/src/lib.rs"
+  sed -i "s/CaH12fwNTKJAG8PxEvo9R96Zc2j8qNHZaFj8ZW49yZNT/$store/" "${BASH_SOURCE%/*}/../contracts/programs/store/src/lib.rs"
 }
 
 function build {
-  cd contracts
+  cd "${BASH_SOURCE%/*}/../contracts"
   anchor build
-  cd ..
+  cd $1
 }
