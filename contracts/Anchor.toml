@@ -21,6 +21,6 @@ test = "yarn run test"
 # TODO: add pubkeys
 
 [programs.localnet]
-ocr2 = "HW3ipKzeeduJq6f1NqRCw4doknMeWkfrM4WxobtG3o5v"
-store = "CaH12fwNTKJAG8PxEvo9R96Zc2j8qNHZaFj8ZW49yZNT"
-access_controller = "DzzjdPWNfwHZmzPVxnmqkkMJraYQQRCpgFZajqkqmU6G"
+ocr2 = "cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ"
+store = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny"
+access_controller = "9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW"

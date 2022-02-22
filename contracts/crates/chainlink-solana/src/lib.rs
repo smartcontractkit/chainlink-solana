@@ -14,7 +14,7 @@ use solana_program::{
 };
 
 // The library uses this to verify the keys
-solana_program::declare_id!("CaH12fwNTKJAG8PxEvo9R96Zc2j8qNHZaFj8ZW49yZNT");
+solana_program::declare_id!("HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny");
 
 #[derive(BorshSerialize, BorshDeserialize)]
 enum Query {

@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import { Program, BN } from '@project-serum/anchor';
 import { HelloWorld } from '../target/types/hello_world';
 
-const CHAINLINK_PROGRAM_ID = "CaH12fwNTKJAG8PxEvo9R96Zc2j8qNHZaFj8ZW49yZNT";
+const CHAINLINK_PROGRAM_ID = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny";
 
 describe('hello-world', () => {
   const provider = anchor.Provider.env();
