@@ -68,7 +68,7 @@ func createNodeKeys(nodes []client.Chainlink) ([]NodeKeysBundle, error) {
 func createOracleIdentities(nkb []NodeKeysBundle) ([]confighelper.OracleIdentityExtra, error) {
 	oracleIdentities := make([]confighelper.OracleIdentityExtra, 0)
 	for _, nodeKeys := range nkb {
-		offChainPubKey, err := hex.DecodeString(stripKeyPrefix(nodeKeys.OCR2Key.Data.Attributes.OffChainPublicKey))
+		offChainPubKeyTemp, err := hex.DecodeString(stripKeyPrefix(nodeKeys.OCR2Key.Data.Attributes.OffChainPublicKey))
 		if err != nil {
 			return nil, err
 		}
@@ -82,6 +82,8 @@ func createOracleIdentities(nkb []NodeKeysBundle) ([]confighelper.OracleIdentity
 		}
 		cfgPubKeyBytes := [curve25519.PointSize]byte{}
 		copy(cfgPubKeyBytes[:], cfgPubKeyTemp)
+		offChainPubKey := [curve25519.PointSize]byte{}
+		copy(offChainPubKey[:], offChainPubKeyTemp)
 		oracleIdentities = append(oracleIdentities, confighelper.OracleIdentityExtra{
 			OracleIdentity: confighelper.OracleIdentity{
 				OffchainPublicKey: offChainPubKey,
