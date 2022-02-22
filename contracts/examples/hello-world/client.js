@@ -1,7 +1,7 @@
 const anchor = require("@project-serum/anchor");
 
 // devnet IDs
-const CHAINLINK_PROGRAM_ID = "CaH12fwNTKJAG8PxEvo9R96Zc2j8qNHZaFj8ZW49yZNT";
+const CHAINLINK_PROGRAM_ID = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny";
 // USDT/USD
 const CHAINLINK_FEED = "CwBg8pxL73LvuJ781cWBGF1e64G2z7AbZ22J2g8Lp35a";
 
