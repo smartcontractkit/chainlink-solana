@@ -93,7 +93,7 @@ func XXXInspectTxs(network string, state string) error {
 		solanaGo.MustPublicKeyFromBase58(state),
 		&rpc.GetSignaturesForAddressOpts{
 			Commitment: rpc.CommitmentConfirmed,
-			Before: txSigs[len(txSigs)-1].Signature,
+			Before:     txSigs[len(txSigs)-1].Signature,
 		},
 	)
 	if err != nil {
@@ -161,10 +161,9 @@ func XXXInspectTxs(network string, state string) error {
 	fmt.Printf("Reverts: %d/min\n", avgFail/t)
 
 	fmt.Printf("\n----------REVERTS/ADDRESS---------------\n")
-	for k,v := range reverts {
+	for k, v := range reverts {
 		fmt.Printf("%s: %d\n", k, v)
 	}
-
 
 	return nil
 }

@@ -119,7 +119,7 @@ func XXXInspectStates(state, transmission, program, rpc string, log int) (answer
 			fmt.Println("Transmitter:", dataOracles[i].Transmitter)
 			fmt.Println("OnchainPublicKey:", hex.EncodeToString(dataOracles[i].Signer.Key[:]))
 			fmt.Println(dataOracles[i].Signer.Key)
-			fmt.Println("OffchainPublicKey:", hex.EncodeToString(dataConfig[i].OffchainPublicKey))
+			fmt.Println("OffchainPublicKey:", hex.EncodeToString(dataConfig[i].OffchainPublicKey[:]))
 			fmt.Println(dataConfig[i].OffchainPublicKey)
 			fmt.Println("PeerID:", dataConfig[i].PeerID)
 			fmt.Println("----------------------------------------------")
