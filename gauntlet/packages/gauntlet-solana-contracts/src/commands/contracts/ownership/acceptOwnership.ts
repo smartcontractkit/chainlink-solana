@@ -27,7 +27,7 @@ export const makeAcceptOwnershipCommand = (contractId: CONTRACT_LIST): SolanaCon
 
       const tx = program.instruction.acceptOwnership({
         accounts: {
-          store: state,
+          state: state,
           authority: signer,
         },
       })
