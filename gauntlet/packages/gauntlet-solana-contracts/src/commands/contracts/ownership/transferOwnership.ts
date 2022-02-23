@@ -31,7 +31,7 @@ export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaC
 
       const tx = program.instruction.transferOwnership(proposedOwner, {
         accounts: {
-          store: state,
+          state: state,
           authority: signer,
         },
       })
