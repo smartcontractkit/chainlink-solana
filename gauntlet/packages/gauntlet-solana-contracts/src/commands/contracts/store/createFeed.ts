@@ -45,7 +45,7 @@ export default class CreateFeed extends SolanaCommand {
 
     const granularity = new BN(input.granularity)
     const liveLength = new BN(input.liveLength)
-    const length = new BN(this.flags.length || 80960)
+    const length = new BN(this.flags.length || 218440)
     const feedAccountLength = new BN(8 + 192 + length.toNumber() * 48)
     const decimals = new BN(input.decimals)
     const description = input.description || ''
@@ -62,6 +62,7 @@ export default class CreateFeed extends SolanaCommand {
       - Granularity (historical): ${granularity.toNumber()}
       - Historical Length: ${feedAccountLength.toNumber() - liveLength.toNumber()}
       - Total Length: ${feedAccountLength.toNumber()}
+      - Feed Account: ${feed.toString()}
     `)
 
     const transmissionsCreationInstruction = SystemProgram.createAccount({
@@ -93,7 +94,8 @@ export default class CreateFeed extends SolanaCommand {
     await prompt('Continue creating new Transmissions Feed?')
 
     const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTxs, [feed])
-    logger.success(`Transmissions feed created on tx ${txhash}`)
+    logger.success(`Transmissions feed created at ${feed.publicKey}`)
+    logger.success(`TX ${txhash}`)
 
     return {
       data: {
