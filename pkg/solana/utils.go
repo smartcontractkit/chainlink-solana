@@ -42,6 +42,7 @@ func XXXInspectStates(state, transmission, program, rpc string, log int) (answer
 
 	digester := OffchainConfigDigester{
 		ProgramID: tracker.ProgramID,
+		StateID: tracker.StateID,
 	}
 
 	cfg, err := tracker.LatestConfig(context.TODO(), 0)
@@ -67,7 +68,7 @@ func XXXInspectStates(state, transmission, program, rpc string, log int) (answer
 		return answer, timestamp, errors.Wrap(err, "error in tracker.LatestBlockHeight")
 	}
 
-	var txs TransmissionsPartial
+	var txs TransmissionsHeader
 	err = tracker.client.rpc.GetAccountDataInto(context.TODO(), tracker.state.Transmissions, &txs)
 	if err != nil {
 		return answer, timestamp, errors.Wrap(err, "error in rpc.GetAccountDataInto")
@@ -83,10 +84,8 @@ func XXXInspectStates(state, transmission, program, rpc string, log int) (answer
 		fmt.Println("LatestBlockHeight", bh)
 		fmt.Println("LatestTransmissionDetails", digest, epoch, round, answer, timestamp)
 		fmt.Println("LatestConfigBlockNumber", tracker.state.Config.LatestConfigBlockNumber)
-		fmt.Println("OffchainConfig Version", tracker.state.Config.OffchainConfig.Version)
-		fmt.Println("OffchainConfig", tracker.state.Config.OffchainConfig.Data())
-		fmt.Println("PendingOffchainConfig Version", tracker.state.Config.PendingOffchainConfig.Version)
-		fmt.Println("PendingOffchainConfig", tracker.state.Config.PendingOffchainConfig.Data())
+		fmt.Println("OffchainConfig Version", tracker.state.OffchainConfig.Version)
+		fmt.Println("OffchainConfig", tracker.state.OffchainConfig.Data())
 		fmt.Println("AccessControllers", tracker.state.Config.RequesterAccessController, tracker.state.Config.BillingAccessController)
 		fmt.Println("BillingConfig", tracker.state.Config.Billing.ObservationPayment, tracker.state.Config.Billing.TransmissionPayment)
 		fmt.Printf("OracleConfigs Len: %d, Data: %+v\n", nodeLen, tracker.state.Oracles.Data())
@@ -102,7 +101,7 @@ func XXXInspectStates(state, transmission, program, rpc string, log int) (answer
 	if log > XXXLogBasic {
 		// parsed config data
 		config, err := confighelper.PublicConfigFromContractConfig(false, types.ContractConfig{
-			OffchainConfig:        tracker.state.Config.OffchainConfig.Data(),
+			OffchainConfig:        tracker.state.OffchainConfig.Data(),
 			OffchainConfigVersion: 2,
 			Signers:               make([]types.OnchainPublicKey, nodeLen),
 			Transmitters:          make([]types.Account, nodeLen),
@@ -128,20 +127,4 @@ func XXXInspectStates(state, transmission, program, rpc string, log int) (answer
 	}
 
 	return answer, timestamp, nil
-}
-
-// Partial transmissions state, does not include actual transmissions
-type TransmissionsPartial struct {
-	Prefix           [8]byte
-	Version          uint8
-	Store            solana.PublicKey
-	Writer           solana.PublicKey
-	Description      [32]byte
-	Decimals         uint8
-	FlagThreshold    uint32
-	RoundID          uint32
-	Granularity      uint8
-	LiveLength       uint32
-	LiveCursor       uint32
-	HistoricalCursor uint32
 }
