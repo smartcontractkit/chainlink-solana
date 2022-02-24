@@ -255,6 +255,7 @@ func (m *OCRv2TestState) createJobs() {
 			ContractID:            m.OCR2.Address(),
 			Relay:                 ChainName,
 			RelayConfig:           relayConfig,
+			PluginType:            "median",
 			P2PPeerID:             m.NodeKeysBundle[nIdx].PeerID,
 			P2PBootstrapPeers:     bootstrapPeers,
 			OCRKeyBundleID:        m.NodeKeysBundle[nIdx].OCR2Key.Data.ID,

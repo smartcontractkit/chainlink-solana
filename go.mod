@@ -24,7 +24,7 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	github.com/rs/zerolog v1.26.1
 	github.com/smartcontractkit/chainlink-relay v0.0.0-20220222135902-9e363833fc61
-	github.com/smartcontractkit/integrations-framework v1.0.49
+	github.com/smartcontractkit/integrations-framework v1.0.50
 	go.uber.org/atomic v1.9.0
 	go.uber.org/multierr v1.7.0
 	golang.org/x/crypto v0.0.0-20211215165025-cf75a172585e

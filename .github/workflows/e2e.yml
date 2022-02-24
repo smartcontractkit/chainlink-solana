@@ -12,11 +12,11 @@ on:
         type: string
       cl_repo:
         required: true
-        default: 795953128386.dkr.ecr.us-west-2.amazonaws.com/chainlink
+        default: public.ecr.aws/z0b1w9r9/chainlink
         type: string
       cl_image:
         required: true
-        default: develop.latest
+        default: develop
         type: string
     secrets:
       QA_AWS_ACCESS_KEY_ID:
