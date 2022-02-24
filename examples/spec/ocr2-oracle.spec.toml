@@ -1,9 +1,9 @@
 type                                   = "offchainreporting2"
+pluginType                             = "median"
 schemaVersion                          = 1
 relay                                  = "solana"
 name                                   = "<insert job name here>"
 contractID                             = "<insert solana ocr2 state account>"
-isBootstrapPeer                        = false
 p2pBootstrapPeers                      = ["somep2pkey@localhost-tcp:port"]  # overrides P2PV2_BOOTSTRAPPERS
 p2pPeerID                              = "<insert p2p id>"                  # overrides P2P_PEER_ID
 ocrKeyBundleID                         = "<insert ocr2 key bundle id>"      # overrides OCR2_KEY_BUNDLE_ID (solana)
@@ -26,6 +26,8 @@ observationSource                      = """
     ds3 -> ds3_parse -> ds3_multiply -> answer
     answer [type="median" index=0]
 """
+
+[pluginConfig]
 juelsPerFeeCoinSource                  = """
     // Fetch the LINK price from three data sources
     // data source 1

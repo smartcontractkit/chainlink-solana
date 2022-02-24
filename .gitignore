@@ -1,6 +1,7 @@
 .direnv
 .DS_Store
 **/*.rs.bk
+.idea
 
 # ignore relay build
 pkg/bin
