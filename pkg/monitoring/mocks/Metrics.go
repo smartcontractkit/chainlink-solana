@@ -9,9 +9,9 @@ type Metrics struct {
 	mock.Mock
 }
 
-// Cleanup provides a mock function with given fields: accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName
-func (_m *Metrics) Cleanup(accountAddress string, feedID string, chainID string, contractStatus string, contractType string, feedName string, feedPath string, networkID string, networkName string) {
-	_m.Called(accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName)
+// Cleanup provides a mock function with given fields: balanceAccountName, accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName
+func (_m *Metrics) Cleanup(balanceAccountName string, accountAddress string, feedID string, chainID string, contractStatus string, contractType string, feedName string, feedPath string, networkID string, networkName string) {
+	_m.Called(balanceAccountName, accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName)
 }
 
 // SetBalance provides a mock function with given fields: balance, balanceAccountName, accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName

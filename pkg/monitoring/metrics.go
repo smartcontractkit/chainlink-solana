@@ -32,16 +32,16 @@ var labelNames = []string{
 
 var gauges map[string]*prometheus.GaugeVec
 
-func makeMetricName(accountName string) string {
-	return fmt.Sprintf("sol_balance_%s", accountName)
+func makeMetricName(balanceAccountName string) string {
+	return fmt.Sprintf("sol_balance_%s", balanceAccountName)
 }
 
 func init() {
 	gauges = map[string]*prometheus.GaugeVec{}
-	for _, name := range BalanceAccountNames {
-		gauges[name] = promauto.NewGaugeVec(
+	for _, balanceAccountName := range BalanceAccountNames {
+		gauges[balanceAccountName] = promauto.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Name: makeMetricName(name),
+				Name: makeMetricName(balanceAccountName),
 			},
 			labelNames,
 		)
@@ -50,7 +50,7 @@ func init() {
 
 type Metrics interface {
 	SetBalance(balance uint64, balanceAccountName, accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string)
-	Cleanup(accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string)
+	Cleanup(balanceAccountName, accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string)
 }
 
 type defaultMetrics struct {
@@ -66,14 +66,41 @@ func (d *defaultMetrics) SetBalance(balance uint64, balanceAccountName, accountA
 	if !found {
 		panic(fmt.Sprintf("gauge not known for name '%s'", balanceAccountName))
 	}
-	gauge.WithLabelValues(accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName).Set(float64(balance))
+	labels := prometheus.Labels{
+		"account_address": accountAddress,
+		"feed_id":         feedID,
+		"chain_id":        chainID,
+		"contract_status": contractStatus,
+		"contract_type":   contractType,
+		"feed_name":       feedName,
+		"feed_path":       feedPath,
+		"network_id":      networkID,
+		"network_name":    networkName,
+	}
+	gauge.With(labels).Set(float64(balance))
 }
 
-func (d *defaultMetrics) Cleanup(accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string) {
-	for _, name := range BalanceAccountNames {
-		deleted := gauges[name].DeleteLabelValues(accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName)
-		if !deleted {
-			d.log.Errorw("failed to delete balance metric", "metric", makeMetricName(name))
-		}
+func (d *defaultMetrics) Cleanup(balanceAccountName, accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string) {
+	gauge, found := gauges[balanceAccountName]
+	if !found {
+		panic(fmt.Sprintf("gauge not known for name '%s'", balanceAccountName))
+	}
+	labels := prometheus.Labels{
+		"account_address": accountAddress,
+		"feed_id":         feedID,
+		"chain_id":        chainID,
+		"contract_status": contractStatus,
+		"contract_type":   contractType,
+		"feed_name":       feedName,
+		"feed_path":       feedPath,
+		"network_id":      networkID,
+		"network_name":    networkName,
+	}
+	deleted := gauge.Delete(labels)
+	if !deleted {
+		d.log.Errorw("failed to delete balance metric",
+			"metric-name", makeMetricName(balanceAccountName),
+			"account-address", accountAddress,
+		)
 	}
 }

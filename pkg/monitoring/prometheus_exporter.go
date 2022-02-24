@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/gagliardetto/solana-go"
 	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
 )
 
@@ -32,7 +33,7 @@ func (p *prometheusExporterFactory) NewExporter(
 		p.log,
 		p.metrics,
 		sync.Mutex{},
-		make(map[string]struct{}),
+		make(map[string]solana.PublicKey),
 	}, nil
 }
 
@@ -43,8 +44,8 @@ type prometheusExporter struct {
 	log     relayMonitoring.Logger
 	metrics Metrics
 
-	addressesMu  sync.Mutex
-	addressesSet map[string]struct{}
+	addressesMu sync.Mutex
+	addresses   map[string]solana.PublicKey
 }
 
 func (p *prometheusExporter) Export(ctx context.Context, data interface{}) {
@@ -52,17 +53,22 @@ func (p *prometheusExporter) Export(ctx context.Context, data interface{}) {
 	if !isBalances {
 		return
 	}
-	for _, key := range BalanceAccountNames {
-		address, okAddress := balances.Addresses[key]
-		value, okValue := balances.Values[key]
-		gauge, okGauge := gauges[key]
-		if !okAddress || !okValue || !okGauge {
-			p.log.Errorw("mismatch address and balance for key", "key", key, "address", address, "value", value, "gauge", gauge)
+	for _, balanceAccountName := range BalanceAccountNames {
+		address, okAddress := balances.Addresses[balanceAccountName]
+		balance, okBalance := balances.Values[balanceAccountName]
+		gauge, okGauge := gauges[balanceAccountName]
+		if !okAddress || !okBalance || !okGauge {
+			p.log.Errorw("mismatch address and balance for account name",
+				"account-name", balanceAccountName,
+				"address", address,
+				"balance", balance,
+				"gauge", gauge,
+			)
 			continue
 		}
 		p.metrics.SetBalance(
-			value,
-			key,
+			balance,
+			balanceAccountName,
 			address.String(),
 			p.feedConfig.GetContractAddress(),
 			p.chainConfig.GetChainID(),
@@ -74,19 +80,19 @@ func (p *prometheusExporter) Export(ctx context.Context, data interface{}) {
 			p.chainConfig.GetNetworkName(),
 		)
 	}
+	// Store the map of account names and their addresses for later cleanup.
 	p.addressesMu.Lock()
 	defer p.addressesMu.Unlock()
-	for _, address := range balances.Addresses {
-		p.addressesSet[address.String()] = struct{}{}
-	}
+	p.addresses = balances.Addresses
 }
 
 func (p *prometheusExporter) Cleanup(_ context.Context) {
 	p.addressesMu.Lock()
 	defer p.addressesMu.Unlock()
-	for address := range p.addressesSet {
+	for balanceAccountName, address := range p.addresses {
 		p.metrics.Cleanup(
-			address,
+			balanceAccountName,
+			address.String(),
 			p.feedConfig.GetContractAddress(),
 			p.chainConfig.GetChainID(),
 			p.feedConfig.GetContractStatus(),

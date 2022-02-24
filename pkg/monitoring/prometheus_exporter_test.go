@@ -43,6 +43,7 @@ func TestPrometheusExporter(t *testing.T) {
 
 		for _, accountName := range BalanceAccountNames {
 			metrics.On("Cleanup",
+				accountName,
 				balances.Addresses[accountName].String(),
 				feedConfig.GetID(),
 				chainConfig.GetChainID(),
