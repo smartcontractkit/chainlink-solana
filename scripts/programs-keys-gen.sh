@@ -3,6 +3,7 @@
 # Generate a new set of keys to use for testing. Primarily used for e2e testing on CI
 
 set -euxo pipefail
+source "${BASH_SOURCE%/*}/lib.sh"
 
 network=${1:-localnet}
 
@@ -22,6 +23,4 @@ mkdir -p ./contracts/target/deploy
 cp ./contracts/artifacts/$network/*.json ./contracts/target/deploy
 
 # Replace existing declare_id!()
-sed -i.bak "s/9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW/$ACCESS_CONTROLLER_PROGRAM_ID/" contracts/programs/access-controller/src/lib.rs
-sed -i.bak "s/HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny/$STORE_PROGRAM_ID/" contracts/programs/store/src/lib.rs
-sed -i.bak "s/cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ/$OCR2_PROGRAM_ID/" contracts/programs/ocr2/src/lib.rs
+modify_program $ACCESS_CONTROLLER_PROGRAM_ID $OCR2_PROGRAM_ID $STORE_PROGRAM_ID
