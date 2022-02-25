@@ -703,7 +703,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> Result<()
     state.config.latest_transmitter = ctx.accounts.transmitter.key();
 
     // calculate and pay reimbursement
-    let reimbursement = calculate_reimbursement(report.juels_per_lamport, signature_count)?;
+    let reimbursement = calculate_reimbursement(report.juels_per_lamport, signature_count)?; // gjuels
     let amount = reimbursement + u64::from(state.config.billing.transmission_payment_gjuels);
     state.oracles[oracle_idx].payment += amount;
 
@@ -789,7 +789,8 @@ fn calculate_reimbursement(juels_per_lamport: u64, _signature_count: usize) -> R
     let lamports_per_signature = fees.fee_calculator.lamports_per_signature;
     let lamports = lamports_per_signature * SIGNERS;
     let juels = lamports * juels_per_lamport;
-    Ok(juels)
+    let gjuels = juels / 1000000000; // return value as gjuels
+    Ok(gjuels)
 }
 
 fn calculate_owed_payment(config: &Billing, oracle: &Oracle, latest_round_id: u32) -> Result<u64> {

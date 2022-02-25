@@ -72,6 +72,7 @@ describe("ocr2", async () => {
 
   const minAnswer = 1;
   const maxAnswer = 1000;
+  const rounds = 15; // number of rounds submitted
 
   const workspace = anchor.workspace;
   const program = anchor.workspace.Ocr2;
@@ -835,7 +836,7 @@ describe("ocr2", async () => {
   });
 
   it("Transmit a bunch of rounds to check ringbuffer wraparound", async () => {
-    for (let i = 3; i < 15; i++) {
+    for (let i = 2; i <= rounds; i++) {
       let transmitTx = await transmit(i, i, new BN(i));
 
       await provider.connection.confirmTransaction(transmitTx);
@@ -852,6 +853,48 @@ describe("ocr2", async () => {
       );
       assert.equal(new BN(round.answer, 10, "le").toNumber(), i);
     }
+  });
+
+  it ("Node payouts happen with the correct decimals", async () => {
+    // fetch payees
+    let account = await program.account.state.fetch(state.publicKey);
+    let currentOracles = account.oracles.xs.slice(0, account.oracles.len);
+    let transmitter: PublicKey;
+    let payees = currentOracles.map((oracle) => {
+      if (!oracle.payment.isZero()) {
+        // oracle payment calculated with:
+        // + 2 juels per lamport => rounded to 0
+        // + 1 gjuel
+        // = 1 gjuel
+        assert.equal(transmissionPayment*rounds, oracle.payment.toNumber())
+        transmitter = oracle.payee;
+      }
+      return { pubkey: oracle.payee, isWritable: true, isSigner: false };
+    });
+
+    await program.rpc.payOracles({
+      accounts: {
+        state: state.publicKey,
+        authority: owner.publicKey,
+        accessController: billingAccessController.publicKey,
+        tokenVault: tokenVault,
+        vaultAuthority: vaultAuthority,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      },
+      remainingAccounts: payees,
+    });
+
+    for (let i = 0; i < payees.length; i++) {
+      const account = await tokenClient.getAccountInfo(payees[i].pubkey)
+      if (payees[i].pubkey.equals(transmitter)) {
+        // transmitter + observation payment
+        assert.equal((observationPayment+transmissionPayment)*rounds, account.amount.toNumber())
+        continue;
+      }
+      // observation payment
+      assert.equal(observationPayment*rounds, account.amount.toNumber())
+    }
+
   });
 
   it("Reclaims rent exempt deposit when closing down a feed", async () => {
