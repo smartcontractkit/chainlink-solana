@@ -34,5 +34,5 @@ pub struct NewTransmission {
     pub observer_count: u8,
     pub observers: [u8; 19], // Can't use MAX_ORACLES because of IDL parsing issues
     pub juels_per_lamport: u64,
-    pub reimbursement: u64,
+    pub reimbursement_gjuels: u64,
 }

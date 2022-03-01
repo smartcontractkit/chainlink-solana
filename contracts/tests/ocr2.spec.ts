@@ -861,12 +861,13 @@ describe("ocr2", async () => {
     let currentOracles = account.oracles.xs.slice(0, account.oracles.len);
     let transmitter: PublicKey;
     let payees = currentOracles.map((oracle) => {
-      if (!oracle.payment.isZero()) {
+      console.log(oracle)
+      if (!oracle.paymentGjuels.isZero()) {
         // oracle payment calculated with:
         // + 2 juels per lamport => rounded to 0
         // + 1 gjuel
         // = 1 gjuel
-        assert.equal(transmissionPayment*rounds, oracle.payment.toNumber())
+        assert.equal(transmissionPayment*rounds, oracle.paymentGjuels.toNumber())
         transmitter = oracle.payee;
       }
       return { pubkey: oracle.payee, isWritable: true, isSigner: false };
