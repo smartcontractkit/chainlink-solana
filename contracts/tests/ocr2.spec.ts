@@ -117,7 +117,8 @@ describe("ocr2", async () => {
   let transmit = async (
     epoch: number,
     round: number,
-    answer: BN
+    answer: BN,
+    juels: Buffer = Buffer.from([0, 0, 0, 0, 0, 0, 0, 2]), // juels per lamport (2)
   ): Promise<string> => {
     let account = await program.account.state.fetch(state.publicKey);
 
@@ -170,7 +171,7 @@ describe("ocr2", async () => {
         0, // observers
       ]),
       Buffer.from(answer.toArray("be", 16)), // median (i128)
-      Buffer.from([0, 0, 0, 0, 0, 0, 0, 2]), // juels per lamport (2)
+      juels,
     ]);
 
     let hash = createHash("sha256")
@@ -861,7 +862,6 @@ describe("ocr2", async () => {
     let currentOracles = account.oracles.xs.slice(0, account.oracles.len);
     let transmitter: PublicKey;
     let payees = currentOracles.map((oracle) => {
-      console.log(oracle)
       if (!oracle.paymentGjuels.isZero()) {
         // oracle payment calculated with:
         // + 2 juels per lamport => rounded to 0
@@ -897,6 +897,14 @@ describe("ocr2", async () => {
     }
 
   });
+
+  it("Transmit does not fail on juelsPerFeecoin edge cases", async () => {
+    // zero value u64 juelsPerFeecoin
+    await transmit(rounds+1, rounds+1, new BN(rounds+1), Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]));
+
+    // max value u64 juelsPerFeecoin
+    await transmit(rounds+2, rounds+2, new BN(rounds+2), Buffer.from([127, 127, 127, 127, 127, 127, 127, 127]));  
+  })
 
   it("Reclaims rent exempt deposit when closing down a feed", async () => {
     let beforeBalance = (
