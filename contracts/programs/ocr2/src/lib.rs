@@ -157,37 +157,39 @@ pub mod ocr2 {
         let billing = state.config.billing;
 
         // NOTE: if multisig supported multi instruction transactions, this could be [pay_oracles, accept_proposal]
-        let payments: Vec<(u64, CpiContext<'_, '_, '_, 'info, token::Transfer<'info>>)> = state
-            .oracles
-            .iter_mut()
-            .zip(ctx.remaining_accounts)
-            .map(|(oracle, payee)| {
-                // Ensure specified accounts match the ones inside oracles
-                require!(&oracle.payee == payee.key, InvalidInput);
+        let payments_gjuels: Vec<(u64, CpiContext<'_, '_, '_, 'info, token::Transfer<'info>>)> =
+            state
+                .oracles
+                .iter_mut()
+                .zip(ctx.remaining_accounts)
+                .map(|(oracle, payee)| {
+                    // Ensure specified accounts match the ones inside oracles
+                    require!(&oracle.payee == payee.key, InvalidInput);
 
-                let amount = calculate_owed_payment(&billing, oracle, latest_round_id)?;
-                // Reset reward and gas reimbursement
-                oracle.payment = 0;
-                oracle.from_round_id = latest_round_id;
+                    let amount_gjuels =
+                        calculate_owed_payment_gjuels(&billing, oracle, latest_round_id)?;
+                    // Reset reward and gas reimbursement
+                    oracle.payment_gjuels = 0;
+                    oracle.from_round_id = latest_round_id;
 
-                let cpi = CpiContext::new(
-                    ctx.accounts.token_program.to_account_info(),
-                    token::Transfer {
-                        from: ctx.accounts.token_vault.to_account_info(),
-                        to: payee.to_account_info(),
-                        authority: ctx.accounts.vault_authority.to_account_info(),
-                    },
-                );
+                    let cpi = CpiContext::new(
+                        ctx.accounts.token_program.to_account_info(),
+                        token::Transfer {
+                            from: ctx.accounts.token_vault.to_account_info(),
+                            to: payee.to_account_info(),
+                            authority: ctx.accounts.vault_authority.to_account_info(),
+                        },
+                    );
 
-                Ok((amount, cpi))
-            })
-            .collect::<Result<_>>()?;
+                    Ok((amount_gjuels, cpi))
+                })
+                .collect::<Result<_>>()?;
 
         // No account can be borrowed during CPI...
         drop(state);
 
-        for (amount, cpi) in payments {
-            if amount == 0 {
+        for (amount_gjuels, cpi) in payments_gjuels {
+            if amount_gjuels == 0 {
                 continue;
             }
 
@@ -197,7 +199,7 @@ pub mod ocr2 {
                     ctx.accounts.state.key().as_ref(),
                     &[vault_nonce],
                 ]]),
-                amount,
+                amount_gjuels,
             )?;
         }
         // END: pay_oracles
@@ -413,13 +415,13 @@ pub mod ocr2 {
     }
 
     #[access_control(has_billing_access(&ctx.accounts.state, &ctx.accounts.access_controller, &ctx.accounts.authority))]
-    pub fn withdraw_funds(ctx: Context<WithdrawFunds>, amount: u64) -> Result<()> {
+    pub fn withdraw_funds(ctx: Context<WithdrawFunds>, amount_gjuels: u64) -> Result<()> {
         let state = &ctx.accounts.state.load()?;
 
-        let link_due = calculate_total_link_due(&state.config, &state.oracles)?;
+        let link_due = calculate_total_link_due_gjuels(&state.config, &state.oracles)?;
 
-        let balance = token::accessor::amount(&ctx.accounts.token_vault.to_account_info())?;
-        let available = balance.saturating_sub(link_due);
+        let balance_gjuels = token::accessor::amount(&ctx.accounts.token_vault.to_account_info())?;
+        let available = balance_gjuels.saturating_sub(link_due);
 
         token::transfer(
             ctx.accounts.transfer_ctx().with_signer(&[&[
@@ -427,7 +429,7 @@ pub mod ocr2 {
                 ctx.accounts.state.key().as_ref(),
                 &[state.vault_nonce],
             ]]),
-            amount.min(available),
+            amount_gjuels.min(available),
         )?;
         Ok(())
     }
@@ -461,12 +463,12 @@ pub mod ocr2 {
 
         // -- Pay oracle
 
-        let amount = calculate_owed_payment(&billing, oracle, latest_round_id)?;
+        let amount_gjuels = calculate_owed_payment_gjuels(&billing, oracle, latest_round_id)?;
         // Reset reward and gas reimbursement
-        oracle.payment = 0;
+        oracle.payment_gjuels = 0;
         oracle.from_round_id = latest_round_id;
 
-        if amount == 0 {
+        if amount_gjuels == 0 {
             return Ok(());
         }
 
@@ -477,7 +479,7 @@ pub mod ocr2 {
                 ctx.accounts.state.key().as_ref(),
                 &[vault_nonce],
             ]]),
-            amount,
+            amount_gjuels,
         )?; // consider using a custom transfer that calls invoke_signed_unchecked instead
 
         Ok(())
@@ -496,34 +498,36 @@ pub mod ocr2 {
         let latest_round_id = state.config.latest_aggregator_round_id;
         let billing = state.config.billing;
 
-        let payments: Vec<(u64, CpiContext<'_, '_, '_, 'info, token::Transfer<'info>>)> = state
-            .oracles
-            .iter_mut()
-            .zip(ctx.remaining_accounts)
-            .map(|(oracle, payee)| {
-                // Ensure specified accounts match the ones inside oracles
-                require!(&oracle.payee == payee.key, InvalidInput);
+        let payments_gjuels: Vec<(u64, CpiContext<'_, '_, '_, 'info, token::Transfer<'info>>)> =
+            state
+                .oracles
+                .iter_mut()
+                .zip(ctx.remaining_accounts)
+                .map(|(oracle, payee)| {
+                    // Ensure specified accounts match the ones inside oracles
+                    require!(&oracle.payee == payee.key, InvalidInput);
 
-                let amount = calculate_owed_payment(&billing, oracle, latest_round_id)?;
-                // Reset reward and gas reimbursement
-                oracle.payment = 0;
-                oracle.from_round_id = latest_round_id;
+                    let amount_gjuels =
+                        calculate_owed_payment_gjuels(&billing, oracle, latest_round_id)?;
+                    // Reset reward and gas reimbursement
+                    oracle.payment_gjuels = 0;
+                    oracle.from_round_id = latest_round_id;
 
-                let cpi = CpiContext::new(
-                    ctx.accounts.token_program.to_account_info(),
-                    token::Transfer {
-                        from: ctx.accounts.token_vault.to_account_info(),
-                        to: payee.to_account_info(),
-                        authority: ctx.accounts.vault_authority.to_account_info(),
-                    },
-                );
+                    let cpi = CpiContext::new(
+                        ctx.accounts.token_program.to_account_info(),
+                        token::Transfer {
+                            from: ctx.accounts.token_vault.to_account_info(),
+                            to: payee.to_account_info(),
+                            authority: ctx.accounts.vault_authority.to_account_info(),
+                        },
+                    );
 
-                Ok((amount, cpi))
-            })
-            .collect::<Result<_>>()?;
+                    Ok((amount_gjuels, cpi))
+                })
+                .collect::<Result<_>>()?;
 
-        for (amount, cpi) in payments {
-            if amount == 0 {
+        for (amount_gjuels, cpi) in payments_gjuels {
+            if amount_gjuels == 0 {
                 continue;
             }
 
@@ -533,7 +537,7 @@ pub mod ocr2 {
                     ctx.accounts.state.key().as_ref(),
                     &[vault_nonce],
                 ]]),
-                amount,
+                amount_gjuels,
             )?;
         }
 
@@ -703,9 +707,11 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> Result<()
     state.config.latest_transmitter = ctx.accounts.transmitter.key();
 
     // calculate and pay reimbursement
-    let reimbursement = calculate_reimbursement(report.juels_per_lamport, signature_count)?; // gjuels
-    let amount = reimbursement + u64::from(state.config.billing.transmission_payment_gjuels);
-    state.oracles[oracle_idx].payment += amount;
+    let reimbursement_gjuels =
+        calculate_reimbursement_gjuels(report.juels_per_lamport, signature_count)?; // gjuels
+    let amount_gjuels =
+        reimbursement_gjuels + u64::from(state.config.billing.transmission_payment_gjuels);
+    state.oracles[oracle_idx].payment_gjuels += amount_gjuels;
 
     emit!(event::NewTransmission {
         round_id: state.config.latest_aggregator_round_id,
@@ -716,7 +722,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> Result<()
         observer_count: report.observer_count,
         observers: report.observers,
         juels_per_lamport: report.juels_per_lamport,
-        reimbursement,
+        reimbursement_gjuels,
     });
 
     let round = NewTransmission {
@@ -783,7 +789,7 @@ impl Report {
     }
 }
 
-fn calculate_reimbursement(juels_per_lamport: u64, _signature_count: usize) -> Result<u64> {
+fn calculate_reimbursement_gjuels(juels_per_lamport: u64, _signature_count: usize) -> Result<u64> {
     const SIGNERS: u64 = 1;
     let fees = Fees::get()?;
     let lamports_per_signature = fees.fee_calculator.lamports_per_signature;
@@ -793,21 +799,25 @@ fn calculate_reimbursement(juels_per_lamport: u64, _signature_count: usize) -> R
     Ok(gjuels)
 }
 
-fn calculate_owed_payment(config: &Billing, oracle: &Oracle, latest_round_id: u32) -> Result<u64> {
+fn calculate_owed_payment_gjuels(
+    config: &Billing,
+    oracle: &Oracle,
+    latest_round_id: u32,
+) -> Result<u64> {
     let rounds = latest_round_id
         .checked_sub(oracle.from_round_id)
         .ok_or(ErrorCode::Overflow)?;
 
-    let amount = u64::from(config.observation_payment_gjuels)
+    let amount_gjuels = u64::from(config.observation_payment_gjuels)
         .checked_mul(rounds.into())
         .ok_or(ErrorCode::Overflow)?
-        .checked_add(oracle.payment)
+        .checked_add(oracle.payment_gjuels)
         .ok_or(ErrorCode::Overflow)?;
 
-    Ok(amount)
+    Ok(amount_gjuels)
 }
 
-fn calculate_total_link_due(config: &Config, oracles: &[Oracle]) -> Result<u64> {
+fn calculate_total_link_due_gjuels(config: &Config, oracles: &[Oracle]) -> Result<u64> {
     let (rounds, reimbursements) = oracles
         .iter()
         .try_fold((0, 0), |(rounds, reimbursements): (u32, u64), oracle| {
@@ -817,18 +827,18 @@ fn calculate_total_link_due(config: &Config, oracles: &[Oracle]) -> Result<u64> 
 
             Some((
                 rounds.checked_add(count)?,
-                reimbursements.checked_add(oracle.payment)?,
+                reimbursements.checked_add(oracle.payment_gjuels)?,
             ))
         })
         .ok_or(ErrorCode::Overflow)?;
 
-    let amount = u64::from(config.billing.observation_payment_gjuels)
+    let amount_gjuels = u64::from(config.billing.observation_payment_gjuels)
         .checked_mul(u64::from(rounds))
         .ok_or(ErrorCode::Overflow)?
         .checked_add(reimbursements)
         .ok_or(ErrorCode::Overflow)?;
 
-    Ok(amount)
+    Ok(amount_gjuels)
 }
 
 // -- Access control modifiers
@@ -980,11 +990,11 @@ pub mod query {
         let loader = AccountLoader::<State>::try_from(account)?;
         let state = loader.load()?;
 
-        let balance = token::accessor::amount(token_vault)?;
+        let balance_gjuels = token::accessor::amount(token_vault)?;
 
-        let link_due = calculate_total_link_due(&state.config, &state.oracles)?;
+        let link_due = calculate_total_link_due_gjuels(&state.config, &state.oracles)?;
 
-        let available_balance = balance.saturating_sub(link_due);
+        let available_balance = balance_gjuels.saturating_sub(link_due);
 
         Ok(LinkAvailableForPayment { available_balance })
     }

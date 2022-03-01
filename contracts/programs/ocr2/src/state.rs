@@ -226,5 +226,5 @@ pub struct Oracle {
     pub from_round_id: u32,
 
     /// `transmit()` reimbursements
-    pub payment: u64,
+    pub payment_gjuels: u64,
 }
