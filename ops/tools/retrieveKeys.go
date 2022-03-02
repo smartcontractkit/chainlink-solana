@@ -12,8 +12,7 @@ import (
 
 const (
 	ChainName        = "solana"
-	PlaceholderName  = "insert display name here"
-	PlaceholderAdmin = "insert admin address here"
+	PlaceholderAdmin = "AVcA6Bbvmw3D9SBzVMb6933XiKha5f8JXF2LdVv3RiRb"
 )
 
 type NodeOutput struct {
@@ -35,11 +34,15 @@ type CSAKey struct {
 }
 
 var URLS = []string{
-	"https://localhost:6688",
+	"http://localhost:6688",
 }
 
 var PASSWORDS = []string{
 	"twoChains",
+}
+
+var NAME = []string{
+	"insert display name here",
 }
 
 func main() {
@@ -48,12 +51,12 @@ func main() {
 	}
 
 	for i := 0; i < len(URLS); i++ {
-		fetch(URLS[i],PASSWORDS[i])
+		fetch(URLS[i], PASSWORDS[i], NAME[i%len(NAME)])
 	}
 
 }
 
-func fetch(url, password string) {
+func fetch(url, password, name string) {
 	cl, err := client.NewChainlink(&client.ChainlinkConfig{
 		URL:      url,
 		Email:    "admin@chain.link",
@@ -75,15 +78,14 @@ func fetch(url, password string) {
 			break
 		}
 	}
-
 	output := NodeOutput{
 		AdminAddress: PlaceholderAdmin,
 		CSAKeys: []CSAKey{CSAKey{
 			NodeAddress: txKeys.Data[0].Attributes.PublicKey,
-			NodeName:    PlaceholderName,
+			NodeName:    name,
 			PublicKey:   csaKeys.Data[0].Attributes.PublicKey,
 		}},
-		DisplayName:           PlaceholderName,
+		DisplayName:           name,
 		OCR2ConfigPublicKey:   []string{ocr2Key.Attributes.ConfigPublicKey},
 		OCR2OffchainPublicKey: []string{ocr2Key.Attributes.OffChainPublicKey},
 		OCR2OnchainPublicKey:  []string{ocr2Key.Attributes.OnChainPublicKey},
@@ -96,5 +98,5 @@ func fetch(url, password string) {
 	if err != nil {
 		log.Fatal(errors.New("failed to marshal output"))
 	}
-	fmt.Printf("\n\nKeys output - %s:\n%s\n------------------------------\n", url,string(out))
+	fmt.Printf("\n\nKeys output - %s:\n%s\n------------------------------\n", url, string(out))
 }
