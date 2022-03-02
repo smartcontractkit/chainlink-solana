@@ -34,11 +34,30 @@ type CSAKey struct {
 	PublicKey   string `json:"publicKey"`
 }
 
+var URLS = []string{
+	"https://localhost:6688",
+}
+
+var PASSWORDS = []string{
+	"twoChains",
+}
+
 func main() {
+	if len(URLS) != len(PASSWORDS) {
+		log.Fatal("mismatch URLs + passwords")
+	}
+
+	for i := 0; i < len(URLS); i++ {
+		fetch(URLS[i],PASSWORDS[i])
+	}
+
+}
+
+func fetch(url, password string) {
 	cl, err := client.NewChainlink(&client.ChainlinkConfig{
-		URL:      "https://localhost:6688",
+		URL:      url,
 		Email:    "admin@chain.link",
-		Password: "twoChains",
+		Password: password,
 	}, http.DefaultClient)
 	if err != nil {
 		log.Fatal(err)
@@ -77,5 +96,5 @@ func main() {
 	if err != nil {
 		log.Fatal(errors.New("failed to marshal output"))
 	}
-	fmt.Printf("\n\nKeys output:\n%s\n", string(out))
+	fmt.Printf("\n\nKeys output - %s:\n%s\n------------------------------\n", url,string(out))
 }
