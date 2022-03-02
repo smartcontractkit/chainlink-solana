@@ -709,9 +709,11 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> Result<()
     // calculate and pay reimbursement
     let reimbursement_gjuels =
         calculate_reimbursement_gjuels(report.juels_per_lamport, signature_count)?; // gjuels
-    let amount_gjuels =
-        reimbursement_gjuels.saturating_add(u64::from(state.config.billing.transmission_payment_gjuels));
-    state.oracles[oracle_idx].payment_gjuels = state.oracles[oracle_idx].payment_gjuels.saturating_add(amount_gjuels);
+    let amount_gjuels = reimbursement_gjuels
+        .saturating_add(u64::from(state.config.billing.transmission_payment_gjuels));
+    state.oracles[oracle_idx].payment_gjuels = state.oracles[oracle_idx]
+        .payment_gjuels
+        .saturating_add(amount_gjuels);
 
     emit!(event::NewTransmission {
         round_id: state.config.latest_aggregator_round_id,
@@ -790,22 +792,16 @@ impl Report {
 }
 
 fn calculate_reimbursement_gjuels(juels_per_lamport: u64, _signature_count: usize) -> Result<u64> {
-    const SIGNERS: u128 = 1;
+    const SIGNERS: u64 = 1;
     const GIGA: u128 = 10u128.pow(9);
     let fees = Fees::get()?;
-    let lamports_per_signature: u128 = fees.fee_calculator.lamports_per_signature.into();
+    let lamports_per_signature = fees.fee_calculator.lamports_per_signature;
     let lamports = lamports_per_signature * SIGNERS;
-    let juels = lamports * u128::from(juels_per_lamport);
+    let juels = u128::from(lamports) * u128::from(juels_per_lamport);
     let gjuels = juels / GIGA; // return value as gjuels
 
     // convert from u128 to u64 with staturating logic to max u64
-    let convert = gjuels.try_into();
-    let gjuels_u64: u64 = match convert {
-        Ok(convert) => convert,
-        Err(_error) => u64::MAX,
-    };
-
-    Ok(gjuels_u64)
+    Ok(gjuels.try_into().unwrap_or(u64::MAX))
 }
 
 fn calculate_owed_payment_gjuels(
