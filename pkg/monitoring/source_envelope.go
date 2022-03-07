@@ -43,6 +43,10 @@ func (s *envelopeSourceFactory) NewSource(
 	}, nil
 }
 
+func (s *envelopeSourceFactory) GetType() string {
+	return "envelope"
+}
+
 type envelopeSource struct {
 	client     *rpc.Client
 	feedConfig SolanaFeedConfig

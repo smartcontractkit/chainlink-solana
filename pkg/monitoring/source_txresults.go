@@ -42,6 +42,10 @@ func (s *txResultsSourceFactory) NewSource(
 	}, nil
 }
 
+func (s *txResultsSourceFactory) GetType() string {
+	return "txresults"
+}
+
 type txResultsSource struct {
 	client     *rpc.Client
 	log        relayMonitoring.Logger

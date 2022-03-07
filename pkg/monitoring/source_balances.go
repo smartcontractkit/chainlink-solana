@@ -46,6 +46,10 @@ func (s *balancesSourceFactory) NewSource(
 	}, nil
 }
 
+func (s *balancesSourceFactory) GetType() string {
+	return "balances"
+}
+
 type balancesSource struct {
 	client     *rpc.Client
 	log        relayMonitoring.Logger
