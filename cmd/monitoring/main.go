@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	coreLog := logger.NewLogger().With("project", "solana")
+	coreLog := logger.NewLogger()
 	log := logWrapper{coreLog}
 
 	chainConfig, err := monitoring.ParseSolanaConfig()
