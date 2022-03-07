@@ -107,6 +107,10 @@ func (f *fakeSourceFactory) NewSource(
 	return &fakeSource{f.log}, nil
 }
 
+func (f *fakeSourceFactory) GetType() string {
+	return "fake"
+}
+
 type fakeSource struct {
 	log relayMonitoring.Logger
 }
