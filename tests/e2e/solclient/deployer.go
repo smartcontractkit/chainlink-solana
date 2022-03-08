@@ -14,7 +14,6 @@ import (
 	access_controller2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/access_controller"
 	ocr_2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr2"
 	store2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/store"
-	utils2 "github.com/smartcontractkit/chainlink-solana/tests/e2e/utils"
 	"github.com/smartcontractkit/helmenv/environment"
 	"github.com/smartcontractkit/integrations-framework/client"
 	"github.com/smartcontractkit/integrations-framework/contracts"
@@ -336,19 +335,19 @@ func (c *ContractDeployer) registerAnchorPrograms() {
 	ocr_2.SetProgramID(c.Client.ProgramWallets["ocr2-keypair.json"].PublicKey())
 }
 
-func (c *ContractDeployer) deployAnchorProgramsRemote() error {
-	contractBinaries, err := c.Client.ListDirFilenamesByExt(utils2.ContractsDir, ".so")
+func (c *ContractDeployer) deployAnchorProgramsRemote(contractsDir string) error {
+	contractBinaries, err := c.Client.ListDirFilenamesByExt(contractsDir, ".so")
 	if err != nil {
 		return err
 	}
 	log.Debug().Interface("Binaries", contractBinaries).Msg("Program binaries")
-	keyFiles, err := c.Client.ListDirFilenamesByExt(utils2.ContractsDir, ".json")
+	keyFiles, err := c.Client.ListDirFilenamesByExt(contractsDir, ".json")
 	if err != nil {
 		return err
 	}
 	log.Debug().Interface("Files", keyFiles).Msg("Program key files")
 	for _, kfn := range keyFiles {
-		pk, err := solana.PrivateKeyFromSolanaKeygenFile(filepath.Join(utils2.ContractsDir, kfn))
+		pk, err := solana.PrivateKeyFromSolanaKeygenFile(filepath.Join(contractsDir, kfn))
 		if err != nil {
 			return err
 		}
@@ -399,12 +398,12 @@ func (c *Client) FindAuthorityAddress(seed string, statePubKey solana.PublicKey,
 	return auth, nonce, err
 }
 
-func NewContractDeployer(client client.BlockchainClient, e *environment.Environment) (*ContractDeployer, error) {
+func NewContractDeployer(client client.BlockchainClient, e *environment.Environment, contractsDir string) (*ContractDeployer, error) {
 	cd := &ContractDeployer{
 		Env:    e,
 		Client: client.(*Client),
 	}
-	if err := cd.deployAnchorProgramsRemote(); err != nil {
+	if err := cd.deployAnchorProgramsRemote(contractsDir); err != nil {
 		return nil, err
 	}
 	cd.registerAnchorPrograms()

@@ -13,7 +13,6 @@ import (
 	"github.com/rs/zerolog/log"
 	uuid "github.com/satori/go.uuid"
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/solclient"
-	"github.com/smartcontractkit/chainlink-solana/tests/e2e/utils"
 	"github.com/smartcontractkit/helmenv/environment"
 	"github.com/smartcontractkit/helmenv/tools"
 	"github.com/smartcontractkit/integrations-framework/client"
@@ -78,15 +77,15 @@ func (m *OCRv2TestState) LabelChaosGroups() {
 	m.LabelChaosGroup(10, 19, ChaosGroupRightHalf)
 }
 
-func (m *OCRv2TestState) DeployCluster(nodes int, stateful bool) {
-	m.DeployEnv(nodes, stateful)
+func (m *OCRv2TestState) DeployCluster(nodes int, stateful bool, contractsDir string) {
+	m.DeployEnv(nodes, stateful, contractsDir)
 	m.SetupClients()
 	if m.Networks.Default.ContractsDeployed() {
 		err := m.LoadContracts()
 		Expect(err).ShouldNot(HaveOccurred())
 		return
 	}
-	m.DeployContracts()
+	m.DeployContracts(contractsDir)
 	err := m.DumpContracts()
 	Expect(err).ShouldNot(HaveOccurred())
 	m.CreateJobs()
@@ -102,15 +101,15 @@ func (m *OCRv2TestState) LabelChaosGroup(startInstance int, endInstance int, gro
 // UploadProgramBinaries uploads programs binary files to solana-validator container
 // currently it's the only way to deploy anything to local solana because ephemeral validator in k8s
 // can't expose UDP ports required to copy .so chunks when deploying
-func (m *OCRv2TestState) UploadProgramBinaries() {
+func (m *OCRv2TestState) UploadProgramBinaries(contractsDir string) {
 	connections := m.Env.Charts.Connections("solana-validator")
 	cc, err := connections.Load("sol", "0", "sol-val")
 	Expect(err).ShouldNot(HaveOccurred())
-	_, _, _, err = m.Env.Charts["solana-validator"].CopyToPod(utils.ContractsDir, fmt.Sprintf("%s/%s:/programs", m.Env.Namespace, cc.PodName), "sol-val")
+	_, _, _, err = m.Env.Charts["solana-validator"].CopyToPod(contractsDir, fmt.Sprintf("%s/%s:/programs", m.Env.Namespace, cc.PodName), "sol-val")
 	Expect(err).ShouldNot(HaveOccurred())
 }
 
-func (m *OCRv2TestState) DeployEnv(nodes int, stateful bool) {
+func (m *OCRv2TestState) DeployEnv(nodes int, stateful bool, contractsDir string) {
 	m.Env, m.err = environment.DeployOrLoadEnvironment(
 		solclient.NewChainlinkSolOCRv2(nodes, stateful),
 		tools.ChartsRoot,
@@ -118,7 +117,7 @@ func (m *OCRv2TestState) DeployEnv(nodes int, stateful bool) {
 	Expect(m.err).ShouldNot(HaveOccurred())
 	m.err = m.Env.ConnectAll()
 	Expect(m.err).ShouldNot(HaveOccurred())
-	m.UploadProgramBinaries()
+	m.UploadProgramBinaries(contractsDir)
 }
 
 func (m *OCRv2TestState) SetupClients() {
@@ -166,10 +165,10 @@ func (m *OCRv2TestState) LoadContracts() error {
 	return nil
 }
 
-func (m *OCRv2TestState) DeployContracts() {
+func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 	m.OffChainConfig, m.NodeKeysBundle, m.err = DefaultOffChainConfigParamsFromNodes(m.ChainlinkNodes)
 	Expect(m.err).ShouldNot(HaveOccurred())
-	m.ContractDeployer, m.err = solclient.NewContractDeployer(m.Networks.Default, m.Env)
+	m.ContractDeployer, m.err = solclient.NewContractDeployer(m.Networks.Default, m.Env, contractsDir)
 	Expect(m.err).ShouldNot(HaveOccurred())
 	m.LinkToken, m.err = m.ContractDeployer.DeployLinkTokenContract()
 	Expect(m.err).ShouldNot(HaveOccurred())
@@ -288,17 +287,6 @@ func (m *OCRv2TestState) CreateJobs() {
 	m.err = m.MockServer.SetValuePath("/juels", 1)
 	Expect(m.err).ShouldNot(HaveOccurred())
 	m.createJobs()
-}
-
-func (m *OCRv2TestState) ImitateSource(changeInterval time.Duration, min int, max int) {
-	go func() {
-		for {
-			m.SetAllAdapterResponsesToTheSameValue(min)
-			time.Sleep(changeInterval)
-			m.SetAllAdapterResponsesToTheSameValue(max)
-			time.Sleep(changeInterval)
-		}
-	}()
 }
 
 func (m *OCRv2TestState) ValidateNoRoundsAfter(chaosStartTime time.Time) {

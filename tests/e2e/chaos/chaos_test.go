@@ -1,6 +1,7 @@
 package chaos
 
 import (
+	"github.com/smartcontractkit/chainlink-solana/tests/e2e/utils"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -13,9 +14,9 @@ var _ = Describe("Solana chaos suite", func() {
 	var state = &common.OCRv2TestState{}
 	BeforeEach(func() {
 		By("Deploying OCRv2 cluster", func() {
-			state.DeployCluster(19, true)
+			state.DeployCluster(19, true, utils.ContractsDir)
 			state.LabelChaosGroups()
-			state.ImitateSource(1*time.Second, 2, 10)
+			state.SetAllAdapterResponsesToTheSameValue(10)
 		})
 	})
 	It("Can tolerate chaos experiments", func() {
