@@ -261,6 +261,14 @@ func (m *OCRv2) SetBilling(observationPayment uint32, transmissionPayment uint32
 	if err != nil {
 		return nil
 	}
+	vaultAuth, err := m.AuthorityAddr("vault")
+	if err != nil {
+		return err
+	}
+	va, err := solana.PublicKeyFromBase58(vaultAuth)
+	if err != nil {
+		return err
+	}
 	err = m.Client.TXAsync(
 		"Set billing",
 		[]solana.Instruction{
@@ -270,6 +278,9 @@ func (m *OCRv2) SetBilling(observationPayment uint32, transmissionPayment uint32
 				m.Client.Accounts.OCR.PublicKey(),
 				m.Client.Accounts.Owner.PublicKey(),
 				billingACPubKey,
+				m.Client.Accounts.OCRVaultAssociatedPubKey, // token vault
+				va,                    // vault authority
+				solana.TokenProgramID, // token program
 			).Build(),
 		},
 		func(key solana.PublicKey) *solana.PrivateKey {

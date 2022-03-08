@@ -475,7 +475,7 @@ type Oracle struct {
 	Payee         ag_solanago.PublicKey
 	ProposedPayee ag_solanago.PublicKey
 	FromRoundId   uint32
-	Payment       uint64
+	PaymentGjuels uint64
 }
 
 func (obj Oracle) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -504,8 +504,8 @@ func (obj Oracle) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `Payment` param:
-	err = encoder.Encode(obj.Payment)
+	// Serialize `PaymentGjuels` param:
+	err = encoder.Encode(obj.PaymentGjuels)
 	if err != nil {
 		return err
 	}
@@ -538,8 +538,8 @@ func (obj *Oracle) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `Payment`:
-	err = decoder.Decode(&obj.Payment)
+	// Deserialize `PaymentGjuels`:
+	err = decoder.Decode(&obj.PaymentGjuels)
 	if err != nil {
 		return err
 	}
