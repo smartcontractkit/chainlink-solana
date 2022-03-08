@@ -348,11 +348,21 @@ pub mod ocr2 {
     }
 
     #[access_control(has_billing_access(&ctx.accounts.state, &ctx.accounts.access_controller, &ctx.accounts.authority))]
-    pub fn set_billing(
-        ctx: Context<SetBilling>,
+    pub fn set_billing<'info>(
+        ctx: Context<'_, '_, '_, 'info, SetBilling<'info>>,
         observation_payment_gjuels: u32,
         transmission_payment_gjuels: u32,
     ) -> Result<()> {
+        // First... pay out the oracles with the original config
+        pay_oracles_impl(
+            ctx.accounts.state.clone(),
+            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts.token_vault.to_account_info(),
+            ctx.accounts.vault_authority.clone(),
+            ctx.remaining_accounts,
+        )?;
+
+        // Then update the config
         let mut state = ctx.accounts.state.load_mut()?;
         state.config.billing.observation_payment_gjuels = observation_payment_gjuels;
         state.config.billing.transmission_payment_gjuels = transmission_payment_gjuels;
@@ -360,6 +370,7 @@ pub mod ocr2 {
             observation_payment_gjuels,
             transmission_payment_gjuels,
         });
+
         Ok(())
     }
 
@@ -435,7 +446,7 @@ pub mod ocr2 {
     }
 
     #[access_control(has_billing_access(&ctx.accounts.state, &ctx.accounts.access_controller, &ctx.accounts.authority))]
-    pub fn pay_oracles<'info>(ctx: Context<'_, '_, '_, 'info, PayOracles<'info>>) -> Result<()> {
+    pub fn pay_oracles<'info>(ctx: Context<'_, '_, '_, 'info, SetBilling<'info>>) -> Result<()> {
         pay_oracles_impl(
             ctx.accounts.state.clone(),
             ctx.accounts.token_program.to_account_info(),

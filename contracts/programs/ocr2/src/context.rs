@@ -136,12 +136,22 @@ pub struct RequestNewRound<'info> {
     pub access_controller: AccountLoader<'info, AccessController>,
 }
 
+/// Used by set_billing and pay_oracles
+/// Expects all the payees listed in matching order to state.oracles as remaining_accounts
 #[derive(Accounts)]
 pub struct SetBilling<'info> {
     #[account(mut)]
     pub state: AccountLoader<'info, State>,
     pub authority: Signer<'info>,
     pub access_controller: AccountLoader<'info, AccessController>,
+
+    #[account(mut, address = state.load()?.config.token_vault)]
+    pub token_vault: Account<'info, TokenAccount>,
+    /// CHECK: This is a PDA
+    #[account(seeds = [b"vault", state.key().as_ref()], bump = state.load()?.vault_nonce)]
+    pub vault_authority: AccountInfo<'info>,
+
+    pub token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
@@ -201,23 +211,6 @@ impl<'info> WithdrawPayment<'info> {
             },
         )
     }
-}
-
-/// Expects all the payees listed in matching order to state.oracles as remaining_accounts
-#[derive(Accounts)]
-pub struct PayOracles<'info> {
-    #[account(mut)]
-    pub state: AccountLoader<'info, State>,
-    pub authority: Signer<'info>,
-    pub access_controller: AccountLoader<'info, AccessController>,
-
-    #[account(mut, address = state.load()?.config.token_vault)]
-    pub token_vault: Account<'info, TokenAccount>,
-    /// CHECK: This is a PDA
-    #[account(seeds = [b"vault", state.key().as_ref()], bump = state.load()?.vault_nonce)]
-    pub vault_authority: AccountInfo<'info>,
-
-    pub token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
