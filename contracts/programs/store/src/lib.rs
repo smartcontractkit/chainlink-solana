@@ -133,21 +133,6 @@ pub mod store {
         Ok(())
     }
 
-    // migrate the feed accounts from v1 if necessary
-    // #[access_control(owner(&ctx.accounts.store, &ctx.accounts.authority))]
-    // pub fn migrate(ctx: Context<Migrate>) -> Result<()> {
-    //     if ctx.remaining_accounts.is_empty() {
-    //         return Err(ErrorCode::InvalidInput.into());
-    //     }
-    //     for info in ctx.remaining_accounts {
-    //         let mut feed = Account::try_from(&info.clone())?;
-    //         state::migrate(&mut feed, info)?;
-    //         // write the change back into the header
-    //         feed.exit(&crate::ID)?;
-    //     }
-    //     Ok(())
-    // }
-
     // NOTE: to bulk lower, a batch transaction can be sent with a bunch of lower calls
     #[access_control(has_lowering_access(
             &ctx.accounts.owner,
@@ -531,13 +516,6 @@ pub struct Submit<'info> {
     /// The OCR2 feed
     #[account(mut)]
     pub feed: Account<'info, Transmissions>,
-    pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct Migrate<'info> {
-    #[account(mut)]
-    pub store: AccountLoader<'info, State>,
     pub authority: Signer<'info>,
 }
 
