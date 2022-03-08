@@ -620,6 +620,13 @@ describe("ocr2", async () => {
 
     // TODO: assert funds came back
 
+    // fetch payees
+    account = await program.account.state.fetch(state.publicKey);
+    currentOracles = account.oracles.xs.slice(0, account.oracles.len);
+    payees = currentOracles.map((oracle) => {
+      return { pubkey: oracle.payee, isWritable: true, isSigner: false };
+    });
+
     console.log("setBilling");
     await program.rpc.setBilling(
       new BN(observationPayment),
@@ -629,8 +636,12 @@ describe("ocr2", async () => {
           state: state.publicKey,
           authority: owner.publicKey,
           accessController: billingAccessController.publicKey,
+          tokenVault: tokenVault,
+          vaultAuthority: vaultAuthority,
+          tokenProgram: TOKEN_PROGRAM_ID,
         },
         signers: [],
+        remainingAccounts: payees,
       }
     );
 
