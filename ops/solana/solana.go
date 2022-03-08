@@ -331,6 +331,24 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 
 	fmt.Println("Setting up OCR Feed:")
 
+	fmt.Println("Setting Billing...")
+	input := map[string]interface{}{
+		"observationPaymentGjuels":  1,
+		"transmissionPaymentGjuels": 1,
+	}
+	jsonInput, err := json.Marshal(input)
+	if err != nil {
+		return err
+	}
+	if err = d.gauntlet.ExecCommand(
+		"ocr2:set_billing",
+		d.gauntlet.Flag("network", d.network),
+		d.gauntlet.Flag("input", string(jsonInput)),
+		d.Account[OCRFeed],
+	); err != nil {
+		return errors.Wrap(err, "'ocr2:set_billing' call failed")
+	}
+
 	fmt.Println("Create config proposal...")
 	if err := d.gauntlet.ExecCommand(
 		"ocr2:create_proposal",
@@ -373,13 +391,13 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 	}
 
 	fmt.Println("Proposing config...")
-	input := map[string]interface{}{
+	input = map[string]interface{}{
 		"oracles":    oracles,
 		"f":          threshold,
 		"proposalId": d.Account[Proposal],
 	}
 
-	jsonInput, err := json.Marshal(input)
+	jsonInput, err = json.Marshal(input)
 	if err != nil {
 		return err
 	}
@@ -466,16 +484,6 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 		return errors.Wrap(err, "'ocr2:propose_payees' call failed")
 	}
 
-	input = map[string]interface{}{
-		"observationPaymentGjuels":  1,
-		"transmissionPaymentGjuels": 1,
-	}
-
-	jsonInput, err = json.Marshal(input)
-	if err != nil {
-		return err
-	}
-
 	fmt.Println("Finalize proposal...")
 	if err = d.gauntlet.ExecCommand(
 		"ocr2:finalize_proposal",
@@ -507,16 +515,6 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 		d.Account[OCRFeed],
 	); err != nil {
 		return errors.Wrap(err, "'ocr2:accept_proposal' call failed")
-	}
-
-	fmt.Println("Setting Billing...")
-	if err = d.gauntlet.ExecCommand(
-		"ocr2:set_billing",
-		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("input", string(jsonInput)),
-		d.Account[OCRFeed],
-	); err != nil {
-		return errors.Wrap(err, "'ocr2:set_billing' call failed")
 	}
 
 	return nil
