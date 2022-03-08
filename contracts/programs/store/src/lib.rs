@@ -55,7 +55,21 @@ pub mod store {
         granularity: u8,
         live_length: u32,
     ) -> Result<()> {
+        use std::mem::size_of;
+
         let feed = &mut ctx.accounts.feed;
+
+        // Validate the feed account is of the correct size
+        let len = feed.to_account_info().data_len();
+        // discriminator + header size
+        let len = len
+            .checked_sub(8 + state::HEADER_SIZE)
+            .ok_or(ErrorCode::InsufficientSize)?;
+        require!(len % size_of::<Transmission>() == 0, InsufficientSize);
+        let space = len / size_of::<Transmission>();
+        // Live length must not exceed total capacity
+        require!(live_length <= space as u32, InvalidInput);
+
         feed.version = FEED_VERSION;
         feed.state = Transmissions::NORMAL;
         feed.owner = ctx.accounts.authority.key();
@@ -445,8 +459,8 @@ pub enum ErrorCode {
     #[msg("Invalid version")]
     InvalidVersion = 3,
 
-    #[msg("Insufficient account capacity")]
-    InsufficientAccountCapacity = 4,
+    #[msg("Insufficient or invalid feed account size, has to be `8 + HEADER_SIZE + n * size_of::<Transmission>()`")]
+    InsufficientSize = 4,
 }
 
 // Feed methods
