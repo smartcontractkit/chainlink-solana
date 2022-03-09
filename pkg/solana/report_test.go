@@ -2,10 +2,12 @@ package solana
 
 import (
 	"encoding/binary"
+	"math"
 	"math/big"
 	"testing"
 	"time"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
@@ -107,4 +109,64 @@ func TestHashReport(t *testing.T) {
 	h, err := HashReport(mockReportCtx, mockReport)
 	assert.NoError(t, err)
 	assert.Equal(t, mockHash, h)
+}
+
+func TestNegativeMedianValue(t *testing.T) {
+	c := ReportCodec{}
+	oo := []median.ParsedAttributedObservation{
+		median.ParsedAttributedObservation{
+			Timestamp:       uint32(time.Now().Unix()),
+			Value:           big.NewInt(-2),
+			JuelsPerFeeCoin: big.NewInt(1),
+			Observer:        commontypes.OracleID(0),
+		},
+	}
+
+	// create report
+	report, err := c.BuildReport(oo)
+	assert.NoError(t, err)
+
+	// check report properly encoded negative number
+	index := 4 + 1 + 32
+	var medianFromRaw bin.Int128
+	medianBytes := make([]byte, MedianLen)
+	copy(medianBytes, report[index:index+int(MedianLen)])
+	// flip order: bin decoder parses from little endian
+	for i, j := 0, len(medianBytes)-1; i < j; i, j = i+1, j-1 {
+		medianBytes[i], medianBytes[j] = medianBytes[j], medianBytes[i]
+	}
+	bin.NewBinDecoder(medianBytes).Decode(&medianFromRaw)
+	assert.True(t, oo[0].Value.Cmp(medianFromRaw.BigInt()) == 0, "median observation in raw report does not match")
+
+	// check report can be parsed properly with a negative number
+	res, err := c.MedianFromReport(report)
+	assert.NoError(t, err)
+	assert.True(t, oo[0].Value.Cmp(res) == 0)
+}
+
+func TestReportHandleOverflow(t *testing.T) {
+	// too large observation should not cause panic
+	c := ReportCodec{}
+	oo := []median.ParsedAttributedObservation{
+		median.ParsedAttributedObservation{
+			Timestamp:       uint32(time.Now().Unix()),
+			Value:           big.NewInt(0).Lsh(big.NewInt(1), 127), // 1<<127
+			JuelsPerFeeCoin: big.NewInt(0),
+			Observer:        commontypes.OracleID(0),
+		},
+	}
+	_, err := c.BuildReport(oo)
+	assert.Error(t, err)
+
+	// too large juelsPerFeeCoin should not cause panic
+	oo = []median.ParsedAttributedObservation{
+		median.ParsedAttributedObservation{
+			Timestamp:       uint32(time.Now().Unix()),
+			Value:           big.NewInt(0),
+			JuelsPerFeeCoin: big.NewInt(0).Add(big.NewInt(math.MaxInt64), big.NewInt(1)),
+			Observer:        commontypes.OracleID(0),
+		},
+	}
+	_, err = c.BuildReport(oo)
+	assert.Error(t, err)
 }

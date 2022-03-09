@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/chains/evmutil"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
@@ -62,11 +63,19 @@ func (c ReportCodec) BuildReport(oo []median.ParsedAttributedObservation) (types
 
 	report = append(report, observers[:]...)
 
-	mBytes := make([]byte, MedianLen)
-	report = append(report, median.FillBytes(mBytes)[:]...)
+	// TODO: replace with generalized function from libocr
+	medianBytes, err := ToBytes(median, uint(MedianLen))
+	if err != nil {
+		return nil, errors.Wrap(err, "error in ToBytes(median)")
+	}
+	report = append(report, medianBytes[:]...)
 
-	jBytes := make([]byte, JuelsLen)
-	report = append(report, juelsPerFeeCoin.FillBytes(jBytes)[:]...)
+	// TODO: replace with generalized function from libocr
+	juelsPerFeeCoinBytes, err := ToBytes(juelsPerFeeCoin, uint(JuelsLen))
+	if err != nil {
+		return nil, errors.Wrap(err, "error in ToBytes(juelsPerFeeCoin)")
+	}
+	report = append(report, juelsPerFeeCoinBytes[:]...)
 
 	return types.Report(report), nil
 }
@@ -81,7 +90,7 @@ func (c ReportCodec) MedianFromReport(report types.Report) (*big.Int, error) {
 	start := 4 + 1 + 32
 	end := start + int(MedianLen)
 	median := report[start:end]
-	return big.NewInt(0).SetBytes(median), nil
+	return ToBigInt(median, uint(MedianLen))
 }
 
 // Create report digest using SHA256 hash fn
