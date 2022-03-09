@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"log"
 
 	"github.com/gagliardetto/solana-go/rpc"
 	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
@@ -14,14 +16,16 @@ func main() {
 	coreLog, closeLggr := logger.NewLogger()
 	defer func() {
 		if closeLggr != nil {
-			_ = closeLggr()
+			if err := closeLggr(); err != nil {
+				log.Println(fmt.Sprintf("Error while closing Logger: %v", err))
+			}
 		}
 	}()
-	log := logWrapper{coreLog}
+	l := logWrapper{coreLog}
 
 	chainConfig, err := monitoring.ParseSolanaConfig()
 	if err != nil {
-		log.Fatalw("failed to parse solana-specific config", "error", err)
+		l.Fatalw("failed to parse solana-specific config", "error", err)
 	}
 
 	client := rpc.New(chainConfig.RPCEndpoint)
@@ -37,34 +41,34 @@ func main() {
 
 	entrypoint, err := relayMonitoring.NewEntrypoint(
 		context.Background(),
-		log,
+		l,
 		chainConfig,
 		envelopeSourceFactory,
 		txResultsSourceFactory,
 		monitoring.SolanaFeedParser,
 	)
 	if err != nil {
-		log.Fatalw("failed to build entrypoint", "error", err)
+		l.Fatalw("failed to build entrypoint", "error", err)
 		return
 	}
 
 	balancesSourceFactory := monitoring.NewBalancesSourceFactory(
 		client,
-		log.With("component", "source-balances"),
+		l.With("component", "source-balances"),
 	)
 	if entrypoint.Config.Feature.TestOnlyFakeReaders {
-		balancesSourceFactory = monitoring.NewFakeBalancesSourceFactory(log.With("component", "fake-balances-source"))
+		balancesSourceFactory = monitoring.NewFakeBalancesSourceFactory(l.With("component", "fake-balances-source"))
 	}
 	entrypoint.SourceFactories = append(entrypoint.SourceFactories, balancesSourceFactory)
 
 	promExporterFactory := monitoring.NewPrometheusExporterFactory(
-		log.With("component", "solana-prom-exporter"),
-		monitoring.NewMetrics(log.With("component", "solana-metrics")),
+		l.With("component", "solana-prom-exporter"),
+		monitoring.NewMetrics(l.With("component", "solana-metrics")),
 	)
 	entrypoint.ExporterFactories = append(entrypoint.ExporterFactories, promExporterFactory)
 
 	entrypoint.Run()
-	log.Infow("monitor stopped")
+	l.Infow("monitor stopped")
 }
 
 // adapt core logger to monitoring logger.
