@@ -969,4 +969,44 @@ describe("ocr2", async () => {
     );
     assert.ok(closedAccount === null);
   });
+
+  it("Fails to create new feeds for invalid account sizes", async () => {
+    const granularity = 30;
+    const liveLength = 3;
+
+    const header = 8 + 192 // account discriminator + header
+    const transmissionSize = 48
+    const invalidLengths = [
+      header - 1, // insufficient for header size
+      header + 6 * transmissionSize - 1, // incorrect size for ring buffer
+      header + 2 * transmissionSize, // live length exceeds total capacity
+    ]
+    for (let i = 0; i < invalidLengths.length; i++) {
+      try {
+        const invalidFeed = Keypair.generate();
+        await workspace.Store.rpc.createFeed(
+          description,
+          decimals,
+          granularity,
+          liveLength,
+          {
+            accounts: {
+              feed: invalidFeed.publicKey,
+              authority: owner.publicKey,
+            },
+            signers: [invalidFeed],
+            preInstructions: [
+              await workspace.Store.account.transmissions.createInstruction(
+                invalidFeed,
+                invalidLengths[i]
+              ),
+            ],
+          }
+        );
+      } catch {
+        continue; // expect error
+      }
+      assert.fail(`create feed shouldn't have succeeded with account size ${invalidLengths[i]}`);
+    }
+  });
 });
