@@ -1,6 +1,7 @@
 package solana
 
 import (
+	"context"
 	"errors"
 
 	"github.com/gagliardetto/solana-go"
@@ -64,7 +65,8 @@ func NewRelayer(lggr Logger) *Relayer {
 	}
 }
 
-func (r *Relayer) Start() error {
+// Start starts the relayer respecting the given context.
+func (r *Relayer) Start(context.Context) error {
 	// No subservices started on relay start, but when the first job is started
 	return nil
 }
@@ -84,8 +86,8 @@ func (r *Relayer) Healthy() error {
 	return nil
 }
 
-// TODO [relay]: import from smartcontractkit/solana-integration impl
-func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relaytypes.OCR2Provider, error) {
+// NewOCR2Provider creates a new OCR2ProviderCtx instance.
+func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relaytypes.OCR2ProviderCtx, error) {
 	var provider ocr2Provider
 	spec, ok := s.(OCR2Spec)
 	if !ok {
@@ -124,7 +126,8 @@ type ocr2Provider struct {
 	tracker                *ContractTracker
 }
 
-func (p *ocr2Provider) Start() error {
+// Start starts OCR2Provider respecting the given context.
+func (p *ocr2Provider) Start(context.Context) error {
 	// TODO: start all needed subservices
 	return p.tracker.Start()
 }
