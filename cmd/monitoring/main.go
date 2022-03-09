@@ -5,12 +5,18 @@ import (
 
 	"github.com/gagliardetto/solana-go/rpc"
 	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
-	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring"
 	"github.com/smartcontractkit/chainlink/core/logger"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring"
 )
 
 func main() {
-	coreLog := logger.NewLogger()
+	coreLog, closeLggr := logger.NewLogger()
+	defer func() {
+		if closeLggr != nil {
+			_ = closeLggr()
+		}
+	}()
 	log := logWrapper{coreLog}
 
 	chainConfig, err := monitoring.ParseSolanaConfig()
