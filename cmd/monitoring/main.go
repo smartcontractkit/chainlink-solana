@@ -15,10 +15,8 @@ import (
 func main() {
 	coreLog, closeLggr := logger.NewLogger()
 	defer func() {
-		if closeLggr != nil {
-			if err := closeLggr(); err != nil {
-				log.Println(fmt.Sprintf("Error while closing Logger: %v", err))
-			}
+		if err := closeLggr(); err != nil {
+			log.Println(fmt.Sprintf("Error while closing Logger: %v", err))
 		}
 	}()
 	l := logWrapper{coreLog}
