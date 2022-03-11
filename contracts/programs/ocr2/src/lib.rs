@@ -144,65 +144,14 @@ pub mod ocr2 {
     ) -> Result<()> {
         require!(digest.len() == DIGEST_SIZE, InvalidInput);
 
-        let mut state = ctx.accounts.state.load_mut()?;
-
-        // TODO: share with pay_oracles
-        require!(
-            ctx.remaining_accounts.len() == state.oracles.len(),
-            InvalidInput
-        );
-
-        let vault_nonce = state.vault_nonce;
-        let latest_round_id = state.config.latest_aggregator_round_id;
-        let billing = state.config.billing;
-
         // NOTE: if multisig supported multi instruction transactions, this could be [pay_oracles, accept_proposal]
-        let payments_gjuels: Vec<(u64, CpiContext<'_, '_, '_, 'info, token::Transfer<'info>>)> =
-            state
-                .oracles
-                .iter_mut()
-                .zip(ctx.remaining_accounts)
-                .map(|(oracle, payee)| {
-                    // Ensure specified accounts match the ones inside oracles
-                    require!(&oracle.payee == payee.key, InvalidInput);
-
-                    let amount_gjuels =
-                        calculate_owed_payment_gjuels(&billing, oracle, latest_round_id)?;
-                    // Reset reward and gas reimbursement
-                    oracle.payment_gjuels = 0;
-                    oracle.from_round_id = latest_round_id;
-
-                    let cpi = CpiContext::new(
-                        ctx.accounts.token_program.to_account_info(),
-                        token::Transfer {
-                            from: ctx.accounts.token_vault.to_account_info(),
-                            to: payee.to_account_info(),
-                            authority: ctx.accounts.vault_authority.to_account_info(),
-                        },
-                    );
-
-                    Ok((amount_gjuels, cpi))
-                })
-                .collect::<Result<_>>()?;
-
-        // No account can be borrowed during CPI...
-        drop(state);
-
-        for (amount_gjuels, cpi) in payments_gjuels {
-            if amount_gjuels == 0 {
-                continue;
-            }
-
-            token::transfer(
-                cpi.with_signer(&[&[
-                    b"vault".as_ref(),
-                    ctx.accounts.state.key().as_ref(),
-                    &[vault_nonce],
-                ]]),
-                amount_gjuels,
-            )?;
-        }
-        // END: pay_oracles
+        pay_oracles_impl(
+            ctx.accounts.state.clone(),
+            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts.token_vault.to_account_info(),
+            ctx.accounts.vault_authority.clone(),
+            ctx.remaining_accounts,
+        )?;
 
         let mut state = ctx.accounts.state.load_mut()?;
         let proposal = ctx.accounts.proposal.load()?;
@@ -399,11 +348,21 @@ pub mod ocr2 {
     }
 
     #[access_control(has_billing_access(&ctx.accounts.state, &ctx.accounts.access_controller, &ctx.accounts.authority))]
-    pub fn set_billing(
-        ctx: Context<SetBilling>,
+    pub fn set_billing<'info>(
+        ctx: Context<'_, '_, '_, 'info, SetBilling<'info>>,
         observation_payment_gjuels: u32,
         transmission_payment_gjuels: u32,
     ) -> Result<()> {
+        // First... pay out the oracles with the original config
+        pay_oracles_impl(
+            ctx.accounts.state.clone(),
+            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts.token_vault.to_account_info(),
+            ctx.accounts.vault_authority.clone(),
+            ctx.remaining_accounts,
+        )?;
+
+        // Then update the config
         let mut state = ctx.accounts.state.load_mut()?;
         state.config.billing.observation_payment_gjuels = observation_payment_gjuels;
         state.config.billing.transmission_payment_gjuels = transmission_payment_gjuels;
@@ -411,6 +370,7 @@ pub mod ocr2 {
             observation_payment_gjuels,
             transmission_payment_gjuels,
         });
+
         Ok(())
     }
 
@@ -486,62 +446,14 @@ pub mod ocr2 {
     }
 
     #[access_control(has_billing_access(&ctx.accounts.state, &ctx.accounts.access_controller, &ctx.accounts.authority))]
-    pub fn pay_oracles<'info>(ctx: Context<'_, '_, '_, 'info, PayOracles<'info>>) -> Result<()> {
-        let mut state = ctx.accounts.state.load_mut()?;
-
-        require!(
-            ctx.remaining_accounts.len() == state.oracles.len(),
-            InvalidInput
-        );
-
-        let vault_nonce = state.vault_nonce;
-        let latest_round_id = state.config.latest_aggregator_round_id;
-        let billing = state.config.billing;
-
-        let payments_gjuels: Vec<(u64, CpiContext<'_, '_, '_, 'info, token::Transfer<'info>>)> =
-            state
-                .oracles
-                .iter_mut()
-                .zip(ctx.remaining_accounts)
-                .map(|(oracle, payee)| {
-                    // Ensure specified accounts match the ones inside oracles
-                    require!(&oracle.payee == payee.key, InvalidInput);
-
-                    let amount_gjuels =
-                        calculate_owed_payment_gjuels(&billing, oracle, latest_round_id)?;
-                    // Reset reward and gas reimbursement
-                    oracle.payment_gjuels = 0;
-                    oracle.from_round_id = latest_round_id;
-
-                    let cpi = CpiContext::new(
-                        ctx.accounts.token_program.to_account_info(),
-                        token::Transfer {
-                            from: ctx.accounts.token_vault.to_account_info(),
-                            to: payee.to_account_info(),
-                            authority: ctx.accounts.vault_authority.to_account_info(),
-                        },
-                    );
-
-                    Ok((amount_gjuels, cpi))
-                })
-                .collect::<Result<_>>()?;
-
-        for (amount_gjuels, cpi) in payments_gjuels {
-            if amount_gjuels == 0 {
-                continue;
-            }
-
-            token::transfer(
-                cpi.with_signer(&[&[
-                    b"vault".as_ref(),
-                    ctx.accounts.state.key().as_ref(),
-                    &[vault_nonce],
-                ]]),
-                amount_gjuels,
-            )?;
-        }
-
-        Ok(())
+    pub fn pay_oracles<'info>(ctx: Context<'_, '_, '_, 'info, SetBilling<'info>>) -> Result<()> {
+        pay_oracles_impl(
+            ctx.accounts.state.clone(),
+            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts.token_vault.to_account_info(),
+            ctx.accounts.vault_authority.clone(),
+            ctx.remaining_accounts,
+        )
     }
 
     pub fn transfer_payeeship(ctx: Context<TransferPayeeship>) -> Result<()> {
@@ -598,6 +510,68 @@ pub mod ocr2 {
         oracle.payee = std::mem::take(&mut oracle.proposed_payee);
         Ok(())
     }
+}
+
+fn pay_oracles_impl<'info>(
+    state: AccountLoader<'info, State>,
+    token_program: AccountInfo<'info>,
+    token_vault: AccountInfo<'info>,
+    vault_authority: AccountInfo<'info>,
+    remaining_accounts: &[AccountInfo<'info>],
+) -> Result<()> {
+    let state_id = state.key();
+    let mut state = state.load_mut()?;
+
+    require!(
+        remaining_accounts.len() == state.oracles.len(),
+        InvalidInput
+    );
+
+    let vault_nonce = state.vault_nonce;
+    let latest_round_id = state.config.latest_aggregator_round_id;
+    let billing = state.config.billing;
+
+    let payments_gjuels: Vec<(u64, CpiContext<'_, '_, '_, 'info, token::Transfer<'info>>)> = state
+        .oracles
+        .iter_mut()
+        .zip(remaining_accounts)
+        .map(|(oracle, payee)| {
+            // Ensure specified accounts match the ones inside oracles
+            require!(&oracle.payee == payee.key, InvalidInput);
+
+            let amount_gjuels = calculate_owed_payment_gjuels(&billing, oracle, latest_round_id)?;
+            // Reset reward and gas reimbursement
+            oracle.payment_gjuels = 0;
+            oracle.from_round_id = latest_round_id;
+
+            let cpi = CpiContext::new(
+                token_program.clone(),
+                token::Transfer {
+                    from: token_vault.clone(),
+                    to: payee.to_account_info(),
+                    authority: vault_authority.clone(),
+                },
+            );
+
+            Ok((amount_gjuels, cpi))
+        })
+        .collect::<Result<_>>()?;
+
+    // No account can be borrowed during CPI...
+    drop(state);
+
+    for (amount_gjuels, cpi) in payments_gjuels {
+        if amount_gjuels == 0 {
+            continue;
+        }
+
+        token::transfer(
+            cpi.with_signer(&[&[b"vault".as_ref(), state_id.as_ref(), &[vault_nonce]]]),
+            amount_gjuels,
+        )?;
+    }
+
+    Ok(())
 }
 
 #[inline(always)]
