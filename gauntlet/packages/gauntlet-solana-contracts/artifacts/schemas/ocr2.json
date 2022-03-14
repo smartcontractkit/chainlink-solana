@@ -417,6 +417,21 @@
           "name": "accessController",
           "isMut": false,
           "isSigner": false
+        },
+        {
+          "name": "tokenVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "vaultAuthority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -471,7 +486,7 @@
       ],
       "args": [
         {
-          "name": "amount",
+          "name": "amountGjuels",
           "type": "u64"
         }
       ]
@@ -1018,7 +1033,7 @@
             "type": "u32"
           },
           {
-            "name": "payment",
+            "name": "paymentGjuels",
             "type": "u64"
           }
         ]
@@ -1157,7 +1172,7 @@
           "index": false
         },
         {
-          "name": "reimbursement",
+          "name": "reimbursementGjuels",
           "type": "u64",
           "index": false
         }
@@ -1240,8 +1255,5 @@
       "name": "UnauthorizedTransmitter",
       "msg": "Oracle transmitter key not found"
     }
-  ],
-  "metadata": {
-    "address": "cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ"
-  }
+  ]
 }

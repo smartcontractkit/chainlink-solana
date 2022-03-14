@@ -499,8 +499,8 @@
     },
     {
       "code": 6004,
-      "name": "InsufficientAccountCapacity",
-      "msg": "Insufficient account capacity"
+      "name": "InsufficientSize",
+      "msg": "Insufficient or invalid feed account size, has to be `8 + HEADER_SIZE + n * size_of::<Transmission>()`"
     }
   ]
 }
