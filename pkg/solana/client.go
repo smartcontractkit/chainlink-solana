@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -22,7 +23,7 @@ type Client struct {
 }
 
 // NewClient will bundle the RPC and requestGroup together as a network Client
-func NewClient(spec OCR2Spec, logger Logger) *Client {
+func NewClient(spec OCR2Spec, logger logger.Logger) *Client {
 	client := &Client{
 		rpc:           rpc.New(spec.NodeEndpointHTTP),
 		skipPreflight: !spec.UsePreflight,

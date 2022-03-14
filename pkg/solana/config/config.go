@@ -1,11 +1,9 @@
-package solana
+package config
 
 import (
-	"net/url"
 	"sync"
 	"time"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
@@ -97,44 +95,44 @@ func (c *config) OCR2CacheTTL() time.Duration {
 }
 
 func (c *config) TxTimeout() time.Duration {
-  c.chainMu.RLock()
-  ch := c.chain.TxTimeout
-  c.chainMu.RUnlock()
-  if ch != nil {
-    return ch.Duration()
-  }
-  return c.defaults.TxTimeout
+	c.chainMu.RLock()
+	ch := c.chain.TxTimeout
+	c.chainMu.RUnlock()
+	if ch != nil {
+		return ch.Duration()
+	}
+	return c.defaults.TxTimeout
 }
 func (c *config) SkipPreflight() bool {
-  c.chainMu.RLock()
-  ch := c.chain.SkipPreflight
-  c.chainMu.RUnlock()
-  if ch.Valid {
-    return ch.Bool
-  }
-  return c.defaults.SkipPreflight
+	c.chainMu.RLock()
+	ch := c.chain.SkipPreflight
+	c.chainMu.RUnlock()
+	if ch.Valid {
+		return ch.Bool
+	}
+	return c.defaults.SkipPreflight
 }
 func (c *config) Commitment() rpc.CommitmentType {
-  c.chainMu.RLock()
-  ch := c.chain.Commitment
-  c.chainMu.RUnlock()
-  if ch.Valid {
-    str := ch.String
-    var commitment rpc.CommitmentType
-    switch str {
-    case "processed":
-      commitment = rpc.CommitmentProcessed
-    case "confirmed":
-      commitment = rpc.CommitmentConfirmed
-    case "finalized":
-      commitment = rpc.CommitmentFinalized
-    default:
-      c.lggr.Warnf(invalidFallbackMsg, "CommitmentType", str, c.defaults.Commitment, nil)
-      commitment = rpc.CommitmentConfirmed
-    }
-    return commitment
-  }
-  return c.defaults.Commitment
+	c.chainMu.RLock()
+	ch := c.chain.Commitment
+	c.chainMu.RUnlock()
+	if ch.Valid {
+		str := ch.String
+		var commitment rpc.CommitmentType
+		switch str {
+		case "processed":
+			commitment = rpc.CommitmentProcessed
+		case "confirmed":
+			commitment = rpc.CommitmentConfirmed
+		case "finalized":
+			commitment = rpc.CommitmentFinalized
+		default:
+			c.lggr.Warnf(invalidFallbackMsg, "CommitmentType", str, c.defaults.Commitment, nil)
+			commitment = rpc.CommitmentConfirmed
+		}
+		return commitment
+	}
+	return c.defaults.Commitment
 }
 
 const invalidFallbackMsg = `Invalid value provided for %s, "%s" - falling back to default "%s": %v`
