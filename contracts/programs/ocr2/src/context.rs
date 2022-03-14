@@ -49,6 +49,14 @@ pub struct Close<'info> {
     #[account(mut)]
     pub receiver: SystemAccount<'info>,
     pub authority: Signer<'info>,
+
+    #[account(mut, address = state.load()?.config.token_vault)]
+    pub token_vault: Account<'info, TokenAccount>,
+    /// CHECK: This is a PDA
+    #[account(seeds = [b"vault", state.key().as_ref()], bump = state.load()?.vault_nonce)]
+    pub vault_authority: AccountInfo<'info>,
+
+    pub token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]

@@ -53,7 +53,16 @@ pub mod ocr2 {
     }
 
     #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
-    pub fn close(ctx: Context<Close>) -> Result<()> {
+    pub fn close<'info>(ctx: Context<'_, '_, '_, 'info, Close<'info>>) -> Result<()> {
+        // Pay out any remaining balances
+        pay_oracles_impl(
+            ctx.accounts.state.clone(),
+            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts.token_vault.to_account_info(),
+            ctx.accounts.vault_authority.clone(),
+            ctx.remaining_accounts,
+        )?;
+
         // NOTE: Close is handled by anchor on exit due to the `close` attribute
         Ok(())
     }

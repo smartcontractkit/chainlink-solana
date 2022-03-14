@@ -484,7 +484,7 @@ describe("ocr2", async () => {
       tokenVault,
       mintAuthority.publicKey,
       [mintAuthority],
-      1000000000
+      100000000000000
     );
 
     // TODO: listen for SetConfig event
@@ -949,12 +949,23 @@ describe("ocr2", async () => {
       await provider.connection.getAccountInfo(provider.wallet.publicKey)
     ).lamports;
 
+    // fetch payees
+    let account = await program.account.state.fetch(state.publicKey);
+    let currentOracles = account.oracles.xs.slice(0, account.oracles.len);
+    let payees = currentOracles.map((oracle) => {
+      return { pubkey: oracle.payee, isWritable: true, isSigner: false };
+    });
+
     await program.rpc.close({
       accounts: {
         state: state.publicKey,
         receiver: provider.wallet.publicKey,
         authority: owner.publicKey,
+        tokenVault: tokenVault,
+        vaultAuthority: vaultAuthority,
+        tokenProgram: TOKEN_PROGRAM_ID,
       },
+      remainingAccounts: payees,
     });
 
     let afterBalance = (
