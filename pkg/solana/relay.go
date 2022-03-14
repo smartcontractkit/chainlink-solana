@@ -7,21 +7,11 @@ import (
 	"github.com/gagliardetto/solana-go"
 	uuid "github.com/satori/go.uuid"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 	relaytypes "github.com/smartcontractkit/chainlink/core/services/relay/types"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
-
-type Logger interface {
-	Tracef(format string, values ...interface{})
-	Debugf(format string, values ...interface{})
-	Infof(format string, values ...interface{})
-	Warnf(format string, values ...interface{})
-	Errorf(format string, values ...interface{})
-	Criticalf(format string, values ...interface{})
-	Panicf(format string, values ...interface{})
-	Fatalf(format string, values ...interface{})
-}
 
 type TransmissionSigner interface {
 	Sign(msg []byte) ([]byte, error)
@@ -55,11 +45,11 @@ type OCR2Spec struct {
 }
 
 type Relayer struct {
-	lggr Logger
+	lggr logger.Logger
 }
 
 // Note: constructed in core
-func NewRelayer(lggr Logger) *Relayer {
+func NewRelayer(lggr logger.Logger) *Relayer {
 	return &Relayer{
 		lggr: lggr,
 	}

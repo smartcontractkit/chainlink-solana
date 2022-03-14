@@ -11,6 +11,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
@@ -45,7 +46,7 @@ type ContractTracker struct {
 
 	// dependencies
 	client *Client
-	lggr   Logger
+	lggr   logger.Logger
 
 	// polling
 	done   chan struct{}
@@ -55,7 +56,7 @@ type ContractTracker struct {
 	utils.StartStopOnce
 }
 
-func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, lggr Logger) ContractTracker {
+func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, lggr logger.Logger) ContractTracker {
 	// parse staleness timeout, if errors: use default timeout (1 min)
 	staleTimeout, err := time.ParseDuration(spec.StaleTimeout)
 	if err != nil {
