@@ -13,8 +13,17 @@ export default class CreateAccount extends SolanaCommand {
   constructor(flags, args) {
     super(flags, args)
 
-    this.requireFlag('address', 'Provide a token destination address')
+    this.requireFlag('address', `Provide an address from which the 'Token Associated Account' will be derived`)
     this.require(!!args[0], 'Provide a token address')
+  }
+
+  isAssociatedTokenAddressCreated = async (token: Token, address: PublicKey) => {
+    try {
+      const info = await token.getAccountInfo(address)
+      return !!info.address
+    } catch (e) {
+      return false
+    }
   }
 
   execute = async () => {
@@ -29,6 +38,17 @@ export default class CreateAccount extends SolanaCommand {
       true,
     )
 
+    const token = new Token(this.provider.connection, tokenAddress, TOKEN_PROGRAM_ID, {
+      publicKey: this.wallet.publicKey,
+      secretKey: Buffer.from([]),
+    })
+
+    const accountExists = await this.isAssociatedTokenAddressCreated(token, associatedAcc)
+    this.require(
+      !accountExists,
+      `A Token Associated Account to address ${newAccountBase.toString()} already exists: ${associatedAcc}`,
+    )
+
     const ix = Token.createAssociatedTokenAccountInstruction(
       ASSOCIATED_TOKEN_PROGRAM_ID,
       TOKEN_PROGRAM_ID,
@@ -38,7 +58,7 @@ export default class CreateAccount extends SolanaCommand {
       this.wallet.publicKey,
     )
 
-    await prompt(`Continue to get or create new Token associated account to ${newAccountBase.toString()}`)
+    await prompt(`Continue to create new Token associated account to ${newAccountBase.toString()}`)
     logger.loading('Creating account...')
     const tx = await this.signAndSendRawTx([ix])
 
