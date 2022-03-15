@@ -18,6 +18,10 @@ type TransmissionSigner interface {
 	PublicKey() solana.PublicKey
 }
 
+type TxManager interface {
+	Enqueue(accountID string, msg *solana.Transaction) error
+}
+
 type OCR2Spec struct {
 	ID          int32
 	IsBootstrap bool

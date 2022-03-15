@@ -24,7 +24,7 @@ type Reader interface {
 }
 
 type Writer interface {
-	SendTx(tx *solana.Transaction) (solana.Signature, error)
+	SendTx(ctx context.Context, tx *solana.Transaction) (solana.Signature, error)
 }
 
 var _ ReaderWriter = (*Client)(nil)
@@ -92,8 +92,8 @@ func (c *Client) RecentBlockhash(commitment rpc.CommitmentType) (*rpc.GetRecentB
 	return c.rpc.GetRecentBlockhash(ctx, c.commitment)
 }
 
-func (c *Client) SendTx(tx *solana.Transaction) (solana.Signature, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), c.txTimeout)
+func (c *Client) SendTx(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
 	defer cancel()
 	return c.rpc.SendTransactionWithOpts(ctx, tx, c.skipPreflight, c.commitment)
 }
