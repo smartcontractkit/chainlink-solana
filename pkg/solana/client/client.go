@@ -8,7 +8,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
-	"go4.org/syncutil/singleflight"
+	"golang.org/x/sync/singleflight"
 )
 
 type ReaderWriter interface {
@@ -20,7 +20,7 @@ type Reader interface {
 	Balance(addr solana.PublicKey) (uint64, error)
 	SlotHeight() (uint64, error)
 	AccountInfo(addr solana.PublicKey, opts *rpc.GetAccountInfoOpts) (*rpc.GetAccountInfoResult, error)
-	LatestBlockhash(commitment rpc.CommitmentType) (*rpc.GetLatestBlockhashResult, error)
+	RecentBlockhash(commitment rpc.CommitmentType) (*rpc.GetRecentBlockhashResult, error)
 }
 
 type Writer interface {
@@ -44,7 +44,7 @@ type Client struct {
 func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration, log logger.Logger) (*Client, error) {
 	return &Client{
 		rpc:             rpc.New(endpoint),
-		skipPreflight:   !cfg.UsePreflight(),
+		skipPreflight:   !cfg.SkipPreflight(),
 		commitment:      cfg.Commitment(),
 		txTimeout:       cfg.TxTimeout(),
 		contextDuration: requestTimeout,
@@ -86,10 +86,10 @@ func (c *Client) AccountInfo(addr solana.PublicKey, opts *rpc.GetAccountInfoOpts
 	return c.rpc.GetAccountInfoWithOpts(ctx, addr, opts)
 }
 
-func (c *Client) LatestBlockhash(commitment rpc.CommitmentType) (*rpc.GetLatestBlockhashResult, error) {
+func (c *Client) RecentBlockhash(commitment rpc.CommitmentType) (*rpc.GetRecentBlockhashResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.contextDuration)
 	defer cancel()
-	return c.rpc.GetLatestBlockhash(ctx, c.commitment)
+	return c.rpc.GetRecentBlockhash(ctx, c.commitment)
 }
 
 func (c *Client) SendTx(tx *solana.Transaction) (solana.Signature, error) {
