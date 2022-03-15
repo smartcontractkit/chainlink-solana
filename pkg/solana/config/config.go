@@ -12,15 +12,17 @@ import (
 
 // Global terra defaults.
 var defaultConfigSet = configSet{
-	ConfirmPollPeriod:   time.Second, // polling for tx confirmation
-	OCR2CachePollPeriod: time.Second, // cache polling rate
-	OCR2CacheTTL:        time.Minute, // stale cache deadline
-	TxTimeout:           time.Minute, // transaction timeout
-	SkipPreflight:       true,        // to enable or disable preflight checks
+	BlockRate:           0.4 * time.Second, // approximate slot rate
+	ConfirmPollPeriod:   time.Second,       // polling for tx confirmation
+	OCR2CachePollPeriod: time.Second,       // cache polling rate
+	OCR2CacheTTL:        time.Minute,       // stale cache deadline
+	TxTimeout:           time.Minute,       // transaction timeout
+	SkipPreflight:       true,              // to enable or disable preflight checks
 	Commitment:          rpc.CommitmentConfirmed,
 }
 
 type Config interface {
+	BlockRate() time.Duration
 	ConfirmPollPeriod() time.Duration
 	OCR2CachePollPeriod() time.Duration
 	OCR2CacheTTL() time.Duration
@@ -63,6 +65,16 @@ func (c *config) Update(dbcfg db.ChainCfg) {
 	c.chainMu.Lock()
 	c.chain = dbcfg
 	c.chainMu.Unlock()
+}
+
+func (c *config) ConfirmPollPeriod() time.Duration {
+	c.chainMu.RLock()
+	ch := c.chain.BlockRate
+	c.chainMu.RUnlock()
+	if ch != nil {
+		return ch.Duration()
+	}
+	return c.defaults.BlockRate
 }
 
 func (c *config) ConfirmPollPeriod() time.Duration {
