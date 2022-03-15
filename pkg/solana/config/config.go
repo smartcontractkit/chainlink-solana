@@ -7,6 +7,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 )
 
 // Global terra defaults.
@@ -46,11 +47,11 @@ type config struct {
 	defaults configSet
 	chain    db.ChainCfg
 	chainMu  sync.RWMutex
-	lggr     Logger
+	lggr     logger.Logger
 }
 
 // NewConfig returns a Config with defaults overridden by dbcfg.
-func NewConfig(dbcfg db.ChainCfg, lggr Logger) *config {
+func NewConfig(dbcfg db.ChainCfg, lggr logger.Logger) *config {
 	return &config{
 		defaults: defaultConfigSet,
 		chain:    dbcfg,
