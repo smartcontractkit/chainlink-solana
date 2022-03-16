@@ -208,6 +208,11 @@ func GetState(ctx context.Context, client *rpc.Client, account solana.PublicKey,
 		return State{}, 0, fmt.Errorf("failed to fetch state account at address '%s': %w", account.String(), err)
 	}
 
+	// check for nil pointers
+	if res == nil || res.Value == nil || res.Value.Data == nil {
+		return State{}, 0, errors.New("nil pointer returned in GetState.GetAccountInfoWithOpts")
+	}
+
 	var state State
 	if err := bin.NewBinDecoder(res.Value.Data.GetBinary()).Decode(&state); err != nil {
 		return State{}, 0, fmt.Errorf("failed to decode state account data: %w", err)
@@ -236,6 +241,11 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 	})
 	if err != nil {
 		return Answer{}, 0, errors.Wrap(err, "error on rpc.GetAccountInfo [cursor]")
+	}
+
+	// check for nil pointers
+	if res == nil || res.Value == nil || res.Value.Data == nil {
+		return Answer{}, 0, errors.New("nil pointer returned in GetLatestTransmission.GetAccountInfoWithOpts.Header")
 	}
 
 	// parse header
@@ -272,6 +282,10 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 	})
 	if err != nil {
 		return Answer{}, 0, errors.Wrap(err, "error on rpc.GetAccountInfo [transmission]")
+	}
+	// check for nil pointers
+	if res == nil || res.Value == nil || res.Value.Data == nil {
+		return Answer{}, 0, errors.New("nil pointer returned in GetLatestTransmission.GetAccountInfoWithOpts.Transmission")
 	}
 
 	// parse tranmission

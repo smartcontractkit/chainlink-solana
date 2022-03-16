@@ -20,7 +20,10 @@ func (c *ContractTracker) Transmit(
 ) error {
 	recent, err := c.client.rpc.GetRecentBlockhash(ctx, c.client.commitment)
 	if err != nil {
-		return errors.Wrap(err, "error on Transmit.GetRecentBlock")
+		return errors.Wrap(err, "error on Transmit.GetRecentBlockhash")
+	}
+	if recent == nil || recent.Value == nil {
+		return errors.New("nil pointer returned from Transmit.GetRecentBlockhash")
 	}
 
 	// Determine store authority
