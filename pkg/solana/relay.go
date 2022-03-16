@@ -53,7 +53,7 @@ type Relayer struct {
 }
 
 // Note: constructed in core
-func NewRelayer(lggr logger.Logger) *Relayer {
+func NewRelayer(lggr logger.Logger, chainSet ChainSet) *Relayer {
 	return &Relayer{
 		lggr: lggr,
 	}
