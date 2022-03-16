@@ -87,7 +87,7 @@ func (c ReportCodec) MedianFromReport(report types.Report) (*big.Int, error) {
 	}
 
 	// unpack median observation
-	start := 4 + 1 + 32
+	start := int(ReportHeaderLen)
 	end := start + int(MedianLen)
 	median := report[start:end]
 	return ToBigInt(median, uint(MedianLen))

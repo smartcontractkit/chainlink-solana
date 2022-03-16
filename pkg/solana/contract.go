@@ -229,8 +229,8 @@ func GetState(ctx context.Context, client *rpc.Client, account solana.PublicKey,
 
 func GetLatestTransmission(ctx context.Context, client *rpc.Client, account solana.PublicKey, rpcCommitment rpc.CommitmentType) (Answer, uint64, error) {
 	// query for transmission header
-	var headerStart uint64 = 8 // skip account discriminator
-	headerLen := HeaderLen
+	headerStart := AccountDiscriminatorLen // skip account discriminator
+	headerLen := TransmissionsHeaderLen
 	res, err := client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
 		Commitment: rpcCommitment,
@@ -268,9 +268,8 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 
 	// setup transmissionLen
 	transmissionLen := TransmissionLen
-	headerArea := uint64(192) // area allocated to header
 
-	var transmissionOffset uint64 = 8 + headerArea + (uint64(cursor) * transmissionLen)
+	var transmissionOffset uint64 = AccountDiscriminatorLen + TransmissionsHeaderMaxSize + (uint64(cursor) * transmissionLen)
 
 	res, err = client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
