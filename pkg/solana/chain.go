@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
 type ChainSet interface {
@@ -16,7 +17,7 @@ type Chain interface {
 	ServiceCtx
 
 	ID() string
-	Config() Config
+	Config() config.Config
 	TxManager() TxManager
 	// Reader returns a new Reader. If nodeName is provided, the underlying client must use that node.
 	Reader(nodeName string) (client.Reader, error)
