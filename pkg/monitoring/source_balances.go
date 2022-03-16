@@ -87,6 +87,11 @@ func (s *balancesSource) Fetch(ctx context.Context) (interface{}, error) {
 				isErr = true
 				return
 			}
+			if res == nil {
+				s.log.Errorw("failed to read the sol balance", "key", key, "address", address.String(), "error", "GetBalance returned nil pointer")
+				isErr = true
+				return
+			}
 			balances.Values[key] = res.Value
 			balances.Addresses[key] = address
 		}(key, address)

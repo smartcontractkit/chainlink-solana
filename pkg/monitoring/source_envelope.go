@@ -83,7 +83,7 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("failed to read the feed's link balance: %w", err))
 			return
 		}
-		if linkBalanceRes.Value == nil {
+		if linkBalanceRes == nil || linkBalanceRes.Value == nil {
 			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("link balance not found for token vault"))
 			return
 		}
