@@ -4,6 +4,7 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST } from '../../../lib/contracts'
+import { isValidTokenAccount } from './utils'
 
 export default class CreateAccount extends SolanaCommand {
   static id = 'token:create_account'
@@ -15,15 +16,6 @@ export default class CreateAccount extends SolanaCommand {
 
     this.requireFlag('address', `Provide an address from which the 'Token Associated Account' will be derived`)
     this.require(!!args[0], 'Provide a token address')
-  }
-
-  isAssociatedTokenAddressCreated = async (token: Token, address: PublicKey) => {
-    try {
-      const info = await token.getAccountInfo(address)
-      return !!info.address
-    } catch (e) {
-      return false
-    }
   }
 
   execute = async () => {
@@ -43,7 +35,7 @@ export default class CreateAccount extends SolanaCommand {
       secretKey: Buffer.from([]),
     })
 
-    const accountExists = await this.isAssociatedTokenAddressCreated(token, associatedAcc)
+    const accountExists = await isValidTokenAccount(token, associatedAcc)
     this.require(
       !accountExists,
       `A Token Associated Account to address ${newAccountBase.toString()} already exists: ${associatedAcc}`,
