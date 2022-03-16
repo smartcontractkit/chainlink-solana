@@ -70,7 +70,8 @@ func NewClient(spec OCR2Spec, logger Logger) *Client {
 	return client
 }
 
-// GetBlockHeight returns the height of the most recent processed block in the chain, coalescing requests.
+// GetBlockHeight returns the height of the most recent processed slot in the chain, coalescing requests.
+// GetBlockHeight is a required method for libocr, however this implementation uses solana slots to match the onchain implementation
 func (c Client) GetBlockHeight(ctx context.Context, commitment rpc.CommitmentType) (blockHeight uint64, err error) {
 	// do single flight request
 	v, err, _ := c.requestGroup.Do("GetSlotHeight", func() (interface{}, error) {
