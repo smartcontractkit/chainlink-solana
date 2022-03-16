@@ -5,6 +5,7 @@ import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from '@solana/sp
 import { PublicKey, TransactionInstruction } from '@solana/web3.js'
 import { TOKEN_DECIMALS } from '../../../lib/constants'
 import { CONTRACT_LIST } from '../../../lib/contracts'
+import { isValidTokenAccount } from './utils'
 
 export default class TransferToken extends SolanaCommand {
   static id = 'token:transfer'
@@ -19,15 +20,6 @@ export default class TransferToken extends SolanaCommand {
     this.requireFlag('to', 'Provide a token destination address')
     this.requireFlag('amount', 'Provide a token amount')
     this.require(!!args[0], 'Provide a token address')
-  }
-
-  isValidTokenAccount = async (token: Token, account: PublicKey) => {
-    try {
-      const info = await token.getAccountInfo(new PublicKey(account))
-      return !!info.address
-    } catch (e) {
-      return false
-    }
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
@@ -49,7 +41,7 @@ export default class TransferToken extends SolanaCommand {
     const destination = new PublicKey(this.flags.to)
     const amount = new BN(this.flags.amount).mul(new BN(10).pow(new BN(TOKEN_DECIMALS)))
     this.require(
-      await this.isValidTokenAccount(token, destination),
+      await isValidTokenAccount(token, destination),
       `Destination ${destination.toString()} is not a valid token account`,
     )
 
