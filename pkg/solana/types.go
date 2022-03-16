@@ -9,18 +9,20 @@ import (
 )
 
 const (
-	// Slot, Timestamp, Padding0, Answer, Padding1, Padding2
+	AccountDiscriminatorLen uint64 = 8
+
+	// TransmissionLen = Slot, Timestamp, Padding0, Answer, Padding1, Padding2
 	TransmissionLen uint64 = 8 + 4 + 4 + 16 + 8 + 8
-	// Timestamp(uint64), Answer
-	TransmissionLenV1 uint64 = 8 + 16
 
-	// Version, State, Owner, ProposedOwner, Writer, Description, Decimals, FlaggingThreshold, LatestRoundID, Granularity, LiveLength, LiveCursor, HistoricalCursor
-	HeaderLen uint64 = 1 + 1 + 32 + 32 + 32 + 32 + 1 + 4 + 4 + 1 + 4 + 4 + 4
+	// TransmissionsHeaderLen = Version, State, Owner, ProposedOwner, Writer, Description, Decimals, FlaggingThreshold, LatestRoundID, Granularity, LiveLength, LiveCursor, HistoricalCursor
+	TransmissionsHeaderLen uint64 = 1 + 1 + 32 + 32 + 32 + 32 + 1 + 4 + 4 + 1 + 4 + 4 + 4
+	TransmissionsHeaderMaxSize uint64 = 192 // max area allocated to transmissions header
 
-	// Report data (61 bytes)
+	// ReportLen data (61 bytes)
 	MedianLen uint64 = 16
 	JuelsLen  uint64 = 8
-	ReportLen uint64 = 4 + 1 + 32 + MedianLen + JuelsLen // TODO: explain all
+	ReportHeaderLen uint64 = 4 + 1 + 32 // timestamp (uint32) + number of observers (uint8) + observer array [32]uint8
+	ReportLen uint64 = ReportHeaderLen + MedianLen + JuelsLen
 
 	// MaxOracles is the maximum number of oracles that can be stored onchain
 	MaxOracles = 19
