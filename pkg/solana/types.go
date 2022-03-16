@@ -1,6 +1,7 @@
 package solana
 
 import (
+	"errors"
 	"math/big"
 
 	bin "github.com/gagliardetto/binary"
@@ -20,6 +21,11 @@ const (
 	MedianLen uint64 = 16
 	JuelsLen  uint64 = 8
 	ReportLen uint64 = 4 + 1 + 32 + MedianLen + JuelsLen // TODO: explain all
+
+	// MaxOracles is the maximum number of oracles that can be stored onchain
+	MaxOracles = 19
+	// MaxOffchainConfigLen is the maximum byte length for the encoded offchainconfig
+	MaxOffchainConfigLen = 4096
 )
 
 // State is the struct representing the contract state
@@ -42,12 +48,15 @@ type SigningKey struct {
 
 type OffchainConfig struct {
 	Version uint64
-	Raw     [4096]byte
+	Raw     [MaxOffchainConfigLen]byte
 	Len     uint64
 }
 
-func (oc OffchainConfig) Data() []byte {
-	return oc.Raw[:oc.Len]
+func (oc OffchainConfig) Data() ([]byte, error) {
+	if oc.Len > MaxOffchainConfigLen {
+		return []byte{}, errors.New("OffchainConfig.Len exceeds MaxOffchainConfigLen")
+	}
+	return oc.Raw[:oc.Len], nil
 }
 
 // Config contains the configuration of the contract
@@ -74,12 +83,15 @@ type Config struct {
 
 // Oracles contains the list of oracles
 type Oracles struct {
-	Raw [19]Oracle
+	Raw [MaxOracles]Oracle
 	Len uint64
 }
 
-func (o Oracles) Data() []Oracle {
-	return o.Raw[:o.Len]
+func (o Oracles) Data() ([]Oracle, error) {
+	if o.Len > MaxOffchainConfigLen {
+		return []Oracle{}, errors.New("Oracles.Len exceeds MaxOracles")
+	}
+	return o.Raw[:o.Len], nil
 }
 
 // Oracle contains information about the reporting nodes

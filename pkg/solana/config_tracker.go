@@ -22,7 +22,11 @@ func (c *ContractTracker) LatestConfigDetails(ctx context.Context) (changedInBlo
 func ConfigFromState(state State) (types.ContractConfig, error) {
 	pubKeys := []types.OnchainPublicKey{}
 	accounts := []types.Account{}
-	for _, o := range state.Oracles.Data() {
+	oracles, err := state.Oracles.Data()
+	if err != nil {
+		return types.ContractConfig{}, err
+	}
+	for _, o := range oracles {
 		o := o //  https://github.com/golang/go/wiki/CommonMistakes#using-reference-to-loop-iterator-variable
 		pubKeys = append(pubKeys, o.Signer.Key[:])
 		accounts = append(accounts, types.Account(o.Transmitter.String()))
@@ -36,6 +40,10 @@ func ConfigFromState(state State) (types.ContractConfig, error) {
 	if err != nil {
 		return types.ContractConfig{}, err
 	}
+	offchainConfig, err := state.OffchainConfig.Data()
+	if err != nil {
+		return types.ContractConfig{}, err
+	}
 
 	return types.ContractConfig{
 		ConfigDigest:          state.Config.LatestConfigDigest,
@@ -45,7 +53,7 @@ func ConfigFromState(state State) (types.ContractConfig, error) {
 		F:                     state.Config.F,
 		OnchainConfig:         onchainConfig,
 		OffchainConfigVersion: state.OffchainConfig.Version,
-		OffchainConfig:        state.OffchainConfig.Data(),
+		OffchainConfig:        offchainConfig,
 	}, nil
 }
 

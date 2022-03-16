@@ -27,12 +27,16 @@ func TestState_Decode(t *testing.T) {
 	assert.Equal(t, mockState.ConfigDigestHex,
 		hex.EncodeToString(state.Config.LatestConfigDigest[:]))
 	assert.Equal(t, uint64(19), state.Oracles.Len)
-	assert.Equal(t, 19, len(state.Oracles.Data()))
+	oracles, err := state.Oracles.Data()
+	assert.NoError(t, err)
+	assert.Equal(t, 19, len(oracles))
 	assert.Equal(t, uint64(2), state.OffchainConfig.Version)
 	assert.Equal(t, uint64(6), state.OffchainConfig.Len)
+	offchainConfig, err := state.OffchainConfig.Data()
+	assert.NoError(t, err)
 	assert.True(t, bytes.Equal(
 		[]byte{4, 5, 6, 4, 5, 6},
-		state.OffchainConfig.Data()))
+		offchainConfig))
 }
 
 var mockState = struct {
