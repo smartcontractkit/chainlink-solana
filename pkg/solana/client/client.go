@@ -11,6 +11,7 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
+//go:generate mockery --name ReaderWriter --output ./mocks/
 type ReaderWriter interface {
 	Writer
 	Reader
