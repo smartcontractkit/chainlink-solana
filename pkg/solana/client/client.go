@@ -50,7 +50,7 @@ type Client struct {
 func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration, log logger.Logger) (*Client, error) {
 	return &Client{
 		rpc:             rpc.New(endpoint),
-		skipPreflight:   !cfg.SkipPreflight(),
+		skipPreflight:   cfg.SkipPreflight(),
 		commitment:      cfg.Commitment(),
 		txTimeout:       cfg.TxTimeout(),
 		contextDuration: requestTimeout,
