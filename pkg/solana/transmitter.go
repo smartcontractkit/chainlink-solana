@@ -18,7 +18,7 @@ func (c *ContractTracker) Transmit(
 	report types.Report,
 	sigs []types.AttributedOnchainSignature,
 ) error {
-	recent, err := c.client.rpc.GetRecentBlockhash(ctx, c.client.commitment)
+	recent, err := c.reader.RecentBlockhash()
 	if err != nil {
 		return errors.Wrap(err, "error on Transmit.GetRecentBlockhash")
 	}
@@ -84,21 +84,10 @@ func (c *ContractTracker) Transmit(
 
 	// Send transaction, and wait for confirmation:
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), c.client.txTimeout)
-		defer cancel()
-		txSig, err := c.client.rpc.SendTransactionWithOpts(
-			ctx, // does not use libocr transmit context
-			tx,
-			c.client.skipPreflight,
-			c.client.commitment,
-		)
-
-		if err != nil {
-			c.lggr.Errorf("error on Transmit.SendAndConfirmTransaction: %s", err.Error())
-			return
+		// send to tx manager
+		if err := c.txManager.Enqueue(c.StateID.String(), tx); err != nil {
+			c.lggr.Errorf("error on Transmit.txManager.Enqueue: %s", err.Error())
 		}
-		// TODO: poll rpc for tx confirmation (WS connection unreliable)
-		c.lggr.Debugf("tx signature from Transmit.SendAndConfirmTransaction: %s", txSig.String())
 	}()
 	return nil
 }
