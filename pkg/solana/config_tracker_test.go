@@ -5,14 +5,13 @@ import (
 	"testing"
 
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestLatestBlockHeight(t *testing.T) {
 	ctx := context.Background()
 	c := &ContractTracker{
-		client: NewClient(OCR2Spec{NodeEndpointHTTP: rpc.DevNet_RPC}, logger.TestLogger(t)),
+		reader: testSetupReader(t, rpc.DevNet_RPC),
 	}
 
 	h, err := c.LatestBlockHeight(ctx)

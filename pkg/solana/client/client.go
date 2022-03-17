@@ -21,7 +21,7 @@ type Reader interface {
 	Balance(addr solana.PublicKey) (uint64, error)
 	SlotHeight() (uint64, error)
 	AccountInfo(addr solana.PublicKey, opts *rpc.GetAccountInfoOpts) (*rpc.GetAccountInfoResult, error)
-	RecentBlockhash(commitment rpc.CommitmentType) (*rpc.GetRecentBlockhashResult, error)
+	RecentBlockhash() (*rpc.GetRecentBlockhashResult, error)
 }
 
 type Writer interface {
@@ -87,7 +87,7 @@ func (c *Client) AccountInfo(addr solana.PublicKey, opts *rpc.GetAccountInfoOpts
 	return c.rpc.GetAccountInfoWithOpts(ctx, addr, opts)
 }
 
-func (c *Client) RecentBlockhash(commitment rpc.CommitmentType) (*rpc.GetRecentBlockhashResult, error) {
+func (c *Client) RecentBlockhash() (*rpc.GetRecentBlockhashResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.contextDuration)
 	defer cancel()
 	return c.rpc.GetRecentBlockhash(ctx, c.commitment)
