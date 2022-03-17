@@ -180,3 +180,38 @@ func TestStatePolling(t *testing.T) {
 	assert.Equal(t, expectedTime, answer.Timestamp)
 	assert.Equal(t, expectedAns, answer.Data.String())
 }
+
+func TestNilPointerHandling(t *testing.T) {
+	passFirst := false
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var data []byte
+		if passFirst {
+			// successful transmissions query
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			data = testTransmissionsResponse(t, body, 0)
+			passFirst = false
+		} else {
+			// bad payload missing data
+			data = []byte(`{"jsonrpc":"2.0","result":{"context": {"slot":1},"value": {"executable": false,"lamports": 1000000000,"owner": "11111111111111111111111111111111","rentEpoch":2}},"id":1}`)
+		}
+		_, err := w.Write(data)
+		require.NoError(t, err)
+	}))
+	defer mockServer.Close()
+
+	errString := "nil pointer returned in "
+
+	// fail on get state query
+	_, _, err := GetState(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
+	assert.EqualError(t, err, errString+"GetState.GetAccountInfoWithOpts")
+
+	// fail on transmissions header query
+	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
+	assert.EqualError(t, err, errString+"GetLatestTransmission.GetAccountInfoWithOpts.Header")
+
+	passFirst = true // allow proper response for header query, fail on transmission
+	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
+	assert.EqualError(t, err, errString+"GetLatestTransmission.GetAccountInfoWithOpts.Transmission")
+
+}
