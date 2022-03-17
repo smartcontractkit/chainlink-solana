@@ -2056,13 +2056,11 @@ github.com/sirupsen/logrus v1.8.1 h1:dJKuHgqk1NNQlqoA6BTlM1Wf9DOH3NBjQyu0h9+AZZE
 github.com/sirupsen/logrus v1.8.1/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
 github.com/smartcontractkit/chainlink v0.8.10-0.20200825114219-81dd2fc95bac/go.mod h1:j7qIYHGCN4QqMXdO8g8A9dmUT5vKFmkxPSbjAIfrfNU=
 github.com/smartcontractkit/chainlink v0.9.5-0.20201207211610-6c7fee37d5b7/go.mod h1:kmdLJbVZRCnBLiL6gG+U+1+0ofT3bB48DOF8tjQvcoI=
-github.com/smartcontractkit/chainlink v1.2.1-0.20220308211624-def53d2c8f38 h1:gsipmHrnKw37GEApcrmJZVi6wGSGc4sr40SCwDzKFTI=
-github.com/smartcontractkit/chainlink v1.2.1-0.20220308211624-def53d2c8f38/go.mod h1:p9G12PMLyJdA4PDKsTQtkqZlbij0JO/XR3Yyq8P+M9M=
 github.com/smartcontractkit/chainlink v1.2.1-0.20220315133704-8769e75d54b1 h1:AZdn1C2/nEo7hpzwMtGIrqjuZlJ+h+1yoB9VR+J3Zyg=
 github.com/smartcontractkit/chainlink v1.2.1-0.20220315133704-8769e75d54b1/go.mod h1:4s2uP2/uabZH5j0VwEZoHgmjTiD/sKo6f5H4/GECN1Y=
-github.com/smartcontractkit/chainlink-relay v0.0.0-20220307003623-2fd8786a6e1f h1:Lctf/SspqDaoOgyTUhu/xVyt1clD+msko1OZDtrxt1Q=
-github.com/smartcontractkit/chainlink-relay v0.0.0-20220307003623-2fd8786a6e1f/go.mod h1:/6gP9XHTQEBeBnXtC9oF1VelYhPMtGDu+6LxLtFP01g=
-github.com/smartcontractkit/chainlink-terra v0.1.4-0.20220308190332-ea421a9fd285 h1:ohuDlFMOe8FwPFhKOWAoQPlKYhyGMH8gQBmtwchYHWs=
+github.com/smartcontractkit/chainlink-relay v0.0.0-20220317101556-ad02f88fa139 h1:2MxD97k/VvpDl3ukzBcqqRuf61x67BwEDZkk0WP1cQg=
+github.com/smartcontractkit/chainlink-relay v0.0.0-20220317101556-ad02f88fa139/go.mod h1:/6gP9XHTQEBeBnXtC9oF1VelYhPMtGDu+6LxLtFP01g=
+github.com/smartcontractkit/chainlink-terra v0.1.4-0.20220315114020-a15962b0ed9b h1:t6aU0/re3Oy1lUwc0Jxnqjs8hx24wiyFh82yLSm+Bj0=
 github.com/smartcontractkit/helmenv v1.0.36 h1:RSgEyvWstAuH5BCssPeSeDrxywvAFHP8sqw2Ft55VaQ=
 github.com/smartcontractkit/helmenv v1.0.36/go.mod h1:pkScfFRZM9UhMAqeG+Bfxyy7YjLWh8pY6vmNGdTpKJs=
 github.com/smartcontractkit/integrations-framework v1.0.50 h1:r9f0pRWGOT4CcPUx6XAf+LRON8SDbda3zbf2kR1O8WQ=
