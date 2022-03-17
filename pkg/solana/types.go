@@ -90,7 +90,7 @@ type Oracles struct {
 }
 
 func (o Oracles) Data() ([]Oracle, error) {
-	if o.Len > MaxOffchainConfigLen {
+	if o.Len > MaxOracles {
 		return []Oracle{}, errors.New("Oracles.Len exceeds MaxOracles")
 	}
 	return o.Raw[:o.Len], nil

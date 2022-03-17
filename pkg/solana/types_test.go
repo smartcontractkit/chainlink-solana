@@ -39,6 +39,38 @@ func TestState_Decode(t *testing.T) {
 		offchainConfig))
 }
 
+func TestOffchainConfig_Data(t *testing.T) {
+	c := OffchainConfig{
+		Len: MaxOffchainConfigLen + 1,
+	}
+
+	// exceeded length does not cause panic, returns error
+	_, err := c.Data()
+	assert.Error(t, err)
+
+	// returns expected output value
+	c.Len = 1
+	out, err := c.Data()
+	assert.NoError(t, err)
+	assert.Equal(t, []byte{0}, out)
+}
+
+func TestOracles_Data(t *testing.T) {
+	c := Oracles{
+		Len: MaxOracles + 1,
+	}
+
+	// exceeded length does not cause panic, returns error
+	_, err := c.Data()
+	assert.Error(t, err)
+
+	// returns expected output value
+	c.Len = 1
+	out, err := c.Data()
+	assert.NoError(t, err)
+	assert.Equal(t, []Oracle{Oracle{}}, out)
+}
+
 var mockState = struct {
 	ConfigDigestHex string
 	Raw             []byte
