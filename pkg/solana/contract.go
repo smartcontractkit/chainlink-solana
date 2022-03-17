@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	configVersion       uint8 = 1
+	configVersion uint8 = 1
 )
 
 type ContractTracker struct {
@@ -160,7 +160,7 @@ func (c *ContractTracker) ReadAnswer() (Answer, error) {
 func (c *ContractTracker) fetchState(ctx context.Context) error {
 
 	c.lggr.Debugf("fetch state for account: %s", c.StateID.String())
-	state, _, err := GetState(ctx, c.reader, c.StateID)
+	state, _, err := GetState(ctx, c.reader, c.StateID, c.cfg.Commitment())
 	if err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ func (c *ContractTracker) fetchState(ctx context.Context) error {
 
 func (c *ContractTracker) fetchLatestTransmission(ctx context.Context) error {
 	c.lggr.Debugf("fetch latest transmission for account: %s", c.TransmissionsID)
-	answer, _, err := GetLatestTransmission(ctx, c.reader, c.TransmissionsID)
+	answer, _, err := GetLatestTransmission(ctx, c.reader, c.TransmissionsID, c.cfg.Commitment())
 	if err != nil {
 		return err
 	}
@@ -191,9 +191,10 @@ func (c *ContractTracker) fetchLatestTransmission(ctx context.Context) error {
 	return nil
 }
 
-func GetState(ctx context.Context, reader client.Reader, account solana.PublicKey) (State, uint64, error) {
-	res, err := reader.AccountInfo(account, &rpc.GetAccountInfoOpts{
-		Encoding: "base64",
+func GetState(ctx context.Context, reader client.AccountReader, account solana.PublicKey, commitment rpc.CommitmentType) (State, uint64, error) {
+	res, err := reader.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
+		Commitment: commitment,
+		Encoding:   "base64",
 	})
 	if err != nil {
 		return State{}, 0, fmt.Errorf("failed to fetch state account at address '%s': %w", account.String(), err)
@@ -218,12 +219,13 @@ func GetState(ctx context.Context, reader client.Reader, account solana.PublicKe
 	return state, blockNum, nil
 }
 
-func GetLatestTransmission(ctx context.Context, reader client.Reader, account solana.PublicKey) (Answer, uint64, error) {
+func GetLatestTransmission(ctx context.Context, reader client.AccountReader, account solana.PublicKey, commitment rpc.CommitmentType) (Answer, uint64, error) {
 	// query for transmission header
 	headerStart := AccountDiscriminatorLen // skip account discriminator
 	headerLen := TransmissionsHeaderLen
-	res, err := reader.AccountInfo(account, &rpc.GetAccountInfoOpts{
+	res, err := reader.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
+		Commitment: commitment,
 		DataSlice: &rpc.DataSlice{
 			Offset: &headerStart,
 			Length: &headerLen,
@@ -261,8 +263,9 @@ func GetLatestTransmission(ctx context.Context, reader client.Reader, account so
 
 	var transmissionOffset = AccountDiscriminatorLen + TransmissionsHeaderMaxSize + (uint64(cursor) * transmissionLen)
 
-	res, err = reader.AccountInfo(account, &rpc.GetAccountInfoOpts{
+	res, err = reader.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
+		Commitment: commitment,
 		DataSlice: &rpc.DataSlice{
 			Offset: &transmissionOffset,
 			Length: &transmissionLen,

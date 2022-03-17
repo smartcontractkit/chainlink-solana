@@ -16,29 +16,6 @@ type ReaderWriter struct {
 	mock.Mock
 }
 
-// AccountInfo provides a mock function with given fields: addr, opts
-func (_m *ReaderWriter) AccountInfo(addr solana.PublicKey, opts *rpc.GetAccountInfoOpts) (*rpc.GetAccountInfoResult, error) {
-	ret := _m.Called(addr, opts)
-
-	var r0 *rpc.GetAccountInfoResult
-	if rf, ok := ret.Get(0).(func(solana.PublicKey, *rpc.GetAccountInfoOpts) *rpc.GetAccountInfoResult); ok {
-		r0 = rf(addr, opts)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*rpc.GetAccountInfoResult)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(solana.PublicKey, *rpc.GetAccountInfoOpts) error); ok {
-		r1 = rf(addr, opts)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // Balance provides a mock function with given fields: addr
 func (_m *ReaderWriter) Balance(addr solana.PublicKey) (uint64, error) {
 	ret := _m.Called(addr)
@@ -53,6 +30,29 @@ func (_m *ReaderWriter) Balance(addr solana.PublicKey) (uint64, error) {
 	var r1 error
 	if rf, ok := ret.Get(1).(func(solana.PublicKey) error); ok {
 		r1 = rf(addr)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetAccountInfoWithOpts provides a mock function with given fields: ctx, addr, opts
+func (_m *ReaderWriter) GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetAccountInfoOpts) (*rpc.GetAccountInfoResult, error) {
+	ret := _m.Called(ctx, addr, opts)
+
+	var r0 *rpc.GetAccountInfoResult
+	if rf, ok := ret.Get(0).(func(context.Context, solana.PublicKey, *rpc.GetAccountInfoOpts) *rpc.GetAccountInfoResult); ok {
+		r0 = rf(ctx, addr, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*rpc.GetAccountInfoResult)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, solana.PublicKey, *rpc.GetAccountInfoOpts) error); ok {
+		r1 = rf(ctx, addr, opts)
 	} else {
 		r1 = ret.Error(1)
 	}

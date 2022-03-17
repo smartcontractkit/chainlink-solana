@@ -18,10 +18,15 @@ type ReaderWriter interface {
 }
 
 type Reader interface {
+	AccountReader
 	Balance(addr solana.PublicKey) (uint64, error)
 	SlotHeight() (uint64, error)
-	AccountInfo(addr solana.PublicKey, opts *rpc.GetAccountInfoOpts) (*rpc.GetAccountInfoResult, error)
 	RecentBlockhash() (*rpc.GetRecentBlockhashResult, error)
+}
+
+// AccountReader is an interface that allows users to pass either the solana rpc client or the relay client
+type AccountReader interface {
+	GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetAccountInfoOpts) (*rpc.GetAccountInfoResult, error)
 }
 
 type Writer interface {
@@ -80,10 +85,10 @@ func (c *Client) SlotHeight() (uint64, error) {
 	return v.(uint64), nil
 }
 
-func (c *Client) AccountInfo(addr solana.PublicKey, opts *rpc.GetAccountInfoOpts) (*rpc.GetAccountInfoResult, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), c.contextDuration)
+func (c *Client) GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetAccountInfoOpts) (*rpc.GetAccountInfoResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
-	opts.Commitment = c.commitment // use client commitment type
+	opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
 	return c.rpc.GetAccountInfoWithOpts(ctx, addr, opts)
 }
 
