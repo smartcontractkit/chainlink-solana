@@ -60,13 +60,13 @@ func (_m *ReaderWriter) Balance(addr solana.PublicKey) (uint64, error) {
 	return r0, r1
 }
 
-// RecentBlockhash provides a mock function with given fields: commitment
-func (_m *ReaderWriter) RecentBlockhash(commitment rpc.CommitmentType) (*rpc.GetRecentBlockhashResult, error) {
-	ret := _m.Called(commitment)
+// RecentBlockhash provides a mock function with given fields:
+func (_m *ReaderWriter) RecentBlockhash() (*rpc.GetRecentBlockhashResult, error) {
+	ret := _m.Called()
 
 	var r0 *rpc.GetRecentBlockhashResult
-	if rf, ok := ret.Get(0).(func(rpc.CommitmentType) *rpc.GetRecentBlockhashResult); ok {
-		r0 = rf(commitment)
+	if rf, ok := ret.Get(0).(func() *rpc.GetRecentBlockhashResult); ok {
+		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*rpc.GetRecentBlockhashResult)
@@ -74,8 +74,8 @@ func (_m *ReaderWriter) RecentBlockhash(commitment rpc.CommitmentType) (*rpc.Get
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(rpc.CommitmentType) error); ok {
-		r1 = rf(commitment)
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
 	} else {
 		r1 = ret.Error(1)
 	}
