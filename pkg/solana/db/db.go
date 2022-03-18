@@ -1,12 +1,14 @@
 package db
 
 import (
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
 	"time"
-
-	"github.com/smartcontractkit/chainlink/core/services/pg"
 
 	"gopkg.in/guregu/null.v4"
 
+	"github.com/smartcontractkit/chainlink/core/services/pg"
 	"github.com/smartcontractkit/chainlink/core/store/models"
 )
 
@@ -58,4 +60,17 @@ type ChainCfg struct {
 	TxTimeout           *models.Duration
 	SkipPreflight       null.Bool // to enable or disable preflight checks
 	Commitment          null.String
+}
+
+func (c *ChainCfg) Scan(value interface{}) error {
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, c)
+}
+
+func (c ChainCfg) Value() (driver.Value, error) {
+	return json.Marshal(c)
 }
