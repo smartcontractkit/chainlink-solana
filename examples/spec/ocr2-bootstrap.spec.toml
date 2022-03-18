@@ -6,12 +6,8 @@ contractID                             = "<insert solana ocr2 state account>"
 p2pPeerID                              = "<insert p2p id>"                  # overrides P2P_PEER_ID
 
 [relayConfig]
-nodeEndpointHTTP   = "http:..."
+chainID            = "<insert solana chain id>"
+nodeName           = "<insert solana node name>" # optional: will automatically select one associated to chainID
 ocr2ProgramID      = "<insert solana ocr2 program ID>"
 transmissionsID    = "<insert solana ocr2 transmissions account>"
 storeProgramID     = "<insert solana ocr2 store account>"
-commitment         = "confirmed" # optional, defaults to "confirmed"
-txTimeout          = "1m"        # optional, defaults to "1m"
-pollingInterval    = "1s"        # optional, defaults to "1s"
-pollingCtxTimeout  = "2s"        # optional, defaults to `2x ${pollingInterval}`
-staleTimeout       = "1m"        # optional, defaults to "1m"
