@@ -2,9 +2,9 @@ package solana
 
 import (
 	"context"
-	"errors"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
@@ -96,11 +96,11 @@ func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay
 
 	chain, err := r.chainSet.Chain(r.ctx, spec.ChainID)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error in NewOCR2Provider.chainSet.Chain")
 	}
 	chainReader, err := chain.Reader(spec.NodeName)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error in NewOCR2Provider.chain.Reader")
 	}
 	msgEnqueuer := chain.TxManager()
 	cfg := chain.Config()
