@@ -27,10 +27,13 @@ func main() {
 
 func RelayConfig(ctx *pulumi.Context, addresses map[int]string) (map[string]string, error) {
 	return map[string]string{
-		"nodeEndpointHTTP": config.Require(ctx, "CL-RELAY_HTTP"),
-		"ocr2ProgramID":    addresses[solana.OCR2],
-		"transmissionsID":  addresses[solana.OCRTransmissions],
-		"storeProgramID":   addresses[solana.Store],
+		"chainID":         "localnet",
+		"ocr2ProgramID":   addresses[solana.OCR2],
+		"transmissionsID": addresses[solana.OCRTransmissions],
+		"storeProgramID":  addresses[solana.Store],
+
+		// not used in spec, used in chains/nodes config
+		"solanaURL": config.Require(ctx, "CL-RELAY_HTTP"),
 	}, nil
 }
 
