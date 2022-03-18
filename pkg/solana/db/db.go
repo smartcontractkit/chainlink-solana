@@ -38,7 +38,7 @@ type Chain struct {
 }
 
 type NewNode struct {
-	Name          string
+	Name          string `json:"name"`
 	SolanaChainID string `json:"solanaChainId" db:"solana_chain_id"`
 	SolanaURL     string `json:"solanaURL" db:"solana_url"`
 }
