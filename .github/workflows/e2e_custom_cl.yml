@@ -56,12 +56,15 @@ jobs:
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v2
-      - name: go version
-        run: go version
+      - name: Parse Go version
+        id: go-version
+        run: |
+          GO_VERSION=$(cat ./.tool-versions | grep golang | sed -En "s/golang.(.*)/\1/p")
+          echo "::set-output name=GO_VERSION::${GO_VERSION}"
       - name: Setup go
         uses: actions/setup-go@v1
         with:
-          go-version: 1.17.2
+          go-version: ${{ steps.go-version.outputs.GO_VERSION }}
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -82,18 +85,20 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+            ~/go/bin
+          key: ${{ runner.os }}-go2-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-
+            ${{ runner.os }}-go2-
       - name: Download Go Vendor Packages
         if: steps.cache-packages.outputs.cache-hit != 'true'
-        run: go mod download
+        run: make download
       - name: Install Ginkgo CLI
+        if: steps.cache-packages.outputs.cache-hit != 'true'
         run: |
-          go get github.com/onsi/ginkgo/v2/ginkgo/generators@v2.1.2
-          go get github.com/onsi/ginkgo/v2/ginkgo/internal@v2.1.2
-          go get github.com/onsi/ginkgo/v2/ginkgo/labels@v2.1.2
-          go install github.com/onsi/ginkgo/v2/ginkgo
+          make install
+      - name: Check for ginkgo ls
+        run: |
+          ls ~/go/bin/
       - uses: actions/download-artifact@master
         with:
           name: target
@@ -108,7 +113,7 @@ jobs:
           CGO_ENABLED: 1
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
-          ginkgo tests/e2e/smoke
+          make test_smoke
       - name: Publish Test Results
         uses: mikepenz/action-junit-report@v2
         if: always()

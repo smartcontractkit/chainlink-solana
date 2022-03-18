@@ -5,76 +5,76 @@ on:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        platform: [ubuntu-latest]
-        node-version: [14.x]
+    runs-on: ubuntu-latest
     env:
       CI: true
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-    runs-on: ${{ matrix.platform }}
-
     steps:
       - uses: actions/checkout@v2
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
+      - name: Parse Node version
+        id: node-version
+        run: |
+          NODE_VERSION=$(cat ./.tool-versions | grep nodejs | sed -En "s/nodejs.(.*)/\1/p")
+          echo "::set-output name=NODE_VERSION::${NODE_VERSION}"
+      - name: Setup Node ${{ steps.node-version.outputs.NODE_VERSION }}
+        uses: actions/setup-node@v2
         with:
-          node-version: ${{ matrix.node-version }}
-      - run: |
+          node-version: ${{ steps.node-version.outputs.NODE_VERSION }}
+      - name: Install
+        run: |
           npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
-          cd gauntlet
-          ${{ matrix.env }} yarn install
-      - run: |
-          cd gauntlet
-          ${{ matrix.env }} yarn build
-      - run: |
-          cd gauntlet
-          ${{ matrix.env }} yarn gauntlet
+          yarn --cwd ./gauntlet install --frozen-lockfile
+      - name: Build
+        run: |
+          yarn --cwd ./gauntlet build
+      - name: Run Gauntlet
+        run: |
+          yarn --cwd ./gauntlet gauntlet
 
   format:
-    strategy:
-      matrix:
-        platform: [ubuntu-latest]
-        node-version: [14.x]
+    runs-on: ubuntu-latest
     env:
       CI: true
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-    runs-on: ${{ matrix.platform }}
-
     steps:
       - uses: actions/checkout@v2
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
+      - name: Parse Node version
+        id: node-version
+        run: |
+          NODE_VERSION=$(cat ./.tool-versions | grep nodejs | sed -En "s/nodejs.(.*)/\1/p")
+          echo "::set-output name=NODE_VERSION::${NODE_VERSION}"
+      - name: Setup Node ${{ steps.node-version.outputs.NODE_VERSION }}
+        uses: actions/setup-node@v2
         with:
-          node-version: ${{ matrix.node-version }}
-      - run: |
+          node-version: ${{ steps.node-version.outputs.NODE_VERSION }}
+      - name: Install
+        run: |
           npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
-          cd gauntlet
-          ${{ matrix.env }} yarn install
-      - run: |
-          cd gauntlet
-          ${{ matrix.env }} yarn lint:format
+          yarn --cwd ./gauntlet install --frozen-lockfile
+      - name: Lint
+        run: |
+          yarn --cwd ./gauntlet lint:format
 
   test:
-    strategy:
-      matrix:
-        platform: [ubuntu-latest]
-        node-version: [14.x]
+    runs-on: ubuntu-latest
     env:
       CI: true
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-    runs-on: ${{ matrix.platform }}
-
     steps:
       - uses: actions/checkout@v2
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
+      - name: Parse Node version
+        id: node-version
+        run: |
+          NODE_VERSION=$(cat ./.tool-versions | grep nodejs | sed -En "s/nodejs.(.*)/\1/p")
+          echo "::set-output name=NODE_VERSION::${NODE_VERSION}"
+      - name: Setup Node ${{ steps.node-version.outputs.NODE_VERSION }}
+        uses: actions/setup-node@v2
         with:
-          node-version: ${{ matrix.node-version }}
-      - run: |
+          node-version: ${{ steps.node-version.outputs.NODE_VERSION }}
+      - name: Install
+        run: |
           npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
-          cd gauntlet
-          ${{ matrix.env }} yarn install
-      - run: |
-          cd gauntlet
-          ${{ matrix.env }} yarn test:ci
+          yarn --cwd ./gauntlet install --frozen-lockfile
+      - name: test:ci
+        run: |
+          yarn --cwd ./gauntlet test:ci

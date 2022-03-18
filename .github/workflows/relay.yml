@@ -12,15 +12,20 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
-      - uses: actions/setup-go@v1
+      - name: Install Nix
+        uses: cachix/install-nix-action@v14
         with:
-          go-version: 1.17
+          install_url: https://nixos-nix-install-tests.cachix.org/serve/vij683ly7sl95nnhb67bdjjfabclr85m/install
+          install_options: "--tarball-url-prefix https://nixos-nix-install-tests.cachix.org/serve"
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
       - name: Build
-        run: go build -v ./pkg/...
+        run: nix develop -c go build -v ./pkg/...
       - name: Test
-        run: go test ./pkg/... -v
+        run: nix develop -c go test ./pkg/... -v
       - name: Test with the race detector enabled
-        run: go test ./pkg/... -v -race -count=10
+        run: nix develop -c go test ./pkg/... -v -race -count=10
 
   lint:
     runs-on: ubuntu-latest
