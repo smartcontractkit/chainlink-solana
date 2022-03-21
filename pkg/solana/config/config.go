@@ -12,12 +12,12 @@ import (
 
 // Global terra defaults.
 var defaultConfigSet = configSet{
-	BlockRate:           5 * time.Millisecond, // approximate slot rate
-	ConfirmPollPeriod:   time.Second,          // polling for tx confirmation
-	OCR2CachePollPeriod: time.Second,          // cache polling rate
-	OCR2CacheTTL:        time.Minute,          // stale cache deadline
-	TxTimeout:           time.Minute,          // transaction timeout
-	SkipPreflight:       true,                 // to enable or disable preflight checks
+	BlockRate:           500 * time.Millisecond, // approximate slot rate
+	ConfirmPollPeriod:   time.Second,            // polling for tx confirmation
+	OCR2CachePollPeriod: time.Second,            // cache polling rate
+	OCR2CacheTTL:        time.Minute,            // stale cache deadline
+	TxTimeout:           time.Minute,            // transaction timeout
+	SkipPreflight:       true,                   // to enable or disable preflight checks
 	Commitment:          rpc.CommitmentConfirmed,
 }
 
