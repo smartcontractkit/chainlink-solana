@@ -206,7 +206,7 @@ export default class AcceptProposal extends SolanaCommand {
     const rawTx = await this.makeRawTransaction(signer)
     await this.simulateTx(signer, rawTx)
     await prompt(`Continue accepting proposal of proposal ${this.flags.proposalId} on aggregator ${this.args[0]}?`)
-    
+
     const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx)
     logger.success(`Accepted proposal on tx ${txhash}`)
 
