@@ -269,7 +269,7 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 	// setup transmissionLen
 	transmissionLen := TransmissionLen
 
-	var transmissionOffset uint64 = AccountDiscriminatorLen + TransmissionsHeaderMaxSize + (uint64(cursor) * transmissionLen)
+	var transmissionOffset = AccountDiscriminatorLen + TransmissionsHeaderMaxSize + (uint64(cursor) * transmissionLen)
 
 	res, err = client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
