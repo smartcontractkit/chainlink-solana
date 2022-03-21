@@ -198,12 +198,15 @@ export default class AcceptProposal extends SolanaCommand {
   }
 
   execute = async () => {
+    const signer = this.wallet.publicKey
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
 
-    const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
+    const rawTx = await this.makeRawTransaction(signer)
+    await this.simulateTx(signer, rawTx)
     await prompt(`Continue accepting proposal of proposal ${this.flags.proposalId} on aggregator ${this.args[0]}?`)
+    
     const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx)
     logger.success(`Accepted proposal on tx ${txhash}`)
 
