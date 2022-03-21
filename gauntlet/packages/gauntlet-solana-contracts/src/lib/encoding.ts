@@ -3,6 +3,16 @@ import { join } from 'path'
 import { OffchainConfig } from '../commands/contracts/ocr2/proposeOffchainConfig'
 import { descriptor as OCR2Descriptor } from './ocr2Proto'
 
+export const deserializeConfig = (buffer: Buffer): any => {
+  const proto = new Proto.Protobuf({ descriptor: OCR2Descriptor })
+  const offchain = proto.decode('offchainreporting2_config.OffchainConfigProto', buffer)
+  const reportingPluginConfig = proto.decode(
+    'offchainreporting2_config.ReportingPluginConfig',
+    offchain.reportingPluginConfig,
+  )
+  return { ...offchain, reportingPluginConfig }
+}
+
 export const serializeOffchainConfig = async (
   input: OffchainConfig,
   gauntletSecret: string,
