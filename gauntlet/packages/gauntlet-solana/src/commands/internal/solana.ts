@@ -102,6 +102,25 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     }
   }
 
+  simulateTx = async (signer: PublicKey, txInstructions: TransactionInstruction[]) => {
+    try {
+      const tx = makeTx(txInstructions, {
+        feePayer: signer,
+      })
+      // simulating through connection allows to skip signing tx (useful when using Ledger device)
+      const { value: simulationResponse } = await this.provider.connection.simulateTransaction(tx)
+      if (simulationResponse.err) {
+        const errorDetails =
+          typeof simulationResponse.err === 'object' ? JSON.stringify(simulationResponse.err) : simulationResponse.err
+        throw errorDetails
+      }
+      logger.success(`Tx simulation succeeded: ${simulationResponse.unitsConsumed} units consumed.`)
+    } catch (err) {
+      logger.error(`Tx simulation failed: ${err}`)
+      throw err
+    }
+  }
+
   sendTx = async (tx: Transaction, signers: Keypair[], idl: Idl): Promise<TransactionSignature> => {
     try {
       return await this.provider.send(tx, signers)

@@ -114,6 +114,7 @@ export const wrapCommand = (command) => {
 
       const instructionIndex = new BN(this.flags.instruction || 0).toNumber()
       const rawTxs = await this.command.makeRawTransaction(multisigSigner)
+      await this.command.simulateTx(multisigSigner, rawTxs)
       await this.showExecutionInstructions(rawTxs, instructionIndex)
       const rawTx = rawTxs[instructionIndex]
 
