@@ -54,7 +54,10 @@ func JuelsSource(priceAdapter string) string {
 	 sol2usd [type=bridge name=%s requestData=<{"data":{"from":"SOL", "to":"USD"}}>]
 	 parseT [type="jsonparse" path="result"]
 
-	 divide [type="divide" input="$(parseL)" divisor="$(parseT)" precision="9"]
+	 // parseL (dollars/LINK)
+	 // parseT (dollars/SOL)
+	 // parseT / parseL = LINK/SOL
+	 divide [type="divide" input="$(parseT)" divisor="$(parseL)" precision="9"]
    scale [type="multiply" times=1000000000]
 
 	 link2usd -> parseL -> divide
