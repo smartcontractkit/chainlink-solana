@@ -15,7 +15,7 @@ import (
 
 // Ensure your env is using go 1.18 then in pkg/solana:
 // go test -tags=go1.18 -fuzz ./...
-func FuzzMedianFromReport(f *testing.F) {
+func FuzzReportCodecMedianFromReport(f *testing.F) {
 	cdc := ReportCodec{}
 	report, err := cdc.BuildReport([]median.ParsedAttributedObservation{
 		{Timestamp: uint32(time.Now().Unix()), Value: big.NewInt(10), JuelsPerFeeCoin: big.NewInt(100000)},
