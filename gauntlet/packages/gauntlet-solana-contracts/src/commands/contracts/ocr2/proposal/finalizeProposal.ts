@@ -32,8 +32,11 @@ export default class FinalizeProposal extends SolanaCommand {
   }
 
   execute = async () => {
-    const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
+    const signer = this.wallet.publicKey
+    const rawTx = await this.makeRawTransaction(signer)
+    await this.simulateTx(signer, rawTx)
     await prompt(`Continue finalizing proposal?`)
+    
     const txhash = await this.signAndSendRawTx(rawTx)
     logger.success(`Proposal finalized on tx ${txhash}`)
 

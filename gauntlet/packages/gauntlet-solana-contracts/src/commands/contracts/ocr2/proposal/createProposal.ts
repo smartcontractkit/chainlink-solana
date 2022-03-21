@@ -45,9 +45,13 @@ export default class CreateProposal extends SolanaCommand {
   }
 
   execute = async () => {
+    const signer = this.wallet.publicKey
+
     const proposal = Keypair.generate()
-    const rawTx = await this.makeRawTransaction(this.wallet.publicKey, proposal.publicKey)
+    const rawTx = await this.makeRawTransaction(signer, proposal.publicKey)
+    await this.simulateTx(signer, rawTx)
     await prompt(`Continue creating config proposal?`)
+    
     const txhash = await this.signAndSendRawTx(rawTx, [proposal])
     logger.success(`Proposal created on tx ${txhash}`)
     logger.line()
