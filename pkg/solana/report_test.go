@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBuildReport(t *testing.T) {
@@ -60,7 +61,7 @@ func TestBuildReport(t *testing.T) {
 	assert.Equal(t, v.FillBytes(make([]byte, 8)), []byte(report[ReportLen-8:ReportLen]), "validate juelsToEth")
 }
 
-func TestMedianFromReport(t *testing.T) {
+func TestMedianFromOnChainReport(t *testing.T) {
 	c := ReportCodec{}
 
 	report := types.Report{
@@ -74,6 +75,71 @@ func TestMedianFromReport(t *testing.T) {
 	res, err := c.MedianFromReport(report)
 	assert.NoError(t, err)
 	assert.Equal(t, "1234567890", res.String())
+}
+
+func TestMedianFromReport(t *testing.T) {
+	cdc := ReportCodec{}
+	// Requires at least one obs
+	_, err := cdc.BuildReport(nil)
+	require.Error(t, err)
+	var tt = []struct {
+		name           string
+		obs            []*big.Int
+		expectedMedian *big.Int
+	}{
+		{
+			name:           "2 positive one zero",
+			obs:            []*big.Int{big.NewInt(0), big.NewInt(10), big.NewInt(20)},
+			expectedMedian: big.NewInt(10),
+		},
+		{
+			name:           "one zero",
+			obs:            []*big.Int{big.NewInt(0)},
+			expectedMedian: big.NewInt(0),
+		},
+		{
+			name:           "two equal",
+			obs:            []*big.Int{big.NewInt(1), big.NewInt(1)},
+			expectedMedian: big.NewInt(1),
+		},
+		{
+			name: "one negative one positive",
+			obs:  []*big.Int{big.NewInt(-1), big.NewInt(1)},
+			// sorts to -1, 1
+			expectedMedian: big.NewInt(1),
+		},
+		{
+			name: "two negative",
+			obs:  []*big.Int{big.NewInt(-2), big.NewInt(-1)},
+			// will sort to -2, -1
+			expectedMedian: big.NewInt(-1),
+		},
+		{
+			name: "three negative",
+			obs:  []*big.Int{big.NewInt(-5), big.NewInt(-3), big.NewInt(-1)},
+			// will sort to -5, -3, -1
+			expectedMedian: big.NewInt(-3),
+		},
+	}
+	for _, tc := range tt {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			var pos []median.ParsedAttributedObservation
+			for i, obs := range tc.obs {
+				pos = append(pos, median.ParsedAttributedObservation{
+					Value:           obs,
+					JuelsPerFeeCoin: obs,
+					Observer:        commontypes.OracleID(uint8(i))},
+				)
+			}
+			report, err := cdc.BuildReport(pos)
+			require.NoError(t, err)
+			med, err := cdc.MedianFromReport(report)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedMedian.String(), med.String())
+		})
+	}
+
 }
 
 func TestHashReport(t *testing.T) {
