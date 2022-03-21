@@ -51,7 +51,7 @@ export default class CreateProposal extends SolanaCommand {
     const rawTx = await this.makeRawTransaction(signer, proposal.publicKey)
     await this.simulateTx(signer, rawTx)
     await prompt(`Continue creating config proposal?`)
-    
+
     const txhash = await this.signAndSendRawTx(rawTx, [proposal])
     logger.success(`Proposal created on tx ${txhash}`)
     logger.line()
