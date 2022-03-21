@@ -1,6 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, BN, prompt, diff } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { Idl, Program } from '@project-serum/anchor'
 import { PublicKey } from '@solana/web3.js'
 import { ORACLES_MAX_LENGTH } from '../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
@@ -15,19 +16,22 @@ type Input = {
   proposalId: string
 }
 
+const _toHex = (a: string) => Buffer.from(a, 'hex')
+
 export default class ProposeConfig extends SolanaCommand {
   static id = 'ocr2:propose_config'
   static category = CONTRACT_LIST.OCR_2
-
   static examples = [
     'yarn gauntlet ocr2:propose_config --network=devnet --rdd=[PATH_TO_RDD] --proposalId=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC [AGGREGATOR_ADDRESS]',
   ]
+
+  private program: Program<Idl>
 
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
     const rdd = RDD.load(this.flags.network, this.flags.rdd)
     const aggregator = rdd.contracts[this.args[0]]
-    const _toHex = (a: string) => Buffer.from(a, 'hex')
+
     const aggregatorOperators: any[] = aggregator.oracles.map((o) => rdd.operators[o.operator])
     const oracles = aggregatorOperators
       .map((operator) => ({
@@ -35,7 +39,13 @@ export default class ProposeConfig extends SolanaCommand {
         signer: operator.ocr2OnchainPublicKey[0].replace('ocr2on_solana_', ''),
       }))
       .sort((a, b) => Buffer.compare(_toHex(a.signer), _toHex(b.signer)))
+
     const f = aggregator.config.f
+
+    const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
+    const address = ocr2.programId.toString()
+    this.program = this.loadProgram(ocr2.idl, address)
+
     return {
       oracles,
       f,
@@ -49,12 +59,11 @@ export default class ProposeConfig extends SolanaCommand {
     this.requireArgs('Please provide an aggregator address')
   }
 
-  makeRawTransaction = async (signer: PublicKey) => {
-    const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
-    const address = ocr2.programId.toString()
-    const program = this.loadProgram(ocr2.idl, address)
+  makeRawTransaction = async (signer: PublicKey, input?: Input) => {
+    if (!input) {
+      input = this.makeInput(this.flags.input)
+    }
 
-    const input = this.makeInput(this.flags.input)
     const proposal = new PublicKey(input.proposalId)
 
     const oracles = input.oracles.map(({ signer, transmitter }) => ({
@@ -70,8 +79,7 @@ export default class ProposeConfig extends SolanaCommand {
       `Oracles max length is ${ORACLES_MAX_LENGTH}, currently ${oracles.length}`,
     )
 
-    logger.log('Config information:', input)
-    const ix = program.instruction.proposeConfig(oracles, f, {
+    const ix = this.program.instruction.proposeConfig(oracles, f, {
       accounts: {
         proposal,
         authority: signer,
@@ -81,9 +89,48 @@ export default class ProposeConfig extends SolanaCommand {
     return [ix]
   }
 
+  beforeExecute = async (input: Input) => {
+    const aggregator = new PublicKey(this.args[0])
+    const contractState = await this.program.account.state.fetch(aggregator)
+
+    // Prepare contract config
+    const contractOracles = contractState.oracles?.xs
+      .slice(0, contractState.oracles.len.toNumber())
+      .sort((a, b) => Buffer.compare(_toHex(a.signer.key), _toHex(b.signer.key)))
+    const contractOraclesForDiff = contractOracles?.reduce((acc, { signer, transmitter }, idx) => {
+      return {
+        ...acc,
+        [`oracle#${idx}`]: {
+          signer: Buffer.from(signer.key).toString('hex'),
+          transmitter: transmitter.toString(),
+        },
+      }
+    }, {})
+
+    const contractConfig = {
+      f: contractState.config.f,
+      oracles: contractOraclesForDiff,
+    }
+
+    const proposedConfig = {
+      f: input.f,
+      oracles: input.oracles.reduce((acc, oracle, idx) => {
+        return { ...acc, [`oracle#${idx}`]: oracle }
+      }, {}),
+    }
+
+    diff.printDiff(contractConfig, proposedConfig)
+  }
+
   execute = async () => {
-    const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
+    const signer = this.wallet.publicKey
+    const input = this.makeInput(this.flags.input)
+
+    const rawTx = await this.makeRawTransaction(signer, input)
+    await this.beforeExecute(input)
+    await this.simulateTx(signer, rawTx)
     await prompt(`Continue setting config on ${this.args[0].toString()}?`)
+
     const txhash = await this.signAndSendRawTx(rawTx)
     logger.success(`Config set on tx ${txhash}`)
 
