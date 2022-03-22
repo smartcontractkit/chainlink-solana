@@ -17,24 +17,31 @@ export const makeCloseCommand = (contractId: CONTRACT_LIST): SolanaConstructor =
       this.require(!!this.flags.state, 'Please provide flags with "state"')
     }
 
-    execute = async () => {
+    makeRawTransaction = async (signer) => {
       const contract = getContract(contractId, '')
       const address = contract.programId.toString()
       const program = this.loadProgram(contract.idl, address)
 
-      const owner = this.wallet.payer
-
       const state = new PublicKey(this.flags.state)
+
+      const ix = program.instruction.close({
+        accounts: {
+          state: state,
+          receiver: signer,
+          authority: signer,
+        },
+      })
+
+      return [ix]
+    }
+
+    execute = async () => {
+      const state = new PublicKey(this.flags.state)
+      const ixs = await this.makeRawTransaction(this.wallet.publicKey)
 
       await prompt(`Continue closing ${contractId} state with address ${state.toString()}?`)
 
-      const tx = await await program.rpc.close({
-        accounts: {
-          state: state,
-          receiver: owner.publicKey,
-          authority: owner.publicKey,
-        },
-      })
+      const tx = await this.signAndSendRawTx(ixs)
 
       logger.success(`Closed state ${state.toString()} on tx ${tx}`)
 
