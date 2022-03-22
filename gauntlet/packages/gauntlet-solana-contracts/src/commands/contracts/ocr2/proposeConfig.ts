@@ -25,7 +25,7 @@ export default class ProposeConfig extends SolanaCommand {
     'yarn gauntlet ocr2:propose_config --network=devnet --rdd=[PATH_TO_RDD] --proposalId=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC [AGGREGATOR_ADDRESS]',
   ]
 
-  private program: Program<Idl>
+  input: Input
 
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
@@ -42,10 +42,6 @@ export default class ProposeConfig extends SolanaCommand {
 
     const f = aggregator.config.f
 
-    const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
-    const address = ocr2.programId.toString()
-    this.program = this.loadProgram(ocr2.idl, address)
-
     return {
       oracles,
       f,
@@ -57,6 +53,14 @@ export default class ProposeConfig extends SolanaCommand {
     super(flags, args)
     this.require(!!this.flags.proposalId, 'Please provide flags with "proposalId"')
     this.requireArgs('Please provide an aggregator address')
+  }
+
+  buildCommand = async (flags, args) => {
+    const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
+    this.program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
+    this.input = this.makeInput(flags.input)
+
+    return this
   }
 
   makeRawTransaction = async (signer: PublicKey, input?: Input) => {
@@ -89,7 +93,7 @@ export default class ProposeConfig extends SolanaCommand {
     return [ix]
   }
 
-  beforeExecute = async (input: Input) => {
+  beforeExecute = async () => {
     const aggregator = new PublicKey(this.args[0])
     const contractState = await this.program.account.state.fetch(aggregator)
 
@@ -113,21 +117,26 @@ export default class ProposeConfig extends SolanaCommand {
     }
 
     const proposedConfig = {
-      f: input.f,
-      oracles: input.oracles.reduce((acc, oracle, idx) => {
+      f: this.input.f,
+      oracles: this.input.oracles.reduce((acc, oracle, idx) => {
         return { ...acc, [`oracle#${idx}`]: oracle }
       }, {}),
     }
 
+    logger.info(`Proposing new config on contract ${this.args[0]}:`)
     diff.printDiff(contractConfig, proposedConfig)
+
+    await prompt('Continue?')
   }
 
   execute = async () => {
+    await this.buildCommand(this.flags, this.args)
+
     const signer = this.wallet.publicKey
     const input = this.makeInput(this.flags.input)
 
     const rawTx = await this.makeRawTransaction(signer, input)
-    await this.beforeExecute(input)
+    await this.beforeExecute()
     await this.simulateTx(signer, rawTx)
     await prompt(`Continue setting config on ${this.args[0].toString()}?`)
 

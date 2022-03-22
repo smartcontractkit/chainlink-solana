@@ -20,8 +20,17 @@ import { makeTx } from '../../lib/utils'
 export default abstract class SolanaCommand extends WriteCommand<TransactionResponse> {
   wallet: SolanaWallet
   provider: Provider
+  program: Program
+
   abstract execute: () => Promise<Result<TransactionResponse>>
   makeRawTransaction: (signer: PublicKey) => Promise<TransactionInstruction[]>
+
+  buildCommand?: (flags, args) => Promise<SolanaCommand>
+  beforeExecute?: (signer: PublicKey) => Promise<void>
+
+  afterExecute = async (response: Result<TransactionResponse>): Promise<void> => {
+    logger.success(`Execution finished at transaction: ${response.responses[0].tx.hash}`)
+  }
 
   constructor(flags, args) {
     super(flags, args)
