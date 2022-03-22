@@ -22,6 +22,7 @@ type Reader interface {
 	Balance(addr solana.PublicKey) (uint64, error)
 	SlotHeight() (uint64, error)
 	RecentBlockhash() (*rpc.GetRecentBlockhashResult, error)
+	ChainID() (string, error)
 }
 
 // AccountReader is an interface that allows users to pass either the solana rpc client or the relay client
@@ -96,6 +97,29 @@ func (c *Client) RecentBlockhash() (*rpc.GetRecentBlockhashResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.contextDuration)
 	defer cancel()
 	return c.rpc.GetRecentBlockhash(ctx, c.commitment)
+}
+
+func (c *Client) ChainID() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), c.contextDuration)
+	defer cancel()
+	hash, err := c.rpc.GetGenesisHash(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	var network string
+	switch hash.String() {
+	case "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG":
+		network = "devnet"
+	case "4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY":
+		network = "testnet"
+	case "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d":
+		network = "mainnet"
+	default:
+		c.log.Warnf("unknown genesis hash - assuming solana chain is 'localnet'")
+		network = "localnet"
+	}
+	return network, nil
 }
 
 func (c *Client) SendTx(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
