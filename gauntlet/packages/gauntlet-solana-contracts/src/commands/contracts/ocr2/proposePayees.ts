@@ -1,7 +1,6 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt, diff } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { Idl, Program } from '@project-serum/anchor'
 import { PublicKey } from '@solana/web3.js'
 import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
@@ -24,7 +23,7 @@ export default class ProposePayees extends SolanaCommand {
     'yarn gauntlet ocr2:propose_payees --proposalId=<PROPOSAL_ID> EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC',
   ]
 
-  private program: Program<Idl>
+  input: Input
 
   makeInput = (userInput: any): Input => {
     if (userInput) return userInput as Input
@@ -63,11 +62,15 @@ export default class ProposePayees extends SolanaCommand {
     this.requireArgs('Please provide an aggregator address as arg')
   }
 
-  makeRawTransaction = async (signer: PublicKey, input?: Input) => {
-    if (!input) {
-      input = this.makeInput(this.flags.input)
-    }
+  buildCommand = async (flags, args) => {
+    const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
+    this.program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
+    this.input = await this.makeInput(flags.input)
 
+    return this
+  }
+
+  makeRawTransaction = async (signer: PublicKey) => {
     const link = new PublicKey(this.flags.link || process.env.LINK)
 
     const token = new Token(this.provider.connection, link, TOKEN_PROGRAM_ID, {
@@ -77,7 +80,7 @@ export default class ProposePayees extends SolanaCommand {
 
     const areValidPayees = (
       await Promise.all(
-        Object.entries(input.payeeByTransmitter).map(async ([transmitter, payee]) => {
+        Object.entries(this.input.payeeByTransmitter).map(async ([transmitter, payee]) => {
           try {
             const info = await token.getAccountInfo(new PublicKey(payee))
             return !!info.address
@@ -90,17 +93,17 @@ export default class ProposePayees extends SolanaCommand {
     ).every((isValid) => isValid)
 
     this.require(
-      areValidPayees || !!input.allowFundRecipient,
+      areValidPayees || !!this.input.allowFundRecipient,
       'Every payee needs to have a valid token recipient address',
     )
 
     // Set the payees in the same order the oracles are saved in the proposal
     // The length of the payees need to be same as the oracles saved
-    const proposal = new PublicKey(input.proposalId)
+    const proposal = new PublicKey(this.input.proposalId)
     const proposalInfo = await this.program.account.proposal.fetch(proposal)
     const payees = proposalInfo.oracles.xs
       .slice(0, proposalInfo.oracles.len)
-      .map(({ transmitter }) => input?.payeeByTransmitter[new PublicKey(transmitter).toString()])
+      .map(({ transmitter }) => this.input.payeeByTransmitter[new PublicKey(transmitter).toString()])
 
     const ix = this.program.instruction.proposePayees(token.publicKey, payees, {
       accounts: {
@@ -111,8 +114,8 @@ export default class ProposePayees extends SolanaCommand {
     return [ix]
   }
 
-  beforeExecute = async (input: Input) => {
-    const proposal = new PublicKey(input.proposalId)
+  beforeExecute = async () => {
+    const proposal = new PublicKey(this.input.proposalId)
     const proposalInfo = await this.program.account.proposal.fetch(proposal)
     const payeesInProposal = proposalInfo.oracles.xs.slice(0, proposalInfo.oracles.len.toNumber()).reduce(
       (agg, { transmitter, payee }, idx) => ({
@@ -130,23 +133,25 @@ export default class ProposePayees extends SolanaCommand {
         ...agg,
         [key]: {
           transmitter: (value as any).transmitter,
-          payee: input?.payeeByTransmitter[(value as any).transmitter].toString(),
+          payee: this.input?.payeeByTransmitter[(value as any).transmitter].toString(),
         },
       }),
       {},
     )
 
+    logger.info(`Proposing payees for contract ${this.args[0]}`)
     diff.printDiff(payeesInProposal, proposedPayees)
+    await prompt('Continue?')
   }
 
   execute = async () => {
-    const signer = this.wallet.publicKey
-    const input = this.makeInput(this.flags.input)
-    await this.beforeExecute(input)
+    await this.buildCommand(this.flags, this.args)
 
-    const rawTx = await this.makeRawTransaction(signer, input)
+    const signer = this.wallet.publicKey
+
+    const rawTx = await this.makeRawTransaction(signer)
     await this.simulateTx(signer, rawTx)
-    await prompt('Continue setting payees proposal?')
+    await this.beforeExecute()
 
     const txhash = await this.signAndSendRawTx(rawTx)
     logger.success(`Payees proposal set on tx hash: ${txhash}`)
