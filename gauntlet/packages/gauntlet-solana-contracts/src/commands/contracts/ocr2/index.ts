@@ -18,7 +18,7 @@ import ProposeConfig from './proposeConfig'
 import ProposeOffchainConfig from './proposeOffchainConfig'
 import ProposePayees from './proposePayees'
 import FinalizeProposal from './proposal/finalizeProposal'
-import { makeCloseCommand } from '../../abstract/close'
+import CloseOCR2 from './close'
 
 export default [
   Initialize,
@@ -42,5 +42,5 @@ export default [
   // ONLY DEV
   Transmit,
   SetupFlow,
-  makeCloseCommand(CONTRACT_LIST.OCR_2),
+  CloseOCR2,
 ]

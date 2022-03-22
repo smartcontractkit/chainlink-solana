@@ -5,7 +5,6 @@ import { makeAcceptOwnershipCommand } from '../ownership/acceptOwnership'
 import { makeTransferOwnershipCommand } from '../ownership/transferOwnership'
 import { CONTRACT_LIST } from '../../../lib/contracts'
 import { makeUpgradeProgramCommand } from '../../abstract/upgrade'
-import { makeCloseCommand } from '../../abstract/close'
 
 export default [
   Initialize,
@@ -14,5 +13,4 @@ export default [
   makeAcceptOwnershipCommand(CONTRACT_LIST.ACCESS_CONTROLLER),
   makeTransferOwnershipCommand(CONTRACT_LIST.ACCESS_CONTROLLER),
   makeUpgradeProgramCommand(CONTRACT_LIST.ACCESS_CONTROLLER),
-  makeCloseCommand(CONTRACT_LIST.ACCESS_CONTROLLER),
 ]

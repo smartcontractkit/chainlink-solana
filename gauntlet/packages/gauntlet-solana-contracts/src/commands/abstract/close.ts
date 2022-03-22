@@ -1,58 +1,67 @@
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand } from '@chainlink/gauntlet-solana'
-import { PublicKey } from '@solana/web3.js'
-import { CONTRACT_LIST, getContract } from '../..'
-import { SolanaConstructor } from '../../lib/types'
+import { PublicKey, TransactionInstruction } from '@solana/web3.js'
+import { CONTRACT_LIST, getContract } from '../../lib/contracts'
 
-export const makeCloseCommand = (contractId: CONTRACT_LIST): SolanaConstructor => {
-  return class Close extends SolanaCommand {
-    static id = `${contractId}:close`
-    static category = contractId
+export default abstract class Close extends SolanaCommand {
+  static makeId = (contractId: CONTRACT_LIST) => `${contractId}:close`
+  static makeCategory = (contractId: CONTRACT_LIST) => contractId
+  static makeDescription = (contractId: CONTRACT_LIST) =>
+    `Closes a ${contractId} account returning the account funds to the signer. Only the contract owner can close it`
+  static makeExamples = (contractId: CONTRACT_LIST) => [
+    `yarn gauntlet ${contractId}:close --network=<NETWORK> <PROGRAM_STATE>`,
+  ]
 
-    static examples = [`yarn gauntlet ${contractId}:close --network=devnet --state=[PROGRAM_STATE]`]
+  contractId: CONTRACT_LIST
 
-    constructor(flags, args) {
-      super(flags, args)
+  constructor(flags, args) {
+    super(flags, args)
+    this.require(!!this.args[0], 'Please provide a valid account address as an argument')
+  }
 
-      this.require(!!this.flags.state, 'Please provide flags with "state"')
-    }
+  prepareInstruction = async (
+    signer: PublicKey,
+    extraAccounts: { [key: string]: PublicKey } = {},
+    closeFunction: string = 'close',
+  ): Promise<TransactionInstruction[]> => {
+    const contract = getContract(this.contractId, '')
+    const address = contract.programId.toString()
+    const program = this.loadProgram(contract.idl, address)
 
-    makeRawTransaction = async (signer) => {
-      const contract = getContract(contractId, '')
-      const address = contract.programId.toString()
-      const program = this.loadProgram(contract.idl, address)
+    const state = new PublicKey(this.args[0])
 
-      const state = new PublicKey(this.flags.state)
+    logger.loading(
+      `Preparing instruction to close account from ${this.contractId} contract with address ${state.toString()}`,
+    )
 
-      const ix = program.instruction.close({
-        accounts: {
-          state: state,
-          receiver: signer,
-          authority: signer,
+    const ix = program.instruction[closeFunction]({
+      accounts: {
+        receiver: signer,
+        authority: signer,
+        ...extraAccounts,
+      },
+    })
+
+    return [ix]
+  }
+
+  execute = async () => {
+    const state = new PublicKey(this.args[0])
+    const ixs = await this.makeRawTransaction(this.wallet.publicKey)
+
+    await prompt(`Continue closing ${this.contractId} state with address ${state.toString()}?`)
+
+    const tx = await this.signAndSendRawTx(ixs)
+
+    logger.success(`Closed state ${state.toString()} on tx ${tx}`)
+
+    return {
+      responses: [
+        {
+          tx: this.wrapResponse(tx, state.toString(), { state: state.toString() }),
+          contract: state.toString(),
         },
-      })
-
-      return [ix]
-    }
-
-    execute = async () => {
-      const state = new PublicKey(this.flags.state)
-      const ixs = await this.makeRawTransaction(this.wallet.publicKey)
-
-      await prompt(`Continue closing ${contractId} state with address ${state.toString()}?`)
-
-      const tx = await this.signAndSendRawTx(ixs)
-
-      logger.success(`Closed state ${state.toString()} on tx ${tx}`)
-
-      return {
-        responses: [
-          {
-            tx: this.wrapResponse(tx, state.toString(), { state: state.toString() }),
-            contract: state.toString(),
-          },
-        ],
-      }
+      ],
     }
   }
 }
