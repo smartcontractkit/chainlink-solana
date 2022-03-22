@@ -18,11 +18,11 @@ func (c *ContractTracker) Transmit(
 	report types.Report,
 	sigs []types.AttributedOnchainSignature,
 ) error {
-	recent, err := c.reader.RecentBlockhash()
+	blockhash, err := c.reader.LatestBlockhash()
 	if err != nil {
 		return errors.Wrap(err, "error on Transmit.GetRecentBlockhash")
 	}
-	if recent == nil || recent.Value == nil {
+	if blockhash == nil || blockhash.Value == nil {
 		return errors.New("nil pointer returned from Transmit.GetRecentBlockhash")
 	}
 
@@ -63,7 +63,7 @@ func (c *ContractTracker) Transmit(
 		[]solana.Instruction{
 			solana.NewInstruction(c.ProgramID, accounts, data.Bytes()),
 		},
-		recent.Value.Blockhash,
+		blockhash.Value.Blockhash,
 		solana.TransactionPayer(c.Transmitter.PublicKey()),
 	)
 	if err != nil {
