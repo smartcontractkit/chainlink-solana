@@ -21,7 +21,7 @@ type Reader interface {
 	AccountReader
 	Balance(addr solana.PublicKey) (uint64, error)
 	SlotHeight() (uint64, error)
-	RecentBlockhash() (*rpc.GetRecentBlockhashResult, error)
+	LatestBlockhash() (*rpc.GetLatestBlockhashResult, error)
 	ChainID() (string, error)
 }
 
@@ -93,10 +93,10 @@ func (c *Client) GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicK
 	return c.rpc.GetAccountInfoWithOpts(ctx, addr, opts)
 }
 
-func (c *Client) RecentBlockhash() (*rpc.GetRecentBlockhashResult, error) {
+func (c *Client) LatestBlockhash() (*rpc.GetLatestBlockhashResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.contextDuration)
 	defer cancel()
-	return c.rpc.GetRecentBlockhash(ctx, c.commitment)
+	return c.rpc.GetLatestBlockhash(ctx, c.commitment)
 }
 
 func (c *Client) ChainID() (string, error) {

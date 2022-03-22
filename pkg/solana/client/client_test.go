@@ -43,7 +43,7 @@ func TestClient_Reader_HappyPath(t *testing.T) {
 			out = `{"jsonrpc":"2.0","result":{"context": {"slot":1},"value": 1},"id":1}`
 		case "getSlot":
 			out = `{"jsonrpc":"2.0","result":1,"id":1}`
-		case "getRecentBlockhash":
+		case "getLatestBlockhash":
 			out = `{"jsonrpc":"2.0","result":{"context":{"slot":1},"value":{"blockhash":"11111111111111111111111111111111","feeCalculator":{"lamportsPerSignature":1}}},"id":0}`
 		case "getAccountInfo":
 			out = `{"jsonrpc":"2.0","result":{"context":{"slot":1},"value":{"data":["c29sYW5hX3N5c3RlbV9wcm9ncmFt","base64"],"executable":true,"lamports":1,"owner":"11111111111111111111111111111111","rentEpoch":0}},"id":0}`
@@ -76,7 +76,7 @@ func TestClient_Reader_HappyPath(t *testing.T) {
 	assert.Equal(t, uint64(1), slot)
 
 	// fetch recent blockhash
-	hash, err := c.RecentBlockhash()
+	hash, err := c.LatestBlockhash()
 	assert.NoError(t, err)
 	assert.Equal(t, "11111111111111111111111111111111", hash.Value.Blockhash.String())
 

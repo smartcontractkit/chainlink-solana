@@ -81,16 +81,16 @@ func (_m *ReaderWriter) GetAccountInfoWithOpts(ctx context.Context, addr solana.
 	return r0, r1
 }
 
-// RecentBlockhash provides a mock function with given fields:
-func (_m *ReaderWriter) RecentBlockhash() (*rpc.GetRecentBlockhashResult, error) {
+// LatestBlockhash provides a mock function with given fields:
+func (_m *ReaderWriter) LatestBlockhash() (*rpc.GetLatestBlockhashResult, error) {
 	ret := _m.Called()
 
-	var r0 *rpc.GetRecentBlockhashResult
-	if rf, ok := ret.Get(0).(func() *rpc.GetRecentBlockhashResult); ok {
+	var r0 *rpc.GetLatestBlockhashResult
+	if rf, ok := ret.Get(0).(func() *rpc.GetLatestBlockhashResult); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*rpc.GetRecentBlockhashResult)
+			r0 = ret.Get(0).(*rpc.GetLatestBlockhashResult)
 		}
 	}
 
