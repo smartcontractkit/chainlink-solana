@@ -115,12 +115,19 @@ export const wrapCommand = (command) => {
 
       const instructionIndex = new BN(this.flags.instruction || 0).toNumber()
       const rawTxs = await this.command.makeRawTransaction(multisigSigner)
+      if (this.command.buildCommand) {
+        await this.command.buildCommand(this.flags, this.args)
+      }
       await this.command.simulateTx(multisigSigner, rawTxs)
       await this.showExecutionInstructions(rawTxs, instructionIndex)
       const rawTx = rawTxs[instructionIndex]
 
       // First step should be creating the proposal account. If no proposal flag is provided, proceed to create it
       const proposal = this.flags.proposal ? new PublicKey(this.flags.proposal) : await this.createProposalAcount()
+
+      if (this.command.beforeExecute) {
+        await this.command.beforeExecute(signer)
+      }
 
       const proposalState = await this.fetchState(proposal)
       const isCreation = !proposalState
