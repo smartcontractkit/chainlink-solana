@@ -82,14 +82,9 @@ func (c *ContractTracker) Transmit(
 	copy(finalSig[:], finalSigBytes)
 	tx.Signatures = append(tx.Signatures, finalSig)
 
-	// Send transaction, and wait for confirmation:
-	go func() {
-		// send to tx manager
-		if err := c.txManager.Enqueue(c.StateID.String(), tx); err != nil {
-			c.lggr.Errorf("error on Transmit.txManager.Enqueue: %s", err.Error())
-		}
-	}()
-	return nil
+	// pass transmit payload to tx manager queue
+	err = c.txManager.Enqueue(c.StateID.String(), tx)
+	return errors.Wrap(err, "error on Transmit.txManager.Enqueue")
 }
 
 func (c *ContractTracker) LatestConfigDigestAndEpoch(
