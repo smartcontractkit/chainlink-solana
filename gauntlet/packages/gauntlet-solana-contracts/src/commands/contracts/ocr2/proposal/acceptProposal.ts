@@ -1,16 +1,18 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { createHash } from 'crypto'
-import { logger, prompt, BN } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, prompt, BN, diff } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { utils } from '@project-serum/anchor'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import ProposeOffchainConfig, { OffchainConfig } from '../proposeOffchainConfig'
-import { serializeOffchainConfig } from '../../../../lib/encoding'
+import { serializeOffchainConfig, deserializeConfig } from '../../../../lib/encoding'
+import { prepareOffchainConfigForDiff } from '../proposeOffchainConfig'
 import RDD from '../../../../lib/rdd'
 
 type Input = {
+  proposalId: string
   version: number
   f: number
   oracles: {
@@ -20,6 +22,17 @@ type Input = {
   }[]
   offchainConfig: OffchainConfig
   randomSecret: string
+}
+
+type ContractInput = {
+  offchainDigest: Buffer
+  payees: {
+    pubkey: PublicKey
+    isWritable: boolean
+    isSigner: boolean
+  }[]
+  tokenVault: PublicKey
+  vaultAuthority: PublicKey
 }
 
 type DigestInput = {
@@ -55,18 +68,22 @@ type Proposal = {
     len: number
   }
 }
+
 export default class AcceptProposal extends SolanaCommand {
   static id = 'ocr2:accept_proposal'
   static category = CONTRACT_LIST.OCR_2
-
   static examples = [
     'yarn gauntlet ocr2:accept_proposal --network=devnet --proposalId=<PROPOSAL_ID> --rdd=<PATH_TO_RDD> <AGGREGATOR_ADDRESS>',
   ]
+
+  input: Input
+  contractInput: ContractInput
 
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
     const rdd = RDD.load(this.flags.network, this.flags.rdd)
     const aggregator = rdd.contracts[this.args[0]]
+
     const _toHex = (a: string) => Buffer.from(a, 'hex')
     const aggregatorOperators: any[] = aggregator.oracles.map((o) => rdd.operators[o.operator])
     const oracles = aggregatorOperators
@@ -76,9 +93,13 @@ export default class AcceptProposal extends SolanaCommand {
         payee: operator.adminAddress,
       }))
       .sort((a, b) => Buffer.compare(_toHex(a.signer), _toHex(b.signer)))
+
     const offchainConfig = ProposeOffchainConfig.makeInputFromRDD(rdd, this.args[0])
+
     const f = aggregator.config.f
+
     return {
+      proposalId: this.flags.proposalId || this.flags.configProposal,
       version: 2,
       f,
       oracles,
@@ -87,13 +108,50 @@ export default class AcceptProposal extends SolanaCommand {
     }
   }
 
+  makeContractInput = async (input: Input): Promise<ContractInput> => {
+    const state = new PublicKey(this.args[0])
+    const contractState = await this.program.account.state.fetch(state)
+    const offchainDigest = this.calculateProposalDigest(
+      await this.makeDigestInput(input, new PublicKey(contractState.config.tokenMint)),
+    )
+
+    const tokenVault = new PublicKey(contractState.config.tokenVault)
+    const [vaultAuthority] = await PublicKey.findProgramAddress(
+      [Buffer.from(utils.bytes.utf8.encode('vault')), state.toBuffer()],
+      this.program.programId,
+    )
+
+    const payees = contractState.oracles.xs
+      .slice(0, contractState.oracles.len.toNumber())
+      .map((oracle) => ({ pubkey: oracle.payee, isWritable: true, isSigner: false }))
+
+    return {
+      offchainDigest,
+      tokenVault,
+      vaultAuthority,
+      payees,
+    }
+  }
+
   constructor(flags, args) {
     super(flags, args)
 
-    this.require(!!this.flags.proposalId, 'Please provide flags with "proposalId"')
+    this.require(
+      !!this.flags.proposalId || !!this.flags.configProposal,
+      'Please provide Config Proposal ID with flag "proposalId" or "configProposal"',
+    )
     this.requireArgs('Please provide an aggregator address as argument')
     this.require(!!this.flags.secret, 'Please provide flags with "secret"')
     this.require(!!process.env.SECRET, 'Please set the SECRET env var')
+  }
+
+  buildCommand = async (flags, args) => {
+    const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
+    this.program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
+    this.input = this.makeInput(flags.input)
+    this.contractInput = await this.makeContractInput(this.input)
+
+    return this
   }
 
   makeDigestInputFromProposal = (proposalInfo: Proposal): DigestInput => {
@@ -150,64 +208,72 @@ export default class AcceptProposal extends SolanaCommand {
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
-    const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
-    const address = ocr2.programId.toString()
-    const program = this.loadProgram(ocr2.idl, address)
-
-    const state = new PublicKey(this.args[0])
-    const proposal = new PublicKey(this.flags.proposalId)
-    const input = this.makeInput(this.flags.input)
-
-    const data = await program.account.state.fetch(state)
-    const proposalInfo = (await program.account.proposal.fetch(proposal)) as Proposal
-
-    const offchainDigest = this.calculateProposalDigest(
-      await this.makeDigestInput(input, new PublicKey(data.config.tokenMint)),
-    )
-    const isSameDigest =
-      Buffer.compare(this.calculateProposalDigest(this.makeDigestInputFromProposal(proposalInfo)), offchainDigest) === 0
-
-    this.require(isSameDigest, 'Digest generated is different from the onchain digest')
-    logger.success('Generated configuration matches with onchain proposal configuration')
-
-    const stateInfo = await program.account.state.fetch(state)
-    const tokenVault = new PublicKey(stateInfo.config.tokenVault)
-    const [vaultAuthority] = await PublicKey.findProgramAddress(
-      [Buffer.from(utils.bytes.utf8.encode('vault')), state.toBuffer()],
-      program.programId,
-    )
-
-    const payees = stateInfo.oracles.xs
-      .slice(0, stateInfo.oracles.len)
-      .map((oracle) => ({ pubkey: oracle.payee, isWritable: true, isSigner: false }))
-
-    const tx = program.instruction.acceptProposal(offchainDigest, {
+    const tx = this.program.instruction.acceptProposal(this.contractInput.offchainDigest, {
       accounts: {
-        state: state,
-        proposal: proposal,
+        state: new PublicKey(this.args[0]),
+        proposal: new PublicKey(this.input.proposalId),
         receiver: signer,
         authority: signer,
-        tokenVault: tokenVault,
-        vaultAuthority: vaultAuthority,
+        tokenVault: this.contractInput.tokenVault,
+        vaultAuthority: this.contractInput.vaultAuthority,
         tokenProgram: TOKEN_PROGRAM_ID,
       },
-      remainingAccounts: payees,
+      remainingAccounts: this.contractInput.payees,
     })
 
     return [tx]
   }
 
+  beforeExecute = async () => {
+    const contractState = await this.program.account.state.fetch(new PublicKey(this.args[0]))
+    const proposalState = await this.program.account.proposal.fetch(new PublicKey(this.input.proposalId))
+
+    const [contractConfig, proposalConfig] = [contractState, proposalState].map((state) => {
+      const oracles = state.oracles?.xs.slice(0, state.oracles.len.toNumber())
+      const oraclesForDiff = oracles?.reduce((acc, { signer, transmitter, payee }, idx) => {
+        return {
+          ...acc,
+          [`oracle#${idx}`]: {
+            signer: Buffer.from(signer.key).toString('hex'),
+            transmitter: transmitter.toString(),
+            payee: payee.toString(),
+          },
+        }
+      }, {})
+      const offchainConfig = deserializeConfig(
+        Buffer.from(state.offchainConfig.xs).slice(0, state.offchainConfig.len.toNumber()),
+      )
+      const offchainConfigForDiff = prepareOffchainConfigForDiff(offchainConfig)
+      return {
+        f: state.f || state.config.f,
+        offchainConfig: offchainConfigForDiff,
+        oracles: oraclesForDiff,
+      }
+    })
+
+    // final diff between proposal and actual contract state
+    diff.printDiff(contractConfig, proposalConfig)
+
+    // verify is proposal digest correspods to the input
+    const proposalDigest = this.calculateProposalDigest(this.makeDigestInputFromProposal(proposalState as Proposal))
+    const isSameDigest = Buffer.compare(this.contractInput.offchainDigest, proposalDigest) === 0
+    this.require(isSameDigest, 'Digest generated is different from the onchain digest')
+
+    logger.success('Generated configuration matches with onchain proposal configuration')
+    await prompt('Continue?')
+  }
+
   execute = async () => {
+    await this.buildCommand(this.flags, this.args)
+
     const signer = this.wallet.publicKey
-    const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
-    const address = ocr2.programId.toString()
-    const program = this.loadProgram(ocr2.idl, address)
+    await this.beforeExecute()
 
     const rawTx = await this.makeRawTransaction(signer)
     await this.simulateTx(signer, rawTx)
-    await prompt(`Continue accepting proposal of proposal ${this.flags.proposalId} on aggregator ${this.args[0]}?`)
+    await prompt(`Continue accepting proposal of proposal ${this.input.proposalId} on aggregator ${this.args[0]}?`)
 
-    const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx)
+    const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, this.program.idl)(rawTx)
     logger.success(`Accepted proposal on tx ${txhash}`)
 
     return {
