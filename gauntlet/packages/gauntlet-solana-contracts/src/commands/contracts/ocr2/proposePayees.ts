@@ -7,12 +7,19 @@ import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import RDD from '../../../lib/rdd'
 
 type Input = {
-  payeeByTransmitter: {
-    [key: string]: PublicKey
-  }
+  operators: {
+    transmitter: string
+    payee: string
+  }[]
   proposalId: string
   // Allows to set payees that do not have a token generated address
   allowFundRecipient?: boolean
+}
+
+type ContractInput = {
+  payeeByTransmitter: {
+    [key: string]: PublicKey
+  }
 }
 
 export default class ProposePayees extends SolanaCommand {
@@ -24,6 +31,7 @@ export default class ProposePayees extends SolanaCommand {
   ]
 
   input: Input
+  contractInput: ContractInput
 
   makeInput = (userInput: any): Input => {
     if (userInput) return userInput as Input
@@ -36,7 +44,16 @@ export default class ProposePayees extends SolanaCommand {
       transmitter: rdd.operators[operator].ocrNodeAddress[0],
       payee: rdd.operators[operator].adminAddress,
     }))
-    const payeeByTransmitter = operators.reduce(
+
+    return {
+      operators,
+      allowFundRecipient: false,
+      proposalId: this.flags.proposalId || this.flags.configProposal,
+    }
+  }
+
+  makeContractInput = (input: Input): ContractInput => {
+    const payeeByTransmitter = input.operators.reduce(
       (agg, operator) => ({
         ...agg,
         [new PublicKey(operator.transmitter).toString()]: new PublicKey(operator.payee),
@@ -46,8 +63,6 @@ export default class ProposePayees extends SolanaCommand {
 
     return {
       payeeByTransmitter,
-      allowFundRecipient: false,
-      proposalId: this.flags.proposalId || this.flags.configProposal,
     }
   }
 
@@ -65,6 +80,7 @@ export default class ProposePayees extends SolanaCommand {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     this.program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
     this.input = await this.makeInput(flags.input)
+    this.contractInput = await this.makeContractInput(this.input)
 
     return this
   }
@@ -79,7 +95,7 @@ export default class ProposePayees extends SolanaCommand {
 
     const areValidPayees = (
       await Promise.all(
-        Object.entries(this.input.payeeByTransmitter).map(async ([transmitter, payee]) => {
+        Object.entries(this.contractInput.payeeByTransmitter).map(async ([transmitter, payee]) => {
           try {
             const info = await token.getAccountInfo(new PublicKey(payee))
             return !!info.address
@@ -102,7 +118,7 @@ export default class ProposePayees extends SolanaCommand {
     const proposalInfo = await this.program.account.proposal.fetch(proposal)
     const payees = proposalInfo.oracles.xs
       .slice(0, proposalInfo.oracles.len)
-      .map(({ transmitter }) => this.input.payeeByTransmitter[new PublicKey(transmitter).toString()])
+      .map(({ transmitter }) => this.contractInput.payeeByTransmitter[new PublicKey(transmitter).toString()])
 
     const ix = this.program.instruction.proposePayees(token.publicKey, payees, {
       accounts: {
@@ -141,7 +157,7 @@ export default class ProposePayees extends SolanaCommand {
         ...agg,
         [key]: {
           transmitter: (value as any).transmitter,
-          payee: this.input?.payeeByTransmitter[(value as any).transmitter].toString(),
+          payee: this.contractInput.payeeByTransmitter[(value as any).transmitter].toString(),
         },
       }),
       {},
