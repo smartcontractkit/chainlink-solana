@@ -36,8 +36,12 @@ export type OffchainConfig = {
 type Input = {
   proposalId: string
   offchainConfig: OffchainConfig
-  serializedOffchainConfig: Buffer
   userSecret?: string
+}
+
+type ContractInput = {
+  serializedOffchainConfig: Buffer
+  randomSecret: string
 }
 
 export const prepareOffchainConfigForDiff = (config: OffchainConfig, extra?: Object): Object => {
@@ -55,13 +59,16 @@ export default class ProposeOffchainConfig extends SolanaCommand {
     'yarn gauntlet ocr2:propose_offchain_config --network=devnet --rdd=[PATH_TO_RDD] --proposalId=<PROPOSAL_ID> <AGGREGATOR_ADDRESS>',
   ]
 
-  randomSecret: string
   input: Input
+  contractInput: ContractInput
 
   constructor(flags, args) {
     super(flags, args)
 
-    this.require(!!this.flags.proposalId, 'Please provide flags with "proposalId"')
+    this.require(
+      !!this.flags.proposalId || !!this.flags.configProposal,
+      'Please provide Config Proposal ID with flag "proposalId" or "configProposal"',
+    )
     this.requireArgs('Please provide a valid aggregator address as arg')
     this.require(
       !!process.env.SECRET,
@@ -131,19 +138,26 @@ export default class ProposeOffchainConfig extends SolanaCommand {
     }
 
     const offchainConfig = ProposeOffchainConfig.makeInputFromRDD(rdd, this.args[0])
+
+    return {
+      offchainConfig,
+      proposalId: this.flags.proposalId || this.flags.configProposal,
+      userSecret,
+    }
+  }
+
+  makeContractInput = async (input: Input): Promise<ContractInput> => {
     // process.env.SECRET is required on the command
+    const { offchainConfig, userSecret } = input
     const { offchainConfig: serializedOffchainConfig, randomSecret } = await serializeOffchainConfig(
       offchainConfig,
       process.env.SECRET!,
       userSecret,
     )
-    this.randomSecret = randomSecret
 
     return {
-      offchainConfig,
       serializedOffchainConfig,
-      proposalId: this.flags.proposalId,
-      userSecret,
+      randomSecret,
     }
   }
 
@@ -205,14 +219,17 @@ export default class ProposeOffchainConfig extends SolanaCommand {
     const maxBufferSize = this.flags.bufferSize || MAX_TRANSACTION_BYTES
     this.validateConfig(this.input.offchainConfig)
 
-    logger.info(`Offchain config size: ${this.input.serializedOffchainConfig.byteLength}`)
-    this.require(this.input.serializedOffchainConfig.byteLength < 4096, 'Offchain config must be lower than 4096 bytes')
+    logger.info(`Offchain config size: ${this.contractInput.serializedOffchainConfig.byteLength}`)
+    this.require(
+      this.contractInput.serializedOffchainConfig.byteLength < 4096,
+      'Offchain config must be lower than 4096 bytes',
+    )
 
     // There's a byte limit per transaction. Write the config in chunks
-    const offchainConfigChunks = divideIntoChunks(this.input.serializedOffchainConfig, maxBufferSize)
+    const offchainConfigChunks = divideIntoChunks(this.contractInput.serializedOffchainConfig, maxBufferSize)
     if (offchainConfigChunks.length > 1) {
       logger.info(
-        `Config size (${this.input.serializedOffchainConfig.byteLength} bytes) is bigger than transaction limit. It needs to be configured using ${offchainConfigChunks.length} transactions`,
+        `Config size (${this.contractInput.serializedOffchainConfig.byteLength} bytes) is bigger than transaction limit. It needs to be configured using ${offchainConfigChunks.length} transactions`,
       )
     }
 
@@ -232,6 +249,7 @@ export default class ProposeOffchainConfig extends SolanaCommand {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     this.program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
     this.input = await this.makeInput(flags.input)
+    this.contractInput = await this.makeContractInput(this.input)
 
     return this
   }
@@ -242,12 +260,12 @@ export default class ProposeOffchainConfig extends SolanaCommand {
 
     // Config in contract
     const contractOffchainConfig = deserializeConfig(
-      Buffer.from(contractState.offchainConfig.xs).slice(0, new BN(contractState.offchainConfig.len).toNumber()),
+      Buffer.from(contractState.offchainConfig.xs).slice(0, contractState.offchainConfig.len.toNumber()),
     )
     const contractOffchainConfigForDiff = prepareOffchainConfigForDiff(contractOffchainConfig)
 
     // Proposed config
-    const proposedConfig = deserializeConfig(this.input.serializedOffchainConfig)
+    const proposedConfig = deserializeConfig(this.contractInput.serializedOffchainConfig)
     const proposedConfigForDiff = prepareOffchainConfigForDiff(proposedConfig)
 
     diff.printDiff(contractOffchainConfigForDiff, proposedConfigForDiff)
@@ -258,7 +276,7 @@ export default class ProposeOffchainConfig extends SolanaCommand {
         - You will need to provide the secret to approve the config proposal
       Provide it with --secret flag`,
     )
-    logger.info(`${this.randomSecret}`)
+    logger.info(`${this.contractInput.randomSecret}`)
     logger.line()
 
     await prompt('Continue?')
@@ -286,7 +304,7 @@ export default class ProposeOffchainConfig extends SolanaCommand {
 
     return {
       data: {
-        secret: this.randomSecret,
+        secret: this.contractInput.randomSecret,
       },
       responses: [
         {
