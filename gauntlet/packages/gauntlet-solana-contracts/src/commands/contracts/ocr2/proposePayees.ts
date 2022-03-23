@@ -131,40 +131,36 @@ export default class ProposePayees extends SolanaCommand {
 
   beforeExecute = async () => {
     const state = new PublicKey(this.args[0])
-    let contractState = await this.program.account.state.fetch(state)
-    let numOfOracles = contractState.oracles.len.toNumber()
-
-    if (numOfOracles === 0) {
-      // handle case when no oracles were set yet
-      // iterate through oracles list in proposal
-      const proposal = new PublicKey(this.input.proposalId)
-      contractState = await this.program.account.proposal.fetch(proposal)
-    }
+    const contractState = await this.program.account.state.fetch(state)
 
     const payeesInContract = contractState.oracles.xs.slice(0, contractState.oracles.len.toNumber()).reduce(
       (agg, { transmitter, payee }, idx) => ({
         ...agg,
-        [`operator#${idx}`]: {
+        [`oracle#${idx}`]: {
           transmitter: transmitter.toString(),
           payee: payee.toString(),
         },
       }),
       {},
     )
+    logger.info(`Existing payees on contract ${this.args[0]}`)
+    logger.log(payeesInContract)
 
-    const proposedPayees = Object.entries(payeesInContract).reduce(
-      (agg, [key, value]) => ({
+    const proposedPayees = Object.entries(this.contractInput.payeeByTransmitter).reduce(
+      (agg, [transmitter, payee], idx) => ({
         ...agg,
-        [key]: {
-          transmitter: (value as any).transmitter,
-          payee: this.contractInput.payeeByTransmitter[(value as any).transmitter].toString(),
+        [`oracle#${idx}`]: {
+          transmitter,
+          payee: payee.toString(),
         },
       }),
       {},
     )
+    logger.info(`Proposed payees for contract ${this.args[0]}`)
+    logger.log(proposedPayees)
 
-    logger.info(`Proposing payees for contract ${this.args[0]}`)
-    diff.printDiff(payeesInContract, proposedPayees)
+    // todo: enable diff when fixed
+    // diff.printDiff(payeesInContract, proposedPayees)
     await prompt('Continue?')
   }
 
