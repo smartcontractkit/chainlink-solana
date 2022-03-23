@@ -124,6 +124,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
         throw errorDetails
       }
       logger.success(`Tx simulation succeeded: ${simulationResponse.unitsConsumed} units consumed.`)
+      return simulationResponse.unitsConsumed
     } catch (err) {
       logger.error(`Tx simulation failed: ${err}`)
       throw err
