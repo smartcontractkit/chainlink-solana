@@ -85,6 +85,12 @@ solana airdrop 10 <account>
 
 # monitor chain logs
 solana logs
+
+# list which features are enabled or disabled (localhost/devnet/testnet/mainnet-beta)
+solana feature status -u localhost
+
+# sometimes features may need to be disabled (used with the `solana feature status`)
+solana-test-validator -r --deactivate-feature JAN1trEUEtZjgXYzNBYHU9DYd7GnThhXfFP7SzPXkPsG
 ```
 
 ## Pulumi Installation Instruction
