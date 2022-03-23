@@ -268,6 +268,7 @@ export default class ProposeOffchainConfig extends SolanaCommand {
     const proposedConfig = deserializeConfig(this.contractInput.serializedOffchainConfig)
     const proposedConfigForDiff = prepareOffchainConfigForDiff(proposedConfig)
 
+    logger.info(`Proposed OffchainConfig for contract ${this.args[0]}`)
     diff.printDiff(contractOffchainConfigForDiff, proposedConfigForDiff)
 
     logger.info(

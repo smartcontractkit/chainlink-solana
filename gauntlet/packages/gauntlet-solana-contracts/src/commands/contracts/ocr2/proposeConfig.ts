@@ -119,9 +119,12 @@ export default class ProposeConfig extends SolanaCommand {
       }, {}),
     }
 
-    logger.info(`Proposing new config on contract ${this.args[0]}:`)
-    diff.printDiff(contractConfig, proposedConfig)
+    logger.info(`Existing Config on contract ${this.args[0]}:`)
+    logger.log(contractConfig)
+    logger.info(`Proposed Config for contract ${this.args[0]}:`)
+    logger.log(proposedConfig)
 
+    // diff.printDiff(contractConfig, proposedConfig)
     await prompt('Continue?')
   }
 
