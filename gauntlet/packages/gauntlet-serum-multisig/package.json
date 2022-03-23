@@ -25,7 +25,7 @@
     "bundle": "yarn build && pkg ."
   },
   "dependencies": {
-    "@chainlink/gauntlet-core": "0.1.0",
+    "@chainlink/gauntlet-core": "0.1.1",
     "@chainlink/gauntlet-solana": "*",
     "@chainlink/gauntlet-solana-contracts": "*",
     "@project-serum/anchor": "^0.22.0",
