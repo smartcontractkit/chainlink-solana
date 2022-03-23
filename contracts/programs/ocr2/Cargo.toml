@@ -15,8 +15,8 @@ cpi = ["no-entrypoint"]
 default = []
 
 [dependencies]
-anchor-lang = { version = "0.22.0", features = [] }
-anchor-spl = "0.22.0"
+anchor-lang = { version = "0.23.0", features = [] }
+anchor-spl = "0.23.0"
 static_assertions = "1.1.0"
 access-controller = { version = "0.1.0", path = "../access-controller", default-features = false, features = ["cpi"] }
 store = { version = "0.1.0", path = "../store", default-features = false, features = ["cpi"] }
