@@ -46,7 +46,7 @@ export const wrapCommand = (command) => {
       const signer = this.wallet.publicKey
       const rawTxs = await this.makeRawTransaction(signer)
       // If proposal is not provided, we are at creation time, and a new proposal acc should have been created
-      const proposal = new PublicKey(this.flags.proposal || rawTxs[0].keys[1].pubkey)
+      const proposal = new PublicKey(this.flags.proposal || this.flags.multisigProposal || rawTxs[0].keys[1].pubkey)
 
       if (this.flags.execute) {
         await prompt('CREATION,APPROVAL or EXECUTION TX will be executed. Continue?')
@@ -122,7 +122,8 @@ export const wrapCommand = (command) => {
       const rawTx = rawTxs[instructionIndex]
 
       // First step should be creating the proposal account. If no proposal flag is provided, proceed to create it
-      const proposal = this.flags.proposal ? new PublicKey(this.flags.proposal) : await this.createProposalAcount()
+      const proposalFlag = this.flags.proposal || this.flags.multisigProposal
+      const proposal = proposalFlag ? new PublicKey(proposalFlag) : await this.createProposalAcount()
 
       if (this.command.beforeExecute) {
         await this.command.beforeExecute(signer)
@@ -144,11 +145,11 @@ export const wrapCommand = (command) => {
       }
 
       const isAlreadyExecuted = proposalState.didExecute
-      if (isAlreadyExecuted) throw new Error('Proposal is already executed')
+      if (isAlreadyExecuted) throw new Error('Multisig Proposal is already executed')
 
       this.require(
         await this.isSameProposal(proposal, rawTx),
-        'The transaction generated is different from the proposal provided',
+        'The transaction generated is different from the Multisig Proposal provided',
       )
 
       if (!this.isReadyForExecution(proposalState, threshold)) {
@@ -168,7 +169,7 @@ export const wrapCommand = (command) => {
       try {
         return await this.program.account.transaction.fetch(proposal)
       } catch (e) {
-        logger.info('Proposal state not found. Should be empty at CREATION time')
+        logger.info('Multisig Proposal state not found. Should be empty at CREATION time')
         return
       }
     }
@@ -176,7 +177,7 @@ export const wrapCommand = (command) => {
     isSameProposal = async (proposal: PublicKey, rawTx: TransactionInstruction): Promise<boolean> => {
       const state = await this.fetchState(proposal)
       if (!state) {
-        logger.error('Proposal state does not exist. Considering the proposal as different')
+        logger.error('Multisig Proposal state does not exist. Considering the proposal as different')
         return false
       }
       const isSameData = Buffer.compare(state.data, rawTx.data) === 0
@@ -186,8 +187,8 @@ export const wrapCommand = (command) => {
     }
 
     createProposalAcount = async (): Promise<PublicKey> => {
-      await prompt('A new proposal account will be created. Continue?')
-      logger.log('Creating proposal account...')
+      await prompt('A new Multisig Proposal account will be created. Continue?')
+      logger.log('Creating Multisig Proposal account...')
       const proposal = Keypair.generate()
       const txSize = 1300 // Space enough
       const proposalInstruction = await SystemProgram.createAccount({
@@ -198,7 +199,7 @@ export const wrapCommand = (command) => {
         programId: this.program.programId,
       })
       await this.signAndSendRawTx([proposalInstruction], [proposal])
-      logger.success(`Proposal account created at: ${proposal.publicKey.toString()}`)
+      logger.success(`Multisig Proposal account created at: ${proposal.publicKey.toString()}`)
       return proposal.publicKey
     }
 
@@ -207,7 +208,7 @@ export const wrapCommand = (command) => {
       signer,
       context,
     ): Promise<TransactionInstruction[]> => {
-      logger.loading(`Generating proposal CREATION data for ${command.id}`)
+      logger.loading(`Generating Multisig Proposal CREATION data for ${command.id}`)
 
       const tx = this.program.instruction.createTransaction(
         context.rawTx.programId,
@@ -225,7 +226,7 @@ export const wrapCommand = (command) => {
     }
 
     approveProposal: ProposalAction = async (proposal: PublicKey, signer): Promise<TransactionInstruction[]> => {
-      logger.loading(`Generating proposal APPROVAL data for ${command.id}`)
+      logger.loading(`Generating Multisig Proposal APPROVAL data for ${command.id}`)
 
       const tx = this.program.instruction.approve({
         accounts: {
@@ -242,7 +243,7 @@ export const wrapCommand = (command) => {
       signer,
       context,
     ): Promise<TransactionInstruction[]> => {
-      logger.loading(`Generating proposal EXECUTION data for ${command.id}`)
+      logger.loading(`Generating Multisig Proposal EXECUTION data for ${command.id}`)
 
       const remainingAccounts = context.proposalState.accounts
         .map((t) => (t.pubkey.equals(context.multisigSigner) ? { ...t, isSigner: false } : t))
@@ -269,16 +270,16 @@ export const wrapCommand = (command) => {
       const threshold = multisigState.threshold
       const owners = multisigState.owners
 
-      logger.debug('Proposal state after action:')
+      logger.debug('Multisig Proposal state after action:')
       logger.debug(JSON.stringify(proposalState, null, 4))
       if (proposalState.didExecute == true) {
-        logger.info(`Proposal has been executed`)
+        logger.info(`Multisig Proposal has been executed`)
         return
       }
 
       if (this.isReadyForExecution(proposalState, threshold)) {
         logger.info(
-          `Threshold has been met, an owner needs to run the command once more in order to execute it, with flag --proposal=${proposal}`,
+          `Threshold has been met, an owner needs to run the command once more in order to execute it, provide ${proposal} with flag --proposal or --multisigProposal`,
         )
         return
       }
@@ -288,7 +289,7 @@ export const wrapCommand = (command) => {
         `${this.getRemainingSigners(
           proposalState,
           threshold,
-        )} more owners should sign this proposal, using the same command with flag --proposal=${proposal}`,
+        )} more owners should sign this multisig proposal, using the same command providing ${proposal} with flag --proposal or --multisigProposal`,
       )
       logger.info(`Eligible owners to sign: `)
       logger.info(remainingEligibleSigners.toString())
