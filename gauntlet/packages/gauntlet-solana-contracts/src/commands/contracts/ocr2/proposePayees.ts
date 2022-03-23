@@ -44,21 +44,20 @@ export default class ProposePayees extends SolanaCommand {
       {},
     )
 
-    const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
-    const address = ocr2.programId.toString()
-    this.program = this.loadProgram(ocr2.idl, address)
-
     return {
       payeeByTransmitter,
       allowFundRecipient: false,
-      proposalId: this.flags.proposalId,
+      proposalId: this.flags.proposalId || this.flags.configProposal,
     }
   }
 
   constructor(flags, args) {
     super(flags, args)
 
-    this.require(!!this.flags.proposalId, 'Please provide flags with "proposalId"')
+    this.require(
+      !!this.flags.proposalId || !!this.flags.configProposal,
+      'Please provide Config Proposal ID with flag "proposalId" or "configProposal"',
+    )
     this.requireArgs('Please provide an aggregator address as arg')
   }
 
@@ -115,9 +114,18 @@ export default class ProposePayees extends SolanaCommand {
   }
 
   beforeExecute = async () => {
-    const proposal = new PublicKey(this.input.proposalId)
-    const proposalInfo = await this.program.account.proposal.fetch(proposal)
-    const payeesInProposal = proposalInfo.oracles.xs.slice(0, proposalInfo.oracles.len.toNumber()).reduce(
+    const state = new PublicKey(this.args[0])
+    let contractState = await this.program.account.state.fetch(state)
+    let numOfOracles = contractState.oracles.len.toNumber()
+
+    if (numOfOracles === 0) {
+      // handle case when no oracles were set yet
+      // iterate through oracles list in proposal
+      const proposal = new PublicKey(this.input.proposalId)
+      contractState = await this.program.account.proposal.fetch(proposal)
+    }
+
+    const payeesInContract = contractState.oracles.xs.slice(0, contractState.oracles.len.toNumber()).reduce(
       (agg, { transmitter, payee }, idx) => ({
         ...agg,
         [`operator#${idx}`]: {
@@ -128,7 +136,7 @@ export default class ProposePayees extends SolanaCommand {
       {},
     )
 
-    const proposedPayees = Object.entries(payeesInProposal).reduce(
+    const proposedPayees = Object.entries(payeesInContract).reduce(
       (agg, [key, value]) => ({
         ...agg,
         [key]: {
@@ -140,7 +148,7 @@ export default class ProposePayees extends SolanaCommand {
     )
 
     logger.info(`Proposing payees for contract ${this.args[0]}`)
-    diff.printDiff(payeesInProposal, proposedPayees)
+    diff.printDiff(payeesInContract, proposedPayees)
     await prompt('Continue?')
   }
 
