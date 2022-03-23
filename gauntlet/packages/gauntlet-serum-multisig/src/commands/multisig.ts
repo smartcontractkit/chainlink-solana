@@ -114,11 +114,11 @@ export const wrapCommand = (command) => {
         - Owners: ${owners}`)
 
       const instructionIndex = new BN(this.flags.instruction || 0).toNumber()
+
+      // Build the internal command if necessary
+      this.command = this.command.buildCommand ? await this.command.buildCommand(this.flags, this.args) : this.command
       const rawTxs = await this.command.makeRawTransaction(multisigSigner)
-      if (this.command.buildCommand) {
-        await this.command.buildCommand(this.flags, this.args)
-      }
-      await this.command.simulateTx(multisigSigner, rawTxs)
+      await this.command.simulateTx(multisigSigner, rawTxs, this.wallet.publicKey)
       await this.showExecutionInstructions(rawTxs, instructionIndex)
       const rawTx = rawTxs[instructionIndex]
 
@@ -280,7 +280,7 @@ export const wrapCommand = (command) => {
 
       if (this.isReadyForExecution(proposalState, threshold)) {
         logger.info(
-          `Threshold has been met, an owner needs to run the command once more in order to execute it, provide ${proposal} with flag --proposal or --multisigProposal`,
+          `Threshold has been met, an owner needs to run the command once more in order to execute it, with flag --proposal=${proposal} or --multisigProposal=${proposal}`,
         )
         return
       }
@@ -290,7 +290,7 @@ export const wrapCommand = (command) => {
         `${this.getRemainingSigners(
           proposalState,
           threshold,
-        )} more owners should sign this multisig proposal, using the same command providing ${proposal} with flag --proposal or --multisigProposal`,
+        )} more owners should sign this multisig proposal, using the same command providing ${proposal} with flag --proposal=${proposal} or --multisigProposal=${proposal}`,
       )
       logger.info(`Eligible owners to sign: `)
       logger.info(remainingEligibleSigners.toString())
