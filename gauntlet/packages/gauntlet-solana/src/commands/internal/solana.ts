@@ -111,10 +111,10 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     }
   }
 
-  simulateTx = async (signer: PublicKey, txInstructions: TransactionInstruction[]) => {
+  simulateTx = async (signer: PublicKey, txInstructions: TransactionInstruction[], feePayer?: PublicKey) => {
     try {
       const tx = makeTx(txInstructions, {
-        feePayer: signer,
+        feePayer: feePayer || signer,
       })
       // simulating through connection allows to skip signing tx (useful when using Ledger device)
       const { value: simulationResponse } = await this.provider.connection.simulateTransaction(tx)

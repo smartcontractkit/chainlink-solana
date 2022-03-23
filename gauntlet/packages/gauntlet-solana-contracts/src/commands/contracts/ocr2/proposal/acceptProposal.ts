@@ -251,15 +251,16 @@ export default class AcceptProposal extends SolanaCommand {
       }
     })
 
-    // final diff between proposal and actual contract state
-    diff.printDiff(contractConfig, proposalConfig)
-
     // verify is proposal digest correspods to the input
     const proposalDigest = this.calculateProposalDigest(this.makeDigestInputFromProposal(proposalState as Proposal))
     const isSameDigest = Buffer.compare(this.contractInput.offchainDigest, proposalDigest) === 0
     this.require(isSameDigest, 'Digest generated is different from the onchain digest')
 
     logger.success('Generated configuration matches with onchain proposal configuration')
+
+    logger.info(`Accepting config proposal at ${this.args[0]} with the following configuration`)
+    // final diff between proposal and actual contract state
+    diff.printDiff(contractConfig, proposalConfig)
     await prompt('Continue?')
   }
 

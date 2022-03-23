@@ -29,6 +29,7 @@ export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse>
       FEED: 1,
       OCR_2: 2,
       PROPOSAL: 3,
+      PROPOSE_OFFCHAIN: 4,
     }
 
     this.requireFlag('rdd', 'This flow only works with information coming from RDD. Please provide the --rdd flag')
@@ -81,6 +82,7 @@ export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse>
         args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
       {
+        id: this.stepIds.PROPOSE_OFFCHAIN,
         name: 'Propose Offchain Config',
         command: ProposeOffchainConfig,
         flags: {
@@ -109,6 +111,7 @@ export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse>
         command: AcceptProposal,
         flags: {
           proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
+          secret: FlowCommand.ID.data(this.stepIds.PROPOSE_OFFCHAIN, 'secret'),
         },
         args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
