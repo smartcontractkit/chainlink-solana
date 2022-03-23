@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::sysvar::fees::Fees;
 use anchor_spl::token;
 
 use arrayref::{array_ref, array_refs};
@@ -777,9 +776,8 @@ impl Report {
 fn calculate_reimbursement_gjuels(juels_per_lamport: u64, _signature_count: usize) -> Result<u64> {
     const SIGNERS: u64 = 1;
     const GIGA: u128 = 10u128.pow(9);
-    let fees = Fees::get()?;
-    let lamports_per_signature = fees.fee_calculator.lamports_per_signature;
-    let lamports = lamports_per_signature * SIGNERS;
+    const LAMPORTS_PER_SIGNATURE: u64 = 5_000; // constant, originally retrieved from deprecated sysvar fees
+    let lamports = LAMPORTS_PER_SIGNATURE * SIGNERS;
     let juels = u128::from(lamports) * u128::from(juels_per_lamport);
     let gjuels = juels / GIGA; // return value as gjuels
 
