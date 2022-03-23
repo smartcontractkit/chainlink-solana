@@ -1,7 +1,6 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, BN, prompt, diff } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { Idl, Program } from '@project-serum/anchor'
 import { PublicKey } from '@solana/web3.js'
 import { ORACLES_MAX_LENGTH } from '../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
@@ -45,13 +44,16 @@ export default class ProposeConfig extends SolanaCommand {
     return {
       oracles,
       f,
-      proposalId: this.flags.proposalId,
+      proposalId: this.flags.proposalId || this.flags.configProposal,
     }
   }
 
   constructor(flags, args) {
     super(flags, args)
-    this.require(!!this.flags.proposalId, 'Please provide flags with "proposalId"')
+    this.require(
+      !!this.flags.proposalId || !!this.flags.configProposal,
+      'Please provide Config Proposal ID with flag "proposalId" or "configProposal"',
+    )
     this.requireArgs('Please provide an aggregator address')
   }
 
@@ -63,18 +65,14 @@ export default class ProposeConfig extends SolanaCommand {
     return this
   }
 
-  makeRawTransaction = async (signer: PublicKey, input?: Input) => {
-    if (!input) {
-      input = this.makeInput(this.flags.input)
-    }
+  makeRawTransaction = async (signer: PublicKey) => {
+    const proposal = new PublicKey(this.input.proposalId)
 
-    const proposal = new PublicKey(input.proposalId)
-
-    const oracles = input.oracles.map(({ signer, transmitter }) => ({
+    const oracles = this.input.oracles.map(({ signer, transmitter }) => ({
       signer: Buffer.from(signer, 'hex'),
       transmitter: new PublicKey(transmitter),
     }))
-    const f = new BN(input.f)
+    const f = new BN(this.input.f)
 
     const minOracleLength = f.mul(new BN(3)).toNumber()
     this.require(oracles.length > minOracleLength, `Number of oracles should be higher than ${minOracleLength}`)
@@ -94,13 +92,11 @@ export default class ProposeConfig extends SolanaCommand {
   }
 
   beforeExecute = async () => {
-    const aggregator = new PublicKey(this.args[0])
-    const contractState = await this.program.account.state.fetch(aggregator)
+    const state = new PublicKey(this.args[0])
+    const contractState = await this.program.account.state.fetch(state)
 
     // Prepare contract config
-    const contractOracles = contractState.oracles?.xs
-      .slice(0, contractState.oracles.len.toNumber())
-      .sort((a, b) => Buffer.compare(_toHex(a.signer.key), _toHex(b.signer.key)))
+    const contractOracles = contractState.oracles?.xs.slice(0, contractState.oracles.len.toNumber())
     const contractOraclesForDiff = contractOracles?.reduce((acc, { signer, transmitter }, idx) => {
       return {
         ...acc,
@@ -133,10 +129,9 @@ export default class ProposeConfig extends SolanaCommand {
     await this.buildCommand(this.flags, this.args)
 
     const signer = this.wallet.publicKey
-    const input = this.makeInput(this.flags.input)
-
-    const rawTx = await this.makeRawTransaction(signer, input)
     await this.beforeExecute()
+
+    const rawTx = await this.makeRawTransaction(signer)
     await this.simulateTx(signer, rawTx)
     await prompt(`Continue setting config on ${this.args[0].toString()}?`)
 
