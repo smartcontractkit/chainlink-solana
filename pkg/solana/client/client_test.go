@@ -30,6 +30,8 @@ func TestClient_Reader_HappyPath(t *testing.T) {
 	networks := []string{"devnet", "testnet", "mainnet", "localnet"}
 	hashCounter := 0
 
+	getFeeNil := false
+
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// read message
 		body, err := io.ReadAll(r.Body)
@@ -50,6 +52,11 @@ func TestClient_Reader_HappyPath(t *testing.T) {
 		case "getGenesisHash":
 			out = fmt.Sprintf(`{"jsonrpc":"2.0","result":"%s","id":1}`, genesisHashes[hashCounter])
 			hashCounter++
+		case "getFeeForMessage":
+			out = `{"jsonrpc":"2.0","result":{"context":{"slot":5068},"value":5000},"id":1}`
+			if getFeeNil {
+				out = `{"jsonrpc":"2.0","result":{"context":{"slot":5068}},"id":1}`
+			}
 		default:
 			out = `{"jsonrpc":"2.0","error":{"code":-32601,"message":"Method not found"},"id":0}`
 		}
@@ -80,12 +87,21 @@ func TestClient_Reader_HappyPath(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "11111111111111111111111111111111", hash.Value.Blockhash.String())
 
-	// get chain ID based on gensis hash
-for _, n := range networks {
-	network, err := c.ChainID()
+	// GetFeeForMessage
+	msg := "AQABAgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEBAQAA"
+	fee, err := c.GetFeeForMessage(msg)
 	assert.NoError(t, err)
-	assert.Equal(t, n, network)
-}
+	assert.Equal(t, uint64(5000), fee)
+	getFeeNil = true
+	_, err = c.GetFeeForMessage(msg)
+	assert.Error(t, err)
+
+	// get chain ID based on gensis hash
+	for _, n := range networks {
+		network, err := c.ChainID()
+		assert.NoError(t, err)
+		assert.Equal(t, n, network)
+	}
 
 	// get account info (also tested inside contract_test)
 	res, err := c.GetAccountInfoWithOpts(context.TODO(), solana.PublicKey{}, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentFinalized})
