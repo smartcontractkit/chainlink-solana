@@ -52,6 +52,7 @@ export const wrapCommand = (command) => {
         await prompt('CREATION,APPROVAL or EXECUTION TX will be executed. Continue?')
         logger.loading(`Executing action...`)
         const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, this.program.idl)(rawTxs)
+        logger.success(`TX succeded at ${txhash}`)
         await this.inspectProposalState(proposal)
         return {
           responses: [
