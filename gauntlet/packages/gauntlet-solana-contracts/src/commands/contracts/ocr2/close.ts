@@ -4,7 +4,7 @@ import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import Close from '../../abstract/close'
 
-export default class CloseOCR2 extends Close {
+export default class extends Close {
   static id = Close.makeId(CONTRACT_LIST.OCR_2)
   static category = Close.makeCategory(CONTRACT_LIST.OCR_2)
   static examples = Close.makeExamples(CONTRACT_LIST.OCR_2)
@@ -34,6 +34,6 @@ export default class CloseOCR2 extends Close {
       state: address,
     }
 
-    return this.prepareInstruction(signer, extraAccounts)
+    return this.prepareInstructions(signer, extraAccounts)
   }
 }
