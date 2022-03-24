@@ -6,6 +6,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 	"golang.org/x/sync/singleflight"
@@ -23,6 +24,7 @@ type Reader interface {
 	SlotHeight() (uint64, error)
 	LatestBlockhash() (*rpc.GetLatestBlockhashResult, error)
 	ChainID() (string, error)
+	GetFeeForMessage(msg string) (uint64, error)
 }
 
 // AccountReader is an interface that allows users to pass either the solana rpc client or the relay client
@@ -120,6 +122,22 @@ func (c *Client) ChainID() (string, error) {
 		network = "localnet"
 	}
 	return network, nil
+}
+
+func (c *Client) GetFeeForMessage(msg string) (uint64, error) {
+	// msg is base58 encoded data
+
+	ctx, cancel := context.WithTimeout(context.Background(), c.contextDuration)
+	defer cancel()
+	res, err := c.rpc.GetFeeForMessage(ctx, msg, c.commitment)
+	if err != nil {
+		return 0, errors.Wrap(err, "error in GetFeeForMessage")
+	}
+
+	if res == nil || res.Value == nil {
+		return 0, errors.New("nil pointer in GetFeeForMessage")
+	}
+	return *res.Value, nil
 }
 
 func (c *Client) SendTx(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
