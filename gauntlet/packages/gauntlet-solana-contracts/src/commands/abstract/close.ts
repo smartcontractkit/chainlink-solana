@@ -19,7 +19,7 @@ export default abstract class Close extends SolanaCommand {
     this.require(!!this.args[0], 'Please provide a valid account address as an argument')
   }
 
-  prepareInstruction = async (
+  prepareInstructions = async (
     signer: PublicKey,
     extraAccounts: { [key: string]: PublicKey } = {},
     closeFunction: string = 'close',
