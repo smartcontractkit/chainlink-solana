@@ -1,8 +1,9 @@
 package smoke
 
 import (
-	"github.com/smartcontractkit/chainlink-solana/tests/e2e/utils"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-solana/tests/e2e/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -11,7 +12,7 @@ import (
 	"github.com/smartcontractkit/integrations-framework/actions"
 )
 
-var _ = Describe("Solana OCRv2", func() {
+var _ = Describe("Solana OCRv2 @ocr", func() {
 	var state = &common.OCRv2TestState{}
 	BeforeEach(func() {
 		By("Deploying OCRv2 cluster", func() {

@@ -34,3 +34,7 @@ gauntlet/packages/gauntlet-serum-multisig/networks/.env.local
 # test
 tests/e2e/logs
 tests/e2e/smoke/logs
+tests/e2e/smoke/reports
+tests/e2e/smoke/contracts-chaos-state.json
+gauntlet/networks/.env.test[a-z0-9]*
+gauntlet/packages/gauntlet-solana-contracts/networks/.env.test[a-z0-9]*

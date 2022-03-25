@@ -56,7 +56,7 @@ type OCRv2TestState struct {
 	Networks         *client.Networks
 	RoundsFound      int
 	LastRoundTime    time.Time
-	err              error
+	Err              error
 }
 
 type ContractsState struct {
@@ -93,8 +93,8 @@ func (m *OCRv2TestState) DeployCluster(nodes int, stateful bool, contractsDir st
 
 func (m *OCRv2TestState) LabelChaosGroup(startInstance int, endInstance int, group string) {
 	for i := startInstance; i <= endInstance; i++ {
-		m.err = m.Env.AddLabel(fmt.Sprintf("instance=%d", i), fmt.Sprintf("%s=1", group))
-		Expect(m.err).ShouldNot(HaveOccurred())
+		m.Err = m.Env.AddLabel(fmt.Sprintf("instance=%d", i), fmt.Sprintf("%s=1", group))
+		Expect(m.Err).ShouldNot(HaveOccurred())
 	}
 }
 
@@ -110,13 +110,13 @@ func (m *OCRv2TestState) UploadProgramBinaries(contractsDir string) {
 }
 
 func (m *OCRv2TestState) DeployEnv(nodes int, stateful bool, contractsDir string) {
-	m.Env, m.err = environment.DeployOrLoadEnvironment(
+	m.Env, m.Err = environment.DeployOrLoadEnvironment(
 		solclient.NewChainlinkSolOCRv2(nodes, stateful),
 		tools.ChartsRoot,
 	)
-	Expect(m.err).ShouldNot(HaveOccurred())
-	m.err = m.Env.ConnectAll()
-	Expect(m.err).ShouldNot(HaveOccurred())
+	Expect(m.Err).ShouldNot(HaveOccurred())
+	m.Err = m.Env.ConnectAll()
+	Expect(m.Err).ShouldNot(HaveOccurred())
 	m.UploadProgramBinaries(contractsDir)
 }
 
@@ -127,12 +127,12 @@ func (m *OCRv2TestState) SetupClients() {
 		solclient.ClientInitFunc(),
 		solclient.ClientURLSFunc(),
 	)
-	m.Networks, m.err = networkRegistry.GetNetworks(m.Env)
-	Expect(m.err).ShouldNot(HaveOccurred())
-	m.MockServer, m.err = client.ConnectMockServer(m.Env)
-	Expect(m.err).ShouldNot(HaveOccurred())
-	m.ChainlinkNodes, m.err = client.ConnectChainlinkNodes(m.Env)
-	Expect(m.err).ShouldNot(HaveOccurred())
+	m.Networks, m.Err = networkRegistry.GetNetworks(m.Env)
+	Expect(m.Err).ShouldNot(HaveOccurred())
+	m.MockServer, m.Err = client.ConnectMockServer(m.Env)
+	Expect(m.Err).ShouldNot(HaveOccurred())
+	m.ChainlinkNodes, m.Err = client.ConnectChainlinkNodes(m.Env)
+	Expect(m.Err).ShouldNot(HaveOccurred())
 }
 
 func (m *OCRv2TestState) DumpContracts() error {
@@ -166,50 +166,50 @@ func (m *OCRv2TestState) LoadContracts() error {
 }
 
 func (m *OCRv2TestState) DeployContracts(contractsDir string) {
-	m.OffChainConfig, m.NodeKeysBundle, m.err = DefaultOffChainConfigParamsFromNodes(m.ChainlinkNodes)
-	Expect(m.err).ShouldNot(HaveOccurred())
-	m.ContractDeployer, m.err = solclient.NewContractDeployer(m.Networks.Default, m.Env, contractsDir)
-	Expect(m.err).ShouldNot(HaveOccurred())
-	m.LinkToken, m.err = m.ContractDeployer.DeployLinkTokenContract()
-	Expect(m.err).ShouldNot(HaveOccurred())
-	m.err = FundOracles(m.Networks.Default, m.NodeKeysBundle, big.NewFloat(5e4))
-	Expect(m.err).ShouldNot(HaveOccurred())
-	m.BillingAC, m.err = m.ContractDeployer.DeployOCRv2AccessController()
-	Expect(m.err).ShouldNot(HaveOccurred())
-	m.RequesterAC, m.err = m.ContractDeployer.DeployOCRv2AccessController()
-	Expect(m.err).ShouldNot(HaveOccurred())
-	m.err = m.Networks.Default.WaitForEvents()
-	Expect(m.err).ShouldNot(HaveOccurred())
+	m.OffChainConfig, m.NodeKeysBundle, m.Err = DefaultOffChainConfigParamsFromNodes(m.ChainlinkNodes)
+	Expect(m.Err).ShouldNot(HaveOccurred())
+	m.ContractDeployer, m.Err = solclient.NewContractDeployer(m.Networks.Default, m.Env, contractsDir)
+	Expect(m.Err).ShouldNot(HaveOccurred())
+	m.LinkToken, m.Err = m.ContractDeployer.DeployLinkTokenContract()
+	Expect(m.Err).ShouldNot(HaveOccurred())
+	m.Err = FundOracles(m.Networks.Default, m.NodeKeysBundle, big.NewFloat(5e4))
+	Expect(m.Err).ShouldNot(HaveOccurred())
+	m.BillingAC, m.Err = m.ContractDeployer.DeployOCRv2AccessController()
+	Expect(m.Err).ShouldNot(HaveOccurred())
+	m.RequesterAC, m.Err = m.ContractDeployer.DeployOCRv2AccessController()
+	Expect(m.Err).ShouldNot(HaveOccurred())
+	m.Err = m.Networks.Default.WaitForEvents()
+	Expect(m.Err).ShouldNot(HaveOccurred())
 
-	m.Store, m.err = m.ContractDeployer.DeployOCRv2Store(m.BillingAC.Address())
-	Expect(m.err).ShouldNot(HaveOccurred())
+	m.Store, m.Err = m.ContractDeployer.DeployOCRv2Store(m.BillingAC.Address())
+	Expect(m.Err).ShouldNot(HaveOccurred())
 
-	m.err = m.Store.CreateFeed("Feed", uint8(18), 10, 1024)
-	Expect(m.err).ShouldNot(HaveOccurred())
+	m.Err = m.Store.CreateFeed("Feed", uint8(18), 10, 1024)
+	Expect(m.Err).ShouldNot(HaveOccurred())
 
-	m.OCR2, m.err = m.ContractDeployer.DeployOCRv2(m.BillingAC.Address(), m.RequesterAC.Address(), m.LinkToken.Address())
-	Expect(m.err).ShouldNot(HaveOccurred())
+	m.OCR2, m.Err = m.ContractDeployer.DeployOCRv2(m.BillingAC.Address(), m.RequesterAC.Address(), m.LinkToken.Address())
+	Expect(m.Err).ShouldNot(HaveOccurred())
 
-	m.err = m.OCR2.SetBilling(uint32(1), uint32(1), m.BillingAC.Address())
-	Expect(m.err).ShouldNot(HaveOccurred())
-	m.StoreAuth, m.err = m.OCR2.AuthorityAddr("store")
-	Expect(m.err).ShouldNot(HaveOccurred())
-	m.err = m.BillingAC.AddAccess(m.StoreAuth)
-	Expect(m.err).ShouldNot(HaveOccurred())
-	m.err = m.Networks.Default.WaitForEvents()
-	Expect(m.err).ShouldNot(HaveOccurred())
+	m.Err = m.OCR2.SetBilling(uint32(1), uint32(1), m.BillingAC.Address())
+	Expect(m.Err).ShouldNot(HaveOccurred())
+	m.StoreAuth, m.Err = m.OCR2.AuthorityAddr("store")
+	Expect(m.Err).ShouldNot(HaveOccurred())
+	m.Err = m.BillingAC.AddAccess(m.StoreAuth)
+	Expect(m.Err).ShouldNot(HaveOccurred())
+	m.Err = m.Networks.Default.WaitForEvents()
+	Expect(m.Err).ShouldNot(HaveOccurred())
 
-	m.err = m.Store.SetWriter(m.StoreAuth)
-	Expect(m.err).ShouldNot(HaveOccurred())
-	m.err = m.Store.SetValidatorConfig(80000)
-	Expect(m.err).ShouldNot(HaveOccurred())
-	m.err = m.Networks.Default.WaitForEvents()
-	Expect(m.err).ShouldNot(HaveOccurred())
+	m.Err = m.Store.SetWriter(m.StoreAuth)
+	Expect(m.Err).ShouldNot(HaveOccurred())
+	m.Err = m.Store.SetValidatorConfig(80000)
+	Expect(m.Err).ShouldNot(HaveOccurred())
+	m.Err = m.Networks.Default.WaitForEvents()
+	Expect(m.Err).ShouldNot(HaveOccurred())
 
-	m.err = m.OCR2.Configure(m.OffChainConfig)
-	Expect(m.err).ShouldNot(HaveOccurred())
-	m.err = m.OCR2.DumpState()
-	Expect(m.err).ShouldNot(HaveOccurred())
+	m.Err = m.OCR2.Configure(m.OffChainConfig)
+	Expect(m.Err).ShouldNot(HaveOccurred())
+	m.Err = m.OCR2.DumpState()
+	Expect(m.Err).ShouldNot(HaveOccurred())
 }
 
 func (m *OCRv2TestState) createJobs() {
@@ -284,8 +284,8 @@ func (m *OCRv2TestState) SetAllAdapterResponsesToDifferentValues(responses []int
 
 func (m *OCRv2TestState) CreateJobs() {
 	m.SetAllAdapterResponsesToTheSameValue(5)
-	m.err = m.MockServer.SetValuePath("/juels", 1)
-	Expect(m.err).ShouldNot(HaveOccurred())
+	m.Err = m.MockServer.SetValuePath("/juels", 1)
+	Expect(m.Err).ShouldNot(HaveOccurred())
 	m.createJobs()
 }
 

@@ -15,4 +15,14 @@ var (
 	TestsDir = filepath.Join(ProjectRoot, "tests", "e2e")
 	// ChartsRoot helm charts root
 	ChartsRoot = filepath.Join(ProjectRoot, "ops", "k8s", "charts")
+	// Gauntlet path to gauntlet
+	Gauntlet = filepath.Join(ProjectRoot, "gauntlet")
+	// GauntletTerraContracts path to the gauntlet-terra-contracts dir
+	GauntletTerraContracts = filepath.Join(Gauntlet, "packages", "gauntlet-solana-contracts")
+	// Networks path to the networks directory
+	Networks = filepath.Join(Gauntlet, "networks")
+	// Reports path to the gauntlet reports directory
+	Reports = filepath.Join(TestsDir, "smoke", "reports")
+	// Rdd path to the gauntlet rdd directory
+	Rdd = filepath.Join(TestsDir, "smoke", "rdd")
 )

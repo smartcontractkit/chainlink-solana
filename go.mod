@@ -23,7 +23,7 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	github.com/rs/zerolog v1.26.1
 	github.com/smartcontractkit/chainlink-relay v0.0.0-20220317101556-ad02f88fa139
-	github.com/smartcontractkit/integrations-framework v1.0.50
+	github.com/smartcontractkit/integrations-framework v1.0.52
 	go.uber.org/atomic v1.9.0
 	go.uber.org/multierr v1.8.0
 	golang.org/x/crypto v0.0.0-20220210151621-f4118a5b28e2
@@ -52,6 +52,7 @@ require (
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
+	github.com/avast/retry-go v3.0.0+incompatible // indirect
 	github.com/aybabtme/rgbterm v0.0.0-20170906152045-cc83f3b3ce59 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blendle/zapdriver v1.3.1 // indirect

@@ -12,6 +12,8 @@ networks:
       - 2tye1GyG7wwTUS2T8puXSErDyzQcBxpgwRN5R2MMy5osJKjQF6ZoeYTTpeHaAxpuiE1G4Pnq4sTa4YCWx3RcXb4Y
       - 5aRBAnU3NBymRyMtrRjPLZ3erZNgTZBhEHszsXF8kTwbGLz8q5FYgKicJ7AFifrFitvJB2NS5jbyQohSJtvkgPER
       - 2MYG6HKpMuGEo3qErj4pAF2Gney6Yb6jgjTc6TZCuu7fiLAVQekTd3HbsT9ienzGHpKwA7Ekj2TGuMHPUB6EHJ8P
+      # test wallet
+      - 2fEYgfGaibS5Atrh7tVcvXDFTS55pEWAJ2ovnHZs4fJZuADbaenT7ySpr9zLQgNAjYmoKS3tyrMzbNKMT2WhFKHv
     urls:
       - "http://localhost:8899"
       - "ws://localhost:8900"

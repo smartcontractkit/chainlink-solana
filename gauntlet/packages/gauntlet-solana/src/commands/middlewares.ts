@@ -2,7 +2,7 @@ import { Middleware, Next } from '@chainlink/gauntlet-core'
 import { boolean } from '@chainlink/gauntlet-core/dist/lib/args'
 import { assertions, logger } from '@chainlink/gauntlet-core/dist/utils'
 import { Provider } from '@project-serum/anchor'
-import { Connection, Keypair } from '@solana/web3.js'
+import { Commitment, ConfirmOptions, Connection, ConnectionConfig, Keypair } from '@solana/web3.js'
 import { DEFAULT_DERIVATION_PATH } from '../lib/constants'
 import SolanaCommand from './internal/solana'
 import { LedgerWallet, LocalWallet } from './wallet'
@@ -18,7 +18,19 @@ export const withProvider: Middleware = (c: SolanaCommand, next: Next) => {
     `Invalid NODE_URL (${nodeURL}), please add an http:// or https:// prefix`,
   )
 
-  c.provider = new Provider(new Connection(nodeURL), c.wallet, {})
+  let connectionConfig: ConnectionConfig = {}
+  let confirmOptions: ConfirmOptions = {}
+  if (process.env.CONFIRM_TX_COMMITMENT) {
+    connectionConfig.commitment = process.env.CONFIRM_TX_COMMITMENT as Commitment
+    confirmOptions.commitment = connectionConfig.commitment
+  }
+  if (process.env.CONFIRM_TX_TIMEOUT_SECONDS) {
+    connectionConfig.confirmTransactionInitialTimeout = parseInt(process.env.CONFIRM_TX_TIMEOUT_SECONDS) * 1000
+  }
+  if (process.env.CONFIRM_MAX_RETRIES) {
+    confirmOptions.maxRetries = parseInt(process.env.CONFIRM_MAX_RETRIES)
+  }
+  c.provider = new Provider(new Connection(nodeURL, connectionConfig), c.wallet, confirmOptions)
   return next()
 }
 

@@ -21,6 +21,8 @@ export default class ReadState extends SolanaCommand {
 
     console.log(data)
 
-    return {} as Result<TransactionResponse>
+    return {
+      data: data
+    } as Result<TransactionResponse>
   }
 }
