@@ -162,7 +162,7 @@ type TransmissionV1 struct {
 // CL Core OCR2 job spec RelayConfig member for Solana
 type RelayConfig struct {
 	// network data
-	ChainID  string `json:"chainID"`  // required
+	ChainID string `json:"chainID"` // required
 
 	// state account passed as the ContractID in main job spec
 	// on-chain program + transmissions account + store programID
