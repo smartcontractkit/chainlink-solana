@@ -53,7 +53,7 @@ type Node struct {
 }
 
 type ChainCfg struct {
-	BlockRate           *models.Duration
+	BalancePollPeriod   *models.Duration
 	ConfirmPollPeriod   *models.Duration
 	OCR2CachePollPeriod *models.Duration
 	OCR2CacheTTL        *models.Duration

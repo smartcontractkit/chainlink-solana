@@ -14,7 +14,7 @@ import (
 
 // testing configs
 var (
-	testBlockRate     = models.MustMakeDuration(1 * time.Minute)
+	testBalancePoll   = models.MustMakeDuration(1 * time.Minute)
 	testConfirmPeriod = models.MustMakeDuration(2 * time.Minute)
 	testCachePeriod   = models.MustMakeDuration(3 * time.Minute)
 	testTTL           = models.MustMakeDuration(4 * time.Minute)
@@ -26,7 +26,7 @@ var (
 func TestConfig_ExpectedDefaults(t *testing.T) {
 	cfg := NewConfig(db.ChainCfg{}, logger.TestLogger(t))
 	configSet := configSet{
-		BlockRate:           cfg.BlockRate(),
+		BalancePollPeriod:   cfg.BalancePollPeriod(),
 		ConfirmPollPeriod:   cfg.ConfirmPollPeriod(),
 		OCR2CachePollPeriod: cfg.OCR2CachePollPeriod(),
 		OCR2CacheTTL:        cfg.OCR2CacheTTL(),
@@ -39,7 +39,7 @@ func TestConfig_ExpectedDefaults(t *testing.T) {
 
 func TestConfig_NewConfig(t *testing.T) {
 	dbCfg := db.ChainCfg{
-		BlockRate:           &testBlockRate,
+		BalancePollPeriod:   &testBalancePoll,
 		ConfirmPollPeriod:   &testConfirmPeriod,
 		OCR2CachePollPeriod: &testCachePeriod,
 		OCR2CacheTTL:        &testTTL,
@@ -48,7 +48,7 @@ func TestConfig_NewConfig(t *testing.T) {
 		Commitment:          null.StringFrom(testCommitment),
 	}
 	cfg := NewConfig(dbCfg, logger.TestLogger(t))
-	assert.Equal(t, testBlockRate.Duration(), cfg.BlockRate())
+	assert.Equal(t, testBalancePoll.Duration(), cfg.BalancePollPeriod())
 	assert.Equal(t, testConfirmPeriod.Duration(), cfg.ConfirmPollPeriod())
 	assert.Equal(t, testCachePeriod.Duration(), cfg.OCR2CachePollPeriod())
 	assert.Equal(t, testTTL.Duration(), cfg.OCR2CacheTTL())
@@ -60,7 +60,7 @@ func TestConfig_NewConfig(t *testing.T) {
 func TestConfig_Update(t *testing.T) {
 	cfg := NewConfig(db.ChainCfg{}, logger.TestLogger(t))
 	dbCfg := db.ChainCfg{
-		BlockRate:           &testBlockRate,
+		BalancePollPeriod:   &testBalancePoll,
 		ConfirmPollPeriod:   &testConfirmPeriod,
 		OCR2CachePollPeriod: &testCachePeriod,
 		OCR2CacheTTL:        &testTTL,
@@ -69,7 +69,7 @@ func TestConfig_Update(t *testing.T) {
 		Commitment:          null.StringFrom(testCommitment),
 	}
 	cfg.Update(dbCfg)
-	assert.Equal(t, testBlockRate.Duration(), cfg.BlockRate())
+	assert.Equal(t, testBalancePoll.Duration(), cfg.BalancePollPeriod())
 	assert.Equal(t, testConfirmPeriod.Duration(), cfg.ConfirmPollPeriod())
 	assert.Equal(t, testCachePeriod.Duration(), cfg.OCR2CachePollPeriod())
 	assert.Equal(t, testTTL.Duration(), cfg.OCR2CacheTTL())
@@ -80,5 +80,5 @@ func TestConfig_Update(t *testing.T) {
 
 func TestConfig_CommitmentFallback(t *testing.T) {
 	cfg := NewConfig(db.ChainCfg{Commitment: null.StringFrom("invalid")}, logger.TestLogger(t))
-  assert.Equal(t, rpc.CommitmentConfirmed, cfg.Commitment())
+	assert.Equal(t, rpc.CommitmentConfirmed, cfg.Commitment())
 }
