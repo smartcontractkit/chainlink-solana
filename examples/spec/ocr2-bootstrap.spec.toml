@@ -7,7 +7,6 @@ p2pPeerID                              = "<insert p2p id>"                  # ov
 
 [relayConfig]
 chainID            = "<insert solana chain id>"
-nodeName           = "<insert solana node name>" # optional: will automatically select one associated to chainID
 ocr2ProgramID      = "<insert solana ocr2 program ID>"
 transmissionsID    = "<insert solana ocr2 transmissions account>"
 storeProgramID     = "<insert solana ocr2 store account>"

@@ -163,7 +163,6 @@ type TransmissionV1 struct {
 type RelayConfig struct {
 	// network data
 	ChainID  string `json:"chainID"`  // required
-	NodeName string `json:"nodeName"` // optional, defaults to a random node with ChainID
 
 	// state account passed as the ContractID in main job spec
 	// on-chain program + transmissions account + store programID

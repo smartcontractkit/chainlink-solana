@@ -19,8 +19,8 @@ type Chain interface {
 	ID() string
 	Config() config.Config
 	TxManager() TxManager
-	// Reader returns a new Reader. If nodeName is provided, the underlying client must use that node.
-	Reader(nodeName string) (client.Reader, error)
+	// Reader returns a new Reader from the available list of nodes (if there are multiple, it will randomly select one)
+	Reader() (client.Reader, error)
 }
 
 // ServiceCtx replaces Service interface due to new Start(ctx) method signature.
