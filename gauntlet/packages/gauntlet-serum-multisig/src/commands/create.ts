@@ -65,13 +65,14 @@ export default class MultisigCreate extends SolanaCommand {
       )}. Continue?`,
     )
 
+    const instruction = await program.account.multisig.createInstruction(multisig, TOTAL_TO_ALLOCATE)
     const tx = await program.rpc.createMultisig(owners, new BN(input.threshold), nonce, {
       accounts: {
         multisig: multisig.publicKey,
         rent: SYSVAR_RENT_PUBKEY,
       },
       signers: [multisig],
-      instructions: [await program.account.multisig.createInstruction(multisig, TOTAL_TO_ALLOCATE)],
+      instructions: [instruction],
     })
     logger.success('New multisig created')
     logger.info(`Multisig address: ${multisig.publicKey}`)

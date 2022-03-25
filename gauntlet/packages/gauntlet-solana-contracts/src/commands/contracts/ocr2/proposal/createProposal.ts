@@ -24,7 +24,7 @@ export default class CreateProposal extends SolanaCommand {
     const version = new BN(2)
 
     logger.log('Generating data for creating config proposal')
-    logger.log('Proposal state will be at:', proposal.toString())
+    logger.log('Config Proposal state will be at:', proposal.toString())
 
     const createIx = await program.instruction.createProposal(version, {
       accounts: {
@@ -45,13 +45,17 @@ export default class CreateProposal extends SolanaCommand {
   }
 
   execute = async () => {
+    const signer = this.wallet.publicKey
+
     const proposal = Keypair.generate()
-    const rawTx = await this.makeRawTransaction(this.wallet.publicKey, proposal.publicKey)
+    const rawTx = await this.makeRawTransaction(signer, proposal.publicKey)
+    await this.simulateTx(signer, rawTx)
     await prompt(`Continue creating config proposal?`)
+
     const txhash = await this.signAndSendRawTx(rawTx, [proposal])
-    logger.success(`Proposal created on tx ${txhash}`)
+    logger.success(`Config Proposal created on tx ${txhash}`)
     logger.line()
-    logger.info('Use the proposal ID in future proposal commands:')
+    logger.info('Use the Config Proposal ID in future proposal commands:')
     logger.info(proposal.publicKey.toString())
     logger.line()
 

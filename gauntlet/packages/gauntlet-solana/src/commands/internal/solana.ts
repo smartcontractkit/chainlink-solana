@@ -20,8 +20,17 @@ import { makeTx } from '../../lib/utils'
 export default abstract class SolanaCommand extends WriteCommand<TransactionResponse> {
   wallet: SolanaWallet
   provider: Provider
+  program: Program
+
   abstract execute: () => Promise<Result<TransactionResponse>>
   makeRawTransaction: (signer: PublicKey) => Promise<TransactionInstruction[]>
+
+  buildCommand?: (flags, args) => Promise<SolanaCommand>
+  beforeExecute?: (signer: PublicKey) => Promise<void>
+
+  afterExecute = async (response: Result<TransactionResponse>): Promise<void> => {
+    logger.success(`Execution finished at transaction: ${response.responses[0].tx.hash}`)
+  }
 
   constructor(flags, args) {
     super(flags, args)
@@ -99,6 +108,26 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
         throw e
       }
       throw translatedErr
+    }
+  }
+
+  simulateTx = async (signer: PublicKey, txInstructions: TransactionInstruction[], feePayer?: PublicKey) => {
+    try {
+      const tx = makeTx(txInstructions, {
+        feePayer: feePayer || signer,
+      })
+      // simulating through connection allows to skip signing tx (useful when using Ledger device)
+      const { value: simulationResponse } = await this.provider.connection.simulateTransaction(tx)
+      if (simulationResponse.err) {
+        const errorDetails =
+          typeof simulationResponse.err === 'object' ? JSON.stringify(simulationResponse.err) : simulationResponse.err
+        throw errorDetails
+      }
+      logger.success(`Tx simulation succeeded: ${simulationResponse.unitsConsumed} units consumed.`)
+      return simulationResponse.unitsConsumed
+    } catch (err) {
+      logger.error(`Tx simulation failed: ${err}`)
+      throw err
     }
   }
 

@@ -12,15 +12,19 @@ export default class FinalizeProposal extends SolanaCommand {
 
   constructor(flags, args) {
     super(flags, args)
-    this.requireFlag('proposalId', 'Please provide a proposalId')
+    this.require(
+      !!this.flags.proposalId || !!this.flags.configProposal,
+      'Please provide Config Proposal ID with flag "proposalId" or "configProposal"',
+    )
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
+    const proposalId = this.flags.proposalId || this.flags.configProposal
 
-    const proposal = new PublicKey(this.flags.proposalId)
+    const proposal = new PublicKey(proposalId)
     const finalizeIx = program.instruction.finalizeProposal({
       accounts: {
         proposal: proposal,
@@ -32,10 +36,14 @@ export default class FinalizeProposal extends SolanaCommand {
   }
 
   execute = async () => {
-    const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
-    await prompt(`Continue finalizing proposal?`)
+    const signer = this.wallet.publicKey
+
+    const rawTx = await this.makeRawTransaction(signer)
+    await this.simulateTx(signer, rawTx)
+    await prompt(`Continue finalizing Config Proposal?`)
+
     const txhash = await this.signAndSendRawTx(rawTx)
-    logger.success(`Proposal finalized on tx ${txhash}`)
+    logger.success(`Config Proposal finalized on tx ${txhash}`)
 
     return {
       responses: [

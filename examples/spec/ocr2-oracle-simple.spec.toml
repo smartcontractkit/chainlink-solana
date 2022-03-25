@@ -30,7 +30,10 @@ juelsPerFeeCoinSource                  = """
     ds1_coin_parse [type="jsonparse" path="result"]
     ds1_coin -> ds1_coin_parse -> divide
 
-    divide [type="divide" input="$(ds1_link_parse)" divisor="$(ds1_coin_parse)" precision="9"]
+    // ds1_link_parse (dollars/LINK)
+    // ds1_coin_parse (dollars/SOL)
+    // ds1_coin_parse / ds1_link_parse = LINK/SOL
+    divide [type="divide" input="$(ds1_coin_parse)" divisor="$(ds1_link_parse)" precision="9"]
     scale  [type="multiply" times=1000000000]
 
     divide -> scale

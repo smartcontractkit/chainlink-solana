@@ -1,11 +1,10 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { inspection, BN } from '@chainlink/gauntlet-core/dist/utils'
-import { Proto } from '@chainlink/gauntlet-core/dist/crypto'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
+import { deserializeConfig } from '../../../../lib/encoding'
 import WriteOffchainConfig, { OffchainConfig } from '../proposeOffchainConfig'
-import { descriptor as OCR2Descriptor } from '../../../../lib/ocr2Proto'
 import { toComparableLongNumber, toComparableNumber, toComparablePubKey } from '../../../../lib/inspection'
 import RDD from '../../../../lib/rdd'
 
@@ -64,16 +63,6 @@ export default class OCR2Inspect extends SolanaCommand {
 
   constructor(flags, args) {
     super(flags, args)
-  }
-
-  deserializeConfig = (buffer: Buffer): any => {
-    const proto = new Proto.Protobuf({ descriptor: OCR2Descriptor })
-    const offchain = proto.decode('offchainreporting2_config.OffchainConfigProto', buffer)
-    const reportingPluginConfig = proto.decode(
-      'offchainreporting2_config.ReportingPluginConfig',
-      offchain.reportingPluginConfig,
-    )
-    return { ...offchain, reportingPluginConfig }
   }
 
   makeFeedInspections = async (bufferedInfo: Keypair, input: Input): Promise<inspection.Inspection[]> => {
@@ -137,7 +126,7 @@ export default class OCR2Inspect extends SolanaCommand {
       new BN(onChainState.offchainConfig.len).toNumber(),
     )
 
-    const onChainOCRConfig = this.deserializeConfig(bufferedConfig)
+    const onChainOCRConfig = deserializeConfig(bufferedConfig)
     const wrappedComparableLongNumber = (v: any) => {
       // Proto encoding will ignore falsy values.
       if (!v) return '0'
