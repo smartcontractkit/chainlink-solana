@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
@@ -66,7 +67,7 @@ func (c *Client) Balance(addr solana.PublicKey) (uint64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.contextDuration)
 	defer cancel()
 
-	v, err, _ := c.requestGroup.Do("GetBalance", func() (interface{}, error) {
+	v, err, _ := c.requestGroup.Do(fmt.Sprintf("GetBalance(%s)", addr.String()), func() (interface{}, error) {
 		return c.rpc.GetBalance(ctx, addr, c.commitment)
 	})
 	if err != nil {
@@ -82,10 +83,7 @@ func (c *Client) SlotHeight() (uint64, error) {
 	v, err, _ := c.requestGroup.Do("GetSlotHeight", func() (interface{}, error) {
 		return c.rpc.GetSlot(ctx, rpc.CommitmentProcessed) // get the latest slot height
 	})
-	if err != nil {
-		return 0, err
-	}
-	return v.(uint64), nil
+	return v.(uint64), err
 }
 
 func (c *Client) GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetAccountInfoOpts) (*rpc.GetAccountInfoResult, error) {
@@ -98,16 +96,23 @@ func (c *Client) GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicK
 func (c *Client) LatestBlockhash() (*rpc.GetLatestBlockhashResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.contextDuration)
 	defer cancel()
-	return c.rpc.GetLatestBlockhash(ctx, c.commitment)
+
+	v, err, _ := c.requestGroup.Do("GetLatestBlockhash", func() (interface{}, error) {
+		return c.rpc.GetLatestBlockhash(ctx, c.commitment)
+	})
+	return v.(*rpc.GetLatestBlockhashResult), err
 }
 
 func (c *Client) ChainID() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.contextDuration)
 	defer cancel()
-	hash, err := c.rpc.GetGenesisHash(ctx)
+	v, err, _ := c.requestGroup.Do("GetGenesisHash", func() (interface{}, error) {
+		return c.rpc.GetGenesisHash(ctx)
+	})
 	if err != nil {
 		return "", err
 	}
+	hash := v.(solana.Hash)
 
 	var network string
 	switch hash.String() {
