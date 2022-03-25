@@ -12,17 +12,17 @@ import (
 
 // Global terra defaults.
 var defaultConfigSet = configSet{
-	BlockRate:           500 * time.Millisecond, // approximate slot rate
-	ConfirmPollPeriod:   time.Second,            // polling for tx confirmation
-	OCR2CachePollPeriod: time.Second,            // cache polling rate
-	OCR2CacheTTL:        time.Minute,            // stale cache deadline
-	TxTimeout:           time.Minute,            // transaction timeout
-	SkipPreflight:       true,                   // to enable or disable preflight checks
+	BalancePollPeriod:   5 * time.Second, // poll period for balance monitoring
+	ConfirmPollPeriod:   time.Second,     // polling for tx confirmation
+	OCR2CachePollPeriod: time.Second,     // cache polling rate
+	OCR2CacheTTL:        time.Minute,     // stale cache deadline
+	TxTimeout:           time.Minute,     // transaction timeout
+	SkipPreflight:       true,            // to enable or disable preflight checks
 	Commitment:          rpc.CommitmentConfirmed,
 }
 
 type Config interface {
-	BlockRate() time.Duration
+	BalancePollPeriod() time.Duration
 	ConfirmPollPeriod() time.Duration
 	OCR2CachePollPeriod() time.Duration
 	OCR2CacheTTL() time.Duration
@@ -35,7 +35,7 @@ type Config interface {
 }
 
 type configSet struct {
-	BlockRate           time.Duration
+	BalancePollPeriod   time.Duration
 	ConfirmPollPeriod   time.Duration
 	OCR2CachePollPeriod time.Duration
 	OCR2CacheTTL        time.Duration
@@ -68,14 +68,14 @@ func (c *config) Update(dbcfg db.ChainCfg) {
 	c.chainMu.Unlock()
 }
 
-func (c *config) BlockRate() time.Duration {
+func (c *config) BalancePollPeriod() time.Duration {
 	c.chainMu.RLock()
-	ch := c.chain.BlockRate
+	ch := c.chain.BalancePollPeriod
 	c.chainMu.RUnlock()
 	if ch != nil {
 		return ch.Duration()
 	}
-	return c.defaults.BlockRate
+	return c.defaults.BalancePollPeriod
 }
 
 func (c *config) ConfirmPollPeriod() time.Duration {
