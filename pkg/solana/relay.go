@@ -28,7 +28,6 @@ type OCR2Spec struct {
 
 	// network data
 	ChainID  string
-	NodeName string
 
 	// on-chain program + 2x state accounts (state + transmissions) + store program
 	ProgramID       solana.PublicKey
@@ -98,7 +97,7 @@ func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay
 	if err != nil {
 		return nil, errors.Wrap(err, "error in NewOCR2Provider.chainSet.Chain")
 	}
-	chainReader, err := chain.Reader(spec.NodeName)
+	chainReader, err := chain.Reader()
 	if err != nil {
 		return nil, errors.Wrap(err, "error in NewOCR2Provider.chain.Reader")
 	}
