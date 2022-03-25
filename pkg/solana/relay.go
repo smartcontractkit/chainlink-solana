@@ -27,7 +27,7 @@ type OCR2Spec struct {
 	IsBootstrap bool
 
 	// network data
-	ChainID  string
+	ChainID string
 
 	// on-chain program + 2x state accounts (state + transmissions) + store program
 	ProgramID       solana.PublicKey
