@@ -4,7 +4,8 @@ on:
   push:
 
 jobs:
-  build:
+  Gauntlet_Build:
+    name: Gauntlet Build
     runs-on: ubuntu-latest
     env:
       CI: true
@@ -31,7 +32,8 @@ jobs:
         run: |
           yarn --cwd ./gauntlet gauntlet
 
-  format:
+  Gauntlet_Format:
+    name: Gauntlet Format
     runs-on: ubuntu-latest
     env:
       CI: true
@@ -55,7 +57,8 @@ jobs:
         run: |
           yarn --cwd ./gauntlet lint:format
 
-  test:
+  Gauntlet_Run_Tests:
+    name: Gauntlet Run Tests
     runs-on: ubuntu-latest
     env:
       CI: true

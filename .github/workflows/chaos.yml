@@ -1,4 +1,4 @@
-name: chaos
+name: E2E Chaos Tests
 on:
   schedule:
     - cron: '0 */3 * * *'
@@ -11,7 +11,7 @@ on:
         type: string
 
 jobs:
-  build:
+  Chaos_Testing_Build_Contracts:
     runs-on: ubuntu-latest
     container:
       image: projectserum/build:v0.22.0
@@ -23,19 +23,22 @@ jobs:
       - uses: actions/checkout@v2
       - run: echo $HOME
       - run: echo $PATH
-      - run: |
+      - name: Set Npm Config
+        run: |
           npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
           NPM_TOKEN=${NPM_TOKEN} yarn install --frozen-lockfile
       - name: Generate program_ids
         run: ./scripts/programs-keys-gen.sh
-      - run: anchor build
+      - name: Build Contracts
+        run: anchor build
         working-directory: contracts
-      - uses: actions/upload-artifact@master
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@master
         with:
           name: target
           path: contracts/target/deploy
-  build_custom_cl_image:
-    name: Build custom CL image
+  Chaos_Testing_Build_Custom_Chainlink_Image:
+    name: Build Custom CL Image
     # target branch can't be set as var, it's from where we getting pipeline code
     uses: smartcontractkit/chainlink/.github/workflows/build-custom.yml@develop
     with:
@@ -50,9 +53,9 @@ jobs:
       AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
-  chaos:
+  Chaos_Testing_Run_Test:
     runs-on: ubuntu-latest
-    needs: [build, build_custom_cl_image]
+    needs: [Chaos_Testing_Build_Contracts, Chaos_Testing_Build_Custom_Chainlink_Image]
     env:
       CGO_ENABLED: 1
     steps:
@@ -94,7 +97,8 @@ jobs:
           go get github.com/onsi/ginkgo/v2/ginkgo/internal@v2.1.2
           go get github.com/onsi/ginkgo/v2/ginkgo/labels@v2.1.2
           go install github.com/onsi/ginkgo/v2/ginkgo
-      - uses: actions/download-artifact@master
+      - name: Download Artifacts
+        uses: actions/download-artifact@master
         with:
           name: target
           path: contracts/target/deploy
