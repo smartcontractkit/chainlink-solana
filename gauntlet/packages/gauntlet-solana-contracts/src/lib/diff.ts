@@ -16,7 +16,6 @@ type BasicType = string | number | boolean
 abstract class DiffItem {
   abstract isArray(): boolean
   abstract isFurtherComparableObject(): boolean
-  abstract size(): number
   abstract getData(): any
   abstract isEqual(item: any): boolean
   abstract toString(): string
@@ -46,7 +45,7 @@ abstract class DiffItem {
       const elem = base[0]
 
       if (Array.isArray(elem)) {
-        throw new Error('Diff: Nested arrays are not supported!')
+        throw new Error('Diff: nested arrays are not supported!')
       }
 
       if (Buffer.isBuffer(elem)) {
@@ -87,10 +86,6 @@ abstract class DiffItemPlain<T> extends DiffItem {
   isArray(): boolean {
     return false
   }
-
-  size(): number {
-    throw new Error('size() is not defined!')
-  }
 }
 
 class DiffBuffer extends DiffItemPlain<Buffer> {
@@ -117,7 +112,7 @@ class DiffObject extends DiffItemPlain<Object> {
   }
 
   toString(): string {
-    throw new Error('Not implemented!')
+    throw new Error('Diff: toString() for Object is not implemented!')
   }
 
   isFurtherComparableObject(): boolean {
@@ -125,7 +120,7 @@ class DiffObject extends DiffItemPlain<Object> {
   }
 
   isEqual(item: Object): boolean {
-    throw new Error('Not implemented!')
+    throw new Error('Diff: isEqual() for Object is not implemented!')
   }
 }
 
@@ -159,10 +154,6 @@ abstract class DiffItemArray<T> extends DiffItem {
     return this.items
   }
 
-  size(): number {
-    return this.items.length
-  }
-
   isArray(): boolean {
     return true
   }
@@ -172,11 +163,11 @@ abstract class DiffItemArray<T> extends DiffItem {
   }
 
   toString(): string {
-    throw new Error('Not implemented!')
+    throw new Error('Diff: toString() for item array is not implemented!')
   }
 
   isEqual(item: any): boolean {
-    throw new Error('Not implemented!')
+    throw new Error('Diff: isEqual() for item array is not implemented!')
   }
 }
 
