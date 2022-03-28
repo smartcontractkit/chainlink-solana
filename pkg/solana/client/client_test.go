@@ -2,17 +2,15 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/gagliardetto/solana-go/rpc/jsonrpc"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -20,7 +18,69 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestClient_Reader_HappyPath(t *testing.T) {
+func TestClient_Reader_Integration(t *testing.T) {
+	url := SetupLocalSolNode(t)
+	privKey, err := solana.NewRandomPrivateKey()
+	pubKey := privKey.PublicKey()
+	FundTestAccounts(t, []solana.PublicKey{pubKey}, url)
+
+	requestTimeout := 5 * time.Second
+	lggr := logger.TestLogger(t)
+	cfg := config.NewConfig(db.ChainCfg{}, lggr)
+
+	c, err := NewClient(url, cfg, requestTimeout, lggr)
+	require.NoError(t, err)
+
+	// check balance
+	bal, err := c.Balance(pubKey)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(100_000_000_000), bal) // once funds get sent to the system program it should be unrecoverable (so this number should remain > 0)
+
+	// check SlotHeight
+	slot0, err := c.SlotHeight()
+	assert.NoError(t, err)
+	assert.Greater(t, slot0, uint64(0))
+	time.Sleep(time.Second)
+	slot1, err := c.SlotHeight()
+	assert.NoError(t, err)
+	assert.Greater(t, slot1, slot0)
+
+	// fetch recent blockhash
+	hash, err := c.LatestBlockhash()
+	assert.NoError(t, err)
+	assert.NotEqual(t, hash.Value.Blockhash, solana.Hash{}) // not an empty hash
+
+	// GetFeeForMessage (transfer to self, successful)
+	tx, err := solana.NewTransaction(
+		[]solana.Instruction{
+			system.NewTransferInstruction(
+				1,
+				pubKey,
+				pubKey,
+			).Build(),
+		},
+		hash.Value.Blockhash,
+		solana.TransactionPayer(pubKey),
+	)
+	assert.NoError(t, err)
+
+	fee, err := c.GetFeeForMessage(tx.Message.ToBase64())
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(5000), fee)
+
+	// get chain ID based on gensis hash
+	network, err := c.ChainID()
+	assert.NoError(t, err)
+	assert.Equal(t, "localnet", network)
+
+	// get account info (also tested inside contract_test)
+	res, err := c.GetAccountInfoWithOpts(context.TODO(), solana.PublicKey{}, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentFinalized})
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(1), res.Value.Lamports)
+	assert.Equal(t, "NativeLoader1111111111111111111111111111111", res.Value.Owner.String())
+}
+
+func TestClient_Reader_ChainID(t *testing.T) {
 	genesisHashes := []string{
 		"EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG", // devnet
 		"4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY", // testnet
@@ -30,38 +90,10 @@ func TestClient_Reader_HappyPath(t *testing.T) {
 	networks := []string{"devnet", "testnet", "mainnet", "localnet"}
 	hashCounter := 0
 
-	getFeeNil := false
-
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// read message
-		body, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
-		var msg jsonrpc.RPCRequest
-		require.NoError(t, json.Unmarshal(body, &msg))
-
-		var out string
-		switch msg.Method {
-		case "getBalance":
-			out = `{"jsonrpc":"2.0","result":{"context": {"slot":1},"value": 1},"id":1}`
-		case "getSlot":
-			out = `{"jsonrpc":"2.0","result":1,"id":1}`
-		case "getLatestBlockhash":
-			out = `{"jsonrpc":"2.0","result":{"context":{"slot":1},"value":{"blockhash":"11111111111111111111111111111111","feeCalculator":{"lamportsPerSignature":1}}},"id":0}`
-		case "getAccountInfo":
-			out = `{"jsonrpc":"2.0","result":{"context":{"slot":1},"value":{"data":["c29sYW5hX3N5c3RlbV9wcm9ncmFt","base64"],"executable":true,"lamports":1,"owner":"11111111111111111111111111111111","rentEpoch":0}},"id":0}`
-		case "getGenesisHash":
-			out = fmt.Sprintf(`{"jsonrpc":"2.0","result":"%s","id":1}`, genesisHashes[hashCounter])
-			hashCounter++
-		case "getFeeForMessage":
-			out = `{"jsonrpc":"2.0","result":{"context":{"slot":5068},"value":5000},"id":1}`
-			if getFeeNil {
-				out = `{"jsonrpc":"2.0","result":{"context":{"slot":5068}},"id":1}`
-			}
-		default:
-			out = `{"jsonrpc":"2.0","error":{"code":-32601,"message":"Method not found"},"id":0}`
-		}
-
-		_, err = w.Write([]byte(out))
+		out := fmt.Sprintf(`{"jsonrpc":"2.0","result":"%s","id":1}`, genesisHashes[hashCounter])
+		hashCounter++
+		_, err := w.Write([]byte(out))
 		require.NoError(t, err)
 	}))
 	defer mockServer.Close()
@@ -72,40 +104,10 @@ func TestClient_Reader_HappyPath(t *testing.T) {
 	c, err := NewClient(mockServer.URL, cfg, requestTimeout, lggr)
 	require.NoError(t, err)
 
-	// check balance
-	bal, err := c.Balance(solana.PublicKey{})
-	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), bal) // once funds get sent to the system program it should be unrecoverable (so this number should remain > 0)
-
-	// check SlotHeight
-	slot, err := c.SlotHeight()
-	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), slot)
-
-	// fetch recent blockhash
-	hash, err := c.LatestBlockhash()
-	assert.NoError(t, err)
-	assert.Equal(t, "11111111111111111111111111111111", hash.Value.Blockhash.String())
-
-	// GetFeeForMessage
-	msg := "AQABAgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEBAQAA"
-	fee, err := c.GetFeeForMessage(msg)
-	assert.NoError(t, err)
-	assert.Equal(t, uint64(5000), fee)
-	getFeeNil = true
-	_, err = c.GetFeeForMessage(msg)
-	assert.Error(t, err)
-
 	// get chain ID based on gensis hash
 	for _, n := range networks {
 		network, err := c.ChainID()
 		assert.NoError(t, err)
 		assert.Equal(t, n, network)
 	}
-
-	// get account info (also tested inside contract_test)
-	res, err := c.GetAccountInfoWithOpts(context.TODO(), solana.PublicKey{}, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentFinalized})
-	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), res.Value.Lamports)
-	assert.Equal(t, solana.PublicKey{}, res.Value.Owner)
 }

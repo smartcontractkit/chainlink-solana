@@ -17,6 +17,7 @@ contracts/id.json
 contracts/artifacts/*
 !contracts/artifacts/localnet/
 ops/localnet.json
+test-ledger
 
 # TS
 node_modules
