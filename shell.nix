@@ -7,7 +7,7 @@ pkgs.mkShell {
     llvm_11
     stdenv.cc.cc.lib
     pkg-config
-    libudev
+    udev
     openssl
 
     # Solana
@@ -20,7 +20,7 @@ pkgs.mkShell {
     gopls
     delve
     golangci-lint
-    goimports
+    gotools
 
     # NodeJS + TS
     nodePackages.typescript
