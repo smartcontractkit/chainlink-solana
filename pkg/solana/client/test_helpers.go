@@ -24,7 +24,7 @@ func SetupLocalSolNode(t *testing.T) string {
 	cmd := exec.Command("solana-test-validator",
 		"--reset",
 		"--rpc-port", port,
-  )
+	)
 	var stdErr bytes.Buffer
 	cmd.Stderr = &stdErr
 	require.NoError(t, cmd.Start())
@@ -43,9 +43,7 @@ func SetupLocalSolNode(t *testing.T) string {
 		time.Sleep(time.Second)
 		client := rpc.New(url)
 		out, err := client.GetHealth(context.Background())
-    slot, err := client.GetSlot(context.Background(), rpc.CommitmentProcessed)
-
-		if err != nil || out != rpc.HealthOk || slot == 0 {
+		if err != nil || out != rpc.HealthOk {
 			t.Logf("API server not ready yet (attempt %d)\n", i+1)
 			continue
 		}
@@ -58,11 +56,12 @@ func SetupLocalSolNode(t *testing.T) string {
 
 func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 	for i := range keys {
-    _, err := exec.Command("solana", "airdrop", "100",
-  		keys[i].String(),
-  		"--url", url,
-    ).Output()
-    require.NoError(t, err)
+		account := keys[i].String()
+		_, err := exec.Command("solana", "airdrop", "100",
+			account,
+			"--url", url,
+		).Output()
+		require.NoError(t, err)
 	}
 }
 
