@@ -241,7 +241,7 @@ pub mod store {
                     .description
                     .iter()
                     .position(|byte| byte == &0)
-                    .unwrap_or_else(|| header.description.len());
+                    .unwrap_or(header.description.len());
 
                 let description = String::from_utf8(header.description[..end].to_vec())
                     .map_err(|_err| ErrorCode::InvalidInput)?;
