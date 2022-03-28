@@ -35,7 +35,7 @@ jobs:
     name: E2E Build Contracts
     runs-on: ubuntu-latest
     container:
-      image: projectserum/build:v0.22.0
+      image: projectserum/build:v0.22.1
       env:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1

@@ -18,6 +18,7 @@ import ProposeConfig from './proposeConfig'
 import ProposeOffchainConfig from './proposeOffchainConfig'
 import ProposePayees from './proposePayees'
 import FinalizeProposal from './proposal/finalizeProposal'
+import Close from './close'
 
 export default [
   Initialize,
@@ -41,4 +42,5 @@ export default [
   // ONLY DEV
   Transmit,
   SetupFlow,
+  Close,
 ]

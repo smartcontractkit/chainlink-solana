@@ -11,7 +11,7 @@ jobs:
     name: Rust Run Anchor Tests
     runs-on: ubuntu-latest
     container:
-      image: projectserum/build:v0.22.0
+      image: projectserum/build:v0.22.1
       env:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1
@@ -48,7 +48,7 @@ jobs:
     name: Rust Lint
     runs-on: ubuntu-latest
     container:
-      image: projectserum/build:v0.22.0
+      image: projectserum/build:v0.22.1
       env:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1

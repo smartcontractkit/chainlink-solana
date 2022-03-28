@@ -155,7 +155,7 @@ impl<'a> Feed<'a> {
                 .header
                 .live_cursor
                 .checked_sub(offset)
-                .unwrap_or_else(|| self.live.len() as u32 - (offset - self.header.live_cursor));
+                .unwrap_or(self.live.len() as u32 - (offset - self.header.live_cursor));
 
             Some(self.live[index as usize])
         } else if (historical_start..=historical_end).contains(&round_id) {
@@ -168,7 +168,7 @@ impl<'a> Feed<'a> {
                 .header
                 .historical_cursor
                 .checked_sub(offset)
-                .unwrap_or_else(|| {
+                .unwrap_or({
                     self.historical.len() as u32 - (offset - self.header.historical_cursor)
                 });
 
