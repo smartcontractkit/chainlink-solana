@@ -83,6 +83,7 @@ func (c *ContractTracker) Transmit(
 	tx.Signatures = append(tx.Signatures, finalSig)
 
 	// pass transmit payload to tx manager queue
+	c.lggr.Debugf("Queuing transmit tx: state (%s) + transmissions (%s)", c.StateID.String(), c.TransmissionsID.String())
 	err = c.txManager.Enqueue(c.StateID.String(), tx)
 	return errors.Wrap(err, "error on Transmit.txManager.Enqueue")
 }
