@@ -10,6 +10,7 @@ import ProposeOffchainConfig, { OffchainConfig } from '../proposeOffchainConfig'
 import { serializeOffchainConfig, deserializeConfig } from '../../../../lib/encoding'
 import { prepareOffchainConfigForDiff } from '../proposeOffchainConfig'
 import RDD from '../../../../lib/rdd'
+import { printDiff } from '../../../../lib/diff'
 
 type Input = {
   proposalId: string
@@ -230,16 +231,11 @@ export default class AcceptProposal extends SolanaCommand {
 
     const [contractConfig, proposalConfig] = [contractState, proposalState].map((state) => {
       const oracles = state.oracles?.xs.slice(0, state.oracles.len.toNumber())
-      const oraclesForDiff = oracles?.reduce((acc, { signer, transmitter, payee }, idx) => {
-        return {
-          ...acc,
-          [`oracle#${idx}`]: {
-            signer: Buffer.from(signer.key).toString('hex'),
+      const oraclesForDiff = oracles.map(({signer, transmitter, payee}) => ({
+        signer: Buffer.from(signer.key).toString('hex'),
             transmitter: transmitter.toString(),
             payee: payee.toString(),
-          },
-        }
-      }, {})
+      }))
       const offchainConfig = deserializeConfig(
         Buffer.from(state.offchainConfig.xs).slice(0, state.offchainConfig.len.toNumber()),
       )
@@ -259,15 +255,7 @@ export default class AcceptProposal extends SolanaCommand {
 
     // final diff between proposal and actual contract state
     logger.info(`OffchainConfig difference in contract ${this.args[0]} and proposal ${this.input.proposalId}`)
-    diff.printDiff(
-      { offchainConfig: contractConfig.offchainConfig, f: contractConfig.f },
-      { offchainConfig: proposalConfig.offchainConfig, f: proposalConfig.f },
-    )
-
-    logger.info(`Existing Oracles Config on contract ${this.args[0]}`)
-    logger.log(contractConfig.oracles)
-    logger.info(`Proposed Oracles Config for contract ${this.args[0]}`)
-    logger.log(proposalConfig.oracles)
+    printDiff(contractConfig, proposalConfig)
 
     await prompt('Accept config proposal?')
   }
@@ -279,7 +267,7 @@ export default class AcceptProposal extends SolanaCommand {
     await this.beforeExecute()
 
     const rawTx = await this.makeRawTransaction(signer)
-    await this.simulateTx(signer, rawTx)
+    // await this.simulateTx(signer, rawTx)
     await prompt(`Continue accepting proposal of proposal ${this.input.proposalId} on aggregator ${this.args[0]}?`)
 
     const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, this.program.idl)(rawTx)

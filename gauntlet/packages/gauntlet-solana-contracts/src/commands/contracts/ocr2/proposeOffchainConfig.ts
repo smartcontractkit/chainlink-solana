@@ -7,6 +7,7 @@ import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { divideIntoChunks } from '../../../lib/utils'
 import { serializeOffchainConfig, deserializeConfig } from '../../../lib/encoding'
 import RDD from '../../../lib/rdd'
+import { printDiff } from '../../../lib/diff'
 
 export type OffchainConfig = {
   deltaProgressNanoseconds: number
@@ -269,7 +270,7 @@ export default class ProposeOffchainConfig extends SolanaCommand {
     const proposedConfigForDiff = prepareOffchainConfigForDiff(proposedConfig)
 
     logger.info(`Proposed OffchainConfig for contract ${this.args[0]}`)
-    diff.printDiff(contractOffchainConfigForDiff, proposedConfigForDiff)
+    printDiff(contractOffchainConfigForDiff, proposedConfigForDiff)
 
     logger.info(
       `Important: Save this secret
