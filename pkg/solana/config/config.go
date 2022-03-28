@@ -141,12 +141,10 @@ func (c *config) Commitment() rpc.CommitmentType {
 		case "finalized":
 			commitment = rpc.CommitmentFinalized
 		default:
-			c.lggr.Warnf(invalidFallbackMsg, "CommitmentType", str, c.defaults.Commitment, nil)
+			c.lggr.Warnf(`Invalid value provided for %s, "%s" - falling back to default "%s"`, "CommitmentType", str, c.defaults.Commitment)
 			commitment = rpc.CommitmentConfirmed
 		}
 		return commitment
 	}
 	return c.defaults.Commitment
 }
-
-const invalidFallbackMsg = `Invalid value provided for %s, "%s" - falling back to default "%s": %v`
