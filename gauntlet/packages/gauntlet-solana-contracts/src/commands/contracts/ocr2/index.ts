@@ -9,6 +9,7 @@ import SetupFlow from './setup.dev.flow'
 import Transmit from './transmit.dev'
 import Inspection from './inspection'
 import { makeAcceptOwnershipCommand } from '../ownership/acceptOwnership'
+import { makeInspectOwnershipCommand } from '../ownership/inspectOwnership'
 import { CONTRACT_LIST } from '../../../lib/contracts'
 import { makeTransferOwnershipCommand } from '../ownership/transferOwnership'
 import { makeUpgradeProgramCommand } from '../../abstract/upgrade'
@@ -36,6 +37,7 @@ export default [
   Fund,
   makeAcceptOwnershipCommand(CONTRACT_LIST.OCR_2),
   makeTransferOwnershipCommand(CONTRACT_LIST.OCR_2),
+  makeInspectOwnershipCommand(CONTRACT_LIST.OCR_2),
   makeUpgradeProgramCommand(CONTRACT_LIST.OCR_2),
   // Inspection
   ...Inspection,

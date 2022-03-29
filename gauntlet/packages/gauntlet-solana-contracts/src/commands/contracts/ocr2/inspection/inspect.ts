@@ -1,5 +1,5 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { inspection, BN } from '@chainlink/gauntlet-core/dist/utils'
+import { inspection, BN, logger } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
@@ -14,6 +14,8 @@ type Input = {
   minAnswer: string | number
   maxAnswer: string | number
   transmitters: string[]
+  payees: string[]
+  signers: string[]
   offchainConfig: OffchainConfig
   billingAccessController: string
   requesterAccessController: string
@@ -43,6 +45,8 @@ export default class OCR2Inspect extends SolanaCommand {
     const aggregator = RDD.loadAggregator(this.args[0], network, rddPath)
     const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
     const transmitters = aggregatorOperators.map((operator) => rdd.operators[operator].ocrNodeAddress[0])
+    const payees = aggregatorOperators.map((operator) => rdd.operators[operator].adminAddress)
+    const signers = aggregatorOperators.map((operator) => rdd.operators[operator].ocr2OnchainPublicKey[0].substring(14))
     const offchainConfig = WriteOffchainConfig.makeInputFromRDD(rdd, this.args[0])
 
     return {
@@ -51,6 +55,8 @@ export default class OCR2Inspect extends SolanaCommand {
       minAnswer: aggregator.minSubmissionValue,
       maxAnswer: aggregator.maxSubmissionValue,
       transmitters,
+      payees,
+      signers,
       billingAccessController,
       requesterAccessController,
       offchainConfig,
@@ -63,6 +69,19 @@ export default class OCR2Inspect extends SolanaCommand {
 
   constructor(flags, args) {
     super(flags, args)
+  }
+
+  // toHexString converts a list of numbers to a hex string
+  toHexString(nums: Int16Array): string {
+    var hexString = ''
+    nums.forEach((num) => {
+      let hexNum = num.toString(16)
+      if (hexNum.length < 2) {
+        hexNum = '0' + hexNum
+      }
+      hexString = hexString + hexNum
+    })
+    return hexString
   }
 
   makeFeedInspections = async (bufferedInfo: Keypair, input: Input): Promise<inspection.Inspection[]> => {
@@ -189,6 +208,16 @@ export default class OCR2Inspect extends SolanaCommand {
         input.transmitters.map(toComparablePubKey),
         'Transmitters',
       ),
+      inspection.makeInspection(
+        onChainState.oracles.xs.slice(0, onChainState.oracles.len).map(({ payee }) => toComparablePubKey(payee)),
+        input.payees.map(toComparablePubKey),
+        'Payees',
+      ),
+      inspection.makeInspection(
+        onChainState.oracles.xs.slice(0, onChainState.oracles.len).map(({ signer }) => this.toHexString(signer.key)),
+        input.signers,
+        'Signers',
+      ),
       // Offchain config inspection
       inspection.makeInspection(onChainOCRConfig.s, input.offchainConfig.s, 'Offchain Config "s"'),
       inspection.makeInspection(onChainOCRConfig.peerIds, input.offchainConfig.peerIds, 'Offchain Config "peerIds"'),
@@ -224,6 +253,20 @@ export default class OCR2Inspect extends SolanaCommand {
         `Offchain Config "reportingPluginConfig.deltaCNanoseconds"`,
       ),
     ]
+    // Print on-chain oracle information
+    onChainState.oracles.xs.forEach((oracle) => {
+      logger.info(
+        'Oracle ' +
+          oracle.transmitter +
+          '\n- Proposed Payee: ' +
+          oracle.proposedPayee +
+          '\n- From Round ID: ' +
+          oracle.fromRoundId +
+          '\n- Payment Gjuels: ' +
+          oracle.paymentGjuels +
+          '\n',
+      )
+    })
 
     // Fetching tranmissions involves a tx. Give the option to the user to choose whether to fetch it or not.
     // Deactivated until we find a more efficient way to fetch this info
