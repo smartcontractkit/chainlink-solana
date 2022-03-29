@@ -2,14 +2,6 @@ name: Relay
 
 on:
   push:
-    branches:
-      - develop
-      - main
-    paths:
-      - '**.go'
-  pull_request:
-    paths:
-      - '**.go'
 
 jobs:
   Relay_Run_Unit_Tests:
