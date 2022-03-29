@@ -12,7 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/store/models"
 )
 
-// ORM manages terra chains and nodes.
+// ORM manages solana chains and nodes.
 type ORM interface {
 	Chain(string, ...pg.QOpt) (Chain, error)
 	Chains(offset, limit int, qopts ...pg.QOpt) ([]Chain, int, error)
