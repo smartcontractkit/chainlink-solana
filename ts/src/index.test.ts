@@ -1,15 +1,53 @@
-import {CHAINLINK_AGGREGATOR_PROGRAM_ID, CHAINLINK_STORE_PROGRAM_ID, OCR2Feed, Round} from '.';
-import {Provider} from "@project-serum/anchor";
+import { OCR2Feed, Round} from '.';
+import { PublicKey } from "@solana/web3.js";
+import * as anchor from "@project-serum/anchor";
+import * as os from "os";
+import * as fs from "fs";
+import * as path from "path";
 
 describe('OCR2Feed', () => {
     //TODO parse tests
 
     let itWS = process.env.ANCHOR_PROVIDER_URL ? it : it.skip
+    let programID = new PublicKey("STGhiM1ZaLjDLZDGcVFp3ppdetggLAs6MXezw5DXXH3")
+    let feed = new PublicKey("HoLknTuGPcjsVDyEAu92x1njFKc5uUXuYLYFuhiEatF1");
     itWS(
         'onRound',
         async () => {
-            let cl = await OCR2Feed.load(CHAINLINK_AGGREGATOR_PROGRAM_ID, Provider.env())
-            let feed = CHAINLINK_STORE_PROGRAM_ID;
+            // Temp dir
+            let tmpResolve
+            let tmpPromise = new Promise<string>((r) => (tmpResolve = r))
+            fs.mkdtemp(path.join(os.tmpdir(), 'anchor-wallet-'), (err, folder) => {
+                if (err) {
+                    console.log(err)
+                    tmpResolve("")
+                    return
+                }
+                tmpResolve(folder)
+            })
+            let tmpDir = await tmpPromise
+            expect(tmpDir).toBeDefined()
+
+            // Temp key
+            let keyPair = anchor.web3.Keypair.generate()
+            process.env.ANCHOR_WALLET = path.join(tmpDir,"test-anchor-key")
+            let doneResolve
+            let donePromise = new Promise<boolean>((r)=>(doneResolve = r))
+
+            let json = JSON.stringify(Array.from(keyPair.secretKey))
+            fs.writeFile(process.env.ANCHOR_WALLET, json, (err) => {
+                if (err) {
+                    console.log(err)
+                    doneResolve(false)
+                    return
+                }
+                doneResolve(true)
+            })
+            let done = await donePromise
+            expect(done).toBeTruthy()
+
+            // Listen to feed
+            let cl = await OCR2Feed.load(programID, anchor.Provider.env())
             let resolve
             let promise = new Promise<Round>((r) => (resolve = r))
             let num
@@ -26,6 +64,6 @@ describe('OCR2Feed', () => {
             expect(got.aggregatorRoundId).toBeDefined()
             expect(got.observationsTS).toBeDefined()
         },
-        120_000,
+        20_000,
     )
 })

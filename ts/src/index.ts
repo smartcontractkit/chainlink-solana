@@ -1,6 +1,6 @@
 import * as anchor from "@project-serum/anchor";
 import { BN } from "@project-serum/anchor";
-import { Connection, PublicKey } from "@solana/web3.js";
+import {  PublicKey } from "@solana/web3.js";
 
 export const CHAINLINK_AGGREGATOR_PROGRAM_ID = new PublicKey("HW3ipKzeeduJq6f1NqRCw4doknMeWkfrM4WxobtG3o5v");
 export const CHAINLINK_STORE_PROGRAM_ID = new PublicKey("CaH12fwNTKJAG8PxEvo9R96Zc2j8qNHZaFj8ZW49yZNT");
@@ -26,9 +26,8 @@ export class OCR2Feed {
 
   static async load(
     programID: PublicKey = CHAINLINK_AGGREGATOR_PROGRAM_ID,
-    provider?: anchor.Provider,
+    provider: anchor.Provider = anchor.getProvider(),
   ): Promise<OCR2Feed> {
-    provider = provider ?? anchor.getProvider();
     const aggregatorProgram = await anchor.Program.at(programID, provider);
     return new OCR2Feed(aggregatorProgram, provider);
   }
