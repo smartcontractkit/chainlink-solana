@@ -12,7 +12,7 @@ jobs:
       - name: .tool-versions to .env
         run: ./scripts/tool-versions-to-env.sh
       - name: dotenv
-        uses: actions/dotenv-action@v0.2.7
+        uses: falti/dotenv-action@v0.2.7
         id: dotenv
       - name: Setup Node ${{ steps.node-version.outputs.NODE_VERSION }}
         uses: actions/setup-node@v2
@@ -37,7 +37,7 @@ jobs:
       - name: .tool-versions to .env
         run: ./scripts/tool-versions-to-env.sh
       - name: dotenv
-        uses: actions/dotenv-action@v0.2.7
+        uses: falti/dotenv-action@v0.2.7
         id: dotenv
       - name: Setup Node ${{ steps.dotenv.outputs.NODEJS_VERSION }}
         uses: actions/setup-node@v2
@@ -56,7 +56,7 @@ jobs:
       - name: .tool-versions to .env
         run: ./scripts/tool-versions-to-env.sh
       - name: dotenv
-        uses: actions/dotenv-action@v0.2.7
+        uses: falti/dotenv-action@v0.2.7
         id: dotenv
       - name: Setup Node ${{ steps.dotenv.outputs.NODEJS_VERSION }}
         uses: actions/setup-node@v2
