@@ -14,20 +14,16 @@ jobs:
       - name: dotenv
         uses: falti/dotenv-action@v0.2.7
         id: dotenv
-      - name: Setup Node ${{ steps.node-version.outputs.NODE_VERSION }}
+      - name: Setup Node ${{ steps.dotenv.outputs.nodejs_version }}
         uses: actions/setup-node@v2
         with:
-          node-version: ${{ steps.node-version.outputs.NODE_VERSION }}
+          node-version: ${{ steps.dotenv.outputs.nodejs_version }}
       - name: Install
-        run: |
-          npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
-          yarn --cwd ./gauntlet install --frozen-lockfile
+        run: yarn --cwd ./gauntlet install --frozen-lockfile
       - name: Build
-        run: |
-          yarn --cwd ./gauntlet build
+        run: yarn --cwd ./gauntlet build
       - name: Run Gauntlet
-        run: |
-          yarn --cwd ./gauntlet gauntlet
+        run: yarn --cwd ./gauntlet gauntlet
 
   gauntlet_format:
     name: Gauntlet Format
@@ -39,10 +35,10 @@ jobs:
       - name: dotenv
         uses: falti/dotenv-action@v0.2.7
         id: dotenv
-      - name: Setup Node ${{ steps.dotenv.outputs.NODEJS_VERSION }}
+      - name: Setup Node ${{ steps.dotenv.outputs.nodejs_version }}
         uses: actions/setup-node@v2
         with:
-          node-version: ${{ steps.dotenv.outputs.NODEJS_VERSION }}
+          node-version: ${{ steps.dotenv.outputs.nodejs_version }}
       - name: Install
         run: yarn --cwd ./gauntlet install --frozen-lockfile
       - name: Lint
@@ -58,10 +54,10 @@ jobs:
       - name: dotenv
         uses: falti/dotenv-action@v0.2.7
         id: dotenv
-      - name: Setup Node ${{ steps.dotenv.outputs.NODEJS_VERSION }}
+      - name: Setup Node ${{ steps.dotenv.outputs.nodejs_version }}
         uses: actions/setup-node@v2
         with:
-          node-version: ${{ steps.dotenv.outputs.NODEJS_VERSION }}
+          node-version: ${{ steps.dotenv.outputs.nodejs_version }}
       - name: Install
         run: yarn --cwd ./gauntlet install --frozen-lockfile
       - name: test:ci

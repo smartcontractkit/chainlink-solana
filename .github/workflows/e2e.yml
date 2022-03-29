@@ -73,7 +73,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v1
         with:
-          go-version: ${{ steps.dotenv.outputs.GOLANG_VERSION }}
+          go-version: ${{ steps.dotenv.outputs.golang_version }}
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
