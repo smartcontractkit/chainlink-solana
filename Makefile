@@ -41,7 +41,7 @@ ifneq ($(CI),true)
 	# install nix
 	sh <(curl -L https://nixos-nix-install-tests.cachix.org/serve/vij683ly7sl95nnhb67bdjjfabclr85m/install) --daemon --tarball-url-prefix https://nixos-nix-install-tests.cachix.org/serve --nix-extra-conf-file ./nix.conf
 endif
-	go install github.com/onsi/ginkgo/v2/ginkgo@v$(shell cat ./.tool-versions | grep ginkgo | sed -En "s/ginkgo.(.*)/\1/p")
+	go install github.com/onsi/ginkgo/v2/ginkgo@v$(shell ./scripts/tool-versions-to-env.sh GINKGO_VERSION)
 endif
 
 anchor_shell:

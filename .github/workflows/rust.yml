@@ -1,4 +1,4 @@
-name: Rust
+name: rust
 on: 
   push:
 
@@ -7,7 +7,7 @@ defaults:
     working-directory: contracts
 
 jobs:
-  Rust_Run_Anchor_Tests:
+  rust_run_anchor_tests:
     name: Rust Run Anchor Tests
     runs-on: ubuntu-latest
     container:
@@ -44,7 +44,7 @@ jobs:
        yarn install --frozen-lockfile
        anchor test
 
-  Rust_Lint:
+  rust_lint:
     name: Rust Lint
     runs-on: ubuntu-latest
     container:

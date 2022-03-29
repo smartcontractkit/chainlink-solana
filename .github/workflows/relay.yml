@@ -1,10 +1,10 @@
-name: Relay
+name: relay
 
 on:
   push:
 
 jobs:
-  Relay_Run_Unit_Tests:
+  relay_run_unit_tests:
     name: Relay Run Unit Tests
     runs-on: ubuntu-latest
     steps:

@@ -1,22 +1,19 @@
-name: Gauntlet
+name: gauntlet
 
 on:
   push:
 
 jobs:
-  Gauntlet_Build:
+  gauntlet_build:
     name: Gauntlet Build
     runs-on: ubuntu-latest
-    env:
-      CI: true
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v2
-      - name: Parse Node version
-        id: node-version
-        run: |
-          NODE_VERSION=$(cat ./.tool-versions | grep nodejs | sed -En "s/nodejs.(.*)/\1/p")
-          echo "::set-output name=NODE_VERSION::${NODE_VERSION}"
+      - name: .tool-versions to .env
+        run: ./scripts/tool-versions-to-env.sh
+      - name: dotenv
+        uses: actions/dotenv-action@v0.2.7
+        id: dotenv
       - name: Setup Node ${{ steps.node-version.outputs.NODE_VERSION }}
         uses: actions/setup-node@v2
         with:
@@ -32,52 +29,40 @@ jobs:
         run: |
           yarn --cwd ./gauntlet gauntlet
 
-  Gauntlet_Format:
+  gauntlet_format:
     name: Gauntlet Format
     runs-on: ubuntu-latest
-    env:
-      CI: true
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v2
-      - name: Parse Node version
-        id: node-version
-        run: |
-          NODE_VERSION=$(cat ./.tool-versions | grep nodejs | sed -En "s/nodejs.(.*)/\1/p")
-          echo "::set-output name=NODE_VERSION::${NODE_VERSION}"
-      - name: Setup Node ${{ steps.node-version.outputs.NODE_VERSION }}
+      - name: .tool-versions to .env
+        run: ./scripts/tool-versions-to-env.sh
+      - name: dotenv
+        uses: actions/dotenv-action@v0.2.7
+        id: dotenv
+      - name: Setup Node ${{ steps.dotenv.outputs.NODEJS_VERSION }}
         uses: actions/setup-node@v2
         with:
-          node-version: ${{ steps.node-version.outputs.NODE_VERSION }}
+          node-version: ${{ steps.dotenv.outputs.NODEJS_VERSION }}
       - name: Install
-        run: |
-          npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
-          yarn --cwd ./gauntlet install --frozen-lockfile
+        run: yarn --cwd ./gauntlet install --frozen-lockfile
       - name: Lint
-        run: |
-          yarn --cwd ./gauntlet lint:format
+        run: yarn --cwd ./gauntlet lint:format
 
-  Gauntlet_Run_Tests:
+  gauntlet_run_tests:
     name: Gauntlet Run Tests
     runs-on: ubuntu-latest
-    env:
-      CI: true
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v2
-      - name: Parse Node version
-        id: node-version
-        run: |
-          NODE_VERSION=$(cat ./.tool-versions | grep nodejs | sed -En "s/nodejs.(.*)/\1/p")
-          echo "::set-output name=NODE_VERSION::${NODE_VERSION}"
-      - name: Setup Node ${{ steps.node-version.outputs.NODE_VERSION }}
+      - name: .tool-versions to .env
+        run: ./scripts/tool-versions-to-env.sh
+      - name: dotenv
+        uses: actions/dotenv-action@v0.2.7
+        id: dotenv
+      - name: Setup Node ${{ steps.dotenv.outputs.NODEJS_VERSION }}
         uses: actions/setup-node@v2
         with:
-          node-version: ${{ steps.node-version.outputs.NODE_VERSION }}
+          node-version: ${{ steps.dotenv.outputs.NODEJS_VERSION }}
       - name: Install
-        run: |
-          npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
-          yarn --cwd ./gauntlet install --frozen-lockfile
+        run: yarn --cwd ./gauntlet install --frozen-lockfile
       - name: test:ci
-        run: |
-          yarn --cwd ./gauntlet test:ci
+        run: yarn --cwd ./gauntlet test:ci
