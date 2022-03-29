@@ -65,8 +65,8 @@ jobs:
       - name: dotenv
         uses: falti/dotenv-action@v0.2.7
         id: dotenv
-      - name: Setup go
-        uses: actions/setup-go@v1
+      - name: Setup go ${{ steps.dotenv.outputs.golang_version }}
+        uses: actions/setup-go@v2
         with:
           go-version: ${{ steps.dotenv.outputs.golang_version }}
       - name: Configure AWS Credentials
