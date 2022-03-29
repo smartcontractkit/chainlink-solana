@@ -10,7 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 )
 
-// Global terra defaults.
+// Global solana defaults.
 var defaultConfigSet = configSet{
 	BalancePollPeriod:   5 * time.Second, // poll period for balance monitoring
 	ConfirmPollPeriod:   time.Second,     // polling for tx confirmation
