@@ -1,52 +1,52 @@
 {
-    "name": "@chainlink/solana-sdk",
-    "version": "0.2.0",
-    "repository": "https://github.com/smartcontractkit/chainlink-solana",
-    "license": "MIT",
-    "engines": {
-        "node": ">= 14"
-    },
-    "publishConfig": {
-        "access": "public"
-    },
-    "files": [
-        "dist/**/*",
-        "src",
-        "LICENSE",
-        "README.md"
-    ],
-    "sideEffects": false,
-    "main": "dist/index.js",
-    "types": "dist/index.d.ts",
-    "scripts": {
-        "lint": "tsc",
-        "test": "SKIP_PROMPTS=true jest --runInBand",
-        "lint:format": "yarn prettier --check ./src",
-        "build": "yarn tsc",
-        "clean": "rm -rf dist",
-        "format": "yarn prettier --write ./src"
-    },
-    "dependencies": {
-        "@project-serum/anchor": "^0.22.0",
-        "@solana/web3.js": "1.30.2"
-    },
-    "devDependencies": {
-        "@types/eslint": "^8.2.1",
-        "@types/eslint-plugin-prettier": "^3.1.0",
-        "@types/jest": "^26.0.15",
-        "@types/mocha": "^9.0.0",
-        "@types/node": "^16.11.13",
-        "@types/prettier": "^2.4.2",
-        "@typescript-eslint/eslint-plugin": "^5.8.1",
-        "@typescript-eslint/parser": "^5.8.1",
-        "eslint": "^8.5.0",
-        "eslint-config-prettier": "^8.3.0",
-        "eslint-plugin-prettier": "^4.0.0",
-        "jest": "^26.6.3",
-        "prettier": "^2.5.1",
-        "ts-node": "^10.4.0",
-        "tslib": "^2.3.1",
-        "typedoc": "^0.22.10",
-        "typescript": "^4.4.4"
-    }
+  "name": "@chainlink/solana-sdk",
+  "version": "0.2.0",
+  "repository": "https://github.com/smartcontractkit/chainlink-solana",
+  "license": "MIT",
+  "engines": {
+    "node": ">= 14"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist/**/*",
+    "src",
+    "LICENSE",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "lint": "tsc --no-emit",
+    "test": "jest --runInBand",
+    "lint:format": "prettier --check ./src",
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "format": "prettier --write ./src"
+  },
+  "dependencies": {
+    "@project-serum/anchor": "^0.22.0",
+    "@solana/web3.js": "1.30.2"
+  },
+  "devDependencies": {
+    "@types/eslint": "^8.2.1",
+    "@types/eslint-plugin-prettier": "^3.1.0",
+    "@types/jest": "^27.4.1",
+    "@types/node": "^16.11.13",
+    "@types/prettier": "^2.4.2",
+    "@typescript-eslint/eslint-plugin": "^5.8.1",
+    "@typescript-eslint/parser": "^5.8.1",
+    "eslint": "^8.5.0",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-prettier": "^4.0.0",
+    "jest": "^27.4.1",
+    "prettier": "^2.5.1",
+    "ts-jest": "^27.1.4",
+    "ts-node": "^10.4.0",
+    "tslib": "^2.3.1",
+    "typedoc": "^0.22.10",
+    "typescript": "^4.4.4"
+  }
 }

@@ -1,6 +1,5 @@
-import {CHAINLINK_AGGREGATOR_PROGRAM_ID, CHAINLINK_STORE_PROGRAM_ID, OCR2Feed, Round} from '../src';
+import {CHAINLINK_AGGREGATOR_PROGRAM_ID, CHAINLINK_STORE_PROGRAM_ID, OCR2Feed, Round} from '.';
 import {Provider} from "@project-serum/anchor";
-import { BN } from "@project-serum/anchor";
 
 describe('OCR2Feed', () => {
     //TODO parse tests
