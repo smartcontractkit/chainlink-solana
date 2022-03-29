@@ -1,9 +1,11 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { SolanaConstructor } from '../../../lib/types'
+import { withAddressBook } from '../../../lib/middlewares'
+import logger from '../../../logger'
 
 export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaConstructor => {
   return class TransferOwnership extends SolanaCommand {
@@ -19,6 +21,7 @@ export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaC
 
       this.require(!!this.flags.state, 'Please provide flags with "state"')
       this.require(!!this.flags.to, 'Please provide flags with "to"')
+      this.use(withAddressBook)
     }
 
     makeRawTransaction = async (signer: PublicKey) => {
@@ -45,9 +48,13 @@ export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaC
       const program = this.loadProgram(contract.idl, address)
 
       const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
-      await prompt(`Transferring ownership of ${contractId} state (${this.flags.state.toString()}). Continue?`)
+      await prompt(
+        `Transferring ownership of ${contractId} state (${logger.styleAddress(
+          this.flags.state,
+        )}) to ${logger.styleAddress(this.flags.to)}. Continue?`,
+      )
       const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx)
-      logger.success(`Ownership transferred to ${new PublicKey(this.flags.to)} on tx ${txhash}`)
+      logger.success(`Ownership transferred to ${logger.styleAddress(this.flags.to)} on tx ${txhash}`)
       return {
         responses: [
           {

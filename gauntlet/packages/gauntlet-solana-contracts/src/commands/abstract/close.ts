@@ -1,7 +1,8 @@
-import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand } from '@chainlink/gauntlet-solana'
 import { PublicKey, TransactionInstruction } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../lib/contracts'
+import logger from '../../logger'
 
 export default abstract class Close extends SolanaCommand {
   static makeId = (contractId: CONTRACT_LIST) => `${contractId}:close`
@@ -31,7 +32,9 @@ export default abstract class Close extends SolanaCommand {
     const state = new PublicKey(this.args[0])
 
     logger.loading(
-      `Preparing instruction to close account from ${this.contractId} contract with address ${state.toString()}`,
+      `Preparing instruction to close account from ${this.contractId} contract with address ${logger.styleAddress(
+        state.toString(),
+      )}`,
     )
 
     const ix = program.instruction[closeFunction]({
@@ -49,11 +52,11 @@ export default abstract class Close extends SolanaCommand {
     const state = new PublicKey(this.args[0])
     const ixs = await this.makeRawTransaction(this.wallet.publicKey)
 
-    await prompt(`Continue closing ${this.contractId} state with address ${state.toString()}?`)
+    await prompt(`Continue closing ${this.contractId} state with address ${logger.styleAddress(state.toString())}?`)
 
     const tx = await this.signAndSendRawTx(ixs)
 
-    logger.success(`Closed state ${state.toString()} on tx ${tx}`)
+    logger.success(`Closed state ${logger.styleAddress(state.toString())} on tx ${tx}`)
 
     return {
       responses: [

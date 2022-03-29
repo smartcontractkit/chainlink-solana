@@ -1,10 +1,11 @@
 import { SolanaCommand } from '@chainlink/gauntlet-solana'
-import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { PublicKey, Keypair, TransactionInstruction, SystemProgram } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract, makeTx } from '@chainlink/gauntlet-solana-contracts'
 import { Idl, Program } from '@project-serum/anchor'
 import { MAX_BUFFER_SIZE } from '../lib/constants'
 import { isDeepEqual } from '../lib/utils'
+import logger from '@chainlink/gauntlet-solana-contracts/dist/logger'
 
 type ProposalContext = {
   rawTx: TransactionInstruction
@@ -97,7 +98,7 @@ export const wrapCommand = (command) => {
     }
 
     makeRawTransaction = async (signer: PublicKey): Promise<TransactionInstruction[]> => {
-      logger.info(`Generating transaction data using ${signer.toString()} account as signer`)
+      logger.info(`Generating transaction data using ${logger.styleAddress(signer.toString())} account as signer`)
 
       const multisigState = await this.program.account.multisig.fetch(this.multisigAddress)
       const [multisigSigner] = await PublicKey.findProgramAddress(
@@ -108,8 +109,8 @@ export const wrapCommand = (command) => {
       const owners = multisigState.owners
 
       logger.info(`Multisig Info:
-        - Address: ${this.multisigAddress.toString()}
-        - Signer: ${multisigSigner.toString()}
+        - Address: ${logger.styleAddress(this.multisigAddress.toString())}
+        - Signer: ${logger.styleAddress(multisigSigner.toString())}
         - Threshold: ${threshold.toString()}
         - Owners: ${owners}`)
 
@@ -284,8 +285,11 @@ export const wrapCommand = (command) => {
         )
         return
       }
+
       // inverting the signers boolean array and filtering owners by it
-      const remainingEligibleSigners = owners.filter((_, i) => proposalState.signers.map((s) => !s)[i])
+      const remainingEligibleSigners = owners
+        .filter((_, i) => proposalState.signers.map((s) => !s)[i])
+        .map((a) => `\n     - ${logger.styleAddress(a)}`)
       logger.info(
         `${this.getRemainingSigners(
           proposalState,

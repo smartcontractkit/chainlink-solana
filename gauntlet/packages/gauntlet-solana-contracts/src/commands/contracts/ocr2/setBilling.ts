@@ -3,8 +3,10 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { utils } from '@project-serum/anchor'
-import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
+import { withAddressBook } from '../../../lib/middlewares'
+import logger from '../../../logger'
 import RDD from '../../../lib/rdd'
 
 type Input = {
@@ -38,6 +40,7 @@ export default class SetBilling extends SolanaCommand {
 
   constructor(flags, args) {
     super(flags, args)
+    this.use(withAddressBook)
   }
 
   buildCommand = async (flags, args) => {
@@ -49,7 +52,7 @@ export default class SetBilling extends SolanaCommand {
   }
 
   beforeExecute = async () => {
-    logger.loading(`Executing ${SetBilling.id} from contract ${this.args[0]}`)
+    logger.loading(`Executing ${SetBilling.id} from contract ${logger.styleAddress(this.args[0])}`)
     logger.log('Input Params:', this.input)
     await prompt(`Continue?`)
   }

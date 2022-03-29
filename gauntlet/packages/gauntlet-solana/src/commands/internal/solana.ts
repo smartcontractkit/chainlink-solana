@@ -1,4 +1,5 @@
 import { Result, WriteCommand } from '@chainlink/gauntlet-core'
+import { AddressBook } from '../addressBook'
 import {
   Transaction,
   BpfLoader,
@@ -21,6 +22,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
   wallet: SolanaWallet
   provider: Provider
   program: Program
+  addressBook: AddressBook
 
   abstract execute: () => Promise<Result<TransactionResponse>>
   makeRawTransaction: (signer: PublicKey) => Promise<TransactionInstruction[]>

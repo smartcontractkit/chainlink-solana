@@ -1,5 +1,6 @@
 import { Transaction, TransactionCtorFields, TransactionInstruction } from '@solana/web3.js'
 import * as BufferLayout from '@solana/buffer-layout'
+import { SolanaLogger } from '@chainlink/gauntlet-solana'
 
 export const divideIntoChunks = (arr: Array<any> | Buffer, chunkSize: number): any[][] => {
   const chunks: any[] = []

@@ -2,6 +2,7 @@ import { ICommand, Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { CONTRACT_LIST, DeploymentContract, getDeploymentContract } from '../../lib/contracts'
+import { withAddressBook } from '../../lib/middlewares'
 
 enum SOLANA_OPERATIONS {
   DEPLOY = 'deploy',
@@ -107,6 +108,8 @@ export default class GeneratorCommand extends SolanaCommand {
     if ([...SOLANA_OPERATIONS.EXECUTE, ...SOLANA_OPERATIONS.QUERY].includes(this.opts.action)) {
       this.require(args[0], 'Provide a valid contract address')
     }
+
+    this.use(withAddressBook)
   }
 
   abstractDeploy: AbstractExecute = async () => {
