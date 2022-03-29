@@ -21,6 +21,7 @@ import (
 func TestClient_Reader_Integration(t *testing.T) {
 	url := SetupLocalSolNode(t)
 	privKey, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
 	pubKey := privKey.PublicKey()
 	FundTestAccounts(t, []solana.PublicKey{pubKey}, url)
 
