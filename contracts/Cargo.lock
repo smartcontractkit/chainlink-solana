@@ -4,10 +4,10 @@ version = 3
 
 [[package]]
 name = "access-controller"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anchor-lang",
- "arrayvec 0.1.0",
+ "arrayvec 1.0.0",
  "static_assertions",
 ]
 
@@ -218,13 +218,13 @@ checksum = "a4c527152e37cf757a3f78aae5a06fbeefdb07ccc535c980a3208ee3060dd544"
 
 [[package]]
 name = "arrayvec"
-version = "0.1.0"
-
-[[package]]
-name = "arrayvec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
+
+[[package]]
+name = "arrayvec"
+version = "1.0.0"
 
 [[package]]
 name = "atty"
@@ -408,7 +408,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chainlink_solana"
-version = "0.1.2"
+version = "1.0.0"
 dependencies = [
  "borsh",
  "borsh-derive",
@@ -752,13 +752,13 @@ dependencies = [
 
 [[package]]
 name = "ocr2"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "access-controller",
  "anchor-lang",
  "anchor-spl",
  "arrayref",
- "arrayvec 0.1.0",
+ "arrayvec 1.0.0",
  "bytemuck",
  "static_assertions",
  "store",
@@ -1116,7 +1116,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "store"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "access-controller",
  "anchor-lang",

@@ -1,6 +1,6 @@
 [package]
 name = "store"
-version = "0.1.0"
+version = "1.0.0"
 description = "Created with Anchor"
 edition = "2018"
 
@@ -16,5 +16,5 @@ default = []
 
 [dependencies]
 anchor-lang = "0.23.0"
-access-controller = { version = "0.1.0", path = "../access-controller", default-features = false, features = ["cpi"] }
+access-controller = { version = "1.0.0", path = "../access-controller", default-features = false, features = ["cpi"] }
 bytemuck = "1.7.2"
