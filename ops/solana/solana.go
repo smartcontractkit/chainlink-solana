@@ -465,6 +465,7 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 	input = map[string]interface{}{
 		"proposalId":     d.Account[Proposal],
 		"offchainConfig": offchainConfig,
+		"userSecret":     testingSecret,
 	}
 
 	jsonInput, err = json.Marshal(input)
@@ -476,7 +477,6 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 		"ocr2:propose_offchain_config",
 		d.gauntlet.Flag("network", d.network),
 		d.gauntlet.Flag("proposalId", d.Account[Proposal]),
-		d.gauntlet.Flag("secret", testingSecret),
 		d.gauntlet.Flag("input", string(jsonInput)),
 		d.Account[OCRFeed],
 	); err != nil {
