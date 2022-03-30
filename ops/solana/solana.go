@@ -5,9 +5,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -76,56 +78,77 @@ func New(ctx *pulumi.Context) (Deployer, error) {
 	}, nil
 }
 
+// filter out non alphanumeric chars (such as newline)
+func filterAlphaNumeric(s string) string {
+	reg, err := regexp.Compile("[^a-zA-Z0-9]+")
+	if err != nil {
+		log.Fatal(err) // should never happen
+	}
+	return reg.ReplaceAllString(s, "")
+}
+
+// use solana cli to deploy programs
+func deployProgram(program string, deployerKeyfile string, expectedAddress string) error {
+	msg := relayUtils.LogStatus(fmt.Sprintf("Deploying '%s'", program))
+	out, err := exec.Command("solana", "program", "deploy",
+		"--keypair", deployerKeyfile,
+		"--program-id", fmt.Sprintf("../gauntlet/packages/gauntlet-solana-contracts/artifacts/programId/%s.json", program),
+		fmt.Sprintf("../gauntlet/packages/gauntlet-solana-contracts/artifacts/bin/%s.so", program),
+	).Output()
+	if err != nil {
+		fmt.Println(string(out))
+		return msg.Check(errors.Wrapf(err, "failed to deploy program '%s'", program))
+	}
+	parsed := filterAlphaNumeric(strings.TrimPrefix(string(out), "Program Id: "))
+	if expectedAddress != parsed {
+		return msg.Check(fmt.Errorf("parsed account (%s) does not match expected (%s) for '%s'", parsed, expectedAddress, program))
+	}
+	return msg.Check(nil)
+}
+
 func (d *Deployer) Load() error {
-	// Access Controller contract deployment
-	fmt.Println("Deploying Access Controller...")
-	err := d.gauntlet.ExecCommand(
-		"access_controller:deploy",
-		d.gauntlet.Flag("network", d.network),
-	)
-	if err != nil {
-		return errors.Wrap(err, "'access_controller:deploy' call failed")
+	deployer := "./localnet.json"
+
+	// create key if doesn't exist
+	msg := relayUtils.LogStatus(fmt.Sprintf("create program deployer key at '%s'", deployer))
+	if _, err := os.Stat(deployer); err != nil {
+		// create key if doesn't exist
+		if out, err := exec.Command("solana-keygen", "new",
+			"-f", "--no-bip39-passphrase",
+			"-o", deployer,
+		).Output(); msg.Check(err) != nil {
+			fmt.Println(string(out))
+			return err
+		}
+	} else {
+		msg.Exists()
+		msg.Check(nil)
 	}
 
-	report, err := d.gauntlet.ReadCommandReport()
+	// get key & fund key
+	out, err := exec.Command("solana-keygen", "pubkey", deployer).Output()
 	if err != nil {
-		return errors.Wrap(err, "report not available")
+		return errors.Wrapf(err, "failed to parse pubkey from '%s'", deployer)
+	}
+	if err := d.Fund([]string{filterAlphaNumeric(string(out))}); err != nil {
+		return errors.Wrap(err, "failed to fund program deployer")
 	}
 
-	d.Account[AccessController] = report.Responses[0].Contract
+	// expected program IDs (match to gauntlet .env.local)
+	d.Account[AccessController] = "2ckhep7Mvy1dExenBqpcdevhRu7CLuuctMcx7G9mWEvo"
+	d.Account[OCR2] = "E3j24rx12SyVsG6quKuZPbQqZPkhAUCh8Uek4XrKYD2x"
+	d.Account[Store] = "9kRNTZmoZSiTBuXC62dzK9E7gC7huYgcmRRhYv3i4osC"
 
-	// Access Controller contract deployment
-	fmt.Println("Deploying Store...")
-	err = d.gauntlet.ExecCommand(
-		"store:deploy",
-		d.gauntlet.Flag("network", d.network),
-	)
-	if err != nil {
-		return errors.Wrap(err, "'store:deploy' call failed")
+	// deploy using solana cli
+	if err := deployProgram("access_controller", deployer, d.Account[AccessController]); err != nil {
+		return errors.Wrap(err, "failed to deploy ocr2")
 	}
-
-	report, err = d.gauntlet.ReadCommandReport()
-	if err != nil {
-		return errors.Wrap(err, "report not available")
+	if err := deployProgram("ocr2", deployer, d.Account[OCR2]); err != nil {
+		return errors.Wrap(err, "failed to deploy ocr2")
 	}
-
-	d.Account[Store] = report.Responses[0].Contract
-
-	// OCR2 contract deployment
-	fmt.Println("Deploying OCR 2...")
-	err = d.gauntlet.ExecCommand(
-		"ocr2:deploy",
-		d.gauntlet.Flag("network", d.network),
-	)
-	if err != nil {
-		return errors.Wrap(err, "'ocr2:deploy' call failed")
+	if err := deployProgram("store", deployer, d.Account[Store]); err != nil {
+		return errors.Wrap(err, "failed to deploy ocr2")
 	}
-
-	report, err = d.gauntlet.ReadCommandReport()
-	if err != nil {
-		return errors.Wrap(err, "report not available")
-	}
-	d.Account[OCR2] = report.Responses[0].Contract
 
 	return nil
 }
@@ -248,7 +271,6 @@ func (d *Deployer) DeployOCR() error {
 		return err
 	}
 
-	// TODO: command doesn't throw an error in go if it fails
 	err = d.gauntlet.ExecCommand(
 		"ocr2:initialize",
 		d.gauntlet.Flag("network", d.network),
@@ -443,6 +465,7 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 	input = map[string]interface{}{
 		"proposalId":     d.Account[Proposal],
 		"offchainConfig": offchainConfig,
+		"userSecret":     testingSecret,
 	}
 
 	jsonInput, err = json.Marshal(input)
@@ -454,7 +477,6 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 		"ocr2:propose_offchain_config",
 		d.gauntlet.Flag("network", d.network),
 		d.gauntlet.Flag("proposalId", d.Account[Proposal]),
-		d.gauntlet.Flag("secret", testingSecret),
 		d.gauntlet.Flag("input", string(jsonInput)),
 		d.Account[OCRFeed],
 	); err != nil {
@@ -495,6 +517,7 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 
 	fmt.Println("Accept proposal...")
 	input = map[string]interface{}{
+		"proposalId":     d.Account[Proposal],
 		"version":        2,
 		"f":              threshold,
 		"oracles":        oracles,

@@ -18,11 +18,11 @@ func (c *ContractTracker) Transmit(
 	report types.Report,
 	sigs []types.AttributedOnchainSignature,
 ) error {
-	recent, err := c.client.rpc.GetRecentBlockhash(ctx, c.client.commitment)
+	blockhash, err := c.reader.LatestBlockhash()
 	if err != nil {
 		return errors.Wrap(err, "error on Transmit.GetRecentBlockhash")
 	}
-	if recent == nil || recent.Value == nil {
+	if blockhash == nil || blockhash.Value == nil {
 		return errors.New("nil pointer returned from Transmit.GetRecentBlockhash")
 	}
 
@@ -63,7 +63,7 @@ func (c *ContractTracker) Transmit(
 		[]solana.Instruction{
 			solana.NewInstruction(c.ProgramID, accounts, data.Bytes()),
 		},
-		recent.Value.Blockhash,
+		blockhash.Value.Blockhash,
 		solana.TransactionPayer(c.Transmitter.PublicKey()),
 	)
 	if err != nil {
@@ -82,25 +82,10 @@ func (c *ContractTracker) Transmit(
 	copy(finalSig[:], finalSigBytes)
 	tx.Signatures = append(tx.Signatures, finalSig)
 
-	// Send transaction, and wait for confirmation:
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), c.client.txTimeout)
-		defer cancel()
-		txSig, err := c.client.rpc.SendTransactionWithOpts(
-			ctx, // does not use libocr transmit context
-			tx,
-			c.client.skipPreflight,
-			c.client.commitment,
-		)
-
-		if err != nil {
-			c.lggr.Errorf("error on Transmit.SendAndConfirmTransaction: %s", err.Error())
-			return
-		}
-		// TODO: poll rpc for tx confirmation (WS connection unreliable)
-		c.lggr.Debugf("tx signature from Transmit.SendAndConfirmTransaction: %s", txSig.String())
-	}()
-	return nil
+	// pass transmit payload to tx manager queue
+	c.lggr.Debugf("Queuing transmit tx: state (%s) + transmissions (%s)", c.StateID.String(), c.TransmissionsID.String())
+	err = c.txManager.Enqueue(c.StateID.String(), tx)
+	return errors.Wrap(err, "error on Transmit.txManager.Enqueue")
 }
 
 func (c *ContractTracker) LatestConfigDigestAndEpoch(

@@ -2,30 +2,24 @@ package solana
 
 import (
 	"context"
-	"errors"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 	relaytypes "github.com/smartcontractkit/chainlink/core/services/relay/types"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
-type Logger interface {
-	Tracef(format string, values ...interface{})
-	Debugf(format string, values ...interface{})
-	Infof(format string, values ...interface{})
-	Warnf(format string, values ...interface{})
-	Errorf(format string, values ...interface{})
-	Criticalf(format string, values ...interface{})
-	Panicf(format string, values ...interface{})
-	Fatalf(format string, values ...interface{})
-}
-
 type TransmissionSigner interface {
 	Sign(msg []byte) ([]byte, error)
 	PublicKey() solana.PublicKey
+}
+
+type TxManager interface {
+	Enqueue(accountID string, msg *solana.Transaction) error
 }
 
 type OCR2Spec struct {
@@ -33,7 +27,7 @@ type OCR2Spec struct {
 	IsBootstrap bool
 
 	// network data
-	NodeEndpointHTTP string
+	ChainID string
 
 	// on-chain program + 2x state accounts (state + transmissions) + store program
 	ProgramID       solana.PublicKey
@@ -41,49 +35,49 @@ type OCR2Spec struct {
 	StoreProgramID  solana.PublicKey
 	TransmissionsID solana.PublicKey
 
-	// transaction + state parameters [optional]
-	UsePreflight bool
-	Commitment   string
-	TxTimeout    string
-
-	// polling configuration [optional]
-	PollingInterval   string
-	PollingCtxTimeout string
-	StaleTimeout      string
-
 	TransmissionSigner TransmissionSigner
 }
 
 type Relayer struct {
-	lggr Logger
+	lggr     logger.Logger
+	chainSet ChainSet
+	ctx      context.Context
+	cancel   func()
 }
 
 // Note: constructed in core
-func NewRelayer(lggr Logger) *Relayer {
+func NewRelayer(lggr logger.Logger, chainSet ChainSet) *Relayer {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Relayer{
-		lggr: lggr,
+		lggr:     lggr,
+		chainSet: chainSet,
+		ctx:      ctx,
+		cancel:   cancel,
 	}
 }
 
 // Start starts the relayer respecting the given context.
 func (r *Relayer) Start(context.Context) error {
 	// No subservices started on relay start, but when the first job is started
+	if r.chainSet == nil {
+		return errors.New("Solana unavailable")
+	}
 	return nil
 }
 
 // Close will close all open subservices
 func (r *Relayer) Close() error {
+	r.cancel()
 	return nil
 }
 
 func (r *Relayer) Ready() error {
-	// always ready
-	return nil
+	return r.chainSet.Ready()
 }
 
 // Healthy only if all subservices are healthy
 func (r *Relayer) Healthy() error {
-	return nil
+	return r.chainSet.Healthy()
 }
 
 // NewOCR2Provider creates a new OCR2ProviderCtx instance.
@@ -99,9 +93,19 @@ func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay
 		StateID:   spec.StateID,
 	}
 
-	// establish network connection RPC
-	client := NewClient(spec, r.lggr)
-	contractTracker := NewTracker(spec, client, spec.TransmissionSigner, r.lggr)
+	chain, err := r.chainSet.Chain(r.ctx, spec.ChainID)
+	if err != nil {
+		return nil, errors.Wrap(err, "error in NewOCR2Provider.chainSet.Chain")
+	}
+	chainReader, err := chain.Reader()
+	if err != nil {
+		return nil, errors.Wrap(err, "error in NewOCR2Provider.chain.Reader")
+	}
+	msgEnqueuer := chain.TxManager()
+	cfg := chain.Config()
+
+	// provide contract config + tracker reader + tx manager + signer + logger
+	contractTracker := NewTracker(spec, cfg, chainReader, msgEnqueuer, spec.TransmissionSigner, r.lggr)
 
 	if spec.IsBootstrap {
 		// Return early if bootstrap node (doesn't require the full OCR2 provider)

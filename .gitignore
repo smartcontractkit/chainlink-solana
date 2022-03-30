@@ -16,6 +16,8 @@ contracts/id.json
 # ignore all except shared localnet keys
 contracts/artifacts/*
 !contracts/artifacts/localnet/
+ops/localnet.json
+test-ledger
 
 # TS
 node_modules

@@ -16,6 +16,9 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -88,6 +91,14 @@ func testTransmissionsResponse(t *testing.T, body []byte, sub uint64) []byte {
 	return []byte(res)
 }
 
+func testSetupReader(t *testing.T, endpoint string) client.Reader {
+	lggr := logger.TestLogger(t)
+	cfg := config.NewConfig(db.ChainCfg{}, lggr)
+	client, err := client.NewClient(endpoint, cfg, 1*time.Second, lggr)
+	require.NoError(t, err)
+	return client
+}
+
 func TestGetState(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write(testStateResponse())
@@ -96,7 +107,7 @@ func TestGetState(t *testing.T) {
 	defer mockServer.Close()
 
 	// happy path does not error (actual state decoding handled in types_test)
-	_, _, err := GetState(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
+	_, _, err := GetState(context.TODO(), testSetupReader(t, mockServer.URL), solana.PublicKey{}, "")
 	require.NoError(t, err)
 }
 
@@ -121,17 +132,18 @@ func TestGetLatestTransmission(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	a, _, err := GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
+	reader := testSetupReader(t, mockServer.URL)
+	a, _, err := GetLatestTransmission(context.TODO(), reader, solana.PublicKey{}, "")
 	assert.NoError(t, err)
 	assert.Equal(t, expectedTime, a.Timestamp)
 	assert.Equal(t, expectedAns, a.Data.String())
 
 	// fail if returned transmission header is too short
-	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
+	_, _, err = GetLatestTransmission(context.TODO(), reader, solana.PublicKey{}, "")
 	assert.Error(t, err)
 
 	// fail if returned transmission is too short
-	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
+	_, _, err = GetLatestTransmission(context.TODO(), reader, solana.PublicKey{}, "")
 	assert.Error(t, err)
 }
 
@@ -158,14 +170,15 @@ func TestStatePolling(t *testing.T) {
 		require.NoError(t, err)
 	}))
 
+	lggr := logger.TestLogger(t)
 	tracker := ContractTracker{
 		StateID:         solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
 		TransmissionsID: solana.MustPublicKeyFromBase58("11111111111111111111111111111112"),
-		client:          NewClient(OCR2Spec{NodeEndpointHTTP: mockServer.URL}, logger.TestLogger(t)),
-		lggr:            logger.TestLogger(t),
+		cfg:             config.NewConfig(db.ChainCfg{}, lggr),
+		reader:          testSetupReader(t, mockServer.URL),
+		lggr:            lggr,
 		stateLock:       &sync.RWMutex{},
 		ansLock:         &sync.RWMutex{},
-		staleTimeout:    defaultStaleTimeout,
 	}
 	require.NoError(t, tracker.Start())
 	require.Error(t, tracker.Start()) // test startOnce
@@ -201,17 +214,18 @@ func TestNilPointerHandling(t *testing.T) {
 	defer mockServer.Close()
 
 	errString := "nil pointer returned in "
+	reader := testSetupReader(t, mockServer.URL)
 
 	// fail on get state query
-	_, _, err := GetState(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
+	_, _, err := GetState(context.TODO(), reader, solana.PublicKey{}, "")
 	assert.EqualError(t, err, errString+"GetState.GetAccountInfoWithOpts")
 
 	// fail on transmissions header query
-	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
+	_, _, err = GetLatestTransmission(context.TODO(), reader, solana.PublicKey{}, "")
 	assert.EqualError(t, err, errString+"GetLatestTransmission.GetAccountInfoWithOpts.Header")
 
 	passFirst = true // allow proper response for header query, fail on transmission
-	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{}, rpc.CommitmentConfirmed)
+	_, _, err = GetLatestTransmission(context.TODO(), reader, solana.PublicKey{}, "")
 	assert.EqualError(t, err, errString+"GetLatestTransmission.GetAccountInfoWithOpts.Transmission")
 
 }

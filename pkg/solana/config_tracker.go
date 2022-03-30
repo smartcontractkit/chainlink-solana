@@ -3,7 +3,6 @@ package solana
 import (
 	"context"
 
-	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
@@ -68,5 +67,5 @@ func (c *ContractTracker) LatestConfig(ctx context.Context, changedInBlock uint6
 
 // LatestBlockHeight returns the height of the most recent block in the chain.
 func (c *ContractTracker) LatestBlockHeight(ctx context.Context) (blockHeight uint64, err error) {
-	return c.client.GetBlockHeight(ctx, rpc.CommitmentProcessed) // this returns the latest height through CommitmentProcessed
+	return c.reader.SlotHeight() // this returns the latest slot height through CommitmentProcessed
 }

@@ -11,13 +11,14 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 var (
-	configVersion       uint8 = 1
-	defaultStaleTimeout       = 1 * time.Minute
-	defaultPollInterval       = 1 * time.Second
+	configVersion uint8 = 1
 )
 
 type ContractTracker struct {
@@ -39,13 +40,14 @@ type ContractTracker struct {
 	ansLock   *sync.RWMutex
 
 	// stale state parameters
-	stateTime    time.Time
-	ansTime      time.Time
-	staleTimeout time.Duration
+	stateTime time.Time
+	ansTime   time.Time
 
 	// dependencies
-	client *Client
-	lggr   Logger
+	reader    client.Reader
+	txManager TxManager
+	cfg       config.Config
+	lggr      logger.Logger
 
 	// polling
 	done   chan struct{}
@@ -55,25 +57,19 @@ type ContractTracker struct {
 	utils.StartStopOnce
 }
 
-func NewTracker(spec OCR2Spec, client *Client, transmitter TransmissionSigner, lggr Logger) ContractTracker {
-	// parse staleness timeout, if errors: use default timeout (1 min)
-	staleTimeout, err := time.ParseDuration(spec.StaleTimeout)
-	if err != nil {
-		lggr.Warnf("could not parse stale timeout interval using default 1m")
-		staleTimeout = defaultStaleTimeout
-	}
-
+func NewTracker(spec OCR2Spec, cfg config.Config, reader client.Reader, txManager TxManager, transmitter TransmissionSigner, lggr logger.Logger) ContractTracker {
 	return ContractTracker{
 		ProgramID:       spec.ProgramID,
 		StateID:         spec.StateID,
 		StoreProgramID:  spec.StoreProgramID,
 		TransmissionsID: spec.TransmissionsID,
 		Transmitter:     transmitter,
-		client:          client,
+		reader:          reader,
+		txManager:       txManager,
 		lggr:            lggr,
+		cfg:             cfg,
 		stateLock:       &sync.RWMutex{},
 		ansLock:         &sync.RWMutex{},
-		staleTimeout:    staleTimeout,
 	}
 }
 
@@ -106,18 +102,14 @@ func (c *ContractTracker) PollState() {
 			wg.Add(2)
 			go func() {
 				defer wg.Done()
-				ctx, cancel := context.WithTimeout(c.ctx, c.client.contextDuration)
-				defer cancel()
-				err := c.fetchState(ctx)
+				err := c.fetchState(c.ctx)
 				if err != nil {
 					c.lggr.Errorf("error in PollState.fetchState %s", err)
 				}
 			}()
 			go func() {
 				defer wg.Done()
-				ctx, cancel := context.WithTimeout(c.ctx, c.client.contextDuration)
-				defer cancel()
-				err := c.fetchLatestTransmission(ctx)
+				err := c.fetchLatestTransmission(c.ctx)
 				if err != nil {
 					c.lggr.Errorf("error in PollState.fetchLatestTransmission %s", err)
 				}
@@ -125,7 +117,7 @@ func (c *ContractTracker) PollState() {
 			wg.Wait()
 
 			// Note negative duration will be immediately ready
-			tick = time.After(utils.WithJitter(c.client.pollingInterval) - time.Since(start))
+			tick = time.After(utils.WithJitter(c.cfg.OCR2CachePollPeriod()) - time.Since(start))
 		}
 	}
 }
@@ -145,7 +137,7 @@ func (c *ContractTracker) ReadState() (State, error) {
 	defer c.stateLock.RUnlock()
 
 	var err error
-	if time.Since(c.stateTime) > c.staleTimeout {
+	if time.Since(c.stateTime) > c.cfg.OCR2CacheTTL() {
 		err = errors.New("error in ReadState: stale state data, polling is likely experiencing errors")
 	}
 	return c.state, err
@@ -158,7 +150,7 @@ func (c *ContractTracker) ReadAnswer() (Answer, error) {
 
 	// check if stale timeout
 	var err error
-	if time.Since(c.ansTime) > c.staleTimeout {
+	if time.Since(c.ansTime) > c.cfg.OCR2CacheTTL() {
 		err = errors.New("error in ReadAnswer: stale answer data, polling is likely experiencing errors")
 	}
 	return c.answer, err
@@ -168,7 +160,7 @@ func (c *ContractTracker) ReadAnswer() (Answer, error) {
 func (c *ContractTracker) fetchState(ctx context.Context) error {
 
 	c.lggr.Debugf("fetch state for account: %s", c.StateID.String())
-	state, _, err := GetState(ctx, c.client.rpc, c.StateID, c.client.commitment)
+	state, _, err := GetState(ctx, c.reader, c.StateID, c.cfg.Commitment())
 	if err != nil {
 		return err
 	}
@@ -185,7 +177,7 @@ func (c *ContractTracker) fetchState(ctx context.Context) error {
 
 func (c *ContractTracker) fetchLatestTransmission(ctx context.Context) error {
 	c.lggr.Debugf("fetch latest transmission for account: %s", c.TransmissionsID)
-	answer, _, err := GetLatestTransmission(ctx, c.client.rpc, c.TransmissionsID, c.client.commitment)
+	answer, _, err := GetLatestTransmission(ctx, c.reader, c.TransmissionsID, c.cfg.Commitment())
 	if err != nil {
 		return err
 	}
@@ -199,10 +191,10 @@ func (c *ContractTracker) fetchLatestTransmission(ctx context.Context) error {
 	return nil
 }
 
-func GetState(ctx context.Context, client *rpc.Client, account solana.PublicKey, rpcCommitment rpc.CommitmentType) (State, uint64, error) {
-	res, err := client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
+func GetState(ctx context.Context, reader client.AccountReader, account solana.PublicKey, commitment rpc.CommitmentType) (State, uint64, error) {
+	res, err := reader.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
+		Commitment: commitment,
 		Encoding:   "base64",
-		Commitment: rpcCommitment,
 	})
 	if err != nil {
 		return State{}, 0, fmt.Errorf("failed to fetch state account at address '%s': %w", account.String(), err)
@@ -227,13 +219,13 @@ func GetState(ctx context.Context, client *rpc.Client, account solana.PublicKey,
 	return state, blockNum, nil
 }
 
-func GetLatestTransmission(ctx context.Context, client *rpc.Client, account solana.PublicKey, rpcCommitment rpc.CommitmentType) (Answer, uint64, error) {
+func GetLatestTransmission(ctx context.Context, reader client.AccountReader, account solana.PublicKey, commitment rpc.CommitmentType) (Answer, uint64, error) {
 	// query for transmission header
 	headerStart := AccountDiscriminatorLen // skip account discriminator
 	headerLen := TransmissionsHeaderLen
-	res, err := client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
+	res, err := reader.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
-		Commitment: rpcCommitment,
+		Commitment: commitment,
 		DataSlice: &rpc.DataSlice{
 			Offset: &headerStart,
 			Length: &headerLen,
@@ -269,11 +261,11 @@ func GetLatestTransmission(ctx context.Context, client *rpc.Client, account sola
 	// setup transmissionLen
 	transmissionLen := TransmissionLen
 
-	var transmissionOffset = AccountDiscriminatorLen + TransmissionsHeaderMaxSize + (uint64(cursor) * transmissionLen)
+	transmissionOffset := AccountDiscriminatorLen + TransmissionsHeaderMaxSize + (uint64(cursor) * transmissionLen)
 
-	res, err = client.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
+	res, err = reader.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
-		Commitment: rpcCommitment,
+		Commitment: commitment,
 		DataSlice: &rpc.DataSlice{
 			Offset: &transmissionOffset,
 			Length: &transmissionLen,
