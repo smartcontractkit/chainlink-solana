@@ -23,8 +23,7 @@ jobs:
       - uses: actions/checkout@v2
       - run: echo $HOME
       - run: echo $PATH
-      - name: Set Npm Config
-        run: yarn install --frozen-lockfile
+      - run: yarn install --frozen-lockfile
       - name: Generate program_ids
         run: ./scripts/programs-keys-gen.sh
       - name: Build Contracts
