@@ -10,19 +10,20 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
-      - name: Install Nix
-        uses: cachix/install-nix-action@v14
+      - name: .tool-versions to .env
+        run: ./scripts/tool-versions-to-env.sh
+      - name: dotenv
+        uses: falti/dotenv-action@v0.2.7
+        id: dotenv
+      - name: Setup go ${{ steps.dotenv.outputs.golang_version }}
+        uses: actions/setup-go@v2
         with:
-          install_url: https://nixos-nix-install-tests.cachix.org/serve/vij683ly7sl95nnhb67bdjjfabclr85m/install
-          install_options: "--tarball-url-prefix https://nixos-nix-install-tests.cachix.org/serve"
-          extra_nix_config: |
-            experimental-features = nix-command flakes
-            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+          go-version: ${{ steps.dotenv.outputs.golang_version }}
       - name: Install Solana CLI
         run: ./scripts/install-solana-ci.sh
       - name: Build
-        run: nix develop -c go build -v ./pkg/...
+        run: go build -v ./pkg/...
       - name: Test
-        run: nix develop -c go test ./pkg/... -v
+        run: go test ./pkg/... -v
       - name: Test with the race detector enabled
-        run: nix develop -c go test ./pkg/... -v -race -count=10
+        run: go test ./pkg/... -v -race -count=10
