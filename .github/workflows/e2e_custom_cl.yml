@@ -9,7 +9,7 @@ on:
         default: develop
         type: string
 jobs:
-  
+
   e2e_custom_build_artifacts:
     name: E2E Custom Build Artifacts
     runs-on: ubuntu-latest
@@ -25,10 +25,22 @@ jobs:
       - run: echo $HOME
       - run: echo $PATH
       - run: yarn install --frozen-lockfile
+      - name: Setup go ${{ steps.dotenv.outputs.golang_version }}
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ steps.dotenv.outputs.golang_version }}
       - name: Generate program_ids
         run: ./scripts/programs-keys-gen.sh
       - run: anchor build
         working-directory: contracts
+      - name: Check anchor build artifacts
+        run: git diff --exit-code
+      - name: Generate anchor-go bindings
+        run: |
+          export PATH=$PATH:$(go env GOPATH)/bin
+          ./scripts/anchor-go-gen.sh
+      - name: Check anchor-go bindings
+        run: git diff --exit-code
       - name: Upload Artifacts
         uses: actions/upload-artifact@master
         with:

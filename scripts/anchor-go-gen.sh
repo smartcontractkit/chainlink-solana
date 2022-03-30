@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-set -e
+set -euxo pipefail
+
+go install github.com/gagliardetto/anchor-go@v0.2.3
 
 for idl_path_str in "contracts/target/idl"/*
 do
