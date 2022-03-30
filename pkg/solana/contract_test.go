@@ -1,48 +1,66 @@
 package solana
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
+	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 )
 
 var mockTransmission = []byte{
-	96, 179, 69, 66, 128, 129, 73, 117, // account discriminator 8 byte
-	8, 0, 0, 0, // latest round id u32, 4 byte
-	8, 0, 0, 0, // cursor u32, 4 byte
-	0, 255, 122, 108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // answer i128, 16 byte
-	240, 181, 184, 97, 0, 0, 0, 0, // timestamp u64, 8 bytes
-	192, 197, 168, 108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	255, 184, 184, 97, 0, 0, 0, 0,
-	192, 197, 168, 108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	18, 185, 184, 97, 0, 0, 0, 0,
-	64, 92, 65, 109, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	67, 187, 184, 97, 0, 0, 0, 0,
-	192, 206, 229, 108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	19, 189, 184, 97, 0, 0, 0, 0,
-	128, 149, 19, 109, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	193, 189, 184, 97, 0, 0, 0, 0,
-	64, 56, 77, 108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	30, 191, 184, 97, 0, 0, 0, 0,
-	64, 20, 89, 107, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	35, 192, 184, 97, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	96, 179, 69, 66, 128, 129, 73, 117, 2, 0, 42, 195,
+	51, 245, 109, 152, 157, 191, 52, 252, 122, 195, 60, 136,
+	46, 95, 164, 123, 7, 132, 62, 133, 183, 255, 55, 14,
+	134, 167, 4, 188, 130, 218, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 153, 56, 154, 99, 168, 217, 60, 195, 166, 70,
+	52, 237, 80, 50, 218, 93, 164, 123, 170, 66, 255, 168,
+	40, 27, 40, 194, 147, 199, 20, 178, 51, 196, 69, 84,
+	72, 47, 66, 84, 67, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 18, 128, 56, 1, 0, 13,
+	0, 0, 0, 30, 3, 0, 0, 0, 1, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0,
+	0, 0, 0, 0, 83, 43, 91, 97, 0, 0, 0, 0,
+	14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 58, 0, 0, 0,
+	0, 0, 0, 0, 83, 43, 91, 97, 0, 0, 0, 0,
+	12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 61, 0, 0, 0,
+	0, 0, 0, 0, 83, 43, 91, 97, 0, 0, 0, 0,
+	13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0,
 }
+
+var (
+	expectedTime = uint32(1633364819)
+	expectedAns  = big.NewInt(14).String()
+)
 
 type mockRequest struct {
 	Method  string
@@ -51,67 +69,163 @@ type mockRequest struct {
 	JSONRPC string
 }
 
+func testStateResponse() []byte {
+	value := base64.StdEncoding.EncodeToString(mockState.Raw)
+	res := fmt.Sprintf(`{"jsonrpc":"2.0","result":{"context": {"slot":1},"value": {"data":["%s","base64"],"executable": false,"lamports": 1000000000,"owner": "11111111111111111111111111111111","rentEpoch":2}},"id":1}`, value)
+	return []byte(res)
+}
+
+func testTransmissionsResponse(t *testing.T, body []byte, sub uint64) []byte {
+	// parse message
+	var msg mockRequest
+	err := json.Unmarshal(body, &msg)
+	require.NoError(t, err)
+	var opts rpc.GetAccountInfoOpts
+	err = json.Unmarshal(msg.Params[1], &opts)
+	require.NoError(t, err)
+
+	// create response
+	mock := mockTransmission
+	value := base64.StdEncoding.EncodeToString(mock[*opts.DataSlice.Offset : *opts.DataSlice.Offset+*opts.DataSlice.Length-sub])
+	res := fmt.Sprintf(`{"jsonrpc":"2.0","result":{"context": {"slot":1},"value": {"data":["%s","base64"],"executable": false,"lamports": 1000000000,"owner": "11111111111111111111111111111111","rentEpoch":2}},"id":1}`, value)
+	return []byte(res)
+}
+
+func testSetupReader(t *testing.T, endpoint string) client.Reader {
+	lggr := logger.TestLogger(t)
+	cfg := config.NewConfig(db.ChainCfg{}, lggr)
+	client, err := client.NewClient(endpoint, cfg, 1*time.Second, lggr)
+	require.NoError(t, err)
+	return client
+}
+
 func TestGetState(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// create response
-		value := base64.StdEncoding.EncodeToString(mockState.Raw)
-		res := fmt.Sprintf(`{"jsonrpc":"2.0","result":{"context": {"slot":1},"value": {"data":["%s","base64"],"executable": false,"lamports": 1000000000,"owner": "11111111111111111111111111111111","rentEpoch":2}},"id":1}`, value)
-
-		_, err := w.Write([]byte(res))
+		_, err := w.Write(testStateResponse())
 		require.NoError(t, err)
 	}))
 	defer mockServer.Close()
 
 	// happy path does not error (actual state decoding handled in types_test)
-	_, _, err := GetState(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{})
+	_, _, err := GetState(context.TODO(), testSetupReader(t, mockServer.URL), solana.PublicKey{}, "")
 	require.NoError(t, err)
 }
 
 func TestGetLatestTransmission(t *testing.T) {
 	// each GetLatestTransmission submits two API requests
 	// 0 + 0: everything passes
-	// 1 + 0: return too short cursor (fail on first API request)
+	// 1 (+ 0): return too short cursor (fail on first API request)
 	// 0 + 1: return too short transmission
-	offsets := []uint64{0, 0, 1, 0, 1}
+	// 0 + 0: everything passes (v1 config)
+	offsets := []uint64{0, 0, 1, 0, 1, 0, 0}
 	i := 0
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var sub uint64 = offsets[i] // change offset depending on when called
-		defer func() { i++ }()      // increment
+		var sub = offsets[i]   // change offset depending on when called
+		defer func() { i++ }() // increment
 
 		// read message
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 
-		// parse message
-		var msg mockRequest
-		err = json.Unmarshal(body, &msg)
-		require.NoError(t, err)
-		var opts rpc.GetAccountInfoOpts
-		err = json.Unmarshal(msg.Params[1], &opts)
-		require.NoError(t, err)
-
-		// create response
-		value := base64.StdEncoding.EncodeToString(mockTransmission[*opts.DataSlice.Offset : *opts.DataSlice.Offset+*opts.DataSlice.Length-sub])
-		res := fmt.Sprintf(`{"jsonrpc":"2.0","result":{"context": {"slot":1},"value": {"data":["%s","base64"],"executable": false,"lamports": 1000000000,"owner": "11111111111111111111111111111111","rentEpoch":2}},"id":1}`, value)
-
-		_, err = w.Write([]byte(res))
+		_, err = w.Write(testTransmissionsResponse(t, body, sub))
 		require.NoError(t, err)
 	}))
 	defer mockServer.Close()
 
-	expectedTime := binary.BigEndian.Uint64([]byte{0, 0, 0, 0, 97, 184, 192, 35})
-	expectedAns := big.NewInt(0).SetBytes([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 107, 89, 20, 64}).String()
-
-	a, _, err := GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{})
+	reader := testSetupReader(t, mockServer.URL)
+	a, _, err := GetLatestTransmission(context.TODO(), reader, solana.PublicKey{}, "")
 	assert.NoError(t, err)
 	assert.Equal(t, expectedTime, a.Timestamp)
 	assert.Equal(t, expectedAns, a.Data.String())
 
-	// fail if returned cursor is too short
-	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{})
-	assert.ErrorIs(t, err, errCursorLength)
+	// fail if returned transmission header is too short
+	_, _, err = GetLatestTransmission(context.TODO(), reader, solana.PublicKey{}, "")
+	assert.Error(t, err)
 
 	// fail if returned transmission is too short
-	_, _, err = GetLatestTransmission(context.TODO(), rpc.New(mockServer.URL), solana.PublicKey{})
-	assert.ErrorIs(t, err, errTransmissionLength)
+	_, _, err = GetLatestTransmission(context.TODO(), reader, solana.PublicKey{}, "")
+	assert.Error(t, err)
+}
+
+func TestStatePolling(t *testing.T) {
+	i := atomic.NewInt32(0)
+	wait := 5 * time.Second
+	callsPerSecond := 4 // total number of rpc calls between getState and GetLatestTransmission
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// create response
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		i.Inc() // count calls
+
+		// state query
+		if bytes.Contains(body, []byte("11111111111111111111111111111111")) {
+			_, err = w.Write(testStateResponse())
+			require.NoError(t, err)
+			return
+		}
+
+		// transmissions query
+		_, err = w.Write(testTransmissionsResponse(t, body, 0))
+		require.NoError(t, err)
+	}))
+
+	lggr := logger.TestLogger(t)
+	tracker := ContractTracker{
+		StateID:         solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
+		TransmissionsID: solana.MustPublicKeyFromBase58("11111111111111111111111111111112"),
+		cfg:             config.NewConfig(db.ChainCfg{}, lggr),
+		reader:          testSetupReader(t, mockServer.URL),
+		lggr:            lggr,
+		stateLock:       &sync.RWMutex{},
+		ansLock:         &sync.RWMutex{},
+	}
+	require.NoError(t, tracker.Start())
+	require.Error(t, tracker.Start()) // test startOnce
+	time.Sleep(wait)
+	require.NoError(t, tracker.Close())
+	require.Error(t, tracker.Close())                                           // test StopOnce
+	mockServer.Close()                                                          // close server once tracker is stopped
+	assert.GreaterOrEqual(t, callsPerSecond*int(wait.Seconds()), int(i.Load())) // expect minimum number of calls
+
+	answer, err := tracker.ReadAnswer()
+	assert.NoError(t, err)
+	assert.Equal(t, expectedTime, answer.Timestamp)
+	assert.Equal(t, expectedAns, answer.Data.String())
+}
+
+func TestNilPointerHandling(t *testing.T) {
+	passFirst := false
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var data []byte
+		if passFirst {
+			// successful transmissions query
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			data = testTransmissionsResponse(t, body, 0)
+			passFirst = false
+		} else {
+			// bad payload missing data
+			data = []byte(`{"jsonrpc":"2.0","result":{"context": {"slot":1},"value": {"executable": false,"lamports": 1000000000,"owner": "11111111111111111111111111111111","rentEpoch":2}},"id":1}`)
+		}
+		_, err := w.Write(data)
+		require.NoError(t, err)
+	}))
+	defer mockServer.Close()
+
+	errString := "nil pointer returned in "
+	reader := testSetupReader(t, mockServer.URL)
+
+	// fail on get state query
+	_, _, err := GetState(context.TODO(), reader, solana.PublicKey{}, "")
+	assert.EqualError(t, err, errString+"GetState.GetAccountInfoWithOpts")
+
+	// fail on transmissions header query
+	_, _, err = GetLatestTransmission(context.TODO(), reader, solana.PublicKey{}, "")
+	assert.EqualError(t, err, errString+"GetLatestTransmission.GetAccountInfoWithOpts.Header")
+
+	passFirst = true // allow proper response for header query, fail on transmission
+	_, _, err = GetLatestTransmission(context.TODO(), reader, solana.PublicKey{}, "")
+	assert.EqualError(t, err, errString+"GetLatestTransmission.GetAccountInfoWithOpts.Transmission")
+
 }

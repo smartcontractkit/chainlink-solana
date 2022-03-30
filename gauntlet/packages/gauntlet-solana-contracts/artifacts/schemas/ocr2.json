@@ -8,6 +8,13 @@
         "defined": "usize"
       },
       "value": "19"
+    },
+    {
+      "name": "DIGEST_SIZE",
+      "type": {
+        "defined": "usize"
+      },
+      "value": "32"
     }
   ],
   "instructions": [
@@ -20,14 +27,14 @@
           "isSigner": false
         },
         {
-          "name": "transmissions",
-          "isMut": true,
+          "name": "feed",
+          "isMut": false,
           "isSigner": false
         },
         {
           "name": "payer",
-          "isMut": false,
-          "isSigner": false
+          "isMut": true,
+          "isSigner": true
         },
         {
           "name": "owner",
@@ -82,26 +89,50 @@
       ],
       "args": [
         {
-          "name": "nonce",
-          "type": "u8"
-        },
-        {
           "name": "minAnswer",
           "type": "i128"
         },
         {
           "name": "maxAnswer",
           "type": "i128"
-        },
-        {
-          "name": "decimals",
-          "type": "u8"
-        },
-        {
-          "name": "description",
-          "type": "string"
         }
       ]
+    },
+    {
+      "name": "close",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "receiver",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "tokenVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "vaultAuthority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
     },
     {
       "name": "transferOwnership",
@@ -141,10 +172,10 @@
       "args": []
     },
     {
-      "name": "beginOffchainConfig",
+      "name": "createProposal",
       "accounts": [
         {
-          "name": "state",
+          "name": "proposal",
           "isMut": true,
           "isSigner": false
         },
@@ -165,7 +196,7 @@
       "name": "writeOffchainConfig",
       "accounts": [
         {
-          "name": "state",
+          "name": "proposal",
           "isMut": true,
           "isSigner": false
         },
@@ -183,10 +214,10 @@
       ]
     },
     {
-      "name": "commitOffchainConfig",
+      "name": "finalizeProposal",
       "accounts": [
         {
-          "name": "state",
+          "name": "proposal",
           "isMut": true,
           "isSigner": false
         },
@@ -199,10 +230,77 @@
       "args": []
     },
     {
-      "name": "setConfig",
+      "name": "closeProposal",
+      "accounts": [
+        {
+          "name": "proposal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "receiver",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "acceptProposal",
       "accounts": [
         {
           "name": "state",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "proposal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "receiver",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "tokenVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "vaultAuthority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "digest",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "proposeConfig",
+      "accounts": [
+        {
+          "name": "proposal",
           "isMut": true,
           "isSigner": false
         },
@@ -224,6 +322,33 @@
         {
           "name": "f",
           "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "proposePayees",
+      "accounts": [
+        {
+          "name": "proposal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenMint",
+          "type": "publicKey"
+        },
+        {
+          "name": "payees",
+          "type": {
+            "vec": "publicKey"
+          }
         }
       ]
     },
@@ -270,32 +395,6 @@
       "args": []
     },
     {
-      "name": "setValidatorConfig",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "validator",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "flaggingThreshold",
-          "type": "u32"
-        }
-      ]
-    },
-    {
       "name": "setBillingAccessController",
       "accounts": [
         {
@@ -331,6 +430,21 @@
         },
         {
           "name": "accessController",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "vaultAuthority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
           "isMut": false,
           "isSigner": false
         }
@@ -387,7 +501,7 @@
       ],
       "args": [
         {
-          "name": "amount",
+          "name": "amountGjuels",
           "type": "u64"
         }
       ]
@@ -418,42 +532,6 @@
         {
           "name": "payee",
           "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "payRemaining",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "accessController",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenVault",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "vaultAuthority",
-          "isMut": false,
           "isSigner": false
         },
         {
@@ -499,29 +577,6 @@
         }
       ],
       "args": []
-    },
-    {
-      "name": "setPayees",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "payees",
-          "type": {
-            "vec": "publicKey"
-          }
-        }
-      ]
     },
     {
       "name": "transferPayeeship",
@@ -579,34 +634,6 @@
         }
       ],
       "args": []
-    },
-    {
-      "name": "query",
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "transmissions",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "buffer",
-          "isMut": true,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "scope",
-          "type": {
-            "defined": "Scope"
-          }
-        }
-      ]
     }
   ],
   "accounts": [
@@ -660,6 +687,54 @@
       }
     },
     {
+      "name": "Proposal",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "state",
+            "type": "u8"
+          },
+          {
+            "name": "f",
+            "type": "u8"
+          },
+          {
+            "name": "padding0",
+            "type": "u8"
+          },
+          {
+            "name": "padding1",
+            "type": "u32"
+          },
+          {
+            "name": "tokenMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "oracles",
+            "type": {
+              "defined": "ProposedOracles"
+            }
+          },
+          {
+            "name": "offchainConfig",
+            "type": {
+              "defined": "OffchainConfig"
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "State",
       "type": {
         "kind": "struct",
@@ -669,7 +744,7 @@
             "type": "u8"
           },
           {
-            "name": "nonce",
+            "name": "vaultNonce",
             "type": "u8"
           },
           {
@@ -681,52 +756,25 @@
             "type": "u32"
           },
           {
+            "name": "feed",
+            "type": "publicKey"
+          },
+          {
             "name": "config",
             "type": {
               "defined": "Config"
             }
           },
           {
+            "name": "offchainConfig",
+            "type": {
+              "defined": "OffchainConfig"
+            }
+          },
+          {
             "name": "oracles",
             "type": {
               "defined": "Oracles"
-            }
-          },
-          {
-            "name": "leftoverPayments",
-            "type": {
-              "defined": "LeftoverPayments"
-            }
-          },
-          {
-            "name": "transmissions",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Transmissions",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "latestRoundId",
-            "type": "u32"
-          },
-          {
-            "name": "cursor",
-            "type": "u32"
-          },
-          {
-            "name": "transmissions",
-            "type": {
-              "array": [
-                {
-                  "defined": "Transmission"
-                },
-                8192
-              ]
             }
           }
         ]
@@ -772,22 +820,6 @@
       }
     },
     {
-      "name": "LeftoverPayment",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "payee",
-            "type": "publicKey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
       "name": "Oracles",
       "type": {
         "kind": "struct",
@@ -811,7 +843,33 @@
       }
     },
     {
-      "name": "LeftoverPayments",
+      "name": "ProposedOracle",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "transmitter",
+            "type": "publicKey"
+          },
+          {
+            "name": "signer",
+            "type": {
+              "defined": "SigningKey"
+            }
+          },
+          {
+            "name": "padding",
+            "type": "u32"
+          },
+          {
+            "name": "payee",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposedOracles",
       "type": {
         "kind": "struct",
         "fields": [
@@ -820,7 +878,7 @@
             "type": {
               "array": [
                 {
-                  "defined": "LeftoverPayment"
+                  "defined": "ProposedOracle"
                 },
                 19
               ]
@@ -896,19 +954,6 @@
             "type": "i128"
           },
           {
-            "name": "description",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "decimals",
-            "type": "u8"
-          },
-          {
             "name": "f",
             "type": "u8"
           },
@@ -918,7 +963,7 @@
           },
           {
             "name": "padding0",
-            "type": "u8"
+            "type": "u16"
           },
           {
             "name": "epoch",
@@ -953,26 +998,6 @@
             "name": "billing",
             "type": {
               "defined": "Billing"
-            }
-          },
-          {
-            "name": "validator",
-            "type": "publicKey"
-          },
-          {
-            "name": "flaggingThreshold",
-            "type": "u32"
-          },
-          {
-            "name": "offchainConfig",
-            "type": {
-              "defined": "OffchainConfig"
-            }
-          },
-          {
-            "name": "pendingOffchainConfig",
-            "type": {
-              "defined": "OffchainConfig"
             }
           }
         ]
@@ -1023,41 +1048,8 @@
             "type": "u32"
           },
           {
-            "name": "payment",
+            "name": "paymentGjuels",
             "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Transmission",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "answer",
-            "type": "i128"
-          },
-          {
-            "name": "timestamp",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Scope",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "LatestConfig"
-          },
-          {
-            "name": "LinkAvailableForPayment"
-          },
-          {
-            "name": "LatestRoundData"
           }
         ]
       }
@@ -1068,18 +1060,45 @@
       "name": "SetConfig",
       "fields": [
         {
-          "name": "previousConfigBlockNumber",
-          "type": "u64",
-          "index": false
-        },
-        {
-          "name": "latestConfigDigest",
+          "name": "configDigest",
           "type": {
             "array": [
               "u8",
               32
             ]
           },
+          "index": false
+        },
+        {
+          "name": "f",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "signers",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                20
+              ]
+            }
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "SetBilling",
+      "fields": [
+        {
+          "name": "observationPaymentGjuels",
+          "type": "u32",
+          "index": false
+        },
+        {
+          "name": "transmissionPaymentGjuels",
+          "type": "u32",
           "index": false
         }
       ]
@@ -1088,9 +1107,39 @@
       "name": "RoundRequested",
       "fields": [
         {
+          "name": "configDigest",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        },
+        {
           "name": "requester",
           "type": "publicKey",
           "index": false
+        },
+        {
+          "name": "epoch",
+          "type": "u32",
+          "index": false
+        },
+        {
+          "name": "round",
+          "type": "u8",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "NewTransmission",
+      "fields": [
+        {
+          "name": "roundId",
+          "type": "u32",
+          "index": true
         },
         {
           "name": "configDigest",
@@ -1103,13 +1152,43 @@
           "index": false
         },
         {
-          "name": "round",
+          "name": "answer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "transmitter",
           "type": "u8",
           "index": false
         },
         {
-          "name": "epoch",
+          "name": "observationsTimestamp",
           "type": "u32",
+          "index": false
+        },
+        {
+          "name": "observerCount",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "observers",
+          "type": {
+            "array": [
+              "u8",
+              19
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "juelsPerLamport",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "reimbursementGjuels",
+          "type": "u64",
           "index": false
         }
       ]
@@ -1173,26 +1252,21 @@
     },
     {
       "code": 6011,
-      "name": "PaymentsRemaining",
-      "msg": "Leftover payments remaining, please call payRemaining first"
+      "name": "PayeeOracleMismatch",
+      "msg": "Payee and Oracle length mismatch"
     },
     {
       "code": 6012,
-      "name": "PayeeOracleMismatch",
-      "msg": "Payee and Oracle lenght mismatch"
-    },
-    {
-      "code": 6013,
       "name": "InvalidTokenAccount",
       "msg": "Invalid Token Account"
     },
     {
-      "code": 6014,
+      "code": 6013,
       "name": "UnauthorizedSigner",
       "msg": "Oracle signer key not found"
     },
     {
-      "code": 6015,
+      "code": 6014,
       "name": "UnauthorizedTransmitter",
       "msg": "Oracle transmitter key not found"
     }

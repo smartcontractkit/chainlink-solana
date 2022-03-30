@@ -2,14 +2,17 @@ package solana
 
 import (
 	"encoding/binary"
+	"math"
 	"math/big"
 	"testing"
 	"time"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBuildReport(t *testing.T) {
@@ -44,7 +47,7 @@ func TestBuildReport(t *testing.T) {
 	assert.Equal(t, oo[0].Timestamp, binary.BigEndian.Uint32(report[0:4]), "validate timestamp")
 
 	// validate observer count
-	assert.Equal(t, uint8(len(observers)), report[4], "validate observer count")
+	assert.Equal(t, uint8(n), report[4], "validate observer count")
 
 	// validate observers
 	index := 4 + 1
@@ -58,7 +61,7 @@ func TestBuildReport(t *testing.T) {
 	assert.Equal(t, v.FillBytes(make([]byte, 8)), []byte(report[ReportLen-8:ReportLen]), "validate juelsToEth")
 }
 
-func TestMedianFromReport(t *testing.T) {
+func TestMedianFromOnChainReport(t *testing.T) {
 	c := ReportCodec{}
 
 	report := types.Report{
@@ -72,6 +75,71 @@ func TestMedianFromReport(t *testing.T) {
 	res, err := c.MedianFromReport(report)
 	assert.NoError(t, err)
 	assert.Equal(t, "1234567890", res.String())
+}
+
+func TestMedianFromReport(t *testing.T) {
+	cdc := ReportCodec{}
+	// Requires at least one obs
+	_, err := cdc.BuildReport(nil)
+	require.Error(t, err)
+	var tt = []struct {
+		name           string
+		obs            []*big.Int
+		expectedMedian *big.Int
+	}{
+		{
+			name:           "2 positive one zero",
+			obs:            []*big.Int{big.NewInt(0), big.NewInt(10), big.NewInt(20)},
+			expectedMedian: big.NewInt(10),
+		},
+		{
+			name:           "one zero",
+			obs:            []*big.Int{big.NewInt(0)},
+			expectedMedian: big.NewInt(0),
+		},
+		{
+			name:           "two equal",
+			obs:            []*big.Int{big.NewInt(1), big.NewInt(1)},
+			expectedMedian: big.NewInt(1),
+		},
+		{
+			name: "one negative one positive",
+			obs:  []*big.Int{big.NewInt(-1), big.NewInt(1)},
+			// sorts to -1, 1
+			expectedMedian: big.NewInt(1),
+		},
+		{
+			name: "two negative",
+			obs:  []*big.Int{big.NewInt(-2), big.NewInt(-1)},
+			// will sort to -2, -1
+			expectedMedian: big.NewInt(-1),
+		},
+		{
+			name: "three negative",
+			obs:  []*big.Int{big.NewInt(-5), big.NewInt(-3), big.NewInt(-1)},
+			// will sort to -5, -3, -1
+			expectedMedian: big.NewInt(-3),
+		},
+	}
+	for _, tc := range tt {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			var pos []median.ParsedAttributedObservation
+			for i, obs := range tc.obs {
+				pos = append(pos, median.ParsedAttributedObservation{
+					Value:           obs,
+					JuelsPerFeeCoin: obs,
+					Observer:        commontypes.OracleID(uint8(i))},
+				)
+			}
+			report, err := cdc.BuildReport(pos)
+			require.NoError(t, err)
+			med, err := cdc.MedianFromReport(report)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedMedian.String(), med.String())
+		})
+	}
+
 }
 
 func TestHashReport(t *testing.T) {
@@ -107,4 +175,64 @@ func TestHashReport(t *testing.T) {
 	h, err := HashReport(mockReportCtx, mockReport)
 	assert.NoError(t, err)
 	assert.Equal(t, mockHash, h)
+}
+
+func TestNegativeMedianValue(t *testing.T) {
+	c := ReportCodec{}
+	oo := []median.ParsedAttributedObservation{
+		median.ParsedAttributedObservation{
+			Timestamp:       uint32(time.Now().Unix()),
+			Value:           big.NewInt(-2),
+			JuelsPerFeeCoin: big.NewInt(1),
+			Observer:        commontypes.OracleID(0),
+		},
+	}
+
+	// create report
+	report, err := c.BuildReport(oo)
+	assert.NoError(t, err)
+
+	// check report properly encoded negative number
+	index := 4 + 1 + 32
+	var medianFromRaw bin.Int128
+	medianBytes := make([]byte, MedianLen)
+	copy(medianBytes, report[index:index+int(MedianLen)])
+	// flip order: bin decoder parses from little endian
+	for i, j := 0, len(medianBytes)-1; i < j; i, j = i+1, j-1 {
+		medianBytes[i], medianBytes[j] = medianBytes[j], medianBytes[i]
+	}
+	bin.NewBinDecoder(medianBytes).Decode(&medianFromRaw)
+	assert.True(t, oo[0].Value.Cmp(medianFromRaw.BigInt()) == 0, "median observation in raw report does not match")
+
+	// check report can be parsed properly with a negative number
+	res, err := c.MedianFromReport(report)
+	assert.NoError(t, err)
+	assert.True(t, oo[0].Value.Cmp(res) == 0)
+}
+
+func TestReportHandleOverflow(t *testing.T) {
+	// too large observation should not cause panic
+	c := ReportCodec{}
+	oo := []median.ParsedAttributedObservation{
+		median.ParsedAttributedObservation{
+			Timestamp:       uint32(time.Now().Unix()),
+			Value:           big.NewInt(0).Lsh(big.NewInt(1), 127), // 1<<127
+			JuelsPerFeeCoin: big.NewInt(0),
+			Observer:        commontypes.OracleID(0),
+		},
+	}
+	_, err := c.BuildReport(oo)
+	assert.Error(t, err)
+
+	// too large juelsPerFeeCoin should not cause panic
+	oo = []median.ParsedAttributedObservation{
+		median.ParsedAttributedObservation{
+			Timestamp:       uint32(time.Now().Unix()),
+			Value:           big.NewInt(0),
+			JuelsPerFeeCoin: big.NewInt(0).Add(big.NewInt(math.MaxInt64), big.NewInt(1)),
+			Observer:        commontypes.OracleID(0),
+		},
+	}
+	_, err = c.BuildReport(oo)
+	assert.Error(t, err)
 }

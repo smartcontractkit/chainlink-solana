@@ -1,7 +1,6 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import { access } from 'fs'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 
 export default class ReadState extends SolanaCommand {
@@ -22,7 +21,10 @@ export default class ReadState extends SolanaCommand {
     // read could be abstract. account.accessController is just the name of the account that can be got form the camelcase(schema.accounts[x].name)
     const data = await program.account.accessController.fetch(state)
 
-    console.log(data)
+    console.log(`
+      - Owner: ${new PublicKey(data.owner).toString()}
+      - Proposed Owner: ${new PublicKey(data.proposedOwner).toString()}
+    `)
     return {} as Result<TransactionResponse>
   }
 }

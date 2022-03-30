@@ -1,7 +1,7 @@
 import { ICommand, Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { Contract, CONTRACT_LIST, DeploymentContract, getDeploymentContract } from '../../lib/contracts'
+import { CONTRACT_LIST, DeploymentContract, getDeploymentContract } from '../../lib/contracts'
 
 enum SOLANA_OPERATIONS {
   DEPLOY = 'deploy',
@@ -120,6 +120,7 @@ export default class GeneratorCommand extends SolanaCommand {
         !!walletBalance && SolanaCommand.lamportsToSol(walletBalance.lamports)
       }`,
     )
+    logger.warn('Gauntlet deploying does not support upgradeable programs. Use the Solana CLI if this is required.')
     await prompt(`Deployment cost is ${SolanaCommand.lamportsToSol(balanceRequired)} SOL, continue?`)
     logger.loading(`Deploying ${this.opts.contract.id}...`)
     const tx = await this.deploy(this.opts.contract.bytecode!, this.opts.contract.programKeypair!)

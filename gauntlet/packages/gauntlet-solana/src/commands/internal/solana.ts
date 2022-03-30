@@ -1,13 +1,36 @@
 import { Result, WriteCommand } from '@chainlink/gauntlet-core'
-import { BpfLoader, BPF_LOADER_PROGRAM_ID, Keypair, LAMPORTS_PER_SOL } from '@solana/web3.js'
+import {
+  Transaction,
+  BpfLoader,
+  BPF_LOADER_PROGRAM_ID,
+  Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  TransactionSignature,
+  TransactionInstruction,
+  sendAndConfirmRawTransaction,
+} from '@solana/web3.js'
 import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { TransactionResponse } from '../types'
-import { Idl, Program, Provider, Wallet } from '@project-serum/anchor'
+import { ProgramError, parseIdlErrors, Idl, Program, Provider } from '@project-serum/anchor'
+import { SolanaWallet } from '../wallet'
+import { logger } from '@chainlink/gauntlet-core/dist/utils'
+import { makeTx } from '../../lib/utils'
 
 export default abstract class SolanaCommand extends WriteCommand<TransactionResponse> {
-  wallet: Wallet
+  wallet: SolanaWallet
   provider: Provider
+  program: Program
+
   abstract execute: () => Promise<Result<TransactionResponse>>
+  makeRawTransaction: (signer: PublicKey) => Promise<TransactionInstruction[]>
+
+  buildCommand?: (flags, args) => Promise<SolanaCommand>
+  beforeExecute?: (signer: PublicKey) => Promise<void>
+
+  afterExecute = async (response: Result<TransactionResponse>): Promise<void> => {
+    logger.success(`Execution finished at transaction: ${response.responses[0].tx.hash}`)
+  }
 
   constructor(flags, args) {
     super(flags, args)
@@ -52,6 +75,73 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       wait: async (hash) => ({
         success: success,
       }),
+    }
+  }
+
+  signAndSendRawTx = async (
+    rawTxs: TransactionInstruction[],
+    extraSigners?: Keypair[],
+  ): Promise<TransactionSignature> => {
+    const recentBlockhash = (await this.provider.connection.getRecentBlockhash()).blockhash
+    const tx = makeTx(rawTxs, {
+      recentBlockhash,
+      feePayer: this.wallet.publicKey,
+    })
+    if (extraSigners) {
+      tx.sign(...extraSigners)
+    }
+    const signedTx = await this.wallet.signTransaction(tx)
+    logger.loading('Sending tx...')
+    return await sendAndConfirmRawTransaction(this.provider.connection, signedTx.serialize())
+  }
+
+  sendTxWithIDL = (sendAction: (...args: any) => Promise<TransactionSignature>, idl: Idl) => async (
+    ...args
+  ): Promise<TransactionSignature> => {
+    try {
+      return await sendAction(...args)
+    } catch (e) {
+      // Translate IDL error
+      const idlErrors = parseIdlErrors(idl)
+      let translatedErr = ProgramError.parse(e, idlErrors)
+      if (translatedErr === null) {
+        throw e
+      }
+      throw translatedErr
+    }
+  }
+
+  simulateTx = async (signer: PublicKey, txInstructions: TransactionInstruction[], feePayer?: PublicKey) => {
+    try {
+      const tx = makeTx(txInstructions, {
+        feePayer: feePayer || signer,
+      })
+      // simulating through connection allows to skip signing tx (useful when using Ledger device)
+      const { value: simulationResponse } = await this.provider.connection.simulateTransaction(tx)
+      if (simulationResponse.err) {
+        const errorDetails =
+          typeof simulationResponse.err === 'object' ? JSON.stringify(simulationResponse.err) : simulationResponse.err
+        throw errorDetails
+      }
+      logger.success(`Tx simulation succeeded: ${simulationResponse.unitsConsumed} units consumed.`)
+      return simulationResponse.unitsConsumed
+    } catch (err) {
+      logger.error(`Tx simulation failed: ${err}`)
+      throw err
+    }
+  }
+
+  sendTx = async (tx: Transaction, signers: Keypair[], idl: Idl): Promise<TransactionSignature> => {
+    try {
+      return await this.provider.send(tx, signers)
+    } catch (err) {
+      // Translate IDL error
+      const idlErrors = parseIdlErrors(idl)
+      let translatedErr = ProgramError.parse(err, idlErrors)
+      if (translatedErr === null) {
+        throw err
+      }
+      throw translatedErr
     }
   }
 }

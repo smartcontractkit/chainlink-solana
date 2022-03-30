@@ -1,6 +1,6 @@
 [package]
 name = "ocr2"
-version = "0.1.0"
+version = "1.0.0"
 description = "Created with Anchor"
 edition = "2018"
 
@@ -12,17 +12,14 @@ name = "ocr2"
 no-entrypoint = []
 no-idl = []
 cpi = ["no-entrypoint"]
-mainnet = ["access-controller/mainnet", "deviation-flagging-validator/mainnet"]
-testnet = ["access-controller/testnet", "deviation-flagging-validator/testnet"]
-devnet = ["access-controller/devnet", "deviation-flagging-validator/devnet"]
-localnet = ["access-controller/localnet", "deviation-flagging-validator/localnet"]
-default = ["localnet"]
+default = []
 
 [dependencies]
-anchor-lang = "0.19.0"
-anchor-spl = "0.19.0"
+anchor-lang = { version = "0.23.0", features = [] }
+anchor-spl = "0.23.0"
 static_assertions = "1.1.0"
-access-controller = { version = "0.1.0", path = "../access-controller", default-features = false, features = ["cpi"] }
-deviation-flagging-validator = { version = "0.1.0", path = "../deviation-flagging-validator", default-features = false, features = ["cpi"] }
+access-controller = { version = "1.0.0", path = "../access-controller", default-features = false, features = ["cpi"] }
+store = { version = "1.0.0", path = "../store", default-features = false, features = ["cpi"] }
 arrayref = "0.3.6"
-arrayvec = { version = "0.1.0", path = "../../crates/arrayvec" }
+arrayvec = { version = "1.0.0", path = "../../crates/arrayvec" }
+bytemuck = "1.7"

@@ -12,3 +12,8 @@ logging:
 # For example, if an environment is created with helmenv CLI, then the YAML file outputted on creation can be
 # referenced for us of that environment during all the tests
 environment_file:
+
+# Specify the image and version of the chainlink image you want to run tests against. Leave blank for default.
+chainlink_image:
+chainlink_version:
+chainlink_env_values:

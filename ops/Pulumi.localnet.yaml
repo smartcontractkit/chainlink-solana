@@ -1,29 +1,50 @@
 encryptionsalt: v1:VLVXZInIcZM=:v1:VFmbM7uWyfbgZrth:RIHQzgnpFyY6SvvNiqkiaByQdFXaDw==
 config:
+  # # testing parameters for updating nodes + mixing node composition
+  # solana-env:ENV-ONLY_BOOT_CONTAINERS: true
+  # # easiest way to upgrade all: update CL-NODE_VERSION, enable ONLY_BOOT_CONTAINERS, disable MIX_UPGRADE
+  # solana-env:ENV-MIX_UPGRADE: true
+  # solana-env:ENV-MIX_UPGRADE_IMAGE: develop.2e585e2dfc3fab13bcad988f1e3dfb9db3495c0e
+  # solana-env:ENV-MIX_UPGRADE_NODES: [false, true, false, false, true] # nodes to upgrade (first one is bootstrap)
   # chainlink node configs
   solana-env:CL-COUNT: 4 # not counting bootstrap, minimum 4
   solana-env:CL-PORT-START: 6688 # start port to expose lite client port
   solana-env:CL-P2P_PORT-START: 5050 # start port to expose lite client P2P ports
-  # solana-env:CL-NODE_VERSION: develop.5deb066ba202f6bc765785781e456e92508890fb # development version can be found at https://gallery.ecr.aws/chainlink/chainlink
-  solana-env:CL-BUILD_LOCALLY: true # (overrides NODE_VERSION) BUILD_CONTEXT and BUILD_DOCKERFILE must be set if this is enabled
+  solana-env:CL-NODE_VERSION: sha-13143ab # development version can be found at https://gallery.ecr.aws/chainlink/chainlink
+  solana-env:CL-BUILD_LOCALLY: false # (overrides NODE_VERSION) BUILD_CONTEXT and BUILD_DOCKERFILE must be set if this is enabled
   solana-env:CL-BUILD_CONTEXT: ../../chainlink
   solana-env:CL-BUILD_DOCKERFILE: ../../chainlink/core/chainlink.Dockerfile
   solana-env:CL-RELAY_NAME: solana
-  solana-env:CL-RELAY_HTTP: http://127.0.0.1:8899
-  solana-env:CL-RELAY_WS: ws://127.0.0.1:8900
+  solana-env:CL-RELAY_HTTP: http://host.docker.internal:8899
   solana-env:CL-ENV_VARS: # specify which chainlink env variables to include, and define below
     - CHAINLINK_DEV
-    - ETH_DISABLED
-    - USE_LEGACY_ETH_ENV_VARS
+    - EVM_ENABLED
+    - EVM_RPC_ENABLED
+    - SOLANA_ENABLED
     - FEATURE_OFFCHAIN_REPORTING2
     - P2P_NETWORKING_STACK
     - P2P_LISTEN_PORT
+    # these two env vars are included because certificates are not properly set up (these prevent CRIT logs from constantly throwing)
+    - CHAINLINK_TLS_PORT
+    - SECURE_COOKIES
+    # these next vars are used for debugging and should be excluded from production deployments
+    - AUTO_PPROF_ENABLED
+    - AUTO_PPROF_MEM_THRESHOLD
+    - AUTO_PPROF_GOROUTINE_THRESHOLD
+    - LOG_LEVEL
   solana-env:CL-CHAINLINK_DEV: true
-  solana-env:CL-ETH_DISABLED: true
-  solana-env:CL-USE_LEGACY_ETH_ENV_VARS: false
+  solana-env:CL-EVM_ENABLED: false
+  solana-env:CL-EVM_RPC_ENABLED: false
+  solana-env:CL-SOLANA_ENABLED: true
   solana-env:CL-FEATURE_OFFCHAIN_REPORTING2: true
   solana-env:CL-P2P_NETWORKING_STACK: "V2"
   solana-env:CL-P2P_LISTEN_PORT: 0
+  solana-env:CL-CHAINLINK_TLS_PORT: 0
+  solana-env:CL-SECURE_COOKIES: false
+  solana-env:CL-AUTO_PPROF_ENABLED: true
+  solana-env:CL-AUTO_PPROF_MEM_THRESHOLD: 500mb
+  solana-env:CL-AUTO_PPROF_GOROUTINE_THRESHOLD: 500
+  solana-env:CL-LOG_LEVEL: debug
   # chainlink node configs (unique to each node - usually not needed, example shown)
   # solana-env:CL_X-ENV_VARS:
   #   - TEST_ENV
@@ -45,3 +66,4 @@ config:
   # postgres configs
   solana-env:PG-PORT: 6600 # OPTIONAL: defaults to 5432
   solana-env:PG-HEALTH-TIMEOUT: 120 # seconds, max wait for postgres to start, default 30
+  solana-env:NETWORK_NAME: chainlink-solana-network

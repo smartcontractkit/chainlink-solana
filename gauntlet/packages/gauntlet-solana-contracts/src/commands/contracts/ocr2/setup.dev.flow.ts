@@ -1,20 +1,23 @@
 import { FlowCommand } from '@chainlink/gauntlet-core'
 import { TransactionResponse, waitExecute } from '@chainlink/gauntlet-solana'
+import { logger } from '@chainlink/gauntlet-core/dist/utils'
 import { CONTRACT_ENV_NAMES, CONTRACT_LIST, getDeploymentContract } from '../../../lib/contracts'
 import { makeAbstractCommand } from '../../abstract'
 import Initialize from './initialize'
 import InitializeAC from '../accessController/initialize'
-import InitializeValidator from '../validator/initialize'
+import InitializeStore from '../store/initialize'
 import DeployToken from '../token/deploy'
-import SetPayees from './setPayees'
-import SetValidatorConfig from './setValidatorConfig'
+import SetValidatorConfig from '../store/setValidatorConfig'
 import AddAccess from '../accessController/addAccess'
-import BeginOffchainConfig from './offchainConfig/begin'
-import WriteOffchainConfig from './offchainConfig/write'
-import CommitOffchainConfig from './offchainConfig/commit'
-import SetConfig from './setConfig'
 import SetBilling from './setBilling'
-import { logger } from '@chainlink/gauntlet-core/dist/utils'
+import CreateFeed from '../store/createFeed'
+import SetWriter from '../store/setWriter'
+import CreateProposal from './proposal/createProposal'
+import ProposeOffchainConfig from './proposeOffchainConfig'
+import ProposeConfig from './proposeConfig'
+import ProposePayees from './proposePayees'
+import FinalizeProposal from './proposal/finalizeProposal'
+import AcceptProposal from './proposal/acceptProposal'
 
 // TODO: Remove. Useful for dev testing
 export default class SetupFlow extends FlowCommand<TransactionResponse> {
@@ -30,12 +33,16 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
       REQUEST_ACCESS_CONTROLLER: 2,
       OCR_2: 3,
       TOKEN: 4,
-      VALIDATOR: 5,
+      STORE: 5,
+      FEED: 6,
+      PROPOSAL: 7,
     }
 
+    const randomSecret = 'awe fluke polygon tonic lilly acuity onyx debra bound gilbert wane'
+
     const offchainConfigInput = {
-      deltaProgressNanoseconds: 30,
-      deltaResendNanoseconds: 30,
+      deltaProgressNanoseconds: 300000000,
+      deltaResendNanoseconds: 300000000,
       deltaRoundNanoseconds: 30,
       deltaGraceNanoseconds: 30,
       deltaStageNanoseconds: 30,
@@ -89,9 +96,10 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
           payee: 'G5LdWMvWoQQ787iPgWbCSTrkPB5Li9e2CWi6jYuAUHUH',
         },
       ],
-      allowFundRecipient: false,
+      allowFundRecipient: true,
     }
 
+    const _toHex = (a: string) => Buffer.from(a, 'hex')
     const configInput = {
       oracles: [
         {
@@ -110,9 +118,14 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
           transmitter: 'G5LdWMvWoQQ787iPgWbCSTrkPB5Li9e2CWi6jYuAUHUH',
           signer: '1b7c57E22a4D4B6c94365A73AD5FF743DBE9c55E',
         },
-      ],
+      ].sort((a, b) => Buffer.compare(_toHex(a.signer), _toHex(b.signer))),
       f: 1,
     }
+
+    const acceptPropOracles = configInput.oracles.map((o, i) => ({
+      ...o,
+      payee: payeesInput.operators[i].payee,
+    }))
 
     this.flow = [
       {
@@ -124,8 +137,8 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         command: 'ocr2:deploy',
       },
       {
-        name: 'Deploy Validator',
-        command: 'deviation_flagging_validator:deploy',
+        name: 'Deploy Store',
+        command: 'store:deploy',
       },
       {
         name: 'Deploy LINK',
@@ -136,6 +149,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         name: 'Set Environment',
         exec: this.setEnvironment,
       },
+      // Constant Contracts
       {
         name: 'Initialize Billing AC',
         command: InitializeAC,
@@ -147,124 +161,150 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         id: this.stepIds.REQUEST_ACCESS_CONTROLLER,
       },
       {
-        name: 'Initialize Validator',
-        command: InitializeValidator,
-        id: this.stepIds.VALIDATOR,
+        name: 'Initialize Store',
+        command: InitializeStore,
+        id: this.stepIds.STORE,
         flags: {
-          accessController: ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
+          accessController: FlowCommand.ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
+        },
+      },
+      // Feed deployment. Unique
+      {
+        name: 'Create Feed',
+        command: CreateFeed,
+        id: this.stepIds.FEED,
+        flags: {
+          input: {
+            store: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.STORE)),
+            granularity: 30,
+            liveLength: 86400,
+            decimals: 9,
+            description: 'TEST',
+          },
         },
       },
       {
         name: 'Initialize OCR 2',
         command: Initialize,
         flags: {
-          billingAccessController: ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
-          requesterAccessController: ID.contract(this.stepIds.REQUEST_ACCESS_CONTROLLER),
-          link: ID.contract(this.stepIds.TOKEN),
+          billingAccessController: FlowCommand.ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
+          requesterAccessController: FlowCommand.ID.contract(this.stepIds.REQUEST_ACCESS_CONTROLLER),
+          link: FlowCommand.ID.contract(this.stepIds.TOKEN),
           input: {
             minAnswer: 0,
             maxAnswer: 1000000000,
-            decimals: 9,
-            description: 'TEST',
+            transmissions: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.FEED, 'transmissions')),
           },
         },
         id: this.stepIds.OCR_2,
       },
       {
-        name: 'Begin Offchain Config',
-        command: BeginOffchainConfig,
+        name: 'Set writer on Store',
+        command: SetWriter,
         flags: {
-          state: ID.contract(this.stepIds.OCR_2),
-          version: this.flags.version || 1,
+          input: {
+            transmissions: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.FEED, 'transmissions')),
+            store: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.STORE)),
+          },
         },
-      },
-      {
-        name: 'Write Offchain Config',
-        command: WriteOffchainConfig,
-        flags: {
-          state: ID.contract(this.stepIds.OCR_2),
-          input: offchainConfigInput,
-        },
-      },
-      {
-        name: 'Commit Offchain Config',
-        command: CommitOffchainConfig,
-        flags: {
-          state: ID.contract(this.stepIds.OCR_2),
-        },
-      },
-      {
-        name: 'Set Config',
-        command: SetConfig,
-        flags: {
-          state: ID.contract(this.stepIds.OCR_2),
-          input: configInput,
-        },
-      },
-      {
-        name: 'Set Payees',
-        command: SetPayees,
-        flags: {
-          state: ID.contract(this.stepIds.OCR_2),
-          input: payeesInput,
-          link: ID.contract(this.stepIds.TOKEN),
-        },
+        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
       {
         name: 'Set Billing',
         command: SetBilling,
         flags: {
-          state: ID.contract(this.stepIds.OCR_2),
           input: {
             observationPaymentGjuels: '1',
             transmissionPaymentGjuels: '1',
           },
         },
+        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
       {
-        name: 'Set Validator Config',
-        command: SetValidatorConfig,
+        id: this.stepIds.PROPOSAL,
+        name: 'Create Proposal',
+        command: CreateProposal,
+      },
+      {
+        name: 'Propose Config',
+        command: ProposeConfig,
         flags: {
-          state: ID.contract(this.stepIds.OCR_2),
           input: {
-            validator: this.getReportStepDataById(ID.contract(this.stepIds.VALIDATOR)),
-            threshold: 1,
+            oracles: configInput.oracles,
+            f: configInput.f,
+            proposalId: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal')),
           },
+          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
+        },
+        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
+      },
+      {
+        name: 'Propose Offchain Config',
+        command: ProposeOffchainConfig,
+        flags: {
+          input: {
+            offchainConfig: offchainConfigInput,
+            proposalId: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal')),
+          },
+          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
+          secret: randomSecret,
+        },
+        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
+      },
+      {
+        name: 'Propose Payees',
+        command: ProposePayees,
+        flags: {
+          input: {
+            operators: payeesInput.operators,
+            allowFundRecipient: true,
+            proposalId: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal')),
+          },
+          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
+        },
+        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
+      },
+      {
+        name: 'Finalize Proposal',
+        command: FinalizeProposal,
+        flags: {
+          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
         },
       },
       {
-        name: 'Add access to validator on AC',
-        command: AddAccess,
+        name: 'Accept Proposal',
+        command: AcceptProposal,
         flags: {
-          state: ID.contract(this.stepIds.BILLING_ACCESS_CONTROLLER),
-          address: ID.data(this.stepIds.OCR_2, 'validatorAuthority'),
+          input: {
+            secret: randomSecret,
+            version: 2,
+            f: configInput.f,
+            tokenMint: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.TOKEN)),
+            oracles: acceptPropOracles,
+            offchainConfig: offchainConfigInput,
+          },
+          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
+          secret: randomSecret,
         },
+        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
     ]
   }
 
   setEnvironment = async () => {
     const programsPublicKeys = await Promise.all(
-      [
-        CONTRACT_LIST.ACCESS_CONTROLLER,
-        CONTRACT_LIST.OCR_2,
-        CONTRACT_LIST.DEVIATION_FLAGGING_VALIDATOR,
-      ].map(async (name) => (await getDeploymentContract(name, '')).programKeypair.publicKey.toString()),
+      [CONTRACT_LIST.ACCESS_CONTROLLER, CONTRACT_LIST.OCR_2, CONTRACT_LIST.STORE].map(async (name) =>
+        (await getDeploymentContract(name, '')).programKeypair.publicKey.toString(),
+      ),
     )
     logger.info(`
       Setting the following env variables. Include them into .env.${this.flags.network} for future runs
         ${CONTRACT_ENV_NAMES[CONTRACT_LIST.ACCESS_CONTROLLER]}=${programsPublicKeys[0]}
         ${CONTRACT_ENV_NAMES[CONTRACT_LIST.OCR_2]}=${programsPublicKeys[1]}
-        ${CONTRACT_ENV_NAMES[CONTRACT_LIST.DEVIATION_FLAGGING_VALIDATOR]}=${programsPublicKeys[2]}
+        ${CONTRACT_ENV_NAMES[CONTRACT_LIST.STORE]}=${programsPublicKeys[2]}
       `)
     process.env[CONTRACT_ENV_NAMES[CONTRACT_LIST.ACCESS_CONTROLLER]] = programsPublicKeys[0]
     process.env[CONTRACT_ENV_NAMES[CONTRACT_LIST.OCR_2]] = programsPublicKeys[1]
-    process.env[CONTRACT_ENV_NAMES[CONTRACT_LIST.DEVIATION_FLAGGING_VALIDATOR]] = programsPublicKeys[2]
+    process.env[CONTRACT_ENV_NAMES[CONTRACT_LIST.STORE]] = programsPublicKeys[2]
   }
-}
-
-const ID = {
-  contract: (id: number, index = 0): string => `ID.${id}.txs.${index}.contract`,
-  tx: (id: number, index = 0): string => `ID.${id}.txs.${index}.tx`,
-  data: (id: number, key = ''): string => `ID.${id}.data.${key}`,
 }

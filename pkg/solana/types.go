@@ -1,6 +1,7 @@
 package solana
 
 import (
+	"errors"
 	"math/big"
 
 	bin "github.com/gagliardetto/binary"
@@ -8,21 +9,25 @@ import (
 )
 
 const (
-	// TransmissionsSize indicates how many transmissions are stored
-	TransmissionsSize uint32 = 8096
+	AccountDiscriminatorLen uint64 = 8
 
-	// answer (int128, 16 bytes), timestamp (uint32, 4 bytes)
-	TimestampLen    uint64 = 8
-	TransmissionLen uint64 = 16 + TimestampLen
+	// TransmissionLen = Slot, Timestamp, Padding0, Answer, Padding1, Padding2
+	TransmissionLen uint64 = 8 + 4 + 4 + 16 + 8 + 8
 
-	// AccountDiscriminator (8 bytes), RoundID (uint32, 4 bytes), Cursor (uint32, 4 bytes)
-	CursorOffset uint64 = 8 + 4
-	CursorLen    uint64 = 4
+	// TransmissionsHeaderLen = Version, State, Owner, ProposedOwner, Writer, Description, Decimals, FlaggingThreshold, LatestRoundID, Granularity, LiveLength, LiveCursor, HistoricalCursor
+	TransmissionsHeaderLen     uint64 = 1 + 1 + 32 + 32 + 32 + 32 + 1 + 4 + 4 + 1 + 4 + 4 + 4
+	TransmissionsHeaderMaxSize uint64 = 192 // max area allocated to transmissions header
 
-	// Report data (61 bytes)
-	MedianLen uint64 = 16
-	JuelsLen  uint64 = 8
-	ReportLen uint64 = 4 + 1 + 32 + MedianLen + JuelsLen // TODO: explain all
+	// ReportLen data (61 bytes)
+	MedianLen       uint64 = 16
+	JuelsLen        uint64 = 8
+	ReportHeaderLen uint64 = 4 + 1 + 32 // timestamp (uint32) + number of observers (uint8) + observer array [32]uint8
+	ReportLen       uint64 = ReportHeaderLen + MedianLen + JuelsLen
+
+	// MaxOracles is the maximum number of oracles that can be stored onchain
+	MaxOracles = 19
+	// MaxOffchainConfigLen is the maximum byte length for the encoded offchainconfig
+	MaxOffchainConfigLen = 4096
 )
 
 // State is the struct representing the contract state
@@ -32,10 +37,10 @@ type State struct {
 	Nonce                uint8
 	Padding0             uint16
 	Padding1             uint32
-	Config               Config
-	Oracles              Oracles
-	LeftoverPayments     LeftoverPayments
 	Transmissions        solana.PublicKey
+	Config               Config
+	OffchainConfig       OffchainConfig
+	Oracles              Oracles
 }
 
 // SigningKey represents the report signing key
@@ -43,23 +48,17 @@ type SigningKey struct {
 	Key [20]byte
 }
 
-type LeftoverPayments struct {
-	Raw [19]LeftoverPayment
-	Len uint64
-}
-
-func (lp LeftoverPayments) Data() []LeftoverPayment {
-	return lp.Raw[:lp.Len]
-}
-
 type OffchainConfig struct {
 	Version uint64
-	Raw     [4096]byte
+	Raw     [MaxOffchainConfigLen]byte
 	Len     uint64
 }
 
-func (oc OffchainConfig) Data() []byte {
-	return oc.Raw[:oc.Len]
+func (oc OffchainConfig) Data() ([]byte, error) {
+	if oc.Len > MaxOffchainConfigLen {
+		return []byte{}, errors.New("OffchainConfig.Len exceeds MaxOffchainConfigLen")
+	}
+	return oc.Raw[:oc.Len], nil
 }
 
 // Config contains the configuration of the contract
@@ -72,11 +71,9 @@ type Config struct {
 	BillingAccessController   solana.PublicKey
 	MinAnswer                 bin.Int128
 	MaxAnswer                 bin.Int128
-	Description               [32]byte
-	Decimals                  uint8
 	F                         uint8
 	Round                     uint8
-	Padding0                  uint8
+	Padding0                  uint16
 	Epoch                     uint32
 	LatestAggregatorRoundID   uint32
 	LatestTransmitter         solana.PublicKey
@@ -84,20 +81,19 @@ type Config struct {
 	LatestConfigDigest        [32]byte
 	LatestConfigBlockNumber   uint64
 	Billing                   Billing
-	Validator                 solana.PublicKey
-	FlaggingThreshold         uint32
-	OffchainConfig            OffchainConfig
-	PendingOffchainConfig     OffchainConfig
 }
 
 // Oracles contains the list of oracles
 type Oracles struct {
-	Raw [19]Oracle
+	Raw [MaxOracles]Oracle
 	Len uint64
 }
 
-func (o Oracles) Data() []Oracle {
-	return o.Raw[:o.Len]
+func (o Oracles) Data() ([]Oracle, error) {
+	if o.Len > MaxOracles {
+		return []Oracle{}, errors.New("Oracles.Len exceeds MaxOracles")
+	}
+	return o.Raw[:o.Len], nil
 }
 
 // Oracle contains information about the reporting nodes
@@ -110,12 +106,6 @@ type Oracle struct {
 	Payment       uint64
 }
 
-// LeftoverPayment contains the remaining payment for each oracle
-type LeftoverPayment struct {
-	Payee  solana.PublicKey
-	Amount uint64
-}
-
 // Billing contains the payment information
 type Billing struct {
 	ObservationPayment  uint32
@@ -125,36 +115,58 @@ type Billing struct {
 // Answer contains the current price answer
 type Answer struct {
 	Data      *big.Int
-	Timestamp uint64
+	Timestamp uint32
 }
 
 // Access controller state
 type AccessController struct {
-	Owner  solana.PublicKey
-	Access [32]solana.PublicKey
-	Len    uint64
+	Owner         solana.PublicKey
+	ProposedOwner solana.PublicKey
+	Access        [32]solana.PublicKey
+	Len           uint64
 }
 
-// Validator state
-type Validator struct {
-	AccountDiscriminator     [8]byte // first 8 bytes of the SHA256 of the account’s Rust ident, https://docs.rs/anchor-lang/0.18.2/anchor_lang/attr.account.html
-	Owner                    solana.PublicKey
-	ProposedOwner            solana.PublicKey
-	RaisingAccessController  solana.PublicKey
-	LoweringAccessController solana.PublicKey
+// TransmissionsHeader struct for decoding transmission state header
+type TransmissionsHeader struct {
+	Version           uint8
+	State             uint8
+	Owner             solana.PublicKey
+	ProposedOwner     solana.PublicKey
+	Writer            solana.PublicKey
+	Description       [32]byte
+	Decimals          uint8
+	FlaggingThreshold uint32
+	LatestRoundID     uint32
+	Granularity       uint8
+	LiveLength        uint32
+	LiveCursor        uint32
+	HistoricalCursor  uint32
+}
 
-	Flags [128]solana.PublicKey
-	Len   uint64
+// Transmission struct for decoding individual tranmissions
+type Transmission struct {
+	Slot      uint64
+	Timestamp uint32
+	Padding0  uint32
+	Answer    bin.Int128
+	Padding1  uint64
+	Padding2  uint64
+}
+
+// TransmissionV1 struct for parsing results pre-migration
+type TransmissionV1 struct {
+	Timestamp uint64
+	Answer    bin.Int128
 }
 
 // CL Core OCR2 job spec RelayConfig member for Solana
 type RelayConfig struct {
 	// network data
-	NodeEndpointRPC string `json:"nodeEndpointRPC"`
-	NodeEndpointWS  string `json:"nodeEndpointWS"`
+	ChainID string `json:"chainID"` // required
 
-	// on-chain program + 2x state accounts (state + transmissions) + validator programID
-	StateID            string `json:"stateID"`
-	TransmissionsID    string `json:"transmissionsID"`
-	ValidatorProgramID string `json:"validatorProgramID"`
+	// state account passed as the ContractID in main job spec
+	// on-chain program + transmissions account + store programID
+	OCR2ProgramID   string `json:"ocr2ProgramID"`
+	TransmissionsID string `json:"transmissionsID"`
+	StoreProgramID  string `json:"storeProgramID"`
 }

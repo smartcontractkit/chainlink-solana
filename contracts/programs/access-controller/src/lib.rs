@@ -1,25 +1,17 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::{system_program, sysvar};
 use static_assertions::const_assert;
 use std::mem;
 
 use arrayvec::arrayvec;
 
-#[cfg(feature = "mainnet")]
-declare_id!("My11111111111111111111111111111111111111112");
-#[cfg(feature = "testnet")]
-declare_id!("My11111111111111111111111111111111111111112");
-#[cfg(feature = "devnet")]
-declare_id!("My11111111111111111111111111111111111111112");
-#[cfg(not(any(feature = "mainnet", feature = "testnet", feature = "devnet")))]
-declare_id!("2F5NEkMnCRkmahEAcQfTQcZv1xtGgrWFfjENtTwHLuKg");
+declare_id!("9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW");
 
 #[constant]
-pub const MAX_ADDRS: usize = 32;
+pub const MAX_ADDRS: usize = 64;
 
 #[zero_copy]
 pub struct AccessList {
-    xs: [Pubkey; 32], // sadly we can't use const https://github.com/project-serum/anchor/issues/632
+    xs: [Pubkey; MAX_ADDRS],
     len: u64,
 }
 arrayvec!(AccessList, Pubkey, u64);
@@ -30,40 +22,64 @@ const_assert!(
 #[account(zero_copy)]
 pub struct AccessController {
     pub owner: Pubkey,
+    pub proposed_owner: Pubkey,
     pub access_list: AccessList,
 }
-
-// IDEA: use a PDA with seeds = [account()], bump = ? to check for proof that account exists
-// the tradeoff would be that we would have to calculate the PDA and pass it as an account everywhere
 
 #[program]
 pub mod access_controller {
     use super::*;
-    pub fn initialize(ctx: Context<Initialize>) -> ProgramResult {
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let mut state = ctx.accounts.state.load_init()?;
         state.owner = ctx.accounts.owner.key();
         Ok(())
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.owner))]
-    pub fn add_access(ctx: Context<AddAccess>) -> ProgramResult {
-        let mut state = ctx.accounts.state.load_mut()?;
-        // if the len reaches array len, we're at capacity
-        require!(state.access_list.remaining_capacity() > 0, Full);
+    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
+    pub fn transfer_ownership(
+        ctx: Context<TransferOwnership>,
+        proposed_owner: Pubkey,
+    ) -> Result<()> {
+        require!(proposed_owner != Pubkey::default(), InvalidInput);
+        let state = &mut *ctx.accounts.state.load_mut()?;
+        state.proposed_owner = proposed_owner;
+        Ok(())
+    }
 
-        state.access_list.push(ctx.accounts.address.key());
-        // keep the access list sorted so we can use binary search
-        state.access_list.sort_unstable();
+    pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
+        let state = &mut *ctx.accounts.state.load_mut()?;
+        require!(
+            ctx.accounts.authority.key == &state.proposed_owner,
+            Unauthorized
+        );
+        state.owner = std::mem::take(&mut state.proposed_owner);
         Ok(())
     }
 
     #[access_control(owner(&ctx.accounts.state, &ctx.accounts.owner))]
-    pub fn remove_access(ctx: Context<RemoveAccess>) -> ProgramResult {
+    pub fn add_access(ctx: Context<AddAccess>) -> Result<()> {
+        let mut state = ctx.accounts.state.load_mut()?;
+        // if the len reaches array len, we're at capacity
+        require!(state.access_list.remaining_capacity() > 0, Full);
+
+        let address = ctx.accounts.address.key();
+
+        match state.access_list.binary_search(&address) {
+            // already present
+            Ok(_i) => (),
+            // not found, insert
+            Err(i) => state.access_list.insert(i, address),
+        }
+        Ok(())
+    }
+
+    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.owner))]
+    pub fn remove_access(ctx: Context<RemoveAccess>) -> Result<()> {
         let mut state = ctx.accounts.state.load_mut()?;
         let address = ctx.accounts.address.key();
 
-        let index = state.access_list.iter().position(|key| key == &address);
-        if let Some(index) = index {
+        let index = state.access_list.binary_search(&address);
+        if let Ok(index) = index {
             state.access_list.remove(index);
             // we don't need to sort again since the list is still sorted
         }
@@ -83,27 +99,37 @@ fn owner(state_loader: &AccountLoader<AccessController>, signer: &AccountInfo) -
     Ok(())
 }
 
-#[error]
+#[error_code]
 pub enum ErrorCode {
     #[msg("Unauthorized")]
     Unauthorized = 0,
 
+    #[msg("Invalid input")]
+    InvalidInput = 1,
+
     #[msg("Access list is full")]
-    Full = 1,
+    Full = 2,
 }
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(zero)]
     pub state: AccountLoader<'info, AccessController>,
-    pub payer: AccountInfo<'info>,
-    #[account(signer)]
-    pub owner: AccountInfo<'info>,
+    pub owner: Signer<'info>,
+}
 
-    #[account(address = sysvar::rent::ID)]
-    pub rent: Sysvar<'info, Rent>,
-    #[account(address = system_program::ID)]
-    pub system_program: AccountInfo<'info>,
+#[derive(Accounts)]
+pub struct TransferOwnership<'info> {
+    #[account(mut)]
+    pub state: AccountLoader<'info, AccessController>,
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct AcceptOwnership<'info> {
+    #[account(mut)]
+    pub state: AccountLoader<'info, AccessController>,
+    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -111,7 +137,8 @@ pub struct AddAccess<'info> {
     #[account(mut, has_one = owner)]
     pub state: AccountLoader<'info, AccessController>,
     pub owner: Signer<'info>,
-    pub address: AccountInfo<'info>,
+    /// CHECK: We don't impose any limits since this could be any signer.
+    pub address: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]
@@ -119,5 +146,6 @@ pub struct RemoveAccess<'info> {
     #[account(mut, has_one = owner)]
     pub state: AccountLoader<'info, AccessController>,
     pub owner: Signer<'info>,
-    pub address: AccountInfo<'info>,
+    /// CHECK: We don't impose any limits since this could be any signer.
+    pub address: UncheckedAccount<'info>,
 }

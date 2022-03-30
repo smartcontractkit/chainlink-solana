@@ -1,16 +1,17 @@
 name: rust
-on: [push]
+on: 
+  push:
 
 defaults:
   run:
     working-directory: contracts
 
 jobs:
-  test:
-    name: Test
+  rust_run_anchor_tests:
+    name: Rust Run Anchor Tests
     runs-on: ubuntu-latest
     container:
-      image: projectserum/build:v0.18.0
+      image: projectserum/build:v0.22.1
       env:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1
@@ -38,12 +39,16 @@ jobs:
     - run: solana-keygen new -o id.json
     - run: yarn install --frozen-lockfile
     - run: anchor test
-  
-  lint:
-    name: Lint
+    - run: |
+       cd examples/hello-world
+       yarn install --frozen-lockfile
+       anchor test
+
+  rust_lint:
+    name: Rust Lint
     runs-on: ubuntu-latest
     container:
-      image: projectserum/build:v0.18.0
+      image: projectserum/build:v0.22.1
       env:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1

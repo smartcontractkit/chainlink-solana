@@ -1,6 +1,7 @@
 .direnv
 .DS_Store
 **/*.rs.bk
+.idea
 
 # ignore relay build
 pkg/bin
@@ -15,6 +16,8 @@ contracts/id.json
 # ignore all except shared localnet keys
 contracts/artifacts/*
 !contracts/artifacts/localnet/
+ops/localnet.json
+test-ledger
 
 # TS
 node_modules
@@ -27,3 +30,10 @@ bin
 # Gauntlet artifacts
 gauntlet/packages/gauntlet-solana-contracts/artifacts/programId
 gauntlet/packages/gauntlet-solana-contracts/artifacts/bin
+# Multisig local env
+gauntlet/packages/gauntlet-serum-multisig/networks/.env.local
+
+# test
+id.json
+tests/e2e/logs
+tests/e2e/smoke/logs

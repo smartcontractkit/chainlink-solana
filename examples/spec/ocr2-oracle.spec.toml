@@ -1,0 +1,80 @@
+type                                   = "offchainreporting2"
+pluginType                             = "median"
+schemaVersion                          = 1
+relay                                  = "solana"
+name                                   = "<insert job name here>"
+contractID                             = "<insert solana ocr2 state account>"
+p2pBootstrapPeers                      = ["somep2pkey@localhost-tcp:port"]  # overrides P2PV2_BOOTSTRAPPERS
+p2pPeerID                              = "<insert p2p id>"                  # overrides P2P_PEER_ID
+ocrKeyBundleID                         = "<insert ocr2 key bundle id>"      # overrides OCR2_KEY_BUNDLE_ID (solana)
+transmitterID                          = "<insert solana transmitter key id>"
+observationSource                      = """
+    // data source 1
+    ds1          [type="bridge" name="bridge-tiingo" requestData=<{"data": {"from":"BTC","to":"USD"}}>]
+    ds1_parse    [type="jsonparse" path="result"]
+    ds1_multiply [type="multiply" times=100000000]
+    ds1 -> ds1_parse -> ds1_multiply -> answer
+    // data source 2
+    ds2          [type="bridge" name="bridge-nomics" requestData=<{"data": {"from":"BTC","to":"USD"}}>]
+    ds2_parse    [type="jsonparse" path="result"]
+    ds2_multiply [type="multiply" times=100000000]
+    ds2 -> ds2_parse -> ds2_multiply -> answer
+    // data source 3
+    ds3          [type="bridge" name="bridge-coinmarketcap" requestData=<{"data": {"from":"BTC","to":"USD"}}>]
+    ds3_parse    [type="jsonparse" path="result"]
+    ds3_multiply [type="multiply" times=100000000]
+    ds3 -> ds3_parse -> ds3_multiply -> answer
+    answer [type="median" index=0]
+"""
+
+[pluginConfig]
+juelsPerFeeCoinSource                  = """
+    // Fetch the LINK price from three data sources
+    // data source 1
+    ds1_link          [type="bridge" name="bridge-tiingo" requestData=<{"data": {"from":"LINK","to":"USD"}}>]
+    ds1_link_parse    [type="jsonparse" path="result"]
+    ds1_link -> ds1_link_parse -> median_link
+    // data source 2
+    ds2_link          [type="bridge" name="bridge-nomics" requestData=<{"data": {"from":"LINK","to":"USD"}}>]
+    ds2_link_parse    [type="jsonparse" path="result"]
+    ds2_link -> ds2_link_parse -> median_link
+    // data source 3
+    ds3_link          [type="bridge" name="bridge-coinmarketcap" requestData=<{"data": {"from":"LINK","to":"USD"}}>]
+    ds3_link_parse    [type="jsonparse" path="result"]
+    ds3_link -> ds3_link_parse -> median_link
+
+    // Fetch the SOL price from three data sources
+    // data source 1
+    ds1_coin          [type="bridge" name="bridge-tiingo" requestData=<{"data": {"from":"SOL","to":"USD"}}>]
+    ds1_coin_parse    [type="jsonparse" path="result"]
+    ds1_coin -> ds1_coin_parse -> median_coin
+    // data source 2
+    ds2_coin          [type="bridge" name="bridge-nomics" requestData=<{"data": {"from":"SOL","to":"USD"}}>]
+    ds2_coin_parse    [type="jsonparse" path="result"]
+    ds2_coin -> ds2_coin_parse -> median_coin
+    // data source 3
+    ds3_coin          [type="bridge" name="bridge-coinmarketcap" requestData=<{"data": {"from":"SOL","to":"USD"}}>]
+    ds3_coin_parse    [type="jsonparse" path="result"]
+    ds3_coin -> ds3_coin_parse -> median_coin
+
+    // Compute the medians from all data sources
+    median_link [type="median" values=<[ $(ds1_link_parse), $(ds2_link_parse), $(ds3_link_parse) ]> allowedFaults=2]
+    median_coin [type="median" values=<[ $(ds1_coin_parse), $(ds2_coin_parse), $(ds3_coin_parse) ]> allowedFaults=2]
+
+    // Divide and scale appropriately
+    // median_link (dollars/LINK)
+    // median_coin (dollars/SOL)
+    // median_coin / median_link = LINK/SOL
+    divide [type="divide" input="$(median_coin)" divisor="$(median_link)" precision="9"]
+    scale  [type="multiply" times=1000000000]
+
+    median_link -> divide
+    median_coin -> divide
+    divide -> scale
+"""
+
+[relayConfig]
+chainID            = "<insert solana chain id>"
+ocr2ProgramID      = "<insert solana ocr2 program ID>"
+transmissionsID    = "<insert solana ocr2 transmissions account>"
+storeProgramID     = "<insert solana ocr2 store account>"

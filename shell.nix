@@ -7,20 +7,29 @@ pkgs.mkShell {
     llvm_11
     stdenv.cc.cc.lib
     pkg-config
-    libudev
+    udev
     openssl
 
-    solana-full
+    # Solana
+    solana.solana-full
     spl-token-cli
     anchor
-    nodePackages.typescript-language-server
-    nodejs-14_x
-    (yarn.override { nodejs = nodejs-14_x; })
 
+    # Golang
+    # Keep this golang version in sync with the version in .tool-versions please
     go_1_17
     gopls
     delve
     golangci-lint
+    gotools
+
+    # NodeJS + TS
+    nodePackages.typescript
+    nodePackages.typescript-language-server
+    # Keep this nodejs version in sync with the version in .tool-versions please
+    nodejs-14_x
+    (yarn.override { nodejs = nodejs-14_x; })
+    python3
   ];
   RUST_BACKTRACE = "1";
   # https://github.com/rust-lang/rust/issues/55979

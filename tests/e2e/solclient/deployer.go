@@ -2,39 +2,42 @@ package solclient
 
 import (
 	"fmt"
+	"math/big"
+	"path/filepath"
+	"strings"
+
 	ag_binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/rs/zerolog/log"
 	access_controller2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/access_controller"
-	deviation_flagging_validator2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/deviation_flagging_validator"
-	"github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr2"
-	utils2 "github.com/smartcontractkit/chainlink-solana/tests/e2e/utils"
+	ocr_2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr2"
+	store2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/store"
 	"github.com/smartcontractkit/helmenv/environment"
 	"github.com/smartcontractkit/integrations-framework/client"
 	"github.com/smartcontractkit/integrations-framework/contracts"
 	"golang.org/x/sync/errgroup"
-	"math/big"
-	"path/filepath"
-	"strings"
 )
 
 // All account sizes are calculated from Rust structures, ex. programs/access-controller/src/lib.rs:L80
 // there is some wrapper in "anchor" that creates accounts for programs automatically, but we are doing that explicitly
 const (
+	Discriminator = 8
 	// TokenMintAccountSize default size of data required for a new mint account
-	TokenMintAccountSize                  = uint64(82)
-	TokenAccountSize                      = uint64(165)
-	AccessControllerStateAccountSize      = uint64(8 + 32 + 8 + 32*32)
-	DeviationFlaggingValidatorAccountSize = uint64(8 + 32*4 + 32*128 + 8)
-	OCRLeftoverPaymentSize                = uint64(32 + 8)
-	OCRLeftoverPaymentsSize               = OCRLeftoverPaymentSize*19 + 8
-	OCROracle                             = uint64(32 + 20 + 32 + 32 + 4 + 8)
-	OCROraclesSize                        = OCROracle*19 + 8
-	OCROffChainConfigSize                 = uint64(8 + 4096 + 8)
-	OCRConfigSize                         = 32 + 32 + 32 + 32 + 32 + 32 + 16 + 16 + 32 + (1 + 1 + 1 + 1 + 4 + 4 + 32) + (4 + 32 + 8) + (4 + 4 + 32 + 4) + 2*OCROffChainConfigSize
-	OCRAccountAccountSize                 = 8 + 1 + 1 + 2 + 4 + OCRConfigSize + OCROraclesSize + OCRLeftoverPaymentsSize + 32
-	OCRTransmissionsAccountSize           = uint64(8 + 4 + 4 + 8192*24)
+	TokenMintAccountSize             = uint64(82)
+	TokenAccountSize                 = uint64(165)
+	AccessControllerStateAccountSize = uint64(Discriminator + solana.PublicKeyLength + solana.PublicKeyLength + 8 + 32*64)
+	StoreAccountSize                 = uint64(Discriminator + solana.PublicKeyLength*3)
+	OCRTransmissionsAccountSize      = uint64(Discriminator + 192 + 8192*48)
+	OCRProposalAccountSize           = Discriminator + 1 + 32 + 1 + 1 + (1 + 4) + 32 + ProposedOraclesSize + OCROffChainConfigSize
+	ProposedOracleSize               = uint64(solana.PublicKeyLength + 20 + 4 + solana.PublicKeyLength)
+	ProposedOraclesSize              = ProposedOracleSize*19 + 8
+	OCROracle                        = uint64(solana.PublicKeyLength + 20 + solana.PublicKeyLength + solana.PublicKeyLength + 4 + 8)
+	OCROraclesSize                   = OCROracle*19 + 8
+	OCROffChainConfigSize            = uint64(8 + 4096 + 8)
+	OCRConfigSize                    = 32 + 32 + 32 + 32 + 32 + 32 + 16 + 16 + (1 + 1 + 2 + 4 + 4 + 32) + (4 + 32 + 8) + (4 + 4)
+	OCRAccountSize                   = Discriminator + 1 + 1 + 2 + 4 + solana.PublicKeyLength + OCRConfigSize + OCROffChainConfigSize + OCROraclesSize
 )
 
 type Authority struct {
@@ -47,11 +50,10 @@ type ContractDeployer struct {
 	Env    *environment.Environment
 }
 
-func (c *ContractDeployer) DeployOCRv2DeviationFlaggingValidator(billingAC string) (contracts.OCRv2DeviationFlaggingValidator, error) {
-	programWallet := c.Client.ProgramWallets["deviation_flagging_validator-keypair.json"]
+func (c *ContractDeployer) DeployOCRv2Store(billingAC string) (*Store, error) {
+	programWallet := c.Client.ProgramWallets["store-keypair.json"]
 	payer := c.Client.DefaultWallet
-	stateAcc := solana.NewWallet()
-	accInstruction, err := c.Client.CreateAccInstr(stateAcc, DeviationFlaggingValidatorAccountSize, programWallet.PublicKey())
+	accInstruction, err := c.Client.CreateAccInstr(c.Client.Accounts.Store, StoreAccountSize, programWallet.PublicKey())
 	if err != nil {
 		return nil, err
 	}
@@ -59,14 +61,14 @@ func (c *ContractDeployer) DeployOCRv2DeviationFlaggingValidator(billingAC strin
 	if err != nil {
 		return nil, err
 	}
-	err = c.Client.TXAsync(
-		"Deploy deviation flagging validator",
+	err = c.Client.TXSync(
+		"Deploy store",
+		rpc.CommitmentFinalized,
 		[]solana.Instruction{
 			accInstruction,
-			deviation_flagging_validator2.NewInitializeInstruction(
-				stateAcc.PublicKey(),
+			store2.NewInitializeInstruction(
+				c.Client.Accounts.Store.PublicKey(),
 				c.Client.Accounts.Owner.PublicKey(),
-				bacPublicKey,
 				bacPublicKey,
 			).Build(),
 		},
@@ -74,8 +76,8 @@ func (c *ContractDeployer) DeployOCRv2DeviationFlaggingValidator(billingAC strin
 			if key.Equals(c.Client.Accounts.Owner.PublicKey()) {
 				return &c.Client.Accounts.Owner.PrivateKey
 			}
-			if key.Equals(stateAcc.PublicKey()) {
-				return &stateAcc.PrivateKey
+			if key.Equals(c.Client.Accounts.Store.PublicKey()) {
+				return &c.Client.Accounts.Store.PrivateKey
 			}
 			if key.Equals(payer.PublicKey()) {
 				return &payer.PrivateKey
@@ -87,43 +89,12 @@ func (c *ContractDeployer) DeployOCRv2DeviationFlaggingValidator(billingAC strin
 	if err != nil {
 		return nil, err
 	}
-	return &DeviationFlaggingValidator{
+	return &Store{
 		Client:        c.Client,
-		State:         stateAcc,
+		Store:         c.Client.Accounts.Store,
+		Feed:          c.Client.Accounts.Feed,
 		ProgramWallet: programWallet,
 	}, nil
-}
-
-func (c *ContractDeployer) Balance() (*big.Float, error) {
-	panic("implement me")
-}
-
-func (c *ContractDeployer) DeployStorageContract() (contracts.Storage, error) {
-	panic("implement me")
-}
-
-func (c *ContractDeployer) DeployAPIConsumer(linkAddr string) (contracts.APIConsumer, error) {
-	panic("implement me")
-}
-
-func (c *ContractDeployer) DeployOracle(linkAddr string) (contracts.Oracle, error) {
-	panic("implement me")
-}
-
-func (c *ContractDeployer) DeployReadAccessController() (contracts.ReadAccessController, error) {
-	panic("implement me")
-}
-
-func (c *ContractDeployer) DeployFlags(rac string) (contracts.Flags, error) {
-	panic("implement me")
-}
-
-func (c *ContractDeployer) DeployDeviationFlaggingValidator(flags string, flaggingThreshold *big.Int) (contracts.DeviationFlaggingValidator, error) {
-	panic("implement me")
-}
-
-func (c *ContractDeployer) DeployFluxAggregatorContract(linkAddr string, fluxOptions contracts.FluxAggregatorOptions) (contracts.FluxAggregator, error) {
-	panic("implement me")
 }
 
 func (c *ContractDeployer) addMintToAccInstr(instr *[]solana.Instruction, dest *solana.Wallet, amount uint64) error {
@@ -137,21 +108,26 @@ func (c *ContractDeployer) addMintToAccInstr(instr *[]solana.Instruction, dest *
 	return nil
 }
 
-func (c *ContractDeployer) DeployLinkTokenContract() (contracts.LinkToken, error) {
+func (c *ContractDeployer) DeployLinkTokenContract() (*LinkToken, error) {
+	var err error
 	payer := c.Client.DefaultWallet
 
 	instr := make([]solana.Instruction, 0)
-	if err := c.Client.addMintInstr(&instr); err != nil {
+	if err = c.Client.addMintInstr(&instr); err != nil {
 		return nil, err
 	}
 	vaultAuthority := c.Client.Accounts.Authorities["vault"]
-	if err := c.Client.addNewAssociatedAccInstr(c.Client.Accounts.OCRVault, vaultAuthority.PublicKey, &instr); err != nil {
+	c.Client.Accounts.OCRVaultAssociatedPubKey, _, err = solana.FindAssociatedTokenAddress(vaultAuthority.PublicKey, c.Client.Accounts.Mint.PublicKey())
+	if err != nil {
 		return nil, err
 	}
-	if err := c.addMintToAccInstr(&instr, c.Client.Accounts.OCRVault, 1e18); err != nil {
+	if err = c.Client.addNewAssociatedAccInstr(c.Client.Accounts.OCRVault, vaultAuthority.PublicKey, &instr); err != nil {
 		return nil, err
 	}
-	err := c.Client.TXAsync(
+	if err = c.addMintToAccInstr(&instr, c.Client.Accounts.OCRVault, 1e18); err != nil {
+		return nil, err
+	}
+	err = c.Client.TXAsync(
 		"Createing LINK Token and associated accounts",
 		instr,
 		func(key solana.PublicKey) *solana.PrivateKey {
@@ -180,14 +156,10 @@ func (c *ContractDeployer) DeployLinkTokenContract() (contracts.LinkToken, error
 	}, nil
 }
 
-func (c *ContractDeployer) DeployOCRv2(billingControllerAddr string, requesterControllerAddr string, linkTokenAddr string) (contracts.OCRv2, error) {
+func (c *ContractDeployer) DeployOCRv2(billingControllerAddr string, requesterControllerAddr string, linkTokenAddr string) (*OCRv2, error) {
 	programWallet := c.Client.ProgramWallets["ocr2-keypair.json"]
 	payer := c.Client.DefaultWallet
-	ocrAccInstruction, err := c.Client.CreateAccInstr(c.Client.Accounts.OCR, OCRAccountAccountSize, programWallet.PublicKey())
-	if err != nil {
-		return nil, err
-	}
-	ocrTransmissionsAccInstruction, err := c.Client.CreateAccInstr(c.Client.Accounts.Transmissions, OCRTransmissionsAccountSize, programWallet.PublicKey())
+	ocrAccInstruction, err := c.Client.CreateAccInstr(c.Client.Accounts.OCR, OCRAccountSize, programWallet.PublicKey())
 	if err != nil {
 		return nil, err
 	}
@@ -204,13 +176,12 @@ func (c *ContractDeployer) DeployOCRv2(billingControllerAddr string, requesterCo
 		return nil, err
 	}
 	vault := c.Client.Accounts.Authorities["vault"]
-	err = c.Client.TXAsync(
+	err = c.Client.TXSync(
 		"Initializing OCRv2",
+		rpc.CommitmentFinalized,
 		[]solana.Instruction{
 			ocrAccInstruction,
-			ocrTransmissionsAccInstruction,
 			ocr_2.NewInitializeInstructionBuilder().
-				SetNonce(vault.Nonce).
 				SetMinAnswer(ag_binary.Int128{
 					Lo: 1,
 					Hi: 0,
@@ -219,14 +190,12 @@ func (c *ContractDeployer) DeployOCRv2(billingControllerAddr string, requesterCo
 					Lo: 1000000,
 					Hi: 0,
 				}).
-				SetDecimals(9).
-				SetDescription("OCRv2").
 				SetStateAccount(c.Client.Accounts.OCR.PublicKey()).
-				SetTransmissionsAccount(c.Client.Accounts.Transmissions.PublicKey()).
+				SetFeedAccount(c.Client.Accounts.Feed.PublicKey()).
 				SetPayerAccount(payer.PublicKey()).
 				SetOwnerAccount(c.Client.Accounts.Owner.PublicKey()).
 				SetTokenMintAccount(linkTokenMintPubKey).
-				SetTokenVaultAccount(c.Client.Accounts.OCRVault.PublicKey()).
+				SetTokenVaultAccount(c.Client.Accounts.OCRVaultAssociatedPubKey).
 				SetVaultAuthorityAccount(vault.PublicKey).
 				SetRequesterAccessControllerAccount(racPubKey).
 				SetBillingAccessControllerAccount(bacPubKey).
@@ -246,9 +215,6 @@ func (c *ContractDeployer) DeployOCRv2(billingControllerAddr string, requesterCo
 			if key.Equals(c.Client.Accounts.Owner.PublicKey()) {
 				return &c.Client.Accounts.Owner.PrivateKey
 			}
-			if key.Equals(c.Client.Accounts.Transmissions.PublicKey()) {
-				return &c.Client.Accounts.Transmissions.PrivateKey
-			}
 			return nil
 		},
 		payer.PublicKey(),
@@ -259,7 +225,6 @@ func (c *ContractDeployer) DeployOCRv2(billingControllerAddr string, requesterCo
 	return &OCRv2{
 		Client:        c.Client,
 		State:         c.Client.Accounts.OCR,
-		Transmissions: c.Client.Accounts.Transmissions,
 		Authorities:   c.Client.Accounts.Authorities,
 		ProgramWallet: programWallet,
 	}, nil
@@ -283,7 +248,7 @@ func (c *ContractDeployer) DeployProgramRemote(programName string) error {
 	return nil
 }
 
-func (c *ContractDeployer) DeployOCRv2AccessController() (contracts.OCRv2AccessController, error) {
+func (c *ContractDeployer) DeployOCRv2AccessController() (*AccessController, error) {
 	programWallet := c.Client.ProgramWallets["access_controller-keypair.json"]
 	payer := c.Client.DefaultWallet
 	stateAcc := solana.NewWallet()
@@ -297,10 +262,7 @@ func (c *ContractDeployer) DeployOCRv2AccessController() (contracts.OCRv2AccessC
 			accInstruction,
 			access_controller2.NewInitializeInstruction(
 				stateAcc.PublicKey(),
-				payer.PublicKey(),
 				c.Client.Accounts.Owner.PublicKey(),
-				solana.SysVarRentPubkey,
-				solana.SystemProgramID,
 			).Build(),
 		},
 		func(key solana.PublicKey) *solana.PrivateKey {
@@ -369,23 +331,23 @@ func (c *ContractDeployer) DeployBlockhashStore() (contracts.BlockHashStore, err
 
 func (c *ContractDeployer) registerAnchorPrograms() {
 	access_controller2.SetProgramID(c.Client.ProgramWallets["access_controller-keypair.json"].PublicKey())
-	deviation_flagging_validator2.SetProgramID(c.Client.ProgramWallets["deviation_flagging_validator-keypair.json"].PublicKey())
+	store2.SetProgramID(c.Client.ProgramWallets["store-keypair.json"].PublicKey())
 	ocr_2.SetProgramID(c.Client.ProgramWallets["ocr2-keypair.json"].PublicKey())
 }
 
-func (c *ContractDeployer) deployAnchorProgramsRemote() error {
-	contractBinaries, err := c.Client.ListDirFilenamesByExt(utils2.ContractsDir, ".so")
+func (c *ContractDeployer) deployAnchorProgramsRemote(contractsDir string) error {
+	contractBinaries, err := c.Client.ListDirFilenamesByExt(contractsDir, ".so")
 	if err != nil {
 		return err
 	}
 	log.Debug().Interface("Binaries", contractBinaries).Msg("Program binaries")
-	keyFiles, err := c.Client.ListDirFilenamesByExt(utils2.ContractsDir, ".json")
+	keyFiles, err := c.Client.ListDirFilenamesByExt(contractsDir, ".json")
 	if err != nil {
 		return err
 	}
 	log.Debug().Interface("Files", keyFiles).Msg("Program key files")
 	for _, kfn := range keyFiles {
-		pk, err := solana.PrivateKeyFromSolanaKeygenFile(filepath.Join(utils2.ContractsDir, kfn))
+		pk, err := solana.PrivateKeyFromSolanaKeygenFile(filepath.Join(contractsDir, kfn))
 		if err != nil {
 			return err
 		}
@@ -400,16 +362,10 @@ func (c *ContractDeployer) deployAnchorProgramsRemote() error {
 	for _, bin := range contractBinaries {
 		bin := bin
 		g.Go(func() error {
-			if err := c.DeployProgramRemote(bin); err != nil {
-				return err
-			}
-			return nil
+			return c.DeployProgramRemote(bin)
 		})
 	}
-	if err := g.Wait(); err != nil {
-		return err
-	}
-	return nil
+	return g.Wait()
 }
 
 // generateOCRAuthorities generates authorities so other contracts can access OCR with on-chain calls when signer needed
@@ -442,16 +398,16 @@ func (c *Client) FindAuthorityAddress(seed string, statePubKey solana.PublicKey,
 	return auth, nonce, err
 }
 
-func NewContractDeployer(client client.BlockchainClient, e *environment.Environment) (*ContractDeployer, error) {
+func NewContractDeployer(client client.BlockchainClient, e *environment.Environment, contractsDir string) (*ContractDeployer, error) {
 	cd := &ContractDeployer{
 		Env:    e,
 		Client: client.(*Client),
 	}
-	if err := cd.deployAnchorProgramsRemote(); err != nil {
+	if err := cd.deployAnchorProgramsRemote(contractsDir); err != nil {
 		return nil, err
 	}
 	cd.registerAnchorPrograms()
-	authorities, err := cd.Client.generateOCRAuthorities([]string{"vault", "validator"})
+	authorities, err := cd.Client.generateOCRAuthorities([]string{"vault", "store"})
 	if err != nil {
 		return nil, err
 	}

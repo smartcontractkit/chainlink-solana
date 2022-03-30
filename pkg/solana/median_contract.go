@@ -18,19 +18,20 @@ func (c *ContractTracker) LatestTransmissionDetails(
 	latestTimestamp time.Time,
 	err error,
 ) {
-	if err := c.fetchState(ctx); err != nil {
-		return types.ConfigDigest{}, 0, 0, big.NewInt(0), time.Unix(0, 0), err
+	state, err := c.ReadState()
+	if err != nil {
+		return configDigest, epoch, round, latestAnswer, latestTimestamp, err
+	}
+	answer, err := c.ReadAnswer()
+	if err != nil {
+		return configDigest, epoch, round, latestAnswer, latestTimestamp, err
 	}
 
-	if err := c.fetchLatestTransmission(ctx); err != nil {
-		return types.ConfigDigest{}, 0, 0, big.NewInt(0), time.Unix(0, 0), err
-	}
-
-	configDigest = c.state.Config.LatestConfigDigest
-	epoch = c.state.Config.Epoch
-	round = c.state.Config.Round
-	latestAnswer = c.answer.Data
-	latestTimestamp = time.Unix(int64(c.answer.Timestamp), 0)
+	configDigest = state.Config.LatestConfigDigest
+	epoch = state.Config.Epoch
+	round = state.Config.Round
+	latestAnswer = answer.Data
+	latestTimestamp = time.Unix(int64(answer.Timestamp), 0)
 	return configDigest, epoch, round, latestAnswer, latestTimestamp, nil
 }
 
@@ -45,7 +46,7 @@ func (c *ContractTracker) LatestTransmissionDetails(
 //
 // As an optimization, this function may also return zero values, if no
 // RoundRequested event has been emitted after the latest NewTransmission event.
-func (c ContractTracker) LatestRoundRequested(
+func (c *ContractTracker) LatestRoundRequested(
 	ctx context.Context,
 	lookback time.Duration,
 ) (
@@ -54,5 +55,6 @@ func (c ContractTracker) LatestRoundRequested(
 	round uint8,
 	err error,
 ) {
-	return c.state.Config.LatestConfigDigest, 0, 0, nil
+	state, err := c.ReadState()
+	return state.Config.LatestConfigDigest, 0, 0, err
 }

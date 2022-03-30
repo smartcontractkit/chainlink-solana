@@ -30,23 +30,29 @@ func init() {
 var (
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
+	Instruction_Close = ag_binary.TypeID([8]byte{98, 165, 201, 177, 108, 65, 206, 96})
+
 	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
 
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
-	Instruction_BeginOffchainConfig = ag_binary.TypeID([8]byte{124, 77, 17, 185, 6, 147, 219, 60})
+	Instruction_CreateProposal = ag_binary.TypeID([8]byte{132, 116, 68, 174, 216, 160, 198, 22})
 
 	Instruction_WriteOffchainConfig = ag_binary.TypeID([8]byte{171, 64, 173, 138, 151, 188, 68, 168})
 
-	Instruction_CommitOffchainConfig = ag_binary.TypeID([8]byte{56, 171, 18, 191, 137, 247, 109, 33})
+	Instruction_FinalizeProposal = ag_binary.TypeID([8]byte{23, 68, 51, 167, 109, 173, 187, 164})
 
-	Instruction_SetConfig = ag_binary.TypeID([8]byte{108, 158, 154, 175, 212, 98, 52, 66})
+	Instruction_CloseProposal = ag_binary.TypeID([8]byte{213, 178, 139, 19, 50, 191, 82, 245})
+
+	Instruction_AcceptProposal = ag_binary.TypeID([8]byte{33, 190, 130, 178, 27, 12, 168, 238})
+
+	Instruction_ProposeConfig = ag_binary.TypeID([8]byte{163, 247, 238, 160, 236, 129, 153, 160})
+
+	Instruction_ProposePayees = ag_binary.TypeID([8]byte{76, 228, 45, 220, 157, 7, 182, 228})
 
 	Instruction_SetRequesterAccessController = ag_binary.TypeID([8]byte{182, 229, 210, 202, 190, 116, 92, 236})
 
 	Instruction_RequestNewRound = ag_binary.TypeID([8]byte{79, 230, 6, 173, 193, 109, 226, 61})
-
-	Instruction_SetValidatorConfig = ag_binary.TypeID([8]byte{87, 248, 224, 193, 17, 41, 80, 250})
 
 	Instruction_SetBillingAccessController = ag_binary.TypeID([8]byte{176, 167, 195, 39, 175, 182, 51, 23})
 
@@ -56,17 +62,11 @@ var (
 
 	Instruction_WithdrawPayment = ag_binary.TypeID([8]byte{118, 231, 133, 187, 151, 154, 111, 95})
 
-	Instruction_PayRemaining = ag_binary.TypeID([8]byte{183, 66, 188, 183, 187, 154, 20, 99})
-
 	Instruction_PayOracles = ag_binary.TypeID([8]byte{150, 220, 13, 20, 104, 214, 61, 89})
-
-	Instruction_SetPayees = ag_binary.TypeID([8]byte{92, 10, 255, 107, 111, 30, 22, 33})
 
 	Instruction_TransferPayeeship = ag_binary.TypeID([8]byte{116, 68, 213, 225, 193, 225, 171, 206})
 
 	Instruction_AcceptPayeeship = ag_binary.TypeID([8]byte{142, 208, 219, 62, 82, 13, 189, 70})
-
-	Instruction_Query = ag_binary.TypeID([8]byte{39, 251, 130, 159, 46, 136, 164, 169})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -74,24 +74,30 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
 	case Instruction_Initialize:
 		return "Initialize"
+	case Instruction_Close:
+		return "Close"
 	case Instruction_TransferOwnership:
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
-	case Instruction_BeginOffchainConfig:
-		return "BeginOffchainConfig"
+	case Instruction_CreateProposal:
+		return "CreateProposal"
 	case Instruction_WriteOffchainConfig:
 		return "WriteOffchainConfig"
-	case Instruction_CommitOffchainConfig:
-		return "CommitOffchainConfig"
-	case Instruction_SetConfig:
-		return "SetConfig"
+	case Instruction_FinalizeProposal:
+		return "FinalizeProposal"
+	case Instruction_CloseProposal:
+		return "CloseProposal"
+	case Instruction_AcceptProposal:
+		return "AcceptProposal"
+	case Instruction_ProposeConfig:
+		return "ProposeConfig"
+	case Instruction_ProposePayees:
+		return "ProposePayees"
 	case Instruction_SetRequesterAccessController:
 		return "SetRequesterAccessController"
 	case Instruction_RequestNewRound:
 		return "RequestNewRound"
-	case Instruction_SetValidatorConfig:
-		return "SetValidatorConfig"
 	case Instruction_SetBillingAccessController:
 		return "SetBillingAccessController"
 	case Instruction_SetBilling:
@@ -100,18 +106,12 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "WithdrawFunds"
 	case Instruction_WithdrawPayment:
 		return "WithdrawPayment"
-	case Instruction_PayRemaining:
-		return "PayRemaining"
 	case Instruction_PayOracles:
 		return "PayOracles"
-	case Instruction_SetPayees:
-		return "SetPayees"
 	case Instruction_TransferPayeeship:
 		return "TransferPayeeship"
 	case Instruction_AcceptPayeeship:
 		return "AcceptPayeeship"
-	case Instruction_Query:
-		return "Query"
 	default:
 		return ""
 	}
@@ -136,31 +136,40 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"initialize", (*Initialize)(nil),
 		},
 		{
+			"close", (*Close)(nil),
+		},
+		{
 			"transfer_ownership", (*TransferOwnership)(nil),
 		},
 		{
 			"accept_ownership", (*AcceptOwnership)(nil),
 		},
 		{
-			"begin_offchain_config", (*BeginOffchainConfig)(nil),
+			"create_proposal", (*CreateProposal)(nil),
 		},
 		{
 			"write_offchain_config", (*WriteOffchainConfig)(nil),
 		},
 		{
-			"commit_offchain_config", (*CommitOffchainConfig)(nil),
+			"finalize_proposal", (*FinalizeProposal)(nil),
 		},
 		{
-			"set_config", (*SetConfig)(nil),
+			"close_proposal", (*CloseProposal)(nil),
+		},
+		{
+			"accept_proposal", (*AcceptProposal)(nil),
+		},
+		{
+			"propose_config", (*ProposeConfig)(nil),
+		},
+		{
+			"propose_payees", (*ProposePayees)(nil),
 		},
 		{
 			"set_requester_access_controller", (*SetRequesterAccessController)(nil),
 		},
 		{
 			"request_new_round", (*RequestNewRound)(nil),
-		},
-		{
-			"set_validator_config", (*SetValidatorConfig)(nil),
 		},
 		{
 			"set_billing_access_controller", (*SetBillingAccessController)(nil),
@@ -175,22 +184,13 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"withdraw_payment", (*WithdrawPayment)(nil),
 		},
 		{
-			"pay_remaining", (*PayRemaining)(nil),
-		},
-		{
 			"pay_oracles", (*PayOracles)(nil),
-		},
-		{
-			"set_payees", (*SetPayees)(nil),
 		},
 		{
 			"transfer_payeeship", (*TransferPayeeship)(nil),
 		},
 		{
 			"accept_payeeship", (*AcceptPayeeship)(nil),
-		},
-		{
-			"query", (*Query)(nil),
 		},
 	},
 )

@@ -21,13 +21,15 @@
     "lint:format": "yarn prettier --check ./src",
     "format": "yarn prettier --write ./src",
     "clean": "rm -rf ./dist/ ./bin/",
-    "build": "yarn clean && tsc",
+    "build": "yarn clean && tsc -b",
     "bundle": "yarn build && pkg ."
   },
   "dependencies": {
-    "@chainlink/gauntlet-core": "0.0.6",
-    "@project-serum/anchor": "^0.18.0",
+    "@chainlink/gauntlet-core": "0.1.2",
+    "@ledgerhq/hw-app-solana": "^6.20.0",
+    "@ledgerhq/hw-transport-node-hid": "^6.20.0",
+    "@project-serum/anchor": "^0.23.0",
     "@project-serum/borsh": "^0.2.2",
-    "@solana/web3.js": "^1.30.2"
+    "@solana/web3.js": "^1.31.0"
   }
 }

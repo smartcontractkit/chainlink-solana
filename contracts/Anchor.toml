@@ -1,4 +1,4 @@
-anchor_version = "0.19.0"
+anchor_version = "0.23.0"
 
 [registry]
 url = "https://anchor.projectserum.com"
@@ -21,6 +21,6 @@ test = "yarn run test"
 # TODO: add pubkeys
 
 [programs.localnet]
-ocr2 = "CF13pnKGJ1WJZeEgVAtFdUi4MMndXm9hneiHs8azUaZt"
-access_controller = "2F5NEkMnCRkmahEAcQfTQcZv1xtGgrWFfjENtTwHLuKg"
-deviation_flagging_validator = "A7Jh2nb1hZHwqEofm4N8SXbKTj82rx7KUfjParQXUyMQ"
+ocr2 = "cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ"
+store = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny"
+access_controller = "9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW"

@@ -1,4 +1,4 @@
-name: Release Artifacts
+name: release_artifacts
 on:
   push:
     tags:
@@ -10,9 +10,10 @@ defaults:
     working-directory: ./contracts
 jobs:
   release-artifacts:
+    name: Release Artifacts
     runs-on: ubuntu-latest
     container:
-      image: projectserum/build:v0.18.2
+      image: projectserum/build:v0.22.1
       env:
         RUSTUP_HOME: "/root/.rustup"
     steps:
@@ -25,4 +26,6 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: contracts/artifacts.tar.gz
+          files: | 
+            contracts/artifacts.tar.gz
+            contracts/target/deploy/*.so

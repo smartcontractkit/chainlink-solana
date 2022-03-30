@@ -1,20 +1,12 @@
 import { Result } from '@chainlink/gauntlet-core'
+import { inspection, BN } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { PublicKey } from '@solana/web3.js'
+import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
-import { getRDD } from '../../../../lib/rdd'
-import {
-  inspect,
-  Inspection,
-  makeInspection,
-  toComparableNumber,
-  toComparablePubKey,
-  toComparableLongNumber,
-} from '../../../../core/inspection'
-import WriteOffchainConfig, { Input as OffchainConfigInput } from '../offchainConfig/write'
-import BN from 'bn.js'
-import { Protobuf } from '../../../../core/proto'
-import { descriptor as OCR2Descriptor } from '../../../../core/proto/ocr2Proto'
+import { deserializeConfig } from '../../../../lib/encoding'
+import WriteOffchainConfig, { OffchainConfig } from '../proposeOffchainConfig'
+import { toComparableLongNumber, toComparableNumber, toComparablePubKey } from '../../../../lib/inspection'
+import RDD from '../../../../lib/rdd'
 
 type Input = {
   description: string
@@ -22,70 +14,124 @@ type Input = {
   minAnswer: string | number
   maxAnswer: string | number
   transmitters: string[]
+  offchainConfig: OffchainConfig
   billingAccessController: string
   requesterAccessController: string
-  link: string
-  offchainConfig: OffchainConfigInput
+  billing: {
+    observationPaymentGjuels: string
+    transmissionPaymentGjuels: string
+  }
 }
 
 export default class OCR2Inspect extends SolanaCommand {
   static id = 'ocr2:inspect'
   static category = CONTRACT_LIST.OCR_2
 
+  static examples = [
+    'yarn gauntlet ocr2:inspect --network=devnet --rdd=[PATH_TO_RDD] [AGGREGATOR_ADDRESS]',
+    'yarn gauntlet ocr2:inspect [AGGREGATOR_ADDRESS]',
+  ]
+
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
-    const rdd = getRDD(this.flags.rdd)
-    const info = rdd.contracts[this.flags.state]
-    const aggregatorOperators: string[] = info.oracles.map((o) => o.operator)
-    const transmitters = aggregatorOperators.map((operator) => rdd.operators[operator].nodeAddress[0])
-    const billingAccessController =
-      this.flags.billingAccessController || process.env.BILLING_ADMIN_ACCESS_CONTROLLER_ADDRESS
-    const requesterAccessController =
-      this.flags.requesterAccessController || process.env.REQUESTER_ADMIN_ACCESS_CONTROLLER_ADDRESS
-    const link = this.flags.link || process.env.LINK_ADDRESS
-    const offchainConfig = WriteOffchainConfig.makeInputFromRDD(rdd, this.flags.state)
+    const network = this.flags.network || ''
+    const rddPath = this.flags.rdd || ''
+    const billingAccessController = this.flags.billingAccessController || process.env.BILLING_ACCESS_CONTROLLER
+    const requesterAccessController = this.flags.requesterAccessController || process.env.REQUESTER_ACCESS_CONTROLLER
+
+    const rdd = RDD.load(network, rddPath)
+    const aggregator = RDD.loadAggregator(this.args[0], network, rddPath)
+    const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
+    const transmitters = aggregatorOperators.map((operator) => rdd.operators[operator].ocrNodeAddress[0])
+    const offchainConfig = WriteOffchainConfig.makeInputFromRDD(rdd, this.args[0])
+
     return {
-      description: info.name,
-      decimals: info.decimals,
-      minAnswer: info.minSubmissionValue,
-      maxAnswer: info.maxSubmissionValue,
+      description: aggregator.name,
+      decimals: aggregator.decimals,
+      minAnswer: aggregator.minSubmissionValue,
+      maxAnswer: aggregator.maxSubmissionValue,
       transmitters,
       billingAccessController,
       requesterAccessController,
-      link,
       offchainConfig,
+      billing: {
+        observationPaymentGjuels: aggregator.billing.observationPaymentGjuels,
+        transmissionPaymentGjuels: aggregator.billing.transmissionPaymentGjuels,
+      },
     }
   }
 
   constructor(flags, args) {
     super(flags, args)
-    this.require(!!this.flags.state, 'Please provide flags with "state""')
   }
 
-  deserializeConfig = (buffer: Buffer): any => {
-    const proto = new Protobuf({ descriptor: OCR2Descriptor })
-    const offchain = proto.decode('offchainreporting2_config.OffchainConfigProto', buffer)
-    const reportingPluginConfig = proto.decode(
-      'offchainreporting2_config.ReportingPluginConfig',
-      offchain.reportingPluginConfig,
+  makeFeedInspections = async (bufferedInfo: Keypair, input: Input): Promise<inspection.Inspection[]> => {
+    const store = getContract(CONTRACT_LIST.STORE, '')
+    const storeProgram = this.loadProgram(store.idl, store.programId.toString())
+    const account = await storeProgram.account.description.fetch(bufferedInfo.publicKey)
+    return [
+      inspection.makeInspection(
+        // Description comes with some empty bytes
+        Buffer.from(account.description.filter((v) => v !== 0)).toString(),
+        input.description,
+        'Description',
+      ),
+      inspection.makeInspection(
+        toComparableNumber(account.config.decimals),
+        toComparableNumber(input.decimals),
+        'Decimals',
+      ),
+    ]
+  }
+
+  getTranmissionsStateAccount = async (tranmissions: PublicKey): Promise<Keypair> => {
+    const store = getContract(CONTRACT_LIST.STORE, '')
+    const storeProgram = this.loadProgram(store.idl, store.programId.toString())
+
+    let buffer = Keypair.generate()
+    await storeProgram.rpc.query(
+      { version: {} },
+      {
+        accounts: {
+          feed: tranmissions,
+          buffer: buffer.publicKey,
+        },
+        preInstructions: [
+          SystemProgram.createAccount({
+            fromPubkey: this.provider.wallet.publicKey,
+            newAccountPubkey: buffer.publicKey,
+            lamports: await this.provider.connection.getMinimumBalanceForRentExemption(256),
+            space: 256,
+            programId: store.programId,
+          }),
+        ],
+        signers: [buffer],
+      },
     )
-    return { ...offchain, reportingPluginConfig }
+
+    return buffer
   }
 
   execute = async () => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
-    const program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
+    const ocr2program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
 
-    const state = new PublicKey(this.flags.state)
     const input = this.makeInput(this.flags.input)
-    const onChainState = await program.account.state.fetch(state)
 
-    const bufferedConfig = Buffer.from(onChainState.config.offchainConfig.xs).slice(
+    const state = new PublicKey(this.args[0])
+    const onChainState = await ocr2program.account.state.fetch(state)
+
+    const bufferedConfig = Buffer.from(onChainState.offchainConfig.xs).slice(
       0,
-      new BN(onChainState.config.offchainConfig.len).toNumber(),
+      new BN(onChainState.offchainConfig.len).toNumber(),
     )
 
-    const onChainOCRConfig = this.deserializeConfig(bufferedConfig)
+    const onChainOCRConfig = deserializeConfig(bufferedConfig)
+    const wrappedComparableLongNumber = (v: any) => {
+      // Proto encoding will ignore falsy values.
+      if (!v) return '0'
+      return toComparableLongNumber(v)
+    }
     const longNumberInspections = [
       'deltaProgressNanoseconds',
       'deltaResendNanoseconds',
@@ -98,42 +144,45 @@ export default class OCR2Inspect extends SolanaCommand {
       'maxDurationShouldAcceptFinalizedReportNanoseconds',
       'maxDurationShouldTransmitAcceptedReportNanoseconds',
     ].map((prop) =>
-      makeInspection(
-        toComparableLongNumber(onChainOCRConfig[prop]),
+      inspection.makeInspection(
+        wrappedComparableLongNumber(onChainOCRConfig[prop]),
         toComparableNumber(input.offchainConfig[prop]),
         `Offchain Config "${prop}"`,
       ),
     )
 
-    const inspections: Inspection[] = [
-      makeInspection(
+    const inspections: inspection.Inspection[] = [
+      inspection.makeInspection(
         toComparableNumber(onChainState.config.minAnswer),
         toComparableNumber(input.minAnswer),
         'Min Answer',
       ),
-      makeInspection(
+      inspection.makeInspection(
         toComparableNumber(onChainState.config.maxAnswer),
         toComparableNumber(input.maxAnswer),
         'Max Answer',
       ),
-      makeInspection(toComparableNumber(onChainState.config.decimals), toComparableNumber(input.decimals), 'Decimals'),
-      makeInspection(
-        // Description comes with some empty bytes
-        Buffer.from(onChainState.config.description.filter((v) => v !== 0)).toString(),
-        input.description,
-        'Description',
+      inspection.makeInspection(
+        toComparableNumber(onChainState.config.billing.transmissionPaymentGjuels),
+        toComparableNumber(input.billing.transmissionPaymentGjuels),
+        'Transmission Payment',
       ),
-      makeInspection(
+      inspection.makeInspection(
+        toComparableNumber(onChainState.config.billing.observationPaymentGjuels),
+        toComparableNumber(input.billing.observationPaymentGjuels),
+        'Observation Payment',
+      ),
+      inspection.makeInspection(
         toComparablePubKey(onChainState.config.requesterAccessController),
         toComparablePubKey(input.requesterAccessController),
         'Requester access controller',
       ),
-      makeInspection(
+      inspection.makeInspection(
         toComparablePubKey(onChainState.config.billingAccessController),
         toComparablePubKey(input.billingAccessController),
-        'Requester access controller',
+        'Billing access controller',
       ),
-      makeInspection(
+      inspection.makeInspection(
         onChainState.oracles.xs
           .slice(0, onChainState.oracles.len)
           .map(({ transmitter }) => toComparablePubKey(transmitter)),
@@ -141,42 +190,53 @@ export default class OCR2Inspect extends SolanaCommand {
         'Transmitters',
       ),
       // Offchain config inspection
-      makeInspection(onChainOCRConfig.s, input.offchainConfig.s, 'Offchain Config "s"'),
-      makeInspection(onChainOCRConfig.peerIds, input.offchainConfig.peerIds, 'Offchain Config "peerIds"'),
-      makeInspection(
+      inspection.makeInspection(onChainOCRConfig.s, input.offchainConfig.s, 'Offchain Config "s"'),
+      inspection.makeInspection(onChainOCRConfig.peerIds, input.offchainConfig.peerIds, 'Offchain Config "peerIds"'),
+      inspection.makeInspection(
         toComparableNumber(onChainOCRConfig.rMax),
         toComparableNumber(input.offchainConfig.rMax),
         'Offchain Config "rMax"',
       ),
       ...longNumberInspections,
-      makeInspection(
+      inspection.makeInspection(
         onChainOCRConfig.reportingPluginConfig.alphaReportInfinite,
         input.offchainConfig.reportingPluginConfig.alphaReportInfinite,
         'Offchain Config "reportingPluginConfig.alphaReportInfinite"',
       ),
-      makeInspection(
+      inspection.makeInspection(
         onChainOCRConfig.reportingPluginConfig.alphaAcceptInfinite,
         input.offchainConfig.reportingPluginConfig.alphaAcceptInfinite,
         'Offchain Config "reportingPluginConfig.alphaAcceptInfinite"',
       ),
-      makeInspection(
-        toComparableLongNumber(onChainOCRConfig.reportingPluginConfig.alphaReportPpb),
+      inspection.makeInspection(
+        wrappedComparableLongNumber(onChainOCRConfig.reportingPluginConfig.alphaReportPpb),
         toComparableNumber(input.offchainConfig.reportingPluginConfig.alphaReportPpb),
         `Offchain Config "reportingPluginConfig.alphaReportPpb"`,
       ),
-      makeInspection(
-        toComparableLongNumber(onChainOCRConfig.reportingPluginConfig.alphaAcceptPpb),
+      inspection.makeInspection(
+        wrappedComparableLongNumber(onChainOCRConfig.reportingPluginConfig.alphaAcceptPpb),
         toComparableNumber(input.offchainConfig.reportingPluginConfig.alphaAcceptPpb),
         `Offchain Config "reportingPluginConfig.alphaAcceptPpb"`,
       ),
-      makeInspection(
-        toComparableLongNumber(onChainOCRConfig.reportingPluginConfig.deltaCNanoseconds),
+      inspection.makeInspection(
+        wrappedComparableLongNumber(onChainOCRConfig.reportingPluginConfig.deltaCNanoseconds),
         toComparableNumber(input.offchainConfig.reportingPluginConfig.deltaCNanoseconds),
         `Offchain Config "reportingPluginConfig.deltaCNanoseconds"`,
       ),
     ]
 
-    const isSuccessfulInspection = inspect(inspections)
+    // Fetching tranmissions involves a tx. Give the option to the user to choose whether to fetch it or not.
+    // Deactivated until we find a more efficient way to fetch this info
+    // const withTransmissionsInfo = !!this.flags.withTransmissions
+    // if (withTransmissionsInfo) {
+    //   prompt('Fetching transmissions information involves sending a transaction. Continue?')
+    //   const trasmissions = new PublicKey(onChainState.transmissions)
+    //   const accountInfo = await this.getTranmissionsStateAccount(trasmissions)
+    //   const tranmissionsInspections = await this.makeFeedInspections(accountInfo, input)
+    //   inspections.push(...tranmissionsInspections)
+    // }
+
+    const isSuccessfulInspection = inspection.inspect(inspections)
 
     return {
       responses: [

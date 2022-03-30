@@ -13,7 +13,7 @@
     "!dist/**/*.test.js"
   ],
   "scripts": {
-    "gauntlet": "ts-node ./src/index.ts",
+    "gauntlet": "ts-node ./src/cli.ts",
     "lint": "tsc",
     "test": "SKIP_PROMPTS=true jest --runInBand",
     "test:coverage": "yarn test --collectCoverage",
@@ -21,15 +21,15 @@
     "lint:format": "yarn prettier --check ./src",
     "format": "yarn prettier --write ./src",
     "clean": "rm -rf ./dist/ ./bin/",
-    "build": "yarn clean && tsc",
+    "build": "yarn clean && tsc -b",
     "bundle": "yarn build && pkg ."
   },
   "dependencies": {
-    "@chainlink/gauntlet-core": "0.0.6",
+    "@chainlink/gauntlet-core": "0.1.2",
     "@chainlink/gauntlet-solana": "*",
     "@ethersproject/keccak256": "^5.5.0",
     "@solana/spl-token": "^0.1.8",
-    "@solana/web3.js": "^1.30.2",
+    "@solana/web3.js": "^1.31.0",
     "protobufjs": "^6.11.2"
   }
 }

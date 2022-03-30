@@ -12,7 +12,7 @@ import (
 
 // WithdrawFunds is the `withdrawFunds` instruction.
 type WithdrawFunds struct {
-	Amount *uint64
+	AmountGjuels *uint64
 
 	// [0] = [WRITE] state
 	//
@@ -38,9 +38,9 @@ func NewWithdrawFundsInstructionBuilder() *WithdrawFunds {
 	return nd
 }
 
-// SetAmount sets the "amount" parameter.
-func (inst *WithdrawFunds) SetAmount(amount uint64) *WithdrawFunds {
-	inst.Amount = &amount
+// SetAmountGjuels sets the "amountGjuels" parameter.
+func (inst *WithdrawFunds) SetAmountGjuels(amountGjuels uint64) *WithdrawFunds {
+	inst.AmountGjuels = &amountGjuels
 	return inst
 }
 
@@ -141,8 +141,8 @@ func (inst WithdrawFunds) ValidateAndBuild() (*Instruction, error) {
 func (inst *WithdrawFunds) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.Amount == nil {
-			return errors.New("Amount parameter is not set")
+		if inst.AmountGjuels == nil {
+			return errors.New("AmountGjuels parameter is not set")
 		}
 	}
 
@@ -183,7 +183,7 @@ func (inst *WithdrawFunds) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("Amount", *inst.Amount))
+						paramsBranch.Child(ag_format.Param("AmountGjuels", *inst.AmountGjuels))
 					})
 
 					// Accounts of the instruction:
@@ -201,16 +201,16 @@ func (inst *WithdrawFunds) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj WithdrawFunds) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Amount` param:
-	err = encoder.Encode(obj.Amount)
+	// Serialize `AmountGjuels` param:
+	err = encoder.Encode(obj.AmountGjuels)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 func (obj *WithdrawFunds) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Amount`:
-	err = decoder.Decode(&obj.Amount)
+	// Deserialize `AmountGjuels`:
+	err = decoder.Decode(&obj.AmountGjuels)
 	if err != nil {
 		return err
 	}
@@ -220,7 +220,7 @@ func (obj *WithdrawFunds) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err 
 // NewWithdrawFundsInstruction declares a new WithdrawFunds instruction with the provided parameters and accounts.
 func NewWithdrawFundsInstruction(
 	// Parameters:
-	amount uint64,
+	amountGjuels uint64,
 	// Accounts:
 	state ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
@@ -230,7 +230,7 @@ func NewWithdrawFundsInstruction(
 	recipient ag_solanago.PublicKey,
 	tokenProgram ag_solanago.PublicKey) *WithdrawFunds {
 	return NewWithdrawFundsInstructionBuilder().
-		SetAmount(amount).
+		SetAmountGjuels(amountGjuels).
 		SetStateAccount(state).
 		SetAuthorityAccount(authority).
 		SetAccessControllerAccount(accessController).

@@ -1,8 +1,11 @@
 import { Middleware, Next } from '@chainlink/gauntlet-core'
-import { assertions } from '@chainlink/gauntlet-core/dist/utils'
-import { Provider, Wallet } from '@project-serum/anchor'
+import { boolean } from '@chainlink/gauntlet-core/dist/lib/args'
+import { assertions, logger } from '@chainlink/gauntlet-core/dist/utils'
+import { Provider } from '@project-serum/anchor'
 import { Connection, Keypair } from '@solana/web3.js'
+import { DEFAULT_DERIVATION_PATH } from '../lib/constants'
 import SolanaCommand from './internal/solana'
+import { LedgerWallet, LocalWallet } from './wallet'
 
 const isValidURL = (url: string) => {
   var pattern = new RegExp('^(https?)://')
@@ -19,11 +22,21 @@ export const withProvider: Middleware = (c: SolanaCommand, next: Next) => {
   return next()
 }
 
-export const withWallet: Middleware = (c: SolanaCommand, next: Next) => {
+export const withWallet: Middleware = async (c: SolanaCommand, next: Next) => {
+  if (c.flags.withLedger || boolean(process.env.WITH_LEDGER)) {
+    logger.info('Loading Ledger wallet')
+    const path = c.flags.ledgerPath || DEFAULT_DERIVATION_PATH
+    c.wallet = await LedgerWallet.create(path)
+    console.info(`Operator address is ${c.wallet.publicKey}`)
+    return next()
+  }
+
+  logger.info('Loading Local wallet')
   const rawPK = process.env.PRIVATE_KEY
   assertions.assert(!!rawPK, `Missing PRIVATE_KEY, please add one`)
 
-  c.wallet = new Wallet(Keypair.fromSecretKey(Uint8Array.from(JSON.parse(rawPK))))
+  const keypair = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(rawPK)))
+  c.wallet = await LocalWallet.create(keypair)
   console.info(`Operator address is ${c.wallet.publicKey}`)
   return next()
 }

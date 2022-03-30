@@ -12,17 +12,14 @@ import (
 
 // Initialize is the `initialize` instruction.
 type Initialize struct {
-	Nonce       *uint8
-	MinAnswer   *ag_binary.Int128
-	MaxAnswer   *ag_binary.Int128
-	Decimals    *uint8
-	Description *string
+	MinAnswer *ag_binary.Int128
+	MaxAnswer *ag_binary.Int128
 
 	// [0] = [WRITE] state
 	//
-	// [1] = [WRITE] transmissions
+	// [1] = [] feed
 	//
-	// [2] = [] payer
+	// [2] = [WRITE, SIGNER] payer
 	//
 	// [3] = [SIGNER] owner
 	//
@@ -54,12 +51,6 @@ func NewInitializeInstructionBuilder() *Initialize {
 	return nd
 }
 
-// SetNonce sets the "nonce" parameter.
-func (inst *Initialize) SetNonce(nonce uint8) *Initialize {
-	inst.Nonce = &nonce
-	return inst
-}
-
 // SetMinAnswer sets the "minAnswer" parameter.
 func (inst *Initialize) SetMinAnswer(minAnswer ag_binary.Int128) *Initialize {
 	inst.MinAnswer = &minAnswer
@@ -69,18 +60,6 @@ func (inst *Initialize) SetMinAnswer(minAnswer ag_binary.Int128) *Initialize {
 // SetMaxAnswer sets the "maxAnswer" parameter.
 func (inst *Initialize) SetMaxAnswer(maxAnswer ag_binary.Int128) *Initialize {
 	inst.MaxAnswer = &maxAnswer
-	return inst
-}
-
-// SetDecimals sets the "decimals" parameter.
-func (inst *Initialize) SetDecimals(decimals uint8) *Initialize {
-	inst.Decimals = &decimals
-	return inst
-}
-
-// SetDescription sets the "description" parameter.
-func (inst *Initialize) SetDescription(description string) *Initialize {
-	inst.Description = &description
 	return inst
 }
 
@@ -95,20 +74,20 @@ func (inst *Initialize) GetStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
-// SetTransmissionsAccount sets the "transmissions" account.
-func (inst *Initialize) SetTransmissionsAccount(transmissions ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(transmissions).WRITE()
+// SetFeedAccount sets the "feed" account.
+func (inst *Initialize) SetFeedAccount(feed ag_solanago.PublicKey) *Initialize {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(feed)
 	return inst
 }
 
-// GetTransmissionsAccount gets the "transmissions" account.
-func (inst *Initialize) GetTransmissionsAccount() *ag_solanago.AccountMeta {
+// GetFeedAccount gets the "feed" account.
+func (inst *Initialize) GetFeedAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
 // SetPayerAccount sets the "payer" account.
 func (inst *Initialize) SetPayerAccount(payer ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(payer)
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(payer).WRITE().SIGNER()
 	return inst
 }
 
@@ -247,20 +226,11 @@ func (inst Initialize) ValidateAndBuild() (*Instruction, error) {
 func (inst *Initialize) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.Nonce == nil {
-			return errors.New("Nonce parameter is not set")
-		}
 		if inst.MinAnswer == nil {
 			return errors.New("MinAnswer parameter is not set")
 		}
 		if inst.MaxAnswer == nil {
 			return errors.New("MaxAnswer parameter is not set")
-		}
-		if inst.Decimals == nil {
-			return errors.New("Decimals parameter is not set")
-		}
-		if inst.Description == nil {
-			return errors.New("Description parameter is not set")
 		}
 	}
 
@@ -270,7 +240,7 @@ func (inst *Initialize) Validate() error {
 			return errors.New("accounts.State is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Transmissions is not set")
+			return errors.New("accounts.Feed is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Payer is not set")
@@ -318,18 +288,15 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("      Nonce", *inst.Nonce))
-						paramsBranch.Child(ag_format.Param("  MinAnswer", *inst.MinAnswer))
-						paramsBranch.Child(ag_format.Param("  MaxAnswer", *inst.MaxAnswer))
-						paramsBranch.Child(ag_format.Param("   Decimals", *inst.Decimals))
-						paramsBranch.Child(ag_format.Param("Description", *inst.Description))
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("MinAnswer", *inst.MinAnswer))
+						paramsBranch.Child(ag_format.Param("MaxAnswer", *inst.MaxAnswer))
 					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=13]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("                    state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("            transmissions", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("                     feed", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("                    payer", inst.AccountMetaSlice[2]))
 						accountsBranch.Child(ag_format.Meta("                    owner", inst.AccountMetaSlice[3]))
 						accountsBranch.Child(ag_format.Meta("                tokenMint", inst.AccountMetaSlice[4]))
@@ -347,11 +314,6 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Nonce` param:
-	err = encoder.Encode(obj.Nonce)
-	if err != nil {
-		return err
-	}
 	// Serialize `MinAnswer` param:
 	err = encoder.Encode(obj.MinAnswer)
 	if err != nil {
@@ -362,24 +324,9 @@ func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	if err != nil {
 		return err
 	}
-	// Serialize `Decimals` param:
-	err = encoder.Encode(obj.Decimals)
-	if err != nil {
-		return err
-	}
-	// Serialize `Description` param:
-	err = encoder.Encode(obj.Description)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Nonce`:
-	err = decoder.Decode(&obj.Nonce)
-	if err != nil {
-		return err
-	}
 	// Deserialize `MinAnswer`:
 	err = decoder.Decode(&obj.MinAnswer)
 	if err != nil {
@@ -390,30 +337,17 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	if err != nil {
 		return err
 	}
-	// Deserialize `Decimals`:
-	err = decoder.Decode(&obj.Decimals)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Description`:
-	err = decoder.Decode(&obj.Description)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
 // NewInitializeInstruction declares a new Initialize instruction with the provided parameters and accounts.
 func NewInitializeInstruction(
 	// Parameters:
-	nonce uint8,
 	minAnswer ag_binary.Int128,
 	maxAnswer ag_binary.Int128,
-	decimals uint8,
-	description string,
 	// Accounts:
 	state ag_solanago.PublicKey,
-	transmissions ag_solanago.PublicKey,
+	feed ag_solanago.PublicKey,
 	payer ag_solanago.PublicKey,
 	owner ag_solanago.PublicKey,
 	tokenMint ag_solanago.PublicKey,
@@ -426,13 +360,10 @@ func NewInitializeInstruction(
 	tokenProgram ag_solanago.PublicKey,
 	associatedTokenProgram ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
-		SetNonce(nonce).
 		SetMinAnswer(minAnswer).
 		SetMaxAnswer(maxAnswer).
-		SetDecimals(decimals).
-		SetDescription(description).
 		SetStateAccount(state).
-		SetTransmissionsAccount(transmissions).
+		SetFeedAccount(feed).
 		SetPayerAccount(payer).
 		SetOwnerAccount(owner).
 		SetTokenMintAccount(tokenMint).

@@ -7,7 +7,7 @@
       "type": {
         "defined": "usize"
       },
-      "value": "32"
+      "value": "64"
     }
   ],
   "instructions": [
@@ -20,24 +20,46 @@
           "isSigner": false
         },
         {
-          "name": "payer",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "owner",
           "isMut": false,
           "isSigner": true
-        },
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "transferOwnership",
+      "accounts": [
         {
-          "name": "rent",
-          "isMut": false,
+          "name": "state",
+          "isMut": true,
           "isSigner": false
         },
         {
-          "name": "systemProgram",
+          "name": "authority",
           "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "proposedOwner",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "acceptOwnership",
+      "accounts": [
+        {
+          "name": "state",
+          "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
         }
       ],
       "args": []
@@ -96,6 +118,10 @@
             "type": "publicKey"
           },
           {
+            "name": "proposedOwner",
+            "type": "publicKey"
+          },
+          {
             "name": "accessList",
             "type": {
               "defined": "AccessList"
@@ -116,7 +142,7 @@
             "type": {
               "array": [
                 "publicKey",
-                32
+                64
               ]
             }
           },
@@ -136,6 +162,11 @@
     },
     {
       "code": 6001,
+      "name": "InvalidInput",
+      "msg": "Invalid input"
+    },
+    {
+      "code": 6002,
       "name": "Full",
       "msg": "Access list is full"
     }

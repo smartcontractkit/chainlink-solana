@@ -5,12 +5,21 @@ import (
 )
 
 // NewChainlinkSolOCRv2 returns a cluster config with Solana test validator
-func NewChainlinkSolOCRv2() *environment.Config {
-	return &environment.Config{
+func NewChainlinkSolOCRv2(nodes int, stateful bool) *environment.Config {
+	env := &environment.Config{
 		NamespacePrefix: "chainlink-sol",
 		Charts: environment.Charts{
 			"solana-validator": {
 				Index: 1,
+				// TODO: remove these values when helm-env is properly setup with new version and the image is in chainlink ecr
+				Values: map[string]interface{}{
+					"sol": map[string]interface{}{
+						"image": map[string]interface{}{
+							"image":   "tateexon/solana-validator",
+							"version": "1.9.14",
+						},
+					},
+				},
 			},
 			"mockserver-config": {
 				Index: 2,
@@ -21,16 +30,20 @@ func NewChainlinkSolOCRv2() *environment.Config {
 			"chainlink": {
 				Index: 4,
 				Values: map[string]interface{}{
-					"replicas": 5,
+					"replicas": nodes,
 					"chainlink": map[string]interface{}{
 						"image": map[string]interface{}{
-							"image":   "public.ecr.aws/chainlink/chainlink",
-							"version": "develop.9b77145f0c57da7ecc8c54f6a2d9218dd1721fd5",
+							"image":   "public.ecr.aws/z0b1w9r9/chainlink",
+							"version": "develop",
 						},
 					},
 					"env": map[string]interface{}{
+						"EVM_ENABLED":                 "false",
+						"EVM_RPC_ENABLED":             "false",
+						"SOLANA_ENABLED":              "true",
 						"eth_url":                     "ws://sol:8900",
 						"eth_disabled":                "true",
+						"CHAINLINK_DEV":               "false",
 						"USE_LEGACY_ETH_ENV_VARS":     "false",
 						"FEATURE_OFFCHAIN_REPORTING2": "true",
 						"feature_external_initiators": "true",
@@ -44,4 +57,11 @@ func NewChainlinkSolOCRv2() *environment.Config {
 			},
 		},
 	}
+	if stateful {
+		env.Charts["chainlink"].Values["db"] = map[string]interface{}{
+			"stateful": true,
+			"capacity": "2Gi",
+		}
+	}
+	return env
 }

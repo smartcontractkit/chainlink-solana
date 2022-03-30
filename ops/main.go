@@ -27,11 +27,13 @@ func main() {
 
 func RelayConfig(ctx *pulumi.Context, addresses map[int]string) (map[string]string, error) {
 	return map[string]string{
-		"nodeEndpointRPC":    config.Require(ctx, "CL-RELAY_HTTP"),
-		"nodeEndpointWS":     config.Require(ctx, "CL-RELAY_WS"),
-		"stateID":            addresses[solana.OCRFeed],
-		"transmissionsID":    addresses[solana.OCRTransmissions],
-		"validatorProgramID": addresses[solana.Validator],
+		"chainID":         "localnet",
+		"ocr2ProgramID":   addresses[solana.OCR2],
+		"transmissionsID": addresses[solana.OCRTransmissions],
+		"storeProgramID":  addresses[solana.Store],
+
+		// not used in spec, used in chains/nodes config
+		"solanaURL": config.Require(ctx, "CL-RELAY_HTTP"),
 	}, nil
 }
 
@@ -55,7 +57,10 @@ func JuelsSource(priceAdapter string) string {
 	 sol2usd [type=bridge name=%s requestData=<{"data":{"from":"SOL", "to":"USD"}}>]
 	 parseT [type="jsonparse" path="result"]
 
-	 divide [type="divide" input="$(parseL)" divisor="$(parseT)" precision="9"]
+	 // parseL (dollars/LINK)
+	 // parseT (dollars/SOL)
+	 // parseT / parseL = LINK/SOL
+	 divide [type="divide" input="$(parseT)" divisor="$(parseL)" precision="9"]
    scale [type="multiply" times=1000000000]
 
 	 link2usd -> parseL -> divide

@@ -13,8 +13,6 @@ var (
 	ContractsDir = filepath.Join(ProjectRoot, "contracts", "target", "deploy")
 	// TestsDir path to e2e tests dir
 	TestsDir = filepath.Join(ProjectRoot, "tests", "e2e")
-	// KeysDir keys dir
-	KeysDir = filepath.Join(TestsDir, "keys")
 	// ChartsRoot helm charts root
 	ChartsRoot = filepath.Join(ProjectRoot, "ops", "k8s", "charts")
 )

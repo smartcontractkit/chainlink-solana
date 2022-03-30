@@ -3,7 +3,15 @@ package solclient
 import (
 	"context"
 	"fmt"
+	"io/fs"
+	"math/big"
+	"net/url"
+	"os"
+	"path/filepath"
+	"time"
+
 	"github.com/gagliardetto/solana-go"
+	associatedtokenaccount "github.com/gagliardetto/solana-go/programs/associated-token-account"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -14,40 +22,40 @@ import (
 	"github.com/smartcontractkit/integrations-framework/client"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
-	"io/fs"
-	"math/big"
-	"net/url"
-	"os"
-	"path/filepath"
-	"time"
 )
 
 type NetworkConfig struct {
-	External    bool          `mapstructure:"external" yaml:"external"`
-	Name        string        `mapstructure:"name" yaml:"name"`
-	ID          string        `mapstructure:"id" yaml:"id"`
-	ChainID     int64         `mapstructure:"chain_id" yaml:"chain_id"`
-	URL         string        `mapstructure:"url" yaml:"url"`
-	URLs        []string      `mapstructure:"urls" yaml:"urls"`
-	Type        string        `mapstructure:"type" yaml:"type"`
-	PrivateKeys []string      `mapstructure:"private_keys" yaml:"private_keys"`
-	Timeout     time.Duration `mapstructure:"transaction_timeout" yaml:"transaction_timeout"`
+	External          bool          `mapstructure:"external" yaml:"external"`
+	ContractsDeployed bool          `mapstructure:"contracts_deployed" yaml:"contracts_deployed"`
+	Name              string        `mapstructure:"name" yaml:"name"`
+	ID                string        `mapstructure:"id" yaml:"id"`
+	ChainID           int64         `mapstructure:"chain_id" yaml:"chain_id"`
+	URL               string        `mapstructure:"url" yaml:"url"`
+	URLs              []string      `mapstructure:"urls" yaml:"urls"`
+	Type              string        `mapstructure:"type" yaml:"type"`
+	PrivateKeys       []string      `mapstructure:"private_keys" yaml:"private_keys"`
+	Timeout           time.Duration `mapstructure:"transaction_timeout" yaml:"transaction_timeout"`
 }
 
 // Accounts is a shared state between contracts in which data is stored in Solana
 type Accounts struct {
 	// OCR OCR program state account
 	OCR *solana.Wallet
+	// Store store program state account
+	Store *solana.Wallet
 	// OCRVault OCR program account to hold LINK
-	OCRVault *solana.Wallet
+	OCRVault                 *solana.Wallet
+	OCRVaultAssociatedPubKey solana.PublicKey
 	// Transmissions OCR transmissions state account
-	Transmissions *solana.Wallet
+	Feed *solana.Wallet
 	// Authorities authorities used to sign on-chain, used by programs
 	Authorities map[string]*Authority
 	// Owner is the owner of all programs
 	Owner *solana.Wallet
 	// Mint LINK mint state account
 	Mint *solana.Wallet
+	// OCR2 Proposal account
+	Proposal *solana.Wallet
 	// MintAuthority LINK mint authority
 	MintAuthority *solana.Wallet
 }
@@ -69,7 +77,15 @@ type Client struct {
 	WS *ws.Client
 }
 
+func (c *Client) GetNetworkType() string {
+	return c.Config.Type
+}
+
 var _ client.BlockchainClient = (*Client)(nil)
+
+func (c *Client) ContractsDeployed() bool {
+	return c.Config.ContractsDeployed
+}
 
 func (c *Client) GetChainID() int64 {
 	panic("implement me")
@@ -104,7 +120,7 @@ func ClientInitFunc() func(networkName string, networkConfig map[string]interfac
 			return nil, err
 		}
 		var cfg *NetworkConfig
-		if err := yaml.Unmarshal(d, &cfg); err != nil {
+		if err = yaml.Unmarshal(d, &cfg); err != nil {
 			return nil, err
 		}
 		cfg.ID = networkName
@@ -144,7 +160,9 @@ func NewClient(cfg *NetworkConfig) (*Client, error) {
 func (c *Client) initSharedState() {
 	c.Accounts = &Accounts{
 		OCR:           solana.NewWallet(),
-		Transmissions: solana.NewWallet(),
+		Store:         solana.NewWallet(),
+		Feed:          solana.NewWallet(),
+		Proposal:      solana.NewWallet(),
 		Owner:         solana.NewWallet(),
 		Mint:          solana.NewWallet(),
 		MintAuthority: solana.NewWallet(),
@@ -198,12 +216,20 @@ func (c *Client) addNewAssociatedAccInstr(acc *solana.Wallet, ownerPubKey solana
 	if err != nil {
 		return err
 	}
-	*instr = append(*instr, accInstr, token.NewInitializeAccountInstruction(
-		acc.PublicKey(),
-		c.Accounts.Mint.PublicKey(),
-		ownerPubKey,
-		solana.SysVarRentPubkey,
-	).Build())
+	*instr = append(*instr,
+		accInstr,
+		token.NewInitializeAccountInstruction(
+			acc.PublicKey(),
+			c.Accounts.Mint.PublicKey(),
+			ownerPubKey,
+			solana.SysVarRentPubkey,
+		).Build(),
+		associatedtokenaccount.NewCreateInstruction(
+			c.DefaultWallet.PublicKey(),
+			acc.PublicKey(),
+			c.Accounts.Mint.PublicKey(),
+		).Build(),
+	)
 	return nil
 }
 
@@ -221,7 +247,7 @@ func (c *Client) TXSync(name string, commitment rpc.CommitmentType, instr []sola
 	if err != nil {
 		return err
 	}
-	if _, err := tx.EncodeTree(text.NewTreeEncoder(os.Stdout, name)); err != nil {
+	if _, err = tx.EncodeTree(text.NewTreeEncoder(os.Stdout, name)); err != nil {
 		return err
 	}
 	if _, err = tx.Sign(signerFunc); err != nil {
@@ -263,17 +289,14 @@ func (c *Client) queueTX(sig solana.Signature, commitment rpc.CommitmentType) {
 			return err
 		}
 		defer sub.Unsubscribe()
-		for {
-			res, err := sub.Recv()
-			if err != nil {
-				return err
-			}
-			if res.Value.Err != nil {
-				return fmt.Errorf("transaction confirmation failed: %v", res.Value.Err)
-			} else {
-				return nil
-			}
+		res, err := sub.Recv()
+		if err != nil {
+			return err
 		}
+		if res.Value.Err != nil {
+			return fmt.Errorf("transaction confirmation failed: %v", res.Value.Err)
+		}
+		return nil
 	})
 }
 
@@ -291,7 +314,7 @@ func (c *Client) TXAsync(name string, instr []solana.Instruction, signerFunc fun
 	if err != nil {
 		return err
 	}
-	if _, err := tx.EncodeTree(text.NewTreeEncoder(os.Stdout, name)); err != nil {
+	if _, err = tx.EncodeTree(text.NewTreeEncoder(os.Stdout, name)); err != nil {
 		return err
 	}
 	if _, err = tx.Sign(signerFunc); err != nil {
@@ -348,10 +371,7 @@ func (c *Client) AirdropAddresses(addr []string, solAmount uint64) error {
 			return err
 		}
 	}
-	if err := c.WaitForEvents(); err != nil {
-		return err
-	}
-	return nil
+	return c.WaitForEvents()
 }
 
 // ListDirFilenamesByExt returns all the filenames inside a dir for file with particular extension, for ex. ".json"
@@ -407,6 +427,11 @@ func (c *Client) CalculateTXSCost(txs int64) (*big.Float, error) {
 }
 
 func (c *Client) CalculateTxGas(gasUsedValue *big.Int) (*big.Float, error) {
+	panic("implement me")
+}
+
+// GetDefaultWallet gets the default wallet
+func (c *Client) GetDefaultWallet() *client.EthereumWallet {
 	panic("implement me")
 }
 

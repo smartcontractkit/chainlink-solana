@@ -4,16 +4,17 @@
   "version": "0.0.1",
   "description": "Gauntlet Solana",
   "workspaces": [
-    "packages/**"
+    "packages/*"
   ],
   "keywords": [
     "typescript",
     "cli"
   ],
   "main": "packages/gauntlet-solana-contracts/dist/index.js",
-  "bin": "packages/gauntlet-solana-contracts/dist/index.js",
+  "bin": "packages/gauntlet-solana-contracts/dist/cli.js",
   "scripts": {
-    "gauntlet": "yarn build && node ./packages/gauntlet-solana-contracts/dist/index.js",
+    "gauntlet": "yarn build && node ./packages/gauntlet-solana-contracts/dist/cli.js",
+    "gauntlet-serum-multisig": "yarn build && node ./packages/gauntlet-serum-multisig/dist/index.js",
     "lint": "tsc -b ./tsconfig.json",
     "test": "yarn build && SKIP_PROMPTS=true jest --runInBand ./packages",
     "test:coverage": "yarn test --collectCoverage",

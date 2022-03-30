@@ -2,32 +2,24 @@ package solana
 
 import (
 	"context"
-	"errors"
-	"time"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
-	"gopkg.in/guregu/null.v4"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 	relaytypes "github.com/smartcontractkit/chainlink/core/services/relay/types"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
-type Logger interface {
-	Tracef(format string, values ...interface{})
-	Debugf(format string, values ...interface{})
-	Infof(format string, values ...interface{})
-	Warnf(format string, values ...interface{})
-	Errorf(format string, values ...interface{})
-	Criticalf(format string, values ...interface{})
-	Panicf(format string, values ...interface{})
-	Fatalf(format string, values ...interface{})
-}
-
 type TransmissionSigner interface {
 	Sign(msg []byte) ([]byte, error)
 	PublicKey() solana.PublicKey
+}
+
+type TxManager interface {
+	Enqueue(accountID string, msg *solana.Transaction) error
 }
 
 type OCR2Spec struct {
@@ -35,81 +27,89 @@ type OCR2Spec struct {
 	IsBootstrap bool
 
 	// network data
-	NodeEndpointRPC string
-	NodeEndpointWS  string
+	ChainID string
 
-	// on-chain program + 2x state accounts (state + transmissions) + validator program
-	ProgramID          solana.PublicKey
-	StateID            solana.PublicKey
-	ValidatorProgramID solana.PublicKey
-	TransmissionsID    solana.PublicKey
+	// on-chain program + 2x state accounts (state + transmissions) + store program
+	ProgramID       solana.PublicKey
+	StateID         solana.PublicKey
+	StoreProgramID  solana.PublicKey
+	TransmissionsID solana.PublicKey
 
 	TransmissionSigner TransmissionSigner
-
-	// OCR key bundle (off/on-chain keys) id
-	KeyBundleID null.String
 }
 
 type Relayer struct {
-	lggr        Logger
-	connections Connections
+	lggr     logger.Logger
+	chainSet ChainSet
+	ctx      context.Context
+	cancel   func()
 }
 
 // Note: constructed in core
-func NewRelayer(lggr Logger) *Relayer {
+func NewRelayer(lggr logger.Logger, chainSet ChainSet) *Relayer {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Relayer{
-		lggr:        lggr,
-		connections: Connections{},
+		lggr:     lggr,
+		chainSet: chainSet,
+		ctx:      ctx,
+		cancel:   cancel,
 	}
 }
 
-func (r *Relayer) Start() error {
+// Start starts the relayer respecting the given context.
+func (r *Relayer) Start(context.Context) error {
 	// No subservices started on relay start, but when the first job is started
+	if r.chainSet == nil {
+		return errors.New("Solana unavailable")
+	}
 	return nil
 }
 
 // Close will close all open subservices
 func (r *Relayer) Close() error {
-	// close all open network client connections
-	return r.connections.Close()
+	r.cancel()
+	return nil
 }
 
 func (r *Relayer) Ready() error {
-	// always ready
-	return nil
+	return r.chainSet.Ready()
 }
 
 // Healthy only if all subservices are healthy
 func (r *Relayer) Healthy() error {
-	// TODO: are all open WS connections healthy?
-	return nil
+	return r.chainSet.Healthy()
 }
 
-// TODO [relay]: import from smartcontractkit/solana-integration impl
-func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relaytypes.OCR2Provider, error) {
+// NewOCR2Provider creates a new OCR2ProviderCtx instance.
+func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relaytypes.OCR2ProviderCtx, error) {
 	var provider ocr2Provider
 	spec, ok := s.(OCR2Spec)
 	if !ok {
-		return provider, errors.New("unsuccessful cast to 'solana.OCR2Spec'")
+		return &provider, errors.New("unsuccessful cast to 'solana.OCR2Spec'")
 	}
 
 	offchainConfigDigester := OffchainConfigDigester{
 		ProgramID: spec.ProgramID,
+		StateID:   spec.StateID,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-	// establish network connection RPC + WS (reuses existing WS client if available)
-	client, err := r.connections.NewConnectedClient(ctx, spec.NodeEndpointRPC, spec.NodeEndpointWS)
+	chain, err := r.chainSet.Chain(r.ctx, spec.ChainID)
 	if err != nil {
-		return provider, err
+		return nil, errors.Wrap(err, "error in NewOCR2Provider.chainSet.Chain")
 	}
+	chainReader, err := chain.Reader()
+	if err != nil {
+		return nil, errors.Wrap(err, "error in NewOCR2Provider.chain.Reader")
+	}
+	msgEnqueuer := chain.TxManager()
+	cfg := chain.Config()
 
-	contractTracker := NewTracker(spec, client, spec.TransmissionSigner, r.lggr)
+	// provide contract config + tracker reader + tx manager + signer + logger
+	contractTracker := NewTracker(spec, cfg, chainReader, msgEnqueuer, spec.TransmissionSigner, r.lggr)
 
 	if spec.IsBootstrap {
 		// Return early if bootstrap node (doesn't require the full OCR2 provider)
-		return ocr2Provider{
+		return &ocr2Provider{
 			offchainConfigDigester: offchainConfigDigester,
 			tracker:                &contractTracker,
 		}, nil
@@ -117,7 +117,7 @@ func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay
 
 	reportCodec := ReportCodec{}
 
-	return ocr2Provider{
+	return &ocr2Provider{
 		offchainConfigDigester: offchainConfigDigester,
 		reportCodec:            reportCodec,
 		tracker:                &contractTracker,
@@ -130,25 +130,25 @@ type ocr2Provider struct {
 	tracker                *ContractTracker
 }
 
-func (p ocr2Provider) Start() error {
+// Start starts OCR2Provider respecting the given context.
+func (p *ocr2Provider) Start(context.Context) error {
 	// TODO: start all needed subservices
-	return nil
+	return p.tracker.Start()
 }
 
-func (p ocr2Provider) Close() error {
+func (p *ocr2Provider) Close() error {
 	// TODO: close all subservices
-	// TODO: close client WS connection if not used/shared anymore
-	return nil
+	return p.tracker.Close()
 }
 
 func (p ocr2Provider) Ready() error {
 	// always ready
-	return nil
+	return p.tracker.Ready()
 }
 
 func (p ocr2Provider) Healthy() error {
 	// TODO: only if all subservices are healthy
-	return nil
+	return p.tracker.Healthy()
 }
 
 func (p ocr2Provider) ContractTransmitter() types.ContractTransmitter {

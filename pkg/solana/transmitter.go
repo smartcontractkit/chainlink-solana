@@ -5,8 +5,6 @@ import (
 	"context"
 
 	"github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/rpc"
-	confirm "github.com/gagliardetto/solana-go/rpc/sendAndConfirmTransaction"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
@@ -20,44 +18,38 @@ func (c *ContractTracker) Transmit(
 	report types.Report,
 	sigs []types.AttributedOnchainSignature,
 ) error {
-	recent, err := c.client.rpc.GetRecentBlockhash(ctx, rpc.CommitmentFinalized)
+	blockhash, err := c.reader.LatestBlockhash()
 	if err != nil {
-		return errors.Wrap(err, "error on Transmit.GetRecentBlock")
+		return errors.Wrap(err, "error on Transmit.GetRecentBlockhash")
+	}
+	if blockhash == nil || blockhash.Value == nil {
+		return errors.New("nil pointer returned from Transmit.GetRecentBlockhash")
 	}
 
-	// Determine validator authority
-	seeds := [][]byte{[]byte("validator"), c.StateID.Bytes()}
-	validatorAuthority, validatorNonce, err := solana.FindProgramAddress(seeds, c.ProgramID)
+	// Determine store authority
+	seeds := [][]byte{[]byte("store"), c.StateID.Bytes()}
+	storeAuthority, storeNonce, err := solana.FindProgramAddress(seeds, c.ProgramID)
 	if err != nil {
 		return errors.Wrap(err, "error on Transmit.FindProgramAddress")
 	}
 
-	// Resolve validator's access controller
-	var validator Validator
-	// only fetch state if validator is set
-	// contract skips validator parts if none is set
-	if (c.state.Config.Validator != solana.PublicKey{}) {
-		if err := c.client.rpc.GetAccountDataInto(ctx, c.state.Config.Validator, &validator); err != nil {
-			return errors.Wrap(err, "error on Transmit.GetAccountDataInto.Validator")
-		}
+	if _, err = c.ReadState(); err != nil {
+		return errors.Wrap(err, "error on Transmit.ReadState")
 	}
-
 	accounts := []*solana.AccountMeta{
-		// state, transmitter, transmissions, validator_program, validator, validator_authority, validator_access_controller
+		// state, transmitter, transmissions, store_program, store, store_authority
 		{PublicKey: c.StateID, IsWritable: true, IsSigner: false},
 		{PublicKey: c.Transmitter.PublicKey(), IsWritable: false, IsSigner: true},
 		{PublicKey: c.TransmissionsID, IsWritable: true, IsSigner: false},
-		{PublicKey: c.ValidatorProgramID, IsWritable: false, IsSigner: false},
-		{PublicKey: c.state.Config.Validator, IsWritable: true, IsSigner: false},
-		{PublicKey: validatorAuthority, IsWritable: false, IsSigner: false},
-		{PublicKey: validator.RaisingAccessController, IsWritable: false, IsSigner: false},
+		{PublicKey: c.StoreProgramID, IsWritable: false, IsSigner: false},
+		{PublicKey: storeAuthority, IsWritable: false, IsSigner: false},
 	}
 
 	reportContext := RawReportContext(reportCtx)
 
 	// Construct the instruction payload
-	data := new(bytes.Buffer) // validator_nonce || report_context || raw_report || raw_signatures
-	data.WriteByte(validatorNonce)
+	data := new(bytes.Buffer) // store_nonce || report_context || raw_report || raw_signatures
+	data.WriteByte(storeNonce)
 	data.Write(reportContext[0][:])
 	data.Write(reportContext[1][:])
 	data.Write(reportContext[2][:])
@@ -71,7 +63,7 @@ func (c *ContractTracker) Transmit(
 		[]solana.Instruction{
 			solana.NewInstruction(c.ProgramID, accounts, data.Bytes()),
 		},
-		recent.Value.Blockhash,
+		blockhash.Value.Blockhash,
 		solana.TransactionPayer(c.Transmitter.PublicKey()),
 	)
 	if err != nil {
@@ -90,21 +82,10 @@ func (c *ContractTracker) Transmit(
 	copy(finalSig[:], finalSigBytes)
 	tx.Signatures = append(tx.Signatures, finalSig)
 
-	// Send transaction, and wait for confirmation:
-	go func() {
-		if _, err := confirm.SendAndConfirmTransactionWithOpts(
-			context.Background(), // does not use libocr transmit context
-			c.client.rpc,
-			c.client.ws,
-			tx,
-			true, // skip preflight
-			rpc.CommitmentConfirmed,
-		); err != nil {
-			c.lggr.Errorf("error on Transmit.SendAndConfirmTransaction: %s", err.Error())
-		}
-	}()
-
-	return nil
+	// pass transmit payload to tx manager queue
+	c.lggr.Debugf("Queuing transmit tx: state (%s) + transmissions (%s)", c.StateID.String(), c.TransmissionsID.String())
+	err = c.txManager.Enqueue(c.StateID.String(), tx)
+	return errors.Wrap(err, "error on Transmit.txManager.Enqueue")
 }
 
 func (c *ContractTracker) LatestConfigDigestAndEpoch(
@@ -114,10 +95,10 @@ func (c *ContractTracker) LatestConfigDigestAndEpoch(
 	epoch uint32,
 	err error,
 ) {
-	err = c.fetchState(ctx)
-	return c.state.Config.LatestConfigDigest, c.state.Config.Epoch, err
+	state, err := c.ReadState()
+	return state.Config.LatestConfigDigest, state.Config.Epoch, err
 }
 
-func (c ContractTracker) FromAccount() types.Account {
+func (c *ContractTracker) FromAccount() types.Account {
 	return types.Account(c.Transmitter.PublicKey().String())
 }

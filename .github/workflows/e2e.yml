@@ -1,40 +1,79 @@
-name: e2e_tests
-on: [push]
+name: e2e_smoke_tests
+on: 
+  workflow_call:
+    inputs:
+      repo_name:
+        required: true
+        default: ${{ github.repository }}
+        type: string
+      ref:
+        required: true
+        default: ${{ github.sha }}
+        type: string
+      cl_repo:
+        required: true
+        default: public.ecr.aws/z0b1w9r9/chainlink
+        type: string
+      cl_image:
+        required: true
+        default: develop
+        type: string
+    secrets:
+      QA_AWS_ACCESS_KEY_ID:
+        required: true
+      QA_AWS_SECRET_KEY:
+        required: true
+      QA_AWS_REGION:
+        required: true
+      QA_AWS_ROLE_TO_ASSUME:
+        required: true
+      QA_KUBECONFIG:
+        required: true
 
 jobs:
-  build:
+  e2e_build_contracts:
+    name: E2E Build Contracts
     runs-on: ubuntu-latest
     container:
-      image: projectserum/build:v0.18.0
+      image: projectserum/build:v0.22.1
       env:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1
-        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v2
+        with:
+          repository: ${{ inputs.repo_name }}
       - run: echo $HOME
       - run: echo $PATH
-      - run: |
-          npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
-          NPM_TOKEN=${NPM_TOKEN} yarn install --frozen-lockfile
+      - run: yarn install --frozen-lockfile
+      - name: Generate program_ids
+        run: ./scripts/programs-keys-gen.sh
       - run: anchor build
         working-directory: contracts
-      - uses: actions/upload-artifact@master
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@master
         with:
           name: target
           path: contracts/target/deploy
-  smoke:
+  e2e_run_smoke_tests:
+    name: E2E Run Smoke Tests
     runs-on: ubuntu-latest
-    needs: build
-    env:
-      CGO_ENABLED: 1
+    needs: e2e_build_contracts
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v2
-      - name: Setup go
-        uses: actions/setup-go@v1
         with:
-          go-version: 1.17
+          repository: ${{ inputs.repo_name }}
+          ref: ${{ inputs.ref }}
+      - name: .tool-versions to .env
+        run: ./scripts/tool-versions-to-env.sh
+      - name: dotenv
+        uses: falti/dotenv-action@v0.2.7
+        id: dotenv
+      - name: Setup go ${{ steps.dotenv.outputs.golang_version }}
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ steps.dotenv.outputs.golang_version }}
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -55,31 +94,38 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+            ~/go/bin
+          key: ${{ runner.os }}-go2-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-
+            ${{ runner.os }}-go2-
       - name: Download Go Vendor Packages
         if: steps.cache-packages.outputs.cache-hit != 'true'
-        run: go mod download
+        run: make download
       - name: Install Ginkgo CLI
+        if: steps.cache-packages.outputs.cache-hit != 'true'
         run: |
-          go get github.com/onsi/ginkgo/v2/ginkgo/generators@v2.0.0-rc2
-          go get github.com/onsi/ginkgo/v2/ginkgo/internal@v2.0.0-rc2
-          go get github.com/onsi/ginkgo/v2/ginkgo/labels@v2.0.0-rc2
-          go install github.com/onsi/ginkgo/v2/ginkgo
-      - uses: actions/download-artifact@master
+          make install
+      - name: Check for ginkgo ls
+        run: |
+          ls ~/go/bin/
+      - name: Download Artifacts
+        uses: actions/download-artifact@master
         with:
           name: target
           path: contracts/target/deploy
-      - name: cp static deploy keys
-        run: ./scripts/programs-keys-cp.sh
+      - name: Echo inputs
+        run: echo ${{ inputs.cl_repo }} ${{ inputs.cl_image }}
+      - name: Env vars
+        run: env
       - name: Run Tests
         env:
           SELECTED_NETWORKS: solana
-          NETWORK_SETTINGS: /home/runner/work/chainlink-solana/chainlink-solana/tests/e2e/networks.yaml
+          CHAINLINK_IMAGE: ${{ inputs.cl_repo }}
+          CHAINLINK_VERSION: ${{ inputs.cl_image }}
+          CGO_ENABLED: 1
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
-          ginkgo tests/e2e/smoke
+          make test_smoke
       - name: Publish Test Results
         uses: mikepenz/action-junit-report@v2
         if: always()
@@ -92,4 +138,4 @@ jobs:
         uses: actions/upload-artifact@v2.2.4
         with:
           name: test-logs
-          path: ./logs
+          path: ./tests/e2e/smoke/logs

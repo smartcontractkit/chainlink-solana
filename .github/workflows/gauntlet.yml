@@ -1,80 +1,64 @@
-name: Gauntlet
+name: gauntlet
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        platform: [ubuntu-latest]
-        node-version: [14.x]
-    env:
-      CI: true
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-    runs-on: ${{ matrix.platform }}
-
+  gauntlet_build:
+    name: Gauntlet Build
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
+      - name: .tool-versions to .env
+        run: ./scripts/tool-versions-to-env.sh
+      - name: dotenv
+        uses: falti/dotenv-action@v0.2.7
+        id: dotenv
+      - name: Setup Node ${{ steps.dotenv.outputs.nodejs_version }}
+        uses: actions/setup-node@v2
         with:
-          node-version: ${{ matrix.node-version }}
-      - run: |
-          npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
-          cd gauntlet
-          ${{ matrix.env }} yarn install
-      - run: |
-          cd gauntlet
-          ${{ matrix.env }} yarn build
+          node-version: ${{ steps.dotenv.outputs.nodejs_version }}
+      - name: Install
+        run: yarn --cwd ./gauntlet install --frozen-lockfile
+      - name: Build
+        run: yarn --cwd ./gauntlet build
+      - name: Run Gauntlet
+        run: yarn --cwd ./gauntlet gauntlet
 
-  format:
-    strategy:
-      matrix:
-        platform: [ubuntu-latest]
-        node-version: [14.x]
-    env:
-      CI: true
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-    runs-on: ${{ matrix.platform }}
-
+  gauntlet_format:
+    name: Gauntlet Format
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
+      - name: .tool-versions to .env
+        run: ./scripts/tool-versions-to-env.sh
+      - name: dotenv
+        uses: falti/dotenv-action@v0.2.7
+        id: dotenv
+      - name: Setup Node ${{ steps.dotenv.outputs.nodejs_version }}
+        uses: actions/setup-node@v2
         with:
-          node-version: ${{ matrix.node-version }}
-      - run: |
-          npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
-          cd gauntlet
-          ${{ matrix.env }} yarn install
-      - run: |
-          cd gauntlet
-          ${{ matrix.env }} yarn lint:format
+          node-version: ${{ steps.dotenv.outputs.nodejs_version }}
+      - name: Install
+        run: yarn --cwd ./gauntlet install --frozen-lockfile
+      - name: Lint
+        run: yarn --cwd ./gauntlet lint:format
 
-  test:
-    strategy:
-      matrix:
-        platform: [ubuntu-latest]
-        node-version: [14.x]
-    env:
-      CI: true
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-    runs-on: ${{ matrix.platform }}
-
+  gauntlet_run_tests:
+    name: Gauntlet Run Tests
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
+      - name: .tool-versions to .env
+        run: ./scripts/tool-versions-to-env.sh
+      - name: dotenv
+        uses: falti/dotenv-action@v0.2.7
+        id: dotenv
+      - name: Setup Node ${{ steps.dotenv.outputs.nodejs_version }}
+        uses: actions/setup-node@v2
         with:
-          node-version: ${{ matrix.node-version }}
-      - run: |
-          npm config set -- '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
-          cd gauntlet
-          ${{ matrix.env }} yarn install
-      - run: |
-          cd gauntlet
-          ${{ matrix.env }} yarn test:ci
+          node-version: ${{ steps.dotenv.outputs.nodejs_version }}
+      - name: Install
+        run: yarn --cwd ./gauntlet install --frozen-lockfile
+      - name: test:ci
+        run: yarn --cwd ./gauntlet test:ci

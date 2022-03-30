@@ -20,13 +20,19 @@ type SetBilling struct {
 	// [1] = [SIGNER] authority
 	//
 	// [2] = [] accessController
+	//
+	// [3] = [WRITE] tokenVault
+	//
+	// [4] = [] vaultAuthority
+	//
+	// [5] = [] tokenProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewSetBillingInstructionBuilder creates a new `SetBilling` instruction builder.
 func NewSetBillingInstructionBuilder() *SetBilling {
 	nd := &SetBilling{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 6),
 	}
 	return nd
 }
@@ -76,6 +82,39 @@ func (inst *SetBilling) GetAccessControllerAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
+// SetTokenVaultAccount sets the "tokenVault" account.
+func (inst *SetBilling) SetTokenVaultAccount(tokenVault ag_solanago.PublicKey) *SetBilling {
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(tokenVault).WRITE()
+	return inst
+}
+
+// GetTokenVaultAccount gets the "tokenVault" account.
+func (inst *SetBilling) GetTokenVaultAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[3]
+}
+
+// SetVaultAuthorityAccount sets the "vaultAuthority" account.
+func (inst *SetBilling) SetVaultAuthorityAccount(vaultAuthority ag_solanago.PublicKey) *SetBilling {
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(vaultAuthority)
+	return inst
+}
+
+// GetVaultAuthorityAccount gets the "vaultAuthority" account.
+func (inst *SetBilling) GetVaultAuthorityAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[4]
+}
+
+// SetTokenProgramAccount sets the "tokenProgram" account.
+func (inst *SetBilling) SetTokenProgramAccount(tokenProgram ag_solanago.PublicKey) *SetBilling {
+	inst.AccountMetaSlice[5] = ag_solanago.Meta(tokenProgram)
+	return inst
+}
+
+// GetTokenProgramAccount gets the "tokenProgram" account.
+func (inst *SetBilling) GetTokenProgramAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[5]
+}
+
 func (inst SetBilling) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
@@ -115,6 +154,15 @@ func (inst *SetBilling) Validate() error {
 		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.AccessController is not set")
 		}
+		if inst.AccountMetaSlice[3] == nil {
+			return errors.New("accounts.TokenVault is not set")
+		}
+		if inst.AccountMetaSlice[4] == nil {
+			return errors.New("accounts.VaultAuthority is not set")
+		}
+		if inst.AccountMetaSlice[5] == nil {
+			return errors.New("accounts.TokenProgram is not set")
+		}
 	}
 	return nil
 }
@@ -134,10 +182,13 @@ func (inst *SetBilling) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=6]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("           state", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("accessController", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("      tokenVault", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("  vaultAuthority", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("    tokenProgram", inst.AccountMetaSlice[5]))
 					})
 				})
 		})
@@ -178,11 +229,17 @@ func NewSetBillingInstruction(
 	// Accounts:
 	state ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
-	accessController ag_solanago.PublicKey) *SetBilling {
+	accessController ag_solanago.PublicKey,
+	tokenVault ag_solanago.PublicKey,
+	vaultAuthority ag_solanago.PublicKey,
+	tokenProgram ag_solanago.PublicKey) *SetBilling {
 	return NewSetBillingInstructionBuilder().
 		SetObservationPaymentGjuels(observationPaymentGjuels).
 		SetTransmissionPaymentGjuels(transmissionPaymentGjuels).
 		SetStateAccount(state).
 		SetAuthorityAccount(authority).
-		SetAccessControllerAccount(accessController)
+		SetAccessControllerAccount(accessController).
+		SetTokenVaultAccount(tokenVault).
+		SetVaultAuthorityAccount(vaultAuthority).
+		SetTokenProgramAccount(tokenProgram)
 }

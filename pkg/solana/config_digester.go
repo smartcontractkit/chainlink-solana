@@ -11,14 +11,14 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
-// TODO: move this in with the Terra constant
-const ConfigDigestPrefixSolana types.ConfigDigestPrefix = 3
-
 var _ types.OffchainConfigDigester = (*OffchainConfigDigester)(nil)
 
 type OffchainConfigDigester struct {
 	// Solana ID for the OCR2 on-chain program
 	ProgramID solana.PublicKey
+
+	// Solana State account address for the OCR2 on-chain program
+	StateID solana.PublicKey
 }
 
 // ConfigDigest is meant to do the same thing as config_digest_from_data from the program.
@@ -30,6 +30,10 @@ func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.Co
 		return digest, err
 	}
 
+	if _, err := buf.Write(d.StateID.Bytes()); err != nil {
+		return digest, err
+	}
+
 	if err := binary.Write(buf, binary.BigEndian, uint32(cfg.ConfigCount)); err != nil {
 		return digest, err
 	}
@@ -37,6 +41,7 @@ func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.Co
 	if err := binary.Write(buf, binary.BigEndian, uint8(len(cfg.Signers))); err != nil {
 		return digest, err
 	}
+
 	for _, signer := range cfg.Signers {
 		if _, err := buf.Write(signer); err != nil {
 			return digest, err
@@ -57,7 +62,6 @@ func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.Co
 		return digest, err
 	}
 
-	cfg.OnchainConfig = []byte{} // on chain config digest does not use onchainConfig inside digest hash
 	if err := binary.Write(buf, binary.BigEndian, uint32(len(cfg.OnchainConfig))); err != nil {
 		return digest, err
 	}
@@ -83,13 +87,12 @@ func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.Co
 		return digest, fmt.Errorf("incorrect hash size %d, expected %d", n, len(digest))
 	}
 
-	digest[0] = 0x00
-	digest[1] = uint8(ConfigDigestPrefixSolana)
+	binary.BigEndian.PutUint16(digest[0:2], uint16(d.ConfigDigestPrefix()))
 
 	return digest, nil
 }
 
 // This should return the same constant value on every invocation
-func (d OffchainConfigDigester) ConfigDigestPrefix() types.ConfigDigestPrefix {
-	return ConfigDigestPrefixSolana
+func (OffchainConfigDigester) ConfigDigestPrefix() types.ConfigDigestPrefix {
+	return types.ConfigDigestPrefixSolana
 }
