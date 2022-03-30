@@ -39,18 +39,25 @@ export const getContract = (name: CONTRACT_LIST, version: string): Contract => (
   programId: getProgramId(name),
 })
 
-export const getDeploymentContract = (name: CONTRACT_LIST, version: string): DeploymentContract => ({
+export const getDeploymentContract = async (name: CONTRACT_LIST, version: string): Promise<DeploymentContract> => ({
   id: name,
   programKeypair: getProgramKeypair(name, version),
-  bytecode: getContractCode(name, version),
+  bytecode: await getContractCode(name, version),
 })
 
-// TODO: Get it from GH Releases
-const getContractCode = (name: CONTRACT_LIST, version: string) => {
+const getContractCode = async (name: CONTRACT_LIST, version: string): Promise<Buffer> => {
   try {
-    return readFileSync(join(process.cwd(), 'packages/gauntlet-solana-contracts/artifacts/bin', `${name}.so`))
+    if (version === 'local') {
+      return readFileSync(join(process.cwd(), 'packages/gauntlet-solana-contracts/artifacts/bin', `${name}.so`))
+    } else {
+      const response = await fetch(
+        `https://github.com/smartcontractkit/chainlink-solana/releases/download/${version}/${name}.so`,
+      )
+      const body = await response.text()
+      return Buffer.from(body)
+    }
   } catch (e) {
-    throw new Error(`No program binary found for ${name} contract`)
+    throw new Error(`No program binary found for ${name} contract with version ${version}`)
   }
 }
 
