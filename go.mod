@@ -6,9 +6,9 @@ require (
 	github.com/gagliardetto/binary v0.6.1
 	github.com/gagliardetto/solana-go v1.4.0
 	github.com/smartcontractkit/chainlink v1.2.1-0.20220315133704-8769e75d54b1
-	github.com/smartcontractkit/helmenv v1.0.36
+	github.com/smartcontractkit/helmenv v1.0.43
 	github.com/smartcontractkit/libocr v0.0.0-20220217180537-449836e6cfec
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.7.1
 )
 
 require github.com/satori/go.uuid v1.2.0
@@ -23,7 +23,7 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	github.com/rs/zerolog v1.26.1
 	github.com/smartcontractkit/chainlink-relay v0.0.0-20220317101556-ad02f88fa139
-	github.com/smartcontractkit/integrations-framework v1.0.50
+	github.com/smartcontractkit/integrations-framework v1.0.53
 	go.uber.org/atomic v1.9.0
 	go.uber.org/multierr v1.8.0
 	golang.org/x/crypto v0.0.0-20220210151621-f4118a5b28e2
@@ -63,13 +63,13 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5 // indirect
 	github.com/confluentinc/confluent-kafka-go v1.8.2 // indirect
-	github.com/containerd/containerd v1.5.9 // indirect
+	github.com/containerd/containerd v1.5.10 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
 	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/dfuse-io/logging v0.0.0-20210109005628-b97a57253f70 // indirect
 	github.com/docker/cli v20.10.11+incompatible // indirect
-	github.com/docker/distribution v2.7.1+incompatible // indirect
+	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/docker v20.10.12+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.6.4 // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
@@ -256,6 +256,7 @@ require (
 	github.com/shirou/gopsutil/v3 v3.22.2 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
+	github.com/slack-go/slack v0.10.2 // indirect
 	github.com/smartcontractkit/sqlx v1.3.5-0.20210805004948-4be295aacbeb // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
@@ -302,16 +303,16 @@ require (
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 	helm.sh/helm/v3 v3.8.0 // indirect
-	k8s.io/api v0.23.3 // indirect
+	k8s.io/api v0.23.4 // indirect
 	k8s.io/apiextensions-apiserver v0.23.1 // indirect
-	k8s.io/apimachinery v0.23.3 // indirect
+	k8s.io/apimachinery v0.23.4 // indirect
 	k8s.io/apiserver v0.23.1 // indirect
-	k8s.io/cli-runtime v0.23.3 // indirect
-	k8s.io/client-go v0.23.3 // indirect
-	k8s.io/component-base v0.23.3 // indirect
+	k8s.io/cli-runtime v0.23.4 // indirect
+	k8s.io/client-go v0.23.4 // indirect
+	k8s.io/component-base v0.23.4 // indirect
 	k8s.io/klog/v2 v2.30.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65 // indirect
-	k8s.io/kubectl v0.23.3 // indirect
+	k8s.io/kubectl v0.23.4 // indirect
 	k8s.io/utils v0.0.0-20211116205334-6203023598ed // indirect
 	oras.land/oras-go v1.1.0 // indirect
 	sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6 // indirect

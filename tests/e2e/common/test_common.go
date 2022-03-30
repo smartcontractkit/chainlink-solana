@@ -121,7 +121,7 @@ func (m *OCRv2TestState) DeployEnv(nodes int, stateful bool, contractsDir string
 }
 
 func (m *OCRv2TestState) SetupClients() {
-	networkRegistry := client.NewNetworkRegistry()
+	networkRegistry := client.NewDefaultNetworkRegistry()
 	networkRegistry.RegisterNetwork(
 		"solana",
 		solclient.ClientInitFunc(),
@@ -218,6 +218,7 @@ func (m *OCRv2TestState) createJobs() {
 		"ocr2ProgramID":    m.OCR2.ProgramAddress(),
 		"transmissionsID":  m.Store.TransmissionsAddress(),
 		"storeProgramID":   m.Store.ProgramAddress(),
+		"chainID":          "localnet",
 	}
 	bootstrapPeers := []client.P2PData{
 		{
@@ -247,6 +248,14 @@ func (m *OCRv2TestState) createJobs() {
 		}
 		juelsSource := client.ObservationSourceSpecBridge(juelsBridge)
 		err = n.CreateBridge(&juelsBridge)
+		Expect(err).ShouldNot(HaveOccurred())
+		_, err = n.CreateSolanaChain(&client.SolanaChainAttributes{ChainID: relayConfig["chainID"]})
+		Expect(err).ShouldNot(HaveOccurred())
+		_, err = n.CreateSolanaNode(&client.SolanaNodeAttributes{
+			Name:          "solana",
+			SolanaChainID: relayConfig["chainID"],
+			SolanaURL:     relayConfig["nodeEndpointHTTP"],
+		})
 		Expect(err).ShouldNot(HaveOccurred())
 		jobSpec := &client.OCR2TaskJobSpec{
 			Name:                  fmt.Sprintf("sol-OCRv2-%d-%s", nIdx, uuid.NewV4().String()),
