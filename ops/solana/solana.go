@@ -135,9 +135,9 @@ func (d *Deployer) Load() error {
 	}
 
 	// expected program IDs (match to gauntlet .env.local)
-	d.Account[AccessController]="2ckhep7Mvy1dExenBqpcdevhRu7CLuuctMcx7G9mWEvo"
-	d.Account[OCR2]="E3j24rx12SyVsG6quKuZPbQqZPkhAUCh8Uek4XrKYD2x"
-	d.Account[Store]="9kRNTZmoZSiTBuXC62dzK9E7gC7huYgcmRRhYv3i4osC"
+	d.Account[AccessController] = "2ckhep7Mvy1dExenBqpcdevhRu7CLuuctMcx7G9mWEvo"
+	d.Account[OCR2] = "E3j24rx12SyVsG6quKuZPbQqZPkhAUCh8Uek4XrKYD2x"
+	d.Account[Store] = "9kRNTZmoZSiTBuXC62dzK9E7gC7huYgcmRRhYv3i4osC"
 
 	// deploy using solana cli
 	if err := deployProgram("access_controller", deployer, d.Account[AccessController]); err != nil {
@@ -465,6 +465,7 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 	input = map[string]interface{}{
 		"proposalId":     d.Account[Proposal],
 		"offchainConfig": offchainConfig,
+		"userSecret":     testingSecret,
 	}
 
 	jsonInput, err = json.Marshal(input)
@@ -476,7 +477,6 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 		"ocr2:propose_offchain_config",
 		d.gauntlet.Flag("network", d.network),
 		d.gauntlet.Flag("proposalId", d.Account[Proposal]),
-		d.gauntlet.Flag("secret", testingSecret),
 		d.gauntlet.Flag("input", string(jsonInput)),
 		d.Account[OCRFeed],
 	); err != nil {
@@ -517,6 +517,7 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 
 	fmt.Println("Accept proposal...")
 	input = map[string]interface{}{
+		"proposalId":     d.Account[Proposal],
 		"version":        2,
 		"f":              threshold,
 		"oracles":        oracles,

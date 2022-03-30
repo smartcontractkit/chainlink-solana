@@ -34,5 +34,6 @@ gauntlet/packages/gauntlet-solana-contracts/artifacts/bin
 gauntlet/packages/gauntlet-serum-multisig/networks/.env.local
 
 # test
+id.json
 tests/e2e/logs
 tests/e2e/smoke/logs

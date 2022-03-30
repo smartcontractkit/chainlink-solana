@@ -16,6 +16,7 @@ pkgs.mkShell {
     anchor
 
     # Golang
+    # Keep this golang version in sync with the version in .tool-versions please
     go_1_17
     gopls
     delve
@@ -25,6 +26,7 @@ pkgs.mkShell {
     # NodeJS + TS
     nodePackages.typescript
     nodePackages.typescript-language-server
+    # Keep this nodejs version in sync with the version in .tool-versions please
     nodejs-14_x
     (yarn.override { nodejs = nodejs-14_x; })
     python3
