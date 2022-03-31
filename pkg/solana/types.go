@@ -1,11 +1,14 @@
 package solana
 
 import (
+	"encoding/json"
 	"errors"
 	"math/big"
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
+	"github.com/smartcontractkit/chainlink-relay/pkg/monitoring/pb"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -32,20 +35,20 @@ const (
 
 // State is the struct representing the contract state
 type State struct {
-	AccountDiscriminator [8]byte // first 8 bytes of the SHA256 of the account’s Rust ident, https://docs.rs/anchor-lang/0.18.2/anchor_lang/attr.account.html
-	Version              uint8
-	Nonce                uint8
-	Padding0             uint16
-	Padding1             uint32
-	Transmissions        solana.PublicKey
-	Config               Config
-	OffchainConfig       OffchainConfig
-	Oracles              Oracles
+	AccountDiscriminator [8]byte          `json:"account_discriminator,omitempty"` // first 8 bytes of the SHA256 of the account’s Rust ident, https://docs.rs/anchor-lang/0.18.2/anchor_lang/attr.account.html
+	Version              uint8            `json:"version,omitempty"`
+	Nonce                uint8            `json:"nonce,omitempty"`
+	Padding0             uint16           `json:"-"`
+	Padding1             uint32           `json:"-"`
+	Transmissions        solana.PublicKey `json:transmissions,omitempty"`
+	Config               Config           `json:"config,omitempty"`
+	OffchainConfig       OffchainConfig   `json:"offchain_config,omitempty"`
+	Oracles              Oracles          `json:"oracles,omitempty"`
 }
 
 // SigningKey represents the report signing key
 type SigningKey struct {
-	Key [20]byte
+	Key [20]byte `json:"key,omitempty"`
 }
 
 type OffchainConfig struct {
@@ -61,26 +64,38 @@ func (oc OffchainConfig) Data() ([]byte, error) {
 	return oc.Raw[:oc.Len], nil
 }
 
+func (oc OffchainConfig) MarshalJSON() ([]byte, error) {
+	data, err := oc.Data()
+	if err != nil {
+		return nil, err
+	}
+	offchainConfig := pb.OffchainConfigProto{}
+	if err := proto.Unmarshal(data, &offchainConfig); err != nil {
+		return nil, err
+	}
+	return json.Marshal(&offchainConfig)
+}
+
 // Config contains the configuration of the contract
 type Config struct {
-	Owner                     solana.PublicKey
-	ProposedOwner             solana.PublicKey
-	TokenMint                 solana.PublicKey
-	TokenVault                solana.PublicKey
-	RequesterAccessController solana.PublicKey
-	BillingAccessController   solana.PublicKey
-	MinAnswer                 bin.Int128
-	MaxAnswer                 bin.Int128
-	F                         uint8
-	Round                     uint8
-	Padding0                  uint16
-	Epoch                     uint32
-	LatestAggregatorRoundID   uint32
-	LatestTransmitter         solana.PublicKey
-	ConfigCount               uint32
-	LatestConfigDigest        [32]byte
-	LatestConfigBlockNumber   uint64
-	Billing                   Billing
+	Owner                     solana.PublicKey `json:"owner,omitempty"`
+	ProposedOwner             solana.PublicKey `json:"proposed_owner,omitempty"`
+	TokenMint                 solana.PublicKey `json:"token_mint,omitempty"`
+	TokenVault                solana.PublicKey `json:"token_vault,omitempty"`
+	RequesterAccessController solana.PublicKey `json:"requester_access_controller,omitempty"`
+	BillingAccessController   solana.PublicKey `json:"billing_access_controller,omitempty"`
+	MinAnswer                 bin.Int128       `json:"min_answer,omitempty"`
+	MaxAnswer                 bin.Int128       `json:"max_answer,omitempty"`
+	F                         uint8            `json:"f,omitempty"`
+	Round                     uint8            `json:"round,omitempty"`
+	Padding0                  uint16           `json:"-"`
+	Epoch                     uint32           `json:"epoch,omitempty"`
+	LatestAggregatorRoundID   uint32           `json:"latest_aggregator_round_id,omitempty"`
+	LatestTransmitter         solana.PublicKey `json:"latest_transmitter,omitempty"`
+	ConfigCount               uint32           `json:"config_count,omitempty"`
+	LatestConfigDigest        [32]byte         `json:"latest_config_digest,omitempty"`
+	LatestConfigBlockNumber   uint64           `json:"latest_config_block_number,omitempty"`
+	Billing                   Billing          `json:"billing,omitempty"`
 }
 
 // Oracles contains the list of oracles
@@ -96,26 +111,34 @@ func (o Oracles) Data() ([]Oracle, error) {
 	return o.Raw[:o.Len], nil
 }
 
+func (o Oracles) MarshalJSON() ([]byte, error) {
+	oracles, err := o.Data()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(oracles)
+}
+
 // Oracle contains information about the reporting nodes
 type Oracle struct {
-	Transmitter   solana.PublicKey
-	Signer        SigningKey
-	Payee         solana.PublicKey
-	ProposedPayee solana.PublicKey
-	FromRoundID   uint32
-	Payment       uint64
+	Transmitter   solana.PublicKey `json:"transmitter,omitempty"`
+	Signer        SigningKey       `json:"signer,omitempty"`
+	Payee         solana.PublicKey `json:"payee,omitempty"`
+	ProposedPayee solana.PublicKey `json:"proposed_payee,omitempty"`
+	FromRoundID   uint32           `json:"from_round_id,omitempty"`
+	Payment       uint64           `json:"payment,omitempty"`
 }
 
 // Billing contains the payment information
 type Billing struct {
-	ObservationPayment  uint32
-	TransmissionPayment uint32
+	ObservationPayment  uint32 `json:"observation_payment,omitempty"`
+	TransmissionPayment uint32 `json:"transmission_payment,omitempty"`
 }
 
 // Answer contains the current price answer
 type Answer struct {
-	Data      *big.Int
-	Timestamp uint32
+	Data      *big.Int `json:"data,omitempty"`
+	Timestamp uint32   `json:"timestamp,omitempty"`
 }
 
 // Access controller state
@@ -128,29 +151,29 @@ type AccessController struct {
 
 // TransmissionsHeader struct for decoding transmission state header
 type TransmissionsHeader struct {
-	Version           uint8
-	State             uint8
-	Owner             solana.PublicKey
-	ProposedOwner     solana.PublicKey
-	Writer            solana.PublicKey
-	Description       [32]byte
-	Decimals          uint8
-	FlaggingThreshold uint32
-	LatestRoundID     uint32
-	Granularity       uint8
-	LiveLength        uint32
-	LiveCursor        uint32
-	HistoricalCursor  uint32
+	Version           uint8            `json:"version,omitempty"`
+	State             uint8            `json:"state,omitempty"`
+	Owner             solana.PublicKey `json:"owner,omitempty"`
+	ProposedOwner     solana.PublicKey `json:"proposed_owner,omitempty"`
+	Writer            solana.PublicKey `json:"writer,omitempty"`
+	Description       [32]byte         `json:"description,omitempty"`
+	Decimals          uint8            `json:"decimals,omitempty"`
+	FlaggingThreshold uint32           `json:"flagging_threshold,omitempty"`
+	LatestRoundID     uint32           `json:"latest_round_id,omitempty"`
+	Granularity       uint8            `json:"granularity,omitempty"`
+	LiveLength        uint32           `json:"live_length,omitempty"`
+	LiveCursor        uint32           `json:"live_cursor,omitempty"`
+	HistoricalCursor  uint32           `json:"historical_cursor,omitempty"`
 }
 
 // Transmission struct for decoding individual tranmissions
 type Transmission struct {
-	Slot      uint64
-	Timestamp uint32
-	Padding0  uint32
-	Answer    bin.Int128
-	Padding1  uint64
-	Padding2  uint64
+	Slot      uint64     `json:"slot,omitempty"`
+	Timestamp uint32     `json:"timestamp,omitempty"`
+	Padding0  uint32     `json:"-"`
+	Answer    bin.Int128 `json:"answer,omitempty"`
+	Padding1  uint64     `json:"-"`
+	Padding2  uint64     `json:"-"`
 }
 
 // TransmissionV1 struct for parsing results pre-migration
