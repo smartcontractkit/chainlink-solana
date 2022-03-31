@@ -1,6 +1,6 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { createHash } from 'crypto'
-import { logger, prompt, BN, diff } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, prompt, BN } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
@@ -231,10 +231,10 @@ export default class AcceptProposal extends SolanaCommand {
 
     const [contractConfig, proposalConfig] = [contractState, proposalState].map((state) => {
       const oracles = state.oracles?.xs.slice(0, state.oracles.len.toNumber())
-      const oraclesForDiff = oracles.map(({signer, transmitter, payee}) => ({
+      const oraclesForDiff = oracles.map(({ signer, transmitter, payee }) => ({
         signer: Buffer.from(signer.key).toString('hex'),
-            transmitter: transmitter.toString(),
-            payee: payee.toString(),
+        transmitter: transmitter.toString(),
+        payee: payee.toString(),
       }))
       const offchainConfig = deserializeConfig(
         Buffer.from(state.offchainConfig.xs).slice(0, state.offchainConfig.len.toNumber()),

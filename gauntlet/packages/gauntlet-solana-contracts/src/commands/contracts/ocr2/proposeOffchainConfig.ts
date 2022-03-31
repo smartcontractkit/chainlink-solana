@@ -1,5 +1,5 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, prompt, time, BN, longs, diff } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, prompt, time, BN, longs } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey, TransactionInstruction } from '@solana/web3.js'
 import { MAX_TRANSACTION_BYTES, ORACLES_MAX_LENGTH } from '../../../lib/constants'
