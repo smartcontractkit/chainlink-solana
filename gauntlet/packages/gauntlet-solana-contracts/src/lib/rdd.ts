@@ -22,6 +22,7 @@ function load(network = DEFAULT_NETWORK, path = `${RDD_DIR}/directory-solana-${n
   }
 }
 
+// TODO: repeated code - get rid of laodAggregator in favor for getContractFromRDD
 function loadAggregator(contractAddress: string, network?: string, rddPath?: string) {
   if (!contractAddress) throw new Error('Could not fetch RDD without a valid aggregator address')
   const rdd = RDD.load(network, rddPath)

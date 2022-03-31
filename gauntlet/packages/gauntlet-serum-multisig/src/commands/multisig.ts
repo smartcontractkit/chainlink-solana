@@ -5,7 +5,6 @@ import { CONTRACT_LIST, getContract, makeTx } from '@chainlink/gauntlet-solana-c
 import { Idl, Program } from '@project-serum/anchor'
 import { MAX_BUFFER_SIZE } from '../lib/constants'
 import { isDeepEqual } from '../lib/utils'
-import { ActionType } from '../lib/types'
 
 type ProposalContext = {
   rawTx: TransactionInstruction
@@ -24,7 +23,6 @@ export const wrapCommand = (command) => {
     command: SolanaCommand
     program: Program<Idl>
     multisigAddress: PublicKey
-    currentAction: ActionType
 
     static id = `${command.id}`
 
@@ -35,7 +33,6 @@ export const wrapCommand = (command) => {
       this.command = new command({ ...flags, bufferSize: MAX_BUFFER_SIZE }, args)
       this.require(!!process.env.MULTISIG_ADDRESS, 'Please set MULTISIG_ADDRESS env var')
       this.multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS)
-      this.currentAction = ActionType.NONE
     }
 
     execute = async () => {
@@ -52,7 +49,7 @@ export const wrapCommand = (command) => {
       const proposal = new PublicKey(this.flags.proposal || this.flags.multisigProposal || rawTxs[0].keys[1].pubkey)
 
       if (this.flags.execute) {
-        await prompt(`${this.currentAction} TX will be executed. Continue?`)
+        await prompt('Continue?')
         logger.loading(`Executing action...`)
         const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, this.program.idl)(rawTxs)
         logger.success(`TX succeded at ${txhash}`)
@@ -136,7 +133,6 @@ export const wrapCommand = (command) => {
       const proposalState = await this.fetchState(proposal)
       const isCreation = !proposalState
       if (isCreation) {
-        this.currentAction = ActionType.CREATE
         return await this.createProposal(proposal, signer, {
           rawTx,
           multisigSigner,
@@ -158,11 +154,9 @@ export const wrapCommand = (command) => {
       )
 
       if (!this.isReadyForExecution(proposalState, threshold)) {
-        this.currentAction = ActionType.APPROVE
         return await this.approveProposal(proposal, signer, proposalContext)
       }
 
-      this.currentAction = ActionType.EXECUTE
       return await this.executeProposal(proposal, signer, proposalContext)
     }
 
