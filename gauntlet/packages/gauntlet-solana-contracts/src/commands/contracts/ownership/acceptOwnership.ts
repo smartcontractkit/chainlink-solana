@@ -10,12 +10,12 @@ export const makeAcceptOwnershipCommand = (contractId: CONTRACT_LIST): SolanaCon
     static id = `${contractId}:accept_ownership`
     static category = contractId
 
-    static examples = [`yarn gauntlet ${contractId}:accept_ownership --network=devnet --state=[PROGRAM_STATE]`]
+    static examples = [`yarn gauntlet ${contractId}:accept_ownership --network=devnet [PROGRAM_STATE]`]
 
     constructor(flags, args) {
       super(flags, args)
 
-      this.require(!!this.flags.state, 'Please provide flags with "state"')
+      this.requireArgs('Please provide the state as an arg!')
     }
 
     makeRawTransaction = async (signer: PublicKey) => {
@@ -23,7 +23,7 @@ export const makeAcceptOwnershipCommand = (contractId: CONTRACT_LIST): SolanaCon
       const address = contract.programId.toString()
       const program = this.loadProgram(contract.idl, address)
 
-      const state = new PublicKey(this.flags.state)
+      const state = new PublicKey(this.args[0])
 
       const tx = program.instruction.acceptOwnership({
         accounts: {
@@ -39,16 +39,17 @@ export const makeAcceptOwnershipCommand = (contractId: CONTRACT_LIST): SolanaCon
       const contract = getContract(contractId, '')
       const address = contract.programId.toString()
       const program = this.loadProgram(contract.idl, address)
+      const state = this.args[0]
 
       const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
-      await prompt(`Accepting ownership of ${contractId} state (${this.flags.state.toString()}). Continue?`)
+      await prompt(`Accepting ownership of ${contractId} state (${state}). Continue?`)
       const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx)
       logger.success(`Accepted ownership on tx hash: ${txhash}`)
       return {
         responses: [
           {
-            tx: this.wrapResponse(txhash, this.flags.state),
-            contract: this.flags.state,
+            tx: this.wrapResponse(txhash, state),
+            contract: state,
           },
         ],
       } as Result<TransactionResponse>

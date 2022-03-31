@@ -11,14 +11,14 @@ export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaC
     static category = contractId
 
     static examples = [
-      `yarn gauntlet ${contractId}:transfer_ownership --network=devnet --state=[PROGRAM_STATE] --to=[PROPOSED_OWNER]`,
+      `yarn gauntlet ${contractId}:transfer_ownership --network=devnet --to=[PROPOSED_OWNER] [PROGRAM_STATE]`,
     ]
 
     constructor(flags, args) {
       super(flags, args)
 
-      this.require(!!this.flags.state, 'Please provide flags with "state"')
       this.require(!!this.flags.to, 'Please provide flags with "to"')
+      this.requireArgs('Please provide the state as an arg!')
     }
 
     makeRawTransaction = async (signer: PublicKey) => {
@@ -26,7 +26,7 @@ export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaC
       const address = contract.programId.toString()
       const program = this.loadProgram(contract.idl, address)
 
-      const state = new PublicKey(this.flags.state)
+      const state = new PublicKey(this.args[0])
       const proposedOwner = new PublicKey(this.flags.to)
 
       const tx = program.instruction.transferOwnership(proposedOwner, {
@@ -43,16 +43,17 @@ export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaC
       const contract = getContract(contractId, '')
       const address = contract.programId.toString()
       const program = this.loadProgram(contract.idl, address)
+      const state = this.args[0]
 
       const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
-      await prompt(`Transferring ownership of ${contractId} state (${this.flags.state.toString()}). Continue?`)
+      await prompt(`Transferring ownership of ${contractId} state (${state}). Continue?`)
       const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx)
       logger.success(`Ownership transferred to ${new PublicKey(this.flags.to)} on tx ${txhash}`)
       return {
         responses: [
           {
-            tx: this.wrapResponse(txhash, this.flags.state),
-            contract: this.flags.state,
+            tx: this.wrapResponse(txhash, state),
+            contract: state,
           },
         ],
       } as Result<TransactionResponse>
