@@ -5,6 +5,7 @@ import { CONTRACT_LIST, getContract, makeTx } from '@chainlink/gauntlet-solana-c
 import { Idl, Program } from '@project-serum/anchor'
 import { MAX_BUFFER_SIZE } from '../lib/constants'
 import { isDeepEqual } from '../lib/utils'
+import { ActionType } from '../lib/types'
 
 type ProposalContext = {
   rawTx: TransactionInstruction
@@ -17,13 +18,6 @@ type ProposalAction = (
   signer: PublicKey,
   context: ProposalContext,
 ) => Promise<TransactionInstruction[]>
-
-enum ActionType {
-  CREATE = 'CREATE',
-  APPROVE = 'APPROVE',
-  EXECUTE = 'EXECUTE',
-  NONE = 'NONE',
-}
 
 export const wrapCommand = (command) => {
   return class Multisig extends SolanaCommand {
