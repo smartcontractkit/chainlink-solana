@@ -21,11 +21,15 @@ export default class extends Close {
     const program = this.loadProgram(contract.idl, contract.programId.toString())
 
     const address = new PublicKey(this.args[0])
-    const { config } = await program.account.state.fetch(address)
+    const { config, oracles } = await program.account.state.fetch(address)
     const [vaultAuthority] = await PublicKey.findProgramAddress(
       [Buffer.from(utils.bytes.utf8.encode('vault')), address.toBuffer()],
       program.programId,
     )
+    // get payees to payout during close command
+    const payees = oracles.xs
+      .slice(0, oracles.len)
+      .map((oracle) => ({ pubkey: oracle.payee, isWritable: true, isSigner: false }))
 
     const extraAccounts = {
       tokenVault: config.tokenVault,
@@ -34,6 +38,6 @@ export default class extends Close {
       state: address,
     }
 
-    return this.prepareInstructions(signer, extraAccounts)
+    return this.prepareInstructions(signer, extraAccounts, 'close', payees)
   }
 }
