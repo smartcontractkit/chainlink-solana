@@ -5,10 +5,10 @@ module.exports = {
       displayName: 'gauntlet-solana',
       preset: 'ts-jest',
       testEnvironment: 'node',
-      testMatch: ['<rootDir>/gaunlet/packages/gauntlet-solana/**/*.test.ts'],
+      testMatch: ['<rootDir>/gauntlet/packages/gauntlet-solana/**/*.test.ts'],
       globals: {
         'ts-jest': {
-          tsconfig: '<rootDir>/gaunlet/packages/gauntlet-solana/tsconfig.json',
+          tsconfig: '<rootDir>/gauntlet/packages/gauntlet-solana/tsconfig.json',
         },
       },
     },
@@ -17,12 +17,12 @@ module.exports = {
       preset: 'ts-jest',
       testEnvironment: 'node',
       testMatch: [
-        '<rootDir>/gaunlet/packages/gauntlet-solana-contracts/**/*.test.ts',
+        '<rootDir>/gauntlet/packages/gauntlet-solana-contracts/**/*.test.ts',
       ],
       globals: {
         'ts-jest': {
           tsconfig:
-            '<rootDir>/gaunlet/packages/gauntlet-solana-contracts/tsconfig.json',
+            '<rootDir>/gauntlet/packages/gauntlet-solana-contracts/tsconfig.json',
         },
       },
     },
