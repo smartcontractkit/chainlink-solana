@@ -1,7 +1,6 @@
 import Initialize from './initialize'
 import OCR2InitializeFlow from './initialize.flow'
 import ReadState from './read'
-import ReadOwnership from './ownership/readOwnership'
 import SetBillingAccessController from './setBillingAccessController'
 import SetRequesterAccessController from './setRequesterAccessController'
 import SetBilling from './setBilling'
@@ -21,6 +20,11 @@ import ProposePayees from './proposePayees'
 import FinalizeProposal from './proposal/finalizeProposal'
 import Close from './close'
 
+const getOwner = async (program, state) => {
+  const contractState = await program.account.state.fetch(state)
+  return contractState?.config?.owner
+}
+
 export default [
   Initialize,
   OCR2InitializeFlow,
@@ -35,8 +39,8 @@ export default [
   SetBillingAccessController,
   SetRequesterAccessController,
   Fund,
-  makeAcceptOwnershipCommand(CONTRACT_LIST.OCR_2, ReadOwnership),
-  makeTransferOwnershipCommand(CONTRACT_LIST.OCR_2, ReadOwnership),
+  makeAcceptOwnershipCommand(CONTRACT_LIST.OCR_2, getOwner),
+  makeTransferOwnershipCommand(CONTRACT_LIST.OCR_2, getOwner),
   makeUpgradeProgramCommand(CONTRACT_LIST.OCR_2),
   // Inspection
   ...Inspection,

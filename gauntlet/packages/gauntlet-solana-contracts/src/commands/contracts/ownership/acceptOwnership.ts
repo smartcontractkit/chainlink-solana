@@ -8,12 +8,11 @@ import RDD from '../../../lib/rdd'
 
 export const makeAcceptOwnershipCommand = (
   contractId: CONTRACT_LIST,
-  readOwnership: SolanaConstructor,
+  getOwner: (program, state) => Promise<PublicKey>,
 ): SolanaConstructor => {
   return class AcceptOwnership extends SolanaCommand {
     static id = `${contractId}:accept_ownership`
     static category = contractId
-    ReadOwnership = readOwnership
 
     static examples = [`yarn gauntlet ${contractId}:accept_ownership --network=devnet [PROGRAM_STATE]`]
 
@@ -48,15 +47,8 @@ export const makeAcceptOwnershipCommand = (
       return [tx]
     }
 
-    readOwner = async () => {
-      const readOwnershipCommand = new this.ReadOwnership(this.flags, this.args)
-      readOwnershipCommand.provider = this.provider
-      const { owner } = (await readOwnershipCommand.execute()) as any
-      return owner
-    }
-
     beforeExecute = async () => {
-      const owner = await this.readOwner()
+      const owner = await getOwner(this.program, new PublicKey(this.args[0]))
       const contract = RDD.getContractFromRDD(RDD.load(this.flags.network, this.flags.rdd), this.args[0])
 
       logger.info(`Accepting Ownership of contract of type "${contract.type}":
