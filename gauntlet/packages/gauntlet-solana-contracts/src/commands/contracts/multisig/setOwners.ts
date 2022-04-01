@@ -1,14 +1,14 @@
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
+import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { Result } from '@chainlink/gauntlet-core'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
 
 export default class SetOwners extends SolanaCommand {
-  static id = 'multisig:set_owners'
+  static id = 'set_owners'
   static category = CONTRACT_LIST.MULTISIG
 
-  static examples = ['yarn gauntlet-serum-multisig multisig:set_owners --network=local']
+  static examples = ['yarn gauntlet multisig:set_owners --network=local']
 
   constructor(flags, args) {
     super(flags, args)

@@ -27,7 +27,7 @@ export default class SetThreshold extends SolanaCommand {
     const ix = program.instruction.changeThreshold(threshold, {
       accounts: {
         multisig: multisigAddress,
-        muitisigSigner: signer,
+        multisigSigner: signer,
       },
     })
 
