@@ -72,17 +72,7 @@ export default class OCR2Inspect extends SolanaCommand {
   }
 
   // toHexString converts a list of numbers to a hex string
-  toHexString(nums: Int16Array): string {
-    var hexString = ''
-    nums.forEach((num) => {
-      let hexNum = num.toString(16)
-      if (hexNum.length < 2) {
-        hexNum = '0' + hexNum
-      }
-      hexString = hexString + hexNum
-    })
-    return hexString
-  }
+  toHexString = (n: number[]) => Buffer.from(n).toString('hex')
 
   makeFeedInspections = async (bufferedInfo: Keypair, input: Input): Promise<inspection.Inspection[]> => {
     const store = getContract(CONTRACT_LIST.STORE, '')
@@ -256,15 +246,12 @@ export default class OCR2Inspect extends SolanaCommand {
     // Print on-chain oracle information
     onChainState.oracles.xs.forEach((oracle) => {
       logger.info(
-        'Oracle ' +
-          oracle.transmitter +
-          '\n- Proposed Payee: ' +
-          oracle.proposedPayee +
-          '\n- From Round ID: ' +
-          oracle.fromRoundId +
-          '\n- Payment Gjuels: ' +
-          oracle.paymentGjuels +
-          '\n',
+        `Oracle Info:
+          - Transmitter: ${oracle.transmitter}
+          - Proposed Payee: ${oracle.proposedPayee}
+          - From Round ID: ${oracle.fromRoundId}
+          - Payment Gjuels: ${oracle.paymentGjuels}
+      `,
       )
     })
 

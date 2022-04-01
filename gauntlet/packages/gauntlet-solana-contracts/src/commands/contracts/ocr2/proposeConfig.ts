@@ -1,10 +1,11 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, BN, prompt, diff } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { ORACLES_MAX_LENGTH } from '../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import RDD from '../../../lib/rdd'
+import { printDiff } from '../../../lib/diff'
 
 type Input = {
   oracles: {
@@ -97,15 +98,10 @@ export default class ProposeConfig extends SolanaCommand {
 
     // Prepare contract config
     const contractOracles = contractState.oracles?.xs.slice(0, contractState.oracles.len.toNumber())
-    const contractOraclesForDiff = contractOracles?.reduce((acc, { signer, transmitter }, idx) => {
-      return {
-        ...acc,
-        [`oracle#${idx}`]: {
-          signer: Buffer.from(signer.key).toString('hex'),
-          transmitter: transmitter.toString(),
-        },
-      }
-    }, {})
+    const contractOraclesForDiff = contractOracles.map(({ signer, transmitter }) => ({
+      signer: Buffer.from(signer.key).toString('hex'),
+      transmitter: transmitter.toString(),
+    }))
 
     const contractConfig = {
       f: contractState.config.f,
@@ -114,17 +110,12 @@ export default class ProposeConfig extends SolanaCommand {
 
     const proposedConfig = {
       f: this.input.f,
-      oracles: this.input.oracles.reduce((acc, oracle, idx) => {
-        return { ...acc, [`oracle#${idx}`]: oracle }
-      }, {}),
+      oracles: this.input.oracles,
     }
 
-    logger.info(`Existing Config on contract ${this.args[0]}:`)
-    logger.log(contractConfig)
     logger.info(`Proposed Config for contract ${this.args[0]}:`)
-    logger.log(proposedConfig)
+    printDiff(contractConfig, proposedConfig)
 
-    // diff.printDiff(contractConfig, proposedConfig)
     await prompt('Continue?')
   }
 

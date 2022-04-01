@@ -37,7 +37,7 @@ func main() {
 		logWrapper{coreLog.With("component", "source-txresults")},
 	)
 
-	entrypoint, err := relayMonitoring.NewEntrypoint(
+	monitor, err := relayMonitoring.NewMonitor(
 		context.Background(),
 		l,
 		chainConfig,
@@ -46,7 +46,7 @@ func main() {
 		monitoring.SolanaFeedParser,
 	)
 	if err != nil {
-		l.Fatalw("failed to build entrypoint", "error", err)
+		l.Fatalw("failed to build monitor", "error", err)
 		return
 	}
 
@@ -54,18 +54,15 @@ func main() {
 		client,
 		l.With("component", "source-balances"),
 	)
-	if entrypoint.Config.Feature.TestOnlyFakeReaders {
-		balancesSourceFactory = monitoring.NewFakeBalancesSourceFactory(l.With("component", "fake-balances-source"))
-	}
-	entrypoint.SourceFactories = append(entrypoint.SourceFactories, balancesSourceFactory)
+	monitor.SourceFactories = append(monitor.SourceFactories, balancesSourceFactory)
 
 	promExporterFactory := monitoring.NewPrometheusExporterFactory(
 		l.With("component", "solana-prom-exporter"),
 		monitoring.NewMetrics(l.With("component", "solana-metrics")),
 	)
-	entrypoint.ExporterFactories = append(entrypoint.ExporterFactories, promExporterFactory)
+	monitor.ExporterFactories = append(monitor.ExporterFactories, promExporterFactory)
 
-	entrypoint.Run()
+	monitor.Run()
 	l.Infow("monitor stopped")
 }
 

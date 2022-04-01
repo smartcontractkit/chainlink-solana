@@ -36,10 +36,7 @@ export default class ReadState extends SolanaCommand {
     console.log('OWNER:', new PublicKey(data.config.owner).toString())
     console.log('DATA:', data)
     // Get the necessary bytes
-    const offchainBuffer = Buffer.from(data.config.offchainConfig.xs).slice(
-      0,
-      new BN(data.config.offchainConfig.len).toNumber(),
-    )
+    const offchainBuffer = Buffer.from(data.offchainConfig.xs).slice(0, new BN(data.offchainConfig.len).toNumber())
     const offchainConfig = await this.deserializeConfig(offchainBuffer)
     console.log('GENERATED LENGTH:', offchainBuffer.byteLength)
 

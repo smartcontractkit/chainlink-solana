@@ -6,7 +6,7 @@ require (
 	github.com/gagliardetto/binary v0.6.1
 	github.com/gagliardetto/solana-go v1.4.0
 	github.com/smartcontractkit/chainlink v1.2.1-0.20220315133704-8769e75d54b1
-	github.com/smartcontractkit/helmenv v1.0.43
+	github.com/smartcontractkit/helmenv v1.0.47
 	github.com/smartcontractkit/libocr v0.0.0-20220217180537-449836e6cfec
 	github.com/stretchr/testify v1.7.1
 )
@@ -22,7 +22,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.1
 	github.com/rs/zerolog v1.26.1
-	github.com/smartcontractkit/chainlink-relay v0.0.0-20220317101556-ad02f88fa139
+	github.com/smartcontractkit/chainlink-relay v0.0.0-20220331131917-698887a93d0c
 	github.com/smartcontractkit/integrations-framework v1.0.53
 	go.uber.org/atomic v1.9.0
 	go.uber.org/multierr v1.8.0
@@ -302,17 +302,17 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
-	helm.sh/helm/v3 v3.8.0 // indirect
-	k8s.io/api v0.23.4 // indirect
-	k8s.io/apiextensions-apiserver v0.23.1 // indirect
-	k8s.io/apimachinery v0.23.4 // indirect
-	k8s.io/apiserver v0.23.1 // indirect
-	k8s.io/cli-runtime v0.23.4 // indirect
-	k8s.io/client-go v0.23.4 // indirect
-	k8s.io/component-base v0.23.4 // indirect
+	helm.sh/helm/v3 v3.8.1 // indirect
+	k8s.io/api v0.23.5 // indirect
+	k8s.io/apiextensions-apiserver v0.23.4 // indirect
+	k8s.io/apimachinery v0.23.5 // indirect
+	k8s.io/apiserver v0.23.4 // indirect
+	k8s.io/cli-runtime v0.23.5 // indirect
+	k8s.io/client-go v0.23.5 // indirect
+	k8s.io/component-base v0.23.5 // indirect
 	k8s.io/klog/v2 v2.30.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65 // indirect
-	k8s.io/kubectl v0.23.4 // indirect
+	k8s.io/kubectl v0.23.5 // indirect
 	k8s.io/utils v0.0.0-20211116205334-6203023598ed // indirect
 	oras.land/oras-go v1.1.0 // indirect
 	sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6 // indirect

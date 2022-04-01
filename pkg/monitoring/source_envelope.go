@@ -70,17 +70,17 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		var err error
-		answer, _, err = pkgSolana.GetLatestTransmission(ctx, s.client, state.Transmissions, rpc.CommitmentConfirmed)
+		var transmissionErr error
+		answer, _, transmissionErr = pkgSolana.GetLatestTransmission(ctx, s.client, state.Transmissions, rpc.CommitmentConfirmed)
 		if err != nil {
-			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("failed to fetch latest on-chain transmission: %w", err))
+			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("failed to fetch latest on-chain transmission: %w", transmissionErr))
 		}
 	}()
 	go func() {
 		defer wg.Done()
-		linkBalanceRes, err := s.client.GetTokenAccountBalance(ctx, state.Config.TokenVault, rpc.CommitmentConfirmed)
-		if err != nil {
-			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("failed to read the feed's link balance: %w", err))
+		linkBalanceRes, balanceErr := s.client.GetTokenAccountBalance(ctx, state.Config.TokenVault, rpc.CommitmentConfirmed)
+		if balanceErr != nil {
+			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("failed to read the feed's link balance: %w", balanceErr))
 			return
 		}
 		if linkBalanceRes == nil || linkBalanceRes.Value == nil {
@@ -95,9 +95,12 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 		}
 	}()
 	wg.Wait()
-
 	if envelopeErr != nil {
 		return nil, envelopeErr
+	}
+	linkAvailableForPayments, err := getLinkAvailableForPayment(state, linkBalance)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate link_available_for_payments: %w", err)
 	}
 	return relayMonitoring.Envelope{
 		ConfigDigest: state.Config.LatestConfigDigest,
@@ -111,11 +114,33 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 		ContractConfig: contractConfig,
 
 		// extra
-		BlockNumber: blockNum,
-		Transmitter: types.Account(state.Config.LatestTransmitter.String()),
-		LinkBalance: linkBalance,
+		BlockNumber:             blockNum,
+		Transmitter:             types.Account(state.Config.LatestTransmitter.String()),
+		LinkBalance:             linkBalance,
+		LinkAvailableForPayment: linkAvailableForPayments,
 
 		JuelsPerFeeCoin:   big.NewInt(0), // TODO (dru)
 		AggregatorRoundID: state.Config.LatestAggregatorRoundID,
 	}, nil
+}
+
+// Helpers
+
+func getLinkAvailableForPayment(state pkgSolana.State, linkBalance *big.Int) (*big.Int, error) {
+	oracles, err := state.Oracles.Data()
+	if err != nil {
+		return nil, err
+	}
+	var countUnpaidRounds, reimbursements uint64 = 0, 0
+	for _, oracle := range oracles {
+		numRounds := int(state.Config.LatestAggregatorRoundID) - int(oracle.FromRoundID)
+		if numRounds < 0 {
+			numRounds = 0
+		}
+		countUnpaidRounds += uint64(numRounds)
+		reimbursements += oracle.Payment
+	}
+	amountDue := uint64(state.Config.Billing.ObservationPayment)*countUnpaidRounds + reimbursements
+	remaining := new(big.Int).Sub(linkBalance, new(big.Int).SetUint64(amountDue))
+	return remaining, nil
 }
