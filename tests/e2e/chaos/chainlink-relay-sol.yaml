@@ -2,11 +2,6 @@ namespace_prefix: chainlink
 charts:
   solana-validator:
     index: 1
-    values:
-      sol:
-        image:
-          image: tateexon/solana-validator
-          version: 1.9.14
   mockserver-config:
     index: 2
   mockserver:
