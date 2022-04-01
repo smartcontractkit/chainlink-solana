@@ -1,8 +1,9 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
+import logger from '../../../logger'
+import { withAddressBook } from '../../../lib/middlewares'
 
 export default class AddAccess extends SolanaCommand {
   static id = 'access_controller:add_access'
@@ -16,6 +17,7 @@ export default class AddAccess extends SolanaCommand {
     super(flags, args)
 
     this.require(!!this.flags.state && !!this.flags.address, 'Please provide flags with "state" and "address"')
+    this.use(withAddressBook)
   }
 
   execute = async () => {
@@ -26,7 +28,7 @@ export default class AddAccess extends SolanaCommand {
     const state = new PublicKey(this.flags.state)
     const accessAddress = new PublicKey(this.flags.address)
 
-    console.log(`Giving access to ${accessAddress}...`)
+    console.log(`Giving access to logger.styleAddress(${accessAddress})...`)
     const tx = await program.rpc.addAccess({
       accounts: {
         state: state,

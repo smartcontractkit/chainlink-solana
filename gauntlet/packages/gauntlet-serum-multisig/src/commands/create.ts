@@ -1,8 +1,10 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
+import { withAddressBook } from '@chainlink/gauntlet-solana-contracts/dist/lib/middlewares'
+import logger from '@chainlink/gauntlet-solana-contracts/dist/logger'
 
 type Input = {
   owners: string[]
@@ -20,6 +22,7 @@ export default class MultisigCreate extends SolanaCommand {
   constructor(flags, args) {
     super(flags, args)
     this.requireFlag('threshold', 'Please provide multisig threshold')
+    this.use(withAddressBook)
   }
 
   makeInput = (userInput: any): Input => {
@@ -61,7 +64,7 @@ export default class MultisigCreate extends SolanaCommand {
     const threshold = new BN(input.threshold)
     await prompt(
       `A new multisig will be created with threshold ${threshold.toNumber()} and owners ${owners.map((o) =>
-        o.toString(),
+        logger.styleAddress(o.toString()),
       )}. Continue?`,
     )
 
@@ -76,7 +79,7 @@ export default class MultisigCreate extends SolanaCommand {
     })
     logger.success('New multisig created')
     logger.info(`Multisig address: ${multisig.publicKey}`)
-    logger.info(`Multisig Signer: ${multisigSigner.toString()}`)
+    logger.info(`Multisig Signer: ${logger.styleAddress(multisigSigner.toString())}`)
 
     return {
       responses: [

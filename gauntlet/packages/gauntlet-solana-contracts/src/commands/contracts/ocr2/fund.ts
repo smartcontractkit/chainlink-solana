@@ -3,7 +3,9 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
+import { BN } from '@chainlink/gauntlet-core/dist/utils'
+import { withAddressBook } from '../../../lib/middlewares'
+import logger from '../../../logger'
 
 export default class Fund extends SolanaCommand {
   static id = 'ocr2:fund'
@@ -16,6 +18,7 @@ export default class Fund extends SolanaCommand {
 
     this.requireArgs('Please provide an aggregator address')
     this.requireFlag('amount', 'Provide an --amount flag')
+    this.use(withAddressBook)
   }
 
   execute = async () => {
@@ -42,7 +45,11 @@ export default class Fund extends SolanaCommand {
       this.wallet.publicKey,
     )
 
-    logger.loading(`Transferring ${amount} tokens to ${state.toString()} token vault ${tokenVault.toString()}...`)
+    logger.loading(
+      `Transferring ${amount} tokens to ${logger.styleAddress(
+        state.toString(),
+      )} token vault ${tokenVault.toString()}...`,
+    )
     const tx = await token.transfer(from, tokenVault, this.wallet.payer, [], amount.toNumber())
 
     return {

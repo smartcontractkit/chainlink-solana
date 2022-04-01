@@ -1,8 +1,9 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
+import logger from '../../../logger'
 
 export default class SetLoweringAccessController extends SolanaCommand {
   static id = 'store:set_lowering_access_controller'
@@ -31,8 +32,8 @@ export default class SetLoweringAccessController extends SolanaCommand {
 
     logger.log(`Access controller information:
       - Store State: ${state.toString()}
-      - Old AC: ${oldAC}
-      - New AC: ${ac.toString()}
+      - Old AC: ${logger.styleAddress(oldAC)}
+      - New AC: ${logger.styleAddress(ac.toString())}
     `)
 
     this.require(oldAC.toString() !== ac.toString(), 'New access controller is the same as existing access controller')

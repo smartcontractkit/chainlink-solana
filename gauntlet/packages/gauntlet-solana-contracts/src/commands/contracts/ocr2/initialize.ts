@@ -4,8 +4,10 @@ import { Keypair, PublicKey, TransactionInstruction, SystemProgram, SYSVAR_RENT_
 import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { utils } from '@project-serum/anchor'
-import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import RDD from '../../../lib/rdd'
+import { withAddressBook } from '../../../lib/middlewares'
+import logger from '../../../logger'
 
 type Input = {
   minAnswer: number | string
@@ -34,6 +36,7 @@ export default class Initialize extends SolanaCommand {
 
   constructor(flags, args) {
     super(flags, args)
+    this.use(withAddressBook)
   }
 
   makeRawTransaction = async (signer: PublicKey, state?: PublicKey): Promise<TransactionInstruction[]> => {
@@ -92,10 +95,10 @@ export default class Initialize extends SolanaCommand {
 
     console.log(`
       STATE ACCOUNTS:
-        - State: ${state?.toString()}
-        - Transmissions: ${transmissions}
-        - Payer: ${this.provider.wallet.publicKey}
-        - Owner: ${signer.toString()}
+        - State: ${logger.styleAddress(state?.toString())}
+        - Transmissions: ${logger.styleAddress(transmissions.toString())}
+        - Payer: ${logger.styleAddress(this.provider.wallet.publicKey.toString())}
+        - Owner: ${logger.styleAddress(signer.toString())}
     `)
 
     const defaultAccountSize = new BN(program.account.state.size)
