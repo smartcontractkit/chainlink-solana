@@ -1,6 +1,7 @@
 import Initialize from './initialize'
 import OCR2InitializeFlow from './initialize.flow'
 import ReadState from './read'
+import ReadOwnership from './ownership/readOwnership'
 import SetBillingAccessController from './setBillingAccessController'
 import SetRequesterAccessController from './setRequesterAccessController'
 import SetBilling from './setBilling'
@@ -34,8 +35,8 @@ export default [
   SetBillingAccessController,
   SetRequesterAccessController,
   Fund,
-  makeAcceptOwnershipCommand(CONTRACT_LIST.OCR_2),
-  makeTransferOwnershipCommand(CONTRACT_LIST.OCR_2),
+  makeAcceptOwnershipCommand(CONTRACT_LIST.OCR_2, ReadOwnership),
+  makeTransferOwnershipCommand(CONTRACT_LIST.OCR_2, ReadOwnership),
   makeUpgradeProgramCommand(CONTRACT_LIST.OCR_2),
   // Inspection
   ...Inspection,

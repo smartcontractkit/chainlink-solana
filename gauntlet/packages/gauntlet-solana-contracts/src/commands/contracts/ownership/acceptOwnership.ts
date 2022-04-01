@@ -6,10 +6,14 @@ import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { SolanaConstructor } from '../../../lib/types'
 import RDD from '../../../lib/rdd'
 
-export const makeAcceptOwnershipCommand = (contractId: CONTRACT_LIST): SolanaConstructor => {
+export const makeAcceptOwnershipCommand = (
+  contractId: CONTRACT_LIST,
+  readOwnership: SolanaConstructor,
+): SolanaConstructor => {
   return class AcceptOwnership extends SolanaCommand {
     static id = `${contractId}:accept_ownership`
     static category = contractId
+    ReadOwnership = readOwnership
 
     static examples = [`yarn gauntlet ${contractId}:accept_ownership --network=devnet [PROGRAM_STATE]`]
 
@@ -23,7 +27,7 @@ export const makeAcceptOwnershipCommand = (contractId: CONTRACT_LIST): SolanaCon
       const contract = getContract(contractId, '')
       const address = contract.programId.toString()
       this.program = this.loadProgram(contract.idl, address)
-  
+
       return this
     }
 
@@ -44,15 +48,20 @@ export const makeAcceptOwnershipCommand = (contractId: CONTRACT_LIST): SolanaCon
       return [tx]
     }
 
+    readOwner = async () => {
+      const readOwnershipCommand = new this.ReadOwnership(this.flags, this.args)
+      readOwnershipCommand.provider = this.provider
+      const { owner } = (await readOwnershipCommand.execute()) as any
+      return owner
+    }
+
     beforeExecute = async () => {
-      const state = new PublicKey(this.args[0])
-      const contractState = await this.program.account.state.fetch(state)
-      const owner = contractState.config.owner.toString()
+      const owner = await this.readOwner()
       const contract = RDD.getContractFromRDD(RDD.load(this.flags.network, this.flags.rdd), this.args[0])
-      
+
       logger.info(`Accepting Ownership of contract of type "${contract.type}":
       - Contract: ${contract.address} ${contract.description ? '- ' + contract.description : ''}
-      - Current Owner: ${owner}
+      - Current Owner: ${owner.toString()}
       - Next Owner (Current signer): ${this.wallet.publicKey}`)
       await prompt('Continue?')
     }
@@ -65,9 +74,9 @@ export const makeAcceptOwnershipCommand = (contractId: CONTRACT_LIST): SolanaCon
       const rawTx = await this.makeRawTransaction(signer)
       await this.simulateTx(signer, rawTx)
       const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, this.program.idl)(rawTx)
-      
+
       logger.success(`Accepted ownership on tx hash: ${txhash}`)
-      
+
       const state = this.args[0]
       return {
         responses: [

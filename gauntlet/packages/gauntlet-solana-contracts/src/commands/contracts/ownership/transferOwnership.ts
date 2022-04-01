@@ -6,10 +6,14 @@ import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { SolanaConstructor } from '../../../lib/types'
 import RDD from '../../../lib/rdd'
 
-export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaConstructor => {
+export const makeTransferOwnershipCommand = (
+  contractId: CONTRACT_LIST,
+  readOwnership: SolanaConstructor,
+): SolanaConstructor => {
   return class TransferOwnership extends SolanaCommand {
     static id = `${contractId}:transfer_ownership`
     static category = contractId
+    ReadOwnership = readOwnership
 
     static examples = [
       `yarn gauntlet ${contractId}:transfer_ownership --network=devnet --to=[PROPOSED_OWNER] [PROGRAM_STATE]`,
@@ -27,7 +31,7 @@ export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaC
       const contract = getContract(contractId, '')
       const address = contract.programId.toString()
       this.program = this.loadProgram(contract.idl, address)
-  
+
       return this
     }
 
@@ -45,15 +49,20 @@ export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaC
       return [tx]
     }
 
+    readOwner = async () => {
+      const readOwnershipCommand = new this.ReadOwnership(this.flags, this.args)
+      readOwnershipCommand.provider = this.provider
+      const { owner } = (await readOwnershipCommand.execute()) as any
+      return owner
+    }
+
     beforeExecute = async () => {
-      const state = new PublicKey(this.args[0])
-      const contractState = await this.program.account.state.fetch(state)
-      const owner = contractState.config.owner.toString()
+      const owner = await this.readOwner()
       const contract = RDD.getContractFromRDD(RDD.load(this.flags.network, this.flags.rdd), this.args[0])
-      
+
       logger.info(`Transferring Ownership of contract of type "${contract.type}":
       - Contract: ${contract.address} ${contract.description ? '- ' + contract.description : ''}
-      - Current Owner: ${owner}
+      - Current Owner: ${owner.toString()}
       - Next Owner: ${this.flags.to}`)
       await prompt('Continue?')
     }
@@ -61,14 +70,14 @@ export const makeTransferOwnershipCommand = (contractId: CONTRACT_LIST): SolanaC
     execute = async () => {
       await this.buildCommand(this.flags, this.args)
       await this.beforeExecute()
-      
+
       const signer = this.wallet.publicKey
       const rawTx = await this.makeRawTransaction(signer)
       await this.simulateTx(signer, rawTx)
       const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, this.program.idl)(rawTx)
-      
+
       logger.success(`Ownership transferred to ${new PublicKey(this.flags.to)} on tx ${txhash}`)
-      
+
       const state = this.args[0]
       return {
         responses: [
