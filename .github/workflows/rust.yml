@@ -37,6 +37,11 @@ jobs:
         key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
     - run: solana-keygen new -o id.json
+    - name: Compile typescript client
+      run: |
+       cd ../ts
+       yarn install --frozen-lockfile
+       yarn build
     - run: yarn install --frozen-lockfile
     - run: anchor test
     - run: |
