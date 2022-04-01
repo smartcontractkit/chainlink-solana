@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-solana
 
-go 1.17
+go 1.18
 
 require (
 	github.com/gagliardetto/binary v0.6.1

@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-solana/ops
 
-go 1.17
+go 1.18
 
 require (
 	github.com/pkg/errors v0.9.1
