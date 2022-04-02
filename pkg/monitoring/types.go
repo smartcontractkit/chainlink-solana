@@ -24,5 +24,5 @@ type Log struct {
 	Slot      uint64
 	Signature []byte
 	Err       interface{} // Either Error or nil (if not error)
-	Logs      []string
+	Events    []string    // json serialized events from the program
 }

@@ -1,3 +1,4 @@
+/*
 package main
 
 import (
@@ -74,8 +75,8 @@ func main() {
 		fmt.Println(">>>>>>>>>>>>>>")
 	}
 }
+*/
 
-/*
 package main
 
 import (
@@ -85,14 +86,23 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/gagliardetto/solana-go/rpc/ws"
 	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring"
 	"github.com/smartcontractkit/chainlink/core/logger"
 )
 
 func main() {
-	rpcEndpoint := "https://floral-morning-sun.solana-devnet.quiknode.pro/d874b0e33834d6babaa1e60a5b6181f22dd0409e/"
-	client := rpc.New(rpcEndpoint)
+	ctx := context.Background()
+
+	//rpcEndpoint := "https://floral-morning-sun.solana-devnet.quiknode.pro/d874b0e33834d6babaa1e60a5b6181f22dd0409e/"
+	//rpcClient := rpc.New(rpcEndpoint)
+
+	wsEndpoint := "wss://floral-morning-sun.solana-devnet.quiknode.pro/d874b0e33834d6babaa1e60a5b6181f22dd0409e/" // testnet program
+	wsClient, err := ws.Connect(ctx, wsEndpoint)
+	if err != nil {
+		panic(err)
+	}
 
 	coreLog, closeLggr := logger.NewLogger()
 	defer func() {
@@ -103,13 +113,16 @@ func main() {
 	log := logWrapper{coreLog}
 
 	//accountPubKeyBase58 := "2TQmhSnGK5NwdXBKEmJ8wfwH17rNSQgH11SVdHkYC1ZD" // testnet LINK/USD state
-	accountPubKeyBase58 := "HoLknTuGPcjsVDyEAu92x1njFKc5uUXuYLYFuhiEatF1" // testnet LINK/USD transmissions
+	//accountPubKeyBase58 := "HoLknTuGPcjsVDyEAu92x1njFKc5uUXuYLYFuhiEatF1" // testnet LINK/USD transmissions
+	accountPubKeyBase58 := "STGhiM1ZaLjDLZDGcVFp3ppdetggLAs6MXezw5DXXH3" // testnet program address
 
-	accounts := []solana.PublicKey{
-		solana.MustPublicKeyFromBase58(accountPubKeyBase58),
-	}
+	//accounts := []solana.PublicKey{
+	//	solana.MustPublicKeyFromBase58(accountPubKeyBase58),
+	//}
+	account := solana.MustPublicKeyFromBase58(accountPubKeyBase58)
 
-	commitment := rpc.CommitmentFinalized
+	//commitment := rpc.CommitmentFinalized
+	commitment := rpc.CommitmentProcessed
 
 	//source := monitoring.NewAccountSource(
 	//	client,
@@ -117,16 +130,31 @@ func main() {
 	//	log.With("source", "state"),
 	//	commitment,
 	//)
-	source := monitoring.NewTransmissionAccountSource(
-		client,
-		accounts,
-		log.With("source", "transmissions"),
+	//source := monitoring.NewTransmissionAccountSource(
+	//	client,
+	//	accounts,
+	//	log.With("source", "transmissions"),
+	//	commitment,
+	//)
+
+	//data, err := source.Fetch(ctx)
+	//fmt.Println(">>>>>>>>>>>", data, err)
+
+	updater := monitoring.NewLogsUpdater(
+		wsClient,
+		account,
 		commitment,
+		log,
 	)
 
-	ctx := context.Background()
-	data, err := source.Fetch(ctx)
-	fmt.Println(">>>>>>>>>>>", data, err)
+	go updater.Run(ctx)
+
+	for {
+		select {
+		case updates := <-updater.Updates():
+			fmt.Println(">>>>>", updates)
+		}
+	}
 }
 
 // adapt core logger to monitoring logger.
@@ -138,4 +166,3 @@ type logWrapper struct {
 func (l logWrapper) With(values ...interface{}) relayMonitoring.Logger {
 	return logWrapper{l.Logger.With(values...)}
 }
-*/
