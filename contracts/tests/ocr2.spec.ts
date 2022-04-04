@@ -19,7 +19,7 @@ import { assert } from "chai";
 import { randomBytes, createHash } from "crypto";
 import * as secp256k1 from "secp256k1";
 import { keccak256 } from "ethereum-cryptography/keccak";
-import { Chainlink } from "@chainlink/solana-sdk";
+import { OCR2Feed } from "@chainlink/solana-sdk";
 
 // generate a new keypair using `solana-keygen new -o id.json`
 
@@ -919,7 +919,7 @@ describe("ocr2", async () => {
   })
 
   it("TS client listens and parses state", async () => {
-    let cl = new Chainlink(program, provider);
+    let cl = new OCR2Feed(program, provider);
     // causes the tests cases to block finishing
     // const feedNum = cl.onRound(state, (event) => {
     //   console.log(event)
@@ -1032,7 +1032,7 @@ describe("ocr2", async () => {
   });
 
   it("TS client listens and parses state", async () => {
-    // let cl = new Chainlink(program, provider);
+    // let cl = new OCR2Feed(program, provider);
     // // cl = cl.load();
     // const feedNum = cl.onRound(state, (event) => {
     //   console.log(event)
