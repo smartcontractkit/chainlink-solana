@@ -19,7 +19,7 @@ import { assert } from "chai";
 import { randomBytes, createHash } from "crypto";
 import * as secp256k1 from "secp256k1";
 import { keccak256 } from "ethereum-cryptography/keccak";
-import { OCR2Feed } from "@chainlink/solana-sdk";
+import { Round as OCRRound, OCR2Feed } from "@chainlink/solana-sdk";
 
 // generate a new keypair using `solana-keygen new -o id.json`
 
@@ -919,12 +919,22 @@ describe("ocr2", async () => {
   })
 
   it("TS client listens and parses state", async () => {
-    let cl = new OCR2Feed(program, provider);
-    // causes the tests cases to block finishing
-    // const feedNum = cl.onRound(state, (event) => {
-    //   console.log(event)
-    // })
-    let transmitTx = await transmit(16, 16, new BN(16));
+    let feed = new OCR2Feed(program, provider);
+    let listener = null;
+
+    let success = new Promise<OCRRound>((resolve, _reject) => {
+      listener = feed.onRound(state.publicKey, (event) => {
+        resolve(event)
+      });
+    });
+
+    let transmitTx = transmit(100, 1, new BN(16));
+  
+    let event = await success;
+    assert.ok(event.feed.equals(state.publicKey))
+    assert.equal(event.answer.toNumber(), 16)
+
+    await feed.removeListener(listener);
   })
 
   it("Reclaims rent exempt deposit when closing down a feed", async () => {
@@ -1031,13 +1041,4 @@ describe("ocr2", async () => {
     }
   });
 
-  it("TS client listens and parses state", async () => {
-    // let cl = new OCR2Feed(program, provider);
-    // // cl = cl.load();
-    // const feedNum = cl.onRound(state, (event) => {
-    //   console.log(event)
-    // })
-    // let transmitTx = await transmit(16, 16, new BN(16));
-
-  })
 });
