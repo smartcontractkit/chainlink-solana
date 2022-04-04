@@ -1,6 +1,7 @@
 package monitoring
 
 import (
+	"flag"
 	"fmt"
 	"net/url"
 	"os"
@@ -10,12 +11,20 @@ import (
 )
 
 type SolanaConfig struct {
+	RunMode string // either "monitor" or "ingestor"
+
 	RPCEndpoint  string
+	WSEndpoint   string
 	NetworkName  string
 	NetworkID    string
 	ChainID      string
 	ReadTimeout  time.Duration
 	PollInterval time.Duration
+
+	// Solana-specific kafka topics
+	StateKafkaTopic         string
+	TransmissionsKafkaTopic string
+	EventsKafkaTopic        string
 }
 
 var _ relayMonitoring.ChainConfig = SolanaConfig{}
@@ -38,6 +47,10 @@ func (s SolanaConfig) ToMapping() map[string]interface{} {
 func ParseSolanaConfig() (SolanaConfig, error) {
 	cfg := SolanaConfig{}
 
+	if err := parseFlags(&cfg); err != nil {
+		return cfg, err
+	}
+
 	if err := parseEnvVars(&cfg); err != nil {
 		return cfg, err
 	}
@@ -48,9 +61,25 @@ func ParseSolanaConfig() (SolanaConfig, error) {
 	return cfg, err
 }
 
+func parseFlags(cfg *SolanaConfig) error {
+	runMode := flag.String("run-mode", "monitor", "either 'monitor' or 'ingestor'")
+	flag.Parse()
+	if runMode == nil {
+		return fmt.Errorf("must set --run-mode")
+	}
+	if *runMode != "monitor" && *runMode != "ingestor" {
+		return fmt.Errorf("--run-mode needs to be either 'monitor' or 'ingestor', '%s' not supported", cfg.RunMode)
+	}
+	cfg.RunMode = *runMode
+	return nil
+}
+
 func parseEnvVars(cfg *SolanaConfig) error {
 	if value, isPresent := os.LookupEnv("SOLANA_RPC_ENDPOINT"); isPresent {
 		cfg.RPCEndpoint = value
+	}
+	if value, isPresent := os.LookupEnv("SOLANA_WS_ENDPOINT"); isPresent {
+		cfg.WSEndpoint = value
 	}
 	if value, isPresent := os.LookupEnv("SOLANA_NETWORK_NAME"); isPresent {
 		cfg.NetworkName = value
@@ -75,17 +104,35 @@ func parseEnvVars(cfg *SolanaConfig) error {
 		}
 		cfg.PollInterval = pollInterval
 	}
+	if value, isPresent := os.LookupEnv("SOLANA_STATE_KAFKA_TOPIC"); isPresent {
+		cfg.StateKafkaTopic = value
+	}
+	if value, isPresent := os.LookupEnv("SOLANA_TRANSMISSIONS_KAFKA_TOPIC"); isPresent {
+		cfg.TransmissionsKafkaTopic = value
+	}
+	if value, isPresent := os.LookupEnv("SOLANA_EVENTS_KAFKA_TOPIC"); isPresent {
+		cfg.EventsKafkaTopic = value
+	}
 	return nil
 }
 
 func validateConfig(cfg SolanaConfig) error {
 	// Required config
-	for envVarName, currentValue := range map[string]string{
-		"SOLANA_RPC_ENDPOINT": cfg.RPCEndpoint,
+	required := map[string]string{
 		"SOLANA_NETWORK_NAME": cfg.NetworkName,
 		"SOLANA_NETWORK_ID":   cfg.NetworkID,
 		"SOLANA_CHAIN_ID":     cfg.ChainID,
-	} {
+	}
+	if cfg.RunMode == "monitor" {
+		required["SOLANA_RPC_ENDPOINT"] = cfg.RPCEndpoint
+	}
+	if cfg.RunMode == "ingestor" {
+		required["SOLANA_WS_ENDPOINT"] = cfg.WSEndpoint
+		required["SOLANA_STATE_KAFKA_TOPIC"] = cfg.StateKafkaTopic
+		required["SOLANA_TRANSMISSIONS_KAFKA_TOPIC"] = cfg.TransmissionsKafkaTopic
+		required["SOLANA_EVENTS_KAFKA_TOPIC"] = cfg.EventsKafkaTopic
+	}
+	for envVarName, currentValue := range required {
 		if currentValue == "" {
 			return fmt.Errorf("'%s' env var is required", envVarName)
 		}
@@ -93,8 +140,9 @@ func validateConfig(cfg SolanaConfig) error {
 	// Validate URLs.
 	for envVarName, currentValue := range map[string]string{
 		"SOLANA_RPC_ENDPOINT": cfg.RPCEndpoint,
+		"SOLANA_WS_ENDPOINT":  cfg.WSEndpoint,
 	} {
-		if _, err := url.ParseRequestURI(currentValue); err != nil {
+		if _, err := url.ParseRequestURI(currentValue); currentValue != "" && err != nil {
 			return fmt.Errorf("%s='%s' is not a valid URL: %w", envVarName, currentValue, err)
 		}
 	}
