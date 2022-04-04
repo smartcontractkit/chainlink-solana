@@ -11,7 +11,6 @@ on:
         type: string
   # tmp remove after testing complete
   push:
-    [chaos_ci_fix]
 
 jobs:
   chaos_testing_build_contracts:
