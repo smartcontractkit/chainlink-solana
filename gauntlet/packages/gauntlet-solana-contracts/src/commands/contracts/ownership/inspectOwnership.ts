@@ -8,6 +8,7 @@ import { SolanaConstructor } from '../../../lib/types'
 export const makeInspectOwnershipCommand = (
   contractId: CONTRACT_LIST,
   getOwner: (program, state) => Promise<PublicKey>,
+  getProposedOwner: (program, state) => Promise<PublicKey>,
 ): SolanaConstructor => {
   return class InspectOwnership extends SolanaCommand {
     static id = `${contractId}:inspect_ownership`
@@ -20,14 +21,19 @@ export const makeInspectOwnershipCommand = (
     }
 
     execute = async () => {
-      // Get contract owner
+      // Get contract owner and proposed owner
       logger.info(`Checking owner of ${this.args[0]}`)
       const contract = getContract(contractId, '')
       const program = this.loadProgram(contract.idl, contract.programId.toString())
       const state = new PublicKey(this.args[0])
       const owner = await getOwner(program, state)
+      const proposedOwner = await getProposedOwner(program, state)
       // Log owner of contract
       logger.info(`Owner: ${owner}`)
+      // Log proposed owner of contract
+      if (proposedOwner!!) {
+        logger.info(`Proposed Owner: ${proposedOwner}`)
+      }
       // Return response
       return {
         data: {

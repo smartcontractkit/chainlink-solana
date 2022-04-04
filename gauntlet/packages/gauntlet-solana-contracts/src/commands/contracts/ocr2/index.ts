@@ -26,6 +26,11 @@ const getOwner = async (program, state) => {
   return contractState?.config?.owner
 }
 
+const getProposedOwner = async (program, state) => {
+  const contractState = await program.account.state.fetch(state)
+  return contractState?.config?.proposedOwner
+}
+
 export default [
   Initialize,
   OCR2InitializeFlow,
@@ -42,7 +47,7 @@ export default [
   Fund,
   makeAcceptOwnershipCommand(CONTRACT_LIST.OCR_2, getOwner),
   makeTransferOwnershipCommand(CONTRACT_LIST.OCR_2, getOwner),
-  makeInspectOwnershipCommand(CONTRACT_LIST.OCR_2, getOwner),
+  makeInspectOwnershipCommand(CONTRACT_LIST.OCR_2, getOwner, getProposedOwner),
   makeUpgradeProgramCommand(CONTRACT_LIST.OCR_2),
   // Inspection
   ...Inspection,
