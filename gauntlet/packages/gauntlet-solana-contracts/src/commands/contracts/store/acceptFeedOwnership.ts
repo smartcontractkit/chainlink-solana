@@ -8,12 +8,12 @@ export default class AcceptFeedOwnership extends SolanaCommand {
   static id = 'store:accept_feed_ownership'
   static category = CONTRACT_LIST.STORE
 
-  static examples = [`yarn gauntlet store:accept_feed_ownership --network=devnet --state=[PROGRAM_STATE]`]
+  static examples = [`yarn gauntlet store:accept_feed_ownership --network=devnet [PROGRAM_STATE]`]
 
   constructor(flags, args) {
     super(flags, args)
 
-    this.require(!!this.flags.state, 'Please provide flags with "state"')
+    this.requireArgs('Please provide the state as an arg!')
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
@@ -21,7 +21,7 @@ export default class AcceptFeedOwnership extends SolanaCommand {
     const address = contract.programId.toString()
     const program = this.loadProgram(contract.idl, address)
 
-    const state = new PublicKey(this.flags.state)
+    const state = new PublicKey(this.args[0])
 
     // Need to resolve feed.proposedOwner. This will either match signer
     // store with store.owner == signer. If not, the instruction will error
@@ -42,16 +42,17 @@ export default class AcceptFeedOwnership extends SolanaCommand {
     const contract = getContract(CONTRACT_LIST.STORE, '')
     const address = contract.programId.toString()
     const program = this.loadProgram(contract.idl, address)
+    const state = this.args[0]
 
     const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
-    await prompt(`Accepting ownership of feed/transmission state (${this.flags.state.toString()}). Continue?`)
+    await prompt(`Accepting ownership of feed/transmission state (${state}). Continue?`)
     const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx)
     logger.success(`Accepted ownership on tx hash: ${txhash}`)
     return {
       responses: [
         {
-          tx: this.wrapResponse(txhash, this.flags.state),
-          contract: this.flags.state,
+          tx: this.wrapResponse(txhash, state),
+          contract: state,
         },
       ],
     } as Result<TransactionResponse>

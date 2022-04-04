@@ -315,8 +315,8 @@ func (d *Deployer) DeployOCR() error {
 	if err = d.gauntlet.ExecCommand(
 		"store:transfer_feed_ownership",
 		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("state", d.Account[OCRTransmissions]),
 		d.gauntlet.Flag("to", d.Account[StoreAccount]),
+		d.Account[OCRTransmissions],
 	); err != nil {
 		return errors.Wrap(err, "'store:transfer_feed_ownership' call failed")
 	}
@@ -324,8 +324,8 @@ func (d *Deployer) DeployOCR() error {
 	if err = d.gauntlet.ExecCommand(
 		"store:accept_feed_ownership",
 		d.gauntlet.Flag("network", d.network),
-		d.gauntlet.Flag("state", d.Account[OCRTransmissions]),
 		d.gauntlet.Flag("to", d.Account[StoreAccount]),
+		d.Account[OCRTransmissions],
 	); err != nil {
 		return errors.Wrap(err, "'store:accept_feed_ownership' call failed")
 	}

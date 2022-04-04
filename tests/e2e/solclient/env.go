@@ -11,15 +11,6 @@ func NewChainlinkSolOCRv2(nodes int, stateful bool) *environment.Config {
 		Charts: environment.Charts{
 			"solana-validator": {
 				Index: 1,
-				// TODO: remove these values when helm-env is properly setup with new version and the image is in chainlink ecr
-				Values: map[string]interface{}{
-					"sol": map[string]interface{}{
-						"image": map[string]interface{}{
-							"image":   "tateexon/solana-validator",
-							"version": "1.9.14",
-						},
-					},
-				},
 			},
 			"mockserver-config": {
 				Index: 2,

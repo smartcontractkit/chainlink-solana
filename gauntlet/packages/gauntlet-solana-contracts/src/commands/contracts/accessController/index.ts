@@ -6,11 +6,16 @@ import { makeTransferOwnershipCommand } from '../ownership/transferOwnership'
 import { CONTRACT_LIST } from '../../../lib/contracts'
 import { makeUpgradeProgramCommand } from '../../abstract/upgrade'
 
+const getOwner = async (program, state) => {
+  const contractState = await program.account.accessController.fetch(state)
+  return contractState?.owner
+}
+
 export default [
   Initialize,
   AddAccess,
   ReadState,
-  makeAcceptOwnershipCommand(CONTRACT_LIST.ACCESS_CONTROLLER),
-  makeTransferOwnershipCommand(CONTRACT_LIST.ACCESS_CONTROLLER),
+  makeAcceptOwnershipCommand(CONTRACT_LIST.ACCESS_CONTROLLER, getOwner),
+  makeTransferOwnershipCommand(CONTRACT_LIST.ACCESS_CONTROLLER, getOwner),
   makeUpgradeProgramCommand(CONTRACT_LIST.ACCESS_CONTROLLER),
 ]

@@ -49,7 +49,7 @@ export const wrapCommand = (command) => {
       const proposal = new PublicKey(this.flags.proposal || this.flags.multisigProposal || rawTxs[0].keys[1].pubkey)
 
       if (this.flags.execute) {
-        await prompt('CREATION,APPROVAL or EXECUTION TX will be executed. Continue?')
+        await prompt('Continue?')
         logger.loading(`Executing action...`)
         const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, this.program.idl)(rawTxs)
         logger.success(`TX succeded at ${txhash}`)
@@ -156,6 +156,7 @@ export const wrapCommand = (command) => {
       if (!this.isReadyForExecution(proposalState, threshold)) {
         return await this.approveProposal(proposal, signer, proposalContext)
       }
+
       return await this.executeProposal(proposal, signer, proposalContext)
     }
 

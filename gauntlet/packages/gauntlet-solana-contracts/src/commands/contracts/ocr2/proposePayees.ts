@@ -1,10 +1,11 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, prompt, diff } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import RDD from '../../../lib/rdd'
+import { printDiff } from '../../../lib/diff'
 
 type Input = {
   operators: {
@@ -118,7 +119,7 @@ export default class ProposePayees extends SolanaCommand {
     const proposalInfo = await this.program.account.proposal.fetch(proposal)
     const payees = proposalInfo.oracles.xs
       .slice(0, proposalInfo.oracles.len)
-      .map(({ transmitter }) => this.contractInput.payeeByTransmitter[new PublicKey(transmitter).toString()])
+      .map(({ transmitter }) => this.contractInput.payeeByTransmitter[transmitter.toString()])
 
     const ix = this.program.instruction.proposePayees(token.publicKey, payees, {
       accounts: {
@@ -131,36 +132,29 @@ export default class ProposePayees extends SolanaCommand {
 
   beforeExecute = async () => {
     const state = new PublicKey(this.args[0])
+    const proposal = new PublicKey(this.input.proposalId)
     const contractState = await this.program.account.state.fetch(state)
+    const proposalState = await this.program.account.proposal.fetch(proposal)
 
-    const payeesInContract = contractState.oracles.xs.slice(0, contractState.oracles.len.toNumber()).reduce(
-      (agg, { transmitter, payee }, idx) => ({
-        ...agg,
-        [`oracle#${idx}`]: {
+    const payeesInContract = {
+      oracles: contractState.oracles.xs
+        .slice(0, contractState.oracles.len.toNumber())
+        .map(({ transmitter, payee }) => ({
           transmitter: transmitter.toString(),
           payee: payee.toString(),
-        },
-      }),
-      {},
-    )
-    logger.info(`Existing payees on contract ${this.args[0]}`)
-    logger.log(payeesInContract)
+        })),
+    }
 
-    const proposedPayees = Object.entries(this.contractInput.payeeByTransmitter).reduce(
-      (agg, [transmitter, payee], idx) => ({
-        ...agg,
-        [`oracle#${idx}`]: {
-          transmitter,
-          payee: payee.toString(),
-        },
-      }),
-      {},
-    )
+    const proposedPayees = {
+      oracles: proposalState.oracles.xs.slice(0, proposalState.oracles.len).map(({ transmitter }) => ({
+        transmitter: transmitter.toString(),
+        payee: this.contractInput.payeeByTransmitter[transmitter.toString()].toString(),
+      })),
+    }
+
     logger.info(`Proposed payees for contract ${this.args[0]}`)
-    logger.log(proposedPayees)
+    printDiff(payeesInContract, proposedPayees)
 
-    // todo: enable diff when fixed
-    // diff.printDiff(payeesInContract, proposedPayees)
     await prompt('Continue?')
   }
 
