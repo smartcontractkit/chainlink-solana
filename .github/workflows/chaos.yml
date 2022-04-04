@@ -9,8 +9,6 @@ on:
         required: true
         default: develop
         type: string
-  # tmp remove after testing complete
-  push:
 
 jobs:
   chaos_testing_build_contracts:
