@@ -9,6 +9,9 @@ on:
         required: true
         default: develop
         type: string
+  # tmp remove after testing complete
+  push:
+    [chaos_ci_fix]
 
 jobs:
   chaos_testing_build_contracts:
@@ -88,18 +91,16 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+            ~/go/bin
+          key: ${{ runner.os }}-go2-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-
+            ${{ runner.os }}-go2-
       - name: Download Go Vendor Packages
         if: steps.cache-packages.outputs.cache-hit != 'true'
         run: go mod download
       - name: Install Ginkgo CLI
-        run: |
-          go get github.com/onsi/ginkgo/v2/ginkgo/generators@v2.1.2
-          go get github.com/onsi/ginkgo/v2/ginkgo/internal@v2.1.2
-          go get github.com/onsi/ginkgo/v2/ginkgo/labels@v2.1.2
-          go install github.com/onsi/ginkgo/v2/ginkgo
+        if: steps.cache-packages.outputs.cache-hit != 'true'
+        run: make install
       - name: Download Artifacts
         uses: actions/download-artifact@master
         with:
