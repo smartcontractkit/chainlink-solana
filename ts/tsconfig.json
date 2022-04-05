@@ -1,0 +1,15 @@
+{
+    "extends": "./tsconfig.base.json",
+    "include": ["**/*.ts"],
+    "exclude": ["**/*.test.ts"],
+    "compilerOptions": {
+        "tsBuildInfoFile": "dist/.tsbuildinfo",
+        "outDir": "dist",
+        "rootDir": "src"
+    },
+    "typedocOptions": {
+        "entryPoints": "src/index.ts",
+        "out": "docs",
+        "readme": "README.md"
+    }
+}
