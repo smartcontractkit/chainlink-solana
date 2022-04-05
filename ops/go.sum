@@ -1257,8 +1257,10 @@ github.com/sirupsen/logrus v1.6.0/go.mod h1:7uNnSEd1DgxDLC74fIahvMZmmYsHGZGEOFrf
 github.com/sirupsen/logrus v1.7.0/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
 github.com/sirupsen/logrus v1.8.1 h1:dJKuHgqk1NNQlqoA6BTlM1Wf9DOH3NBjQyu0h9+AZZE=
 github.com/sirupsen/logrus v1.8.1/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
-github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20220318225854-968fe6a058ca h1:zjwEWhHxnma+f7xzmY2TwjbRcfLLM5vlitvlsqXOVy8=
-github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20220318225854-968fe6a058ca/go.mod h1:Ev75zX13prJKIdg7ziKZq59szQKo9vZR9AYIcI0yaSE=
+github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20220405200649-5970f8a8969e h1:m0SaLa8PRd69pOdqrLmFa5jKrDNI+55LJWoxH+ojkvY=
+github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20220405200649-5970f8a8969e/go.mod h1:7PYQS/cRMgbzlkiuAyFGhDTuiEvHuNSZTlau4A1sM3Q=
+github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20220405205522-cb8e5cd6bb3f h1:r4q/sS9SiP78OWSs34N5EZx94lDEt73Y4pTOtZXYuks=
+github.com/smartcontractkit/chainlink-relay/ops v0.0.0-20220405205522-cb8e5cd6bb3f/go.mod h1:7PYQS/cRMgbzlkiuAyFGhDTuiEvHuNSZTlau4A1sM3Q=
 github.com/smartcontractkit/helmenv v1.0.33 h1:yJEY3cmt6ADrM2BnzUKYSYf+1sib64T+jQ33OYKssaY=
 github.com/smartcontractkit/helmenv v1.0.33/go.mod h1:pkScfFRZM9UhMAqeG+Bfxyy7YjLWh8pY6vmNGdTpKJs=
 github.com/smartcontractkit/integrations-framework v1.0.52-0.20220318155657-306acd34b9c6 h1:56jY0A9fSONVx0RM7RJd7j4Ds9Yx9t2c4L9/qp8jrV4=
