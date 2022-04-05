@@ -9,10 +9,7 @@ export { makeTx } from './lib/utils'
 const baseList = [...Solana, SendRawTx]
 
 export const commands = {
-  custom: [
-    ...baseList,
-    ...baseList.map(wrapCommand),
-  ],
+  custom: [...baseList, ...baseList.map(wrapCommand)],
   loadDefaultFlags: () => defaultFlags,
   abstract: {
     findPolymorphic: () => undefined,

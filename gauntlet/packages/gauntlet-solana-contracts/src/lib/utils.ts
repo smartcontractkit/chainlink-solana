@@ -1,6 +1,5 @@
 import { Transaction, TransactionCtorFields, TransactionInstruction } from '@solana/web3.js'
 import * as BufferLayout from '@solana/buffer-layout'
-import assert from 'assert'
 
 export const divideIntoChunks = (arr: Array<any> | Buffer, chunkSize: number): any[][] => {
   const chunks: any[] = []
@@ -38,16 +37,4 @@ export const encodeInstruction = (data: any): Buffer => {
   const instructionBuffer = Buffer.alloc(4 + 4 + 8 + CHUNK_SIZE)
   const encodedSize = dataLayout.encode(data, instructionBuffer)
   return instructionBuffer.slice(0, encodedSize)
-}
-
-export const isDeepEqual = (a: any, b: any) => {
-  try {
-    assert.deepStrictEqual(a, b)
-  } catch (error) {
-    if (error.name === 'AssertionError') {
-      return false
-    }
-    throw error
-  }
-  return true
 }
