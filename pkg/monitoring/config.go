@@ -1,7 +1,6 @@
 package monitoring
 
 import (
-	"flag"
 	"fmt"
 	"net/url"
 	"os"
@@ -47,10 +46,6 @@ func (s SolanaConfig) ToMapping() map[string]interface{} {
 func ParseSolanaConfig() (SolanaConfig, error) {
 	cfg := SolanaConfig{}
 
-	if err := parseFlags(&cfg); err != nil {
-		return cfg, err
-	}
-
 	if err := parseEnvVars(&cfg); err != nil {
 		return cfg, err
 	}
@@ -61,20 +56,10 @@ func ParseSolanaConfig() (SolanaConfig, error) {
 	return cfg, err
 }
 
-func parseFlags(cfg *SolanaConfig) error {
-	runMode := flag.String("run-mode", "monitor", "either 'monitor' or 'ingestor'")
-	flag.Parse()
-	if runMode == nil {
-		return fmt.Errorf("must set --run-mode")
-	}
-	if *runMode != "monitor" && *runMode != "ingestor" {
-		return fmt.Errorf("--run-mode needs to be either 'monitor' or 'ingestor', '%s' not supported", cfg.RunMode)
-	}
-	cfg.RunMode = *runMode
-	return nil
-}
-
 func parseEnvVars(cfg *SolanaConfig) error {
+	if value, isPresent := os.LookupEnv("SOLANA_RUN_MODE"); isPresent {
+		cfg.RunMode = value
+	}
 	if value, isPresent := os.LookupEnv("SOLANA_RPC_ENDPOINT"); isPresent {
 		cfg.RPCEndpoint = value
 	}
@@ -117,6 +102,11 @@ func parseEnvVars(cfg *SolanaConfig) error {
 }
 
 func validateConfig(cfg SolanaConfig) error {
+	// RunMode
+	if cfg.RunMode != "" && cfg.RunMode != "monitor" && cfg.RunMode != "ingestor" {
+		return fmt.Errorf("SOLANA_RUN_MODE should be either 'monitor' or 'ingestor' and it defaults to 'monitor'")
+	}
+
 	// Required config
 	required := map[string]string{
 		"SOLANA_NETWORK_NAME": cfg.NetworkName,
@@ -150,6 +140,9 @@ func validateConfig(cfg SolanaConfig) error {
 }
 
 func applyDefaults(cfg *SolanaConfig) {
+	if cfg.RunMode == "" {
+		cfg.RunMode = "monitor"
+	}
 	if cfg.ReadTimeout == 0 {
 		cfg.ReadTimeout = 2 * time.Second
 	}
