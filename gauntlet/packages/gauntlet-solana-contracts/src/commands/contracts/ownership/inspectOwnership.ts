@@ -37,7 +37,7 @@ export const makeInspectOwnershipCommand = (
       // Log owner of contract
       logger.info(`Owner: ${ownership.owner}`)
       // Log proposed owner of contract if it exists
-      if (ownership.proposedOwner!!) {
+      if (!!ownership.proposedOwner) {
         logger.info(`Proposed Owner: ${ownership.proposedOwner}`)
       }
       // Return response
