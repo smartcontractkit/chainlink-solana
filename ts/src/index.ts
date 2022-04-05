@@ -3,10 +3,10 @@ import { BN } from "@project-serum/anchor";
 import { PublicKey } from "@solana/web3.js";
 
 export const CHAINLINK_AGGREGATOR_PROGRAM_ID = new PublicKey(
-  "HW3ipKzeeduJq6f1NqRCw4doknMeWkfrM4WxobtG3o5v"
+  "cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ"
 );
 export const CHAINLINK_STORE_PROGRAM_ID = new PublicKey(
-  "CaH12fwNTKJAG8PxEvo9R96Zc2j8qNHZaFj8ZW49yZNT"
+  "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny"
 );
 
 export interface Round {
