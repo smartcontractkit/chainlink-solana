@@ -9,6 +9,7 @@ import SetupFlow from './setup.dev.flow'
 import Transmit from './transmit.dev'
 import Inspection from './inspection'
 import { makeAcceptOwnershipCommand } from '../ownership/acceptOwnership'
+import { makeInspectOwnershipCommand } from '../ownership/inspectOwnership'
 import { CONTRACT_LIST } from '../../../lib/contracts'
 import { makeTransferOwnershipCommand } from '../ownership/transferOwnership'
 import { makeUpgradeProgramCommand } from '../../abstract/upgrade'
@@ -22,7 +23,10 @@ import Close from './close'
 
 const getOwner = async (program, state) => {
   const contractState = await program.account.state.fetch(state)
-  return contractState?.config?.owner
+  return {
+    owner: contractState?.config?.owner,
+    proposedOwner: contractState?.config?.proposedOwner,
+  }
 }
 
 export default [
@@ -41,6 +45,7 @@ export default [
   Fund,
   makeAcceptOwnershipCommand(CONTRACT_LIST.OCR_2, getOwner),
   makeTransferOwnershipCommand(CONTRACT_LIST.OCR_2, getOwner),
+  makeInspectOwnershipCommand(CONTRACT_LIST.OCR_2, getOwner),
   makeUpgradeProgramCommand(CONTRACT_LIST.OCR_2),
   // Inspection
   ...Inspection,
