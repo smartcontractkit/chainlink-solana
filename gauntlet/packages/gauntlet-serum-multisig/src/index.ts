@@ -1,4 +1,3 @@
-import { commands } from '@chainlink/gauntlet-solana-contracts'
 import { executeCLI } from '@chainlink/gauntlet-core'
 import { existsSync } from 'fs'
 import path from 'path'
@@ -9,7 +8,7 @@ import CreateMultisig from './commands/create'
 import MultisigInspect from './commands/inspect'
 
 export const multisigCommands = {
-  custom: [...commands.custom.concat(multisigSpecificCommands).map(wrapCommand), CreateMultisig, MultisigInspect],
+  custom: [multisigSpecificCommands.map(wrapCommand), CreateMultisig, MultisigInspect],
   loadDefaultFlags: () => ({}),
   abstract: {
     findPolymorphic: () => undefined,

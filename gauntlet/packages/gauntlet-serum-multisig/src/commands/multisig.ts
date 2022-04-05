@@ -1,7 +1,8 @@
 import { SolanaCommand } from '@chainlink/gauntlet-solana'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { PublicKey, Keypair, TransactionInstruction, SystemProgram } from '@solana/web3.js'
-import { CONTRACT_LIST, getContract, makeTx } from '@chainlink/gauntlet-solana-contracts'
+import { CONTRACT_LIST, getContract } from '../lib/contracts'
+import { makeTx } from '../lib/utils'
 import { Idl, Program } from '@project-serum/anchor'
 import { MAX_BUFFER_SIZE } from '../lib/constants'
 import { isDeepEqual } from '../lib/utils'
@@ -24,7 +25,8 @@ export const wrapCommand = (command) => {
     program: Program<Idl>
     multisigAddress: PublicKey
 
-    static id = `${command.id}`
+    static id = `${command.id}:multisig`
+    static category = command.category
 
     constructor(flags, args) {
       super(flags, args)
@@ -32,7 +34,7 @@ export const wrapCommand = (command) => {
 
       this.command = new command({ ...flags, bufferSize: MAX_BUFFER_SIZE }, args)
       this.require(!!process.env.MULTISIG_ADDRESS, 'Please set MULTISIG_ADDRESS env var')
-      this.multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS)
+      this.multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS!)
     }
 
     execute = async () => {
@@ -67,15 +69,15 @@ export const wrapCommand = (command) => {
       const latestSlot = await this.provider.connection.getSlot()
       const recentBlock = await this.provider.connection.getBlock(latestSlot)
       const tx = makeTx(rawTxs, {
-        recentBlockhash: recentBlock.blockhash,
+        recentBlockhash: recentBlock!.blockhash,
         feePayer: signer,
       })
 
       const msgData = tx.serializeMessage().toString('base64')
       logger.line()
       logger.success(
-        `Message generated with blockhash ID: ${recentBlock.blockhash.toString()} (${new Date(
-          recentBlock.blockTime * 1000,
+        `Message generated with blockhash ID: ${recentBlock!.blockhash.toString()} (${new Date(
+          recentBlock!.blockTime! * 1000,
         ).toLocaleString()}). MESSAGE DATA:`,
       )
       logger.log()
