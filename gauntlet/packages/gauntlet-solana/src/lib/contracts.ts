@@ -46,7 +46,7 @@ export const registerContracts = <List extends Record<string, string>>(
 
   const _getProgramId = (name: ListValue): PublicKey => {
     try {
-      const envName = listProgramIdEnvNames[list[name]]
+      const envName = listProgramIdEnvNames[name]
       return new PublicKey(process.env[envName])
     } catch (e) {
       throw new Error(`No program id found set for program ${name}`)
