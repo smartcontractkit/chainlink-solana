@@ -1,9 +1,8 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse, utils } from '@chainlink/gauntlet-solana'
 import { AccountMeta, PublicKey, TransactionInstruction } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { makeTx } from '../../../lib/utils'
 import { makeRawUpgradeTransaction } from '../../abstract/upgrade'
 
 export default class Migrate extends SolanaCommand {
@@ -55,7 +54,7 @@ export default class Migrate extends SolanaCommand {
   execute = async () => {
     const contract = getContract(CONTRACT_LIST.STORE, '')
     const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
-    const tx = makeTx(rawTx)
+    const tx = utils.makeTx(rawTx)
     logger.debug(tx)
     logger.info(
       `Migrating Store program (${contract.programId.toString()})

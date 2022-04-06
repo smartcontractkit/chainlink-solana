@@ -1,8 +1,8 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse, contracts } from '@chainlink/gauntlet-solana'
 import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair } from '@solana/web3.js'
-import { CONTRACT_LIST, getContract } from '../lib/contracts'
+import { MULTISIG_PROGRAM_ID_ENV, MULTISIG_NAME, SCHEMA_PATH } from '../lib/constants'
 
 type Input = {
   owners: string[]
@@ -10,8 +10,8 @@ type Input = {
 }
 
 export default class MultisigCreate extends SolanaCommand {
-  static id = 'create'
-  static category = CONTRACT_LIST.MULTISIG
+  static id = 'create:multisig'
+  static category = MULTISIG_NAME
 
   static examples = [
     'yarn gauntlet-serum-multisig create --network=local 3W37Aopzbtzczi8XWdkFTvBeSyYgXLuUkaodkq59xBCT ETqajtkz4xcsB397qTBPetprR8jMC3JszkjJJp3cjWJS QMaHW2Fpyet4ZVf7jgrGB6iirZLjwZUjN9vPKcpQrHs --threshold=2',
@@ -34,7 +34,7 @@ export default class MultisigCreate extends SolanaCommand {
 
   execute = async () => {
     this.require(this.args.length > 0, 'Please provide at least one owner as an argument')
-    const contract = getContract(CONTRACT_LIST.MULTISIG, '')
+    const contract = contracts.getContract(MULTISIG_NAME, '', MULTISIG_PROGRAM_ID_ENV, SCHEMA_PATH)
     const address = contract.programId.toString()
     const program = this.loadProgram(contract.idl, address)
 

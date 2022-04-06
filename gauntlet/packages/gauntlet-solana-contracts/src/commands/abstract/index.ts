@@ -1,7 +1,7 @@
 import { ICommand, Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { CONTRACT_LIST, DeploymentContract, getDeploymentContract } from '../../lib/contracts'
+import { SolanaCommand, TransactionResponse, contracts } from '@chainlink/gauntlet-solana'
+import { CONTRACT_LIST, getDeploymentContract } from '../../lib/contracts'
 
 enum SOLANA_OPERATIONS {
   DEPLOY = 'deploy',
@@ -10,7 +10,7 @@ enum SOLANA_OPERATIONS {
   HELP = 'help',
 }
 interface AbstractOpts {
-  contract: DeploymentContract
+  contract: contracts.DeploymentContract
   function: string
   action: SOLANA_OPERATIONS.DEPLOY | SOLANA_OPERATIONS.EXECUTE | SOLANA_OPERATIONS.QUERY | SOLANA_OPERATIONS.HELP
 }

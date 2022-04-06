@@ -1,10 +1,8 @@
-import { SolanaCommand } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, utils, contracts } from '@chainlink/gauntlet-solana'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { PublicKey, Keypair, TransactionInstruction, SystemProgram } from '@solana/web3.js'
-import { CONTRACT_LIST, getContract } from '../lib/contracts'
-import { makeTx } from '../lib/utils'
 import { Idl, Program } from '@project-serum/anchor'
-import { MAX_BUFFER_SIZE } from '../lib/constants'
+import { MAX_BUFFER_SIZE, MULTISIG_NAME, MULTISIG_PROGRAM_ID_ENV, SCHEMA_PATH } from '../lib/constants'
 import { isDeepEqual } from '../lib/utils'
 
 type ProposalContext = {
@@ -42,7 +40,7 @@ export const wrapCommand = (command) => {
       this.command.provider = this.provider
       this.command.wallet = this.wallet
 
-      const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
+      const multisig = contracts.getContract(MULTISIG_NAME, '', MULTISIG_PROGRAM_ID_ENV, SCHEMA_PATH)
       this.program = this.loadProgram(multisig.idl, multisig.programId.toString())
 
       const signer = this.wallet.publicKey
@@ -68,16 +66,21 @@ export const wrapCommand = (command) => {
 
       const latestSlot = await this.provider.connection.getSlot()
       const recentBlock = await this.provider.connection.getBlock(latestSlot)
-      const tx = makeTx(rawTxs, {
-        recentBlockhash: recentBlock!.blockhash,
+      if (!!recentBlock) {
+        return {
+          responses: [],
+        }
+      }
+      const tx = utils.makeTx(rawTxs, {
+        recentBlockhash: recentBlock.blockhash,
         feePayer: signer,
       })
 
       const msgData = tx.serializeMessage().toString('base64')
       logger.line()
       logger.success(
-        `Message generated with blockhash ID: ${recentBlock!.blockhash.toString()} (${new Date(
-          recentBlock!.blockTime! * 1000,
+        `Message generated with blockhash ID: ${recentBlock.blockhash.toString()} (${new Date(
+          recentBlock.blockTime! * 1000,
         ).toLocaleString()}). MESSAGE DATA:`,
       )
       logger.log()

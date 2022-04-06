@@ -12,7 +12,3 @@ export const isDeepEqual = (a: any, b: any) => {
   }
   return true
 }
-
-export const makeTx = (rawTx: TransactionInstruction[], opts?: TransactionCtorFields): Transaction => {
-  return rawTx.reduce((tx, instruction) => tx.add(instruction), new Transaction(opts))
-}
