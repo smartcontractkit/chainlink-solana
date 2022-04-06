@@ -16,50 +16,58 @@ export type DeploymentContract = {
   programKeypair: Keypair
 }
 
-export const getContract = (name: string, version: string, envVar: string, path: string): Contract => ({
-  id: name,
-  version,
-  idl: getContractSchema(name, version, path),
-  programId: getProgramId(name, envVar),
-})
-
-export const getDeploymentContract = (
-  name: string,
-  version: string,
-  binaryPath: string,
-  programIdPath: string,
-): DeploymentContract => ({
-  id: name,
-  programKeypair: getProgramKeypair(name, version, programIdPath),
-  bytecode: getContractCode(name, version, binaryPath),
-})
-
-// TODO: Get it from GH Releases
-const getContractCode = (name: string, version: string, path: string) => {
-  try {
-    return readFileSync(join(path, `${name}.so`))
-  } catch (e) {
-    throw new Error(`No program binary found for ${name} contract`)
+export const registerContracts = <List extends Record<string, string>>(
+  list: List,
+  listProgramIdEnvNames: Record<List[keyof List], string>,
+  artifactsPath: string,
+) => {
+  type ListValue = List[keyof List]
+  // TODO: Get it from GH Releases
+  const _getContractCode = (name: ListValue, version: string) => {
+    try {
+      return readFileSync(join(process.cwd(), `${artifactsPath}/bin`, `${name}.so`))
+    } catch (e) {
+      throw new Error(`No program binary found for ${name} contract`)
+    }
   }
-}
 
-const getContractSchema = (name: string, version: string, path: string) => {
-  return io.readJSON(join(path, `${name}`))
-}
-
-const getProgramKeypair = (name: string, version: string, path: string): Keypair => {
-  try {
-    const rawPK = io.readJSON(join(path, `${name}`))
-    return Keypair.fromSecretKey(Uint8Array.from(rawPK))
-  } catch (e) {
-    throw new Error(`No program id keypair set for program ${name}`)
+  const _getContractSchema = (name: ListValue, version: string) => {
+    return io.readJSON(join(process.cwd(), `${artifactsPath}/schemas`, `${name}`))
   }
-}
 
-const getProgramId = (name: string, envVar: string): PublicKey => {
-  try {
-    return new PublicKey(process.env[envVar]!)
-  } catch (e) {
-    throw new Error(`No program id set for program ${name}. Set it in as env var with name ${envVar}`)
+  const _getProgramKeypair = (name: ListValue, version: string): Keypair => {
+    try {
+      const rawPK = io.readJSON(join(process.cwd(), `${artifactsPath}/programId`, `${name}`))
+      return Keypair.fromSecretKey(Uint8Array.from(rawPK))
+    } catch (e) {
+      throw new Error(`No program id keypair set for program ${name}`)
+    }
+  }
+
+  const _getProgramId = (name: ListValue): PublicKey => {
+    try {
+      const envName = listProgramIdEnvNames[list[name]]
+      return new PublicKey(process.env[envName])
+    } catch (e) {
+      throw new Error(`No program id found set for program ${name}`)
+    }
+  }
+
+  const getContract = (name: ListValue, version?: string): Contract => ({
+    id: name,
+    version,
+    idl: _getContractSchema(name, version),
+    programId: _getProgramId(name),
+  })
+
+  const getDeploymentContract = (name: ListValue, version?: string): DeploymentContract => ({
+    id: name,
+    programKeypair: _getProgramKeypair(name, version),
+    bytecode: _getContractCode(name, version),
+  })
+
+  return {
+    getContract,
+    getDeploymentContract,
   }
 }

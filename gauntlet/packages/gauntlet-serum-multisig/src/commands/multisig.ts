@@ -1,9 +1,10 @@
-import { SolanaCommand, utils, contracts } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, utils } from '@chainlink/gauntlet-solana'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { PublicKey, Keypair, TransactionInstruction, SystemProgram } from '@solana/web3.js'
 import { Idl, Program } from '@project-serum/anchor'
-import { MAX_BUFFER_SIZE, MULTISIG_NAME, MULTISIG_PROGRAM_ID_ENV, SCHEMA_PATH } from '../lib/constants'
+import { MAX_BUFFER_SIZE } from '../lib/constants'
 import { isDeepEqual } from '../lib/utils'
+import { CONTRACT_LIST, getContract } from '../lib/contracts'
 
 type ProposalContext = {
   rawTx: TransactionInstruction
@@ -40,7 +41,7 @@ export const wrapCommand = (command) => {
       this.command.provider = this.provider
       this.command.wallet = this.wallet
 
-      const multisig = contracts.getContract(MULTISIG_NAME, '', MULTISIG_PROGRAM_ID_ENV, SCHEMA_PATH)
+      const multisig = getContract(CONTRACT_LIST.MULTISIG)
       this.program = this.loadProgram(multisig.idl, multisig.programId.toString())
 
       const signer = this.wallet.publicKey

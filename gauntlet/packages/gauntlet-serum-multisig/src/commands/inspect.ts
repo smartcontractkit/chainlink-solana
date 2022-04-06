@@ -1,12 +1,12 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse, contracts } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import { MULTISIG_NAME, MULTISIG_PROGRAM_ID_ENV, SCHEMA_PATH } from '../lib/constants'
+import { CONTRACT_LIST, getContract } from '../lib/contracts'
 
 export default class MultisigInspect extends SolanaCommand {
   static id = `inspect:multisig`
-  static category = MULTISIG_NAME
+  static category = CONTRACT_LIST.MULTISIG
 
   static examples = ['yarn gauntlet-serum-multisig multisig:inspect --network=local --state=MULTISIG_ACCOUNT']
 
@@ -16,7 +16,7 @@ export default class MultisigInspect extends SolanaCommand {
   }
 
   execute = async () => {
-    const multisig = contracts.getContract(MULTISIG_NAME, '', MULTISIG_PROGRAM_ID_ENV, SCHEMA_PATH)
+    const multisig = getContract(CONTRACT_LIST.MULTISIG)
     const program = this.loadProgram(multisig.idl, multisig.programId.toString())
 
     const state = new PublicKey(this.flags.state)
