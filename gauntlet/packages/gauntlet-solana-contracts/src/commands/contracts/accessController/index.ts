@@ -9,7 +9,10 @@ import { makeUpgradeProgramCommand } from '../../abstract/upgrade'
 
 const getOwner = async (program, state) => {
   const contractState = await program.account.accessController.fetch(state)
-  return contractState?.owner
+  return {
+    owner: contractState?.owner,
+    proposedOwner: contractState?.proposedOwner,
+  }
 }
 
 export default [

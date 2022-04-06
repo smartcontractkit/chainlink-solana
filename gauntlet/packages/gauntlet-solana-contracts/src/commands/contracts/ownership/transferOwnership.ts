@@ -3,12 +3,13 @@ import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
+import { GetOwnership } from './inspectOwnership'
 import { SolanaConstructor } from '../../../lib/types'
 import RDD from '../../../lib/rdd'
 
 export const makeTransferOwnershipCommand = (
   contractId: CONTRACT_LIST,
-  getOwner: (program, state) => Promise<PublicKey>,
+  getOwnership: GetOwnership,
 ): SolanaConstructor => {
   return class TransferOwnership extends SolanaCommand {
     static id = `${contractId}:transfer_ownership`
@@ -49,12 +50,12 @@ export const makeTransferOwnershipCommand = (
     }
 
     beforeExecute = async () => {
-      const owner = await getOwner(this.program, new PublicKey(this.args[0]))
+      const ownership = await getOwnership(this.program, new PublicKey(this.args[0]))
       const contract = RDD.getContractFromRDD(RDD.load(this.flags.network, this.flags.rdd), this.args[0])
 
       logger.info(`Transferring Ownership of contract of type "${contract.type}":
       - Contract: ${contract.address} ${contract.description ? '- ' + contract.description : ''}
-      - Current Owner: ${owner.toString()}
+      - Current Owner: ${ownership.owner.toString()}
       - Next Owner: ${this.flags.to}`)
       await prompt('Continue?')
     }

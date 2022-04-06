@@ -23,7 +23,10 @@ import Close from './close'
 
 const getOwner = async (program, state) => {
   const contractState = await program.account.state.fetch(state)
-  return contractState?.config?.owner
+  return {
+    owner: contractState?.config?.owner,
+    proposedOwner: contractState?.config?.proposedOwner,
+  }
 }
 
 export default [

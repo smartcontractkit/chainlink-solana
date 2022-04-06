@@ -103,11 +103,9 @@ jobs:
         run: make download
       - name: Install Ginkgo CLI
         if: steps.cache-packages.outputs.cache-hit != 'true'
-        run: |
-          make install
+        run: make install
       - name: Check for ginkgo ls
-        run: |
-          ls ~/go/bin/
+        run: ls ~/go/bin/
       - name: Download Artifacts
         uses: actions/download-artifact@master
         with:

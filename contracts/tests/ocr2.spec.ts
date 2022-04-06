@@ -19,6 +19,7 @@ import { assert } from "chai";
 import { randomBytes, createHash } from "crypto";
 import * as secp256k1 from "secp256k1";
 import { keccak256 } from "ethereum-cryptography/keccak";
+import { Round as OCRRound, OCR2Feed } from "@chainlink/solana-sdk";
 
 // generate a new keypair using `solana-keygen new -o id.json`
 
@@ -914,7 +915,26 @@ describe("ocr2", async () => {
     await transmit(rounds+1, rounds+1, new BN(rounds+1), Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]));
 
     // max value u64 juelsPerFeecoin
-    await transmit(rounds+2, rounds+2, new BN(rounds+2), Buffer.from([127, 127, 127, 127, 127, 127, 127, 127]));  
+    await transmit(rounds+2, rounds+2, new BN(rounds+2), Buffer.from([127, 127, 127, 127, 127, 127, 127, 127]));
+  })
+
+  it("TS client listens and parses state", async () => {
+    let feed = new OCR2Feed(program, provider);
+    let listener = null;
+
+    let success = new Promise<OCRRound>((resolve, _reject) => {
+      listener = feed.onRound(state.publicKey, (event) => {
+        resolve(event)
+      });
+    });
+
+    let transmitTx = transmit(100, 1, new BN(16));
+  
+    let event = await success;
+    assert.ok(event.feed.equals(state.publicKey))
+    assert.equal(event.answer.toNumber(), 16)
+
+    await feed.removeListener(listener);
   })
 
   it("Reclaims rent exempt deposit when closing down a feed", async () => {
@@ -1020,4 +1040,5 @@ describe("ocr2", async () => {
       assert.fail(`create feed shouldn't have succeeded with account size ${invalidLengths[i]}`);
     }
   });
+
 });
