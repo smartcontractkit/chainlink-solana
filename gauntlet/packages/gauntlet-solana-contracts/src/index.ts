@@ -7,11 +7,7 @@ import { defaultFlags } from './lib/args'
 const baseList = [...Solana, SendRawTx]
 
 export const commands = {
-  custom: [
-    ...multisigCommands,
-    ...baseList,
-    ...baseList.map(wrapCommand)
-  ],
+  custom: [...multisigCommands, ...baseList, ...baseList.map(wrapCommand)],
   loadDefaultFlags: () => defaultFlags,
   abstract: {
     findPolymorphic: () => undefined,

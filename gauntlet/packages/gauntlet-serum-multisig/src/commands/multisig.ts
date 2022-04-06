@@ -66,7 +66,7 @@ export const wrapCommand = (command) => {
 
       const latestSlot = await this.provider.connection.getSlot()
       const recentBlock = await this.provider.connection.getBlock(latestSlot)
-      if (!!recentBlock) {
+      if (!!recentBlock == false) {
         return {
           responses: [],
         }

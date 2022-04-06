@@ -7,14 +7,12 @@ export enum CONTRACT_LIST {
   FLAGS = 'flags',
   STORE = 'store',
   TOKEN = 'token',
-  MULTISIG = 'serum_multisig',
 }
 
 export const CONTRACT_ENV_NAMES = {
   [CONTRACT_LIST.ACCESS_CONTROLLER]: 'PROGRAM_ID_ACCESS_CONTROLLER',
   [CONTRACT_LIST.OCR_2]: 'PROGRAM_ID_OCR2',
   [CONTRACT_LIST.STORE]: 'PROGRAM_ID_STORE',
-  [CONTRACT_LIST.MULTISIG]: 'PROGRAM_ID_MULTISIG',
 }
 
 const SCHEMA_PATH = './artifacts/schemas'
