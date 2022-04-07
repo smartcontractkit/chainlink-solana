@@ -10,7 +10,7 @@ type Input = {
 }
 
 export default class MultisigCreate extends SolanaCommand {
-  static id = 'create:multisig'
+  static id = 'serum_multisig:create'
   static category = CONTRACT_LIST.MULTISIG
 
   static examples = [

@@ -5,7 +5,7 @@ import { logger } from '@chainlink/gauntlet-core/dist/utils'
 import { CONTRACT_LIST, getContract } from '../lib/contracts'
 
 export default class SetOwners extends SolanaCommand {
-  static id = 'set_owners'
+  static id = 'serum_multisig:set_owners'
   static category = CONTRACT_LIST.MULTISIG
 
   static examples = ['yarn gauntlet-serum-multisig multisig:set_owners --network=local']

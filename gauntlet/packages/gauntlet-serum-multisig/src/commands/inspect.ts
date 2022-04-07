@@ -5,7 +5,7 @@ import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../lib/contracts'
 
 export default class MultisigInspect extends SolanaCommand {
-  static id = `inspect:multisig`
+  static id = `serum_multisig:inspect`
   static category = CONTRACT_LIST.MULTISIG
 
   static examples = ['yarn gauntlet-serum-multisig multisig:inspect --network=local --state=MULTISIG_ACCOUNT']
