@@ -67,10 +67,8 @@ export const wrapCommand = (command) => {
 
       const latestSlot = await this.provider.connection.getSlot()
       const recentBlock = await this.provider.connection.getBlock(latestSlot)
-      if (!!recentBlock == false) {
-        return {
-          responses: [],
-        }
+      if (!recentBlock) {
+        throw new Error('Block not found. Could not generate message data')
       }
       const tx = utils.makeTx(rawTxs, {
         recentBlockhash: recentBlock.blockhash,
