@@ -8,7 +8,7 @@ export default class SetOwners extends SolanaCommand {
   static id = 'serum_multisig:set_owners'
   static category = CONTRACT_LIST.MULTISIG
 
-  static examples = ['yarn gauntlet-serum-multisig multisig:set_owners --network=local']
+  static examples = ['yarn gauntlet serum_multisig:set_owners:multisig --network=local [OWNERS...]']
 
   constructor(flags, args) {
     super(flags, args)
