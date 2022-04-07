@@ -1,11 +1,11 @@
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse, contracts } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
 import { Result } from '@chainlink/gauntlet-core'
 import { BN, logger } from '@chainlink/gauntlet-core/dist/utils'
+import { CONTRACT_LIST, getContract } from '../lib/contracts'
 
 export default class SetThreshold extends SolanaCommand {
-  static id = 'multisig:change_threshold'
+  static id = 'serum_multisig:change_threshold'
   static category = CONTRACT_LIST.MULTISIG
 
   static examples = ['yarn gauntlet-serum-multisig multisig:change_threshold --network=local --threshold=2 [OWNERS...]']
@@ -17,7 +17,7 @@ export default class SetThreshold extends SolanaCommand {
 
   makeRawTransaction = async (signer: PublicKey) => {
     const multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS || '')
-    const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
+    const multisig = getContract(CONTRACT_LIST.MULTISIG)
     const address = multisig.programId.toString()
     const program = this.loadProgram(multisig.idl, address)
 
@@ -27,7 +27,7 @@ export default class SetThreshold extends SolanaCommand {
     const ix = program.instruction.changeThreshold(threshold, {
       accounts: {
         multisig: multisigAddress,
-        muitisigSigner: signer,
+        multisigSigner: signer,
       },
     })
 

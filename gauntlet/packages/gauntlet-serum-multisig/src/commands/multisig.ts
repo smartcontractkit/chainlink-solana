@@ -1,10 +1,10 @@
-import { SolanaCommand } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, utils } from '@chainlink/gauntlet-solana'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { PublicKey, Keypair, TransactionInstruction, SystemProgram } from '@solana/web3.js'
-import { CONTRACT_LIST, getContract, makeTx } from '@chainlink/gauntlet-solana-contracts'
 import { Idl, Program } from '@project-serum/anchor'
 import { MAX_BUFFER_SIZE } from '../lib/constants'
 import { isDeepEqual } from '../lib/utils'
+import { CONTRACT_LIST, getContract } from '../lib/contracts'
 
 type ProposalContext = {
   rawTx: TransactionInstruction
@@ -24,7 +24,8 @@ export const wrapCommand = (command) => {
     program: Program<Idl>
     multisigAddress: PublicKey
 
-    static id = `${command.id}`
+    static id = `${command.id}:multisig`
+    static category = command.category
 
     constructor(flags, args) {
       super(flags, args)
@@ -32,7 +33,7 @@ export const wrapCommand = (command) => {
 
       this.command = new command({ ...flags, bufferSize: MAX_BUFFER_SIZE }, args)
       this.require(!!process.env.MULTISIG_ADDRESS, 'Please set MULTISIG_ADDRESS env var')
-      this.multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS)
+      this.multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS!)
     }
 
     execute = async () => {
@@ -40,7 +41,7 @@ export const wrapCommand = (command) => {
       this.command.provider = this.provider
       this.command.wallet = this.wallet
 
-      const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
+      const multisig = getContract(CONTRACT_LIST.MULTISIG)
       this.program = this.loadProgram(multisig.idl, multisig.programId.toString())
 
       const signer = this.wallet.publicKey
@@ -66,7 +67,10 @@ export const wrapCommand = (command) => {
 
       const latestSlot = await this.provider.connection.getSlot()
       const recentBlock = await this.provider.connection.getBlock(latestSlot)
-      const tx = makeTx(rawTxs, {
+      if (!recentBlock) {
+        throw new Error('Block not found. Could not generate message data')
+      }
+      const tx = utils.makeTx(rawTxs, {
         recentBlockhash: recentBlock.blockhash,
         feePayer: signer,
       })
@@ -75,7 +79,7 @@ export const wrapCommand = (command) => {
       logger.line()
       logger.success(
         `Message generated with blockhash ID: ${recentBlock.blockhash.toString()} (${new Date(
-          recentBlock.blockTime * 1000,
+          recentBlock.blockTime! * 1000,
         ).toLocaleString()}). MESSAGE DATA:`,
       )
       logger.log()

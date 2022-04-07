@@ -11,10 +11,6 @@ export const divideIntoChunks = (arr: Array<any> | Buffer, chunkSize: number): a
   return chunks
 }
 
-export const makeTx = (rawTx: TransactionInstruction[], opts?: TransactionCtorFields): Transaction => {
-  return rawTx.reduce((tx, instruction) => tx.add(instruction), new Transaction(opts))
-}
-
 // Source: https://github.com/neonlabsorg/multisig/blob/8f1938c82c8db1251fad48a403487af18ecf5eb0/client/loader.ts#L25
 export const encodeInstruction = (data: any): Buffer => {
   const CHUNK_SIZE = 900

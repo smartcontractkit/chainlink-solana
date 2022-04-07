@@ -7,10 +7,10 @@
       "path": "./packages/gauntlet-solana"
     },
     {
-      "path": "./packages/gauntlet-solana-contracts"
+      "path": "./packages/gauntlet-serum-multisig"
     },
     {
-      "path": "./packages/gauntlet-serum-multisig"
+      "path": "./packages/gauntlet-solana-contracts"
     }
   ]
 }

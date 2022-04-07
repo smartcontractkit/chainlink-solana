@@ -1,3 +1,4 @@
+import { Transaction, TransactionCtorFields, TransactionInstruction } from '@solana/web3.js'
 import assert from 'assert'
 
 export const isDeepEqual = (a: any, b: any) => {
