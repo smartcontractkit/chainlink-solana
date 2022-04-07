@@ -83,9 +83,9 @@ func TestClient_Reader_Integration(t *testing.T) {
 
 func TestClient_Reader_ChainID(t *testing.T) {
 	genesisHashes := []string{
-		"EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG", // devnet
-		"4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY", // testnet
-		"5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d", // mainnet
+		DevnetGenesisHash,  // devnet
+		TestnetGenesisHash, // testnet
+		MainnetGenesisHash, // mainnet
 		"GH7ome3EiwEr7tu9JuTh2dpYWBJK3z69Xm1ZE3MEE6JC", // localnet (random)
 	}
 	networks := []string{"devnet", "testnet", "mainnet", "localnet"}

@@ -13,6 +13,12 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
+const (
+	DevnetGenesisHash  = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
+	TestnetGenesisHash = "4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY"
+	MainnetGenesisHash = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
+)
+
 //go:generate mockery --name ReaderWriter --output ./mocks/
 type ReaderWriter interface {
 	Writer
@@ -116,11 +122,11 @@ func (c *Client) ChainID() (string, error) {
 
 	var network string
 	switch hash.String() {
-	case "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG":
+	case DevnetGenesisHash:
 		network = "devnet"
-	case "4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY":
+	case TestnetGenesisHash:
 		network = "testnet"
-	case "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d":
+	case MainnetGenesisHash:
 		network = "mainnet"
 	default:
 		c.log.Warnf("unknown genesis hash - assuming solana chain is 'localnet'")
