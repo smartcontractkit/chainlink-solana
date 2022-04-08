@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	bin "github.com/gagliardetto/binary"
@@ -65,6 +66,8 @@ func main() {
 		}
 	case "txs":
 		err = XXXInspectTxs(network, stateAccount)
+	case "slots":
+		err = XXXInspectSlots(network)
 	default:
 		log.Fatal(errors.New("Unknown type"))
 	}
@@ -185,6 +188,41 @@ func XXXInspectTxs(network string, state string) error {
 	fmt.Printf("\n----------REVERTS/ADDRESS---------------\n")
 	for k, v := range reverts {
 		fmt.Printf("%s: %d\n", k, v)
+	}
+
+	return nil
+}
+
+func XXXInspectSlots(network string) error {
+	client := rpc.New(network)
+
+	for i := 0; i < 10; i++ {
+		var wg sync.WaitGroup
+		wg.Add(3)
+
+		var slotFinalized uint64
+		var slotConfirmed uint64
+		var slotProcessed uint64
+		var err error
+
+		go func() {
+			slotFinalized, err = client.GetSlot(context.Background(), rpc.CommitmentFinalized)
+			wg.Done()
+		}()
+		go func() {
+			slotConfirmed, err = client.GetSlot(context.Background(), rpc.CommitmentConfirmed)
+			wg.Done()
+		}()
+		go func() {
+			slotProcessed, err = client.GetSlot(context.Background(), rpc.CommitmentProcessed)
+			wg.Done()
+		}()
+		wg.Wait()
+		if err != nil {
+			return err
+		}
+		fmt.Println("Finalized", slotFinalized, "| Confirmed", slotConfirmed, "| Processed", slotProcessed)
+		time.Sleep(time.Second)
 	}
 
 	return nil
