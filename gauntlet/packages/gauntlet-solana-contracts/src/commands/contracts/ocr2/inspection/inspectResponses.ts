@@ -26,6 +26,27 @@ export default class OCR2InspectResponses extends SolanaCommand {
     super(flags, args)
   }
 
+  getLatestTransmissionEvent = async (blockNumber, programId) => {
+    // Get block
+    let block = await this.provider.connection.getBlock(blockNumber)
+    if (!block) {
+      throw new Error('Block not found. Could not find latest block number in config')
+    }
+    // Check all transactions in block
+    block.transactions.forEach(transaction => {
+      // Get list of accounts keys associated with txn
+      let accountKeys = transaction.transaction.message.accountKeys
+      // Get list of instructions associated with txn
+      let instructions = transaction.transaction.message.instructions
+      // Check each instruction for program Id
+      instructions.forEach(instruction => {
+        if (accountKeys[instruction.programIdIndex].toString() == programId) {
+          console.log(instruction)
+        }
+      })
+    });
+  }
+
   execute = async () => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
@@ -40,15 +61,8 @@ export default class OCR2InspectResponses extends SolanaCommand {
   - Latest Config Digest: ${onChainState.config.latestConfigDigest}
   - Latest Config Block Number: ${onChainState.config.latestConfigBlockNumber}`)
 
-  /*
-    const bufferedConfig = Buffer.from(onChainState.offchainConfig.xs).slice(
-      0,
-      new BN(onChainState.offchainConfig.len).toNumber(),
-    )
-    const onChainOCRConfig = deserializeConfig(bufferedConfig)
-    console.log(onChainOCRConfig)
-    */
-
+    this.getLatestTransmissionEvent(onChainState.config.latestConfigBlockNumber.toNumber(), ocr2.programId.toString())
+    
     const inspections: inspection.Inspection[] = []
 
     const successfulInspection = inspection.inspect(inspections)
