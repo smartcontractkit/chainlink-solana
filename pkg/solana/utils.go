@@ -9,7 +9,11 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
+	solrpc "github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
@@ -23,15 +27,23 @@ const (
 
 // XXXInspectStates prints out state data, it should only be used for inspection
 func XXXInspectStates(state, transmission, program, rpc string, log int) (answer *big.Int, timestamp time.Time, err error) {
+
+	chainConfig := config.NewConfig(db.ChainCfg{}, logger.NullLogger)
+	client, err := client.NewClient(rpc, chainConfig, 5*time.Second, logger.NullLogger)
+	if err != nil {
+		return answer, timestamp, errors.Wrap(err, "error in tracker.NewClient")
+	}
+	solClient := solrpc.New(rpc)
+
 	tracker := ContractTracker{
+		ProgramID:       solana.MustPublicKeyFromBase58(program),
 		StateID:         solana.MustPublicKeyFromBase58(state),
 		TransmissionsID: solana.MustPublicKeyFromBase58(transmission),
-		client:          NewClient(OCR2Spec{NodeEndpointHTTP: rpc}, logger.NullLogger),
+		reader:          client,
+		cfg:             chainConfig,
 		lggr:            logger.NullLogger,
-		ProgramID:       solana.MustPublicKeyFromBase58(program),
 		stateLock:       &sync.RWMutex{},
 		ansLock:         &sync.RWMutex{},
-		staleTimeout:    defaultStaleTimeout,
 	}
 
 	if err := tracker.Start(); err != nil {
@@ -42,7 +54,7 @@ func XXXInspectStates(state, transmission, program, rpc string, log int) (answer
 
 	digester := OffchainConfigDigester{
 		ProgramID: tracker.ProgramID,
-		StateID: tracker.StateID,
+		StateID:   tracker.StateID,
 	}
 
 	cfg, err := tracker.LatestConfig(context.TODO(), 0)
@@ -69,7 +81,7 @@ func XXXInspectStates(state, transmission, program, rpc string, log int) (answer
 	}
 
 	var txs TransmissionsHeader
-	err = tracker.client.rpc.GetAccountDataInto(context.TODO(), tracker.state.Transmissions, &txs)
+	err = solClient.GetAccountDataInto(context.TODO(), tracker.state.Transmissions, &txs)
 	if err != nil {
 		return answer, timestamp, errors.Wrap(err, "error in rpc.GetAccountDataInto")
 	}
@@ -79,16 +91,24 @@ func XXXInspectStates(state, transmission, program, rpc string, log int) (answer
 		return answer, timestamp, errors.Wrap(err, "error in solana.FindProgramAddress")
 	}
 
-	nodeLen := len(tracker.state.Oracles.Data())
+	oracleData, err := tracker.state.Oracles.Data()
+	if err != nil {
+		return answer, timestamp, errors.Wrap(err, "error in Oracles.Data")
+	}
+	offchainConfig, err := tracker.state.OffchainConfig.Data()
+	if err != nil {
+		return answer, timestamp, errors.Wrap(err, "error in OffchainConfig.Data")
+	}
+	nodeLen := len(oracleData)
 	if log > XXXLogNone {
 		fmt.Println("LatestBlockHeight", bh)
 		fmt.Println("LatestTransmissionDetails", digest, epoch, round, answer, timestamp)
 		fmt.Println("LatestConfigBlockNumber", tracker.state.Config.LatestConfigBlockNumber)
 		fmt.Println("OffchainConfig Version", tracker.state.OffchainConfig.Version)
-		fmt.Println("OffchainConfig", tracker.state.OffchainConfig.Data())
+		fmt.Println("OffchainConfig", offchainConfig)
 		fmt.Println("AccessControllers", tracker.state.Config.RequesterAccessController, tracker.state.Config.BillingAccessController)
 		fmt.Println("BillingConfig", tracker.state.Config.Billing.ObservationPayment, tracker.state.Config.Billing.TransmissionPayment)
-		fmt.Printf("OracleConfigs Len: %d, Data: %+v\n", nodeLen, tracker.state.Oracles.Data())
+		fmt.Printf("OracleConfigs Len: %d, Data: %+v\n", nodeLen, oracleData)
 		fmt.Println("Transmissions Account", tracker.state.Transmissions)
 		fmt.Printf("Transmissions %+v\n", tracker.answer)
 
@@ -101,7 +121,7 @@ func XXXInspectStates(state, transmission, program, rpc string, log int) (answer
 	if log > XXXLogBasic {
 		// parsed config data
 		config, err := confighelper.PublicConfigFromContractConfig(false, types.ContractConfig{
-			OffchainConfig:        tracker.state.OffchainConfig.Data(),
+			OffchainConfig:        offchainConfig,
 			OffchainConfigVersion: 2,
 			Signers:               make([]types.OnchainPublicKey, nodeLen),
 			Transmitters:          make([]types.Account, nodeLen),
@@ -109,7 +129,7 @@ func XXXInspectStates(state, transmission, program, rpc string, log int) (answer
 		if err != nil {
 			return answer, timestamp, errors.Wrap(err, "error in confighelper.PublicConfigFromContractConfig")
 		}
-		dataOracles := tracker.state.Oracles.Data()
+		dataOracles := oracleData
 		dataConfig := config.OracleIdentities
 		if len(dataOracles) != len(dataConfig) {
 			return answer, timestamp, errors.New("mismatch oracle length in offchain config and retrieved oracle data")
