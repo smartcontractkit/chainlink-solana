@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"flag"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	bin "github.com/gagliardetto/binary"
 	solanaGo "github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	solanaRelay "github.com/smartcontractkit/chainlink-solana/pkg/solana"
@@ -109,11 +111,13 @@ func XXXInspectTxs(network string, state string) error {
 	var pass []int
 	var fail []int
 
+	var minuteAnalysis string
+
 	// parse all txs
 	for i := len(txSigs) - 1; i >= 0; i-- {
 		tx := txSigs[i]
 		if tx.BlockTime.Time().Sub(chunkStart) > 1*time.Minute {
-			fmt.Printf("%s: Success - %d, Reverted - %d\n", chunkStart, passCount, revertCount)
+			minuteAnalysis = minuteAnalysis + fmt.Sprintf("%s: Success - %d, Reverted - %d\n", chunkStart, passCount, revertCount)
 			pass = append(pass, passCount)
 			fail = append(fail, revertCount)
 
@@ -122,29 +126,47 @@ func XXXInspectTxs(network string, state string) error {
 			passCount = 0
 		}
 
-		if tx.Err == nil {
-			passCount++
-			continue
-		}
-
-		revertCount++
-		// fetch additional data if revert (hits the rate limit)
+		// fetch additional data about tx (hits the rate limit for public endpoint)
 		txRaw, err := client.GetTransaction(
 			context.TODO(),
 			tx.Signature,
 			&rpc.GetTransactionOpts{
 				Commitment: rpc.CommitmentConfirmed,
+				Encoding:   solanaGo.EncodingBase64,
 			},
 		)
 		if err != nil {
 			return err
 		}
-		txDetails := txRaw.Transaction.GetParsedTransaction()
+		txData, err := solanaGo.TransactionFromDecoder(bin.NewBinDecoder(txRaw.Transaction.GetBinary()))
+		if err != nil {
+			return err
+		}
 
-		// use first address: https://docs.solana.com/developing/clients/jsonrpc-api#transaction-structure
-		// The first message.header.numRequiredSignatures public keys must sign the transaction (therefore it is the transmitter)
-		reverts[txDetails.Message.AccountKeys[0].String()]++
+		status := "PASS"
+		if tx.Err == nil {
+			passCount++
+		} else {
+			status = "FAIL"
+			revertCount++
+			// use first address: https://docs.solana.com/developing/clients/jsonrpc-api#transaction-structure
+			// The first message.header.numRequiredSignatures public keys must sign the transaction (therefore it is the transmitter)
+			reverts[txData.Message.AccountKeys[0].String()]++
+		}
+
+		// store nonce (byte) + config digest ([32]byte) + epoch/round prefix ([32-4-1]byte)
+		offset := 1 + 32 + 27
+		epochRound := []byte(txData.Message.Instructions[0].Data)
+
+		if len(epochRound) < offset + 5 {
+			fmt.Println("WARN: Unable to parse tx", tx.Signature)
+			continue
+		}
+		fmt.Println(status, "Epoch", binary.BigEndian.Uint32(epochRound[offset:offset+4]), "Round", epochRound[offset+4:offset+5])
 	}
+	
+	fmt.Printf("\n---------------MINUTE SUMMARY-----------------\n")
+	fmt.Println(minuteAnalysis)
 
 	// calculate averages
 	var avgPass int
