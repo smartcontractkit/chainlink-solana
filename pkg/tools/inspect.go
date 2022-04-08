@@ -158,13 +158,13 @@ func XXXInspectTxs(network string, state string) error {
 		offset := 1 + 32 + 27
 		epochRound := []byte(txData.Message.Instructions[0].Data)
 
-		if len(epochRound) < offset + 5 {
+		if len(epochRound) < offset+5 {
 			fmt.Println("WARN: Unable to parse tx", tx.Signature)
 			continue
 		}
 		fmt.Println(status, "Epoch", binary.BigEndian.Uint32(epochRound[offset:offset+4]), "Round", epochRound[offset+4:offset+5])
 	}
-	
+
 	fmt.Printf("\n---------------MINUTE SUMMARY-----------------\n")
 	fmt.Println(minuteAnalysis)
 
