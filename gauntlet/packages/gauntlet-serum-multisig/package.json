@@ -27,7 +27,6 @@
   "dependencies": {
     "@chainlink/gauntlet-core": "0.1.2",
     "@chainlink/gauntlet-solana": "*",
-    "@chainlink/gauntlet-solana-contracts": "*",
     "@project-serum/anchor": "^0.23.0",
     "@solana/web3.js": "^1.31.0"
   }

@@ -1,11 +1,11 @@
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
 import { Result } from '@chainlink/gauntlet-core'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
+import { CONTRACT_LIST, getContract } from '../lib/contracts'
 
 export default class SetOwners extends SolanaCommand {
-  static id = 'multisig:set_owners'
+  static id = 'serum_multisig:set_owners'
   static category = CONTRACT_LIST.MULTISIG
 
   static examples = ['yarn gauntlet-serum-multisig multisig:set_owners --network=local']
@@ -15,7 +15,7 @@ export default class SetOwners extends SolanaCommand {
   }
   makeRawTransaction = async (signer: PublicKey) => {
     const multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS || '')
-    const multisig = getContract(CONTRACT_LIST.MULTISIG, '')
+    const multisig = getContract(CONTRACT_LIST.MULTISIG)
     const address = multisig.programId.toString()
     const program = this.loadProgram(multisig.idl, address)
 
@@ -26,7 +26,7 @@ export default class SetOwners extends SolanaCommand {
     const ix = program.instruction.setOwners(owners, {
       accounts: {
         multisig: multisigAddress,
-        muitisigSigner: signer,
+        multisigSigner: signer,
       },
     })
     return [ix]

@@ -1,8 +1,8 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse, contracts } from '@chainlink/gauntlet-solana'
 import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair } from '@solana/web3.js'
-import { CONTRACT_LIST, getContract } from '@chainlink/gauntlet-solana-contracts'
+import { CONTRACT_LIST, getContract } from '../lib/contracts'
 
 type Input = {
   owners: string[]
@@ -10,7 +10,7 @@ type Input = {
 }
 
 export default class MultisigCreate extends SolanaCommand {
-  static id = 'create'
+  static id = 'serum_multisig:create'
   static category = CONTRACT_LIST.MULTISIG
 
   static examples = [
@@ -34,7 +34,7 @@ export default class MultisigCreate extends SolanaCommand {
 
   execute = async () => {
     this.require(this.args.length > 0, 'Please provide at least one owner as an argument')
-    const contract = getContract(CONTRACT_LIST.MULTISIG, '')
+    const contract = getContract(CONTRACT_LIST.MULTISIG)
     const address = contract.programId.toString()
     const program = this.loadProgram(contract.idl, address)
 
