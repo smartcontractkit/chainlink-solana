@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
-	"fmt"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -16,11 +15,16 @@ import (
 )
 
 type OCRv2 struct {
-	Client        *Client
-	State         *solana.Wallet
-	Authorities   map[string]*Authority
-	Payees        []*solana.Wallet
-	ProgramWallet *solana.Wallet
+	Client                   *Client
+	ContractDeployer         *ContractDeployer
+	State                    *solana.Wallet
+	Authorities              map[string]*Authority
+	Payees                   []*solana.Wallet
+	Owner                    *solana.Wallet
+	Proposal                 *solana.Wallet
+	Mint                     *solana.Wallet
+	OCRVaultAssociatedPubKey solana.PublicKey
+	ProgramWallet            *solana.Wallet
 }
 
 func (m *OCRv2) ProgramAddress() string {
@@ -35,19 +39,19 @@ func (m *OCRv2) writeOffChainConfig(ocConfigBytes []byte) error {
 		[]solana.Instruction{
 			ocr_2.NewWriteOffchainConfigInstruction(
 				ocConfigBytes,
-				m.Client.Accounts.Proposal.PublicKey(),
-				m.Client.Accounts.Owner.PublicKey(),
+				m.Proposal.PublicKey(),
+				m.Owner.PublicKey(),
 			).Build(),
 		},
 		func(key solana.PublicKey) *solana.PrivateKey {
-			if key.Equals(m.Client.Accounts.Owner.PublicKey()) {
-				return &m.Client.Accounts.Owner.PrivateKey
+			if key.Equals(m.Owner.PublicKey()) {
+				return &m.Owner.PrivateKey
 			}
 			if key.Equals(payer.PublicKey()) {
 				return &payer.PrivateKey
 			}
-			if key.Equals(m.Client.Accounts.Proposal.PublicKey()) {
-				return &m.Client.Accounts.Proposal.PrivateKey
+			if key.Equals(m.Proposal.PublicKey()) {
+				return &m.Proposal.PrivateKey
 			}
 			return nil
 		},
@@ -57,38 +61,31 @@ func (m *OCRv2) writeOffChainConfig(ocConfigBytes []byte) error {
 
 func (m *OCRv2) acceptProposal(digest []byte) error {
 	payer := m.Client.DefaultWallet
-	vaultAuth, err := m.AuthorityAddr("vault")
-	if err != nil {
-		return err
-	}
-	va, err := solana.PublicKeyFromBase58(vaultAuth)
-	if err != nil {
-		return nil
-	}
+	va := m.ContractDeployer.Accounts.Authorities["vault"]
 	return m.Client.TXSync(
 		"Accept OffChain config proposal",
-		rpc.CommitmentFinalized,
+		rpc.CommitmentConfirmed,
 		[]solana.Instruction{
 			ocr_2.NewAcceptProposalInstruction(
 				digest,
-				m.Client.Accounts.OCR.PublicKey(),
-				m.Client.Accounts.Proposal.PublicKey(),
-				m.Client.Accounts.Owner.PublicKey(),
-				m.Client.Accounts.Owner.PublicKey(),
-				m.Client.Accounts.OCRVaultAssociatedPubKey,
-				va,
+				m.State.PublicKey(),
+				m.Proposal.PublicKey(),
+				m.Owner.PublicKey(),
+				m.Owner.PublicKey(),
+				m.OCRVaultAssociatedPubKey,
+				va.PublicKey,
 				solana.TokenProgramID,
 			).Build(),
 		},
 		func(key solana.PublicKey) *solana.PrivateKey {
-			if key.Equals(m.Client.Accounts.Owner.PublicKey()) {
-				return &m.Client.Accounts.Owner.PrivateKey
+			if key.Equals(m.Owner.PublicKey()) {
+				return &m.Owner.PrivateKey
 			}
 			if key.Equals(payer.PublicKey()) {
 				return &payer.PrivateKey
 			}
-			if key.Equals(m.Client.Accounts.Proposal.PublicKey()) {
-				return &m.Client.Accounts.Proposal.PrivateKey
+			if key.Equals(m.Proposal.PublicKey()) {
+				return &m.Proposal.PrivateKey
 			}
 			return nil
 		},
@@ -103,19 +100,19 @@ func (m *OCRv2) finalizeOffChainConfig() error {
 		rpc.CommitmentFinalized,
 		[]solana.Instruction{
 			ocr_2.NewFinalizeProposalInstruction(
-				m.Client.Accounts.Proposal.PublicKey(),
-				m.Client.Accounts.Owner.PublicKey(),
+				m.Proposal.PublicKey(),
+				m.Owner.PublicKey(),
 			).Build(),
 		},
 		func(key solana.PublicKey) *solana.PrivateKey {
-			if key.Equals(m.Client.Accounts.Owner.PublicKey()) {
-				return &m.Client.Accounts.Owner.PrivateKey
+			if key.Equals(m.Owner.PublicKey()) {
+				return &m.Owner.PrivateKey
 			}
 			if key.Equals(payer.PublicKey()) {
 				return &payer.PrivateKey
 			}
-			if key.Equals(m.Client.Accounts.Proposal.PublicKey()) {
-				return &m.Client.Accounts.Proposal.PrivateKey
+			if key.Equals(m.Proposal.PublicKey()) {
+				return &m.Proposal.PrivateKey
 			}
 			return nil
 		},
@@ -150,7 +147,7 @@ func (m *OCRv2) fetchProposalAccount() (*ocr_2.Proposal, error) {
 	var proposal ocr_2.Proposal
 	err := m.Client.RPC.GetAccountDataInto(
 		context.Background(),
-		m.Client.Accounts.Proposal.PublicKey(),
+		m.Proposal.PublicKey(),
 		&proposal,
 	)
 	if err != nil {
@@ -163,7 +160,7 @@ func (m *OCRv2) fetchProposalAccount() (*ocr_2.Proposal, error) {
 func (m *OCRv2) createProposal(version uint64) error {
 	payer := m.Client.DefaultWallet
 	programWallet := m.Client.ProgramWallets["ocr2-keypair.json"]
-	proposalAccInstruction, err := m.Client.CreateAccInstr(m.Client.Accounts.Proposal, OCRProposalAccountSize, programWallet.PublicKey())
+	proposalAccInstruction, err := m.Client.CreateAccInstr(m.Proposal, OCRProposalAccountSize, programWallet.PublicKey())
 	if err != nil {
 		return err
 	}
@@ -174,16 +171,16 @@ func (m *OCRv2) createProposal(version uint64) error {
 			proposalAccInstruction,
 			ocr_2.NewCreateProposalInstruction(
 				version,
-				m.Client.Accounts.Proposal.PublicKey(),
-				m.Client.Accounts.Owner.PublicKey(),
+				m.Proposal.PublicKey(),
+				m.Owner.PublicKey(),
 			).Build(),
 		},
 		func(key solana.PublicKey) *solana.PrivateKey {
-			if key.Equals(m.Client.Accounts.Owner.PublicKey()) {
-				return &m.Client.Accounts.Owner.PrivateKey
+			if key.Equals(m.Owner.PublicKey()) {
+				return &m.Owner.PrivateKey
 			}
-			if key.Equals(m.Client.Accounts.Proposal.PublicKey()) {
-				return &m.Client.Accounts.Proposal.PrivateKey
+			if key.Equals(m.Proposal.PublicKey()) {
+				return &m.Proposal.PrivateKey
 			}
 			if key.Equals(payer.PublicKey()) {
 				return &payer.PrivateKey
@@ -244,7 +241,7 @@ func (m *OCRv2) DumpState() error {
 	var stateDump ocr_2.State
 	err := m.Client.RPC.GetAccountDataInto(
 		context.Background(),
-		m.Client.Accounts.OCR.PublicKey(),
+		m.State.PublicKey(),
 		&stateDump,
 	)
 	if err != nil {
@@ -261,31 +258,25 @@ func (m *OCRv2) SetBilling(observationPayment uint32, transmissionPayment uint32
 	if err != nil {
 		return nil
 	}
-	vaultAuth, err := m.AuthorityAddr("vault")
-	if err != nil {
-		return err
-	}
-	va, err := solana.PublicKeyFromBase58(vaultAuth)
-	if err != nil {
-		return err
-	}
-	err = m.Client.TXAsync(
+	va := m.ContractDeployer.Accounts.Authorities["vault"]
+	err = m.Client.TXSync(
 		"Set billing",
+		rpc.CommitmentConfirmed,
 		[]solana.Instruction{
 			ocr_2.NewSetBillingInstruction(
 				observationPayment,
 				transmissionPayment,
-				m.Client.Accounts.OCR.PublicKey(),
-				m.Client.Accounts.Owner.PublicKey(),
+				m.State.PublicKey(),
+				m.Owner.PublicKey(),
 				billingACPubKey,
-				m.Client.Accounts.OCRVaultAssociatedPubKey, // token vault
-				va,                    // vault authority
-				solana.TokenProgramID, // token program
+				m.OCRVaultAssociatedPubKey, // token vault
+				va.PublicKey,               // vault authority
+				solana.TokenProgramID,      // token program
 			).Build(),
 		},
 		func(key solana.PublicKey) *solana.PrivateKey {
-			if key.Equals(m.Client.Accounts.Owner.PublicKey()) {
-				return &m.Client.Accounts.Owner.PrivateKey
+			if key.Equals(m.Owner.PublicKey()) {
+				return &m.Owner.PrivateKey
 			}
 			if key.Equals(payer.PublicKey()) {
 				return &payer.PrivateKey
@@ -329,16 +320,16 @@ func (m *OCRv2) proposeConfig(ocConfig contracts.OffChainAggregatorV2Config) err
 			ocr_2.NewProposeConfigInstruction(
 				oracles,
 				uint8(ocConfig.F),
-				m.Client.Accounts.Proposal.PublicKey(),
-				m.Client.Accounts.Owner.PublicKey(),
+				m.Proposal.PublicKey(),
+				m.Owner.PublicKey(),
 			).Build(),
 		},
 		func(key solana.PublicKey) *solana.PrivateKey {
-			if key.Equals(m.Client.Accounts.Owner.PublicKey()) {
-				return &m.Client.Accounts.Owner.PrivateKey
+			if key.Equals(m.Owner.PublicKey()) {
+				return &m.Owner.PrivateKey
 			}
-			if key.Equals(m.Client.Accounts.Proposal.PublicKey()) {
-				return &m.Client.Accounts.Proposal.PrivateKey
+			if key.Equals(m.Proposal.PublicKey()) {
+				return &m.Proposal.PrivateKey
 			}
 			if key.Equals(payer.PublicKey()) {
 				return &payer.PrivateKey
@@ -353,7 +344,7 @@ func (m *OCRv2) proposeConfig(ocConfig contracts.OffChainAggregatorV2Config) err
 	// set one payee for all
 	instr := make([]solana.Instruction, 0)
 	payee := solana.NewWallet()
-	if err := m.Client.addNewAssociatedAccInstr(payee, m.Client.Accounts.Owner.PublicKey(), &instr); err != nil {
+	if err := m.ContractDeployer.AddNewAssociatedAccInstr(payee, m.Owner.PublicKey(), &instr); err != nil {
 		return err
 	}
 	payees := make([]solana.PublicKey, 0)
@@ -361,10 +352,10 @@ func (m *OCRv2) proposeConfig(ocConfig contracts.OffChainAggregatorV2Config) err
 		payees = append(payees, payee.PublicKey())
 	}
 	instr = append(instr, ocr_2.NewProposePayeesInstruction(
-		m.Client.Accounts.Mint.PublicKey(),
+		m.Mint.PublicKey(),
 		payees,
-		m.Client.Accounts.Proposal.PublicKey(),
-		m.Client.Accounts.Owner.PublicKey()).Build(),
+		m.Proposal.PublicKey(),
+		m.Owner.PublicKey()).Build(),
 	)
 	return m.Client.TXSync(
 		"Set payees",
@@ -374,8 +365,8 @@ func (m *OCRv2) proposeConfig(ocConfig contracts.OffChainAggregatorV2Config) err
 			if key.Equals(payee.PublicKey()) {
 				return &payee.PrivateKey
 			}
-			if key.Equals(m.Client.Accounts.Owner.PublicKey()) {
-				return &m.Client.Accounts.Owner.PrivateKey
+			if key.Equals(m.Owner.PublicKey()) {
+				return &m.Owner.PrivateKey
 			}
 			if key.Equals(payer.PublicKey()) {
 				return &payer.PrivateKey
@@ -388,14 +379,6 @@ func (m *OCRv2) proposeConfig(ocConfig contracts.OffChainAggregatorV2Config) err
 
 func (m *OCRv2) RequestNewRound() error {
 	panic("implement me")
-}
-
-func (m *OCRv2) AuthorityAddr(s string) (string, error) {
-	auth, ok := m.Authorities[s]
-	if !ok {
-		return "", fmt.Errorf("authority with seed %s not found", s)
-	}
-	return auth.PublicKey.String(), nil
 }
 
 func (m *OCRv2) Address() string {

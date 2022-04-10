@@ -1,8 +1,9 @@
 package chaos
 
 import (
-	"github.com/smartcontractkit/chainlink-solana/tests/e2e/utils"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-solana/tests/e2e/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -21,7 +22,7 @@ var _ = Describe("Solana chaos suite", func() {
 	})
 	It("Can tolerate chaos experiments", func() {
 		By("Stable and working", func() {
-			state.ValidateRoundsAfter(time.Now(), 10)
+			state.ValidateRoundsAfter(time.Now(), common.NewRoundCheckTimeout, 10)
 		})
 		By("Can work with faulty nodes offline", func() {
 			state.CanWorkWithFaultyNodesOffline()

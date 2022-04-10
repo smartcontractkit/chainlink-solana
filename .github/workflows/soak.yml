@@ -1,0 +1,126 @@
+name: E2E Soak Test
+on:
+  schedule:
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+    inputs:
+      cl_branch_ref:
+        description: Chainlink repo branch to integrate with
+        required: true
+        default: develop
+        type: string
+jobs:
+  soak_testing_build_contracts:
+    name: Soak Testing Build Contracts
+    runs-on: ubuntu-latest
+    container:
+      image: projectserum/build:v0.22.1
+      env:
+        RUSTUP_HOME: "/root/.rustup"
+        FORCE_COLOR: 1
+    steps:
+      - uses: actions/checkout@v2
+      - run: echo $HOME
+      - run: echo $PATH
+      - run: yarn install --frozen-lockfile
+      - name: Generate program_ids
+        run: ./scripts/programs-keys-gen.sh
+      - name: Build Contracts
+        run: anchor build
+        working-directory: contracts
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@master
+        with:
+          name: target
+          path: contracts/target/deploy
+  soak_testing_build_custom_chainlink_image:
+    name: Soak Testing Build Custom Chainlink Image
+    # target branch can't be set as var, it's from where we getting pipeline code
+    uses: smartcontractkit/chainlink/.github/workflows/build-custom.yml@develop
+    with:
+      cl_repo: smartcontractkit/chainlink
+      # by default we are integrating with develop
+      cl_ref: ${{ github.event.inputs.cl_branch_ref }}
+      # commit of the caller branch
+      dep_solana_sha: ${{ github.sha }}
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.QA_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.QA_AWS_SECRET_KEY }}
+      AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+      AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+      QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
+  soak_testing_run_test:
+    name: Soak Testing Run Test
+    runs-on: ubuntu-latest
+    needs: [soak_testing_build_contracts, soak_testing_build_custom_chainlink_image]
+    env:
+      CGO_ENABLED: 1
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v2
+      - name: .tool-versions to .env
+        run: ./scripts/tool-versions-to-env.sh
+      - name: dotenv
+        uses: falti/dotenv-action@v0.2.7
+        id: dotenv
+      - name: Setup go ${{ steps.dotenv.outputs.golang_version }}
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ steps.dotenv.outputs.golang_version }}
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.QA_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.QA_AWS_SECRET_KEY }}
+          aws-region: ${{ secrets.QA_AWS_REGION }}
+          role-to-assume: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          role-duration-seconds: 3600
+      - name: Set Kubernetes Context
+        uses: azure/k8s-set-context@v1
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.QA_KUBECONFIG }}
+      - name: Cache Vendor Packages
+        uses: actions/cache@v2
+        id: cache-packages
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+            ~/go/bin
+          key: ${{ runner.os }}-go2-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go2-
+      - name: Download Go Vendor Packages
+        if: steps.cache-packages.outputs.cache-hit != 'true'
+        run: go mod download
+      - name: Install Ginkgo CLI
+        if: steps.cache-packages.outputs.cache-hit != 'true'
+        run: make install
+      - name: Download Artifacts
+        uses: actions/download-artifact@master
+        with:
+          name: target
+          path: contracts/target/deploy
+      - name: Run Tests
+        env:
+          SELECTED_NETWORKS: solana
+          NETWORK_SETTINGS: /home/runner/work/chainlink-solana/chainlink-solana/tests/e2e/networks.yaml
+          CHAINLINK_IMAGE: 795953128386.dkr.ecr.us-west-2.amazonaws.com/chainlink
+          CHAINLINK_VERSION: custom.${{ github.sha }}
+        run: |
+          export PATH=$PATH:$(go env GOPATH)/bin
+          ginkgo tests/e2e/soak
+      - name: Publish Test Results
+        uses: mikepenz/action-junit-report@v2
+        if: always()
+        with:
+          report_paths: "./tests-soak-report.xml"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          check_name: Soak Test Results
+      - name: Publish Artifacts
+        if: failure()
+        uses: actions/upload-artifact@v2.2.4
+        with:
+          name: test-logs
+          path: ./tests/e2e/soak/logs

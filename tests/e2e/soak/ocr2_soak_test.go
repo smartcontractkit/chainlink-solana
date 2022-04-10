@@ -11,8 +11,8 @@ import (
 	"github.com/smartcontractkit/integrations-framework/actions"
 )
 
-var _ = Describe("Solana OCRv2", func() {
-	var state = common.NewOCRv2State(1, 5)
+var _ = Describe("Solana OCRv2 soak test @ocr2-soak", func() {
+	var state = common.NewOCRv2State(30, 5)
 	BeforeEach(func() {
 		By("Deploying OCRv2 cluster", func() {
 			state.DeployCluster(5, false, utils.ContractsDir)
@@ -20,8 +20,8 @@ var _ = Describe("Solana OCRv2", func() {
 		})
 	})
 	Describe("with Solana", func() {
-		It("performs OCR round", func() {
-			state.ValidateRoundsAfter(time.Now(), common.NewRoundCheckTimeout, 1)
+		It("performs OCR rounds", func() {
+			state.ValidateRoundsAfter(time.Now(), common.NewSoakRoundsCheckTimeout, 200)
 		})
 	})
 	AfterEach(func() {

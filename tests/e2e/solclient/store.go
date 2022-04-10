@@ -13,6 +13,7 @@ type Store struct {
 	Client        *Client
 	Store         *solana.Wallet
 	Feed          *solana.Wallet
+	Owner         *solana.Wallet
 	ProgramWallet *solana.Wallet
 }
 
@@ -36,13 +37,13 @@ func (m *Store) SetValidatorConfig(flaggingThreshold uint32) error {
 			store.NewSetValidatorConfigInstruction(
 				flaggingThreshold,
 				m.Feed.PublicKey(),
-				m.Client.Accounts.Owner.PublicKey(),
-				m.Client.Accounts.Owner.PublicKey(),
+				m.Owner.PublicKey(),
+				m.Owner.PublicKey(),
 			).Build(),
 		},
 		func(key solana.PublicKey) *solana.PrivateKey {
-			if key.Equals(m.Client.Accounts.Owner.PublicKey()) {
-				return &m.Client.Accounts.Owner.PrivateKey
+			if key.Equals(m.Owner.PublicKey()) {
+				return &m.Owner.PrivateKey
 			}
 			if key.Equals(payer.PublicKey()) {
 				return &payer.PrivateKey
@@ -69,54 +70,13 @@ func (m *Store) SetWriter(writerAuthority string) error {
 			store.NewSetWriterInstruction(
 				writerAuthPubKey,
 				m.Feed.PublicKey(),
-				m.Client.Accounts.Owner.PublicKey(),
-				m.Client.Accounts.Owner.PublicKey(),
+				m.Owner.PublicKey(),
+				m.Owner.PublicKey(),
 			).Build(),
 		},
 		func(key solana.PublicKey) *solana.PrivateKey {
-			if key.Equals(m.Client.Accounts.Owner.PublicKey()) {
-				return &m.Client.Accounts.Owner.PrivateKey
-			}
-			if key.Equals(m.Feed.PublicKey()) {
-				return &m.Feed.PrivateKey
-			}
-			if key.Equals(payer.PublicKey()) {
-				return &payer.PrivateKey
-			}
-			return nil
-		},
-		payer.PublicKey(),
-	)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (m *Store) CreateFeed(desc string, decimals uint8, granularity int, liveLength int) error {
-	payer := m.Client.DefaultWallet
-	programWallet := m.Client.ProgramWallets["store-keypair.json"]
-	feedAccInstruction, err := m.Client.CreateAccInstr(m.Client.Accounts.Feed, OCRTransmissionsAccountSize, programWallet.PublicKey())
-	if err != nil {
-		return err
-	}
-	err = m.Client.TXSync(
-		"Create feed",
-		rpc.CommitmentFinalized,
-		[]solana.Instruction{
-			feedAccInstruction,
-			store.NewCreateFeedInstruction(
-				desc,
-				decimals,
-				uint8(granularity),
-				uint32(liveLength),
-				m.Feed.PublicKey(),
-				m.Client.Accounts.Owner.PublicKey(),
-			).Build(),
-		},
-		func(key solana.PublicKey) *solana.PrivateKey {
-			if key.Equals(m.Client.Accounts.Owner.PublicKey()) {
-				return &m.Client.Accounts.Owner.PrivateKey
+			if key.Equals(m.Owner.PublicKey()) {
+				return &m.Owner.PrivateKey
 			}
 			if key.Equals(m.Feed.PublicKey()) {
 				return &m.Feed.PrivateKey
