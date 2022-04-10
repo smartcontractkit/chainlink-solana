@@ -27,13 +27,13 @@ func (s *AccessController) AddAccess(addr string) error {
 		[]solana.Instruction{
 			access_controller2.NewAddAccessInstruction(
 				s.State.PublicKey(),
-				s.Client.Accounts.Owner.PublicKey(),
+				s.Owner.PublicKey(),
 				validatorPubKey,
 			).Build(),
 		},
 		func(key solana.PublicKey) *solana.PrivateKey {
-			if key.Equals(s.Client.Accounts.Owner.PublicKey()) {
-				return &s.Client.Accounts.Owner.PrivateKey
+			if key.Equals(s.Owner.PublicKey()) {
+				return &s.Owner.PrivateKey
 			}
 			if key.Equals(payer.PublicKey()) {
 				return &payer.PrivateKey

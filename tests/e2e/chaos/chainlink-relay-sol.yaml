@@ -9,14 +9,15 @@ charts:
   chainlink:
     index: 4
     values:
-      replicas: 19
+      replicas: 5
       chainlink:
         image:
-          image: "public.ecr.aws/chainlink/chainlink"
-          version: "develop.4bc99afb22dca23469d9a7bc2bdfa7ea49028ae6"
+          image: "public.ecr.aws/z0b1w9r9/chainlink"
+          version: "develop"
       env:
         eth_url: "ws://sol:8990"
         eth_disabled: "true"
+        SOLANA_ENABLED: "true"
         USE_LEGACY_ETH_ENV_VARS: "true"
         feature_external_initiators: "true"
         FEATURE_OFFCHAIN_REPORTING2: "true"
