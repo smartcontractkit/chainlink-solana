@@ -125,8 +125,6 @@ export default class OCR2Inspect extends SolanaCommand {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const ocr2program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
 
-    const input = this.makeInput(this.flags.input)
-
     const state = new PublicKey(this.args[0])
     const onChainState = await ocr2program.account.state.fetch(state)
 
@@ -136,6 +134,38 @@ export default class OCR2Inspect extends SolanaCommand {
     )
 
     const onChainOCRConfig = deserializeConfig(bufferedConfig)
+
+    // Print on-chain oracle information
+    onChainState.oracles.xs.forEach((oracle) => {
+      logger.info(
+        `Oracle Info:
+          - Transmitter: ${oracle.transmitter}
+          - Proposed Payee: ${oracle.proposedPayee}
+          - From Round ID: ${oracle.fromRoundId}
+          - Payment Gjuels: ${oracle.paymentGjuels}
+      `,
+      )
+    })
+
+    // If rdd input doesn't exist, just print config
+    if (!this.flags.rdd) {
+      logger.info(`Min Answer: ${onChainState.config.minAnswer}`)
+      logger.info(`Max Answer: ${onChainState.config.maxAnswer}`)
+      logger.info(`Transmission Payment: ${onChainState.config.billing.transmissionPaymentGjuels}`)
+      logger.info(`Observation Payment: ${onChainState.config.billing.observationPaymentGjuels}`)
+      logger.info(`Requester Access Controller: ${onChainState.config.requesterAccessController}`)
+      logger.info(`Billing Access Controller: ${onChainState.config.billingAccessController}`)
+      return {
+        responses: [
+          {
+            contract: state.toString(),
+          },
+        ],
+      } as Result<TransactionResponse>
+    }
+
+    const input = this.makeInput(this.flags.input)
+
     const wrappedComparableLongNumber = (v: any) => {
       // Proto encoding will ignore falsy values.
       if (!v) return '0'
@@ -243,17 +273,6 @@ export default class OCR2Inspect extends SolanaCommand {
         `Offchain Config "reportingPluginConfig.deltaCNanoseconds"`,
       ),
     ]
-    // Print on-chain oracle information
-    onChainState.oracles.xs.forEach((oracle) => {
-      logger.info(
-        `Oracle Info:
-          - Transmitter: ${oracle.transmitter}
-          - Proposed Payee: ${oracle.proposedPayee}
-          - From Round ID: ${oracle.fromRoundId}
-          - Payment Gjuels: ${oracle.paymentGjuels}
-      `,
-      )
-    })
 
     // Fetching tranmissions involves a tx. Give the option to the user to choose whether to fetch it or not.
     // Deactivated until we find a more efficient way to fetch this info
