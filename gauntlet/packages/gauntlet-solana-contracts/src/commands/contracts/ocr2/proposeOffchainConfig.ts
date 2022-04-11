@@ -78,6 +78,33 @@ export default class ProposeOffchainConfig extends SolanaCommand {
   }
 
   static makeInputFromRDD = (rdd: any, stateAddress: string): OffchainConfig => {
+    if (!rdd) {
+      return {
+        deltaProgressNanoseconds: 0,
+        deltaResendNanoseconds: 0,
+        deltaRoundNanoseconds: 0,
+        deltaGraceNanoseconds: 0,
+        deltaStageNanoseconds: 0,
+        rMax: 0,
+        s: [],
+        offchainPublicKeys: [],
+        peerIds: [],
+        reportingPluginConfig: {
+          alphaReportInfinite: false,
+          alphaReportPpb: 0,
+          alphaAcceptInfinite: false,
+          alphaAcceptPpb: 0,
+          deltaCNanoseconds: 0,
+        },
+        maxDurationQueryNanoseconds: 0,
+        maxDurationObservationNanoseconds: 0,
+        maxDurationReportNanoseconds: 0,
+        maxDurationShouldAcceptFinalizedReportNanoseconds: 0,
+        maxDurationShouldTransmitAcceptedReportNanoseconds: 0,
+        configPublicKeys: [],
+      }
+    }
+
     const aggregator = rdd.contracts[stateAddress]
     const config = aggregator.config
 

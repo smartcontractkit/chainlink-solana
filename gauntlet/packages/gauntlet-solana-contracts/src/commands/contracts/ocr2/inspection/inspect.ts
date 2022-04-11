@@ -41,6 +41,26 @@ export default class OCR2Inspect extends SolanaCommand {
     const billingAccessController = this.flags.billingAccessController || process.env.BILLING_ACCESS_CONTROLLER
     const requesterAccessController = this.flags.requesterAccessController || process.env.REQUESTER_ACCESS_CONTROLLER
 
+    // Return empty input if no rdd or user input provided
+    if (!rddPath) {
+      return {
+        description: '',
+        decimals: '',
+        minAnswer: '',
+        maxAnswer: '',
+        transmitters: [],
+        payees: [],
+        signers: [],
+        billingAccessController: '',
+        requesterAccessController: '',
+        offchainConfig: WriteOffchainConfig.makeInputFromRDD(null, this.args[0]),
+        billing: {
+          observationPaymentGjuels: '',
+          transmissionPaymentGjuels: '',
+        },
+      }
+    }
+
     const rdd = RDD.load(network, rddPath)
     const aggregator = RDD.loadAggregator(this.args[0], network, rddPath)
     const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
@@ -147,8 +167,9 @@ export default class OCR2Inspect extends SolanaCommand {
       )
     })
 
-    // If rdd input doesn't exist, just print config
-    if (!this.flags.rdd) {
+    const input = this.makeInput(this.flags.input)
+    // If input does not exist, just print config
+    if (!input.description) {
       logger.info(`Min Answer: ${onChainState.config.minAnswer}`)
       logger.info(`Max Answer: ${onChainState.config.maxAnswer}`)
       logger.info(`Transmission Payment: ${onChainState.config.billing.transmissionPaymentGjuels}`)
@@ -163,8 +184,6 @@ export default class OCR2Inspect extends SolanaCommand {
         ],
       } as Result<TransactionResponse>
     }
-
-    const input = this.makeInput(this.flags.input)
 
     const wrappedComparableLongNumber = (v: any) => {
       // Proto encoding will ignore falsy values.
