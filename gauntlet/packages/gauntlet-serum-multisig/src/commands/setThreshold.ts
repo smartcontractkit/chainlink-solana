@@ -8,7 +8,7 @@ export default class SetThreshold extends SolanaCommand {
   static id = 'serum_multisig:change_threshold'
   static category = CONTRACT_LIST.MULTISIG
 
-  static examples = ['yarn gauntlet-serum-multisig multisig:change_threshold --network=local --threshold=2 [OWNERS...]']
+  static examples = ['yarn gauntlet serum_multisig:change_threshold:multisig --network=local --threshold=2']
 
   constructor(flags, args) {
     super(flags, args)

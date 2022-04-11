@@ -8,7 +8,7 @@ export default class MultisigInspect extends SolanaCommand {
   static id = `serum_multisig:inspect`
   static category = CONTRACT_LIST.MULTISIG
 
-  static examples = ['yarn gauntlet-serum-multisig multisig:inspect --network=local --state=MULTISIG_ACCOUNT']
+  static examples = ['yarn gauntlet serum_multisig:inspect --network=local --state=MULTISIG_ACCOUNT']
 
   constructor(flags, args) {
     super(flags, args)
