@@ -3,14 +3,17 @@ package client
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 	"github.com/smartcontractkit/chainlink/core/logger"
@@ -111,4 +114,79 @@ func TestClient_Reader_ChainID(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, n, network)
 	}
+}
+
+func TestClient_SendTx_Integration(t *testing.T) {
+	// set up environment
+	url := SetupLocalSolNode(t)
+	privKey, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	pubKey := privKey.PublicKey()
+	FundTestAccounts(t, []solana.PublicKey{pubKey}, url)
+
+	// create client
+	requestTimeout := 5 * time.Second
+	lggr := logger.TestLogger(t)
+	cfg := config.NewConfig(db.ChainCfg{}, lggr)
+	c, err := NewClient(url, cfg, requestTimeout, lggr)
+	require.NoError(t, err)
+
+	// fetch recent blockhash
+	hash, err := c.LatestBlockhash()
+	assert.NoError(t, err)
+
+	initBal, err := c.Balance(pubKey)
+	assert.NoError(t, err)
+
+	// create + sign tx
+	// tx sends tokens to self
+	tx, err := solana.NewTransaction(
+		[]solana.Instruction{
+			system.NewTransferInstruction(
+				1,
+				pubKey,
+				pubKey,
+			).Build(),
+		},
+		hash.Value.Blockhash,
+		solana.TransactionPayer(pubKey),
+	)
+	assert.NoError(t, err)
+	_, err = tx.Sign(
+		func(key solana.PublicKey) *solana.PrivateKey {
+			if pubKey.Equals(key) {
+				return &privKey
+			}
+			return nil
+		},
+	)
+	assert.NoError(t, err)
+
+	// send 5 of the same transcation
+	n := 5
+	sigs := make([]solana.Signature, n)
+	var wg sync.WaitGroup
+	ctx := context.Background()
+	wg.Add(5)
+	for i := 0; i < n; i++ {
+		go func(i int) {
+			time.Sleep(time.Duration(rand.Intn(3)) * time.Second) // randomly submit txs
+			sig, err := c.SendTx(ctx, tx)
+			assert.NoError(t, errors.Wrapf(err, "try #%d", i))
+			sigs[i] = sig
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+
+	// expect one single transaction hash
+	for i := 1; i < n; i++ {
+		assert.Equal(t, sigs[0], sigs[i])
+	}
+
+	// expect one sender has only sent one tx
+	// original balance - current bal = 5000 lamports (tx fee)
+	endBal, err := c.Balance(pubKey)
+	assert.NoError(t, err)
+	assert.Equal(t, initBal-endBal, uint64(5_000))
 }
