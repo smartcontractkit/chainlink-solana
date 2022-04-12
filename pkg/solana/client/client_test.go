@@ -117,8 +117,7 @@ func TestClient_Reader_ChainID(t *testing.T) {
 }
 
 func TestClient_Writer_Integration(t *testing.T) {
-	// url := SetupLocalSolNode(t)
-	url := "http://127.0.0.1:8899"
+	url := SetupLocalSolNode(t)
 	privKey, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 	pubKey := privKey.PublicKey()
