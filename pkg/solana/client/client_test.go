@@ -116,7 +116,80 @@ func TestClient_Reader_ChainID(t *testing.T) {
 	}
 }
 
-func TestClient_SendTx_Integration(t *testing.T) {
+func TestClient_Writer_Integration(t *testing.T) {
+	// url := SetupLocalSolNode(t)
+	url := "http://127.0.0.1:8899"
+	privKey, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	pubKey := privKey.PublicKey()
+	FundTestAccounts(t, []solana.PublicKey{pubKey}, url)
+
+	requestTimeout := 5 * time.Second
+	lggr := logger.TestLogger(t)
+	cfg := config.NewConfig(db.ChainCfg{}, lggr)
+
+	ctx := context.Background()
+	c, err := NewClient(url, cfg, requestTimeout, lggr)
+	require.NoError(t, err)
+
+	// create + sign transaction
+	createTx := func(to solana.PublicKey) *solana.Transaction {
+		hash, err := c.LatestBlockhash()
+		assert.NoError(t, err)
+
+		tx, err := solana.NewTransaction(
+			[]solana.Instruction{
+				system.NewTransferInstruction(
+					1,
+					pubKey,
+					to,
+				).Build(),
+			},
+			hash.Value.Blockhash,
+			solana.TransactionPayer(pubKey),
+		)
+		assert.NoError(t, err)
+		_, err = tx.Sign(
+			func(key solana.PublicKey) *solana.PrivateKey {
+				if pubKey.Equals(key) {
+					return &privKey
+				}
+				return nil
+			},
+		)
+		assert.NoError(t, err)
+		return tx
+	}
+
+	// simulate successful transcation
+	txSuccess := createTx(pubKey)
+	simSuccess, err := c.SimulateTx(ctx, txSuccess)
+	assert.NoError(t, err)
+	assert.Nil(t, simSuccess.Err)
+
+	// simulate failed transaction
+	txFail := createTx(solana.MustPublicKeyFromBase58("11111111111111111111111111111111"))
+	simFail, err := c.SimulateTx(ctx, txFail)
+	assert.NoError(t, err)
+	assert.NotNil(t, simFail.Err)
+
+	// send successful + failed tx to get tx signatures
+	sigSuccess, err := c.SendTx(ctx, txSuccess)
+	assert.NoError(t, err)
+
+	sigFail, err := c.SendTx(ctx, txFail)
+	assert.NoError(t, err)
+
+	// check signature statuses
+	time.Sleep(2 * time.Second) // wait for processing
+	statuses, err := c.SignatureStatuses(ctx, []solana.Signature{sigSuccess, sigFail})
+	assert.NoError(t, err)
+
+	assert.Nil(t, statuses[0].Err)
+	assert.NotNil(t, statuses[1].Err)
+}
+
+func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 	// set up environment
 	url := SetupLocalSolNode(t)
 	privKey, err := solana.NewRandomPrivateKey()
