@@ -31,7 +31,7 @@ var _ = Describe("Solana OCRv2", func() {
 	})
 	AfterEach(func() {
 		By("Tearing down the environment", func() {
-			err := actions.TeardownSuite(state.Env, nil, "logs", nil)
+			err := actions.TeardownSuite(state.Env, nil, "logs", nil, nil)
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 	})

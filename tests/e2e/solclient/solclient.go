@@ -503,6 +503,10 @@ func (c *Client) Close() error {
 	return nil
 }
 
+func (c *Client) EstimateTransactionGasCost() (*big.Int, error) {
+	panic("implement me")
+}
+
 func (c *Client) AddHeaderEventSubscription(key string, subscriber client.HeaderEventSubscription) {
 	panic("implement me")
 }
