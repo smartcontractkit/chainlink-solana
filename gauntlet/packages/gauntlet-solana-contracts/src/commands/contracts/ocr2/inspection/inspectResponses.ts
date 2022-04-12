@@ -1,4 +1,5 @@
 import { Result } from '@chainlink/gauntlet-core'
+import { EventParser, BorshCoder, Idl, Event } from '@project-serum/anchor'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { deserializeConfig } from '../../../../lib/encoding'
@@ -6,6 +7,18 @@ import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import { inspection, logger, BN } from '@chainlink/gauntlet-core/dist/utils'
 
 type Input = {}
+
+type NewTransmission = {
+  roundId: number,
+  configDigest: number[],
+  answer: BN,
+  transmitter: PublicKey,
+  observationsTimestamp: number,
+  observerCount: number,
+  observers: PublicKey[],
+  juelsPerLamport: BN,
+  reimbursementGjuels: BN,
+}
 
 export default class OCR2InspectResponses extends SolanaCommand {
   static id = 'ocr2:inspect:responses'
@@ -26,25 +39,76 @@ export default class OCR2InspectResponses extends SolanaCommand {
     super(flags, args)
   }
 
-  getLatestTransmissionEvent = async (blockNumber, programId) => {
+  /*
+  Gets latest NewTransmission event from latest config block number
+  @param blockNumber block to query
+  @param programId address of ocr2 program
+  @param programAccount address of ocr2 program account
+  @param idl interface description for ocr2 contract
+  @param transmitters list of oracle addresses from on-chain config
+  */
+  getLatestTransmissionEvent = async (
+    blockNumber: number,
+    programId: PublicKey,
+    programAccount: PublicKey,
+    idl: Idl,
+    transmitters: PublicKey[]) => {
+
+    // Event parser callback (used by parseLogs)
+    const returnTransmissionEvent = (event: Event) => {
+      // Print data from NewTransmission events
+      if (event.name == 'NewTransmission') {
+        const transmission: NewTransmission = {
+          roundId: event.data.roundId as number,
+          configDigest: event.data.configDigest as number[],
+          answer: event.data.answer as BN,
+          transmitter: transmitters[event.data.transmitter as number],
+          observationsTimestamp: event.data.observationsTimestamp as number,
+          observerCount: event.data.observerCount as number,
+          observers: (event.data.observers as []).slice(0, event.data.observerCount as number).map(observer => transmitters[observer]),
+          juelsPerLamport: event.data.juelsPerLamport as BN,
+          reimbursementGjuels: event.data.reimbursementGjuels as BN,
+        }
+        logger.info(`Recent Transmission
+  - Round Id: ${transmission.roundId}
+  - Config Digest: ${transmission.configDigest}
+  - Answer: ${transmission.answer}
+  - Transmitter: ${transmission.transmitter}
+  - Observations Timestamp: ${transmission.observationsTimestamp}
+  - Observer Count: ${transmission.observerCount}
+  - Observers: ${transmission.observers}
+  - Juels Per Lamport: ${transmission.juelsPerLamport}
+  - Reimbursement Gjuels: ${transmission.reimbursementGjuels}
+        `)
+      }
+    }
+
+    // Define coder and event parser
+    const coder = new BorshCoder(idl)
+    const eventParser = new EventParser(programId, coder)
     // Get block
     let block = await this.provider.connection.getBlock(blockNumber)
     if (!block) {
       throw new Error('Block not found. Could not find latest block number in config')
     }
-    // Check all transactions in block
+    // Iterate over all transactions in block
     block.transactions.forEach(transaction => {
       // Get list of accounts keys associated with txn
-      let accountKeys = transaction.transaction.message.accountKeys
+      let accountKeys = transaction.transaction.message.accountKeys.map(key => `${key}`)
       // Get list of instructions associated with txn
       let instructions = transaction.transaction.message.instructions
-      // Check each instruction for program Id
+      // Check each instruction for program id and account
       instructions.forEach(instruction => {
-        if (accountKeys[instruction.programIdIndex].toString() == programId) {
-          console.log(instruction)
+        // Instruction's program id == inputted program id
+        let hasProgramId = accountKeys[instruction.programIdIndex] == programId.toString()
+        // Transaction's account keys contains inputted account key
+        let hasAccount = accountKeys.includes(programAccount.toString())
+        // Parse event logs if above conditions are met
+        if (hasProgramId && hasAccount && transaction.meta && transaction.meta.logMessages) {
+          eventParser.parseLogs(transaction.meta.logMessages, returnTransmissionEvent)
         }
       })
-    });
+    })
   }
 
   execute = async () => {
@@ -55,14 +119,21 @@ export default class OCR2InspectResponses extends SolanaCommand {
     const input = this.makeInput(this.flags.input)
     const onChainState = await program.account.state.fetch(state)
 
-    logger.info(`Latest Transmission:
-  - Latest Transmitter: ${onChainState.config.latestTransmitter}
-  - Latest Aggregator Round ID: ${onChainState.config.latestAggregatorRoundId}
-  - Latest Config Digest: ${onChainState.config.latestConfigDigest}
-  - Latest Config Block Number: ${onChainState.config.latestConfigBlockNumber}`)
+    logger.info(`Latest Config: 
+    - Latest Transmitter: ${onChainState.config.latestTransmitter}
+    - Latest Aggregator Round ID: ${onChainState.config.latestAggregatorRoundId}
+    - Latest Config Digest: ${onChainState.config.latestConfigDigest}
+    - Latest Config Block Number: ${onChainState.config.latestConfigBlockNumber}
+    `)
 
-    this.getLatestTransmissionEvent(onChainState.config.latestConfigBlockNumber.toNumber(), ocr2.programId.toString())
-    
+    this.getLatestTransmissionEvent(
+      onChainState.config.latestConfigBlockNumber.toNumber(),
+      ocr2.programId,
+      state,
+      ocr2.idl, 
+      onChainState.oracles.xs.map(oracle => oracle.transmitter)
+    )
+
     const inspections: inspection.Inspection[] = []
 
     const successfulInspection = inspection.inspect(inspections)
