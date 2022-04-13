@@ -162,13 +162,25 @@ func TestClient_Writer_Integration(t *testing.T) {
 
 	// simulate successful transcation
 	txSuccess := createTx(pubKey)
-	simSuccess, err := c.SimulateTx(ctx, txSuccess)
+	simSuccess, err := c.SimulateTx(ctx, txSuccess, nil)
 	assert.NoError(t, err)
 	assert.Nil(t, simSuccess.Err)
+	assert.Equal(t, 0, len(simSuccess.Accounts)) // default option, no accounts requested
+
+	// simulate successful transcation with custom options
+	simCustom, err := c.SimulateTx(ctx, txSuccess, &rpc.SimulateTransactionOpts{
+		Commitment: c.commitment,
+		Accounts: &rpc.SimulateTransactionAccountsOpts{
+			Encoding:  solana.EncodingBase64,
+			Addresses: txSuccess.Message.AccountKeys, // request data for accounts in the tx
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, len(txSuccess.Message.AccountKeys), len(simCustom.Accounts)) // data should be returned for the accounts in the tx
 
 	// simulate failed transaction
 	txFail := createTx(solana.MustPublicKeyFromBase58("11111111111111111111111111111111"))
-	simFail, err := c.SimulateTx(ctx, txFail)
+	simFail, err := c.SimulateTx(ctx, txFail, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, simFail.Err)
 

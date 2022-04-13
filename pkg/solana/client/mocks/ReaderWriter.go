@@ -171,13 +171,13 @@ func (_m *ReaderWriter) SignatureStatuses(ctx context.Context, sigs []solana.Sig
 	return r0, r1
 }
 
-// SimulateTx provides a mock function with given fields: ctx, tx
-func (_m *ReaderWriter) SimulateTx(ctx context.Context, tx *solana.Transaction) (*rpc.SimulateTransactionResult, error) {
-	ret := _m.Called(ctx, tx)
+// SimulateTx provides a mock function with given fields: ctx, tx, opts
+func (_m *ReaderWriter) SimulateTx(ctx context.Context, tx *solana.Transaction, opts *rpc.SimulateTransactionOpts) (*rpc.SimulateTransactionResult, error) {
+	ret := _m.Called(ctx, tx, opts)
 
 	var r0 *rpc.SimulateTransactionResult
-	if rf, ok := ret.Get(0).(func(context.Context, *solana.Transaction) *rpc.SimulateTransactionResult); ok {
-		r0 = rf(ctx, tx)
+	if rf, ok := ret.Get(0).(func(context.Context, *solana.Transaction, *rpc.SimulateTransactionOpts) *rpc.SimulateTransactionResult); ok {
+		r0 = rf(ctx, tx, opts)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*rpc.SimulateTransactionResult)
@@ -185,8 +185,8 @@ func (_m *ReaderWriter) SimulateTx(ctx context.Context, tx *solana.Transaction) 
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *solana.Transaction) error); ok {
-		r1 = rf(ctx, tx)
+	if rf, ok := ret.Get(1).(func(context.Context, *solana.Transaction, *rpc.SimulateTransactionOpts) error); ok {
+		r1 = rf(ctx, tx, opts)
 	} else {
 		r1 = ret.Error(1)
 	}

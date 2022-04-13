@@ -41,7 +41,7 @@ type AccountReader interface {
 
 type Writer interface {
 	SendTx(ctx context.Context, tx *solana.Transaction) (solana.Signature, error)
-	SimulateTx(ctx context.Context, tx *solana.Transaction) (*rpc.SimulateTransactionResult, error)
+	SimulateTx(ctx context.Context, tx *solana.Transaction, opts *rpc.SimulateTransactionOpts) (*rpc.SimulateTransactionResult, error)
 	SignatureStatuses(ctx context.Context, sigs []solana.Signature) ([]*rpc.SignatureStatusesResult, error)
 }
 
@@ -171,14 +171,19 @@ func (c *Client) SignatureStatuses(ctx context.Context, sigs []solana.Signature)
 }
 
 // https://docs.solana.com/developing/clients/jsonrpc-api#simulatetransaction
-func (c *Client) SimulateTx(ctx context.Context, tx *solana.Transaction) (*rpc.SimulateTransactionResult, error) {
+// opts - (optional) use `nil` to use defaults
+func (c *Client) SimulateTx(ctx context.Context, tx *solana.Transaction, opts *rpc.SimulateTransactionOpts) (*rpc.SimulateTransactionResult, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
 
-	res, err := c.rpc.SimulateTransactionWithOpts(ctx, tx, &rpc.SimulateTransactionOpts{
-		SigVerify:  true, // verify signature
-		Commitment: c.commitment,
-	})
+	if opts == nil {
+		opts = &rpc.SimulateTransactionOpts{
+			SigVerify:  true, // verify signature
+			Commitment: c.commitment,
+		}
+	}
+
+	res, err := c.rpc.SimulateTransactionWithOpts(ctx, tx, opts)
 	if err != nil {
 		return nil, errors.Wrap(err, "error in SimulateTransactionWithOpts")
 	}
