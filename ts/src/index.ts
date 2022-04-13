@@ -14,6 +14,8 @@ export interface Round {
   answer: BN;
   roundId: number;
   observationsTS: Date;
+
+  slot: number;
 }
 
 export class OCR2Feed {
@@ -43,7 +45,10 @@ export class OCR2Feed {
         if (log.name != "NewTransmission") {
           return;
         }
-        callback(OCR2Feed.parseLog(feed, log));
+        let parsed = OCR2Feed.parseLog(log);
+        parsed.feed = feed;
+        parsed.slot = ctx.slot;
+        callback(parsed);
       });
     });
   }
@@ -52,7 +57,7 @@ export class OCR2Feed {
     return this.provider.connection.removeOnLogsListener(listener);
   }
 
-  public static parseLog(feed, log): Round {
+  public static parseLog(log): Round {
     if (!log || !log.data) return null;
     let answer: BN;
     if (log.data.answer)
@@ -65,10 +70,9 @@ export class OCR2Feed {
         (log.data.observationsTimestamp as number) * 1000
       );
     return {
-      feed: feed,
       answer: answer,
       roundId: roundId,
       observationsTS: observationsTS,
-    };
+    } as Round;
   }
 }

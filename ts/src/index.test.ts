@@ -12,7 +12,7 @@ import * as path from "path";
 
 describe("OCR2Feed", () => {
   it("parseLog", () => {
-    let got = OCR2Feed.parseLog("testfeed", {
+    let got = OCR2Feed.parseLog({
       data: {
         roundId: 1688241,
         configDigest: [
@@ -29,24 +29,22 @@ describe("OCR2Feed", () => {
       },
     });
     expect(got).toEqual({
-      feed: "testfeed",
       answer: new BN("328053000000"),
       roundId: 1688241,
       observationsTS: new Date("2022-03-31T23:11:30.000Z"),
     });
   });
   it("parseLog null log", () => {
-    let got = OCR2Feed.parseLog("testfeed", null);
+    let got = OCR2Feed.parseLog(null);
     expect(got).toBeNull();
   });
   it("parseLog null data", () => {
-    let got = OCR2Feed.parseLog("testfeed", {});
+    let got = OCR2Feed.parseLog({});
     expect(got).toBeNull();
   });
   it("parseLog empty data", () => {
-    let got = OCR2Feed.parseLog("testfeed", { data: {} });
+    let got = OCR2Feed.parseLog({ data: {} });
     expect(got).toBeDefined();
-    expect(got.feed).toEqual("testfeed");
     expect(got.answer).toBeUndefined();
     expect(got.roundId).toBeUndefined();
     expect(got.observationsTS).toBeUndefined();
@@ -106,6 +104,7 @@ describe("OCR2Feed", () => {
       expect(got.answer).toBeDefined();
       expect(got.roundId).toBeDefined();
       expect(got.observationsTS).toBeDefined();
+      expect(got.slot).toBeDefined();
     },
     20_000
   );
