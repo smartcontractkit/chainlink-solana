@@ -8,31 +8,7 @@ import { divideIntoChunks } from '../../../lib/utils'
 import { serializeOffchainConfig, deserializeConfig } from '../../../lib/encoding'
 import RDD from '../../../lib/rdd'
 import { printDiff } from '../../../lib/diff'
-
-export type OffchainConfig = {
-  deltaProgressNanoseconds: number
-  deltaResendNanoseconds: number
-  deltaRoundNanoseconds: number
-  deltaGraceNanoseconds: number
-  deltaStageNanoseconds: number
-  rMax: number
-  s: number[]
-  offchainPublicKeys: string[]
-  peerIds: string[]
-  reportingPluginConfig: {
-    alphaReportInfinite: boolean
-    alphaReportPpb: number
-    alphaAcceptInfinite: boolean
-    alphaAcceptPpb: number
-    deltaCNanoseconds: number
-  }
-  maxDurationQueryNanoseconds: number
-  maxDurationObservationNanoseconds: number
-  maxDurationReportNanoseconds: number
-  maxDurationShouldAcceptFinalizedReportNanoseconds: number
-  maxDurationShouldTransmitAcceptedReportNanoseconds: number
-  configPublicKeys: string[]
-}
+import { OffchainConfig } from './types'
 
 type Input = {
   proposalId: string

@@ -4,26 +4,10 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import { deserializeConfig } from '../../../../lib/encoding'
-import WriteOffchainConfig, { OffchainConfig } from '../proposeOffchainConfig'
+import WriteOffchainConfig from '../proposeOffchainConfig'
 import { toComparableLongNumber, toComparableNumber, toComparablePubKey } from '../../../../lib/inspection'
 import RDD from '../../../../lib/rdd'
-
-type Input = {
-  description: string
-  decimals: string | number
-  minAnswer: string | number
-  maxAnswer: string | number
-  transmitters: string[]
-  payees: string[]
-  signers: string[]
-  offchainConfig: OffchainConfig
-  billingAccessController: string
-  requesterAccessController: string
-  billing: {
-    observationPaymentGjuels: string
-    transmissionPaymentGjuels: string
-  }
-}
+import { InspectionInput, emptyInspectionInput } from '../types'
 
 export default class OCR2Inspect extends SolanaCommand {
   static id = 'ocr2:inspect'
@@ -34,8 +18,8 @@ export default class OCR2Inspect extends SolanaCommand {
     'yarn gauntlet ocr2:inspect [AGGREGATOR_ADDRESS]',
   ]
 
-  makeInput = (userInput): Input => {
-    if (userInput) return userInput as Input
+  makeInput = (userInput): InspectionInput => {
+    if (userInput) return userInput as InspectionInput
     const network = this.flags.network || ''
     const rddPath = this.flags.rdd || ''
     const billingAccessController = this.flags.billingAccessController || process.env.BILLING_ACCESS_CONTROLLER
@@ -43,45 +27,7 @@ export default class OCR2Inspect extends SolanaCommand {
 
     // Return empty input if no rdd or user input provided
     if (!rddPath) {
-      return {
-        description: '',
-        decimals: '',
-        minAnswer: '',
-        maxAnswer: '',
-        transmitters: [],
-        payees: [],
-        signers: [],
-        billingAccessController: '',
-        requesterAccessController: '',
-        offchainConfig: {
-          deltaProgressNanoseconds: 0,
-          deltaResendNanoseconds: 0,
-          deltaRoundNanoseconds: 0,
-          deltaGraceNanoseconds: 0,
-          deltaStageNanoseconds: 0,
-          rMax: 0,
-          s: [],
-          offchainPublicKeys: [],
-          peerIds: [],
-          reportingPluginConfig: {
-            alphaReportInfinite: false,
-            alphaReportPpb: 0,
-            alphaAcceptInfinite: false,
-            alphaAcceptPpb: 0,
-            deltaCNanoseconds: 0,
-          },
-          maxDurationQueryNanoseconds: 0,
-          maxDurationObservationNanoseconds: 0,
-          maxDurationReportNanoseconds: 0,
-          maxDurationShouldAcceptFinalizedReportNanoseconds: 0,
-          maxDurationShouldTransmitAcceptedReportNanoseconds: 0,
-          configPublicKeys: [],
-        },
-        billing: {
-          observationPaymentGjuels: '',
-          transmissionPaymentGjuels: '',
-        },
-      }
+      return emptyInspectionInput
     }
 
     const rdd = RDD.load(network, rddPath)
@@ -117,7 +63,7 @@ export default class OCR2Inspect extends SolanaCommand {
   // toHexString converts a list of numbers to a hex string
   toHexString = (n: number[]) => Buffer.from(n).toString('hex')
 
-  makeFeedInspections = async (bufferedInfo: Keypair, input: Input): Promise<inspection.Inspection[]> => {
+  makeFeedInspections = async (bufferedInfo: Keypair, input: InspectionInput): Promise<inspection.Inspection[]> => {
     const store = getContract(CONTRACT_LIST.STORE, '')
     const storeProgram = this.loadProgram(store.idl, store.programId.toString())
     const account = await storeProgram.account.description.fetch(bufferedInfo.publicKey)
@@ -182,10 +128,10 @@ export default class OCR2Inspect extends SolanaCommand {
     onChainState.oracles.xs.forEach((oracle) => {
       logger.info(
         `Oracle Info:
-          - Transmitter: ${oracle.transmitter}
-          - Proposed Payee: ${oracle.proposedPayee}
-          - From Round ID: ${oracle.fromRoundId}
-          - Payment Gjuels: ${oracle.paymentGjuels}
+         - Transmitter: ${oracle.transmitter}
+         - Proposed Payee: ${oracle.proposedPayee}
+         - From Round ID: ${oracle.fromRoundId}
+         - Payment Gjuels: ${oracle.paymentGjuels}
       `,
       )
     })
@@ -193,12 +139,16 @@ export default class OCR2Inspect extends SolanaCommand {
     const input = this.makeInput(this.flags.input)
     // If input does not exist, just print config
     if (!input.description) {
-      logger.info(`Min Answer: ${onChainState.config.minAnswer}`)
-      logger.info(`Max Answer: ${onChainState.config.maxAnswer}`)
-      logger.info(`Transmission Payment: ${onChainState.config.billing.transmissionPaymentGjuels}`)
-      logger.info(`Observation Payment: ${onChainState.config.billing.observationPaymentGjuels}`)
-      logger.info(`Requester Access Controller: ${onChainState.config.requesterAccessController}`)
-      logger.info(`Billing Access Controller: ${onChainState.config.billingAccessController}`)
+      logger.info(
+        `On Chain Config
+         - Min Answer: ${onChainState.config.minAnswer}
+         - Max Answer: ${onChainState.config.maxAnswer}
+         - Transmission Payment: ${onChainState.config.billing.transmissionPaymentGjuels}
+         - Observation Payment: ${onChainState.config.billing.observationPaymentGjuels}
+         - Requester Access Controller: ${onChainState.config.requesterAccessController}
+         - Billing Access Controller: ${onChainState.config.billingAccessController}
+      `,
+      )
       return {
         responses: [
           {

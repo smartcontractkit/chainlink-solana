@@ -1,6 +1,6 @@
 import { Proto, sharedSecretEncryptions } from '@chainlink/gauntlet-core/dist/crypto'
 import { join } from 'path'
-import { OffchainConfig } from '../commands/contracts/ocr2/proposeOffchainConfig'
+import { OffchainConfig } from '../commands/contracts/ocr2/types'
 import { descriptor as OCR2Descriptor } from './ocr2Proto'
 
 export const deserializeConfig = (buffer: Buffer): any => {

@@ -75,11 +75,16 @@ Operator address is H2ScWiFt1ZMRR1beYWB6Yr9cuADJ8sQhkGvYJxjJNAh8
 ✨  Done in 12.61s.
 ```
 
-## Via Solana Explorer
+## Via Block Explorers
 
 [Solana Explorer](https://explorer.solana.com/) allows users to search for deployed programs and read their state. On the home page, search the address of the program account that you want to inspect. For example, if you want to inspect the OCR2 program for the BTC/USD feed on mainnet, search *2oyA8ZLwuWeAR5ANyDsiEGueUyDC8jFGFLSixSzT9KtV*.
 
 On the program account page, select the *Anchor Account* tab. In this tab, you will be able to inspect all of the data stored on the program in JSON format. In the case of an OCR2 program, this includes on-chain configuration and oracle information.
+
+Other block explorers include:
+
+- [Solscan](https://solscan.io/)
+- [Solana Beach](https://solanabeach.io/)
 
 ## Via cURL
 
