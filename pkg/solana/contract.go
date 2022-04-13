@@ -11,10 +11,11 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/chainlink/core/utils"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
-	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 var (
@@ -80,6 +81,13 @@ func (c *ContractTracker) Start() error {
 		ctx, cancel := context.WithCancel(context.Background())
 		c.ctx = ctx
 		c.cancel = cancel
+		// We synchronously update the config on start so that
+		// when OCR starts there is config available (if possible).
+		// Avoids confusing "contract has not been configured" OCR errors.
+		err := c.fetchState(c.ctx)
+		if err != nil {
+			c.lggr.Warnf("error in initial PollState.fetchState %s", err)
+		}
 		go c.PollState()
 		return nil
 	})
