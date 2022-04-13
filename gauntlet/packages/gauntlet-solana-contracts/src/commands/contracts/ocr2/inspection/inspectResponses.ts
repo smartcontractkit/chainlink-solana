@@ -2,22 +2,22 @@ import { Result } from '@chainlink/gauntlet-core'
 import { EventParser, BorshCoder, Idl, Event } from '@project-serum/anchor'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import { deserializeConfig } from '../../../../lib/encoding'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import { inspection, logger, BN } from '@chainlink/gauntlet-core/dist/utils'
+import { ORACLES_MAX_LENGTH } from '../../../../lib/constants'
 
 type Input = {}
 
 type NewTransmission = {
-  roundId: number,
-  configDigest: number[],
-  answer: BN,
-  transmitter: PublicKey,
-  observationsTimestamp: number,
-  observerCount: number,
-  observers: PublicKey[],
-  juelsPerLamport: BN,
-  reimbursementGjuels: BN,
+  roundId: number
+  configDigest: number[]
+  answer: BN
+  transmitter: PublicKey
+  observationsTimestamp: number
+  observerCount: number
+  observers: PublicKey[]
+  juelsPerLamport: BN
+  reimbursementGjuels: BN
 }
 
 export default class OCR2InspectResponses extends SolanaCommand {
@@ -40,7 +40,7 @@ export default class OCR2InspectResponses extends SolanaCommand {
   }
 
   /*
-  Gets latest NewTransmission event from latest config block number
+  Gets latest NewTransmission events from latest config block number
   @param blockNumber block to query
   @param programId address of ocr2 program
   @param programAccount address of ocr2 program account
@@ -52,11 +52,11 @@ export default class OCR2InspectResponses extends SolanaCommand {
     programId: PublicKey,
     programAccount: PublicKey,
     idl: Idl,
-    transmitters: PublicKey[]) => {
-
+    transmitters: PublicKey[],
+  ) => {
     // Event parser callback (used by parseLogs)
-    const returnTransmissionEvent = (event: Event) => {
-      // Print data from NewTransmission events
+    const logTransmissionEvent = (event: Event) => {
+      // Assemble NewTransmission struct
       if (event.name == 'NewTransmission') {
         const transmission: NewTransmission = {
           roundId: event.data.roundId as number,
@@ -65,11 +65,14 @@ export default class OCR2InspectResponses extends SolanaCommand {
           transmitter: transmitters[event.data.transmitter as number],
           observationsTimestamp: event.data.observationsTimestamp as number,
           observerCount: event.data.observerCount as number,
-          observers: (event.data.observers as []).slice(0, event.data.observerCount as number).map(observer => transmitters[observer]),
+          observers: (event.data.observers as [])
+            .slice(0, event.data.observerCount as number)
+            .map((observer) => transmitters[observer]),
           juelsPerLamport: event.data.juelsPerLamport as BN,
           reimbursementGjuels: event.data.reimbursementGjuels as BN,
         }
-        logger.info(`Recent Transmission
+        // Log transmission data
+        logger.info(`Latest Transmission
   - Round Id: ${transmission.roundId}
   - Config Digest: ${transmission.configDigest}
   - Answer: ${transmission.answer}
@@ -79,7 +82,18 @@ export default class OCR2InspectResponses extends SolanaCommand {
   - Observers: ${transmission.observers}
   - Juels Per Lamport: ${transmission.juelsPerLamport}
   - Reimbursement Gjuels: ${transmission.reimbursementGjuels}
+  `)
+        // Log responding oracle count
+        logger.info(`${transmission.observerCount}/${transmitters.length} oracles are responding
         `)
+        // Log oracles that are not responsive
+        transmitters.forEach((transmitter) => {
+          // If the transmitter is not listed as an observer, log it
+          if (!transmission.observers.includes(transmitter)) {
+            logger.error(`Oracle ${transmitter} not responding
+            `)
+          }
+        })
       }
     }
 
@@ -92,20 +106,20 @@ export default class OCR2InspectResponses extends SolanaCommand {
       throw new Error('Block not found. Could not find latest block number in config')
     }
     // Iterate over all transactions in block
-    block.transactions.forEach(transaction => {
+    block.transactions.forEach((transaction) => {
       // Get list of accounts keys associated with txn
-      let accountKeys = transaction.transaction.message.accountKeys.map(key => `${key}`)
+      let accountKeys = transaction.transaction.message.accountKeys.map((key) => `${key}`)
       // Get list of instructions associated with txn
       let instructions = transaction.transaction.message.instructions
       // Check each instruction for program id and account
-      instructions.forEach(instruction => {
+      instructions.forEach((instruction) => {
         // Instruction's program id == inputted program id
         let hasProgramId = accountKeys[instruction.programIdIndex] == programId.toString()
         // Transaction's account keys contains inputted account key
         let hasAccount = accountKeys.includes(programAccount.toString())
         // Parse event logs if above conditions are met
         if (hasProgramId && hasAccount && transaction.meta && transaction.meta.logMessages) {
-          eventParser.parseLogs(transaction.meta.logMessages, returnTransmissionEvent)
+          eventParser.parseLogs(transaction.meta.logMessages, logTransmissionEvent)
         }
       })
     })
@@ -130,8 +144,12 @@ export default class OCR2InspectResponses extends SolanaCommand {
       onChainState.config.latestConfigBlockNumber.toNumber(),
       ocr2.programId,
       state,
-      ocr2.idl, 
-      onChainState.oracles.xs.map(oracle => oracle.transmitter)
+      ocr2.idl,
+      onChainState.oracles.xs
+        .map((oracle) => oracle.transmitter)
+        .filter((transmitter) => {
+          return transmitter._bn != 0
+        }),
     )
 
     const inspections: inspection.Inspection[] = []
