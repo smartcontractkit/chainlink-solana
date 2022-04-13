@@ -41,6 +41,8 @@ type AccountReader interface {
 
 type Writer interface {
 	SendTx(ctx context.Context, tx *solana.Transaction) (solana.Signature, error)
+	SimulateTx(ctx context.Context, tx *solana.Transaction, opts *rpc.SimulateTransactionOpts) (*rpc.SimulateTransactionResult, error)
+	SignatureStatuses(ctx context.Context, sigs []solana.Signature) ([]*rpc.SignatureStatusesResult, error)
 }
 
 var _ ReaderWriter = (*Client)(nil)
@@ -149,6 +151,48 @@ func (c *Client) GetFeeForMessage(msg string) (uint64, error) {
 		return 0, errors.New("nil pointer in GetFeeForMessage")
 	}
 	return *res.Value, nil
+}
+
+// https://docs.solana.com/developing/clients/jsonrpc-api#getsignaturestatuses
+func (c *Client) SignatureStatuses(ctx context.Context, sigs []solana.Signature) ([]*rpc.SignatureStatusesResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+
+	// searchTransactionHistory = false
+	res, err := c.rpc.GetSignatureStatuses(ctx, false, sigs...)
+	if err != nil {
+		return nil, errors.Wrap(err, "error in GetSignatureStatuses")
+	}
+
+	if res == nil || res.Value == nil {
+		return nil, errors.New("nil pointer in GetSignatureStatuses")
+	}
+	return res.Value, nil
+}
+
+// https://docs.solana.com/developing/clients/jsonrpc-api#simulatetransaction
+// opts - (optional) use `nil` to use defaults
+func (c *Client) SimulateTx(ctx context.Context, tx *solana.Transaction, opts *rpc.SimulateTransactionOpts) (*rpc.SimulateTransactionResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+
+	if opts == nil {
+		opts = &rpc.SimulateTransactionOpts{
+			SigVerify:  true, // verify signature
+			Commitment: c.commitment,
+		}
+	}
+
+	res, err := c.rpc.SimulateTransactionWithOpts(ctx, tx, opts)
+	if err != nil {
+		return nil, errors.Wrap(err, "error in SimulateTransactionWithOpts")
+	}
+
+	if res == nil || res.Value == nil {
+		return nil, errors.New("nil pointer in SimulateTransactionWithOpts")
+	}
+
+	return res.Value, nil
 }
 
 func (c *Client) SendTx(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
