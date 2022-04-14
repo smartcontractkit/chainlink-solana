@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { EventParser, BorshCoder, Idl, Event } from '@project-serum/anchor'
+import { EventParser, BorshCoder, Idl, Event, Program } from '@project-serum/anchor'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { PublicKey } from '@solana/web3.js'
+import { PublicKey, ParsedTransactionWithMeta } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import { inspection, logger, BN } from '@chainlink/gauntlet-core/dist/utils'
 import { ORACLES_MAX_LENGTH } from '../../../../lib/constants'
@@ -40,6 +40,27 @@ export default class OCR2InspectResponses extends SolanaCommand {
   }
 
   /*
+  Gets the latest transactions to a contract
+  @param account address of contract
+  @param limit number of transactions to return
+  @param before transaction signature to start at
+  */
+  getLatestTxns = async (
+    account: PublicKey,
+    limit: number,
+    before: string | undefined,
+  ): Promise<(null | ParsedTransactionWithMeta)[]> => {
+    // Get latest sigs
+    const sigs = await this.provider.connection.getSignaturesForAddress(account, {
+      limit,
+      before,
+    })
+    // Get the txns associated with the sigs
+    const txns = await this.provider.connection.getParsedTransactions(sigs.map((sig) => sig.signature))
+    return txns
+  }
+
+  /*
   Searches for latest transmission event from last {numSigs} transactions
   @param programAccount address of ocr2 program account
   @param programId address of ocr2 program
@@ -49,8 +70,7 @@ export default class OCR2InspectResponses extends SolanaCommand {
   */
   getLatestTransmissionEvent = async (
     programAccount: PublicKey,
-    programId: PublicKey,
-    idl: Idl,
+    program: Program,
     transmitters: PublicKey[],
     callback: (transmission: NewTransmission) => void,
   ) => {
@@ -59,19 +79,12 @@ export default class OCR2InspectResponses extends SolanaCommand {
     // Tracks the last sig checked
     var lastSigChecked: string | undefined = undefined
     // Number of transactions to check at once
-    const batchSize = 100
+    const batchSize = 10
     // Define coder and event parser
-    const coder = new BorshCoder(idl)
-    const eventParser = new EventParser(programId, coder)
+    const eventParser = new EventParser(program.programId, program.coder)
     // Loop until transmission found
     while (newTransmissionCount == 0) {
-      // Get {batchSize} latest sigs
-      const sigs = await this.provider.connection.getSignaturesForAddress(programAccount, {
-        limit: batchSize,
-        before: lastSigChecked,
-      })
-      // Get the txns associated with the sigs
-      const txns = await this.provider.connection.getParsedTransactions(sigs.map((sig) => sig.signature))
+      const txns = await this.getLatestTxns(programAccount, batchSize, lastSigChecked)
       txns.forEach((txn) => {
         // Check txns with logs
         if (txn && txn.meta && txn.meta.logMessages) {
@@ -98,10 +111,10 @@ export default class OCR2InspectResponses extends SolanaCommand {
               reimbursementGjuels: event.data.reimbursementGjuels as BN,
             })
           })
+          // Update last sig checked
+          lastSigChecked = txn.transaction.signatures[0]
         }
       })
-      // Update last sig checked
-      lastSigChecked = sigs[batchSize - 1]
     }
   }
 
@@ -124,7 +137,7 @@ export default class OCR2InspectResponses extends SolanaCommand {
       .map((oracle) => oracle.transmitter)
       .filter((transmitter) => transmitter._bn != 0)
 
-    await this.getLatestTransmissionEvent(state, ocr2.programId, ocr2.idl, transmitters, (event: NewTransmission) => {
+    await this.getLatestTransmissionEvent(state, program, transmitters, (event: NewTransmission) => {
       // Log transmission data
       logger.info(
         `Latest Transmission
