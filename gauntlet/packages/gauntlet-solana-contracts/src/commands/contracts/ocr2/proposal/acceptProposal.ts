@@ -6,12 +6,11 @@ import { PublicKey } from '@solana/web3.js'
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { utils } from '@project-serum/anchor'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
-import ProposeOffchainConfig from '../proposeOffchainConfig'
+import ProposeOffchainConfig, { OffchainConfig } from '../proposeOffchainConfig'
 import { serializeOffchainConfig, deserializeConfig } from '../../../../lib/encoding'
 import { prepareOffchainConfigForDiff } from '../proposeOffchainConfig'
 import RDD from '../../../../lib/rdd'
 import { printDiff } from '../../../../lib/diff'
-import { OffchainConfig } from '../types'
 
 type Input = {
   proposalId: string

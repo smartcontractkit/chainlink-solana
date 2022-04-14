@@ -4,10 +4,26 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import { deserializeConfig } from '../../../../lib/encoding'
-import WriteOffchainConfig from '../proposeOffchainConfig'
+import WriteOffchainConfig, { OffchainConfig } from '../proposeOffchainConfig'
 import { toComparableLongNumber, toComparableNumber, toComparablePubKey } from '../../../../lib/inspection'
 import RDD from '../../../../lib/rdd'
-import { InspectionInput, emptyInspectionInput } from '../types'
+
+type Input = {
+  description: string
+  decimals: string | number
+  minAnswer: string | number
+  maxAnswer: string | number
+  transmitters: string[]
+  payees: string[]
+  signers: string[]
+  offchainConfig: OffchainConfig
+  billingAccessController: string
+  requesterAccessController: string
+  billing: {
+    observationPaymentGjuels: string
+    transmissionPaymentGjuels: string
+  }
+}
 
 export default class OCR2Inspect extends SolanaCommand {
   static id = 'ocr2:inspect'
@@ -18,8 +34,8 @@ export default class OCR2Inspect extends SolanaCommand {
     'yarn gauntlet ocr2:inspect [AGGREGATOR_ADDRESS]',
   ]
 
-  makeInput = (userInput): InspectionInput => {
-    if (userInput) return userInput as InspectionInput
+  makeInput = (userInput): Input | undefined => {
+    if (userInput) return userInput as Input
     const network = this.flags.network || ''
     const rddPath = this.flags.rdd || ''
     const billingAccessController = this.flags.billingAccessController || process.env.BILLING_ACCESS_CONTROLLER
@@ -27,7 +43,7 @@ export default class OCR2Inspect extends SolanaCommand {
 
     // Return empty input if no rdd or user input provided
     if (!rddPath) {
-      return emptyInspectionInput
+      return undefined
     }
 
     const rdd = RDD.load(network, rddPath)
@@ -63,7 +79,7 @@ export default class OCR2Inspect extends SolanaCommand {
   // toHexString converts a list of numbers to a hex string
   toHexString = (n: number[]) => Buffer.from(n).toString('hex')
 
-  makeFeedInspections = async (bufferedInfo: Keypair, input: InspectionInput): Promise<inspection.Inspection[]> => {
+  makeFeedInspections = async (bufferedInfo: Keypair, input: Input): Promise<inspection.Inspection[]> => {
     const store = getContract(CONTRACT_LIST.STORE, '')
     const storeProgram = this.loadProgram(store.idl, store.programId.toString())
     const account = await storeProgram.account.description.fetch(bufferedInfo.publicKey)
@@ -138,7 +154,7 @@ export default class OCR2Inspect extends SolanaCommand {
 
     const input = this.makeInput(this.flags.input)
     // If input does not exist, just print config
-    if (!input.description) {
+    if (!input) {
       logger.info(
         `On Chain Config
          - Min Answer: ${onChainState.config.minAnswer}
