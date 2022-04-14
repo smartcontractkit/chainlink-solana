@@ -10,12 +10,10 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/rs/zerolog/log"
-	uuid "github.com/satori/go.uuid"
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/solclient"
 	"github.com/smartcontractkit/helmenv/environment"
 	"github.com/smartcontractkit/helmenv/tools"
 	"github.com/smartcontractkit/integrations-framework/client"
-	"github.com/smartcontractkit/integrations-framework/contracts"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -50,28 +48,35 @@ type Contracts struct {
 }
 
 func NewOCRv2State(contracts int, nodes int) *OCRv2TestState {
-	return &OCRv2TestState{
-		Mu:            &sync.Mutex{},
-		ContractsNum:  contracts,
-		LastRoundTime: map[string]time.Time{},
+	state := &OCRv2TestState{
+		Mu:                 &sync.Mutex{},
+		LastRoundTime:      make(map[string]time.Time),
+		ContractsNodeSetup: make(map[int]*ContractNodeInfo),
 	}
+	for i := 0; i < contracts; i++ {
+		state.ContractsNodeSetup[i] = &ContractNodeInfo{}
+		state.ContractsNodeSetup[i].BootstrapNodeIdx = 0
+		for n := 1; n < nodes; n++ {
+			state.ContractsNodeSetup[i].NodesIdx = append(state.ContractsNodeSetup[i].NodesIdx, n)
+		}
+	}
+	return state
 }
 
 type OCRv2TestState struct {
-	Mu               *sync.Mutex
-	Env              *environment.Environment
-	ChainlinkNodes   []client.Chainlink
-	ContractDeployer *solclient.ContractDeployer
-	LinkToken        *solclient.LinkToken
-	ContractsNum     int
-	Contracts        []Contracts
-	OffChainConfig   contracts.OffChainAggregatorV2Config
-	NodeKeysBundle   []NodeKeysBundle
-	MockServer       *client.MockserverClient
-	Networks         *client.Networks
-	RoundsFound      int
-	LastRoundTime    map[string]time.Time
-	err              error
+	Mu                 *sync.Mutex
+	Env                *environment.Environment
+	ChainlinkNodes     []client.Chainlink
+	ContractDeployer   *solclient.ContractDeployer
+	LinkToken          *solclient.LinkToken
+	Contracts          []Contracts
+	ContractsNodeSetup map[int]*ContractNodeInfo
+	NodeKeysBundle     []NodeKeysBundle
+	MockServer         *client.MockserverClient
+	Networks           *client.Networks
+	RoundsFound        int
+	LastRoundTime      map[string]time.Time
+	err                error
 }
 
 type ContractsState struct {
@@ -143,8 +148,20 @@ func (m *OCRv2TestState) SetupClients() {
 	Expect(m.err).ShouldNot(HaveOccurred())
 }
 
+func (m *OCRv2TestState) initializeNodesInContractsMap() {
+	for i := 0; i < len(m.ContractsNodeSetup); i++ {
+		for _, nodeIndex := range m.ContractsNodeSetup[i].NodesIdx {
+			m.ContractsNodeSetup[i].Nodes = append(m.ContractsNodeSetup[i].Nodes, m.ChainlinkNodes[nodeIndex])
+			m.ContractsNodeSetup[i].NodeKeysBundle = append(m.ContractsNodeSetup[i].NodeKeysBundle, m.NodeKeysBundle[nodeIndex])
+		}
+		m.ContractsNodeSetup[i].BootstrapNode = m.ChainlinkNodes[m.ContractsNodeSetup[i].BootstrapNodeIdx]
+		m.ContractsNodeSetup[i].BootstrapNodeKeysBundle = m.NodeKeysBundle[m.ContractsNodeSetup[i].BootstrapNodeIdx]
+	}
+}
+
+// DeployContracts deploys contracts
 func (m *OCRv2TestState) DeployContracts(contractsDir string) {
-	m.OffChainConfig, m.NodeKeysBundle, m.err = DefaultOffChainConfigParamsFromNodes(m.ChainlinkNodes)
+	m.NodeKeysBundle, m.err = CreateNodeKeysBundle(m.ChainlinkNodes)
 	Expect(m.err).ShouldNot(HaveOccurred())
 	cd, err := solclient.NewContractDeployer(m.Networks.Default, m.Env, nil)
 	Expect(err).ShouldNot(HaveOccurred())
@@ -158,9 +175,11 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 	err = FundOracles(m.Networks.Default, m.NodeKeysBundle, big.NewFloat(1e4))
 	Expect(err).ShouldNot(HaveOccurred())
 
-	wg := errgroup.Group{}
-	for i := 0; i < m.ContractsNum; i++ {
-		wg.Go(func() error {
+	m.initializeNodesInContractsMap()
+	g := errgroup.Group{}
+	for i := 0; i < len(m.ContractsNodeSetup); i++ {
+		i := i
+		g.Go(func() error {
 			defer ginkgo.GinkgoRecover()
 			cd, err := solclient.NewContractDeployer(m.Networks.Default, m.Env, m.LinkToken)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -195,7 +214,10 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 			err = m.Networks.Default.WaitForEvents()
 			Expect(err).ShouldNot(HaveOccurred())
 
-			err = ocr2.Configure(m.OffChainConfig)
+			ocConfig, err := OffChainConfigParamsFromNodes(m.ContractsNodeSetup[i].Nodes, m.ContractsNodeSetup[i].NodeKeysBundle)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			err = ocr2.Configure(ocConfig)
 			Expect(err).ShouldNot(HaveOccurred())
 			m.Mu.Lock()
 			m.Contracts = append(m.Contracts, Contracts{
@@ -209,115 +231,44 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 			return nil
 		})
 	}
-	Expect(wg.Wait()).ShouldNot(HaveOccurred())
-}
-
-type BridgeSources struct {
-	ObservaionSource string
-	JuelsSource      string
-}
-
-func (m *OCRv2TestState) createBridges() []BridgeSources {
-	bs := make([]BridgeSources, 0)
-	for nIdx, n := range m.ChainlinkNodes {
-		sourceValueBridge := client.BridgeTypeAttributes{
-			Name:        "variable",
-			URL:         fmt.Sprintf("%s/node%d", m.MockServer.Config.ClusterURL, nIdx),
-			RequestData: "{}",
-		}
-		observationSource := client.ObservationSourceSpecBridge(sourceValueBridge)
-		err := n.CreateBridge(&sourceValueBridge)
-		Expect(err).ShouldNot(HaveOccurred())
-
-		juelsBridge := client.BridgeTypeAttributes{
-			Name:        "juels",
-			URL:         fmt.Sprintf("%s/juels", m.MockServer.Config.ClusterURL),
-			RequestData: "{}",
-		}
-		juelsSource := client.ObservationSourceSpecBridge(juelsBridge)
-		err = n.CreateBridge(&juelsBridge)
-		Expect(err).ShouldNot(HaveOccurred())
-		_, err = n.CreateSolanaChain(&client.SolanaChainAttributes{ChainID: "localnet"})
-		Expect(err).ShouldNot(HaveOccurred())
-		_, err = n.CreateSolanaNode(&client.SolanaNodeAttributes{
-			Name:          "solana",
-			SolanaChainID: "localnet",
-			SolanaURL:     "http://sol:8899",
-		})
-		Expect(err).ShouldNot(HaveOccurred())
-		bs = append(bs, BridgeSources{ObservaionSource: observationSource, JuelsSource: juelsSource})
-	}
-	return bs
-}
-
-func (m *OCRv2TestState) createJobs() error {
-	bridges := m.createBridges()
-	wg := errgroup.Group{}
-	for _, contract := range m.Contracts {
-		contract := contract
-		wg.Go(func() error {
-			relayConfig := map[string]string{
-				"nodeEndpointHTTP": "http://sol:8899",
-				"ocr2ProgramID":    contract.OCR2.ProgramAddress(),
-				"transmissionsID":  contract.Store.TransmissionsAddress(),
-				"storeProgramID":   contract.Store.ProgramAddress(),
-				"chainID":          "localnet",
-			}
-			bootstrapPeers := []client.P2PData{
-				{
-					RemoteIP:   m.ChainlinkNodes[0].RemoteIP(),
-					RemotePort: "6690",
-					PeerID:     m.NodeKeysBundle[0].PeerID,
-				},
-			}
-			for nIdx, n := range m.ChainlinkNodes {
-				jobType := "offchainreporting2"
-				if nIdx == 0 {
-					jobType = "bootstrap"
-				}
-				jobSpec := &client.OCR2TaskJobSpec{
-					Name:                  fmt.Sprintf("sol-OCRv2-%d-%s", nIdx, uuid.NewV4().String()),
-					JobType:               jobType,
-					ContractID:            contract.OCR2.Address(),
-					Relay:                 ChainName,
-					RelayConfig:           relayConfig,
-					PluginType:            "median",
-					P2PPeerID:             m.NodeKeysBundle[nIdx].PeerID,
-					P2PBootstrapPeers:     bootstrapPeers,
-					OCRKeyBundleID:        m.NodeKeysBundle[nIdx].OCR2Key.Data.ID,
-					TransmitterID:         m.NodeKeysBundle[nIdx].TXKey.Data.ID,
-					ObservationSource:     bridges[nIdx].ObservaionSource,
-					JuelsPerFeeCoinSource: bridges[nIdx].JuelsSource,
-					TrackerPollInterval:   10 * time.Second, // faster config checking
-				}
-				_, err := n.CreateJob(jobSpec)
-				Expect(err).ShouldNot(HaveOccurred())
-			}
-			return nil
-		})
-	}
-	return wg.Wait()
-}
-
-func (m *OCRv2TestState) SetAllAdapterResponsesToTheSameValue(response int) {
-	for i := range m.ChainlinkNodes {
-		path := fmt.Sprintf("/node%d", i)
-		_ = m.MockServer.SetValuePath(path, response)
+	Expect(g.Wait()).ShouldNot(HaveOccurred())
+	for i := 0; i < len(m.ContractsNodeSetup); i++ {
+		m.ContractsNodeSetup[i].OCR2 = m.Contracts[i].OCR2
+		m.ContractsNodeSetup[i].Store = m.Contracts[i].Store
 	}
 }
 
-func (m *OCRv2TestState) SetAllAdapterResponsesToDifferentValues(responses []int) {
-	Expect(len(responses)).Should(BeNumerically("==", len(m.ChainlinkNodes)))
-	for i := range m.ChainlinkNodes {
-		_ = m.MockServer.SetValuePath(fmt.Sprintf("/node%d", i), responses[i])
-	}
-}
-
+// CreateJobs creating OCR jobs and EA stubs
 func (m *OCRv2TestState) CreateJobs() {
 	m.err = m.MockServer.SetValuePath("/juels", 1)
 	Expect(m.err).ShouldNot(HaveOccurred())
-	m.err = m.createJobs()
+	m.err = CreateSolanaChainAndNode(m.ChainlinkNodes)
 	Expect(m.err).ShouldNot(HaveOccurred())
+	m.err = CreateBridges(m.ContractsNodeSetup, m.MockServer)
+	Expect(m.err).ShouldNot(HaveOccurred())
+	g := errgroup.Group{}
+	for i := 0; i < len(m.ContractsNodeSetup); i++ {
+		i := i
+		g.Go(func() error {
+			defer ginkgo.GinkgoRecover()
+			m.err = CreateJobsForContract(m.ContractsNodeSetup[i])
+			Expect(m.err).ShouldNot(HaveOccurred())
+			return nil
+		})
+	}
+	Expect(g.Wait()).ShouldNot(HaveOccurred())
+}
+
+func (m *OCRv2TestState) SetAllAdapterResponsesToTheSameValue(response int) {
+	for i := 0; i < len(m.ContractsNodeSetup); i++ {
+		for _, node := range m.ContractsNodeSetup[i].Nodes {
+			nodeContractPairID, err := BuildNodeContractPairID(node, m.ContractsNodeSetup[i].OCR2.Address())
+			Expect(err).ShouldNot(HaveOccurred())
+			path := fmt.Sprintf("/%s", nodeContractPairID)
+			m.err = m.MockServer.SetValuePath(path, response)
+			Expect(m.err).ShouldNot(HaveOccurred())
+		}
+	}
 }
 
 func (m *OCRv2TestState) ValidateNoRoundsAfter(chaosStartTime time.Time) {
