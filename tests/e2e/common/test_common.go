@@ -69,7 +69,6 @@ type OCRv2TestState struct {
 	ChainlinkNodes     []client.Chainlink
 	ContractDeployer   *solclient.ContractDeployer
 	LinkToken          *solclient.LinkToken
-	ContractsNum       int
 	Contracts          []Contracts
 	ContractsNodeSetup map[int]*ContractNodeInfo
 	NodeKeysBundle     []NodeKeysBundle

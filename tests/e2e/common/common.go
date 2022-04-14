@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	uuid "github.com/satori/go.uuid"
+
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/solclient"
 	"math/big"
 	"sort"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	uuid "github.com/satori/go.uuid"
 	"github.com/smartcontractkit/integrations-framework/client"
 	"github.com/smartcontractkit/integrations-framework/contracts"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
