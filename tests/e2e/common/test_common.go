@@ -242,7 +242,8 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 func (m *OCRv2TestState) CreateJobs() {
 	m.err = m.MockServer.SetValuePath("/juels", 1)
 	Expect(m.err).ShouldNot(HaveOccurred())
-
+	m.err = CreateSolanaChainAndNode(m.ChainlinkNodes)
+	Expect(m.err).ShouldNot(HaveOccurred())
 	m.err = CreateBridges(m.ContractsNodeSetup, m.MockServer)
 	Expect(m.err).ShouldNot(HaveOccurred())
 	g := errgroup.Group{}

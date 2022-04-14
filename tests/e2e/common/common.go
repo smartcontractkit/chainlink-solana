@@ -63,30 +63,22 @@ func stripKeyPrefix(key string) string {
 	return key
 }
 
-func createNodeKeys(nodes []client.Chainlink) ([]NodeKeysBundle, error) {
-	nkb := make([]NodeKeysBundle, 0)
+func CreateSolanaChainAndNode(nodes []client.Chainlink) error {
 	for _, n := range nodes {
-		p2pkeys, err := n.ReadP2PKeys()
+		_, err := n.CreateSolanaChain(&client.SolanaChainAttributes{ChainID: "localnet"})
 		if err != nil {
-			return nil, err
+			return err
 		}
-
-		peerID := p2pkeys.Data[0].Attributes.PeerID
-		txKey, err := n.CreateTxKey(ChainName)
-		if err != nil {
-			return nil, err
-		}
-		ocrKey, err := n.CreateOCR2Key(ChainName)
-		if err != nil {
-			return nil, err
-		}
-		nkb = append(nkb, NodeKeysBundle{
-			PeerID:  peerID,
-			OCR2Key: ocrKey,
-			TXKey:   txKey,
+		_, err = n.CreateSolanaNode(&client.SolanaNodeAttributes{
+			Name:          "solana",
+			SolanaChainID: "localnet",
+			SolanaURL:     "http://sol:8899",
 		})
+		if err != nil {
+			return err
+		}
 	}
-	return nkb, nil
+	return nil
 }
 
 func CreateNodeKeysBundle(nodes []client.Chainlink) ([]NodeKeysBundle, error) {
@@ -161,51 +153,6 @@ func FundOracles(c client.BlockchainClient, nkb []NodeKeysBundle, amount *big.Fl
 	return nil
 }
 
-// DefaultOffChainConfigParamsFromNodes collects OCR2 keys and creates contracts.OffChainAggregatorV2Config
-func DefaultOffChainConfigParamsFromNodes(nodes []client.Chainlink) (contracts.OffChainAggregatorV2Config, []NodeKeysBundle, error) {
-	nkb, err := createNodeKeys(nodes)
-	if err != nil {
-		return contracts.OffChainAggregatorV2Config{}, nil, err
-	}
-	oi, err := createOracleIdentities(nkb[1:])
-	if err != nil {
-		return contracts.OffChainAggregatorV2Config{}, nil, err
-	}
-	s := make([]int, 0)
-	for range nodes[1:] {
-		s = append(s, 1)
-	}
-	faultyNodes := 0
-	if len(nodes[1:]) > 1 {
-		faultyNodes = len(nkb[1:])/3 - 1
-	}
-	if faultyNodes == 0 {
-		faultyNodes = 1
-	}
-	log.Warn().Int("Nodes", faultyNodes).Msg("Faulty nodes")
-	return contracts.OffChainAggregatorV2Config{
-		DeltaProgress: 2 * time.Second,
-		DeltaResend:   5 * time.Second,
-		DeltaRound:    1 * time.Second,
-		DeltaGrace:    500 * time.Millisecond,
-		DeltaStage:    5 * time.Second,
-		RMax:          3,
-		S:             s,
-		Oracles:       oi,
-		ReportingPluginConfig: median.OffchainConfig{
-			AlphaReportPPB: uint64(0),
-			AlphaAcceptPPB: uint64(0),
-		}.Encode(),
-		MaxDurationQuery:                        0,
-		MaxDurationObservation:                  500 * time.Millisecond,
-		MaxDurationReport:                       500 * time.Millisecond,
-		MaxDurationShouldAcceptFinalizedReport:  500 * time.Millisecond,
-		MaxDurationShouldTransmitAcceptedReport: 500 * time.Millisecond,
-		F:                                       faultyNodes,
-		OnchainConfig:                           []byte{},
-	}, nkb, nil
-}
-
 // OffChainConfigParamsFromNodes creates contracts.OffChainAggregatorV2Config
 func OffChainConfigParamsFromNodes(nodes []client.Chainlink, nkb []NodeKeysBundle) (contracts.OffChainAggregatorV2Config, error) {
 	oi, err := createOracleIdentities(nkb)
@@ -274,18 +221,6 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 		if err != nil {
 			return err
 		}
-		_, err = nodesInfo.BootstrapNode.CreateSolanaChain(&client.SolanaChainAttributes{ChainID: "localnet"})
-		if err != nil {
-			return err
-		}
-		_, err = nodesInfo.BootstrapNode.CreateSolanaNode(&client.SolanaNodeAttributes{
-			Name:          "solana",
-			SolanaChainID: "localnet",
-			SolanaURL:     "http://sol:8899",
-		})
-		if err != nil {
-			return err
-		}
 		ContractsIdxMapToContractsNodeInfo[i].BootstrapBridgeInfo = BridgeInfo{ObservationSource: observationSource, JuelsSource: juelsSource}
 
 		// Other nodes later
@@ -311,18 +246,6 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 			}
 			juelsSource := client.ObservationSourceSpecBridge(juelsBridge)
 			err = node.CreateBridge(&juelsBridge)
-			if err != nil {
-				return err
-			}
-			_, err = node.CreateSolanaChain(&client.SolanaChainAttributes{ChainID: "localnet"})
-			if err != nil {
-				return err
-			}
-			_, err = node.CreateSolanaNode(&client.SolanaNodeAttributes{
-				Name:          "solana",
-				SolanaChainID: "localnet",
-				SolanaURL:     "http://sol:8899",
-			})
 			if err != nil {
 				return err
 			}
