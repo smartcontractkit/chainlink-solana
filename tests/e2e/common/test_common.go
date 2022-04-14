@@ -355,12 +355,13 @@ func (m *OCRv2TestState) ValidateRoundsAfter(chaosStartTime time.Time, timeout t
 			answers[c.OCR2.Address()] = &Answer{Answer: answer, Timestamp: timestamp, Error: err}
 		}
 		for ci, a := range answers {
-			log.Debug().Str("Contract", ci).Interface("Answer", a).Msg("Answer found")
 			answerTime := time.Unix(int64(a.Timestamp), 0)
 			if answerTime.After(m.LastRoundTime[ci]) {
 				m.LastRoundTime[ci] = answerTime
 				roundsFound++
-				log.Debug().Int("RoundsFound", roundsFound).Send()
+				log.Debug().Str("Contract", ci).Interface("Answer", a).Int("RoundsFound", roundsFound).Msg("New answer found")
+			} else {
+				log.Debug().Str("Contract", ci).Interface("Answer", a).Msg("Answer haven't changed")
 			}
 		}
 		g.Expect(roundsFound).To(BeNumerically(">=", rounds*len(m.Contracts)))
