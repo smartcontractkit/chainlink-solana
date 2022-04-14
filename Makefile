@@ -34,6 +34,8 @@ ifeq ($(OSFLAG),$(OSX))
 	asdf plugin-add golang https://github.com/kennyp/asdf-golang.git || true
 	asdf plugin-add ginkgo https://github.com/jimmidyson/asdf-ginkgo.git || true
 	asdf plugin-add pulumi || true
+	asdf plugin add actionlint || true
+	asdf plugin add shellcheck || true
 	asdf install
 endif
 ifeq ($(OSFLAG),$(LINUX))

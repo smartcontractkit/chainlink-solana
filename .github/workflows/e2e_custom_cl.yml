@@ -19,11 +19,9 @@ jobs:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1
     steps:
-      - uses: actions/checkout@v2
-        with:
-          repository: ${{ inputs.repo_name }}
-      - run: echo $HOME
-      - run: echo $PATH
+      - uses: actions/checkout@v3
+      - run: echo "$HOME"
+      - run: echo "$PATH"
       - run: yarn install --frozen-lockfile
       - name: Generate program_ids
         run: ./scripts/programs-keys-gen.sh
@@ -56,16 +54,13 @@ jobs:
     needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image]
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v2
-      - name: .tool-versions to .env
-        run: ./scripts/tool-versions-to-env.sh
-      - name: dotenv
-        uses: falti/dotenv-action@v0.2.7
-        id: dotenv
-      - name: Setup go ${{ steps.dotenv.outputs.golang_version }}
+        uses: actions/checkout@v3
+      - uses: smartcontractkit/tool-versions-to-env-action@v1.0.7
+        id: tool-versions
+      - name: Setup go ${{ steps.tool-versions.outputs.golang_version }}
         uses: actions/setup-go@v2
         with:
-          go-version: ${{ steps.dotenv.outputs.golang_version }}
+          go-version: ${{ steps.tool-versions.outputs.golang_version }}
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -112,7 +107,8 @@ jobs:
           CHAINLINK_VERSION: custom.${{ github.sha }}
           CGO_ENABLED: 1
         run: |
-          export PATH=$PATH:$(go env GOPATH)/bin
+          PATH=$PATH:$(go env GOPATH)/bin
+          export PATH
           make test_smoke
       - name: Publish Test Results
         uses: mikepenz/action-junit-report@v2

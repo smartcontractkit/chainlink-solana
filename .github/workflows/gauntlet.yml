@@ -8,16 +8,13 @@ jobs:
     name: Gauntlet Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: .tool-versions to .env
-        run: ./scripts/tool-versions-to-env.sh
-      - name: dotenv
-        uses: falti/dotenv-action@v0.2.7
-        id: dotenv
-      - name: Setup Node ${{ steps.dotenv.outputs.nodejs_version }}
+      - uses: actions/checkout@v3
+      - uses: smartcontractkit/tool-versions-to-env-action@v1.0.7
+        id: tool-versions
+      - name: Setup Node ${{ steps.tool-versions.outputs.nodejs_version }}
         uses: actions/setup-node@v2
         with:
-          node-version: ${{ steps.dotenv.outputs.nodejs_version }}
+          node-version: ${{ steps.tool-versions.outputs.nodejs_version }}
       - name: Install
         run: yarn --cwd ./gauntlet install --frozen-lockfile
       - name: Build
@@ -29,16 +26,13 @@ jobs:
     name: Gauntlet Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: .tool-versions to .env
-        run: ./scripts/tool-versions-to-env.sh
-      - name: dotenv
-        uses: falti/dotenv-action@v0.2.7
-        id: dotenv
-      - name: Setup Node ${{ steps.dotenv.outputs.nodejs_version }}
+      - uses: actions/checkout@v3
+      - uses: smartcontractkit/tool-versions-to-env-action@v1.0.7
+        id: tool-versions
+      - name: Setup Node ${{ steps.tool-versions.outputs.nodejs_version }}
         uses: actions/setup-node@v2
         with:
-          node-version: ${{ steps.dotenv.outputs.nodejs_version }}
+          node-version: ${{ steps.tool-versions.outputs.nodejs_version }}
       - name: Install
         run: yarn --cwd ./gauntlet install --frozen-lockfile
       - name: Lint
@@ -48,16 +42,13 @@ jobs:
     name: Gauntlet Run Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: .tool-versions to .env
-        run: ./scripts/tool-versions-to-env.sh
-      - name: dotenv
-        uses: falti/dotenv-action@v0.2.7
-        id: dotenv
-      - name: Setup Node ${{ steps.dotenv.outputs.nodejs_version }}
+      - uses: actions/checkout@v3
+      - uses: smartcontractkit/tool-versions-to-env-action@v1.0.7
+        id: tool-versions
+      - name: Setup Node ${{ steps.tool-versions.outputs.nodejs_version }}
         uses: actions/setup-node@v2
         with:
-          node-version: ${{ steps.dotenv.outputs.nodejs_version }}
+          node-version: ${{ steps.tool-versions.outputs.nodejs_version }}
       - name: Install
         run: yarn --cwd ./gauntlet install --frozen-lockfile
       - name: test:ci
