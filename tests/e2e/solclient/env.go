@@ -47,7 +47,7 @@ func NewChainlinkSolOCRv2(nodes int, stateful bool) *environment.Config {
 	if stateful {
 		env.Charts["chainlink"].Values["db"] = map[string]interface{}{
 			"stateful": true,
-			"capacity": "2Gi",
+			"capacity": "4Gi",
 		}
 	}
 	return env
