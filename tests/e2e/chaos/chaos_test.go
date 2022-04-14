@@ -12,7 +12,7 @@ import (
 )
 
 var _ = Describe("Solana chaos suite", func() {
-	var state = common.NewOCRv2State(1, 5)
+	var state = common.NewOCRv2State(1, 19)
 	BeforeEach(func() {
 		By("Deploying OCRv2 cluster", func() {
 			state.DeployCluster(19, true, utils.ContractsDir)
