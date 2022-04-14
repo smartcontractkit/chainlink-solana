@@ -5,11 +5,12 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-solana/tests/e2e/solclient"
 	"math/big"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-solana/tests/e2e/solclient"
 
 	"github.com/rs/zerolog/log"
 
