@@ -19,7 +19,7 @@ jobs:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
       - run: echo "$HOME"
       - run: echo "$PATH"
       - run: yarn install --frozen-lockfile
@@ -57,7 +57,7 @@ jobs:
       CGO_ENABLED: 1
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
       - uses: smartcontractkit/tool-versions-to-env-action@v1.0.7
         id: tool-versions
       - name: Setup go ${{ steps.tool-versions.outputs.golang_version }}
