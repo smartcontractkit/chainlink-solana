@@ -93,6 +93,10 @@ func (c ReportCodec) MedianFromReport(report types.Report) (*big.Int, error) {
 	return ToBigInt(median, uint(MedianLen))
 }
 
+func (c ReportCodec) MaxReportLength(n int) int {
+	return int(ReportLen)
+}
+
 // Create report digest using SHA256 hash fn
 func HashReport(ctx types.ReportContext, r types.Report) ([]byte, error) {
 	rawCtx := RawReportContext(ctx)
