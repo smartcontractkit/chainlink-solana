@@ -19,9 +19,9 @@ jobs:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1
     steps:
-      - uses: actions/checkout@v2
-      - run: echo $HOME
-      - run: echo $PATH
+      - uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
+      - run: echo "$HOME"
+      - run: echo "$PATH"
       - run: yarn install --frozen-lockfile
       - name: Generate program_ids
         run: ./scripts/programs-keys-gen.sh
@@ -57,16 +57,13 @@ jobs:
       CGO_ENABLED: 1
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v2
-      - name: .tool-versions to .env
-        run: ./scripts/tool-versions-to-env.sh
-      - name: dotenv
-        uses: falti/dotenv-action@v0.2.7
-        id: dotenv
-      - name: Setup go ${{ steps.dotenv.outputs.golang_version }}
+        uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
+      - uses: smartcontractkit/tool-versions-to-env-action@v1.0.7
+        id: tool-versions
+      - name: Setup go ${{ steps.tool-versions.outputs.golang_version }}
         uses: actions/setup-go@v2
         with:
-          go-version: ${{ steps.dotenv.outputs.golang_version }}
+          go-version: ${{ steps.tool-versions.outputs.golang_version }}
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -109,7 +106,8 @@ jobs:
           CHAINLINK_IMAGE: 795953128386.dkr.ecr.us-west-2.amazonaws.com/chainlink
           CHAINLINK_VERSION: custom.${{ github.sha }}
         run: |
-          export PATH=$PATH:$(go env GOPATH)/bin
+          PATH=$PATH:$(go env GOPATH)/bin
+          export PATH
           ginkgo tests/e2e/soak
       - name: Publish Test Results
         uses: mikepenz/action-junit-report@v2
