@@ -67,14 +67,14 @@ func (c ReportCodec) BuildReport(oo []median.ParsedAttributedObservation) (types
 	// TODO: replace with generalized function from libocr
 	medianBytes, err := bigbigendian.SerializeSigned(int(MedianLen), median)
 	if err != nil {
-		return nil, errors.Wrap(err, "error in DeserializeSigned(median)")
+		return nil, errors.Wrap(err, "error in SerializeSigned(median)")
 	}
 	report = append(report, medianBytes[:]...)
 
 	// TODO: replace with generalized function from libocr
 	juelsPerFeeCoinBytes, err := bigbigendian.SerializeSigned(int(JuelsLen), juelsPerFeeCoin)
 	if err != nil {
-		return nil, errors.Wrap(err, "error in DeserializeSigned(juelsPerFeeCoin)")
+		return nil, errors.Wrap(err, "error in SerializeSigned(juelsPerFeeCoin)")
 	}
 	report = append(report, juelsPerFeeCoinBytes[:]...)
 
