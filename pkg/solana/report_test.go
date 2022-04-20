@@ -2,6 +2,7 @@ package solana
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math"
 	"math/big"
 	"testing"
@@ -77,16 +78,18 @@ func TestMedianFromOnChainReport(t *testing.T) {
 	assert.Equal(t, "1234567890", res.String())
 }
 
+type medianTest struct {
+	name           string
+	obs            []*big.Int
+	expectedMedian *big.Int
+}
+
 func TestMedianFromReport(t *testing.T) {
 	cdc := ReportCodec{}
 	// Requires at least one obs
 	_, err := cdc.BuildReport(nil)
 	require.Error(t, err)
-	var tt = []struct {
-		name           string
-		obs            []*big.Int
-		expectedMedian *big.Int
-	}{
+	var tt = []medianTest{
 		{
 			name:           "2 positive one zero",
 			obs:            []*big.Int{big.NewInt(0), big.NewInt(10), big.NewInt(20)},
@@ -121,6 +124,20 @@ func TestMedianFromReport(t *testing.T) {
 			expectedMedian: big.NewInt(-3),
 		},
 	}
+
+	// add cases for observation number from [1..31]
+	for i := 1; i < 32; i++ {
+		test := medianTest{
+			name:           fmt.Sprintf("observations=%d", i),
+			obs:            []*big.Int{},
+			expectedMedian: big.NewInt(1),
+		}
+		for j := 0; j < i; j++ {
+			test.obs = append(test.obs, big.NewInt(1))
+		}
+		tt = append(tt, test)
+	}
+
 	for _, tc := range tt {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
