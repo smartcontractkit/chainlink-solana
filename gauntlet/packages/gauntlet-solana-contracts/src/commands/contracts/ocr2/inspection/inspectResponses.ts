@@ -24,10 +24,7 @@ export default class OCR2InspectResponses extends SolanaCommand {
   static id = 'ocr2:inspect:responses'
   static category = CONTRACT_LIST.OCR_2
 
-  static examples = [
-    'yarn gauntlet ocr2:inspect:responses --network=devnet --rdd=[PATH_TO_RDD] [AGGREGATOR_ADDRESS]',
-    'yarn gauntlet ocr2:inspect:responses [AGGREGATOR_ADDRESS]',
-  ]
+  static examples = ['yarn gauntlet ocr2:inspect:responses --network=devnet [AGGREGATOR_ADDRESS]']
 
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input

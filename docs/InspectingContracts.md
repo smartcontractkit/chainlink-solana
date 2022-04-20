@@ -75,6 +75,52 @@ Operator address is H2ScWiFt1ZMRR1beYWB6Yr9cuADJ8sQhkGvYJxjJNAh8
 ✨  Done in 12.61s.
 ```
 
+### OCR2 Inspect Responses
+
+Gauntlet also enables you to view the latest transmission from a given OCR2 program. Transmissions provide information about the current aggregator round, the latest data feed value, the transmitter, and the number of observers that contributed to the transmission. Run the following command.
+
+```bash
+yarn gauntlet ocr2:inspect:responses --network=[NETWORK_NAME] [AGGREGATOR_ADDRESS]
+
+e.g. yarn gauntlet ocr2:inspect:responses --network=mainnet 2oyA8ZLwuWeAR5ANyDsiEGueUyDC8jFGFLSixSzT9KtV
+```
+
+The response provides the latest on-chain config, the contents of the latest transmission, and the oracles that did not contribute to the transmission.
+
+```bash
+🧤  gauntlet 0.1.2
+ℹ️   Loading Local wallet
+Operator address is 3iXMGCiHZ5UcND8XrRgChwFSHKK3XGagvH53YKozwBm2
+ℹ️   Latest Config: 
+    - Latest Transmitter: DDws22Z91d3ZzxPFCqvh1BWZY1zyZzLzGHVXXQw5bhwc
+    - Latest Aggregator Round ID: 213551
+    - Latest Config Digest: 0,3,132,97,236,248,39,85,125,146,34,75,83,125,202,151,233,196,131,119,24,115,248,41,143,88,20,118,17,83,100,137
+    - Latest Config Block Number: 129616565
+    
+ℹ️   Latest Transmission
+    - Round Id: 213551
+    - Config Digest: 0,3,132,97,236,248,39,85,125,146,34,75,83,125,202,151,233,196,131,119,24,115,248,41,143,88,20,118,17,83,100,137
+    - Answer: 4129582000000
+    - Transmitter: DDws22Z91d3ZzxPFCqvh1BWZY1zyZzLzGHVXXQw5bhwc
+    - Observations Timestamp: 1650467589
+    - Observer Count: 12
+    - Observers: 3QioEt3JQEs7Sd2B19oBjXpCV2bth8svTmjNsqCwEkux,6FpWeQow6SX9ABRMPgdW948fuoMMbEDWWieoPyMuWEVv,HQUygbE1xW1JTiQSMxds3VcPe5ZjqzUrCE9gEaweohKK,277Xi9qxS7HtewZnXtETX7WmNNeJjcsDWErVnTd5haoi,D5shgkAbSHH1VGDybY5bEbgbvvCMbop4u5WKTKxb3cFq,5od8t5kD2gVZvbMfYUJTfjy2FdqsAEkd8EeLvcaWQqBG,6rRiMihF7UdJz25t5QvS7PgP9yzfubN7TBRv26ZBVAhE,DDws22Z91d3ZzxPFCqvh1BWZY1zyZzLzGHVXXQw5bhwc,BwEkdn8SgNQZkZJhEQStmv4MPEZtqHjurKVxJycGRYLm,Fhfv8uB5Sux1nWiw4ssDrbDdt26BPB4tfoW4Bm2on3rj,9xmyHHdJvryP82a1QwzcAueFhGHG9NfdfSdPp64xduCG,6fhjrYHYfhymJsmwLaRBKZXMK2ChYErkteE7jK6h236e
+    - Juels Per Lamport: 7588976109
+    - Reimbursement Gjuels: 37944
+        
+ℹ️   12/16 oracles are responding
+        
+❌  Oracle 5dDyfdy9fannAdHEkYghgQpiPZrQPHadxBLa1WsGHPFi not responding
+            
+❌  Oracle 7H2aMNigJrHi5TtXtDtEN9NFQRp5x7GQR48SUWdZ7SnW not responding
+            
+❌  Oracle BEMZ2yGTwLfxb1tmWHJzURaDSwobp5L6Z6JKMATMyYK3 not responding
+            
+❌  Oracle Gb2tVHqnEmXEqcqdv5LSwgEusEyP3Yhwy9Gu7D1VBS9z not responding
+            
+✨  Done in 11.92s.
+```
+
 ## Via Block Explorers
 
 [Solana Explorer](https://explorer.solana.com/) allows users to search for deployed programs and read their state. On the home page, search the address of the program account that you want to inspect. For example, if you want to inspect the OCR2 program for the BTC/USD feed on mainnet, search *2oyA8ZLwuWeAR5ANyDsiEGueUyDC8jFGFLSixSzT9KtV*.
