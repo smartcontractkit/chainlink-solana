@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/pkg/errors"
+	"github.com/smartcontractkit/libocr/bigbigendian"
 	"github.com/smartcontractkit/libocr/offchainreporting2/chains/evmutil"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
@@ -64,16 +64,16 @@ func (c ReportCodec) BuildReport(oo []median.ParsedAttributedObservation) (types
 	report = append(report, observers[:]...)
 
 	// TODO: replace with generalized function from libocr
-	medianBytes, err := ToBytes(median, uint(MedianLen))
+	medianBytes, err := bigbigendian.SerializeSigned(int(MedianLen), median)
 	if err != nil {
-		return nil, errors.Wrap(err, "error in ToBytes(median)")
+		return nil, fmt.Errorf("error in SerializeSigned(median): %w", err)
 	}
 	report = append(report, medianBytes[:]...)
 
 	// TODO: replace with generalized function from libocr
-	juelsPerFeeCoinBytes, err := ToBytes(juelsPerFeeCoin, uint(JuelsLen))
+	juelsPerFeeCoinBytes, err := bigbigendian.SerializeSigned(int(JuelsLen), juelsPerFeeCoin)
 	if err != nil {
-		return nil, errors.Wrap(err, "error in ToBytes(juelsPerFeeCoin)")
+		return nil, fmt.Errorf("error in SerializeSigned(juelsPerFeeCoin): %w", err)
 	}
 	report = append(report, juelsPerFeeCoinBytes[:]...)
 
@@ -90,7 +90,11 @@ func (c ReportCodec) MedianFromReport(report types.Report) (*big.Int, error) {
 	start := int(ReportHeaderLen)
 	end := start + int(MedianLen)
 	median := report[start:end]
-	return ToBigInt(median, uint(MedianLen))
+	return bigbigendian.DeserializeSigned(int(MedianLen), median)
+}
+
+func (c ReportCodec) MaxReportLength(n int) int {
+	return int(ReportLen)
 }
 
 // Create report digest using SHA256 hash fn
