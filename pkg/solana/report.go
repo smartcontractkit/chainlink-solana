@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/bigbigendian"
 	"github.com/smartcontractkit/libocr/offchainreporting2/chains/evmutil"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
@@ -67,14 +66,14 @@ func (c ReportCodec) BuildReport(oo []median.ParsedAttributedObservation) (types
 	// TODO: replace with generalized function from libocr
 	medianBytes, err := bigbigendian.SerializeSigned(int(MedianLen), median)
 	if err != nil {
-		return nil, errors.Wrap(err, "error in SerializeSigned(median)")
+		return nil, fmt.Errorf("error in SerializeSigned(median): %w", err)
 	}
 	report = append(report, medianBytes[:]...)
 
 	// TODO: replace with generalized function from libocr
 	juelsPerFeeCoinBytes, err := bigbigendian.SerializeSigned(int(JuelsLen), juelsPerFeeCoin)
 	if err != nil {
-		return nil, errors.Wrap(err, "error in SerializeSigned(juelsPerFeeCoin)")
+		return nil, fmt.Errorf("error in SerializeSigned(juelsPerFeeCoin): %w", err)
 	}
 	report = append(report, juelsPerFeeCoinBytes[:]...)
 
