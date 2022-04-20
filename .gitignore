@@ -37,3 +37,4 @@ gauntlet/packages/gauntlet-serum-multisig/networks/.env.local
 id.json
 tests/e2e/logs
 tests/e2e/smoke/logs
+tests/e2e/smoke/contracts-chaos-state.json

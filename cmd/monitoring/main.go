@@ -13,17 +13,17 @@ import (
 )
 
 func main() {
-	coreLog, closeLggr := logger.NewLogger()
+	coreLog, closeLog := logger.NewLogger()
 	defer func() {
-		if err := closeLggr(); err != nil {
+		if err := closeLog(); err != nil {
 			log.Println(fmt.Sprintf("Error while closing Logger: %v", err))
 		}
 	}()
-	l := logWrapper{coreLog}
+	log := logWrapper{coreLog}
 
 	chainConfig, err := monitoring.ParseSolanaConfig()
 	if err != nil {
-		l.Fatalw("failed to parse solana-specific config", "error", err)
+		log.Fatalw("failed to parse solana-specific config", "error", err)
 	}
 
 	client := rpc.New(chainConfig.RPCEndpoint)
@@ -39,31 +39,32 @@ func main() {
 
 	monitor, err := relayMonitoring.NewMonitor(
 		context.Background(),
-		l,
+		log,
 		chainConfig,
 		envelopeSourceFactory,
 		txResultsSourceFactory,
-		monitoring.SolanaFeedParser,
+		monitoring.SolanaFeedsParser,
+		monitoring.SolanaNodesParser,
 	)
 	if err != nil {
-		l.Fatalw("failed to build monitor", "error", err)
+		log.Fatalw("failed to build monitor", "error", err)
 		return
 	}
 
 	balancesSourceFactory := monitoring.NewBalancesSourceFactory(
 		client,
-		l.With("component", "source-balances"),
+		log.With("component", "source-balances"),
 	)
 	monitor.SourceFactories = append(monitor.SourceFactories, balancesSourceFactory)
 
 	promExporterFactory := monitoring.NewPrometheusExporterFactory(
-		l.With("component", "solana-prom-exporter"),
-		monitoring.NewMetrics(l.With("component", "solana-metrics")),
+		log.With("component", "solana-prom-exporter"),
+		monitoring.NewMetrics(log.With("component", "solana-metrics")),
 	)
 	monitor.ExporterFactories = append(monitor.ExporterFactories, promExporterFactory)
 
 	monitor.Run()
-	l.Infow("monitor stopped")
+	log.Infow("monitor stopped")
 }
 
 // adapt core logger to monitoring logger.

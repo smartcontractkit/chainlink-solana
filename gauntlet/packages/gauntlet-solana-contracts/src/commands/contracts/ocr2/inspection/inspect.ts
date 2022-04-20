@@ -34,12 +34,17 @@ export default class OCR2Inspect extends SolanaCommand {
     'yarn gauntlet ocr2:inspect [AGGREGATOR_ADDRESS]',
   ]
 
-  makeInput = (userInput): Input => {
+  makeInput = (userInput): Input | undefined => {
     if (userInput) return userInput as Input
     const network = this.flags.network || ''
     const rddPath = this.flags.rdd || ''
     const billingAccessController = this.flags.billingAccessController || process.env.BILLING_ACCESS_CONTROLLER
     const requesterAccessController = this.flags.requesterAccessController || process.env.REQUESTER_ACCESS_CONTROLLER
+
+    // Return empty input if no rdd or user input provided
+    if (!rddPath) {
+      return undefined
+    }
 
     const rdd = RDD.load(network, rddPath)
     const aggregator = RDD.loadAggregator(this.args[0], network, rddPath)
@@ -125,8 +130,6 @@ export default class OCR2Inspect extends SolanaCommand {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const ocr2program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
 
-    const input = this.makeInput(this.flags.input)
-
     const state = new PublicKey(this.args[0])
     const onChainState = await ocr2program.account.state.fetch(state)
 
@@ -136,6 +139,41 @@ export default class OCR2Inspect extends SolanaCommand {
     )
 
     const onChainOCRConfig = deserializeConfig(bufferedConfig)
+
+    // Print on-chain oracle information
+    onChainState.oracles.xs.forEach((oracle) => {
+      logger.info(
+        `Oracle Info:
+         - Transmitter: ${oracle.transmitter}
+         - Proposed Payee: ${oracle.proposedPayee}
+         - From Round ID: ${oracle.fromRoundId}
+         - Payment Gjuels: ${oracle.paymentGjuels}
+      `,
+      )
+    })
+
+    const input = this.makeInput(this.flags.input)
+    // If input does not exist, just print config
+    if (!input) {
+      logger.info(
+        `On Chain Config
+         - Min Answer: ${onChainState.config.minAnswer}
+         - Max Answer: ${onChainState.config.maxAnswer}
+         - Transmission Payment: ${onChainState.config.billing.transmissionPaymentGjuels}
+         - Observation Payment: ${onChainState.config.billing.observationPaymentGjuels}
+         - Requester Access Controller: ${onChainState.config.requesterAccessController}
+         - Billing Access Controller: ${onChainState.config.billingAccessController}
+      `,
+      )
+      return {
+        responses: [
+          {
+            contract: state.toString(),
+          },
+        ],
+      } as Result<TransactionResponse>
+    }
+
     const wrappedComparableLongNumber = (v: any) => {
       // Proto encoding will ignore falsy values.
       if (!v) return '0'
@@ -243,17 +281,6 @@ export default class OCR2Inspect extends SolanaCommand {
         `Offchain Config "reportingPluginConfig.deltaCNanoseconds"`,
       ),
     ]
-    // Print on-chain oracle information
-    onChainState.oracles.xs.forEach((oracle) => {
-      logger.info(
-        `Oracle Info:
-          - Transmitter: ${oracle.transmitter}
-          - Proposed Payee: ${oracle.proposedPayee}
-          - From Round ID: ${oracle.fromRoundId}
-          - Payment Gjuels: ${oracle.paymentGjuels}
-      `,
-      )
-    })
 
     // Fetching tranmissions involves a tx. Give the option to the user to choose whether to fetch it or not.
     // Deactivated until we find a more efficient way to fetch this info

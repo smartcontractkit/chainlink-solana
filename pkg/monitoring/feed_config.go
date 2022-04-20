@@ -100,7 +100,7 @@ func (s SolanaFeedConfig) ToMapping() map[string]interface{} {
 	}
 }
 
-func SolanaFeedParser(buf io.ReadCloser) ([]relayMonitoring.FeedConfig, error) {
+func SolanaFeedsParser(buf io.ReadCloser) ([]relayMonitoring.FeedConfig, error) {
 	rawFeeds := []SolanaFeedConfig{}
 	decoder := json.NewDecoder(buf)
 	if err := decoder.Decode(&rawFeeds); err != nil {

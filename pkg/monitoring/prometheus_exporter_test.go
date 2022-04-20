@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/mocks"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +20,7 @@ func TestPrometheusExporter(t *testing.T) {
 
 		chainConfig := generateChainConfig()
 		feedConfig := generateFeedConfig()
-		exporter, err := factory.NewExporter(chainConfig, feedConfig)
+		exporter, err := factory.NewExporter(relayMonitoring.ExporterParams{chainConfig, feedConfig, []relayMonitoring.NodeConfig{}})
 		require.NoError(t, err)
 
 		balances := generateBalances()

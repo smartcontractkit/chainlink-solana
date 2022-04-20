@@ -11,9 +11,7 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
-	associatedtokenaccount "github.com/gagliardetto/solana-go/programs/associated-token-account"
 	"github.com/gagliardetto/solana-go/programs/system"
-	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/gagliardetto/solana-go/rpc/ws"
 	"github.com/gagliardetto/solana-go/text"
@@ -68,7 +66,6 @@ type Client struct {
 	// ProgramWallets program wallets by key filename
 	ProgramWallets    map[string]*solana.Wallet
 	DefaultWallet     *solana.Wallet
-	Accounts          *Accounts
 	txErrGroup        errgroup.Group
 	queueTransactions bool
 	// RPC rpc client
@@ -136,7 +133,6 @@ func ClientInitFunc() func(networkName string, networkConfig map[string]interfac
 		if err := c.LoadWallets(cfg); err != nil {
 			return nil, err
 		}
-		c.initSharedState()
 		return c, nil
 	}
 }
@@ -157,20 +153,6 @@ func NewClient(cfg *NetworkConfig) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) initSharedState() {
-	c.Accounts = &Accounts{
-		OCR:           solana.NewWallet(),
-		Store:         solana.NewWallet(),
-		Feed:          solana.NewWallet(),
-		Proposal:      solana.NewWallet(),
-		Owner:         solana.NewWallet(),
-		Mint:          solana.NewWallet(),
-		MintAuthority: solana.NewWallet(),
-		OCRVault:      solana.NewWallet(),
-		Authorities:   make(map[string]*Authority),
-	}
-}
-
 // CreateAccInstr creates instruction for account creation of particular size
 func (c *Client) CreateAccInstr(acc *solana.Wallet, accSize uint64, ownerPubKey solana.PublicKey) (solana.Instruction, error) {
 	payer := c.DefaultWallet
@@ -189,48 +171,6 @@ func (c *Client) CreateAccInstr(acc *solana.Wallet, accSize uint64, ownerPubKey 
 		payer.PublicKey(),
 		acc.PublicKey(),
 	).Build(), nil
-}
-
-// addMintInstr adds instruction for creating new mint (token)
-func (c *Client) addMintInstr(instr *[]solana.Instruction) error {
-	accInstr, err := c.CreateAccInstr(c.Accounts.Mint, TokenMintAccountSize, token.ProgramID)
-	if err != nil {
-		return err
-	}
-	*instr = append(
-		*instr,
-		accInstr,
-		token.NewInitializeMintInstruction(
-			18,
-			c.Accounts.MintAuthority.PublicKey(),
-			c.Accounts.MintAuthority.PublicKey(),
-			c.Accounts.Mint.PublicKey(),
-			solana.SysVarRentPubkey,
-		).Build())
-	return nil
-}
-
-// addNewAssociatedAccInstr adds instruction to create new account associated with some mint (token)
-func (c *Client) addNewAssociatedAccInstr(acc *solana.Wallet, ownerPubKey solana.PublicKey, instr *[]solana.Instruction) error {
-	accInstr, err := c.CreateAccInstr(acc, TokenAccountSize, token.ProgramID)
-	if err != nil {
-		return err
-	}
-	*instr = append(*instr,
-		accInstr,
-		token.NewInitializeAccountInstruction(
-			acc.PublicKey(),
-			c.Accounts.Mint.PublicKey(),
-			ownerPubKey,
-			solana.SysVarRentPubkey,
-		).Build(),
-		associatedtokenaccount.NewCreateInstruction(
-			c.DefaultWallet.PublicKey(),
-			acc.PublicKey(),
-			c.Accounts.Mint.PublicKey(),
-		).Build(),
-	)
-	return nil
 }
 
 // TXSync executes tx synchronously in "CommitmentFinalized"
@@ -324,7 +264,7 @@ func (c *Client) TXAsync(name string, instr []solana.Instruction, signerFunc fun
 	if err != nil {
 		return err
 	}
-	c.queueTX(sig, rpc.CommitmentFinalized)
+	c.queueTX(sig, rpc.CommitmentConfirmed)
 	log.Info().Interface("Sig", sig).Msg("TX send")
 	return nil
 }
@@ -357,7 +297,7 @@ func (c *Client) Airdrop(wpk solana.PublicKey, solAmount uint64) error {
 		Str("PublicKey", wpk.String()).
 		Str("TX", txHash.String()).
 		Msg("Airdropping account")
-	c.queueTX(txHash, rpc.CommitmentProcessed)
+	c.queueTX(txHash, rpc.CommitmentConfirmed)
 	return nil
 }
 
@@ -406,7 +346,7 @@ func (c *Client) LoadWallets(nc interface{}) error {
 	for _, w := range c.Wallets {
 		addresses = append(addresses, w.PublicKey().String())
 	}
-	if err := c.AirdropAddresses(addresses, 5); err != nil {
+	if err := c.AirdropAddresses(addresses, 500); err != nil {
 		return err
 	}
 	if err := c.SetWallet(1); err != nil {
@@ -486,7 +426,7 @@ func (c *Client) Fund(toAddress string, amount *big.Float) error {
 		Str("PublicKey", pubKey.String()).
 		Str("TX", txHash.String()).
 		Msg("Airdropping account")
-	c.queueTX(txHash, rpc.CommitmentFinalized)
+	c.queueTX(txHash, rpc.CommitmentConfirmed)
 	return nil
 }
 
@@ -501,6 +441,10 @@ func (c *Client) ParallelTransactions(enabled bool) {
 func (c *Client) Close() error {
 	c.WS.Close()
 	return nil
+}
+
+func (c *Client) EstimateTransactionGasCost() (*big.Int, error) {
+	panic("implement me")
 }
 
 func (c *Client) AddHeaderEventSubscription(key string, subscriber client.HeaderEventSubscription) {

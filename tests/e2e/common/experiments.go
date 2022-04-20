@@ -25,7 +25,7 @@ func (m *OCRv2TestState) CanRecoverAllNodesValidatorConnectionLoss() {
 	time.Sleep(ChaosAwaitingApply)
 	err = m.Env.ClearAllChaosExperiments()
 	Expect(err).ShouldNot(HaveOccurred())
-	m.ValidateRoundsAfter(time.Now(), 10)
+	m.ValidateRoundsAfter(time.Now(), NewRoundCheckTimeout, 10)
 }
 
 func (m *OCRv2TestState) CanWorkYellowGroupNoValidatorConnection() {
@@ -43,7 +43,7 @@ func (m *OCRv2TestState) CanWorkYellowGroupNoValidatorConnection() {
 	)
 	Expect(err).ShouldNot(HaveOccurred())
 	time.Sleep(ChaosAwaitingApply)
-	m.ValidateRoundsAfter(time.Now(), 10)
+	m.ValidateRoundsAfter(time.Now(), NewRoundCheckTimeout, 10)
 }
 
 func (m *OCRv2TestState) CantWorkWithFaultyNodesFailed() {
@@ -77,7 +77,7 @@ func (m *OCRv2TestState) CanWorkWithFaultyNodesOffline() {
 	)
 	Expect(err).ShouldNot(HaveOccurred())
 	time.Sleep(ChaosAwaitingApply)
-	m.ValidateRoundsAfter(time.Now(), 10)
+	m.ValidateRoundsAfter(time.Now(), NewRoundCheckTimeout, 10)
 }
 
 func (m *OCRv2TestState) CantWorkWithMoreThanFaultyNodesOffline() {
@@ -95,7 +95,7 @@ func (m *OCRv2TestState) CantWorkWithMoreThanFaultyNodesOffline() {
 	)
 	Expect(err).ShouldNot(HaveOccurred())
 	time.Sleep(ChaosAwaitingApply)
-	m.ValidateRoundsAfter(time.Now(), 30)
+	m.ValidateRoundsAfter(time.Now(), NewRoundCheckTimeout, 30)
 }
 
 func (m *OCRv2TestState) CantWorkWithMoreThanFaultyNodesSplit() {
@@ -131,7 +131,7 @@ func (m *OCRv2TestState) NetworkCorrupt(group string, corrupt int, rounds int) {
 	)
 	Expect(err).ShouldNot(HaveOccurred())
 	time.Sleep(ChaosAwaitingApply)
-	m.ValidateRoundsAfter(time.Now(), rounds)
+	m.ValidateRoundsAfter(time.Now(), NewRoundCheckTimeout, rounds)
 }
 
 func (m *OCRv2TestState) CanWorkAfterAllNodesRestarted() {
@@ -147,7 +147,7 @@ func (m *OCRv2TestState) CanWorkAfterAllNodesRestarted() {
 	)
 	Expect(err).ShouldNot(HaveOccurred())
 	time.Sleep(ChaosAwaitingApply)
-	m.ValidateRoundsAfter(time.Now(), 10)
+	m.ValidateRoundsAfter(time.Now(), NewRoundCheckTimeout, 10)
 }
 
 func (m *OCRv2TestState) RestoredAfterNetworkSplit() {
@@ -168,5 +168,5 @@ func (m *OCRv2TestState) RestoredAfterNetworkSplit() {
 	m.ValidateNoRoundsAfter(time.Now())
 	err = m.Env.ClearAllChaosExperiments()
 	Expect(err).ShouldNot(HaveOccurred())
-	m.ValidateRoundsAfter(time.Now(), 10)
+	m.ValidateRoundsAfter(time.Now(), NewRoundCheckTimeout, 10)
 }

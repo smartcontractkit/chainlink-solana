@@ -24,12 +24,11 @@ type prometheusExporterFactory struct {
 }
 
 func (p *prometheusExporterFactory) NewExporter(
-	chainConfig relayMonitoring.ChainConfig,
-	feedConfig relayMonitoring.FeedConfig,
+	params relayMonitoring.ExporterParams,
 ) (relayMonitoring.Exporter, error) {
 	return &prometheusExporter{
-		chainConfig,
-		feedConfig,
+		params.ChainConfig,
+		params.FeedConfig,
 		p.log,
 		p.metrics,
 		sync.Mutex{},

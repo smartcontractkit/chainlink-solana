@@ -29,11 +29,13 @@ ifeq ($(OSFLAG),$(WINDOWS))
 endif
 ifeq ($(OSFLAG),$(OSX))
 	brew install asdf
-	asdf plugin-add nodejs https://github.com/asdf-vm/asdf-nodejs.git || true
-	asdf plugin-add rust https://github.com/code-lever/asdf-rust.git || true
-	asdf plugin-add golang https://github.com/kennyp/asdf-golang.git || true
-	asdf plugin-add ginkgo https://github.com/jimmidyson/asdf-ginkgo.git || true
+	asdf plugin-add nodejs || true
+	asdf plugin-add rust || true
+	asdf plugin-add golang || true
+	asdf plugin-add ginkgo || true
 	asdf plugin-add pulumi || true
+	asdf plugin add actionlint || true
+	asdf plugin add shellcheck || true
 	asdf install
 endif
 ifeq ($(OSFLAG),$(LINUX))
@@ -41,7 +43,7 @@ ifneq ($(CI),true)
 	# install nix
 	sh <(curl -L https://nixos-nix-install-tests.cachix.org/serve/vij683ly7sl95nnhb67bdjjfabclr85m/install) --daemon --tarball-url-prefix https://nixos-nix-install-tests.cachix.org/serve --nix-extra-conf-file ./nix.conf
 endif
-	go install github.com/onsi/ginkgo/v2/ginkgo@v$(shell ./scripts/tool-versions-to-env.sh GINKGO_VERSION)
+	go install github.com/onsi/ginkgo/v2/ginkgo@v$(shell cat ./.tool-versions | grep ginkgo | sed -En "s/ginkgo.(.*)/\1/p")
 endif
 
 anchor_shell:
@@ -61,6 +63,9 @@ test_relay_unit:
 
 test_smoke:
 	SELECTED_NETWORKS=solana NETWORK_SETTINGS=$(shell pwd)/tests/e2e/networks.yaml ginkgo tests/e2e/smoke
+
+test_ocr_soak:
+	SELECTED_NETWORKS=solana NETWORK_SETTINGS=$(shell pwd)/tests/e2e/networks.yaml ginkgo tests/e2e/soak
 
 test_chaos:
 	SELECTED_NETWORKS=solana NETWORK_SETTINGS=$(shell pwd)/tests/e2e/networks.yaml ginkgo tests/e2e/chaos

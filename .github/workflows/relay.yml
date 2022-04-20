@@ -9,16 +9,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
-      - name: .tool-versions to .env
-        run: ./scripts/tool-versions-to-env.sh
-      - name: dotenv
-        uses: falti/dotenv-action@v0.2.7
-        id: dotenv
-      - name: Setup go ${{ steps.dotenv.outputs.golang_version }}
+        uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
+      - uses: smartcontractkit/tool-versions-to-env-action@v1.0.7
+        id: tool-versions
+      - name: Setup go ${{ steps.tool-versions.outputs.golang_version }}
         uses: actions/setup-go@v2
         with:
-          go-version: ${{ steps.dotenv.outputs.golang_version }}
+          go-version: ${{ steps.tool-versions.outputs.golang_version }}
       - name: Install Solana CLI
         run: ./scripts/install-solana-ci.sh
       - name: Build
