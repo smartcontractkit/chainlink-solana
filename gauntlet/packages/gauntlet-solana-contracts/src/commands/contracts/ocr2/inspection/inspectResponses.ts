@@ -4,20 +4,30 @@ import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import { inspection, logger } from '@chainlink/gauntlet-core/dist/utils'
 import { getLatestNewTransmissionEvents } from '../../../../lib/events'
+import { makeInput } from './inputs'
 
-type Input = {}
+// Maps the addresses of on-chain transmitters to display names
+const onChainDisplayNames = (
+  inputtedTransmitters: string[],
+  inputtedDisplayNames: string[],
+  onChainTransmitters: PublicKey[],
+): string[] => {
+  return onChainTransmitters.map((transmitter) => {
+    // Find index of on-chain transmitter in inputted transmitters
+    const index = inputtedTransmitters.findIndex((inputted) => inputted == transmitter.toString())
+    // Use address if display name unknown
+    if (index == -1) {
+      return transmitter.toString()
+    }
+    return inputtedDisplayNames[index]
+  })
+}
 
 export default class OCR2InspectResponses extends SolanaCommand {
   static id = 'ocr2:inspect:responses'
   static category = CONTRACT_LIST.OCR_2
 
   static examples = ['yarn gauntlet ocr2:inspect:responses --network=devnet [AGGREGATOR_ADDRESS]']
-
-  makeInput = (userInput): Input => {
-    if (userInput) return userInput as Input
-
-    return {}
-  }
 
   constructor(flags, args) {
     super(flags, args)
@@ -28,15 +38,17 @@ export default class OCR2InspectResponses extends SolanaCommand {
     const program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
 
     const state = new PublicKey(this.args[0])
-    const input = this.makeInput(this.flags.input)
     const onChainState = await program.account.state.fetch(state)
 
-    logger.info(`Latest Config: 
+    logger.info(
+      `Latest Config: 
+
     - Latest Transmitter: ${onChainState.config.latestTransmitter}
     - Latest Aggregator Round ID: ${onChainState.config.latestAggregatorRoundId}
     - Latest Config Digest: ${onChainState.config.latestConfigDigest}
     - Latest Config Block Number: ${onChainState.config.latestConfigBlockNumber}
-    `)
+    `,
+    )
 
     const transmitters = onChainState.oracles.xs
       .filter((oracle) => oracle.transmitter._bn != 0)
@@ -45,13 +57,18 @@ export default class OCR2InspectResponses extends SolanaCommand {
     // Get latest transmission events
     const events = await getLatestNewTransmissionEvents(this.provider.connection, state, program)
 
-    events.forEach((event) => {
+    // Store observers from each transmission
+    const observerRounds: PublicKey[][] = []
+
+    events.forEach((event, i) => {
       // Map observer indices into addresses
       const observers = (event.observers as []).slice(0, event.observerCount).map((observer) => transmitters[observer])
+      observerRounds.push(observers as PublicKey[])
 
       // Log transmission data
       logger.info(
-        `Latest Transmission
+        `Latest Transmission No. ${i + 1}
+
     - Round Id: ${event.roundId}
     - Config Digest: ${[...event.configDigest]}
     - Answer: ${event.answer}
@@ -61,12 +78,8 @@ export default class OCR2InspectResponses extends SolanaCommand {
     - Observers: ${observers}
     - Juels Per Lamport: ${event.juelsPerLamport}
     - Reimbursement Gjuels: ${event.reimbursementGjuels}
-  `,
-      )
 
-      // Log responding oracle count
-      logger.info(
-        `${event.observerCount}/${transmitters.length} oracles are responding
+    ${event.observerCount}/${transmitters.length} oracles are responding
   `,
       )
 
@@ -83,6 +96,31 @@ export default class OCR2InspectResponses extends SolanaCommand {
     })
 
     const inspections: inspection.Inspection[] = []
+
+    // Compare to user/rdd input
+    const input = makeInput(this.flags, this.args)
+    if (input) {
+      logger.info(
+        `Comparing On-Chain to Input
+      `,
+      )
+      // Convert on-chain transmitters to display names
+      const transmitterDisplayNames = onChainDisplayNames(input.transmitters, input.displayNames, transmitters)
+      // Compare transmitters from onchain config to transmitters in RDD
+      inspections.push(inspection.makeInspection(transmitterDisplayNames, input.displayNames, 'Transmitters in Config'))
+      // For each transmission event, compare observers from transmission to transmitters in RDD
+      observerRounds.forEach((observers, i) => {
+        // Convert observers to display names
+        const observerDisplayNames = onChainDisplayNames(input.transmitters, input.displayNames, observers)
+        inspections.push(
+          inspection.makeInspection(
+            observerDisplayNames,
+            input.displayNames,
+            `Observers from Latest Transmission No. ${i + 1}`,
+          ),
+        )
+      })
+    }
 
     const successfulInspection = inspection.inspect(inspections)
 

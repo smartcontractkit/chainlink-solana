@@ -4,26 +4,8 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import { deserializeConfig } from '../../../../lib/encoding'
-import WriteOffchainConfig, { OffchainConfig } from '../proposeOffchainConfig'
 import { toComparableLongNumber, toComparableNumber, toComparablePubKey } from '../../../../lib/inspection'
-import RDD from '../../../../lib/rdd'
-
-type Input = {
-  description: string
-  decimals: string | number
-  minAnswer: string | number
-  maxAnswer: string | number
-  transmitters: string[]
-  payees: string[]
-  signers: string[]
-  offchainConfig: OffchainConfig
-  billingAccessController: string
-  requesterAccessController: string
-  billing: {
-    observationPaymentGjuels: string
-    transmissionPaymentGjuels: string
-  }
-}
+import { makeInput, Input } from './inputs'
 
 export default class OCR2Inspect extends SolanaCommand {
   static id = 'ocr2:inspect'
@@ -33,44 +15,6 @@ export default class OCR2Inspect extends SolanaCommand {
     'yarn gauntlet ocr2:inspect --network=devnet --rdd=[PATH_TO_RDD] [AGGREGATOR_ADDRESS]',
     'yarn gauntlet ocr2:inspect [AGGREGATOR_ADDRESS]',
   ]
-
-  makeInput = (userInput): Input | undefined => {
-    if (userInput) return userInput as Input
-    const network = this.flags.network || ''
-    const rddPath = this.flags.rdd || ''
-    const billingAccessController = this.flags.billingAccessController || process.env.BILLING_ACCESS_CONTROLLER
-    const requesterAccessController = this.flags.requesterAccessController || process.env.REQUESTER_ACCESS_CONTROLLER
-
-    // Return empty input if no rdd or user input provided
-    if (!rddPath) {
-      return undefined
-    }
-
-    const rdd = RDD.load(network, rddPath)
-    const aggregator = RDD.loadAggregator(this.args[0], network, rddPath)
-    const aggregatorOperators: string[] = aggregator.oracles.map((o) => o.operator)
-    const transmitters = aggregatorOperators.map((operator) => rdd.operators[operator].ocrNodeAddress[0])
-    const payees = aggregatorOperators.map((operator) => rdd.operators[operator].adminAddress)
-    const signers = aggregatorOperators.map((operator) => rdd.operators[operator].ocr2OnchainPublicKey[0].substring(14))
-    const offchainConfig = WriteOffchainConfig.makeInputFromRDD(rdd, this.args[0])
-
-    return {
-      description: aggregator.name,
-      decimals: aggregator.decimals,
-      minAnswer: aggregator.minSubmissionValue,
-      maxAnswer: aggregator.maxSubmissionValue,
-      transmitters,
-      payees,
-      signers,
-      billingAccessController,
-      requesterAccessController,
-      offchainConfig,
-      billing: {
-        observationPaymentGjuels: aggregator.billing.observationPaymentGjuels,
-        transmissionPaymentGjuels: aggregator.billing.transmissionPaymentGjuels,
-      },
-    }
-  }
 
   constructor(flags, args) {
     super(flags, args)
@@ -152,7 +96,7 @@ export default class OCR2Inspect extends SolanaCommand {
       )
     })
 
-    const input = this.makeInput(this.flags.input)
+    const input = makeInput(this.flags, this.args)
     // If input does not exist, just print config
     if (!input) {
       logger.info(
