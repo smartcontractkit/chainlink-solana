@@ -39,46 +39,48 @@ export default class OCR2InspectResponses extends SolanaCommand {
     `)
 
     const transmitters = onChainState.oracles.xs
+      .filter((oracle) => oracle.transmitter._bn != 0)
       .map((oracle) => oracle.transmitter)
-      .filter((transmitter) => transmitter._bn != 0)
 
-    // TODO: Get the info we need. Match trasmitter index with our list, observers...
+    // Get latest transmission events
     const events = await getLatestNewTransmissionEvents(this.provider.connection, state, program)
 
-    console.log(events)
+    events.forEach((event) => {
+      // Map observer indices into addresses
+      const observers = (event.observers as []).slice(0, event.observerCount).map((observer) => transmitters[observer])
 
-    // await this.getLatestTransmissionEvent(state, program, transmitters, (event: NewTransmission) => {
-    //   // Log transmission data
-    //   logger.info(
-    //     `Latest Transmission
-    // - Round Id: ${event.roundId}
-    // - Config Digest: ${event.configDigest}
-    // - Answer: ${event.answer}
-    // - Transmitter: ${event.transmitter}
-    // - Observations Timestamp: ${event.observationsTimestamp}
-    // - Observer Count: ${event.observerCount}
-    // - Observers: ${event.observers}
-    // - Juels Per Lamport: ${event.juelsPerLamport}
-    // - Reimbursement Gjuels: ${event.reimbursementGjuels}
-    //     `,
-    //   )
-    //   // Log responding oracle count
-    //   logger.info(
-    //     `${event.observerCount}/${transmitters.length} oracles are responding
-    //     `,
-    //   )
-    //   // Log oracles that are not responsive
-    //   transmitters.forEach((transmitter) => {
-    //     // If the transmitter is not listed as an observer, log it
-    //     if (!event.observers.includes(transmitter)) {
-    //       logger.error(
-    //         `Oracle ${transmitter} not responding
-    //         `,
-    //       )
-    //     }
-    //   })
-    //   return
-    // })
+      // Log transmission data
+      logger.info(
+        `Latest Transmission
+    - Round Id: ${event.roundId}
+    - Config Digest: ${[...event.configDigest]}
+    - Answer: ${event.answer}
+    - Transmitter: ${observers[event.transmitter]}
+    - Observations Timestamp: ${event.observationsTimestamp}
+    - Observer Count: ${event.observerCount}
+    - Observers: ${observers}
+    - Juels Per Lamport: ${event.juelsPerLamport}
+    - Reimbursement Gjuels: ${event.reimbursementGjuels}
+  `,
+      )
+
+      // Log responding oracle count
+      logger.info(
+        `${event.observerCount}/${transmitters.length} oracles are responding
+  `,
+      )
+
+      // Log oracles that are not responsive
+      transmitters.forEach((transmitter) => {
+        // If the transmitter is not listed as an observer, log it
+        if (!observers.includes(transmitter)) {
+          logger.error(
+            `Oracle ${transmitter} not responding
+      `,
+          )
+        }
+      })
+    })
 
     const inspections: inspection.Inspection[] = []
 
