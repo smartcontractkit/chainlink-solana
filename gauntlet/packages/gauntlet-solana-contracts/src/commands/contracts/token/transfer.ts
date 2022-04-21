@@ -48,7 +48,14 @@ export default class TransferToken extends SolanaCommand {
     logger.info(
       `Preparing instruction to send ${amount.toString()} (${this.flags.amount}) Tokens to ${destination.toString()}`,
     )
-    const ix = Token.createTransferInstruction(TOKEN_PROGRAM_ID, from, destination, signer, [], amount.toNumber())
+    const ix = Token.createTransferInstruction(
+      TOKEN_PROGRAM_ID,
+      from,
+      destination,
+      signer,
+      [],
+      amount.toString() as any,
+    )
 
     return [
       {
