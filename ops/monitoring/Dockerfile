@@ -15,7 +15,7 @@ COPY ./go.sum /solana-monitoring/
 
 # Install golang
 
-RUN wget -c https://dl.google.com/go/go1.17.4.linux-amd64.tar.gz -O - \
+RUN wget -c https://dl.google.com/go/go1.18.1.linux-amd64.tar.gz -O - \
   | tar -xz -C /usr/local \
   && mkdir -p /go/src /go/bin
 ENV PATH /usr/local/go/bin:$PATH
