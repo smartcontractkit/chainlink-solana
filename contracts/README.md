@@ -53,6 +53,8 @@ anchor test
 
 Install `https://github.com/gagliardetto/anchor-go`
 
+Current version: [v0.2.3](https://github.com/gagliardetto/anchor-go/tree/v0.2.3)
+
 ```bash
 ./scripts/anchor-go-gen.sh
 ```

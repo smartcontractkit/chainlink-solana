@@ -18,13 +18,19 @@ type Close struct {
 	// [1] = [WRITE] receiver
 	//
 	// [2] = [SIGNER] authority
+	//
+	// [3] = [WRITE] tokenVault
+	//
+	// [4] = [] vaultAuthority
+	//
+	// [5] = [] tokenProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewCloseInstructionBuilder creates a new `Close` instruction builder.
 func NewCloseInstructionBuilder() *Close {
 	nd := &Close{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 6),
 	}
 	return nd
 }
@@ -62,6 +68,39 @@ func (inst *Close) GetAuthorityAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
+// SetTokenVaultAccount sets the "tokenVault" account.
+func (inst *Close) SetTokenVaultAccount(tokenVault ag_solanago.PublicKey) *Close {
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(tokenVault).WRITE()
+	return inst
+}
+
+// GetTokenVaultAccount gets the "tokenVault" account.
+func (inst *Close) GetTokenVaultAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[3]
+}
+
+// SetVaultAuthorityAccount sets the "vaultAuthority" account.
+func (inst *Close) SetVaultAuthorityAccount(vaultAuthority ag_solanago.PublicKey) *Close {
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(vaultAuthority)
+	return inst
+}
+
+// GetVaultAuthorityAccount gets the "vaultAuthority" account.
+func (inst *Close) GetVaultAuthorityAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[4]
+}
+
+// SetTokenProgramAccount sets the "tokenProgram" account.
+func (inst *Close) SetTokenProgramAccount(tokenProgram ag_solanago.PublicKey) *Close {
+	inst.AccountMetaSlice[5] = ag_solanago.Meta(tokenProgram)
+	return inst
+}
+
+// GetTokenProgramAccount gets the "tokenProgram" account.
+func (inst *Close) GetTokenProgramAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[5]
+}
+
 func (inst Close) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
@@ -91,6 +130,15 @@ func (inst *Close) Validate() error {
 		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
+		if inst.AccountMetaSlice[3] == nil {
+			return errors.New("accounts.TokenVault is not set")
+		}
+		if inst.AccountMetaSlice[4] == nil {
+			return errors.New("accounts.VaultAuthority is not set")
+		}
+		if inst.AccountMetaSlice[5] == nil {
+			return errors.New("accounts.TokenProgram is not set")
+		}
 	}
 	return nil
 }
@@ -107,10 +155,13 @@ func (inst *Close) EncodeToTree(parent ag_treeout.Branches) {
 					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta(" receiver", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[2]))
+					instructionBranch.Child("Accounts[len=6]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("         state", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("      receiver", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("    tokenVault", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("vaultAuthority", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("  tokenProgram", inst.AccountMetaSlice[5]))
 					})
 				})
 		})
@@ -128,9 +179,15 @@ func NewCloseInstruction(
 	// Accounts:
 	state ag_solanago.PublicKey,
 	receiver ag_solanago.PublicKey,
-	authority ag_solanago.PublicKey) *Close {
+	authority ag_solanago.PublicKey,
+	tokenVault ag_solanago.PublicKey,
+	vaultAuthority ag_solanago.PublicKey,
+	tokenProgram ag_solanago.PublicKey) *Close {
 	return NewCloseInstructionBuilder().
 		SetStateAccount(state).
 		SetReceiverAccount(receiver).
-		SetAuthorityAccount(authority)
+		SetAuthorityAccount(authority).
+		SetTokenVaultAccount(tokenVault).
+		SetVaultAuthorityAccount(vaultAuthority).
+		SetTokenProgramAccount(tokenProgram)
 }
