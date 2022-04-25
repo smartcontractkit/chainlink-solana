@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "1.0.0",
   "name": "store",
   "constants": [
     {
@@ -405,6 +405,22 @@
   ],
   "types": [
     {
+      "name": "NewTransmission",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "timestamp",
+            "type": "u64"
+          },
+          {
+            "name": "answer",
+            "type": "i128"
+          }
+        ]
+      }
+    },
+    {
       "name": "Round",
       "type": {
         "kind": "struct",
@@ -420,22 +436,6 @@
           {
             "name": "timestamp",
             "type": "u32"
-          },
-          {
-            "name": "answer",
-            "type": "i128"
-          }
-        ]
-      }
-    },
-    {
-      "name": "NewTransmission",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "timestamp",
-            "type": "u64"
           },
           {
             "name": "answer",

@@ -55,7 +55,20 @@ build_js:
 build_contracts:
 	docker run --rm -it -v $(shell pwd):/workdir ${PROJECT_SERUM_IMAGE} /bin/bash ./scripts/anchor-build.sh
 
-build: build_js build_contracts
+build_contracts_local:
+	docker run --rm -it -v $(shell pwd):/workdir ${PROJECT_SERUM_IMAGE} /bin/bash ./scripts/setup-local.sh
+
+build_contracts_staging:
+	docker run --rm -it -v $(shell pwd):/workdir ${PROJECT_SERUM_IMAGE} /bin/bash ./scripts/setup-staging.sh
+
+cp_gauntlet_idl:
+	cp ./contracts/target/idl/*.json ./gauntlet/packages/gauntlet-solana-contracts/artifacts/schemas
+
+build: build_js build_contracts cp_gauntlet_idl
+
+build_local: build_js build_contracts_local cp_gauntlet_idl
+
+build_staging: build_js build_contracts_staging cp_gauntlet_idl
 
 test_relay_unit:
 	go build -v ./pkg/...

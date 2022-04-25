@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "1.0.0",
   "name": "ocr2",
   "constants": [
     {
@@ -783,27 +783,6 @@
   ],
   "types": [
     {
-      "name": "NewOracle",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "signer",
-            "type": {
-              "array": [
-                "u8",
-                20
-              ]
-            }
-          },
-          {
-            "name": "transmitter",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
       "name": "Billing",
       "type": {
         "kind": "struct",
@@ -1050,6 +1029,27 @@
           {
             "name": "paymentGjuels",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "NewOracle",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "signer",
+            "type": {
+              "array": [
+                "u8",
+                20
+              ]
+            }
+          },
+          {
+            "name": "transmitter",
+            "type": "publicKey"
           }
         ]
       }
