@@ -1,3 +1,4 @@
 import Inspect from './inspect'
+import InspectResponses from './inspectResponses'
 
-export default [Inspect]
+export default [Inspect, InspectResponses]
