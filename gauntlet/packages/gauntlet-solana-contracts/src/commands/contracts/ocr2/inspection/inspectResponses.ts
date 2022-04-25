@@ -17,23 +17,36 @@ type Oracle = {
   website: string
   name: string
   apis: string[]
-  observation?: number
 }
 
-// Returns a formatted oracle log given an address, a command input, a label, and a start tab,
-const oracleLog = (address: string, label: string, startTab: number, input?: Input) => {
-  const oracle = input?.aggregatorOracles.find((o) => o.transmitter == address)
-  if (!oracle) {
+// Returns a formatted oracle log given a list of addresses and a start tab
+// if a list of oracles is provided, add context to logs
+const makeOracleLog = (addresses: string[], startTab = 2, oracles?: Oracle[]): string[] => {
+  // Returns a default log with only the node address
+  const makeDefaultLog = (address: string) => {
     return `
-${'  '.repeat(startTab)}- ${label}
+${'  '.repeat(startTab)}- Oracle
 ${'  '.repeat(startTab + 1)}- Node Address: ${address}`
   }
-  return `
-${'  '.repeat(startTab)}- ${label}
-${'  '.repeat(startTab + 1)}- Node Address: ${address}
-${'  '.repeat(startTab + 1)}- Name: ${oracle.name}
+  // Assemble default logs if no oracles inputted
+  if (!oracles) {
+    return addresses.map((address) => {
+      return makeDefaultLog(address)
+    })
+  }
+  // Assemble logs with context from oracles
+  return addresses.map((address) => {
+    const oracle = oracles.find((o) => o.transmitter == address)
+    // If no oracle found for address, use default log
+    if (!oracle) {
+      return makeDefaultLog(address)
+    }
+    return `
+${'  '.repeat(startTab)}- ${oracle.name}
+${'  '.repeat(startTab + 1)}- Node Address: ${oracle.transmitter}
 ${'  '.repeat(startTab + 1)}- Website: ${oracle.website}
 ${'  '.repeat(startTab + 1)}- APIs: ${oracle.apis}`
+  })
 }
 
 export default class OCR2InspectResponses extends SolanaCommand {
@@ -60,8 +73,6 @@ export default class OCR2InspectResponses extends SolanaCommand {
     const aggregatorOracles: Oracle[] = aggregator.oracles.map((o) => {
       return {
         transmitter: rdd.operators[o.operator].ocrNodeAddress[0],
-        payee: rdd.operators[o.operator].adminAddress,
-        signer: rdd.operators[o.operator].ocr2OnchainPublicKey[0].substring(14),
         website: rdd.operators[o.operator].website,
         name: o.operator,
         apis: o.api,
@@ -111,14 +122,19 @@ export default class OCR2InspectResponses extends SolanaCommand {
       const observers = (event.observers as []).slice(0, event.observerCount).map((observer) => transmitters[observer])
       observerRounds.push(observers as PublicKey[])
       // Assemble logs for observers
-      const observerLogs = observers.map((observer, j) => oracleLog(observer.toString(), `Observer ${j + 1}`, 3, input))
+      const observerLogs = makeOracleLog(
+        observers.map((o) => o.toString()),
+        3,
+        input?.aggregatorOracles,
+      )
       // Log transmission constants
       logger.info(
         `Latest Transmission No. ${i + 1}
 
     - Round Id: ${event.roundId}
     - Config Digest: ${[...event.configDigest]}
-    - Answer: ${event.answer} ${oracleLog(transmitters[event.transmitter].toString(), 'Transmitter', 2, input)}
+    - Answer: ${event.answer} 
+    - Transmitter: ${makeOracleLog([transmitters[event.transmitter].toString()], 3, input?.aggregatorOracles)}
     - Observations Timestamp: ${event.observationsTimestamp}
     - Observer Count: ${event.observerCount}
     - Observers: ${observerLogs}
@@ -136,7 +152,7 @@ export default class OCR2InspectResponses extends SolanaCommand {
         if (!observers.includes(transmitter)) {
           notResponding++
           logger.error(
-            `Not responding ${oracleLog(transmitter, `Oracle ${notResponding}`, 2, input)}
+            `Not responding ${makeOracleLog([transmitter.toString()], 2, input?.aggregatorOracles)}
             `,
           )
         }
