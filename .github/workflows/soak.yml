@@ -20,19 +20,8 @@ jobs:
         FORCE_COLOR: 1
     steps:
       - uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
-      - run: echo "$HOME"
-      - run: echo "$PATH"
-      - run: yarn install --frozen-lockfile
-      - name: Generate program_ids
-        run: ./scripts/programs-keys-gen.sh
-      - name: Build Contracts
-        run: anchor build
-        working-directory: contracts
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@master
-        with:
-          name: target
-          path: contracts/target/deploy
+      - name: Build Test Contracts
+        uses: ./.github/actions/build_test_contracts
   soak_testing_build_custom_chainlink_image:
     name: Soak Testing Build Custom Chainlink Image
     # target branch can't be set as var, it's from where we getting pipeline code
@@ -58,67 +47,18 @@ jobs:
     steps:
       - name: Checkout the repo
         uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
-      - uses: smartcontractkit/tool-versions-to-env-action@v1.0.7
-        id: tool-versions
-      - name: Setup go ${{ steps.tool-versions.outputs.golang_version }}
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{ steps.tool-versions.outputs.golang_version }}
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.QA_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.QA_AWS_SECRET_KEY }}
-          aws-region: ${{ secrets.QA_AWS_REGION }}
-          role-to-assume: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-          role-duration-seconds: 3600
-      - name: Set Kubernetes Context
-        uses: azure/k8s-set-context@v1
-        with:
-          method: kubeconfig
-          kubeconfig: ${{ secrets.QA_KUBECONFIG }}
-      - name: Cache Vendor Packages
-        uses: actions/cache@v2
-        id: cache-packages
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-            ~/go/bin
-          key: ${{ runner.os }}-go2-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go2-
-      - name: Download Go Vendor Packages
-        if: steps.cache-packages.outputs.cache-hit != 'true'
-        run: go mod download
-      - name: Install Ginkgo CLI
-        if: steps.cache-packages.outputs.cache-hit != 'true'
-        run: make install
-      - name: Download Artifacts
-        uses: actions/download-artifact@master
-        with:
-          name: target
-          path: contracts/target/deploy
       - name: Run Tests
-        env:
-          SELECTED_NETWORKS: solana
-          NETWORK_SETTINGS: /home/runner/work/chainlink-solana/chainlink-solana/tests/e2e/networks.yaml
-          CHAINLINK_IMAGE: 795953128386.dkr.ecr.us-west-2.amazonaws.com/chainlink
-          CHAINLINK_VERSION: custom.${{ github.sha }}
-        run: |
-          PATH=$PATH:$(go env GOPATH)/bin
-          export PATH
-          ginkgo tests/e2e/soak
-      - name: Publish Test Results
-        uses: mikepenz/action-junit-report@v2
-        if: always()
+        uses: ./.github/actions/run_e2e
         with:
-          report_paths: "./tests-soak-report.xml"
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          check_name: Soak Test Results
-      - name: Publish Artifacts
-        if: failure()
-        uses: actions/upload-artifact@v2.2.4
-        with:
-          name: test-logs
-          path: ./tests/e2e/soak/logs
+          test_command_to_run: make test_ocr_soak
+          cl_repo: 795953128386.dkr.ecr.us-west-2.amazonaws.com/chainlink
+          cl_image_tag: custom.${{ github.sha }}
+          download_artifacts_path: contracts/target/deploy
+          publish_report_paths: "./tests-soak-report.xml"
+          publish_check_name: Soak Test Results
+          QA_AWS_ACCESS_KEY_ID: ${{ secrets.QA_AWS_ACCESS_KEY_ID }}
+          QA_AWS_SECRET_KEY: ${{ secrets.QA_AWS_SECRET_KEY }}
+          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,32 @@
+name: Build Test Contracts
+description: Common builder for test contracts
+
+inputs:
+  check_generated_go_bindings:
+    required: false
+    description: To check whether we verify generated go bindings match
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: yarn install
+      shell: bash
+      run: yarn install --frozen-lockfile
+    - name: Generate program_ids
+      if: inputs.check_generated_go_bindings == 'false'
+      shell: bash
+      run: ./scripts/programs-keys-gen.sh
+    - name: Generate build artifacts for go bindings check
+      shell: bash
+      env:
+        RUSTUP_HOME: "/root/.rustup"
+        FORCE_COLOR: '1'
+      run: anchor build
+      working-directory: contracts
+    - name: Upload Artifacts
+      if: inputs.check_generated_go_bindings == 'false'
+      uses: actions/upload-artifact@v2.2.4
+      with:
+        name: artifacts
+        path: contracts/target/deploy
