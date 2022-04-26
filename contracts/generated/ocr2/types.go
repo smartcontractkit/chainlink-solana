@@ -7,39 +7,6 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type NewOracle struct {
-	Signer      [20]uint8
-	Transmitter ag_solanago.PublicKey
-}
-
-func (obj NewOracle) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Signer` param:
-	err = encoder.Encode(obj.Signer)
-	if err != nil {
-		return err
-	}
-	// Serialize `Transmitter` param:
-	err = encoder.Encode(obj.Transmitter)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *NewOracle) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Signer`:
-	err = decoder.Decode(&obj.Signer)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Transmitter`:
-	err = decoder.Decode(&obj.Transmitter)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 type Billing struct {
 	ObservationPaymentGjuels  uint32
 	TransmissionPaymentGjuels uint32
@@ -540,6 +507,39 @@ func (obj *Oracle) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	}
 	// Deserialize `PaymentGjuels`:
 	err = decoder.Decode(&obj.PaymentGjuels)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type NewOracle struct {
+	Signer      [20]uint8
+	Transmitter ag_solanago.PublicKey
+}
+
+func (obj NewOracle) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Signer` param:
+	err = encoder.Encode(obj.Signer)
+	if err != nil {
+		return err
+	}
+	// Serialize `Transmitter` param:
+	err = encoder.Encode(obj.Transmitter)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *NewOracle) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Signer`:
+	err = decoder.Decode(&obj.Signer)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Transmitter`:
+	err = decoder.Decode(&obj.Transmitter)
 	if err != nil {
 		return err
 	}

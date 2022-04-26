@@ -4,6 +4,39 @@ package store
 
 import ag_binary "github.com/gagliardetto/binary"
 
+type NewTransmission struct {
+	Timestamp uint64
+	Answer    ag_binary.Int128
+}
+
+func (obj NewTransmission) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Timestamp` param:
+	err = encoder.Encode(obj.Timestamp)
+	if err != nil {
+		return err
+	}
+	// Serialize `Answer` param:
+	err = encoder.Encode(obj.Answer)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *NewTransmission) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Timestamp`:
+	err = decoder.Decode(&obj.Timestamp)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Answer`:
+	err = decoder.Decode(&obj.Answer)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type Round struct {
 	RoundId   uint32
 	Slot      uint64
@@ -46,39 +79,6 @@ func (obj *Round) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Deserialize `Timestamp`:
-	err = decoder.Decode(&obj.Timestamp)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Answer`:
-	err = decoder.Decode(&obj.Answer)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type NewTransmission struct {
-	Timestamp uint64
-	Answer    ag_binary.Int128
-}
-
-func (obj NewTransmission) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Timestamp` param:
-	err = encoder.Encode(obj.Timestamp)
-	if err != nil {
-		return err
-	}
-	// Serialize `Answer` param:
-	err = encoder.Encode(obj.Answer)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *NewTransmission) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `Timestamp`:
 	err = decoder.Decode(&obj.Timestamp)
 	if err != nil {
