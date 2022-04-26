@@ -34,7 +34,8 @@
       "linux",
       "macos"
     ],
-    "outputPath": "bin"
+    "outputPath": "bin",
+    "assets": "node_modules/usb/prebuilds"
   },
   "devDependencies": {
     "@changesets/cli": "^2.17.0",
