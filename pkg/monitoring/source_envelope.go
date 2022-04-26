@@ -55,7 +55,7 @@ type envelopeSource struct {
 func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 	state, blockNum, err := pkgSolana.GetState(ctx, s.client, s.feedConfig.StateAccount, rpc.CommitmentConfirmed)
 	if err != nil {
-		return nil, fmt.Errorf("failed to state from on-chain: %w", err)
+		return nil, fmt.Errorf("failed to fetch state from on-chain: %w", err)
 	}
 	contractConfig, err := pkgSolana.ConfigFromState(state)
 	if err != nil {
