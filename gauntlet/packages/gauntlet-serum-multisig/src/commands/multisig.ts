@@ -242,8 +242,8 @@ export const wrapCommand = (command) => {
 
     createProposalAcount = async (): Promise<PublicKey> => {
       await prompt('A new Multisig Proposal account will be created. Continue?')
-      logger.log('Creating Multisig Proposal account...')
       const proposal = Keypair.generate()
+      logger.loading(`Creating Multisig Proposal account at ${proposal.publicKey.toString()}...`)
       const txSize = 1300 // Space enough
       const proposalInstruction = await SystemProgram.createAccount({
         fromPubkey: this.wallet.publicKey,
