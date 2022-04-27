@@ -5,10 +5,8 @@ import { io } from '@chainlink/gauntlet-core/dist/utils'
 import { commands } from '.'
 ;(async () => {
   try {
-    const networkPossiblePaths = ['./networks', './packages/gauntlet-solana-contracts/networks']
-    const networkPath = networkPossiblePaths.filter((networkPath) =>
-      existsSync(path.join(__dirname, networkPath)),
-    )[0]
+    const networkPossiblePaths = [path.join(process.cwd(), 'networks'), path.join(__dirname, '../networks')]
+    const networkPath = networkPossiblePaths.filter((networkPath) => existsSync(networkPath))[0]
     const result = await executeCLI(commands, networkPath)
     if (result) {
       io.saveJSON(result, process.env['REPORT_NAME'] ? process.env['REPORT_NAME'] : 'report')

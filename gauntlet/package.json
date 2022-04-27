@@ -37,8 +37,8 @@
     "outputPath": "bin",
     "assets": [
       "node_modules/usb/prebuilds",
-      "packages/gauntlet-solana-contracts/artifacts",
       "packages/gauntlet-solana-contracts/networks",
+      "packages/gauntlet-solana-contracts/artifacts",
       "packages/gauntlet-serum-multisig/artifacts"
     ]
   },
