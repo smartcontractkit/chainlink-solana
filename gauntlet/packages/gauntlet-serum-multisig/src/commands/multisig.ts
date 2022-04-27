@@ -173,11 +173,10 @@ export const wrapCommand = (command) => {
         proposalState,
       }
 
-      if (proposalState.isExecuted)
-        this.require(
-          await this.isSameProposal(proposalState, rawTx),
-          'The transaction generated is different from the Multisig Proposal provided',
-        )
+      this.require(
+        await this.isSameProposal(proposalState, rawTx),
+        'The transaction generated is different from the Multisig Proposal provided',
+      )
 
       if (!this.isReadyForExecution(proposalState, multisigState.threshold)) {
         return await this.approveProposal(proposal, signer, proposalContext)
