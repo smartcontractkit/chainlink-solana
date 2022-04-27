@@ -7,7 +7,7 @@ import { commands } from '.'
   try {
     const networkPossiblePaths = ['./networks', './packages/gauntlet-solana-contracts/networks']
     const networkPath = networkPossiblePaths.filter((networkPath) =>
-      existsSync(path.join(process.cwd(), networkPath)),
+      existsSync(path.join(__dirname, networkPath)),
     )[0]
     const result = await executeCLI(commands, networkPath)
     if (result) {

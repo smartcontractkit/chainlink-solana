@@ -35,7 +35,12 @@
       "macos"
     ],
     "outputPath": "bin",
-    "assets": "node_modules/usb/prebuilds"
+    "assets": [
+      "node_modules/usb/prebuilds",
+      "packages/gauntlet-solana-contracts/artifacts",
+      "packages/gauntlet-solana-contracts/networks",
+      "packages/gauntlet-serum-multisig/artifacts"
+    ]
   },
   "devDependencies": {
     "@changesets/cli": "^2.17.0",

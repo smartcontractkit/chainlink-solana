@@ -48,7 +48,7 @@ const generateSecretEncryptions = async (
   gauntletSecret: string,
   secret?: string,
 ): Promise<{ sharedSecretEncryptions: sharedSecretEncryptions.SharedSecretEncryptions; randomSecret: string }> => {
-  const path = join(process.cwd(), 'packages/gauntlet-solana-contracts/artifacts/bip-0039', 'english.txt')
+  const path = join(__dirname, 'packages/gauntlet-solana-contracts/artifacts/bip-0039', 'english.txt')
   const randomSecret = secret || (await sharedSecretEncryptions.generateSecretWords(path))
   return {
     sharedSecretEncryptions: sharedSecretEncryptions.makeSharedSecretEncryptions(

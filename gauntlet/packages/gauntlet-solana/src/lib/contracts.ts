@@ -25,19 +25,19 @@ export const registerContracts = <List extends Record<string, string>>(
   // TODO: Get it from GH Releases
   const _getContractCode = (name: ListValue, version: string) => {
     try {
-      return readFileSync(join(process.cwd(), `${artifactsPath}/bin`, `${name}.so`))
+      return readFileSync(join(__dirname, `${artifactsPath}/bin`, `${name}.so`))
     } catch (e) {
       throw new Error(`No program binary found for ${name} contract`)
     }
   }
 
   const _getContractSchema = (name: ListValue, version: string) => {
-    return io.readJSON(join(process.cwd(), `${artifactsPath}/schemas`, `${name}`))
+    return io.readJSON(join(__dirname, `${artifactsPath}/schemas`, `${name}`))
   }
 
   const _getProgramKeypair = (name: ListValue, version: string): Keypair => {
     try {
-      const rawPK = io.readJSON(join(process.cwd(), `${artifactsPath}/programId`, `${name}`))
+      const rawPK = io.readJSON(join(__dirname, `${artifactsPath}/programId`, `${name}`))
       return Keypair.fromSecretKey(Uint8Array.from(rawPK))
     } catch (e) {
       throw new Error(`No program id keypair set for program ${name}`)
