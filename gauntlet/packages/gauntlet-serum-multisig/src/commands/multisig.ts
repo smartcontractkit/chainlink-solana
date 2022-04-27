@@ -1,6 +1,6 @@
 import { SolanaCommand, utils } from '@chainlink/gauntlet-solana'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { PublicKey, Keypair, TransactionInstruction, SystemProgram } from '@solana/web3.js'
+import { PublicKey, Keypair, TransactionInstruction, SystemProgram, AccountMeta } from '@solana/web3.js'
 import { Idl, Program } from '@project-serum/anchor'
 import { MAX_BUFFER_SIZE } from '../lib/constants'
 import { isDeepEqual } from '../lib/utils'
@@ -17,6 +17,20 @@ type ProposalAction = (
   signer: PublicKey,
   context: ProposalContext,
 ) => Promise<TransactionInstruction[]>
+
+type MultisigState = {
+  threshold: number
+  owners: PublicKey[]
+}
+
+type ProposalState = {
+  id: PublicKey
+  data: Buffer
+  approvers: PublicKey[]
+  isExecuted: boolean
+  programId: PublicKey
+  accounts: AccountMeta[]
+}
 
 export const wrapCommand = (command) => {
   return class Multisig extends SolanaCommand {
@@ -45,6 +59,14 @@ export const wrapCommand = (command) => {
       this.program = this.loadProgram(multisig.idl, multisig.programId.toString())
 
       const signer = this.wallet.publicKey
+      const [multisigSigner] = await PublicKey.findProgramAddress(
+        [this.multisigAddress.toBuffer()],
+        this.program.programId,
+      )
+
+      const multisigState = await this.fetchMultisigState(this.multisigAddress)
+      this.inspectMsigState(multisigState, multisigSigner)
+
       const rawTxs = await this.makeRawTransaction(signer)
       // If proposal is not provided, we are at creation time, and a new proposal acc should have been created
       const proposal = new PublicKey(this.flags.proposal || this.flags.multisigProposal || rawTxs[0].keys[1].pubkey)
@@ -54,7 +76,10 @@ export const wrapCommand = (command) => {
         logger.loading(`Executing action...`)
         const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, this.program.idl)(rawTxs)
         logger.success(`TX succeded at ${txhash}`)
-        await this.inspectProposalState(proposal)
+
+        const msigState = await this.fetchMultisigState(this.multisigAddress)
+        const proposalState = await this.fetchProposalState(proposal, msigState)
+        await this.inspectProposalState(msigState, proposalState)
         return {
           responses: [
             {
@@ -103,38 +128,37 @@ export const wrapCommand = (command) => {
     makeRawTransaction = async (signer: PublicKey): Promise<TransactionInstruction[]> => {
       logger.info(`Generating transaction data using ${signer.toString()} account as signer`)
 
-      const multisigState = await this.program.account.multisig.fetch(this.multisigAddress)
+      const multisigState = await this.fetchMultisigState(this.multisigAddress)
       const [multisigSigner] = await PublicKey.findProgramAddress(
         [this.multisigAddress.toBuffer()],
         this.program.programId,
       )
-      const threshold = multisigState.threshold
-      const owners = multisigState.owners
-
-      logger.info(`Multisig Info:
-        - Address: ${this.multisigAddress.toString()}
-        - Signer: ${multisigSigner.toString()}
-        - Threshold: ${threshold.toString()}
-        - Owners: ${owners}`)
 
       const instructionIndex = new BN(this.flags.instruction || 0).toNumber()
 
       // Build the internal command if necessary
       this.command = this.command.buildCommand ? await this.command.buildCommand(this.flags, this.args) : this.command
-      const rawTxs = await this.command.makeRawTransaction(multisigSigner)
-      await this.command.simulateTx(multisigSigner, rawTxs, this.wallet.publicKey)
-      await this.showExecutionInstructions(rawTxs, instructionIndex)
-      const rawTx = rawTxs[instructionIndex]
 
       // First step should be creating the proposal account. If no proposal flag is provided, proceed to create it
       const proposalFlag = this.flags.proposal || this.flags.multisigProposal
       const proposal = proposalFlag ? new PublicKey(proposalFlag) : await this.createProposalAcount()
 
+      const proposalState = await this.fetchProposalState(proposal, multisigState)
+      if (proposalState && proposalState.isExecuted) throw new Error('Multisig Proposal is already executed')
+      this.inspectProposalState(multisigState, proposalState)
+
+      const rawTxs = await this.command.makeRawTransaction(multisigSigner)
+
+      logger.loading('Simulating proposal transaction...')
+      await this.command.simulateTx(multisigSigner, rawTxs, this.wallet.publicKey)
+
       if (this.command.beforeExecute) {
         await this.command.beforeExecute(signer)
       }
 
-      const proposalState = await this.fetchState(proposal)
+      await this.showExecutionInstructions(rawTxs, instructionIndex)
+      const rawTx = rawTxs[instructionIndex]
+
       const isCreation = !proposalState
       if (isCreation) {
         return await this.createProposal(proposal, signer, {
@@ -149,53 +173,76 @@ export const wrapCommand = (command) => {
         proposalState,
       }
 
-      const isAlreadyExecuted = proposalState.didExecute
-      if (isAlreadyExecuted) throw new Error('Multisig Proposal is already executed')
-
       this.require(
-        await this.isSameProposal(proposal, rawTx),
+        await this.isSameProposal(proposalState, rawTx),
         'The transaction generated is different from the Multisig Proposal provided',
       )
 
-      if (!this.isReadyForExecution(proposalState, threshold)) {
+      if (!this.isReadyForExecution(proposalState, multisigState.threshold)) {
         return await this.approveProposal(proposal, signer, proposalContext)
       }
 
       return await this.executeProposal(proposal, signer, proposalContext)
     }
 
-    getRemainingSigners = (proposalState: any, threshold: number): number =>
-      Number(threshold) - proposalState.signers.filter(Boolean).length
+    getRemainingSigners = (proposalState: ProposalState, threshold: number): number =>
+      Number(threshold) - proposalState.approvers.filter(Boolean).length
 
-    isReadyForExecution = (proposalState: any, threshold: number): boolean => {
+    isReadyForExecution = (proposalState: ProposalState, threshold: number): boolean => {
       return this.getRemainingSigners(proposalState, threshold) <= 0
     }
 
-    fetchState = async (proposal: PublicKey): Promise<any | undefined> => {
+    fetchMultisigState = async (address: PublicKey): Promise<MultisigState | undefined> => {
       try {
-        return await this.program.account.transaction.fetch(proposal)
+        const state = await this.program.account.multisig.fetch(address)
+        return {
+          threshold: new BN(state.threshold).toNumber(),
+          owners: state.owners.map((owner) => new PublicKey(owner)),
+        }
+      } catch (e) {
+        logger.info('Multisig state not found')
+        return
+      }
+    }
+
+    fetchProposalState = async (
+      proposal: PublicKey,
+      multisigState: MultisigState,
+    ): Promise<ProposalState | undefined> => {
+      try {
+        const state = await this.program.account.transaction.fetch(proposal)
+        return {
+          id: proposal,
+          data: Buffer.from(state.data),
+          approvers: state.signers.reduce((acc, didApprove, i) => {
+            if (didApprove) return [...acc, multisigState.owners[i]]
+            return acc
+          }, []),
+          isExecuted: state.didExecute,
+          accounts: state.accounts,
+          programId: new PublicKey(state.programId),
+        }
       } catch (e) {
         logger.info('Multisig Proposal state not found. Should be empty at CREATION time')
         return
       }
     }
 
-    isSameProposal = async (proposal: PublicKey, rawTx: TransactionInstruction): Promise<boolean> => {
-      const state = await this.fetchState(proposal)
-      if (!state) {
+    isSameProposal = async (proposalState: ProposalState, rawTx: TransactionInstruction): Promise<boolean> => {
+      if (!proposalState) {
         logger.error('Multisig Proposal state does not exist. Considering the proposal as different')
         return false
       }
-      const isSameData = Buffer.compare(state.data, rawTx.data) === 0
-      const isSameProgramId = new PublicKey(state.programId).toString() === rawTx.programId.toString()
-      const isSameAccounts = isDeepEqual(state.accounts, rawTx.keys)
+      const isSameData = Buffer.compare(proposalState.data, rawTx.data) === 0
+      const isSameProgramId = new PublicKey(proposalState.programId).toString() === rawTx.programId.toString()
+      const isSameAccounts = isDeepEqual(proposalState.accounts, rawTx.keys)
       return isSameData && isSameProgramId && isSameAccounts
     }
 
     createProposalAcount = async (): Promise<PublicKey> => {
       await prompt('A new Multisig Proposal account will be created. Continue?')
-      logger.log('Creating Multisig Proposal account...')
       const proposal = Keypair.generate()
+      logger.loading(`Creating Multisig Proposal account at ${proposal.publicKey.toString()}...`)
       const txSize = 1300 // Space enough
       const proposalInstruction = await SystemProgram.createAccount({
         fromPubkey: this.wallet.publicKey,
@@ -270,35 +317,46 @@ export const wrapCommand = (command) => {
       return [tx]
     }
 
-    inspectProposalState = async (proposal) => {
-      const proposalState = await this.program.account.transaction.fetch(proposal)
-      const multisigState = await this.program.account.multisig.fetch(this.multisigAddress)
-      const threshold = multisigState.threshold
-      const owners = multisigState.owners
+    inspectMsigState = (multisigState: MultisigState, multisigSigner: PublicKey) => {
+      logger.info(`Multisig State:
+        - Address: ${this.multisigAddress.toString()}
+        - Signer: ${multisigSigner.toString()}
+        - Threshold: ${multisigState.threshold}
+        - Total Owners: ${multisigState.owners.length}
+        - Owners List: ${multisigState.owners.map((o) => o.toString())}`)
+      logger.line()
+    }
 
-      logger.debug('Multisig Proposal state after action:')
-      logger.debug(JSON.stringify(proposalState, null, 4))
-      if (proposalState.didExecute == true) {
+    inspectProposalState = (multisigState: MultisigState, proposalState?: ProposalState) => {
+      if (!proposalState) return
+
+      logger.info(`Proposal State:
+      - Multisig Proposal ID: ${proposalState.id}
+      - Total Approvers: ${proposalState.approvers.length}
+      - Approvers List: ${proposalState.approvers.map((a) => a.toString())}`)
+
+      if (proposalState.isExecuted) {
         logger.info(`Multisig Proposal has been executed`)
         return
       }
 
-      if (this.isReadyForExecution(proposalState, threshold)) {
+      const proposalId = proposalState.id.toString()
+      if (this.isReadyForExecution(proposalState, multisigState.threshold)) {
         logger.info(
-          `Threshold has been met, an owner needs to run the command once more in order to execute it, with flag --proposal=${proposal} or --multisigProposal=${proposal}`,
+          `Threshold has been met, an owner needs to run the command once more in order to execute it, with flag --proposal=${proposalId} or --multisigProposal=${proposalId}`,
         )
         return
       }
-      // inverting the signers boolean array and filtering owners by it
-      const remainingEligibleSigners = owners.filter((_, i) => proposalState.signers.map((s) => !s)[i])
+      const remainingEligibleSigners = multisigState.owners.filter((owner) => !proposalState.approvers.includes(owner))
       logger.info(
         `${this.getRemainingSigners(
           proposalState,
-          threshold,
-        )} more owners should sign this multisig proposal, using the same command providing ${proposal} with flag --proposal=${proposal} or --multisigProposal=${proposal}`,
+          multisigState.threshold,
+        )} more owners should sign this multisig proposal, using the same command providing ${proposalId} with flag --proposal=${proposalId} or --multisigProposal=${proposalId}`,
       )
       logger.info(`Eligible owners to sign: `)
       logger.info(remainingEligibleSigners.toString())
+      logger.line()
     }
 
     showExecutionInstructions = async (rawTxs: TransactionInstruction[], instructionIndex: number) => {

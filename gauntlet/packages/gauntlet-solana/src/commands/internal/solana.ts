@@ -119,15 +119,17 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       // simulating through connection allows to skip signing tx (useful when using Ledger device)
       const { value: simulationResponse } = await this.provider.connection.simulateTransaction(tx)
       if (simulationResponse.err) {
-        const errorDetails =
-          typeof simulationResponse.err === 'object' ? JSON.stringify(simulationResponse.err) : simulationResponse.err
-        throw errorDetails
+        const error =
+          typeof simulationResponse.err === 'object'
+            ? new Error(JSON.stringify(simulationResponse.err))
+            : new Error(simulationResponse.err as string)
+        throw error
       }
       logger.success(`Tx simulation succeeded: ${simulationResponse.unitsConsumed} units consumed.`)
       return simulationResponse.unitsConsumed
-    } catch (err) {
-      logger.error(`Tx simulation failed: ${err}`)
-      throw err
+    } catch (e) {
+      logger.error(`Tx simulation failed: ${e.message}`)
+      throw e
     }
   }
 
