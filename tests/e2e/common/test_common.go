@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smartcontractkit/integrations-framework/blockchain"
+
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/rs/zerolog/log"
@@ -73,7 +75,7 @@ type OCRv2TestState struct {
 	ContractsNodeSetup map[int]*ContractNodeInfo
 	NodeKeysBundle     []NodeKeysBundle
 	MockServer         *client.MockserverClient
-	Networks           *client.Networks
+	Networks           *blockchain.Networks
 	RoundsFound        int
 	LastRoundTime      map[string]time.Time
 	err                error
@@ -134,7 +136,7 @@ func (m *OCRv2TestState) DeployEnv(nodes int, stateful bool, contractsDir string
 }
 
 func (m *OCRv2TestState) SetupClients() {
-	networkRegistry := client.NewDefaultNetworkRegistry()
+	networkRegistry := blockchain.NewDefaultNetworkRegistry()
 	networkRegistry.RegisterNetwork(
 		"solana",
 		solclient.ClientInitFunc(),

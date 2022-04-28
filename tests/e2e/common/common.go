@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/smartcontractkit/integrations-framework/blockchain"
+
 	"math/big"
 	"sort"
 	"strings"
@@ -143,7 +145,7 @@ func createOracleIdentities(nkb []NodeKeysBundle) ([]confighelper.OracleIdentity
 	return oracleIdentities, nil
 }
 
-func FundOracles(c client.BlockchainClient, nkb []NodeKeysBundle, amount *big.Float) error {
+func FundOracles(c blockchain.EVMClient, nkb []NodeKeysBundle, amount *big.Float) error {
 	for _, nk := range nkb {
 		addr := nk.TXKey.Data.Attributes.PublicKey
 		if err := c.Fund(addr, amount); err != nil {
