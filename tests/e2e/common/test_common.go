@@ -3,6 +3,7 @@ package common
 //revive:disable:dot-imports
 import (
 	"fmt"
+	"github.com/smartcontractkit/integrations-framework/blockchain"
 	"math/big"
 	"sync"
 	"time"
@@ -73,7 +74,7 @@ type OCRv2TestState struct {
 	ContractsNodeSetup map[int]*ContractNodeInfo
 	NodeKeysBundle     []NodeKeysBundle
 	MockServer         *client.MockserverClient
-	Networks           *client.Networks
+	Networks           *blockchain.Networks
 	RoundsFound        int
 	LastRoundTime      map[string]time.Time
 	err                error
@@ -134,7 +135,7 @@ func (m *OCRv2TestState) DeployEnv(nodes int, stateful bool, contractsDir string
 }
 
 func (m *OCRv2TestState) SetupClients() {
-	networkRegistry := client.NewDefaultNetworkRegistry()
+	networkRegistry := blockchain.NewDefaultNetworkRegistry()
 	networkRegistry.RegisterNetwork(
 		"solana",
 		solclient.ClientInitFunc(),

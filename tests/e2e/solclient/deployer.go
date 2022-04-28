@@ -2,6 +2,7 @@ package solclient
 
 import (
 	"fmt"
+	"github.com/smartcontractkit/integrations-framework/blockchain"
 	"path/filepath"
 	"strings"
 
@@ -15,7 +16,6 @@ import (
 	ocr_2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr2"
 	store2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/store"
 	"github.com/smartcontractkit/helmenv/environment"
-	"github.com/smartcontractkit/integrations-framework/client"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -459,7 +459,7 @@ func (c *Client) FindAuthorityAddress(seed string, statePubKey solana.PublicKey,
 	return auth, nonce, err
 }
 
-func NewContractDeployer(client client.BlockchainClient, e *environment.Environment, lt *LinkToken) (*ContractDeployer, error) {
+func NewContractDeployer(client blockchain.EVMClient, e *environment.Environment, lt *LinkToken) (*ContractDeployer, error) {
 	cd := &ContractDeployer{
 		Env: e,
 		Accounts: &Accounts{
