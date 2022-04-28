@@ -6,7 +6,7 @@ require (
 	github.com/gagliardetto/binary v0.6.1
 	github.com/gagliardetto/solana-go v1.4.1-0.20220413001530-3e39c80b7211
 	github.com/smartcontractkit/chainlink v1.3.0
-	github.com/smartcontractkit/helmenv v1.0.67
+	github.com/smartcontractkit/helmenv v1.0.68
 	github.com/smartcontractkit/libocr v0.0.0-20220414173908-cdfa6bef133a
 	github.com/stretchr/testify v1.7.1
 )
@@ -15,6 +15,7 @@ require github.com/satori/go.uuid v1.2.0
 
 require (
 	github.com/davecgh/go-spew v1.1.1
+	github.com/ethereum/go-ethereum v1.10.16
 	github.com/gagliardetto/gofuzz v1.2.2
 	github.com/gagliardetto/treeout v0.1.4
 	github.com/onsi/ginkgo/v2 v2.1.3
@@ -76,7 +77,6 @@ require (
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
-	github.com/ethereum/go-ethereum v1.10.16 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
