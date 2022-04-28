@@ -28,6 +28,18 @@ func NewChainlinkSolOCRv2(nodes int, stateful bool) *environment.Config {
 							"version": "develop",
 						},
 					},
+					"db": map[string]interface{}{
+						"resources": map[string]interface{}{
+							"requests": map[string]interface{}{
+								"cpu":    "4000m",
+								"memory": "4000Mi",
+							},
+							"limits": map[string]interface{}{
+								"cpu":    "4000m",
+								"memory": "4000Mi",
+							},
+						},
+					},
 					"env": map[string]interface{}{
 						"SOLANA_ENABLED":              "true",
 						"EVM_ENABLED":                 "false",
@@ -47,7 +59,7 @@ func NewChainlinkSolOCRv2(nodes int, stateful bool) *environment.Config {
 	if stateful {
 		env.Charts["chainlink"].Values["db"] = map[string]interface{}{
 			"stateful": true,
-			"capacity": "4Gi",
+			"capacity": "5Gi",
 		}
 	}
 	return env
