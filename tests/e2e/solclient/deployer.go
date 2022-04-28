@@ -2,9 +2,10 @@ package solclient
 
 import (
 	"fmt"
-	"github.com/smartcontractkit/integrations-framework/blockchain"
 	"path/filepath"
 	"strings"
+
+	"github.com/smartcontractkit/integrations-framework/blockchain"
 
 	ag_binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"

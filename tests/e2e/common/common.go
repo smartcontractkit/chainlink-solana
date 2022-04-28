@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+
 	"github.com/smartcontractkit/integrations-framework/blockchain"
 
 	"math/big"

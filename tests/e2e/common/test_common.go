@@ -3,10 +3,11 @@ package common
 //revive:disable:dot-imports
 import (
 	"fmt"
-	"github.com/smartcontractkit/integrations-framework/blockchain"
 	"math/big"
 	"sync"
 	"time"
+
+	"github.com/smartcontractkit/integrations-framework/blockchain"
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
