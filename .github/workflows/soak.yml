@@ -1,5 +1,6 @@
 name: E2E Soak Test
 on:
+  push:
   schedule:
     - cron: '0 */3 * * *'
   workflow_dispatch:
