@@ -9,6 +9,7 @@ use solana_program::{
     account_info::AccountInfo,
     instruction::{AccountMeta, Instruction},
     program::invoke,
+    entrypoint::ProgramResult,
     program_error::ProgramError,
     pubkey::Pubkey,
 };
@@ -39,12 +40,22 @@ pub struct Round {
     pub answer: i128,
 }
 
-fn query<'info, T: BorshDeserialize>(
-    program_id: AccountInfo<'info>,
-    feed: AccountInfo<'info>,
+/// Checks that the supplied program ID is the correct one for chainlink
+pub fn check_program_account(chainlink_program_id: &Pubkey) -> ProgramResult {
+    if chainlink_program_id != &id() {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+    Ok(())
+}
+
+
+fn query<T: BorshDeserialize>(
+    chainlink_program_id: &Pubkey,
+    feed: AccountInfo,
     scope: Query,
 ) -> Result<T, ProgramError> {
     use std::io::{Cursor, Write};
+    check_program_account(chainlink_program_id)?;
 
     const QUERY_INSTRUCTION_DISCRIMINATOR: &[u8] =
         &[0x27, 0xfb, 0x82, 0x9f, 0x2e, 0x88, 0xa4, 0xa9];
@@ -57,7 +68,7 @@ fn query<'info, T: BorshDeserialize>(
     scope.serialize(&mut data)?;
 
     let ix = Instruction {
-        program_id: *program_id.key,
+        program_id: *chainlink_program_id,
         accounts: vec![AccountMeta::new_readonly(*feed.key, false)],
         data: data.into_inner(),
     };
@@ -71,41 +82,41 @@ fn query<'info, T: BorshDeserialize>(
 }
 
 /// Query the feed version.
-pub fn version<'info>(
-    program_id: AccountInfo<'info>,
-    feed: AccountInfo<'info>,
+pub fn version(
+    program_id: &Pubkey,
+    feed: AccountInfo,
 ) -> Result<u8, ProgramError> {
     query(program_id, feed, Query::Version)
 }
 
 /// Returns the amount of decimal places.
-pub fn decimals<'info>(
-    program_id: AccountInfo<'info>,
-    feed: AccountInfo<'info>,
+pub fn decimals(
+    program_id: &Pubkey,
+    feed: AccountInfo,
 ) -> Result<u8, ProgramError> {
     query(program_id, feed, Query::Decimals)
 }
 
 /// Returns the feed description.
-pub fn description<'info>(
-    program_id: AccountInfo<'info>,
-    feed: AccountInfo<'info>,
+pub fn description(
+    program_id: &Pubkey,
+    feed: AccountInfo,
 ) -> Result<String, ProgramError> {
     query(program_id, feed, Query::Description)
 }
 
 /// Returns round data for the latest round.
-pub fn latest_round_data<'info>(
-    program_id: AccountInfo<'info>,
-    feed: AccountInfo<'info>,
+pub fn latest_round_data(
+    program_id: &Pubkey,
+    feed: AccountInfo,
 ) -> Result<Round, ProgramError> {
     query(program_id, feed, Query::LatestRoundData)
 }
 
 /// Returns the address of the underlying OCR2 aggregator.
-pub fn aggregator<'info>(
-    program_id: AccountInfo<'info>,
-    feed: AccountInfo<'info>,
+pub fn aggregator(
+    program_id: &Pubkey,
+    feed: AccountInfo,
 ) -> Result<Pubkey, ProgramError> {
     query(program_id, feed, Query::Aggregator)
 }
