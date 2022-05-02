@@ -1,6 +1,7 @@
 import { Middleware, Next } from '@chainlink/gauntlet-core'
+import logger from './logger'
 import { boolean } from '@chainlink/gauntlet-core/dist/lib/args'
-import { assertions, logger } from '@chainlink/gauntlet-core/dist/utils'
+import { assertions } from '@chainlink/gauntlet-core/dist/utils'
 import { Provider } from '@project-serum/anchor'
 import { Connection, Keypair } from '@solana/web3.js'
 import { DEFAULT_DERIVATION_PATH } from '../lib/constants'

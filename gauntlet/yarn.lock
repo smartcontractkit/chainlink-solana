@@ -333,6 +333,16 @@
     bn.js "^5.2.0"
     protobufjs "^6.11.2"
 
+"@chainlink/gauntlet-core@0.2.0":
+  version "0.2.0"
+  resolved "https://registry.yarnpkg.com/@chainlink/gauntlet-core/-/gauntlet-core-0.2.0.tgz#ffc67d4d91575b09d2a0471ea1b4b3b303ba47e1"
+  integrity sha512-KI4FcpFWBN8BFBODr44/vctdgSkv8RHDI6D/Di7wPbVREkzvc3du6IpdYx3T7a2M2jwgYYVjw7WKhAHKrJPd+g==
+  dependencies:
+    "@ethersproject/keccak256" "^5.5.0"
+    axios "^0.24.0"
+    bn.js "^5.2.0"
+    protobufjs "^6.11.2"
+
 "@changesets/apply-release-plan@^5.0.2":
   version "5.0.2"
   resolved "https://registry.yarnpkg.com/@changesets/apply-release-plan/-/apply-release-plan-5.0.2.tgz#8abcbbce338a0ac10d67b1cc777b0b893b452198"

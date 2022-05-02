@@ -1,6 +1,6 @@
 import { ICommand, Result } from '@chainlink/gauntlet-core'
-import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse, contracts } from '@chainlink/gauntlet-solana'
+import { prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { SolanaCommand, TransactionResponse, contracts, logger } from '@chainlink/gauntlet-solana'
 import { CONTRACT_LIST, getDeploymentContract } from '../../lib/contracts'
 
 enum SOLANA_OPERATIONS {

@@ -1,5 +1,5 @@
-import { SolanaCommand, utils } from '@chainlink/gauntlet-solana'
-import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { SolanaCommand, utils, logger } from '@chainlink/gauntlet-solana'
+import { BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { PublicKey, Keypair, TransactionInstruction, SystemProgram, AccountMeta } from '@solana/web3.js'
 import { Idl, Program } from '@project-serum/anchor'
 import { MAX_BUFFER_SIZE } from '../lib/constants'

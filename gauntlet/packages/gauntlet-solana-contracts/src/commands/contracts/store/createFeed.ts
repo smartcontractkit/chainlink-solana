@@ -1,5 +1,5 @@
-import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand } from '@chainlink/gauntlet-solana'
+import { BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { SolanaCommand, logger } from '@chainlink/gauntlet-solana'
 import { Keypair, PublicKey, TransactionInstruction, SystemProgram } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import RDD from '../../../lib/rdd'

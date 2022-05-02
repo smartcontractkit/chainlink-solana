@@ -14,7 +14,7 @@ import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { TransactionResponse } from '../types'
 import { ProgramError, parseIdlErrors, Idl, Program, Provider } from '@project-serum/anchor'
 import { SolanaWallet } from '../wallet'
-import { logger } from '@chainlink/gauntlet-core/dist/utils'
+import logger from '../logger'
 import { makeTx } from '../../lib/utils'
 
 export default abstract class SolanaCommand extends WriteCommand<TransactionResponse> {

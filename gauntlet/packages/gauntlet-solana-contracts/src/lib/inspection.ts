@@ -1,4 +1,5 @@
-import { BN, logger } from '@chainlink/gauntlet-core/dist/utils'
+import { BN } from '@chainlink/gauntlet-core/dist/utils'
+import { logger } from '@chainlink/gauntlet-solana'
 import { Proto } from '@chainlink/gauntlet-core/dist/crypto'
 import { PublicKey } from '@solana/web3.js'
 

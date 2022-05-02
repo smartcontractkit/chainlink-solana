@@ -1,9 +1,8 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse, logger } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
 
 export default class Fund extends SolanaCommand {
   static id = 'ocr2:fund'

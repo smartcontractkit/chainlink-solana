@@ -1,7 +1,7 @@
-import { SolanaCommand, TransactionResponse, contracts } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse, logger } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { Result } from '@chainlink/gauntlet-core'
-import { BN, logger } from '@chainlink/gauntlet-core/dist/utils'
+import { BN } from '@chainlink/gauntlet-core/dist/utils'
 import { CONTRACT_LIST, getContract } from '../lib/contracts'
 
 export default class SetThreshold extends SolanaCommand {
