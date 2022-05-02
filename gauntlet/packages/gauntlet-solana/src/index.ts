@@ -6,5 +6,6 @@ import * as constants from './lib/constants'
 import * as contracts from './lib/contracts'
 import * as utils from './lib/utils'
 import * as provider from './lib/provider'
+import logger from './commands/logger'
 
-export { SolanaCommand, SendRawTx, waitExecute, TransactionResponse, constants, contracts, utils, provider }
+export { SolanaCommand, SendRawTx, waitExecute, TransactionResponse, constants, contracts, utils, provider, logger }
