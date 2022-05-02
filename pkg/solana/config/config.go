@@ -12,12 +12,14 @@ import (
 
 // Global solana defaults.
 var defaultConfigSet = configSet{
-	BalancePollPeriod:   5 * time.Second, // poll period for balance monitoring
-	ConfirmPollPeriod:   time.Second,     // polling for tx confirmation
-	OCR2CachePollPeriod: time.Second,     // cache polling rate
-	OCR2CacheTTL:        time.Minute,     // stale cache deadline
-	TxTimeout:           time.Minute,     // transaction timeout
-	SkipPreflight:       true,            // to enable or disable preflight checks
+	BalancePollPeriod:   5 * time.Second,        // poll period for balance monitoring
+	ConfirmPollPeriod:   500 * time.Millisecond, // polling for tx confirmation
+	OCR2CachePollPeriod: time.Second,            // cache polling rate
+	OCR2CacheTTL:        time.Minute,            // stale cache deadline
+	TxTimeout:           time.Minute,            // timeout for send tx method in client
+	TxRetryTimeout:      5 * time.Second,        // duration for tx rebroadcasting to RPC node
+	TxConfirmTimeout:    15 * time.Second,       // duration before discarding tx as unconfirmed
+	SkipPreflight:       true,                   // to enable or disable preflight checks
 	Commitment:          rpc.CommitmentConfirmed,
 }
 
@@ -40,6 +42,8 @@ type configSet struct {
 	OCR2CachePollPeriod time.Duration
 	OCR2CacheTTL        time.Duration
 	TxTimeout           time.Duration
+	TxRetryTimeout      time.Duration
+	TxConfirmTimeout    time.Duration
 	SkipPreflight       bool
 	Commitment          rpc.CommitmentType
 }
@@ -117,6 +121,27 @@ func (c *config) TxTimeout() time.Duration {
 	}
 	return c.defaults.TxTimeout
 }
+
+func (c *config) TxRetryTimeout() time.Duration {
+	c.chainMu.RLock()
+	ch := c.chain.TxRetryTimeout
+	c.chainMu.RUnlock()
+	if ch != nil {
+		return ch.Duration()
+	}
+	return c.defaults.TxRetryTimeout
+}
+
+func (c *config) TxConfirmTimeout() time.Duration {
+	c.chainMu.RLock()
+	ch := c.chain.TxConfirmTimeout
+	c.chainMu.RUnlock()
+	if ch != nil {
+		return ch.Duration()
+	}
+	return c.defaults.TxConfirmTimeout
+}
+
 func (c *config) SkipPreflight() bool {
 	c.chainMu.RLock()
 	ch := c.chain.SkipPreflight
@@ -126,6 +151,7 @@ func (c *config) SkipPreflight() bool {
 	}
 	return c.defaults.SkipPreflight
 }
+
 func (c *config) Commitment() rpc.CommitmentType {
 	c.chainMu.RLock()
 	ch := c.chain.Commitment
