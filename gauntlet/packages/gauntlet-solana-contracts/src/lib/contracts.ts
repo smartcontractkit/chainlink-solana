@@ -1,4 +1,5 @@
-import { contracts, utils } from '@chainlink/gauntlet-solana'
+import { contracts } from '@chainlink/gauntlet-solana'
+import { join } from 'path'
 
 export enum CONTRACT_LIST {
   ACCESS_CONTROLLER = 'access_controller',
@@ -17,5 +18,5 @@ export const CONTRACT_ENV_NAMES = {
 export const { getContract, getDeploymentContract } = contracts.registerContracts(
   CONTRACT_LIST,
   CONTRACT_ENV_NAMES,
-  'packages/gauntlet-solana-contracts/artifacts',
+  join(__dirname, '../../artifacts'),
 )
