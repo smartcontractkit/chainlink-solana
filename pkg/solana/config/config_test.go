@@ -14,13 +14,15 @@ import (
 
 // testing configs
 var (
-	testBalancePoll   = models.MustMakeDuration(1 * time.Minute)
-	testConfirmPeriod = models.MustMakeDuration(2 * time.Minute)
-	testCachePeriod   = models.MustMakeDuration(3 * time.Minute)
-	testTTL           = models.MustMakeDuration(4 * time.Minute)
-	testTxTimeout     = models.MustMakeDuration(5 * time.Minute)
-	testPreflight     = false
-	testCommitment    = "finalized"
+	testBalancePoll      = models.MustMakeDuration(1 * time.Minute)
+	testConfirmPeriod    = models.MustMakeDuration(2 * time.Minute)
+	testCachePeriod      = models.MustMakeDuration(3 * time.Minute)
+	testTTL              = models.MustMakeDuration(4 * time.Minute)
+	testTxTimeout        = models.MustMakeDuration(5 * time.Minute)
+	testTxRetryTimeout   = models.MustMakeDuration(6 * time.Minute)
+	testTxConfirmTimeout = models.MustMakeDuration(7 * time.Minute)
+	testPreflight        = false
+	testCommitment       = "finalized"
 )
 
 func TestConfig_ExpectedDefaults(t *testing.T) {
@@ -31,6 +33,8 @@ func TestConfig_ExpectedDefaults(t *testing.T) {
 		OCR2CachePollPeriod: cfg.OCR2CachePollPeriod(),
 		OCR2CacheTTL:        cfg.OCR2CacheTTL(),
 		TxTimeout:           cfg.TxTimeout(),
+		TxRetryTimeout:      cfg.TxRetryTimeout(),
+		TxConfirmTimeout:    cfg.TxConfirmTimeout(),
 		SkipPreflight:       cfg.SkipPreflight(),
 		Commitment:          cfg.Commitment(),
 	}
@@ -44,6 +48,8 @@ func TestConfig_NewConfig(t *testing.T) {
 		OCR2CachePollPeriod: &testCachePeriod,
 		OCR2CacheTTL:        &testTTL,
 		TxTimeout:           &testTxTimeout,
+		TxRetryTimeout:      &testTxRetryTimeout,
+		TxConfirmTimeout:    &testTxConfirmTimeout,
 		SkipPreflight:       null.BoolFrom(testPreflight),
 		Commitment:          null.StringFrom(testCommitment),
 	}
@@ -53,6 +59,8 @@ func TestConfig_NewConfig(t *testing.T) {
 	assert.Equal(t, testCachePeriod.Duration(), cfg.OCR2CachePollPeriod())
 	assert.Equal(t, testTTL.Duration(), cfg.OCR2CacheTTL())
 	assert.Equal(t, testTxTimeout.Duration(), cfg.TxTimeout())
+	assert.Equal(t, testTxRetryTimeout.Duration(), cfg.TxRetryTimeout())
+	assert.Equal(t, testTxConfirmTimeout.Duration(), cfg.TxConfirmTimeout())
 	assert.Equal(t, testPreflight, cfg.SkipPreflight())
 	assert.Equal(t, rpc.CommitmentType(testCommitment), cfg.Commitment())
 }
@@ -65,6 +73,8 @@ func TestConfig_Update(t *testing.T) {
 		OCR2CachePollPeriod: &testCachePeriod,
 		OCR2CacheTTL:        &testTTL,
 		TxTimeout:           &testTxTimeout,
+		TxRetryTimeout:      &testTxRetryTimeout,
+		TxConfirmTimeout:    &testTxConfirmTimeout,
 		SkipPreflight:       null.BoolFrom(testPreflight),
 		Commitment:          null.StringFrom(testCommitment),
 	}
@@ -74,6 +84,8 @@ func TestConfig_Update(t *testing.T) {
 	assert.Equal(t, testCachePeriod.Duration(), cfg.OCR2CachePollPeriod())
 	assert.Equal(t, testTTL.Duration(), cfg.OCR2CacheTTL())
 	assert.Equal(t, testTxTimeout.Duration(), cfg.TxTimeout())
+	assert.Equal(t, testTxRetryTimeout.Duration(), cfg.TxRetryTimeout())
+	assert.Equal(t, testTxConfirmTimeout.Duration(), cfg.TxConfirmTimeout())
 	assert.Equal(t, testPreflight, cfg.SkipPreflight())
 	assert.Equal(t, rpc.CommitmentType(testCommitment), cfg.Commitment())
 }

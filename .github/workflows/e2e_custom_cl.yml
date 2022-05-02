@@ -21,6 +21,7 @@ jobs:
     steps:
       - name: Install latest Git version (>= 2.18.0) for actions/checkout
         run: |
+          apt-get update
           apt-get install software-properties-common -y
           add-apt-repository ppa:git-core/ppa
           apt update
