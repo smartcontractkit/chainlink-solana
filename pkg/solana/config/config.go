@@ -29,6 +29,8 @@ type Config interface {
 	OCR2CachePollPeriod() time.Duration
 	OCR2CacheTTL() time.Duration
 	TxTimeout() time.Duration
+	TxRetryTimeout() time.Duration
+	TxConfirmTimeout() time.Duration
 	SkipPreflight() bool
 	Commitment() rpc.CommitmentType
 
