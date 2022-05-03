@@ -11,7 +11,7 @@ import (
 )
 
 func NewTxResultsSourceFactory(
-	client *rpc.Client,
+	client ChainReader,
 	log relayMonitoring.Logger,
 ) relayMonitoring.SourceFactory {
 	return &txResultsSourceFactory{
@@ -21,7 +21,7 @@ func NewTxResultsSourceFactory(
 }
 
 type txResultsSourceFactory struct {
-	client *rpc.Client
+	client ChainReader
 	log    relayMonitoring.Logger
 }
 
@@ -47,7 +47,7 @@ func (s *txResultsSourceFactory) GetType() string {
 }
 
 type txResultsSource struct {
-	client     *rpc.Client
+	client     ChainReader
 	log        relayMonitoring.Logger
 	feedConfig SolanaFeedConfig
 
