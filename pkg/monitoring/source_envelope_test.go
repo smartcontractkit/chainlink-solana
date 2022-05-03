@@ -18,9 +18,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestEnvelopeSource(t *testing.T) {
-	// Responses recoreded from the chain.
-	state := pkgSolana.State{
+var (
+	fakeState = pkgSolana.State{
 		AccountDiscriminator: [8]uint8{0xd8, 0x92, 0x6b, 0x5e, 0x68, 0x4b, 0xb6, 0xb1},
 		Version:              0x1,
 		Nonce:                0xff,
@@ -42,7 +41,10 @@ func TestEnvelopeSource(t *testing.T) {
 			ConfigCount:               0x1,
 			LatestConfigDigest:        types.ConfigDigest([32]uint8{0x0, 0x3, 0x72, 0xfb, 0x1f, 0xcb, 0x20, 0x44, 0xeb, 0xb3, 0xb9, 0xda, 0xb, 0x49, 0x9c, 0xe3, 0xda, 0x6e, 0x38, 0x3d, 0xfe, 0x7d, 0x20, 0x3e, 0x32, 0x6b, 0xa7, 0x93, 0x68, 0xf9, 0x80, 0xa8}),
 			LatestConfigBlockNumber:   0x71dee21,
-			Billing:                   pkgSolana.Billing{ObservationPayment: 0x1, TransmissionPayment: 0x1},
+			Billing: pkgSolana.Billing{
+				ObservationPayment:  0x1,
+				TransmissionPayment: 0x1,
+			},
 		},
 		OffchainConfig: pkgSolana.OffchainConfig{
 			Version: 0x2,
@@ -75,17 +77,23 @@ func TestEnvelopeSource(t *testing.T) {
 			Len: 0x10,
 		},
 	}
-	var blockNum uint64 = 0x7d9e7ad
-	linkBalanceRes := &rpc.GetTokenAccountBalanceResult{
+	fakeBlockNum       uint64 = 0x7d9e7ad
+	fakeLinkBalanceRes        = &rpc.GetTokenAccountBalanceResult{
 		RPCContext: rpc.RPCContext{
 			Context: rpc.Context{Slot: 0x7d9e7ad},
 		},
-		Value: &rpc.UiTokenAmount{Amount: "824640212736"},
+		Value: &rpc.UiTokenAmount{
+			Amount: "824640212736",
+		},
 	}
-	answer := pkgSolana.Answer{
+	fakeAnswer = pkgSolana.Answer{
 		Data:      big.NewInt(51268930158),
 		Timestamp: 0x627116e9,
 	}
+)
+
+func TestEnvelopeSource(t *testing.T) {
+	// Responses recoreded from the chain.
 
 	// Generated data.
 	chainConfig := generateChainConfig()
@@ -98,17 +106,17 @@ func TestEnvelopeSource(t *testing.T) {
 		mock.Anything, // ctx
 		feedConfig.StateAccount,
 		rpc.CommitmentConfirmed,
-	).Return(state, blockNum, nil).Once()
+	).Return(fakeState, fakeBlockNum, nil).Once()
 	chainReader.On("GetLatestTransmission",
 		mock.Anything, // ctx
-		state.Transmissions,
+		fakeState.Transmissions,
 		rpc.CommitmentConfirmed,
-	).Return(answer, blockNum, nil).Once()
+	).Return(fakeAnswer, fakeBlockNum, nil).Once()
 	chainReader.On("GetTokenAccountBalance",
 		mock.Anything, // ctx
-		state.Config.TokenVault,
+		fakeState.Config.TokenVault,
 		rpc.CommitmentConfirmed,
-	).Return(linkBalanceRes, nil).Once()
+	).Return(fakeLinkBalanceRes, nil).Once()
 
 	// Call Fetch
 	factory := NewEnvelopeSourceFactory(chainReader, newNullLogger())
@@ -177,4 +185,19 @@ func TestEnvelopeSource(t *testing.T) {
 		AggregatorRoundID:       0x13841a,
 	}
 	require.Equal(t, expectedEnvelope, envelope)
+}
+
+func TestGetLinkAvailableForPayment(t *testing.T) {
+	t.Run("should panic for a nil link balance", func(t *testing.T) {
+		require.Panics(t, func() {
+			_, _ = getLinkAvailableForPayment(fakeState, nil)
+		})
+	})
+	t.Run("should not panic for an empty state", func(t *testing.T) {
+		require.NotPanics(t, func() {
+			out, err := getLinkAvailableForPayment(pkgSolana.State{}, big.NewInt(1000))
+			require.NoError(t, err)
+			require.Equal(t, uint64(1000), out.Uint64())
+		})
+	})
 }
