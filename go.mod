@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/gagliardetto/binary v0.6.1
-	github.com/gagliardetto/solana-go v1.4.1-0.20220413001530-3e39c80b7211
+	github.com/gagliardetto/solana-go v1.4.1-0.20220428092759-5250b4abbb27
 	github.com/smartcontractkit/chainlink v1.3.0
 	github.com/smartcontractkit/helmenv v1.0.68
 	github.com/smartcontractkit/libocr v0.0.0-20220414173908-cdfa6bef133a

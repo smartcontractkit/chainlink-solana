@@ -62,6 +62,7 @@ type ChainCfg struct {
 	TxConfirmTimeout    *models.Duration
 	SkipPreflight       null.Bool // to enable or disable preflight checks
 	Commitment          null.String
+	MaxRetries          null.Int
 }
 
 func (c *ChainCfg) Scan(value interface{}) error {
