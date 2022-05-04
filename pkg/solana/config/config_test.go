@@ -103,5 +103,5 @@ func TestConfig_CommitmentFallback(t *testing.T) {
 
 func TestConfig_MaxRetriesNegativeFallback(t *testing.T) {
 	cfg := NewConfig(db.ChainCfg{MaxRetries: null.IntFrom(-100)}, logger.TestLogger(t))
-	assert.Same(t, defaultConfigSet.MaxRetries, cfg.MaxRetries())
+	assert.Nil(t, cfg.MaxRetries())
 }
