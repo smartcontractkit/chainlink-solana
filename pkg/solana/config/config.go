@@ -21,6 +21,7 @@ var defaultConfigSet = configSet{
 	TxConfirmTimeout:    15 * time.Second,       // duration before discarding tx as unconfirmed
 	SkipPreflight:       true,                   // to enable or disable preflight checks
 	Commitment:          rpc.CommitmentConfirmed,
+	MaxRetries:          nil, // max number of retries, when nil - rpc node will do a reasonable number of retries
 }
 
 type Config interface {
@@ -33,6 +34,7 @@ type Config interface {
 	TxConfirmTimeout() time.Duration
 	SkipPreflight() bool
 	Commitment() rpc.CommitmentType
+	MaxRetries() *uint
 
 	// Update sets new chain config values.
 	Update(db.ChainCfg)
@@ -48,6 +50,7 @@ type configSet struct {
 	TxConfirmTimeout    time.Duration
 	SkipPreflight       bool
 	Commitment          rpc.CommitmentType
+	MaxRetries          *uint
 }
 
 var _ Config = (*config)(nil)
@@ -175,4 +178,19 @@ func (c *config) Commitment() rpc.CommitmentType {
 		return commitment
 	}
 	return c.defaults.Commitment
+}
+
+func (c *config) MaxRetries() *uint {
+	c.chainMu.RLock()
+	ch := c.chain.MaxRetries
+	c.chainMu.RUnlock()
+	if ch.Valid {
+		if ch.Int64 < 0 {
+			c.lggr.Warnf(`Invalid value provided for %s: %d, must not be negative - falling back to default`, "MaxRetries", ch.Int64)
+			return c.defaults.MaxRetries
+		}
+		val := uint(ch.Int64)
+		return &val
+	}
+	return c.defaults.MaxRetries
 }
