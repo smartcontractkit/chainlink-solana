@@ -58,8 +58,11 @@ type ChainCfg struct {
 	OCR2CachePollPeriod *models.Duration
 	OCR2CacheTTL        *models.Duration
 	TxTimeout           *models.Duration
+	TxRetryTimeout      *models.Duration
+	TxConfirmTimeout    *models.Duration
 	SkipPreflight       null.Bool // to enable or disable preflight checks
 	Commitment          null.String
+	MaxRetries          null.Int
 }
 
 func (c *ChainCfg) Scan(value interface{}) error {
