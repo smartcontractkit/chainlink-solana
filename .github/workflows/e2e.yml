@@ -53,12 +53,24 @@ jobs:
         with:
           repository: ${{ inputs.repo_name }}
           ref: ${{ inputs.ref }}
-          path: chainlink-solana
-      - run: |
-          ls
-          ls ../
-      - name: Build Test Contracts
-        uses: ./chainlink-solana/.github/actions/build_test_contracts
+      - name: yarn install
+        shell: bash
+        run: yarn install --frozen-lockfile
+      - name: Generate program_ids
+        shell: bash
+        run: ./scripts/programs-keys-gen.sh
+      - name: Generate build artifacts for go bindings check
+        shell: bash
+        env:
+          RUSTUP_HOME: "/root/.rustup"
+          FORCE_COLOR: '1'
+        run: anchor build
+        working-directory: contracts
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v2.2.4
+        with:
+          name: artifacts
+          path: contracts/target/deploy
   e2e_run_smoke_tests:
     name: E2E Run Smoke Tests
     runs-on: ubuntu-latest
