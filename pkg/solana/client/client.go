@@ -51,6 +51,7 @@ type Client struct {
 	rpc             *rpc.Client
 	skipPreflight   bool // to enable or disable preflight checks
 	commitment      rpc.CommitmentType
+	maxRetries      *uint
 	txTimeout       time.Duration
 	contextDuration time.Duration
 	log             logger.Logger
@@ -64,6 +65,7 @@ func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration,
 		rpc:             rpc.New(endpoint),
 		skipPreflight:   cfg.SkipPreflight(),
 		commitment:      cfg.Commitment(),
+		maxRetries:      cfg.MaxRetries(),
 		txTimeout:       cfg.TxTimeout(),
 		contextDuration: requestTimeout,
 		log:             log,
@@ -198,5 +200,12 @@ func (c *Client) SimulateTx(ctx context.Context, tx *solana.Transaction, opts *r
 func (c *Client) SendTx(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
 	defer cancel()
-	return c.rpc.SendTransactionWithOpts(ctx, tx, c.skipPreflight, c.commitment)
+
+	opts := rpc.TransactionOpts{
+		SkipPreflight:       c.skipPreflight,
+		PreflightCommitment: c.commitment,
+		MaxRetries:          c.maxRetries,
+	}
+
+	return c.rpc.SendTransactionWithOpts(ctx, tx, opts)
 }

@@ -10,6 +10,12 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/smartcontractkit/integrations-framework/blockchain"
+	"github.com/smartcontractkit/integrations-framework/config"
+
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -17,7 +23,6 @@ import (
 	"github.com/gagliardetto/solana-go/text"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/helmenv/environment"
-	"github.com/smartcontractkit/integrations-framework/client"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
 )
@@ -78,14 +83,10 @@ func (c *Client) GetNetworkType() string {
 	return c.Config.Type
 }
 
-var _ client.BlockchainClient = (*Client)(nil)
+var _ blockchain.EVMClient = (*Client)(nil)
 
 func (c *Client) ContractsDeployed() bool {
 	return c.Config.ContractsDeployed
-}
-
-func (c *Client) GetChainID() int64 {
-	panic("implement me")
 }
 
 func (c *Client) EstimateCostForChainlinkOperations(amountOfOperations int) (*big.Float, error) {
@@ -110,8 +111,8 @@ func ClientURLSFunc() func(e *environment.Environment) ([]*url.URL, error) {
 	}
 }
 
-func ClientInitFunc() func(networkName string, networkConfig map[string]interface{}, urls []*url.URL) (client.BlockchainClient, error) {
-	return func(networkName string, networkConfig map[string]interface{}, urls []*url.URL) (client.BlockchainClient, error) {
+func ClientInitFunc() func(networkName string, networkConfig map[string]interface{}, urls []*url.URL) (blockchain.EVMClient, error) {
+	return func(networkName string, networkConfig map[string]interface{}, urls []*url.URL) (blockchain.EVMClient, error) {
 		d, err := yaml.Marshal(networkConfig)
 		if err != nil {
 			return nil, err
@@ -196,8 +197,10 @@ func (c *Client) TXSync(name string, commitment rpc.CommitmentType, instr []sola
 	sig, err := c.RPC.SendTransactionWithOpts(
 		context.Background(),
 		tx,
-		false,
-		commitment,
+		rpc.TransactionOpts{
+			SkipPreflight:       false,
+			PreflightCommitment: commitment,
+		},
 	)
 	if err != nil {
 		return err
@@ -370,11 +373,6 @@ func (c *Client) CalculateTxGas(gasUsedValue *big.Int) (*big.Float, error) {
 	panic("implement me")
 }
 
-// GetDefaultWallet gets the default wallet
-func (c *Client) GetDefaultWallet() *client.EthereumWallet {
-	panic("implement me")
-}
-
 func (c *Client) Get() interface{} {
 	return c
 }
@@ -384,10 +382,6 @@ func (c *Client) GetNetworkName() string {
 }
 
 func (c *Client) SwitchNode(node int) error {
-	panic("implement me")
-}
-
-func (c *Client) GetClients() []client.BlockchainClient {
 	panic("implement me")
 }
 
@@ -430,10 +424,6 @@ func (c *Client) Fund(toAddress string, amount *big.Float) error {
 	return nil
 }
 
-func (c *Client) GasStats() *client.GasStats {
-	panic("implement me")
-}
-
 func (c *Client) ParallelTransactions(enabled bool) {
 	c.queueTransactions = enabled
 }
@@ -447,14 +437,70 @@ func (c *Client) EstimateTransactionGasCost() (*big.Int, error) {
 	panic("implement me")
 }
 
-func (c *Client) AddHeaderEventSubscription(key string, subscriber client.HeaderEventSubscription) {
-	panic("implement me")
-}
-
 func (c *Client) DeleteHeaderEventSubscription(key string) {
 	panic("implement me")
 }
 
 func (c *Client) WaitForEvents() error {
 	return c.txErrGroup.Wait()
+}
+
+func (c *Client) GetChainID() *big.Int {
+	panic("implement me")
+}
+
+func (c *Client) GetClients() []blockchain.EVMClient {
+	panic("implement me")
+}
+
+func (c *Client) GetDefaultWallet() *blockchain.EthereumWallet {
+	panic("implement me")
+}
+
+func (c *Client) GetWallets() []*blockchain.EthereumWallet {
+	panic("implement me")
+}
+
+func (c *Client) GetNetworkConfig() *config.ETHNetwork {
+	panic("implement me")
+}
+
+func (c *Client) SetID(id int) {
+	panic("implement me")
+}
+
+func (c *Client) SetDefaultWallet(num int) error {
+	panic("implement me")
+}
+
+func (c *Client) SetWallets(wallets []*blockchain.EthereumWallet) {
+	panic("implement me")
+}
+
+func (c *Client) LatestBlockNumber(ctx context.Context) (uint64, error) {
+	panic("implement me")
+}
+
+func (c *Client) DeployContract(contractName string, deployer blockchain.ContractDeployer) (*common.Address, *types.Transaction, interface{}, error) {
+	panic("implement me")
+}
+
+func (c *Client) TransactionOpts(from *blockchain.EthereumWallet) (*bind.TransactOpts, error) {
+	panic("implement me")
+}
+
+func (c *Client) ProcessTransaction(tx *types.Transaction) error {
+	panic("implement me")
+}
+
+func (c *Client) IsTxConfirmed(txHash common.Hash) (bool, error) {
+	panic("implement me")
+}
+
+func (c *Client) GasStats() *blockchain.GasStats {
+	panic("implement me")
+}
+
+func (c *Client) AddHeaderEventSubscription(key string, subscriber blockchain.HeaderEventSubscription) {
+	panic("implement me")
 }
