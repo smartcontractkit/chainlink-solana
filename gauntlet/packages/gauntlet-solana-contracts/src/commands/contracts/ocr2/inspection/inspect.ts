@@ -130,10 +130,10 @@ export default class OCR2Inspect extends SolanaCommand {
     latestRoundId: number,
     fromRoundId: number,
     observationPaymentGjuels: number,
-    oraclePaymentGjuels: BN,
+    oraclePaymentGjuels: number,
   ): number => {
     const rounds = latestRoundId - fromRoundId
-    const owed = observationPaymentGjuels * rounds + oraclePaymentGjuels.toNumber()
+    const owed = observationPaymentGjuels * rounds + oraclePaymentGjuels
     return owed
   }
 
@@ -156,7 +156,7 @@ export default class OCR2Inspect extends SolanaCommand {
           onChainState.config.latestAggregatorRoundId,
           oracle.fromRoundId,
           onChainState.config.billing.observationPaymentGjuels,
-          oracle.paymentGjuels,
+          oracle.paymentGjuels.toNumber(),
         )
       )
     }, 0)
