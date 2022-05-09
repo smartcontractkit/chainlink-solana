@@ -126,12 +126,41 @@ export default class OCR2Inspect extends SolanaCommand {
     return buffer
   }
 
+  calculateOwedPayment = (
+    latestRoundId: number,
+    fromRoundId: number,
+    observationPaymentGjuels: number,
+    oraclePaymentGjuels: number,
+  ): number => {
+    const rounds = latestRoundId - fromRoundId
+    const owed = observationPaymentGjuels * rounds + oraclePaymentGjuels
+    return owed
+  }
+
   execute = async () => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const ocr2program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
 
     const state = new PublicKey(this.args[0])
     const onChainState = await ocr2program.account.state.fetch(state)
+
+    // Get balance
+    const balance = await this.provider.connection.getBalance(state)
+    logger.info(`Contract balance: ${balance}`)
+
+    // Get total owed
+    const totalOwed = onChainState.oracles.xs.reduce((agg, oracle) => {
+      return (
+        agg +
+        this.calculateOwedPayment(
+          onChainState.config.latestAggregatorRoundId,
+          oracle.fromRoundId,
+          onChainState.config.billing.observationPaymentGjuels,
+          oracle.paymentGjuels.toNumber(),
+        )
+      )
+    }, 0)
+    logger.info(`Total owed: ${totalOwed}`)
 
     const bufferedConfig = Buffer.from(onChainState.offchainConfig.xs).slice(
       0,

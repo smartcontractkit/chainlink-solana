@@ -197,8 +197,10 @@ func (c *Client) TXSync(name string, commitment rpc.CommitmentType, instr []sola
 	sig, err := c.RPC.SendTransactionWithOpts(
 		context.Background(),
 		tx,
-		false,
-		commitment,
+		rpc.TransactionOpts{
+			SkipPreflight:       false,
+			PreflightCommitment: commitment,
+		},
 	)
 	if err != nil {
 		return err
