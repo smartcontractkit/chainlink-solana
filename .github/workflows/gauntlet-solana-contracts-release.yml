@@ -1,0 +1,23 @@
+name: gauntlet-solana-contracts-release
+
+on:
+  push:
+    tags:
+      - "gauntlet-solana-contracts-v[0-9]+.[0-9]+.[0-9]" # Push events to matching v*, i.e. gauntlet-solana-contracts-v1.0
+      - "gauntlet-solana-contracts-v[0-9]+.[0-9]+.[0-9]+-rc*" # Push events to matching v*, i.e. gauntlet-solana-contracts-v1.0-rc1
+
+jobs:
+  release-gauntlet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
+      - name: Build Gauntlet
+        run: cd gauntlet && yarn && yarn bundle
+      - name: Create Archive
+        run: tar cfvz gauntlet-solana-contracts.tar.gz gauntlet/packages/gauntlet-solana-contracts/**
+      - name: Release Gauntlet
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            gauntlet-solana-contracts.tar.gz
+            gauntlet/bin/gauntlet-*
