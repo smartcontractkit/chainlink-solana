@@ -77,12 +77,12 @@ func main() {
 }
 
 type Transmission struct {
-	Epoch uint32
-	Round uint8
-	Oracle string
-	Success bool
+	Epoch                 uint32
+	Round                 uint8
+	Oracle                string
+	Success               bool
 	ObservationsTimestamp time.Time
-	BlockTimestamp time.Time	
+	BlockTimestamp        time.Time
 }
 
 func (r *Transmission) Delay() time.Duration {
@@ -99,7 +99,6 @@ func Summary(rs []Transmission, filter func(r Transmission) bool) string {
 
 	filteredDelaySum := time.Duration(0)
 	filteredDelays := []time.Duration{}
-
 
 	for _, r := range rs {
 		f := filter(r)
@@ -123,18 +122,19 @@ func Summary(rs []Transmission, filter func(r Transmission) bool) string {
 	})
 
 	s := ""
-	// s += fmt.Sprintf("total    count: %3d success: %3d fail: %3d success-%%: %5.2f\n", 
+	// s += fmt.Sprintf("total    count: %3d success: %3d fail: %3d success-%%: %5.2f\n",
 	// 	len(rs), succeeded, len(rs)-succeeded, float64(suceeded)/float64(len(rs)))
-	s += fmt.Sprintf("  success-%%: %6.2f count: %3d success: %3d fail: %3d\n", 
+	s += fmt.Sprintf("  success-%%: %6.2f count: %3d success: %3d fail: %3d\n",
 		100*float64(filteredSucceeded)/float64(filtered), filtered, filteredSucceeded, filtered-filteredSucceeded)
-	s += fmt.Sprintf("  rel success-%%: %6.2f fail-%%: %6.2f\n", 
+	s += fmt.Sprintf("  rel success-%%: %6.2f fail-%%: %6.2f\n",
 		100*float64(filteredSucceeded)/float64(succeeded), 100*float64(filtered-filteredSucceeded)/float64(len(rs)-succeeded))
 	s += fmt.Sprintf("  avg delay in s:         %6.2f\n", filteredDelaySum.Seconds()/float64(filtered))
-	s += fmt.Sprintf("  50-th %%ile delay in s:  %6.2f\n", filteredDelays[len(filteredDelays)/2].Seconds())
-	s += fmt.Sprintf("  95-th %%ile delay in s:  %6.2f\n", filteredDelays[len(filteredDelays)*95/100].Seconds())
+	if len(filteredDelays) != 0 {
+		s += fmt.Sprintf("  50-th %%ile delay in s:  %6.2f\n", filteredDelays[len(filteredDelays)/2].Seconds())
+		s += fmt.Sprintf("  95-th %%ile delay in s:  %6.2f\n", filteredDelays[len(filteredDelays)*95/100].Seconds())
+	}
 	return s
 }
-
 
 func XXXInspectTxs(network string, state string) error {
 	client := rpc.New(network)
@@ -173,7 +173,7 @@ func XXXInspectTxs(network string, state string) error {
 
 	// parse all txs
 	for i := len(txSigs) - 1; i >= 0; i-- {
-	// for i := 0; i < len(txSigs); i++ {
+		// for i := 0; i < len(txSigs); i++ {
 		tx := txSigs[i]
 
 		// fetch additional data about tx (hits the rate limit for public endpoint)
@@ -193,7 +193,6 @@ func XXXInspectTxs(network string, state string) error {
 			return err
 		}
 
-
 		// use first address: https://docs.solana.com/developing/clients/jsonrpc-api#transaction-structure
 		// The first message.header.numRequiredSignatures public keys must sign the transaction (therefore it is the transmitter)
 		transmitter := txData.Message.AccountKeys[0].String()
@@ -211,10 +210,9 @@ func XXXInspectTxs(network string, state string) error {
 			continue
 		}
 
-		epoch := binary.BigEndian.Uint32(transmitData[epochRoundOffset:epochRoundOffset+4])
+		epoch := binary.BigEndian.Uint32(transmitData[epochRoundOffset : epochRoundOffset+4])
 		round := transmitData[epochRoundOffset+4]
 		obsTs := time.Unix(int64(binary.BigEndian.Uint32(transmitData[97:97+4])), 0)
-
 
 		// fmt.Println("Epoch", epoch, "Round", round)
 		// fmt.Printf("     Observations Timestamp: %v\n", obsTs.Format(time.Stamp))
@@ -230,31 +228,29 @@ func XXXInspectTxs(network string, state string) error {
 			tx.BlockTime.Time(),
 		})
 
-		if i % 500 == 0 {
+		if i%500 == 0 {
 			fmt.Fprintf(os.Stderr, "%d left...\n", i)
 		}
 	}
 
 	fmt.Printf("\n---------------totals-----------------\n")
 
-
 	fmt.Println("total")
-	fmt.Println(Summary(transmissions, func (r Transmission) bool {
+	fmt.Println(Summary(transmissions, func(r Transmission) bool {
 		return true
-	}))	
+	}))
 
 	fmt.Printf("\n---------------breakdown by success/revert-----------------\n")
 
 	fmt.Println("success")
-	fmt.Println(Summary(transmissions, func (r Transmission) bool {
+	fmt.Println(Summary(transmissions, func(r Transmission) bool {
 		return r.Success
-	}))	
+	}))
 
 	fmt.Println("revert")
-	fmt.Println(Summary(transmissions, func (r Transmission) bool {
+	fmt.Println(Summary(transmissions, func(r Transmission) bool {
 		return !r.Success
-	}))		
-
+	}))
 
 	fmt.Printf("\n---------------breakdown by transmitting oracle-----------------\n")
 
@@ -269,17 +265,17 @@ func XXXInspectTxs(network string, state string) error {
 	sort.StringSlice(sortedOracles).Sort()
 	for _, oracle := range sortedOracles {
 		fmt.Println(oracle)
-		fmt.Println(Summary(transmissions, func (r Transmission) bool {
+		fmt.Println(Summary(transmissions, func(r Transmission) bool {
 			return r.Oracle == oracle
 		}))
 	}
 
 	fmt.Printf("\n---------------breakdown by delay-----------------\n")
 
-	for minDelaySecs := 0;  minDelaySecs <= 50; minDelaySecs += 5 {
+	for minDelaySecs := 0; minDelaySecs <= 50; minDelaySecs += 5 {
 		maxDelaySecs := minDelaySecs + 5
 		fmt.Printf("%vs < delay <= %vs\n", minDelaySecs, maxDelaySecs)
-		fmt.Println(Summary(transmissions, func (r Transmission) bool {
+		fmt.Println(Summary(transmissions, func(r Transmission) bool {
 			return float64(minDelaySecs) < r.Delay().Seconds() && r.Delay().Seconds() <= float64(maxDelaySecs)
 		}))
 	}
@@ -291,26 +287,25 @@ func XXXInspectTxs(network string, state string) error {
 	for ts := startTimestamp; ts.Before(stopTimestamp); ts = ts.Add(time.Hour) {
 		tsTo := ts.Add(time.Hour)
 		fmt.Printf("block timestamp between %v and %v\n", ts.Format(time.Stamp), tsTo.Format(time.Stamp))
-		fmt.Println(Summary(transmissions, func (r Transmission) bool {
+		fmt.Println(Summary(transmissions, func(r Transmission) bool {
 			return ts.Before(r.BlockTimestamp) && r.BlockTimestamp.Before(tsTo)
-		}))		
+		}))
 	}
 
 	fmt.Printf("\n---------------rate stats-----------------\n")
 	durationSeconds := stopTimestamp.Sub(startTimestamp).Seconds()
-	successCount := 0;
+	successCount := 0
 	for _, r := range transmissions {
 		if r.Success {
 			successCount++
 		}
 	}
 	fmt.Printf("interval between txs in s:       %5.2f\n", durationSeconds/float64(len(transmissions)))
-	fmt.Printf("tx rate in 1/s:                  %5.2f\n", float64(len(transmissions))/durationSeconds)	
+	fmt.Printf("tx rate in 1/s:                  %5.2f\n", float64(len(transmissions))/durationSeconds)
 	fmt.Printf("interval between successes in s: %5.2f\n", durationSeconds/float64(successCount))
 	fmt.Printf("success rate in 1/s:             %5.2f\n", float64(successCount)/durationSeconds)
 	fmt.Printf("interval between reverts in s:   %5.2f\n", durationSeconds/float64(len(transmissions)-successCount))
 	fmt.Printf("revert rate in 1/s:              %5.2f\n", float64(len(transmissions)-successCount)/durationSeconds)
-
 
 	fmt.Printf("\n---------------successful update interval stats-----------------\n")
 	successTransmissions := []Transmission{}
@@ -335,7 +330,6 @@ func XXXInspectTxs(network string, state string) error {
 	fmt.Printf("99.5-th %%ile successful update interval in s:  %6.2f\n", successTransmissionIntervals[len(successTransmissionIntervals)*995/1000].Seconds())
 	fmt.Printf("worst successful update interval in s:          %6.2f\n", successTransmissionIntervals[len(successTransmissionIntervals)-1].Seconds())
 
-
 	fmt.Printf("\n---------------age of latest value in contract-----------------\n")
 	totalAgeSeconds := float64(0)
 	for i := 1; i < len(successTransmissions); i++ {
@@ -344,7 +338,6 @@ func XXXInspectTxs(network string, state string) error {
 		totalAgeSeconds += ageSeconds * secondsBetweenUpdates
 	}
 	fmt.Printf("average age in seconds: %v\n", totalAgeSeconds/durationSeconds)
-
 
 	return nil
 }
