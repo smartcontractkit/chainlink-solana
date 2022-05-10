@@ -14,12 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: projectserum/build:v0.22.1
-      env:
-        RUSTUP_HOME: "/root/.rustup"
     steps:
       - uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
-      - name: Build Artifacts
-        run: anchor build
+      - name: Build Contract Artifacts
+        uses: ./.github/actions/build_contract_artifacts
       - name: Generate archive
         run: |
           tar cfvz artifacts.tar.gz target/deploy/*.so target/idl/*

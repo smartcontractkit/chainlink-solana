@@ -20,7 +20,7 @@ jobs:
         FORCE_COLOR: 1
     steps:
       - uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
-      - name: Build Test Contracts
+      - name: Build Contract Artifacts
         uses: ./.github/actions/build_contract_artifacts
   soak_testing_build_custom_chainlink_image:
     name: Soak Testing Build Custom Chainlink Image

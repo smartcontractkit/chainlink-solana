@@ -17,7 +17,7 @@ jobs:
       image: projectserum/build:v0.22.1
     steps:
       - uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
-      - name: Build Test Contracts
+      - name: Build Contract Artifacts
         uses: ./.github/actions/build_contract_artifacts
   e2e_custom_check_go_bindings:
     name: E2E Custom Check Go Bindings
@@ -40,7 +40,7 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: ${{ steps.tool-versions.outputs.golang_version }}
-      - name: Build Test Contracts
+      - name: Build Contract Artifacts
         uses: ./.github/actions/build_contract_artifacts
         with:
           check_generated_go_bindings: 'true'
