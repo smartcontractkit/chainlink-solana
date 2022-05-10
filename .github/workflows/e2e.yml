@@ -82,12 +82,12 @@ jobs:
           repository: ${{ inputs.repo_name }}
           ref: ${{ inputs.ref }}
       - name: Run Tests
-        uses: smartcontractkit/ctf-ci-e2e-action@v1.0.0
+        uses: smartcontractkit/ctf-ci-e2e-action@v1.0.1
         with:
           test_command_to_run: make test_smoke
           cl_repo: ${{ inputs.cl_repo }}
           cl_image_tag: ${{ inputs.cl_image }}
-          download_artifacts_path: contracts/target/deploy
+          download_contract_artifacts_path: contracts/target/deploy
           publish_report_paths: "./tests-smoke-report.xml"
           publish_check_name: Smoke Test Results
           QA_AWS_ACCESS_KEY_ID: ${{ secrets.QA_AWS_ACCESS_KEY_ID }}

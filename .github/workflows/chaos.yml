@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
       - name: Build Test Contracts
-        uses: ./.github/actions/build_test_contracts
+        uses: ./.github/actions/build_contract_artifacts
   chaos_testing_build_custom_chainlink_image:
     name: Chaos Testing Build Custom Chainlink Image
     # target branch can't be set as var, it's from where we getting pipeline code
@@ -50,12 +50,12 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
       - name: Run Tests
-        uses: smartcontractkit/ctf-ci-e2e-action@v1.0.0
+        uses: smartcontractkit/ctf-ci-e2e-action@v1.0.1
         with:
           test_command_to_run: make test_chaos
           cl_repo: 795953128386.dkr.ecr.us-west-2.amazonaws.com/chainlink
           cl_image_tag: custom.${{ github.sha }}
-          download_artifacts_path: contracts/target/deploy
+          download_contract_artifacts_path: contracts/target/deploy
           publish_report_paths: "./tests-chaos-report.xml"
           publish_check_name: Chaos Test Results
           QA_AWS_ACCESS_KEY_ID: ${{ secrets.QA_AWS_ACCESS_KEY_ID }}

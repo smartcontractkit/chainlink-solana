@@ -1,4 +1,4 @@
-name: Build Test Contracts
+name: Build Contract Artifacts
 description: Common builder for test contracts
 
 inputs:
@@ -24,7 +24,7 @@ runs:
         FORCE_COLOR: '1'
       run: anchor build
       working-directory: contracts
-    - name: Upload Artifacts
+    - name: Upload Contract Artifacts
       if: inputs.check_generated_go_bindings == 'false'
       uses: actions/upload-artifact@v2.2.4
       with:
