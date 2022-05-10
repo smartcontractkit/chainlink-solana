@@ -15,7 +15,7 @@ import (
 )
 
 func NewEnvelopeSourceFactory(
-	client *rpc.Client,
+	client ChainReader,
 	log relayMonitoring.Logger,
 ) relayMonitoring.SourceFactory {
 	return &envelopeSourceFactory{
@@ -25,7 +25,7 @@ func NewEnvelopeSourceFactory(
 }
 
 type envelopeSourceFactory struct {
-	client *rpc.Client
+	client ChainReader
 	log    relayMonitoring.Logger
 }
 
@@ -48,12 +48,12 @@ func (s *envelopeSourceFactory) GetType() string {
 }
 
 type envelopeSource struct {
-	client     *rpc.Client
+	client     ChainReader
 	feedConfig SolanaFeedConfig
 }
 
 func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
-	state, blockNum, err := pkgSolana.GetState(ctx, s.client, s.feedConfig.StateAccount, rpc.CommitmentConfirmed)
+	state, blockNum, err := s.client.GetState(ctx, s.feedConfig.StateAccount, rpc.CommitmentConfirmed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch state from on-chain: %w", err)
 	}
@@ -61,24 +61,39 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode ContractConfig from on-chain state: %w", err)
 	}
-	var (
-		answer      pkgSolana.Answer
-		linkBalance *big.Int
-		envelopeErr error
-	)
+	envelope := relayMonitoring.Envelope{
+		ConfigDigest: state.Config.LatestConfigDigest,
+		Epoch:        state.Config.Epoch,
+		Round:        state.Config.Round,
+		// latest contract config
+		ContractConfig: contractConfig,
+		// extra
+		BlockNumber:       blockNum,
+		Transmitter:       types.Account(state.Config.LatestTransmitter.String()),
+		JuelsPerFeeCoin:   big.NewInt(0), // TODO (dru)
+		AggregatorRoundID: state.Config.LatestAggregatorRoundID,
+	}
+	var envelopeErr error
+	envelopeMu := &sync.Mutex{}
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		var transmissionErr error
-		answer, _, transmissionErr = pkgSolana.GetLatestTransmission(ctx, s.client, state.Transmissions, rpc.CommitmentConfirmed)
-		if err != nil {
+		answer, _, transmissionErr := s.client.GetLatestTransmission(ctx, state.Transmissions, rpc.CommitmentConfirmed)
+		envelopeMu.Lock()
+		defer envelopeMu.Unlock()
+		if transmissionErr != nil {
 			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("failed to fetch latest on-chain transmission: %w", transmissionErr))
+			return
 		}
+		envelope.LatestAnswer = answer.Data
+		envelope.LatestTimestamp = time.Unix(int64(answer.Timestamp), 0)
 	}()
 	go func() {
 		defer wg.Done()
 		linkBalanceRes, balanceErr := s.client.GetTokenAccountBalance(ctx, state.Config.TokenVault, rpc.CommitmentConfirmed)
+		envelopeMu.Lock()
+		defer envelopeMu.Unlock()
 		if balanceErr != nil {
 			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("failed to read the feed's link balance: %w", balanceErr))
 			return
@@ -87,41 +102,23 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("link balance not found for token vault"))
 			return
 		}
-		var success bool
-		linkBalance, success = big.NewInt(0).SetString(linkBalanceRes.Value.Amount, 10)
+		linkBalance, success := big.NewInt(0).SetString(linkBalanceRes.Value.Amount, 10)
 		if !success {
 			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("failed to parse link balance value: %s", linkBalanceRes.Value.Amount))
 			return
 		}
+		envelope.LinkBalance = linkBalance
 	}()
 	wg.Wait()
 	if envelopeErr != nil {
 		return nil, envelopeErr
 	}
-	linkAvailableForPayments, err := getLinkAvailableForPayment(state, linkBalance)
+	linkAvailableForPayment, err := getLinkAvailableForPayment(state, envelope.LinkBalance)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate link_available_for_payments: %w", err)
 	}
-	return relayMonitoring.Envelope{
-		ConfigDigest: state.Config.LatestConfigDigest,
-		Epoch:        state.Config.Epoch,
-		Round:        state.Config.Round,
-
-		LatestAnswer:    answer.Data,
-		LatestTimestamp: time.Unix(int64(answer.Timestamp), 0),
-
-		// latest contract config
-		ContractConfig: contractConfig,
-
-		// extra
-		BlockNumber:             blockNum,
-		Transmitter:             types.Account(state.Config.LatestTransmitter.String()),
-		LinkBalance:             linkBalance,
-		LinkAvailableForPayment: linkAvailableForPayments,
-
-		JuelsPerFeeCoin:   big.NewInt(0), // TODO (dru)
-		AggregatorRoundID: state.Config.LatestAggregatorRoundID,
-	}, nil
+	envelope.LinkAvailableForPayment = linkAvailableForPayment
+	return envelope, nil
 }
 
 // Helpers

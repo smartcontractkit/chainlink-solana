@@ -8,7 +8,6 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
-	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 )
 
 type Balances struct {
@@ -17,7 +16,7 @@ type Balances struct {
 }
 
 func NewBalancesSourceFactory(
-	client *rpc.Client,
+	client ChainReader,
 	log relayMonitoring.Logger,
 ) relayMonitoring.SourceFactory {
 	return &balancesSourceFactory{
@@ -27,7 +26,7 @@ func NewBalancesSourceFactory(
 }
 
 type balancesSourceFactory struct {
-	client *rpc.Client
+	client ChainReader
 	log    relayMonitoring.Logger
 }
 
@@ -51,13 +50,13 @@ func (s *balancesSourceFactory) GetType() string {
 }
 
 type balancesSource struct {
-	client     *rpc.Client
+	client     ChainReader
 	log        relayMonitoring.Logger
 	feedConfig SolanaFeedConfig
 }
 
 func (s *balancesSource) Fetch(ctx context.Context) (interface{}, error) {
-	state, _, err := pkgSolana.GetState(ctx, s.client, s.feedConfig.StateAccount, rpc.CommitmentConfirmed)
+	state, _, err := s.client.GetState(ctx, s.feedConfig.StateAccount, rpc.CommitmentConfirmed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get contract state: %w", err)
 	}

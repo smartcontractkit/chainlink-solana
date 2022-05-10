@@ -27,13 +27,14 @@ func main() {
 	}
 
 	client := rpc.New(chainConfig.RPCEndpoint)
+	chainReader := monitoring.NewChainReader(client)
 
 	envelopeSourceFactory := monitoring.NewEnvelopeSourceFactory(
-		client,
+		chainReader,
 		logWrapper{coreLog.With("component", "source-envelope")},
 	)
 	txResultsSourceFactory := monitoring.NewTxResultsSourceFactory(
-		client,
+		chainReader,
 		logWrapper{coreLog.With("component", "source-txresults")},
 	)
 
@@ -52,7 +53,7 @@ func main() {
 	}
 
 	balancesSourceFactory := monitoring.NewBalancesSourceFactory(
-		client,
+		chainReader,
 		log.With("component", "source-balances"),
 	)
 	monitor.SourceFactories = append(monitor.SourceFactories, balancesSourceFactory)
