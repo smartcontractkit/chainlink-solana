@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/smartcontractkit/integrations-framework/config"
+	"github.com/smartcontractkit/chainlink-testing-framework/config"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

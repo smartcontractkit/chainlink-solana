@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/smartcontractkit/integrations-framework/blockchain"
+	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
 	"math/big"
 	"sort"
@@ -17,8 +17,8 @@ import (
 	"github.com/rs/zerolog/log"
 
 	uuid "github.com/satori/go.uuid"
-	"github.com/smartcontractkit/integrations-framework/client"
-	"github.com/smartcontractkit/integrations-framework/contracts"
+	"github.com/smartcontractkit/chainlink-testing-framework/client"
+	"github.com/smartcontractkit/chainlink-testing-framework/contracts"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"

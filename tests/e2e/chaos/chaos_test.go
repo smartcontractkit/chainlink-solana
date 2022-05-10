@@ -8,7 +8,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/common"
-	"github.com/smartcontractkit/integrations-framework/actions"
+	"github.com/smartcontractkit/chainlink-testing-framework/actions"
 )
 
 var _ = Describe("Solana chaos suite", func() {
