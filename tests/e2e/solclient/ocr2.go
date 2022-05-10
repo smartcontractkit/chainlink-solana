@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 	ocr_2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr2"
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/utils"
-	"github.com/smartcontractkit/integrations-framework/contracts"
+	"github.com/smartcontractkit/chainlink-testing-framework/contracts"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 )
 

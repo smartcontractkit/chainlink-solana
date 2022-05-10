@@ -7,15 +7,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/smartcontractkit/integrations-framework/blockchain"
+	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/solclient"
+	"github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/smartcontractkit/helmenv/environment"
 	"github.com/smartcontractkit/helmenv/tools"
-	"github.com/smartcontractkit/integrations-framework/client"
 	"golang.org/x/sync/errgroup"
 )
 

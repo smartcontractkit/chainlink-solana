@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/smartcontractkit/integrations-framework/blockchain"
+	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
 	ag_binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
