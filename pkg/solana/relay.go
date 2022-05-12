@@ -80,7 +80,8 @@ func (r *Relayer) NewMedianProvider(args relaytypes.OCR2Args) (relaytypes.Median
 		return nil, err
 	}
 	var relayConfig RelayConfig
-	if err := json.Unmarshal(relayConfigBytes, &relayConfig); err != nil {
+	err = json.Unmarshal(relayConfigBytes, &relayConfig)
+	if err != nil {
 		return nil, err
 	}
 	stateID, err := solana.PublicKeyFromBase58(args.ContractID)
