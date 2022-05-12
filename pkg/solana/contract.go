@@ -30,7 +30,8 @@ type ContractTracker struct {
 	StoreProgramID  solana.PublicKey
 
 	// private key for the transmission signing
-	Transmitter TransmissionSigner
+	transmitterSet bool
+	Transmitter    TransmissionSigner
 
 	// tracked contract state
 	state  State

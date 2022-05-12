@@ -10,7 +10,7 @@ require (
 	github.com/gagliardetto/treeout v0.1.4
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.1
-	github.com/smartcontractkit/chainlink v1.4.1-0.20220512162144-b9662b3b52c3
+	github.com/smartcontractkit/chainlink v1.4.1-rc1.0.20220512210926-5363811660bf
 	github.com/smartcontractkit/chainlink-relay v0.0.0-20220422131434-0cef40354ecc
 	github.com/smartcontractkit/libocr v0.0.0-20220414173908-cdfa6bef133a
 	github.com/stretchr/testify v1.7.1
@@ -175,3 +175,5 @@ require (
 )
 
 replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
+
+replace github.com/smartcontractkit/chainlink => /Users/connorstein/go/src/github.com/smartcontractkit/chainlink

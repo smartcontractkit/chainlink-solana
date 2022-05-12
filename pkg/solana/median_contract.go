@@ -8,7 +8,12 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
-func (c *ContractTracker) LatestTransmissionDetails(
+type MedianContract struct {
+	stateCache         StateCache
+	transmissionsCache TransmissionsCache
+}
+
+func (c *MedianContract) LatestTransmissionDetails(
 	ctx context.Context,
 ) (
 	configDigest types.ConfigDigest,
@@ -18,11 +23,11 @@ func (c *ContractTracker) LatestTransmissionDetails(
 	latestTimestamp time.Time,
 	err error,
 ) {
-	state, err := c.ReadState()
+	state, err := c.stateCache.ReadState()
 	if err != nil {
 		return configDigest, epoch, round, latestAnswer, latestTimestamp, err
 	}
-	answer, err := c.ReadAnswer()
+	answer, err := c.transmissionsCache.ReadAnswer()
 	if err != nil {
 		return configDigest, epoch, round, latestAnswer, latestTimestamp, err
 	}
@@ -46,7 +51,7 @@ func (c *ContractTracker) LatestTransmissionDetails(
 //
 // As an optimization, this function may also return zero values, if no
 // RoundRequested event has been emitted after the latest NewTransmission event.
-func (c *ContractTracker) LatestRoundRequested(
+func (c *MedianContract) LatestRoundRequested(
 	ctx context.Context,
 	lookback time.Duration,
 ) (
@@ -55,6 +60,6 @@ func (c *ContractTracker) LatestRoundRequested(
 	round uint8,
 	err error,
 ) {
-	state, err := c.ReadState()
+	state, err := c.stateCache.ReadState()
 	return state.Config.LatestConfigDigest, 0, 0, err
 }

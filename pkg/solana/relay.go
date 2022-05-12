@@ -28,6 +28,8 @@ type TxManager interface {
 	Enqueue(accountID string, msg *solana.Transaction) error
 }
 
+var _ relaytypes.Relayer = &Relayer{}
+
 type Relayer struct {
 	lggr     logger.Logger
 	chainSet ChainSet
@@ -72,9 +74,19 @@ func (r *Relayer) Healthy() error {
 	return r.chainSet.Healthy()
 }
 
-var _ relaytypes.RelayerCtx = &Relayer{}
+func (r *Relayer) NewConfigWatcher(args relaytypes.ConfigWatcherArgs) (relaytypes.ConfigWatcher, error) {
+	return newConfigWatcher(r.ctx, r.lggr, r.chainSet, args)
+}
 
-func (r *Relayer) NewMedianProvider(args relaytypes.OCR2Args) (relaytypes.MedianProvider, error) {
+type configWatcher struct {
+	chainID                            string
+	programID, storeProgramID, stateID solana.PublicKey
+	stateCache                         StateCache
+	offchainConfigDigester             types.OffchainConfigDigester
+	configTracker                      types.ContractConfigTracker
+}
+
+func newConfigWatcher(ctx context.Context, lggr logger.Logger, chainSet ChainSet, args relaytypes.ConfigWatcherArgs) (*configWatcher, error) {
 	relayConfigBytes, err := json.Marshal(args.RelayConfig)
 	if err != nil {
 		return nil, err
@@ -92,33 +104,15 @@ func (r *Relayer) NewMedianProvider(args relaytypes.OCR2Args) (relaytypes.Median
 	if err != nil {
 		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.OCR2ProgramID")
 	}
-
 	storeProgramID, err := solana.PublicKeyFromBase58(relayConfig.StoreProgramID)
 	if err != nil {
 		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.StateID")
-	}
-
-	transmissionsID, err := solana.PublicKeyFromBase58(relayConfig.TransmissionsID)
-	if err != nil {
-		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.TransmissionsID")
-	}
-
-	var transmissionSigner TransmissionSigner
-	if !args.IsBootstrap {
-		if !args.TransmitterID.Valid {
-			return nil, errors.New("transmitterID is required for non-bootstrap jobs")
-		}
-		transmissionSigner, err = r.ks.Get(args.TransmitterID.String)
-		if err != nil {
-			return nil, err
-		}
 	}
 	offchainConfigDigester := OffchainConfigDigester{
 		ProgramID: programID,
 		StateID:   stateID,
 	}
-
-	chain, err := r.chainSet.Chain(r.ctx, relayConfig.ChainID)
+	chain, err := chainSet.Chain(ctx, relayConfig.ChainID)
 	if err != nil {
 		return nil, errors.Wrap(err, "error in NewOCR2Provider.chainSet.Chain")
 	}
@@ -126,63 +120,97 @@ func (r *Relayer) NewMedianProvider(args relaytypes.OCR2Args) (relaytypes.Median
 	if err != nil {
 		return nil, errors.Wrap(err, "error in NewOCR2Provider.chain.Reader")
 	}
-	msgEnqueuer := chain.TxManager()
-	cfg := chain.Config()
-
-	// provide contract config + tracker reader + tx manager + signer + logger
-	contractTracker := NewTracker(programID, stateID, storeProgramID, transmissionsID, cfg, chainReader, msgEnqueuer, transmissionSigner, r.lggr)
-
-	if args.IsBootstrap {
-		// Return early if bootstrap node (doesn't require the full OCR2 provider)
-		return &medianProvider{
-			offchainConfigDigester: offchainConfigDigester,
-			tracker:                &contractTracker,
-		}, nil
-	}
-
-	reportCodec := ReportCodec{}
-
-	return &medianProvider{
+	stateCache := NewStateCache(programID, stateID, storeProgramID, chain.Config(), chainReader, lggr)
+	return &configWatcher{
+		chainID:                relayConfig.ChainID,
+		stateID:                stateID,
+		programID:              programID,
+		storeProgramID:         storeProgramID,
+		stateCache:             stateCache,
 		offchainConfigDigester: offchainConfigDigester,
-		reportCodec:            reportCodec,
-		tracker:                &contractTracker,
+		configTracker:          &ConfigTracker{stateCache: stateCache, reader: chainReader},
+	}, nil
+
+}
+
+func (c configWatcher) Start(ctx context.Context) error {
+	return c.stateCache.Start()
+}
+
+func (c configWatcher) Close() error {
+	return c.stateCache.Close()
+}
+
+func (c configWatcher) Ready() error {
+	return nil
+}
+
+func (c configWatcher) Healthy() error {
+	return nil
+}
+
+func (c configWatcher) OffchainConfigDigester() types.OffchainConfigDigester {
+	return c.offchainConfigDigester
+}
+
+func (c configWatcher) ContractConfigTracker() types.ContractConfigTracker {
+	return c.configTracker
+}
+
+func (r *Relayer) NewMedianProvider(args relaytypes.PluginArgs) (relaytypes.MedianProvider, error) {
+	configWatcher, err := newConfigWatcher(r.ctx, r.lggr, r.chainSet, args.ConfigWatcherArgs)
+	if err != nil {
+		return nil, err
+	}
+	transmissionsID, err := solana.PublicKeyFromBase58(args.TransmitterID)
+	if err != nil {
+		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.TransmissionsID")
+	}
+	transmissionSigner, err := r.ks.Get(transmissionsID.String())
+	if err != nil {
+		return nil, err
+	}
+	chain, err := r.chainSet.Chain(r.ctx, configWatcher.chainID)
+	if err != nil {
+		return nil, errors.Wrap(err, "error in NewOCR2Provider.chainSet.Chain")
+	}
+	chainReader, err := chain.Reader()
+	if err != nil {
+		return nil, errors.Wrap(err, "error in NewOCR2Provider.chain.Reader")
+	}
+	cfg := chain.Config()
+	stateCache := NewStateCache(configWatcher.programID, configWatcher.stateID, configWatcher.storeProgramID, cfg, chainReader, r.lggr)
+	transmissionsCache := NewTransmissionsCache(configWatcher.programID, configWatcher.stateID, configWatcher.storeProgramID, transmissionsID, cfg, chainReader, chain.TxManager(), transmissionSigner, r.lggr)
+	return &medianProvider{
+		configWatcher: configWatcher,
+		reportCodec:   ReportCodec{},
+		contract: &MedianContract{
+			stateCache:         stateCache,
+			transmissionsCache: transmissionsCache,
+		},
+		transmitter: &Transmitter{
+			stateID:            configWatcher.stateID,
+			programID:          configWatcher.stateID,
+			storeProgramID:     configWatcher.stateID,
+			transmissionsID:    configWatcher.stateID,
+			transmissionSigner: transmissionSigner,
+			reader:             chainReader,
+			stateCache:         stateCache,
+			lggr:               r.lggr,
+			txManager:          chain.TxManager(),
+		},
 	}, nil
 }
 
 type medianProvider struct {
-	offchainConfigDigester OffchainConfigDigester
-	reportCodec            ReportCodec
-	tracker                *ContractTracker
-}
-
-// Start starts OCR2Provider respecting the given context.
-func (p *medianProvider) Start(context.Context) error {
-	return p.tracker.Start()
-}
-
-func (p *medianProvider) Close() error {
-	return p.tracker.Close()
-}
-
-func (p medianProvider) Ready() error {
-	// always ready
-	return p.tracker.Ready()
-}
-
-func (p medianProvider) Healthy() error {
-	return p.tracker.Healthy()
+	*configWatcher
+	reportCodec median.ReportCodec
+	contract    median.MedianContract
+	transmitter types.ContractTransmitter
 }
 
 func (p medianProvider) ContractTransmitter() types.ContractTransmitter {
-	return p.tracker
-}
-
-func (p medianProvider) ContractConfigTracker() types.ContractConfigTracker {
-	return p.tracker
-}
-
-func (p medianProvider) OffchainConfigDigester() types.OffchainConfigDigester {
-	return p.offchainConfigDigester
+	return p.transmitter
 }
 
 func (p medianProvider) ReportCodec() median.ReportCodec {
@@ -190,5 +218,5 @@ func (p medianProvider) ReportCodec() median.ReportCodec {
 }
 
 func (p medianProvider) MedianContract() median.MedianContract {
-	return p.tracker
+	return p.contract
 }

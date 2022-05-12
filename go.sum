@@ -1130,11 +1130,9 @@ github.com/shurcooL/sanitized_anchor_name v1.0.0/go.mod h1:1NzhyTcUVG4SuEtjjoZeV
 github.com/sirupsen/logrus v1.2.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPxbbu5VWo=
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=
 github.com/sirupsen/logrus v1.6.0/go.mod h1:7uNnSEd1DgxDLC74fIahvMZmmYsHGZGEOFrfsX/uA88=
-github.com/smartcontractkit/chainlink v1.4.1-0.20220512162144-b9662b3b52c3 h1:p7ulHbsSqbMLaGAnAKmbUdQ10xUztKOYUK/Vt/0Q16s=
-github.com/smartcontractkit/chainlink v1.4.1-0.20220512162144-b9662b3b52c3/go.mod h1:VfGJfeTYxfrnMtjUKE9C4Cdt4g/g7VOEGjGjI7E0FQI=
 github.com/smartcontractkit/chainlink-relay v0.0.0-20220422131434-0cef40354ecc h1:l4ZG9sm4Udlruzxyl/Cc4lm4oPOacQ5hzaIX8jzi0fY=
 github.com/smartcontractkit/chainlink-relay v0.0.0-20220422131434-0cef40354ecc/go.mod h1:/6gP9XHTQEBeBnXtC9oF1VelYhPMtGDu+6LxLtFP01g=
-github.com/smartcontractkit/chainlink-terra v0.1.4-0.20220510145600-e520ea1fab70 h1:kORA1+5/a003DOB5H/08JYsbZUWkbGl8O668L6ONqtQ=
+github.com/smartcontractkit/chainlink-terra v0.1.4-0.20220512162831-a1ad6679f984 h1:yQA9KD2lvsCGjWbepkr+FPGl2faeBanRYsVJuSmeuJo=
 github.com/smartcontractkit/libocr v0.0.0-20220414173908-cdfa6bef133a h1:j5v0DlqdteLKgCB7My1On+KOO4levVV51byFGt3DoNA=
 github.com/smartcontractkit/libocr v0.0.0-20220414173908-cdfa6bef133a/go.mod h1:tHNcoCeQdbRfjvVZjvd3n8yNTKUdnM+NmlWgSHhfceY=
 github.com/smartcontractkit/sqlx v1.3.5-0.20210805004948-4be295aacbeb h1:OMaBUb4X9IFPLbGbCHsMU+kw/BPCrewaVwWGIBc0I4A=
