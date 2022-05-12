@@ -5,7 +5,9 @@ import (
 	"sync"
 	"time"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink/core/utils"
 
@@ -136,4 +138,76 @@ func (c *TransmissionsCache) fetchLatestTransmission(ctx context.Context) error 
 	c.answer = answer
 	c.ansTime = time.Now()
 	return nil
+}
+
+func GetLatestTransmission(ctx context.Context, reader client.AccountReader, account solana.PublicKey, commitment rpc.CommitmentType) (Answer, uint64, error) {
+	// query for transmission header
+	headerStart := AccountDiscriminatorLen // skip account discriminator
+	headerLen := TransmissionsHeaderLen
+	res, err := reader.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
+		Encoding:   "base64",
+		Commitment: commitment,
+		DataSlice: &rpc.DataSlice{
+			Offset: &headerStart,
+			Length: &headerLen,
+		},
+	})
+	if err != nil {
+		return Answer{}, 0, errors.Wrap(err, "error on rpc.GetAccountInfo [cursor]")
+	}
+
+	// check for nil pointers
+	if res == nil || res.Value == nil || res.Value.Data == nil {
+		return Answer{}, 0, errors.New("nil pointer returned in GetLatestTransmission.GetAccountInfoWithOpts.Header")
+	}
+
+	// parse header
+	var header TransmissionsHeader
+	if err = bin.NewBinDecoder(res.Value.Data.GetBinary()).Decode(&header); err != nil {
+		return Answer{}, 0, errors.Wrap(err, "failed to decode transmission account header")
+	}
+
+	if header.Version != 2 {
+		return Answer{}, 0, errors.Wrapf(err, "can't parse feed version %v", header.Version)
+	}
+
+	cursor := header.LiveCursor
+	liveLength := header.LiveLength
+
+	if cursor == 0 { // handle array wrap
+		cursor = liveLength
+	}
+	cursor-- // cursor indicates index for new answer, latest answer is in previous index
+
+	// setup transmissionLen
+	transmissionLen := TransmissionLen
+
+	transmissionOffset := AccountDiscriminatorLen + TransmissionsHeaderMaxSize + (uint64(cursor) * transmissionLen)
+
+	res, err = reader.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
+		Encoding:   "base64",
+		Commitment: commitment,
+		DataSlice: &rpc.DataSlice{
+			Offset: &transmissionOffset,
+			Length: &transmissionLen,
+		},
+	})
+	if err != nil {
+		return Answer{}, 0, errors.Wrap(err, "error on rpc.GetAccountInfo [transmission]")
+	}
+	// check for nil pointers
+	if res == nil || res.Value == nil || res.Value.Data == nil {
+		return Answer{}, 0, errors.New("nil pointer returned in GetLatestTransmission.GetAccountInfoWithOpts.Transmission")
+	}
+
+	// parse tranmission
+	var t Transmission
+	if err := bin.NewBinDecoder(res.Value.Data.GetBinary()).Decode(&t); err != nil {
+		return Answer{}, 0, errors.Wrap(err, "failed to decode transmission")
+	}
+
+	return Answer{
+		Data:      t.Answer.BigInt(),
+		Timestamp: t.Timestamp,
+	}, res.RPCContext.Context.Slot, nil
 }

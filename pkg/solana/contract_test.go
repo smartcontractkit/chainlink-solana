@@ -16,13 +16,14 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 )
 
 var mockTransmission = []byte{
@@ -171,14 +172,14 @@ func TestStatePolling(t *testing.T) {
 	}))
 
 	lggr := logger.TestLogger(t)
-	tracker := ContractTracker{
-		StateID:         solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
-		TransmissionsID: solana.MustPublicKeyFromBase58("11111111111111111111111111111112"),
-		cfg:             config.NewConfig(db.ChainCfg{}, lggr),
-		reader:          testSetupReader(t, mockServer.URL),
-		lggr:            lggr,
-		stateLock:       &sync.RWMutex{},
-		ansLock:         &sync.RWMutex{},
+	tracker := StateCache{
+		StateID: solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
+		//TransmissionsID: solana.MustPublicKeyFromBase58("11111111111111111111111111111112"),
+		cfg:       config.NewConfig(db.ChainCfg{}, lggr),
+		reader:    testSetupReader(t, mockServer.URL),
+		lggr:      lggr,
+		stateLock: &sync.RWMutex{},
+		//ansLock:         &sync.RWMutex{},
 	}
 	require.NoError(t, tracker.Start())
 	require.Error(t, tracker.Start()) // test startOnce
@@ -187,8 +188,20 @@ func TestStatePolling(t *testing.T) {
 	require.Error(t, tracker.Close())                                           // test StopOnce
 	mockServer.Close()                                                          // close server once tracker is stopped
 	assert.GreaterOrEqual(t, callsPerSecond*int(wait.Seconds()), int(i.Load())) // expect minimum number of calls
+	tc := TransmissionsCache{
+		StateID:         solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
+		TransmissionsID: solana.MustPublicKeyFromBase58("11111111111111111111111111111112"),
+		cfg:             config.NewConfig(db.ChainCfg{}, lggr),
+		reader:          testSetupReader(t, mockServer.URL),
+		lggr:            lggr,
+	}
+	require.NoError(t, tracker.Start())
+	require.Error(t, tracker.Start()) // test startOnce
+	time.Sleep(wait)
+	require.NoError(t, tracker.Close())
+	require.Error(t, tracker.Close()) // test StopOnce
 
-	answer, err := tracker.ReadAnswer()
+	answer, err := tc.ReadAnswer()
 	assert.NoError(t, err)
 	assert.Equal(t, expectedTime, answer.Timestamp)
 	assert.Equal(t, expectedAns, answer.Data.String())
