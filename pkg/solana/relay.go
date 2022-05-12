@@ -2,15 +2,16 @@ package solana
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/pkg/errors"
-	uuid "github.com/satori/go.uuid"
-
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
+	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/solkey"
 	relaytypes "github.com/smartcontractkit/chainlink/core/services/relay/types"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 )
 
 type TransmissionSigner interface {
@@ -18,39 +19,30 @@ type TransmissionSigner interface {
 	PublicKey() solana.PublicKey
 }
 
-type TxManager interface {
-	Enqueue(accountID string, msg *solana.Transaction) error
+// TODO: Goes away with solana txm
+type KeyStore interface {
+	Get(id string) (solkey.Key, error)
 }
 
-type OCR2Spec struct {
-	ID          int32
-	IsBootstrap bool
-
-	// network data
-	ChainID string
-
-	// on-chain program + 2x state accounts (state + transmissions) + store program
-	ProgramID       solana.PublicKey
-	StateID         solana.PublicKey
-	StoreProgramID  solana.PublicKey
-	TransmissionsID solana.PublicKey
-
-	TransmissionSigner TransmissionSigner
+type TxManager interface {
+	Enqueue(accountID string, msg *solana.Transaction) error
 }
 
 type Relayer struct {
 	lggr     logger.Logger
 	chainSet ChainSet
+	ks       KeyStore
 	ctx      context.Context
 	cancel   func()
 }
 
 // Note: constructed in core
-func NewRelayer(lggr logger.Logger, chainSet ChainSet) *Relayer {
+func NewRelayer(lggr logger.Logger, chainSet ChainSet, ks KeyStore) *Relayer {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Relayer{
 		lggr:     lggr,
 		chainSet: chainSet,
+		ks:       ks,
 		ctx:      ctx,
 		cancel:   cancel,
 	}
@@ -80,20 +72,52 @@ func (r *Relayer) Healthy() error {
 	return r.chainSet.Healthy()
 }
 
-// NewOCR2Provider creates a new OCR2ProviderCtx instance.
-func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relaytypes.OCR2ProviderCtx, error) {
-	var provider ocr2Provider
-	spec, ok := s.(OCR2Spec)
-	if !ok {
-		return &provider, errors.New("unsuccessful cast to 'solana.OCR2Spec'")
+var _ relaytypes.RelayerCtx = &Relayer{}
+
+func (r *Relayer) NewMedianProvider(args relaytypes.OCR2Args) (relaytypes.MedianProvider, error) {
+	relayConfigBytes, err := json.Marshal(args.RelayConfig)
+	if err != nil {
+		return nil, err
+	}
+	var relayConfig RelayConfig
+	if err := json.Unmarshal(relayConfigBytes, &relayConfig); err != nil {
+		return nil, err
+	}
+	stateID, err := solana.PublicKeyFromBase58(args.ContractID)
+	if err != nil {
+		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.ContractID")
+	}
+	programID, err := solana.PublicKeyFromBase58(relayConfig.OCR2ProgramID)
+	if err != nil {
+		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.OCR2ProgramID")
 	}
 
+	storeProgramID, err := solana.PublicKeyFromBase58(relayConfig.StoreProgramID)
+	if err != nil {
+		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.StateID")
+	}
+
+	transmissionsID, err := solana.PublicKeyFromBase58(relayConfig.TransmissionsID)
+	if err != nil {
+		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.TransmissionsID")
+	}
+
+	var transmissionSigner TransmissionSigner
+	if !args.IsBootstrap {
+		if !args.TransmitterID.Valid {
+			return nil, errors.New("transmitterID is required for non-bootstrap jobs")
+		}
+		transmissionSigner, err = r.ks.Get(args.TransmitterID.String)
+		if err != nil {
+			return nil, err
+		}
+	}
 	offchainConfigDigester := OffchainConfigDigester{
-		ProgramID: spec.ProgramID,
-		StateID:   spec.StateID,
+		ProgramID: programID,
+		StateID:   stateID,
 	}
 
-	chain, err := r.chainSet.Chain(r.ctx, spec.ChainID)
+	chain, err := r.chainSet.Chain(r.ctx, relayConfig.ChainID)
 	if err != nil {
 		return nil, errors.Wrap(err, "error in NewOCR2Provider.chainSet.Chain")
 	}
@@ -105,11 +129,11 @@ func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay
 	cfg := chain.Config()
 
 	// provide contract config + tracker reader + tx manager + signer + logger
-	contractTracker := NewTracker(spec, cfg, chainReader, msgEnqueuer, spec.TransmissionSigner, r.lggr)
+	contractTracker := NewTracker(programID, stateID, storeProgramID, transmissionsID, cfg, chainReader, msgEnqueuer, transmissionSigner, r.lggr)
 
-	if spec.IsBootstrap {
+	if args.IsBootstrap {
 		// Return early if bootstrap node (doesn't require the full OCR2 provider)
-		return &ocr2Provider{
+		return &medianProvider{
 			offchainConfigDigester: offchainConfigDigester,
 			tracker:                &contractTracker,
 		}, nil
@@ -117,56 +141,53 @@ func (r *Relayer) NewOCR2Provider(externalJobID uuid.UUID, s interface{}) (relay
 
 	reportCodec := ReportCodec{}
 
-	return &ocr2Provider{
+	return &medianProvider{
 		offchainConfigDigester: offchainConfigDigester,
 		reportCodec:            reportCodec,
 		tracker:                &contractTracker,
 	}, nil
 }
 
-type ocr2Provider struct {
+type medianProvider struct {
 	offchainConfigDigester OffchainConfigDigester
 	reportCodec            ReportCodec
 	tracker                *ContractTracker
 }
 
 // Start starts OCR2Provider respecting the given context.
-func (p *ocr2Provider) Start(context.Context) error {
-	// TODO: start all needed subservices
+func (p *medianProvider) Start(context.Context) error {
 	return p.tracker.Start()
 }
 
-func (p *ocr2Provider) Close() error {
-	// TODO: close all subservices
+func (p *medianProvider) Close() error {
 	return p.tracker.Close()
 }
 
-func (p ocr2Provider) Ready() error {
+func (p medianProvider) Ready() error {
 	// always ready
 	return p.tracker.Ready()
 }
 
-func (p ocr2Provider) Healthy() error {
-	// TODO: only if all subservices are healthy
+func (p medianProvider) Healthy() error {
 	return p.tracker.Healthy()
 }
 
-func (p ocr2Provider) ContractTransmitter() types.ContractTransmitter {
+func (p medianProvider) ContractTransmitter() types.ContractTransmitter {
 	return p.tracker
 }
 
-func (p ocr2Provider) ContractConfigTracker() types.ContractConfigTracker {
+func (p medianProvider) ContractConfigTracker() types.ContractConfigTracker {
 	return p.tracker
 }
 
-func (p ocr2Provider) OffchainConfigDigester() types.OffchainConfigDigester {
+func (p medianProvider) OffchainConfigDigester() types.OffchainConfigDigester {
 	return p.offchainConfigDigester
 }
 
-func (p ocr2Provider) ReportCodec() median.ReportCodec {
+func (p medianProvider) ReportCodec() median.ReportCodec {
 	return p.reportCodec
 }
 
-func (p ocr2Provider) MedianContract() median.MedianContract {
+func (p medianProvider) MedianContract() median.MedianContract {
 	return p.tracker
 }

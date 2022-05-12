@@ -58,12 +58,12 @@ type ContractTracker struct {
 	utils.StartStopOnce
 }
 
-func NewTracker(spec OCR2Spec, cfg config.Config, reader client.Reader, txManager TxManager, transmitter TransmissionSigner, lggr logger.Logger) ContractTracker {
+func NewTracker(programID, stateID, storeProgramID, transmissionsID solana.PublicKey, cfg config.Config, reader client.Reader, txManager TxManager, transmitter TransmissionSigner, lggr logger.Logger) ContractTracker {
 	return ContractTracker{
-		ProgramID:       spec.ProgramID,
-		StateID:         spec.StateID,
-		StoreProgramID:  spec.StoreProgramID,
-		TransmissionsID: spec.TransmissionsID,
+		ProgramID:       programID,
+		StateID:         stateID,
+		StoreProgramID:  storeProgramID,
+		TransmissionsID: transmissionsID,
 		Transmitter:     transmitter,
 		reader:          reader,
 		txManager:       txManager,
