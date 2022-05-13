@@ -24,20 +24,11 @@ type TransmissionsCache struct {
 	StoreProgramID  solana.PublicKey
 
 	// private key for the transmission signing
-	transmitterSet bool
-	Transmitter    TransmissionSigner
+	Transmitter TransmissionSigner
 
-	// tracked contract state
-	//state  State
-	answer Answer
-
-	// read/write mutexes
-	//stateLock *sync.RWMutex
-	ansLock *sync.RWMutex
-
-	// stale state parameters
-	stateTime time.Time
-	ansTime   time.Time
+	ansLock sync.RWMutex
+	answer  Answer
+	ansTime time.Time
 
 	// dependencies
 	reader    client.Reader
@@ -53,8 +44,8 @@ type TransmissionsCache struct {
 	utils.StartStopOnce
 }
 
-func NewTransmissionsCache(programID, stateID, storeProgramID, transmissionsID solana.PublicKey, cfg config.Config, reader client.Reader, txManager TxManager, transmitter TransmissionSigner, lggr logger.Logger) TransmissionsCache {
-	return TransmissionsCache{
+func NewTransmissionsCache(programID, stateID, storeProgramID, transmissionsID solana.PublicKey, cfg config.Config, reader client.Reader, txManager TxManager, transmitter TransmissionSigner, lggr logger.Logger) *TransmissionsCache {
+	return &TransmissionsCache{
 		ProgramID:       programID,
 		StateID:         stateID,
 		StoreProgramID:  storeProgramID,
@@ -64,14 +55,12 @@ func NewTransmissionsCache(programID, stateID, storeProgramID, transmissionsID s
 		txManager:       txManager,
 		lggr:            lggr,
 		cfg:             cfg,
-		//stateLock:       &sync.RWMutex{},
-		ansLock: &sync.RWMutex{},
 	}
 }
 
 // Start polling
 func (c *TransmissionsCache) Start() error {
-	return c.StartOnce("pollState", func() error {
+	return c.StartOnce("pollTransmissions", func() error {
 		c.done = make(chan struct{})
 		ctx, cancel := context.WithCancel(context.Background())
 		c.ctx = ctx
@@ -81,9 +70,18 @@ func (c *TransmissionsCache) Start() error {
 		// Avoids confusing "contract has not been configured" OCR errors.
 		err := c.fetchLatestTransmission(c.ctx)
 		if err != nil {
-			c.lggr.Warnf("error in initial PollState.fetchState %s", err)
+			c.lggr.Warnf("error in initial PollTransmissions %s", err)
 		}
 		go c.PollTransmissions()
+		return nil
+	})
+}
+
+// Close stops the polling
+func (c *TransmissionsCache) Close() error {
+	return c.StopOnce("transmissionCache", func() error {
+		c.cancel()
+		<-c.done
 		return nil
 	})
 }

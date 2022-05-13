@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/solkey"
 	relaytypes "github.com/smartcontractkit/chainlink/core/services/relay/types"
+	"github.com/smartcontractkit/chainlink/core/utils"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
@@ -78,85 +79,6 @@ func (r *Relayer) NewConfigWatcher(args relaytypes.ConfigWatcherArgs) (relaytype
 	return newConfigWatcher(r.ctx, r.lggr, r.chainSet, args)
 }
 
-type configWatcher struct {
-	chainID                            string
-	programID, storeProgramID, stateID solana.PublicKey
-	stateCache                         StateCache
-	offchainConfigDigester             types.OffchainConfigDigester
-	configTracker                      types.ContractConfigTracker
-}
-
-func newConfigWatcher(ctx context.Context, lggr logger.Logger, chainSet ChainSet, args relaytypes.ConfigWatcherArgs) (*configWatcher, error) {
-	relayConfigBytes, err := json.Marshal(args.RelayConfig)
-	if err != nil {
-		return nil, err
-	}
-	var relayConfig RelayConfig
-	err = json.Unmarshal(relayConfigBytes, &relayConfig)
-	if err != nil {
-		return nil, err
-	}
-	stateID, err := solana.PublicKeyFromBase58(args.ContractID)
-	if err != nil {
-		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.ContractID")
-	}
-	programID, err := solana.PublicKeyFromBase58(relayConfig.OCR2ProgramID)
-	if err != nil {
-		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.OCR2ProgramID")
-	}
-	storeProgramID, err := solana.PublicKeyFromBase58(relayConfig.StoreProgramID)
-	if err != nil {
-		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.StateID")
-	}
-	offchainConfigDigester := OffchainConfigDigester{
-		ProgramID: programID,
-		StateID:   stateID,
-	}
-	chain, err := chainSet.Chain(ctx, relayConfig.ChainID)
-	if err != nil {
-		return nil, errors.Wrap(err, "error in NewOCR2Provider.chainSet.Chain")
-	}
-	chainReader, err := chain.Reader()
-	if err != nil {
-		return nil, errors.Wrap(err, "error in NewOCR2Provider.chain.Reader")
-	}
-	stateCache := NewStateCache(programID, stateID, storeProgramID, chain.Config(), chainReader, lggr)
-	return &configWatcher{
-		chainID:                relayConfig.ChainID,
-		stateID:                stateID,
-		programID:              programID,
-		storeProgramID:         storeProgramID,
-		stateCache:             stateCache,
-		offchainConfigDigester: offchainConfigDigester,
-		configTracker:          &ConfigTracker{stateCache: stateCache, reader: chainReader},
-	}, nil
-
-}
-
-func (c configWatcher) Start(ctx context.Context) error {
-	return c.stateCache.Start()
-}
-
-func (c configWatcher) Close() error {
-	return c.stateCache.Close()
-}
-
-func (c configWatcher) Ready() error {
-	return nil
-}
-
-func (c configWatcher) Healthy() error {
-	return nil
-}
-
-func (c configWatcher) OffchainConfigDigester() types.OffchainConfigDigester {
-	return c.offchainConfigDigester
-}
-
-func (c configWatcher) ContractConfigTracker() types.ContractConfigTracker {
-	return c.configTracker
-}
-
 func (r *Relayer) NewMedianProvider(args relaytypes.PluginArgs) (relaytypes.MedianProvider, error) {
 	configWatcher, err := newConfigWatcher(r.ctx, r.lggr, r.chainSet, args.ConfigWatcherArgs)
 	if err != nil {
@@ -202,6 +124,73 @@ func (r *Relayer) NewMedianProvider(args relaytypes.PluginArgs) (relaytypes.Medi
 	}, nil
 }
 
+type configWatcher struct {
+	utils.StartStopOnce
+	chainID                            string
+	programID, storeProgramID, stateID solana.PublicKey
+	stateCache                         *StateCache
+	offchainConfigDigester             types.OffchainConfigDigester
+	configTracker                      types.ContractConfigTracker
+}
+
+func newConfigWatcher(ctx context.Context, lggr logger.Logger, chainSet ChainSet, args relaytypes.ConfigWatcherArgs) (*configWatcher, error) {
+	var relayConfig RelayConfig
+	err := json.Unmarshal(args.RelayConfig, &relayConfig)
+	if err != nil {
+		return nil, err
+	}
+	stateID, err := solana.PublicKeyFromBase58(args.ContractID)
+	if err != nil {
+		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.ContractID")
+	}
+	programID, err := solana.PublicKeyFromBase58(relayConfig.OCR2ProgramID)
+	if err != nil {
+		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.OCR2ProgramID")
+	}
+	storeProgramID, err := solana.PublicKeyFromBase58(relayConfig.StoreProgramID)
+	if err != nil {
+		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.StateID")
+	}
+	offchainConfigDigester := OffchainConfigDigester{
+		ProgramID: programID,
+		StateID:   stateID,
+	}
+	chain, err := chainSet.Chain(ctx, relayConfig.ChainID)
+	if err != nil {
+		return nil, errors.Wrap(err, "error in NewOCR2Provider.chainSet.Chain")
+	}
+	chainReader, err := chain.Reader()
+	if err != nil {
+		return nil, errors.Wrap(err, "error in NewOCR2Provider.chain.Reader")
+	}
+	stateCache := NewStateCache(programID, stateID, storeProgramID, chain.Config(), chainReader, lggr)
+	return &configWatcher{
+		chainID:                relayConfig.ChainID,
+		stateID:                stateID,
+		programID:              programID,
+		storeProgramID:         storeProgramID,
+		stateCache:             stateCache,
+		offchainConfigDigester: offchainConfigDigester,
+		configTracker:          &ConfigTracker{stateCache: stateCache, reader: chainReader},
+	}, nil
+}
+
+func (c *configWatcher) Start(ctx context.Context) error {
+	return c.stateCache.Start()
+}
+
+func (c *configWatcher) Close() error {
+	return c.stateCache.Close()
+}
+
+func (c *configWatcher) OffchainConfigDigester() types.OffchainConfigDigester {
+	return c.offchainConfigDigester
+}
+
+func (c *configWatcher) ContractConfigTracker() types.ContractConfigTracker {
+	return c.configTracker
+}
+
 type medianProvider struct {
 	*configWatcher
 	reportCodec median.ReportCodec
@@ -209,14 +198,14 @@ type medianProvider struct {
 	transmitter types.ContractTransmitter
 }
 
-func (p medianProvider) ContractTransmitter() types.ContractTransmitter {
+func (p *medianProvider) ContractTransmitter() types.ContractTransmitter {
 	return p.transmitter
 }
 
-func (p medianProvider) ReportCodec() median.ReportCodec {
+func (p *medianProvider) ReportCodec() median.ReportCodec {
 	return p.reportCodec
 }
 
-func (p medianProvider) MedianContract() median.MedianContract {
+func (p *medianProvider) MedianContract() median.MedianContract {
 	return p.contract
 }

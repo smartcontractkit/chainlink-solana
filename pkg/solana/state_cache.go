@@ -29,7 +29,7 @@ type StateCache struct {
 	StateID        solana.PublicKey
 	StoreProgramID solana.PublicKey
 
-	stateLock *sync.RWMutex
+	stateLock sync.RWMutex
 	state     State
 	stateTime time.Time
 
@@ -44,15 +44,14 @@ type StateCache struct {
 	cancel context.CancelFunc
 }
 
-func NewStateCache(programID, stateID, storeProgramID solana.PublicKey, cfg config.Config, reader client.Reader, lggr logger.Logger) StateCache {
-	return StateCache{
+func NewStateCache(programID, stateID, storeProgramID solana.PublicKey, cfg config.Config, reader client.Reader, lggr logger.Logger) *StateCache {
+	return &StateCache{
 		ProgramID:      programID,
 		StateID:        stateID,
 		StoreProgramID: storeProgramID,
 		reader:         reader,
 		lggr:           lggr,
 		cfg:            cfg,
-		stateLock:      &sync.RWMutex{},
 	}
 }
 

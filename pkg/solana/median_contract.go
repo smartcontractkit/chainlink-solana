@@ -9,8 +9,8 @@ import (
 )
 
 type MedianContract struct {
-	stateCache         StateCache
-	transmissionsCache TransmissionsCache
+	stateCache         *StateCache
+	transmissionsCache *TransmissionsCache
 }
 
 func (c *MedianContract) LatestTransmissionDetails(

@@ -18,7 +18,7 @@ type Transmitter struct {
 	stateID, programID, storeProgramID, transmissionsID solana.PublicKey
 	transmissionSigner                                  TransmissionSigner
 	reader                                              client.Reader
-	stateCache                                          StateCache
+	stateCache                                          *StateCache
 	lggr                                                logger.Logger
 	txManager                                           TxManager
 }

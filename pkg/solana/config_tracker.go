@@ -10,7 +10,7 @@ import (
 )
 
 type ConfigTracker struct {
-	stateCache StateCache
+	stateCache *StateCache
 	reader     client.Reader
 }
 
