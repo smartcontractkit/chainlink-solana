@@ -146,7 +146,7 @@ func TestGetLatestTransmission(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestStatePolling(t *testing.T) {
+func TestCache(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// create response
 		body, err := io.ReadAll(r.Body)
@@ -165,34 +165,34 @@ func TestStatePolling(t *testing.T) {
 	}))
 
 	lggr := logger.TestLogger(t)
-	tracker := StateCache{
+	stateCache := StateCache{
 		StateID: solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
 		cfg:     config.NewConfig(db.ChainCfg{}, lggr),
 		reader:  testSetupReader(t, mockServer.URL),
 		lggr:    lggr,
 	}
-	require.NoError(t, tracker.Start())
-	require.Error(t, tracker.Start()) // test startOnce
-	require.NoError(t, tracker.fetchState(context.Background()))
-	require.NoError(t, tracker.Close())
-	require.Error(t, tracker.Close()) // test StopOnce
-	tc := TransmissionsCache{
+	require.NoError(t, stateCache.Start())
+	require.NoError(t, stateCache.Close())
+	require.NoError(t, stateCache.fetchState(context.Background()))
+	assert.Equal(t, "GADeYvXjPwZP7ds1yDY9VFp12bNjdxT1YyksMvFGK9xn", stateCache.state.Transmissions.String())
+	assert.True(t, !stateCache.stateTime.IsZero())
+
+	transmissionsCache := TransmissionsCache{
 		StateID:         solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
 		TransmissionsID: solana.MustPublicKeyFromBase58("11111111111111111111111111111112"),
 		cfg:             config.NewConfig(db.ChainCfg{}, lggr),
 		reader:          testSetupReader(t, mockServer.URL),
 		lggr:            lggr,
 	}
-	require.Error(t, tc.Start()) // test startOnce
-	require.NoError(t, tc.fetchLatestTransmission(context.Background()))
-	require.NoError(t, tc.Close())
-	require.Error(t, tc.Close()) // test StopOnce
+	require.NoError(t, transmissionsCache.Start())
+	require.NoError(t, transmissionsCache.Close())
 
-	answer, err := tc.ReadAnswer()
+	require.NoError(t, transmissionsCache.fetchLatestTransmission(context.Background()))
+	answer, err := transmissionsCache.ReadAnswer()
 	assert.NoError(t, err)
 	assert.Equal(t, expectedTime, answer.Timestamp)
 	assert.Equal(t, expectedAns, answer.Data.String())
-	mockServer.Close() // close server once tracker is stopped
+	mockServer.Close()
 }
 
 func TestNilPointerHandling(t *testing.T) {
