@@ -10,7 +10,6 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
-	"sync"
 	"testing"
 	"time"
 
@@ -148,15 +147,10 @@ func TestGetLatestTransmission(t *testing.T) {
 }
 
 func TestStatePolling(t *testing.T) {
-	//i := atomic.NewInt32(0)
-	//wait := 5 * time.Second
-	//callsPerSecond := 4 // total number of rpc calls between getState and GetLatestTransmission
-
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// create response
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
-		//i.Inc() // count calls
 
 		// state query
 		if bytes.Contains(body, []byte("11111111111111111111111111111111")) {
@@ -188,7 +182,6 @@ func TestStatePolling(t *testing.T) {
 		cfg:             config.NewConfig(db.ChainCfg{}, lggr),
 		reader:          testSetupReader(t, mockServer.URL),
 		lggr:            lggr,
-		ansLock:         &sync.RWMutex{},
 	}
 	require.Error(t, tc.Start()) // test startOnce
 	require.NoError(t, tc.fetchLatestTransmission(context.Background()))

@@ -94,11 +94,11 @@ func (r *Relayer) NewMedianProvider(args relaytypes.PluginArgs) (relaytypes.Medi
 	}
 	chain, err := r.chainSet.Chain(r.ctx, configWatcher.chainID)
 	if err != nil {
-		return nil, errors.Wrap(err, "error in NewOCR2Provider.chainSet.Chain")
+		return nil, errors.Wrap(err, "error in NewMedianProvider.chainSet.Chain")
 	}
 	chainReader, err := chain.Reader()
 	if err != nil {
-		return nil, errors.Wrap(err, "error in NewOCR2Provider.chain.Reader")
+		return nil, errors.Wrap(err, "error in NewMedianProvider.chain.Reader")
 	}
 	cfg := chain.Config()
 	stateCache := NewStateCache(configWatcher.programID, configWatcher.stateID, configWatcher.storeProgramID, cfg, chainReader, r.lggr)
@@ -123,6 +123,8 @@ func (r *Relayer) NewMedianProvider(args relaytypes.PluginArgs) (relaytypes.Medi
 		},
 	}, nil
 }
+
+var _ relaytypes.ConfigWatcher = &configWatcher{}
 
 type configWatcher struct {
 	utils.StartStopOnce
@@ -157,11 +159,11 @@ func newConfigWatcher(ctx context.Context, lggr logger.Logger, chainSet ChainSet
 	}
 	chain, err := chainSet.Chain(ctx, relayConfig.ChainID)
 	if err != nil {
-		return nil, errors.Wrap(err, "error in NewOCR2Provider.chainSet.Chain")
+		return nil, errors.Wrap(err, "error in NewMedianProvider.chainSet.Chain")
 	}
 	chainReader, err := chain.Reader()
 	if err != nil {
-		return nil, errors.Wrap(err, "error in NewOCR2Provider.chain.Reader")
+		return nil, errors.Wrap(err, "error in NewMedianProvider.chain.Reader")
 	}
 	stateCache := NewStateCache(programID, stateID, storeProgramID, chain.Config(), chainReader, lggr)
 	return &configWatcher{
@@ -190,6 +192,8 @@ func (c *configWatcher) OffchainConfigDigester() types.OffchainConfigDigester {
 func (c *configWatcher) ContractConfigTracker() types.ContractConfigTracker {
 	return c.configTracker
 }
+
+var _ relaytypes.MedianProvider = &medianProvider{}
 
 type medianProvider struct {
 	*configWatcher

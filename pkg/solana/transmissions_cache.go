@@ -86,22 +86,22 @@ func (c *TransmissionsCache) Close() error {
 	})
 }
 
-// PollState contains the transmissions polling implementation
+// PollTransmissions contains the transmissions polling implementation
 func (c *TransmissionsCache) PollTransmissions() {
 	defer close(c.done)
-	c.lggr.Debugf("Starting state polling for state: %s, transmissions: %s", c.StateID, c.TransmissionsID)
+	c.lggr.Debugf("Starting state polling transmissions: %s", c.TransmissionsID)
 	tick := time.After(0)
 	for {
 		select {
 		case <-c.ctx.Done():
-			c.lggr.Debugf("Stopping state polling for state: %s, transmissions: %s", c.StateID, c.TransmissionsID)
+			c.lggr.Debugf("Stopping state polling transmissions: %s", c.TransmissionsID)
 			return
 		case <-tick:
 			// async poll both transmission + ocr2 states
 			start := time.Now()
 			err := c.fetchLatestTransmission(c.ctx)
 			if err != nil {
-				c.lggr.Errorf("error in PollState.fetchLatestTransmission %s", err)
+				c.lggr.Errorf("error in PollTransmissions.fetchLatestTransmission %s", err)
 			}
 			// Note negative duration will be immediately ready
 			tick = time.After(utils.WithJitter(c.cfg.OCR2CachePollPeriod()) - time.Since(start))
