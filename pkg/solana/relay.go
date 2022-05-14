@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 )
 
@@ -92,22 +93,13 @@ func (r *Relayer) NewMedianProvider(args relaytypes.PluginArgs) (relaytypes.Medi
 	if err != nil {
 		return nil, err
 	}
-	chain, err := r.chainSet.Chain(r.ctx, configWatcher.chainID)
-	if err != nil {
-		return nil, errors.Wrap(err, "error in NewMedianProvider.chainSet.Chain")
-	}
-	chainReader, err := chain.Reader()
-	if err != nil {
-		return nil, errors.Wrap(err, "error in NewMedianProvider.chain.Reader")
-	}
-	cfg := chain.Config()
-	stateCache := NewStateCache(configWatcher.programID, configWatcher.stateID, configWatcher.storeProgramID, cfg, chainReader, r.lggr)
-	transmissionsCache := NewTransmissionsCache(configWatcher.programID, configWatcher.stateID, configWatcher.storeProgramID, transmissionsID, cfg, chainReader, chain.TxManager(), transmissionSigner, r.lggr)
+	cfg := configWatcher.chain.Config()
+	transmissionsCache := NewTransmissionsCache(configWatcher.programID, configWatcher.stateID, configWatcher.storeProgramID, transmissionsID, cfg, configWatcher.reader, configWatcher.chain.TxManager(), transmissionSigner, r.lggr)
 	return &medianProvider{
 		configWatcher: configWatcher,
 		reportCodec:   ReportCodec{},
 		contract: &MedianContract{
-			stateCache:         stateCache,
+			stateCache:         configWatcher.stateCache,
 			transmissionsCache: transmissionsCache,
 		},
 		transmitter: &Transmitter{
@@ -116,10 +108,10 @@ func (r *Relayer) NewMedianProvider(args relaytypes.PluginArgs) (relaytypes.Medi
 			storeProgramID:     configWatcher.stateID,
 			transmissionsID:    configWatcher.stateID,
 			transmissionSigner: transmissionSigner,
-			reader:             chainReader,
-			stateCache:         stateCache,
+			reader:             configWatcher.reader,
+			stateCache:         configWatcher.stateCache,
 			lggr:               r.lggr,
-			txManager:          chain.TxManager(),
+			txManager:          configWatcher.chain.TxManager(),
 		},
 	}, nil
 }
@@ -133,6 +125,8 @@ type configWatcher struct {
 	stateCache                         *StateCache
 	offchainConfigDigester             types.OffchainConfigDigester
 	configTracker                      types.ContractConfigTracker
+	chain                              Chain
+	reader                             client.Reader
 }
 
 func newConfigWatcher(ctx context.Context, lggr logger.Logger, chainSet ChainSet, args relaytypes.ConfigWatcherArgs) (*configWatcher, error) {
@@ -161,11 +155,11 @@ func newConfigWatcher(ctx context.Context, lggr logger.Logger, chainSet ChainSet
 	if err != nil {
 		return nil, errors.Wrap(err, "error in NewMedianProvider.chainSet.Chain")
 	}
-	chainReader, err := chain.Reader()
+	reader, err := chain.Reader()
 	if err != nil {
 		return nil, errors.Wrap(err, "error in NewMedianProvider.chain.Reader")
 	}
-	stateCache := NewStateCache(programID, stateID, storeProgramID, chain.Config(), chainReader, lggr)
+	stateCache := NewStateCache(programID, stateID, storeProgramID, chain.Config(), reader, lggr)
 	return &configWatcher{
 		chainID:                relayConfig.ChainID,
 		stateID:                stateID,
@@ -173,7 +167,9 @@ func newConfigWatcher(ctx context.Context, lggr logger.Logger, chainSet ChainSet
 		storeProgramID:         storeProgramID,
 		stateCache:             stateCache,
 		offchainConfigDigester: offchainConfigDigester,
-		configTracker:          &ConfigTracker{stateCache: stateCache, reader: chainReader},
+		configTracker:          &ConfigTracker{stateCache: stateCache, reader: reader},
+		chain:                  chain,
+		reader:                 reader,
 	}, nil
 }
 
