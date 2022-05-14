@@ -174,11 +174,15 @@ func newConfigWatcher(ctx context.Context, lggr logger.Logger, chainSet ChainSet
 }
 
 func (c *configWatcher) Start(ctx context.Context) error {
-	return c.stateCache.Start()
+	return c.StartOnce("SolanaConfigWatcher", func() error {
+		return c.stateCache.Start()
+	})
 }
 
 func (c *configWatcher) Close() error {
-	return c.stateCache.Close()
+	return c.StopOnce("SolanaConfigWatcher", func() error {
+		return c.stateCache.Close()
+	})
 }
 
 func (c *configWatcher) OffchainConfigDigester() types.OffchainConfigDigester {
