@@ -119,16 +119,20 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       // simulating through connection allows to skip signing tx (useful when using Ledger device)
       const { value: simulationResponse } = await this.provider.connection.simulateTransaction(tx)
       if (simulationResponse.err) {
-        const error =
-          typeof simulationResponse.err === 'object'
-            ? new Error(JSON.stringify(simulationResponse.err))
-            : new Error(simulationResponse.err as string)
-        throw error
+        throw new Error(JSON.stringify({ error: simulationResponse.err, logs: simulationResponse.logs }))
       }
       logger.success(`Tx simulation succeeded: ${simulationResponse.unitsConsumed} units consumed.`)
       return simulationResponse.unitsConsumed
     } catch (e) {
-      logger.error(`Tx simulation failed: ${e.message}`)
+      const parsedError = JSON.parse(e.message)
+      const errorCode = parsedError.error.InstructionError ? parsedError.error.InstructionError[1].Custom : -1
+      // Insufficient funds error
+      if (errorCode == 1 && parsedError.logs.includes('Program log: Error: Insufficient funds')) {
+        logger.error('Feed has insufficient funds for transfer')
+        // Other errors
+      } else {
+        logger.error(`Tx simulation failed: ${e.message}`)
+      }
       throw e
     }
   }
