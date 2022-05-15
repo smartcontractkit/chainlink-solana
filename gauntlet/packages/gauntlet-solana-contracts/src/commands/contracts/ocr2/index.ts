@@ -20,6 +20,7 @@ import ProposeOffchainConfig from './proposeOffchainConfig'
 import ProposePayees from './proposePayees'
 import FinalizeProposal from './proposal/finalizeProposal'
 import Close from './close'
+import WithdrawFunds from './withdrawFunds'
 
 const getOwner = async (program, state) => {
   const contractState = await program.account.state.fetch(state)
@@ -47,6 +48,7 @@ export default [
   makeTransferOwnershipCommand(CONTRACT_LIST.OCR_2, getOwner),
   makeInspectOwnershipCommand(CONTRACT_LIST.OCR_2, getOwner),
   makeUpgradeProgramCommand(CONTRACT_LIST.OCR_2),
+  WithdrawFunds,
   // Inspection
   ...Inspection,
   // ONLY DEV
