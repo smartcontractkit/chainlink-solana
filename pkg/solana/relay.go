@@ -76,21 +76,21 @@ func (r *Relayer) Healthy() error {
 	return r.chainSet.Healthy()
 }
 
-func (r *Relayer) NewConfigWatcher(args relaytypes.ConfigWatcherArgs) (relaytypes.ConfigWatcher, error) {
-	configWatcher, err := newConfigWatcher(r.ctx, r.lggr, r.chainSet, args)
+func (r *Relayer) NewConfigProvider(args relaytypes.RelayArgs) (relaytypes.ConfigProvider, error) {
+	configWatcher, err := newConfigProvider(r.ctx, r.lggr, r.chainSet, args)
 	if err != nil {
-		// Never return (*configWatcher)(nil)
+		// Never return (*configProvider)(nil)
 		return nil, err
 	}
 	return configWatcher, err
 }
 
-func (r *Relayer) NewMedianProvider(args relaytypes.PluginArgs) (relaytypes.MedianProvider, error) {
-	configWatcher, err := newConfigWatcher(r.ctx, r.lggr, r.chainSet, args.ConfigWatcherArgs)
+func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MedianProvider, error) {
+	configWatcher, err := newConfigProvider(r.ctx, r.lggr, r.chainSet, rargs)
 	if err != nil {
 		return nil, err
 	}
-	transmissionsID, err := solana.PublicKeyFromBase58(args.TransmitterID)
+	transmissionsID, err := solana.PublicKeyFromBase58(pargs.TransmitterID)
 	if err != nil {
 		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.TransmissionsID")
 	}
@@ -101,8 +101,8 @@ func (r *Relayer) NewMedianProvider(args relaytypes.PluginArgs) (relaytypes.Medi
 	cfg := configWatcher.chain.Config()
 	transmissionsCache := NewTransmissionsCache(configWatcher.programID, configWatcher.stateID, configWatcher.storeProgramID, transmissionsID, cfg, configWatcher.reader, configWatcher.chain.TxManager(), transmissionSigner, r.lggr)
 	return &medianProvider{
-		configWatcher: configWatcher,
-		reportCodec:   ReportCodec{},
+		configProvider: configWatcher,
+		reportCodec:    ReportCodec{},
 		contract: &MedianContract{
 			stateCache:         configWatcher.stateCache,
 			transmissionsCache: transmissionsCache,
@@ -121,9 +121,9 @@ func (r *Relayer) NewMedianProvider(args relaytypes.PluginArgs) (relaytypes.Medi
 	}, nil
 }
 
-var _ relaytypes.ConfigWatcher = &configWatcher{}
+var _ relaytypes.ConfigProvider = &configProvider{}
 
-type configWatcher struct {
+type configProvider struct {
 	utils.StartStopOnce
 	chainID                            string
 	programID, storeProgramID, stateID solana.PublicKey
@@ -134,7 +134,7 @@ type configWatcher struct {
 	reader                             client.Reader
 }
 
-func newConfigWatcher(ctx context.Context, lggr logger.Logger, chainSet ChainSet, args relaytypes.ConfigWatcherArgs) (*configWatcher, error) {
+func newConfigProvider(ctx context.Context, lggr logger.Logger, chainSet ChainSet, args relaytypes.RelayArgs) (*configProvider, error) {
 	var relayConfig RelayConfig
 	err := json.Unmarshal(args.RelayConfig, &relayConfig)
 	if err != nil {
@@ -165,7 +165,7 @@ func newConfigWatcher(ctx context.Context, lggr logger.Logger, chainSet ChainSet
 		return nil, errors.Wrap(err, "error in NewMedianProvider.chain.Reader")
 	}
 	stateCache := NewStateCache(programID, stateID, storeProgramID, chain.Config(), reader, lggr)
-	return &configWatcher{
+	return &configProvider{
 		chainID:                relayConfig.ChainID,
 		stateID:                stateID,
 		programID:              programID,
@@ -178,30 +178,30 @@ func newConfigWatcher(ctx context.Context, lggr logger.Logger, chainSet ChainSet
 	}, nil
 }
 
-func (c *configWatcher) Start(ctx context.Context) error {
-	return c.StartOnce("SolanaConfigWatcher", func() error {
+func (c *configProvider) Start(ctx context.Context) error {
+	return c.StartOnce("SolanaConfigProvider", func() error {
 		return c.stateCache.Start()
 	})
 }
 
-func (c *configWatcher) Close() error {
-	return c.StopOnce("SolanaConfigWatcher", func() error {
+func (c *configProvider) Close() error {
+	return c.StopOnce("SolanaConfigProvider", func() error {
 		return c.stateCache.Close()
 	})
 }
 
-func (c *configWatcher) OffchainConfigDigester() types.OffchainConfigDigester {
+func (c *configProvider) OffchainConfigDigester() types.OffchainConfigDigester {
 	return c.offchainConfigDigester
 }
 
-func (c *configWatcher) ContractConfigTracker() types.ContractConfigTracker {
+func (c *configProvider) ContractConfigTracker() types.ContractConfigTracker {
 	return c.configTracker
 }
 
 var _ relaytypes.MedianProvider = &medianProvider{}
 
 type medianProvider struct {
-	*configWatcher
+	*configProvider
 	reportCodec median.ReportCodec
 	contract    median.MedianContract
 	transmitter types.ContractTransmitter
