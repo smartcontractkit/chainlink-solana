@@ -11,7 +11,8 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.1
 	github.com/smartcontractkit/chainlink v1.4.1-rc1.0.20220512210926-5363811660bf
-	github.com/smartcontractkit/chainlink-relay v0.0.0-20220422131434-0cef40354ecc
+	github.com/satori/go.uuid v1.2.0
+	github.com/smartcontractkit/chainlink-relay v0.0.0-20220516114104-7bb76d12796b
 	github.com/smartcontractkit/libocr v0.0.0-20220414173908-cdfa6bef133a
 	github.com/stretchr/testify v1.7.1
 	go.uber.org/multierr v1.8.0
@@ -26,6 +27,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.1.1 // indirect
 	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
 	github.com/aybabtme/rgbterm v0.0.0-20170906152045-cc83f3b3ce59 // indirect
+	github.com/benbjohnson/clock v1.1.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blendle/zapdriver v1.3.1 // indirect
 	github.com/btcsuite/btcd v0.22.0-beta // indirect
@@ -67,6 +69,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/koron/go-ssdp v0.0.2 // indirect
+	github.com/lib/pq v1.10.5 // indirect
 	github.com/libp2p/go-addr-util v0.0.2 // indirect
 	github.com/libp2p/go-buffer-pool v0.0.2 // indirect
 	github.com/libp2p/go-cidranger v1.1.0 // indirect

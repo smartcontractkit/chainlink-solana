@@ -15,9 +15,10 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -91,7 +92,7 @@ func testTransmissionsResponse(t *testing.T, body []byte, sub uint64) []byte {
 }
 
 func testSetupReader(t *testing.T, endpoint string) client.Reader {
-	lggr := logger.TestLogger(t)
+	lggr := logger.Test(t)
 	cfg := config.NewConfig(db.ChainCfg{}, lggr)
 	client, err := client.NewClient(endpoint, cfg, 1*time.Second, lggr)
 	require.NoError(t, err)
@@ -164,7 +165,7 @@ func TestCache(t *testing.T) {
 		require.NoError(t, err)
 	}))
 
-	lggr := logger.TestLogger(t)
+	lggr := logger.Test(t)
 	stateCache := StateCache{
 		StateID: solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
 		cfg:     config.NewConfig(db.ChainCfg{}, lggr),
