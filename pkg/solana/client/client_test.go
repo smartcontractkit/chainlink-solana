@@ -14,11 +14,13 @@ import (
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
-	"github.com/smartcontractkit/chainlink/core/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 )
 
 func TestClient_Reader_Integration(t *testing.T) {
@@ -29,7 +31,7 @@ func TestClient_Reader_Integration(t *testing.T) {
 	FundTestAccounts(t, []solana.PublicKey{pubKey}, url)
 
 	requestTimeout := 5 * time.Second
-	lggr := logger.TestLogger(t)
+	lggr := logger.Test(t)
 	cfg := config.NewConfig(db.ChainCfg{}, lggr)
 
 	c, err := NewClient(url, cfg, requestTimeout, lggr)
@@ -103,7 +105,7 @@ func TestClient_Reader_ChainID(t *testing.T) {
 	defer mockServer.Close()
 
 	requestTimeout := 5 * time.Second
-	lggr := logger.TestLogger(t)
+	lggr := logger.Test(t)
 	cfg := config.NewConfig(db.ChainCfg{}, lggr)
 	c, err := NewClient(mockServer.URL, cfg, requestTimeout, lggr)
 	require.NoError(t, err)
@@ -124,7 +126,7 @@ func TestClient_Writer_Integration(t *testing.T) {
 	FundTestAccounts(t, []solana.PublicKey{pubKey}, url)
 
 	requestTimeout := 5 * time.Second
-	lggr := logger.TestLogger(t)
+	lggr := logger.Test(t)
 	cfg := config.NewConfig(db.ChainCfg{}, lggr)
 
 	ctx := context.Background()
@@ -210,7 +212,7 @@ func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 
 	// create client
 	requestTimeout := 5 * time.Second
-	lggr := logger.TestLogger(t)
+	lggr := logger.Test(t)
 	cfg := config.NewConfig(db.ChainCfg{}, lggr)
 	c, err := NewClient(url, cfg, requestTimeout, lggr)
 	require.NoError(t, err)

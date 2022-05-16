@@ -5,11 +5,12 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
-	"github.com/smartcontractkit/chainlink/core/logger"
+	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
 	"github.com/smartcontractkit/chainlink/core/store/models"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v4"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 )
 
 // testing configs
@@ -27,7 +28,7 @@ var (
 )
 
 func TestConfig_ExpectedDefaults(t *testing.T) {
-	cfg := NewConfig(db.ChainCfg{}, logger.TestLogger(t))
+	cfg := NewConfig(db.ChainCfg{}, logger.Test(t))
 	configSet := configSet{
 		BalancePollPeriod:   cfg.BalancePollPeriod(),
 		ConfirmPollPeriod:   cfg.ConfirmPollPeriod(),
@@ -56,7 +57,7 @@ func TestConfig_NewConfig(t *testing.T) {
 		Commitment:          null.StringFrom(testCommitment),
 		MaxRetries:          null.IntFrom(testMaxRetries),
 	}
-	cfg := NewConfig(dbCfg, logger.TestLogger(t))
+	cfg := NewConfig(dbCfg, logger.Test(t))
 	assert.Equal(t, testBalancePoll.Duration(), cfg.BalancePollPeriod())
 	assert.Equal(t, testConfirmPeriod.Duration(), cfg.ConfirmPollPeriod())
 	assert.Equal(t, testCachePeriod.Duration(), cfg.OCR2CachePollPeriod())
@@ -70,7 +71,7 @@ func TestConfig_NewConfig(t *testing.T) {
 }
 
 func TestConfig_Update(t *testing.T) {
-	cfg := NewConfig(db.ChainCfg{}, logger.TestLogger(t))
+	cfg := NewConfig(db.ChainCfg{}, logger.Test(t))
 	dbCfg := db.ChainCfg{
 		BalancePollPeriod:   &testBalancePoll,
 		ConfirmPollPeriod:   &testConfirmPeriod,
@@ -97,11 +98,11 @@ func TestConfig_Update(t *testing.T) {
 }
 
 func TestConfig_CommitmentFallback(t *testing.T) {
-	cfg := NewConfig(db.ChainCfg{Commitment: null.StringFrom("invalid")}, logger.TestLogger(t))
+	cfg := NewConfig(db.ChainCfg{Commitment: null.StringFrom("invalid")}, logger.Test(t))
 	assert.Equal(t, rpc.CommitmentConfirmed, cfg.Commitment())
 }
 
 func TestConfig_MaxRetriesNegativeFallback(t *testing.T) {
-	cfg := NewConfig(db.ChainCfg{MaxRetries: null.IntFrom(-100)}, logger.TestLogger(t))
+	cfg := NewConfig(db.ChainCfg{MaxRetries: null.IntFrom(-100)}, logger.Test(t))
 	assert.Nil(t, cfg.MaxRetries())
 }
