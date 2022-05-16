@@ -77,7 +77,12 @@ func (r *Relayer) Healthy() error {
 }
 
 func (r *Relayer) NewConfigWatcher(args relaytypes.ConfigWatcherArgs) (relaytypes.ConfigWatcher, error) {
-	return newConfigWatcher(r.ctx, r.lggr, r.chainSet, args)
+	configWatcher, err := newConfigWatcher(r.ctx, r.lggr, r.chainSet, args)
+	if err != nil {
+		// Never return (*configWatcher)(nil)
+		return nil, err
+	}
+	return configWatcher, err
 }
 
 func (r *Relayer) NewMedianProvider(args relaytypes.PluginArgs) (relaytypes.MedianProvider, error) {

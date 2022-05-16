@@ -23,18 +23,14 @@ type TransmissionsCache struct {
 	TransmissionsID solana.PublicKey
 	StoreProgramID  solana.PublicKey
 
-	// private key for the transmission signing
-	Transmitter TransmissionSigner
-
 	ansLock sync.RWMutex
 	answer  Answer
 	ansTime time.Time
 
 	// dependencies
-	reader    client.Reader
-	txManager TxManager
-	cfg       config.Config
-	lggr      logger.Logger
+	reader client.Reader
+	cfg    config.Config
+	lggr   logger.Logger
 
 	// polling
 	done   chan struct{}
@@ -50,9 +46,7 @@ func NewTransmissionsCache(programID, stateID, storeProgramID, transmissionsID s
 		StateID:         stateID,
 		StoreProgramID:  storeProgramID,
 		TransmissionsID: transmissionsID,
-		Transmitter:     transmitter,
 		reader:          reader,
-		txManager:       txManager,
 		lggr:            lggr,
 		cfg:             cfg,
 	}
