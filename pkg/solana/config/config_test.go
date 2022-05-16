@@ -6,7 +6,7 @@ import (
 
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
-	"github.com/smartcontractkit/chainlink/core/store/models"
+	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v4"
 
@@ -15,17 +15,25 @@ import (
 
 // testing configs
 var (
-	testBalancePoll            = models.MustMakeDuration(1 * time.Minute)
-	testConfirmPeriod          = models.MustMakeDuration(2 * time.Minute)
-	testCachePeriod            = models.MustMakeDuration(3 * time.Minute)
-	testTTL                    = models.MustMakeDuration(4 * time.Minute)
-	testTxTimeout              = models.MustMakeDuration(5 * time.Minute)
-	testTxRetryTimeout         = models.MustMakeDuration(6 * time.Minute)
-	testTxConfirmTimeout       = models.MustMakeDuration(7 * time.Minute)
+	testBalancePoll            = mustDuration(1 * time.Minute)
+	testConfirmPeriod          = mustDuration(2 * time.Minute)
+	testCachePeriod            = mustDuration(3 * time.Minute)
+	testTTL                    = mustDuration(4 * time.Minute)
+	testTxTimeout              = mustDuration(5 * time.Minute)
+	testTxRetryTimeout         = mustDuration(6 * time.Minute)
+	testTxConfirmTimeout       = mustDuration(7 * time.Minute)
 	testPreflight              = false
 	testCommitment             = "finalized"
 	testMaxRetries       int64 = 123
 )
+
+func mustDuration(d time.Duration) utils.Duration {
+	ud, err := utils.NewDuration(d)
+	if err != nil {
+		panic(err)
+	}
+	return ud
+}
 
 func TestConfig_ExpectedDefaults(t *testing.T) {
 	cfg := NewConfig(db.ChainCfg{}, logger.Test(t))

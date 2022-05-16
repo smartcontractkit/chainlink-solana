@@ -3,7 +3,7 @@ package solana
 import (
 	"context"
 
-	"github.com/smartcontractkit/chainlink/core/services"
+	"github.com/smartcontractkit/chainlink-relay/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -11,13 +11,13 @@ import (
 )
 
 type ChainSet interface {
-	services.ServiceCtx
+	types.Service
 	// Chain returns chain for the given id.
 	Chain(ctx context.Context, id string) (Chain, error)
 }
 
 type Chain interface {
-	services.ServiceCtx
+	types.Service
 
 	ID() string
 	Config() config.Config

@@ -8,7 +8,7 @@ import (
 
 	"gopkg.in/guregu/null.v4"
 
-	"github.com/smartcontractkit/chainlink/core/store/models"
+	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
 )
 
 type Chain struct {
@@ -35,13 +35,13 @@ type Node struct {
 }
 
 type ChainCfg struct {
-	BalancePollPeriod   *models.Duration
-	ConfirmPollPeriod   *models.Duration
-	OCR2CachePollPeriod *models.Duration
-	OCR2CacheTTL        *models.Duration
-	TxTimeout           *models.Duration
-	TxRetryTimeout      *models.Duration
-	TxConfirmTimeout    *models.Duration
+	BalancePollPeriod   *utils.Duration
+	ConfirmPollPeriod   *utils.Duration
+	OCR2CachePollPeriod *utils.Duration
+	OCR2CacheTTL        *utils.Duration
+	TxTimeout           *utils.Duration
+	TxRetryTimeout      *utils.Duration
+	TxConfirmTimeout    *utils.Duration
 	SkipPreflight       null.Bool // to enable or disable preflight checks
 	Commitment          null.String
 	MaxRetries          null.Int
