@@ -5,16 +5,23 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 )
 
-func (c *ContractTracker) Notify() <-chan struct{} {
+type ConfigTracker struct {
+	stateCache *StateCache
+	reader     client.Reader
+}
+
+func (c *ConfigTracker) Notify() <-chan struct{} {
 	return nil // not using websocket, config changes will be handled by polling in libocr
 }
 
 // LatestConfigDetails returns information about the latest configuration,
 // but not the configuration itself.
-func (c *ContractTracker) LatestConfigDetails(ctx context.Context) (changedInBlock uint64, configDigest types.ConfigDigest, err error) {
-	state, err := c.ReadState()
+func (c *ConfigTracker) LatestConfigDetails(ctx context.Context) (changedInBlock uint64, configDigest types.ConfigDigest, err error) {
+	state, err := c.stateCache.ReadState()
 	return state.Config.LatestConfigBlockNumber, state.Config.LatestConfigDigest, err
 }
 
@@ -57,8 +64,8 @@ func ConfigFromState(state State) (types.ContractConfig, error) {
 }
 
 // LatestConfig returns the latest configuration.
-func (c *ContractTracker) LatestConfig(ctx context.Context, changedInBlock uint64) (types.ContractConfig, error) {
-	state, err := c.ReadState()
+func (c *ConfigTracker) LatestConfig(ctx context.Context, changedInBlock uint64) (types.ContractConfig, error) {
+	state, err := c.stateCache.ReadState()
 	if err != nil {
 		return types.ContractConfig{}, err
 	}
@@ -66,6 +73,6 @@ func (c *ContractTracker) LatestConfig(ctx context.Context, changedInBlock uint6
 }
 
 // LatestBlockHeight returns the height of the most recent block in the chain.
-func (c *ContractTracker) LatestBlockHeight(ctx context.Context) (blockHeight uint64, err error) {
+func (c *ConfigTracker) LatestBlockHeight(ctx context.Context) (blockHeight uint64, err error) {
 	return c.reader.SlotHeight() // this returns the latest slot height through CommitmentProcessed
 }

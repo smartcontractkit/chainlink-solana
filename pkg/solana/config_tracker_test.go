@@ -18,7 +18,7 @@ func TestLatestBlockHeight(t *testing.T) {
 	defer mockServer.Close()
 
 	ctx := context.Background()
-	c := &ContractTracker{
+	c := &ConfigTracker{
 		reader: testSetupReader(t, mockServer.URL),
 	}
 
