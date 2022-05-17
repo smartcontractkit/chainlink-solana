@@ -3,23 +3,24 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
 	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
-	"github.com/smartcontractkit/chainlink/core/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring"
 )
 
 func main() {
-	coreLog, closeLog := logger.NewLogger()
+	log, err := logger.New()
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer func() {
-		if err := closeLog(); err != nil {
-			log.Println(fmt.Sprintf("Error while closing Logger: %v", err))
+		if serr := log.Sync(); serr != nil {
+			fmt.Println(fmt.Sprintf("Error while closing Logger: %v", serr))
 		}
 	}()
-	log := logWrapper{coreLog}
 
 	chainConfig, err := monitoring.ParseSolanaConfig()
 	if err != nil {
@@ -27,14 +28,15 @@ func main() {
 	}
 
 	client := rpc.New(chainConfig.RPCEndpoint)
+	chainReader := monitoring.NewChainReader(client)
 
 	envelopeSourceFactory := monitoring.NewEnvelopeSourceFactory(
-		client,
-		logWrapper{coreLog.With("component", "source-envelope")},
+		chainReader,
+		logger.With(log, "component", "source-envelope"),
 	)
 	txResultsSourceFactory := monitoring.NewTxResultsSourceFactory(
-		client,
-		logWrapper{coreLog.With("component", "source-txresults")},
+		chainReader,
+		logger.With(log, "component", "source-txresults"),
 	)
 
 	monitor, err := relayMonitoring.NewMonitor(
@@ -52,27 +54,17 @@ func main() {
 	}
 
 	balancesSourceFactory := monitoring.NewBalancesSourceFactory(
-		client,
-		log.With("component", "source-balances"),
+		chainReader,
+		logger.With(log, "component", "source-balances"),
 	)
 	monitor.SourceFactories = append(monitor.SourceFactories, balancesSourceFactory)
 
 	promExporterFactory := monitoring.NewPrometheusExporterFactory(
-		log.With("component", "solana-prom-exporter"),
-		monitoring.NewMetrics(log.With("component", "solana-metrics")),
+		logger.With(log, "component", "solana-prom-exporter"),
+		monitoring.NewMetrics(logger.With(log, "component", "solana-metrics")),
 	)
 	monitor.ExporterFactories = append(monitor.ExporterFactories, promExporterFactory)
 
 	monitor.Run()
 	log.Infow("monitor stopped")
-}
-
-// adapt core logger to monitoring logger.
-
-type logWrapper struct {
-	logger.Logger
-}
-
-func (l logWrapper) With(values ...interface{}) relayMonitoring.Logger {
-	return logWrapper{l.Logger.With(values...)}
 }

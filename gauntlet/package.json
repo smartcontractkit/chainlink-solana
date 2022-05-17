@@ -23,7 +23,7 @@
     "format": "yarn prettier --write .",
     "clean": "tsc -b --clean ./tsconfig.json",
     "build": "yarn clean && tsc -b ./tsconfig.json",
-    "bundle": "yarn build && pkg .",
+    "bundle": "yarn build && pkg . --no-native-build",
     "release": "yarn changeset publish"
   },
   "pkg": {
