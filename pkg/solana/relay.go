@@ -6,9 +6,9 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/solkey"
-	relaytypes "github.com/smartcontractkit/chainlink/core/services/relay/types"
-	"github.com/smartcontractkit/chainlink/core/utils"
+
+	relaytypes "github.com/smartcontractkit/chainlink-relay/pkg/types"
+	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
@@ -16,15 +16,13 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 )
 
-type TransmissionSigner interface {
+type Signer interface {
 	Sign(msg []byte) ([]byte, error)
 	PublicKey() solana.PublicKey
 }
 
 // TODO: Goes away with solana txm
-type KeyStore interface {
-	Get(id string) (solkey.Key, error)
-}
+type SignerProvider func(id string) (Signer, error)
 
 type TxManager interface {
 	Enqueue(accountID string, msg *solana.Transaction) error
@@ -33,22 +31,22 @@ type TxManager interface {
 var _ relaytypes.Relayer = &Relayer{}
 
 type Relayer struct {
-	lggr     logger.Logger
-	chainSet ChainSet
-	ks       KeyStore
-	ctx      context.Context
-	cancel   func()
+	lggr      logger.Logger
+	chainSet  ChainSet
+	getSigner SignerProvider
+	ctx       context.Context
+	cancel    func()
 }
 
 // Note: constructed in core
-func NewRelayer(lggr logger.Logger, chainSet ChainSet, ks KeyStore) *Relayer {
+func NewRelayer(lggr logger.Logger, chainSet ChainSet, getSigner SignerProvider) *Relayer {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Relayer{
-		lggr:     lggr,
-		chainSet: chainSet,
-		ks:       ks,
-		ctx:      ctx,
-		cancel:   cancel,
+		lggr:      lggr,
+		chainSet:  chainSet,
+		getSigner: getSigner,
+		ctx:       ctx,
+		cancel:    cancel,
 	}
 }
 
@@ -94,7 +92,7 @@ func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes
 	if err != nil {
 		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.TransmissionsID")
 	}
-	transmissionSigner, err := r.ks.Get(transmissionsID.String())
+	transmissionSigner, err := r.getSigner(transmissionsID.String())
 	if err != nil {
 		return nil, err
 	}

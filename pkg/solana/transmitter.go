@@ -16,7 +16,7 @@ var _ types.ContractTransmitter = (*Transmitter)(nil)
 
 type Transmitter struct {
 	stateID, programID, storeProgramID, transmissionsID solana.PublicKey
-	transmissionSigner                                  TransmissionSigner
+	transmissionSigner                                  Signer
 	reader                                              client.Reader
 	stateCache                                          *StateCache
 	lggr                                                logger.Logger

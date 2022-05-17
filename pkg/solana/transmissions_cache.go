@@ -9,7 +9,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/chainlink/core/utils"
+
+	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -40,7 +41,7 @@ type TransmissionsCache struct {
 	utils.StartStopOnce
 }
 
-func NewTransmissionsCache(programID, stateID, storeProgramID, transmissionsID solana.PublicKey, cfg config.Config, reader client.Reader, txManager TxManager, transmitter TransmissionSigner, lggr logger.Logger) *TransmissionsCache {
+func NewTransmissionsCache(programID, stateID, storeProgramID, transmissionsID solana.PublicKey, cfg config.Config, reader client.Reader, txManager TxManager, transmitter Signer, lggr logger.Logger) *TransmissionsCache {
 	return &TransmissionsCache{
 		ProgramID:       programID,
 		StateID:         stateID,
