@@ -17,8 +17,8 @@ var defaultConfigSet = configSet{
 	OCR2CachePollPeriod: time.Second,            // cache polling rate
 	OCR2CacheTTL:        time.Minute,            // stale cache deadline
 	TxTimeout:           time.Minute,            // timeout for send tx method in client
-	TxRetryTimeout:      5 * time.Second,        // duration for tx rebroadcasting to RPC node
-	TxConfirmTimeout:    15 * time.Second,       // duration before discarding tx as unconfirmed
+	TxRetryTimeout:      10 * time.Second,       // duration for tx rebroadcasting to RPC node
+	TxConfirmTimeout:    30 * time.Second,       // duration before discarding tx as unconfirmed
 	SkipPreflight:       true,                   // to enable or disable preflight checks
 	Commitment:          rpc.CommitmentConfirmed,
 	MaxRetries:          new(uint), // max number of retries, when nil - rpc node will do a reasonable number of retries
