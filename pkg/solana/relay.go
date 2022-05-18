@@ -16,14 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 )
 
-type Signer interface {
-	Sign(msg []byte) ([]byte, error)
-	PublicKey() solana.PublicKey
-}
-
-// TODO: Goes away with solana txm
-type SignerProvider func(id string) (Signer, error)
-
 type TxManager interface {
 	Enqueue(accountID string, msg *solana.Transaction) error
 }
