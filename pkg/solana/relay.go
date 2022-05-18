@@ -215,18 +215,20 @@ type medianProvider struct {
 	transmitter        types.ContractTransmitter
 }
 
+// start both cache services
 func (p *medianProvider) Start(ctx context.Context) error {
 	return p.StartOnce("SolanaMedianProvider", func() error {
-		if err := p.configProvider.Start(ctx); err != nil {
+		if err := p.configProvider.stateCache.Start(); err != nil {
 			return err
 		}
 		return p.transmissionsCache.Start()
 	})
 }
 
+// close both cache services
 func (p *medianProvider) Close() error {
 	return p.StopOnce("SolanaMedianProvider", func() error {
-		if err := p.configProvider.Close(); err != nil {
+		if err := p.configProvider.stateCache.Close(); err != nil {
 			return err
 		}
 		return p.transmissionsCache.Close()
