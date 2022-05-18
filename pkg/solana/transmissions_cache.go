@@ -19,10 +19,7 @@ import (
 
 type TransmissionsCache struct {
 	// on-chain program + 2x state accounts (state + transmissions)
-	ProgramID       solana.PublicKey
-	StateID         solana.PublicKey
 	TransmissionsID solana.PublicKey
-	StoreProgramID  solana.PublicKey
 
 	ansLock sync.RWMutex
 	answer  Answer
@@ -41,11 +38,8 @@ type TransmissionsCache struct {
 	utils.StartStopOnce
 }
 
-func NewTransmissionsCache(programID, stateID, storeProgramID, transmissionsID solana.PublicKey, cfg config.Config, reader client.Reader, txManager TxManager, transmitter Signer, lggr logger.Logger) *TransmissionsCache {
+func NewTransmissionsCache(transmissionsID solana.PublicKey, cfg config.Config, reader client.Reader, lggr logger.Logger) *TransmissionsCache {
 	return &TransmissionsCache{
-		ProgramID:       programID,
-		StateID:         stateID,
-		StoreProgramID:  storeProgramID,
 		TransmissionsID: transmissionsID,
 		reader:          reader,
 		lggr:            lggr,

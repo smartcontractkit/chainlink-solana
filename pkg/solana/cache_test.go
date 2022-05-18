@@ -179,7 +179,6 @@ func TestCache(t *testing.T) {
 	assert.True(t, !stateCache.stateTime.IsZero())
 
 	transmissionsCache := TransmissionsCache{
-		StateID:         solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
 		TransmissionsID: solana.MustPublicKeyFromBase58("11111111111111111111111111111112"),
 		cfg:             config.NewConfig(db.ChainCfg{}, lggr),
 		reader:          testSetupReader(t, mockServer.URL),

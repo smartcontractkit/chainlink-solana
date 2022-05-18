@@ -31,22 +31,20 @@ type TxManager interface {
 var _ relaytypes.Relayer = &Relayer{}
 
 type Relayer struct {
-	lggr      logger.Logger
-	chainSet  ChainSet
-	getSigner SignerProvider
-	ctx       context.Context
-	cancel    func()
+	lggr     logger.Logger
+	chainSet ChainSet
+	ctx      context.Context
+	cancel   func()
 }
 
 // Note: constructed in core
-func NewRelayer(lggr logger.Logger, chainSet ChainSet, getSigner SignerProvider) *Relayer {
+func NewRelayer(lggr logger.Logger, chainSet ChainSet) *Relayer {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Relayer{
-		lggr:      lggr,
-		chainSet:  chainSet,
-		getSigner: getSigner,
-		ctx:       ctx,
-		cancel:    cancel,
+		lggr:     lggr,
+		chainSet: chainSet,
+		ctx:      ctx,
+		cancel:   cancel,
 	}
 }
 
@@ -88,29 +86,40 @@ func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes
 	if err != nil {
 		return nil, err
 	}
-	transmissionsID, err := solana.PublicKeyFromBase58(pargs.TransmitterID)
+
+	// parse transmitter account
+	transmitterAccount, err := solana.PublicKeyFromBase58(pargs.TransmitterID)
 	if err != nil {
-		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.TransmissionsID")
+		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.PluginArgs.TransmissionsID")
 	}
-	transmissionSigner, err := r.getSigner(transmissionsID.String())
+
+	// parse transmissions state account
+	var relayConfig RelayConfig
+	err = json.Unmarshal(rargs.RelayConfig, &relayConfig)
 	if err != nil {
 		return nil, err
 	}
+	transmissionsID, err := solana.PublicKeyFromBase58(relayConfig.TransmissionsID)
+	if err != nil {
+		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.TransmissionsID")
+	}
+
 	cfg := configWatcher.chain.Config()
-	transmissionsCache := NewTransmissionsCache(configWatcher.programID, configWatcher.stateID, configWatcher.storeProgramID, transmissionsID, cfg, configWatcher.reader, configWatcher.chain.TxManager(), transmissionSigner, r.lggr)
+	transmissionsCache := NewTransmissionsCache(transmissionsID, cfg, configWatcher.reader, r.lggr)
 	return &medianProvider{
-		configProvider: configWatcher,
-		reportCodec:    ReportCodec{},
+		configProvider:     configWatcher,
+		transmissionsCache: transmissionsCache,
+		reportCodec:        ReportCodec{},
 		contract: &MedianContract{
 			stateCache:         configWatcher.stateCache,
 			transmissionsCache: transmissionsCache,
 		},
 		transmitter: &Transmitter{
 			stateID:            configWatcher.stateID,
-			programID:          configWatcher.stateID,
-			storeProgramID:     configWatcher.stateID,
-			transmissionsID:    configWatcher.stateID,
-			transmissionSigner: transmissionSigner,
+			programID:          configWatcher.programID,
+			storeProgramID:     configWatcher.storeProgramID,
+			transmissionsID:    transmissionsID,
+			transmissionSigner: transmitterAccount,
 			reader:             configWatcher.reader,
 			stateCache:         configWatcher.stateCache,
 			lggr:               r.lggr,
@@ -162,7 +171,7 @@ func newConfigProvider(ctx context.Context, lggr logger.Logger, chainSet ChainSe
 	if err != nil {
 		return nil, errors.Wrap(err, "error in NewMedianProvider.chain.Reader")
 	}
-	stateCache := NewStateCache(programID, stateID, storeProgramID, chain.Config(), reader, lggr)
+	stateCache := NewStateCache(stateID, chain.Config(), reader, lggr)
 	return &configProvider{
 		chainID:                relayConfig.ChainID,
 		stateID:                stateID,
@@ -200,9 +209,28 @@ var _ relaytypes.MedianProvider = &medianProvider{}
 
 type medianProvider struct {
 	*configProvider
-	reportCodec median.ReportCodec
-	contract    median.MedianContract
-	transmitter types.ContractTransmitter
+	transmissionsCache *TransmissionsCache
+	reportCodec        median.ReportCodec
+	contract           median.MedianContract
+	transmitter        types.ContractTransmitter
+}
+
+func (p *medianProvider) Start(ctx context.Context) error {
+	return p.StartOnce("SolanaMedianProvider", func() error {
+		if err := p.configProvider.Start(ctx); err != nil {
+			return err
+		}
+		return p.transmissionsCache.Start()
+	})
+}
+
+func (p *medianProvider) Close() error {
+	return p.StopOnce("SolanaMedianProvider", func() error {
+		if err := p.configProvider.Close(); err != nil {
+			return err
+		}
+		return p.transmissionsCache.Close()
+	})
 }
 
 func (p *medianProvider) ContractTransmitter() types.ContractTransmitter {
