@@ -45,10 +45,10 @@ type StateCache struct {
 
 func NewStateCache(stateID solana.PublicKey, cfg config.Config, reader client.Reader, lggr logger.Logger) *StateCache {
 	return &StateCache{
-		StateID:        stateID,
-		reader:         reader,
-		lggr:           lggr,
-		cfg:            cfg,
+		StateID: stateID,
+		reader:  reader,
+		lggr:    lggr,
+		cfg:     cfg,
 	}
 }
 
