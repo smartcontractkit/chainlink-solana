@@ -1,11 +1,13 @@
 package solclient
 
 import (
+	"github.com/smartcontractkit/chainlink-testing-framework/config"
 	"github.com/smartcontractkit/helmenv/environment"
 )
 
 // NewChainlinkSolOCRv2 returns a cluster config with Solana test validator
 func NewChainlinkSolOCRv2(nodes int, stateful bool) *environment.Config {
+	config.ChainlinkVals()
 	env := &environment.Config{
 		NamespacePrefix: "chainlink-sol",
 		Charts: environment.Charts{
@@ -24,8 +26,8 @@ func NewChainlinkSolOCRv2(nodes int, stateful bool) *environment.Config {
 					"replicas": nodes,
 					"chainlink": map[string]interface{}{
 						"image": map[string]interface{}{
-							"image":   "public.ecr.aws/z0b1w9r9/chainlink",
-							"version": "develop",
+							"image":   config.ProjectFrameworkSettings.ChainlinkImage,
+							"version": config.ProjectFrameworkSettings.ChainlinkVersion,
 						},
 					},
 					"env": map[string]interface{}{
