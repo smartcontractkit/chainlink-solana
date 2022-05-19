@@ -15,12 +15,11 @@ import (
 var _ types.ContractTransmitter = (*Transmitter)(nil)
 
 type Transmitter struct {
-	stateID, programID, storeProgramID, transmissionsID solana.PublicKey
-	transmissionSigner                                  Signer
-	reader                                              client.Reader
-	stateCache                                          *StateCache
-	lggr                                                logger.Logger
-	txManager                                           TxManager
+	stateID, programID, storeProgramID, transmissionsID, transmissionSigner solana.PublicKey
+	reader                                                                  client.Reader
+	stateCache                                                              *StateCache
+	lggr                                                                    logger.Logger
+	txManager                                                               TxManager
 }
 
 // Transmit sends the report to the on-chain OCR2Aggregator smart contract's Transmit method
@@ -45,13 +44,10 @@ func (c *Transmitter) Transmit(
 		return errors.Wrap(err, "error on Transmit.FindProgramAddress")
 	}
 
-	if _, err = c.stateCache.ReadState(); err != nil {
-		return errors.Wrap(err, "error on Transmit.ReadState")
-	}
 	accounts := []*solana.AccountMeta{
 		// state, transmitter, transmissions, store_program, store, store_authority
 		{PublicKey: c.stateID, IsWritable: true, IsSigner: false},
-		{PublicKey: c.transmissionSigner.PublicKey(), IsWritable: false, IsSigner: true},
+		{PublicKey: c.transmissionSigner, IsWritable: false, IsSigner: true},
 		{PublicKey: c.transmissionsID, IsWritable: true, IsSigner: false},
 		{PublicKey: c.storeProgramID, IsWritable: false, IsSigner: false},
 		{PublicKey: storeAuthority, IsWritable: false, IsSigner: false},
@@ -76,23 +72,11 @@ func (c *Transmitter) Transmit(
 			solana.NewInstruction(c.programID, accounts, data.Bytes()),
 		},
 		blockhash.Value.Blockhash,
-		solana.TransactionPayer(c.transmissionSigner.PublicKey()),
+		solana.TransactionPayer(c.transmissionSigner),
 	)
 	if err != nil {
 		return errors.Wrap(err, "error on Transmit.NewTransaction")
 	}
-
-	msgToSign, err := tx.Message.MarshalBinary()
-	if err != nil {
-		return errors.Wrap(err, "error on Transmit.Message.MarshalBinary")
-	}
-	finalSigBytes, err := c.transmissionSigner.Sign(msgToSign)
-	if err != nil {
-		return errors.Wrap(err, "error on Transmit.Sign")
-	}
-	var finalSig [64]byte
-	copy(finalSig[:], finalSigBytes)
-	tx.Signatures = append(tx.Signatures, finalSig)
 
 	// pass transmit payload to tx manager queue
 	c.lggr.Debugf("Queuing transmit tx: state (%s) + transmissions (%s)", c.stateID.String(), c.transmissionsID.String())
@@ -112,5 +96,5 @@ func (c *Transmitter) LatestConfigDigestAndEpoch(
 }
 
 func (c *Transmitter) FromAccount() types.Account {
-	return types.Account(c.transmissionSigner.PublicKey().String())
+	return types.Account(c.transmissionSigner.String())
 }

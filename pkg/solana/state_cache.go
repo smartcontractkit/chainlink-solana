@@ -26,9 +26,7 @@ var (
 type StateCache struct {
 	utils.StartStopOnce
 	// on-chain program + 2x state accounts (state + transmissions)
-	ProgramID      solana.PublicKey
-	StateID        solana.PublicKey
-	StoreProgramID solana.PublicKey
+	StateID solana.PublicKey
 
 	stateLock sync.RWMutex
 	state     State
@@ -45,14 +43,12 @@ type StateCache struct {
 	cancel context.CancelFunc
 }
 
-func NewStateCache(programID, stateID, storeProgramID solana.PublicKey, cfg config.Config, reader client.Reader, lggr logger.Logger) *StateCache {
+func NewStateCache(stateID solana.PublicKey, cfg config.Config, reader client.Reader, lggr logger.Logger) *StateCache {
 	return &StateCache{
-		ProgramID:      programID,
-		StateID:        stateID,
-		StoreProgramID: storeProgramID,
-		reader:         reader,
-		lggr:           lggr,
-		cfg:            cfg,
+		StateID: stateID,
+		reader:  reader,
+		lggr:    lggr,
+		cfg:     cfg,
 	}
 }
 
