@@ -36,6 +36,7 @@ func NewChainlinkSolOCRv2(nodes int, stateful bool) *environment.Config {
 						"EVM_RPC_ENABLED":             "false",
 						"CHAINLINK_DEV":               "false",
 						"FEATURE_OFFCHAIN_REPORTING2": "true",
+						"feature_offchain_reporting":  "false",
 						"P2P_NETWORKING_STACK":        "V2",
 						"P2PV2_LISTEN_ADDRESSES":      "0.0.0.0:6690",
 						"P2PV2_DELTA_DIAL":            "5s",
