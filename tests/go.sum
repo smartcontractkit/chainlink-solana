@@ -1261,8 +1261,8 @@ github.com/sirupsen/logrus v1.8.1 h1:dJKuHgqk1NNQlqoA6BTlM1Wf9DOH3NBjQyu0h9+AZZE
 github.com/sirupsen/logrus v1.8.1/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
 github.com/slack-go/slack v0.10.2 h1:KMN/h2sgUninHXvQI8PrR/PHBUuWp2NPvz2Kr66tki4=
 github.com/slack-go/slack v0.10.2/go.mod h1:5FLdBRv7VW/d9EBxx/eEktOptWygbA9K2QK/KW7ds1s=
-github.com/smartcontractkit/chainlink-relay v0.0.0-20220516224734-c4759cac049a h1:E8wPIW80TOk3AcjJBvzL1ckJ1Byp6pYJ8/NU5P3mias=
-github.com/smartcontractkit/chainlink-relay v0.0.0-20220516224734-c4759cac049a/go.mod h1:iQnEkkbWn1mhF3X6qdh8Lgl5emLsJzwxFGd1C7xCcaM=
+github.com/smartcontractkit/chainlink-relay v0.1.0 h1:uMgHh3GzGpnFAahde1PW2AKmBxXqN8vVFcJo3m2A/Ac=
+github.com/smartcontractkit/chainlink-relay v0.1.0/go.mod h1:iQnEkkbWn1mhF3X6qdh8Lgl5emLsJzwxFGd1C7xCcaM=
 github.com/smartcontractkit/chainlink-testing-framework v1.1.19-0.20220509150418-cfc7513b9506 h1:hmk7V2XgBEepZKqlbKowhxIZvLGHij8bijOOzrs1vN0=
 github.com/smartcontractkit/chainlink-testing-framework v1.1.19-0.20220509150418-cfc7513b9506/go.mod h1:Squ1stWJdnlxS74X6ie2ucPGp0tjSwW1lxscUdoDTLI=
 github.com/smartcontractkit/helmenv v1.0.68 h1:lDsgD3RIVE4FDkJBluFF90NbAiYsX+EDzPkCKlmWhNQ=
