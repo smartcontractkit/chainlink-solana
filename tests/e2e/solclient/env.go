@@ -26,8 +26,8 @@ func NewChainlinkSolOCRv2(nodes int, stateful bool) *environment.Config {
 					"replicas": nodes,
 					"chainlink": map[string]interface{}{
 						"image": map[string]interface{}{
-							"image":   config.ProjectFrameworkSettings.ChainlinkImage,
-							"version": config.ProjectFrameworkSettings.ChainlinkVersion,
+							"image":   config.ProjectConfig.FrameworkConfig.ChainlinkImage,
+							"version": config.ProjectConfig.FrameworkConfig.ChainlinkVersion,
 						},
 					},
 					"env": map[string]interface{}{
