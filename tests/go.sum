@@ -899,6 +899,10 @@ github.com/smartcontractkit/chainlink-relay v0.1.0 h1:uMgHh3GzGpnFAahde1PW2AKmBx
 github.com/smartcontractkit/chainlink-relay v0.1.0/go.mod h1:iQnEkkbWn1mhF3X6qdh8Lgl5emLsJzwxFGd1C7xCcaM=
 github.com/smartcontractkit/chainlink-testing-framework v1.2.5-0.20220525185348-60420e40b745 h1:p/1dOa5UoFFnonsYEKqD/hbVVTsgaAmI83SXH16PHFU=
 github.com/smartcontractkit/chainlink-testing-framework v1.2.5-0.20220525185348-60420e40b745/go.mod h1:piESTIOlUWHyux8/g+Y5c8zKbbqZXbRecpKOS+XRU/I=
+github.com/smartcontractkit/chainlink-testing-framework v1.2.5-0.20220530124839-ce641ae5d667 h1:fdRyYgeEL+s+uqasPN3xIXk82iH+t9zinKNefC5x/k0=
+github.com/smartcontractkit/chainlink-testing-framework v1.2.5-0.20220530124839-ce641ae5d667/go.mod h1:piESTIOlUWHyux8/g+Y5c8zKbbqZXbRecpKOS+XRU/I=
+github.com/smartcontractkit/chainlink-testing-framework v1.2.5-0.20220530125243-164797d0e11c h1:43v/dKTS1s331BRH8ejjk/F1Czixz4jf1ZrZHGjIgc4=
+github.com/smartcontractkit/chainlink-testing-framework v1.2.5-0.20220530125243-164797d0e11c/go.mod h1:piESTIOlUWHyux8/g+Y5c8zKbbqZXbRecpKOS+XRU/I=
 github.com/smartcontractkit/helmenv v1.2.2 h1:jP6dHikMXEg90h4PiH1o3DxrC9YncRnXpEx2NFL9FF4=
 github.com/smartcontractkit/helmenv v1.2.2/go.mod h1:hZDi/s7pBOdkdTQRh9X3tiQy1IYF7t/0mYd8gaFWNqE=
 github.com/smartcontractkit/libocr v0.0.0-20220512162406-9e4afd8896f3 h1:SpaPYF6Yf/9D4Ilj6S9Yti5kMMe86xlliWQpGwaAFok=

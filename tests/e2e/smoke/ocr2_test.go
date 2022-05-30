@@ -1,6 +1,7 @@
 package smoke
 
 import (
+	"github.com/smartcontractkit/chainlink-testing-framework/actions"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/utils"
@@ -8,7 +9,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/common"
-	"github.com/smartcontractkit/chainlink-testing-framework/actions"
 )
 
 var _ = Describe("Solana OCRv2", func() {
