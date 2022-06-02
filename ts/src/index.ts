@@ -23,7 +23,7 @@ export class OCR2Feed {
 
   constructor(
     readonly aggregatorProgram: anchor.Program,
-    readonly provider: anchor.Provider
+    readonly provider: anchor.AnchorProvider
   ) {
     this._parser = new anchor.EventParser(
       aggregatorProgram.programId,
@@ -33,7 +33,7 @@ export class OCR2Feed {
 
   static async load(
     programID: PublicKey = CHAINLINK_AGGREGATOR_PROGRAM_ID,
-    provider: anchor.Provider = anchor.getProvider()
+    provider: anchor.AnchorProvider = anchor.AnchorProvider.env()
   ): Promise<OCR2Feed> {
     const aggregatorProgram = await anchor.Program.at(programID, provider);
     return new OCR2Feed(aggregatorProgram, provider);
