@@ -23,12 +23,6 @@ on:
         default: develop
         type: string
     secrets:
-      QA_AWS_ACCESS_KEY_ID:
-        required: true
-        description: The AWS access key id to use
-      QA_AWS_SECRET_KEY:
-        required: true
-        description: The AWS secret key to use
       QA_AWS_REGION:
         required: true
         description: The AWS region to use
@@ -83,8 +77,6 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.QA_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.QA_AWS_SECRET_KEY }}
           aws-region: ${{ secrets.QA_AWS_REGION }}
           role-to-assume: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           role-duration-seconds: 3600
