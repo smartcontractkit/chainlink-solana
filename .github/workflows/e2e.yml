@@ -27,6 +27,16 @@ on:
         description: The GITHUB_TOKEN for the workflow
         default: ${{ github.token }}
         type: string
+    secrets:
+      QA_AWS_REGION:
+        required: true
+        description: AWS Region where K8s cluster is located
+      QA_AWS_ROLE_TO_ASSUME:
+        required: true
+        description: AWS Role to access K8s cluster
+      QA_KUBECONFIG:
+        required: true
+        description: KUBECONFIG for cluster
 
 jobs:
   e2e_build_contracts:
