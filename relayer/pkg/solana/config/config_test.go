@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v4"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
+	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/db"
 )
 
 // testing configs

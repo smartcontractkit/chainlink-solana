@@ -1,4 +1,4 @@
-# gauntlet-solana
+# solana-gauntlet
 
 ### Prepare
 

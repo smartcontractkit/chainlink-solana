@@ -3,7 +3,7 @@ name: Solana Gauntlet CLI Release
 on:
   push:
     tags:
-      - "@chainlink/solana-gauntlet-cli@[0-9]+.[0-9]+.[0-9]"
+      - "@chainlink/solana-gauntlet-contracts@[0-9]+.[0-9]+.[0-9]"
 
 jobs:
   solana-gauntlet-cli-release:
@@ -39,7 +39,7 @@ jobs:
           nix develop -c yarn bundle
       # Store gauntlet-cli version
       - name: Set Env Variables
-        run: echo "SOLANA_GAUNTLET_CLI=$(npm info @chainlink/gauntlet-solana-contracts version)" >> $GITHUB_ENV
+        run: echo "SOLANA_GAUNTLET_CLI=$(npm info @chainlink/solana-gauntlet-contracts version)" >> $GITHUB_ENV
       # Upload gauntlet binary to gauntlet-cli release
       - name: Upload Gauntlet Binary
         uses: svenstaro/upload-release-action@v2
@@ -48,5 +48,5 @@ jobs:
           file: gauntlet/bin/gauntlet-*
           file_glob: true
           tag: |
-            @chainlink/gauntlet-solana-contracts@${{ env.solana_GAUNTLET_CLI }}
+            @chainlink/solana-gauntlet-contracts@${{ env.solana_GAUNTLET_CLI }}
           overwrite: false

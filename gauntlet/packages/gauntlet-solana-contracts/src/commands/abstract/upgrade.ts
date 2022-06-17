@@ -1,6 +1,6 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse, utils } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse, utils } from '@chainlink/solana-gauntlet'
 import {
   AccountMeta,
   PublicKey,

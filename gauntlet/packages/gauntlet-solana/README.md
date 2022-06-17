@@ -1,1 +1,1 @@
-# Gauntlet Solana
+# Solana Gauntlet

@@ -7,7 +7,7 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
-	pkgsolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
+	pkgsolana "github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana"
 
 	rpc "github.com/gagliardetto/solana-go/rpc"
 

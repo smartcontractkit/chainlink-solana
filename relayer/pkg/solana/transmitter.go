@@ -8,8 +8,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
+	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/logger"
 )
 
 var _ types.ContractTransmitter = (*Transmitter)(nil)

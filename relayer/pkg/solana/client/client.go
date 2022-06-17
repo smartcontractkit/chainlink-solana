@@ -8,8 +8,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
+	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/logger"
 	"golang.org/x/sync/singleflight"
 )
 

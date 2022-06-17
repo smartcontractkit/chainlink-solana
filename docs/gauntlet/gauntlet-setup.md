@@ -1,4 +1,4 @@
-# Gauntlet Solana
+# Solana Gauntlet
 
 Install node version with asdf. Which can be done by running this from the base of the chainlink-solana repository:
 

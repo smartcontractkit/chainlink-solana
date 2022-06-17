@@ -7,9 +7,9 @@ Chainlink-Solana contains a number of projects, all individually versioned and r
 - [@chainlink/solana-relayer](/relayer/)
 - [@chainlink/solana-ops](/ops/)
 - [@chainlink/solana-integration-tests](/tests/)
-- [@chainlink/gauntlet-solana](/gauntlet/packages/gauntlet-solana/)
+- [@chainlink/solana-gauntlet](/gauntlet/packages/gauntlet-solana/)
 - [@chainlink/gauntlet-serum-multisig](/gauntlet/packages/gauntlet-serum-multisig/)
-- [@chainlink/gauntlet-solana-contracts](/gauntlet/packages/gauntlet-solana-contracts/)
+- [@chainlink/solana-gauntlet-contracts](/gauntlet/packages/gauntlet-solana-contracts/)
 - [@chainlink/solana-sdk](/ts/)
 - [@chainlink/solana-contracts](/contracts/)
 

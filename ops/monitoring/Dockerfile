@@ -9,9 +9,9 @@ RUN apt-get update && apt-get install -y wget gcc
 
 RUN mkdir -p /solana-monitoring/cmd
 COPY ./cmd/monitoring /solana-monitoring/cmd/monitoring
-COPY ./pkg /solana-monitoring/pkg
-COPY ./go.mod /solana-monitoring/
-COPY ./go.sum /solana-monitoring/
+COPY ./relayer/pkg /solana-monitoring/pkg
+COPY ./relayer/go.mod /solana-monitoring/
+COPY ./relayer/go.sum /solana-monitoring/
 
 # Install golang
 

@@ -19,8 +19,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
+	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/db"
 )
 
 func TestClient_Reader_Integration(t *testing.T) {

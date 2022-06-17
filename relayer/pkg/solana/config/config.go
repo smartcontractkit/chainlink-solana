@@ -6,8 +6,8 @@ import (
 
 	"github.com/gagliardetto/solana-go/rpc"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
+	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/db"
+	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/logger"
 )
 
 // Global solana defaults.

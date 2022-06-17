@@ -5,9 +5,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-relay/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
+	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/db"
 )
 
 type ChainSet interface {

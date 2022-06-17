@@ -12,9 +12,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
+	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/logger"
 )
 
 type TransmissionsCache struct {
