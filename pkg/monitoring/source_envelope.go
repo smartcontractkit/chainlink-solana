@@ -7,8 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/event"
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"go.uber.org/multierr"
@@ -70,13 +72,12 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 		// extra
 		BlockNumber:       blockNum,
 		Transmitter:       types.Account(state.Config.LatestTransmitter.String()),
-		JuelsPerFeeCoin:   big.NewInt(0), // TODO (dru)
 		AggregatorRoundID: state.Config.LatestAggregatorRoundID,
 	}
 	var envelopeErr error
 	envelopeMu := &sync.Mutex{}
 	wg := &sync.WaitGroup{}
-	wg.Add(2)
+	wg.Add(3)
 	go func() {
 		defer wg.Done()
 		answer, _, transmissionErr := s.client.GetLatestTransmission(ctx, state.Transmissions, rpc.CommitmentConfirmed)
@@ -109,6 +110,17 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 		}
 		envelope.LinkBalance = linkBalance
 	}()
+	go func() {
+		defer wg.Done()
+		juelsPerLamport, juelsErr := s.getJuelsPerLamport(ctx)
+		envelopeMu.Lock()
+		defer envelopeMu.Unlock()
+		if juelsErr != nil {
+			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("Failed to fetch Juels/FeeCoin: %w", juelsErr))
+			return
+		}
+		envelope.JuelsPerFeeCoin = juelsPerLamport
+	}()
 	wg.Wait()
 	if envelopeErr != nil {
 		return nil, envelopeErr
@@ -119,6 +131,51 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 	}
 	envelope.LinkAvailableForPayment = linkAvailableForPayment
 	return envelope, nil
+}
+
+func (s *envelopeSource) getJuelsPerLamport(ctx context.Context) (*big.Int, error) {
+	txSigsPageSize := 30
+	txSigs, err := s.client.GetSignaturesForAddressWithOpts(
+		ctx,
+		s.feedConfig.StateAccount,
+		&rpc.GetSignaturesForAddressOpts{
+			Commitment: rpc.CommitmentConfirmed,
+			Limit:      &txSigsPageSize, // we only need the last tx
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch tx signatures for state account '%s': %w", s.feedConfig.StateAccountBase58, err)
+	}
+	if len(txSigs) == 0 {
+		return nil, fmt.Errorf("found no transactions from state account '%s'", s.feedConfig.StateAccountBase58)
+	}
+	for _, txSig := range txSigs {
+		if txSig.Err != nil {
+			continue
+		}
+		txRes, err := s.client.GetTransaction(
+			ctx,
+			txSig.Signature,
+			&rpc.GetTransactionOpts{
+				Commitment: rpc.CommitmentConfirmed,
+				Encoding:   solana.EncodingBase64,
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch tx with signature %s: %w", txSig.Signature, err)
+		}
+		events := event.ExtractEvents(txRes.Meta.LogMessages, s.feedConfig.ContractAddressBase58)
+		for _, rawEvent := range events {
+			decodedEvent, err := event.Decode(rawEvent)
+			if err != nil {
+				return nil, fmt.Errorf("failed decode events '%s' from tx with signature '%s': %w", rawEvent, txSigs[0].Signature, err)
+			}
+			if newTransmission, isNewTransmission := decodedEvent.(event.NewTransmission); isNewTransmission {
+				return new(big.Int).SetUint64(newTransmission.JuelsPerLamport), nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("no NewTransmission event found in the last %d transactions on contract state '%s'", txSigsPageSize, s.feedConfig.StateAccountBase58)
 }
 
 // Helpers
