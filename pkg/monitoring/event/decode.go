@@ -7,9 +7,9 @@ import (
 	"regexp"
 )
 
-var programInvocation = regexp.MustCompile("^Program\\s([a-zA-Z0-9]+)?\\sinvoke\\s\\[\\d\\]$")
-var programFinished = regexp.MustCompile("^Program\\s([a-zA-Z0-9]+)?\\s(?:success|error)$")
-var programLogEvent = regexp.MustCompile("^Program\\s(?:log|data):\\s([+/0-9A-Za-z]+={0,2})?$")
+var programInvocation = regexp.MustCompile(`^Program\s([a-zA-Z0-9]+)?\sinvoke\s\[\d\]$`)
+var programFinished = regexp.MustCompile(`^Program\s([a-zA-Z0-9]+)?\s(?:success|error)$`)
+var programLogEvent = regexp.MustCompile(`^Program\s(?:log|data):\s([+/0-9A-Za-z]+={0,2})?$`)
 
 func ExtractEvents(logs []string, programIDBase58 string) []string {
 	invocationStack := []string{}
@@ -20,9 +20,7 @@ func ExtractEvents(logs []string, programIDBase58 string) []string {
 			invocationStack = append(invocationStack, invokedProgramID)
 		} else if matches := programFinished.FindStringSubmatch(log); matches != nil {
 			finishedProgramID := matches[1]
-			if invocationStack[len(invocationStack)-1] != finishedProgramID {
-				// Oh noes!
-			} else {
+			if invocationStack[len(invocationStack)-1] == finishedProgramID {
 				invocationStack = invocationStack[:len(invocationStack)-1]
 			}
 		} else if matches := programLogEvent.FindStringSubmatch(log); matches != nil {

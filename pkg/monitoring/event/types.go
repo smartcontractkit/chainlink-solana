@@ -2,7 +2,6 @@ package event
 
 import (
 	"crypto/sha256"
-	"fmt"
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
@@ -16,16 +15,16 @@ var (
 )
 
 func init() {
-	sumSetConfig := sha256.Sum256([]byte(fmt.Sprintf("event:SetConfig")))
+	sumSetConfig := sha256.Sum256([]byte("event:SetConfig"))
 	SetConfigDiscriminator = sumSetConfig[:8]
 
-	sumSetBilling := sha256.Sum256([]byte(fmt.Sprintf("event:SetBilling")))
+	sumSetBilling := sha256.Sum256([]byte("event:SetBilling"))
 	SetBillingDiscriminator = sumSetBilling[:8]
 
-	sumRoundRequested := sha256.Sum256([]byte(fmt.Sprintf("event:RoundRequested")))
+	sumRoundRequested := sha256.Sum256([]byte("event:RoundRequested"))
 	RoundRequestedDiscriminator = sumRoundRequested[:8]
 
-	sumNewTransmission := sha256.Sum256([]byte(fmt.Sprintf("event:NewTransmission")))
+	sumNewTransmission := sha256.Sum256([]byte("event:NewTransmission"))
 	NewTransmissionDiscriminator = sumNewTransmission[:8]
 }
 
