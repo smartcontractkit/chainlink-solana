@@ -1,14 +1,12 @@
 package solana
 
 import (
-	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"math/big"
 	"sort"
 
 	"github.com/smartcontractkit/libocr/bigbigendian"
-	"github.com/smartcontractkit/libocr/offchainreporting2/chains/evmutil"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
@@ -95,21 +93,4 @@ func (c ReportCodec) MedianFromReport(report types.Report) (*big.Int, error) {
 
 func (c ReportCodec) MaxReportLength(n int) int {
 	return int(ReportLen)
-}
-
-// Create report digest using SHA256 hash fn
-func HashReport(ctx types.ReportContext, r types.Report) ([]byte, error) {
-	rawCtx := RawReportContext(ctx)
-	buf := sha256.New()
-	for _, v := range [][]byte{r[:], rawCtx[0][:], rawCtx[1][:], rawCtx[2][:]} {
-		if _, err := buf.Write(v); err != nil {
-			return []byte{}, err
-		}
-	}
-
-	return buf.Sum(nil), nil
-}
-
-func RawReportContext(ctx types.ReportContext) [3][32]byte {
-	return evmutil.RawReportContext(ctx)
 }
