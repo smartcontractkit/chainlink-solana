@@ -2,16 +2,17 @@
 #
 # All configuration can be set at runtime with environment variables, for example:
 # KEEP_ENVIRONMENTS=OnFail
-keep_environments: Never # Options: Always, OnFail, Never
+keep_environments: Always # Options: Always, OnFail, Never
 logging:
-  write_pod_logs: OnFail # Options: Always, OnFail
-  # panic=5, fatal=4, error=3, warn=2, info=1, debug=0, trace=-1
-  level: 0
+    write_pod_logs: Always # Options: Always, OnFail
+    # panic=5, fatal=4, error=3, warn=2, info=1, debug=0, trace=-1
+    level: 0
 
 # Specify the image and version of the chainlink image you want to run tests against. Leave blank for default.
 chainlink_image: public.ecr.aws/chainlink/chainlink
-chainlink_version: 1.4.1-root
+chainlink_version: 1.5.0-root
 chainlink_env_values:
+    http_server_write_timeout: "6m"
 
 # Setting an environment file allows for persistent, not ephemeral environments on test execution
 #

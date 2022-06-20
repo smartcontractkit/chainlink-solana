@@ -21,7 +21,7 @@ var _ = Describe("Solana OCRv2 soak test @ocr2-soak", func() {
 	})
 	Describe("with Solana", func() {
 		It("performs OCR rounds", func() {
-			state.ValidateRoundsAfter(time.Now(), common.NewSoakRoundsCheckTimeout, 200)
+			state.ValidateRoundsAfter(time.Now(), common.NewSoakRoundsCheckTimeout, 8000)
 		})
 	})
 	AfterEach(func() {
