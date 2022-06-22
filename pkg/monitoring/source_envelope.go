@@ -164,6 +164,9 @@ func (s *envelopeSource) getJuelsPerLamport(ctx context.Context) (*big.Int, erro
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch tx with signature %s: %w", txSig.Signature, err)
 		}
+		if txRes == nil {
+			return nil, fmt.Errorf("no transaction returned for signature %s", txSig.Signature)
+		}
 		events := event.ExtractEvents(txRes.Meta.LogMessages, s.feedConfig.ContractAddressBase58)
 		for _, rawEvent := range events {
 			decodedEvent, err := event.Decode(rawEvent)
