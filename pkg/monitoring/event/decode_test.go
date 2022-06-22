@@ -101,6 +101,16 @@ func TestExtractEvents(t *testing.T) {
 			"Program STGhiM1ZaLjDLZDGcVFp3ppdetggLAs6MXezw5DXXH3 consumed 181832 of 200000 compute units",
 			"Program STGhiM1ZaLjDLZDGcVFp3ppdetggLAs6MXezw5DXXH3 success",
 		},
+		{
+			"Program STGhiM1ZaLjDLZDGcVFp3ppdetggLAs6MXezw5DXXH3 invoke [1]",
+			"Program data: gjbLTR5rT6j9IRcAAAM0cArd3JbxinfsblA0z3qwRRlKQpralO0xSE8aPrh4zfUFAAAAAAAAAAAAAAAADW77smIPAwkHCgQPBgAMCw4BBQ0CAAAAAMxmujUBAAAAfWUAAAAAAAA=",
+			"Program HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny invoke [2]",
+			"Program log: Instruction: Submit",
+			"Program HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny consumed 3461 of 1212284 compute units",
+			"Program HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny success",
+			"Program STGhiM1ZaLjDLZDGcVFp3ppdetggLAs6MXezw5DXXH3 consumed 191737 of 1400000 compute units",
+			"Program STGhiM1ZaLjDLZDGcVFp3ppdetggLAs6MXezw5DXXH3 success",
+		},
 	}
 	expectedEvents := [][]string{
 		{"gjbLTR5rT6iaSQcAAAMQumV5CqMwMWjU5bBudJS4G7Kr1YGm1javi5Tpf4Y3dOLMJAAAAAAAAAAAAAAAAigtRmIQCAEOCQ8EBgcFAwoLDA0CAAAAAADKmjsAAAAAiBMAAAAAAAA="},
@@ -112,6 +122,7 @@ func TestExtractEvents(t *testing.T) {
 		{"gjbLTR5rT6iwQwcAAAM6wHcIzwrEysN7tds4vrXRJIBZlnB3bbc/91U47g03dOLMJAAAAAAAAAAAAAAACBQtRmIQCAEOCQ8EBgcFAwoLDA0CAAAAAADKmjsAAAAAiBMAAAAAAAA="},
 		{"gjbLTR5rT6iUSQcAAAMQumV5CqMwMWjU5bBudJS4G7Kr1YGm1javi5Tpf4Y3dOLMJAAAAAAAAAAAAAAAAhYtRmIQCAEOCQ8EBgcFAwoLDA0CAAAAAADKmjsAAAAAiBMAAAAAAAA="},
 		{"gjbLTR5rT6iqQwcAAANy+x/LIETrs7naC0mc49puOD3+fSA+Mmunk2j5gKg3dOLMJAAAAAAAAAAAAAAAChgtRmIQCAEOCQ8EBgcFAwoLDA0CAAAAAADKmjsAAAAAiBMAAAAAAAA="},
+		{"gjbLTR5rT6j9IRcAAAM0cArd3JbxinfsblA0z3qwRRlKQpralO0xSE8aPrh4zfUFAAAAAAAAAAAAAAAADW77smIPAwkHCgQPBgAMCw4BBQ0CAAAAAMxmujUBAAAAfWUAAAAAAAA="},
 	}
 	for i, logs := range groupsOfLogs {
 		actualEvents := ExtractEvents(logs, programIDBase58)
