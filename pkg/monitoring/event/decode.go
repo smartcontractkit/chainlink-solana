@@ -2,6 +2,7 @@ package event
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"regexp"
@@ -82,4 +83,9 @@ func DecodeMultiple(base64EncodedEvents []string) ([]interface{}, error) {
 		events = append(events, event)
 	}
 	return events, nil
+}
+
+func getDiscriminator(prefix string) []byte {
+	hash := sha256.Sum256([]byte(prefix))
+	return hash[:8]
 }

@@ -1,32 +1,16 @@
 package event
 
 import (
-	"crypto/sha256"
-
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 )
 
 var (
-	SetConfigDiscriminator       []byte
-	SetBillingDiscriminator      []byte
-	RoundRequestedDiscriminator  []byte
-	NewTransmissionDiscriminator []byte
+	SetConfigDiscriminator       = getDiscriminator("event:SetConfig")
+	SetBillingDiscriminator      = getDiscriminator("event:SetBilling")
+	RoundRequestedDiscriminator  = getDiscriminator("event:RoundRequested")
+	NewTransmissionDiscriminator = getDiscriminator("event:NewTransmission")
 )
-
-func init() {
-	sumSetConfig := sha256.Sum256([]byte("event:SetConfig"))
-	SetConfigDiscriminator = sumSetConfig[:8]
-
-	sumSetBilling := sha256.Sum256([]byte("event:SetBilling"))
-	SetBillingDiscriminator = sumSetBilling[:8]
-
-	sumRoundRequested := sha256.Sum256([]byte("event:RoundRequested"))
-	RoundRequestedDiscriminator = sumRoundRequested[:8]
-
-	sumNewTransmission := sha256.Sum256([]byte("event:NewTransmission"))
-	NewTransmissionDiscriminator = sumNewTransmission[:8]
-}
 
 type SetConfig struct {
 	ConfigDigest [32]uint8   `json:"config_digest,omitempty"`
