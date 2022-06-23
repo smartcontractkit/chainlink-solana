@@ -13,12 +13,39 @@ func NewChainlinkSolOCRv2(nodes int, stateful bool) *environment.Config {
 		Charts: environment.Charts{
 			"solana-validator": {
 				Index: 1,
+				Values: map[string]interface{}{
+					"nodeSelector": map[string]interface{}{"node-role": "foundations"},
+					"tolerations": []map[string]interface{}{{
+						"key":      "node-role",
+						"operator": "Equal",
+						"value":    "foundations",
+						"effect":   "NoSchedule",
+					}},
+				},
 			},
 			"mockserver-config": {
 				Index: 2,
+				Values: map[string]interface{}{
+					"nodeSelector": map[string]interface{}{"node-role": "foundations"},
+					"tolerations": []map[string]interface{}{{
+						"key":      "node-role",
+						"operator": "Equal",
+						"value":    "foundations",
+						"effect":   "NoSchedule",
+					}},
+				},
 			},
 			"mockserver": {
 				Index: 3,
+				Values: map[string]interface{}{
+					"nodeSelector": map[string]interface{}{"node-role": "foundations"},
+					"tolerations": []map[string]interface{}{{
+						"key":      "node-role",
+						"operator": "Equal",
+						"value":    "foundations",
+						"effect":   "NoSchedule",
+					}},
+				},
 			},
 			"chainlink": {
 				Index: 4,
@@ -53,6 +80,13 @@ func NewChainlinkSolOCRv2(nodes int, stateful bool) *environment.Config {
 						"P2PV2_DELTA_RECONCILE":       "5s",
 						"p2p_listen_port":             "0",
 					},
+					"nodeSelector": map[string]interface{}{"node-role": "foundations"},
+					"tolerations": []map[string]interface{}{{
+						"key":      "node-role",
+						"operator": "Equal",
+						"value":    "foundations",
+						"effect":   "NoSchedule",
+					}},
 				},
 			},
 		},
