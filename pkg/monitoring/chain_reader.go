@@ -15,6 +15,7 @@ type ChainReader interface {
 	GetTokenAccountBalance(ctx context.Context, account solana.PublicKey, commitment rpc.CommitmentType) (out *rpc.GetTokenAccountBalanceResult, err error)
 	GetBalance(ctx context.Context, account solana.PublicKey, commitment rpc.CommitmentType) (out *rpc.GetBalanceResult, err error)
 	GetSignaturesForAddressWithOpts(ctx context.Context, account solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts) (out []*rpc.TransactionSignature, err error)
+	GetTransaction(ctx context.Context, txSig solana.Signature, opts *rpc.GetTransactionOpts) (out *rpc.GetTransactionResult, err error)
 }
 
 func NewChainReader(client *rpc.Client) ChainReader {
@@ -43,4 +44,8 @@ func (c *chainReader) GetBalance(ctx context.Context, account solana.PublicKey, 
 
 func (c *chainReader) GetSignaturesForAddressWithOpts(ctx context.Context, account solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts) (out []*rpc.TransactionSignature, err error) {
 	return c.client.GetSignaturesForAddressWithOpts(ctx, account, opts)
+}
+
+func (c *chainReader) GetTransaction(ctx context.Context, txSig solana.Signature, opts *rpc.GetTransactionOpts) (out *rpc.GetTransactionResult, err error) {
+	return c.client.GetTransaction(ctx, txSig, opts)
 }

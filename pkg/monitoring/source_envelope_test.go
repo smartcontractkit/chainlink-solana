@@ -90,6 +90,25 @@ var (
 		Data:      big.NewInt(51268930158),
 		Timestamp: 0x627116e9,
 	}
+	fakeTxSignatures = []*rpc.TransactionSignature{
+		{
+			Err:       interface{}(nil),
+			Signature: solana.Signature{0x24, 0xc, 0x70, 0x3b, 0xd4, 0xdd, 0x90, 0xd, 0x41, 0xe8, 0x25, 0xe0, 0xbe, 0x4c, 0x12, 0xe5, 0x25, 0x9a, 0x44, 0x8a, 0xd0, 0x66, 0x95, 0x57, 0xfc, 0xbc, 0xc9, 0x7e, 0x7f, 0xc6, 0x72, 0x30, 0xf0, 0x9e, 0x8a, 0x5a, 0x6f, 0xe1, 0x75, 0x1b, 0xdb, 0xef, 0xc0, 0x16, 0x27, 0xa9, 0xfb, 0x22, 0xe7, 0x85, 0xfb, 0x71, 0x66, 0x9b, 0xdb, 0xca, 0x9e, 0x98, 0x88, 0xb1, 0x98, 0xc5, 0x30, 0x6},
+		},
+	}
+	fakeTxResult = &rpc.GetTransactionResult{
+		Meta: &rpc.TransactionMeta{
+			LogMessages: []string{
+				"Program cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ invoke [1]",
+				"Program data: gjbLTR5rT6jBkhUAAAOEYez4J1V9kiJLU33Kl+nEg3cYc/gpj1gUdhFTZIlARYTZtgEAAAAAAAAAAAAABrMErmIOBA8JBgELCAUDDA4CDQcAAAAAAPuxKzMBAAAAp2QAAAAAAAA=", "Program HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny invoke [2]",
+				"Program log: Instruction: Submit",
+				"Program HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny consumed 3467 of 1212618 compute units",
+				"Program HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny success",
+				"Program cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ consumed 191409 of 1400000 compute units",
+				"Program cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ success",
+			},
+		},
+	}
 )
 
 func TestEnvelopeSource(t *testing.T) {
@@ -98,6 +117,8 @@ func TestEnvelopeSource(t *testing.T) {
 	// Generated data.
 	chainConfig := generateChainConfig()
 	feedConfig := generateFeedConfig()
+	feedConfig.ContractAddressBase58 = "cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ"
+	feedConfig.ContractAddress = solana.MustPublicKeyFromBase58(feedConfig.ContractAddressBase58)
 
 	// Setup mocks
 	chainReader := new(mocks.ChainReader)
@@ -117,6 +138,19 @@ func TestEnvelopeSource(t *testing.T) {
 		fakeState.Config.TokenVault,
 		rpc.CommitmentConfirmed,
 	).Return(fakeLinkBalanceRes, nil).Once()
+	chainReader.On("GetSignaturesForAddressWithOpts",
+		mock.Anything, // ctx
+		feedConfig.StateAccount,
+		mock.Anything, // // because it's hard to mock pointer values!
+	).Return(fakeTxSignatures, nil)
+	chainReader.On("GetTransaction",
+		mock.Anything, // ctx
+		fakeTxSignatures[0].Signature,
+		&rpc.GetTransactionOpts{
+			Commitment: rpc.CommitmentConfirmed,
+			Encoding:   solana.EncodingBase64,
+		},
+	).Return(fakeTxResult, nil)
 
 	// Call Fetch
 	factory := NewEnvelopeSourceFactory(chainReader, newNullLogger())
@@ -181,7 +215,7 @@ func TestEnvelopeSource(t *testing.T) {
 		Transmitter:             "MovNQPmSSdyD8deQH6qhdoEQ57tTKPEMsv6w6LXmo1h",
 		LinkBalance:             big.NewInt(824640212736),
 		LinkAvailableForPayment: big.NewInt(818267512487),
-		JuelsPerFeeCoin:         big.NewInt(0),
+		JuelsPerFeeCoin:         big.NewInt(5153468923),
 		AggregatorRoundID:       0x13841a,
 	}
 	require.Equal(t, expectedEnvelope, envelope)

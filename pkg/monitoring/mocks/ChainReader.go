@@ -146,6 +146,29 @@ func (_m *ChainReader) GetTokenAccountBalance(ctx context.Context, account solan
 	return r0, r1
 }
 
+// GetTransaction provides a mock function with given fields: ctx, txSig, opts
+func (_m *ChainReader) GetTransaction(ctx context.Context, txSig solana.Signature, opts *rpc.GetTransactionOpts) (*rpc.GetTransactionResult, error) {
+	ret := _m.Called(ctx, txSig, opts)
+
+	var r0 *rpc.GetTransactionResult
+	if rf, ok := ret.Get(0).(func(context.Context, solana.Signature, *rpc.GetTransactionOpts) *rpc.GetTransactionResult); ok {
+		r0 = rf(ctx, txSig, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*rpc.GetTransactionResult)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, solana.Signature, *rpc.GetTransactionOpts) error); ok {
+		r1 = rf(ctx, txSig, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // NewChainReader creates a new instance of ChainReader. It also registers the testing.TB interface on the mock and a cleanup function to assert the mocks expectations.
 func NewChainReader(t testing.TB) *ChainReader {
 	mock := &ChainReader{}
