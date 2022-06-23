@@ -9,7 +9,7 @@ import (
 func NewChainlinkSolOCRv2(nodes int, stateful bool) *environment.Config {
 	config.ChainlinkVals()
 	env := &environment.Config{
-		NamespacePrefix: "chainlink-sol",
+		NamespacePrefix: "foundations-chainlink-sol",
 		Charts: environment.Charts{
 			"solana-validator": {
 				Index: 1,
@@ -94,7 +94,7 @@ func NewChainlinkSolOCRv2(nodes int, stateful bool) *environment.Config {
 	if stateful {
 		env.Charts["chainlink"].Values["db"] = map[string]interface{}{
 			"stateful": true,
-			"capacity": "50Gi",
+			"capacity": "80Gi",
 			"resources": map[string]interface{}{
 				"requests": map[string]interface{}{
 					"cpu":    "2000m",
