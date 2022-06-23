@@ -15,7 +15,7 @@ var _ = Describe("Solana OCRv2 soak test @ocr2-soak", func() {
 	var state = common.NewOCRv2State(30, 5)
 	BeforeEach(func() {
 		By("Deploying OCRv2 cluster", func() {
-			state.DeployCluster(5, false, utils.ContractsDir)
+			state.DeployCluster(5, true, utils.ContractsDir)
 			state.SetAllAdapterResponsesToTheSameValue(10)
 		})
 	})
