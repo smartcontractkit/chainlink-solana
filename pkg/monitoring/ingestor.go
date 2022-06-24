@@ -23,7 +23,8 @@ type Ingestor struct {
 	eventsSchema       relayMonitoring.Schema
 	blockSchema        relayMonitoring.Schema
 
-	log relayMonitoring.Logger
+	metrics IngestorMetrics
+	log     relayMonitoring.Logger
 }
 
 func NewIngestor(
@@ -37,6 +38,7 @@ func NewIngestor(
 	eventsSchema relayMonitoring.Schema,
 	blockSchema relayMonitoring.Schema,
 
+	metrics IngestorMetrics,
 	log relayMonitoring.Logger,
 ) *Ingestor {
 	return &Ingestor{
@@ -48,6 +50,7 @@ func NewIngestor(
 		transmissionSchema,
 		eventsSchema,
 		blockSchema,
+		metrics,
 		log,
 	}
 }
@@ -69,6 +72,7 @@ func (i *Ingestor) Run(ctx context.Context, data relayMonitoring.RDDData) {
 			for {
 				select {
 				case update := <-pipeline.Updater.Updates():
+					i.metrics.IncReceivedObjectFromChain(pipeline.Topic)
 					i.handleUpdate(update, pipeline)
 				case <-ctx.Done():
 					return

@@ -98,11 +98,14 @@ func runIngestor(chainConfig monitoring.SolanaConfig, log logger.Logger) {
 		log.Fatalw("failed to parse generic configuration", "error", err)
 	}
 
+	chainMetrics := relayMonitoring.NewChainMetrics(chainConfig)
+	ingestorMetrics := monitoring.NewIngestorMetrics(chainConfig)
+
 	producer, err := relayMonitoring.NewProducer(rootCtx, logger.With(log, "component", "producer"), cfg.Kafka)
 	if err != nil {
 		log.Fatalw("failed to create kafka producer", "error", err)
 	}
-	// TODO (dru) instrument producer
+	producer = relayMonitoring.NewInstrumentedProducer(producer, chainMetrics)
 
 	schemaRegistry := relayMonitoring.NewSchemaRegistry(cfg.SchemaRegistry, log)
 
@@ -153,9 +156,8 @@ func runIngestor(chainConfig monitoring.SolanaConfig, log logger.Logger) {
 		logger.With(log, "component", "http-server"),
 	)
 	httpServer.Handle("/debug", manager.HTTPHandler())
-	// TODO (dru) add /metrics
+	httpServer.Handle("/metrics", ingestorMetrics.HTTPHandler())
 
-	// TODO (dru) add ingestion monitoring
 	processor := monitoring.NewIngestor(
 		chainConfig,
 		client,
@@ -165,6 +167,7 @@ func runIngestor(chainConfig monitoring.SolanaConfig, log logger.Logger) {
 		transmissionSchema,
 		eventsSchema,
 		blockSchema,
+		ingestorMetrics,
 		log,
 	)
 
