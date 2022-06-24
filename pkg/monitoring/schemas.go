@@ -237,7 +237,7 @@ func init() {
 	}
 	TransmissionAvroSchema, transmissionCodec, err = parseSchema(transmissionAvroSchema)
 	if err != nil {
-		panic(fmt.Errorf("failed to generate Avro schema for Transmisison objects: %w", err))
+		panic(fmt.Errorf("failed to generate Avro schema for Transmission objects: %w", err))
 	}
 	EventsAvroSchema, eventsCodec, err = parseSchema(eventsAvroSchema)
 	if err != nil {
