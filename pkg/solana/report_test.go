@@ -9,6 +9,7 @@ import (
 	"time"
 
 	bin "github.com/gagliardetto/binary"
+	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
@@ -190,7 +191,7 @@ func TestHashReport(t *testing.T) {
 		0x27, 0x11, 0x33, 0x5f, 0xed, 0x43, 0x91, 0x60,
 	}
 
-	h, err := HashReport(mockReportCtx, mockReport)
+	h, err := utils.HashReport(mockReportCtx, mockReport)
 	assert.NoError(t, err)
 	assert.Equal(t, mockHash, h)
 }
