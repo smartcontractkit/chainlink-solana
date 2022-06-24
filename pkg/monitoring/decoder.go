@@ -24,8 +24,8 @@ type StateAccount struct {
 	RentEpoch  uint64
 
 	State                 pkgSolana.State
-	OffchainConfig        pb.OffchainConfigProto
-	NumericalMedianConfig pb.NumericalMedianConfigProto
+	OffchainConfig        *pb.OffchainConfigProto
+	NumericalMedianConfig *pb.NumericalMedianConfigProto
 }
 
 func StateResultDecoder(raw interface{}, _ SolanaConfig, _ SolanaFeedConfig) (interface{}, error) {
@@ -56,8 +56,8 @@ func StateResultDecoder(raw interface{}, _ SolanaConfig, _ SolanaFeedConfig) (in
 		result.Value.Executable,
 		result.Value.RentEpoch,
 		state,
-		offchainConfig,
-		numericalMedianConfig,
+		&offchainConfig,
+		&numericalMedianConfig,
 	}, nil
 }
 

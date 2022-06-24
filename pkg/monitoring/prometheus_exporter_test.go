@@ -20,7 +20,11 @@ func TestPrometheusExporter(t *testing.T) {
 
 		chainConfig := generateChainConfig()
 		feedConfig := generateFeedConfig()
-		exporter, err := factory.NewExporter(relayMonitoring.ExporterParams{chainConfig, feedConfig, []relayMonitoring.NodeConfig{}})
+		exporter, err := factory.NewExporter(relayMonitoring.ExporterParams{
+			ChainConfig: chainConfig,
+			FeedConfig:  feedConfig,
+			Nodes:       []relayMonitoring.NodeConfig{},
+		})
 		require.NoError(t, err)
 
 		balances := generateBalances()
