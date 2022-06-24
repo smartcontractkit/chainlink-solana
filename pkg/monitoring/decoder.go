@@ -162,9 +162,9 @@ func BlockResultDecode(raw interface{}, _ SolanaConfig, config SolanaFeedConfig)
 	}
 	block := Block{
 		Slot: result.Context.Slot,
-		Err:  fmt.Sprintf("%s", result.Value.Err),
+		Err:  errToString(result.Value.Err),
 	}
-	if result.Value.Err != nil {
+	if result.Value.Err == nil {
 		return block, nil
 	}
 	block.Blockhash = result.Value.Block.Blockhash

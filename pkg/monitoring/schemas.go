@@ -122,7 +122,7 @@ var transmissionAvroSchema = avro.Record("transmissions_account", avro.Opts{Name
 
 	avro.Field("transmission", avro.Opts{}, avro.Record("transmission", avro.Opts{}, avro.Fields{
 		avro.Field("slot", avro.Opts{Doc: "uint64"}, avro.Bytes),
-		avro.Field("timestamp", avro.Opts{Doc: "uint32"}, avro.Long),
+		avro.Field("timestamp", avro.Opts{Doc: "int64"}, avro.Long),
 		avro.Field("answer", avro.Opts{Doc: "bin.Int128"}, avro.Bytes),
 	})),
 })

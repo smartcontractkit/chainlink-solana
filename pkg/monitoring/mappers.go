@@ -176,7 +176,7 @@ func BlockMapper(raw interface{}, _ SolanaConfig, feedConfig SolanaFeedConfig) (
 		transactions = append(transactions, map[string]interface{}{
 			"data": tx.Transaction.GetBinary(),
 			"meta": map[string]interface{}{
-				"err":                 fmt.Sprintf("%s", tx.Meta.Err),
+				"err":                 errToString(tx.Meta.Err),
 				"fee":                 uint64ToBeBytes(tx.Meta.Fee),
 				"pre_balances":        uint64ArrToBytesArr(tx.Meta.PreBalances),
 				"post_balances":       uint64ArrToBytesArr(tx.Meta.PostBalances),
@@ -338,4 +338,11 @@ func mapRewards(rawRewards []rpc.BlockReward) []interface{} {
 		})
 	}
 	return rewards
+}
+
+func errToString(err interface{}) string {
+	if err == nil {
+		return ""
+	}
+	return fmt.Sprintf("%#v", err)
 }
