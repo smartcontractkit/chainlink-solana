@@ -1,5 +1,13 @@
-# Solana Onchain monitoring
+# Solana on-chain monitoring
 
+The SOM (short for Solana on-chain monitor) tracks the following metrics for each feed deployed on the network:
+- latest transmission
+- latest feed configuration
+- SOL and LINK balance for each feed
+- latest Juels/Lamport feed transmissions
+- number of failed/succeeded transactions processed by the aggregator contract
+
+It exports this data to prometheus and publishes a subset of this data to kafka.
 
 ## Run locally
 
@@ -62,9 +70,8 @@ SCHEMA_REGISTRY_URL="http://localhost:8989" \
 SCHEMA_REGISTRY_USERNAME="" \
 SCHEMA_REGISTRY_PASSWORD="" \
 HTTP_ADDRESS="localhost:3000" \
-FEEDS_URL="http://localhost:4000" \
-FEATURE_TEST_ONLY_FAKE_READERS=true \
-FEATURE_TEST_ONLY_FAKE_RDD=true \
+FEEDS_URL="http://localhost:4000/feeds.json" \
+NODES_URL="http://localhost:4000/nodes.json" \
 go run ./cmd/monitoring/main.go
 ```
 
@@ -72,13 +79,29 @@ See `go run ./cmd/monitoring/*.go -help` for details.
 
 To generate random data instead of reading from the chain, use the env var `TEST_MODE=enabled`.
 
-## Ingestor
+# Ingestor
+
+The ingestor is a different "running mode" for the Solana on-chain monitor.
+It consumes data from the Solana chain and publishes a representation of this data to a kafka cluster.
+
+The ingestor runs the following pipline:
+- a pipline that subscribes to all the blocks that have transactions for the aggregator contract.
+- a pipline that subscribes to all the logs emitted by the aggregator contract.
+- a pipline that subscribes to all the state and transmission account changes for each feed deployed
+
+The high-level structure of a pipeline is:
+
+```
+          +-------------------------pipeline------------------------------+
+(solana)--|-->(updater)-->(decoder)-->(mapper)-->(encoder)-->(publisher)--|-->(kafka)
+          +---------------------------------------------------------------+
+```
 
 ## Running
 
 ```bash
 SOLANA_RUN_MODE=ingestor \
-SOLANA_WS_ENDPOINT="wss://wispy-bold-water.solana-mainnet.quiknode.pro/01b51251bd130abae974c0cc72d79f068c133416/" \
+SOLANA_WS_ENDPOINT="wss://127.0.0.1:9988/ws" \
 SOLANA_NETWORK_NAME="solana-mainnet" \
 SOLANA_NETWORK_ID="solana-mainnet" \
 SOLANA_CHAIN_ID="1" \
@@ -98,12 +121,12 @@ SCHEMA_REGISTRY_URL="http://localhost:8989" \
 SCHEMA_REGISTRY_USERNAME="" \
 SCHEMA_REGISTRY_PASSWORD="" \
 HTTP_ADDRESS="localhost:3000" \
-FEEDS_URL="https://weiwatchers.smartcontract.com/som-solana-mainnet.json" \
-NODES_URL="https://weiwatchers.com/nodes-solana-mainnet.json" \
+FEEDS_URL="http://localhost:4000/feeds.json" \
+NODES_URL="http://localhost:4000/nodes.json" \
 go run ./cmd/monitoring/main.go
 ```
 
-## List of events
+## List of events published on the SOLANA_EVENTS_KAFKA_TOPIC
 - These events are only only issued by the ocr2 contract.
 
 ```
@@ -133,10 +156,4 @@ NewTransmission {
     pub juels_per_lamport: u64,
     pub reimbursement_gjuels: u64,
 }
-```
-
-## Build docker image
-
-```bash
-docker build -f ./ops/monitoring/Dockerfile -t solana-onchain-monitor:0.1.0 .
 ```
