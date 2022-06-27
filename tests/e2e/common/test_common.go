@@ -15,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/solclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/smartcontractkit/helmenv/environment"
-	"github.com/smartcontractkit/helmenv/tools"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -125,10 +124,7 @@ func (m *OCRv2TestState) UploadProgramBinaries(contractsDir string) {
 }
 
 func (m *OCRv2TestState) DeployEnv(nodes int, stateful bool, contractsDir string) {
-	m.Env, m.err = environment.DeployOrLoadEnvironment(
-		solclient.NewChainlinkSolOCRv2(nodes, stateful),
-		tools.ChartsRoot,
-	)
+	m.Env, m.err = environment.DeployOrLoadEnvironment(solclient.NewChainlinkSolOCRv2(nodes, stateful))
 	Expect(m.err).ShouldNot(HaveOccurred())
 	m.err = m.Env.ConnectAll()
 	Expect(m.err).ShouldNot(HaveOccurred())

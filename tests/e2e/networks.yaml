@@ -1,5 +1,5 @@
 selected_networks:
-  solana:
+  - "solana"
 networks:
   solana:
     contracts_deployed: false

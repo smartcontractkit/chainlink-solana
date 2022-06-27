@@ -5,29 +5,40 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
-	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/smartcontractkit/chainlink/core/store/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v4"
+
+	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
+	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 )
 
 // testing configs
 var (
-	testBalancePoll            = models.MustMakeDuration(1 * time.Minute)
-	testConfirmPeriod          = models.MustMakeDuration(2 * time.Minute)
-	testCachePeriod            = models.MustMakeDuration(3 * time.Minute)
-	testTTL                    = models.MustMakeDuration(4 * time.Minute)
-	testTxTimeout              = models.MustMakeDuration(5 * time.Minute)
-	testTxRetryTimeout         = models.MustMakeDuration(6 * time.Minute)
-	testTxConfirmTimeout       = models.MustMakeDuration(7 * time.Minute)
+	testBalancePoll            = mustDuration(1 * time.Minute)
+	testConfirmPeriod          = mustDuration(2 * time.Minute)
+	testCachePeriod            = mustDuration(3 * time.Minute)
+	testTTL                    = mustDuration(4 * time.Minute)
+	testTxTimeout              = mustDuration(5 * time.Minute)
+	testTxRetryTimeout         = mustDuration(6 * time.Minute)
+	testTxConfirmTimeout       = mustDuration(7 * time.Minute)
 	testPreflight              = false
 	testCommitment             = "finalized"
 	testMaxRetries       int64 = 123
 )
 
+func mustDuration(d time.Duration) utils.Duration {
+	ud, err := utils.NewDuration(d)
+	if err != nil {
+		panic(err)
+	}
+	return ud
+}
+
 func TestConfig_ExpectedDefaults(t *testing.T) {
-	cfg := NewConfig(db.ChainCfg{}, logger.TestLogger(t))
+	cfg := NewConfig(db.ChainCfg{}, logger.Test(t))
 	configSet := configSet{
 		BalancePollPeriod:   cfg.BalancePollPeriod(),
 		ConfirmPollPeriod:   cfg.ConfirmPollPeriod(),
@@ -56,7 +67,7 @@ func TestConfig_NewConfig(t *testing.T) {
 		Commitment:          null.StringFrom(testCommitment),
 		MaxRetries:          null.IntFrom(testMaxRetries),
 	}
-	cfg := NewConfig(dbCfg, logger.TestLogger(t))
+	cfg := NewConfig(dbCfg, logger.Test(t))
 	assert.Equal(t, testBalancePoll.Duration(), cfg.BalancePollPeriod())
 	assert.Equal(t, testConfirmPeriod.Duration(), cfg.ConfirmPollPeriod())
 	assert.Equal(t, testCachePeriod.Duration(), cfg.OCR2CachePollPeriod())
@@ -70,7 +81,7 @@ func TestConfig_NewConfig(t *testing.T) {
 }
 
 func TestConfig_Update(t *testing.T) {
-	cfg := NewConfig(db.ChainCfg{}, logger.TestLogger(t))
+	cfg := NewConfig(db.ChainCfg{}, logger.Test(t))
 	dbCfg := db.ChainCfg{
 		BalancePollPeriod:   &testBalancePoll,
 		ConfirmPollPeriod:   &testConfirmPeriod,
@@ -97,11 +108,93 @@ func TestConfig_Update(t *testing.T) {
 }
 
 func TestConfig_CommitmentFallback(t *testing.T) {
-	cfg := NewConfig(db.ChainCfg{Commitment: null.StringFrom("invalid")}, logger.TestLogger(t))
+	cfg := NewConfig(db.ChainCfg{Commitment: null.StringFrom("invalid")}, logger.Test(t))
 	assert.Equal(t, rpc.CommitmentConfirmed, cfg.Commitment())
 }
 
 func TestConfig_MaxRetriesNegativeFallback(t *testing.T) {
-	cfg := NewConfig(db.ChainCfg{MaxRetries: null.IntFrom(-100)}, logger.TestLogger(t))
+	cfg := NewConfig(db.ChainCfg{MaxRetries: null.IntFrom(-100)}, logger.Test(t))
 	assert.Nil(t, cfg.MaxRetries())
+}
+
+func TestChain_SetFromDB(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		dbCfg *db.ChainCfg
+		exp   Chain
+	}{
+		{"nil", nil, Chain{}},
+		{"empty", &db.ChainCfg{}, Chain{}},
+		{"full", &db.ChainCfg{
+			BalancePollPeriod:   utils.MustNewDuration(5 * time.Second),
+			ConfirmPollPeriod:   utils.MustNewDuration(500 * time.Millisecond),
+			OCR2CachePollPeriod: utils.MustNewDuration(time.Second),
+			OCR2CacheTTL:        utils.MustNewDuration(time.Minute),
+			TxTimeout:           utils.MustNewDuration(time.Minute),
+			TxRetryTimeout:      utils.MustNewDuration(10 * time.Second),
+			TxConfirmTimeout:    utils.MustNewDuration(30 * time.Second),
+			SkipPreflight:       null.BoolFrom(true),
+			Commitment:          null.StringFrom("confirmed"),
+			MaxRetries:          null.IntFrom(0),
+		}, Chain{
+			BalancePollPeriod:   utils.MustNewDuration(5 * time.Second),
+			ConfirmPollPeriod:   utils.MustNewDuration(500 * time.Millisecond),
+			OCR2CachePollPeriod: utils.MustNewDuration(time.Second),
+			OCR2CacheTTL:        utils.MustNewDuration(time.Minute),
+			TxTimeout:           utils.MustNewDuration(time.Minute),
+			TxRetryTimeout:      utils.MustNewDuration(10 * time.Second),
+			TxConfirmTimeout:    utils.MustNewDuration(30 * time.Second),
+			SkipPreflight:       ptr(true),
+			Commitment:          ptr("confirmed"),
+			MaxRetries:          ptr[int64](0),
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var c Chain
+			require.NoError(t, c.SetFromDB(tt.dbCfg))
+			assert.Equal(t, tt.exp, c)
+		})
+	}
+}
+
+func TestNode_SetFromDB(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		dbNode db.Node
+		exp    Node
+		expErr bool
+	}{
+		{"empty", db.Node{}, Node{}, false},
+		{"url", db.Node{
+			Name:      "test-name",
+			SolanaURL: "http://fake.test",
+		}, Node{
+			Name: "test-name",
+			URL:  utils.MustParseURL("http://fake.test"),
+		}, false},
+		{"url-missing", db.Node{
+			Name: "test-name",
+		}, Node{
+			Name: "test-name",
+		}, false},
+		{"url-invalid", db.Node{
+			Name:      "test-name",
+			SolanaURL: "asdf;lk.asdf.;lk://asdlkvpoicx;",
+		}, Node{}, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var n Node
+			err := n.SetFromDB(tt.dbNode)
+			if tt.expErr {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.exp, n)
+			}
+		})
+	}
+}
+
+func ptr[T any](t T) *T {
+	return &t
 }

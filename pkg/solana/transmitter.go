@@ -6,13 +6,25 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 )
 
-var _ types.ContractTransmitter = (*ContractTracker)(nil)
+var _ types.ContractTransmitter = (*Transmitter)(nil)
+
+type Transmitter struct {
+	stateID, programID, storeProgramID, transmissionsID, transmissionSigner solana.PublicKey
+	reader                                                                  client.Reader
+	stateCache                                                              *StateCache
+	lggr                                                                    logger.Logger
+	txManager                                                               TxManager
+}
 
 // Transmit sends the report to the on-chain OCR2Aggregator smart contract's Transmit method
-func (c *ContractTracker) Transmit(
+func (c *Transmitter) Transmit(
 	ctx context.Context,
 	reportCtx types.ReportContext,
 	report types.Report,
@@ -27,25 +39,22 @@ func (c *ContractTracker) Transmit(
 	}
 
 	// Determine store authority
-	seeds := [][]byte{[]byte("store"), c.StateID.Bytes()}
-	storeAuthority, storeNonce, err := solana.FindProgramAddress(seeds, c.ProgramID)
+	seeds := [][]byte{[]byte("store"), c.stateID.Bytes()}
+	storeAuthority, storeNonce, err := solana.FindProgramAddress(seeds, c.programID)
 	if err != nil {
 		return errors.Wrap(err, "error on Transmit.FindProgramAddress")
 	}
 
-	if _, err = c.ReadState(); err != nil {
-		return errors.Wrap(err, "error on Transmit.ReadState")
-	}
 	accounts := []*solana.AccountMeta{
 		// state, transmitter, transmissions, store_program, store, store_authority
-		{PublicKey: c.StateID, IsWritable: true, IsSigner: false},
-		{PublicKey: c.Transmitter.PublicKey(), IsWritable: false, IsSigner: true},
-		{PublicKey: c.TransmissionsID, IsWritable: true, IsSigner: false},
-		{PublicKey: c.StoreProgramID, IsWritable: false, IsSigner: false},
+		{PublicKey: c.stateID, IsWritable: true, IsSigner: false},
+		{PublicKey: c.transmissionSigner, IsWritable: false, IsSigner: true},
+		{PublicKey: c.transmissionsID, IsWritable: true, IsSigner: false},
+		{PublicKey: c.storeProgramID, IsWritable: false, IsSigner: false},
 		{PublicKey: storeAuthority, IsWritable: false, IsSigner: false},
 	}
 
-	reportContext := RawReportContext(reportCtx)
+	reportContext := utils.RawReportContext(reportCtx)
 
 	// Construct the instruction payload
 	data := new(bytes.Buffer) // store_nonce || report_context || raw_report || raw_signatures
@@ -61,44 +70,32 @@ func (c *ContractTracker) Transmit(
 
 	tx, err := solana.NewTransaction(
 		[]solana.Instruction{
-			solana.NewInstruction(c.ProgramID, accounts, data.Bytes()),
+			solana.NewInstruction(c.programID, accounts, data.Bytes()),
 		},
 		blockhash.Value.Blockhash,
-		solana.TransactionPayer(c.Transmitter.PublicKey()),
+		solana.TransactionPayer(c.transmissionSigner),
 	)
 	if err != nil {
 		return errors.Wrap(err, "error on Transmit.NewTransaction")
 	}
 
-	msgToSign, err := tx.Message.MarshalBinary()
-	if err != nil {
-		return errors.Wrap(err, "error on Transmit.Message.MarshalBinary")
-	}
-	finalSigBytes, err := c.Transmitter.Sign(msgToSign)
-	if err != nil {
-		return errors.Wrap(err, "error on Transmit.Sign")
-	}
-	var finalSig [64]byte
-	copy(finalSig[:], finalSigBytes)
-	tx.Signatures = append(tx.Signatures, finalSig)
-
 	// pass transmit payload to tx manager queue
-	c.lggr.Debugf("Queuing transmit tx: state (%s) + transmissions (%s)", c.StateID.String(), c.TransmissionsID.String())
-	err = c.txManager.Enqueue(c.StateID.String(), tx)
+	c.lggr.Debugf("Queuing transmit tx: state (%s) + transmissions (%s)", c.stateID.String(), c.transmissionsID.String())
+	err = c.txManager.Enqueue(c.stateID.String(), tx)
 	return errors.Wrap(err, "error on Transmit.txManager.Enqueue")
 }
 
-func (c *ContractTracker) LatestConfigDigestAndEpoch(
+func (c *Transmitter) LatestConfigDigestAndEpoch(
 	ctx context.Context,
 ) (
 	configDigest types.ConfigDigest,
 	epoch uint32,
 	err error,
 ) {
-	state, err := c.ReadState()
+	state, err := c.stateCache.ReadState()
 	return state.Config.LatestConfigDigest, state.Config.Epoch, err
 }
 
-func (c *ContractTracker) FromAccount() types.Account {
-	return types.Account(c.Transmitter.PublicKey().String())
+func (c *Transmitter) FromAccount() types.Account {
+	return types.Account(c.transmissionSigner.String())
 }

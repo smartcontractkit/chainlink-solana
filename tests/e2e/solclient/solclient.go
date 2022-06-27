@@ -79,6 +79,14 @@ type Client struct {
 	WS *ws.Client
 }
 
+func (c *Client) BalanceAt(ctx context.Context, address common.Address) (*big.Int, error) {
+	panic("implement me")
+}
+
+func (c *Client) GetTxReceipt(txHash common.Hash) (*types.Receipt, error) {
+	panic("implement me")
+}
+
 func (c *Client) GetNetworkType() string {
 	return c.Config.Type
 }

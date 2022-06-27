@@ -89,7 +89,7 @@ describe("OCR2Feed", () => {
       // Listen to feed
       let cl = await OCR2Feed.load(
         CHAINLINK_AGGREGATOR_PROGRAM_ID,
-        anchor.Provider.env()
+        anchor.AnchorProvider.env()
       );
       let resolve;
       let promise = new Promise<Round>((r) => (resolve = r));

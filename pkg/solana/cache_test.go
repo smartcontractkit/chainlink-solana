@@ -10,19 +10,19 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
-	"github.com/smartcontractkit/chainlink/core/logger"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/atomic"
 )
 
 var mockTransmission = []byte{
@@ -92,7 +92,7 @@ func testTransmissionsResponse(t *testing.T, body []byte, sub uint64) []byte {
 }
 
 func testSetupReader(t *testing.T, endpoint string) client.Reader {
-	lggr := logger.TestLogger(t)
+	lggr := logger.Test(t)
 	cfg := config.NewConfig(db.ChainCfg{}, lggr)
 	client, err := client.NewClient(endpoint, cfg, 1*time.Second, lggr)
 	require.NoError(t, err)
@@ -147,51 +147,52 @@ func TestGetLatestTransmission(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestStatePolling(t *testing.T) {
-	i := atomic.NewInt32(0)
-	wait := 5 * time.Second
-	callsPerSecond := 4 // total number of rpc calls between getState and GetLatestTransmission
-
+func TestCache(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// create response
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
-		i.Inc() // count calls
 
 		// state query
 		if bytes.Contains(body, []byte("11111111111111111111111111111111")) {
-			_, err = w.Write(testStateResponse())
-			require.NoError(t, err)
+			// Drop error, client may cancel ctx.
+			w.Write(testStateResponse())
 			return
 		}
 
 		// transmissions query
-		_, err = w.Write(testTransmissionsResponse(t, body, 0))
-		require.NoError(t, err)
+		// Drop error, client may cancel ctx.
+		w.Write(testTransmissionsResponse(t, body, 0))
 	}))
 
-	lggr := logger.TestLogger(t)
-	tracker := ContractTracker{
-		StateID:         solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
+	lggr := logger.Test(t)
+	stateCache := StateCache{
+		StateID: solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
+		cfg:     config.NewConfig(db.ChainCfg{}, lggr),
+		reader:  testSetupReader(t, mockServer.URL),
+		lggr:    lggr,
+	}
+	require.NoError(t, stateCache.Start())
+	require.NoError(t, stateCache.Close())
+	require.NoError(t, stateCache.fetchState(context.Background()))
+	assert.Equal(t, "GADeYvXjPwZP7ds1yDY9VFp12bNjdxT1YyksMvFGK9xn", stateCache.state.Transmissions.String())
+	assert.True(t, !stateCache.stateTime.IsZero())
+
+	transmissionsCache := TransmissionsCache{
 		TransmissionsID: solana.MustPublicKeyFromBase58("11111111111111111111111111111112"),
 		cfg:             config.NewConfig(db.ChainCfg{}, lggr),
 		reader:          testSetupReader(t, mockServer.URL),
 		lggr:            lggr,
-		stateLock:       &sync.RWMutex{},
-		ansLock:         &sync.RWMutex{},
 	}
-	require.NoError(t, tracker.Start())
-	require.Error(t, tracker.Start()) // test startOnce
-	time.Sleep(wait)
-	require.NoError(t, tracker.Close())
-	require.Error(t, tracker.Close())                                           // test StopOnce
-	mockServer.Close()                                                          // close server once tracker is stopped
-	assert.GreaterOrEqual(t, callsPerSecond*int(wait.Seconds()), int(i.Load())) // expect minimum number of calls
+	require.NoError(t, transmissionsCache.Start())
+	require.NoError(t, transmissionsCache.Close())
 
-	answer, err := tracker.ReadAnswer()
+	require.NoError(t, transmissionsCache.fetchLatestTransmission(context.Background()))
+	answer, err := transmissionsCache.ReadAnswer()
 	assert.NoError(t, err)
 	assert.Equal(t, expectedTime, answer.Timestamp)
 	assert.Equal(t, expectedAns, answer.Data.String())
+	mockServer.Close()
 }
 
 func TestNilPointerHandling(t *testing.T) {
