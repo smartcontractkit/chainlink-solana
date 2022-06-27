@@ -9,8 +9,8 @@ logging:
     level: 0
 
 # Specify the image and version of the chainlink image you want to run tests against. Leave blank for default.
-chainlink_image: public.ecr.aws/chainlink/chainlink
-chainlink_version: 1.5.0-root
+chainlink_image: 795953128386.dkr.ecr.us-west-2.amazonaws.com/chainlink
+chainlink_version: latest.a692ff75e7e377dff55487935958cb81325e2621
 chainlink_env_values:
     http_server_write_timeout: "6m"
 
