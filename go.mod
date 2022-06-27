@@ -11,7 +11,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.1
 	github.com/smartcontractkit/chainlink-relay v0.1.2
-	github.com/smartcontractkit/libocr v0.0.0-20220512162406-9e4afd8896f3
+	github.com/smartcontractkit/libocr v0.0.0-20220623210256-b7ae1e1c66f6
 	github.com/stretchr/testify v1.7.1
 	go.uber.org/multierr v1.8.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
