@@ -18,7 +18,7 @@ func main() {
 	}
 	defer func() {
 		if serr := log.Sync(); serr != nil {
-			fmt.Println(fmt.Sprintf("Error while closing Logger: %v", serr))
+			fmt.Printf("Error while closing Logger: %v\n", serr)
 		}
 	}()
 

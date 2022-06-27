@@ -6,6 +6,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/client"
@@ -53,7 +54,7 @@ func (c *Transmitter) Transmit(
 		{PublicKey: storeAuthority, IsWritable: false, IsSigner: false},
 	}
 
-	reportContext := RawReportContext(reportCtx)
+	reportContext := utils.RawReportContext(reportCtx)
 
 	// Construct the instruction payload
 	data := new(bytes.Buffer) // store_nonce || report_context || raw_report || raw_signatures

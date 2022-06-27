@@ -15,7 +15,7 @@ require (
 	github.com/smartcontractkit/chainlink-solana/relayer v0.2.20-0.20220516141700-c34f50b2a188
 	github.com/smartcontractkit/chainlink-testing-framework v1.2.5-0.20220530125243-164797d0e11c
 	github.com/smartcontractkit/helmenv v1.2.2
-	github.com/smartcontractkit/libocr v0.0.0-20220512162406-9e4afd8896f3
+	github.com/smartcontractkit/libocr v0.0.0-20220623210256-b7ae1e1c66f6
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	gopkg.in/yaml.v2 v2.4.0
@@ -147,7 +147,7 @@ require (
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/slack-go/slack v0.10.3 // indirect
-	github.com/smartcontractkit/chainlink-relay v0.1.1 // indirect
+	github.com/smartcontractkit/chainlink-relay v0.1.2 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/spf13/cobra v1.4.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect

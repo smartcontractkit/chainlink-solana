@@ -5,10 +5,12 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v4"
+
 	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
 	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
-	"github.com/stretchr/testify/assert"
-	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/db"
 )
@@ -113,4 +115,86 @@ func TestConfig_CommitmentFallback(t *testing.T) {
 func TestConfig_MaxRetriesNegativeFallback(t *testing.T) {
 	cfg := NewConfig(db.ChainCfg{MaxRetries: null.IntFrom(-100)}, logger.Test(t))
 	assert.Nil(t, cfg.MaxRetries())
+}
+
+func TestChain_SetFromDB(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		dbCfg *db.ChainCfg
+		exp   Chain
+	}{
+		{"nil", nil, Chain{}},
+		{"empty", &db.ChainCfg{}, Chain{}},
+		{"full", &db.ChainCfg{
+			BalancePollPeriod:   utils.MustNewDuration(5 * time.Second),
+			ConfirmPollPeriod:   utils.MustNewDuration(500 * time.Millisecond),
+			OCR2CachePollPeriod: utils.MustNewDuration(time.Second),
+			OCR2CacheTTL:        utils.MustNewDuration(time.Minute),
+			TxTimeout:           utils.MustNewDuration(time.Minute),
+			TxRetryTimeout:      utils.MustNewDuration(10 * time.Second),
+			TxConfirmTimeout:    utils.MustNewDuration(30 * time.Second),
+			SkipPreflight:       null.BoolFrom(true),
+			Commitment:          null.StringFrom("confirmed"),
+			MaxRetries:          null.IntFrom(0),
+		}, Chain{
+			BalancePollPeriod:   utils.MustNewDuration(5 * time.Second),
+			ConfirmPollPeriod:   utils.MustNewDuration(500 * time.Millisecond),
+			OCR2CachePollPeriod: utils.MustNewDuration(time.Second),
+			OCR2CacheTTL:        utils.MustNewDuration(time.Minute),
+			TxTimeout:           utils.MustNewDuration(time.Minute),
+			TxRetryTimeout:      utils.MustNewDuration(10 * time.Second),
+			TxConfirmTimeout:    utils.MustNewDuration(30 * time.Second),
+			SkipPreflight:       ptr(true),
+			Commitment:          ptr("confirmed"),
+			MaxRetries:          ptr[int64](0),
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var c Chain
+			require.NoError(t, c.SetFromDB(tt.dbCfg))
+			assert.Equal(t, tt.exp, c)
+		})
+	}
+}
+
+func TestNode_SetFromDB(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		dbNode db.Node
+		exp    Node
+		expErr bool
+	}{
+		{"empty", db.Node{}, Node{}, false},
+		{"url", db.Node{
+			Name:      "test-name",
+			SolanaURL: "http://fake.test",
+		}, Node{
+			Name: "test-name",
+			URL:  utils.MustParseURL("http://fake.test"),
+		}, false},
+		{"url-missing", db.Node{
+			Name: "test-name",
+		}, Node{
+			Name: "test-name",
+		}, false},
+		{"url-invalid", db.Node{
+			Name:      "test-name",
+			SolanaURL: "asdf;lk.asdf.;lk://asdlkvpoicx;",
+		}, Node{}, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var n Node
+			err := n.SetFromDB(tt.dbNode)
+			if tt.expErr {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.exp, n)
+			}
+		})
+	}
+}
+
+func ptr[T any](t T) *T {
+	return &t
 }
