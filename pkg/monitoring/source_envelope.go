@@ -134,7 +134,7 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 }
 
 func (s *envelopeSource) getJuelsPerLamport(ctx context.Context) (*big.Int, error) {
-	txSigsPageSize := 30
+	txSigsPageSize := 100
 	txSigs, err := s.client.GetSignaturesForAddressWithOpts(
 		ctx,
 		s.feedConfig.StateAccount,

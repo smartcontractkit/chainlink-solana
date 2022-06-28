@@ -96,11 +96,5 @@ func (d *defaultMetrics) Cleanup(balanceAccountName, accountAddress, feedID, cha
 		"network_id":      networkID,
 		"network_name":    networkName,
 	}
-	deleted := gauge.Delete(labels)
-	if !deleted {
-		d.log.Errorw("failed to delete balance metric",
-			"metric-name", makeMetricName(balanceAccountName),
-			"account-address", accountAddress,
-		)
-	}
+	gauge.Delete(labels)
 }
