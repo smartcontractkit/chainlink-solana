@@ -1,4 +1,4 @@
-package monitoring
+package ingestor
 
 import (
 	"context"
@@ -10,14 +10,14 @@ import (
 	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
 )
 
-func NewAccountUpdater(
-	account solana.PublicKey,
+func NewProgramLogsUpdater(
+	program solana.PublicKey,
 	client *ws.Client,
 	commitment rpc.CommitmentType,
 	log relayMonitoring.Logger,
 ) relayMonitoring.Updater {
-	return &accountUpdater{
-		account,
+	return &programLogsUpdater{
+		program,
 		client,
 		commitment,
 		log,
@@ -25,21 +25,21 @@ func NewAccountUpdater(
 	}
 }
 
-type accountUpdater struct {
-	account    solana.PublicKey
+type programLogsUpdater struct {
+	program    solana.PublicKey
 	client     *ws.Client
 	commitment rpc.CommitmentType
 	log        relayMonitoring.Logger
 	updates    chan interface{}
 }
 
-func (a *accountUpdater) Run(ctx context.Context) {
+func (a *programLogsUpdater) Run(ctx context.Context) {
 SUBSCRIBE_LOOP:
 	for {
-		a.log.Infow("subscribing to account updates")
-		subscription, err := a.client.AccountSubscribe(a.account, a.commitment)
+		a.log.Infow("subscribing to program logs")
+		subscription, err := a.client.LogsSubscribeMentions(a.program, a.commitment)
 		if err != nil {
-			a.log.Errorw("error creating account subscription")
+			a.log.Errorw("error creating subscription to program logs")
 			// TODO (dru) a better reconnect logic: exp backoff, error-specific handling.
 			select {
 			case <-ctx.Done():
@@ -51,7 +51,7 @@ SUBSCRIBE_LOOP:
 		for {
 			result, err := subscription.Recv()
 			if err != nil {
-				a.log.Errorw("error reading message from account subscription. Disconnecting!", "error", err)
+				a.log.Errorw("error reading message from logs subscription. Disconnecting!", "error", err)
 				subscription.Unsubscribe()
 				select {
 				case <-ctx.Done():
@@ -70,6 +70,6 @@ SUBSCRIBE_LOOP:
 	}
 }
 
-func (a *accountUpdater) Updates() <-chan interface{} {
+func (a *programLogsUpdater) Updates() <-chan interface{} {
 	return a.updates
 }

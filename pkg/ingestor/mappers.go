@@ -1,17 +1,18 @@
-package monitoring
+package ingestor
 
 import (
 	"encoding/binary"
 	"fmt"
 
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/event"
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 )
 
-type Mapper func(interface{}, SolanaConfig, SolanaFeedConfig) (map[string]interface{}, error)
+type Mapper func(interface{}, SolanaConfig, monitoring.SolanaFeedConfig) (map[string]interface{}, error)
 
-func StateMapper(raw interface{}, _ SolanaConfig, feedConfig SolanaFeedConfig) (map[string]interface{}, error) {
+func StateMapper(raw interface{}, _ SolanaConfig, feedConfig monitoring.SolanaFeedConfig) (map[string]interface{}, error) {
 	account, isStateAccount := raw.(StateAccount)
 	if !isStateAccount {
 		return nil, fmt.Errorf("expected input of type StateAccount but got '%T'", raw)
@@ -106,7 +107,7 @@ func StateMapper(raw interface{}, _ SolanaConfig, feedConfig SolanaFeedConfig) (
 	return out, nil
 }
 
-func TransmissionsMapper(raw interface{}, _ SolanaConfig, feedConfig SolanaFeedConfig) (map[string]interface{}, error) {
+func TransmissionsMapper(raw interface{}, _ SolanaConfig, feedConfig monitoring.SolanaFeedConfig) (map[string]interface{}, error) {
 	account, isTransmissionsAccount := raw.(TransmissionsAccount)
 	if !isTransmissionsAccount {
 		return nil, fmt.Errorf("expected input of type TransmissionsAccount but got '%T'", raw)
@@ -145,7 +146,7 @@ func TransmissionsMapper(raw interface{}, _ SolanaConfig, feedConfig SolanaFeedC
 	return out, nil
 }
 
-func LogMapper(raw interface{}, _ SolanaConfig, feedConfig SolanaFeedConfig) (map[string]interface{}, error) {
+func LogMapper(raw interface{}, _ SolanaConfig, feedConfig monitoring.SolanaFeedConfig) (map[string]interface{}, error) {
 	logs, isLogs := raw.(Logs)
 	if !isLogs {
 		return nil, fmt.Errorf("expected input of type Logs but got '%T'", raw)
@@ -166,7 +167,7 @@ func LogMapper(raw interface{}, _ SolanaConfig, feedConfig SolanaFeedConfig) (ma
 	return out, nil
 }
 
-func BlockMapper(raw interface{}, _ SolanaConfig, feedConfig SolanaFeedConfig) (map[string]interface{}, error) {
+func BlockMapper(raw interface{}, _ SolanaConfig, feedConfig monitoring.SolanaFeedConfig) (map[string]interface{}, error) {
 	block, isBlock := raw.(Block)
 	if !isBlock {
 		return nil, fmt.Errorf("expected input of type Block but got '%T'", raw)

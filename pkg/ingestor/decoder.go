@@ -1,4 +1,4 @@
-package monitoring
+package ingestor
 
 import (
 	"fmt"
@@ -9,12 +9,13 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/gagliardetto/solana-go/rpc/ws"
 	"github.com/smartcontractkit/chainlink-relay/pkg/monitoring/pb"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/event"
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	"google.golang.org/protobuf/proto"
 )
 
-type Decoder func(interface{}, SolanaConfig, SolanaFeedConfig) (interface{}, error)
+type Decoder func(interface{}, SolanaConfig, monitoring.SolanaFeedConfig) (interface{}, error)
 
 type StateAccount struct {
 	Slot       uint64
@@ -28,7 +29,7 @@ type StateAccount struct {
 	NumericalMedianConfig *pb.NumericalMedianConfigProto
 }
 
-func StateResultDecoder(raw interface{}, _ SolanaConfig, _ SolanaFeedConfig) (interface{}, error) {
+func StateResultDecoder(raw interface{}, _ SolanaConfig, _ monitoring.SolanaFeedConfig) (interface{}, error) {
 	result, isResult := raw.(*ws.AccountResult)
 	if !isResult {
 		return nil, fmt.Errorf("expected input of type *ws.AccountResult, instead got '%T'", raw)
@@ -72,7 +73,7 @@ type TransmissionsAccount struct {
 	Transmission pkgSolana.Transmission
 }
 
-func TransmissionResultDecoder(raw interface{}, _ SolanaConfig, _ SolanaFeedConfig) (interface{}, error) {
+func TransmissionResultDecoder(raw interface{}, _ SolanaConfig, _ monitoring.SolanaFeedConfig) (interface{}, error) {
 	result, isResult := raw.(*ws.AccountResult)
 	if !isResult {
 		return nil, fmt.Errorf("expected input of type *ws.AccountResult, instead got '%T'", raw)
@@ -115,7 +116,7 @@ type Logs struct {
 	Events []interface{}
 }
 
-func LogResultDecode(raw interface{}, _ SolanaConfig, config SolanaFeedConfig) (interface{}, error) {
+func LogResultDecode(raw interface{}, _ SolanaConfig, config monitoring.SolanaFeedConfig) (interface{}, error) {
 	result, isResult := raw.(*ws.LogResult)
 	if !isResult {
 		return nil, fmt.Errorf("expected input of type *ws.BlockResult, instead got '%T'", raw)
@@ -155,7 +156,7 @@ type Block struct {
 	Rewards      []rpc.BlockReward
 }
 
-func BlockResultDecode(raw interface{}, _ SolanaConfig, config SolanaFeedConfig) (interface{}, error) {
+func BlockResultDecode(raw interface{}, _ SolanaConfig, config monitoring.SolanaFeedConfig) (interface{}, error) {
 	result, isResult := raw.(*ws.BlockResult)
 	if !isResult {
 		return nil, fmt.Errorf("expected input of type *ws.LogResult, instead got '%T'", raw)

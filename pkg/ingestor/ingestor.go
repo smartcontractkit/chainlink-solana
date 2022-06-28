@@ -1,4 +1,4 @@
-package monitoring
+package ingestor
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc/ws"
 	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
 	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring"
 )
 
 type Ingestor struct {
@@ -27,7 +28,7 @@ type Ingestor struct {
 	log     relayMonitoring.Logger
 }
 
-func NewIngestor(
+func New(
 	chainConfig SolanaConfig,
 	client *ws.Client,
 	commitment rpc.CommitmentType,
@@ -89,7 +90,7 @@ type ingestorPipeline struct {
 	Schema      relayMonitoring.Schema
 	Topic       string
 	ChainConfig SolanaConfig
-	FeedConfig  SolanaFeedConfig
+	FeedConfig  monitoring.SolanaFeedConfig
 }
 
 func (i *Ingestor) createPipelines(rawFeeds []relayMonitoring.FeedConfig) []ingestorPipeline {
@@ -111,7 +112,7 @@ func (i *Ingestor) createPipelines(rawFeeds []relayMonitoring.FeedConfig) []inge
 		i.chainConfig,
 		// The only data needed by LogResultDecode is the aggregator
 		// address (ie. ProgramAddress) which is the same for all feeds on Solana.
-		SolanaFeedConfig{
+		monitoring.SolanaFeedConfig{
 			ContractAddressBase58: feeds[0].ContractAddressBase58,
 			ContractAddress:       feeds[0].ContractAddress,
 		},
@@ -129,7 +130,7 @@ func (i *Ingestor) createPipelines(rawFeeds []relayMonitoring.FeedConfig) []inge
 		i.blockSchema,
 		i.chainConfig.BlocksKafkaTopic,
 		i.chainConfig,
-		SolanaFeedConfig{}, // not needed
+		monitoring.SolanaFeedConfig{}, // not needed
 	})
 	// Add pipelines for state and transmissions accounts for every feed.
 	for _, feed := range feeds {
@@ -197,10 +198,10 @@ func (i *Ingestor) handleUpdate(
 
 // Helpers
 
-func convertToSolanaFeeds(feeds []relayMonitoring.FeedConfig) []SolanaFeedConfig {
-	output := make([]SolanaFeedConfig, len(feeds))
+func convertToSolanaFeeds(feeds []relayMonitoring.FeedConfig) []monitoring.SolanaFeedConfig {
+	output := make([]monitoring.SolanaFeedConfig, len(feeds))
 	for i, feed := range feeds {
-		if typed, ok := feed.(SolanaFeedConfig); ok {
+		if typed, ok := feed.(monitoring.SolanaFeedConfig); ok {
 			output[i] = typed
 		}
 	}

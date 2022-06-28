@@ -1,7 +1,6 @@
-package monitoring
+package ingestor
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/linkedin/goavro"
@@ -231,19 +230,19 @@ var (
 
 func init() {
 	var err error
-	StateAvroSchema, stateCodec, err = parseSchema(stateAvroSchema)
+	StateAvroSchema, stateCodec, err = avro.ParseSchema(stateAvroSchema)
 	if err != nil {
 		panic(fmt.Errorf("failed to generate Avro schema for State objects: %w", err))
 	}
-	TransmissionAvroSchema, transmissionCodec, err = parseSchema(transmissionAvroSchema)
+	TransmissionAvroSchema, transmissionCodec, err = avro.ParseSchema(transmissionAvroSchema)
 	if err != nil {
 		panic(fmt.Errorf("failed to generate Avro schema for Transmission objects: %w", err))
 	}
-	EventsAvroSchema, eventsCodec, err = parseSchema(eventsAvroSchema)
+	EventsAvroSchema, eventsCodec, err = avro.ParseSchema(eventsAvroSchema)
 	if err != nil {
 		panic(fmt.Errorf("failed to generate Avro schema for Events objects: %w", err))
 	}
-	BlockAvroSchema, blockCodec, err = parseSchema(blockAvroSchema)
+	BlockAvroSchema, blockCodec, err = avro.ParseSchema(blockAvroSchema)
 	if err != nil {
 		panic(fmt.Errorf("failed to generate Avro schema for Block objects: %w", err))
 	}
@@ -253,17 +252,4 @@ func init() {
 	_ = transmissionCodec
 	_ = eventsCodec
 	_ = blockCodec
-}
-
-func parseSchema(schema avro.Schema) (jsonEncoded string, codec *goavro.Codec, err error) {
-	buf, err := json.Marshal(schema)
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to encode Avro schema to JSON: %w", err)
-	}
-	jsonEncoded = string(buf)
-	codec, err = goavro.NewCodec(jsonEncoded)
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to parse JSON-encoded Avro schema into a codec: %w", err)
-	}
-	return jsonEncoded, codec, nil
 }

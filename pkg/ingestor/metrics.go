@@ -1,4 +1,4 @@
-package monitoring
+package ingestor
 
 import (
 	"net/http"
