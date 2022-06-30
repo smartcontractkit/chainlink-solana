@@ -1,6 +1,6 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { SolanaCommand, TransactionResponse, logger } from '@chainlink/gauntlet-solana'
 import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { PublicKey, TransactionInstruction } from '@solana/web3.js'
 import { TOKEN_DECIMALS } from '../../../lib/constants'

@@ -1,6 +1,5 @@
 import { FlowCommand } from '@chainlink/gauntlet-core'
-import { TransactionResponse, waitExecute } from '@chainlink/gauntlet-solana'
-import { logger } from '@chainlink/gauntlet-core/dist/utils'
+import { TransactionResponse, waitExecute, logger } from '@chainlink/gauntlet-solana'
 import { CONTRACT_ENV_NAMES, CONTRACT_LIST, getDeploymentContract } from '../../../lib/contracts'
 import { makeAbstractCommand } from '../../abstract'
 import Initialize from './initialize'

@@ -1,9 +1,9 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse, logger } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { utils } from '@project-serum/anchor'
-import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import RDD from '../../../lib/rdd'
 

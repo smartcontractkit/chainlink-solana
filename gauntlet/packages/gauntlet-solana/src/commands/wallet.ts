@@ -2,7 +2,7 @@ import { Wallet } from '@project-serum/anchor'
 import { Keypair, PublicKey, Transaction } from '@solana/web3.js'
 import TransportNodeHid from '@ledgerhq/hw-transport-node-hid'
 import Solana from '@ledgerhq/hw-app-solana'
-import { logger } from '@chainlink/gauntlet-core/dist/utils'
+import logger from './logger'
 
 export enum WalletTypes {
   LOCAL = 'local',

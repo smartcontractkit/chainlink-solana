@@ -1,6 +1,6 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, prompt, BN } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { prompt, BN } from '@chainlink/gauntlet-core/dist/utils'
+import { SolanaCommand, TransactionResponse, logger } from '@chainlink/gauntlet-solana'
 import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { TOKEN_DECIMALS } from '../../../lib/constants'
 import { CONTRACT_LIST } from '../../../lib/contracts'

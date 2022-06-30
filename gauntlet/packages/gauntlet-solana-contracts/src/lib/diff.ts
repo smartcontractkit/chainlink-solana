@@ -1,4 +1,4 @@
-import { logger } from '@chainlink/gauntlet-core/dist/utils'
+import { logger } from '@chainlink/gauntlet-solana'
 
 enum DIFF_PROPERTY_COLOR {
   ADDED = 'green',

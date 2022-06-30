@@ -1,5 +1,6 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import logger from '../logger'
+import { prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { Message, sendAndConfirmRawTransaction, Transaction } from '@solana/web3.js'
 import SolanaCommand from './solana'
 import { TransactionResponse } from '../types'

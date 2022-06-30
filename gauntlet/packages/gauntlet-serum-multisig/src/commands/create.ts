@@ -1,6 +1,6 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse, contracts } from '@chainlink/gauntlet-solana'
+import { BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { SolanaCommand, TransactionResponse, contracts, logger } from '@chainlink/gauntlet-solana'
 import { PublicKey, SYSVAR_RENT_PUBKEY, Keypair } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../lib/contracts'
 
