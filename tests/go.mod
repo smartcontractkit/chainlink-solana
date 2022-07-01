@@ -15,7 +15,7 @@ require (
 	github.com/smartcontractkit/chainlink-solana v0.2.20-0.20220623180542-e8bd188d1a26
 	github.com/smartcontractkit/chainlink-testing-framework v1.2.9
 	github.com/smartcontractkit/helmenv v1.2.7
-	github.com/smartcontractkit/libocr v0.0.0-20220623210256-b7ae1e1c66f6
+	github.com/smartcontractkit/libocr v0.0.0-20220701150323-d815c8d0eab8
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	gopkg.in/yaml.v2 v2.4.0
