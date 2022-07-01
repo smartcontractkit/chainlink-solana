@@ -284,7 +284,7 @@ func CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error {
 		TransmitterID:         contractNodeInfo.BootstrapNodeKeysBundle.TXKey.Data.ID,
 		ObservationSource:     contractNodeInfo.BootstrapBridgeInfo.ObservationSource,
 		JuelsPerFeeCoinSource: contractNodeInfo.BootstrapBridgeInfo.JuelsSource,
-		TrackerPollInterval:   10 * time.Second, // faster config checking
+		TrackerPollInterval:   15 * time.Second, // faster config checking
 	}
 	if _, err := contractNodeInfo.BootstrapNode.CreateJob(jobSpec); err != nil {
 		return fmt.Errorf("failed creating job for boostrap node: %w", err)
@@ -302,7 +302,7 @@ func CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error {
 			TransmitterID:         contractNodeInfo.NodeKeysBundle[nIdx].TXKey.Data.ID,
 			ObservationSource:     contractNodeInfo.BridgeInfos[nIdx].ObservationSource,
 			JuelsPerFeeCoinSource: contractNodeInfo.BridgeInfos[nIdx].JuelsSource,
-			TrackerPollInterval:   10 * time.Second, // faster config checking
+			TrackerPollInterval:   15 * time.Second, // faster config checking
 		}
 		if _, err := n.CreateJob(jobSpec); err != nil {
 			return fmt.Errorf("failed creating job for node %s: %w", n.URL(), err)
