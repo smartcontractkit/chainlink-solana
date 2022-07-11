@@ -36,6 +36,11 @@ jobs:
           path: contracts/target/deploy
   chaos_testing_build_custom_chainlink_image:
     name: Chaos Testing Build Custom Chainlink Image
+    permissions:
+      checks: write
+      pull-requests: write
+      id-token: write
+      contents: read
     # target branch can't be set as var, it's from where we getting pipeline code
     uses: smartcontractkit/chainlink/.github/workflows/build-custom.yml@develop
     with:
@@ -45,13 +50,17 @@ jobs:
       # commit of the caller branch
       dep_solana_sha: ${{ github.sha }}
     secrets:
-      AWS_ACCESS_KEY_ID: ${{ secrets.QA_AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.QA_AWS_SECRET_KEY }}
       AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
   chaos_testing_run_test:
     name: Chaos Testing Run Test
+    environment: qa
+    permissions:
+      checks: write
+      pull-requests: write
+      id-token: write
+      contents: read
     runs-on: ubuntu-latest
     needs: [chaos_testing_build_contracts, chaos_testing_build_custom_chainlink_image]
     env:
@@ -68,8 +77,6 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.QA_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.QA_AWS_SECRET_KEY }}
           aws-region: ${{ secrets.QA_AWS_REGION }}
           role-to-assume: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           role-duration-seconds: 3600
