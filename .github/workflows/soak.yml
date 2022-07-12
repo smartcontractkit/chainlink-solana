@@ -52,7 +52,7 @@ jobs:
       QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
   soak_testing_run_test:
     name: Soak Testing Run Test
-    environment: qa
+    environment: integration
     permissions:
       id-token: write
       contents: read

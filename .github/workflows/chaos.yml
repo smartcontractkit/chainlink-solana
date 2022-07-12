@@ -53,7 +53,7 @@ jobs:
       QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
   chaos_testing_run_test:
     name: Chaos Testing Run Test
-    environment: qa
+    environment: integration
     permissions:
       id-token: write
       contents: read
