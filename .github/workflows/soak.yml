@@ -36,8 +36,6 @@ jobs:
   soak_testing_build_custom_chainlink_image:
     name: Soak Testing Build Custom Chainlink Image
     permissions:
-      checks: write
-      pull-requests: write
       id-token: write
       contents: read
     # target branch can't be set as var, it's from where we getting pipeline code
@@ -56,8 +54,6 @@ jobs:
     name: Soak Testing Run Test
     environment: qa
     permissions:
-      checks: write
-      pull-requests: write
       id-token: write
       contents: read
     runs-on: ubuntu-latest
