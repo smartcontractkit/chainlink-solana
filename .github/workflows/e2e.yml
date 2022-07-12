@@ -54,21 +54,10 @@ jobs:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1
     steps:
-      - uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
-        with:
-          repository: ${{ inputs.repo_name }}
-      - run: echo "$HOME"
-      - run: echo "$PATH"
-      - run: yarn install --frozen-lockfile
-      - name: Generate program_ids
-        run: ./scripts/programs-keys-gen.sh
-      - run: anchor build
-        working-directory: contracts
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@master
-        with:
-          name: target
-          path: contracts/target/deploy
+      - name: Checkout the repo
+        uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
+      - name: Build contracts
+        uses: ./.github/actions/build_contract_artifacts
   e2e_run_smoke_tests:
     name: E2E Run Smoke Tests
     runs-on: ubuntu-latest

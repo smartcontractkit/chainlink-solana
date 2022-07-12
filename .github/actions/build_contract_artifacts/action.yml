@@ -1,0 +1,47 @@
+name: Build Contract Artifacts
+description: Common builder for test contracts for automated tests
+
+runs:
+  using: composite
+  steps:
+    - name: Install latest Git version (>= 2.18.0) for actions/checkout
+      shell: bash
+      run: |
+        apt-get update
+        apt-get install software-properties-common -y
+        add-apt-repository ppa:git-core/ppa
+        apt update
+        apt install git -y
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
+    - uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
+    - uses: smartcontractkit/tool-versions-to-env-action@v1.0.7
+      id: tool-versions
+    - name: Setup go ${{ steps.tool-versions.outputs.golang_version }}
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ steps.tool-versions.outputs.golang_version }}
+    - name: yarn install
+      shell: bash
+      run: yarn install --frozen-lockfile
+    - name: Generate build artifacts for go bindings check
+      shell: bash
+      run: anchor build
+      working-directory: contracts
+    - name: Check generated go bindings are up to date
+      shell: bash
+      run: |
+        go install github.com/gagliardetto/anchor-go@v0.2.3
+        ./scripts/anchor-go-gen.sh
+        git diff --stat --exit-code
+    - name: Generate program_ids
+      shell: bash
+      run: ./scripts/programs-keys-gen.sh
+    - name: Generate build artifacts with custom program_ids
+      shell: bash
+      run: anchor build
+      working-directory: contracts
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@master
+      with:
+        name: artifacts
+        path: contracts/target/deploy
