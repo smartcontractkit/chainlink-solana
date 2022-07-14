@@ -3,18 +3,15 @@ package solclient
 import (
 	"context"
 	"fmt"
-	"io/fs"
-	"math/big"
-	"net/url"
-	"os"
-	"path/filepath"
-	"time"
-
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
-	"github.com/smartcontractkit/chainlink-testing-framework/config"
+	"io/fs"
+	"math/big"
+	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
@@ -22,23 +19,8 @@ import (
 	"github.com/gagliardetto/solana-go/rpc/ws"
 	"github.com/gagliardetto/solana-go/text"
 	"github.com/rs/zerolog/log"
-	"github.com/smartcontractkit/helmenv/environment"
 	"golang.org/x/sync/errgroup"
-	"gopkg.in/yaml.v2"
 )
-
-type NetworkConfig struct {
-	External          bool          `mapstructure:"external" yaml:"external"`
-	ContractsDeployed bool          `mapstructure:"contracts_deployed" yaml:"contracts_deployed"`
-	Name              string        `mapstructure:"name" yaml:"name"`
-	ID                string        `mapstructure:"id" yaml:"id"`
-	ChainID           int64         `mapstructure:"chain_id" yaml:"chain_id"`
-	URL               string        `mapstructure:"url" yaml:"url"`
-	URLs              []string      `mapstructure:"urls" yaml:"urls"`
-	Type              string        `mapstructure:"type" yaml:"type"`
-	PrivateKeys       []string      `mapstructure:"private_keys" yaml:"private_keys"`
-	Timeout           time.Duration `mapstructure:"transaction_timeout" yaml:"transaction_timeout"`
-}
 
 // Accounts is a shared state between contracts in which data is stored in Solana
 type Accounts struct {
@@ -63,9 +45,22 @@ type Accounts struct {
 	MintAuthority *solana.Wallet
 }
 
+type SolNetwork struct {
+	External          bool          `mapstructure:"external" yaml:"external"`
+	ContractsDeployed bool          `mapstructure:"contracts_deployed" yaml:"contracts_deployed"`
+	Name              string        `mapstructure:"name" yaml:"name"`
+	ID                string        `mapstructure:"id" yaml:"id"`
+	ChainID           int64         `mapstructure:"chain_id" yaml:"chain_id"`
+	URL               string        `mapstructure:"url" yaml:"url"`
+	URLs              []string      `mapstructure:"urls" yaml:"urls"`
+	Type              string        `mapstructure:"type" yaml:"type"`
+	PrivateKeys       []string      `mapstructure:"private_keys" yaml:"private_keys"`
+	Timeout           time.Duration `mapstructure:"transaction_timeout" yaml:"transaction_timeout"`
+}
+
 // Client implements BlockchainClient
 type Client struct {
-	Config *NetworkConfig
+	Config *SolNetwork
 	// Wallets lamport wallets
 	Wallets []*solana.Wallet
 	// ProgramWallets program wallets by key filename
@@ -91,8 +86,6 @@ func (c *Client) GetNetworkType() string {
 	return c.Config.Type
 }
 
-var _ blockchain.EVMClient = (*Client)(nil)
-
 func (c *Client) ContractsDeployed() bool {
 	return c.Config.ContractsDeployed
 }
@@ -101,65 +94,24 @@ func (c *Client) EstimateCostForChainlinkOperations(amountOfOperations int) (*bi
 	panic("implement me")
 }
 
-func ClientURLSFunc() func(e *environment.Environment) ([]*url.URL, error) {
-	return func(e *environment.Environment) ([]*url.URL, error) {
-		urls := make([]*url.URL, 0)
-		httpURL, err := e.Charts.Connections("solana-validator").LocalURLsByPort("http-rpc", environment.HTTP)
-		if err != nil {
-			return nil, err
-		}
-		wsURL, err := e.Charts.Connections("solana-validator").LocalURLsByPort("ws-rpc", environment.WS)
-		if err != nil {
-			return nil, err
-		}
-		log.Debug().Interface("WS_URL", wsURL).Interface("HTTP_URL", httpURL).Msg("URLS loaded")
-		urls = append(urls, httpURL...)
-		urls = append(urls, wsURL...)
-		return urls, nil
-	}
-}
-
-func ClientInitFunc() func(networkName string, networkConfig map[string]interface{}, urls []*url.URL) (blockchain.EVMClient, error) {
-	return func(networkName string, networkConfig map[string]interface{}, urls []*url.URL) (blockchain.EVMClient, error) {
-		d, err := yaml.Marshal(networkConfig)
-		if err != nil {
-			return nil, err
-		}
-		var cfg *NetworkConfig
-		if err = yaml.Unmarshal(d, &cfg); err != nil {
-			return nil, err
-		}
-		cfg.ID = networkName
-		urlStrings := make([]string, 0)
-		for _, u := range urls {
-			urlStrings = append(urlStrings, u.String())
-		}
-		cfg.URLs = urlStrings
-		c, err := NewClient(cfg)
-		if err != nil {
-			return nil, err
-		}
-		if err := c.LoadWallets(cfg); err != nil {
-			return nil, err
-		}
-		return c, nil
-	}
-}
-
 // NewClient creates new Solana client both for RPC ans WS
-func NewClient(cfg *NetworkConfig) (*Client, error) {
+func NewClient(cfg *SolNetwork) (*Client, error) {
 	c := rpc.New(cfg.URLs[0])
 	wsc, err := ws.Connect(context.Background(), cfg.URLs[1])
 	if err != nil {
 		return nil, err
 	}
-	return &Client{
+	client := &Client{
 		Config:         cfg,
 		RPC:            c,
 		WS:             wsc,
 		ProgramWallets: make(map[string]*solana.Wallet),
 		txErrGroup:     errgroup.Group{},
-	}, nil
+	}
+	if err := client.LoadWallets(cfg); err != nil {
+		return nil, err
+	}
+	return client, nil
 }
 
 // CreateAccInstr creates instruction for account creation of particular size
@@ -345,7 +297,7 @@ func (c *Client) ListDirFilenamesByExt(dir string, ext string) ([]string, error)
 
 // LoadWallets loads wallets from config
 func (c *Client) LoadWallets(nc interface{}) error {
-	cfg := nc.(*NetworkConfig)
+	cfg := nc.(*SolNetwork)
 	for _, pkString := range cfg.PrivateKeys {
 		w, err := c.LoadWallet(pkString)
 		if err != nil {
@@ -466,10 +418,6 @@ func (c *Client) GetDefaultWallet() *blockchain.EthereumWallet {
 }
 
 func (c *Client) GetWallets() []*blockchain.EthereumWallet {
-	panic("implement me")
-}
-
-func (c *Client) GetNetworkConfig() *config.ETHNetwork {
 	panic("implement me")
 }
 

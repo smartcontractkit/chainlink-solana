@@ -5,18 +5,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
-
 	ag_binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	associatedtokenaccount "github.com/gagliardetto/solana-go/programs/associated-token-account"
 	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/chainlink-env/environment"
 	access_controller2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/access_controller"
 	ocr_2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr2"
 	store2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/store"
-	"github.com/smartcontractkit/helmenv/environment"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -345,18 +343,22 @@ func (c *ContractDeployer) InitOCR2(billingControllerAddr string, requesterContr
 
 func (c *ContractDeployer) DeployProgramRemote(programName string) error {
 	log.Debug().Str("Program", programName).Msg("Deploying program")
-	connections := c.Env.Charts.Connections("solana-validator")
-	cc, err := connections.Load("sol", "0", "sol-val")
-	if err != nil {
-		return err
-	}
-	chart := c.Env.Charts["solana-validator"]
+	//connections := c.Env.Charts.Connections("solana-validator")
+	//cc, err := connections.Load("sol", "0", "sol-val")
+	//if err != nil {
+	//	return err
+	//}
+	//chart := c.Env.Charts["solana-validator"]
 
 	programPath := filepath.Join("programs", programName)
 	programKeyFileName := strings.Replace(programName, ".so", "-keypair.json", -1)
 	programKeyFilePath := filepath.Join("programs", programKeyFileName)
 	cmd := fmt.Sprintf("solana deploy %s %s", programPath, programKeyFilePath)
-	stdOutBytes, stdErrBytes, _ := chart.ExecuteInPod(cc.PodName, "sol-val", strings.Split(cmd, " "))
+	pl, err := c.Env.Client.ListPods(c.Env.Cfg.Namespace, "app=sol")
+	if err != nil {
+		return err
+	}
+	stdOutBytes, stdErrBytes, _ := c.Env.Client.ExecuteInPod(c.Env.Cfg.Namespace, pl.Items[0].Name, "sol-val", strings.Split(cmd, " "))
 	log.Debug().Str("STDOUT", string(stdOutBytes)).Str("STDERR", string(stdErrBytes)).Str("CMD", cmd).Send()
 	return nil
 }
@@ -460,7 +462,7 @@ func (c *Client) FindAuthorityAddress(seed string, statePubKey solana.PublicKey,
 	return auth, nonce, err
 }
 
-func NewContractDeployer(client blockchain.EVMClient, e *environment.Environment, lt *LinkToken) (*ContractDeployer, error) {
+func NewContractDeployer(client *Client, e *environment.Environment, lt *LinkToken) (*ContractDeployer, error) {
 	cd := &ContractDeployer{
 		Env: e,
 		Accounts: &Accounts{
@@ -473,7 +475,7 @@ func NewContractDeployer(client blockchain.EVMClient, e *environment.Environment
 			MintAuthority: solana.NewWallet(),
 			OCRVault:      solana.NewWallet(),
 		},
-		Client: client.(*Client),
+		Client: client,
 	}
 	if lt != nil {
 		cd.Accounts.Mint = lt.Mint
