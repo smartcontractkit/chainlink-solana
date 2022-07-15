@@ -1,3 +1,4 @@
+# NOTE: This file is still in todo since we need to figure out what is all needed to interact with the chainlink repo
 name: e2e_smoke_tests
 on: 
   workflow_call:
@@ -54,21 +55,13 @@ jobs:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1
     steps:
-      - uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
+      - name: Checkout the repo
+        uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
         with:
           repository: ${{ inputs.repo_name }}
-      - run: echo "$HOME"
-      - run: echo "$PATH"
-      - run: yarn install --frozen-lockfile
-      - name: Generate program_ids
-        run: ./scripts/programs-keys-gen.sh
-      - run: anchor build
-        working-directory: contracts
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@master
-        with:
-          name: target
-          path: contracts/target/deploy
+          ref: ${{ inputs.ref }}
+      - name: Build contracts
+        uses: smartcontractkit/chainlink-solana/.github/actions/build_contract_artifacts@0e7caff8f0dd8e82a1189fe02b361b341f788f5a # develop on 15/07/2022
   e2e_run_smoke_tests:
     name: E2E Run Smoke Tests
     runs-on: ubuntu-latest
@@ -79,72 +72,16 @@ jobs:
         with:
           repository: ${{ inputs.repo_name }}
           ref: ${{ inputs.ref }}
-      - uses: smartcontractkit/tool-versions-to-env-action@v1.0.7
-        id: tool-versions
-      - name: Setup go ${{ steps.tool-versions.outputs.golang_version }}
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{ steps.tool-versions.outputs.golang_version }}
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-region: ${{ secrets.QA_AWS_REGION }}
-          role-to-assume: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-          role-duration-seconds: 3600
-      - name: Set Kubernetes Context
-        uses: azure/k8s-set-context@v1
-        with:
-          method: kubeconfig
-          kubeconfig: ${{ secrets.QA_KUBECONFIG }}
-      - name: Cache Vendor Packages
-        uses: actions/cache@v2
-        id: cache-packages
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-            ~/go/bin
-          key: ${{ runner.os }}-go2-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go2-
-      - name: Download Go Vendor Packages
-        if: steps.cache-packages.outputs.cache-hit != 'true'
-        run: make download
-      - name: Install Ginkgo CLI
-        if: steps.cache-packages.outputs.cache-hit != 'true'
-        run: make install
-      - name: Check for ginkgo ls
-        run: ls ~/go/bin/
-      - name: Download Artifacts
-        uses: actions/download-artifact@master
-        with:
-          name: target
-          path: contracts/target/deploy
-      - name: Echo inputs
-        run: echo ${{ inputs.cl_repo }} ${{ inputs.cl_image }}
-      - name: Env vars
-        run: env
       - name: Run Tests
-        env:
-          SELECTED_NETWORKS: solana
-          CHAINLINK_IMAGE: ${{ inputs.cl_repo }}
-          CHAINLINK_VERSION: ${{ inputs.cl_image }}
-          CGO_ENABLED: 1
-        run: |
-          PATH=$PATH:$(go env GOPATH)/bin
-          export PATH
-          make test_smoke
-      - name: Publish Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v1
-        if: always()
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@010068ddc7dd55cd4439159a485390aa651fdd39 # v2.0.3
         with:
-          files: ${{ inputs.publish_report_paths }}
-          github_token: ${{ inputs.token }}
-          check_name: ${{ inputs.publish_check_name }}
-          comment_mode: create new
-      - name: Publish Artifacts
-        if: failure()
-        uses: actions/upload-artifact@v2.2.4
-        with:
-          name: test-logs
-          path: ./tests/e2e/smoke/logs
+          test_command_to_run: make test_smoke
+          cl_repo: ${{ inputs.cl_repo }}
+          cl_image_tag: ${{ inputs.cl_image }}
+          download_contract_artifacts_path: contracts/target/deploy
+          artifacts_location: "./tests-smoke-report.xml"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
+          CGO_ENABLED: "1"

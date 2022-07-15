@@ -12,6 +12,9 @@ jobs:
 
   e2e_custom_build_artifacts:
     name: E2E Custom Build Artifacts
+    permissions:
+      id-token: write
+      contents: read
     runs-on: ubuntu-latest
     container:
       image: projectserum/build:v0.22.1
@@ -19,130 +22,52 @@ jobs:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1
     steps:
-      - name: Install latest Git version (>= 2.18.0) for actions/checkout
-        run: |
-          apt-get update
-          apt-get install software-properties-common -y
-          add-apt-repository ppa:git-core/ppa
-          apt update
-          apt install git -y
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
-      - uses: smartcontractkit/tool-versions-to-env-action@v1.0.7
-        id: tool-versions
-      - name: Setup go ${{ steps.tool-versions.outputs.golang_version }}
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{ steps.tool-versions.outputs.golang_version }}
-      - run: echo "$HOME"
-      - run: echo "$PATH"
-      - run: yarn install --frozen-lockfile
-      - name: Generate build artifacts for go bindings check
-        run: anchor build
-        working-directory: contracts
-      - name: Check generated go bindings are up to date
-        run: |
-          go install github.com/gagliardetto/anchor-go@v0.2.3
-          ./scripts/anchor-go-gen.sh
-          git diff --stat --exit-code
-      - name: Generate program_ids
-        run: ./scripts/programs-keys-gen.sh
-      - name: Generate build artifacts with custom program_ids
-        run: anchor build
-        working-directory: contracts
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@master
-        with:
-          name: target
-          path: contracts/target/deploy
+      - name: Checkout the repo
+        uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
+      - name: Build contracts
+        uses: ./.github/actions/build_contract_artifacts
   e2e_custom_build_custom_chainlink_image:
     name: E2E Custom Build Custom CL Image
-    # target branch can't be set as var, it's from where we getting pipeline code
-    uses: smartcontractkit/chainlink/.github/workflows/build-custom.yml@develop
-    with:
-      cl_repo: smartcontractkit/chainlink
-      # by default we are integrating with develop
-      cl_ref: ${{ github.event.inputs.cl_branch_ref }}
-      # commit of the caller branch
-      dep_solana_sha: ${{ github.sha }}
-    secrets:
-      AWS_ACCESS_KEY_ID: ${{ secrets.QA_AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.QA_AWS_SECRET_KEY }}
-      AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-      AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-      QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
-  e2e_custom_run_smoke_tests:
+    runs-on: ubuntu-latest
+    environment: integration
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Build Image
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@010068ddc7dd55cd4439159a485390aa651fdd39 # v2.0.3
+        with:
+          cl_repo: smartcontractkit/chainlink
+          # by default we are integrating with develop
+          cl_ref: ${{ github.event.inputs.cl_branch_ref }}
+          # commit of the caller branch
+          dep_solana_sha: ${{ github.sha }}
+          push_tag: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink:custom.${{ github.sha }}
+          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+
+  e2e_custom_run_smoke_testss:
     name: E2E Custom Run Smoke Tests
+    environment: integration
+    permissions:
+      checks: write
+      pull-requests: write
+      id-token: write
+      contents: read
     runs-on: ubuntu-latest
     needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image]
     steps:
       - name: Checkout the repo
         uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
-      - uses: smartcontractkit/tool-versions-to-env-action@v1.0.7
-        id: tool-versions
-      - name: Setup go ${{ steps.tool-versions.outputs.golang_version }}
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{ steps.tool-versions.outputs.golang_version }}
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.QA_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.QA_AWS_SECRET_KEY }}
-          aws-region: ${{ secrets.QA_AWS_REGION }}
-          role-to-assume: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-          role-duration-seconds: 3600
-      - name: Set Kubernetes Context
-        uses: azure/k8s-set-context@v1
-        with:
-          method: kubeconfig
-          kubeconfig: ${{ secrets.QA_KUBECONFIG }}
-      - name: Cache Vendor Packages
-        uses: actions/cache@v2
-        id: cache-packages
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-            ~/go/bin
-          key: ${{ runner.os }}-go2-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go2-
-      - name: Download Go Vendor Packages
-        if: steps.cache-packages.outputs.cache-hit != 'true'
-        run: make download
-      - name: Install Ginkgo CLI
-        if: steps.cache-packages.outputs.cache-hit != 'true'
-        run: make install
-      - name: Check for ginkgo ls
-        run: ls ~/go/bin/
-      - name: Download Artifacts
-        uses: actions/download-artifact@master
-        with:
-          name: target
-          path: contracts/target/deploy
-      - name: Env vars
-        run: env
       - name: Run Tests
-        env:
-          SELECTED_NETWORKS: solana
-          CHAINLINK_IMAGE: 795953128386.dkr.ecr.us-west-2.amazonaws.com/chainlink
-          CHAINLINK_VERSION: custom.${{ github.sha }}
-          CGO_ENABLED: 1
-        run: |
-          PATH=$PATH:$(go env GOPATH)/bin
-          export PATH
-          make test_smoke
-      - name: Publish Test Results
-        uses: mikepenz/action-junit-report@v2
-        if: always()
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@010068ddc7dd55cd4439159a485390aa651fdd39 # v2.0.3
         with:
-          report_paths: "./tests-smoke-report.xml"
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          check_name: Smoke Test Results
-      - name: Publish Artifacts
-        if: failure()
-        uses: actions/upload-artifact@v2.2.4
-        with:
-          name: test-logs
-          path: /home/runner/work/chainlink-solana/chainlink-solana/tests/e2e/logs
+          test_command_to_run: make test_smoke
+          cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
+          cl_image_tag: custom.${{ github.sha }}
+          download_contract_artifacts_path: contracts/target/deploy
+          artifacts_location: /home/runner/work/chainlink-solana/chainlink-solana/tests/e2e/logs
+          token: ${{ secrets.GITHUB_TOKEN }}
+          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
