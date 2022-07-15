@@ -12,12 +12,13 @@ on:
 jobs:
   soak_testing_build_contracts:
     name: Soak Testing Build Contracts
+    environment: integration
     permissions:
       id-token: write
       contents: read
     runs-on: ubuntu-latest
     container:
-      image: projectserum/build:v0.22.1
+      image: projectserum/build:v0.24.2
       env:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1

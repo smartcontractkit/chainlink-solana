@@ -12,12 +12,13 @@ jobs:
 
   e2e_custom_build_artifacts:
     name: E2E Custom Build Artifacts
+    environment: integration
     permissions:
       id-token: write
       contents: read
     runs-on: ubuntu-latest
     container:
-      image: projectserum/build:v0.22.1
+      image: projectserum/build:v0.24.2
       env:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1
