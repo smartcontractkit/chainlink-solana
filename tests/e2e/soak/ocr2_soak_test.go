@@ -26,7 +26,7 @@ var _ = Describe("Solana OCRv2 soak test @ocr2-soak", func() {
 	})
 	AfterEach(func() {
 		By("Tearing down the environment", func() {
-			err := actions.TeardownSuite(state.Env, nil, "logs", nil, nil)
+			err := actions.TeardownSuite(state.Env, "logs", state.ChainlinkNodes, nil, nil)
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 	})
