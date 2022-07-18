@@ -7,14 +7,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
+	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
+	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver"
+	"github.com/smartcontractkit/chainlink-env/pkg/helm/sol"
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/chainlink-env/environment"
+	mockservercfg "github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver-cfg"
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/solclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/client"
-	"github.com/smartcontractkit/helmenv/environment"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -74,7 +77,7 @@ type OCRv2TestState struct {
 	ContractsNodeSetup map[int]*ContractNodeInfo
 	NodeKeysBundle     []NodeKeysBundle
 	MockServer         *client.MockserverClient
-	Networks           *blockchain.Networks
+	c                  *solclient.Client
 	RoundsFound        int
 	LastRoundTime      map[string]time.Time
 	err                error
@@ -107,7 +110,7 @@ func (m *OCRv2TestState) DeployCluster(nodes int, stateful bool, contractsDir st
 
 func (m *OCRv2TestState) LabelChaosGroup(startInstance int, endInstance int, group string) {
 	for i := startInstance; i <= endInstance; i++ {
-		m.err = m.Env.AddLabel(fmt.Sprintf("instance=%d", i), fmt.Sprintf("%s=1", group))
+		m.err = m.Env.Client.AddLabel(m.Env.Cfg.Namespace, fmt.Sprintf("instance=%d", i), fmt.Sprintf("%s=1", group))
 		Expect(m.err).ShouldNot(HaveOccurred())
 	}
 }
@@ -116,29 +119,71 @@ func (m *OCRv2TestState) LabelChaosGroup(startInstance int, endInstance int, gro
 // currently it's the only way to deploy anything to local solana because ephemeral validator in k8s
 // can't expose UDP ports required to copy .so chunks when deploying
 func (m *OCRv2TestState) UploadProgramBinaries(contractsDir string) {
-	connections := m.Env.Charts.Connections("solana-validator")
-	cc, err := connections.Load("sol", "0", "sol-val")
+	pl, err := m.Env.Client.ListPods(m.Env.Cfg.Namespace, "app=sol")
 	Expect(err).ShouldNot(HaveOccurred())
-	_, _, _, err = m.Env.Charts["solana-validator"].CopyToPod(contractsDir, fmt.Sprintf("%s/%s:/programs", m.Env.Namespace, cc.PodName), "sol-val")
+	_, _, _, err = m.Env.Client.CopyToPod(m.Env.Cfg.Namespace, contractsDir, fmt.Sprintf("%s/%s:/programs", m.Env.Cfg.Namespace, pl.Items[0].Name), "sol-val")
 	Expect(err).ShouldNot(HaveOccurred())
 }
 
 func (m *OCRv2TestState) DeployEnv(nodes int, stateful bool, contractsDir string) {
-	m.Env, m.err = environment.DeployOrLoadEnvironment(solclient.NewChainlinkSolOCRv2(nodes, stateful))
-	Expect(m.err).ShouldNot(HaveOccurred())
-	m.err = m.Env.ConnectAll()
-	Expect(m.err).ShouldNot(HaveOccurred())
+	m.Env = environment.New(&environment.Config{
+		NamespacePrefix: "chainlink-test-sol",
+		TTL:             3 * time.Hour,
+	}).
+		AddHelm(mockservercfg.New(nil)).
+		AddHelm(mockserver.New(nil)).
+		AddHelm(sol.New(nil)).
+		AddHelm(chainlink.New(0, map[string]interface{}{
+			"replicas": nodes,
+			"env": map[string]interface{}{
+				"SOLANA_ENABLED":              "true",
+				"EVM_ENABLED":                 "false",
+				"EVM_RPC_ENABLED":             "false",
+				"CHAINLINK_DEV":               "false",
+				"FEATURE_OFFCHAIN_REPORTING2": "true",
+				"feature_offchain_reporting":  "false",
+				"P2P_NETWORKING_STACK":        "V2",
+				"P2PV2_LISTEN_ADDRESSES":      "0.0.0.0:6690",
+				"P2PV2_DELTA_DIAL":            "5s",
+				"P2PV2_DELTA_RECONCILE":       "5s",
+				"p2p_listen_port":             "0",
+			},
+		}))
+	err := m.Env.Run()
+	Expect(err).ShouldNot(HaveOccurred())
 	m.UploadProgramBinaries(contractsDir)
 }
 
+func NewSolanaClientSetup(networkSettings *solclient.SolNetwork) func(*environment.Environment) (*solclient.Client, error) {
+	return func(env *environment.Environment) (*solclient.Client, error) {
+		networkSettings.URLs = env.URLs[networkSettings.Name]
+		ec, err := solclient.NewClient(networkSettings)
+		if err != nil {
+			return nil, err
+		}
+		log.Info().
+			Interface("URLs", networkSettings.URLs).
+			Msg("Connected Solana client")
+		return ec, nil
+	}
+}
+
 func (m *OCRv2TestState) SetupClients() {
-	networkRegistry := blockchain.NewDefaultNetworkRegistry()
-	networkRegistry.RegisterNetwork(
-		"solana",
-		solclient.ClientInitFunc(),
-		solclient.ClientURLSFunc(),
-	)
-	m.Networks, m.err = networkRegistry.GetNetworks(m.Env)
+	m.c, m.err = NewSolanaClientSetup(&solclient.SolNetwork{
+		Name:              "sol",
+		Type:              "solana",
+		ContractsDeployed: false,
+		PrivateKeys: []string{
+			"57qbvFjTChfNwQxqkFZwjHp7xYoPZa7f9ow6GA59msfCH1g6onSjKUTrrLp4w1nAwbwQuit8YgJJ2AwT9BSwownC",
+			"2tye1GyG7wwTUS2T8puXSErDyzQcBxpgwRN5R2MMy5osJKjQF6ZoeYTTpeHaAxpuiE1G4Pnq4sTa4YCWx3RcXb4Y",
+			"5aRBAnU3NBymRyMtrRjPLZ3erZNgTZBhEHszsXF8kTwbGLz8q5FYgKicJ7AFifrFitvJB2NS5jbyQohSJtvkgPER",
+			"2MYG6HKpMuGEo3qErj4pAF2Gney6Yb6jgjTc6TZCuu7fiLAVQekTd3HbsT9ienzGHpKwA7Ekj2TGuMHPUB6EHJ8P",
+		},
+		URLs: []string{
+			"http://localhost:8899",
+			"ws://localhost:8900",
+		},
+	})(m.Env)
 	Expect(m.err).ShouldNot(HaveOccurred())
 	m.MockServer, m.err = client.ConnectMockServer(m.Env)
 	Expect(m.err).ShouldNot(HaveOccurred())
@@ -161,7 +206,7 @@ func (m *OCRv2TestState) initializeNodesInContractsMap() {
 func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 	m.NodeKeysBundle, m.err = CreateNodeKeysBundle(m.ChainlinkNodes)
 	Expect(m.err).ShouldNot(HaveOccurred())
-	cd, err := solclient.NewContractDeployer(m.Networks.Default, m.Env, nil)
+	cd, err := solclient.NewContractDeployer(m.c, m.Env, nil)
 	Expect(err).ShouldNot(HaveOccurred())
 	err = cd.LoadPrograms(contractsDir)
 	Expect(err).ShouldNot(HaveOccurred())
@@ -170,7 +215,7 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 	cd.RegisterAnchorPrograms()
 	m.LinkToken, err = cd.DeployLinkTokenContract()
 	Expect(err).ShouldNot(HaveOccurred())
-	err = FundOracles(m.Networks.Default, m.NodeKeysBundle, big.NewFloat(1e4))
+	err = FundOracles(m.c, m.NodeKeysBundle, big.NewFloat(1e4))
 	Expect(err).ShouldNot(HaveOccurred())
 
 	m.initializeNodesInContractsMap()
@@ -179,7 +224,7 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 		i := i
 		g.Go(func() error {
 			defer ginkgo.GinkgoRecover()
-			cd, err := solclient.NewContractDeployer(m.Networks.Default, m.Env, m.LinkToken)
+			cd, err := solclient.NewContractDeployer(m.c, m.Env, m.LinkToken)
 			Expect(err).ShouldNot(HaveOccurred())
 			err = cd.GenerateAuthorities([]string{"vault", "store"})
 			Expect(err).ShouldNot(HaveOccurred())
@@ -187,7 +232,7 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 			Expect(err).ShouldNot(HaveOccurred())
 			rac, err := cd.DeployOCRv2AccessController()
 			Expect(err).ShouldNot(HaveOccurred())
-			err = m.Networks.Default.WaitForEvents()
+			err = m.c.WaitForEvents()
 			Expect(err).ShouldNot(HaveOccurred())
 
 			store, err := cd.DeployOCRv2Store(bac.Address())
@@ -202,14 +247,14 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 			storeAuth := cd.Accounts.Authorities["store"].PublicKey.String()
 			err = bac.AddAccess(storeAuth)
 			Expect(err).ShouldNot(HaveOccurred())
-			err = m.Networks.Default.WaitForEvents()
+			err = m.c.WaitForEvents()
 			Expect(err).ShouldNot(HaveOccurred())
 
 			err = store.SetWriter(storeAuth)
 			Expect(err).ShouldNot(HaveOccurred())
 			err = store.SetValidatorConfig(80000)
 			Expect(err).ShouldNot(HaveOccurred())
-			err = m.Networks.Default.WaitForEvents()
+			err = m.c.WaitForEvents()
 			Expect(err).ShouldNot(HaveOccurred())
 
 			ocConfig, err := OffChainConfigParamsFromNodes(m.ContractsNodeSetup[i].Nodes, m.ContractsNodeSetup[i].NodeKeysBundle)
