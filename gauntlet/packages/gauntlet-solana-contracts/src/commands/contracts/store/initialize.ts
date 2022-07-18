@@ -1,5 +1,5 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse } from '@chainlink/solana-gauntlet'
 import { Keypair, PublicKey } from '@solana/web3.js'
 import BN from 'bn.js'
 import { ADDITIONAL_STATE_BUFFER } from '../../../lib/constants'

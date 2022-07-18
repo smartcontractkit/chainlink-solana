@@ -2,7 +2,7 @@ module github.com/smartcontractkit/chainlink-solana/tests
 
 go 1.18
 
-replace github.com/smartcontractkit/chainlink-solana => ../
+replace github.com/smartcontractkit/chainlink-solana/relayer => ../relayer
 
 require (
 	github.com/ethereum/go-ethereum v1.10.19
@@ -12,8 +12,9 @@ require (
 	github.com/onsi/gomega v1.19.0
 	github.com/rs/zerolog v1.27.0
 	github.com/satori/go.uuid v1.2.0
+	github.com/smartcontractkit/chainlink-solana/relayer v0.2.20-0.20220516141700-c34f50b2a188
+	github.com/smartcontractkit/helmenv v1.2.2
 	github.com/smartcontractkit/chainlink-env v0.2.24
-	github.com/smartcontractkit/chainlink-solana v0.2.20-0.20220623180542-e8bd188d1a26
 	github.com/smartcontractkit/chainlink-testing-framework v1.4.6
 	github.com/smartcontractkit/libocr v0.0.0-20220701150323-d815c8d0eab8
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4

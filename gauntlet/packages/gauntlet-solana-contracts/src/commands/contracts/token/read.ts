@@ -1,5 +1,5 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse } from '@chainlink/solana-gauntlet'
 import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST } from '../../../lib/contracts'

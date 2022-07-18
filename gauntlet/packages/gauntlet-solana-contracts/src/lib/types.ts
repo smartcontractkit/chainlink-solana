@@ -1,4 +1,4 @@
-import { SolanaCommand } from '@chainlink/gauntlet-solana'
+import { SolanaCommand } from '@chainlink/solana-gauntlet'
 
 interface Oracle {
   signer: Buffer

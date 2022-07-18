@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { Proto } from '@chainlink/gauntlet-core/dist/crypto'
 import { BN } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse } from '@chainlink/solana-gauntlet'
 import { PublicKey } from '@solana/web3.js'
 
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'

@@ -5,7 +5,7 @@
 .vscode/
 
 # ignore relay build
-pkg/bin
+relayer/pkg/bin
 
 v1/target
 

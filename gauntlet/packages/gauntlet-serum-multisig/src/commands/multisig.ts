@@ -1,4 +1,4 @@
-import { SolanaCommand, utils } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, utils } from '@chainlink/solana-gauntlet'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { PublicKey, Keypair, TransactionInstruction, SystemProgram, AccountMeta } from '@solana/web3.js'
 import { Idl, Program } from '@project-serum/anchor'

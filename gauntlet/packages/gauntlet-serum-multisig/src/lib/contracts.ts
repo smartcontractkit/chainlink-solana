@@ -1,4 +1,4 @@
-import { contracts } from '@chainlink/gauntlet-solana'
+import { contracts } from '@chainlink/solana-gauntlet'
 import { join } from 'path'
 
 export enum CONTRACT_LIST {

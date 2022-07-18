@@ -2,7 +2,7 @@ module.exports = {
   rootDir: '.',
   projects: [
     {
-      displayName: 'gauntlet-solana',
+      displayName: 'solana-gauntlet',
       preset: 'ts-jest',
       testEnvironment: 'node',
       testMatch: ['<rootDir>/packages/gauntlet-solana/**/*.test.ts'],
@@ -13,7 +13,7 @@ module.exports = {
       },
     },
     {
-      displayName: 'gauntlet-solana-contracts',
+      displayName: 'solana-gauntlet-contracts',
       preset: 'ts-jest',
       testEnvironment: 'node',
       testMatch: ['<rootDir>/packages/gauntlet-solana-contracts/**/*.test.ts'],

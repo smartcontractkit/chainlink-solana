@@ -1,7 +1,7 @@
 {
-  "name": "@chainlink/gauntlet-solana-contracts",
+  "name": "@chainlink/solana-gauntlet-contracts",
   "version": "0.0.1",
-  "description": "Gauntlet Solana Contracts",
+  "description": "Solana Gauntlet Contracts",
   "keywords": [
     "typescript",
     "cli"
@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "@chainlink/gauntlet-core": "0.1.2",
-    "@chainlink/gauntlet-solana": "*",
+    "@chainlink/solana-gauntlet": "*",
     "@chainlink/gauntlet-serum-multisig": "*",
     "@ethersproject/keccak256": "^5.5.0",
     "@solana/spl-token": "^0.1.8",

@@ -1,6 +1,6 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse, utils } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse, utils } from '@chainlink/solana-gauntlet'
 import { AccountMeta, PublicKey, TransactionInstruction } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { makeRawUpgradeTransaction } from '../../abstract/upgrade'

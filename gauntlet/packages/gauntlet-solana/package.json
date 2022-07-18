@@ -1,7 +1,7 @@
 {
-  "name": "@chainlink/gauntlet-solana",
+  "name": "@chainlink/solana-gauntlet",
   "version": "0.0.1",
-  "description": "Gauntlet Solana",
+  "description": "Solana Gauntlet",
   "keywords": [
     "typescript",
     "cli"

@@ -1,0 +1,49 @@
+name: Changesets
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  changesets:
+    name: Changesets
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout this repository
+      - name: Checkout Repo
+        uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
+        with:
+          # This makes Actions fetch all Git history so that Changesets can generate changelogs with the correct commits
+          fetch-depth: 0
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      # Get tool versions
+      - name: Get tool versions
+        uses: smartcontractkit/tool-versions-to-env-action@v1.0.7
+        id: tool-versions
+      # Install nix
+      - name: Install Nix
+        uses: cachix/install-nix-action@v14
+        with:
+          install_url: https://nixos-nix-install-tests.cachix.org/serve/vij683ly7sl95nnhb67bdjjfabclr85m/install
+          install_options: '--tarball-url-prefix https://nixos-nix-install-tests.cachix.org/serve'
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            access-tokens = github.com=${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      # Set up Node.js
+      - name: Setup Node.js ${{ steps.tool-versions.outputs.nodejs_version }}
+        uses: actions/setup-node@master
+        with:
+          node-version: ${{ steps.tool-versions.outputs.nodejs_version }}
+      # Install dependencies using yarn
+      - name: Install Dependencies
+        run: nix develop -c yarn install --frozen-lockfile
+      # Create PR that will update versions or trigger publish
+      - name: Create Release Pull Request
+        uses: changesets/action@master
+        id: changesets
+        with:
+          publish: nix develop -c yarn release
+        env:
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
