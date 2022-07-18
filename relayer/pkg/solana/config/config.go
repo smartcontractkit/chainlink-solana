@@ -7,7 +7,7 @@ import (
 
 	"github.com/gagliardetto/solana-go/rpc"
 
-	"github.com/smartcontractkit/chainlink-relay/relayer/pkg/utils"
+	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/db"
 	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/logger"

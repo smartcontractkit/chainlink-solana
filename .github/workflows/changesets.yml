@@ -16,7 +16,7 @@ jobs:
         with:
           # This makes Actions fetch all Git history so that Changesets can generate changelogs with the correct commits
           fetch-depth: 0
-          token: ${{ secrets.INTEGRATIONS_PERSONAL_ACCESS_TOKEN }}
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
       # Get tool versions
       - name: Get tool versions
         uses: smartcontractkit/tool-versions-to-env-action@v1.0.7
@@ -29,7 +29,7 @@ jobs:
           install_options: '--tarball-url-prefix https://nixos-nix-install-tests.cachix.org/serve'
           extra_nix_config: |
             experimental-features = nix-command flakes
-            access-tokens = github.com=${{ secrets.INTEGRATIONS_PERSONAL_ACCESS_TOKEN }}
+            access-tokens = github.com=${{ secrets.PERSONAL_ACCESS_TOKEN }}
       # Set up Node.js
       - name: Setup Node.js ${{ steps.tool-versions.outputs.nodejs_version }}
         uses: actions/setup-node@master
@@ -45,5 +45,5 @@ jobs:
         with:
           publish: nix develop -c yarn release
         env:
-          GITHUB_TOKEN: ${{ secrets.INTEGRATIONS_PERSONAL_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
