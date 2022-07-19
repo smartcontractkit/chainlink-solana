@@ -169,13 +169,13 @@ func TestNode_SetFromDB(t *testing.T) {
 			Name:      "test-name",
 			SolanaURL: "http://fake.test",
 		}, Node{
-			Name: "test-name",
+			Name: ptr("test-name"),
 			URL:  utils.MustParseURL("http://fake.test"),
 		}, false},
 		{"url-missing", db.Node{
 			Name: "test-name",
 		}, Node{
-			Name: "test-name",
+			Name: ptr("test-name"),
 		}, false},
 		{"url-invalid", db.Node{
 			Name:      "test-name",
