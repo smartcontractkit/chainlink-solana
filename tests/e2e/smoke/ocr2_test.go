@@ -1,7 +1,7 @@
 package smoke
 
 import (
-	"github.com/smartcontractkit/chainlink-testing-framework/actions"
+	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/utils"
