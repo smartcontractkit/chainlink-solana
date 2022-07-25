@@ -19,8 +19,8 @@ jobs:
       - name: Install Solana CLI
         run: ./scripts/install-solana-ci.sh
       - name: Build
-        run: go build -v ./relayer/...
+        run: cd ./relayer && go build -v ./pkg/...
       - name: Test
-        run: go test ./relayer/... -v
+        run: cd ./relayer && go test ./pkg/... -v
       - name: Test with the race detector enabled
-        run: go test ./relayer/... -v -race -count=10
+        run: cd ./relayer && go test ./pkg/... -v -race -count=10
