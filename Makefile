@@ -71,8 +71,7 @@ build_local: build_js build_contracts_local cp_gauntlet_idl
 build_staging: build_js build_contracts_staging cp_gauntlet_idl
 
 test_relay_unit:
-	go build -v ./relayer/...
-	go test -v ./relayer/...
+	cd relayer && go build -v ./pkg/... && go test -v ./pkg/...
 
 test_smoke:
 	SELECTED_NETWORKS=solana NETWORK_SETTINGS=$(shell pwd)/tests/e2e/networks.yaml \
