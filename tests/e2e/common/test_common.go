@@ -17,7 +17,8 @@ import (
 	"github.com/smartcontractkit/chainlink-env/environment"
 	mockservercfg "github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver-cfg"
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/solclient"
-	"github.com/smartcontractkit/chainlink-testing-framework/client"
+	"github.com/smartcontractkit/chainlink/integration-tests/client"
+ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -76,7 +77,7 @@ type OCRv2TestState struct {
 	Contracts          []Contracts
 	ContractsNodeSetup map[int]*ContractNodeInfo
 	NodeKeysBundle     []NodeKeysBundle
-	MockServer         *client.MockserverClient
+	MockServer         *ctfClient.MockserverClient
 	c                  *solclient.Client
 	RoundsFound        int
 	LastRoundTime      map[string]time.Time
@@ -185,7 +186,7 @@ func (m *OCRv2TestState) SetupClients() {
 		},
 	})(m.Env)
 	Expect(m.err).ShouldNot(HaveOccurred())
-	m.MockServer, m.err = client.ConnectMockServer(m.Env)
+	m.MockServer, m.err = ctfClient.ConnectMockServer(m.Env)
 	Expect(m.err).ShouldNot(HaveOccurred())
 	m.ChainlinkNodes, m.err = client.ConnectChainlinkNodes(m.Env)
 	Expect(m.err).ShouldNot(HaveOccurred())

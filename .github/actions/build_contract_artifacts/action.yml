@@ -1,5 +1,9 @@
 name: Build Contract Artifacts
 description: Common builder for test contracts for automated tests
+inputs:
+  ref:
+    required: false
+    description: The chainlink-solana ref to use
 
 runs:
   using: composite
@@ -14,6 +18,9 @@ runs:
         apt install git -y
         git config --global --add safe.directory "$GITHUB_WORKSPACE"
     - uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
+      with:
+        repository: smartcontractkit/chainlink-solana
+        ref: ${{ inputs.ref }}
     - uses: smartcontractkit/tool-versions-to-env-action@v1.0.7
       id: tool-versions
     - name: Setup go ${{ steps.tool-versions.outputs.golang_version }}
