@@ -12,14 +12,14 @@ import {
 } from '@solana/web3.js'
 import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { TransactionResponse } from '../types'
-import { ProgramError, parseIdlErrors, Idl, Program, Provider } from '@project-serum/anchor'
+import { ProgramError, parseIdlErrors, Idl, Program, AnchorProvider } from '@project-serum/anchor'
 import { SolanaWallet } from '../wallet'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
 import { makeTx } from '../../lib/utils'
 
 export default abstract class SolanaCommand extends WriteCommand<TransactionResponse> {
   wallet: SolanaWallet
-  provider: Provider
+  provider: AnchorProvider
   program: Program
 
   abstract execute: () => Promise<Result<TransactionResponse>>
@@ -139,7 +139,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
 
   sendTx = async (tx: Transaction, signers: Keypair[], idl: Idl): Promise<TransactionSignature> => {
     try {
-      return await this.provider.send(tx, signers)
+      return await this.provider.sendAndConfirm(tx, signers)
     } catch (err) {
       // Translate IDL error
       const idlErrors = parseIdlErrors(idl)

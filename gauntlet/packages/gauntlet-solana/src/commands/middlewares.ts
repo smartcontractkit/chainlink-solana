@@ -1,7 +1,7 @@
 import { Middleware, Next } from '@chainlink/gauntlet-core'
 import { boolean } from '@chainlink/gauntlet-core/dist/lib/args'
 import { assertions, logger } from '@chainlink/gauntlet-core/dist/utils'
-import { Provider } from '@project-serum/anchor'
+import { AnchorProvider } from '@project-serum/anchor'
 import { Connection, Keypair } from '@solana/web3.js'
 import { DEFAULT_DERIVATION_PATH } from '../lib/constants'
 import SolanaCommand from './internal/solana'
@@ -18,7 +18,7 @@ export const withProvider: Middleware = (c: SolanaCommand, next: Next) => {
     `Invalid NODE_URL (${nodeURL}), please add an http:// or https:// prefix`,
   )
 
-  c.provider = new Provider(new Connection(nodeURL), c.wallet, {})
+  c.provider = new AnchorProvider(new Connection(nodeURL), c.wallet, {})
   return next()
 }
 
