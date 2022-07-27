@@ -17,8 +17,9 @@ import (
 	"github.com/smartcontractkit/chainlink-env/environment"
 	mockservercfg "github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver-cfg"
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/solclient"
+
+	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
-ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -71,7 +72,7 @@ func NewOCRv2State(contracts int, nodes int) *OCRv2TestState {
 type OCRv2TestState struct {
 	Mu                 *sync.Mutex
 	Env                *environment.Environment
-	ChainlinkNodes     []client.Chainlink
+	ChainlinkNodes     []*client.Chainlink
 	ContractDeployer   *solclient.ContractDeployer
 	LinkToken          *solclient.LinkToken
 	Contracts          []Contracts
