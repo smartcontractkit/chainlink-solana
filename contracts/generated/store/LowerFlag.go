@@ -20,7 +20,7 @@ type LowerFlag struct {
 	// [2] = [SIGNER] authority
 	//
 	// [3] = [] accessController
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewLowerFlagInstructionBuilder creates a new `LowerFlag` instruction builder.
@@ -39,7 +39,7 @@ func (inst *LowerFlag) SetFeedAccount(feed ag_solanago.PublicKey) *LowerFlag {
 
 // GetFeedAccount gets the "feed" account.
 func (inst *LowerFlag) GetFeedAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetOwnerAccount sets the "owner" account.
@@ -50,7 +50,7 @@ func (inst *LowerFlag) SetOwnerAccount(owner ag_solanago.PublicKey) *LowerFlag {
 
 // GetOwnerAccount gets the "owner" account.
 func (inst *LowerFlag) GetOwnerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -61,7 +61,7 @@ func (inst *LowerFlag) SetAuthorityAccount(authority ag_solanago.PublicKey) *Low
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *LowerFlag) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetAccessControllerAccount sets the "accessController" account.
@@ -72,7 +72,7 @@ func (inst *LowerFlag) SetAccessControllerAccount(accessController ag_solanago.P
 
 // GetAccessControllerAccount gets the "accessController" account.
 func (inst *LowerFlag) GetAccessControllerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst LowerFlag) Build() *Instruction {
@@ -124,10 +124,10 @@ func (inst *LowerFlag) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("            feed", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("           owner", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("accessController", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("            feed", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("           owner", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("accessController", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})

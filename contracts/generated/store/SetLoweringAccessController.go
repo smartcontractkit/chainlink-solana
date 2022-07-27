@@ -18,7 +18,7 @@ type SetLoweringAccessController struct {
 	// [1] = [SIGNER] authority
 	//
 	// [2] = [] accessController
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewSetLoweringAccessControllerInstructionBuilder creates a new `SetLoweringAccessController` instruction builder.
@@ -37,7 +37,7 @@ func (inst *SetLoweringAccessController) SetStoreAccount(store ag_solanago.Publi
 
 // GetStoreAccount gets the "store" account.
 func (inst *SetLoweringAccessController) GetStoreAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -48,7 +48,7 @@ func (inst *SetLoweringAccessController) SetAuthorityAccount(authority ag_solana
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *SetLoweringAccessController) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAccessControllerAccount sets the "accessController" account.
@@ -59,7 +59,7 @@ func (inst *SetLoweringAccessController) SetAccessControllerAccount(accessContro
 
 // GetAccessControllerAccount gets the "accessController" account.
 func (inst *SetLoweringAccessController) GetAccessControllerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 func (inst SetLoweringAccessController) Build() *Instruction {
@@ -108,9 +108,9 @@ func (inst *SetLoweringAccessController) EncodeToTree(parent ag_treeout.Branches
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("           store", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("accessController", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("           store", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("accessController", inst.AccountMetaSlice.Get(2)))
 					})
 				})
 		})

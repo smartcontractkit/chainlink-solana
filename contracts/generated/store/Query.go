@@ -16,7 +16,7 @@ type Query struct {
 	Scope Scope
 
 	// [0] = [] feed
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewQueryInstructionBuilder creates a new `Query` instruction builder.
@@ -41,7 +41,7 @@ func (inst *Query) SetFeedAccount(feed ag_solanago.PublicKey) *Query {
 
 // GetFeedAccount gets the "feed" account.
 func (inst *Query) GetFeedAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 func (inst Query) Build() *Instruction {
@@ -93,7 +93,7 @@ func (inst *Query) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=1]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("feed", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("feed", inst.AccountMetaSlice.Get(0)))
 					})
 				})
 		})
@@ -104,22 +104,22 @@ func (obj Query) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	{
 		tmp := scopeContainer{}
 		switch realvalue := obj.Scope.(type) {
-		case *Version:
+		case *ScopeVersion:
 			tmp.Enum = 0
 			tmp.Version = *realvalue
-		case *Decimals:
+		case *ScopeDecimals:
 			tmp.Enum = 1
 			tmp.Decimals = *realvalue
-		case *Description:
+		case *ScopeDescription:
 			tmp.Enum = 2
 			tmp.Description = *realvalue
-		case *RoundData:
+		case *ScopeRoundData:
 			tmp.Enum = 3
 			tmp.RoundData = *realvalue
-		case *LatestRoundData:
+		case *ScopeLatestRoundData:
 			tmp.Enum = 4
 			tmp.LatestRoundData = *realvalue
-		case *Aggregator:
+		case *ScopeAggregator:
 			tmp.Enum = 5
 			tmp.Aggregator = *realvalue
 		}
@@ -140,17 +140,17 @@ func (obj *Query) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 		}
 		switch tmp.Enum {
 		case 0:
-			obj.Scope = (*Version)(&tmp.Enum)
+			obj.Scope = (*ScopeVersion)(&tmp.Enum)
 		case 1:
-			obj.Scope = (*Decimals)(&tmp.Enum)
+			obj.Scope = (*ScopeDecimals)(&tmp.Enum)
 		case 2:
-			obj.Scope = (*Description)(&tmp.Enum)
+			obj.Scope = (*ScopeDescription)(&tmp.Enum)
 		case 3:
 			obj.Scope = &tmp.RoundData
 		case 4:
-			obj.Scope = (*LatestRoundData)(&tmp.Enum)
+			obj.Scope = (*ScopeLatestRoundData)(&tmp.Enum)
 		case 5:
-			obj.Scope = (*Aggregator)(&tmp.Enum)
+			obj.Scope = (*ScopeAggregator)(&tmp.Enum)
 		default:
 			return fmt.Errorf("unknown enum index: %v", tmp.Enum)
 		}

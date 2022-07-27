@@ -18,7 +18,7 @@ type RemoveAccess struct {
 	// [1] = [SIGNER] owner
 	//
 	// [2] = [] address
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewRemoveAccessInstructionBuilder creates a new `RemoveAccess` instruction builder.
@@ -37,7 +37,7 @@ func (inst *RemoveAccess) SetStateAccount(state ag_solanago.PublicKey) *RemoveAc
 
 // GetStateAccount gets the "state" account.
 func (inst *RemoveAccess) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetOwnerAccount sets the "owner" account.
@@ -48,7 +48,7 @@ func (inst *RemoveAccess) SetOwnerAccount(owner ag_solanago.PublicKey) *RemoveAc
 
 // GetOwnerAccount gets the "owner" account.
 func (inst *RemoveAccess) GetOwnerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetAddressAccount sets the "address" account.
@@ -59,7 +59,7 @@ func (inst *RemoveAccess) SetAddressAccount(address ag_solanago.PublicKey) *Remo
 
 // GetAddressAccount gets the "address" account.
 func (inst *RemoveAccess) GetAddressAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 func (inst RemoveAccess) Build() *Instruction {
@@ -108,9 +108,9 @@ func (inst *RemoveAccess) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("  state", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("  owner", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("address", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("  state", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("  owner", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("address", inst.AccountMetaSlice.Get(2)))
 					})
 				})
 		})

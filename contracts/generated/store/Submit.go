@@ -17,7 +17,7 @@ type Submit struct {
 	// [0] = [WRITE] feed
 	//
 	// [1] = [SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewSubmitInstructionBuilder creates a new `Submit` instruction builder.
@@ -42,7 +42,7 @@ func (inst *Submit) SetFeedAccount(feed ag_solanago.PublicKey) *Submit {
 
 // GetFeedAccount gets the "feed" account.
 func (inst *Submit) GetFeedAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -53,7 +53,7 @@ func (inst *Submit) SetAuthorityAccount(authority ag_solanago.PublicKey) *Submit
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *Submit) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 func (inst Submit) Build() *Instruction {
@@ -108,8 +108,8 @@ func (inst *Submit) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("     feed", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("     feed", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice.Get(1)))
 					})
 				})
 		})

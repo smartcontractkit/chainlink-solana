@@ -20,7 +20,7 @@ type CloseFeed struct {
 	// [2] = [WRITE] receiver
 	//
 	// [3] = [SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewCloseFeedInstructionBuilder creates a new `CloseFeed` instruction builder.
@@ -39,7 +39,7 @@ func (inst *CloseFeed) SetFeedAccount(feed ag_solanago.PublicKey) *CloseFeed {
 
 // GetFeedAccount gets the "feed" account.
 func (inst *CloseFeed) GetFeedAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetOwnerAccount sets the "owner" account.
@@ -50,7 +50,7 @@ func (inst *CloseFeed) SetOwnerAccount(owner ag_solanago.PublicKey) *CloseFeed {
 
 // GetOwnerAccount gets the "owner" account.
 func (inst *CloseFeed) GetOwnerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetReceiverAccount sets the "receiver" account.
@@ -61,7 +61,7 @@ func (inst *CloseFeed) SetReceiverAccount(receiver ag_solanago.PublicKey) *Close
 
 // GetReceiverAccount gets the "receiver" account.
 func (inst *CloseFeed) GetReceiverAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -72,7 +72,7 @@ func (inst *CloseFeed) SetAuthorityAccount(authority ag_solanago.PublicKey) *Clo
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *CloseFeed) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst CloseFeed) Build() *Instruction {
@@ -124,10 +124,10 @@ func (inst *CloseFeed) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("     feed", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("    owner", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta(" receiver", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("     feed", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("    owner", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta(" receiver", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})

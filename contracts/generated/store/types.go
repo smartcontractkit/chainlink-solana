@@ -98,55 +98,55 @@ type Scope interface {
 
 type scopeContainer struct {
 	Enum            ag_binary.BorshEnum `borsh_enum:"true"`
-	Version         Version
-	Decimals        Decimals
-	Description     Description
-	RoundData       RoundData
-	LatestRoundData LatestRoundData
-	Aggregator      Aggregator
+	Version         ScopeVersion
+	Decimals        ScopeDecimals
+	Description     ScopeDescription
+	RoundData       ScopeRoundData
+	LatestRoundData ScopeLatestRoundData
+	Aggregator      ScopeAggregator
 }
 
-type Version uint8
+type ScopeVersion uint8
 
-func (obj Version) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ScopeVersion) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 
-func (obj *Version) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ScopeVersion) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	return nil
 }
 
-func (_ *Version) isScope() {}
+func (_ *ScopeVersion) isScope() {}
 
-type Decimals uint8
+type ScopeDecimals uint8
 
-func (obj Decimals) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ScopeDecimals) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 
-func (obj *Decimals) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ScopeDecimals) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	return nil
 }
 
-func (_ *Decimals) isScope() {}
+func (_ *ScopeDecimals) isScope() {}
 
-type Description uint8
+type ScopeDescription uint8
 
-func (obj Description) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ScopeDescription) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 
-func (obj *Description) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ScopeDescription) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	return nil
 }
 
-func (_ *Description) isScope() {}
+func (_ *ScopeDescription) isScope() {}
 
-type RoundData struct {
+type ScopeRoundData struct {
 	RoundId uint32
 }
 
-func (obj RoundData) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ScopeRoundData) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `RoundId` param:
 	err = encoder.Encode(obj.RoundId)
 	if err != nil {
@@ -155,7 +155,7 @@ func (obj RoundData) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) 
 	return nil
 }
 
-func (obj *RoundData) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ScopeRoundData) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `RoundId`:
 	err = decoder.Decode(&obj.RoundId)
 	if err != nil {
@@ -164,28 +164,28 @@ func (obj *RoundData) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 	return nil
 }
 
-func (_ *RoundData) isScope() {}
+func (_ *ScopeRoundData) isScope() {}
 
-type LatestRoundData uint8
+type ScopeLatestRoundData uint8
 
-func (obj LatestRoundData) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ScopeLatestRoundData) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 
-func (obj *LatestRoundData) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ScopeLatestRoundData) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	return nil
 }
 
-func (_ *LatestRoundData) isScope() {}
+func (_ *ScopeLatestRoundData) isScope() {}
 
-type Aggregator uint8
+type ScopeAggregator uint8
 
-func (obj Aggregator) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj ScopeAggregator) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 
-func (obj *Aggregator) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *ScopeAggregator) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	return nil
 }
 
-func (_ *Aggregator) isScope() {}
+func (_ *ScopeAggregator) isScope() {}

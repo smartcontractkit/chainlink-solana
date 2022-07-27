@@ -20,7 +20,7 @@ type CreateFeed struct {
 	// [0] = [WRITE] feed
 	//
 	// [1] = [SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewCreateFeedInstructionBuilder creates a new `CreateFeed` instruction builder.
@@ -63,7 +63,7 @@ func (inst *CreateFeed) SetFeedAccount(feed ag_solanago.PublicKey) *CreateFeed {
 
 // GetFeedAccount gets the "feed" account.
 func (inst *CreateFeed) GetFeedAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -74,7 +74,7 @@ func (inst *CreateFeed) SetAuthorityAccount(authority ag_solanago.PublicKey) *Cr
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *CreateFeed) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 func (inst CreateFeed) Build() *Instruction {
@@ -141,8 +141,8 @@ func (inst *CreateFeed) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("     feed", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("     feed", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice.Get(1)))
 					})
 				})
 		})
