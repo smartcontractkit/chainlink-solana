@@ -111,6 +111,11 @@ impl<'a> Feed<'a> {
         self.live[self.header.live_cursor as usize] = round;
         self.header.live_cursor = (self.header.live_cursor + 1) % self.live.len() as u32;
 
+        // Skip if historical ringbuffer is disabled
+        if self.historical.len() == 0 {
+            return;
+        }
+
         if self.header.latest_round_id % self.header.granularity as u32 == 0 {
             // insert into historical data
             self.historical[self.header.historical_cursor as usize] = round;

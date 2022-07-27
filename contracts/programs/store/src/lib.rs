@@ -70,6 +70,10 @@ pub mod store {
         // Live length must not exceed total capacity
         require!(live_length <= space as u32, InvalidInput);
 
+        // Both inputs should also be more than zero
+        require!(live_length > 0, InvalidInput);
+        require!(granularity > 0, InvalidInput);
+
         feed.version = FEED_VERSION;
         feed.state = Transmissions::NORMAL;
         feed.owner = ctx.accounts.authority.key();
