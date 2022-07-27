@@ -100,7 +100,6 @@ pub mod store {
         ctx: Context<TransferFeedOwnership>,
         proposed_owner: Pubkey,
     ) -> Result<()> {
-        require!(proposed_owner != Pubkey::default(), InvalidInput);
         ctx.accounts.feed.proposed_owner = proposed_owner;
         Ok(())
     }
@@ -199,7 +198,6 @@ pub mod store {
         ctx: Context<TransferStoreOwnership>,
         proposed_owner: Pubkey,
     ) -> Result<()> {
-        require!(proposed_owner != Pubkey::default(), InvalidInput);
         let store = &mut *ctx.accounts.store.load_mut()?;
         store.proposed_owner = proposed_owner;
         Ok(())

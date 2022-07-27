@@ -71,7 +71,6 @@ pub mod ocr2 {
         ctx: Context<TransferOwnership>,
         proposed_owner: Pubkey,
     ) -> Result<()> {
-        require!(proposed_owner != Pubkey::default(), InvalidInput);
         let mut state = ctx.accounts.state.load_mut()?;
         state.config.proposed_owner = proposed_owner;
         Ok(())

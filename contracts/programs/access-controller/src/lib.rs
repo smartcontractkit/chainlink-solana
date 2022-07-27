@@ -40,7 +40,6 @@ pub mod access_controller {
         ctx: Context<TransferOwnership>,
         proposed_owner: Pubkey,
     ) -> Result<()> {
-        require!(proposed_owner != Pubkey::default(), InvalidInput);
         let state = &mut *ctx.accounts.state.load_mut()?;
         state.proposed_owner = proposed_owner;
         Ok(())
