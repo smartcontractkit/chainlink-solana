@@ -332,10 +332,16 @@ pub mod ocr2 {
         // Use a raw instruction to skip data decoding, but keep using Anchor contexts.
 
         let mut bumps = std::collections::BTreeMap::new();
+        let mut reallocs = std::collections::BTreeSet::new();
         // Deserialize accounts.
         let mut remaining_accounts: &[AccountInfo] = accounts;
-        let mut accounts =
-            Transmit::try_accounts(program_id, &mut remaining_accounts, data, &mut bumps)?;
+        let mut accounts = Transmit::try_accounts(
+            program_id,
+            &mut remaining_accounts,
+            data,
+            &mut bumps,
+            &mut reallocs,
+        )?;
 
         // Construct a context
         let ctx = Context::new(program_id, &mut accounts, remaining_accounts, bumps);
