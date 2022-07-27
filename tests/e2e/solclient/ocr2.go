@@ -353,10 +353,10 @@ func (m *OCRv2) proposeConfig(ocConfig contracts.OffChainAggregatorV2Config) err
 	}
 	instr = append(instr, ocr_2.NewProposePayeesInstruction(
 		m.Mint.PublicKey(),
-		payees,
 		m.Proposal.PublicKey(),
 		m.Owner.PublicKey()).Build(),
 	)
+	// TODO: how to set payees as remaining
 	return m.Client.TXSync(
 		"Set payees",
 		rpc.CommitmentFinalized,

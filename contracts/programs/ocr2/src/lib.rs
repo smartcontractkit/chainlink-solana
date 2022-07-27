@@ -278,25 +278,23 @@ pub mod ocr2 {
     }
 
     #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
-    pub fn propose_payees(
-        ctx: Context<ProposeConfig>,
-        token_mint: Pubkey,
-        payees: Vec<Pubkey>,
-    ) -> Result<()> {
+    pub fn propose_payees(ctx: Context<ProposeConfig>, token_mint: Pubkey) -> Result<()> {
         let mut proposal = ctx.accounts.proposal.load_mut()?;
         require!(proposal.state != Proposal::FINALIZED, InvalidInput);
+
+        let payees = ctx.remaining_accounts;
 
         // Need to provide a payee for each oracle
         require!(proposal.oracles.len() == payees.len(), PayeeOracleMismatch);
 
         // Verify that the remaining accounts are valid token accounts.
-        for account in ctx.remaining_accounts {
+        for account in payees {
             let account = Account::<'_, token::TokenAccount>::try_from(account)?;
             require!(account.mint == token_mint, InvalidTokenAccount);
         }
 
-        for (oracle, payee) in proposal.oracles.iter_mut().zip(payees.into_iter()) {
-            oracle.payee = payee;
+        for (oracle, payee) in proposal.oracles.iter_mut().zip(payees.iter()) {
+            oracle.payee = payee.key();
         }
         proposal.token_mint = token_mint;
 

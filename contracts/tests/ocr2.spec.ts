@@ -533,14 +533,15 @@ describe("ocr2", async () => {
     });
 
     console.log("proposePayees");
+    let payees = oracles.map((oracle) => oracle.payee.address);
     await program.rpc.proposePayees(
       token.publicKey,
-      oracles.map((oracle) => oracle.payee.address),
       {
         accounts: {
           proposal: proposal.publicKey,
           authority: owner.publicKey,
         },
+        remainingAccounts: payees,
       }
     );
 

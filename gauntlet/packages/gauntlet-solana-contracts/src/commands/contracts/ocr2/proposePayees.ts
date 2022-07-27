@@ -121,11 +121,12 @@ export default class ProposePayees extends SolanaCommand {
       .slice(0, proposalInfo.oracles.len)
       .map(({ transmitter }) => this.contractInput.payeeByTransmitter[transmitter.toString()])
 
-    const ix = this.program.instruction.proposePayees(token.publicKey, payees, {
+    const ix = this.program.instruction.proposePayees(token.publicKey, {
       accounts: {
         proposal,
         authority: signer,
       },
+      remainingAccounts: payees,
     })
     return [ix]
   }
