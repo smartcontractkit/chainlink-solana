@@ -137,6 +137,10 @@ impl<'a> Feed<'a> {
     }
 
     pub fn fetch(&self, round_id: u32) -> Option<Transmission> {
+        if round_id == 0 {
+            return None;
+        }
+
         if self.header.latest_round_id < round_id {
             return None;
         }
