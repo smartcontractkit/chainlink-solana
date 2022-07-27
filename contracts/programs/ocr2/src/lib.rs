@@ -110,7 +110,7 @@ pub mod ocr2 {
         require!(proposal.state != Proposal::FINALIZED, InvalidInput);
 
         require!(
-            offchain_config.len() < proposal.offchain_config.remaining_capacity(),
+            offchain_config.len() <= proposal.offchain_config.remaining_capacity(),
             InvalidInput
         );
         proposal.offchain_config.extend(&offchain_config);
