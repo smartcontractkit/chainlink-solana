@@ -27,7 +27,7 @@ async function main() {
   let tx = await program.rpc.execute({
     accounts: {
       chainlinkFeed: CHAINLINK_FEED,
-      chainlinkProgram: CHAINLINK_PROGRAM_ID
+      chainlinkProgram: CHAINLINK_PROGRAM_ID,
     },
     options: { commitment: "confirmed" },
   });

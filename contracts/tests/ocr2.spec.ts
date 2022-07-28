@@ -119,7 +119,7 @@ describe("ocr2", async () => {
     epoch: number,
     round: number,
     answer: BN,
-    juels: Buffer = Buffer.from([0, 0, 0, 0, 0, 0, 0, 2]), // juels per lamport (2)
+    juels: Buffer = Buffer.from([0, 0, 0, 0, 0, 0, 0, 2]) // juels per lamport (2)
   ): Promise<string> => {
     let account = await program.account.state.fetch(state.publicKey);
 
@@ -335,36 +335,32 @@ describe("ocr2", async () => {
 
     const granularity = 30;
     const liveLength = 3;
-    await workspace.Store.rpc.createFeed(
-      description,
-      decimals,
-      granularity,
-      liveLength,
-      {
-        accounts: {
-          feed: feed.publicKey,
-          authority: owner.publicKey,
-        },
-        signers: [feed],
-        preInstructions: [
-          await workspace.Store.account.transmissions.createInstruction(
-            feed,
-            8 + 192 + 6 * 48
-          ),
-        ],
-      }
-    );
+    await workspace.Store.methods
+      .createFeed(description, decimals, granularity, liveLength)
+      .accounts({
+        feed: feed.publicKey,
+        authority: owner.publicKey,
+      })
+      .signers([feed])
+      .preInstructions([
+        await workspace.Store.account.transmissions.createInstruction(
+          feed,
+          8 + 192 + 6 * 48
+        ),
+      ])
+      .rpc();
     // Program log: panicked at 'range end index 8 out of range for slice of length 0', store/src/lib.rs:476:10
 
     // Configure threshold for the feed
-    await workspace.Store.rpc.setValidatorConfig(flaggingThreshold, {
-      accounts: {
+    await workspace.Store.methods
+      .setValidatorConfig(flaggingThreshold)
+      .accounts({
         feed: feed.publicKey,
         owner: owner.publicKey,
         authority: owner.publicKey,
-      },
-      signers: [],
-    });
+      })
+      .signers([])
+      .rpc();
 
     // store authority for our ocr2 config
     [storeAuthority, storeNonce] = await PublicKey.findProgramAddress(
@@ -421,33 +417,30 @@ describe("ocr2", async () => {
   // });
 
   it("Initializes the OCR2 config", async () => {
-    await program.rpc.initialize(
-      new BN(minAnswer),
-      new BN(maxAnswer),
-      {
-        accounts: {
-          state: state.publicKey,
-          feed: feed.publicKey,
-          payer: provider.wallet.publicKey,
-          owner: owner.publicKey,
-          tokenMint: token.publicKey,
-          tokenVault: tokenVault,
-          vaultAuthority: vaultAuthority,
-          requesterAccessController: requesterAccessController.publicKey,
-          billingAccessController: billingAccessController.publicKey,
-          rent: SYSVAR_RENT_PUBKEY,
-          systemProgram: SystemProgram.programId,
-          tokenProgram: TOKEN_PROGRAM_ID,
-          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-        },
-        signers: [state],
-        preInstructions: [
-          await program.account.state.createInstruction(state),
-          // await store.account.transmissions.createInstruction(transmissions, 8+192+8096*24),
-          // createFeed,
-        ],
-      }
-    );
+    await program.methods
+      .initialize(new BN(minAnswer), new BN(maxAnswer))
+      .accounts({
+        state: state.publicKey,
+        feed: feed.publicKey,
+        payer: provider.wallet.publicKey,
+        owner: owner.publicKey,
+        tokenMint: token.publicKey,
+        tokenVault: tokenVault,
+        vaultAuthority: vaultAuthority,
+        requesterAccessController: requesterAccessController.publicKey,
+        billingAccessController: billingAccessController.publicKey,
+        rent: SYSVAR_RENT_PUBKEY,
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      })
+      .signers([state])
+      .preInstructions([
+        await program.account.state.createInstruction(state),
+        // await store.account.transmissions.createInstruction(transmissions, 8+192+8096*24),
+        // createFeed,
+      ])
+      .rpc();
 
     let account = await program.account.state.fetch(state.publicKey);
     let config = account.config;
@@ -534,16 +527,13 @@ describe("ocr2", async () => {
 
     console.log("proposePayees");
     let payees = oracles.map((oracle) => oracle.payee.address);
-    await program.rpc.proposePayees(
-      token.publicKey,
-      {
-        accounts: {
-          proposal: proposal.publicKey,
-          authority: owner.publicKey,
-        },
-        remainingAccounts: payees,
-      }
-    );
+    await program.rpc.proposePayees(token.publicKey, {
+      accounts: {
+        proposal: proposal.publicKey,
+        authority: owner.publicKey,
+      },
+      remainingAccounts: payees,
+    });
 
     console.log("finalizeProposal");
     await program.rpc.finalizeProposal({
@@ -554,22 +544,35 @@ describe("ocr2", async () => {
     });
 
     // compute proposal digest
-    let proposalAccount = await program.account.proposal.fetch(proposal.publicKey);
+    let proposalAccount = await program.account.proposal.fetch(
+      proposal.publicKey
+    );
     console.log(proposalAccount);
 
-    let proposalOracles = proposalAccount.oracles.xs.slice(0, proposalAccount.oracles.len);
-    let proposalOC = proposalAccount.offchainConfig.xs.slice(0, proposalAccount.offchainConfig.len);
+    let proposalOracles = proposalAccount.oracles.xs.slice(
+      0,
+      proposalAccount.oracles.len
+    );
+    let proposalOC = proposalAccount.offchainConfig.xs.slice(
+      0,
+      proposalAccount.offchainConfig.len
+    );
 
-    let hasher = createHash("sha256").update(Buffer.from([proposalAccount.oracles.len]));
+    let hasher = createHash("sha256").update(
+      Buffer.from([proposalAccount.oracles.len])
+    );
     hasher = proposalOracles.reduce((hasher, oracle) => {
       return hasher
         .update(Buffer.from(oracle.signer.key))
         .update(oracle.transmitter.toBuffer())
-        .update(oracle.payee.toBuffer())
+        .update(oracle.payee.toBuffer());
     }, hasher);
 
-    let offchainConfigHeader = Buffer.alloc(8+4);
-    offchainConfigHeader.writeBigUInt64BE(BigInt(proposalAccount.offchainConfig.version), 0);
+    let offchainConfigHeader = Buffer.alloc(8 + 4);
+    offchainConfigHeader.writeBigUInt64BE(
+      BigInt(proposalAccount.offchainConfig.version),
+      0
+    );
     offchainConfigHeader.writeUInt32BE(proposalAccount.offchainConfig.len, 8);
 
     let digest = hasher
@@ -829,12 +832,7 @@ describe("ocr2", async () => {
     const versionSchema = new Map([
       [Round, { kind: "struct", fields: [["version", "u8"]] }],
     ]);
-    let data = await query(
-      feed.publicKey,
-      Scope.Version,
-      versionSchema,
-      Round
-    );
+    let data = await query(feed.publicKey, Scope.Version, versionSchema, Round);
     assert.ok(data.version == 2);
 
     const descriptionSchema = new Map([
@@ -869,7 +867,7 @@ describe("ocr2", async () => {
     }
   });
 
-  it ("Node payouts happen with the correct decimals", async () => {
+  it("Node payouts happen with the correct decimals", async () => {
     // fetch payees
     let account = await program.account.state.fetch(state.publicKey);
     let currentOracles = account.oracles.xs.slice(0, account.oracles.len);
@@ -880,7 +878,10 @@ describe("ocr2", async () => {
         // + 2 juels per lamport => rounded to 0
         // + 1 gjuel
         // = 1 gjuel
-        assert.equal(transmissionPayment*rounds, oracle.paymentGjuels.toNumber())
+        assert.equal(
+          transmissionPayment * rounds,
+          oracle.paymentGjuels.toNumber()
+        );
         transmitter = oracle.payee;
       }
       return { pubkey: oracle.payee, isWritable: true, isSigner: false };
@@ -899,44 +900,56 @@ describe("ocr2", async () => {
     });
 
     for (let i = 0; i < payees.length; i++) {
-      const account = await tokenClient.getAccountInfo(payees[i].pubkey)
+      const account = await tokenClient.getAccountInfo(payees[i].pubkey);
       if (payees[i].pubkey.equals(transmitter)) {
         // transmitter + observation payment
-        assert.equal((observationPayment+transmissionPayment)*rounds, account.amount.toNumber())
+        assert.equal(
+          (observationPayment + transmissionPayment) * rounds,
+          account.amount.toNumber()
+        );
         continue;
       }
       // observation payment
-      assert.equal(observationPayment*rounds, account.amount.toNumber())
+      assert.equal(observationPayment * rounds, account.amount.toNumber());
     }
-
   });
 
   it("Transmit does not fail on juelsPerFeecoin edge cases", async () => {
     // zero value u64 juelsPerFeecoin
-    await transmit(rounds+1, rounds+1, new BN(rounds+1), Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]));
+    await transmit(
+      rounds + 1,
+      rounds + 1,
+      new BN(rounds + 1),
+      Buffer.from([0, 0, 0, 0, 0, 0, 0, 0])
+    );
 
     // max value u64 juelsPerFeecoin
-    await transmit(rounds+2, rounds+2, new BN(rounds+2), Buffer.from([127, 127, 127, 127, 127, 127, 127, 127]));
-  })
+    await transmit(
+      rounds + 2,
+      rounds + 2,
+      new BN(rounds + 2),
+      Buffer.from([127, 127, 127, 127, 127, 127, 127, 127])
+    );
+  });
 
-  it("TS client listens and parses state", async () => {
-    let feed = new OCR2Feed(program, provider);
-    let listener = null;
+  // it("TS client listens and parses state", async () => {
+  //   let feed = new OCR2Feed(program, provider);
+  //   let listener = null;
 
-    let success = new Promise<OCRRound>((resolve, _reject) => {
-      listener = feed.onRound(state.publicKey, (event) => {
-        resolve(event)
-      });
-    });
+  //   let success = new Promise<OCRRound>((resolve, _reject) => {
+  //     listener = feed.onRound(state.publicKey, (event) => {
+  //       resolve(event)
+  //     });
+  //   });
 
-    let transmitTx = transmit(100, 1, new BN(16));
-  
-    let event = await success;
-    assert.ok(event.feed.equals(state.publicKey))
-    assert.equal(event.answer.toNumber(), 16)
+  //   let transmitTx = transmit(100, 1, new BN(16));
 
-    await feed.removeListener(listener);
-  })
+  //   let event = await success;
+  //   assert.ok(event.feed.equals(state.publicKey))
+  //   assert.equal(event.answer.toNumber(), 16)
+
+  //   await feed.removeListener(listener);
+  // })
 
   it("Reclaims rent exempt deposit when closing down a feed", async () => {
     let beforeBalance = (
@@ -1006,13 +1019,13 @@ describe("ocr2", async () => {
     const granularity = 30;
     const liveLength = 3;
 
-    const header = 8 + 192 // account discriminator + header
-    const transmissionSize = 48
+    const header = 8 + 192; // account discriminator + header
+    const transmissionSize = 48;
     const invalidLengths = [
       header - 1, // insufficient for header size
       header + 6 * transmissionSize - 1, // incorrect size for ring buffer
       header + 2 * transmissionSize, // live length exceeds total capacity
-    ]
+    ];
     for (let i = 0; i < invalidLengths.length; i++) {
       try {
         const invalidFeed = Keypair.generate();
@@ -1038,8 +1051,9 @@ describe("ocr2", async () => {
       } catch {
         continue; // expect error
       }
-      assert.fail(`create feed shouldn't have succeeded with account size ${invalidLengths[i]}`);
+      assert.fail(
+        `create feed shouldn't have succeeded with account size ${invalidLengths[i]}`
+      );
     }
   });
-
 });
