@@ -788,11 +788,13 @@ describe("ocr2", async () => {
       fromWallet,
       token,
       placeholder);
+    // TODO: it complains account is off curve
     let recipientTokenAccount = await getOrCreateAssociatedTokenAccount(
       provider.connection,
       fromWallet,
       token,
-      recipient
+      recipient,
+      true
     );
 
     await program.rpc.withdrawFunds(new BN(1), {
@@ -808,11 +810,13 @@ describe("ocr2", async () => {
       signers: [],
     });
 
+    // TODO: it complains account is off curve
     recipientTokenAccount = await getOrCreateAssociatedTokenAccount(
       provider.connection,
       fromWallet,
       token,
-      recipient
+      recipient,
+      true
     );
     assert.ok(recipientTokenAccount.amount === BigInt(1));
   });
