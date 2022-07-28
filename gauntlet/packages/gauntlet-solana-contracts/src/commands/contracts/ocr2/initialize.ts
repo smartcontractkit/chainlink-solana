@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { Keypair, PublicKey, TransactionInstruction, SystemProgram, SYSVAR_RENT_PUBKEY } from '@solana/web3.js'
-import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
+import { ASSOCIATED_TOKEN_PROGRAM_ID, getOrCreateAssociatedTokenAccount, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { utils } from '@project-serum/anchor'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
@@ -64,31 +64,25 @@ export default class Initialize extends SolanaCommand {
     const maxAnswer = new BN(input.maxAnswer)
     const transmissions = new PublicKey(input.transmissions)
 
-    // TODO: use getOrCreateAssociatedTokenAccount
-    const tokenVault = await Token.getAssociatedTokenAddress(
-      ASSOCIATED_TOKEN_PROGRAM_ID,
-      TOKEN_PROGRAM_ID,
+    const tokenVault = (await getOrCreateAssociatedTokenAccount(
+      this.provider.connection,
+      this.provider.wallet,
       linkPublicKey,
       vaultAuthority,
       true,
-    )
+    )).address
 
     const tx = await program.methods
       .initialize(minAnswer, maxAnswer)
       .accounts({
         state,
         feed: transmissions,
-        payer: signer,
         owner: signer,
         tokenMint: linkPublicKey,
         tokenVault,
         vaultAuthority,
         requesterAccessController,
         billingAccessController,
-        rent: SYSVAR_RENT_PUBKEY,
-        systemProgram: SystemProgram.programId,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       })
       .instruction()
 
@@ -101,7 +95,7 @@ export default class Initialize extends SolanaCommand {
     `)
 
     const defaultAccountSize = new BN(program.account.state.size)
-    const feedCreationInstruction = await SystemProgram.createAccount({
+    const feedCreationInstruction = SystemProgram.createAccount({
       fromPubkey: signer,
       newAccountPubkey: state,
       space: defaultAccountSize.toNumber(),
