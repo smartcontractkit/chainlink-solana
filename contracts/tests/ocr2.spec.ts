@@ -538,25 +538,24 @@ describe("ocr2", async () => {
     });
 
     console.log("proposePayees");
-    let payees = oracles.map((oracle) => oracle.payee.address);
-    await program.rpc.proposePayees(
-      token,
-      {
-        accounts: {
-          proposal: proposal.publicKey,
-          authority: owner.publicKey,
-        },
-        remainingAccounts: payees,
-      }
-    );
-
-    console.log("finalizeProposal");
-    await program.rpc.finalizeProposal({
-      accounts: {
+    let payees = oracles.map((oracle) => {
+      return { pubkey: oracle.payee.address, isWritable: true, isSigner: false };
+    });
+    await program.methods.proposePayees(token)
+      .accounts({
         proposal: proposal.publicKey,
         authority: owner.publicKey,
-      },
-    });
+      })
+      .remainingAccounts(payees)
+      .rpc();
+
+    console.log("finalizeProposal");
+    await program.methods.finalizeProposal()
+      .accounts({
+        proposal: proposal.publicKey,
+        authority: owner.publicKey,
+      })
+      .rpc();
 
     // compute proposal digest
     let proposalAccount = await program.account.proposal.fetch(proposal.publicKey);
