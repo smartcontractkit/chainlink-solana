@@ -351,11 +351,15 @@ func (m *OCRv2) proposeConfig(ocConfig contracts.OffChainAggregatorV2Config) err
 	for i := 0; i < len(oracles); i++ {
 		payees = append(payees, payee.PublicKey())
 	}
-	instr = append(instr, ocr_2.NewProposePayeesInstruction(
+	proposeInstr := ocr_2.NewProposePayeesInstruction(
 		m.Mint.PublicKey(),
 		m.Proposal.PublicKey(),
-		m.Owner.PublicKey()).Build(),
-	)
+		m.Owner.PublicKey())
+	// Add payees as remaining accounts
+	for i := 0; i < len(payees); i++ {
+		proposeInstr.Append(solana.Meta(payees[i]))
+	}
+	instr = append(instr, proposeInstr.Build())
 	// TODO: how to set payees as remaining
 	return m.Client.TXSync(
 		"Set payees",
