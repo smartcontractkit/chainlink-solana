@@ -223,7 +223,7 @@ describe("ocr2", async () => {
     );
 
     try {
-      return await provider.send(tx, [transmitter]);
+      return await provider.sendAndConfirm(tx, [transmitter]);
     } catch (err) {
       // Translate IDL error
       const idlErrors = anchor.parseIdlErrors(program.idl);
@@ -582,7 +582,7 @@ describe("ocr2", async () => {
     // fetch payees
     account = await program.account.state.fetch(state.publicKey);
     let currentOracles = account.oracles.xs.slice(0, account.oracles.len);
-    let payees = currentOracles.map((oracle) => {
+    payees = currentOracles.map((oracle) => {
       return { pubkey: oracle.payee, isWritable: true, isSigner: false };
     });
 
