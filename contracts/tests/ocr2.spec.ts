@@ -322,11 +322,13 @@ describe("ocr2", async () => {
     );
 
     // Create an associated token account for LINK, owned by the program instance
-    tokenVault = await getAssociatedTokenAddress(
+    tokenVault = (await getOrCreateAssociatedTokenAccount(
+      provider.connection,
+      fromWallet,
       token,
       vaultAuthority,
       true // allowOwnerOffCurve: seems required since a PDA isn't a valid keypair
-    );
+    )).address;
   });
 
   it("Initializes the OCR2 feed", async () => {
@@ -427,21 +429,21 @@ describe("ocr2", async () => {
     ).accounts({
           state: state.publicKey,
           feed: feed.publicKey,
-          payer: provider.wallet.publicKey,
+          // payer: provider.wallet.publicKey,
           owner: owner.publicKey,
           tokenMint: token,
           tokenVault: tokenVault,
           vaultAuthority: vaultAuthority,
           requesterAccessController: requesterAccessController.publicKey,
           billingAccessController: billingAccessController.publicKey,
-          rent: SYSVAR_RENT_PUBKEY,
-          systemProgram: SystemProgram.programId,
-          tokenProgram: TOKEN_PROGRAM_ID,
-          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+          // rent: SYSVAR_RENT_PUBKEY,
+          // systemProgram: SystemProgram.programId,
+          // tokenProgram: TOKEN_PROGRAM_ID,
+          // associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
     })
     .signers([state])
     .preInstructions([
-      await program.account.state.createInstruction(state),
+      await program.account.state.createInstruction(state)
       // await store.account.transmissions.createInstruction(transmissions, 8+192+8096*24),
       // createFeed,
     ]).rpc());
