@@ -937,24 +937,24 @@ describe("ocr2", async () => {
     await transmit(rounds+2, rounds+2, new BN(rounds+2), Buffer.from([127, 127, 127, 127, 127, 127, 127, 127]));
   })
 
-  // it("TS client listens and parses state", async () => {
-  //   let feed = new OCR2Feed(program, provider);
-  //   let listener = null;
+  it("TS client listens and parses state", async () => {
+    let feed = new OCR2Feed(program, provider);
+    let listener = null;
 
-  //   let success = new Promise<OCRRound>((resolve, _reject) => {
-  //     listener = feed.onRound(state.publicKey, (event) => {
-  //       resolve(event)
-  //     });
-  //   });
+    let success = new Promise<OCRRound>((resolve, _reject) => {
+      listener = feed.onRound(state.publicKey, (event) => {
+        resolve(event)
+      });
+    });
 
-  //   let transmitTx = transmit(100, 1, new BN(16));
+    let transmitTx = transmit(100, 1, new BN(16));
   
-  //   let event = await success;
-  //   assert.ok(event.feed.equals(state.publicKey))
-  //   assert.equal(event.answer.toNumber(), 16)
+    let event = await success;
+    assert.ok(event.feed.equals(state.publicKey))
+    assert.equal(event.answer.toNumber(), 16)
 
-  //   await feed.removeListener(listener);
-  // })
+    await feed.removeListener(listener);
+  })
 
   it("Reclaims rent exempt deposit when closing down a feed", async () => {
     let beforeBalance = (
