@@ -79,7 +79,7 @@ export const wrapCommand = (command) => {
 
         const msigState = await this.fetchMultisigState(this.multisigAddress)
         const proposalState = await this.fetchProposalState(proposal, msigState)
-        await this.inspectProposalState(msigState, proposalState)
+        this.inspectProposalState(msigState, proposalState)
         return {
           responses: [
             {
@@ -194,7 +194,7 @@ export const wrapCommand = (command) => {
 
     fetchMultisigState = async (address: PublicKey): Promise<MultisigState | undefined> => {
       try {
-        const state = await this.program.account.multisig.fetch(address)
+        const state = await this.program.account.multisig.fetch(address) as any
         return {
           threshold: new BN(state.threshold).toNumber(),
           owners: state.owners.map((owner) => new PublicKey(owner)),
@@ -210,7 +210,7 @@ export const wrapCommand = (command) => {
       multisigState: MultisigState,
     ): Promise<ProposalState | undefined> => {
       try {
-        const state = await this.program.account.transaction.fetch(proposal)
+        const state = await this.program.account.transaction.fetch(proposal) as any
         return {
           id: proposal,
           data: Buffer.from(state.data),
@@ -244,7 +244,7 @@ export const wrapCommand = (command) => {
       const proposal = Keypair.generate()
       logger.loading(`Creating Multisig Proposal account at ${proposal.publicKey.toString()}...`)
       const txSize = 1300 // Space enough
-      const proposalInstruction = await SystemProgram.createAccount({
+      const proposalInstruction = SystemProgram.createAccount({
         fromPubkey: this.wallet.publicKey,
         newAccountPubkey: proposal.publicKey,
         space: txSize,

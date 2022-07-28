@@ -111,7 +111,7 @@ export default class AcceptProposal extends SolanaCommand {
 
   makeContractInput = async (input: Input): Promise<ContractInput> => {
     const state = new PublicKey(this.args[0])
-    const contractState = await this.program.account.state.fetch(state)
+    const contractState = await this.program.account.state.fetch(state) as any
     const offchainDigest = this.calculateProposalDigest(
       await this.makeDigestInput(input, new PublicKey(contractState.config.tokenMint)),
     )
@@ -226,8 +226,8 @@ export default class AcceptProposal extends SolanaCommand {
   }
 
   beforeExecute = async () => {
-    const contractState = await this.program.account.state.fetch(new PublicKey(this.args[0]))
-    const proposalState = await this.program.account.proposal.fetch(new PublicKey(this.input.proposalId))
+    const contractState = await this.program.account.state.fetch(new PublicKey(this.args[0])) as any
+    const proposalState = await this.program.account.proposal.fetch(new PublicKey(this.input.proposalId)) as any
 
     const [contractConfig, proposalConfig] = [contractState, proposalState].map((state) => {
       const oracles = state.oracles?.xs.slice(0, state.oracles.len.toNumber())

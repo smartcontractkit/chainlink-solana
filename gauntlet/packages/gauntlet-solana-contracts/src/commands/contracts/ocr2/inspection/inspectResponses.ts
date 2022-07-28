@@ -95,7 +95,7 @@ export default class OCR2InspectResponses extends SolanaCommand {
 
     const state = new PublicKey(this.args[0])
     const input = this.makeInput(this.flags.input)
-    const onChainState = await program.account.state.fetch(state)
+    const onChainState = await program.account.state.fetch(state) as any
 
     logger.info(
       `Latest Config: 

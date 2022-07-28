@@ -80,8 +80,8 @@ export default class ProposePayees extends SolanaCommand {
   buildCommand = async (flags, args) => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     this.program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
-    this.input = await this.makeInput(flags.input)
-    this.contractInput = await this.makeContractInput(this.input)
+    this.input = this.makeInput(flags.input)
+    this.contractInput = this.makeContractInput(this.input)
 
     return this
   }
@@ -116,7 +116,7 @@ export default class ProposePayees extends SolanaCommand {
     // Set the payees in the same order the oracles are saved in the proposal
     // The length of the payees need to be same as the oracles saved
     const proposal = new PublicKey(this.input.proposalId)
-    const proposalInfo = await this.program.account.proposal.fetch(proposal)
+    const proposalInfo = await this.program.account.proposal.fetch(proposal) as any
     const payees = proposalInfo.oracles.xs
       .slice(0, proposalInfo.oracles.len)
       .map(({ transmitter }) => this.contractInput.payeeByTransmitter[transmitter.toString()])
@@ -134,8 +134,8 @@ export default class ProposePayees extends SolanaCommand {
   beforeExecute = async () => {
     const state = new PublicKey(this.args[0])
     const proposal = new PublicKey(this.input.proposalId)
-    const contractState = await this.program.account.state.fetch(state)
-    const proposalState = await this.program.account.proposal.fetch(proposal)
+    const contractState = await this.program.account.state.fetch(state) as any
+    const proposalState = await this.program.account.proposal.fetch(proposal) as any
 
     const payeesInContract = {
       oracles: contractState.oracles.xs

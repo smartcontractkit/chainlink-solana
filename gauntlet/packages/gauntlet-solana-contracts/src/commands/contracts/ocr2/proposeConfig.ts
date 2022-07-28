@@ -94,7 +94,7 @@ export default class ProposeConfig extends SolanaCommand {
 
   beforeExecute = async () => {
     const state = new PublicKey(this.args[0])
-    const contractState = await this.program.account.state.fetch(state)
+    const contractState = await this.program.account.state.fetch(state) as any
 
     // Prepare contract config
     const contractOracles = contractState.oracles?.xs.slice(0, contractState.oracles.len.toNumber())

@@ -82,7 +82,7 @@ export default class OCR2Inspect extends SolanaCommand {
   makeFeedInspections = async (bufferedInfo: Keypair, input: Input): Promise<inspection.Inspection[]> => {
     const store = getContract(CONTRACT_LIST.STORE, '')
     const storeProgram = this.loadProgram(store.idl, store.programId.toString())
-    const account = await storeProgram.account.description.fetch(bufferedInfo.publicKey)
+    const account = await storeProgram.account.description.fetch(bufferedInfo.publicKey) as any
     return [
       inspection.makeInspection(
         // Description comes with some empty bytes
@@ -142,7 +142,7 @@ export default class OCR2Inspect extends SolanaCommand {
     const ocr2program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
 
     const state = new PublicKey(this.args[0])
-    const onChainState = await ocr2program.account.state.fetch(state)
+    const onChainState = await ocr2program.account.state.fetch(state) as any
 
     // Get balance
     const balance = await this.provider.connection.getBalance(state)

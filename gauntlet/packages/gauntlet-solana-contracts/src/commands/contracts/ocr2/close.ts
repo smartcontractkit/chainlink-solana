@@ -21,7 +21,7 @@ export default class extends Close {
     const program = this.loadProgram(contract.idl, contract.programId.toString())
 
     const address = new PublicKey(this.args[0])
-    const { config, oracles } = await program.account.state.fetch(address)
+    const { config, oracles } = await program.account.state.fetch(address) as any
     const [vaultAuthority] = await PublicKey.findProgramAddress(
       [Buffer.from(utils.bytes.utf8.encode('vault')), address.toBuffer()],
       program.programId,

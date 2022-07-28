@@ -20,7 +20,7 @@ export default class CloseFeed extends Close {
     const program = this.loadProgram(contract.idl, contract.programId.toString())
 
     const transmissions = new PublicKey(this.args[0])
-    const info = await program.account.transmissions.fetch(transmissions)
+    const info = await program.account.transmissions.fetch(transmissions) as any
     const extraAccounts = {
       feed: transmissions,
       owner: new PublicKey(info.owner),

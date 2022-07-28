@@ -26,7 +26,7 @@ export default class SetBillingAccessController extends SolanaCommand {
     const state = new PublicKey(this.args[0])
     const ac = new PublicKey(this.flags.accessController)
 
-    const info = await program.account.state.fetch(state)
+    const info = await program.account.state.fetch(state) as any
     const oldAC = info.config.billingAccessController
 
     logger.log(`Access controller information:

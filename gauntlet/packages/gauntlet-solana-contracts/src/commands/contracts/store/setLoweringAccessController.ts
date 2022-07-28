@@ -26,7 +26,7 @@ export default class SetLoweringAccessController extends SolanaCommand {
     const state = new PublicKey(this.args[0])
     const ac = new PublicKey(this.flags.accessController)
 
-    const info = await program.account.store.fetch(state)
+    const info = await program.account.store.fetch(state) as any
     const oldAC = info.loweringAccessController
 
     logger.log(`Access controller information:
