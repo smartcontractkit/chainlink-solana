@@ -59,7 +59,7 @@ export default class WithdrawFunds extends SolanaCommand {
   makeRawTransaction = async (signer: PublicKey) => {
     const state = new PublicKey(this.args[0])
 
-    const info = await this.program.account.state.fetch(state) as any
+    const info = (await this.program.account.state.fetch(state)) as any
     const tokenVault = new PublicKey(info.config.tokenVault)
     const [vaultAuthority] = await PublicKey.findProgramAddress(
       [Buffer.from(utils.bytes.utf8.encode('vault')), state.toBuffer()],
@@ -68,8 +68,9 @@ export default class WithdrawFunds extends SolanaCommand {
 
     const billingAC = new PublicKey(info.config.billingAccessController)
 
-    const data = this.program.instruction.withdrawFunds(new BN(this.input.amountGjuels), {
-      accounts: {
+    const data = await this.program.methods
+      .withdrawFunds(new BN(this.input.amountGjuels))
+      .accounts({
         state,
         authority: signer,
         accessController: billingAC,
@@ -77,8 +78,8 @@ export default class WithdrawFunds extends SolanaCommand {
         vaultAuthority: vaultAuthority,
         tokenProgram: TOKEN_PROGRAM_ID,
         recipient: this.input.recipient,
-      },
-    })
+      })
+      .instruction()
 
     return [data]
   }

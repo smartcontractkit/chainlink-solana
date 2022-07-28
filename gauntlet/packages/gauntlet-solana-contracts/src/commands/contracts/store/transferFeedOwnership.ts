@@ -26,15 +26,16 @@ export default class TransferFeedOwnership extends SolanaCommand {
     const proposedOwner = new PublicKey(this.flags.to)
 
     // Need to resolve feed.owner
-    const feedAccount = await program.account.transmissions.fetch(state)
+    const feedAccount = (await program.account.transmissions.fetch(state)) as any
 
-    const tx = program.instruction.transferFeedOwnership(proposedOwner, {
-      accounts: {
+    const tx = await program.methods
+      .transferFeedOwnership(proposedOwner)
+      .accounts({
         feed: state,
         owner: feedAccount.owner,
         authority: signer,
-      },
-    })
+      })
+      .instruction()
 
     return [tx]
   }

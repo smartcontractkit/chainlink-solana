@@ -116,26 +116,28 @@ export default class ProposePayees extends SolanaCommand {
     // Set the payees in the same order the oracles are saved in the proposal
     // The length of the payees need to be same as the oracles saved
     const proposal = new PublicKey(this.input.proposalId)
-    const proposalInfo = await this.program.account.proposal.fetch(proposal) as any
+    const proposalInfo = (await this.program.account.proposal.fetch(proposal)) as any
     const payees = proposalInfo.oracles.xs
       .slice(0, proposalInfo.oracles.len)
       .map(({ transmitter }) => this.contractInput.payeeByTransmitter[transmitter.toString()])
 
-    const ix = this.program.instruction.proposePayees(token.publicKey, {
-      accounts: {
+    const ix = await this.program.methods
+      .proposePayees(token.publicKey)
+      .accounts({
         proposal,
         authority: signer,
-      },
-      remainingAccounts: payees,
-    })
+      })
+      .remainingAccounts(payees)
+      .instruction()
+
     return [ix]
   }
 
   beforeExecute = async () => {
     const state = new PublicKey(this.args[0])
     const proposal = new PublicKey(this.input.proposalId)
-    const contractState = await this.program.account.state.fetch(state) as any
-    const proposalState = await this.program.account.proposal.fetch(proposal) as any
+    const contractState = (await this.program.account.state.fetch(state)) as any
+    const proposalState = (await this.program.account.proposal.fetch(proposal)) as any
 
     const payeesInContract = {
       oracles: contractState.oracles.xs

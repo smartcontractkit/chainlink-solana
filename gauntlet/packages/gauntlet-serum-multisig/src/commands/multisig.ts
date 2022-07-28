@@ -194,7 +194,7 @@ export const wrapCommand = (command) => {
 
     fetchMultisigState = async (address: PublicKey): Promise<MultisigState | undefined> => {
       try {
-        const state = await this.program.account.multisig.fetch(address) as any
+        const state = (await this.program.account.multisig.fetch(address)) as any
         return {
           threshold: new BN(state.threshold).toNumber(),
           owners: state.owners.map((owner) => new PublicKey(owner)),
@@ -210,7 +210,7 @@ export const wrapCommand = (command) => {
       multisigState: MultisigState,
     ): Promise<ProposalState | undefined> => {
       try {
-        const state = await this.program.account.transaction.fetch(proposal) as any
+        const state = (await this.program.account.transaction.fetch(proposal)) as any
         return {
           id: proposal,
           data: Buffer.from(state.data),
@@ -263,31 +263,30 @@ export const wrapCommand = (command) => {
     ): Promise<TransactionInstruction[]> => {
       logger.loading(`Generating Multisig Proposal CREATION data for ${command.id}`)
 
-      const tx = this.program.instruction.createTransaction(
-        context.rawTx.programId,
-        context.rawTx.keys,
-        context.rawTx.data,
-        {
+      const tx = await this.program.methods
+        .createTransaction(context.rawTx.programId, context.rawTx.keys, context.rawTx.data)
+        .accounts({
           accounts: {
             multisig: this.multisigAddress,
             transaction: proposal,
             proposer: signer,
           },
-        },
-      )
+        })
+        .instruction()
       return [tx]
     }
 
     approveProposal: ProposalAction = async (proposal: PublicKey, signer): Promise<TransactionInstruction[]> => {
       logger.loading(`Generating Multisig Proposal APPROVAL data for ${command.id}`)
 
-      const tx = this.program.instruction.approve({
-        accounts: {
+      const tx = await this.program.methods
+        .approve()
+        .accounts({
           multisig: this.multisigAddress,
           transaction: proposal,
           owner: signer,
-        },
-      })
+        })
+        .instruction()
       return [tx]
     }
 
@@ -306,14 +305,15 @@ export const wrapCommand = (command) => {
           isSigner: false,
         })
 
-      const tx = this.program.instruction.executeTransaction({
-        accounts: {
+      const tx = await this.program.methods
+        .executeTransaction()
+        .accounts({
           multisig: this.multisigAddress,
           transaction: proposal,
           multisigSigner: context.multisigSigner,
-        },
-        remainingAccounts,
-      })
+        })
+        .remainingAccounts(remainingAccounts)
+        .instruction()
       return [tx]
     }
 

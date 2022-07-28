@@ -23,12 +23,13 @@ export default class SetOwners extends SolanaCommand {
 
     logger.info(`Generating data for new owners: ${owners.map((o) => o.toString())}`)
 
-    const ix = program.instruction.setOwners(owners, {
-      accounts: {
+    const ix = await program.methods
+      .setOwners(owners)
+      .accounts({
         multisig: multisigAddress,
         multisigSigner: signer,
-      },
-    })
+      })
+      .instruction()
     return [ix]
   }
 

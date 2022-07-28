@@ -25,15 +25,16 @@ export default class AcceptFeedOwnership extends SolanaCommand {
 
     // Need to resolve feed.proposedOwner. This will either match signer
     // store with store.owner == signer. If not, the instruction will error
-    const feedAccount = await program.account.transmissions.fetch(state)
+    const feedAccount = (await program.account.transmissions.fetch(state)) as any
 
-    const tx = program.instruction.acceptFeedOwnership({
-      accounts: {
+    const tx = await program.methods
+      .acceptFeedOwnership()
+      .accounts({
         feed: state,
         proposedOwner: feedAccount.proposedOwner,
         authority: signer,
-      },
-    })
+      })
+      .instruction()
 
     return [tx]
   }

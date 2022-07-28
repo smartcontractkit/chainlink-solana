@@ -52,15 +52,16 @@ export default class SetWriter extends SolanaCommand {
     )
 
     // Resolve the current store owner
-    let feedAccount = await storeProgram.account.transmissions.fetch(feedState)
+    let feedAccount = (await storeProgram.account.transmissions.fetch(feedState)) as any
 
-    const tx = storeProgram.instruction.setWriter(storeAuthority, {
-      accounts: {
+    const tx = await storeProgram.methods
+      .setWriter(storeAuthority)
+      .accounts({
         feed: feedState,
         owner: feedAccount.owner,
         authority: signer,
-      },
-    })
+      })
+      .instruction()
     return [tx]
   }
 

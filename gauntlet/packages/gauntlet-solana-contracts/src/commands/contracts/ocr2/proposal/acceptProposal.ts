@@ -111,7 +111,7 @@ export default class AcceptProposal extends SolanaCommand {
 
   makeContractInput = async (input: Input): Promise<ContractInput> => {
     const state = new PublicKey(this.args[0])
-    const contractState = await this.program.account.state.fetch(state) as any
+    const contractState = (await this.program.account.state.fetch(state)) as any
     const offchainDigest = this.calculateProposalDigest(
       await this.makeDigestInput(input, new PublicKey(contractState.config.tokenMint)),
     )
@@ -209,8 +209,9 @@ export default class AcceptProposal extends SolanaCommand {
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
-    const tx = this.program.instruction.acceptProposal(this.contractInput.offchainDigest, {
-      accounts: {
+    const tx = await this.program.methods
+      .acceptProposal(this.contractInput.offchainDigest)
+      .accounts({
         state: new PublicKey(this.args[0]),
         proposal: new PublicKey(this.input.proposalId),
         receiver: signer,
@@ -218,16 +219,16 @@ export default class AcceptProposal extends SolanaCommand {
         tokenVault: this.contractInput.tokenVault,
         vaultAuthority: this.contractInput.vaultAuthority,
         tokenProgram: TOKEN_PROGRAM_ID,
-      },
-      remainingAccounts: this.contractInput.payees,
-    })
+      })
+      .remainingAccounts(this.contractInput.payees)
+      .instruction()
 
     return [tx]
   }
 
   beforeExecute = async () => {
-    const contractState = await this.program.account.state.fetch(new PublicKey(this.args[0])) as any
-    const proposalState = await this.program.account.proposal.fetch(new PublicKey(this.input.proposalId)) as any
+    const contractState = (await this.program.account.state.fetch(new PublicKey(this.args[0]))) as any
+    const proposalState = (await this.program.account.proposal.fetch(new PublicKey(this.input.proposalId))) as any
 
     const [contractConfig, proposalConfig] = [contractState, proposalState].map((state) => {
       const oracles = state.oracles?.xs.slice(0, state.oracles.len.toNumber())

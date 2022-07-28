@@ -72,8 +72,9 @@ export default class Initialize extends SolanaCommand {
       true,
     )
 
-    const tx = program.instruction.initialize(minAnswer, maxAnswer, {
-      accounts: {
+    const tx = await program.methods
+      .initialize(minAnswer, maxAnswer)
+      .accounts({
         state,
         feed: transmissions,
         payer: signer,
@@ -87,8 +88,8 @@ export default class Initialize extends SolanaCommand {
         systemProgram: SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-      },
-    })
+      })
+      .instruction()
 
     console.log(`
       STATE ACCOUNTS:

@@ -26,12 +26,13 @@ export default class CreateProposal extends SolanaCommand {
     logger.log('Generating data for creating config proposal')
     logger.log('Config Proposal state will be at:', proposal.toString())
 
-    const createIx = await program.instruction.createProposal(version, {
-      accounts: {
+    const createIx = await program.methods
+      .createProposal(version)
+      .accounts({
         proposal: proposal,
         authority: signer,
-      },
-    })
+      })
+      .instruction()
     const defaultAccountSize = new BN(program.account.proposal.size)
     const createAccountIx = SystemProgram.createAccount({
       fromPubkey: signer,

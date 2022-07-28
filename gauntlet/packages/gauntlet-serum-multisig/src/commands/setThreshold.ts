@@ -24,12 +24,13 @@ export default class SetThreshold extends SolanaCommand {
     const threshold = new BN(this.flags.threshold)
     logger.info(`Generating data for new threshold: ${threshold.toNumber()}`)
 
-    const ix = program.instruction.changeThreshold(threshold, {
-      accounts: {
+    const ix = await program.methods
+      .changeThreshold(threshold)
+      .accounts({
         multisig: multisigAddress,
         multisigSigner: signer,
-      },
-    })
+      })
+      .instruction()
 
     return [ix]
   }

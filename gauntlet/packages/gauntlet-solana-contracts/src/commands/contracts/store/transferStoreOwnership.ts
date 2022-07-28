@@ -28,12 +28,13 @@ export default class TransferStoreOwnership extends SolanaCommand {
     const state = new PublicKey(this.args[0])
     const proposedOwner = new PublicKey(this.flags.to)
 
-    const tx = program.instruction.transferStoreOwnership(proposedOwner, {
-      accounts: {
+    const tx = await program.methods
+      .transferStoreOwnership(proposedOwner)
+      .accounts({
         store: state,
         authority: signer,
-      },
-    })
+      })
+      .instruction()
 
     return [tx]
   }

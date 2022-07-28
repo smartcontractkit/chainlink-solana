@@ -31,7 +31,7 @@ export default class Transmit extends SolanaCommand {
     const transmissions = new PublicKey(this.flags.transmissions)
     const store = new PublicKey(this.flags.store)
     const round = Number(this.flags.round) || 1
-    const info = await program.account.state.fetch(state) as any
+    const info = (await program.account.state.fetch(state)) as any
 
     const reportContext: any[] = []
     reportContext.push(...info.config.latestConfigDigest)

@@ -35,14 +35,14 @@ export default abstract class Close extends SolanaCommand {
       `Preparing instruction to close account from ${this.contractId} contract with address ${state.toString()}`,
     )
 
-    const ix = program.instruction[closeFunction]({
-      accounts: {
+    const ix = await program.methods[closeFunction]()
+      .accounts({
         receiver: signer,
         authority: signer,
         ...extraAccounts,
-      },
-      remainingAccounts,
-    })
+      })
+      .remainingAccounts(remainingAccounts)
+      .instruction()
 
     return [ix]
   }
