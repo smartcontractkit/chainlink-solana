@@ -5,7 +5,7 @@ const CHAINLINK_PROGRAM_ID = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny";
 // USDT/USD
 const CHAINLINK_FEED = "CwBg8pxL73LvuJ781cWBGF1e64G2z7AbZ22J2g8Lp35a";
 
-const provider = anchor.Provider.env();
+const provider = anchor.AnchorProvider.env();
 
 // Configure the cluster.
 anchor.setProvider(provider);

@@ -47,7 +47,7 @@ class Round extends Assignable {}
 
 describe("ocr2", async () => {
   // Configure the client to use the local cluster.
-  const provider = anchor.Provider.env();
+  const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
   const billingAccessController = Keypair.generate();
