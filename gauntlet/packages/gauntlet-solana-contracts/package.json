@@ -29,8 +29,8 @@
     "@chainlink/gauntlet-solana": "*",
     "@chainlink/gauntlet-serum-multisig": "*",
     "@ethersproject/keccak256": "^5.5.0",
-    "@solana/spl-token": "^0.1.8",
-    "@solana/web3.js": "^1.31.0",
+    "@solana/spl-token": "^0.2.0",
+    "@solana/web3.js": "^1.50.1",
     "protobufjs": "^6.11.2"
   }
 }

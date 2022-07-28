@@ -64,6 +64,7 @@ export default class Initialize extends SolanaCommand {
     const maxAnswer = new BN(input.maxAnswer)
     const transmissions = new PublicKey(input.transmissions)
 
+    // TODO: use getOrCreateAssociatedTokenAccount
     const tokenVault = await Token.getAssociatedTokenAddress(
       ASSOCIATED_TOKEN_PROGRAM_ID,
       TOKEN_PROGRAM_ID,
