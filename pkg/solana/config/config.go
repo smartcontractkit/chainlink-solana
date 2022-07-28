@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go/rpc"
+	"go.uber.org/multierr"
 
+	relaycfg "github.com/smartcontractkit/chainlink-relay/pkg/config"
 	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
@@ -250,12 +252,14 @@ func (c *Chain) SetFromDB(cfg *db.ChainCfg) error {
 }
 
 type Node struct {
-	Name string
+	Name *string
 	URL  *utils.URL
 }
 
 func (n *Node) SetFromDB(db db.Node) error {
-	n.Name = db.Name
+	if db.Name != "" {
+		n.Name = &db.Name
+	}
 	if db.SolanaURL != "" {
 		u, err := url.Parse(db.SolanaURL)
 		if err != nil {
@@ -264,4 +268,16 @@ func (n *Node) SetFromDB(db db.Node) error {
 		n.URL = (*utils.URL)(u)
 	}
 	return nil
+}
+
+func (n *Node) ValidateConfig() (err error) {
+	if n.Name == nil {
+		err = multierr.Append(err, relaycfg.ErrMissing{Name: "Name", Msg: "required for all nodes"})
+	} else if *n.Name == "" {
+		err = multierr.Append(err, relaycfg.ErrEmpty{Name: "Name", Msg: "required for all nodes"})
+	}
+	if n.URL == nil {
+		err = multierr.Append(err, relaycfg.ErrMissing{Name: "URL", Msg: "required for all nodes"})
+	}
+	return
 }
