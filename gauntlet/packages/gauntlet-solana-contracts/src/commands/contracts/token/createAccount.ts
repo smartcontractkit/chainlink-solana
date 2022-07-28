@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
+import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID, createAssociatedTokenAccountInstruction, getAssociatedTokenAddress } from '@solana/spl-token'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST } from '../../../lib/contracts'
 import { isValidTokenAccount } from './utils'
@@ -22,18 +22,16 @@ export default class CreateAccount extends SolanaCommand {
     const tokenAddress = new PublicKey(this.args[0])
 
     const newAccountBase = new PublicKey(this.flags.address)
-    const associatedAcc = await Token.getAssociatedTokenAddress(
-      ASSOCIATED_TOKEN_PROGRAM_ID,
-      TOKEN_PROGRAM_ID,
+    const associatedAcc = await getAssociatedTokenAddress(
       tokenAddress,
       newAccountBase,
       true,
     )
 
-    const token = new Token(this.provider.connection, tokenAddress, TOKEN_PROGRAM_ID, {
-      publicKey: this.wallet.publicKey,
-      secretKey: Buffer.from([]),
-    })
+    // const token = new Token(this.provider.connection, tokenAddress, TOKEN_PROGRAM_ID, {
+    //   publicKey: this.wallet.publicKey,
+    //   secretKey: Buffer.from([]),
+    // })
 
     const accountExists = await isValidTokenAccount(token, associatedAcc)
     this.require(
@@ -41,13 +39,11 @@ export default class CreateAccount extends SolanaCommand {
       `A Token Associated Account to address ${newAccountBase.toString()} already exists: ${associatedAcc}`,
     )
 
-    const ix = Token.createAssociatedTokenAccountInstruction(
-      ASSOCIATED_TOKEN_PROGRAM_ID,
-      TOKEN_PROGRAM_ID,
-      tokenAddress,
+    const ix = createAssociatedTokenAccountInstruction(
+      this.wallet.publicKey,
       associatedAcc,
       newAccountBase,
-      this.wallet.publicKey,
+      tokenAddress,
     )
 
     await prompt(`Continue to create new Token associated account to ${newAccountBase.toString()}`)
