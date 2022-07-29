@@ -16,6 +16,10 @@ const_assert!(MAX_ORACLES <= 31);
 #[constant]
 pub const DIGEST_SIZE: usize = 32;
 
+pub const ONCHAIN_CONFIG_VERSION: u8 = 1;
+
+pub const STATE_VERSION: u8 = 1;
+
 #[zero_copy]
 pub struct Billing {
     pub observation_payment_gjuels: u32,
@@ -146,7 +150,7 @@ impl Config {
         oracles: &[Oracle],
     ) -> [u8; DIGEST_SIZE] {
         // calculate onchain_config from stored config
-        let mut onchain_config = vec![1]; // version
+        let mut onchain_config = vec![ONCHAIN_CONFIG_VERSION]; // version
 
         // the ocr plugin expects i192 encoded values, so we need to sign extend to make the digest match
         if self.min_answer.is_negative() {

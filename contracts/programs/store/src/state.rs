@@ -131,7 +131,7 @@ impl<'a> Feed<'a> {
 
         let len = self.header.live_length;
         // Handle wraparound
-        let i = (self.header.live_cursor + len.saturating_sub(1)) % len;
+        let i = (self.header.live_cursor + len - 1) % len;
 
         Some(self.live[i as usize])
     }

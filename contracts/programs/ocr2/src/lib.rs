@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token;
 
 use arrayref::{array_ref, array_refs};
-use state::{Billing, Proposal, ProposedOracle};
+use state::{Billing, Proposal, ProposedOracle, STATE_VERSION};
 
 declare_id!("cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ");
 
@@ -31,7 +31,7 @@ pub mod ocr2 {
     use super::*;
     pub fn initialize(ctx: Context<Initialize>, min_answer: i128, max_answer: i128) -> Result<()> {
         let mut state = ctx.accounts.state.load_init()?;
-        state.version = 1;
+        state.version = STATE_VERSION;
 
         state.vault_nonce = *ctx.bumps.get("vault_authority").unwrap();
         state.feed = ctx.accounts.feed.key();
@@ -86,7 +86,7 @@ pub mod ocr2 {
     ) -> Result<()> {
         let mut proposal = ctx.accounts.proposal.load_init()?;
 
-        proposal.version = 1;
+        proposal.version = STATE_VERSION;
         proposal.owner = ctx.accounts.authority.key();
 
         require!(offchain_config_version != 0, InvalidInput);
@@ -113,12 +113,12 @@ pub mod ocr2 {
         let mut proposal = ctx.accounts.proposal.load_mut()?;
         require!(proposal.state != Proposal::FINALIZED, InvalidInput);
 
-        // Require that at least some data was written via setOffchainConfig
+        // Require that at least some data was written via write_offchain_config
         require!(proposal.offchain_config.version > 0, InvalidInput);
         require!(!proposal.offchain_config.is_empty(), InvalidInput);
-        // setConfig must have been called
+        // propose_config must have been called
         require!(!proposal.oracles.is_empty(), InvalidInput);
-        // setPayees must have been called
+        // propose_payees must have been called
         let valid_payees = proposal
             .oracles
             .iter()
@@ -152,6 +152,9 @@ pub mod ocr2 {
 
         let mut state = ctx.accounts.state.load_mut()?;
         let proposal = ctx.accounts.proposal.load()?;
+
+        // State version should equal proposal version
+        require!(state.version == proposal.version, InvalidInput);
 
         // Proposal has to be finalized
         require!(proposal.state == Proposal::FINALIZED, InvalidInput);
@@ -735,7 +738,7 @@ struct Report {
 }
 
 impl Report {
-    // (uint32, u8, bytes32, int128, uint128)
+    // (uint32, u8, bytes32, int128, u64)
     pub const LEN: usize =
         size_of::<u32>() + size_of::<u8>() + 32 + size_of::<i128>() + size_of::<u64>();
 
