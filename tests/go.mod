@@ -13,9 +13,9 @@ require (
 	github.com/rs/zerolog v1.27.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/smartcontractkit/chainlink-solana/relayer v0.2.20-0.20220516141700-c34f50b2a188
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20220721203724-8bc65e40415c
-	github.com/smartcontractkit/chainlink-env v0.2.24
-	github.com/smartcontractkit/chainlink-testing-framework v1.4.6
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20220727205731-7d3de7be1c70
+	github.com/smartcontractkit/chainlink-env v0.2.31
+	github.com/smartcontractkit/chainlink-testing-framework v1.5.2-0.20220726165703-ed4e6cabca38
 	github.com/smartcontractkit/libocr v0.0.0-20220701150323-d815c8d0eab8
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
@@ -61,6 +61,7 @@ require (
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.19.6 // indirect
 	github.com/go-openapi/swag v0.19.15 // indirect
+	github.com/go-resty/resty/v2 v2.7.0 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/gogo/protobuf v1.3.3 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
@@ -106,7 +107,7 @@ require (
 	github.com/russross/blackfriday v1.6.0 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/slack-go/slack v0.11.0 // indirect
-	github.com/smartcontractkit/chainlink-relay v0.1.2 // indirect
+	github.com/smartcontractkit/chainlink-relay v0.1.3 // indirect
 	github.com/spf13/cobra v1.5.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/testify v1.8.0 // indirect
