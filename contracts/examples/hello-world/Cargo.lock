@@ -24,7 +24,7 @@ dependencies = [
 
 [[package]]
 name = "anchor-attribute-access-control"
-version = "0.24.2"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "70f6ee9518f50ff4d434471ccf569186022bdd5ef65a21d14da3ea5231af944f"
 dependencies = [
@@ -388,9 +388,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chainlink_solana"
-version = "0.1.1"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44e1a6c94acdef947c091751143a1271c433fe140ed045888c0a1248330b1647"
+checksum = "a1bc07ff7987366d193e8e1913b4aafcb83f919ad71be8c040b420bcedb6339b"
 dependencies = [
  "borsh",
  "borsh-derive",
