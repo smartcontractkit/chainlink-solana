@@ -2,7 +2,7 @@ import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
+import { getAccount } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import RDD from '../../../lib/rdd'
 import { printDiff } from '../../../lib/diff'
@@ -89,16 +89,11 @@ export default class ProposePayees extends SolanaCommand {
   makeRawTransaction = async (signer: PublicKey) => {
     const link = new PublicKey(this.flags.link || process.env.LINK)
 
-    const token = new Token(this.provider.connection, link, TOKEN_PROGRAM_ID, {
-      publicKey: signer,
-      secretKey: Buffer.from([]),
-    })
-
     const areValidPayees = (
       await Promise.all(
         Object.entries(this.contractInput.payeeByTransmitter).map(async ([transmitter, payee]) => {
           try {
-            const info = await token.getAccountInfo(new PublicKey(payee))
+            const info = await getAccount(this.provider.connection, payee)
             return !!info.address
           } catch (e) {
             logger.error(`Payee with address ${payee} does not have a valid Token recipient address`)
@@ -122,7 +117,7 @@ export default class ProposePayees extends SolanaCommand {
       .map(({ transmitter }) => ({ pubkey: this.contractInput.payeeByTransmitter[transmitter.toString()], isWritable: true, isSigner: false }));
 
     const ix = await this.program.methods
-      .proposePayees(token.publicKey)
+      .proposePayees(link)
       .accounts({
         proposal,
         authority: signer,

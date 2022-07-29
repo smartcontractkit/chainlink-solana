@@ -66,7 +66,7 @@ export default class Initialize extends SolanaCommand {
 
     const tokenVault = (await getOrCreateAssociatedTokenAccount(
       this.provider.connection,
-      this.provider.wallet,
+      this.wallet.payer,
       linkPublicKey,
       vaultAuthority,
       true,
@@ -90,7 +90,7 @@ export default class Initialize extends SolanaCommand {
       STATE ACCOUNTS:
         - State: ${state?.toString()}
         - Transmissions: ${transmissions}
-        - Payer: ${this.provider.wallet.publicKey}
+        - Payer: ${this.wallet.publicKey}
         - Owner: ${signer.toString()}
     `)
 

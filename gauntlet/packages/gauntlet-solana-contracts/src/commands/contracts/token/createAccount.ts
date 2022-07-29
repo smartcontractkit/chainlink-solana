@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID, createAssociatedTokenAccountInstruction, getAssociatedTokenAddress } from '@solana/spl-token'
+import { createAssociatedTokenAccountInstruction, getAssociatedTokenAddress } from '@solana/spl-token'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST } from '../../../lib/contracts'
 import { isValidTokenAccount } from './utils'
@@ -28,12 +28,7 @@ export default class CreateAccount extends SolanaCommand {
       true,
     )
 
-    // const token = new Token(this.provider.connection, tokenAddress, TOKEN_PROGRAM_ID, {
-    //   publicKey: this.wallet.publicKey,
-    //   secretKey: Buffer.from([]),
-    // })
-
-    const accountExists = await isValidTokenAccount(token, associatedAcc)
+    const accountExists = await isValidTokenAccount(this.provider.connection, tokenAddress, associatedAcc)
     this.require(
       !accountExists,
       `A Token Associated Account to address ${newAccountBase.toString()} already exists: ${associatedAcc}`,

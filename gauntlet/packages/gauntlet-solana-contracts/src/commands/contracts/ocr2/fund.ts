@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
+import { getAssociatedTokenAddress, transfer } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
 
@@ -33,17 +33,10 @@ export default class Fund extends SolanaCommand {
     const tokenMint = stateAccount.config.tokenMint
     this.require(tokenMint.equals(linkPublicKey), 'LINK does not match aggregator.config.tokenMint')
 
-    const token = new Token(this.provider.connection, linkPublicKey, TOKEN_PROGRAM_ID, this.wallet.payer)
-
-    const from = await Token.getAssociatedTokenAddress(
-      ASSOCIATED_TOKEN_PROGRAM_ID,
-      TOKEN_PROGRAM_ID,
-      token.publicKey,
-      this.wallet.publicKey,
-    )
+    const from = await getAssociatedTokenAddress(linkPublicKey, this.wallet.publicKey)
 
     logger.loading(`Transferring ${amount} tokens to ${state.toString()} token vault ${tokenVault.toString()}...`)
-    const tx = await token.transfer(from, tokenVault, this.wallet.payer, [], amount.toNumber())
+    const tx = await transfer(this.provider.connection, this.wallet.payer, from, tokenVault, this.wallet.payer, amount.toNumber())
 
     return {
       responses: [
