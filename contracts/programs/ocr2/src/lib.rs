@@ -51,7 +51,6 @@ pub mod ocr2 {
         Ok(())
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
     pub fn close<'info>(ctx: Context<'_, '_, '_, 'info, Close<'info>>) -> Result<()> {
         // Pay out any remaining balances
         pay_oracles_impl(
@@ -66,7 +65,6 @@ pub mod ocr2 {
         Ok(())
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
     pub fn transfer_ownership(
         ctx: Context<TransferOwnership>,
         proposed_owner: Pubkey,
@@ -78,10 +76,6 @@ pub mod ocr2 {
 
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
         let mut state = ctx.accounts.state.load_mut()?;
-        require!(
-            ctx.accounts.authority.key == &state.config.proposed_owner,
-            Unauthorized
-        );
         state.config.owner = std::mem::take(&mut state.config.proposed_owner);
         Ok(())
     }
@@ -100,7 +94,6 @@ pub mod ocr2 {
         Ok(())
     }
 
-    #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
     pub fn write_offchain_config(
         ctx: Context<ProposeConfig>,
         offchain_config: Vec<u8>,
@@ -116,7 +109,6 @@ pub mod ocr2 {
         Ok(())
     }
 
-    #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
     pub fn finalize_proposal(ctx: Context<ProposeConfig>) -> Result<()> {
         let mut proposal = ctx.accounts.proposal.load_mut()?;
         require!(proposal.state != Proposal::FINALIZED, InvalidInput);
@@ -138,13 +130,11 @@ pub mod ocr2 {
         Ok(())
     }
 
-    #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
-    pub fn close_proposal(ctx: Context<CloseProposal>) -> Result<()> {
+    pub fn close_proposal(_ctx: Context<CloseProposal>) -> Result<()> {
         // NOTE: Close is handled by anchor on exit due to the `close` attribute
         Ok(())
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
     pub fn accept_proposal<'info>(
         ctx: Context<'_, '_, '_, 'info, AcceptProposal<'info>>,
         digest: Vec<u8>,
@@ -223,7 +213,6 @@ pub mod ocr2 {
         Ok(())
     }
 
-    #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
     pub fn propose_config(
         ctx: Context<ProposeConfig>,
         new_oracles: Vec<NewOracle>,
@@ -276,7 +265,6 @@ pub mod ocr2 {
         Ok(())
     }
 
-    #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
     pub fn propose_payees(ctx: Context<ProposeConfig>, token_mint: Pubkey) -> Result<()> {
         let mut proposal = ctx.accounts.proposal.load_mut()?;
         require!(proposal.state != Proposal::FINALIZED, InvalidInput);
@@ -300,7 +288,6 @@ pub mod ocr2 {
         Ok(())
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
     pub fn set_requester_access_controller(ctx: Context<SetAccessController>) -> Result<()> {
         let mut state = ctx.accounts.state.load_mut()?;
         state.config.requester_access_controller = ctx.accounts.access_controller.key();
@@ -351,7 +338,6 @@ pub mod ocr2 {
         accounts.exit(program_id)
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
     pub fn set_billing_access_controller(ctx: Context<SetAccessController>) -> Result<()> {
         let mut state = ctx.accounts.state.load_mut()?;
         state.config.billing_access_controller = ctx.accounts.access_controller.key();
@@ -831,19 +817,6 @@ fn calculate_total_link_due_gjuels(config: &Config, oracles: &[Oracle]) -> Resul
 }
 
 // -- Access control modifiers
-
-// Only owner access
-fn owner(state_loader: &AccountLoader<State>, signer: &AccountInfo) -> Result<()> {
-    let config = state_loader.load()?.config;
-    require!(signer.key.eq(&config.owner), Unauthorized);
-    Ok(())
-}
-
-fn proposal_owner(proposal_loader: &AccountLoader<Proposal>, signer: &AccountInfo) -> Result<()> {
-    let proposal = proposal_loader.load()?;
-    require!(signer.key.eq(&proposal.owner), Unauthorized);
-    Ok(())
-}
 
 fn has_billing_access(
     state: &AccountLoader<State>,

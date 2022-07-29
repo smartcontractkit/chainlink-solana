@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount, Transfer};
 
 use crate::state::{Proposal, State};
+use crate::ErrorCode;
 
 use access_controller::AccessController;
 use store::{Store, Transmissions};
@@ -42,6 +43,7 @@ pub struct Close<'info> {
     pub state: AccountLoader<'info, State>,
     #[account(mut)]
     pub receiver: SystemAccount<'info>,
+    #[account(address = state.load()?.config.owner @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
 
     #[account(mut, address = state.load()?.config.token_vault)]
@@ -57,6 +59,7 @@ pub struct Close<'info> {
 pub struct TransferOwnership<'info> {
     #[account(mut)]
     pub state: AccountLoader<'info, State>,
+    #[account(address = state.load()?.config.owner @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -64,6 +67,7 @@ pub struct TransferOwnership<'info> {
 pub struct AcceptOwnership<'info> {
     #[account(mut)]
     pub state: AccountLoader<'info, State>,
+    #[account(address = state.load()?.config.proposed_owner @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -80,6 +84,7 @@ pub struct CloseProposal<'info> {
     pub proposal: AccountLoader<'info, Proposal>,
     #[account(mut)]
     pub receiver: SystemAccount<'info>,
+    #[account(address = proposal.load()?.owner @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -87,6 +92,7 @@ pub struct CloseProposal<'info> {
 pub struct ProposeConfig<'info> {
     #[account(mut)]
     pub proposal: AccountLoader<'info, Proposal>,
+    #[account(address = proposal.load()?.owner @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -98,6 +104,7 @@ pub struct AcceptProposal<'info> {
     pub proposal: AccountLoader<'info, Proposal>,
     #[account(mut)]
     pub receiver: SystemAccount<'info>,
+    #[account(address = state.load()?.config.owner @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
 
     #[account(mut, address = state.load()?.config.token_vault)]

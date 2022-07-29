@@ -148,12 +148,6 @@ pub mod store {
     }
 
     pub fn submit(ctx: Context<Submit>, round: NewTransmission) -> Result<()> {
-        // check if this particular ocr2 cluster is allowed to write to the feed
-        require!(
-            ctx.accounts.authority.key == &ctx.accounts.feed.writer,
-            Unauthorized
-        );
-
         let clock = Clock::get()?;
         let round = Transmission {
             slot: clock.slot,
@@ -193,7 +187,6 @@ pub mod store {
         Ok(())
     }
 
-    #[access_control(store_owner(&ctx.accounts.store, &ctx.accounts.authority))]
     pub fn transfer_store_ownership(
         ctx: Context<TransferStoreOwnership>,
         proposed_owner: Pubkey,
@@ -205,15 +198,10 @@ pub mod store {
 
     pub fn accept_store_ownership(ctx: Context<AcceptStoreOwnership>) -> Result<()> {
         let store = &mut *ctx.accounts.store.load_mut()?;
-        require!(
-            ctx.accounts.authority.key == &store.proposed_owner,
-            Unauthorized
-        );
         store.owner = std::mem::take(&mut store.proposed_owner);
         Ok(())
     }
 
-    #[access_control(store_owner(&ctx.accounts.store, &ctx.accounts.authority))]
     pub fn set_lowering_access_controller(ctx: Context<SetAccessController>) -> Result<()> {
         let mut store = ctx.accounts.store.load_mut()?;
         store.lowering_access_controller = ctx.accounts.access_controller.key();
@@ -323,12 +311,6 @@ fn owner<'info>(owner: &UncheckedAccount<'info>, authority: &Signer) -> Result<(
     };
 
     require!(authority.key == &owner, Unauthorized);
-    Ok(())
-}
-
-fn store_owner(store_loader: &AccountLoader<State>, signer: &AccountInfo) -> Result<()> {
-    let store = store_loader.load()?;
-    require!(signer.key.eq(&store.owner), Unauthorized);
     Ok(())
 }
 
@@ -518,6 +500,8 @@ pub struct Submit<'info> {
     /// The OCR2 feed
     #[account(mut)]
     pub feed: Account<'info, Transmissions>,
+    // check if this particular ocr2 cluster is allowed to write to the feed
+    #[account(address = feed.writer @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -535,6 +519,7 @@ pub struct Initialize<'info> {
 pub struct TransferStoreOwnership<'info> {
     #[account(mut)]
     pub store: AccountLoader<'info, State>,
+    #[account(address = store.load()?.owner @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -542,6 +527,7 @@ pub struct TransferStoreOwnership<'info> {
 pub struct AcceptStoreOwnership<'info> {
     #[account(mut)]
     pub store: AccountLoader<'info, State>,
+    #[account(address = store.load()?.proposed_owner @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -549,6 +535,7 @@ pub struct AcceptStoreOwnership<'info> {
 pub struct SetAccessController<'info> {
     #[account(mut)]
     pub store: AccountLoader<'info, State>,
+    #[account(address = store.load()?.owner @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
     pub access_controller: AccountLoader<'info, AccessController>,
 }
