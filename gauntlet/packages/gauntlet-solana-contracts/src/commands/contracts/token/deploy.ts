@@ -29,7 +29,12 @@ export default class DeployToken extends SolanaCommand {
     )
 
     const billion = BigInt(Math.pow(10, 9))
-    const tokenVault = await createAssociatedTokenAccount(this.provider.connection, this.wallet.payer, token, this.wallet.payer.publicKey)
+    const tokenVault = await createAssociatedTokenAccount(
+      this.provider.connection,
+      this.wallet.payer,
+      token,
+      this.wallet.payer.publicKey,
+    )
     const mintAmount = billion * BigInt(Math.pow(10, decimals))
 
     await prompt(

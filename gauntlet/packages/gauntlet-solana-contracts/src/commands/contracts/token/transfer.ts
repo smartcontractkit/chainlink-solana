@@ -1,7 +1,12 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { ASSOCIATED_TOKEN_PROGRAM_ID, createTransferInstruction, getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token'
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  createTransferInstruction,
+  getAssociatedTokenAddress,
+  TOKEN_PROGRAM_ID,
+} from '@solana/spl-token'
 import { PublicKey, TransactionInstruction } from '@solana/web3.js'
 import { TOKEN_DECIMALS } from '../../../lib/constants'
 import { CONTRACT_LIST } from '../../../lib/contracts'
@@ -25,12 +30,12 @@ export default class TransferToken extends SolanaCommand {
   makeRawTransaction = async (signer: PublicKey) => {
     const address = this.args[0]
 
-    const token = new PublicKey(address);
+    const token = new PublicKey(address)
 
     const from = await getAssociatedTokenAddress(token, signer, true)
 
     const destination = new PublicKey(this.flags.to)
-    const amount = BigInt(this.flags.amount) * (BigInt(10) ** BigInt(TOKEN_DECIMALS))
+    const amount = BigInt(this.flags.amount) * BigInt(10) ** BigInt(TOKEN_DECIMALS)
     this.require(
       await isValidTokenAccount(this.provider.connection, token, destination),
       `Destination ${destination.toString()} is not a valid token account`,
@@ -39,7 +44,7 @@ export default class TransferToken extends SolanaCommand {
     logger.info(
       `Preparing instruction to send ${amount.toString()} (${this.flags.amount}) Tokens to ${destination.toString()}`,
     )
-    
+
     const ix = createTransferInstruction(from, destination, signer, amount)
 
     return [

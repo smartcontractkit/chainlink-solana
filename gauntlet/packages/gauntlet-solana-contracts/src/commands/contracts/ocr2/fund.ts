@@ -36,7 +36,14 @@ export default class Fund extends SolanaCommand {
     const from = await getAssociatedTokenAddress(linkPublicKey, this.wallet.publicKey)
 
     logger.loading(`Transferring ${amount} tokens to ${state.toString()} token vault ${tokenVault.toString()}...`)
-    const tx = await transfer(this.provider.connection, this.wallet.payer, from, tokenVault, this.wallet.payer, amount.toNumber())
+    const tx = await transfer(
+      this.provider.connection,
+      this.wallet.payer,
+      from,
+      tokenVault,
+      this.wallet.payer,
+      amount.toNumber(),
+    )
 
     return {
       responses: [

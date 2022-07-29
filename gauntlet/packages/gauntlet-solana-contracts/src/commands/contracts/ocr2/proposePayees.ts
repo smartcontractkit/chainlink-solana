@@ -112,9 +112,11 @@ export default class ProposePayees extends SolanaCommand {
     // The length of the payees need to be same as the oracles saved
     const proposal = new PublicKey(this.input.proposalId)
     const proposalInfo = (await this.program.account.proposal.fetch(proposal)) as any
-    const payees = proposalInfo.oracles.xs
-      .slice(0, proposalInfo.oracles.len)
-      .map(({ transmitter }) => ({ pubkey: this.contractInput.payeeByTransmitter[transmitter.toString()], isWritable: true, isSigner: false }));
+    const payees = proposalInfo.oracles.xs.slice(0, proposalInfo.oracles.len).map(({ transmitter }) => ({
+      pubkey: this.contractInput.payeeByTransmitter[transmitter.toString()],
+      isWritable: true,
+      isSigner: false,
+    }))
 
     const ix = await this.program.methods
       .proposePayees(link)

@@ -22,11 +22,7 @@ export default class CreateAccount extends SolanaCommand {
     const tokenAddress = new PublicKey(this.args[0])
 
     const newAccountBase = new PublicKey(this.flags.address)
-    const associatedAcc = await getAssociatedTokenAddress(
-      tokenAddress,
-      newAccountBase,
-      true,
-    )
+    const associatedAcc = await getAssociatedTokenAddress(tokenAddress, newAccountBase, true)
 
     const accountExists = await isValidTokenAccount(this.provider.connection, tokenAddress, associatedAcc)
     this.require(

@@ -64,13 +64,15 @@ export default class Initialize extends SolanaCommand {
     const maxAnswer = new BN(input.maxAnswer)
     const transmissions = new PublicKey(input.transmissions)
 
-    const tokenVault = (await getOrCreateAssociatedTokenAccount(
-      this.provider.connection,
-      this.wallet.payer,
-      linkPublicKey,
-      vaultAuthority,
-      true,
-    )).address
+    const tokenVault = (
+      await getOrCreateAssociatedTokenAccount(
+        this.provider.connection,
+        this.wallet.payer,
+        linkPublicKey,
+        vaultAuthority,
+        true,
+      )
+    ).address
 
     const tx = await program.methods
       .initialize(minAnswer, maxAnswer)
