@@ -6,7 +6,7 @@ import (
 	"time"
 
 	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
-	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/mocks"
+	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/monitoring/mocks"
 	"github.com/stretchr/testify/require"
 )
 

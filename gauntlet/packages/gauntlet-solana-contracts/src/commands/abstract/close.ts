@@ -1,5 +1,5 @@
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand } from '@chainlink/gauntlet-solana'
+import { SolanaCommand } from '@chainlink/solana-gauntlet'
 import { PublicKey, TransactionInstruction, AccountMeta } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../lib/contracts'
 

@@ -1,4 +1,4 @@
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse } from '@chainlink/solana-gauntlet'
 import { PublicKey } from '@solana/web3.js'
 import { Result } from '@chainlink/gauntlet-core'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'

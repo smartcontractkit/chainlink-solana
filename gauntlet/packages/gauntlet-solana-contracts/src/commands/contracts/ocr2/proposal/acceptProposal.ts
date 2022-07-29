@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { createHash } from 'crypto'
 import { logger, prompt, BN } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse } from '@chainlink/solana-gauntlet'
 import { PublicKey } from '@solana/web3.js'
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { utils } from '@project-serum/anchor'

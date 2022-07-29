@@ -1,4 +1,4 @@
-module github.com/smartcontractkit/chainlink-solana
+module github.com/smartcontractkit/chainlink-solana/relayer
 
 go 1.18
 

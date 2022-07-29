@@ -1,0 +1,20 @@
+{
+    "name": "@chainlink/solana",
+    "private": true,
+    "version": "0.0.1",
+    "description": "Chainlink's Solana integration monorepo",
+    "workspaces": [
+      "gauntlet/packages/*",
+      "contracts",
+      "ops",
+      "relayer",
+      "tests",
+      "ts"
+    ],
+    "scripts": {
+      "release": "yarn changeset publish"
+    },
+    "devDependencies": {
+      "@changesets/cli": "^2.22.0"
+    }
+  }

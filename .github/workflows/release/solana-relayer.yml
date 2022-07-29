@@ -1,0 +1,24 @@
+name: Solana Relayer Release
+
+on:
+  push:
+    tags:
+      - "@chainlink/solana-relayer@[0-9]+.[0-9]+.[0-9]"
+
+jobs:
+  solana-relayer-release:
+    name: Release Solana Relayer
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout this repository
+      - name: Checkout Repo
+        uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
+      # Store solana version
+      - name: Set Env Variables
+        run: echo "SOLANA_RELAYER=$(npm info @chainlink/solana-relayer version)" >> $GITHUB_ENV
+      # Release code under vX.X.X
+      - name: Release Code
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: relayer/v${{ env.SOLANA_RELAYER }}
+          token: ${{ secrets.GITHUB_TOKEN }}

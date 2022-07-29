@@ -8,7 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
 	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring"
+	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/monitoring"
 )
 
 func main() {

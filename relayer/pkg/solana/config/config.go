@@ -11,8 +11,8 @@ import (
 	relaycfg "github.com/smartcontractkit/chainlink-relay/pkg/config"
 	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
+	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/db"
+	"github.com/smartcontractkit/chainlink-solana/relayer/pkg/solana/logger"
 )
 
 // Global solana defaults.

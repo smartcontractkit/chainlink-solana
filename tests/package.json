@@ -1,0 +1,7 @@
+{
+    "name": "@chainlink/solana-integration-tests",
+    "version": "0.0.1",
+    "license": "MIT",
+    "dependencies": {},
+    "devDependencies": {}
+}
