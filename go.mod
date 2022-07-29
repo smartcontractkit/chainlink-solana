@@ -10,6 +10,7 @@ require (
 	github.com/gagliardetto/treeout v0.1.4
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.1
+	github.com/rs/zerolog v1.27.0
 	github.com/smartcontractkit/chainlink-relay v0.1.3
 	github.com/smartcontractkit/libocr v0.0.0-20220701150323-d815c8d0eab8
 	github.com/stretchr/testify v1.7.1
