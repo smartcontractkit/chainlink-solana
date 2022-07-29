@@ -23,7 +23,7 @@ jobs:
           version: v${{ steps.tool-versions.outputs.golangci-lint_version }}
 
           # Optional: working directory, useful for monorepos
-          # working-directory: somedir
+          working-directory: relayer
 
           # Optional: golangci-lint command line arguments.
           args: --enable=gofmt --tests=false --exclude-use-default --timeout=5m0s
