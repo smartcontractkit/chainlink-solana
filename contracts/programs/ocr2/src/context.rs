@@ -41,8 +41,12 @@ pub struct Initialize<'info> {
 pub struct Close<'info> {
     #[account(mut, close = receiver)]
     pub state: AccountLoader<'info, State>,
+    // Receives the SOL deposit
     #[account(mut)]
     pub receiver: SystemAccount<'info>,
+    // Receives the remaining LINK amount
+    #[account(mut, token::mint = state.load()?.config.token_mint)]
+    pub token_receiver: Account<'info, TokenAccount>,
     #[account(address = state.load()?.config.owner @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
 

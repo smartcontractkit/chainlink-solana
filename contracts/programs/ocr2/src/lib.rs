@@ -61,6 +61,25 @@ pub mod ocr2 {
             ctx.remaining_accounts,
         )?;
 
+        // Transfer out remaining balance from the token_vault
+        let balance_gjuels = token::accessor::amount(&ctx.accounts.token_vault.to_account_info())?;
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token::Transfer {
+                    from: ctx.accounts.token_vault.to_account_info(),
+                    to: ctx.accounts.token_receiver.to_account_info(),
+                    authority: ctx.accounts.vault_authority.to_account_info(),
+                },
+            )
+            .with_signer(&[&[
+                b"vault".as_ref(),
+                ctx.accounts.state.key().as_ref(),
+                &[ctx.accounts.state.load()?.vault_nonce],
+            ]]),
+            balance_gjuels,
+        )?;
+
         // NOTE: Close is handled by anchor on exit due to the `close` attribute
         Ok(())
     }

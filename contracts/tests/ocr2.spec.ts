@@ -2,11 +2,9 @@ import * as anchor from "@project-serum/anchor";
 import { ProgramError, BN } from "@project-serum/anchor";
 import * as borsh from "borsh";
 import {
-  SYSVAR_RENT_PUBKEY,
   LAMPORTS_PER_SOL,
   PublicKey,
   Keypair,
-  SystemProgram,
   Transaction,
   TransactionInstruction,
 } from "@solana/web3.js";
@@ -16,8 +14,6 @@ import {
   mintTo,
   getAccount,
   getOrCreateAssociatedTokenAccount,
-  getAssociatedTokenAddress,
-  ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID
 } from "@solana/spl-token";
 import { assert } from "chai";
@@ -74,8 +70,6 @@ describe("ocr2", async () => {
   // const owner = Keypair.generate();
   const owner = provider.wallet;
   const mintAuthority = Keypair.generate();
-
-  const placeholder = Keypair.generate().publicKey;
 
   const decimals = 18;
   const description = "ETH/BTC";
@@ -341,7 +335,6 @@ describe("ocr2", async () => {
     console.log("tokenMint", token.toBase58());
     console.log("tokenVault", tokenVault.toBase58());
     console.log("vaultAuthority", vaultAuthority.toBase58());
-    console.log("placeholder", placeholder.toBase58());
 
     const granularity = 30;
     const liveLength = 3;
@@ -783,6 +776,7 @@ describe("ocr2", async () => {
   });
 
   it("Withdraws funds", async () => {
+    const placeholder = Keypair.generate().publicKey;
     const recipient = await createAccount(
       provider.connection,
       fromWallet,
@@ -977,6 +971,8 @@ describe("ocr2", async () => {
     // Retrieved rent exemption sol.
     assert.ok(afterBalance > beforeBalance);
 
+    // TODO: also verify tokenVault got drained
+
     const closedAccount = await provider.connection.getAccountInfo(
       feed.publicKey
     );
@@ -984,10 +980,6 @@ describe("ocr2", async () => {
   });
 
   it("Reclaims rent exempt deposit when closing down an aggregator", async () => {
-    let beforeBalance = (
-      await provider.connection.getAccountInfo(provider.wallet.publicKey)
-    ).lamports;
-
     // fetch payees
     let account = await program.account.state.fetch(state.publicKey);
     let currentOracles = account.oracles.xs.slice(0, account.oracles.len);
@@ -995,10 +987,24 @@ describe("ocr2", async () => {
       return { pubkey: oracle.payee, isWritable: true, isSigner: false };
     });
 
+    // TODO: it complains account is off curve
+    let recipientTokenAccount = await getOrCreateAssociatedTokenAccount(
+      provider.connection,
+      fromWallet,
+      token,
+      provider.wallet.publicKey,
+      true
+    );
+
+    let beforeBalance = (
+      await provider.connection.getAccountInfo(provider.wallet.publicKey)
+    ).lamports;
+
     await program.rpc.close({
       accounts: {
         state: state.publicKey,
         receiver: provider.wallet.publicKey,
+        tokenReceiver: recipientTokenAccount.address,
         authority: owner.publicKey,
         tokenVault: tokenVault,
         vaultAuthority: vaultAuthority,
