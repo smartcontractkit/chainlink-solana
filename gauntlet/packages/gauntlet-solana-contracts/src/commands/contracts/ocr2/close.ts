@@ -40,7 +40,7 @@ export default class extends Close {
       .map((oracle) => ({ pubkey: oracle.payee, isWritable: true, isSigner: false }))
 
     const extraAccounts = {
-      tokenRecipient,
+      tokenRecipient: tokenRecipient.address,
       tokenVault: config.tokenVault,
       vaultAuthority,
       tokenProgram: TOKEN_PROGRAM_ID,
