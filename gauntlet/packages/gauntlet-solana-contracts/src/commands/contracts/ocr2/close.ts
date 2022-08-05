@@ -27,8 +27,8 @@ export default class extends Close {
       this.wallet.payer,
       linkPublicKey,
       this.provider.wallet.publicKey,
-      true
-    );
+      true,
+    )
     const { config, oracles } = (await program.account.state.fetch(address)) as any
     const [vaultAuthority] = await PublicKey.findProgramAddress(
       [Buffer.from(utils.bytes.utf8.encode('vault')), address.toBuffer()],
