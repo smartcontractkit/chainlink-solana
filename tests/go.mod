@@ -107,7 +107,7 @@ require (
 	github.com/russross/blackfriday v1.6.0 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/slack-go/slack v0.11.0 // indirect
-	github.com/smartcontractkit/chainlink-relay v0.1.3 // indirect
+	github.com/smartcontractkit/chainlink-relay v0.1.5-0.20220808171357-bcc8d912ed36 // indirect
 	github.com/spf13/cobra v1.5.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/testify v1.8.0 // indirect
@@ -158,3 +158,7 @@ replace (
 	github.com/smartcontractkit/chainlink-env => github.com/smartcontractkit/chainlink-env v0.2.27-0.20220720162059-a7a5cdae23a9
 	github.com/smartcontractkit/chainlink-testing-framework => github.com/smartcontractkit/chainlink-testing-framework v1.5.0
 )
+
+// Fix go mod tidy issue for ambiguous imports from go-ethereum
+// See https://github.com/ugorji/go/issues/279
+replace github.com/btcsuite/btcd => github.com/btcsuite/btcd v0.22.1
