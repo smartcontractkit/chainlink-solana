@@ -11,16 +11,17 @@ import (
 )
 
 func TestPrometheusExporter(t *testing.T) {
+	t.Parallel()
+
 	t.Run("it should export balance updates then clean up", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
-		metrics := new(mocks.Metrics)
-		metrics.Test(t)
+		metrics := mocks.NewMetrics(t)
 		factory := NewPrometheusExporterFactory(newNullLogger(), metrics)
 
 		chainConfig := generateChainConfig()
 		feedConfig := generateFeedConfig()
-		exporter, err := factory.NewExporter(relayMonitoring.ExporterParams{chainConfig, feedConfig, []relayMonitoring.NodeConfig{}})
+		exporter, err := factory.NewExporter(relayMonitoring.ExporterParams{ChainConfig: chainConfig, FeedConfig: feedConfig, Nodes: []relayMonitoring.NodeConfig{}})
 		require.NoError(t, err)
 
 		balances := generateBalances()
