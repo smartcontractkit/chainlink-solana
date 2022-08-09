@@ -1,6 +1,6 @@
 name: e2e_tests_custom_cl
 on:
-  push:
+  pull_request:
   workflow_dispatch:
     inputs:
       cl_branch_ref:
@@ -8,8 +8,11 @@ on:
         required: true
         default: develop
         type: string
-jobs:
+concurrency:
+  group: e2e-solana-${{ github.ref }}
+  cancel-in-progress: true
 
+jobs:
   e2e_custom_build_artifacts:
     name: E2E Custom Build Artifacts
     environment: integration
@@ -36,7 +39,7 @@ jobs:
       contents: read
     steps:
       - name: Build Image
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@010068ddc7dd55cd4439159a485390aa651fdd39 # v2.0.3
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@de292d573eea2debf31c058a0a7c003fa5880af5 # v2.0.6
         with:
           cl_repo: smartcontractkit/chainlink
           # by default we are integrating with develop
@@ -61,7 +64,7 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@010068ddc7dd55cd4439159a485390aa651fdd39 # v2.0.3
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@de292d573eea2debf31c058a0a7c003fa5880af5 # v2.0.6
         with:
           test_command_to_run: make test_smoke
           cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
