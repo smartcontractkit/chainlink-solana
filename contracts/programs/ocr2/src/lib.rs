@@ -59,6 +59,7 @@ pub mod ocr2 {
             ctx.accounts.token_vault.to_account_info(),
             ctx.accounts.vault_authority.clone(),
             ctx.remaining_accounts,
+            ctx.accounts.token_receiver.to_account_info(),
         )?;
 
         // Transfer out remaining balance from the token_vault
@@ -167,6 +168,7 @@ pub mod ocr2 {
             ctx.accounts.token_vault.to_account_info(),
             ctx.accounts.vault_authority.clone(),
             ctx.remaining_accounts,
+            ctx.accounts.token_receiver.to_account_info(),
         )?;
 
         let mut state = ctx.accounts.state.load_mut()?;
@@ -379,6 +381,7 @@ pub mod ocr2 {
             ctx.accounts.token_vault.to_account_info(),
             ctx.accounts.vault_authority.clone(),
             ctx.remaining_accounts,
+            ctx.accounts.token_receiver.to_account_info(),
         )?;
 
         // Then update the config
@@ -472,6 +475,7 @@ pub mod ocr2 {
             ctx.accounts.token_vault.to_account_info(),
             ctx.accounts.vault_authority.clone(),
             ctx.remaining_accounts,
+            ctx.accounts.token_receiver.to_account_info(),
         )
     }
 
@@ -537,6 +541,7 @@ fn pay_oracles_impl<'info>(
     token_vault: AccountInfo<'info>,
     vault_authority: AccountInfo<'info>,
     remaining_accounts: &[AccountInfo<'info>],
+    token_receiver: AccountInfo<'info>,
 ) -> Result<()> {
     let state_id = state.key();
     let mut state = state.load_mut()?;
@@ -563,11 +568,18 @@ fn pay_oracles_impl<'info>(
             oracle.payment_gjuels = 0;
             oracle.from_round_id = latest_round_id;
 
+            let to = if payee.owner == &token::ID {
+                payee.to_account_info()
+            } else {
+                // then the token account must be closed
+                token_receiver.to_account_info()
+            };
+
             let cpi = CpiContext::new(
                 token_program.clone(),
                 token::Transfer {
                     from: token_vault.clone(),
-                    to: payee.to_account_info(),
+                    to,
                     authority: vault_authority.clone(),
                 },
             );
@@ -587,7 +599,7 @@ fn pay_oracles_impl<'info>(
         token::transfer(
             cpi.with_signer(&[&[b"vault".as_ref(), state_id.as_ref(), &[vault_nonce]]]),
             amount_gjuels,
-        )?;
+        )?
     }
 
     Ok(())

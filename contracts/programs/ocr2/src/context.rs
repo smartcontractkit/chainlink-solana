@@ -108,6 +108,9 @@ pub struct AcceptProposal<'info> {
     pub proposal: AccountLoader<'info, Proposal>,
     #[account(mut)]
     pub receiver: SystemAccount<'info>,
+    // Receives LINK amount from oracles with closed token accounts
+    #[account(mut, token::mint = state.load()?.config.token_mint)]
+    pub token_receiver: Account<'info, TokenAccount>,
     #[account(address = state.load()?.config.owner @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
 
@@ -157,6 +160,10 @@ pub struct SetBilling<'info> {
     pub state: AccountLoader<'info, State>,
     pub authority: Signer<'info>,
     pub access_controller: AccountLoader<'info, AccessController>,
+
+    // Receives LINK amount from oracles with closed token accounts
+    #[account(mut, token::mint = state.load()?.config.token_mint)]
+    pub token_receiver: Account<'info, TokenAccount>,
 
     #[account(mut, address = state.load()?.config.token_vault)]
     pub token_vault: Account<'info, TokenAccount>,

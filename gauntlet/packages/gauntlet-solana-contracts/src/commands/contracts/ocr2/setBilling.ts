@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
+import { getOrCreateAssociatedTokenAccount, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { utils } from '@project-serum/anchor'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
@@ -58,6 +58,15 @@ export default class SetBilling extends SolanaCommand {
     const state = new PublicKey(this.args[0])
 
     const info = (await this.program.account.state.fetch(state)) as any
+
+    const linkPublicKey = new PublicKey(this.flags.link || process.env.LINK)
+    const tokenRecipient = await getOrCreateAssociatedTokenAccount(
+      this.provider.connection,
+      this.wallet.payer,
+      linkPublicKey,
+      this.provider.wallet.publicKey,
+      true,
+    )
     const tokenVault = new PublicKey(info.config.tokenVault)
     const [vaultAuthority] = await PublicKey.findProgramAddress(
       [Buffer.from(utils.bytes.utf8.encode('vault')), state.toBuffer()],
@@ -74,6 +83,7 @@ export default class SetBilling extends SolanaCommand {
         state,
         authority: signer,
         accessController: billingAC,
+        tokenRecipient: tokenRecipient.address,
         tokenVault: tokenVault,
         vaultAuthority: vaultAuthority,
         tokenProgram: TOKEN_PROGRAM_ID,

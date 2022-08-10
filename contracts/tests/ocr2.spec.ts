@@ -11,10 +11,12 @@ import {
 import {
   createMint,
   createAccount,
+  closeAccount,
   mintTo,
   getAccount,
   getOrCreateAssociatedTokenAccount,
   TOKEN_PROGRAM_ID,
+  Account,
 } from "@solana/spl-token";
 import { assert } from "chai";
 
@@ -85,6 +87,7 @@ describe("ocr2", async () => {
   let token: PublicKey;
   let storeAuthority: PublicKey, storeNonce: number;
   let tokenVault: PublicKey, vaultAuthority: PublicKey, vaultNonce: number;
+  let recipient: PublicKey, recipientTokenAccount: Account;
 
   let oracles = [];
   const f = 6;
@@ -261,13 +264,21 @@ describe("ocr2", async () => {
       9 // SPL tokens use a u64, we can fit enough total supply in 9 decimals. Smallest unit is Gjuels
     );
 
-    // tokenClient = new Token(
-    //   provider.connection,
-    //   token.publicKey,
-    //   TOKEN_PROGRAM_ID,
-    //   // @ts-ignore
-    //   program.provider.wallet.payer
-    // );
+    const placeholder = Keypair.generate().publicKey;
+    recipient = await createAccount(
+      provider.connection,
+      fromWallet,
+      token,
+      placeholder
+    );
+    // TODO: it complains account is off curve
+    recipientTokenAccount = await getOrCreateAssociatedTokenAccount(
+      provider.connection,
+      fromWallet,
+      token,
+      recipient,
+      true
+    );
   });
 
   it("Creates access controllers", async () => {
@@ -583,6 +594,7 @@ describe("ocr2", async () => {
         proposal: proposal.publicKey,
         receiver: owner.publicKey,
         authority: owner.publicKey,
+        tokenReceiver: recipientTokenAccount.address,
         tokenVault: tokenVault,
         vaultAuthority: vaultAuthority,
         tokenProgram: TOKEN_PROGRAM_ID,
@@ -670,6 +682,7 @@ describe("ocr2", async () => {
           state: state.publicKey,
           authority: owner.publicKey,
           accessController: billingAccessController.publicKey,
+          tokenReceiver: recipientTokenAccount.address,
           tokenVault: tokenVault,
           vaultAuthority: vaultAuthority,
           tokenProgram: TOKEN_PROGRAM_ID,
@@ -811,22 +824,6 @@ describe("ocr2", async () => {
   });
 
   it("Withdraws funds", async () => {
-    const placeholder = Keypair.generate().publicKey;
-    const recipient = await createAccount(
-      provider.connection,
-      fromWallet,
-      token,
-      placeholder
-    );
-    // TODO: it complains account is off curve
-    let recipientTokenAccount = await getOrCreateAssociatedTokenAccount(
-      provider.connection,
-      fromWallet,
-      token,
-      recipient,
-      true
-    );
-
     await program.rpc.withdrawFunds(new BN(1), {
       accounts: {
         state: state.publicKey,
@@ -932,11 +929,34 @@ describe("ocr2", async () => {
       return { pubkey: oracle.payee, isWritable: true, isSigner: false };
     });
 
+    // can still pay out oracles even if a token account is closed
+
+    // Close oracle0's token account
+    let oracle = oracles[0]
+    let tx = await closeAccount(
+      provider.connection,
+      fromWallet,
+      oracle.payee.address, // account
+      recipientTokenAccount.address, // destination
+      oracle.transmitter, // authority
+    );
+    await provider.connection.confirmTransaction(tx);
+
+    // TODO: it complains account is off curve
+    recipientTokenAccount = await getOrCreateAssociatedTokenAccount(
+      provider.connection,
+      fromWallet,
+      token,
+      recipient,
+      true
+    );
+
     await program.rpc.payOracles({
       accounts: {
         state: state.publicKey,
         authority: owner.publicKey,
         accessController: billingAccessController.publicKey,
+        tokenReceiver: recipientTokenAccount.address,
         tokenVault: tokenVault,
         vaultAuthority: vaultAuthority,
         tokenProgram: TOKEN_PROGRAM_ID,
@@ -944,7 +964,10 @@ describe("ocr2", async () => {
       remainingAccounts: payees,
     });
 
-    for (let i = 0; i < payees.length; i++) {
+    // TODO: check remaining amount on tokenRecipient
+
+    // NOTE: we skip payees0 since it's closed
+    for (let i = 1; i < payees.length; i++) {
       const account = await getAccount(provider.connection, payees[i].pubkey);
       if (payees[i].pubkey.equals(transmitter)) {
         // transmitter + observation payment
