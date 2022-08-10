@@ -8,6 +8,7 @@ on:
         required: true
         default: develop
         type: string
+# Only run 1 of this workflow at a time per PR
 concurrency:
   group: e2e-solana-${{ github.ref }}
   cancel-in-progress: true
@@ -45,8 +46,8 @@ jobs:
           # by default we are integrating with develop
           cl_ref: ${{ github.event.inputs.cl_branch_ref }}
           # commit of the caller branch
-          dep_solana_sha: ${{ github.sha }}
-          push_tag: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink:custom.${{ github.sha }}
+          dep_solana_sha: ${{ github.event.pull_request.head.sha }}
+          push_tag: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink:custom.${{ github.event.pull_request.head.sha }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
 
@@ -68,7 +69,7 @@ jobs:
         with:
           test_command_to_run: make test_smoke
           cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
-          cl_image_tag: custom.${{ github.sha }}
+          cl_image_tag: custom.${{ github.event.pull_request.head.sha }}
           download_contract_artifacts_path: contracts/target/deploy
           artifacts_location: /home/runner/work/chainlink-solana/chainlink-solana/tests/e2e/logs
           token: ${{ secrets.GITHUB_TOKEN }}
