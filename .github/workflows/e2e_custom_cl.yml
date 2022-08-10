@@ -9,11 +9,6 @@ on:
         default: develop
         type: string
 
-# Only run 1 of this workflow at a time per PR
-concurrency:
-  group: e2e-solana-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   e2e_custom_build_artifacts:
     name: E2E Custom Build Artifacts
