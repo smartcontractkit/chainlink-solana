@@ -9,6 +9,11 @@ on:
         default: develop
         type: string
 
+# Only run 1 of this workflow at a time per PR
+concurrency:
+  group: integration-tests-solana-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   e2e_custom_build_artifacts:
     name: E2E Custom Build Artifacts
@@ -37,7 +42,7 @@ jobs:
       contents: read
     steps:
       - name: Build Image
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@de292d573eea2debf31c058a0a7c003fa5880af5 # v2.0.6
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@f828fdf6b929c762f1f5ed4e6ecd52be52a2f379 # v2.0.8
         with:
           cl_repo: smartcontractkit/chainlink
           # by default we are integrating with develop
@@ -48,7 +53,7 @@ jobs:
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
 
-  e2e_custom_run_smoke_testss:
+  e2e_custom_run_smoke_tests:
     name: E2E Custom Run Smoke Tests
     environment: integration
     permissions:
@@ -58,11 +63,16 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image]
+    env:
+      CHAINLINK_COMMIT_SHA: ${{ github.sha }}
+      CHAINLINK_ENV_USER: ${{ github.actor }}
+      TEST_TRIGGERED_BY: solana-CI
+      TEST_LOG_LEVEL: debug
     steps:
       - name: Checkout the repo
         uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@de292d573eea2debf31c058a0a7c003fa5880af5 # v2.0.6
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@f828fdf6b929c762f1f5ed4e6ecd52be52a2f379 # v2.0.8
         with:
           test_command_to_run: make test_smoke
           cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
@@ -70,6 +80,12 @@ jobs:
           download_contract_artifacts_path: contracts/target/deploy
           artifacts_location: /home/runner/work/chainlink-solana/chainlink-solana/tests/e2e/logs
           token: ${{ secrets.GITHUB_TOKEN }}
+          triggered_by: ${{ env.TEST_TRIGGERED_BY }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
+      - name: cleanup
+        if: always()
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@f828fdf6b929c762f1f5ed4e6ecd52be52a2f379 # v2.0.8
+        with:
+          triggered_by: ${{ env.TEST_TRIGGERED_BY }}
