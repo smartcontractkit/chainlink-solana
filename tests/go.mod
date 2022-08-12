@@ -16,7 +16,7 @@ require (
 	github.com/smartcontractkit/chainlink-solana v0.2.20-0.20220727214817-9d2526661be3
 	github.com/smartcontractkit/chainlink-testing-framework v1.5.2-0.20220726165703-ed4e6cabca38
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20220727205731-7d3de7be1c70
-	github.com/smartcontractkit/libocr v0.0.0-20220701150323-d815c8d0eab8
+	github.com/smartcontractkit/libocr v0.0.0-20220812191430-db92a9fdaa52
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 )
@@ -107,7 +107,7 @@ require (
 	github.com/russross/blackfriday v1.6.0 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/slack-go/slack v0.11.0 // indirect
-	github.com/smartcontractkit/chainlink-relay v0.1.5-0.20220808181113-70f8468a87ee // indirect
+	github.com/smartcontractkit/chainlink-relay v0.1.5 // indirect
 	github.com/spf13/cobra v1.5.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/testify v1.8.0 // indirect
