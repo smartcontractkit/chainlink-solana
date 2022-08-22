@@ -6,3 +6,4 @@ pulumi 3.25.1
 ginkgo 2.1.4
 actionlint 1.6.15
 shellcheck 0.8.0
+helm 3.9.2
