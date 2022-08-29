@@ -6,7 +6,7 @@ replace github.com/smartcontractkit/chainlink-solana => ../
 
 require (
 	github.com/ethereum/go-ethereum v1.10.20
-	github.com/gagliardetto/binary v0.6.1
+	github.com/gagliardetto/binary v0.7.1
 	github.com/gagliardetto/solana-go v1.4.1-0.20220428092759-5250b4abbb27
 	github.com/onsi/ginkgo/v2 v2.1.4
 	github.com/onsi/gomega v1.19.0
