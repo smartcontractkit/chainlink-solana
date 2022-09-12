@@ -19,7 +19,7 @@ type SetValidatorConfig struct {
 	// [1] = [] owner
 	//
 	// [2] = [SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-"`
+	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewSetValidatorConfigInstructionBuilder creates a new `SetValidatorConfig` instruction builder.
@@ -44,7 +44,7 @@ func (inst *SetValidatorConfig) SetFeedAccount(feed ag_solanago.PublicKey) *SetV
 
 // GetFeedAccount gets the "feed" account.
 func (inst *SetValidatorConfig) GetFeedAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(0)
+	return inst.AccountMetaSlice[0]
 }
 
 // SetOwnerAccount sets the "owner" account.
@@ -55,7 +55,7 @@ func (inst *SetValidatorConfig) SetOwnerAccount(owner ag_solanago.PublicKey) *Se
 
 // GetOwnerAccount gets the "owner" account.
 func (inst *SetValidatorConfig) GetOwnerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(1)
+	return inst.AccountMetaSlice[1]
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -66,7 +66,7 @@ func (inst *SetValidatorConfig) SetAuthorityAccount(authority ag_solanago.Public
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *SetValidatorConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(2)
+	return inst.AccountMetaSlice[2]
 }
 
 func (inst SetValidatorConfig) Build() *Instruction {
@@ -124,9 +124,9 @@ func (inst *SetValidatorConfig) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("     feed", inst.AccountMetaSlice.Get(0)))
-						accountsBranch.Child(ag_format.Meta("    owner", inst.AccountMetaSlice.Get(1)))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("     feed", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("    owner", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[2]))
 					})
 				})
 		})

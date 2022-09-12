@@ -16,7 +16,7 @@ type Initialize struct {
 	// [0] = [WRITE] state
 	//
 	// [1] = [SIGNER] owner
-	ag_solanago.AccountMetaSlice `bin:"-"`
+	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
@@ -35,7 +35,7 @@ func (inst *Initialize) SetStateAccount(state ag_solanago.PublicKey) *Initialize
 
 // GetStateAccount gets the "state" account.
 func (inst *Initialize) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(0)
+	return inst.AccountMetaSlice[0]
 }
 
 // SetOwnerAccount sets the "owner" account.
@@ -46,7 +46,7 @@ func (inst *Initialize) SetOwnerAccount(owner ag_solanago.PublicKey) *Initialize
 
 // GetOwnerAccount gets the "owner" account.
 func (inst *Initialize) GetOwnerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(1)
+	return inst.AccountMetaSlice[1]
 }
 
 func (inst Initialize) Build() *Instruction {
@@ -92,8 +92,8 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("state", inst.AccountMetaSlice.Get(0)))
-						accountsBranch.Child(ag_format.Meta("owner", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("state", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("owner", inst.AccountMetaSlice[1]))
 					})
 				})
 		})

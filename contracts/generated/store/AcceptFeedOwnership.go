@@ -18,7 +18,7 @@ type AcceptFeedOwnership struct {
 	// [1] = [] proposedOwner
 	//
 	// [2] = [SIGNER] authority
-	ag_solanago.AccountMetaSlice `bin:"-"`
+	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewAcceptFeedOwnershipInstructionBuilder creates a new `AcceptFeedOwnership` instruction builder.
@@ -37,7 +37,7 @@ func (inst *AcceptFeedOwnership) SetFeedAccount(feed ag_solanago.PublicKey) *Acc
 
 // GetFeedAccount gets the "feed" account.
 func (inst *AcceptFeedOwnership) GetFeedAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(0)
+	return inst.AccountMetaSlice[0]
 }
 
 // SetProposedOwnerAccount sets the "proposedOwner" account.
@@ -48,7 +48,7 @@ func (inst *AcceptFeedOwnership) SetProposedOwnerAccount(proposedOwner ag_solana
 
 // GetProposedOwnerAccount gets the "proposedOwner" account.
 func (inst *AcceptFeedOwnership) GetProposedOwnerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(1)
+	return inst.AccountMetaSlice[1]
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -59,7 +59,7 @@ func (inst *AcceptFeedOwnership) SetAuthorityAccount(authority ag_solanago.Publi
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *AcceptFeedOwnership) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(2)
+	return inst.AccountMetaSlice[2]
 }
 
 func (inst AcceptFeedOwnership) Build() *Instruction {
@@ -108,9 +108,9 @@ func (inst *AcceptFeedOwnership) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("         feed", inst.AccountMetaSlice.Get(0)))
-						accountsBranch.Child(ag_format.Meta("proposedOwner", inst.AccountMetaSlice.Get(1)))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("         feed", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("proposedOwner", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
 					})
 				})
 		})

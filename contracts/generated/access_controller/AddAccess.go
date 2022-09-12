@@ -18,7 +18,7 @@ type AddAccess struct {
 	// [1] = [SIGNER] owner
 	//
 	// [2] = [] address
-	ag_solanago.AccountMetaSlice `bin:"-"`
+	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewAddAccessInstructionBuilder creates a new `AddAccess` instruction builder.
@@ -37,7 +37,7 @@ func (inst *AddAccess) SetStateAccount(state ag_solanago.PublicKey) *AddAccess {
 
 // GetStateAccount gets the "state" account.
 func (inst *AddAccess) GetStateAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(0)
+	return inst.AccountMetaSlice[0]
 }
 
 // SetOwnerAccount sets the "owner" account.
@@ -48,7 +48,7 @@ func (inst *AddAccess) SetOwnerAccount(owner ag_solanago.PublicKey) *AddAccess {
 
 // GetOwnerAccount gets the "owner" account.
 func (inst *AddAccess) GetOwnerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(1)
+	return inst.AccountMetaSlice[1]
 }
 
 // SetAddressAccount sets the "address" account.
@@ -59,7 +59,7 @@ func (inst *AddAccess) SetAddressAccount(address ag_solanago.PublicKey) *AddAcce
 
 // GetAddressAccount gets the "address" account.
 func (inst *AddAccess) GetAddressAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(2)
+	return inst.AccountMetaSlice[2]
 }
 
 func (inst AddAccess) Build() *Instruction {
@@ -108,9 +108,9 @@ func (inst *AddAccess) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("  state", inst.AccountMetaSlice.Get(0)))
-						accountsBranch.Child(ag_format.Meta("  owner", inst.AccountMetaSlice.Get(1)))
-						accountsBranch.Child(ag_format.Meta("address", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("  state", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("  owner", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("address", inst.AccountMetaSlice[2]))
 					})
 				})
 		})

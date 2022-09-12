@@ -3,15 +3,16 @@ package solclient
 import (
 	"context"
 	"fmt"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	"io/fs"
 	"math/big"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
@@ -115,7 +116,7 @@ func NewClient(cfg *SolNetwork) (*Client, error) {
 }
 
 // CreateAccInstr creates instruction for account creation of particular size
-func (c *Client) CreateAccInstr(acc *solana.Wallet, accSize uint64, ownerPubKey solana.PublicKey) (solana.Instruction, error) {
+func (c *Client) CreateAccInstr(acc solana.PublicKey, accSize uint64, ownerPubKey solana.PublicKey) (solana.Instruction, error) {
 	payer := c.DefaultWallet
 	rentMin, err := c.RPC.GetMinimumBalanceForRentExemption(
 		context.TODO(),
@@ -130,7 +131,7 @@ func (c *Client) CreateAccInstr(acc *solana.Wallet, accSize uint64, ownerPubKey 
 		accSize,
 		ownerPubKey,
 		payer.PublicKey(),
-		acc.PublicKey(),
+		acc,
 	).Build(), nil
 }
 
