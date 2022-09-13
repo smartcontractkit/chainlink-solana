@@ -72,6 +72,7 @@ build_staging: build_js build_contracts_staging cp_gauntlet_idl
 
 test_install_ci:
 	./scripts/install-solana-ci.sh
+	export PATH="/home/runner/.local/share/solana/install/active_release/bin:$PATH"
 
 test_relay_unit:
 	go build -v ./pkg/...
