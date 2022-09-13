@@ -36,7 +36,7 @@ jobs:
       contents: read
     steps:
       - name: Build Image
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@010068ddc7dd55cd4439159a485390aa651fdd39 # v2.0.3
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@f828fdf6b929c762f1f5ed4e6ecd52be52a2f379 # v2.0.8
         with:
           cl_repo: smartcontractkit/chainlink
           # by default we are integrating with develop
@@ -58,11 +58,15 @@ jobs:
     needs: [soak_testing_build_contracts, soak_testing_build_custom_chainlink_image]
     env:
       CGO_ENABLED: 1
+      CHAINLINK_COMMIT_SHA: ${{ github.sha }}
+      CHAINLINK_ENV_USER: ${{ github.actor }}
+      TEST_TRIGGERED_BY: solana-soak
+      TEST_LOG_LEVEL: debug
     steps:
       - name: Checkout the repo
         uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@010068ddc7dd55cd4439159a485390aa651fdd39 # v2.0.3
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@f828fdf6b929c762f1f5ed4e6ecd52be52a2f379 # v2.0.8
         with:
           test_command_to_run: make test_ocr_soak
           cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
@@ -72,6 +76,7 @@ jobs:
           publish_report_paths: ./tests-soak-report.xml
           publish_check_name: Chaos Test Results
           token: ${{ secrets.GITHUB_TOKEN }}
+          triggered_by: ${{ env.TEST_TRIGGERED_BY }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}

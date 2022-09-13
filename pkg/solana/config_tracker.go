@@ -42,7 +42,8 @@ func ConfigFromState(state State) (types.ContractConfig, error) {
 		Min: state.Config.MinAnswer.BigInt(),
 		Max: state.Config.MaxAnswer.BigInt(),
 	}
-	onchainConfig, err := onchainConfigStruct.Encode()
+
+	onchainConfig, err := median.StandardOnchainConfigCodec{}.Encode(onchainConfigStruct)
 	if err != nil {
 		return types.ContractConfig{}, err
 	}

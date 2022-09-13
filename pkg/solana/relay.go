@@ -238,3 +238,7 @@ func (p *medianProvider) ReportCodec() median.ReportCodec {
 func (p *medianProvider) MedianContract() median.MedianContract {
 	return p.contract
 }
+
+func (p *medianProvider) OnchainConfigCodec() median.OnchainConfigCodec {
+	return median.StandardOnchainConfigCodec{}
+}

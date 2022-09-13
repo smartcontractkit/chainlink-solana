@@ -35,7 +35,7 @@ type ProposalState = {
 export const wrapCommand = (command) => {
   return class Multisig extends SolanaCommand {
     command: SolanaCommand
-    program: Program<Idl>
+    program: Program<any>
     multisigAddress: PublicKey
 
     static id = `${command.id}:multisig`

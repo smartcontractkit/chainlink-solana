@@ -3,23 +3,20 @@ package client
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"fmt"
-	"math/big"
 	"os/exec"
-	"strconv"
 	"testing"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // SetupLocalSolNode sets up a local solana node via solana cli, and returns the url
 func SetupLocalSolNode(t *testing.T) string {
-	port := mustRandomPort()
+	port := utils.MustRandomPort(t)
 	url := "http://127.0.0.1:" + port
 	cmd := exec.Command("solana-test-validator",
 		"--reset",
@@ -63,12 +60,4 @@ func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 		).Output()
 		require.NoError(t, err)
 	}
-}
-
-func mustRandomPort() string {
-	r, err := rand.Int(rand.Reader, big.NewInt(65535-1023))
-	if err != nil {
-		panic(fmt.Errorf("unexpected error generating random port: %w", err))
-	}
-	return strconv.Itoa(int(r.Int64() + 1024))
 }
