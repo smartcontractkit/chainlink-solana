@@ -19,6 +19,6 @@ jobs:
       - name: Install Solana CLI
         run: make test_install_ci
       - name: Build & Test
-        run: make test_relay_unit_ci
+        run: make test_relay_unit
       - name: Test with the race detector enabled
         run: go test ./pkg/... -v -race -count=10

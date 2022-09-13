@@ -36,6 +36,8 @@ ifeq ($(OSFLAG),$(OSX))
 	asdf plugin-add pulumi || true
 	asdf plugin add actionlint || true
 	asdf plugin add shellcheck || true
+	asdf plugin add shfmt || true
+	asdf plugin add helm || true
 	asdf install
 endif
 ifeq ($(OSFLAG),$(LINUX))
@@ -88,3 +90,9 @@ test_ocr_soak:
 test_chaos:
 	SELECTED_NETWORKS=solana NETWORK_SETTINGS=$(shell pwd)/tests/e2e/networks.yaml \
 	ginkgo -v -r --junit-report=tests-chaos-report.xml --keep-going --trace tests/e2e/chaos
+
+shellcheck:
+	exec shellcheck -x -s bash -P ./scripts ./scripts/*
+
+shfmt:
+	exec shfmt -l -d ./scripts
