@@ -1,7 +1,7 @@
 name: relay
 
 on:
-  push:
+  pull_request:
 
 jobs:
   relay_run_unit_tests:
@@ -9,18 +9,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
+        uses: actions/checkout@v3
       - uses: smartcontractkit/tool-versions-to-env-action@v1.0.7
         id: tool-versions
       - name: Setup go ${{ steps.tool-versions.outputs.golang_version }}
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ steps.tool-versions.outputs.golang_version }}
-      - name: Install Solana CLI
-        run: ./scripts/install-solana-ci.sh
-      - name: Build
-        run: go build -v ./pkg/...
-      - name: Test
-        run: go test ./pkg/... -v
+      - name: Build & Test
+        run: make test_relay_unit_ci
       - name: Test with the race detector enabled
         run: go test ./pkg/... -v -race -count=10
