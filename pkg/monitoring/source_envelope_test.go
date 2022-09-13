@@ -121,8 +121,7 @@ func TestEnvelopeSource(t *testing.T) {
 	feedConfig.ContractAddress = solana.MustPublicKeyFromBase58(feedConfig.ContractAddressBase58)
 
 	// Setup mocks
-	chainReader := new(mocks.ChainReader)
-	chainReader.Test(t)
+	chainReader := mocks.NewChainReader(t)
 	chainReader.On("GetState",
 		mock.Anything, // ctx
 		feedConfig.StateAccount,
@@ -222,6 +221,8 @@ func TestEnvelopeSource(t *testing.T) {
 }
 
 func TestGetLinkAvailableForPayment(t *testing.T) {
+	t.Parallel()
+
 	t.Run("should panic for a nil link balance", func(t *testing.T) {
 		require.Panics(t, func() {
 			_, _ = getLinkAvailableForPayment(fakeState, nil)
