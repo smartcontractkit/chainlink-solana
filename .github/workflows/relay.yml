@@ -16,6 +16,8 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ steps.tool-versions.outputs.golang_version }}
+      - name: Install Solana CLI
+        run: make test_install_ci
       - name: Build & Test
         run: make test_relay_unit_ci
       - name: Test with the race detector enabled
