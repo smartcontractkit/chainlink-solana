@@ -57,7 +57,7 @@ pub mod ocr2 {
             ctx.accounts.state.clone(),
             ctx.accounts.token_program.to_account_info(),
             ctx.accounts.token_vault.to_account_info(),
-            ctx.accounts.vault_authority.clone(),
+            ctx.accounts.vault_authority.to_account_info(),
             ctx.remaining_accounts,
             ctx.accounts.token_receiver.to_account_info(),
         )?;
