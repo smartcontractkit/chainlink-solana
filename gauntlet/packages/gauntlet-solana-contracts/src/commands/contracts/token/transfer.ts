@@ -1,13 +1,8 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import {
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  createTransferInstruction,
-  getAssociatedTokenAddress,
-  TOKEN_PROGRAM_ID,
-} from '@solana/spl-token'
-import { PublicKey, TransactionInstruction } from '@solana/web3.js'
+import { createTransferInstruction, getAssociatedTokenAddress } from '@solana/spl-token'
+import { PublicKey } from '@solana/web3.js'
 import { TOKEN_DECIMALS } from '../../../lib/constants'
 import { CONTRACT_LIST } from '../../../lib/contracts'
 import { isValidTokenAccount } from './utils'
