@@ -14,8 +14,6 @@ pub struct Initialize<'info> {
     #[account(zero)]
     pub state: AccountLoader<'info, State>,
     pub feed: Account<'info, Transmissions>,
-    // #[account(mut)]
-    // pub payer: Signer<'info>,
     pub owner: Signer<'info>,
 
     pub token_mint: Account<'info, Mint>,
@@ -30,11 +28,6 @@ pub struct Initialize<'info> {
 
     pub requester_access_controller: AccountLoader<'info, AccessController>,
     pub billing_access_controller: AccountLoader<'info, AccessController>,
-    // #[account(address = sysvar::rent::ID)]
-    // pub rent: Sysvar<'info, Rent>,
-    // pub system_program: Program<'info, System>,
-    // pub token_program: Program<'info, Token>,
-    // pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
 #[derive(Accounts)]

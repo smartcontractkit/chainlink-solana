@@ -363,7 +363,6 @@ func (m *OCRv2) proposeConfig(ocConfig contracts.OffChainAggregatorV2Config) err
 		proposeInstr.Append(solana.Meta(payees[i]))
 	}
 	instr = append(instr, proposeInstr.Build())
-	// TODO: how to set payees as remaining
 	return m.Client.TXSync(
 		"Set payees",
 		rpc.CommitmentFinalized,

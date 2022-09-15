@@ -609,17 +609,12 @@ describe("ocr2", async () => {
       .accounts({
         state: state.publicKey,
         feed: feed.publicKey,
-        // payer: provider.wallet.publicKey,
         owner: owner.publicKey,
         tokenMint: token,
         tokenVault: tokenVault,
         vaultAuthority: vaultAuthority,
         requesterAccessController: requesterAccessController.publicKey,
         billingAccessController: billingAccessController.publicKey,
-        // rent: SYSVAR_RENT_PUBKEY,
-        // systemProgram: SystemProgram.programId,
-        // tokenProgram: TOKEN_PROGRAM_ID,
-        // associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       })
       .signers([state])
       .preInstructions([
