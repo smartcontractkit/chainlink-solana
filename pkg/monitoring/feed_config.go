@@ -85,13 +85,14 @@ func (s SolanaFeedConfig) GetContractAddressBytes() []byte {
 
 func (s SolanaFeedConfig) ToMapping() map[string]interface{} {
 	return map[string]interface{}{
-		"feed_name":        s.Name,
-		"feed_path":        s.Path,
-		"symbol":           s.Symbol,
-		"heartbeat_sec":    int64(s.HeartbeatSec),
-		"contract_type":    s.ContractType,
-		"contract_status":  s.ContractStatus,
-		"contract_address": s.ContractAddress.Bytes(),
+		"feed_name":               s.Name,
+		"feed_path":               s.Path,
+		"symbol":                  s.Symbol,
+		"heartbeat_sec":           int64(s.HeartbeatSec),
+		"contract_type":           s.ContractType,
+		"contract_status":         s.ContractStatus,
+		"contract_address":        s.ContractAddress.Bytes(),
+		"contract_address_string": map[string]interface{}{"string": s.ContractAddressBase58},
 
 		// These fields are Solana specific.
 		// They are required in the schema but they should be set to a zero value for any other chain.
