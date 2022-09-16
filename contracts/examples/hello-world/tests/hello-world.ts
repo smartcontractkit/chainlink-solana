@@ -13,11 +13,13 @@ describe("hello-world", () => {
 
   const program = anchor.workspace.HelloWorld as Program<HelloWorld>;
 
+  const header = 8 + 192; // account discriminator + header
+  const transmissionSize = 48;
+
   it("Is initialized!", async () => {
     const owner = provider.wallet;
     const store = anchor.web3.Keypair.generate();
     const feed = anchor.web3.Keypair.generate();
-    const accessController = anchor.web3.Keypair.generate();
 
     let storeIdl = JSON.parse(fs.readFileSync("../../target/idl/store.json"));
     const storeProgram = new Program(storeIdl, CHAINLINK_PROGRAM_ID, provider);
@@ -27,6 +29,7 @@ describe("hello-world", () => {
     const decimals = 18;
     const granularity = 30;
     const liveLength = 3;
+    const historicalLength = 3;
     await storeProgram.rpc.createFeed(
       description,
       decimals,
@@ -41,7 +44,7 @@ describe("hello-world", () => {
         preInstructions: [
           await storeProgram.account.transmissions.createInstruction(
             feed,
-            8 + 192 + 6 * 24
+            header + (liveLength + historicalLength) * transmissionSize
           ),
         ],
       }

@@ -49,6 +49,9 @@ class Assignable {
 }
 class Round extends Assignable {}
 
+const header = 8 + 192; // account discriminator + header
+const transmissionSize = 48;
+
 describe("ocr2", async () => {
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
@@ -356,6 +359,7 @@ describe("ocr2", async () => {
 
     const granularity = 30;
     const liveLength = 3;
+    const historicalLength = 3;
     await workspace.Store.methods
       .createFeed(description, decimals, granularity, liveLength)
       .accounts({
@@ -366,7 +370,7 @@ describe("ocr2", async () => {
       .preInstructions([
         await workspace.Store.account.transmissions.createInstruction(
           feed,
-          8 + 192 + 6 * 48
+          header + (liveLength + historicalLength) * transmissionSize
         ),
       ])
       .rpc();
@@ -1096,8 +1100,6 @@ describe("ocr2", async () => {
     const granularity = 30;
     const liveLength = 3;
 
-    const header = 8 + 192; // account discriminator + header
-    const transmissionSize = 48;
     const invalidLengths = [
       header - 1, // insufficient for header size
       header + 6 * transmissionSize - 1, // incorrect size for ring buffer
@@ -1138,8 +1140,6 @@ describe("ocr2", async () => {
     const granularity = 1;
     const liveLength = 3;
 
-    const header = 8 + 192; // account discriminator + header
-    const transmissionSize = 48;
     const feed = Keypair.generate();
     const length = header + transmissionSize * liveLength;
 
