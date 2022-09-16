@@ -21,7 +21,7 @@ describe("hello-world", () => {
     const store = anchor.web3.Keypair.generate();
     const feed = anchor.web3.Keypair.generate();
 
-    let storeIdl = JSON.parse(fs.readFileSync("../../target/idl/store.json"));
+    let storeIdl = JSON.parse(fs.readFileSync("../../target/idl/store.json", "utf-8"));
     const storeProgram = new Program(storeIdl, CHAINLINK_PROGRAM_ID, provider);
 
     // Create a feed
@@ -30,58 +30,45 @@ describe("hello-world", () => {
     const granularity = 30;
     const liveLength = 3;
     const historicalLength = 3;
-    await storeProgram.rpc.createFeed(
-      description,
-      decimals,
-      granularity,
-      liveLength,
-      {
-        accounts: {
-          feed: feed.publicKey,
-          authority: owner.publicKey,
-        },
-        signers: [feed],
-        preInstructions: [
-          await storeProgram.account.transmissions.createInstruction(
-            feed,
-            header + (liveLength + historicalLength) * transmissionSize
-          ),
-        ],
-      }
-    );
-
-    await storeProgram.rpc.setWriter(owner.publicKey, {
-      accounts: {
+    await storeProgram.methods
+      .createFeed(description, decimals, granularity, liveLength)
+      .accounts({
         feed: feed.publicKey,
-        owner: owner.publicKey,
         authority: owner.publicKey,
-      },
-    });
+      })
+      .signers([feed])
+      .preInstructions([
+        await storeProgram.account.transmissions.createInstruction(
+          feed,
+          header + (liveLength + historicalLength) * transmissionSize
+        ),
+      ]).rpc();
+
+    await storeProgram.methods.setWriter(owner.publicKey).accounts({
+      feed: feed.publicKey,
+      owner: owner.publicKey,
+      authority: owner.publicKey,
+    }).rpc();
 
     const scale = new BN(10).pow(new BN(decimals));
     // Scale answer to enough decimals
     let answer = new BN(1).mul(scale);
     let round = { timestamp: new BN(1), answer };
 
-    let tx = await storeProgram.rpc.submit(round, {
-      accounts: {
+    let tx = await storeProgram.methods.submit(round).accounts({
         store: store.publicKey,
         feed: feed.publicKey,
         authority: owner.publicKey,
-      },
-    });
+    }).rpc();
     await provider.connection.confirmTransaction(tx);
 
     // Add your test here.
-    tx = await program.rpc.execute({
-      accounts: {
+    tx = await program.methods.execute().accounts({
         chainlinkFeed: feed.publicKey,
         chainlinkProgram: CHAINLINK_PROGRAM_ID,
-      },
-      options: { commitment: "confirmed" },
-    });
+    }).rpc({ commitment: "confirmed" });
     console.log("Your transaction signature", tx);
-    let t = await provider.connection.getConfirmedTransaction(tx, "confirmed");
+    let t = await provider.connection.getTransaction(tx, { commitment: "confirmed" });
     console.log(t.meta.logMessages);
   });
 });
