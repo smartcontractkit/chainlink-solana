@@ -31,6 +31,6 @@
     "@ethersproject/keccak256": "^5.5.0",
     "@solana/spl-token": "^0.2.0",
     "@solana/web3.js": "^1.50.1",
-    "protobufjs": "^6.11.2"
+    "protobufjs": "^6.11.3"
   }
 }
