@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token;
 
 use arrayref::{array_ref, array_refs};
-use state::{Billing, Proposal, ProposedOracle};
+use state::{Billing, Proposal, ProposedOracle, STATE_VERSION};
 
 declare_id!("cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ");
 
@@ -31,7 +31,7 @@ pub mod ocr2 {
     use super::*;
     pub fn initialize(ctx: Context<Initialize>, min_answer: i128, max_answer: i128) -> Result<()> {
         let mut state = ctx.accounts.state.load_init()?;
-        state.version = 1;
+        state.version = STATE_VERSION;
 
         state.vault_nonce = *ctx.bumps.get("vault_authority").unwrap();
         state.feed = ctx.accounts.feed.key();
@@ -51,27 +51,47 @@ pub mod ocr2 {
         Ok(())
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
     pub fn close<'info>(ctx: Context<'_, '_, '_, 'info, Close<'info>>) -> Result<()> {
         // Pay out any remaining balances
         pay_oracles_impl(
             ctx.accounts.state.clone(),
             ctx.accounts.token_program.to_account_info(),
             ctx.accounts.token_vault.to_account_info(),
-            ctx.accounts.vault_authority.clone(),
+            ctx.accounts.vault_authority.to_account_info(),
             ctx.remaining_accounts,
+            ctx.accounts.token_receiver.to_account_info(),
         )?;
+
+        // Transfer out remaining balance from the token_vault
+        let balance_gjuels = token::accessor::amount(&ctx.accounts.token_vault.to_account_info())?;
+
+        if balance_gjuels > 0 {
+            token::transfer(
+                CpiContext::new(
+                    ctx.accounts.token_program.to_account_info(),
+                    token::Transfer {
+                        from: ctx.accounts.token_vault.to_account_info(),
+                        to: ctx.accounts.token_receiver.to_account_info(),
+                        authority: ctx.accounts.vault_authority.to_account_info(),
+                    },
+                )
+                .with_signer(&[&[
+                    b"vault".as_ref(),
+                    ctx.accounts.state.key().as_ref(),
+                    &[ctx.accounts.state.load()?.vault_nonce],
+                ]]),
+                balance_gjuels,
+            )?;
+        }
 
         // NOTE: Close is handled by anchor on exit due to the `close` attribute
         Ok(())
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
     pub fn transfer_ownership(
         ctx: Context<TransferOwnership>,
         proposed_owner: Pubkey,
     ) -> Result<()> {
-        require!(proposed_owner != Pubkey::default(), InvalidInput);
         let mut state = ctx.accounts.state.load_mut()?;
         state.config.proposed_owner = proposed_owner;
         Ok(())
@@ -79,10 +99,6 @@ pub mod ocr2 {
 
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
         let mut state = ctx.accounts.state.load_mut()?;
-        require!(
-            ctx.accounts.authority.key == &state.config.proposed_owner,
-            Unauthorized
-        );
         state.config.owner = std::mem::take(&mut state.config.proposed_owner);
         Ok(())
     }
@@ -93,7 +109,7 @@ pub mod ocr2 {
     ) -> Result<()> {
         let mut proposal = ctx.accounts.proposal.load_init()?;
 
-        proposal.version = 1;
+        proposal.version = STATE_VERSION;
         proposal.owner = ctx.accounts.authority.key();
 
         require!(offchain_config_version != 0, InvalidInput);
@@ -101,7 +117,6 @@ pub mod ocr2 {
         Ok(())
     }
 
-    #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
     pub fn write_offchain_config(
         ctx: Context<ProposeConfig>,
         offchain_config: Vec<u8>,
@@ -110,24 +125,23 @@ pub mod ocr2 {
         require!(proposal.state != Proposal::FINALIZED, InvalidInput);
 
         require!(
-            offchain_config.len() < proposal.offchain_config.remaining_capacity(),
+            offchain_config.len() <= proposal.offchain_config.remaining_capacity(),
             InvalidInput
         );
         proposal.offchain_config.extend(&offchain_config);
         Ok(())
     }
 
-    #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
     pub fn finalize_proposal(ctx: Context<ProposeConfig>) -> Result<()> {
         let mut proposal = ctx.accounts.proposal.load_mut()?;
         require!(proposal.state != Proposal::FINALIZED, InvalidInput);
 
-        // Require that at least some data was written via setOffchainConfig
+        // Require that at least some data was written via write_offchain_config
         require!(proposal.offchain_config.version > 0, InvalidInput);
         require!(!proposal.offchain_config.is_empty(), InvalidInput);
-        // setConfig must have been called
+        // propose_config must have been called
         require!(!proposal.oracles.is_empty(), InvalidInput);
-        // setPayees must have been called
+        // propose_payees must have been called
         let valid_payees = proposal
             .oracles
             .iter()
@@ -139,13 +153,11 @@ pub mod ocr2 {
         Ok(())
     }
 
-    #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
-    pub fn close_proposal(ctx: Context<CloseProposal>) -> Result<()> {
+    pub fn close_proposal(_ctx: Context<CloseProposal>) -> Result<()> {
         // NOTE: Close is handled by anchor on exit due to the `close` attribute
         Ok(())
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
     pub fn accept_proposal<'info>(
         ctx: Context<'_, '_, '_, 'info, AcceptProposal<'info>>,
         digest: Vec<u8>,
@@ -159,10 +171,14 @@ pub mod ocr2 {
             ctx.accounts.token_vault.to_account_info(),
             ctx.accounts.vault_authority.clone(),
             ctx.remaining_accounts,
+            ctx.accounts.token_receiver.to_account_info(),
         )?;
 
         let mut state = ctx.accounts.state.load_mut()?;
         let proposal = ctx.accounts.proposal.load()?;
+
+        // State version should equal proposal version
+        require!(state.version == proposal.version, InvalidInput);
 
         // Proposal has to be finalized
         require!(proposal.state == Proposal::FINALIZED, InvalidInput);
@@ -224,7 +240,6 @@ pub mod ocr2 {
         Ok(())
     }
 
-    #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
     pub fn propose_config(
         ctx: Context<ProposeConfig>,
         new_oracles: Vec<NewOracle>,
@@ -277,33 +292,29 @@ pub mod ocr2 {
         Ok(())
     }
 
-    #[access_control(proposal_owner(&ctx.accounts.proposal, &ctx.accounts.authority))]
-    pub fn propose_payees(
-        ctx: Context<ProposeConfig>,
-        token_mint: Pubkey,
-        payees: Vec<Pubkey>,
-    ) -> Result<()> {
+    pub fn propose_payees(ctx: Context<ProposeConfig>, token_mint: Pubkey) -> Result<()> {
         let mut proposal = ctx.accounts.proposal.load_mut()?;
         require!(proposal.state != Proposal::FINALIZED, InvalidInput);
+
+        let payees = ctx.remaining_accounts;
 
         // Need to provide a payee for each oracle
         require!(proposal.oracles.len() == payees.len(), PayeeOracleMismatch);
 
         // Verify that the remaining accounts are valid token accounts.
-        for account in ctx.remaining_accounts {
+        for account in payees {
             let account = Account::<'_, token::TokenAccount>::try_from(account)?;
             require!(account.mint == token_mint, InvalidTokenAccount);
         }
 
-        for (oracle, payee) in proposal.oracles.iter_mut().zip(payees.into_iter()) {
-            oracle.payee = payee;
+        for (oracle, payee) in proposal.oracles.iter_mut().zip(payees.iter()) {
+            oracle.payee = payee.key();
         }
         proposal.token_mint = token_mint;
 
         Ok(())
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
     pub fn set_requester_access_controller(ctx: Context<SetAccessController>) -> Result<()> {
         let mut state = ctx.accounts.state.load_mut()?;
         state.config.requester_access_controller = ctx.accounts.access_controller.key();
@@ -334,10 +345,16 @@ pub mod ocr2 {
         // Use a raw instruction to skip data decoding, but keep using Anchor contexts.
 
         let mut bumps = std::collections::BTreeMap::new();
+        let mut reallocs = std::collections::BTreeSet::new();
         // Deserialize accounts.
         let mut remaining_accounts: &[AccountInfo] = accounts;
-        let mut accounts =
-            Transmit::try_accounts(program_id, &mut remaining_accounts, data, &mut bumps)?;
+        let mut accounts = Transmit::try_accounts(
+            program_id,
+            &mut remaining_accounts,
+            data,
+            &mut bumps,
+            &mut reallocs,
+        )?;
 
         // Construct a context
         let ctx = Context::new(program_id, &mut accounts, remaining_accounts, bumps);
@@ -348,7 +365,6 @@ pub mod ocr2 {
         accounts.exit(program_id)
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
     pub fn set_billing_access_controller(ctx: Context<SetAccessController>) -> Result<()> {
         let mut state = ctx.accounts.state.load_mut()?;
         state.config.billing_access_controller = ctx.accounts.access_controller.key();
@@ -368,6 +384,7 @@ pub mod ocr2 {
             ctx.accounts.token_vault.to_account_info(),
             ctx.accounts.vault_authority.clone(),
             ctx.remaining_accounts,
+            ctx.accounts.token_receiver.to_account_info(),
         )?;
 
         // Then update the config
@@ -461,6 +478,7 @@ pub mod ocr2 {
             ctx.accounts.token_vault.to_account_info(),
             ctx.accounts.vault_authority.clone(),
             ctx.remaining_accounts,
+            ctx.accounts.token_receiver.to_account_info(),
         )
     }
 
@@ -526,6 +544,7 @@ fn pay_oracles_impl<'info>(
     token_vault: AccountInfo<'info>,
     vault_authority: AccountInfo<'info>,
     remaining_accounts: &[AccountInfo<'info>],
+    token_receiver: AccountInfo<'info>,
 ) -> Result<()> {
     let state_id = state.key();
     let mut state = state.load_mut()?;
@@ -552,11 +571,18 @@ fn pay_oracles_impl<'info>(
             oracle.payment_gjuels = 0;
             oracle.from_round_id = latest_round_id;
 
+            let to = if payee.owner == &token::ID {
+                payee.to_account_info()
+            } else {
+                // then the token account must be closed
+                token_receiver.to_account_info()
+            };
+
             let cpi = CpiContext::new(
                 token_program.clone(),
                 token::Transfer {
                     from: token_vault.clone(),
-                    to: payee.to_account_info(),
+                    to,
                     authority: vault_authority.clone(),
                 },
             );
@@ -576,7 +602,7 @@ fn pay_oracles_impl<'info>(
         token::transfer(
             cpi.with_signer(&[&[b"vault".as_ref(), state_id.as_ref(), &[vault_nonce]]]),
             amount_gjuels,
-        )?;
+        )?
     }
 
     Ok(())
@@ -746,7 +772,7 @@ struct Report {
 }
 
 impl Report {
-    // (uint32, u8, bytes32, int128, uint128)
+    // (uint32, u8, bytes32, int128, u64)
     pub const LEN: usize =
         size_of::<u32>() + size_of::<u8>() + 32 + size_of::<i128>() + size_of::<u64>();
 
@@ -828,19 +854,6 @@ fn calculate_total_link_due_gjuels(config: &Config, oracles: &[Oracle]) -> Resul
 }
 
 // -- Access control modifiers
-
-// Only owner access
-fn owner(state_loader: &AccountLoader<State>, signer: &AccountInfo) -> Result<()> {
-    let config = state_loader.load()?.config;
-    require!(signer.key.eq(&config.owner), Unauthorized);
-    Ok(())
-}
-
-fn proposal_owner(proposal_loader: &AccountLoader<Proposal>, signer: &AccountInfo) -> Result<()> {
-    let proposal = proposal_loader.load()?;
-    require!(signer.key.eq(&proposal.owner), Unauthorized);
-    Ok(())
-}
 
 fn has_billing_access(
     state: &AccountLoader<State>,

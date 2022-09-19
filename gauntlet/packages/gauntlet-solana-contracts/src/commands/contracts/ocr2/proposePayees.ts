@@ -2,7 +2,7 @@ import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
+import { getAccount } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import RDD from '../../../lib/rdd'
 import { printDiff } from '../../../lib/diff'
@@ -80,8 +80,8 @@ export default class ProposePayees extends SolanaCommand {
   buildCommand = async (flags, args) => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     this.program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
-    this.input = await this.makeInput(flags.input)
-    this.contractInput = await this.makeContractInput(this.input)
+    this.input = this.makeInput(flags.input)
+    this.contractInput = this.makeContractInput(this.input)
 
     return this
   }
@@ -89,16 +89,11 @@ export default class ProposePayees extends SolanaCommand {
   makeRawTransaction = async (signer: PublicKey) => {
     const link = new PublicKey(this.flags.link || process.env.LINK)
 
-    const token = new Token(this.provider.connection, link, TOKEN_PROGRAM_ID, {
-      publicKey: signer,
-      secretKey: Buffer.from([]),
-    })
-
     const areValidPayees = (
       await Promise.all(
         Object.entries(this.contractInput.payeeByTransmitter).map(async ([transmitter, payee]) => {
           try {
-            const info = await token.getAccountInfo(new PublicKey(payee))
+            const info = await getAccount(this.provider.connection, payee)
             return !!info.address
           } catch (e) {
             logger.error(`Payee with address ${payee} does not have a valid Token recipient address`)
@@ -116,25 +111,30 @@ export default class ProposePayees extends SolanaCommand {
     // Set the payees in the same order the oracles are saved in the proposal
     // The length of the payees need to be same as the oracles saved
     const proposal = new PublicKey(this.input.proposalId)
-    const proposalInfo = await this.program.account.proposal.fetch(proposal)
-    const payees = proposalInfo.oracles.xs
-      .slice(0, proposalInfo.oracles.len)
-      .map(({ transmitter }) => this.contractInput.payeeByTransmitter[transmitter.toString()])
+    const proposalInfo = (await this.program.account.proposal.fetch(proposal)) as any
+    const payees = proposalInfo.oracles.xs.slice(0, proposalInfo.oracles.len).map(({ transmitter }) => ({
+      pubkey: this.contractInput.payeeByTransmitter[transmitter.toString()],
+      isWritable: true,
+      isSigner: false,
+    }))
 
-    const ix = this.program.instruction.proposePayees(token.publicKey, payees, {
-      accounts: {
+    const ix = await this.program.methods
+      .proposePayees(link)
+      .accounts({
         proposal,
         authority: signer,
-      },
-    })
+      })
+      .remainingAccounts(payees)
+      .instruction()
+
     return [ix]
   }
 
   beforeExecute = async () => {
     const state = new PublicKey(this.args[0])
     const proposal = new PublicKey(this.input.proposalId)
-    const contractState = await this.program.account.state.fetch(state)
-    const proposalState = await this.program.account.proposal.fetch(proposal)
+    const contractState = (await this.program.account.state.fetch(state)) as any
+    const proposalState = (await this.program.account.proposal.fetch(proposal)) as any
 
     const payeesInContract = {
       oracles: contractState.oracles.xs

@@ -21,18 +21,20 @@ type SetBilling struct {
 	//
 	// [2] = [] accessController
 	//
-	// [3] = [WRITE] tokenVault
+	// [3] = [WRITE] tokenReceiver
 	//
-	// [4] = [] vaultAuthority
+	// [4] = [WRITE] tokenVault
 	//
-	// [5] = [] tokenProgram
+	// [5] = [] vaultAuthority
+	//
+	// [6] = [] tokenProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewSetBillingInstructionBuilder creates a new `SetBilling` instruction builder.
 func NewSetBillingInstructionBuilder() *SetBilling {
 	nd := &SetBilling{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 6),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 7),
 	}
 	return nd
 }
@@ -82,37 +84,48 @@ func (inst *SetBilling) GetAccessControllerAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
+// SetTokenReceiverAccount sets the "tokenReceiver" account.
+func (inst *SetBilling) SetTokenReceiverAccount(tokenReceiver ag_solanago.PublicKey) *SetBilling {
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(tokenReceiver).WRITE()
+	return inst
+}
+
+// GetTokenReceiverAccount gets the "tokenReceiver" account.
+func (inst *SetBilling) GetTokenReceiverAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[3]
+}
+
 // SetTokenVaultAccount sets the "tokenVault" account.
 func (inst *SetBilling) SetTokenVaultAccount(tokenVault ag_solanago.PublicKey) *SetBilling {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(tokenVault).WRITE()
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(tokenVault).WRITE()
 	return inst
 }
 
 // GetTokenVaultAccount gets the "tokenVault" account.
 func (inst *SetBilling) GetTokenVaultAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice[4]
 }
 
 // SetVaultAuthorityAccount sets the "vaultAuthority" account.
 func (inst *SetBilling) SetVaultAuthorityAccount(vaultAuthority ag_solanago.PublicKey) *SetBilling {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(vaultAuthority)
+	inst.AccountMetaSlice[5] = ag_solanago.Meta(vaultAuthority)
 	return inst
 }
 
 // GetVaultAuthorityAccount gets the "vaultAuthority" account.
 func (inst *SetBilling) GetVaultAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice[5]
 }
 
 // SetTokenProgramAccount sets the "tokenProgram" account.
 func (inst *SetBilling) SetTokenProgramAccount(tokenProgram ag_solanago.PublicKey) *SetBilling {
-	inst.AccountMetaSlice[5] = ag_solanago.Meta(tokenProgram)
+	inst.AccountMetaSlice[6] = ag_solanago.Meta(tokenProgram)
 	return inst
 }
 
 // GetTokenProgramAccount gets the "tokenProgram" account.
 func (inst *SetBilling) GetTokenProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice[6]
 }
 
 func (inst SetBilling) Build() *Instruction {
@@ -155,12 +168,15 @@ func (inst *SetBilling) Validate() error {
 			return errors.New("accounts.AccessController is not set")
 		}
 		if inst.AccountMetaSlice[3] == nil {
-			return errors.New("accounts.TokenVault is not set")
+			return errors.New("accounts.TokenReceiver is not set")
 		}
 		if inst.AccountMetaSlice[4] == nil {
-			return errors.New("accounts.VaultAuthority is not set")
+			return errors.New("accounts.TokenVault is not set")
 		}
 		if inst.AccountMetaSlice[5] == nil {
+			return errors.New("accounts.VaultAuthority is not set")
+		}
+		if inst.AccountMetaSlice[6] == nil {
 			return errors.New("accounts.TokenProgram is not set")
 		}
 	}
@@ -182,13 +198,14 @@ func (inst *SetBilling) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=6]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=7]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("           state", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("accessController", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("      tokenVault", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("  vaultAuthority", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("    tokenProgram", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("   tokenReceiver", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("      tokenVault", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("  vaultAuthority", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("    tokenProgram", inst.AccountMetaSlice[6]))
 					})
 				})
 		})
@@ -230,6 +247,7 @@ func NewSetBillingInstruction(
 	state ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	accessController ag_solanago.PublicKey,
+	tokenReceiver ag_solanago.PublicKey,
 	tokenVault ag_solanago.PublicKey,
 	vaultAuthority ag_solanago.PublicKey,
 	tokenProgram ag_solanago.PublicKey) *SetBilling {
@@ -239,6 +257,7 @@ func NewSetBillingInstruction(
 		SetStateAccount(state).
 		SetAuthorityAccount(authority).
 		SetAccessControllerAccount(accessController).
+		SetTokenReceiverAccount(tokenReceiver).
 		SetTokenVaultAccount(tokenVault).
 		SetVaultAuthorityAccount(vaultAuthority).
 		SetTokenProgramAccount(tokenProgram)

@@ -19,34 +19,24 @@ type Initialize struct {
 	//
 	// [1] = [] feed
 	//
-	// [2] = [WRITE, SIGNER] payer
+	// [2] = [SIGNER] owner
 	//
-	// [3] = [SIGNER] owner
+	// [3] = [] tokenMint
 	//
-	// [4] = [] tokenMint
+	// [4] = [] tokenVault
 	//
-	// [5] = [WRITE] tokenVault
+	// [5] = [] vaultAuthority
 	//
-	// [6] = [] vaultAuthority
+	// [6] = [] requesterAccessController
 	//
-	// [7] = [] requesterAccessController
-	//
-	// [8] = [] billingAccessController
-	//
-	// [9] = [] rent
-	//
-	// [10] = [] systemProgram
-	//
-	// [11] = [] tokenProgram
-	//
-	// [12] = [] associatedTokenProgram
+	// [7] = [] billingAccessController
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
 func NewInitializeInstructionBuilder() *Initialize {
 	nd := &Initialize{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 13),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 8),
 	}
 	return nd
 }
@@ -85,125 +75,70 @@ func (inst *Initialize) GetFeedAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
-// SetPayerAccount sets the "payer" account.
-func (inst *Initialize) SetPayerAccount(payer ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(payer).WRITE().SIGNER()
-	return inst
-}
-
-// GetPayerAccount gets the "payer" account.
-func (inst *Initialize) GetPayerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
-}
-
 // SetOwnerAccount sets the "owner" account.
 func (inst *Initialize) SetOwnerAccount(owner ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(owner).SIGNER()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(owner).SIGNER()
 	return inst
 }
 
 // GetOwnerAccount gets the "owner" account.
 func (inst *Initialize) GetOwnerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice[2]
 }
 
 // SetTokenMintAccount sets the "tokenMint" account.
 func (inst *Initialize) SetTokenMintAccount(tokenMint ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(tokenMint)
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(tokenMint)
 	return inst
 }
 
 // GetTokenMintAccount gets the "tokenMint" account.
 func (inst *Initialize) GetTokenMintAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice[3]
 }
 
 // SetTokenVaultAccount sets the "tokenVault" account.
 func (inst *Initialize) SetTokenVaultAccount(tokenVault ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[5] = ag_solanago.Meta(tokenVault).WRITE()
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(tokenVault)
 	return inst
 }
 
 // GetTokenVaultAccount gets the "tokenVault" account.
 func (inst *Initialize) GetTokenVaultAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[5]
+	return inst.AccountMetaSlice[4]
 }
 
 // SetVaultAuthorityAccount sets the "vaultAuthority" account.
 func (inst *Initialize) SetVaultAuthorityAccount(vaultAuthority ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[6] = ag_solanago.Meta(vaultAuthority)
+	inst.AccountMetaSlice[5] = ag_solanago.Meta(vaultAuthority)
 	return inst
 }
 
 // GetVaultAuthorityAccount gets the "vaultAuthority" account.
 func (inst *Initialize) GetVaultAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
+	return inst.AccountMetaSlice[5]
 }
 
 // SetRequesterAccessControllerAccount sets the "requesterAccessController" account.
 func (inst *Initialize) SetRequesterAccessControllerAccount(requesterAccessController ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[7] = ag_solanago.Meta(requesterAccessController)
+	inst.AccountMetaSlice[6] = ag_solanago.Meta(requesterAccessController)
 	return inst
 }
 
 // GetRequesterAccessControllerAccount gets the "requesterAccessController" account.
 func (inst *Initialize) GetRequesterAccessControllerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[7]
+	return inst.AccountMetaSlice[6]
 }
 
 // SetBillingAccessControllerAccount sets the "billingAccessController" account.
 func (inst *Initialize) SetBillingAccessControllerAccount(billingAccessController ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[8] = ag_solanago.Meta(billingAccessController)
+	inst.AccountMetaSlice[7] = ag_solanago.Meta(billingAccessController)
 	return inst
 }
 
 // GetBillingAccessControllerAccount gets the "billingAccessController" account.
 func (inst *Initialize) GetBillingAccessControllerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[8]
-}
-
-// SetRentAccount sets the "rent" account.
-func (inst *Initialize) SetRentAccount(rent ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[9] = ag_solanago.Meta(rent)
-	return inst
-}
-
-// GetRentAccount gets the "rent" account.
-func (inst *Initialize) GetRentAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[9]
-}
-
-// SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *Initialize) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[10] = ag_solanago.Meta(systemProgram)
-	return inst
-}
-
-// GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *Initialize) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[10]
-}
-
-// SetTokenProgramAccount sets the "tokenProgram" account.
-func (inst *Initialize) SetTokenProgramAccount(tokenProgram ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[11] = ag_solanago.Meta(tokenProgram)
-	return inst
-}
-
-// GetTokenProgramAccount gets the "tokenProgram" account.
-func (inst *Initialize) GetTokenProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[11]
-}
-
-// SetAssociatedTokenProgramAccount sets the "associatedTokenProgram" account.
-func (inst *Initialize) SetAssociatedTokenProgramAccount(associatedTokenProgram ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[12] = ag_solanago.Meta(associatedTokenProgram)
-	return inst
-}
-
-// GetAssociatedTokenProgramAccount gets the "associatedTokenProgram" account.
-func (inst *Initialize) GetAssociatedTokenProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[12]
+	return inst.AccountMetaSlice[7]
 }
 
 func (inst Initialize) Build() *Instruction {
@@ -243,37 +178,22 @@ func (inst *Initialize) Validate() error {
 			return errors.New("accounts.Feed is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.Payer is not set")
-		}
-		if inst.AccountMetaSlice[3] == nil {
 			return errors.New("accounts.Owner is not set")
 		}
-		if inst.AccountMetaSlice[4] == nil {
+		if inst.AccountMetaSlice[3] == nil {
 			return errors.New("accounts.TokenMint is not set")
 		}
-		if inst.AccountMetaSlice[5] == nil {
+		if inst.AccountMetaSlice[4] == nil {
 			return errors.New("accounts.TokenVault is not set")
 		}
-		if inst.AccountMetaSlice[6] == nil {
+		if inst.AccountMetaSlice[5] == nil {
 			return errors.New("accounts.VaultAuthority is not set")
 		}
-		if inst.AccountMetaSlice[7] == nil {
+		if inst.AccountMetaSlice[6] == nil {
 			return errors.New("accounts.RequesterAccessController is not set")
 		}
-		if inst.AccountMetaSlice[8] == nil {
+		if inst.AccountMetaSlice[7] == nil {
 			return errors.New("accounts.BillingAccessController is not set")
-		}
-		if inst.AccountMetaSlice[9] == nil {
-			return errors.New("accounts.Rent is not set")
-		}
-		if inst.AccountMetaSlice[10] == nil {
-			return errors.New("accounts.SystemProgram is not set")
-		}
-		if inst.AccountMetaSlice[11] == nil {
-			return errors.New("accounts.TokenProgram is not set")
-		}
-		if inst.AccountMetaSlice[12] == nil {
-			return errors.New("accounts.AssociatedTokenProgram is not set")
 		}
 	}
 	return nil
@@ -294,20 +214,15 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=13]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=8]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("                    state", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("                     feed", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("                    payer", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("                    owner", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("                tokenMint", inst.AccountMetaSlice[4]))
-						accountsBranch.Child(ag_format.Meta("               tokenVault", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("           vaultAuthority", inst.AccountMetaSlice[6]))
-						accountsBranch.Child(ag_format.Meta("requesterAccessController", inst.AccountMetaSlice[7]))
-						accountsBranch.Child(ag_format.Meta("  billingAccessController", inst.AccountMetaSlice[8]))
-						accountsBranch.Child(ag_format.Meta("                     rent", inst.AccountMetaSlice[9]))
-						accountsBranch.Child(ag_format.Meta("            systemProgram", inst.AccountMetaSlice[10]))
-						accountsBranch.Child(ag_format.Meta("             tokenProgram", inst.AccountMetaSlice[11]))
-						accountsBranch.Child(ag_format.Meta("   associatedTokenProgram", inst.AccountMetaSlice[12]))
+						accountsBranch.Child(ag_format.Meta("                    owner", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("                tokenMint", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("               tokenVault", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("           vaultAuthority", inst.AccountMetaSlice[5]))
+						accountsBranch.Child(ag_format.Meta("requesterAccessController", inst.AccountMetaSlice[6]))
+						accountsBranch.Child(ag_format.Meta("  billingAccessController", inst.AccountMetaSlice[7]))
 					})
 				})
 		})
@@ -348,31 +263,21 @@ func NewInitializeInstruction(
 	// Accounts:
 	state ag_solanago.PublicKey,
 	feed ag_solanago.PublicKey,
-	payer ag_solanago.PublicKey,
 	owner ag_solanago.PublicKey,
 	tokenMint ag_solanago.PublicKey,
 	tokenVault ag_solanago.PublicKey,
 	vaultAuthority ag_solanago.PublicKey,
 	requesterAccessController ag_solanago.PublicKey,
-	billingAccessController ag_solanago.PublicKey,
-	rent ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey,
-	tokenProgram ag_solanago.PublicKey,
-	associatedTokenProgram ag_solanago.PublicKey) *Initialize {
+	billingAccessController ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
 		SetMinAnswer(minAnswer).
 		SetMaxAnswer(maxAnswer).
 		SetStateAccount(state).
 		SetFeedAccount(feed).
-		SetPayerAccount(payer).
 		SetOwnerAccount(owner).
 		SetTokenMintAccount(tokenMint).
 		SetTokenVaultAccount(tokenVault).
 		SetVaultAuthorityAccount(vaultAuthority).
 		SetRequesterAccessControllerAccount(requesterAccessController).
-		SetBillingAccessControllerAccount(billingAccessController).
-		SetRentAccount(rent).
-		SetSystemProgramAccount(systemProgram).
-		SetTokenProgramAccount(tokenProgram).
-		SetAssociatedTokenProgramAccount(associatedTokenProgram)
+		SetBillingAccessControllerAccount(billingAccessController)
 }

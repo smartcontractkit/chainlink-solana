@@ -28,7 +28,9 @@ const parseTxLog = (parser: EventParser, tx: ParsedTransactionWithMeta | null): 
   const addToList = (event: Event) => eventList.push(event)
 
   if (tx?.meta?.logMessages) {
-    parser.parseLogs(tx.meta.logMessages, addToList)
+    for (const event of parser.parseLogs(tx.meta.logMessages)) {
+      addToList(event)
+    }
   }
 
   return eventList

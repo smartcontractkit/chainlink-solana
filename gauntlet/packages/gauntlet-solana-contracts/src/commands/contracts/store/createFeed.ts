@@ -73,12 +73,13 @@ export default class CreateFeed extends SolanaCommand {
       programId: program.programId,
     })
 
-    const ix = program.instruction.createFeed(description, decimals, granularity, liveLength, {
-      accounts: {
+    const ix = await program.methods
+      .createFeed(description, decimals, granularity, liveLength)
+      .accounts({
         feed,
         authority: signer,
-      },
-    })
+      })
+      .instruction()
 
     return [transmissionsCreationInstruction, ix]
   }

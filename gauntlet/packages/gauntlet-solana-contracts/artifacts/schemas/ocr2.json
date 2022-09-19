@@ -32,11 +32,6 @@
           "isSigner": false
         },
         {
-          "name": "payer",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
           "name": "owner",
           "isMut": false,
           "isSigner": true
@@ -48,7 +43,7 @@
         },
         {
           "name": "tokenVault",
-          "isMut": true,
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -63,26 +58,6 @@
         },
         {
           "name": "billingAccessController",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rent",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "associatedTokenProgram",
           "isMut": false,
           "isSigner": false
         }
@@ -108,6 +83,11 @@
         },
         {
           "name": "receiver",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenReceiver",
           "isMut": true,
           "isSigner": false
         },
@@ -269,6 +249,11 @@
           "isSigner": false
         },
         {
+          "name": "tokenReceiver",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": false,
           "isSigner": true
@@ -343,12 +328,6 @@
         {
           "name": "tokenMint",
           "type": "publicKey"
-        },
-        {
-          "name": "payees",
-          "type": {
-            "vec": "publicKey"
-          }
         }
       ]
     },
@@ -431,6 +410,11 @@
         {
           "name": "accessController",
           "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenReceiver",
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -558,6 +542,11 @@
         {
           "name": "accessController",
           "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenReceiver",
+          "isMut": true,
           "isSigner": false
         },
         {

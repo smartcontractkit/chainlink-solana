@@ -12,7 +12,7 @@ const UPGRADEABLE_BPF_LOADER_PROGRAM_ID = new anchor.web3.PublicKey(
   "BPFLoaderUpgradeab1e11111111111111111111111"
 );
 
-const provider = anchor.Provider.env();
+const provider = anchor.AnchorProvider.env();
 
 // Configure the cluster.
 anchor.setProvider(provider);

@@ -35,12 +35,10 @@ pub mod access_controller {
         Ok(())
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.authority))]
     pub fn transfer_ownership(
         ctx: Context<TransferOwnership>,
         proposed_owner: Pubkey,
     ) -> Result<()> {
-        require!(proposed_owner != Pubkey::default(), InvalidInput);
         let state = &mut *ctx.accounts.state.load_mut()?;
         state.proposed_owner = proposed_owner;
         Ok(())
@@ -48,15 +46,10 @@ pub mod access_controller {
 
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
         let state = &mut *ctx.accounts.state.load_mut()?;
-        require!(
-            ctx.accounts.authority.key == &state.proposed_owner,
-            Unauthorized
-        );
         state.owner = std::mem::take(&mut state.proposed_owner);
         Ok(())
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.owner))]
     pub fn add_access(ctx: Context<AddAccess>) -> Result<()> {
         let mut state = ctx.accounts.state.load_mut()?;
         // if the len reaches array len, we're at capacity
@@ -73,7 +66,6 @@ pub mod access_controller {
         Ok(())
     }
 
-    #[access_control(owner(&ctx.accounts.state, &ctx.accounts.owner))]
     pub fn remove_access(ctx: Context<RemoveAccess>) -> Result<()> {
         let mut state = ctx.accounts.state.load_mut()?;
         let address = ctx.accounts.address.key();
@@ -91,12 +83,6 @@ pub mod access_controller {
 pub fn has_access(loader: &AccountLoader<AccessController>, address: &Pubkey) -> Result<bool> {
     let state = loader.load()?;
     Ok(state.access_list.binary_search(address).is_ok())
-}
-
-fn owner(state_loader: &AccountLoader<AccessController>, signer: &AccountInfo) -> Result<()> {
-    let config = state_loader.load()?;
-    require!(signer.key.eq(&config.owner), Unauthorized);
-    Ok(())
 }
 
 #[error_code]
@@ -122,6 +108,7 @@ pub struct Initialize<'info> {
 pub struct TransferOwnership<'info> {
     #[account(mut)]
     pub state: AccountLoader<'info, AccessController>,
+    #[account(address = state.load()?.owner @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -129,6 +116,7 @@ pub struct TransferOwnership<'info> {
 pub struct AcceptOwnership<'info> {
     #[account(mut)]
     pub state: AccountLoader<'info, AccessController>,
+    #[account(address = state.load()?.proposed_owner @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -136,6 +124,7 @@ pub struct AcceptOwnership<'info> {
 pub struct AddAccess<'info> {
     #[account(mut, has_one = owner)]
     pub state: AccountLoader<'info, AccessController>,
+    #[account(address = state.load()?.owner @ ErrorCode::Unauthorized)]
     pub owner: Signer<'info>,
     /// CHECK: We don't impose any limits since this could be any signer.
     pub address: UncheckedAccount<'info>,
@@ -145,6 +134,7 @@ pub struct AddAccess<'info> {
 pub struct RemoveAccess<'info> {
     #[account(mut, has_one = owner)]
     pub state: AccountLoader<'info, AccessController>,
+    #[account(address = state.load()?.owner @ ErrorCode::Unauthorized)]
     pub owner: Signer<'info>,
     /// CHECK: We don't impose any limits since this could be any signer.
     pub address: UncheckedAccount<'info>,

@@ -171,7 +171,7 @@ func OffChainConfigParamsFromNodes(nodes []*client.Chainlink, nkb []NodeKeysBund
 	if faultyNodes == 0 {
 		faultyNodes = 1
 	}
-	log.Warn().Int("Nodes", faultyNodes).Msg("Faulty nodes")
+	log.Debug().Int("Nodes", faultyNodes).Msg("Faulty nodes")
 	return contracts.OffChainAggregatorV2Config{
 		DeltaProgress: 2 * time.Second,
 		DeltaResend:   5 * time.Second,

@@ -1,8 +1,8 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from '@solana/spl-token'
-import { PublicKey, TransactionInstruction } from '@solana/web3.js'
+import { createTransferInstruction, getAssociatedTokenAddress } from '@solana/spl-token'
+import { PublicKey } from '@solana/web3.js'
 import { TOKEN_DECIMALS } from '../../../lib/constants'
 import { CONTRACT_LIST } from '../../../lib/contracts'
 import { isValidTokenAccount } from './utils'
@@ -25,37 +25,22 @@ export default class TransferToken extends SolanaCommand {
   makeRawTransaction = async (signer: PublicKey) => {
     const address = this.args[0]
 
-    const token = new Token(this.provider.connection, new PublicKey(address), TOKEN_PROGRAM_ID, {
-      publicKey: signer,
-      secretKey: Buffer.from([]),
-    })
+    const token = new PublicKey(address)
 
-    const from = await Token.getAssociatedTokenAddress(
-      ASSOCIATED_TOKEN_PROGRAM_ID,
-      TOKEN_PROGRAM_ID,
-      token.publicKey,
-      signer,
-      true,
-    )
+    const from = await getAssociatedTokenAddress(token, signer, true)
 
     const destination = new PublicKey(this.flags.to)
-    const amount = new BN(this.flags.amount).mul(new BN(10).pow(new BN(TOKEN_DECIMALS)))
+    const amount = BigInt(this.flags.amount) * BigInt(10) ** BigInt(TOKEN_DECIMALS)
     this.require(
-      await isValidTokenAccount(token, destination),
+      await isValidTokenAccount(this.provider.connection, token, destination),
       `Destination ${destination.toString()} is not a valid token account`,
     )
 
     logger.info(
       `Preparing instruction to send ${amount.toString()} (${this.flags.amount}) Tokens to ${destination.toString()}`,
     )
-    const ix = Token.createTransferInstruction(
-      TOKEN_PROGRAM_ID,
-      from,
-      destination,
-      signer,
-      [],
-      amount.toString() as any,
-    )
+
+    const ix = createTransferInstruction(from, destination, signer, amount)
 
     return [
       {

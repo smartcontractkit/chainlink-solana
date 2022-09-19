@@ -3,7 +3,7 @@ import { createHash } from 'crypto'
 import { logger, prompt, BN } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
+import { getOrCreateAssociatedTokenAccount, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { utils } from '@project-serum/anchor'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import ProposeOffchainConfig, { OffchainConfig } from '../proposeOffchainConfig'
@@ -111,7 +111,7 @@ export default class AcceptProposal extends SolanaCommand {
 
   makeContractInput = async (input: Input): Promise<ContractInput> => {
     const state = new PublicKey(this.args[0])
-    const contractState = await this.program.account.state.fetch(state)
+    const contractState = (await this.program.account.state.fetch(state)) as any
     const offchainDigest = this.calculateProposalDigest(
       await this.makeDigestInput(input, new PublicKey(contractState.config.tokenMint)),
     )
@@ -209,25 +209,36 @@ export default class AcceptProposal extends SolanaCommand {
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
-    const tx = this.program.instruction.acceptProposal(this.contractInput.offchainDigest, {
-      accounts: {
+    const linkPublicKey = new PublicKey(this.flags.link || process.env.LINK)
+    const tokenRecipient = await getOrCreateAssociatedTokenAccount(
+      this.provider.connection,
+      this.wallet.payer,
+      linkPublicKey,
+      this.provider.wallet.publicKey,
+      true,
+    )
+
+    const tx = await this.program.methods
+      .acceptProposal(this.contractInput.offchainDigest)
+      .accounts({
         state: new PublicKey(this.args[0]),
         proposal: new PublicKey(this.input.proposalId),
         receiver: signer,
         authority: signer,
+        tokenRecipient: tokenRecipient.address,
         tokenVault: this.contractInput.tokenVault,
         vaultAuthority: this.contractInput.vaultAuthority,
         tokenProgram: TOKEN_PROGRAM_ID,
-      },
-      remainingAccounts: this.contractInput.payees,
-    })
+      })
+      .remainingAccounts(this.contractInput.payees)
+      .instruction()
 
     return [tx]
   }
 
   beforeExecute = async () => {
-    const contractState = await this.program.account.state.fetch(new PublicKey(this.args[0]))
-    const proposalState = await this.program.account.proposal.fetch(new PublicKey(this.input.proposalId))
+    const contractState = (await this.program.account.state.fetch(new PublicKey(this.args[0]))) as any
+    const proposalState = (await this.program.account.proposal.fetch(new PublicKey(this.input.proposalId))) as any
 
     const [contractConfig, proposalConfig] = [contractState, proposalState].map((state) => {
       const oracles = state.oracles?.xs.slice(0, state.oracles.len.toNumber())

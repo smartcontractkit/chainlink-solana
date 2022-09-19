@@ -82,19 +82,20 @@ export default class ProposeConfig extends SolanaCommand {
       `Oracles max length is ${ORACLES_MAX_LENGTH}, currently ${oracles.length}`,
     )
 
-    const ix = this.program.instruction.proposeConfig(oracles, f, {
-      accounts: {
+    const ix = await this.program.methods
+      .proposeConfig(oracles, f)
+      .accounts({
         proposal,
         authority: signer,
-      },
-    })
+      })
+      .instruction()
 
     return [ix]
   }
 
   beforeExecute = async () => {
     const state = new PublicKey(this.args[0])
-    const contractState = await this.program.account.state.fetch(state)
+    const contractState = (await this.program.account.state.fetch(state)) as any
 
     // Prepare contract config
     const contractOracles = contractState.oracles?.xs.slice(0, contractState.oracles.len.toNumber())

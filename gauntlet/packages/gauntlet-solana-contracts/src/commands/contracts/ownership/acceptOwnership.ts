@@ -38,12 +38,13 @@ export const makeAcceptOwnershipCommand = (
 
       const state = new PublicKey(this.args[0])
 
-      const tx = program.instruction.acceptOwnership({
-        accounts: {
+      const tx = await program.methods
+        .acceptOwnership()
+        .accounts({
           state: state,
           authority: signer,
-        },
-      })
+        })
+        .instruction()
 
       return [tx]
     }

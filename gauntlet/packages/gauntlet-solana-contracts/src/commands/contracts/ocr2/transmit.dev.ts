@@ -31,7 +31,7 @@ export default class Transmit extends SolanaCommand {
     const transmissions = new PublicKey(this.flags.transmissions)
     const store = new PublicKey(this.flags.store)
     const round = Number(this.flags.round) || 1
-    const info = await program.account.state.fetch(state)
+    const info = (await program.account.state.fetch(state)) as any
 
     const reportContext: any[] = []
     reportContext.push(...info.config.latestConfigDigest)
@@ -93,7 +93,7 @@ export default class Transmit extends SolanaCommand {
 
     let txhash
     try {
-      txhash = await this.provider.send(tx, [transmitter])
+      txhash = await this.provider.sendAndConfirm(tx, [transmitter])
     } catch (err) {
       // Translate IDL error
       const idlErrors = parseIdlErrors(program.idl)

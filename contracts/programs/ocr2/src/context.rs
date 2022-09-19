@@ -1,9 +1,8 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::sysvar;
-use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{Mint, Token, TokenAccount, Transfer};
 
 use crate::state::{Proposal, State};
+use crate::ErrorCode;
 
 use access_controller::AccessController;
 use store::{Store, Transmissions};
@@ -15,14 +14,10 @@ pub struct Initialize<'info> {
     #[account(zero)]
     pub state: AccountLoader<'info, State>,
     pub feed: Account<'info, Transmissions>,
-    #[account(mut)]
-    pub payer: Signer<'info>,
     pub owner: Signer<'info>,
 
     pub token_mint: Account<'info, Mint>,
     #[account(
-        init,
-        payer = payer,
         associated_token::mint = token_mint,
         associated_token::authority = vault_authority,
     )]
@@ -33,21 +28,19 @@ pub struct Initialize<'info> {
 
     pub requester_access_controller: AccountLoader<'info, AccessController>,
     pub billing_access_controller: AccountLoader<'info, AccessController>,
-
-    #[account(address = sysvar::rent::ID)]
-    pub rent: Sysvar<'info, Rent>,
-
-    pub system_program: Program<'info, System>,
-    pub token_program: Program<'info, Token>,
-    pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
 #[derive(Accounts)]
 pub struct Close<'info> {
     #[account(mut, close = receiver)]
     pub state: AccountLoader<'info, State>,
+    // Receives the SOL deposit
     #[account(mut)]
     pub receiver: SystemAccount<'info>,
+    // Receives the remaining LINK amount
+    #[account(mut, token::mint = state.load()?.config.token_mint)]
+    pub token_receiver: Account<'info, TokenAccount>,
+    #[account(address = state.load()?.config.owner @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
 
     #[account(mut, address = state.load()?.config.token_vault)]
@@ -63,6 +56,7 @@ pub struct Close<'info> {
 pub struct TransferOwnership<'info> {
     #[account(mut)]
     pub state: AccountLoader<'info, State>,
+    #[account(address = state.load()?.config.owner @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -70,6 +64,7 @@ pub struct TransferOwnership<'info> {
 pub struct AcceptOwnership<'info> {
     #[account(mut)]
     pub state: AccountLoader<'info, State>,
+    #[account(address = state.load()?.config.proposed_owner @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -86,6 +81,7 @@ pub struct CloseProposal<'info> {
     pub proposal: AccountLoader<'info, Proposal>,
     #[account(mut)]
     pub receiver: SystemAccount<'info>,
+    #[account(address = proposal.load()?.owner @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -93,6 +89,7 @@ pub struct CloseProposal<'info> {
 pub struct ProposeConfig<'info> {
     #[account(mut)]
     pub proposal: AccountLoader<'info, Proposal>,
+    #[account(address = proposal.load()?.owner @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -104,6 +101,10 @@ pub struct AcceptProposal<'info> {
     pub proposal: AccountLoader<'info, Proposal>,
     #[account(mut)]
     pub receiver: SystemAccount<'info>,
+    // Receives LINK amount from oracles with closed token accounts
+    #[account(mut, token::mint = state.load()?.config.token_mint)]
+    pub token_receiver: Account<'info, TokenAccount>,
+    #[account(address = state.load()?.config.owner @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
 
     #[account(mut, address = state.load()?.config.token_vault)]
@@ -152,6 +153,10 @@ pub struct SetBilling<'info> {
     pub state: AccountLoader<'info, State>,
     pub authority: Signer<'info>,
     pub access_controller: AccountLoader<'info, AccessController>,
+
+    // Receives LINK amount from oracles with closed token accounts
+    #[account(mut, token::mint = state.load()?.config.token_mint)]
+    pub token_receiver: Account<'info, TokenAccount>,
 
     #[account(mut, address = state.load()?.config.token_vault)]
     pub token_vault: Account<'info, TokenAccount>,

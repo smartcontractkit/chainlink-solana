@@ -13,7 +13,6 @@ import (
 // ProposePayees is the `proposePayees` instruction.
 type ProposePayees struct {
 	TokenMint *ag_solanago.PublicKey
-	Payees    *[]ag_solanago.PublicKey
 
 	// [0] = [WRITE] proposal
 	//
@@ -32,12 +31,6 @@ func NewProposePayeesInstructionBuilder() *ProposePayees {
 // SetTokenMint sets the "tokenMint" parameter.
 func (inst *ProposePayees) SetTokenMint(tokenMint ag_solanago.PublicKey) *ProposePayees {
 	inst.TokenMint = &tokenMint
-	return inst
-}
-
-// SetPayees sets the "payees" parameter.
-func (inst *ProposePayees) SetPayees(payees []ag_solanago.PublicKey) *ProposePayees {
-	inst.Payees = &payees
 	return inst
 }
 
@@ -86,9 +79,6 @@ func (inst *ProposePayees) Validate() error {
 		if inst.TokenMint == nil {
 			return errors.New("TokenMint parameter is not set")
 		}
-		if inst.Payees == nil {
-			return errors.New("Payees parameter is not set")
-		}
 	}
 
 	// Check whether all (required) accounts are set:
@@ -112,9 +102,8 @@ func (inst *ProposePayees) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("TokenMint", *inst.TokenMint))
-						paramsBranch.Child(ag_format.Param("   Payees", *inst.Payees))
 					})
 
 					// Accounts of the instruction:
@@ -132,21 +121,11 @@ func (obj ProposePayees) MarshalWithEncoder(encoder *ag_binary.Encoder) (err err
 	if err != nil {
 		return err
 	}
-	// Serialize `Payees` param:
-	err = encoder.Encode(obj.Payees)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 func (obj *ProposePayees) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `TokenMint`:
 	err = decoder.Decode(&obj.TokenMint)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Payees`:
-	err = decoder.Decode(&obj.Payees)
 	if err != nil {
 		return err
 	}
@@ -157,13 +136,11 @@ func (obj *ProposePayees) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err 
 func NewProposePayeesInstruction(
 	// Parameters:
 	tokenMint ag_solanago.PublicKey,
-	payees []ag_solanago.PublicKey,
 	// Accounts:
 	proposal ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *ProposePayees {
 	return NewProposePayeesInstructionBuilder().
 		SetTokenMint(tokenMint).
-		SetPayees(payees).
 		SetProposalAccount(proposal).
 		SetAuthorityAccount(authority)
 }

@@ -28,8 +28,8 @@
     "@chainlink/gauntlet-core": "0.1.2",
     "@ledgerhq/hw-app-solana": "^6.20.0",
     "@ledgerhq/hw-transport-node-hid": "^6.20.0",
-    "@project-serum/anchor": "^0.23.0",
+    "@project-serum/anchor": "^0.25.0",
     "@project-serum/borsh": "^0.2.2",
-    "@solana/web3.js": "^1.31.0"
+    "@solana/web3.js": "^1.50.1"
   }
 }

@@ -71,6 +71,7 @@ func (m *OCRv2) acceptProposal(digest []byte) error {
 				m.State.PublicKey(),
 				m.Proposal.PublicKey(),
 				m.Owner.PublicKey(),
+				m.OCRVaultAssociatedPubKey,
 				m.Owner.PublicKey(),
 				m.OCRVaultAssociatedPubKey,
 				va.PublicKey,
@@ -91,6 +92,47 @@ func (m *OCRv2) acceptProposal(digest []byte) error {
 		},
 		payer.PublicKey(),
 	)
+}
+
+// SetBilling sets default billing to oracles
+func (m *OCRv2) SetBilling(observationPayment uint32, transmissionPayment uint32, controllerAddr string) error {
+	payer := m.Client.DefaultWallet
+	billingACPubKey, err := solana.PublicKeyFromBase58(controllerAddr)
+	if err != nil {
+		return nil
+	}
+	va := m.ContractDeployer.Accounts.Authorities["vault"]
+	err = m.Client.TXSync(
+		"Set billing",
+		rpc.CommitmentConfirmed,
+		[]solana.Instruction{
+			ocr_2.NewSetBillingInstruction(
+				observationPayment,
+				transmissionPayment,
+				m.State.PublicKey(),
+				m.Owner.PublicKey(),
+				m.Owner.PublicKey(),
+				billingACPubKey,
+				m.OCRVaultAssociatedPubKey, // token vault
+				va.PublicKey,               // vault authority
+				solana.TokenProgramID,      // token program
+			).Build(),
+		},
+		func(key solana.PublicKey) *solana.PrivateKey {
+			if key.Equals(m.Owner.PublicKey()) {
+				return &m.Owner.PrivateKey
+			}
+			if key.Equals(payer.PublicKey()) {
+				return &payer.PrivateKey
+			}
+			return nil
+		},
+		payer.PublicKey(),
+	)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (m *OCRv2) finalizeOffChainConfig() error {
@@ -160,7 +202,7 @@ func (m *OCRv2) fetchProposalAccount() (*ocr_2.Proposal, error) {
 func (m *OCRv2) createProposal(version uint64) error {
 	payer := m.Client.DefaultWallet
 	programWallet := m.Client.ProgramWallets["ocr2-keypair.json"]
-	proposalAccInstruction, err := m.Client.CreateAccInstr(m.Proposal, OCRProposalAccountSize, programWallet.PublicKey())
+	proposalAccInstruction, err := m.Client.CreateAccInstr(m.Proposal.PublicKey(), OCRProposalAccountSize, programWallet.PublicKey())
 	if err != nil {
 		return err
 	}
@@ -251,46 +293,6 @@ func (m *OCRv2) DumpState() error {
 	return nil
 }
 
-// SetBilling sets default billing to oracles
-func (m *OCRv2) SetBilling(observationPayment uint32, transmissionPayment uint32, controllerAddr string) error {
-	payer := m.Client.DefaultWallet
-	billingACPubKey, err := solana.PublicKeyFromBase58(controllerAddr)
-	if err != nil {
-		return nil
-	}
-	va := m.ContractDeployer.Accounts.Authorities["vault"]
-	err = m.Client.TXSync(
-		"Set billing",
-		rpc.CommitmentConfirmed,
-		[]solana.Instruction{
-			ocr_2.NewSetBillingInstruction(
-				observationPayment,
-				transmissionPayment,
-				m.State.PublicKey(),
-				m.Owner.PublicKey(),
-				billingACPubKey,
-				m.OCRVaultAssociatedPubKey, // token vault
-				va.PublicKey,               // vault authority
-				solana.TokenProgramID,      // token program
-			).Build(),
-		},
-		func(key solana.PublicKey) *solana.PrivateKey {
-			if key.Equals(m.Owner.PublicKey()) {
-				return &m.Owner.PrivateKey
-			}
-			if key.Equals(payer.PublicKey()) {
-				return &payer.PrivateKey
-			}
-			return nil
-		},
-		payer.PublicKey(),
-	)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (m *OCRv2) GetContractData(ctx context.Context) (*contracts.OffchainAggregatorData, error) {
 	panic("implement me")
 }
@@ -343,20 +345,24 @@ func (m *OCRv2) proposeConfig(ocConfig contracts.OffChainAggregatorV2Config) err
 	}
 	// set one payee for all
 	instr := make([]solana.Instruction, 0)
+	// TODO: get associated addr
 	payee := solana.NewWallet()
-	if err := m.ContractDeployer.AddNewAssociatedAccInstr(payee, m.Owner.PublicKey(), &instr); err != nil {
+	if err := m.ContractDeployer.AddNewAssociatedAccInstr(payee.PublicKey(), m.Owner.PublicKey(), payee.PublicKey(), &instr); err != nil {
 		return err
 	}
 	payees := make([]solana.PublicKey, 0)
 	for i := 0; i < len(oracles); i++ {
 		payees = append(payees, payee.PublicKey())
 	}
-	instr = append(instr, ocr_2.NewProposePayeesInstruction(
+	proposeInstr := ocr_2.NewProposePayeesInstruction(
 		m.Mint.PublicKey(),
-		payees,
 		m.Proposal.PublicKey(),
-		m.Owner.PublicKey()).Build(),
-	)
+		m.Owner.PublicKey())
+	// Add payees as remaining accounts
+	for i := 0; i < len(payees); i++ {
+		proposeInstr.Append(solana.Meta(payees[i]))
+	}
+	instr = append(instr, proposeInstr.Build())
 	return m.Client.TXSync(
 		"Set payees",
 		rpc.CommitmentFinalized,

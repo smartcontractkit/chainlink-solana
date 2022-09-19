@@ -25,12 +25,13 @@ export default class FinalizeProposal extends SolanaCommand {
     const proposalId = this.flags.proposalId || this.flags.configProposal
 
     const proposal = new PublicKey(proposalId)
-    const finalizeIx = program.instruction.finalizeProposal({
-      accounts: {
+    const finalizeIx = await program.methods
+      .finalizeProposal()
+      .accounts({
         proposal: proposal,
         authority: signer,
-      },
-    })
+      })
+      .instruction()
 
     return [finalizeIx]
   }

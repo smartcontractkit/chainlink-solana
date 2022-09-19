@@ -39,12 +39,13 @@ export const makeTransferOwnershipCommand = (
       const state = new PublicKey(this.args[0])
       const proposedOwner = new PublicKey(this.flags.to)
 
-      const tx = this.program.instruction.transferOwnership(proposedOwner, {
-        accounts: {
+      const tx = await this.program.methods
+        .transferOwnership(proposedOwner)
+        .accounts({
           state: state,
           authority: signer,
-        },
-      })
+        })
+        .instruction()
 
       return [tx]
     }

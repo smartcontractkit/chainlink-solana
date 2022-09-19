@@ -111,6 +111,11 @@ impl<'a> Feed<'a> {
         self.live[self.header.live_cursor as usize] = round;
         self.header.live_cursor = (self.header.live_cursor + 1) % self.live.len() as u32;
 
+        // Skip if historical ringbuffer is disabled
+        if self.historical.len() == 0 {
+            return;
+        }
+
         if self.header.latest_round_id % self.header.granularity as u32 == 0 {
             // insert into historical data
             self.historical[self.header.historical_cursor as usize] = round;
@@ -126,12 +131,16 @@ impl<'a> Feed<'a> {
 
         let len = self.header.live_length;
         // Handle wraparound
-        let i = (self.header.live_cursor + len.saturating_sub(1)) % len;
+        let i = (self.header.live_cursor + len - 1) % len;
 
         Some(self.live[i as usize])
     }
 
     pub fn fetch(&self, round_id: u32) -> Option<Transmission> {
+        if round_id == 0 {
+            return None;
+        }
+
         if self.header.latest_round_id < round_id {
             return None;
         }
@@ -151,11 +160,13 @@ impl<'a> Feed<'a> {
             let offset = latest_round_id - round_id;
             let offset = offset + 1; // + 1 because we're looking for the element before the cursor
 
+            // with overflow-checks = true the else branch could abort
+            #[allow(clippy::unnecessary_lazy_evaluations)]
             let index = self
                 .header
                 .live_cursor
                 .checked_sub(offset)
-                .unwrap_or(self.live.len() as u32 - (offset - self.header.live_cursor));
+                .unwrap_or_else(|| self.live.len() as u32 - (offset - self.header.live_cursor));
 
             Some(self.live[index as usize])
         } else if (historical_start..=historical_end).contains(&round_id) {
@@ -164,11 +175,13 @@ impl<'a> Feed<'a> {
             let offset = (historical_end - round_id) / granularity;
             let offset = offset + 1; // + 1 because we're looking for the element before the cursor
 
+            // with overflow-checks = true the else branch could abort
+            #[allow(clippy::unnecessary_lazy_evaluations)]
             let index = self
                 .header
                 .historical_cursor
                 .checked_sub(offset)
-                .unwrap_or({
+                .unwrap_or_else(|| {
                     self.historical.len() as u32 - (offset - self.header.historical_cursor)
                 });
 
