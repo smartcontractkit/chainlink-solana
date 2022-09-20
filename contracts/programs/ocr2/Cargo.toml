@@ -1,6 +1,6 @@
 [package]
 name = "ocr2"
-version = "1.0.0"
+version = "1.0.1"
 description = "Created with Anchor"
 edition = "2018"
 
@@ -18,8 +18,8 @@ default = []
 anchor-lang = { version = "0.25.0", features = [] }
 anchor-spl = "0.25.0"
 static_assertions = "1.1.0"
-access-controller = { version = "1.0.0", path = "../access-controller", default-features = false, features = ["cpi"] }
-store = { version = "1.0.0", path = "../store", default-features = false, features = ["cpi"] }
+access-controller = { version = "1.0.1", path = "../access-controller", default-features = false, features = ["cpi"] }
+store = { version = "1.0.1", path = "../store", default-features = false, features = ["cpi"] }
 arrayref = "0.3.6"
 arrayvec = { version = "1.0.0", path = "../../crates/arrayvec" }
 bytemuck = "1.7"

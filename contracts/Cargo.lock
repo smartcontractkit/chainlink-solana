@@ -4,7 +4,7 @@ version = 3
 
 [[package]]
 name = "access-controller"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anchor-lang",
  "arrayvec 1.0.0",
@@ -856,7 +856,7 @@ dependencies = [
 
 [[package]]
 name = "ocr2"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "access-controller",
  "anchor-lang",
@@ -1310,7 +1310,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "store"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "access-controller",
  "anchor-lang",
