@@ -1,7 +1,7 @@
 name: golangci_lint
 
 on:
-  pull_request:
+  push:
 
 jobs:
   golang_lint:

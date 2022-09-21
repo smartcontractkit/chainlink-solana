@@ -13,7 +13,7 @@ jobs:
     name: Release Artifacts
     runs-on: ubuntu-latest
     container:
-      image: projectserum/build:v0.25.0
+      image: projectserum/build:v0.24.2
       env:
         RUSTUP_HOME: "/root/.rustup"
     steps:

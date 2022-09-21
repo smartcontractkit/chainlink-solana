@@ -1,7 +1,7 @@
 name: gauntlet
 
 on:
-  pull_request:
+  push:
 
 jobs:
   gauntlet_build:
