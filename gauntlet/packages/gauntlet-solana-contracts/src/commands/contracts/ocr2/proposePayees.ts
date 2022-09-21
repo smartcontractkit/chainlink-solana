@@ -100,10 +100,7 @@ export default class ProposePayees extends SolanaCommand {
       )
     ).every((isValid) => isValid)
 
-    this.require(
-      areValidPayees,
-      'Every payee needs to have a valid token recipient address',
-    )
+    this.require(areValidPayees, 'Every payee needs to have a valid token recipient address')
 
     // Set the payees in the same order the oracles are saved in the proposal
     // The length of the payees need to be same as the oracles saved

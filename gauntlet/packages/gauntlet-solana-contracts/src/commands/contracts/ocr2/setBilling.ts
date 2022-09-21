@@ -26,7 +26,7 @@ export default class SetBilling extends SolanaCommand {
   makeInput = (userInput: any): Input => {
     // validate LINK address present
     this.require(this.flags.link || process.env.LINK, 'LINK token not found')
-    
+
     if (userInput) return userInput as Input
     const rdd = RDD.load(this.flags.network, this.flags.rdd)
     const billingInfo = rdd.contracts[this.args[0]]?.billing
