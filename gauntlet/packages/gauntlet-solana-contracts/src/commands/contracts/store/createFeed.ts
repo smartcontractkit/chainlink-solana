@@ -51,8 +51,8 @@ export default class CreateFeed extends SolanaCommand {
     const description = input.description || ''
 
     this.require(
-      feedAccountLength.gte(liveLength),
-      `Feed account Length (${feedAccountLength.toNumber()}) must be greater than liveLength (${liveLength.toNumber()})`,
+      length.gte(liveLength),
+      `Feed account Length (${length.toNumber()}) must be greater than liveLength (${liveLength.toNumber()})`,
     )
 
     logger.info(`
@@ -60,8 +60,9 @@ export default class CreateFeed extends SolanaCommand {
       - Description: ${description}
       - Live Length: ${liveLength.toNumber()}
       - Granularity (historical): ${granularity.toNumber()}
-      - Historical Length: ${feedAccountLength.toNumber() - liveLength.toNumber()}
-      - Total Length: ${feedAccountLength.toNumber()}
+      - Historical Length: ${length.toNumber() - liveLength.toNumber()}
+      - Total Length: ${length.toNumber()}
+      - Total Account Size: ${feedAccountLength.toNumber()}
       - Feed Account: ${feed.toString()}
     `)
 

@@ -239,8 +239,8 @@ func (d *Deployer) DeployOCR() error {
 	fmt.Println("Step 4: Create Feed")
 	input := map[string]interface{}{
 		"store":       d.Account[StoreAccount],
-		"granularity": 30,
-		"liveLength":  1024,
+		"granularity": 1, // granularity > 0
+		"liveLength":  10,
 		"decimals":    8,
 		"description": "Test LINK/USD",
 	}
@@ -254,6 +254,7 @@ func (d *Deployer) DeployOCR() error {
 		"store:create_feed",
 		d.gauntlet.Flag("network", d.network),
 		d.gauntlet.Flag("input", string(jsonInput)),
+		d.gauntlet.Flag("length", "10"),
 	)
 	if err != nil {
 		return errors.Wrap(err, "'store:create_feed' call failed")
