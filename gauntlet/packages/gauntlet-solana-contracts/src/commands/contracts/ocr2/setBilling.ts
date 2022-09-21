@@ -24,6 +24,9 @@ export default class SetBilling extends SolanaCommand {
   input: Input
 
   makeInput = (userInput: any): Input => {
+    // validate LINK address present
+    this.require(this.flags.link || process.env.LINK, 'LINK token not found')
+    
     if (userInput) return userInput as Input
     const rdd = RDD.load(this.flags.network, this.flags.rdd)
     const billingInfo = rdd.contracts[this.args[0]]?.billing
@@ -60,7 +63,7 @@ export default class SetBilling extends SolanaCommand {
     const info = (await this.program.account.state.fetch(state)) as any
 
     const linkPublicKey = new PublicKey(this.flags.link || process.env.LINK)
-    const tokenRecipient = await getOrCreateAssociatedTokenAccount(
+    const tokenReceiver = await getOrCreateAssociatedTokenAccount(
       this.provider.connection,
       this.wallet.payer,
       linkPublicKey,
@@ -83,7 +86,7 @@ export default class SetBilling extends SolanaCommand {
         state,
         authority: signer,
         accessController: billingAC,
-        tokenRecipient: tokenRecipient.address,
+        tokenReceiver: tokenReceiver.address,
         tokenVault: tokenVault,
         vaultAuthority: vaultAuthority,
         tokenProgram: TOKEN_PROGRAM_ID,
