@@ -1,7 +1,7 @@
 name: relay
 
 on:
-  push:
+  pull_request:
 
 jobs:
   relay_run_unit_tests:

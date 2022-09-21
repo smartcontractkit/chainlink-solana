@@ -1,6 +1,6 @@
 name: Lint GH Workflows
 on:
-  push:
+  pull_request:
 jobs:
   lint_workflows:
     name: Validate Github Action Workflows
