@@ -21,12 +21,11 @@ runs:
       with:
         repository: smartcontractkit/chainlink-solana
         ref: ${{ inputs.ref }}
-    - uses: smartcontractkit/tool-versions-to-env-action@v1.0.7
-      id: tool-versions
-    - name: Setup go ${{ steps.tool-versions.outputs.golang_version }}
-      uses: actions/setup-go@v2
+    - name: Setup go
+      uses: actions/setup-go@v3
       with:
-        go-version: ${{ steps.tool-versions.outputs.golang_version }}
+        go-version-file: "go.mod"
+        check-latest: true
     - name: yarn install
       shell: bash
       run: yarn install --frozen-lockfile

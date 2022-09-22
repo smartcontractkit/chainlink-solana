@@ -1,7 +1,7 @@
 name: relay
 
 on:
-  push:
+  pull_request:
 
 jobs:
   relay_run_unit_tests:
@@ -10,12 +10,11 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
-      - uses: smartcontractkit/tool-versions-to-env-action@v1.0.7
-        id: tool-versions
-      - name: Setup go ${{ steps.tool-versions.outputs.golang_version }}
-        uses: actions/setup-go@v2
+      - name: Setup go
+        uses: actions/setup-go@v3
         with:
-          go-version: ${{ steps.tool-versions.outputs.golang_version }}
+          go-version-file: "go.mod"
+          check-latest: true
       - name: Install Solana CLI
         run: ./scripts/install-solana-ci.sh
       - name: Build
