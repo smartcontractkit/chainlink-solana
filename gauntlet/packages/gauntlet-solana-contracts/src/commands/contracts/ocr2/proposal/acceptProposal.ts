@@ -81,6 +81,9 @@ export default class AcceptProposal extends SolanaCommand {
   contractInput: ContractInput
 
   makeInput = (userInput): Input => {
+    // validate LINK address present
+    this.require(this.flags.link || process.env.LINK, 'LINK token not found')
+
     if (userInput) return userInput as Input
     const rdd = RDD.load(this.flags.network, this.flags.rdd)
     const aggregator = rdd.contracts[this.args[0]]
@@ -210,7 +213,7 @@ export default class AcceptProposal extends SolanaCommand {
 
   makeRawTransaction = async (signer: PublicKey) => {
     const linkPublicKey = new PublicKey(this.flags.link || process.env.LINK)
-    const tokenRecipient = await getOrCreateAssociatedTokenAccount(
+    const tokenReceiver = await getOrCreateAssociatedTokenAccount(
       this.provider.connection,
       this.wallet.payer,
       linkPublicKey,
@@ -225,7 +228,7 @@ export default class AcceptProposal extends SolanaCommand {
         proposal: new PublicKey(this.input.proposalId),
         receiver: signer,
         authority: signer,
-        tokenRecipient: tokenRecipient.address,
+        tokenReceiver: tokenReceiver.address,
         tokenVault: this.contractInput.tokenVault,
         vaultAuthority: this.contractInput.vaultAuthority,
         tokenProgram: TOKEN_PROGRAM_ID,

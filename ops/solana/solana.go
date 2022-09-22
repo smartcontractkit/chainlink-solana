@@ -35,10 +35,15 @@ const (
 	LINK
 	StoreAuthority
 	Proposal
+
+	// deployer accounts
+	DeployerAccount
+	AssociatedTokenAccount
 )
 
 const (
 	testingSecret = "this is an testing only secret"
+	deployer      = "./localnet.json"
 )
 
 type Deployer struct {
@@ -107,8 +112,6 @@ func deployProgram(program string, deployerKeyfile string, expectedAddress strin
 }
 
 func (d *Deployer) Load() error {
-	deployer := "./localnet.json"
-
 	// create key if doesn't exist
 	msg := relayUtils.LogStatus(fmt.Sprintf("create program deployer key at '%s'", deployer))
 	if _, err := os.Stat(deployer); err != nil {
@@ -130,7 +133,8 @@ func (d *Deployer) Load() error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to parse pubkey from '%s'", deployer)
 	}
-	if err := d.Fund([]string{filterAlphaNumeric(string(out))}); err != nil {
+	d.Account[DeployerAccount] = filterAlphaNumeric(string(out))
+	if err := d.Fund([]string{d.Account[DeployerAccount]}); err != nil {
 		return errors.Wrap(err, "failed to fund program deployer")
 	}
 
@@ -170,6 +174,19 @@ func (d *Deployer) DeployLINK() error {
 
 	linkAddress := report.Responses[0].Contract
 	d.Account[LINK] = linkAddress
+
+	// create associated token account for payee
+	msg := relayUtils.LogStatus(fmt.Sprintf("created associated LINK token (%s) account for %s", d.Account[LINK], d.Account[DeployerAccount]))
+	out, err := exec.Command("spl-token", "create-account", d.Account[LINK], "--owner", d.Account[DeployerAccount], "--fee-payer", deployer).Output()
+	if err == nil {
+		// output structure: Creating account <associated-token-account> ...etc
+		d.Account[AssociatedTokenAccount] = strings.Fields(string(out))[2]
+		fmt.Printf(": %s", d.Account[AssociatedTokenAccount])
+	}
+
+	if msg.Check(err) != nil {
+		return err
+	}
 
 	return nil
 }
@@ -222,8 +239,8 @@ func (d *Deployer) DeployOCR() error {
 	fmt.Println("Step 4: Create Feed")
 	input := map[string]interface{}{
 		"store":       d.Account[StoreAccount],
-		"granularity": 30,
-		"liveLength":  1024,
+		"granularity": 1, // granularity > 0
+		"liveLength":  10,
 		"decimals":    8,
 		"description": "Test LINK/USD",
 	}
@@ -237,6 +254,7 @@ func (d *Deployer) DeployOCR() error {
 		"store:create_feed",
 		d.gauntlet.Flag("network", d.network),
 		d.gauntlet.Flag("input", string(jsonInput)),
+		d.gauntlet.Flag("length", "10"),
 	)
 	if err != nil {
 		return errors.Wrap(err, "'store:create_feed' call failed")
@@ -366,6 +384,7 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 		"ocr2:set_billing",
 		d.gauntlet.Flag("network", d.network),
 		d.gauntlet.Flag("input", string(jsonInput)),
+		d.gauntlet.Flag("link", d.Account[LINK]),
 		d.Account[OCRFeed],
 	); err != nil {
 		return errors.Wrap(err, "'ocr2:set_billing' call failed")
@@ -408,7 +427,7 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 		oracles = append(oracles, map[string]string{
 			"signer":      k.OCR2OnchainPublicKey,
 			"transmitter": k.OCR2Transmitter,
-			"payee":       k.OCR2Transmitter, // payee is the same as transmitter
+			"payee":       d.Account[AssociatedTokenAccount], // payee is the associated token account of deployer
 		})
 	}
 
@@ -485,9 +504,8 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 
 	fmt.Println("Proposing Payees...")
 	input = map[string]interface{}{
-		"operators":          oracles,
-		"proposalId":         d.Account[Proposal],
-		"allowFundRecipient": true,
+		"operators":  oracles,
+		"proposalId": d.Account[Proposal],
 	}
 
 	jsonInput, err = json.Marshal(input)
@@ -534,6 +552,7 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 		d.gauntlet.Flag("network", d.network),
 		d.gauntlet.Flag("proposalId", d.Account[Proposal]),
 		d.gauntlet.Flag("secret", testingSecret),
+		d.gauntlet.Flag("link", d.Account[LINK]),
 		d.gauntlet.Flag("input", string(jsonInput)),
 		d.Account[OCRFeed],
 	); err != nil {

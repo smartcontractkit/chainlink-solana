@@ -13,8 +13,6 @@ type Input = {
     payee: string
   }[]
   proposalId: string
-  // Allows to set payees that do not have a token generated address
-  allowFundRecipient?: boolean
 }
 
 type ContractInput = {
@@ -48,7 +46,6 @@ export default class ProposePayees extends SolanaCommand {
 
     return {
       operators,
-      allowFundRecipient: false,
       proposalId: this.flags.proposalId || this.flags.configProposal,
     }
   }
@@ -103,10 +100,7 @@ export default class ProposePayees extends SolanaCommand {
       )
     ).every((isValid) => isValid)
 
-    this.require(
-      areValidPayees || !!this.input.allowFundRecipient,
-      'Every payee needs to have a valid token recipient address',
-    )
+    this.require(areValidPayees, 'Every payee needs to have a valid token recipient address')
 
     // Set the payees in the same order the oracles are saved in the proposal
     // The length of the payees need to be same as the oracles saved
