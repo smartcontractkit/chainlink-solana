@@ -251,6 +251,41 @@ func (c *Chain) SetFromDB(cfg *db.ChainCfg) error {
 	return nil
 }
 
+func (c *Chain) SetDefaults() {
+	if c.BalancePollPeriod == nil {
+		c.BalancePollPeriod = utils.MustNewDuration(defaultConfigSet.BalancePollPeriod)
+	}
+	if c.ConfirmPollPeriod == nil {
+		c.ConfirmPollPeriod = utils.MustNewDuration(defaultConfigSet.ConfirmPollPeriod)
+	}
+	if c.OCR2CachePollPeriod == nil {
+		c.OCR2CachePollPeriod = utils.MustNewDuration(defaultConfigSet.OCR2CachePollPeriod)
+	}
+	if c.OCR2CacheTTL == nil {
+		c.OCR2CacheTTL = utils.MustNewDuration(defaultConfigSet.OCR2CacheTTL)
+	}
+	if c.TxTimeout == nil {
+		c.TxTimeout = utils.MustNewDuration(defaultConfigSet.TxTimeout)
+	}
+	if c.TxRetryTimeout == nil {
+		c.TxRetryTimeout = utils.MustNewDuration(defaultConfigSet.TxRetryTimeout)
+	}
+	if c.TxConfirmTimeout == nil {
+		c.TxConfirmTimeout = utils.MustNewDuration(defaultConfigSet.TxConfirmTimeout)
+	}
+	if c.SkipPreflight == nil {
+		c.SkipPreflight = &defaultConfigSet.SkipPreflight
+	}
+	if c.Commitment == nil {
+		c.Commitment = (*string)(&defaultConfigSet.Commitment)
+	}
+	if c.MaxRetries == nil && defaultConfigSet.MaxRetries != nil {
+		i := int64(*defaultConfigSet.MaxRetries)
+		c.MaxRetries = &i
+	}
+	return
+}
+
 type Node struct {
 	Name *string
 	URL  *utils.URL
