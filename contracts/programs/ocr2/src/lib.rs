@@ -557,6 +557,7 @@ fn pay_oracles_impl<'info>(
     let vault_nonce = state.vault_nonce;
     let latest_round_id = state.config.latest_aggregator_round_id;
     let billing = state.config.billing;
+    let token_mint = state.config.token_mint;
 
     let payments_gjuels: Vec<(u64, CpiContext<'_, '_, '_, 'info, token::Transfer<'info>>)> = state
         .oracles
@@ -571,11 +572,11 @@ fn pay_oracles_impl<'info>(
             oracle.payment_gjuels = 0;
             oracle.from_round_id = latest_round_id;
 
-            let to = if payee.owner == &token::ID {
-                payee.to_account_info()
-            } else {
-                // then the token account must be closed
-                token_receiver.to_account_info()
+            // NOTE: try_from also checks account.owner == token::ID
+            let to = match Account::<'_, token::TokenAccount>::try_from(payee) {
+                Ok(account) if account.mint == token_mint => payee.to_account_info(),
+                // then the token account must be closed or otherwise invalid
+                _ => token_receiver.to_account_info(),
             };
 
             let cpi = CpiContext::new(
