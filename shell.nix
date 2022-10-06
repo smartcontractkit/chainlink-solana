@@ -11,9 +11,9 @@ pkgs.mkShell {
     openssl
 
     # Solana
-    solana.solana-full
-    spl-token-cli
-    anchor
+    # solana.solana-full
+    # spl-token-cli
+    # anchor
 
     # Golang
     # Keep this golang version in sync with the version in .tool-versions please
