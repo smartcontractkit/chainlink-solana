@@ -36,7 +36,7 @@ jobs:
         path: contracts/target
         key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
-    - run: solana-keygen new -o id.json
+    - run: solana-keygen new -o id.json --no-bip39-passphrase
     - name: Compile typescript client
       run: |
        cd ../ts
