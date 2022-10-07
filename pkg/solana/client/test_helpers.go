@@ -17,13 +17,17 @@ import (
 // SetupLocalSolNode sets up a local solana node via solana cli, and returns the url
 func SetupLocalSolNode(t *testing.T) string {
 	port := utils.MustRandomPort(t)
+	faucetPort := utils.MustRandomPort(t)
 	url := "http://127.0.0.1:" + port
 	cmd := exec.Command("solana-test-validator",
 		"--reset",
 		"--rpc-port", port,
+		"--faucet-port", faucetPort,
 	)
 	var stdErr bytes.Buffer
 	cmd.Stderr = &stdErr
+	var stdOut bytes.Buffer
+	cmd.Stdout = &stdOut
 	require.NoError(t, cmd.Start())
 	t.Cleanup(func() {
 		assert.NoError(t, cmd.Process.Kill())
@@ -46,6 +50,9 @@ func SetupLocalSolNode(t *testing.T) string {
 		}
 		ready = true
 		break
+	}
+	if !ready {
+		t.Logf("Cmd output: %s\nCmd error: %s\n", stdOut.String(), stdErr.String())
 	}
 	require.True(t, ready)
 	return url
