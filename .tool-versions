@@ -1,6 +1,6 @@
 nodejs 14.19.1
 rust 1.59.0
-golang 1.18
+golang 1.19.2
 golangci-lint 1.45.2
 pulumi 3.40.1
 ginkgo 2.2.0
