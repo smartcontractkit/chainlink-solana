@@ -8,8 +8,8 @@ require (
 	github.com/ethereum/go-ethereum v1.10.20
 	github.com/gagliardetto/binary v0.7.1
 	github.com/gagliardetto/solana-go v1.4.1-0.20220428092759-5250b4abbb27
-	github.com/onsi/ginkgo/v2 v2.1.4
-	github.com/onsi/gomega v1.19.0
+	github.com/onsi/ginkgo/v2 v2.2.0
+	github.com/onsi/gomega v1.20.1
 	github.com/rs/zerolog v1.27.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/smartcontractkit/chainlink-env v0.2.31
@@ -125,9 +125,9 @@ require (
 	go.uber.org/multierr v1.8.0 // indirect
 	go.uber.org/ratelimit v0.2.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
-	golang.org/x/net v0.0.0-20220607020251-c690dde0001d // indirect
+	golang.org/x/net v0.0.0-20220722155237-a158d28d115b // indirect
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
-	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
+	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
