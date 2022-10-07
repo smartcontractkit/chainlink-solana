@@ -133,6 +133,7 @@ pub struct Transmit<'info> {
 pub struct SetAccessController<'info> {
     #[account(mut)]
     pub state: AccountLoader<'info, State>,
+    #[account(address = state.load()?.config.owner @ ErrorCode::Unauthorized)]
     pub authority: Signer<'info>,
     pub access_controller: AccountLoader<'info, AccessController>,
 }
