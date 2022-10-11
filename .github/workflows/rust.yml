@@ -11,7 +11,7 @@ jobs:
     name: Rust Run Anchor Tests
     runs-on: ubuntu-latest
     container:
-      image: projectserum/build:v0.24.2
+      image: projectserum/build:v0.25.0
       env:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1
@@ -36,7 +36,7 @@ jobs:
         path: contracts/target
         key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
-    - run: solana-keygen new -o id.json
+    - run: solana-keygen new -o id.json --no-bip39-passphrase
     - name: Compile typescript client
       run: |
        cd ../ts
@@ -53,7 +53,7 @@ jobs:
     name: Rust Lint
     runs-on: ubuntu-latest
     container:
-      image: projectserum/build:v0.24.2
+      image: projectserum/build:v0.25.0
       env:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1

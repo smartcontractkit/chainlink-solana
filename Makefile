@@ -1,7 +1,7 @@
 BIN_DIR = bin
 export GOPATH ?= $(shell go env GOPATH)
 export GO111MODULE ?= on
-export PROJECT_SERUM_IMAGE ?= projectserum/build:v0.24.2
+export PROJECT_SERUM_IMAGE ?= projectserum/build:v0.25.0
 
 LINUX=LINUX
 OSX=OSX
