@@ -45,7 +45,7 @@ export default class CreateFeed extends SolanaCommand {
 
     const granularity = new BN(input.granularity)
     const liveLength = new BN(input.liveLength)
-    const length = new BN(this.flags.length || 140000) // maximum f = 5 (16 oracles)
+    const length = new BN(this.flags.length || input.liveLength) // default to no historical data, maximum is 140000 for f = 5 (16 oracles)
     const feedAccountLength = new BN(8 + 192 + length.toNumber() * 48) // account discriminator + max transmission header length + (number of transmissions store * size of transmission)
     const decimals = new BN(input.decimals)
     const description = input.description || ''
