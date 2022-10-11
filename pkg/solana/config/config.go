@@ -1,7 +1,9 @@
 package config
 
 import (
+	"fmt"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,45 +19,71 @@ import (
 
 // Global solana defaults.
 var defaultConfigSet = configSet{
-	BalancePollPeriod:   5 * time.Second,        // poll period for balance monitoring
-	ConfirmPollPeriod:   500 * time.Millisecond, // polling for tx confirmation
-	OCR2CachePollPeriod: time.Second,            // cache polling rate
-	OCR2CacheTTL:        time.Minute,            // stale cache deadline
-	TxTimeout:           time.Minute,            // timeout for send tx method in client
-	TxRetryTimeout:      10 * time.Second,       // duration for tx rebroadcasting to RPC node
-	TxConfirmTimeout:    30 * time.Second,       // duration before discarding tx as unconfirmed
-	SkipPreflight:       true,                   // to enable or disable preflight checks
-	Commitment:          rpc.CommitmentConfirmed,
-	MaxRetries:          new(uint), // max number of retries, when nil - rpc node will do a reasonable number of retries
+	BalancePollPeriod: 5 * time.Second, // poll period for balance monitoring
+
+	// OCR2 cache
+	OCR2CachePollPeriod: time.Second, // cache polling rate
+	OCR2CacheTTL:        time.Minute, // stale cache deadline
+
+	// txm parameters
+	TxTimeout:         time.Minute,            // timeout for send tx method in client
+	TxConfirmTimeout:  2 * time.Second,        // duration before tx is considered unconfirmed and will be rebroadcast
+	ConfirmPollPeriod: 500 * time.Millisecond, // polling for tx confirmation
+
+	// tx parameters
+	SkipPreflight: true, // to enable or disable preflight checks
+	Commitment:    rpc.CommitmentConfirmed,
+	MaxRetries:    new(uint), // max number of retries, when nil - rpc node will do a reasonable number of retries
+
+	// fee estimator
+	FeeEstimatorMode:        "fixed",
+	MaxComputeUnitPrice:     1_000_000,
+	MinComputeUnitPrice:     0,
+	DefaultComputeUnitPrice: 0,
 }
 
 type Config interface {
 	BalancePollPeriod() time.Duration
-	ConfirmPollPeriod() time.Duration
+
 	OCR2CachePollPeriod() time.Duration
 	OCR2CacheTTL() time.Duration
+
 	TxTimeout() time.Duration
-	TxRetryTimeout() time.Duration
 	TxConfirmTimeout() time.Duration
+	ConfirmPollPeriod() time.Duration
+
 	SkipPreflight() bool
 	Commitment() rpc.CommitmentType
 	MaxRetries() *uint
+
+	// fee estimator
+	FeeEstimatorMode() string
+	MaxComputeUnitPrice() uint64
+	MinComputeUnitPrice() uint64
+	DefaultComputeUnitPrice() uint64
 
 	// Update sets new chain config values.
 	Update(db.ChainCfg)
 }
 
 type configSet struct {
-	BalancePollPeriod   time.Duration
-	ConfirmPollPeriod   time.Duration
+	BalancePollPeriod time.Duration
+
 	OCR2CachePollPeriod time.Duration
 	OCR2CacheTTL        time.Duration
-	TxTimeout           time.Duration
-	TxRetryTimeout      time.Duration
-	TxConfirmTimeout    time.Duration
-	SkipPreflight       bool
-	Commitment          rpc.CommitmentType
-	MaxRetries          *uint
+
+	TxTimeout         time.Duration
+	TxConfirmTimeout  time.Duration
+	ConfirmPollPeriod time.Duration
+
+	SkipPreflight bool
+	Commitment    rpc.CommitmentType
+	MaxRetries    *uint
+
+	FeeEstimatorMode        string
+	MaxComputeUnitPrice     uint64
+	MinComputeUnitPrice     uint64
+	DefaultComputeUnitPrice uint64
 }
 
 var _ Config = (*config)(nil)
@@ -92,16 +120,6 @@ func (c *config) BalancePollPeriod() time.Duration {
 	return c.defaults.BalancePollPeriod
 }
 
-func (c *config) ConfirmPollPeriod() time.Duration {
-	c.chainMu.RLock()
-	ch := c.chain.ConfirmPollPeriod
-	c.chainMu.RUnlock()
-	if ch != nil {
-		return ch.Duration()
-	}
-	return c.defaults.ConfirmPollPeriod
-}
-
 func (c *config) OCR2CachePollPeriod() time.Duration {
 	c.chainMu.RLock()
 	ch := c.chain.OCR2CachePollPeriod
@@ -132,16 +150,6 @@ func (c *config) TxTimeout() time.Duration {
 	return c.defaults.TxTimeout
 }
 
-func (c *config) TxRetryTimeout() time.Duration {
-	c.chainMu.RLock()
-	ch := c.chain.TxRetryTimeout
-	c.chainMu.RUnlock()
-	if ch != nil {
-		return ch.Duration()
-	}
-	return c.defaults.TxRetryTimeout
-}
-
 func (c *config) TxConfirmTimeout() time.Duration {
 	c.chainMu.RLock()
 	ch := c.chain.TxConfirmTimeout
@@ -150,6 +158,16 @@ func (c *config) TxConfirmTimeout() time.Duration {
 		return ch.Duration()
 	}
 	return c.defaults.TxConfirmTimeout
+}
+
+func (c *config) ConfirmPollPeriod() time.Duration {
+	c.chainMu.RLock()
+	ch := c.chain.ConfirmPollPeriod
+	c.chainMu.RUnlock()
+	if ch != nil {
+		return ch.Duration()
+	}
+	return c.defaults.ConfirmPollPeriod
 }
 
 func (c *config) SkipPreflight() bool {
@@ -200,17 +218,73 @@ func (c *config) MaxRetries() *uint {
 	return c.defaults.MaxRetries
 }
 
+func (c *config) FeeEstimatorMode() string {
+	c.chainMu.RLock()
+	ch := c.chain.FeeEstimatorMode
+	c.chainMu.RUnlock()
+	if ch.Valid {
+		return strings.ToLower(ch.String)
+	}
+	return c.defaults.FeeEstimatorMode
+}
+
+func (c *config) MaxComputeUnitPrice() uint64 {
+	c.chainMu.RLock()
+	ch := c.chain.MaxComputeUnitPrice
+	c.chainMu.RUnlock()
+	if ch.Valid {
+		if ch.Int64 >= 0 {
+			return uint64(ch.Int64)
+		}
+		c.lggr.Warnf("Negative value provided for MaxComputeUnitPrice, falling back to default: %d", c.defaults.MaxComputeUnitPrice)
+	}
+	return c.defaults.MaxComputeUnitPrice
+}
+
+func (c *config) MinComputeUnitPrice() uint64 {
+	c.chainMu.RLock()
+	ch := c.chain.MinComputeUnitPrice
+	c.chainMu.RUnlock()
+	if ch.Valid {
+		if ch.Int64 >= 0 {
+			return uint64(ch.Int64)
+		}
+		c.lggr.Warnf("Negative value provided for MinComputeUnitPrice, falling back to default: %d", c.defaults.MinComputeUnitPrice)
+	}
+	return c.defaults.MinComputeUnitPrice
+}
+
+func (c *config) DefaultComputeUnitPrice() uint64 {
+	c.chainMu.RLock()
+	ch := c.chain.DefaultComputeUnitPrice
+	c.chainMu.RUnlock()
+	if ch.Valid {
+		if ch.Int64 >= 0 {
+			return uint64(ch.Int64)
+		}
+		c.lggr.Warnf("Negative value provided for DefaultComputeUnitPrice, falling back to default: %d", c.defaults.DefaultComputeUnitPrice)
+	}
+	return c.defaults.DefaultComputeUnitPrice
+}
+
 type Chain struct {
-	BalancePollPeriod   *utils.Duration
-	ConfirmPollPeriod   *utils.Duration
+	BalancePollPeriod *utils.Duration
+
 	OCR2CachePollPeriod *utils.Duration
 	OCR2CacheTTL        *utils.Duration
-	TxTimeout           *utils.Duration
-	TxRetryTimeout      *utils.Duration
-	TxConfirmTimeout    *utils.Duration
-	SkipPreflight       *bool
-	Commitment          *string
-	MaxRetries          *int64
+
+	TxTimeout         *utils.Duration
+	TxConfirmTimeout  *utils.Duration
+	ConfirmPollPeriod *utils.Duration
+
+	SkipPreflight *bool
+	Commitment    *string
+	MaxRetries    *int64
+
+	FeeEstimatorMode        *string
+	MaxComputeUnitPrice     *uint64
+	MinComputeUnitPrice     *uint64
+	DefaultComputeUnitPrice *uint64
 }
 
 func (c *Chain) SetFromDB(cfg *db.ChainCfg) error {
@@ -221,9 +295,6 @@ func (c *Chain) SetFromDB(cfg *db.ChainCfg) error {
 	if cfg.BalancePollPeriod != nil {
 		c.BalancePollPeriod = utils.MustNewDuration(cfg.BalancePollPeriod.Duration())
 	}
-	if cfg.ConfirmPollPeriod != nil {
-		c.ConfirmPollPeriod = utils.MustNewDuration(cfg.ConfirmPollPeriod.Duration())
-	}
 	if cfg.OCR2CachePollPeriod != nil {
 		c.OCR2CachePollPeriod = utils.MustNewDuration(cfg.OCR2CachePollPeriod.Duration())
 	}
@@ -233,11 +304,11 @@ func (c *Chain) SetFromDB(cfg *db.ChainCfg) error {
 	if cfg.TxTimeout != nil {
 		c.TxTimeout = utils.MustNewDuration(cfg.TxTimeout.Duration())
 	}
-	if cfg.TxRetryTimeout != nil {
-		c.TxRetryTimeout = utils.MustNewDuration(cfg.TxRetryTimeout.Duration())
-	}
 	if cfg.TxConfirmTimeout != nil {
 		c.TxConfirmTimeout = utils.MustNewDuration(cfg.TxConfirmTimeout.Duration())
+	}
+	if cfg.ConfirmPollPeriod != nil {
+		c.ConfirmPollPeriod = utils.MustNewDuration(cfg.ConfirmPollPeriod.Duration())
 	}
 	if cfg.SkipPreflight.Valid {
 		c.SkipPreflight = &cfg.SkipPreflight.Bool
@@ -248,6 +319,28 @@ func (c *Chain) SetFromDB(cfg *db.ChainCfg) error {
 	if cfg.MaxRetries.Valid {
 		c.MaxRetries = &cfg.MaxRetries.Int64
 	}
+	if cfg.FeeEstimatorMode.Valid {
+		c.FeeEstimatorMode = &cfg.FeeEstimatorMode.String
+	}
+	if cfg.MaxComputeUnitPrice.Valid {
+		if cfg.MaxComputeUnitPrice.Int64 < 0 {
+			return fmt.Errorf("MaxComputeUnitPrice is less than zero %d < 0", cfg.MaxComputeUnitPrice.Int64)
+		}
+		c.MaxComputeUnitPrice = ptr(uint64(cfg.MaxComputeUnitPrice.Int64))
+	}
+	if cfg.MinComputeUnitPrice.Valid {
+		if cfg.MinComputeUnitPrice.Int64 < 0 {
+			return fmt.Errorf("MinComputeUnitPrice is less than zero %d < 0", cfg.MinComputeUnitPrice.Int64)
+		}
+		c.MinComputeUnitPrice = ptr(uint64(cfg.MinComputeUnitPrice.Int64))
+	}
+	if cfg.DefaultComputeUnitPrice.Valid {
+		if cfg.DefaultComputeUnitPrice.Int64 < 0 {
+			return fmt.Errorf("DefaultComputeUnitPrice is less than zero %d < 0", cfg.DefaultComputeUnitPrice.Int64)
+		}
+		c.DefaultComputeUnitPrice = ptr(uint64(cfg.DefaultComputeUnitPrice.Int64))
+	}
+
 	return nil
 }
 
@@ -267,9 +360,6 @@ func (c *Chain) SetDefaults() {
 	if c.TxTimeout == nil {
 		c.TxTimeout = utils.MustNewDuration(defaultConfigSet.TxTimeout)
 	}
-	if c.TxRetryTimeout == nil {
-		c.TxRetryTimeout = utils.MustNewDuration(defaultConfigSet.TxRetryTimeout)
-	}
 	if c.TxConfirmTimeout == nil {
 		c.TxConfirmTimeout = utils.MustNewDuration(defaultConfigSet.TxConfirmTimeout)
 	}
@@ -282,6 +372,18 @@ func (c *Chain) SetDefaults() {
 	if c.MaxRetries == nil && defaultConfigSet.MaxRetries != nil {
 		i := int64(*defaultConfigSet.MaxRetries)
 		c.MaxRetries = &i
+	}
+	if c.FeeEstimatorMode == nil {
+		c.FeeEstimatorMode = &defaultConfigSet.FeeEstimatorMode
+	}
+	if c.MaxComputeUnitPrice == nil {
+		c.MaxComputeUnitPrice = &defaultConfigSet.MaxComputeUnitPrice
+	}
+	if c.MinComputeUnitPrice == nil {
+		c.MinComputeUnitPrice = &defaultConfigSet.MinComputeUnitPrice
+	}
+	if c.DefaultComputeUnitPrice == nil {
+		c.DefaultComputeUnitPrice = &defaultConfigSet.DefaultComputeUnitPrice
 	}
 	return
 }
@@ -315,4 +417,8 @@ func (n *Node) ValidateConfig() (err error) {
 		err = multierr.Append(err, relaycfg.ErrMissing{Name: "URL", Msg: "required for all nodes"})
 	}
 	return
+}
+
+func ptr[T any](t T) *T {
+	return &t
 }

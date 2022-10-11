@@ -35,16 +35,23 @@ type Node struct {
 }
 
 type ChainCfg struct {
-	BalancePollPeriod   *utils.Duration
-	ConfirmPollPeriod   *utils.Duration
+	BalancePollPeriod *utils.Duration
+
 	OCR2CachePollPeriod *utils.Duration
 	OCR2CacheTTL        *utils.Duration
-	TxTimeout           *utils.Duration
-	TxRetryTimeout      *utils.Duration
-	TxConfirmTimeout    *utils.Duration
-	SkipPreflight       null.Bool // to enable or disable preflight checks
-	Commitment          null.String
-	MaxRetries          null.Int
+
+	TxTimeout         *utils.Duration
+	TxConfirmTimeout  *utils.Duration
+	ConfirmPollPeriod *utils.Duration
+
+	SkipPreflight null.Bool // to enable or disable preflight checks
+	Commitment    null.String
+	MaxRetries    null.Int
+
+	FeeEstimatorMode        null.String
+	MaxComputeUnitPrice     null.Int
+	MinComputeUnitPrice     null.Int
+	DefaultComputeUnitPrice null.Int
 }
 
 func (c *ChainCfg) Scan(value interface{}) error {
