@@ -201,7 +201,10 @@
         {
           "name": "feed",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "The OCR2 feed"
+          ]
         },
         {
           "name": "authority",
@@ -299,6 +302,10 @@
     },
     {
       "name": "query",
+      "docs": [
+        "The query instruction takes a `Query` and serializes the response in a fixed format. That way queries",
+        "are not bound to the underlying layout."
+      ],
       "accounts": [
         {
           "name": "feed",
@@ -364,6 +371,9 @@
           },
           {
             "name": "description",
+            "docs": [
+              "Raw UTF-8 byte string"
+            ],
             "type": {
               "array": [
                 "u8",

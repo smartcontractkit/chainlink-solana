@@ -52,6 +52,8 @@ var (
 
 	Instruction_SetLoweringAccessController = ag_binary.TypeID([8]byte{207, 68, 147, 34, 164, 94, 189, 113})
 
+	// The query instruction takes a `Query` and serializes the response in a fixed format. That way queries
+	// are not bound to the underlying layout.
 	Instruction_Query = ag_binary.TypeID([8]byte{39, 251, 130, 159, 46, 136, 164, 169})
 )
 
