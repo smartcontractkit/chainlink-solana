@@ -157,12 +157,14 @@ func (obj *OracleObservationCount) UnmarshalWithDecoder(decoder *ag_binary.Decod
 }
 
 type Proposal struct {
-	Version        uint8
-	Owner          ag_solanago.PublicKey
-	State          uint8
-	F              uint8
-	Padding0       uint8
-	Padding1       uint32
+	Version  uint8
+	Owner    ag_solanago.PublicKey
+	State    uint8
+	F        uint8
+	Padding0 uint8
+	Padding1 uint32
+
+	// Set by set_payees, used to verify payee's token type matches the aggregator token type.
 	TokenMint      ag_solanago.PublicKey
 	Oracles        ProposedOracles
 	OffchainConfig OffchainConfig

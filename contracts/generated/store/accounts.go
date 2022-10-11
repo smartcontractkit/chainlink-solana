@@ -73,11 +73,13 @@ func (obj *Store) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 }
 
 type Transmissions struct {
-	Version           uint8
-	State             uint8
-	Owner             ag_solanago.PublicKey
-	ProposedOwner     ag_solanago.PublicKey
-	Writer            ag_solanago.PublicKey
+	Version       uint8
+	State         uint8
+	Owner         ag_solanago.PublicKey
+	ProposedOwner ag_solanago.PublicKey
+	Writer        ag_solanago.PublicKey
+
+	// Raw UTF-8 byte string
 	Description       [32]uint8
 	Decimals          uint8
 	FlaggingThreshold uint32

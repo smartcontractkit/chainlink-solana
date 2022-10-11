@@ -706,6 +706,9 @@
           },
           {
             "name": "tokenMint",
+            "docs": [
+              "Set by set_payees, used to verify payee's token type matches the aggregator token type."
+            ],
             "type": "publicKey"
           },
           {
@@ -812,6 +815,9 @@
     },
     {
       "name": "ProposedOracle",
+      "docs": [
+        "A subset of the [Oracles] type to save space."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -821,6 +827,9 @@
           },
           {
             "name": "signer",
+            "docs": [
+              "secp256k1 signing key for submissions"
+            ],
             "type": {
               "defined": "SigningKey"
             }
@@ -831,6 +840,9 @@
           },
           {
             "name": "payee",
+            "docs": [
+              "Payee address to pay out rewards to"
+            ],
             "type": "publicKey"
           }
         ]
@@ -899,18 +911,30 @@
           },
           {
             "name": "tokenMint",
+            "docs": [
+              "LINK SPL token account."
+            ],
             "type": "publicKey"
           },
           {
             "name": "tokenVault",
+            "docs": [
+              "LINK SPL token vault."
+            ],
             "type": "publicKey"
           },
           {
             "name": "requesterAccessController",
+            "docs": [
+              "Access controller program managing access to `RequestNewRound`."
+            ],
             "type": "publicKey"
           },
           {
             "name": "billingAccessController",
+            "docs": [
+              "Access controller program managing access to billing."
+            ],
             "type": "publicKey"
           },
           {
@@ -999,24 +1023,39 @@
           },
           {
             "name": "signer",
+            "docs": [
+              "secp256k1 signing key for submissions"
+            ],
             "type": {
               "defined": "SigningKey"
             }
           },
           {
             "name": "payee",
+            "docs": [
+              "Payee address to pay out rewards to"
+            ],
             "type": "publicKey"
           },
           {
             "name": "proposedPayee",
+            "docs": [
+              "will be zeroed out if empty"
+            ],
             "type": "publicKey"
           },
           {
             "name": "fromRoundId",
+            "docs": [
+              "Rewards from round_id up until now"
+            ],
             "type": "u32"
           },
           {
             "name": "paymentGjuels",
+            "docs": [
+              "`transmit()` reimbursements"
+            ],
             "type": "u64"
           }
         ]

@@ -15,6 +15,7 @@ type Submit struct {
 	Round *NewTransmission
 
 	// [0] = [WRITE] feed
+	// ··········· The OCR2 feed
 	//
 	// [1] = [SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
@@ -35,12 +36,14 @@ func (inst *Submit) SetRound(round NewTransmission) *Submit {
 }
 
 // SetFeedAccount sets the "feed" account.
+// The OCR2 feed
 func (inst *Submit) SetFeedAccount(feed ag_solanago.PublicKey) *Submit {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(feed).WRITE()
 	return inst
 }
 
 // GetFeedAccount gets the "feed" account.
+// The OCR2 feed
 func (inst *Submit) GetFeedAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }

@@ -75,9 +75,13 @@ func (obj *Oracles) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error)
 
 type ProposedOracle struct {
 	Transmitter ag_solanago.PublicKey
-	Signer      SigningKey
-	Padding     uint32
-	Payee       ag_solanago.PublicKey
+
+	// secp256k1 signing key for submissions
+	Signer  SigningKey
+	Padding uint32
+
+	// Payee address to pay out rewards to
+	Payee ag_solanago.PublicKey
 }
 
 func (obj ProposedOracle) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -206,24 +210,32 @@ func (obj *OffchainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 }
 
 type Config struct {
-	Owner                     ag_solanago.PublicKey
-	ProposedOwner             ag_solanago.PublicKey
-	TokenMint                 ag_solanago.PublicKey
-	TokenVault                ag_solanago.PublicKey
+	Owner         ag_solanago.PublicKey
+	ProposedOwner ag_solanago.PublicKey
+
+	// LINK SPL token account.
+	TokenMint ag_solanago.PublicKey
+
+	// LINK SPL token vault.
+	TokenVault ag_solanago.PublicKey
+
+	// Access controller program managing access to `RequestNewRound`.
 	RequesterAccessController ag_solanago.PublicKey
-	BillingAccessController   ag_solanago.PublicKey
-	MinAnswer                 ag_binary.Int128
-	MaxAnswer                 ag_binary.Int128
-	F                         uint8
-	Round                     uint8
-	Padding0                  uint16
-	Epoch                     uint32
-	LatestAggregatorRoundId   uint32
-	LatestTransmitter         ag_solanago.PublicKey
-	ConfigCount               uint32
-	LatestConfigDigest        [32]uint8
-	LatestConfigBlockNumber   uint64
-	Billing                   Billing
+
+	// Access controller program managing access to billing.
+	BillingAccessController ag_solanago.PublicKey
+	MinAnswer               ag_binary.Int128
+	MaxAnswer               ag_binary.Int128
+	F                       uint8
+	Round                   uint8
+	Padding0                uint16
+	Epoch                   uint32
+	LatestAggregatorRoundId uint32
+	LatestTransmitter       ag_solanago.PublicKey
+	ConfigCount             uint32
+	LatestConfigDigest      [32]uint8
+	LatestConfigBlockNumber uint64
+	Billing                 Billing
 }
 
 func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -437,11 +449,21 @@ func (obj *SigningKey) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 }
 
 type Oracle struct {
-	Transmitter   ag_solanago.PublicKey
-	Signer        SigningKey
-	Payee         ag_solanago.PublicKey
+	Transmitter ag_solanago.PublicKey
+
+	// secp256k1 signing key for submissions
+	Signer SigningKey
+
+	// Payee address to pay out rewards to
+	Payee ag_solanago.PublicKey
+
+	// will be zeroed out if empty
 	ProposedPayee ag_solanago.PublicKey
-	FromRoundId   uint32
+
+	// Rewards from round_id up until now
+	FromRoundId uint32
+
+	// `transmit()` reimbursements
 	PaymentGjuels uint64
 }
 

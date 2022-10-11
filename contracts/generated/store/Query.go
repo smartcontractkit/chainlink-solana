@@ -11,7 +11,8 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Query is the `query` instruction.
+// The query instruction takes a `Query` and serializes the response in a fixed format. That way queries
+// are not bound to the underlying layout.
 type Query struct {
 	Scope Scope
 
