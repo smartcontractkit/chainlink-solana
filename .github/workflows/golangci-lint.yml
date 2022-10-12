@@ -10,7 +10,7 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
-      - uses: smartcontractkit/tool-versions-to-env-action@v1.0.7
+      - uses: smartcontractkit/tool-versions-to-env-action@v1.0.8
         id: tool-versions
       - name: Setup Go
         uses: actions/setup-go@v3
