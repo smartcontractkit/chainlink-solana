@@ -1,7 +1,8 @@
 BIN_DIR = bin
 export GOPATH ?= $(shell go env GOPATH)
 export GO111MODULE ?= on
-export PROJECT_SERUM_IMAGE ?= projectserum/build:v0.25.0
+export PROJECT_SERUM_VERSION ?=v0.25.0
+export PROJECT_SERUM_IMAGE ?= projectserum/build:$(PROJECT_SERUM_VERSION)
 
 LINUX=LINUX
 OSX=OSX
@@ -45,6 +46,10 @@ ifneq ($(CI),true)
 endif
 	go install github.com/onsi/ginkgo/v2/ginkgo@v$(shell cat ./.tool-versions | grep ginkgo | sed -En "s/ginkgo.(.*)/\1/p")
 endif
+
+.PHONY: projectserum_version
+projectserum_version:
+	@echo "${PROJECT_SERUM_VERSION}"
 
 anchor_shell:
 	docker run --rm -it -v $(shell pwd):/workdir --entrypoint bash ${PROJECT_SERUM_IMAGE}

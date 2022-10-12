@@ -1,0 +1,16 @@
+name: Get ProjectSerum Image Version
+description: Gets the projectserum version in the makefile
+outputs:
+  projectserum_version:
+    description: The projectserum image version
+    value: ${{ steps.psversion.outputs.PSVERSION }}
+
+runs:
+  using: composite
+  steps:
+    - name: Get the projectserum version
+      id: psversion
+      shell: bash
+      run: |
+        PSVERSION=$(make projectserum_version)
+        echo "PSVERSION=${PSVERSION}" >>$GITHUB_OUTPUT
