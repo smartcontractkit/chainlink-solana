@@ -9,11 +9,23 @@ defaults:
   run:
     working-directory: ./contracts
 jobs:
+  get_projectserum_version:
+    name: Get ProjectSerum Version
+    runs-on: ubuntu-latest
+    outputs:
+      projectserum_version: ${{ steps.psversion.outputs.projectserum_version }}
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
+      - name: Get ProjectSerum Version
+        id: psversion
+        uses: ./.github/actions/projectserum_version
   release-artifacts:
     name: Release Artifacts
     runs-on: ubuntu-latest
+    needs: [get_projectserum_version]
     container:
-      image: projectserum/build:v0.25.0
+      image: projectserum/build:${{ needs.get_projectserum_version.outputs.projectserum_version }}
       env:
         RUSTUP_HOME: "/root/.rustup"
     steps:
