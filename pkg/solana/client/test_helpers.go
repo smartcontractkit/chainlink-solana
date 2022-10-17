@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os/exec"
+	"strconv"
 	"testing"
 	"time"
 
@@ -14,8 +15,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	DEFAULT_TICKS_PER_SLOT = 64 // https://github.com/solana-labs/solana/blob/master/web3.js/src/timing.ts
+)
+
 // SetupLocalSolNode sets up a local solana node via solana cli, and returns the url
 func SetupLocalSolNode(t *testing.T) string {
+	return SetupLocalSolNodeOpts(t, DEFAULT_TICKS_PER_SLOT)
+}
+
+func SetupLocalSolNodeOpts(t *testing.T, ticksPerSlot int) string {
 	port := utils.MustRandomPort(t)
 	faucetPort := utils.MustRandomPort(t)
 	url := "http://127.0.0.1:" + port
@@ -23,6 +32,7 @@ func SetupLocalSolNode(t *testing.T) string {
 		"--reset",
 		"--rpc-port", port,
 		"--faucet-port", faucetPort,
+		"--ticks-per-slot", strconv.Itoa(ticksPerSlot), // slows down the blockchain
 	)
 	var stdErr bytes.Buffer
 	cmd.Stderr = &stdErr
