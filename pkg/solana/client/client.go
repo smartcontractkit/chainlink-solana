@@ -43,6 +43,7 @@ type Writer interface {
 	SendTx(ctx context.Context, tx *solana.Transaction) (solana.Signature, error)
 	SimulateTx(ctx context.Context, tx *solana.Transaction, opts *rpc.SimulateTransactionOpts) (*rpc.SimulateTransactionResult, error)
 	SignatureStatuses(ctx context.Context, sigs []solana.Signature) ([]*rpc.SignatureStatusesResult, error)
+	IsBlockhashValid(ctx context.Context, hash solana.Hash) (bool, error)
 }
 
 var _ ReaderWriter = (*Client)(nil)
@@ -208,4 +209,24 @@ func (c *Client) SendTx(ctx context.Context, tx *solana.Transaction) (solana.Sig
 	}
 
 	return c.rpc.SendTransactionWithOpts(ctx, tx, opts)
+}
+
+func (c *Client) IsBlockhashValid(ctx context.Context, hash solana.Hash) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), c.contextDuration)
+	defer cancel()
+
+	v, err, _ := c.requestGroup.Do(fmt.Sprintf("IsBlockhashValid_%s", hash), func() (interface{}, error) {
+		res, err := c.rpc.IsBlockhashValid(ctx, hash, c.commitment)
+		if err != nil {
+			return false, err
+		}
+
+		if res == nil {
+			return false, fmt.Errorf("nil pointer in IsBlockhashValid")
+		}
+
+		return res.Value, nil
+	})
+
+	return v.(bool), err
 }

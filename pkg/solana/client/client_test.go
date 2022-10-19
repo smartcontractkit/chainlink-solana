@@ -200,6 +200,16 @@ func TestClient_Writer_Integration(t *testing.T) {
 
 	assert.Nil(t, statuses[0].Err)
 	assert.NotNil(t, statuses[1].Err)
+
+	// check blockhash valid
+	hash, err := c.LatestBlockhash()
+	assert.NoError(t, err)
+	ok, err := c.IsBlockhashValid(ctx, hash.Value.Blockhash)
+	assert.NoError(t, err)
+	assert.True(t, ok)
+	ok, err = c.IsBlockhashValid(ctx, solana.Hash{})
+	assert.NoError(t, err)
+	assert.False(t, ok)
 }
 
 func TestClient_SendTxDuplicates_Integration(t *testing.T) {
