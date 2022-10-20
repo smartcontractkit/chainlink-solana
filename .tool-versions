@@ -7,3 +7,4 @@ ginkgo 2.4.0
 actionlint 1.6.19
 shellcheck 0.8.0
 helm 3.9.4
+mockery 2.14.0
