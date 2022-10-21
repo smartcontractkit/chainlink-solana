@@ -266,11 +266,9 @@ export const wrapCommand = (command) => {
       const tx = await this.program.methods
         .createTransaction(context.rawTx.programId, context.rawTx.keys, context.rawTx.data)
         .accounts({
-          accounts: {
-            multisig: this.multisigAddress,
-            transaction: proposal,
-            proposer: signer,
-          },
+          multisig: this.multisigAddress,
+          transaction: proposal,
+          proposer: signer,
         })
         .instruction()
       return [tx]
