@@ -15,11 +15,12 @@ export const makeAcceptOwnershipCommand = (
     static id = `${contractId}:accept_ownership`
     static category = contractId
 
-    static examples = [`yarn gauntlet ${contractId}:accept_ownership --network=devnet [PROGRAM_STATE]`]
+    static examples = [`yarn gauntlet ${contractId}:accept_ownership --network=devnet --authority=[PROPOSED_OWNER] [PROGRAM_STATE]`]
 
     constructor(flags, args) {
       super(flags, args)
 
+      this.require(!!this.flags.authority, 'Please provide flags with "authority"')
       this.requireArgs('Please provide the state as an arg!')
     }
 
@@ -31,10 +32,11 @@ export const makeAcceptOwnershipCommand = (
       return this
     }
 
-    makeRawTransaction = async (signer: PublicKey) => {
+    makeRawTransaction = async () => {
       const contract = getContract(contractId, '')
       const address = contract.programId.toString()
       const program = this.loadProgram(contract.idl, address)
+      const authority = new PublicKey(this.flags.authority)
 
       const state = new PublicKey(this.args[0])
 
@@ -42,7 +44,7 @@ export const makeAcceptOwnershipCommand = (
         .acceptOwnership()
         .accounts({
           state: state,
-          authority: signer,
+          authority: authority,
         })
         .instruction()
 
@@ -56,7 +58,7 @@ export const makeAcceptOwnershipCommand = (
       logger.info(`Accepting Ownership of contract of type "${contract.type}":
       - Contract: ${contract.address} ${contract.description ? '- ' + contract.description : ''}
       - Current Owner: ${ownership.owner.toString()}
-      - Next Owner (Current signer): ${this.wallet.publicKey}`)
+      - Next Owner: ${this.flags.authority}`)
       await prompt('Continue?')
     }
 
@@ -65,7 +67,7 @@ export const makeAcceptOwnershipCommand = (
       await this.beforeExecute()
 
       const signer = this.wallet.publicKey
-      const rawTx = await this.makeRawTransaction(signer)
+      const rawTx = await this.makeRawTransaction()
       await this.simulateTx(signer, rawTx)
       const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, this.program.idl)(rawTx)
 

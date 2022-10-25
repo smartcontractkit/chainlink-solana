@@ -9,18 +9,20 @@ export default class AcceptStoreOwnership extends SolanaCommand {
   static id = `store:accept_store_ownership`
   static category = CONTRACT_LIST.STORE
 
-  static examples = [`yarn gauntlet store:accept_store_ownership --network=devnet [PROGRAM_STATE]`]
+  static examples = [`yarn gauntlet store:accept_store_ownership --network=devnet --authority=[PROPOSED_OWNER] [PROGRAM_STATE]`]
 
   constructor(flags, args) {
     super(flags, args)
 
+    this.require(!!this.flags.authority, 'Please provide flags with "authority"')
     this.requireArgs('Please provide the state as an arg!')
   }
 
-  makeRawTransaction = async (signer: PublicKey) => {
+  makeRawTransaction = async () => {
     const contract = getContract(CONTRACT_LIST.STORE, '')
     const address = contract.programId.toString()
     const program = this.loadProgram(contract.idl, address)
+    const authority = new PublicKey(this.flags.authority)
 
     const state = new PublicKey(this.args[0])
 
@@ -28,7 +30,7 @@ export default class AcceptStoreOwnership extends SolanaCommand {
       .acceptStoreOwnership()
       .accounts({
         store: state,
-        authority: signer,
+        authority: authority,
       })
       .instruction()
 
@@ -41,7 +43,7 @@ export default class AcceptStoreOwnership extends SolanaCommand {
     const program = this.loadProgram(contract.idl, address)
     const state = this.args[0]
 
-    const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
+    const rawTx = await this.makeRawTransaction()
     await prompt(`Accepting ownership of store state (${state}). Continue?`)
     const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx)
     logger.success(`Accepted ownership on tx hash: ${txhash}`)
