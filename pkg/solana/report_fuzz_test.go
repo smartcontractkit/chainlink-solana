@@ -1,6 +1,3 @@
-//go:build go1.18
-// +build go1.18
-
 package solana
 
 import (
@@ -13,8 +10,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 )
 
-// Ensure your env is using go 1.18 then in pkg/solana:
-// go test -tags=go1.18 -fuzz ./...
+// go test -fuzz ./...
 func FuzzReportCodecMedianFromReport(f *testing.F) {
 	cdc := ReportCodec{}
 	report, err := cdc.BuildReport([]median.ParsedAttributedObservation{
