@@ -82,7 +82,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     rawTxs: TransactionInstruction[],
     extraSigners?: Keypair[],
   ): Promise<TransactionSignature> => {
-    const recentBlockhash = (await this.provider.connection.getRecentBlockhash()).blockhash
+    const recentBlockhash = (await this.provider.connection.getLatestBlockhash()).blockhash
     const tx = makeTx(rawTxs, {
       recentBlockhash,
       feePayer: this.wallet.publicKey,
