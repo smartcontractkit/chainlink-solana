@@ -27,14 +27,13 @@ pkgs.mkShell {
     nodePackages.typescript
     nodePackages.typescript-language-server
     # Keep this nodejs version in sync with the version in .tool-versions please
-    nodejs-14_x
-    (yarn.override { nodejs = nodejs-14_x; })
+    nodejs-18_x
+    (yarn.override { nodejs = nodejs-18_x; })
     python3
   ];
   RUST_BACKTRACE = "1";
   # https://github.com/rust-lang/rust/issues/55979
   LD_LIBRARY_PATH = lib.makeLibraryPath (with pkgs; [ stdenv.cc.cc.lib ]);
-  GOROOT="${pkgs.go_1_18}/share/go";
 
   # Avoids issues with delve
   CGO_CPPFLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0";
