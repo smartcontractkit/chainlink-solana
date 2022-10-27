@@ -364,3 +364,6 @@ replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alp
 // Fix go mod tidy issue for ambiguous imports from go-ethereum
 // See https://github.com/ugorji/go/issues/279
 replace github.com/btcsuite/btcd => github.com/btcsuite/btcd v0.22.1
+
+// updating CosmWasm to v1.0.0 which brings ARM support
+replace github.com/CosmWasm/wasmvm => github.com/CosmWasm/wasmvm v1.0.0
