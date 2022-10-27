@@ -97,6 +97,7 @@ jobs:
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
+          CGO_ENABLED: "1"
       - name: cleanup
         if: always()
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@cd9e407a6e0aa8ef7f315067644c0333846ffd40 # v2.0.24
