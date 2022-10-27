@@ -1216,4 +1216,25 @@ describe("ocr2", async () => {
     );
     assert.equal(new BN(round.answer, 10, "le").toNumber(), 100);
   });
+
+  const newOwner = Keypair.generate();
+
+  it("Can transfer aggregator ownership", async () => {
+    await program.methods
+      .transferOwnership(newOwner.publicKey)
+      .accounts({
+        state: state.publicKey,
+        authority: owner.publicKey,
+      })
+      .rpc();
+
+    await program.methods
+      .acceptOwnership()
+      .accounts({
+        state: state.publicKey,
+        authority: newOwner.publicKey,
+      })
+      .signers([newOwner])
+      .rpc();
+  });
 });
