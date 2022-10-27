@@ -1,7 +1,7 @@
 nodejs 18.6.0
 rust 1.64.0
 golang 1.19.2
-golangci-lint 1.45.2
+golangci-lint 1.50.1
 pulumi 3.40.1
 ginkgo 2.4.0
 actionlint 1.6.19
