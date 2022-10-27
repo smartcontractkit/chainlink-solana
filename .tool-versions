@@ -3,7 +3,7 @@ rust 1.59.0
 golang 1.19.2
 golangci-lint 1.45.2
 pulumi 3.40.1
-ginkgo 2.2.0
+ginkgo 2.4.0
 actionlint 1.6.19
 shellcheck 0.8.0
 helm 3.9.4
