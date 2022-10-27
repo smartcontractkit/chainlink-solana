@@ -10,12 +10,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/solclient"
+	"gopkg.in/guregu/null.v4"
 
 	"github.com/rs/zerolog/log"
 
 	uuid "github.com/satori/go.uuid"
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
+	"github.com/smartcontractkit/chainlink/core/services/job"
+	"github.com/smartcontractkit/chainlink/core/store/models"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
@@ -91,7 +95,7 @@ func CreateNodeKeysBundle(nodes []*client.Chainlink) ([]NodeKeysBundle, error) {
 		}
 
 		peerID := p2pkeys.Data[0].Attributes.PeerID
-		txKey, _, err := n.CreateTxKey(ChainName)
+		txKey, _, err := n.CreateTxKey(ChainName, "localnet")
 		if err != nil {
 			return nil, err
 		}
@@ -257,7 +261,7 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 }
 
 func CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error {
-	relayConfig := map[string]string{
+	relayConfig := job.JSONConfig{
 		"nodeEndpointHTTP": "http://sol:8899",
 		"ocr2ProgramID":    contractNodeInfo.OCR2.ProgramAddress(),
 		"transmissionsID":  contractNodeInfo.Store.TransmissionsAddress(),
@@ -272,36 +276,45 @@ func CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error {
 		},
 	}
 	jobSpec := &client.OCR2TaskJobSpec{
-		Name:                  fmt.Sprintf("sol-OCRv2-%s-%s", "bootstrap", uuid.NewV4().String()),
-		JobType:               "bootstrap",
-		ContractID:            contractNodeInfo.OCR2.Address(),
-		Relay:                 ChainName,
-		RelayConfig:           relayConfig,
-		PluginType:            "median",
-		P2PV2Bootstrappers:    bootstrapPeers,
-		OCRKeyBundleID:        contractNodeInfo.BootstrapNodeKeysBundle.OCR2Key.Data.ID,
-		TransmitterID:         contractNodeInfo.BootstrapNodeKeysBundle.TXKey.Data.ID,
-		ObservationSource:     contractNodeInfo.BootstrapBridgeInfo.ObservationSource,
-		JuelsPerFeeCoinSource: contractNodeInfo.BootstrapBridgeInfo.JuelsSource,
-		TrackerPollInterval:   15 * time.Second, // faster config checking
+		Name:              fmt.Sprintf("sol-OCRv2-%s-%s", "bootstrap", uuid.NewV4().String()),
+		JobType:           "bootstrap",
+		ObservationSource: contractNodeInfo.BootstrapBridgeInfo.ObservationSource,
+		OCR2OracleSpec: job.OCR2OracleSpec{
+			ID:                                0,
+			ContractID:                        contractNodeInfo.OCR2.Address(),
+			Relay:                             ChainName,
+			RelayConfig:                       relayConfig,
+			P2PV2Bootstrappers:                pq.StringArray{bootstrapPeers[0].P2PV2Bootstrapper()},
+			OCRKeyBundleID:                    null.StringFrom(contractNodeInfo.BootstrapNodeKeysBundle.OCR2Key.Data.ID),
+			TransmitterID:                     null.StringFrom(contractNodeInfo.BootstrapNodeKeysBundle.TXKey.Data.ID),
+			ContractConfigTrackerPollInterval: models.Interval(15 * time.Second),
+			PluginType:                        "median",
+			PluginConfig: map[string]interface{}{
+				"juelsPerFeeCoinSource": contractNodeInfo.BootstrapBridgeInfo.JuelsSource,
+			},
+		},
 	}
 	if _, err := contractNodeInfo.BootstrapNode.MustCreateJob(jobSpec); err != nil {
 		return fmt.Errorf("failed creating job for boostrap node: %w", err)
 	}
 	for nIdx, n := range contractNodeInfo.Nodes {
 		jobSpec := &client.OCR2TaskJobSpec{
-			Name:                  fmt.Sprintf("sol-OCRv2-%d-%s", nIdx, uuid.NewV4().String()),
-			JobType:               "offchainreporting2",
-			ContractID:            contractNodeInfo.OCR2.Address(),
-			Relay:                 ChainName,
-			RelayConfig:           relayConfig,
-			PluginType:            "median",
-			P2PV2Bootstrappers:    bootstrapPeers,
-			OCRKeyBundleID:        contractNodeInfo.NodeKeysBundle[nIdx].OCR2Key.Data.ID,
-			TransmitterID:         contractNodeInfo.NodeKeysBundle[nIdx].TXKey.Data.ID,
-			ObservationSource:     contractNodeInfo.BridgeInfos[nIdx].ObservationSource,
-			JuelsPerFeeCoinSource: contractNodeInfo.BridgeInfos[nIdx].JuelsSource,
-			TrackerPollInterval:   15 * time.Second, // faster config checking
+			Name:              fmt.Sprintf("sol-OCRv2-%d-%s", nIdx, uuid.NewV4().String()),
+			JobType:           "offchainreporting2",
+			ObservationSource: contractNodeInfo.BridgeInfos[nIdx].ObservationSource,
+			OCR2OracleSpec: job.OCR2OracleSpec{
+				ContractID:                        contractNodeInfo.OCR2.Address(),
+				Relay:                             ChainName,
+				RelayConfig:                       relayConfig,
+				P2PV2Bootstrappers:                pq.StringArray{bootstrapPeers[0].P2PV2Bootstrapper()},
+				OCRKeyBundleID:                    null.StringFrom(contractNodeInfo.NodeKeysBundle[nIdx].OCR2Key.Data.ID),
+				TransmitterID:                     null.StringFrom(contractNodeInfo.NodeKeysBundle[nIdx].TXKey.Data.ID),
+				ContractConfigTrackerPollInterval: models.Interval(15 * time.Second),
+				PluginType:                        "median",
+				PluginConfig: map[string]interface{}{
+					"juelsPerFeeCoinSource": contractNodeInfo.BridgeInfos[nIdx].JuelsSource,
+				},
+			},
 		}
 		if _, err := n.MustCreateJob(jobSpec); err != nil {
 			return fmt.Errorf("failed creating job for node %s: %w", n.URL(), err)

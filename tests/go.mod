@@ -8,10 +8,12 @@ require (
 	github.com/ethereum/go-ethereum v1.10.25
 	github.com/gagliardetto/binary v0.7.1
 	github.com/gagliardetto/solana-go v1.4.1-0.20220428092759-5250b4abbb27
+	github.com/lib/pq v1.10.7
 	github.com/onsi/ginkgo/v2 v2.4.0
 	github.com/onsi/gomega v1.22.1
 	github.com/rs/zerolog v1.28.0
 	github.com/satori/go.uuid v1.2.0
+	github.com/smartcontractkit/chainlink v1.8.0
 	github.com/smartcontractkit/chainlink-env v0.2.46
 	github.com/smartcontractkit/chainlink-solana v0.2.20-0.20220823154935-6bb62aeb987a
 	github.com/smartcontractkit/chainlink-testing-framework v1.7.5
@@ -19,6 +21,7 @@ require (
 	github.com/smartcontractkit/libocr v0.0.0-20220812191430-db92a9fdaa52
 	golang.org/x/crypto v0.1.0
 	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
+	gopkg.in/guregu/null.v4 v4.0.0
 )
 
 require (
@@ -171,7 +174,6 @@ require (
 	github.com/koron/go-ssdp v0.0.2 // indirect
 	github.com/leanovate/gopter v0.2.10-0.20210127095200-9abe2343507a // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
-	github.com/lib/pq v1.10.7 // indirect
 	github.com/libp2p/go-addr-util v0.0.2 // indirect
 	github.com/libp2p/go-buffer-pool v0.0.2 // indirect
 	github.com/libp2p/go-cidranger v1.1.0 // indirect
@@ -271,7 +273,6 @@ require (
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/slack-go/slack v0.11.3 // indirect
-	github.com/smartcontractkit/chainlink v1.8.0 // indirect
 	github.com/smartcontractkit/chainlink-relay v0.1.6-0.20220824173548-dab4ac0a6595 // indirect
 	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.0-20220930034704-572ac07611cb // indirect
 	github.com/smartcontractkit/ocr2vrf v0.0.0-20221021145954-aef9beb5fcbf // indirect
@@ -334,7 +335,6 @@ require (
 	google.golang.org/genproto v0.0.0-20220602131408-e326c6e8e9c8 // indirect
 	google.golang.org/grpc v1.47.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
-	gopkg.in/guregu/null.v4 v4.0.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.66.4 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
