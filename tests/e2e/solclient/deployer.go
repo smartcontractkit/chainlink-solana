@@ -379,39 +379,20 @@ func (c *ContractDeployer) DeployProgramRemote(programName string) error {
 }
 
 func (c *ContractDeployer) DeployOCRv2AccessController() (*AccessController, error) {
+	// TODO: need to inject program_ids into the env of the script beforehand so that the deployed programs match
 	programWallet := c.Client.ProgramWallets["access_controller-keypair.json"]
-	payer := c.Client.DefaultWallet
-	stateAcc := solana.NewWallet()
-	accInstruction, err := c.Client.CreateAccInstr(stateAcc.PublicKey(), AccessControllerStateAccountSize, programWallet.PublicKey())
+
+	state, err := c.Client.Gauntlet.DeployAccessControllerContract()
 	if err != nil {
 		return nil, err
 	}
-	err = c.Client.TXAsync(
-		"Initializing access controller",
-		[]solana.Instruction{
-			accInstruction,
-			access_controller2.NewInitializeInstruction(
-				stateAcc.PublicKey(),
-				c.Accounts.Owner.PublicKey(),
-			).Build(),
-		},
-		func(key solana.PublicKey) *solana.PrivateKey {
-			if key.Equals(c.Accounts.Owner.PublicKey()) {
-				return &c.Accounts.Owner.PrivateKey
-			}
-			if key.Equals(stateAcc.PublicKey()) {
-				return &stateAcc.PrivateKey
-			}
-			if key.Equals(payer.PublicKey()) {
-				return &payer.PrivateKey
-			}
-			return nil
-		},
-		payer.PublicKey(),
-	)
+	stateAcc, err := solana.PublicKeyFromBase58(state)
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO: deal with Owner param being possibly different than the payer?
+
 	return &AccessController{
 		State:         stateAcc,
 		Client:        c.Client,

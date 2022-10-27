@@ -7,13 +7,13 @@ import (
 
 type AccessController struct {
 	Client        *Client
-	State         *solana.Wallet
+	State         solana.PublicKey
 	Owner         *solana.Wallet
 	ProgramWallet *solana.Wallet
 }
 
 func (s *AccessController) Address() string {
-	return s.State.PublicKey().String()
+	return s.State.String()
 }
 
 func (s *AccessController) AddAccess(addr string) error {
@@ -26,7 +26,7 @@ func (s *AccessController) AddAccess(addr string) error {
 		"Add validator access",
 		[]solana.Instruction{
 			access_controller2.NewAddAccessInstruction(
-				s.State.PublicKey(),
+				s.State,
 				s.Owner.PublicKey(),
 				validatorPubKey,
 			).Build(),

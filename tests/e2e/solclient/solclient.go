@@ -12,6 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/smartcontractkit/chainlink-solana/tests/e2e/gauntlet"
+	"github.com/smartcontractkit/chainlink-solana/tests/e2e/utils"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
 	"github.com/gagliardetto/solana-go"
@@ -61,7 +63,8 @@ type SolNetwork struct {
 
 // Client implements BlockchainClient
 type Client struct {
-	Config *SolNetwork
+	Config   *SolNetwork
+	Gauntlet *gauntlet.SolanaGauntlet
 	// Wallets lamport wallets
 	Wallets []*solana.Wallet
 	// ProgramWallets program wallets by key filename
@@ -102,8 +105,13 @@ func NewClient(cfg *SolNetwork) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	g, err := gauntlet.NewSolanaGauntlet(utils.ProjectRoot)
+	if err != nil {
+		return nil, err
+	}
 	client := &Client{
 		Config:         cfg,
+		Gauntlet:       g,
 		RPC:            c,
 		WS:             wsc,
 		ProgramWallets: make(map[string]*solana.Wallet),

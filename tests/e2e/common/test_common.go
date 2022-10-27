@@ -4,6 +4,7 @@ package common
 import (
 	"fmt"
 	"math/big"
+	"os"
 	"sync"
 	"time"
 
@@ -187,6 +188,8 @@ func (m *OCRv2TestState) SetupClients() {
 		},
 	})(m.Env)
 	Expect(m.err).ShouldNot(HaveOccurred())
+	// NOTE: code later uses SetWallet(1) so we reuse the same key for gauntlet
+	os.Setenv("PRIVATE_KEY", "2tye1GyG7wwTUS2T8puXSErDyzQcBxpgwRN5R2MMy5osJKjQF6ZoeYTTpeHaAxpuiE1G4Pnq4sTa4YCWx3RcXb4Y")
 	m.MockServer, m.err = ctfClient.ConnectMockServer(m.Env)
 	Expect(m.err).ShouldNot(HaveOccurred())
 	m.ChainlinkNodes, m.err = client.ConnectChainlinkNodes(m.Env)
