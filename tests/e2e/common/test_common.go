@@ -134,28 +134,7 @@ func (m *OCRv2TestState) DeployEnv(nodes int, stateful bool, contractsDir string
 	}).
 		AddHelm(mockservercfg.New(nil)).
 		AddHelm(mockserver.New(nil)).
-		AddHelm(sol.New(&sol.Props{ // copied because config is not merged
-			NetworkName: "sol",
-			Values: map[string]interface{}{
-				"replicas": "1",
-				"sol": map[string]interface{}{
-					"image": map[string]interface{}{
-						"image":   "solanalabs/solana",
-						"version": "v1.13.3",
-					},
-					"resources": map[string]interface{}{
-						"requests": map[string]interface{}{
-							"cpu":    "2000m",
-							"memory": "4000Mi",
-						},
-						"limits": map[string]interface{}{
-							"cpu":    "2000m",
-							"memory": "4000Mi",
-						},
-					},
-				},
-			},
-		})).
+		AddHelm(sol.New(nil)).
 		AddHelm(chainlink.New(0, map[string]interface{}{
 			"replicas": nodes,
 			"env": map[string]interface{}{
