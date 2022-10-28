@@ -931,13 +931,13 @@ describe("ocr2", async () => {
     // can still pay out oracles even if a token account is closed
 
     // Close oracle0's token account
-    let oracle = oracles[0]
+    let oracle = oracles[0];
     let tx = await closeAccount(
       provider.connection,
       fromWallet,
       oracle.payee.address, // account
       recipientTokenAccount.address, // destination
-      oracle.transmitter, // authority
+      oracle.transmitter // authority
     );
     await provider.connection.confirmTransaction(tx);
 
