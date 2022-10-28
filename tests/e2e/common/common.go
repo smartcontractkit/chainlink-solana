@@ -280,13 +280,13 @@ func CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error {
 		JobType:           "bootstrap",
 		ObservationSource: contractNodeInfo.BootstrapBridgeInfo.ObservationSource,
 		OCR2OracleSpec: job.OCR2OracleSpec{
-			ID:                                0,
 			ContractID:                        contractNodeInfo.OCR2.Address(),
 			Relay:                             ChainName,
 			RelayConfig:                       relayConfig,
 			P2PV2Bootstrappers:                pq.StringArray{bootstrapPeers[0].P2PV2Bootstrapper()},
 			OCRKeyBundleID:                    null.StringFrom(contractNodeInfo.BootstrapNodeKeysBundle.OCR2Key.Data.ID),
 			TransmitterID:                     null.StringFrom(contractNodeInfo.BootstrapNodeKeysBundle.TXKey.Data.ID),
+			ContractConfigConfirmations:       1,
 			ContractConfigTrackerPollInterval: models.Interval(15 * time.Second),
 			PluginType:                        "median",
 			PluginConfig: map[string]interface{}{
@@ -309,6 +309,7 @@ func CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error {
 				P2PV2Bootstrappers:                pq.StringArray{bootstrapPeers[0].P2PV2Bootstrapper()},
 				OCRKeyBundleID:                    null.StringFrom(contractNodeInfo.NodeKeysBundle[nIdx].OCR2Key.Data.ID),
 				TransmitterID:                     null.StringFrom(contractNodeInfo.NodeKeysBundle[nIdx].TXKey.Data.ID),
+				ContractConfigConfirmations:       1,
 				ContractConfigTrackerPollInterval: models.Interval(15 * time.Second),
 				PluginType:                        "median",
 				PluginConfig: map[string]interface{}{
