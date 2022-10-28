@@ -226,7 +226,7 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 	cd.RegisterAnchorPrograms()
 
 	cd.Client.Gauntlet.SetupNetwork(
-		"http://localhost:8899",
+		"http://sol:8899",
 		cd.Client.ProgramWallets["access_controller-keypair.json"].PublicKey().String(),
 		cd.Client.ProgramWallets["store-keypair.json"].PublicKey().String(),
 		cd.Client.ProgramWallets["ocr2-keypair.json"].PublicKey().String(),
