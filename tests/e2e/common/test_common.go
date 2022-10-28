@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/sol"
@@ -189,7 +191,10 @@ func (m *OCRv2TestState) SetupClients() {
 	})(m.Env)
 	Expect(m.err).ShouldNot(HaveOccurred())
 	// NOTE: code later uses SetWallet(1) so we reuse the same key for gauntlet
-	os.Setenv("PRIVATE_KEY", "2tye1GyG7wwTUS2T8puXSErDyzQcBxpgwRN5R2MMy5osJKjQF6ZoeYTTpeHaAxpuiE1G4Pnq4sTa4YCWx3RcXb4Y")
+	key, err := solana.PrivateKeyFromBase58("2tye1GyG7wwTUS2T8puXSErDyzQcBxpgwRN5R2MMy5osJKjQF6ZoeYTTpeHaAxpuiE1G4Pnq4sTa4YCWx3RcXb4Y")
+	Expect(err).ShouldNot(HaveOccurred())
+	// format as json array...
+	os.Setenv("PRIVATE_KEY", strings.Join(strings.Fields(fmt.Sprintf("%d", []byte(key))), ","))
 	m.MockServer, m.err = ctfClient.ConnectMockServer(m.Env)
 	Expect(m.err).ShouldNot(HaveOccurred())
 	m.ChainlinkNodes, m.err = client.ConnectChainlinkNodes(m.Env)
