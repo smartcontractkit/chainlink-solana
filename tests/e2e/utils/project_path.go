@@ -8,7 +8,8 @@ import (
 var (
 	_, b, _, _ = runtime.Caller(0)
 	// ProjectRoot Root folder of this project
-	ProjectRoot = filepath.Join(filepath.Dir(b), "/../../..")
+	ProjectRoot  = filepath.Join(filepath.Dir(b), "/../../..")
+	GauntletRoot = filepath.Join(ProjectRoot, "gauntlet")
 	// ContractsDir path to our contracts
 	ContractsDir = filepath.Join(ProjectRoot, "contracts", "target", "deploy")
 	// TestsDir path to e2e tests dir

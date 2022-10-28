@@ -105,7 +105,7 @@ func NewClient(cfg *SolNetwork) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	g, err := gauntlet.NewSolanaGauntlet(utils.ProjectRoot)
+	g, err := gauntlet.NewSolanaGauntlet(utils.GauntletRoot)
 	if err != nil {
 		return nil, err
 	}
