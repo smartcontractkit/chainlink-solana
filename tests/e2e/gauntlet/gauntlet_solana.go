@@ -90,7 +90,7 @@ func (sg *SolanaGauntlet) DeployAccountContract(salt int64, pubKey string) (sola
 }
 
 func (sg *SolanaGauntlet) DeployLinkTokenContract() (solana.PublicKey, error) {
-	_, err := sg.g.ExecCommand([]string{"ERC20:deploy", "--link"}, *sg.options)
+	_, err := sg.g.ExecCommand([]string{"token:deploy"}, *sg.options)
 	if err != nil {
 		return solana.PublicKey{}, err
 	}
@@ -102,7 +102,7 @@ func (sg *SolanaGauntlet) DeployLinkTokenContract() (solana.PublicKey, error) {
 }
 
 func (sg *SolanaGauntlet) MintLinkToken(token, to, amount string) (solana.PublicKey, error) {
-	_, err := sg.g.ExecCommand([]string{"ERC20:mint", fmt.Sprintf("--account=%s", to), fmt.Sprintf("--amount=%s", amount), token}, *sg.options)
+	_, err := sg.g.ExecCommand([]string{"token:mint", fmt.Sprintf("--account=%s", to), fmt.Sprintf("--amount=%s", amount), token}, *sg.options)
 	if err != nil {
 		return solana.PublicKey{}, err
 	}
