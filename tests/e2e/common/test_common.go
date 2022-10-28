@@ -214,6 +214,7 @@ func (m *OCRv2TestState) initializeNodesInContractsMap() {
 
 // DeployContracts deploys contracts
 func (m *OCRv2TestState) DeployContracts(contractsDir string) {
+
 	m.NodeKeysBundle, m.err = CreateNodeKeysBundle(m.ChainlinkNodes)
 	Expect(m.err).ShouldNot(HaveOccurred())
 	cd, err := solclient.NewContractDeployer(m.c, m.Env, nil)
@@ -223,6 +224,14 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 	err = cd.DeployAnchorProgramsRemote(contractsDir)
 	Expect(err).ShouldNot(HaveOccurred())
 	cd.RegisterAnchorPrograms()
+
+	cd.Client.Gauntlet.SetupNetwork(
+		"http://localhost:8899",
+		cd.Client.ProgramWallets["access_controller-keypair.json"].PublicKey().String(),
+		cd.Client.ProgramWallets["store-keypair.json"].PublicKey().String(),
+		cd.Client.ProgramWallets["ocr2-keypair.json"].PublicKey().String(),
+	)
+
 	m.LinkToken, err = cd.DeployLinkTokenContract()
 	Expect(err).ShouldNot(HaveOccurred())
 	err = FundOracles(m.c, m.NodeKeysBundle, big.NewFloat(1e4))

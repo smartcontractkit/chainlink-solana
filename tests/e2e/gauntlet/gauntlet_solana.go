@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 
 	"github.com/gagliardetto/solana-go"
 	gauntlet "github.com/smartcontractkit/chainlink-testing-framework/gauntlet"
@@ -72,9 +73,16 @@ func (sg *SolanaGauntlet) FetchGauntletJsonOutput() (*GauntletResponse, error) {
 }
 
 // Sets up a new network and sets the NODE_URL for Devnet / Solana RPC
-func (sg *SolanaGauntlet) SetupNetwork(addr string) {
+func (sg *SolanaGauntlet) SetupNetwork(addr string, access_controller, store, ocr2 string) {
 	sg.g.AddNetworkConfigVar("NODE_URL", addr)
-	sg.g.WriteNetworkConfigMap(sg.dir + "gauntlet/packages/gauntlet-solana-contracts/networks/")
+	sg.g.AddNetworkConfigVar("PROGRAM_ID_OCR2", ocr2)
+	sg.g.AddNetworkConfigVar("PROGRAM_ID_ACCESS_CONTROLLER", access_controller)
+	sg.g.AddNetworkConfigVar("PROGRAM_ID_STORE", store)
+	// sg.g.AddNetworkConfigVar("LINK", addr)
+	// sg.g.AddNetworkConfigVar("BILLING_ACCESS_CONTROLLER", addr)
+	// sg.g.AddNetworkConfigVar("LOWERING_ACCESS_CONTROLLER", addr)
+	// sg.g.AddNetworkConfigVar("REQUESTER_ACCESS_CONTROLLER", addr)
+	sg.g.WriteNetworkConfigMap(filepath.Join(sg.dir, "packages/gauntlet-solana-contracts/networks/"))
 }
 
 func (sg *SolanaGauntlet) DeployAccountContract(salt int64, pubKey string) (solana.PublicKey, error) {
