@@ -80,13 +80,13 @@ test_relay_unit:
 	go test -v ./pkg/...
 
 test_smoke:
-	SELECTED_NETWORKS=solana NETWORK_SETTINGS=$(shell pwd)/tests/e2e/networks.yaml \
+	CGO_ENABLED=1 SELECTED_NETWORKS=solana \
 	ginkgo -v -r --junit-report=tests-smoke-report.xml --keep-going --trace tests/e2e/smoke
 
 test_ocr_soak:
-	SELECTED_NETWORKS=solana NETWORK_SETTINGS=$(shell pwd)/tests/e2e/networks.yaml \
+	CGO_ENABLED=1 SELECTED_NETWORKS=solana \
 	ginkgo -v -r --junit-report=tests-soak-report.xml --keep-going --trace tests/e2e/soak
 
 test_chaos:
-	SELECTED_NETWORKS=solana NETWORK_SETTINGS=$(shell pwd)/tests/e2e/networks.yaml \
+	CGO_ENABLED=1 SELECTED_NETWORKS=solana \
 	ginkgo -v -r --junit-report=tests-chaos-report.xml --keep-going --trace tests/e2e/chaos
