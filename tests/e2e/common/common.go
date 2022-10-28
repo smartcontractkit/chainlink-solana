@@ -30,6 +30,7 @@ import (
 
 const (
 	ChainName = "solana"
+	ChainID   = "localnet"
 )
 
 // ContractNodeInfo contains the indexes of the nodes, bridges, NodeKeyBundles and nodes relevant to an OCR2 Contract
@@ -70,13 +71,13 @@ func stripKeyPrefix(key string) string {
 
 func CreateSolanaChainAndNode(nodes []*client.Chainlink) error {
 	for _, n := range nodes {
-		_, _, err := n.CreateSolanaChain(&client.SolanaChainAttributes{ChainID: "localnet"})
+		_, _, err := n.CreateSolanaChain(&client.SolanaChainAttributes{ChainID: ChainID})
 		if err != nil {
 			return err
 		}
 		_, _, err = n.CreateSolanaNode(&client.SolanaNodeAttributes{
 			Name:          "solana",
-			SolanaChainID: "localnet",
+			SolanaChainID: ChainID,
 			SolanaURL:     "http://sol:8899",
 		})
 		if err != nil {
@@ -95,7 +96,7 @@ func CreateNodeKeysBundle(nodes []*client.Chainlink) ([]NodeKeysBundle, error) {
 		}
 
 		peerID := p2pkeys.Data[0].Attributes.PeerID
-		txKey, _, err := n.CreateTxKey(ChainName, "localnet")
+		txKey, _, err := n.CreateTxKey(ChainName, ChainID)
 		if err != nil {
 			return nil, err
 		}
@@ -260,13 +261,19 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 	return nil
 }
 
+func pluginConfigToTomlFormat(pluginConfig string) job.JSONConfig {
+	return job.JSONConfig{
+		"juelsPerFeeCoinSource": fmt.Sprintf("\"\"\"\n%s\n\"\"\"", pluginConfig),
+	}
+}
+
 func CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error {
 	relayConfig := job.JSONConfig{
-		"nodeEndpointHTTP": "http://sol:8899",
-		"ocr2ProgramID":    contractNodeInfo.OCR2.ProgramAddress(),
-		"transmissionsID":  contractNodeInfo.Store.TransmissionsAddress(),
-		"storeProgramID":   contractNodeInfo.Store.ProgramAddress(),
-		"chainID":          "localnet",
+		"nodeEndpointHTTP": "\"http://sol:8899\"",
+		"ocr2ProgramID":    fmt.Sprintf("\"%s\"", contractNodeInfo.OCR2.ProgramAddress()),
+		"transmissionsID":  fmt.Sprintf("\"%s\"", contractNodeInfo.Store.TransmissionsAddress()),
+		"storeProgramID":   fmt.Sprintf("\"%s\"", contractNodeInfo.Store.ProgramAddress()),
+		"chainID":          fmt.Sprintf("\"%s\"", ChainID),
 	}
 	bootstrapPeers := []client.P2PData{
 		{
@@ -289,9 +296,7 @@ func CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error {
 			ContractConfigConfirmations:       1,
 			ContractConfigTrackerPollInterval: models.Interval(15 * time.Second),
 			PluginType:                        "median",
-			PluginConfig: map[string]interface{}{
-				"juelsPerFeeCoinSource": contractNodeInfo.BootstrapBridgeInfo.JuelsSource,
-			},
+			PluginConfig:                      pluginConfigToTomlFormat(contractNodeInfo.BootstrapBridgeInfo.JuelsSource),
 		},
 	}
 	if _, err := contractNodeInfo.BootstrapNode.MustCreateJob(jobSpec); err != nil {
@@ -312,9 +317,7 @@ func CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error {
 				ContractConfigConfirmations:       1,
 				ContractConfigTrackerPollInterval: models.Interval(15 * time.Second),
 				PluginType:                        "median",
-				PluginConfig: map[string]interface{}{
-					"juelsPerFeeCoinSource": contractNodeInfo.BridgeInfos[nIdx].JuelsSource,
-				},
+				PluginConfig:                      pluginConfigToTomlFormat(contractNodeInfo.BridgeInfos[nIdx].JuelsSource),
 			},
 		}
 		if _, err := n.MustCreateJob(jobSpec); err != nil {
