@@ -22,7 +22,7 @@ type OCRv2 struct {
 	Payees                   []*solana.Wallet
 	Owner                    *solana.Wallet
 	Proposal                 *solana.Wallet
-	Mint                     *solana.Wallet
+	Mint                     solana.PublicKey
 	OCRVaultAssociatedPubKey solana.PublicKey
 	ProgramWallet            *solana.Wallet
 }
@@ -355,7 +355,7 @@ func (m *OCRv2) proposeConfig(ocConfig contracts.OffChainAggregatorV2Config) err
 		payees = append(payees, payee.PublicKey())
 	}
 	proposeInstr := ocr_2.NewProposePayeesInstruction(
-		m.Mint.PublicKey(),
+		m.Mint,
 		m.Proposal.PublicKey(),
 		m.Owner.PublicKey())
 	// Add payees as remaining accounts

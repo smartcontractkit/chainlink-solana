@@ -41,7 +41,7 @@ type Accounts struct {
 	// Owner is the owner of all programs
 	Owner *solana.Wallet
 	// Mint LINK mint state account
-	Mint *solana.Wallet
+	Mint solana.PublicKey
 	// OCR2 Proposal account
 	Proposal *solana.Wallet
 	// MintAuthority LINK mint authority
