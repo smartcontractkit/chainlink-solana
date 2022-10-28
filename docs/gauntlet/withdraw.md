@@ -12,7 +12,7 @@ The `recipient` address is the payee address set in the contract configuration. 
 yarn gauntlet ocr2:withdraw_payment --network=mainnet --recipient=<PAYEE_ADDRESS> <FEED_ADDRESS>
 ```
 
-If you are using a Ledger, include the `--withLedger` flag. Gauntlet will ask you to sign the transaction using your Ledger.
+If you are using a Ledger, include the `--withLedger` flag. Gauntlet will ask you to sign the transaction using your Ledger. The default derivation path is `44'/501'`. If you want to use another one, use the `--ledgerPath` flag. e.g. `--ledgerPath=44/501/0/0`
 
 ```bash
 yarn gauntlet ocr2:withdraw_payment --network=mainnet --recipient=<PAYEE_ADDRESS> --withLedger <FEED_ADDRESS>
