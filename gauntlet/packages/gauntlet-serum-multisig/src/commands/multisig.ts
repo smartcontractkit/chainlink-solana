@@ -235,7 +235,10 @@ export const wrapCommand = (command) => {
       }
       const isSameData = Buffer.compare(proposalState.data, rawTx.data) === 0
       const isSameProgramId = new PublicKey(proposalState.programId).toString() === rawTx.programId.toString()
-      const isSameAccounts = isDeepEqual(proposalState.accounts, rawTx.keys)
+      const isSameAccounts = isDeepEqual(
+        proposalState.accounts.map((a) => a.pubkey.toString()),
+        rawTx.keys.map((a) => a.pubkey.toString()),
+      )
       return isSameData && isSameProgramId && isSameAccounts
     }
 
