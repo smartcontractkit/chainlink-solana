@@ -247,14 +247,10 @@ func (c *ContractDeployer) DeployLinkTokenContract() (*LinkToken, error) {
 	if err != nil {
 		return nil, err
 	}
-	mintAcc, err := solana.PublicKeyFromBase58(mint)
-	if err != nil {
-		return nil, err
-	}
 
 	return &LinkToken{
 		Client:        c.Client,
-		Mint:          mintAcc,
+		Mint:          mint,
 		MintAuthority: c.Accounts.MintAuthority,
 	}, nil
 }
@@ -366,15 +362,11 @@ func (c *ContractDeployer) DeployOCRv2AccessController() (*AccessController, err
 	if err != nil {
 		return nil, err
 	}
-	stateAcc, err := solana.PublicKeyFromBase58(state)
-	if err != nil {
-		return nil, err
-	}
 
 	// TODO: deal with Owner param being possibly different than the payer?
 
 	return &AccessController{
-		State:         stateAcc,
+		State:         state,
 		Client:        c.Client,
 		Owner:         c.Accounts.Owner,
 		ProgramWallet: programWallet,

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"github.com/gagliardetto/solana-go"
 	gauntlet "github.com/smartcontractkit/chainlink-testing-framework/gauntlet"
 )
 
@@ -33,7 +34,7 @@ type GauntletResponse struct {
 				TransactionHash string   `json:"transaction_hash"`
 			} `json:"tx"`
 		} `json:"tx"`
-		Contract string `json:"contract"`
+		Contract solana.PublicKey `json:"contract"`
 	} `json:"responses"`
 }
 
@@ -76,110 +77,110 @@ func (sg *SolanaGauntlet) SetupNetwork(addr string) {
 	sg.g.WriteNetworkConfigMap(sg.dir + "gauntlet/packages/gauntlet-solana-contracts/networks/")
 }
 
-func (sg *SolanaGauntlet) DeployAccountContract(salt int64, pubKey string) (string, error) {
+func (sg *SolanaGauntlet) DeployAccountContract(salt int64, pubKey string) (solana.PublicKey, error) {
 	_, err := sg.g.ExecCommand([]string{"account:deploy", fmt.Sprintf("--salt=%d", salt), fmt.Sprintf("--publicKey=%s", pubKey)}, *sg.options)
 	if err != nil {
-		return "", err
+		return solana.PublicKey{}, err
 	}
 	sg.gr, err = sg.FetchGauntletJsonOutput()
 	if err != nil {
-		return "", err
+		return solana.PublicKey{}, err
 	}
 	return sg.gr.Responses[0].Contract, nil
 }
 
-func (sg *SolanaGauntlet) DeployLinkTokenContract() (string, error) {
+func (sg *SolanaGauntlet) DeployLinkTokenContract() (solana.PublicKey, error) {
 	_, err := sg.g.ExecCommand([]string{"ERC20:deploy", "--link"}, *sg.options)
 	if err != nil {
-		return "", err
+		return solana.PublicKey{}, err
 	}
 	sg.gr, err = sg.FetchGauntletJsonOutput()
 	if err != nil {
-		return "", err
+		return solana.PublicKey{}, err
 	}
 	return sg.gr.Responses[0].Contract, nil
 }
 
-func (sg *SolanaGauntlet) MintLinkToken(token, to, amount string) (string, error) {
+func (sg *SolanaGauntlet) MintLinkToken(token, to, amount string) (solana.PublicKey, error) {
 	_, err := sg.g.ExecCommand([]string{"ERC20:mint", fmt.Sprintf("--account=%s", to), fmt.Sprintf("--amount=%s", amount), token}, *sg.options)
 	if err != nil {
-		return "", err
+		return solana.PublicKey{}, err
 	}
 	sg.gr, err = sg.FetchGauntletJsonOutput()
 	if err != nil {
-		return "", err
+		return solana.PublicKey{}, err
 	}
 	return sg.gr.Responses[0].Contract, nil
 }
 
-func (sg *SolanaGauntlet) DeployOCR2ControllerContract(minSubmissionValue int64, maxSubmissionValue int64, decimals int, name string, linkTokenAddress string) (string, error) {
+func (sg *SolanaGauntlet) DeployOCR2ControllerContract(minSubmissionValue int64, maxSubmissionValue int64, decimals int, name string, linkTokenAddress string) (solana.PublicKey, error) {
 	_, err := sg.g.ExecCommand([]string{"ocr2:deploy", fmt.Sprintf("--minSubmissionValue=%d", minSubmissionValue), fmt.Sprintf("--maxSubmissionValue=%d", maxSubmissionValue), fmt.Sprintf("--decimals=%d", decimals), fmt.Sprintf("--name=%s", name), fmt.Sprintf("--link=%s", linkTokenAddress)}, *sg.options)
 	if err != nil {
-		return "", err
+		return solana.PublicKey{}, err
 	}
 	sg.gr, err = sg.FetchGauntletJsonOutput()
 	if err != nil {
-		return "", err
+		return solana.PublicKey{}, err
 	}
 	return sg.gr.Responses[0].Contract, nil
 }
 
-func (sg *SolanaGauntlet) DeployAccessControllerContract() (string, error) {
+func (sg *SolanaGauntlet) DeployAccessControllerContract() (solana.PublicKey, error) {
 	_, err := sg.g.ExecCommand([]string{"access_controller:initialize"}, *sg.options)
 	if err != nil {
-		return "", err
+		return solana.PublicKey{}, err
 	}
 	sg.gr, err = sg.FetchGauntletJsonOutput()
 	if err != nil {
-		return "", err
+		return solana.PublicKey{}, err
 	}
 	return sg.gr.Responses[0].Contract, nil
 }
 
-func (sg *SolanaGauntlet) DeployOCR2ProxyContract(aggregator string) (string, error) {
+func (sg *SolanaGauntlet) DeployOCR2ProxyContract(aggregator string) (solana.PublicKey, error) {
 	_, err := sg.g.ExecCommand([]string{"proxy:deploy", fmt.Sprintf("--address=%s", aggregator)}, *sg.options)
 	if err != nil {
-		return "", err
+		return solana.PublicKey{}, err
 	}
 	sg.gr, err = sg.FetchGauntletJsonOutput()
 	if err != nil {
-		return "", err
+		return solana.PublicKey{}, err
 	}
 	return sg.gr.Responses[0].Contract, nil
 }
 
-func (sg *SolanaGauntlet) SetOCRBilling(observationPaymentGjuels int64, transmissionPaymentGjuels int64, ocrAddress string) (string, error) {
+func (sg *SolanaGauntlet) SetOCRBilling(observationPaymentGjuels int64, transmissionPaymentGjuels int64, ocrAddress string) (solana.PublicKey, error) {
 	_, err := sg.g.ExecCommand([]string{"ocr2:set_billing", fmt.Sprintf("--observationPaymentGjuels=%d", observationPaymentGjuels), fmt.Sprintf("--transmissionPaymentGjuels=%d", transmissionPaymentGjuels), ocrAddress}, *sg.options)
 	if err != nil {
-		return "", err
+		return solana.PublicKey{}, err
 	}
 	sg.gr, err = sg.FetchGauntletJsonOutput()
 	if err != nil {
-		return "", err
+		return solana.PublicKey{}, err
 	}
 	return sg.gr.Responses[0].Contract, nil
 }
 
-func (sg *SolanaGauntlet) SetConfigDetails(cfg string, ocrAddress string) (string, error) {
+func (sg *SolanaGauntlet) SetConfigDetails(cfg string, ocrAddress string) (solana.PublicKey, error) {
 	_, err := sg.g.ExecCommand([]string{"ocr2:set_config", "--input=" + cfg, ocrAddress}, *sg.options)
 	if err != nil {
-		return "", err
+		return solana.PublicKey{}, err
 	}
 	sg.gr, err = sg.FetchGauntletJsonOutput()
 	if err != nil {
-		return "", err
+		return solana.PublicKey{}, err
 	}
 	return sg.gr.Responses[0].Contract, nil
 }
 
-func (sg *SolanaGauntlet) AddAccess(aggregator, address string) (string, error) {
+func (sg *SolanaGauntlet) AddAccess(aggregator, address string) (solana.PublicKey, error) {
 	_, err := sg.g.ExecCommand([]string{"ocr2:add_access", fmt.Sprintf("--address=%s", address), aggregator}, *sg.options)
 	if err != nil {
-		return "", err
+		return solana.PublicKey{}, err
 	}
 	sg.gr, err = sg.FetchGauntletJsonOutput()
 	if err != nil {
-		return "", err
+		return solana.PublicKey{}, err
 	}
 	return sg.gr.Responses[0].Contract, nil
 }
