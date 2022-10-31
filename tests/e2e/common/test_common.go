@@ -17,7 +17,6 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/rs/zerolog/log"
-	envclient "github.com/smartcontractkit/chainlink-env/client"
 	"github.com/smartcontractkit/chainlink-env/environment"
 	mockservercfg "github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver-cfg"
 	"github.com/smartcontractkit/chainlink-solana/tests/e2e/solclient"
@@ -226,10 +225,10 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 	Expect(err).ShouldNot(HaveOccurred())
 	cd.RegisterAnchorPrograms()
 
-	netRemote, err := m.Env.Fwd.FindPort("sol:0", "sol-val", "http-rpc").As(envclient.RemoteConnection, envclient.HTTP)
-	Expect(err).ShouldNot(HaveOccurred())
+	// netRemote, err := m.Env.Fwd.FindPort("sol:0", "sol-val", "http-rpc").As(envclient.RemoteConnection, envclient.HTTP)
+	// Expect(err).ShouldNot(HaveOccurred())
 	cd.Client.Gauntlet.SetupNetwork(
-		netRemote,
+		m.Env.URLs["sol"][0],
 		cd.Client.ProgramWallets["access_controller-keypair.json"].PublicKey().String(),
 		cd.Client.ProgramWallets["store-keypair.json"].PublicKey().String(),
 		cd.Client.ProgramWallets["ocr2-keypair.json"].PublicKey().String(),
