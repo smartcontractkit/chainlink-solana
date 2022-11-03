@@ -61,8 +61,16 @@ export const makeUpgradeProgramCommand = (contractId: CONTRACT_LIST): SolanaCons
       this.require(!!this.flags.buffer, 'Please provide flags with "buffer"')
     }
 
+    beforeExecute = async (signer: PublicKey) => {
+      logger.loading(`Preparing the transaction to upgrade the ${contractId} program with signer ${signer}`)
+    }
+
+    makeRawTransaction = async (signer: PublicKey) => {
+      return await makeRawUpgradeTransaction(signer, contractId, this.flags.buffer)
+    }
+
     execute = async () => {
-      const rawTx = await makeRawUpgradeTransaction(this.wallet.payer.publicKey, contractId, this.flags.buffer)
+      const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
       await prompt(`Continue upgrading the ${contractId} program?`)
       logger.loading('Upgrading program...')
       const txhash = await this.provider.sendAndConfirm(utils.makeTx(rawTx), [this.wallet.payer])
