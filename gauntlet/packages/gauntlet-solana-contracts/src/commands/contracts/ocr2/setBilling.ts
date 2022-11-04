@@ -63,7 +63,7 @@ export default class SetBilling extends SolanaCommand {
     const info = (await this.program.account.state.fetch(state)) as any
 
     const linkPublicKey = new PublicKey(this.flags.link || process.env.LINK)
-    const tokenReceiver = await getAssociatedTokenAddress(linkPublicKey, signer)
+    const tokenReceiver = await getAssociatedTokenAddress(linkPublicKey, signer, true)
     const tokenVault = new PublicKey(info.config.tokenVault)
     const [vaultAuthority] = await PublicKey.findProgramAddress(
       [Buffer.from(utils.bytes.utf8.encode('vault')), state.toBuffer()],
