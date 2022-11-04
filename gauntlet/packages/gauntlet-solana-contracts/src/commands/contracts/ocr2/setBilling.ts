@@ -74,6 +74,7 @@ export default class SetBilling extends SolanaCommand {
       .map((oracle) => ({ pubkey: oracle.payee, isWritable: true, isSigner: false }))
 
     const billingAC = new PublicKey(info.config.billingAccessController)
+    logger.info(`This command involves a token payout. The receiver will be: ${tokenReceiver}`)
     const data = await this.program.methods
       .setBilling(new BN(this.input.observationPaymentGjuels), new BN(this.input.transmissionPaymentGjuels))
       .accounts({
