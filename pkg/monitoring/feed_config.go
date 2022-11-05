@@ -92,6 +92,9 @@ func (s SolanaFeedConfig) ToMapping() map[string]interface{} {
 		"contract_type":    s.ContractType,
 		"contract_status":  s.ContractStatus,
 		"contract_address": s.ContractAddress.Bytes(),
+		"contract_address_string": map[string]interface{}{
+			"string": s.ContractAddressBase58,
+		},
 
 		// These fields are Solana specific.
 		// They are required in the schema but they should be set to a zero value for any other chain.
