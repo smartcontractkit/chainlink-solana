@@ -214,7 +214,7 @@ export default class AcceptProposal extends SolanaCommand {
   makeRawTransaction = async (signer: PublicKey) => {
     const linkPublicKey = new PublicKey(this.flags.link || process.env.LINK)
     const tokenReceiver = await getAssociatedTokenAddress(linkPublicKey, signer, true)
-    logger.info(`This command involves a token payout. The receiver will be: ${tokenReceiver}`)
+    logger.info(`This command involves a token payout. If owed tokens are unable to be paid to node operators, they will be sent to: ${tokenReceiver}`)
 
     const tx = await this.program.methods
       .acceptProposal(this.contractInput.offchainDigest)
