@@ -3,7 +3,7 @@ import { createHash } from 'crypto'
 import { logger, prompt, BN } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import { getOrCreateAssociatedTokenAccount, TOKEN_PROGRAM_ID } from '@solana/spl-token'
+import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { utils } from '@project-serum/anchor'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import ProposeOffchainConfig, { OffchainConfig } from '../proposeOffchainConfig'
@@ -213,13 +213,8 @@ export default class AcceptProposal extends SolanaCommand {
 
   makeRawTransaction = async (signer: PublicKey) => {
     const linkPublicKey = new PublicKey(this.flags.link || process.env.LINK)
-    const tokenReceiver = await getOrCreateAssociatedTokenAccount(
-      this.provider.connection,
-      this.wallet.payer,
-      linkPublicKey,
-      this.provider.wallet.publicKey,
-      true,
-    )
+    const tokenReceiver = await getAssociatedTokenAddress(linkPublicKey, signer, true)
+    logger.info(`This command involves a token payout. The receiver will be: ${tokenReceiver}`)
 
     const tx = await this.program.methods
       .acceptProposal(this.contractInput.offchainDigest)
@@ -228,7 +223,7 @@ export default class AcceptProposal extends SolanaCommand {
         proposal: new PublicKey(this.input.proposalId),
         receiver: signer,
         authority: signer,
-        tokenReceiver: tokenReceiver.address,
+        tokenReceiver: tokenReceiver,
         tokenVault: this.contractInput.tokenVault,
         vaultAuthority: this.contractInput.vaultAuthority,
         tokenProgram: TOKEN_PROGRAM_ID,

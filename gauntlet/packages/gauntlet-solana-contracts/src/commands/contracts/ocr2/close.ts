@@ -1,8 +1,9 @@
-import { getOrCreateAssociatedTokenAccount, TOKEN_PROGRAM_ID } from '@solana/spl-token'
+import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { utils } from '@project-serum/anchor'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import Close from '../../abstract/close'
+import { logger } from '@chainlink/gauntlet-core/dist/utils'
 
 export default class extends Close {
   static id = Close.makeId(CONTRACT_LIST.OCR_2)
@@ -22,13 +23,9 @@ export default class extends Close {
 
     const address = new PublicKey(this.args[0])
     const linkPublicKey = new PublicKey(this.flags.link || process.env.LINK)
-    const tokenRecipient = await getOrCreateAssociatedTokenAccount(
-      this.provider.connection,
-      this.wallet.payer,
-      linkPublicKey,
-      this.provider.wallet.publicKey,
-      true,
-    )
+    const tokenReceiver = await getAssociatedTokenAddress(linkPublicKey, signer, true)
+    logger.info(`This command involves a token payout. The receiver will be: ${tokenReceiver}`)
+
     const { config, oracles } = (await program.account.state.fetch(address)) as any
     const [vaultAuthority] = await PublicKey.findProgramAddress(
       [Buffer.from(utils.bytes.utf8.encode('vault')), address.toBuffer()],
@@ -40,7 +37,7 @@ export default class extends Close {
       .map((oracle) => ({ pubkey: oracle.payee, isWritable: true, isSigner: false }))
 
     const extraAccounts = {
-      tokenReceiver: tokenRecipient.address,
+      tokenReceiver,
       tokenVault: config.tokenVault,
       vaultAuthority,
       tokenProgram: TOKEN_PROGRAM_ID,
