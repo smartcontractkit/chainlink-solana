@@ -23,7 +23,7 @@ jobs:
       projectserum_version: ${{ steps.psversion.outputs.projectserum_version }}
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
+        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
       - name: Get ProjectSerum Version
         id: psversion
         uses: ./.github/actions/projectserum_version
@@ -42,7 +42,7 @@ jobs:
         FORCE_COLOR: 1
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
+        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
       - name: Build contracts
         uses: ./.github/actions/build_contract_artifacts
   e2e_custom_build_custom_chainlink_image:
@@ -54,7 +54,7 @@ jobs:
       contents: read
     steps:
       - name: Build Image
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@cd9e407a6e0aa8ef7f315067644c0333846ffd40 # v2.0.24
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@5ca2b0a07d534f216fb97ab54e69d3fdcf03de11 # v2.0.25
         with:
           cl_repo: smartcontractkit/chainlink
           # by default we are integrating with develop
@@ -82,9 +82,9 @@ jobs:
       TEST_LOG_LEVEL: debug
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@f25a3a9f25bd5f4c5d77189cab02ff357b5aedeb # v2.4.1
+        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@cd9e407a6e0aa8ef7f315067644c0333846ffd40 # v2.0.24
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@5ca2b0a07d534f216fb97ab54e69d3fdcf03de11 # v2.0.25
         with:
           test_command_to_run: make test_smoke
           go_mod_path: ./tests/go.mod
@@ -94,12 +94,12 @@ jobs:
           artifacts_location: /home/runner/work/chainlink-solana/chainlink-solana/tests/e2e/logs
           token: ${{ secrets.GITHUB_TOKEN }}
           triggered_by: ${{ env.TEST_TRIGGERED_BY }}
+          dep_chainlink_integration_tests: ${{ github.event.inputs.cl_branch_ref || 'develop' }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
-          CGO_ENABLED: "1"
       - name: cleanup
         if: always()
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@cd9e407a6e0aa8ef7f315067644c0333846ffd40 # v2.0.24
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@5ca2b0a07d534f216fb97ab54e69d3fdcf03de11 # v2.0.25
         with:
           triggered_by: ${{ env.TEST_TRIGGERED_BY }}
