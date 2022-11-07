@@ -24,7 +24,9 @@ export default class extends Close {
     const address = new PublicKey(this.args[0])
     const linkPublicKey = new PublicKey(this.flags.link || process.env.LINK)
     const tokenReceiver = await getAssociatedTokenAddress(linkPublicKey, signer, true)
-    logger.info(`This command involves a token payout. The receiver will be: ${tokenReceiver}`)
+    logger.info(
+      `This command involves a token payout. If owed tokens are unable to be paid to node operators, they will be sent to: ${tokenReceiver}`,
+    )
 
     const { config, oracles } = (await program.account.state.fetch(address)) as any
     const [vaultAuthority] = await PublicKey.findProgramAddress(
