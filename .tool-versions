@@ -1,9 +1,10 @@
 nodejs 14.19.1
 rust 1.59.0
-golang 1.19.2
+golang 1.19.3
 golangci-lint 1.45.2
 pulumi 3.40.1
 ginkgo 2.4.0
-actionlint 1.6.19
+actionlint 1.6.22
 shellcheck 0.8.0
 helm 3.9.4
+kubectl 1.25.3

@@ -37,6 +37,7 @@ ifeq ($(OSFLAG),$(OSX))
 	asdf plugin-add pulumi || true
 	asdf plugin add actionlint || true
 	asdf plugin add shellcheck || true
+	asdf plugin add kubectl || true
 	asdf install
 endif
 ifeq ($(OSFLAG),$(LINUX))
