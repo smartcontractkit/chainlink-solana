@@ -74,7 +74,7 @@ export const wrapCommand = (command) => {
       if (this.flags.execute) {
         await prompt('Continue?')
         logger.loading(`Executing action...`)
-        const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, this.program.idl)(rawTxs, [], {
+        const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, this.program.idl)(rawTxs, null, {
           price: Number(this.flags.computePrice),
           units: Number(this.flags.computeUnits),
         })
