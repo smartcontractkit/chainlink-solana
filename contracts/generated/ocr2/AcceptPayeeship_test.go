@@ -21,7 +21,6 @@ func TestEncodeDecode_AcceptPayeeship(t *testing.T) {
 				buf := new(bytes.Buffer)
 				err := encodeT(*params, buf)
 				ag_require.NoError(t, err)
-				//
 				got := new(AcceptPayeeship)
 				err = decodeT(got, buf.Bytes())
 				got.AccountMetaSlice = nil

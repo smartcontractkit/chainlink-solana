@@ -4,9 +4,12 @@ package common
 import (
 	"fmt"
 	"math/big"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/sol"
@@ -187,6 +190,11 @@ func (m *OCRv2TestState) SetupClients() {
 		},
 	})(m.Env)
 	Expect(m.err).ShouldNot(HaveOccurred())
+	// NOTE: code later uses SetWallet(1) so we reuse the same key for gauntlet
+	key, err := solana.PrivateKeyFromBase58("2tye1GyG7wwTUS2T8puXSErDyzQcBxpgwRN5R2MMy5osJKjQF6ZoeYTTpeHaAxpuiE1G4Pnq4sTa4YCWx3RcXb4Y")
+	Expect(err).ShouldNot(HaveOccurred())
+	// format as json array...
+	os.Setenv("PRIVATE_KEY", strings.Join(strings.Fields(fmt.Sprintf("%d", []byte(key))), ","))
 	m.MockServer, m.err = ctfClient.ConnectMockServer(m.Env)
 	Expect(m.err).ShouldNot(HaveOccurred())
 	m.ChainlinkNodes, m.err = client.ConnectChainlinkNodes(m.Env)
@@ -206,6 +214,7 @@ func (m *OCRv2TestState) initializeNodesInContractsMap() {
 
 // DeployContracts deploys contracts
 func (m *OCRv2TestState) DeployContracts(contractsDir string) {
+
 	m.NodeKeysBundle, m.err = CreateNodeKeysBundle(m.ChainlinkNodes)
 	Expect(m.err).ShouldNot(HaveOccurred())
 	cd, err := solclient.NewContractDeployer(m.c, m.Env, nil)
@@ -215,6 +224,16 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 	err = cd.DeployAnchorProgramsRemote(contractsDir)
 	Expect(err).ShouldNot(HaveOccurred())
 	cd.RegisterAnchorPrograms()
+
+	// netRemote, err := m.Env.Fwd.FindPort("sol:0", "sol-val", "http-rpc").As(envclient.RemoteConnection, envclient.HTTP)
+	// Expect(err).ShouldNot(HaveOccurred())
+	cd.Client.Gauntlet.SetupNetwork(
+		m.Env.URLs["sol"][0],
+		cd.Client.ProgramWallets["access_controller-keypair.json"].PublicKey().String(),
+		cd.Client.ProgramWallets["store-keypair.json"].PublicKey().String(),
+		cd.Client.ProgramWallets["ocr2-keypair.json"].PublicKey().String(),
+	)
+
 	m.LinkToken, err = cd.DeployLinkTokenContract()
 	Expect(err).ShouldNot(HaveOccurred())
 	err = FundOracles(m.c, m.NodeKeysBundle, big.NewFloat(1e4))

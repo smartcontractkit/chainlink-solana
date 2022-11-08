@@ -21,7 +21,6 @@ func TestEncodeDecode_RequestNewRound(t *testing.T) {
 				buf := new(bytes.Buffer)
 				err := encodeT(*params, buf)
 				ag_require.NoError(t, err)
-				//
 				got := new(RequestNewRound)
 				err = decodeT(got, buf.Bytes())
 				got.AccountMetaSlice = nil

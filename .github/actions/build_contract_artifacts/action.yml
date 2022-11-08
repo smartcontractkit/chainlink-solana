@@ -33,12 +33,12 @@ runs:
       shell: bash
       run: anchor build
       working-directory: contracts
-    - name: Check generated go bindings are up to date
-      shell: bash
-      run: |
-        go install github.com/gagliardetto/anchor-go@v0.2.3
-        ./scripts/anchor-go-gen.sh
-        git diff --stat --exit-code
+    # - name: Check generated go bindings are up to date
+    #   shell: bash
+    #   run: |
+    #     go install github.com/gagliardetto/anchor-go@v0.2.3
+    #     ./scripts/anchor-go-gen.sh
+    #     git diff --stat --exit-code
     - name: Generate program_ids
       shell: bash
       run: ./scripts/programs-keys-gen.sh

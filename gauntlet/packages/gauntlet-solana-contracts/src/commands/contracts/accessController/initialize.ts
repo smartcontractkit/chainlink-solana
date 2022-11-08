@@ -22,14 +22,14 @@ export default class Initialize extends SolanaCommand {
     const owner = this.wallet.payer
 
     console.log(`Initializing access controller contract with State at ${state.publicKey}...`)
-    const txHash = await program.rpc.initialize({
-      accounts: {
+    const txHash = await program.methods.initialize()
+      .accounts({
         state: state.publicKey,
         owner: owner.publicKey,
-      },
-      signers: [owner, state],
-      instructions: [await program.account.accessController.createInstruction(state)],
-    })
+      })
+      .signers([owner, state])
+      .preInstructions([await program.account.accessController.createInstruction(state)])
+      .rpc();
 
     console.log('TX', txHash)
 

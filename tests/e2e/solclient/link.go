@@ -6,10 +6,10 @@ import (
 
 type LinkToken struct {
 	Client        *Client
-	Mint          *solana.Wallet
+	Mint          solana.PublicKey
 	MintAuthority *solana.Wallet
 }
 
 func (l *LinkToken) Address() string {
-	return l.Mint.PublicKey().String()
+	return l.Mint.String()
 }

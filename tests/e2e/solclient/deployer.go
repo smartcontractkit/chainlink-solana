@@ -69,7 +69,7 @@ func (c *ContractDeployer) GenerateAuthorities(seeds []string) error {
 
 // addMintInstr adds instruction for creating new mint (token)
 func (c *ContractDeployer) addMintInstr(instr *[]solana.Instruction) error {
-	accInstr, err := c.Client.CreateAccInstr(c.Accounts.Mint.PublicKey(), TokenMintAccountSize, token.ProgramID)
+	accInstr, err := c.Client.CreateAccInstr(c.Accounts.Mint, TokenMintAccountSize, token.ProgramID)
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func (c *ContractDeployer) addMintInstr(instr *[]solana.Instruction) error {
 			18,
 			c.Accounts.MintAuthority.PublicKey(),
 			c.Accounts.MintAuthority.PublicKey(),
-			c.Accounts.Mint.PublicKey(),
+			c.Accounts.Mint,
 			solana.SysVarRentPubkey,
 		).Build())
 	return nil
@@ -93,7 +93,7 @@ func (c *ContractDeployer) SetupAssociatedAccount() (*solana.PublicKey, *solana.
 	ainstr := associatedtokenaccount.NewCreateInstruction(
 		c.Client.DefaultWallet.PublicKey(),
 		vault.PublicKey,
-		c.Accounts.Mint.PublicKey(),
+		c.Accounts.Mint,
 	).Build()
 	aaccount := ainstr.Impl.(associatedtokenaccount.Create).AccountMetaSlice[1].PublicKey
 	instr = append(instr,
@@ -128,14 +128,14 @@ func (c *ContractDeployer) AddNewAssociatedAccInstr(acc solana.PublicKey, ownerP
 		accInstr,
 		token.NewInitializeAccountInstruction(
 			acc,
-			c.Accounts.Mint.PublicKey(),
+			c.Accounts.Mint,
 			ownerPubKey,
 			solana.SysVarRentPubkey,
 		).Build(),
 		associatedtokenaccount.NewCreateInstruction(
 			c.Client.DefaultWallet.PublicKey(),
 			assocAccount,
-			c.Accounts.Mint.PublicKey(),
+			c.Accounts.Mint,
 		).Build(),
 	)
 	return nil
@@ -233,7 +233,7 @@ func (c *ContractDeployer) CreateFeed(desc string, decimals uint8, granularity i
 func (c *ContractDeployer) addMintToAccInstr(instr *[]solana.Instruction, dest solana.PublicKey, amount uint64) error {
 	*instr = append(*instr, token.NewMintToInstruction(
 		amount,
-		c.Accounts.Mint.PublicKey(),
+		c.Accounts.Mint,
 		dest,
 		c.Accounts.MintAuthority.PublicKey(),
 		nil,
@@ -243,38 +243,14 @@ func (c *ContractDeployer) addMintToAccInstr(instr *[]solana.Instruction, dest s
 
 func (c *ContractDeployer) DeployLinkTokenContract() (*LinkToken, error) {
 	var err error
-	payer := c.Client.DefaultWallet
-
-	instr := make([]solana.Instruction, 0)
-	if err = c.addMintInstr(&instr); err != nil {
-		return nil, err
-	}
-	err = c.Client.TXAsync(
-		"Createing LINK Token and associated accounts",
-		instr,
-		func(key solana.PublicKey) *solana.PrivateKey {
-			if key.Equals(c.Accounts.OCRVault.PublicKey()) {
-				return &c.Accounts.OCRVault.PrivateKey
-			}
-			if key.Equals(c.Accounts.Mint.PublicKey()) {
-				return &c.Accounts.Mint.PrivateKey
-			}
-			if key.Equals(payer.PublicKey()) {
-				return &payer.PrivateKey
-			}
-			if key.Equals(c.Accounts.MintAuthority.PublicKey()) {
-				return &c.Accounts.MintAuthority.PrivateKey
-			}
-			return nil
-		},
-		payer.PublicKey(),
-	)
+	mint, err := c.Client.Gauntlet.DeployLinkTokenContract()
 	if err != nil {
 		return nil, err
 	}
+
 	return &LinkToken{
 		Client:        c.Client,
-		Mint:          c.Accounts.Mint,
+		Mint:          mint,
 		MintAuthority: c.Accounts.MintAuthority,
 	}, nil
 }
@@ -313,7 +289,7 @@ func (c *ContractDeployer) InitOCR2(billingControllerAddr string, requesterContr
 			SetStateAccount(c.Accounts.OCR.PublicKey()).
 			SetFeedAccount(c.Accounts.Feed.PublicKey()).
 			SetOwnerAccount(c.Accounts.Owner.PublicKey()).
-			SetTokenMintAccount(c.Accounts.Mint.PublicKey()).
+			SetTokenMintAccount(c.Accounts.Mint).
 			SetTokenVaultAccount(*assocVault).
 			SetVaultAuthorityAccount(*vault).
 			SetRequesterAccessControllerAccount(racPubKey).
@@ -379,41 +355,18 @@ func (c *ContractDeployer) DeployProgramRemote(programName string) error {
 }
 
 func (c *ContractDeployer) DeployOCRv2AccessController() (*AccessController, error) {
+	// TODO: need to inject program_ids into the env of the script beforehand so that the deployed programs match
 	programWallet := c.Client.ProgramWallets["access_controller-keypair.json"]
-	payer := c.Client.DefaultWallet
-	stateAcc := solana.NewWallet()
-	accInstruction, err := c.Client.CreateAccInstr(stateAcc.PublicKey(), AccessControllerStateAccountSize, programWallet.PublicKey())
+
+	state, err := c.Client.Gauntlet.DeployAccessControllerContract()
 	if err != nil {
 		return nil, err
 	}
-	err = c.Client.TXAsync(
-		"Initializing access controller",
-		[]solana.Instruction{
-			accInstruction,
-			access_controller2.NewInitializeInstruction(
-				stateAcc.PublicKey(),
-				c.Accounts.Owner.PublicKey(),
-			).Build(),
-		},
-		func(key solana.PublicKey) *solana.PrivateKey {
-			if key.Equals(c.Accounts.Owner.PublicKey()) {
-				return &c.Accounts.Owner.PrivateKey
-			}
-			if key.Equals(stateAcc.PublicKey()) {
-				return &stateAcc.PrivateKey
-			}
-			if key.Equals(payer.PublicKey()) {
-				return &payer.PrivateKey
-			}
-			return nil
-		},
-		payer.PublicKey(),
-	)
-	if err != nil {
-		return nil, err
-	}
+
+	// TODO: deal with Owner param being possibly different than the payer?
+
 	return &AccessController{
-		State:         stateAcc,
+		State:         state,
 		Client:        c.Client,
 		Owner:         c.Accounts.Owner,
 		ProgramWallet: programWallet,
@@ -486,7 +439,7 @@ func NewContractDeployer(client *Client, e *environment.Environment, lt *LinkTok
 			Feed:          solana.NewWallet(),
 			Proposal:      solana.NewWallet(),
 			Owner:         solana.NewWallet(),
-			Mint:          solana.NewWallet(),
+			Mint:          solana.NewWallet().PublicKey(), // TODO: zero key
 			MintAuthority: solana.NewWallet(),
 			OCRVault:      solana.NewWallet(),
 		},

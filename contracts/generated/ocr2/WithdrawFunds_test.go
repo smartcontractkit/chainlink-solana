@@ -21,7 +21,6 @@ func TestEncodeDecode_WithdrawFunds(t *testing.T) {
 				buf := new(bytes.Buffer)
 				err := encodeT(*params, buf)
 				ag_require.NoError(t, err)
-				//
 				got := new(WithdrawFunds)
 				err = decodeT(got, buf.Bytes())
 				got.AccountMetaSlice = nil

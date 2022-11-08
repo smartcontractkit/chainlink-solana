@@ -21,7 +21,6 @@ func TestEncodeDecode_ProposePayees(t *testing.T) {
 				buf := new(bytes.Buffer)
 				err := encodeT(*params, buf)
 				ag_require.NoError(t, err)
-				//
 				got := new(ProposePayees)
 				err = decodeT(got, buf.Bytes())
 				got.AccountMetaSlice = nil
