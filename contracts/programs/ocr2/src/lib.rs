@@ -719,7 +719,7 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> Result<()
     let reimbursement_gjuels = calculate_reimbursement_gjuels(
         report.juels_per_lamport,
         signature_count,
-        &ctx.accounts.instructions,
+        ctx.remaining_accounts.first(),
     )?;
     let amount_gjuels = reimbursement_gjuels
         .saturating_add(u64::from(state.config.billing.transmission_payment_gjuels));
@@ -806,7 +806,7 @@ impl Report {
 fn calculate_reimbursement_gjuels(
     juels_per_lamport: u64,
     signature_count: usize,
-    instruction_sysvar: &AccountInfo<'_>,
+    instructions_sysvar: Option<&AccountInfo<'_>>,
 ) -> Result<u64> {
     const SIGNERS: u64 = 1;
     const MICRO: u64 = 10u64.pow(3);
@@ -815,12 +815,14 @@ fn calculate_reimbursement_gjuels(
     let mut lamports = LAMPORTS_PER_SIGNATURE * SIGNERS;
 
     // if a compute unit price is set then we also need to
-    if let Some(compute_unit_price_micro_lamports) = compute_unit_price(instruction_sysvar)? {
-        // 25k per signature, plus ~21k for the rest
-        let exec_units = 25_000 * signature_count as u64 + 21_000;
-        // TODO: std::cmp::min(compute_unit_price_micro_lamports, config.max_compute_unit_price)
-        lamports += exec_units * compute_unit_price_micro_lamports / MICRO;
-    };
+    if let Some(sysvar) = instructions_sysvar {
+        if let Some(compute_unit_price_micro_lamports) = compute_unit_price(sysvar)? {
+            // 25k per signature, plus ~21k for the rest
+            let exec_units = 25_000 * signature_count as u64 + 21_000;
+            // TODO: std::cmp::min(compute_unit_price_micro_lamports, config.max_compute_unit_price)
+            lamports += exec_units * compute_unit_price_micro_lamports / MICRO;
+        };
+    }
 
     let juels = u128::from(lamports) * u128::from(juels_per_lamport);
     let gjuels = juels / GIGA; // return value as gjuels

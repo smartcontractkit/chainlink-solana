@@ -127,10 +127,9 @@ pub struct Transmit<'info> {
     pub store_program: Program<'info, Store>,
     /// CHECK: PDA from the aggregator state, validated by the store program
     pub store_authority: AccountInfo<'info>,
-
-    // TODO: doesn't seem to work: pub instructions: Sysvar<'info, Instructions>,
-    /// CHECK: Validated by sysvar::instructions::load_current_index_checked/load_instruction_at_checked
-    pub instructions: AccountInfo<'info>,
+    // TODO: stop using remaining_accounts once nodes update
+    // /// CHECK: Validated by sysvar::instructions::load_current_index_checked/load_instruction_at_checked
+    // pub instructions: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]
