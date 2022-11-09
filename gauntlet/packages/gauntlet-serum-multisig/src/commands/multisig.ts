@@ -74,7 +74,10 @@ export const wrapCommand = (command) => {
       if (this.flags.execute) {
         await prompt('Continue?')
         logger.loading(`Executing action...`)
-        const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, this.program.idl)(rawTxs)
+        const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, this.program.idl)(rawTxs, null, {
+          price: Number(this.flags.computePrice),
+          units: Number(this.flags.computeUnits),
+        })
         logger.success(`TX succeded at ${txhash}`)
 
         const msigState = await this.fetchMultisigState(this.multisigAddress)
@@ -90,23 +93,19 @@ export const wrapCommand = (command) => {
         }
       }
 
-      const latestSlot = await this.provider.connection.getSlot()
-      const recentBlock = await this.provider.connection.getBlock(latestSlot)
-      if (!recentBlock) {
+      const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
+      if (!lastValidBlockHeight) {
         throw new Error('Block not found. Could not generate message data')
       }
       const tx = utils.makeTx(rawTxs, {
-        recentBlockhash: recentBlock.blockhash,
+        blockhash,
+        lastValidBlockHeight,
         feePayer: signer,
       })
 
       const msgData = tx.serializeMessage().toString('base64')
       logger.line()
-      logger.success(
-        `Message generated with blockhash ID: ${recentBlock.blockhash.toString()} (${new Date(
-          recentBlock.blockTime! * 1000,
-        ).toLocaleString()}). MESSAGE DATA:`,
-      )
+      logger.success(`Message generated with blockhash ID: ${blockhash.toString()}). MESSAGE DATA:`)
       logger.log()
       logger.log(msgData)
       logger.log()

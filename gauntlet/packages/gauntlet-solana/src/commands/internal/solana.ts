@@ -81,12 +81,23 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
   signAndSendRawTx = async (
     rawTxs: TransactionInstruction[],
     extraSigners?: Keypair[],
+    overrides: {
+      units?: number
+      price?: number
+    } = {},
   ): Promise<TransactionSignature> => {
-    const recentBlockhash = (await this.provider.connection.getRecentBlockhash()).blockhash
-    const tx = makeTx(rawTxs, {
-      recentBlockhash,
-      feePayer: this.wallet.publicKey,
-    })
+    const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
+    if (overrides.units) logger.info(`Sending transaction with custom unit limit: ${overrides.units}`)
+    if (overrides.price) logger.info(`Sending transaction with custom unit price: ${overrides.price}`)
+    const tx = makeTx(
+      rawTxs,
+      {
+        blockhash,
+        lastValidBlockHeight,
+        feePayer: this.wallet.publicKey,
+      },
+      overrides,
+    )
     if (extraSigners) {
       tx.sign(...extraSigners)
     }
@@ -113,8 +124,11 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
 
   simulateTx = async (signer: PublicKey, txInstructions: TransactionInstruction[], feePayer?: PublicKey) => {
     try {
+      const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
       const tx = makeTx(txInstructions, {
         feePayer: feePayer || signer,
+        blockhash,
+        lastValidBlockHeight,
       })
       // simulating through connection allows to skip signing tx (useful when using Ledger device)
       const { value: simulationResponse } = await this.provider.connection.simulateTransaction(tx)
