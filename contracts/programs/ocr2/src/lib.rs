@@ -809,7 +809,7 @@ fn calculate_reimbursement_gjuels(
     instructions_sysvar: Option<&AccountInfo<'_>>,
 ) -> Result<u64> {
     const SIGNERS: u64 = 1;
-    const MICRO: u64 = 10u64.pow(3);
+    const MICRO: u64 = 10u64.pow(6);
     const GIGA: u128 = 10u128.pow(9);
     const LAMPORTS_PER_SIGNATURE: u64 = 5_000; // constant, originally retrieved from deprecated sysvar fees
     let mut lamports = LAMPORTS_PER_SIGNATURE * SIGNERS;
@@ -820,7 +820,14 @@ fn calculate_reimbursement_gjuels(
             // 25k per signature, plus ~21k for the rest
             let exec_units = 25_000 * signature_count as u64 + 21_000;
             // TODO: std::cmp::min(compute_unit_price_micro_lamports, config.max_compute_unit_price)
-            lamports += exec_units * compute_unit_price_micro_lamports / MICRO;
+
+            // https://github.com/solana-labs/solana/blob/090e11210aa7222d8295610a6ccac4acda711bb9/program-runtime/src/prioritization_fee.rs#L34-L38
+            let micro_lamport_fee = exec_units.saturating_mul(compute_unit_price_micro_lamports);
+            let fee = micro_lamport_fee
+                .saturating_add(MICRO.saturating_sub(1))
+                .saturating_div(MICRO);
+
+            lamports += fee;
         };
     }
 

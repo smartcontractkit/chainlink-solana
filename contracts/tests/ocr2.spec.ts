@@ -1001,14 +1001,14 @@ describe("ocr2", async () => {
     console.log(oracle);
     let before = oracle.paymentGjuels;
     
-    let computePrice = 1;
+    let computePriceMicroLamports = 10;
     let juelsPerLamport = Buffer.from([0, 0, 0, 0, 59, 154, 202, 0]); // 1 gjuel (to_be_bytes)
     let tx = await transmit(
       feed.publicKey,
       rounds + 1,
       rounds + 1,
       new BN(rounds + 2),
-      computePrice,
+      computePriceMicroLamports,
       juelsPerLamport,
     );
     await provider.connection.confirmTransaction(tx);
@@ -1022,10 +1022,10 @@ describe("ocr2", async () => {
     
     let payment = after.sub(before).toNumber();
     let execUnits = (25_000 * (f+1) + 21_000);
-    let computeUnitCostLamports = execUnits * computePrice / Math.pow(10, 3);
+    let computeUnitCostLamports = execUnits * computePriceMicroLamports / Math.pow(10, 6);
     let lamportsPerSignature = 5000;
     let signers = 1;
-    let computeUnitCostGjuels = (computeUnitCostLamports + lamportsPerSignature * signers) * 1; // 1 lamport = 1 gjuel
+    let computeUnitCostGjuels = Math.ceil((computeUnitCostLamports + lamportsPerSignature * signers) * 1); // 1 lamport = 1 gjuel
     assert.equal(payment, transmissionPayment + computeUnitCostGjuels);
 
     // payOracles to clean up the payment state for the next test
