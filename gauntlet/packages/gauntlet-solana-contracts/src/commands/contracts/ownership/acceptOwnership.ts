@@ -56,7 +56,7 @@ export const makeAcceptOwnershipCommand = (
       logger.info(`Accepting Ownership of contract of type "${contract.type}":
       - Contract: ${contract.address} ${contract.description ? '- ' + contract.description : ''}
       - Current Owner: ${ownership.owner.toString()}
-      - Next Owner (Current signer): ${this.wallet.publicKey}`)
+      - Next Owner (proposed): ${ownership.proposedOwner?.toString()}`)
       await prompt('Continue?')
     }
 
