@@ -135,7 +135,8 @@ func (m *OCRv2TestState) DeployEnv(nodes int, stateful bool, contractsDir string
 		AddHelm(mockservercfg.New(nil)).
 		AddHelm(mockserver.New(nil)).
 		AddHelm(sol.New(nil)).
-		AddHelm(chainlink.New(0, map[string]interface{}{
+		// TODO: Convert to utilize TOML config when available
+		AddHelm(chainlink.NewVersioned(0, "0.0.11", map[string]interface{}{
 			"replicas": nodes,
 			"env": map[string]interface{}{
 				"SOLANA_ENABLED":              "true",
