@@ -14,7 +14,7 @@ require (
 	github.com/rs/zerolog v1.28.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/smartcontractkit/chainlink v1.9.0
-	github.com/smartcontractkit/chainlink-env v0.2.50
+	github.com/smartcontractkit/chainlink-env v0.2.52
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20221027174234-50b4d94d7135
 	github.com/smartcontractkit/chainlink-testing-framework v1.7.10
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20221108194954-9075d1844d90
@@ -39,7 +39,7 @@ require (
 	github.com/alecthomas/units v0.0.0-20210927113745-59d0afb8317a // indirect
 	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
 	github.com/armon/go-metrics v0.3.10 // indirect
-	github.com/aws/constructs-go/constructs/v10 v10.1.145 // indirect
+	github.com/aws/constructs-go/constructs/v10 v10.1.152 // indirect
 	github.com/aws/jsii-runtime-go v1.70.0 // indirect
 	github.com/aybabtme/rgbterm v0.0.0-20170906152045-cc83f3b3ce59 // indirect
 	github.com/benbjohnson/clock v1.1.0 // indirect
@@ -50,7 +50,7 @@ require (
 	github.com/btcsuite/btcd v0.23.1 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.2.1 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
-	github.com/cdk8s-team/cdk8s-core-go/cdk8s/v2 v2.5.33 // indirect
+	github.com/cdk8s-team/cdk8s-core-go/cdk8s/v2 v2.5.37 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
