@@ -29,6 +29,12 @@ var defaultConfigSet = configSet{
 	SkipPreflight:       true,                   // to enable or disable preflight checks
 	Commitment:          rpc.CommitmentConfirmed,
 	MaxRetries:          new(uint), // max number of retries, when nil - rpc node will do a reasonable number of retries
+
+	// fee estimator
+	FeeEstimatorMode:        "fixed",
+	MaxComputeUnitPrice:     1_000_000,
+	MinComputeUnitPrice:     0,
+	DefaultComputeUnitPrice: 0,
 }
 
 type Config interface {
