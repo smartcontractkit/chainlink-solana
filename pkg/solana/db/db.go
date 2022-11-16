@@ -45,6 +45,11 @@ type ChainCfg struct {
 	SkipPreflight       null.Bool // to enable or disable preflight checks
 	Commitment          null.String
 	MaxRetries          null.Int
+
+	FeeEstimatorMode        null.String
+	MaxComputeUnitPrice     null.Int
+	MinComputeUnitPrice     null.Int
+	DefaultComputeUnitPrice null.Int
 }
 
 func (c *ChainCfg) Scan(value interface{}) error {

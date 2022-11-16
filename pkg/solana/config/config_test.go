@@ -17,16 +17,20 @@ import (
 
 // testing configs
 var (
-	testBalancePoll            = mustDuration(1 * time.Minute)
-	testConfirmPeriod          = mustDuration(2 * time.Minute)
-	testCachePeriod            = mustDuration(3 * time.Minute)
-	testTTL                    = mustDuration(4 * time.Minute)
-	testTxTimeout              = mustDuration(5 * time.Minute)
-	testTxRetryTimeout         = mustDuration(6 * time.Minute)
-	testTxConfirmTimeout       = mustDuration(7 * time.Minute)
-	testPreflight              = false
-	testCommitment             = "finalized"
-	testMaxRetries       int64 = 123
+	testBalancePoll                    = mustDuration(1 * time.Minute)
+	testConfirmPeriod                  = mustDuration(2 * time.Minute)
+	testCachePeriod                    = mustDuration(3 * time.Minute)
+	testTTL                            = mustDuration(4 * time.Minute)
+	testTxTimeout                      = mustDuration(5 * time.Minute)
+	testTxRetryTimeout                 = mustDuration(6 * time.Minute)
+	testTxConfirmTimeout               = mustDuration(7 * time.Minute)
+	testPreflight                      = false
+	testCommitment                     = "finalized"
+	testMaxRetries              int64  = 123
+	testFeeEstimatorMode               = "block"
+	testMaxComputeUnitPrice     uint64 = 100_000
+	testMinComputeUnitPrice     uint64 = 1
+	testDefaultComputeUnitPrice uint64 = 10
 )
 
 func mustDuration(d time.Duration) utils.Duration {
@@ -40,32 +44,40 @@ func mustDuration(d time.Duration) utils.Duration {
 func TestConfig_ExpectedDefaults(t *testing.T) {
 	cfg := NewConfig(db.ChainCfg{}, logger.Test(t))
 	configSet := configSet{
-		BalancePollPeriod:   cfg.BalancePollPeriod(),
-		ConfirmPollPeriod:   cfg.ConfirmPollPeriod(),
-		OCR2CachePollPeriod: cfg.OCR2CachePollPeriod(),
-		OCR2CacheTTL:        cfg.OCR2CacheTTL(),
-		TxTimeout:           cfg.TxTimeout(),
-		TxRetryTimeout:      cfg.TxRetryTimeout(),
-		TxConfirmTimeout:    cfg.TxConfirmTimeout(),
-		SkipPreflight:       cfg.SkipPreflight(),
-		Commitment:          cfg.Commitment(),
-		MaxRetries:          cfg.MaxRetries(),
+		BalancePollPeriod:       cfg.BalancePollPeriod(),
+		ConfirmPollPeriod:       cfg.ConfirmPollPeriod(),
+		OCR2CachePollPeriod:     cfg.OCR2CachePollPeriod(),
+		OCR2CacheTTL:            cfg.OCR2CacheTTL(),
+		TxTimeout:               cfg.TxTimeout(),
+		TxRetryTimeout:          cfg.TxRetryTimeout(),
+		TxConfirmTimeout:        cfg.TxConfirmTimeout(),
+		SkipPreflight:           cfg.SkipPreflight(),
+		Commitment:              cfg.Commitment(),
+		MaxRetries:              cfg.MaxRetries(),
+		FeeEstimatorMode:        cfg.FeeEstimatorMode(),
+		MaxComputeUnitPrice:     cfg.MaxComputeUnitPrice(),
+		MinComputeUnitPrice:     cfg.MinComputeUnitPrice(),
+		DefaultComputeUnitPrice: cfg.DefaultComputeUnitPrice(),
 	}
 	assert.Equal(t, defaultConfigSet, configSet)
 }
 
 func TestConfig_NewConfig(t *testing.T) {
 	dbCfg := db.ChainCfg{
-		BalancePollPeriod:   &testBalancePoll,
-		ConfirmPollPeriod:   &testConfirmPeriod,
-		OCR2CachePollPeriod: &testCachePeriod,
-		OCR2CacheTTL:        &testTTL,
-		TxTimeout:           &testTxTimeout,
-		TxRetryTimeout:      &testTxRetryTimeout,
-		TxConfirmTimeout:    &testTxConfirmTimeout,
-		SkipPreflight:       null.BoolFrom(testPreflight),
-		Commitment:          null.StringFrom(testCommitment),
-		MaxRetries:          null.IntFrom(testMaxRetries),
+		BalancePollPeriod:       &testBalancePoll,
+		ConfirmPollPeriod:       &testConfirmPeriod,
+		OCR2CachePollPeriod:     &testCachePeriod,
+		OCR2CacheTTL:            &testTTL,
+		TxTimeout:               &testTxTimeout,
+		TxRetryTimeout:          &testTxRetryTimeout,
+		TxConfirmTimeout:        &testTxConfirmTimeout,
+		SkipPreflight:           null.BoolFrom(testPreflight),
+		Commitment:              null.StringFrom(testCommitment),
+		MaxRetries:              null.IntFrom(testMaxRetries),
+		FeeEstimatorMode:        null.StringFrom(testFeeEstimatorMode),
+		MaxComputeUnitPrice:     null.IntFrom(int64(testMaxComputeUnitPrice)),
+		MinComputeUnitPrice:     null.IntFrom(int64(testMinComputeUnitPrice)),
+		DefaultComputeUnitPrice: null.IntFrom(int64(testDefaultComputeUnitPrice)),
 	}
 	cfg := NewConfig(dbCfg, logger.Test(t))
 	assert.Equal(t, testBalancePoll.Duration(), cfg.BalancePollPeriod())
@@ -78,21 +90,29 @@ func TestConfig_NewConfig(t *testing.T) {
 	assert.Equal(t, testPreflight, cfg.SkipPreflight())
 	assert.Equal(t, rpc.CommitmentType(testCommitment), cfg.Commitment())
 	assert.EqualValues(t, testMaxRetries, *cfg.MaxRetries())
+	assert.Equal(t, testFeeEstimatorMode, cfg.FeeEstimatorMode())
+	assert.Equal(t, testMaxComputeUnitPrice, cfg.MaxComputeUnitPrice())
+	assert.Equal(t, testMinComputeUnitPrice, cfg.MinComputeUnitPrice())
+	assert.Equal(t, testDefaultComputeUnitPrice, cfg.DefaultComputeUnitPrice())
 }
 
 func TestConfig_Update(t *testing.T) {
 	cfg := NewConfig(db.ChainCfg{}, logger.Test(t))
 	dbCfg := db.ChainCfg{
-		BalancePollPeriod:   &testBalancePoll,
-		ConfirmPollPeriod:   &testConfirmPeriod,
-		OCR2CachePollPeriod: &testCachePeriod,
-		OCR2CacheTTL:        &testTTL,
-		TxTimeout:           &testTxTimeout,
-		TxRetryTimeout:      &testTxRetryTimeout,
-		TxConfirmTimeout:    &testTxConfirmTimeout,
-		SkipPreflight:       null.BoolFrom(testPreflight),
-		Commitment:          null.StringFrom(testCommitment),
-		MaxRetries:          null.IntFrom(testMaxRetries),
+		BalancePollPeriod:       &testBalancePoll,
+		ConfirmPollPeriod:       &testConfirmPeriod,
+		OCR2CachePollPeriod:     &testCachePeriod,
+		OCR2CacheTTL:            &testTTL,
+		TxTimeout:               &testTxTimeout,
+		TxRetryTimeout:          &testTxRetryTimeout,
+		TxConfirmTimeout:        &testTxConfirmTimeout,
+		SkipPreflight:           null.BoolFrom(testPreflight),
+		Commitment:              null.StringFrom(testCommitment),
+		MaxRetries:              null.IntFrom(testMaxRetries),
+		FeeEstimatorMode:        null.StringFrom(testFeeEstimatorMode),
+		MaxComputeUnitPrice:     null.IntFrom(int64(testMaxComputeUnitPrice)),
+		MinComputeUnitPrice:     null.IntFrom(int64(testMinComputeUnitPrice)),
+		DefaultComputeUnitPrice: null.IntFrom(int64(testDefaultComputeUnitPrice)),
 	}
 	cfg.Update(dbCfg)
 	assert.Equal(t, testBalancePoll.Duration(), cfg.BalancePollPeriod())
@@ -105,11 +125,26 @@ func TestConfig_Update(t *testing.T) {
 	assert.Equal(t, testPreflight, cfg.SkipPreflight())
 	assert.Equal(t, rpc.CommitmentType(testCommitment), cfg.Commitment())
 	assert.EqualValues(t, testMaxRetries, *cfg.MaxRetries())
+	assert.Equal(t, testFeeEstimatorMode, cfg.FeeEstimatorMode())
+	assert.Equal(t, testMaxComputeUnitPrice, cfg.MaxComputeUnitPrice())
+	assert.Equal(t, testMinComputeUnitPrice, cfg.MinComputeUnitPrice())
+	assert.Equal(t, testDefaultComputeUnitPrice, cfg.DefaultComputeUnitPrice())
 }
 
 func TestConfig_CommitmentFallback(t *testing.T) {
 	cfg := NewConfig(db.ChainCfg{Commitment: null.StringFrom("invalid")}, logger.Test(t))
 	assert.Equal(t, rpc.CommitmentConfirmed, cfg.Commitment())
+}
+
+func TestConfig_ComputeBudgetPriceFallback(t *testing.T) {
+	cfg := NewConfig(db.ChainCfg{
+		MaxComputeUnitPrice:     null.IntFrom(-1),
+		MinComputeUnitPrice:     null.IntFrom(-1),
+		DefaultComputeUnitPrice: null.IntFrom(-1),
+	}, logger.Test(t))
+	assert.Equal(t, defaultConfigSet.MaxComputeUnitPrice, cfg.MaxComputeUnitPrice())
+	assert.Equal(t, defaultConfigSet.MinComputeUnitPrice, cfg.MinComputeUnitPrice())
+	assert.Equal(t, defaultConfigSet.DefaultComputeUnitPrice, cfg.DefaultComputeUnitPrice())
 }
 
 func TestConfig_MaxRetriesNegativeFallback(t *testing.T) {
@@ -126,27 +161,35 @@ func TestChain_SetFromDB(t *testing.T) {
 		{"nil", nil, Chain{}},
 		{"empty", &db.ChainCfg{}, Chain{}},
 		{"full", &db.ChainCfg{
-			BalancePollPeriod:   utils.MustNewDuration(5 * time.Second),
-			ConfirmPollPeriod:   utils.MustNewDuration(500 * time.Millisecond),
-			OCR2CachePollPeriod: utils.MustNewDuration(time.Second),
-			OCR2CacheTTL:        utils.MustNewDuration(time.Minute),
-			TxTimeout:           utils.MustNewDuration(time.Minute),
-			TxRetryTimeout:      utils.MustNewDuration(10 * time.Second),
-			TxConfirmTimeout:    utils.MustNewDuration(30 * time.Second),
-			SkipPreflight:       null.BoolFrom(true),
-			Commitment:          null.StringFrom("confirmed"),
-			MaxRetries:          null.IntFrom(0),
+			BalancePollPeriod:       utils.MustNewDuration(5 * time.Second),
+			ConfirmPollPeriod:       utils.MustNewDuration(500 * time.Millisecond),
+			OCR2CachePollPeriod:     utils.MustNewDuration(time.Second),
+			OCR2CacheTTL:            utils.MustNewDuration(time.Minute),
+			TxTimeout:               utils.MustNewDuration(time.Minute),
+			TxRetryTimeout:          utils.MustNewDuration(10 * time.Second),
+			TxConfirmTimeout:        utils.MustNewDuration(30 * time.Second),
+			SkipPreflight:           null.BoolFrom(true),
+			Commitment:              null.StringFrom("confirmed"),
+			MaxRetries:              null.IntFrom(0),
+			FeeEstimatorMode:        null.StringFrom("block"),
+			MaxComputeUnitPrice:     null.IntFrom(100),
+			MinComputeUnitPrice:     null.IntFrom(10),
+			DefaultComputeUnitPrice: null.IntFrom(50),
 		}, Chain{
-			BalancePollPeriod:   utils.MustNewDuration(5 * time.Second),
-			ConfirmPollPeriod:   utils.MustNewDuration(500 * time.Millisecond),
-			OCR2CachePollPeriod: utils.MustNewDuration(time.Second),
-			OCR2CacheTTL:        utils.MustNewDuration(time.Minute),
-			TxTimeout:           utils.MustNewDuration(time.Minute),
-			TxRetryTimeout:      utils.MustNewDuration(10 * time.Second),
-			TxConfirmTimeout:    utils.MustNewDuration(30 * time.Second),
-			SkipPreflight:       ptr(true),
-			Commitment:          ptr("confirmed"),
-			MaxRetries:          ptr[int64](0),
+			BalancePollPeriod:       utils.MustNewDuration(5 * time.Second),
+			ConfirmPollPeriod:       utils.MustNewDuration(500 * time.Millisecond),
+			OCR2CachePollPeriod:     utils.MustNewDuration(time.Second),
+			OCR2CacheTTL:            utils.MustNewDuration(time.Minute),
+			TxTimeout:               utils.MustNewDuration(time.Minute),
+			TxRetryTimeout:          utils.MustNewDuration(10 * time.Second),
+			TxConfirmTimeout:        utils.MustNewDuration(30 * time.Second),
+			SkipPreflight:           ptr(true),
+			Commitment:              ptr("confirmed"),
+			MaxRetries:              ptr[int64](0),
+			FeeEstimatorMode:        ptr("block"),
+			MaxComputeUnitPrice:     ptr[uint64](100),
+			MinComputeUnitPrice:     ptr[uint64](10),
+			DefaultComputeUnitPrice: ptr[uint64](50),
 		}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -193,8 +236,4 @@ func TestNode_SetFromDB(t *testing.T) {
 			}
 		})
 	}
-}
-
-func ptr[T any](t T) *T {
-	return &t
 }
