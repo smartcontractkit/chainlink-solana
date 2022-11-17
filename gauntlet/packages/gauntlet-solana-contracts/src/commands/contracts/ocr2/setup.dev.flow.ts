@@ -7,13 +7,10 @@ import Initialize from './initialize'
 import InitializeAC from '../accessController/initialize'
 import InitializeStore from '../store/initialize'
 import DeployToken from '../token/deploy'
-import SetValidatorConfig from '../store/setValidatorConfig'
-import AddAccess from '../accessController/addAccess'
 import SetBilling from './setBilling'
 import CreateFeed from '../store/createFeed'
 import SetWriter from '../store/setWriter'
 import CreateProposal from './proposal/createProposal'
-import ProposeOffchainConfig from './proposeOffchainConfig'
 import ProposeConfig from './proposeConfig'
 import FinalizeProposal from './proposal/finalizeProposal'
 import AcceptProposal from './proposal/acceptProposal'
@@ -208,17 +205,6 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
           input: {
             oracles: configInput.oracles,
             f: configInput.f,
-            proposalId: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal')),
-          },
-          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
-        },
-        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
-      },
-      {
-        name: 'Propose Offchain Config',
-        command: ProposeOffchainConfig,
-        flags: {
-          input: {
             offchainConfig: offchainConfigInput,
             proposalId: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal')),
           },

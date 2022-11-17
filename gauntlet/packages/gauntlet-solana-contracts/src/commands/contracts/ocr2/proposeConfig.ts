@@ -1,11 +1,91 @@
 import { Result } from '@chainlink/gauntlet-core'
-import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, BN, time, prompt, longs } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import { ORACLES_MAX_LENGTH } from '../../../lib/constants'
+import { MAX_TRANSACTION_BYTES, ORACLES_MAX_LENGTH } from '../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
+import { divideIntoChunks } from '../../../lib/utils'
+import { serializeOffchainConfig, deserializeConfig } from '../../../lib/encoding'
 import RDD from '../../../lib/rdd'
 import { printDiff } from '../../../lib/diff'
+
+export type OffchainConfig = {
+  deltaProgressNanoseconds: number
+  deltaResendNanoseconds: number
+  deltaRoundNanoseconds: number
+  deltaGraceNanoseconds: number
+  deltaStageNanoseconds: number
+  rMax: number
+  s: number[]
+  offchainPublicKeys: string[]
+  peerIds: string[]
+  reportingPluginConfig: {
+    alphaReportInfinite: boolean
+    alphaReportPpb: number
+    alphaAcceptInfinite: boolean
+    alphaAcceptPpb: number
+    deltaCNanoseconds: number
+  }
+  maxDurationQueryNanoseconds: number
+  maxDurationObservationNanoseconds: number
+  maxDurationReportNanoseconds: number
+  maxDurationShouldAcceptFinalizedReportNanoseconds: number
+  maxDurationShouldTransmitAcceptedReportNanoseconds: number
+  configPublicKeys: string[]
+}
+
+const validateConfig = (input: OffchainConfig): boolean => {
+  const _isNegative = (v: number): boolean => new BN(v).lt(new BN(0))
+  const nonNegativeValues = [
+    'deltaProgressNanoseconds',
+    'deltaResendNanoseconds',
+    'deltaRoundNanoseconds',
+    'deltaGraceNanoseconds',
+    'deltaStageNanoseconds',
+    'maxDurationQueryNanoseconds',
+    'maxDurationObservationNanoseconds',
+    'maxDurationReportNanoseconds',
+    'maxDurationShouldAcceptFinalizedReportNanoseconds',
+    'maxDurationShouldTransmitAcceptedReportNanoseconds',
+  ]
+  for (let prop in nonNegativeValues) {
+    if (_isNegative(input[prop])) throw new Error(`${prop} must be non-negative`)
+  }
+  const safeIntervalNanoseconds = new BN(200).mul(time.Millisecond).toNumber()
+  if (input.deltaProgressNanoseconds < safeIntervalNanoseconds)
+    throw new Error(
+      `deltaProgressNanoseconds (${input.deltaProgressNanoseconds} ns)  is set below the resource exhaustion safe interval (${safeIntervalNanoseconds} ns)`,
+    )
+  if (input.deltaResendNanoseconds < safeIntervalNanoseconds)
+    throw new Error(
+      `deltaResendNanoseconds (${input.deltaResendNanoseconds} ns) is set below the resource exhaustion safe interval (${safeIntervalNanoseconds} ns)`,
+    )
+
+  if (input.deltaRoundNanoseconds >= input.deltaProgressNanoseconds)
+    throw new Error(
+      `deltaRoundNanoseconds (${input.deltaRoundNanoseconds}) must be less than deltaProgressNanoseconds (${input.deltaProgressNanoseconds})`,
+    )
+  const sumMaxDurationsReportGeneration = new BN(input.maxDurationQueryNanoseconds)
+    .add(new BN(input.maxDurationObservationNanoseconds))
+    .add(new BN(input.maxDurationReportNanoseconds))
+
+  if (sumMaxDurationsReportGeneration.gte(new BN(input.deltaProgressNanoseconds)))
+    throw new Error(
+      `sum of MaxDurationQuery/Observation/Report (${sumMaxDurationsReportGeneration}) must be less than deltaProgressNanoseconds (${input.deltaProgressNanoseconds})`,
+    )
+
+  if (input.rMax <= 0 || input.rMax >= 255)
+    throw new Error(`rMax (${input.rMax}) must be greater than zero and less than 255`)
+
+  if (input.s.length >= 1000) throw new Error(`Length of S (${input.s.length}) must be less than 1000`)
+  for (let i = 0; i < input.s.length; i++) {
+    const s = input.s[i]
+    if (s < 0 || s > ORACLES_MAX_LENGTH)
+      throw new Error(`S[${i}] (${s}) must be between 0 and Max Oracles (${ORACLES_MAX_LENGTH})`)
+  }
+
+  return true
+}
 
 type Input = {
   oracles: {
@@ -14,7 +94,17 @@ type Input = {
     payee: string
   }[]
   f: number | string
+  offchainConfig: OffchainConfig
+  userSecret?: string
   proposalId: string
+}
+
+export const prepareOffchainConfigForDiff = (config: OffchainConfig, extra?: Object): Object => {
+  return longs.longsInObjToNumbers({
+    ...config,
+    ...(extra || {}),
+    offchainPublicKeys: config.offchainPublicKeys?.map((key) => Buffer.from(key).toString('hex')),
+  }) as Object
 }
 
 const _toHex = (a: string) => Buffer.from(a, 'hex')
@@ -27,11 +117,66 @@ export default class ProposeConfig extends SolanaCommand {
   ]
 
   input: Input
+  randomSecret: string
+
+  static makeInputFromRDD = (rdd: any, stateAddress: string): OffchainConfig => {
+    const aggregator = rdd.contracts[stateAddress]
+    const config = aggregator.config
+
+    const _getSigner = (o) => o.ocr2OnchainPublicKey[0].replace('ocr2on_solana_', '')
+    const aggregatorOperators: any[] = aggregator.oracles
+      .map((o) => rdd.operators[o.operator])
+      .sort((a, b) => Buffer.compare(_toHex(_getSigner(a)), _toHex(_getSigner(b))))
+    const operatorsPublicKeys = aggregatorOperators.map((o) =>
+      o.ocr2OffchainPublicKey[0].replace('ocr2off_solana_', ''),
+    )
+    const operatorsPeerIds = aggregatorOperators.map((o) => o.peerId[0])
+    const operatorConfigPublicKeys = aggregatorOperators.map((o) =>
+      o.ocr2ConfigPublicKey[0].replace('ocr2cfg_solana_', ''),
+    )
+
+    const input: OffchainConfig = {
+      deltaProgressNanoseconds: time.durationToNanoseconds(config.deltaProgress).toNumber(),
+      deltaResendNanoseconds: time.durationToNanoseconds(config.deltaResend).toNumber(),
+      deltaRoundNanoseconds: time.durationToNanoseconds(config.deltaRound).toNumber(),
+      deltaGraceNanoseconds: time.durationToNanoseconds(config.deltaGrace).toNumber(),
+      deltaStageNanoseconds: time.durationToNanoseconds(config.deltaStage).toNumber(),
+      rMax: config.rMax,
+      s: config.s,
+      offchainPublicKeys: operatorsPublicKeys,
+      peerIds: operatorsPeerIds,
+      reportingPluginConfig: {
+        alphaReportInfinite: config.reportingPluginConfig.alphaReportInfinite,
+        alphaReportPpb: Number(config.reportingPluginConfig.alphaReportPpb),
+        alphaAcceptInfinite: config.reportingPluginConfig.alphaAcceptInfinite,
+        alphaAcceptPpb: Number(config.reportingPluginConfig.alphaAcceptPpb),
+        deltaCNanoseconds: time.durationToNanoseconds(config.reportingPluginConfig.deltaC).toNumber(),
+      },
+      maxDurationQueryNanoseconds: time.durationToNanoseconds(config.maxDurationQuery).toNumber(),
+      maxDurationObservationNanoseconds: time.durationToNanoseconds(config.maxDurationObservation).toNumber(),
+      maxDurationReportNanoseconds: time.durationToNanoseconds(config.maxDurationReport).toNumber(),
+      maxDurationShouldAcceptFinalizedReportNanoseconds: time
+        .durationToNanoseconds(config.maxDurationShouldAcceptFinalizedReport)
+        .toNumber(),
+      maxDurationShouldTransmitAcceptedReportNanoseconds: time
+        .durationToNanoseconds(config.maxDurationShouldTransmitAcceptedReport)
+        .toNumber(),
+      configPublicKeys: operatorConfigPublicKeys,
+    }
+    return input
+  }
 
   makeInput = (userInput): Input => {
     if (userInput) return userInput as Input
     const rdd = RDD.load(this.flags.network, this.flags.rdd)
     const aggregator = rdd.contracts[this.args[0]]
+
+    const userSecret = this.flags.secret
+    if (!!userSecret) {
+      logger.info(`Using given random secret: ${userSecret}`)
+    }
+
+    const offchainConfig = ProposeConfig.makeInputFromRDD(rdd, this.args[0])
 
     const aggregatorOperators: any[] = aggregator.oracles.map((o) => rdd.operators[o.operator])
     const oracles = aggregatorOperators
@@ -47,6 +192,7 @@ export default class ProposeConfig extends SolanaCommand {
     return {
       oracles,
       f,
+      offchainConfig,
       proposalId: this.flags.proposalId || this.flags.configProposal,
     }
   }
@@ -58,6 +204,11 @@ export default class ProposeConfig extends SolanaCommand {
       'Please provide Config Proposal ID with flag "proposalId" or "configProposal"',
     )
     this.requireArgs('Please provide an aggregator address')
+    this.require(
+      // TODO: should be able to just rely on random secret?
+      !!process.env.SECRET,
+      'Please specify the Gauntlet secret words e.g. SECRET="awe fluke polygon tonic lilly acuity onyx debra bound gilbert wane"',
+    )
   }
 
   buildCommand = async (flags, args) => {
@@ -114,7 +265,44 @@ export default class ProposeConfig extends SolanaCommand {
       .remainingAccounts(payees)
       .instruction()
 
-    return [configIx, payeesIx]
+    // proposeOffchainConfig
+
+    const maxBufferSize = this.flags.bufferSize || MAX_TRANSACTION_BYTES
+    // process.env.SECRET is required on the command
+    const { offchainConfig, userSecret } = this.input
+    const { offchainConfig: serializedOffchainConfig, randomSecret } = await serializeOffchainConfig(
+      offchainConfig,
+      process.env.SECRET!,
+      userSecret,
+    )
+    this.randomSecret = randomSecret
+
+    validateConfig(this.input.offchainConfig)
+
+    logger.info(`Offchain config size: ${serializedOffchainConfig.byteLength}`)
+    this.require(serializedOffchainConfig.byteLength < 4096, 'Offchain config must be lower than 4096 bytes')
+
+    // There's a byte limit per transaction. Write the config in chunks
+    const offchainConfigChunks = divideIntoChunks(serializedOffchainConfig, maxBufferSize)
+    if (offchainConfigChunks.length > 1) {
+      logger.info(
+        `Config size (${serializedOffchainConfig.byteLength} bytes) is bigger than transaction limit. It needs to be configured using ${offchainConfigChunks.length} transactions`,
+      )
+    }
+
+    const offchainConfigIxs = await Promise.all(
+      offchainConfigChunks.map((buffer) =>
+        this.program.methods
+          .writeOffchainConfig(buffer)
+          .accounts({
+            proposal: proposal,
+            authority: signer,
+          })
+          .instruction(),
+      ),
+    )
+
+    return [configIx, payeesIx, ...offchainConfigIxs]
   }
 
   beforeExecute = async () => {
@@ -141,6 +329,25 @@ export default class ProposeConfig extends SolanaCommand {
 
     logger.info(`Proposed Config for contract ${this.args[0]}:`)
     printDiff(contractConfig, proposedConfig)
+
+    // Config in contract
+    const contractOffchainConfig = deserializeConfig(
+      Buffer.from(contractState.offchainConfig.xs).slice(0, contractState.offchainConfig.len.toNumber()),
+    )
+    const contractOffchainConfigForDiff = prepareOffchainConfigForDiff(contractOffchainConfig)
+    const proposedConfigForDiff = prepareOffchainConfigForDiff(this.input.offchainConfig)
+
+    logger.info(`Proposed OffchainConfig for contract ${this.args[0]}`)
+    printDiff(contractOffchainConfigForDiff, proposedConfigForDiff)
+
+    logger.info(
+      `Important: Save this secret
+        - If you run this command for the same configuration, use the same RANDOM SECRET
+        - You will need to provide the secret to approve the config proposal
+      Provide it with --secret flag`,
+    )
+    logger.info(`${this.randomSecret}`)
+    logger.line()
 
     await prompt('Continue?')
   }
@@ -169,7 +376,11 @@ export default class ProposeConfig extends SolanaCommand {
     logger.success(`Config set on tx ${txhash}`)
 
     return {
-      responses: [ // TODO: map over responses
+      data: {
+        secret: this.randomSecret,
+      },
+      responses: [
+        // TODO: map over responses
         {
           tx: this.wrapResponse(txhash, this.args[0]),
           contract: this.args[0],

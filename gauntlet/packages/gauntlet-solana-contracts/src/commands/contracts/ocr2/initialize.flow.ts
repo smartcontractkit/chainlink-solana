@@ -9,7 +9,6 @@ import OCR2Inspect from './inspection/inspect'
 import CreateFeed from '../store/createFeed'
 import SetWriter from '../store/setWriter'
 import CreateProposal from './proposal/createProposal'
-import ProposeOffchainConfig from './proposeOffchainConfig'
 import ProposeConfig from './proposeConfig'
 import FinalizeProposal from './proposal/finalizeProposal'
 import AcceptProposal from './proposal/acceptProposal'
@@ -75,15 +74,6 @@ export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse>
       {
         name: 'Propose Config',
         command: ProposeConfig,
-        flags: {
-          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
-        },
-        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
-      },
-      {
-        id: this.stepIds.PROPOSE_OFFCHAIN,
-        name: 'Propose Offchain Config',
-        command: ProposeOffchainConfig,
         flags: {
           proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
         },

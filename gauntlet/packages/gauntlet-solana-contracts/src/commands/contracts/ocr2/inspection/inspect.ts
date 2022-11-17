@@ -4,7 +4,7 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
 import { deserializeConfig } from '../../../../lib/encoding'
-import WriteOffchainConfig, { OffchainConfig } from '../proposeOffchainConfig'
+import WriteOffchainConfig, { OffchainConfig } from '../proposeConfig'
 import { toComparableLongNumber, toComparableNumber, toComparablePubKey } from '../../../../lib/inspection'
 import RDD from '../../../../lib/rdd'
 

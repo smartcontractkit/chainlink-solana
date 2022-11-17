@@ -6,9 +6,9 @@ import { PublicKey } from '@solana/web3.js'
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { utils } from '@project-serum/anchor'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
-import ProposeOffchainConfig, { OffchainConfig } from '../proposeOffchainConfig'
+import ProposeConfig, { OffchainConfig } from '../proposeConfig'
 import { serializeOffchainConfig, deserializeConfig } from '../../../../lib/encoding'
-import { prepareOffchainConfigForDiff } from '../proposeOffchainConfig'
+import { prepareOffchainConfigForDiff } from '../proposeConfig'
 import RDD from '../../../../lib/rdd'
 import { printDiff } from '../../../../lib/diff'
 
@@ -98,7 +98,7 @@ export default class AcceptProposal extends SolanaCommand {
       }))
       .sort((a, b) => Buffer.compare(_toHex(a.signer), _toHex(b.signer)))
 
-    const offchainConfig = ProposeOffchainConfig.makeInputFromRDD(rdd, this.args[0])
+    const offchainConfig = ProposeConfig.makeInputFromRDD(rdd, this.args[0])
 
     const f = aggregator.config.f
 
