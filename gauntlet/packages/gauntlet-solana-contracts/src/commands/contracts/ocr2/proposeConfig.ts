@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, BN, time, prompt, longs } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { PublicKey } from '@solana/web3.js'
+import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js'
 import { MAX_TRANSACTION_BYTES, ORACLES_MAX_LENGTH } from '../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { divideIntoChunks } from '../../../lib/utils'
@@ -96,7 +96,6 @@ type Input = {
   f: number | string
   offchainConfig: OffchainConfig
   userSecret?: string
-  proposalId: string
 }
 
 export const prepareOffchainConfigForDiff = (config: OffchainConfig, extra?: Object): Object => {
@@ -112,12 +111,11 @@ const _toHex = (a: string) => Buffer.from(a, 'hex')
 export default class ProposeConfig extends SolanaCommand {
   static id = 'ocr2:propose_config'
   static category = CONTRACT_LIST.OCR_2
-  static examples = [
-    'yarn gauntlet ocr2:propose_config --network=devnet --rdd=[PATH_TO_RDD] --proposalId=EPRYwrb1Dwi8VT5SutS4vYNdF8HqvE7QwvqeCCwHdVLC [AGGREGATOR_ADDRESS]',
-  ]
+  static examples = ['yarn gauntlet ocr2:propose_config --network=devnet --rdd=[PATH_TO_RDD] [AGGREGATOR_ADDRESS]']
 
   input: Input
   randomSecret: string
+  proposal: Keypair
 
   static makeInputFromRDD = (rdd: any, stateAddress: string): OffchainConfig => {
     const aggregator = rdd.contracts[stateAddress]
@@ -193,16 +191,11 @@ export default class ProposeConfig extends SolanaCommand {
       oracles,
       f,
       offchainConfig,
-      proposalId: this.flags.proposalId || this.flags.configProposal,
     }
   }
 
   constructor(flags, args) {
     super(flags, args)
-    this.require(
-      !!this.flags.proposalId || !!this.flags.configProposal,
-      'Please provide Config Proposal ID with flag "proposalId" or "configProposal"',
-    )
     this.requireArgs('Please provide an aggregator address')
     this.require(
       // TODO: should be able to just rely on random secret?
@@ -220,14 +213,37 @@ export default class ProposeConfig extends SolanaCommand {
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
-    const proposal = new PublicKey(this.input.proposalId)
+    const proposal = Keypair.generate()
+    this.proposal = proposal
+
+    // createProposal
+    const version = new BN(2)
+
+    logger.log('Generating data for creating config proposal')
+    logger.log('Config Proposal state will be at:', proposal.toString())
+
+    const createIx = await this.program.methods
+      .createProposal(version)
+      .accounts({
+        proposal: proposal.publicKey,
+        authority: signer,
+      })
+      .instruction()
+    const defaultAccountSize = new BN(this.program.account.proposal.size)
+    const createAccountIx = SystemProgram.createAccount({
+      fromPubkey: signer,
+      newAccountPubkey: proposal.publicKey,
+      space: defaultAccountSize.toNumber(),
+      lamports: await this.provider.connection.getMinimumBalanceForRentExemption(defaultAccountSize.toNumber()),
+      programId: this.program.programId,
+    })
+
+    // proposeConfig
 
     const oracles = this.input.oracles.map(({ signer, transmitter }) => ({
       signer: Buffer.from(signer, 'hex'),
       transmitter: new PublicKey(transmitter),
     }))
-
-    // proposeConfig
 
     const f = new BN(this.input.f)
 
@@ -241,7 +257,7 @@ export default class ProposeConfig extends SolanaCommand {
     const configIx = await this.program.methods
       .proposeConfig(oracles, f)
       .accounts({
-        proposal,
+        proposal: proposal.publicKey,
         authority: signer,
       })
       .instruction()
@@ -259,7 +275,7 @@ export default class ProposeConfig extends SolanaCommand {
     const payeesIx = await this.program.methods
       .proposePayees(link)
       .accounts({
-        proposal,
+        proposal: proposal.publicKey,
         authority: signer,
       })
       .remainingAccounts(payees)
@@ -295,7 +311,7 @@ export default class ProposeConfig extends SolanaCommand {
         this.program.methods
           .writeOffchainConfig(buffer)
           .accounts({
-            proposal: proposal,
+            proposal: proposal.publicKey,
             authority: signer,
           })
           .instruction(),
@@ -305,12 +321,12 @@ export default class ProposeConfig extends SolanaCommand {
     const finalizeIx = await this.program.methods
       .finalizeProposal()
       .accounts({
-        proposal: proposal,
+        proposal: proposal.publicKey,
         authority: signer,
       })
       .instruction()
 
-    return [configIx, payeesIx, ...offchainConfigIxs, finalizeIx]
+    return [createAccountIx, createIx, configIx, payeesIx, ...offchainConfigIxs, finalizeIx]
   }
 
   beforeExecute = async () => {
@@ -382,10 +398,15 @@ export default class ProposeConfig extends SolanaCommand {
     }
     const txhash = txs[txs.length - 1]
     logger.success(`Config proposal finalized on tx ${txhash}`)
+    logger.line()
+    logger.info('Use the Config Proposal ID in future proposal commands:')
+    logger.info(this.proposal.publicKey.toString())
+    logger.line()
 
     return {
       data: {
         secret: this.randomSecret,
+        proposal: this.proposal.publicKey.toString(),
       },
       responses: [
         // TODO: map over responses

@@ -10,7 +10,6 @@ import DeployToken from '../token/deploy'
 import SetBilling from './setBilling'
 import CreateFeed from '../store/createFeed'
 import SetWriter from '../store/setWriter'
-import CreateProposal from './proposal/createProposal'
 import ProposeConfig from './proposeConfig'
 import AcceptProposal from './proposal/acceptProposal'
 
@@ -193,21 +192,15 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
       {
-        id: this.stepIds.PROPOSAL,
-        name: 'Create Proposal',
-        command: CreateProposal,
-      },
-      {
         name: 'Propose Config',
         command: ProposeConfig,
+        id: this.stepIds.PROPOSAL,
         flags: {
           input: {
             oracles: configInput.oracles,
             f: configInput.f,
             offchainConfig: offchainConfigInput,
-            proposalId: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal')),
           },
-          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
           secret: randomSecret,
         },
         args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],

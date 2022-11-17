@@ -14,7 +14,6 @@ import { CONTRACT_LIST } from '../../../lib/contracts'
 import { makeTransferOwnershipCommand } from '../ownership/transferOwnership'
 import { makeUpgradeProgramCommand } from '../../abstract/upgrade'
 import Fund from './fund'
-import CreateProposal from './proposal/createProposal'
 import ProposeConfig from './proposeConfig'
 import Close from './close'
 import WithdrawFunds from './withdrawFunds'
@@ -33,7 +32,6 @@ export default [
   OCR2InitializeFlow,
   SetBilling,
   AcceptProposal,
-  CreateProposal,
   ProposeConfig,
   ReadState,
   SetBillingAccessController,
