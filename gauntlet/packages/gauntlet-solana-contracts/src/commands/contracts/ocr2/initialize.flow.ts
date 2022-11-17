@@ -11,7 +11,6 @@ import SetWriter from '../store/setWriter'
 import CreateProposal from './proposal/createProposal'
 import ProposeOffchainConfig from './proposeOffchainConfig'
 import ProposeConfig from './proposeConfig'
-import ProposePayees from './proposePayees'
 import FinalizeProposal from './proposal/finalizeProposal'
 import AcceptProposal from './proposal/acceptProposal'
 
@@ -85,14 +84,6 @@ export default class OCR2InitializeFlow extends FlowCommand<TransactionResponse>
         id: this.stepIds.PROPOSE_OFFCHAIN,
         name: 'Propose Offchain Config',
         command: ProposeOffchainConfig,
-        flags: {
-          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
-        },
-        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
-      },
-      {
-        name: 'Propose Payees',
-        command: ProposePayees,
         flags: {
           proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
         },

@@ -11,6 +11,7 @@ type Input = {
   oracles: {
     signer: string
     transmitter: string
+    payee: string
   }[]
   f: number | string
   proposalId: string
@@ -37,6 +38,7 @@ export default class ProposeConfig extends SolanaCommand {
       .map((operator) => ({
         transmitter: operator.ocrNodeAddress[0],
         signer: operator.ocr2OnchainPublicKey[0].replace('ocr2on_solana_', ''),
+        payee: operator.adminAddress,
       }))
       .sort((a, b) => Buffer.compare(_toHex(a.signer), _toHex(b.signer)))
 
@@ -73,6 +75,9 @@ export default class ProposeConfig extends SolanaCommand {
       signer: Buffer.from(signer, 'hex'),
       transmitter: new PublicKey(transmitter),
     }))
+
+    // proposeConfig
+
     const f = new BN(this.input.f)
 
     const minOracleLength = f.mul(new BN(3)).toNumber()
@@ -82,7 +87,7 @@ export default class ProposeConfig extends SolanaCommand {
       `Oracles max length is ${ORACLES_MAX_LENGTH}, currently ${oracles.length}`,
     )
 
-    const ix = await this.program.methods
+    const configIx = await this.program.methods
       .proposeConfig(oracles, f)
       .accounts({
         proposal,
@@ -90,7 +95,26 @@ export default class ProposeConfig extends SolanaCommand {
       })
       .instruction()
 
-    return [ix]
+    // proposePayees
+
+    const link = new PublicKey(this.flags.link || process.env.LINK)
+
+    const payees = this.input.oracles.map(({ payee }) => ({
+      pubkey: new PublicKey(payee),
+      isWritable: true,
+      isSigner: false,
+    }))
+
+    const payeesIx = await this.program.methods
+      .proposePayees(link)
+      .accounts({
+        proposal,
+        authority: signer,
+      })
+      .remainingAccounts(payees)
+      .instruction()
+
+    return [configIx, payeesIx]
   }
 
   beforeExecute = async () => {
@@ -99,9 +123,10 @@ export default class ProposeConfig extends SolanaCommand {
 
     // Prepare contract config
     const contractOracles = contractState.oracles?.xs.slice(0, contractState.oracles.len.toNumber())
-    const contractOraclesForDiff = contractOracles.map(({ signer, transmitter }) => ({
+    const contractOraclesForDiff = contractOracles.map(({ signer, transmitter, payee }) => ({
       signer: Buffer.from(signer.key).toString('hex'),
       transmitter: transmitter.toString(),
+      payee: payee.toString(),
     }))
 
     const contractConfig = {
@@ -126,15 +151,25 @@ export default class ProposeConfig extends SolanaCommand {
     const signer = this.wallet.publicKey
     await this.beforeExecute()
 
-    const rawTx = await this.makeRawTransaction(signer)
-    await this.simulateTx(signer, rawTx)
-    await prompt(`Continue setting config on ${this.args[0].toString()}?`)
+    const rawTxs = await this.makeRawTransaction(signer)
+    // simulate all transactions first, then send them
+    for (const rawTx of rawTxs) {
+      await this.simulateTx(signer, [rawTx])
+    }
 
-    const txhash = await this.signAndSendRawTx(rawTx)
+    await prompt(`Continue setting config on ${this.args[0]}?`)
+
+    const txs: string[] = []
+    for (const rawTx of rawTxs) {
+      // TODO: signAndSend in parallel (proposeConfig, proposeOffchainConfig, proposePayees) via Promise.all
+      const txhash = await this.signAndSendRawTx([rawTx])
+      txs.push(txhash)
+    }
+    const txhash = txs[txs.length - 1]
     logger.success(`Config set on tx ${txhash}`)
 
     return {
-      responses: [
+      responses: [ // TODO: map over responses
         {
           tx: this.wrapResponse(txhash, this.args[0]),
           contract: this.args[0],

@@ -17,7 +17,6 @@ import Fund from './fund'
 import CreateProposal from './proposal/createProposal'
 import ProposeConfig from './proposeConfig'
 import ProposeOffchainConfig from './proposeOffchainConfig'
-import ProposePayees from './proposePayees'
 import FinalizeProposal from './proposal/finalizeProposal'
 import Close from './close'
 import WithdrawFunds from './withdrawFunds'
@@ -40,7 +39,6 @@ export default [
   FinalizeProposal,
   ProposeConfig,
   ProposeOffchainConfig,
-  ProposePayees,
   ReadState,
   SetBillingAccessController,
   SetRequesterAccessController,

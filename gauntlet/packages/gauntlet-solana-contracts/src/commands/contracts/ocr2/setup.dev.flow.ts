@@ -15,7 +15,6 @@ import SetWriter from '../store/setWriter'
 import CreateProposal from './proposal/createProposal'
 import ProposeOffchainConfig from './proposeOffchainConfig'
 import ProposeConfig from './proposeConfig'
-import ProposePayees from './proposePayees'
 import FinalizeProposal from './proposal/finalizeProposal'
 import AcceptProposal from './proposal/acceptProposal'
 
@@ -77,55 +76,32 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
       ],
     }
 
-    const payeesInput = {
-      operators: [
-        {
-          transmitter: 'DxRwKpwNBuMzKf5YEG1vLpnRbWeKo1Z4tKHfFGt8vUkj',
-          payee: 'DxRwKpwNBuMzKf5YEG1vLpnRbWeKo1Z4tKHfFGt8vUkj',
-        },
-        {
-          transmitter: '8sdUrh9LQdAXhrgFEBDxnUauJTTLfEq5PNsJbn9Pw19K',
-          payee: '8sdUrh9LQdAXhrgFEBDxnUauJTTLfEq5PNsJbn9Pw19K',
-        },
-        {
-          transmitter: '9n1sSGA5rhfsQyaX3tHz3ZU1ffR6V8KffvWtFPBcFrJw',
-          payee: '9n1sSGA5rhfsQyaX3tHz3ZU1ffR6V8KffvWtFPBcFrJw',
-        },
-        {
-          transmitter: 'G5LdWMvWoQQ787iPgWbCSTrkPB5Li9e2CWi6jYuAUHUH',
-          payee: 'G5LdWMvWoQQ787iPgWbCSTrkPB5Li9e2CWi6jYuAUHUH',
-        },
-      ],
-      allowFundRecipient: true,
-    }
-
     const _toHex = (a: string) => Buffer.from(a, 'hex')
     const configInput = {
       oracles: [
         {
           transmitter: 'DxRwKpwNBuMzKf5YEG1vLpnRbWeKo1Z4tKHfFGt8vUkj',
           signer: '0cAFF71b6Dbb4f9Ebc862F8E9C124E737C917e80',
+          payee: 'DxRwKpwNBuMzKf5YEG1vLpnRbWeKo1Z4tKHfFGt8vUkj',
         },
         {
           transmitter: '8sdUrh9LQdAXhrgFEBDxnUauJTTLfEq5PNsJbn9Pw19K',
           signer: '6b211EdeF015C9931eA7D65CD326472891ecf501',
+          payee: '8sdUrh9LQdAXhrgFEBDxnUauJTTLfEq5PNsJbn9Pw19K',
         },
         {
           transmitter: '9n1sSGA5rhfsQyaX3tHz3ZU1ffR6V8KffvWtFPBcFrJw',
           signer: 'C6CD7e27Ea7653362906A7C9923c15602dC04F41',
+          payee: '9n1sSGA5rhfsQyaX3tHz3ZU1ffR6V8KffvWtFPBcFrJw',
         },
         {
           transmitter: 'G5LdWMvWoQQ787iPgWbCSTrkPB5Li9e2CWi6jYuAUHUH',
           signer: '1b7c57E22a4D4B6c94365A73AD5FF743DBE9c55E',
+          payee: 'G5LdWMvWoQQ787iPgWbCSTrkPB5Li9e2CWi6jYuAUHUH',
         },
       ].sort((a, b) => Buffer.compare(_toHex(a.signer), _toHex(b.signer))),
       f: 1,
     }
-
-    const acceptPropOracles = configInput.oracles.map((o, i) => ({
-      ...o,
-      payee: payeesInput.operators[i].payee,
-    }))
 
     this.flow = [
       {
@@ -252,19 +228,6 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
       {
-        name: 'Propose Payees',
-        command: ProposePayees,
-        flags: {
-          input: {
-            operators: payeesInput.operators,
-            allowFundRecipient: true,
-            proposalId: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal')),
-          },
-          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
-        },
-        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
-      },
-      {
         name: 'Finalize Proposal',
         command: FinalizeProposal,
         flags: {
@@ -280,7 +243,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
             version: 2,
             f: configInput.f,
             tokenMint: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.TOKEN)),
-            oracles: acceptPropOracles,
+            oracles: configInput,
             offchainConfig: offchainConfigInput,
           },
           proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
@@ -294,7 +257,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
   setEnvironment = async () => {
     const programsPublicKeys = await Promise.all(
       [CONTRACT_LIST.ACCESS_CONTROLLER, CONTRACT_LIST.OCR_2, CONTRACT_LIST.STORE].map(async (name) =>
-        (await getDeploymentContract(name, '')).programKeypair.publicKey.toString(),
+        getDeploymentContract(name, '').programKeypair.publicKey.toString(),
       ),
     )
     logger.info(`
