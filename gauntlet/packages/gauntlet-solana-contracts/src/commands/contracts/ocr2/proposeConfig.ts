@@ -302,7 +302,15 @@ export default class ProposeConfig extends SolanaCommand {
       ),
     )
 
-    return [configIx, payeesIx, ...offchainConfigIxs]
+    const finalizeIx = await this.program.methods
+      .finalizeProposal()
+      .accounts({
+        proposal: proposal,
+        authority: signer,
+      })
+      .instruction()
+
+    return [configIx, payeesIx, ...offchainConfigIxs, finalizeIx]
   }
 
   beforeExecute = async () => {
@@ -373,7 +381,7 @@ export default class ProposeConfig extends SolanaCommand {
       txs.push(txhash)
     }
     const txhash = txs[txs.length - 1]
-    logger.success(`Config set on tx ${txhash}`)
+    logger.success(`Config proposal finalized on tx ${txhash}`)
 
     return {
       data: {

@@ -12,7 +12,6 @@ import CreateFeed from '../store/createFeed'
 import SetWriter from '../store/setWriter'
 import CreateProposal from './proposal/createProposal'
 import ProposeConfig from './proposeConfig'
-import FinalizeProposal from './proposal/finalizeProposal'
 import AcceptProposal from './proposal/acceptProposal'
 
 // TODO: Remove. Useful for dev testing
@@ -212,13 +211,6 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
           secret: randomSecret,
         },
         args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
-      },
-      {
-        name: 'Finalize Proposal',
-        command: FinalizeProposal,
-        flags: {
-          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
-        },
       },
       {
         name: 'Accept Proposal',

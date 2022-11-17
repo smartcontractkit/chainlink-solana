@@ -16,7 +16,6 @@ import { makeUpgradeProgramCommand } from '../../abstract/upgrade'
 import Fund from './fund'
 import CreateProposal from './proposal/createProposal'
 import ProposeConfig from './proposeConfig'
-import FinalizeProposal from './proposal/finalizeProposal'
 import Close from './close'
 import WithdrawFunds from './withdrawFunds'
 import WithdrawPayment from './withdrawPayment'
@@ -35,7 +34,6 @@ export default [
   SetBilling,
   AcceptProposal,
   CreateProposal,
-  FinalizeProposal,
   ProposeConfig,
   ReadState,
   SetBillingAccessController,
