@@ -384,23 +384,35 @@ export default class ProposeConfig extends SolanaCommand {
 
     let rawTxs = await this.makeRawTransaction(signer)
     // create instruction needs to be bundled together with createAccount
-    let createTx = rawTxs.splice(0, 2)
-
-    // simulate all transactions first, then send them
-    await this.simulateTx(signer, createTx)
-    for (const rawTx of rawTxs) {
-      await this.simulateTx(signer, [rawTx])
-    }
+    const createTx = rawTxs.splice(0, 2)
+    const finalizeTx = rawTxs.splice(-1)
 
     await prompt(`Continue setting config on ${this.args[0]}?`)
 
+    // NOTE: can't simulate all steps ahead of time since:
+    // - each step depends on createProposal already been ran
+    // - finalizeProposal depends on the previous steps
+
     const txs: string[] = []
+
+    // Simulate and execute createProposal
+    await this.simulateTx(signer, createTx)
     txs.push(await this.signAndSendRawTx(createTx))
+
+    // Simulate all proposal steps before actually executing them
+    for (const rawTx of rawTxs) {
+      await this.simulateTx(signer, [rawTx])
+    }
     for (const rawTx of rawTxs) {
       // TODO: signAndSend in parallel (proposeConfig, proposeOffchainConfig, proposePayees) via Promise.all
       const txhash = await this.signAndSendRawTx([rawTx])
       txs.push(txhash)
     }
+
+    // Now simulate and execute finalizeProposal
+    await this.simulateTx(signer, finalizeTx)
+    txs.push(await this.signAndSendRawTx(finalizeTx))
+
     const txhash = txs[txs.length - 1]
     logger.success(`Config proposal finalized on tx ${txhash}`)
     logger.line()
