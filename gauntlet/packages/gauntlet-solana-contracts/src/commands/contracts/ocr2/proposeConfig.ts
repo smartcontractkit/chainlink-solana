@@ -382,8 +382,12 @@ export default class ProposeConfig extends SolanaCommand {
     const signer = this.wallet.publicKey
     await this.beforeExecute()
 
-    const rawTxs = await this.makeRawTransaction(signer)
+    let rawTxs = await this.makeRawTransaction(signer)
+    // create instruction needs to be bundled together with createAccount
+    let createTx = rawTxs.splice(0, 2)
+
     // simulate all transactions first, then send them
+    await this.simulateTx(signer, createTx)
     for (const rawTx of rawTxs) {
       await this.simulateTx(signer, [rawTx])
     }
@@ -391,6 +395,7 @@ export default class ProposeConfig extends SolanaCommand {
     await prompt(`Continue setting config on ${this.args[0]}?`)
 
     const txs: string[] = []
+    txs.push(await this.signAndSendRawTx(createTx))
     for (const rawTx of rawTxs) {
       // TODO: signAndSend in parallel (proposeConfig, proposeOffchainConfig, proposePayees) via Promise.all
       const txhash = await this.signAndSendRawTx([rawTx])
