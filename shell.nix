@@ -30,10 +30,15 @@ pkgs.mkShell {
     nodejs-14_x
     (yarn.override { nodejs = nodejs-14_x; })
     python3
+  ] ++ lib.optionals stdenv.isLinux [
+    # ledger specific packages
+    libudev-zero
+    # udev.lib
+    libusb1
   ];
   RUST_BACKTRACE = "1";
   # https://github.com/rust-lang/rust/issues/55979
-  LD_LIBRARY_PATH = lib.makeLibraryPath (with pkgs; [ stdenv.cc.cc.lib ]);
+  LD_LIBRARY_PATH = lib.makeLibraryPath (with pkgs; [ stdenv.cc.cc.lib libudev-zero ]);
   GOROOT="${pkgs.go_1_18}/share/go";
 
   # Avoids issues with delve
