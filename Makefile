@@ -53,7 +53,7 @@ projectserum_version:
 	@echo "${PROJECT_SERUM_VERSION}"
 
 anchor_shell:
-	docker run --rm -it -v $(shell pwd):/workdir --entrypoint bash ${PROJECT_SERUM_IMAGE}
+	docker run --rm -it -v $(shell pwd):/workdir -p 8899:8899 -p 8900:8900 --entrypoint bash ${PROJECT_SERUM_IMAGE}
 
 build_js:
 	cd gauntlet && yarn install --frozen-lockfile && yarn bundle
