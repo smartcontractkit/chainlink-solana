@@ -184,6 +184,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         name: 'Set Billing',
         command: SetBilling,
         flags: {
+          link: FlowCommand.ID.contract(this.stepIds.TOKEN),
           input: {
             observationPaymentGjuels: '1',
             transmissionPaymentGjuels: '1',
@@ -196,6 +197,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         command: ProposeConfig,
         id: this.stepIds.PROPOSAL,
         flags: {
+          link: FlowCommand.ID.contract(this.stepIds.TOKEN),
           input: {
             oracles: configInput.oracles,
             f: configInput.f,
@@ -209,6 +211,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         name: 'Accept Proposal',
         command: AcceptProposal,
         flags: {
+          link: FlowCommand.ID.contract(this.stepIds.TOKEN),
           input: {
             secret: randomSecret,
             version: 2,
