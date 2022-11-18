@@ -397,7 +397,7 @@ export default class ProposeConfig extends SolanaCommand {
 
     // Simulate and execute createProposal
     await this.simulateTx(signer, createTx)
-    txs.push(await this.signAndSendRawTx(createTx))
+    txs.push(await this.signAndSendRawTx(createTx, [this.proposal]))
 
     // Simulate all proposal steps before actually executing them
     for (const rawTx of rawTxs) {
