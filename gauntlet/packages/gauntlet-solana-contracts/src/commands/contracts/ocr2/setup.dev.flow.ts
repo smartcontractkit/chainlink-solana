@@ -146,9 +146,9 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         id: this.stepIds.FEED,
         flags: {
           input: {
-            store: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.STORE)),
+            store: FlowCommand.ID.contract(this.stepIds.STORE),
             granularity: 30,
-            liveLength: 86400,
+            liveLength: 400,
             decimals: 9,
             description: 'TEST',
           },
@@ -164,7 +164,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
           input: {
             minAnswer: 0,
             maxAnswer: 1000000000,
-            transmissions: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.FEED, 'transmissions')),
+            transmissions: FlowCommand.ID.data(this.stepIds.FEED, 'transmissions'),
           },
         },
         id: this.stepIds.OCR_2,
@@ -174,8 +174,8 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         command: SetWriter,
         flags: {
           input: {
-            transmissions: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.FEED, 'transmissions')),
-            store: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.STORE)),
+            transmissions: FlowCommand.ID.data(this.stepIds.FEED, 'transmissions'),
+            store: FlowCommand.ID.contract(this.stepIds.STORE),
           },
         },
         args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
@@ -213,7 +213,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
             secret: randomSecret,
             version: 2,
             f: configInput.f,
-            tokenMint: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.TOKEN)),
+            tokenMint: FlowCommand.ID.contract(this.stepIds.TOKEN),
             oracles: configInput,
             offchainConfig: offchainConfigInput,
           },
