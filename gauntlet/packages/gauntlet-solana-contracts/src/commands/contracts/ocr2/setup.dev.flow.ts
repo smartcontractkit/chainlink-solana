@@ -99,27 +99,27 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
     }
 
     this.flow = [
-      {
-        name: 'Deploy AC',
-        command: 'access_controller:deploy',
-      },
-      {
-        name: 'Deploy OCR',
-        command: 'ocr2:deploy',
-      },
-      {
-        name: 'Deploy Store',
-        command: 'store:deploy',
-      },
+      // {
+      //   name: 'Deploy AC',
+      //   command: 'access_controller:deploy',
+      // },
+      // {
+      //   name: 'Deploy OCR',
+      //   command: 'ocr2:deploy',
+      // },
+      // {
+      //   name: 'Deploy Store',
+      //   command: 'store:deploy',
+      // },
       {
         name: 'Deploy LINK',
         command: DeployToken,
         id: this.stepIds.TOKEN,
       },
-      {
-        name: 'Set Environment',
-        exec: this.setEnvironment,
-      },
+      // {
+      //   name: 'Set Environment',
+      //   exec: this.setEnvironment,
+      // },
       // Constant Contracts
       {
         name: 'Initialize Billing AC',

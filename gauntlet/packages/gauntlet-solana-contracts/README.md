@@ -62,31 +62,11 @@ yarn gauntlet <contract_name>:<contract_function> --help
 
 ## Testing Locally
 
-### Preparation
-
-- Include program keypairs under `/packages/gauntlet-solana-contracts/artifacts/programId/*.json`, resulting in:
-
 ```
-packages/gauntlet-solana-contracts/artifacts/programId
-|  access_controller.json
-|  store.json
-|  ocr2.json
+scripts/localnet.sh
 ```
 
-- Make sure these accounts public keys correspond to the ones declared on each contract `declare_id`. If they don't, compile the contracts (`anchor build`) with the correct `declare_id` and move the generated binaries from `/target/deploy/*.so` to `/packages/gauntlet-solana-contracts/artifacts/bin/*.so`
-
-- Run a local store node
-
-```
-solana config set --url http://127.0.0.1:8899
-solana-test-store -r
-```
-
-- Get some SOL on your account. This account needs to be the same specified on gauntlet `.env` `PRIVATE_KEY`
-
-```
-solana airdrop 100 9ohrpVDVNKKW1LipksFrmq6wa1oLLYL9QSoYUn4pAQ2v
-```
+Starts a `solana-test-validator` with the programs pre-loaded and airdrops funds to the default PRIVATE_KEY used by `.env.local`.
 
 ### Running
 
