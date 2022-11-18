@@ -99,7 +99,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       overrides,
     )
     if (extraSigners) {
-      tx.sign(...extraSigners)
+      tx.partialSign(...extraSigners)
     }
     const signedTx = await this.wallet.signTransaction(tx)
     logger.loading('Sending tx...')
