@@ -230,6 +230,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         flags: {
           link: FlowCommand.ID.contract(this.stepIds.TOKEN),
           input: {
+            proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
             secret: randomSecret,
             version: 2,
             f: this.configInput.f,
