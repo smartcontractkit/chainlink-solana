@@ -301,7 +301,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
                 resolve(result)
               }
             },
-            'processed',
+            confirmLevel,
           )
         } catch (e) {
           done = true
@@ -319,7 +319,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
               //if startTimeoutThreshold passed we start to check if
               //current blocks are did not passed timeoutBlockHeight threshold
               if (startTimeoutCheck) {
-                promises.push(this.provider.connection.getBlockHeight('confirmed'))
+                promises.push(this.provider.connection.getBlockHeight(confirmLevel))
               }
               const [signatureStatus, currentBlockHeight] = await Promise.all(promises)
               if (typeof currentBlockHeight !== undefined && timeoutBlockHeight <= currentBlockHeight!) {
@@ -335,13 +335,13 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
                   console.log('REST error for', txid, result)
                   done = true
                   reject(result.err)
-                } else if (!(result.confirmations || confirmLevels.includes(result.confirmationStatus))) {
-                  console.log('REST not confirmed', txid, result)
-                } else {
+                } else if (result.confirmations && confirmLevels.includes(result.confirmationStatus)) {
                   // this.lastSlot = signatureStatuses?.context?.slot;
                   console.log('REST confirmed', txid, result)
                   done = true
                   resolve(result)
+                } else {
+                  console.log('REST not confirmed', txid, result)
                 }
               }
             } catch (e) {
