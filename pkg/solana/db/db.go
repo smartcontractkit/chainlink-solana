@@ -50,6 +50,7 @@ type ChainCfg struct {
 	MaxComputeUnitPrice     null.Int
 	MinComputeUnitPrice     null.Int
 	DefaultComputeUnitPrice null.Int
+	FeeBumpPeriod           *utils.Duration
 }
 
 func (c *ChainCfg) Scan(value interface{}) error {

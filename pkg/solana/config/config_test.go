@@ -31,6 +31,7 @@ var (
 	testMaxComputeUnitPrice     uint64 = 100_000
 	testMinComputeUnitPrice     uint64 = 1
 	testDefaultComputeUnitPrice uint64 = 10
+	testFeeBumpPeriod                  = mustDuration(8 * time.Minute)
 )
 
 func mustDuration(d time.Duration) utils.Duration {
@@ -58,6 +59,7 @@ func TestConfig_ExpectedDefaults(t *testing.T) {
 		MaxComputeUnitPrice:     cfg.MaxComputeUnitPrice(),
 		MinComputeUnitPrice:     cfg.MinComputeUnitPrice(),
 		DefaultComputeUnitPrice: cfg.DefaultComputeUnitPrice(),
+		FeeBumpPeriod:           cfg.FeeBumpPeriod(),
 	}
 	assert.Equal(t, defaultConfigSet, configSet)
 }
@@ -78,6 +80,7 @@ func TestConfig_NewConfig(t *testing.T) {
 		MaxComputeUnitPrice:     null.IntFrom(int64(testMaxComputeUnitPrice)),
 		MinComputeUnitPrice:     null.IntFrom(int64(testMinComputeUnitPrice)),
 		DefaultComputeUnitPrice: null.IntFrom(int64(testDefaultComputeUnitPrice)),
+		FeeBumpPeriod:           &testFeeBumpPeriod,
 	}
 	cfg := NewConfig(dbCfg, logger.Test(t))
 	assert.Equal(t, testBalancePoll.Duration(), cfg.BalancePollPeriod())
@@ -94,6 +97,7 @@ func TestConfig_NewConfig(t *testing.T) {
 	assert.Equal(t, testMaxComputeUnitPrice, cfg.MaxComputeUnitPrice())
 	assert.Equal(t, testMinComputeUnitPrice, cfg.MinComputeUnitPrice())
 	assert.Equal(t, testDefaultComputeUnitPrice, cfg.DefaultComputeUnitPrice())
+	assert.Equal(t, testFeeBumpPeriod.Duration(), cfg.FeeBumpPeriod())
 }
 
 func TestConfig_Update(t *testing.T) {
@@ -113,6 +117,7 @@ func TestConfig_Update(t *testing.T) {
 		MaxComputeUnitPrice:     null.IntFrom(int64(testMaxComputeUnitPrice)),
 		MinComputeUnitPrice:     null.IntFrom(int64(testMinComputeUnitPrice)),
 		DefaultComputeUnitPrice: null.IntFrom(int64(testDefaultComputeUnitPrice)),
+		FeeBumpPeriod:           &testFeeBumpPeriod,
 	}
 	cfg.Update(dbCfg)
 	assert.Equal(t, testBalancePoll.Duration(), cfg.BalancePollPeriod())
@@ -129,6 +134,7 @@ func TestConfig_Update(t *testing.T) {
 	assert.Equal(t, testMaxComputeUnitPrice, cfg.MaxComputeUnitPrice())
 	assert.Equal(t, testMinComputeUnitPrice, cfg.MinComputeUnitPrice())
 	assert.Equal(t, testDefaultComputeUnitPrice, cfg.DefaultComputeUnitPrice())
+	assert.Equal(t, testFeeBumpPeriod.Duration(), cfg.FeeBumpPeriod())
 }
 
 func TestConfig_CommitmentFallback(t *testing.T) {
@@ -175,6 +181,7 @@ func TestChain_SetFromDB(t *testing.T) {
 			MaxComputeUnitPrice:     null.IntFrom(100),
 			MinComputeUnitPrice:     null.IntFrom(10),
 			DefaultComputeUnitPrice: null.IntFrom(50),
+			FeeBumpPeriod:           utils.MustNewDuration(3 * time.Second),
 		}, Chain{
 			BalancePollPeriod:       utils.MustNewDuration(5 * time.Second),
 			ConfirmPollPeriod:       utils.MustNewDuration(500 * time.Millisecond),
@@ -190,6 +197,7 @@ func TestChain_SetFromDB(t *testing.T) {
 			MaxComputeUnitPrice:     ptr[uint64](100),
 			MinComputeUnitPrice:     ptr[uint64](10),
 			DefaultComputeUnitPrice: ptr[uint64](50),
+			FeeBumpPeriod:           utils.MustNewDuration(3 * time.Second),
 		}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

@@ -32,9 +32,10 @@ var defaultConfigSet = configSet{
 
 	// fee estimator
 	FeeEstimatorMode:        "fixed",
-	MaxComputeUnitPrice:     1_000_000,
+	MaxComputeUnitPrice:     1_000,
 	MinComputeUnitPrice:     0,
 	DefaultComputeUnitPrice: 0,
+	FeeBumpPeriod:           3 * time.Second,
 }
 
 type Config interface {
@@ -54,6 +55,7 @@ type Config interface {
 	MaxComputeUnitPrice() uint64
 	MinComputeUnitPrice() uint64
 	DefaultComputeUnitPrice() uint64
+	FeeBumpPeriod() time.Duration
 
 	// Update sets new chain config values.
 	Update(db.ChainCfg)
@@ -75,6 +77,7 @@ type configSet struct {
 	MaxComputeUnitPrice     uint64
 	MinComputeUnitPrice     uint64
 	DefaultComputeUnitPrice uint64
+	FeeBumpPeriod           time.Duration
 }
 
 var _ Config = (*config)(nil)
@@ -268,6 +271,16 @@ func (c *config) MaxRetries() *uint {
 	return c.defaults.MaxRetries
 }
 
+func (c *config) FeeBumpPeriod() time.Duration {
+	c.chainMu.RLock()
+	ch := c.chain.FeeBumpPeriod
+	c.chainMu.RUnlock()
+	if ch != nil {
+		return ch.Duration()
+	}
+	return c.defaults.FeeBumpPeriod
+}
+
 type Chain struct {
 	BalancePollPeriod       *utils.Duration
 	ConfirmPollPeriod       *utils.Duration
@@ -283,6 +296,7 @@ type Chain struct {
 	MaxComputeUnitPrice     *uint64
 	MinComputeUnitPrice     *uint64
 	DefaultComputeUnitPrice *uint64
+	FeeBumpPeriod           *utils.Duration
 }
 
 func (c *Chain) SetFromDB(cfg *db.ChainCfg) error {
@@ -341,6 +355,9 @@ func (c *Chain) SetFromDB(cfg *db.ChainCfg) error {
 		}
 		c.DefaultComputeUnitPrice = ptr(uint64(cfg.DefaultComputeUnitPrice.Int64))
 	}
+	if cfg.FeeBumpPeriod != nil {
+		c.FeeBumpPeriod = utils.MustNewDuration(cfg.FeeBumpPeriod.Duration())
+	}
 	return nil
 }
 
@@ -387,6 +404,9 @@ func (c *Chain) SetDefaults() {
 	}
 	if c.DefaultComputeUnitPrice == nil {
 		c.DefaultComputeUnitPrice = &defaultConfigSet.DefaultComputeUnitPrice
+	}
+	if c.FeeBumpPeriod == nil {
+		c.FeeBumpPeriod = utils.MustNewDuration(defaultConfigSet.FeeBumpPeriod)
 	}
 	return
 }
