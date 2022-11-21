@@ -159,15 +159,13 @@ export default class AcceptProposal extends SolanaCommand {
   }
 
   makeDigestInputFromProposal = (proposalInfo: Proposal): DigestInput => {
-    const oracles = proposalInfo.oracles.xs
-      .map((oracle) => {
-        return {
-          transmitter: new PublicKey(oracle.transmitter),
-          signer: Buffer.from(oracle.signer.key),
-          payee: new PublicKey(oracle.payee),
-        }
-      })
-      .slice(0, proposalInfo.oracles.len)
+    const oracles = proposalInfo.oracles.xs.slice(0, proposalInfo.oracles.len).map((oracle) => {
+      return {
+        transmitter: new PublicKey(oracle.transmitter),
+        signer: Buffer.from(oracle.signer.key),
+        payee: new PublicKey(oracle.payee),
+      }
+    })
     return {
       version: new BN(proposalInfo.offchainConfig.version),
       f: new BN(proposalInfo.f),

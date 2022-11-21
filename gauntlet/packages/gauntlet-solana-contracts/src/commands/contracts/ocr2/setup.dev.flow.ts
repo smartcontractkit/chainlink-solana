@@ -231,7 +231,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
           link: FlowCommand.ID.contract(this.stepIds.TOKEN),
           input: {
             proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
-            secret: randomSecret,
+            secret: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'secret'),
             version: 2,
             f: this.configInput.f,
             tokenMint: FlowCommand.ID.contract(this.stepIds.TOKEN),
@@ -239,7 +239,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
             offchainConfig: offchainConfigInput,
           },
           proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
-          secret: randomSecret,
+          secret: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'secret'),
         },
         args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
