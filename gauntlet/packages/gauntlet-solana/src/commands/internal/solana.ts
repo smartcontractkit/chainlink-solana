@@ -14,6 +14,8 @@ import {
   RpcResponseAndContext,
   SignatureStatus,
   SimulatedTransactionResponse,
+  Connection,
+  Commitment,
 } from '@solana/web3.js'
 import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { TransactionResponse } from '../types'
@@ -61,6 +63,29 @@ export class SolanaError extends Error {
     this.message = message
     this.txid = txid
   }
+}
+
+// Workaround vlegacy not supporting commitment on simulateTransaction
+export async function simulateTransaction(
+  connection: Connection,
+  transaction: Transaction,
+  commitment: Commitment,
+): Promise<RpcResponseAndContext<SimulatedTransactionResponse>> {
+  const currentBlockhash = await connection.getLatestBlockhash()
+  transaction.recentBlockhash = currentBlockhash.blockhash;
+
+  // @ts-ignore
+  const wireTransaction = transaction.serialize();
+  const encodedTransaction = wireTransaction.toString('base64');
+  const config: any = { encoding: 'base64', commitment };
+  const args = [encodedTransaction, config];
+
+  // @ts-ignore
+  const res = await connection._rpcRequest('simulateTransaction', args);
+  if (res.error) {
+    throw new Error('failed to simulate transaction: ' + res.error.message);
+  }
+  return res.result;
 }
 
 export default abstract class SolanaCommand extends WriteCommand<TransactionResponse> {
@@ -139,7 +164,8 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     if (overrides.units) logger.info(`Sending transaction with custom unit limit: ${overrides.units}`)
     if (overrides.price) logger.info(`Sending transaction with custom unit price: ${overrides.price}`)
 
-    let confirmLevel: TransactionConfirmationStatus = 'confirmed'
+    // let confirmLevel: TransactionConfirmationStatus = 'confirmed'
+    let confirmLevel: TransactionConfirmationStatus = 'finalized'
 
     const currentBlockhash = await this.provider.connection.getLatestBlockhash()
     const { blockhash, lastValidBlockHeight } = currentBlockhash
@@ -154,7 +180,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       overrides,
     )
     if (extraSigners) {
-      tx.partialSign(...extraSigners)
+      tx.sign(...extraSigners) // TODO: partialSign instead?
     }
     const signedTx = await this.wallet.signTransaction(tx)
     logger.loading('Sending tx...')
@@ -362,7 +388,9 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
         blockhash,
         lastValidBlockHeight,
       })
+      // TODO: makeTx is missing extra signatures
       // simulating through connection allows to skip signing tx (useful when using Ledger device)
+      // const { value: simulationResponse } = await simulateTransaction(this.provider.connection, tx, 'confirmed')
       const { value: simulationResponse } = await this.provider.connection.simulateTransaction(tx)
       if (simulationResponse.err) {
         throw new Error(JSON.stringify({ error: simulationResponse.err, logs: simulationResponse.logs }))
@@ -370,6 +398,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       logger.success(`Tx simulation succeeded: ${simulationResponse.unitsConsumed} units consumed.`)
       return simulationResponse.unitsConsumed
     } catch (e) {
+      console.log(e.message)
       const parsedError = JSON.parse(e.message)
       const errorCode = parsedError.error.InstructionError ? parsedError.error.InstructionError[1].Custom : -1
       // Insufficient funds error
