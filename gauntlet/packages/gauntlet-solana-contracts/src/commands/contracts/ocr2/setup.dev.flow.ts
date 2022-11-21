@@ -12,12 +12,16 @@ import CreateFeed from '../store/createFeed'
 import SetWriter from '../store/setWriter'
 import ProposeConfig from './proposeConfig'
 import AcceptProposal from './proposal/acceptProposal'
+import CreateAccount from '../token/createAccount'
+import { getAssociatedTokenAddress } from '@solana/spl-token'
+import { PublicKey } from '@solana/web3.js'
 
 // TODO: Remove. Useful for dev testing
 export default class SetupFlow extends FlowCommand<TransactionResponse> {
   static id = 'ocr2:setup:flow'
   static category = CONTRACT_LIST.OCR_2
   static examples = ['yarn gauntlet ocr2:setup:flow --network=local --version=1']
+  configInput: any
 
   constructor(flags, args) {
     super(flags, args, waitExecute, makeAbstractCommand)
@@ -72,7 +76,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
     }
 
     const _toHex = (a: string) => Buffer.from(a, 'hex')
-    const configInput = {
+    this.configInput = {
       oracles: [
         {
           transmitter: 'DxRwKpwNBuMzKf5YEG1vLpnRbWeKo1Z4tKHfFGt8vUkj',
@@ -115,6 +119,19 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         name: 'Deploy LINK',
         command: DeployToken,
         id: this.stepIds.TOKEN,
+      },
+      {
+        name: 'Create payee accounts',
+        command: CreateAccount,
+        id: this.stepIds.ASSOCIATED_TOKEN_ACCOUNT,
+        flags: {
+          link: FlowCommand.ID.contract(this.stepIds.TOKEN),
+        },
+        args: this.configInput.oracles.map((oracle) => oracle.transmitter.toString()),
+      },
+      {
+        name: 'Update payees',
+        exec: this.updatePayees,
       },
       // {
       //   name: 'Set Environment',
@@ -199,8 +216,8 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         flags: {
           link: FlowCommand.ID.contract(this.stepIds.TOKEN),
           input: {
-            oracles: configInput.oracles,
-            f: configInput.f,
+            oracles: this.configInput.oracles,
+            f: this.configInput.f,
             offchainConfig: offchainConfigInput,
           },
           secret: randomSecret,
@@ -215,9 +232,9 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
           input: {
             secret: randomSecret,
             version: 2,
-            f: configInput.f,
+            f: this.configInput.f,
             tokenMint: FlowCommand.ID.contract(this.stepIds.TOKEN),
-            oracles: configInput,
+            oracles: this.configInput.oracles,
             offchainConfig: offchainConfigInput,
           },
           proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
@@ -243,5 +260,19 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
     process.env[CONTRACT_ENV_NAMES[CONTRACT_LIST.ACCESS_CONTROLLER]] = programsPublicKeys[0]
     process.env[CONTRACT_ENV_NAMES[CONTRACT_LIST.OCR_2]] = programsPublicKeys[1]
     process.env[CONTRACT_ENV_NAMES[CONTRACT_LIST.STORE]] = programsPublicKeys[2]
+  }
+
+  updatePayees = async () => {
+    // payees have to be derived token addresses, matching the ones we just
+    // created in the previous step.
+    for (let oracle of this.configInput.oracles) {
+      oracle.payee = (
+        await getAssociatedTokenAddress(
+          new PublicKey(this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.TOKEN))),
+          new PublicKey(oracle.transmitter),
+          true,
+        )
+      ).toString()
+    }
   }
 }

@@ -9,39 +9,42 @@ import { isValidTokenAccount } from './utils'
 export default class CreateAccount extends SolanaCommand {
   static id = 'token:create_account'
   static category = CONTRACT_LIST.TOKEN
-  static examples = ['yarn gauntlet token:create_account --network=devnet --address=<BASE_ADDRESS> <TOKEN>']
+  static examples = ['yarn gauntlet token:create_account --network=devnet --link=<TOKEN> [BASE_ADDRESS...]']
 
   constructor(flags, args) {
     super(flags, args)
 
-    this.requireFlag('address', `Provide an address from which the 'Token Associated Account' will be derived`)
-    this.require(!!args[0], 'Provide a token address')
+    this.require(!!args[0], `Provide an address from which the 'Token Associated Account' will be derived`)
   }
 
   execute = async () => {
-    const tokenAddress = new PublicKey(this.args[0])
+    // validate LINK address present
+    this.require(this.flags.link || process.env.LINK, 'LINK token not found')
 
-    const newAccountBase = new PublicKey(this.flags.address)
-    const associatedAcc = await getAssociatedTokenAddress(tokenAddress, newAccountBase, true)
+    const tokenAddress = new PublicKey(this.flags.link || process.env.LINK)
 
-    const accountExists = await isValidTokenAccount(this.provider.connection, tokenAddress, associatedAcc)
-    this.require(
-      !accountExists,
-      `A Token Associated Account to address ${newAccountBase.toString()} already exists: ${associatedAcc}`,
+    const addresses = this.args.map((addr) => new PublicKey(addr))
+
+    const ixs = await Promise.all(
+      addresses.map(async (address) => {
+        const associatedAcc = await getAssociatedTokenAddress(tokenAddress, address, true)
+
+        const accountExists = await isValidTokenAccount(this.provider.connection, tokenAddress, associatedAcc)
+        this.require(
+          !accountExists,
+          `A Token Associated Account to address ${address.toString()} already exists: ${associatedAcc}`,
+        )
+
+        return createAssociatedTokenAccountInstruction(this.wallet.publicKey, associatedAcc, address, tokenAddress)
+      }),
     )
 
-    const ix = createAssociatedTokenAccountInstruction(
-      this.wallet.publicKey,
-      associatedAcc,
-      newAccountBase,
-      tokenAddress,
-    )
+    await prompt(`Continue to create new Token associated accounts?`)
+    logger.loading('Creating accounts...')
+    const tx = await this.signAndSendRawTx(ixs)
 
-    await prompt(`Continue to create new Token associated account to ${newAccountBase.toString()}`)
-    logger.loading('Creating account...')
-    const tx = await this.signAndSendRawTx([ix])
-
-    logger.success(`New account created at ${associatedAcc.toString()} on tx ${tx}`)
+    logger.success(`New accounts created on tx ${tx}`)
+    // logger.success(`New account created at ${associatedAcc.toString()} on tx ${tx}`)
 
     return {
       responses: [
