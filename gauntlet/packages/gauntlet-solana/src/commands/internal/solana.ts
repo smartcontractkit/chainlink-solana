@@ -72,20 +72,20 @@ export async function simulateTransaction(
   commitment: Commitment,
 ): Promise<RpcResponseAndContext<SimulatedTransactionResponse>> {
   const currentBlockhash = await connection.getLatestBlockhash()
-  transaction.recentBlockhash = currentBlockhash.blockhash;
+  transaction.recentBlockhash = currentBlockhash.blockhash
 
   // @ts-ignore
-  const wireTransaction = transaction.serialize();
-  const encodedTransaction = wireTransaction.toString('base64');
-  const config: any = { encoding: 'base64', commitment };
-  const args = [encodedTransaction, config];
+  const wireTransaction = transaction.serialize()
+  const encodedTransaction = wireTransaction.toString('base64')
+  const config: any = { encoding: 'base64', commitment }
+  const args = [encodedTransaction, config]
 
   // @ts-ignore
-  const res = await connection._rpcRequest('simulateTransaction', args);
+  const res = await connection._rpcRequest('simulateTransaction', args)
   if (res.error) {
-    throw new Error('failed to simulate transaction: ' + res.error.message);
+    throw new Error('failed to simulate transaction: ' + res.error.message)
   }
-  return res.result;
+  return res.result
 }
 
 export default abstract class SolanaCommand extends WriteCommand<TransactionResponse> {
