@@ -1,6 +1,5 @@
 import { Result, WriteCommand } from '@chainlink/gauntlet-core'
 import {
-  Transaction,
   BpfLoader,
   BPF_LOADER_PROGRAM_ID,
   Keypair,
@@ -14,7 +13,6 @@ import {
   RpcResponseAndContext,
   SignatureStatus,
   SimulatedTransactionResponse,
-  Connection,
   Commitment,
 } from '@solana/web3.js'
 import { withProvider, withWallet, withNetwork } from '../middlewares'
@@ -35,7 +33,7 @@ import { makeTx } from '../../lib/utils'
  */
 export const MAXIMUM_NUMBER_OF_BLOCKS_FOR_TRANSACTION = 152
 
-async function sleep(ms) {
+async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
