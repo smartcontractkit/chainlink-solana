@@ -63,6 +63,9 @@ export class SolanaError extends Error {
   }
 }
 
+const CONFIRM_LEVEL: TransactionConfirmationStatus = 'confirmed'
+// const CONFIRM_LEVEL: TransactionConfirmationStatus = 'finalized'
+
 export default abstract class SolanaCommand extends WriteCommand<TransactionResponse> {
   wallet: SolanaWallet
   provider: AnchorProvider
@@ -139,9 +142,6 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     if (overrides.units) logger.info(`Sending transaction with custom unit limit: ${overrides.units}`)
     if (overrides.price) logger.info(`Sending transaction with custom unit price: ${overrides.price}`)
 
-    // let confirmLevel: TransactionConfirmationStatus = 'confirmed'
-    let confirmLevel: TransactionConfirmationStatus = 'finalized'
-
     this.simulateTx(this.wallet.publicKey, rawTxs)
 
     const currentBlockhash = await this.provider.connection.getLatestBlockhash()
@@ -189,7 +189,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     })()
 
     try {
-      await this.awaitTransactionSignatureConfirmation(txid, timeout, confirmLevel, currentBlockhash)
+      await this.awaitTransactionSignatureConfirmation(txid, timeout, CONFIRM_LEVEL, currentBlockhash)
     } catch (err: any) {
       if (err.timeout) {
         throw new TimeoutError({ txid })
@@ -366,7 +366,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       })
       // simulating through connection allows to skip signing tx (useful when using Ledger device)
       const { value: simulationResponse } = await this.provider.connection.simulateTransaction(tx, {
-        commitment: 'confirmed',
+        commitment: CONFIRM_LEVEL,
       })
       if (simulationResponse.err) {
         throw new Error(JSON.stringify({ error: simulationResponse.err, logs: simulationResponse.logs }))
