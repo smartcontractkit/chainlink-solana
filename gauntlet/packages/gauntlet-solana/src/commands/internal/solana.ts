@@ -142,7 +142,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     if (overrides.units) logger.info(`Sending transaction with custom unit limit: ${overrides.units}`)
     if (overrides.price) logger.info(`Sending transaction with custom unit price: ${overrides.price}`)
 
-    this.simulateTx(this.wallet.publicKey, rawTxs)
+    await this.simulateTx(this.wallet.publicKey, rawTxs)
 
     const currentBlockhash = await this.provider.connection.getLatestBlockhash()
 
