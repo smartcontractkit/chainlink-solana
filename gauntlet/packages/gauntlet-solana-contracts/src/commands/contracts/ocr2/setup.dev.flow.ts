@@ -219,8 +219,8 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
             oracles: this.configInput.oracles,
             f: this.configInput.f,
             offchainConfig: offchainConfigInput,
+            userSecret: randomSecret,
           },
-          secret: randomSecret,
         },
         args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
@@ -231,7 +231,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
           link: FlowCommand.ID.contract(this.stepIds.TOKEN),
           input: {
             proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
-            secret: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'secret'),
+            randomSecret: randomSecret,
             version: 2,
             f: this.configInput.f,
             tokenMint: FlowCommand.ID.contract(this.stepIds.TOKEN),
@@ -239,7 +239,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
             offchainConfig: offchainConfigInput,
           },
           proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
-          secret: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'secret'),
+          secret: randomSecret, // otherwise input validation complains
         },
         args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },

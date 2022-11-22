@@ -195,6 +195,7 @@ export default class ProposeConfig extends SolanaCommand {
       oracles,
       f,
       offchainConfig,
+      userSecret,
     }
   }
 
