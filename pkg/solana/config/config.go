@@ -1,7 +1,9 @@
 package config
 
 import (
+	"fmt"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,6 +29,13 @@ var defaultConfigSet = configSet{
 	SkipPreflight:       true,                   // to enable or disable preflight checks
 	Commitment:          rpc.CommitmentConfirmed,
 	MaxRetries:          new(uint), // max number of retries, when nil - rpc node will do a reasonable number of retries
+
+	// fee estimator
+	FeeEstimatorMode:        "fixed",
+	MaxComputeUnitPrice:     1_000,
+	MinComputeUnitPrice:     0,
+	DefaultComputeUnitPrice: 0,
+	FeeBumpPeriod:           3 * time.Second,
 }
 
 type Config interface {
@@ -40,6 +49,13 @@ type Config interface {
 	SkipPreflight() bool
 	Commitment() rpc.CommitmentType
 	MaxRetries() *uint
+
+	// fee estimator
+	FeeEstimatorMode() string
+	MaxComputeUnitPrice() uint64
+	MinComputeUnitPrice() uint64
+	DefaultComputeUnitPrice() uint64
+	FeeBumpPeriod() time.Duration
 
 	// Update sets new chain config values.
 	Update(db.ChainCfg)
@@ -56,6 +72,12 @@ type configSet struct {
 	SkipPreflight       bool
 	Commitment          rpc.CommitmentType
 	MaxRetries          *uint
+
+	FeeEstimatorMode        string
+	MaxComputeUnitPrice     uint64
+	MinComputeUnitPrice     uint64
+	DefaultComputeUnitPrice uint64
+	FeeBumpPeriod           time.Duration
 }
 
 var _ Config = (*config)(nil)
@@ -185,6 +207,55 @@ func (c *config) Commitment() rpc.CommitmentType {
 	return c.defaults.Commitment
 }
 
+func (c *config) FeeEstimatorMode() string {
+	c.chainMu.RLock()
+	ch := c.chain.FeeEstimatorMode
+	c.chainMu.RUnlock()
+	if ch.Valid {
+		return strings.ToLower(ch.String)
+	}
+	return c.defaults.FeeEstimatorMode
+}
+
+func (c *config) MaxComputeUnitPrice() uint64 {
+	c.chainMu.RLock()
+	ch := c.chain.MaxComputeUnitPrice
+	c.chainMu.RUnlock()
+	if ch.Valid {
+		if ch.Int64 >= 0 {
+			return uint64(ch.Int64)
+		}
+		c.lggr.Warnf("Negative value provided for MaxComputeUnitPrice, falling back to default: %d", c.defaults.MaxComputeUnitPrice)
+	}
+	return c.defaults.MaxComputeUnitPrice
+}
+
+func (c *config) MinComputeUnitPrice() uint64 {
+	c.chainMu.RLock()
+	ch := c.chain.MinComputeUnitPrice
+	c.chainMu.RUnlock()
+	if ch.Valid {
+		if ch.Int64 >= 0 {
+			return uint64(ch.Int64)
+		}
+		c.lggr.Warnf("Negative value provided for MinComputeUnitPrice, falling back to default: %d", c.defaults.MinComputeUnitPrice)
+	}
+	return c.defaults.MinComputeUnitPrice
+}
+
+func (c *config) DefaultComputeUnitPrice() uint64 {
+	c.chainMu.RLock()
+	ch := c.chain.DefaultComputeUnitPrice
+	c.chainMu.RUnlock()
+	if ch.Valid {
+		if ch.Int64 >= 0 {
+			return uint64(ch.Int64)
+		}
+		c.lggr.Warnf("Negative value provided for DefaultComputeUnitPrice, falling back to default: %d", c.defaults.DefaultComputeUnitPrice)
+	}
+	return c.defaults.DefaultComputeUnitPrice
+}
+
 func (c *config) MaxRetries() *uint {
 	c.chainMu.RLock()
 	ch := c.chain.MaxRetries
@@ -200,17 +271,32 @@ func (c *config) MaxRetries() *uint {
 	return c.defaults.MaxRetries
 }
 
+func (c *config) FeeBumpPeriod() time.Duration {
+	c.chainMu.RLock()
+	ch := c.chain.FeeBumpPeriod
+	c.chainMu.RUnlock()
+	if ch != nil {
+		return ch.Duration()
+	}
+	return c.defaults.FeeBumpPeriod
+}
+
 type Chain struct {
-	BalancePollPeriod   *utils.Duration
-	ConfirmPollPeriod   *utils.Duration
-	OCR2CachePollPeriod *utils.Duration
-	OCR2CacheTTL        *utils.Duration
-	TxTimeout           *utils.Duration
-	TxRetryTimeout      *utils.Duration
-	TxConfirmTimeout    *utils.Duration
-	SkipPreflight       *bool
-	Commitment          *string
-	MaxRetries          *int64
+	BalancePollPeriod       *utils.Duration
+	ConfirmPollPeriod       *utils.Duration
+	OCR2CachePollPeriod     *utils.Duration
+	OCR2CacheTTL            *utils.Duration
+	TxTimeout               *utils.Duration
+	TxRetryTimeout          *utils.Duration
+	TxConfirmTimeout        *utils.Duration
+	SkipPreflight           *bool
+	Commitment              *string
+	MaxRetries              *int64
+	FeeEstimatorMode        *string
+	MaxComputeUnitPrice     *uint64
+	MinComputeUnitPrice     *uint64
+	DefaultComputeUnitPrice *uint64
+	FeeBumpPeriod           *utils.Duration
 }
 
 func (c *Chain) SetFromDB(cfg *db.ChainCfg) error {
@@ -248,6 +334,30 @@ func (c *Chain) SetFromDB(cfg *db.ChainCfg) error {
 	if cfg.MaxRetries.Valid {
 		c.MaxRetries = &cfg.MaxRetries.Int64
 	}
+	if cfg.FeeEstimatorMode.Valid {
+		c.FeeEstimatorMode = &cfg.FeeEstimatorMode.String
+	}
+	if cfg.MaxComputeUnitPrice.Valid {
+		if cfg.MaxComputeUnitPrice.Int64 < 0 {
+			return fmt.Errorf("MaxComputeUnitPrice is less than zero %d < 0", cfg.MaxComputeUnitPrice.Int64)
+		}
+		c.MaxComputeUnitPrice = ptr(uint64(cfg.MaxComputeUnitPrice.Int64))
+	}
+	if cfg.MinComputeUnitPrice.Valid {
+		if cfg.MinComputeUnitPrice.Int64 < 0 {
+			return fmt.Errorf("MinComputeUnitPrice is less than zero %d < 0", cfg.MinComputeUnitPrice.Int64)
+		}
+		c.MinComputeUnitPrice = ptr(uint64(cfg.MinComputeUnitPrice.Int64))
+	}
+	if cfg.DefaultComputeUnitPrice.Valid {
+		if cfg.DefaultComputeUnitPrice.Int64 < 0 {
+			return fmt.Errorf("DefaultComputeUnitPrice is less than zero %d < 0", cfg.DefaultComputeUnitPrice.Int64)
+		}
+		c.DefaultComputeUnitPrice = ptr(uint64(cfg.DefaultComputeUnitPrice.Int64))
+	}
+	if cfg.FeeBumpPeriod != nil {
+		c.FeeBumpPeriod = utils.MustNewDuration(cfg.FeeBumpPeriod.Duration())
+	}
 	return nil
 }
 
@@ -283,6 +393,21 @@ func (c *Chain) SetDefaults() {
 		i := int64(*defaultConfigSet.MaxRetries)
 		c.MaxRetries = &i
 	}
+	if c.FeeEstimatorMode == nil {
+		c.FeeEstimatorMode = &defaultConfigSet.FeeEstimatorMode
+	}
+	if c.MaxComputeUnitPrice == nil {
+		c.MaxComputeUnitPrice = &defaultConfigSet.MaxComputeUnitPrice
+	}
+	if c.MinComputeUnitPrice == nil {
+		c.MinComputeUnitPrice = &defaultConfigSet.MinComputeUnitPrice
+	}
+	if c.DefaultComputeUnitPrice == nil {
+		c.DefaultComputeUnitPrice = &defaultConfigSet.DefaultComputeUnitPrice
+	}
+	if c.FeeBumpPeriod == nil {
+		c.FeeBumpPeriod = utils.MustNewDuration(defaultConfigSet.FeeBumpPeriod)
+	}
 	return
 }
 
@@ -315,4 +440,8 @@ func (n *Node) ValidateConfig() (err error) {
 		err = multierr.Append(err, relaycfg.ErrMissing{Name: "URL", Msg: "required for all nodes"})
 	}
 	return
+}
+
+func ptr[T any](t T) *T {
+	return &t
 }
