@@ -1,5 +1,5 @@
 import { Wallet } from '@project-serum/anchor'
-import { Keypair, PublicKey, Transaction } from '@solana/web3.js'
+import { Keypair, PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js'
 import TransportNodeHid from '@ledgerhq/hw-transport-node-hid'
 import Solana from '@ledgerhq/hw-app-solana'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
@@ -13,6 +13,7 @@ export abstract class SolanaWallet {
   static create: (...args) => Promise<SolanaWallet>
 
   abstract signTransaction: (tx: Transaction) => Promise<Transaction>
+  abstract signVersionedTransaction: (tx: VersionedTransaction) => Promise<VersionedTransaction>
   abstract signAllTransactions: (txs: Transaction[]) => Promise<Transaction[]>
   abstract publicKey: PublicKey
   abstract payer: Keypair
@@ -33,6 +34,10 @@ export class LocalWallet extends SolanaWallet {
     return new LocalWallet(wallet)
   }
 
+  signVersionedTransaction = async (tx: VersionedTransaction) => {
+    tx.sign([this.wallet.payer])
+    return tx
+  }
   signTransaction = (tx: Transaction) => this.wallet.signTransaction(tx)
   signAllTransactions = (txs: Transaction[]) => this.wallet.signAllTransactions(txs)
 
@@ -72,6 +77,14 @@ export class LedgerWallet extends SolanaWallet {
       logger.error('Ledger: Could not access ledger. Is it unlocked and Solana app open?')
       throw e
     }
+  }
+
+  signVersionedTransaction = async (tx: VersionedTransaction) => {
+    logger.info(`Ledger: Request to sign message`)
+    const msg = tx.serialize()
+    const { signature } = await this.wallet.signTransaction(this.path, Buffer.from(msg))
+    tx.addSignature(this.publicKey, signature)
+    return tx
   }
 
   signTransaction = async (tx: Transaction) => {

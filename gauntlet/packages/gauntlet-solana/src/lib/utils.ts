@@ -1,17 +1,25 @@
-import { Transaction, TransactionInstruction, TransactionBlockhashCtor, ComputeBudgetProgram } from '@solana/web3.js'
+import {
+  VersionedTransaction,
+  TransactionMessage,
+  ComputeBudgetProgram,
+  TransactionMessageArgs,
+  TransactionInstruction,
+} from '@solana/web3.js'
 
 export const makeTx = (
-  rawTx: TransactionInstruction[],
-  opts?: TransactionBlockhashCtor,
+  args: TransactionMessageArgs,
   overrides: { price?: number; units?: number } = {},
-): Transaction => {
+): VersionedTransaction => {
   if (overrides.price && overrides.units)
     throw new Error('Cannot set limit for units and price in the same transaction')
 
   let computeIx: TransactionInstruction
   if (overrides.price) computeIx = ComputeBudgetProgram.setComputeUnitPrice({ microLamports: overrides.price })
   if (overrides.units) computeIx = ComputeBudgetProgram.setComputeUnitLimit({ units: overrides.units })
-  const initialTx = computeIx ? new Transaction(opts).add(computeIx) : new Transaction(opts)
+  if (computeIx) {
+    args.instructions.unshift(computeIx)
+  }
 
-  return rawTx.reduce((tx, instruction) => tx.add(instruction), initialTx)
+  const messageV0 = new TransactionMessage(args).compileToV0Message()
+  return new VersionedTransaction(messageV0)
 }

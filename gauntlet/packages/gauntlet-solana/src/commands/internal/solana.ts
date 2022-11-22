@@ -65,29 +65,6 @@ export class SolanaError extends Error {
   }
 }
 
-// Workaround vlegacy not supporting commitment on simulateTransaction
-export async function simulateTransaction(
-  connection: Connection,
-  transaction: Transaction,
-  commitment: Commitment,
-): Promise<RpcResponseAndContext<SimulatedTransactionResponse>> {
-  const currentBlockhash = await connection.getLatestBlockhash()
-  transaction.recentBlockhash = currentBlockhash.blockhash
-
-  // @ts-ignore
-  const wireTransaction = transaction.serialize()
-  const encodedTransaction = wireTransaction.toString('base64')
-  const config: any = { encoding: 'base64', commitment }
-  const args = [encodedTransaction, config]
-
-  // @ts-ignore
-  const res = await connection._rpcRequest('simulateTransaction', args)
-  if (res.error) {
-    throw new Error('failed to simulate transaction: ' + res.error.message)
-  }
-  return res.result
-}
-
 export default abstract class SolanaCommand extends WriteCommand<TransactionResponse> {
   wallet: SolanaWallet
   provider: AnchorProvider
@@ -170,21 +147,19 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     this.simulateTx(this.wallet.publicKey, rawTxs)
 
     const currentBlockhash = await this.provider.connection.getLatestBlockhash()
-    const { blockhash, lastValidBlockHeight } = currentBlockhash
 
     const tx = makeTx(
-      rawTxs,
       {
-        blockhash,
-        lastValidBlockHeight,
-        feePayer: this.wallet.publicKey,
+        instructions: rawTxs,
+        recentBlockhash: currentBlockhash.blockhash,
+        payerKey: this.wallet.publicKey,
       },
       overrides,
     )
     if (extraSigners) {
-      tx.sign(...extraSigners) // TODO: partialSign instead?
+      tx.sign(extraSigners)
     }
-    const signedTx = await this.wallet.signTransaction(tx)
+    const signedTx = await this.wallet.signVersionedTransaction(tx)
     logger.loading('Sending tx...')
 
     const rawTransaction = signedTx.serialize()
@@ -384,16 +359,17 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
 
   simulateTx = async (signer: PublicKey, txInstructions: TransactionInstruction[], feePayer?: PublicKey) => {
     try {
-      const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
-      const tx = makeTx(txInstructions, {
-        feePayer: feePayer || signer,
-        blockhash,
-        lastValidBlockHeight,
+      const { blockhash } = await this.provider.connection.getLatestBlockhash()
+      // TODO: accept a tx pre-made tx without the signatures
+      const tx = makeTx({
+        instructions: txInstructions,
+        recentBlockhash: blockhash,
+        payerKey: feePayer || signer,
       })
-      // TODO: makeTx is missing extra signatures
       // simulating through connection allows to skip signing tx (useful when using Ledger device)
-      // const { value: simulationResponse } = await simulateTransaction(this.provider.connection, tx, 'confirmed')
-      const { value: simulationResponse } = await this.provider.connection.simulateTransaction(tx)
+      const { value: simulationResponse } = await this.provider.connection.simulateTransaction(tx, {
+        commitment: 'confirmed',
+      })
       if (simulationResponse.err) {
         throw new Error(JSON.stringify({ error: simulationResponse.err, logs: simulationResponse.logs }))
       }
