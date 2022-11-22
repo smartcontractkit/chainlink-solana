@@ -411,18 +411,4 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       throw e
     }
   }
-
-  sendTx = async (tx: Transaction, signers: Keypair[], idl: Idl): Promise<TransactionSignature> => {
-    try {
-      return await this.provider.sendAndConfirm(tx, signers)
-    } catch (err) {
-      // Translate IDL error
-      const idlErrors = parseIdlErrors(idl)
-      let translatedErr = ProgramError.parse(err, idlErrors)
-      if (translatedErr === null) {
-        throw err
-      }
-      throw translatedErr
-    }
-  }
 }
