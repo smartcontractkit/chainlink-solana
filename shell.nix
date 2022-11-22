@@ -27,8 +27,8 @@ pkgs.mkShell {
     nodePackages.typescript
     nodePackages.typescript-language-server
     # Keep this nodejs version in sync with the version in .tool-versions please
-    nodejs-14_x
-    (yarn.override { nodejs = nodejs-14_x; })
+    nodejs-16_x
+    (yarn.override { nodejs = nodejs-16_x; })
     python3
   ];
   RUST_BACKTRACE = "1";

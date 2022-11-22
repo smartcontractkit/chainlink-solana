@@ -46,12 +46,13 @@ func (c *Transmitter) Transmit(
 	}
 
 	accounts := []*solana.AccountMeta{
-		// state, transmitter, transmissions, store_program, store, store_authority
+		// state, transmitter, transmissions, store_program, store, store_authority, instructions_sysvar
 		{PublicKey: c.stateID, IsWritable: true, IsSigner: false},
 		{PublicKey: c.transmissionSigner, IsWritable: false, IsSigner: true},
 		{PublicKey: c.transmissionsID, IsWritable: true, IsSigner: false},
 		{PublicKey: c.storeProgramID, IsWritable: false, IsSigner: false},
 		{PublicKey: storeAuthority, IsWritable: false, IsSigner: false},
+		{PublicKey: solana.SysVarInstructionsPubkey, IsWritable: false, IsSigner: false},
 	}
 
 	reportContext := utils.RawReportContext(reportCtx)
