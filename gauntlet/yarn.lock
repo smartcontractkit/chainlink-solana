@@ -323,10 +323,10 @@
   resolved "https://registry.yarnpkg.com/@bcoe/v8-coverage/-/v8-coverage-0.2.3.tgz#75a2e8b51cb758a7553d6804a5932d7aace75c39"
   integrity sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==
 
-"@chainlink/gauntlet-core@0.1.2":
-  version "0.1.2"
-  resolved "https://registry.yarnpkg.com/@chainlink/gauntlet-core/-/gauntlet-core-0.1.2.tgz#9095aa7b79505c5f1de3986da4031d8293f30fb2"
-  integrity sha512-qR1C/6MERUeerO9pWQmJKJN1odoV27gpwEXA6V/HeldKTiuBcfkpiqx9NlB6qOdZBKOmsSezt0u2TAVpYIzwvw==
+"@chainlink/gauntlet-core@0.5.0":
+  version "0.5.0"
+  resolved "https://registry.yarnpkg.com/@chainlink/gauntlet-core/-/gauntlet-core-0.5.0.tgz#8e9d96e785b2cb5960883e3247166c12d9eb8488"
+  integrity sha512-DaCKYOheMiGZhBy9IkQ0Y03DIcOqHWIVxltkanKja2wlrkiPqLPbF5Cdr6GFTASy7vkFxS3OF/Qul2B8a4Sliw==
   dependencies:
     "@ethersproject/keccak256" "^5.5.0"
     axios "^0.24.0"
