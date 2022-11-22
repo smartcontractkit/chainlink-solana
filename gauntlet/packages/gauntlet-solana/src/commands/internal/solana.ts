@@ -167,6 +167,8 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     // let confirmLevel: TransactionConfirmationStatus = 'confirmed'
     let confirmLevel: TransactionConfirmationStatus = 'finalized'
 
+    this.simulateTx(this.wallet.publicKey, rawTxs)
+
     const currentBlockhash = await this.provider.connection.getLatestBlockhash()
     const { blockhash, lastValidBlockHeight } = currentBlockhash
 

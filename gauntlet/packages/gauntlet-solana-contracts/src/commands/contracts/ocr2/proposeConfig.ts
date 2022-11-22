@@ -401,12 +401,10 @@ export default class ProposeConfig extends SolanaCommand {
 
     const txs: string[] = []
 
-    // Simulate and execute createProposal
-    await this.simulateTx(signer, createTx)
+    // execute createProposal
     txs.push(await this.signAndSendRawTx(createTx, [this.proposal]))
 
     for (const rawTx of rawTxs) {
-      await this.simulateTx(signer, [rawTx])
       const txhash = await this.signAndSendRawTx([rawTx])
       txs.push(txhash)
     }
