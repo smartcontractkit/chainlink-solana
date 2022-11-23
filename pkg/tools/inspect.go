@@ -205,6 +205,11 @@ func XXXInspectTxs(network string, state string) error {
 		epochRoundOffset := 1 + 32 + 27
 		obsTsOffset := 97
 
+		// handle if there is a set compute budget instruction
+		if len(transmitData) < obsTsOffset+4 && len(txData.Message.Instructions) == 2 {
+			transmitData = []byte(txData.Message.Instructions[1].Data)
+		}
+
 		if len(transmitData) < obsTsOffset+4 {
 			fmt.Println("WARN: Unable to parse tx", tx.Signature)
 			continue
