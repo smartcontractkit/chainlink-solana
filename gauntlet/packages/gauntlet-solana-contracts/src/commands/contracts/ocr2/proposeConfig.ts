@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, BN, time, prompt, longs } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js'
+import { Keypair, PublicKey, SystemProgram, TransactionInstruction } from '@solana/web3.js'
 import { MAX_TRANSACTION_BYTES, ORACLES_MAX_LENGTH } from '../../../lib/constants'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { divideIntoChunks } from '../../../lib/utils'
@@ -115,7 +115,9 @@ export default class ProposeConfig extends SolanaCommand {
 
   input: Input
   randomSecret: string
-  proposal: Keypair
+  proposalId: PublicKey
+  proposalKeypair: Keypair
+  proposal?: any
 
   static makeInputFromRDD = (rdd: any, stateAddress: string): OffchainConfig => {
     const aggregator = rdd.contracts[stateAddress]
@@ -218,30 +220,46 @@ export default class ProposeConfig extends SolanaCommand {
   }
 
   makeRawTransaction = async (signer: PublicKey) => {
-    const proposal = Keypair.generate()
-    this.proposal = proposal
+    // TODO: don't generate but use flag
+
+    if (this.flags.proposal) {
+      this.proposalId = this.flags.proposal
+
+      // fetch proposal if it already exists
+      this.proposal = await this.program.account.proposal.fetchNullable(this.proposalId)
+    }
 
     // createProposal
     const version = new BN(2)
 
     logger.log('Generating data for creating config proposal')
-    logger.log('Config Proposal state will be at:', proposal.toString())
 
-    const createIx = await this.program.methods
-      .createProposal(version)
-      .accounts({
-        proposal: proposal.publicKey,
-        authority: signer,
+    let ixs: TransactionInstruction[] = []
+
+    if (!this.proposal) {
+      this.proposalKeypair = Keypair.generate()
+      this.proposalId = this.proposalKeypair.publicKey
+
+      const createIx = await this.program.methods
+        .createProposal(version)
+        .accounts({
+          proposal: this.proposalId,
+          authority: signer,
+        })
+        .instruction()
+      const defaultAccountSize = new BN(this.program.account.proposal.size)
+      const createAccountIx = SystemProgram.createAccount({
+        fromPubkey: signer,
+        newAccountPubkey: this.proposalId,
+        space: defaultAccountSize.toNumber(),
+        lamports: await this.provider.connection.getMinimumBalanceForRentExemption(defaultAccountSize.toNumber()),
+        programId: this.program.programId,
       })
-      .instruction()
-    const defaultAccountSize = new BN(this.program.account.proposal.size)
-    const createAccountIx = SystemProgram.createAccount({
-      fromPubkey: signer,
-      newAccountPubkey: proposal.publicKey,
-      space: defaultAccountSize.toNumber(),
-      lamports: await this.provider.connection.getMinimumBalanceForRentExemption(defaultAccountSize.toNumber()),
-      programId: this.program.programId,
-    })
+
+      ixs.push(createAccountIx, createIx)
+    }
+
+    logger.log('Config Proposal state will be at:', this.proposalId.toString())
 
     // proposeConfig
 
@@ -259,13 +277,16 @@ export default class ProposeConfig extends SolanaCommand {
       `Oracles max length is ${ORACLES_MAX_LENGTH}, currently ${oracles.length}`,
     )
 
-    const configIx = await this.program.methods
-      .proposeConfig(oracles, f)
-      .accounts({
-        proposal: proposal.publicKey,
-        authority: signer,
-      })
-      .instruction()
+    if (this.proposal?.oracles.len != oracles.length) {
+      const configIx = await this.program.methods
+        .proposeConfig(oracles, f)
+        .accounts({
+          proposal: this.proposalId,
+          authority: signer,
+        })
+        .instruction()
+      ixs.push(configIx)
+    }
 
     // proposePayees
 
@@ -282,11 +303,13 @@ export default class ProposeConfig extends SolanaCommand {
     const payeesIx = await this.program.methods
       .proposePayees(link)
       .accounts({
-        proposal: proposal.publicKey,
+        proposal: this.proposalId,
         authority: signer,
       })
       .remainingAccounts(payees)
       .instruction()
+
+    ixs.push(payeesIx)
 
     // proposeOffchainConfig
 
@@ -305,35 +328,45 @@ export default class ProposeConfig extends SolanaCommand {
     logger.info(`Offchain config size: ${serializedOffchainConfig.byteLength}`)
     this.require(serializedOffchainConfig.byteLength < 4096, 'Offchain config must be lower than 4096 bytes')
 
-    // There's a byte limit per transaction. Write the config in chunks
-    const offchainConfigChunks = divideIntoChunks(serializedOffchainConfig, maxBufferSize)
-    if (offchainConfigChunks.length > 1) {
-      logger.info(
-        `Config size (${serializedOffchainConfig.byteLength} bytes) is bigger than transaction limit. It needs to be configured using ${offchainConfigChunks.length} transactions`,
-      )
-    }
+    if (!this.proposal || this.proposal.offchain_config.len < serializedOffchainConfig.byteLength) {
+      let writtenChunks = this.proposal ? Math.floor(this.proposal.offchain_config.len / maxBufferSize) : 0
 
-    const offchainConfigIxs = await Promise.all(
-      offchainConfigChunks.map((buffer) =>
-        this.program.methods
-          .writeOffchainConfig(buffer)
-          .accounts({
-            proposal: proposal.publicKey,
-            authority: signer,
-          })
-          .instruction(),
-      ),
-    )
+      // There's a byte limit per transaction. Write the config in chunks
+      const offchainConfigChunks = divideIntoChunks(serializedOffchainConfig, maxBufferSize)
+      if (offchainConfigChunks.length > 1) {
+        logger.info(
+          `Config size (${serializedOffchainConfig.byteLength} bytes) is bigger than transaction limit. It needs to be configured using ${offchainConfigChunks.length} transactions`,
+        )
+      }
+
+      const offchainConfigIxs = (
+        await Promise.all(
+          offchainConfigChunks.map((buffer) =>
+            this.program.methods
+              .writeOffchainConfig(buffer)
+              .accounts({
+                proposal: this.proposalId,
+                authority: signer,
+              })
+              .instruction(),
+          ),
+        )
+      ).slice(writtenChunks) // start writing from last chunk onwards
+
+      ixs.push(...offchainConfigIxs)
+    }
 
     const finalizeIx = await this.program.methods
       .finalizeProposal()
       .accounts({
-        proposal: proposal.publicKey,
+        proposal: this.proposalId,
         authority: signer,
       })
       .instruction()
 
-    return [createAccountIx, createIx, configIx, payeesIx, ...offchainConfigIxs, finalizeIx]
+    ixs.push(finalizeIx)
+
+    return ixs
   }
 
   beforeExecute = async () => {
@@ -403,7 +436,7 @@ export default class ProposeConfig extends SolanaCommand {
     const txs: string[] = []
 
     // execute createProposal
-    txs.push(await this.signAndSendRawTx(createTx, [this.proposal]))
+    txs.push(await this.signAndSendRawTx(createTx, [this.proposalKeypair!]))
 
     for (const rawTx of rawTxs) {
       const txhash = await this.signAndSendRawTx([rawTx])
@@ -414,13 +447,13 @@ export default class ProposeConfig extends SolanaCommand {
     logger.success(`Config proposal finalized on tx ${txhash}`)
     logger.line()
     logger.info('Use the Config Proposal ID in future proposal commands:')
-    logger.info(this.proposal.publicKey.toString())
+    logger.info(this.proposalId.toString())
     logger.line()
 
     return {
       data: {
         secret: this.randomSecret,
-        proposal: this.proposal.publicKey.toString(),
+        proposal: this.proposalId.toString(),
       },
       responses: [
         // TODO: map over responses
