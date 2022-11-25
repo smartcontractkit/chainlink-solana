@@ -32,10 +32,8 @@ export default class SetWriter extends SolanaCommand {
   makeRawTransaction = async (signer: PublicKey) => {
     const store = getContract(CONTRACT_LIST.STORE, '')
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
-    const storeAddress = store.programId.toString()
-    const ocr2Address = ocr2.programId.toString()
-    const storeProgram = this.loadProgram(store.idl, storeAddress)
-    const ocr2Program = this.loadProgram(ocr2.idl, ocr2Address)
+    const address = store.programId.toString()
+    const program = this.loadProgram(store.idl, address)
 
     const input = this.makeInput(this.flags.input)
 
@@ -48,13 +46,13 @@ export default class SetWriter extends SolanaCommand {
 
     const [storeAuthority, _storeNonce] = await PublicKey.findProgramAddress(
       [Buffer.from(utils.bytes.utf8.encode('store')), ocr2State.toBuffer()],
-      ocr2Program.programId,
+      ocr2.programId,
     )
 
     // Resolve the current store owner
-    let feedAccount = (await storeProgram.account.transmissions.fetch(feedState)) as any
+    let feedAccount = (await program.account.transmissions.fetch(feedState)) as any
 
-    const tx = await storeProgram.methods
+    const tx = await program.methods
       .setWriter(storeAuthority)
       .accounts({
         feed: feedState,
