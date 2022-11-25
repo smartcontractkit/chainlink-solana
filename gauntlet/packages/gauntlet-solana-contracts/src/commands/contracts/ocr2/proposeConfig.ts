@@ -420,9 +420,9 @@ export default class ProposeConfig extends SolanaCommand {
     await this.buildCommand(this.flags, this.args)
 
     const signer = this.wallet.publicKey
+    let rawTxs = await this.makeRawTransaction(signer) // needs to run before beforeExecute so it sets this.randomSecret
     await this.beforeExecute()
 
-    let rawTxs = await this.makeRawTransaction(signer)
     // create instruction needs to be bundled together with createAccount
     const createTx = rawTxs.splice(0, 2)
 
