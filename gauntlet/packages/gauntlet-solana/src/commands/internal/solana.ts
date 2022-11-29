@@ -7,13 +7,9 @@ import {
   PublicKey,
   TransactionSignature,
   TransactionInstruction,
-  sendAndConfirmRawTransaction,
   TransactionConfirmationStatus,
-  BlockhashWithExpiryBlockHeight,
-  RpcResponseAndContext,
-  SignatureStatus,
   SimulatedTransactionResponse,
-  Commitment,
+  TransactionExpiredBlockheightExceededError,
 } from '@solana/web3.js'
 import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { TransactionResponse } from '../types'
@@ -39,17 +35,6 @@ async function sleep(ms: number) {
 
 export const getUnixTs = () => {
   return new Date().getTime() / 1000
-}
-
-export class TimeoutError extends Error {
-  message: string
-  txid: string
-
-  constructor({ txid }) {
-    super()
-    this.message = `Timed out awaiting confirmation. Please confirm in the explorer: `
-    this.txid = txid
-  }
 }
 
 export class SolanaError extends Error {
@@ -129,8 +114,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
 
   // Based on mango-client-v3
   // - https://github.com/blockworks-foundation/mango-client-v3/blob/d34d248a3c9a97d51d977139f61cd982278b7f01/src/client.ts#L356-L437
-  // - https://github.com/blockworks-foundation/mango-client-v3/blob/d34d248a3c9a97d51d977139f61cd982278b7f01/src/client.ts#L546-L668
-  // for more reliable transaction submission. Works around https://github.com/solana-labs/solana/issues/25955
+  // for more reliable transaction submission.
   signAndSendRawTx = async (
     rawTxs: TransactionInstruction[],
     extraSigners?: Keypair[],
@@ -166,6 +150,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       skipPreflight: true,
     })
 
+    // Send the transaction, periodically retrying for durability
     console.log('Started awaiting confirmation for', txid, 'size:', rawTransaction.length)
     const startTime = getUnixTs()
     let timeout = 60_000
@@ -189,10 +174,17 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     })()
 
     try {
-      await this.awaitTransactionSignatureConfirmation(txid, timeout, CONFIRM_LEVEL, currentBlockhash)
+      await this.provider.connection.confirmTransaction(
+        {
+          signature: txid,
+          ...currentBlockhash,
+        },
+        CONFIRM_LEVEL,
+      )
     } catch (err: any) {
-      if (err.timeout) {
-        throw new TimeoutError({ txid })
+      if (err instanceof TransactionExpiredBlockheightExceededError) {
+        console.log(`Timed out awaiting confirmation. Please confirm in the explorer: `, txid)
+        throw err
       }
       let simulateResult: SimulatedTransactionResponse | null = null
       try {
@@ -223,120 +215,6 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       done = true
     }
     return txid
-
-    // TODO: skipPreflight: true since we previously simulated it?
-    // return await sendAndConfirmRawTransaction(this.provider.connection, rawTransaction) // TODO: { maxRetries: 5 }
-  }
-
-  async awaitTransactionSignatureConfirmation(
-    txid: TransactionSignature,
-    timeout: number,
-    confirmLevel: TransactionConfirmationStatus,
-    signedAtBlock?: BlockhashWithExpiryBlockHeight,
-  ) {
-    const timeoutBlockHeight = signedAtBlock
-      ? signedAtBlock.lastValidBlockHeight + MAXIMUM_NUMBER_OF_BLOCKS_FOR_TRANSACTION
-      : 0
-    let startTimeoutCheck = false
-    let done = false
-    const confirmLevels: (TransactionConfirmationStatus | null | undefined)[] = ['finalized']
-
-    if (confirmLevel === 'confirmed') {
-      confirmLevels.push('confirmed')
-    } else if (confirmLevel === 'processed') {
-      confirmLevels.push('confirmed')
-      confirmLevels.push('processed')
-    }
-    let subscriptionId: number | undefined
-
-    const result = await new Promise((resolve, reject) => {
-      ;(async () => {
-        setTimeout(() => {
-          if (done) {
-            return
-          }
-          if (timeoutBlockHeight !== 0) {
-            startTimeoutCheck = true
-          } else {
-            done = true
-            console.log('Timed out for txid: ', txid)
-            reject({ timeout: true })
-          }
-        }, timeout)
-        try {
-          subscriptionId = this.provider.connection.onSignature(
-            txid,
-            (result, context) => {
-              subscriptionId = undefined
-              done = true
-              if (result.err) {
-                reject(result.err)
-              } else {
-                // this.lastSlot = context?.slot;
-                resolve(result)
-              }
-            },
-            confirmLevel,
-          )
-        } catch (e) {
-          done = true
-          console.log('WS error in setup', txid, e)
-        }
-        let retrySleep = 2000
-        while (!done) {
-          // eslint-disable-next-line no-loop-func
-          await sleep(retrySleep)
-          ;(async () => {
-            try {
-              const promises: [Promise<RpcResponseAndContext<SignatureStatus | null>>, Promise<number>?] = [
-                this.provider.connection.getSignatureStatus(txid),
-              ]
-              //if startTimeoutThreshold passed we start to check if
-              //current blocks are did not passed timeoutBlockHeight threshold
-              if (startTimeoutCheck) {
-                promises.push(this.provider.connection.getBlockHeight(confirmLevel))
-              }
-              const [signatureStatus, currentBlockHeight] = await Promise.all(promises)
-              if (typeof currentBlockHeight !== undefined && timeoutBlockHeight <= currentBlockHeight!) {
-                console.log('Timed out for txid: ', txid)
-                done = true
-                reject({ timeout: true })
-              }
-
-              const result = signatureStatus?.value
-              if (!done) {
-                if (!result) return
-                if (result.err) {
-                  console.log('REST error for', txid, result)
-                  done = true
-                  reject(result.err)
-                } else if (result.confirmations && confirmLevels.includes(result.confirmationStatus)) {
-                  // this.lastSlot = signatureStatuses?.context?.slot;
-                  console.log('REST confirmed', txid, result)
-                  done = true
-                  resolve(result)
-                } else {
-                  console.log('REST not confirmed', txid, result)
-                }
-              }
-            } catch (e) {
-              if (!done) {
-                console.log('REST connection error: txid', txid, e)
-              }
-            }
-          })()
-        }
-      })()
-    })
-
-    if (subscriptionId) {
-      this.provider.connection.removeSignatureListener(subscriptionId).catch((e) => {
-        console.log('WS error in cleanup', e)
-      })
-    }
-
-    done = true
-    return result
   }
 
   sendTxWithIDL = (sendAction: (...args: any) => Promise<TransactionSignature>, idl: Idl) => async (
