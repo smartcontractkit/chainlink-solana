@@ -40,6 +40,18 @@ export default class Approve extends SolanaCommand {
 
   //execute not needed, this command cannot be ran outside of multisig
   execute = async () => {
-    return {} as Result<TransactionResponse>
+    const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
+    const txhash = await this.signAndSendRawTx(rawTx)
+    const multisigAddress = new PublicKey(process.env.MULTISIG_ADDRESS || '').toString()
+    logger.success(`Approved transactions on tx hash: ${txhash}`)
+
+    return {
+      responses: [
+        {
+          tx: this.wrapResponse(txhash, multisigAddress),
+          contract: multisigAddress,
+        },
+      ],
+    } as Result<TransactionResponse>
   }
 }
