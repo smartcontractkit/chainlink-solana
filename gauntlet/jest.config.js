@@ -11,6 +11,10 @@ module.exports = {
           tsconfig: '<rootDir>/packages/gauntlet-solana/tsconfig.json',
         },
       },
+      moduleNameMapper: {
+        // workaround for https://github.com/LedgerHQ/ledger-live/issues/763
+        '@ledgerhq/devices/hid-framing': '<rootDir>/node_modules/@ledgerhq/devices/lib/hid-framing.js',
+      },
     },
     {
       displayName: 'gauntlet-solana-contracts',
@@ -21,6 +25,10 @@ module.exports = {
         'ts-jest': {
           tsconfig: '<rootDir>/packages/gauntlet-solana-contracts/tsconfig.json',
         },
+      },
+      moduleNameMapper: {
+        // workaround for https://github.com/LedgerHQ/ledger-live/issues/763
+        '@ledgerhq/devices/hid-framing': '<rootDir>/node_modules/@ledgerhq/devices/lib/hid-framing.js',
       },
     },
   ],

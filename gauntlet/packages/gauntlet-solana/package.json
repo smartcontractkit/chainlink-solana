@@ -25,11 +25,14 @@
     "bundle": "yarn build && pkg ."
   },
   "dependencies": {
-    "@chainlink/gauntlet-core": "0.1.2",
+    "@chainlink/gauntlet-core": "0.5.0",
     "@ledgerhq/hw-app-solana": "^6.20.0",
     "@ledgerhq/hw-transport-node-hid": "^6.20.0",
     "@project-serum/anchor": "^0.25.0",
     "@project-serum/borsh": "^0.2.2",
-    "@solana/web3.js": "^1.50.1"
+    "@solana/web3.js": "^1.67.0"
+  },
+  "overrides": {
+    "@solana/web3.js": "^1.67.0"
   }
 }

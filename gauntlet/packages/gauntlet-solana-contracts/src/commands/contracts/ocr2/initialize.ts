@@ -22,6 +22,8 @@ export default class Initialize extends SolanaCommand {
     'yarn gauntlet ocr2:initialize [UNDEPLOYED_CONTRACT_ADDRESS]',
   ]
 
+  input: Input
+
   makeInput = (userInput: any): Input => {
     if (userInput) return userInput as Input
     const aggregator = RDD.loadAggregator(this.args[0], this.flags.network, this.flags.rdd)
@@ -36,15 +38,20 @@ export default class Initialize extends SolanaCommand {
     super(flags, args)
   }
 
+  buildCommand = async (flags, args) => {
+    const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
+    this.program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
+    this.input = this.makeInput(flags.input)
+
+    return this
+  }
+
   makeRawTransaction = async (signer: PublicKey, state?: PublicKey): Promise<TransactionInstruction[]> => {
     if (!state) throw new Error('State account is required')
 
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const address = ocr2.programId.toString()
     const program = this.loadProgram(ocr2.idl, address)
-
-    // STATE ACCOUNTS
-    const input = this.makeInput(this.flags.input)
 
     // ARGS
     const [vaultAuthority] = await PublicKey.findProgramAddress(
@@ -60,9 +67,9 @@ export default class Initialize extends SolanaCommand {
       this.flags.billingAccessController || process.env.BILLING_ACCESS_CONTROLLER,
     )
 
-    const minAnswer = new BN(input.minAnswer)
-    const maxAnswer = new BN(input.maxAnswer)
-    const transmissions = new PublicKey(input.transmissions)
+    const minAnswer = new BN(this.input.minAnswer)
+    const maxAnswer = new BN(this.input.maxAnswer)
+    const transmissions = new PublicKey(this.input.transmissions)
 
     const tokenVault = (
       await getOrCreateAssociatedTokenAccount(
@@ -109,35 +116,31 @@ export default class Initialize extends SolanaCommand {
   }
 
   execute = async () => {
-    const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
-    const address = ocr2.programId.toString()
-    const program = this.loadProgram(ocr2.idl, address)
+    await this.buildCommand(this.flags, this.args)
 
     const state = Keypair.generate()
     const rawTx = await this.makeRawTransaction(this.wallet.publicKey, state.publicKey)
     await prompt(`Start initializing ocr2 feed?`)
 
-    const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx, [state])
+    const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, this.program.idl)(rawTx, [state])
     logger.success(`Feed initialized on tx ${txhash}`)
-
-    const transmissions = rawTx[1].keys[1].pubkey
 
     const [storeAuthority, _storeNonce] = await PublicKey.findProgramAddress(
       [Buffer.from(utils.bytes.utf8.encode('store')), state.publicKey.toBuffer()],
-      program.programId,
+      this.program.programId,
     )
 
     return {
       data: {
         state: state.publicKey.toString(),
-        transmissions: transmissions.toString(),
+        transmissions: this.input.transmissions.toString(),
         storeAuthority: storeAuthority.toString(),
       },
       responses: [
         {
-          tx: this.wrapResponse(txhash, address, {
+          tx: this.wrapResponse(txhash, state.publicKey.toString(), {
             state: state.publicKey.toString(),
-            transmissions: transmissions.toString(),
+            transmissions: this.input.transmissions.toString(),
           }),
           contract: state.publicKey.toString(),
         },

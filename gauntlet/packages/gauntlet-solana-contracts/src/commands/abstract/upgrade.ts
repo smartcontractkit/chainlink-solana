@@ -73,7 +73,7 @@ export const makeUpgradeProgramCommand = (contractId: CONTRACT_LIST): SolanaCons
       const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
       await prompt(`Continue upgrading the ${contractId} program?`)
       logger.loading('Upgrading program...')
-      const txhash = await this.provider.sendAndConfirm(utils.makeTx(rawTx), [this.wallet.payer])
+      const txhash = await this.signAndSendRawTx(rawTx)
       logger.success(`Program upgraded on tx ${txhash}`)
       return {
         responses: [

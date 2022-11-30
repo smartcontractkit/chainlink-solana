@@ -90,7 +90,6 @@ export default class WithdrawFunds extends SolanaCommand {
     const signer = this.wallet.publicKey
 
     const rawTx = await this.makeRawTransaction(signer)
-    await this.simulateTx(signer, rawTx)
 
     await this.beforeExecute()
     const txhash = await this.signAndSendRawTx(rawTx)

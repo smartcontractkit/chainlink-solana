@@ -1,6 +1,5 @@
 import { Result, WriteCommand } from '@chainlink/gauntlet-core'
 import {
-  Transaction,
   BpfLoader,
   BPF_LOADER_PROGRAM_ID,
   Keypair,
@@ -8,14 +7,40 @@ import {
   PublicKey,
   TransactionSignature,
   TransactionInstruction,
-  sendAndConfirmRawTransaction,
+  TransactionConfirmationStatus,
+  SimulatedTransactionResponse,
+  TransactionExpiredBlockheightExceededError,
+  Transaction,
+  VersionedTransaction,
 } from '@solana/web3.js'
 import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { TransactionResponse } from '../types'
 import { ProgramError, parseIdlErrors, Idl, Program, AnchorProvider } from '@project-serum/anchor'
-import { SolanaWallet } from '../wallet'
+import { LedgerWallet, SolanaWallet } from '../wallet'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
-import { makeTx } from '../../lib/utils'
+import { makeLegacyTx, makeTx } from '../../lib/utils'
+
+/**
+ * If transaction is not confirmed by validators in 152 blocks
+ * from signing by the wallet
+ * it will never reach blockchain and is considered a timeout
+ *
+ * (e.g. transaction is signed at 121398019 block
+ * if its not confirmed by the time blockchain reach 121398171 (121398019 + 152)
+ * it will never reach blockchain)
+ */
+export const MAXIMUM_NUMBER_OF_BLOCKS_FOR_TRANSACTION = 152
+
+async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+export const getUnixTs = () => {
+  return new Date().getTime() / 1000
+}
+
+const CONFIRM_LEVEL: TransactionConfirmationStatus = 'confirmed'
+// const CONFIRM_LEVEL: TransactionConfirmationStatus = 'finalized'
 
 export default abstract class SolanaCommand extends WriteCommand<TransactionResponse> {
   wallet: SolanaWallet
@@ -78,6 +103,9 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     }
   }
 
+  // Based on mango-client-v3
+  // - https://github.com/blockworks-foundation/mango-client-v3/blob/d34d248a3c9a97d51d977139f61cd982278b7f01/src/client.ts#L356-L437
+  // for more reliable transaction submission.
   signAndSendRawTx = async (
     rawTxs: TransactionInstruction[],
     extraSigners?: Keypair[],
@@ -86,24 +114,94 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       price?: number
     } = {},
   ): Promise<TransactionSignature> => {
-    const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
     if (overrides.units) logger.info(`Sending transaction with custom unit limit: ${overrides.units}`)
     if (overrides.price) logger.info(`Sending transaction with custom unit price: ${overrides.price}`)
-    const tx = makeTx(
-      rawTxs,
-      {
-        blockhash,
-        lastValidBlockHeight,
-        feePayer: this.wallet.publicKey,
-      },
-      overrides,
-    )
-    if (extraSigners) {
-      tx.sign(...extraSigners)
+
+    await this.simulateTx(this.wallet.publicKey, rawTxs)
+
+    const currentBlockhash = await this.provider.connection.getLatestBlockhash()
+
+    let tx: Transaction | VersionedTransaction
+    let rawTransaction: Uint8Array
+
+    // Workaround until Ledger supports v0 transactions
+    if (this.wallet instanceof LedgerWallet) {
+      tx = makeLegacyTx(
+        {
+          instructions: rawTxs,
+          recentBlockhash: currentBlockhash.blockhash,
+          payerKey: this.wallet.publicKey,
+        },
+        overrides,
+      )
+      if (extraSigners) {
+        tx.sign(...extraSigners)
+      }
+      const signedTx = await this.wallet.signTransaction(tx)
+
+      rawTransaction = signedTx.serialize()
+    } else {
+      tx = makeTx(
+        {
+          instructions: rawTxs,
+          recentBlockhash: currentBlockhash.blockhash,
+          payerKey: this.wallet.publicKey,
+        },
+        overrides,
+      )
+      if (extraSigners) {
+        tx.sign(extraSigners)
+      }
+      const signedTx = await this.wallet.signVersionedTransaction(tx)
+
+      rawTransaction = signedTx.serialize()
     }
-    const signedTx = await this.wallet.signTransaction(tx)
+
     logger.loading('Sending tx...')
-    return await sendAndConfirmRawTransaction(this.provider.connection, signedTx.serialize())
+    const txid = await this.provider.connection.sendRawTransaction(rawTransaction, {
+      skipPreflight: true,
+    })
+
+    // Send the transaction, periodically retrying for durability
+    console.log('Started awaiting confirmation for', txid, 'size:', rawTransaction.length)
+    const startTime = getUnixTs()
+    let timeout = 60_000
+    let done = false
+    let retryAttempts = 0
+    const retrySleep = 2000
+    const maxRetries = 30
+    ;(async () => {
+      while (!done && getUnixTs() - startTime < timeout / 1000) {
+        await sleep(retrySleep)
+        // console.log(new Date().toUTCString(), ' sending tx ', txid);
+        this.provider.connection.sendRawTransaction(rawTransaction, {
+          skipPreflight: true,
+        })
+        if (retryAttempts <= maxRetries) {
+          retryAttempts = retryAttempts++
+        } else {
+          break
+        }
+      }
+    })()
+
+    try {
+      await this.provider.connection.confirmTransaction(
+        {
+          signature: txid,
+          ...currentBlockhash,
+        },
+        CONFIRM_LEVEL,
+      )
+    } catch (err: any) {
+      if (err instanceof TransactionExpiredBlockheightExceededError) {
+        console.log(`Timed out awaiting confirmation. Please confirm in the explorer: `, txid)
+      }
+      throw err
+    } finally {
+      done = true
+    }
+    return txid
   }
 
   sendTxWithIDL = (sendAction: (...args: any) => Promise<TransactionSignature>, idl: Idl) => async (
@@ -124,20 +222,24 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
 
   simulateTx = async (signer: PublicKey, txInstructions: TransactionInstruction[], feePayer?: PublicKey) => {
     try {
-      const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
-      const tx = makeTx(txInstructions, {
-        feePayer: feePayer || signer,
-        blockhash,
-        lastValidBlockHeight,
+      const { blockhash } = await this.provider.connection.getLatestBlockhash()
+      // TODO: accept a tx pre-made tx without the signatures
+      const tx = makeTx({
+        instructions: txInstructions,
+        recentBlockhash: blockhash,
+        payerKey: feePayer || signer,
       })
       // simulating through connection allows to skip signing tx (useful when using Ledger device)
-      const { value: simulationResponse } = await this.provider.connection.simulateTransaction(tx)
+      const { value: simulationResponse } = await this.provider.connection.simulateTransaction(tx, {
+        commitment: CONFIRM_LEVEL,
+      })
       if (simulationResponse.err) {
         throw new Error(JSON.stringify({ error: simulationResponse.err, logs: simulationResponse.logs }))
       }
       logger.success(`Tx simulation succeeded: ${simulationResponse.unitsConsumed} units consumed.`)
       return simulationResponse.unitsConsumed
     } catch (e) {
+      console.log(e.message)
       const parsedError = JSON.parse(e.message)
       const errorCode = parsedError.error.InstructionError ? parsedError.error.InstructionError[1].Custom : -1
       // Insufficient funds error
@@ -148,20 +250,6 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
         logger.error(`Tx simulation failed: ${e.message}`)
       }
       throw e
-    }
-  }
-
-  sendTx = async (tx: Transaction, signers: Keypair[], idl: Idl): Promise<TransactionSignature> => {
-    try {
-      return await this.provider.sendAndConfirm(tx, signers)
-    } catch (err) {
-      // Translate IDL error
-      const idlErrors = parseIdlErrors(idl)
-      let translatedErr = ProgramError.parse(err, idlErrors)
-      if (translatedErr === null) {
-        throw err
-      }
-      throw translatedErr
     }
   }
 }

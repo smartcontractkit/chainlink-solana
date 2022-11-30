@@ -7,23 +7,21 @@ import Initialize from './initialize'
 import InitializeAC from '../accessController/initialize'
 import InitializeStore from '../store/initialize'
 import DeployToken from '../token/deploy'
-import SetValidatorConfig from '../store/setValidatorConfig'
-import AddAccess from '../accessController/addAccess'
 import SetBilling from './setBilling'
 import CreateFeed from '../store/createFeed'
 import SetWriter from '../store/setWriter'
-import CreateProposal from './proposal/createProposal'
-import ProposeOffchainConfig from './proposeOffchainConfig'
 import ProposeConfig from './proposeConfig'
-import ProposePayees from './proposePayees'
-import FinalizeProposal from './proposal/finalizeProposal'
 import AcceptProposal from './proposal/acceptProposal'
+import CreateAccount from '../token/createAccount'
+import { getAssociatedTokenAddress } from '@solana/spl-token'
+import { PublicKey } from '@solana/web3.js'
 
 // TODO: Remove. Useful for dev testing
 export default class SetupFlow extends FlowCommand<TransactionResponse> {
   static id = 'ocr2:setup:flow'
   static category = CONTRACT_LIST.OCR_2
   static examples = ['yarn gauntlet ocr2:setup:flow --network=local --version=1']
+  configInput: any
 
   constructor(flags, args) {
     super(flags, args, waitExecute, makeAbstractCommand)
@@ -77,78 +75,68 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
       ],
     }
 
-    const payeesInput = {
-      operators: [
-        {
-          transmitter: 'DxRwKpwNBuMzKf5YEG1vLpnRbWeKo1Z4tKHfFGt8vUkj',
-          payee: 'DxRwKpwNBuMzKf5YEG1vLpnRbWeKo1Z4tKHfFGt8vUkj',
-        },
-        {
-          transmitter: '8sdUrh9LQdAXhrgFEBDxnUauJTTLfEq5PNsJbn9Pw19K',
-          payee: '8sdUrh9LQdAXhrgFEBDxnUauJTTLfEq5PNsJbn9Pw19K',
-        },
-        {
-          transmitter: '9n1sSGA5rhfsQyaX3tHz3ZU1ffR6V8KffvWtFPBcFrJw',
-          payee: '9n1sSGA5rhfsQyaX3tHz3ZU1ffR6V8KffvWtFPBcFrJw',
-        },
-        {
-          transmitter: 'G5LdWMvWoQQ787iPgWbCSTrkPB5Li9e2CWi6jYuAUHUH',
-          payee: 'G5LdWMvWoQQ787iPgWbCSTrkPB5Li9e2CWi6jYuAUHUH',
-        },
-      ],
-      allowFundRecipient: true,
-    }
-
     const _toHex = (a: string) => Buffer.from(a, 'hex')
-    const configInput = {
+    this.configInput = {
       oracles: [
         {
           transmitter: 'DxRwKpwNBuMzKf5YEG1vLpnRbWeKo1Z4tKHfFGt8vUkj',
           signer: '0cAFF71b6Dbb4f9Ebc862F8E9C124E737C917e80',
+          payee: 'DxRwKpwNBuMzKf5YEG1vLpnRbWeKo1Z4tKHfFGt8vUkj',
         },
         {
           transmitter: '8sdUrh9LQdAXhrgFEBDxnUauJTTLfEq5PNsJbn9Pw19K',
           signer: '6b211EdeF015C9931eA7D65CD326472891ecf501',
+          payee: '8sdUrh9LQdAXhrgFEBDxnUauJTTLfEq5PNsJbn9Pw19K',
         },
         {
           transmitter: '9n1sSGA5rhfsQyaX3tHz3ZU1ffR6V8KffvWtFPBcFrJw',
           signer: 'C6CD7e27Ea7653362906A7C9923c15602dC04F41',
+          payee: '9n1sSGA5rhfsQyaX3tHz3ZU1ffR6V8KffvWtFPBcFrJw',
         },
         {
           transmitter: 'G5LdWMvWoQQ787iPgWbCSTrkPB5Li9e2CWi6jYuAUHUH',
           signer: '1b7c57E22a4D4B6c94365A73AD5FF743DBE9c55E',
+          payee: 'G5LdWMvWoQQ787iPgWbCSTrkPB5Li9e2CWi6jYuAUHUH',
         },
       ].sort((a, b) => Buffer.compare(_toHex(a.signer), _toHex(b.signer))),
       f: 1,
     }
 
-    const acceptPropOracles = configInput.oracles.map((o, i) => ({
-      ...o,
-      payee: payeesInput.operators[i].payee,
-    }))
-
     this.flow = [
-      {
-        name: 'Deploy AC',
-        command: 'access_controller:deploy',
-      },
-      {
-        name: 'Deploy OCR',
-        command: 'ocr2:deploy',
-      },
-      {
-        name: 'Deploy Store',
-        command: 'store:deploy',
-      },
+      // {
+      //   name: 'Deploy AC',
+      //   command: 'access_controller:deploy',
+      // },
+      // {
+      //   name: 'Deploy OCR',
+      //   command: 'ocr2:deploy',
+      // },
+      // {
+      //   name: 'Deploy Store',
+      //   command: 'store:deploy',
+      // },
       {
         name: 'Deploy LINK',
         command: DeployToken,
         id: this.stepIds.TOKEN,
       },
       {
-        name: 'Set Environment',
-        exec: this.setEnvironment,
+        name: 'Create payee accounts',
+        command: CreateAccount,
+        id: this.stepIds.ASSOCIATED_TOKEN_ACCOUNT,
+        flags: {
+          link: FlowCommand.ID.contract(this.stepIds.TOKEN),
+        },
+        args: this.configInput.oracles.map((oracle) => oracle.transmitter.toString()),
       },
+      {
+        name: 'Update payees',
+        exec: this.updatePayees,
+      },
+      // {
+      //   name: 'Set Environment',
+      //   exec: this.setEnvironment,
+      // },
       // Constant Contracts
       {
         name: 'Initialize Billing AC',
@@ -175,9 +163,9 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         id: this.stepIds.FEED,
         flags: {
           input: {
-            store: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.STORE)),
+            store: FlowCommand.ID.contract(this.stepIds.STORE),
             granularity: 30,
-            liveLength: 86400,
+            liveLength: 400,
             decimals: 9,
             description: 'TEST',
           },
@@ -193,7 +181,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
           input: {
             minAnswer: 0,
             maxAnswer: 1000000000,
-            transmissions: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.FEED, 'transmissions')),
+            transmissions: FlowCommand.ID.data(this.stepIds.FEED, 'transmissions'),
           },
         },
         id: this.stepIds.OCR_2,
@@ -203,8 +191,8 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         command: SetWriter,
         flags: {
           input: {
-            transmissions: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.FEED, 'transmissions')),
-            store: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.STORE)),
+            transmissions: FlowCommand.ID.data(this.stepIds.FEED, 'transmissions'),
+            store: FlowCommand.ID.contract(this.stepIds.STORE),
           },
         },
         args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
@@ -213,6 +201,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         name: 'Set Billing',
         command: SetBilling,
         flags: {
+          link: FlowCommand.ID.contract(this.stepIds.TOKEN),
           input: {
             observationPaymentGjuels: '1',
             transmissionPaymentGjuels: '1',
@@ -221,70 +210,36 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
         args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
       {
-        id: this.stepIds.PROPOSAL,
-        name: 'Create Proposal',
-        command: CreateProposal,
-      },
-      {
         name: 'Propose Config',
         command: ProposeConfig,
+        id: this.stepIds.PROPOSAL,
         flags: {
+          link: FlowCommand.ID.contract(this.stepIds.TOKEN),
           input: {
-            oracles: configInput.oracles,
-            f: configInput.f,
-            proposalId: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal')),
-          },
-          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
-        },
-        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
-      },
-      {
-        name: 'Propose Offchain Config',
-        command: ProposeOffchainConfig,
-        flags: {
-          input: {
+            oracles: this.configInput.oracles,
+            f: this.configInput.f,
             offchainConfig: offchainConfigInput,
-            proposalId: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal')),
+            userSecret: randomSecret,
           },
-          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
-          secret: randomSecret,
         },
         args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
-      },
-      {
-        name: 'Propose Payees',
-        command: ProposePayees,
-        flags: {
-          input: {
-            operators: payeesInput.operators,
-            allowFundRecipient: true,
-            proposalId: this.getReportStepDataById(FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal')),
-          },
-          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
-        },
-        args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
-      },
-      {
-        name: 'Finalize Proposal',
-        command: FinalizeProposal,
-        flags: {
-          proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
-        },
       },
       {
         name: 'Accept Proposal',
         command: AcceptProposal,
         flags: {
+          link: FlowCommand.ID.contract(this.stepIds.TOKEN),
           input: {
-            secret: randomSecret,
+            proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
+            randomSecret: randomSecret,
             version: 2,
-            f: configInput.f,
-            tokenMint: this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.TOKEN)),
-            oracles: acceptPropOracles,
+            f: this.configInput.f,
+            tokenMint: FlowCommand.ID.contract(this.stepIds.TOKEN),
+            oracles: this.configInput.oracles,
             offchainConfig: offchainConfigInput,
           },
           proposalId: FlowCommand.ID.data(this.stepIds.PROPOSAL, 'proposal'),
-          secret: randomSecret,
+          secret: randomSecret, // otherwise input validation complains
         },
         args: [FlowCommand.ID.contract(this.stepIds.OCR_2)],
       },
@@ -294,7 +249,7 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
   setEnvironment = async () => {
     const programsPublicKeys = await Promise.all(
       [CONTRACT_LIST.ACCESS_CONTROLLER, CONTRACT_LIST.OCR_2, CONTRACT_LIST.STORE].map(async (name) =>
-        (await getDeploymentContract(name, '')).programKeypair.publicKey.toString(),
+        getDeploymentContract(name, '').programKeypair.publicKey.toString(),
       ),
     )
     logger.info(`
@@ -306,5 +261,19 @@ export default class SetupFlow extends FlowCommand<TransactionResponse> {
     process.env[CONTRACT_ENV_NAMES[CONTRACT_LIST.ACCESS_CONTROLLER]] = programsPublicKeys[0]
     process.env[CONTRACT_ENV_NAMES[CONTRACT_LIST.OCR_2]] = programsPublicKeys[1]
     process.env[CONTRACT_ENV_NAMES[CONTRACT_LIST.STORE]] = programsPublicKeys[2]
+  }
+
+  updatePayees = async () => {
+    // payees have to be derived token addresses, matching the ones we just
+    // created in the previous step.
+    for (let oracle of this.configInput.oracles) {
+      oracle.payee = (
+        await getAssociatedTokenAddress(
+          new PublicKey(this.getReportStepDataById(FlowCommand.ID.contract(this.stepIds.TOKEN))),
+          new PublicKey(oracle.transmitter),
+          true,
+        )
+      ).toString()
+    }
   }
 }

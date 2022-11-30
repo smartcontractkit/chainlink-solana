@@ -54,8 +54,6 @@ export default class Migrate extends SolanaCommand {
   execute = async () => {
     const contract = getContract(CONTRACT_LIST.STORE, '')
     const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
-    const tx = utils.makeTx(rawTx)
-    logger.debug(tx)
     logger.info(
       `Migrating Store program (${contract.programId.toString()})
     - store account: ${this.flags.state}
@@ -67,7 +65,7 @@ export default class Migrate extends SolanaCommand {
     await prompt(`Continue migrating?`)
 
     logger.loading('Sending tx...')
-    const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
+    const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, contract.idl)(rawTx)
     logger.success(`Migrated on tx hash: ${txhash}`)
 
     return {

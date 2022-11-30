@@ -55,7 +55,7 @@ const parseInstruction = async (instruction: string, version: string): Promise<A
   const command = instruction.split(':')
   if (!command.length || command.length > 2) return
 
-  const contract = isValidContract(command[0]) && (await getDeploymentContract(command[0] as CONTRACT_LIST, version))
+  const contract = isValidContract(command[0]) && getDeploymentContract(command[0] as CONTRACT_LIST, version)
   if (!contract) throw new Error(`Abstract: Contract ${command[0]} not found`)
 
   if (command[1] === SOLANA_OPERATIONS.HELP) {

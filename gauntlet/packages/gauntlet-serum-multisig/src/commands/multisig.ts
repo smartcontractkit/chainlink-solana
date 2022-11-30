@@ -1,7 +1,7 @@
 import { SolanaCommand, utils } from '@chainlink/gauntlet-solana'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { PublicKey, Keypair, TransactionInstruction, SystemProgram, AccountMeta } from '@solana/web3.js'
-import { Idl, Program } from '@project-serum/anchor'
+import { Program } from '@project-serum/anchor'
 import { MAX_BUFFER_SIZE } from '../lib/constants'
 import { isDeepEqual } from '../lib/utils'
 import { CONTRACT_LIST, getContract } from '../lib/contracts'
@@ -97,13 +97,13 @@ export const wrapCommand = (command) => {
       if (!lastValidBlockHeight) {
         throw new Error('Block not found. Could not generate message data')
       }
-      const tx = utils.makeTx(rawTxs, {
-        blockhash,
-        lastValidBlockHeight,
-        feePayer: signer,
+      const tx = utils.makeLegacyTx({
+        instructions: rawTxs,
+        recentBlockhash: blockhash,
+        payerKey: signer,
       })
 
-      const msgData = tx.serializeMessage().toString('base64')
+      const msgData = Buffer.from(tx.serializeMessage()).toString('base64')
       logger.line()
       logger.success(`Message generated with blockhash ID: ${blockhash.toString()}). MESSAGE DATA:`)
       logger.log()

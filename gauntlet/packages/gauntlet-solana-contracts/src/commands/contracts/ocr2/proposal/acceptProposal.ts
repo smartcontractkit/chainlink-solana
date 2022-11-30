@@ -6,9 +6,9 @@ import { PublicKey } from '@solana/web3.js'
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { utils } from '@project-serum/anchor'
 import { CONTRACT_LIST, getContract } from '../../../../lib/contracts'
-import ProposeOffchainConfig, { OffchainConfig } from '../proposeOffchainConfig'
+import ProposeConfig, { OffchainConfig } from '../proposeConfig'
 import { serializeOffchainConfig, deserializeConfig } from '../../../../lib/encoding'
-import { prepareOffchainConfigForDiff } from '../proposeOffchainConfig'
+import { prepareOffchainConfigForDiff } from '../proposeConfig'
 import RDD from '../../../../lib/rdd'
 import { printDiff } from '../../../../lib/diff'
 
@@ -98,7 +98,7 @@ export default class AcceptProposal extends SolanaCommand {
       }))
       .sort((a, b) => Buffer.compare(_toHex(a.signer), _toHex(b.signer)))
 
-    const offchainConfig = ProposeOffchainConfig.makeInputFromRDD(rdd, this.args[0])
+    const offchainConfig = ProposeConfig.makeInputFromRDD(rdd, this.args[0])
 
     const f = aggregator.config.f
 
@@ -159,15 +159,13 @@ export default class AcceptProposal extends SolanaCommand {
   }
 
   makeDigestInputFromProposal = (proposalInfo: Proposal): DigestInput => {
-    const oracles = proposalInfo.oracles.xs
-      .map((oracle) => {
-        return {
-          transmitter: new PublicKey(oracle.transmitter),
-          signer: Buffer.from(oracle.signer.key),
-          payee: new PublicKey(oracle.payee),
-        }
-      })
-      .slice(0, proposalInfo.oracles.len)
+    const oracles = proposalInfo.oracles.xs.slice(0, proposalInfo.oracles.len).map((oracle) => {
+      return {
+        transmitter: new PublicKey(oracle.transmitter),
+        signer: Buffer.from(oracle.signer.key),
+        payee: new PublicKey(oracle.payee),
+      }
+    })
     return {
       version: new BN(proposalInfo.offchainConfig.version),
       f: new BN(proposalInfo.f),
@@ -278,7 +276,6 @@ export default class AcceptProposal extends SolanaCommand {
     await this.beforeExecute()
 
     const rawTx = await this.makeRawTransaction(signer)
-    await this.simulateTx(signer, rawTx)
     await prompt(`Continue accepting proposal of proposal ${this.input.proposalId} on aggregator ${this.args[0]}?`)
 
     const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, this.program.idl)(rawTx)
