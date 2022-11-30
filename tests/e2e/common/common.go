@@ -283,9 +283,8 @@ func CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error {
 		},
 	}
 	jobSpec := &client.OCR2TaskJobSpec{
-		Name:              fmt.Sprintf("sol-OCRv2-%s-%s", "bootstrap", uuid.NewV4().String()),
-		JobType:           "bootstrap",
-		ObservationSource: contractNodeInfo.BootstrapBridgeInfo.ObservationSource,
+		Name:    fmt.Sprintf("sol-OCRv2-%s-%s", "bootstrap", uuid.NewV4().String()),
+		JobType: "bootstrap",
 		OCR2OracleSpec: job.OCR2OracleSpec{
 			ContractID:                        contractNodeInfo.OCR2.Address(),
 			Relay:                             ChainName,
@@ -295,12 +294,11 @@ func CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error {
 			TransmitterID:                     null.StringFrom(contractNodeInfo.BootstrapNodeKeysBundle.TXKey.Data.ID),
 			ContractConfigConfirmations:       1,
 			ContractConfigTrackerPollInterval: models.Interval(15 * time.Second),
-			PluginType:                        "median",
-			PluginConfig:                      pluginConfigToTomlFormat(contractNodeInfo.BootstrapBridgeInfo.JuelsSource),
 		},
 	}
 	if _, err := contractNodeInfo.BootstrapNode.MustCreateJob(jobSpec); err != nil {
-		return fmt.Errorf("failed creating job for boostrap node: %w", err)
+		s, _ := jobSpec.String()
+		return fmt.Errorf("failed creating job for boostrap node: %w\n spec:\n%s", err, s)
 	}
 	for nIdx, n := range contractNodeInfo.Nodes {
 		jobSpec := &client.OCR2TaskJobSpec{
