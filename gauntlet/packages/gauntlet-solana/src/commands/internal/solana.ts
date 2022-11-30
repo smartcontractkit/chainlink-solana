@@ -10,13 +10,15 @@ import {
   TransactionConfirmationStatus,
   SimulatedTransactionResponse,
   TransactionExpiredBlockheightExceededError,
+  Transaction,
+  VersionedTransaction,
 } from '@solana/web3.js'
 import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { TransactionResponse } from '../types'
 import { ProgramError, parseIdlErrors, Idl, Program, AnchorProvider } from '@project-serum/anchor'
-import { SolanaWallet } from '../wallet'
+import { LedgerWallet, SolanaWallet } from '../wallet'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
-import { makeTx } from '../../lib/utils'
+import { makeLegacyTx, makeTx } from '../../lib/utils'
 
 /**
  * If transaction is not confirmed by validators in 152 blocks
@@ -119,22 +121,43 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
 
     const currentBlockhash = await this.provider.connection.getLatestBlockhash()
 
-    const tx = makeTx(
-      {
-        instructions: rawTxs,
-        recentBlockhash: currentBlockhash.blockhash,
-        payerKey: this.wallet.publicKey,
-      },
-      overrides,
-    )
-    if (extraSigners) {
-      tx.sign(extraSigners)
+    let tx: Transaction | VersionedTransaction
+    let rawTransaction: Uint8Array
+
+    // Workaround until Ledger supports v0 transactions
+    if (this.wallet instanceof LedgerWallet) {
+      tx = makeLegacyTx(
+        {
+          instructions: rawTxs,
+          recentBlockhash: currentBlockhash.blockhash,
+          payerKey: this.wallet.publicKey,
+        },
+        overrides,
+      )
+      if (extraSigners) {
+        tx.sign(...extraSigners)
+      }
+      const signedTx = await this.wallet.signTransaction(tx)
+
+      rawTransaction = signedTx.serialize()
+    } else {
+      tx = makeTx(
+        {
+          instructions: rawTxs,
+          recentBlockhash: currentBlockhash.blockhash,
+          payerKey: this.wallet.publicKey,
+        },
+        overrides,
+      )
+      if (extraSigners) {
+        tx.sign(extraSigners)
+      }
+      const signedTx = await this.wallet.signVersionedTransaction(tx)
+
+      rawTransaction = signedTx.serialize()
     }
-    const signedTx = await this.wallet.signVersionedTransaction(tx)
+
     logger.loading('Sending tx...')
-
-    const rawTransaction = signedTx.serialize()
-
     const txid = await this.provider.connection.sendRawTransaction(rawTransaction, {
       skipPreflight: true,
     })

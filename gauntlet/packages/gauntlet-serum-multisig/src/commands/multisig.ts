@@ -97,13 +97,13 @@ export const wrapCommand = (command) => {
       if (!lastValidBlockHeight) {
         throw new Error('Block not found. Could not generate message data')
       }
-      const tx = utils.makeTx({
+      const tx = utils.makeLegacyTx({
         instructions: rawTxs,
         recentBlockhash: blockhash,
         payerKey: signer,
       })
 
-      const msgData = Buffer.from(tx.serialize()).toString('base64')
+      const msgData = Buffer.from(tx.serializeMessage()).toString('base64')
       logger.line()
       logger.success(`Message generated with blockhash ID: ${blockhash.toString()}). MESSAGE DATA:`)
       logger.log()
