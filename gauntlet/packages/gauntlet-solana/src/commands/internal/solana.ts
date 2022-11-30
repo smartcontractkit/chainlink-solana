@@ -37,17 +37,6 @@ export const getUnixTs = () => {
   return new Date().getTime() / 1000
 }
 
-export class SolanaError extends Error {
-  message: string
-  txid: string
-
-  constructor({ txid, message }) {
-    super()
-    this.message = message
-    this.txid = txid
-  }
-}
-
 const CONFIRM_LEVEL: TransactionConfirmationStatus = 'confirmed'
 // const CONFIRM_LEVEL: TransactionConfirmationStatus = 'finalized'
 
@@ -184,33 +173,8 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     } catch (err: any) {
       if (err instanceof TransactionExpiredBlockheightExceededError) {
         console.log(`Timed out awaiting confirmation. Please confirm in the explorer: `, txid)
-        throw err
       }
-      let simulateResult: SimulatedTransactionResponse | null = null
-      try {
-        simulateResult = (await this.provider.connection.simulateTransaction(tx)).value
-      } catch (e) {
-        console.warn('Simulate transaction failed')
-      }
-
-      if (simulateResult && simulateResult.err) {
-        if (simulateResult.logs) {
-          for (let i = simulateResult.logs.length - 1; i >= 0; --i) {
-            const line = simulateResult.logs[i]
-            if (line.startsWith('Program log: ')) {
-              throw new SolanaError({
-                message: 'Transaction failed: ' + line.slice('Program log: '.length),
-                txid,
-              })
-            }
-          }
-        }
-        throw new SolanaError({
-          message: JSON.stringify(simulateResult.err),
-          txid,
-        })
-      }
-      throw new SolanaError({ message: 'Transaction failed', txid })
+      throw err
     } finally {
       done = true
     }
