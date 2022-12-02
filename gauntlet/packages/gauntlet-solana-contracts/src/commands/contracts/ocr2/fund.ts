@@ -1,15 +1,22 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
-import { getAssociatedTokenAddress, transfer } from '@solana/spl-token'
+import { createTransferInstruction, getAssociatedTokenAddress } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
-import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
+import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
+
+type Input = {
+  amount: number
+  link: string
+}
 
 export default class Fund extends SolanaCommand {
   static id = 'ocr2:fund'
   static category = CONTRACT_LIST.OCR_2
 
   static examples = ['yarn gauntlet ocr2:fund --network=devnet --amount=[AMOUNT] [AGGREGATOR_ADDRESS]']
+
+  input: Input
 
   constructor(flags, args) {
     super(flags, args)
@@ -18,40 +25,66 @@ export default class Fund extends SolanaCommand {
     this.requireFlag('amount', 'Provide an --amount flag')
   }
 
-  execute = async () => {
+  buildCommand = async (flags, args) => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
-    const program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
+    this.program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
+    this.input = this.makeInput(flags.input)
 
+    return this
+  }
+
+  makeInput = (input?: Input) => {
+    if (input) return input
+
+    const link = this.flags.link || process.env.LINK
+    this.require(link, 'Please provide a link address with --link or env LINK')
+    return {
+      amount: this.flags.amount,
+      link: this.flags.link || process.env.LINK,
+    }
+  }
+
+  makeRawTransaction = async (signer: PublicKey) => {
     const state = new PublicKey(this.args[0])
-    const amount = new BN(this.flags.amount)
-
-    const linkPublicKey = new PublicKey(this.flags.link || process.env.LINK)
+    const linkPublicKey = new PublicKey(this.input.link)
 
     // Resolve the tokenVault from the aggregator state account
-    const stateAccount = (await program.account.state.fetch(state)) as any
+    const stateAccount = (await this.program.account.state.fetch(state)) as any
     const tokenVault = stateAccount.config.tokenVault
     const tokenMint = stateAccount.config.tokenMint
     this.require(tokenMint.equals(linkPublicKey), 'LINK does not match aggregator.config.tokenMint')
 
-    const from = await getAssociatedTokenAddress(linkPublicKey, this.wallet.publicKey)
-
-    logger.loading(`Transferring ${amount} tokens to ${state.toString()} token vault ${tokenVault.toString()}...`)
-    const tx = await transfer(
-      this.provider.connection,
-      this.wallet.payer,
-      from,
-      tokenVault,
-      this.wallet.payer,
-      amount.toNumber(),
+    const from = await getAssociatedTokenAddress(linkPublicKey, signer)
+    const amount = new BN(this.input.amount)
+    logger.loading(
+      `Transferring ${amount.toString()} tokens to ${state.toString()} aggregator token vault ${tokenVault.toString()}...`,
     )
+
+    const ix = createTransferInstruction(from, tokenVault, signer, amount.toNumber())
+
+    return [
+      {
+        ...ix,
+        // createTransferInstruction does not return the PublicKey type
+        keys: ix.keys.map((k) => ({ ...k, pubkey: new PublicKey(k.pubkey) })),
+      },
+    ]
+  }
+
+  execute = async () => {
+    await this.buildCommand(this.flags, this.args)
+    // use local wallet as signer
+    const signer = this.wallet.publicKey
+    const rawTx = await this.makeRawTransaction(signer)
+    await prompt('Continue funding feed?')
+    const txhash = await this.signAndSendRawTx(rawTx)
+    logger.success(`Tokens sent on tx hash: ${txhash}`)
 
     return {
       responses: [
         {
-          tx: this.wrapResponse(tx, state.toString(), {
-            state: state.toString(),
-          }),
-          contract: state.toString(),
+          tx: this.wrapResponse(txhash, this.args[0]),
+          contract: this.args[0],
         },
       ],
     } as Result<TransactionResponse>
