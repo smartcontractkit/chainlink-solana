@@ -17,7 +17,7 @@ require (
 	github.com/smartcontractkit/chainlink-env v0.2.55
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20221027174234-50b4d94d7135
 	github.com/smartcontractkit/chainlink-testing-framework v1.8.5
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20221130214003-2872a0d0504f
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20221206171451-ede2dc1e2b53
 	github.com/smartcontractkit/libocr v0.0.0-20221121171434-482da3ed36d8
 	golang.org/x/crypto v0.1.0
 	golang.org/x/sync v0.1.0
@@ -277,7 +277,7 @@ require (
 	github.com/smartcontractkit/chainlink-relay v0.1.6-0.20221205145242-57d65316ed43 // indirect
 	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.0-20220930034704-572ac07611cb // indirect
 	github.com/smartcontractkit/ocr2keepers v0.4.8 // indirect
-	github.com/smartcontractkit/ocr2vrf v0.0.0-20221108213147-df72abedd302 // indirect
+	github.com/smartcontractkit/ocr2vrf v0.0.0-20221206151523-7ae0ec615c0e // indirect
 	github.com/smartcontractkit/sqlx v1.3.5-0.20210805004948-4be295aacbeb // indirect
 	github.com/smartcontractkit/terra.go v1.0.3-0.20220108002221-62b39252ee16 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
