@@ -1616,12 +1616,15 @@ github.com/smartcontractkit/chainlink-testing-framework v1.8.5 h1:lsGqtTYqT1V2j8
 github.com/smartcontractkit/chainlink-testing-framework v1.8.5/go.mod h1:ajdhuex4G92Cb1Dt/iuZmLDbBHBgoNHifBPqg1lLju4=
 github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20221130214003-2872a0d0504f h1:Z0+ReyancclipHBahd1gD14H9UDiXp1WMfL6lERyvr0=
 github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20221130214003-2872a0d0504f/go.mod h1:Fn7JvVUmPPrgENx3szeWo+nSep0KCKdFzwPu3ayy1l8=
+github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20221206171451-ede2dc1e2b53 h1:HtxdmBooP6BsQ86Vc5cdMGhlyVD0Cq1IdT9jSlaStac=
+github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20221206171451-ede2dc1e2b53/go.mod h1:7usGRFBQMPk9Xiavrzi4Ff/gdIvubbiLu2ufmSlvZEU=
 github.com/smartcontractkit/libocr v0.0.0-20221121171434-482da3ed36d8 h1:KcTNxuP5g3GGUqn3WJe7KKnTixqfVZjmHnMAnKkLGJw=
 github.com/smartcontractkit/libocr v0.0.0-20221121171434-482da3ed36d8/go.mod h1:5JnCHuYgmIP9ZyXzgAfI5Iwu0WxBtBKp+ApeT5o1Cjw=
 github.com/smartcontractkit/ocr2keepers v0.4.8 h1:pvCDWIsYaSJI/M6qw0xIIXpHs5MPQaYEpmWsJiyi6LM=
 github.com/smartcontractkit/ocr2keepers v0.4.8/go.mod h1:6wSlAWYBmlJM7bDZ4Ewc5J5AJQszIRGDNaUAw35r3qc=
 github.com/smartcontractkit/ocr2vrf v0.0.0-20221108213147-df72abedd302 h1:r+AUXFhKLerpaNdAm0H+nMHvPUTb4uv8oRWBwlCfM28=
 github.com/smartcontractkit/ocr2vrf v0.0.0-20221108213147-df72abedd302/go.mod h1:NKkp8yf3trq+hJe/gn2Q1dd4abZvcYavUKPzYJCgVew=
+github.com/smartcontractkit/ocr2vrf v0.0.0-20221206151523-7ae0ec615c0e/go.mod h1:NKkp8yf3trq+hJe/gn2Q1dd4abZvcYavUKPzYJCgVew=
 github.com/smartcontractkit/sqlx v1.3.5-0.20210805004948-4be295aacbeb h1:OMaBUb4X9IFPLbGbCHsMU+kw/BPCrewaVwWGIBc0I4A=
 github.com/smartcontractkit/sqlx v1.3.5-0.20210805004948-4be295aacbeb/go.mod h1:HNUu4cJekUdsJbwRBCiOybtkPJEfGRELQPe2tkoDEyk=
 github.com/smartcontractkit/terra.go v1.0.3-0.20220108002221-62b39252ee16 h1:k+E0RKzVSG1QpxXakNUtcGUhq4ZMe0MAJ5Awg/l9oSc=

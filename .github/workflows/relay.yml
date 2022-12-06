@@ -15,6 +15,11 @@ jobs:
         with:
           go-version-file: "go.mod"
           check-latest: true
+      - name: Check go mod tidy
+        run: |
+          go mod tidy
+          echo "if this fails run 'go mod tidy' to fix"
+          git diff --stat --exit-code
       - name: Install Solana CLI
         run: ./scripts/install-solana-ci.sh
       - name: Build
