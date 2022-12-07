@@ -40,6 +40,9 @@ export const makeLegacyTx = (
     args.instructions.unshift(computeIx)
   }
 
-  let tx = args.instructions.reduce((tx, ix) => tx.add(ix), new Transaction())
+  let tx = args.instructions.reduce((tx, ix) => tx.add(ix), new Transaction({
+    blockhash: args.recentBlockhash,
+    feePayer: args.payerKey
+  }))
   return tx
 }
