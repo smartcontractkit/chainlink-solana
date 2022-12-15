@@ -94,7 +94,7 @@ jobs:
           artifacts_location: /home/runner/work/chainlink-solana/chainlink-solana/tests/e2e/logs
           token: ${{ secrets.GITHUB_TOKEN }}
           triggered_by: ${{ env.TEST_TRIGGERED_BY }}
-          dep_chainlink_integration_tests: ${{ github.event.inputs.cl_branch_ref || 'develop' }}
+          dep_chainlink_integration_tests: ede2dc1e2b53 # ${{ github.event.inputs.cl_branch_ref || 'develop' }} # Use the version specified in go.mod until after ginkgo is removed
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
