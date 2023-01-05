@@ -1,6 +1,5 @@
 package common
 
-//revive:disable:dot-imports
 import (
 	"fmt"
 	"github.com/stretchr/testify/require"
