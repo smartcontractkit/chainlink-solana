@@ -16,6 +16,6 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 	state.DeployCluster(5, false, utils.ContractsDir)
 	state.SetAllAdapterResponsesToTheSameValue(10)
 	state.ValidateRoundsAfter(time.Now(), common.NewRoundCheckTimeout, 1)
-	err := actions.TeardownSuite(state.Env, "logs", state.ChainlinkNodes, nil, nil)
+	err := actions.TeardownSuite(state.T, state.Env, "logs", state.ChainlinkNodes, nil, nil)
 	require.NoError(t, err)
 }
