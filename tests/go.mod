@@ -9,7 +9,6 @@ require (
 	github.com/gagliardetto/binary v0.7.1
 	github.com/gagliardetto/solana-go v1.4.1-0.20220428092759-5250b4abbb27
 	github.com/lib/pq v1.10.7
-	github.com/onsi/ginkgo/v2 v2.5.1
 	github.com/onsi/gomega v1.24.1
 	github.com/rs/zerolog v1.28.0
 	github.com/satori/go.uuid v1.2.0
@@ -19,6 +18,7 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework v1.8.5
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20221206171451-ede2dc1e2b53
 	github.com/smartcontractkit/libocr v0.0.0-20221121171434-482da3ed36d8
+	github.com/stretchr/testify v1.8.1
 	golang.org/x/crypto v0.1.0
 	golang.org/x/sync v0.1.0
 	gopkg.in/guregu/null.v4 v4.0.0
@@ -247,6 +247,7 @@ require (
 	github.com/multiformats/go-varint v0.0.6 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
+	github.com/onsi/ginkgo/v2 v2.5.1 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.5 // indirect
@@ -288,7 +289,6 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.12.0 // indirect
-	github.com/stretchr/testify v1.8.1 // indirect
 	github.com/subosito/gotenv v1.3.0 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a // indirect
 	github.com/tendermint/btcd v0.1.1 // indirect

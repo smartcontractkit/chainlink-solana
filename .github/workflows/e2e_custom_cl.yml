@@ -84,7 +84,7 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@966f889fe6989138e01773204ff23d96d0b485aa # v2.0.30
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
         with:
           test_command_to_run: make test_smoke
           go_mod_path: ./tests/go.mod
@@ -94,12 +94,12 @@ jobs:
           artifacts_location: /home/runner/work/chainlink-solana/chainlink-solana/tests/e2e/logs
           token: ${{ secrets.GITHUB_TOKEN }}
           triggered_by: ${{ env.TEST_TRIGGERED_BY }}
-          dep_chainlink_integration_tests: ede2dc1e2b53 # ${{ github.event.inputs.cl_branch_ref || 'develop' }} # Use the version specified in go.mod until after ginkgo is removed
+          dep_chainlink_integration_tests: develop
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
       - name: cleanup
         if: always()
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@966f889fe6989138e01773204ff23d96d0b485aa # v2.0.30
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
         with:
           triggered_by: ${{ env.TEST_TRIGGERED_BY }}

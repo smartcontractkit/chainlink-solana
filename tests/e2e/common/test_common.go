@@ -3,16 +3,17 @@ package common
 //revive:disable:dot-imports
 import (
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"math/big"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/sol"
 
-	"github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-env/environment"
 	mockservercfg "github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver-cfg"
@@ -53,11 +54,12 @@ type Contracts struct {
 	StoreAuth string
 }
 
-func NewOCRv2State(contracts int, nodes int) *OCRv2TestState {
+func NewOCRv2State(t *testing.T, contracts int, nodes int) *OCRv2TestState {
 	state := &OCRv2TestState{
 		Mu:                 &sync.Mutex{},
 		LastRoundTime:      make(map[string]time.Time),
 		ContractsNodeSetup: make(map[int]*ContractNodeInfo),
+		T:                  t,
 	}
 	for i := 0; i < contracts; i++ {
 		state.ContractsNodeSetup[i] = &ContractNodeInfo{}
@@ -83,6 +85,7 @@ type OCRv2TestState struct {
 	RoundsFound        int
 	LastRoundTime      map[string]time.Time
 	err                error
+	T                  *testing.T
 }
 
 type ContractsState struct {
@@ -113,7 +116,7 @@ func (m *OCRv2TestState) DeployCluster(nodes int, stateful bool, contractsDir st
 func (m *OCRv2TestState) LabelChaosGroup(startInstance int, endInstance int, group string) {
 	for i := startInstance; i <= endInstance; i++ {
 		m.err = m.Env.Client.AddLabel(m.Env.Cfg.Namespace, fmt.Sprintf("instance=%d", i), fmt.Sprintf("%s=1", group))
-		Expect(m.err).ShouldNot(HaveOccurred())
+		require.NoError(m.T, m.err)
 	}
 }
 
@@ -122,9 +125,9 @@ func (m *OCRv2TestState) LabelChaosGroup(startInstance int, endInstance int, gro
 // can't expose UDP ports required to copy .so chunks when deploying
 func (m *OCRv2TestState) UploadProgramBinaries(contractsDir string) {
 	pl, err := m.Env.Client.ListPods(m.Env.Cfg.Namespace, "app=sol")
-	Expect(err).ShouldNot(HaveOccurred())
+	require.NoError(m.T, err)
 	_, _, _, err = m.Env.Client.CopyToPod(m.Env.Cfg.Namespace, contractsDir, fmt.Sprintf("%s/%s:/programs", m.Env.Cfg.Namespace, pl.Items[0].Name), "sol-val")
-	Expect(err).ShouldNot(HaveOccurred())
+	require.NoError(m.T, err)
 }
 
 func (m *OCRv2TestState) DeployEnv(nodes int, stateful bool, contractsDir string) {
@@ -153,7 +156,7 @@ func (m *OCRv2TestState) DeployEnv(nodes int, stateful bool, contractsDir string
 			},
 		}))
 	err := m.Env.Run()
-	Expect(err).ShouldNot(HaveOccurred())
+	require.NoError(m.T, err)
 	m.UploadProgramBinaries(contractsDir)
 }
 
@@ -187,11 +190,11 @@ func (m *OCRv2TestState) SetupClients() {
 			"ws://localhost:8900",
 		},
 	})(m.Env)
-	Expect(m.err).ShouldNot(HaveOccurred())
+	require.NoError(m.T, m.err)
 	m.MockServer, m.err = ctfClient.ConnectMockServer(m.Env)
-	Expect(m.err).ShouldNot(HaveOccurred())
+	require.NoError(m.T, m.err)
 	m.ChainlinkNodes, m.err = client.ConnectChainlinkNodes(m.Env)
-	Expect(m.err).ShouldNot(HaveOccurred())
+	require.NoError(m.T, m.err)
 }
 
 func (m *OCRv2TestState) initializeNodesInContractsMap() {
@@ -208,63 +211,62 @@ func (m *OCRv2TestState) initializeNodesInContractsMap() {
 // DeployContracts deploys contracts
 func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 	m.NodeKeysBundle, m.err = CreateNodeKeysBundle(m.ChainlinkNodes)
-	Expect(m.err).ShouldNot(HaveOccurred())
+	require.NoError(m.T, m.err)
 	cd, err := solclient.NewContractDeployer(m.c, m.Env, nil)
-	Expect(err).ShouldNot(HaveOccurred())
+	require.NoError(m.T, err)
 	err = cd.LoadPrograms(contractsDir)
-	Expect(err).ShouldNot(HaveOccurred())
+	require.NoError(m.T, err)
 	err = cd.DeployAnchorProgramsRemote(contractsDir)
-	Expect(err).ShouldNot(HaveOccurred())
+	require.NoError(m.T, err)
 	cd.RegisterAnchorPrograms()
 	m.LinkToken, err = cd.DeployLinkTokenContract()
-	Expect(err).ShouldNot(HaveOccurred())
+	require.NoError(m.T, err)
 	err = FundOracles(m.c, m.NodeKeysBundle, big.NewFloat(1e4))
-	Expect(err).ShouldNot(HaveOccurred())
+	require.NoError(m.T, err)
 
 	m.initializeNodesInContractsMap()
 	g := errgroup.Group{}
 	for i := 0; i < len(m.ContractsNodeSetup); i++ {
 		i := i
 		g.Go(func() error {
-			defer ginkgo.GinkgoRecover()
 			cd, err := solclient.NewContractDeployer(m.c, m.Env, m.LinkToken)
-			Expect(err).ShouldNot(HaveOccurred())
+			require.NoError(m.T, err)
 			err = cd.GenerateAuthorities([]string{"vault", "store"})
-			Expect(err).ShouldNot(HaveOccurred())
+			require.NoError(m.T, err)
 			bac, err := cd.DeployOCRv2AccessController()
-			Expect(err).ShouldNot(HaveOccurred())
+			require.NoError(m.T, err)
 			rac, err := cd.DeployOCRv2AccessController()
-			Expect(err).ShouldNot(HaveOccurred())
+			require.NoError(m.T, err)
 			err = m.c.WaitForEvents()
-			Expect(err).ShouldNot(HaveOccurred())
+			require.NoError(m.T, err)
 
 			store, err := cd.DeployOCRv2Store(bac.Address())
-			Expect(err).ShouldNot(HaveOccurred())
+			require.NoError(m.T, err)
 
 			err = cd.CreateFeed("Feed", uint8(18), 10, 1024)
-			Expect(err).ShouldNot(HaveOccurred())
+			require.NoError(m.T, err)
 
 			ocr2, err := cd.InitOCR2(bac.Address(), rac.Address())
-			Expect(err).ShouldNot(HaveOccurred())
+			require.NoError(m.T, err)
 
 			storeAuth := cd.Accounts.Authorities["store"].PublicKey.String()
 			err = bac.AddAccess(storeAuth)
-			Expect(err).ShouldNot(HaveOccurred())
+			require.NoError(m.T, err)
 			err = m.c.WaitForEvents()
-			Expect(err).ShouldNot(HaveOccurred())
+			require.NoError(m.T, err)
 
 			err = store.SetWriter(storeAuth)
-			Expect(err).ShouldNot(HaveOccurred())
+			require.NoError(m.T, err)
 			err = store.SetValidatorConfig(80000)
-			Expect(err).ShouldNot(HaveOccurred())
+			require.NoError(m.T, err)
 			err = m.c.WaitForEvents()
-			Expect(err).ShouldNot(HaveOccurred())
+			require.NoError(m.T, err)
 
 			ocConfig, err := OffChainConfigParamsFromNodes(m.ContractsNodeSetup[i].Nodes, m.ContractsNodeSetup[i].NodeKeysBundle)
-			Expect(err).ShouldNot(HaveOccurred())
+			require.NoError(m.T, err)
 
 			err = ocr2.Configure(ocConfig)
-			Expect(err).ShouldNot(HaveOccurred())
+			require.NoError(m.T, err)
 			m.Mu.Lock()
 			m.Contracts = append(m.Contracts, Contracts{
 				BAC:       bac,
@@ -277,7 +279,7 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 			return nil
 		})
 	}
-	Expect(g.Wait()).ShouldNot(HaveOccurred())
+	require.NoError(m.T, g.Wait())
 	for i := 0; i < len(m.ContractsNodeSetup); i++ {
 		m.ContractsNodeSetup[i].OCR2 = m.Contracts[i].OCR2
 		m.ContractsNodeSetup[i].Store = m.Contracts[i].Store
@@ -287,32 +289,31 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 // CreateJobs creating OCR jobs and EA stubs
 func (m *OCRv2TestState) CreateJobs() {
 	m.err = m.MockServer.SetValuePath("/juels", 1)
-	Expect(m.err).ShouldNot(HaveOccurred())
+	require.NoError(m.T, m.err)
 	m.err = CreateSolanaChainAndNode(m.ChainlinkNodes)
-	Expect(m.err).ShouldNot(HaveOccurred())
+	require.NoError(m.T, m.err)
 	m.err = CreateBridges(m.ContractsNodeSetup, m.MockServer)
-	Expect(m.err).ShouldNot(HaveOccurred())
+	require.NoError(m.T, m.err)
 	g := errgroup.Group{}
 	for i := 0; i < len(m.ContractsNodeSetup); i++ {
 		i := i
 		g.Go(func() error {
-			defer ginkgo.GinkgoRecover()
 			m.err = CreateJobsForContract(m.ContractsNodeSetup[i])
-			Expect(m.err).ShouldNot(HaveOccurred())
+			require.NoError(m.T, m.err)
 			return nil
 		})
 	}
-	Expect(g.Wait()).ShouldNot(HaveOccurred())
+	require.NoError(m.T, g.Wait())
 }
 
 func (m *OCRv2TestState) SetAllAdapterResponsesToTheSameValue(response int) {
 	for i := 0; i < len(m.ContractsNodeSetup); i++ {
 		for _, node := range m.ContractsNodeSetup[i].Nodes {
 			nodeContractPairID, err := BuildNodeContractPairID(node, m.ContractsNodeSetup[i].OCR2.Address())
-			Expect(err).ShouldNot(HaveOccurred())
+			require.NoError(m.T, err)
 			path := fmt.Sprintf("/%s", nodeContractPairID)
 			m.err = m.MockServer.SetValuePath(path, response)
-			Expect(m.err).ShouldNot(HaveOccurred())
+			require.NoError(m.T, m.err)
 		}
 	}
 }
@@ -322,14 +323,15 @@ func (m *OCRv2TestState) ValidateNoRoundsAfter(chaosStartTime time.Time) {
 	for _, c := range m.Contracts {
 		m.LastRoundTime[c.OCR2.Address()] = chaosStartTime
 	}
-	Consistently(func(g Gomega) {
+	gom := gomega.NewWithT(m.T)
+	gom.Consistently(func(g gomega.Gomega) {
 		for _, c := range m.Contracts {
 			_, timestamp, _, err := c.Store.GetLatestRoundData()
-			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(err).ShouldNot(gomega.HaveOccurred())
 			roundTime := time.Unix(int64(timestamp), 0)
-			g.Expect(roundTime.Before(m.LastRoundTime[c.OCR2.Address()])).Should(BeTrue())
+			g.Expect(roundTime.Before(m.LastRoundTime[c.OCR2.Address()])).Should(gomega.BeTrue())
 		}
-	}, NewRoundCheckTimeout, NewRoundCheckPollInterval).Should(Succeed())
+	}, NewRoundCheckTimeout, NewRoundCheckPollInterval).Should(gomega.Succeed())
 }
 
 type Answer struct {
@@ -344,11 +346,12 @@ func (m *OCRv2TestState) ValidateRoundsAfter(chaosStartTime time.Time, timeout t
 		m.LastRoundTime[c.OCR2.Address()] = chaosStartTime
 	}
 	roundsFound := 0
-	Eventually(func(g Gomega) {
+	gom := gomega.NewWithT(m.T)
+	gom.Eventually(func(g gomega.Gomega) {
 		answers := make(map[string]*Answer)
 		for _, c := range m.Contracts {
 			answer, timestamp, _, err := c.Store.GetLatestRoundData()
-			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(err).ShouldNot(gomega.HaveOccurred())
 			answers[c.OCR2.Address()] = &Answer{Answer: answer, Timestamp: timestamp, Error: err}
 		}
 		for ci, a := range answers {
@@ -361,6 +364,6 @@ func (m *OCRv2TestState) ValidateRoundsAfter(chaosStartTime time.Time, timeout t
 				log.Debug().Str("Contract", ci).Interface("Answer", a).Msg("Answer haven't changed")
 			}
 		}
-		g.Expect(roundsFound).To(BeNumerically(">=", rounds*len(m.Contracts)))
-	}, timeout, NewRoundCheckPollInterval).Should(Succeed())
+		g.Expect(roundsFound).To(gomega.BeNumerically(">=", rounds*len(m.Contracts)))
+	}, timeout, NewRoundCheckPollInterval).Should(gomega.Succeed())
 }
