@@ -42,6 +42,7 @@ func (s *envelopeSourceFactory) NewSource(
 	return &envelopeSource{
 		s.client,
 		solanaFeedConfig,
+		s.log,
 	}, nil
 }
 
@@ -52,6 +53,7 @@ func (s *envelopeSourceFactory) GetType() string {
 type envelopeSource struct {
 	client     ChainReader
 	feedConfig SolanaFeedConfig
+	log        relayMonitoring.Logger
 }
 
 func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
@@ -92,20 +94,11 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 	}()
 	go func() {
 		defer wg.Done()
-		linkBalanceRes, balanceErr := s.client.GetTokenAccountBalance(ctx, state.Config.TokenVault, rpc.CommitmentConfirmed)
+		linkBalance, linkBalanceErr := s.getLinkBalance(ctx, state.Config.TokenVault)
 		envelopeMu.Lock()
 		defer envelopeMu.Unlock()
-		if balanceErr != nil {
-			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("failed to read the feed's link balance: %w", balanceErr))
-			return
-		}
-		if linkBalanceRes == nil || linkBalanceRes.Value == nil {
-			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("link balance not found for token vault"))
-			return
-		}
-		linkBalance, success := big.NewInt(0).SetString(linkBalanceRes.Value.Amount, 10)
-		if !success {
-			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("failed to parse link balance value: %s", linkBalanceRes.Value.Amount))
+		if linkBalanceErr != nil {
+			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("failed to get the feed's link balance: %w", linkBalanceErr))
 			return
 		}
 		envelope.LinkBalance = linkBalance
@@ -131,6 +124,24 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 	}
 	envelope.LinkAvailableForPayment = linkAvailableForPayment
 	return envelope, nil
+}
+
+func (s *envelopeSource) getLinkBalance(ctx context.Context, tokenVault solana.PublicKey) (*big.Int, error) {
+	linkBalanceRes, err := s.client.GetTokenAccountBalance(ctx, tokenVault, rpc.CommitmentConfirmed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read the feed's link balance: %w", err)
+	}
+	if linkBalanceRes == nil || linkBalanceRes.Value == nil {
+		return nil, fmt.Errorf("link balance not found for token vault")
+	}
+	linkBalance, success := big.NewInt(0).SetString(linkBalanceRes.Value.Amount, 10)
+	if !success {
+		return nil, fmt.Errorf("failed to parse link balance value: %s", linkBalanceRes.Value.Amount)
+	}
+	if linkBalance.Cmp(big.NewInt(0)) == 0 {
+		return nil, fmt.Errorf("contract's LINK balance should not be zero")
+	}
+	return linkBalance, nil
 }
 
 func (s *envelopeSource) getJuelsPerLamport(ctx context.Context) (*big.Int, error) {
@@ -162,23 +173,32 @@ func (s *envelopeSource) getJuelsPerLamport(ctx context.Context) (*big.Int, erro
 			},
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch tx with signature %s: %w", txSig.Signature, err)
+			s.log.Infow("failed to fetch tx with signature %s: %w", txSig.Signature, err)
+			continue
 		}
 		if txRes == nil {
-			return nil, fmt.Errorf("no transaction returned for signature %s", txSig.Signature)
+			s.log.Infow("no transaction returned for signature %s", txSig.Signature)
+			continue
 		}
 		events := event.ExtractEvents(txRes.Meta.LogMessages, s.feedConfig.ContractAddressBase58)
 		for _, rawEvent := range events {
 			decodedEvent, err := event.Decode(rawEvent)
 			if err != nil {
-				return nil, fmt.Errorf("failed decode events '%s' from tx with signature '%s': %w", rawEvent, txSigs[0].Signature, err)
+				s.log.Infow("failed decode events '%s' from tx with signature '%s': %w", rawEvent, txSigs[0].Signature, err)
+				continue
 			}
-			if newTransmission, isNewTransmission := decodedEvent.(event.NewTransmission); isNewTransmission {
-				return new(big.Int).SetUint64(newTransmission.JuelsPerLamport), nil
+			newTransmission, isNewTransmission := decodedEvent.(event.NewTransmission)
+			if !isNewTransmission {
+				continue
 			}
+			if newTransmission.JuelsPerLamport == 0 {
+				s.log.Infow("zero value for juels/lamport feed is not supported: %d", newTransmission.JuelsPerLamport)
+				continue
+			}
+			return new(big.Int).SetUint64(newTransmission.JuelsPerLamport), nil
 		}
 	}
-	return nil, fmt.Errorf("no NewTransmission event found in the last %d transactions on contract state '%s'", txSigsPageSize, s.feedConfig.StateAccountBase58)
+	return nil, fmt.Errorf("no correct NewTransmission event found in the last %d transactions on contract state '%s'", txSigsPageSize, s.feedConfig.StateAccountBase58)
 }
 
 // Helpers
