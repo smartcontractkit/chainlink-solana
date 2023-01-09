@@ -164,6 +164,7 @@ func (s *envelopeSource) getJuelsPerLamport(ctx context.Context) (*big.Int, erro
 	}
 	for _, txSig := range txSigs {
 		if txSig.Err != nil {
+			// We're not interested in failed transactions.
 			continue
 		}
 		txRes, err := s.client.GetTransaction(
@@ -175,18 +176,18 @@ func (s *envelopeSource) getJuelsPerLamport(ctx context.Context) (*big.Int, erro
 			},
 		)
 		if err != nil {
-			s.log.Infow("failed to fetch tx with signature %s: %w", txSig.Signature, err)
+			s.log.Infow("failed to fetch tx", "txSig", txSig.Signature, "err", err)
 			continue
 		}
 		if txRes == nil {
-			s.log.Infow("no transaction returned for signature %s", txSig.Signature)
+			s.log.Infow("no transaction found for signature", "txSig", txSig.Signature)
 			continue
 		}
 		events := event.ExtractEvents(txRes.Meta.LogMessages, s.feedConfig.ContractAddressBase58)
 		for _, rawEvent := range events {
 			decodedEvent, err := event.Decode(rawEvent)
 			if err != nil {
-				s.log.Infow("failed decode events '%s' from tx with signature '%s': %w", rawEvent, txSigs[0].Signature, err)
+				s.log.Infow("failed to decode event", "rawEvent", rawEvent, "txSig", txSigs[0].Signature, "err", err)
 				continue
 			}
 			newTransmission, isNewTransmission := decodedEvent.(event.NewTransmission)
@@ -194,7 +195,7 @@ func (s *envelopeSource) getJuelsPerLamport(ctx context.Context) (*big.Int, erro
 				continue
 			}
 			if newTransmission.JuelsPerLamport == 0 {
-				s.log.Infow("zero value for juels/lamport feed is not supported: %d", newTransmission.JuelsPerLamport)
+				s.log.Infow("zero value for juels/lamport feed is not supported")
 				continue
 			}
 			return new(big.Int).SetUint64(newTransmission.JuelsPerLamport), nil
