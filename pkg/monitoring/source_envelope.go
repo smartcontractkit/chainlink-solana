@@ -126,6 +126,8 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 	return envelope, nil
 }
 
+var zeroBigInt = big.NewInt(0)
+
 func (s *envelopeSource) getLinkBalance(ctx context.Context, tokenVault solana.PublicKey) (*big.Int, error) {
 	linkBalanceRes, err := s.client.GetTokenAccountBalance(ctx, tokenVault, rpc.CommitmentConfirmed)
 	if err != nil {
@@ -138,7 +140,7 @@ func (s *envelopeSource) getLinkBalance(ctx context.Context, tokenVault solana.P
 	if !success {
 		return nil, fmt.Errorf("failed to parse link balance value: %s", linkBalanceRes.Value.Amount)
 	}
-	if linkBalance.Cmp(big.NewInt(0)) == 0 {
+	if linkBalance.Cmp(zeroBigInt) == 0 {
 		return nil, fmt.Errorf("contract's LINK balance should not be zero")
 	}
 	return linkBalance, nil
