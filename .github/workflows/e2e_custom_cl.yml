@@ -14,6 +14,11 @@ concurrency:
   group: integration-tests-solana-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
+  ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-solana-tests:ci.${{ github.sha }}
+  CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
+
 jobs:
   get_projectserum_version:
     name: Get ProjectSerum Version
@@ -54,7 +59,7 @@ jobs:
       contents: read
     steps:
       - name: Build Image
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@966f889fe6989138e01773204ff23d96d0b485aa # v2.0.30
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
         with:
           cl_repo: smartcontractkit/chainlink
           # by default we are integrating with develop
@@ -65,6 +70,44 @@ jobs:
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
 
+  build-test-image:
+    environment: integration
+    permissions:
+      id-token: write
+      contents: read
+    name: Build Test Image
+    runs-on: ubuntu-latest
+    needs: [e2e_custom_build_artifacts]
+    steps:
+      - name: Collect Metrics
+        id: collect-gha-metrics
+        uses: smartcontractkit/push-gha-metrics-action@v1
+        with:
+          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+          this-job-name: Build Test Image
+        continue-on-error: true
+      - name: Checkout the repo
+        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Download Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: artifacts
+          path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
+      - name: build test runner
+        uses: smartcontractkit/chainlink-github-actions/docker/build-push@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
+        with:
+          tags: ${{ env.ENV_JOB_IMAGE }}
+          file: ./tests/test.Dockerfile
+          build-args: |
+            BASE_IMAGE=${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/test-base-image
+            IMAGE_VERSION=v0.3.0
+            SUITES="smoke"
+          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+          AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+
   e2e_custom_run_smoke_tests:
     name: E2E Custom Run Smoke Tests
     environment: integration
@@ -74,11 +117,12 @@ jobs:
       id-token: write
       contents: read
     runs-on: ubuntu-latest
-    needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image]
+    needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image, build-test-image]
     env:
+      TEST_SUITE: smoke
+      TEST_ARGS: -test.timeout 30m
       CHAINLINK_COMMIT_SHA: ${{ github.sha }}
       CHAINLINK_ENV_USER: ${{ github.actor }}
-      TEST_TRIGGERED_BY: solana-CI
       TEST_LOG_LEVEL: debug
     steps:
       - name: Checkout the repo
@@ -88,18 +132,13 @@ jobs:
         with:
           test_command_to_run: make test_smoke
           go_mod_path: ./tests/go.mod
-          cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
+          cl_repo: ${{ env.CL_ECR }}
           cl_image_tag: custom.${{ github.event.pull_request.head.sha }}
-          download_contract_artifacts_path: contracts/target/deploy
+          download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
           artifacts_location: /home/runner/work/chainlink-solana/chainlink-solana/tests/e2e/logs
           token: ${{ secrets.GITHUB_TOKEN }}
-          triggered_by: ${{ env.TEST_TRIGGERED_BY }}
           dep_chainlink_integration_tests: develop
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
-      - name: cleanup
-        if: always()
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
-        with:
-          triggered_by: ${{ env.TEST_TRIGGERED_BY }}
+          should_cleanup: false
