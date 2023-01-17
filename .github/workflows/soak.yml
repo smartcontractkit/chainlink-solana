@@ -13,10 +13,10 @@ on:
         required: true
         default: 72h
         type: string
-        node_count:
-          required: true
-          default: 5h
-          type: string
+      node_count:
+        required: true
+        default: 5h
+        type: string
 jobs:
   get_projectserum_version:
     name: Get ProjectSerum Version
