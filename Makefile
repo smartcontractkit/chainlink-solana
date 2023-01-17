@@ -81,10 +81,10 @@ test_relay_unit:
 	go test -v ./pkg/...
 
 test_smoke:
-	SELECTED_NETWORKS=solana \
+	SELECTED_NETWORKS=SIMULATED \
 	cd ./integration-tests && go test -timeout 24h -count=1 -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestfmt
 
 test_ocr_soak:
-	SELECTED_NETWORKS=solana \
+	SELECTED_NETWORKS=SIMULATED \
 	cd ./integration-tests && go test -timeout 24h -count=1 -json $(args) ./soak 2>&1 | tee /tmp/gotest.log | gotestfmt
 
