@@ -228,7 +228,6 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 			return err
 		}
 		ContractsIdxMapToContractsNodeInfo[i].BootstrapBridgeInfo = BridgeInfo{ObservationSource: observationSource, JuelsSource: juelsSource}
-
 		// Other nodes later
 		for _, node := range nodesInfo.Nodes {
 			nodeContractPairID, err := BuildNodeContractPairID(node, nodesInfo.OCR2.Address())
