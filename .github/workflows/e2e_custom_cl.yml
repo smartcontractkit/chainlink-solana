@@ -87,7 +87,7 @@ jobs:
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
         with:
           test_command_to_run: make test_smoke
-          go_mod_path: ./tests/go.mod
+          go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
           cl_image_tag: custom.${{ github.event.pull_request.head.sha }}
           download_contract_artifacts_path: contracts/target/deploy
