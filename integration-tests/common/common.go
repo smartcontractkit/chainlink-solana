@@ -42,6 +42,7 @@ const (
 	ChainID          = "localnet"
 	DefaultNodeCount = 5
 	DefaultTTL       = "3h"
+	SolanaURL        = "http://sol:8899"
 )
 
 type Common struct {
@@ -141,7 +142,7 @@ func (c *Common) CreateSolanaChainAndNode(nodes []*client.Chainlink) error {
 		_, _, err = n.CreateSolanaNode(&client.SolanaNodeAttributes{
 			Name:          ChainName,
 			SolanaChainID: ChainID,
-			SolanaURL:     "http://sol:8899",
+			SolanaURL:     SolanaURL,
 		})
 		if err != nil {
 			return err
@@ -331,7 +332,7 @@ func pluginConfigToTomlFormat(pluginConfig string) job.JSONConfig {
 
 func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error {
 	relayConfig := job.JSONConfig{
-		"nodeEndpointHTTP": "\"http://sol:8899\"",
+		"nodeEndpointHTTP": fmt.Sprintf("\"%s\"", SolanaURL),
 		"ocr2ProgramID":    fmt.Sprintf("\"%s\"", contractNodeInfo.OCR2.ProgramAddress()),
 		"transmissionsID":  fmt.Sprintf("\"%s\"", contractNodeInfo.Store.TransmissionsAddress()),
 		"storeProgramID":   fmt.Sprintf("\"%s\"", contractNodeInfo.Store.ProgramAddress()),
@@ -400,12 +401,12 @@ func BuildNodeContractPairID(node *client.Chainlink, ocr2Addr string) (string, e
 func (c *Common) Default() *Common {
 	c.K8Config = &environment.Config{InsideK8s: c.InsideK8, TTL: c.TTL}
 	testNetwork := networks.SelectedNetwork
-	baseTOML := `[[Solana]]
+	baseTOML := fmt.Sprintf(`[[Solana]]
 Enabled = true
-ChainID = 'localnet'
+ChainID = '%s'
 [[Solana.Nodes]]
 Name = 'primary' 
-URL = 'http://sol:8899'
+URL = '%s'
 
 [OCR2]
 Enabled = true
@@ -416,7 +417,7 @@ Enabled = true
 DeltaDial = '5s'
 DeltaReconcile = '5s'
 ListenAddresses = ['0.0.0.0:6690']
-`
+`, ChainID, SolanaURL)
 	c.Env = environment.New(c.K8Config).
 		AddHelm(mockservercfg.New(nil)).
 		AddHelm(mockserver.New(nil)).

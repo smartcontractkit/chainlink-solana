@@ -15,7 +15,7 @@ on:
         type: string
       node_count:
         required: true
-        default: 5h
+        default: 5
         type: string
 jobs:
   get_projectserum_version:
