@@ -2,12 +2,11 @@ package common
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"math/big"
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver"
@@ -106,11 +105,8 @@ func (m *OCRv2TestState) LabelChaosGroups() {
 	m.LabelChaosGroup(10, 19, ChaosGroupRightHalf)
 }
 
-func (m *OCRv2TestState) DeployCluster(nodes int, stateful bool, contractsDir string, ttl time.Duration) {
-	m.DeployEnv(nodes, stateful, contractsDir, ttl)
-	if m.Env.WillUseRemoteRunner() {
-		return
-	}
+func (m *OCRv2TestState) DeployCluster(nodes int, stateful bool, contractsDir string) {
+	m.DeployEnv(nodes, stateful, contractsDir)
 	m.SetupClients()
 	m.DeployContracts(contractsDir)
 	m.CreateJobs()
@@ -133,11 +129,10 @@ func (m *OCRv2TestState) UploadProgramBinaries(contractsDir string) {
 	require.NoError(m.T, err)
 }
 
-func (m *OCRv2TestState) DeployEnv(nodes int, stateful bool, contractsDir string, ttl time.Duration) {
+func (m *OCRv2TestState) DeployEnv(nodes int, stateful bool, contractsDir string) {
 	m.Env = environment.New(&environment.Config{
 		NamespacePrefix: "chainlink-test-sol",
-		TTL:             ttl,
-		Test:            m.T,
+		TTL:             3 * time.Hour,
 	}).
 		AddHelm(mockservercfg.New(nil)).
 		AddHelm(mockserver.New(nil)).
@@ -161,11 +156,7 @@ func (m *OCRv2TestState) DeployEnv(nodes int, stateful bool, contractsDir string
 		}))
 	err := m.Env.Run()
 	require.NoError(m.T, err)
-	if m.Env.WillUseRemoteRunner() {
-		return
-	}
 	m.UploadProgramBinaries(contractsDir)
-
 }
 
 func NewSolanaClientSetup(networkSettings *solclient.SolNetwork) func(*environment.Environment) (*solclient.Client, error) {
