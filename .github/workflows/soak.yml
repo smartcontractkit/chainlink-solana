@@ -9,6 +9,14 @@ on:
         required: true
         default: develop
         type: string
+      ttl:
+        required: true
+        default: 72h
+        type: string
+      node_count:
+        required: true
+        default: 5
+        type: string
 jobs:
   get_projectserum_version:
     name: Get ProjectSerum Version
@@ -75,6 +83,8 @@ jobs:
       CHAINLINK_ENV_USER: ${{ github.actor }}
       TEST_TRIGGERED_BY: solana-soak
       TEST_LOG_LEVEL: debug
+      TTL: ${{ github.event.inputs.ttl }}
+      NODE_COUNT: ${{ github.event.inputs.node_count }}
     steps:
       - name: Checkout the repo
         uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
@@ -82,11 +92,11 @@ jobs:
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
         with:
           test_command_to_run: make test_ocr_soak
-          go_mod_path: ./tests/go.mod
+          go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
           cl_image_tag: custom.${{ github.sha }}
           download_contract_artifacts_path: contracts/target/deploy
-          artifacts_location: /home/runner/work/chainlink-solana/chainlink-solana/tests/e2e/soak/logs
+          artifacts_location: /home/runner/work/chainlink-solana/chainlink-solana/integration-tests/soak/logs
           publish_report_paths: ./tests-soak-report.xml
           publish_check_name: Chaos Test Results
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -95,3 +105,4 @@ jobs:
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
+          should_cleanup: "false"

@@ -4,6 +4,15 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-env/environment"
+	"github.com/smartcontractkit/chainlink-env/pkg/alias"
+	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
+	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver"
+	mockservercfg "github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver-cfg"
+	"github.com/smartcontractkit/chainlink-env/pkg/helm/sol"
+	networks "github.com/smartcontractkit/chainlink/integration-tests"
+	"os"
+	"strconv"
 
 	"math/big"
 	"sort"
@@ -11,7 +20,7 @@ import (
 	"time"
 
 	"github.com/lib/pq"
-	"github.com/smartcontractkit/chainlink-solana/tests/e2e/solclient"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	"gopkg.in/guregu/null.v4"
 
 	"github.com/rs/zerolog/log"
@@ -29,9 +38,25 @@ import (
 )
 
 const (
-	ChainName = "solana"
-	ChainID   = "localnet"
+	ChainName        = "solana"
+	ChainID          = "localnet"
+	DefaultNodeCount = 5
+	DefaultTTL       = "3h"
+	SolanaURL        = "http://sol:8899"
 )
+
+type Common struct {
+	ChainName string
+	ChainId   string
+	NodeCount int
+	TTL       time.Duration
+	ClConfig  map[string]interface{}
+	EnvConfig map[string]interface{}
+	K8Config  *environment.Config
+	Env       *environment.Environment
+	InsideK8  bool
+	SolanaUrl string
+}
 
 // ContractNodeInfo contains the indexes of the nodes, bridges, NodeKeyBundles and nodes relevant to an OCR2 Contract
 type ContractNodeInfo struct {
@@ -39,11 +64,11 @@ type ContractNodeInfo struct {
 	Store                   *solclient.Store
 	BootstrapNodeIdx        int
 	BootstrapNode           *client.Chainlink
-	BootstrapNodeKeysBundle NodeKeysBundle
+	BootstrapNodeKeysBundle client.NodeKeysBundle
 	BootstrapBridgeInfo     BridgeInfo
 	NodesIdx                []int
 	Nodes                   []*client.Chainlink
-	NodeKeysBundle          []NodeKeysBundle
+	NodeKeysBundle          []client.NodeKeysBundle
 	BridgeInfos             []BridgeInfo
 }
 
@@ -69,16 +94,55 @@ func stripKeyPrefix(key string) string {
 	return key
 }
 
-func CreateSolanaChainAndNode(nodes []*client.Chainlink) error {
+func New() *Common {
+	var err error
+	c := &Common{
+		ChainName: ChainName,
+		ChainId:   ChainID,
+	}
+	// Checking if count of OCR nodes is defined in ENV
+	nodeCountSet, nodeCountDefined := os.LookupEnv("NODE_COUNT")
+	if nodeCountDefined {
+		c.NodeCount, err = strconv.Atoi(nodeCountSet)
+		if err != nil {
+			panic(fmt.Sprintf("Please define a proper node count for the test: %v", err))
+		}
+	} else {
+		c.NodeCount = DefaultNodeCount
+	}
+
+	// Checking if TTL env var is set in ENV
+	ttlValue, ttlDefined := os.LookupEnv("TTL")
+	if ttlDefined {
+		duration, err := time.ParseDuration(ttlValue)
+		if err != nil {
+			panic(fmt.Sprintf("Please define a proper duration for the test: %v", err))
+		}
+		c.TTL, err = time.ParseDuration(*alias.ShortDur(duration))
+		if err != nil {
+			panic(fmt.Sprintf("Please define a proper duration for the test: %v", err))
+		}
+	} else {
+		duration, _ := time.ParseDuration(DefaultTTL)
+		c.TTL, err = time.ParseDuration(*alias.ShortDur(duration))
+	}
+
+	// Setting optional parameters
+	_, c.InsideK8 = os.LookupEnv("INSIDE_K8")
+
+	return c
+}
+
+func (c *Common) CreateSolanaChainAndNode(nodes []*client.Chainlink) error {
 	for _, n := range nodes {
 		_, _, err := n.CreateSolanaChain(&client.SolanaChainAttributes{ChainID: ChainID})
 		if err != nil {
 			return err
 		}
 		_, _, err = n.CreateSolanaNode(&client.SolanaNodeAttributes{
-			Name:          "solana",
+			Name:          ChainName,
 			SolanaChainID: ChainID,
-			SolanaURL:     "http://sol:8899",
+			SolanaURL:     SolanaURL,
 		})
 		if err != nil {
 			return err
@@ -87,8 +151,8 @@ func CreateSolanaChainAndNode(nodes []*client.Chainlink) error {
 	return nil
 }
 
-func CreateNodeKeysBundle(nodes []*client.Chainlink) ([]NodeKeysBundle, error) {
-	nkb := make([]NodeKeysBundle, 0)
+func CreateNodeKeysBundle(nodes []*client.Chainlink) ([]client.NodeKeysBundle, error) {
+	nkb := make([]client.NodeKeysBundle, 0)
 	for _, n := range nodes {
 		p2pkeys, err := n.MustReadP2PKeys()
 		if err != nil {
@@ -104,16 +168,16 @@ func CreateNodeKeysBundle(nodes []*client.Chainlink) ([]NodeKeysBundle, error) {
 		if err != nil {
 			return nil, err
 		}
-		nkb = append(nkb, NodeKeysBundle{
+		nkb = append(nkb, client.NodeKeysBundle{
 			PeerID:  peerID,
-			OCR2Key: ocrKey,
-			TXKey:   txKey,
+			OCR2Key: *ocrKey,
+			TXKey:   *txKey,
 		})
 	}
 	return nkb, nil
 }
 
-func createOracleIdentities(nkb []NodeKeysBundle) ([]confighelper.OracleIdentityExtra, error) {
+func createOracleIdentities(nkb []client.NodeKeysBundle) ([]confighelper.OracleIdentityExtra, error) {
 	oracleIdentities := make([]confighelper.OracleIdentityExtra, 0)
 	for _, nodeKeys := range nkb {
 		offChainPubKeyTemp, err := hex.DecodeString(stripKeyPrefix(nodeKeys.OCR2Key.Data.Attributes.OffChainPublicKey))
@@ -149,7 +213,7 @@ func createOracleIdentities(nkb []NodeKeysBundle) ([]confighelper.OracleIdentity
 	return oracleIdentities, nil
 }
 
-func FundOracles(c *solclient.Client, nkb []NodeKeysBundle, amount *big.Float) error {
+func FundOracles(c *solclient.Client, nkb []client.NodeKeysBundle, amount *big.Float) error {
 	for _, nk := range nkb {
 		addr := nk.TXKey.Data.Attributes.PublicKey
 		if err := c.Fund(addr, amount); err != nil {
@@ -160,7 +224,7 @@ func FundOracles(c *solclient.Client, nkb []NodeKeysBundle, amount *big.Float) e
 }
 
 // OffChainConfigParamsFromNodes creates contracts.OffChainAggregatorV2Config
-func OffChainConfigParamsFromNodes(nodes []*client.Chainlink, nkb []NodeKeysBundle) (contracts.OffChainAggregatorV2Config, error) {
+func OffChainConfigParamsFromNodes(nodes []*client.Chainlink, nkb []client.NodeKeysBundle) (contracts.OffChainAggregatorV2Config, error) {
 	oi, err := createOracleIdentities(nkb)
 	if err != nil {
 		return contracts.OffChainAggregatorV2Config{}, err
@@ -228,7 +292,6 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 			return err
 		}
 		ContractsIdxMapToContractsNodeInfo[i].BootstrapBridgeInfo = BridgeInfo{ObservationSource: observationSource, JuelsSource: juelsSource}
-
 		// Other nodes later
 		for _, node := range nodesInfo.Nodes {
 			nodeContractPairID, err := BuildNodeContractPairID(node, nodesInfo.OCR2.Address())
@@ -267,9 +330,9 @@ func pluginConfigToTomlFormat(pluginConfig string) job.JSONConfig {
 	}
 }
 
-func CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error {
+func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error {
 	relayConfig := job.JSONConfig{
-		"nodeEndpointHTTP": "\"http://sol:8899\"",
+		"nodeEndpointHTTP": fmt.Sprintf("\"%s\"", SolanaURL),
 		"ocr2ProgramID":    fmt.Sprintf("\"%s\"", contractNodeInfo.OCR2.ProgramAddress()),
 		"transmissionsID":  fmt.Sprintf("\"%s\"", contractNodeInfo.Store.TransmissionsAddress()),
 		"storeProgramID":   fmt.Sprintf("\"%s\"", contractNodeInfo.Store.ProgramAddress()),
@@ -333,4 +396,36 @@ func BuildNodeContractPairID(node *client.Chainlink, ocr2Addr string) (string, e
 	shortNodeAddr := csaKeys.Data[0].Attributes.PublicKey[2:12]
 	shortOCRAddr := ocr2Addr[2:12]
 	return strings.ToLower(fmt.Sprintf("node_%s_contract_%s", shortNodeAddr, shortOCRAddr)), nil
+}
+
+func (c *Common) Default() *Common {
+	c.K8Config = &environment.Config{InsideK8s: c.InsideK8, TTL: c.TTL}
+	testNetwork := networks.SelectedNetwork
+	baseTOML := fmt.Sprintf(`[[Solana]]
+Enabled = true
+ChainID = '%s'
+[[Solana.Nodes]]
+Name = 'primary' 
+URL = '%s'
+
+[OCR2]
+Enabled = true
+
+[P2P]
+[P2P.V2]
+Enabled = true
+DeltaDial = '5s'
+DeltaReconcile = '5s'
+ListenAddresses = ['0.0.0.0:6690']
+`, ChainID, SolanaURL)
+	c.Env = environment.New(c.K8Config).
+		AddHelm(mockservercfg.New(nil)).
+		AddHelm(mockserver.New(nil)).
+		AddHelm(sol.New(nil)).
+		AddHelm(chainlink.New(0, map[string]interface{}{
+			"toml":     client.AddNetworksConfig(baseTOML, testNetwork),
+			"replicas": c.NodeCount,
+		}))
+
+	return c
 }
