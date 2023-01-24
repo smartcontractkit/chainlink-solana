@@ -8,15 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
-	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver"
-	"github.com/smartcontractkit/chainlink-env/pkg/helm/sol"
-
 	"github.com/onsi/gomega"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-env/environment"
-	mockservercfg "github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver-cfg"
-	"github.com/smartcontractkit/chainlink-solana/tests/e2e/solclient"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
@@ -53,17 +48,20 @@ type Contracts struct {
 	StoreAuth string
 }
 
-func NewOCRv2State(t *testing.T, contracts int, nodes int) *OCRv2TestState {
+func NewOCRv2State(t *testing.T, contracts int) *OCRv2TestState {
 	state := &OCRv2TestState{
 		Mu:                 &sync.Mutex{},
 		LastRoundTime:      make(map[string]time.Time),
 		ContractsNodeSetup: make(map[int]*ContractNodeInfo),
+		Common:             New().Default(),
+		Client:             &solclient.Client{},
 		T:                  t,
 	}
+	state.Client.Config = state.Client.Config.Default()
 	for i := 0; i < contracts; i++ {
 		state.ContractsNodeSetup[i] = &ContractNodeInfo{}
 		state.ContractsNodeSetup[i].BootstrapNodeIdx = 0
-		for n := 1; n < nodes; n++ {
+		for n := 1; n < state.Common.NodeCount; n++ {
 			state.ContractsNodeSetup[i].NodesIdx = append(state.ContractsNodeSetup[i].NodesIdx, n)
 		}
 	}
@@ -78,13 +76,14 @@ type OCRv2TestState struct {
 	LinkToken          *solclient.LinkToken
 	Contracts          []Contracts
 	ContractsNodeSetup map[int]*ContractNodeInfo
-	NodeKeysBundle     []NodeKeysBundle
+	NodeKeysBundle     []client.NodeKeysBundle
 	MockServer         *ctfClient.MockserverClient
-	c                  *solclient.Client
+	Client             *solclient.Client
 	RoundsFound        int
 	LastRoundTime      map[string]time.Time
 	err                error
 	T                  *testing.T
+	Common             *Common
 }
 
 type ContractsState struct {
@@ -105,8 +104,8 @@ func (m *OCRv2TestState) LabelChaosGroups() {
 	m.LabelChaosGroup(10, 19, ChaosGroupRightHalf)
 }
 
-func (m *OCRv2TestState) DeployCluster(nodes int, stateful bool, contractsDir string) {
-	m.DeployEnv(nodes, stateful, contractsDir)
+func (m *OCRv2TestState) DeployCluster(contractsDir string) {
+	m.DeployEnv(contractsDir)
 	m.SetupClients()
 	m.DeployContracts(contractsDir)
 	m.CreateJobs()
@@ -114,7 +113,7 @@ func (m *OCRv2TestState) DeployCluster(nodes int, stateful bool, contractsDir st
 
 func (m *OCRv2TestState) LabelChaosGroup(startInstance int, endInstance int, group string) {
 	for i := startInstance; i <= endInstance; i++ {
-		m.err = m.Env.Client.AddLabel(m.Env.Cfg.Namespace, fmt.Sprintf("instance=%d", i), fmt.Sprintf("%s=1", group))
+		m.err = m.Common.Env.Client.AddLabel(m.Common.Env.Cfg.Namespace, fmt.Sprintf("instance=%d", i), fmt.Sprintf("%s=1", group))
 		require.NoError(m.T, m.err)
 	}
 }
@@ -123,45 +122,29 @@ func (m *OCRv2TestState) LabelChaosGroup(startInstance int, endInstance int, gro
 // currently it's the only way to deploy anything to local solana because ephemeral validator in k8s
 // can't expose UDP ports required to copy .so chunks when deploying
 func (m *OCRv2TestState) UploadProgramBinaries(contractsDir string) {
-	pl, err := m.Env.Client.ListPods(m.Env.Cfg.Namespace, "app=sol")
+	pl, err := m.Common.Env.Client.ListPods(m.Common.Env.Cfg.Namespace, "app=sol")
 	require.NoError(m.T, err)
-	_, _, _, err = m.Env.Client.CopyToPod(m.Env.Cfg.Namespace, contractsDir, fmt.Sprintf("%s/%s:/programs", m.Env.Cfg.Namespace, pl.Items[0].Name), "sol-val")
+	_, _, _, err = m.Common.Env.Client.CopyToPod(m.Common.Env.Cfg.Namespace, contractsDir, fmt.Sprintf("%s/%s:/programs", m.Common.Env.Cfg.Namespace, pl.Items[0].Name), "sol-val")
 	require.NoError(m.T, err)
 }
 
-func (m *OCRv2TestState) DeployEnv(nodes int, stateful bool, contractsDir string) {
-	m.Env = environment.New(&environment.Config{
-		NamespacePrefix: "chainlink-test-sol",
-		TTL:             3 * time.Hour,
-	}).
-		AddHelm(mockservercfg.New(nil)).
-		AddHelm(mockserver.New(nil)).
-		AddHelm(sol.New(nil)).
-		// TODO: Convert to utilize TOML config when available
-		AddHelm(chainlink.NewVersioned(0, "0.0.11", map[string]interface{}{
-			"replicas": nodes,
-			"env": map[string]interface{}{
-				"SOLANA_ENABLED":              "true",
-				"EVM_ENABLED":                 "false",
-				"EVM_RPC_ENABLED":             "false",
-				"CHAINLINK_DEV":               "false",
-				"FEATURE_OFFCHAIN_REPORTING2": "true",
-				"feature_offchain_reporting":  "false",
-				"P2P_NETWORKING_STACK":        "V2",
-				"P2PV2_LISTEN_ADDRESSES":      "0.0.0.0:6690",
-				"P2PV2_DELTA_DIAL":            "5s",
-				"P2PV2_DELTA_RECONCILE":       "5s",
-				"p2p_listen_port":             "0",
-			},
-		}))
-	err := m.Env.Run()
+func (m *OCRv2TestState) DeployEnv(contractsDir string) {
+	err := m.Common.Env.Run()
 	require.NoError(m.T, err)
+	if m.Common.InsideK8 {
+		m.Common.SolanaUrl = m.Common.Env.URLs[m.Client.Config.Name][2]
+	} else {
+		m.Common.SolanaUrl = m.Common.Env.URLs[m.Client.Config.Name][0]
+	}
 	m.UploadProgramBinaries(contractsDir)
 }
 
-func NewSolanaClientSetup(networkSettings *solclient.SolNetwork) func(*environment.Environment) (*solclient.Client, error) {
+func (m *OCRv2TestState) NewSolanaClientSetup(networkSettings *solclient.SolNetwork) func(*environment.Environment) (*solclient.Client, error) {
 	return func(env *environment.Environment) (*solclient.Client, error) {
 		networkSettings.URLs = env.URLs[networkSettings.Name]
+		if m.Common.InsideK8 {
+			networkSettings.URLs = networkSettings.URLs[2:]
+		}
 		ec, err := solclient.NewClient(networkSettings)
 		if err != nil {
 			return nil, err
@@ -174,25 +157,11 @@ func NewSolanaClientSetup(networkSettings *solclient.SolNetwork) func(*environme
 }
 
 func (m *OCRv2TestState) SetupClients() {
-	m.c, m.err = NewSolanaClientSetup(&solclient.SolNetwork{
-		Name:              "sol",
-		Type:              "solana",
-		ContractsDeployed: false,
-		PrivateKeys: []string{
-			"57qbvFjTChfNwQxqkFZwjHp7xYoPZa7f9ow6GA59msfCH1g6onSjKUTrrLp4w1nAwbwQuit8YgJJ2AwT9BSwownC",
-			"2tye1GyG7wwTUS2T8puXSErDyzQcBxpgwRN5R2MMy5osJKjQF6ZoeYTTpeHaAxpuiE1G4Pnq4sTa4YCWx3RcXb4Y",
-			"5aRBAnU3NBymRyMtrRjPLZ3erZNgTZBhEHszsXF8kTwbGLz8q5FYgKicJ7AFifrFitvJB2NS5jbyQohSJtvkgPER",
-			"2MYG6HKpMuGEo3qErj4pAF2Gney6Yb6jgjTc6TZCuu7fiLAVQekTd3HbsT9ienzGHpKwA7Ekj2TGuMHPUB6EHJ8P",
-		},
-		URLs: []string{
-			"http://localhost:8899",
-			"ws://localhost:8900",
-		},
-	})(m.Env)
+	m.Client, m.err = m.NewSolanaClientSetup(m.Client.Config)(m.Common.Env)
 	require.NoError(m.T, m.err)
-	m.MockServer, m.err = ctfClient.ConnectMockServer(m.Env)
+	m.MockServer, m.err = ctfClient.ConnectMockServer(m.Common.Env)
 	require.NoError(m.T, m.err)
-	m.ChainlinkNodes, m.err = client.ConnectChainlinkNodes(m.Env)
+	m.ChainlinkNodes, m.err = client.ConnectChainlinkNodes(m.Common.Env)
 	require.NoError(m.T, m.err)
 }
 
@@ -211,16 +180,16 @@ func (m *OCRv2TestState) initializeNodesInContractsMap() {
 func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 	m.NodeKeysBundle, m.err = CreateNodeKeysBundle(m.ChainlinkNodes)
 	require.NoError(m.T, m.err)
-	cd, err := solclient.NewContractDeployer(m.c, m.Env, nil)
+	cd, err := solclient.NewContractDeployer(m.Client, m.Common.Env, nil)
 	require.NoError(m.T, err)
 	err = cd.LoadPrograms(contractsDir)
 	require.NoError(m.T, err)
 	err = cd.DeployAnchorProgramsRemote(contractsDir)
 	require.NoError(m.T, err)
 	cd.RegisterAnchorPrograms()
-	m.LinkToken, err = cd.DeployLinkTokenContract()
+	m.Client.LinkToken, err = cd.DeployLinkTokenContract()
 	require.NoError(m.T, err)
-	err = FundOracles(m.c, m.NodeKeysBundle, big.NewFloat(1e4))
+	err = FundOracles(m.Client, m.NodeKeysBundle, big.NewFloat(1e4))
 	require.NoError(m.T, err)
 
 	m.initializeNodesInContractsMap()
@@ -228,7 +197,7 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 	for i := 0; i < len(m.ContractsNodeSetup); i++ {
 		i := i
 		g.Go(func() error {
-			cd, err := solclient.NewContractDeployer(m.c, m.Env, m.LinkToken)
+			cd, err := solclient.NewContractDeployer(m.Client, m.Common.Env, m.Client.LinkToken)
 			require.NoError(m.T, err)
 			err = cd.GenerateAuthorities([]string{"vault", "store"})
 			require.NoError(m.T, err)
@@ -236,7 +205,7 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 			require.NoError(m.T, err)
 			rac, err := cd.DeployOCRv2AccessController()
 			require.NoError(m.T, err)
-			err = m.c.WaitForEvents()
+			err = m.Client.WaitForEvents()
 			require.NoError(m.T, err)
 
 			store, err := cd.DeployOCRv2Store(bac.Address())
@@ -251,14 +220,14 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 			storeAuth := cd.Accounts.Authorities["store"].PublicKey.String()
 			err = bac.AddAccess(storeAuth)
 			require.NoError(m.T, err)
-			err = m.c.WaitForEvents()
+			err = m.Client.WaitForEvents()
 			require.NoError(m.T, err)
 
 			err = store.SetWriter(storeAuth)
 			require.NoError(m.T, err)
 			err = store.SetValidatorConfig(80000)
 			require.NoError(m.T, err)
-			err = m.c.WaitForEvents()
+			err = m.Client.WaitForEvents()
 			require.NoError(m.T, err)
 
 			ocConfig, err := OffChainConfigParamsFromNodes(m.ContractsNodeSetup[i].Nodes, m.ContractsNodeSetup[i].NodeKeysBundle)
@@ -289,7 +258,7 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 func (m *OCRv2TestState) CreateJobs() {
 	m.err = m.MockServer.SetValuePath("/juels", 1)
 	require.NoError(m.T, m.err)
-	m.err = CreateSolanaChainAndNode(m.ChainlinkNodes)
+	m.err = m.Common.CreateSolanaChainAndNode(m.ChainlinkNodes)
 	require.NoError(m.T, m.err)
 	m.err = CreateBridges(m.ContractsNodeSetup, m.MockServer)
 	require.NoError(m.T, m.err)
@@ -297,7 +266,7 @@ func (m *OCRv2TestState) CreateJobs() {
 	for i := 0; i < len(m.ContractsNodeSetup); i++ {
 		i := i
 		g.Go(func() error {
-			m.err = CreateJobsForContract(m.ContractsNodeSetup[i])
+			m.err = m.Common.CreateJobsForContract(m.ContractsNodeSetup[i])
 			require.NoError(m.T, m.err)
 			return nil
 		})

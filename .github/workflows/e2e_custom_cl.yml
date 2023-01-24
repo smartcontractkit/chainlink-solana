@@ -91,7 +91,7 @@ jobs:
           cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
           cl_image_tag: custom.${{ github.event.pull_request.head.sha }}
           download_contract_artifacts_path: contracts/target/deploy
-          artifacts_location: /home/runner/work/chainlink-solana/chainlink-solana/tests/e2e/logs
+          artifacts_location: /home/runner/work/chainlink-solana/chainlink-solana/integration-tests/logs
           token: ${{ secrets.GITHUB_TOKEN }}
           triggered_by: ${{ env.TEST_TRIGGERED_BY }}
           dep_chainlink_integration_tests: develop
