@@ -102,7 +102,7 @@ func New() *Common {
 	}
 	// Checking if count of OCR nodes is defined in ENV
 	nodeCountSet, nodeCountDefined := os.LookupEnv("NODE_COUNT")
-	if nodeCountDefined {
+	if nodeCountDefined && nodeCountSet != "" {
 		c.NodeCount, err = strconv.Atoi(nodeCountSet)
 		if err != nil {
 			panic(fmt.Sprintf("Please define a proper node count for the test: %v", err))
@@ -113,7 +113,7 @@ func New() *Common {
 
 	// Checking if TTL env var is set in ENV
 	ttlValue, ttlDefined := os.LookupEnv("TTL")
-	if ttlDefined {
+	if ttlDefined && ttlValue != "" {
 		duration, err := time.ParseDuration(ttlValue)
 		if err != nil {
 			panic(fmt.Sprintf("Please define a proper duration for the test: %v", err))
