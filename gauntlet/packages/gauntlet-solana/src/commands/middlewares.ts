@@ -4,7 +4,7 @@ import { assertions, logger } from '@chainlink/gauntlet-core/dist/utils'
 import { AnchorProvider } from '@project-serum/anchor'
 import { Connection, Keypair } from '@solana/web3.js'
 import { DEFAULT_DERIVATION_PATH } from '../lib/constants'
-import SolanaCommand from './internal/solana'
+import SolanaCommand, { CONFIRM_LEVEL } from './internal/solana'
 import { LedgerWallet, LocalWallet } from './wallet'
 
 const isValidURL = (url: string) => {
@@ -18,7 +18,10 @@ export const withProvider: Middleware = (c: SolanaCommand, next: Next) => {
     `Invalid NODE_URL (${nodeURL}), please add an http:// or https:// prefix`,
   )
 
-  c.provider = new AnchorProvider(new Connection(nodeURL), c.wallet, {})
+  c.provider = new AnchorProvider(new Connection(nodeURL), c.wallet, {
+    preflightCommitment: CONFIRM_LEVEL,
+    commitment: CONFIRM_LEVEL,
+  })
   return next()
 }
 

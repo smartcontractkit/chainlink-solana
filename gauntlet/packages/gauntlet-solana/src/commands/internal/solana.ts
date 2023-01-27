@@ -8,7 +8,6 @@ import {
   TransactionSignature,
   TransactionInstruction,
   TransactionConfirmationStatus,
-  SimulatedTransactionResponse,
   TransactionExpiredBlockheightExceededError,
   Transaction,
   VersionedTransaction,
