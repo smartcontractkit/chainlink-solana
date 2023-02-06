@@ -139,20 +139,13 @@ func (m *OCRv2TestState) DeployEnv(contractsDir string) {
 		return
 	}
 
-	if m.Common.Env.Cfg.InsideK8s {
-		m.Common.SolanaUrl = m.Common.Env.URLs[m.Client.Config.Name][2]
-	} else {
-		m.Common.SolanaUrl = m.Common.Env.URLs[m.Client.Config.Name][0]
-	}
+	m.Common.SolanaUrl = m.Common.Env.URLs[m.Client.Config.Name][0]
 	m.UploadProgramBinaries(contractsDir)
 }
 
 func (m *OCRv2TestState) NewSolanaClientSetup(networkSettings *solclient.SolNetwork) func(*environment.Environment) (*solclient.Client, error) {
 	return func(env *environment.Environment) (*solclient.Client, error) {
 		networkSettings.URLs = env.URLs[networkSettings.Name]
-		if m.Common.Env.Cfg.InsideK8s {
-			networkSettings.URLs = networkSettings.URLs[2:]
-		}
 		ec, err := solclient.NewClient(networkSettings)
 		if err != nil {
 			return nil, err
