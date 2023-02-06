@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-env/environment"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
+	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
@@ -49,12 +50,12 @@ type Contracts struct {
 	StoreAuth string
 }
 
-func NewOCRv2State(t *testing.T, contracts int) *OCRv2TestState {
+func NewOCRv2State(t *testing.T, contracts int, namespacePrefix string) *OCRv2TestState {
 	state := &OCRv2TestState{
 		Mu:                 &sync.Mutex{},
 		LastRoundTime:      make(map[string]time.Time),
 		ContractsNodeSetup: make(map[int]*ContractNodeInfo),
-		Common:             New().Default(t),
+		Common:             New().Default(t, namespacePrefix),
 		Client:             &solclient.Client{},
 		T:                  t,
 	}
@@ -110,6 +111,11 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 	if m.Env.WillUseRemoteRunner() {
 		return
 	}
+	m.T.Cleanup(func() {
+		if err := actions.TeardownSuite(m.T, m.Common.Env, "logs", m.ChainlinkNodes, nil, nil); err != nil {
+			log.Error().Err(err).Msg("Error tearing down environment")
+		}
+	})
 	m.SetupClients()
 	m.DeployContracts(contractsDir)
 	m.CreateJobs()

@@ -402,8 +402,12 @@ func BuildNodeContractPairID(node *client.Chainlink, ocr2Addr string) (string, e
 	return strings.ToLower(fmt.Sprintf("node_%s_contract_%s", shortNodeAddr, shortOCRAddr)), nil
 }
 
-func (c *Common) Default(t *testing.T) *Common {
-	c.K8Config = &environment.Config{TTL: c.TTL, Test: t}
+func (c *Common) Default(t *testing.T, namespacePrefix string) *Common {
+	c.K8Config = &environment.Config{
+		NamespacePrefix: fmt.Sprintf("solana-%s", namespacePrefix),
+		TTL:             c.TTL,
+		Test:            t,
+	}
 	testNetwork := networks.SelectedNetwork
 	baseTOML := fmt.Sprintf(`[[Solana]]
 Enabled = true
