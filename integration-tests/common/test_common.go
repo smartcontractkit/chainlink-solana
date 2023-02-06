@@ -2,11 +2,12 @@ package common
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"math/big"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/onsi/gomega"
 	"github.com/rs/zerolog/log"
@@ -53,7 +54,7 @@ func NewOCRv2State(t *testing.T, contracts int) *OCRv2TestState {
 		Mu:                 &sync.Mutex{},
 		LastRoundTime:      make(map[string]time.Time),
 		ContractsNodeSetup: make(map[int]*ContractNodeInfo),
-		Common:             New().Default(),
+		Common:             New().Default(t),
 		Client:             &solclient.Client{},
 		T:                  t,
 	}
@@ -106,6 +107,9 @@ func (m *OCRv2TestState) LabelChaosGroups() {
 
 func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 	m.DeployEnv(contractsDir)
+	if m.Env.WillUseRemoteRunner() {
+		return
+	}
 	m.SetupClients()
 	m.DeployContracts(contractsDir)
 	m.CreateJobs()
@@ -131,7 +135,11 @@ func (m *OCRv2TestState) UploadProgramBinaries(contractsDir string) {
 func (m *OCRv2TestState) DeployEnv(contractsDir string) {
 	err := m.Common.Env.Run()
 	require.NoError(m.T, err)
-	if m.Common.InsideK8 {
+	if m.Common.Env.WillUseRemoteRunner() {
+		return
+	}
+
+	if m.Common.Env.Cfg.InsideK8s {
 		m.Common.SolanaUrl = m.Common.Env.URLs[m.Client.Config.Name][2]
 	} else {
 		m.Common.SolanaUrl = m.Common.Env.URLs[m.Client.Config.Name][0]
@@ -142,7 +150,7 @@ func (m *OCRv2TestState) DeployEnv(contractsDir string) {
 func (m *OCRv2TestState) NewSolanaClientSetup(networkSettings *solclient.SolNetwork) func(*environment.Environment) (*solclient.Client, error) {
 	return func(env *environment.Environment) (*solclient.Client, error) {
 		networkSettings.URLs = env.URLs[networkSettings.Name]
-		if m.Common.InsideK8 {
+		if m.Common.Env.Cfg.InsideK8s {
 			networkSettings.URLs = networkSettings.URLs[2:]
 		}
 		ec, err := solclient.NewClient(networkSettings)

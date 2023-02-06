@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"os"
+	"strconv"
+	"testing"
+
 	"github.com/smartcontractkit/chainlink-env/environment"
 	"github.com/smartcontractkit/chainlink-env/pkg/alias"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
@@ -11,8 +15,6 @@ import (
 	mockservercfg "github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver-cfg"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/sol"
 	networks "github.com/smartcontractkit/chainlink/integration-tests"
-	"os"
-	"strconv"
 
 	"math/big"
 	"sort"
@@ -54,7 +56,6 @@ type Common struct {
 	EnvConfig map[string]interface{}
 	K8Config  *environment.Config
 	Env       *environment.Environment
-	InsideK8  bool
 	SolanaUrl string
 }
 
@@ -123,12 +124,15 @@ func New() *Common {
 			panic(fmt.Sprintf("Please define a proper duration for the test: %v", err))
 		}
 	} else {
-		duration, _ := time.ParseDuration(DefaultTTL)
+		duration, err := time.ParseDuration(DefaultTTL)
+		if err != nil {
+			panic(fmt.Sprintf("Please define a proper duration for the test: %v", err))
+		}
 		c.TTL, err = time.ParseDuration(*alias.ShortDur(duration))
+		if err != nil {
+			panic(fmt.Sprintf("Please define a proper duration for the test: %v", err))
+		}
 	}
-
-	// Setting optional parameters
-	_, c.InsideK8 = os.LookupEnv("INSIDE_K8")
 
 	return c
 }
@@ -398,8 +402,8 @@ func BuildNodeContractPairID(node *client.Chainlink, ocr2Addr string) (string, e
 	return strings.ToLower(fmt.Sprintf("node_%s_contract_%s", shortNodeAddr, shortOCRAddr)), nil
 }
 
-func (c *Common) Default() *Common {
-	c.K8Config = &environment.Config{InsideK8s: c.InsideK8, TTL: c.TTL}
+func (c *Common) Default(t *testing.T) *Common {
+	c.K8Config = &environment.Config{TTL: c.TTL, Test: t}
 	testNetwork := networks.SelectedNetwork
 	baseTOML := fmt.Sprintf(`[[Solana]]
 Enabled = true

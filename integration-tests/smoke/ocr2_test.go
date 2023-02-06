@@ -14,6 +14,10 @@ import (
 func TestSolanaOCRV2Smoke(t *testing.T) {
 	var state = common.NewOCRv2State(t, 1)
 	state.DeployCluster(utils.ContractsDir)
+	if state.Env.WillUseRemoteRunner() {
+		return
+	}
+
 	state.SetAllAdapterResponsesToTheSameValue(10)
 	state.ValidateRoundsAfter(time.Now(), common.NewRoundCheckTimeout, 1)
 	err := actions.TeardownSuite(state.T, state.Common.Env, "logs", state.ChainlinkNodes, nil, nil)
