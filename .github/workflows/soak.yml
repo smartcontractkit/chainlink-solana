@@ -23,6 +23,7 @@ on:
 env:
   REF_NAME: ${{ github.head_ref || github.ref_name }}
   ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-solana-tests:${{ github.head_ref || github.ref_name }}
+  CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
 
 jobs:
   get_projectserum_version:
@@ -101,6 +102,11 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           ref: ${{ env.REF_NAME }}
+      - name: Download Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: artifacts
+          path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
       - name: Build Test Runner
         if: ${{ env.REF_NAME != 'develop' }}
         uses: smartcontractkit/chainlink-github-actions/docker/build-push@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
@@ -120,7 +126,7 @@ jobs:
           go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
           cl_image_tag: custom.${{ github.sha }}
-          download_contract_artifacts_path: contracts/target/deploy
+          download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
           artifacts_location: /home/runner/work/chainlink-solana/chainlink-solana/integration-tests/soak/logs
           publish_report_paths: ./tests-soak-report.xml
           publish_check_name: Soak Test Results
