@@ -2,16 +2,18 @@ package common
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"math/big"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onsi/gomega"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-env/environment"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
+	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
@@ -21,7 +23,7 @@ import (
 const (
 	ContractsStateFile        = "contracts-chaos-state.json"
 	NewRoundCheckTimeout      = 120 * time.Second
-	NewSoakRoundsCheckTimeout = 6 * time.Hour
+	NewSoakRoundsCheckTimeout = 3 * time.Hour
 	NewRoundCheckPollInterval = 1 * time.Second
 	SourceChangeInterval      = 5 * time.Second
 	ChaosAwaitingApply        = 1 * time.Minute
@@ -48,12 +50,12 @@ type Contracts struct {
 	StoreAuth string
 }
 
-func NewOCRv2State(t *testing.T, contracts int) *OCRv2TestState {
+func NewOCRv2State(t *testing.T, contracts int, namespacePrefix string) *OCRv2TestState {
 	state := &OCRv2TestState{
 		Mu:                 &sync.Mutex{},
 		LastRoundTime:      make(map[string]time.Time),
 		ContractsNodeSetup: make(map[int]*ContractNodeInfo),
-		Common:             New().Default(),
+		Common:             New().Default(t, namespacePrefix),
 		Client:             &solclient.Client{},
 		T:                  t,
 	}
@@ -70,7 +72,6 @@ func NewOCRv2State(t *testing.T, contracts int) *OCRv2TestState {
 
 type OCRv2TestState struct {
 	Mu                 *sync.Mutex
-	Env                *environment.Environment
 	ChainlinkNodes     []*client.Chainlink
 	ContractDeployer   *solclient.ContractDeployer
 	LinkToken          *solclient.LinkToken
@@ -106,6 +107,14 @@ func (m *OCRv2TestState) LabelChaosGroups() {
 
 func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 	m.DeployEnv(contractsDir)
+	if m.Common.Env.WillUseRemoteRunner() {
+		return
+	}
+	m.T.Cleanup(func() {
+		if err := actions.TeardownSuite(m.T, m.Common.Env, "logs", m.ChainlinkNodes, nil, nil); err != nil {
+			log.Error().Err(err).Msg("Error tearing down environment")
+		}
+	})
 	m.SetupClients()
 	m.DeployContracts(contractsDir)
 	m.CreateJobs()
@@ -131,20 +140,17 @@ func (m *OCRv2TestState) UploadProgramBinaries(contractsDir string) {
 func (m *OCRv2TestState) DeployEnv(contractsDir string) {
 	err := m.Common.Env.Run()
 	require.NoError(m.T, err)
-	if m.Common.InsideK8 {
-		m.Common.SolanaUrl = m.Common.Env.URLs[m.Client.Config.Name][2]
-	} else {
-		m.Common.SolanaUrl = m.Common.Env.URLs[m.Client.Config.Name][0]
+	if m.Common.Env.WillUseRemoteRunner() {
+		return
 	}
+
+	m.Common.SolanaUrl = m.Common.Env.URLs[m.Client.Config.Name][0]
 	m.UploadProgramBinaries(contractsDir)
 }
 
 func (m *OCRv2TestState) NewSolanaClientSetup(networkSettings *solclient.SolNetwork) func(*environment.Environment) (*solclient.Client, error) {
 	return func(env *environment.Environment) (*solclient.Client, error) {
 		networkSettings.URLs = env.URLs[networkSettings.Name]
-		if m.Common.InsideK8 {
-			networkSettings.URLs = networkSettings.URLs[2:]
-		}
 		ec, err := solclient.NewClient(networkSettings)
 		if err != nil {
 			return nil, err

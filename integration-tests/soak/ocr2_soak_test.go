@@ -1,4 +1,4 @@
-package smoke
+package tests
 
 import (
 	"testing"
@@ -9,12 +9,12 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/common"
 )
 
-func TestSolanaOCRV2Smoke(t *testing.T) {
-	state := common.NewOCRv2State(t, 1, "smoke")
+func TestSolanaOCRV2SoakTest(t *testing.T) {
+	state := common.NewOCRv2State(t, 5, "soak")
 	state.DeployCluster(utils.ContractsDir)
 	if state.Common.Env.WillUseRemoteRunner() {
 		return
 	}
 	state.SetAllAdapterResponsesToTheSameValue(10)
-	state.ValidateRoundsAfter(time.Now(), common.NewRoundCheckTimeout, 1)
+	state.ValidateRoundsAfter(time.Now(), common.NewSoakRoundsCheckTimeout, 200)
 }
