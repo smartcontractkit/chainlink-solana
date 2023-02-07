@@ -1,7 +1,7 @@
 name: E2E Soak Test
 on:
   schedule:
-    - cron: '0 */3 * * *'
+    - cron: '0 0 * * *'
   workflow_dispatch:
     inputs:
       cl_branch_ref:
@@ -12,7 +12,7 @@ on:
       ttl:
         description: The total time for the test to live
         required: true
-        default: 72h
+        default: 3h
         type: string
       node_count:
         description: The number of chainlink nodes to use
@@ -90,7 +90,7 @@ jobs:
     env:
       DETACH_RUNNER: false
       TEST_SUITE: soak
-      TEST_ARGS: -test.timeout 3h
+      TEST_ARGS: -test.timeout 4h
       CHAINLINK_COMMIT_SHA: ${{ github.sha }}
       CHAINLINK_ENV_USER: ${{ github.actor }}
       TEST_LOG_LEVEL: debug
@@ -122,7 +122,7 @@ jobs:
       - name: Run Tests
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
         with:
-          test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -json $(args) ./soak 2>&1 | tee /tmp/gotest.log | gotestfmt
+          test_command_to_run: cd ./integration-tests && go test -timeout 5h -count=1 -json $(args) ./soak 2>&1 | tee /tmp/gotest.log | gotestfmt
           go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
           cl_image_tag: custom.${{ github.sha }}
