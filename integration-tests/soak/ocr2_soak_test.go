@@ -12,7 +12,7 @@ import (
 func TestSolanaOCRV2SoakTest(t *testing.T) {
 	state := common.NewOCRv2State(t, 5, "soak")
 	state.DeployCluster(utils.ContractsDir)
-	if state.Env.WillUseRemoteRunner() {
+	if state.Common.Env.WillUseRemoteRunner() {
 		return
 	}
 	state.SetAllAdapterResponsesToTheSameValue(10)

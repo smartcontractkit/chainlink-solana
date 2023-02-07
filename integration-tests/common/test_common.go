@@ -72,7 +72,6 @@ func NewOCRv2State(t *testing.T, contracts int, namespacePrefix string) *OCRv2Te
 
 type OCRv2TestState struct {
 	Mu                 *sync.Mutex
-	Env                *environment.Environment
 	ChainlinkNodes     []*client.Chainlink
 	ContractDeployer   *solclient.ContractDeployer
 	LinkToken          *solclient.LinkToken
@@ -108,7 +107,7 @@ func (m *OCRv2TestState) LabelChaosGroups() {
 
 func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 	m.DeployEnv(contractsDir)
-	if m.Env.WillUseRemoteRunner() {
+	if m.Common.Env.WillUseRemoteRunner() {
 		return
 	}
 	m.T.Cleanup(func() {
