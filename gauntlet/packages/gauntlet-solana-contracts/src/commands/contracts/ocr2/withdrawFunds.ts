@@ -69,6 +69,10 @@ export default class WithdrawFunds extends SolanaCommand {
 
     const billingAC = new PublicKey(info.config.billingAccessController)
 
+    logger.loading(
+      `Withdrawing ${this.input.amountGjuels} (${this.flags.amount}) tokens from ${state.toString()} aggregator token vault ${tokenVault.toString()}...`,
+    )
+
     const data = await this.program.methods
       .withdrawFunds(new BN(this.input.amountGjuels))
       .accounts({

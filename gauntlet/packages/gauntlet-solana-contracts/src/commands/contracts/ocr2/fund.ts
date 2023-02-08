@@ -58,7 +58,7 @@ export default class Fund extends SolanaCommand {
     const from = await getAssociatedTokenAddress(linkPublicKey, signer)
     const amount = new BN(this.input.amount)
     logger.loading(
-      `Transferring ${amount.toString()} tokens to ${state.toString()} aggregator token vault ${tokenVault.toString()}...`,
+      `Transferring ${amount.toString()} (${this.flags.amount}) tokens to ${state.toString()} aggregator token vault ${tokenVault.toString()}...`,
     )
 
     const ix = createTransferInstruction(from, tokenVault, signer, amount.toNumber())
