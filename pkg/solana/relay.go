@@ -120,6 +120,10 @@ func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes
 	}, nil
 }
 
+func (r *Relayer) NewMercuryProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MercuryProvider, error) {
+	return nil, errors.New("mercury is not supported on solana")
+}
+
 var _ relaytypes.ConfigProvider = &configProvider{}
 
 type configProvider struct {
