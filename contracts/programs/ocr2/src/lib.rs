@@ -852,8 +852,6 @@ fn compute_unit_price(instruction_sysvar: &AccountInfo<'_>) -> Result<Option<u64
         return Ok(None);
     }
 
-    require!(current_instruction != 0, InvalidInput);
-
     // find ComputeBudgetInstruction::SetComputeUnitPrice()
     let compute_budget_ix = sysvar::instructions::load_instruction_at_checked(
         (current_instruction as usize) - 1,
