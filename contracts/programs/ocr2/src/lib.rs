@@ -827,7 +827,7 @@ fn calculate_reimbursement_gjuels(
                 .saturating_add(MICRO.saturating_sub(1))
                 .saturating_div(MICRO);
 
-            lamports += fee;
+            lamports = lamports.saturating_add(fee);
         };
     }
 
