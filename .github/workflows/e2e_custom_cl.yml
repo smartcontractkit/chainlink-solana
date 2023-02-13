@@ -135,10 +135,8 @@ jobs:
           go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ env.CL_ECR }}
           cl_image_tag: custom.${{ github.event.pull_request.head.sha }}
-          download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
           artifacts_location: /home/runner/work/chainlink-solana/chainlink-solana/integration-tests/logs
           token: ${{ secrets.GITHUB_TOKEN }}
-          dep_chainlink_integration_tests: develop
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
