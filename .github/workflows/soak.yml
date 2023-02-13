@@ -127,12 +127,10 @@ jobs:
           go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
           cl_image_tag: custom.${{ github.sha }}
-          download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
           artifacts_location: /home/runner/work/chainlink-solana/chainlink-solana/integration-tests/soak/logs
           publish_report_paths: ./tests-soak-report.xml
           publish_check_name: Soak Test Results
           token: ${{ secrets.GITHUB_TOKEN }}
-          dep_chainlink_integration_tests: develop
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
