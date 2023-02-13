@@ -103,6 +103,7 @@ jobs:
         with:
           ref: ${{ env.REF_NAME }}
       - name: Download Artifacts
+        if: ${{ env.REF_NAME != 'develop' }}
         uses: actions/download-artifact@v3
         with:
           name: artifacts
