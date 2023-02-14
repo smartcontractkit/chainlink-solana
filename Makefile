@@ -81,13 +81,9 @@ test_relay_unit:
 	go test -v ./pkg/...
 
 test_smoke:
-	CGO_ENABLED=1 SELECTED_NETWORKS=solana \
-	ginkgo -v -r --junit-report=tests-smoke-report.xml --keep-going --trace tests/e2e/smoke
+	cd ./integration-tests &&\
+	SELECTED_NETWORKS=SIMULATED go test -timeout 24h -count=1 -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestfmt
 
 test_ocr_soak:
-	CGO_ENABLED=1 SELECTED_NETWORKS=solana \
-	ginkgo -v -r --junit-report=tests-soak-report.xml --keep-going --trace tests/e2e/soak
-
-test_chaos:
-	CGO_ENABLED=1 SELECTED_NETWORKS=solana \
-	ginkgo -v -r --junit-report=tests-chaos-report.xml --keep-going --trace tests/e2e/chaos
+	cd ./integration-tests &&\
+ 	SELECTED_NETWORKS=SIMULATED go test -timeout 24h -count=1 -json $(args) ./soak 2>&1 | tee /tmp/gotest.log | gotestfmt

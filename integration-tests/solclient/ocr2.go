@@ -9,7 +9,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/rs/zerolog/log"
 	ocr_2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr2"
-	"github.com/smartcontractkit/chainlink-solana/tests/e2e/utils"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 )

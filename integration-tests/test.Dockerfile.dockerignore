@@ -1,0 +1,25 @@
+.direnv
+.DS_Store
+**/*.rs.bk
+.idea
+.vscode/
+.github/
+ops/
+
+# TS
+node_modules/
+contracts/node_modules/
+**/tsconfig.tsbuildinfo
+dist
+.env
+flow-report.jsons
+report.json
+bin
+
+# test
+id.json
+integration-tests/logs
+integration-tests/smoke/logs
+integration-teststests/smoke/contracts-chaos-state.json
+tmp-manifest-*
+tests-smoke-report.xml

@@ -23,6 +23,15 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var (
+	DefaultPrivateKeysSolValidator = []string{
+		"57qbvFjTChfNwQxqkFZwjHp7xYoPZa7f9ow6GA59msfCH1g6onSjKUTrrLp4w1nAwbwQuit8YgJJ2AwT9BSwownC",
+		"2tye1GyG7wwTUS2T8puXSErDyzQcBxpgwRN5R2MMy5osJKjQF6ZoeYTTpeHaAxpuiE1G4Pnq4sTa4YCWx3RcXb4Y",
+		"5aRBAnU3NBymRyMtrRjPLZ3erZNgTZBhEHszsXF8kTwbGLz8q5FYgKicJ7AFifrFitvJB2NS5jbyQohSJtvkgPER",
+		"2MYG6HKpMuGEo3qErj4pAF2Gney6Yb6jgjTc6TZCuu7fiLAVQekTd3HbsT9ienzGHpKwA7Ekj2TGuMHPUB6EHJ8P",
+	}
+)
+
 // Accounts is a shared state between contracts in which data is stored in Solana
 type Accounts struct {
 	// OCR OCR program state account
@@ -61,7 +70,8 @@ type SolNetwork struct {
 
 // Client implements BlockchainClient
 type Client struct {
-	Config *SolNetwork
+	Accounts *Accounts
+	Config   *SolNetwork
 	// Wallets lamport wallets
 	Wallets []*solana.Wallet
 	// ProgramWallets program wallets by key filename
@@ -72,7 +82,8 @@ type Client struct {
 	// RPC rpc client
 	RPC *rpc.Client
 	// WS websocket client
-	WS *ws.Client
+	WS        *ws.Client
+	LinkToken *LinkToken
 }
 
 func (c *Client) BalanceAt(ctx context.Context, address common.Address) (*big.Int, error) {
@@ -383,6 +394,19 @@ func (c *Client) Fund(toAddress string, amount *big.Float) error {
 		Msg("Airdropping account")
 	c.queueTX(txHash, rpc.CommitmentConfirmed)
 	return nil
+}
+
+func (cfg *SolNetwork) Default() *SolNetwork {
+	return &SolNetwork{
+		Name:              "sol",
+		Type:              "solana",
+		ContractsDeployed: false,
+		PrivateKeys:       DefaultPrivateKeysSolValidator,
+		URLs: []string{
+			"http://localhost:8899",
+			"ws://localhost:8900",
+		},
+	}
 }
 
 func (c *Client) ParallelTransactions(enabled bool) {
