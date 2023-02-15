@@ -7,6 +7,8 @@ import {
   Keypair,
   Transaction,
   TransactionInstruction,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
+  ComputeBudgetProgram,
 } from "@solana/web3.js";
 import {
   createMint,
@@ -130,6 +132,7 @@ describe("ocr2", async () => {
     epoch: number,
     round: number,
     answer: BN,
+    computeUnitPrice: number = 0,
     juels: Buffer = Buffer.from([0, 0, 0, 0, 0, 0, 0, 2]) // juels per lamport (2)
   ): Promise<string> => {
     let account = await program.account.state.fetch(state.publicKey);
@@ -206,6 +209,9 @@ describe("ocr2", async () => {
     const transmitter = oracles[0].transmitter;
 
     const tx = new Transaction();
+    if (computeUnitPrice > 0) {
+      tx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: computeUnitPrice }))
+    }
     tx.add(
       new TransactionInstruction({
         programId: anchor.translateAddress(program.programId),
@@ -223,6 +229,7 @@ describe("ocr2", async () => {
             isSigner: false,
           },
           { pubkey: storeAuthority, isWritable: false, isSigner: false },
+          { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isWritable: false, isSigner: false },
         ],
         data: Buffer.concat([
           Buffer.from([storeNonce]),
@@ -247,13 +254,14 @@ describe("ocr2", async () => {
   };
 
   it("Funds the payer", async () => {
+    await provider.connection.confirmTransaction(
     await provider.connection.requestAirdrop(
       fromWallet.publicKey,
-      LAMPORTS_PER_SOL
-    );
+      LAMPORTS_PER_SOL * 1000
+    ), "confirmed");
 
     await provider.connection.confirmTransaction(
-      await provider.connection.requestAirdrop(payer.publicKey, 10000000000),
+      await provider.connection.requestAirdrop(payer.publicKey, LAMPORTS_PER_SOL * 1000),
       "confirmed"
     );
   });
@@ -861,6 +869,7 @@ describe("ocr2", async () => {
       },
     ],
   ]);
+
   it("Can call query", async () => {
     let round = await query(
       feed.publicKey,
@@ -981,22 +990,81 @@ describe("ocr2", async () => {
     }
   });
 
+  it("Transmit reimburses for setComputeUnitPrice", async () => {
+    const transmitter = oracles[0].transmitter.publicKey;
+
+    let account = await program.account.state.fetch(state.publicKey);
+    let currentOracles = account.oracles.xs.slice(0, account.oracles.len);
+    // get the transmitter
+    let i = currentOracles.findIndex((o) => o.transmitter.equals(transmitter));
+    let oracle = currentOracles[i];
+    console.log(oracle);
+    let before = oracle.paymentGjuels;
+    
+    let computePriceMicroLamports = 10;
+    let juelsPerLamport = Buffer.from([0, 0, 0, 0, 59, 154, 202, 0]); // 1 gjuel (to_be_bytes)
+    let tx = await transmit(
+      feed.publicKey,
+      rounds + 1,
+      rounds + 1,
+      new BN(rounds + 2),
+      computePriceMicroLamports,
+      juelsPerLamport,
+    );
+    await provider.connection.confirmTransaction(tx);
+    let t = await provider.connection.getTransaction(tx, { commitment: "confirmed" });
+    console.log(t.meta.logMessages); // 195_785/195_997
+    account = await program.account.state.fetch(state.publicKey, 'confirmed');
+    currentOracles = account.oracles.xs.slice(0, account.oracles.len);
+    // get the transmitter
+    oracle = currentOracles[i];
+    let after = oracle.paymentGjuels;
+    
+    let payment = after.sub(before).toNumber();
+    let execUnits = (25_000 * (f+1) + 21_000);
+    let computeUnitCostLamports = execUnits * computePriceMicroLamports / Math.pow(10, 6);
+    let lamportsPerSignature = 5000;
+    let signers = 1;
+    let computeUnitCostGjuels = Math.ceil((computeUnitCostLamports + lamportsPerSignature * signers) * 1); // 1 lamport = 1 gjuel
+    assert.equal(payment, transmissionPayment + computeUnitCostGjuels);
+
+    // payOracles to clean up the payment state for the next test
+    let payees = currentOracles.map((oracle) => {
+      return { pubkey: oracle.payee, isWritable: true, isSigner: false };
+    });
+    tx = await program.rpc.payOracles({
+      accounts: {
+        state: state.publicKey,
+        authority: owner.publicKey,
+        accessController: billingAccessController.publicKey,
+        tokenReceiver: recipientTokenAccount.address,
+        tokenVault: tokenVault,
+        vaultAuthority: vaultAuthority,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      },
+      remainingAccounts: payees,
+    });
+    await provider.connection.confirmTransaction(tx);
+  });
+
   it("Transmit does not fail on juelsPerFeecoin edge cases", async () => {
     // zero value u64 juelsPerFeecoin
     await transmit(
       feed.publicKey,
-      rounds + 1,
-      rounds + 1,
+      rounds + 2,
+      rounds + 2,
       new BN(rounds + 1),
+      0,
       Buffer.from([0, 0, 0, 0, 0, 0, 0, 0])
     );
 
     // max value u64 juelsPerFeecoin
     await transmit(
       feed.publicKey,
-      rounds + 2,
-      rounds + 2,
+      rounds + 3,
+      rounds + 3,
       new BN(rounds + 2),
+      0,
       Buffer.from([127, 127, 127, 127, 127, 127, 127, 127])
     );
   });
@@ -1216,4 +1284,5 @@ describe("ocr2", async () => {
     );
     assert.equal(new BN(round.answer, 10, "le").toNumber(), 100);
   });
+
 });

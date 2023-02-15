@@ -716,8 +716,11 @@ fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> Result<()
     state.config.latest_transmitter = ctx.accounts.transmitter.key();
 
     // calculate and pay reimbursement
-    let reimbursement_gjuels =
-        calculate_reimbursement_gjuels(report.juels_per_lamport, signature_count)?; // gjuels
+    let reimbursement_gjuels = calculate_reimbursement_gjuels(
+        report.juels_per_lamport,
+        signature_count,
+        ctx.remaining_accounts.first(),
+    )?;
     let amount_gjuels = reimbursement_gjuels
         .saturating_add(u64::from(state.config.billing.transmission_payment_gjuels));
     state.oracles[oracle_idx].payment_gjuels = state.oracles[oracle_idx]
@@ -800,16 +803,76 @@ impl Report {
     }
 }
 
-fn calculate_reimbursement_gjuels(juels_per_lamport: u64, _signature_count: usize) -> Result<u64> {
+fn calculate_reimbursement_gjuels(
+    juels_per_lamport: u64,
+    signature_count: usize,
+    instructions_sysvar: Option<&AccountInfo<'_>>,
+) -> Result<u64> {
     const SIGNERS: u64 = 1;
+    const MICRO: u64 = 10u64.pow(6);
     const GIGA: u128 = 10u128.pow(9);
     const LAMPORTS_PER_SIGNATURE: u64 = 5_000; // constant, originally retrieved from deprecated sysvar fees
-    let lamports = LAMPORTS_PER_SIGNATURE * SIGNERS;
+    let mut lamports = LAMPORTS_PER_SIGNATURE * SIGNERS;
+
+    // if a compute unit price is set then we also need to
+    if let Some(sysvar) = instructions_sysvar {
+        if let Some(compute_unit_price_micro_lamports) = compute_unit_price(sysvar)? {
+            // 25k per signature, plus ~21k for the rest
+            let exec_units = 25_000 * signature_count as u64 + 21_000;
+            // TODO: std::cmp::min(compute_unit_price_micro_lamports, config.max_compute_unit_price)
+
+            // https://github.com/solana-labs/solana/blob/090e11210aa7222d8295610a6ccac4acda711bb9/program-runtime/src/prioritization_fee.rs#L34-L38
+            let micro_lamport_fee = exec_units.saturating_mul(compute_unit_price_micro_lamports);
+            let fee = micro_lamport_fee
+                .saturating_add(MICRO.saturating_sub(1))
+                .saturating_div(MICRO);
+
+            lamports = lamports.saturating_add(fee);
+        };
+    }
+
     let juels = u128::from(lamports) * u128::from(juels_per_lamport);
     let gjuels = juels / GIGA; // return value as gjuels
 
     // convert from u128 to u64 with staturating logic to max u64
     Ok(gjuels.try_into().unwrap_or(u64::MAX))
+}
+
+pub mod compute_budget {
+    crate::declare_id!("ComputeBudget111111111111111111111111111111");
+}
+
+fn compute_unit_price(instruction_sysvar: &AccountInfo<'_>) -> Result<Option<u64>> {
+    use anchor_lang::solana_program::sysvar;
+    // look at sysvar instructions
+    let current_instruction = sysvar::instructions::load_current_index_checked(instruction_sysvar)?;
+
+    // if we can't find unit price return None and skip this part of calc
+    if current_instruction == 0 {
+        return Ok(None);
+    }
+
+    // find ComputeBudgetInstruction::SetComputeUnitPrice()
+    let compute_budget_ix = sysvar::instructions::load_instruction_at_checked(
+        (current_instruction as usize) - 1,
+        instruction_sysvar,
+    )?;
+
+    require!(
+        compute_budget_ix.program_id == compute_budget::ID,
+        InvalidInput
+    );
+
+    require!(compute_budget_ix.data[0] == 3, InvalidInput); // SetComputeUnitPrice index
+
+    // u8, u64
+    require!(compute_budget_ix.data.len() == 9, InvalidInput); // <--
+    let unit_price_micro_lamports =
+        u64::from_le_bytes(compute_budget_ix.data[1..1 + 8].try_into().unwrap());
+
+    // parse out execution unit price
+
+    Ok(Some(unit_price_micro_lamports))
 }
 
 fn calculate_owed_payment_gjuels(
