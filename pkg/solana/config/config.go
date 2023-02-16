@@ -32,9 +32,9 @@ var defaultConfigSet = configSet{
 
 	// fee estimator
 	FeeEstimatorMode:        "fixed",
-	MaxComputeUnitPrice:     1_000,
-	MinComputeUnitPrice:     0,
-	DefaultComputeUnitPrice: 0,
+	ComputeUnitPriceMax:     1_000,
+	ComputeUnitPriceMin:     0,
+	ComputeUnitPriceDefault: 0,
 	FeeBumpPeriod:           3 * time.Second,
 }
 
@@ -52,9 +52,9 @@ type Config interface {
 
 	// fee estimator
 	FeeEstimatorMode() string
-	MaxComputeUnitPrice() uint64
-	MinComputeUnitPrice() uint64
-	DefaultComputeUnitPrice() uint64
+	ComputeUnitPriceMax() uint64
+	ComputeUnitPriceMin() uint64
+	ComputeUnitPriceDefault() uint64
 	FeeBumpPeriod() time.Duration
 
 	// Update sets new chain config values.
@@ -74,9 +74,9 @@ type configSet struct {
 	MaxRetries          *uint
 
 	FeeEstimatorMode        string
-	MaxComputeUnitPrice     uint64
-	MinComputeUnitPrice     uint64
-	DefaultComputeUnitPrice uint64
+	ComputeUnitPriceMax     uint64
+	ComputeUnitPriceMin     uint64
+	ComputeUnitPriceDefault uint64
 	FeeBumpPeriod           time.Duration
 }
 
@@ -217,43 +217,43 @@ func (c *config) FeeEstimatorMode() string {
 	return c.defaults.FeeEstimatorMode
 }
 
-func (c *config) MaxComputeUnitPrice() uint64 {
+func (c *config) ComputeUnitPriceMax() uint64 {
 	c.chainMu.RLock()
-	ch := c.chain.MaxComputeUnitPrice
+	ch := c.chain.ComputeUnitPriceMax
 	c.chainMu.RUnlock()
 	if ch.Valid {
 		if ch.Int64 >= 0 {
 			return uint64(ch.Int64)
 		}
-		c.lggr.Warnf("Negative value provided for MaxComputeUnitPrice, falling back to default: %d", c.defaults.MaxComputeUnitPrice)
+		c.lggr.Warnf("Negative value provided for ComputeUnitPriceMax, falling back to default: %d", c.defaults.ComputeUnitPriceMax)
 	}
-	return c.defaults.MaxComputeUnitPrice
+	return c.defaults.ComputeUnitPriceMax
 }
 
-func (c *config) MinComputeUnitPrice() uint64 {
+func (c *config) ComputeUnitPriceMin() uint64 {
 	c.chainMu.RLock()
-	ch := c.chain.MinComputeUnitPrice
+	ch := c.chain.ComputeUnitPriceMin
 	c.chainMu.RUnlock()
 	if ch.Valid {
 		if ch.Int64 >= 0 {
 			return uint64(ch.Int64)
 		}
-		c.lggr.Warnf("Negative value provided for MinComputeUnitPrice, falling back to default: %d", c.defaults.MinComputeUnitPrice)
+		c.lggr.Warnf("Negative value provided for ComputeUnitPriceMin, falling back to default: %d", c.defaults.ComputeUnitPriceMin)
 	}
-	return c.defaults.MinComputeUnitPrice
+	return c.defaults.ComputeUnitPriceMin
 }
 
-func (c *config) DefaultComputeUnitPrice() uint64 {
+func (c *config) ComputeUnitPriceDefault() uint64 {
 	c.chainMu.RLock()
-	ch := c.chain.DefaultComputeUnitPrice
+	ch := c.chain.ComputeUnitPriceDefault
 	c.chainMu.RUnlock()
 	if ch.Valid {
 		if ch.Int64 >= 0 {
 			return uint64(ch.Int64)
 		}
-		c.lggr.Warnf("Negative value provided for DefaultComputeUnitPrice, falling back to default: %d", c.defaults.DefaultComputeUnitPrice)
+		c.lggr.Warnf("Negative value provided for ComputeUnitPriceDefault, falling back to default: %d", c.defaults.ComputeUnitPriceDefault)
 	}
-	return c.defaults.DefaultComputeUnitPrice
+	return c.defaults.ComputeUnitPriceDefault
 }
 
 func (c *config) MaxRetries() *uint {
@@ -293,9 +293,9 @@ type Chain struct {
 	Commitment              *string
 	MaxRetries              *int64
 	FeeEstimatorMode        *string
-	MaxComputeUnitPrice     *uint64
-	MinComputeUnitPrice     *uint64
-	DefaultComputeUnitPrice *uint64
+	ComputeUnitPriceMax     *uint64
+	ComputeUnitPriceMin     *uint64
+	ComputeUnitPriceDefault *uint64
 	FeeBumpPeriod           *utils.Duration
 }
 
@@ -337,23 +337,23 @@ func (c *Chain) SetFromDB(cfg *db.ChainCfg) error {
 	if cfg.FeeEstimatorMode.Valid {
 		c.FeeEstimatorMode = &cfg.FeeEstimatorMode.String
 	}
-	if cfg.MaxComputeUnitPrice.Valid {
-		if cfg.MaxComputeUnitPrice.Int64 < 0 {
-			return fmt.Errorf("MaxComputeUnitPrice is less than zero %d < 0", cfg.MaxComputeUnitPrice.Int64)
+	if cfg.ComputeUnitPriceMax.Valid {
+		if cfg.ComputeUnitPriceMax.Int64 < 0 {
+			return fmt.Errorf("ComputeUnitPriceMax is less than zero %d < 0", cfg.ComputeUnitPriceMax.Int64)
 		}
-		c.MaxComputeUnitPrice = ptr(uint64(cfg.MaxComputeUnitPrice.Int64))
+		c.ComputeUnitPriceMax = ptr(uint64(cfg.ComputeUnitPriceMax.Int64))
 	}
-	if cfg.MinComputeUnitPrice.Valid {
-		if cfg.MinComputeUnitPrice.Int64 < 0 {
-			return fmt.Errorf("MinComputeUnitPrice is less than zero %d < 0", cfg.MinComputeUnitPrice.Int64)
+	if cfg.ComputeUnitPriceMin.Valid {
+		if cfg.ComputeUnitPriceMin.Int64 < 0 {
+			return fmt.Errorf("ComputeUnitPriceMin is less than zero %d < 0", cfg.ComputeUnitPriceMin.Int64)
 		}
-		c.MinComputeUnitPrice = ptr(uint64(cfg.MinComputeUnitPrice.Int64))
+		c.ComputeUnitPriceMin = ptr(uint64(cfg.ComputeUnitPriceMin.Int64))
 	}
-	if cfg.DefaultComputeUnitPrice.Valid {
-		if cfg.DefaultComputeUnitPrice.Int64 < 0 {
-			return fmt.Errorf("DefaultComputeUnitPrice is less than zero %d < 0", cfg.DefaultComputeUnitPrice.Int64)
+	if cfg.ComputeUnitPriceDefault.Valid {
+		if cfg.ComputeUnitPriceDefault.Int64 < 0 {
+			return fmt.Errorf("ComputeUnitPriceDefault is less than zero %d < 0", cfg.ComputeUnitPriceDefault.Int64)
 		}
-		c.DefaultComputeUnitPrice = ptr(uint64(cfg.DefaultComputeUnitPrice.Int64))
+		c.ComputeUnitPriceDefault = ptr(uint64(cfg.ComputeUnitPriceDefault.Int64))
 	}
 	if cfg.FeeBumpPeriod != nil {
 		c.FeeBumpPeriod = utils.MustNewDuration(cfg.FeeBumpPeriod.Duration())
@@ -396,14 +396,14 @@ func (c *Chain) SetDefaults() {
 	if c.FeeEstimatorMode == nil {
 		c.FeeEstimatorMode = &defaultConfigSet.FeeEstimatorMode
 	}
-	if c.MaxComputeUnitPrice == nil {
-		c.MaxComputeUnitPrice = &defaultConfigSet.MaxComputeUnitPrice
+	if c.ComputeUnitPriceMax == nil {
+		c.ComputeUnitPriceMax = &defaultConfigSet.ComputeUnitPriceMax
 	}
-	if c.MinComputeUnitPrice == nil {
-		c.MinComputeUnitPrice = &defaultConfigSet.MinComputeUnitPrice
+	if c.ComputeUnitPriceMin == nil {
+		c.ComputeUnitPriceMin = &defaultConfigSet.ComputeUnitPriceMin
 	}
-	if c.DefaultComputeUnitPrice == nil {
-		c.DefaultComputeUnitPrice = &defaultConfigSet.DefaultComputeUnitPrice
+	if c.ComputeUnitPriceDefault == nil {
+		c.ComputeUnitPriceDefault = &defaultConfigSet.ComputeUnitPriceDefault
 	}
 	if c.FeeBumpPeriod == nil {
 		c.FeeBumpPeriod = utils.MustNewDuration(defaultConfigSet.FeeBumpPeriod)
