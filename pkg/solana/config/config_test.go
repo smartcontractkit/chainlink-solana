@@ -28,9 +28,9 @@ var (
 	testCommitment                     = "finalized"
 	testMaxRetries              int64  = 123
 	testFeeEstimatorMode               = "block"
-	testMaxComputeUnitPrice     uint64 = 100_000
-	testMinComputeUnitPrice     uint64 = 1
-	testDefaultComputeUnitPrice uint64 = 10
+	testComputeUnitPriceMax     uint64 = 100_000
+	testComputeUnitPriceMin     uint64 = 1
+	testComputeUnitPriceDefault uint64 = 10
 	testFeeBumpPeriod                  = mustDuration(8 * time.Minute)
 )
 
@@ -56,9 +56,9 @@ func TestConfig_ExpectedDefaults(t *testing.T) {
 		Commitment:              cfg.Commitment(),
 		MaxRetries:              cfg.MaxRetries(),
 		FeeEstimatorMode:        cfg.FeeEstimatorMode(),
-		MaxComputeUnitPrice:     cfg.MaxComputeUnitPrice(),
-		MinComputeUnitPrice:     cfg.MinComputeUnitPrice(),
-		DefaultComputeUnitPrice: cfg.DefaultComputeUnitPrice(),
+		ComputeUnitPriceMax:     cfg.ComputeUnitPriceMax(),
+		ComputeUnitPriceMin:     cfg.ComputeUnitPriceMin(),
+		ComputeUnitPriceDefault: cfg.ComputeUnitPriceDefault(),
 		FeeBumpPeriod:           cfg.FeeBumpPeriod(),
 	}
 	assert.Equal(t, defaultConfigSet, configSet)
@@ -77,9 +77,9 @@ func TestConfig_NewConfig(t *testing.T) {
 		Commitment:              null.StringFrom(testCommitment),
 		MaxRetries:              null.IntFrom(testMaxRetries),
 		FeeEstimatorMode:        null.StringFrom(testFeeEstimatorMode),
-		MaxComputeUnitPrice:     null.IntFrom(int64(testMaxComputeUnitPrice)),
-		MinComputeUnitPrice:     null.IntFrom(int64(testMinComputeUnitPrice)),
-		DefaultComputeUnitPrice: null.IntFrom(int64(testDefaultComputeUnitPrice)),
+		ComputeUnitPriceMax:     null.IntFrom(int64(testComputeUnitPriceMax)),
+		ComputeUnitPriceMin:     null.IntFrom(int64(testComputeUnitPriceMin)),
+		ComputeUnitPriceDefault: null.IntFrom(int64(testComputeUnitPriceDefault)),
 		FeeBumpPeriod:           &testFeeBumpPeriod,
 	}
 	cfg := NewConfig(dbCfg, logger.Test(t))
@@ -94,9 +94,9 @@ func TestConfig_NewConfig(t *testing.T) {
 	assert.Equal(t, rpc.CommitmentType(testCommitment), cfg.Commitment())
 	assert.EqualValues(t, testMaxRetries, *cfg.MaxRetries())
 	assert.Equal(t, testFeeEstimatorMode, cfg.FeeEstimatorMode())
-	assert.Equal(t, testMaxComputeUnitPrice, cfg.MaxComputeUnitPrice())
-	assert.Equal(t, testMinComputeUnitPrice, cfg.MinComputeUnitPrice())
-	assert.Equal(t, testDefaultComputeUnitPrice, cfg.DefaultComputeUnitPrice())
+	assert.Equal(t, testComputeUnitPriceMax, cfg.ComputeUnitPriceMax())
+	assert.Equal(t, testComputeUnitPriceMin, cfg.ComputeUnitPriceMin())
+	assert.Equal(t, testComputeUnitPriceDefault, cfg.ComputeUnitPriceDefault())
 	assert.Equal(t, testFeeBumpPeriod.Duration(), cfg.FeeBumpPeriod())
 }
 
@@ -114,9 +114,9 @@ func TestConfig_Update(t *testing.T) {
 		Commitment:              null.StringFrom(testCommitment),
 		MaxRetries:              null.IntFrom(testMaxRetries),
 		FeeEstimatorMode:        null.StringFrom(testFeeEstimatorMode),
-		MaxComputeUnitPrice:     null.IntFrom(int64(testMaxComputeUnitPrice)),
-		MinComputeUnitPrice:     null.IntFrom(int64(testMinComputeUnitPrice)),
-		DefaultComputeUnitPrice: null.IntFrom(int64(testDefaultComputeUnitPrice)),
+		ComputeUnitPriceMax:     null.IntFrom(int64(testComputeUnitPriceMax)),
+		ComputeUnitPriceMin:     null.IntFrom(int64(testComputeUnitPriceMin)),
+		ComputeUnitPriceDefault: null.IntFrom(int64(testComputeUnitPriceDefault)),
 		FeeBumpPeriod:           &testFeeBumpPeriod,
 	}
 	cfg.Update(dbCfg)
@@ -131,9 +131,9 @@ func TestConfig_Update(t *testing.T) {
 	assert.Equal(t, rpc.CommitmentType(testCommitment), cfg.Commitment())
 	assert.EqualValues(t, testMaxRetries, *cfg.MaxRetries())
 	assert.Equal(t, testFeeEstimatorMode, cfg.FeeEstimatorMode())
-	assert.Equal(t, testMaxComputeUnitPrice, cfg.MaxComputeUnitPrice())
-	assert.Equal(t, testMinComputeUnitPrice, cfg.MinComputeUnitPrice())
-	assert.Equal(t, testDefaultComputeUnitPrice, cfg.DefaultComputeUnitPrice())
+	assert.Equal(t, testComputeUnitPriceMax, cfg.ComputeUnitPriceMax())
+	assert.Equal(t, testComputeUnitPriceMin, cfg.ComputeUnitPriceMin())
+	assert.Equal(t, testComputeUnitPriceDefault, cfg.ComputeUnitPriceDefault())
 	assert.Equal(t, testFeeBumpPeriod.Duration(), cfg.FeeBumpPeriod())
 }
 
@@ -144,13 +144,13 @@ func TestConfig_CommitmentFallback(t *testing.T) {
 
 func TestConfig_ComputeBudgetPriceFallback(t *testing.T) {
 	cfg := NewConfig(db.ChainCfg{
-		MaxComputeUnitPrice:     null.IntFrom(-1),
-		MinComputeUnitPrice:     null.IntFrom(-1),
-		DefaultComputeUnitPrice: null.IntFrom(-1),
+		ComputeUnitPriceMax:     null.IntFrom(-1),
+		ComputeUnitPriceMin:     null.IntFrom(-1),
+		ComputeUnitPriceDefault: null.IntFrom(-1),
 	}, logger.Test(t))
-	assert.Equal(t, defaultConfigSet.MaxComputeUnitPrice, cfg.MaxComputeUnitPrice())
-	assert.Equal(t, defaultConfigSet.MinComputeUnitPrice, cfg.MinComputeUnitPrice())
-	assert.Equal(t, defaultConfigSet.DefaultComputeUnitPrice, cfg.DefaultComputeUnitPrice())
+	assert.Equal(t, defaultConfigSet.ComputeUnitPriceMax, cfg.ComputeUnitPriceMax())
+	assert.Equal(t, defaultConfigSet.ComputeUnitPriceMin, cfg.ComputeUnitPriceMin())
+	assert.Equal(t, defaultConfigSet.ComputeUnitPriceDefault, cfg.ComputeUnitPriceDefault())
 }
 
 func TestConfig_MaxRetriesNegativeFallback(t *testing.T) {
@@ -178,9 +178,9 @@ func TestChain_SetFromDB(t *testing.T) {
 			Commitment:              null.StringFrom("confirmed"),
 			MaxRetries:              null.IntFrom(0),
 			FeeEstimatorMode:        null.StringFrom("block"),
-			MaxComputeUnitPrice:     null.IntFrom(100),
-			MinComputeUnitPrice:     null.IntFrom(10),
-			DefaultComputeUnitPrice: null.IntFrom(50),
+			ComputeUnitPriceMax:     null.IntFrom(100),
+			ComputeUnitPriceMin:     null.IntFrom(10),
+			ComputeUnitPriceDefault: null.IntFrom(50),
 			FeeBumpPeriod:           utils.MustNewDuration(3 * time.Second),
 		}, Chain{
 			BalancePollPeriod:       utils.MustNewDuration(5 * time.Second),
@@ -194,9 +194,9 @@ func TestChain_SetFromDB(t *testing.T) {
 			Commitment:              ptr("confirmed"),
 			MaxRetries:              ptr[int64](0),
 			FeeEstimatorMode:        ptr("block"),
-			MaxComputeUnitPrice:     ptr[uint64](100),
-			MinComputeUnitPrice:     ptr[uint64](10),
-			DefaultComputeUnitPrice: ptr[uint64](50),
+			ComputeUnitPriceMax:     ptr[uint64](100),
+			ComputeUnitPriceMin:     ptr[uint64](10),
+			ComputeUnitPriceDefault: ptr[uint64](50),
 			FeeBumpPeriod:           utils.MustNewDuration(3 * time.Second),
 		}},
 	} {
