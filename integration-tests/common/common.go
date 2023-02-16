@@ -393,9 +393,12 @@ func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error
 }
 
 func BuildNodeContractPairID(node *client.Chainlink, ocr2Addr string) (string, error) {
-	csaKeys, _, err := node.ReadCSAKeys()
+	csaKeys, resp, err := node.ReadCSAKeys()
 	if err != nil {
 		return "", err
+	}
+	if len(csaKeys.Data) <= 0 {
+		return "", fmt.Errorf("no csa key data was found on the node %v", resp)
 	}
 	shortNodeAddr := csaKeys.Data[0].Attributes.PublicKey[2:12]
 	shortOCRAddr := ocr2Addr[2:12]
