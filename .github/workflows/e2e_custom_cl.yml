@@ -10,6 +10,7 @@ on:
         type: string
 
 env:
+  DEFAULT_CHAINLINK_VERSION: 4c8245ae57e1f570328525c92120244faec1c090
   CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
   ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-solana-tests:ci.${{ github.sha }}
   CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
@@ -64,7 +65,7 @@ jobs:
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
         with:
           cl_repo: smartcontractkit/chainlink
-          cl_ref: ${{ github.event.inputs.cl_branch_ref }}
+          cl_ref: ${{ github.event.inputs.cl_branch_ref || env.DEFAULT_CHAINLINK_VERSION }}
           dep_solana_sha: ${{ github.event.pull_request.head.sha }}
           push_tag: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink:custom.${{ github.event.pull_request.head.sha }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
