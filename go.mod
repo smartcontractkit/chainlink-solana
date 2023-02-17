@@ -10,7 +10,7 @@ require (
 	github.com/gagliardetto/treeout v0.1.4
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.1
-	github.com/smartcontractkit/chainlink-relay v0.1.6-0.20230216164529-8bd9380f2f3f
+	github.com/smartcontractkit/chainlink-relay v0.1.6-0.20230217141955-99bdfda74345
 	github.com/smartcontractkit/libocr v0.0.0-20221121171434-482da3ed36d8
 	github.com/stretchr/testify v1.7.5
 	go.uber.org/multierr v1.8.0
