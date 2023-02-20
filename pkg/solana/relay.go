@@ -7,6 +7,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/pkg/errors"
 
+	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
 	relaytypes "github.com/smartcontractkit/chainlink-relay/pkg/types"
 	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
@@ -33,7 +34,7 @@ type Relayer struct {
 func NewRelayer(lggr logger.Logger, chainSet ChainSet) *Relayer {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Relayer{
-		lggr:     lggr.Named("SolanaRelayer"),
+		lggr:     lggr,
 		chainSet: chainSet,
 		ctx:      ctx,
 		cancel:   cancel,
@@ -72,6 +73,10 @@ func (r *Relayer) HealthReport() map[string]error {
 	return map[string]error{r.Name(): r.Healthy()}
 }
 
+func (r *Relayer) NewMercuryProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MercuryProvider, error) {
+	return nil, errors.New("mercury is not supported for starknet")
+}
+
 func (r *Relayer) NewConfigProvider(args relaytypes.RelayArgs) (relaytypes.ConfigProvider, error) {
 	configWatcher, err := newConfigProvider(r.ctx, r.lggr, r.chainSet, args)
 	if err != nil {
@@ -82,7 +87,7 @@ func (r *Relayer) NewConfigProvider(args relaytypes.RelayArgs) (relaytypes.Confi
 }
 
 func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MedianProvider, error) {
-	lggr := r.lggr.Named("MedianProvider")
+	lggr := relaylogger.Named(r.lggr, "MedianProvider")
 	configWatcher, err := newConfigProvider(r.ctx, lggr, r.chainSet, rargs)
 	if err != nil {
 		return nil, err
@@ -143,7 +148,7 @@ type configProvider struct {
 }
 
 func newConfigProvider(ctx context.Context, lggr logger.Logger, chainSet ChainSet, args relaytypes.RelayArgs) (*configProvider, error) {
-	lggr = lggr.Named("ConfigProvider")
+	lggr = relaylogger.Named(lggr, "ConfigProvider")
 	var relayConfig RelayConfig
 	err := json.Unmarshal(args.RelayConfig, &relayConfig)
 	if err != nil {
