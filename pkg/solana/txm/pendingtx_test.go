@@ -73,7 +73,7 @@ func TestPendingTxContext_expired(t *testing.T) {
 	} else {
 		_, cancel = context.WithCancel(context.Background())
 	}
-	
+
 	sig := solana.Signature{}
 	txs := newPendingTxContext()
 

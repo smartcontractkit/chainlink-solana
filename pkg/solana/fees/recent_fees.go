@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
 var (
