@@ -97,9 +97,13 @@ func TestTxm(t *testing.T) {
 	id := "mocknet"
 
 	ctx := context.Background()
+	var cancel func()
 	if d, ok := t.Deadline(); ok {
-		ctx, _ = context.WithDeadline(ctx, d)
+		ctx, cancel = context.WithDeadline(ctx, d)
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
 	}
+	t.Cleanup(cancel)
 
 	lggr := logger.Test(t)
 	cfg := config.NewConfig(db.ChainCfg{}, lggr)
