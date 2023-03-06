@@ -15,10 +15,15 @@ import (
 
 func TestPendingTxContext(t *testing.T) {
 	var wg sync.WaitGroup
+
 	ctx := context.Background()
+	var cancel func()
 	if d, ok := t.Deadline(); ok {
-		ctx, _ = context.WithDeadline(ctx, d)
+		ctx, cancel = context.WithDeadline(ctx, d)
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
 	}
+	t.Cleanup(cancel)
 
 	newProcess := func(i int) (solana.Signature, context.CancelFunc) {
 		// make random signature
