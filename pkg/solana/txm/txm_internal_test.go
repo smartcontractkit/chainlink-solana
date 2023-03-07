@@ -21,8 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
-
-	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 
 	"github.com/smartcontractkit/chainlink/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/solkey"
@@ -95,6 +94,7 @@ func newReaderWriterMock(t *testing.T) *mocks.ReaderWriter {
 func TestTxm(t *testing.T) {
 	// set up configs needed in txm
 	id := "mocknet"
+	t.Log("Starting new iteration")
 
 	ctx := context.Background()
 	var cancel func()

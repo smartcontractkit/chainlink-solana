@@ -16,12 +16,12 @@ import (
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
-
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 
-	"github.com/smartcontractkit/chainlink/core/services"
+	relaytypes "github.com/smartcontractkit/chainlink-relay/pkg/types"
+	relayutils "github.com/smartcontractkit/chainlink-relay/pkg/utils"
+
 	"github.com/smartcontractkit/chainlink/core/services/keystore"
-	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 const (
@@ -31,14 +31,14 @@ const (
 )
 
 var (
-	_ services.ServiceCtx = (*Txm)(nil)
-	_ solana.TxManager    = (*Txm)(nil)
+	_ relaytypes.Service = (*Txm)(nil)
+	_ solana.TxManager   = (*Txm)(nil)
 )
 
 // Txm manages transactions for the solana blockchain.
 // simple implementation with no persistently stored txs
 type Txm struct {
-	starter utils.StartStopOnce
+	starter relayutils.StartStopOnce
 	lggr    logger.Logger
 	chSend  chan pendingTx
 	chSim   chan pendingTx
@@ -47,7 +47,7 @@ type Txm struct {
 	cfg     config.Config
 	txs     PendingTxContext
 	ks      keystore.Solana
-	client  *utils.LazyLoad[solanaClient.ReaderWriter]
+	client  *relayutils.LazyLoad[solanaClient.ReaderWriter]
 	fee     fees.Estimator
 }
 
@@ -61,7 +61,7 @@ type pendingTx struct {
 // NewTxm creates a txm. Uses simulation so should only be used to send txes to trusted contracts i.e. OCR.
 func NewTxm(chainID string, tc func() (solanaClient.ReaderWriter, error), cfg config.Config, ks keystore.Solana, lggr logger.Logger) *Txm {
 	return &Txm{
-		starter: utils.StartStopOnce{},
+		starter: relayutils.StartStopOnce{},
 		lggr:    lggr,
 		chSend:  make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
 		chSim:   make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
@@ -69,7 +69,7 @@ func NewTxm(chainID string, tc func() (solanaClient.ReaderWriter, error), cfg co
 		cfg:     cfg,
 		txs:     newPendingTxContextWithProm(chainID),
 		ks:      ks,
-		client:  utils.NewLazyLoad(tc),
+		client:  relayutils.NewLazyLoad(tc),
 	}
 }
 
@@ -103,7 +103,7 @@ func (txm *Txm) Start(ctx context.Context) error {
 
 func (txm *Txm) run() {
 	defer txm.done.Done()
-	ctx, cancel := utils.ContextFromChan(txm.chStop)
+	ctx, cancel := relayutils.ContextFromChan(txm.chStop)
 	defer cancel()
 
 	// start confirmer + simulator
@@ -321,7 +321,7 @@ func (txm *Txm) confirm(ctx context.Context) {
 			}
 
 			// batch sigs no more than MaxSigsToConfirm each
-			sigsBatch, err := utils.BatchSplit(sigs, MaxSigsToConfirm)
+			sigsBatch, err := relayutils.BatchSplit(sigs, MaxSigsToConfirm)
 			if err != nil { // this should never happen
 				txm.lggr.Fatalw("failed to batch signatures", "error", err)
 				break // exit switch
@@ -412,7 +412,7 @@ func (txm *Txm) confirm(ctx context.Context) {
 			}
 			wg.Wait() // wait for processing to finish
 		}
-		tick = time.After(utils.WithJitter(txm.cfg.ConfirmPollPeriod()))
+		tick = time.After(relayutils.WithJitter(txm.cfg.ConfirmPollPeriod()))
 	}
 }
 
