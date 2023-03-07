@@ -46,6 +46,6 @@ export default class extends Close {
       state: address,
     }
 
-    return this.prepareInstructions(signer, extraAccounts, 'close', payees)
+    return this.prepareInstructions(signer, extraAccounts, 'close', payees, 'aggregator')
   }
 }
