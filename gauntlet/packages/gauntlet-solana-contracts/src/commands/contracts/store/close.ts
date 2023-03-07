@@ -26,6 +26,6 @@ export default class CloseFeed extends Close {
       owner: new PublicKey(info.owner),
       tokenProgram: TOKEN_PROGRAM_ID,
     }
-    return this.prepareInstructions(signer, extraAccounts, 'closeFeed')
+    return this.prepareInstructions(signer, extraAccounts, 'closeFeed', [], 'feed')
   }
 }
