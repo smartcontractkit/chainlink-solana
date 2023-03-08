@@ -21,11 +21,10 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/keys"
+	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/keys/mocks"
 
-	"github.com/smartcontractkit/chainlink/core/services/keystore"
-	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/solkey"
-	keyMocks "github.com/smartcontractkit/chainlink/core/services/keystore/mocks"
+	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
 )
 
 type soltxmProm struct {
@@ -48,7 +47,7 @@ func (p soltxmProm) getInflight() float64 {
 }
 
 // create placeholder transaction and returns func for signed tx with fee
-func getTx(t *testing.T, val uint64, key solkey.Key, price fees.ComputeUnitPrice) (*solana.Transaction, func(fees.ComputeUnitPrice) *solana.Transaction) {
+func getTx(t *testing.T, val uint64, key keys.Key, price fees.ComputeUnitPrice) (*solana.Transaction, func(fees.ComputeUnitPrice) *solana.Transaction) {
 	pubkey := key.PublicKey()
 
 	// create transfer tx
@@ -110,11 +109,11 @@ func TestTxm(t *testing.T) {
 	mc := newReaderWriterMock(t)
 
 	// mock solana keystore
-	key, err := solkey.New()
+	key, err := keys.New()
 	require.NoError(t, err)
 
 	require.NoError(t, err)
-	mkey := keyMocks.NewSolana(t)
+	mkey := keyMocks.NewKeystore(t)
 	mkey.On("Get", key.ID()).Return(key, nil)
 
 	txm := NewTxm(id, func() (client.ReaderWriter, error) {
@@ -597,16 +596,16 @@ func TestTxm_Enqueue(t *testing.T) {
 	mc := newReaderWriterMock(t)
 
 	// mock solana keystore
-	key, err := solkey.New()
+	key, err := keys.New()
 	require.NoError(t, err)
 	tx, _ := getTx(t, 0, key, 0)
 
-	mkey := keyMocks.NewSolana(t)
+	mkey := keyMocks.NewKeystore(t)
 	mkey.On("Get", key.ID()).Return(key, nil)
-	invalidKey, err := solkey.New()
+	invalidKey, err := keys.New()
 	require.NoError(t, err)
 	invalidTx, _ := getTx(t, 0, invalidKey, 0)
-	mkey.On("Get", invalidKey.ID()).Return(solkey.Key{}, keystore.KeyNotFoundError{ID: invalidKey.ID(), KeyType: "Solana"})
+	mkey.On("Get", invalidKey.ID()).Return(keys.Key{}, keys.KeyNotFoundError{ID: invalidKey.ID(), KeyType: "Solana"})
 
 	txm := NewTxm("enqueue_test", func() (client.ReaderWriter, error) {
 		return mc, nil

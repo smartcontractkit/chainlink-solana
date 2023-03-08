@@ -15,14 +15,12 @@ import (
 
 	relayutils "github.com/smartcontractkit/chainlink-relay/pkg/utils"
 	
-	"github.com/smartcontractkit/chainlink/core/services/keystore"
-	"github.com/smartcontractkit/chainlink/core/services/keystore/keys/solkey"
-	"github.com/smartcontractkit/chainlink/core/services/keystore/mocks"
-	
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/keys"
+	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/keys/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 )
 
@@ -31,12 +29,12 @@ func TestTxm_Integration(t *testing.T) {
 	url := solanaClient.SetupLocalSolNode(t)
 
 	// setup key
-	key, err := solkey.New()
+	key, err := keys.New()
 	require.NoError(t, err)
 	pubKey := key.PublicKey()
 
 	// setup load test key
-	loadTestKey, err := solkey.New()
+	loadTestKey, err := keys.New()
 	require.NoError(t, err)
 
 	// setup receiver key
@@ -47,10 +45,10 @@ func TestTxm_Integration(t *testing.T) {
 	solanaClient.FundTestAccounts(t, []solana.PublicKey{pubKey, loadTestKey.PublicKey()}, url)
 
 	// setup mock keystore
-	mkey := mocks.NewSolana(t)
+	mkey := keyMocks.NewSolana(t)
 	mkey.On("Get", key.ID()).Return(key, nil)
 	mkey.On("Get", loadTestKey.ID()).Return(loadTestKey, nil)
-	mkey.On("Get", pubKeyReceiver.String()).Return(solkey.Key{}, keystore.KeyNotFoundError{ID: pubKeyReceiver.String(), KeyType: "Solana"})
+	mkey.On("Get", pubKeyReceiver.String()).Return(keys.Key{}, keys.KeyNotFoundError{ID: pubKeyReceiver.String(), KeyType: "Solana"})
 
 	// set up txm
 	lggr := logger.TestLogger(t)

@@ -16,12 +16,11 @@ import (
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/keys"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 
 	relaytypes "github.com/smartcontractkit/chainlink-relay/pkg/types"
 	relayutils "github.com/smartcontractkit/chainlink-relay/pkg/utils"
-
-	"github.com/smartcontractkit/chainlink/core/services/keystore"
 )
 
 const (
@@ -46,7 +45,7 @@ type Txm struct {
 	done    sync.WaitGroup
 	cfg     config.Config
 	txs     PendingTxContext
-	ks      keystore.Solana
+	ks      keys.Keystore
 	client  *relayutils.LazyLoad[solanaClient.ReaderWriter]
 	fee     fees.Estimator
 }
@@ -59,7 +58,7 @@ type pendingTx struct {
 }
 
 // NewTxm creates a txm. Uses simulation so should only be used to send txes to trusted contracts i.e. OCR.
-func NewTxm(chainID string, tc func() (solanaClient.ReaderWriter, error), cfg config.Config, ks keystore.Solana, lggr logger.Logger) *Txm {
+func NewTxm(chainID string, tc func() (solanaClient.ReaderWriter, error), cfg config.Config, ks keys.Keystore, lggr logger.Logger) *Txm {
 	return &Txm{
 		starter: relayutils.StartStopOnce{},
 		lggr:    lggr,
