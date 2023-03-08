@@ -1603,8 +1603,8 @@ github.com/smartcontractkit/chainlink v1.12.0 h1:pJ8rmxHVWYSktZVrBN19a5lbnvBDklj
 github.com/smartcontractkit/chainlink v1.12.0/go.mod h1:7Esvan/yD3Fh6zrI3r604ZK4y1ELvlDhR5W0NeUOqds=
 github.com/smartcontractkit/chainlink-env v0.3.8 h1:GMj0Tz0qMjUuzNlhvVtOT4FjUymRVqMFagC1CfKxyCo=
 github.com/smartcontractkit/chainlink-env v0.3.8/go.mod h1:zspYFdXS57CzKkpcLkFEPuMQHOmI3L9H5idoPxobxRM=
-github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230307225120-1d975a1042ea h1:epR2VrRBYqW2ioVIVWshmgX4U88uHPac7E/2WMf7AJg=
-github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230307225120-1d975a1042ea/go.mod h1:Uqt8amCr4U4/6n+pvr1OMlNBzSqYSr6oeWAaBsBdPYE=
+github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230308154539-3e696293b689 h1:iSc5Yt7MmbQJH9hfrKHpTMpxya7qmTBUguAvNHvEVKg=
+github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230308154539-3e696293b689/go.mod h1:Uqt8amCr4U4/6n+pvr1OMlNBzSqYSr6oeWAaBsBdPYE=
 github.com/smartcontractkit/chainlink-starknet/relayer v0.0.0-20220930034704-572ac07611cb h1:oRKhJVdoXTVQqBVSPkvfC/hxYoxsL3hldTavEuZrWOk=
 github.com/smartcontractkit/chainlink-starknet/relayer v0.0.0-20220930034704-572ac07611cb/go.mod h1:FR8+xi6pmUuK6/PaH64B+OT5n/QOz7ox9pp9z05Dc2g=
 github.com/smartcontractkit/chainlink-terra v0.1.4-0.20220930034731-ef9eb53de886 h1:VVB/jdEBD9O01uOPvONEWeUVJr2/crLjVVCfTl1fOLM=

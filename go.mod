@@ -12,7 +12,7 @@ require (
 	github.com/mr-tron/base58 v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.14.0
-	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230307225120-1d975a1042ea
+	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230308154539-3e696293b689
 	github.com/smartcontractkit/libocr v0.0.0-20221209172631-568a30f68407
 	github.com/stretchr/testify v1.8.2
 	go.uber.org/multierr v1.8.0
