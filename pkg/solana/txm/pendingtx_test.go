@@ -11,19 +11,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	relayutils "github.com/smartcontractkit/chainlink-relay/pkg/utils"
 )
 
 func TestPendingTxContext(t *testing.T) {
 	var wg sync.WaitGroup
-
-	ctx := context.Background()
-	var cancel func()
-	if d, ok := t.Deadline(); ok {
-		ctx, cancel = context.WithDeadline(ctx, d)
-	} else {
-		ctx, cancel = context.WithCancel(ctx)
-	}
-	t.Cleanup(cancel)
+	ctx := relayutils.Context(t)
 
 	newProcess := func(i int) (solana.Signature, context.CancelFunc) {
 		// make random signature
@@ -72,13 +66,7 @@ func TestPendingTxContext(t *testing.T) {
 }
 
 func TestPendingTxContext_expired(t *testing.T) {
-	var cancel func()
-	if d, ok := t.Deadline(); ok {
-		_, cancel = context.WithDeadline(context.Background(), d)
-	} else {
-		_, cancel = context.WithCancel(context.Background())
-	}
-
+	_, cancel := context.WithCancel(relayutils.Context(t))
 	sig := solana.Signature{}
 	txs := newPendingTxContext()
 

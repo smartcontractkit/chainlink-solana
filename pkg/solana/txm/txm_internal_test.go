@@ -27,6 +27,8 @@ import (
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/keys/mocks"
 
 	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
+	relayconfig "github.com/smartcontractkit/chainlink-relay/pkg/config"
+	relayutils "github.com/smartcontractkit/chainlink-relay/pkg/utils"
 )
 
 type soltxmProm struct {
@@ -97,14 +99,7 @@ func TestTxm(t *testing.T) {
 	id := "mocknet"
 	t.Log("Starting new iteration")
 
-	ctx := context.Background()
-	var cancel func()
-	if d, ok := t.Deadline(); ok {
-		ctx, cancel = context.WithDeadline(ctx, d)
-	} else {
-		ctx, cancel = context.WithCancel(ctx)
-	}
-	t.Cleanup(cancel)
+	ctx := relayutils.Context(t)
 
 	lggr := logger.Test(t)
 	cfg := config.NewConfig(db.ChainCfg{}, lggr)
@@ -607,7 +602,7 @@ func TestTxm_Enqueue(t *testing.T) {
 	invalidKey, err := keys.New()
 	require.NoError(t, err)
 	invalidTx, _ := getTx(t, 0, invalidKey, 0)
-	mkey.On("Get", invalidKey.ID()).Return(keys.Key{}, keys.KeyNotFoundError{ID: invalidKey.ID(), KeyType: "Solana"})
+	mkey.On("Get", invalidKey.ID()).Return(keys.Key{}, relayconfig.KeyNotFoundError{ID: invalidKey.ID(), KeyType: "Solana"})
 
 	txm := NewTxm("enqueue_test", func() (client.ReaderWriter, error) {
 		return mc, nil

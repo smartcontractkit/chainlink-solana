@@ -13,19 +13,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	relayutils "github.com/smartcontractkit/chainlink-relay/pkg/utils"
-
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/keys"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/keys/mocks"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
+	
+	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
+	relayconfig "github.com/smartcontractkit/chainlink-relay/pkg/config"
+	relayutils "github.com/smartcontractkit/chainlink-relay/pkg/utils"
 )
 
 func TestTxm_Integration(t *testing.T) {
-	ctx := testutils.Context(t)
+	ctx := relayutils.Context(t)
 	url := solanaClient.SetupLocalSolNode(t)
 
 	// setup key
@@ -45,13 +46,13 @@ func TestTxm_Integration(t *testing.T) {
 	solanaClient.FundTestAccounts(t, []solana.PublicKey{pubKey, loadTestKey.PublicKey()}, url)
 
 	// setup mock keystore
-	mkey := keyMocks.NewSolana(t)
+	mkey := keyMocks.NewKeystore(t)
 	mkey.On("Get", key.ID()).Return(key, nil)
 	mkey.On("Get", loadTestKey.ID()).Return(loadTestKey, nil)
-	mkey.On("Get", pubKeyReceiver.String()).Return(keys.Key{}, keys.KeyNotFoundError{ID: pubKeyReceiver.String(), KeyType: "Solana"})
+	mkey.On("Get", pubKeyReceiver.String()).Return(keys.Key{}, relayconfig.KeyNotFoundError{ID: pubKeyReceiver.String(), KeyType: "Solana"})
 
 	// set up txm
-	lggr := logger.TestLogger(t)
+	lggr := logger.Test(t)
 	confirmDuration, err := relayutils.NewDuration(500 * time.Millisecond)
 	require.NoError(t, err)
 	cfg := config.NewConfig(db.ChainCfg{
@@ -62,7 +63,7 @@ func TestTxm_Integration(t *testing.T) {
 	getClient := func() (solanaClient.ReaderWriter, error) {
 		return client, nil
 	}
-	txm := soltxm.NewTxm("localnet", getClient, cfg, mkey, lggr)
+	txm := txm.NewTxm("localnet", getClient, cfg, mkey, lggr)
 
 	// track initial balance
 	initBal, err := client.Balance(pubKey)
