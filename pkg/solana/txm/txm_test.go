@@ -19,9 +19,9 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/keys"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/keys/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
-	
-	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
+
 	relayconfig "github.com/smartcontractkit/chainlink-relay/pkg/config"
+	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
 	relayutils "github.com/smartcontractkit/chainlink-relay/pkg/utils"
 )
 
