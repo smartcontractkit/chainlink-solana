@@ -47,9 +47,9 @@ type ChainCfg struct {
 	MaxRetries          null.Int
 
 	FeeEstimatorMode        null.String
-	MaxComputeUnitPrice     null.Int
-	MinComputeUnitPrice     null.Int
-	DefaultComputeUnitPrice null.Int
+	ComputeUnitPriceMax     null.Int
+	ComputeUnitPriceMin     null.Int
+	ComputeUnitPriceDefault null.Int
 	FeeBumpPeriod           *utils.Duration
 }
 

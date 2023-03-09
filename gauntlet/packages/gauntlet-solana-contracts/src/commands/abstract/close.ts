@@ -24,6 +24,7 @@ export default abstract class Close extends SolanaCommand {
     extraAccounts: { [key: string]: PublicKey } = {},
     closeFunction: string = 'close',
     remainingAccounts: AccountMeta[] = [],
+    type: string = '',
   ): Promise<TransactionInstruction[]> => {
     const contract = getContract(this.contractId, '')
     const address = contract.programId.toString()
@@ -32,7 +33,9 @@ export default abstract class Close extends SolanaCommand {
     const state = new PublicKey(this.args[0])
 
     logger.loading(
-      `Preparing instruction to close account from ${this.contractId} contract with address ${state.toString()}`,
+      `Preparing instruction to close ${type} account from ${
+        this.contractId
+      } contract with address ${state.toString()}`,
     )
 
     const ix = await program.methods[closeFunction]()

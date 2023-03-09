@@ -7,6 +7,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/pkg/errors"
 
+	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
 	relaytypes "github.com/smartcontractkit/chainlink-relay/pkg/types"
 	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
@@ -40,6 +41,10 @@ func NewRelayer(lggr logger.Logger, chainSet ChainSet) *Relayer {
 	}
 }
 
+func (r *Relayer) Name() string {
+	return r.lggr.Name()
+}
+
 // Start starts the relayer respecting the given context.
 func (r *Relayer) Start(context.Context) error {
 	// No subservices started on relay start, but when the first job is started
@@ -64,6 +69,14 @@ func (r *Relayer) Healthy() error {
 	return r.chainSet.Healthy()
 }
 
+func (r *Relayer) HealthReport() map[string]error {
+	return map[string]error{r.Name(): r.Healthy()}
+}
+
+func (r *Relayer) NewMercuryProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MercuryProvider, error) {
+	return nil, errors.New("mercury is not supported for starknet")
+}
+
 func (r *Relayer) NewConfigProvider(args relaytypes.RelayArgs) (relaytypes.ConfigProvider, error) {
 	configWatcher, err := newConfigProvider(r.ctx, r.lggr, r.chainSet, args)
 	if err != nil {
@@ -74,7 +87,8 @@ func (r *Relayer) NewConfigProvider(args relaytypes.RelayArgs) (relaytypes.Confi
 }
 
 func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MedianProvider, error) {
-	configWatcher, err := newConfigProvider(r.ctx, r.lggr, r.chainSet, rargs)
+	lggr := relaylogger.Named(r.lggr, "MedianProvider")
+	configWatcher, err := newConfigProvider(r.ctx, lggr, r.chainSet, rargs)
 	if err != nil {
 		return nil, err
 	}
@@ -134,6 +148,7 @@ type configProvider struct {
 }
 
 func newConfigProvider(ctx context.Context, lggr logger.Logger, chainSet ChainSet, args relaytypes.RelayArgs) (*configProvider, error) {
+	lggr = relaylogger.Named(lggr, "ConfigProvider")
 	var relayConfig RelayConfig
 	err := json.Unmarshal(args.RelayConfig, &relayConfig)
 	if err != nil {
@@ -177,6 +192,10 @@ func newConfigProvider(ctx context.Context, lggr logger.Logger, chainSet ChainSe
 	}, nil
 }
 
+func (c *configProvider) Name() string {
+	return c.stateCache.lggr.Name()
+}
+
 func (c *configProvider) Start(ctx context.Context) error {
 	return c.StartOnce("SolanaConfigProvider", func() error {
 		return c.stateCache.Start()
@@ -187,6 +206,10 @@ func (c *configProvider) Close() error {
 	return c.StopOnce("SolanaConfigProvider", func() error {
 		return c.stateCache.Close()
 	})
+}
+
+func (c *configProvider) HealthReport() map[string]error {
+	return map[string]error{c.Name(): c.Healthy()}
 }
 
 func (c *configProvider) OffchainConfigDigester() types.OffchainConfigDigester {
@@ -205,6 +228,10 @@ type medianProvider struct {
 	reportCodec        median.ReportCodec
 	contract           median.MedianContract
 	transmitter        types.ContractTransmitter
+}
+
+func (m *medianProvider) Name() string {
+	return m.stateCache.lggr.Name()
 }
 
 // start both cache services

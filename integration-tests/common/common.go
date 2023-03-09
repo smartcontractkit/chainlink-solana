@@ -4,9 +4,19 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"os"
+	"sort"
 	"strconv"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/lib/pq"
+	"github.com/rs/zerolog/log"
+	uuid "github.com/satori/go.uuid"
+	"golang.org/x/crypto/curve25519"
+	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink-env/environment"
 	"github.com/smartcontractkit/chainlink-env/pkg/alias"
@@ -14,20 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver"
 	mockservercfg "github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver-cfg"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/sol"
-	networks "github.com/smartcontractkit/chainlink/integration-tests"
 
-	"math/big"
-	"sort"
-	"strings"
-	"time"
-
-	"github.com/lib/pq"
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
-	"gopkg.in/guregu/null.v4"
-
-	"github.com/rs/zerolog/log"
-
-	uuid "github.com/satori/go.uuid"
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/smartcontractkit/chainlink/core/services/job"
 	"github.com/smartcontractkit/chainlink/core/store/models"
@@ -36,7 +33,8 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
-	"golang.org/x/crypto/curve25519"
+
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 )
 
 const (
@@ -411,7 +409,6 @@ func (c *Common) Default(t *testing.T, namespacePrefix string) *Common {
 		TTL:             c.TTL,
 		Test:            t,
 	}
-	testNetwork := networks.SelectedNetwork
 	baseTOML := fmt.Sprintf(`[[Solana]]
 Enabled = true
 ChainID = '%s'
@@ -434,7 +431,7 @@ ListenAddresses = ['0.0.0.0:6690']
 		AddHelm(mockserver.New(nil)).
 		AddHelm(sol.New(nil)).
 		AddHelm(chainlink.New(0, map[string]interface{}{
-			"toml":     client.AddNetworksConfig(baseTOML, testNetwork),
+			"toml":     baseTOML,
 			"replicas": c.NodeCount,
 		}))
 

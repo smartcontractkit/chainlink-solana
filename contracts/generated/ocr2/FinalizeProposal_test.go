@@ -21,7 +21,6 @@ func TestEncodeDecode_FinalizeProposal(t *testing.T) {
 				buf := new(bytes.Buffer)
 				err := encodeT(*params, buf)
 				ag_require.NoError(t, err)
-				//
 				got := new(FinalizeProposal)
 				err = decodeT(got, buf.Bytes())
 				got.AccountMetaSlice = nil
