@@ -23,8 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/keys"
-	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/keys/mocks"
+	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 
 	relayconfig "github.com/smartcontractkit/chainlink-relay/pkg/config"
 	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
@@ -51,8 +50,8 @@ func (p soltxmProm) getInflight() float64 {
 }
 
 // create placeholder transaction and returns func for signed tx with fee
-func getTx(t *testing.T, val uint64, key keys.Key, price fees.ComputeUnitPrice) (*solana.Transaction, func(fees.ComputeUnitPrice) *solana.Transaction) {
-	pubkey := key.PublicKey()
+func getTx(t *testing.T, val uint64, keystore SimpleKeystore, price fees.ComputeUnitPrice) (*solana.Transaction, func(fees.ComputeUnitPrice) *solana.Transaction) {
+	pubkey := solana.PublicKey{}
 
 	// create transfer tx
 	tx, err := solana.NewTransaction(
@@ -78,7 +77,7 @@ func getTx(t *testing.T, val uint64, key keys.Key, price fees.ComputeUnitPrice) 
 		// sign tx
 		txMsg, err := tx.Message.MarshalBinary()
 		require.NoError(t, err)
-		sigBytes, err := key.Sign(txMsg)
+		sigBytes, err := keystore.Sign(context.Background(), pubkey.String(), txMsg)
 		require.NoError(t, err)
 		var finalSig [64]byte
 		copy(finalSig[:], sigBytes)
@@ -106,12 +105,8 @@ func TestTxm(t *testing.T) {
 	mc := newReaderWriterMock(t)
 
 	// mock solana keystore
-	key, err := keys.New()
-	require.NoError(t, err)
-
-	require.NoError(t, err)
-	mkey := keyMocks.NewKeystore(t)
-	mkey.On("Get", key.ID()).Return(key, nil)
+	mkey := keyMocks.NewSimpleKeystore(t)
+	mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
 
 	txm := NewTxm(id, func() (client.ReaderWriter, error) {
 		return mc, nil
@@ -166,7 +161,7 @@ func TestTxm(t *testing.T) {
 	// happy path (send => simulate success => tx: nil => tx: processed => tx: confirmed => done)
 	t.Run("happyPath", func(t *testing.T) {
 		sig := getSig()
-		tx, signed := getTx(t, 0, key, 0)
+		tx, signed := getTx(t, 0, mkey, 0)
 		var wg sync.WaitGroup
 		wg.Add(3)
 
@@ -220,7 +215,7 @@ func TestTxm(t *testing.T) {
 
 	// fail on initial transmit (RPC immediate rejects)
 	t.Run("fail_initialTx", func(t *testing.T) {
-		tx, signed := getTx(t, 1, key, 0)
+		tx, signed := getTx(t, 1, mkey, 0)
 		var wg sync.WaitGroup
 		wg.Add(1)
 
@@ -244,7 +239,7 @@ func TestTxm(t *testing.T) {
 
 	// tx fails simulation (simulation error)
 	t.Run("fail_simulation", func(t *testing.T) {
-		tx, signed := getTx(t, 2, key, 0)
+		tx, signed := getTx(t, 2, mkey, 0)
 		sig := getSig()
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -270,7 +265,7 @@ func TestTxm(t *testing.T) {
 
 	// tx fails simulation (rpc error, timeout should clean up b/c sig status will be nil)
 	t.Run("fail_simulation_confirmNil", func(t *testing.T) {
-		tx, signed := getTx(t, 3, key, 0)
+		tx, signed := getTx(t, 3, mkey, 0)
 		sig := getSig()
 		retry0 := getSig()
 		retry1 := getSig()
@@ -306,7 +301,7 @@ func TestTxm(t *testing.T) {
 	// tx fails simulation with an InstructionError (indicates reverted execution)
 	// manager should cancel sending retry immediately + increment reverted prom metric
 	t.Run("fail_simulation_instructionError", func(t *testing.T) {
-		tx, signed := getTx(t, 4, key, 0)
+		tx, signed := getTx(t, 4, mkey, 0)
 		sig := getSig()
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -342,7 +337,7 @@ func TestTxm(t *testing.T) {
 	// tx fails simulation with BlockHashNotFound error
 	// txm should continue to confirm tx (in this case it will succeed)
 	t.Run("fail_simulation_blockhashNotFound", func(t *testing.T) {
-		tx, signed := getTx(t, 5, key, 0)
+		tx, signed := getTx(t, 5, mkey, 0)
 		sig := getSig()
 		var wg sync.WaitGroup
 		wg.Add(3)
@@ -384,7 +379,7 @@ func TestTxm(t *testing.T) {
 	// tx fails simulation with AlreadyProcessed error
 	// txm should continue to confirm tx (in this case it will revert)
 	t.Run("fail_simulation_alreadyProcessed", func(t *testing.T) {
-		tx, signed := getTx(t, 6, key, 0)
+		tx, signed := getTx(t, 6, mkey, 0)
 		sig := getSig()
 		var wg sync.WaitGroup
 		wg.Add(2)
@@ -421,7 +416,7 @@ func TestTxm(t *testing.T) {
 
 	// tx passes sim, never passes processed (timeout should cleanup)
 	t.Run("fail_confirm_processed", func(t *testing.T) {
-		tx, signed := getTx(t, 7, key, 0)
+		tx, signed := getTx(t, 7, mkey, 0)
 		sig := getSig()
 		retry0 := getSig()
 		retry1 := getSig()
@@ -462,7 +457,7 @@ func TestTxm(t *testing.T) {
 
 	// tx passes sim, shows processed, moves to nil (timeout should cleanup)
 	t.Run("fail_confirm_processedToNil", func(t *testing.T) {
-		tx, signed := getTx(t, 8, key, 0)
+		tx, signed := getTx(t, 8, mkey, 0)
 		sig := getSig()
 		retry0 := getSig()
 		retry1 := getSig()
@@ -510,7 +505,7 @@ func TestTxm(t *testing.T) {
 
 	// tx passes sim, errors on confirm
 	t.Run("fail_confirm_revert", func(t *testing.T) {
-		tx, signed := getTx(t, 9, key, 0)
+		tx, signed := getTx(t, 9, mkey, 0)
 		sig := getSig()
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -544,7 +539,7 @@ func TestTxm(t *testing.T) {
 
 	// tx passes sim, first retried TXs get dropped
 	t.Run("success_retryTx", func(t *testing.T) {
-		tx, signed := getTx(t, 10, key, 0)
+		tx, signed := getTx(t, 10, mkey, 0)
 		sig := getSig()
 		retry0 := getSig()
 		retry1 := getSig()
@@ -593,16 +588,38 @@ func TestTxm_Enqueue(t *testing.T) {
 	mc := newReaderWriterMock(t)
 
 	// mock solana keystore
-	key, err := keys.New()
-	require.NoError(t, err)
-	tx, _ := getTx(t, 0, key, 0)
+	mkey := keyMocks.NewSimpleKeystore(t)
+	validKey := solana.PublicKeyFromBytes([]byte{1})
+	invalidKey := solana.PublicKeyFromBytes([]byte{2})
+	mkey.On("Sign", mock.Anything, validKey.String(), mock.Anything).Return([]byte{1}, nil)
+	mkey.On("Sign", mock.Anything, invalidKey.String(), mock.Anything).Return([]byte{}, relayconfig.KeyNotFoundError{ID: invalidKey.String(), KeyType: "Solana"})
 
-	mkey := keyMocks.NewKeystore(t)
-	mkey.On("Get", key.ID()).Return(key, nil)
-	invalidKey, err := keys.New()
+	// build txs
+	tx, err := solana.NewTransaction(
+		[]solana.Instruction{
+			system.NewTransferInstruction(
+				0,
+				validKey,
+				validKey,
+			).Build(),
+		},
+		solana.Hash{},
+		solana.TransactionPayer(validKey),
+	)
 	require.NoError(t, err)
-	invalidTx, _ := getTx(t, 0, invalidKey, 0)
-	mkey.On("Get", invalidKey.ID()).Return(keys.Key{}, relayconfig.KeyNotFoundError{ID: invalidKey.ID(), KeyType: "Solana"})
+
+	invalidTx, err := solana.NewTransaction(
+		[]solana.Instruction{
+			system.NewTransferInstruction(
+				0,
+				invalidKey,
+				invalidKey,
+			).Build(),
+		},
+		solana.Hash{},
+		solana.TransactionPayer(invalidKey),
+	)
+	require.NoError(t, err)
 
 	txm := NewTxm("enqueue_test", func() (client.ReaderWriter, error) {
 		return mc, nil

@@ -11,14 +11,14 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/keys"
-	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/keys/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
+	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 
 	relayconfig "github.com/smartcontractkit/chainlink-relay/pkg/config"
 	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
@@ -30,12 +30,12 @@ func TestTxm_Integration(t *testing.T) {
 	url := solanaClient.SetupLocalSolNode(t)
 
 	// setup key
-	key, err := keys.New()
+	key, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 	pubKey := key.PublicKey()
 
 	// setup load test key
-	loadTestKey, err := keys.New()
+	loadTestKey, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 
 	// setup receiver key
@@ -46,10 +46,16 @@ func TestTxm_Integration(t *testing.T) {
 	solanaClient.FundTestAccounts(t, []solana.PublicKey{pubKey, loadTestKey.PublicKey()}, url)
 
 	// setup mock keystore
-	mkey := keyMocks.NewKeystore(t)
-	mkey.On("Get", key.ID()).Return(key, nil)
-	mkey.On("Get", loadTestKey.ID()).Return(loadTestKey, nil)
-	mkey.On("Get", pubKeyReceiver.String()).Return(keys.Key{}, relayconfig.KeyNotFoundError{ID: pubKeyReceiver.String(), KeyType: "Solana"})
+	mkey := keyMocks.NewSimpleKeystore(t)
+	mkey.On("Sign", mock.Anything, key.PublicKey().String(), mock.Anything).Return(func(_ context.Context, _ string, data []byte) []byte {
+		sig, _ := key.Sign(data)
+		return sig[:]
+	}, nil)
+	mkey.On("Sign", mock.Anything, loadTestKey.PublicKey().String(), mock.Anything).Return(func(_ context.Context, _ string, data []byte) []byte {
+		sig, _ := loadTestKey.Sign(data)
+		return sig[:]
+	}, nil)
+	mkey.On("Sign", mock.Anything, pubKeyReceiver.String(), mock.Anything).Return([]byte{}, relayconfig.KeyNotFoundError{ID: pubKeyReceiver.String(), KeyType: "Solana"})
 
 	// set up txm
 	lggr := logger.Test(t)
