@@ -16,7 +16,6 @@ import (
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/keys"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 
 	relaytypes "github.com/smartcontractkit/chainlink-relay/pkg/types"
@@ -34,6 +33,11 @@ var (
 	_ solana.TxManager   = (*Txm)(nil)
 )
 
+//go:generate mockery --name SimpleKeystore --output ./mocks/ --case=underscore --filename simple_keystore.go
+type SimpleKeystore interface {
+	Sign(ctx context.Context, account string, data []byte) (signature []byte, err error)
+}
+
 // Txm manages transactions for the solana blockchain.
 // simple implementation with no persistently stored txs
 type Txm struct {
@@ -45,7 +49,7 @@ type Txm struct {
 	done    sync.WaitGroup
 	cfg     config.Config
 	txs     PendingTxContext
-	ks      keys.Keystore
+	ks      SimpleKeystore
 	client  *relayutils.LazyLoad[solanaClient.ReaderWriter]
 	fee     fees.Estimator
 }
@@ -58,7 +62,7 @@ type pendingTx struct {
 }
 
 // NewTxm creates a txm. Uses simulation so should only be used to send txes to trusted contracts i.e. OCR.
-func NewTxm(chainID string, tc func() (solanaClient.ReaderWriter, error), cfg config.Config, ks keys.Keystore, lggr logger.Logger) *Txm {
+func NewTxm(chainID string, tc func() (solanaClient.ReaderWriter, error), cfg config.Config, ks SimpleKeystore, lggr logger.Logger) *Txm {
 	return &Txm{
 		starter: relayutils.StartStopOnce{},
 		lggr:    lggr,
@@ -147,10 +151,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 	// get key
 	// fee payer account is index 0 account
 	// https://github.com/gagliardetto/solana-go/blob/main/transaction.go#L252
-	key, keyErr := txm.ks.Get(baseTx.Message.AccountKeys[0].String())
-	if keyErr != nil {
-		return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, errors.Wrap(keyErr, "error in soltxm.Enqueue.GetKey")
-	}
+	key := baseTx.Message.AccountKeys[0].String()
 
 	getFee := func(count uint) fees.ComputeUnitPrice {
 		fee := fees.CalculateFee(
@@ -176,7 +177,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 		if marshalErr != nil {
 			return solanaGo.Transaction{}, errors.Wrap(marshalErr, "error in soltxm.SendWithRetry.MarshalBinary")
 		}
-		sigBytes, signErr := key.Sign(txMsg)
+		sigBytes, signErr := txm.ks.Sign(context.TODO(), key, txMsg)
 		if signErr != nil {
 			return solanaGo.Transaction{}, errors.Wrap(signErr, "error in soltxm.SendWithRetry.Sign")
 		}
@@ -486,10 +487,10 @@ func (txm *Txm) Enqueue(accountID string, tx *solanaGo.Transaction) error {
 		return errors.New("error in soltxm.Enqueue: not enough account keys in tx")
 	}
 
-	// validate expected key exists
+	// validate expected key exists by trying to sign with it
 	// fee payer account is index 0 account
 	// https://github.com/gagliardetto/solana-go/blob/main/transaction.go#L252
-	_, err := txm.ks.Get(tx.Message.AccountKeys[0].String())
+	_, err := txm.ks.Sign(context.TODO(), tx.Message.AccountKeys[0].String(), nil)
 	if err != nil {
 		return errors.Wrap(err, "error in soltxm.Enqueue.GetKey")
 	}

@@ -9,10 +9,9 @@ require (
 	github.com/gagliardetto/solana-go v1.4.1-0.20220428092759-5250b4abbb27
 	github.com/gagliardetto/treeout v0.1.4
 	github.com/google/uuid v1.3.0
-	github.com/mr-tron/base58 v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.14.0
-	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230308154539-3e696293b689
+	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230309154839-2b6a5b078888
 	github.com/smartcontractkit/libocr v0.0.0-20221209172631-568a30f68407
 	github.com/stretchr/testify v1.8.2
 	go.uber.org/multierr v1.8.0
@@ -51,6 +50,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mostynb/zstdpool-freelist v0.0.0-20201229113212-927304c0c3b1 // indirect
+	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/onsi/gomega v1.24.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
