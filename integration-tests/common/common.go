@@ -256,7 +256,7 @@ func OffChainConfigParamsFromNodes(nodes []*client.Chainlink, nkb []client.NodeK
 			AlphaReportPPB: uint64(0),
 			AlphaAcceptPPB: uint64(0),
 		}.Encode(),
-		MaxDurationQuery:                        0,
+		MaxDurationQuery:                        500 * time.Millisecond,
 		MaxDurationObservation:                  500 * time.Millisecond,
 		MaxDurationReport:                       500 * time.Millisecond,
 		MaxDurationShouldAcceptFinalizedReport:  500 * time.Millisecond,
