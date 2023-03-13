@@ -25,6 +25,6 @@ jobs:
       - name: Build
         run: go build -v ./pkg/...
       - name: Test
-        run: go test ./pkg/... -v
+        run: go test ./pkg/... -v -tags integration
       - name: Test with the race detector enabled
-        run: go test ./pkg/... -v -race -count=10
+        run: go test ./pkg/... -v -race -count=10 -timeout=15m
