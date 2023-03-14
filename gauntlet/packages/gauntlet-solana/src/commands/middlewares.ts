@@ -2,7 +2,7 @@ import { Middleware, Next } from '@chainlink/gauntlet-core'
 import { boolean } from '@chainlink/gauntlet-core/dist/lib/args'
 import { assertions, logger } from '@chainlink/gauntlet-core/dist/utils'
 import { AnchorProvider } from '@project-serum/anchor'
-import { Connection, Keypair } from '@solana/web3.js'
+import { Commitment, Connection, ConnectionConfig, Keypair } from '@solana/web3.js'
 import { DEFAULT_DERIVATION_PATH } from '../lib/constants'
 import SolanaCommand from './internal/solana'
 import { LedgerWallet, LocalWallet } from './wallet'
@@ -18,7 +18,10 @@ export const withProvider: Middleware = (c: SolanaCommand, next: Next) => {
     `Invalid NODE_URL (${nodeURL}), please add an http:// or https:// prefix`,
   )
 
-  c.provider = new AnchorProvider(new Connection(nodeURL), c.wallet, {})
+  const commitmentOrConfig: Commitment | ConnectionConfig = {
+    confirmTransactionInitialTimeout: c.flags.timeout || 60 * 1000,
+  } // Add
+  c.provider = new AnchorProvider(new Connection(nodeURL, commitmentOrConfig), c.wallet, {})
   return next()
 }
 
