@@ -16,5 +16,5 @@ func TestSolanaOCRV2SoakTest(t *testing.T) {
 		return
 	}
 	state.SetAllAdapterResponsesToTheSameValue(10)
-	state.ValidateRoundsAfter(time.Now(), common.NewSoakRoundsCheckTimeout, 200)
+	state.ValidateRoundsAfter(time.Now(), common.NewSoakRoundsCheckTimeout, 20000)
 }
