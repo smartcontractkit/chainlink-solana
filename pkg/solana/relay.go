@@ -65,16 +65,14 @@ func (r *Relayer) Ready() error {
 }
 
 // Healthy only if all subservices are healthy
-func (r *Relayer) Healthy() error {
-	return r.chainSet.Healthy()
-}
+func (r *Relayer) Healthy() error { return nil }
 
 func (r *Relayer) HealthReport() map[string]error {
 	return map[string]error{r.Name(): r.Healthy()}
 }
 
 func (r *Relayer) NewMercuryProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MercuryProvider, error) {
-	return nil, errors.New("mercury is not supported for starknet")
+	return nil, errors.New("mercury is not supported for solana")
 }
 
 func (r *Relayer) NewConfigProvider(args relaytypes.RelayArgs) (relaytypes.ConfigProvider, error) {
