@@ -100,43 +100,6 @@ func TestConfig_NewConfig(t *testing.T) {
 	assert.Equal(t, testFeeBumpPeriod.Duration(), cfg.FeeBumpPeriod())
 }
 
-func TestConfig_Update(t *testing.T) {
-	cfg := NewConfig(db.ChainCfg{}, logger.Test(t))
-	dbCfg := db.ChainCfg{
-		BalancePollPeriod:       &testBalancePoll,
-		ConfirmPollPeriod:       &testConfirmPeriod,
-		OCR2CachePollPeriod:     &testCachePeriod,
-		OCR2CacheTTL:            &testTTL,
-		TxTimeout:               &testTxTimeout,
-		TxRetryTimeout:          &testTxRetryTimeout,
-		TxConfirmTimeout:        &testTxConfirmTimeout,
-		SkipPreflight:           null.BoolFrom(testPreflight),
-		Commitment:              null.StringFrom(testCommitment),
-		MaxRetries:              null.IntFrom(testMaxRetries),
-		FeeEstimatorMode:        null.StringFrom(testFeeEstimatorMode),
-		ComputeUnitPriceMax:     null.IntFrom(int64(testComputeUnitPriceMax)),
-		ComputeUnitPriceMin:     null.IntFrom(int64(testComputeUnitPriceMin)),
-		ComputeUnitPriceDefault: null.IntFrom(int64(testComputeUnitPriceDefault)),
-		FeeBumpPeriod:           &testFeeBumpPeriod,
-	}
-	cfg.Update(dbCfg)
-	assert.Equal(t, testBalancePoll.Duration(), cfg.BalancePollPeriod())
-	assert.Equal(t, testConfirmPeriod.Duration(), cfg.ConfirmPollPeriod())
-	assert.Equal(t, testCachePeriod.Duration(), cfg.OCR2CachePollPeriod())
-	assert.Equal(t, testTTL.Duration(), cfg.OCR2CacheTTL())
-	assert.Equal(t, testTxTimeout.Duration(), cfg.TxTimeout())
-	assert.Equal(t, testTxRetryTimeout.Duration(), cfg.TxRetryTimeout())
-	assert.Equal(t, testTxConfirmTimeout.Duration(), cfg.TxConfirmTimeout())
-	assert.Equal(t, testPreflight, cfg.SkipPreflight())
-	assert.Equal(t, rpc.CommitmentType(testCommitment), cfg.Commitment())
-	assert.EqualValues(t, testMaxRetries, *cfg.MaxRetries())
-	assert.Equal(t, testFeeEstimatorMode, cfg.FeeEstimatorMode())
-	assert.Equal(t, testComputeUnitPriceMax, cfg.ComputeUnitPriceMax())
-	assert.Equal(t, testComputeUnitPriceMin, cfg.ComputeUnitPriceMin())
-	assert.Equal(t, testComputeUnitPriceDefault, cfg.ComputeUnitPriceDefault())
-	assert.Equal(t, testFeeBumpPeriod.Duration(), cfg.FeeBumpPeriod())
-}
-
 func TestConfig_CommitmentFallback(t *testing.T) {
 	cfg := NewConfig(db.ChainCfg{Commitment: null.StringFrom("invalid")}, logger.Test(t))
 	assert.Equal(t, rpc.CommitmentConfirmed, cfg.Commitment())
