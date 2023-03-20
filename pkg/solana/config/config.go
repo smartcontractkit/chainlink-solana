@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gagliardetto/solana-go/rpc"
@@ -56,9 +55,6 @@ type Config interface {
 	ComputeUnitPriceMin() uint64
 	ComputeUnitPriceDefault() uint64
 	FeeBumpPeriod() time.Duration
-
-	// Update sets new chain config values.
-	Update(db.ChainCfg)
 }
 
 type configSet struct {
@@ -85,7 +81,6 @@ var _ Config = (*config)(nil)
 type config struct {
 	defaults configSet
 	chain    db.ChainCfg
-	chainMu  sync.RWMutex
 	lggr     logger.Logger
 }
 
@@ -98,16 +93,8 @@ func NewConfig(dbcfg db.ChainCfg, lggr logger.Logger) *config {
 	}
 }
 
-func (c *config) Update(dbcfg db.ChainCfg) {
-	c.chainMu.Lock()
-	c.chain = dbcfg
-	c.chainMu.Unlock()
-}
-
 func (c *config) BalancePollPeriod() time.Duration {
-	c.chainMu.RLock()
 	ch := c.chain.BalancePollPeriod
-	c.chainMu.RUnlock()
 	if ch != nil {
 		return ch.Duration()
 	}
@@ -115,9 +102,7 @@ func (c *config) BalancePollPeriod() time.Duration {
 }
 
 func (c *config) ConfirmPollPeriod() time.Duration {
-	c.chainMu.RLock()
 	ch := c.chain.ConfirmPollPeriod
-	c.chainMu.RUnlock()
 	if ch != nil {
 		return ch.Duration()
 	}
@@ -125,9 +110,7 @@ func (c *config) ConfirmPollPeriod() time.Duration {
 }
 
 func (c *config) OCR2CachePollPeriod() time.Duration {
-	c.chainMu.RLock()
 	ch := c.chain.OCR2CachePollPeriod
-	c.chainMu.RUnlock()
 	if ch != nil {
 		return ch.Duration()
 	}
@@ -135,9 +118,7 @@ func (c *config) OCR2CachePollPeriod() time.Duration {
 }
 
 func (c *config) OCR2CacheTTL() time.Duration {
-	c.chainMu.RLock()
 	ch := c.chain.OCR2CacheTTL
-	c.chainMu.RUnlock()
 	if ch != nil {
 		return ch.Duration()
 	}
@@ -145,9 +126,7 @@ func (c *config) OCR2CacheTTL() time.Duration {
 }
 
 func (c *config) TxTimeout() time.Duration {
-	c.chainMu.RLock()
 	ch := c.chain.TxTimeout
-	c.chainMu.RUnlock()
 	if ch != nil {
 		return ch.Duration()
 	}
@@ -155,9 +134,7 @@ func (c *config) TxTimeout() time.Duration {
 }
 
 func (c *config) TxRetryTimeout() time.Duration {
-	c.chainMu.RLock()
 	ch := c.chain.TxRetryTimeout
-	c.chainMu.RUnlock()
 	if ch != nil {
 		return ch.Duration()
 	}
@@ -165,9 +142,7 @@ func (c *config) TxRetryTimeout() time.Duration {
 }
 
 func (c *config) TxConfirmTimeout() time.Duration {
-	c.chainMu.RLock()
 	ch := c.chain.TxConfirmTimeout
-	c.chainMu.RUnlock()
 	if ch != nil {
 		return ch.Duration()
 	}
@@ -175,9 +150,7 @@ func (c *config) TxConfirmTimeout() time.Duration {
 }
 
 func (c *config) SkipPreflight() bool {
-	c.chainMu.RLock()
 	ch := c.chain.SkipPreflight
-	c.chainMu.RUnlock()
 	if ch.Valid {
 		return ch.Bool
 	}
@@ -185,9 +158,7 @@ func (c *config) SkipPreflight() bool {
 }
 
 func (c *config) Commitment() rpc.CommitmentType {
-	c.chainMu.RLock()
 	ch := c.chain.Commitment
-	c.chainMu.RUnlock()
 	if ch.Valid {
 		str := ch.String
 		var commitment rpc.CommitmentType
@@ -208,9 +179,7 @@ func (c *config) Commitment() rpc.CommitmentType {
 }
 
 func (c *config) FeeEstimatorMode() string {
-	c.chainMu.RLock()
 	ch := c.chain.FeeEstimatorMode
-	c.chainMu.RUnlock()
 	if ch.Valid {
 		return strings.ToLower(ch.String)
 	}
@@ -218,9 +187,7 @@ func (c *config) FeeEstimatorMode() string {
 }
 
 func (c *config) ComputeUnitPriceMax() uint64 {
-	c.chainMu.RLock()
 	ch := c.chain.ComputeUnitPriceMax
-	c.chainMu.RUnlock()
 	if ch.Valid {
 		if ch.Int64 >= 0 {
 			return uint64(ch.Int64)
@@ -231,9 +198,7 @@ func (c *config) ComputeUnitPriceMax() uint64 {
 }
 
 func (c *config) ComputeUnitPriceMin() uint64 {
-	c.chainMu.RLock()
 	ch := c.chain.ComputeUnitPriceMin
-	c.chainMu.RUnlock()
 	if ch.Valid {
 		if ch.Int64 >= 0 {
 			return uint64(ch.Int64)
@@ -244,9 +209,7 @@ func (c *config) ComputeUnitPriceMin() uint64 {
 }
 
 func (c *config) ComputeUnitPriceDefault() uint64 {
-	c.chainMu.RLock()
 	ch := c.chain.ComputeUnitPriceDefault
-	c.chainMu.RUnlock()
 	if ch.Valid {
 		if ch.Int64 >= 0 {
 			return uint64(ch.Int64)
@@ -257,9 +220,7 @@ func (c *config) ComputeUnitPriceDefault() uint64 {
 }
 
 func (c *config) MaxRetries() *uint {
-	c.chainMu.RLock()
 	ch := c.chain.MaxRetries
-	c.chainMu.RUnlock()
 	if ch.Valid {
 		if ch.Int64 < 0 {
 			c.lggr.Warnf(`Negative value provided for %s: %d, falling back to <nil> - let RPC node do a reasonable amount of tries`, "MaxRetries", ch.Int64)
@@ -272,9 +233,7 @@ func (c *config) MaxRetries() *uint {
 }
 
 func (c *config) FeeBumpPeriod() time.Duration {
-	c.chainMu.RLock()
 	ch := c.chain.FeeBumpPeriod
-	c.chainMu.RUnlock()
 	if ch != nil {
 		return ch.Duration()
 	}
