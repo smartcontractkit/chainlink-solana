@@ -7,13 +7,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-testing-framework/utils"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/onsi/gomega"
-	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-env/environment"
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
+
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
@@ -106,13 +108,14 @@ func (m *OCRv2TestState) LabelChaosGroups() {
 }
 
 func (m *OCRv2TestState) DeployCluster(contractsDir string) {
+	l := utils.GetTestLogger(m.T)
 	m.DeployEnv(contractsDir)
 	if m.Common.Env.WillUseRemoteRunner() {
 		return
 	}
 	m.T.Cleanup(func() {
-		if err := actions.TeardownSuite(m.T, m.Common.Env, "logs", m.ChainlinkNodes, nil, nil); err != nil {
-			log.Error().Err(err).Msg("Error tearing down environment")
+		if err := actions.TeardownSuite(m.T, m.Common.Env, "logs", m.ChainlinkNodes, nil, zapcore.PanicLevel, nil); err != nil {
+			l.Error().Err(err).Msg("Error tearing down environment")
 		}
 	})
 	m.SetupClients()
@@ -150,12 +153,13 @@ func (m *OCRv2TestState) DeployEnv(contractsDir string) {
 
 func (m *OCRv2TestState) NewSolanaClientSetup(networkSettings *solclient.SolNetwork) func(*environment.Environment) (*solclient.Client, error) {
 	return func(env *environment.Environment) (*solclient.Client, error) {
+		l := utils.GetTestLogger(m.T)
 		networkSettings.URLs = env.URLs[networkSettings.Name]
 		ec, err := solclient.NewClient(networkSettings)
 		if err != nil {
 			return nil, err
 		}
-		log.Info().
+		l.Info().
 			Interface("URLs", networkSettings.URLs).
 			Msg("Connected Solana client")
 		return ec, nil
@@ -315,6 +319,7 @@ type Answer struct {
 }
 
 func (m *OCRv2TestState) ValidateRoundsAfter(chaosStartTime time.Time, timeout time.Duration, rounds int) {
+	l := utils.GetTestLogger(m.T)
 	m.RoundsFound = 0
 	for _, c := range m.Contracts {
 		m.LastRoundTime[c.OCR2.Address()] = chaosStartTime
@@ -333,9 +338,9 @@ func (m *OCRv2TestState) ValidateRoundsAfter(chaosStartTime time.Time, timeout t
 			if answerTime.After(m.LastRoundTime[ci]) {
 				m.LastRoundTime[ci] = answerTime
 				roundsFound++
-				log.Debug().Str("Contract", ci).Interface("Answer", a).Int("RoundsFound", roundsFound).Msg("New answer found")
+				l.Debug().Str("Contract", ci).Interface("Answer", a).Int("RoundsFound", roundsFound).Msg("New answer found")
 			} else {
-				log.Debug().Str("Contract", ci).Interface("Answer", a).Msg("Answer haven't changed")
+				l.Debug().Str("Contract", ci).Interface("Answer", a).Msg("Answer haven't changed")
 			}
 		}
 		g.Expect(roundsFound).To(gomega.BeNumerically(">=", rounds*len(m.Contracts)))
