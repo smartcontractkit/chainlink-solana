@@ -1,8 +1,6 @@
 package config
 
 import (
-	"fmt"
-	"net/url"
 	"strings"
 	"time"
 
@@ -57,6 +55,7 @@ type Config interface {
 	FeeBumpPeriod() time.Duration
 }
 
+// opt: remove
 type configSet struct {
 	BalancePollPeriod   time.Duration
 	ConfirmPollPeriod   time.Duration
@@ -78,6 +77,7 @@ type configSet struct {
 
 var _ Config = (*config)(nil)
 
+// Deprecated
 type config struct {
 	defaults configSet
 	chain    db.ChainCfg
@@ -85,6 +85,7 @@ type config struct {
 }
 
 // NewConfig returns a Config with defaults overridden by dbcfg.
+// Deprecated
 func NewConfig(dbcfg db.ChainCfg, lggr logger.Logger) *config {
 	return &config{
 		defaults: defaultConfigSet,
@@ -258,68 +259,6 @@ type Chain struct {
 	FeeBumpPeriod           *utils.Duration
 }
 
-func (c *Chain) SetFromDB(cfg *db.ChainCfg) error {
-	if cfg == nil {
-		return nil
-	}
-
-	if cfg.BalancePollPeriod != nil {
-		c.BalancePollPeriod = utils.MustNewDuration(cfg.BalancePollPeriod.Duration())
-	}
-	if cfg.ConfirmPollPeriod != nil {
-		c.ConfirmPollPeriod = utils.MustNewDuration(cfg.ConfirmPollPeriod.Duration())
-	}
-	if cfg.OCR2CachePollPeriod != nil {
-		c.OCR2CachePollPeriod = utils.MustNewDuration(cfg.OCR2CachePollPeriod.Duration())
-	}
-	if cfg.OCR2CacheTTL != nil {
-		c.OCR2CacheTTL = utils.MustNewDuration(cfg.OCR2CacheTTL.Duration())
-	}
-	if cfg.TxTimeout != nil {
-		c.TxTimeout = utils.MustNewDuration(cfg.TxTimeout.Duration())
-	}
-	if cfg.TxRetryTimeout != nil {
-		c.TxRetryTimeout = utils.MustNewDuration(cfg.TxRetryTimeout.Duration())
-	}
-	if cfg.TxConfirmTimeout != nil {
-		c.TxConfirmTimeout = utils.MustNewDuration(cfg.TxConfirmTimeout.Duration())
-	}
-	if cfg.SkipPreflight.Valid {
-		c.SkipPreflight = &cfg.SkipPreflight.Bool
-	}
-	if cfg.Commitment.Valid {
-		c.Commitment = &cfg.Commitment.String
-	}
-	if cfg.MaxRetries.Valid {
-		c.MaxRetries = &cfg.MaxRetries.Int64
-	}
-	if cfg.FeeEstimatorMode.Valid {
-		c.FeeEstimatorMode = &cfg.FeeEstimatorMode.String
-	}
-	if cfg.ComputeUnitPriceMax.Valid {
-		if cfg.ComputeUnitPriceMax.Int64 < 0 {
-			return fmt.Errorf("ComputeUnitPriceMax is less than zero %d < 0", cfg.ComputeUnitPriceMax.Int64)
-		}
-		c.ComputeUnitPriceMax = ptr(uint64(cfg.ComputeUnitPriceMax.Int64))
-	}
-	if cfg.ComputeUnitPriceMin.Valid {
-		if cfg.ComputeUnitPriceMin.Int64 < 0 {
-			return fmt.Errorf("ComputeUnitPriceMin is less than zero %d < 0", cfg.ComputeUnitPriceMin.Int64)
-		}
-		c.ComputeUnitPriceMin = ptr(uint64(cfg.ComputeUnitPriceMin.Int64))
-	}
-	if cfg.ComputeUnitPriceDefault.Valid {
-		if cfg.ComputeUnitPriceDefault.Int64 < 0 {
-			return fmt.Errorf("ComputeUnitPriceDefault is less than zero %d < 0", cfg.ComputeUnitPriceDefault.Int64)
-		}
-		c.ComputeUnitPriceDefault = ptr(uint64(cfg.ComputeUnitPriceDefault.Int64))
-	}
-	if cfg.FeeBumpPeriod != nil {
-		c.FeeBumpPeriod = utils.MustNewDuration(cfg.FeeBumpPeriod.Duration())
-	}
-	return nil
-}
-
 func (c *Chain) SetDefaults() {
 	if c.BalancePollPeriod == nil {
 		c.BalancePollPeriod = utils.MustNewDuration(defaultConfigSet.BalancePollPeriod)
@@ -375,20 +314,6 @@ type Node struct {
 	URL  *utils.URL
 }
 
-func (n *Node) SetFromDB(db db.Node) error {
-	if db.Name != "" {
-		n.Name = &db.Name
-	}
-	if db.SolanaURL != "" {
-		u, err := url.Parse(db.SolanaURL)
-		if err != nil {
-			return err
-		}
-		n.URL = (*utils.URL)(u)
-	}
-	return nil
-}
-
 func (n *Node) ValidateConfig() (err error) {
 	if n.Name == nil {
 		err = multierr.Append(err, relaycfg.ErrMissing{Name: "Name", Msg: "required for all nodes"})
@@ -399,8 +324,4 @@ func (n *Node) ValidateConfig() (err error) {
 		err = multierr.Append(err, relaycfg.ErrMissing{Name: "URL", Msg: "required for all nodes"})
 	}
 	return
-}
-
-func ptr[T any](t T) *T {
-	return &t
 }
