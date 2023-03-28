@@ -11,20 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
 )
 
-type Chain struct {
-	ID        string
-	Cfg       ChainCfg
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	Enabled   bool
-}
-
-type NewNode struct {
-	Name          string `json:"name"`
-	SolanaChainID string `json:"solanaChainId" db:"solana_chain_id"`
-	SolanaURL     string `json:"solanaURL" db:"solana_url"`
-}
-
 type Node struct {
 	ID            int32
 	Name          string
@@ -34,6 +20,7 @@ type Node struct {
 	UpdatedAt     time.Time
 }
 
+// Deprecated
 type ChainCfg struct {
 	BalancePollPeriod   *utils.Duration
 	ConfirmPollPeriod   *utils.Duration
