@@ -13,10 +13,9 @@ require (
 	github.com/rs/zerolog v1.29.0
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
 	github.com/smartcontractkit/chainlink v1.12.1-0.20230320022421-bdf2f4cea7d2
-	github.com/smartcontractkit/chainlink-env v0.30.20
+	github.com/smartcontractkit/chainlink-env v0.3.25
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20230313192900-6270bc7c445f
 	github.com/smartcontractkit/chainlink-testing-framework v1.10.10
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230320022421-bdf2f4cea7d2
 	github.com/smartcontractkit/libocr v0.0.0-20221209172631-568a30f68407
 	github.com/stretchr/testify v1.8.2
 	go.uber.org/zap v1.24.0
