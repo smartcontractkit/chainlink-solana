@@ -334,9 +334,6 @@ replace (
 	// needed to address mismatch between cosmosSDK and hdevalence/ed25519consensus
 	filippo.io/edwards25519 => filippo.io/edwards25519 v1.0.0-rc.1
 
-	// updating CosmWasm to v1.0.0 which brings ARM support
-	github.com/CosmWasm/wasmvm => github.com/CosmWasm/wasmvm v1.0.0
-
 	// Fix go mod tidy issue for ambiguous imports from go-ethereum
 	// See https://github.com/ugorji/go/issues/279
 	github.com/btcsuite/btcd => github.com/btcsuite/btcd v0.22.1
@@ -350,9 +347,6 @@ replace (
 	// replicating the replace directive on cosmos SDK
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 
-	// fixes deprecation warnings and keychain undefined bugs on macOS
-	// See https://github.com/99designs/keyring/issues/94
-	github.com/keybase/go-keychain => github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4
 	github.com/prometheus/common => github.com/prometheus/common v0.10.0
 
 	// Some dependency keeps trying to update this to an unstable version
