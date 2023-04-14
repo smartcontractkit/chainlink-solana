@@ -11,7 +11,7 @@ on:
 
 env:
   CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
-  ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-solana-tests:ci.${{ github.sha }}
+  ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-solana-tests:${{ github.sha }}
   CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
 
 # Only run 1 of this workflow at a time per PR
@@ -49,7 +49,16 @@ jobs:
     steps:
       - name: Checkout the repo
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: Check if image exists
+        id: check-image
+        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@ab595504ae9cf10c60eb8d2c5ce025284e58b210 #v2.1.5
+        with:
+          repository: chainlink-solana-tests
+          tag: ${{ github.sha }}
+          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+          AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       - name: Build contracts
+        if: steps.check-image.outputs.exists == 'false'
         uses: ./.github/actions/build_contract_artifacts
 
   e2e_custom_build_custom_chainlink_image:
@@ -60,13 +69,22 @@ jobs:
       id-token: write
       contents: read
     steps:
+      - name: Check if image exists
+        id: check-image
+        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@ab595504ae9cf10c60eb8d2c5ce025284e58b210 #v2.1.5
+        with:
+          repository: chainlink
+          tag: solana.${{ github.sha }}
+          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+          AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       - name: Build Image
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
+        if: steps.check-image.outputs.exists == 'false'
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@ab595504ae9cf10c60eb8d2c5ce025284e58b210 #v2.1.5
         with:
           cl_repo: smartcontractkit/chainlink
           cl_ref: ${{ github.event.inputs.cl_branch_ref }}
           dep_solana_sha: ${{ github.event.pull_request.head.sha }}
-          push_tag: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink:custom.${{ github.event.pull_request.head.sha }}
+          push_tag: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink:solana.${{ github.event.pull_request.head.sha }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
 
@@ -91,22 +109,13 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - name: Download Artifacts
-        uses: actions/download-artifact@v3
+      - name: Build Image
+        uses: ./.github/actions/build-test-image
         with:
-          name: artifacts
-          path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
-      - name: build test runner
-        uses: smartcontractkit/chainlink-github-actions/docker/build-push@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
-        with:
-          tags: ${{ env.ENV_JOB_IMAGE }}
-          file: ./integration-tests/test.Dockerfile
-          build-args: |
-            BASE_IMAGE=${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/test-base-image
-            IMAGE_VERSION=v0.3.19
-            SUITES="smoke"
-          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
+          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+          QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
 
   e2e_custom_run_smoke_tests:
     name: E2E Custom Run Smoke Tests
@@ -129,12 +138,12 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@ab595504ae9cf10c60eb8d2c5ce025284e58b210 #v2.1.5
         with:
           test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestfmt
           go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ env.CL_ECR }}
-          cl_image_tag: custom.${{ github.event.pull_request.head.sha }}
+          cl_image_tag: solana.${{ github.sha }}
           artifacts_location: /home/runner/work/chainlink-solana/chainlink-solana/integration-tests/logs
           token: ${{ secrets.GITHUB_TOKEN }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
