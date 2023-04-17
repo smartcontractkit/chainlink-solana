@@ -22,7 +22,7 @@ on:
 
 env:
   REF_NAME: ${{ github.head_ref || github.ref_name }}
-  ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-solana-tests:${{ github.head_ref || github.ref_name }}
+  ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-solana-tests:${{ github.sha }}
   CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
 
 jobs:
@@ -38,6 +38,26 @@ jobs:
       - name: Get ProjectSerum Version
         id: psversion
         uses: ./.github/actions/projectserum_version
+  test-image-exists:
+    environment: integration
+    permissions:
+      checks: write
+      pull-requests: write
+      id-token: write
+      contents: read
+    name: Check If Solana Test Image Exists
+    runs-on: ubuntu-latest
+    outputs:
+      exists: ${{ steps.check-image.outputs.exists }}
+    steps:
+      - name: Check if image exists
+        id: check-image
+        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@ab595504ae9cf10c60eb8d2c5ce025284e58b210 #v2.1.5
+        with:
+          repository: chainlink-solana-tests
+          tag: ${{ github.sha }}
+          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+          AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
 
   soak_testing_build_contracts:
     name: Soak Testing Build Contracts
@@ -46,7 +66,7 @@ jobs:
       id-token: write
       contents: read
     runs-on: ubuntu-latest
-    needs: [get_projectserum_version]
+    needs: [get_projectserum_version, test-image-exists]
     container:
       image: projectserum/build:${{ needs.get_projectserum_version.outputs.projectserum_version }}
       env:
@@ -56,7 +76,7 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: Build contracts
-        if: ${{ env.REF_NAME != 'develop' }}
+        if: needs.test-image-exists.outputs.exists == 'false'
         uses: ./.github/actions/build_contract_artifacts
 
   soak_testing_build_custom_chainlink_image:
@@ -67,13 +87,21 @@ jobs:
       id-token: write
       contents: read
     steps:
+      - name: Check if image exists
+        id: check-image
+        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@ab595504ae9cf10c60eb8d2c5ce025284e58b210 #v2.1.5
+        with:
+          repository: chainlink
+          tag: solana.${{ github.sha }}
+          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+          AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       - name: Build Image
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@5ca2b0a07d534f216fb97ab54e69d3fdcf03de11 # v2.0.25
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@cosmos_one_off # we will want to switch back to this once cosmos cools offab595504ae9cf10c60eb8d2c5ce025284e58b210 #v2.1.5
         with:
           cl_repo: smartcontractkit/chainlink
           cl_ref: ${{ github.event.inputs.cl_branch_ref }}
           dep_solana_sha: ${{ github.sha }}
-          push_tag: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink:custom.${{ github.sha }}
+          push_tag: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink:solana.${{ github.sha }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
 
@@ -102,31 +130,20 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           ref: ${{ env.REF_NAME }}
-      - name: Download Artifacts
-        if: ${{ env.REF_NAME != 'develop' }}
-        uses: actions/download-artifact@v3
+      - name: Build Test Image
+        uses: ./.github/actions/build-test-image
         with:
-          name: artifacts
-          path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
-      - name: Build Test Runner
-        if: ${{ env.REF_NAME != 'develop' }}
-        uses: smartcontractkit/chainlink-github-actions/docker/build-push@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
-        with:
-          tags: ${{ env.ENV_JOB_IMAGE }}
-          file: ./integration-tests/test.Dockerfile
-          build-args: |
-            BASE_IMAGE=${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/test-base-image
-            IMAGE_VERSION=v0.3.8
-            SUITES="soak"
-          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
+          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+          QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@e72f0a768ac934afce498a802de893d89b12802f # v2.1.1
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@ab595504ae9cf10c60eb8d2c5ce025284e58b210 #v2.1.5
         with:
           test_command_to_run: cd ./integration-tests && go test -timeout 5h -count=1 -json $(args) ./soak 2>&1 | tee /tmp/gotest.log | gotestfmt
           go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
-          cl_image_tag: custom.${{ github.sha }}
+          cl_image_tag: solana.${{ github.sha }}
           artifacts_location: /home/runner/work/chainlink-solana/chainlink-solana/integration-tests/soak/logs
           publish_report_paths: ./tests-soak-report.xml
           publish_check_name: Soak Test Results

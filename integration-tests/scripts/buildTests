@@ -8,6 +8,8 @@ set -ex
 # get this scripts directory
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
+helm repo update
+
 cd "$SCRIPT_DIR"/../ || exit 1
 
 # parse out quotes if they exist in the string
