@@ -9,3 +9,4 @@ actionlint 1.6.22
 shellcheck 0.8.0
 helm 3.9.4
 kubectl 1.25.3
+mockery 2.20.0

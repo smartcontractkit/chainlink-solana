@@ -35,6 +35,7 @@ var defaultConfigSet = configSet{
 	FeeBumpPeriod:           3 * time.Second,
 }
 
+//go:generate mockery --name Config --output ./mocks/ --case=underscore --filename config.go
 type Config interface {
 	BalancePollPeriod() time.Duration
 	ConfirmPollPeriod() time.Duration

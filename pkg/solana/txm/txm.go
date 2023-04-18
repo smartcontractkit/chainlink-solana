@@ -226,6 +226,8 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 			select {
 			case <-ctx.Done():
 				// stop sending tx after retry tx ctx times out (does not stop confirmation polling for tx)
+				sigsLock.RLock()
+				defer sigsLock.RUnlock()
 				txm.lggr.Debugw("stopped tx retry", "id", id, "signatures", sigs)
 				return
 			case <-tick:
@@ -249,6 +251,11 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 
 				// take currentTx and broadcast, if bumped fee -> save signature to list
 				go func(bump bool, count uint, retryTx solanaGo.Transaction) {
+					// calculate index to compare before broadcasting
+					sigsLock.RLock()
+					index := len(sigs) - 1
+					sigsLock.RUnlock()
+
 					retrySig, retrySendErr := client.SendTx(ctx, &retryTx)
 					// this could occur if endpoint goes down or if ctx cancelled
 					if retrySendErr != nil {
@@ -268,14 +275,16 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 						}
 						sigsLock.Lock()
 						sigs = append(sigs, retrySig)
+						// recalculate comparison index after adding bumped signature
+						index = len(sigs) - 1
 						sigsLock.Unlock()
 						txm.lggr.Debugw("tx rebroadcast with bumped fee", "id", id, "fee", getFee(count), "signatures", sigs)
 					}
 
 					// this should never happen (should match the last signature saved to sigs)
 					sigsLock.RLock()
-					if len(sigs) == 0 || retrySig != sigs[len(sigs)-1] {
-						txm.lggr.Fatalw("original signature does not match retry signature", "expectedSignatures", sigs, "receivedSignature", retrySig)
+					if len(sigs) == 0 || retrySig != sigs[index] {
+						txm.lggr.Errorw("original signature does not match retry signature", "expectedSignatures", sigs, "receivedSignature", retrySig)
 					}
 					sigsLock.RUnlock()
 				}(shouldBump, bumpCount, currentTx)
