@@ -93,7 +93,9 @@ func (s *signatureList) List() []solana.Signature {
 }
 
 func (s *signatureList) Length() int {
-	return len(s.List())
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return len(s.sigs)
 }
 
 func (s *signatureList) Append(sig solana.Signature) (sigs []solana.Signature, count int) {
