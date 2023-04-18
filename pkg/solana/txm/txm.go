@@ -275,8 +275,8 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 					}
 
 					// this should never happen (should match the last signature saved to sigs)
-					if sig, err := sigs.Get(index); err != nil || retrySig != sig {
-						txm.lggr.Errorw("original signature does not match retry signature", "expectedSignatures", sigs.List(), "receivedSignature", retrySig, "error", err)
+					if fetchedSig, fetchErr := sigs.Get(index); fetchErr != nil || retrySig != fetchedSig {
+						txm.lggr.Errorw("original signature does not match retry signature", "expectedSignatures", sigs.List(), "receivedSignature", retrySig, "error", fetchErr)
 					}
 				}(shouldBump, bumpCount, currentTx)
 			}
