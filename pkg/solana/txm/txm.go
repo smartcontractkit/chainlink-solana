@@ -356,7 +356,7 @@ func (txm *Txm) confirm(ctx context.Context) {
 						// check confirm timeout exceeded
 						if txm.txs.Expired(s[i], txm.cfg.TxConfirmTimeout()) {
 							id := txm.txs.OnError(s[i], TxFailDrop)
-							txm.lggr.Warnw("failed to find transaction within confirm timeout", "id", id, "signature", s[i], "timeoutSeconds", txm.cfg.TxConfirmTimeout())
+							txm.lggr.Infow("failed to find transaction within confirm timeout", "id", id, "signature", s[i], "timeoutSeconds", txm.cfg.TxConfirmTimeout())
 						}
 						continue
 					}
@@ -364,7 +364,7 @@ func (txm *Txm) confirm(ctx context.Context) {
 					// if signature has an error, end polling
 					if res[i].Err != nil {
 						id := txm.txs.OnError(s[i], TxFailRevert)
-						txm.lggr.Errorw("tx state: failed",
+						txm.lggr.Debugw("tx state: failed",
 							"id", id,
 							"signature", s[i],
 							"error", res[i].Err,
@@ -382,7 +382,7 @@ func (txm *Txm) confirm(ctx context.Context) {
 						// check confirm timeout exceeded
 						if txm.txs.Expired(s[i], txm.cfg.TxConfirmTimeout()) {
 							id := txm.txs.OnError(s[i], TxFailDrop)
-							txm.lggr.Warnw("tx failed to move beyond 'processed' within confirm timeout", "id", id, "signature", s[i], "timeoutSeconds", txm.cfg.TxConfirmTimeout())
+							txm.lggr.Debugw("tx failed to move beyond 'processed' within confirm timeout", "id", id, "signature", s[i], "timeoutSeconds", txm.cfg.TxConfirmTimeout())
 						}
 						continue
 					}
@@ -447,7 +447,7 @@ func (txm *Txm) simulate(ctx context.Context) {
 			if err != nil {
 				// this error can occur if endpoint goes down or if invalid signature (invalid signature should occur further upstream in sendWithRetry)
 				// allow retry to continue in case temporary endpoint failure (if still invalid, confirm or timeout will cleanup)
-				txm.lggr.Errorw("failed to simulate tx", "id", msg.id, "signature", msg.signature, "error", err)
+				txm.lggr.Debugw("failed to simulate tx", "id", msg.id, "signature", msg.signature, "error", err)
 				continue
 			}
 
@@ -464,12 +464,12 @@ func (txm *Txm) simulate(ctx context.Context) {
 			// blockhash not found when simulating, occurs when network bank has not seen the given blockhash or tx is too old
 			// let confirmation process clean up
 			case strings.Contains(errStr, "BlockhashNotFound"):
-				txm.lggr.Warnw("simulate: BlockhashNotFound", "id", msg.id, "signature", msg.signature, "result", res)
+				txm.lggr.Debugw("simulate: BlockhashNotFound", "id", msg.id, "signature", msg.signature, "result", res)
 				continue
 			// transaction will encounter execution error/revert, mark as reverted to remove from confirmation + retry
 			case strings.Contains(errStr, "InstructionError"):
 				txm.txs.OnError(msg.signature, TxFailSimRevert) // cancel retry
-				txm.lggr.Warnw("simulate: InstructionError", "id", msg.id, "signature", msg.signature, "result", res)
+				txm.lggr.Debugw("simulate: InstructionError", "id", msg.id, "signature", msg.signature, "result", res)
 				continue
 			// transaction is already processed in the chain, letting txm confirmation handle
 			case strings.Contains(errStr, "AlreadyProcessed"):
@@ -478,7 +478,7 @@ func (txm *Txm) simulate(ctx context.Context) {
 			// unrecognized errors (indicates more concerning failures)
 			default:
 				txm.txs.OnError(msg.signature, TxFailSimOther) // cancel retry
-				txm.lggr.Errorw("simulate: unrecognized error", "id", msg.id, "signature", msg.signature, "result", res)
+				txm.lggr.Warnw("simulate: unrecognized error", "id", msg.id, "signature", msg.signature, "result", res)
 				continue
 			}
 		}
