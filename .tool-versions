@@ -1,4 +1,4 @@
-nodejs 14.19.1
+nodejs 16.13.2
 yarn 1.22.19
 rust 1.59.0
 golang 1.20.1
