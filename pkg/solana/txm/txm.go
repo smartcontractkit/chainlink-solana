@@ -227,8 +227,8 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 			case <-ctx.Done():
 				// stop sending tx after retry tx ctx times out (does not stop confirmation polling for tx)
 				sigsLock.RLock()
-				defer sigsLock.RUnlock()
 				txm.lggr.Debugw("stopped tx retry", "id", id, "signatures", sigs)
+				sigsLock.RUnlock()
 				return
 			case <-tick:
 				var shouldBump bool
