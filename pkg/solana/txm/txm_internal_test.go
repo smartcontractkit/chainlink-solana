@@ -86,13 +86,6 @@ func getTx(t *testing.T, val uint64, keystore SimpleKeystore, price fees.Compute
 	}
 }
 
-func newReaderWriterMock(t *testing.T) *mocks.ReaderWriter {
-	m := new(mocks.ReaderWriter)
-	m.Test(t)
-	t.Cleanup(func() { m.AssertExpectations(t) })
-	return m
-}
-
 func TestTxm(t *testing.T) {
 	// set up configs needed in txm
 	id := "mocknet"
@@ -102,7 +95,7 @@ func TestTxm(t *testing.T) {
 
 	lggr := logger.Test(t)
 	cfg := config.NewConfig(db.ChainCfg{}, lggr)
-	mc := newReaderWriterMock(t)
+	mc := mocks.NewReaderWriter(t)
 
 	// mock solana keystore
 	mkey := keyMocks.NewSimpleKeystore(t)
@@ -585,7 +578,7 @@ func TestTxm_Enqueue(t *testing.T) {
 	// set up configs needed in txm
 	lggr := logger.Test(t)
 	cfg := config.NewConfig(db.ChainCfg{}, lggr)
-	mc := newReaderWriterMock(t)
+	mc := mocks.NewReaderWriter(t)
 
 	// mock solana keystore
 	mkey := keyMocks.NewSimpleKeystore(t)
