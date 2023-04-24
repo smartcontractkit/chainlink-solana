@@ -395,6 +395,12 @@ replace (
 	// K8s imports are weird
 	k8s.io/api => k8s.io/api v0.25.4
 	k8s.io/client-go => k8s.io/client-go v0.25.4
+
+	// TODO: replace this with the installation of the libocr final version supporting block ranges for mercury
+    github.com/smartcontractkit/libocr => github.com/smartcontractkit/libocr v0.0.0-20230428143950-b8c4d1923d16
+
+    github.com/smartcontractkit/chainlink/v2 => github.com/smartcontractkit/chainlink/v2 v2.0.0-20230424160613-84de6834a2e7
+    github.com/smartcontractkit/chainlink/integration-tests => github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230424160613-84de6834a2e7
 )
 
 exclude k8s.io/client-go v12.0.0+incompatible
