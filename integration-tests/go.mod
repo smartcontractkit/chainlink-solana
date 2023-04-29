@@ -365,9 +365,6 @@ require (
 )
 
 replace (
-	// needed to address mismatch between cosmosSDK and hdevalence/ed25519consensus
-	filippo.io/edwards25519 => filippo.io/edwards25519 v1.0.0-rc.1
-
 	// Fix go mod tidy issue for ambiguous imports from go-ethereum
 	// See https://github.com/ugorji/go/issues/279
 	github.com/btcsuite/btcd => github.com/btcsuite/btcd v0.22.1
@@ -389,7 +386,6 @@ replace (
 	github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
 
 	// The Loki - Grafana - Prometheus - Cortex stack is all sorts of wack
-	github.com/weaveworks/common => github.com/weaveworks/common v0.0.0-20200625145055-4b1847531bc9
 	google.golang.org/grpc => google.golang.org/grpc v1.29.1
 
 	// K8s imports are weird
