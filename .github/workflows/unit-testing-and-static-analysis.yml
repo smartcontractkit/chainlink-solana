@@ -39,9 +39,7 @@ jobs:
         with:
           version: v${{ needs.tools.outputs.golangci-lint-version }} # keep golangci-lint 1.51.1 for multiple --out-format
           allow-extra-out-format-args: true
-          args: |
-            --out-format checkstyle:golangci-lint-report.xml
-            --enable=gofmt --tests=false --exclude-use-default --timeout=5m0s
+          args: --out-format checkstyle:golangci-lint-report.xml --enable=gofmt --tests=false --exclude-use-default --timeout=5m0s
           only-new-issues: true
       - name: Print lint report artifact
         if: always()
