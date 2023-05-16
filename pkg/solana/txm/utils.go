@@ -75,6 +75,7 @@ func convertStatus(res *rpc.SignatureStatusesResult) uint {
 type signatureList struct {
 	sigs []solana.Signature
 	lock sync.RWMutex
+	wg   []*sync.WaitGroup
 }
 
 func (s *signatureList) Get(index int) (sig solana.Signature, err error) {
@@ -98,10 +99,38 @@ func (s *signatureList) Length() int {
 	return len(s.sigs)
 }
 
-func (s *signatureList) Append(sig solana.Signature) (sigs []solana.Signature, count int) {
+func (s *signatureList) Allocate() (index int) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.sigs = append(s.sigs, sig)
-	return s.sigs, len(s.sigs)
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	s.sigs = append(s.sigs, solana.Signature{})
+	s.wg = append(s.wg, &wg)
+
+	return len(s.sigs) - 1
+}
+
+func (s *signatureList) Set(index int, sig solana.Signature) error {
+	v, err := s.Get(index)
+	if err != nil {
+		return err
+	}
+
+	if !v.IsZero() {
+		return fmt.Errorf("trying to set signature when already set - index: %d, existing: %s, new: %s", index, v, sig)
+	}
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.sigs[index] = sig
+	s.wg[index].Done()
+	return nil
+}
+
+func (s *signatureList) Wait(index int) {
+	if index < len(s.wg) {
+		s.wg[index].Wait()
+	}
 }

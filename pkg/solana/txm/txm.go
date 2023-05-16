@@ -204,8 +204,10 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 		return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, errors.Wrap(initSendErr, "tx failed initial transmit")
 	}
 
+	// used for tracking rebroadcasting only in SendWithRetry
 	var sigs signatureList
-	sigs.Append(sig) // add initial signature
+	sigs.Allocate()
+	sigs.Set(0, sig)
 
 	// store tx signature + cancel function
 	id, initStoreErr := txm.txs.New(sig, cancel)
@@ -213,6 +215,8 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 		cancel() // cancel context when exiting early
 		return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, errors.Wrapf(initStoreErr, "failed to save tx signature (%s) to inflight txs", sig)
 	}
+
+	txm.lggr.Debugw("tx initial broadcast", "id", id, "signature", sig)
 
 	// retry with exponential backoff
 	// until context cancelled by timeout or called externally
@@ -244,14 +248,15 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 						txm.lggr.Errorw("failed to build bumped retry tx", "error", retryBuildErr, "id", id)
 						return // exit func if cannot build tx for retrying
 					}
-
+					ind := sigs.Allocate()
+					if uint(ind) != bumpCount {
+						txm.lggr.Errorw("INVARIANT VIOLATION: index (%d) != bumpCount (%d)", ind, bumpCount)
+						return
+					}
 				}
 
 				// take currentTx and broadcast, if bumped fee -> save signature to list
 				go func(bump bool, count uint, retryTx solanaGo.Transaction) {
-					// calculate index to compare before broadcasting
-					index := sigs.Length() - 1
-
 					retrySig, retrySendErr := client.SendTx(ctx, &retryTx)
 					// this could occur if endpoint goes down or if ctx cancelled
 					if retrySendErr != nil {
@@ -269,13 +274,17 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 							txm.lggr.Warnw("error in adding retry transaction", "error", retryStoreErr, "id", id)
 							return
 						}
-						sigsList, sigsLength := sigs.Append(retrySig)
-						index = sigsLength - 1
-						txm.lggr.Debugw("tx rebroadcast with bumped fee", "id", id, "fee", getFee(count), "signatures", sigsList)
+						if setErr := sigs.Set(int(count), retrySig); setErr != nil {
+							// this should never happen
+							txm.lggr.Errorw("INVARIANT VIOLATION", "error", setErr)
+						}
+						txm.lggr.Debugw("tx rebroadcast with bumped fee", "id", id, "fee", getFee(count), "signatures", sigs.List())
 					}
 
-					// this should never happen (should match the last signature saved to sigs)
-					if fetchedSig, fetchErr := sigs.Get(index); fetchErr != nil || retrySig != fetchedSig {
+					sigs.Wait(int(count)) // wait until firts bump tx has set the tx signature
+
+					// this should never happen (should match the signature saved to sigs)
+					if fetchedSig, fetchErr := sigs.Get(int(count)); fetchErr != nil || retrySig != fetchedSig {
 						txm.lggr.Errorw("original signature does not match retry signature", "expectedSignatures", sigs.List(), "receivedSignature", retrySig, "error", fetchErr)
 					}
 				}(shouldBump, bumpCount, currentTx)

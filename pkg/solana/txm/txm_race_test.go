@@ -29,13 +29,9 @@ import (
 // The bumped tx will cause the storage check to move on to the next tx signature even with a inflight "non-bumped" tx
 func TestTxm_SendWithRetry_Race(t *testing.T) {
 	// test config
-	txRetryDuration := time.Second
+	txRetryDuration := 2 * time.Second
 
 	// mocks init
-	client := clientmocks.NewReaderWriter(t)
-	getClient := func() (solanaClient.ReaderWriter, error) {
-		return client, nil
-	}
 	cfg := cfgmocks.NewConfig(t)
 	ks := ksmocks.NewSimpleKeystore(t)
 	lggr, observer := logger.TestObserved(t, zapcore.DebugLevel)
@@ -47,59 +43,118 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 	// config mock
 	cfg.On("ComputeUnitPriceMax").Return(uint64(10))
 	cfg.On("ComputeUnitPriceMin").Return(uint64(0))
-	cfg.On("FeeBumpPeriod").Return(txRetryDuration * 3 / 4) // trigger fee bump after 75% of tx life (only 1 bump)
-
+	cfg.On("FeeBumpPeriod").Return(txRetryDuration / 6)
 	// keystore mock
 	ks.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
-
-	// client mock
-	txs := map[string]solanaGo.Signature{}
-	var lock sync.RWMutex
-	client.On("SendTx", mock.Anything, mock.Anything).Return(
-		// build new sig if tx is different
-		func(_ context.Context, tx *solanaGo.Transaction) solanaGo.Signature {
-			strTx := tx.String()
-
-			// if exists previously slow down client response to trigger race
-			lock.RLock()
-			val, exists := txs[strTx]
-			lock.RUnlock()
-			if exists {
-				time.Sleep(txRetryDuration / 3)
-				return val
-			}
-
-			lock.Lock()
-			defer lock.Unlock()
-			// recheck existence
-			val, exists = txs[strTx]
-			if exists {
-				return val
-			}
-			sig := make([]byte, 16)
-			rand.Read(sig)
-			txs[strTx] = solanaGo.SignatureFromBytes(sig)
-
-			return txs[strTx]
-		},
-		nil,
-	)
-
-	// build minimal txm
-	txm := NewTxm("retry_race", getClient, cfg, ks, lggr)
-	txm.fee = fee
 
 	// assemble minimal tx for testing retry
 	tx := solanaGo.Transaction{}
 	tx.Message.AccountKeys = append(tx.Message.AccountKeys, solanaGo.PublicKey{})
 
-	_, _, _, err := txm.sendWithRetry(
-		utils.Context(t),
-		tx,
-		txRetryDuration,
-	)
-	require.NoError(t, err)
+	t.Run("delay in rebroadcasting tx", func(t *testing.T) {
+		client := clientmocks.NewReaderWriter(t)
+		getClient := func() (solanaClient.ReaderWriter, error) {
+			return client, nil
+		}
 
-	time.Sleep(txRetryDuration / 4 * 5) // wait 1.25x longer of tx life to capture all logs
-	assert.Equal(t, observer.FilterLevelExact(zapcore.ErrorLevel).Len(), 0)
+		// client mock
+		txs := map[string]solanaGo.Signature{}
+		var lock sync.RWMutex
+		client.On("SendTx", mock.Anything, mock.Anything).Return(
+			// build new sig if tx is different
+			// rebroadcast txs will be delayed
+			func(_ context.Context, tx *solanaGo.Transaction) solanaGo.Signature {
+				strTx := tx.String()
+
+				// if exists previously slow down client response to trigger race
+				lock.RLock()
+				val, exists := txs[strTx]
+				lock.RUnlock()
+				if exists {
+					time.Sleep(txRetryDuration / 3)
+					return val
+				}
+
+				lock.Lock()
+				defer lock.Unlock()
+				// recheck existence
+				val, exists = txs[strTx]
+				if exists {
+					return val
+				}
+				sig := make([]byte, 16)
+				rand.Read(sig)
+				txs[strTx] = solanaGo.SignatureFromBytes(sig)
+
+				return txs[strTx]
+			},
+			nil,
+		)
+
+		// build minimal txm
+		txm := NewTxm("retry_race", getClient, cfg, ks, lggr)
+		txm.fee = fee
+
+		_, _, _, err := txm.sendWithRetry(
+			utils.Context(t),
+			tx,
+			txRetryDuration,
+		)
+		require.NoError(t, err)
+
+		time.Sleep(txRetryDuration / 4 * 5) // wait 1.25x longer of tx life to capture all logs
+		assert.Equal(t, observer.FilterLevelExact(zapcore.ErrorLevel).Len(), 0)
+	})
+
+	t.Run("delay in broadcasting new tx", func(t *testing.T) {
+		client := clientmocks.NewReaderWriter(t)
+		getClient := func() (solanaClient.ReaderWriter, error) {
+			return client, nil
+		}
+
+		// client mock
+		txs := map[string]solanaGo.Signature{}
+		var lock sync.RWMutex
+		client.On("SendTx", mock.Anything, mock.Anything).Return(
+			// build new sig if tx is different
+			// new tx will be delayed
+			func(_ context.Context, tx *solanaGo.Transaction) solanaGo.Signature {
+				strTx := tx.String()
+
+				lock.Lock()
+				// recheck existence
+				val, exists := txs[strTx]
+				if exists {
+					lock.Unlock()
+					return val
+				}
+				sig := make([]byte, 16)
+				rand.Read(sig)
+				txs[strTx] = solanaGo.SignatureFromBytes(sig)
+				lock.Unlock()
+
+				// don't lock on delay
+				time.Sleep(txRetryDuration / 3)
+
+				lock.RLock()
+				defer lock.RUnlock()
+				return txs[strTx]
+			},
+			nil,
+		)
+
+		// build minimal txm
+		txm := NewTxm("retry_race", getClient, cfg, ks, lggr)
+		txm.fee = fee
+
+		_, _, _, err := txm.sendWithRetry(
+			utils.Context(t),
+			tx,
+			txRetryDuration,
+		)
+		require.NoError(t, err)
+
+		time.Sleep(txRetryDuration / 4 * 5) // wait 1.25x longer of tx life to capture all logs
+		assert.Equal(t, observer.FilterLevelExact(zapcore.ErrorLevel).Len(), 0)
+	})
 }
