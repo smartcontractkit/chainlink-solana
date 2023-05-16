@@ -129,8 +129,12 @@ func (s *signatureList) Set(index int, sig solana.Signature) error {
 	return nil
 }
 
-func (s *signatureList) Wait(index int) {
+func (s *signatureList) Wait(index int) *sync.WaitGroup {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 	if index < len(s.wg) {
-		s.wg[index].Wait()
+		return s.wg[index]
 	}
+
+	return &sync.WaitGroup{} // return empty waitgroup if index doesn't exist
 }

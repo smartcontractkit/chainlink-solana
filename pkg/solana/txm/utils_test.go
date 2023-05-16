@@ -54,7 +54,7 @@ func TestSignatureList_AllocateWaitSet(t *testing.T) {
 	assert.ErrorContains(t, sigs.Set(0, solana.Signature{1}), "trying to set signature when already set")
 
 	// waitgroup does not block on invalid index
-	sigs.Wait(100000)
+	sigs.Wait(100000).Wait()
 
 	// waitgroup blocks between allocate and set
 	ind1 := sigs.Allocate()
@@ -65,8 +65,8 @@ func TestSignatureList_AllocateWaitSet(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		sigs.Wait(ind1)
-		sigs.Wait(ind2)
+		sigs.Wait(ind1).Wait()
+		sigs.Wait(ind2).Wait()
 		wg.Done()
 	}()
 	assert.NoError(t, sigs.Set(ind2, solana.Signature{1}))
