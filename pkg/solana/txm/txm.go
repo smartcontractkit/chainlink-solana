@@ -293,7 +293,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 					wait := make(chan struct{})
 					go func() {
 						defer close(wait)
-						sigs.Wait(int(count)).Wait() // wait until bump tx has set the tx signature to compare rebroadcast signatures
+						sigs.Wait(int(count)) // wait until bump tx has set the tx signature to compare rebroadcast signatures
 					}()
 					select {
 					case <-ctx.Done():

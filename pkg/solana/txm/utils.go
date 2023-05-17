@@ -78,13 +78,18 @@ type signatureList struct {
 	wg   []*sync.WaitGroup
 }
 
-func (s *signatureList) Get(index int) (sig solana.Signature, err error) {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+// internal function that should be called using the proper lock
+func (s *signatureList) get(index int) (sig solana.Signature, err error) {
 	if index >= len(s.sigs) {
 		return sig, errors.New("invalid index")
 	}
 	return s.sigs[index], nil
+}
+
+func (s *signatureList) Get(index int) (sig solana.Signature, err error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.get(index)
 }
 
 func (s *signatureList) List() []solana.Signature {
@@ -113,7 +118,10 @@ func (s *signatureList) Allocate() (index int) {
 }
 
 func (s *signatureList) Set(index int, sig solana.Signature) error {
-	v, err := s.Get(index)
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	v, err := s.get(index)
 	if err != nil {
 		return err
 	}
@@ -122,19 +130,18 @@ func (s *signatureList) Set(index int, sig solana.Signature) error {
 		return fmt.Errorf("trying to set signature when already set - index: %d, existing: %s, new: %s", index, v, sig)
 	}
 
-	s.lock.Lock()
-	defer s.lock.Unlock()
 	s.sigs[index] = sig
 	s.wg[index].Done()
 	return nil
 }
 
-func (s *signatureList) Wait(index int) *sync.WaitGroup {
+func (s *signatureList) Wait(index int) {
+	wg := &sync.WaitGroup{}
 	s.lock.RLock()
-	defer s.lock.RUnlock()
 	if index < len(s.wg) {
-		return s.wg[index]
+		wg = s.wg[index]
 	}
+	s.lock.RUnlock()
 
-	return &sync.WaitGroup{} // return empty waitgroup if index doesn't exist
+	wg.Wait()
 }
