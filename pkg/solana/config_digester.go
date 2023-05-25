@@ -87,12 +87,16 @@ func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.Co
 		return digest, fmt.Errorf("incorrect hash size %d, expected %d", n, len(digest))
 	}
 
-	binary.BigEndian.PutUint16(digest[0:2], uint16(d.ConfigDigestPrefix()))
+	pre, err := d.ConfigDigestPrefix()
+	if err != nil {
+		return digest, err
+	}
+	binary.BigEndian.PutUint16(digest[0:2], uint16(pre))
 
 	return digest, nil
 }
 
 // This should return the same constant value on every invocation
-func (OffchainConfigDigester) ConfigDigestPrefix() types.ConfigDigestPrefix {
-	return types.ConfigDigestPrefixSolana
+func (OffchainConfigDigester) ConfigDigestPrefix() (types.ConfigDigestPrefix, error) {
+	return types.ConfigDigestPrefixSolana, nil
 }

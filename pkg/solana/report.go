@@ -91,6 +91,6 @@ func (c ReportCodec) MedianFromReport(report types.Report) (*big.Int, error) {
 	return bigbigendian.DeserializeSigned(int(MedianLen), median)
 }
 
-func (c ReportCodec) MaxReportLength(n int) int {
-	return int(ReportLen)
+func (c ReportCodec) MaxReportLength(n int) (int, error) {
+	return int(ReportLen), nil
 }
