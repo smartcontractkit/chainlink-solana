@@ -152,7 +152,9 @@ func TestMedianFromReport(t *testing.T) {
 			}
 			report, err := cdc.BuildReport(pos)
 			require.NoError(t, err)
-			assert.Equal(t, len(report), cdc.MaxReportLength(len(tc.obs)))
+			max, err := cdc.MaxReportLength(len(tc.obs))
+			require.NoError(t, err)
+			assert.Equal(t, len(report), max)
 			med, err := cdc.MedianFromReport(report)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedMedian.String(), med.String())
