@@ -1331,6 +1331,7 @@ github.com/smartcontractkit/chainlink-testing-framework v1.11.5 h1:gYSnOQhLxgE0m
 github.com/smartcontractkit/chainlink-testing-framework v1.11.5/go.mod h1:0ktPcDE5fFSvNewsaHuC4tGVaiCMQsl5RN/cWO5k0rg=
 github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230418232145-9b83bdc20e8a h1:P4SBSDeAaBqWBoOiYLberqn68/ziF8lSubfySCTjEZI=
 github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230418232145-9b83bdc20e8a/go.mod h1:yEBKMo/0B2q2U7peHWTUiAVYU0swpgrBGP87ZUBcsvg=
+<<<<<<< HEAD
 github.com/smartcontractkit/chainlink/v2 v2.2.0-mercury-20230527.0.20230531021143-790758f0bd08 h1:WgEteBcWB+t+Na8K1GReIM6SS1CPxyO6/sST5L9NSsQ=
 github.com/smartcontractkit/chainlink/v2 v2.2.0-mercury-20230527.0.20230531021143-790758f0bd08/go.mod h1:euMZJQMObJPBsmMD8Klvy/xvXg/hOzbU2D4eal8phiM=
 github.com/smartcontractkit/libocr v0.0.0-20230525150148-a75f6e244bb3 h1:/Gel/U5eIZ/BGGr25OrHaXiVDTAJ5DYX5+UlXp3q7Gg=
@@ -1339,6 +1340,16 @@ github.com/smartcontractkit/ocr2keepers v0.6.15 h1:dFhg+qT+tc6b3G8N4qnAHuHe8N0m8
 github.com/smartcontractkit/ocr2keepers v0.6.15/go.mod h1:gqIksJFzdXFsHfGdCWm1uTxbwvAltgcwcaqIgAStC1A=
 github.com/smartcontractkit/ocr2vrf v0.0.0-20230510102715-c58be582bf19 h1:RxaC+V34UEP2u/riXfcvWPZEglri4UsfQi5joUObZ08=
 github.com/smartcontractkit/ocr2vrf v0.0.0-20230510102715-c58be582bf19/go.mod h1:AZbOisIoA3cOUku8suZ+KWBnzbRiafmhi7UKiXoezrk=
+=======
+github.com/smartcontractkit/chainlink/v2 v2.0.0-20230418232145-9b83bdc20e8a h1:euA3VRgcEXw8RtsYD9srEsGkl08O19JhYcWUggmi1Zs=
+github.com/smartcontractkit/chainlink/v2 v2.0.0-20230418232145-9b83bdc20e8a/go.mod h1:s4z5oq5g5J+ezpO8DGUcS1FnlnXzgmnLty+4F2FowEE=
+github.com/smartcontractkit/libocr v0.0.0-20230413082317-9561d14087cc h1:aSCDAai0Dmbhp/KHTtJnC/EJcaEz4CAO80SKRzRZiQA=
+github.com/smartcontractkit/libocr v0.0.0-20230413082317-9561d14087cc/go.mod h1:7Pd28puvezPJXB+xRJlcsx5CfzzkFJbMXydaAEsL4E8=
+github.com/smartcontractkit/ocr2keepers v0.6.14 h1:Rg+SYd8PCyd4CcCetwnRKjVEQsHVsV6QOaWcLhi+6sg=
+github.com/smartcontractkit/ocr2keepers v0.6.14/go.mod h1:gqIksJFzdXFsHfGdCWm1uTxbwvAltgcwcaqIgAStC1A=
+github.com/smartcontractkit/ocr2vrf v0.0.0-20230313164535-dce9b4be73a3 h1:YqC6hCZpYPafWIYNcWDWCG/pbrvc6vhfnIKhbp6GBQ8=
+github.com/smartcontractkit/ocr2vrf v0.0.0-20230313164535-dce9b4be73a3/go.mod h1:NKkp8yf3trq+hJe/gn2Q1dd4abZvcYavUKPzYJCgVew=
+>>>>>>> 38cedf8 (Bumps dependencies)
 github.com/smartcontractkit/sqlx v1.3.5-0.20210805004948-4be295aacbeb h1:OMaBUb4X9IFPLbGbCHsMU+kw/BPCrewaVwWGIBc0I4A=
 github.com/smartcontractkit/sqlx v1.3.5-0.20210805004948-4be295aacbeb/go.mod h1:HNUu4cJekUdsJbwRBCiOybtkPJEfGRELQPe2tkoDEyk=
 github.com/smartcontractkit/wsrpc v0.7.2 h1:iBXzMeg7vc5YoezIQBq896y25BARw7OKbhrb6vPbtRQ=

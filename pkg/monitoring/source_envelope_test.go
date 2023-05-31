@@ -11,11 +11,12 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
-	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/mocks"
-	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
-	"github.com/smartcontractkit/libocr/offchainreporting2/types"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/mocks"
+	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 )
 
 var (
