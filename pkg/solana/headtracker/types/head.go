@@ -7,22 +7,32 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-solana/pkg/common/types"
 )
 
-var _ commontypes.Head[Hash] = (*SolanaHead)(nil)
-var _ htrktypes.Head[Hash, ChainID] = (*SolanaHead)(nil)
+var _ commontypes.Head[Hash] = (*Head)(nil)
+var _ htrktypes.Head[Hash, ChainID] = (*Head)(nil)
 
-type SolanaHead struct {
+type Head struct {
 	Slot   int64
 	Block  rpc.GetBlockResult
-	Parent *SolanaHead
+	Parent *Head
 	ID     ChainID
 }
 
-func (h *SolanaHead) BlockNumber() int64 {
+// NewHead returns an instance of Head
+func NewHead(slot int64, block rpc.GetBlockResult, parent *Head, id ChainID) *Head {
+	return &Head{
+		Slot:   slot,
+		Block:  block,
+		Parent: parent,
+		ID:     id,
+	}
+}
+
+func (h *Head) BlockNumber() int64 {
 	return h.Slot
 }
 
 // ChainLength returns the length of the chain followed by recursively looking up parents
-func (h *SolanaHead) ChainLength() uint32 {
+func (h *Head) ChainLength() uint32 {
 	if h == nil {
 		return 0
 	}
@@ -42,40 +52,40 @@ func (h *SolanaHead) ChainLength() uint32 {
 	return l
 }
 
-func (h *SolanaHead) EarliestHeadInChain() commontypes.Head[Hash] {
+func (h *Head) EarliestHeadInChain() commontypes.Head[Hash] {
 	return h.earliestInChain()
 }
 
-func (h *SolanaHead) earliestInChain() *SolanaHead {
+func (h *Head) earliestInChain() *Head {
 	for h.Parent != nil {
 		h = h.Parent
 	}
 	return h
 }
 
-func (h *SolanaHead) BlockHash() Hash {
+func (h *Head) BlockHash() Hash {
 	return Hash{Hash: h.blockHash()}
 }
 
-func (h *SolanaHead) blockHash() solana.Hash {
+func (h *Head) blockHash() solana.Hash {
 	return h.Block.Blockhash
 }
 
-func (h *SolanaHead) GetParent() commontypes.Head[Hash] {
+func (h *Head) GetParent() commontypes.Head[Hash] {
 	if h.Parent == nil {
 		return nil
 	}
 	return h.Parent
 }
 
-func (h *SolanaHead) GetParentHash() Hash {
+func (h *Head) GetParentHash() Hash {
 	if h.Parent == nil {
 		return Hash{}
 	}
 	return h.Parent.BlockHash()
 }
 
-func (h *SolanaHead) HashAtHeight(slotNum int64) Hash {
+func (h *Head) HashAtHeight(slotNum int64) Hash {
 	for {
 		if h.Slot == slotNum {
 			return h.BlockHash()
@@ -89,14 +99,14 @@ func (h *SolanaHead) HashAtHeight(slotNum int64) Hash {
 	return Hash{}
 }
 
-func (h *SolanaHead) ChainID() ChainID {
+func (h *Head) ChainID() ChainID {
 	return h.ID
 }
 
-func (h *SolanaHead) HasChainID() bool {
+func (h *Head) HasChainID() bool {
 	return h.ID.String() != "unknown" // TODO: Refactor this into a more coherent check
 }
 
-func (h *SolanaHead) IsValid() bool {
+func (h *Head) IsValid() bool {
 	return h != nil
 }
