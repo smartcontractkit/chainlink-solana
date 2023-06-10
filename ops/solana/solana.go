@@ -473,7 +473,7 @@ func (d Deployer) InitOCR(keys []opsChainlink.NodeKeys) error {
 			"alphaAcceptPpb":      uint64(0),       // accept all reports (if deviation matches number)
 			"deltaCNanoseconds":   0 * time.Second, // heartbeat
 		},
-		"maxDurationQueryNanoseconds":                        300 * time.Millisecond,
+		"maxDurationQueryNanoseconds":                        20 * time.Millisecond,
 		"maxDurationObservationNanoseconds":                  300 * time.Millisecond,
 		"maxDurationReportNanoseconds":                       300 * time.Millisecond,
 		"maxDurationShouldAcceptFinalizedReportNanoseconds":  1 * time.Second,
