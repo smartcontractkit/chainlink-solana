@@ -104,7 +104,10 @@ func (h *Head) ChainID() ChainID {
 }
 
 func (h *Head) HasChainID() bool {
-	return h.ID.String() != "unknown" // TODO: Refactor this into a more coherent check
+	if h == nil {
+		return false
+	}
+	return h.ChainID().String() != "unknown" // TODO: Refactor this into a more coherent check
 }
 
 func (h *Head) IsValid() bool {
