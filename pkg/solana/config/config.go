@@ -34,6 +34,13 @@ var defaultConfigSet = configSet{
 	ComputeUnitPriceMin:     0,
 	ComputeUnitPriceDefault: 0,
 	FeeBumpPeriod:           3 * time.Second,
+
+	// headtracker
+	BlockEmissionIdleWarningThreshold: 30 * time.Second,
+	FinalityDepth:                     50,
+	HeadTrackerHistoryDepth:           100,
+	HeadTrackerMaxBufferSize:          3,
+	HeadTrackerSamplingInterval:       1 * time.Second,
 }
 
 //go:generate mockery --name Config --output ./mocks/ --case=underscore --filename config.go
