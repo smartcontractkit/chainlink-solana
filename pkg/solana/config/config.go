@@ -10,6 +10,7 @@ import (
 	relaycfg "github.com/smartcontractkit/chainlink-relay/pkg/config"
 	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
 
+	htrktypes "github.com/smartcontractkit/chainlink-solana/pkg/common/headtracker/types"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 )
@@ -54,6 +55,13 @@ type Config interface {
 	ComputeUnitPriceMin() uint64
 	ComputeUnitPriceDefault() uint64
 	FeeBumpPeriod() time.Duration
+
+	// headtracker
+	BlockEmissionIdleWarningThreshold() time.Duration
+	FinalityDepth() uint32
+	HeadTrackerHistoryDepth() uint32
+	HeadTrackerMaxBufferSize() uint32
+	HeadTrackerSamplingInterval() time.Duration
 }
 
 // opt: remove
@@ -74,9 +82,16 @@ type configSet struct {
 	ComputeUnitPriceMin     uint64
 	ComputeUnitPriceDefault uint64
 	FeeBumpPeriod           time.Duration
+
+	BlockEmissionIdleWarningThreshold time.Duration
+	FinalityDepth                     uint32
+	HeadTrackerHistoryDepth           uint32
+	HeadTrackerMaxBufferSize          uint32
+	HeadTrackerSamplingInterval       time.Duration
 }
 
 var _ Config = (*config)(nil)
+var _ htrktypes.Config = (*config)(nil)
 
 // Deprecated
 type config struct {
@@ -242,22 +257,47 @@ func (c *config) FeeBumpPeriod() time.Duration {
 	return c.defaults.FeeBumpPeriod
 }
 
+func (c *config) BlockEmissionIdleWarningThreshold() time.Duration {
+	return c.defaults.BlockEmissionIdleWarningThreshold
+}
+
+func (c *config) FinalityDepth() uint32 {
+	return c.defaults.FinalityDepth
+}
+
+func (c *config) HeadTrackerHistoryDepth() uint32 {
+	return c.defaults.HeadTrackerHistoryDepth
+}
+
+func (c *config) HeadTrackerMaxBufferSize() uint32 {
+	return c.defaults.HeadTrackerMaxBufferSize
+}
+
+func (c *config) HeadTrackerSamplingInterval() time.Duration {
+	return c.defaults.HeadTrackerSamplingInterval
+}
+
 type Chain struct {
-	BalancePollPeriod       *utils.Duration
-	ConfirmPollPeriod       *utils.Duration
-	OCR2CachePollPeriod     *utils.Duration
-	OCR2CacheTTL            *utils.Duration
-	TxTimeout               *utils.Duration
-	TxRetryTimeout          *utils.Duration
-	TxConfirmTimeout        *utils.Duration
-	SkipPreflight           *bool
-	Commitment              *string
-	MaxRetries              *int64
-	FeeEstimatorMode        *string
-	ComputeUnitPriceMax     *uint64
-	ComputeUnitPriceMin     *uint64
-	ComputeUnitPriceDefault *uint64
-	FeeBumpPeriod           *utils.Duration
+	BalancePollPeriod                 *utils.Duration
+	ConfirmPollPeriod                 *utils.Duration
+	OCR2CachePollPeriod               *utils.Duration
+	OCR2CacheTTL                      *utils.Duration
+	TxTimeout                         *utils.Duration
+	TxRetryTimeout                    *utils.Duration
+	TxConfirmTimeout                  *utils.Duration
+	SkipPreflight                     *bool
+	Commitment                        *string
+	MaxRetries                        *int64
+	FeeEstimatorMode                  *string
+	ComputeUnitPriceMax               *uint64
+	ComputeUnitPriceMin               *uint64
+	ComputeUnitPriceDefault           *uint64
+	FeeBumpPeriod                     *utils.Duration
+	BlockEmissionIdleWarningThreshold *utils.Duration
+	FinalityDepth                     *uint32
+	HeadTrackerHistoryDepth           *uint32
+	HeadTrackerMaxBufferSize          *uint32
+	HeadTrackerSamplingInterval       *utils.Duration
 }
 
 func (c *Chain) SetDefaults() {
@@ -307,6 +347,22 @@ func (c *Chain) SetDefaults() {
 	if c.FeeBumpPeriod == nil {
 		c.FeeBumpPeriod = utils.MustNewDuration(defaultConfigSet.FeeBumpPeriod)
 	}
+	if c.BlockEmissionIdleWarningThreshold == nil {
+		c.BlockEmissionIdleWarningThreshold = utils.MustNewDuration(defaultConfigSet.BlockEmissionIdleWarningThreshold)
+	}
+	if c.FinalityDepth == nil {
+		c.FinalityDepth = &defaultConfigSet.FinalityDepth
+	}
+	if c.HeadTrackerHistoryDepth == nil {
+		c.HeadTrackerHistoryDepth = &defaultConfigSet.HeadTrackerHistoryDepth
+	}
+	if c.HeadTrackerMaxBufferSize == nil {
+		c.HeadTrackerMaxBufferSize = &defaultConfigSet.HeadTrackerMaxBufferSize
+	}
+	if c.HeadTrackerSamplingInterval == nil {
+		c.HeadTrackerSamplingInterval = utils.MustNewDuration(defaultConfigSet.HeadTrackerSamplingInterval)
+	}
+
 	return
 }
 
