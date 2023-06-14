@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/devnet"
 	"math/big"
 	"os"
 	"sort"
@@ -417,6 +418,13 @@ ChainID = '%s'
 Name = 'primary' 
 URL = '%s'
 
+[[Starknet]]
+Enabled = true
+ChainID = 'SN_GOERLI'
+[[Starknet.Nodes]]
+Name = 'primary'
+URL = 'http://starknet-dev:5000'
+
 [OCR2]
 Enabled = true
 
@@ -430,10 +438,14 @@ ListenAddresses = ['0.0.0.0:6690']
 	c.Env = environment.New(c.K8Config).
 		AddHelm(mockservercfg.New(nil)).
 		AddHelm(mockserver.New(nil)).
+		AddHelm(devnet.New(nil)).
 		AddHelm(sol.New(nil)).
 		AddHelm(chainlink.New(0, map[string]interface{}{
 			"toml":     baseTOML,
 			"replicas": c.NodeCount,
+			"db": map[string]any{
+				"stateful": true,
+			},
 		}))
 
 	return c

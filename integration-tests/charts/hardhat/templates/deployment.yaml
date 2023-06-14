@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hardhat
+  labels:
+    release: {{ .Release.Name }}
+    app: hardhat
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      release: {{ .Release.Name }}
+      app: hardhat
+  template:
+    metadata:
+      labels:
+        release: {{ .Release.Name }}
+        app: hardhat
+    spec:
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.repository | default "ethereumoptimism/hardhat-node"}}:{{ .Values.tag | default "nightly"}}"
+        imagePullPolicy: IfNotPresent
+        ports:
+          - name: http
+            containerPort: {{ .Values.service.internalPort }}
+        livenessProbe:
+          httpGet:
+            path: /
+            port: {{ .Values.service.externalPort }}
+          initialDelaySeconds: 1
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: {{ .Values.service.externalPort }}
+          initialDelaySeconds: 2
+          periodSeconds: 1
+        resources:
+          requests:
+            memory: {{ .Values.resources.requests.memory }}
+            cpu: {{ .Values.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.resources.limits.memory }}
+            cpu: {{ .Values.resources.limits.cpu }}

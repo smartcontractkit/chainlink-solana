@@ -1,0 +1,7 @@
+apiVersion: v1
+description: StarkNET Pathfined/devnet deployment
+name: starknetdev
+version: 0.1.0
+keywords: 
+  - starknet
+  - pathfinder

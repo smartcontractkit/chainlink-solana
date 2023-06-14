@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: starknet-dev
+  labels:
+    release: {{ .Release.Name }}
+    app: starknet-dev
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      release: {{ .Release.Name }}
+      app: starknet-dev
+  template:
+    metadata:
+      labels:
+        release: {{ .Release.Name }}
+        app: starknet-dev
+    spec:
+      volumes:
+        - name: vol
+          hostPath:
+            path: /dumps
+        - name: cairo-build
+          emptyDir: {}
+      initContainers:
+        - name: cairo-download
+          image: appropriate/curl
+          command: ["/bin/sh"]
+          args:
+            - "-c"
+            - |
+              mkdir -p cairo-build
+              curl -L --output release.tgz https://github.com/starkware-libs/cairo/releases/download/v1.0.0-rc0/release-x86_64-unknown-linux-musl.tar.gz
+              tar xzf release.tgz
+              mv cairo/* cairo-build/
+          volumeMounts:
+            - name: cairo-build
+              mountPath: /cairo-build
+      containers:
+      - name: {{ .Chart.Name }}
+        volumeMounts:
+          - name: vol
+            mountPath: /dumps
+{{- if eq .Values.real_node true }}
+        image: "{{ .Values.repository | default "eqlabs/pathfinder"}}:{{ .Values.tag | default "v0.1.8-alpha"}}"
+{{- else }}
+          - name: cairo-build
+            mountPath: /cairo-build
+        image: "{{ .Values.repository | default "shardlabs/starknet-devnet"}}:{{ .Values.tag | default "0.5.2"}}"
+        args: ["--sierra-compiler-path", "/cairo-build/bin/starknet-sierra-compile", "--lite-mode", "--port", {{ .Values.service.internalPort | quote}}, "--seed", {{ .Values.seed | quote}}]
+{{- end }}
+        imagePullPolicy: IfNotPresent
+{{- if eq .Values.real_node true }}
+        env:
+          - name: PATHFINDER_HTTP_RPC_ADDRESS
+            value: "0.0.0.0:5000"
+          - name: RUSTLOG
+            value: "info"
+          - name: PATHFINDER_ETHEREUM_API_URL
+            value: {{ .Values.url_http_L1 }}
+{{- else }}
+        env:
+          - name: PYTHONUNBUFFERED
+            value: "1"
+          - name: PATHFINDER_ETHEREUM_API_URL
+            value: {{ .Values.url_http_L1 }}
+{{- end }}
+        ports:
+          - name: http
+            containerPort: {{ .Values.service.internalPort }}
+        livenessProbe:
+          httpGet:
+            path: /is_alive
+            port: {{ .Values.service.externalPort }}
+          initialDelaySeconds: 5
+          periodSeconds: 30
+          timeoutSeconds: 300
+          failureThreshold: 10
+        readinessProbe:
+          httpGet:
+            path: /is_alive
+            port: {{ .Values.service.externalPort }}
+          initialDelaySeconds: 5
+          periodSeconds: 30
+          timeoutSeconds: 300
+          failureThreshold: 10
+        resources:
+          requests:
+            memory: {{ .Values.resources.requests.memory }}
+            cpu: {{ .Values.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.resources.limits.memory }}
+            cpu: {{ .Values.resources.limits.cpu }}

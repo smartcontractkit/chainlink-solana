@@ -1,0 +1,14 @@
+# Declare variables to be passed into your templates.
+replicaCount: 1
+service:
+  name: hardhat-service
+  type: ClusterIP
+  externalPort: 8545
+  internalPort: 8545
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2048Mi
+  requests:
+    cpu: 2000m
+    memory: 2048Mi

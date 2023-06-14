@@ -1,0 +1,16 @@
+# Declare variables to be passed into your templates.
+replicaCount: 1
+service:
+  type: ClusterIP
+  externalPort: 5000
+  internalPort: 5000
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2048Mi
+  requests:
+    cpu: 2000m
+    memory: 2048Mi
+url_http_L1: ""
+real_node: false
+seed: 0
