@@ -14,6 +14,7 @@ require (
 	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230525161650-dce1bc58b504
 	github.com/smartcontractkit/libocr v0.0.0-20230525150148-a75f6e244bb3
 	github.com/stretchr/testify v1.8.2
+	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.8.0
 	go.uber.org/zap v1.24.0
 	golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53
