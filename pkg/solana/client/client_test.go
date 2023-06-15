@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -391,4 +392,115 @@ func TestClient_SubscribeNewHead(t *testing.T) {
 
 	// Clean up the subscription.
 	subscription.Unsubscribe()
+}
+
+func TestClient_HeadByNumber(t *testing.T) {
+	url := SetupLocalSolNode(t)
+
+	requestTimeout := 5 * time.Second
+	lggr := logger.Test(t)
+	cfg := config.NewConfig(db.ChainCfg{}, lggr)
+	c, err := NewClient(url, cfg, requestTimeout, lggr)
+	assert.NoError(t, err)
+
+	t.Run("happy case, valid block number", func(t *testing.T) {
+		ctx := context.Background()
+		// Get most recent height
+		slotHeight, err := c.SlotHeight()
+		assert.NoError(t, err)
+
+		// Get List of blocks
+		blockNumbers, err := c.GetBlocks(ctx, 0, slotHeight)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, blockNumbers)
+
+		// Use the first block for our test
+		firstBlockNumber := blockNumbers[0]
+		block, err := c.HeadByNumber(ctx, big.NewInt(int64(firstBlockNumber)))
+
+		// Make sure no error is returned.
+		assert.NoError(t, err)
+		assert.Equal(t, int64(firstBlockNumber), block.Slot)
+	})
+
+	t.Run("negative block number", func(t *testing.T) {
+		// Call HeadByNumber with zero or a negative number.
+		ctx := context.Background()
+
+		block, err := c.HeadByNumber(ctx, big.NewInt(-1))
+		assert.Error(t, err) // expecting error
+		assert.Nil(t, block) // expecting no block
+	})
+
+	t.Run("block does not exist", func(t *testing.T) {
+		ctx := context.Background()
+
+		block, err := c.HeadByNumber(ctx, big.NewInt(99999999999))
+		assert.Error(t, err)
+		assert.Nil(t, block)
+	})
+
+}
+
+func TestClient_GetBlock(t *testing.T) {
+	requestTimeout := 5 * time.Second
+	lggr := logger.Test(t)
+	cfg := config.NewConfig(db.ChainCfg{}, lggr)
+
+	blockHeight := uint64(199750875)
+	blockHash, err := solana.HashFromBase58("FDJBEXcTgD3Z17BdVM2K6o2j35JHJRXUf7NkHK5w7AbD")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	previousBlockHash, err := solana.HashFromBase58("3rQRaHFL8uC8jMERbXeTJjhgSomtiuEPVAGYtjrickxr")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	blockTime := solana.UnixTimeSeconds(1626110123)
+
+	block := &rpc.GetBlockResult{
+		BlockHeight:       &blockHeight,
+		Blockhash:         blockHash,
+		ParentSlot:        uint64(199750874),
+		PreviousBlockhash: previousBlockHash,
+		Rewards:           []rpc.BlockReward{},
+		Transactions:      []rpc.TransactionWithMeta{},
+		BlockTime:         &blockTime,
+	}
+
+	// Mock Server
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		out := fmt.Sprintf(`{"jsonrpc":"2.0","result":%s,"id":1}`, MustJSON(block))
+		_, err := w.Write([]byte(out))
+		require.NoError(t, err)
+	}))
+	defer mockServer.Close()
+
+	c, err := NewClient(mockServer.URL, cfg, requestTimeout, lggr)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	out, err := c.GetBlock(ctx, uint64(100))
+	// print out for debugging
+	t.Logf("out: %+v", *out.BlockHeight)
+	t.Logf("block: %+v", *block.BlockHeight)
+	assert.NoError(t, err)
+	assert.Equal(t, block, out)
+}
+
+func TestClient_GetLatestSlot(t *testing.T) {
+	requestTimeout := 5 * time.Second
+	lggr := logger.Test(t)
+	cfg := config.NewConfig(db.ChainCfg{}, lggr)
+	url := SetupLocalSolNode(t)
+
+	c, err := NewClient(url, cfg, requestTimeout, lggr)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	slot, err := c.GetLatestSlot(ctx)
+	assert.NoError(t, err)
+	assert.Greater(t, slot, uint64(0))
 }

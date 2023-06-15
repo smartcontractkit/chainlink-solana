@@ -231,7 +231,7 @@ func (c *Client) SendTx(ctx context.Context, tx *solana.Transaction) (solana.Sig
 func (c *Client) HeadByNumber(ctx context.Context, number *big.Int) (*headtracker.Head, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
-	block, err := c.getBlock(ctx, number.Uint64())
+	block, err := c.GetBlock(ctx, number.Uint64())
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +239,7 @@ func (c *Client) HeadByNumber(ctx context.Context, number *big.Int) (*headtracke
 		return nil, errors.New("invalid block in HeadByNumber")
 	}
 	chainId := c.ConfiguredChainID()
-	// TODO: check if parent head will be linked in the headsaver
+	// TODO: check if parent head can be linked in the headsaver
 	head := &headtracker.Head{
 		Slot:  number.Int64(),
 		Block: *block,
@@ -288,12 +288,12 @@ func (c *Client) getLatestBlock(ctx context.Context) (block *rpc.GetBlockResult,
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
 
-	slot, err = c.getLatestSlot(ctx)
+	slot, err = c.GetLatestSlot(ctx)
 	if err != nil {
-		return nil, slot, err
+		return nil, slot, errors.Wrap(err, "error in GetLatestSlot")
 	}
 
-	block, err = c.getBlock(ctx, slot)
+	block, err = c.GetBlock(ctx, slot)
 	if err != nil {
 		return nil, slot, err
 	}
@@ -301,22 +301,61 @@ func (c *Client) getLatestBlock(ctx context.Context) (block *rpc.GetBlockResult,
 	return block, slot, nil
 }
 
-func (c *Client) getBlock(ctx context.Context, number uint64) (out *rpc.GetBlockResult, err error) {
+func (c *Client) GetBlock(ctx context.Context, slot uint64) (out *rpc.GetBlockResult, err error) {
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
 
-	v, err, _ := c.requestGroup.Do("GetBlock", func() (interface{}, error) {
-		return c.rpc.GetBlock(ctx, number)
+	res, err, _ := c.requestGroup.Do("GetBlock", func() (interface{}, error) {
+		return c.rpc.GetBlock(ctx, slot)
 	})
-	return v.(*rpc.GetBlockResult), err
+	// Check for errors and nil pointers
+	if err != nil {
+		return nil, errors.Wrap(err, "error in GetBlock")
+	}
+	if res == nil {
+		return nil, errors.New("nil pointer in GetBlock")
+	}
+
+	return res.(*rpc.GetBlockResult), err
 }
 
-func (c *Client) getLatestSlot(ctx context.Context) (uint64, error) {
+// TODO: confirm commitment for RPC again. Public RPC nodes cannot handle CommitmentProcessed due to requests being too frequent.
+func (c *Client) GetLatestSlot(ctx context.Context) (uint64, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
 
-	v, err, _ := c.requestGroup.Do("GetSlot", func() (interface{}, error) {
+	res, err, _ := c.requestGroup.Do("GetSlot", func() (interface{}, error) {
 		return c.rpc.GetSlot(ctx, c.commitment)
 	})
-	return v.(uint64), err
+
+	if err != nil {
+		return 0, errors.Wrap(err, "error in GetSlot")
+	}
+
+	if res == nil {
+		return 0, errors.New("nil pointer in GetSlot")
+	}
+
+	return res.(uint64), err
+}
+
+func (c *Client) GetBlocks(ctx context.Context, startSlot, endSlot uint64) (blocks []uint64, err error) {
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+
+	res, err, _ := c.requestGroup.Do("GetBlocks", func() (interface{}, error) {
+		return c.rpc.GetBlocks(ctx, startSlot, &endSlot, c.commitment)
+	})
+
+	if err != nil {
+		return nil, errors.Wrap(err, "error in GetBlocks")
+	}
+	if res == nil {
+		return nil, errors.New("nil pointer in GetBlocks")
+	}
+
+	blocks = make([]uint64, len(res.(rpc.BlocksResult)))
+	copy(blocks, res.(rpc.BlocksResult))
+
+	return blocks, err
 }
