@@ -41,6 +41,7 @@ var defaultConfigSet = configSet{
 	HeadTrackerHistoryDepth:           100,
 	HeadTrackerMaxBufferSize:          3,
 	HeadTrackerSamplingInterval:       1 * time.Second,
+	PollingInterval:                   2 * time.Second,
 }
 
 //go:generate mockery --name Config --output ./mocks/ --case=underscore --filename config.go
@@ -95,6 +96,7 @@ type configSet struct {
 	HeadTrackerHistoryDepth           uint32
 	HeadTrackerMaxBufferSize          uint32
 	HeadTrackerSamplingInterval       time.Duration
+	PollingInterval                   time.Duration
 }
 
 var _ Config = (*config)(nil)
@@ -284,6 +286,10 @@ func (c *config) HeadTrackerSamplingInterval() time.Duration {
 	return c.defaults.HeadTrackerSamplingInterval
 }
 
+func (c *config) PollingInterval() time.Duration {
+	return c.defaults.PollingInterval
+}
+
 type Chain struct {
 	BalancePollPeriod                 *utils.Duration
 	ConfirmPollPeriod                 *utils.Duration
@@ -305,6 +311,7 @@ type Chain struct {
 	HeadTrackerHistoryDepth           *uint32
 	HeadTrackerMaxBufferSize          *uint32
 	HeadTrackerSamplingInterval       *utils.Duration
+	PollingInterval                   *utils.Duration
 }
 
 func (c *Chain) SetDefaults() {
@@ -368,6 +375,9 @@ func (c *Chain) SetDefaults() {
 	}
 	if c.HeadTrackerSamplingInterval == nil {
 		c.HeadTrackerSamplingInterval = utils.MustNewDuration(defaultConfigSet.HeadTrackerSamplingInterval)
+	}
+	if c.PollingInterval == nil {
+		c.PollingInterval = utils.MustNewDuration(defaultConfigSet.PollingInterval)
 	}
 
 	return
