@@ -70,6 +70,7 @@ type Config interface {
 	HeadTrackerHistoryDepth() uint32
 	HeadTrackerMaxBufferSize() uint32
 	HeadTrackerSamplingInterval() time.Duration
+	PollingInterval() time.Duration
 }
 
 // opt: remove

@@ -21,6 +21,21 @@ func (id ChainID) String() string {
 	case Localnet:
 		return "localnet"
 	default:
-		return "unknown"
+		return "localnet"
+	}
+}
+
+func StringToChainID(id string) ChainID {
+	switch id {
+	case "mainnet":
+		return Mainnet
+	case "testnet":
+		return Testnet
+	case "devnet":
+		return Devnet
+	case "localnet":
+		return Localnet
+	default:
+		return Localnet
 	}
 }
