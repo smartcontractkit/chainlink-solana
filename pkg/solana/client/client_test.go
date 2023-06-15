@@ -332,14 +332,12 @@ func TestClient_SubscribeNewHead(t *testing.T) {
 
 		switch rpcReq.Method {
 		case "getSlot":
-			// respond with slot number for the block
 			slot = slotResponses[requestCounter]
 			out := fmt.Sprintf(`{"jsonrpc":"2.0","result":%d,"id":1}`, slot)
 			_, err := w.Write([]byte(out))
 			require.NoError(t, err)
 
 		case "getBlock":
-			// respond with block info
 			out := fmt.Sprintf(`{"jsonrpc":"2.0","result":%s,"id":1}`, blockResponses[int(slot)])
 			requestCounter++
 			_, err := w.Write([]byte(out))
@@ -350,10 +348,6 @@ func TestClient_SubscribeNewHead(t *testing.T) {
 			require.NoError(t, err)
 
 		default:
-			// Print method for debugging.
-			t.Logf("RPc: %s", rpcReq.JSONRPC)
-			fmt.Println("Unrecognized method:", rpcReq.Method)
-
 			// respond with error
 			http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
 		}
@@ -390,7 +384,6 @@ func TestClient_SubscribeNewHead(t *testing.T) {
 		// No more heads, as expected.
 	}
 
-	// Clean up the subscription.
 	subscription.Unsubscribe()
 }
 
@@ -418,13 +411,11 @@ func TestClient_HeadByNumber(t *testing.T) {
 		firstBlockNumber := blockNumbers[0]
 		block, err := c.HeadByNumber(ctx, big.NewInt(int64(firstBlockNumber)))
 
-		// Make sure no error is returned.
 		assert.NoError(t, err)
 		assert.Equal(t, int64(firstBlockNumber), block.Slot)
 	})
 
 	t.Run("negative block number", func(t *testing.T) {
-		// Call HeadByNumber with zero or a negative number.
 		ctx := context.Background()
 
 		block, err := c.HeadByNumber(ctx, big.NewInt(-1))
@@ -470,7 +461,6 @@ func TestClient_GetBlock(t *testing.T) {
 		BlockTime:         &blockTime,
 	}
 
-	// Mock Server
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		out := fmt.Sprintf(`{"jsonrpc":"2.0","result":%s,"id":1}`, MustJSON(block))
 		_, err := w.Write([]byte(out))
@@ -483,9 +473,7 @@ func TestClient_GetBlock(t *testing.T) {
 
 	ctx := context.Background()
 	out, err := c.GetBlock(ctx, uint64(100))
-	// print out for debugging
-	t.Logf("out: %+v", *out.BlockHeight)
-	t.Logf("block: %+v", *block.BlockHeight)
+
 	assert.NoError(t, err)
 	assert.Equal(t, block, out)
 }

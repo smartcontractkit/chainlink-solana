@@ -250,7 +250,7 @@ func (c *Client) HeadByNumber(ctx context.Context, number *big.Int) (*headtracke
 
 // SubscribeNewHead polls the RPC endpoint for new blocks.
 func (c *Client) SubscribeNewHead(ctx context.Context, ch chan<- *headtracker.Head) (*Subscription, error) {
-	subscription := NewSubscription(c, ctx)
+	subscription := NewSubscription(ctx, c)
 
 	go func() {
 		ticker := time.NewTicker(c.pollingInterval)
@@ -261,7 +261,6 @@ func (c *Client) SubscribeNewHead(ctx context.Context, ch chan<- *headtracker.He
 				ticker.Stop()
 				return
 			case <-ticker.C:
-				// Fetch latest block
 				block, slot, err := c.getLatestBlock(ctx)
 				// TODO: Improve error handling
 				if err != nil {
@@ -308,7 +307,7 @@ func (c *Client) GetBlock(ctx context.Context, slot uint64) (out *rpc.GetBlockRe
 	res, err, _ := c.requestGroup.Do("GetBlock", func() (interface{}, error) {
 		return c.rpc.GetBlock(ctx, slot)
 	})
-	// Check for errors and nil pointers
+
 	if err != nil {
 		return nil, errors.Wrap(err, "error in GetBlock")
 	}

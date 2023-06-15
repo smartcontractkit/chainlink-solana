@@ -33,7 +33,7 @@ func TestSubscription_New(t *testing.T) {
 	c, ctx := initClient(t)
 
 	t.Run("happy path", func(t *testing.T) {
-		subscription := NewSubscription(c, ctx)
+		subscription := NewSubscription(ctx, c)
 		assert.NotNil(t, subscription)
 		assert.NotNil(t, subscription.ctx)
 		assert.NotNil(t, subscription.cancel)
@@ -43,7 +43,7 @@ func TestSubscription_New(t *testing.T) {
 
 	// Edge case: pass a nil client
 	t.Run("nil client", func(t *testing.T) {
-		subscription := NewSubscription(nil, ctx)
+		subscription := NewSubscription(ctx, nil)
 		assert.NotNil(t, subscription)
 		assert.Nil(t, subscription.client)
 	})
@@ -53,7 +53,7 @@ func TestSubscription_Unsubscribe(t *testing.T) {
 	c, ctx := initClient(t)
 
 	t.Run("happy path", func(t *testing.T) {
-		subscription := NewSubscription(c, ctx)
+		subscription := NewSubscription(ctx, c)
 
 		// The Done channel should not be closed yet
 		select {
@@ -76,7 +76,7 @@ func TestSubscription_Unsubscribe(t *testing.T) {
 
 	// Edge case: unsubscribe twice
 	t.Run("double unsubscribe", func(t *testing.T) {
-		subscription := NewSubscription(c, ctx)
+		subscription := NewSubscription(ctx, c)
 		subscription.Unsubscribe()
 		subscription.Unsubscribe() // Shouldn't panic or error
 	})
@@ -85,7 +85,7 @@ func TestSubscription_Unsubscribe(t *testing.T) {
 func TestSubscription_Err(t *testing.T) {
 	c, ctx := initClient(t)
 	t.Run("happy path", func(t *testing.T) {
-		subscription := NewSubscription(c, ctx)
+		subscription := NewSubscription(ctx, c)
 
 		errCh := subscription.Err()
 		assert.NotNil(t, errCh)
@@ -106,7 +106,7 @@ func TestSubscription_Err(t *testing.T) {
 
 	// Edge case: no error sent
 	t.Run("no error", func(t *testing.T) {
-		subscription := NewSubscription(c, ctx)
+		subscription := NewSubscription(ctx, c)
 		errCh := subscription.Err()
 		assert.NotNil(t, errCh)
 

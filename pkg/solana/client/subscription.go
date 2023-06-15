@@ -15,7 +15,7 @@ type Subscription struct {
 	client  *Client
 }
 
-func NewSubscription(client *Client, ctx context.Context) *Subscription {
+func NewSubscription(ctx context.Context, client *Client) *Subscription {
 	ctx, cancel := context.WithCancel(ctx)
 	return &Subscription{
 		ctx:     ctx,
