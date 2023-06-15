@@ -3,14 +3,18 @@ package client
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 	"golang.org/x/sync/singleflight"
+
+	htrktypes "github.com/smartcontractkit/chainlink-solana/pkg/common/headtracker/types"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	headtracker "github.com/smartcontractkit/chainlink-solana/pkg/solana/headtracker/types"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 )
 
 const (
@@ -47,6 +51,8 @@ type Writer interface {
 
 var _ ReaderWriter = (*Client)(nil)
 
+var _ htrktypes.Client[*headtracker.Head, *Subscription, headtracker.ChainID, headtracker.Hash] = (*Client)(nil)
+
 type Client struct {
 	rpc             *rpc.Client
 	skipPreflight   bool // to enable or disable preflight checks
@@ -55,6 +61,7 @@ type Client struct {
 	txTimeout       time.Duration
 	contextDuration time.Duration
 	log             logger.Logger
+	pollingInterval time.Duration
 
 	// provides a duplicate function call suppression mechanism
 	requestGroup *singleflight.Group
@@ -67,6 +74,7 @@ func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration,
 		commitment:      cfg.Commitment(),
 		maxRetries:      cfg.MaxRetries(),
 		txTimeout:       cfg.TxTimeout(),
+		pollingInterval: cfg.PollingInterval(), //TODO: Add this in the config in core
 		contextDuration: requestTimeout,
 		log:             log,
 		requestGroup:    &singleflight.Group{},
@@ -139,6 +147,16 @@ func (c *Client) ChainID() (string, error) {
 	return network, nil
 }
 
+// TODO: requires refactor. Do we want to store chainID? how do we want to cache ChainID?
+func (c *Client) ConfiguredChainID() headtracker.ChainID {
+	chainID, err := c.ChainID()
+	if err != nil {
+		c.log.Warnf("unable to determine configured chain ID: %v", err)
+		return headtracker.ChainID(headtracker.Localnet)
+	}
+	return headtracker.StringToChainID(chainID)
+}
+
 func (c *Client) GetFeeForMessage(msg string) (uint64, error) {
 	// msg is base58 encoded data
 
@@ -208,4 +226,97 @@ func (c *Client) SendTx(ctx context.Context, tx *solana.Transaction) (solana.Sig
 	}
 
 	return c.rpc.SendTransactionWithOpts(ctx, tx, opts)
+}
+
+func (c *Client) HeadByNumber(ctx context.Context, number *big.Int) (*headtracker.Head, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+	block, err := c.getBlock(ctx, number.Uint64())
+	if err != nil {
+		return nil, err
+	}
+	if block == nil {
+		return nil, errors.New("invalid block in HeadByNumber")
+	}
+	chainId := c.ConfiguredChainID()
+	// TODO: check if parent head will be linked in the headsaver
+	head := &headtracker.Head{
+		Slot:  number.Int64(),
+		Block: *block,
+		ID:    chainId,
+	}
+	return head, nil
+}
+
+// SubscribeNewHead polls the RPC endpoint for new blocks.
+func (c *Client) SubscribeNewHead(ctx context.Context, ch chan<- *headtracker.Head) (*Subscription, error) {
+	subscription := NewSubscription(c, ctx)
+
+	go func() {
+		ticker := time.NewTicker(c.pollingInterval)
+
+		for {
+			select {
+			case <-ctx.Done():
+				ticker.Stop()
+				return
+			case <-ticker.C:
+				// Fetch latest block
+				block, slot, err := c.getLatestBlock(ctx)
+				// TODO: Improve error handling
+				if err != nil {
+					subscription.errChan <- err
+					continue
+				}
+
+				// Create a new Head object and send to channel
+				head := &headtracker.Head{
+					Slot:  int64(slot),
+					Block: *block,
+					ID:    c.ConfiguredChainID(),
+				}
+				ch <- head
+			}
+		}
+	}()
+
+	return subscription, nil
+}
+
+// getLatestBlock queries the latest slot and returns the block.
+func (c *Client) getLatestBlock(ctx context.Context) (block *rpc.GetBlockResult, slot uint64, err error) {
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+
+	slot, err = c.getLatestSlot(ctx)
+	if err != nil {
+		return nil, slot, err
+	}
+
+	block, err = c.getBlock(ctx, slot)
+	if err != nil {
+		return nil, slot, err
+	}
+
+	return block, slot, nil
+}
+
+func (c *Client) getBlock(ctx context.Context, number uint64) (out *rpc.GetBlockResult, err error) {
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+
+	v, err, _ := c.requestGroup.Do("GetBlock", func() (interface{}, error) {
+		return c.rpc.GetBlock(ctx, number)
+	})
+	return v.(*rpc.GetBlockResult), err
+}
+
+func (c *Client) getLatestSlot(ctx context.Context) (uint64, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+
+	v, err, _ := c.requestGroup.Do("GetSlot", func() (interface{}, error) {
+		return c.rpc.GetSlot(ctx, c.commitment)
+	})
+	return v.(uint64), err
 }
