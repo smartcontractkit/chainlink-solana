@@ -68,3 +68,9 @@ func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 		require.NoError(t, err)
 	}
 }
+
+func DummyUrl(t *testing.T) string {
+	port := utils.MustRandomPort(t)
+	url := "http://127.0.0.1:" + port
+	return url
+}
