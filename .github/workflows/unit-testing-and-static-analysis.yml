@@ -74,9 +74,9 @@ jobs:
       - name: Build
         run: go build -v ./pkg/...
       - name: Test
-        run: go test ./pkg/... -v -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage.txt $1 | tee $OUTPUT_FILE
+        run: go test ./pkg/... -v -tags integration -covermode=atomic -coverpkg=./... -coverprofile=coverage.txt "$1" | tee "$OUTPUT_FILE"
       - name: Test with the race detector enabled
-        run: go test ./pkg/... -v -race -count=10 -timeout=15m -coverpkg=./... -coverprofile=race_coverage.txt $1 | tee $OUTPUT_FILE
+        run: go test ./pkg/... -v -race -count=10 -timeout=15m -coverpkg=./... -coverprofile=race_coverage.txt "$1" | tee "$OUTPUT_FILE"
       - name: Upload Go test results
         if: always()
         uses: actions/upload-artifact@v3
@@ -103,9 +103,11 @@ jobs:
         id: sonarqube_report_paths
         shell: bash
         run: |
-          echo "sonarqube_tests_report_paths=$(find go-test-results -name output.txt | paste -sd "," -)" >> $GITHUB_OUTPUT
-          echo "sonarqube_coverage_report_paths=$(find go-test-results -name coverage.txt | paste -sd "," -)" >> $GITHUB_OUTPUT
-          echo "sonarqube_golangci_report_paths=$(find -type f -name 'golangci-lint-report.xml' -printf "%p,")" >> $GITHUB_OUTPUT
+          {
+            echo "sonarqube_tests_report_paths=$(find go-test-results -name output.txt | paste -sd "," -)"
+            echo "sonarqube_coverage_report_paths=$(find go-test-results -name coverage.txt | paste -sd "," -)"
+            echo "sonarqube_golangci_report_paths=$(find -type f -name 'golangci-lint-report.xml' -printf "%p,")"
+          } >> "$GITHUB_OUTPUT"
       - name: SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@a6ba0aafc293e03de5437af7edbc97f7d3ebc91a # v1.2.0
         with:
