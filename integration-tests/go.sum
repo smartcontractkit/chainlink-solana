@@ -1322,8 +1322,8 @@ github.com/slack-go/slack v0.12.2/go.mod h1:hlGi5oXA+Gt+yWTPP0plCdRKmjsDxecdHxYQ
 github.com/smartcontractkit/caigo v0.0.0-20230526231506-786d4587099a h1:B0WjTVtPW+GNY90rpmiwD/8tf3xr4jFC60sjuznNtRs=
 github.com/smartcontractkit/caigo v0.0.0-20230526231506-786d4587099a/go.mod h1:2QuJdEouTWjh5BDy5o/vgGXQtR4Gz8yH1IYB5eT7u4M=
 github.com/smartcontractkit/chainlink-cosmos v0.4.0 h1:xYLAcJJIm0cyMtYtMaosO45bykEwcwQOmZz3mz46Y2A=
-github.com/smartcontractkit/chainlink-env v0.30.20 h1:3VQIQcXoprC3AIq1lVhiby3ZEWokuKhVTlCToIvt2uc=
-github.com/smartcontractkit/chainlink-env v0.30.20/go.mod h1:9c0Czq4a6wZKY20BcoAlK29DnejQIiLo/MwKYtSFnHk=
+github.com/smartcontractkit/chainlink-env v0.33.0 h1:t8flqQyVtgL2MsPRKu80bAO+d2fPWN0EWxzHVZCst14=
+github.com/smartcontractkit/chainlink-env v0.33.0/go.mod h1:9c0Czq4a6wZKY20BcoAlK29DnejQIiLo/MwKYtSFnHk=
 github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230531014621-9c303da4c086 h1:d2WiCTnsCtA16KVabnX3E9SZH1irp2/d0MLT0/UI3XY=
 github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230531014621-9c303da4c086/go.mod h1:zfUba6Okm7zTBxap24I78Vq9z+twHmjXSMBAl2C2Qgc=
 github.com/smartcontractkit/chainlink-starknet/relayer v0.0.0-20230530233948-90c8af98011e h1:0g2/8OSVFxbGQ2L7FTDo29t90ItOf+1CI2zOn3DBwHM=
