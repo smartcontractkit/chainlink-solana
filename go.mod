@@ -11,7 +11,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.15.0
-	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230609013816-dc5d37505ce4
+	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230621184141-6c65ae346995
 	github.com/smartcontractkit/libocr v0.0.0-20230606215712-82b910bef5c1
 	github.com/stretchr/testify v1.8.4
 	github.com/test-go/testify v1.1.4
