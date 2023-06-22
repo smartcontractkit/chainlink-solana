@@ -20,7 +20,7 @@ jobs:
       go-version: ${{ steps.tool-versions.outputs.golang_version }}
       golangci-lint-version: ${{ steps.tool-versions.outputs.golangci-lint_version }}
   golangci:
-    name: Golangci Linting
+    name: Golang Lint
     runs-on: ubuntu-latest
     needs: [tools]
     steps:
