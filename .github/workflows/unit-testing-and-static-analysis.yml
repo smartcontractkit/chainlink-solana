@@ -105,7 +105,7 @@ jobs:
         run: |
           {
             echo "sonarqube_tests_report_paths=$(find go-test-results -name output.txt | paste -sd "," -)"
-            echo "sonarqube_coverage_report_paths=$(find go-test-results -name coverage.txt | paste -sd "," -)"
+            echo "sonarqube_coverage_report_paths=$(find go-test-results -name '*coverage.txt' | paste -sd "," -)"
             echo "sonarqube_golangci_report_paths=$(find go-test-results -name 'golangci-lint-report.xml' -printf "%p,")"
           } >> "$GITHUB_OUTPUT"
       - name: SonarQube Scan
