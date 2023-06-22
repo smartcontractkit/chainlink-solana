@@ -3,7 +3,7 @@ package client
 import (
 	"context"
 
-	commontypes "github.com/smartcontractkit/chainlink-solana/pkg/common/types"
+	commontypes "github.com/smartcontractkit/chainlink-relay/pkg/types"
 )
 
 var _ commontypes.Subscription = (*Subscription)(nil)
