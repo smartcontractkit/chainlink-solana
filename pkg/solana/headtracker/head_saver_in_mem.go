@@ -66,9 +66,8 @@ func (hs *inMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) Save(ctx context.Context, 
 	return nil
 }
 
-// No OP function for EVM
+// No OP function for Solana
 func (hs *inMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) Load(ctx context.Context) (H, error) {
-
 	return hs.LatestChain(), nil
 }
 
