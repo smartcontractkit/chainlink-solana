@@ -106,7 +106,7 @@ jobs:
           {
             echo "sonarqube_tests_report_paths=$(find go-test-results -name output.txt | paste -sd "," -)"
             echo "sonarqube_coverage_report_paths=$(find go-test-results -name '*coverage.txt' | paste -sd "," -)"
-            echo "sonarqube_golangci_report_paths=$(find go-test-results -name 'golangci-lint-report.xml' -printf "%p,")"
+            echo "sonarqube_golangci_report_paths=$(find golangci-lint-report -name 'golangci-lint-report.xml' -printf "%p,")"
           } >> "$GITHUB_OUTPUT"
       - name: SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@a6ba0aafc293e03de5437af7edbc97f7d3ebc91a # v1.2.0
