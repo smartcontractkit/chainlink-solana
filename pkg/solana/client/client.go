@@ -11,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/singleflight"
 
-	htrktypes "github.com/smartcontractkit/chainlink-solana/pkg/common/headtracker/types"
+	htrktypes "github.com/smartcontractkit/chainlink-relay/pkg/headtracker/types"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	headtracker "github.com/smartcontractkit/chainlink-solana/pkg/solana/headtracker/types"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"

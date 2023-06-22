@@ -3,8 +3,8 @@ package headtracker
 import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	htrktypes "github.com/smartcontractkit/chainlink-solana/pkg/common/headtracker/types"
-	commontypes "github.com/smartcontractkit/chainlink-solana/pkg/common/types"
+	htrktypes "github.com/smartcontractkit/chainlink-relay/pkg/headtracker/types"
+	commontypes "github.com/smartcontractkit/chainlink-relay/pkg/types"
 )
 
 var _ commontypes.Head[Hash] = (*Head)(nil)

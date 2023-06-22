@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
+	"github.com/smartcontractkit/chainlink-solana/pkg/internal/utils"
 	"github.com/stretchr/testify/assert"
 )
 

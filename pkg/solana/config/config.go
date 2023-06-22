@@ -10,7 +10,7 @@ import (
 	relaycfg "github.com/smartcontractkit/chainlink-relay/pkg/config"
 	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
 
-	htrktypes "github.com/smartcontractkit/chainlink-solana/pkg/common/headtracker/types"
+	htrktypes "github.com/smartcontractkit/chainlink-relay/pkg/headtracker/types"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 )

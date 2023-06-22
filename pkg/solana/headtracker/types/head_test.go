@@ -6,8 +6,8 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/smartcontractkit/chainlink-solana/pkg/internal/utils"
 	headtracker "github.com/smartcontractkit/chainlink-solana/pkg/solana/headtracker/types"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 	"github.com/stretchr/testify/assert"
 )
 
