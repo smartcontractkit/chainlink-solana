@@ -1,4 +1,4 @@
-package headtracker
+package types
 
 import (
 	"github.com/gagliardetto/solana-go"

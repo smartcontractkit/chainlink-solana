@@ -7,11 +7,11 @@ import (
 
 	htrktypes "github.com/smartcontractkit/chainlink-relay/pkg/headtracker/types"
 	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
-	"github.com/smartcontractkit/chainlink-relay/pkg/types"
-	headtracker "github.com/smartcontractkit/chainlink-solana/pkg/solana/headtracker/types"
+	commontypes "github.com/smartcontractkit/chainlink-relay/pkg/types"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/headtracker/types"
 )
 
-type inMemoryHeadSaver[H htrktypes.Head[BLOCK_HASH, CHAIN_ID], BLOCK_HASH types.Hashable, CHAIN_ID types.ID] struct {
+type inMemoryHeadSaver[H htrktypes.Head[BLOCK_HASH, CHAIN_ID], BLOCK_HASH commontypes.Hashable, CHAIN_ID commontypes.ID] struct {
 	config      htrktypes.Config
 	logger      logger.Logger
 	latestHead  H
@@ -22,14 +22,14 @@ type inMemoryHeadSaver[H htrktypes.Head[BLOCK_HASH, CHAIN_ID], BLOCK_HASH types.
 	setParent   func(H, H)
 }
 
-type HeadSaver = inMemoryHeadSaver[*headtracker.Head, headtracker.Hash, headtracker.ChainID]
+type HeadSaver = inMemoryHeadSaver[*types.Head, types.Hash, types.ChainID]
 
-var _ types.HeadSaver[*headtracker.Head, headtracker.Hash] = (*HeadSaver)(nil)
+var _ commontypes.HeadSaver[*types.Head, types.Hash] = (*HeadSaver)(nil)
 
 func NewInMemoryHeadSaver[
 	H htrktypes.Head[BLOCK_HASH, CHAIN_ID],
-	BLOCK_HASH types.Hashable,
-	CHAIN_ID types.ID](
+	BLOCK_HASH commontypes.Hashable,
+	CHAIN_ID commontypes.ID](
 	config htrktypes.Config,
 	lggr logger.Logger,
 	getNilHead func() H,
@@ -47,11 +47,11 @@ func NewInMemoryHeadSaver[
 
 // Creates a new In Memory HeadSaver for solana
 func NewHeadSaver(config htrktypes.Config, lggr logger.Logger) *HeadSaver {
-	return NewInMemoryHeadSaver[*headtracker.Head, headtracker.Hash, headtracker.ChainID](
+	return NewInMemoryHeadSaver[*types.Head, types.Hash, types.ChainID](
 		config,
 		lggr,
-		func() *headtracker.Head { return nil },
-		func(head, parent *headtracker.Head) { head.Parent = parent },
+		func() *types.Head { return nil },
+		func(head, parent *types.Head) { head.Parent = parent },
 	)
 }
 

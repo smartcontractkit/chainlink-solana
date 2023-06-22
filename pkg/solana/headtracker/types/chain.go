@@ -1,4 +1,4 @@
-package headtracker
+package types
 
 type ChainID int
 
