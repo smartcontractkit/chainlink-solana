@@ -7,12 +7,12 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/headtracker/types"
 )
 
-type headBroadcaster = headtracker.HeadBroadcaster[*types.Head, types.Hash]
+type HeadBroadcaster = headtracker.HeadBroadcaster[*types.Head, types.Hash]
 
-var _ commontypes.HeadBroadcaster[*types.Head, types.Hash] = &headBroadcaster{}
+var _ commontypes.HeadBroadcaster[*types.Head, types.Hash] = &HeadBroadcaster{}
 
 func NewBroadcaster(
 	lggr logger.Logger,
-) *headBroadcaster {
+) *HeadBroadcaster {
 	return headtracker.NewHeadBroadcaster[*types.Head, types.Hash](lggr)
 }

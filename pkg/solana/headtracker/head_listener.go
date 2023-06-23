@@ -8,16 +8,16 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/headtracker/types"
 )
 
-type headListener = headtracker.HeadListener[*types.Head, commontypes.Subscription, types.ChainID, types.Hash]
+type HeadListener = headtracker.HeadListener[*types.Head, commontypes.Subscription, types.ChainID, types.Hash]
 
-var _ commontypes.HeadListener[*types.Head, types.Hash] = &headListener{}
+var _ commontypes.HeadListener[*types.Head, types.Hash] = &HeadListener{}
 
 func NewListener(
 	lggr logger.Logger,
 	solanaClient htrktypes.Client[*types.Head, commontypes.Subscription, types.ChainID, types.Hash],
 	config htrktypes.Config,
 	chStop chan struct{},
-) *headListener {
+) *HeadListener {
 	return headtracker.NewHeadListener[*types.Head, commontypes.Subscription,
 		types.ChainID, types.Hash](lggr, solanaClient, config, chStop)
 }

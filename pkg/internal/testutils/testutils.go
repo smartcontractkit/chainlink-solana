@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+// TODO: These can prob refactor to chainlink internal testutils
+
 // Context returns a context with the test's deadline, if available.
 func Context(tb testing.TB) context.Context {
 	ctx := context.Background()
@@ -36,3 +38,7 @@ func WaitTimeout(t *testing.T) time.Duration {
 	}
 	return DefaultWaitTimeout
 }
+
+// TestInterval is just a sensible poll interval that gives fast tests without
+// risk of spamming
+const TestInterval = 100 * time.Millisecond
