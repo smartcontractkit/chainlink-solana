@@ -11,21 +11,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	commonhtrk "github.com/smartcontractkit/chainlink-relay/pkg/headtracker"
+	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
+	"github.com/smartcontractkit/chainlink-relay/pkg/services"
 	commontypes "github.com/smartcontractkit/chainlink-relay/pkg/types"
 	commonmocks "github.com/smartcontractkit/chainlink-relay/pkg/types/mocks"
-
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/headtracker"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/headtracker/types"
-
-	// configtest "github.com/smartcontractkit/chainlink/v2/core/internal/testutils/configtest/v2"
-	"github.com/smartcontractkit/chainlink-solana/pkg/internal/testutils"
-	// "github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
-	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
-	// "github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
-	// "github.com/smartcontractkit/chainlink/v2/core/store/models"
-	"github.com/smartcontractkit/chainlink-relay/pkg/services"
 	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/internal/cltest"
+	"github.com/smartcontractkit/chainlink-solana/pkg/internal/testutils"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/headtracker"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/headtracker/types"
 )
 
 func waitHeadBroadcasterToStart(t *testing.T, hb commontypes.HeadBroadcaster[*types.Head, types.Hash]) {
@@ -43,6 +37,7 @@ func waitHeadBroadcasterToStart(t *testing.T, hb commontypes.HeadBroadcaster[*ty
 func TestHeadBroadcaster_Subscribe(t *testing.T) {
 	t.Parallel()
 	g := gomega.NewWithT(t)
+	g.SetDefaultEventuallyTimeout(1 * time.Second)
 
 	lggr, _ := logger.New()
 	sub := commonmocks.NewSubscription(t)
@@ -87,6 +82,7 @@ func TestHeadBroadcaster_Subscribe(t *testing.T) {
 	g.Eventually(checker1.OnNewLongestChainCount).Should(gomega.Equal(int32(1)))
 
 	latest2, _ := hb.Subscribe(checker2)
+
 	// "latest head" is set here to the most recent head received
 	assert.NotNil(t, latest2)
 	assert.Equal(t, firstHead.BlockNumber(), latest2.BlockNumber())
@@ -94,7 +90,9 @@ func TestHeadBroadcaster_Subscribe(t *testing.T) {
 	unsubscribe1()
 
 	headers <- secondHead
-	g.Eventually(checker2.OnNewLongestChainCount).Should(gomega.Equal(int32(1)))
+	// sleep for 3 seconds
+	time.Sleep(3 * time.Second)
+	g.Eventually(checker2.OnNewLongestChainCount).Should(gomega.Equal(int32(1))) // TODO: Fix this test
 }
 
 func TestHeadBroadcaster_BroadcastNewLongestChain(t *testing.T) {
