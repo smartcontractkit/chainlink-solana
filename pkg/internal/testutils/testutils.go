@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/headtracker"
 )
 
 // TODO: These can prob refactor to chainlink internal testutils
@@ -42,3 +44,9 @@ func WaitTimeout(t *testing.T) time.Duration {
 // TestInterval is just a sensible poll interval that gives fast tests without
 // risk of spamming
 const TestInterval = 100 * time.Millisecond
+
+// NewHeadtrackerConfig returns a new Solana Headtracker Config with overrides.
+func NewHeadtrackerConfig(config *headtracker.Config, overrideFn func(*headtracker.Config)) *headtracker.Config {
+	overrideFn(config)
+	return config
+}

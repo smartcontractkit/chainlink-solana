@@ -91,18 +91,15 @@ func Test_HeadListener_NotReceivingHeads(t *testing.T) {
 	lggr, _ := logger.New()
 	client := cltest.NewClientMockWithDefaultChain(t)
 	cfg := headtracker.NewConfig()
+	overridenConfig := testutils.NewHeadtrackerConfig(cfg, func(c *headtracker.Config) {
+		c.Defaults.BlockEmissionIdleWarningThreshold = 1 * time.Second
+	})
 	chStop := make(chan struct{})
-	hl := headtracker.NewListener(lggr, client, cfg, chStop)
+	hl := headtracker.NewListener(lggr, client, overridenConfig, chStop)
 
 	firstHeadAwaiter := cltest.NewAwaiter()
-	// handler := func(context.Context, *types.Head) error {
-	// 	firstHeadAwaiter.ItHappened()
-	// 	return nil
-	// }
-
-	var headCount atomic.Int32
 	handler := func(context.Context, *types.Head) error {
-		headCount.Add(1)
+		firstHeadAwaiter.ItHappened()
 		return nil
 	}
 
@@ -130,6 +127,7 @@ func Test_HeadListener_NotReceivingHeads(t *testing.T) {
 	go hl.ListenForNewHeads(handler, done)
 
 	subscribeAwaiter.AwaitOrFail(t, testutils.WaitTimeout(t))
+	require.Eventually(t, hl.Connected, testutils.WaitTimeout(t), testutils.TestInterval)
 
 	chHeads <- cltest.Head(0)
 	firstHeadAwaiter.AwaitOrFail(t)

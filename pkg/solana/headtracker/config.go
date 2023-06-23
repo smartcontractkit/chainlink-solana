@@ -2,15 +2,17 @@ package headtracker
 
 import (
 	"time"
+
+	htrktypes "github.com/smartcontractkit/chainlink-relay/pkg/headtracker/types"
 )
 
-// This config serves as a POC for headtracker.
-// It should be replaced with a more robust config
-// such as the one in pkg/solana/config
+// This Config serves as a POC for headtracker.
+// It should be replaced with a more robust Config
+// such as the one in pkg/solana/Config
 
-// TODO: replace this config with a more robust config
-type config struct {
-	defaults configSet
+// TODO: replace this Config with a more robust Config. Requires research
+type Config struct {
+	Defaults configSet
 }
 
 type configSet struct {
@@ -24,7 +26,7 @@ type configSet struct {
 
 var defaultConfigSet = configSet{
 	// headtracker
-	BlockEmissionIdleWarningThreshold: 30 * time.Second,
+	BlockEmissionIdleWarningThreshold: 30 * time.Second, // TODO: Check this Config value again
 	FinalityDepth:                     50,
 	HeadTrackerHistoryDepth:           100,
 	HeadTrackerMaxBufferSize:          3,
@@ -32,32 +34,34 @@ var defaultConfigSet = configSet{
 	PollingInterval:                   2 * time.Second,
 }
 
-func NewConfig() *config {
-	return &config{
-		defaults: defaultConfigSet,
+func NewConfig() *Config {
+	return &Config{
+		Defaults: defaultConfigSet,
 	}
 }
 
-func (c *config) BlockEmissionIdleWarningThreshold() time.Duration {
-	return c.defaults.BlockEmissionIdleWarningThreshold
+var _ htrktypes.Config = &Config{}
+
+func (c *Config) BlockEmissionIdleWarningThreshold() time.Duration {
+	return c.Defaults.BlockEmissionIdleWarningThreshold
 }
 
-func (c *config) FinalityDepth() uint32 {
-	return c.defaults.FinalityDepth
+func (c *Config) FinalityDepth() uint32 {
+	return c.Defaults.FinalityDepth
 }
 
-func (c *config) HeadTrackerHistoryDepth() uint32 {
-	return c.defaults.HeadTrackerHistoryDepth
+func (c *Config) HeadTrackerHistoryDepth() uint32 {
+	return c.Defaults.HeadTrackerHistoryDepth
 }
 
-func (c *config) HeadTrackerMaxBufferSize() uint32 {
-	return c.defaults.HeadTrackerMaxBufferSize
+func (c *Config) HeadTrackerMaxBufferSize() uint32 {
+	return c.Defaults.HeadTrackerMaxBufferSize
 }
 
-func (c *config) HeadTrackerSamplingInterval() time.Duration {
-	return c.defaults.HeadTrackerSamplingInterval
+func (c *Config) HeadTrackerSamplingInterval() time.Duration {
+	return c.Defaults.HeadTrackerSamplingInterval
 }
 
-func (c *config) PollingInterval() time.Duration {
-	return c.defaults.PollingInterval
+func (c *Config) PollingInterval() time.Duration {
+	return c.Defaults.PollingInterval
 }
