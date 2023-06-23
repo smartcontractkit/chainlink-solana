@@ -13,7 +13,7 @@ type headTracker = headtracker.HeadTracker[*types.Head, commontypes.Subscription
 
 var _ commontypes.HeadTracker[*types.Head, types.Hash] = (*headTracker)(nil)
 
-func NewHeadTracker(
+func NewTracker(
 	lggr logger.Logger,
 	solanaClient htrktypes.Client[*types.Head, commontypes.Subscription, types.ChainID, types.Hash],
 	config htrktypes.Config,

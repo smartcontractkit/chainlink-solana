@@ -59,10 +59,10 @@ func TestHeadBroadcaster_Subscribe(t *testing.T) {
 	checker1 := &cltest.MockHeadTrackable{}
 	checker2 := &cltest.MockHeadTrackable{}
 
-	hb := headtracker.NewHeadBroadcaster(lggr)
+	hb := headtracker.NewBroadcaster(lggr)
 	hs := headtracker.NewHeadSaver(cfg, lggr)
 	mailMon := utils.NewMailboxMonitor(t.Name())
-	ht := headtracker.NewHeadTracker(lggr, client, cfg, hb, hs, mailMon)
+	ht := headtracker.NewTracker(lggr, client, cfg, hb, hs, mailMon)
 
 	var ms services.MultiStart
 	require.NoError(t, ms.Start(testutils.Context(t), mailMon, hb, ht))
@@ -100,7 +100,7 @@ func TestHeadBroadcaster_BroadcastNewLongestChain(t *testing.T) {
 	g := gomega.NewWithT(t)
 
 	lggr, _ := logger.New()
-	broadcaster := headtracker.NewHeadBroadcaster(lggr)
+	broadcaster := headtracker.NewBroadcaster(lggr)
 
 	err := broadcaster.Start(testutils.Context(t))
 	require.NoError(t, err)
@@ -142,7 +142,7 @@ func TestHeadBroadcaster_TrackableCallbackTimeout(t *testing.T) {
 	t.Parallel()
 
 	lggr, _ := logger.New()
-	broadcaster := headtracker.NewHeadBroadcaster(lggr)
+	broadcaster := headtracker.NewBroadcaster(lggr)
 
 	err := broadcaster.Start(testutils.Context(t))
 	require.NoError(t, err)

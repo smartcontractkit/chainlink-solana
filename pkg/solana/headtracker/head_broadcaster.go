@@ -11,7 +11,7 @@ type headBroadcaster = headtracker.HeadBroadcaster[*types.Head, types.Hash]
 
 var _ commontypes.HeadBroadcaster[*types.Head, types.Hash] = &headBroadcaster{}
 
-func NewHeadBroadcaster(
+func NewBroadcaster(
 	lggr logger.Logger,
 ) *headBroadcaster {
 	return headtracker.NewHeadBroadcaster[*types.Head, types.Hash](lggr)
