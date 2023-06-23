@@ -13,7 +13,7 @@ import (
 
 	htrktypes "github.com/smartcontractkit/chainlink-relay/pkg/headtracker/types"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	headtracker "github.com/smartcontractkit/chainlink-solana/pkg/solana/headtracker/types"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/headtracker/types"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 )
 
@@ -51,8 +51,9 @@ type Writer interface {
 
 var _ ReaderWriter = (*Client)(nil)
 
-var _ htrktypes.Client[*headtracker.Head, *Subscription, headtracker.ChainID, headtracker.Hash] = (*Client)(nil)
+var _ htrktypes.Client[*types.Head, *Subscription, types.ChainID, types.Hash] = (*Client)(nil)
 
+//go:generate mockery --quiet --name Client --output ./mocks/ --case=underscore
 type Client struct {
 	rpc             *rpc.Client
 	skipPreflight   bool // to enable or disable preflight checks
@@ -148,13 +149,13 @@ func (c *Client) ChainID() (string, error) {
 }
 
 // TODO: requires refactor. Do we want to store chainID? how do we want to cache ChainID?
-func (c *Client) ConfiguredChainID() headtracker.ChainID {
+func (c *Client) ConfiguredChainID() types.ChainID {
 	chainID, err := c.ChainID()
 	if err != nil {
 		c.log.Warnf("unable to determine configured chain ID: %v", err)
-		return headtracker.ChainID(headtracker.Localnet)
+		return types.ChainID(types.Localnet)
 	}
-	return headtracker.StringToChainID(chainID)
+	return types.StringToChainID(chainID)
 }
 
 func (c *Client) GetFeeForMessage(msg string) (uint64, error) {
@@ -228,7 +229,7 @@ func (c *Client) SendTx(ctx context.Context, tx *solana.Transaction) (solana.Sig
 	return c.rpc.SendTransactionWithOpts(ctx, tx, opts)
 }
 
-func (c *Client) HeadByNumber(ctx context.Context, number *big.Int) (*headtracker.Head, error) {
+func (c *Client) HeadByNumber(ctx context.Context, number *big.Int) (*types.Head, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
 	block, err := c.GetBlock(ctx, number.Uint64())
@@ -240,7 +241,7 @@ func (c *Client) HeadByNumber(ctx context.Context, number *big.Int) (*headtracke
 	}
 	chainId := c.ConfiguredChainID()
 	// TODO: check if parent head can be linked in the headsaver
-	head := &headtracker.Head{
+	head := &types.Head{
 		Slot:  number.Int64(),
 		Block: *block,
 		ID:    chainId,
@@ -249,7 +250,7 @@ func (c *Client) HeadByNumber(ctx context.Context, number *big.Int) (*headtracke
 }
 
 // SubscribeNewHead polls the RPC endpoint for new blocks.
-func (c *Client) SubscribeNewHead(ctx context.Context, ch chan<- *headtracker.Head) (*Subscription, error) {
+func (c *Client) SubscribeNewHead(ctx context.Context, ch chan<- *types.Head) (*Subscription, error) {
 	subscription := NewSubscription(ctx, c)
 
 	go func() {
@@ -269,7 +270,7 @@ func (c *Client) SubscribeNewHead(ctx context.Context, ch chan<- *headtracker.He
 				}
 
 				// Create a new Head object and send to channel
-				head := &headtracker.Head{
+				head := &types.Head{
 					Slot:  int64(slot),
 					Block: *block,
 					ID:    c.ConfiguredChainID(),

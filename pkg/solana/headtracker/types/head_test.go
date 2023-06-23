@@ -1,58 +1,44 @@
-package types
+package types_test
 
 import (
 	"strconv"
 	"testing"
 
-	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/smartcontractkit/chainlink-solana/pkg/internal/utils"
+	"github.com/smartcontractkit/chainlink-solana/pkg/internal/cltest"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/headtracker/types"
 	"github.com/stretchr/testify/assert"
 )
 
-func configureBlockResult() rpc.GetBlockResult {
-	result := rpc.GetBlockResult{
-		Blockhash:         utils.NewHash(),
-		PreviousBlockhash: utils.NewHash(),
-		ParentSlot:        0,
-		Transactions:      []rpc.TransactionWithMeta{},
-		Signatures:        []solana.Signature{},
-		Rewards:           []rpc.BlockReward{},
-		BlockTime:         nil,
-		BlockHeight:       nil,
-	}
-	return result
-}
-
 func TestHead_NewHead(t *testing.T) {
-	emptyBlockResult := configureBlockResult()
+	emptyBlockResult := cltest.ConfigureBlockResult()
 	t.Parallel()
 
 	tests := []struct {
 		slot     int64
 		block    rpc.GetBlockResult
-		parent   *Head
-		id       ChainID
+		parent   *types.Head
+		id       types.ChainID
 		wantSlot int64
 	}{
 		// with no parent
-		{10, emptyBlockResult, nil, Mainnet, 10},
+		{10, emptyBlockResult, nil, types.Mainnet, 10},
 		// with parent
 		{20, emptyBlockResult,
-			NewHead(10, emptyBlockResult, nil, Mainnet),
-			Mainnet, 20},
+			types.NewHead(10, emptyBlockResult, nil, types.Mainnet),
+			types.Mainnet, 20},
 		{30, emptyBlockResult,
-			NewHead(20, emptyBlockResult,
-				NewHead(10, emptyBlockResult, nil, Mainnet),
-				Mainnet),
-			Mainnet, 30},
+			types.NewHead(20, emptyBlockResult,
+				types.NewHead(10, emptyBlockResult, nil, types.Mainnet),
+				types.Mainnet),
+			types.Mainnet, 30},
 	}
 
 	for _, test := range tests {
 		t.Run(
 			strconv.FormatInt(test.wantSlot, 10), // convert to base 10
 			func(t *testing.T) {
-				head := NewHead(test.slot, test.block, test.parent, test.id)
+				head := types.NewHead(test.slot, test.block, test.parent, test.id)
 				assert.Equal(t, test.wantSlot, head.Slot)
 				assert.Equal(t, test.block, head.Block)
 				assert.Equal(t, test.parent, head.Parent)
@@ -62,62 +48,64 @@ func TestHead_NewHead(t *testing.T) {
 }
 
 func TestHead_ChainLength(t *testing.T) {
-	blockResult := configureBlockResult()
-	id := Mainnet
+	blockResult := cltest.ConfigureBlockResult()
+	id := types.Mainnet
 
-	head := NewHead(0, blockResult, NewHead(0, blockResult, NewHead(0, blockResult, nil, id), id), id)
+	head := types.NewHead(0, blockResult,
+		types.NewHead(0, blockResult,
+			types.NewHead(0, blockResult, nil, id), id), id)
 
 	assert.Equal(t, uint32(3), head.ChainLength())
 
-	var head2 *Head
+	var head2 *types.Head
 	assert.Equal(t, uint32(0), head2.ChainLength())
 }
 
 func TestHead_EarliestHeadInChain(t *testing.T) {
-	blockResult := configureBlockResult()
-	id := Mainnet
+	blockResult := cltest.ConfigureBlockResult()
+	id := types.Mainnet
 
-	head := NewHead(3, blockResult,
-		NewHead(2, blockResult,
-			NewHead(1, blockResult, nil, id), id), id)
+	head := types.NewHead(3, blockResult,
+		types.NewHead(2, blockResult,
+			types.NewHead(1, blockResult, nil, id), id), id)
 
 	assert.Equal(t, int64(1), head.EarliestHeadInChain().BlockNumber())
 }
 
 func TestHead_GetParentHash(t *testing.T) {
-	blockResult := configureBlockResult()
-	id := Mainnet
+	blockResult := cltest.ConfigureBlockResult()
+	id := types.Mainnet
 
-	head := NewHead(3, blockResult,
-		NewHead(2, blockResult,
-			NewHead(1, blockResult, nil, id), id), id)
+	head := types.NewHead(3, blockResult,
+		types.NewHead(2, blockResult,
+			types.NewHead(1, blockResult, nil, id), id), id)
 
 	assert.Equal(t, head.Parent.BlockHash(), head.GetParentHash())
 }
 
 func TestHead_GetParent(t *testing.T) {
-	blockResult := configureBlockResult()
-	id := Mainnet
+	blockResult := cltest.ConfigureBlockResult()
+	id := types.Mainnet
 
-	head := NewHead(3, blockResult,
-		NewHead(2, blockResult,
-			NewHead(1, blockResult, nil, id), id), id)
+	head := types.NewHead(3, blockResult,
+		types.NewHead(2, blockResult,
+			types.NewHead(1, blockResult, nil, id), id), id)
 
 	assert.Equal(t, head.Parent, head.GetParent())
 }
 
 func TestHead_HasChainID(t *testing.T) {
 	t.Parallel()
-	blockResult := configureBlockResult() // Assuming this function creates a mock rpc.GetBlockResult
+	blockResult := cltest.ConfigureBlockResult() // Assuming this function creates a mock rpc.GetBlockResult
 
 	tests := []struct {
 		name    string
-		chainID ChainID
+		chainID types.ChainID
 		want    bool
 	}{
 		{
 			"HasChainID returns true when ChainID is not 'unknown'",
-			Devnet, // replace with correct initialization
+			types.Devnet, // replace with correct initialization
 			true,
 		},
 		{
@@ -129,13 +117,13 @@ func TestHead_HasChainID(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			head := NewHead(0, blockResult, nil, test.chainID)
+			head := types.NewHead(0, blockResult, nil, test.chainID)
 			assert.Equal(t, test.want, head.HasChainID())
 		})
 	}
 
 	t.Run("HasChainID returns false when Head is nil", func(t *testing.T) {
-		var head *Head
+		var head *types.Head
 		assert.False(t, head.HasChainID())
 	})
 }

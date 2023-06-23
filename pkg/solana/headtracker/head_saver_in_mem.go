@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/headtracker/types"
 )
 
-type inMemoryHeadSaver[H htrktypes.Head[BLOCK_HASH, CHAIN_ID], BLOCK_HASH commontypes.Hashable, CHAIN_ID commontypes.ID] struct {
+type InMemoryHeadSaver[H htrktypes.Head[BLOCK_HASH, CHAIN_ID], BLOCK_HASH commontypes.Hashable, CHAIN_ID commontypes.ID] struct {
 	config      htrktypes.Config
 	logger      logger.Logger
 	latestHead  H
@@ -22,7 +22,7 @@ type inMemoryHeadSaver[H htrktypes.Head[BLOCK_HASH, CHAIN_ID], BLOCK_HASH common
 	setParent   func(H, H)
 }
 
-type HeadSaver = inMemoryHeadSaver[*types.Head, types.Hash, types.ChainID]
+type HeadSaver = InMemoryHeadSaver[*types.Head, types.Hash, types.ChainID]
 
 var _ commontypes.HeadSaver[*types.Head, types.Hash] = (*HeadSaver)(nil)
 
@@ -34,8 +34,8 @@ func NewInMemoryHeadSaver[
 	lggr logger.Logger,
 	getNilHead func() H,
 	setParent func(H, H),
-) *inMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID] {
-	return &inMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]{
+) *InMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID] {
+	return &InMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]{
 		config:      config,
 		logger:      logger.Named(lggr, "InMemoryHeadSaver"),
 		Heads:       make(map[BLOCK_HASH]H),
@@ -55,7 +55,7 @@ func NewHeadSaver(config htrktypes.Config, lggr logger.Logger) *HeadSaver {
 	)
 }
 
-func (hs *inMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) Save(ctx context.Context, head H) error {
+func (hs *InMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) Save(ctx context.Context, head H) error {
 	if !head.IsValid() {
 		return errors.New("invalid head passed to Save method of InMemoryHeadSaver")
 	}
@@ -67,11 +67,11 @@ func (hs *inMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) Save(ctx context.Context, 
 }
 
 // No OP function for Solana
-func (hs *inMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) Load(ctx context.Context) (H, error) {
+func (hs *InMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) Load(ctx context.Context) (H, error) {
 	return hs.LatestChain(), nil
 }
 
-func (hs *inMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) LatestChain() H {
+func (hs *InMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) LatestChain() H {
 	head := hs.getLatestHead()
 
 	if head.ChainLength() < hs.config.FinalityDepth() {
@@ -80,7 +80,7 @@ func (hs *inMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) LatestChain() H {
 	return head
 }
 
-func (hs *inMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) Chain(blockHash BLOCK_HASH) H {
+func (hs *InMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) Chain(blockHash BLOCK_HASH) H {
 	hs.mu.RLock()
 	defer hs.mu.RUnlock()
 
@@ -91,7 +91,7 @@ func (hs *inMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) Chain(blockHash BLOCK_HASH
 	return hs.getNilHead()
 }
 
-func (hs *inMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) HeadByNumber(blockNumber int64) []H {
+func (hs *InMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) HeadByNumber(blockNumber int64) []H {
 	hs.mu.RLock()
 	defer hs.mu.RUnlock()
 
@@ -99,7 +99,7 @@ func (hs *inMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) HeadByNumber(blockNumber i
 }
 
 // Assembles the heads together and populates the Heads Map
-func (hs *inMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) AddHeads(historyDepth int64, newHeads ...H) {
+func (hs *InMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) AddHeads(historyDepth int64, newHeads ...H) {
 	hs.mu.Lock()
 	defer hs.mu.Unlock()
 
@@ -131,7 +131,7 @@ func (hs *inMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) AddHeads(historyDepth int6
 	}
 }
 
-func (hs *inMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) TrimOldHeads(historyDepth int64) {
+func (hs *InMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) TrimOldHeads(historyDepth int64) {
 	hs.mu.Lock()
 	defer hs.mu.Unlock()
 
@@ -140,7 +140,7 @@ func (hs *inMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) TrimOldHeads(historyDepth 
 
 // trimHeads() is should only be called by functions with mutex locking.
 // trimHeads() is an internal function without locking to prevent deadlocks
-func (hs *inMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) trimHeads(historyDepth int64) {
+func (hs *InMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) trimHeads(historyDepth int64) {
 	for headNumber, headNumberList := range hs.HeadsNumber {
 		if hs.latestHead.BlockNumber()-headNumber > historyDepth {
 			for _, head := range headNumberList {
@@ -152,7 +152,7 @@ func (hs *inMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) trimHeads(historyDepth int
 	}
 }
 
-func (hs *inMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) getLatestHead() H {
+func (hs *InMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) getLatestHead() H {
 	hs.mu.RLock()
 	defer hs.mu.RUnlock()
 
