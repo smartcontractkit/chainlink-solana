@@ -8,8 +8,8 @@ on:
         required: true
         default: develop
         type: string
-schedule:
-  - cron: '0 12 * * *'
+  schedule:
+    - cron: '0 12 * * *'
 env:
   CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
   ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-solana-tests:${{ github.sha }}
