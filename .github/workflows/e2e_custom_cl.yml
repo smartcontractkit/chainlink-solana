@@ -140,9 +140,9 @@ jobs:
         id: set_job_name
         run: |
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            echo "job_name=Scheduled E2E Custom Run Smoke Tests" >> $GITHUB_ENV
+            echo "job_name='Simulated E2E Custom Run Smoke Tests'" >> $GITHUB_ENV
           else
-            echo "job_name=E2E Custom Run Smoke Tests" >> $GITHUB_ENV
+            echo "job_name='E2E Custom Run Smoke Tests'" >> $GITHUB_ENV
           fi
 
   e2e_custom_run_smoke_tests:
