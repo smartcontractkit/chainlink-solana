@@ -131,7 +131,7 @@ jobs:
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
 
-  setup_job_name:
+  setup:
     runs-on: ubuntu-latest
     outputs:
       job_name: ${{ steps.set_job_name.outputs.job_name }}
@@ -140,10 +140,11 @@ jobs:
         id: set_job_name
         run: |
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            echo "::set-output name=job_name::Scheduled E2E Custom Run Smoke Tests"
+            echo "job_name=Scheduled E2E Custom Run Smoke Tests" >> $GITHUB_ENV
           else
-            echo "::set-output name=job_name::E2E Custom Run Smoke Tests"
+            echo "job_name=E2E Custom Run Smoke Tests" >> $GITHUB_ENV
           fi
+
   e2e_custom_run_smoke_tests:
     name: ${{ needs.setup.outputs.job_name }}
     environment: integration
