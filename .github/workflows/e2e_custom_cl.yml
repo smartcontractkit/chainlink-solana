@@ -8,7 +8,8 @@ on:
         required: true
         default: develop
         type: string
-
+schedule:
+  - cron: '0 11 45 * *'
 env:
   CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
   ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-solana-tests:${{ github.sha }}
@@ -131,7 +132,7 @@ jobs:
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
 
   e2e_custom_run_smoke_tests:
-    name: E2E Custom Run Smoke Tests
+    name: ${{ github.event_name == 'schedule' ? 'Scheduled E2E Custom Run Smoke Tests' : 'E2E Custom Run Smoke Tests' }}
     environment: integration
     permissions:
       checks: write
