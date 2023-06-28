@@ -131,23 +131,8 @@ jobs:
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
 
-
-  setup:
-    runs-on: ubuntu-latest
-    outputs:
-      job_name: ${{ steps.set_job_name.outputs.job_name }}
-    steps:
-      - name: Set job name
-        id: set_job_name
-        run: |
-          if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            echo "job_name='Simulated E2E Custom Run Smoke Tests'" >> $GITHUB_ENV
-          else
-            echo "job_name='E2E Custom Run Smoke Tests'" >> $GITHUB_ENV
-          fi
-
   e2e_custom_run_smoke_tests:
-    name: ${{ needs.setup.outputs.job_name }}
+    name: E2E Custom Run Smoke Tests
     environment: integration
     permissions:
       checks: write
@@ -155,7 +140,8 @@ jobs:
       id-token: write
       contents: read
     runs-on: ubuntu-latest
-    needs: [setup, e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image, build_test_image]
+
+    needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image, build_test_image]
     env:
       TEST_SUITE: smoke
       TEST_ARGS: -test.timeout 30m
@@ -164,6 +150,13 @@ jobs:
       TEST_LOG_LEVEL: debug
       SELECTED_NETWORKS: SIMULATED
     steps:
+      - name: Display dynamic job name
+        run: |
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo "Running job: Scheduled E2E Custom Run Smoke Tests"
+          else
+            echo "Running job: E2E Custom Run Smoke Tests"
+          fi
       - name: Collect Metrics
         if: always()
         id: collect-gha-metrics
