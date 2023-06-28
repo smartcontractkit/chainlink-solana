@@ -132,7 +132,7 @@ jobs:
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
 
   e2e_custom_run_smoke_tests:
-    name: E2E Custom Run Smoke Tests
+    name: E2E Run Smoke Tests
     environment: integration
     permissions:
       checks: write
