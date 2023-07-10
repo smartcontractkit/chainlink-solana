@@ -21,16 +21,6 @@ import (
 )
 
 func Test_HeadListener_HappyPath(t *testing.T) {
-	// Logic:
-	// - spawn a listener instance
-	// - mock SubscribeNewHead/Err/Unsubscribe to track these calls
-	// - send 3 heads
-	// - ask listener to stop
-	// Asserts:
-	// - check Connected()/ReceivingHeads() are updated
-	// - 3 heads is passed to callback
-	// - ethClient methods are invoked
-
 	lggr, _ := logger.New()
 	client := cltest.NewClientMockWithDefaultChain(t)
 	cfg := headtracker.NewConfig()
@@ -83,11 +73,6 @@ func Test_HeadListener_HappyPath(t *testing.T) {
 }
 
 func Test_HeadListener_NotReceivingHeads(t *testing.T) {
-	// Logic:
-	// - same as Test_HeadListener_HappyPath, but
-	// - send one head, make sure ReceivingHeads() is true
-	// - do not send any heads within BlockEmissionIdleWarningThreshold and check ReceivingHeads() is false
-
 	lggr, _ := logger.New()
 	client := cltest.NewClientMockWithDefaultChain(t)
 	cfg := headtracker.NewConfig()
@@ -118,7 +103,7 @@ func Test_HeadListener_NotReceivingHeads(t *testing.T) {
 		unsubscribeAwaiter.ItHappened()
 		close(chHeads)
 		close(chErr)
-	}) // TODO: Fix error here
+	})
 
 	doneAwaiter := cltest.NewAwaiter()
 	done := func() {
@@ -235,7 +220,6 @@ func Test_HeadListener_SubscriptionErr(t *testing.T) {
 			// Second call to unsubscribe on close
 			sub2.On("Unsubscribe").Once().Run(func(_ mock.Arguments) {
 				close(headsCh2)
-				// geth guarantees that Unsubscribe closes the errors channel
 				close(chSubErrTest2)
 			})
 			close(chStop)
