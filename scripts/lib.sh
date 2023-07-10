@@ -10,9 +10,9 @@ old_store=`cat "${BASH_SOURCE%/*}/../contracts/programs/store/src/lib.rs" | grep
 old_ocr2=`cat "${BASH_SOURCE%/*}/../contracts/programs/ocr2/src/lib.rs" | grep -E -e 'declare_id\!\(\"[a-zA-Z0-9]+\"\)' | grep -o '".*"' | tr -d '"' | head -1`
 
   # Replace existing declare_id!()
-  sed -i '' -e "s/$old_ac/$ac/" "${BASH_SOURCE%/*}/../contracts/programs/access-controller/src/lib.rs"
-  sed -i '' -e  "s/$old_store/$store/" "${BASH_SOURCE%/*}/../contracts/programs/store/src/lib.rs"
-  sed -i '' -e  "s/$old_ocr2/$ocr2/" "${BASH_SOURCE%/*}/../contracts/programs/ocr2/src/lib.rs"
+  sed -i "s/$old_ac/$ac/" "${BASH_SOURCE%/*}/../contracts/programs/access-controller/src/lib.rs"
+  sed -i "s/$old_store/$store/" "${BASH_SOURCE%/*}/../contracts/programs/store/src/lib.rs"
+  sed -i "s/$old_ocr2/$ocr2/" "${BASH_SOURCE%/*}/../contracts/programs/ocr2/src/lib.rs"
 }
 
 function build {
