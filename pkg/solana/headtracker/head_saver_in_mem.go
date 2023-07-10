@@ -46,7 +46,7 @@ func NewInMemoryHeadSaver[
 }
 
 // Creates a new In Memory HeadSaver for solana
-func NewHeadSaver(config htrktypes.Config, lggr logger.Logger) *HeadSaver {
+func NewSaver(config htrktypes.Config, lggr logger.Logger) *HeadSaver {
 	return NewInMemoryHeadSaver[*types.Head, types.Hash, types.ChainID](
 		config,
 		lggr,

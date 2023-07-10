@@ -14,7 +14,7 @@ import (
 func configureInMemorySaver(t *testing.T) *headtracker.HeadSaver {
 	htCfg := headtracker.NewConfig()
 	lggr, _ := logger.New()
-	return headtracker.NewHeadSaver(htCfg, lggr)
+	return headtracker.NewSaver(htCfg, lggr)
 }
 
 func TestInMemoryHeadSaver_Save(t *testing.T) {

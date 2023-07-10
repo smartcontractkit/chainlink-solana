@@ -60,7 +60,7 @@ func TestHeadBroadcaster_Subscribe(t *testing.T) {
 	checker2 := &cltest.MockHeadTrackable{}
 
 	hb := headtracker.NewBroadcaster(lggr)
-	hs := headtracker.NewHeadSaver(cfg, lggr)
+	hs := headtracker.NewSaver(cfg, lggr)
 	mailMon := utils.NewMailboxMonitor(t.Name())
 	ht := headtracker.NewTracker(lggr, client, cfg, hb, hs, mailMon)
 
