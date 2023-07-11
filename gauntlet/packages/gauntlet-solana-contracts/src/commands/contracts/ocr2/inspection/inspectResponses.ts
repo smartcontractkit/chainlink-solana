@@ -199,7 +199,9 @@ export default class OCR2InspectResponses extends SolanaCommand {
     const successfulInspection = inspection.inspect(inspections)
 
     return {
-      data:   transmissionDetails,
+      data: {
+        latestTransmissions: transmissionDetails
+      },
       responses: [
         {
           tx: this.wrapInspectResponse(successfulInspection, state.toString()),

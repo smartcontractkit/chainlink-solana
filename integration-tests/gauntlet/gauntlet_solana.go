@@ -67,8 +67,16 @@ type GauntletResponse struct {
 		Contract string `json:"contract"`
 	} `json:"responses"`
 	Data struct {
-		Proposal string `json:"proposal"`
+		Proposal            *string         `json:"proposal,omitempty"`
+		LatestTransmissions *[]Transmission `json:"latestTransmissions,omitempty"`
 	}
+}
+
+type Transmission struct {
+	LatestTransmissionNo int64  `json:"latestTransmissionNo"`
+	RoundId              int64  `json:"roundId"`
+	Answer               int64  `json:"answer"`
+	Transmitter          string `json:"transmitter"`
 }
 
 // NewSolanaGauntlet Creates a default gauntlet config
@@ -265,7 +273,7 @@ func (sg *SolanaGauntlet) OCR2CreateProposal(version int) (string, error) {
 		return "", err
 	}
 
-	return sg.gr.Data.Proposal, nil
+	return *sg.gr.Data.Proposal, nil
 }
 
 func (sg *SolanaGauntlet) ProposeOnChainConfig(proposalId string, onChainConfig common.OCR2OnChainConfig, ocrFeedAddress string) (string, error) {
@@ -392,8 +400,24 @@ func (sg *SolanaGauntlet) AcceptProposal(proposalId string, secret string, propo
 	return sg.gr.Responses[0].Contract, nil
 }
 
-func (sg *SolanaGauntlet) DeployStoreProgramID() {
+// FetchTransmissions returns the last 10 transmissions
+func (sg *SolanaGauntlet) FetchTransmissions(ocrState string) ([]Transmission, error) {
+	_, err := sg.G.ExecCommand([]string{
+		"ocr2:inspect:responses",
+		ocrState,
+	},
+		*sg.options,
+	)
 
+	if err != nil {
+		return nil, err
+	}
+	sg.gr, err = sg.FetchGauntletJsonOutput()
+	if err != nil {
+		return nil, err
+	}
+
+	return *sg.gr.Data.LatestTransmissions, nil
 }
 
 func (sg *SolanaGauntlet) DeployOCR2() (string, error) {

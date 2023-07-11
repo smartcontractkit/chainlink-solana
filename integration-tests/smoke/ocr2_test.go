@@ -5,6 +5,7 @@ import (
 	"github.com/lib/pq"
 	uuid "github.com/satori/go.uuid"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
+	ctfUtils "github.com/smartcontractkit/chainlink-testing-framework/utils"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
@@ -171,5 +172,12 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 		}
 		_, _, err = node.CreateJob(jobSpec)
 		require.NoError(t, err)
+		l := ctfUtils.GetTestLogger(t)
+		for i := 1; i < 100; i++ {
+			transmissions, err := sg.FetchTransmissions(sg.OcrAddress)
+			require.NoError(t, err)
+			l.Debug().Str("Contract", sg.OcrAddress).Interface("Answer", transmissions[0].Answer).Int64("RoundID", transmissions[0].RoundId).Msg("New answer found")
+			time.Sleep(time.Second * 5)
+		}
 	}
 }
