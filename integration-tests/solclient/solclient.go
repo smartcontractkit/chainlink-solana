@@ -2,6 +2,7 @@ package solclient
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"math/big"
@@ -17,8 +18,10 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
+	confirm "github.com/gagliardetto/solana-go/rpc/sendAndConfirmTransaction"
 	"github.com/gagliardetto/solana-go/rpc/ws"
 	"github.com/gagliardetto/solana-go/text"
+
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 )
@@ -484,4 +487,65 @@ func (c *Client) GasStats() *blockchain.GasStats {
 
 func (c *Client) AddHeaderEventSubscription(key string, subscriber blockchain.HeaderEventSubscription) {
 	panic("implement me")
+}
+
+func SendFunds(senderPrivateKey string, receiverPublicKey string, lamports uint64, rpcClient *rpc.Client, wsClient *ws.Client) error {
+
+	// Convert the private key string to a byte slice
+	var privateKeyBytes []byte
+	err := json.Unmarshal([]byte(senderPrivateKey), &privateKeyBytes)
+	if err != nil {
+		return err
+	}
+
+	accountFrom := solana.PrivateKey(privateKeyBytes)
+	accountTo := solana.MustPublicKeyFromBase58(receiverPublicKey)
+
+	// Get recent blockhash
+	recent, err := rpcClient.GetRecentBlockhash(context.Background(), rpc.CommitmentFinalized)
+	if err != nil {
+		return err
+	}
+
+	// Create a transfer transaction
+	tx, err := solana.NewTransaction(
+		[]solana.Instruction{
+			system.NewTransferInstruction(
+				lamports,
+				accountFrom.PublicKey(),
+				accountTo,
+			).Build(),
+		},
+		recent.Value.Blockhash,
+		solana.TransactionPayer(accountFrom.PublicKey()),
+	)
+	if err != nil {
+		return err
+	}
+
+	// Sign the transaction
+	_, err = tx.Sign(
+		func(key solana.PublicKey) *solana.PrivateKey {
+			if accountFrom.PublicKey().Equals(key) {
+				return &accountFrom
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	// Send transaction, and wait for confirmation:
+	_, err = confirm.SendAndConfirmTransaction(
+		context.Background(),
+		rpcClient,
+		wsClient,
+		tx,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

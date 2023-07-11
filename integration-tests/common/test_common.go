@@ -537,6 +537,11 @@ func (m *OCRv2TestState) ConfigureGauntlet(secret string) map[string]string {
 	if !exists {
 		panic("Please define RPC_URL")
 	}
+
+	wsUrl, exists := os.LookupEnv("WS_URL")
+	if !exists {
+		panic("Please define WS_URL")
+	}
 	privateKey, exists := os.LookupEnv("PRIVATE_KEY")
 	if !exists {
 		panic("Please define PRIVATE_KEY")
@@ -568,6 +573,7 @@ func (m *OCRv2TestState) ConfigureGauntlet(secret string) map[string]string {
 
 	return map[string]string{
 		"NODE_URL":                     rpcUrl,
+		"WS_URL":                       wsUrl,
 		"PRIVATE_KEY":                  privateKey,
 		"PROGRAM_ID_OCR2":              programIdOCR2,
 		"PROGRAM_ID_ACCESS_CONTROLLER": programIdAccessController,

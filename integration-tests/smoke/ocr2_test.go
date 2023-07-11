@@ -1,14 +1,19 @@
 package smoke
 
 import (
+	"context"
 	"fmt"
+	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/gagliardetto/solana-go/rpc/ws"
 	"github.com/lib/pq"
 	uuid "github.com/satori/go.uuid"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	ctfUtils "github.com/smartcontractkit/chainlink-testing-framework/utils"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
+	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v4"
 	"sort"
 	"testing"
@@ -32,7 +37,6 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 
 func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	secret := "this is an testing only secret"
-
 	state := common.NewOCRv2State(t, 1, "gauntlet", "devnet")
 	sg, err := gauntlet.NewSolanaGauntlet(fmt.Sprintf("%s/gauntlet", utils.ProjectRoot))
 
@@ -46,6 +50,10 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	gauntletConfig := state.ConfigureGauntlet(secret)
 	err = sg.SetupNetwork(gauntletConfig)
 	require.NoError(t, err, "Error setting gauntlet network")
+
+	// Setting up RPC
+	c := rpc.New(gauntletConfig["NODE_URL"])
+	wsc, err := ws.Connect(context.Background(), gauntletConfig["WS_URL"])
 
 	_, err = sg.DeployOCR2()
 	require.NoError(t, err, "Error deploying OCR")
@@ -141,11 +149,16 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	_, err = state.ChainlinkNodes[0].MustCreateJob(jobSpec)
 	require.NoError(t, err)
 
+	// TODO - This needs to be decoupled into one method as in common.go
+	// TODO - The current setup in common.go is using the solana validator, so we need to create one method for both gauntlet and solana
+	// Leaving this for the time being as is so we have Testnet runs enabled on Solana
 	for nIdx, node := range state.ChainlinkNodes {
 		// Skipping bootstrap
 		if nIdx == 0 {
 			continue
 		}
+		err = solclient.SendFunds(gauntletConfig["PRIVATE_KEY"], state.NodeKeysBundle[nIdx].TXKey.Data.ID, 100000000, c, wsc)
+		require.NoError(t, err, "Error sending Funds")
 		sourceValueBridge := client.BridgeTypeAttributes{
 			Name:        "mockserver-bridge",
 			URL:         fmt.Sprintf("%s/%s", state.MockServer.Config.ClusterURL, "juels"),
@@ -170,14 +183,23 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 				PluginConfig:                      common.PluginConfigToTomlFormat(observationSource),
 			},
 		}
-		_, _, err = node.CreateJob(jobSpec)
+		_, err = node.MustCreateJob(jobSpec)
 		require.NoError(t, err)
-		l := ctfUtils.GetTestLogger(t)
-		for i := 1; i < 100; i++ {
-			transmissions, err := sg.FetchTransmissions(sg.OcrAddress)
-			require.NoError(t, err)
-			l.Debug().Str("Contract", sg.OcrAddress).Interface("Answer", transmissions[0].Answer).Int64("RoundID", transmissions[0].RoundId).Msg("New answer found")
-			time.Sleep(time.Second * 5)
+
+	}
+
+	// Test start
+	l := ctfUtils.GetTestLogger(t)
+	for i := 1; i < 10; i++ {
+		transmissions, err := sg.FetchTransmissions(sg.OcrAddress)
+		require.NoError(t, err)
+		if len(transmissions) <= 1 {
+			l.Info().Str("Contract", sg.OcrAddress).Str("No", "Transmissions")
+		} else {
+			l.Info().Str("Contract", sg.OcrAddress).Interface("Answer", transmissions[0].Answer).Int64("RoundID", transmissions[0].RoundId).Msg("New answer found")
+			assert.Equal(t, transmissions[0].Answer, int64(1), fmt.Sprintf("Actual: %d, Expected: 1", transmissions[0].Answer))
+			assert.Less(t, transmissions[1].RoundId, transmissions[0].RoundId, fmt.Sprintf("Expected round %d to be less than %d", transmissions[1].RoundId, transmissions[0].RoundId))
 		}
+		time.Sleep(time.Second * 6)
 	}
 }
