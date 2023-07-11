@@ -3,6 +3,7 @@ package headtracker_test
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/big"
 	"sync"
 	"testing"
@@ -35,9 +36,19 @@ func firstHead(
 		*types.Head,
 		types.Hash,
 		types.ChainID,
-	]) (h types.Head) {
+	]) (h *types.Head) {
 
-	return h
+	// Get all the Heads in the HeadSaver and find the one with lowest block number
+	// Iterate over HeadsNumber
+	// HeadsNumber is a map[int64][]H
+	lowestBlockNumber := int64(math.MaxInt64)
+	for blockNumber := range hs.HeadsNumber {
+		if blockNumber < lowestBlockNumber {
+			lowestBlockNumber = blockNumber
+		}
+	}
+
+	return hs.HeadsNumber[lowestBlockNumber][0]
 }
 
 func TestHeadTracker_New(t *testing.T) {
@@ -74,44 +85,31 @@ func TestHeadTracker_Save_InsertsAndTrimsTable(t *testing.T) {
 
 	client := cltest.NewClientMockWithDefaultChain(t)
 
-	var parentHead *types.Head
-
-	for idx := 0; idx < 5; idx++ {
+	// Generate 200 consecutive heads
+	for idx := 0; idx < 200; idx++ {
 		idxHead := cltest.Head(idx)
+		parentHead := headSaver.LatestChain()
 
 		if parentHead != nil {
 			idxHead.Parent = parentHead
 		}
 		parentHead = idxHead
-		fmt.Println("parentHead", idxHead.Parent)
-
 		assert.Nil(t, headSaver.Save(testutils.Context(t), idxHead))
 	}
 
 	ht := createHeadTracker(t, headtracker.NewConfig(), client, headSaver)
 
 	h := cltest.Head(200)
+	h.Parent = headSaver.LatestChain()
 	require.NoError(t, ht.headSaver.Save(testutils.Context(t), h))
 	assert.Equal(t, int64(200), ht.headSaver.LatestChain().BlockNumber())
 
-	// Recursively get the parent of the head until we reach the first head
-	var firstHead *types.Head
+	firstHead := firstHead(t, headSaver)
 
-	for {
-		// print h.Parent
-		fmt.Println("h.Parent", h.Parent)
-		if h.Parent == nil {
-			firstHead = h
-			break
-		}
-		h = h.Parent
-	}
+	assert.Equal(t, int64(100), firstHead.BlockNumber())
 
-	assert.Equal(t, int64(101), firstHead.BlockNumber())
-
-	// lastHead, err := orm.LatestHead(testutils.Context(t))
-	// require.NoError(t, err)
-	// assert.Equal(t, int64(200), lastHead.Number)
+	lastHead := headSaver.LatestChain()
+	assert.Equal(t, int64(200), lastHead.BlockNumber())
 }
 
 // func TestHeadTracker_Get(t *testing.T) {
