@@ -2,13 +2,23 @@ package testutils
 
 import (
 	"context"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+
+	clientmocks "github.com/smartcontractkit/chainlink-relay/pkg/headtracker/types/mocks"
+	commontypes "github.com/smartcontractkit/chainlink-relay/pkg/types"
+	commonmocks "github.com/smartcontractkit/chainlink-relay/pkg/types/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/headtracker"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/headtracker/types"
 )
 
-// TODO: These can prob refactor to chainlink internal testutils
+// TODO: These can refactor to chainlink internal testutils
+
+// Chain Agnostic Test Utils
 
 // Context returns a context with the test's deadline, if available.
 func Context(tb testing.TB) context.Context {
@@ -49,4 +59,53 @@ const TestInterval = 100 * time.Millisecond
 func NewHeadtrackerConfig(config *headtracker.Config, overrideFn func(*headtracker.Config)) *headtracker.Config {
 	overrideFn(config)
 	return config
+}
+
+type MockChain struct {
+	Client *clientmocks.Client[
+		*types.Head,
+		commontypes.Subscription,
+		types.ChainID,
+		types.Hash]
+
+	CheckFilterLogs  func(int64, int64)
+	subsMu           sync.RWMutex
+	subs             []*commonmocks.Subscription
+	errChs           []chan error
+	subscribeCalls   atomic.Int32
+	unsubscribeCalls atomic.Int32
+}
+
+func (m *MockChain) SubscribeCallCount() int32 {
+	return m.subscribeCalls.Load()
+}
+
+func (m *MockChain) UnsubscribeCallCount() int32 {
+	return m.unsubscribeCalls.Load()
+}
+
+func (m *MockChain) NewSub(t *testing.T) commontypes.Subscription {
+	m.subscribeCalls.Add(1)
+	sub := commonmocks.NewSubscription(t)
+	errCh := make(chan error)
+	sub.On("Err").
+		Return(func() <-chan error { return errCh }).Maybe()
+	sub.On("Unsubscribe").
+		Run(func(mock.Arguments) {
+			m.unsubscribeCalls.Add(1)
+			close(errCh)
+		}).Return().Maybe()
+	m.subsMu.Lock()
+	m.subs = append(m.subs, sub)
+	m.errChs = append(m.errChs, errCh)
+	m.subsMu.Unlock()
+	return sub
+}
+
+func (m *MockChain) SubsErr(err error) {
+	m.subsMu.Lock()
+	defer m.subsMu.Unlock()
+	for _, errCh := range m.errChs {
+		errCh <- err
+	}
 }
