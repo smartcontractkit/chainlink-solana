@@ -151,14 +151,12 @@ export default class OCR2InspectResponses extends SolanaCommand {
     ${event.observerCount}/${transmitters.length} oracles are responding
   `,
       )
-      transmissionDetails.push(
-          {
-            latestTransmissionNo: i + 1,
-            roundId: event.roundId,
-            answer: parseInt(event.answer.toString(), 2),
-            transmitter: transmitters[event.transmitter].toString()
-          }
-      )
+      transmissionDetails.push({
+        latestTransmissionNo: i + 1,
+        roundId: event.roundId,
+        answer: parseInt(event.answer.toString(), 2),
+        transmitter: transmitters[event.transmitter].toString(),
+      })
       // Log oracles that are not responsive
       var notResponding: number = 0
       transmitters.forEach((transmitter) => {
@@ -200,12 +198,12 @@ export default class OCR2InspectResponses extends SolanaCommand {
 
     return {
       data: {
-        latestTransmissions: transmissionDetails
+        latestTransmissions: transmissionDetails,
       },
       responses: [
         {
           tx: this.wrapInspectResponse(successfulInspection, state.toString()),
-          contract: state.toString()
+          contract: state.toString(),
         },
       ],
     } as Result<TransactionResponse>
