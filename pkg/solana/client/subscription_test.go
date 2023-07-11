@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -67,7 +66,6 @@ func TestSubscription_Unsubscribe(t *testing.T) {
 		select {
 		// Success
 		case <-subscription.ctx.Done():
-			fmt.Println("Context is done")
 			return
 		case <-time.After(100 * time.Millisecond):
 			t.Fatal("Expected context to be done")

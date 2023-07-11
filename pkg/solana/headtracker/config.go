@@ -65,3 +65,7 @@ func (c *Config) HeadTrackerSamplingInterval() time.Duration {
 func (c *Config) PollingInterval() time.Duration {
 	return c.Defaults.PollingInterval
 }
+
+func (c *Config) SetHeadTrackerSamplingInterval(d time.Duration) {
+	c.Defaults.HeadTrackerSamplingInterval = d
+}

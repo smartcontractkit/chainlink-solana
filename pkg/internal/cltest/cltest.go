@@ -56,8 +56,8 @@ func getParentSlot(blockHeight uint64) uint64 {
 
 func getBlock(blockHeight, parentSlot uint64, time solana.UnixTimeSeconds) rpc.GetBlockResult {
 	return rpc.GetBlockResult{
-		Blockhash:         utils.NewHash(),
-		PreviousBlockhash: utils.NewHash(),
+		Blockhash:         utils.NewSolanaHash(),
+		PreviousBlockhash: utils.NewSolanaHash(),
 		ParentSlot:        parentSlot,
 		Transactions:      nil,
 		Rewards:           nil,
@@ -77,6 +77,97 @@ func createHead(val interface{}, blockHeight uint64, block rpc.GetBlockResult, c
 	default:
 		panic(fmt.Sprintf("Could not convert %v of type %T to Head", val, val))
 	}
+}
+
+// Blocks - a helper logic to construct a range of linked heads
+// and an ability to fork and create logs from them
+type Blocks struct {
+	t       *testing.T
+	Hashes  []types.Hash
+	mHashes map[int64]types.Hash
+	Heads   map[int64]*types.Head
+}
+
+func (b *Blocks) Head(number uint64) *types.Head {
+	return b.Heads[int64(number)]
+}
+
+func NewBlocks(t *testing.T, numHashes int) *Blocks {
+	hashes := make([]types.Hash, 0)
+	heads := make(map[int64]*types.Head)
+	for i := int64(0); i < int64(numHashes); i++ {
+		hash := utils.NewHash()
+		hashes = append(hashes, hash)
+
+		heads[i] = Head(i)
+		if i > 0 {
+			parent := heads[i-1]
+			heads[i].Parent = parent
+		}
+	}
+
+	hashesMap := make(map[int64]types.Hash)
+	for i := 0; i < len(hashes); i++ {
+		hashesMap[int64(i)] = hashes[i]
+	}
+
+	return &Blocks{
+		t:       t,
+		Hashes:  hashes,
+		mHashes: hashesMap,
+		Heads:   heads,
+	}
+}
+
+func (b *Blocks) NewHead(number uint64) *types.Head {
+	parentNumber := number - 1
+	parent, ok := b.Heads[int64(parentNumber)]
+	if !ok {
+		b.t.Fatalf("Can't find parent block at index: %v", parentNumber)
+	}
+
+	head := Head(number)
+	head.Parent = parent
+
+	return head
+}
+
+func (b *Blocks) ForkAt(t *testing.T, blockNum int64, numHashes int) *Blocks {
+	forked := NewBlocks(t, len(b.Heads)+numHashes)
+	if _, exists := forked.Heads[blockNum]; !exists {
+		t.Fatalf("Not enough length for block num: %v", blockNum)
+	}
+
+	for i := int64(0); i < blockNum; i++ {
+		forked.Heads[i] = b.Heads[i]
+	}
+
+	forked.Heads[blockNum].Parent = b.Heads[blockNum].Parent
+	return forked
+}
+
+// HeadBuffer - stores heads in sequence, with increasing timestamps
+type HeadBuffer struct {
+	t     *testing.T
+	Heads []*types.Head
+}
+
+func NewHeadBuffer(t *testing.T) *HeadBuffer {
+	return &HeadBuffer{
+		t:     t,
+		Heads: make([]*types.Head, 0),
+	}
+}
+
+func (hb *HeadBuffer) Append(head *types.Head) {
+	// Create a copy of the head, so that we can modify it
+	cloned := &types.Head{
+		Slot:   head.Slot,
+		Block:  head.Block,
+		Parent: head.Parent,
+		ID:     head.ID,
+	}
+	hb.Heads = append(hb.Heads, cloned)
 }
 
 // MockHeadTrackable allows you to mock HeadTrackable
@@ -151,8 +242,8 @@ func NewClientMockWithDefaultChain(t *testing.T) *clientmocks.Client[
 
 func ConfigureBlockResult() rpc.GetBlockResult {
 	result := rpc.GetBlockResult{
-		Blockhash:         utils.NewHash(),
-		PreviousBlockhash: utils.NewHash(),
+		Blockhash:         utils.NewSolanaHash(),
+		PreviousBlockhash: utils.NewSolanaHash(),
 		ParentSlot:        0,
 		Transactions:      []rpc.TransactionWithMeta{},
 		Signatures:        []solana.Signature{},

@@ -240,7 +240,6 @@ func (c *Client) HeadByNumber(ctx context.Context, number *big.Int) (*types.Head
 		return nil, errors.New("invalid block in HeadByNumber")
 	}
 	chainId := c.ConfiguredChainID()
-	// TODO: check if parent head can be linked in the headsaver
 	head := &types.Head{
 		Slot:  number.Int64(),
 		Block: *block,

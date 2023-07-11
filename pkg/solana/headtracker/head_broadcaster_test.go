@@ -90,9 +90,8 @@ func TestHeadBroadcaster_Subscribe(t *testing.T) {
 	unsubscribe1()
 
 	headers <- secondHead
-	// sleep for 3 seconds
-	time.Sleep(3 * time.Second)
-	g.Eventually(checker2.OnNewLongestChainCount).Should(gomega.Equal(int32(1))) // TODO: Fix this test
+	g.SetDefaultEventuallyTimeout(2 * time.Second)
+	g.Eventually(checker2.OnNewLongestChainCount).Should(gomega.Equal(int32(1)))
 }
 
 func TestHeadBroadcaster_BroadcastNewLongestChain(t *testing.T) {

@@ -109,3 +109,23 @@ func (m *MockChain) SubsErr(err error) {
 		errCh <- err
 	}
 }
+
+type RawSub[T any] struct {
+	ch  chan<- T
+	err <-chan error
+}
+
+func NewRawSub[T any](ch chan<- T, err <-chan error) RawSub[T] {
+	return RawSub[T]{ch: ch, err: err}
+}
+
+func (r *RawSub[T]) CloseCh() {
+	close(r.ch)
+}
+
+func (r *RawSub[T]) TrySend(t T) {
+	select {
+	case <-r.err:
+	case r.ch <- t:
+	}
+}

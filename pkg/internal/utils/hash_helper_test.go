@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewHash(t *testing.T) {
+func TestNewSolanaHash(t *testing.T) {
 	t.Parallel()
 
-	h1 := utils.NewHash()
-	h2 := utils.NewHash()
+	h1 := utils.NewSolanaHash()
+	h2 := utils.NewSolanaHash()
 	// Check that the two hashes are not the same.
 	assert.NotEqual(t, h1, h2)
 
