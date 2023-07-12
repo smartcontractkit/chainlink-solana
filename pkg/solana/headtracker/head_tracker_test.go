@@ -387,7 +387,7 @@ func TestHeadTracker_Start_LoadsLatestChain(t *testing.T) {
 	trackable := &cltest.MockHeadTrackable{}
 	ht := createHeadTrackerWithChecker(t, cfg, client, headSaver, trackable)
 
-	require.NoError(t, headSaver.Save(context.Background(), heads[2]))
+	require.NoError(t, headSaver.Save(testutils.Context(t), heads[2]))
 
 	ht.Start(t)
 
@@ -532,431 +532,434 @@ func TestHeadTracker_SwitchesToLongestChainWithHeadSamplingEnabled(t *testing.T)
 	}
 }
 
-// func TestHeadTracker_SwitchesToLongestChainWithHeadSamplingDisabled(t *testing.T) {
-// 	t.Parallel()
-
-// 	db := pgtest.NewSqlxDB(t)
-// 	logger := logger.TestLogger(t)
-
-// 	config := configtest.NewGeneralConfig(t, func(c *chainlink.Config, s *chainlink.Secrets) {
-// 		c.EVM[0].FinalityDepth = ptr[uint32](50)
-// 		// Need to set the buffer to something large since we inject a lot of heads at once and otherwise they will be dropped
-// 		c.EVM[0].HeadTracker.MaxBufferSize = ptr[uint32](100)
-// 		c.EVM[0].HeadTracker.SamplingInterval = models.MustNewDuration(0)
-// 	})
-
-// 	client := evmtest.NewclientMockWithDefaultChain(t)
-
-// 	checker := commonmocks.NewHeadTrackable[*types.Head, types.Hash](t)
-// 	orm := headtracker.NewORM(db, logger, config.Database(), cltest.FixtureChainID)
-// 	evmcfg := evmtest.NewChainScopedConfig(t, config)
-// 	ht := createHeadTrackerWithChecker(t, client, evmcfg.EVM(), evmcfg.EVM().HeadTracker(), orm, checker)
-
-// 	chchHeaders := make(chan evmtest.RawSub[*types.Head], 1)
-// 	mockChain := &evmtest.mockChain{client: client}
-// 	client.On("SubscribeNewHead", mock.Anything, mock.Anything).
-// 		Return(
-// 			func(ctx context.Context, ch chan<- *types.Head) commontypes.Subscription {
-// 				sub := mockChain.NewSub(t)
-// 				chchHeaders <- testutils.NewRawSub(ch, sub.Err())
-// 				return sub
-// 			},
-// 			func(ctx context.Context, ch chan<- *types.Head) error { return nil },
-// 		)
-
-// 	// ---------------------
-// 	blocks := cltest.NewBlocks(t, 10)
-
-// 	head0 := blocks.Head(0) // types.Head{Number: 0, Hash: utils.NewSolanaHash(), ParentHash: utils.NewSolanaHash(), Timestamp: time.Unix(0, 0)}
-// 	// Initial query
-// 	client.On("HeadByNumber", mock.Anything, (*big.Int)(nil)).Return(head0, nil)
-
-// 	headSeq := cltest.NewHeadBuffer(t)
-// 	headSeq.Append(blocks.Head(0))
-// 	headSeq.Append(blocks.Head(1))
-
-// 	// Blocks 2 and 3 are out of order
-// 	headSeq.Append(blocks.Head(3))
-// 	headSeq.Append(blocks.Head(2))
-
-// 	// Block 4 comes in
-// 	headSeq.Append(blocks.Head(4))
-
-// 	// Another block at level 4 comes in, that will be uncled
-// 	headSeq.Append(blocks.NewHead(4))
-
-// 	// Reorg happened forking from block 2
-// 	blocksForked := blocks.ForkAt(t, 2, 5)
-// 	headSeq.Append(blocksForked.Head(2))
-// 	headSeq.Append(blocksForked.Head(3))
-// 	headSeq.Append(blocksForked.Head(4))
-// 	headSeq.Append(blocksForked.Head(5)) // Now the new chain is longer
-
-// 	lastLongestChainAwaiter := cltest.NewAwaiter()
-
-// 	checker.On("OnNewLongestChain", mock.Anything, mock.Anything).
-// 		Run(func(args mock.Arguments) {
-// 			h := args.Get(1).(*types.Head)
-// 			require.Equal(t, int64(0), h.BlockNumber())
-// 			require.Equal(t, blocks.Head(0).BlockHash(), h.BlockHash())
-// 		}).Return().Once()
-
-// 	checker.On("OnNewLongestChain", mock.Anything, mock.Anything).
-// 		Run(func(args mock.Arguments) {
-// 			h := args.Get(1).(*types.Head)
-// 			require.Equal(t, int64(1), h.BlockNumber())
-// 			require.Equal(t, blocks.Head(1).BlockHash(), h.BlockHash())
-// 		}).Return().Once()
-
-// 	checker.On("OnNewLongestChain", mock.Anything, mock.Anything).
-// 		Run(func(args mock.Arguments) {
-// 			h := args.Get(1).(*types.Head)
-// 			require.Equal(t, int64(3), h.BlockNumber())
-// 			require.Equal(t, blocks.Head(3).BlockHash(), h.BlockHash())
-// 		}).Return().Once()
-
-// 	checker.On("OnNewLongestChain", mock.Anything, mock.Anything).
-// 		Run(func(args mock.Arguments) {
-// 			h := args.Get(1).(*types.Head)
-// 			require.Equal(t, int64(4), h.BlockNumber())
-// 			require.Equal(t, blocks.Head(4).BlockHash(), h.BlockHash())
-
-// 			// Check that the block came with its parents
-// 			require.NotNil(t, h.Parent)
-// 			require.Equal(t, h.Parent.BlockHash(), blocks.Head(3).BlockHash())
-// 			require.NotNil(t, h.Parent.Parent.BlockHash())
-// 			require.Equal(t, h.Parent.Parent.BlockHash(), blocks.Head(2).BlockHash())
-// 			require.NotNil(t, h.Parent.Parent.Parent)
-// 			require.Equal(t, h.Parent.Parent.Parent.BlockHash(), blocks.Head(1).BlockHash())
-// 		}).Return().Once()
-
-// 	checker.On("OnNewLongestChain", mock.Anything, mock.Anything).
-// 		Run(func(args mock.Arguments) {
-// 			h := args.Get(1).(*types.Head)
-
-// 			require.Equal(t, int64(5), h.BlockNumber())
-// 			require.Equal(t, blocksForked.Head(5).BlockHash(), h.BlockHash())
-
-// 			// This is the new longest chain, check that it came with its parents
-// 			require.NotNil(t, h.Parent)
-// 			require.Equal(t, h.Parent.BlockHash(), blocksForked.Head(4).BlockHash())
-// 			require.NotNil(t, h.Parent.Parent)
-// 			require.Equal(t, h.Parent.Parent.BlockHash(), blocksForked.Head(3).BlockHash())
-// 			require.NotNil(t, h.Parent.Parent.Parent)
-// 			require.Equal(t, h.Parent.Parent.Parent.BlockHash(), blocksForked.Head(2).BlockHash())
-// 			require.NotNil(t, h.Parent.Parent.Parent.Parent)
-// 			require.Equal(t, h.Parent.Parent.Parent.Parent.BlockHash(), blocksForked.Head(1).BlockHash())
-// 			lastLongestChainAwaiter.ItHappened()
-// 		}).Return().Once()
-
-// 	ht.Start(t)
-
-// 	headers := <-chchHeaders
-
-// 	// This grotesque construction is the only way to do dynamic return values using
-// 	// the mock package.  We need dynamic returns because we're simulating reorgs.
-// 	latestHeadByNumber := make(map[int64]*types.Head)
-// 	latestHeadByNumberMu := new(sync.Mutex)
-
-// 	fnCall := client.On("HeadByNumber", mock.Anything, mock.Anything)
-// 	fnCall.RunFn = func(args mock.Arguments) {
-// 		latestHeadByNumberMu.Lock()
-// 		defer latestHeadByNumberMu.Unlock()
-// 		num := args.Get(1).(int64)
-// 		head, exists := latestHeadByNumber[num]
-// 		if !exists {
-// 			head = cltest.Head(num)
-// 			latestHeadByNumber[num] = head
-// 		}
-// 		fnCall.ReturnArguments = mock.Arguments{head, nil}
-// 	}
-
-// 	for _, h := range headSeq.Heads {
-// 		latestHeadByNumberMu.Lock()
-// 		latestHeadByNumber[h.BlockNumber()] = h
-// 		latestHeadByNumberMu.Unlock()
-// 		headers.TrySend(h)
-// 		time.Sleep(testutils.TestInterval)
-// 	}
-
-// 	// default 10s may not be sufficient, so using testutils.WaitTimeout(t)
-// 	lastLongestChainAwaiter.AwaitOrFail(t, testutils.WaitTimeout(t))
-// 	ht.Stop(t)
-// 	assert.Equal(t, int64(5), ht.headSaver.LatestChain().BlockNumber())
-
-// 	for _, h := range headSeq.Heads {
-// 		c := ht.headSaver.Chain(h.BlockHash())
-// 		require.NotNil(t, c)
-// 		assert.Equal(t, c.ParentHash, h.ParentHash)
-// 		assert.Equal(t, c.Timestamp.Unix(), h.Timestamp.UTC().Unix())
-// 		assert.Equal(t, c.BlockNumber(), h.BlockNumber())
-// 	}
-// }
-
-// func TestHeadTracker_Backfill(t *testing.T) {
-// 	t.Parallel()
-
-// 	// Heads are arranged as follows:
-// 	// headN indicates an unpersisted ethereum header
-// 	// hN indicates a persisted head record
-// 	//
-// 	// (1)->(H0)
-// 	//
-// 	//       (14Orphaned)-+
-// 	//                    +->(13)->(12)->(11)->(H10)->(9)->(H8)
-// 	// (15)->(14)---------+
-
-// 	now := uint64(time.Now().UTC().Unix())
-
-// 	gethHead0 := &gethTypes.Header{
-// 		Number:     int64(0),
-// 		ParentHash: gethCommon.BigToHash(int64(0)),
-// 		Time:       now,
-// 	}
-// 	head0 := evmtypes.NewHead(gethHead0.BlockNumber(), utils.NewSolanaHash(), gethHead0.ParentHash, gethHead0.Time, utils.NewBig(&cltest.FixtureChainID))
-
-// 	h1 := *cltest.Head(1)
-// 	h1.ParentHash = head0.BlockHash()
-
-// 	gethHead8 := &gethTypes.Header{
-// 		Number:     int64(8),
-// 		ParentHash: utils.NewSolanaHash(),
-// 		Time:       now,
-// 	}
-// 	head8 := evmtypes.NewHead(gethHead8.BlockNumber(), utils.NewSolanaHash(), gethHead8.ParentHash, gethHead8.Time, utils.NewBig(&cltest.FixtureChainID))
-
-// 	h9 := *cltest.Head(9)
-// 	h9.ParentHash = head8.BlockHash()
-
-// 	gethHead10 := &gethTypes.Header{
-// 		Number:     int64(10),
-// 		ParentHash: h9.BlockHash(),
-// 		Time:       now,
-// 	}
-// 	head10 := evmtypes.NewHead(gethHead10.BlockNumber(), utils.NewSolanaHash(), gethHead10.ParentHash, gethHead10.Time, utils.NewBig(&cltest.FixtureChainID))
-
-// 	h11 := *cltest.Head(11)
-// 	h11.ParentHash = head10.BlockHash()
-
-// 	h12 := *cltest.Head(12)
-// 	h12.ParentHash = h11.BlockHash()
-
-// 	h13 := *cltest.Head(13)
-// 	h13.ParentHash = h12.BlockHash()
-
-// 	h14Orphaned := *cltest.Head(14)
-// 	h14Orphaned.ParentHash = h13.BlockHash()
-
-// 	h14 := *cltest.Head(14)
-// 	h14.ParentHash = h13.BlockHash()
-
-// 	h15 := *cltest.Head(15)
-// 	h15.ParentHash = h14.BlockHash()
-
-// 	heads := []types.Head{
-// 		h9,
-// 		h11,
-// 		h12,
-// 		h13,
-// 		h14Orphaned,
-// 		h14,
-// 		h15,
-// 	}
-
-// 	ctx := testutils.Context(t)
-
-// 	t.Run("does nothing if all the heads are in database", func(t *testing.T) {
-// 		db := pgtest.NewSqlxDB(t)
-// 		cfg := configtest.NewGeneralConfig(t, nil)
-// 		logger := logger.TestLogger(t)
-// 		orm := headtracker.NewORM(db, logger, cfg.Database(), cltest.FixtureChainID)
-// 		for i := range heads {
-// 			require.NoError(t, orm.IdempotentInsertHead(testutils.Context(t), &heads[i]))
-// 		}
-
-// 		client := evmtest.NewclientMock(t)
-// 		client.On("ConfiguredChainID", mock.Anything).Return(cfg.DefaultChainID(), nil)
-// 		ht := createHeadTrackerWithNeverSleeper(t, client, cfg, orm)
-
-// 		err := ht.Backfill(ctx, &h12, 2)
-// 		require.NoError(t, err)
-// 	})
-
-// 	t.Run("fetches a missing head", func(t *testing.T) {
-// 		db := pgtest.NewSqlxDB(t)
-// 		cfg := configtest.NewGeneralConfig(t, nil)
-// 		logger := logger.TestLogger(t)
-// 		orm := headtracker.NewORM(db, logger, cfg.Database(), cltest.FixtureChainID)
-// 		for i := range heads {
-// 			require.NoError(t, orm.IdempotentInsertHead(testutils.Context(t), &heads[i]))
-// 		}
-
-// 		client := evmtest.NewclientMock(t)
-// 		client.On("ConfiguredChainID", mock.Anything).Return(cfg.DefaultChainID(), nil)
-// 		client.On("HeadByNumber", mock.Anything, int64(10)).
-// 			Return(&head10, nil)
-
-// 		ht := createHeadTrackerWithNeverSleeper(t, client, cfg, orm)
-
-// 		var depth uint = 3
-
-// 		err := ht.Backfill(ctx, &h12, depth)
-// 		require.NoError(t, err)
-
-// 		h := ht.headSaver.Chain(h12.BlockHash())
-
-// 		assert.Equal(t, int64(12), h.BlockNumber())
-// 		require.NotNil(t, h.Parent)
-// 		assert.Equal(t, int64(11), h.Parent.BlockNumber())
-// 		require.NotNil(t, h.Parent)
-// 		assert.Equal(t, int64(10), h.Parent.Parent.BlockNumber())
-// 		require.NotNil(t, h.Parent.Parent.Parent)
-// 		assert.Equal(t, int64(9), h.Parent.Parent.Parent.BlockNumber())
-
-// 		writtenHead, err := orm.HeadByHash(testutils.Context(t), head10.BlockHash())
-// 		require.NoError(t, err)
-// 		assert.Equal(t, int64(10), writtenHead.BlockNumber())
-// 	})
-
-// 	t.Run("fetches only heads that are missing", func(t *testing.T) {
-// 		db := pgtest.NewSqlxDB(t)
-// 		cfg := configtest.NewGeneralConfig(t, nil)
-// 		logger := logger.TestLogger(t)
-// 		orm := headtracker.NewORM(db, logger, cfg.Database(), cltest.FixtureChainID)
-// 		for i := range heads {
-// 			require.NoError(t, orm.IdempotentInsertHead(testutils.Context(t), &heads[i]))
-// 		}
-
-// 		client := evmtest.NewclientMock(t)
-// 		client.On("ConfiguredChainID", mock.Anything).Return(cfg.DefaultChainID(), nil)
-
-// 		ht := createHeadTrackerWithNeverSleeper(t, client, cfg, orm)
-
-// 		client.On("HeadByNumber", mock.Anything, int64(10)).
-// 			Return(&head10, nil)
-// 		client.On("HeadByNumber", mock.Anything, int64(8)).
-// 			Return(&head8, nil)
-
-// 		// Needs to be 8 because there are 8 heads in chain (15,14,13,12,11,10,9,8)
-// 		var depth uint = 8
-
-// 		err := ht.Backfill(ctx, &h15, depth)
-// 		require.NoError(t, err)
-
-// 		h := ht.headSaver.Chain(h15.BlockHash())
-
-// 		require.Equal(t, uint32(8), h.ChainLength())
-// 		earliestInChain := h.EarliestInChain()
-// 		assert.Equal(t, head8.BlockNumber(), earliestInChain.BlockNumber())
-// 		assert.Equal(t, head8.BlockHash(), earliestInChain.BlockHash())
-// 	})
-
-// 	t.Run("does not backfill if chain length is already greater than or equal to depth", func(t *testing.T) {
-// 		db := pgtest.NewSqlxDB(t)
-// 		cfg := configtest.NewGeneralConfig(t, nil)
-// 		logger := logger.TestLogger(t)
-// 		orm := headtracker.NewORM(db, logger, cfg.Database(), cltest.FixtureChainID)
-// 		for i := range heads {
-// 			require.NoError(t, orm.IdempotentInsertHead(testutils.Context(t), &heads[i]))
-// 		}
-
-// 		client := evmtest.NewclientMock(t)
-// 		client.On("ConfiguredChainID", mock.Anything).Return(cfg.DefaultChainID(), nil)
-
-// 		ht := createHeadTrackerWithNeverSleeper(t, client, cfg, orm)
-
-// 		err := ht.Backfill(ctx, &h15, 3)
-// 		require.NoError(t, err)
-
-// 		err = ht.Backfill(ctx, &h15, 5)
-// 		require.NoError(t, err)
-// 	})
-
-// 	t.Run("only backfills to height 0 if chain length would otherwise cause it to try and fetch a negative head", func(t *testing.T) {
-// 		db := pgtest.NewSqlxDB(t)
-// 		cfg := configtest.NewGeneralConfig(t, nil)
-// 		logger := logger.TestLogger(t)
-// 		orm := headtracker.NewORM(db, logger, cfg.Database(), cltest.FixtureChainID)
-
-// 		client := evmtest.NewclientMock(t)
-// 		client.On("ConfiguredChainID", mock.Anything).Return(cfg.DefaultChainID(), nil)
-// 		client.On("HeadByNumber", mock.Anything, int64(0)).
-// 			Return(&head0, nil)
-
-// 		require.NoError(t, orm.IdempotentInsertHead(testutils.Context(t), &h1))
-
-// 		ht := createHeadTrackerWithNeverSleeper(t, client, cfg, orm)
-
-// 		err := ht.Backfill(ctx, &h1, 400)
-// 		require.NoError(t, err)
-
-// 		h := ht.headSaver.Chain(h1.BlockHash())
-// 		require.NotNil(t, h)
-
-// 		require.Equal(t, uint32(2), h.ChainLength())
-// 		require.Equal(t, int64(0), h.EarliestInChain().BlockNumber())
-// 	})
-
-// 	t.Run("abandons backfill and returns error if the eth node returns not found", func(t *testing.T) {
-// 		db := pgtest.NewSqlxDB(t)
-// 		cfg := configtest.NewGeneralConfig(t, nil)
-// 		logger := logger.TestLogger(t)
-// 		orm := headtracker.NewORM(db, logger, cfg.Database(), cltest.FixtureChainID)
-// 		for i := range heads {
-// 			require.NoError(t, orm.IdempotentInsertHead(testutils.Context(t), &heads[i]))
-// 		}
-
-// 		client := evmtest.NewclientMock(t)
-// 		client.On("ConfiguredChainID", mock.Anything).Return(cfg.DefaultChainID(), nil)
-// 		client.On("HeadByNumber", mock.Anything, int64(10)).
-// 			Return(&head10, nil).
-// 			Once()
-// 		client.On("HeadByNumber", mock.Anything, int64(8)).
-// 			Return(nil, ethereum.NotFound).
-// 			Once()
-
-// 		ht := createHeadTrackerWithNeverSleeper(t, client, cfg, orm)
-
-// 		err := ht.Backfill(ctx, &h12, 400)
-// 		require.Error(t, err)
-// 		require.EqualError(t, err, "fetchAndSaveHead failed: not found")
-
-// 		h := ht.headSaver.Chain(h12.BlockHash())
-
-// 		// Should contain 12, 11, 10, 9
-// 		assert.Equal(t, 4, int(h.ChainLength()))
-// 		assert.Equal(t, int64(9), h.EarliestInChain().BlockNumber())
-// 	})
-
-// 	t.Run("abandons backfill and returns error if the context time budget is exceeded", func(t *testing.T) {
-// 		db := pgtest.NewSqlxDB(t)
-// 		cfg := configtest.NewGeneralConfig(t, nil)
-// 		logger := logger.TestLogger(t)
-// 		orm := headtracker.NewORM(db, logger, cfg.Database(), cltest.FixtureChainID)
-// 		for i := range heads {
-// 			require.NoError(t, orm.IdempotentInsertHead(testutils.Context(t), &heads[i]))
-// 		}
-
-// 		client := evmtest.NewclientMock(t)
-// 		client.On("ConfiguredChainID", mock.Anything).Return(cfg.DefaultChainID(), nil)
-// 		client.On("HeadByNumber", mock.Anything, int64(10)).
-// 			Return(&head10, nil)
-// 		client.On("HeadByNumber", mock.Anything, int64(8)).
-// 			Return(nil, context.DeadlineExceeded)
-
-// 		ht := createHeadTrackerWithNeverSleeper(t, client, cfg, orm)
-
-// 		err := ht.Backfill(ctx, &h12, 400)
-// 		require.Error(t, err)
-// 		require.EqualError(t, err, "fetchAndSaveHead failed: context deadline exceeded")
-
-// 		h := ht.headSaver.Chain(h12.BlockHash())
-
-// 		// Should contain 12, 11, 10, 9
-// 		assert.Equal(t, 4, int(h.ChainLength()))
-// 		assert.Equal(t, int64(9), h.EarliestInChain().BlockNumber())
-// 	})
-// }
+// TODO: Fix this test later
+func TestHeadTracker_SwitchesToLongestChainWithHeadSamplingDisabled(t *testing.T) {
+	t.Parallel()
+	lggr, _ := logger.New()
+	cfg := headtracker.NewConfig()
+	headSaver := headtracker.NewSaver(cfg, lggr)
+	client := cltest.NewClientMockWithDefaultChain(t)
+	mockChain := &testutils.MockChain{Client: client}
+	chchHeaders := make(chan testutils.RawSub[*types.Head], 1)
+	checker := commonmocks.NewHeadTrackable[*types.Head, types.Hash](t)
+	ht := createHeadTrackerWithChecker(t, cfg, client, headSaver, checker)
+	cfg.SetHeadTrackerSamplingInterval(0)
+	cfg.SetHeadTrackerMaxBufferSize(100)
+
+	client.On("SubscribeNewHead", mock.Anything, mock.Anything).
+		Return(
+			func(ctx context.Context, ch chan<- *types.Head) commontypes.Subscription {
+				sub := mockChain.NewSub(t)
+				chchHeaders <- testutils.NewRawSub(ch, sub.Err())
+				return sub
+			},
+			func(ctx context.Context, ch chan<- *types.Head) error { return nil },
+		)
+
+	// ---------------------
+	blocks := cltest.NewBlocks(t, 10)
+
+	head0 := blocks.Head(0) // types.Head{Number: 0, Hash: utils.NewSolanaHash(), ParentHash: utils.NewSolanaHash(), Timestamp: time.Unix(0, 0)}
+	// Initial query
+	client.On("HeadByNumber", mock.Anything, (*big.Int)(nil)).Return(head0, nil)
+
+	headSeq := cltest.NewHeadBuffer(t)
+	headSeq.Append(blocks.Head(0))
+	headSeq.Append(blocks.Head(1))
+
+	// Blocks 2 and 3 are out of order
+	headSeq.Append(blocks.Head(3))
+	headSeq.Append(blocks.Head(2))
+
+	// Block 4 comes in
+	headSeq.Append(blocks.Head(4))
+
+	// Another block at level 4 comes in, that will be uncled
+	headSeq.Append(blocks.NewHead(4))
+
+	// Reorg happened forking from block 2
+	blocksForked := blocks.ForkAt(t, 2, 5)
+	headSeq.Append(blocksForked.Head(2))
+	headSeq.Append(blocksForked.Head(3))
+	headSeq.Append(blocksForked.Head(4))
+	headSeq.Append(blocksForked.Head(5)) // Now the new chain is longer
+
+	// --------------------- Delete
+	// Print HeadSequence in a nice format
+	fmt.Println("headSeq", headSeq.Heads)
+
+	// Iterate over Head sequence, print head.BlockHash() and parent.BlockHash()
+	// Add new line after each head
+	for _, h := range headSeq.Heads {
+		if h.Parent == nil {
+			fmt.Printf("head %s, parent nil \n\n", h.BlockHash())
+			continue
+		}
+		fmt.Printf("head hash %s head number %d, parent hash %s parent number %d \n\n ", h.BlockHash(), h.BlockNumber(), h.Parent.BlockHash(), h.Parent.BlockNumber())
+	}
+	// --------------------- Delete
+
+	lastLongestChainAwaiter := cltest.NewAwaiter()
+
+	checker.On("OnNewLongestChain", mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			h := args.Get(1).(*types.Head)
+			require.Equal(t, int64(0), h.BlockNumber())
+			require.Equal(t, blocks.Head(0).BlockHash(), h.BlockHash())
+		}).Return().Once()
+
+	checker.On("OnNewLongestChain", mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			h := args.Get(1).(*types.Head)
+			require.Equal(t, int64(1), h.BlockNumber())
+			require.Equal(t, blocks.Head(1).BlockHash(), h.BlockHash())
+
+			fmt.Println("good h number, hash", h.BlockNumber(), h.BlockHash())
+
+		}).Return().Once()
+
+	checker.On("OnNewLongestChain", mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			h := args.Get(1).(*types.Head)
+			require.Equal(t, int64(3), h.BlockNumber())
+			require.Equal(t, blocks.Head(3).BlockHash(), h.BlockHash())
+
+			// Get parent parent parent
+			fmt.Println("problematic h number, hash", h.BlockNumber(), h.BlockHash())
+
+			// Get parent
+			fmt.Println("Parent of problematic h", h.Parent)
+		}).Return().Once()
+
+	checker.On("OnNewLongestChain", mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			h := args.Get(1).(*types.Head)
+			require.Equal(t, int64(4), h.BlockNumber())
+			require.Equal(t, blocks.Head(4).BlockHash(), h.BlockHash())
+
+			// Check that the block came with its parents
+			require.NotNil(t, h.Parent)
+			require.Equal(t, h.Parent.BlockHash(), blocks.Head(3).BlockHash())
+			require.NotNil(t, h.Parent.Parent.BlockHash()) // 2
+			require.Equal(t, h.Parent.Parent.BlockHash(), blocks.Head(2).BlockHash())
+			require.NotNil(t, h.Parent.Parent.Parent)
+			require.Equal(t, h.Parent.Parent.Parent.BlockHash(), blocks.Head(1).BlockHash())
+		}).Return().Once()
+
+	checker.On("OnNewLongestChain", mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			h := args.Get(1).(*types.Head)
+
+			require.Equal(t, int64(5), h.BlockNumber())
+			require.Equal(t, blocksForked.Head(5).BlockHash(), h.BlockHash())
+
+			// This is the new longest chain, check that it came with its parents
+			require.NotNil(t, h.Parent)
+			require.Equal(t, h.Parent.BlockHash(), blocksForked.Head(4).BlockHash())
+			require.NotNil(t, h.Parent.Parent)
+			require.Equal(t, h.Parent.Parent.BlockHash(), blocksForked.Head(3).BlockHash())
+			require.NotNil(t, h.Parent.Parent.Parent)
+			require.Equal(t, h.Parent.Parent.Parent.BlockHash(), blocksForked.Head(2).BlockHash())
+			require.NotNil(t, h.Parent.Parent.Parent.Parent)
+			require.Equal(t, h.Parent.Parent.Parent.Parent.BlockHash(), blocksForked.Head(1).BlockHash())
+			lastLongestChainAwaiter.ItHappened()
+		}).Return().Once()
+
+	ht.Start(t)
+
+	headers := <-chchHeaders
+
+	// This grotesque construction is the only way to do dynamic return values using
+	// the mock package.  We need dynamic returns because we're simulating reorgs.
+	latestHeadByNumber := make(map[int64]*types.Head)
+	latestHeadByNumberMu := new(sync.Mutex)
+
+	fnCall := client.On("HeadByNumber", mock.Anything, mock.Anything)
+	fnCall.RunFn = func(args mock.Arguments) {
+		latestHeadByNumberMu.Lock()
+		defer latestHeadByNumberMu.Unlock()
+		num := args.Get(1).(*big.Int)
+		head, exists := latestHeadByNumber[num.Int64()]
+		if !exists {
+			head = cltest.Head(num)
+			latestHeadByNumber[num.Int64()] = head
+		}
+		fnCall.ReturnArguments = mock.Arguments{head, nil}
+	}
+
+	for _, h := range headSeq.Heads {
+		latestHeadByNumberMu.Lock()
+		latestHeadByNumber[h.BlockNumber()] = h
+		latestHeadByNumberMu.Unlock()
+		headers.TrySend(h)
+		time.Sleep(testutils.TestInterval)
+	}
+
+	// default 10s may not be sufficient, so using testutils.WaitTimeout(t)
+	lastLongestChainAwaiter.AwaitOrFail(t, testutils.WaitTimeout(t))
+	ht.Stop(t)
+	assert.Equal(t, int64(5), ht.headSaver.LatestChain().BlockNumber())
+
+	for _, h := range headSeq.Heads {
+		c := ht.headSaver.Chain(h.BlockHash())
+		require.NotNil(t, c)
+		assert.Equal(t, c.GetParentHash(), h.GetParentHash())
+		assert.Equal(t, c.BlockNumber(), h.BlockNumber())
+	}
+}
+
+func TestHeadTracker_Backfill(t *testing.T) {
+	t.Parallel()
+
+	// Heads are arranged as follows:
+	// headN indicates an unpersisted ethereum header
+	// hN indicates a persisted head record
+	//
+	// (1)->(H0)
+	//
+	//       (14Orphaned)-+
+	//                    +->(13)->(12)->(11)->(H10)->(9)->(H8)
+	// (15)->(14)---------+
+
+	head0 := cltest.Head(0)
+
+	h1 := cltest.Head(1)
+	h1.Block.PreviousBlockhash = head0.BlockHash().Hash
+
+	fmt.Println("\n\n head0 Blockhash \n", head0.BlockHash().Hash)
+	fmt.Println("\n\n h1 Blockhash \n", h1.GetParentHash())
+	fmt.Println("h1 Blockhash \n", h1.Block.PreviousBlockhash)
+
+	h8 := cltest.Head(8)
+
+	h9 := cltest.Head(9)
+	h9.Block.PreviousBlockhash = h8.BlockHash().Hash
+
+	h10 := cltest.Head(10)
+	h10.Block.PreviousBlockhash = h9.BlockHash().Hash
+
+	h11 := cltest.Head(11)
+	h11.Block.PreviousBlockhash = h10.BlockHash().Hash
+
+	h12 := cltest.Head(12)
+	h12.Block.PreviousBlockhash = h11.BlockHash().Hash
+
+	h13 := cltest.Head(13)
+	h13.Block.PreviousBlockhash = h12.BlockHash().Hash
+
+	h14Orphaned := cltest.Head(14)
+	h14Orphaned.Block.PreviousBlockhash = h13.BlockHash().Hash
+
+	h14 := cltest.Head(14)
+	h14.Block.PreviousBlockhash = h13.BlockHash().Hash
+
+	h15 := cltest.Head(15)
+	h15.Block.PreviousBlockhash = h14.BlockHash().Hash
+
+	heads := []types.Head{
+		*h9,
+		*h11,
+		*h12,
+		*h13,
+		*h14Orphaned,
+		*h14,
+		*h15,
+	}
+
+	ctx := testutils.Context(t)
+
+	t.Run("does nothing if all the heads are in headsaver", func(t *testing.T) {
+		lggr, _ := logger.New()
+		cfg := headtracker.NewConfig()
+		headSaver := headtracker.NewSaver(cfg, lggr)
+
+		for i := range heads {
+			require.NoError(t, headSaver.Save(testutils.Context(t), &heads[i]))
+		}
+
+		client := cltest.NewClientMock(t)
+		client.On("ConfiguredChainID", mock.Anything).Return(types.Localnet, nil)
+		ht := createHeadTrackerWithNeverSleeper(t, cfg, client, headSaver)
+
+		err := ht.Backfill(ctx, h12, 2)
+		require.NoError(t, err)
+	})
+
+	t.Run("fetches a missing head", func(t *testing.T) {
+		lggr, _ := logger.New()
+		cfg := headtracker.NewConfig()
+		headSaver := headtracker.NewSaver(cfg, lggr)
+
+		for i := range heads {
+			require.NoError(t, headSaver.Save(testutils.Context(t), &heads[i]))
+		}
+
+		client := cltest.NewClientMock(t)
+		client.On("ConfiguredChainID", mock.Anything).Return(types.Localnet, nil)
+		client.On("HeadByNumber", mock.Anything, big.NewInt(10)).
+			Return(h10, nil)
+
+		ht := createHeadTrackerWithNeverSleeper(t, cfg, client, headSaver)
+
+		var depth uint = 3
+
+		// Should backfill h10
+		err := ht.Backfill(ctx, h12, depth)
+		require.NoError(t, err)
+
+		h := ht.headSaver.Chain(h12.BlockHash())
+
+		assert.Equal(t, int64(12), h.BlockNumber())
+		require.NotNil(t, h.Parent)
+		assert.Equal(t, int64(11), h.Parent.BlockNumber())
+		require.NotNil(t, h.Parent.Parent)
+		assert.Equal(t, int64(10), h.Parent.Parent.BlockNumber())
+		require.NotNil(t, h.Parent.Parent.Parent)
+		assert.Equal(t, int64(9), h.Parent.Parent.Parent.BlockNumber())
+
+		writtenHead, err := headSaver.HeadByHash(h10.BlockHash())
+		require.NoError(t, err)
+		assert.Equal(t, int64(10), writtenHead.BlockNumber())
+	})
+
+	t.Run("fetches only heads that are missing", func(t *testing.T) {
+		lggr, _ := logger.New()
+		cfg := headtracker.NewConfig()
+		headSaver := headtracker.NewSaver(cfg, lggr)
+
+		for i := range heads {
+			require.NoError(t, headSaver.Save(testutils.Context(t), &heads[i]))
+		}
+
+		client := cltest.NewClientMock(t)
+		client.On("ConfiguredChainID", mock.Anything).Return(types.Localnet, nil)
+
+		ht := createHeadTrackerWithNeverSleeper(t, cfg, client, headSaver)
+
+		client.On("HeadByNumber", mock.Anything, big.NewInt(10)).
+			Return(h10, nil)
+		client.On("HeadByNumber", mock.Anything, big.NewInt(8)).
+			Return(h8, nil)
+
+		// Needs to be 8 because there are 8 heads in chain (15,14,13,12,11,10,9,8)
+		var depth uint = 8
+
+		err := ht.Backfill(ctx, h15, depth)
+		require.NoError(t, err)
+
+		h := ht.headSaver.Chain(h15.BlockHash())
+
+		require.Equal(t, uint32(8), h.ChainLength())
+		earliestInChain := h.EarliestHeadInChain()
+		assert.Equal(t, h8.BlockNumber(), earliestInChain.BlockNumber())
+		assert.Equal(t, h8.BlockHash(), earliestInChain.BlockHash())
+	})
+
+	t.Run("does not backfill if chain length is already greater than or equal to depth", func(t *testing.T) {
+		lggr, _ := logger.New()
+		cfg := headtracker.NewConfig()
+		headSaver := headtracker.NewSaver(cfg, lggr)
+
+		for i := range heads {
+			require.NoError(t, headSaver.Save(testutils.Context(t), &heads[i]))
+		}
+
+		client := cltest.NewClientMock(t)
+		client.On("ConfiguredChainID", mock.Anything).Return(types.Localnet, nil)
+
+		ht := createHeadTrackerWithNeverSleeper(t, cfg, client, headSaver)
+
+		err := ht.Backfill(ctx, h15, 3)
+		require.NoError(t, err)
+
+		err = ht.Backfill(ctx, h15, 5)
+		require.NoError(t, err)
+	})
+
+	t.Run("only backfills to height 0 if chain length would otherwise cause it to try and fetch a negative head", func(t *testing.T) {
+		lggr, _ := logger.New()
+		cfg := headtracker.NewConfig()
+		headSaver := headtracker.NewSaver(cfg, lggr)
+
+		client := cltest.NewClientMock(t)
+		client.On("ConfiguredChainID", mock.Anything).Return(types.Localnet, nil)
+		client.On("HeadByNumber", mock.Anything, big.NewInt(0)).
+			Return(head0, nil)
+
+		require.NoError(t, headSaver.Save(testutils.Context(t), h1))
+
+		ht := createHeadTrackerWithNeverSleeper(t, cfg, client, headSaver)
+
+		err := ht.Backfill(ctx, h1, 400)
+		require.NoError(t, err)
+
+		h := ht.headSaver.Chain(h1.BlockHash())
+		require.NotNil(t, h)
+
+		require.Equal(t, uint32(2), h.ChainLength())
+		require.Equal(t, int64(0), h.EarliestHeadInChain().BlockNumber())
+	})
+
+	t.Run("abandons backfill and returns error if the eth node returns not found", func(t *testing.T) {
+		lggr, _ := logger.New()
+		cfg := headtracker.NewConfig()
+		headSaver := headtracker.NewSaver(cfg, lggr)
+
+		for i := range heads {
+			require.NoError(t, headSaver.Save(testutils.Context(t), &heads[i]))
+		}
+
+		client := cltest.NewClientMock(t)
+		client.On("ConfiguredChainID", mock.Anything).Return(types.Localnet, nil)
+
+		client.On("HeadByNumber", mock.Anything, big.NewInt(10)).
+			Return(h10, nil).
+			Once()
+		client.On("HeadByNumber", mock.Anything, big.NewInt(8)).
+			Return(cltest.Head(0), errors.New("not found")).
+			Once()
+
+		ht := createHeadTrackerWithNeverSleeper(t, cfg, client, headSaver)
+
+		err := ht.Backfill(ctx, h12, 400)
+		require.Error(t, err)
+		require.EqualError(t, err, "fetchAndSaveHead failed: not found")
+
+		h := ht.headSaver.Chain(h12.BlockHash())
+
+		// Should contain 12, 11, 10, 9
+		assert.Equal(t, 4, int(h.ChainLength()))
+		assert.Equal(t, int64(9), h.EarliestHeadInChain().BlockNumber())
+	})
+
+	t.Run("abandons backfill and returns error if the context time budget is exceeded", func(t *testing.T) {
+		lggr, _ := logger.New()
+		cfg := headtracker.NewConfig()
+		headSaver := headtracker.NewSaver(cfg, lggr)
+		for i := range heads {
+			require.NoError(t, headSaver.Save(testutils.Context(t), &heads[i]))
+		}
+
+		client := cltest.NewClientMock(t)
+		client.On("ConfiguredChainID", mock.Anything).Return(types.Localnet, nil)
+		client.On("HeadByNumber", mock.Anything, big.NewInt(10)).
+			Return(h10, nil)
+		client.On("HeadByNumber", mock.Anything, big.NewInt(8)).
+			Return(cltest.Head(0), context.DeadlineExceeded)
+
+		ht := createHeadTrackerWithNeverSleeper(t, cfg, client, headSaver)
+
+		err := ht.Backfill(ctx, h12, 400)
+		require.Error(t, err)
+		require.EqualError(t, err, "fetchAndSaveHead failed: context deadline exceeded")
+
+		h := ht.headSaver.Chain(h12.BlockHash())
+
+		// Should contain 12, 11, 10, 9
+		assert.Equal(t, 4, int(h.ChainLength()))
+		assert.Equal(t, int64(9), h.EarliestHeadInChain().BlockNumber())
+	})
+}
 
 // Helper Functions
 
@@ -986,24 +989,29 @@ func createHeadTracker(
 	}
 }
 
-// func createHeadTrackerWithNeverSleeper(t *testing.T, solanaClient *client.Client, config *headtracker.Config) *headTrackerUniverse {
-// 	htCfg := headtracker.NewConfig()
-// 	lggr, _ := logger.New()
-
-// 	hb := headtracker.NewBroadcaster(lggr)
-// 	hs := headtracker.NewSaver(htCfg, lggr)
-// 	mailMon := utils.NewMailboxMonitor(t.Name())
-// 	ht := headtracker.NewTracker(lggr, solanaClient, config, hb, hs, mailMon)
-// 	return &headTrackerUniverse{
-// 		mu:              new(sync.Mutex),
-// 		headTracker:     ht,
-// 		headBroadcaster: hb,
-// 		headSaver:       hs,
-// 		mailMon:         mailMon,
-// 	}
-// }
-
-// created with 	evmcfg := evmtest.NewChainScopedConfig(t, cfg)
+func createHeadTrackerWithNeverSleeper(t *testing.T,
+	config *headtracker.Config,
+	solanaClient htrktypes.Client[
+		*types.Head,
+		commontypes.Subscription,
+		types.ChainID,
+		types.Hash],
+	hs *headtracker.InMemoryHeadSaver[
+		*types.Head,
+		types.Hash,
+		types.ChainID]) *headTrackerUniverse {
+	lggr, _ := logger.New()
+	hb := headtracker.NewBroadcaster(lggr)
+	mailMon := utils.NewMailboxMonitor(t.Name())
+	ht := headtracker.NewTracker(lggr, solanaClient, config, hb, hs, mailMon)
+	return &headTrackerUniverse{
+		mu:              new(sync.Mutex),
+		headTracker:     ht,
+		headBroadcaster: hb,
+		headSaver:       hs,
+		mailMon:         mailMon,
+	}
+}
 
 func createHeadTrackerWithChecker(t *testing.T,
 	config *headtracker.Config,
