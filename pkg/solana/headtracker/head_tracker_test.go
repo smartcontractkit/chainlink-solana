@@ -420,7 +420,9 @@ func TestHeadTracker_SwitchesToLongestChainWithHeadSamplingEnabled(t *testing.T)
 	chchHeaders := make(chan testutils.RawSub[*types.Head], 1)
 	checker := commonmocks.NewHeadTrackable[*types.Head, types.Hash](t)
 	ht := createHeadTrackerWithChecker(t, cfg, client, headSaver, checker)
+
 	cfg.SetHeadTrackerSamplingInterval(2500 * time.Millisecond)
+	cfg.SetHeadTrackerMaxBufferSize(100)
 
 	client.On("SubscribeNewHead", mock.Anything, mock.Anything).
 		Return(
@@ -461,6 +463,16 @@ func TestHeadTracker_SwitchesToLongestChainWithHeadSamplingEnabled(t *testing.T)
 	headSeq.Append(blocksForked.Head(4))
 	headSeq.Append(blocksForked.Head(5)) // Now the new chain is longer
 
+	// Print out all the block and the parent block
+	for i := 0; i < len(headSeq.Heads); i++ {
+		h := headSeq.Heads[i]
+		if h.Parent == nil {
+			fmt.Println("headSeq h.BlockNumber, hash:", h.BlockNumber(), h.BlockHash(), "Parent: nil")
+		} else {
+			fmt.Println("headSeq", h.BlockNumber(), h.BlockHash(), "Parent: ", h.Parent.BlockNumber(), h.Parent.BlockHash())
+		}
+	}
+
 	lastLongestChainAwaiter := cltest.NewAwaiter()
 
 	// the callback is only called for head number 5 because of head sampling
@@ -471,6 +483,8 @@ func TestHeadTracker_SwitchesToLongestChainWithHeadSamplingEnabled(t *testing.T)
 
 			assert.Equal(t, int64(5), h.BlockNumber())
 			assert.Equal(t, blocksForked.Head(5).BlockHash(), h.BlockHash())
+
+			fmt.Println("\n\n H Parent: ", h.Parent) // Why is the parent nil?
 
 			// This is the new longest chain, check that it came with its parents
 			if !assert.NotNil(t, h.Parent) {
@@ -488,7 +502,20 @@ func TestHeadTracker_SwitchesToLongestChainWithHeadSamplingEnabled(t *testing.T)
 			if !assert.NotNil(t, h.Parent.Parent.Parent.Parent) {
 				return
 			}
-			assert.Equal(t, h.Parent.Parent.Parent.Parent.BlockHash(), blocksForked.Head(1).BlockHash())
+			// h is 5, h.parent.parent.parent.parent is 1
+			fmt.Println("Inconsistency of block number:", h.Parent.Parent.Parent.Parent.BlockNumber())
+			// Print out all parent block number
+			fmt.Println("h Blocknumber", h.BlockNumber())
+			fmt.Println("Parent 1 Blocknumber", h.Parent.BlockNumber())
+			fmt.Println("Parent 2 Blocknumber", h.Parent.Parent.BlockNumber())
+			fmt.Println("Parent 3 Blocknumber", h.Parent.Parent.Parent.BlockNumber(), h.Parent.Parent.Parent.BlockHash())
+			fmt.Println("Parent 4 Blocknumber, hash", h.Parent.Parent.Parent.Parent.BlockNumber(), h.Parent.Parent.Parent.Parent.BlockHash())
+
+			// Why does it have 2 parents?
+			// 5->4->3->2->2->1
+			// Why is 2 he parent of 2
+
+			assert.Equal(t, blocksForked.Head(1).BlockHash(), h.Parent.Parent.Parent.Parent.BlockHash())
 			lastLongestChainAwaiter.ItHappened()
 		}).Return().Once()
 

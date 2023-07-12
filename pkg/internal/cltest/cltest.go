@@ -103,6 +103,7 @@ func NewBlocks(t *testing.T, numHashes int) *Blocks {
 		if i > 0 {
 			parent := heads[i-1]
 			heads[i].Parent = parent
+			heads[i].Block.PreviousBlockhash = parent.BlockHash().Hash
 		}
 	}
 
@@ -128,6 +129,7 @@ func (b *Blocks) NewHead(number uint64) *types.Head {
 
 	head := Head(number)
 	head.Parent = parent
+	head.Block.PreviousBlockhash = parent.BlockHash().Hash
 
 	return head
 }
@@ -142,6 +144,7 @@ func (b *Blocks) ForkAt(t *testing.T, blockNum int64, numHashes int) *Blocks {
 		forked.Heads[i] = b.Heads[i]
 	}
 
+	forked.Heads[blockNum].Block.PreviousBlockhash = b.Heads[blockNum].Block.PreviousBlockhash
 	forked.Heads[blockNum].Parent = b.Heads[blockNum].Parent
 	return forked
 }
