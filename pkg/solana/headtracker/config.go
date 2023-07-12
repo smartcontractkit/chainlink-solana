@@ -69,3 +69,7 @@ func (c *Config) PollingInterval() time.Duration {
 func (c *Config) SetHeadTrackerSamplingInterval(d time.Duration) {
 	c.Defaults.HeadTrackerSamplingInterval = d
 }
+
+func (c *Config) SetHeadTrackerMaxBufferSize(n uint32) {
+	c.Defaults.HeadTrackerMaxBufferSize = n
+}

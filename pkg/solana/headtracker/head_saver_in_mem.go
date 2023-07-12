@@ -99,7 +99,22 @@ func (hs *InMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) HeadByNumber(blockNumber i
 	hs.mu.RLock()
 	defer hs.mu.RUnlock()
 
-	return hs.HeadsNumber[blockNumber]
+	if heads, exists := hs.HeadsNumber[blockNumber]; exists {
+		return heads
+	}
+
+	return []H{}
+}
+
+func (hs *InMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) HeadByHash(hash BLOCK_HASH) (H, error) {
+	hs.mu.RLock()
+	defer hs.mu.RUnlock()
+
+	if head, exists := hs.Heads[hash]; exists {
+		return head, nil
+	}
+
+	return hs.getNilHead(), errors.New("head not found")
 }
 
 // Assembles the heads together and populates the Heads Map
@@ -108,7 +123,6 @@ func (hs *InMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) AddHeads(historyDepth int6
 	defer hs.mu.Unlock()
 
 	hs.trimHeads(historyDepth)
-
 	for _, head := range newHeads {
 		blockHash := head.BlockHash()
 		blockNumber := head.BlockNumber()
@@ -129,6 +143,16 @@ func (hs *InMemoryHeadSaver[H, BLOCK_HASH, CHAIN_ID]) AddHeads(historyDepth int6
 
 		hs.Heads[blockHash] = head
 		hs.HeadsNumber[blockNumber] = append(hs.HeadsNumber[blockNumber], head)
+
+		// Set the parent of the existing heads to the new heads added
+		for _, existingHead := range hs.Heads {
+			parentHash := existingHead.GetParentHash()
+			if parentHash != hs.getNilHash() {
+				if parent, exists := hs.Heads[parentHash]; exists {
+					hs.setParent(existingHead, parent)
+				}
+			}
+		}
 
 		if !hs.latestHead.IsValid() {
 			hs.latestHead = head
