@@ -79,10 +79,7 @@ func (h *Head) GetParent() commontypes.Head[Hash] {
 }
 
 func (h *Head) GetParentHash() Hash {
-	if h.Parent == nil {
-		return Hash{}
-	}
-	return h.Parent.BlockHash()
+	return Hash{Hash: h.Block.PreviousBlockhash}
 }
 
 func (h *Head) HashAtHeight(slotNum int64) Hash {
