@@ -54,16 +54,10 @@ type Contracts struct {
 	StoreAuth string
 }
 
-type Oracle struct {
-	Signer      string `json:"signer"`
-	Transmitter string `json:"transmitter"`
-	Payee       string `json:"payee"`
-}
-
 type OCR2OnChainConfig struct {
-	Oracles    []Oracle `json:"oracles"`
-	F          int      `json:"f"`
-	ProposalId string   `json:"proposalId"`
+	Oracles    []Operator `json:"oracles"`
+	F          int        `json:"f"`
+	ProposalId string     `json:"proposalId"`
 }
 
 type OffchainConfig struct {
@@ -93,6 +87,7 @@ type ReportingPluginConfig struct {
 	DeltaCNanoseconds   int  `json:"deltaCNanoseconds"`
 }
 
+// TODO - Decouple all OCR2 config structs to be reusable between chains
 type OCROffChainConfig struct {
 	ProposalId     string         `json:"proposalId"`
 	OffchainConfig OffchainConfig `json:"offchainConfig"`
@@ -114,7 +109,7 @@ type ProposalAcceptConfig struct {
 	ProposalId     string         `json:"proposalId"`
 	Version        int            `json:"version"`
 	F              int            `json:"f"`
-	Oracles        []Oracle       `json:"oracles"`
+	Oracles        []Operator     `json:"oracles"`
 	OffchainConfig OffchainConfig `json:"offchainConfig"`
 	RandomSecret   string         `json:"randomSecret"`
 }
@@ -416,10 +411,10 @@ func (m *OCRv2TestState) ValidateRoundsAfter(chaosStartTime time.Time, timeout t
 
 func (m *OCRv2TestState) GenerateOnChainConfig(nodeKeys []client.NodeKeysBundle, vaultAddress string, proposalId string) (OCR2OnChainConfig, error) {
 
-	var oracles []Oracle
+	var oracles []Operator
 
 	for _, nodeKey := range nodeKeys {
-		oracles = append(oracles, Oracle{
+		oracles = append(oracles, Operator{
 			Signer:      strings.Replace(nodeKey.OCR2Key.Data.Attributes.OnChainPublicKey, "ocr2on_solana_", "", 1),
 			Transmitter: nodeKey.TXKey.Data.Attributes.PublicKey,
 			Payee:       vaultAddress,
@@ -513,7 +508,7 @@ func (m *OCRv2TestState) GenerateProposalAcceptConfig(
 	proposalId string,
 	version int,
 	f int,
-	oracles []Oracle,
+	oracles []Operator,
 	offChainConfig OffchainConfig,
 	randomSecret string,
 
