@@ -4,7 +4,7 @@ use anchor_spl::token;
 use arrayref::{array_ref, array_refs};
 use state::{Billing, Proposal, ProposedOracle, STATE_VERSION};
 
-declare_id!("9v5sGbNhyTM23yVvczzPbk5NtCqrARQpZjuzebBur43h");
+declare_id!("cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ");
 
 mod context;
 pub mod event;

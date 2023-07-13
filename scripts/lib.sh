@@ -5,14 +5,10 @@ function modify_program {
   ocr2=$2
   store=$3
 
-old_ac=`cat "${BASH_SOURCE%/*}/../contracts/programs/access-controller/src/lib.rs" | grep -E -e 'declare_id\!\(\"[a-zA-Z0-9]+\"\)' | grep -o '".*"' | tr -d '"' | head -1`
-old_store=`cat "${BASH_SOURCE%/*}/../contracts/programs/store/src/lib.rs" | grep -E -e 'declare_id\!\(\"[a-zA-Z0-9]+\"\)' | grep -o '".*"' | tr -d '"' | head -1`
-old_ocr2=`cat "${BASH_SOURCE%/*}/../contracts/programs/ocr2/src/lib.rs" | grep -E -e 'declare_id\!\(\"[a-zA-Z0-9]+\"\)' | grep -o '".*"' | tr -d '"' | head -1`
-
   # Replace existing declare_id!()
-  sed -i "s/$old_ac/$ac/" "${BASH_SOURCE%/*}/../contracts/programs/access-controller/src/lib.rs"
-  sed -i "s/$old_store/$store/" "${BASH_SOURCE%/*}/../contracts/programs/store/src/lib.rs"
-  sed -i "s/$old_ocr2/$ocr2/" "${BASH_SOURCE%/*}/../contracts/programs/ocr2/src/lib.rs"
+  sed -i "s/9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW/$ac/" "${BASH_SOURCE%/*}/../contracts/programs/access-controller/src/lib.rs"
+  sed -i "s/HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny/$store/" "${BASH_SOURCE%/*}/../contracts/programs/store/src/lib.rs"
+  sed -i "s/cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ/$ocr2/" "${BASH_SOURCE%/*}/../contracts/programs/ocr2/src/lib.rs"
 }
 
 function build {
