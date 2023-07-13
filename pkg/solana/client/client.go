@@ -63,6 +63,7 @@ type Client struct {
 	contextDuration time.Duration
 	log             logger.Logger
 	pollingInterval time.Duration
+	chainId         types.ChainID
 
 	// provides a duplicate function call suppression mechanism
 	requestGroup *singleflight.Group
@@ -148,14 +149,19 @@ func (c *Client) ChainID() (string, error) {
 	return network, nil
 }
 
-// TODO: requires refactor. Do we want to store chainID? how do we want to cache ChainID?
 func (c *Client) ConfiguredChainID() types.ChainID {
+	if c.chainId != types.Unknown {
+		return c.chainId
+	}
+
 	chainID, err := c.ChainID()
 	if err != nil {
-		c.log.Warnf("unable to determine configured chain ID: %v", err)
-		return types.ChainID(types.Localnet)
+		c.log.Warnf("Unable to determine configured chain ID: %v", err)
+		return types.Unknown
 	}
-	return types.StringToChainID(chainID)
+
+	c.chainId = types.StringToChainID(chainID)
+	return c.chainId
 }
 
 func (c *Client) GetFeeForMessage(msg string) (uint64, error) {
@@ -262,10 +268,10 @@ func (c *Client) SubscribeNewHead(ctx context.Context, ch chan<- *types.Head) (*
 				return
 			case <-ticker.C:
 				block, slot, err := c.getLatestBlock(ctx)
-				// TODO: Improve error handling
+
 				if err != nil {
 					subscription.errChan <- err
-					continue
+					return
 				}
 
 				// Create a new Head object and send to channel
@@ -318,7 +324,6 @@ func (c *Client) GetBlock(ctx context.Context, slot uint64) (out *rpc.GetBlockRe
 	return res.(*rpc.GetBlockResult), err
 }
 
-// TODO: confirm commitment for RPC again. Public RPC nodes cannot handle CommitmentProcessed due to requests being too frequent.
 func (c *Client) GetLatestSlot(ctx context.Context) (uint64, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()

@@ -10,7 +10,6 @@ import (
 // It should be replaced with a more robust Config
 // such as the one in pkg/solana/Config
 
-// TODO: replace this Config with a more robust Config. Requires research
 type Config struct {
 	Defaults configSet
 }
@@ -26,7 +25,7 @@ type configSet struct {
 
 var defaultConfigSet = configSet{
 	// headtracker
-	BlockEmissionIdleWarningThreshold: 30 * time.Second, // TODO: Check this Config value again
+	BlockEmissionIdleWarningThreshold: 30 * time.Second,
 	FinalityDepth:                     50,
 	HeadTrackerHistoryDepth:           100,
 	HeadTrackerMaxBufferSize:          3,

@@ -7,6 +7,7 @@ const (
 	Testnet
 	Devnet
 	Localnet
+	Unknown
 )
 
 // String returns the string representation of the Network value.
@@ -36,6 +37,6 @@ func StringToChainID(id string) ChainID {
 	case "localnet":
 		return Localnet
 	default:
-		return Localnet
+		return Unknown
 	}
 }
