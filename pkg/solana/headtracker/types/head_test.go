@@ -73,14 +73,30 @@ func TestHead_EarliestHeadInChain(t *testing.T) {
 }
 
 func TestHead_GetParentHash(t *testing.T) {
-	blockResult := cltest.ConfigureBlockResult()
 	id := types.Mainnet
 
-	head := types.NewHead(3, blockResult,
-		types.NewHead(2, blockResult,
-			types.NewHead(1, blockResult, nil, id), id), id)
+	blockResult0 := cltest.ConfigureBlockResult()
+	h0 := types.NewHead(0, blockResult0, nil, id)
 
-	assert.Equal(t, head.Parent.BlockHash(), head.GetParentHash())
+	blockResult1 := cltest.ConfigureBlockResult()
+	blockResult1.ParentSlot = 0
+	blockResult1.PreviousBlockhash = blockResult0.Blockhash
+	h1 := types.NewHead(1, blockResult1, h0, id)
+
+	blockResult2 := cltest.ConfigureBlockResult()
+	blockResult2.ParentSlot = 1
+	blockResult2.PreviousBlockhash = blockResult1.Blockhash
+	h2 := types.NewHead(2, blockResult2, h1, id)
+
+	blockResult3 := cltest.ConfigureBlockResult()
+	blockResult3.ParentSlot = 2
+	blockResult3.PreviousBlockhash = blockResult2.Blockhash
+	h3 := types.NewHead(3, blockResult3, h2, id)
+
+	// h3 -> h2 -> h1 -> h0
+	assert.Equal(t, h2.BlockHash(), h3.GetParentHash())
+	assert.Equal(t, h1.BlockHash(), h2.GetParentHash())
+	assert.Equal(t, h0.BlockHash(), h1.GetParentHash())
 }
 
 func TestHead_GetParent(t *testing.T) {

@@ -21,7 +21,7 @@ func (id ChainID) String() string {
 	case Localnet:
 		return "localnet"
 	default:
-		return "localnet"
+		return "unknown"
 	}
 }
 

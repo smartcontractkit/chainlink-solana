@@ -3,7 +3,6 @@ package headtracker_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math"
 	"math/big"
 	"sync"
@@ -463,28 +462,15 @@ func TestHeadTracker_SwitchesToLongestChainWithHeadSamplingEnabled(t *testing.T)
 	headSeq.Append(blocksForked.Head(4))
 	headSeq.Append(blocksForked.Head(5)) // Now the new chain is longer
 
-	// Print out all the block and the parent block
-	for i := 0; i < len(headSeq.Heads); i++ {
-		h := headSeq.Heads[i]
-		if h.Parent == nil {
-			fmt.Println("headSeq h.BlockNumber, hash:", h.BlockNumber(), h.BlockHash(), "Parent: nil")
-		} else {
-			fmt.Println("headSeq", h.BlockNumber(), h.BlockHash(), "Parent: ", h.Parent.BlockNumber(), h.Parent.BlockHash())
-		}
-	}
-
 	lastLongestChainAwaiter := cltest.NewAwaiter()
 
 	// the callback is only called for head number 5 because of head sampling
 	checker.On("OnNewLongestChain", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			h := args.Get(1).(*types.Head)
-			fmt.Println("OnNewLongestChain", h.BlockNumber())
 
 			assert.Equal(t, int64(5), h.BlockNumber())
 			assert.Equal(t, blocksForked.Head(5).BlockHash(), h.BlockHash())
-
-			fmt.Println("\n\n H Parent: ", h.Parent) // Why is the parent nil?
 
 			// This is the new longest chain, check that it came with its parents
 			if !assert.NotNil(t, h.Parent) {
@@ -502,18 +488,6 @@ func TestHeadTracker_SwitchesToLongestChainWithHeadSamplingEnabled(t *testing.T)
 			if !assert.NotNil(t, h.Parent.Parent.Parent.Parent) {
 				return
 			}
-			// h is 5, h.parent.parent.parent.parent is 1
-			fmt.Println("Inconsistency of block number:", h.Parent.Parent.Parent.Parent.BlockNumber())
-			// Print out all parent block number
-			fmt.Println("h Blocknumber", h.BlockNumber())
-			fmt.Println("Parent 1 Blocknumber", h.Parent.BlockNumber())
-			fmt.Println("Parent 2 Blocknumber", h.Parent.Parent.BlockNumber())
-			fmt.Println("Parent 3 Blocknumber", h.Parent.Parent.Parent.BlockNumber(), h.Parent.Parent.Parent.BlockHash())
-			fmt.Println("Parent 4 Blocknumber, hash", h.Parent.Parent.Parent.Parent.BlockNumber(), h.Parent.Parent.Parent.Parent.BlockHash())
-
-			// Why does it have 2 parents?
-			// 5->4->3->2->2->1
-			// Why is 2 he parent of 2
 
 			assert.Equal(t, blocksForked.Head(1).BlockHash(), h.Parent.Parent.Parent.Parent.BlockHash())
 			lastLongestChainAwaiter.ItHappened()
@@ -559,7 +533,6 @@ func TestHeadTracker_SwitchesToLongestChainWithHeadSamplingEnabled(t *testing.T)
 	}
 }
 
-// TODO: Fix this test later
 func TestHeadTracker_SwitchesToLongestChainWithHeadSamplingDisabled(t *testing.T) {
 	t.Parallel()
 	lggr, _ := logger.New()
@@ -586,7 +559,7 @@ func TestHeadTracker_SwitchesToLongestChainWithHeadSamplingDisabled(t *testing.T
 	// ---------------------
 	blocks := cltest.NewBlocks(t, 10)
 
-	head0 := blocks.Head(0) // types.Head{Number: 0, Hash: utils.NewSolanaHash(), ParentHash: utils.NewSolanaHash(), Timestamp: time.Unix(0, 0)}
+	head0 := blocks.Head(0)
 	// Initial query
 	client.On("HeadByNumber", mock.Anything, (*big.Int)(nil)).Return(head0, nil)
 
@@ -611,21 +584,6 @@ func TestHeadTracker_SwitchesToLongestChainWithHeadSamplingDisabled(t *testing.T
 	headSeq.Append(blocksForked.Head(4))
 	headSeq.Append(blocksForked.Head(5)) // Now the new chain is longer
 
-	// --------------------- Delete
-	// Print HeadSequence in a nice format
-	fmt.Println("headSeq", headSeq.Heads)
-
-	// Iterate over Head sequence, print head.BlockHash() and parent.BlockHash()
-	// Add new line after each head
-	for _, h := range headSeq.Heads {
-		if h.Parent == nil {
-			fmt.Printf("head %s, parent nil \n\n", h.BlockHash())
-			continue
-		}
-		fmt.Printf("head hash %s head number %d, parent hash %s parent number %d \n\n ", h.BlockHash(), h.BlockNumber(), h.Parent.BlockHash(), h.Parent.BlockNumber())
-	}
-	// --------------------- Delete
-
 	lastLongestChainAwaiter := cltest.NewAwaiter()
 
 	checker.On("OnNewLongestChain", mock.Anything, mock.Anything).
@@ -640,9 +598,6 @@ func TestHeadTracker_SwitchesToLongestChainWithHeadSamplingDisabled(t *testing.T
 			h := args.Get(1).(*types.Head)
 			require.Equal(t, int64(1), h.BlockNumber())
 			require.Equal(t, blocks.Head(1).BlockHash(), h.BlockHash())
-
-			fmt.Println("good h number, hash", h.BlockNumber(), h.BlockHash())
-
 		}).Return().Once()
 
 	checker.On("OnNewLongestChain", mock.Anything, mock.Anything).
@@ -650,12 +605,6 @@ func TestHeadTracker_SwitchesToLongestChainWithHeadSamplingDisabled(t *testing.T
 			h := args.Get(1).(*types.Head)
 			require.Equal(t, int64(3), h.BlockNumber())
 			require.Equal(t, blocks.Head(3).BlockHash(), h.BlockHash())
-
-			// Get parent parent parent
-			fmt.Println("problematic h number, hash", h.BlockNumber(), h.BlockHash())
-
-			// Get parent
-			fmt.Println("Parent of problematic h", h.Parent)
 		}).Return().Once()
 
 	checker.On("OnNewLongestChain", mock.Anything, mock.Anything).
@@ -752,10 +701,6 @@ func TestHeadTracker_Backfill(t *testing.T) {
 
 	h1 := cltest.Head(1)
 	h1.Block.PreviousBlockhash = head0.BlockHash().Hash
-
-	fmt.Println("\n\n head0 Blockhash \n", head0.BlockHash().Hash)
-	fmt.Println("\n\n h1 Blockhash \n", h1.GetParentHash())
-	fmt.Println("h1 Blockhash \n", h1.Block.PreviousBlockhash)
 
 	h8 := cltest.Head(8)
 
