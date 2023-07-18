@@ -12,13 +12,13 @@ require (
 	github.com/onsi/gomega v1.24.1
 	github.com/rs/zerolog v1.29.1
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
-	github.com/smartcontractkit/chainlink-env v0.33.1
+	github.com/smartcontractkit/chainlink-env v0.34.2
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20230518143827-0b7a6e43719c
-	github.com/smartcontractkit/chainlink-testing-framework v1.11.5
+	github.com/smartcontractkit/chainlink-testing-framework v1.13.1
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230418232145-9b83bdc20e8a
 	github.com/smartcontractkit/chainlink/v2 v2.2.0-mercury-20230527.0.20230531021143-790758f0bd08
 	github.com/smartcontractkit/libocr v0.0.0-20230525150148-a75f6e244bb3
-	github.com/stretchr/testify v1.8.3
+	github.com/stretchr/testify v1.8.4
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.9.0
 	golang.org/x/sync v0.2.0
@@ -264,8 +264,8 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/prometheus/client_golang v1.15.1 // indirect
-	github.com/prometheus/client_model v0.3.0 // indirect
-	github.com/prometheus/common v0.42.0 // indirect
+	github.com/prometheus/client_model v0.4.0 // indirect
+	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/pyroscope-io/client v0.7.1 // indirect
 	github.com/pyroscope-io/godeltaprof v0.1.0 // indirect
@@ -335,7 +335,7 @@ require (
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/mod v0.10.0 // indirect
 	golang.org/x/net v0.10.0 // indirect
-	golang.org/x/oauth2 v0.6.0 // indirect
+	golang.org/x/oauth2 v0.8.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/term v0.8.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
