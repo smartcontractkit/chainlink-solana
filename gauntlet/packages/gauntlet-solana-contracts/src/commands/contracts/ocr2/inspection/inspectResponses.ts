@@ -19,6 +19,13 @@ type Oracle = {
   apis: string[]
 }
 
+type Transmission = {
+  latestTransmissionNo: number
+  roundId: number
+  answer: any
+  transmitter: string
+}
+
 // Returns a formatted oracle log given a list of addresses and a start tab
 // if a list of oracles is provided, add context to logs
 const makeOracleLog = (addresses: string[], startTab = 2, oracles?: Oracle[]): string[] => {
@@ -116,7 +123,7 @@ export default class OCR2InspectResponses extends SolanaCommand {
 
     // Store observers from each transmission
     const observerRounds: PublicKey[][] = []
-
+    const transmissionDetails: Transmission[] = []
     events.forEach((event, i) => {
       // Map observer indices into addresses
       const observers = (event.observers as []).slice(0, event.observerCount).map((observer) => transmitters[observer])
@@ -144,7 +151,14 @@ export default class OCR2InspectResponses extends SolanaCommand {
     ${event.observerCount}/${transmitters.length} oracles are responding
   `,
       )
-
+      transmissionDetails.push(
+          {
+            latestTransmissionNo: i + 1,
+            roundId: event.roundId,
+            answer: parseInt(event.answer.toString(), 2),
+            transmitter: transmitters[event.transmitter].toString()
+          }
+      )
       // Log oracles that are not responsive
       var notResponding: number = 0
       transmitters.forEach((transmitter) => {
@@ -185,10 +199,11 @@ export default class OCR2InspectResponses extends SolanaCommand {
     const successfulInspection = inspection.inspect(inspections)
 
     return {
+      data:   transmissionDetails,
       responses: [
         {
           tx: this.wrapInspectResponse(successfulInspection, state.toString()),
-          contract: state.toString(),
+          contract: state.toString()
         },
       ],
     } as Result<TransactionResponse>

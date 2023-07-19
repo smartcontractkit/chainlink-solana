@@ -10,7 +10,7 @@ import (
 )
 
 func TestSolanaOCRV2SoakTest(t *testing.T) {
-	state := common.NewOCRv2State(t, 5, "soak")
+	state := common.NewOCRv2State(t, 5, "soak", "localnet")
 	state.DeployCluster(utils.ContractsDir)
 	if state.Common.Env.WillUseRemoteRunner() {
 		return
