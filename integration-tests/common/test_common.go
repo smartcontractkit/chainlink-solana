@@ -9,15 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/utils"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zapcore"
-
 	"github.com/onsi/gomega"
 	"github.com/smartcontractkit/chainlink-env/environment"
-	"github.com/smartcontractkit/chainlink/integration-tests/actions"
-
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils"
+	"github.com/stretchr/testify/require"
 
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
@@ -170,16 +166,7 @@ func (m *OCRv2TestState) LabelChaosGroups() {
 }
 
 func (m *OCRv2TestState) DeployCluster(contractsDir string) {
-	l := utils.GetTestLogger(m.T)
 	m.DeployEnv(contractsDir)
-	if m.Common.Env.WillUseRemoteRunner() {
-		return
-	}
-	m.T.Cleanup(func() {
-		if err := actions.TeardownSuite(m.T, m.Common.Env, "logs", m.ChainlinkNodes, nil, zapcore.PanicLevel, nil); err != nil {
-			l.Error().Err(err).Msg("Error tearing down environment")
-		}
-	})
 	m.SetupClients()
 	m.DeployContracts(contractsDir)
 	m.CreateJobs()

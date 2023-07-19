@@ -10,10 +10,12 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	ctfUtils "github.com/smartcontractkit/chainlink-testing-framework/utils"
+	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap/zapcore"
 	"gopkg.in/guregu/null.v4"
 	"sort"
 	"testing"
@@ -26,22 +28,38 @@ import (
 )
 
 func TestSolanaOCRV2Smoke(t *testing.T) {
+	l := ctfUtils.GetTestLogger(t)
 	state := common.NewOCRv2State(t, 1, "smoke", "localnet")
 	state.DeployCluster(utils.ContractsDir)
 	if state.Common.Env.WillUseRemoteRunner() {
 		return
 	}
+	t.Cleanup(func() {
+		if err := actions.TeardownSuite(t, state.Common.Env, "logs", state.ChainlinkNodes, nil, zapcore.PanicLevel, nil); err != nil {
+			l.Error().Err(err).Msg("Error tearing down environment")
+		}
+	})
 	state.SetAllAdapterResponsesToTheSameValue(10)
 	state.ValidateRoundsAfter(time.Now(), common.NewRoundCheckTimeout, 1)
 }
 
 func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
+	l := ctfUtils.GetTestLogger(t)
 	secret := "this is an testing only secret"
 	state := common.NewOCRv2State(t, 1, "gauntlet", "devnet")
 	sg, err := gauntlet.NewSolanaGauntlet(fmt.Sprintf("%s/gauntlet", utils.ProjectRoot))
 
 	err = state.Common.Env.Run()
 	require.NoError(t, err)
+
+	if state.Common.Env.WillUseRemoteRunner() {
+		return
+	}
+	t.Cleanup(func() {
+		if err := actions.TeardownSuite(t, state.Common.Env, "logs", state.ChainlinkNodes, nil, zapcore.PanicLevel, nil); err != nil {
+			l.Error().Err(err).Msg("Error tearing down environment")
+		}
+	})
 
 	state.SetupClients()
 	state.NodeKeysBundle, err = state.Common.CreateNodeKeysBundle(state.ChainlinkNodes)
@@ -191,7 +209,6 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	}
 
 	// Test start
-	l := ctfUtils.GetTestLogger(t)
 	for i := 1; i < 10; i++ {
 		transmissions, err := sg.FetchTransmissions(sg.OcrAddress)
 		require.NoError(t, err)
