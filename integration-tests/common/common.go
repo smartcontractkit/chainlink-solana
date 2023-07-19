@@ -291,7 +291,7 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 			URL:         fmt.Sprintf("%s/%s", mock.Config.ClusterURL, nodeContractPairID),
 			RequestData: "{}",
 		}
-		observationSource := client.ObservationSourceSpecBridge(sourceValueBridge)
+		observationSource := client.ObservationSourceSpecBridge(&sourceValueBridge)
 		err = nodesInfo.BootstrapNode.MustCreateBridge(&sourceValueBridge)
 		if err != nil {
 			return err
@@ -301,7 +301,7 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 			URL:         fmt.Sprintf("%s/juels", mock.Config.ClusterURL),
 			RequestData: "{}",
 		}
-		juelsSource := client.ObservationSourceSpecBridge(juelsBridge)
+		juelsSource := client.ObservationSourceSpecBridge(&juelsBridge)
 		err = nodesInfo.BootstrapNode.MustCreateBridge(&juelsBridge)
 		if err != nil {
 			return err
@@ -318,7 +318,7 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 				URL:         fmt.Sprintf("%s/%s", mock.Config.ClusterURL, nodeContractPairID),
 				RequestData: "{}",
 			}
-			observationSource := client.ObservationSourceSpecBridge(sourceValueBridge)
+			observationSource := client.ObservationSourceSpecBridge(&sourceValueBridge)
 			err = node.MustCreateBridge(&sourceValueBridge)
 			if err != nil {
 				return err
@@ -328,7 +328,7 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 				URL:         fmt.Sprintf("%s/juels", mock.Config.ClusterURL),
 				RequestData: "{}",
 			}
-			juelsSource := client.ObservationSourceSpecBridge(juelsBridge)
+			juelsSource := client.ObservationSourceSpecBridge(&juelsBridge)
 			err = node.MustCreateBridge(&juelsBridge)
 			if err != nil {
 				return err
@@ -355,9 +355,9 @@ func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error
 	}
 	bootstrapPeers := []client.P2PData{
 		{
-			RemoteIP:   contractNodeInfo.BootstrapNode.RemoteIP(),
-			RemotePort: "6690",
-			PeerID:     contractNodeInfo.BootstrapNodeKeysBundle.PeerID,
+			InternalIP:   contractNodeInfo.BootstrapNode.InternalIP(),
+			InternalPort: "6690",
+			PeerID:       contractNodeInfo.BootstrapNodeKeysBundle.PeerID,
 		},
 	}
 	jobSpec := &client.OCR2TaskJobSpec{

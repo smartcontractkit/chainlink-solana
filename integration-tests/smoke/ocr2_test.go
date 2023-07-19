@@ -46,6 +46,8 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	state.SetupClients()
 	state.NodeKeysBundle, err = state.Common.CreateNodeKeysBundle(state.ChainlinkNodes)
 	require.NoError(t, err)
+	err = state.Common.CreateSolanaChainAndNode(state.ChainlinkNodes)
+	require.NoError(t, err)
 
 	gauntletConfig := state.ConfigureGauntlet(secret)
 	err = sg.SetupNetwork(gauntletConfig)
@@ -117,9 +119,9 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	}
 	bootstrapPeers := []client.P2PData{
 		{
-			RemoteIP:   state.ChainlinkNodes[0].RemoteIP(),
-			RemotePort: "6690",
-			PeerID:     state.NodeKeysBundle[0].PeerID,
+			InternalIP:   state.ChainlinkNodes[0].InternalIP(),
+			InternalPort: "6690",
+			PeerID:       state.NodeKeysBundle[0].PeerID,
 		},
 	}
 	jobSpec := &client.OCR2TaskJobSpec{
@@ -142,7 +144,7 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 		RequestData: "{}",
 	}
 
-	observationSource := client.ObservationSourceSpecBridge(sourceValueBridge)
+	observationSource := client.ObservationSourceSpecBridge(&sourceValueBridge)
 	bridgeInfo := common.BridgeInfo{ObservationSource: observationSource}
 	err = state.ChainlinkNodes[0].MustCreateBridge(&sourceValueBridge)
 	require.NoError(t, err)
