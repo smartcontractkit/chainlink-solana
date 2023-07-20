@@ -111,6 +111,7 @@ type ProposalAcceptConfig struct {
 }
 
 func NewOCRv2State(t *testing.T, contracts int, namespacePrefix string, env string) *OCRv2TestState {
+
 	state := &OCRv2TestState{
 		Mu:                 &sync.Mutex{},
 		LastRoundTime:      make(map[string]time.Time),
@@ -119,6 +120,7 @@ func NewOCRv2State(t *testing.T, contracts int, namespacePrefix string, env stri
 		Client:             &solclient.Client{},
 		T:                  t,
 	}
+
 	state.Client.Config = state.Client.Config.Default()
 	for i := 0; i < contracts; i++ {
 		state.ContractsNodeSetup[i] = &ContractNodeInfo{}
@@ -192,9 +194,6 @@ func (m *OCRv2TestState) UploadProgramBinaries(contractsDir string) {
 func (m *OCRv2TestState) DeployEnv(contractsDir string) {
 	err := m.Common.Env.Run()
 	require.NoError(m.T, err)
-	if m.Common.Env.WillUseRemoteRunner() {
-		return
-	}
 
 	m.Common.SolanaUrl = m.Common.Env.URLs[m.Client.Config.Name][0]
 	m.UploadProgramBinaries(contractsDir)
