@@ -2,8 +2,6 @@ package common
 
 import (
 	"fmt"
-	"github.com/smartcontractkit/chainlink/integration-tests/actions"
-	"go.uber.org/zap/zapcore"
 	"math/big"
 	"os"
 	"strings"
@@ -170,16 +168,7 @@ func (m *OCRv2TestState) LabelChaosGroups() {
 }
 
 func (m *OCRv2TestState) DeployCluster(contractsDir string) {
-	l := utils.GetTestLogger(m.T)
 	m.DeployEnv(contractsDir)
-	if m.Common.Env.WillUseRemoteRunner() {
-		return
-	}
-	m.T.Cleanup(func() {
-		if err := actions.TeardownSuite(m.T, m.Common.Env, "logs", m.ChainlinkNodes, nil, zapcore.PanicLevel, nil); err != nil {
-			l.Error().Err(err).Msg("Error tearing down environment")
-		}
-	})
 	m.SetupClients()
 	m.DeployContracts(contractsDir)
 	m.CreateJobs()
