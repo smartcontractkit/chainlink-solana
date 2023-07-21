@@ -47,7 +47,7 @@ jobs:
     steps:
       - name: Check if image exists
         id: check-image
-        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@c46244485685a0c0b1bea657b8602360378e4cd7 # v3.5.0
+        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@ab53e6ea68e772cbeb66a5b81b23b3887275b41f # v3.5.0
         with:
           repository: chainlink-solana-tests
           tag: ${{ github.sha }}
@@ -84,7 +84,7 @@ jobs:
     steps:
       - name: Check if image exists
         id: check-image
-        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@c46244485685a0c0b1bea657b8602360378e4cd7 # v3.5.0
+        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@ab53e6ea68e772cbeb66a5b81b23b3887275b41f # v3.5.0
         with:
           repository: chainlink
           tag: solana.${{ github.sha }}
@@ -92,7 +92,7 @@ jobs:
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       - name: Build Image
         if: steps.check-image.outputs.exists == 'false'
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@d5ab9fe53da374dd789b5d9ef10f3282197e088d # we will want to switch to this once cosmos settles back down 336617ae6d70fec60c15cc3382e17a4d2615a801 # v2.2.0
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@ab53e6ea68e772cbeb66a5b81b23b3887275b41f # we will want to switch to this once cosmos settles back down 336617ae6d70fec60c15cc3382e17a4d2615a801 # v2.2.0
         with:
           cl_repo: smartcontractkit/chainlink
           cl_ref: ${{ github.event.inputs.cl_branch_ref }}
@@ -161,7 +161,7 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@c46244485685a0c0b1bea657b8602360378e4cd7 # v3.5.0
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@ab53e6ea68e772cbeb66a5b81b23b3887275b41f # v3.5.0
         with:
           test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestfmt
           go_mod_path: ./integration-tests/go.mod
