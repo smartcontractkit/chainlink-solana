@@ -14,7 +14,7 @@ require (
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
 	github.com/smartcontractkit/chainlink-env v0.35.0
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20230612131011-369bfb503592
-	github.com/smartcontractkit/chainlink-testing-framework v1.12.0
+	github.com/smartcontractkit/chainlink-testing-framework v1.14.0
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230713025544-29b418df4ded
 	github.com/smartcontractkit/chainlink/v2 v2.2.1-0.20230713025544-29b418df4ded
 	github.com/smartcontractkit/libocr v0.0.0-20230606215712-82b910bef5c1
