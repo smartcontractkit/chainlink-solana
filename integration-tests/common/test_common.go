@@ -564,3 +564,17 @@ func (m *OCRv2TestState) ConfigureGauntlet(secret string) map[string]string {
 	}
 
 }
+
+// GauntletEnvToRemoteRunner Setup the environment variables that will be needed inside the remote runner
+func (m *OCRv2TestState) GauntletEnvToRemoteRunner() {
+	utils.SetupEnvVarsForRemoteRunner([]string{
+		"RPC_URL",
+		"WS_URL",
+		"PRIVATE_KEY",
+		"PROGRAM_ID_OCR2",
+		"PROGRAM_ID_ACCESS_CONTROLLER",
+		"PROGRAM_ID_STORE",
+		"LINK_TOKEN",
+		"VAULT_ADDRESS",
+	})
+}

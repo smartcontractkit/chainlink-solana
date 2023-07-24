@@ -3,6 +3,10 @@ package smoke
 import (
 	"context"
 	"fmt"
+	"sort"
+	"testing"
+	"time"
+
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/gagliardetto/solana-go/rpc/ws"
 	"github.com/lib/pq"
@@ -17,9 +21,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/guregu/null.v4"
-	"sort"
-	"testing"
-	"time"
 
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 
@@ -30,10 +31,13 @@ import (
 func TestSolanaOCRV2Smoke(t *testing.T) {
 	l := ctfUtils.GetTestLogger(t)
 	state := common.NewOCRv2State(t, 1, "smoke", "localnet")
-	state.DeployCluster(utils.ContractsDir)
 	if state.Common.Env.WillUseRemoteRunner() {
+		// run the remote runner and exit
+		err := state.Common.Env.Run()
+		require.NoError(t, err)
 		return
 	}
+	state.DeployCluster(utils.ContractsDir)
 	t.Cleanup(func() {
 		if err := actions.TeardownSuite(t, state.Common.Env, "logs", state.ChainlinkNodes, nil, zapcore.PanicLevel, nil); err != nil {
 			l.Error().Err(err).Msg("Error tearing down environment")
@@ -47,14 +51,17 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	l := ctfUtils.GetTestLogger(t)
 	secret := "this is an testing only secret"
 	state := common.NewOCRv2State(t, 1, "gauntlet", "devnet")
-	sg, err := gauntlet.NewSolanaGauntlet(fmt.Sprintf("%s/gauntlet", utils.ProjectRoot))
-
-	err = state.Common.Env.Run()
-	require.NoError(t, err)
-
 	if state.Common.Env.WillUseRemoteRunner() {
+		// run the remote runner and exit
+		state.GauntletEnvToRemoteRunner()
+		err := state.Common.Env.Run()
+		require.NoError(t, err)
 		return
 	}
+	sg, err := gauntlet.NewSolanaGauntlet(fmt.Sprintf("%s/gauntlet", utils.ProjectRoot))
+	require.NoError(t, err)
+	err = state.Common.Env.Run()
+	require.NoError(t, err)
 	t.Cleanup(func() {
 		if err := actions.TeardownSuite(t, state.Common.Env, "logs", state.ChainlinkNodes, nil, zapcore.PanicLevel, nil); err != nil {
 			l.Error().Err(err).Msg("Error tearing down environment")
@@ -74,6 +81,7 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	// Setting up RPC
 	c := rpc.New(gauntletConfig["NODE_URL"])
 	wsc, err := ws.Connect(context.Background(), gauntletConfig["WS_URL"])
+	require.NoError(t, err)
 
 	_, err = sg.DeployOCR2()
 	require.NoError(t, err, "Error deploying OCR")
@@ -119,6 +127,7 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 
 	require.NoError(t, err)
 	err = sg.ConfigureOCR2(onChainConfig, offChainConfig, payees, proposalAccept)
+	require.NoError(t, err)
 
 	err = state.Common.CreateSolanaChainAndNode(state.ChainlinkNodes)
 	require.NoError(t, err)
