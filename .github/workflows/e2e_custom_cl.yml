@@ -131,7 +131,7 @@ jobs:
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
 
   e2e_custom_run_smoke_tests:
-    name: E2E Run Smoke Tests
+    name: E2E Custom Run Smoke Tests
     environment: integration
     permissions:
       checks: write
@@ -156,7 +156,7 @@ jobs:
         with:
           basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
           hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
-          this-job-name: E2E Run Smoke Tests
+          this-job-name: E2E Custom Run Smoke Tests
         continue-on-error: true
       - name: Checkout the repo
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
