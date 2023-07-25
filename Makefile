@@ -82,7 +82,7 @@ test_relay_unit:
 
 test_smoke:
 	cd ./integration-tests &&\
-	SELECTED_NETWORKS=SIMULATED go test -timeout 24h -count=1 -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestfmt
+	SELECTED_NETWORKS=SIMULATED go test -timeout 24h -count=1 -json $(args) -run TestSolanaOCRV2Smoke ./smoke 2>&1 | tee /tmp/gotest.log | gotestfmt
 
 test_ocr_soak:
 	cd ./integration-tests &&\

@@ -39,11 +39,13 @@ import (
 )
 
 const (
-	ChainName        = "solana"
-	ChainID          = "localnet"
-	DefaultNodeCount = 5
-	DefaultTTL       = "3h"
-	SolanaURL        = "http://sol:8899"
+	ChainName         = "solana"
+	LocalnetChainID   = "localnet"
+	DevnetChainID     = "devnet"
+	DefaultNodeCount  = 5
+	DefaultTTL        = "3h"
+	SolanaLocalNetURL = "http://sol:8899"
+	SolanaDevnetURL   = "https://api.devnet.solana.com"
 )
 
 type Common struct {
@@ -94,11 +96,21 @@ func stripKeyPrefix(key string) string {
 	return key
 }
 
-func New() *Common {
+func New(env string) *Common {
 	var err error
-	c := &Common{
-		ChainName: ChainName,
-		ChainId:   ChainID,
+	var c *Common
+	if env == "devnet" {
+		c = &Common{
+			ChainName: ChainName,
+			ChainId:   DevnetChainID,
+			SolanaUrl: SolanaDevnetURL,
+		}
+	} else {
+		c = &Common{
+			ChainName: ChainName,
+			ChainId:   LocalnetChainID,
+			SolanaUrl: SolanaLocalNetURL,
+		}
 	}
 	// Checking if count of OCR nodes is defined in ENV
 	nodeCountSet, nodeCountDefined := os.LookupEnv("NODE_COUNT")
@@ -138,14 +150,14 @@ func New() *Common {
 
 func (c *Common) CreateSolanaChainAndNode(nodes []*client.Chainlink) error {
 	for _, n := range nodes {
-		_, _, err := n.CreateSolanaChain(&client.SolanaChainAttributes{ChainID: ChainID})
+		_, _, err := n.CreateSolanaChain(&client.SolanaChainAttributes{ChainID: c.ChainId})
 		if err != nil {
 			return err
 		}
 		_, _, err = n.CreateSolanaNode(&client.SolanaNodeAttributes{
 			Name:          ChainName,
-			SolanaChainID: ChainID,
-			SolanaURL:     SolanaURL,
+			SolanaChainID: c.ChainId,
+			SolanaURL:     c.SolanaUrl,
 		})
 		if err != nil {
 			return err
@@ -154,7 +166,7 @@ func (c *Common) CreateSolanaChainAndNode(nodes []*client.Chainlink) error {
 	return nil
 }
 
-func CreateNodeKeysBundle(nodes []*client.Chainlink) ([]client.NodeKeysBundle, error) {
+func (c *Common) CreateNodeKeysBundle(nodes []*client.Chainlink) ([]client.NodeKeysBundle, error) {
 	nkb := make([]client.NodeKeysBundle, 0)
 	for _, n := range nodes {
 		p2pkeys, err := n.MustReadP2PKeys()
@@ -163,7 +175,7 @@ func CreateNodeKeysBundle(nodes []*client.Chainlink) ([]client.NodeKeysBundle, e
 		}
 
 		peerID := p2pkeys.Data[0].Attributes.PeerID
-		txKey, _, err := n.CreateTxKey(ChainName, ChainID)
+		txKey, _, err := n.CreateTxKey(ChainName, c.ChainId)
 		if err != nil {
 			return nil, err
 		}
@@ -279,7 +291,7 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 			URL:         fmt.Sprintf("%s/%s", mock.Config.ClusterURL, nodeContractPairID),
 			RequestData: "{}",
 		}
-		observationSource := client.ObservationSourceSpecBridge(sourceValueBridge)
+		observationSource := client.ObservationSourceSpecBridge(&sourceValueBridge)
 		err = nodesInfo.BootstrapNode.MustCreateBridge(&sourceValueBridge)
 		if err != nil {
 			return err
@@ -289,7 +301,7 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 			URL:         fmt.Sprintf("%s/juels", mock.Config.ClusterURL),
 			RequestData: "{}",
 		}
-		juelsSource := client.ObservationSourceSpecBridge(juelsBridge)
+		juelsSource := client.ObservationSourceSpecBridge(&juelsBridge)
 		err = nodesInfo.BootstrapNode.MustCreateBridge(&juelsBridge)
 		if err != nil {
 			return err
@@ -306,7 +318,7 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 				URL:         fmt.Sprintf("%s/%s", mock.Config.ClusterURL, nodeContractPairID),
 				RequestData: "{}",
 			}
-			observationSource := client.ObservationSourceSpecBridge(sourceValueBridge)
+			observationSource := client.ObservationSourceSpecBridge(&sourceValueBridge)
 			err = node.MustCreateBridge(&sourceValueBridge)
 			if err != nil {
 				return err
@@ -316,7 +328,7 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 				URL:         fmt.Sprintf("%s/juels", mock.Config.ClusterURL),
 				RequestData: "{}",
 			}
-			juelsSource := client.ObservationSourceSpecBridge(juelsBridge)
+			juelsSource := client.ObservationSourceSpecBridge(&juelsBridge)
 			err = node.MustCreateBridge(&juelsBridge)
 			if err != nil {
 				return err
@@ -327,7 +339,7 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 	return nil
 }
 
-func pluginConfigToTomlFormat(pluginConfig string) job.JSONConfig {
+func PluginConfigToTomlFormat(pluginConfig string) job.JSONConfig {
 	return job.JSONConfig{
 		"juelsPerFeeCoinSource": fmt.Sprintf("\"\"\"\n%s\n\"\"\"", pluginConfig),
 	}
@@ -335,17 +347,17 @@ func pluginConfigToTomlFormat(pluginConfig string) job.JSONConfig {
 
 func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error {
 	relayConfig := job.JSONConfig{
-		"nodeEndpointHTTP": fmt.Sprintf("\"%s\"", SolanaURL),
+		"nodeEndpointHTTP": fmt.Sprintf("\"%s\"", SolanaLocalNetURL),
 		"ocr2ProgramID":    fmt.Sprintf("\"%s\"", contractNodeInfo.OCR2.ProgramAddress()),
 		"transmissionsID":  fmt.Sprintf("\"%s\"", contractNodeInfo.Store.TransmissionsAddress()),
 		"storeProgramID":   fmt.Sprintf("\"%s\"", contractNodeInfo.Store.ProgramAddress()),
-		"chainID":          fmt.Sprintf("\"%s\"", ChainID),
+		"chainID":          fmt.Sprintf("\"%s\"", LocalnetChainID),
 	}
 	bootstrapPeers := []client.P2PData{
 		{
-			RemoteIP:   contractNodeInfo.BootstrapNode.RemoteIP(),
-			RemotePort: "6690",
-			PeerID:     contractNodeInfo.BootstrapNodeKeysBundle.PeerID,
+			InternalIP:   contractNodeInfo.BootstrapNode.InternalIP(),
+			InternalPort: "6690",
+			PeerID:       contractNodeInfo.BootstrapNodeKeysBundle.PeerID,
 		},
 	}
 	jobSpec := &client.OCR2TaskJobSpec{
@@ -381,7 +393,7 @@ func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error
 				ContractConfigConfirmations:       1,
 				ContractConfigTrackerPollInterval: models.Interval(15 * time.Second),
 				PluginType:                        "median",
-				PluginConfig:                      pluginConfigToTomlFormat(contractNodeInfo.BridgeInfos[nIdx].JuelsSource),
+				PluginConfig:                      PluginConfigToTomlFormat(contractNodeInfo.BridgeInfos[nIdx].JuelsSource),
 			},
 		}
 		if _, err := n.MustCreateJob(jobSpec); err != nil {
@@ -426,7 +438,7 @@ Enabled = true
 DeltaDial = '5s'
 DeltaReconcile = '5s'
 ListenAddresses = ['0.0.0.0:6690']
-`, ChainID, SolanaURL)
+`, c.ChainId, c.SolanaUrl)
 	c.Env = environment.New(c.K8Config).
 		AddHelm(mockservercfg.New(nil)).
 		AddHelm(mockserver.New(nil)).
