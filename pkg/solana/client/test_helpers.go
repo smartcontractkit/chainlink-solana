@@ -3,6 +3,8 @@ package client
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"log"
 	"os/exec"
 	"testing"
 	"time"
@@ -45,7 +47,8 @@ func SetupLocalSolNode(t *testing.T) string {
 		client := rpc.New(url)
 		out, err := client.GetHealth(context.Background())
 		if err != nil || out != rpc.HealthOk {
-			t.Logf("API server not ready yet (attempt %d)\n", i+1)
+			t.Logf("API server not ready yet (attempt %d)\nCmd output: %s\nCmd error: %s\n",
+				i+1, stdOut.String(), stdErr.String())
 			continue
 		}
 		ready = true
@@ -67,4 +70,19 @@ func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 		).Output()
 		require.NoError(t, err)
 	}
+}
+
+func DummyUrl(t *testing.T) string {
+	port := utils.MustRandomPort(t)
+	url := "http://127.0.0.1:" + port
+	return url
+}
+
+// MustJSON marshals an object into a JSON string and panics if there's an error.
+func MustJSON(obj interface{}) string {
+	jsonBytes, err := json.Marshal(obj)
+	if err != nil {
+		log.Fatalf("Error marshalling object: %v", err)
+	}
+	return string(jsonBytes)
 }

@@ -3,14 +3,18 @@ package client
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 	"golang.org/x/sync/singleflight"
+
+	htrktypes "github.com/smartcontractkit/chainlink-relay/pkg/headtracker/types"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/headtracker/types"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 )
 
 const (
@@ -47,6 +51,9 @@ type Writer interface {
 
 var _ ReaderWriter = (*Client)(nil)
 
+var _ htrktypes.Client[*types.Head, *Subscription, types.ChainID, types.Hash] = (*Client)(nil)
+
+//go:generate mockery --quiet --name Client --output ./mocks/ --case=underscore
 type Client struct {
 	rpc             *rpc.Client
 	skipPreflight   bool // to enable or disable preflight checks
@@ -55,6 +62,8 @@ type Client struct {
 	txTimeout       time.Duration
 	contextDuration time.Duration
 	log             logger.Logger
+	pollingInterval time.Duration
+	chainId         types.ChainID
 
 	// provides a duplicate function call suppression mechanism
 	requestGroup *singleflight.Group
@@ -67,6 +76,7 @@ func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration,
 		commitment:      cfg.Commitment(),
 		maxRetries:      cfg.MaxRetries(),
 		txTimeout:       cfg.TxTimeout(),
+		pollingInterval: cfg.PollingInterval(), //TODO: Add this in the config in core
 		contextDuration: requestTimeout,
 		log:             log,
 		requestGroup:    &singleflight.Group{},
@@ -139,6 +149,21 @@ func (c *Client) ChainID() (string, error) {
 	return network, nil
 }
 
+func (c *Client) ConfiguredChainID() types.ChainID {
+	if c.chainId != types.Unknown {
+		return c.chainId
+	}
+
+	chainID, err := c.ChainID()
+	if err != nil {
+		c.log.Warnf("Unable to determine configured chain ID: %v", err)
+		return types.Unknown
+	}
+
+	c.chainId = types.StringToChainID(chainID)
+	return c.chainId
+}
+
 func (c *Client) GetFeeForMessage(msg string) (uint64, error) {
 	// msg is base58 encoded data
 
@@ -208,4 +233,133 @@ func (c *Client) SendTx(ctx context.Context, tx *solana.Transaction) (solana.Sig
 	}
 
 	return c.rpc.SendTransactionWithOpts(ctx, tx, opts)
+}
+
+func (c *Client) HeadByNumber(ctx context.Context, number *big.Int) (*types.Head, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+	block, err := c.GetBlock(ctx, number.Uint64())
+	if err != nil {
+		return nil, err
+	}
+	if block == nil {
+		return nil, errors.New("invalid block in HeadByNumber")
+	}
+	chainId := c.ConfiguredChainID()
+	head := &types.Head{
+		Slot:  number.Int64(),
+		Block: *block,
+		ID:    chainId,
+	}
+	return head, nil
+}
+
+// SubscribeNewHead polls the RPC endpoint for new blocks.
+func (c *Client) SubscribeNewHead(ctx context.Context, ch chan<- *types.Head) (*Subscription, error) {
+	subscription := NewSubscription(ctx, c)
+
+	go func() {
+		ticker := time.NewTicker(c.pollingInterval)
+
+		for {
+			select {
+			case <-ctx.Done():
+				ticker.Stop()
+				return
+			case <-ticker.C:
+				block, slot, err := c.getLatestBlock(ctx)
+
+				if err != nil {
+					subscription.errChan <- err
+					return
+				}
+
+				// Create a new Head object and send to channel
+				head := &types.Head{
+					Slot:  int64(slot),
+					Block: *block,
+					ID:    c.ConfiguredChainID(),
+				}
+				ch <- head
+			}
+		}
+	}()
+
+	return subscription, nil
+}
+
+// getLatestBlock queries the latest slot and returns the block.
+func (c *Client) getLatestBlock(ctx context.Context) (block *rpc.GetBlockResult, slot uint64, err error) {
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+
+	slot, err = c.GetLatestSlot(ctx)
+	if err != nil {
+		return nil, slot, errors.Wrap(err, "error in GetLatestSlot")
+	}
+
+	block, err = c.GetBlock(ctx, slot)
+	if err != nil {
+		return nil, slot, err
+	}
+
+	return block, slot, nil
+}
+
+func (c *Client) GetBlock(ctx context.Context, slot uint64) (out *rpc.GetBlockResult, err error) {
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+
+	res, err, _ := c.requestGroup.Do("GetBlock", func() (interface{}, error) {
+		return c.rpc.GetBlock(ctx, slot)
+	})
+
+	if err != nil {
+		return nil, errors.Wrap(err, "error in GetBlock")
+	}
+	if res == nil {
+		return nil, errors.New("nil pointer in GetBlock")
+	}
+
+	return res.(*rpc.GetBlockResult), err
+}
+
+func (c *Client) GetLatestSlot(ctx context.Context) (uint64, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+
+	res, err, _ := c.requestGroup.Do("GetSlot", func() (interface{}, error) {
+		return c.rpc.GetSlot(ctx, c.commitment)
+	})
+
+	if err != nil {
+		return 0, errors.Wrap(err, "error in GetSlot")
+	}
+
+	if res == nil {
+		return 0, errors.New("nil pointer in GetSlot")
+	}
+
+	return res.(uint64), err
+}
+
+func (c *Client) GetBlocks(ctx context.Context, startSlot, endSlot uint64) (blocks []uint64, err error) {
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+
+	res, err, _ := c.requestGroup.Do("GetBlocks", func() (interface{}, error) {
+		return c.rpc.GetBlocks(ctx, startSlot, &endSlot, c.commitment)
+	})
+
+	if err != nil {
+		return nil, errors.Wrap(err, "error in GetBlocks")
+	}
+	if res == nil {
+		return nil, errors.New("nil pointer in GetBlocks")
+	}
+
+	blocks = make([]uint64, len(res.(rpc.BlocksResult)))
+	copy(blocks, res.(rpc.BlocksResult))
+
+	return blocks, err
 }
