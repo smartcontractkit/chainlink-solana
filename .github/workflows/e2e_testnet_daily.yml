@@ -170,7 +170,7 @@ jobs:
       LINK_TOKEN: Dmw5mDvteezKfop9zd3RQbJmZfBATF3QuSqDU66axyts
       VAULT_ADDRESS: G27m7KxTh4KVLapxB9MXfEA8HLUfYuGYQ1ELEs2zQdiQ
       PRIVATE_KEY: ${{ github.event_name == 'schedule' && secrets.PRIVATE_KEY || github.event.inputs.PRIVATE_KEY }}
-
+      INTERNAL_DOCKER_REPO: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
     steps:
       - name: Collect Metrics
         if: always()

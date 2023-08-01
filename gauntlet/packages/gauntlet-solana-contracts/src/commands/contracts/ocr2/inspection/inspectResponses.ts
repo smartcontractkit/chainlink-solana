@@ -154,7 +154,7 @@ export default class OCR2InspectResponses extends SolanaCommand {
       transmissionDetails.push({
         latestTransmissionNo: i + 1,
         roundId: event.roundId,
-        answer: parseInt(event.answer.toString(), 2),
+        answer: parseInt(event.answer.toString(), 10),
         transmitter: transmitters[event.transmitter].toString(),
       })
       // Log oracles that are not responsive

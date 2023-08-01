@@ -43,7 +43,6 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 			l.Error().Err(err).Msg("Error tearing down environment")
 		}
 	})
-	state.SetAllAdapterResponsesToTheSameValue(10)
 	state.ValidateRoundsAfter(time.Now(), common.NewRoundCheckTimeout, 1)
 }
 
@@ -67,7 +66,6 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 			l.Error().Err(err).Msg("Error tearing down environment")
 		}
 	})
-
 	state.SetupClients()
 	state.NodeKeysBundle, err = state.Common.CreateNodeKeysBundle(state.ChainlinkNodes)
 	require.NoError(t, err)
@@ -131,8 +129,6 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 
 	err = state.Common.CreateSolanaChainAndNode(state.ChainlinkNodes)
 	require.NoError(t, err)
-	err = state.MockServer.SetValuePath("/juels", 1)
-	require.NoError(t, err)
 
 	// TODO - This needs to be decoupled into one method as in common.go
 	// TODO - The current setup in common.go is using the solana validator, so we need to create one method for both gauntlet and solana
@@ -167,7 +163,7 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	}
 	sourceValueBridge := client.BridgeTypeAttributes{
 		Name:        "mockserver-bridge",
-		URL:         fmt.Sprintf("%s/%s", state.MockServer.Config.ClusterURL, "juels"),
+		URL:         fmt.Sprintf("%s/%s", state.Common.Env.URLs["qa_mock_adapter_internal"][0], "five"),
 		RequestData: "{}",
 	}
 
@@ -190,7 +186,7 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 		require.NoError(t, err, "Error sending Funds")
 		sourceValueBridge := client.BridgeTypeAttributes{
 			Name:        "mockserver-bridge",
-			URL:         fmt.Sprintf("%s/%s", state.MockServer.Config.ClusterURL, "juels"),
+			URL:         fmt.Sprintf("%s/%s", state.Common.Env.URLs["qa_mock_adapter_internal"][0], "five"),
 			RequestData: "{}",
 		}
 		_, err := node.CreateBridge(&sourceValueBridge)
@@ -225,7 +221,7 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 			l.Info().Str("Contract", sg.OcrAddress).Str("No", "Transmissions")
 		} else {
 			l.Info().Str("Contract", sg.OcrAddress).Interface("Answer", transmissions[0].Answer).Int64("RoundID", transmissions[0].RoundId).Msg("New answer found")
-			assert.Equal(t, transmissions[0].Answer, int64(1), fmt.Sprintf("Actual: %d, Expected: 1", transmissions[0].Answer))
+			assert.Equal(t, transmissions[0].Answer, int64(5), fmt.Sprintf("Actual: %d, Expected: 5", transmissions[0].Answer))
 			assert.Less(t, transmissions[1].RoundId, transmissions[0].RoundId, fmt.Sprintf("Expected round %d to be less than %d", transmissions[1].RoundId, transmissions[0].RoundId))
 		}
 		time.Sleep(time.Second * 6)

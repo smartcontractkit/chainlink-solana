@@ -148,6 +148,7 @@ jobs:
       CHAINLINK_ENV_USER: ${{ github.actor }}
       TEST_LOG_LEVEL: debug
       SELECTED_NETWORKS: SIMULATED
+      INTERNAL_DOCKER_REPO: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
     steps:
       - name: Collect Metrics
         if: always()
