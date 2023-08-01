@@ -7,11 +7,12 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/pkg/errors"
 
+	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
+	"github.com/smartcontractkit/libocr/offchainreporting2/types"
+
 	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
 	relaytypes "github.com/smartcontractkit/chainlink-relay/pkg/types"
 	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
-	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
-	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
@@ -130,6 +131,10 @@ func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes
 			txManager:          configWatcher.chain.TxManager(),
 		},
 	}, nil
+}
+
+func (r *Relayer) NewFunctionsProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.FunctionsProvider, error) {
+	return nil, errors.New("functions are not supported for solana")
 }
 
 var _ relaytypes.ConfigProvider = &configProvider{}
