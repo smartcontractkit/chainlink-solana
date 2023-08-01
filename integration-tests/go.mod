@@ -408,8 +408,6 @@ replace (
 	// Some dependency keeps trying to update this to an unstable version
 	github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
 
-	github.com/smartcontractkit/chainlink-env => ../../chainlink-env
-
 	// K8s imports are weird
 	k8s.io/api => k8s.io/api v0.25.4
 	k8s.io/client-go => k8s.io/client-go v0.25.4
