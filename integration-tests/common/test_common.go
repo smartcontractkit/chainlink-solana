@@ -15,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/utils"
 	"github.com/stretchr/testify/require"
 
-	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"golang.org/x/sync/errgroup"
 )
@@ -140,7 +139,6 @@ type OCRv2TestState struct {
 	Contracts          []Contracts
 	ContractsNodeSetup map[int]*ContractNodeInfo
 	NodeKeysBundle     []client.NodeKeysBundle
-	MockServer         *ctfClient.MockserverClient
 	Client             *solclient.Client
 	RoundsFound        int
 	LastRoundTime      map[string]time.Time
@@ -216,8 +214,6 @@ func (m *OCRv2TestState) NewSolanaClientSetup(networkSettings *solclient.SolNetw
 
 func (m *OCRv2TestState) SetupClients() {
 	m.Client, m.err = m.NewSolanaClientSetup(m.Client.Config)(m.Common.Env)
-	require.NoError(m.T, m.err)
-	m.MockServer, m.err = ctfClient.ConnectMockServer(m.Common.Env)
 	require.NoError(m.T, m.err)
 	m.ChainlinkNodes, m.err = client.ConnectChainlinkNodes(m.Common.Env)
 	require.NoError(m.T, m.err)
@@ -314,11 +310,10 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 
 // CreateJobs creating OCR jobs and EA stubs
 func (m *OCRv2TestState) CreateJobs() {
-	m.err = m.MockServer.SetValuePath("/juels", 1)
-	require.NoError(m.T, m.err)
+
 	m.err = m.Common.CreateSolanaChainAndNode(m.ChainlinkNodes)
 	require.NoError(m.T, m.err)
-	m.err = CreateBridges(m.ContractsNodeSetup, m.MockServer)
+	m.err = CreateBridges(m.ContractsNodeSetup, m.Common.Env.URLs["qa_mock_adapter_internal"][0])
 	require.NoError(m.T, m.err)
 	g := errgroup.Group{}
 	for i := 0; i < len(m.ContractsNodeSetup); i++ {
@@ -330,18 +325,6 @@ func (m *OCRv2TestState) CreateJobs() {
 		})
 	}
 	require.NoError(m.T, g.Wait())
-}
-
-func (m *OCRv2TestState) SetAllAdapterResponsesToTheSameValue(response int) {
-	for i := 0; i < len(m.ContractsNodeSetup); i++ {
-		for _, node := range m.ContractsNodeSetup[i].Nodes {
-			nodeContractPairID, err := BuildNodeContractPairID(node, m.ContractsNodeSetup[i].OCR2.Address())
-			require.NoError(m.T, err)
-			path := fmt.Sprintf("/%s", nodeContractPairID)
-			m.err = m.MockServer.SetValuePath(path, response)
-			require.NoError(m.T, m.err)
-		}
-	}
 }
 
 func (m *OCRv2TestState) ValidateNoRoundsAfter(chaosStartTime time.Time) {

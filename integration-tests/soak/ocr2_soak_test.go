@@ -19,6 +19,5 @@ func TestSolanaOCRV2SoakTest(t *testing.T) {
 		return
 	}
 	state.DeployCluster(utils.ContractsDir)
-	state.SetAllAdapterResponsesToTheSameValue(10)
 	state.ValidateRoundsAfter(time.Now(), common.NewSoakRoundsCheckTimeout, 20000)
 }

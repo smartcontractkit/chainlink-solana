@@ -21,15 +21,13 @@ import (
 	"github.com/smartcontractkit/chainlink-env/environment"
 	"github.com/smartcontractkit/chainlink-env/pkg/alias"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
-	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver"
-	mockservercfg "github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver-cfg"
+	"github.com/smartcontractkit/chainlink-env/pkg/helm/mock-adapter"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/sol"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
-	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -279,7 +277,7 @@ func OffChainConfigParamsFromNodes(nodes []*client.Chainlink, nkb []client.NodeK
 	}, nil
 }
 
-func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo, mock *ctfClient.MockserverClient) error {
+func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo, mockUrl string) error {
 	for i, nodesInfo := range ContractsIdxMapToContractsNodeInfo {
 		// Bootstrap node first
 		nodeContractPairID, err := BuildNodeContractPairID(nodesInfo.BootstrapNode, nodesInfo.OCR2.Address())
@@ -288,7 +286,7 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 		}
 		sourceValueBridge := client.BridgeTypeAttributes{
 			Name:        nodeContractPairID,
-			URL:         fmt.Sprintf("%s/%s", mock.Config.ClusterURL, nodeContractPairID),
+			URL:         fmt.Sprintf("%s/%s", mockUrl, "five"),
 			RequestData: "{}",
 		}
 		observationSource := client.ObservationSourceSpecBridge(&sourceValueBridge)
@@ -298,7 +296,7 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 		}
 		juelsBridge := client.BridgeTypeAttributes{
 			Name:        nodeContractPairID + "juels",
-			URL:         fmt.Sprintf("%s/juels", mock.Config.ClusterURL),
+			URL:         fmt.Sprintf("%s/%s", mockUrl, "five"),
 			RequestData: "{}",
 		}
 		juelsSource := client.ObservationSourceSpecBridge(&juelsBridge)
@@ -315,7 +313,7 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 			}
 			sourceValueBridge := client.BridgeTypeAttributes{
 				Name:        nodeContractPairID,
-				URL:         fmt.Sprintf("%s/%s", mock.Config.ClusterURL, nodeContractPairID),
+				URL:         fmt.Sprintf("%s/%s", mockUrl, "five"),
 				RequestData: "{}",
 			}
 			observationSource := client.ObservationSourceSpecBridge(&sourceValueBridge)
@@ -325,7 +323,7 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 			}
 			juelsBridge := client.BridgeTypeAttributes{
 				Name:        nodeContractPairID + "juels",
-				URL:         fmt.Sprintf("%s/juels", mock.Config.ClusterURL),
+				URL:         fmt.Sprintf("%s/%s", mockUrl, "five"),
 				RequestData: "{}",
 			}
 			juelsSource := client.ObservationSourceSpecBridge(&juelsBridge)
@@ -440,9 +438,8 @@ DeltaReconcile = '5s'
 ListenAddresses = ['0.0.0.0:6690']
 `, c.ChainId, c.SolanaUrl)
 	c.Env = environment.New(c.K8Config).
-		AddHelm(mockservercfg.New(nil)).
-		AddHelm(mockserver.New(nil)).
 		AddHelm(sol.New(nil)).
+		AddHelm(mock_adapter.New(nil)).
 		AddHelm(chainlink.New(0, map[string]interface{}{
 			"toml":     baseTOML,
 			"replicas": c.NodeCount,
