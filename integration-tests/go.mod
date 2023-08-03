@@ -17,7 +17,7 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework v1.14.0
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230713025544-29b418df4ded
 	github.com/smartcontractkit/chainlink/v2 v2.2.1-0.20230713025544-29b418df4ded
-	github.com/smartcontractkit/libocr v0.0.0-20230606215712-82b910bef5c1
+	github.com/smartcontractkit/libocr v0.0.0-20230802221916-2271752fa829
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.11.0
@@ -285,7 +285,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/slack-go/slack v0.12.2 // indirect
 	github.com/smartcontractkit/caigo v0.0.0-20230621050857-b29a4ca8c704 // indirect
-	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230801204930-f46c3ccc7815 // indirect
+	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230803135212-d96fd6cc63ea // indirect
 	github.com/smartcontractkit/ocr2keepers v0.7.1-0.20230712182556-93ccfc7b283f // indirect
 	github.com/smartcontractkit/ocr2vrf v0.0.0-20230616201444-d8b4222aff3c // indirect
 	github.com/smartcontractkit/sqlx v1.3.5-0.20210805004948-4be295aacbeb // indirect
