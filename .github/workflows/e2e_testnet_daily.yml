@@ -1,5 +1,6 @@
 name: e2e_testnet_daily
 on:
+  pull_request:
   workflow_dispatch:
     inputs:
       cl_branch_ref:
@@ -162,14 +163,14 @@ jobs:
       CHAINLINK_ENV_USER: ${{ github.actor }}
       TEST_LOG_LEVEL: debug
       SELECTED_NETWORKS: SIMULATED
-      RPC_URL: ${{ github.event_name == 'schedule' && 'https://api.devnet.solana.com' || github.event.inputs.RPC_URL }}
-      WS_URL: ${{ github.event_name == 'schedule' && 'wss://api.devnet.solana.com/' || github.event.inputs.WS_URL }}
+      RPC_URL: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.RPC_URL || 'https://api.devnet.solana.com' }}
+      WS_URL: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.WS_URL || 'wss://api.devnet.solana.com/' }}
       PROGRAM_ID_OCR2: 9v5sGbNhyTM23yVvczzPbk5NtCqrARQpZjuzebBur43h
       PROGRAM_ID_ACCESS_CONTROLLER: 5Gm8JySC3RzGonihF1hj1kZkjHyyW7qxJNvyzq1ieAY5
       PROGRAM_ID_STORE: ANooJg7j9UxgJ2DNuLqUJs5h956qzc5LdPLFFtQdDb8M
       LINK_TOKEN: Dmw5mDvteezKfop9zd3RQbJmZfBATF3QuSqDU66axyts
       VAULT_ADDRESS: G27m7KxTh4KVLapxB9MXfEA8HLUfYuGYQ1ELEs2zQdiQ
-      PRIVATE_KEY: ${{ github.event_name == 'schedule' && secrets.PRIVATE_KEY || github.event.inputs.PRIVATE_KEY }}
+      PRIVATE_KEY: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.PRIVATE_KEY || secrets.PRIVATE_KEY }}
       INTERNAL_DOCKER_REPO: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
     steps:
       - name: Collect Metrics
