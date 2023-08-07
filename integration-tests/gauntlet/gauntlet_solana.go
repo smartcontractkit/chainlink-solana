@@ -490,7 +490,11 @@ func (sg *SolanaGauntlet) DeployOCR2() (string, error) {
 	return "", nil
 }
 func (sg *SolanaGauntlet) ConfigureOCR2(onChainConfig common.OCR2OnChainConfig, offChainConfig common.OCROffChainConfig, payees common.PayeeConfig, proposalAccept common.ProposalAcceptConfig) error {
-	_, err := sg.ProposeOnChainConfig(sg.ProposalAddress, onChainConfig, sg.OcrAddress)
+	err := sg.InstallDependencies()
+	if err != nil {
+		return err
+	}
+	_, err = sg.ProposeOnChainConfig(sg.ProposalAddress, onChainConfig, sg.OcrAddress)
 	if err != nil {
 		return err
 	}
