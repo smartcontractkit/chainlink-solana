@@ -422,6 +422,10 @@ func (sg *SolanaGauntlet) FetchTransmissions(ocrState string) ([]Transmission, e
 
 func (sg *SolanaGauntlet) DeployOCR2() (string, error) {
 	var err error
+	err = sg.InstallDependencies()
+	if err != nil {
+		return "", err
+	}
 
 	sg.AccessControllerAddress, err = sg.InitializeAccessController()
 	if err != nil {
@@ -490,11 +494,7 @@ func (sg *SolanaGauntlet) DeployOCR2() (string, error) {
 	return "", nil
 }
 func (sg *SolanaGauntlet) ConfigureOCR2(onChainConfig common.OCR2OnChainConfig, offChainConfig common.OCROffChainConfig, payees common.PayeeConfig, proposalAccept common.ProposalAcceptConfig) error {
-	err := sg.InstallDependencies()
-	if err != nil {
-		return err
-	}
-	_, err = sg.ProposeOnChainConfig(sg.ProposalAddress, onChainConfig, sg.OcrAddress)
+	_, err := sg.ProposeOnChainConfig(sg.ProposalAddress, onChainConfig, sg.OcrAddress)
 	if err != nil {
 		return err
 	}
