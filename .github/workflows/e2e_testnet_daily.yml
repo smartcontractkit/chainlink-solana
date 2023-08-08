@@ -22,7 +22,7 @@ on:
         required: true
         type: string
   schedule:
-    - cron: '0 * * * *'
+    - cron: '0 6 * * *'
 env:
   CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
   ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-solana-tests:${{ github.sha }}
@@ -162,14 +162,14 @@ jobs:
       CHAINLINK_ENV_USER: ${{ github.actor }}
       TEST_LOG_LEVEL: debug
       SELECTED_NETWORKS: SIMULATED
-      RPC_URL: ${{ github.event_name == 'schedule' && 'https://api.devnet.solana.com' || github.event.inputs.RPC_URL }}
-      WS_URL: ${{ github.event_name == 'schedule' && 'wss://api.devnet.solana.com/' || github.event.inputs.WS_URL }}
-      PROGRAM_ID_OCR2: 9v5sGbNhyTM23yVvczzPbk5NtCqrARQpZjuzebBur43h
-      PROGRAM_ID_ACCESS_CONTROLLER: 5Gm8JySC3RzGonihF1hj1kZkjHyyW7qxJNvyzq1ieAY5
-      PROGRAM_ID_STORE: ANooJg7j9UxgJ2DNuLqUJs5h956qzc5LdPLFFtQdDb8M
+      RPC_URL: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.RPC_URL || 'https://api.devnet.solana.com' }}
+      WS_URL: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.WS_URL || 'wss://api.devnet.solana.com/' }}
+      PROGRAM_ID_OCR2: cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ
+      PROGRAM_ID_ACCESS_CONTROLLER: 9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW
+      PROGRAM_ID_STORE: HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny
       LINK_TOKEN: Dmw5mDvteezKfop9zd3RQbJmZfBATF3QuSqDU66axyts
       VAULT_ADDRESS: G27m7KxTh4KVLapxB9MXfEA8HLUfYuGYQ1ELEs2zQdiQ
-      PRIVATE_KEY: ${{ github.event_name == 'schedule' && secrets.PRIVATE_KEY || github.event.inputs.PRIVATE_KEY }}
+      PRIVATE_KEY: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.PRIVATE_KEY || secrets.PRIVATE_KEY }}
       INTERNAL_DOCKER_REPO: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
     steps:
       - name: Collect Metrics

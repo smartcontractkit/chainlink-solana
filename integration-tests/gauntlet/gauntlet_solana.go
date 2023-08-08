@@ -422,6 +422,10 @@ func (sg *SolanaGauntlet) FetchTransmissions(ocrState string) ([]Transmission, e
 
 func (sg *SolanaGauntlet) DeployOCR2() (string, error) {
 	var err error
+	err = sg.InstallDependencies()
+	if err != nil {
+		return "", err
+	}
 
 	sg.AccessControllerAddress, err = sg.InitializeAccessController()
 	if err != nil {
