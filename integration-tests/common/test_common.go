@@ -133,7 +133,7 @@ func NewOCRv2State(t *testing.T, contracts int, namespacePrefix string, env stri
 
 type OCRv2TestState struct {
 	Mu                 *sync.Mutex
-	ChainlinkNodes     []*client.Chainlink
+	ChainlinkNodes     []*client.ChainlinkK8sClient
 	ContractDeployer   *solclient.ContractDeployer
 	LinkToken          *solclient.LinkToken
 	Contracts          []Contracts
@@ -232,7 +232,7 @@ func (m *OCRv2TestState) initializeNodesInContractsMap() {
 
 // DeployContracts deploys contracts
 func (m *OCRv2TestState) DeployContracts(contractsDir string) {
-	m.NodeKeysBundle, m.err = m.Common.CreateNodeKeysBundle(m.ChainlinkNodes)
+	m.NodeKeysBundle, m.err = m.Common.CreateNodeKeysBundle(m.GetChainlinkNodes())
 	require.NoError(m.T, m.err)
 	cd, err := solclient.NewContractDeployer(m.Client, m.Common.Env, nil)
 	require.NoError(m.T, err)
@@ -311,7 +311,7 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 // CreateJobs creating OCR jobs and EA stubs
 func (m *OCRv2TestState) CreateJobs() {
 
-	m.err = m.Common.CreateSolanaChainAndNode(m.ChainlinkNodes)
+	m.err = m.Common.CreateSolanaChainAndNode(m.GetChainlinkNodes())
 	require.NoError(m.T, m.err)
 	m.err = CreateBridges(m.ContractsNodeSetup, m.Common.Env.URLs["qa_mock_adapter_internal"][0])
 	require.NoError(m.T, m.err)
@@ -560,4 +560,13 @@ func (m *OCRv2TestState) GauntletEnvToRemoteRunner() {
 		"LINK_TOKEN",
 		"VAULT_ADDRESS",
 	})
+}
+
+func (m *OCRv2TestState) GetChainlinkNodes() []*client.ChainlinkClient {
+	// retrieve client from K8s client
+	chainlinkNodes := []*client.ChainlinkClient{}
+	for i := range m.ChainlinkNodes {
+		chainlinkNodes = append(chainlinkNodes, m.ChainlinkNodes[i].ChainlinkClient)
+	}
+	return chainlinkNodes
 }
