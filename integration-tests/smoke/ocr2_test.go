@@ -67,9 +67,9 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 		}
 	})
 	state.SetupClients()
-	state.NodeKeysBundle, err = state.Common.CreateNodeKeysBundle(state.ChainlinkNodes)
+	state.NodeKeysBundle, err = state.Common.CreateNodeKeysBundle(state.GetChainlinkNodes())
 	require.NoError(t, err)
-	err = state.Common.CreateSolanaChainAndNode(state.ChainlinkNodes)
+	err = state.Common.CreateSolanaChainAndNode(state.GetChainlinkNodes())
 	require.NoError(t, err)
 
 	gauntletConfig := state.ConfigureGauntlet(secret)
@@ -127,7 +127,7 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	err = sg.ConfigureOCR2(onChainConfig, offChainConfig, payees, proposalAccept)
 	require.NoError(t, err)
 
-	err = state.Common.CreateSolanaChainAndNode(state.ChainlinkNodes)
+	err = state.Common.CreateSolanaChainAndNode(state.GetChainlinkNodes())
 	require.NoError(t, err)
 
 	// TODO - This needs to be decoupled into one method as in common.go

@@ -63,11 +63,11 @@ type ContractNodeInfo struct {
 	OCR2                    *solclient.OCRv2
 	Store                   *solclient.Store
 	BootstrapNodeIdx        int
-	BootstrapNode           *client.Chainlink
+	BootstrapNode           *client.ChainlinkK8sClient
 	BootstrapNodeKeysBundle client.NodeKeysBundle
 	BootstrapBridgeInfo     BridgeInfo
 	NodesIdx                []int
-	Nodes                   []*client.Chainlink
+	Nodes                   []*client.ChainlinkK8sClient
 	NodeKeysBundle          []client.NodeKeysBundle
 	BridgeInfos             []BridgeInfo
 }
@@ -146,7 +146,7 @@ func New(env string) *Common {
 	return c
 }
 
-func (c *Common) CreateSolanaChainAndNode(nodes []*client.Chainlink) error {
+func (c *Common) CreateSolanaChainAndNode(nodes []*client.ChainlinkClient) error {
 	for _, n := range nodes {
 		_, _, err := n.CreateSolanaChain(&client.SolanaChainAttributes{ChainID: c.ChainId})
 		if err != nil {
@@ -164,7 +164,7 @@ func (c *Common) CreateSolanaChainAndNode(nodes []*client.Chainlink) error {
 	return nil
 }
 
-func (c *Common) CreateNodeKeysBundle(nodes []*client.Chainlink) ([]client.NodeKeysBundle, error) {
+func (c *Common) CreateNodeKeysBundle(nodes []*client.ChainlinkClient) ([]client.NodeKeysBundle, error) {
 	nkb := make([]client.NodeKeysBundle, 0)
 	for _, n := range nodes {
 		p2pkeys, err := n.MustReadP2PKeys()
@@ -237,7 +237,7 @@ func FundOracles(c *solclient.Client, nkb []client.NodeKeysBundle, amount *big.F
 }
 
 // OffChainConfigParamsFromNodes creates contracts.OffChainAggregatorV2Config
-func OffChainConfigParamsFromNodes(nodes []*client.Chainlink, nkb []client.NodeKeysBundle) (contracts.OffChainAggregatorV2Config, error) {
+func OffChainConfigParamsFromNodes(nodes []*client.ChainlinkK8sClient, nkb []client.NodeKeysBundle) (contracts.OffChainAggregatorV2Config, error) {
 	oi, err := createOracleIdentities(nkb)
 	if err != nil {
 		return contracts.OffChainAggregatorV2Config{}, err
@@ -280,7 +280,7 @@ func OffChainConfigParamsFromNodes(nodes []*client.Chainlink, nkb []client.NodeK
 func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo, mockUrl string) error {
 	for i, nodesInfo := range ContractsIdxMapToContractsNodeInfo {
 		// Bootstrap node first
-		nodeContractPairID, err := BuildNodeContractPairID(nodesInfo.BootstrapNode, nodesInfo.OCR2.Address())
+		nodeContractPairID, err := BuildNodeContractPairID(nodesInfo.BootstrapNode.ChainlinkClient, nodesInfo.OCR2.Address())
 		if err != nil {
 			return err
 		}
@@ -307,7 +307,7 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 		ContractsIdxMapToContractsNodeInfo[i].BootstrapBridgeInfo = BridgeInfo{ObservationSource: observationSource, JuelsSource: juelsSource}
 		// Other nodes later
 		for _, node := range nodesInfo.Nodes {
-			nodeContractPairID, err := BuildNodeContractPairID(node, nodesInfo.OCR2.Address())
+			nodeContractPairID, err := BuildNodeContractPairID(node.ChainlinkClient, nodesInfo.OCR2.Address())
 			if err != nil {
 				return err
 			}
@@ -401,7 +401,7 @@ func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error
 	return nil
 }
 
-func BuildNodeContractPairID(node *client.Chainlink, ocr2Addr string) (string, error) {
+func BuildNodeContractPairID(node *client.ChainlinkClient, ocr2Addr string) (string, error) {
 	csaKeys, resp, err := node.ReadCSAKeys()
 	if err != nil {
 		return "", err
