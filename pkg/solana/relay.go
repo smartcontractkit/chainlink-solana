@@ -25,20 +25,20 @@ type TxManager interface {
 var _ relaytypes.Relayer = &Relayer{}
 
 type Relayer struct {
-	lggr     logger.Logger
-	chainSet ChainSet
-	ctx      context.Context
-	cancel   func()
+	lggr   logger.Logger
+	chain  Chain
+	ctx    context.Context
+	cancel func()
 }
 
 // Note: constructed in core
-func NewRelayer(lggr logger.Logger, chainSet ChainSet) *Relayer {
+func NewRelayer(lggr logger.Logger, chain Chain) *Relayer {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Relayer{
-		lggr:     lggr,
-		chainSet: chainSet,
-		ctx:      ctx,
-		cancel:   cancel,
+		lggr:   lggr,
+		chain:  chain,
+		ctx:    ctx,
+		cancel: cancel,
 	}
 }
 
@@ -49,7 +49,7 @@ func (r *Relayer) Name() string {
 // Start starts the relayer respecting the given context.
 func (r *Relayer) Start(context.Context) error {
 	// No subservices started on relay start, but when the first job is started
-	if r.chainSet == nil {
+	if r.chain == nil {
 		return errors.New("Solana unavailable")
 	}
 	return nil
@@ -62,7 +62,7 @@ func (r *Relayer) Close() error {
 }
 
 func (r *Relayer) Ready() error {
-	return r.chainSet.Ready()
+	return r.chain.Ready()
 }
 
 // Healthy only if all subservices are healthy
@@ -77,7 +77,7 @@ func (r *Relayer) NewMercuryProvider(rargs relaytypes.RelayArgs, pargs relaytype
 }
 
 func (r *Relayer) NewConfigProvider(args relaytypes.RelayArgs) (relaytypes.ConfigProvider, error) {
-	configWatcher, err := newConfigProvider(r.ctx, r.lggr, r.chainSet, args)
+	configWatcher, err := newConfigProvider(r.ctx, r.lggr, r.chain, args)
 	if err != nil {
 		// Never return (*configProvider)(nil)
 		return nil, err
@@ -87,7 +87,7 @@ func (r *Relayer) NewConfigProvider(args relaytypes.RelayArgs) (relaytypes.Confi
 
 func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MedianProvider, error) {
 	lggr := relaylogger.Named(r.lggr, "MedianProvider")
-	configWatcher, err := newConfigProvider(r.ctx, lggr, r.chainSet, rargs)
+	configWatcher, err := newConfigProvider(r.ctx, lggr, r.chain, rargs)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +150,7 @@ type configProvider struct {
 	reader                             client.Reader
 }
 
-func newConfigProvider(ctx context.Context, lggr logger.Logger, chainSet ChainSet, args relaytypes.RelayArgs) (*configProvider, error) {
+func newConfigProvider(ctx context.Context, lggr logger.Logger, chain Chain, args relaytypes.RelayArgs) (*configProvider, error) {
 	lggr = relaylogger.Named(lggr, "ConfigProvider")
 	var relayConfig RelayConfig
 	err := json.Unmarshal(args.RelayConfig, &relayConfig)
@@ -173,10 +173,7 @@ func newConfigProvider(ctx context.Context, lggr logger.Logger, chainSet ChainSe
 		ProgramID: programID,
 		StateID:   stateID,
 	}
-	chain, err := chainSet.Chain(ctx, relayConfig.ChainID)
-	if err != nil {
-		return nil, errors.Wrap(err, "error in NewMedianProvider.chainSet.Chain")
-	}
+
 	reader, err := chain.Reader()
 	if err != nil {
 		return nil, errors.Wrap(err, "error in NewMedianProvider.chain.Reader")
