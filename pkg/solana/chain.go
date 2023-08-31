@@ -7,8 +7,6 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
-type ChainSet = types.ChainSet[string, Chain]
-
 type Chain interface {
 	types.ChainService
 
