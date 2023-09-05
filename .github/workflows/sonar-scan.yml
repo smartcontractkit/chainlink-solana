@@ -23,7 +23,7 @@ jobs:
         with:
           max-timeout: "1200"
           polling-interval: "30"
-          exclude-workflow-names: "Lint GH Workflows"
+          exclude-workflow-names: "Lint GH Workflows,e2e_tests_custom_cl"
           exclude-workflow-ids: ""
           github-token: ${{ secrets.GITHUB_TOKEN }}
         env:
