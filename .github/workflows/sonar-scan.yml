@@ -51,8 +51,25 @@ jobs:
         uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
         with:
           fetch-depth: 0 # fetches all history for all tags and branches to provide more metadata for sonar reports
-      - name: Download all workflow run artifacts
-        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+
+      - name: Download Golangci unit tests reports
+        uses: dawidd6/action-download-artifact@v2.27.0
+        with:
+          workflow: relay.yml
+          workflow_conclusion: ""
+          name_is_regexp: true
+          name: go-test-results
+          if_no_artifact_found: warn
+
+      - name: Download Golangci Relayer report
+        uses: dawidd6/action-download-artifact@v2.27.0
+        with:
+          workflow: golangci-lint.yml
+          workflow_conclusion: ""
+          name_is_regexp: true
+          name: golangci-lint-report
+          if_no_artifact_found: warn
+
       - name: Set SonarQube Report Paths
         id: sonarqube_report_paths
         shell: bash
@@ -60,8 +77,9 @@ jobs:
           {
             echo "sonarqube_tests_report_paths=$(find . -type f -name output.txt | paste -sd "," -)"
             echo "sonarqube_coverage_report_paths=$(find . -type f -name '*coverage.txt' | paste -sd "," -)"
-            echo "sonarqube_golangci_report_paths=$(find . -type f -name 'golangci-lint-report.xml' -printf "%p,")"
+            echo "sonarqube_golangci_report_paths=$(find . -type f -name 'golangci-*-report.xml' -printf "%p,")"
           } >> "$GITHUB_OUTPUT"
+
       - name: SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@a6ba0aafc293e03de5437af7edbc97f7d3ebc91a # v1.2.0
         with:
