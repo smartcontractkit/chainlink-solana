@@ -9,16 +9,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-      - uses: smartcontractkit/tool-versions-to-env-action@v1.0.8
-        id: tool-versions
-      - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      - name: Install Nix
+        uses: cachix/install-nix-action@29bd9290ef037a3ecbdafe83cbd2185e9dd0fa0a # v20
         with:
-          go-version-file: "go.mod"
-          check-latest: true
+          nix_path: nixpkgs=channel:nixos-unstable
       - name: golangci-lint
-        run: make lint-go-ops
+        run: nix develop -c make lint-go-ops
       - name: Store lint report artifact
         if: always()
         uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
@@ -31,16 +28,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-      - uses: smartcontractkit/tool-versions-to-env-action@v1.0.8
-        id: tool-versions
-      - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      - name: Install Nix
+        uses: cachix/install-nix-action@29bd9290ef037a3ecbdafe83cbd2185e9dd0fa0a # v20
         with:
-          go-version-file: "go.mod"
-          check-latest: true
+          nix_path: nixpkgs=channel:nixos-unstable
       - name: golangci-lint
-        run: make lint-go-integration-tests
+        run: nix develop -c make lint-go-integration-tests
       - name: Store lint report artifact
         if: always()
         uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
@@ -53,16 +47,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-      - uses: smartcontractkit/tool-versions-to-env-action@v1.0.8
-        id: tool-versions
-      - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      - name: Install Nix
+        uses: cachix/install-nix-action@29bd9290ef037a3ecbdafe83cbd2185e9dd0fa0a # v20
         with:
-          go-version-file: "go.mod"
-          check-latest: true
+          nix_path: nixpkgs=channel:nixos-unstable
       - name: golangci-lint
-        run: make lint-go-relay
+        run: nix develop -c make lint-go-relay
       - name: Store lint report artifact
         if: always()
         uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
