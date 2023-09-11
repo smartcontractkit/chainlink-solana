@@ -92,3 +92,15 @@ gomodtidy:
 	go mod tidy
 	cd ./integration-tests && go mod tidy
 	cd ./ops && go mod tidy
+
+.PHONY: lint-go-ops
+lint-go-ops:
+	cd ./ops && golangci-lint --color=always --out-format checkstyle:golangci-lint-ops-report.xml run
+
+.PHONY: lint-go-integration-tests
+lint-go-integration-tests:
+	cd ./integration-tests && golangci-lint --color=always --out-format checkstyle:golangci-lint-integration-tests-report.xml run
+
+.PHONY: lint-go-relay
+lint-go-relay:
+	cd ./pkg && golangci-lint --color=always --out-format checkstyle:golangci-lint-relay-report.xml run

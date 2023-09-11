@@ -4,8 +4,8 @@ on:
   pull_request:
 
 jobs:
-  golang_lint:
-    name: Golang Lint
+  golang_lint_ops:
+    name: Golang Lint Ops
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -20,12 +20,58 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
-          version: v${{ steps.tool-versions.outputs.golangci-lint_version }}
-          args: --enable=gofmt --tests=false --exclude-use-default --timeout=5m0s
-          only-new-issues: true
+          run: make lint-go-ops
       - name: Store lint report artifact
         if: always()
         uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
         with:
-          name: golangci-lint-report
-          path: ./golangci-lint-report.xml
+          name: golangci-lint-ops-report
+          path: ./ops/golangci-lint-ops-report.xml
+
+  golang_lint_integration_tests:
+    name: Golang Lint Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - uses: smartcontractkit/tool-versions-to-env-action@v1.0.8
+        id: tool-versions
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: "go.mod"
+          check-latest: true
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          run: make lint-go-integration-tests
+      - name: Store lint report artifact
+        if: always()
+        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
+        with:
+          name: golangci-lint-integration-tests-report
+          path: ./integration-tests/golangci-lint-integration-tests-report.xml
+
+  golang_lint_relay:
+    name: Golang Lint Relay tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - uses: smartcontractkit/tool-versions-to-env-action@v1.0.8
+        id: tool-versions
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: "go.mod"
+          check-latest: true
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          run: make lint-go-relay
+      - name: Store lint report artifact
+        if: always()
+        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
+        with:
+          name: golangci-lint-relay-report
+          path: ./pkg/golangci-lint-relay-report.xml
