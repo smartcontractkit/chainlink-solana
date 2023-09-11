@@ -1,4 +1,4 @@
-name: Unit testing and static analysis
+name: Static analysis
 
 on:
   push:
