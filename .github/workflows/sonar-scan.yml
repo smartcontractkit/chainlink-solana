@@ -55,19 +55,19 @@ jobs:
       - name: Download Golangci unit tests reports
         uses: dawidd6/action-download-artifact@v2.27.0
         with:
-          workflow: relay.yml
+          workflow: golangci-lint.yml
           workflow_conclusion: ""
           name_is_regexp: true
-          name: go-test-results
+          name: golangci-lint-report
           if_no_artifact_found: warn
 
       - name: Download Golangci Relayer report
         uses: dawidd6/action-download-artifact@v2.27.0
         with:
-          workflow: golangci-lint.yml
+          workflow: relay.yml
           workflow_conclusion: ""
           name_is_regexp: true
-          name: golangci-lint-report
+          name: go-relay-test-results
           if_no_artifact_found: warn
 
       - name: Set SonarQube Report Paths

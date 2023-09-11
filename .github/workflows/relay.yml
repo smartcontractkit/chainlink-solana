@@ -32,7 +32,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v3
         with:
-          name: go-test-results
+          name: go-relay-test-results
           path: |
             ./output.txt
             ./coverage.txt
