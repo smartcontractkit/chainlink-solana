@@ -25,9 +25,9 @@ jobs:
       - name: Build
         run: go build -v ./pkg/...
       - name: Test
-        run: go test ./pkg/... -v -tags integration
+        run: go test ./pkg/... -v -tags integration -covermode=atomic -coverpkg=./... -coverprofile=integration_coverage.txt
       - name: Test with the race detector enabled
-        run: go test ./pkg/... -v -race -count=10 -timeout=15m
+        run: go test ./pkg/... -v -race -count=10 -timeout=15m -covermode=atomic -coverpkg=./... -coverprofile=coverage.txt
       - name: Upload Go test results
         if: always()
         uses: actions/upload-artifact@v3
@@ -36,4 +36,4 @@ jobs:
           path: |
             ./output.txt
             ./coverage.txt
-            ./race_coverage.txt
+            ./integration_coverage.txt
