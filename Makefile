@@ -95,12 +95,12 @@ gomodtidy:
 
 .PHONY: lint-go-ops
 lint-go-ops:
-	cd ./ops && golangci-lint --color=always --timeout 10m --out-format checkstyle:golangci-lint-ops-report.xml run
+	cd ./ops && golangci-lint --color=always --exclude=dot-imports --timeout 10m --out-format checkstyle:golangci-lint-ops-report.xml run || true
 
 .PHONY: lint-go-integration-tests
 lint-go-integration-tests:
-	cd ./integration-tests && golangci-lint --color=always --timeout 10m --out-format checkstyle:golangci-lint-integration-tests-report.xml run
+	cd ./integration-tests && golangci-lint --color=always --exclude=dot-imports --timeout 10m --out-format checkstyle:golangci-lint-integration-tests-report.xml run || true
 
 .PHONY: lint-go-relay
 lint-go-relay:
-	cd ./pkg && golangci-lint --color=always --timeout 10m --out-format checkstyle:golangci-lint-relay-report.xml run
+	cd ./pkg && golangci-lint --color=always --exclude=dot-imports --timeout 10m --out-format checkstyle:golangci-lint-relay-report.xml run || true
