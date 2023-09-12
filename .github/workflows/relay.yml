@@ -34,5 +34,5 @@ jobs:
         with:
           name: go-relay-test-results
           path: |
-            ./coverage.txt
+            ./race_coverage.txt
             ./integration_coverage.txt
