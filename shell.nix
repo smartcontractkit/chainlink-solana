@@ -7,7 +7,6 @@ pkgs.mkShell {
     llvm_11
     stdenv.cc.cc.lib
     pkg-config
-    # udev
     openssl
 
     # Solana
@@ -31,7 +30,11 @@ pkgs.mkShell {
     nodejs-18_x
     (yarn.override { nodejs = nodejs-18_x; })
     python3
-  ];
+    ] ++ lib.optionals stdenv.isLinux [
+      # ledger specific packages
+      libudev-zero
+      libusb1
+    ];
   RUST_BACKTRACE = "1";
 
   LD_LIBRARY_PATH = lib.makeLibraryPath [pkgs.zlib stdenv.cc.cc.lib]; # lib64
