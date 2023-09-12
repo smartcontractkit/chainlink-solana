@@ -15,7 +15,6 @@ type ConfigTracker struct {
 }
 
 func (c *ConfigTracker) Notify() <-chan struct{} {
-	var unused_var
 	return nil // not using websocket, config changes will be handled by polling in libocr
 }
 
