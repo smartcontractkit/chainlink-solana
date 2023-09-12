@@ -7,7 +7,7 @@ pkgs.mkShell {
     llvm_11
     stdenv.cc.cc.lib
     pkg-config
-    udev
+    # udev
     openssl
 
     # Solana
@@ -26,14 +26,15 @@ pkgs.mkShell {
     # NodeJS + TS
     nodePackages.typescript
     nodePackages.typescript-language-server
+    nodePackages.npm
     # Keep this nodejs version in sync with the version in .tool-versions please
-    nodejs-16_x
-    (yarn.override { nodejs = nodejs-16_x; })
+    nodejs-18_x
+    (yarn.override { nodejs = nodejs-18_x; })
     python3
   ];
   RUST_BACKTRACE = "1";
-  # https://github.com/rust-lang/rust/issues/55979
-  LD_LIBRARY_PATH = lib.makeLibraryPath (with pkgs; [ stdenv.cc.cc.lib ]);
+
+  LD_LIBRARY_PATH = lib.makeLibraryPath [pkgs.zlib stdenv.cc.cc.lib]; # lib64
 
 
   # Avoids issues with delve
