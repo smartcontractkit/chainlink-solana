@@ -5,7 +5,7 @@ on:
 
 jobs:
   golang_lint_ops:
-    name: Golang Lint Ops
+    name: Golang Lint
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
