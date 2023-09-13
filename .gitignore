@@ -42,3 +42,9 @@ tests/e2e/smoke/contracts-chaos-state.json
 tmp-manifest-*
 tests-smoke-report.xml
 .env.test*
+
+# Test & linter reports
+*report.xml
+*report.json
+*.out
+*coverage*
