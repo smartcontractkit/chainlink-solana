@@ -11,8 +11,8 @@ on:
 
 env:
   CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
-  ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-solana-tests:${{ github.sha }}
   CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
+  MOD_CACHE_VERSION: 1
 
 # Only run 1 of this workflow at a time per PR
 concurrency:
@@ -33,35 +33,14 @@ jobs:
         id: psversion
         uses: ./.github/actions/projectserum_version
 
-  test-image-exists:
-    environment: integration
-    permissions:
-      checks: write
-      pull-requests: write
-      id-token: write
-      contents: read
-    name: Check If Solana Test Image Exists
-    runs-on: ubuntu-latest
-    outputs:
-      exists: ${{ steps.check-image.outputs.exists }}
-    steps:
-      - name: Check if image exists
-        id: check-image
-        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@ad22fbd6f4d108b82aaf49b527bcf40f32babea8 # v2.2.1
-        with:
-          repository: chainlink-solana-tests
-          tag: ${{ github.sha }}
-          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-
   e2e_custom_build_artifacts:
     name: E2E Custom Build Artifacts
     environment: integration
     permissions:
       id-token: write
       contents: read
-    runs-on: ubuntu-latest
-    needs: [get_projectserum_version, test-image-exists]
+    runs-on: ubuntu20.04-32cores-128GB
+    needs: [get_projectserum_version]
     container:
       image: projectserum/build:${{ needs.get_projectserum_version.outputs.projectserum_version }}
       env:
@@ -71,12 +50,11 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: Build contracts
-        if: needs.test-image-exists.outputs.exists == 'false'
         uses: ./.github/actions/build_contract_artifacts
 
   e2e_custom_build_custom_chainlink_image:
     name: E2E Custom Build Custom CL Image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu20.04-16cores-64GB
     environment: integration
     permissions:
       id-token: write
@@ -87,7 +65,7 @@ jobs:
         uses: smartcontractkit/chainlink-github-actions/docker/image-exists@ad22fbd6f4d108b82aaf49b527bcf40f32babea8 # v2.2.1
         with:
           repository: chainlink
-          tag: solana.${{ github.sha }}
+          tag: solana.${{ github.event.inputs.cl_branch_ref || github.sha }}
           AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       - name: Build Image
@@ -97,38 +75,9 @@ jobs:
           cl_repo: smartcontractkit/chainlink
           cl_ref: ${{ github.event.inputs.cl_branch_ref }}
           dep_solana_sha: ${{ github.event.pull_request.head.sha }}
-          push_tag: ${{ env.CL_ECR }}:solana.${{ github.sha }}
+          push_tag: ${{ env.CL_ECR }}:solana.${{ github.event.inputs.cl_branch_ref || github.sha }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-
-  build_test_image:
-    environment: integration
-    permissions:
-      id-token: write
-      contents: read
-    name: Build Test Image
-    runs-on: ubuntu-latest
-    needs: [e2e_custom_build_artifacts]
-    steps:
-      - name: Collect Metrics
-        id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@v1
-        with:
-          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
-          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
-          this-job-name: Build Test Image
-        continue-on-error: true
-      - name: Checkout the repo
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - name: Build Image
-        uses: ./.github/actions/build-test-image
-        with:
-          artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
-          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
 
   e2e_custom_run_smoke_tests:
     name: E2E Custom Run Smoke Tests
@@ -138,9 +87,9 @@ jobs:
       pull-requests: write
       id-token: write
       contents: read
-    runs-on: ubuntu-latest
+    runs-on: ubuntu20.04-16cores-64GB
 
-    needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image, build_test_image]
+    needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image]
     env:
       TEST_SUITE: smoke
       TEST_ARGS: -test.timeout 30m
@@ -161,16 +110,25 @@ jobs:
         continue-on-error: true
       - name: Checkout the repo
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: Download Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: artifacts
+          path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@ad22fbd6f4d108b82aaf49b527bcf40f32babea8 # v2.2.1
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@eccde1970eca69f079d3efb3409938a72ade8497 # v2.2.13
         with:
           test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestfmt
+          test_download_vendor_packages_command: cd ./integration-tests && go mod download
           go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ env.CL_ECR }}
-          cl_image_tag: solana.${{ github.sha }}
-          artifacts_location: /home/runner/work/chainlink-solana/chainlink-solana/integration-tests/logs
+          cl_image_tag: solana.${{ github.event.inputs.cl_branch_ref || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
+          artifacts_name: smoke-test-logs
+          artifacts_location: ./integration-tests/smoke/logs/
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
-          should_cleanup: false
+          cache_key_id: solana-e2e-${{ env.MOD_CACHE_VERSION }}
+          cache_restore_only: "false"
