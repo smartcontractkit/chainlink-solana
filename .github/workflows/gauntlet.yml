@@ -70,7 +70,7 @@ jobs:
         uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
         with:
           name: gauntlet-eslint-report
-          path: ./eslint-report.json
+          path: ./gauntlet/eslint-report.json
 
   gauntlet_run_tests:
     name: Gauntlet Run Tests
