@@ -63,8 +63,8 @@ jobs:
         with:
           name: chainlink-cosmos
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-      - run: nix develop -c yarn install --frozen-lockfile
-      - run: nix develop -c yarn eslint
+      - run: nix develop -c yarn --cwd ./gauntlet install --frozen-lockfile
+      - run: nix develop -c yarn --cwd ./gauntlet eslint
       - name: Upload eslint report
         if: always()
         uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
