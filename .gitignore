@@ -48,3 +48,4 @@ tests-smoke-report.xml
 *report.json
 *.out
 *coverage*
+eslint-report.json
