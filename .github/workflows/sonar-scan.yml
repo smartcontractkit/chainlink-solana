@@ -88,6 +88,15 @@ jobs:
           name: go-relay-test-results
           if_no_artifact_found: warn
 
+      - name: Download gauntlet eslint reports
+        uses: dawidd6/action-download-artifact@v2.27.0
+        with:
+          workflow: gauntlet.yml
+          workflow_conclusion: ""
+          name_is_regexp: true
+          name: gauntlet-eslint-report
+          if_no_artifact_found: warn
+
       - name: Set SonarQube Report Paths
         id: sonarqube_report_paths
         shell: bash
@@ -96,7 +105,13 @@ jobs:
             echo "sonarqube_tests_report_paths=$(find . -type f -name output.txt | paste -sd "," -)"
             echo "sonarqube_coverage_report_paths=$(find . -type f -name '*coverage.txt' | paste -sd "," -)"
             echo "sonarqube_golangci_report_paths=$(find . -type f -name 'golangci-*-report.xml' -printf "%p,")"
+            echo "sonarqube_eslint_report_paths=$(find -type f -name 'eslint-report.json' -printf "%p")" >> $GITHUB_OUTPUT
           } >> "$GITHUB_OUTPUT"
+
+      - name: Update ESLint report symlinks
+        continue-on-error: true
+        run: sed -i 's+/home/runner/work/feeds-manager/feeds-manager/+/github/workspace/+g' ${{ steps.sonarqube_report_paths.outputs.sonarqube_eslint_report_paths }}
+
 
       - name: SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@a6ba0aafc293e03de5437af7edbc97f7d3ebc91a # v1.2.0
@@ -105,6 +120,7 @@ jobs:
             -Dsonar.go.tests.reportPaths=${{ steps.sonarqube_report_paths.outputs.sonarqube_tests_report_paths }}
             -Dsonar.go.coverage.reportPaths=${{ steps.sonarqube_report_paths.outputs.sonarqube_coverage_report_paths }}
             -Dsonar.go.golangci-lint.reportPaths=${{ steps.sonarqube_report_paths.outputs.sonarqube_golangci_report_paths }}
+            -Dsonar.eslint.reportPaths=${{ steps.sonarqube_report_paths.outputs.sonarqube_eslint_report_paths }}
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
