@@ -29,6 +29,7 @@ import (
 )
 
 func TestSolanaOCRV2Smoke(t *testing.T) {
+
 	l := ctfUtils.GetTestLogger(t)
 	state := common.NewOCRv2State(t, 1, "smoke", "localnet")
 	if state.Common.Env.WillUseRemoteRunner() {
