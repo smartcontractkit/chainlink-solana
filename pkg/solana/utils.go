@@ -1,7 +1,5 @@
 package solana
 
-import "github.com/gagliardetto/solana-go"
+import "github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 
-func LamportsToSol(lamports uint64) float64 {
-	return float64(lamports) / float64(solana.LAMPORTS_PER_SOL) // 1_000_000_000
-}
+func LamportsToSol(lamports uint64) float64 { return internal.LamportsToSol(lamports) }

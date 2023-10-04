@@ -12,13 +12,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana"
+	"github.com/smartcontractkit/chainlink-relay/pkg/services"
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 
-	relaytypes "github.com/smartcontractkit/chainlink-relay/pkg/types"
 	relayutils "github.com/smartcontractkit/chainlink-relay/pkg/utils"
 )
 
@@ -28,10 +27,7 @@ const (
 	MaxSigsToConfirm = 256 // max number of signatures in GetSignatureStatus call
 )
 
-var (
-	_ relaytypes.Service = (*Txm)(nil)
-	_ solana.TxManager   = (*Txm)(nil)
-)
+var _ services.Service = (*Txm)(nil)
 
 //go:generate mockery --name SimpleKeystore --output ./mocks/ --case=underscore --filename simple_keystore.go
 type SimpleKeystore interface {

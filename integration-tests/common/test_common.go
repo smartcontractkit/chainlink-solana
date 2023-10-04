@@ -12,15 +12,17 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/stretchr/testify/require"
+
 	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/test_env"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils"
-	"github.com/stretchr/testify/require"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
-	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -262,7 +264,7 @@ func (m *OCRv2TestState) SetupClients() {
 		m.ChainlinkNodesK8s, m.err = client.ConnectChainlinkNodes(m.Common.Env)
 		require.NoError(m.T, m.err)
 	} else {
-		m.ChainlinkNodes = m.Common.DockerEnv.GetAPIs()
+		m.ChainlinkNodes = m.Common.DockerEnv.ClCluster.NodeAPIs()
 	}
 }
 
@@ -290,7 +292,7 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 	if m.Common.IsK8s {
 		m.NodeKeysBundle, m.err = m.Common.CreateNodeKeysBundle(m.GetChainlinkNodes())
 	} else {
-		m.NodeKeysBundle, m.err = m.Common.CreateNodeKeysBundle(m.Common.DockerEnv.GetAPIs())
+		m.NodeKeysBundle, m.err = m.Common.CreateNodeKeysBundle(m.Common.DockerEnv.ClCluster.NodeAPIs())
 	}
 	require.NoError(m.T, m.err)
 	cd, err := solclient.NewContractDeployer(m.Client, nil)
@@ -385,7 +387,7 @@ func (m *OCRv2TestState) CreateJobs() {
 		nodes = m.GetChainlinkNodes()
 		mockInternalUrl = m.Common.Env.URLs["qa_mock_adapter_internal"][0]
 	} else {
-		nodes = m.Common.DockerEnv.GetAPIs()
+		nodes = m.Common.DockerEnv.ClCluster.NodeAPIs()
 		mockInternalUrl = m.Common.DockerEnv.Killgrave.InternalEndpoint
 	}
 	m.L.Info().Str("Url", mockInternalUrl).Msg("Mock adapter url")
