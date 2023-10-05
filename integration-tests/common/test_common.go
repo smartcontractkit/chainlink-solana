@@ -14,7 +14,6 @@ import (
 	"github.com/rs/zerolog/log"
 	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/test_env"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
-	ctf_test_env "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils"
 	"github.com/stretchr/testify/require"
@@ -190,12 +189,10 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		err = sol.StartContainer()
 		require.NoError(m.T, err)
 		m.Common.SolanaUrl = sol.InternalHttpUrl
-		kg := ctf_test_env.NewKillgrave([]string{env.Network.Name}, "")
-		err = kg.StartContainer()
-		require.NoError(m.T, err)
 		b, err := test_env.NewCLTestEnvBuilder().
 			WithNonEVM().
 			WithTestLogger(m.T).
+			WithMockAdapter().
 			WithCLNodeConfig(m.Common.DefaultNodeConfig()).
 			WithCLNodes(m.Common.NodeCount).
 			WithTestEnv(env)
@@ -210,7 +207,7 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		m.Common.DockerEnv = &SolCLClusterTestEnv{
 			CLClusterTestEnv: env,
 			Sol:              sol,
-			Killgrave:        kg,
+			Killgrave:        env.MockAdapter,
 		}
 	}
 	m.SetupClients()
