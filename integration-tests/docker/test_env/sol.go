@@ -169,6 +169,6 @@ func (ms *Solana) getContainerRequest() (*tc.ContainerRequest, error) {
 				},
 			},
 		},
-		Entrypoint: []string{"sh", "-c", "mkdir -p /root/.config/solana/cli && solana-test-validator -r --mint AAxAoGfkbWnbgsiQeAanwUvjv6bQrM5JS8Vxv1ckzVxg"}, //"solana-test-validator", "-r", "--mint", "AAxAoGfkbWnbgsiQeAanwUvjv6bQrM5JS8Vxv1ckzVxg"},
+		Entrypoint: []string{"sh", "-c", "mkdir -p /root/.config/solana/cli && solana-test-validator -r --mint AAxAoGfkbWnbgsiQeAanwUvjv6bQrM5JS8Vxv1ckzVxg"},
 	}, nil
 }

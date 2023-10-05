@@ -264,7 +264,6 @@ func OffChainConfigParamsFromNodes(nodeCount int, nkb []client.NodeKeysBundle) (
 		return contracts.OffChainAggregatorV2Config{}, err
 	}
 	s := make([]int, 0)
-	// for range nodes {
 	for i := 0; i < nodeCount; i++ {
 		s = append(s, 1)
 	}
