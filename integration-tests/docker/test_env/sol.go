@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	tc "github.com/testcontainers/testcontainers-go"
@@ -86,7 +85,7 @@ func (s *Solana) StartContainer() error {
 		Logger:           l,
 	})
 	if err != nil {
-		return errors.Wrapf(err, "cannot start Solana container")
+		return fmt.Errorf("cannot start Solana container: %w", err)
 	}
 	s.Container = c
 	host, err := c.Host(context.Background())
