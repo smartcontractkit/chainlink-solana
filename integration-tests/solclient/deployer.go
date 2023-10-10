@@ -1,6 +1,7 @@
 package solclient
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	access_controller2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/access_controller"
 	ocr_2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr2"
 	store2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/store"
+	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/test_env"
 )
 
 // All account sizes are calculated from Rust structures, ex. programs/access-controller/src/lib.rs:L80
@@ -47,7 +49,6 @@ type Authority struct {
 type ContractDeployer struct {
 	Client   *Client
 	Accounts *Accounts
-	Env      *environment.Environment
 }
 
 // GenerateAuthorities generates authorities so other contracts can access OCR with on-chain calls when signer needed
@@ -357,26 +358,29 @@ func (c *ContractDeployer) InitOCR2(billingControllerAddr string, requesterContr
 	}, nil
 }
 
-func (c *ContractDeployer) DeployProgramRemote(programName string) error {
+func (c *ContractDeployer) DeployProgramRemote(programName string, env *environment.Environment) error {
 	log.Debug().Str("Program", programName).Msg("Deploying program")
-	//connections := c.Env.Charts.Connections("solana-validator")
-	//cc, err := connections.Load("sol", "0", "sol-val")
-	//if err != nil {
-	//	return err
-	//}
-	//chart := c.Env.Charts["solana-validator"]
-
 	programPath := filepath.Join("programs", programName)
 	programKeyFileName := strings.Replace(programName, ".so", "-keypair.json", -1)
 	programKeyFilePath := filepath.Join("programs", programKeyFileName)
 	cmd := fmt.Sprintf("solana deploy %s %s", programPath, programKeyFilePath)
-	pl, err := c.Env.Client.ListPods(c.Env.Cfg.Namespace, "app=sol")
+	pl, err := env.Client.ListPods(env.Cfg.Namespace, "app=sol")
 	if err != nil {
 		return err
 	}
-	stdOutBytes, stdErrBytes, _ := c.Env.Client.ExecuteInPod(c.Env.Cfg.Namespace, pl.Items[0].Name, "sol-val", strings.Split(cmd, " "))
+	stdOutBytes, stdErrBytes, _ := env.Client.ExecuteInPod(env.Cfg.Namespace, pl.Items[0].Name, "sol-val", strings.Split(cmd, " "))
 	log.Debug().Str("STDOUT", string(stdOutBytes)).Str("STDERR", string(stdErrBytes)).Str("CMD", cmd).Send()
 	return nil
+}
+
+func (c *ContractDeployer) DeployProgramRemoteLocal(programName string, sol *test_env_sol.Solana) error {
+	log.Debug().Str("Program", programName).Msg("Deploying program")
+	programPath := filepath.Join("programs", programName)
+	programKeyFileName := strings.Replace(programName, ".so", "-keypair.json", -1)
+	programKeyFilePath := filepath.Join("programs", programKeyFileName)
+	cmd := fmt.Sprintf("solana deploy %s %s", programPath, programKeyFilePath)
+	_, _, err := sol.Container.Exec(context.Background(), strings.Split(cmd, " "))
+	return err
 }
 
 func (c *ContractDeployer) DeployOCRv2AccessController() (*AccessController, error) {
@@ -448,7 +452,7 @@ func (c *ContractDeployer) LoadPrograms(contractsDir string) error {
 	return nil
 }
 
-func (c *ContractDeployer) DeployAnchorProgramsRemote(contractsDir string) error {
+func (c *ContractDeployer) DeployAnchorProgramsRemote(contractsDir string, env *environment.Environment) error {
 	contractBinaries, err := c.Client.ListDirFilenamesByExt(contractsDir, ".so")
 	if err != nil {
 		return err
@@ -458,7 +462,23 @@ func (c *ContractDeployer) DeployAnchorProgramsRemote(contractsDir string) error
 	for _, bin := range contractBinaries {
 		bin := bin
 		g.Go(func() error {
-			return c.DeployProgramRemote(bin)
+			return c.DeployProgramRemote(bin, env)
+		})
+	}
+	return g.Wait()
+}
+
+func (c *ContractDeployer) DeployAnchorProgramsRemoteDocker(contractsDir string, sol *test_env_sol.Solana) error {
+	contractBinaries, err := c.Client.ListDirFilenamesByExt(contractsDir, ".so")
+	if err != nil {
+		return err
+	}
+	log.Debug().Interface("Binaries", contractBinaries).Msg("Program binaries")
+	g := errgroup.Group{}
+	for _, bin := range contractBinaries {
+		bin := bin
+		g.Go(func() error {
+			return c.DeployProgramRemoteLocal(bin, sol)
 		})
 	}
 	return g.Wait()
@@ -478,9 +498,8 @@ func (c *Client) FindAuthorityAddress(seed string, statePubKey solana.PublicKey,
 	return auth, nonce, err
 }
 
-func NewContractDeployer(client *Client, e *environment.Environment, lt *LinkToken) (*ContractDeployer, error) {
+func NewContractDeployer(client *Client, lt *LinkToken) (*ContractDeployer, error) {
 	cd := &ContractDeployer{
-		Env: e,
 		Accounts: &Accounts{
 			OCR:           solana.NewWallet(),
 			Store:         solana.NewWallet(),

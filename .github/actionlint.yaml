@@ -1,0 +1,8 @@
+self-hosted-runner:
+  # Labels of self-hosted or large runner labels in array of string
+  labels:
+    - ubuntu20.04-4cores-16GB
+    - ubuntu20.04-8cores-32GB
+    - ubuntu20.04-16cores-64GB
+    - ubuntu20.04-32cores-128GB
+    - ubuntu20.04-64cores-256GB

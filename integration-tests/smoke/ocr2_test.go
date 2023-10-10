@@ -13,7 +13,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
-	ctfUtils "github.com/smartcontractkit/chainlink-testing-framework/utils"
+	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -29,27 +29,19 @@ import (
 )
 
 func TestSolanaOCRV2Smoke(t *testing.T) {
-	l := ctfUtils.GetTestLogger(t)
-	state := common.NewOCRv2State(t, 1, "smoke", "localnet")
-	if state.Common.Env.WillUseRemoteRunner() {
-		// run the remote runner and exit
-		err := state.Common.Env.Run()
-		require.NoError(t, err)
-		return
-	}
+	logging.Init()
+	state, err := common.NewOCRv2State(t, 1, "smoke", "localnet", false)
+	require.NoError(t, err, "Could not setup the ocrv2 state")
 	state.DeployCluster(utils.ContractsDir)
-	t.Cleanup(func() {
-		if err := actions.TeardownSuite(t, state.Common.Env, "logs", state.ChainlinkNodes, nil, zapcore.PanicLevel, nil); err != nil {
-			l.Error().Err(err).Msg("Error tearing down environment")
-		}
-	})
+
 	state.ValidateRoundsAfter(time.Now(), common.NewRoundCheckTimeout, 1)
 }
 
 func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
-	l := ctfUtils.GetTestLogger(t)
+	l := logging.GetTestLogger(t)
 	secret := "this is an testing only secret"
-	state := common.NewOCRv2State(t, 1, "gauntlet", "devnet")
+	state, err := common.NewOCRv2State(t, 1, "gauntlet", "devnet", true)
+	require.NoError(t, err, "Could not setup the ocrv2 state")
 	if state.Common.Env.WillUseRemoteRunner() {
 		// run the remote runner and exit
 		state.GauntletEnvToRemoteRunner()
@@ -62,7 +54,7 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	err = state.Common.Env.Run()
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		if err := actions.TeardownSuite(t, state.Common.Env, "logs", state.ChainlinkNodes, nil, zapcore.PanicLevel, nil); err != nil {
+		if err := actions.TeardownSuite(t, state.Common.Env, "logs", state.ChainlinkNodesK8s, nil, zapcore.PanicLevel, nil); err != nil {
 			l.Error().Err(err).Msg("Error tearing down environment")
 		}
 	})
@@ -142,7 +134,7 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	}
 	bootstrapPeers := []client.P2PData{
 		{
-			InternalIP:   state.ChainlinkNodes[0].InternalIP(),
+			InternalIP:   state.ChainlinkNodesK8s[0].InternalIP(),
 			InternalPort: "6690",
 			PeerID:       state.NodeKeysBundle[0].PeerID,
 		},
@@ -169,15 +161,15 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 
 	observationSource := client.ObservationSourceSpecBridge(&sourceValueBridge)
 	bridgeInfo := common.BridgeInfo{ObservationSource: observationSource}
-	err = state.ChainlinkNodes[0].MustCreateBridge(&sourceValueBridge)
+	err = state.ChainlinkNodesK8s[0].MustCreateBridge(&sourceValueBridge)
 	require.NoError(t, err)
-	_, err = state.ChainlinkNodes[0].MustCreateJob(jobSpec)
+	_, err = state.ChainlinkNodesK8s[0].MustCreateJob(jobSpec)
 	require.NoError(t, err)
 
 	// TODO - This needs to be decoupled into one method as in common.go
 	// TODO - The current setup in common.go is using the solana validator, so we need to create one method for both gauntlet and solana
 	// Leaving this for the time being as is so we have Testnet runs enabled on Solana
-	for nIdx, node := range state.ChainlinkNodes {
+	for nIdx, node := range state.ChainlinkNodesK8s {
 		// Skipping bootstrap
 		if nIdx == 0 {
 			continue
