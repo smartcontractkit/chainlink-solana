@@ -16,11 +16,11 @@ require (
 	github.com/rs/zerolog v1.30.0
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
 	github.com/smartcontractkit/chainlink-env v0.38.3
-	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20231016132219-9c6fdb379595
-	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20231016132516-795ee7ce8d00
-	github.com/smartcontractkit/chainlink-testing-framework v1.17.12-0.20231016091231-25809996fbd4
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20231016132655-7950ae7befec
-	github.com/smartcontractkit/chainlink/v2 v2.5.1-0.20231016132655-7950ae7befec
+	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20231020211750-7a730729c169
+	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20231020211840-0b428fa4352c
+	github.com/smartcontractkit/chainlink-testing-framework v1.17.12-0.20231018101901-23824db88d36
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20231020211957-78a1d7ea6e2d
+	github.com/smartcontractkit/chainlink/v2 v2.5.1-0.20231020211957-78a1d7ea6e2d
 	github.com/smartcontractkit/libocr v0.0.0-20230925165524-ffa38fe11ef8
 	github.com/stretchr/testify v1.8.4
 	github.com/testcontainers/testcontainers-go v0.23.0
@@ -196,6 +196,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0-rc.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 // indirect
 	github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c // indirect
 	github.com/gtank/merlin v0.1.1 // indirect
 	github.com/gtank/ristretto255 v0.1.2 // indirect
@@ -365,6 +366,7 @@ require (
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
 	github.com/scylladb/go-reflectx v1.0.1 // indirect
 	github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 // indirect
+	github.com/segmentio/ksuid v1.0.4 // indirect
 	github.com/sercand/kuberesolver v2.4.0+incompatible // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/shirou/gopsutil/v3 v3.23.9 // indirect
@@ -433,9 +435,12 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.45.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.42.0 // indirect
 	go.opentelemetry.io/otel v1.19.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.18.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.18.0 // indirect
 	go.opentelemetry.io/otel/metric v1.19.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.19.0 // indirect
 	go.opentelemetry.io/otel/trace v1.19.0 // indirect
+	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
 	go.starlark.net v0.0.0-20220817180228-f738f5508c12 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/goleak v1.2.1 // indirect
