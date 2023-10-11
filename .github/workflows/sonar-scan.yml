@@ -52,6 +52,15 @@ jobs:
         with:
           fetch-depth: 0 # fetches all history for all tags and branches to provide more metadata for sonar reports
 
+      - name: Download Golangci ops reports
+        uses: dawidd6/action-download-artifact@v2.27.0
+        with:
+          workflow: golangci-lint.yml
+          workflow_conclusion: ""
+          name_is_regexp: true
+          name: golangci-lint-ops-report
+          if_no_artifact_found: warn
+
       - name: Download Golangci integration tests reports
         uses: dawidd6/action-download-artifact@v2.27.0
         with:
