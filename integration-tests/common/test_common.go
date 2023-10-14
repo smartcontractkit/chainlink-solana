@@ -199,11 +199,6 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		require.NoError(m.T, err)
 		env, err = b.Build()
 		require.NoError(m.T, err)
-		m.T.Cleanup(func() {
-			if err := env.Cleanup(m.T); err != nil {
-				m.L.Error().Err(err).Msg("Error cleaning up test environment")
-			}
-		})
 		m.Common.DockerEnv = &SolCLClusterTestEnv{
 			CLClusterTestEnv: env,
 			Sol:              sol,
