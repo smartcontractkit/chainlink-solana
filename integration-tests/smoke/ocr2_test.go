@@ -11,21 +11,21 @@ import (
 	"github.com/gagliardetto/solana-go/rpc/ws"
 	"github.com/lib/pq"
 	uuid "github.com/satori/go.uuid"
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
+	"gopkg.in/guregu/null.v4"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap/zapcore"
-	"gopkg.in/guregu/null.v4"
-
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/common"
-	"github.com/stretchr/testify/require"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 )
 
 func TestSolanaOCRV2Smoke(t *testing.T) {
