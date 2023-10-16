@@ -406,8 +406,8 @@ func (cfg *SolNetwork) Default() *SolNetwork {
 		ContractsDeployed: false,
 		PrivateKeys:       DefaultPrivateKeysSolValidator,
 		URLs: []string{
-			"http://localhost:8899",
-			"ws://localhost:8900",
+			"http://127.0.0.1:8899",
+			"ws://127.0.0.1:8900",
 		},
 	}
 }

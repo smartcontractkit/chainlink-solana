@@ -88,7 +88,7 @@ func (s *Solana) StartContainer() error {
 		return fmt.Errorf("cannot start Solana container: %w", err)
 	}
 	s.Container = c
-	host, err := c.Host(context.Background())
+	host, err := test_env.GetHost(context.Background(), c)
 	if err != nil {
 		return err
 	}

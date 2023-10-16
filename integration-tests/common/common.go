@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
 	mock_adapter "github.com/smartcontractkit/chainlink-env/pkg/helm/mock-adapter"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/sol"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
@@ -33,7 +34,6 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 	"github.com/smartcontractkit/chainlink/integration-tests/types/config/node"
 	"github.com/smartcontractkit/chainlink/integration-tests/utils"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/solana"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 
@@ -495,7 +495,7 @@ func BuildNodeContractPairID(node *client.ChainlinkClient, ocr2Addr string) (str
 }
 
 func (c *Common) DefaultNodeConfig() *cl.Config {
-	solConfig := solana.SolanaConfig{
+	solConfig := solana.TOMLConfig{
 		Enabled: utils.Ptr(true),
 		ChainID: utils.Ptr(c.ChainId),
 		Nodes: []*solcfg.Node{
@@ -506,7 +506,7 @@ func (c *Common) DefaultNodeConfig() *cl.Config {
 		},
 	}
 	baseConfig := node.NewBaseConfig()
-	baseConfig.Solana = solana.SolanaConfigs{
+	baseConfig.Solana = solana.TOMLConfigs{
 		&solConfig,
 	}
 	baseConfig.OCR2.Enabled = utils.Ptr(true)
