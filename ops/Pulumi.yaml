@@ -1,3 +1,0 @@
-name: solana-env
-runtime: go
-description: pulumi program for starting up a solana ocr testing environment

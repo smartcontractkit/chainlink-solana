@@ -2,6 +2,8 @@ module github.com/smartcontractkit/chainlink-solana/integration-tests
 
 go 1.21
 
+toolchain go1.21.1
+
 replace github.com/smartcontractkit/chainlink-solana => ../
 
 require (
