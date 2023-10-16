@@ -91,11 +91,6 @@ test_ocr_soak:
 gomodtidy:
 	go mod tidy
 	cd ./integration-tests && go mod tidy
-	cd ./ops && go mod tidy
-
-.PHONY: lint-go-ops
-lint-go-ops:
-	cd ./ops && golangci-lint --color=always --exclude=dot-imports --timeout 10m --out-format checkstyle:golangci-lint-ops-report.xml run || true
 
 .PHONY: lint-go-integration-tests
 lint-go-integration-tests:

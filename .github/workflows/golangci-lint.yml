@@ -4,25 +4,6 @@ on:
   pull_request:
 
 jobs:
-  golang_lint_ops:
-    name: Golang Lint
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
-      - name: Install Nix
-        uses: cachix/install-nix-action@29bd9290ef037a3ecbdafe83cbd2185e9dd0fa0a # v20
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
-      - name: golangci-lint
-        run: nix develop -c make lint-go-ops
-      - name: Store lint report artifact
-        if: always()
-        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
-        with:
-          name: golangci-lint-ops-report
-          path: ./ops/golangci-lint-ops-report.xml
-
   golang_lint_integration_tests:
     name: Golang Lint Integration Tests
     runs-on: ubuntu-latest
