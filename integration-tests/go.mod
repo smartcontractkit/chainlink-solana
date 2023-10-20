@@ -16,7 +16,7 @@ require (
 	github.com/rs/zerolog v1.30.0
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
 	github.com/smartcontractkit/chainlink-env v0.38.3
-	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20231020211750-7a730729c169
+	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20231020230319-2ede955d1dc9
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20231020211840-0b428fa4352c
 	github.com/smartcontractkit/chainlink-testing-framework v1.17.12-0.20231018101901-23824db88d36
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20231020211957-78a1d7ea6e2d
