@@ -197,6 +197,7 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 			WithMockAdapter().
 			WithCLNodeConfig(m.Common.DefaultNodeConfig()).
 			WithCLNodes(m.Common.NodeCount).
+			WithStandardCleanup().
 			WithTestEnv(env)
 		require.NoError(m.T, err)
 		env, err = b.Build()
