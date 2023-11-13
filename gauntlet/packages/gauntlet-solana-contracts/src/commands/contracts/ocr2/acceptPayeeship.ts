@@ -5,20 +5,18 @@ import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 
 type Input = {
-    transmitter: string
+  transmitter: string
 }
 
 type ContractInput = {
-    transmitter: string
-    proposedPayee: PublicKey
+  transmitter: string
+  proposedPayee: PublicKey
 }
 
 export default class AcceptPayeeship extends SolanaCommand {
   static id = 'ocr2:accept_payeeship'
   static category = CONTRACT_LIST.OCR_2
-  static examples = [
-    'yarn gauntlet ocr2:accept_payeeship --network=<NETWORK> --transmitter=<TRANSMITTER> <CONTRACT>',
-  ]
+  static examples = ['yarn gauntlet ocr2:accept_payeeship --network=<NETWORK> --transmitter=<TRANSMITTER> <CONTRACT>']
 
   input: Input
   contractInput: ContractInput
@@ -27,11 +25,11 @@ export default class AcceptPayeeship extends SolanaCommand {
     if (userInput) return userInput as Input
 
     if (!this.flags.transmitter) {
-        throw Error('Please specify a valid transmitter (--transmitter))')
+      throw Error('Please specify a valid transmitter (--transmitter))')
     }
-    
+
     return {
-        transmitter: this.flags.transmitter,
+      transmitter: this.flags.transmitter,
     }
   }
 
@@ -42,12 +40,12 @@ export default class AcceptPayeeship extends SolanaCommand {
     const oracle = contractOracles.find(({ transmitter }) => transmitter.toString() == input.transmitter)
 
     if (!oracle) {
-        throw Error(`No oracle found with the transmitter id ${input.transmitter}`)
+      throw Error(`No oracle found with the transmitter id ${input.transmitter}`)
     }
 
     return {
-        transmitter: input.transmitter,
-        proposedPayee: oracle.proposedPayee,
+      transmitter: input.transmitter,
+      proposedPayee: oracle.proposedPayee,
     }
   }
 
@@ -66,12 +64,12 @@ export default class AcceptPayeeship extends SolanaCommand {
 
   makeRawTransaction = async (signer: PublicKey) => {
     const data = this.program.instruction.acceptPayeeship({
-        accounts: {
-            state: new PublicKey(this.args[0]),
-            authority: signer,
-            transmitter: this.contractInput.transmitter,
-            proposedPayee: this.contractInput.proposedPayee,
-        },
+      accounts: {
+        state: new PublicKey(this.args[0]),
+        authority: signer,
+        transmitter: this.contractInput.transmitter,
+        proposedPayee: this.contractInput.proposedPayee,
+      },
     })
 
     return [data]

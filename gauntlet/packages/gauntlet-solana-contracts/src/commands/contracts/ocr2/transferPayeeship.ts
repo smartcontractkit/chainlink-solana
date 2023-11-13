@@ -5,14 +5,14 @@ import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 
 type Input = {
-    transmitter: string
-    proposedPayee: string
+  transmitter: string
+  proposedPayee: string
 }
 
 type ContractInput = {
-    transmitter: string
-    payee: PublicKey
-    proposedPayee: PublicKey
+  transmitter: string
+  payee: PublicKey
+  proposedPayee: PublicKey
 }
 
 export default class TransferPayeeship extends SolanaCommand {
@@ -29,16 +29,16 @@ export default class TransferPayeeship extends SolanaCommand {
     if (userInput) return userInput as Input
 
     if (!this.flags.transmitter) {
-        throw Error('Please specify a valid transmitter (--transmitter))')
+      throw Error('Please specify a valid transmitter (--transmitter))')
     }
 
     if (!this.flags.proposedPayee) {
-        throw Error('Please specify a valid proposed payee (--proposedPayee)')
+      throw Error('Please specify a valid proposed payee (--proposedPayee)')
     }
-    
+
     return {
-        transmitter: this.flags.transmitter,
-        proposedPayee: this.flags.proposedPayee,
+      transmitter: this.flags.transmitter,
+      proposedPayee: this.flags.proposedPayee,
     }
   }
 
@@ -49,13 +49,13 @@ export default class TransferPayeeship extends SolanaCommand {
     const oracle = contractOracles.find(({ transmitter }) => transmitter.toString() == input.transmitter)
 
     if (!oracle) {
-        throw Error(`No oracle found with the transmitter id ${input.transmitter}`)
+      throw Error(`No oracle found with the transmitter id ${input.transmitter}`)
     }
 
     return {
-        transmitter: input.transmitter,
-        payee: new PublicKey(oracle.payee),
-        proposedPayee: new PublicKey(input.proposedPayee),
+      transmitter: input.transmitter,
+      payee: new PublicKey(oracle.payee),
+      proposedPayee: new PublicKey(input.proposedPayee),
     }
   }
 
@@ -74,20 +74,22 @@ export default class TransferPayeeship extends SolanaCommand {
 
   makeRawTransaction = async (signer: PublicKey) => {
     const data = this.program.instruction.transferPayeeship({
-        accounts: {
-            state: new PublicKey(this.args[0]),
-            authority: signer,
-            transmitter: this.contractInput.transmitter,
-            payee: this.contractInput.payee,
-            proposedPayee: this.contractInput.proposedPayee,
-        },
+      accounts: {
+        state: new PublicKey(this.args[0]),
+        authority: signer,
+        transmitter: this.contractInput.transmitter,
+        payee: this.contractInput.payee,
+        proposedPayee: this.contractInput.proposedPayee,
+      },
     })
 
     return [data]
   }
 
   beforeExecute = async () => {
-    logger.loading(`Transferring payeeship for transmitter ${this.contractInput.transmitter}: ${this.contractInput.payee} -> ${this.contractInput.proposedPayee}`)
+    logger.loading(
+      `Transferring payeeship for transmitter ${this.contractInput.transmitter}: ${this.contractInput.payee} -> ${this.contractInput.proposedPayee}`,
+    )
     await prompt(`Continue?`)
   }
 
