@@ -18,6 +18,8 @@ import CreateProposal from './proposal/createProposal'
 import ProposeConfig from './proposeConfig'
 import ProposeOffchainConfig from './proposeOffchainConfig'
 import ProposePayees from './proposePayees'
+import TransferPayeeship from './transferPayeeship'
+import AcceptPayeeship from './acceptPayeeship'
 import FinalizeProposal from './proposal/finalizeProposal'
 import Close from './close'
 import WithdrawFunds from './withdrawFunds'
@@ -41,6 +43,8 @@ export default [
   ProposeConfig,
   ProposeOffchainConfig,
   ProposePayees,
+  TransferPayeeship,
+  AcceptPayeeship,
   ReadState,
   SetBillingAccessController,
   SetRequesterAccessController,
