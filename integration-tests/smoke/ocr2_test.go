@@ -1,7 +1,6 @@
 package smoke
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"testing"
@@ -17,6 +16,7 @@ import (
 	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -54,7 +54,7 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	err = state.Common.Env.Run()
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		if err := actions.TeardownSuite(t, state.Common.Env, "logs", state.ChainlinkNodesK8s, nil, zapcore.PanicLevel, nil); err != nil {
+		if err := actions.TeardownSuite(t, state.Common.Env, state.ChainlinkNodesK8s, nil, zapcore.PanicLevel, nil); err != nil {
 			l.Error().Err(err).Msg("Error tearing down environment")
 		}
 	})
@@ -70,7 +70,7 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 
 	// Setting up RPC
 	c := rpc.New(gauntletConfig["NODE_URL"])
-	wsc, err := ws.Connect(context.Background(), gauntletConfig["WS_URL"])
+	wsc, err := ws.Connect(testcontext.Get(t), gauntletConfig["WS_URL"])
 	require.NoError(t, err)
 
 	_, err = sg.DeployOCR2()

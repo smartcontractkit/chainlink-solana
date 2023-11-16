@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
 )
 
 const (
@@ -78,7 +79,7 @@ func (s *Solana) StartContainer() error {
 	if err != nil {
 		return err
 	}
-	c, err := tc.GenericContainer(context.Background(), tc.GenericContainerRequest{
+	c, err := tc.GenericContainer(testcontext.Get(s.t), tc.GenericContainerRequest{
 		ContainerRequest: *cReq,
 		Reuse:            true,
 		Started:          true,
@@ -88,15 +89,15 @@ func (s *Solana) StartContainer() error {
 		return fmt.Errorf("cannot start Solana container: %w", err)
 	}
 	s.Container = c
-	host, err := test_env.GetHost(context.Background(), c)
+	host, err := test_env.GetHost(testcontext.Get(s.t), c)
 	if err != nil {
 		return err
 	}
-	httpPort, err := c.MappedPort(context.Background(), test_env.NatPort(SOL_HTTP_PORT))
+	httpPort, err := c.MappedPort(testcontext.Get(s.t), test_env.NatPort(SOL_HTTP_PORT))
 	if err != nil {
 		return err
 	}
-	wsPort, err := c.MappedPort(context.Background(), test_env.NatPort(SOL_WS_PORT))
+	wsPort, err := c.MappedPort(testcontext.Get(s.t), test_env.NatPort(SOL_WS_PORT))
 	if err != nil {
 		return err
 	}

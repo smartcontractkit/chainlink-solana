@@ -18,22 +18,22 @@ import (
 	"golang.org/x/crypto/curve25519"
 	"gopkg.in/guregu/null.v4"
 
-	"github.com/smartcontractkit/chainlink-env/environment"
-	"github.com/smartcontractkit/chainlink-env/pkg/alias"
-	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
-	mock_adapter "github.com/smartcontractkit/chainlink-env/pkg/helm/mock-adapter"
-	"github.com/smartcontractkit/chainlink-env/pkg/helm/sol"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/alias"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/chainlink"
+	mock_adapter "github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/mock-adapter"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/sol"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 	"github.com/smartcontractkit/chainlink/integration-tests/types/config/node"
-	"github.com/smartcontractkit/chainlink/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 
@@ -496,11 +496,11 @@ func BuildNodeContractPairID(node *client.ChainlinkClient, ocr2Addr string) (str
 
 func (c *Common) DefaultNodeConfig() *cl.Config {
 	solConfig := solana.TOMLConfig{
-		Enabled: utils.Ptr(true),
-		ChainID: utils.Ptr(c.ChainId),
+		Enabled: ptr.Ptr(true),
+		ChainID: ptr.Ptr(c.ChainId),
 		Nodes: []*solcfg.Node{
 			{
-				Name: utils.Ptr("primary"),
+				Name: ptr.Ptr("primary"),
 				URL:  relay_utils.MustParseURL(c.SolanaUrl),
 			},
 		},
@@ -509,8 +509,8 @@ func (c *Common) DefaultNodeConfig() *cl.Config {
 	baseConfig.Solana = solana.TOMLConfigs{
 		&solConfig,
 	}
-	baseConfig.OCR2.Enabled = utils.Ptr(true)
-	baseConfig.P2P.V2.Enabled = utils.Ptr(true)
+	baseConfig.OCR2.Enabled = ptr.Ptr(true)
+	baseConfig.P2P.V2.Enabled = ptr.Ptr(true)
 	fiveSecondDuration := models.MustMakeDuration(5 * time.Second)
 	baseConfig.P2P.V2.DeltaDial = &fiveSecondDuration
 	baseConfig.P2P.V2.DeltaReconcile = &fiveSecondDuration
