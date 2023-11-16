@@ -17,7 +17,7 @@ import (
 	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/test_env"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/osutil"
 
 	"golang.org/x/sync/errgroup"
 
@@ -630,7 +630,7 @@ func (m *OCRv2TestState) ConfigureGauntlet(secret string) map[string]string {
 
 // GauntletEnvToRemoteRunner Setup the environment variables that will be needed inside the remote runner
 func (m *OCRv2TestState) GauntletEnvToRemoteRunner() {
-	utils.SetupEnvVarsForRemoteRunner([]string{
+	osutil.SetupEnvVarsForRemoteRunner([]string{
 		"RPC_URL",
 		"WS_URL",
 		"PRIVATE_KEY",

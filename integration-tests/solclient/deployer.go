@@ -12,7 +12,7 @@ import (
 	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/rs/zerolog/log"
-	"github.com/smartcontractkit/chainlink-env/environment"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
 	"golang.org/x/sync/errgroup"
 
 	access_controller2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/access_controller"

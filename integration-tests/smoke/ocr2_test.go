@@ -54,7 +54,7 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	err = state.Common.Env.Run()
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		if err := actions.TeardownSuite(t, state.Common.Env, "logs", state.ChainlinkNodesK8s, nil, zapcore.PanicLevel, nil); err != nil {
+		if err := actions.TeardownSuite(t, state.Common.Env, state.ChainlinkNodesK8s, nil, zapcore.PanicLevel, nil); err != nil {
 			l.Error().Err(err).Msg("Error tearing down environment")
 		}
 	})
