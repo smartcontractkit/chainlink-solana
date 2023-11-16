@@ -6,7 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
@@ -17,7 +18,7 @@ var (
 var _ Estimator = &recentFeeEstimator{}
 
 type recentFeeEstimator struct {
-	starter utils.StartStopOnce
+	starter services.StateMachine
 	chStop  chan struct{}
 	done    sync.WaitGroup
 

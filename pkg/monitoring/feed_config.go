@@ -7,7 +7,8 @@ import (
 	"math/big"
 
 	"github.com/gagliardetto/solana-go"
-	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
+
+	relayMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
 )
 
 type SolanaFeedConfig struct {

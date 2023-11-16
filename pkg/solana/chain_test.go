@@ -13,12 +13,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
-
-	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
 )
 
 const TestSolanaGenesisHashTemplate = `{"jsonrpc":"2.0","result":"%s","id":1}`
@@ -57,42 +57,42 @@ func TestSolanaChain_GetClient(t *testing.T) {
 		clientCache: map[string]*verifiedCachedClient{},
 	}
 
-	cfg.Nodes = SolanaNodes([]*solcfg.Node{
-		&solcfg.Node{
+	cfg.Nodes = []*solcfg.Node{
+		{
 			Name: ptr("devnet"),
-			URL:  utils.MustParseURL(mockServer.URL + "/1"),
+			URL:  config.MustParseURL(mockServer.URL + "/1"),
 		},
-		&solcfg.Node{
+		{
 			Name: ptr("devnet"),
-			URL:  utils.MustParseURL(mockServer.URL + "/2"),
+			URL:  config.MustParseURL(mockServer.URL + "/2"),
 		},
-	})
+	}
 	_, err := testChain.getClient()
 	assert.NoError(t, err)
 
 	// random nodes (happy path, 1 valid + multiple invalid)
-	cfg.Nodes = SolanaNodes([]*solcfg.Node{
-		&solcfg.Node{
+	cfg.Nodes = []*solcfg.Node{
+		{
 			Name: ptr("devnet"),
-			URL:  utils.MustParseURL(mockServer.URL + "/1"),
+			URL:  config.MustParseURL(mockServer.URL + "/1"),
 		},
-		&solcfg.Node{
+		{
 			Name: ptr("devnet"),
-			URL:  utils.MustParseURL(mockServer.URL + "/mismatch/1"),
+			URL:  config.MustParseURL(mockServer.URL + "/mismatch/1"),
 		},
-		&solcfg.Node{
+		{
 			Name: ptr("devnet"),
-			URL:  utils.MustParseURL(mockServer.URL + "/mismatch/2"),
+			URL:  config.MustParseURL(mockServer.URL + "/mismatch/2"),
 		},
-		&solcfg.Node{
+		{
 			Name: ptr("devnet"),
-			URL:  utils.MustParseURL(mockServer.URL + "/mismatch/3"),
+			URL:  config.MustParseURL(mockServer.URL + "/mismatch/3"),
 		},
-		&solcfg.Node{
+		{
 			Name: ptr("devnet"),
-			URL:  utils.MustParseURL(mockServer.URL + "/mismatch/4"),
+			URL:  config.MustParseURL(mockServer.URL + "/mismatch/4"),
 		},
-	})
+	}
 	_, err = testChain.getClient()
 	assert.NoError(t, err)
 
@@ -102,16 +102,16 @@ func TestSolanaChain_GetClient(t *testing.T) {
 	assert.Error(t, err)
 
 	// no valid nodes to select from
-	cfg.Nodes = SolanaNodes([]*solcfg.Node{
-		&solcfg.Node{
+	cfg.Nodes = []*solcfg.Node{
+		{
 			Name: ptr("devnet"),
-			URL:  utils.MustParseURL(mockServer.URL + "/mismatch/1"),
+			URL:  config.MustParseURL(mockServer.URL + "/mismatch/1"),
 		},
-		&solcfg.Node{
+		{
 			Name: ptr("devnet"),
-			URL:  utils.MustParseURL(mockServer.URL + "/mismatch/2"),
+			URL:  config.MustParseURL(mockServer.URL + "/mismatch/2"),
 		},
-	})
+	}
 	_, err = testChain.getClient()
 	assert.NoError(t, err)
 }

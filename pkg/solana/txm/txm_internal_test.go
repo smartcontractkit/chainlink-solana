@@ -25,9 +25,9 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 
-	relayconfig "github.com/smartcontractkit/chainlink-relay/pkg/config"
-	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
-	relayutils "github.com/smartcontractkit/chainlink-relay/pkg/utils"
+	relayconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
 type soltxmProm struct {
@@ -91,7 +91,7 @@ func TestTxm(t *testing.T) {
 	id := "mocknet"
 	t.Log("Starting new iteration")
 
-	ctx := relayutils.Context(t)
+	ctx := tests.Context(t)
 
 	lggr := logger.Test(t)
 	cfg := config.NewConfig(db.ChainCfg{}, lggr)

@@ -15,14 +15,12 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/multierr"
 
-	"github.com/smartcontractkit/chainlink-relay/pkg/chains"
-	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
-	"github.com/smartcontractkit/chainlink-relay/pkg/loop"
-	"github.com/smartcontractkit/chainlink-relay/pkg/services"
-	"github.com/smartcontractkit/chainlink-relay/pkg/types"
-	relaytypes "github.com/smartcontractkit/chainlink-relay/pkg/types"
-	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
-
+	"github.com/smartcontractkit/chainlink-common/pkg/chains"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/loop"
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
@@ -80,7 +78,7 @@ func NewChain(cfg *TOMLConfig, opts ChainOpts) (Chain, error) {
 var _ Chain = (*chain)(nil)
 
 type chain struct {
-	utils.StartStopOnce
+	services.StateMachine
 	id             string
 	cfg            *TOMLConfig
 	txm            *txm.Txm
@@ -386,13 +384,13 @@ func (c *chain) Close() error {
 
 func (c *chain) Ready() error {
 	return multierr.Combine(
-		c.StartStopOnce.Ready(),
+		c.StateMachine.Ready(),
 		c.txm.Ready(),
 	)
 }
 
 func (c *chain) HealthReport() map[string]error {
-	report := map[string]error{c.Name(): c.StartStopOnce.Healthy()}
+	report := map[string]error{c.Name(): c.Healthy()}
 	services.CopyHealth(report, c.txm.HealthReport())
 	return report
 }

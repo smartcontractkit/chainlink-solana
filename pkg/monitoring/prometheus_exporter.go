@@ -5,7 +5,8 @@ import (
 	"sync"
 
 	"github.com/gagliardetto/solana-go"
-	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
+
+	relayMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
 )
 
 func NewPrometheusExporterFactory(

@@ -7,7 +7,8 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
+
+	relayMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
 )
 
 type Balances struct {

@@ -12,12 +12,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	relayutils "github.com/smartcontractkit/chainlink-relay/pkg/utils"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
 func TestPendingTxContext(t *testing.T) {
 	var wg sync.WaitGroup
-	ctx := relayutils.Context(t)
+	ctx := tests.Context(t)
 
 	newProcess := func(i int) (solana.Signature, context.CancelFunc) {
 		// make random signature
@@ -66,7 +66,7 @@ func TestPendingTxContext(t *testing.T) {
 }
 
 func TestPendingTxContext_expired(t *testing.T) {
-	_, cancel := context.WithCancel(relayutils.Context(t))
+	_, cancel := context.WithCancel(tests.Context(t))
 	sig := solana.Signature{}
 	txs := newPendingTxContext()
 

@@ -10,7 +10,8 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
 
-	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -18,6 +19,8 @@ import (
 )
 
 type TransmissionsCache struct {
+	services.StateMachine
+
 	// on-chain program + 2x state accounts (state + transmissions)
 	TransmissionsID solana.PublicKey
 
@@ -34,8 +37,6 @@ type TransmissionsCache struct {
 	done   chan struct{}
 	ctx    context.Context
 	cancel context.CancelFunc
-
-	utils.StartStopOnce
 }
 
 func NewTransmissionsCache(transmissionsID solana.PublicKey, cfg config.Config, reader client.Reader, lggr logger.Logger) *TransmissionsCache {

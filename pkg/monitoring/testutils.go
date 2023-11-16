@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
-	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
-	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	relayMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
 )
 
 // Generators

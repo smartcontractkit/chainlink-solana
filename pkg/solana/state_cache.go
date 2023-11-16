@@ -12,7 +12,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
-	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -24,7 +25,7 @@ var (
 )
 
 type StateCache struct {
-	utils.StartStopOnce
+	services.StateMachine
 	// on-chain program + 2x state accounts (state + transmissions)
 	StateID solana.PublicKey
 

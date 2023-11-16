@@ -12,13 +12,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
-	"github.com/smartcontractkit/chainlink-relay/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 
-	relayutils "github.com/smartcontractkit/chainlink-relay/pkg/utils"
+	relayutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
 )
 
 const (
@@ -37,7 +37,7 @@ type SimpleKeystore interface {
 // Txm manages transactions for the solana blockchain.
 // simple implementation with no persistently stored txs
 type Txm struct {
-	starter relayutils.StartStopOnce
+	starter services.StateMachine
 	lggr    logger.Logger
 	chSend  chan pendingTx
 	chSim   chan pendingTx
@@ -60,15 +60,14 @@ type pendingTx struct {
 // NewTxm creates a txm. Uses simulation so should only be used to send txes to trusted contracts i.e. OCR.
 func NewTxm(chainID string, tc func() (solanaClient.ReaderWriter, error), cfg config.Config, ks SimpleKeystore, lggr logger.Logger) *Txm {
 	return &Txm{
-		starter: relayutils.StartStopOnce{},
-		lggr:    lggr,
-		chSend:  make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
-		chSim:   make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
-		chStop:  make(chan struct{}),
-		cfg:     cfg,
-		txs:     newPendingTxContextWithProm(chainID),
-		ks:      ks,
-		client:  relayutils.NewLazyLoad(tc),
+		lggr:   lggr,
+		chSend: make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
+		chSim:  make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
+		chStop: make(chan struct{}),
+		cfg:    cfg,
+		txs:    newPendingTxContextWithProm(chainID),
+		ks:     ks,
+		client: relayutils.NewLazyLoad(tc),
 	}
 }
 
