@@ -11,8 +11,8 @@ import (
 	solanaGo "github.com/gagliardetto/solana-go"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
-	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
@@ -67,7 +67,7 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 		txm.fee = fee
 
 		_, _, _, err := txm.sendWithRetry(
-			utils.Context(t),
+			tests.Context(t),
 			tx,
 			txRetryDuration,
 		)

@@ -7,9 +7,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"go.uber.org/multierr"
 
-	relaycfg "github.com/smartcontractkit/chainlink-relay/pkg/config"
-	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
-
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 )
@@ -76,10 +74,10 @@ type configSet struct {
 	FeeBumpPeriod           time.Duration
 }
 
-var _ Config = (*config)(nil)
+var _ Config = (*cfg)(nil)
 
 // Deprecated
-type config struct {
+type cfg struct {
 	defaults configSet
 	chain    db.ChainCfg
 	lggr     logger.Logger
@@ -87,15 +85,15 @@ type config struct {
 
 // NewConfig returns a Config with defaults overridden by dbcfg.
 // Deprecated
-func NewConfig(dbcfg db.ChainCfg, lggr logger.Logger) *config {
-	return &config{
+func NewConfig(dbcfg db.ChainCfg, lggr logger.Logger) *cfg {
+	return &cfg{
 		defaults: defaultConfigSet,
 		chain:    dbcfg,
 		lggr:     lggr,
 	}
 }
 
-func (c *config) BalancePollPeriod() time.Duration {
+func (c *cfg) BalancePollPeriod() time.Duration {
 	ch := c.chain.BalancePollPeriod
 	if ch != nil {
 		return ch.Duration()
@@ -103,7 +101,7 @@ func (c *config) BalancePollPeriod() time.Duration {
 	return c.defaults.BalancePollPeriod
 }
 
-func (c *config) ConfirmPollPeriod() time.Duration {
+func (c *cfg) ConfirmPollPeriod() time.Duration {
 	ch := c.chain.ConfirmPollPeriod
 	if ch != nil {
 		return ch.Duration()
@@ -111,7 +109,7 @@ func (c *config) ConfirmPollPeriod() time.Duration {
 	return c.defaults.ConfirmPollPeriod
 }
 
-func (c *config) OCR2CachePollPeriod() time.Duration {
+func (c *cfg) OCR2CachePollPeriod() time.Duration {
 	ch := c.chain.OCR2CachePollPeriod
 	if ch != nil {
 		return ch.Duration()
@@ -119,7 +117,7 @@ func (c *config) OCR2CachePollPeriod() time.Duration {
 	return c.defaults.OCR2CachePollPeriod
 }
 
-func (c *config) OCR2CacheTTL() time.Duration {
+func (c *cfg) OCR2CacheTTL() time.Duration {
 	ch := c.chain.OCR2CacheTTL
 	if ch != nil {
 		return ch.Duration()
@@ -127,7 +125,7 @@ func (c *config) OCR2CacheTTL() time.Duration {
 	return c.defaults.OCR2CacheTTL
 }
 
-func (c *config) TxTimeout() time.Duration {
+func (c *cfg) TxTimeout() time.Duration {
 	ch := c.chain.TxTimeout
 	if ch != nil {
 		return ch.Duration()
@@ -135,7 +133,7 @@ func (c *config) TxTimeout() time.Duration {
 	return c.defaults.TxTimeout
 }
 
-func (c *config) TxRetryTimeout() time.Duration {
+func (c *cfg) TxRetryTimeout() time.Duration {
 	ch := c.chain.TxRetryTimeout
 	if ch != nil {
 		return ch.Duration()
@@ -143,7 +141,7 @@ func (c *config) TxRetryTimeout() time.Duration {
 	return c.defaults.TxRetryTimeout
 }
 
-func (c *config) TxConfirmTimeout() time.Duration {
+func (c *cfg) TxConfirmTimeout() time.Duration {
 	ch := c.chain.TxConfirmTimeout
 	if ch != nil {
 		return ch.Duration()
@@ -151,7 +149,7 @@ func (c *config) TxConfirmTimeout() time.Duration {
 	return c.defaults.TxConfirmTimeout
 }
 
-func (c *config) SkipPreflight() bool {
+func (c *cfg) SkipPreflight() bool {
 	ch := c.chain.SkipPreflight
 	if ch.Valid {
 		return ch.Bool
@@ -159,7 +157,7 @@ func (c *config) SkipPreflight() bool {
 	return c.defaults.SkipPreflight
 }
 
-func (c *config) Commitment() rpc.CommitmentType {
+func (c *cfg) Commitment() rpc.CommitmentType {
 	ch := c.chain.Commitment
 	if ch.Valid {
 		str := ch.String
@@ -180,7 +178,7 @@ func (c *config) Commitment() rpc.CommitmentType {
 	return c.defaults.Commitment
 }
 
-func (c *config) FeeEstimatorMode() string {
+func (c *cfg) FeeEstimatorMode() string {
 	ch := c.chain.FeeEstimatorMode
 	if ch.Valid {
 		return strings.ToLower(ch.String)
@@ -188,7 +186,7 @@ func (c *config) FeeEstimatorMode() string {
 	return c.defaults.FeeEstimatorMode
 }
 
-func (c *config) ComputeUnitPriceMax() uint64 {
+func (c *cfg) ComputeUnitPriceMax() uint64 {
 	ch := c.chain.ComputeUnitPriceMax
 	if ch.Valid {
 		if ch.Int64 >= 0 {
@@ -199,7 +197,7 @@ func (c *config) ComputeUnitPriceMax() uint64 {
 	return c.defaults.ComputeUnitPriceMax
 }
 
-func (c *config) ComputeUnitPriceMin() uint64 {
+func (c *cfg) ComputeUnitPriceMin() uint64 {
 	ch := c.chain.ComputeUnitPriceMin
 	if ch.Valid {
 		if ch.Int64 >= 0 {
@@ -210,7 +208,7 @@ func (c *config) ComputeUnitPriceMin() uint64 {
 	return c.defaults.ComputeUnitPriceMin
 }
 
-func (c *config) ComputeUnitPriceDefault() uint64 {
+func (c *cfg) ComputeUnitPriceDefault() uint64 {
 	ch := c.chain.ComputeUnitPriceDefault
 	if ch.Valid {
 		if ch.Int64 >= 0 {
@@ -221,7 +219,7 @@ func (c *config) ComputeUnitPriceDefault() uint64 {
 	return c.defaults.ComputeUnitPriceDefault
 }
 
-func (c *config) MaxRetries() *uint {
+func (c *cfg) MaxRetries() *uint {
 	ch := c.chain.MaxRetries
 	if ch.Valid {
 		if ch.Int64 < 0 {
@@ -234,7 +232,7 @@ func (c *config) MaxRetries() *uint {
 	return c.defaults.MaxRetries
 }
 
-func (c *config) FeeBumpPeriod() time.Duration {
+func (c *cfg) FeeBumpPeriod() time.Duration {
 	ch := c.chain.FeeBumpPeriod
 	if ch != nil {
 		return ch.Duration()
@@ -243,13 +241,13 @@ func (c *config) FeeBumpPeriod() time.Duration {
 }
 
 type Chain struct {
-	BalancePollPeriod       *utils.Duration
-	ConfirmPollPeriod       *utils.Duration
-	OCR2CachePollPeriod     *utils.Duration
-	OCR2CacheTTL            *utils.Duration
-	TxTimeout               *utils.Duration
-	TxRetryTimeout          *utils.Duration
-	TxConfirmTimeout        *utils.Duration
+	BalancePollPeriod       *config.Duration
+	ConfirmPollPeriod       *config.Duration
+	OCR2CachePollPeriod     *config.Duration
+	OCR2CacheTTL            *config.Duration
+	TxTimeout               *config.Duration
+	TxRetryTimeout          *config.Duration
+	TxConfirmTimeout        *config.Duration
 	SkipPreflight           *bool
 	Commitment              *string
 	MaxRetries              *int64
@@ -257,30 +255,30 @@ type Chain struct {
 	ComputeUnitPriceMax     *uint64
 	ComputeUnitPriceMin     *uint64
 	ComputeUnitPriceDefault *uint64
-	FeeBumpPeriod           *utils.Duration
+	FeeBumpPeriod           *config.Duration
 }
 
 func (c *Chain) SetDefaults() {
 	if c.BalancePollPeriod == nil {
-		c.BalancePollPeriod = utils.MustNewDuration(defaultConfigSet.BalancePollPeriod)
+		c.BalancePollPeriod = config.MustNewDuration(defaultConfigSet.BalancePollPeriod)
 	}
 	if c.ConfirmPollPeriod == nil {
-		c.ConfirmPollPeriod = utils.MustNewDuration(defaultConfigSet.ConfirmPollPeriod)
+		c.ConfirmPollPeriod = config.MustNewDuration(defaultConfigSet.ConfirmPollPeriod)
 	}
 	if c.OCR2CachePollPeriod == nil {
-		c.OCR2CachePollPeriod = utils.MustNewDuration(defaultConfigSet.OCR2CachePollPeriod)
+		c.OCR2CachePollPeriod = config.MustNewDuration(defaultConfigSet.OCR2CachePollPeriod)
 	}
 	if c.OCR2CacheTTL == nil {
-		c.OCR2CacheTTL = utils.MustNewDuration(defaultConfigSet.OCR2CacheTTL)
+		c.OCR2CacheTTL = config.MustNewDuration(defaultConfigSet.OCR2CacheTTL)
 	}
 	if c.TxTimeout == nil {
-		c.TxTimeout = utils.MustNewDuration(defaultConfigSet.TxTimeout)
+		c.TxTimeout = config.MustNewDuration(defaultConfigSet.TxTimeout)
 	}
 	if c.TxRetryTimeout == nil {
-		c.TxRetryTimeout = utils.MustNewDuration(defaultConfigSet.TxRetryTimeout)
+		c.TxRetryTimeout = config.MustNewDuration(defaultConfigSet.TxRetryTimeout)
 	}
 	if c.TxConfirmTimeout == nil {
-		c.TxConfirmTimeout = utils.MustNewDuration(defaultConfigSet.TxConfirmTimeout)
+		c.TxConfirmTimeout = config.MustNewDuration(defaultConfigSet.TxConfirmTimeout)
 	}
 	if c.SkipPreflight == nil {
 		c.SkipPreflight = &defaultConfigSet.SkipPreflight
@@ -305,24 +303,24 @@ func (c *Chain) SetDefaults() {
 		c.ComputeUnitPriceDefault = &defaultConfigSet.ComputeUnitPriceDefault
 	}
 	if c.FeeBumpPeriod == nil {
-		c.FeeBumpPeriod = utils.MustNewDuration(defaultConfigSet.FeeBumpPeriod)
+		c.FeeBumpPeriod = config.MustNewDuration(defaultConfigSet.FeeBumpPeriod)
 	}
 	return
 }
 
 type Node struct {
 	Name *string
-	URL  *utils.URL
+	URL  *config.URL
 }
 
 func (n *Node) ValidateConfig() (err error) {
 	if n.Name == nil {
-		err = multierr.Append(err, relaycfg.ErrMissing{Name: "Name", Msg: "required for all nodes"})
+		err = multierr.Append(err, config.ErrMissing{Name: "Name", Msg: "required for all nodes"})
 	} else if *n.Name == "" {
-		err = multierr.Append(err, relaycfg.ErrEmpty{Name: "Name", Msg: "required for all nodes"})
+		err = multierr.Append(err, config.ErrEmpty{Name: "Name", Msg: "required for all nodes"})
 	}
 	if n.URL == nil {
-		err = multierr.Append(err, relaycfg.ErrMissing{Name: "URL", Msg: "required for all nodes"})
+		err = multierr.Append(err, config.ErrMissing{Name: "URL", Msg: "required for all nodes"})
 	}
 	return
 }

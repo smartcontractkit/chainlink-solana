@@ -10,13 +10,13 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
-	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
-	relaytypes "github.com/smartcontractkit/chainlink-relay/pkg/types"
-	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
+	relaylogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 )
 
 var _ TxManager = (*txm.Txm)(nil)
@@ -143,7 +143,7 @@ func (r *Relayer) NewFunctionsProvider(rargs relaytypes.RelayArgs, pargs relayty
 var _ relaytypes.ConfigProvider = &configProvider{}
 
 type configProvider struct {
-	utils.StartStopOnce
+	services.StateMachine
 	chainID                            string
 	programID, storeProgramID, stateID solana.PublicKey
 	stateCache                         *StateCache

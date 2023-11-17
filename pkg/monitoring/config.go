@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
+	relayMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
 )
 
 type SolanaConfig struct {

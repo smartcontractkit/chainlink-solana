@@ -6,9 +6,10 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 
-	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
-	"github.com/smartcontractkit/chainlink-relay/pkg/types"
-	"github.com/smartcontractkit/chainlink-relay/pkg/utils"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 )
@@ -43,7 +44,7 @@ func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keysto
 }
 
 type balanceMonitor struct {
-	utils.StartStopOnce
+	services.StateMachine
 	chainID   string
 	cfg       Config
 	lggr      logger.Logger

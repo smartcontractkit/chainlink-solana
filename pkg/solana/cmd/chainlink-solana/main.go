@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/go-plugin"
 	"github.com/pelletier/go-toml/v2"
 
-	"github.com/smartcontractkit/chainlink-relay/pkg/loop"
+	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana"
 )
 

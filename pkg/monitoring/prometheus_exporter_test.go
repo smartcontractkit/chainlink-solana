@@ -5,9 +5,10 @@ import (
 	"testing"
 	"time"
 
-	relayMonitoring "github.com/smartcontractkit/chainlink-relay/pkg/monitoring"
-	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/mocks"
 	"github.com/stretchr/testify/require"
+
+	relayMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/mocks"
 )
 
 func TestPrometheusExporter(t *testing.T) {

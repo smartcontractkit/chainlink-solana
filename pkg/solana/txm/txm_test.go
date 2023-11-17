@@ -20,13 +20,13 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 
-	relayconfig "github.com/smartcontractkit/chainlink-relay/pkg/config"
-	"github.com/smartcontractkit/chainlink-relay/pkg/logger"
-	relayutils "github.com/smartcontractkit/chainlink-relay/pkg/utils"
+	relayconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
 func TestTxm_Integration(t *testing.T) {
-	ctx := relayutils.Context(t)
+	ctx := tests.Context(t)
 	url := solanaClient.SetupLocalSolNode(t)
 
 	// setup key
@@ -59,7 +59,7 @@ func TestTxm_Integration(t *testing.T) {
 
 	// set up txm
 	lggr := logger.Test(t)
-	confirmDuration, err := relayutils.NewDuration(500 * time.Millisecond)
+	confirmDuration, err := relayconfig.NewDuration(500 * time.Millisecond)
 	require.NoError(t, err)
 	cfg := config.NewConfig(db.ChainCfg{
 		ConfirmPollPeriod: &confirmDuration,
