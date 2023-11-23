@@ -16,10 +16,10 @@ require (
 	github.com/rs/zerolog v1.30.0
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20231123003013-379db0b9e4c7
-	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20231120073604-89592fceb0af
+	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20231123152908-322b3326d2a8
 	github.com/smartcontractkit/chainlink-testing-framework v1.19.5
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20231123044049-109e0d90133a
-	github.com/smartcontractkit/chainlink/v2 v2.0.0-20231123044049-109e0d90133a
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20231123194728-833dbe758ed8
+	github.com/smartcontractkit/chainlink/v2 v2.5.1-0.20231123194728-833dbe758ed8
 	github.com/smartcontractkit/libocr v0.0.0-20231107151413-13e0202ae8d7
 	github.com/stretchr/testify v1.8.4
 	github.com/testcontainers/testcontainers-go v0.23.0
@@ -521,7 +521,7 @@ replace (
 
 	// Some dependency keeps trying to update this to an unstable version
 	github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
-	github.com/sercand/kuberesolver v2.4.0+incompatible => github.com/sercand/kuberesolver/v5 v5.1.1
+	github.com/sercand/kuberesolver/v4 v4.0.0 => github.com/sercand/kuberesolver/v5 v5.1.1
 
 	// K8s imports are weird
 	k8s.io/api => k8s.io/api v0.25.11
