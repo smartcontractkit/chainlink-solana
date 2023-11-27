@@ -17,7 +17,7 @@ require (
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20231117021201-6814387d8d3e
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20231116220215-93510f138ff6
-	github.com/smartcontractkit/chainlink-testing-framework v1.19.0
+	github.com/smartcontractkit/chainlink-testing-framework v1.19.5
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20231116224343-7780eb63d8dc
 	github.com/smartcontractkit/chainlink/v2 v2.5.1-0.20231116224343-7780eb63d8dc
 	github.com/smartcontractkit/libocr v0.0.0-20231107151413-13e0202ae8d7
@@ -71,6 +71,7 @@ require (
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/bytedance/sonic v1.9.1 // indirect
 	github.com/c2h5oh/datasize v0.0.0-20200112174442-28bbd4740fee // indirect
+	github.com/c9s/goprocinfo v0.0.0-20210130143923-c95fcf8c64a8 // indirect
 	github.com/cdk8s-team/cdk8s-core-go/cdk8s/v2 v2.7.5 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
@@ -191,7 +192,7 @@ require (
 	github.com/gosimple/slug v1.13.1 // indirect
 	github.com/gosimple/unidecode v1.0.1 // indirect
 	github.com/grafana/dskit v0.0.0-20230201083518-528d8a7d52f2 // indirect
-	github.com/grafana/loki v1.6.2-0.20230403212622-90888a0cc737 // indirect
+	github.com/grafana/loki v1.6.2-0.20231017135925-990ac685e6a6 // indirect
 	github.com/grafana/loki/pkg/push v0.0.0-20230127102416-571f88bc5765 // indirect
 	github.com/grafana/pyroscope-go v1.0.4 // indirect
 	github.com/grafana/pyroscope-go/godeltaprof v0.1.4 // indirect
@@ -348,6 +349,7 @@ require (
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/otiai10/copy v1.14.0 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
+	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
@@ -372,7 +374,7 @@ require (
 	github.com/scylladb/go-reflectx v1.0.1 // indirect
 	github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 // indirect
 	github.com/segmentio/ksuid v1.0.4 // indirect
-	github.com/sercand/kuberesolver v2.4.0+incompatible // indirect
+	github.com/sercand/kuberesolver/v4 v4.0.0 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/shirou/gopsutil/v3 v3.23.9 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
@@ -385,7 +387,7 @@ require (
 	github.com/smartcontractkit/ocr2vrf v0.0.0-20230804151440-2f1eb1e20687 // indirect
 	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20230906073235-9e478e5e19f1 // indirect
 	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20230906073235-9e478e5e19f1 // indirect
-	github.com/smartcontractkit/wasp v0.3.0 // indirect
+	github.com/smartcontractkit/wasp v0.3.6 // indirect
 	github.com/smartcontractkit/wsrpc v0.7.2 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
@@ -418,7 +420,7 @@ require (
 	github.com/umbracle/ethgo v0.1.3 // indirect
 	github.com/umbracle/fastrlp v0.0.0-20220527094140-59d5dd30e722 // indirect
 	github.com/valyala/fastjson v1.4.1 // indirect
-	github.com/weaveworks/common v0.0.0-20221201103051-7c2720a9024d // indirect
+	github.com/weaveworks/common v0.0.0-20230411130259-f7d83a041205 // indirect
 	github.com/weaveworks/promrus v1.2.0 // indirect
 	github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 // indirect
 	github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7 // indirect
@@ -518,7 +520,7 @@ replace (
 
 	// Some dependency keeps trying to update this to an unstable version
 	github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
-	github.com/sercand/kuberesolver v2.4.0+incompatible => github.com/sercand/kuberesolver/v5 v5.1.1
+	github.com/sercand/kuberesolver/v4 v4.0.0 => github.com/sercand/kuberesolver/v5 v5.1.1
 
 	// K8s imports are weird
 	k8s.io/api => k8s.io/api v0.25.11
