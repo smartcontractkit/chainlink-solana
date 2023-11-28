@@ -2,6 +2,7 @@ package smoke
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
+	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 
@@ -29,12 +31,36 @@ import (
 )
 
 func TestSolanaOCRV2Smoke(t *testing.T) {
-	logging.Init()
-	state, err := common.NewOCRv2State(t, 1, "smoke", "localnet", false)
-	require.NoError(t, err, "Could not setup the ocrv2 state")
-	state.DeployCluster(utils.ContractsDir)
+	for _, test := range []struct {
+		name string
+		env  map[string]string
+	}{
+		{name: "embeded"},
+		{name: "plugins", env: map[string]string{
+			"CL_MEDIAN_CMD": "chainlink-feeds",
+			"CL_SOLANA_CMD": "chainlink-solana",
+		}},
+	} {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 
-	state.ValidateRoundsAfter(time.Now(), common.NewRoundCheckTimeout, 1)
+			logging.Init()
+			state, err := common.NewOCRv2State(t, 1, "smoke-"+test.name, "localnet", false)
+			require.NoError(t, err, "Could not setup the ocrv2 state")
+			if len(test.env) > 0 {
+				state.Common.NodeOpts = append(state.Common.NodeOpts, func(n *test_env.ClNode) {
+					if n.ContainerEnvs == nil {
+						n.ContainerEnvs = map[string]string{}
+					}
+					maps.Copy(n.ContainerEnvs, test.env)
+				})
+			}
+			state.DeployCluster(utils.ContractsDir)
+
+			state.ValidateRoundsAfter(time.Now(), common.NewRoundCheckTimeout, 1)
+		})
+	}
 }
 
 func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
