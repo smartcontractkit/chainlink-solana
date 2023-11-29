@@ -59,6 +59,7 @@ type Common struct {
 	ChainName string
 	ChainId   string
 	NodeCount int
+	NodeOpts  []test_env.ClNodeOption
 	TTL       time.Duration
 	ClConfig  map[string]interface{}
 	EnvConfig map[string]interface{}
