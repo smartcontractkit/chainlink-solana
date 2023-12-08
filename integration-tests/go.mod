@@ -13,7 +13,7 @@ require (
 	github.com/onsi/gomega v1.30.0
 	github.com/rs/zerolog v1.30.0
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
-	github.com/smartcontractkit/chainlink-common v0.1.7-0.20231208230026-7edd126291bf
+	github.com/smartcontractkit/chainlink-common v0.1.7-0.20231208233226-07c07e4b009e
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20231205041407-c90fe4d6f696
 	github.com/smartcontractkit/chainlink-testing-framework v1.20.0
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20231205043820-1cd875f11d60
