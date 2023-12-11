@@ -59,6 +59,8 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Get core ref from PR body
         if: github.event_name == 'pull_request'
