@@ -9,8 +9,8 @@ import (
 
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/gagliardetto/solana-go/rpc/ws"
+	"github.com/google/uuid"
 	"github.com/lib/pq"
-	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
@@ -166,7 +166,7 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 		},
 	}
 	jobSpec := &client.OCR2TaskJobSpec{
-		Name:    fmt.Sprintf("sol-OCRv2-%s-%s", "bootstrap", uuid.NewV4().String()),
+		Name:    fmt.Sprintf("sol-OCRv2-%s-%s", "bootstrap", uuid.New().String()),
 		JobType: "bootstrap",
 		OCR2OracleSpec: job.OCR2OracleSpec{
 			ContractID:                        sg.OcrAddress,
@@ -210,7 +210,7 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 		_, err := node.CreateBridge(&sourceValueBridge)
 		require.NoError(t, err)
 		jobSpec := &client.OCR2TaskJobSpec{
-			Name:              fmt.Sprintf("sol-OCRv2-%d-%s", nIdx, uuid.NewV4().String()),
+			Name:              fmt.Sprintf("sol-OCRv2-%d-%s", nIdx, uuid.New().String()),
 			JobType:           "offchainreporting2",
 			ObservationSource: bridgeInfo.ObservationSource,
 			OCR2OracleSpec: job.OCR2OracleSpec{
