@@ -101,14 +101,22 @@ jobs:
 
     needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image]
     env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       TEST_SUITE: smoke
       TEST_ARGS: -test.timeout 30m
-      CHAINLINK_COMMIT_SHA: ${{ github.sha }}
       CHAINLINK_ENV_USER: ${{ github.actor }}
       TEST_LOG_LEVEL: debug
       SELECTED_NETWORKS: SIMULATED
       INTERNAL_DOCKER_REPO: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
     steps:
+      - name: Get core ref from PR body
+        if: github.event_name == 'pull_request'
+        run: |
+          comment=$(gh pr view https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }} --json body -q '.body')
+          core_ref=$(echo $comment | grep -oP 'core ref: \K\S+' || true)
+          if [ ! -z "$core_ref" ]; then
+            echo "CUSTOM_CORE_REF=${core_ref}" >> "${GITHUB_ENV}"
+          fi
       - name: Collect Metrics
         if: always()
         id: collect-gha-metrics
@@ -132,11 +140,12 @@ jobs:
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
           go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ env.CL_ECR }}
-          cl_image_tag: solana.${{ github.event.inputs.cl_branch_ref || github.sha }}
+          cl_image_tag: solana.${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
           aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
           artifacts_name: smoke-test-logs
           artifacts_location: ./integration-tests/smoke/logs/
+          CHAINLINK_COMMIT_SHA: ${{ env.CUSTOM_CORE_REF || github.sha }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
