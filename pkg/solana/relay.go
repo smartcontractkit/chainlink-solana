@@ -140,6 +140,10 @@ func (r *Relayer) NewFunctionsProvider(rargs relaytypes.RelayArgs, pargs relayty
 	return nil, errors.New("functions are not supported for solana")
 }
 
+func (r *Relayer) NewAutomationProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.AutomationProvider, error) {
+    return nil, errors.New("automation is not supported for solana")
+}
+
 var _ relaytypes.ConfigProvider = &configProvider{}
 
 type configProvider struct {
