@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/rs/zerolog/log"
-	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/curve25519"
 	"gopkg.in/guregu/null.v4"
 
@@ -423,7 +423,7 @@ func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error
 		},
 	}
 	jobSpec := &client.OCR2TaskJobSpec{
-		Name:    fmt.Sprintf("sol-OCRv2-%s-%s", "bootstrap", uuid.NewV4().String()),
+		Name:    fmt.Sprintf("sol-OCRv2-%s-%s", "bootstrap", uuid.New().String()),
 		JobType: "bootstrap",
 		OCR2OracleSpec: job.OCR2OracleSpec{
 			ContractID:                        contractNodeInfo.OCR2.Address(),
@@ -450,7 +450,7 @@ func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error
 
 	for nIdx := 0; nIdx < nodeCount; nIdx++ {
 		jobSpec := &client.OCR2TaskJobSpec{
-			Name:              fmt.Sprintf("sol-OCRv2-%d-%s", nIdx, uuid.NewV4().String()),
+			Name:              fmt.Sprintf("sol-OCRv2-%d-%s", nIdx, uuid.New().String()),
 			JobType:           "offchainreporting2",
 			ObservationSource: contractNodeInfo.BridgeInfos[nIdx].ObservationSource,
 			OCR2OracleSpec: job.OCR2OracleSpec{
