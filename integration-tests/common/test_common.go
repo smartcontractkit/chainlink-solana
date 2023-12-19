@@ -193,7 +193,7 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		m.Common.SolanaUrl = sol.InternalHttpUrl
 		b, err := test_env.NewCLTestEnvBuilder().
 			WithNonEVM().
-			WithTestLogger(m.T).
+			WithTestInstance(m.T).
 			WithMockAdapter().
 			WithCLNodeConfig(m.Common.DefaultNodeConfig()).
 			WithCLNodes(m.Common.NodeCount).
