@@ -10,10 +10,10 @@ require (
 	github.com/gagliardetto/treeout v0.1.4
 	github.com/google/uuid v1.3.1
 	github.com/hashicorp/go-plugin v1.5.2
-	github.com/pelletier/go-toml/v2 v2.1.0
+	github.com/pelletier/go-toml/v2 v2.1.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.17.0
-	github.com/smartcontractkit/chainlink-common v0.1.7-0.20231221144407-7e8b44f63e2e
+	github.com/smartcontractkit/chainlink-common v0.1.7-0.20231221185953-a3a9e0db479f
 	github.com/smartcontractkit/libocr v0.0.0-20230925165524-ffa38fe11ef8
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/multierr v1.11.0
