@@ -13,7 +13,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.1.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.17.0
-	github.com/smartcontractkit/chainlink-common v0.1.7-0.20231128165554-4ca240b67cd7
+	github.com/smartcontractkit/chainlink-common v0.1.7-0.20231221144407-7e8b44f63e2e
 	github.com/smartcontractkit/libocr v0.0.0-20230925165524-ffa38fe11ef8
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/multierr v1.11.0
@@ -33,7 +33,7 @@ require (
 	github.com/blendle/zapdriver v1.3.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/confluentinc/confluent-kafka-go v1.9.2 // indirect
+	github.com/confluentinc/confluent-kafka-go/v2 v2.3.0 // indirect
 	github.com/dfuse-io/logging v0.0.0-20210109005628-b97a57253f70 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.5.0 // indirect
@@ -53,7 +53,6 @@ require (
 	github.com/klauspost/compress v1.15.11 // indirect
 	github.com/linkedin/goavro/v2 v2.12.0 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
-	github.com/magiconair/properties v1.8.6 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
@@ -70,8 +69,7 @@ require (
 	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.11.1 // indirect
 	github.com/riferrei/srclient v0.5.4 // indirect
-	github.com/santhosh-tekuri/jsonschema/v5 v5.1.1 // indirect
-	github.com/shopspring/decimal v1.3.1 // indirect
+	github.com/santhosh-tekuri/jsonschema/v5 v5.2.0 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/teris-io/shortid v0.0.0-20201117134242-e59966efd125 // indirect
 	github.com/tidwall/gjson v1.14.4 // indirect
