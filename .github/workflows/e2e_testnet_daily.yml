@@ -25,7 +25,6 @@ on:
     - cron: '0 6 * * *'
 env:
   CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
-  ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-solana-tests:${{ github.sha }}
   CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
 
 # Only run 1 of this workflow at a time per PR
