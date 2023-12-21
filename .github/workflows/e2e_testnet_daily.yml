@@ -133,16 +133,16 @@ jobs:
           this-job-name: Build Test Image
         continue-on-error: true
       - name: Checkout the repo
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - name: Build Image
-        uses: ./.github/actions/build-test-image
-        with:
-          artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
-          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+            - name: Build Test Image
+              if: needs.changes.outputs.src == 'true'
+              uses: ./.github/actions/build-test-image
+              with:
+                QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+                QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+                QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
 
   e2e_custom_run_daily_testnet_smoke_tests:
     name: E2E Run Daily Smoke Tests
