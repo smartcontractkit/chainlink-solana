@@ -136,13 +136,17 @@ jobs:
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
-            - name: Build Test Image
-              if: needs.changes.outputs.src == 'true'
-              uses: ./.github/actions/build-test-image
-              with:
-                QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-                QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-                QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
+      - name: Build Test Image
+        if: needs.changes.outputs.src == 'true' && needs.solana-test-image-exists.outputs.exists == 'false'
+        uses: ./.github/actions/build-test-image
+        with:
+          tag: ${{ needs.get_solana_sha.outputs.sha }}
+          artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
+          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+          QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
+      - run: echo "this exists so we don't have to run anything else if the build is skipped"
+        if: needs.changes.outputs.src == 'false' || needs.solana-test-image-exists.outputs.exists == 'true'
 
   e2e_custom_run_daily_testnet_smoke_tests:
     name: E2E Run Daily Smoke Tests
