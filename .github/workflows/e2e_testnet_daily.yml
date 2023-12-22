@@ -202,7 +202,7 @@ jobs:
       contents: read
     name: Build Test Image
     runs-on: ubuntu-latest
-    needs: [e2e_custom_build_artifacts]
+    needs: [e2e_custom_build_artifacts, changes, solana-test-image-exists, get_solana_sha]
     steps:
       - name: Collect Metrics
         id: collect-gha-metrics
