@@ -12,7 +12,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/onsi/gomega v1.30.0
 	github.com/rs/zerolog v1.30.0
-	github.com/smartcontractkit/chainlink-common v0.1.7-0.20231221185953-a3a9e0db479f
+	github.com/smartcontractkit/chainlink-common v0.1.7-0.20231222013743-f67285bba7bd
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20231215215420-f0b4a00004c1
 	github.com/smartcontractkit/chainlink-testing-framework v1.22.0
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20231215220731-a4091a3e4d3c
@@ -328,10 +328,10 @@ require (
 	github.com/slack-go/slack v0.12.2 // indirect
 	github.com/smartcontractkit/caigo v0.0.0-20230621050857-b29a4ca8c704 // indirect
 	github.com/smartcontractkit/chainlink-automation v1.0.1 // indirect
-	github.com/smartcontractkit/chainlink-cosmos v0.4.1-0.20231218175426-6e0427c661e5 // indirect
+	github.com/smartcontractkit/chainlink-cosmos v0.4.1-0.20231222201016-da3f0a763f71 // indirect
 	github.com/smartcontractkit/chainlink-data-streams v0.0.0-20231204152908-a6e3fe8ff2a1 // indirect
-	github.com/smartcontractkit/chainlink-feeds v0.0.0-20231127231053-2232d3a6766d // indirect
-	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20231218164059-e21436ef6202 // indirect
+	github.com/smartcontractkit/chainlink-feeds v0.0.0-20231222013040-c93f24a1b105 // indirect
+	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20231221191127-1f32389044ea // indirect
 	github.com/smartcontractkit/chainlink-vrf v0.0.0-20231120191722-fef03814f868 // indirect
 	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20230906073235-9e478e5e19f1 // indirect
 	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20230906073235-9e478e5e19f1 // indirect
