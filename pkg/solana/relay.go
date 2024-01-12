@@ -3,6 +3,7 @@ package solana
 import (
 	"context"
 	"encoding/json"
+	"math/big"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/pkg/errors"
@@ -10,12 +11,11 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
-	relaylogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 )
 
@@ -28,20 +28,15 @@ type TxManager interface {
 var _ relaytypes.Relayer = &Relayer{}
 
 type Relayer struct {
-	lggr   logger.Logger
-	chain  Chain
-	ctx    context.Context
-	cancel func()
+	lggr  logger.Logger
+	chain Chain
 }
 
 // Note: constructed in core
 func NewRelayer(lggr logger.Logger, chain Chain) *Relayer {
-	ctx, cancel := context.WithCancel(context.Background())
 	return &Relayer{
-		lggr:   lggr,
-		chain:  chain,
-		ctx:    ctx,
-		cancel: cancel,
+		lggr:  logger.Named(lggr, "Relayer"),
+		chain: chain,
 	}
 }
 
@@ -50,41 +45,51 @@ func (r *Relayer) Name() string {
 }
 
 // Start starts the relayer respecting the given context.
-func (r *Relayer) Start(context.Context) error {
+func (r *Relayer) Start(ctx context.Context) error {
 	// No subservices started on relay start, but when the first job is started
 	if r.chain == nil {
 		return errors.New("Solana unavailable")
 	}
-	return nil
+	return r.chain.Start(ctx)
 }
 
 // Close will close all open subservices
-func (r *Relayer) Close() error {
-	r.cancel()
-	return nil
-}
+func (r *Relayer) Close() error { return r.chain.Close() }
 
 func (r *Relayer) Ready() error {
 	return r.chain.Ready()
 }
 
-// Healthy only if all subservices are healthy
 func (r *Relayer) Healthy() error { return nil }
 
 func (r *Relayer) HealthReport() map[string]error {
-	return map[string]error{r.Name(): r.Healthy()}
+	hp := map[string]error{r.Name(): r.Healthy()}
+	services.CopyHealth(hp, r.chain.HealthReport())
+	return hp
 }
 
-func (r *Relayer) NewMercuryProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MercuryProvider, error) {
+func (r *Relayer) GetChainStatus(ctx context.Context) (relaytypes.ChainStatus, error) {
+	return r.chain.GetChainStatus(ctx)
+}
+
+func (r *Relayer) ListNodeStatuses(ctx context.Context, pageSize int32, pageToken string) (stats []relaytypes.NodeStatus, nextPageToken string, total int, err error) {
+	return r.chain.ListNodeStatuses(ctx, pageSize, pageToken)
+}
+
+func (r *Relayer) Transact(ctx context.Context, from, to string, amount *big.Int, balanceCheck bool) error {
+	return r.chain.Transact(ctx, from, to, amount, balanceCheck)
+}
+
+func (r *Relayer) NewMercuryProvider(ctx context.Context, rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MercuryProvider, error) {
 	return nil, errors.New("mercury is not supported for solana")
 }
 
-func (r *Relayer) NewLLOProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.LLOProvider, error) {
+func (r *Relayer) NewLLOProvider(ctx context.Context, rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.LLOProvider, error) {
 	return nil, errors.New("data streams is not supported for solana")
 }
 
-func (r *Relayer) NewConfigProvider(args relaytypes.RelayArgs) (relaytypes.ConfigProvider, error) {
-	configWatcher, err := newConfigProvider(r.ctx, r.lggr, r.chain, args)
+func (r *Relayer) NewConfigProvider(ctx context.Context, args relaytypes.RelayArgs) (relaytypes.ConfigProvider, error) {
+	configWatcher, err := newConfigProvider(ctx, r.lggr, r.chain, args)
 	if err != nil {
 		// Never return (*configProvider)(nil)
 		return nil, err
@@ -92,9 +97,9 @@ func (r *Relayer) NewConfigProvider(args relaytypes.RelayArgs) (relaytypes.Confi
 	return configWatcher, err
 }
 
-func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MedianProvider, error) {
-	lggr := relaylogger.Named(r.lggr, "MedianProvider")
-	configWatcher, err := newConfigProvider(r.ctx, lggr, r.chain, rargs)
+func (r *Relayer) NewMedianProvider(ctx context.Context, rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MedianProvider, error) {
+	lggr := logger.Named(r.lggr, "MedianProvider")
+	configWatcher, err := newConfigProvider(ctx, lggr, r.chain, rargs)
 	if err != nil {
 		return nil, err
 	}
@@ -140,11 +145,11 @@ func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes
 	}, nil
 }
 
-func (r *Relayer) NewFunctionsProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.FunctionsProvider, error) {
+func (r *Relayer) NewFunctionsProvider(ctx context.Context, rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.FunctionsProvider, error) {
 	return nil, errors.New("functions are not supported for solana")
 }
 
-func (r *Relayer) NewAutomationProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.AutomationProvider, error) {
+func (r *Relayer) NewAutomationProvider(ctx context.Context, rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.AutomationProvider, error) {
 	return nil, errors.New("automation is not supported for solana")
 }
 
@@ -162,7 +167,7 @@ type configProvider struct {
 }
 
 func newConfigProvider(ctx context.Context, lggr logger.Logger, chain Chain, args relaytypes.RelayArgs) (*configProvider, error) {
-	lggr = relaylogger.Named(lggr, "ConfigProvider")
+	lggr = logger.Named(lggr, "ConfigProvider")
 	var relayConfig RelayConfig
 	err := json.Unmarshal(args.RelayConfig, &relayConfig)
 	if err != nil {
@@ -289,6 +294,6 @@ func (p *medianProvider) Codec() relaytypes.Codec {
 	return nil
 }
 
-func (r *Relayer) NewPluginProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.PluginProvider, error) {
+func (r *Relayer) NewPluginProvider(ctx context.Context, rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.PluginProvider, error) {
 	return nil, errors.New("plugin provider is not supported for solana")
 }
