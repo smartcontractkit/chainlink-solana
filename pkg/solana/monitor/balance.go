@@ -64,14 +64,14 @@ func (b *balanceMonitor) Name() string {
 }
 
 func (b *balanceMonitor) Start(context.Context) error {
-	return b.StartOnce("SolanaBalanceMonitor", func() error {
+	return b.StartOnce("BalanceMonitor", func() error {
 		go b.monitor()
 		return nil
 	})
 }
 
 func (b *balanceMonitor) Close() error {
-	return b.StopOnce("SolanaBalanceMonitor", func() error {
+	return b.StopOnce("BalanceMonitor", func() error {
 		close(b.stop)
 		<-b.done
 		return nil

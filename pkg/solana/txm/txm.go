@@ -41,17 +41,17 @@ var _ loop.Keystore = (SimpleKeystore)(nil)
 // Txm manages transactions for the solana blockchain.
 // simple implementation with no persistently stored txs
 type Txm struct {
-	starter services.StateMachine
-	lggr    logger.Logger
-	chSend  chan pendingTx
-	chSim   chan pendingTx
-	chStop  services.StopChan
-	done    sync.WaitGroup
-	cfg     config.Config
-	txs     PendingTxContext
-	ks      SimpleKeystore
-	client  *utils.LazyLoad[client.ReaderWriter]
-	fee     fees.Estimator
+	services.StateMachine
+	lggr   logger.Logger
+	chSend chan pendingTx
+	chSim  chan pendingTx
+	chStop services.StopChan
+	done   sync.WaitGroup
+	cfg    config.Config
+	txs    PendingTxContext
+	ks     SimpleKeystore
+	client *utils.LazyLoad[client.ReaderWriter]
+	fee    fees.Estimator
 }
 
 type TxConfig struct {
@@ -76,7 +76,7 @@ type pendingTx struct {
 // NewTxm creates a txm. Uses simulation so should only be used to send txes to trusted contracts i.e. OCR.
 func NewTxm(chainID string, tc func() (client.ReaderWriter, error), cfg config.Config, ks SimpleKeystore, lggr logger.Logger) *Txm {
 	return &Txm{
-		lggr:   lggr,
+		lggr:   logger.Named(lggr, "Txm"),
 		chSend: make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
 		chSim:  make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
 		chStop: make(chan struct{}),
@@ -89,7 +89,7 @@ func NewTxm(chainID string, tc func() (client.ReaderWriter, error), cfg config.C
 
 // Start subscribes to queuing channel and processes them.
 func (txm *Txm) Start(ctx context.Context) error {
-	return txm.starter.StartOnce("solana_txm", func() error {
+	return txm.StartOnce("Txm", func() error {
 		// determine estimator type
 		var estimator fees.Estimator
 		var err error
@@ -574,23 +574,13 @@ func (txm *Txm) InflightTxs() int {
 
 // Close close service
 func (txm *Txm) Close() error {
-	return txm.starter.StopOnce("solanatxm", func() error {
+	return txm.StopOnce("Txm", func() error {
 		close(txm.chStop)
 		txm.done.Wait()
 		return txm.fee.Close()
 	})
 }
-func (txm *Txm) Name() string { return "solanatxm" }
-
-// Healthy service is healthy
-func (txm *Txm) Healthy() error {
-	return nil
-}
-
-// Ready service is ready
-func (txm *Txm) Ready() error {
-	return txm.starter.Ready()
-}
+func (txm *Txm) Name() string { return txm.lggr.Name() }
 
 func (txm *Txm) HealthReport() map[string]error { return map[string]error{txm.Name(): txm.Healthy()} }
 
