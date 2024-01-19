@@ -38,6 +38,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+
 	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/test_env"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana"
@@ -511,9 +513,10 @@ func (c *Common) DefaultNodeConfig() *cl.Config {
 	}
 	baseConfig.OCR2.Enabled = ptr.Ptr(true)
 	baseConfig.P2P.V2.Enabled = ptr.Ptr(true)
-	fiveSecondDuration := models.MustMakeDuration(5 * time.Second)
-	baseConfig.P2P.V2.DeltaDial = &fiveSecondDuration
-	baseConfig.P2P.V2.DeltaReconcile = &fiveSecondDuration
+	fiveSecondDuration := commonconfig.MustNewDuration(5 * time.Second)
+
+	baseConfig.P2P.V2.DeltaDial = fiveSecondDuration
+	baseConfig.P2P.V2.DeltaReconcile = fiveSecondDuration
 	baseConfig.P2P.V2.ListenAddresses = &[]string{"0.0.0.0:6690"}
 
 	return baseConfig
