@@ -14,8 +14,8 @@ require (
 	github.com/rs/zerolog v1.30.0
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240119014733-5ea50bbe81be
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20231222220348-c7d81beaf8fd
-	github.com/smartcontractkit/chainlink-testing-framework v1.22.1
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20231222204838-fa1325e3a88c
+	github.com/smartcontractkit/chainlink-testing-framework v1.22.4
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240119021513-7acd8a5ce4cb
 	github.com/smartcontractkit/chainlink/v2 v2.8.0-beta0.0.20240119021513-7acd8a5ce4cb
 	github.com/smartcontractkit/libocr v0.0.0-20240112202000-6359502d2ff1
 	github.com/stretchr/testify v1.8.4
@@ -189,6 +189,7 @@ require (
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/gnostic v0.6.9 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/go-github/v41 v41.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/go-tpm v0.9.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
