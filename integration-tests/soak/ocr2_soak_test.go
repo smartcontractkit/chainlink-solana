@@ -11,7 +11,7 @@ import (
 )
 
 func TestSolanaOCRV2SoakTest(t *testing.T) {
-	state, err := common.NewOCRv2State(t, 5, "soak", "localnet", true)
+	state, err := common.NewOCRv2State(t, 5, "soak", "devnet", true)
 	require.NoError(t, err, "Could not setup the ocrv2 state")
 	if state.Common.Env.WillUseRemoteRunner() {
 		// run the remote runner and exit
