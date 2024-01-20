@@ -411,11 +411,11 @@ func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error
 		bootstrapNodeInternalIP = contractNodeInfo.BootstrapNode.InternalIP()
 	}
 	relayConfig := job.JSONConfig{
-		"nodeEndpointHTTP": fmt.Sprintf("\"%s\"", SolanaLocalNetURL),
-		"ocr2ProgramID":    fmt.Sprintf("\"%s\"", contractNodeInfo.OCR2.ProgramAddress()),
-		"transmissionsID":  fmt.Sprintf("\"%s\"", contractNodeInfo.Store.TransmissionsAddress()),
-		"storeProgramID":   fmt.Sprintf("\"%s\"", contractNodeInfo.Store.ProgramAddress()),
-		"chainID":          fmt.Sprintf("\"%s\"", LocalnetChainID),
+		"nodeEndpointHTTP": SolanaLocalNetURL,
+		"ocr2ProgramID":    contractNodeInfo.OCR2.ProgramAddress(),
+		"transmissionsID":  contractNodeInfo.Store.TransmissionsAddress(),
+		"storeProgramID":   contractNodeInfo.Store.ProgramAddress(),
+		"chainID":          LocalnetChainID,
 	}
 	bootstrapPeers := []client.P2PData{
 		{
