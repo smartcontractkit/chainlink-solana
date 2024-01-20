@@ -152,11 +152,11 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	// TODO - The current setup in common.go is using the solana validator, so we need to create one method for both gauntlet and solana
 	// Leaving this for the time being as is so we have Testnet runs enabled on Solana
 	relayConfig := job.JSONConfig{
-		"nodeEndpointHTTP": fmt.Sprintf("\"%s\"", state.Common.SolanaUrl),
-		"ocr2ProgramID":    fmt.Sprintf("\"%s\"", gauntletConfig["PROGRAM_ID_OCR2"]),
-		"transmissionsID":  fmt.Sprintf("\"%s\"", sg.FeedAddress),
-		"storeProgramID":   fmt.Sprintf("\"%s\"", gauntletConfig["PROGRAM_ID_STORE"]),
-		"chainID":          fmt.Sprintf("\"%s\"", state.Common.ChainId),
+		"nodeEndpointHTTP": state.Common.SolanaUrl,
+		"ocr2ProgramID":    gauntletConfig["PROGRAM_ID_OCR2"],
+		"transmissionsID":  sg.FeedAddress,
+		"storeProgramID":   gauntletConfig["PROGRAM_ID_STORE"],
+		"chainID":          state.Common.ChainId,
 	}
 	bootstrapPeers := []client.P2PData{
 		{
