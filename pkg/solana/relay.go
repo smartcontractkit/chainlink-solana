@@ -141,7 +141,7 @@ func (r *Relayer) NewFunctionsProvider(rargs relaytypes.RelayArgs, pargs relayty
 }
 
 func (r *Relayer) NewAutomationProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.AutomationProvider, error) {
-    return nil, errors.New("automation is not supported for solana")
+	return nil, errors.New("automation is not supported for solana")
 }
 
 var _ relaytypes.ConfigProvider = &configProvider{}
@@ -278,5 +278,9 @@ func (p *medianProvider) OnchainConfigCodec() median.OnchainConfigCodec {
 }
 
 func (p *medianProvider) ChainReader() relaytypes.ChainReader {
+	return nil
+}
+
+func (p *medianProvider) Codec() relaytypes.Codec {
 	return nil
 }
