@@ -424,8 +424,6 @@ github.com/shurcooL/sanitized_anchor_name v1.0.0/go.mod h1:1NzhyTcUVG4SuEtjjoZeV
 github.com/sirupsen/logrus v1.2.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPxbbu5VWo=
 github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ=
 github.com/sirupsen/logrus v1.9.3/go.mod h1:naHLuLoDiP4jHNo9R0sCBMtWGeIprob74mVsIT4qYEQ=
-github.com/smartcontractkit/chainlink-common v0.1.7-0.20240119143538-04c7f63ad53a h1:lgM0yPo0KqSntLY4Y42RAH3avdv+Kyne8n+VM7cwlxo=
-github.com/smartcontractkit/chainlink-common v0.1.7-0.20240119143538-04c7f63ad53a/go.mod h1:05rRF84QKlIOF5LfTBPkHdw4UpBI2G3zxRcuZ65bPjk=
 github.com/smartcontractkit/chainlink-common v0.1.7-0.20240122161056-177752fcd926 h1:4GQamMITT58swnAJ5ck572apbU1GCCVF1B8yiNdGry4=
 github.com/smartcontractkit/chainlink-common v0.1.7-0.20240122161056-177752fcd926/go.mod h1:NZ+p9FNx9jdPPfE7eBW2YER9IccxmFmLkxEvaVEEz+A=
 github.com/smartcontractkit/go-plugin v0.0.0-20231003134350-e49dad63b306 h1:ko88+ZznniNJZbZPWAvHQU8SwKAdHngdDZ+pvVgB5ss=
