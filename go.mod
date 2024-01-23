@@ -13,7 +13,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.1.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.17.0
-	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240123153406-eb7d880ccbe2
+	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240123173807-c1c775844325
 	github.com/smartcontractkit/libocr v0.0.0-20240112202000-6359502d2ff1
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/multierr v1.11.0
