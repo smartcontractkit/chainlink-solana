@@ -79,6 +79,10 @@ func (r *Relayer) NewMercuryProvider(rargs relaytypes.RelayArgs, pargs relaytype
 	return nil, errors.New("mercury is not supported for solana")
 }
 
+func (r *Relayer) NewLLOProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.LLOProvider, error) {
+	return nil, errors.New("data streams is not supported for solana")
+}
+
 func (r *Relayer) NewConfigProvider(args relaytypes.RelayArgs) (relaytypes.ConfigProvider, error) {
 	configWatcher, err := newConfigProvider(r.ctx, r.lggr, r.chain, args)
 	if err != nil {
