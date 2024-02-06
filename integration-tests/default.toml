@@ -1,0 +1,10 @@
+[Logging]
+test_log_collect=false
+
+[Logging.LogStream]
+log_targets=["file"]
+log_producer_timeout="10s"
+log_producer_retry_limit=10
+
+[Network]
+selected_networks=["simulated"]
