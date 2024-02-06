@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/osutil"
+	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
 
 	"golang.org/x/sync/errgroup"
 
@@ -191,9 +192,15 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		err = sol.StartContainer()
 		require.NoError(m.T, err)
 		m.Common.SolanaUrl = sol.InternalHttpUrl
+
+		config, err := tc.GetConfig("Smoke", tc.OCR2)
+		if err != nil {
+			m.T.Fatal(err)
+		}
 		b, err := test_env.NewCLTestEnvBuilder().
 			WithNonEVM().
 			WithTestInstance(m.T).
+			WithTestConfig(&config).
 			WithMockAdapter().
 			WithCLNodeConfig(m.Common.DefaultNodeConfig()).
 			WithCLNodes(m.Common.NodeCount).
