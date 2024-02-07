@@ -2,7 +2,6 @@ package smoke
 
 import (
 	"fmt"
-	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
 	"maps"
 	"sort"
 	"testing"
@@ -16,6 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/guregu/null.v4"
+
+	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
