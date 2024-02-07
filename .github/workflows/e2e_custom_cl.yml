@@ -123,8 +123,11 @@ jobs:
           version="solana.${{ github.event.inputs.cl_branch_ref || github.sha }}"
           EOF
 
+          # shellcheck disable=SC2002
           BASE64_CONFIG_OVERRIDE=$(cat config.toml | base64 -w 0)
+          # shellcheck disable=SC2086
           echo ::add-mask::$BASE64_CONFIG_OVERRIDE
+          # shellcheck disable=SC2086
           echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> $GITHUB_ENV
       - name: Run Tests
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@eccde1970eca69f079d3efb3409938a72ade8497 # v2.2.13
