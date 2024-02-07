@@ -6,12 +6,18 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
+
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/common"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 )
 
 func TestSolanaOCRV2SoakTest(t *testing.T) {
-	state, err := common.NewOCRv2State(t, 5, "soak", "devnet", true)
+	config, err := tc.GetConfig("Soak", tc.OCR2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := common.NewOCRv2State(t, 5, "soak", "devnet", true, &config)
 	require.NoError(t, err, "Could not setup the ocrv2 state")
 	if state.Common.Env.WillUseRemoteRunner() {
 		// run the remote runner and exit

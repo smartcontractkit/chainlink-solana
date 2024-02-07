@@ -16,6 +16,8 @@ import (
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/guregu/null.v4"
 
+	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
@@ -41,12 +43,16 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 			"CL_SOLANA_CMD": "chainlink-solana",
 		}},
 	} {
+		config, err := tc.GetConfig("Smoke", tc.OCR2)
+		if err != nil {
+			t.Fatal(err)
+		}
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
 			logging.Init()
-			state, err := common.NewOCRv2State(t, 1, "smoke-"+test.name, "localnet", false)
+			state, err := common.NewOCRv2State(t, 1, "smoke-"+test.name, "localnet", false, &config)
 			require.NoError(t, err, "Could not setup the ocrv2 state")
 			if len(test.env) > 0 {
 				state.Common.NodeOpts = append(state.Common.NodeOpts, func(n *test_env.ClNode) {
@@ -64,9 +70,13 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 }
 
 func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
+	config, err := tc.GetConfig("Smoke", tc.OCR2)
+	if err != nil {
+		t.Fatal(err)
+	}
 	l := logging.GetTestLogger(t)
 	secret := "this is an testing only secret"
-	state, err := common.NewOCRv2State(t, 1, "gauntlet", "devnet", true)
+	state, err := common.NewOCRv2State(t, 1, "gauntlet", "devnet", true, &config)
 	require.NoError(t, err, "Could not setup the ocrv2 state")
 	if state.Common.Env.WillUseRemoteRunner() {
 		// run the remote runner and exit
