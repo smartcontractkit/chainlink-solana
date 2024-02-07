@@ -41,6 +41,7 @@ integration-tests/smoke/contracts-chaos-state.json
 tmp-manifest-*
 tests-smoke-report.xml
 .env.test*
+overrides.toml
 
 # Test & linter reports
 *report.xml
