@@ -13,7 +13,7 @@ import (
 )
 
 func TestSolanaOCRV2SoakTest(t *testing.T) {
-	config, err := tc.GetConfig("Smoke", tc.OCR2)
+	config, err := tc.GetConfig("Soak", tc.OCR2)
 	if err != nil {
 		t.Fatal(err)
 	}
