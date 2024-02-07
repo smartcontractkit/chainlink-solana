@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/osutil"
+	"github.com/smartcontractkit/chainlink/integration-tests/testconfig"
 
 	"golang.org/x/sync/errgroup"
 
@@ -115,7 +116,7 @@ type ProposalAcceptConfig struct {
 	RandomSecret   string         `json:"randomSecret"`
 }
 
-func NewOCRv2State(t *testing.T, contracts int, namespacePrefix string, env string, isK8s bool) (*OCRv2TestState, error) {
+func NewOCRv2State(t *testing.T, contracts int, namespacePrefix string, env string, isK8s bool, testConfig *testconfig.TestConfig) (*OCRv2TestState, error) {
 
 	c, err := New(env, isK8s).Default(t, namespacePrefix)
 	if err != nil {
@@ -129,6 +130,7 @@ func NewOCRv2State(t *testing.T, contracts int, namespacePrefix string, env stri
 		Client:             &solclient.Client{},
 		T:                  t,
 		L:                  log.Logger,
+		TestConfig:         testConfig,
 	}
 	if state.T != nil {
 		state.L = logging.GetTestLogger(state.T)
@@ -161,6 +163,7 @@ type OCRv2TestState struct {
 	T                  *testing.T
 	Common             *Common
 	L                  zerolog.Logger
+	TestConfig         *testconfig.TestConfig
 }
 
 type ContractsState struct {
@@ -194,6 +197,7 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		b, err := test_env.NewCLTestEnvBuilder().
 			WithNonEVM().
 			WithTestInstance(m.T).
+			WithTestConfig(m.TestConfig).
 			WithMockAdapter().
 			WithCLNodeConfig(m.Common.DefaultNodeConfig()).
 			WithCLNodes(m.Common.NodeCount).
