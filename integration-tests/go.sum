@@ -1407,10 +1407,10 @@ github.com/smartcontractkit/chainlink-testing-framework v1.23.2 h1:haXPd9Pg++Zs5
 github.com/smartcontractkit/chainlink-testing-framework v1.23.2/go.mod h1:StIOdxvwd8AMO6xuBtmD6FQfJXktEn/mJJEr7728BTc=
 github.com/smartcontractkit/chainlink-vrf v0.0.0-20231120191722-fef03814f868 h1:FFdvEzlYwcuVHkdZ8YnZR/XomeMGbz5E2F2HZI3I3w8=
 github.com/smartcontractkit/chainlink-vrf v0.0.0-20231120191722-fef03814f868/go.mod h1:Kn1Hape05UzFZ7bOUnm3GVsHzP0TNrVmpfXYNHdqGGs=
-github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240207165744-230ff8ccd821 h1:TAVolauV5Y7qZfhrvY2bKSMSHbXKRHmuoyTWoQxt/tU=
-github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240207165744-230ff8ccd821/go.mod h1:40/94yfTYqFMyKnElZc2Uaq8ZYZSlBFf5FpWT1mbYeI=
-github.com/smartcontractkit/chainlink/v2 v2.9.0-beta0.0.20240207165744-230ff8ccd821 h1:jCRla05GlwQ1xzghAz5ufORI3jOKP+iMGGh/L6CXrms=
-github.com/smartcontractkit/chainlink/v2 v2.9.0-beta0.0.20240207165744-230ff8ccd821/go.mod h1:bJmsdGnX7bnC/8hVfQExHcpvPZraypYVr2SgUJU0PZ8=
+github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240207222909-f90e419c7f2e h1:Tk9P9iBgvaJ164w/lkrJwXFKzgSzOmbM4eJ4mAPbGjk=
+github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240207222909-f90e419c7f2e/go.mod h1:uhifJmBzwfQesYrN052Ej1kcYLOvUabXDODDaYIGZPs=
+github.com/smartcontractkit/chainlink/v2 v2.9.0-beta0.0.20240207222909-f90e419c7f2e h1:nVVLDveoA0rF9GNEPlGVaBfSSS8YnyjYFByeaMeTz8c=
+github.com/smartcontractkit/chainlink/v2 v2.9.0-beta0.0.20240207222909-f90e419c7f2e/go.mod h1:j/6IibXUIaiE7G+3MxXE/UIj9G2K903Q9JQqsh2uBVs=
 github.com/smartcontractkit/go-plugin v0.0.0-20231003134350-e49dad63b306 h1:ko88+ZznniNJZbZPWAvHQU8SwKAdHngdDZ+pvVgB5ss=
 github.com/smartcontractkit/go-plugin v0.0.0-20231003134350-e49dad63b306/go.mod h1:w1sAEES3g3PuV/RzUrgow20W2uErMly84hhD3um1WL4=
 github.com/smartcontractkit/grpc-proxy v0.0.0-20230731113816-f1be6620749f h1:hgJif132UCdjo8u43i7iPN1/MFnu49hv7lFGFftCHKU=

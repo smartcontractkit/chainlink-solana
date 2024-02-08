@@ -20,6 +20,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check_test_compilation:
+    name: Check integration test compilation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: Setup go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: "go.mod"
+          check-latest: true
+          cache: true
+      - run: cd ./integration-tests && go test -run=xxx ./...
+
   get_projectserum_version:
     name: Get ProjectSerum Version
     environment: integration
@@ -89,7 +103,7 @@ jobs:
       contents: read
     runs-on: ubuntu20.04-16cores-64GB
 
-    needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image]
+    needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image, check_test_compilation]
     env:
       TEST_SUITE: smoke
       TEST_ARGS: -test.timeout 30m
