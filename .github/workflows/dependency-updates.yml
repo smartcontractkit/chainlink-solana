@@ -1,0 +1,103 @@
+name: DependencyUpdater
+on: push
+#   workflow_dispatch:
+#   schedule:
+#     - cron: '0 0 * * *' # check every day at midnight UTC
+  
+jobs:
+#   E2E-Solana-Image:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v3 # checkout branch that it is called from
+#       - name: Check for solana image updates
+#         id: solImage
+#         run: |
+#           make upgrade-e2e-solana-image
+#           image=$(curl https://api.github.com/repos/solana-labs/solana/releases/latest | jq -r '.tag_name')
+#           echo "image=$image" >> "$GITHUB_OUTPUT"
+#       - name: Check if PR exists
+#         id: check
+#         env:
+#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#         run: |
+#           prs=$(gh pr list \
+#               --repo "$GITHUB_REPOSITORY" \
+#               --head "bump/solana-${{ steps.solImage.outputs.image }}" \
+#               --json title \
+#               --jq 'length')
+#           if ((prs > 0)); then
+#               echo "skip=true" >> "$GITHUB_OUTPUT"
+#           fi
+#       - name: Create pull request
+#         if: '!steps.check.outputs.skip'
+#         uses: peter-evans/create-pull-request@b1ddad2c994a25fbc81a28b3ec0e368bb2021c50 # v6.0.0
+#         with:
+#           title: "[automated] bump solana image to ${{ steps.solImage.outputs.image }}"
+#           branch: bump/solana-${{ steps.solImage.outputs.image }}
+#           author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+#           reviewers: aalu1418
+#           commit-message: "[automated] bump solana dependencies"
+#           body: "Latest Solana mainnet release is [\"${{ steps.solImage.outputs.image }}\"](https://github.com/solana-labs/solana/releases/latest)"
+  E2E-Testing-Dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: "go.mod"
+          check-latest: true
+          cache: true
+      # ------ Get CTF version from core ------------
+      - uses: actions/checkout@v3
+        with: 
+          repository: smartcontractkit/chainlink
+          ref: develop
+          path: ./chainlink
+      - name: Check CTF version in core
+        id: coreCTF
+        working-directory: ./chainlink
+        run: |
+          cd integration-tests
+          version=$(go list -m github.com/smartcontractkit/chainlink-testing-framework | awk '{print $NF}')
+          echo $version
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          cd ../../
+          rm -rf chainlink
+      # -------- Compare to chainlink-solana/integration-tests --------------
+      - name: Check CTF version in chainlink-solana
+        id: solanaCTF
+        run: |
+          cd integration-tests
+          version=$(go list -m github.com/smartcontractkit/chainlink-testing-framework | awk '{print $NF}')
+          echo $version
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Update integration test dependencies
+        if: ${{ steps.coreCTF.outputs.version != steps.solanaCTF.outputs.version }}
+        run: |
+          make upgrade-e2e-core-deps
+          make gomodtidy
+      # --------- Build PR if necessary --------------------
+      - name: Check if PR exists
+        id: check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          prs=$(gh pr list \
+              --repo "$GITHUB_REPOSITORY" \
+              --head "bump/e2e-test-deps-${{ steps.coreCTF.outputs.version }}" \
+              --json title \
+              --jq 'length')
+          if ((prs > 0)); then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Create pull request
+        if: '!steps.check.outputs.skip'
+        uses: peter-evans/create-pull-request@b1ddad2c994a25fbc81a28b3ec0e368bb2021c50 # v6.0.0
+        with:
+          title: "[automated] bump e2e test deps to match chainlink/integration-tests"
+          branch: bump/e2e-test-deps-${{ steps.coreCTF.outputs.version }}
+          author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+          reviewers: aalu1418
+          commit-message: "[automated] bump e2e <> core/integration-tests dependencies"
+          body: "chainlink/integration-tests uses chainlink-testing-framework@${{ steps.coreCTF.outputs.version }}"
