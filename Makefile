@@ -99,3 +99,7 @@ lint-go-integration-tests:
 .PHONY: lint-go-relay
 lint-go-relay:
 	cd ./pkg && golangci-lint --color=always --exclude=dot-imports --timeout 10m --out-format checkstyle:golangci-lint-relay-report.xml run || true
+
+.PHONY: upgrade-e2e-solana-image
+upgrade-e2e-solana-image:
+	cd ./integration-tests && ../scripts/update-solana.sh
