@@ -22,3 +22,4 @@ else
 fi
 
 echo "Done"
+export SOL_IMAGE="$latestVersion"
