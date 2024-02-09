@@ -3,6 +3,7 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '0 0 * * *' # check every day at midnight UTC
+  push:
   
 jobs:
   E2E-Solana-Image:
