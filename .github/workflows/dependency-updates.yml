@@ -1,7 +1,8 @@
 name: DependencyUpdater
 on: 
   workflow_dispatch:
-  push:
+  schedule:
+    - cron: '0 0 * * *' # check every day at midnight UTC
   
 jobs:
   E2E-Solana-Image:
