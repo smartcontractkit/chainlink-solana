@@ -256,7 +256,7 @@ func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 	wg.Add(5)
 	for i := 0; i < n; i++ {
 		go func(i int) {
-			time.Sleep(time.Duration(rand.Intn(3)) * time.Second) // randomly submit txs
+			time.Sleep(time.Duration(rand.Intn(500)) * time.Millisecond) // randomly submit txs
 			sig, err := c.SendTx(ctx, tx)
 			assert.NoError(t, errors.Wrapf(err, "try #%d", i))
 			sigs[i] = sig
@@ -270,9 +270,20 @@ func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 		assert.Equal(t, sigs[0], sigs[i])
 	}
 
+	// try waiting for tx to execute - reduce flakiness
+	require.Eventually(t, func() bool {
+		res, err := c.SignatureStatuses(ctx, []solana.Signature{sigs[0]})
+		require.NoError(t, err)
+		require.Equal(t, 1, len(res))
+		if res[0] == nil {
+			return false
+		}
+		return res[0].ConfirmationStatus == rpc.ConfirmationStatusConfirmed
+	}, 5*time.Second, 500*time.Millisecond)
+
 	// expect one sender has only sent one tx
 	// original balance - current bal = 5000 lamports (tx fee)
 	endBal, err := c.Balance(pubKey)
 	assert.NoError(t, err)
-	assert.Equal(t, initBal-endBal, uint64(5_000))
+	assert.Equal(t, uint64(5_000), initBal-endBal)
 }
