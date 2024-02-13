@@ -65,14 +65,14 @@ pub mod store {
         let len = len
             .checked_sub(8 + state::HEADER_SIZE)
             .ok_or(ErrorCode::InsufficientSize)?;
-        require!(len % size_of::<Transmission>() == 0, InsufficientSize);
+        require!(len % size_of::<Transmission>() == 0, ErrorCode::InsufficientSize);
         let space = len / size_of::<Transmission>();
         // Live length must not exceed total capacity
-        require!(live_length <= space as u32, InvalidInput);
+        require!(live_length <= space as u32, ErrorCode::InvalidInput);
 
         // Both inputs should also be more than zero
-        require!(live_length > 0, InvalidInput);
-        require!(granularity > 0, InvalidInput);
+        require!(live_length > 0, ErrorCode::InvalidInput);
+        require!(granularity > 0, ErrorCode::InvalidInput);
 
         feed.version = FEED_VERSION;
         feed.state = Transmissions::NORMAL;
@@ -83,7 +83,7 @@ pub mod store {
 
         feed.decimals = decimals;
         let description = description.as_bytes();
-        require!(description.len() <= 32, InvalidInput);
+        require!(description.len() <= 32, ErrorCode::InvalidInput);
         feed.description[..description.len()].copy_from_slice(description);
 
         Ok(())
@@ -114,7 +114,7 @@ pub mod store {
             // else, it's an individual owner
             Err(_err) => ctx.accounts.proposed_owner.key(),
         };
-        require!(ctx.accounts.authority.key == &proposed_owner, Unauthorized);
+        require!(ctx.accounts.authority.key == &proposed_owner, ErrorCode::Unauthorized);
 
         let feed = &mut ctx.accounts.feed;
         feed.owner = std::mem::take(&mut feed.proposed_owner);
@@ -310,7 +310,7 @@ fn owner<'info>(owner: &UncheckedAccount<'info>, authority: &Signer) -> Result<(
         Err(_err) => *owner.key,
     };
 
-    require!(authority.key == &owner, Unauthorized);
+    require!(authority.key == &owner, ErrorCode::Unauthorized);
     Ok(())
 }
 
@@ -337,7 +337,7 @@ fn has_lowering_access(
             // The controller account has to match the lowering_access_controller on the store
             require!(
                 controller.key() == store.lowering_access_controller,
-                InvalidInput
+                ErrorCode::InvalidInput
             );
 
             let controller = AccountLoader::try_from(controller)?;
@@ -347,11 +347,11 @@ fn has_lowering_access(
                 // TODO: better mapping, maybe InvalidInput?
                 .map_err(|_| ErrorCode::Unauthorized)?;
 
-            require!(has_access, Unauthorized);
+            require!(has_access, ErrorCode::Unauthorized);
         }
         // else, it's an individual owner
         Err(_err) => {
-            require!(authority.key == owner.key, Unauthorized);
+            require!(authority.key == owner.key, ErrorCode::Unauthorized);
         }
     };
 

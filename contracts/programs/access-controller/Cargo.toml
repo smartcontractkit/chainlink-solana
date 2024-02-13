@@ -15,6 +15,7 @@ cpi = ["no-entrypoint"]
 default = []
 
 [dependencies]
-anchor-lang = "0.25.0"
+anchor-lang = "0.29.0"
+bytemuck = { version = "1.4.0", features = ["derive", "min_const_generics"]}
 static_assertions = "1.1.0"
 arrayvec = { version = "1.0.0", path = "../../crates/arrayvec" }
