@@ -102,4 +102,4 @@ lint-go-relay:
 
 .PHONY: upgrade-e2e-solana-image
 upgrade-e2e-solana-image:
-	cd ./integration-tests && ../scripts/update-solana.sh
+	./scripts/update-solana.sh
