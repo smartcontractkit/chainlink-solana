@@ -290,5 +290,5 @@ func (p *medianProvider) Codec() relaytypes.Codec {
 }
 
 func (r *Relayer) NewPluginProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.PluginProvider, error) {
-	return nil, errors.New("plugin provider is not supported for cosmos")
+	return nil, errors.New("plugin provider is not supported for solana")
 }
