@@ -37,7 +37,9 @@ jobs:
           author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
           reviewers: aalu1418
           commit-message: "[automated] bump solana dependencies"
-          body: "Latest Solana mainnet release is [\"${{ steps.solImage.outputs.image }}\"](https://github.com/solana-labs/solana/releases/latest)"
+          body: |
+            Latest Solana mainnet release is [\"${{ steps.solImage.outputs.image }}\"](https://github.com/solana-labs/solana/releases/latest)
+            (run CI by closing + reopening PR)
   E2E-Testing-Dependencies:
     runs-on: ubuntu-latest
     steps:
@@ -100,4 +102,6 @@ jobs:
           author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
           reviewers: aalu1418
           commit-message: "[automated] bump e2e <> core/integration-tests dependencies"
-          body: "chainlink/integration-tests uses chainlink-testing-framework@${{ steps.coreCTF.outputs.version }}"
+          body: | 
+            chainlink/integration-tests uses chainlink-testing-framework@${{ steps.coreCTF.outputs.version }}
+            (run CI by closing + reopening PR)
