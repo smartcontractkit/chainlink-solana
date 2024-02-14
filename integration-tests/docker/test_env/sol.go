@@ -2,8 +2,11 @@ package test_env
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -114,6 +117,12 @@ func (s *Solana) StartContainer() error {
 		Str("containerName", s.ContainerName).
 		Msgf("Started Solana container")
 
+	feat, err := CheckFeatures(s.ExternalHttpUrl)
+	if err != nil {
+		return err
+	}
+	s.l.Info().Any("features", feat).Msgf("test validator features")
+
 	return nil
 }
 
@@ -135,6 +144,12 @@ func (ms *Solana) getContainerRequest() (*tc.ContainerRequest, error) {
 	if err != nil {
 		return nil, err
 	}
+	// get disabled/unreleased features on mainnet
+	inactiveFeatures, err := GetInactiveFeatureHashes()
+	if err != nil {
+		return nil, err
+	}
+	ms.l.Info().Any("Disabled Features", inactiveFeatures).Msg("Disabling features on the test validator to match mainnet")
 
 	return &tc.ContainerRequest{
 		Name:         ms.ContainerName,
@@ -169,6 +184,55 @@ func (ms *Solana) getContainerRequest() (*tc.ContainerRequest, error) {
 				},
 			},
 		},
-		Entrypoint: []string{"sh", "-c", "mkdir -p /root/.config/solana/cli && solana-test-validator -r --mint AAxAoGfkbWnbgsiQeAanwUvjv6bQrM5JS8Vxv1ckzVxg"},
+		// Entrypoint: []string{"sh", "-c", "mkdir -p /root/.config/solana/cli && solana-test-validator -r --mint=AAxAoGfkbWnbgsiQeAanwUvjv6bQrM5JS8Vxv1ckzVxg " + inactiveFeatures.CLIString()},
+		Entrypoint: []string{"sh", "-c", "mkdir -p /root/.config/solana/cli && solana-test-validator -r --mint=AAxAoGfkbWnbgsiQeAanwUvjv6bQrM5JS8Vxv1ckzVxg " + inactiveFeatures.CLIString()},
 	}, nil
+}
+
+type FeatureStatuses struct {
+	Features []FeatureStatus
+	// note: there are other unused params in the json response
+}
+
+type FeatureStatus struct {
+	ID          string
+	Description string
+	Status      string
+	SinceSlot   int
+}
+
+type InactiveFeatures []string
+
+func (f InactiveFeatures) CLIString() string {
+	return "--deactivate-feature=" + strings.Join(f, " --deactivate-feature=")
+}
+
+// GetInactiveFeatureHashes uses the solana CLI to fetch inactive solana features
+// This is used in conjuction with the solana-test-validator command to produce a solana network that has the same features as mainnet
+// the solana-test-validator has all features on by default (released + unreleased)
+func GetInactiveFeatureHashes() (output InactiveFeatures, err error) {
+	cmd := exec.Command("solana", "feature", "status", "-um", "--output=json") // -um is for mainnet url
+	stdout, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get feature status: %w", err)
+	}
+
+	statuses := FeatureStatuses{}
+	if err = json.Unmarshal(stdout, &statuses); err != nil {
+		return nil, fmt.Errorf("Failed to unmarshal feature status: %w", err)
+	}
+
+	for _, f := range statuses.Features {
+		if f.Status == "inactive" {
+			output = append(output, f.ID)
+		}
+	}
+
+	return output, err
+}
+
+func CheckFeatures(url string) (string, error) {
+	cmd := exec.Command("solana", "feature", "status", "-u "+url)
+	stdout, err := cmd.Output()
+	return string(stdout), err
 }
