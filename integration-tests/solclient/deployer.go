@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	ag_binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
@@ -371,7 +372,7 @@ func (c *ContractDeployer) DeployProgramRemote(programName string, env *environm
 }
 
 func (c *ContractDeployer) DeployProgramRemoteLocal(programName string, sol *test_env_sol.Solana) error {
-	log.Debug().Str("Program", programName).Msg("Deploying program")
+	log.Info().Str("Program", programName).Msg("Deploying program")
 	programPath := filepath.Join("programs", programName)
 	programKeyFileName := strings.Replace(programName, ".so", "-keypair.json", -1)
 	programKeyFilePath := filepath.Join("programs", programKeyFileName)
@@ -429,11 +430,14 @@ func (c *ContractDeployer) RegisterAnchorPrograms() {
 }
 
 func (c *ContractDeployer) ValidateProgramsDeployed() error {
+
+	time.Sleep(time.Minute)
+
 	keys := []solana.PublicKey{}
 	names := []string{}
 	for i := range c.Client.ProgramWallets {
 		keys = append(keys, c.Client.ProgramWallets[i].PublicKey())
-		names = append(names, strings.Trim(i, "-keypair.json"))
+		names = append(names, strings.TrimSuffix(i, "-keypair.json"))
 	}
 
 	res, err := c.Client.RPC.GetMultipleAccountsWithOpts(
@@ -455,13 +459,11 @@ func (c *ContractDeployer) ValidateProgramsDeployed() error {
 			output = append(output, fmt.Sprintf("%s=nil", names[i]))
 			continue
 		}
-
 		if !res.Value[i].Executable {
 			invalid = true
 			output = append(output, fmt.Sprintf("%s=notProgram(%s)", names[i], keys[i].String()))
 			continue
 		}
-
 		output = append(output, fmt.Sprintf("%s=valid(%s)", names[i], keys[i].String()))
 	}
 
