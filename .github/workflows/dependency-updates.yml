@@ -1,5 +1,6 @@
 name: DependencyUpdater
 on: 
+  push: # TODO: remove
   workflow_dispatch:
   schedule:
     - cron: '0 0 * * *' # check every day at midnight UTC
@@ -22,21 +23,42 @@ jobs:
         run: |
           prs=$(gh pr list \
               --repo "$GITHUB_REPOSITORY" \
-              --head "bump/solana-${{ steps.solImage.outputs.image }}" \
+              --head "bump/solana-${{ steps.solImage.outputs.image }}-test" \
               --json title \
               --jq 'length')
           if ((prs > 0)); then
               echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
+      - name: "Create new branch if needed"
+        id: branch
+        if: '!steps.check.outputs.skip'
+        run: |
+          echo "original=${{ github.head_ref || github.ref_name }}" >> $GITHUB_OUTPUT
+          git branch "bump/solana-${{ steps.solImage.outputs.image }}-test" # TODO: remove suffix
+          git push origin "bump/solana-${{ steps.solImage.outputs.image }}-test" # TODO: remove suffix
+      - uses: planetscale/ghcommit-action@v0.1.33
+        if: '!steps.check.outputs.skip'
+        with:
+          commit_message: "[automated] bump solana dependencies"
+          repo: ${{ github.repository }}
+          branch: "bump/solana-${{ steps.solImage.outputs.image }}-test" # TODO: remove suffix
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: "Pull branch from ghcommit push"
+        if: '!steps.check.outputs.skip'
+        run: |
+          git reset --hard
+          git branch --set-upstream-to=origin/bump/solana-${{ steps.solImage.outputs.image }}-test # TODO: remove prefix
+          git pull
       - name: Create pull request
         if: '!steps.check.outputs.skip'
         uses: peter-evans/create-pull-request@b1ddad2c994a25fbc81a28b3ec0e368bb2021c50 # v6.0.0
         with:
           title: "[automated] bump solana image to ${{ steps.solImage.outputs.image }}"
-          branch: bump/solana-${{ steps.solImage.outputs.image }}
-          author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+          base: ${{ steps.branch.outputs.original }}
+          branch: bump/solana-${{ steps.solImage.outputs.image }}-test # TODO: remove suffix
+          # author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
           reviewers: aalu1418
-          commit-message: "[automated] bump solana dependencies"
           body: |
             Latest Solana mainnet release is [\"${{ steps.solImage.outputs.image }}\"](https://github.com/solana-labs/solana/releases/latest)
             (run CI by closing + reopening PR)
