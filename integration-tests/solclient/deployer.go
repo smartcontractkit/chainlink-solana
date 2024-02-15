@@ -361,7 +361,7 @@ func (c *ContractDeployer) DeployProgramRemote(programName string, env *environm
 	programPath := filepath.Join("programs", programName)
 	programKeyFileName := strings.Replace(programName, ".so", "-keypair.json", -1)
 	programKeyFilePath := filepath.Join("programs", programKeyFileName)
-	cmd := fmt.Sprintf("solana deploy %s %s", programPath, programKeyFilePath)
+	cmd := fmt.Sprintf("solana program deploy %s %s", programPath, programKeyFilePath)
 	pl, err := env.Client.ListPods(env.Cfg.Namespace, "app=sol")
 	if err != nil {
 		return err
@@ -376,7 +376,7 @@ func (c *ContractDeployer) DeployProgramRemoteLocal(programName string, sol *tes
 	programPath := filepath.Join("programs", programName)
 	programKeyFileName := strings.Replace(programName, ".so", "-keypair.json", -1)
 	programKeyFilePath := filepath.Join("programs", programKeyFileName)
-	cmd := fmt.Sprintf("solana deploy %s %s", programPath, programKeyFilePath)
+	cmd := fmt.Sprintf("solana program deploy %s %s", programPath, programKeyFilePath)
 	_, res, err := sol.Container.Exec(context.Background(), strings.Split(cmd, " "))
 	if err != nil {
 		return err
