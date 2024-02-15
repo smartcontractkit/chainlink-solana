@@ -428,6 +428,49 @@ func (c *ContractDeployer) RegisterAnchorPrograms() {
 	ocr_2.SetProgramID(c.Client.ProgramWallets["ocr2-keypair.json"].PublicKey())
 }
 
+func (c *ContractDeployer) ValidateProgramsDeployed() error {
+	keys := []solana.PublicKey{}
+	names := []string{}
+	for i := range c.Client.ProgramWallets {
+		keys = append(keys, c.Client.ProgramWallets[i].PublicKey())
+		names = append(names, strings.Trim(i, "-keypair.json"))
+	}
+
+	res, err := c.Client.RPC.GetMultipleAccountsWithOpts(
+		context.Background(),
+		keys,
+		&rpc.GetMultipleAccountsOpts{
+			Commitment: rpc.CommitmentConfirmed,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to get accounts: %w", err)
+	}
+
+	output := []string{}
+	invalid := false
+	for i := range res.Value {
+		if res.Value[i] == nil {
+			invalid = true
+			output = append(output, fmt.Sprintf("%s=nil", names[i]))
+			continue
+		}
+
+		if !res.Value[i].Executable {
+			invalid = true
+			output = append(output, fmt.Sprintf("%s=notProgram(%s)", names[i], keys[i].String()))
+			continue
+		}
+
+		output = append(output, fmt.Sprintf("%s=valid(%s)", names[i], keys[i].String()))
+	}
+
+	if invalid {
+		return fmt.Errorf("Programs not deployed: %s", strings.Join(output, " "))
+	}
+	return nil
+}
+
 func (c *ContractDeployer) LoadPrograms(contractsDir string) error {
 	keyFiles, err := c.Client.ListDirFilenamesByExt(contractsDir, ".json")
 	if err != nil {
