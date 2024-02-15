@@ -3,9 +3,9 @@ package solclient
 import (
 	"context"
 	"fmt"
+	"io"
 	"path/filepath"
 	"strings"
-	"time"
 
 	ag_binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
@@ -377,8 +377,16 @@ func (c *ContractDeployer) DeployProgramRemoteLocal(programName string, sol *tes
 	programKeyFileName := strings.Replace(programName, ".so", "-keypair.json", -1)
 	programKeyFilePath := filepath.Join("programs", programKeyFileName)
 	cmd := fmt.Sprintf("solana deploy %s %s", programPath, programKeyFilePath)
-	_, _, err := sol.Container.Exec(context.Background(), strings.Split(cmd, " "))
-	return err
+	_, res, err := sol.Container.Exec(context.Background(), strings.Split(cmd, " "))
+	if err != nil {
+		return err
+	}
+	out, err := io.ReadAll(res)
+	if err != nil {
+		return err
+	}
+	log.Info().Str("Output", string(out)).Msg("Deploying " + programName)
+	return nil
 }
 
 func (c *ContractDeployer) DeployOCRv2AccessController() (*AccessController, error) {
@@ -430,9 +438,6 @@ func (c *ContractDeployer) RegisterAnchorPrograms() {
 }
 
 func (c *ContractDeployer) ValidateProgramsDeployed() error {
-
-	time.Sleep(time.Minute)
-
 	keys := []solana.PublicKey{}
 	names := []string{}
 	for i := range c.Client.ProgramWallets {
