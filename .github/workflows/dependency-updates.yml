@@ -30,9 +30,11 @@ jobs:
               echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
       - name: "Create new branch if needed"
+        id: branch
         if: '!steps.check.outputs.skip'
         run: |
-          git branch "bump/solana-${{ steps.solImage.outputs.image }}-test" # TODO: remove suffix
+          echo "original=${{ github.head_ref || github.ref_name }}" >> $GITHUB_OUTPUT
+          git checkout -b "bump/solana-${{ steps.solImage.outputs.image }}-test" # TODO: remove suffix
           git push origin "bump/solana-${{ steps.solImage.outputs.image }}-test" # TODO: remove suffix
       - uses: planetscale/ghcommit-action@v0.1.33
         if: '!steps.check.outputs.skip'
@@ -47,8 +49,9 @@ jobs:
         uses: peter-evans/create-pull-request@b1ddad2c994a25fbc81a28b3ec0e368bb2021c50 # v6.0.0
         with:
           title: "[automated] bump solana image to ${{ steps.solImage.outputs.image }}"
+          base: ${{ steps.branch.outputs.original }}
           branch: bump/solana-${{ steps.solImage.outputs.image }}-test # TODO: remove suffix
-          # author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+          author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
           reviewers: aalu1418
           body: |
             Latest Solana mainnet release is [\"${{ steps.solImage.outputs.image }}\"](https://github.com/solana-labs/solana/releases/latest)
