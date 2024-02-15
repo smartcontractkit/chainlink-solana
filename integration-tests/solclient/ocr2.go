@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/rs/zerolog/log"
@@ -194,6 +195,18 @@ func (m *OCRv2) fetchProposalAccount() (*ocr_2.Proposal, error) {
 		m.Proposal.PublicKey(),
 		&proposal,
 	)
+	// reimplement GetAccountDataInto with options
+	resp, err := m.Client.RPC.GetAccountInfoWithOpts(
+		context.Background(),
+		m.Proposal.PublicKey(),
+		&rpc.GetAccountInfoOpts{
+			Commitment: rpc.CommitmentConfirmed,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	err = bin.NewBinDecoder(resp.Value.Data.GetBinary()).Decode(&proposal)
 	if err != nil {
 		return nil, err
 	}
