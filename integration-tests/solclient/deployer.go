@@ -40,6 +40,7 @@ const (
 	OCROffChainConfigSize            = uint64(8 + 4096 + 8)
 	OCRConfigSize                    = 32 + 32 + 32 + 32 + 32 + 32 + 16 + 16 + (1 + 1 + 2 + 4 + 4 + 32) + (4 + 32 + 8) + (4 + 4)
 	OCRAccountSize                   = Discriminator + 1 + 1 + 2 + 4 + solana.PublicKeyLength + OCRConfigSize + OCROffChainConfigSize + OCROraclesSize
+	keypairSuffix                    = "-keypair.json"
 )
 
 type Authority struct {
@@ -359,9 +360,9 @@ func (c *ContractDeployer) InitOCR2(billingControllerAddr string, requesterContr
 func (c *ContractDeployer) DeployProgramRemote(programName string, env *environment.Environment) error {
 	log.Debug().Str("Program", programName).Msg("Deploying program")
 	programPath := filepath.Join("programs", programName)
-	programKeyFileName := strings.Replace(programName, ".so", "-keypair.json", -1)
+	programKeyFileName := strings.Replace(programName, ".so", keypairSuffix, -1)
 	programKeyFilePath := filepath.Join("programs", programKeyFileName)
-	cmd := fmt.Sprintf("solana program deploy %s %s", programPath, programKeyFilePath)
+	cmd := fmt.Sprintf("solana program deploy --program-id %s %s", programKeyFilePath, programPath)
 	pl, err := env.Client.ListPods(env.Cfg.Namespace, "app=sol")
 	if err != nil {
 		return err
@@ -374,9 +375,9 @@ func (c *ContractDeployer) DeployProgramRemote(programName string, env *environm
 func (c *ContractDeployer) DeployProgramRemoteLocal(programName string, sol *test_env_sol.Solana) error {
 	log.Info().Str("Program", programName).Msg("Deploying program")
 	programPath := filepath.Join("programs", programName)
-	programKeyFileName := strings.Replace(programName, ".so", "-keypair.json", -1)
+	programKeyFileName := strings.Replace(programName, ".so", keypairSuffix, -1)
 	programKeyFilePath := filepath.Join("programs", programKeyFileName)
-	cmd := fmt.Sprintf("solana program deploy %s %s", programPath, programKeyFilePath)
+	cmd := fmt.Sprintf("solana program deploy --program-id %s %s", programKeyFilePath, programPath)
 	_, res, err := sol.Container.Exec(context.Background(), strings.Split(cmd, " "))
 	if err != nil {
 		return err
@@ -442,7 +443,7 @@ func (c *ContractDeployer) ValidateProgramsDeployed() error {
 	names := []string{}
 	for i := range c.Client.ProgramWallets {
 		keys = append(keys, c.Client.ProgramWallets[i].PublicKey())
-		names = append(names, strings.TrimSuffix(i, "-keypair.json"))
+		names = append(names, strings.TrimSuffix(i, keypairSuffix))
 	}
 
 	res, err := c.Client.RPC.GetMultipleAccountsWithOpts(
