@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
+	"fmt"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -255,28 +256,32 @@ func (m *OCRv2) Configure(cfg contracts.OffChainAggregatorV2Config) error {
 		cfg.OnchainConfig,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("config args: %w", err)
 	}
 	chunks := utils.ChunkSlice(cfgBytes, 1000)
 	if err = m.createProposal(version); err != nil {
-		return err
+		return fmt.Errorf("createProposal: %w", err)
 	}
 	if err = m.proposeConfig(cfg); err != nil {
-		return err
+		return fmt.Errorf("proposeConfig: %w", err)
 	}
-	for _, cfgChunk := range chunks {
+	for i, cfgChunk := range chunks {
 		if err = m.writeOffChainConfig(cfgChunk); err != nil {
-			return err
+			return fmt.Errorf("writeOffchainConfig: (chunk %d) %w", i, err)
 		}
 	}
 	if err = m.finalizeOffChainConfig(); err != nil {
-		return err
+		return fmt.Errorf("finalizeOffchainConfig: %w", err)
 	}
 	digest, err := m.makeDigest()
 	if err != nil {
-		return err
+		return fmt.Errorf("makeDigest: %w", err)
 	}
-	return m.acceptProposal(digest)
+
+	if err = m.acceptProposal(digest); err != nil {
+		return fmt.Errorf("acceptProposal: %w", err)
+	}
+	return nil
 }
 
 // DumpState dumps all OCR accounts state
