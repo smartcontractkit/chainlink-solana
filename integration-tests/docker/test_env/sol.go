@@ -15,6 +15,7 @@ import (
 	"github.com/rs/zerolog/log"
 	tc "github.com/testcontainers/testcontainers-go"
 	tcwait "github.com/testcontainers/testcontainers-go/wait"
+	"golang.org/x/exp/slices"
 
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
@@ -78,7 +79,14 @@ func (s *Solana) StartContainer() error {
 			L: s.l,
 		}
 	}
-	cReq, err := s.getContainerRequest()
+
+	// get disabled/unreleased features on mainnet
+	inactiveMainnetFeatures, err := GetInactiveFeatureHashes("mainnet-beta")
+	if err != nil {
+		return err
+	}
+
+	cReq, err := s.getContainerRequest(inactiveMainnetFeatures)
 	if err != nil {
 		return err
 	}
@@ -117,16 +125,18 @@ func (s *Solana) StartContainer() error {
 		Str("containerName", s.ContainerName).
 		Msgf("Started Solana container")
 
-	feat, err := CheckFeatures(s.ExternalHttpUrl)
+	// validate features are properly set
+	inactiveLocalFeatures, err := GetInactiveFeatureHashes(s.ExternalHttpUrl)
 	if err != nil {
 		return err
 	}
-	s.l.Info().Any("features", feat).Msgf("test validator features")
-
+	if !slices.Equal(inactiveMainnetFeatures, inactiveLocalFeatures) {
+		return fmt.Errorf("Localnet features does not match mainnet features")
+	}
 	return nil
 }
 
-func (ms *Solana) getContainerRequest() (*tc.ContainerRequest, error) {
+func (ms *Solana) getContainerRequest(inactiveFeatures InactiveFeatures) (*tc.ContainerRequest, error) {
 	configYml, err := os.CreateTemp("", "config.yml")
 	if err != nil {
 		return nil, err
@@ -144,12 +154,6 @@ func (ms *Solana) getContainerRequest() (*tc.ContainerRequest, error) {
 	if err != nil {
 		return nil, err
 	}
-	// get disabled/unreleased features on mainnet
-	inactiveFeatures, err := GetInactiveFeatureHashes()
-	if err != nil {
-		return nil, err
-	}
-	ms.l.Info().Any("Disabled Features", inactiveFeatures).Msg("Disabling features on the test validator to match mainnet")
 
 	return &tc.ContainerRequest{
 		Name:         ms.ContainerName,
@@ -210,8 +214,8 @@ func (f InactiveFeatures) CLIString() string {
 // GetInactiveFeatureHashes uses the solana CLI to fetch inactive solana features
 // This is used in conjuction with the solana-test-validator command to produce a solana network that has the same features as mainnet
 // the solana-test-validator has all features on by default (released + unreleased)
-func GetInactiveFeatureHashes() (output InactiveFeatures, err error) {
-	cmd := exec.Command("solana", "feature", "status", "-um", "--output=json") // -um is for mainnet url
+func GetInactiveFeatureHashes(url string) (output InactiveFeatures, err error) {
+	cmd := exec.Command("solana", "feature", "status", "-u="+url, "--output=json") // -um is for mainnet url
 	stdout, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get feature status: %w", err)
@@ -228,11 +232,6 @@ func GetInactiveFeatureHashes() (output InactiveFeatures, err error) {
 		}
 	}
 
+	slices.Sort(output)
 	return output, err
-}
-
-func CheckFeatures(url string) (string, error) {
-	cmd := exec.Command("solana", "feature", "status", "-u "+url)
-	stdout, err := cmd.Output()
-	return string(stdout), err
 }
