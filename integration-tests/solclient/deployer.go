@@ -104,7 +104,7 @@ func (c *ContractDeployer) SetupAssociatedAccount() (*solana.PublicKey, *solana.
 	c.Accounts.OCRVaultAssociatedPubKey = aaccount
 	err := c.Client.TXSync(
 		"Setup associated account",
-		rpc.CommitmentFinalized,
+		rpc.CommitmentConfirmed,
 		instr,
 		func(key solana.PublicKey) *solana.PrivateKey {
 			if key.Equals(payer.PublicKey()) {
@@ -200,7 +200,7 @@ func (c *ContractDeployer) CreateFeed(desc string, decimals uint8, granularity i
 	}
 	err = c.Client.TXSync(
 		"Create feed",
-		rpc.CommitmentFinalized,
+		rpc.CommitmentConfirmed,
 		[]solana.Instruction{
 			feedAccInstruction,
 			store2.NewCreateFeedInstruction(
@@ -247,30 +247,14 @@ func (c *ContractDeployer) DeployLinkTokenContract() (*LinkToken, error) {
 	var err error
 	payer := c.Client.DefaultWallet
 
-	fbal, err := c.Client.RPC.GetBalance(context.TODO(), payer.PublicKey(), rpc.CommitmentFinalized)
-	if err != nil {
-		return nil, err
-	}
-	cbal, err := c.Client.RPC.GetBalance(context.TODO(), payer.PublicKey(), rpc.CommitmentConfirmed)
-	if err != nil {
-		return nil, err
-	}
-	pbal, err := c.Client.RPC.GetBalance(context.TODO(), payer.PublicKey(), rpc.CommitmentProcessed)
-	if err != nil {
-		return nil, err
-	}
-
 	instr := make([]solana.Instruction, 0)
 	if err = c.addMintInstr(&instr); err != nil {
 		return nil, err
 	}
 	err = c.Client.TXAsync(
-		fmt.Sprintf("Createing LINK Token and associated accounts - %s: %d %d %d", payer.PublicKey(), fbal.Value, cbal.Value, pbal.Value),
+		"Creating LINK Token and associated accounts",
 		instr,
 		func(key solana.PublicKey) *solana.PrivateKey {
-			// if key.Equals(c.Accounts.OCRVault.PublicKey()) {
-			// 	return &c.Accounts.OCRVault.PrivateKey
-			// }
 			if key.Equals(c.Accounts.Mint.PublicKey()) {
 				return &c.Accounts.Mint.PrivateKey
 			}
@@ -336,7 +320,7 @@ func (c *ContractDeployer) InitOCR2(billingControllerAddr string, requesterContr
 			Build())
 	err = c.Client.TXSync(
 		"Initializing OCRv2",
-		rpc.CommitmentFinalized,
+		rpc.CommitmentConfirmed,
 		instr,
 		func(key solana.PublicKey) *solana.PrivateKey {
 			if key.Equals(payer.PublicKey()) {

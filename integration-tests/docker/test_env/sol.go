@@ -188,7 +188,6 @@ func (ms *Solana) getContainerRequest(inactiveFeatures InactiveFeatures) (*tc.Co
 				},
 			},
 		},
-		// Entrypoint: []string{"sh", "-c", "mkdir -p /root/.config/solana/cli && solana-test-validator -r --mint=AAxAoGfkbWnbgsiQeAanwUvjv6bQrM5JS8Vxv1ckzVxg " + inactiveFeatures.CLIString()},
 		Entrypoint: []string{"sh", "-c", "mkdir -p /root/.config/solana/cli && solana-test-validator -r --mint=AAxAoGfkbWnbgsiQeAanwUvjv6bQrM5JS8Vxv1ckzVxg " + inactiveFeatures.CLIString()},
 	}, nil
 }

@@ -36,7 +36,7 @@ func (m *OCRv2) writeOffChainConfig(ocConfigBytes []byte) error {
 	payer := m.Client.DefaultWallet
 	return m.Client.TXSync(
 		"Write OffChain config chunk",
-		rpc.CommitmentFinalized,
+		rpc.CommitmentConfirmed,
 		[]solana.Instruction{
 			ocr_2.NewWriteOffchainConfigInstruction(
 				ocConfigBytes,
@@ -140,7 +140,7 @@ func (m *OCRv2) finalizeOffChainConfig() error {
 	payer := m.Client.DefaultWallet
 	return m.Client.TXSync(
 		"Finalize OffChain config",
-		rpc.CommitmentFinalized,
+		rpc.CommitmentConfirmed,
 		[]solana.Instruction{
 			ocr_2.NewFinalizeProposalInstruction(
 				m.Proposal.PublicKey(),
@@ -209,7 +209,7 @@ func (m *OCRv2) createProposal(version uint64) error {
 	}
 	return m.Client.TXSync(
 		"Create proposal",
-		rpc.CommitmentFinalized,
+		rpc.CommitmentConfirmed,
 		[]solana.Instruction{
 			proposalAccInstruction,
 			ocr_2.NewCreateProposalInstruction(
@@ -318,7 +318,7 @@ func (m *OCRv2) proposeConfig(ocConfig contracts.OffChainAggregatorV2Config) err
 	}
 	err := m.Client.TXSync(
 		"Propose new config",
-		rpc.CommitmentFinalized,
+		rpc.CommitmentConfirmed,
 		[]solana.Instruction{
 			ocr_2.NewProposeConfigInstruction(
 				oracles,
@@ -366,7 +366,7 @@ func (m *OCRv2) proposeConfig(ocConfig contracts.OffChainAggregatorV2Config) err
 	instr = append(instr, proposeInstr.Build())
 	return m.Client.TXSync(
 		"Set payees",
-		rpc.CommitmentFinalized,
+		rpc.CommitmentConfirmed,
 		instr,
 		func(key solana.PublicKey) *solana.PrivateKey {
 			if key.Equals(payee.PublicKey()) {
