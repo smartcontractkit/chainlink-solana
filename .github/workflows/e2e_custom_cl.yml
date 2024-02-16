@@ -129,6 +129,8 @@ jobs:
         with:
           name: artifacts
           path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
+      - name: Install Solana CLI # required for ensuring the local test validator is configured correctly
+        run: ./scripts/install-solana-ci.sh
       - name: Generate config overrides
         run: | # https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/README.md
           cat << EOF > config.toml

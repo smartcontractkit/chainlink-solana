@@ -3,6 +3,7 @@ package solclient
 import (
 	"context"
 	"fmt"
+	"io"
 	"path/filepath"
 	"strings"
 
@@ -39,6 +40,7 @@ const (
 	OCROffChainConfigSize            = uint64(8 + 4096 + 8)
 	OCRConfigSize                    = 32 + 32 + 32 + 32 + 32 + 32 + 16 + 16 + (1 + 1 + 2 + 4 + 4 + 32) + (4 + 32 + 8) + (4 + 4)
 	OCRAccountSize                   = Discriminator + 1 + 1 + 2 + 4 + solana.PublicKeyLength + OCRConfigSize + OCROffChainConfigSize + OCROraclesSize
+	keypairSuffix                    = "-keypair.json"
 )
 
 type Authority struct {
@@ -104,7 +106,7 @@ func (c *ContractDeployer) SetupAssociatedAccount() (*solana.PublicKey, *solana.
 	c.Accounts.OCRVaultAssociatedPubKey = aaccount
 	err := c.Client.TXSync(
 		"Setup associated account",
-		rpc.CommitmentFinalized,
+		rpc.CommitmentConfirmed,
 		instr,
 		func(key solana.PublicKey) *solana.PrivateKey {
 			if key.Equals(payer.PublicKey()) {
@@ -200,7 +202,7 @@ func (c *ContractDeployer) CreateFeed(desc string, decimals uint8, granularity i
 	}
 	err = c.Client.TXSync(
 		"Create feed",
-		rpc.CommitmentFinalized,
+		rpc.CommitmentConfirmed,
 		[]solana.Instruction{
 			feedAccInstruction,
 			store2.NewCreateFeedInstruction(
@@ -252,12 +254,9 @@ func (c *ContractDeployer) DeployLinkTokenContract() (*LinkToken, error) {
 		return nil, err
 	}
 	err = c.Client.TXAsync(
-		"Createing LINK Token and associated accounts",
+		"Creating LINK Token and associated accounts",
 		instr,
 		func(key solana.PublicKey) *solana.PrivateKey {
-			if key.Equals(c.Accounts.OCRVault.PublicKey()) {
-				return &c.Accounts.OCRVault.PrivateKey
-			}
 			if key.Equals(c.Accounts.Mint.PublicKey()) {
 				return &c.Accounts.Mint.PrivateKey
 			}
@@ -323,7 +322,7 @@ func (c *ContractDeployer) InitOCR2(billingControllerAddr string, requesterContr
 			Build())
 	err = c.Client.TXSync(
 		"Initializing OCRv2",
-		rpc.CommitmentFinalized,
+		rpc.CommitmentConfirmed,
 		instr,
 		func(key solana.PublicKey) *solana.PrivateKey {
 			if key.Equals(payer.PublicKey()) {
@@ -361,9 +360,9 @@ func (c *ContractDeployer) InitOCR2(billingControllerAddr string, requesterContr
 func (c *ContractDeployer) DeployProgramRemote(programName string, env *environment.Environment) error {
 	log.Debug().Str("Program", programName).Msg("Deploying program")
 	programPath := filepath.Join("programs", programName)
-	programKeyFileName := strings.Replace(programName, ".so", "-keypair.json", -1)
+	programKeyFileName := strings.Replace(programName, ".so", keypairSuffix, -1)
 	programKeyFilePath := filepath.Join("programs", programKeyFileName)
-	cmd := fmt.Sprintf("solana deploy %s %s", programPath, programKeyFilePath)
+	cmd := fmt.Sprintf("solana program deploy --program-id %s %s", programKeyFilePath, programPath)
 	pl, err := env.Client.ListPods(env.Cfg.Namespace, "app=sol")
 	if err != nil {
 		return err
@@ -374,13 +373,21 @@ func (c *ContractDeployer) DeployProgramRemote(programName string, env *environm
 }
 
 func (c *ContractDeployer) DeployProgramRemoteLocal(programName string, sol *test_env_sol.Solana) error {
-	log.Debug().Str("Program", programName).Msg("Deploying program")
+	log.Info().Str("Program", programName).Msg("Deploying program")
 	programPath := filepath.Join("programs", programName)
-	programKeyFileName := strings.Replace(programName, ".so", "-keypair.json", -1)
+	programKeyFileName := strings.Replace(programName, ".so", keypairSuffix, -1)
 	programKeyFilePath := filepath.Join("programs", programKeyFileName)
-	cmd := fmt.Sprintf("solana deploy %s %s", programPath, programKeyFilePath)
-	_, _, err := sol.Container.Exec(context.Background(), strings.Split(cmd, " "))
-	return err
+	cmd := fmt.Sprintf("solana program deploy --program-id %s %s", programKeyFilePath, programPath)
+	_, res, err := sol.Container.Exec(context.Background(), strings.Split(cmd, " "))
+	if err != nil {
+		return err
+	}
+	out, err := io.ReadAll(res)
+	if err != nil {
+		return err
+	}
+	log.Info().Str("Output", string(out)).Msg("Deploying " + programName)
+	return nil
 }
 
 func (c *ContractDeployer) DeployOCRv2AccessController() (*AccessController, error) {
@@ -429,6 +436,47 @@ func (c *ContractDeployer) RegisterAnchorPrograms() {
 	access_controller2.SetProgramID(c.Client.ProgramWallets["access_controller-keypair.json"].PublicKey())
 	store2.SetProgramID(c.Client.ProgramWallets["store-keypair.json"].PublicKey())
 	ocr_2.SetProgramID(c.Client.ProgramWallets["ocr2-keypair.json"].PublicKey())
+}
+
+func (c *ContractDeployer) ValidateProgramsDeployed() error {
+	keys := []solana.PublicKey{}
+	names := []string{}
+	for i := range c.Client.ProgramWallets {
+		keys = append(keys, c.Client.ProgramWallets[i].PublicKey())
+		names = append(names, strings.TrimSuffix(i, keypairSuffix))
+	}
+
+	res, err := c.Client.RPC.GetMultipleAccountsWithOpts(
+		context.Background(),
+		keys,
+		&rpc.GetMultipleAccountsOpts{
+			Commitment: rpc.CommitmentConfirmed,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to get accounts: %w", err)
+	}
+
+	output := []string{}
+	invalid := false
+	for i := range res.Value {
+		if res.Value[i] == nil {
+			invalid = true
+			output = append(output, fmt.Sprintf("%s=nil", names[i]))
+			continue
+		}
+		if !res.Value[i].Executable {
+			invalid = true
+			output = append(output, fmt.Sprintf("%s=notProgram(%s)", names[i], keys[i].String()))
+			continue
+		}
+		output = append(output, fmt.Sprintf("%s=valid(%s)", names[i], keys[i].String()))
+	}
+
+	if invalid {
+		return fmt.Errorf("Programs not deployed: %s", strings.Join(output, " "))
+	}
+	return nil
 }
 
 func (c *ContractDeployer) LoadPrograms(contractsDir string) error {
