@@ -21,93 +21,34 @@ jobs:
         echo "commitString=[automated] bump solana dependencies" >> "$GITHUB_OUTPUT"
     secrets: inherit
   E2E-Testing-Dependencies:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup go
-        uses: actions/setup-go@v3
-        with:
-          go-version-file: "go.mod"
-          check-latest: true
-          cache: true
-      # ------ Get CTF version from core ------------
-      - uses: actions/checkout@v3
-        with: 
-          repository: smartcontractkit/chainlink
-          ref: develop
-          path: ./chainlink
-      - name: Check CTF version in core
-        id: coreCTF
-        working-directory: ./chainlink
-        run: |
-          cd integration-tests
-          version=$(go list -m github.com/smartcontractkit/chainlink-testing-framework | awk '{print $NF}')
-          echo "chainlink/integration-tests CTF: $version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          cd ../../
-          rm -rf chainlink
-      # -------- Compare to chainlink-solana/integration-tests --------------
-      - name: Check CTF version in chainlink-solana
-        id: solanaCTF
-        run: |
-          cd integration-tests
-          version=$(go list -m github.com/smartcontractkit/chainlink-testing-framework | awk '{print $NF}')
-          echo "chainlink-solana/integration-tests CTF: $version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Update integration test dependencies
-        if: ${{ steps.coreCTF.outputs.version != steps.solanaCTF.outputs.version }}
-        run: |
+    uses: ./.github/workflows/open-pr.yml
+    with:
+      reviewers: aalu1418
+      run: |
+
+        # get CTF version in core
+        git clone https://github.com/smartcontractkit/chainlink.git temp-chainlink
+        cd temp-chainlink/integration-tests
+        coreVersion=$(go list -m github.com/smartcontractkit/chainlink-testing-framework | awk '{print $NF}')
+        cd ../../
+        rm -rf temp-chainlink
+        echo "chainlink/integration-tests CTF: $coreVersion"
+
+        # get CTF version in solana
+        cd integration-tests
+        solVersion=$(go list -m github.com/smartcontractkit/chainlink-testing-framework | awk '{print $NF}')
+        echo "chainlink-solana/integration-tests CTF: $solVersion"
+        cd ../
+        
+        # compare versions
+        if [[ $coreVersion != $solVersion ]]; then
           make upgrade-e2e-core-deps
           make gomodtidy
-      # --------- Build PR if necessary --------------------
-      - name: Generate branch name
-        id: branchName
-        run: |
-          echo "name=bump/e2e-deps-${{ steps.coreCTF.outputs.version }}" >> "$GITHUB_OUTPUT"
-      - name: Check if changes + PR exists
-        id: check
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          prs=$(gh pr list \
-              --repo "$GITHUB_REPOSITORY" \
-              --head "${{ steps.branchName.outputs.name }}" \
-              --json title \
-              --jq 'length')
-          if ((prs > 0)) || [ -z "$(git status --porcelain)" ]; then
-              echo "skip=true" >> "$GITHUB_OUTPUT"
-          fi
-      - name: "Create new branch if needed"
-        id: branch
-        if: '!steps.check.outputs.skip'
-        env:
-          SHA: ${{ github.head_ref || github.ref_name }}
-        run: |
-          echo "original=$SHA" >> "$GITHUB_OUTPUT"
-          git branch "${{ steps.branchName.outputs.name }}" 
-          git push origin "${{ steps.branchName.outputs.name }}" 
-      - uses: planetscale/ghcommit-action@v0.1.33
-        if: '!steps.check.outputs.skip'
-        with:
-          commit_message: "[automated] bump e2e <> core/integration-tests dependencies"
-          repo: ${{ github.repository }}
-          branch: "${{ steps.branchName.outputs.name }}" 
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: "Cleanup branch"
-        if: '!steps.check.outputs.skip'
-        run: |
-          git reset --hard
-          git branch --set-upstream-to=origin/${{ steps.branchName.outputs.name }} 
-          git pull
-      - name: Create pull request
-        if: '!steps.check.outputs.skip'
-        uses: peter-evans/create-pull-request@b1ddad2c994a25fbc81a28b3ec0e368bb2021c50 # v6.0.0
-        with:
-          title: "[automated] bump e2e test deps to match chainlink/integration-tests"
-          base: ${{ steps.branch.outputs.original }}
-          branch: ${{ steps.branchName.outputs.name }} 
-          reviewers: aalu1418
-          body: | 
-            chainlink/integration-tests uses chainlink-testing-framework@${{ steps.coreCTF.outputs.version }}
-            (run CI by closing + reopening PR)
+        fi
+
+        # outputs
+        echo "name=bump/e2e-deps-$coreVersion" >> "$GITHUB_OUTPUT"
+        echo "prTitle=[automated] bump e2e test deps to match chainlink/integration-tests" >> "$GITHUB_OUTPUT"
+        echo "prBody=(run CI by closing + reopening PR) chainlink/integration-tests uses chainlink-testing-framework@$coreVersion" >> "$GITHUB_OUTPUT"
+        echo "commitString=[automated] bump e2e <> core/integration-tests dependencies" >> "$GITHUB_OUTPUT"
+    secrets: inherit
