@@ -7,66 +7,19 @@ on:
   
 jobs:
   E2E-Solana-Image:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3 # checkout branch that it is called from
-      - name: Check for solana image updates
-        id: solImage
-        run: |
-          make upgrade-e2e-solana-image
-          image=$(curl https://api.github.com/repos/solana-labs/solana/releases/latest | jq -r '.tag_name')
-          echo "image=$image" >> "$GITHUB_OUTPUT"
-      - name: Generate branch name
-        id: branchName
-        run: |
-          echo "name=bump/solana-${{ steps.solImage.outputs.image }}" >> "$GITHUB_OUTPUT"
-      - name: Check if changes + PR exists
-        id: check
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          prs=$(gh pr list \
-              --repo "$GITHUB_REPOSITORY" \
-              --head "${{ steps.branchName.outputs.name }}" \
-              --json title \
-              --jq 'length')
-          if ((prs > 0)) || [ -z "$(git status --porcelain)" ]; then
-              echo "skip=true" >> "$GITHUB_OUTPUT"
-          fi
-      - name: "Create new branch if needed"
-        id: branch
-        if: '!steps.check.outputs.skip'
-        env:
-          SHA: ${{ github.head_ref || github.ref_name }}
-        run: |
-          echo "original=$SHA" >> "$GITHUB_OUTPUT"
-          git branch "${{ steps.branchName.outputs.name }}" 
-          git push origin "${{ steps.branchName.outputs.name }}" 
-      - uses: planetscale/ghcommit-action@v0.1.33
-        if: '!steps.check.outputs.skip'
-        with:
-          commit_message: "[automated] bump solana dependencies"
-          repo: ${{ github.repository }}
-          branch: "${{ steps.branchName.outputs.name }}" 
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: "Cleanup branch"
-        if: '!steps.check.outputs.skip'
-        run: |
-          git reset --hard
-          git branch --set-upstream-to=origin/${{ steps.branchName.outputs.name }} 
-          git pull
-      - name: Create pull request
-        if: '!steps.check.outputs.skip'
-        uses: peter-evans/create-pull-request@b1ddad2c994a25fbc81a28b3ec0e368bb2021c50 # v6.0.0
-        with:
-          title: "[automated] bump solana image to ${{ steps.solImage.outputs.image }}"
-          base: ${{ steps.branch.outputs.original }}
-          branch: ${{ steps.branchName.outputs.name }} 
-          reviewers: aalu1418
-          body: |
-            Latest Solana mainnet release is [\"${{ steps.solImage.outputs.image }}\"](https://github.com/solana-labs/solana/releases/latest)
-            (run CI by closing + reopening PR)
+    uses: ./.github/workflows/open-pr.yml
+    with:
+      reviewers: aalu1418
+      run: |
+        make upgrade-e2e-solana-image
+        image=$(curl https://api.github.com/repos/solana-labs/solana/releases/latest | jq -r '.tag_name')
+
+        # outputs
+        echo "name=bump/solana-$image" >> "$GITHUB_OUTPUT"
+        echo "prTitle=[automated] bump solana image to $image" >> "$GITHUB_OUTPUT"
+        echo "prBody=(run CI by closing + reopening PR) Latest Solana mainnet release is [$image](https://github.com/solana-labs/solana/releases/latest)" >> "$GITHUB_OUTPUT"
+        echo "commitString=[automated] bump solana dependencies" >> "$GITHUB_OUTPUT"
+    secrets: inherit
   E2E-Testing-Dependencies:
     runs-on: ubuntu-latest
     steps:
