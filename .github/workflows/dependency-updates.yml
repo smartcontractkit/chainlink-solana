@@ -19,7 +19,7 @@ jobs:
       - name: Generate branch name
         id: branchName
         run: |
-          echo "name=bump/solana-${{ steps.solImage.outputs.image }}-test" >> "$GITHUB_OUTPUT"
+          echo "name=bump/solana-${{ steps.solImage.outputs.image }}" >> "$GITHUB_OUTPUT"
       - name: Check if PR exists
         id: check
         env:
@@ -87,19 +87,19 @@ jobs:
         id: coreCTF
         working-directory: ./chainlink
         run: |
-          cd integrations
-          version=$(go list -m github.com/smartcontractkit/chainlinking-framework | awk '{print $NF}')
-          echo "chainlink/integrations CTF: $version"
+          cd integration-tests
+          version=$(go list -m github.com/smartcontractkit/chainlink-testing-framework | awk '{print $NF}')
+          echo "chainlink/integration-tests CTF: $version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           cd ../../
           rm -rf chainlink
-      # -------- Compare to chainlink-solana/integrations --------------
+      # -------- Compare to chainlink-solana/integration-tests --------------
       - name: Check CTF version in chainlink-solana
         id: solanaCTF
         run: |
-          cd integrations
-          version=$(go list -m github.com/smartcontractkit/chainlinking-framework | awk '{print $NF}')
-          echo "chainlink-solana/integrationts CTF: $version"
+          cd integration-tests
+          version=$(go list -m github.com/smartcontractkit/chainlink-testing-framework | awk '{print $NF}')
+          echo "chainlink-solana/integration-tests CTF: $version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Update integration test dependencies
         if: ${{ steps.coreCTF.outputs.version != steps.solanaCTF.outputs.version }}
@@ -107,6 +107,10 @@ jobs:
           make upgrade-e2e-core-deps
           make gomodtidy
       # --------- Build PR if necessary --------------------
+      - name: Generate branch name
+        id: branchName
+        run: |
+          echo "name=bump/e2e-deps-${{ steps.coreCTF.outputs.version }}" >> "$GITHUB_OUTPUT"
       - name: Check if PR exists
         id: check
         env:
@@ -114,21 +118,43 @@ jobs:
         run: |
           prs=$(gh pr list \
               --repo "$GITHUB_REPOSITORY" \
-              --head "bump/e2e-deps-${{ steps.coreCTF.outputs.version }}" \
+              --head "${{ steps.branchName.outputs.name }}" \
               --json title \
               --jq 'length')
           if ((prs > 0)); then
               echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
+      - name: "Create new branch if needed"
+        id: branch
+        if: '!steps.check.outputs.skip'
+        env:
+          SHA: ${{ github.head_ref || github.ref_name }}
+        run: |
+          echo "original=$SHA" >> "$GITHUB_OUTPUT"
+          git branch "${{ steps.branchName.outputs.name }}" 
+          git push origin "${{ steps.branchName.outputs.name }}" 
+      - uses: planetscale/ghcommit-action@v0.1.33
+        if: '!steps.check.outputs.skip'
+        with:
+          commit_message: "[automated] bump e2e <> core/integration-tests dependencies"
+          repo: ${{ github.repository }}
+          branch: "${{ steps.branchName.outputs.name }}" 
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: "Cleanup branch"
+        if: '!steps.check.outputs.skip'
+        run: |
+          git reset --hard
+          git branch --set-upstream-to=origin/${{ steps.branchName.outputs.name }} 
+          git pull
       - name: Create pull request
         if: '!steps.check.outputs.skip'
         uses: peter-evans/create-pull-request@b1ddad2c994a25fbc81a28b3ec0e368bb2021c50 # v6.0.0
         with:
-          title: "[automated] bump e2e test deps to match chainlink/integrations"
-          branch: bump/e2e-deps-${{ steps.coreCTF.outputs.version }}
-          author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+          title: "[automated] bump e2e test deps to match chainlink/integration-tests"
+          base: ${{ steps.branch.outputs.original }}
+          branch: ${{ steps.branchName.outputs.name }} 
           reviewers: aalu1418
-          commit-message: "[automated] bump e2e <> core/integrations dependencies"
           body: | 
-            chainlink/integrations uses chainlinking-framework@${{ steps.coreCTF.outputs.version }}
+            chainlink/integration-tests uses chainlink-testing-framework@${{ steps.coreCTF.outputs.version }}
             (run CI by closing + reopening PR)
