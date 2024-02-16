@@ -38,6 +38,7 @@ jobs:
         cd integration-tests
         solVersion=$(go list -m github.com/smartcontractkit/chainlink-testing-framework | awk '{print $NF}')
         echo "chainlink-solana/integration-tests CTF: $solVersion"
+        cd ../
         
         # compare versions
         if [[ $coreVersion == $solVersion ]]; then
