@@ -312,6 +312,7 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 	}
 	require.NoError(m.T, err)
 	cd.RegisterAnchorPrograms()
+	require.NoError(m.T, cd.ValidateProgramsDeployed())
 	m.Client.LinkToken, err = cd.DeployLinkTokenContract()
 	require.NoError(m.T, err)
 	err = FundOracles(m.Client, m.NodeKeysBundle, big.NewFloat(1e4))
