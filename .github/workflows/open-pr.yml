@@ -15,6 +15,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3 # checkout branch that it is called from
+      - uses: actions/setup-go@v3
+        with:
+          go-version-file: "go.mod"
+          check-latest: true
+          cache: true
       - name: Run changes
         id: run
         run: ${{ inputs.run }}
