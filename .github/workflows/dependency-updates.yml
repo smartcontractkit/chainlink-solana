@@ -20,7 +20,7 @@ jobs:
         id: branchName
         run: |
           echo "name=bump/solana-${{ steps.solImage.outputs.image }}" >> "$GITHUB_OUTPUT"
-      - name: Check if PR exists
+      - name: Check if changes + PR exists
         id: check
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -30,7 +30,7 @@ jobs:
               --head "${{ steps.branchName.outputs.name }}" \
               --json title \
               --jq 'length')
-          if ((prs > 0)); then
+          if ((prs > 0)) && [ -n "$(git status --porcelain)" ]; then
               echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
       - name: "Create new branch if needed"
@@ -111,7 +111,7 @@ jobs:
         id: branchName
         run: |
           echo "name=bump/e2e-deps-${{ steps.coreCTF.outputs.version }}" >> "$GITHUB_OUTPUT"
-      - name: Check if PR exists
+      - name: Check if changes + PR exists
         id: check
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -121,7 +121,7 @@ jobs:
               --head "${{ steps.branchName.outputs.name }}" \
               --json title \
               --jq 'length')
-          if ((prs > 0)); then
+          if ((prs > 0)) && [ -n "$(git status --porcelain)" ]; then
               echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
       - name: "Create new branch if needed"
