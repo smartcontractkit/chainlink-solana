@@ -1,0 +1,74 @@
+name: Open PR With Signed Commit
+
+on:
+  workflow_call:
+    inputs:
+      run:
+        required: true
+        type: string
+      reviewers:
+        required: false
+        type: string
+
+jobs:
+  create-commits-and-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3 # checkout branch that it is called from
+      - uses: actions/setup-go@v3
+        with:
+          go-version-file: "go.mod"
+          check-latest: true
+          cache: true
+      - name: Run changes
+        id: run
+        run: ${{ inputs.run }}
+      - run: |
+          echo "must have branch name output set"
+          exit 1 
+        if: '!steps.run.outputs.name'
+      - name: Check if changes + PR exists
+        id: check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          prs=$(gh pr list \
+              --repo "$GITHUB_REPOSITORY" \
+              --head "${{ steps.run.outputs.name }}" \
+              --json title \
+              --jq 'length')
+          if ((prs > 0)) || [ -z "$(git status --porcelain)" ]; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: "Create new branch if needed"
+        id: branch
+        if: '!steps.check.outputs.skip'
+        env:
+          SHA: ${{ github.head_ref || github.ref_name }}
+        run: |
+          echo "original=$SHA" >> "$GITHUB_OUTPUT"
+          git branch "${{ steps.run.outputs.name }}" 
+          git push origin "${{ steps.run.outputs.name }}" 
+      - uses: planetscale/ghcommit-action@v0.1.33
+        if: '!steps.check.outputs.skip'
+        with:
+          commit_message: ${{ steps.run.outputs.commitString }}
+          repo: ${{ github.repository }}
+          branch: "${{ steps.run.outputs.name }}" 
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: "Cleanup branch"
+        if: '!steps.check.outputs.skip'
+        run: |
+          git reset --hard
+          git branch --set-upstream-to=origin/${{ steps.run.outputs.name }} 
+          git pull
+      - name: Create pull request
+        if: '!steps.check.outputs.skip'
+        uses: peter-evans/create-pull-request@b1ddad2c994a25fbc81a28b3ec0e368bb2021c50 # v6.0.0
+        with:
+          title: ${{ steps.run.outputs.prTitle }}
+          base: ${{ steps.branch.outputs.original }}
+          branch: ${{ steps.run.outputs.name }} 
+          reviewers: ${{ inputs.reviewers }}
+          body: ${{ steps.run.outputs.prBody }}
