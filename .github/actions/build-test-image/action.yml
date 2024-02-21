@@ -39,6 +39,13 @@ runs:
       with:
         name: artifacts
         path: ${{ inputs.artifacts_path }}
+    - name: Get CTF Version
+      id: version
+      uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/mod-version@92e0f299a87522c2a37bfc4686c4d8a96dc9d28b # v2.3.5
+      with:
+        go-project-path: ./integration-tests
+        module-name: github.com/smartcontractkit/chainlink-testing-framework
+        enforce-semantic-tag: false
     - name: Build and Publish Test Runner
       if: steps.check-image.outputs.exists == 'false'
       uses: smartcontractkit/chainlink-github-actions/docker/build-push@336617ae6d70fec60c15cc3382e17a4d2615a801 # v2.2.0
@@ -49,7 +56,7 @@ runs:
         file: ./integration-tests/test.Dockerfile
         build-args: |
           BASE_IMAGE=${{ inputs.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ inputs.QA_AWS_REGION }}.amazonaws.com/test-base-image
-          IMAGE_VERSION=v1.19.7
+          IMAGE_VERSION=${{ steps.version.outputs.version }}
           SUITES="soak smoke"
         AWS_REGION: ${{ inputs.QA_AWS_REGION }}
         AWS_ROLE_TO_ASSUME: ${{ inputs.QA_AWS_ROLE_TO_ASSUME }}
