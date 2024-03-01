@@ -5,21 +5,19 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	commonservices "github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 const ServiceName = "SolanaChainReader"
 
 type SolanaChainReaderService struct {
 	lggr logger.Logger
-	commonservices.StateMachine
+	services.StateMachine
 }
 
 var (
-	_ services.Service        = &SolanaChainReaderService{}
-	_ commontypes.ChainReader = &SolanaChainReaderService{}
+	_ services.Service  = &SolanaChainReaderService{}
+	_ types.ChainReader = &SolanaChainReaderService{}
 )
 
 // NewChainReaderService is a constructor for a new ChainReaderService for Solana. Returns a nil service on error.
@@ -71,6 +69,6 @@ func (s *SolanaChainReaderService) GetLatestValue(_ context.Context, contractNam
 
 // Bind implements the types.ChainReader interface and allows new contract bindings to be added
 // to the service.
-func (s *SolanaChainReaderService) Bind(_ context.Context, bindings []commontypes.BoundContract) error {
+func (s *SolanaChainReaderService) Bind(_ context.Context, bindings []types.BoundContract) error {
 	return types.UnimplementedError("Bind not available")
 }
