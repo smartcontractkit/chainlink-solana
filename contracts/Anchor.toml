@@ -1,11 +1,14 @@
-anchor_version = "0.29.0"
+[toolchain]
+
+[features]
+seeds = false
+skip-lint = false
 
 [registry]
 url = "https://anchor.projectserum.com"
 
 [provider]
-cluster = "localnet"
-# wallet = "~/.config/solana/id.json"
+cluster = "Localnet"
 wallet = "id.json"
 
 [scripts]
@@ -21,6 +24,7 @@ test = "yarn run test"
 # TODO: add pubkeys
 
 [programs.localnet]
+access_controller = "9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW"
+keystone-forwarder = "6v9Lm94wiHXJf4HYoWoRj7JGb5YCDnsvybr9Y3seJ7po"
 ocr_2 = "cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ" # need to rename the idl to satisfy anchor.js...
 store = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny"
-access_controller = "9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW"
