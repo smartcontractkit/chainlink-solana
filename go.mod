@@ -9,11 +9,12 @@ require (
 	github.com/gagliardetto/solana-go v1.4.1-0.20220428092759-5250b4abbb27
 	github.com/gagliardetto/treeout v0.1.4
 	github.com/google/uuid v1.3.1
-	github.com/hashicorp/go-plugin v1.5.2
+	github.com/hashicorp/go-plugin v1.6.0
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/pelletier/go-toml/v2 v2.1.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.17.0
-	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240213113935-001c2f4befd4
+	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240301141417-6e6e1dd8a6ea
 	github.com/smartcontractkit/libocr v0.0.0-20240112202000-6359502d2ff1
 	github.com/stretchr/testify v1.8.4
 	github.com/test-go/testify v1.1.4
@@ -48,7 +49,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0-rc.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 // indirect
 	github.com/hashicorp/go-hclog v1.5.0 // indirect
-	github.com/hashicorp/yamux v0.0.0-20180604194846-3520598351bb // indirect
+	github.com/hashicorp/yamux v0.1.1 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.15.15 // indirect

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"go.uber.org/multierr"
 
@@ -31,6 +32,7 @@ var defaultConfigSet = configSet{
 	ComputeUnitPriceMin:     0,
 	ComputeUnitPriceDefault: 0,
 	FeeBumpPeriod:           3 * time.Second,
+	ChainWriter:             nil,
 }
 
 //go:generate mockery --name Config --output ./mocks/ --case=underscore --filename config.go
@@ -52,6 +54,8 @@ type Config interface {
 	ComputeUnitPriceMin() uint64
 	ComputeUnitPriceDefault() uint64
 	FeeBumpPeriod() time.Duration
+
+	ChainWriter() *ChainWriter
 }
 
 // opt: remove
@@ -72,6 +76,7 @@ type configSet struct {
 	ComputeUnitPriceMin     uint64
 	ComputeUnitPriceDefault uint64
 	FeeBumpPeriod           time.Duration
+	ChainWriter             *ChainWriter
 }
 
 var _ Config = (*cfg)(nil)
@@ -240,6 +245,10 @@ func (c *cfg) FeeBumpPeriod() time.Duration {
 	return c.defaults.FeeBumpPeriod
 }
 
+func (c *cfg) ChainWriter() *ChainWriter {
+	return nil // TODO: should never get used
+}
+
 type Chain struct {
 	BalancePollPeriod       *config.Duration
 	ConfirmPollPeriod       *config.Duration
@@ -256,6 +265,7 @@ type Chain struct {
 	ComputeUnitPriceMin     *uint64
 	ComputeUnitPriceDefault *uint64
 	FeeBumpPeriod           *config.Duration
+	ChainWriter             *ChainWriter
 }
 
 func (c *Chain) SetDefaults() {
@@ -323,4 +333,10 @@ func (n *Node) ValidateConfig() (err error) {
 		err = multierr.Append(err, config.ErrMissing{Name: "URL", Msg: "required for all nodes"})
 	}
 	return
+}
+
+type ChainWriter struct {
+	FromAddress           solana.PublicKey
+	ForwarderProgramID    solana.PublicKey
+	ForwarderStateAccount solana.PublicKey
 }
