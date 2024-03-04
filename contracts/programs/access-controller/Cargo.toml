@@ -2,7 +2,7 @@
 name = "access-controller"
 version = "1.0.1"
 description = "Created with Anchor"
-edition = "2018"
+edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
