@@ -2,16 +2,30 @@ package solana
 
 import (
 	"context"
+	"encoding/json"
+
+	ag_solana "github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
 const ServiceName = "SolanaChainReader"
 
 type SolanaChainReaderService struct {
-	lggr logger.Logger
+	// provided values
+	lggr   logger.Logger
+	client BinaryDataReader
+
+	// internal values
+	bindings namespaceBindings
+
+	// service state management
 	services.StateMachine
 }
 
@@ -21,10 +35,19 @@ var (
 )
 
 // NewChainReaderService is a constructor for a new ChainReaderService for Solana. Returns a nil service on error.
-func NewChainReaderService(lggr logger.Logger) (*SolanaChainReaderService, error) {
-	return &SolanaChainReaderService{
-		lggr: logger.Named(lggr, ServiceName),
-	}, nil
+func NewChainReaderService(lggr logger.Logger, dataReader BinaryDataReader, cfg config.ChainReader) (*SolanaChainReaderService, error) {
+	svc := &SolanaChainReaderService{
+		lggr:     logger.Named(lggr, ServiceName),
+		client:   dataReader,
+		bindings: namespaceBindings{},
+		// parsed:           &parsedTypes{encoderDefs: map[string]types.CodecEntry{}, decoderDefs: map[string]types.CodecEntry{}},
+	}
+
+	if err := svc.init(cfg.Namespaces); err != nil {
+		return nil, err
+	}
+
+	return svc, nil
 }
 
 // Name implements the services.ServiceCtx interface and returns the logger service name.
@@ -63,12 +86,78 @@ func (s *SolanaChainReaderService) HealthReport() map[string]error {
 
 // GetLatestValue implements the types.ChainReader interface and requests and parses on-chain
 // data named by the provided contract, method, and params.
-func (s *SolanaChainReaderService) GetLatestValue(_ context.Context, contractName, method string, params any, returnVal any) error {
-	return types.UnimplementedError("GetLatestValue not available")
+func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, contractName, method string, params any, returnVal any) error {
+	bindings, err := s.bindings.GetReadBindings(contractName, method)
+	if err != nil {
+		return err
+	}
+
+	for _, binding := range bindings {
+		if err := binding.GetLatestValue(ctx, params, returnVal); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Bind implements the types.ChainReader interface and allows new contract bindings to be added
 // to the service.
 func (s *SolanaChainReaderService) Bind(_ context.Context, bindings []types.BoundContract) error {
-	return types.UnimplementedError("Bind not available")
+	return s.bindings.Bind(bindings)
+}
+
+func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainReaderMethods) error {
+	for namespace, methods := range namespaces {
+		for methodName, method := range methods.Methods {
+			var idl codec.IDL
+			if err := json.Unmarshal([]byte(method.AnchorIDL), &idl); err != nil {
+				return err
+			}
+
+			idlCodec, err := codec.NewIDLCodec(idl)
+			if err != nil {
+				return err
+			}
+
+			for _, procedure := range method.Procedures {
+				mod, err := procedure.OutputModifications.ToModifier(codec.DecoderHooks...)
+				if err != nil {
+					return err
+				}
+
+				codecWithModifiers, err := codec.NewNamedModifierCodec(idlCodec, procedure.IDLAccount, mod)
+				if err != nil {
+					return err
+				}
+
+				s.bindings.AddReadBinding(namespace, methodName, &accountReadBinding{
+					idlAccount: procedure.IDLAccount,
+					codec:      codecWithModifiers,
+					client:     s.client,
+				})
+			}
+		}
+	}
+
+	return nil
+}
+
+type binaryDataReader struct {
+	client *rpc.Client
+}
+
+func NewBinaryDataReader(client *rpc.Client) *binaryDataReader {
+	return &binaryDataReader{client: client}
+}
+
+func (r *binaryDataReader) GetAccountInfoBinaryData(ctx context.Context, pk ag_solana.PublicKey) ([]byte, error) {
+	result, err := r.client.GetAccountInfo(ctx, pk)
+	if err != nil {
+		return nil, err
+	}
+
+	bts := result.Value.Data.GetBinary()
+
+	return bts, nil
 }
