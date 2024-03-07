@@ -12,6 +12,7 @@ import (
 type readBinding interface {
 	GetLatestValue(ctx context.Context, params, returnVal any) error
 	Bind(types.BoundContract) error
+	CreateType(bool) (any, error)
 }
 
 // key is namespace
@@ -50,6 +51,21 @@ func (b namespaceBindings) GetReadBindings(namespace, methodName string) ([]read
 	}
 
 	return rbs, nil
+}
+
+func (b namespaceBindings) CreateType(namespace, methodName string, forEncoding bool) (any, error) {
+	bindings, err := b.GetReadBindings(namespace, methodName)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(bindings) == 1 {
+		// get the item type from the binding codec
+		return bindings[0].CreateType(forEncoding)
+	}
+
+	// default to map when multiple bindings exist
+	return &map[string]any{}, nil
 }
 
 func (b namespaceBindings) Bind(boundContracts []types.BoundContract) error {

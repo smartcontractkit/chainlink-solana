@@ -106,6 +106,12 @@ func (s *SolanaChainReaderService) Bind(_ context.Context, bindings []types.Boun
 	return s.bindings.Bind(bindings)
 }
 
+// CreateContractType implements the ContractTypeProvider interface and allows the chain reader
+// service to explicitly define the expected type for a grpc server to provide.
+func (s *SolanaChainReaderService) CreateContractType(contractName, itemType string, forEncoding bool) (any, error) {
+	return s.bindings.CreateType(contractName, itemType, forEncoding)
+}
+
 func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainReaderMethods) error {
 	for namespace, methods := range namespaces {
 		for methodName, method := range methods.Methods {

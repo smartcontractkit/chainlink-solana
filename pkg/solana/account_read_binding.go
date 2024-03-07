@@ -20,7 +20,7 @@ type BinaryDataReader interface {
 type accountReadBinding struct {
 	idlAccount string
 	account    solana.PublicKey
-	codec      types.Codec
+	codec      types.RemoteCodec
 	reader     BinaryDataReader
 }
 
@@ -44,4 +44,8 @@ func (b *accountReadBinding) Bind(contract types.BoundContract) error {
 	b.account = account
 
 	return nil
+}
+
+func (b *accountReadBinding) CreateType(_ bool) (any, error) {
+	return b.codec.CreateType(b.idlAccount, false)
 }
