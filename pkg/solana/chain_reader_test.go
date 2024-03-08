@@ -305,7 +305,7 @@ func (r *chainReaderInterfaceTester) Name() string {
 
 func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 	r.address = make([]string, 6)
-	for idx, _ := range r.address {
+	for idx := range r.address {
 		r.address[idx] = ag_solana.NewWallet().PublicKey().String()
 	}
 

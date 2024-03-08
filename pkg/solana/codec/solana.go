@@ -1,11 +1,21 @@
 /*
-Package codec provides functions to create a codec from an Anchor IDL using NewIDLCodec. All primitives map 1:1, however
-some common types are either not supported or may not have expected behavior.
+Package codec provides functions to create a codec from an Anchor IDL. All Anchor primitives map to the following native
+Go values:
 
-Using time.Time as a native struct for encoding or decoding to and IDL unixTimestamp primitive will not work without
-the codec modifier `ModifierEpochToTime`. The native value to represent timestamps is int64.
+bool -> bool
+string -> string
+bytes -> []byte
+[u|i][8-64] -> [u]int[8-64]
+[u|i]128 -> *big.Int
+duration -> time.Duration
+unixTimestamp -> int64
+publicKey -> [32]byte
+hash -> [32]byte
 
-Enums are only supported in their basic form of uint8 values. Enums with variants are not supported.
+Enums as an Anchor data structure are only supported in their basic form of uint8 values. Enums with variants are not
+supported at this time.
+
+Modifiers can be provided to assist in modifying property names, adding properties, etc.
 */
 package codec
 
