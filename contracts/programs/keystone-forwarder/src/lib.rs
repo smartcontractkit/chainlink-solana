@@ -4,11 +4,18 @@ declare_id!("6v9Lm94wiHXJf4HYoWoRj7JGb5YCDnsvybr9Y3seJ7po");
 
 // TODO: ownable
 
+pub const STATE_VERSION: u8 = 1;
+
 #[account]
 #[derive(Default)]
 pub struct State {
+    version: u8,
     authority_nonce: u8,
 }
+
+#[account]
+#[derive(Default)]
+pub struct ExecutionState {}
 
 #[error_code]
 pub enum ErrorCode {
@@ -26,9 +33,15 @@ pub mod keystone_forwarder {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        // TODO: store authority_nonce
+        // Precompute the authority PDA bump
+        let (_authority_pubkey, authority_nonce) = Pubkey::find_program_address(
+            &[b"forwarder", ctx.accounts.state.key().as_ref()],
+            &crate::ID,
+        );
+
         let state = &mut ctx.accounts.state;
-        // state.authority_nonce = ctx.bumps.forwarder_authority;
+        state.version = STATE_VERSION;
+        state.authority_nonce = authority_nonce;
         Ok(())
     }
 
@@ -105,14 +118,22 @@ pub struct Initialize<'info> {
 
 #[derive(Accounts)]
 pub struct Report<'info> {
+    /// Forwarder state acccount
     #[account(mut)]
     pub state: Account<'info, State>,
 
+    /// Transmitter, signing the current transaction call
     pub authority: Signer<'info>,
 
+    /// Authority used for signing the receiver invocation
     /// CHECK: This is a PDA
     #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce)]
     pub forwarder_authority: AccountInfo<'info>,
+
+    /// State PDA for the workflow execution represented by this report.
+    /// TODO: we need to manually verify that it's the correct PDA since we need to unpack meta to get the execution ID
+    #[account(mut)]
+    pub execution_state: Account<'info, ExecutionState>,
 
     #[account(executable)]
     // we don't use Program<> here since it can be any program, "executable" is enough
