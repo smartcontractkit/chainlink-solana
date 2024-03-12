@@ -646,7 +646,7 @@ fn pay_oracles_impl<'info>(
 }
 
 #[inline(always)]
-fn transmit_impl<'info>(ctx: Context<Transmit<'info>>, data: &[u8]) -> Result<()> {
+fn transmit_impl(ctx: Context<Transmit<'_>>, data: &[u8]) -> Result<()> {
     let (store_nonce, data) = data.split_first().ok_or(ErrorCode::InvalidInput)?;
 
     use anchor_lang::solana_program::{hash, keccak, secp256k1_recover::*};
