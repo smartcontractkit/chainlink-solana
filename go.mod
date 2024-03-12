@@ -15,9 +15,9 @@ require (
 	github.com/pelletier/go-toml/v2 v2.1.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.17.0
-	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240306212342-bde2560306e8
+	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240312172711-7ec0dab0a498
 	github.com/smartcontractkit/libocr v0.0.0-20240112202000-6359502d2ff1
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.11.0
 	go.uber.org/zap v1.26.0
@@ -82,7 +82,7 @@ require (
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v5 v5.2.0 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
-	github.com/stretchr/objx v0.5.0 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/teris-io/shortid v0.0.0-20201117134242-e59966efd125 // indirect
 	github.com/tidwall/gjson v1.14.4 // indirect
 	github.com/tidwall/match v1.1.1 // indirect

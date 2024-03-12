@@ -42,7 +42,8 @@ const (
 // Useful for config, or if when a model may use a go type that isn't a *big.Int when Pack expects one.
 // Eg: int32 in a go struct from a plugin could require a *big.Int in Pack for int24, if it fits, we shouldn't care.
 // SliceToArrayVerifySizeHook verifies that slices have the correct size when converting to an array
-var DecoderHooks = []mapstructure.DecodeHookFunc{codec.BigIntHook, codec.SliceToArrayVerifySizeHook}
+// EpochToTimeHook allows multiple conversions: time.Time -> int64; int64 -> time.Time; *big.Int -> time.Time; and more
+var DecoderHooks = []mapstructure.DecodeHookFunc{codec.EpochToTimeHook, codec.BigIntHook, codec.SliceToArrayVerifySizeHook}
 
 func NewNamedModifierCodec(original types.RemoteCodec, itemType string, modifier codec.Modifier) (types.RemoteCodec, error) {
 	mod, err := codec.NewByItemTypeModifier(map[string]codec.Modifier{itemType: modifier})
