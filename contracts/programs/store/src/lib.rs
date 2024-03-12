@@ -65,7 +65,10 @@ pub mod store {
         let len = len
             .checked_sub(8 + state::HEADER_SIZE)
             .ok_or(ErrorCode::InsufficientSize)?;
-        require!(len % size_of::<Transmission>() == 0, ErrorCode::InsufficientSize);
+        require!(
+            len % size_of::<Transmission>() == 0,
+            ErrorCode::InsufficientSize
+        );
         let space = len / size_of::<Transmission>();
         // Live length must not exceed total capacity
         require!(live_length <= space as u32, ErrorCode::InvalidInput);
@@ -114,7 +117,10 @@ pub mod store {
             // else, it's an individual owner
             Err(_err) => ctx.accounts.proposed_owner.key(),
         };
-        require!(ctx.accounts.authority.key == &proposed_owner, ErrorCode::Unauthorized);
+        require!(
+            ctx.accounts.authority.key == &proposed_owner,
+            ErrorCode::Unauthorized
+        );
 
         let feed = &mut ctx.accounts.feed;
         feed.owner = std::mem::take(&mut feed.proposed_owner);
