@@ -106,7 +106,7 @@ pub mod store {
 
     pub fn accept_feed_ownership(ctx: Context<AcceptFeedOwnership>) -> Result<()> {
         let store: std::result::Result<AccountLoader<State>, _> =
-            AccountLoader::try_from(&ctx.accounts.proposed_owner);
+            try_from!(AccountLoader<State>, &ctx.accounts.proposed_owner);
 
         let proposed_owner = match store {
             // if the feed is owned by a store, validate the store's owner signed
@@ -299,9 +299,18 @@ fn is_valid(flagging_threshold: u32, previous_answer: i128, answer: i128) -> boo
     ratio <= u128::from(flagging_threshold)
 }
 
+// https://github.com/coral-xyz/anchor/pull/2770
+#[macro_export]
+macro_rules! try_from {
+    ($ty: ty, $acc: expr) => {
+        <$ty>::try_from(unsafe { core::mem::transmute::<_, &AccountInfo<'_>>($acc.as_ref()) })
+    };
+}
+
 // Only owner access
 fn owner<'info>(owner: &UncheckedAccount<'info>, authority: &Signer) -> Result<()> {
-    let store: std::result::Result<AccountLoader<'info, State>, _> = AccountLoader::try_from(owner);
+    let store: std::result::Result<AccountLoader<'info, State>, _> =
+        try_from!(AccountLoader<'info, State>, owner);
 
     let owner = match store {
         // if the feed is owned by a store, validate the store's owner signed
@@ -319,7 +328,8 @@ fn has_lowering_access(
     controller: &UncheckedAccount,
     authority: &Signer,
 ) -> Result<()> {
-    let store: std::result::Result<AccountLoader<State>, _> = AccountLoader::try_from(owner);
+    let store: std::result::Result<AccountLoader<State>, _> =
+        try_from!(AccountLoader<State>, owner);
 
     match store {
         // if the feed is owned by a store
@@ -340,7 +350,7 @@ fn has_lowering_access(
                 ErrorCode::InvalidInput
             );
 
-            let controller = AccountLoader::try_from(controller)?;
+            let controller = try_from!(AccountLoader<AccessController>, controller)?;
 
             // Check if the key is present on the access controller
             let has_access = access_controller::has_access(&controller, authority.key)
