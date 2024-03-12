@@ -7,7 +7,7 @@ import (
 	"time"
 
 	ag_solana "github.com/gagliardetto/solana-go"
-	"github.com/test-go/testify/require"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 )

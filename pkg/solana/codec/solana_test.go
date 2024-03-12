@@ -1,13 +1,16 @@
 package codec_test
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
 	ag_solana "github.com/gagliardetto/solana-go"
-	"github.com/test-go/testify/require"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	codeccommon "github.com/smartcontractkit/chainlink-common/pkg/codec"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
@@ -97,4 +100,61 @@ func TestNewIDLCodec_WithModifiers(t *testing.T) {
 	require.Equal(t, expected.DurationVal, unmodifiedDecoded.DurationVal)
 	require.Equal(t, expected.PublicKey, unmodifiedDecoded.PublicKey)
 	require.Equal(t, expected.EnumVal, unmodifiedDecoded.EnumVal)
+}
+
+func TestNewIDLCodec_CircularDependency(t *testing.T) {
+	t.Parallel()
+
+	rawIDL := `{
+		"accounts": [{
+			"name": "TopLevelStruct",
+			"type": {
+				"kind": "struct",
+				"fields": [{
+					"name": "circularOne",
+					"type": {
+						"defined": "TypeOne"
+					}
+				}, {
+					"name": "circularTwo",
+					"type": {
+						"defined": "TypeTwo"
+					}
+				}]
+			}
+		}],
+		"types": [{
+			"name": "TypeOne",
+			"type": {
+				"kind": "struct",
+				"fields": [{
+					"name": "circular",
+					"type": {
+						"defined": "TypeTwo"
+					}
+				}]
+			}
+		}, {
+			"name": "TypeTwo",
+			"type": {
+				"kind": "struct",
+				"fields": [{
+					"name": "circular",
+					"type": {
+						"defined": "TypeOne"
+					}
+				}]
+			}
+		}]
+	}`
+
+	var idl codec.IDL
+	if err := json.Unmarshal([]byte(rawIDL), &idl); err != nil {
+		t.Logf("failed to unmarshal test IDL: %s", err.Error())
+		t.FailNow()
+	}
+
+	_, err := codec.NewIDLCodec(idl)
+
+	assert.ErrorIs(t, err, types.ErrInvalidConfig)
 }

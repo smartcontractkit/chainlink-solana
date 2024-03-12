@@ -66,9 +66,10 @@ func NewIDLCodec(idl IDL) (encodings.CodecFromTypeCodec, error) {
 	accounts := make(map[string]encodings.TypeCodec)
 
 	refs := &codecRefs{
-		builder:  binary.LittleEndian(),
-		codecs:   make(map[string]encodings.TypeCodec),
-		typeDefs: idl.Types,
+		builder:      binary.LittleEndian(),
+		codecs:       make(map[string]encodings.TypeCodec),
+		typeDefs:     idl.Types,
+		dependencies: make(map[string][]string),
 	}
 
 	for _, account := range idl.Accounts {
@@ -90,9 +91,10 @@ func NewIDLCodec(idl IDL) (encodings.CodecFromTypeCodec, error) {
 }
 
 type codecRefs struct {
-	builder  encodings.Builder
-	codecs   map[string]encodings.TypeCodec
-	typeDefs IdlTypeDefSlice
+	builder      encodings.Builder
+	codecs       map[string]encodings.TypeCodec
+	typeDefs     IdlTypeDefSlice
+	dependencies map[string][]string
 }
 
 func createNamedCodec(
@@ -120,7 +122,7 @@ func createNamedCodec(
 func asStruct(
 	def IdlTypeDef,
 	refs *codecRefs,
-	name string,
+	name string, // name is the struct name and can be used in dependency checks
 	caser cases.Caser,
 ) (string, encodings.TypeCodec, error) {
 	if def.Type.Fields == nil {
@@ -132,7 +134,7 @@ func asStruct(
 	for idx, field := range *def.Type.Fields {
 		fieldName := field.Name
 
-		typedCodec, err := processFieldType(field.Type, refs)
+		typedCodec, err := processFieldType(name, field.Type, refs)
 		if err != nil {
 			return name, nil, err
 		}
@@ -148,35 +150,26 @@ func asStruct(
 	return name, structCodec, nil
 }
 
-func processFieldType(idlType IdlType, refs *codecRefs) (encodings.TypeCodec, error) {
+func processFieldType(parentTypeName string, idlType IdlType, refs *codecRefs) (encodings.TypeCodec, error) {
 	switch true {
 	case idlType.IsString():
 		return getCodecByStringType(idlType.GetString(), refs.builder)
 	case idlType.IsIdlTypeOption():
-		return asOption(idlType.GetIdlTypeOption(), refs)
+		// Go doesn't have an `Option` type; use pointer to type instead
+		// this should be automatic in the codec
+		return processFieldType(parentTypeName, idlType.GetIdlTypeOption().Option, refs)
 	case idlType.IsIdlTypeDefined():
-		return asDefined(idlType.GetIdlTypeDefined(), refs)
+		return asDefined(parentTypeName, idlType.GetIdlTypeDefined(), refs)
 	case idlType.IsArray():
-		return asArray(idlType.GetArray(), refs)
+		return asArray(parentTypeName, idlType.GetArray(), refs)
 	case idlType.IsIdlTypeVec():
-		return asVec(idlType.GetIdlTypeVec(), refs)
+		return asVec(parentTypeName, idlType.GetIdlTypeVec(), refs)
 	default:
 		return nil, fmt.Errorf("%w: unknown IDL type def", types.ErrInvalidConfig)
 	}
 }
 
-func asOption(opt *IdlTypeOption, refs *codecRefs) (encodings.TypeCodec, error) {
-	// Go doesn't have an `Option` type; use pointer to type instead
-	// this should be automatic in the codec
-	codec, err := processFieldType(opt.Option, refs)
-	if err != nil {
-		return nil, err
-	}
-
-	return codec, nil
-}
-
-func asDefined(definedName *IdlTypeDefined, refs *codecRefs) (encodings.TypeCodec, error) {
+func asDefined(parentTypeName string, definedName *IdlTypeDefined, refs *codecRefs) (encodings.TypeCodec, error) {
 	if definedName == nil {
 		return nil, fmt.Errorf("%w: defined type name should not be nil", types.ErrInvalidConfig)
 	}
@@ -186,12 +179,19 @@ func asDefined(definedName *IdlTypeDefined, refs *codecRefs) (encodings.TypeCode
 		return savedCodec, nil
 	}
 
+	// nextDef should not have a dependency on definedName
+	if !validDependency(refs, parentTypeName, definedName.Defined) {
+		return nil, fmt.Errorf("%w: circular dependency detected on %s -> %s relation", types.ErrInvalidConfig, parentTypeName, definedName.Defined)
+	}
+
 	// codec by defined type doesn't exist
 	// process it using the provided typeDefs
 	nextDef := refs.typeDefs.GetByName(definedName.Defined)
 	if nextDef == nil {
 		return nil, fmt.Errorf("%w: IDL type does not exist for name %s", types.ErrInvalidConfig, definedName.Defined)
 	}
+
+	saveDependency(refs, parentTypeName, definedName.Defined)
 
 	newTypeName, newTypeCodec, err := createNamedCodec(*nextDef, refs)
 	if err != nil {
@@ -204,8 +204,8 @@ func asDefined(definedName *IdlTypeDefined, refs *codecRefs) (encodings.TypeCode
 	return newTypeCodec, nil
 }
 
-func asArray(idlArray *IdlTypeArray, refs *codecRefs) (encodings.TypeCodec, error) {
-	codec, err := processFieldType(idlArray.Thing, refs)
+func asArray(parentTypeName string, idlArray *IdlTypeArray, refs *codecRefs) (encodings.TypeCodec, error) {
+	codec, err := processFieldType(parentTypeName, idlArray.Thing, refs)
 	if err != nil {
 		return nil, err
 	}
@@ -213,8 +213,8 @@ func asArray(idlArray *IdlTypeArray, refs *codecRefs) (encodings.TypeCodec, erro
 	return encodings.NewArray(idlArray.Num, codec)
 }
 
-func asVec(idlVec *IdlTypeVec, refs *codecRefs) (encodings.TypeCodec, error) {
-	codec, err := processFieldType(idlVec.Vec, refs)
+func asVec(parentTypeName string, idlVec *IdlTypeVec, refs *codecRefs) (encodings.TypeCodec, error) {
+	codec, err := processFieldType(parentTypeName, idlVec.Vec, refs)
 	if err != nil {
 		return nil, err
 	}
@@ -305,4 +305,26 @@ func getByteCodecByStringType(curType IdlTypeAsString, builder encodings.Builder
 	default:
 		return nil, fmt.Errorf(unknownIDLFormat, types.ErrInvalidConfig, curType)
 	}
+}
+
+func validDependency(refs *codecRefs, parent, child string) bool {
+	deps, ok := refs.dependencies[child]
+	if ok {
+		for _, dep := range deps {
+			if dep == parent {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+func saveDependency(refs *codecRefs, parent, child string) {
+	deps, ok := refs.dependencies[parent]
+	if !ok {
+		deps = make([]string, 0)
+	}
+
+	refs.dependencies[parent] = append(deps, child)
 }
