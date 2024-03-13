@@ -68,6 +68,7 @@ func (b namespaceBindings) CreateType(namespace, methodName string, forEncoding 
 	// build a merged struct from all bindings
 	fields := make([]reflect.StructField, 0)
 	var fieldIdx int
+	fieldNames := make(map[string]struct{})
 
 	for _, binding := range bindings {
 		bindingType, err := binding.CreateType(forEncoding)
@@ -85,6 +86,11 @@ func (b namespaceBindings) CreateType(namespace, methodName string, forEncoding 
 		for idx := 0; idx < tBinding.NumField(); idx++ {
 			value := tBinding.FieldByIndex([]int{idx})
 
+			_, exists := fieldNames[value.Name]
+			if exists {
+				return nil, fmt.Errorf("%w: field name overlap on %s", types.ErrInvalidConfig, value.Name)
+			}
+
 			field := reflect.StructField{
 				Name:  value.Name,
 				Type:  value.Type,
@@ -94,6 +100,7 @@ func (b namespaceBindings) CreateType(namespace, methodName string, forEncoding 
 			fields = append(fields, field)
 
 			fieldIdx++
+			fieldNames[value.Name] = struct{}{}
 		}
 	}
 

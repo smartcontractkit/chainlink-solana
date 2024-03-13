@@ -125,10 +125,6 @@ func asStruct(
 	name string, // name is the struct name and can be used in dependency checks
 	caser cases.Caser,
 ) (string, encodings.TypeCodec, error) {
-	if def.Type.Fields == nil {
-		return name, nil, fmt.Errorf("%w: provided def type fields should not be nil", types.ErrInvalidConfig)
-	}
-
 	named := make([]encodings.NamedTypeCodec, len(*def.Type.Fields))
 
 	for idx, field := range *def.Type.Fields {
