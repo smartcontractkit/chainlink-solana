@@ -3,6 +3,7 @@ package solana
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -64,8 +65,39 @@ func (b namespaceBindings) CreateType(namespace, methodName string, forEncoding 
 		return bindings[0].CreateType(forEncoding)
 	}
 
-	// default to map when multiple bindings exist
-	return &map[string]any{}, nil
+	// build a merged struct from all bindings
+	fields := make([]reflect.StructField, 0)
+	var fieldIdx int
+
+	for _, binding := range bindings {
+		bindingType, err := binding.CreateType(forEncoding)
+		if err != nil {
+			return nil, err
+		}
+
+		tBinding := reflect.TypeOf(bindingType)
+
+		// all bindings must be structs to allow multiple bindings
+		if tBinding.Kind() != reflect.Struct {
+			return nil, fmt.Errorf("%w: support for multiple bindings only applies to all bindings having the type struct", types.ErrInvalidType)
+		}
+
+		for idx := 0; idx < tBinding.NumField(); idx++ {
+			value := tBinding.FieldByIndex([]int{idx})
+
+			field := reflect.StructField{
+				Name:  value.Name,
+				Type:  value.Type,
+				Index: []int{fieldIdx},
+			}
+
+			fields = append(fields, field)
+
+			fieldIdx++
+		}
+	}
+
+	return reflect.New(reflect.StructOf(fields)).Interface(), nil
 }
 
 func (b namespaceBindings) Bind(boundContracts []types.BoundContract) error {
