@@ -25,6 +25,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
@@ -72,13 +73,13 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 	ctx := tests.Context(t)
 
 	// encode values from unmodified test struct to be read and decoded
-	expected := codec.DefaultTestStruct
+	expected := testutils.DefaultTestStruct
 
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 
 		testCodec, conf := newTestConfAndCodec(t)
-		encoded, err := testCodec.Encode(ctx, expected, codec.TestStructWithNestedStruct)
+		encoded, err := testCodec.Encode(ctx, expected, testutils.TestStructWithNestedStruct)
 
 		require.NoError(t, err)
 
@@ -229,10 +230,30 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 	})
 }
 
+func newTestIDLAndCodec(t *testing.T) (string, codec.IDL, encodings.CodecFromTypeCodec) {
+	t.Helper()
+
+	var idl codec.IDL
+	if err := json.Unmarshal([]byte(testutils.JSONIDLWithAllTypes), &idl); err != nil {
+		t.Logf("failed to unmarshal test IDL: %s", err.Error())
+		t.FailNow()
+	}
+
+	entry, err := codec.NewIDLCodec(idl)
+	if err != nil {
+		t.Logf("failed to create new codec from test IDL: %s", err.Error())
+		t.FailNow()
+	}
+
+	require.NotNil(t, entry)
+
+	return testutils.JSONIDLWithAllTypes, idl, entry
+}
+
 func newTestConfAndCodec(t *testing.T) (encodings.CodecFromTypeCodec, config.ChainReader) {
 	t.Helper()
 
-	rawIDL, _, testCodec := codec.NewTestIDLAndCodec(t)
+	rawIDL, _, testCodec := newTestIDLAndCodec(t)
 	conf := config.ChainReader{
 		Namespaces: map[string]config.ChainReaderMethods{
 			Namespace: {
@@ -241,7 +262,7 @@ func newTestConfAndCodec(t *testing.T) (encodings.CodecFromTypeCodec, config.Cha
 						AnchorIDL: rawIDL,
 						Procedures: []config.ChainReaderProcedure{
 							{
-								IDLAccount: codec.TestStructWithNestedStruct,
+								IDLAccount: testutils.TestStructWithNestedStruct,
 								Type:       config.ProcedureTypeAnchor,
 								OutputModifications: codeccommon.ModifiersConfig{
 									&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},
@@ -259,10 +280,10 @@ func newTestConfAndCodec(t *testing.T) (encodings.CodecFromTypeCodec, config.Cha
 
 type modifiedStructWithNestedStruct struct {
 	V                uint8
-	InnerStruct      codec.ObjectRef1
+	InnerStruct      testutils.ObjectRef1
 	BasicNestedArray [][]uint32
 	Option           *string
-	DefinedArray     []codec.ObjectRef2
+	DefinedArray     []testutils.ObjectRef2
 	BasicVector      []string
 	TimeVal          int64
 	DurationVal      time.Duration
