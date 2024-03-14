@@ -41,7 +41,8 @@ export class OCR2Feed {
 
   public onRound(feed: PublicKey, callback: (round: Round) => void): number {
     return this.provider.connection.onLogs(feed, (event, ctx) => {
-      this._parser.parseLogs(event.logs, (log) => {
+
+      for (const log of this._parser.parseLogs(event.logs)) {
         if (log.name != "NewTransmission") {
           return;
         }
@@ -49,7 +50,7 @@ export class OCR2Feed {
         parsed.feed = feed;
         parsed.slot = ctx.slot;
         callback(parsed);
-      });
+      }
     });
   }
 
