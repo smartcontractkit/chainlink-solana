@@ -1138,7 +1138,7 @@ describe("ocr2", async () => {
       await provider.connection.getAccountInfo(provider.wallet.publicKey)
     ).lamports;
 
-    await program.rpc.close({
+    let tx = await program.rpc.close({
       accounts: {
         state: state.publicKey,
         receiver: provider.wallet.publicKey,
@@ -1149,7 +1149,17 @@ describe("ocr2", async () => {
         tokenProgram: TOKEN_PROGRAM_ID,
       },
       remainingAccounts: payees,
+      preInstructions: [
+        // close seems to consume just over 200k units for some reason now
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 })
+      ]
     });
+    // Print out program log so we can see total units consumed
+    await provider.connection.confirmTransaction(tx);
+    let t = await provider.connection.getTransaction(tx, {
+      commitment: "confirmed",
+    });
+    console.log(t.meta.logMessages);
 
     let afterBalance = (
       await provider.connection.getAccountInfo(provider.wallet.publicKey)
