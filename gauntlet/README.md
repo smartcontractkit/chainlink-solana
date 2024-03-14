@@ -1,3 +1,3 @@
 # Gauntlet Solana
 
-For more information, see the [Chainlink Solana Documentation](./docs/gauntlet).
+For more information, see the [Chainlink Solana Documentation](../docs/gauntlet/README.md).
