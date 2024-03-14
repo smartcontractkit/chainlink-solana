@@ -1,12 +1,12 @@
 [package]
-name = "ocr2"
+name = "ocr_2"
 version = "1.0.1"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "ocr2"
+name = "ocr_2"
 
 [features]
 no-entrypoint = []

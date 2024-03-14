@@ -54,9 +54,9 @@ class Round extends Assignable {}
 const header = 8 + 192; // account discriminator + header
 const transmissionSize = 48;
 
-describe("ocr2", async () => {
+describe("ocr2", () => {
   // Configure the client to use the local cluster.
-  const provider = anchor.AnchorProvider.env();
+  const provider = anchor.AnchorProvider.local();
   anchor.setProvider(provider);
 
   // Generate a new wallet keypair and airdrop SOL

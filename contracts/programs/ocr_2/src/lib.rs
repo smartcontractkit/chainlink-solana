@@ -27,7 +27,7 @@ pub struct NewOracle {
 }
 
 #[program]
-pub mod ocr2 {
+pub mod ocr_2 {
     use super::*;
     pub fn initialize(ctx: Context<Initialize>, min_answer: i128, max_answer: i128) -> Result<()> {
         let mut state = ctx.accounts.state.load_init()?;

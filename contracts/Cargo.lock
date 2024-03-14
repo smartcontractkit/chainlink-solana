@@ -1344,7 +1344,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ocr2"
+name = "ocr_2"
 version = "1.0.1"
 dependencies = [
  "access-controller",
