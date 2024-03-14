@@ -12,13 +12,13 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/onsi/gomega v1.30.0
 	github.com/rs/zerolog v1.30.0
-	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240219152510-85226a0fbdc1
+	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240312172711-7ec0dab0a498
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240216142700-c5869534c19e
 	github.com/smartcontractkit/chainlink-testing-framework v1.23.6
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240221052856-2cd4bc5508e2
 	github.com/smartcontractkit/chainlink/v2 v2.9.0-beta0.0.20240221052856-2cd4bc5508e2
 	github.com/smartcontractkit/libocr v0.0.0-20240215150045-fe2ba71b2f0a
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	github.com/testcontainers/testcontainers-go v0.23.0
 	go.uber.org/zap v1.26.0
 	golang.org/x/crypto v0.19.0
@@ -372,7 +372,7 @@ require (
 	github.com/spf13/viper v1.16.0 // indirect
 	github.com/status-im/keycard-go v0.2.0 // indirect
 	github.com/streamingfast/logging v0.0.0-20220405224725-2755dab2ce75 // indirect
-	github.com/stretchr/objx v0.5.0 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
 	github.com/supranational/blst v0.3.11 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d // indirect
