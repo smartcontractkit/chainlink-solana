@@ -291,6 +291,7 @@ type modifiedStructWithNestedStruct struct {
 	EnumVal          uint8
 }
 
+// TODO: BCF-3060 convert mock client to be instance of solana chain.
 type mockedRPCClient struct {
 	mock.Mock
 }
@@ -561,7 +562,7 @@ func (r *chainReaderInterfaceTester) GetBindings(t *testing.T) []types.BoundCont
 
 func (r *chainReaderInterfaceTester) MaxWaitTimeForEvents() time.Duration {
 	// From trial and error, when running on CI, sometimes the boxes get slow
-	maxWaitTime := time.Second * 20
+	maxWaitTime := time.Second
 	maxWaitTimeStr, ok := os.LookupEnv("MAX_WAIT_TIME_FOR_EVENTS_S")
 	if ok {
 		wiatS, err := strconv.ParseInt(maxWaitTimeStr, 10, 64)
