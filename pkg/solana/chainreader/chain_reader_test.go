@@ -1,4 +1,4 @@
-package solana_test
+package chainreader_test
 
 import (
 	"context"
@@ -23,7 +23,7 @@ import (
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -46,19 +46,19 @@ func TestSolanaChainReaderService_ServiceCtx(t *testing.T) {
 	t.Parallel()
 
 	ctx := tests.Context(t)
-	svc, err := solana.NewChainReaderService(logger.Test(t), new(mockedRPCClient), config.ChainReader{})
+	svc, err := chainreader.NewChainReaderService(logger.Test(t), new(mockedRPCClient), config.ChainReader{})
 
 	require.NoError(t, err)
 	require.NotNil(t, svc)
 
 	require.Error(t, svc.Ready())
 	require.Len(t, svc.HealthReport(), 1)
-	require.Contains(t, svc.HealthReport(), solana.ServiceName)
-	require.Error(t, svc.HealthReport()[solana.ServiceName])
+	require.Contains(t, svc.HealthReport(), chainreader.ServiceName)
+	require.Error(t, svc.HealthReport()[chainreader.ServiceName])
 
 	require.NoError(t, svc.Start(ctx))
 	require.NoError(t, svc.Ready())
-	require.Equal(t, map[string]error{solana.ServiceName: nil}, svc.HealthReport())
+	require.Equal(t, map[string]error{chainreader.ServiceName: nil}, svc.HealthReport())
 
 	require.Error(t, svc.Start(ctx))
 
@@ -84,7 +84,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		require.NoError(t, err)
 
 		client := new(mockedRPCClient)
-		svc, err := solana.NewChainReaderService(logger.Test(t), client, conf)
+		svc, err := chainreader.NewChainReaderService(logger.Test(t), client, conf)
 
 		require.NoError(t, err)
 		require.NotNil(t, svc)
@@ -107,7 +107,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 
 		client := new(mockedRPCClient)
 		expectedErr := fmt.Errorf("expected error")
-		svc, err := solana.NewChainReaderService(logger.Test(t), client, conf)
+		svc, err := chainreader.NewChainReaderService(logger.Test(t), client, conf)
 
 		require.NoError(t, err)
 		require.NotNil(t, svc)
@@ -125,7 +125,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		_, conf := newTestConfAndCodec(t)
 
 		client := new(mockedRPCClient)
-		svc, err := solana.NewChainReaderService(logger.Test(t), client, conf)
+		svc, err := chainreader.NewChainReaderService(logger.Test(t), client, conf)
 
 		require.NoError(t, err)
 		require.NotNil(t, svc)
@@ -141,7 +141,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		_, conf := newTestConfAndCodec(t)
 
 		client := new(mockedRPCClient)
-		svc, err := solana.NewChainReaderService(logger.Test(t), client, conf)
+		svc, err := chainreader.NewChainReaderService(logger.Test(t), client, conf)
 
 		require.NoError(t, err)
 		require.NotNil(t, svc)
@@ -157,7 +157,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		_, conf := newTestConfAndCodec(t)
 
 		client := new(mockedRPCClient)
-		svc, err := solana.NewChainReaderService(logger.Test(t), client, conf)
+		svc, err := chainreader.NewChainReaderService(logger.Test(t), client, conf)
 
 		require.NoError(t, err)
 		require.NotNil(t, svc)
@@ -179,7 +179,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		_, conf := newTestConfAndCodec(t)
 
 		client := new(mockedRPCClient)
-		svc, err := solana.NewChainReaderService(logger.Test(t), client, conf)
+		svc, err := chainreader.NewChainReaderService(logger.Test(t), client, conf)
 
 		require.NoError(t, err)
 		require.NotNil(t, svc)
@@ -417,7 +417,7 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 
 func (r *chainReaderInterfaceTester) GetChainReader(t *testing.T) types.ChainReader {
 	client := new(mockedRPCClient)
-	svc, err := solana.NewChainReaderService(logger.Test(t), client, r.conf)
+	svc, err := chainreader.NewChainReaderService(logger.Test(t), client, r.conf)
 	if err != nil {
 		t.Logf("chain reader service was not able to start: %s", err.Error())
 		t.FailNow()
@@ -438,7 +438,7 @@ func (r *chainReaderInterfaceTester) GetChainReader(t *testing.T) types.ChainRea
 
 type wrappedTestChainReader struct {
 	test            *testing.T
-	service         *solana.SolanaChainReaderService
+	service         *chainreader.SolanaChainReaderService
 	client          *mockedRPCClient
 	tester          ChainReaderInterfaceTester
 	testStructQueue []*TestStruct
