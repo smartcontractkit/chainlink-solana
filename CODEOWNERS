@@ -9,7 +9,7 @@
 /integration-tests @smartcontractkit/qa @smartcontractkit/bix-team
 
 # gauntlet ownership
-/gauntlet @smartcontractkit/devex @smartcontractkit/bix-team
+/gauntlet @smartcontractkit/devx @smartcontractkit/bix-team
 
 # relayer ownership
 /pkg @smartcontractkit/bix-team
