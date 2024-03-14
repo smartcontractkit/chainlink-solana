@@ -1,5 +1,5 @@
-import * as anchor from "@project-serum/anchor";
-import { ProgramError, BN } from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
+import { ProgramError, BN } from "@coral-xyz/anchor";
 import * as borsh from "borsh";
 import {
   LAMPORTS_PER_SOL,

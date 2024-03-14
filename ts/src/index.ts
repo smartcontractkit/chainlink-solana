@@ -1,5 +1,5 @@
-import * as anchor from "@project-serum/anchor";
-import { BN } from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
+import { BN } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 
 export const CHAINLINK_AGGREGATOR_PROGRAM_ID = new PublicKey(

@@ -1,6 +1,6 @@
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import * as fs from "fs";
-import { Program, BN } from "@project-serum/anchor";
+import { Program, BN } from "@coral-xyz/anchor";
 import { HelloWorld } from "../target/types/hello_world";
 
 const CHAINLINK_PROGRAM_ID = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny";
