@@ -105,7 +105,9 @@ type mockBinding struct {
 	mock.Mock
 }
 
-func (_m *mockBinding) GetLatestValue(ctx context.Context, params, returnVal any) error {
+func (_m *mockBinding) PreLoad(context.Context, *loadedResult) {}
+
+func (_m *mockBinding) GetLatestValue(ctx context.Context, params, returnVal any, _ *loadedResult) error {
 	return nil
 }
 
