@@ -3,7 +3,6 @@ package chainreader
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/gagliardetto/solana-go"
 
