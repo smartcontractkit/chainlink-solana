@@ -3,6 +3,7 @@ package chainreader
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
 
@@ -15,6 +16,8 @@ type BinaryDataReader interface {
 	ReadAll(context.Context, solana.PublicKey) ([]byte, error)
 }
 
+const maxResultAge = time.Minute
+
 // accountReadBinding provides decoding and reading Solana Account data using a defined codec. The
 // `idlAccount` refers to the account name in the IDL for which the codec has a type mapping.
 type accountReadBinding struct {
@@ -24,12 +27,61 @@ type accountReadBinding struct {
 	reader     BinaryDataReader
 }
 
+func newAccountReadBinding(acct string, codec types.RemoteCodec, reader BinaryDataReader) *accountReadBinding {
+	return &accountReadBinding{
+		idlAccount: acct,
+		codec:      codec,
+		reader:     reader,
+	}
+}
+
 var _ readBinding = &accountReadBinding{}
 
-func (b *accountReadBinding) GetLatestValue(ctx context.Context, _ any, outVal any) error {
+func (b *accountReadBinding) PreLoad(ctx context.Context, result *loadedResult) {
+	if result == nil {
+		return
+	}
+
 	bts, err := b.reader.ReadAll(ctx, b.account)
 	if err != nil {
-		return fmt.Errorf("%w: failed to get binary data", err)
+		result.err <- fmt.Errorf("%w: failed to get binary data", err)
+
+		return
+	}
+
+	select {
+	case <-ctx.Done():
+		result.err <- ctx.Err()
+	default:
+		result.value <- bts
+	}
+}
+
+func (b *accountReadBinding) GetLatestValue(ctx context.Context, _ any, outVal any, result *loadedResult) error {
+	var (
+		bts []byte
+		err error
+	)
+
+	if result != nil {
+		// when preloading, the process will wait for one of three conditions:
+		// 1. the context ends and returns an error
+		// 2. bytes were loaded in the bytes channel
+		// 3. an error was loaded in the err channel
+		select {
+		case <-ctx.Done():
+			err = ctx.Err()
+		case bts = <-result.value:
+		case err = <-result.err:
+		}
+
+		if err != nil {
+			return err
+		}
+	} else {
+		if bts, err = b.reader.ReadAll(ctx, b.account); err != nil {
+			return fmt.Errorf("%w: failed to get binary data", err)
+		}
 	}
 
 	return b.codec.Decode(ctx, bts, outVal, b.idlAccount)

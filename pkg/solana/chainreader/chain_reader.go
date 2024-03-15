@@ -3,6 +3,9 @@ package chainreader
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"reflect"
+	"sync"
 
 	ag_solana "github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -26,6 +29,7 @@ type SolanaChainReaderService struct {
 	bindings namespaceBindings
 
 	// service state management
+	wg sync.WaitGroup
 	services.StateMachine
 }
 
@@ -67,6 +71,8 @@ func (s *SolanaChainReaderService) Start(_ context.Context) error {
 // up used resources. Subsequent calls to Close return an error.
 func (s *SolanaChainReaderService) Close() error {
 	return s.StopOnce(ServiceName, func() error {
+		s.wg.Wait()
+
 		return nil
 	})
 }
@@ -86,16 +92,77 @@ func (s *SolanaChainReaderService) HealthReport() map[string]error {
 // GetLatestValue implements the types.ChainReader interface and requests and parses on-chain
 // data named by the provided contract, method, and params.
 func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, contractName, method string, params any, returnVal any) error {
+	if err := s.Ready(); err != nil {
+		return err
+	}
+
+	s.wg.Add(1)
+	defer s.wg.Done()
+
 	bindings, err := s.bindings.GetReadBindings(contractName, method)
 	if err != nil {
 		return err
 	}
 
-	for _, binding := range bindings {
-		if err := binding.GetLatestValue(ctx, params, returnVal); err != nil {
+	localCtx, localCancel := context.WithCancel(ctx)
+
+	// the wait group ensures GetLatestValue returns only after all go-routines have completed
+	var wg sync.WaitGroup
+
+	results := make(map[int]*loadedResult)
+
+	if len(bindings) > 1 {
+		// might go for some guardrails when dealing with multiple bindings
+		// the returnVal should be compatible with multiple passes by the codec decoder
+		// this should only apply to types struct{} and map[any]any
+		tReturnVal := reflect.TypeOf(returnVal)
+		if tReturnVal.Kind() == reflect.Pointer {
+			tReturnVal = reflect.Indirect(reflect.ValueOf(returnVal)).Type()
+		}
+
+		switch tReturnVal.Kind() {
+		case reflect.Struct, reflect.Map:
+		default:
+			localCancel()
+
+			wg.Wait()
+
+			return fmt.Errorf("%w: multiple bindings is only supported for struct and map", types.ErrInvalidType)
+		}
+
+		// for multiple bindings, preload the remote data in parallel
+		for idx, binding := range bindings {
+			results[idx] = &loadedResult{
+				value: make(chan []byte, 1),
+				err:   make(chan error, 1),
+			}
+
+			wg.Add(1)
+			go func(ctx context.Context, rb readBinding, res *loadedResult) {
+				defer wg.Done()
+
+				rb.PreLoad(ctx, res)
+			}(localCtx, binding, results[idx])
+		}
+	}
+
+	// in the case of parallel preloading, GetLatestValue will still run in
+	// sequence because the function will block until the data is loaded.
+	// in the case of no preloading, GetLatestValue will load and decode in
+	// sequence.
+	for idx, binding := range bindings {
+		if err := binding.GetLatestValue(ctx, params, returnVal, results[idx]); err != nil {
+			localCancel()
+
+			wg.Wait()
+
 			return err
 		}
 	}
+
+	localCancel()
+
+	wg.Wait()
 
 	return nil
 }
@@ -136,11 +203,11 @@ func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainReader
 					return err
 				}
 
-				s.bindings.AddReadBinding(namespace, methodName, &accountReadBinding{
-					idlAccount: procedure.IDLAccount,
-					codec:      codecWithModifiers,
-					reader:     s.client,
-				})
+				s.bindings.AddReadBinding(namespace, methodName, newAccountReadBinding(
+					procedure.IDLAccount,
+					codecWithModifiers,
+					s.client,
+				))
 			}
 		}
 	}

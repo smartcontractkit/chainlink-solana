@@ -7,12 +7,12 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	ag_solana "github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	codeccommon "github.com/smartcontractkit/chainlink-common/pkg/codec"
@@ -89,8 +89,13 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, svc)
+		require.NoError(t, svc.Start(ctx))
 
-		client.On("ReadAll", mock.Anything, mock.Anything).Return(encoded, nil)
+		t.Cleanup(func() {
+			require.NoError(t, svc.Close())
+		})
+
+		client.SetNext(encoded, nil, 0)
 
 		var result modifiedStructWithNestedStruct
 
@@ -112,8 +117,13 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, svc)
+		require.NoError(t, svc.Start(ctx))
 
-		client.On("ReadAll", mock.Anything, mock.Anything).Return(nil, expectedErr)
+		t.Cleanup(func() {
+			require.NoError(t, svc.Close())
+		})
+
+		client.SetNext(nil, expectedErr, 0)
 
 		var result modifiedStructWithNestedStruct
 
@@ -130,6 +140,11 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, svc)
+		require.NoError(t, svc.Start(ctx))
+
+		t.Cleanup(func() {
+			require.NoError(t, svc.Close())
+		})
 
 		var result modifiedStructWithNestedStruct
 
@@ -146,6 +161,11 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, svc)
+		require.NoError(t, svc.Start(ctx))
+
+		t.Cleanup(func() {
+			require.NoError(t, svc.Close())
+		})
 
 		var result modifiedStructWithNestedStruct
 
@@ -162,6 +182,11 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, svc)
+		require.NoError(t, svc.Start(ctx))
+
+		t.Cleanup(func() {
+			require.NoError(t, svc.Close())
+		})
 
 		pk := ag_solana.NewWallet().PublicKey()
 		err = svc.Bind(ctx, []types.BoundContract{
@@ -184,6 +209,11 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, svc)
+		require.NoError(t, svc.Start(ctx))
+
+		t.Cleanup(func() {
+			require.NoError(t, svc.Close())
+		})
 
 		pk := ag_solana.NewWallet().PublicKey()
 
@@ -291,21 +321,74 @@ type modifiedStructWithNestedStruct struct {
 	EnumVal          uint8
 }
 
-// TODO: BCF-3060 convert mock client to be instance of solana chain.
-type mockedRPCClient struct {
-	mock.Mock
+type mockedRPCCall struct {
+	bts   []byte
+	err   error
+	delay time.Duration
 }
 
-func (_m *mockedRPCClient) ReadAll(ctx context.Context, pk ag_solana.PublicKey) ([]byte, error) {
-	ret := _m.Called(ctx, pk)
+type mockedRPCClient struct {
+	mu                sync.Mutex
+	responseByAddress map[string]mockedRPCCall
+	sequence          []mockedRPCCall
+}
 
-	var r0 []byte
+func (_m *mockedRPCClient) ReadAll(_ context.Context, pk ag_solana.PublicKey) ([]byte, error) {
+	_m.mu.Lock()
+	defer _m.mu.Unlock()
 
-	if val, ok := ret.Get(0).([]byte); ok {
-		r0 = val
+	if _m.responseByAddress == nil {
+		_m.responseByAddress = make(map[string]mockedRPCCall)
 	}
 
-	return r0, ret.Error(1)
+	if resp, ok := _m.responseByAddress[pk.String()]; ok {
+		if resp.delay > 0 {
+			time.Sleep(resp.delay)
+		}
+
+		delete(_m.responseByAddress, pk.String())
+
+		return resp.bts, resp.err
+	}
+
+	if len(_m.sequence) == 0 {
+		panic("no values to return")
+	}
+
+	next := _m.sequence[0]
+	_m.sequence = _m.sequence[1:len(_m.sequence)]
+
+	if next.delay > 0 {
+		time.Sleep(next.delay)
+	}
+
+	return next.bts, next.err
+}
+
+func (_m *mockedRPCClient) SetNext(bts []byte, err error, delay time.Duration) {
+	_m.mu.Lock()
+	defer _m.mu.Unlock()
+
+	_m.sequence = append(_m.sequence, mockedRPCCall{
+		bts:   bts,
+		err:   err,
+		delay: delay,
+	})
+}
+
+func (_m *mockedRPCClient) SetForAddress(pk ag_solana.PublicKey, bts []byte, err error, delay time.Duration) {
+	_m.mu.Lock()
+	defer _m.mu.Unlock()
+
+	if _m.responseByAddress == nil {
+		_m.responseByAddress = make(map[string]mockedRPCCall)
+	}
+
+	_m.responseByAddress[pk.String()] = mockedRPCCall{
+		bts:   bts,
+		err:   err,
+		delay: delay,
+	}
 }
 
 type chainReaderInterfaceTester struct {
@@ -326,7 +409,7 @@ func (r *chainReaderInterfaceTester) Name() string {
 }
 
 func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
-	r.address = make([]string, 6)
+	r.address = make([]string, 8)
 	for idx := range r.address {
 		r.address[idx] = ag_solana.NewWallet().PublicKey().String()
 	}
@@ -336,11 +419,14 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 			AnyContractName: {
 				Methods: map[string]config.ChainDataReader{
 					MethodTakingLatestParamsReturningTestStruct: {
-						AnchorIDL: fmt.Sprintf(baseIDL, testStructIDL, strings.Join([]string{midLevelStructIDL, innerStructIDL}, ",")),
+						AnchorIDL: fullStructIDL(t),
 						Encoding:  config.EncodingTypeBorsh,
 						Procedures: []config.ChainReaderProcedure{
 							{
-								IDLAccount: "TestStruct",
+								IDLAccount: "TestStructB",
+							},
+							{
+								IDLAccount: "TestStructA",
 							},
 						},
 					},
@@ -381,14 +467,16 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 						},
 					},
 					MethodReturningSeenStruct: {
-						AnchorIDL: fmt.Sprintf(baseIDL, testStructIDL, strings.Join([]string{midLevelStructIDL, innerStructIDL}, ",")),
+						AnchorIDL: fullStructIDL(t),
 						Encoding:  config.EncodingTypeBorsh,
 						Procedures: []config.ChainReaderProcedure{
 							{
-								IDLAccount: "TestStruct",
+								IDLAccount: "TestStructB",
+							},
+							{
+								IDLAccount: "TestStructA",
 								OutputModifications: codeccommon.ModifiersConfig{
 									&codeccommon.HardCodeModifierConfig{OffChainValues: map[string]any{"ExtraField": AnyExtraValue}},
-									// &codeccommon.RenameModifierConfig{Fields: map[string]string{"NestedStruct.Inner.IntVal": "I"}},
 								},
 							},
 						},
@@ -423,6 +511,11 @@ func (r *chainReaderInterfaceTester) GetChainReader(t *testing.T) types.ChainRea
 		t.FailNow()
 	}
 
+	require.NoError(t, svc.Start(context.Background()))
+	t.Cleanup(func() {
+		require.NoError(t, svc.Close())
+	})
+
 	if r.reader == nil {
 		r.reader = &wrappedTestChainReader{
 			test:   t,
@@ -445,6 +538,10 @@ type wrappedTestChainReader struct {
 }
 
 func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractName string, method string, params, returnVal any) error {
+	var (
+		a ag_solana.PublicKey
+		b ag_solana.PublicKey
+	)
 	switch contractName + method {
 	case AnyContractName + EventName:
 		// t.Skip won't skip the test here
@@ -464,7 +561,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 			r.test.FailNow()
 		}
 
-		r.client.On("ReadAll", mock.Anything, mock.Anything).Return(bts, nil).Once()
+		r.client.SetNext(bts, nil, 0)
 	case AnyContractName + MethodReturningUint64Slice:
 		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, uint64SliceBaseTypeIDL, ""), config.EncodingTypeBincode)
 		onChainStruct := struct {
@@ -478,7 +575,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 			r.test.FailNow()
 		}
 
-		r.client.On("ReadAll", mock.Anything, mock.Anything).Return(bts, nil).Once()
+		r.client.SetNext(bts, nil, 0)
 	case AnySecondContractName + MethodReturningUint64, AnyContractName + DifferentMethodReturningUint64:
 		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""), config.EncodingTypeBorsh)
 		onChainStruct := struct {
@@ -492,10 +589,12 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 			r.test.FailNow()
 		}
 
-		r.client.On("ReadAll", mock.Anything, mock.Anything).Return(bts, nil).Once()
+		r.client.SetNext(bts, nil, 0)
 	case AnyContractName + MethodReturningSeenStruct:
 		nextStruct := CreateTestStruct(0, r.tester)
 		r.testStructQueue = append(r.testStructQueue, &nextStruct)
+
+		a, b = getAddresses(r.test, r.tester, 5, 6)
 
 		fallthrough
 	default:
@@ -503,19 +602,42 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 			r.test.FailNow()
 		}
 
+		if contractName+method != AnyContractName+MethodReturningSeenStruct {
+			a, b = getAddresses(r.test, r.tester, 0, 1)
+		}
+
 		nextTestStruct := r.testStructQueue[0]
 		r.testStructQueue = r.testStructQueue[1:len(r.testStructQueue)]
 
-		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, testStructIDL, strings.Join([]string{midLevelStructIDL, innerStructIDL}, ",")), config.EncodingTypeBorsh)
-		bts, err := cdc.Encode(ctx, nextTestStruct, "TestStruct")
+		// split into two encoded parts to test the preloading function
+		cdc := makeTestCodec(r.test, fullStructIDL(r.test), config.EncodingTypeBorsh)
+
+		bts, err := cdc.Encode(ctx, nextTestStruct, "TestStructB")
 		if err != nil {
 			r.test.FailNow()
 		}
 
-		r.client.On("ReadAll", mock.Anything, mock.Anything).Return(bts, nil).Once()
+		// make part A return slower than part B
+		r.client.SetForAddress(a, bts, nil, 300*time.Millisecond)
+
+		bts, err = cdc.Encode(ctx, nextTestStruct, "TestStructA")
+		if err != nil {
+			r.test.FailNow()
+		}
+
+		r.client.SetForAddress(b, bts, nil, 50*time.Millisecond)
 	}
 
 	return r.service.GetLatestValue(ctx, contractName, method, params, returnVal)
+}
+
+func getAddresses(t *testing.T, tester ChainReaderInterfaceTester, a, b int) (ag_solana.PublicKey, ag_solana.PublicKey) {
+	t.Helper()
+
+	bindings := tester.GetBindings(t)
+	fn := ag_solana.MustPublicKeyFromBase58
+
+	return fn(bindings[a].Address), fn(bindings[b].Address)
 }
 
 func (r *wrappedTestChainReader) Bind(ctx context.Context, bindings []types.BoundContract) error {
@@ -552,11 +674,13 @@ func (r *chainReaderInterfaceTester) TriggerEvent(t *testing.T, testStruct *Test
 func (r *chainReaderInterfaceTester) GetBindings(t *testing.T) []types.BoundContract {
 	return []types.BoundContract{
 		{Name: strings.Join([]string{AnyContractName, MethodTakingLatestParamsReturningTestStruct, "0"}, "."), Address: r.address[0], Pending: true},
-		{Name: strings.Join([]string{AnyContractName, MethodReturningUint64, "0"}, "."), Address: r.address[1], Pending: true},
-		{Name: strings.Join([]string{AnyContractName, DifferentMethodReturningUint64, "0"}, "."), Address: r.address[2], Pending: true},
-		{Name: strings.Join([]string{AnyContractName, MethodReturningUint64Slice, "0"}, "."), Address: r.address[3], Pending: true},
-		{Name: strings.Join([]string{AnyContractName, MethodReturningSeenStruct, "0"}, "."), Address: r.address[4], Pending: true},
-		{Name: strings.Join([]string{AnySecondContractName, MethodReturningUint64, "0"}, "."), Address: r.address[5], Pending: true},
+		{Name: strings.Join([]string{AnyContractName, MethodTakingLatestParamsReturningTestStruct, "1"}, "."), Address: r.address[1], Pending: true},
+		{Name: strings.Join([]string{AnyContractName, MethodReturningUint64, "0"}, "."), Address: r.address[2], Pending: true},
+		{Name: strings.Join([]string{AnyContractName, DifferentMethodReturningUint64, "0"}, "."), Address: r.address[3], Pending: true},
+		{Name: strings.Join([]string{AnyContractName, MethodReturningUint64Slice, "0"}, "."), Address: r.address[4], Pending: true},
+		{Name: strings.Join([]string{AnyContractName, MethodReturningSeenStruct, "0"}, "."), Address: r.address[5], Pending: true},
+		{Name: strings.Join([]string{AnyContractName, MethodReturningSeenStruct, "1"}, "."), Address: r.address[6], Pending: true},
+		{Name: strings.Join([]string{AnySecondContractName, MethodReturningUint64, "0"}, "."), Address: r.address[7], Pending: true},
 	}
 }
 
@@ -593,6 +717,16 @@ func makeTestCodec(t *testing.T, rawIDL string, encoding config.EncodingType) en
 	return testCodec
 }
 
+func fullStructIDL(t *testing.T) string {
+	t.Helper()
+
+	return fmt.Sprintf(
+		baseIDL,
+		strings.Join([]string{testStructAIDL, testStructBIDL}, ","),
+		strings.Join([]string{midLevelStructIDL, innerStructIDL}, ","),
+	)
+}
+
 const (
 	baseIDL = `{
 		"version": "0.1.0",
@@ -601,19 +735,28 @@ const (
 		"types": [%s]
 	}`
 
-	testStructIDL = `{
-		"name": "TestStruct",
+	testStructAIDL = `{
+		"name": "TestStructA",
 		"type": {
 			"kind": "struct",
 			"fields": [
 				{"name": "field","type": {"option": "i32"}},
 				{"name": "differentField","type": "string"},
+				{"name": "bigField","type": "i128"},
+				{"name": "nestedStruct","type": {"defined": "MidLevelStruct"}}
+			]
+		}
+	}`
+
+	testStructBIDL = `{
+		"name": "TestStructB",
+		"type": {
+			"kind": "struct",
+			"fields": [
 				{"name": "oracleID","type": "u8"},
 				{"name": "oracleIDs","type": {"array": ["u8",32]}},
 				{"name": "account","type": "bytes"},
-				{"name": "accounts","type": {"vec": "bytes"}},
-				{"name": "bigField","type": "i128"},
-				{"name": "nestedStruct","type": {"defined": "MidLevelStruct"}}
+				{"name": "accounts","type": {"vec": "bytes"}}
 			]
 		}
 	}`

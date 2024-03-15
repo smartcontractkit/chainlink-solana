@@ -11,7 +11,8 @@ import (
 )
 
 type readBinding interface {
-	GetLatestValue(ctx context.Context, params, returnVal any) error
+	PreLoad(context.Context, *loadedResult)
+	GetLatestValue(ctx context.Context, params, returnVal any, preload *loadedResult) error
 	Bind(types.BoundContract) error
 	CreateType(bool) (any, error)
 }
@@ -77,6 +78,9 @@ func (b namespaceBindings) CreateType(namespace, methodName string, forEncoding 
 		}
 
 		tBinding := reflect.TypeOf(bindingType)
+		if tBinding.Kind() == reflect.Pointer {
+			tBinding = tBinding.Elem()
+		}
 
 		// all bindings must be structs to allow multiple bindings
 		if tBinding.Kind() != reflect.Struct {
@@ -139,4 +143,9 @@ func (b namespaceBindings) Bind(boundContracts []types.BoundContract) error {
 	}
 
 	return nil
+}
+
+type loadedResult struct {
+	value chan []byte
+	err   chan error
 }
