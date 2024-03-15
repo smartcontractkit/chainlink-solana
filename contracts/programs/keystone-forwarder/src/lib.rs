@@ -11,6 +11,7 @@ pub const STATE_VERSION: u8 = 1;
 pub struct State {
     version: u8,
     authority_nonce: u8,
+    owner: Pubkey,
 }
 
 #[account]
@@ -42,6 +43,7 @@ pub mod keystone_forwarder {
         let state = &mut ctx.accounts.state;
         state.version = STATE_VERSION;
         state.authority_nonce = authority_nonce;
+        state.owner = ctx.accounts.owner.key();
         Ok(())
     }
 
@@ -107,7 +109,7 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = owner,
-        space = 8 + 1
+        space = 8 + 1 + 1 + 32
     )]
     pub state: Account<'info, State>,
     #[account(mut)]
@@ -136,7 +138,9 @@ pub struct Report<'info> {
     pub execution_state: Account<'info, ExecutionState>,
 
     #[account(executable)]
-    // we don't use Program<> here since it can be any program, "executable" is enough
+    /// CHECK: We don't use Program<> here since it can be any program, "executable" is enough
     pub receiver_program: UncheckedAccount<'info>,
+    // TODO: ensure receiver isn't forwarder itself?
+
     // remaining_accounts... get passed to receiver as is
 }
