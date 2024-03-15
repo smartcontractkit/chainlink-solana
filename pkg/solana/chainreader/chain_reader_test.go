@@ -17,6 +17,7 @@ import (
 
 	codeccommon "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
+	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontestutils "github.com/smartcontractkit/chainlink-common/pkg/loop/testutils"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -239,7 +240,7 @@ func newTestIDLAndCodec(t *testing.T) (string, codec.IDL, encodings.CodecFromTyp
 		t.FailNow()
 	}
 
-	entry, err := codec.NewIDLCodec(idl)
+	entry, err := codec.NewIDLCodec(idl, binary.LittleEndian())
 	if err != nil {
 		t.Logf("failed to create new codec from test IDL: %s", err.Error())
 		t.FailNow()
@@ -263,7 +264,6 @@ func newTestConfAndCodec(t *testing.T) (encodings.CodecFromTypeCodec, config.Cha
 						Procedures: []config.ChainReaderProcedure{
 							{
 								IDLAccount: testutils.TestStructWithNestedStruct,
-								Type:       config.ProcedureTypeAnchor,
 								OutputModifications: codeccommon.ModifiersConfig{
 									&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},
 								},
@@ -337,19 +337,19 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 				Methods: map[string]config.ChainDataReader{
 					MethodTakingLatestParamsReturningTestStruct: {
 						AnchorIDL: fmt.Sprintf(baseIDL, testStructIDL, strings.Join([]string{midLevelStructIDL, innerStructIDL}, ",")),
+						Encoding:  config.EncodingTypeBorsh,
 						Procedures: []config.ChainReaderProcedure{
 							{
 								IDLAccount: "TestStruct",
-								Type:       config.ProcedureTypeAnchor,
 							},
 						},
 					},
 					MethodReturningUint64: {
 						AnchorIDL: fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""),
+						Encoding:  config.EncodingTypeBorsh,
 						Procedures: []config.ChainReaderProcedure{
 							{
 								IDLAccount: "SimpleUint64Value",
-								Type:       config.ProcedureTypeAnchor,
 								OutputModifications: codeccommon.ModifiersConfig{
 									&codeccommon.PropertyExtractorConfig{FieldName: "I"},
 								},
@@ -358,10 +358,10 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 					},
 					DifferentMethodReturningUint64: {
 						AnchorIDL: fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""),
+						Encoding:  config.EncodingTypeBorsh,
 						Procedures: []config.ChainReaderProcedure{
 							{
 								IDLAccount: "SimpleUint64Value",
-								Type:       config.ProcedureTypeAnchor,
 								OutputModifications: codeccommon.ModifiersConfig{
 									&codeccommon.PropertyExtractorConfig{FieldName: "I"},
 								},
@@ -370,10 +370,10 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 					},
 					MethodReturningUint64Slice: {
 						AnchorIDL: fmt.Sprintf(baseIDL, uint64SliceBaseTypeIDL, ""),
+						Encoding:  config.EncodingTypeBincode,
 						Procedures: []config.ChainReaderProcedure{
 							{
 								IDLAccount: "Uint64Slice",
-								Type:       config.ProcedureTypeAnchor,
 								OutputModifications: codeccommon.ModifiersConfig{
 									&codeccommon.PropertyExtractorConfig{FieldName: "Vals"},
 								},
@@ -382,10 +382,10 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 					},
 					MethodReturningSeenStruct: {
 						AnchorIDL: fmt.Sprintf(baseIDL, testStructIDL, strings.Join([]string{midLevelStructIDL, innerStructIDL}, ",")),
+						Encoding:  config.EncodingTypeBorsh,
 						Procedures: []config.ChainReaderProcedure{
 							{
 								IDLAccount: "TestStruct",
-								Type:       config.ProcedureTypeAnchor,
 								OutputModifications: codeccommon.ModifiersConfig{
 									&codeccommon.HardCodeModifierConfig{OffChainValues: map[string]any{"ExtraField": AnyExtraValue}},
 									// &codeccommon.RenameModifierConfig{Fields: map[string]string{"NestedStruct.Inner.IntVal": "I"}},
@@ -399,10 +399,10 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 				Methods: map[string]config.ChainDataReader{
 					MethodReturningUint64: {
 						AnchorIDL: fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""),
+						Encoding:  config.EncodingTypeBorsh,
 						Procedures: []config.ChainReaderProcedure{
 							{
 								IDLAccount: "SimpleUint64Value",
-								Type:       config.ProcedureTypeAnchor,
 								OutputModifications: codeccommon.ModifiersConfig{
 									&codeccommon.PropertyExtractorConfig{FieldName: "I"},
 								},
@@ -451,7 +451,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 		// returning the expected error to satisfy the test
 		return types.ErrNotFound
 	case AnyContractName + MethodReturningUint64:
-		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""))
+		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""), config.EncodingTypeBorsh)
 		onChainStruct := struct {
 			I uint64
 		}{
@@ -466,7 +466,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 
 		r.client.On("ReadAll", mock.Anything, mock.Anything).Return(bts, nil).Once()
 	case AnyContractName + MethodReturningUint64Slice:
-		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, uint64SliceBaseTypeIDL, ""))
+		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, uint64SliceBaseTypeIDL, ""), config.EncodingTypeBincode)
 		onChainStruct := struct {
 			Vals []uint64
 		}{
@@ -480,7 +480,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 
 		r.client.On("ReadAll", mock.Anything, mock.Anything).Return(bts, nil).Once()
 	case AnySecondContractName + MethodReturningUint64, AnyContractName + DifferentMethodReturningUint64:
-		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""))
+		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""), config.EncodingTypeBorsh)
 		onChainStruct := struct {
 			I uint64
 		}{
@@ -506,7 +506,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 		nextTestStruct := r.testStructQueue[0]
 		r.testStructQueue = r.testStructQueue[1:len(r.testStructQueue)]
 
-		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, testStructIDL, strings.Join([]string{midLevelStructIDL, innerStructIDL}, ",")))
+		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, testStructIDL, strings.Join([]string{midLevelStructIDL, innerStructIDL}, ",")), config.EncodingTypeBorsh)
 		bts, err := cdc.Encode(ctx, nextTestStruct, "TestStruct")
 		if err != nil {
 			r.test.FailNow()
@@ -575,7 +575,7 @@ func (r *chainReaderInterfaceTester) MaxWaitTimeForEvents() time.Duration {
 	return maxWaitTime
 }
 
-func makeTestCodec(t *testing.T, rawIDL string) encodings.CodecFromTypeCodec {
+func makeTestCodec(t *testing.T, rawIDL string, encoding config.EncodingType) encodings.CodecFromTypeCodec {
 	t.Helper()
 
 	var idl codec.IDL
@@ -584,7 +584,7 @@ func makeTestCodec(t *testing.T, rawIDL string) encodings.CodecFromTypeCodec {
 		t.FailNow()
 	}
 
-	testCodec, err := codec.NewIDLCodec(idl)
+	testCodec, err := codec.NewIDLCodec(idl, config.BuilderForEncoding(encoding))
 	if err != nil {
 		t.Logf("failed to create new codec from test IDL: %s", err.Error())
 		t.FailNow()

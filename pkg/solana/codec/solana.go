@@ -29,7 +29,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
-	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
@@ -62,11 +61,11 @@ func NewNamedModifierCodec(original types.RemoteCodec, itemType string, modifier
 }
 
 // NewIDLCodec is for Anchor custom types
-func NewIDLCodec(idl IDL) (encodings.CodecFromTypeCodec, error) {
+func NewIDLCodec(idl IDL, builder encodings.Builder) (encodings.CodecFromTypeCodec, error) {
 	accounts := make(map[string]encodings.TypeCodec)
 
 	refs := &codecRefs{
-		builder:      binary.LittleEndian(),
+		builder:      builder,
 		codecs:       make(map[string]encodings.TypeCodec),
 		typeDefs:     idl.Types,
 		dependencies: make(map[string][]string),
