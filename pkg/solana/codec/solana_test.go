@@ -11,6 +11,7 @@ import (
 
 	codeccommon "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
+	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
@@ -113,7 +114,7 @@ func TestNewIDLCodec_CircularDependency(t *testing.T) {
 		t.FailNow()
 	}
 
-	_, err := codec.NewIDLCodec(idl)
+	_, err := codec.NewIDLCodec(idl, binary.LittleEndian())
 
 	assert.ErrorIs(t, err, types.ErrInvalidConfig)
 }
@@ -127,7 +128,7 @@ func newTestIDLAndCodec(t *testing.T) (string, codec.IDL, encodings.CodecFromTyp
 		t.FailNow()
 	}
 
-	entry, err := codec.NewIDLCodec(idl)
+	entry, err := codec.NewIDLCodec(idl, binary.LittleEndian())
 	if err != nil {
 		t.Logf("failed to create new codec from test IDL: %s", err.Error())
 		t.FailNow()

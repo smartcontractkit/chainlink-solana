@@ -120,7 +120,7 @@ func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainReader
 				return err
 			}
 
-			idlCodec, err := codec.NewIDLCodec(idl)
+			idlCodec, err := codec.NewIDLCodec(idl, config.BuilderForEncoding(method.Encoding))
 			if err != nil {
 				return err
 			}

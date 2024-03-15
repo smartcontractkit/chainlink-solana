@@ -1,0 +1,37 @@
+{
+  "namespaces": {
+    "Contract": {
+      "methods": {
+        "Method": {
+          "anchorIDL": "test idl 1",
+          "encoding": "borsh",
+          "procedures": [{
+            "idlAccount": "StructWithNestedStruct"
+          }]
+        },
+        "MethodWithOpts": {
+          "anchorIDL": "test idl 2",
+          "encoding": "borsh",
+          "procedures": [{
+            "idlAccount": "StructWithNestedStruct",
+            "outputModifications": [{
+              "Type": "extract property",
+              "FieldName": "DurationVal"
+            }]
+          }]
+        }
+      }
+    },
+    "OtherContract": {
+      "methods": {
+        "Method": {
+          "anchorIDL": "test idl 3",
+          "encoding": "bincode",
+          "procedures": [{
+            "idlAccount": "StructWithNestedStruct"
+          }]
+        }
+      }
+    }
+  }
+}
