@@ -16,8 +16,6 @@ type BinaryDataReader interface {
 	ReadAll(context.Context, solana.PublicKey) ([]byte, error)
 }
 
-const maxResultAge = time.Minute
-
 // accountReadBinding provides decoding and reading Solana Account data using a defined codec. The
 // `idlAccount` refers to the account name in the IDL for which the codec has a type mapping.
 type accountReadBinding struct {
