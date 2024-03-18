@@ -25,7 +25,7 @@ describe("ocr2", () => {
   const state = Keypair.generate();
   const transmitter = Keypair.generate();
 
-  let authorityNonce;
+  let authorityNonce: number;
   let authority: PublicKey;
 
   let oracles = [];
@@ -93,8 +93,11 @@ describe("ocr2", () => {
   it("Successfully receives a new, valid report", async () => {
     const rawReport = Buffer.from([
       // 32 byte workflow id
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
       // 32 byte workflow execution id
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
       // report data
+      0, 0, 0, 1
     ]);
 
     let hash = createHash("sha256")

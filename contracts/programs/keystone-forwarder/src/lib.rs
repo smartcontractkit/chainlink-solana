@@ -25,7 +25,7 @@ pub enum ErrorCode {
 
     #[msg("Invalid input")]
     InvalidInput = 1,
-} // TODO: can we use the derived state as the authority too?
+}
 
 #[program]
 pub mod keystone_forwarder {
@@ -57,8 +57,8 @@ pub mod keystone_forwarder {
 
         // TODO: a way to store context inside data without limiting the receiver
         const OFFSET: usize = 32 + 32;
-        let (meta, data) = raw_report.split_at(OFFSET);
         // meta = (workflowID, workflowExecutionID)
+        let (meta, data) = raw_report.split_at(OFFSET);
 
         // verify signature
         use anchor_lang::solana_program::{hash, keccak, secp256k1_recover::*};
@@ -135,7 +135,9 @@ pub struct Report<'info> {
     /// State PDA for the workflow execution represented by this report.
     /// TODO: we need to manually verify that it's the correct PDA since we need to unpack meta to get the execution ID
     #[account(mut)]
-    pub execution_state: Account<'info, ExecutionState>,
+    // pub execution_state: Account<'info, ExecutionState>,
+    /// CHECK: TODO:
+    pub execution_state: UncheckedAccount<'info>,
 
     #[account(executable)]
     /// CHECK: We don't use Program<> here since it can be any program, "executable" is enough
