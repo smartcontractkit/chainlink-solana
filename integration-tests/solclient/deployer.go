@@ -17,7 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	access_controller2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/access_controller"
-	ocr_2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr2"
+	ocr_2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr_2"
 	store2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/store"
 	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/test_env"
 )
