@@ -17,7 +17,15 @@
             "outputModifications": [{
               "Type": "extract property",
               "FieldName": "DurationVal"
-            }]
+            }],
+            "rpcOpts": {
+              "encoding": "base64",
+              "commitment": "finalized",
+              "dataSlice": {
+                "offset": 10,
+                "length": 10
+              }
+            }
           }]
         }
       }

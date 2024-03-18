@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -25,14 +26,14 @@ func TestPreload(t *testing.T) {
 		t.Parallel()
 
 		reader := new(mockReader)
-		binding := newAccountReadBinding(testCodecKey, testCodec, reader)
+		binding := newAccountReadBinding(testCodecKey, testCodec, reader, nil)
 
 		expected := testStruct{A: true, B: 42}
 		bts, err := testCodec.Encode(context.Background(), expected, testCodecKey)
 
 		require.NoError(t, err)
 
-		reader.On("ReadAll", mock.Anything, mock.Anything).Return(bts, nil).After(time.Second)
+		reader.On("ReadAll", mock.Anything, mock.Anything, mock.Anything).Return(bts, nil).After(time.Second)
 
 		ctx := context.Background()
 		start := time.Now()
@@ -58,12 +59,12 @@ func TestPreload(t *testing.T) {
 		t.Parallel()
 
 		reader := new(mockReader)
-		binding := newAccountReadBinding(testCodecKey, testCodec, reader)
+		binding := newAccountReadBinding(testCodecKey, testCodec, reader, nil)
 
 		ctx, cancel := context.WithCancelCause(context.Background())
 
 		// make the readall pause until after the context is cancelled
-		reader.On("ReadAll", mock.Anything, mock.Anything).
+		reader.On("ReadAll", mock.Anything, mock.Anything, mock.Anything).
 			Return([]byte{}, nil).
 			After(600 * time.Millisecond)
 
@@ -94,11 +95,11 @@ func TestPreload(t *testing.T) {
 		t.Parallel()
 
 		reader := new(mockReader)
-		binding := newAccountReadBinding(testCodecKey, testCodec, reader)
+		binding := newAccountReadBinding(testCodecKey, testCodec, reader, nil)
 		ctx := context.Background()
 		expectedErr := errors.New("test error")
 
-		reader.On("ReadAll", mock.Anything, mock.Anything).
+		reader.On("ReadAll", mock.Anything, mock.Anything, mock.Anything).
 			Return([]byte{}, expectedErr)
 
 		loaded := &loadedResult{
@@ -118,7 +119,7 @@ type mockReader struct {
 	mock.Mock
 }
 
-func (_m *mockReader) ReadAll(ctx context.Context, pk solana.PublicKey) ([]byte, error) {
+func (_m *mockReader) ReadAll(ctx context.Context, pk solana.PublicKey, opts *rpc.GetAccountInfoOpts) ([]byte, error) {
 	ret := _m.Called(ctx, pk)
 
 	var r0 []byte

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
@@ -12,7 +13,7 @@ import (
 // BinaryDataReader provides an interface for reading bytes from a source. This is likely a wrapper
 // for a solana client.
 type BinaryDataReader interface {
-	ReadAll(context.Context, solana.PublicKey) ([]byte, error)
+	ReadAll(context.Context, solana.PublicKey, *rpc.GetAccountInfoOpts) ([]byte, error)
 }
 
 // accountReadBinding provides decoding and reading Solana Account data using a defined codec. The
@@ -22,13 +23,15 @@ type accountReadBinding struct {
 	account    solana.PublicKey
 	codec      types.RemoteCodec
 	reader     BinaryDataReader
+	opts       *rpc.GetAccountInfoOpts
 }
 
-func newAccountReadBinding(acct string, codec types.RemoteCodec, reader BinaryDataReader) *accountReadBinding {
+func newAccountReadBinding(acct string, codec types.RemoteCodec, reader BinaryDataReader, opts *rpc.GetAccountInfoOpts) *accountReadBinding {
 	return &accountReadBinding{
 		idlAccount: acct,
 		codec:      codec,
 		reader:     reader,
+		opts:        opts,
 	}
 }
 
@@ -39,7 +42,7 @@ func (b *accountReadBinding) PreLoad(ctx context.Context, result *loadedResult) 
 		return
 	}
 
-	bts, err := b.reader.ReadAll(ctx, b.account)
+	bts, err := b.reader.ReadAll(ctx, b.account, b.opts)
 	if err != nil {
 		result.err <- fmt.Errorf("%w: failed to get binary data", err)
 
@@ -76,7 +79,7 @@ func (b *accountReadBinding) GetLatestValue(ctx context.Context, _ any, outVal a
 			return err
 		}
 	} else {
-		if bts, err = b.reader.ReadAll(ctx, b.account); err != nil {
+		if bts, err = b.reader.ReadAll(ctx, b.account, b.opts); err != nil {
 			return fmt.Errorf("%w: failed to get binary data", err)
 		}
 	}

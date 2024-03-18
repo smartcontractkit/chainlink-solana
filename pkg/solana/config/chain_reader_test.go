@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -74,6 +76,13 @@ func TestBuilderForEncoding_Default(t *testing.T) {
 	require.Equal(t, binary.LittleEndian(), builder)
 }
 
+var (
+	encodingBase64 = solana.EncodingBase64
+	commitment     = rpc.CommitmentFinalized
+	offset         = uint64(10)
+	length         = uint64(10)
+)
+
 var validChainReaderConfig = config.ChainReader{
 	Namespaces: map[string]config.ChainReaderMethods{
 		"Contract": {
@@ -95,6 +104,14 @@ var validChainReaderConfig = config.ChainReader{
 							IDLAccount: testutils.TestStructWithNestedStruct,
 							OutputModifications: codeccommon.ModifiersConfig{
 								&codeccommon.PropertyExtractorConfig{FieldName: "DurationVal"},
+							},
+							RPCOpts: &config.RPCOpts{
+								Encoding:   &encodingBase64,
+								Commitment: &commitment,
+								DataSlice: &rpc.DataSlice{
+									Offset: &offset,
+									Length: &length,
+								},
 							},
 						},
 					},
