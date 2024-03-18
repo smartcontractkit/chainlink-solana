@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
@@ -66,6 +69,12 @@ func (t *EncodingType) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type RPCOpts struct {
+	Encoding   *solana.EncodingType `json:"encoding,omitempty"`
+	Commitment *rpc.CommitmentType  `json:"commitment,omitempty"`
+	DataSlice  *rpc.DataSlice       `json:"dataSlice,omitempty"`
+}
+
 type ChainReaderProcedure chainDataProcedureFields
 
 type chainDataProcedureFields struct {
@@ -74,6 +83,9 @@ type chainDataProcedureFields struct {
 	// OutputModifications provides modifiers to convert chain data format to custom
 	// output formats.
 	OutputModifications codec.ModifiersConfig `json:"outputModifications,omitempty"`
+	// RPCOpts provides optional configurations for commitment, encoding, and data
+	// slice offsets.
+	RPCOpts *RPCOpts `json:"rpcOpts,omitempty"`
 }
 
 // BuilderForEncoding returns a builder for the encoding configuration. Defaults to little endian.

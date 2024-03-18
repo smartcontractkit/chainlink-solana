@@ -11,7 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
 	ag_solana "github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -333,7 +335,7 @@ type mockedRPCClient struct {
 	sequence          []mockedRPCCall
 }
 
-func (_m *mockedRPCClient) ReadAll(_ context.Context, pk ag_solana.PublicKey) ([]byte, error) {
+func (_m *mockedRPCClient) ReadAll(_ context.Context, pk ag_solana.PublicKey, _ *rpc.GetAccountInfoOpts) ([]byte, error) {
 	_m.mu.Lock()
 	defer _m.mu.Unlock()
 
@@ -414,6 +416,11 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 		r.address[idx] = ag_solana.NewWallet().PublicKey().String()
 	}
 
+	encodingBase64 := solana.EncodingBase64
+	commitment := rpc.CommitmentConfirmed
+	offset := uint64(1)
+	length := uint64(1)
+
 	r.conf = config.ChainReader{
 		Namespaces: map[string]config.ChainReaderMethods{
 			AnyContractName: {
@@ -424,6 +431,14 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 						Procedures: []config.ChainReaderProcedure{
 							{
 								IDLAccount: "TestStructB",
+								RPCOpts: &config.RPCOpts{
+									Encoding:   &encodingBase64,
+									Commitment: &commitment,
+									DataSlice: &rpc.DataSlice{
+										Offset: &offset,
+										Length: &length,
+									},
+								},
 							},
 							{
 								IDLAccount: "TestStructA",

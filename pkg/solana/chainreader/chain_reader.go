@@ -207,12 +207,33 @@ func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainReader
 					procedure.IDLAccount,
 					codecWithModifiers,
 					s.client,
+					createRPCOpts(procedure.RPCOpts),
 				))
 			}
 		}
 	}
 
 	return nil
+}
+
+func createRPCOpts(opts *config.RPCOpts) *rpc.GetAccountInfoOpts {
+	if opts == nil {
+		return nil
+	}
+
+	result := &rpc.GetAccountInfoOpts{
+		DataSlice: opts.DataSlice,
+	}
+
+	if opts.Encoding != nil {
+		result.Encoding = *opts.Encoding
+	}
+
+	if opts.Commitment != nil {
+		result.Commitment = *opts.Commitment
+	}
+
+	return result
 }
 
 type accountDataReader struct {
@@ -223,8 +244,8 @@ func NewAccountDataReader(client *rpc.Client) *accountDataReader {
 	return &accountDataReader{client: client}
 }
 
-func (r *accountDataReader) ReadAll(ctx context.Context, pk ag_solana.PublicKey) ([]byte, error) {
-	result, err := r.client.GetAccountInfo(ctx, pk)
+func (r *accountDataReader) ReadAll(ctx context.Context, pk ag_solana.PublicKey, opts *rpc.GetAccountInfoOpts) ([]byte, error) {
+	result, err := r.client.GetAccountInfoWithOpts(ctx, pk, opts)
 	if err != nil {
 		return nil, err
 	}
