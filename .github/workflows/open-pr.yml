@@ -14,16 +14,13 @@ jobs:
   create-commits-and-pr:
     runs-on: ubuntu-latest
     steps:
-      - name: Configure AWS for GATI
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
-        with:
-          role-to-assume: ${{ secrets.AWS_OIDC_CHAINLINK_SOLANA_CICD_TOKEN_ISSUER_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
-      - name: Get GH Token for GATI
+      - name: Setup GitHub Token
         id: token
-        uses: smartcontractkit/chainlink-github-actions/github-app-token-issuer@main
+        uses: smartcontractkit/.github/actions/setup-github-token@9e7cc0779934cae4a9028b8588c9adb64d8ce68c # setup-github-token@0.1.0
         with:
-          url: ${{ secrets.AWS_RELENG_TEAM_GATI_LAMBDA_URL }}
+          aws-role-arn: ${{ secrets.AWS_OIDC_CHAINLINK_SOLANA_CICD_TOKEN_ISSUER_ROLE_ARN }}
+          aws-lambda-url: ${{ secrets.AWS_RELENG_TEAM_GATI_LAMBDA_URL }}
+          aws-region: ${{ secrets.AWS_REGION }}
       - uses: actions/checkout@v3 # checkout branch that it is called from
       - uses: actions/setup-go@v3
         with:
