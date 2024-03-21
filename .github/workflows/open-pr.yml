@@ -14,7 +14,7 @@ jobs:
   create-commits-and-pr:
     permissions:
       id-token: write
-      contents: read
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - name: Setup GitHub Token
@@ -83,3 +83,4 @@ jobs:
           reviewers: ${{ inputs.reviewers }}
           body: ${{ steps.run.outputs.prBody }}
           token: ${{ steps.token.outputs.access-token }}
+          author: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
