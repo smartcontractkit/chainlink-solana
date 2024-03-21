@@ -14,7 +14,7 @@ jobs:
   create-commits-and-pr:
     permissions:
       id-token: write
-      contents: read
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3 # checkout branch that it is called from
