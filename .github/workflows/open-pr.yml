@@ -12,6 +12,9 @@ on:
 
 jobs:
   create-commits-and-pr:
+    permissions:
+      id-token: write
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - name: Setup GitHub Token
