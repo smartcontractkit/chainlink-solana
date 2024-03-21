@@ -1,5 +1,6 @@
 name: DependencyUpdater
 on: 
+  push: # testing
   workflow_dispatch:
   schedule:
     - cron: '0 0 * * *' # check every day at midnight UTC

@@ -24,6 +24,7 @@ jobs:
           aws-role-arn: ${{ secrets.AWS_OIDC_CHAINLINK_SOLANA_CICD_TOKEN_ISSUER_ROLE_ARN }}
           aws-lambda-url: ${{ secrets.AWS_RELENG_TEAM_GATI_LAMBDA_URL }}
           aws-region: ${{ secrets.AWS_REGION }}
+          set-git-config: true
       - uses: actions/checkout@v3 # checkout branch that it is called from
       - uses: actions/setup-go@v3
         with:
