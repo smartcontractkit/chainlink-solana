@@ -7,6 +7,6 @@ echo "Chainlink Develop Commit: $SHA"
 
 # update dependencies
 go get github.com/smartcontractkit/chainlink/integration-tests@$SHA
-go mod tidy
+go mod tidy || echo -e "------\nInitial go mod tidy failed - will update chainlink dep and try tidy again\n------"
 go get github.com/smartcontractkit/chainlink/v2@$SHA
 go mod tidy
