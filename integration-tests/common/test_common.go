@@ -190,7 +190,7 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 	} else {
 		env, err := test_env.NewTestEnv()
 		require.NoError(m.T, err)
-		sol := test_env_sol.NewSolana([]string{env.Network.Name})
+		sol := test_env_sol.NewSolana([]string{env.DockerNetwork.Name})
 		err = sol.StartContainer()
 		require.NoError(m.T, err)
 		m.Common.SolanaUrl = sol.InternalHttpUrl
