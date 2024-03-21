@@ -14,6 +14,16 @@ jobs:
   create-commits-and-pr:
     runs-on: ubuntu-latest
     steps:
+      - name: Configure AWS for GATI
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_CHAINLINK_SOLANA_CICD_TOKEN_ISSUER_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Get GH Token for GATI
+        id: token
+        uses: smartcontractkit/chainlink-github-actions/github-app-token-issuer@main
+        with:
+          url: ${{ secrets.AWS_RELENG_TEAM_GATI_LAMBDA_URL }}
       - uses: actions/checkout@v3 # checkout branch that it is called from
       - uses: actions/setup-go@v3
         with:
@@ -30,7 +40,7 @@ jobs:
       - name: Check if changes + PR exists
         id: check
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.token.outputs.access-token }}
         run: |
           prs=$(gh pr list \
               --repo "$GITHUB_REPOSITORY" \
@@ -56,7 +66,7 @@ jobs:
           repo: ${{ github.repository }}
           branch: "${{ steps.run.outputs.name }}" 
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.token.outputs.access-token }}
       - name: "Cleanup branch"
         if: '!steps.check.outputs.skip'
         run: |
@@ -72,3 +82,4 @@ jobs:
           branch: ${{ steps.run.outputs.name }} 
           reviewers: ${{ inputs.reviewers }}
           body: ${{ steps.run.outputs.prBody }}
+          token: ${{ steps.token.outputs.access-token }}
