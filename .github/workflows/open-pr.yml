@@ -17,14 +17,6 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     steps:
-      - name: Setup GitHub Token
-        id: token
-        uses: smartcontractkit/.github/actions/setup-github-token@9e7cc0779934cae4a9028b8588c9adb64d8ce68c # setup-github-token@0.1.0
-        with:
-          aws-role-arn: ${{ secrets.AWS_OIDC_CHAINLINK_SOLANA_CICD_TOKEN_ISSUER_ROLE_ARN }}
-          aws-lambda-url: ${{ secrets.AWS_RELENG_TEAM_GATI_LAMBDA_URL }}
-          aws-region: ${{ secrets.AWS_REGION }}
-          set-git-config: true
       - uses: actions/checkout@v3 # checkout branch that it is called from
       - uses: actions/setup-go@v3
         with:
@@ -41,7 +33,7 @@ jobs:
       - name: Check if changes + PR exists
         id: check
         env:
-          GITHUB_TOKEN: ${{ steps.token.outputs.access-token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           prs=$(gh pr list \
               --repo "$GITHUB_REPOSITORY" \
@@ -67,13 +59,20 @@ jobs:
           repo: ${{ github.repository }}
           branch: "${{ steps.run.outputs.name }}" 
         env:
-          GITHUB_TOKEN: ${{ steps.token.outputs.access-token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: "Cleanup branch"
         if: '!steps.check.outputs.skip'
         run: |
           git reset --hard
           git branch --set-upstream-to=origin/${{ steps.run.outputs.name }} 
           git pull
+      - name: Setup GitHub Token
+        id: token
+        uses: smartcontractkit/.github/actions/setup-github-token@9e7cc0779934cae4a9028b8588c9adb64d8ce68c # setup-github-token@0.1.0
+        with:
+          aws-role-arn: ${{ secrets.AWS_OIDC_CHAINLINK_SOLANA_CICD_TOKEN_ISSUER_ROLE_ARN }}
+          aws-lambda-url: ${{ secrets.AWS_RELENG_TEAM_GATI_LAMBDA_URL }}
+          aws-region: ${{ secrets.AWS_REGION }}
       - name: Create pull request
         if: '!steps.check.outputs.skip'
         uses: peter-evans/create-pull-request@b1ddad2c994a25fbc81a28b3ec0e368bb2021c50 # v6.0.0
