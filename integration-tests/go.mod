@@ -14,9 +14,9 @@ require (
 	github.com/rs/zerolog v1.30.0
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240320150640-2ab7f210b05c
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240216142700-c5869534c19e
-	github.com/smartcontractkit/chainlink-testing-framework v1.27.0
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240321154927-31350477ae51
-	github.com/smartcontractkit/chainlink/v2 v2.10.0-beta0.0.20240321154927-31350477ae51
+	github.com/smartcontractkit/chainlink-testing-framework v1.27.3
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240322155528-17c037678d05
+	github.com/smartcontractkit/chainlink/v2 v2.10.0-beta0.0.20240322155528-17c037678d05
 	github.com/smartcontractkit/libocr v0.0.0-20240229181116-bfb2432a7a66
 	github.com/stretchr/testify v1.9.0
 	github.com/testcontainers/testcontainers-go v0.28.0
@@ -128,6 +128,7 @@ require (
 	github.com/docker/docker v25.0.2+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
+	github.com/dominikbraun/graph v0.23.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/dvsekhvalnov/jose2go v1.5.0 // indirect
 	github.com/edsrzf/mmap-go v1.1.0 // indirect
