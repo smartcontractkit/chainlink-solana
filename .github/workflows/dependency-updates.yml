@@ -1,81 +1,53 @@
 name: DependencyUpdater
 on: 
-  push:
   workflow_dispatch:
   schedule:
     - cron: '0 0 * * *' # check every day at midnight UTC
   
 jobs:
-  # E2E-Solana-Image:
-  #   uses: ./.github/workflows/open-pr.yml
-  #   with:
-  #     reviewers: aalu1418
-  #     run: |
-  #       make upgrade-e2e-solana-image
-  #       image=$(curl https://api.github.com/repos/solana-labs/solana/releases/latest | jq -r '.tag_name')
+  E2E-Solana-Image:
+    uses: ./.github/workflows/open-pr.yml
+    with:
+      reviewers: aalu1418
+      run: |
+        make upgrade-e2e-solana-image
+        image=$(curl https://api.github.com/repos/solana-labs/solana/releases/latest | jq -r '.tag_name')
 
-  #       # outputs
-  #       echo "name=bump/solana-$image" >> "$GITHUB_OUTPUT"
-  #       echo "prTitle=[automated] bump solana image to $image" >> "$GITHUB_OUTPUT"
-  #       echo "prBody=(run CI by closing + reopening PR) Latest Solana mainnet release is [$image](https://github.com/solana-labs/solana/releases/latest)" >> "$GITHUB_OUTPUT"
-  #       echo "commitString=[automated] bump solana dependencies" >> "$GITHUB_OUTPUT"
-  #   secrets: inherit
-  # E2E-Testing-Dependencies:
-  #   uses: ./.github/workflows/open-pr.yml
-  #   with:
-  #     reviewers: aalu1418
-  #     run: |
+        # outputs
+        echo "name=bump/solana-$image" >> "$GITHUB_OUTPUT"
+        echo "prTitle=[automated] bump solana image to $image" >> "$GITHUB_OUTPUT"
+        echo "prBody=Latest Solana mainnet release is [$image](https://github.com/solana-labs/solana/releases/latest)" >> "$GITHUB_OUTPUT"
+        echo "commitString=[automated] bump solana dependencies" >> "$GITHUB_OUTPUT"
+    secrets: inherit
+  E2E-Testing-Dependencies:
+    uses: ./.github/workflows/open-pr.yml
+    with:
+      reviewers: aalu1418
+      run: |
 
-  #       # get CTF version in core
-  #       git clone https://github.com/smartcontractkit/chainlink.git temp-chainlink
-  #       cd temp-chainlink/integration-tests
-  #       coreVersion=$(go list -m github.com/smartcontractkit/chainlink-testing-framework | awk '{print $NF}')
-  #       cd ../../
-  #       rm -rf temp-chainlink
-  #       echo "chainlink/integration-tests CTF: $coreVersion"
+        # get CTF version in core
+        git clone https://github.com/smartcontractkit/chainlink.git temp-chainlink
+        cd temp-chainlink/integration-tests
+        coreVersion=$(go list -m github.com/smartcontractkit/chainlink-testing-framework | awk '{print $NF}')
+        cd ../../
+        rm -rf temp-chainlink
+        echo "chainlink/integration-tests CTF: $coreVersion"
 
-  #       # get CTF version in solana
-  #       cd integration-tests
-  #       solVersion=$(go list -m github.com/smartcontractkit/chainlink-testing-framework | awk '{print $NF}')
-  #       echo "chainlink-solana/integration-tests CTF: $solVersion"
-  #       cd ../
+        # get CTF version in solana
+        cd integration-tests
+        solVersion=$(go list -m github.com/smartcontractkit/chainlink-testing-framework | awk '{print $NF}')
+        echo "chainlink-solana/integration-tests CTF: $solVersion"
+        cd ../
         
-  #       # compare versions
-  #       if [[ $coreVersion != $solVersion ]]; then
-  #         make upgrade-e2e-core-deps
-  #         make gomodtidy
-  #       fi
+        # compare versions
+        if [[ $coreVersion != $solVersion ]]; then
+          make upgrade-e2e-core-deps
+          make gomodtidy
+        fi
 
-  #       # outputs
-  #       echo "name=bump/e2e-deps-$coreVersion" >> "$GITHUB_OUTPUT"
-  #       echo "prTitle=[automated] bump e2e test deps to match chainlink/integration-tests" >> "$GITHUB_OUTPUT"
-  #       echo "prBody=(run CI by closing + reopening PR) chainlink/integration-tests uses chainlink-testing-framework@$coreVersion" >> "$GITHUB_OUTPUT"
-  #       echo "commitString=[automated] bump e2e <> core/integration-tests dependencies" >> "$GITHUB_OUTPUT"
-  #   secrets: inherit
-  SIMD-Update-Checker:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check For Updates In Past Week
-        id: updates
-        run: |
-          # new PRs
-          OPEN=$(curl https://api.github.com/repos/solana-foundation/solana-improvement-documents/pulls\?state=open\&per_page=100 | jq --arg t "$(date -d '0 days ago' +%s)" -r '.[] | select (.created_at | . == null or fromdateiso8601 > ($t|tonumber)) | "- \(.html_url)"')
-          # macos
-          # OPEN=$(curl https://api.github.com/repos/solana-foundation/solana-improvement-documents/pulls\?state\=open\&per_page\=100 | jq --arg t "$(date -v-7d +%s)" -r '.[] | select (.created_at | . == null or fromdateiso8601 > ($t|tonumber)) | "- \(.html_url)"')
-
-          # closed PRs
-          CLOSED=$(curl https://api.github.com/repos/solana-foundation/solana-improvement-documents/pulls\?state=closed\&per_page=100 | jq --arg t "$(date -d '0 days ago' +%s)" -r '.[] | select (.created_at | . == null or fromdateiso8601 > ($t|tonumber)) | "- \(.html_url)"')
-          # macos
-          # CLOSED=$(curl https://api.github.com/repos/solana-foundation/solana-improvement-documents/pulls\?state\=closed\&per_page\=100 | jq --arg t "$(date -v-7d +%s)" -r '.[] | select (.created_at | . == null or fromdateiso8601 > ($t|tonumber)) | "- \(.html_url)"')
-
-          echo "open=$OPEN" >> "$GITHUB_OUTPUT"
-          echo "closed=$CLOSED" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v3
-        if: steps.updates.outputs.open || steps.updates.outputs.closed
-      - name: Open Issue
-        if: steps.updates.outputs.open || steps.updates.outputs.closed
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh issue create -a aalu1418 -t "SIMD Updates - $(date)" -l "[auto] SIMD Updates" -b $'## Opened\n${{ steps.updates.outputs.open}}\n\n## Closed\n${{ steps.updates.outputs.closed}}'
-            
-        
+        # outputs
+        echo "name=bump/e2e-deps-$coreVersion" >> "$GITHUB_OUTPUT"
+        echo "prTitle=[automated] bump e2e test deps to match chainlink/integration-tests" >> "$GITHUB_OUTPUT"
+        echo "prBody=chainlink/integration-tests uses chainlink-testing-framework@$coreVersion" >> "$GITHUB_OUTPUT"
+        echo "commitString=[automated] bump e2e <> core/integration-tests dependencies" >> "$GITHUB_OUTPUT"
+    secrets: inherit
