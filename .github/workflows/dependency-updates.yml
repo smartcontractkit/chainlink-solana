@@ -1,5 +1,6 @@
 name: DependencyUpdater
 on: 
+  push:
   workflow_dispatch:
   schedule:
     - cron: '0 0 * * *' # check every day at midnight UTC
@@ -51,3 +52,34 @@ jobs:
         echo "prBody=(run CI by closing + reopening PR) chainlink/integration-tests uses chainlink-testing-framework@$coreVersion" >> "$GITHUB_OUTPUT"
         echo "commitString=[automated] bump e2e <> core/integration-tests dependencies" >> "$GITHUB_OUTPUT"
     secrets: inherit
+  SIMD-Update-Checker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check For Updates In Past Week
+        id: updates
+        run: |
+          # new PRs
+          OPEN=$(curl https://api.github.com/repos/solana-foundation/solana-improvement-documents/pulls\?state\=open\&per_page\=100 | jq --arg t "$(date -v-7d +%s)" -r '.[] | select (.created_at | . == null or fromdateiso8601 > ($t|tonumber)) | "- \(.html_url)"')
+
+          # closed PRs
+          CLOSED=$(curl https://api.github.com/repos/solana-foundation/solana-improvement-documents/pulls\?state\=closed\&per_page\=100 | jq --arg t "$(date -v-7d +%s)" -r '.[] | select (.created_at | . == null or fromdateiso8601 > ($t|tonumber)) | "- \(.html_url)"')
+
+          echo "open=$OPEN" >> "$GITHUB_OUTPUT"
+          echo "closed=$CLOSED" >> "$GITHUB_OUTPUT"
+      - name: Open Issue
+        if: steps.updates.outputs.open || steps.updates.outputs.closed
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            -a @aalu1418 # TODO: assign to team when available
+            -t "SIMD Updates - $(date)"
+            -l auto-SIMD-alerts
+            -b "## Opened
+          ${{ steps.updates.outputs.open}}
+          
+          ## Closed
+          ${{ steps.updates.outputs.closed}}
+          "
+            
+        
