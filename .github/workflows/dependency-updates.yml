@@ -59,12 +59,12 @@ jobs:
         id: updates
         run: |
           # new PRs
-          OPEN=$(curl https://api.github.com/repos/solana-foundation/solana-improvement-documents/pulls\?state=open\&per_page=100 | jq --arg t "$(date -d '7 days ago' +%s)" -r '.[] | select (.created_at | . == null or fromdateiso8601 > ($t|tonumber)) | "- \(.html_url)"')
+          OPEN=$(curl https://api.github.com/repos/solana-foundation/solana-improvement-documents/pulls\?state=open\&per_page=100 | jq --arg t "$(date -d '0 days ago' +%s)" -r '.[] | select (.created_at | . == null or fromdateiso8601 > ($t|tonumber)) | "- \(.html_url)"')
           # macos
           # OPEN=$(curl https://api.github.com/repos/solana-foundation/solana-improvement-documents/pulls\?state\=open\&per_page\=100 | jq --arg t "$(date -v-7d +%s)" -r '.[] | select (.created_at | . == null or fromdateiso8601 > ($t|tonumber)) | "- \(.html_url)"')
 
           # closed PRs
-          CLOSED=$(curl https://api.github.com/repos/solana-foundation/solana-improvement-documents/pulls\?state=closed\&per_page=100 | jq --arg t "$(date -d '7 days ago' +%s)" -r '.[] | select (.created_at | . == null or fromdateiso8601 > ($t|tonumber)) | "- \(.html_url)"')
+          CLOSED=$(curl https://api.github.com/repos/solana-foundation/solana-improvement-documents/pulls\?state=closed\&per_page=100 | jq --arg t "$(date -d '0 days ago' +%s)" -r '.[] | select (.created_at | . == null or fromdateiso8601 > ($t|tonumber)) | "- \(.html_url)"')
           # macos
           # CLOSED=$(curl https://api.github.com/repos/solana-foundation/solana-improvement-documents/pulls\?state\=closed\&per_page\=100 | jq --arg t "$(date -v-7d +%s)" -r '.[] | select (.created_at | . == null or fromdateiso8601 > ($t|tonumber)) | "- \(.html_url)"')
 
