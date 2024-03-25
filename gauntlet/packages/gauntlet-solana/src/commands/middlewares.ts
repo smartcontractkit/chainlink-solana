@@ -1,7 +1,7 @@
 import { Middleware, Next } from '@chainlink/gauntlet-core'
 import { boolean } from '@chainlink/gauntlet-core/dist/lib/args'
 import { assertions, logger } from '@chainlink/gauntlet-core/dist/utils'
-import { AnchorProvider } from '@project-serum/anchor'
+import { AnchorProvider } from '@coral-xyz/anchor'
 import { Connection, Keypair } from '@solana/web3.js'
 import { DEFAULT_DERIVATION_PATH } from '../lib/constants'
 import SolanaCommand from './internal/solana'

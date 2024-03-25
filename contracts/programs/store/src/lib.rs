@@ -65,14 +65,17 @@ pub mod store {
         let len = len
             .checked_sub(8 + state::HEADER_SIZE)
             .ok_or(ErrorCode::InsufficientSize)?;
-        require!(len % size_of::<Transmission>() == 0, InsufficientSize);
+        require!(
+            len % size_of::<Transmission>() == 0,
+            ErrorCode::InsufficientSize
+        );
         let space = len / size_of::<Transmission>();
         // Live length must not exceed total capacity
-        require!(live_length <= space as u32, InvalidInput);
+        require!(live_length <= space as u32, ErrorCode::InvalidInput);
 
         // Both inputs should also be more than zero
-        require!(live_length > 0, InvalidInput);
-        require!(granularity > 0, InvalidInput);
+        require!(live_length > 0, ErrorCode::InvalidInput);
+        require!(granularity > 0, ErrorCode::InvalidInput);
 
         feed.version = FEED_VERSION;
         feed.state = Transmissions::NORMAL;
@@ -83,7 +86,7 @@ pub mod store {
 
         feed.decimals = decimals;
         let description = description.as_bytes();
-        require!(description.len() <= 32, InvalidInput);
+        require!(description.len() <= 32, ErrorCode::InvalidInput);
         feed.description[..description.len()].copy_from_slice(description);
 
         Ok(())
@@ -106,7 +109,7 @@ pub mod store {
 
     pub fn accept_feed_ownership(ctx: Context<AcceptFeedOwnership>) -> Result<()> {
         let store: std::result::Result<AccountLoader<State>, _> =
-            AccountLoader::try_from(&ctx.accounts.proposed_owner);
+            try_from!(AccountLoader<State>, &ctx.accounts.proposed_owner);
 
         let proposed_owner = match store {
             // if the feed is owned by a store, validate the store's owner signed
@@ -114,7 +117,10 @@ pub mod store {
             // else, it's an individual owner
             Err(_err) => ctx.accounts.proposed_owner.key(),
         };
-        require!(ctx.accounts.authority.key == &proposed_owner, Unauthorized);
+        require!(
+            ctx.accounts.authority.key == &proposed_owner,
+            ErrorCode::Unauthorized
+        );
 
         let feed = &mut ctx.accounts.feed;
         feed.owner = std::mem::take(&mut feed.proposed_owner);
@@ -299,9 +305,18 @@ fn is_valid(flagging_threshold: u32, previous_answer: i128, answer: i128) -> boo
     ratio <= u128::from(flagging_threshold)
 }
 
+// https://github.com/coral-xyz/anchor/pull/2770
+#[macro_export]
+macro_rules! try_from {
+    ($ty: ty, $acc: expr) => {
+        <$ty>::try_from(unsafe { core::mem::transmute::<_, &AccountInfo<'_>>($acc.as_ref()) })
+    };
+}
+
 // Only owner access
 fn owner<'info>(owner: &UncheckedAccount<'info>, authority: &Signer) -> Result<()> {
-    let store: std::result::Result<AccountLoader<'info, State>, _> = AccountLoader::try_from(owner);
+    let store: std::result::Result<AccountLoader<'info, State>, _> =
+        try_from!(AccountLoader<'info, State>, owner);
 
     let owner = match store {
         // if the feed is owned by a store, validate the store's owner signed
@@ -310,7 +325,7 @@ fn owner<'info>(owner: &UncheckedAccount<'info>, authority: &Signer) -> Result<(
         Err(_err) => *owner.key,
     };
 
-    require!(authority.key == &owner, Unauthorized);
+    require!(authority.key == &owner, ErrorCode::Unauthorized);
     Ok(())
 }
 
@@ -319,7 +334,8 @@ fn has_lowering_access(
     controller: &UncheckedAccount,
     authority: &Signer,
 ) -> Result<()> {
-    let store: std::result::Result<AccountLoader<State>, _> = AccountLoader::try_from(owner);
+    let store: std::result::Result<AccountLoader<State>, _> =
+        try_from!(AccountLoader<State>, owner);
 
     match store {
         // if the feed is owned by a store
@@ -337,21 +353,21 @@ fn has_lowering_access(
             // The controller account has to match the lowering_access_controller on the store
             require!(
                 controller.key() == store.lowering_access_controller,
-                InvalidInput
+                ErrorCode::InvalidInput
             );
 
-            let controller = AccountLoader::try_from(controller)?;
+            let controller = try_from!(AccountLoader<AccessController>, controller)?;
 
             // Check if the key is present on the access controller
             let has_access = access_controller::has_access(&controller, authority.key)
                 // TODO: better mapping, maybe InvalidInput?
                 .map_err(|_| ErrorCode::Unauthorized)?;
 
-            require!(has_access, Unauthorized);
+            require!(has_access, ErrorCode::Unauthorized);
         }
         // else, it's an individual owner
         Err(_err) => {
-            require!(authority.key == owner.key, Unauthorized);
+            require!(authority.key == owner.key, ErrorCode::Unauthorized);
         }
     };
 

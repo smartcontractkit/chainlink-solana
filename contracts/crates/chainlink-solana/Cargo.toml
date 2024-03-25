@@ -15,6 +15,6 @@ name = "chainlink_solana"
 default = []
 
 [dependencies]
-solana-program = "1.10.25"
+solana-program = "1.17.25"
 borsh = "0.9.1"
 borsh-derive = "0.9.1"

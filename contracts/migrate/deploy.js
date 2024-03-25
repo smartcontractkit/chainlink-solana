@@ -1,4 +1,4 @@
-const anchor = require("@project-serum/anchor");
+const anchor = require("@coral-xyz/anchor");
 const fs = require("fs");
 const BufferLayout = require("@solana/buffer-layout");
 

@@ -1,8 +1,6 @@
 use anchor_lang::prelude::*;
 use static_assertions::const_assert;
 
-pub use anchor_lang::solana_program::secp256k1_recover::Secp256k1Pubkey;
-
 use arrayvec::arrayvec;
 
 // NOTE: ALL types in this file have to be verified to contain no padding via `cargo rustc -- -Zprint-type-sizes`!

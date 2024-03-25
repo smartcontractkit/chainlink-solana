@@ -1,12 +1,12 @@
 [package]
-name = "ocr2"
+name = "ocr_2"
 version = "1.0.1"
 description = "Created with Anchor"
-edition = "2018"
+edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "ocr2"
+name = "ocr_2"
 
 [features]
 no-entrypoint = []
@@ -15,8 +15,9 @@ cpi = ["no-entrypoint"]
 default = []
 
 [dependencies]
-anchor-lang = { version = "0.25.0", features = [] }
-anchor-spl = "0.25.0"
+solana-program = "1.17.25" # pin solana to 1.17
+anchor-lang = { version = "0.29.0", features = [] }
+anchor-spl = "0.29.0"
 static_assertions = "1.1.0"
 access-controller = { version = "1.0.1", path = "../access-controller", default-features = false, features = ["cpi"] }
 store = { version = "1.0.1", path = "../store", default-features = false, features = ["cpi"] }

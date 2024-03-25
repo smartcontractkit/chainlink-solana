@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [get-projectserum-version]
     container:
-      image: projectserum/build:${{ needs.get-projectserum-version.outputs.projectserum_version }}
+      image: backpackapp/build:${{ needs.get-projectserum-version.outputs.projectserum_version }}
       env:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1

@@ -13,7 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 
-	ocr_2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr2"
+	ocr_2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr_2"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 )
 

@@ -1,5 +1,5 @@
 import { Connection, ParsedTransactionWithMeta, PublicKey } from '@solana/web3.js'
-import { EventParser, Event, Program } from '@project-serum/anchor'
+import { EventParser, Event, Program } from '@coral-xyz/anchor'
 
 /*
   Gets the latest transactions to a contract

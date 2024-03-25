@@ -1,8 +1,8 @@
 BIN_DIR = bin
 export GOPATH ?= $(shell go env GOPATH)
 export GO111MODULE ?= on
-export PROJECT_SERUM_VERSION ?=v0.25.0
-export PROJECT_SERUM_IMAGE ?= projectserum/build:$(PROJECT_SERUM_VERSION)
+export PROJECT_SERUM_VERSION ?=v0.29.0
+export PROJECT_SERUM_IMAGE ?= backpackapp/build:$(PROJECT_SERUM_VERSION)
 
 LINUX=LINUX
 OSX=OSX

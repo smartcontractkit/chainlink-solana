@@ -1,5 +1,5 @@
-import { Wallet } from '@project-serum/anchor'
-import { Keypair, PublicKey, Transaction } from '@solana/web3.js'
+import { Wallet } from '@coral-xyz/anchor'
+import { Keypair, PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js'
 import TransportNodeHid from '@ledgerhq/hw-transport-node-hid'
 import Solana from '@ledgerhq/hw-app-solana'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
@@ -12,8 +12,8 @@ export enum WalletTypes {
 export abstract class SolanaWallet {
   static create: (...args) => Promise<SolanaWallet>
 
-  abstract signTransaction: (tx: Transaction) => Promise<Transaction>
-  abstract signAllTransactions: (txs: Transaction[]) => Promise<Transaction[]>
+  abstract signTransaction<T extends Transaction | VersionedTransaction>(tx: T): Promise<T>
+  abstract signAllTransactions<T extends Transaction | VersionedTransaction>(txs: T[]): Promise<T[]>
   abstract publicKey: PublicKey
   abstract payer: Keypair
 
@@ -33,8 +33,12 @@ export class LocalWallet extends SolanaWallet {
     return new LocalWallet(wallet)
   }
 
-  signTransaction = (tx: Transaction) => this.wallet.signTransaction(tx)
-  signAllTransactions = (txs: Transaction[]) => this.wallet.signAllTransactions(txs)
+  async signTransaction<T extends Transaction | VersionedTransaction>(tx: T): Promise<T> {
+    return this.wallet.signTransaction(tx)
+  }
+  async signAllTransactions<T extends Transaction | VersionedTransaction>(txs: T[]): Promise<T[]> {
+    return this.wallet.signAllTransactions(txs)
+  }
 
   get publicKey() {
     return this.wallet.payer.publicKey
@@ -45,6 +49,10 @@ export class LocalWallet extends SolanaWallet {
   }
 
   type = () => WalletTypes.LOCAL
+}
+
+const isVersionedTransaction = (tx: Transaction | VersionedTransaction): tx is VersionedTransaction => {
+  return 'version' in tx
 }
 
 export class LedgerWallet extends SolanaWallet {
@@ -74,15 +82,23 @@ export class LedgerWallet extends SolanaWallet {
     }
   }
 
-  signTransaction = async (tx: Transaction) => {
+  signTransaction = async <T extends Transaction | VersionedTransaction>(tx: T) => {
     logger.info(`Ledger: Request to sign message`)
-    const msg = tx.serializeMessage()
+    // serializeMessage on v0, serialize on v1
+
+    let msg: Buffer
+
+    if (isVersionedTransaction(tx)) {
+      msg = Buffer.from(tx.serialize())
+    } else {
+      msg = tx.serializeMessage()
+    }
     const { signature } = await this.wallet.signTransaction(this.path, msg)
     tx.addSignature(this.publicKey, signature)
     return tx
   }
 
-  signAllTransactions = async (txs: Transaction[]) => {
+  signAllTransactions = async <T extends Transaction | VersionedTransaction>(txs: T[]) => {
     logger.warn('Signing multiple transactions with Ledger')
     return Promise.all(txs.map(this.signTransaction))
   }

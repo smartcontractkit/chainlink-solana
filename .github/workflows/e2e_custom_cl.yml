@@ -56,7 +56,7 @@ jobs:
     runs-on: ubuntu20.04-32cores-128GB
     needs: [get_projectserum_version]
     container:
-      image: projectserum/build:${{ needs.get_projectserum_version.outputs.projectserum_version }}
+      image: backpackapp/build:${{ needs.get_projectserum_version.outputs.projectserum_version }}
       env:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1
