@@ -16,7 +16,7 @@ jobs:
         # outputs
         echo "name=bump/solana-$image" >> "$GITHUB_OUTPUT"
         echo "prTitle=[automated] bump solana image to $image" >> "$GITHUB_OUTPUT"
-        echo "prBody=(run CI by closing + reopening PR) Latest Solana mainnet release is [$image](https://github.com/solana-labs/solana/releases/latest)" >> "$GITHUB_OUTPUT"
+        echo "prBody=Latest Solana mainnet release is [$image](https://github.com/solana-labs/solana/releases/latest)" >> "$GITHUB_OUTPUT"
         echo "commitString=[automated] bump solana dependencies" >> "$GITHUB_OUTPUT"
     secrets: inherit
   E2E-Testing-Dependencies:
@@ -48,6 +48,6 @@ jobs:
         # outputs
         echo "name=bump/e2e-deps-$coreVersion" >> "$GITHUB_OUTPUT"
         echo "prTitle=[automated] bump e2e test deps to match chainlink/integration-tests" >> "$GITHUB_OUTPUT"
-        echo "prBody=(run CI by closing + reopening PR) chainlink/integration-tests uses chainlink-testing-framework@$coreVersion" >> "$GITHUB_OUTPUT"
+        echo "prBody=chainlink/integration-tests uses chainlink-testing-framework@$coreVersion" >> "$GITHUB_OUTPUT"
         echo "commitString=[automated] bump e2e <> core/integration-tests dependencies" >> "$GITHUB_OUTPUT"
     secrets: inherit
