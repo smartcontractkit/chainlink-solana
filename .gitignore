@@ -49,3 +49,7 @@ overrides.toml
 *.out
 *coverage*
 eslint-report.json
+.run.id
+
+# go work files
+go.work*
