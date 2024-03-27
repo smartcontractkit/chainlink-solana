@@ -123,7 +123,7 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	onChainConfig, err := state.GenerateOnChainConfig(bundleData, gauntletConfig["VAULT"], sg.ProposalAddress)
 	require.NoError(t, err)
 
-	reportingConfig := common.ReportingPluginConfig{
+	reportingConfig := utils.ReportingPluginConfig{
 		AlphaReportInfinite: false,
 		AlphaReportPpb:      0,
 		AlphaAcceptInfinite: false,

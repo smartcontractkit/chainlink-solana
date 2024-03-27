@@ -15,7 +15,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/test_env"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/osutil"
 	"github.com/smartcontractkit/chainlink/integration-tests/testconfig"
@@ -54,66 +56,6 @@ type Contracts struct {
 	OCR2      *solclient.OCRv2
 	Store     *solclient.Store
 	StoreAuth string
-}
-
-type OCR2OnChainConfig struct {
-	Oracles    []Operator `json:"oracles"`
-	F          int        `json:"f"`
-	ProposalId string     `json:"proposalId"`
-}
-
-type OffchainConfig struct {
-	DeltaProgressNanoseconds                           int64                 `json:"deltaProgressNanoseconds"`
-	DeltaResendNanoseconds                             int64                 `json:"deltaResendNanoseconds"`
-	DeltaRoundNanoseconds                              int64                 `json:"deltaRoundNanoseconds"`
-	DeltaGraceNanoseconds                              int64                 `json:"deltaGraceNanoseconds"`
-	DeltaStageNanoseconds                              int64                 `json:"deltaStageNanoseconds"`
-	RMax                                               int                   `json:"rMax"`
-	S                                                  []int                 `json:"s"`
-	OffchainPublicKeys                                 []string              `json:"offchainPublicKeys"`
-	PeerIds                                            []string              `json:"peerIds"`
-	ReportingPluginConfig                              ReportingPluginConfig `json:"reportingPluginConfig"`
-	MaxDurationQueryNanoseconds                        int64                 `json:"maxDurationQueryNanoseconds"`
-	MaxDurationObservationNanoseconds                  int64                 `json:"maxDurationObservationNanoseconds"`
-	MaxDurationReportNanoseconds                       int64                 `json:"maxDurationReportNanoseconds"`
-	MaxDurationShouldAcceptFinalizedReportNanoseconds  int64                 `json:"maxDurationShouldAcceptFinalizedReportNanoseconds"`
-	MaxDurationShouldTransmitAcceptedReportNanoseconds int64                 `json:"maxDurationShouldTransmitAcceptedReportNanoseconds"`
-	ConfigPublicKeys                                   []string              `json:"configPublicKeys"`
-}
-
-type ReportingPluginConfig struct {
-	AlphaReportInfinite bool `json:"alphaReportInfinite"`
-	AlphaReportPpb      int  `json:"alphaReportPpb"`
-	AlphaAcceptInfinite bool `json:"alphaAcceptInfinite"`
-	AlphaAcceptPpb      int  `json:"alphaAcceptPpb"`
-	DeltaCNanoseconds   int  `json:"deltaCNanoseconds"`
-}
-
-// TODO - Decouple all OCR2 config structs to be reusable between chains
-type OCROffChainConfig struct {
-	ProposalId     string         `json:"proposalId"`
-	OffchainConfig OffchainConfig `json:"offchainConfig"`
-	UserSecret     string         `json:"userSecret"`
-}
-
-type Operator struct {
-	Signer      string `json:"signer"`
-	Transmitter string `json:"transmitter"`
-	Payee       string `json:"payee"`
-}
-
-type PayeeConfig struct {
-	Operators  []Operator `json:"operators"`
-	ProposalId string     `json:"proposalId"`
-}
-
-type ProposalAcceptConfig struct {
-	ProposalId     string         `json:"proposalId"`
-	Version        int            `json:"version"`
-	F              int            `json:"f"`
-	Oracles        []Operator     `json:"oracles"`
-	OffchainConfig OffchainConfig `json:"offchainConfig"`
-	RandomSecret   string         `json:"randomSecret"`
 }
 
 func NewOCRv2State(t *testing.T, contracts int, namespacePrefix string, env string, isK8s bool, testConfig *testconfig.TestConfig) (*OCRv2TestState, error) {
@@ -156,6 +98,7 @@ type OCRv2TestState struct {
 	ContractsNodeSetup map[int]*ContractNodeInfo
 	NodeKeysBundle     []client.NodeKeysBundle
 	Client             *solclient.Client
+	Gauntlet           *gauntlet.SolanaGauntlet
 	RoundsFound        int
 	LastRoundTime      map[string]time.Time
 	err                error
@@ -476,19 +419,19 @@ func (m *OCRv2TestState) ValidateRoundsAfter(chaosStartTime time.Time, timeout t
 	}, timeout, NewRoundCheckPollInterval).Should(gomega.Succeed())
 }
 
-func (m *OCRv2TestState) GenerateOnChainConfig(nodeKeys []client.NodeKeysBundle, vaultAddress string, proposalId string) (OCR2OnChainConfig, error) {
+func (m *OCRv2TestState) GenerateOnChainConfig(nodeKeys []client.NodeKeysBundle, vaultAddress string, proposalId string) (utils.OCR2OnChainConfig, error) {
 
-	var oracles []Operator
+	var oracles []utils.Operator
 
 	for _, nodeKey := range nodeKeys {
-		oracles = append(oracles, Operator{
+		oracles = append(oracles, utils.Operator{
 			Signer:      strings.Replace(nodeKey.OCR2Key.Data.Attributes.OnChainPublicKey, "ocr2on_solana_", "", 1),
 			Transmitter: nodeKey.TXKey.Data.Attributes.PublicKey,
 			Payee:       vaultAddress,
 		})
 	}
 
-	return OCR2OnChainConfig{
+	return utils.OCR2OnChainConfig{
 		Oracles:    oracles,
 		F:          1,
 		ProposalId: proposalId,
@@ -498,7 +441,7 @@ func (m *OCRv2TestState) GenerateOnChainConfig(nodeKeys []client.NodeKeysBundle,
 func (m *OCRv2TestState) GenerateOffChainConfig(
 	nodeKeysBundle []client.NodeKeysBundle,
 	proposalId string,
-	reportingConfig ReportingPluginConfig,
+	reportingConfig utils.ReportingPluginConfig,
 	deltaProgressNanoseconds int64,
 	deltaResendNanoseconds int64,
 	deltaRoundNanoseconds int64,
@@ -512,7 +455,7 @@ func (m *OCRv2TestState) GenerateOffChainConfig(
 	maxDurationShouldTransmitAcceptedReportNanoseconds int64,
 	secret string,
 
-) OCROffChainConfig {
+) utils.OCROffChainConfig {
 
 	offchainPublicKeys := make([]string, len(nodeKeysBundle))
 	peerIds := make([]string, len(nodeKeysBundle))
@@ -529,9 +472,9 @@ func (m *OCRv2TestState) GenerateOffChainConfig(
 		configPublicKeys[i] = strings.Replace(bundle.OCR2Key.Data.Attributes.ConfigPublicKey, "ocr2cfg_solana_", "", 1)
 	}
 
-	offChainConfig := OCROffChainConfig{
+	offChainConfig := utils.OCROffChainConfig{
 		ProposalId: proposalId,
-		OffchainConfig: OffchainConfig{
+		OffchainConfig: utils.OffchainConfig{
 			DeltaProgressNanoseconds:          deltaProgressNanoseconds,
 			DeltaResendNanoseconds:            deltaResendNanoseconds,
 			DeltaRoundNanoseconds:             deltaRoundNanoseconds,
@@ -555,17 +498,17 @@ func (m *OCRv2TestState) GenerateOffChainConfig(
 	return offChainConfig
 }
 
-func (m *OCRv2TestState) GeneratePayees(nodeKeys []client.NodeKeysBundle, vaultAddress string, proposalId string) PayeeConfig {
-	var operators []Operator
+func (m *OCRv2TestState) GeneratePayees(nodeKeys []client.NodeKeysBundle, vaultAddress string, proposalId string) utils.PayeeConfig {
+	var operators []utils.Operator
 	for _, key := range nodeKeys {
-		operators = append(operators, Operator{
+		operators = append(operators, utils.Operator{
 			Signer:      strings.Replace(key.OCR2Key.Data.Attributes.OnChainPublicKey, "ocr2on_solana_", "", 1),
 			Transmitter: key.TXKey.Data.Attributes.PublicKey,
 			Payee:       vaultAddress,
 		})
 	}
 
-	return PayeeConfig{
+	return utils.PayeeConfig{
 		Operators:  operators,
 		ProposalId: proposalId,
 	}
@@ -575,12 +518,12 @@ func (m *OCRv2TestState) GenerateProposalAcceptConfig(
 	proposalId string,
 	version int,
 	f int,
-	oracles []Operator,
-	offChainConfig OffchainConfig,
+	oracles []utils.Operator,
+	offChainConfig utils.OffchainConfig,
 	randomSecret string,
 
-) ProposalAcceptConfig {
-	return ProposalAcceptConfig{
+) utils.ProposalAcceptConfig {
+	return utils.ProposalAcceptConfig{
 		ProposalId:     proposalId,
 		Version:        version,
 		F:              f,

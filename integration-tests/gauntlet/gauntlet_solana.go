@@ -3,8 +3,9 @@ package gauntlet
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/common"
 	"os"
+
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/gauntlet"
 )
@@ -26,29 +27,6 @@ type SolanaGauntlet struct {
 	ProposalAddress          string
 }
 
-type StoreFeedConfig struct {
-	Store       string `json:"store"`
-	Granularity int    `json:"granularity"`
-	LiveLength  int    `json:"liveLength"`
-	Decimals    int    `json:"decimals"`
-	Description string `json:"description"`
-}
-
-type OCR2Config struct {
-	MinAnswer     string `json:"minAnswer"`
-	MaxAnswer     string `json:"maxAnswer"`
-	Transmissions string `json:"transmissions"`
-}
-
-type OCR2BillingConfig struct {
-	ObservationPaymentGjuels  int `json:"ObservationPaymentGjuels"`
-	TransmissionPaymentGjuels int `json:"TransmissionPaymentGjuels"`
-}
-
-type StoreWriterConfig struct {
-	Transmissions string `json:"transmissions"`
-}
-
 // GauntletResponse Default response output for starknet gauntlet commands
 type GauntletResponse struct {
 	Responses []struct {
@@ -67,16 +45,9 @@ type GauntletResponse struct {
 		Contract string `json:"contract"`
 	} `json:"responses"`
 	Data struct {
-		Proposal            *string         `json:"proposal,omitempty"`
-		LatestTransmissions *[]Transmission `json:"latestTransmissions,omitempty"`
+		Proposal            *string               `json:"proposal,omitempty"`
+		LatestTransmissions *[]utils.Transmission `json:"latestTransmissions,omitempty"`
 	}
-}
-
-type Transmission struct {
-	LatestTransmissionNo int64  `json:"latestTransmissionNo"`
-	RoundId              int64  `json:"roundId"`
-	Answer               int64  `json:"answer"`
-	Transmitter          string `json:"transmitter"`
 }
 
 // NewSolanaGauntlet Creates a default gauntlet config
@@ -159,7 +130,7 @@ func (sg *SolanaGauntlet) InitializeStore(billingController string) (string, err
 	return sg.gr.Responses[0].Contract, nil
 }
 
-func (sg *SolanaGauntlet) StoreCreateFeed(length int, feedConfig *StoreFeedConfig) (string, error) {
+func (sg *SolanaGauntlet) StoreCreateFeed(length int, feedConfig *utils.StoreFeedConfig) (string, error) {
 	config, err := json.Marshal(feedConfig)
 	if err != nil {
 		return "", err
@@ -188,7 +159,7 @@ func (sg *SolanaGauntlet) StoreSetValidatorConfig(feedAddress string, threshold 
 	return sg.gr.Responses[0].Contract, nil
 }
 
-func (sg *SolanaGauntlet) InitializeOCR2(requesterAccessController string, billingAccessController string, ocrConfig *OCR2Config) (string, error) {
+func (sg *SolanaGauntlet) InitializeOCR2(requesterAccessController string, billingAccessController string, ocrConfig *utils.OCR2Config) (string, error) {
 	config, err := json.Marshal(ocrConfig)
 	if err != nil {
 		return "", err
@@ -209,7 +180,7 @@ func (sg *SolanaGauntlet) InitializeOCR2(requesterAccessController string, billi
 	return sg.gr.Responses[0].Contract, nil
 }
 
-func (sg *SolanaGauntlet) StoreSetWriter(storeConfig *StoreWriterConfig, ocrAddress string) (string, error) {
+func (sg *SolanaGauntlet) StoreSetWriter(storeConfig *utils.StoreWriterConfig, ocrAddress string) (string, error) {
 	config, err := json.Marshal(storeConfig)
 	if err != nil {
 		return "", err
@@ -233,7 +204,7 @@ func (sg *SolanaGauntlet) StoreSetWriter(storeConfig *StoreWriterConfig, ocrAddr
 	return sg.gr.Responses[0].Contract, nil
 }
 
-func (sg *SolanaGauntlet) OCR2SetBilling(ocr2BillingConfig *OCR2BillingConfig, ocrAddress string) (string, error) {
+func (sg *SolanaGauntlet) OCR2SetBilling(ocr2BillingConfig *utils.OCR2BillingConfig, ocrAddress string) (string, error) {
 	config, err := json.Marshal(ocr2BillingConfig)
 	if err != nil {
 		return "", err
@@ -276,7 +247,7 @@ func (sg *SolanaGauntlet) OCR2CreateProposal(version int) (string, error) {
 	return *sg.gr.Data.Proposal, nil
 }
 
-func (sg *SolanaGauntlet) ProposeOnChainConfig(proposalId string, onChainConfig common.OCR2OnChainConfig, ocrFeedAddress string) (string, error) {
+func (sg *SolanaGauntlet) ProposeOnChainConfig(proposalId string, onChainConfig utils.OCR2OnChainConfig, ocrFeedAddress string) (string, error) {
 	config, err := json.Marshal(onChainConfig)
 	if err != nil {
 		return "", err
@@ -302,7 +273,7 @@ func (sg *SolanaGauntlet) ProposeOnChainConfig(proposalId string, onChainConfig 
 	return sg.gr.Responses[0].Contract, nil
 }
 
-func (sg *SolanaGauntlet) ProposeOffChainConfig(proposalId string, offChainConfig common.OCROffChainConfig, ocrFeedAddress string) (string, error) {
+func (sg *SolanaGauntlet) ProposeOffChainConfig(proposalId string, offChainConfig utils.OCROffChainConfig, ocrFeedAddress string) (string, error) {
 	config, err := json.Marshal(offChainConfig)
 	if err != nil {
 		return "", err
@@ -328,7 +299,7 @@ func (sg *SolanaGauntlet) ProposeOffChainConfig(proposalId string, offChainConfi
 	return sg.gr.Responses[0].Contract, nil
 }
 
-func (sg *SolanaGauntlet) ProposePayees(proposalId string, payeesConfig common.PayeeConfig, ocrFeedAddress string) (string, error) {
+func (sg *SolanaGauntlet) ProposePayees(proposalId string, payeesConfig utils.PayeeConfig, ocrFeedAddress string) (string, error) {
 	config, err := json.Marshal(payeesConfig)
 	if err != nil {
 		return "", err
@@ -373,7 +344,7 @@ func (sg *SolanaGauntlet) FinalizeProposal(proposalId string) (string, error) {
 	return sg.gr.Responses[0].Contract, nil
 }
 
-func (sg *SolanaGauntlet) AcceptProposal(proposalId string, secret string, proposalAcceptConfig common.ProposalAcceptConfig, ocrFeedAddres string) (string, error) {
+func (sg *SolanaGauntlet) AcceptProposal(proposalId string, secret string, proposalAcceptConfig utils.ProposalAcceptConfig, ocrFeedAddres string) (string, error) {
 	config, err := json.Marshal(proposalAcceptConfig)
 	if err != nil {
 		return "", err
@@ -401,7 +372,7 @@ func (sg *SolanaGauntlet) AcceptProposal(proposalId string, secret string, propo
 }
 
 // FetchTransmissions returns the last 10 transmissions
-func (sg *SolanaGauntlet) FetchTransmissions(ocrState string) ([]Transmission, error) {
+func (sg *SolanaGauntlet) FetchTransmissions(ocrState string) ([]utils.Transmission, error) {
 	_, err := sg.G.ExecCommand([]string{
 		"ocr2:inspect:responses",
 		ocrState,
@@ -441,7 +412,7 @@ func (sg *SolanaGauntlet) DeployOCR2() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	storeConfig := &StoreFeedConfig{
+	storeConfig := &utils.StoreFeedConfig{
 		Store:       sg.StoreAddress,
 		Granularity: 1,
 		LiveLength:  10,
@@ -459,7 +430,7 @@ func (sg *SolanaGauntlet) DeployOCR2() (string, error) {
 		return "", err
 	}
 
-	ocr2Config := &OCR2Config{
+	ocr2Config := &utils.OCR2Config{
 		MinAnswer:     "0",
 		MaxAnswer:     "10000000000",
 		Transmissions: sg.FeedAddress,
@@ -470,14 +441,14 @@ func (sg *SolanaGauntlet) DeployOCR2() (string, error) {
 		return "", err
 	}
 
-	storeWriter := &StoreWriterConfig{Transmissions: sg.FeedAddress}
+	storeWriter := &utils.StoreWriterConfig{Transmissions: sg.FeedAddress}
 
 	_, err = sg.StoreSetWriter(storeWriter, sg.OcrAddress)
 	if err != nil {
 		return "", err
 	}
 
-	ocr2BillingConfig := &OCR2BillingConfig{
+	ocr2BillingConfig := &utils.OCR2BillingConfig{
 		ObservationPaymentGjuels:  1,
 		TransmissionPaymentGjuels: 1,
 	}
@@ -493,7 +464,7 @@ func (sg *SolanaGauntlet) DeployOCR2() (string, error) {
 	}
 	return "", nil
 }
-func (sg *SolanaGauntlet) ConfigureOCR2(onChainConfig common.OCR2OnChainConfig, offChainConfig common.OCROffChainConfig, payees common.PayeeConfig, proposalAccept common.ProposalAcceptConfig) error {
+func (sg *SolanaGauntlet) ConfigureOCR2(onChainConfig utils.OCR2OnChainConfig, offChainConfig utils.OCROffChainConfig, payees utils.PayeeConfig, proposalAccept utils.ProposalAcceptConfig) error {
 	_, err := sg.ProposeOnChainConfig(sg.ProposalAddress, onChainConfig, sg.OcrAddress)
 	if err != nil {
 		return err
