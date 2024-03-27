@@ -205,12 +205,25 @@ func (m *OCRv2TestState) NewSolanaClientSetup(networkSettings *solclient.SolNetw
 
 }
 
-func (m *OCRv2TestState) SetupClients() {
+func (m *OCRv2TestState) NewGauntletSetup() (*gauntlet.SolanaGauntlet, error) {
+	cfg := m.ConfigureGauntlet("this is an testing only secret") // TODO: move secret
+	g, err := gauntlet.NewSolanaGauntlet(fmt.Sprintf("%s/gauntlet", utils.ProjectRoot))
+	if err != nil {
+		return nil, err
+	}
+	return g, g.SetupNetwork(cfg)
+}
+
+func (m *OCRv2TestState) SetupClients(enableGauntlet bool) {
 	// setup direct solana API
 	m.Client, m.err = m.NewSolanaClientSetup(m.Client.Config)
-	require.NoError(m.T, m.err)
+	require.NoError(m.T, m.err, "error setting up sol client")
 
-	// TODO: setup gauntlet
+	// setup gauntlet
+	if enableGauntlet {
+		m.Gauntlet, m.err = m.NewGauntletSetup()
+		require.NoError(m.T, m.err, "error setting up gauntlet")
+	}
 
 	if m.Common.IsK8s {
 		m.ChainlinkNodesK8s, m.err = client.ConnectChainlinkNodes(m.Common.Env)
@@ -272,8 +285,11 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 	g := errgroup.Group{}
 	for i := 0; i < len(m.ContractsNodeSetup); i++ {
 		i := i
-		// TODO: boolean to handle deploying with gauntlet
 		g.Go(func() error {
+			// use gauntlet if it exists
+			if m.Gauntlet != nil {
+				return m.DeployFeedWithGauntlet(i)
+			}
 			return m.DeployFeedWithSolClient(i)
 		})
 	}
@@ -282,6 +298,34 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 		m.ContractsNodeSetup[i].OCR2 = m.Contracts[i].OCR2
 		m.ContractsNodeSetup[i].Store = m.Contracts[i].Store
 	}
+}
+
+func (m *OCRv2TestState) DeployFeedWithGauntlet(i int) error {
+	_, err := m.Gauntlet.DeployOCR2()
+	require.NoError(m.T, err, "Error deploying OCR")
+
+	var nodeCount int
+	if m.Common.IsK8s {
+		nodeCount = len(m.ContractsNodeSetup[i].NodesK8s)
+	} else {
+		nodeCount = len(m.ContractsNodeSetup[i].Nodes)
+	}
+	ocConfig, err := OffChainConfigParamsFromNodes(nodeCount, m.ContractsNodeSetup[i].NodeKeysBundle)
+	require.NoError(m.T, err)
+
+	// TODO: use gauntlet
+	// err = ocr2.Configure(ocConfig)
+	// require.NoError(m.T, err)
+	// m.Mu.Lock()
+	// m.Contracts = append(m.Contracts, Contracts{
+	// 	BAC:       bac,
+	// 	RAC:       rac,
+	// 	OCR2:      ocr2,
+	// 	Store:     store,
+	// 	StoreAuth: storeAuth,
+	// })
+	// m.Mu.Unlock()
+	return nil
 }
 
 func (m *OCRv2TestState) DeployFeedWithSolClient(i int) error {

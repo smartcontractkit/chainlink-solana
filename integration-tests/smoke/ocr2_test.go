@@ -37,7 +37,7 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 		name string
 		env  map[string]string
 	}{
-		{name: "embeded"},
+		{name: "embedded"},
 		{name: "plugins", env: map[string]string{
 			"CL_MEDIAN_CMD": "chainlink-feeds",
 			"CL_SOLANA_CMD": "chainlink-solana",
