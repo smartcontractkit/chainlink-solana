@@ -151,7 +151,6 @@ type OCRv2TestState struct {
 	Mu                 *sync.Mutex
 	ChainlinkNodesK8s  []*client.ChainlinkK8sClient
 	ChainlinkNodes     []*client.ChainlinkClient
-	ContractDeployer   *solclient.ContractDeployer
 	LinkToken          *solclient.LinkToken
 	Contracts          []Contracts
 	ContractsNodeSetup map[int]*ContractNodeInfo
@@ -264,8 +263,12 @@ func (m *OCRv2TestState) NewSolanaClientSetup(networkSettings *solclient.SolNetw
 }
 
 func (m *OCRv2TestState) SetupClients() {
+	// setup direct solana API
 	m.Client, m.err = m.NewSolanaClientSetup(m.Client.Config)
 	require.NoError(m.T, m.err)
+
+	// TODO: setup gauntlet
+
 	if m.Common.IsK8s {
 		m.ChainlinkNodesK8s, m.err = client.ConnectChainlinkNodes(m.Common.Env)
 		require.NoError(m.T, m.err)
@@ -301,6 +304,8 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 		m.NodeKeysBundle, m.err = m.Common.CreateNodeKeysBundle(m.Common.DockerEnv.ClCluster.NodeAPIs())
 	}
 	require.NoError(m.T, m.err)
+
+	// Deploy programs + LINK token via API
 	cd, err := solclient.NewContractDeployer(m.Client, nil)
 	require.NoError(m.T, err)
 	err = cd.LoadPrograms(contractsDir)
@@ -315,68 +320,18 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 	require.NoError(m.T, cd.ValidateProgramsDeployed())
 	m.Client.LinkToken, err = cd.DeployLinkTokenContract()
 	require.NoError(m.T, err)
-	err = FundOracles(m.Client, m.NodeKeysBundle, big.NewFloat(1e4))
+	err = FundOracles(m.Client, m.NodeKeysBundle, big.NewFloat(1e4)) // TODO: handle if devnet
 	require.NoError(m.T, err)
 
 	m.initializeNodesInContractsMap()
+
+	// Deploy feed instances using solclient or gauntlet
 	g := errgroup.Group{}
 	for i := 0; i < len(m.ContractsNodeSetup); i++ {
 		i := i
+		// TODO: boolean to handle deploying with gauntlet
 		g.Go(func() error {
-			cd, err := solclient.NewContractDeployer(m.Client, m.Client.LinkToken)
-			require.NoError(m.T, err)
-			err = cd.GenerateAuthorities([]string{"vault", "store"})
-			require.NoError(m.T, err)
-			bac, err := cd.DeployOCRv2AccessController()
-			require.NoError(m.T, err)
-			rac, err := cd.DeployOCRv2AccessController()
-			require.NoError(m.T, err)
-			err = m.Client.WaitForEvents()
-			require.NoError(m.T, err)
-
-			store, err := cd.DeployOCRv2Store(bac.Address())
-			require.NoError(m.T, err)
-
-			err = cd.CreateFeed("Feed", uint8(18), 10, 1024)
-			require.NoError(m.T, err)
-
-			ocr2, err := cd.InitOCR2(bac.Address(), rac.Address())
-			require.NoError(m.T, err)
-
-			storeAuth := cd.Accounts.Authorities["store"].PublicKey.String()
-			err = bac.AddAccess(storeAuth)
-			require.NoError(m.T, err)
-			err = m.Client.WaitForEvents()
-			require.NoError(m.T, err)
-
-			err = store.SetWriter(storeAuth)
-			require.NoError(m.T, err)
-			err = store.SetValidatorConfig(80000)
-			require.NoError(m.T, err)
-			err = m.Client.WaitForEvents()
-			require.NoError(m.T, err)
-
-			var nodeCount int
-			if m.Common.IsK8s {
-				nodeCount = len(m.ContractsNodeSetup[i].NodesK8s)
-			} else {
-				nodeCount = len(m.ContractsNodeSetup[i].Nodes)
-			}
-			ocConfig, err := OffChainConfigParamsFromNodes(nodeCount, m.ContractsNodeSetup[i].NodeKeysBundle)
-			require.NoError(m.T, err)
-
-			err = ocr2.Configure(ocConfig)
-			require.NoError(m.T, err)
-			m.Mu.Lock()
-			m.Contracts = append(m.Contracts, Contracts{
-				BAC:       bac,
-				RAC:       rac,
-				OCR2:      ocr2,
-				Store:     store,
-				StoreAuth: storeAuth,
-			})
-			m.Mu.Unlock()
-			return nil
+			return m.DeployFeedWithSolClient(i)
 		})
 	}
 	require.NoError(m.T, g.Wait())
@@ -384,6 +339,63 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 		m.ContractsNodeSetup[i].OCR2 = m.Contracts[i].OCR2
 		m.ContractsNodeSetup[i].Store = m.Contracts[i].Store
 	}
+}
+
+func (m *OCRv2TestState) DeployFeedWithSolClient(i int) error {
+	cd, err := solclient.NewContractDeployer(m.Client, m.Client.LinkToken)
+	require.NoError(m.T, err)
+	err = cd.GenerateAuthorities([]string{"vault", "store"})
+	require.NoError(m.T, err)
+	bac, err := cd.DeployOCRv2AccessController()
+	require.NoError(m.T, err)
+	rac, err := cd.DeployOCRv2AccessController()
+	require.NoError(m.T, err)
+	err = m.Client.WaitForEvents()
+	require.NoError(m.T, err)
+
+	store, err := cd.DeployOCRv2Store(bac.Address())
+	require.NoError(m.T, err)
+
+	err = cd.CreateFeed("Feed", uint8(18), 10, 1024)
+	require.NoError(m.T, err)
+
+	ocr2, err := cd.InitOCR2(bac.Address(), rac.Address())
+	require.NoError(m.T, err)
+
+	storeAuth := cd.Accounts.Authorities["store"].PublicKey.String()
+	err = bac.AddAccess(storeAuth)
+	require.NoError(m.T, err)
+	err = m.Client.WaitForEvents()
+	require.NoError(m.T, err)
+
+	err = store.SetWriter(storeAuth)
+	require.NoError(m.T, err)
+	err = store.SetValidatorConfig(80000)
+	require.NoError(m.T, err)
+	err = m.Client.WaitForEvents()
+	require.NoError(m.T, err)
+
+	var nodeCount int
+	if m.Common.IsK8s {
+		nodeCount = len(m.ContractsNodeSetup[i].NodesK8s)
+	} else {
+		nodeCount = len(m.ContractsNodeSetup[i].Nodes)
+	}
+	ocConfig, err := OffChainConfigParamsFromNodes(nodeCount, m.ContractsNodeSetup[i].NodeKeysBundle)
+	require.NoError(m.T, err)
+
+	err = ocr2.Configure(ocConfig)
+	require.NoError(m.T, err)
+	m.Mu.Lock()
+	m.Contracts = append(m.Contracts, Contracts{
+		BAC:       bac,
+		RAC:       rac,
+		OCR2:      ocr2,
+		Store:     store,
+		StoreAuth: storeAuth,
+	})
+	m.Mu.Unlock()
+	return nil
 }
 
 // CreateJobs creating OCR jobs and EA stubs
