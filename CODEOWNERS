@@ -3,13 +3,13 @@
 # Please define less specific codeowner paths before more specific codeowner paths in order for the more specific rule to have priority
 
 # global ownership
-* @smartcontractkit/bix-team
+* @smartcontractkit/bix-build
 
 # e2e test ownership
-/integration-tests @smartcontractkit/qa @smartcontractkit/bix-team
+/integration-tests @smartcontractkit/qa @smartcontractkit/bix-build
 
 # gauntlet ownership
-/gauntlet @smartcontractkit/devx @smartcontractkit/bix-team
+/gauntlet @smartcontractkit/devx @smartcontractkit/bix-build
 
 # relayer ownership
-/pkg @smartcontractkit/bix-team
+/pkg @smartcontractkit/bix-build
