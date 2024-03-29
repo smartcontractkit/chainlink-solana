@@ -95,7 +95,6 @@ type OCRv2TestState struct {
 	Mu                 *sync.Mutex
 	ChainlinkNodesK8s  []*client.ChainlinkK8sClient
 	ChainlinkNodes     []*client.ChainlinkClient
-	LinkToken          *solclient.LinkToken
 	Contracts          []Contracts
 	ContractsNodeSetup map[int]*ContractNodeInfo
 	NodeKeysBundle     []client.NodeKeysBundle
@@ -633,7 +632,7 @@ func (m *OCRv2TestState) ConfigureGauntletFromState(secret string) map[string]st
 		"PROGRAM_ID_OCR2":              m.Client.ProgramWallets["ocr2-keypair.json"].PublicKey().String(),
 		"PROGRAM_ID_ACCESS_CONTROLLER": m.Client.ProgramWallets["access_controller-keypair.json"].PublicKey().String(),
 		"PROGRAM_ID_STORE":             m.Client.ProgramWallets["store-keypair.json"].PublicKey().String(),
-		"LINK":                         m.LinkToken.Address(),
+		"LINK":                         m.Client.LinkToken.Address(),
 		// unused?
 		// "WS_URL":                       wsUrl,
 		// "VAULT":                        vault,
