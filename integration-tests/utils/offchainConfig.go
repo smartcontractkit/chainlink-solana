@@ -1,5 +1,9 @@
 package utils
 
+const (
+	TestingSecret = "this is an testing only secret"
+)
+
 type OCR2OnChainConfig struct {
 	Oracles    []Operator `json:"oracles"`
 	F          int        `json:"f"`

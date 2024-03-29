@@ -11,14 +11,14 @@ import (
 
 type Store struct {
 	Client        *Client
-	Store         *solana.Wallet
-	Feed          *solana.Wallet
+	Store         solana.PublicKey
+	Feed          solana.PublicKey
 	Owner         *solana.Wallet
-	ProgramWallet *solana.Wallet
+	ProgramWallet solana.PublicKey
 }
 
 func (m *Store) GetLatestRoundData() (uint64, uint64, uint64, error) {
-	a, _, err := relaySol.GetLatestTransmission(context.Background(), m.Client.RPC, m.Feed.PublicKey(), rpc.CommitmentConfirmed)
+	a, _, err := relaySol.GetLatestTransmission(context.Background(), m.Client.RPC, m.Feed, rpc.CommitmentConfirmed)
 	if err != nil {
 		return 0, 0, 0, err
 	}
@@ -26,7 +26,7 @@ func (m *Store) GetLatestRoundData() (uint64, uint64, uint64, error) {
 }
 
 func (m *Store) TransmissionsAddress() string {
-	return m.Feed.PublicKey().String()
+	return m.Feed.String()
 }
 
 func (m *Store) SetValidatorConfig(flaggingThreshold uint32) error {
@@ -36,7 +36,7 @@ func (m *Store) SetValidatorConfig(flaggingThreshold uint32) error {
 		[]solana.Instruction{
 			store.NewSetValidatorConfigInstruction(
 				flaggingThreshold,
-				m.Feed.PublicKey(),
+				m.Feed,
 				m.Owner.PublicKey(),
 				m.Owner.PublicKey(),
 			).Build(),
@@ -69,7 +69,7 @@ func (m *Store) SetWriter(writerAuthority string) error {
 		[]solana.Instruction{
 			store.NewSetWriterInstruction(
 				writerAuthPubKey,
-				m.Feed.PublicKey(),
+				m.Feed,
 				m.Owner.PublicKey(),
 				m.Owner.PublicKey(),
 			).Build(),
@@ -78,9 +78,10 @@ func (m *Store) SetWriter(writerAuthority string) error {
 			if key.Equals(m.Owner.PublicKey()) {
 				return &m.Owner.PrivateKey
 			}
-			if key.Equals(m.Feed.PublicKey()) {
-				return &m.Feed.PrivateKey
-			}
+			// TODO: is this needed?
+			// if key.Equals(m.Feed)) {
+			// 	return &m.Feed.PrivateKey
+			// }
 			if key.Equals(payer.PublicKey()) {
 				return &payer.PrivateKey
 			}
@@ -95,9 +96,9 @@ func (m *Store) SetWriter(writerAuthority string) error {
 }
 
 func (m *Store) ProgramAddress() string {
-	return m.ProgramWallet.PublicKey().String()
+	return m.ProgramWallet.String()
 }
 
 func (m *Store) Address() string {
-	return m.Store.PublicKey().String()
+	return m.Store.String()
 }

@@ -186,10 +186,10 @@ func (c *ContractDeployer) DeployOCRv2Store(billingAC string) (*Store, error) {
 	}
 	return &Store{
 		Client:        c.Client,
-		Store:         c.Accounts.Store,
-		Feed:          c.Accounts.Feed,
+		Store:         c.Accounts.Store.PublicKey(),
+		Feed:          c.Accounts.Feed.PublicKey(),
 		Owner:         c.Accounts.Owner,
-		ProgramWallet: programWallet,
+		ProgramWallet: programWallet.PublicKey(),
 	}, nil
 }
 
@@ -347,13 +347,13 @@ func (c *ContractDeployer) InitOCR2(billingControllerAddr string, requesterContr
 	return &OCRv2{
 		ContractDeployer:         c,
 		Client:                   c.Client,
-		State:                    c.Accounts.OCR,
+		State:                    c.Accounts.OCR.PublicKey(),
 		Authorities:              c.Accounts.Authorities,
 		Owner:                    c.Accounts.Owner,
 		Proposal:                 c.Accounts.Proposal,
 		OCRVaultAssociatedPubKey: *assocVault,
 		Mint:                     c.Accounts.Mint,
-		ProgramWallet:            programWallet,
+		ProgramWallet:            programWallet.PublicKey(),
 	}, nil
 }
 

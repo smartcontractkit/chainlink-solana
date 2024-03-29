@@ -481,7 +481,7 @@ func (sg *SolanaGauntlet) ConfigureOCR2(onChainConfig utils.OCR2OnChainConfig, o
 	if err != nil {
 		return err
 	}
-	_, err = sg.AcceptProposal(sg.ProposalAddress, "this is an testing only secret", proposalAccept, sg.OcrAddress)
+	_, err = sg.AcceptProposal(sg.ProposalAddress, utils.TestingSecret, proposalAccept, sg.OcrAddress)
 	if err != nil {
 		return err
 	}

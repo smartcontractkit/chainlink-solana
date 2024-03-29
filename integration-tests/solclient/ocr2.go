@@ -20,18 +20,18 @@ import (
 type OCRv2 struct {
 	Client                   *Client
 	ContractDeployer         *ContractDeployer
-	State                    *solana.Wallet
+	State                    solana.PublicKey
 	Authorities              map[string]*Authority
 	Payees                   []*solana.Wallet
 	Owner                    *solana.Wallet
 	Proposal                 *solana.Wallet
 	Mint                     *solana.Wallet
 	OCRVaultAssociatedPubKey solana.PublicKey
-	ProgramWallet            *solana.Wallet
+	ProgramWallet            solana.PublicKey
 }
 
 func (m *OCRv2) ProgramAddress() string {
-	return m.ProgramWallet.PublicKey().String()
+	return m.ProgramWallet.String()
 }
 
 func (m *OCRv2) writeOffChainConfig(ocConfigBytes []byte) error {
@@ -71,7 +71,7 @@ func (m *OCRv2) acceptProposal(digest []byte) error {
 		[]solana.Instruction{
 			ocr_2.NewAcceptProposalInstruction(
 				digest,
-				m.State.PublicKey(),
+				m.State,
 				m.Proposal.PublicKey(),
 				m.Owner.PublicKey(),
 				m.OCRVaultAssociatedPubKey,
@@ -112,7 +112,7 @@ func (m *OCRv2) SetBilling(observationPayment uint32, transmissionPayment uint32
 			ocr_2.NewSetBillingInstruction(
 				observationPayment,
 				transmissionPayment,
-				m.State.PublicKey(),
+				m.State,
 				m.Owner.PublicKey(),
 				m.Owner.PublicKey(),
 				billingACPubKey,
@@ -302,7 +302,7 @@ func (m *OCRv2) DumpState() error {
 	var stateDump ocr_2.State
 	err := m.Client.RPC.GetAccountDataInto(
 		context.Background(),
-		m.State.PublicKey(),
+		m.State,
 		&stateDump,
 	)
 	if err != nil {
@@ -318,7 +318,7 @@ func (m *OCRv2) GetContractData(ctx context.Context) (*contracts.OffchainAggrega
 
 // ProposeConfig sets oracles with payee addresses
 func (m *OCRv2) proposeConfig(ocConfig contracts.OffChainAggregatorV2Config) error {
-	log.Info().Str("Program Address", m.ProgramWallet.PublicKey().String()).Msg("Proposing new config")
+	log.Info().Str("Program Address", m.ProgramWallet.String()).Msg("Proposing new config")
 	payer := m.Client.DefaultWallet
 	oracles := make([]ocr_2.NewOracle, 0)
 	for _, oc := range ocConfig.Oracles {
@@ -407,7 +407,7 @@ func (m *OCRv2) RequestNewRound() error {
 }
 
 func (m *OCRv2) Address() string {
-	return m.State.PublicKey().String()
+	return m.State.String()
 }
 
 func (m *OCRv2) TransferOwnership(to string) error {

@@ -34,14 +34,16 @@ import (
 
 func TestSolanaOCRV2Smoke(t *testing.T) {
 	for _, test := range []struct {
-		name string
-		env  map[string]string
+		name           string
+		env            map[string]string
+		enableGauntlet bool
 	}{
 		{name: "embedded"},
 		{name: "plugins", env: map[string]string{
 			"CL_MEDIAN_CMD": "chainlink-feeds",
 			"CL_SOLANA_CMD": "chainlink-solana",
 		}},
+		{name: "embedded-gauntlet", enableGauntlet: true},
 	} {
 		config, err := tc.GetConfig("Smoke", tc.OCR2)
 		if err != nil {
@@ -62,7 +64,7 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 					maps.Copy(n.ContainerEnvs, test.env)
 				})
 			}
-			state.DeployCluster(utils.ContractsDir)
+			state.DeployCluster(utils.ContractsDir, test.enableGauntlet)
 
 			state.ValidateRoundsAfter(time.Now(), common.NewRoundCheckTimeout, 1)
 		})
@@ -75,7 +77,6 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 		t.Fatal(err)
 	}
 	l := logging.GetTestLogger(t)
-	secret := "this is an testing only secret"
 	state, err := common.NewOCRv2State(t, 1, "gauntlet", "devnet", true, &config)
 	require.NoError(t, err, "Could not setup the ocrv2 state")
 	if state.Common.Env.WillUseRemoteRunner() {
@@ -94,13 +95,13 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 			l.Error().Err(err).Msg("Error tearing down environment")
 		}
 	})
-	state.SetupClients()
+	state.SetupClients(false) // not setting up gauntlet because it is set up outside
 	state.NodeKeysBundle, err = state.Common.CreateNodeKeysBundle(state.GetChainlinkNodes())
 	require.NoError(t, err)
 	err = state.Common.CreateSolanaChainAndNode(state.GetChainlinkNodes())
 	require.NoError(t, err)
 
-	gauntletConfig := state.ConfigureGauntlet(secret)
+	gauntletConfig := state.ConfigureGauntlet(utils.TestingSecret)
 	err = sg.SetupNetwork(gauntletConfig)
 	require.NoError(t, err, "Error setting gauntlet network")
 
@@ -145,11 +146,11 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 		int64(3000000000),
 		int64(100000000),
 		int64(100000000),
-		secret,
+		utils.TestingSecret,
 	)
 
 	payees := state.GeneratePayees(bundleData, gauntletConfig["VAULT"], sg.ProposalAddress)
-	proposalAccept := state.GenerateProposalAcceptConfig(sg.ProposalAddress, 2, 1, onChainConfig.Oracles, offChainConfig.OffchainConfig, secret)
+	proposalAccept := state.GenerateProposalAcceptConfig(sg.ProposalAddress, 2, 1, onChainConfig.Oracles, offChainConfig.OffchainConfig, utils.TestingSecret)
 
 	require.NoError(t, err)
 	err = sg.ConfigureOCR2(onChainConfig, offChainConfig, payees, proposalAccept)

@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/onsi/gomega"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -126,7 +128,7 @@ func (m *OCRv2TestState) LabelChaosGroups() {
 	m.LabelChaosGroup(10, 19, ChaosGroupRightHalf)
 }
 
-func (m *OCRv2TestState) DeployCluster(contractsDir string) {
+func (m *OCRv2TestState) DeployCluster(contractsDir string, enableGauntlet bool) {
 	if m.Common.IsK8s {
 		m.DeployEnv(contractsDir)
 	} else {
@@ -155,7 +157,7 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 			Killgrave:        env.MockAdapter,
 		}
 	}
-	m.SetupClients()
+	m.SetupClients(enableGauntlet)
 	m.DeployContracts(contractsDir)
 	m.CreateJobs()
 }
@@ -206,7 +208,7 @@ func (m *OCRv2TestState) NewSolanaClientSetup(networkSettings *solclient.SolNetw
 }
 
 func (m *OCRv2TestState) NewGauntletSetup() (*gauntlet.SolanaGauntlet, error) {
-	cfg := m.ConfigureGauntlet("this is an testing only secret") // TODO: move secret
+	cfg := m.ConfigureGauntlet(utils.TestingSecret)
 	g, err := gauntlet.NewSolanaGauntlet(fmt.Sprintf("%s/gauntlet", utils.ProjectRoot))
 	if err != nil {
 		return nil, err
@@ -304,27 +306,76 @@ func (m *OCRv2TestState) DeployFeedWithGauntlet(i int) error {
 	_, err := m.Gauntlet.DeployOCR2()
 	require.NoError(m.T, err, "Error deploying OCR")
 
-	var nodeCount int
-	if m.Common.IsK8s {
-		nodeCount = len(m.ContractsNodeSetup[i].NodesK8s)
-	} else {
-		nodeCount = len(m.ContractsNodeSetup[i].Nodes)
-	}
-	ocConfig, err := OffChainConfigParamsFromNodes(nodeCount, m.ContractsNodeSetup[i].NodeKeysBundle)
+	gauntletConfig := m.ConfigureGauntlet(utils.TestingSecret)
+	bundleData := make([]client.NodeKeysBundle, len(m.ContractsNodeSetup[i].NodeKeysBundle))
+	copy(bundleData, m.ContractsNodeSetup[i].NodeKeysBundle)
+
+	// We have to sort by on_chain_pub_key for the config digest
+	sort.Slice(bundleData, func(i, j int) bool {
+		return bundleData[i].OCR2Key.Data.Attributes.OnChainPublicKey < bundleData[j].OCR2Key.Data.Attributes.OnChainPublicKey
+	})
+
+	onChainConfig, err := m.GenerateOnChainConfig(bundleData, gauntletConfig["VAULT"], m.Gauntlet.ProposalAddress)
 	require.NoError(m.T, err)
 
-	// TODO: use gauntlet
+	reportingConfig := utils.ReportingPluginConfig{
+		AlphaReportInfinite: false,
+		AlphaReportPpb:      0,
+		AlphaAcceptInfinite: false,
+		AlphaAcceptPpb:      0,
+		DeltaCNanoseconds:   0,
+	}
+	offChainConfig := m.GenerateOffChainConfig(
+		bundleData,
+		m.Gauntlet.ProposalAddress,
+		reportingConfig,
+		int64(20000000000),
+		int64(50000000000),
+		int64(1000000000),
+		int64(4000000000),
+		int64(50000000000),
+		3,
+		int64(0),
+		int64(3000000000),
+		int64(3000000000),
+		int64(100000000),
+		int64(100000000),
+		utils.TestingSecret,
+	)
+
+	payees := m.GeneratePayees(bundleData, gauntletConfig["VAULT"], m.Gauntlet.ProposalAddress)
+	proposalAccept := m.GenerateProposalAcceptConfig(m.Gauntlet.ProposalAddress, 2, 1, onChainConfig.Oracles, offChainConfig.OffchainConfig, utils.TestingSecret)
+
+	err = m.Gauntlet.ConfigureOCR2(onChainConfig, offChainConfig, payees, proposalAccept)
+	require.NoError(m.T, err)
+
+	// TODO: standardize config generation
+	// var nodeCount int
+	// if m.Common.IsK8s {
+	// 	nodeCount = len(m.ContractsNodeSetup[i].NodesK8s)
+	// } else {
+	// 	nodeCount = len(m.ContractsNodeSetup[i].Nodes)
+	// }
+	// ocConfig, err := OffChainConfigParamsFromNodes(nodeCount, m.ContractsNodeSetup[i].NodeKeysBundle)
+	// require.NoError(m.T, err)
 	// err = ocr2.Configure(ocConfig)
 	// require.NoError(m.T, err)
-	// m.Mu.Lock()
-	// m.Contracts = append(m.Contracts, Contracts{
-	// 	BAC:       bac,
-	// 	RAC:       rac,
-	// 	OCR2:      ocr2,
-	// 	Store:     store,
-	// 	StoreAuth: storeAuth,
-	// })
-	// m.Mu.Unlock()
+
+	m.Mu.Lock()
+	m.Contracts = append(m.Contracts, Contracts{
+		OCR2: &solclient.OCRv2{
+			Client:        m.Client,
+			State:         solana.MustPublicKeyFromBase58(m.Gauntlet.OcrAddress),
+			ProgramWallet: m.Client.ProgramWallets["ocr2-keypair.json"].PublicKey(),
+		},
+		Store: &solclient.Store{
+			Client:        m.Client,
+			Store:         solana.MustPublicKeyFromBase58(m.Gauntlet.StoreAddress),
+			Feed:          solana.MustPublicKeyFromBase58(m.Gauntlet.FeedAddress),
+			ProgramWallet: m.Client.ProgramWallets["store-keypair.json"].PublicKey(),
+		},
+	})
+	m.Mu.Unlock()
 	return nil
 }
 

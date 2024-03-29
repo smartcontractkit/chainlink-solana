@@ -25,6 +25,6 @@ func TestSolanaOCRV2SoakTest(t *testing.T) {
 		require.NoError(t, err)
 		return
 	}
-	state.DeployCluster(utils.ContractsDir)
+	state.DeployCluster(utils.ContractsDir, false)
 	state.ValidateRoundsAfter(time.Now(), common.NewSoakRoundsCheckTimeout, 20000)
 }
