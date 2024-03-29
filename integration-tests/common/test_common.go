@@ -207,15 +207,6 @@ func (m *OCRv2TestState) NewSolanaClientSetup(networkSettings *solclient.SolNetw
 
 }
 
-func (m *OCRv2TestState) NewGauntletSetup() (*gauntlet.SolanaGauntlet, error) {
-	cfg := m.ConfigureGauntlet(utils.TestingSecret)
-	g, err := gauntlet.NewSolanaGauntlet(fmt.Sprintf("%s/gauntlet", utils.ProjectRoot))
-	if err != nil {
-		return nil, err
-	}
-	return g, g.SetupNetwork(cfg)
-}
-
 func (m *OCRv2TestState) SetupClients(enableGauntlet bool) {
 	// setup direct solana API
 	m.Client, m.err = m.NewSolanaClientSetup(m.Client.Config)
@@ -223,7 +214,7 @@ func (m *OCRv2TestState) SetupClients(enableGauntlet bool) {
 
 	// setup gauntlet
 	if enableGauntlet {
-		m.Gauntlet, m.err = m.NewGauntletSetup()
+		m.Gauntlet, m.err = gauntlet.NewSolanaGauntlet(fmt.Sprintf("%s/gauntlet", utils.ProjectRoot))
 		require.NoError(m.T, m.err, "error setting up gauntlet")
 	}
 
@@ -278,7 +269,7 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 	require.NoError(m.T, cd.ValidateProgramsDeployed())
 	m.Client.LinkToken, err = cd.DeployLinkTokenContract()
 	require.NoError(m.T, err)
-	err = FundOracles(m.Client, m.NodeKeysBundle, big.NewFloat(1e4)) // TODO: handle if devnet
+	err = FundOracles(m.Client, m.NodeKeysBundle, big.NewFloat(1e4)) // TODO: handle if devnet?
 	require.NoError(m.T, err)
 
 	m.initializeNodesInContractsMap()
@@ -303,10 +294,13 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 }
 
 func (m *OCRv2TestState) DeployFeedWithGauntlet(i int) error {
+	gauntletConfig := m.ConfigureGauntletFromState(utils.TestingSecret)
+	require.NoError(m.T, m.Gauntlet.SetupNetwork(gauntletConfig))
+
 	_, err := m.Gauntlet.DeployOCR2()
 	require.NoError(m.T, err, "Error deploying OCR")
 
-	gauntletConfig := m.ConfigureGauntlet(utils.TestingSecret)
+	// TODO: cleanup duplicate logic
 	bundleData := make([]client.NodeKeysBundle, len(m.ContractsNodeSetup[i].NodeKeysBundle))
 	copy(bundleData, m.ContractsNodeSetup[i].NodeKeysBundle)
 
@@ -628,7 +622,25 @@ func (m *OCRv2TestState) GenerateProposalAcceptConfig(
 	}
 }
 
-func (m *OCRv2TestState) ConfigureGauntlet(secret string) map[string]string {
+func (m *OCRv2TestState) ConfigureGauntletFromState(secret string) map[string]string {
+	if err := os.Setenv("SECRET", secret); err != nil {
+		panic("Error setting SECRET")
+	}
+
+	return map[string]string{
+		"NODE_URL":                     m.Common.SolanaUrl,
+		"PRIVATE_KEY":                  m.Client.DefaultWallet.PrivateKey.String(),
+		"PROGRAM_ID_OCR2":              m.Client.ProgramWallets["ocr2-keypair.json"].PublicKey().String(),
+		"PROGRAM_ID_ACCESS_CONTROLLER": m.Client.ProgramWallets["access_controller-keypair.json"].PublicKey().String(),
+		"PROGRAM_ID_STORE":             m.Client.ProgramWallets["store-keypair.json"].PublicKey().String(),
+		"LINK":                         m.LinkToken.Address(),
+		// unused?
+		// "WS_URL":                       wsUrl,
+		// "VAULT":                        vault,
+	}
+}
+
+func (m *OCRv2TestState) ConfigureGauntletFromEnv(secret string) map[string]string {
 	err := os.Setenv("SECRET", secret)
 	if err != nil {
 		panic("Error setting SECRET")

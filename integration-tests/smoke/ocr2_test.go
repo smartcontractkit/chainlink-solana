@@ -101,7 +101,7 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	err = state.Common.CreateSolanaChainAndNode(state.GetChainlinkNodes())
 	require.NoError(t, err)
 
-	gauntletConfig := state.ConfigureGauntlet(utils.TestingSecret)
+	gauntletConfig := state.ConfigureGauntletFromEnv(utils.TestingSecret)
 	err = sg.SetupNetwork(gauntletConfig)
 	require.NoError(t, err, "Error setting gauntlet network")
 
