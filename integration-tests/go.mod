@@ -491,8 +491,6 @@ replace (
 	// until merged upstream: https://github.com/mwitkow/grpc-proxy/pull/69
 	github.com/mwitkow/grpc-proxy => github.com/smartcontractkit/grpc-proxy v0.0.0-20230731113816-f1be6620749f
 
-	github.com/smartcontractkit/chainlink-testing-framework => ../../chainlink-testing-framework
-
 	// K8s imports are weird
 	k8s.io/api => k8s.io/api v0.25.11
 	k8s.io/client-go => k8s.io/client-go v0.25.11
