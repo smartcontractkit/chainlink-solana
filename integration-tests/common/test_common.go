@@ -628,7 +628,7 @@ func (m *OCRv2TestState) ConfigureGauntletFromState(secret string) map[string]st
 
 	return map[string]string{
 		"NODE_URL":                     m.Common.SolanaUrl,
-		"PRIVATE_KEY":                  strings.ReplaceAll(fmt.Sprintf("\"%v\"", m.Client.DefaultWallet.PrivateKey), " ", ","), // base58 privkey -> [#,#,...,#]
+		"PRIVATE_KEY":                  strings.ReplaceAll(fmt.Sprintf("%v", []byte(m.Client.DefaultWallet.PrivateKey)), " ", ","), // base58 privkey -> [#,#,...,#]
 		"PROGRAM_ID_OCR2":              m.Client.ProgramWallets["ocr2-keypair.json"].PublicKey().String(),
 		"PROGRAM_ID_ACCESS_CONTROLLER": m.Client.ProgramWallets["access_controller-keypair.json"].PublicKey().String(),
 		"PROGRAM_ID_STORE":             m.Client.ProgramWallets["store-keypair.json"].PublicKey().String(),

@@ -88,12 +88,7 @@ func (sg *SolanaGauntlet) SetupNetwork(args map[string]string) error {
 	for key, arg := range args {
 		sg.G.AddNetworkConfigVar(key, arg)
 	}
-	err := sg.G.WriteNetworkConfigMap(sg.dir + "/packages/gauntlet-solana-contracts/networks")
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return sg.G.WriteNetworkConfigMap(sg.dir + "/packages/gauntlet-solana-contracts/networks")
 }
 
 func (sg *SolanaGauntlet) InstallDependencies() error {
