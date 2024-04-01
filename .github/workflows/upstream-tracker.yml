@@ -21,13 +21,18 @@ jobs:
           # macos
           # CLOSED=$(curl https://api.github.com/repos/solana-foundation/solana-improvement-documents/pulls\?state\=closed\&per_page\=100 | jq --arg t "$(date -v-7d +%s)" -r '.[] | select (.created_at | . == null or fromdateiso8601 > ($t|tonumber)) | "- \(.html_url)"')
 
-          echo "open=$OPEN" >> "$GITHUB_OUTPUT"
-          echo "closed=$CLOSED" >> "$GITHUB_OUTPUT"
+          echo "open<<EOF" >> $GITHUB_OUTPUT
+          echo "$OPEN" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "closed<<EOF" >> $GITHUB_OUTPUT
+          echo "$CLOSED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
       - uses: actions/checkout@v3
         if: steps.updates.outputs.open || steps.updates.outputs.closed
       - name: Open Issue
         if: steps.updates.outputs.open || steps.updates.outputs.closed
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # TODO: update tagged to team
+        # TODO: update assignee to teams when GH supports it
         run: gh issue create -a aalu1418 -t "SIMD Updates - $(date)" -l "[auto] SIMD Updates" -b $'## Opened\n${{ steps.updates.outputs.open}}\n\n## Closed\n${{ steps.updates.outputs.closed}}'
