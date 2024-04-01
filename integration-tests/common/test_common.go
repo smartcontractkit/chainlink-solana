@@ -296,7 +296,7 @@ func (m *OCRv2TestState) DeployFeedWithGauntlet(i int) error {
 	gauntletConfig := m.ConfigureGauntletFromState(utils.TestingSecret)
 	require.NoError(m.T, m.Gauntlet.SetupNetwork(gauntletConfig))
 
-	_, err := m.Gauntlet.DeployOCR2()
+	err := m.Gauntlet.DeployOCR2()
 	require.NoError(m.T, err, "Error deploying OCR")
 
 	// TODO: cleanup duplicate logic

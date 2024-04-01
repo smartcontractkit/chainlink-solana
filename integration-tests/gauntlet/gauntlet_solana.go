@@ -391,26 +391,26 @@ func (sg *SolanaGauntlet) FetchTransmissions(ocrState string) ([]utils.Transmiss
 	return *sg.gr.Data.LatestTransmissions, nil
 }
 
-func (sg *SolanaGauntlet) DeployOCR2() (string, error) {
+func (sg *SolanaGauntlet) DeployOCR2() error {
 	var err error
 	err = sg.InstallDependencies()
 	if err != nil {
-		return "", err
+		return fmt.Errorf("install deps: %w", err)
 	}
 
 	sg.AccessControllerAddress, err = sg.InitializeAccessController()
 	if err != nil {
-		return "", err
+		return fmt.Errorf("init read AC: %w", err)
 	}
 
 	sg.BillingControllerAddress, err = sg.InitializeAccessController()
 	if err != nil {
-		return "", err
+		return fmt.Errorf("init billing AC: %w", err)
 	}
 
 	sg.StoreAddress, err = sg.InitializeStore(sg.BillingControllerAddress)
 	if err != nil {
-		return "", err
+		return fmt.Errorf("init store: %w", err)
 	}
 	storeConfig := &utils.StoreFeedConfig{
 		Store:       sg.StoreAddress,
@@ -422,12 +422,12 @@ func (sg *SolanaGauntlet) DeployOCR2() (string, error) {
 
 	sg.FeedAddress, err = sg.StoreCreateFeed(10, storeConfig)
 	if err != nil {
-		return "", err
+		return fmt.Errorf("create feed: %w", err)
 	}
 
 	_, err = sg.StoreSetValidatorConfig(sg.FeedAddress, 8000)
 	if err != nil {
-		return "", err
+		return fmt.Errorf("set validator: %w", err)
 	}
 
 	ocr2Config := &utils.OCR2Config{
@@ -438,14 +438,14 @@ func (sg *SolanaGauntlet) DeployOCR2() (string, error) {
 
 	sg.OcrAddress, err = sg.InitializeOCR2(sg.AccessControllerAddress, sg.BillingControllerAddress, ocr2Config)
 	if err != nil {
-		return "", err
+		return fmt.Errorf("init ocr2: %w", err)
 	}
 
 	storeWriter := &utils.StoreWriterConfig{Transmissions: sg.FeedAddress}
 
 	_, err = sg.StoreSetWriter(storeWriter, sg.OcrAddress)
 	if err != nil {
-		return "", err
+		return fmt.Errorf("set writer: %w", err)
 	}
 
 	ocr2BillingConfig := &utils.OCR2BillingConfig{
@@ -455,14 +455,14 @@ func (sg *SolanaGauntlet) DeployOCR2() (string, error) {
 
 	_, err = sg.OCR2SetBilling(ocr2BillingConfig, sg.OcrAddress)
 	if err != nil {
-		return "", err
+		return fmt.Errorf("set billing: %w", err)
 	}
 
 	sg.ProposalAddress, err = sg.OCR2CreateProposal(2)
 	if err != nil {
-		return "", err
+		return fmt.Errorf("create proposal: %w", err)
 	}
-	return "", nil
+	return nil
 }
 func (sg *SolanaGauntlet) ConfigureOCR2(onChainConfig utils.OCR2OnChainConfig, offChainConfig utils.OCROffChainConfig, payees utils.PayeeConfig, proposalAccept utils.ProposalAcceptConfig) error {
 	_, err := sg.ProposeOnChainConfig(sg.ProposalAddress, onChainConfig, sg.OcrAddress)

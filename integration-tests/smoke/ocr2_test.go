@@ -110,7 +110,7 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	wsc, err := ws.Connect(testcontext.Get(t), gauntletConfig["WS_URL"])
 	require.NoError(t, err)
 
-	_, err = sg.DeployOCR2()
+	err = sg.DeployOCR2()
 	require.NoError(t, err, "Error deploying OCR")
 
 	bundleData := make([]client.NodeKeysBundle, len(state.NodeKeysBundle))
