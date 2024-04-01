@@ -14,7 +14,7 @@ require (
 	github.com/rs/zerolog v1.30.0
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240320150640-2ab7f210b05c
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240216142700-c5869534c19e
-	github.com/smartcontractkit/chainlink-testing-framework v1.27.3
+	github.com/smartcontractkit/chainlink-testing-framework v1.27.9-0.20240401151529-850978f58941
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240322204500-8162f7b1012d
 	github.com/smartcontractkit/chainlink/v2 v2.10.0-beta0.0.20240322204500-8162f7b1012d
 	github.com/smartcontractkit/libocr v0.0.0-20240229181116-bfb2432a7a66
@@ -490,6 +490,8 @@ replace (
 
 	// until merged upstream: https://github.com/mwitkow/grpc-proxy/pull/69
 	github.com/mwitkow/grpc-proxy => github.com/smartcontractkit/grpc-proxy v0.0.0-20230731113816-f1be6620749f
+
+	github.com/smartcontractkit/chainlink-testing-framework => ../../chainlink-testing-framework
 
 	// K8s imports are weird
 	k8s.io/api => k8s.io/api v0.25.11
