@@ -107,9 +107,9 @@ func (sg *SolanaGauntlet) InstallDependencies() error {
 }
 
 func (sg *SolanaGauntlet) InitializeAccessController() (string, error) {
-	_, err := sg.G.ExecCommand([]string{"access_controller:initialize"}, *sg.options)
+	logs, err := sg.G.ExecCommand([]string{"access_controller:initialize"}, *sg.options)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("err: %w, logs: %s", err, logs)
 	}
 	sg.gr, err = sg.FetchGauntletJsonOutput()
 	if err != nil {
