@@ -18,7 +18,10 @@ export const withProvider: Middleware = (c: SolanaCommand, next: Next) => {
     `Invalid NODE_URL (${nodeURL}), please add an http:// or https:// prefix`,
   )
 
-  c.provider = new AnchorProvider(new Connection(nodeURL), c.wallet, {})
+  c.provider = new AnchorProvider(new Connection(nodeURL), c.wallet, {
+      preflightCommitment: "confirmed",
+      commitment: "confirmed",
+    })
   return next()
 }
 

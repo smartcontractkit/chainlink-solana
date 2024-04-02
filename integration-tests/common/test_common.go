@@ -633,6 +633,7 @@ func (m *OCRv2TestState) ConfigureGauntletFromState(secret string) map[string]st
 		"PROGRAM_ID_ACCESS_CONTROLLER": m.Client.ProgramWallets["access_controller-keypair.json"].PublicKey().String(),
 		"PROGRAM_ID_STORE":             m.Client.ProgramWallets["store-keypair.json"].PublicKey().String(),
 		"LINK":                         m.Client.LinkToken.Address(),
+		"DEBUG":                        "true",
 		// unused?
 		// "WS_URL":                       wsUrl,
 		// "VAULT":                        vault,

@@ -62,7 +62,7 @@ func NewSolanaGauntlet(workingDir string) (*SolanaGauntlet, error) {
 		G:   g,
 		gr:  &GauntletResponse{},
 		options: &gauntlet.ExecCommandOptions{
-			ErrHandling:       []string{},
+			ErrHandling:       []string{"error"},
 			CheckErrorsInRead: true,
 		},
 	}
