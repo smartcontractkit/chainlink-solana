@@ -93,7 +93,7 @@ func (sg *SolanaGauntlet) SetupNetwork(args map[string]string) error {
 
 func (sg *SolanaGauntlet) InstallDependencies() error {
 	sg.G.Command = "yarn"
-	logs, err := sg.G.ExecCommand([]string{"install"}, *sg.options)
+	logs, err := sg.G.ExecCommand([]string{"install", "--frozen-lockfile"}, *sg.options)
 	if err != nil {
 		return fmt.Errorf("err: %w, logs: %s", err, logs)
 	}
