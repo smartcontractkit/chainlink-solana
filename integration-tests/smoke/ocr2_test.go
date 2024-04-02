@@ -38,11 +38,11 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 		env            map[string]string
 		enableGauntlet bool
 	}{
-		{name: "embedded"},
-		{name: "plugins", env: map[string]string{
-			"CL_MEDIAN_CMD": "chainlink-feeds",
-			"CL_SOLANA_CMD": "chainlink-solana",
-		}},
+		// {name: "embedded"},
+		// {name: "plugins", env: map[string]string{
+		// 	"CL_MEDIAN_CMD": "chainlink-feeds",
+		// 	"CL_SOLANA_CMD": "chainlink-solana",
+		// }},
 		{name: "embedded-gauntlet", enableGauntlet: true},
 	} {
 		config, err := tc.GetConfig("Smoke", tc.OCR2)

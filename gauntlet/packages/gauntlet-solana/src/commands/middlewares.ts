@@ -19,9 +19,9 @@ export const withProvider: Middleware = (c: SolanaCommand, next: Next) => {
   )
 
   c.provider = new AnchorProvider(new Connection(nodeURL), c.wallet, {
-      preflightCommitment: "confirmed",
-      commitment: "confirmed",
-    })
+    preflightCommitment: 'confirmed',
+    commitment: 'confirmed',
+  })
   return next()
 }
 
