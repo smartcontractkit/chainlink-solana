@@ -1,4 +1,4 @@
-package monitoring
+package config
 
 import (
 	"encoding/json"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
-	relayMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
 )
 
 type SolanaNodeConfig struct {
@@ -27,13 +27,13 @@ func (s SolanaNodeConfig) GetAccount() types.Account {
 	return types.Account(address)
 }
 
-func SolanaNodesParser(buf io.ReadCloser) ([]relayMonitoring.NodeConfig, error) {
+func SolanaNodesParser(buf io.ReadCloser) ([]commonMonitoring.NodeConfig, error) {
 	rawNodes := []SolanaNodeConfig{}
 	decoder := json.NewDecoder(buf)
 	if err := decoder.Decode(&rawNodes); err != nil {
 		return nil, fmt.Errorf("unable to unmarshal nodes config data: %w", err)
 	}
-	nodes := make([]relayMonitoring.NodeConfig, len(rawNodes))
+	nodes := make([]commonMonitoring.NodeConfig, len(rawNodes))
 	for i, rawNode := range rawNodes {
 		nodes[i] = rawNode
 	}

@@ -1,4 +1,4 @@
-package monitoring
+package exporter
 
 import (
 	"context"
@@ -6,28 +6,30 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 
-	relayMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/metrics"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 )
 
-func NewPrometheusExporterFactory(
-	log relayMonitoring.Logger,
-	metrics Metrics,
-) relayMonitoring.ExporterFactory {
-	return &prometheusExporterFactory{
+func NewFeedBalancePrometheusExporterFactory(
+	log commonMonitoring.Logger,
+	metrics metrics.Metrics,
+) commonMonitoring.ExporterFactory {
+	return &feedBalancePrometheusExporterFactory{
 		log,
 		metrics,
 	}
 }
 
-type prometheusExporterFactory struct {
-	log     relayMonitoring.Logger
-	metrics Metrics
+type feedBalancePrometheusExporterFactory struct {
+	log     commonMonitoring.Logger
+	metrics metrics.Metrics
 }
 
-func (p *prometheusExporterFactory) NewExporter(
-	params relayMonitoring.ExporterParams,
-) (relayMonitoring.Exporter, error) {
-	return &prometheusExporter{
+func (p *feedBalancePrometheusExporterFactory) NewExporter(
+	params commonMonitoring.ExporterParams,
+) (commonMonitoring.Exporter, error) {
+	return &feedBalancePrometheusExporter{
 		params.ChainConfig,
 		params.FeedConfig,
 		p.log,
@@ -37,26 +39,26 @@ func (p *prometheusExporterFactory) NewExporter(
 	}, nil
 }
 
-type prometheusExporter struct {
-	chainConfig relayMonitoring.ChainConfig
-	feedConfig  relayMonitoring.FeedConfig
+type feedBalancePrometheusExporter struct {
+	chainConfig commonMonitoring.ChainConfig
+	feedConfig  commonMonitoring.FeedConfig
 
-	log     relayMonitoring.Logger
-	metrics Metrics
+	log     commonMonitoring.Logger
+	metrics metrics.Metrics
 
 	addressesMu sync.Mutex
 	addresses   map[string]solana.PublicKey
 }
 
-func (p *prometheusExporter) Export(ctx context.Context, data interface{}) {
-	balances, isBalances := data.(Balances)
+func (p *feedBalancePrometheusExporter) Export(ctx context.Context, data interface{}) {
+	balances, isBalances := data.(types.Balances)
 	if !isBalances {
 		return
 	}
-	for _, balanceAccountName := range BalanceAccountNames {
+	for _, balanceAccountName := range types.FeedBalanceAccountNames {
 		address, okAddress := balances.Addresses[balanceAccountName]
 		balance, okBalance := balances.Values[balanceAccountName]
-		gauge, okGauge := gauges[balanceAccountName]
+		gauge, okGauge := metrics.Gauges[balanceAccountName]
 		if !okAddress || !okBalance || !okGauge {
 			p.log.Errorw("mismatch address and balance for account name",
 				"account-name", balanceAccountName,
@@ -86,7 +88,7 @@ func (p *prometheusExporter) Export(ctx context.Context, data interface{}) {
 	p.addresses = balances.Addresses
 }
 
-func (p *prometheusExporter) Cleanup(_ context.Context) {
+func (p *feedBalancePrometheusExporter) Cleanup(_ context.Context) {
 	p.addressesMu.Lock()
 	defer p.addressesMu.Unlock()
 	for balanceAccountName, address := range p.addresses {

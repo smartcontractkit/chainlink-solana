@@ -1,4 +1,4 @@
-package monitoring
+package exporter
 
 import (
 	"context"
@@ -7,27 +7,29 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	relayMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/mocks"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/testutils"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 )
 
-func TestPrometheusExporter(t *testing.T) {
+func TestFeedBalancePrometheusExporter(t *testing.T) {
 	t.Parallel()
 
 	t.Run("it should export balance updates then clean up", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
 		metrics := mocks.NewMetrics(t)
-		factory := NewPrometheusExporterFactory(newNullLogger(), metrics)
+		factory := NewFeedBalancePrometheusExporterFactory(testutils.NewNullLogger(), metrics)
 
-		chainConfig := generateChainConfig()
-		feedConfig := generateFeedConfig()
-		exporter, err := factory.NewExporter(relayMonitoring.ExporterParams{ChainConfig: chainConfig, FeedConfig: feedConfig, Nodes: []relayMonitoring.NodeConfig{}})
+		chainConfig := testutils.GenerateChainConfig()
+		feedConfig := testutils.GenerateFeedConfig()
+		exporter, err := factory.NewExporter(commonMonitoring.ExporterParams{ChainConfig: chainConfig, FeedConfig: feedConfig, Nodes: []commonMonitoring.NodeConfig{}})
 		require.NoError(t, err)
 
-		balances := generateBalances()
+		balances := testutils.GenerateBalances()
 
-		for _, accountName := range BalanceAccountNames {
+		for _, accountName := range types.FeedBalanceAccountNames {
 			metrics.On("SetBalance",
 				balances.Values[accountName],
 				accountName,
@@ -44,7 +46,7 @@ func TestPrometheusExporter(t *testing.T) {
 		}
 		exporter.Export(ctx, balances)
 
-		for _, accountName := range BalanceAccountNames {
+		for _, accountName := range types.FeedBalanceAccountNames {
 			metrics.On("Cleanup",
 				accountName,
 				balances.Addresses[accountName].String(),

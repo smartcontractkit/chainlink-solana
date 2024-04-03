@@ -8,67 +8,64 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
-	relayMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 )
 
-type Balances struct {
-	Values    map[string]uint64
-	Addresses map[string]solana.PublicKey
-}
-
-func NewBalancesSourceFactory(
+func NewFeedBalancesSourceFactory(
 	client ChainReader,
-	log relayMonitoring.Logger,
-) relayMonitoring.SourceFactory {
-	return &balancesSourceFactory{
+	log commonMonitoring.Logger,
+) commonMonitoring.SourceFactory {
+	return &feedBalancesSourceFactory{
 		client,
 		log,
 	}
 }
 
-type balancesSourceFactory struct {
+type feedBalancesSourceFactory struct {
 	client ChainReader
-	log    relayMonitoring.Logger
+	log    commonMonitoring.Logger
 }
 
-func (s *balancesSourceFactory) NewSource(
-	_ relayMonitoring.ChainConfig,
-	feedConfig relayMonitoring.FeedConfig,
-) (relayMonitoring.Source, error) {
-	solanaFeedConfig, ok := feedConfig.(SolanaFeedConfig)
+func (s *feedBalancesSourceFactory) NewSource(
+	_ commonMonitoring.ChainConfig,
+	feedConfig commonMonitoring.FeedConfig,
+) (commonMonitoring.Source, error) {
+	solanaFeedConfig, ok := feedConfig.(config.SolanaFeedConfig)
 	if !ok {
-		return nil, fmt.Errorf("expected feedConfig to be of type SolanaFeedConfig not %T", feedConfig)
+		return nil, fmt.Errorf("expected feedConfig to be of type config.SolanaFeedConfig not %T", feedConfig)
 	}
-	return &balancesSource{
+	return &feedBalancesSource{
 		s.client,
 		s.log,
 		solanaFeedConfig,
 	}, nil
 }
 
-func (s *balancesSourceFactory) GetType() string {
+func (s *feedBalancesSourceFactory) GetType() string {
 	return "balances"
 }
 
-type balancesSource struct {
+type feedBalancesSource struct {
 	client     ChainReader
-	log        relayMonitoring.Logger
-	feedConfig SolanaFeedConfig
+	log        commonMonitoring.Logger
+	feedConfig config.SolanaFeedConfig
 }
 
-func (s *balancesSource) Fetch(ctx context.Context) (interface{}, error) {
+func (s *feedBalancesSource) Fetch(ctx context.Context) (interface{}, error) {
 	state, _, err := s.client.GetState(ctx, s.feedConfig.StateAccount, rpc.CommitmentConfirmed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get contract state: %w", err)
 	}
 	isErr := false
-	balances := Balances{
+	balances := types.Balances{
 		Values:    make(map[string]uint64),
 		Addresses: make(map[string]solana.PublicKey),
 	}
 	balancesMu := &sync.Mutex{}
 	wg := &sync.WaitGroup{}
-	wg.Add(len(BalanceAccountNames))
+	wg.Add(len(types.FeedBalanceAccountNames))
 	for key, address := range map[string]solana.PublicKey{
 		"contract":                    s.feedConfig.ContractAddress,
 		"state":                       s.feedConfig.StateAccount,
@@ -99,7 +96,7 @@ func (s *balancesSource) Fetch(ctx context.Context) (interface{}, error) {
 
 	wg.Wait()
 	if isErr {
-		return Balances{}, fmt.Errorf("error while fetching balances")
+		return types.Balances{}, fmt.Errorf("error while fetching balances")
 	}
 	return balances, nil
 }

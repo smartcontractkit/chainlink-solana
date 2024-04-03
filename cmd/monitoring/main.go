@@ -10,6 +10,9 @@ import (
 	relayMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/exporter"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/metrics"
 )
 
 func main() {
@@ -23,7 +26,7 @@ func main() {
 		}
 	}()
 
-	chainConfig, err := monitoring.ParseSolanaConfig()
+	chainConfig, err := config.ParseSolanaConfig()
 	if err != nil {
 		log.Fatalw("failed to parse solana-specific config", "error", err)
 	}
@@ -46,23 +49,23 @@ func main() {
 		chainConfig,
 		envelopeSourceFactory,
 		txResultsSourceFactory,
-		monitoring.SolanaFeedsParser,
-		monitoring.SolanaNodesParser,
+		config.SolanaFeedsParser,
+		config.SolanaNodesParser,
 	)
 	if err != nil {
 		log.Fatalw("failed to build monitor", "error", err)
 		return
 	}
 
-	balancesSourceFactory := monitoring.NewBalancesSourceFactory(
+	balancesSourceFactory := monitoring.NewFeedBalancesSourceFactory(
 		chainReader,
 		logger.With(log, "component", "source-balances"),
 	)
 	monitor.SourceFactories = append(monitor.SourceFactories, balancesSourceFactory)
 
-	promExporterFactory := monitoring.NewPrometheusExporterFactory(
+	promExporterFactory := exporter.NewFeedBalancePrometheusExporterFactory(
 		logger.With(log, "component", "solana-prom-exporter"),
-		monitoring.NewMetrics(logger.With(log, "component", "solana-metrics")),
+		metrics.NewMetrics(logger.With(log, "component", "solana-metrics")),
 	)
 	monitor.ExporterFactories = append(monitor.ExporterFactories, promExporterFactory)
 
