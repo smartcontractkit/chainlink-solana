@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
-	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/mocks"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/metrics/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/testutils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 )

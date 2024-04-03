@@ -41,6 +41,8 @@ func init() {
 	}
 }
 
+//go:generate mockery --name Metrics --output ./mocks/
+
 type Metrics interface {
 	SetBalance(balance uint64, balanceAccountName, accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string)
 	Cleanup(balanceAccountName, accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string)
