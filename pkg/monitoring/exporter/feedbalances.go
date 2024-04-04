@@ -70,16 +70,18 @@ func (p *feeBalances) Export(ctx context.Context, data interface{}) {
 		}
 		p.metrics.SetBalance(
 			balance,
-			balanceAccountName,
-			address.String(),
-			p.feedConfig.GetContractAddress(),
-			p.chainConfig.GetChainID(),
-			p.feedConfig.GetContractStatus(),
-			p.feedConfig.GetContractType(),
-			p.feedConfig.GetName(),
-			p.feedConfig.GetPath(),
-			p.chainConfig.GetNetworkID(),
-			p.chainConfig.GetNetworkName(),
+			metrics.FeedBalanceInput{
+				BalanceAccountName: balanceAccountName,
+				AccountAddress:     address.String(),
+				FeedID:             p.feedConfig.GetContractAddress(),
+				ChainID:            p.chainConfig.GetChainID(),
+				ContractStatus:     p.feedConfig.GetContractStatus(),
+				ContractType:       p.feedConfig.GetContractType(),
+				FeedName:           p.feedConfig.GetName(),
+				FeedPath:           p.feedConfig.GetPath(),
+				NetworkID:          p.chainConfig.GetNetworkID(),
+				NetworkName:        p.chainConfig.GetNetworkName(),
+			},
 		)
 	}
 	// Store the map of account names and their addresses for later cleanup.
@@ -92,17 +94,17 @@ func (p *feeBalances) Cleanup(_ context.Context) {
 	p.addressesMu.Lock()
 	defer p.addressesMu.Unlock()
 	for balanceAccountName, address := range p.addresses {
-		p.metrics.Cleanup(
-			balanceAccountName,
-			address.String(),
-			p.feedConfig.GetContractAddress(),
-			p.chainConfig.GetChainID(),
-			p.feedConfig.GetContractStatus(),
-			p.feedConfig.GetContractType(),
-			p.feedConfig.GetName(),
-			p.feedConfig.GetPath(),
-			p.chainConfig.GetNetworkID(),
-			p.chainConfig.GetNetworkName(),
-		)
+		p.metrics.Cleanup(metrics.FeedBalanceInput{
+			BalanceAccountName: balanceAccountName,
+			AccountAddress:     address.String(),
+			FeedID:             p.feedConfig.GetContractAddress(),
+			ChainID:            p.chainConfig.GetChainID(),
+			ContractStatus:     p.feedConfig.GetContractStatus(),
+			ContractType:       p.feedConfig.GetContractType(),
+			FeedName:           p.feedConfig.GetName(),
+			FeedPath:           p.feedConfig.GetPath(),
+			NetworkID:          p.chainConfig.GetNetworkID(),
+			NetworkName:        p.chainConfig.GetNetworkName(),
+		})
 	}
 }

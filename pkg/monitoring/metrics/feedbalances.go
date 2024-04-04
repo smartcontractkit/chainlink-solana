@@ -12,14 +12,32 @@ import (
 
 type FeedBalances interface {
 	Exists(balanceAccountName string) (*prometheus.GaugeVec, bool)
-	SetBalance(balance uint64, balanceAccountName, accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string)
-	Cleanup(balanceAccountName, accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string)
+	SetBalance(balance uint64, input FeedBalanceInput)
+	Cleanup(input FeedBalanceInput)
 }
 
 var _ FeedBalances = (*feedBalances)(nil)
 
 type feedBalances struct {
 	log commonMonitoring.Logger
+}
+
+type FeedBalanceInput struct {
+	BalanceAccountName, AccountAddress, FeedID, ChainID, ContractStatus, ContractType, FeedName, FeedPath, NetworkID, NetworkName string
+}
+
+func (i FeedBalanceInput) ToPromLabels() prometheus.Labels {
+	return prometheus.Labels{
+		"account_address": i.AccountAddress,
+		"feed_id":         i.FeedID,
+		"chain_id":        i.ChainID,
+		"contract_status": i.ContractStatus,
+		"contract_type":   i.ContractType,
+		"feed_name":       i.FeedName,
+		"feed_path":       i.FeedPath,
+		"network_id":      i.NetworkID,
+		"network_name":    i.NetworkName,
+	}
 }
 
 func NewFeedBalances(log commonMonitoring.Logger) *feedBalances {
@@ -31,40 +49,18 @@ func (fb *feedBalances) Exists(balanceAccountName string) (*prometheus.GaugeVec,
 	return g, ok
 }
 
-func (fb *feedBalances) SetBalance(balance uint64, balanceAccountName, accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string) {
-	gauge, found := fb.Exists(balanceAccountName)
+func (fb *feedBalances) SetBalance(balance uint64, input FeedBalanceInput) {
+	gauge, found := fb.Exists(input.BalanceAccountName)
 	if !found {
-		panic(fmt.Sprintf("gauge not known for name '%s'", balanceAccountName))
+		panic(fmt.Sprintf("gauge not known for name '%s'", input.BalanceAccountName))
 	}
-	labels := prometheus.Labels{
-		"account_address": accountAddress,
-		"feed_id":         feedID,
-		"chain_id":        chainID,
-		"contract_status": contractStatus,
-		"contract_type":   contractType,
-		"feed_name":       feedName,
-		"feed_path":       feedPath,
-		"network_id":      networkID,
-		"network_name":    networkName,
-	}
-	gauge.With(labels).Set(float64(balance))
+	gauge.With(input.ToPromLabels()).Set(float64(balance))
 }
 
-func (fb *feedBalances) Cleanup(balanceAccountName, accountAddress, feedID, chainID, contractStatus, contractType, feedName, feedPath, networkID, networkName string) {
-	gauge, found := fb.Exists(balanceAccountName)
+func (fb *feedBalances) Cleanup(input FeedBalanceInput) {
+	gauge, found := fb.Exists(input.BalanceAccountName)
 	if !found {
-		panic(fmt.Sprintf("gauge not known for name '%s'", balanceAccountName))
+		panic(fmt.Sprintf("gauge not known for name '%s'", input.BalanceAccountName))
 	}
-	labels := prometheus.Labels{
-		"account_address": accountAddress,
-		"feed_id":         feedID,
-		"chain_id":        chainID,
-		"contract_status": contractStatus,
-		"contract_type":   contractType,
-		"feed_name":       feedName,
-		"feed_path":       feedPath,
-		"network_id":      networkID,
-		"network_name":    networkName,
-	}
-	gauge.Delete(labels)
+	gauge.Delete(input.ToPromLabels())
 }
