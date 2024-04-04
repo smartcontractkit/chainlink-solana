@@ -13,3 +13,6 @@
 
 # relayer ownership
 /pkg @smartcontractkit/bix-build
+
+# monitoring ownership
+/pkg/monitoring @smartcontractkit/realtime

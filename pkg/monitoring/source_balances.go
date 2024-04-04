@@ -13,6 +13,10 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 )
 
+const (
+	balancesType = "balances"
+)
+
 func NewFeedBalancesSourceFactory(
 	client ChainReader,
 	log commonMonitoring.Logger,
@@ -44,7 +48,7 @@ func (s *feedBalancesSourceFactory) NewSource(
 }
 
 func (s *feedBalancesSourceFactory) GetType() string {
-	return "balances"
+	return balancesType
 }
 
 type feedBalancesSource struct {
@@ -80,12 +84,12 @@ func (s *feedBalancesSource) Fetch(ctx context.Context) (interface{}, error) {
 			balancesMu.Lock()
 			defer balancesMu.Unlock()
 			if err != nil {
-				s.log.Errorw("failed to read the sol balance", "key", key, "address", address.String(), "error", err)
+				s.log.Errorw("GetBalance failed", "key", key, "address", address.String(), "error", err)
 				isErr = true
 				return
 			}
 			if res == nil {
-				s.log.Errorw("failed to read the sol balance", "key", key, "address", address.String(), "error", "GetBalance returned nil pointer")
+				s.log.Errorw("GetBalance returned nil", "key", key, "address", address.String())
 				isErr = true
 				return
 			}
