@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
@@ -13,14 +14,14 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 )
 
-func TestFeedBalancePrometheusExporter(t *testing.T) {
+func TestFeedBalances(t *testing.T) {
 	t.Parallel()
 
 	t.Run("it should export balance updates then clean up", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
-		metrics := mocks.NewMetrics(t)
-		factory := NewFeedBalancePrometheusExporterFactory(testutils.NewNullLogger(), metrics)
+		metrics := mocks.NewFeedBalances(t)
+		factory := NewFeedBalancesFactory(testutils.NewNullLogger(), metrics)
 
 		chainConfig := testutils.GenerateChainConfig()
 		feedConfig := testutils.GenerateFeedConfig()
@@ -28,6 +29,9 @@ func TestFeedBalancePrometheusExporter(t *testing.T) {
 		require.NoError(t, err)
 
 		balances := testutils.GenerateBalances()
+
+		// return all gauges exist
+		metrics.On("Exists", mock.Anything).Return(nil, true)
 
 		for _, accountName := range types.FeedBalanceAccountNames {
 			metrics.On("SetBalance",

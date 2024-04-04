@@ -11,25 +11,25 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 )
 
-func NewFeedBalancePrometheusExporterFactory(
+func NewFeedBalancesFactory(
 	log commonMonitoring.Logger,
-	metrics metrics.Metrics,
+	metrics metrics.FeedBalances,
 ) commonMonitoring.ExporterFactory {
-	return &feedBalancePrometheusExporterFactory{
+	return &feedBalancesFactory{
 		log,
 		metrics,
 	}
 }
 
-type feedBalancePrometheusExporterFactory struct {
+type feedBalancesFactory struct {
 	log     commonMonitoring.Logger
-	metrics metrics.Metrics
+	metrics metrics.FeedBalances
 }
 
-func (p *feedBalancePrometheusExporterFactory) NewExporter(
+func (p *feedBalancesFactory) NewExporter(
 	params commonMonitoring.ExporterParams,
 ) (commonMonitoring.Exporter, error) {
-	return &feedBalancePrometheusExporter{
+	return &feeBalances{
 		params.ChainConfig,
 		params.FeedConfig,
 		p.log,
@@ -39,18 +39,18 @@ func (p *feedBalancePrometheusExporterFactory) NewExporter(
 	}, nil
 }
 
-type feedBalancePrometheusExporter struct {
+type feeBalances struct {
 	chainConfig commonMonitoring.ChainConfig
 	feedConfig  commonMonitoring.FeedConfig
 
 	log     commonMonitoring.Logger
-	metrics metrics.Metrics
+	metrics metrics.FeedBalances
 
 	addressesMu sync.Mutex
 	addresses   map[string]solana.PublicKey
 }
 
-func (p *feedBalancePrometheusExporter) Export(ctx context.Context, data interface{}) {
+func (p *feeBalances) Export(ctx context.Context, data interface{}) {
 	balances, isBalances := data.(types.Balances)
 	if !isBalances {
 		return
@@ -58,7 +58,7 @@ func (p *feedBalancePrometheusExporter) Export(ctx context.Context, data interfa
 	for _, balanceAccountName := range types.FeedBalanceAccountNames {
 		address, okAddress := balances.Addresses[balanceAccountName]
 		balance, okBalance := balances.Values[balanceAccountName]
-		gauge, okGauge := metrics.Gauges[balanceAccountName]
+		gauge, okGauge := p.metrics.Exists(balanceAccountName)
 		if !okAddress || !okBalance || !okGauge {
 			p.log.Errorw("mismatch address and balance for account name",
 				"account-name", balanceAccountName,
@@ -88,7 +88,7 @@ func (p *feedBalancePrometheusExporter) Export(ctx context.Context, data interfa
 	p.addresses = balances.Addresses
 }
 
-func (p *feedBalancePrometheusExporter) Cleanup(_ context.Context) {
+func (p *feeBalances) Cleanup(_ context.Context) {
 	p.addressesMu.Lock()
 	defer p.addressesMu.Unlock()
 	for balanceAccountName, address := range p.addresses {

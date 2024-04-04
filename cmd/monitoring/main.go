@@ -63,9 +63,9 @@ func main() {
 	)
 	monitor.SourceFactories = append(monitor.SourceFactories, balancesSourceFactory)
 
-	promExporterFactory := exporter.NewFeedBalancePrometheusExporterFactory(
+	promExporterFactory := exporter.NewFeedBalancesFactory(
 		logger.With(log, "component", "solana-prom-exporter"),
-		metrics.NewMetrics(logger.With(log, "component", "solana-metrics")),
+		metrics.NewFeedBalances(logger.With(log, "component", "solana-metrics")),
 	)
 	monitor.ExporterFactories = append(monitor.ExporterFactories, promExporterFactory)
 
