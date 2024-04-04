@@ -12,6 +12,10 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 )
 
+const (
+	txresultsType = "txresults"
+)
+
 func NewTxResultsSourceFactory(
 	client ChainReader,
 	log commonMonitoring.Logger,
@@ -45,7 +49,7 @@ func (s *txResultsSourceFactory) NewSource(
 }
 
 func (s *txResultsSourceFactory) GetType() string {
-	return "txresults"
+	return txresultsType
 }
 
 type txResultsSource struct {

@@ -3,10 +3,12 @@ package testutils
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/rand"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
@@ -75,6 +77,25 @@ func GenerateBalances() types.Balances {
 		out.Addresses[key] = GeneratePublicKey()
 	}
 	return out
+}
+
+func GenerateTransactionSignatures() (success, fail int, out []*rpc.TransactionSignature) {
+	success = int(math.Mod(float64(rand.Uint32()), 100))
+	fail = 100 - success
+	for i := 0; i < success; i++ {
+		out = append(out, &rpc.TransactionSignature{Err: nil})
+	}
+	for i := 0; i < fail; i++ {
+		out = append(out, &rpc.TransactionSignature{Err: fmt.Errorf("error %d", i)})
+	}
+
+	// randomize
+	for i := range out {
+		j := rand.Intn(i + 1)
+		out[i], out[j] = out[j], out[i]
+	}
+
+	return success, fail, out
 }
 
 // Sources
