@@ -28,6 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 )
 
+//go:generate mockery --name Chain --output ./mocks/ --case=underscore --filename chain.go
 type Chain interface {
 	types.ChainService
 

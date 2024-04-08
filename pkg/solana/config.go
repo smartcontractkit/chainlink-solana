@@ -178,6 +178,9 @@ func setFromChain(c, f *solcfg.Chain) {
 	if f.MaxRetries != nil {
 		c.MaxRetries = f.MaxRetries
 	}
+	if f.ChainWriter != nil {
+		c.ChainWriter = f.ChainWriter
+	}
 }
 
 func (c *TOMLConfig) ValidateConfig() (err error) {
@@ -265,6 +268,10 @@ func (c *TOMLConfig) ComputeUnitPriceDefault() uint64 {
 
 func (c *TOMLConfig) FeeBumpPeriod() time.Duration {
 	return c.Chain.FeeBumpPeriod.Duration()
+}
+
+func (c *TOMLConfig) ChainWriter() *solcfg.ChainWriter {
+	return c.Chain.ChainWriter
 }
 
 func (c *TOMLConfig) ListNodes() ([]soldb.Node, error) {
