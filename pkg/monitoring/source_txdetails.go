@@ -26,6 +26,8 @@ func (f *txDetailsSourceFactory) NewSource(cfg commonMonitoring.Params) (commonM
 		return nil, fmt.Errorf("expected feedConfig to be of type config.SolanaFeedConfig not %T", cfg.FeedConfig)
 	}
 
+	// TODO: build map for looking up nodes
+
 	return &txDetailsSource{
 		client: f.client,
 		sigSource: &txResultsSource{
@@ -60,7 +62,7 @@ func (s *txDetailsSource) Fetch(ctx context.Context) (interface{}, error) {
 		}
 
 		// TODO: async?
-		tx, err := s.client.GetTransaction(ctx, sig.Signature, &rpc.GetTransactionOpts{})
+		tx, err := s.client.GetTransaction(ctx, sig.Signature, &rpc.GetTransactionOpts{Commitment: "confirmed"})
 		if err != nil {
 			return types.TxDetails{}, err
 		}
