@@ -2,6 +2,7 @@ package monitoring
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -14,7 +15,9 @@ import (
 )
 
 const (
-	balancesType = "balances"
+	ErrBalancesSource = "error while fetching balances"
+	ErrGetBalance     = "GetBalance failed"
+	ErrGetBalanceNil  = "GetBalance returned nil"
 )
 
 func NewFeedBalancesSourceFactory(
@@ -41,56 +44,82 @@ func (s *feedBalancesSourceFactory) NewSource(
 		return nil, fmt.Errorf("expected feedConfig to be of type config.SolanaFeedConfig not %T", feedConfig)
 	}
 	return &feedBalancesSource{
-		s.client,
-		s.log,
-		solanaFeedConfig,
+		bs: balancesSource{
+			client: s.client,
+			log:    s.log,
+			// nodes are initialized during Fetch - accounts may change
+		},
+		feedConfig: solanaFeedConfig,
 	}, nil
 }
 
 func (s *feedBalancesSourceFactory) GetType() string {
-	return balancesType
+	return types.BalanceType
 }
 
 type feedBalancesSource struct {
-	client     ChainReader
-	log        commonMonitoring.Logger
+	bs         balancesSource
 	feedConfig config.SolanaFeedConfig
 }
 
 func (s *feedBalancesSource) Fetch(ctx context.Context) (interface{}, error) {
-	state, _, err := s.client.GetState(ctx, s.feedConfig.StateAccount, rpc.CommitmentConfirmed)
+	state, _, err := s.bs.client.GetState(ctx, s.feedConfig.StateAccount, rpc.CommitmentConfirmed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get contract state: %w", err)
 	}
-	isErr := false
-	balances := types.Balances{
-		Values:    make(map[string]uint64),
-		Addresses: make(map[string]solana.PublicKey),
-	}
-	balancesMu := &sync.Mutex{}
-	wg := &sync.WaitGroup{}
-	wg.Add(len(types.FeedBalanceAccountNames))
-	for key, address := range map[string]solana.PublicKey{
+
+	s.bs.addresses = map[string]solana.PublicKey{
 		"contract":                    s.feedConfig.ContractAddress,
 		"state":                       s.feedConfig.StateAccount,
 		"transmissions":               state.Transmissions,
 		"token_vault":                 state.Config.TokenVault,
 		"requester_access_controller": state.Config.RequesterAccessController,
 		"billing_access_controller":   state.Config.BillingAccessController,
-	} {
+	}
+	return s.bs.Fetch(ctx)
+}
+
+// balancesSource is a reusable component for reading balances of specified accounts
+// this is used as a subcomponent of feedBalancesSource and nodeBalancesSourceFactory
+type balancesSource struct {
+	client    ChainReader
+	log       commonMonitoring.Logger
+	addresses map[string]solana.PublicKey
+}
+
+// Fetch is the shared logic for reading balances from the chain
+func (s *balancesSource) Fetch(ctx context.Context) (interface{}, error) {
+	var totalErr error
+	balances := types.Balances{
+		Values:    make(map[string]uint64),
+		Addresses: make(map[string]solana.PublicKey),
+	}
+	rwlock := &sync.Mutex{}
+	wg := &sync.WaitGroup{}
+	wg.Add(len(s.addresses))
+
+	// exit early if no addresses
+	if s.addresses == nil {
+		return types.Balances{}, fmt.Errorf("balancesSource.addresses is nil")
+	}
+	if len(s.addresses) == 0 {
+		return types.Balances{}, nil
+	}
+
+	for key, address := range s.addresses {
 		go func(key string, address solana.PublicKey) {
 			defer wg.Done()
 			res, err := s.client.GetBalance(ctx, address, rpc.CommitmentProcessed)
-			balancesMu.Lock()
-			defer balancesMu.Unlock()
+			rwlock.Lock()
+			defer rwlock.Unlock()
 			if err != nil {
-				s.log.Errorw("GetBalance failed", "key", key, "address", address.String(), "error", err)
-				isErr = true
+				s.log.Errorw(ErrGetBalance, "key", key, "address", address.String(), "error", err)
+				totalErr = errors.Join(totalErr, fmt.Errorf("%s (%s, %s): %w", ErrGetBalance, key, address.String(), err))
 				return
 			}
 			if res == nil {
-				s.log.Errorw("GetBalance returned nil", "key", key, "address", address.String())
-				isErr = true
+				s.log.Errorw(ErrGetBalanceNil, "key", key, "address", address.String())
+				totalErr = errors.Join(totalErr, fmt.Errorf("%s (%s, %s)", ErrGetBalanceNil, key, address.String()))
 				return
 			}
 			balances.Values[key] = res.Value
@@ -99,8 +128,8 @@ func (s *feedBalancesSource) Fetch(ctx context.Context) (interface{}, error) {
 	}
 
 	wg.Wait()
-	if isErr {
-		return types.Balances{}, fmt.Errorf("error while fetching balances")
+	if totalErr != nil {
+		return types.Balances{}, fmt.Errorf("%s: %w", ErrBalancesSource, totalErr)
 	}
 	return balances, nil
 }

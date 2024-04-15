@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
@@ -27,6 +28,10 @@ func (s SolanaNodeConfig) GetAccount() types.Account {
 	return types.Account(address)
 }
 
+func (s SolanaNodeConfig) PublicKey() (solana.PublicKey, error) {
+	return solana.PublicKeyFromBase58(string(s.GetAccount()))
+}
+
 func SolanaNodesParser(buf io.ReadCloser) ([]commonMonitoring.NodeConfig, error) {
 	rawNodes := []SolanaNodeConfig{}
 	decoder := json.NewDecoder(buf)
@@ -38,4 +43,19 @@ func SolanaNodesParser(buf io.ReadCloser) ([]commonMonitoring.NodeConfig, error)
 		nodes[i] = rawNode
 	}
 	return nodes, nil
+}
+
+func MakeSolanaNodeConfigs(in []commonMonitoring.NodeConfig) (out []SolanaNodeConfig, err error) {
+	for i := range in {
+		if in[i] == nil {
+			return nil, fmt.Errorf("node config is nil")
+		}
+
+		cfg, ok := in[i].(SolanaNodeConfig)
+		if !ok {
+			return nil, fmt.Errorf("expected NodeConfig to be of type config.SolanaFeedConfig not %T - node name %s", in[i], in[i].GetName())
+		}
+		out = append(out, cfg)
+	}
+	return out, nil
 }
