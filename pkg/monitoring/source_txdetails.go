@@ -27,9 +27,22 @@ func (f *txDetailsSourceFactory) NewSource(cfg commonMonitoring.Params) (commonM
 		return nil, fmt.Errorf("expected feedConfig to be of type config.SolanaFeedConfig not %T", cfg.FeedConfig)
 	}
 
-	// TODO: build map for looking up nodes
+	// build map for looking up node pubkey -> operator name
+	nodes := map[solana.PublicKey]string{}
+	solanaNodeConfigs, err := config.MakeSolanaNodeConfigs(cfg.Nodes)
+	if err != nil {
+		return nil, fmt.Errorf("MakeSolanaNodeConfigs: %w", err)
+	}
+	for _, c := range solanaNodeConfigs {
+		key, err := c.PublicKey()
+		if err != nil {
+			return nil, fmt.Errorf("Could not parse public key (%s: %s): %w", c.GetName(), c.GetAccount(), err)
+		}
+		nodes[key] = c.GetName()
+	}
 
 	return &txDetailsSource{
+		nodes: nodes,
 		source: &txResultsSource{
 			client:     f.client,
 			log:        f.log,
@@ -82,6 +95,19 @@ func (s *txDetailsSource) Fetch(ctx context.Context) (interface{}, error) {
 
 		// append to TxDetails
 		details.Count += 1
+
+		// signatures are ordered with the latest first
+		if res.Err == nil && details.ObsLatest == 0 {
+			details.ObsLatest = res.ObservationCount // only supports single feed result
+		}
+
+		if res.Err != nil {
+			details.ObsFailed = append(details.ObsFailed, res.ObservationCount)
+		} else {
+			details.ObsSuccess = append(details.ObsSuccess, res.ObservationCount)
+		}
+		details.ObsAll = append(details.ObsAll, res.ObservationCount)
+
 	}
 
 	return details, nil

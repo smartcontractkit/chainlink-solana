@@ -7,7 +7,6 @@ import (
 	solanaGo "github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
-	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana"
@@ -22,24 +21,19 @@ var (
 type TxDetails struct {
 	Count int // total signatures processed
 
-	// PerOperator categorizes TxResults based on sender/operator
-	PerOperator map[string]commonMonitoring.TxResults
+	// TODO: PerOperator categorizes TxResults based on sender/operator
+	// PerOperator map[string]commonMonitoring.TxResults
 
 	// observation counts within each report
-	latestSet  bool
-	ObsLatest  uint8 // number of observations in latest included report/tx
-	ObsAll     []int // observations across all seen txs/reports from operators
-	ObsSuccess []int // observations included in successful reports
-	ObsFailed  []int // observations included in failed reports
+	ObsLatest  uint8   // number of observations in latest included report/tx
+	ObsAll     []uint8 // observations across all seen txs/reports from operators
+	ObsSuccess []uint8 // observations included in successful reports
+	ObsFailed  []uint8 // observations included in failed reports
 
 	// TODO: implement - parse fee using shared logic from fee/computebudget.go
 	// FeeAvg
 	// FeeSuccessAvg
 	// FeeFailedAvg
-}
-
-func (d TxDetails) SetLatest(obs uint8) {
-
 }
 
 type ParsedTx struct {
@@ -49,8 +43,8 @@ type ParsedTx struct {
 	Sender   solanaGo.PublicKey
 	Operator string // human readable name associated to public key
 
-	// report information - can support batched with slice
-	ObservationCount []uint8
+	// report information - only supports single report per tx
+	ObservationCount uint8
 }
 
 // ParseTxResult parses the GetTransaction RPC response
@@ -107,7 +101,7 @@ func ParseTx(tx *solanaGo.Transaction, nodes map[solanaGo.PublicKey]string, prog
 		return ParsedTx{}, fmt.Errorf("unknown public key: %s", sender)
 	}
 
-	obsCount := []uint8{}
+	var obsCount uint8
 	var totalErr error
 	for _, instruction := range tx.Message.Instructions {
 		// protect against invalid index
@@ -126,7 +120,7 @@ func ParseTx(tx *solanaGo.Transaction, nodes map[solanaGo.PublicKey]string, prog
 				totalErr = errors.Join(totalErr, fmt.Errorf("%w (%+v)", err, instruction))
 				continue
 			}
-			obsCount = append(obsCount, count)
+			obsCount = count
 		}
 
 		// find compute budget program instruction
