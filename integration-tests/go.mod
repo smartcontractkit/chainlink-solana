@@ -7,7 +7,7 @@ replace github.com/smartcontractkit/chainlink-solana => ../
 require (
 	github.com/ethereum/go-ethereum v1.13.8
 	github.com/gagliardetto/binary v0.7.7
-	github.com/gagliardetto/solana-go v1.8.3
+	github.com/gagliardetto/solana-go v1.8.4
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
 	github.com/onsi/gomega v1.30.0
@@ -415,7 +415,7 @@ require (
 	go.etcd.io/etcd/api/v3 v3.5.9 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.9 // indirect
 	go.etcd.io/etcd/client/v3 v3.5.9 // indirect
-	go.mongodb.org/mongo-driver v1.12.0 // indirect
+	go.mongodb.org/mongo-driver v1.15.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/collector/pdata v1.0.0-rcv0016 // indirect
 	go.opentelemetry.io/collector/semconv v0.87.0 // indirect
