@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
 
@@ -29,8 +30,7 @@ func (f *txDetailsSourceFactory) NewSource(cfg commonMonitoring.Params) (commonM
 	// TODO: build map for looking up nodes
 
 	return &txDetailsSource{
-		client: f.client,
-		sigSource: &txResultsSource{
+		source: &txResultsSource{
 			client:     f.client,
 			log:        f.log,
 			feedConfig: solanaFeedConfig,
@@ -43,12 +43,13 @@ func (f *txDetailsSourceFactory) GetType() string {
 }
 
 type txDetailsSource struct {
-	client    ChainReader
-	sigSource *txResultsSource // reuse underlying logic for getting signatures
+	nodes map[solana.PublicKey]string // track pubkey to operator name
+
+	source *txResultsSource // reuse underlying logic for getting signatures
 }
 
 func (s *txDetailsSource) Fetch(ctx context.Context) (interface{}, error) {
-	_, sigs, err := s.sigSource.fetch(ctx)
+	_, sigs, err := s.source.fetch(ctx)
 	if err != nil {
 		return types.TxDetails{}, err
 	}
@@ -56,13 +57,14 @@ func (s *txDetailsSource) Fetch(ctx context.Context) (interface{}, error) {
 		return types.TxDetails{}, nil
 	}
 
+	details := types.TxDetails{}
 	for _, sig := range sigs {
 		if sig == nil {
 			continue // skip for nil signatures
 		}
 
 		// TODO: async?
-		tx, err := s.client.GetTransaction(ctx, sig.Signature, &rpc.GetTransactionOpts{Commitment: "confirmed"})
+		tx, err := s.source.client.GetTransaction(ctx, sig.Signature, &rpc.GetTransactionOpts{Commitment: "confirmed"})
 		if err != nil {
 			return types.TxDetails{}, err
 		}
@@ -70,14 +72,17 @@ func (s *txDetailsSource) Fetch(ctx context.Context) (interface{}, error) {
 			return types.TxDetails{}, fmt.Errorf("GetTransaction returned nil")
 		}
 
-		// TODO: parse transaction
+		// parse transaction + filter based on known senders
+		res, err := types.ParseTxResult(tx, s.nodes, s.source.feedConfig.ContractAddress)
+		if err != nil {
+			// skip invalid transaction
+			s.source.log.Debugw("tx was not valid for tracking", "error", err, "signature", sig)
+			continue
+		}
 
-		// TODO: filter signatures/transactions based on known operator/sender
-
-		// TODO: parse observations from remaining transactions
-
-		// TODO: add to proper list for averaging
+		// append to TxDetails
+		details.Count += 1
 	}
 
-	return types.TxDetails{}, nil
+	return details, nil
 }

@@ -72,7 +72,7 @@ func (s SolanaFeedConfig) GetMultiply() *big.Int {
 	return s.Multiply
 }
 
-// GetID returns the state account's address as that uniquely
+// GetContractAddress returns the state account's address as that uniquely
 // identifies a feed on Solana. In Solana, a program is stateless and we
 // use the same program for all feeds so we can't use the program
 // account's address.

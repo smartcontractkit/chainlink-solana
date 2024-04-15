@@ -1,10 +1,17 @@
 package types
 
 import (
+	"errors"
 	"fmt"
 
-	"github.com/gagliardetto/solana-go"
+	solanaGo "github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+
+	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+	"github.com/smartcontractkit/libocr/offchainreporting2/types"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 )
 
 var (
@@ -13,35 +20,41 @@ var (
 
 // TxDetails expands on TxResults and contains additional detail on a set of tx signatures specific to solana
 type TxDetails struct {
-	count int // total signatures processed
+	Count int // total signatures processed
 
-	// TODO: PerOperator categorizes TxResults based on sender/operator
-	// PerOperator map[string]commonMonitoring.TxResults
+	// PerOperator categorizes TxResults based on sender/operator
+	PerOperator map[string]commonMonitoring.TxResults
 
 	// observation counts within each report
-	obsLatest     int // number of observations in latest included report/tx
-	obsAvg        int // average number of observations across all seen txs/reports from operators
-	obsSuccessAvg int // average number of observations included in successful reports
-	obsFailedAvg  int // average number of observations included in failed reports
+	latestSet  bool
+	ObsLatest  uint8 // number of observations in latest included report/tx
+	ObsAll     []int // observations across all seen txs/reports from operators
+	ObsSuccess []int // observations included in successful reports
+	ObsFailed  []int // observations included in failed reports
 
 	// TODO: implement - parse fee using shared logic from fee/computebudget.go
-	// feeAvg
-	// feeSuccessAvg
-	// feeFailedAvg
+	// FeeAvg
+	// FeeSuccessAvg
+	// FeeFailedAvg
+}
+
+func (d TxDetails) SetLatest(obs uint8) {
+
 }
 
 type ParsedTx struct {
 	Err interface{}
 	Fee uint64
 
-	Sender   solana.PublicKey
+	Sender   solanaGo.PublicKey
 	Operator string // human readable name associated to public key
 
-	// report information
-	ObservationCount int
+	// report information - can support batched with slice
+	ObservationCount []uint8
 }
 
-func ParseTx(txResult *rpc.GetTransactionResult, nodes map[solana.PublicKey]string) (ParsedTx, error) {
+// ParseTxResult parses the GetTransaction RPC response
+func ParseTxResult(txResult *rpc.GetTransactionResult, nodes map[solanaGo.PublicKey]string, programAddr solanaGo.PublicKey) (ParsedTx, error) {
 	if txResult == nil {
 		return ParsedTx{}, fmt.Errorf("txResult is nil")
 	}
@@ -51,20 +64,36 @@ func ParseTx(txResult *rpc.GetTransactionResult, nodes map[solana.PublicKey]stri
 	if txResult.Transaction == nil {
 		return ParsedTx{}, fmt.Errorf("txResult.Transaction is nil")
 	}
-
 	// get original tx
 	tx, err := txResult.Transaction.GetTransaction()
 	if err != nil {
 		return ParsedTx{}, fmt.Errorf("GetTransaction: %w", err)
 	}
+
+	details, err := ParseTx(tx, nodes, programAddr)
+	if err != nil {
+		return ParsedTx{}, fmt.Errorf("ParseTx: %w", err)
+	}
+
+	// append more details from tx meta
+	details.Err = txResult.Meta.Err
+	details.Fee = txResult.Meta.Fee
+	return details, nil
+}
+
+// ParseTx parses a solana transaction
+func ParseTx(tx *solanaGo.Transaction, nodes map[solanaGo.PublicKey]string, programAddr solanaGo.PublicKey) (ParsedTx, error) {
 	if tx == nil {
-		return ParsedTx{}, fmt.Errorf("GetTransaction returned nil")
+		return ParsedTx{}, fmt.Errorf("tx is nil")
+	}
+	if nodes == nil {
+		return ParsedTx{}, fmt.Errorf("nodes is nil")
 	}
 
 	// determine sender
 	// if more than 1 tx signature, then it is not a data feed report tx from a CL node -> ignore
 	if len(tx.Signatures) != 1 || len(tx.Message.AccountKeys) == 0 {
-		return ParsedTx{}, nil
+		return ParsedTx{}, fmt.Errorf("invalid number of signatures")
 	}
 	// from docs: https://solana.com/docs/rpc/json-structures#transactions
 	// A list of base-58 encoded signatures applied to the transaction.
@@ -73,35 +102,42 @@ func ParseTx(txResult *rpc.GetTransactionResult, nodes map[solana.PublicKey]stri
 	sender := tx.Message.AccountKeys[0]
 
 	// if sender matches a known node/operator + sending to feed account, parse transmit tx data
-	// node transmit calls the fallback which is difficult to filter
+	// node transmit calls the fallback which is difficult to filter for the function call
 	if _, ok := nodes[sender]; !ok {
-		return ParsedTx{}, nil
+		return ParsedTx{}, fmt.Errorf("unknown public key: %s", sender)
 	}
 
-	var found bool // found transmit instruction
+	obsCount := []uint8{}
+	var totalErr error
 	for _, instruction := range tx.Message.Instructions {
 		// protect against invalid index
 		if int(instruction.ProgramIDIndex) >= len(tx.Message.AccountKeys) {
 			continue
 		}
 
-		// find OCR2 transmit instruction
-		// TODO: fix hardcoding OCR2 program ID - SolanaFeedConfig.ContractAddress
-		if !found && // only can find one transmit instruction
-			tx.Message.AccountKeys[instruction.ProgramIDIndex].String() == "cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ" {
-			found = true
-
-			// TODO: parse report
+		// find OCR2 transmit instruction at specified program address
+		if tx.Message.AccountKeys[instruction.ProgramIDIndex] == programAddr {
+			// parse report from tx data (see solana/transmitter.go)
+			start := solana.StoreNonceLen + solana.ReportContextLen
+			end := start + int(solana.ReportLen)
+			report := types.Report(instruction.Data[start:end])
+			count, err := solana.ReportCodec{}.ObserversCountFromReport(report)
+			if err != nil {
+				totalErr = errors.Join(totalErr, fmt.Errorf("%w (%+v)", err, instruction))
+				continue
+			}
+			obsCount = append(obsCount, count)
 		}
 
-		// TODO: parsing fee calculation
-		// ComputeBudget111111111111111111111111111111
+		// find compute budget program instruction
+		if tx.Message.AccountKeys[instruction.ProgramIDIndex] == solanaGo.MustPublicKeyFromBase58(fees.COMPUTE_BUDGET_PROGRAM) {
+			// TODO: parsing fee calculation
+		}
 	}
 
 	return ParsedTx{
-		Err:      txResult.Meta.Err,
-		Fee:      txResult.Meta.Fee,
-		Sender:   sender,
-		Operator: nodes[sender],
-	}, nil
+		Sender:           sender,
+		Operator:         nodes[sender],
+		ObservationCount: obsCount,
+	}, totalErr
 }
