@@ -17,77 +17,66 @@ var (
 	TxDetailsType = "txdetails"
 )
 
-// TxDetails expands on TxResults and contains additional detail on a set of tx signatures specific to solana
 type TxDetails struct {
-	Count int // total signatures processed
+	Err  interface{}
+	Fee  uint64
+	Slot uint64
 
-	// TODO: PerOperator categorizes TxResults based on sender/operator
-	// PerOperator map[string]commonMonitoring.TxResults
-
-	// observation counts within each report
-	ObsLatest  uint8   // number of observations in latest included report/tx
-	ObsAll     []uint8 // observations across all seen txs/reports from operators
-	ObsSuccess []uint8 // observations included in successful reports
-	ObsFailed  []uint8 // observations included in failed reports
-
-	// TODO: implement - parse fee using shared logic from fee/computebudget.go
-	// FeeAvg
-	// FeeSuccessAvg
-	// FeeFailedAvg
-}
-
-type ParsedTx struct {
-	Err interface{}
-	Fee uint64
-
-	Sender   solanaGo.PublicKey
-	Operator string // human readable name associated to public key
+	Sender solanaGo.PublicKey
 
 	// report information - only supports single report per tx
 	ObservationCount uint8
 }
 
+// MakeTxDetails casts an interface to []TxDetails
+func MakeTxDetails(in interface{}) ([]TxDetails, error) {
+	out, ok := (in).([]TxDetails)
+	if !ok {
+		return nil, fmt.Errorf("Unable to make type []TxDetails from %T", in)
+	}
+	return out, nil
+}
+
 // ParseTxResult parses the GetTransaction RPC response
-func ParseTxResult(txResult *rpc.GetTransactionResult, nodes map[solanaGo.PublicKey]string, programAddr solanaGo.PublicKey) (ParsedTx, error) {
+func ParseTxResult(txResult *rpc.GetTransactionResult, programAddr solanaGo.PublicKey) (TxDetails, error) {
 	if txResult == nil {
-		return ParsedTx{}, fmt.Errorf("txResult is nil")
+		return TxDetails{}, fmt.Errorf("txResult is nil")
 	}
 	if txResult.Meta == nil {
-		return ParsedTx{}, fmt.Errorf("txResult.Meta is nil")
+		return TxDetails{}, fmt.Errorf("txResult.Meta is nil")
 	}
 	if txResult.Transaction == nil {
-		return ParsedTx{}, fmt.Errorf("txResult.Transaction is nil")
+		return TxDetails{}, fmt.Errorf("txResult.Transaction is nil")
 	}
+
 	// get original tx
 	tx, err := txResult.Transaction.GetTransaction()
 	if err != nil {
-		return ParsedTx{}, fmt.Errorf("GetTransaction: %w", err)
+		return TxDetails{}, fmt.Errorf("GetTransaction: %w", err)
 	}
 
-	details, err := ParseTx(tx, nodes, programAddr)
+	details, err := ParseTx(tx, programAddr)
 	if err != nil {
-		return ParsedTx{}, fmt.Errorf("ParseTx: %w", err)
+		return TxDetails{}, fmt.Errorf("ParseTx: %w", err)
 	}
 
 	// append more details from tx meta
 	details.Err = txResult.Meta.Err
 	details.Fee = txResult.Meta.Fee
+	details.Slot = txResult.Slot
 	return details, nil
 }
 
 // ParseTx parses a solana transaction
-func ParseTx(tx *solanaGo.Transaction, nodes map[solanaGo.PublicKey]string, programAddr solanaGo.PublicKey) (ParsedTx, error) {
+func ParseTx(tx *solanaGo.Transaction, programAddr solanaGo.PublicKey) (TxDetails, error) {
 	if tx == nil {
-		return ParsedTx{}, fmt.Errorf("tx is nil")
-	}
-	if nodes == nil {
-		return ParsedTx{}, fmt.Errorf("nodes is nil")
+		return TxDetails{}, fmt.Errorf("tx is nil")
 	}
 
 	// determine sender
 	// if more than 1 tx signature, then it is not a data feed report tx from a CL node -> ignore
 	if len(tx.Signatures) != 1 || len(tx.Message.AccountKeys) == 0 {
-		return ParsedTx{}, fmt.Errorf("invalid number of signatures")
+		return TxDetails{}, fmt.Errorf("invalid number of signatures")
 	}
 	// from docs: https://solana.com/docs/rpc/json-structures#transactions
 	// A list of base-58 encoded signatures applied to the transaction.
@@ -95,14 +84,15 @@ func ParseTx(tx *solanaGo.Transaction, nodes map[solanaGo.PublicKey]string, prog
 	// The signature at index i corresponds to the public key at index i in message.accountKeys.
 	sender := tx.Message.AccountKeys[0]
 
-	// if sender matches a known node/operator + sending to feed account, parse transmit tx data
-	// node transmit calls the fallback which is difficult to filter for the function call
-	if _, ok := nodes[sender]; !ok {
-		return ParsedTx{}, fmt.Errorf("unknown public key: %s", sender)
+	// CL node DF transactions should only have a compute budget + ocr2 instruction
+	if len(tx.Message.Instructions) != 2 {
+		return TxDetails{}, fmt.Errorf("not a node transaction")
 	}
 
 	var obsCount uint8
 	var totalErr error
+	var foundTransmit bool
+	var foundFee bool
 	for _, instruction := range tx.Message.Instructions {
 		// protect against invalid index
 		if int(instruction.ProgramIDIndex) >= len(tx.Message.AccountKeys) {
@@ -121,17 +111,27 @@ func ParseTx(tx *solanaGo.Transaction, nodes map[solanaGo.PublicKey]string, prog
 				continue
 			}
 			obsCount = count
+			foundTransmit = true
+			continue
 		}
 
 		// find compute budget program instruction
 		if tx.Message.AccountKeys[instruction.ProgramIDIndex] == solanaGo.MustPublicKeyFromBase58(fees.COMPUTE_BUDGET_PROGRAM) {
 			// TODO: parsing fee calculation
+			foundFee = true
 		}
 	}
+	if totalErr != nil {
+		return TxDetails{}, totalErr
+	}
 
-	return ParsedTx{
+	// if missing either instruction, return error
+	if !foundTransmit || !foundFee {
+		return TxDetails{}, fmt.Errorf("unable to parse both Transmit and Fee instructions")
+	}
+
+	return TxDetails{
 		Sender:           sender,
-		Operator:         nodes[sender],
 		ObservationCount: obsCount,
-	}, totalErr
+	}, nil
 }
