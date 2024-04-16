@@ -157,7 +157,7 @@ func (ms *Solana) getContainerRequest(inactiveFeatures InactiveFeatures) (*tc.Co
 
 	return &tc.ContainerRequest{
 		Name:         ms.ContainerName,
-		Image:        "solanalabs/solana:v1.17.28",
+		Image:        "solanalabs/solana:v1.17.31",
 		ExposedPorts: []string{test_env.NatPortFormat(SOL_HTTP_PORT), test_env.NatPortFormat(SOL_WS_PORT)},
 		Env: map[string]string{
 			"SERVER_PORT": "1080",
