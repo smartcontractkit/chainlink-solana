@@ -15,36 +15,27 @@ type NodeBalances interface {
 }
 
 type nodeBalances struct {
-	log   commonMonitoring.Logger
+	simpleGauge
 	chain string
 }
 
 func NewNodeBalances(log commonMonitoring.Logger, chain string) NodeBalances {
-	return &nodeBalances{log, chain}
+	return &nodeBalances{
+		newSimpleGauge(log, types.NodeBalanceMetric),
+		chain,
+	}
 }
 
 func (nb *nodeBalances) SetBalance(balance uint64, address, operator string) {
-	gauge, ok := gauges[types.NodeBalanceMetric]
-	if !ok {
-		nb.log.Fatalw("gauge not found", "name", types.NodeBalanceMetric)
-		return
-	}
-
-	gauge.With(prometheus.Labels{
+	nb.set(float64(balance), prometheus.Labels{
 		"account_address": address,
 		"node_operator":   operator,
 		"chain":           nb.chain,
-	}).Set(float64(balance))
+	})
 }
 
 func (nb *nodeBalances) Cleanup(address, operator string) {
-	gauge, ok := gauges[types.NodeBalanceMetric]
-	if !ok {
-		nb.log.Fatalw("gauge not found", "name", types.NodeBalanceMetric)
-		return
-	}
-
-	gauge.Delete(prometheus.Labels{
+	nb.delete(prometheus.Labels{
 		"account_address": address,
 		"node_operator":   operator,
 		"chain":           nb.chain,

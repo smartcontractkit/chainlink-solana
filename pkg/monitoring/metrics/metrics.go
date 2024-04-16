@@ -65,3 +65,21 @@ func init() {
 		feedLabels,
 	)
 }
+
+type FeedInput struct {
+	AccountAddress, FeedID, ChainID, ContractStatus, ContractType, FeedName, FeedPath, NetworkID, NetworkName string
+}
+
+func (i FeedInput) ToPromLabels() prometheus.Labels {
+	return prometheus.Labels{
+		"account_address": i.AccountAddress,
+		"feed_id":         i.FeedID,
+		"chain_id":        i.ChainID,
+		"contract_status": i.ContractStatus,
+		"contract_type":   i.ContractType,
+		"feed_name":       i.FeedName,
+		"feed_path":       i.FeedPath,
+		"network_id":      i.NetworkID,
+		"network_name":    i.NetworkName,
+	}
+}

@@ -37,34 +37,33 @@ func TestFeedBalances(t *testing.T) {
 		for _, accountName := range types.FeedBalanceAccountNames {
 			mockMetrics.On("SetBalance",
 				balances.Values[accountName],
-				metrics.FeedBalanceInput{
-					BalanceAccountName: accountName,
-					AccountAddress:     balances.Addresses[accountName].String(),
-					FeedID:             feedConfig.GetID(),
-					ChainID:            chainConfig.GetChainID(),
-					ContractStatus:     feedConfig.GetContractStatus(),
-					ContractType:       feedConfig.GetContractType(),
-					FeedName:           feedConfig.GetName(),
-					FeedPath:           feedConfig.GetPath(),
-					NetworkID:          chainConfig.GetNetworkID(),
-					NetworkName:        chainConfig.GetNetworkName(),
+				accountName,
+				metrics.FeedInput{
+					AccountAddress: balances.Addresses[accountName].String(),
+					FeedID:         feedConfig.GetID(),
+					ChainID:        chainConfig.GetChainID(),
+					ContractStatus: feedConfig.GetContractStatus(),
+					ContractType:   feedConfig.GetContractType(),
+					FeedName:       feedConfig.GetName(),
+					FeedPath:       feedConfig.GetPath(),
+					NetworkID:      chainConfig.GetNetworkID(),
+					NetworkName:    chainConfig.GetNetworkName(),
 				},
 			)
 		}
 		exporter.Export(ctx, balances)
 
 		for _, accountName := range types.FeedBalanceAccountNames {
-			mockMetrics.On("Cleanup", metrics.FeedBalanceInput{
-				BalanceAccountName: accountName,
-				AccountAddress:     balances.Addresses[accountName].String(),
-				FeedID:             feedConfig.GetID(),
-				ChainID:            chainConfig.GetChainID(),
-				ContractStatus:     feedConfig.GetContractStatus(),
-				ContractType:       feedConfig.GetContractType(),
-				FeedName:           feedConfig.GetName(),
-				FeedPath:           feedConfig.GetPath(),
-				NetworkID:          chainConfig.GetNetworkID(),
-				NetworkName:        chainConfig.GetNetworkName(),
+			mockMetrics.On("Cleanup", accountName, metrics.FeedInput{
+				AccountAddress: balances.Addresses[accountName].String(),
+				FeedID:         feedConfig.GetID(),
+				ChainID:        chainConfig.GetChainID(),
+				ContractStatus: feedConfig.GetContractStatus(),
+				ContractType:   feedConfig.GetContractType(),
+				FeedName:       feedConfig.GetName(),
+				FeedPath:       feedConfig.GetPath(),
+				NetworkID:      chainConfig.GetNetworkID(),
+				NetworkName:    chainConfig.GetNetworkName(),
 			})
 		}
 		exporter.Cleanup(ctx)
