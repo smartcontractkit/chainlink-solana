@@ -126,7 +126,7 @@ func ParseTx(tx *solanaGo.Transaction, programAddr solanaGo.PublicKey) (TxDetail
 
 		// find compute budget program instruction
 		if tx.Message.AccountKeys[instruction.ProgramIDIndex] == solanaGo.MustPublicKeyFromBase58(fees.COMPUTE_BUDGET_PROGRAM) {
-			// TODO: parsing fee calculation
+			// future: parsing fee calculation
 			foundFee = true
 		}
 	}

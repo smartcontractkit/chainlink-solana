@@ -60,7 +60,7 @@ func (s *txDetailsSource) Fetch(ctx context.Context) (interface{}, error) {
 			continue
 		}
 
-		// TODO: worker pool - how many GetTransaction requests in a row?
+		// potential improvement: worker pool - how many GetTransaction requests in a row?
 		tx, err := s.source.client.GetTransaction(ctx, sig.Signature, &rpc.GetTransactionOpts{Commitment: "confirmed"})
 		if err != nil {
 			return nil, err
