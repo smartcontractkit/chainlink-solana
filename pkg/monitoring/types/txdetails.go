@@ -15,6 +15,8 @@ import (
 
 var (
 	TxDetailsType = "txdetails"
+
+	ReportObservationMetric = "report_observations"
 )
 
 type TxDetails struct {
@@ -26,6 +28,13 @@ type TxDetails struct {
 
 	// report information - only supports single report per tx
 	ObservationCount uint8
+}
+
+func (td TxDetails) Empty() bool {
+	return td.Fee == 0 &&
+		td.Slot == 0 &&
+		td.Sender == solanaGo.PublicKey{} &&
+		td.ObservationCount == 0
 }
 
 // MakeTxDetails casts an interface to []TxDetails

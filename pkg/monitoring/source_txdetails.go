@@ -49,10 +49,15 @@ func (s *txDetailsSource) Fetch(ctx context.Context) (interface{}, error) {
 		return nil, err
 	}
 
-	details := make([]types.TxDetails, len(sigs))
-	for i, sig := range sigs {
+	details := []types.TxDetails{}
+	for _, sig := range sigs {
 		if sig == nil {
 			continue // skip for nil signatures
+		}
+
+		// check only successful txs: indicates the fastest submissions of a report
+		if sig.Err != nil {
+			continue
 		}
 
 		// TODO: worker pool - how many GetTransaction requests in a row?
@@ -73,8 +78,9 @@ func (s *txDetailsSource) Fetch(ctx context.Context) (interface{}, error) {
 			s.source.log.Debugw("tx not valid for tracking", "error", err, "signature", sig)
 			continue
 		}
-		details[i] = res
+		details = append(details, res)
 	}
 
+	// only return successful OCR2 transmit transactions
 	return details, nil
 }

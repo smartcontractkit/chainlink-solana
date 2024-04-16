@@ -50,7 +50,7 @@ func TestTxDetailsSource(t *testing.T) {
 	res, err = s.Fetch(tests.Context(t))
 	require.NoError(t, err)
 	data = testutils.ParseTxDetails(t, res)
-	assert.Equal(t, 1, len(data))
+	assert.Equal(t, 0, len(data)) // ignores tx
 	assert.Equal(t, 1, logs.FilterLevelExact(zapcore.DebugLevel).FilterMessage("GetTransaction returned nil").Len())
 
 	// invalid tx
@@ -66,7 +66,7 @@ func TestTxDetailsSource(t *testing.T) {
 	res, err = s.Fetch(tests.Context(t))
 	require.NoError(t, err)
 	data = testutils.ParseTxDetails(t, res)
-	assert.Equal(t, 1, len(data))
+	assert.Equal(t, 0, len(data)) // ignores tx
 	assert.Equal(t, 1, logs.FilterLevelExact(zapcore.DebugLevel).FilterMessage("tx not valid for tracking").Len())
 
 	// happy path
