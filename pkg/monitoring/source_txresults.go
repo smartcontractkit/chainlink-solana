@@ -8,13 +8,18 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
-	relayMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
+)
+
+const (
+	txresultsType = "txresults"
 )
 
 func NewTxResultsSourceFactory(
 	client ChainReader,
-	log relayMonitoring.Logger,
-) relayMonitoring.SourceFactory {
+	log commonMonitoring.Logger,
+) commonMonitoring.SourceFactory {
 	return &txResultsSourceFactory{
 		client,
 		log,
@@ -23,16 +28,16 @@ func NewTxResultsSourceFactory(
 
 type txResultsSourceFactory struct {
 	client ChainReader
-	log    relayMonitoring.Logger
+	log    commonMonitoring.Logger
 }
 
 func (s *txResultsSourceFactory) NewSource(
-	_ relayMonitoring.ChainConfig,
-	feedConfig relayMonitoring.FeedConfig,
-) (relayMonitoring.Source, error) {
-	solanaFeedConfig, ok := feedConfig.(SolanaFeedConfig)
+	_ commonMonitoring.ChainConfig,
+	feedConfig commonMonitoring.FeedConfig,
+) (commonMonitoring.Source, error) {
+	solanaFeedConfig, ok := feedConfig.(config.SolanaFeedConfig)
 	if !ok {
-		return nil, fmt.Errorf("expected feedConfig to be of type SolanaFeedConfig not %T", feedConfig)
+		return nil, fmt.Errorf("expected feedConfig to be of type config.SolanaFeedConfig not %T", feedConfig)
 	}
 	return &txResultsSource{
 		s.client,
@@ -44,13 +49,13 @@ func (s *txResultsSourceFactory) NewSource(
 }
 
 func (s *txResultsSourceFactory) GetType() string {
-	return "txresults"
+	return txresultsType
 }
 
 type txResultsSource struct {
 	client     ChainReader
-	log        relayMonitoring.Logger
-	feedConfig SolanaFeedConfig
+	log        commonMonitoring.Logger
+	feedConfig config.SolanaFeedConfig
 
 	latestSig   solana.Signature
 	latestSigMu sync.Mutex
@@ -71,7 +76,7 @@ func (t *txResultsSource) Fetch(ctx context.Context) (interface{}, error) {
 		return nil, fmt.Errorf("failed to fetch transactions for state account: %w", err)
 	}
 	if len(txSigs) == 0 {
-		return relayMonitoring.TxResults{NumSucceeded: 0, NumFailed: 0}, nil
+		return commonMonitoring.TxResults{NumSucceeded: 0, NumFailed: 0}, nil
 	}
 	var numSucceeded, numFailed uint64 = 0, 0
 	for _, txSig := range txSigs {
@@ -86,5 +91,5 @@ func (t *txResultsSource) Fetch(ctx context.Context) (interface{}, error) {
 		defer t.latestSigMu.Unlock()
 		t.latestSig = txSigs[0].Signature
 	}()
-	return relayMonitoring.TxResults{NumSucceeded: numSucceeded, NumFailed: numFailed}, nil
+	return commonMonitoring.TxResults{NumSucceeded: numSucceeded, NumFailed: numFailed}, nil
 }

@@ -1,4 +1,4 @@
-package monitoring
+package config
 
 import (
 	"encoding/json"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 
-	relayMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
 )
 
 type SolanaFeedConfig struct {
@@ -30,7 +30,7 @@ type SolanaFeedConfig struct {
 	StateAccount         solana.PublicKey `json:"-"`
 }
 
-var _ relayMonitoring.FeedConfig = SolanaFeedConfig{}
+var _ commonMonitoring.FeedConfig = SolanaFeedConfig{}
 
 // GetID returns the state account's address as that uniquely
 // identifies a feed on Solana. In Solana, a program is stateless and we
@@ -104,13 +104,13 @@ func (s SolanaFeedConfig) ToMapping() map[string]interface{} {
 	}
 }
 
-func SolanaFeedsParser(buf io.ReadCloser) ([]relayMonitoring.FeedConfig, error) {
+func SolanaFeedsParser(buf io.ReadCloser) ([]commonMonitoring.FeedConfig, error) {
 	rawFeeds := []SolanaFeedConfig{}
 	decoder := json.NewDecoder(buf)
 	if err := decoder.Decode(&rawFeeds); err != nil {
 		return nil, fmt.Errorf("unable to unmarshal feeds config data: %w", err)
 	}
-	feeds := make([]relayMonitoring.FeedConfig, len(rawFeeds))
+	feeds := make([]commonMonitoring.FeedConfig, len(rawFeeds))
 	for i, rawFeed := range rawFeeds {
 		contractAddress, err := solana.PublicKeyFromBase58(rawFeed.ContractAddressBase58)
 		if err != nil {
@@ -129,7 +129,7 @@ func SolanaFeedsParser(buf io.ReadCloser) ([]relayMonitoring.FeedConfig, error) 
 			return nil, fmt.Errorf("failed to parse multiply '%s' into a big.Int", rawFeed.MultiplyRaw)
 		}
 		// NOTE: multiply is not required so if a parse error occurs, we'll use 0.
-		feeds[i] = relayMonitoring.FeedConfig(SolanaFeedConfig{
+		feeds[i] = commonMonitoring.FeedConfig(SolanaFeedConfig{
 			rawFeed.Name,
 			rawFeed.Path,
 			rawFeed.Symbol,

@@ -1,4 +1,4 @@
-package monitoring
+package config
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	relayMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
 )
 
 type SolanaConfig struct {
@@ -18,7 +18,7 @@ type SolanaConfig struct {
 	PollInterval time.Duration
 }
 
-var _ relayMonitoring.ChainConfig = SolanaConfig{}
+var _ commonMonitoring.ChainConfig = SolanaConfig{}
 
 func (s SolanaConfig) GetRPCEndpoint() string         { return s.RPCEndpoint }
 func (s SolanaConfig) GetNetworkName() string         { return s.NetworkName }

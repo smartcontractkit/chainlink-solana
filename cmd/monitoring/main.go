@@ -7,9 +7,12 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	relayMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/exporter"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/metrics"
 )
 
 func main() {
@@ -23,7 +26,7 @@ func main() {
 		}
 	}()
 
-	chainConfig, err := monitoring.ParseSolanaConfig()
+	chainConfig, err := config.ParseSolanaConfig()
 	if err != nil {
 		log.Fatalw("failed to parse solana-specific config", "error", err)
 	}
@@ -40,31 +43,41 @@ func main() {
 		logger.With(log, "component", "source-txresults"),
 	)
 
-	monitor, err := relayMonitoring.NewMonitor(
+	monitor, err := commonMonitoring.NewMonitor(
 		context.Background(),
 		log,
 		chainConfig,
 		envelopeSourceFactory,
 		txResultsSourceFactory,
-		monitoring.SolanaFeedsParser,
-		monitoring.SolanaNodesParser,
+		config.SolanaFeedsParser,
+		config.SolanaNodesParser,
 	)
 	if err != nil {
 		log.Fatalw("failed to build monitor", "error", err)
 		return
 	}
 
-	balancesSourceFactory := monitoring.NewBalancesSourceFactory(
+	feedBalancesSourceFactory := monitoring.NewFeedBalancesSourceFactory(
 		chainReader,
-		logger.With(log, "component", "source-balances"),
+		logger.With(log, "component", "source-feed-balances"),
 	)
-	monitor.SourceFactories = append(monitor.SourceFactories, balancesSourceFactory)
+	nodeBalancesSourceFactory := monitoring.NewNodeBalancesSourceFactory(
+		chainReader,
+		logger.With(log, "component", "source-node-balances"),
+	)
+	monitor.SourceFactories = append(monitor.SourceFactories, feedBalancesSourceFactory)
+	monitor.NetworkSourceFactories = append(monitor.NetworkSourceFactories, nodeBalancesSourceFactory)
 
-	promExporterFactory := monitoring.NewPrometheusExporterFactory(
+	feedBalancesExporterFactory := exporter.NewFeedBalancesFactory(
 		logger.With(log, "component", "solana-prom-exporter"),
-		monitoring.NewMetrics(logger.With(log, "component", "solana-metrics")),
+		metrics.NewFeedBalances(logger.With(log, "component", "solana-metrics")),
 	)
-	monitor.ExporterFactories = append(monitor.ExporterFactories, promExporterFactory)
+	nodeBalancesExporterFactory := exporter.NewNodeBalancesFactory(
+		logger.With(log, "component", "solana-prom-exporter"),
+		metrics.NewNodeBalances,
+	)
+	monitor.ExporterFactories = append(monitor.ExporterFactories, feedBalancesExporterFactory)
+	monitor.NetworkExporterFactories = append(monitor.NetworkExporterFactories, nodeBalancesExporterFactory)
 
 	monitor.Run()
 	log.Infow("monitor stopped")

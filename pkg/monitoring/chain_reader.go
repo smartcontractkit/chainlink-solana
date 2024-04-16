@@ -8,6 +8,7 @@ import (
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 )
 
+//go:generate mockery --name ChainReader --output ./mocks/
 type ChainReader interface {
 	GetState(ctx context.Context, account solana.PublicKey, commitment rpc.CommitmentType) (state pkgSolana.State, blockHeight uint64, err error)
 	GetLatestTransmission(ctx context.Context, account solana.PublicKey, commitment rpc.CommitmentType) (answer pkgSolana.Answer, blockHeight uint64, err error)

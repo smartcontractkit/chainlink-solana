@@ -12,15 +12,16 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"go.uber.org/multierr"
 
-	relayMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/event"
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 )
 
 func NewEnvelopeSourceFactory(
 	client ChainReader,
-	log relayMonitoring.Logger,
-) relayMonitoring.SourceFactory {
+	log commonMonitoring.Logger,
+) commonMonitoring.SourceFactory {
 	return &envelopeSourceFactory{
 		client,
 		log,
@@ -29,16 +30,16 @@ func NewEnvelopeSourceFactory(
 
 type envelopeSourceFactory struct {
 	client ChainReader
-	log    relayMonitoring.Logger
+	log    commonMonitoring.Logger
 }
 
 func (s *envelopeSourceFactory) NewSource(
-	_ relayMonitoring.ChainConfig,
-	feedConfig relayMonitoring.FeedConfig,
-) (relayMonitoring.Source, error) {
-	solanaFeedConfig, ok := feedConfig.(SolanaFeedConfig)
+	_ commonMonitoring.ChainConfig,
+	feedConfig commonMonitoring.FeedConfig,
+) (commonMonitoring.Source, error) {
+	solanaFeedConfig, ok := feedConfig.(config.SolanaFeedConfig)
 	if !ok {
-		return nil, fmt.Errorf("expected feedConfig to be of type SolanaFeedConfig not %T", feedConfig)
+		return nil, fmt.Errorf("expected feedConfig to be of type config.SolanaFeedConfig not %T", feedConfig)
 	}
 	return &envelopeSource{
 		s.client,
@@ -53,8 +54,8 @@ func (s *envelopeSourceFactory) GetType() string {
 
 type envelopeSource struct {
 	client     ChainReader
-	feedConfig SolanaFeedConfig
-	log        relayMonitoring.Logger
+	feedConfig config.SolanaFeedConfig
+	log        commonMonitoring.Logger
 }
 
 func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
@@ -66,7 +67,7 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode ContractConfig from on-chain state: %w", err)
 	}
-	envelope := relayMonitoring.Envelope{
+	envelope := commonMonitoring.Envelope{
 		ConfigDigest: state.Config.LatestConfigDigest,
 		Epoch:        state.Config.Epoch,
 		Round:        state.Config.Round,
