@@ -57,27 +57,51 @@ func main() {
 		return
 	}
 
+	// per-feed sources
 	feedBalancesSourceFactory := monitoring.NewFeedBalancesSourceFactory(
 		chainReader,
 		logger.With(log, "component", "source-feed-balances"),
 	)
+	txDetailsSourceFactory := monitoring.NewTxDetailsSourceFactory(
+		chainReader,
+		logger.With(log, "component", "source-tx-details"),
+	)
+	monitor.SourceFactories = append(monitor.SourceFactories,
+		feedBalancesSourceFactory,
+		txDetailsSourceFactory,
+	)
+
+	// network sources
 	nodeBalancesSourceFactory := monitoring.NewNodeBalancesSourceFactory(
 		chainReader,
 		logger.With(log, "component", "source-node-balances"),
 	)
-	monitor.SourceFactories = append(monitor.SourceFactories, feedBalancesSourceFactory)
-	monitor.NetworkSourceFactories = append(monitor.NetworkSourceFactories, nodeBalancesSourceFactory)
+	monitor.NetworkSourceFactories = append(monitor.NetworkSourceFactories,
+		nodeBalancesSourceFactory,
+	)
 
+	// per-feed exporters
 	feedBalancesExporterFactory := exporter.NewFeedBalancesFactory(
 		logger.With(log, "component", "solana-prom-exporter"),
 		metrics.NewFeedBalances(logger.With(log, "component", "solana-metrics")),
 	)
+	reportObservationsFactory := exporter.NewReportObservationsFactory(
+		logger.With(log, "component", "solana-prome-exporter"),
+		metrics.NewReportObservations(logger.With(log, "component", "solana-metrics")),
+	)
+	monitor.ExporterFactories = append(monitor.ExporterFactories,
+		feedBalancesExporterFactory,
+		reportObservationsFactory,
+	)
+
+	// network exporters
 	nodeBalancesExporterFactory := exporter.NewNodeBalancesFactory(
 		logger.With(log, "component", "solana-prom-exporter"),
 		metrics.NewNodeBalances,
 	)
-	monitor.ExporterFactories = append(monitor.ExporterFactories, feedBalancesExporterFactory)
-	monitor.NetworkExporterFactories = append(monitor.NetworkExporterFactories, nodeBalancesExporterFactory)
+	monitor.NetworkExporterFactories = append(monitor.NetworkExporterFactories,
+		nodeBalancesExporterFactory,
+	)
 
 	monitor.Run()
 	log.Infow("monitor stopped")

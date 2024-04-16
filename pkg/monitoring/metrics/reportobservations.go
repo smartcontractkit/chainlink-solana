@@ -9,7 +9,7 @@ import (
 //go:generate mockery --name ReportObservations --output ./mocks/
 
 type ReportObservations interface {
-	SetCount(count uint64, feedInput FeedInput)
+	SetCount(count uint8, feedInput FeedInput)
 	Cleanup(feedInput FeedInput)
 }
 
@@ -23,7 +23,7 @@ func NewReportObservations(log commonMonitoring.Logger) *reportObservations {
 	return &reportObservations{newSimpleGauge(log, types.ReportObservationMetric)}
 }
 
-func (ro *reportObservations) SetCount(count uint64, feedInput FeedInput) {
+func (ro *reportObservations) SetCount(count uint8, feedInput FeedInput) {
 	ro.set(float64(count), feedInput.ToPromLabels())
 }
 

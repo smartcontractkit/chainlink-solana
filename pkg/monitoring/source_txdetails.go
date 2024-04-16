@@ -81,6 +81,6 @@ func (s *txDetailsSource) Fetch(ctx context.Context) (interface{}, error) {
 		details = append(details, res)
 	}
 
-	// only return successful OCR2 transmit transactions
+	// only return successful OCR2 transmit transactions (slice/array)
 	return details, nil
 }

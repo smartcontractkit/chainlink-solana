@@ -24,7 +24,7 @@ func TestReportObservations(t *testing.T) {
 	inputs := FeedInput{NetworkName: t.Name()}
 
 	// set gauge
-	assert.NotPanics(t, func() { m.SetCount(uint64(v), inputs) })
+	assert.NotPanics(t, func() { m.SetCount(uint8(v), inputs) })
 	promBal := testutil.ToFloat64(g.With(inputs.ToPromLabels()))
 	assert.Equal(t, float64(v), promBal)
 
