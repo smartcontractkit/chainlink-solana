@@ -17,6 +17,7 @@ type ChainReader interface {
 	GetBalance(ctx context.Context, account solana.PublicKey, commitment rpc.CommitmentType) (out *rpc.GetBalanceResult, err error)
 	GetSignaturesForAddressWithOpts(ctx context.Context, account solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts) (out []*rpc.TransactionSignature, err error)
 	GetTransaction(ctx context.Context, txSig solana.Signature, opts *rpc.GetTransactionOpts) (out *rpc.GetTransactionResult, err error)
+	GetSlot(ctx context.Context) (slot uint64, err error)
 }
 
 func NewChainReader(client *rpc.Client) ChainReader {
@@ -49,4 +50,8 @@ func (c *chainReader) GetSignaturesForAddressWithOpts(ctx context.Context, accou
 
 func (c *chainReader) GetTransaction(ctx context.Context, txSig solana.Signature, opts *rpc.GetTransactionOpts) (out *rpc.GetTransactionResult, err error) {
 	return c.client.GetTransaction(ctx, txSig, opts)
+}
+
+func (c *chainReader) GetSlot(ctx context.Context) (uint64, error) {
+	return c.client.GetSlot(ctx, rpc.CommitmentProcessed) // get latest height
 }
