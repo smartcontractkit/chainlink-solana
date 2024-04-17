@@ -76,8 +76,13 @@ func main() {
 		chainReader,
 		logger.With(log, "component", "source-node-balances"),
 	)
+	slotHeightSourceFactory := monitoring.NewSlotHeightSourceFactory(
+		chainReader,
+		logger.With(log, "component", "souce-slot-height"),
+	)
 	monitor.NetworkSourceFactories = append(monitor.NetworkSourceFactories,
 		nodeBalancesSourceFactory,
+		slotHeightSourceFactory,
 	)
 
 	// per-feed exporters
@@ -99,8 +104,13 @@ func main() {
 		logger.With(log, "component", "solana-prom-exporter"),
 		metrics.NewNodeBalances,
 	)
+	slotHeightExporterFactory := exporter.NewSlotHeightFactory(
+		logger.With(log, "component", "solana-prom-exporter"),
+		metrics.NewSlotHeight(logger.With(log, "component", "solana-metrics")),
+	)
 	monitor.NetworkExporterFactories = append(monitor.NetworkExporterFactories,
 		nodeBalancesExporterFactory,
+		slotHeightExporterFactory,
 	)
 
 	monitor.Run()
