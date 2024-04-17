@@ -3,8 +3,10 @@ package exporter
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
@@ -14,23 +16,35 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 )
 
-func TestSlotHeight(t *testing.T) {
+func TestReportObservations(t *testing.T) {
 	ctx := utils.Context(t)
-	m := mocks.NewSlotHeight(t)
-	m.On("Set", mock.Anything, mock.Anything, mock.Anything).Once()
-	m.On("Cleanup").Once()
+	lgr, logs := logger.TestObserved(t, zapcore.ErrorLevel)
+	m := mocks.NewReportObservations(t)
+	m.On("SetCount", mock.Anything, mock.Anything).Once()
+	m.On("Cleanup", mock.Anything).Once()
 
-	factory := NewSlotHeightFactory(logger.Test(t), m)
+	factory := NewReportObservationsFactory(lgr, m)
 
 	chainConfig := testutils.GenerateChainConfig()
-	exporter, err := factory.NewExporter(commonMonitoring.ExporterParams{ChainConfig: chainConfig})
+	feedConfig := testutils.GenerateFeedConfig()
+	exporter, err := factory.NewExporter(commonMonitoring.ExporterParams{ChainConfig: chainConfig, FeedConfig: feedConfig, Nodes: []commonMonitoring.NodeConfig{}})
 	require.NoError(t, err)
 
 	// happy path
-	exporter.Export(ctx, types.SlotHeight(10))
+	exporter.Export(ctx, []types.TxDetails{{ObservationCount: 10}})
 	exporter.Cleanup(ctx)
 
-	// test passing uint64 instead of SlotHeight - should not call mock
-	// SlotHeight alias of uint64
-	exporter.Export(ctx, uint64(10))
+	// not txdetails type - no calls to mock
+	assert.NotPanics(t, func() { exporter.Export(ctx, 1) })
+
+	// zero txdetails - no calls to mock
+	exporter.Export(ctx, []types.TxDetails{})
+
+	// empty txdetails
+	exporter.Export(ctx, []types.TxDetails{{}})
+	assert.Equal(t, 1, logs.FilterMessage("exporter could not find non-empty TxDetails").Len())
+
+	// multiple TxDetails should only call for the first non-empty one
+	m.On("SetCount", uint8(1), mock.Anything).Once()
+	exporter.Export(ctx, []types.TxDetails{{}, {ObservationCount: 1}, {ObservationCount: 10}})
 }

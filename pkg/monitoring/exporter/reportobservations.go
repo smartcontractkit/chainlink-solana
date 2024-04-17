@@ -8,43 +8,75 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 )
 
-func NewSlotHeightFactory(
-	_ commonMonitoring.Logger,
-	metrics metrics.SlotHeight,
+func NewReportObservationsFactory(
+	log commonMonitoring.Logger,
+	metrics metrics.ReportObservations,
 ) commonMonitoring.ExporterFactory {
-	return &slotHeightFactory{
+	return &reportObservationsFactory{
+		log,
 		metrics,
 	}
 }
 
-type slotHeightFactory struct {
-	metrics metrics.SlotHeight
+type reportObservationsFactory struct {
+	log     commonMonitoring.Logger
+	metrics metrics.ReportObservations
 }
 
-func (p *slotHeightFactory) NewExporter(
+func (p *reportObservationsFactory) NewExporter(
 	params commonMonitoring.ExporterParams,
 ) (commonMonitoring.Exporter, error) {
-	return &slotHeight{
-		params.ChainConfig.GetNetworkName(),
-		params.ChainConfig.GetRPCEndpoint(),
+	return &reportObservations{
+		metrics.FeedInput{
+			AccountAddress: params.FeedConfig.GetContractAddress(),
+			FeedID:         params.FeedConfig.GetContractAddress(),
+			ChainID:        params.ChainConfig.GetChainID(),
+			ContractStatus: params.FeedConfig.GetContractStatus(),
+			ContractType:   params.FeedConfig.GetContractType(),
+			FeedName:       params.FeedConfig.GetName(),
+			FeedPath:       params.FeedConfig.GetPath(),
+			NetworkID:      params.ChainConfig.GetNetworkID(),
+			NetworkName:    params.ChainConfig.GetNetworkName(),
+		},
+		p.log,
 		p.metrics,
 	}, nil
 }
 
-type slotHeight struct {
-	chain, url string
-	metrics    metrics.SlotHeight
+type reportObservations struct {
+	label   metrics.FeedInput // static for each feed
+	log     commonMonitoring.Logger
+	metrics metrics.ReportObservations
 }
 
-func (p *slotHeight) Export(ctx context.Context, data interface{}) {
-	slot, ok := data.(types.SlotHeight)
-	if !ok {
+func (p *reportObservations) Export(ctx context.Context, data interface{}) {
+	details, err := types.MakeTxDetails(data)
+	if err != nil {
 		return // skip if input could not be parsed
 	}
 
-	p.metrics.Set(slot, p.chain, p.url)
+	// skip on no updates
+	if len(details) == 0 {
+		return
+	}
+
+	// sanity check: find non-empty detail
+	// assumption: details ordered from latest -> earliest
+	var latest types.TxDetails
+	for _, d := range details {
+		if !d.Empty() {
+			latest = d
+			break
+		}
+	}
+	if latest.Empty() {
+		p.log.Errorw("exporter could not find non-empty TxDetails", "feed", p.label.ToPromLabels())
+		return
+	}
+
+	p.metrics.SetCount(latest.ObservationCount, p.label)
 }
 
-func (p *slotHeight) Cleanup(_ context.Context) {
-	p.metrics.Cleanup()
+func (p *reportObservations) Cleanup(_ context.Context) {
+	p.metrics.Cleanup(p.label)
 }
