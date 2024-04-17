@@ -39,5 +39,6 @@ type slotHeightSource struct {
 }
 
 func (t *slotHeightSource) Fetch(ctx context.Context) (interface{}, error) {
-	return t.client.GetSlot(ctx) // TODO: wrap the type to make it clear which type it is?
+	slot, err := t.client.GetSlot(ctx)
+	return types.SlotHeight(slot), err
 }

@@ -64,6 +64,14 @@ func init() {
 		},
 		feedLabels,
 	)
+
+	// init gauge for slot height
+	gauges[types.SlotHeightMetric] = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: types.SlotHeightMetric,
+		},
+		[]string{"chain", "url"},
+	)
 }
 
 type FeedInput struct {
