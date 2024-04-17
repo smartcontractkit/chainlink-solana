@@ -29,7 +29,7 @@ type feedBalancesFactory struct {
 func (p *feedBalancesFactory) NewExporter(
 	params commonMonitoring.ExporterParams,
 ) (commonMonitoring.Exporter, error) {
-	return &feeBalances{
+	return &feedBalances{
 		params.ChainConfig,
 		params.FeedConfig,
 		p.log,
@@ -39,7 +39,7 @@ func (p *feedBalancesFactory) NewExporter(
 	}, nil
 }
 
-type feeBalances struct {
+type feedBalances struct {
 	chainConfig commonMonitoring.ChainConfig
 	feedConfig  commonMonitoring.FeedConfig
 
@@ -50,7 +50,7 @@ type feeBalances struct {
 	addresses   map[string]solana.PublicKey
 }
 
-func (p *feeBalances) Export(ctx context.Context, data interface{}) {
+func (p *feedBalances) Export(ctx context.Context, data interface{}) {
 	balances, isBalances := data.(types.Balances)
 	if !isBalances {
 		return
@@ -70,17 +70,17 @@ func (p *feeBalances) Export(ctx context.Context, data interface{}) {
 		}
 		p.metrics.SetBalance(
 			balance,
-			metrics.FeedBalanceInput{
-				BalanceAccountName: balanceAccountName,
-				AccountAddress:     address.String(),
-				FeedID:             p.feedConfig.GetContractAddress(),
-				ChainID:            p.chainConfig.GetChainID(),
-				ContractStatus:     p.feedConfig.GetContractStatus(),
-				ContractType:       p.feedConfig.GetContractType(),
-				FeedName:           p.feedConfig.GetName(),
-				FeedPath:           p.feedConfig.GetPath(),
-				NetworkID:          p.chainConfig.GetNetworkID(),
-				NetworkName:        p.chainConfig.GetNetworkName(),
+			balanceAccountName,
+			metrics.FeedInput{
+				AccountAddress: address.String(),
+				FeedID:         p.feedConfig.GetContractAddress(),
+				ChainID:        p.chainConfig.GetChainID(),
+				ContractStatus: p.feedConfig.GetContractStatus(),
+				ContractType:   p.feedConfig.GetContractType(),
+				FeedName:       p.feedConfig.GetName(),
+				FeedPath:       p.feedConfig.GetPath(),
+				NetworkID:      p.chainConfig.GetNetworkID(),
+				NetworkName:    p.chainConfig.GetNetworkName(),
 			},
 		)
 	}
@@ -90,21 +90,20 @@ func (p *feeBalances) Export(ctx context.Context, data interface{}) {
 	p.addresses = balances.Addresses
 }
 
-func (p *feeBalances) Cleanup(_ context.Context) {
+func (p *feedBalances) Cleanup(_ context.Context) {
 	p.addressesMu.Lock()
 	defer p.addressesMu.Unlock()
 	for balanceAccountName, address := range p.addresses {
-		p.metrics.Cleanup(metrics.FeedBalanceInput{
-			BalanceAccountName: balanceAccountName,
-			AccountAddress:     address.String(),
-			FeedID:             p.feedConfig.GetContractAddress(),
-			ChainID:            p.chainConfig.GetChainID(),
-			ContractStatus:     p.feedConfig.GetContractStatus(),
-			ContractType:       p.feedConfig.GetContractType(),
-			FeedName:           p.feedConfig.GetName(),
-			FeedPath:           p.feedConfig.GetPath(),
-			NetworkID:          p.chainConfig.GetNetworkID(),
-			NetworkName:        p.chainConfig.GetNetworkName(),
+		p.metrics.Cleanup(balanceAccountName, metrics.FeedInput{
+			AccountAddress: address.String(),
+			FeedID:         p.feedConfig.GetContractAddress(),
+			ChainID:        p.chainConfig.GetChainID(),
+			ContractStatus: p.feedConfig.GetContractStatus(),
+			ContractType:   p.feedConfig.GetContractType(),
+			FeedName:       p.feedConfig.GetName(),
+			FeedPath:       p.feedConfig.GetPath(),
+			NetworkID:      p.chainConfig.GetNetworkID(),
+			NetworkName:    p.chainConfig.GetNetworkName(),
 		})
 	}
 }

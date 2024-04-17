@@ -159,6 +159,9 @@ func TestMedianFromReport(t *testing.T) {
 			med, err := cdc.MedianFromReport(report)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedMedian.String(), med.String())
+			count, err := cdc.ObserversCountFromReport(report)
+			require.NoError(t, err)
+			assert.Equal(t, len(tc.obs), int(count))
 		})
 	}
 

@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	feedBalanceLabelNames = []string{
+	feedLabels = []string{
 		// This is the address of the account associated with one of the account names above.
 		"account_address",
 		"feed_id",
@@ -23,7 +23,7 @@ var (
 		"network_name",
 	}
 
-	nodeBalanceLabels = []string{
+	nodeLabels = []string{
 		"account_address",
 		"node_operator",
 		"chain",
@@ -45,7 +45,7 @@ func init() {
 			prometheus.GaugeOpts{
 				Name: makeBalanceMetricName(balanceAccountName),
 			},
-			feedBalanceLabelNames,
+			feedLabels,
 		)
 	}
 
@@ -54,6 +54,32 @@ func init() {
 		prometheus.GaugeOpts{
 			Name: makeBalanceMetricName(types.NodeBalanceMetric),
 		},
-		nodeBalanceLabels,
+		nodeLabels,
 	)
+
+	// init gauge for observation count tracking
+	gauges[types.ReportObservationMetric] = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: types.ReportObservationMetric,
+		},
+		feedLabels,
+	)
+}
+
+type FeedInput struct {
+	AccountAddress, FeedID, ChainID, ContractStatus, ContractType, FeedName, FeedPath, NetworkID, NetworkName string
+}
+
+func (i FeedInput) ToPromLabels() prometheus.Labels {
+	return prometheus.Labels{
+		"account_address": i.AccountAddress,
+		"feed_id":         i.FeedID,
+		"chain_id":        i.ChainID,
+		"contract_status": i.ContractStatus,
+		"contract_type":   i.ContractType,
+		"feed_name":       i.FeedName,
+		"feed_path":       i.FeedPath,
+		"network_id":      i.NetworkID,
+		"network_name":    i.NetworkName,
+	}
 }

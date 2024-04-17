@@ -14,9 +14,9 @@ type FeedBalances struct {
 	mock.Mock
 }
 
-// Cleanup provides a mock function with given fields: input
-func (_m *FeedBalances) Cleanup(input metrics.FeedBalanceInput) {
-	_m.Called(input)
+// Cleanup provides a mock function with given fields: balanceAccountName, feedInput
+func (_m *FeedBalances) Cleanup(balanceAccountName string, feedInput metrics.FeedInput) {
+	_m.Called(balanceAccountName, feedInput)
 }
 
 // Exists provides a mock function with given fields: balanceAccountName
@@ -45,9 +45,9 @@ func (_m *FeedBalances) Exists(balanceAccountName string) (*prometheus.GaugeVec,
 	return r0, r1
 }
 
-// SetBalance provides a mock function with given fields: balance, input
-func (_m *FeedBalances) SetBalance(balance uint64, input metrics.FeedBalanceInput) {
-	_m.Called(balance, input)
+// SetBalance provides a mock function with given fields: balance, balanceAccountName, feedInput
+func (_m *FeedBalances) SetBalance(balance uint64, balanceAccountName string, feedInput metrics.FeedInput) {
+	_m.Called(balance, balanceAccountName, feedInput)
 }
 
 type mockConstructorTestingTNewFeedBalances interface {

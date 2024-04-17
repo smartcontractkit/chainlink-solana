@@ -22,19 +22,19 @@ func TestFeedBalances(t *testing.T) {
 	assert.False(t, ok)
 
 	// setting gauges
-	input := FeedBalanceInput{
-		BalanceAccountName: types.FeedBalanceAccountNames[0],
-		AccountAddress:     t.Name(), // use unique to prevent conflicts if run parallel
+	balanceAccountName := types.FeedBalanceAccountNames[0]
+	input := FeedInput{
+		AccountAddress: t.Name(), // use unique to prevent conflicts if run parallel
 	}
 	v := 100
-	assert.NotPanics(t, func() { m.SetBalance(uint64(v), input) })
+	assert.NotPanics(t, func() { m.SetBalance(uint64(v), balanceAccountName, input) })
 	promBal := testutil.ToFloat64(bal.With(input.ToPromLabels()))
 	assert.Equal(t, float64(v), promBal)
-	assert.Panics(t, func() { m.SetBalance(0, FeedBalanceInput{}) })
+	assert.Panics(t, func() { m.SetBalance(0, "", FeedInput{}) })
 
 	// cleanup gauges
 	assert.Equal(t, 1, testutil.CollectAndCount(bal))
-	assert.NotPanics(t, func() { m.Cleanup(input) })
+	assert.NotPanics(t, func() { m.Cleanup(balanceAccountName, input) })
 	assert.Equal(t, 0, testutil.CollectAndCount(bal))
-	assert.Panics(t, func() { m.Cleanup(FeedBalanceInput{}) })
+	assert.Panics(t, func() { m.Cleanup("", FeedInput{}) })
 }
