@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	codeccommon "github.com/smartcontractkit/chainlink-common/pkg/codec"
-	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -119,7 +118,7 @@ func TestNewIDLCodec_CircularDependency(t *testing.T) {
 	assert.ErrorIs(t, err, types.ErrInvalidConfig)
 }
 
-func newTestIDLAndCodec(t *testing.T) (string, codec.IDL, encodings.CodecFromTypeCodec) {
+func newTestIDLAndCodec(t *testing.T) (string, codec.IDL, types.RemoteCodec) {
 	t.Helper()
 
 	var idl codec.IDL
