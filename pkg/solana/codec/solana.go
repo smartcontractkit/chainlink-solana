@@ -60,9 +60,18 @@ func NewNamedModifierCodec(original types.RemoteCodec, itemType string, modifier
 	return modCodec, err
 }
 
-// NewIDLCodec is for Anchor custom types
-func NewIDLCodec(idl IDL, builder encodings.Builder) (types.RemoteCodec, error) {
-	accounts := make(encodings.LenientCodecFromTypeCodec)
+// NewIDLAccountCodec is for Anchor custom types
+func NewIDLAccountCodec(idl IDL, builder encodings.Builder) (types.RemoteCodec, error) {
+	return newIDLCoded(idl, builder, idl.Accounts, true)
+}
+
+func NewIDLDefinedTypesCodec(idl IDL, builder encodings.Builder) (types.RemoteCodec, error) {
+	return newIDLCoded(idl, builder, idl.Types, false)
+}
+
+func newIDLCoded(
+	idl IDL, builder encodings.Builder, from IdlTypeDefSlice, includeDiscriminator bool) (types.RemoteCodec, error) {
+	typeCodecs := make(encodings.LenientCodecFromTypeCodec)
 
 	refs := &codecRefs{
 		builder:      builder,
@@ -71,22 +80,22 @@ func NewIDLCodec(idl IDL, builder encodings.Builder) (types.RemoteCodec, error) 
 		dependencies: make(map[string][]string),
 	}
 
-	for _, account := range idl.Accounts {
+	for _, def := range from {
 		var (
 			name     string
 			accCodec encodings.TypeCodec
 			err      error
 		)
 
-		name, accCodec, err = createNamedCodec(account, refs)
+		name, accCodec, err = createNamedCodec(def, refs, includeDiscriminator)
 		if err != nil {
 			return nil, err
 		}
 
-		accounts[name] = accCodec
+		typeCodecs[name] = accCodec
 	}
 
-	return accounts, nil
+	return typeCodecs, nil
 }
 
 type codecRefs struct {
@@ -99,13 +108,14 @@ type codecRefs struct {
 func createNamedCodec(
 	def IdlTypeDef,
 	refs *codecRefs,
+	includeDiscriminator bool,
 ) (string, encodings.TypeCodec, error) {
 	caser := cases.Title(language.English)
 	name := def.Name
 
 	switch def.Type.Kind {
 	case IdlTypeDefTyKindStruct:
-		return asStruct(def, refs, name, caser)
+		return asStruct(def, refs, name, caser, includeDiscriminator)
 	case IdlTypeDefTyKindEnum:
 		variants := def.Type.Variants
 		if !variants.IsAllUint8() {
@@ -123,8 +133,17 @@ func asStruct(
 	refs *codecRefs,
 	name string, // name is the struct name and can be used in dependency checks
 	caser cases.Caser,
+	includeDiscriminator bool,
 ) (string, encodings.TypeCodec, error) {
-	named := make([]encodings.NamedTypeCodec, len(*def.Type.Fields))
+	desLen := 0
+	if includeDiscriminator {
+		desLen = 1
+	}
+	named := make([]encodings.NamedTypeCodec, len(*def.Type.Fields)+desLen)
+
+	if includeDiscriminator {
+		named[0] = encodings.NamedTypeCodec{Name: "Discriminator" + name, Codec: NewDiscriminator(name)}
+	}
 
 	for idx, field := range *def.Type.Fields {
 		fieldName := field.Name
@@ -134,7 +153,7 @@ func asStruct(
 			return name, nil, err
 		}
 
-		named[idx] = encodings.NamedTypeCodec{Name: caser.String(fieldName), Codec: typedCodec}
+		named[idx+desLen] = encodings.NamedTypeCodec{Name: caser.String(fieldName), Codec: typedCodec}
 	}
 
 	structCodec, err := encodings.NewStructCodec(named)
@@ -188,7 +207,7 @@ func asDefined(parentTypeName string, definedName *IdlTypeDefined, refs *codecRe
 
 	saveDependency(refs, parentTypeName, definedName.Defined)
 
-	newTypeName, newTypeCodec, err := createNamedCodec(*nextDef, refs)
+	newTypeName, newTypeCodec, err := createNamedCodec(*nextDef, refs, false)
 	if err != nil {
 		return nil, err
 	}
