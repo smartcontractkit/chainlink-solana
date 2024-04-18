@@ -53,7 +53,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    runs-on: ubuntu20.04-32cores-128GB
+    runs-on: ubuntu-latest-32cores-128GB
     needs: [get_projectserum_version]
     container:
       image: projectserum/build:${{ needs.get_projectserum_version.outputs.projectserum_version }}
@@ -68,7 +68,7 @@ jobs:
 
   e2e_custom_build_custom_chainlink_image:
     name: E2E Custom Build Custom CL Image
-    runs-on: ubuntu20.04-16cores-64GB
+    runs-on: ubuntu-latest-16cores-64GB
     environment: integration
     permissions:
       id-token: write
@@ -101,7 +101,7 @@ jobs:
       pull-requests: write
       id-token: write
       contents: read
-    runs-on: ubuntu20.04-16cores-64GB
+    runs-on: ubuntu-latest-16cores-64GB
 
     needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image, check_test_compilation]
     env:
