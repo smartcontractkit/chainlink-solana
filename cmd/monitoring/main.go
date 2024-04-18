@@ -76,18 +76,27 @@ func main() {
 		chainReader,
 		logger.With(log, "component", "source-node-balances"),
 	)
+	slotHeightSourceFactory := monitoring.NewSlotHeightSourceFactory(
+		chainReader,
+		logger.With(log, "component", "souce-slot-height"),
+	)
 	monitor.NetworkSourceFactories = append(monitor.NetworkSourceFactories,
 		nodeBalancesSourceFactory,
+		slotHeightSourceFactory,
 	)
+
+	// exporter names
+	promExporter := "solana-prom-exporter"
+	promMetrics := "solana-metrics"
 
 	// per-feed exporters
 	feedBalancesExporterFactory := exporter.NewFeedBalancesFactory(
-		logger.With(log, "component", "solana-prom-exporter"),
-		metrics.NewFeedBalances(logger.With(log, "component", "solana-metrics")),
+		logger.With(log, "component", promExporter),
+		metrics.NewFeedBalances(logger.With(log, "component", promMetrics)),
 	)
 	reportObservationsFactory := exporter.NewReportObservationsFactory(
 		logger.With(log, "component", "solana-prome-exporter"),
-		metrics.NewReportObservations(logger.With(log, "component", "solana-metrics")),
+		metrics.NewReportObservations(logger.With(log, "component", promMetrics)),
 	)
 	monitor.ExporterFactories = append(monitor.ExporterFactories,
 		feedBalancesExporterFactory,
@@ -96,11 +105,16 @@ func main() {
 
 	// network exporters
 	nodeBalancesExporterFactory := exporter.NewNodeBalancesFactory(
-		logger.With(log, "component", "solana-prom-exporter"),
+		logger.With(log, "component", promExporter),
 		metrics.NewNodeBalances,
+	)
+	slotHeightExporterFactory := exporter.NewSlotHeightFactory(
+		logger.With(log, "component", promExporter),
+		metrics.NewSlotHeight(logger.With(log, "component", promMetrics)),
 	)
 	monitor.NetworkExporterFactories = append(monitor.NetworkExporterFactories,
 		nodeBalancesExporterFactory,
+		slotHeightExporterFactory,
 	)
 
 	monitor.Run()
