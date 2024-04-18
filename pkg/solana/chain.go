@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
@@ -44,7 +45,7 @@ const DefaultRequestTimeout = 30 * time.Second
 // ChainOpts holds options for configuring a Chain.
 type ChainOpts struct {
 	Logger   logger.Logger
-	KeyStore types.Keystore
+	KeyStore core.Keystore
 }
 
 func (o *ChainOpts) Validate() (err error) {
