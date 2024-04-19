@@ -57,13 +57,15 @@ func init() {
 		nodeLabels,
 	)
 
-	// init gauge for observation count tracking
-	gauges[types.ReportObservationMetric] = promauto.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: types.ReportObservationMetric,
-		},
-		feedLabels,
-	)
+	// init gauges for tx details tracking
+	for _, txDetailMetric := range types.TxDetailsMetrics {
+		gauges[txDetailMetric] = promauto.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: txDetailMetric,
+			},
+			feedLabels,
+		)
+	}
 
 	// init gauge for slot height
 	gauges[types.SlotHeightMetric] = promauto.NewGaugeVec(

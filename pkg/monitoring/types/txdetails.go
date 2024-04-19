@@ -16,7 +16,15 @@ import (
 var (
 	TxDetailsType = "txdetails"
 
-	ReportObservationMetric = "report_observations"
+	ReportObservationMetric = "sol_report_observations"
+	TxFeeMetric             = "sol_tx_fee"
+	ComputeUnitPriceMetric  = "sol_tx_compute_unit_price"
+
+	TxDetailsMetrics = []string{
+		ReportObservationMetric,
+		TxFeeMetric,
+		ComputeUnitPriceMetric,
+	}
 )
 
 type TxDetails struct {
