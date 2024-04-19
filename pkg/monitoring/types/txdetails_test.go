@@ -6,20 +6,29 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
 	sampleTxResultSigner = solana.MustPublicKeyFromBase58("9YR7YttJFfptQJSo5xrnYoAw1fJyVonC1vxUSqzAgyjY")
-
-	sampleTxResult = rpc.GetTransactionResult{}
 )
 
 func init() {
-	if err := json.Unmarshal([]byte(SampleTxResultJSON), &sampleTxResult); err != nil {
-		panic("unable to unmarshal sampleTxResult")
-	}
+}
+
+func getTestTxResult(t *testing.T) *rpc.GetTransactionResult {
+	out := &rpc.GetTransactionResult{}
+	require.NoError(t, json.Unmarshal([]byte(SampleTxResultJSON), out))
+	return out
+}
+
+func getTestTx(t *testing.T) *solana.Transaction {
+	tx, err := getTestTxResult(t).Transaction.GetTransaction()
+	require.NoError(t, err)
+	require.NotNil(t, tx)
+	return tx
 }
 
 func TestParseTxResult(t *testing.T) {
@@ -36,7 +45,7 @@ func TestParseTxResult(t *testing.T) {
 	require.ErrorContains(t, err, "txResult.Transaction")
 
 	// happy path
-	res, err := ParseTxResult(&sampleTxResult, SampleTxResultProgram)
+	res, err := ParseTxResult(getTestTxResult(t), SampleTxResultProgram)
 	require.NoError(t, err)
 
 	assert.Equal(t, nil, res.Err)
@@ -47,40 +56,44 @@ func TestParseTx(t *testing.T) {
 	_, err := ParseTx(nil, SampleTxResultProgram)
 	require.ErrorContains(t, err, "tx is nil")
 
-	tx, err := sampleTxResult.Transaction.GetTransaction()
-	require.NoError(t, err)
-	require.NotNil(t, tx)
-
-	txMissingSig := *tx // copy
+	txMissingSig := getTestTx(t) // copy
 	txMissingSig.Signatures = []solana.Signature{}
-	_, err = ParseTx(&txMissingSig, SampleTxResultProgram)
+	_, err = ParseTx(txMissingSig, SampleTxResultProgram)
 	require.ErrorContains(t, err, "invalid number of signatures")
 
-	txMissingAccounts := *tx // copy
+	txMissingAccounts := getTestTx(t) // copy
 	txMissingAccounts.Message.AccountKeys = []solana.PublicKey{}
-	_, err = ParseTx(&txMissingAccounts, SampleTxResultProgram)
+	_, err = ParseTx(txMissingAccounts, SampleTxResultProgram)
 	require.ErrorContains(t, err, "invalid number of signatures")
 
-	prevIndex := tx.Message.Instructions[1].ProgramIDIndex
-	txInvalidProgramIndex := *tx                                       // copy
+	txInvalidProgramIndex := getTestTx(t)                              // copy
 	txInvalidProgramIndex.Message.Instructions[1].ProgramIDIndex = 100 // index 1 is ocr transmit call
-	out, err := ParseTx(&txInvalidProgramIndex, SampleTxResultProgram)
+	out, err := ParseTx(txInvalidProgramIndex, SampleTxResultProgram)
 	require.Error(t, err)
-	tx.Message.Instructions[1].ProgramIDIndex = prevIndex // reset - something shares memory underneath
 
 	// don't match program
-	out, err = ParseTx(tx, solana.PublicKey{})
+	out, err = ParseTx(getTestTx(t), solana.PublicKey{})
 	require.Error(t, err)
 
+	// invalid length transmit instruction + compute budget instruction
+	txInvalidTransmitInstruction := getTestTx(t)
+	txInvalidTransmitInstruction.Message.Instructions[0].Data = []byte{}
+	txInvalidTransmitInstruction.Message.Instructions[1].Data = []byte{}
+	_, err = ParseTx(txInvalidTransmitInstruction, SampleTxResultProgram)
+	require.ErrorContains(t, err, "transmit: invalid instruction length")
+
+	require.ErrorContains(t, err, "computeUnitPrice")
+
 	// happy path
-	out, err = ParseTx(tx, SampleTxResultProgram)
+	out, err = ParseTx(getTestTx(t), SampleTxResultProgram)
 	require.NoError(t, err)
 	assert.Equal(t, sampleTxResultSigner, out.Sender)
 	assert.Equal(t, uint8(4), out.ObservationCount)
+	assert.Equal(t, fees.ComputeUnitPrice(0), out.ComputeUnitPrice)
 
 	// multiple instructions - currently not the case
-	txMultipleTransmit := *tx
-	txMultipleTransmit.Message.Instructions = append(tx.Message.Instructions, tx.Message.Instructions[1])
-	out, err = ParseTx(&txMultipleTransmit, SampleTxResultProgram)
+	txMultipleTransmit := getTestTx(t)
+	txMultipleTransmit.Message.Instructions = append(txMultipleTransmit.Message.Instructions, getTestTx(t).Message.Instructions[1])
+	out, err = ParseTx(txMultipleTransmit, SampleTxResultProgram)
 	require.Error(t, err)
 }
