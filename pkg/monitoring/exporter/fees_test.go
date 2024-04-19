@@ -11,9 +11,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/metrics/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/testutils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 )
 
 func TestFees(t *testing.T) {
@@ -31,7 +33,7 @@ func TestFees(t *testing.T) {
 	require.NoError(t, err)
 
 	// happy path
-	exporter.Export(ctx, []types.TxDetails{{ObservationCount: 10}})
+	exporter.Export(ctx, []types.TxDetails{{Fee: 1, ComputeUnitPrice: 1}})
 	exporter.Cleanup(ctx)
 
 	// not txdetails type - no calls to mock
@@ -44,7 +46,8 @@ func TestFees(t *testing.T) {
 	exporter.Export(ctx, []types.TxDetails{{}})
 	assert.Equal(t, 1, logs.FilterMessage("exporter could not find non-empty TxDetails").Len())
 
-	// multiple TxDetails should only call for the first non-empty one
-	m.On("SetCount", uint8(1), mock.Anything).Once()
-	exporter.Export(ctx, []types.TxDetails{{}, {ObservationCount: 1}, {ObservationCount: 10}})
+	// multiple TxDetails should return average
+	// skip empty
+	m.On("Set", uint64(1), fees.ComputeUnitPrice(10), mock.Anything).Once()
+	exporter.Export(ctx, []types.TxDetails{{}, {Fee: 2}, {ComputeUnitPrice: 20}})
 }

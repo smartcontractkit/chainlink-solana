@@ -2,8 +2,12 @@ package exporter
 
 import (
 	"context"
+	"fmt"
+
+	"golang.org/x/exp/constraints"
 
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/metrics"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
@@ -50,7 +54,7 @@ type feesExporter struct {
 	metrics metrics.Fees
 }
 
-func (p *feesExporter) Export(ctx context.Context, data interface{}) {
+func (f *feesExporter) Export(ctx context.Context, data interface{}) {
 	details, err := types.MakeTxDetails(data)
 	if err != nil {
 		return // skip if input could not be parsed
@@ -62,25 +66,49 @@ func (p *feesExporter) Export(ctx context.Context, data interface{}) {
 	}
 
 	// calculate average of non empty TxDetails
-	var count int
-	var fee uint64
-	var computeUnits fees.ComputeUnitPrice
+	var feeArr []uint64
+	var computeUnitsArr []fees.ComputeUnitPrice
 	for _, d := range details {
 		if d.Empty() {
 			continue
 		}
-		count += 1
-		fee += d.Fee                       // TODO: overflow
-		computeUnits += d.ComputeUnitPrice // TODO: overflow
+		feeArr = append(feeArr, d.Fee)
+		computeUnitsArr = append(computeUnitsArr, d.ComputeUnitPrice)
 	}
-	if count == 0 {
+	if len(feeArr) == 0 || len(computeUnitsArr) == 0 {
+		f.log.Errorf("exporter could not find non-empty TxDetails")
 		return
 	}
 
-	// TODO: handle avg with generics?
-	p.metrics.Set(fee/uint64(count), computeUnits/fees.ComputeUnitPrice(count), p.label)
+	fee, err := Avg(feeArr)
+	if err != nil {
+		f.log.Errorf("fee average: %w", err)
+		return
+	}
+	computeUnits, err := Avg(computeUnitsArr)
+	if err != nil {
+		f.log.Errorf("computeUnits average: %w", err)
+		return
+	}
+
+	f.metrics.Set(fee, computeUnits, f.label)
 }
 
-func (p *feesExporter) Cleanup(_ context.Context) {
-	p.metrics.Cleanup(p.label)
+func (f *feesExporter) Cleanup(_ context.Context) {
+	f.metrics.Cleanup(f.label)
+}
+
+// TODO: move to chainlink-common + test cases
+func Avg[V constraints.Integer](arr []V) (V, error) {
+	total := V(0)
+
+	for _, v := range arr {
+		prev := total
+		total += v
+
+		if total < prev {
+			return 0, fmt.Errorf("overflow: %T", v)
+		}
+	}
+	return total / V(len(arr)), nil
 }
