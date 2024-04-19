@@ -43,7 +43,8 @@ func (td TxDetails) Empty() bool {
 	return td.Fee == 0 &&
 		td.Slot == 0 &&
 		td.Sender == solanaGo.PublicKey{} &&
-		td.ObservationCount == 0
+		td.ObservationCount == 0 &&
+		td.ComputeUnitPrice == 0
 }
 
 // MakeTxDetails casts an interface to []TxDetails

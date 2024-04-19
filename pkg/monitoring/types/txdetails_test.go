@@ -11,13 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	sampleTxResultSigner = solana.MustPublicKeyFromBase58("9YR7YttJFfptQJSo5xrnYoAw1fJyVonC1vxUSqzAgyjY")
-)
-
-func init() {
-}
-
 func getTestTxResult(t *testing.T) *rpc.GetTransactionResult {
 	out := &rpc.GetTransactionResult{}
 	require.NoError(t, json.Unmarshal([]byte(SampleTxResultJSON), out))
