@@ -73,6 +73,8 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Get core ref from PR body
         if: github.event_name == 'pull_request'
@@ -120,6 +122,7 @@ jobs:
       TEST_LOG_LEVEL: debug
       SELECTED_NETWORKS: SIMULATED
       INTERNAL_DOCKER_REPO: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Collect Metrics
         id: collect-gha-metrics
