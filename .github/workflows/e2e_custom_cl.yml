@@ -80,8 +80,9 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           comment="$(gh pr view https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }} --json body -q '.body')"
+          # shellcheck disable=SC2086
           core_ref="$(echo $comment | grep -oP 'core ref: \K\S+' || true)"
-          if [ ! -z "$core_ref" ]; then
+          if [ -n "$core_ref" ]; then
             echo "CUSTOM_CORE_REF=${core_ref}" >> "${GITHUB_ENV}"
           fi
       - name: Check if image exists
@@ -137,8 +138,9 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           comment="$(gh pr view https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }} --json body -q '.body')"
+          # shellcheck disable=SC2086
           core_ref="$(echo $comment | grep -oP 'core ref: \K\S+' || true)"
-          if [ ! -z "$core_ref" ]; then
+          if [ -n "$core_ref" ]; then
             echo "CUSTOM_CORE_REF=${core_ref}" >> "${GITHUB_ENV}"
           fi
       - name: Checkout the repo
