@@ -2,11 +2,9 @@ package exporter
 
 import (
 	"context"
-	"fmt"
-
-	"golang.org/x/exp/constraints"
 
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/mathutil"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/metrics"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
@@ -80,12 +78,12 @@ func (f *feesExporter) Export(ctx context.Context, data interface{}) {
 		return
 	}
 
-	fee, err := Avg(feeArr)
+	fee, err := mathutil.Avg(feeArr)
 	if err != nil {
 		f.log.Errorf("fee average: %w", err)
 		return
 	}
-	computeUnits, err := Avg(computeUnitsArr)
+	computeUnits, err := mathutil.Avg(computeUnitsArr)
 	if err != nil {
 		f.log.Errorf("computeUnits average: %w", err)
 		return
@@ -96,19 +94,4 @@ func (f *feesExporter) Export(ctx context.Context, data interface{}) {
 
 func (f *feesExporter) Cleanup(_ context.Context) {
 	f.metrics.Cleanup(f.label)
-}
-
-// TODO: move to chainlink-common + test cases
-func Avg[V constraints.Integer](arr []V) (V, error) {
-	total := V(0)
-
-	for _, v := range arr {
-		prev := total
-		total += v
-
-		if total < prev {
-			return 0, fmt.Errorf("overflow: %T", v)
-		}
-	}
-	return total / V(len(arr)), nil
 }
