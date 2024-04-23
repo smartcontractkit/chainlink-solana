@@ -16,7 +16,15 @@ import (
 var (
 	TxDetailsType = "txdetails"
 
-	ReportObservationMetric = "report_observations"
+	ReportObservationMetric = "sol_report_observations"
+	TxFeeMetric             = "sol_tx_fee"
+	ComputeUnitPriceMetric  = "sol_tx_compute_unit_price"
+
+	TxDetailsMetrics = []string{
+		ReportObservationMetric,
+		TxFeeMetric,
+		ComputeUnitPriceMetric,
+	}
 )
 
 type TxDetails struct {
@@ -26,15 +34,17 @@ type TxDetails struct {
 
 	Sender solanaGo.PublicKey
 
-	// report information - only supports single report per tx
+	// report tx information - only supports single report per tx
 	ObservationCount uint8
+	ComputeUnitPrice fees.ComputeUnitPrice
 }
 
 func (td TxDetails) Empty() bool {
 	return td.Fee == 0 &&
 		td.Slot == 0 &&
 		td.Sender == solanaGo.PublicKey{} &&
-		td.ObservationCount == 0
+		td.ObservationCount == 0 &&
+		td.ComputeUnitPrice == 0
 }
 
 // MakeTxDetails casts an interface to []TxDetails
@@ -93,15 +103,15 @@ func ParseTx(tx *solanaGo.Transaction, programAddr solanaGo.PublicKey) (TxDetail
 	// The signature at index i corresponds to the public key at index i in message.accountKeys.
 	sender := tx.Message.AccountKeys[0]
 
-	// CL node DF transactions should only have a compute budget + ocr2 instruction
+	// CL node DF transactions should only have a compute unit price + ocr2 instruction
 	if len(tx.Message.Instructions) != 2 {
 		return TxDetails{}, fmt.Errorf("not a node transaction")
 	}
 
-	var obsCount uint8
 	var totalErr error
 	var foundTransmit bool
 	var foundFee bool
+	txDetails := TxDetails{Sender: sender}
 	for _, instruction := range tx.Message.Instructions {
 		// protect against invalid index
 		if int(instruction.ProgramIDIndex) >= len(tx.Message.AccountKeys) {
@@ -113,21 +123,35 @@ func ParseTx(tx *solanaGo.Transaction, programAddr solanaGo.PublicKey) (TxDetail
 			// parse report from tx data (see solana/transmitter.go)
 			start := solana.StoreNonceLen + solana.ReportContextLen
 			end := start + int(solana.ReportLen)
+
+			// handle invalid length
+			if len(instruction.Data) < (solana.StoreNonceLen + solana.ReportContextLen + int(solana.ReportLen)) {
+				totalErr = errors.Join(totalErr, fmt.Errorf("transmit: invalid instruction length (%+v)", instruction))
+				continue
+			}
+
 			report := types.Report(instruction.Data[start:end])
-			count, err := solana.ReportCodec{}.ObserversCountFromReport(report)
+			var err error
+			txDetails.ObservationCount, err = solana.ReportCodec{}.ObserversCountFromReport(report)
 			if err != nil {
 				totalErr = errors.Join(totalErr, fmt.Errorf("%w (%+v)", err, instruction))
 				continue
 			}
-			obsCount = count
 			foundTransmit = true
 			continue
 		}
 
 		// find compute budget program instruction
 		if tx.Message.AccountKeys[instruction.ProgramIDIndex] == solanaGo.MustPublicKeyFromBase58(fees.COMPUTE_BUDGET_PROGRAM) {
-			// future: parsing fee calculation
+			// parsing compute unit price
+			var err error
+			txDetails.ComputeUnitPrice, err = fees.ParseComputeUnitPrice(instruction.Data)
+			if err != nil {
+				totalErr = errors.Join(totalErr, fmt.Errorf("computeUnitPrice: %w (%+v)", err, instruction))
+				continue
+			}
 			foundFee = true
+			continue
 		}
 	}
 	if totalErr != nil {
@@ -139,8 +163,5 @@ func ParseTx(tx *solanaGo.Transaction, programAddr solanaGo.PublicKey) (TxDetail
 		return TxDetails{}, fmt.Errorf("unable to parse both Transmit and Fee instructions")
 	}
 
-	return TxDetails{
-		Sender:           sender,
-		ObservationCount: obsCount,
-	}, nil
+	return txDetails, nil
 }

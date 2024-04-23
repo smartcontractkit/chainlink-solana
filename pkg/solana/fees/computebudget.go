@@ -3,6 +3,7 @@ package fees
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 
 	"github.com/gagliardetto/solana-go"
 )
@@ -61,6 +62,19 @@ func (val ComputeUnitPrice) Data() ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+func ParseComputeUnitPrice(data []byte) (ComputeUnitPrice, error) {
+	if len(data) != (1 + 8) { // instruction byte + uint64
+		return 0, fmt.Errorf("invalid length: %d", len(data))
+	}
+
+	if data[0] != Instruction_SetComputeUnitPrice {
+		return 0, fmt.Errorf("not SetComputeUnitPrice identifier: %d", data[0])
+	}
+
+	// guarantees length 8
+	return ComputeUnitPrice(binary.LittleEndian.Uint64(data[1:])), nil
 }
 
 // modifies passed in tx to set compute unit price
