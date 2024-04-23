@@ -61,8 +61,8 @@ func NewNamedModifierCodec(original types.RemoteCodec, itemType string, modifier
 }
 
 // NewIDLCodec is for Anchor custom types
-func NewIDLCodec(idl IDL, builder encodings.Builder) (encodings.CodecFromTypeCodec, error) {
-	accounts := make(map[string]encodings.TypeCodec)
+func NewIDLCodec(idl IDL, builder encodings.Builder) (types.RemoteCodec, error) {
+	accounts := make(encodings.LenientCodecFromTypeCodec)
 
 	refs := &codecRefs{
 		builder:      builder,
@@ -86,7 +86,7 @@ func NewIDLCodec(idl IDL, builder encodings.Builder) (encodings.CodecFromTypeCod
 		accounts[name] = accCodec
 	}
 
-	return encodings.CodecFromTypeCodec(accounts), nil
+	return accounts, nil
 }
 
 type codecRefs struct {

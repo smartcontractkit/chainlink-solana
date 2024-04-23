@@ -18,7 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	codeccommon "github.com/smartcontractkit/chainlink-common/pkg/codec"
-	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontestutils "github.com/smartcontractkit/chainlink-common/pkg/loop/testutils"
@@ -263,7 +262,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 	})
 }
 
-func newTestIDLAndCodec(t *testing.T) (string, codec.IDL, encodings.CodecFromTypeCodec) {
+func newTestIDLAndCodec(t *testing.T) (string, codec.IDL, types.RemoteCodec) {
 	t.Helper()
 
 	var idl codec.IDL
@@ -283,7 +282,7 @@ func newTestIDLAndCodec(t *testing.T) (string, codec.IDL, encodings.CodecFromTyp
 	return testutils.JSONIDLWithAllTypes, idl, entry
 }
 
-func newTestConfAndCodec(t *testing.T) (encodings.CodecFromTypeCodec, config.ChainReader) {
+func newTestConfAndCodec(t *testing.T) (types.RemoteCodec, config.ChainReader) {
 	t.Helper()
 
 	rawIDL, _, testCodec := newTestIDLAndCodec(t)
@@ -714,7 +713,7 @@ func (r *chainReaderInterfaceTester) MaxWaitTimeForEvents() time.Duration {
 	return maxWaitTime
 }
 
-func makeTestCodec(t *testing.T, rawIDL string, encoding config.EncodingType) encodings.CodecFromTypeCodec {
+func makeTestCodec(t *testing.T, rawIDL string, encoding config.EncodingType) types.RemoteCodec {
 	t.Helper()
 
 	var idl codec.IDL
