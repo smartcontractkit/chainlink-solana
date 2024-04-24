@@ -1,6 +1,6 @@
 # Build image
 
-FROM ubuntu:20.04 AS build
+FROM golang:1.21.5 AS build
 
 # OS dependencies
 RUN apt-get update && apt-get install -y wget gcc
@@ -12,13 +12,6 @@ COPY ./cmd/monitoring /solana-monitoring/cmd/monitoring
 COPY ./pkg /solana-monitoring/pkg
 COPY ./go.mod /solana-monitoring/
 COPY ./go.sum /solana-monitoring/
-
-# Install golang
-
-RUN wget -c https://dl.google.com/go/go1.18.1.linux-amd64.tar.gz -O - \
-  | tar -xz -C /usr/local \
-  && mkdir -p /go/src /go/bin
-ENV PATH /usr/local/go/bin:$PATH
 
 # Compile binary
 
