@@ -1,15 +1,10 @@
 name: "Compile SOM"
 
 on:
-  push:
-    branches:
-      - develop
-    paths:
-      - monitoring/**
-      - relayer/**
+  pull_request:
 
 jobs:
-  build:
+  build-container:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
