@@ -9,9 +9,10 @@ import (
 )
 
 var (
-	TestStructWithNestedStruct = "StructWithNestedStruct"
-	DefaultStringRef           = "test string"
-	DefaultTestStruct          = StructWithNestedStruct{
+	TestStructWithNestedStruct     = "StructWithNestedStruct"
+	TestStructWithNestedStructType = "StructWithNestedStructType"
+	DefaultStringRef               = "test string"
+	DefaultTestStruct              = StructWithNestedStruct{
 		Value: 80,
 		InnerStruct: ObjectRef1{
 			Prop1: 10,

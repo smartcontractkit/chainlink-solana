@@ -271,7 +271,7 @@ func newTestIDLAndCodec(t *testing.T) (string, codec.IDL, types.RemoteCodec) {
 		t.FailNow()
 	}
 
-	entry, err := codec.NewIDLCodec(idl, binary.LittleEndian())
+	entry, err := codec.NewIDLAccountCodec(idl, binary.LittleEndian())
 	if err != nil {
 		t.Logf("failed to create new codec from test IDL: %s", err.Error())
 		t.FailNow()
@@ -328,6 +328,7 @@ type mockedRPCCall struct {
 	delay time.Duration
 }
 
+// TODO BCI-3156 use a localnet for testing instead of a mock.
 type mockedRPCClient struct {
 	mu                sync.Mutex
 	responseByAddress map[string]mockedRPCCall
@@ -722,7 +723,7 @@ func makeTestCodec(t *testing.T, rawIDL string, encoding config.EncodingType) ty
 		t.FailNow()
 	}
 
-	testCodec, err := codec.NewIDLCodec(idl, config.BuilderForEncoding(encoding))
+	testCodec, err := codec.NewIDLAccountCodec(idl, config.BuilderForEncoding(encoding))
 	if err != nil {
 		t.Logf("failed to create new codec from test IDL: %s", err.Error())
 		t.FailNow()

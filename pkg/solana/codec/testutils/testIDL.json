@@ -78,6 +78,79 @@
   ],
   "types": [
     {
+      "name": "StructWithNestedStructType",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "value",
+            "type": "u8"
+          },
+          {
+            "name": "innerStruct",
+            "type": {
+              "defined": "ObjectRef1"
+            }
+          },
+          {
+            "name": "basicNestedArray",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u32",
+                    3
+                  ]
+                },
+                3
+              ]
+            }
+          },
+          {
+            "name": "option",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "definedArray",
+            "type": {
+              "array": [
+                {
+                  "defined": "ObjectRef2"
+                },
+                2
+              ]
+            }
+          },
+          {
+            "name": "basicVector",
+            "type": {
+              "vec": "string"
+            }
+          },
+          {
+            "name": "timeVal",
+            "type": "unixTimestamp"
+          },
+          {
+            "name": "durationVal",
+            "type": "duration"
+          },
+          {
+            "name": "publicKey",
+            "type": "publicKey"
+          },
+          {
+            "name": "enumVal",
+            "type": {
+              "defined": "SimpleEnum"
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "ObjectRef1",
       "type": {
         "kind": "struct",
