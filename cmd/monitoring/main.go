@@ -98,9 +98,14 @@ func main() {
 		logger.With(log, "component", "solana-prome-exporter"),
 		metrics.NewReportObservations(logger.With(log, "component", promMetrics)),
 	)
+	feesFactory := exporter.NewFeesFactory(
+		logger.With(log, "component", "solana-prome-exporter"),
+		metrics.NewFees(logger.With(log, "component", promMetrics)),
+	)
 	monitor.ExporterFactories = append(monitor.ExporterFactories,
 		feedBalancesExporterFactory,
 		reportObservationsFactory,
+		feesFactory,
 	)
 
 	// network exporters

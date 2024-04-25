@@ -16,9 +16,9 @@ import (
 var (
 	TxDetailsType = "txdetails"
 
-	ReportObservationMetric = "sol_report_observations"
-	TxFeeMetric             = "sol_tx_fee"
-	ComputeUnitPriceMetric  = "sol_tx_compute_unit_price"
+	ReportObservationMetric = "report_observations"
+	TxFeeMetric             = "tx_fee"
+	ComputeUnitPriceMetric  = "tx_compute_unit_price"
 
 	TxDetailsMetrics = []string{
 		ReportObservationMetric,
