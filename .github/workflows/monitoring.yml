@@ -2,6 +2,9 @@ name: "Compile SOM"
 
 on:
   pull_request:
+  push:
+    branches:
+      - develop
 
 jobs:
   build-container:

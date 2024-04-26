@@ -2,6 +2,9 @@ name: gauntlet
 
 on:
   pull_request:
+  push:
+    branches:
+      - develop
 
 jobs:
   tool_versions:

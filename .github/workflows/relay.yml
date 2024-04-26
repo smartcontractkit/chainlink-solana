@@ -2,6 +2,9 @@ name: relay
 
 on:
   pull_request:
+  push:
+    branches:
+      - develop
 
 jobs:
   relay_run_unit_tests:

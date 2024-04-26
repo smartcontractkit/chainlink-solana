@@ -1,6 +1,9 @@
 name: rust
 on:
   pull_request:
+  push:
+    branches:
+      - develop
 
 defaults:
   run:
