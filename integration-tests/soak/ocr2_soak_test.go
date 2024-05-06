@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
+	tc "github.com/smartcontractkit/chainlink/e2e-tests/testconfig"
 
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/common"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
