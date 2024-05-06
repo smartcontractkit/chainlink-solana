@@ -16,13 +16,13 @@ import (
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/guregu/null.v4"
 
-	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
+	tc "github.com/smartcontractkit/chainlink/e2e-tests/testconfig"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
-	"github.com/smartcontractkit/chainlink/integration-tests/actions"
-	"github.com/smartcontractkit/chainlink/integration-tests/client"
-	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
+	"github.com/smartcontractkit/chainlink/e2e-tests/actions"
+	"github.com/smartcontractkit/chainlink/e2e-tests/client"
+	"github.com/smartcontractkit/chainlink/e2e-tests/docker/test_env"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 
