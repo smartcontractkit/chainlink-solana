@@ -662,8 +662,8 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 name = "chainlink_solana"
 version = "1.0.0"
 dependencies = [
- "borsh 0.9.3",
- "borsh-derive 0.9.3",
+ "borsh 0.10.3",
+ "borsh-derive 0.10.3",
  "solana-program",
 ]
 
