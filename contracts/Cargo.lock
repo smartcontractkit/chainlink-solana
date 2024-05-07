@@ -9,6 +9,7 @@ dependencies = [
  "ahash 0.8.4",
  "anchor-lang",
  "arrayvec 1.0.0",
+ "bytemuck",
  "static_assertions",
 ]
 

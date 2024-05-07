@@ -19,3 +19,4 @@ anchor-lang = "0.28.0"
 static_assertions = "1.1.0"
 arrayvec = { version = "1.0.0", path = "../../crates/arrayvec" }
 ahash = "=0.8.4"
+bytemuck = "1.7"
