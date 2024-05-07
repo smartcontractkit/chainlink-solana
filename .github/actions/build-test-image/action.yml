@@ -28,7 +28,7 @@ runs:
   steps:
     - name: Check if image exists
       id: check-image
-      uses: smartcontractkit/chainlink-github-actions/docker/image-exists@336617ae6d70fec60c15cc3382e17a4d2615a801 # v2.2.0
+      uses: smartcontractkit/chainlink-github-actions/docker/image-exists@e29366cdecfe6befff9ab8c3cfe4825218505d58 # v2.3.16
       with:
         repository: chainlink-solana-tests
         tag: ${{ inputs.tag }}
@@ -41,14 +41,14 @@ runs:
         path: ${{ inputs.artifacts_path }}
     - name: Get CTF Version
       id: version
-      uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/mod-version@92e0f299a87522c2a37bfc4686c4d8a96dc9d28b # v2.3.5
+      uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/mod-version@e29366cdecfe6befff9ab8c3cfe4825218505d58 # v2.3.16
       with:
         go-project-path: ./integration-tests
         module-name: github.com/smartcontractkit/chainlink-testing-framework
         enforce-semantic-tag: false
     - name: Build and Publish Test Runner
       if: steps.check-image.outputs.exists == 'false'
-      uses: smartcontractkit/chainlink-github-actions/docker/build-push@336617ae6d70fec60c15cc3382e17a4d2615a801 # v2.2.0
+      uses: smartcontractkit/chainlink-github-actions/docker/build-push@e29366cdecfe6befff9ab8c3cfe4825218505d58 # v2.3.16
       with:
         tags: |
           ${{ inputs.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ inputs.QA_AWS_REGION }}.amazonaws.com/chainlink-solana-tests:${{ inputs.tag }}

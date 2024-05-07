@@ -52,7 +52,7 @@ jobs:
     steps:
       - name: Check if image exists
         id: check-image
-        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@336617ae6d70fec60c15cc3382e17a4d2615a801 # v2.2.0
+        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@e29366cdecfe6befff9ab8c3cfe4825218505d58 # v2.3.16
         with:
           repository: chainlink-solana-tests
           tag: ${{ github.sha }}
@@ -89,14 +89,14 @@ jobs:
     steps:
       - name: Check if image exists
         id: check-image
-        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@336617ae6d70fec60c15cc3382e17a4d2615a801 # v2.2.0
+        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@e29366cdecfe6befff9ab8c3cfe4825218505d58 # v2.3.16
         with:
           repository: chainlink
           tag: solana.${{ github.sha }}
           AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       - name: Build Image
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@cosmos_one_off # we will want to switch back to this once cosmos cools off336617ae6d70fec60c15cc3382e17a4d2615a801 # v2.2.0
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@e29366cdecfe6befff9ab8c3cfe4825218505d58 # v2.3.16
         with:
           cl_repo: smartcontractkit/chainlink
           cl_ref: ${{ github.event.inputs.cl_branch_ref }}
@@ -138,7 +138,7 @@ jobs:
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@336617ae6d70fec60c15cc3382e17a4d2615a801 # v2.2.0
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@e29366cdecfe6befff9ab8c3cfe4825218505d58 # v2.3.16
         with:
           test_command_to_run: cd ./integration-tests && go test -timeout 5h -count=1 -json $(args) ./soak 2>&1 | tee /tmp/gotest.log | gotestfmt
           go_mod_path: ./integration-tests/go.mod

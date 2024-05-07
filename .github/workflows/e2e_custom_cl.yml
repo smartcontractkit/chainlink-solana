@@ -87,7 +87,7 @@ jobs:
           fi
       - name: Check if image exists
         id: check-image
-        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@ad22fbd6f4d108b82aaf49b527bcf40f32babea8 # v2.2.1
+        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@e29366cdecfe6befff9ab8c3cfe4825218505d58 # v2.3.16
         with:
           repository: chainlink
           tag: solana.${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref || github.sha }}
@@ -95,7 +95,7 @@ jobs:
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       - name: Build Image
         if: steps.check-image.outputs.exists == 'false'
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@d5ab9fe53da374dd789b5d9ef10f3282197e088d # we will want to switch to this once cosmos settles back down 336617ae6d70fec60c15cc3382e17a4d2615a801 # v2.2.0
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@e29366cdecfe6befff9ab8c3cfe4825218505d58 # v2.3.16
         with:
           cl_repo: smartcontractkit/chainlink
           cl_ref: ${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref }}
@@ -167,7 +167,7 @@ jobs:
           # shellcheck disable=SC2086
           echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> $GITHUB_ENV
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@eccde1970eca69f079d3efb3409938a72ade8497 # v2.2.13
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@e29366cdecfe6befff9ab8c3cfe4825218505d58 # v2.3.16
         with:
           test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestfmt
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
