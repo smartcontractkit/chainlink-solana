@@ -3,6 +3,7 @@ package chainreader
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -13,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -165,6 +167,11 @@ func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, contractN
 	wg.Wait()
 
 	return nil
+}
+
+// QueryKey implements the types.ChainReader interface.
+func (s *SolanaChainReaderService) QueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
+	return nil, errors.New("unimplemented")
 }
 
 // Bind implements the types.ChainReader interface and allows new contract bindings to be added
