@@ -35,19 +35,19 @@ jobs:
     steps:
     - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
     - name: Cache cargo registry
-      uses: actions/cache@v2.1.7
+      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         path: ~/.cargo/registry
         key: ${{ runner.os }}-v2-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Cache cargo index
-      uses: actions/cache@v2.1.7
+      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         path: ~/.cargo/git
         key: ${{ runner.os }}-v2-cargo-index-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Cache cargo target dir
-      uses: actions/cache@v2.1.7
+      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         path: contracts/target
         key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
@@ -78,19 +78,19 @@ jobs:
     steps:
     - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
     - name: Cache cargo registry
-      uses: actions/cache@v2.1.7
+      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         path: ~/.cargo/registry
         key: ${{ runner.os }}-v2-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Cache cargo index
-      uses: actions/cache@v2.1.7
+      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         path: ~/.cargo/git
         key: ${{ runner.os }}-v2-cargo-index-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Cache cargo target dir
-      uses: actions/cache@v2.1.7
+      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         path: contracts/target
         key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
