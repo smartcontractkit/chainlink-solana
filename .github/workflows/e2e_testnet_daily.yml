@@ -190,6 +190,7 @@ jobs:
         if: steps.check-image.outputs.exists == 'false'
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@e29366cdecfe6befff9ab8c3cfe4825218505d58 # v2.3.16
         with:
+          should_checkout: true
           cl_repo: smartcontractkit/chainlink
           cl_ref: ${{ github.event.inputs.cl_branch_ref }}
           dep_solana_sha: ${{ github.event.pull_request.head.sha }}
