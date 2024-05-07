@@ -11,7 +11,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
       - name: Install Nix
-        uses: cachix/install-nix-action@29bd9290ef037a3ecbdafe83cbd2185e9dd0fa0a # v20
+        uses: cachix/install-nix-action@8887e596b4ee1134dae06b98d573bd674693f47c # v26
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - name: golangci-lint
@@ -30,7 +30,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
       - name: Install Nix
-        uses: cachix/install-nix-action@29bd9290ef037a3ecbdafe83cbd2185e9dd0fa0a # v20
+        uses: cachix/install-nix-action@8887e596b4ee1134dae06b98d573bd674693f47c # v26
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - name: golangci-lint
