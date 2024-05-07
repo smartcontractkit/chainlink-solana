@@ -16,7 +16,7 @@ pkgs.mkShell {
 
     # Golang
     # Keep this golang version in sync with the version in .tool-versions please
-    go_1_20
+    go_1_21
     gopls
     delve
     golangci-lint
@@ -39,7 +39,12 @@ pkgs.mkShell {
 
   LD_LIBRARY_PATH = lib.makeLibraryPath [pkgs.zlib stdenv.cc.cc.lib]; # lib64
 
-
   # Avoids issues with delve
   CGO_CPPFLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0";
+  CGO_ENABLED=0;
+
+  shellHook = ''
+    # install gotestloghelper
+    go install github.com/smartcontractkit/chainlink-testing-framework/tools/gotestloghelper@latest
+  '';
 }
