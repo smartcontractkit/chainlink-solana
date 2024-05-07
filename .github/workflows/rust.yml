@@ -31,40 +31,39 @@ jobs:
       env:
         RUSTUP_HOME: "/root/.rustup"
         FORCE_COLOR: 1
-
     steps:
-    - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
-    - name: Cache cargo registry
-      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
-      with:
-        path: ~/.cargo/registry
-        key: ${{ runner.os }}-v2-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
-    - name: Cache cargo index
-      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
-      with:
-        path: ~/.cargo/git
-        key: ${{ runner.os }}-v2-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-
-    - name: Cache cargo target dir
-      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
-      with:
-        path: contracts/target
-        key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-
-    - run: solana-keygen new -o id.json --no-bip39-passphrase
-    - name: Compile typescript client
-      run: |
-       cd ../ts
-       yarn install --frozen-lockfile
-       yarn build
-    - run: yarn install --frozen-lockfile
-    - run: anchor test
-    - run: |
-       cd examples/hello-world
-       yarn install --frozen-lockfile
-       anchor test
-
+      - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: Cache cargo registry
+        uses: actions/cache@v2.1.7
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-v2-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+  
+      - name: Cache cargo index
+        uses: actions/cache@v2.1.7
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-v2-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+  
+      - name: Cache cargo target dir
+        uses: actions/cache@v2.1.7
+        with:
+          path: contracts/target
+          key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+  
+      - run: solana-keygen new -o id.json --no-bip39-passphrase
+      - name: Compile typescript client
+        run: |
+          cd ../ts
+          yarn install --frozen-lockfile
+          yarn build
+      - run: yarn install --frozen-lockfile
+      - run: anchor test
+      - run: |
+          cd examples/hello-world
+          yarn install --frozen-lockfile
+          anchor test
+      
   rust_lint:
     name: Rust Lint
     runs-on: ubuntu-latest
@@ -76,21 +75,21 @@ jobs:
         FORCE_COLOR: 1
 
     steps:
-    - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+    - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
     - name: Cache cargo registry
-      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+      uses: actions/cache@v2.1.7
       with:
         path: ~/.cargo/registry
         key: ${{ runner.os }}-v2-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Cache cargo index
-      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+      uses: actions/cache@v2.1.7
       with:
         path: ~/.cargo/git
         key: ${{ runner.os }}-v2-cargo-index-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Cache cargo target dir
-      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+      uses: actions/cache@v2.1.7
       with:
         path: contracts/target
         key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
