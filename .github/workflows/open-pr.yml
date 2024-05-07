@@ -52,7 +52,7 @@ jobs:
           echo "original=$SHA" >> "$GITHUB_OUTPUT"
           git branch "${{ steps.run.outputs.name }}" 
           git push origin "${{ steps.run.outputs.name }}" 
-      - uses: planetscale/ghcommit-action@v0.1.33
+      - uses: planetscale/ghcommit-action@21a8cda29f55e5cc2cdae0cdbdd08e38dd148c25 # v0.1.37
         if: '!steps.check.outputs.skip'
         with:
           commit_message: ${{ steps.run.outputs.commitString }}
