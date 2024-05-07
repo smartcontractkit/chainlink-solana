@@ -1,7 +1,7 @@
-anchor_version = "0.25.0"
+anchor_version = "0.28.0"
 
 [registry]
-url = "https://anchor.projectserum.com"
+url = "https://api.apr.dev"
 
 [provider]
 cluster = "localnet"

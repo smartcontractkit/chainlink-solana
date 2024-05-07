@@ -15,6 +15,6 @@ cpi = ["no-entrypoint"]
 default = []
 
 [dependencies]
-anchor-lang = "0.25.0"
+anchor-lang = "0.28.0"
 static_assertions = "1.1.0"
 arrayvec = { version = "1.0.0", path = "../../crates/arrayvec" }
