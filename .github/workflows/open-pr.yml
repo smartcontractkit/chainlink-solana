@@ -69,7 +69,7 @@ jobs:
       - name: Setup GitHub Token
         if: '!steps.check.outputs.skip'
         id: token
-        uses: smartcontractkit/.github/actions/setup-github-token@9e7cc0779934cae4a9028b8588c9adb64d8ce68c # setup-github-token@0.1.0
+        uses: smartcontractkit/.github/actions/setup-github-token@7ac9af09dda8c553593d2153a975b43b6958fa9f # setup-github-token@0.1.2
         with:
           aws-role-arn: ${{ secrets.AWS_OIDC_CHAINLINK_SOLANA_CICD_TOKEN_ISSUER_ROLE_ARN }}
           aws-lambda-url: ${{ secrets.AWS_RELENG_TEAM_GATI_LAMBDA_URL }}
