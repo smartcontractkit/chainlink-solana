@@ -28,7 +28,7 @@ jobs:
           echo "closed<<EOF" >> $GITHUB_OUTPUT
           echo "$CLOSED" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
         if: steps.updates.outputs.open || steps.updates.outputs.closed
       - name: Open Issue
         if: steps.updates.outputs.open || steps.updates.outputs.closed
