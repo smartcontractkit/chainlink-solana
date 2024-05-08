@@ -101,3 +101,23 @@ func TestSetComputeUnitPrice(t *testing.T) {
 	})
 
 }
+
+func TestParseComputeUnitPrice(t *testing.T) {
+	data, err := ComputeUnitPrice(100).Data()
+	assert.NoError(t, err)
+
+	v, err := ParseComputeUnitPrice(data)
+	assert.NoError(t, err)
+	assert.Equal(t, ComputeUnitPrice(100), v)
+
+	_, err = ParseComputeUnitPrice([]byte{})
+	assert.ErrorContains(t, err, "invalid length")
+	tooLong := [10]byte{}
+	_, err = ParseComputeUnitPrice(tooLong[:])
+	assert.ErrorContains(t, err, "invalid length")
+
+	invalidData := data
+	invalidData[0] = Instruction_RequestHeapFrame
+	_, err = ParseComputeUnitPrice(invalidData)
+	assert.ErrorContains(t, err, "not SetComputeUnitPrice identifier")
+}

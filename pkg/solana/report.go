@@ -81,7 +81,7 @@ func (c ReportCodec) BuildReport(oo []median.ParsedAttributedObservation) (types
 func (c ReportCodec) MedianFromReport(report types.Report) (*big.Int, error) {
 	// report should contain timestamp + observers + median + juels per eth
 	if len(report) != int(ReportLen) {
-		return nil, fmt.Errorf("report length missmatch: %d (received), %d (expected)", len(report), ReportLen)
+		return nil, fmt.Errorf("report length mismatch: %d (received), %d (expected)", len(report), ReportLen)
 	}
 
 	// unpack median observation
@@ -93,4 +93,16 @@ func (c ReportCodec) MedianFromReport(report types.Report) (*big.Int, error) {
 
 func (c ReportCodec) MaxReportLength(n int) (int, error) {
 	return int(ReportLen), nil
+}
+
+func (c ReportCodec) ObserversCountFromReport(report types.Report) (uint8, error) {
+	// report should contain timestamp + observers + median + juels per eth
+	if len(report) != int(ReportLen) {
+		return 0, fmt.Errorf("report length mismatch: %d (received), %d (expected)", len(report), ReportLen)
+	}
+
+	// unpack observers count
+	start := int(TimestampLen)
+	end := start + int(ObsCountLen)
+	return report[start:end][0], nil
 }

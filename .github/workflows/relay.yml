@@ -2,6 +2,9 @@ name: relay
 
 on:
   pull_request:
+  push:
+    branches:
+      - develop
 
 jobs:
   relay_run_unit_tests:
@@ -22,6 +25,8 @@ jobs:
           git diff --stat --exit-code
       - name: Install Solana CLI
         run: ./scripts/install-solana-ci.sh
+      - name: Compilation check
+        run: go test -run=xxx ./... # check compilation across tests + relayer / monitoring go code without running
       - name: Build
         run: go build -v ./pkg/...
       - name: Test

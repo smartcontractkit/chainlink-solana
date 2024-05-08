@@ -1,0 +1,18 @@
+# CODEOWNERS Best Practices
+# 1. Per Github docs: "Order is important; the last matching pattern takes the most precedence."
+# Please define less specific codeowner paths before more specific codeowner paths in order for the more specific rule to have priority
+
+# global ownership
+* @smartcontractkit/bix-build
+
+# e2e test ownership
+/integration-tests @smartcontractkit/qa @smartcontractkit/bix-build
+
+# gauntlet ownership
+/gauntlet @smartcontractkit/devx @smartcontractkit/bix-build
+
+# relayer ownership
+/pkg @smartcontractkit/bix-build
+
+# monitoring ownership
+/pkg/monitoring @smartcontractkit/realtime
