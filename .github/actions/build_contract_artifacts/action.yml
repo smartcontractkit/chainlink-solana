@@ -31,7 +31,7 @@ runs:
     - name: Docker build
       if: ${{ inputs.image != '' && inputs.image-version != '' }}
       shell: bash
-      run: docker exec -it build-container bash -c "/repo/scripts/build-contract-artifacts-action.sh"
+      run: docker exec build-container bash -c "/repo/scripts/build-contract-artifacts-action.sh"
     - name: Check generated go bindings are up to date
       if: ${{ inputs.image  != '' && inputs.image-version  != '' }}
       shell: bash
@@ -40,7 +40,7 @@ runs:
       if: ${{ inputs.image != '' && inputs.image-version != '' }}
       shell: bash
       run: |
-        docker exec -it build-container bash -c "\
+        docker exec build-container bash -c "\
         export RUSTUP_HOME=\"/root/.rustup\" &&\
         cd /repo &&\
         ./scripts/programs-keys-gen.sh &&\
