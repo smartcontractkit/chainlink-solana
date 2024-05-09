@@ -68,7 +68,7 @@ jobs:
           cd /repo/contracts &&\
           yarn install --frozen-lockfile &&\
           anchor test &&\
-          cd /repo/examples/hello-world &&\
+          cd /repo/contracts/examples/hello-world &&\
           yarn install --frozen-lockfile &&\
           anchor test"
 

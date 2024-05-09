@@ -34,7 +34,7 @@ jobs:
         env:
           psversion: ${{ needs.get_projectserum_version.outputs.projectserum_version }}
         run: |
-          docker run -v $(pwd):/repo projectserum/build:"${psversion}" bash -c "\
+          docker run -v "$(pwd)":/repo projectserum/build:"${psversion}" bash -c "\
             anchor build &&\
             chown -R $(id -u):$(id -g) /repo"
       - name: Generate archive
