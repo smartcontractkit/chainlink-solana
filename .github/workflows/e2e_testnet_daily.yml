@@ -141,10 +141,10 @@ jobs:
         get_solana_sha,
       ]
     container:
-      image: projectserum/build:${{ needs.get_projectserum_version.outputs.projectserum_version }}
-      env:
-        RUSTUP_HOME: "/root/.rustup"
-        FORCE_COLOR: 1
+      # image: projectserum/build:${{ needs.get_projectserum_version.outputs.projectserum_version }}
+      # env:
+      #   RUSTUP_HOME: "/root/.rustup"
+      #   FORCE_COLOR: 1
     steps:
       - name: Collect Metrics
         if: needs.changes.outputs.src == 'true'
@@ -165,9 +165,11 @@ jobs:
           ref: ${{ needs.get_solana_sha.outputs.sha }}
       - name: Build contracts
         if: needs.changes.outputs.src == 'true' && needs.solana-test-image-exists.outputs.exists == 'false'
-        uses: smartcontractkit/chainlink-solana/.github/actions/build_contract_artifacts@21675b3a7dcdff8e790391708d4763020cace21e # stable action on December 18 2023
+        uses: ./.github/actions/build_contract_artifacts
         with:
           ref: ${{ needs.get_solana_sha.outputs.sha }}
+          image: projectserum/build
+          image-version: ${{ needs.get_projectserum_version.outputs.projectserum_version }}
 
   e2e_custom_build_custom_chainlink_image:
     name: E2E Custom Build Custom CL Image

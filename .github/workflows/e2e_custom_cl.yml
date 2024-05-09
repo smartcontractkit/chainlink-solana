@@ -55,16 +55,19 @@ jobs:
       contents: read
     runs-on: ubuntu-latest-32cores-128GB
     needs: [get_projectserum_version]
-    container:
-      image: projectserum/build:${{ needs.get_projectserum_version.outputs.projectserum_version }}
-      env:
-        RUSTUP_HOME: "/root/.rustup"
-        FORCE_COLOR: 1
+    # container:
+    #   image: projectserum/build:${{ needs.get_projectserum_version.outputs.projectserum_version }}
+    #   env:
+    #     RUSTUP_HOME: "/root/.rustup"
+    #     FORCE_COLOR: 1
     steps:
       - name: Checkout the repo
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: Build contracts
         uses: ./.github/actions/build_contract_artifacts
+        with:
+          image: projectserum/build
+          image-version: ${{ needs.get_projectserum_version.outputs.projectserum_version }}
 
   e2e_custom_build_custom_chainlink_image:
     name: E2E Custom Build Custom CL Image
