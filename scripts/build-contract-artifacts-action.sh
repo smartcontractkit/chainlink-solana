@@ -26,7 +26,7 @@ add-apt-repository ppa:git-core/ppa
 apt update
 apt install git -y
 cd "${REPO}"
-git config --global --add safe.directory "$1"
+git config --global --add safe.directory "${REPO}"
 
 # install achor-go
 go install github.com/gagliardetto/anchor-go@v0.2.3

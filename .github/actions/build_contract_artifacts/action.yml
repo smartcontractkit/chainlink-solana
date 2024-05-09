@@ -17,7 +17,7 @@ runs:
     - name: Docker run
       if: ${{ inputs.image != '' && inputs.image-version != '' }}
       shell: bash
-      run: docker run -v $(pwd):/repo projectserum/build:v0.27.0 bash -c "/repo/scripts/build-contract-artifacts-action.sh \"${GITHUB_WORKSPACE}\""
+      run: docker run -v $(pwd):/repo projectserum/build:v0.27.0 bash -c "/repo/scripts/build-contract-artifacts-action.sh"
 
     # should be used again after moving from projectserum/build to backpackapp/build
     - name: Install latest Git version (>= 2.18.0) for actions/checkout
