@@ -33,7 +33,7 @@ jobs:
       - name: Build Artifacts
         env:
           psversion: ${{ needs.get_projectserum_version.outputs.projectserum_version }}
-        run: docker run -v $(pwd):/repo projectserum/build:${psversion} bash -c "anchor build"
+        run: docker run -v $(pwd):/repo projectserum/build:"${psversion}"" bash -c "anchor build"
       - name: Generate archive
         run: |
           tar cfvz artifacts.tar.gz target/deploy/*.so target/idl/*
