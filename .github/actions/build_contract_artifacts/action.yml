@@ -14,14 +14,12 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Docker run
-      if: ${{ inputs.image != '' && inputs.image-version != '' }}
-      shell: bash
-      run: docker run -v $(pwd):/repo projectserum/build:v0.27.0 bash -c "/repo/scripts/build-contract-artifacts-action.sh"
-
-    # should be used again after moving from projectserum/build to backpackapp/build
+    - name: Checkout solana
+      uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+      with:
+        repository: smartcontractkit/chainlink-solana
+        ref: ${{ inputs.ref }}
     - name: Install latest Git version (>= 2.18.0) for actions/checkout
-      if: ${{ inputs.image == '' && inputs.image-version  == '' }}
       shell: bash
       run: |
         apt-get update
@@ -30,12 +28,36 @@ runs:
         apt update
         apt install git -y
         git config --global --add safe.directory "$GITHUB_WORKSPACE"
-    - name: Checkout solana
-      if: ${{ inputs.image  == '' && inputs.image-version  == '' }}
-      uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
-      with:
-        repository: smartcontractkit/chainlink-solana
-        ref: ${{ inputs.ref }}
+
+    # temporary docker run to build artifacts
+    - name: Builder Start
+      if: ${{ inputs.image != '' && inputs.image-version != '' }}
+      env:
+        image: ${{ inputs.image }}
+        image_version: ${{ inputs.image-version }}
+      shell: bash
+      run: docker run -d -v $(pwd):/repo --name build-container "${image}":"${image_version}" tail -f /dev/null
+    - name: Docker build
+      if: ${{ inputs.image != '' && inputs.image-version != '' }}
+      shell: bash
+      run: docker exec -it build-container bash -c "/repo/scripts/build-contract-artifacts-action.sh"
+    - name: Check generated go bindings are up to date
+      if: ${{ inputs.image  != '' && inputs.image-version  != '' }}
+      shell: bash
+      run: git diff --stat --exit-code
+    - name: Docker generate keys and build
+      if: ${{ inputs.image != '' && inputs.image-version != '' }}
+      shell: bash
+      run: |
+        docker exec -it build-container bash -c "\
+        export RUSTUP_HOME=\"/root/.rustup\" &&\
+        cd /repo &&\
+        ./scripts/programs-keys-gen.sh &&\
+        cd ./contracts &&\
+        anchor build"
+
+
+    # should be used again after moving from projectserum/build to backpackapp/build
     - name: Setup go
       if: ${{ inputs.image  == '' && inputs.image-version  == '' }}
       uses: actions/setup-go@v4
