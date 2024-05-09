@@ -21,36 +21,35 @@ runs:
         ref: ${{ inputs.ref }}
 
     # temporary docker run to build artifacts
-    - name: Builder Start
+    - name: Docker Builder
       if: ${{ inputs.image != '' && inputs.image-version != '' }}
       env:
         image: ${{ inputs.image }}
         image_version: ${{ inputs.image-version }}
       shell: bash
-      run: docker run -d -v $(pwd):/repo --name build-container "${image}":"${image_version}" tail -f /dev/null
-    - name: Docker build
-      if: ${{ inputs.image != '' && inputs.image-version != '' }}
-      shell: bash
-      run: docker exec build-container bash -c "/repo/scripts/build-contract-artifacts-action.sh"
-    - name: Check generated go bindings are up to date
-      if: ${{ inputs.image  != '' && inputs.image-version  != '' }}
-      shell: bash
-      run: git diff --stat --exit-code
-    - name: Docker generate keys and build
-      if: ${{ inputs.image != '' && inputs.image-version != '' }}
-      shell: bash
       run: |
+        # start container
+        docker run -d -v $(pwd):/repo --name build-container "${image}":"${image_version}" tail -f /dev/null
+        # generate go bindings
         docker exec build-container bash -c "\
-        export RUSTUP_HOME=\"/root/.rustup\" &&\
-        cd /repo &&\
-        ./scripts/programs-keys-gen.sh &&\
-        cd ./contracts &&\
-        anchor build"
+          chown -R $(id -u):$(id -g) /repo &&\
+          /repo/scripts/build-contract-artifacts-action.sh"
+        # check go bindings
+        git diff --stat --exit-code
+        # build with keys
+        docker exec build-container bash -c "\
+          export RUSTUP_HOME=\"/root/.rustup\" &&\
+          cd /repo &&\
+          ./scripts/programs-keys-gen.sh &&\
+          cd ./contracts &&\
+          anchor build &&\
+          chown -R $(id -u):$(id -g) /repo"
+        # clean up the container
         docker stop build-container
         docker rm build-container
-    - name: Adjust permissions for artifacts
-      if: ${{ inputs.image != '' && inputs.image-version != '' }}
-      run: chmod -R 644 ./contracts/target/deploy/
+        # fix upload permissions
+        # chown -R $(whoami):$(whoami) ./contracts/target/deploy/
+        # chmod -R 644 ./contracts/target/deploy/
 
 
     # should be used again after moving from projectserum/build to backpackapp/build

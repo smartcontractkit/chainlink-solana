@@ -39,13 +39,3 @@ anchor build
 # generate contract artifacts
 cd "${REPO}"
 ./scripts/anchor-go-gen.sh
-
-# check if the go interfaces have changed
-# git diff --stat --exit-code
-
-# # generate program keys
-# ./scripts/programs-keys-gen.sh
-
-# # build the contracts with updated keys
-# cd "${CONTRACTS}"
-# anchor build
