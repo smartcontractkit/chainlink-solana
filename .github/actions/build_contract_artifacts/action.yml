@@ -15,13 +15,13 @@ runs:
   using: composite
   steps:
     - name: Docker run
-      if: ${{ inputs.image != "" && inputs.image-version != "" }}
+      if: ${{ inputs.image != '' && inputs.image-version != '' }}
       shell: bash
       run: docker run -v $(pwd):/repo projectserum/build:v0.27.0 bash -c "/repo/scripts/build-contract-artifacts-action.sh"
 
     # should be used again after moving from projectserum/build to backpackapp/build
     - name: Install latest Git version (>= 2.18.0) for actions/checkout
-      if: ${{ inputs.image == "" && inputs.image-version == "" }}
+      if: ${{ inputs.image == '' && inputs.image-version  == '' }}
       shell: bash
       run: |
         apt-get update
@@ -31,35 +31,35 @@ runs:
         apt install git -y
         git config --global --add safe.directory "$GITHUB_WORKSPACE"
     - name: Checkout solana
-      if: ${{ inputs.image == "" && inputs.image-version == "" }}
+      if: ${{ inputs.image  == '' && inputs.image-version  == '' }}
       uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
       with:
         repository: smartcontractkit/chainlink-solana
         ref: ${{ inputs.ref }}
     - name: Setup go
-      if: ${{ inputs.image == "" && inputs.image-version == "" }}
+      if: ${{ inputs.image  == '' && inputs.image-version  == '' }}
       uses: actions/setup-go@v4
       with:
         go-version-file: "go.mod"
         check-latest: true
     - name: Generate build artifacts for go bindings check
-      if: ${{ inputs.image == "" && inputs.image-version == "" }}
+      if: ${{ inputs.image  == '' && inputs.image-version  == '' }}
       shell: bash
       run: anchor build
       working-directory: contracts
     - name: Check generated go bindings are up to date
-      if: ${{ inputs.image == "" && inputs.image-version == "" }}
+      if: ${{ inputs.image  == '' && inputs.image-version  == '' }}
       shell: bash
       run: |
         go install github.com/gagliardetto/anchor-go@v0.2.3
         ./scripts/anchor-go-gen.sh
         git diff --stat --exit-code
     - name: Generate program_ids
-      if: ${{ inputs.image == "" && inputs.image-version == "" }}
+      if: ${{ inputs.image  == '' && inputs.image-version  == '' }}
       shell: bash
       run: ./scripts/programs-keys-gen.sh
     - name: Generate build artifacts with custom program_ids
-      if: ${{ inputs.image == "" && inputs.image-version == "" }}
+      if: ${{ inputs.image  == '' && inputs.image-version  == '' }}
       shell: bash
       run: anchor build
       working-directory: contracts
