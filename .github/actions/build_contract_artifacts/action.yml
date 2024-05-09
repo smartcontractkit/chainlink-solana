@@ -31,9 +31,7 @@ runs:
         # start container
         docker run -d -v $(pwd):/repo --name build-container "${image}":"${image_version}" tail -f /dev/null
         # generate go bindings
-        docker exec build-container bash -c "\
-          chown -R $(id -u):$(id -g) /repo &&\
-          /repo/scripts/build-contract-artifacts-action.sh"
+        docker exec build-container bash -c "/repo/scripts/build-contract-artifacts-action.sh"
         # check go bindings
         git diff --stat --exit-code
         # build with keys
@@ -47,10 +45,6 @@ runs:
         # clean up the container
         docker stop build-container
         docker rm build-container
-        # fix upload permissions
-        # chown -R $(whoami):$(whoami) ./contracts/target/deploy/
-        # chmod -R 644 ./contracts/target/deploy/
-
 
     # should be used again after moving from projectserum/build to backpackapp/build
     - name: Install latest Git version (>= 2.18.0) for actions/checkout
