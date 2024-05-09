@@ -3,6 +3,7 @@ package chainreader_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -23,6 +24,7 @@ import (
 	commontestutils "github.com/smartcontractkit/chainlink-common/pkg/loop/testutils"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader"
@@ -40,8 +42,8 @@ func TestSolanaChainReaderService_ReaderInterface(t *testing.T) {
 	t.Parallel()
 
 	it := &chainReaderInterfaceTester{}
-	RunChainReaderInterfaceTests(t, it)
-	RunChainReaderInterfaceTests(t, commontestutils.WrapChainReaderTesterForLoop(it))
+	RunChainReaderGetLatestValueInterfaceTests(t, it)
+	RunChainReaderGetLatestValueInterfaceTests(t, commontestutils.WrapChainReaderTesterForLoop(it))
 }
 
 func TestSolanaChainReaderService_ServiceCtx(t *testing.T) {
@@ -644,6 +646,11 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 	}
 
 	return r.service.GetLatestValue(ctx, contractName, method, params, returnVal)
+}
+
+// QueryKey implements the types.ChainReader interface.
+func (r *wrappedTestChainReader) QueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
+	return nil, errors.New("unimplemented")
 }
 
 func getAddresses(t *testing.T, tester ChainReaderInterfaceTester, a, b int) (ag_solana.PublicKey, ag_solana.PublicKey) {
