@@ -19,15 +19,6 @@ runs:
       with:
         repository: smartcontractkit/chainlink-solana
         ref: ${{ inputs.ref }}
-    - name: Install latest Git version (>= 2.18.0) for actions/checkout
-      shell: bash
-      run: |
-        apt-get update
-        apt-get install software-properties-common -y
-        add-apt-repository ppa:git-core/ppa
-        apt update
-        apt install git -y
-        git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
     # temporary docker run to build artifacts
     - name: Builder Start
@@ -56,8 +47,17 @@ runs:
         cd ./contracts &&\
         anchor build"
 
-
     # should be used again after moving from projectserum/build to backpackapp/build
+    - name: Install latest Git version (>= 2.18.0) for actions/checkout
+      if: ${{ inputs.image  == '' && inputs.image-version  == '' }}
+      shell: bash
+      run: |
+        apt-get update
+        apt-get install software-properties-common -y
+        add-apt-repository ppa:git-core/ppa
+        apt update
+        apt install git -y
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
     - name: Setup go
       if: ${{ inputs.image  == '' && inputs.image-version  == '' }}
       uses: actions/setup-go@v4
