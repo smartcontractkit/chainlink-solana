@@ -46,6 +46,12 @@ runs:
         ./scripts/programs-keys-gen.sh &&\
         cd ./contracts &&\
         anchor build"
+        docker stop build-container
+        docker rm build-container
+    - name: Adjust permissions for artifacts
+      if: ${{ inputs.image != '' && inputs.image-version != '' }}
+      run: chmod -R 644 ./contracts/target/deploy/
+
 
     # should be used again after moving from projectserum/build to backpackapp/build
     - name: Install latest Git version (>= 2.18.0) for actions/checkout
