@@ -141,7 +141,7 @@ jobs:
         solana-test-image-exists,
         get_solana_sha,
       ]
-    container:
+    # container:
       # image: projectserum/build:${{ needs.get_projectserum_version.outputs.projectserum_version }}
       # env:
       #   RUSTUP_HOME: "/root/.rustup"
