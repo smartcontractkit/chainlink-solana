@@ -17,8 +17,8 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3 # checkout branch that it is called from
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+      - uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
         with:
           go-version-file: "go.mod"
           check-latest: true
@@ -52,7 +52,7 @@ jobs:
           echo "original=$SHA" >> "$GITHUB_OUTPUT"
           git branch "${{ steps.run.outputs.name }}" 
           git push origin "${{ steps.run.outputs.name }}" 
-      - uses: planetscale/ghcommit-action@v0.1.33
+      - uses: planetscale/ghcommit-action@21a8cda29f55e5cc2cdae0cdbdd08e38dd148c25 # v0.1.37
         if: '!steps.check.outputs.skip'
         with:
           commit_message: ${{ steps.run.outputs.commitString }}
@@ -69,14 +69,14 @@ jobs:
       - name: Setup GitHub Token
         if: '!steps.check.outputs.skip'
         id: token
-        uses: smartcontractkit/.github/actions/setup-github-token@9e7cc0779934cae4a9028b8588c9adb64d8ce68c # setup-github-token@0.1.0
+        uses: smartcontractkit/.github/actions/setup-github-token@7ac9af09dda8c553593d2153a975b43b6958fa9f # setup-github-token@0.1.2
         with:
           aws-role-arn: ${{ secrets.AWS_OIDC_CHAINLINK_SOLANA_CICD_TOKEN_ISSUER_ROLE_ARN }}
           aws-lambda-url: ${{ secrets.AWS_RELENG_TEAM_GATI_LAMBDA_URL }}
           aws-region: ${{ secrets.AWS_REGION }}
       - name: Create pull request
         if: '!steps.check.outputs.skip'
-        uses: peter-evans/create-pull-request@b1ddad2c994a25fbc81a28b3ec0e368bb2021c50 # v6.0.0
+        uses: peter-evans/create-pull-request@6d6857d36972b65feb161a90e484f2984215f83e # v6.0.5
         with:
           title: ${{ steps.run.outputs.prTitle }}
           base: ${{ steps.branch.outputs.original }}
