@@ -31,7 +31,7 @@ func newAccountReadBinding(acct string, codec types.RemoteCodec, reader BinaryDa
 		idlAccount: acct,
 		codec:      codec,
 		reader:     reader,
-		opts:        opts,
+		opts:       opts,
 	}
 }
 

@@ -4,11 +4,51 @@ inputs:
   ref:
     required: false
     description: The chainlink-solana ref to use
+  image:
+    required: false
+    description: docker image to use to build
+  image-version:
+    required: false
+    description: docker image version/tag to use for build
 
 runs:
   using: composite
   steps:
+    - name: Checkout solana
+      uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+      with:
+        repository: smartcontractkit/chainlink-solana
+        ref: ${{ inputs.ref }}
+
+    # temporary docker run to build artifacts
+    - name: Docker Builder
+      if: ${{ inputs.image != '' && inputs.image-version != '' }}
+      env:
+        image: ${{ inputs.image }}
+        image_version: ${{ inputs.image-version }}
+      shell: bash
+      run: |
+        # start container
+        docker run -d -v $(pwd):/repo --name build-container "${image}":"${image_version}" tail -f /dev/null
+        # generate go bindings
+        docker exec build-container bash -c "/repo/scripts/build-contract-artifacts-action.sh"
+        # check go bindings
+        git diff --stat --exit-code
+        # build with keys
+        docker exec build-container bash -c "\
+          export RUSTUP_HOME=\"/root/.rustup\" &&\
+          cd /repo &&\
+          ./scripts/programs-keys-gen.sh &&\
+          cd ./contracts &&\
+          anchor build &&\
+          chown -R $(id -u):$(id -g) /repo"
+        # clean up the container
+        docker stop build-container
+        docker rm build-container
+
+    # should be used again after moving from projectserum/build to backpackapp/build
     - name: Install latest Git version (>= 2.18.0) for actions/checkout
+      if: ${{ inputs.image  == '' && inputs.image-version  == '' }}
       shell: bash
       run: |
         apt-get update
@@ -17,35 +57,35 @@ runs:
         apt update
         apt install git -y
         git config --global --add safe.directory "$GITHUB_WORKSPACE"
-    - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-      with:
-        repository: smartcontractkit/chainlink-solana
-        ref: ${{ inputs.ref }}
     - name: Setup go
+      if: ${{ inputs.image  == '' && inputs.image-version  == '' }}
       uses: actions/setup-go@v4
       with:
         go-version-file: "go.mod"
         check-latest: true
-    - name: yarn install
-      shell: bash
-      run: yarn install --frozen-lockfile
     - name: Generate build artifacts for go bindings check
+      if: ${{ inputs.image  == '' && inputs.image-version  == '' }}
       shell: bash
       run: anchor build
       working-directory: contracts
     - name: Check generated go bindings are up to date
+      if: ${{ inputs.image  == '' && inputs.image-version  == '' }}
       shell: bash
       run: |
         go install github.com/gagliardetto/anchor-go@v0.2.3
         ./scripts/anchor-go-gen.sh
         git diff --stat --exit-code
     - name: Generate program_ids
+      if: ${{ inputs.image  == '' && inputs.image-version  == '' }}
       shell: bash
       run: ./scripts/programs-keys-gen.sh
     - name: Generate build artifacts with custom program_ids
+      if: ${{ inputs.image  == '' && inputs.image-version  == '' }}
       shell: bash
       run: anchor build
       working-directory: contracts
+
+    #save the contracts artifacts
     - name: Upload Artifacts
       uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
       with:

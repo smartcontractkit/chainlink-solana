@@ -55,18 +55,19 @@ jobs:
       contents: read
     runs-on: ubuntu-latest-32cores-128GB
     needs: [get_projectserum_version]
-    container:
-      image: projectserum/build:${{ needs.get_projectserum_version.outputs.projectserum_version }}
-      env:
-        RUSTUP_HOME: "/root/.rustup"
-        FORCE_COLOR: 1
+    # container:
+    #   image: projectserum/build:${{ needs.get_projectserum_version.outputs.projectserum_version }}
+    #   env:
+    #     RUSTUP_HOME: "/root/.rustup"
+    #     FORCE_COLOR: 1
     steps:
       - name: Checkout the repo
-        # Use v3.6.0 because the custom runner (container configured above)
-        # doesn't have node20 installed which is required for versions >=4
-        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
       - name: Build contracts
         uses: ./.github/actions/build_contract_artifacts
+        with:
+          image: projectserum/build
+          image-version: ${{ needs.get_projectserum_version.outputs.projectserum_version }}
 
   e2e_custom_build_custom_chainlink_image:
     name: E2E Custom Build Custom CL Image
@@ -149,10 +150,8 @@ jobs:
           fi
       - name: Checkout the repo
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
-        # Use v3-node20 because the build_contract_artfifacts action must use the node16 actions/upload-artifact@v3
-        # due to tech-debt. actions/download-artifact@v4 is not compatible with actions/upload-artifact@v3.
       - name: Download Artifacts
-        uses: actions/download-artifact@246d7188e736d3686f6d19628d253ede9697bd55 # v3-node20
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
         with:
           name: artifacts
           path: ${{ env.CONTRACT_ARTIFACTS_PATH }}

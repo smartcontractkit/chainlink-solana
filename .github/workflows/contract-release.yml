@@ -24,20 +24,25 @@ jobs:
     name: Release Artifacts
     runs-on: ubuntu-latest
     needs: [get_projectserum_version]
-    container:
-      image: projectserum/build:${{ needs.get_projectserum_version.outputs.projectserum_version }}
-      env:
-        RUSTUP_HOME: "/root/.rustup"
+    # container:
+    #   image: projectserum/build:${{ needs.get_projectserum_version.outputs.projectserum_version }}
+    #   env:
+    #     RUSTUP_HOME: "/root/.rustup"
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
       - name: Build Artifacts
-        run: anchor build
+        env:
+          psversion: ${{ needs.get_projectserum_version.outputs.projectserum_version }}
+        run: |
+          docker run -v "$(pwd)":/repo projectserum/build:"${psversion}" bash -c "\
+            anchor build &&\
+            chown -R $(id -u):$(id -g) /repo"
       - name: Generate archive
         run: |
           tar cfvz artifacts.tar.gz target/deploy/*.so target/idl/*
       - name: Create Release
         uses: softprops/action-gh-release@69320dbe05506a9a39fc8ae11030b214ec2d1f87 # v2.0.5
         with:
-          files: | 
+          files: |
             contracts/artifacts.tar.gz
             contracts/target/deploy/*.so
