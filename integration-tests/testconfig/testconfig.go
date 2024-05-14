@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/smartcontractkit/seth"
 
 	"github.com/barkimedes/go-deepcopy"
@@ -40,8 +39,8 @@ func (c *TestConfig) GetLoggingConfig() *ctf_config.LoggingConfig {
 	return c.Logging
 }
 
-func (c *TestConfig) GetPrivateEthereumNetworkConfig() *test_env.EthereumNetwork {
-	return &test_env.EthereumNetwork{}
+func (c *TestConfig) GetPrivateEthereumNetworkConfig() *ctf_config.EthereumNetworkConfig {
+	return &ctf_config.EthereumNetworkConfig{}
 }
 
 func (c *TestConfig) GetPyroscopeConfig() *ctf_config.PyroscopeConfig {
@@ -49,6 +48,10 @@ func (c *TestConfig) GetPyroscopeConfig() *ctf_config.PyroscopeConfig {
 }
 
 func (c *TestConfig) GetSethConfig() *seth.Config {
+	return nil
+}
+
+func (c *TestConfig) GetNodeConfig() *ctf_config.NodeConfig {
 	return nil
 }
 
