@@ -14,11 +14,12 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
-	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/test_env"
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/osutil"
 	"github.com/smartcontractkit/chainlink/integration-tests/testconfig"
+
+	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/test_env"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 
 	"golang.org/x/sync/errgroup"
 
@@ -117,7 +118,6 @@ type ProposalAcceptConfig struct {
 }
 
 func NewOCRv2State(t *testing.T, contracts int, namespacePrefix string, env string, isK8s bool, testConfig *testconfig.TestConfig) (*OCRv2TestState, error) {
-
 	c, err := New(env, isK8s).Default(t, namespacePrefix)
 	if err != nil {
 		return nil, err
@@ -260,7 +260,6 @@ func (m *OCRv2TestState) NewSolanaClientSetup(networkSettings *solclient.SolNetw
 		Interface("URLs", networkSettings.URLs).
 		Msg("Connected Solana client")
 	return ec, nil
-
 }
 
 func (m *OCRv2TestState) SetupClients() {
@@ -465,7 +464,6 @@ func (m *OCRv2TestState) ValidateRoundsAfter(chaosStartTime time.Time, timeout t
 }
 
 func (m *OCRv2TestState) GenerateOnChainConfig(nodeKeys []client.NodeKeysBundle, vaultAddress string, proposalId string) (OCR2OnChainConfig, error) {
-
 	var oracles []Operator
 
 	for _, nodeKey := range nodeKeys {
@@ -501,7 +499,6 @@ func (m *OCRv2TestState) GenerateOffChainConfig(
 	secret string,
 
 ) OCROffChainConfig {
-
 	offchainPublicKeys := make([]string, len(nodeKeysBundle))
 	peerIds := make([]string, len(nodeKeysBundle))
 	configPublicKeys := make([]string, len(nodeKeysBundle))
@@ -631,7 +628,6 @@ func (m *OCRv2TestState) ConfigureGauntlet(secret string) map[string]string {
 		"LINK":                         linkToken,
 		"VAULT":                        vault,
 	}
-
 }
 
 // GauntletEnvToRemoteRunner Setup the environment variables that will be needed inside the remote runner

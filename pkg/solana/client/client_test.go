@@ -13,7 +13,6 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -258,7 +257,7 @@ func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 		go func(i int) {
 			time.Sleep(time.Duration(rand.Intn(500)) * time.Millisecond) // randomly submit txs
 			sig, err := c.SendTx(ctx, tx)
-			assert.NoError(t, errors.Wrapf(err, "try #%d", i))
+			assert.NoError(t, err)
 			sigs[i] = sig
 			wg.Done()
 		}(i)

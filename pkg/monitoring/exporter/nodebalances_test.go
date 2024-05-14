@@ -10,15 +10,15 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/metrics"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/testutils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 )
 
 func TestNodeBalances(t *testing.T) {
-	ctx := utils.Context(t)
+	ctx := tests.Context(t)
 	lgr, logs := logger.TestObserved(t, zapcore.ErrorLevel)
 	factory := NewNodeBalancesFactory(lgr, metrics.NewNodeBalances)
 

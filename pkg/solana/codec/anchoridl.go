@@ -64,7 +64,6 @@ type IdlInstruction struct {
 type IdlAccountItemSlice []IdlAccountItem
 
 func (slice IdlAccountItemSlice) NumAccounts() (count int) {
-
 	for _, item := range slice {
 		if item.IdlAccount != nil {
 			count++
@@ -224,7 +223,6 @@ func (env *IdlType) UnmarshalJSON(data []byte) error {
 			env.asIdlTypeDefined = &target
 		}
 		if got, ok := v["array"]; ok {
-
 			if _, ok := got.([]interface{}); !ok {
 				panic(utilz.Sf("array is not in expected format:\n%s", spew.Sdump(got)))
 			}

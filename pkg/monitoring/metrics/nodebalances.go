@@ -4,6 +4,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 )
 

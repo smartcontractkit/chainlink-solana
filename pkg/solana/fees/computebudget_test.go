@@ -62,7 +62,6 @@ func TestSetComputeUnitPrice(t *testing.T) {
 		data, err := ComputeUnitPrice(1).Data()
 		assert.NoError(t, err)
 		assert.Equal(t, data, []byte(tx.Message.Instructions[0].Data))
-
 	})
 
 	// // not a valid test, account must exist for tx to be added
@@ -99,7 +98,6 @@ func TestSetComputeUnitPrice(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, data, []byte(tx.Message.Instructions[1].Data))
 	})
-
 }
 
 func TestParseComputeUnitPrice(t *testing.T) {

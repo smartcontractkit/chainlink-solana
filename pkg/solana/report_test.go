@@ -164,7 +164,6 @@ func TestMedianFromReport(t *testing.T) {
 			assert.Equal(t, len(tc.obs), int(count))
 		})
 	}
-
 }
 
 func TestHashReport(t *testing.T) {
@@ -226,7 +225,7 @@ func TestNegativeMedianValue(t *testing.T) {
 	for i, j := 0, len(medianBytes)-1; i < j; i, j = i+1, j-1 {
 		medianBytes[i], medianBytes[j] = medianBytes[j], medianBytes[i]
 	}
-	bin.NewBinDecoder(medianBytes).Decode(&medianFromRaw)
+	assert.NoError(t, bin.NewBinDecoder(medianBytes).Decode(&medianFromRaw))
 	assert.True(t, oo[0].Value.Cmp(medianFromRaw.BigInt()) == 0, "median observation in raw report does not match")
 
 	// check report can be parsed properly with a negative number

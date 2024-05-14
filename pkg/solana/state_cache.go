@@ -40,8 +40,7 @@ type StateCache struct {
 
 	// polling
 	done   chan struct{}
-	ctx    context.Context
-	cancel context.CancelFunc
+	stopCh services.StopChan
 }
 
 func NewStateCache(stateID solana.PublicKey, cfg config.Config, reader client.Reader, lggr logger.Logger) *StateCache {
@@ -54,16 +53,14 @@ func NewStateCache(stateID solana.PublicKey, cfg config.Config, reader client.Re
 }
 
 // Start polling
-func (c *StateCache) Start() error {
+func (c *StateCache) Start(ctx context.Context) error {
 	return c.StartOnce("pollState", func() error {
 		c.done = make(chan struct{})
-		ctx, cancel := context.WithCancel(context.Background())
-		c.ctx = ctx
-		c.cancel = cancel
+		c.stopCh = make(chan struct{})
 		// We synchronously update the config on start so that
 		// when OCR starts there is config available (if possible).
 		// Avoids confusing "contract has not been configured" OCR errors.
-		err := c.fetchState(c.ctx)
+		err := c.fetchState(ctx)
 		if err != nil {
 			c.lggr.Warnf("error in initial PollState.fetchState %s", err)
 		}
@@ -75,17 +72,19 @@ func (c *StateCache) Start() error {
 // PollState contains the state and transmissions polling implementation
 func (c *StateCache) PollState() {
 	defer close(c.done)
+	ctx, cancel := c.stopCh.NewCtx()
+	defer cancel()
 	c.lggr.Debugf("Starting state polling for state: %s", c.StateID)
 	tick := time.After(0)
 	for {
 		select {
-		case <-c.ctx.Done():
+		case <-ctx.Done():
 			c.lggr.Debugf("Stopping state polling for state: %s", c.StateID)
 			return
 		case <-tick:
 			// async poll both ocr2 states
 			start := time.Now()
-			err := c.fetchState(c.ctx)
+			err := c.fetchState(ctx)
 			if err != nil {
 				c.lggr.Errorf("error in PollState.fetchState %s", err)
 			}
@@ -98,7 +97,7 @@ func (c *StateCache) PollState() {
 // Close stops the polling
 func (c *StateCache) Close() error {
 	return c.StopOnce("pollState", func() error {
-		c.cancel()
+		close(c.stopCh)
 		<-c.done
 		return nil
 	})
@@ -117,7 +116,6 @@ func (c *StateCache) ReadState() (State, error) {
 }
 
 func (c *StateCache) fetchState(ctx context.Context) error {
-
 	c.lggr.Debugf("fetch state for account: %s", c.StateID.String())
 	state, _, err := GetState(ctx, c.reader, c.StateID, c.cfg.Commitment())
 	if err != nil {

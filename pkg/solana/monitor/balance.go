@@ -8,7 +8,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
@@ -25,7 +24,7 @@ type Keystore interface {
 }
 
 // NewBalanceMonitor returns a balance monitoring services.Service which reports the SOL balance of all ks keys to prometheus.
-func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, newReader func() (solanaClient.Reader, error)) types.Service {
+func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, newReader func() (solanaClient.Reader, error)) services.Service {
 	return newBalanceMonitor(chainID, cfg, lggr, ks, newReader)
 }
 
@@ -54,7 +53,8 @@ type balanceMonitor struct {
 
 	reader solanaClient.Reader
 
-	stop, done chan struct{}
+	stop services.StopChan
+	done chan struct{}
 }
 
 func (b *balanceMonitor) Name() string {
@@ -82,7 +82,7 @@ func (b *balanceMonitor) HealthReport() map[string]error {
 
 func (b *balanceMonitor) monitor() {
 	defer close(b.done)
-	ctx, cancel := utils.ContextFromChan(b.stop)
+	ctx, cancel := b.stop.NewCtx()
 	defer cancel()
 
 	tick := time.After(utils.WithJitter(b.cfg.BalancePollPeriod()))

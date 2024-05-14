@@ -8,14 +8,15 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/metrics/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/testutils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 )
 
 func TestSlotHeight(t *testing.T) {
-	ctx := utils.Context(t)
+	ctx := tests.Context(t)
 	m := mocks.NewSlotHeight(t)
 	m.On("Set", mock.Anything, mock.Anything, mock.Anything).Once()
 	m.On("Cleanup").Once()

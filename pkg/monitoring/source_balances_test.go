@@ -14,7 +14,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/testutils"
@@ -25,18 +26,19 @@ import (
 func TestFeedBalancesSource(t *testing.T) {
 	cr := mocks.NewChainReader(t)
 	lgr := logger.Test(t)
-	ctx := utils.Context(t)
+	ctx := tests.Context(t)
 
 	factory := NewFeedBalancesSourceFactory(cr, lgr)
 	assert.Equal(t, types.BalanceType, factory.GetType())
 
 	// generate source
-	source, err := factory.NewSource(nil, nil)
+	_, err := factory.NewSource(nil, nil)
 	assert.Error(t, err)
-	source, err = factory.NewSource(nil, config.SolanaFeedConfig{
+	source, err := factory.NewSource(nil, config.SolanaFeedConfig{
 		ContractAddress: testutils.GeneratePublicKey(),
 		StateAccount:    testutils.GeneratePublicKey(),
 	})
+	require.NoError(t, err)
 
 	cr.On("GetState", mock.Anything, mock.Anything, mock.Anything).Return(pkgSolana.State{}, uint64(0), fmt.Errorf("fail")).Once()
 	cr.On("GetState", mock.Anything, mock.Anything, mock.Anything).Return(pkgSolana.State{
@@ -76,7 +78,7 @@ func TestFeedBalancesSource(t *testing.T) {
 func TestBalancesSource(t *testing.T) {
 	cr := mocks.NewChainReader(t)
 	lgr, logs := logger.TestObserved(t, zapcore.ErrorLevel)
-	ctx := utils.Context(t)
+	ctx := tests.Context(t)
 
 	b := balancesSource{
 		client: cr,
@@ -132,7 +134,7 @@ func TestBalancesSource(t *testing.T) {
 func TestNodeBalancesSource(t *testing.T) {
 	cr := mocks.NewChainReader(t)
 	lgr := logger.Test(t)
-	ctx := utils.Context(t)
+	ctx := tests.Context(t)
 	key := solana.PublicKey{1}
 
 	factory := NewNodeBalancesSourceFactory(cr, lgr)

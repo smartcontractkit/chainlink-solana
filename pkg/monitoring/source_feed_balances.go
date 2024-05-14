@@ -10,6 +10,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 )

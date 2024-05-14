@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -148,6 +149,7 @@ func TestGetLatestTransmission(t *testing.T) {
 }
 
 func TestCache(t *testing.T) {
+	ctx := tests.Context(t)
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// create response
 		body, err := io.ReadAll(r.Body)
@@ -172,9 +174,9 @@ func TestCache(t *testing.T) {
 		reader:  testSetupReader(t, mockServer.URL),
 		lggr:    lggr,
 	}
-	require.NoError(t, stateCache.Start())
+	require.NoError(t, stateCache.Start(ctx))
 	require.NoError(t, stateCache.Close())
-	require.NoError(t, stateCache.fetchState(context.Background()))
+	require.NoError(t, stateCache.fetchState(ctx))
 	assert.Equal(t, "GADeYvXjPwZP7ds1yDY9VFp12bNjdxT1YyksMvFGK9xn", stateCache.state.Transmissions.String())
 	assert.True(t, !stateCache.stateTime.IsZero())
 
@@ -184,10 +186,10 @@ func TestCache(t *testing.T) {
 		reader:          testSetupReader(t, mockServer.URL),
 		lggr:            lggr,
 	}
-	require.NoError(t, transmissionsCache.Start())
+	require.NoError(t, transmissionsCache.Start(ctx))
 	require.NoError(t, transmissionsCache.Close())
 
-	require.NoError(t, transmissionsCache.fetchLatestTransmission(context.Background()))
+	require.NoError(t, transmissionsCache.fetchLatestTransmission(ctx))
 	answer, err := transmissionsCache.ReadAnswer()
 	assert.NoError(t, err)
 	assert.Equal(t, expectedTime, answer.Timestamp)
@@ -228,5 +230,4 @@ func TestNilPointerHandling(t *testing.T) {
 	passFirst = true // allow proper response for header query, fail on transmission
 	_, _, err = GetLatestTransmission(context.TODO(), reader, solana.PublicKey{}, "")
 	assert.EqualError(t, err, errString+"GetLatestTransmission.GetAccountInfoWithOpts.Transmission")
-
 }

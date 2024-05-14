@@ -1,6 +1,7 @@
 package solana
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,7 +10,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -34,7 +34,7 @@ func TestSolanaChain_GetClient(t *testing.T) {
 
 			// clients with correct chainID should request chainID only once
 			if _, exists := checkOnce[r.URL.Path]; exists {
-				assert.NoError(t, errors.Errorf("rpc has been called once already for successful client '%s'", r.URL.Path))
+				assert.NoError(t, fmt.Errorf("rpc has been called once already for successful client '%s'", r.URL.Path))
 			}
 			checkOnce[r.URL.Path] = struct{}{}
 		}
