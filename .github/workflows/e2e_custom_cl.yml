@@ -122,11 +122,7 @@ jobs:
     env:
       TEST_SUITE: smoke
       TEST_ARGS: -test.timeout 30m
-      CHAINLINK_COMMIT_SHA: ${{ github.sha }}
-      CHAINLINK_ENV_USER: ${{ github.actor }}
       TEST_LOG_LEVEL: debug
-      SELECTED_NETWORKS: SIMULATED
-      INTERNAL_DOCKER_REPO: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Collect Metrics
@@ -163,7 +159,9 @@ jobs:
           [ChainlinkImage]
           image="${{ env.CL_ECR }}"
           version="solana.${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref || github.sha }}"
+          [Common]
           user="${{ github.actor }}"
+          internal_docker_repo = "${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com"
           EOF
 
           # shellcheck disable=SC2002
