@@ -163,6 +163,7 @@ jobs:
           [ChainlinkImage]
           image="${{ env.CL_ECR }}"
           version="solana.${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref || github.sha }}"
+          user="${{ github.actor }}"
           EOF
 
           # shellcheck disable=SC2002

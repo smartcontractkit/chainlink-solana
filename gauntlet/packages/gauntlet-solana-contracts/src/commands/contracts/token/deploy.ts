@@ -56,6 +56,9 @@ export default class DeployToken extends SolanaCommand {
     `)
 
     return {
+      data: {
+        vault: tokenVault.toString()
+      },
       responses: [
         {
           tx: { ...this.wrapResponse('', token.toString()), wait: async () => ({ success: true }) },

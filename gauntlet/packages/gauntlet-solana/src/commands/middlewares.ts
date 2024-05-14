@@ -8,7 +8,7 @@ import SolanaCommand from './internal/solana'
 import { LedgerWallet, LocalWallet } from './wallet'
 
 const isValidURL = (url: string) => {
-  var pattern = new RegExp('^(https?)://')
+  var pattern = new RegExp('^(https?|wss?):\/')
   return pattern.test(url)
 }
 export const withProvider: Middleware = (c: SolanaCommand, next: Next) => {
@@ -17,8 +17,12 @@ export const withProvider: Middleware = (c: SolanaCommand, next: Next) => {
     nodeURL && isValidURL(nodeURL),
     `Invalid NODE_URL (${nodeURL}), please add an http:// or https:// prefix`,
   )
-
-  c.provider = new AnchorProvider(new Connection(nodeURL), c.wallet, {})
+  const wsUrl = process.env.WS_URL
+  assertions.assert(
+    wsUrl && isValidURL(wsUrl),
+    `Invalid WS_URL (${wsUrl}), please add an ws:// or wss:// prefix`,
+  )
+  c.provider = new AnchorProvider(new Connection(nodeURL, { wsEndpoint: wsUrl }), c.wallet, {})
   return next()
 }
 
