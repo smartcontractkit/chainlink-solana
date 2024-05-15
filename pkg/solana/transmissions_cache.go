@@ -2,13 +2,14 @@ package solana
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 	"time"
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
@@ -35,8 +36,7 @@ type TransmissionsCache struct {
 
 	// polling
 	done   chan struct{}
-	ctx    context.Context
-	cancel context.CancelFunc
+	stopCh services.StopChan
 }
 
 func NewTransmissionsCache(transmissionsID solana.PublicKey, cfg config.Config, reader client.Reader, lggr logger.Logger) *TransmissionsCache {
@@ -49,16 +49,14 @@ func NewTransmissionsCache(transmissionsID solana.PublicKey, cfg config.Config, 
 }
 
 // Start polling
-func (c *TransmissionsCache) Start() error {
+func (c *TransmissionsCache) Start(ctx context.Context) error {
 	return c.StartOnce("pollTransmissions", func() error {
 		c.done = make(chan struct{})
-		ctx, cancel := context.WithCancel(context.Background())
-		c.ctx = ctx
-		c.cancel = cancel
+		c.stopCh = make(chan struct{})
 		// We synchronously update the config on start so that
 		// when OCR starts there is config available (if possible).
 		// Avoids confusing "contract has not been configured" OCR errors.
-		err := c.fetchLatestTransmission(c.ctx)
+		err := c.fetchLatestTransmission(ctx)
 		if err != nil {
 			c.lggr.Warnf("error in initial PollTransmissions %s", err)
 		}
@@ -70,7 +68,7 @@ func (c *TransmissionsCache) Start() error {
 // Close stops the polling
 func (c *TransmissionsCache) Close() error {
 	return c.StopOnce("transmissionCache", func() error {
-		c.cancel()
+		close(c.stopCh)
 		<-c.done
 		return nil
 	})
@@ -79,17 +77,19 @@ func (c *TransmissionsCache) Close() error {
 // PollTransmissions contains the transmissions polling implementation
 func (c *TransmissionsCache) PollTransmissions() {
 	defer close(c.done)
+	ctx, cancel := c.stopCh.NewCtx()
+	defer cancel()
 	c.lggr.Debugf("Starting state polling transmissions: %s", c.TransmissionsID)
 	tick := time.After(0)
 	for {
 		select {
-		case <-c.ctx.Done():
+		case <-ctx.Done():
 			c.lggr.Debugf("Stopping state polling transmissions: %s", c.TransmissionsID)
 			return
 		case <-tick:
 			// async poll both transmission + ocr2 states
 			start := time.Now()
-			err := c.fetchLatestTransmission(c.ctx)
+			err := c.fetchLatestTransmission(ctx)
 			if err != nil {
 				c.lggr.Errorf("error in PollTransmissions.fetchLatestTransmission %s", err)
 			}
@@ -141,7 +141,7 @@ func GetLatestTransmission(ctx context.Context, reader client.AccountReader, acc
 		},
 	})
 	if err != nil {
-		return Answer{}, 0, errors.Wrap(err, "error on rpc.GetAccountInfo [cursor]")
+		return Answer{}, 0, fmt.Errorf("error on rpc.GetAccountInfo [cursor]: %w", err)
 	}
 
 	// check for nil pointers
@@ -152,11 +152,11 @@ func GetLatestTransmission(ctx context.Context, reader client.AccountReader, acc
 	// parse header
 	var header TransmissionsHeader
 	if err = bin.NewBinDecoder(res.Value.Data.GetBinary()).Decode(&header); err != nil {
-		return Answer{}, 0, errors.Wrap(err, "failed to decode transmission account header")
+		return Answer{}, 0, fmt.Errorf("failed to decode transmission account header: %w", err)
 	}
 
 	if header.Version != 2 {
-		return Answer{}, 0, errors.Wrapf(err, "can't parse feed version %v", header.Version)
+		return Answer{}, 0, fmt.Errorf("can't parse feed version %v: %w", header.Version, err)
 	}
 
 	cursor := header.LiveCursor
@@ -181,7 +181,7 @@ func GetLatestTransmission(ctx context.Context, reader client.AccountReader, acc
 		},
 	})
 	if err != nil {
-		return Answer{}, 0, errors.Wrap(err, "error on rpc.GetAccountInfo [transmission]")
+		return Answer{}, 0, fmt.Errorf("error on rpc.GetAccountInfo [transmission]: %w", err)
 	}
 	// check for nil pointers
 	if res == nil || res.Value == nil || res.Value.Data == nil {
@@ -191,7 +191,7 @@ func GetLatestTransmission(ctx context.Context, reader client.AccountReader, acc
 	// parse tranmission
 	var t Transmission
 	if err := bin.NewBinDecoder(res.Value.Data.GetBinary()).Decode(&t); err != nil {
-		return Answer{}, 0, errors.Wrap(err, "failed to decode transmission")
+		return Answer{}, 0, fmt.Errorf("failed to decode transmission: %w", err)
 	}
 
 	return Answer{

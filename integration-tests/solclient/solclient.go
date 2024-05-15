@@ -497,7 +497,6 @@ func (c *Client) AddHeaderEventSubscription(key string, subscriber blockchain.He
 }
 
 func SendFunds(senderPrivateKey string, receiverPublicKey string, lamports uint64, rpcClient *rpc.Client, wsClient *ws.Client) error {
-
 	// Convert the private key string to a byte slice
 	var privateKeyBytes []byte
 	err := json.Unmarshal([]byte(senderPrivateKey), &privateKeyBytes)

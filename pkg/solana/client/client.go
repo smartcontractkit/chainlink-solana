@@ -2,15 +2,16 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/pkg/errors"
+	"golang.org/x/sync/singleflight"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
-	"golang.org/x/sync/singleflight"
 )
 
 const (
@@ -146,7 +147,7 @@ func (c *Client) GetFeeForMessage(msg string) (uint64, error) {
 	defer cancel()
 	res, err := c.rpc.GetFeeForMessage(ctx, msg, c.commitment)
 	if err != nil {
-		return 0, errors.Wrap(err, "error in GetFeeForMessage")
+		return 0, fmt.Errorf("error in GetFeeForMessage: %w", err)
 	}
 
 	if res == nil || res.Value == nil {
@@ -163,7 +164,7 @@ func (c *Client) SignatureStatuses(ctx context.Context, sigs []solana.Signature)
 	// searchTransactionHistory = false
 	res, err := c.rpc.GetSignatureStatuses(ctx, false, sigs...)
 	if err != nil {
-		return nil, errors.Wrap(err, "error in GetSignatureStatuses")
+		return nil, fmt.Errorf("error in GetSignatureStatuses: %w", err)
 	}
 
 	if res == nil || res.Value == nil {
@@ -187,7 +188,7 @@ func (c *Client) SimulateTx(ctx context.Context, tx *solana.Transaction, opts *r
 
 	res, err := c.rpc.SimulateTransactionWithOpts(ctx, tx, opts)
 	if err != nil {
-		return nil, errors.Wrap(err, "error in SimulateTransactionWithOpts")
+		return nil, fmt.Errorf("error in SimulateTransactionWithOpts: %w", err)
 	}
 
 	if res == nil || res.Value == nil {

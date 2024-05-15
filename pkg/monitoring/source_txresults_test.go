@@ -11,7 +11,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/testutils"
@@ -20,17 +21,18 @@ import (
 func TestTxResultsSource(t *testing.T) {
 	cr := mocks.NewChainReader(t)
 	lgr := logger.Test(t)
-	ctx := utils.Context(t)
+	ctx := tests.Context(t)
 
 	factory := NewTxResultsSourceFactory(cr, lgr)
 	assert.Equal(t, txresultsType, factory.GetType())
 
 	// generate source
-	source, err := factory.NewSource(nil, nil)
+	_, err := factory.NewSource(nil, nil)
 	assert.Error(t, err)
-	source, err = factory.NewSource(nil, config.SolanaFeedConfig{
+	source, err := factory.NewSource(nil, config.SolanaFeedConfig{
 		StateAccount: testutils.GeneratePublicKey(),
 	})
+	require.NoError(t, err)
 
 	success, fail, sigs := testutils.GenerateTransactionSignatures()
 	assert.Equal(t, 100, success+fail)

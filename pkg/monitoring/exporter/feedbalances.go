@@ -7,6 +7,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/metrics"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 )

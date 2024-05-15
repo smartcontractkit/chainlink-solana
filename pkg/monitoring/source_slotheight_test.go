@@ -8,7 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 )
@@ -16,13 +17,14 @@ import (
 func TestSlotHeightSource(t *testing.T) {
 	cr := mocks.NewChainReader(t)
 	lgr := logger.Test(t)
-	ctx := utils.Context(t)
+	ctx := tests.Context(t)
 
 	factory := NewSlotHeightSourceFactory(cr, lgr)
 	assert.Equal(t, types.SlotHeightType, factory.GetType())
 
 	// generate source
 	source, err := factory.NewSource(nil, nil)
+	require.NoError(t, err)
 	cr.On("GetSlot", mock.Anything, mock.Anything, mock.Anything).Return(uint64(1), nil).Once()
 
 	// happy path

@@ -3,9 +3,10 @@ package solana
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 
 	"github.com/gagliardetto/solana-go"
-	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
@@ -30,18 +31,15 @@ var _ relaytypes.Relayer = &Relayer{}
 type Relayer struct {
 	lggr   logger.Logger
 	chain  Chain
-	ctx    context.Context
-	cancel func()
+	stopCh services.StopChan
 }
 
 // Note: constructed in core
 func NewRelayer(lggr logger.Logger, chain Chain) *Relayer {
-	ctx, cancel := context.WithCancel(context.Background())
 	return &Relayer{
 		lggr:   lggr,
 		chain:  chain,
-		ctx:    ctx,
-		cancel: cancel,
+		stopCh: make(chan struct{}),
 	}
 }
 
@@ -60,7 +58,7 @@ func (r *Relayer) Start(context.Context) error {
 
 // Close will close all open subservices
 func (r *Relayer) Close() error {
-	r.cancel()
+	close(r.stopCh)
 	return nil
 }
 
@@ -84,7 +82,9 @@ func (r *Relayer) NewLLOProvider(rargs relaytypes.RelayArgs, pargs relaytypes.Pl
 }
 
 func (r *Relayer) NewConfigProvider(args relaytypes.RelayArgs) (relaytypes.ConfigProvider, error) {
-	configWatcher, err := newConfigProvider(r.ctx, r.lggr, r.chain, args)
+	ctx, cancel := r.stopCh.NewCtx()
+	defer cancel()
+	configWatcher, err := newConfigProvider(ctx, r.lggr, r.chain, args)
 	if err != nil {
 		// Never return (*configProvider)(nil)
 		return nil, err
@@ -93,8 +93,10 @@ func (r *Relayer) NewConfigProvider(args relaytypes.RelayArgs) (relaytypes.Confi
 }
 
 func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MedianProvider, error) {
+	ctx, cancel := r.stopCh.NewCtx()
+	defer cancel()
 	lggr := relaylogger.Named(r.lggr, "MedianProvider")
-	configWatcher, err := newConfigProvider(r.ctx, lggr, r.chain, rargs)
+	configWatcher, err := newConfigProvider(ctx, lggr, r.chain, rargs)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +104,7 @@ func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes
 	// parse transmitter account
 	transmitterAccount, err := solana.PublicKeyFromBase58(pargs.TransmitterID)
 	if err != nil {
-		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.PluginArgs.TransmissionsID")
+		return nil, fmt.Errorf("error on 'solana.PublicKeyFromBase58' for 'spec.PluginArgs.TransmissionsID: %w", err)
 	}
 
 	// parse transmissions state account
@@ -113,7 +115,7 @@ func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes
 	}
 	transmissionsID, err := solana.PublicKeyFromBase58(relayConfig.TransmissionsID)
 	if err != nil {
-		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.TransmissionsID")
+		return nil, fmt.Errorf("error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.TransmissionsID: %w", err)
 	}
 
 	cfg := configWatcher.chain.Config()
@@ -170,15 +172,15 @@ func newConfigProvider(ctx context.Context, lggr logger.Logger, chain Chain, arg
 	}
 	stateID, err := solana.PublicKeyFromBase58(args.ContractID)
 	if err != nil {
-		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.ContractID")
+		return nil, fmt.Errorf("error on 'solana.PublicKeyFromBase58' for 'spec.ContractID: %w", err)
 	}
 	programID, err := solana.PublicKeyFromBase58(relayConfig.OCR2ProgramID)
 	if err != nil {
-		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.OCR2ProgramID")
+		return nil, fmt.Errorf("error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.OCR2ProgramID: %w", err)
 	}
 	storeProgramID, err := solana.PublicKeyFromBase58(relayConfig.StoreProgramID)
 	if err != nil {
-		return nil, errors.Wrap(err, "error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.StateID")
+		return nil, fmt.Errorf("error on 'solana.PublicKeyFromBase58' for 'spec.RelayConfig.StateID: %w", err)
 	}
 	offchainConfigDigester := OffchainConfigDigester{
 		ProgramID: programID,
@@ -187,7 +189,7 @@ func newConfigProvider(ctx context.Context, lggr logger.Logger, chain Chain, arg
 
 	reader, err := chain.Reader()
 	if err != nil {
-		return nil, errors.Wrap(err, "error in NewMedianProvider.chain.Reader")
+		return nil, fmt.Errorf("error in NewMedianProvider.chain.Reader: %w", err)
 	}
 	stateCache := NewStateCache(stateID, chain.Config(), reader, lggr)
 	return &configProvider{
@@ -209,7 +211,7 @@ func (c *configProvider) Name() string {
 
 func (c *configProvider) Start(ctx context.Context) error {
 	return c.StartOnce("SolanaConfigProvider", func() error {
-		return c.stateCache.Start()
+		return c.stateCache.Start(ctx)
 	})
 }
 
@@ -241,17 +243,17 @@ type medianProvider struct {
 	transmitter        types.ContractTransmitter
 }
 
-func (m *medianProvider) Name() string {
-	return m.stateCache.lggr.Name()
+func (p *medianProvider) Name() string {
+	return p.stateCache.lggr.Name()
 }
 
 // start both cache services
 func (p *medianProvider) Start(ctx context.Context) error {
 	return p.StartOnce("SolanaMedianProvider", func() error {
-		if err := p.configProvider.stateCache.Start(); err != nil {
+		if err := p.configProvider.stateCache.Start(ctx); err != nil {
 			return err
 		}
-		return p.transmissionsCache.Start()
+		return p.transmissionsCache.Start(ctx)
 	})
 }
 

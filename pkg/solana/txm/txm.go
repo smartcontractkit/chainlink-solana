@@ -2,6 +2,7 @@ package txm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -10,9 +11,9 @@ import (
 	solanaGo "github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
@@ -41,7 +42,7 @@ type Txm struct {
 	lggr    logger.Logger
 	chSend  chan pendingTx
 	chSim   chan pendingTx
-	chStop  chan struct{}
+	chStop  services.StopChan
 	done    sync.WaitGroup
 	cfg     config.Config
 	txs     PendingTxContext
@@ -101,7 +102,7 @@ func (txm *Txm) Start(ctx context.Context) error {
 
 func (txm *Txm) run() {
 	defer txm.done.Done()
-	ctx, cancel := relayutils.ContextFromChan(txm.chStop)
+	ctx, cancel := txm.chStop.NewCtx()
 	defer cancel()
 
 	// start confirmer + simulator
@@ -140,7 +141,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 	// fetch client
 	client, clientErr := txm.client.Get()
 	if clientErr != nil {
-		return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, errors.Wrap(clientErr, "failed to get client in soltxm.sendWithRetry")
+		return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, fmt.Errorf("failed to get client in soltxm.sendWithRetry: %w", clientErr)
 	}
 
 	// get key
@@ -170,11 +171,11 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 		// sign tx
 		txMsg, marshalErr := newTx.Message.MarshalBinary()
 		if marshalErr != nil {
-			return solanaGo.Transaction{}, errors.Wrap(marshalErr, "error in soltxm.SendWithRetry.MarshalBinary")
+			return solanaGo.Transaction{}, fmt.Errorf("error in soltxm.SendWithRetry.MarshalBinary: %w", marshalErr)
 		}
 		sigBytes, signErr := txm.ks.Sign(context.TODO(), key, txMsg)
 		if signErr != nil {
-			return solanaGo.Transaction{}, errors.Wrap(signErr, "error in soltxm.SendWithRetry.Sign")
+			return solanaGo.Transaction{}, fmt.Errorf("error in soltxm.SendWithRetry.Sign: %w", signErr)
 		}
 		var finalSig [64]byte
 		copy(finalSig[:], sigBytes)
@@ -196,14 +197,14 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 	if initSendErr != nil {
 		cancel()                           // cancel context when exiting early
 		txm.txs.OnError(sig, TxFailReject) // increment failed metric
-		return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, errors.Wrap(initSendErr, "tx failed initial transmit")
+		return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, fmt.Errorf("tx failed initial transmit: %w", initSendErr)
 	}
 
 	// store tx signature + cancel function
 	id, initStoreErr := txm.txs.New(sig, cancel)
 	if initStoreErr != nil {
 		cancel() // cancel context when exiting early
-		return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, errors.Wrapf(initStoreErr, "failed to save tx signature (%s) to inflight txs", sig)
+		return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, fmt.Errorf("failed to save tx signature (%s) to inflight txs: %w", sig, initStoreErr)
 	}
 
 	// used for tracking rebroadcasting only in SendWithRetry
@@ -514,7 +515,7 @@ func (txm *Txm) Enqueue(accountID string, tx *solanaGo.Transaction) error {
 	// https://github.com/gagliardetto/solana-go/blob/main/transaction.go#L252
 	_, err := txm.ks.Sign(context.TODO(), tx.Message.AccountKeys[0].String(), nil)
 	if err != nil {
-		return errors.Wrap(err, "error in soltxm.Enqueue.GetKey")
+		return fmt.Errorf("error in soltxm.Enqueue.GetKey: %w", err)
 	}
 
 	msg := pendingTx{
@@ -526,7 +527,7 @@ func (txm *Txm) Enqueue(accountID string, tx *solanaGo.Transaction) error {
 	case txm.chSend <- msg:
 	default:
 		txm.lggr.Errorw("failed to enqeue tx", "queueFull", len(txm.chSend) == MaxQueueLen, "tx", msg)
-		return errors.Errorf("failed to enqueue transaction for %s", accountID)
+		return fmt.Errorf("failed to enqueue transaction for %s", accountID)
 	}
 	return nil
 }

@@ -106,7 +106,8 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 					return val
 				}
 				sig := make([]byte, 16)
-				rand.Read(sig)
+				_, err := rand.Read(sig)
+				require.NoError(t, err)
 				txs[strTx] = solanaGo.SignatureFromBytes(sig)
 
 				return txs[strTx]
@@ -134,7 +135,8 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 					return val
 				}
 				sig := make([]byte, 16)
-				rand.Read(sig)
+				_, err := rand.Read(sig)
+				require.NoError(t, err)
 				txs[strTx] = solanaGo.SignatureFromBytes(sig)
 				lock.Unlock()
 
@@ -169,7 +171,8 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 					return val
 				}
 				sig := make([]byte, 16)
-				rand.Read(sig)
+				_, err := rand.Read(sig)
+				require.NoError(t, err)
 				txs[strTx] = solanaGo.SignatureFromBytes(sig)
 
 				triggerDelay := len(txs) == 2

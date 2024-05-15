@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/testutils"
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"

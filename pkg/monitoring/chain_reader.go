@@ -5,6 +5,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 )
 

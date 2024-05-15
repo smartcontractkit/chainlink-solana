@@ -6,9 +6,10 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 )
 
 func getTestTxResult(t *testing.T) *rpc.GetTransactionResult {
@@ -61,11 +62,11 @@ func TestParseTx(t *testing.T) {
 
 	txInvalidProgramIndex := getTestTx(t)                              // copy
 	txInvalidProgramIndex.Message.Instructions[1].ProgramIDIndex = 100 // index 1 is ocr transmit call
-	out, err := ParseTx(txInvalidProgramIndex, SampleTxResultProgram)
+	_, err = ParseTx(txInvalidProgramIndex, SampleTxResultProgram)
 	require.Error(t, err)
 
 	// don't match program
-	out, err = ParseTx(getTestTx(t), solana.PublicKey{})
+	_, err = ParseTx(getTestTx(t), solana.PublicKey{})
 	require.Error(t, err)
 
 	// invalid length transmit instruction + compute budget instruction
@@ -78,7 +79,7 @@ func TestParseTx(t *testing.T) {
 	require.ErrorContains(t, err, "computeUnitPrice")
 
 	// happy path
-	out, err = ParseTx(getTestTx(t), SampleTxResultProgram)
+	out, err := ParseTx(getTestTx(t), SampleTxResultProgram)
 	require.NoError(t, err)
 	assert.Equal(t, sampleTxResultSigner, out.Sender)
 	assert.Equal(t, uint8(4), out.ObservationCount)

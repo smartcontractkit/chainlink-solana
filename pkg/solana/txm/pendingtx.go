@@ -27,7 +27,7 @@ var _ PendingTxContext = &pendingTxContext{}
 type pendingTxContext struct {
 	cancelBy  map[uuid.UUID]context.CancelFunc
 	timestamp map[uuid.UUID]time.Time
-	sigToId   map[solana.Signature]uuid.UUID
+	sigToID   map[solana.Signature]uuid.UUID
 	idToSigs  map[uuid.UUID][]solana.Signature
 	lock      sync.RWMutex
 }
@@ -36,7 +36,7 @@ func newPendingTxContext() *pendingTxContext {
 	return &pendingTxContext{
 		cancelBy:  map[uuid.UUID]context.CancelFunc{},
 		timestamp: map[uuid.UUID]time.Time{},
-		sigToId:   map[solana.Signature]uuid.UUID{},
+		sigToID:   map[solana.Signature]uuid.UUID{},
 		idToSigs:  map[uuid.UUID][]solana.Signature{},
 	}
 }
@@ -44,7 +44,7 @@ func newPendingTxContext() *pendingTxContext {
 func (c *pendingTxContext) New(sig solana.Signature, cancel context.CancelFunc) (uuid.UUID, error) {
 	// validate signature does not exist
 	c.lock.RLock()
-	if _, exists := c.sigToId[sig]; exists {
+	if _, exists := c.sigToID[sig]; exists {
 		c.lock.RUnlock()
 		return uuid.UUID{}, errors.New("signature already exists")
 	}
@@ -53,14 +53,14 @@ func (c *pendingTxContext) New(sig solana.Signature, cancel context.CancelFunc) 
 	// upgrade to write lock if sig does not exist
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	if _, exists := c.sigToId[sig]; exists {
+	if _, exists := c.sigToID[sig]; exists {
 		return uuid.UUID{}, errors.New("signature already exists")
 	}
 	// save cancel func
 	id := uuid.New()
 	c.cancelBy[id] = cancel
 	c.timestamp[id] = time.Now()
-	c.sigToId[sig] = id
+	c.sigToID[sig] = id
 	c.idToSigs[id] = []solana.Signature{sig}
 	return id, nil
 }
@@ -68,7 +68,7 @@ func (c *pendingTxContext) New(sig solana.Signature, cancel context.CancelFunc) 
 func (c *pendingTxContext) Add(id uuid.UUID, sig solana.Signature) error {
 	// already exists
 	c.lock.RLock()
-	if _, exists := c.sigToId[sig]; exists {
+	if _, exists := c.sigToID[sig]; exists {
 		c.lock.RUnlock()
 		return errors.New("signature already exists")
 	}
@@ -81,14 +81,14 @@ func (c *pendingTxContext) Add(id uuid.UUID, sig solana.Signature) error {
 	// upgrade to write lock if sig does not exist
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	if _, exists := c.sigToId[sig]; exists {
+	if _, exists := c.sigToID[sig]; exists {
 		return errors.New("signature already exists")
 	}
 	if _, exists := c.idToSigs[id]; !exists {
 		return errors.New("id does not exist - tx likely confirmed by other signature")
 	}
 	// save signature
-	c.sigToId[sig] = id
+	c.sigToID[sig] = id
 	c.idToSigs[id] = append(c.idToSigs[id], sig)
 	return nil
 }
@@ -97,7 +97,7 @@ func (c *pendingTxContext) Add(id uuid.UUID, sig solana.Signature) error {
 func (c *pendingTxContext) Remove(sig solana.Signature) (id uuid.UUID) {
 	// check if already cancelled
 	c.lock.RLock()
-	id, sigExists := c.sigToId[sig]
+	id, sigExists := c.sigToID[sig]
 	if !sigExists {
 		c.lock.RUnlock()
 		return id
@@ -111,7 +111,7 @@ func (c *pendingTxContext) Remove(sig solana.Signature) (id uuid.UUID) {
 	// upgrade to write lock if sig does not exist
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	id, sigExists = c.sigToId[sig]
+	id, sigExists = c.sigToID[sig]
 	if !sigExists {
 		return id
 	}
@@ -126,7 +126,7 @@ func (c *pendingTxContext) Remove(sig solana.Signature) (id uuid.UUID) {
 	delete(c.timestamp, id)
 	delete(c.idToSigs, id)
 	for _, s := range sigs {
-		delete(c.sigToId, s)
+		delete(c.sigToID, s)
 	}
 	return id
 }
@@ -134,14 +134,14 @@ func (c *pendingTxContext) Remove(sig solana.Signature) (id uuid.UUID) {
 func (c *pendingTxContext) ListAll() []solana.Signature {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	return maps.Keys(c.sigToId)
+	return maps.Keys(c.sigToID)
 }
 
 // Expired returns if the timeout for trying to confirm a signature has been reached
 func (c *pendingTxContext) Expired(sig solana.Signature, lifespan time.Duration) bool {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	id, exists := c.sigToId[sig]
+	id, exists := c.sigToID[sig]
 	if !exists {
 		return false // return expired = false if timestamp does not exist (likely cleaned up by something else previously)
 	}
