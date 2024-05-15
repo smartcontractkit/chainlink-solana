@@ -57,7 +57,7 @@ export default class DeployToken extends SolanaCommand {
 
     return {
       data: {
-        vault: tokenVault.toString()
+        vault: tokenVault.toString(),
       },
       responses: [
         {
