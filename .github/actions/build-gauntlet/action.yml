@@ -18,9 +18,12 @@ runs:
 
     - name: Install Dependencies
       run: yarn --cwd ./gauntlet install --frozen-lockfile
+      shell: bash
 
     - name: Build Gauntlet
       run: yarn --cwd ./gauntlet build
+      shell: bash
 
     - name: Run Gauntlet
       run: yarn --cwd ./gauntlet gauntlet
+      shell: bash
