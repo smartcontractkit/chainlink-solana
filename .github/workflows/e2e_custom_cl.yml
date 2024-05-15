@@ -144,8 +144,6 @@ jobs:
           if [ -n "$core_ref" ]; then
             echo "CUSTOM_CORE_REF=${core_ref}" >> "${GITHUB_ENV}"
           fi
-      - name: Install gauntlet dependencies
-        run: pwd && ls
       - name: Checkout the repo
         uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
       - name: Download Artifacts
@@ -155,6 +153,8 @@ jobs:
           path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
       - name: Install Solana CLI # required for ensuring the local test validator is configured correctly
         run: ./scripts/install-solana-ci.sh
+      - name: Install gauntlet
+        run: make build_js
       - name: Generate config overrides
         run: | # https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/README.md
           cat << EOF > config.toml
