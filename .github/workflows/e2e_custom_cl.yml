@@ -144,7 +144,7 @@ jobs:
           if [ -n "$core_ref" ]; then
             echo "CUSTOM_CORE_REF=${core_ref}" >> "${GITHUB_ENV}"
           fi
-      - name: Run Tests
+      - name: Prepare gauntlet
         run: |
           cd gauntlet && yarn install
       - name: Checkout the repo
