@@ -3,7 +3,6 @@ package chainreader_test
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -42,8 +41,9 @@ func TestSolanaChainReaderService_ReaderInterface(t *testing.T) {
 	t.Parallel()
 
 	it := &chainReaderInterfaceTester{}
-	RunChainReaderGetLatestValueInterfaceTests(t, it)
-	RunChainReaderGetLatestValueInterfaceTests(t, commontestutils.WrapChainReaderTesterForLoop(it))
+	RunChainReaderInterfaceTests(t, it)
+	lsIt := &skipEventsChainReaderTester{ChainReaderInterfaceTester: commontestutils.WrapChainReaderTesterForLoop(it)}
+	RunChainReaderInterfaceTests(t, lsIt)
 }
 
 func TestSolanaChainReaderService_ServiceCtx(t *testing.T) {
@@ -534,12 +534,10 @@ func (r *chainReaderInterfaceTester) GetChainReader(t *testing.T) types.ChainRea
 	})
 
 	if r.reader == nil {
-		r.reader = &wrappedTestChainReader{
-			test:   t,
-			tester: r,
-		}
+		r.reader = &wrappedTestChainReader{tester: r}
 	}
 
+	r.reader.test = t
 	r.reader.service = svc
 	r.reader.client = client
 
@@ -561,9 +559,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 	)
 	switch contractName + method {
 	case AnyContractName + EventName:
-		// t.Skip won't skip the test here
-		// returning the expected error to satisfy the test
-		return types.ErrNotFound
+		r.test.Skip("Events are not yet supported in Solana")
 	case AnyContractName + MethodReturningUint64:
 		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""), config.EncodingTypeBorsh)
 		onChainStruct := struct {
@@ -650,7 +646,8 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 
 // QueryKey implements the types.ChainReader interface.
 func (r *wrappedTestChainReader) QueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
-	return nil, errors.New("unimplemented")
+	r.test.Skip("QueryKey is not yet supported in Solana")
+	return nil, nil
 }
 
 func getAddresses(t *testing.T, tester ChainReaderInterfaceTester, a, b int) (ag_solana.PublicKey, ag_solana.PublicKey) {
@@ -668,8 +665,7 @@ func (r *wrappedTestChainReader) Bind(ctx context.Context, bindings []types.Boun
 
 func (r *wrappedTestChainReader) CreateContractType(contractName, itemType string, forEncoding bool) (any, error) {
 	if AnyContractName+EventName == contractName+itemType {
-		// events are not supported, so just make the tests pass
-		return nil, types.ErrNotFound
+		r.test.Skip("Events are not yet supported in Solana")
 	}
 
 	return r.service.CreateContractType(contractName, itemType, forEncoding)
@@ -825,3 +821,31 @@ const (
 		}
 	}`
 )
+
+// Required to allow test skipping to be on the same goroutine
+type skipEventsChainReaderTester struct{ ChainReaderInterfaceTester }
+
+func (s *skipEventsChainReaderTester) GetChainReader(t *testing.T) types.ChainReader {
+	return &skipEventsChainReader{
+		ChainReader: s.ChainReaderInterfaceTester.GetChainReader(t),
+		t:           t,
+	}
+}
+
+type skipEventsChainReader struct {
+	types.ChainReader
+	t *testing.T
+}
+
+func (s *skipEventsChainReader) GetLatestValue(ctx context.Context, contractName string, method string, params, returnVal any) error {
+	if contractName == AnyContractName && method == EventName {
+		s.t.Skip("Events are not yet supported in Solana")
+	}
+
+	return s.ChainReader.GetLatestValue(ctx, contractName, method, params, returnVal)
+}
+
+func (s *skipEventsChainReader) QueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
+	s.t.Skip("QueryKey is not yet supported in Solana")
+	return nil, nil
+}
