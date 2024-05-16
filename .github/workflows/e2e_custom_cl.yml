@@ -11,7 +11,7 @@ on:
 
 env:
   CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
-  CONTRACT_ARTIFACTS_PATH: ./contracts/target/deploy
+  CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
   MOD_CACHE_VERSION: 1
 
 # Only run 1 of this workflow at a time per PR
@@ -179,7 +179,7 @@ jobs:
       - name: Run Tests
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@7f2d504e0b6ebd4aa5ece371d9c5eb9762803ca0 # v2.3.16
         with:
-          test_command_to_run: make build_contracts && ls -la ./contracts && cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestfmt
+          test_command_to_run: ls -la ./contracts && cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestfmt
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
           download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 
           go_mod_path: ./integration-tests/go.mod
