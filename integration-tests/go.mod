@@ -12,7 +12,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/onsi/gomega v1.30.0
 	github.com/rs/zerolog v1.30.0
-	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240514153505-0ddba5aa4d2c
+	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240516150131-e1be553a9d10
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240510181707-46b1311a5a83
 	github.com/smartcontractkit/chainlink-testing-framework v1.28.12
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240515225456-aeb9f4d50d65
