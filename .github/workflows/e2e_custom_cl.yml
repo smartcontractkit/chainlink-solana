@@ -151,6 +151,8 @@ jobs:
         with:
           name: artifacts
           path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
+      - name: Check artifacts
+        run: ls -la ./contracts
       - name: Install Solana CLI # required for ensuring the local test validator is configured correctly
         run: ./scripts/install-solana-ci.sh
       - name: Install gauntlet
