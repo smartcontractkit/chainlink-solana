@@ -177,7 +177,7 @@ func (ms *Solana) getContainerRequest(inactiveFeatures InactiveFeatures) (*tc.Co
 		HostConfigModifier: func(hostConfig *container.HostConfig) {
 			hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
 				Type:     mount.TypeBind,
-				Source:   utils.ProjectRoot,
+				Source:   utils.ContractsDir,
 				Target:   "/programs",
 				ReadOnly: false,
 			})
