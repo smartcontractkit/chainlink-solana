@@ -98,7 +98,7 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 		RoundId: 0,
 	}
 	for successFullRounds < *config.OCR2.Smoke.NumberOfRounds {
-		require.Less(t, stuck, 10, "Rounds have been stuck for more than 10 iterantions")
+		require.Less(t, stuck, 10, "Rounds have been stuck for more than 10 iterations")
 		log.Info().Str("Transmission", sg.OcrAddress).Msg("Inspecting transmissions")
 		transmissions, err := sg.FetchTransmissions(sg.OcrAddress)
 		require.NoError(t, err)
@@ -107,7 +107,7 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 			stuck++
 			continue
 		}
-		currentRound := transmissions[len(transmissions)-1]
+		currentRound := common.GetLatestRound(transmissions)
 		if prevRound.RoundId == 0 {
 			prevRound = currentRound
 		}

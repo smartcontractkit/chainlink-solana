@@ -353,3 +353,13 @@ func formatBuffer(buf []byte) string {
 	}
 	return result
 }
+
+func GetLatestRound(transmissions []gauntlet.Transmission) gauntlet.Transmission {
+	highestRound := transmissions[0]
+	for _, t := range transmissions[1:] {
+		if t.RoundId > highestRound.RoundId {
+			highestRound = t
+		}
+	}
+	return highestRound
+}
