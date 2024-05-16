@@ -151,8 +151,6 @@ jobs:
         with:
           name: artifacts
           path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
-      - name: Setting artifacts permissions 
-        run: chmod -R 777 ./contracts
       - name: Install Solana CLI # required for ensuring the local test validator is configured correctly
         run: ./scripts/install-solana-ci.sh
       - name: Install gauntlet
