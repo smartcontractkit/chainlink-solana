@@ -24,7 +24,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 )
@@ -65,7 +64,7 @@ func (o *ChainOpts) GetLogger() logger.Logger {
 	return o.Logger
 }
 
-func NewChain(cfg *TOMLConfig, opts ChainOpts) (Chain, error) {
+func NewChain(cfg *config.TOMLConfig, opts ChainOpts) (Chain, error) {
 	if !cfg.IsEnabled() {
 		return nil, fmt.Errorf("cannot create new chain with ID %s: chain is disabled", *cfg.ChainID)
 	}
@@ -81,7 +80,7 @@ var _ Chain = (*chain)(nil)
 type chain struct {
 	services.StateMachine
 	id             string
-	cfg            *TOMLConfig
+	cfg            *config.TOMLConfig
 	txm            *txm.Txm
 	balanceMonitor services.Service
 	lggr           logger.Logger
@@ -214,7 +213,7 @@ func (v *verifiedCachedClient) GetAccountInfoWithOpts(ctx context.Context, addr 
 	return v.ReaderWriter.GetAccountInfoWithOpts(ctx, addr, opts)
 }
 
-func newChain(id string, cfg *TOMLConfig, ks loop.Keystore, lggr logger.Logger) (*chain, error) {
+func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.Logger) (*chain, error) {
 	lggr = logger.With(lggr, "chainID", id, "chain", "solana")
 	var ch = chain{
 		id:          id,
@@ -297,12 +296,9 @@ func (c *chain) ChainID() string {
 
 // getClient returns a client, randomly selecting one from available and valid nodes
 func (c *chain) getClient() (client.ReaderWriter, error) {
-	var node db.Node
+	var node *config.Node
 	var client client.ReaderWriter
-	nodes, err := c.cfg.ListNodes()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get nodes: %w", err)
-	}
+	nodes := c.cfg.ListNodes()
 	if len(nodes) == 0 {
 		return nil, errors.New("no nodes available")
 	}
@@ -311,10 +307,11 @@ func (c *chain) getClient() (client.ReaderWriter, error) {
 	for _, i := range index {
 		node = nodes[i]
 		// create client and check
+		var err error
 		client, err = c.verifiedClient(node)
 		// if error, try another node
 		if err != nil {
-			c.lggr.Warnw("failed to create node", "name", node.Name, "solana-url", node.SolanaURL, "err", err.Error())
+			c.lggr.Warnw("failed to create node", "name", node.Name, "solana-url", node.URL, "err", err.Error())
 			continue
 		}
 		// if all checks passed, mark found and break loop
@@ -324,15 +321,23 @@ func (c *chain) getClient() (client.ReaderWriter, error) {
 	if client == nil {
 		return nil, errors.New("no node valid nodes available")
 	}
-	c.lggr.Debugw("Created client", "name", node.Name, "solana-url", node.SolanaURL)
+	c.lggr.Debugw("Created client", "name", node.Name, "solana-url", node.URL)
 	return client, nil
 }
 
 // verifiedClient returns a client for node or an error if fails to create the client.
 // The client will still be returned if the nodes are not valid, or the chain id doesn't match.
 // Further client calls will try and verify the client, and fail if the client is still not valid.
-func (c *chain) verifiedClient(node db.Node) (client.ReaderWriter, error) {
-	url := node.SolanaURL
+func (c *chain) verifiedClient(node *config.Node) (client.ReaderWriter, error) {
+	if node == nil {
+		return nil, fmt.Errorf("nil node")
+	}
+
+	if node.Name == nil || node.URL == nil {
+		return nil, fmt.Errorf("node config contains nil: %+v", node)
+	}
+
+	url := node.URL.String()
 	var err error
 
 	// check if cached client exists
@@ -346,7 +351,7 @@ func (c *chain) verifiedClient(node db.Node) (client.ReaderWriter, error) {
 			expectedChainID: c.id,
 		}
 		// create client
-		cl.ReaderWriter, err = client.NewClient(url, c.cfg, DefaultRequestTimeout, logger.Named(c.lggr, "Client."+node.Name))
+		cl.ReaderWriter, err = client.NewClient(url, c.cfg, DefaultRequestTimeout, logger.Named(c.lggr, "Client."+*node.Name))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create client: %w", err)
 		}

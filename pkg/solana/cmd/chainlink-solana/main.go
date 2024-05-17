@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana"
+	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
 const (
@@ -53,7 +54,7 @@ func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore 
 	d := toml.NewDecoder(strings.NewReader(config))
 	d.DisallowUnknownFields()
 	var cfg struct {
-		Solana solana.TOMLConfig
+		Solana solcfg.TOMLConfig
 	}
 
 	if err := d.Decode(&cfg); err != nil {

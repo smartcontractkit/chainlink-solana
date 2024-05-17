@@ -4,9 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"time"
 
-	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pelletier/go-toml/v2"
 	"golang.org/x/exp/slices"
 
@@ -14,13 +12,9 @@ import (
 	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	soldb "github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 )
 
-// Deprecated: use TOMLConfigs
-type SolanaConfigs = TOMLConfigs
-
-type TOMLConfigs []*TOMLConfig
+type TOMLConfigs []*solcfg.TOMLConfig
 
 func (cs TOMLConfigs) ValidateConfig() (err error) {
 	return cs.validateKeys()
@@ -65,7 +59,7 @@ func (cs *TOMLConfigs) SetFrom(fs *TOMLConfigs) (err error) {
 	for _, f := range *fs {
 		if f.ChainID == nil {
 			*cs = append(*cs, f)
-		} else if i := slices.IndexFunc(*cs, func(c *TOMLConfig) bool {
+		} else if i := slices.IndexFunc(*cs, func(c *solcfg.TOMLConfig) bool {
 			return c.ChainID != nil && *c.ChainID == *f.ChainID
 		}); i == -1 {
 			*cs = append(*cs, f)
@@ -86,191 +80,4 @@ func nodeStatus(n *solcfg.Node, id string) (relaytypes.NodeStatus, error) {
 	}
 	s.Config = string(b)
 	return s, nil
-}
-
-type SolanaNodes []*solcfg.Node
-
-func (ns *SolanaNodes) SetFrom(fs *SolanaNodes) {
-	for _, f := range *fs {
-		if f.Name == nil {
-			*ns = append(*ns, f)
-		} else if i := slices.IndexFunc(*ns, func(n *solcfg.Node) bool {
-			return n.Name != nil && *n.Name == *f.Name
-		}); i == -1 {
-			*ns = append(*ns, f)
-		} else {
-			setFromNode((*ns)[i], f)
-		}
-	}
-}
-
-func setFromNode(n, f *solcfg.Node) {
-	if f.Name != nil {
-		n.Name = f.Name
-	}
-	if f.URL != nil {
-		n.URL = f.URL
-	}
-}
-
-func legacySolNode(n *solcfg.Node, id string) soldb.Node {
-	return soldb.Node{
-		Name:          *n.Name,
-		SolanaChainID: id,
-		SolanaURL:     (*url.URL)(n.URL).String(),
-	}
-}
-
-// Deprecated: use TOMLConfig
-type SolanaConfig = TOMLConfig
-
-type TOMLConfig struct {
-	ChainID *string
-	// Do not access directly, use [IsEnabled]
-	Enabled *bool
-	solcfg.Chain
-	Nodes SolanaNodes
-}
-
-func (c *TOMLConfig) IsEnabled() bool {
-	return c.Enabled == nil || *c.Enabled
-}
-
-func (c *TOMLConfig) SetFrom(f *TOMLConfig) {
-	if f.ChainID != nil {
-		c.ChainID = f.ChainID
-	}
-	if f.Enabled != nil {
-		c.Enabled = f.Enabled
-	}
-	setFromChain(&c.Chain, &f.Chain)
-	c.Nodes.SetFrom(&f.Nodes)
-}
-
-func setFromChain(c, f *solcfg.Chain) {
-	if f.BalancePollPeriod != nil {
-		c.BalancePollPeriod = f.BalancePollPeriod
-	}
-	if f.ConfirmPollPeriod != nil {
-		c.ConfirmPollPeriod = f.ConfirmPollPeriod
-	}
-	if f.OCR2CachePollPeriod != nil {
-		c.OCR2CachePollPeriod = f.OCR2CachePollPeriod
-	}
-	if f.OCR2CacheTTL != nil {
-		c.OCR2CacheTTL = f.OCR2CacheTTL
-	}
-	if f.TxTimeout != nil {
-		c.TxTimeout = f.TxTimeout
-	}
-	if f.TxRetryTimeout != nil {
-		c.TxRetryTimeout = f.TxRetryTimeout
-	}
-	if f.TxConfirmTimeout != nil {
-		c.TxConfirmTimeout = f.TxConfirmTimeout
-	}
-	if f.SkipPreflight != nil {
-		c.SkipPreflight = f.SkipPreflight
-	}
-	if f.Commitment != nil {
-		c.Commitment = f.Commitment
-	}
-	if f.MaxRetries != nil {
-		c.MaxRetries = f.MaxRetries
-	}
-}
-
-func (c *TOMLConfig) ValidateConfig() (err error) {
-	if c.ChainID == nil {
-		err = errors.Join(err, config.ErrMissing{Name: "ChainID", Msg: "required for all chains"})
-	} else if *c.ChainID == "" {
-		err = errors.Join(err, config.ErrEmpty{Name: "ChainID", Msg: "required for all chains"})
-	}
-
-	if len(c.Nodes) == 0 {
-		err = errors.Join(err, config.ErrMissing{Name: "Nodes", Msg: "must have at least one node"})
-	}
-	return
-}
-
-func (c *TOMLConfig) TOMLString() (string, error) {
-	b, err := toml.Marshal(c)
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
-}
-
-var _ solcfg.Config = &TOMLConfig{}
-
-func (c *TOMLConfig) BalancePollPeriod() time.Duration {
-	return c.Chain.BalancePollPeriod.Duration()
-}
-
-func (c *TOMLConfig) ConfirmPollPeriod() time.Duration {
-	return c.Chain.ConfirmPollPeriod.Duration()
-}
-
-func (c *TOMLConfig) OCR2CachePollPeriod() time.Duration {
-	return c.Chain.OCR2CachePollPeriod.Duration()
-}
-
-func (c *TOMLConfig) OCR2CacheTTL() time.Duration {
-	return c.Chain.OCR2CacheTTL.Duration()
-}
-
-func (c *TOMLConfig) TxTimeout() time.Duration {
-	return c.Chain.TxTimeout.Duration()
-}
-
-func (c *TOMLConfig) TxRetryTimeout() time.Duration {
-	return c.Chain.TxRetryTimeout.Duration()
-}
-
-func (c *TOMLConfig) TxConfirmTimeout() time.Duration {
-	return c.Chain.TxConfirmTimeout.Duration()
-}
-
-func (c *TOMLConfig) SkipPreflight() bool {
-	return *c.Chain.SkipPreflight
-}
-
-func (c *TOMLConfig) Commitment() rpc.CommitmentType {
-	return rpc.CommitmentType(*c.Chain.Commitment)
-}
-
-func (c *TOMLConfig) MaxRetries() *uint {
-	if c.Chain.MaxRetries == nil {
-		return nil
-	}
-	mr := uint(*c.Chain.MaxRetries)
-	return &mr
-}
-
-func (c *TOMLConfig) FeeEstimatorMode() string {
-	return *c.Chain.FeeEstimatorMode
-}
-
-func (c *TOMLConfig) ComputeUnitPriceMax() uint64 {
-	return *c.Chain.ComputeUnitPriceMax
-}
-
-func (c *TOMLConfig) ComputeUnitPriceMin() uint64 {
-	return *c.Chain.ComputeUnitPriceMin
-}
-
-func (c *TOMLConfig) ComputeUnitPriceDefault() uint64 {
-	return *c.Chain.ComputeUnitPriceDefault
-}
-
-func (c *TOMLConfig) FeeBumpPeriod() time.Duration {
-	return c.Chain.FeeBumpPeriod.Duration()
-}
-
-func (c *TOMLConfig) ListNodes() ([]soldb.Node, error) {
-	var allNodes []soldb.Node
-	for _, n := range c.Nodes {
-		allNodes = append(allNodes, legacySolNode(n, *c.ChainID))
-	}
-	return allNodes, nil
 }
