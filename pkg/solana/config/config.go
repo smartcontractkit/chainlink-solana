@@ -20,7 +20,7 @@ var defaultConfigSet = configSet{
 	TxConfirmTimeout:    30 * time.Second,       // duration before discarding tx as unconfirmed
 	SkipPreflight:       true,                   // to enable or disable preflight checks
 	Commitment:          rpc.CommitmentConfirmed,
-	MaxRetries:          new(uint), // max number of retries, when nil - rpc node will do a reasonable number of retries
+	MaxRetries:          new(uint), // max number of retries (default = *new(uint) = 0). when config.MaxRetries < 0, interpreted as MaxRetries = nil and rpc node will do a reasonable number of retries
 
 	// fee estimator
 	FeeEstimatorMode:        "fixed",

@@ -170,6 +170,9 @@ func (c *TOMLConfig) MaxRetries() *uint {
 	if c.Chain.MaxRetries == nil {
 		return nil
 	}
+	if *c.Chain.MaxRetries < 0 {
+		return nil // interpret negative numbers as nil (prevents unlikely case of overflow)
+	}
 	mr := uint(*c.Chain.MaxRetries)
 	return &mr
 }
