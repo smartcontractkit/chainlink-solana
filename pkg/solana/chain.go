@@ -261,7 +261,7 @@ func (c *chain) listNodeStatuses(start, end int) ([]relaytypes.NodeStatus, int, 
 	}
 	nodes := c.cfg.Nodes[start:end]
 	for _, node := range nodes {
-		stat, err := nodeStatus(node, c.ChainID())
+		stat, err := config.NodeStatus(node, c.ChainID())
 		if err != nil {
 			return stats, total, err
 		}
