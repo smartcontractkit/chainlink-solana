@@ -42,7 +42,6 @@ import (
 
 	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/test_env"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
@@ -497,7 +496,7 @@ func BuildNodeContractPairID(node *client.ChainlinkClient, ocr2Addr string) (str
 }
 
 func (c *Common) DefaultNodeConfig() *cl.Config {
-	solConfig := solana.TOMLConfig{
+	solConfig := solcfg.TOMLConfig{
 		Enabled: ptr.Ptr(true),
 		ChainID: ptr.Ptr(c.ChainId),
 		Nodes: []*solcfg.Node{
@@ -508,7 +507,7 @@ func (c *Common) DefaultNodeConfig() *cl.Config {
 		},
 	}
 	baseConfig := node.NewBaseConfig()
-	baseConfig.Solana = solana.TOMLConfigs{
+	baseConfig.Solana = solcfg.TOMLConfigs{
 		&solConfig,
 	}
 	baseConfig.OCR2.Enabled = ptr.Ptr(true)
