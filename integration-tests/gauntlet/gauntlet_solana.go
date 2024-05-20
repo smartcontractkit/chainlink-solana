@@ -285,7 +285,7 @@ func (sg *SolanaGauntlet) ProposeOnChainConfig(proposalID string, onChainConfig 
 
 	_, err = sg.G.ExecCommand([]string{
 		"ocr2:propose_config",
-		fmt.Sprintf("--proposalID=%s", proposalID),
+		fmt.Sprintf("--proposalId=%s", proposalID),
 		fmt.Sprintf("--input=%v", string(config)),
 		ocrFeedAddress,
 	},
@@ -311,7 +311,7 @@ func (sg *SolanaGauntlet) ProposeOffChainConfig(proposalID string, offChainConfi
 
 	_, err = sg.G.ExecCommand([]string{
 		"ocr2:propose_offchain_config",
-		fmt.Sprintf("--proposalID=%s", proposalID),
+		fmt.Sprintf("--proposalId=%s", proposalID),
 		fmt.Sprintf("--input=%v", string(config)),
 		ocrFeedAddress,
 	},
@@ -337,7 +337,7 @@ func (sg *SolanaGauntlet) ProposePayees(proposalID string, payeesConfig common.P
 
 	_, err = sg.G.ExecCommand([]string{
 		"ocr2:propose_payees",
-		fmt.Sprintf("--proposalID=%s", proposalID),
+		fmt.Sprintf("--proposalId=%s", proposalID),
 		fmt.Sprintf("--input=%v", string(config)),
 		ocrFeedAddress,
 	},
@@ -358,7 +358,7 @@ func (sg *SolanaGauntlet) ProposePayees(proposalID string, payeesConfig common.P
 func (sg *SolanaGauntlet) FinalizeProposal(proposalID string) (string, error) {
 	_, err := sg.G.ExecCommand([]string{
 		"ocr2:finalize_proposal",
-		fmt.Sprintf("--proposalID=%s", proposalID),
+		fmt.Sprintf("--proposalId=%s", proposalID),
 	},
 		*sg.options,
 	)
@@ -382,7 +382,7 @@ func (sg *SolanaGauntlet) AcceptProposal(proposalID string, secret string, propo
 
 	_, err = sg.G.ExecCommand([]string{
 		"ocr2:accept_proposal",
-		fmt.Sprintf("--proposalID=%s", proposalID),
+		fmt.Sprintf("--proposalId=%s", proposalID),
 		fmt.Sprintf("--secret=%s", secret),
 		fmt.Sprintf("--input=%s", string(config)),
 		ocrFeedAddres,
