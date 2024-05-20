@@ -127,11 +127,6 @@ func stripKeyPrefix(key string) string {
 func New(testConfig *tc.TestConfig) *Common {
 	var c *Common
 
-	duration, err := time.ParseDuration(*testConfig.OCR2.TestDuration)
-	if err != nil {
-		panic("Invalid test duration")
-	}
-
 	// Setting localnet as the default config
 	config := chainConfig.LocalNetConfig()
 	// Getting the default localnet private key
@@ -166,7 +161,7 @@ func New(testConfig *tc.TestConfig) *Common {
 		},
 		TestConfig: testConfig,
 		TestEnvDetails: &TestEnvDetails{
-			TestDuration: duration,
+			TestDuration: *testConfig.OCR2.TestDurationParsed,
 		},
 		AccountDetails: &AccountDetails{
 			PrivateKey: privateKeyString,

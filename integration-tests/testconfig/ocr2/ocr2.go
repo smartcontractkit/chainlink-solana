@@ -2,12 +2,14 @@ package ocr2
 
 import (
 	"errors"
+	"time"
 )
 
 type Config struct {
-	Smoke        *SmokeConfig `toml:"Smoke"`
-	NodeCount    *int         `toml:"node_count"`
-	TestDuration *string      `toml:"test_duration"`
+	Smoke              *SmokeConfig `toml:"Smoke"`
+	NodeCount          *int         `toml:"node_count"`
+	TestDuration       *string      `toml:"test_duration"`
+	TestDurationParsed *time.Duration
 }
 
 func (o *Config) Validate() error {
@@ -17,6 +19,12 @@ func (o *Config) Validate() error {
 
 	if o.TestDuration == nil {
 		return errors.New("test_duration must be set")
+	} else {
+		duration, err := time.ParseDuration(*o.TestDuration)
+		if err != nil {
+			return errors.New("Invalid test duration")
+		}
+		o.TestDurationParsed = &duration
 	}
 
 	if o.Smoke == nil {
