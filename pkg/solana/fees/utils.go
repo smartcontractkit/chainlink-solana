@@ -8,13 +8,13 @@ func CalculateFee(base, max, min uint64, count uint) uint64 {
 		if base == 0 && i == 0 {
 			amount = 1
 		} else {
-			// check for overflow
-			if next := amount + amount; next > amount {
-				amount = next
-			} else {
+			next := amount + amount
+			if next <= amount {
+				// overflowed
 				amount = max
-				break // exit loop if value overflowed
+				break
 			}
+			amount = next
 		}
 	}
 

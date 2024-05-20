@@ -13,13 +13,13 @@ jobs:
     if: always()
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
         with:
           ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
 
       - name: Wait for Workflows
         id: wait
-        uses: smartcontractkit/chainlink-github-actions/utils/wait-for-workflows@main
+        uses: smartcontractkit/chainlink-github-actions/utils/wait-for-workflows@e29366cdecfe6befff9ab8c3cfe4825218505d58 # v2.3.16
         with:
           max-timeout: "1200"
           polling-interval: "30"
@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
       - name: Parse tool-versions file
         uses: smartcontractkit/tool-versions-to-env-action@v1.0.8
         id: tool-versions
@@ -48,12 +48,12 @@ jobs:
     if: ${{ always() }}
     steps:
       - name: Fetch blame information
-        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
         with:
           fetch-depth: 0 # fetches all history for all tags and branches to provide more metadata for sonar reports
 
       - name: Download Golangci integration tests reports
-        uses: dawidd6/action-download-artifact@v2.27.0
+        uses: dawidd6/action-download-artifact@09f2f74827fd3a8607589e5ad7f9398816f540fe # v3.1.4
         with:
           workflow: golangci-lint.yml
           workflow_conclusion: ""
@@ -62,7 +62,7 @@ jobs:
           if_no_artifact_found: warn
 
       - name: Download Golangci relay reports
-        uses: dawidd6/action-download-artifact@v2.27.0
+        uses: dawidd6/action-download-artifact@09f2f74827fd3a8607589e5ad7f9398816f540fe # v3.1.4
         with:
           workflow: golangci-lint.yml
           workflow_conclusion: ""
@@ -71,7 +71,7 @@ jobs:
           if_no_artifact_found: warn
 
       - name: Download Relayer unit tests report
-        uses: dawidd6/action-download-artifact@v2.27.0
+        uses: dawidd6/action-download-artifact@09f2f74827fd3a8607589e5ad7f9398816f540fe # v3.1.4
         with:
           workflow: relay.yml
           workflow_conclusion: ""
@@ -80,7 +80,7 @@ jobs:
           if_no_artifact_found: warn
 
       - name: Download gauntlet eslint reports
-        uses: dawidd6/action-download-artifact@v2.27.0
+        uses: dawidd6/action-download-artifact@09f2f74827fd3a8607589e5ad7f9398816f540fe # v3.1.4
         with:
           workflow: gauntlet.yml
           workflow_conclusion: ""
@@ -105,7 +105,7 @@ jobs:
 
 
       - name: SonarQube Scan
-        uses: sonarsource/sonarqube-scan-action@69c1a75940dec6249b86dace6b630d3a2ae9d2a7 # v2.0.1
+        uses: sonarsource/sonarqube-scan-action@53c3e3207fe4b8d52e2f1ac9d6eb1d2506f626c0 # v2.0.2
         with:
           args: >
             -Dsonar.go.tests.reportPaths=${{ steps.sonarqube_report_paths.outputs.sonarqube_tests_report_paths }}

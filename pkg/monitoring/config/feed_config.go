@@ -89,7 +89,7 @@ func (s SolanaFeedConfig) ToMapping() map[string]interface{} {
 		"feed_name":        s.Name,
 		"feed_path":        s.Path,
 		"symbol":           s.Symbol,
-		"heartbeat_sec":    int64(s.HeartbeatSec),
+		"heartbeat_sec":    s.HeartbeatSec,
 		"contract_type":    s.ContractType,
 		"contract_status":  s.ContractStatus,
 		"contract_address": s.ContractAddress.Bytes(),

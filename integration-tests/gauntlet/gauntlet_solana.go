@@ -3,8 +3,9 @@ package gauntlet
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/common"
 	"os"
+
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/common"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/gauntlet"
 )

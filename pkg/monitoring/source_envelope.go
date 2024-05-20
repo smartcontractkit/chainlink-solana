@@ -2,6 +2,7 @@ package monitoring
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -10,9 +11,9 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
-	"go.uber.org/multierr"
 
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/event"
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
@@ -88,7 +89,7 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 		envelopeMu.Lock()
 		defer envelopeMu.Unlock()
 		if transmissionErr != nil {
-			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("failed to fetch latest on-chain transmission: %w", transmissionErr))
+			envelopeErr = errors.Join(envelopeErr, fmt.Errorf("failed to fetch latest on-chain transmission: %w", transmissionErr))
 			return
 		}
 		envelope.LatestAnswer = answer.Data
@@ -100,7 +101,7 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 		envelopeMu.Lock()
 		defer envelopeMu.Unlock()
 		if linkBalanceErr != nil {
-			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("failed to get the feed's link balance: %w", linkBalanceErr))
+			envelopeErr = errors.Join(envelopeErr, fmt.Errorf("failed to get the feed's link balance: %w", linkBalanceErr))
 			return
 		}
 		envelope.LinkBalance = linkBalance
@@ -111,7 +112,7 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 		envelopeMu.Lock()
 		defer envelopeMu.Unlock()
 		if juelsErr != nil {
-			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("Failed to fetch Juels/FeeCoin: %w", juelsErr))
+			envelopeErr = errors.Join(envelopeErr, fmt.Errorf("Failed to fetch Juels/FeeCoin: %w", juelsErr))
 			return
 		}
 		envelope.JuelsPerFeeCoin = juelsPerLamport

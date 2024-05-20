@@ -17,10 +17,11 @@ import (
 	tcwait "github.com/testcontainers/testcontainers-go/wait"
 	"golang.org/x/exp/slices"
 
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
+
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 )
 
 const (
@@ -157,7 +158,7 @@ func (ms *Solana) getContainerRequest(inactiveFeatures InactiveFeatures) (*tc.Co
 
 	return &tc.ContainerRequest{
 		Name:         ms.ContainerName,
-		Image:        "solanalabs/solana:v1.17.31",
+		Image:        "solanalabs/solana:v1.17.33",
 		ExposedPorts: []string{test_env.NatPortFormat(SOL_HTTP_PORT), test_env.NatPortFormat(SOL_WS_PORT)},
 		Env: map[string]string{
 			"SERVER_PORT": "1080",
@@ -211,7 +212,7 @@ func (f InactiveFeatures) CLIString() string {
 }
 
 // GetInactiveFeatureHashes uses the solana CLI to fetch inactive solana features
-// This is used in conjuction with the solana-test-validator command to produce a solana network that has the same features as mainnet
+// This is used in conjunction with the solana-test-validator command to produce a solana network that has the same features as mainnet
 // the solana-test-validator has all features on by default (released + unreleased)
 func GetInactiveFeatureHashes(url string) (output InactiveFeatures, err error) {
 	cmd := exec.Command("solana", "feature", "status", "-u="+url, "--output=json") // -um is for mainnet url

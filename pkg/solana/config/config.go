@@ -1,13 +1,14 @@
 package config
 
 import (
+	"errors"
 	"strings"
 	"time"
 
 	"github.com/gagliardetto/solana-go/rpc"
-	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 )
@@ -305,7 +306,6 @@ func (c *Chain) SetDefaults() {
 	if c.FeeBumpPeriod == nil {
 		c.FeeBumpPeriod = config.MustNewDuration(defaultConfigSet.FeeBumpPeriod)
 	}
-	return
 }
 
 type Node struct {
@@ -315,12 +315,12 @@ type Node struct {
 
 func (n *Node) ValidateConfig() (err error) {
 	if n.Name == nil {
-		err = multierr.Append(err, config.ErrMissing{Name: "Name", Msg: "required for all nodes"})
+		err = errors.Join(err, config.ErrMissing{Name: "Name", Msg: "required for all nodes"})
 	} else if *n.Name == "" {
-		err = multierr.Append(err, config.ErrEmpty{Name: "Name", Msg: "required for all nodes"})
+		err = errors.Join(err, config.ErrEmpty{Name: "Name", Msg: "required for all nodes"})
 	}
 	if n.URL == nil {
-		err = multierr.Append(err, config.ErrMissing{Name: "URL", Msg: "required for all nodes"})
+		err = errors.Join(err, config.ErrMissing{Name: "URL", Msg: "required for all nodes"})
 	}
 	return
 }

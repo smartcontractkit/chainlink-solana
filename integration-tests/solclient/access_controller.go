@@ -2,6 +2,7 @@ package solclient
 
 import (
 	"github.com/gagliardetto/solana-go"
+
 	access_controller2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/access_controller"
 )
 
