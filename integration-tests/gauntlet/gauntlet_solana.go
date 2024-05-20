@@ -17,7 +17,7 @@ var (
 type SolanaGauntlet struct {
 	dir                      string
 	G                        *gauntlet.Gauntlet
-	gr                       *GauntletResponse
+	gr                       *Response
 	options                  *gauntlet.ExecCommandOptions
 	AccessControllerAddress  string
 	BillingControllerAddress string
@@ -50,8 +50,8 @@ type StoreWriterConfig struct {
 	Transmissions string `json:"transmissions"`
 }
 
-// GauntletResponse Default response output for starknet gauntlet commands
-type GauntletResponse struct {
+// Response Default response output for starknet gauntlet commands
+type Response struct {
 	Responses []struct {
 		Tx struct {
 			Hash    string `json:"hash"`
@@ -75,7 +75,7 @@ type GauntletResponse struct {
 
 type Transmission struct {
 	LatestTransmissionNo int64  `json:"latestTransmissionNo"`
-	RoundId              int64  `json:"roundId"`
+	RoundID              int64  `json:"roundId"`
 	Answer               int64  `json:"answer"`
 	Transmitter          string `json:"transmitter"`
 }
@@ -90,7 +90,7 @@ func NewSolanaGauntlet(workingDir string) (*SolanaGauntlet, error) {
 	sg = &SolanaGauntlet{
 		dir: workingDir,
 		G:   g,
-		gr:  &GauntletResponse{},
+		gr:  &Response{},
 		options: &gauntlet.ExecCommandOptions{
 			ErrHandling:       []string{},
 			CheckErrorsInRead: true,
@@ -99,9 +99,9 @@ func NewSolanaGauntlet(workingDir string) (*SolanaGauntlet, error) {
 	return sg, nil
 }
 
-// FetchGauntletJsonOutput Parse gauntlet json response that is generated after yarn gauntlet command execution
-func (sg *SolanaGauntlet) FetchGauntletJsonOutput() (*GauntletResponse, error) {
-	var payload = &GauntletResponse{}
+// FetchGauntletJSONOutput Parse gauntlet json response that is generated after yarn gauntlet command execution
+func (sg *SolanaGauntlet) FetchGauntletJSONOutput() (*Response, error) {
+	var payload = &Response{}
 	gauntletOutput, err := os.ReadFile(sg.dir + "/report.json")
 	if err != nil {
 		return payload, err
@@ -141,7 +141,7 @@ func (sg *SolanaGauntlet) InitializeAccessController() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	sg.gr, err = sg.FetchGauntletJsonOutput()
+	sg.gr, err = sg.FetchGauntletJSONOutput()
 	if err != nil {
 		return "", err
 	}
@@ -153,7 +153,7 @@ func (sg *SolanaGauntlet) InitializeStore(billingController string) (string, err
 	if err != nil {
 		return "", err
 	}
-	sg.gr, err = sg.FetchGauntletJsonOutput()
+	sg.gr, err = sg.FetchGauntletJSONOutput()
 	if err != nil {
 		return "", err
 	}
@@ -169,7 +169,7 @@ func (sg *SolanaGauntlet) StoreCreateFeed(length int, feedConfig *StoreFeedConfi
 	if err != nil {
 		return "", err
 	}
-	sg.gr, err = sg.FetchGauntletJsonOutput()
+	sg.gr, err = sg.FetchGauntletJSONOutput()
 	if err != nil {
 		return "", err
 	}
@@ -182,7 +182,7 @@ func (sg *SolanaGauntlet) StoreSetValidatorConfig(feedAddress string, threshold 
 	if err != nil {
 		return "", err
 	}
-	sg.gr, err = sg.FetchGauntletJsonOutput()
+	sg.gr, err = sg.FetchGauntletJSONOutput()
 	if err != nil {
 		return "", err
 	}
@@ -202,7 +202,7 @@ func (sg *SolanaGauntlet) InitializeOCR2(requesterAccessController string, billi
 	if err != nil {
 		return "", err
 	}
-	sg.gr, err = sg.FetchGauntletJsonOutput()
+	sg.gr, err = sg.FetchGauntletJSONOutput()
 	if err != nil {
 		return "", err
 	}
@@ -226,7 +226,7 @@ func (sg *SolanaGauntlet) StoreSetWriter(storeConfig *StoreWriterConfig, ocrAddr
 	if err != nil {
 		return "", err
 	}
-	sg.gr, err = sg.FetchGauntletJsonOutput()
+	sg.gr, err = sg.FetchGauntletJSONOutput()
 	if err != nil {
 		return "", err
 	}
@@ -250,7 +250,7 @@ func (sg *SolanaGauntlet) OCR2SetBilling(ocr2BillingConfig *OCR2BillingConfig, o
 	if err != nil {
 		return "", err
 	}
-	sg.gr, err = sg.FetchGauntletJsonOutput()
+	sg.gr, err = sg.FetchGauntletJSONOutput()
 	if err != nil {
 		return "", err
 	}
@@ -269,7 +269,7 @@ func (sg *SolanaGauntlet) OCR2CreateProposal(version int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	sg.gr, err = sg.FetchGauntletJsonOutput()
+	sg.gr, err = sg.FetchGauntletJSONOutput()
 	if err != nil {
 		return "", err
 	}
@@ -277,7 +277,7 @@ func (sg *SolanaGauntlet) OCR2CreateProposal(version int) (string, error) {
 	return *sg.gr.Data.Proposal, nil
 }
 
-func (sg *SolanaGauntlet) ProposeOnChainConfig(proposalId string, onChainConfig common.OCR2OnChainConfig, ocrFeedAddress string) (string, error) {
+func (sg *SolanaGauntlet) ProposeOnChainConfig(proposalID string, onChainConfig common.OCR2OnChainConfig, ocrFeedAddress string) (string, error) {
 	config, err := json.Marshal(onChainConfig)
 	if err != nil {
 		return "", err
@@ -285,7 +285,7 @@ func (sg *SolanaGauntlet) ProposeOnChainConfig(proposalId string, onChainConfig 
 
 	_, err = sg.G.ExecCommand([]string{
 		"ocr2:propose_config",
-		fmt.Sprintf("--proposalId=%s", proposalId),
+		fmt.Sprintf("--proposalID=%s", proposalID),
 		fmt.Sprintf("--input=%v", string(config)),
 		ocrFeedAddress,
 	},
@@ -295,7 +295,7 @@ func (sg *SolanaGauntlet) ProposeOnChainConfig(proposalId string, onChainConfig 
 	if err != nil {
 		return "", err
 	}
-	sg.gr, err = sg.FetchGauntletJsonOutput()
+	sg.gr, err = sg.FetchGauntletJSONOutput()
 	if err != nil {
 		return "", err
 	}
@@ -303,7 +303,7 @@ func (sg *SolanaGauntlet) ProposeOnChainConfig(proposalId string, onChainConfig 
 	return sg.gr.Responses[0].Contract, nil
 }
 
-func (sg *SolanaGauntlet) ProposeOffChainConfig(proposalId string, offChainConfig common.OCROffChainConfig, ocrFeedAddress string) (string, error) {
+func (sg *SolanaGauntlet) ProposeOffChainConfig(proposalID string, offChainConfig common.OCROffChainConfig, ocrFeedAddress string) (string, error) {
 	config, err := json.Marshal(offChainConfig)
 	if err != nil {
 		return "", err
@@ -311,7 +311,7 @@ func (sg *SolanaGauntlet) ProposeOffChainConfig(proposalId string, offChainConfi
 
 	_, err = sg.G.ExecCommand([]string{
 		"ocr2:propose_offchain_config",
-		fmt.Sprintf("--proposalId=%s", proposalId),
+		fmt.Sprintf("--proposalID=%s", proposalID),
 		fmt.Sprintf("--input=%v", string(config)),
 		ocrFeedAddress,
 	},
@@ -321,7 +321,7 @@ func (sg *SolanaGauntlet) ProposeOffChainConfig(proposalId string, offChainConfi
 	if err != nil {
 		return "", err
 	}
-	sg.gr, err = sg.FetchGauntletJsonOutput()
+	sg.gr, err = sg.FetchGauntletJSONOutput()
 	if err != nil {
 		return "", err
 	}
@@ -329,7 +329,7 @@ func (sg *SolanaGauntlet) ProposeOffChainConfig(proposalId string, offChainConfi
 	return sg.gr.Responses[0].Contract, nil
 }
 
-func (sg *SolanaGauntlet) ProposePayees(proposalId string, payeesConfig common.PayeeConfig, ocrFeedAddress string) (string, error) {
+func (sg *SolanaGauntlet) ProposePayees(proposalID string, payeesConfig common.PayeeConfig, ocrFeedAddress string) (string, error) {
 	config, err := json.Marshal(payeesConfig)
 	if err != nil {
 		return "", err
@@ -337,7 +337,7 @@ func (sg *SolanaGauntlet) ProposePayees(proposalId string, payeesConfig common.P
 
 	_, err = sg.G.ExecCommand([]string{
 		"ocr2:propose_payees",
-		fmt.Sprintf("--proposalId=%s", proposalId),
+		fmt.Sprintf("--proposalID=%s", proposalID),
 		fmt.Sprintf("--input=%v", string(config)),
 		ocrFeedAddress,
 	},
@@ -347,7 +347,7 @@ func (sg *SolanaGauntlet) ProposePayees(proposalId string, payeesConfig common.P
 	if err != nil {
 		return "", err
 	}
-	sg.gr, err = sg.FetchGauntletJsonOutput()
+	sg.gr, err = sg.FetchGauntletJSONOutput()
 	if err != nil {
 		return "", err
 	}
@@ -355,10 +355,10 @@ func (sg *SolanaGauntlet) ProposePayees(proposalId string, payeesConfig common.P
 	return sg.gr.Responses[0].Contract, nil
 }
 
-func (sg *SolanaGauntlet) FinalizeProposal(proposalId string) (string, error) {
+func (sg *SolanaGauntlet) FinalizeProposal(proposalID string) (string, error) {
 	_, err := sg.G.ExecCommand([]string{
 		"ocr2:finalize_proposal",
-		fmt.Sprintf("--proposalId=%s", proposalId),
+		fmt.Sprintf("--proposalID=%s", proposalID),
 	},
 		*sg.options,
 	)
@@ -366,7 +366,7 @@ func (sg *SolanaGauntlet) FinalizeProposal(proposalId string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	sg.gr, err = sg.FetchGauntletJsonOutput()
+	sg.gr, err = sg.FetchGauntletJSONOutput()
 	if err != nil {
 		return "", err
 	}
@@ -374,7 +374,7 @@ func (sg *SolanaGauntlet) FinalizeProposal(proposalId string) (string, error) {
 	return sg.gr.Responses[0].Contract, nil
 }
 
-func (sg *SolanaGauntlet) AcceptProposal(proposalId string, secret string, proposalAcceptConfig common.ProposalAcceptConfig, ocrFeedAddres string) (string, error) {
+func (sg *SolanaGauntlet) AcceptProposal(proposalID string, secret string, proposalAcceptConfig common.ProposalAcceptConfig, ocrFeedAddres string) (string, error) {
 	config, err := json.Marshal(proposalAcceptConfig)
 	if err != nil {
 		return "", err
@@ -382,7 +382,7 @@ func (sg *SolanaGauntlet) AcceptProposal(proposalId string, secret string, propo
 
 	_, err = sg.G.ExecCommand([]string{
 		"ocr2:accept_proposal",
-		fmt.Sprintf("--proposalId=%s", proposalId),
+		fmt.Sprintf("--proposalID=%s", proposalID),
 		fmt.Sprintf("--secret=%s", secret),
 		fmt.Sprintf("--input=%s", string(config)),
 		ocrFeedAddres,
@@ -393,7 +393,7 @@ func (sg *SolanaGauntlet) AcceptProposal(proposalId string, secret string, propo
 	if err != nil {
 		return "", err
 	}
-	sg.gr, err = sg.FetchGauntletJsonOutput()
+	sg.gr, err = sg.FetchGauntletJSONOutput()
 	if err != nil {
 		return "", err
 	}
@@ -413,7 +413,7 @@ func (sg *SolanaGauntlet) FetchTransmissions(ocrState string) ([]Transmission, e
 	if err != nil {
 		return nil, err
 	}
-	sg.gr, err = sg.FetchGauntletJsonOutput()
+	sg.gr, err = sg.FetchGauntletJSONOutput()
 	if err != nil {
 		return nil, err
 	}

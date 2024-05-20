@@ -81,7 +81,7 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	if state.Common.Env.WillUseRemoteRunner() {
 		// run the remote runner and exit
 		state.GauntletEnvToRemoteRunner()
-		err := state.Common.Env.Run()
+		err = state.Common.Env.Run()
 		require.NoError(t, err)
 		return
 	}
@@ -90,7 +90,7 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	err = state.Common.Env.Run()
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		if err := actions.TeardownSuite(t, state.Common.Env, state.ChainlinkNodesK8s, nil, zapcore.PanicLevel, nil); err != nil {
+		if err = actions.TeardownSuite(t, state.Common.Env, state.ChainlinkNodesK8s, nil, zapcore.PanicLevel, nil); err != nil {
 			l.Error().Err(err).Msg("Error tearing down environment")
 		}
 	})
@@ -162,11 +162,11 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 	// TODO - The current setup in common.go is using the solana validator, so we need to create one method for both gauntlet and solana
 	// Leaving this for the time being as is so we have Testnet runs enabled on Solana
 	relayConfig := job.JSONConfig{
-		"nodeEndpointHTTP": state.Common.SolanaUrl,
+		"nodeEndpointHTTP": state.Common.SolanaURL,
 		"ocr2ProgramID":    gauntletConfig["PROGRAM_ID_OCR2"],
 		"transmissionsID":  sg.FeedAddress,
 		"storeProgramID":   gauntletConfig["PROGRAM_ID_STORE"],
-		"chainID":          state.Common.ChainId,
+		"chainID":          state.Common.ChainID,
 	}
 	bootstrapPeers := []client.P2PData{
 		{
@@ -247,9 +247,9 @@ func TestSolanaGauntletOCRV2Smoke(t *testing.T) {
 		if len(transmissions) <= 1 {
 			l.Info().Str("Contract", sg.OcrAddress).Str("No", "Transmissions")
 		} else {
-			l.Info().Str("Contract", sg.OcrAddress).Interface("Answer", transmissions[0].Answer).Int64("RoundID", transmissions[0].RoundId).Msg("New answer found")
+			l.Info().Str("Contract", sg.OcrAddress).Interface("Answer", transmissions[0].Answer).Int64("RoundID", transmissions[0].RoundID).Msg("New answer found")
 			assert.Equal(t, transmissions[0].Answer, int64(5), fmt.Sprintf("Actual: %d, Expected: 5", transmissions[0].Answer))
-			assert.Less(t, transmissions[1].RoundId, transmissions[0].RoundId, fmt.Sprintf("Expected round %d to be less than %d", transmissions[1].RoundId, transmissions[0].RoundId))
+			assert.Less(t, transmissions[1].RoundID, transmissions[0].RoundID, fmt.Sprintf("Expected round %d to be less than %d", transmissions[1].RoundID, transmissions[0].RoundID))
 		}
 		time.Sleep(time.Second * 6)
 	}

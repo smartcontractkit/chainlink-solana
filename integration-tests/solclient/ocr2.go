@@ -195,6 +195,9 @@ func (m *OCRv2) fetchProposalAccount() (*ocr_2.Proposal, error) {
 		m.Proposal.PublicKey(),
 		&proposal,
 	)
+	if err != nil {
+		return nil, err
+	}
 	// reimplement GetAccountDataInto with options
 	resp, err := m.Client.RPC.GetAccountInfoWithOpts(
 		context.Background(),
