@@ -16,6 +16,10 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
       - name: golangci-lint
         run: nix develop -c make lint-go-integration-tests
+      - name: Print lint report artifact
+        if: failure()
+        shell: bash
+        run: cat ./integration-tests/golangci-lint-integration-tests-report.xml
       - name: Store lint report artifact
         if: always()
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
@@ -35,6 +39,10 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
       - name: golangci-lint
         run: nix develop -c make lint-go-relay
+      - name: Print lint report artifact
+        if: failure()
+        shell: bash
+        run: cat ./pkg/golangci-lint-relay-report.xml
       - name: Store lint report artifact
         if: always()
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
