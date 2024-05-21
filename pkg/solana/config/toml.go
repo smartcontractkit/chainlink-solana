@@ -83,6 +83,7 @@ func NodeStatus(n *Node, id string) (relaytypes.NodeStatus, error) {
 	return s, nil
 }
 
+// revive:disable-next-line will be handled in https://github.com/smartcontractkit/chainlink-solana/pull/709
 type SolanaNodes []*Node
 
 func (ns *SolanaNodes) SetFrom(fs *SolanaNodes) {

@@ -133,10 +133,10 @@ func TestClient_Writer_Integration(t *testing.T) {
 
 	// create + sign transaction
 	createTx := func(to solana.PublicKey) *solana.Transaction {
-		hash, err := c.LatestBlockhash()
-		assert.NoError(t, err)
+		hash, hashErr := c.LatestBlockhash()
+		assert.NoError(t, hashErr)
 
-		tx, err := solana.NewTransaction(
+		tx, txErr := solana.NewTransaction(
 			[]solana.Instruction{
 				system.NewTransferInstruction(
 					1,
@@ -147,8 +147,8 @@ func TestClient_Writer_Integration(t *testing.T) {
 			hash.Value.Blockhash,
 			solana.TransactionPayer(pubKey),
 		)
-		assert.NoError(t, err)
-		_, err = tx.Sign(
+		assert.NoError(t, txErr)
+		_, signErr := tx.Sign(
 			func(key solana.PublicKey) *solana.PrivateKey {
 				if pubKey.Equals(key) {
 					return &privKey
@@ -156,7 +156,7 @@ func TestClient_Writer_Integration(t *testing.T) {
 				return nil
 			},
 		)
-		assert.NoError(t, err)
+		assert.NoError(t, signErr)
 		return tx
 	}
 
@@ -255,8 +255,8 @@ func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 	for i := 0; i < n; i++ {
 		go func(i int) {
 			time.Sleep(time.Duration(rand.Intn(500)) * time.Millisecond) // randomly submit txs
-			sig, err := c.SendTx(ctx, tx)
-			assert.NoError(t, err)
+			sig, sendErr := c.SendTx(ctx, tx)
+			assert.NoError(t, sendErr)
 			sigs[i] = sig
 			wg.Done()
 		}(i)
@@ -270,8 +270,8 @@ func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 
 	// try waiting for tx to execute - reduce flakiness
 	require.Eventually(t, func() bool {
-		res, err := c.SignatureStatuses(ctx, []solana.Signature{sigs[0]})
-		require.NoError(t, err)
+		res, statusErr := c.SignatureStatuses(ctx, []solana.Signature{sigs[0]})
+		require.NoError(t, statusErr)
 		require.Equal(t, 1, len(res))
 		if res[0] == nil {
 			return false

@@ -40,7 +40,7 @@ import (
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 
-	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/test_env"
+	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
@@ -58,7 +58,7 @@ const (
 type Common struct {
 	IsK8s     bool
 	ChainName string
-	ChainId   string
+	ChainID   string
 	NodeCount int
 	NodeOpts  []test_env.ClNodeOption
 	TTL       time.Duration
@@ -67,7 +67,7 @@ type Common struct {
 	K8Config  *environment.Config
 	Env       *environment.Environment
 	DockerEnv *SolCLClusterTestEnv
-	SolanaUrl string
+	SolanaURL string
 }
 
 type SolCLClusterTestEnv struct {
@@ -121,15 +121,15 @@ func New(env string, isK8s bool) *Common {
 		c = &Common{
 			IsK8s:     isK8s,
 			ChainName: ChainName,
-			ChainId:   DevnetChainID,
-			SolanaUrl: SolanaDevnetURL,
+			ChainID:   DevnetChainID,
+			SolanaURL: SolanaDevnetURL,
 		}
 	} else {
 		c = &Common{
 			IsK8s:     isK8s,
 			ChainName: ChainName,
-			ChainId:   LocalnetChainID,
-			SolanaUrl: SolanaLocalNetURL,
+			ChainID:   LocalnetChainID,
+			SolanaURL: SolanaLocalNetURL,
 		}
 	}
 	// Checking if count of OCR nodes is defined in ENV
@@ -170,14 +170,14 @@ func New(env string, isK8s bool) *Common {
 
 func (c *Common) CreateSolanaChainAndNode(nodes []*client.ChainlinkClient) error {
 	for _, n := range nodes {
-		_, _, err := n.CreateSolanaChain(&client.SolanaChainAttributes{ChainID: c.ChainId})
+		_, _, err := n.CreateSolanaChain(&client.SolanaChainAttributes{ChainID: c.ChainID})
 		if err != nil {
 			return err
 		}
 		_, _, err = n.CreateSolanaNode(&client.SolanaNodeAttributes{
 			Name:          ChainName,
-			SolanaChainID: c.ChainId,
-			SolanaURL:     c.SolanaUrl,
+			SolanaChainID: c.ChainID,
+			SolanaURL:     c.SolanaURL,
 		})
 		if err != nil {
 			return err
@@ -195,7 +195,7 @@ func (c *Common) CreateNodeKeysBundle(nodes []*client.ChainlinkClient) ([]client
 		}
 
 		peerID := p2pkeys.Data[0].Attributes.PeerID
-		txKey, _, err := n.CreateTxKey(ChainName, c.ChainId)
+		txKey, _, err := n.CreateTxKey(ChainName, c.ChainID)
 		if err != nil {
 			return nil, err
 		}
@@ -299,7 +299,7 @@ func OffChainConfigParamsFromNodes(nodeCount int, nkb []client.NodeKeysBundle) (
 	}, nil
 }
 
-func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo, mockUrl string, isK8s bool) error {
+func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo, mockURL string, isK8s bool) error {
 	for i, nodesInfo := range ContractsIdxMapToContractsNodeInfo {
 		// Bootstrap node first
 		var err error
@@ -314,7 +314,7 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 		}
 		sourceValueBridge := client.BridgeTypeAttributes{
 			Name:        nodeContractPairID,
-			URL:         fmt.Sprintf("%s/%s", mockUrl, "five"),
+			URL:         fmt.Sprintf("%s/%s", mockURL, "five"),
 			RequestData: "{}",
 		}
 		observationSource := client.ObservationSourceSpecBridge(&sourceValueBridge)
@@ -328,7 +328,7 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 		}
 		juelsBridge := client.BridgeTypeAttributes{
 			Name:        nodeContractPairID + "juels",
-			URL:         fmt.Sprintf("%s/%s", mockUrl, "five"),
+			URL:         fmt.Sprintf("%s/%s", mockURL, "five"),
 			RequestData: "{}",
 		}
 		juelsSource := client.ObservationSourceSpecBridge(&juelsBridge)
@@ -361,7 +361,7 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 			}
 			sourceValueBridge := client.BridgeTypeAttributes{
 				Name:        nodeContractPairID,
-				URL:         fmt.Sprintf("%s/%s", mockUrl, "five"),
+				URL:         fmt.Sprintf("%s/%s", mockURL, "five"),
 				RequestData: "{}",
 			}
 			observationSource := client.ObservationSourceSpecBridge(&sourceValueBridge)
@@ -375,7 +375,7 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 			}
 			juelsBridge := client.BridgeTypeAttributes{
 				Name:        nodeContractPairID + "juels",
-				URL:         fmt.Sprintf("%s/%s", mockUrl, "five"),
+				URL:         fmt.Sprintf("%s/%s", mockURL, "five"),
 				RequestData: "{}",
 			}
 			juelsSource := client.ObservationSourceSpecBridge(&juelsBridge)
@@ -498,11 +498,11 @@ func BuildNodeContractPairID(node *client.ChainlinkClient, ocr2Addr string) (str
 func (c *Common) DefaultNodeConfig() *cl.Config {
 	solConfig := solcfg.TOMLConfig{
 		Enabled: ptr.Ptr(true),
-		ChainID: ptr.Ptr(c.ChainId),
+		ChainID: ptr.Ptr(c.ChainID),
 		Nodes: []*solcfg.Node{
 			{
 				Name: ptr.Ptr("primary"),
-				URL:  config.MustParseURL(c.SolanaUrl),
+				URL:  config.MustParseURL(c.SolanaURL),
 			},
 		},
 	}
