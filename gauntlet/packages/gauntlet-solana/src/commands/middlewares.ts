@@ -8,7 +8,7 @@ import SolanaCommand from './internal/solana'
 import { LedgerWallet, LocalWallet } from './wallet'
 
 const isValidURL = (url: string) => {
-  var pattern = new RegExp('^(https?|wss?):/')
+  const pattern = new RegExp('^(https?|wss?):/')
   return pattern.test(url)
 }
 export const withProvider: Middleware = (c: SolanaCommand, next: Next) => {
