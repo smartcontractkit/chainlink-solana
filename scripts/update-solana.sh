@@ -5,7 +5,7 @@ cliVersion=$(grep -oh "release.solana.com/v[0-9]*.[0-9]*.[0-9]*" scripts/install
 echo "Current Test CLI Version: $cliVersion"
 
 cd integration-tests
-testVersion=$(grep -oh "solanalabs/solana:v[0-9]*.[0-9]*.[0-9]*" */**/*.go) 
+testVersion=$(grep -oh "solanalabs/solana:v[0-9]*.[0-9]*.[0-9]*" testconfig/default.toml) 
 echo "Current E2E Test Version: $testVersion"
 cd ..
 
@@ -24,11 +24,11 @@ echo "Replacing Solana Image Version"
 if [ "$(uname -s)" = "Darwin" ]; then
   sed -i '' -e "s~$cliVersion~$latestCLI~" scripts/install-solana-ci.sh
   cd integration-tests
-  sed -i '' -e "s~$testVersion~$latestVersion~" */**/*.go
+  sed -i '' -e "s~$testVersion~$latestVersion~" testconfig/default.toml
 else
   sed -i -e "s~$cliVersion~$latestCLI~" scripts/install-solana-ci.sh
   cd integration-tests
-  sed -i -e "s~$testVersion~$latestVersion~" */**/*.go
+  sed -i -e "s~$testVersion~$latestVersion~" testconfig/default.toml
 fi
 cd ..
 
