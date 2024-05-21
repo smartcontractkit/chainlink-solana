@@ -1,0 +1,3 @@
+[Common]
+node_count = 6
+test_duration = "30m"

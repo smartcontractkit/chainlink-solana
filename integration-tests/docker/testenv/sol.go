@@ -10,9 +10,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
 	tc "github.com/testcontainers/testcontainers-go"
 	tcwait "github.com/testcontainers/testcontainers-go/wait"
 	"golang.org/x/exp/slices"
@@ -39,7 +42,7 @@ commitment: finalized
 `
 
 var idJSONRaw = `
-[205,246,252,222,193,57,3,13,164,146,52,162,143,135,8,254,37,4,250,48,137,61,49,57,187,210,209,118,108,125,81,235,136,69,202,17,24,209,91,226,206,92,80,45,83,14,222,113,229,190,94,142,188,124,102,122,15,246,40,190,24,247,69,133]
+[94,214,238,83,144,226,75,151,226,20,5,188,42,110,64,180,196,244,6,199,29,231,108,112,67,175,110,182,3,242,102,83,103,72,221,132,137,219,215,192,224,17,146,227,94,4,173,67,173,207,11,239,127,174,101,204,65,225,90,88,224,45,205,117]
 `
 
 type Solana struct {
@@ -50,15 +53,19 @@ type Solana struct {
 	InternalWsURL   string
 	t               *testing.T
 	l               zerolog.Logger
+	Image           string
+	PublicKey       string
 }
 
-func NewSolana(networks []string, opts ...test_env.EnvComponentOption) *Solana {
+func NewSolana(networks []string, devnetImage string, publicKey string, opts ...test_env.EnvComponentOption) *Solana {
 	ms := &Solana{
 		EnvComponent: test_env.EnvComponent{
 			ContainerName: fmt.Sprintf("%s-%s", "solana", uuid.NewString()[0:8]),
 			Networks:      networks,
 		},
-		l: log.Logger,
+		l:         log.Logger,
+		Image:     devnetImage,
+		PublicKey: publicKey,
 	}
 	for _, opt := range opts {
 		opt(&ms.EnvComponent)
@@ -158,7 +165,7 @@ func (s *Solana) getContainerRequest(inactiveFeatures InactiveFeatures) (*tc.Con
 
 	return &tc.ContainerRequest{
 		Name:         s.ContainerName,
-		Image:        "solanalabs/solana:v1.17.33",
+		Image:        s.Image,
 		ExposedPorts: []string{test_env.NatPortFormat(SolHTTPPort), test_env.NatPortFormat(SolWSPort)},
 		Env: map[string]string{
 			"SERVER_PORT": "1080",
@@ -167,13 +174,13 @@ func (s *Solana) getContainerRequest(inactiveFeatures InactiveFeatures) (*tc.Con
 		WaitingFor: tcwait.ForLog("Processed Slot: 1").
 			WithStartupTimeout(30 * time.Second).
 			WithPollInterval(100 * time.Millisecond),
-		Mounts: tc.ContainerMounts{
-			tc.ContainerMount{
-				Source: tc.GenericBindMountSource{ //nolint:staticcheck
-					HostPath: utils.ContractsDir,
-				},
-				Target: "/programs",
-			},
+		HostConfigModifier: func(hostConfig *container.HostConfig) {
+			hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
+				Type:     mount.TypeBind,
+				Source:   utils.ContractsDir,
+				Target:   "/programs",
+				ReadOnly: false,
+			})
 		},
 		LifecycleHooks: []tc.ContainerLifecycleHooks{
 			{
@@ -189,7 +196,7 @@ func (s *Solana) getContainerRequest(inactiveFeatures InactiveFeatures) (*tc.Con
 				},
 			},
 		},
-		Entrypoint: []string{"sh", "-c", "mkdir -p /root/.config/solana/cli && solana-test-validator -r --mint=AAxAoGfkbWnbgsiQeAanwUvjv6bQrM5JS8Vxv1ckzVxg " + inactiveFeatures.CLIString()},
+		Entrypoint: []string{"sh", "-c", "mkdir -p /root/.config/solana/cli && solana-test-validator -r --mint=" + s.PublicKey + " " + inactiveFeatures.CLIString()},
 	}, nil
 }
 
