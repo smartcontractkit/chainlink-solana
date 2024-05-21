@@ -1,0 +1,29 @@
+name: Install gauntlet dependencies
+description: A GitHub Action to get tool versions and build Gauntlet
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4.1.5
+
+    - name: Get Tool Versions
+      uses: smartcontractkit/tool-versions-to-env-action@v1.0.8
+      id: tool-versions
+
+    - name: Setup Node ${{ steps.tool-versions.outputs.nodejs_version }}
+      uses: actions/setup-node@v4.0.2
+      with:
+        node-version: ${{ steps.tool-versions.outputs.nodejs_version }}
+
+    - name: Install Dependencies
+      run: yarn --cwd ./gauntlet install --frozen-lockfile
+      shell: bash
+
+    - name: Build Gauntlet
+      run: yarn --cwd ./gauntlet build
+      shell: bash
+
+    - name: Run Gauntlet
+      run: yarn --cwd ./gauntlet gauntlet
+      shell: bash

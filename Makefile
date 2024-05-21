@@ -94,11 +94,11 @@ gomodtidy:
 
 .PHONY: lint-go-integration-tests
 lint-go-integration-tests:
-	cd ./integration-tests && golangci-lint --max-issues-per-linter 0 --max-same-issues 0 --color=always --exclude=dot-imports --timeout 10m --out-format checkstyle:golangci-lint-integration-tests-report.xml run || true
+	cd ./integration-tests && golangci-lint --max-issues-per-linter 0 --max-same-issues 0 --color=always --exclude=dot-imports --timeout 10m --out-format checkstyle:golangci-lint-integration-tests-report.xml run
 
 .PHONY: lint-go-relay
 lint-go-relay:
-	cd ./pkg && golangci-lint --max-issues-per-linter 0 --max-same-issues 0 --color=always --exclude=dot-imports --timeout 10m --out-format checkstyle:golangci-lint-relay-report.xml run || true
+	cd ./pkg && golangci-lint --max-issues-per-linter 0 --max-same-issues 0 --color=always --exclude=dot-imports --timeout 10m --out-format checkstyle:golangci-lint-relay-report.xml run
 
 .PHONY: upgrade-e2e-solana-image
 upgrade-e2e-solana-image:

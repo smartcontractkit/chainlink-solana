@@ -158,13 +158,13 @@ func TestCache(t *testing.T) {
 		// state query
 		if bytes.Contains(body, []byte("11111111111111111111111111111111")) {
 			// Drop error, client may cancel ctx.
-			w.Write(testStateResponse())
+			w.Write(testStateResponse()) //nolint:errcheck
 			return
 		}
 
 		// transmissions query
 		// Drop error, client may cancel ctx.
-		w.Write(testTransmissionsResponse(t, body, 0))
+		w.Write(testTransmissionsResponse(t, body, 0)) //nolint:errcheck
 	}))
 
 	lggr := logger.Test(t)

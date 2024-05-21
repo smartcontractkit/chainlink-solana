@@ -1,4 +1,4 @@
-package test_env
+package testenv
 
 import (
 	"context"
@@ -10,9 +10,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
 	tc "github.com/testcontainers/testcontainers-go"
 	tcwait "github.com/testcontainers/testcontainers-go/wait"
 	"golang.org/x/exp/slices"
@@ -25,11 +28,11 @@ import (
 )
 
 const (
-	SOL_HTTP_PORT = "8899"
-	SOL_WS_PORT   = "8900"
+	SolHTTPPort = "8899"
+	SolWSPort   = "8900"
 )
 
-var config_yml = `
+var configYmlRaw = `
 json_rpc_url: http://0.0.0.0:8899
 websocket_url: ws://0.0.0.0:8900
 keypair_path: /root/.config/solana/cli/id.json
@@ -38,27 +41,31 @@ address_labels:
 commitment: finalized
 `
 
-var id_json = `
-[205,246,252,222,193,57,3,13,164,146,52,162,143,135,8,254,37,4,250,48,137,61,49,57,187,210,209,118,108,125,81,235,136,69,202,17,24,209,91,226,206,92,80,45,83,14,222,113,229,190,94,142,188,124,102,122,15,246,40,190,24,247,69,133]
+var idJSONRaw = `
+[94,214,238,83,144,226,75,151,226,20,5,188,42,110,64,180,196,244,6,199,29,231,108,112,67,175,110,182,3,242,102,83,103,72,221,132,137,219,215,192,224,17,146,227,94,4,173,67,173,207,11,239,127,174,101,204,65,225,90,88,224,45,205,117]
 `
 
 type Solana struct {
 	test_env.EnvComponent
-	ExternalHttpUrl string
-	ExternalWsUrl   string
-	InternalHttpUrl string
-	InternalWsUrl   string
+	ExternalHTTPURL string
+	ExternalWsURL   string
+	InternalHTTPURL string
+	InternalWsURL   string
 	t               *testing.T
 	l               zerolog.Logger
+	Image           string
+	PublicKey       string
 }
 
-func NewSolana(networks []string, opts ...test_env.EnvComponentOption) *Solana {
+func NewSolana(networks []string, devnetImage string, publicKey string, opts ...test_env.EnvComponentOption) *Solana {
 	ms := &Solana{
 		EnvComponent: test_env.EnvComponent{
 			ContainerName: fmt.Sprintf("%s-%s", "solana", uuid.NewString()[0:8]),
 			Networks:      networks,
 		},
-		l: log.Logger,
+		l:         log.Logger,
+		Image:     devnetImage,
+		PublicKey: publicKey,
 	}
 	for _, opt := range opts {
 		opt(&ms.EnvComponent)
@@ -105,29 +112,29 @@ func (s *Solana) StartContainer() error {
 	if err != nil {
 		return err
 	}
-	httpPort, err := c.MappedPort(testcontext.Get(s.t), test_env.NatPort(SOL_HTTP_PORT))
+	httpPort, err := c.MappedPort(testcontext.Get(s.t), test_env.NatPort(SolHTTPPort))
 	if err != nil {
 		return err
 	}
-	wsPort, err := c.MappedPort(testcontext.Get(s.t), test_env.NatPort(SOL_WS_PORT))
+	wsPort, err := c.MappedPort(testcontext.Get(s.t), test_env.NatPort(SolWSPort))
 	if err != nil {
 		return err
 	}
-	s.ExternalHttpUrl = fmt.Sprintf("http://%s:%s", host, httpPort.Port())
-	s.InternalHttpUrl = fmt.Sprintf("http://%s:%s", s.ContainerName, SOL_HTTP_PORT)
-	s.ExternalWsUrl = fmt.Sprintf("ws://%s:%s", host, wsPort.Port())
-	s.InternalWsUrl = fmt.Sprintf("ws://%s:%s", s.ContainerName, SOL_WS_PORT)
+	s.ExternalHTTPURL = fmt.Sprintf("http://%s:%s", host, httpPort.Port())
+	s.InternalHTTPURL = fmt.Sprintf("http://%s:%s", s.ContainerName, SolHTTPPort)
+	s.ExternalWsURL = fmt.Sprintf("ws://%s:%s", host, wsPort.Port())
+	s.InternalWsURL = fmt.Sprintf("ws://%s:%s", s.ContainerName, SolWSPort)
 
 	s.l.Info().
-		Any("ExternalHttpUrl", s.ExternalHttpUrl).
-		Any("InternalHttpUrl", s.InternalHttpUrl).
-		Any("ExternalWsUrl", s.ExternalWsUrl).
-		Any("InternalWsUrl", s.InternalWsUrl).
+		Any("ExternalHTTPURL", s.ExternalHTTPURL).
+		Any("InternalHTTPURL", s.InternalHTTPURL).
+		Any("ExternalWsURL", s.ExternalWsURL).
+		Any("InternalWsURL", s.InternalWsURL).
 		Str("containerName", s.ContainerName).
 		Msgf("Started Solana container")
 
 	// validate features are properly set
-	inactiveLocalFeatures, err := GetInactiveFeatureHashes(s.ExternalHttpUrl)
+	inactiveLocalFeatures, err := GetInactiveFeatureHashes(s.ExternalHTTPURL)
 	if err != nil {
 		return err
 	}
@@ -137,43 +144,43 @@ func (s *Solana) StartContainer() error {
 	return nil
 }
 
-func (ms *Solana) getContainerRequest(inactiveFeatures InactiveFeatures) (*tc.ContainerRequest, error) {
+func (s *Solana) getContainerRequest(inactiveFeatures InactiveFeatures) (*tc.ContainerRequest, error) {
 	configYml, err := os.CreateTemp("", "config.yml")
 	if err != nil {
 		return nil, err
 	}
-	_, err = configYml.WriteString(config_yml)
+	_, err = configYml.WriteString(configYmlRaw)
 	if err != nil {
 		return nil, err
 	}
 
-	idJson, err := os.CreateTemp("", "id.json")
+	idJSON, err := os.CreateTemp("", "id.json")
 	if err != nil {
 		return nil, err
 	}
-	_, err = idJson.WriteString(id_json)
+	_, err = idJSON.WriteString(idJSONRaw)
 	if err != nil {
 		return nil, err
 	}
 
 	return &tc.ContainerRequest{
-		Name:         ms.ContainerName,
-		Image:        "solanalabs/solana:v1.17.33",
-		ExposedPorts: []string{test_env.NatPortFormat(SOL_HTTP_PORT), test_env.NatPortFormat(SOL_WS_PORT)},
+		Name:         s.ContainerName,
+		Image:        s.Image,
+		ExposedPorts: []string{test_env.NatPortFormat(SolHTTPPort), test_env.NatPortFormat(SolWSPort)},
 		Env: map[string]string{
 			"SERVER_PORT": "1080",
 		},
-		Networks: ms.Networks,
+		Networks: s.Networks,
 		WaitingFor: tcwait.ForLog("Processed Slot: 1").
 			WithStartupTimeout(30 * time.Second).
 			WithPollInterval(100 * time.Millisecond),
-		Mounts: tc.ContainerMounts{
-			tc.ContainerMount{
-				Source: tc.GenericBindMountSource{
-					HostPath: utils.ContractsDir,
-				},
-				Target: "/programs",
-			},
+		HostConfigModifier: func(hostConfig *container.HostConfig) {
+			hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
+				Type:     mount.TypeBind,
+				Source:   utils.ContractsDir,
+				Target:   "/programs",
+				ReadOnly: false,
+			})
 		},
 		LifecycleHooks: []tc.ContainerLifecycleHooks{
 			{
@@ -183,13 +190,13 @@ func (ms *Solana) getContainerRequest(inactiveFeatures InactiveFeatures) (*tc.Co
 						if err != nil {
 							return err
 						}
-						err = container.CopyFileToContainer(ctx, idJson.Name(), "/root/.config/solana/cli/id.json", 0644)
+						err = container.CopyFileToContainer(ctx, idJSON.Name(), "/root/.config/solana/cli/id.json", 0644)
 						return err
 					},
 				},
 			},
 		},
-		Entrypoint: []string{"sh", "-c", "mkdir -p /root/.config/solana/cli && solana-test-validator -r --mint=AAxAoGfkbWnbgsiQeAanwUvjv6bQrM5JS8Vxv1ckzVxg " + inactiveFeatures.CLIString()},
+		Entrypoint: []string{"sh", "-c", "mkdir -p /root/.config/solana/cli && solana-test-validator -r --mint=" + s.PublicKey + " " + inactiveFeatures.CLIString()},
 	}, nil
 }
 
@@ -215,7 +222,7 @@ func (f InactiveFeatures) CLIString() string {
 // This is used in conjunction with the solana-test-validator command to produce a solana network that has the same features as mainnet
 // the solana-test-validator has all features on by default (released + unreleased)
 func GetInactiveFeatureHashes(url string) (output InactiveFeatures, err error) {
-	cmd := exec.Command("solana", "feature", "status", "-u="+url, "--output=json") // -um is for mainnet url
+	cmd := exec.Command("solana", "feature", "status", "-u="+url, "--output=json") //nolint:gosec // -um is for mainnet url
 	stdout, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get feature status: %w", err)
