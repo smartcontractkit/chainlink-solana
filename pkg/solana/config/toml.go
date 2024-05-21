@@ -83,10 +83,9 @@ func NodeStatus(n *Node, id string) (relaytypes.NodeStatus, error) {
 	return s, nil
 }
 
-// revive:disable-next-line will be handled in https://github.com/smartcontractkit/chainlink-solana/pull/709
-type SolanaNodes []*Node
+type Nodes []*Node
 
-func (ns *SolanaNodes) SetFrom(fs *SolanaNodes) {
+func (ns *Nodes) SetFrom(fs *Nodes) {
 	for _, f := range *fs {
 		if f.Name == nil {
 			*ns = append(*ns, f)
@@ -114,7 +113,7 @@ type TOMLConfig struct {
 	// Do not access directly, use [IsEnabled]
 	Enabled *bool
 	Chain
-	Nodes SolanaNodes
+	Nodes Nodes
 }
 
 func (c *TOMLConfig) IsEnabled() bool {
@@ -270,7 +269,7 @@ func (c *TOMLConfig) FeeBumpPeriod() time.Duration {
 	return c.Chain.FeeBumpPeriod.Duration()
 }
 
-func (c *TOMLConfig) ListNodes() SolanaNodes {
+func (c *TOMLConfig) ListNodes() Nodes {
 	return c.Nodes
 }
 
