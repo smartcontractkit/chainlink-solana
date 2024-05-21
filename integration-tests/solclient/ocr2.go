@@ -190,12 +190,6 @@ func (m *OCRv2) makeDigest() ([]byte, error) {
 
 func (m *OCRv2) fetchProposalAccount() (*ocr_2.Proposal, error) {
 	var proposal ocr_2.Proposal
-	err := m.Client.RPC.GetAccountDataInto(
-		context.Background(),
-		m.Proposal.PublicKey(),
-		&proposal,
-	)
-	// reimplement GetAccountDataInto with options
 	resp, err := m.Client.RPC.GetAccountInfoWithOpts(
 		context.Background(),
 		m.Proposal.PublicKey(),

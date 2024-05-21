@@ -18,7 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/osutil"
 	"github.com/smartcontractkit/chainlink/integration-tests/testconfig"
 
-	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/test_env"
+	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 
 	"golang.org/x/sync/errgroup"
@@ -60,7 +60,7 @@ type Contracts struct {
 type OCR2OnChainConfig struct {
 	Oracles    []Operator `json:"oracles"`
 	F          int        `json:"f"`
-	ProposalId string     `json:"proposalId"`
+	ProposalID string     `json:"proposalId"`
 }
 
 type OffchainConfig struct {
@@ -92,7 +92,7 @@ type ReportingPluginConfig struct {
 
 // TODO - Decouple all OCR2 config structs to be reusable between chains
 type OCROffChainConfig struct {
-	ProposalId     string         `json:"proposalId"`
+	ProposalID     string         `json:"proposalId"`
 	OffchainConfig OffchainConfig `json:"offchainConfig"`
 	UserSecret     string         `json:"userSecret"`
 }
@@ -105,11 +105,11 @@ type Operator struct {
 
 type PayeeConfig struct {
 	Operators  []Operator `json:"operators"`
-	ProposalId string     `json:"proposalId"`
+	ProposalID string     `json:"proposalId"`
 }
 
 type ProposalAcceptConfig struct {
-	ProposalId     string         `json:"proposalId"`
+	ProposalID     string         `json:"proposalId"`
 	Version        int            `json:"version"`
 	F              int            `json:"f"`
 	Oracles        []Operator     `json:"oracles"`
@@ -193,7 +193,7 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		sol := test_env_sol.NewSolana([]string{env.DockerNetwork.Name})
 		err = sol.StartContainer()
 		require.NoError(m.T, err)
-		m.Common.SolanaUrl = sol.InternalHttpUrl
+		m.Common.SolanaURL = sol.InternalHTTPURL
 		b, err := test_env.NewCLTestEnvBuilder().
 			WithNonEVM().
 			WithTestInstance(m.T).
@@ -239,7 +239,7 @@ func (m *OCRv2TestState) DeployEnv(contractsDir string) {
 	err := m.Common.Env.Run()
 	require.NoError(m.T, err)
 
-	m.Common.SolanaUrl = m.Common.Env.URLs[m.Client.Config.Name][0]
+	m.Common.SolanaURL = m.Common.Env.URLs[m.Client.Config.Name][0]
 	m.UploadProgramBinaries(contractsDir)
 }
 
@@ -248,8 +248,8 @@ func (m *OCRv2TestState) NewSolanaClientSetup(networkSettings *solclient.SolNetw
 		networkSettings.URLs = m.Common.Env.URLs[networkSettings.Name]
 	} else {
 		networkSettings.URLs = []string{
-			m.Common.DockerEnv.Sol.ExternalHttpUrl,
-			m.Common.DockerEnv.Sol.ExternalWsUrl,
+			m.Common.DockerEnv.Sol.ExternalHTTPURL,
+			m.Common.DockerEnv.Sol.ExternalWsURL,
 		}
 	}
 	ec, err := solclient.NewClient(networkSettings)
@@ -388,18 +388,18 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 // CreateJobs creating OCR jobs and EA stubs
 func (m *OCRv2TestState) CreateJobs() {
 	var nodes []*client.ChainlinkClient
-	var mockInternalUrl string
+	var mockInternalURL string
 	if m.Common.IsK8s {
 		nodes = m.GetChainlinkNodes()
-		mockInternalUrl = m.Common.Env.URLs["qa_mock_adapter_internal"][0]
+		mockInternalURL = m.Common.Env.URLs["qa_mock_adapter_internal"][0]
 	} else {
 		nodes = m.Common.DockerEnv.ClCluster.NodeAPIs()
-		mockInternalUrl = m.Common.DockerEnv.Killgrave.InternalEndpoint
+		mockInternalURL = m.Common.DockerEnv.Killgrave.InternalEndpoint
 	}
-	m.L.Info().Str("Url", mockInternalUrl).Msg("Mock adapter url")
+	m.L.Info().Str("Url", mockInternalURL).Msg("Mock adapter url")
 	m.err = m.Common.CreateSolanaChainAndNode(nodes)
 	require.NoError(m.T, m.err)
-	m.err = CreateBridges(m.ContractsNodeSetup, mockInternalUrl, m.Common.IsK8s)
+	m.err = CreateBridges(m.ContractsNodeSetup, mockInternalURL, m.Common.IsK8s)
 	require.NoError(m.T, m.err)
 	g := errgroup.Group{}
 	for i := 0; i < len(m.ContractsNodeSetup); i++ {
@@ -463,7 +463,7 @@ func (m *OCRv2TestState) ValidateRoundsAfter(chaosStartTime time.Time, timeout t
 	}, timeout, NewRoundCheckPollInterval).Should(gomega.Succeed())
 }
 
-func (m *OCRv2TestState) GenerateOnChainConfig(nodeKeys []client.NodeKeysBundle, vaultAddress string, proposalId string) (OCR2OnChainConfig, error) {
+func (m *OCRv2TestState) GenerateOnChainConfig(nodeKeys []client.NodeKeysBundle, vaultAddress string, proposalID string) (OCR2OnChainConfig, error) {
 	var oracles []Operator
 
 	for _, nodeKey := range nodeKeys {
@@ -477,13 +477,13 @@ func (m *OCRv2TestState) GenerateOnChainConfig(nodeKeys []client.NodeKeysBundle,
 	return OCR2OnChainConfig{
 		Oracles:    oracles,
 		F:          1,
-		ProposalId: proposalId,
+		ProposalID: proposalID,
 	}, nil
 }
 
 func (m *OCRv2TestState) GenerateOffChainConfig(
 	nodeKeysBundle []client.NodeKeysBundle,
-	proposalId string,
+	proposalID string,
 	reportingConfig ReportingPluginConfig,
 	deltaProgressNanoseconds int64,
 	deltaResendNanoseconds int64,
@@ -515,7 +515,7 @@ func (m *OCRv2TestState) GenerateOffChainConfig(
 	}
 
 	offChainConfig := OCROffChainConfig{
-		ProposalId: proposalId,
+		ProposalID: proposalID,
 		OffchainConfig: OffchainConfig{
 			DeltaProgressNanoseconds:          deltaProgressNanoseconds,
 			DeltaResendNanoseconds:            deltaResendNanoseconds,
@@ -540,7 +540,7 @@ func (m *OCRv2TestState) GenerateOffChainConfig(
 	return offChainConfig
 }
 
-func (m *OCRv2TestState) GeneratePayees(nodeKeys []client.NodeKeysBundle, vaultAddress string, proposalId string) PayeeConfig {
+func (m *OCRv2TestState) GeneratePayees(nodeKeys []client.NodeKeysBundle, vaultAddress string, proposalID string) PayeeConfig {
 	var operators []Operator
 	for _, key := range nodeKeys {
 		operators = append(operators, Operator{
@@ -552,12 +552,12 @@ func (m *OCRv2TestState) GeneratePayees(nodeKeys []client.NodeKeysBundle, vaultA
 
 	return PayeeConfig{
 		Operators:  operators,
-		ProposalId: proposalId,
+		ProposalID: proposalID,
 	}
 }
 
 func (m *OCRv2TestState) GenerateProposalAcceptConfig(
-	proposalId string,
+	proposalID string,
 	version int,
 	f int,
 	oracles []Operator,
@@ -566,7 +566,7 @@ func (m *OCRv2TestState) GenerateProposalAcceptConfig(
 
 ) ProposalAcceptConfig {
 	return ProposalAcceptConfig{
-		ProposalId:     proposalId,
+		ProposalID:     proposalID,
 		Version:        version,
 		F:              f,
 		Oracles:        oracles,
@@ -580,12 +580,12 @@ func (m *OCRv2TestState) ConfigureGauntlet(secret string) map[string]string {
 	if err != nil {
 		panic("Error setting SECRET")
 	}
-	rpcUrl, exists := os.LookupEnv("RPC_URL")
+	rpcURL, exists := os.LookupEnv("RPC_URL")
 	if !exists {
 		panic("Please define RPC_URL")
 	}
 
-	wsUrl, exists := os.LookupEnv("WS_URL")
+	wsURL, exists := os.LookupEnv("WS_URL")
 	if !exists {
 		panic("Please define WS_URL")
 	}
@@ -593,17 +593,17 @@ func (m *OCRv2TestState) ConfigureGauntlet(secret string) map[string]string {
 	if !exists {
 		panic("Please define PRIVATE_KEY")
 	}
-	programIdOCR2, exists := os.LookupEnv("PROGRAM_ID_OCR2")
+	programIDOCR2, exists := os.LookupEnv("PROGRAM_ID_OCR2")
 	if !exists {
 		panic("Please define PROGRAM_ID_OCR2")
 	}
 
-	programIdAccessController, exists := os.LookupEnv("PROGRAM_ID_ACCESS_CONTROLLER")
+	programIDAccessController, exists := os.LookupEnv("PROGRAM_ID_ACCESS_CONTROLLER")
 	if !exists {
 		panic("Please define PROGRAM_ID_ACCESS_CONTROLLER")
 	}
 
-	programIdStore, exists := os.LookupEnv("PROGRAM_ID_STORE")
+	programIDStore, exists := os.LookupEnv("PROGRAM_ID_STORE")
 	if !exists {
 		panic("Please define PROGRAM_ID_STORE")
 	}
@@ -619,12 +619,12 @@ func (m *OCRv2TestState) ConfigureGauntlet(secret string) map[string]string {
 	}
 
 	return map[string]string{
-		"NODE_URL":                     rpcUrl,
-		"WS_URL":                       wsUrl,
+		"NODE_URL":                     rpcURL,
+		"WS_URL":                       wsURL,
 		"PRIVATE_KEY":                  privateKey,
-		"PROGRAM_ID_OCR2":              programIdOCR2,
-		"PROGRAM_ID_ACCESS_CONTROLLER": programIdAccessController,
-		"PROGRAM_ID_STORE":             programIdStore,
+		"PROGRAM_ID_OCR2":              programIDOCR2,
+		"PROGRAM_ID_ACCESS_CONTROLLER": programIDAccessController,
+		"PROGRAM_ID_STORE":             programIDStore,
 		"LINK":                         linkToken,
 		"VAULT":                        vault,
 	}
@@ -632,7 +632,7 @@ func (m *OCRv2TestState) ConfigureGauntlet(secret string) map[string]string {
 
 // GauntletEnvToRemoteRunner Setup the environment variables that will be needed inside the remote runner
 func (m *OCRv2TestState) GauntletEnvToRemoteRunner() {
-	osutil.SetupEnvVarsForRemoteRunner([]string{
+	err := osutil.SetupEnvVarsForRemoteRunner([]string{
 		"RPC_URL",
 		"WS_URL",
 		"PRIVATE_KEY",
@@ -642,6 +642,7 @@ func (m *OCRv2TestState) GauntletEnvToRemoteRunner() {
 		"LINK_TOKEN",
 		"VAULT_ADDRESS",
 	})
+	require.NoError(m.T, err)
 }
 
 func (m *OCRv2TestState) GetChainlinkNodes() []*client.ChainlinkClient {
