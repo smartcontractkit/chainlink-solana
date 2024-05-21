@@ -41,7 +41,7 @@ import (
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 
-	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/test_env"
+	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	cl_solana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"

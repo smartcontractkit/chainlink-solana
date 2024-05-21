@@ -32,7 +32,7 @@ func TestSetComputeUnitPrice(t *testing.T) {
 		currentCount := len(tx.Message.Instructions)
 		assert.Greater(t, currentCount, instructionCount)
 		assert.Equal(t, 2, currentCount)
-		assert.Equal(t, COMPUTE_BUDGET_PROGRAM, tx.Message.AccountKeys[tx.Message.Instructions[0].ProgramIDIndex].String())
+		assert.Equal(t, ComputeBudgetProgram, tx.Message.AccountKeys[tx.Message.Instructions[0].ProgramIDIndex].String())
 		data, err := ComputeUnitPrice(1).Data()
 		assert.NoError(t, err)
 		assert.Equal(t, data, []byte(tx.Message.Instructions[0].Data))
@@ -58,7 +58,7 @@ func TestSetComputeUnitPrice(t *testing.T) {
 		// accounts should not have changed
 		assert.Equal(t, accountCount, len(tx.Message.AccountKeys))
 		assert.Equal(t, 2, len(tx.Message.Instructions))
-		assert.Equal(t, COMPUTE_BUDGET_PROGRAM, tx.Message.AccountKeys[tx.Message.Instructions[0].ProgramIDIndex].String())
+		assert.Equal(t, ComputeBudgetProgram, tx.Message.AccountKeys[tx.Message.Instructions[0].ProgramIDIndex].String())
 		data, err := ComputeUnitPrice(1).Data()
 		assert.NoError(t, err)
 		assert.Equal(t, data, []byte(tx.Message.Instructions[0].Data))
@@ -115,7 +115,7 @@ func TestParseComputeUnitPrice(t *testing.T) {
 	assert.ErrorContains(t, err, "invalid length")
 
 	invalidData := data
-	invalidData[0] = Instruction_RequestHeapFrame
+	invalidData[0] = InstructionRequestHeapFrame
 	_, err = ParseComputeUnitPrice(invalidData)
 	assert.ErrorContains(t, err, "not SetComputeUnitPrice identifier")
 }

@@ -26,7 +26,7 @@ type TxManager interface {
 	Enqueue(accountID string, msg *solana.Transaction) error
 }
 
-var _ relaytypes.Relayer = &Relayer{}
+var _ relaytypes.Relayer = &Relayer{} //nolint:staticcheck
 
 type Relayer struct {
 	lggr   logger.Logger

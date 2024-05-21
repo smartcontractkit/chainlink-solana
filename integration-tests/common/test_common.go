@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v4"
 
-	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/test_env"
+	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	test_env_ctf "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
@@ -128,9 +128,9 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		require.NoError(m.Config.T, err)
 
 		// Setting the External RPC url for Gauntlet
-		m.Common.ChainDetails.RPCUrl = sol.InternalHttpUrl
-		m.Common.ChainDetails.RPCURLExternal = sol.ExternalHttpUrl
-		m.Common.ChainDetails.WSURLExternal = sol.ExternalWsUrl
+		m.Common.ChainDetails.RPCUrl = sol.InternalHTTPURL
+		m.Common.ChainDetails.RPCURLExternal = sol.ExternalHTTPURL
+		m.Common.ChainDetails.WSURLExternal = sol.ExternalWsURL
 
 		if *m.Config.TestConfig.Common.Network == "devnet" {
 			m.Common.ChainDetails.RPCUrl = *m.Config.TestConfig.Common.RPC_URL
@@ -192,8 +192,8 @@ func (m *OCRv2TestState) NewSolanaClientSetup(networkSettings *solclient.SolNetw
 		networkSettings.URLs = m.Common.Env.URLs[networkSettings.Name]
 	} else {
 		networkSettings.URLs = []string{
-			m.Common.DockerEnv.Sol.ExternalHttpUrl,
-			m.Common.DockerEnv.Sol.ExternalWsUrl,
+			m.Common.DockerEnv.Sol.ExternalHTTPURL,
+			m.Common.DockerEnv.Sol.ExternalWsURL,
 		}
 	}
 	ec, err := solclient.NewClient(networkSettings)
@@ -357,7 +357,7 @@ func formatBuffer(buf []byte) string {
 func GetLatestRound(transmissions []gauntlet.Transmission) gauntlet.Transmission {
 	highestRound := transmissions[0]
 	for _, t := range transmissions[1:] {
-		if t.RoundId > highestRound.RoundId {
+		if t.RoundID > highestRound.RoundID {
 			highestRound = t
 		}
 	}

@@ -1,8 +1,8 @@
 nodejs 18.13.0
 yarn 1.22.19
 rust 1.59.0
-golang 1.21.1
-golangci-lint 1.52.1
+golang 1.21.6
+golangci-lint 1.55.2
 pulumi 3.40.1
 ginkgo 2.5.1
 actionlint 1.6.22

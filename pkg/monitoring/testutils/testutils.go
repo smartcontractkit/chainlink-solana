@@ -2,6 +2,7 @@ package testutils
 
 import (
 	"context"
+	crand "crypto/rand"
 	"fmt"
 	"math"
 	"math/rand"
@@ -59,7 +60,7 @@ func GenerateFeedConfig() config.SolanaFeedConfig {
 
 func Generate32ByteArr() [32]byte {
 	buf := make([]byte, 32)
-	_, err := rand.Read(buf)
+	_, err := crand.Read(buf)
 	if err != nil {
 		panic("unable to Generate [32]byte from rand")
 	}

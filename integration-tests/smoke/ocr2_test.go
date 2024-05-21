@@ -113,7 +113,7 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 			stuck := 0
 			successFullRounds := 0
 			prevRound := gauntlet.Transmission{
-				RoundId: 0,
+				RoundID: 0,
 			}
 			for successFullRounds < *config.OCR2.Smoke.NumberOfRounds {
 				require.Less(t, stuck, 10, "Rounds have been stuck for more than 10 iterations")
@@ -126,23 +126,22 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 					continue
 				}
 				currentRound := common.GetLatestRound(transmissions)
-				if prevRound.RoundId == 0 {
+				if prevRound.RoundID == 0 {
 					prevRound = currentRound
 				}
-				if currentRound.RoundId <= prevRound.RoundId {
+				if currentRound.RoundID <= prevRound.RoundID {
 					log.Info().Str("Transmission", sg.OcrAddress).Msg("No new transmissions")
 					stuck++
 					continue
 				}
 				log.Info().Str("Contract", sg.OcrAddress).Interface("Answer", currentRound.Answer).Int64("RoundID", currentRound.Answer).Msg("New answer found")
 				require.Equal(t, currentRound.Answer, int64(5), fmt.Sprintf("Actual: %d, Expected: 5", currentRound.Answer))
-				require.Less(t, prevRound.RoundId, currentRound.RoundId, fmt.Sprintf("Expected round %d to be less than %d", prevRound.RoundId, currentRound.RoundId))
+				require.Less(t, prevRound.RoundID, currentRound.RoundID, fmt.Sprintf("Expected round %d to be less than %d", prevRound.RoundID, currentRound.RoundID))
 				prevRound = currentRound
 				successFullRounds++
 				time.Sleep(time.Second * 6)
 				stuck = 0
 			}
 		})
-
 	}
 }
