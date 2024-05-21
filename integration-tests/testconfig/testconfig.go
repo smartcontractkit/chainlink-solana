@@ -3,25 +3,26 @@ package testconfig
 import (
 	"embed"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 
-	"github.com/smartcontractkit/seth"
-
 	"github.com/barkimedes/go-deepcopy"
 	"github.com/google/uuid"
 	"github.com/pelletier/go-toml/v2"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
-	ocr2_config "github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig/ocr2"
+	"github.com/smartcontractkit/seth"
+
 	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/config"
 	k8s_config "github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/osutil"
+
+	ocr2_config "github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig/ocr2"
 )
 
 type TestConfig struct {
@@ -68,12 +69,12 @@ func (c *TestConfig) Save() (string, error) {
 
 	content, err := toml.Marshal(*c)
 	if err != nil {
-		return "", errors.Wrapf(err, "error marshaling test config")
+		return "", fmt.Errorf("error marshaling test config: %w", err)
 	}
 
 	err = os.WriteFile(filePath, content, 0600)
 	if err != nil {
-		return "", errors.Wrapf(err, "error writing test config")
+		return "", fmt.Errorf("error writing test config: %w", err)
 	}
 
 	return filePath, nil
@@ -112,7 +113,7 @@ func (c TestConfig) GetConfigurationName() string {
 func (c *TestConfig) AsBase64() (string, error) {
 	content, err := toml.Marshal(*c)
 	if err != nil {
-		return "", errors.Wrapf(err, "error marshaling test config")
+		return "", fmt.Errorf("error marshaling test config: %w", err)
 	}
 
 	return base64.StdEncoding.EncodeToString(content), nil
@@ -123,8 +124,8 @@ type Common struct {
 	InsideK8s *bool   `toml:"inside_k8"`
 	User      *string `toml:"user"`
 	// if rpc requires api key to be passed as an HTTP header
-	RPC_URL            *string `toml:"rpc_url"`
-	WS_URL             *string `toml:"ws_url"`
+	RPCURL             *string `toml:"rpc_url"`
+	WsURL              *string `toml:"ws_url"`
 	PrivateKey         *string `toml:"private_key"`
 	Stateful           *bool   `toml:"stateful_db"`
 	InternalDockerRepo *string `toml:"internal_docker_repo"`
@@ -133,9 +134,9 @@ type Common struct {
 
 type SolanaConfig struct {
 	Secret                    *string `toml:"secret"`
-	OCR2ProgramId             *string `toml:"ocr2_program_id"`
-	AccessControllerProgramId *string `toml:"access_controller_program_id"`
-	StoreProgramId            *string `toml:"store_program_id"`
+	OCR2ProgramID             *string `toml:"ocr2_program_id"`
+	AccessControllerProgramID *string `toml:"access_controller_program_id"`
+	StoreProgramID            *string `toml:"store_program_id"`
 	LinkTokenAddress          *string `toml:"link_token_address"`
 	VaultAddress              *string `toml:"vault_address"`
 }
@@ -144,13 +145,13 @@ func (c *SolanaConfig) Validate() error {
 	if c.Secret == nil {
 		return fmt.Errorf("secret must be set")
 	}
-	if c.OCR2ProgramId == nil {
+	if c.OCR2ProgramID == nil {
 		return fmt.Errorf("ocr2_program_id must be set")
 	}
-	if c.AccessControllerProgramId == nil {
+	if c.AccessControllerProgramID == nil {
 		return fmt.Errorf("access_controller_program_id must be set")
 	}
-	if c.StoreProgramId == nil {
+	if c.StoreProgramID == nil {
 		return fmt.Errorf("store_program_id must be set")
 	}
 	if c.LinkTokenAddress == nil {
@@ -176,10 +177,10 @@ func (c *Common) Validate() error {
 		if c.PrivateKey == nil {
 			return fmt.Errorf("private_key must be set")
 		}
-		if c.RPC_URL == nil {
+		if c.RPCURL == nil {
 			return fmt.Errorf("rpc_url must be set")
 		}
-		if c.WS_URL == nil {
+		if c.WsURL == nil {
 			return fmt.Errorf("rpc_url must be set")
 		}
 
@@ -250,7 +251,7 @@ func GetConfig(configurationName string, product Product) (TestConfig, error) {
 		default:
 			err := ctf_config.BytesToAnyTomlStruct(logger, filename, configurationName, &testConfig, content)
 			if err != nil {
-				return errors.Wrapf(err, "error reading file %s", filename)
+				return fmt.Errorf("error reading file %s: %w", filename, err)
 			}
 
 			return nil
@@ -268,12 +269,12 @@ func GetConfig(configurationName string, product Product) (TestConfig, error) {
 				logger.Debug().Msgf("Embedded config file %s not found. Continuing", fileName)
 				continue
 			} else if err != nil {
-				return TestConfig{}, errors.Wrapf(err, "error reading embedded config")
+				return TestConfig{}, fmt.Errorf("error reading embedded config: %w", err)
 			}
 
 			err = handleSpecialOverrides(logger, fileName, configurationName, &testConfig, file, product)
 			if err != nil {
-				return TestConfig{}, errors.Wrapf(err, "error unmarshalling embedded config")
+				return TestConfig{}, fmt.Errorf("error unmarshalling embedded config: %w", err)
 			}
 		}
 	}
@@ -287,18 +288,18 @@ func GetConfig(configurationName string, product Product) (TestConfig, error) {
 			logger.Debug().Msgf("Config file %s not found", fileName)
 			continue
 		} else if err != nil {
-			return TestConfig{}, errors.Wrapf(err, "error looking for file %s", filePath)
+			return TestConfig{}, fmt.Errorf("error looking for file %s: %w", filePath, err)
 		}
 		logger.Debug().Str("location", filePath).Msgf("Found config file %s", fileName)
 
 		content, err := readFile(filePath)
 		if err != nil {
-			return TestConfig{}, errors.Wrapf(err, "error reading file %s", filePath)
+			return TestConfig{}, fmt.Errorf("error reading file %s: %w", filePath, err)
 		}
 
 		err = handleSpecialOverrides(logger, fileName, configurationName, &testConfig, content, product)
 		if err != nil {
-			return TestConfig{}, errors.Wrapf(err, "error reading file %s", filePath)
+			return TestConfig{}, fmt.Errorf("error reading file %s: %w", filePath, err)
 		}
 	}
 
@@ -313,7 +314,7 @@ func GetConfig(configurationName string, product Product) (TestConfig, error) {
 
 		err = handleSpecialOverrides(logger, Base64OverrideEnvVarName, configurationName, &testConfig, decoded, product)
 		if err != nil {
-			return TestConfig{}, errors.Wrapf(err, "error unmarshaling base64 config")
+			return TestConfig{}, fmt.Errorf("error unmarshaling base64 config: %w", err)
 		}
 	} else {
 		logger.Debug().Msg("Base64 config override from environment variable not found")
@@ -322,13 +323,13 @@ func GetConfig(configurationName string, product Product) (TestConfig, error) {
 	// it neede some custom logic, so we do it separately
 	err := testConfig.readNetworkConfiguration()
 	if err != nil {
-		return TestConfig{}, errors.Wrapf(err, "error reading network config")
+		return TestConfig{}, fmt.Errorf("error reading network config: %w", err)
 	}
 
 	logger.Debug().Msg("Validating test config")
 	err = testConfig.Validate()
 	if err != nil {
-		return TestConfig{}, errors.Wrapf(err, "error validating test config")
+		return TestConfig{}, fmt.Errorf("error validating test config: %w", err)
 	}
 
 	if testConfig.Common == nil {
@@ -348,7 +349,7 @@ func (c *TestConfig) readNetworkConfiguration() error {
 	c.Network.UpperCaseNetworkNames()
 	err := c.Network.Default()
 	if err != nil {
-		return errors.Wrapf(err, "error reading default network config")
+		return fmt.Errorf("error reading default network config: %w", err)
 	}
 
 	return nil
@@ -364,15 +365,15 @@ func (c *TestConfig) Validate() error {
 		return fmt.Errorf("chainlink image config must be set")
 	}
 	if err := c.ChainlinkImage.Validate(); err != nil {
-		return errors.Wrapf(err, "chainlink image config validation failed")
+		return fmt.Errorf("chainlink image config validation failed: %w", err)
 	}
 	if c.ChainlinkUpgradeImage != nil {
 		if err := c.ChainlinkUpgradeImage.Validate(); err != nil {
-			return errors.Wrapf(err, "chainlink upgrade image config validation failed")
+			return fmt.Errorf("chainlink upgrade image config validation failed: %w", err)
 		}
 	}
 	if err := c.Network.Validate(); err != nil {
-		return errors.Wrapf(err, "network config validation failed")
+		return fmt.Errorf("network config validation failed: %w", err)
 	}
 
 	if c.Common == nil {
@@ -380,7 +381,7 @@ func (c *TestConfig) Validate() error {
 	}
 
 	if err := c.Common.Validate(); err != nil {
-		return errors.Wrapf(err, "Common config validation failed")
+		return fmt.Errorf("Common config validation failed: %w", err)
 	}
 
 	if c.OCR2 == nil {
@@ -388,14 +389,14 @@ func (c *TestConfig) Validate() error {
 	}
 
 	if err := c.OCR2.Validate(); err != nil {
-		return errors.Wrapf(err, "OCR2 config validation failed")
+		return fmt.Errorf("OCR2 config validation failed: %w", err)
 	}
 	if c.SolanaConfig == nil {
 		return fmt.Errorf("SolanaConfig config must be set")
 	}
 
 	if err := c.SolanaConfig.Validate(); err != nil {
-		return errors.Wrapf(err, "SolanaConfig config validation failed")
+		return fmt.Errorf("SolanaConfig config validation failed: %w", err)
 	}
 	return nil
 }
@@ -403,7 +404,7 @@ func (c *TestConfig) Validate() error {
 func readFile(filePath string) ([]byte, error) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error reading file %s", filePath)
+		return nil, fmt.Errorf("error reading file %s: %w", filePath, err)
 	}
 
 	return content, nil

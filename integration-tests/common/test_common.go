@@ -13,20 +13,22 @@ import (
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/rs/zerolog/log"
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v4"
 
-	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	test_env_ctf "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
+
+	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig"
 )
 
 type OCRv2TestState struct {
@@ -50,8 +52,6 @@ type ChainlinkClient struct {
 	ChainlinkClientK8s    []*client.ChainlinkK8sClient
 	ChainlinkNodes        []*client.ChainlinkClient
 	NKeys                 []client.NodeKeysBundle
-	bTypeAttr             *client.BridgeTypeAttributes
-	bootstrapPeers        []client.P2PData
 	AccountAddresses      []string
 }
 
@@ -63,7 +63,6 @@ type Config struct {
 }
 
 func NewOCRv2State(t *testing.T, contracts int, namespacePrefix string, testConfig *testconfig.TestConfig) (*OCRv2TestState, error) {
-
 	c, err := New(testConfig).Default(t, namespacePrefix)
 	if err != nil {
 		return nil, err
@@ -113,9 +112,9 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		m.Common.ChainDetails.WSURLExternal = m.Common.Env.URLs["sol"][1]
 
 		if *m.Config.TestConfig.Common.Network == "devnet" {
-			m.Common.ChainDetails.RPCUrl = *m.Config.TestConfig.Common.RPC_URL
-			m.Common.ChainDetails.RPCURLExternal = *m.Config.TestConfig.Common.RPC_URL
-			m.Common.ChainDetails.WSURLExternal = *m.Config.TestConfig.Common.WS_URL
+			m.Common.ChainDetails.RPCUrl = *m.Config.TestConfig.Common.RPCURL
+			m.Common.ChainDetails.RPCURLExternal = *m.Config.TestConfig.Common.RPCURL
+			m.Common.ChainDetails.WSURLExternal = *m.Config.TestConfig.Common.WsURL
 		}
 
 		m.Common.ChainDetails.MockserverURLInternal = m.Common.Env.URLs["qa_mock_adapter_internal"][0]
@@ -133,9 +132,9 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		m.Common.ChainDetails.WSURLExternal = sol.ExternalWsURL
 
 		if *m.Config.TestConfig.Common.Network == "devnet" {
-			m.Common.ChainDetails.RPCUrl = *m.Config.TestConfig.Common.RPC_URL
-			m.Common.ChainDetails.RPCURLExternal = *m.Config.TestConfig.Common.RPC_URL
-			m.Common.ChainDetails.WSURLExternal = *m.Config.TestConfig.Common.WS_URL
+			m.Common.ChainDetails.RPCUrl = *m.Config.TestConfig.Common.RPCURL
+			m.Common.ChainDetails.RPCURLExternal = *m.Config.TestConfig.Common.RPCURL
+			m.Common.ChainDetails.WSURLExternal = *m.Config.TestConfig.Common.WsURL
 		}
 
 		b, err := test_env.NewCLTestEnvBuilder().
@@ -162,7 +161,6 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		m.Common.ChainDetails.MockServerEndpoint = "mockserver-bridge"
 		err = m.Clients.KillgraveClient.SetAdapterBasedIntValuePath("/mockserver-bridge", []string{http.MethodGet, http.MethodPost}, 5)
 		require.NoError(m.Config.T, err, "Failed to set mock adapter value")
-
 	}
 
 	m.SetupClients()
@@ -230,13 +228,14 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 	} else {
 		err = cd.DeployAnchorProgramsRemoteDocker(contractsDir, m.Common.DockerEnv.Sol)
 	}
+	require.NoError(m.Config.T, err)
 }
 
 // CreateJobs creating OCR jobs and EA stubs
 func (m *OCRv2TestState) CreateJobs() {
 	// Setting up RPC
-	c := rpc.New(*m.Config.TestConfig.Common.RPC_URL)
-	wsc, err := ws.Connect(testcontext.Get(m.Config.T), *m.Config.TestConfig.Common.WS_URL)
+	c := rpc.New(*m.Config.TestConfig.Common.RPCURL)
+	wsc, err := ws.Connect(testcontext.Get(m.Config.T), *m.Config.TestConfig.Common.WsURL)
 	require.NoError(m.Config.T, err, "Error connecting to websocket client")
 
 	relayConfig := job.JSONConfig{
@@ -244,7 +243,7 @@ func (m *OCRv2TestState) CreateJobs() {
 		"ocr2ProgramID":    m.Common.ChainDetails.ProgramAddresses.OCR2,
 		"transmissionsID":  m.Gauntlet.FeedAddress,
 		"storeProgramID":   m.Common.ChainDetails.ProgramAddresses.Store,
-		"chainID":          m.Common.ChainDetails.ChainId,
+		"chainID":          m.Common.ChainDetails.ChainID,
 	}
 	boostratInternalIP := m.Clients.ChainlinkClient.ChainlinkNodes[0].InternalIP()
 	bootstrapPeers := []client.P2PData{
@@ -291,7 +290,6 @@ func (m *OCRv2TestState) CreateJobs() {
 		if *m.Config.TestConfig.Common.Network == "localnet" {
 			err = m.Clients.SolanaClient.Fund(m.Clients.ChainlinkClient.NKeys[nIdx].TXKey.Data.ID, big.NewFloat(1e4))
 			require.NoError(m.Config.T, err, "Error sending funds")
-
 		} else {
 			err = solclient.SendFunds(*m.Config.TestConfig.Common.PrivateKey, m.Clients.ChainlinkClient.NKeys[nIdx].TXKey.Data.ID, 100000000, c, wsc)
 			require.NoError(m.Config.T, err, "Error sending funds")
@@ -336,9 +334,7 @@ func (m *OCRv2TestState) SetChainlinkNodes() {
 			chainlinkNodes = append(chainlinkNodes, m.Clients.ChainlinkClient.ChainlinkClientK8s[i].ChainlinkClient)
 		}
 	} else {
-		for _, node := range m.Clients.ChainlinkClient.ChainlinkClientDocker.NodeAPIs() {
-			chainlinkNodes = append(chainlinkNodes, node)
-		}
+		chainlinkNodes = append(chainlinkNodes, m.Clients.ChainlinkClient.ChainlinkClientDocker.NodeAPIs()...)
 	}
 	m.Clients.ChainlinkClient.ChainlinkNodes = chainlinkNodes
 }

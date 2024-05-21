@@ -6,16 +6,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
-	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/chainlink/integration-tests/actions"
+	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
+
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/common"
 	ocr_config "github.com/smartcontractkit/chainlink-solana/integration-tests/config"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
 	tc "github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
-	"github.com/smartcontractkit/chainlink/integration-tests/actions"
-	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 )
 
 func TestSolanaOCRV2Smoke(t *testing.T) {
@@ -36,7 +37,6 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-
 			state, err := common.NewOCRv2State(t, 1, "gauntlet-"+test.name, &config)
 			require.NoError(t, err, "Could not setup the ocrv2 state")
 			if len(test.env) > 0 {
@@ -56,7 +56,7 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 
 			if *config.Common.InsideK8s {
 				t.Cleanup(func() {
-					if err := actions.TeardownRemoteSuite(t, state.Common.Env.Cfg.Namespace, state.Clients.ChainlinkClient.ChainlinkClientK8s, nil, nil, nil); err != nil {
+					if err = actions.TeardownRemoteSuite(t, state.Common.Env.Cfg.Namespace, state.Clients.ChainlinkClient.ChainlinkClientK8s, nil, nil, nil); err != nil {
 						log.Error().Err(err).Msg("Error tearing down environment")
 					}
 				})
@@ -75,9 +75,9 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 			require.NoError(t, err, "Error setting gauntlet network")
 
 			if *config.Common.Network == "devnet" {
-				state.Common.ChainDetails.ProgramAddresses.OCR2 = *config.SolanaConfig.OCR2ProgramId
-				state.Common.ChainDetails.ProgramAddresses.AccessController = *config.SolanaConfig.AccessControllerProgramId
-				state.Common.ChainDetails.ProgramAddresses.Store = *config.SolanaConfig.StoreProgramId
+				state.Common.ChainDetails.ProgramAddresses.OCR2 = *config.SolanaConfig.OCR2ProgramID
+				state.Common.ChainDetails.ProgramAddresses.AccessController = *config.SolanaConfig.AccessControllerProgramID
+				state.Common.ChainDetails.ProgramAddresses.Store = *config.SolanaConfig.StoreProgramID
 				sg.LinkAddress = *config.SolanaConfig.LinkTokenAddress
 				sg.VaultAddress = *config.SolanaConfig.VaultAddress
 			} else {

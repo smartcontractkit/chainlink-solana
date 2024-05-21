@@ -15,13 +15,13 @@ type OCR2Config struct {
 	NodeKeys             []client.NodeKeysBundle
 	VaultAddress         string
 	Secret               string
-	ProposalId           string
+	ProposalID           string
 }
 
 type OCR2OnChainConfig struct {
 	Oracles    []Operator `json:"oracles"`
 	F          int        `json:"f"`
-	ProposalId string     `json:"proposalId"`
+	ProposalID string     `json:"proposalId"`
 }
 
 type OffchainConfig struct {
@@ -53,7 +53,7 @@ type ReportingPluginConfig struct {
 
 // TODO - Decouple all OCR2 config structs to be reusable between chains
 type OCROffChainConfig struct {
-	ProposalId     string         `json:"proposalId"`
+	ProposalID     string         `json:"proposalId"`
 	OffchainConfig OffchainConfig `json:"offchainConfig"`
 	UserSecret     string         `json:"userSecret"`
 }
@@ -66,11 +66,11 @@ type Operator struct {
 
 type PayeeConfig struct {
 	Operators  []Operator `json:"operators"`
-	ProposalId string     `json:"proposalId"`
+	ProposalID string     `json:"proposalId"`
 }
 
 type ProposalAcceptConfig struct {
-	ProposalId     string         `json:"proposalId"`
+	ProposalID     string         `json:"proposalId"`
 	Version        int            `json:"version"`
 	F              int            `json:"f"`
 	Oracles        []Operator     `json:"oracles"`
@@ -101,7 +101,7 @@ type StoreWriterConfig struct {
 	Transmissions string `json:"transmissions"`
 }
 
-func NewOCR2Config(nodeKeys []client.NodeKeysBundle, proposalId string, vaultAddress string, secret string) *OCR2Config {
+func NewOCR2Config(nodeKeys []client.NodeKeysBundle, proposalID string, vaultAddress string, secret string) *OCR2Config {
 	var oracles []Operator
 
 	nodeKeysSorted := make([]client.NodeKeysBundle, len(nodeKeys))
@@ -124,7 +124,7 @@ func NewOCR2Config(nodeKeys []client.NodeKeysBundle, proposalId string, vaultAdd
 		OnChainConfig: &OCR2OnChainConfig{
 			Oracles:    oracles,
 			F:          1,
-			ProposalId: proposalId,
+			ProposalID: proposalID,
 		},
 		OffChainConfig:       &OCROffChainConfig{},
 		PayeeConfig:          &PayeeConfig{},
@@ -132,7 +132,7 @@ func NewOCR2Config(nodeKeys []client.NodeKeysBundle, proposalId string, vaultAdd
 		NodeKeys:             nodeKeysSorted,
 		VaultAddress:         vaultAddress,
 		Secret:               secret,
-		ProposalId:           proposalId,
+		ProposalID:           proposalID,
 	}
 }
 
@@ -160,7 +160,7 @@ func (o *OCR2Config) Default() {
 	}
 	o.OffChainConfig = &OCROffChainConfig{
 		UserSecret: o.Secret,
-		ProposalId: o.ProposalId,
+		ProposalID: o.ProposalID,
 		OffchainConfig: OffchainConfig{
 			DeltaProgressNanoseconds:          int64(20000000000),
 			DeltaResendNanoseconds:            int64(50000000000),
@@ -182,10 +182,10 @@ func (o *OCR2Config) Default() {
 	}
 	o.PayeeConfig = &PayeeConfig{
 		Operators:  o.OnChainConfig.Oracles,
-		ProposalId: o.ProposalId,
+		ProposalID: o.ProposalID,
 	}
 	o.ProposalAcceptConfig = &ProposalAcceptConfig{
-		ProposalId:     o.ProposalId,
+		ProposalID:     o.ProposalID,
 		Version:        2,
 		F:              1,
 		Oracles:        o.OnChainConfig.Oracles,

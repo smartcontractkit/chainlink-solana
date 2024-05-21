@@ -147,7 +147,7 @@ func (sg *SolanaGauntlet) DeployLinkToken() error {
 		return err
 	}
 	sg.VaultAddress = *sg.gr.Data.Vault
-	sg.LinkAddress = *&sg.gr.Responses[0].Contract
+	sg.LinkAddress = sg.gr.Responses[0].Contract
 
 	return nil
 }
@@ -495,10 +495,10 @@ func (sg *SolanaGauntlet) DeployOCR2() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	sg.OCR2Config.OnChainConfig.ProposalId = sg.ProposalAddress
-	sg.OCR2Config.OffChainConfig.ProposalId = sg.ProposalAddress
-	sg.OCR2Config.PayeeConfig.ProposalId = sg.ProposalAddress
-	sg.OCR2Config.ProposalAcceptConfig.ProposalId = sg.ProposalAddress
+	sg.OCR2Config.OnChainConfig.ProposalID = sg.ProposalAddress
+	sg.OCR2Config.OffChainConfig.ProposalID = sg.ProposalAddress
+	sg.OCR2Config.PayeeConfig.ProposalID = sg.ProposalAddress
+	sg.OCR2Config.ProposalAcceptConfig.ProposalID = sg.ProposalAddress
 
 	return "", nil
 }

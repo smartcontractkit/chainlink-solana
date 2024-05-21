@@ -19,18 +19,17 @@ func (o *Config) Validate() error {
 
 	if o.TestDuration == nil {
 		return errors.New("test_duration must be set")
-	} else {
-		duration, err := time.ParseDuration(*o.TestDuration)
-		if err != nil {
-			return errors.New("Invalid test duration")
-		}
-		o.TestDurationParsed = &duration
 	}
+	duration, err := time.ParseDuration(*o.TestDuration)
+	if err != nil {
+		return errors.New("Invalid test duration")
+	}
+	o.TestDurationParsed = &duration
 
 	if o.Smoke == nil {
 		return errors.New("smoke must be defined")
 	}
-	err := o.Smoke.Validate()
+	err = o.Smoke.Validate()
 	if err != nil {
 		return err
 	}
