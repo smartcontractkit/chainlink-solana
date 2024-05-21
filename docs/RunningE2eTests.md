@@ -11,10 +11,14 @@ The main test config logic resides in the `integration-tests/testconfig/` direct
 There are a few possibile combinations to run tests that we support.
 
 **Devnet** 
+Devnet requires previously deployed programs that are owned by the person running the tests. The program ID's are required for testnet, but ignored in localnet.
 
 - `Common.network` needs to be set to `devnet` which will instruct the tests to run against devnet
 - `ocr2_program_id`, `access_controller_program_id`, `store_program_id`, `link_token_address`, `vault_address` need to be set so the tests know what programs to use so we avoid deploying each time.
 - `rpc_url` and `ws_url` need to be set
+
+**Localnet**
+Setting localnet will instruct the tests to run in localnet, the program ID's are not taken from the TOML in this scenario, but rather defined in the `integration-tests/config/config.go`.
 
 **K8s**
 

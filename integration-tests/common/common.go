@@ -132,7 +132,7 @@ func New(testConfig *tc.TestConfig) *Common {
 	// Getting the default localnet private key
 	privateKey, err := solana.PrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1])
 	if err != nil {
-		panic("Could not decode private devnet private key")
+		panic("Could not decode private localnet private key")
 	}
 	privateKeyString := fmt.Sprintf("[%s]", formatBuffer([]byte(privateKey)))
 	publicKey := privateKey.PublicKey().String()

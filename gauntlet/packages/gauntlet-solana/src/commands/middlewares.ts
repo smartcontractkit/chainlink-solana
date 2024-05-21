@@ -18,8 +18,10 @@ export const withProvider: Middleware = (c: SolanaCommand, next: Next) => {
     `Invalid NODE_URL (${nodeURL}), please add an http:// or https:// prefix`,
   )
   const wsUrl = process.env.WS_URL
-  assertions.assert(wsUrl && isValidURL(wsUrl), `Invalid WS_URL (${wsUrl}), please add an ws:// or wss:// prefix`)
-  c.provider = new AnchorProvider(new Connection(nodeURL, { wsEndpoint: wsUrl }), c.wallet, {})
+  if (wsUrl) {
+    assertions.assert(isValidURL(wsUrl), `Invalid WS_URL (${wsUrl}), please add an ws:// or wss:// prefix`)
+  }
+  c.provider = new AnchorProvider(new Connection(nodeURL, wsUrl ? { wsEndpoint: wsUrl } : {}), c.wallet, {})
   return next()
 }
 
