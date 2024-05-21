@@ -12,10 +12,10 @@ require (
 	github.com/onsi/gomega v1.30.0
 	github.com/rs/zerolog v1.30.0
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240517134904-f4446b816a28
-	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240517221828-4a5f6d2cfecb
+	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240521200803-6c605f618787
 	github.com/smartcontractkit/chainlink-testing-framework v1.28.12
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240515225456-aeb9f4d50d65
-	github.com/smartcontractkit/chainlink/v2 v2.10.0-beta0.0.20240517223924-60eb51b3b61e
+	github.com/smartcontractkit/chainlink/v2 v2.10.0-beta0.0.20240521201249-c00f33248fe4
 	github.com/smartcontractkit/libocr v0.0.0-20240419185742-fd3cab206b2c
 	github.com/stretchr/testify v1.9.0
 	github.com/testcontainers/testcontainers-go v0.28.0
