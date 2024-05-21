@@ -13,7 +13,6 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
 	github.com/pelletier/go-toml/v2 v2.1.1
-	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.30.0
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240516150131-e1be553a9d10
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240510181707-46b1311a5a83
@@ -330,6 +329,7 @@ require (
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/petermattis/goid v0.0.0-20230317030725-371a4b8eda08 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/prometheus/alertmanager v0.26.0 // indirect
