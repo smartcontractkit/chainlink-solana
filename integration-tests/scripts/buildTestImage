@@ -13,7 +13,7 @@ cd "$SCRIPT_DIR"/../../ || exit 1
 TAG_VERSION="${1}"
 BASE_IMAGE_VERSION="${2}"
 SUITES=$3
-DEFAULT_SUITES="smoke soak"
+DEFAULT_SUITES="smoke"
 ACCOUNT=$(aws sts get-caller-identity | jq -r .Account)
 AWS_BASE="${ACCOUNT}".dkr.ecr.us-west-2.amazonaws.com
 TAG="${AWS_BASE}"/chainlink-solana-tests:"${TAG_VERSION}"
