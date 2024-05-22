@@ -39,13 +39,13 @@ ifeq ($(OSFLAG),$(OSX))
 	asdf plugin add shellcheck || true
 	asdf plugin add kubectl || true
 	asdf install
+	go install github.com/smartcontractkit/chainlink-testing-framework/tools/gotestloghelper@latest
 endif
 ifeq ($(OSFLAG),$(LINUX))
 ifneq ($(CI),true)
 	# install nix
 	sh <(curl -L https://nixos-nix-install-tests.cachix.org/serve/vij683ly7sl95nnhb67bdjjfabclr85m/install) --daemon --tarball-url-prefix https://nixos-nix-install-tests.cachix.org/serve --nix-extra-conf-file ./nix.conf
 endif
-	go install github.com/onsi/ginkgo/v2/ginkgo@v$(shell cat ./.tool-versions | grep ginkgo | sed -En "s/ginkgo.(.*)/\1/p")
 endif
 
 .PHONY: projectserum_version
@@ -82,7 +82,7 @@ test_relay_unit:
 
 test_smoke:
 	cd ./integration-tests &&\
-	SELECTED_NETWORKS=SIMULATED go test -timeout 24h -count=1 -json $(args) -run TestSolanaOCRV2Smoke ./smoke 2>&1 | tee /tmp/gotest.log | gotestfmt
+	SELECTED_NETWORKS=SIMULATED go test -timeout 24h -count=1 -json $(args) -run TestSolanaOCRV2Smoke ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -json -tlogprefix -singlepackage -color
 
 gomodtidy:
 	go mod tidy
