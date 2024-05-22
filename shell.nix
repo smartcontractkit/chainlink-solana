@@ -41,7 +41,6 @@ pkgs.mkShell {
 
   # Avoids issues with delve
   CGO_CPPFLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0";
-  CGO_ENABLED=0;
 
   shellHook = ''
     # install gotestloghelper
