@@ -57,7 +57,7 @@ runs:
         build-args: |
           BASE_IMAGE=${{ inputs.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ inputs.QA_AWS_REGION }}.amazonaws.com/test-base-image
           IMAGE_VERSION=${{ steps.version.outputs.version }}
-          SUITES="soak smoke"
+          SUITES="smoke"
         AWS_REGION: ${{ inputs.QA_AWS_REGION }}
         AWS_ROLE_TO_ASSUME: ${{ inputs.QA_AWS_ROLE_TO_ASSUME }}
     - name: Print Image Built
