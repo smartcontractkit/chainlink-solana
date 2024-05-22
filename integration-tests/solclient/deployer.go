@@ -19,7 +19,7 @@ import (
 	access_controller2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/access_controller"
 	ocr_2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr2"
 	store2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/store"
-	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/test_env"
+	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
 )
 
 // All account sizes are calculated from Rust structures, ex. programs/access-controller/src/lib.rs:L80
@@ -231,17 +231,6 @@ func (c *ContractDeployer) CreateFeed(desc string, decimals uint8, granularity i
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-func (c *ContractDeployer) addMintToAccInstr(instr *[]solana.Instruction, dest solana.PublicKey, amount uint64) error {
-	*instr = append(*instr, token.NewMintToInstruction(
-		amount,
-		c.Accounts.Mint.PublicKey(),
-		dest,
-		c.Accounts.MintAuthority.PublicKey(),
-		nil,
-	).Build())
 	return nil
 }
 

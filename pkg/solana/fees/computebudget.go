@@ -11,27 +11,27 @@ import (
 // https://github.com/solana-labs/solana/blob/60858d043ca612334de300805d93ea3014e8ab37/sdk/src/compute_budget.rs#L25
 const (
 	// deprecated: will not support for building instruction
-	Instruction_RequestUnitsDeprecated uint8 = iota
+	InstructionRequestUnitsDeprecated uint8 = iota
 
 	// Request a specific transaction-wide program heap region size in bytes.
 	// The value requested must be a multiple of 1024. This new heap region
 	// size applies to each program executed in the transaction, including all
 	// calls to CPIs.
 	// note: uses ag_binary.Varuint32
-	Instruction_RequestHeapFrame
+	InstructionRequestHeapFrame
 
 	// Set a specific compute unit limit that the transaction is allowed to consume.
 	// note: uses ag_binary.Varuint32
-	Instruction_SetComputeUnitLimit
+	InstructionSetComputeUnitLimit
 
 	// Set a compute unit price in "micro-lamports" to pay a higher transaction
 	// fee for higher transaction prioritization.
 	// note: uses ag_binary.Uint64
-	Instruction_SetComputeUnitPrice
+	InstructionSetComputeUnitPrice
 )
 
 const (
-	COMPUTE_BUDGET_PROGRAM = "ComputeBudget111111111111111111111111111111"
+	ComputeBudgetProgram = "ComputeBudget111111111111111111111111111111"
 )
 
 // https://docs.solana.com/developing/programming-model/runtime
@@ -39,7 +39,7 @@ type ComputeUnitPrice uint64
 
 // returns the compute budget program
 func (val ComputeUnitPrice) ProgramID() solana.PublicKey {
-	return solana.MustPublicKeyFromBase58(COMPUTE_BUDGET_PROGRAM)
+	return solana.MustPublicKeyFromBase58(ComputeBudgetProgram)
 }
 
 // No accounts needed
@@ -52,7 +52,7 @@ func (val ComputeUnitPrice) Data() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
 	// encode method identifier
-	if err := buf.WriteByte(Instruction_SetComputeUnitPrice); err != nil {
+	if err := buf.WriteByte(InstructionSetComputeUnitPrice); err != nil {
 		return []byte{}, err
 	}
 
@@ -69,7 +69,7 @@ func ParseComputeUnitPrice(data []byte) (ComputeUnitPrice, error) {
 		return 0, fmt.Errorf("invalid length: %d", len(data))
 	}
 
-	if data[0] != Instruction_SetComputeUnitPrice {
+	if data[0] != InstructionSetComputeUnitPrice {
 		return 0, fmt.Errorf("not SetComputeUnitPrice identifier: %d", data[0])
 	}
 
@@ -117,7 +117,7 @@ func SetComputeUnitPrice(tx *solana.Transaction, price ComputeUnitPrice) error {
 	for i := range tx.Message.Instructions {
 		if tx.Message.Instructions[i].ProgramIDIndex == programIdx &&
 			len(tx.Message.Instructions[i].Data) > 0 &&
-			tx.Message.Instructions[i].Data[0] == Instruction_SetComputeUnitPrice {
+			tx.Message.Instructions[i].Data[0] == InstructionSetComputeUnitPrice {
 			found = true
 			instructionIdx = i
 			break

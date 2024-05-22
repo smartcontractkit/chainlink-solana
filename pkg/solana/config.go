@@ -17,9 +17,6 @@ import (
 	soldb "github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 )
 
-// Deprecated: use TOMLConfigs
-type SolanaConfigs = TOMLConfigs
-
 type TOMLConfigs []*TOMLConfig
 
 func (cs TOMLConfigs) ValidateConfig() (err error) {
@@ -88,6 +85,7 @@ func nodeStatus(n *solcfg.Node, id string) (relaytypes.NodeStatus, error) {
 	return s, nil
 }
 
+// revive:disable-next-line will be handled in https://github.com/smartcontractkit/chainlink-solana/pull/709
 type SolanaNodes []*solcfg.Node
 
 func (ns *SolanaNodes) SetFrom(fs *SolanaNodes) {
@@ -120,9 +118,6 @@ func legacySolNode(n *solcfg.Node, id string) soldb.Node {
 		SolanaURL:     (*url.URL)(n.URL).String(),
 	}
 }
-
-// Deprecated: use TOMLConfig
-type SolanaConfig = TOMLConfig
 
 type TOMLConfig struct {
 	ChainID *string
