@@ -21,11 +21,13 @@ func (cs TOMLConfigs) ValidateConfig() (err error) {
 }
 
 func (cs TOMLConfigs) validateKeys() (err error) {
+	errA := []error{}
+
 	// Unique chain IDs
 	chainIDs := config.UniqueStrings{}
 	for i, c := range cs {
 		if chainIDs.IsDupe(c.ChainID) {
-			err = errors.Join(err, config.NewErrDuplicate(fmt.Sprintf("%d.ChainID", i), *c.ChainID))
+			errA = append(errA, config.NewErrDuplicate(fmt.Sprintf("%d.ChainID", i), *c.ChainID))
 		}
 	}
 
@@ -34,7 +36,7 @@ func (cs TOMLConfigs) validateKeys() (err error) {
 	for i, c := range cs {
 		for j, n := range c.Nodes {
 			if names.IsDupe(n.Name) {
-				err = errors.Join(err, config.NewErrDuplicate(fmt.Sprintf("%d.Nodes.%d.Name", i, j), *n.Name))
+				errA = append(errA, config.NewErrDuplicate(fmt.Sprintf("%d.Nodes.%d.Name", i, j), *n.Name))
 			}
 		}
 	}
@@ -45,11 +47,11 @@ func (cs TOMLConfigs) validateKeys() (err error) {
 		for j, n := range c.Nodes {
 			u := (*url.URL)(n.URL)
 			if urls.IsDupeFmt(u) {
-				err = errors.Join(err, config.NewErrDuplicate(fmt.Sprintf("%d.Nodes.%d.URL", i, j), u.String()))
+				errA = append(errA, config.NewErrDuplicate(fmt.Sprintf("%d.Nodes.%d.URL", i, j), u.String()))
 			}
 		}
 	}
-	return
+	return errors.Join(errA...)
 }
 
 func (cs *TOMLConfigs) SetFrom(fs *TOMLConfigs) (err error) {
@@ -179,16 +181,18 @@ func setFromChain(c, f *Chain) {
 }
 
 func (c *TOMLConfig) ValidateConfig() (err error) {
+	errA := []error{}
+
 	if c.ChainID == nil {
-		err = errors.Join(err, config.ErrMissing{Name: "ChainID", Msg: "required for all chains"})
+		errA = append(errA, config.ErrMissing{Name: "ChainID", Msg: "required for all chains"})
 	} else if *c.ChainID == "" {
-		err = errors.Join(err, config.ErrEmpty{Name: "ChainID", Msg: "required for all chains"})
+		errA = append(errA, config.ErrEmpty{Name: "ChainID", Msg: "required for all chains"})
 	}
 
 	if len(c.Nodes) == 0 {
-		err = errors.Join(err, config.ErrMissing{Name: "Nodes", Msg: "must have at least one node"})
+		errA = append(errA, config.ErrMissing{Name: "Nodes", Msg: "must have at least one node"})
 	}
-	return
+	return errors.Join(errA...)
 }
 
 func (c *TOMLConfig) TOMLString() (string, error) {
