@@ -90,7 +90,7 @@ jobs:
           fi
       - name: Check if image exists
         id: check-image
-        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@e29366cdecfe6befff9ab8c3cfe4825218505d58 # v2.3.16
+        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
         with:
           repository: chainlink
           tag: solana.${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref || github.sha }}
@@ -98,7 +98,7 @@ jobs:
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       - name: Build Image
         if: steps.check-image.outputs.exists == 'false'
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@e29366cdecfe6befff9ab8c3cfe4825218505d58 # v2.3.16
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
         with:
           should_checkout: true
           cl_repo: smartcontractkit/chainlink
@@ -122,22 +122,19 @@ jobs:
     env:
       TEST_SUITE: smoke
       TEST_ARGS: -test.timeout 30m
-      CHAINLINK_COMMIT_SHA: ${{ github.sha }}
-      CHAINLINK_ENV_USER: ${{ github.actor }}
       TEST_LOG_LEVEL: debug
-      SELECTED_NETWORKS: SIMULATED
-      INTERNAL_DOCKER_REPO: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Collect Metrics
         id: collect-gha-metrics
         uses: smartcontractkit/push-gha-metrics-action@dea9b546553cb4ca936607c2267a09c004e4ab3f # v3.0.0
         with:
-          id: e2e_custom_run_smoke_tests
+          id: solana-e2e-smoke
           org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
           basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
           hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
           this-job-name: E2E Custom Run Smoke Tests
+          test-results-file: '{"testType":"go","filePath":"/tmp/gotest.log"}'
         continue-on-error: true
       - name: Get core ref from PR body
         if: github.event_name == 'pull_request'
@@ -150,19 +147,19 @@ jobs:
           fi
       - name: Checkout the repo
         uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
-      - name: Download Artifacts
-        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
-        with:
-          name: artifacts
-          path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
       - name: Install Solana CLI # required for ensuring the local test validator is configured correctly
         run: ./scripts/install-solana-ci.sh
+      - name: Install gauntlet
+        uses: ./.github/actions/build-gauntlet
       - name: Generate config overrides
         run: | # https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/README.md
           cat << EOF > config.toml
           [ChainlinkImage]
           image="${{ env.CL_ECR }}"
           version="solana.${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref || github.sha }}"
+          [Common]
+          user="${{ github.actor }}"
+          internal_docker_repo = "${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com"
           EOF
 
           # shellcheck disable=SC2002
@@ -172,10 +169,11 @@ jobs:
           # shellcheck disable=SC2086
           echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> $GITHUB_ENV
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@e29366cdecfe6befff9ab8c3cfe4825218505d58 # v2.3.16
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
         with:
-          test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestfmt
+          test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
+          download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 
           go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ env.CL_ECR }}
           cl_image_tag: solana.${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref || github.sha }}

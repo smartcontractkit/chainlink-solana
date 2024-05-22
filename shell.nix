@@ -39,7 +39,11 @@ pkgs.mkShell {
 
   LD_LIBRARY_PATH = lib.makeLibraryPath [pkgs.zlib stdenv.cc.cc.lib]; # lib64
 
-
   # Avoids issues with delve
   CGO_CPPFLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0";
+
+  shellHook = ''
+    # install gotestloghelper
+    go install github.com/smartcontractkit/chainlink-testing-framework/tools/gotestloghelper@latest
+  '';
 }
