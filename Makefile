@@ -84,10 +84,6 @@ test_smoke:
 	cd ./integration-tests &&\
 	SELECTED_NETWORKS=SIMULATED go test -timeout 24h -count=1 -json $(args) -run TestSolanaOCRV2Smoke ./smoke 2>&1 | tee /tmp/gotest.log | gotestfmt
 
-test_ocr_soak:
-	cd ./integration-tests &&\
-	SELECTED_NETWORKS=SIMULATED go test -timeout 24h -count=1 -json $(args) ./soak 2>&1 | tee /tmp/gotest.log | gotestfmt
-
 gomodtidy:
 	go mod tidy
 	cd ./integration-tests && go mod tidy
