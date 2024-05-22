@@ -73,6 +73,8 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 
 			err = sg.SetupNetwork(gauntletConfig)
 			require.NoError(t, err, "Error setting gauntlet network")
+			err = sg.InstallDependencies()
+			require.NoError(t, err, "Error installing gauntlet dependencies")
 
 			if *config.Common.Network == "devnet" {
 				state.Common.ChainDetails.ProgramAddresses.OCR2 = *config.SolanaConfig.OCR2ProgramID
