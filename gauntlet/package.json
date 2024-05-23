@@ -14,6 +14,7 @@
   "bin": "packages/gauntlet-solana-contracts/dist/cli.js",
   "scripts": {
     "gauntlet": "yarn build && node ./packages/gauntlet-solana-contracts/dist/cli.js",
+    "gauntlet-nobuild": "node ./packages/gauntlet-solana-contracts/dist/cli.js",
     "gauntlet-serum-multisig": "yarn build && node ./packages/gauntlet-serum-multisig/dist/index.js",
     "lint": "tsc -b ./tsconfig.json",
     "eslint": "eslint -f json -o eslint-report.json ./packages || true",

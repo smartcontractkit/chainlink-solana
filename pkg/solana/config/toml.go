@@ -1,4 +1,4 @@
-package solana
+package config
 
 import (
 	"errors"
@@ -12,9 +12,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-
-	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	soldb "github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 )
 
 type TOMLConfigs []*TOMLConfig
@@ -24,11 +21,13 @@ func (cs TOMLConfigs) ValidateConfig() (err error) {
 }
 
 func (cs TOMLConfigs) validateKeys() (err error) {
+	errA := []error{} // goal: remove and go back to only errors.Join (https://smartcontract-it.atlassian.net/browse/BCI-3330)
+
 	// Unique chain IDs
 	chainIDs := config.UniqueStrings{}
 	for i, c := range cs {
 		if chainIDs.IsDupe(c.ChainID) {
-			err = errors.Join(err, config.NewErrDuplicate(fmt.Sprintf("%d.ChainID", i), *c.ChainID))
+			errA = append(errA, config.NewErrDuplicate(fmt.Sprintf("%d.ChainID", i), *c.ChainID))
 		}
 	}
 
@@ -37,7 +36,7 @@ func (cs TOMLConfigs) validateKeys() (err error) {
 	for i, c := range cs {
 		for j, n := range c.Nodes {
 			if names.IsDupe(n.Name) {
-				err = errors.Join(err, config.NewErrDuplicate(fmt.Sprintf("%d.Nodes.%d.Name", i, j), *n.Name))
+				errA = append(errA, config.NewErrDuplicate(fmt.Sprintf("%d.Nodes.%d.Name", i, j), *n.Name))
 			}
 		}
 	}
@@ -48,11 +47,11 @@ func (cs TOMLConfigs) validateKeys() (err error) {
 		for j, n := range c.Nodes {
 			u := (*url.URL)(n.URL)
 			if urls.IsDupeFmt(u) {
-				err = errors.Join(err, config.NewErrDuplicate(fmt.Sprintf("%d.Nodes.%d.URL", i, j), u.String()))
+				errA = append(errA, config.NewErrDuplicate(fmt.Sprintf("%d.Nodes.%d.URL", i, j), u.String()))
 			}
 		}
 	}
-	return
+	return errors.Join(errA...)
 }
 
 func (cs *TOMLConfigs) SetFrom(fs *TOMLConfigs) (err error) {
@@ -73,7 +72,7 @@ func (cs *TOMLConfigs) SetFrom(fs *TOMLConfigs) (err error) {
 	return
 }
 
-func nodeStatus(n *solcfg.Node, id string) (relaytypes.NodeStatus, error) {
+func NodeStatus(n *Node, id string) (relaytypes.NodeStatus, error) {
 	var s relaytypes.NodeStatus
 	s.ChainID = id
 	s.Name = *n.Name
@@ -85,14 +84,13 @@ func nodeStatus(n *solcfg.Node, id string) (relaytypes.NodeStatus, error) {
 	return s, nil
 }
 
-// revive:disable-next-line will be handled in https://github.com/smartcontractkit/chainlink-solana/pull/709
-type SolanaNodes []*solcfg.Node
+type Nodes []*Node
 
-func (ns *SolanaNodes) SetFrom(fs *SolanaNodes) {
+func (ns *Nodes) SetFrom(fs *Nodes) {
 	for _, f := range *fs {
 		if f.Name == nil {
 			*ns = append(*ns, f)
-		} else if i := slices.IndexFunc(*ns, func(n *solcfg.Node) bool {
+		} else if i := slices.IndexFunc(*ns, func(n *Node) bool {
 			return n.Name != nil && *n.Name == *f.Name
 		}); i == -1 {
 			*ns = append(*ns, f)
@@ -102,7 +100,7 @@ func (ns *SolanaNodes) SetFrom(fs *SolanaNodes) {
 	}
 }
 
-func setFromNode(n, f *solcfg.Node) {
+func setFromNode(n, f *Node) {
 	if f.Name != nil {
 		n.Name = f.Name
 	}
@@ -111,20 +109,12 @@ func setFromNode(n, f *solcfg.Node) {
 	}
 }
 
-func legacySolNode(n *solcfg.Node, id string) soldb.Node {
-	return soldb.Node{
-		Name:          *n.Name,
-		SolanaChainID: id,
-		SolanaURL:     (*url.URL)(n.URL).String(),
-	}
-}
-
 type TOMLConfig struct {
 	ChainID *string
 	// Do not access directly, use [IsEnabled]
 	Enabled *bool
-	solcfg.Chain
-	Nodes SolanaNodes
+	Chain
+	Nodes Nodes
 }
 
 func (c *TOMLConfig) IsEnabled() bool {
@@ -142,7 +132,7 @@ func (c *TOMLConfig) SetFrom(f *TOMLConfig) {
 	c.Nodes.SetFrom(&f.Nodes)
 }
 
-func setFromChain(c, f *solcfg.Chain) {
+func setFromChain(c, f *Chain) {
 	if f.BalancePollPeriod != nil {
 		c.BalancePollPeriod = f.BalancePollPeriod
 	}
@@ -173,19 +163,36 @@ func setFromChain(c, f *solcfg.Chain) {
 	if f.MaxRetries != nil {
 		c.MaxRetries = f.MaxRetries
 	}
+	if f.FeeEstimatorMode != nil {
+		c.FeeEstimatorMode = f.FeeEstimatorMode
+	}
+	if f.ComputeUnitPriceMax != nil {
+		c.ComputeUnitPriceMax = f.ComputeUnitPriceMax
+	}
+	if f.ComputeUnitPriceMin != nil {
+		c.ComputeUnitPriceMin = f.ComputeUnitPriceMin
+	}
+	if f.ComputeUnitPriceDefault != nil {
+		c.ComputeUnitPriceDefault = f.ComputeUnitPriceDefault
+	}
+	if f.FeeBumpPeriod != nil {
+		c.FeeBumpPeriod = f.FeeBumpPeriod
+	}
 }
 
 func (c *TOMLConfig) ValidateConfig() (err error) {
+	errA := []error{}
+
 	if c.ChainID == nil {
-		err = errors.Join(err, config.ErrMissing{Name: "ChainID", Msg: "required for all chains"})
+		errA = append(errA, config.ErrMissing{Name: "ChainID", Msg: "required for all chains"})
 	} else if *c.ChainID == "" {
-		err = errors.Join(err, config.ErrEmpty{Name: "ChainID", Msg: "required for all chains"})
+		errA = append(errA, config.ErrEmpty{Name: "ChainID", Msg: "required for all chains"})
 	}
 
 	if len(c.Nodes) == 0 {
-		err = errors.Join(err, config.ErrMissing{Name: "Nodes", Msg: "must have at least one node"})
+		errA = append(errA, config.ErrMissing{Name: "Nodes", Msg: "must have at least one node"})
 	}
-	return
+	return errors.Join(errA...)
 }
 
 func (c *TOMLConfig) TOMLString() (string, error) {
@@ -196,7 +203,7 @@ func (c *TOMLConfig) TOMLString() (string, error) {
 	return string(b), nil
 }
 
-var _ solcfg.Config = &TOMLConfig{}
+var _ Config = &TOMLConfig{}
 
 func (c *TOMLConfig) BalancePollPeriod() time.Duration {
 	return c.Chain.BalancePollPeriod.Duration()
@@ -238,6 +245,9 @@ func (c *TOMLConfig) MaxRetries() *uint {
 	if c.Chain.MaxRetries == nil {
 		return nil
 	}
+	if *c.Chain.MaxRetries < 0 {
+		return nil // interpret negative numbers as nil (prevents unlikely case of overflow)
+	}
 	mr := uint(*c.Chain.MaxRetries)
 	return &mr
 }
@@ -262,10 +272,12 @@ func (c *TOMLConfig) FeeBumpPeriod() time.Duration {
 	return c.Chain.FeeBumpPeriod.Duration()
 }
 
-func (c *TOMLConfig) ListNodes() ([]soldb.Node, error) {
-	var allNodes []soldb.Node
-	for _, n := range c.Nodes {
-		allNodes = append(allNodes, legacySolNode(n, *c.ChainID))
-	}
-	return allNodes, nil
+func (c *TOMLConfig) ListNodes() Nodes {
+	return c.Nodes
+}
+
+func NewDefault() *TOMLConfig {
+	cfg := &TOMLConfig{}
+	cfg.SetDefaults()
+	return cfg
 }

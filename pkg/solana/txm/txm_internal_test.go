@@ -21,7 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 
@@ -94,7 +93,7 @@ func TestTxm(t *testing.T) {
 	ctx := tests.Context(t)
 
 	lggr := logger.Test(t)
-	cfg := config.NewConfig(db.ChainCfg{}, lggr)
+	cfg := config.NewDefault()
 	mc := mocks.NewReaderWriter(t)
 
 	// mock solana keystore
@@ -577,7 +576,7 @@ func TestTxm(t *testing.T) {
 func TestTxm_Enqueue(t *testing.T) {
 	// set up configs needed in txm
 	lggr := logger.Test(t)
-	cfg := config.NewConfig(db.ChainCfg{}, lggr)
+	cfg := config.NewDefault()
 	mc := mocks.NewReaderWriter(t)
 
 	// mock solana keystore

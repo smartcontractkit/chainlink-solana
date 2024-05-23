@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,7 +19,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 )
 
 const TestSolanaGenesisHashTemplate = `{"jsonrpc":"2.0","result":"%s","id":1}`
@@ -46,7 +46,7 @@ func TestSolanaChain_GetClient(t *testing.T) {
 
 	ch := solcfg.Chain{}
 	ch.SetDefaults()
-	cfg := &TOMLConfig{
+	cfg := &solcfg.TOMLConfig{
 		ChainID: ptr("devnet"),
 		Chain:   ch,
 	}
@@ -143,7 +143,7 @@ func TestSolanaChain_VerifiedClient(t *testing.T) {
 
 	ch := solcfg.Chain{}
 	ch.SetDefaults()
-	cfg := &TOMLConfig{
+	cfg := &solcfg.TOMLConfig{
 		ChainID: ptr("devnet"),
 		Chain:   ch,
 	}
@@ -152,28 +152,32 @@ func TestSolanaChain_VerifiedClient(t *testing.T) {
 		lggr:        logger.Test(t),
 		clientCache: map[string]*verifiedCachedClient{},
 	}
-	node := db.Node{SolanaURL: mockServer.URL}
+	nName := t.Name() + "-" + uuid.NewString()
+	node := &solcfg.Node{
+		Name: &nName,
+		URL:  config.MustParseURL(mockServer.URL),
+	}
 
 	// happy path
 	testChain.id = "devnet"
 	_, err := testChain.verifiedClient(node)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// retrieve cached client and retrieve slot height
 	c, err := testChain.verifiedClient(node)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	slot, err := c.SlotHeight()
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(1234), slot)
 
-	node.SolanaURL = mockServer.URL + "/mismatch"
+	node.URL = config.MustParseURL(mockServer.URL + "/mismatch")
 	testChain.id = "incorrect"
 	c, err = testChain.verifiedClient(node)
 	assert.NoError(t, err)
 	_, err = c.ChainID()
 	// expect error from id mismatch (even if using a cached client) when performing RPC calls
 	assert.Error(t, err)
-	assert.Equal(t, fmt.Sprintf("client returned mismatched chain id (expected: %s, got: %s): %s", "incorrect", "devnet", node.SolanaURL), err.Error())
+	assert.Equal(t, fmt.Sprintf("client returned mismatched chain id (expected: %s, got: %s): %s", "incorrect", "devnet", node.URL), err.Error())
 }
 
 func TestSolanaChain_VerifiedClient_ParallelClients(t *testing.T) {
@@ -186,7 +190,7 @@ func TestSolanaChain_VerifiedClient_ParallelClients(t *testing.T) {
 
 	ch := solcfg.Chain{}
 	ch.SetDefaults()
-	cfg := &TOMLConfig{
+	cfg := &solcfg.TOMLConfig{
 		ChainID: ptr("devnet"),
 		Enabled: ptr(true),
 		Chain:   ch,
@@ -197,7 +201,11 @@ func TestSolanaChain_VerifiedClient_ParallelClients(t *testing.T) {
 		lggr:        logger.Test(t),
 		clientCache: map[string]*verifiedCachedClient{},
 	}
-	node := db.Node{SolanaURL: mockServer.URL}
+	nName := t.Name() + "-" + uuid.NewString()
+	node := &solcfg.Node{
+		Name: &nName,
+		URL:  config.MustParseURL(mockServer.URL),
+	}
 
 	var wg sync.WaitGroup
 	wg.Add(2)
