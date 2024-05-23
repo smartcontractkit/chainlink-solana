@@ -65,7 +65,6 @@ type Transmission struct {
 // NewSolanaGauntlet Creates a default gauntlet config
 func NewSolanaGauntlet(workingDir string) (*SolanaGauntlet, error) {
 	g, err := gauntlet.NewGauntlet()
-	g.SetWorkingDir(workingDir)
 	if err != nil {
 		return nil, err
 	}
@@ -117,11 +116,11 @@ func (sg *SolanaGauntlet) SetupNetwork(args map[string]string) error {
 
 func (sg *SolanaGauntlet) InstallDependencies() error {
 	sg.G.Command = "yarn"
-	_, err := sg.G.ExecCommand([]string{"install"}, *sg.options)
+	_, err := sg.G.ExecCommand([]string{"--cwd", sg.Dir, "install"}, *sg.options)
 	if err != nil {
 		return err
 	}
-	_, err = sg.G.ExecCommand([]string{"build"}, *sg.options) // initial build
+	_, err = sg.G.ExecCommand([]string{"--cwd", sg.Dir, "build"}, *sg.options) // initial build
 	if err != nil {
 		return err
 	}
@@ -131,7 +130,7 @@ func (sg *SolanaGauntlet) InstallDependencies() error {
 
 // exect is a custom wrapper to use custom set gauntlet command + error wrapping
 func (sg *SolanaGauntlet) exec(args []string, options gauntlet.ExecCommandOptions) (string, error) {
-	updatedArgs := []string{sg.G.Command, args[0], sg.G.Flag("network", sg.G.Network)}
+	updatedArgs := []string{"--cwd", sg.Dir, sg.G.Command, args[0], sg.G.Flag("network", sg.G.Network)}
 	if len(args) > 1 {
 		updatedArgs = append(updatedArgs, args[1:]...)
 	}
