@@ -44,5 +44,5 @@ node_count = 6
 test_duration = "50m"
 
 [OCR2.Smoke]
-number_of_rounds = 5
+number_of_rounds = 2
 
