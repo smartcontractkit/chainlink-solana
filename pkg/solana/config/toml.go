@@ -21,7 +21,7 @@ func (cs TOMLConfigs) ValidateConfig() (err error) {
 }
 
 func (cs TOMLConfigs) validateKeys() (err error) {
-	errA := []error{}
+	errA := []error{} // goal: remove and go back to only errors.Join (https://smartcontract-it.atlassian.net/browse/BCI-3330)
 
 	// Unique chain IDs
 	chainIDs := config.UniqueStrings{}
