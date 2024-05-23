@@ -16,7 +16,6 @@ import (
 
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 
@@ -59,11 +58,8 @@ func TestTxm_Integration(t *testing.T) {
 
 	// set up txm
 	lggr := logger.Test(t)
-	confirmDuration, err := relayconfig.NewDuration(500 * time.Millisecond)
-	require.NoError(t, err)
-	cfg := config.NewConfig(db.ChainCfg{
-		ConfirmPollPeriod: &confirmDuration,
-	}, lggr)
+	cfg := config.NewDefault()
+	cfg.Chain.ConfirmPollPeriod = relayconfig.MustNewDuration(500 * time.Millisecond)
 	client, err := solanaClient.NewClient(url, cfg, 2*time.Second, lggr)
 	require.NoError(t, err)
 	getClient := func() (solanaClient.ReaderWriter, error) {

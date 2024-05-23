@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 )
 
 func TestSetupLocalSolNode_SimultaneousNetworks(t *testing.T) {
@@ -25,7 +24,7 @@ func TestSetupLocalSolNode_SimultaneousNetworks(t *testing.T) {
 	// client configs
 	requestTimeout := 5 * time.Second
 	lggr := logger.Test(t)
-	cfg := config.NewConfig(db.ChainCfg{}, lggr)
+	cfg := config.NewDefault()
 
 	// check & fund address
 	checkFunded := func(t *testing.T, url string) {

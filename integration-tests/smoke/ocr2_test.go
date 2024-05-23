@@ -3,6 +3,7 @@ package smoke
 import (
 	"fmt"
 	"maps"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -37,7 +38,10 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			state, err := common.NewOCRv2State(t, 1, "gauntlet-"+test.name, &config)
+			t.Parallel()
+
+			name := "gauntlet-" + test.name
+			state, err := common.NewOCRv2State(t, 1, name, &config)
 			require.NoError(t, err, "Could not setup the ocrv2 state")
 			if len(test.env) > 0 {
 				state.Common.TestEnvDetails.NodeOpts = append(state.Common.TestEnvDetails.NodeOpts, func(n *test_env.ClNode) {
@@ -50,7 +54,13 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 
 			state.DeployCluster(utils.ContractsDir)
 
-			sg, err := gauntlet.NewSolanaGauntlet(fmt.Sprintf("%s/gauntlet", utils.ProjectRoot))
+			// copy gauntlet folder to run in parallel (gauntlet generates an output file that is read by the e2e tests - causes conflict if shared)
+			gauntletCopyPath := utils.ProjectRoot + "/" + name
+			if out, cpErr := exec.Command("cp", "-r", utils.ProjectRoot+"/gauntlet", gauntletCopyPath).Output(); cpErr != nil { // nolint:gosec
+				require.NoError(t, err, "output: "+string(out))
+			}
+
+			sg, err := gauntlet.NewSolanaGauntlet(gauntletCopyPath)
 			require.NoError(t, err)
 			state.Gauntlet = sg
 
@@ -73,6 +83,8 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 
 			err = sg.SetupNetwork(gauntletConfig)
 			require.NoError(t, err, "Error setting gauntlet network")
+			err = sg.InstallDependencies()
+			require.NoError(t, err, "Error installing gauntlet dependencies")
 
 			if *config.Common.Network == "devnet" {
 				state.Common.ChainDetails.ProgramAddresses.OCR2 = *config.SolanaConfig.OCR2ProgramID

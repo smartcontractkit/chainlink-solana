@@ -23,7 +23,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
 )
 
 var mockTransmission = []byte{
@@ -94,7 +93,7 @@ func testTransmissionsResponse(t *testing.T, body []byte, sub uint64) []byte {
 
 func testSetupReader(t *testing.T, endpoint string) client.Reader {
 	lggr := logger.Test(t)
-	cfg := config.NewConfig(db.ChainCfg{}, lggr)
+	cfg := config.NewDefault()
 	client, err := client.NewClient(endpoint, cfg, 1*time.Second, lggr)
 	require.NoError(t, err)
 	return client
@@ -170,7 +169,7 @@ func TestCache(t *testing.T) {
 	lggr := logger.Test(t)
 	stateCache := StateCache{
 		StateID: solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
-		cfg:     config.NewConfig(db.ChainCfg{}, lggr),
+		cfg:     config.NewDefault(),
 		reader:  testSetupReader(t, mockServer.URL),
 		lggr:    lggr,
 	}
@@ -182,7 +181,7 @@ func TestCache(t *testing.T) {
 
 	transmissionsCache := TransmissionsCache{
 		TransmissionsID: solana.MustPublicKeyFromBase58("11111111111111111111111111111112"),
-		cfg:             config.NewConfig(db.ChainCfg{}, lggr),
+		cfg:             config.NewDefault(),
 		reader:          testSetupReader(t, mockServer.URL),
 		lggr:            lggr,
 	}
