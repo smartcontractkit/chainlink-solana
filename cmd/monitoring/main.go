@@ -102,10 +102,15 @@ func main() {
 		logger.With(log, "component", "solana-prome-exporter"),
 		metrics.NewFees(logger.With(log, "component", promMetrics)),
 	)
+	nodeSuccessFactory := exporter.NewNodeSuccessFactory(
+		logger.With(log, "component", "solana-prome-exporter"),
+		metrics.NewNodeSuccess(logger.With(log, "component", promMetrics)),
+	)
 	monitor.ExporterFactories = append(monitor.ExporterFactories,
 		feedBalancesExporterFactory,
 		reportObservationsFactory,
 		feesFactory,
+		nodeSuccessFactory,
 	)
 
 	// network exporters
