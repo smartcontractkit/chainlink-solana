@@ -36,8 +36,8 @@ type SolanaChainReaderService struct {
 }
 
 var (
-	_ services.Service  = &SolanaChainReaderService{}
-	_ types.ChainReader = &SolanaChainReaderService{}
+	_ services.Service     = &SolanaChainReaderService{}
+	_ types.ContractReader = &SolanaChainReaderService{}
 )
 
 // NewChainReaderService is a constructor for a new ChainReaderService for Solana. Returns a nil service on error.
@@ -91,7 +91,7 @@ func (s *SolanaChainReaderService) HealthReport() map[string]error {
 	return map[string]error{s.Name(): s.Healthy()}
 }
 
-// GetLatestValue implements the types.ChainReader interface and requests and parses on-chain
+// GetLatestValue implements the types.ContractReader interface and requests and parses on-chain
 // data named by the provided contract, method, and params.
 func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, contractName, method string, params any, returnVal any) error {
 	if err := s.Ready(); err != nil {
@@ -169,12 +169,12 @@ func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, contractN
 	return nil
 }
 
-// QueryKey implements the types.ChainReader interface.
+// QueryKey implements the types.ContractReader interface.
 func (s *SolanaChainReaderService) QueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
 	return nil, errors.New("unimplemented")
 }
 
-// Bind implements the types.ChainReader interface and allows new contract bindings to be added
+// Bind implements the types.ContractReader interface and allows new contract bindings to be added
 // to the service.
 func (s *SolanaChainReaderService) Bind(_ context.Context, bindings []types.BoundContract) error {
 	return s.bindings.Bind(bindings)
