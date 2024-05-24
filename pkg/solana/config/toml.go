@@ -21,13 +21,11 @@ func (cs TOMLConfigs) ValidateConfig() (err error) {
 }
 
 func (cs TOMLConfigs) validateKeys() (err error) {
-	errA := []error{} // goal: remove and go back to only errors.Join (https://smartcontract-it.atlassian.net/browse/BCI-3330)
-
 	// Unique chain IDs
 	chainIDs := config.UniqueStrings{}
 	for i, c := range cs {
 		if chainIDs.IsDupe(c.ChainID) {
-			errA = append(errA, config.NewErrDuplicate(fmt.Sprintf("%d.ChainID", i), *c.ChainID))
+			err = errors.Join(err, config.NewErrDuplicate(fmt.Sprintf("%d.ChainID", i), *c.ChainID))
 		}
 	}
 
@@ -36,7 +34,7 @@ func (cs TOMLConfigs) validateKeys() (err error) {
 	for i, c := range cs {
 		for j, n := range c.Nodes {
 			if names.IsDupe(n.Name) {
-				errA = append(errA, config.NewErrDuplicate(fmt.Sprintf("%d.Nodes.%d.Name", i, j), *n.Name))
+				err = errors.Join(err, config.NewErrDuplicate(fmt.Sprintf("%d.Nodes.%d.Name", i, j), *n.Name))
 			}
 		}
 	}
@@ -47,11 +45,11 @@ func (cs TOMLConfigs) validateKeys() (err error) {
 		for j, n := range c.Nodes {
 			u := (*url.URL)(n.URL)
 			if urls.IsDupeFmt(u) {
-				errA = append(errA, config.NewErrDuplicate(fmt.Sprintf("%d.Nodes.%d.URL", i, j), u.String()))
+				err = errors.Join(err, config.NewErrDuplicate(fmt.Sprintf("%d.Nodes.%d.URL", i, j), u.String()))
 			}
 		}
 	}
-	return errors.Join(errA...)
+	return
 }
 
 func (cs *TOMLConfigs) SetFrom(fs *TOMLConfigs) (err error) {
@@ -181,18 +179,16 @@ func setFromChain(c, f *Chain) {
 }
 
 func (c *TOMLConfig) ValidateConfig() (err error) {
-	errA := []error{}
-
 	if c.ChainID == nil {
-		errA = append(errA, config.ErrMissing{Name: "ChainID", Msg: "required for all chains"})
+		err = errors.Join(err, config.ErrMissing{Name: "ChainID", Msg: "required for all chains"})
 	} else if *c.ChainID == "" {
-		errA = append(errA, config.ErrEmpty{Name: "ChainID", Msg: "required for all chains"})
+		err = errors.Join(err, config.ErrEmpty{Name: "ChainID", Msg: "required for all chains"})
 	}
 
 	if len(c.Nodes) == 0 {
-		errA = append(errA, config.ErrMissing{Name: "Nodes", Msg: "must have at least one node"})
+		err = errors.Join(err, config.ErrMissing{Name: "Nodes", Msg: "must have at least one node"})
 	}
-	return errors.Join(errA...)
+	return
 }
 
 func (c *TOMLConfig) TOMLString() (string, error) {
