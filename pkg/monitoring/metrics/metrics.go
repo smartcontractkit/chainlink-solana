@@ -23,6 +23,11 @@ var (
 		"network_name",
 	}
 
+	nodeFeedLabels = append([]string{
+		"node_address",
+		"node_operator",
+	}, feedLabels...)
+
 	nodeLabels = []string{
 		"account_address",
 		"node_operator",
@@ -67,6 +72,14 @@ func init() {
 		)
 	}
 
+	// init gauge for node success per feed per node
+	gauges[types.NodeSuccessMetric] = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: types.NodeSuccessMetric,
+		},
+		nodeFeedLabels,
+	)
+
 	// init gauge for slot height
 	gauges[types.SlotHeightMetric] = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -92,4 +105,16 @@ func (i FeedInput) ToPromLabels() prometheus.Labels {
 		"network_id":      i.NetworkID,
 		"network_name":    i.NetworkName,
 	}
+}
+
+type NodeFeedInput struct {
+	NodeAddress, NodeOperator string
+	FeedInput
+}
+
+func (i NodeFeedInput) ToPromLabels() prometheus.Labels {
+	l := i.FeedInput.ToPromLabels()
+	l["node_address"] = i.NodeAddress
+	l["node_operator"] = i.NodeOperator
+	return l
 }

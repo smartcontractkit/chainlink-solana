@@ -19,7 +19,9 @@ var (
 	ReportObservationMetric = "report_observations"
 	TxFeeMetric             = "tx_fee"
 	ComputeUnitPriceMetric  = "tx_compute_unit_price"
+	NodeSuccessMetric       = "node_success" // per node per feed
 
+	// these metrics are per feed
 	TxDetailsMetrics = []string{
 		ReportObservationMetric,
 		TxFeeMetric,

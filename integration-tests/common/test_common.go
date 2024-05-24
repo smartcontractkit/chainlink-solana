@@ -142,7 +142,6 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 			WithTestInstance(m.Config.T).
 			WithTestConfig(m.Config.TestConfig).
 			WithMockAdapter().
-			WithCLNodeConfig(m.Common.DefaultNodeConfig()).
 			WithCLNodes(*m.Config.TestConfig.OCR2.NodeCount).
 			WithCLNodeOptions(m.Common.TestEnvDetails.NodeOpts...).
 			WithStandardCleanup().
