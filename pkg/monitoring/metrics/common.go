@@ -20,30 +20,30 @@ func newSimpleGauge(log commonMonitoring.Logger, name string) simpleGauge {
 	return simpleGauge{log, name}
 }
 
-func (sg simpleGauge) set(value float64, labels prometheus.Labels) {
+func (sg simpleGauge) run(
+	f func(*prometheus.GaugeVec),
+) {
 	if gauges == nil {
 		sg.log.Fatalw("gauges is nil")
 		return
 	}
 
 	gauge, ok := gauges[sg.metricName]
-	if !ok {
+	if !ok || gauge == nil {
 		sg.log.Errorw("gauge not found", "name", sg.metricName)
 		return
 	}
-	gauge.With(labels).Set(value)
+	f(gauge)
+}
+
+func (sg simpleGauge) set(value float64, labels prometheus.Labels) {
+	sg.run(func(g *prometheus.GaugeVec) { g.With(labels).Set(value) })
 }
 
 func (sg simpleGauge) delete(labels prometheus.Labels) {
-	if gauges == nil {
-		sg.log.Fatalw("gauges is nil")
-		return
-	}
+	sg.run(func(g *prometheus.GaugeVec) { g.Delete(labels) })
+}
 
-	gauge, ok := gauges[sg.metricName]
-	if !ok {
-		sg.log.Errorw("gauge not found", "name", sg.metricName)
-		return
-	}
-	gauge.Delete(labels)
+func (sg simpleGauge) add(value float64, labels prometheus.Labels) {
+	sg.run(func(g *prometheus.GaugeVec) { g.With(labels).Add(value) })
 }
