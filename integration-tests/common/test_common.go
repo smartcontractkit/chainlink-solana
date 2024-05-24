@@ -137,12 +137,13 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 			m.Common.ChainDetails.WSURLExternal = *m.Config.TestConfig.Common.WsURL
 		}
 
+		// nolint:staticcheck
 		b, err := test_env.NewCLTestEnvBuilder().
 			WithNonEVM().
 			WithTestInstance(m.Config.T).
 			WithTestConfig(m.Config.TestConfig).
 			WithMockAdapter().
-			WithCLNodeConfig(m.Common.DefaultNodeConfig()).
+			WithCLNodeConfig(m.Common.DefaultNodeConfig()). // this should be removed in the future
 			WithCLNodes(*m.Config.TestConfig.OCR2.NodeCount).
 			WithCLNodeOptions(m.Common.TestEnvDetails.NodeOpts...).
 			WithStandardCleanup().
