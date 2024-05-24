@@ -50,8 +50,8 @@ func ParseBlock(res *rpc.GetBlockResult) (out BlockData, err error) {
 		if tx.Meta == nil {
 			continue
 		}
-		baseTx, err := tx.GetTransaction()
-		if err != nil {
+		baseTx, getTxErr := tx.GetTransaction()
+		if getTxErr != nil {
 			// exit on GetTransaction error
 			// if this occurs, solana-go was unable to parse a transaction
 			// further investigation is required to determine if there is incompatibility
@@ -72,11 +72,11 @@ func ParseBlock(res *rpc.GetBlockResult) (out BlockData, err error) {
 		for _, instruction := range baseTx.Message.Instructions {
 			// find instructions for compute budget program
 			if baseTx.Message.AccountKeys[instruction.ProgramIDIndex] == solana.MustPublicKeyFromBase58(ComputeBudgetProgram) {
-				parsed, err := ParseComputeUnitPrice(instruction.Data)
+				parsed, parseErr := ParseComputeUnitPrice(instruction.Data)
 				// if compute unit price found, break instruction loop
 				// only one compute unit price tx is allowed
 				// err returned if not SetComputeUnitPrice instruction
-				if err == nil {
+				if parseErr == nil {
 					price = parsed
 					break
 				}
@@ -85,5 +85,5 @@ func ParseBlock(res *rpc.GetBlockResult) (out BlockData, err error) {
 		out.Prices = append(out.Prices, price)
 		out.Fees = append(out.Fees, tx.Meta.Fee)
 	}
-	return out, err
+	return out, nil
 }

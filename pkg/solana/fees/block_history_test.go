@@ -3,7 +3,7 @@ package fees
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -38,7 +38,7 @@ func TestBlockHistoryEstimator(t *testing.T) {
 	ctx := tests.Context(t)
 
 	// file contains legacy + v0 transactions
-	testBlockData, err := ioutil.ReadFile("./blockdata.json")
+	testBlockData, err := os.ReadFile("./blockdata.json")
 	require.NoError(t, err)
 	blockRes := &rpc.GetBlockResult{}
 	require.NoError(t, json.Unmarshal(testBlockData, blockRes))
