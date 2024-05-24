@@ -92,6 +92,10 @@ func (r *Relayer) NewConfigProvider(args relaytypes.RelayArgs) (relaytypes.Confi
 	return configWatcher, err
 }
 
+func (r *Relayer) NewContractReader(_ []byte) (relaytypes.ContractReader, error) {
+	return nil, errors.New("contract reader is not supported for solana")
+}
+
 func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MedianProvider, error) {
 	ctx, cancel := r.stopCh.NewCtx()
 	defer cancel()
@@ -283,7 +287,7 @@ func (p *medianProvider) OnchainConfigCodec() median.OnchainConfigCodec {
 	return median.StandardOnchainConfigCodec{}
 }
 
-func (p *medianProvider) ChainReader() relaytypes.ChainReader {
+func (p *medianProvider) ChainReader() relaytypes.ContractReader {
 	return nil
 }
 

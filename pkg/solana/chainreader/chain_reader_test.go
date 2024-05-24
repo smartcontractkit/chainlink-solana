@@ -520,7 +520,7 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 	}
 }
 
-func (r *chainReaderInterfaceTester) GetChainReader(t *testing.T) types.ChainReader {
+func (r *chainReaderInterfaceTester) GetChainReader(t *testing.T) types.ContractReader {
 	client := new(mockedRPCClient)
 	svc, err := chainreader.NewChainReaderService(logger.Test(t), client, r.conf)
 	if err != nil {
@@ -550,6 +550,26 @@ type wrappedTestChainReader struct {
 	client          *mockedRPCClient
 	tester          ChainReaderInterfaceTester
 	testStructQueue []*TestStruct
+}
+
+func (r *wrappedTestChainReader) Start(ctx context.Context) error {
+	return nil
+}
+
+func (r *wrappedTestChainReader) Close() error {
+	return nil
+}
+
+func (r *wrappedTestChainReader) Ready() error {
+	return nil
+}
+
+func (r *wrappedTestChainReader) HealthReport() map[string]error {
+	return nil
+}
+
+func (r *wrappedTestChainReader) Name() string {
+	return "wrappedTestChainReader"
 }
 
 func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractName string, method string, params, returnVal any) error {
@@ -644,7 +664,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 	return r.service.GetLatestValue(ctx, contractName, method, params, returnVal)
 }
 
-// QueryKey implements the types.ChainReader interface.
+// QueryKey implements the types.ContractReader interface.
 func (r *wrappedTestChainReader) QueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
 	r.test.Skip("QueryKey is not yet supported in Solana")
 	return nil, nil
@@ -825,15 +845,15 @@ const (
 // Required to allow test skipping to be on the same goroutine
 type skipEventsChainReaderTester struct{ ChainReaderInterfaceTester }
 
-func (s *skipEventsChainReaderTester) GetChainReader(t *testing.T) types.ChainReader {
+func (s *skipEventsChainReaderTester) GetChainReader(t *testing.T) types.ContractReader {
 	return &skipEventsChainReader{
-		ChainReader: s.ChainReaderInterfaceTester.GetChainReader(t),
-		t:           t,
+		ContractReader: s.ChainReaderInterfaceTester.GetChainReader(t),
+		t:              t,
 	}
 }
 
 type skipEventsChainReader struct {
-	types.ChainReader
+	types.ContractReader
 	t *testing.T
 }
 
@@ -842,7 +862,7 @@ func (s *skipEventsChainReader) GetLatestValue(ctx context.Context, contractName
 		s.t.Skip("Events are not yet supported in Solana")
 	}
 
-	return s.ChainReader.GetLatestValue(ctx, contractName, method, params, returnVal)
+	return s.ContractReader.GetLatestValue(ctx, contractName, method, params, returnVal)
 }
 
 func (s *skipEventsChainReader) QueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
