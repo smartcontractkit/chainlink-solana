@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/gagliardetto/solana-go/rpc"
@@ -44,7 +43,7 @@ func main() {
 	)
 
 	monitor, err := commonMonitoring.NewMonitor(
-		context.Background(),
+		make(chan struct{}),
 		log,
 		chainConfig,
 		envelopeSourceFactory,
