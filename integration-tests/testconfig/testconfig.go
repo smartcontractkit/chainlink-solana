@@ -5,8 +5,10 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/barkimedes/go-deepcopy"
 	"github.com/google/uuid"
@@ -15,14 +17,18 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink/integration-tests/types/config/node"
 	"github.com/smartcontractkit/seth"
 
 	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/config"
 	k8s_config "github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/osutil"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
 
 	ocr2_config "github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig/ocr2"
+	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
 type TestConfig struct {
@@ -34,6 +40,10 @@ type TestConfig struct {
 	OCR2                  *ocr2_config.Config              `toml:"OCR2"`
 	SolanaConfig          *SolanaConfig                    `toml:"SolanaConfig"`
 	ConfigurationName     string                           `toml:"-"`
+
+	// getter funcs for passing parameters
+	GetChainID func() string
+	GetURL     func() string
 }
 
 func (c *TestConfig) GetLoggingConfig() *ctf_config.LoggingConfig {
@@ -53,7 +63,49 @@ func (c *TestConfig) GetSethConfig() *seth.Config {
 }
 
 func (c *TestConfig) GetNodeConfig() *ctf_config.NodeConfig {
-	return nil
+	cfgTOML, err := c.GetNodeConfigTOML()
+	if err != nil {
+		log.Fatalf("failed to parse TOML config: %s", err)
+		return nil
+	}
+
+	return &ctf_config.NodeConfig{
+		BaseConfigTOML: cfgTOML,
+	}
+}
+
+func (c *TestConfig) GetNodeConfigTOML() (string, error) {
+	var chainID, url string
+	if c.GetChainID != nil {
+		chainID = c.GetChainID()
+	}
+	if c.GetURL != nil {
+		url = c.GetURL()
+	}
+
+	solConfig := solcfg.TOMLConfig{
+		Enabled: ptr.Ptr(true),
+		ChainID: ptr.Ptr(chainID),
+		Nodes: []*solcfg.Node{
+			{
+				Name: ptr.Ptr("primary"),
+				URL:  config.MustParseURL(url),
+			},
+		},
+	}
+	baseConfig := node.NewBaseConfig()
+	baseConfig.Solana = solcfg.TOMLConfigs{
+		&solConfig,
+	}
+	baseConfig.OCR2.Enabled = ptr.Ptr(true)
+	baseConfig.P2P.V2.Enabled = ptr.Ptr(true)
+	fiveSecondDuration := config.MustNewDuration(5 * time.Second)
+
+	baseConfig.P2P.V2.DeltaDial = fiveSecondDuration
+	baseConfig.P2P.V2.DeltaReconcile = fiveSecondDuration
+	baseConfig.P2P.V2.ListenAddresses = &[]string{"0.0.0.0:6690"}
+
+	return baseConfig.TOMLString()
 }
 
 var embeddedConfigs embed.FS

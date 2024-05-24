@@ -27,25 +27,18 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/chainlink"
 	mock_adapter "github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/mock-adapter"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/sol"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
-	"github.com/smartcontractkit/chainlink/integration-tests/types/config/node"
 
-	cl "github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/config"
-	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 
 	chainConfig "github.com/smartcontractkit/chainlink-solana/integration-tests/config"
 	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	tc "github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig"
-	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
 type Common struct {
@@ -170,6 +163,9 @@ func New(testConfig *tc.TestConfig) *Common {
 		},
 		Env: &environment.Environment{},
 	}
+	// provide getters for TestConfig (pointers to chain details)
+	c.TestConfig.GetChainID = func() string { return c.ChainDetails.ChainID }
+	c.TestConfig.GetURL = func() string { return c.ChainDetails.RPCUrl }
 
 	return c
 }
@@ -483,32 +479,6 @@ func BuildNodeContractPairID(node *client.ChainlinkClient, ocr2Addr string) (str
 	return strings.ToLower(fmt.Sprintf("node_%s_contract_%s", shortNodeAddr, shortOCRAddr)), nil
 }
 
-func (c *Common) DefaultNodeConfig() *cl.Config {
-	solConfig := solcfg.TOMLConfig{
-		Enabled: ptr.Ptr(true),
-		ChainID: ptr.Ptr(c.ChainDetails.ChainID),
-		Nodes: []*solcfg.Node{
-			{
-				Name: ptr.Ptr("primary"),
-				URL:  config.MustParseURL(c.ChainDetails.RPCUrl),
-			},
-		},
-	}
-	baseConfig := node.NewBaseConfig()
-	baseConfig.Solana = solcfg.TOMLConfigs{
-		&solConfig,
-	}
-	baseConfig.OCR2.Enabled = ptr.Ptr(true)
-	baseConfig.P2P.V2.Enabled = ptr.Ptr(true)
-	fiveSecondDuration := commonconfig.MustNewDuration(5 * time.Second)
-
-	baseConfig.P2P.V2.DeltaDial = fiveSecondDuration
-	baseConfig.P2P.V2.DeltaReconcile = fiveSecondDuration
-	baseConfig.P2P.V2.ListenAddresses = &[]string{"0.0.0.0:6690"}
-
-	return baseConfig
-}
-
 func (c *Common) Default(t *testing.T, namespacePrefix string) (*Common, error) {
 	c.TestEnvDetails.K8Config = &environment.Config{
 		NamespacePrefix: fmt.Sprintf("solana-%s", namespacePrefix),
@@ -517,8 +487,7 @@ func (c *Common) Default(t *testing.T, namespacePrefix string) (*Common, error) 
 	}
 
 	if *c.TestConfig.Common.InsideK8s {
-		toml := c.DefaultNodeConfig()
-		tomlString, err := toml.TOMLString()
+		tomlString, err := c.TestConfig.GetNodeConfigTOML()
 		if err != nil {
 			return nil, err
 		}
