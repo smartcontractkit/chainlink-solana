@@ -22,7 +22,6 @@ import (
 )
 
 func TestBlockHistoryEstimator(t *testing.T) {
-	feePolling = 100 * time.Millisecond // TODO: make this part of cfg mock
 	min := uint64(10)
 	max := uint64(1000)
 
@@ -34,6 +33,7 @@ func TestBlockHistoryEstimator(t *testing.T) {
 	cfg.On("ComputeUnitPriceDefault").Return(uint64(100))
 	cfg.On("ComputeUnitPriceMin").Return(min)
 	cfg.On("ComputeUnitPriceMax").Return(max)
+	cfg.On("BlockHistoryPollPeriod").Return(100 * time.Millisecond)
 	lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 	ctx := tests.Context(t)
 

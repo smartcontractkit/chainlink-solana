@@ -578,6 +578,65 @@ func TestTxm(t *testing.T) {
 				prom.success++
 				prom.assertEqual(t)
 			})
+
+			// fee bumping disabled
+			t.Run("feeBumpingDisabled", func(t *testing.T) {
+				sig := getSig()
+				tx, signed := getTx(t, 11, mkey, 0)
+
+				// disable fee bumping
+				defaultFeeBumpPeriod := cfg.FeeBumpPeriod()
+				cfg.Chain.FeeBumpPeriod = relayconfig.MustNewDuration(0)
+				defer func() {
+					cfg.Chain.FeeBumpPeriod = relayconfig.MustNewDuration(defaultFeeBumpPeriod) // reset
+				}()
+
+				sendCount := 0
+				var countRW sync.RWMutex
+				mc.On("SendTx", mock.Anything, signed(0)).Run(func(mock.Arguments) {
+					countRW.Lock()
+					sendCount++
+					countRW.Unlock()
+				}).Return(sig, nil) // only sends one transaction type (no bumping)
+				mc.On("SimulateTx", mock.Anything, signed(0), mock.Anything).Return(&rpc.SimulateTransactionResult{}, nil).Once()
+
+				// handle signature status calls
+				var wg sync.WaitGroup
+				wg.Add(1)
+				count := 0
+				start := time.Now()
+				statuses[sig] = func() (out *rpc.SignatureStatusesResult) {
+					defer func() { count++ }()
+
+					out = &rpc.SignatureStatusesResult{}
+					if time.Since(start) > 2*defaultFeeBumpPeriod {
+						out.ConfirmationStatus = rpc.ConfirmationStatusConfirmed
+						wg.Done()
+						return
+					}
+					out.ConfirmationStatus = rpc.ConfirmationStatusProcessed
+					return
+				}
+
+				// send tx
+				assert.NoError(t, txm.Enqueue(t.Name(), tx))
+				wg.Wait()
+
+				// no transactions stored inflight txs list
+				waitFor(empty)
+				// transaction should be sent more than twice
+				countRW.RLock()
+				t.Logf("sendTx received %d calls", sendCount)
+				assert.Greater(t, sendCount, 2)
+				countRW.RUnlock()
+
+				// panic if sendTx called after context cancelled
+				mc.On("SendTx", mock.Anything, tx).Panic("SendTx should not be called anymore").Maybe()
+
+				// check prom metric
+				prom.success++
+				prom.assertEqual(t)
+			})
 		})
 	}
 }

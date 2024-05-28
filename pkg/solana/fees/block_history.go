@@ -15,10 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
-var (
-	feePolling = 5 * time.Second // TODO: make configurable
-)
-
 var _ Estimator = &blockHistoryEstimator{}
 
 type blockHistoryEstimator struct {
@@ -70,7 +66,7 @@ func (bhe *blockHistoryEstimator) run() {
 			}
 		}
 
-		tick = time.After(utils.WithJitter(feePolling))
+		tick = time.After(utils.WithJitter(bhe.cfg.BlockHistoryPollPeriod()))
 	}
 }
 

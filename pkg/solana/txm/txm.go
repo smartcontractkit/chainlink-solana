@@ -237,8 +237,8 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 				return
 			case <-tick:
 				var shouldBump bool
-				// TODO: be able to enable / disable bumping
-				if time.Since(bumpTime) > txm.cfg.FeeBumpPeriod() {
+				// bump if period > 0 and past time
+				if txm.cfg.FeeBumpPeriod() != 0 && time.Since(bumpTime) > txm.cfg.FeeBumpPeriod() {
 					bumpCount++
 					bumpTime = time.Now()
 					shouldBump = true
