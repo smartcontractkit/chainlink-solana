@@ -18,7 +18,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
@@ -99,9 +98,8 @@ func TestTxm(t *testing.T) {
 
 			ctx := tests.Context(t)
 			lggr := logger.Test(t)
-			cfg := config.NewConfig(db.ChainCfg{
-				FeeEstimatorMode: null.StringFrom(estimator),
-			}, lggr)
+			cfg := config.NewDefault()
+			cfg.Chain.FeeEstimatorMode = &estimator
 			mc := mocks.NewReaderWriter(t)
 			mc.On("GetLatestBlock").Return(&rpc.GetBlockResult{}, nil).Maybe()
 

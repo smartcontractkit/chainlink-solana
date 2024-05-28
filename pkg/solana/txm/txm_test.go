@@ -64,9 +64,9 @@ func TestTxm_Integration(t *testing.T) {
 			// set up txm
 			lggr := logger.Test(t)
 			require.NoError(t, err)
-			cfg := config.NewConfig(db.ChainCfg{
-				ConfirmPollPeriod: relayconfig.MustNewDuration(500 * time.Millisecond),
-			}, lggr)
+			cfg := config.NewDefault()
+			cfg.Chain.ConfirmPollPeriod = relayconfig.MustNewDuration(500 * time.Millisecond)
+			cfg.Chain.FeeEstimatorMode = &estimator
 			client, err := solanaClient.NewClient(url, cfg, 2*time.Second, lggr)
 			require.NoError(t, err)
 			getClient := func() (solanaClient.ReaderWriter, error) {
