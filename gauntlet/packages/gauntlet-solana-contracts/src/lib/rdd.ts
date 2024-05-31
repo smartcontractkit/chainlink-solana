@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs'
+import { readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 
 const RDD_DIR = '../../reference-data-directory'
@@ -17,6 +17,15 @@ function load(network = DEFAULT_NETWORK, path = `${RDD_DIR}/directory-solana-${n
     const buffer = readFileSync(path, 'utf8')
     const rdd = JSON.parse(buffer.toString())
     return rdd
+  } catch (e) {
+    throw new Error('An error ocurred while parsing the RDD. Make sure you provided a valid RDD path')
+  }
+}
+
+function write(network = DEFAULT_NETWORK, path = `${RDD_DIR}/directory-solana-${network}.json`, rdd: any) {
+  try {
+    writeFileSync(path, JSON.stringify(rdd, null, 2))
+    return
   } catch (e) {
     throw new Error('An error ocurred while parsing the RDD. Make sure you provided a valid RDD path')
   }
@@ -48,6 +57,7 @@ function getContractFromRDD(rdd: any, address: string) {
 
 const RDD = {
   load,
+  write,
   loadAggregator,
   getContractFromRDD,
 }
