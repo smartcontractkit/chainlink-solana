@@ -492,7 +492,7 @@ func (txm *Txm) simulate(ctx context.Context) {
 			// unrecognized errors (indicates more concerning failures)
 			default:
 				txm.txs.OnError(msg.signature, TxFailSimOther) // cancel retry
-				txm.lggr.Warnw("simulate: unrecognized error", "id", msg.id, "signature", msg.signature, "result", res)
+				txm.lggr.Errorw("simulate: unrecognized error", "id", msg.id, "signature", msg.signature, "result", res)
 				continue
 			}
 		}
