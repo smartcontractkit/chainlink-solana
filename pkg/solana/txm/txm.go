@@ -12,14 +12,13 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/google/uuid"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	relayutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
-
-	relayutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
 )
 
 const (
