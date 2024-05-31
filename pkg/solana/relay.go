@@ -80,6 +80,14 @@ func (r *Relayer) NewLLOProvider(rargs relaytypes.RelayArgs, pargs relaytypes.Pl
 	return nil, errors.New("data streams is not supported for solana")
 }
 
+func (r *Relayer) NewCCIPCommitProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.CCIPCommitProvider, error) {
+	return nil, errors.New("ccip.commit is not supported for solana")
+}
+
+func (r *Relayer) NewCCIPExecProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.CCIPExecProvider, error) {
+	return nil, errors.New("ccip.exec is not supported for solana")
+}
+
 func (r *Relayer) NewConfigProvider(args relaytypes.RelayArgs) (relaytypes.ConfigProvider, error) {
 	ctx, cancel := r.stopCh.NewCtx()
 	defer cancel()
