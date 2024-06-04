@@ -16,3 +16,6 @@
 
 # monitoring ownership
 /pkg/monitoring @smartcontractkit/realtime
+
+# CI/CD
+/.github/** @smartcontractkit/releng
