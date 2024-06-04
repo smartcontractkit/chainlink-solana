@@ -11,12 +11,11 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
-	relaylogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 )
 
@@ -99,7 +98,7 @@ func (r *Relayer) NewContractReader(_ []byte) (relaytypes.ContractReader, error)
 func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MedianProvider, error) {
 	ctx, cancel := r.stopCh.NewCtx()
 	defer cancel()
-	lggr := relaylogger.Named(r.lggr, "MedianProvider")
+	lggr := logger.Named(r.lggr, "MedianProvider")
 	configWatcher, err := newConfigProvider(ctx, lggr, r.chain, rargs)
 	if err != nil {
 		return nil, err
@@ -168,7 +167,7 @@ type configProvider struct {
 }
 
 func newConfigProvider(ctx context.Context, lggr logger.Logger, chain Chain, args relaytypes.RelayArgs) (*configProvider, error) {
-	lggr = relaylogger.Named(lggr, "ConfigProvider")
+	lggr = logger.Named(lggr, "ConfigProvider")
 	var relayConfig RelayConfig
 	err := json.Unmarshal(args.RelayConfig, &relayConfig)
 	if err != nil {
