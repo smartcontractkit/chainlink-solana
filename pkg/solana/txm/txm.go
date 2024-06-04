@@ -12,13 +12,13 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/google/uuid"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 )
 
 const (
@@ -495,7 +495,7 @@ func (txm *Txm) simulate(ctx context.Context) {
 			// unrecognized errors (indicates more concerning failures)
 			default:
 				txm.txs.OnError(msg.signature, TxFailSimOther) // cancel retry
-				txm.lggr.Warnw("simulate: unrecognized error", "id", msg.id, "signature", msg.signature, "result", res)
+				txm.lggr.Errorw("simulate: unrecognized error", "id", msg.id, "signature", msg.signature, "result", res)
 				continue
 			}
 		}

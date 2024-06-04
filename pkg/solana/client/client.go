@@ -10,8 +10,9 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"golang.org/x/sync/singleflight"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 )
 
 const (
