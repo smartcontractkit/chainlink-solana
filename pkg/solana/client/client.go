@@ -34,6 +34,7 @@ type Reader interface {
 	LatestBlockhash() (*rpc.GetLatestBlockhashResult, error)
 	ChainID() (string, error)
 	GetFeeForMessage(msg string) (uint64, error)
+	GetLatestBlock() (*rpc.GetBlockResult, error)
 }
 
 // AccountReader is an interface that allows users to pass either the solana rpc client or the relay client
@@ -90,10 +91,14 @@ func (c *Client) Balance(addr solana.PublicKey) (uint64, error) {
 }
 
 func (c *Client) SlotHeight() (uint64, error) {
+	return c.SlotHeightWithCommitment(rpc.CommitmentProcessed) // get the latest slot height
+}
+
+func (c *Client) SlotHeightWithCommitment(commitment rpc.CommitmentType) (uint64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.contextDuration)
 	defer cancel()
 	v, err, _ := c.requestGroup.Do("GetSlotHeight", func() (interface{}, error) {
-		return c.rpc.GetSlot(ctx, rpc.CommitmentProcessed) // get the latest slot height
+		return c.rpc.GetSlot(ctx, commitment)
 	})
 	return v.(uint64), err
 }
@@ -210,4 +215,24 @@ func (c *Client) SendTx(ctx context.Context, tx *solana.Transaction) (solana.Sig
 	}
 
 	return c.rpc.SendTransactionWithOpts(ctx, tx, opts)
+}
+
+func (c *Client) GetLatestBlock() (*rpc.GetBlockResult, error) {
+	// get latest confirmed slot
+	slot, err := c.SlotHeightWithCommitment(c.commitment)
+	if err != nil {
+		return nil, fmt.Errorf("GetLatestBlock.SlotHeight: %w", err)
+	}
+
+	// get block based on slot
+	ctx, cancel := context.WithTimeout(context.Background(), c.txTimeout)
+	defer cancel()
+	v, err, _ := c.requestGroup.Do("GetBlockWithOpts", func() (interface{}, error) {
+		version := uint64(0) // pull all tx types (legacy + v0)
+		return c.rpc.GetBlockWithOpts(ctx, slot, &rpc.GetBlockOpts{
+			Commitment:                     c.commitment,
+			MaxSupportedTransactionVersion: &version,
+		})
+	})
+	return v.(*rpc.GetBlockResult), err
 }

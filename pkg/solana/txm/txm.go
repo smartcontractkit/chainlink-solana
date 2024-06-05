@@ -14,9 +14,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	relayutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
-	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 )
@@ -46,7 +46,7 @@ type Txm struct {
 	cfg     config.Config
 	txs     PendingTxContext
 	ks      SimpleKeystore
-	client  *relayutils.LazyLoad[solanaClient.ReaderWriter]
+	client  *utils.LazyLoad[client.ReaderWriter]
 	fee     fees.Estimator
 }
 
@@ -58,7 +58,7 @@ type pendingTx struct {
 }
 
 // NewTxm creates a txm. Uses simulation so should only be used to send txes to trusted contracts i.e. OCR.
-func NewTxm(chainID string, tc func() (solanaClient.ReaderWriter, error), cfg config.Config, ks SimpleKeystore, lggr logger.Logger) *Txm {
+func NewTxm(chainID string, tc func() (client.ReaderWriter, error), cfg config.Config, ks SimpleKeystore, lggr logger.Logger) *Txm {
 	return &Txm{
 		lggr:   lggr,
 		chSend: make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
@@ -67,7 +67,7 @@ func NewTxm(chainID string, tc func() (solanaClient.ReaderWriter, error), cfg co
 		cfg:    cfg,
 		txs:    newPendingTxContextWithProm(chainID),
 		ks:     ks,
-		client: relayutils.NewLazyLoad(tc),
+		client: utils.NewLazyLoad(tc),
 	}
 }
 
@@ -80,8 +80,8 @@ func (txm *Txm) Start(ctx context.Context) error {
 		switch strings.ToLower(txm.cfg.FeeEstimatorMode()) {
 		case "fixed":
 			estimator, err = fees.NewFixedPriceEstimator(txm.cfg)
-		case "recentfees":
-			estimator, err = fees.NewRecentFeeEstimator(txm.cfg)
+		case "blockhistory":
+			estimator, err = fees.NewBlockHistoryEstimator(txm.client, txm.cfg, txm.lggr)
 		default:
 			err = fmt.Errorf("unknown solana fee estimator type: %s", txm.cfg.FeeEstimatorMode())
 		}
@@ -148,9 +148,12 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 	// https://github.com/gagliardetto/solana-go/blob/main/transaction.go#L252
 	key := baseTx.Message.AccountKeys[0].String()
 
+	// only calculate base price once
+	// prevent underlying base changing when bumping (could occur with RPC based estimation)
+	basePrice := txm.fee.BaseComputeUnitPrice()
 	getFee := func(count uint) fees.ComputeUnitPrice {
 		fee := fees.CalculateFee(
-			txm.fee.BaseComputeUnitPrice(),
+			basePrice,
 			txm.cfg.ComputeUnitPriceMax(),
 			txm.cfg.ComputeUnitPriceMin(),
 			count,
@@ -234,7 +237,8 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 				return
 			case <-tick:
 				var shouldBump bool
-				if time.Since(bumpTime) > txm.cfg.FeeBumpPeriod() {
+				// bump if period > 0 and past time
+				if txm.cfg.FeeBumpPeriod() != 0 && time.Since(bumpTime) > txm.cfg.FeeBumpPeriod() {
 					bumpCount++
 					bumpTime = time.Now()
 					shouldBump = true
@@ -343,7 +347,7 @@ func (txm *Txm) confirm(ctx context.Context) {
 			}
 
 			// batch sigs no more than MaxSigsToConfirm each
-			sigsBatch, err := relayutils.BatchSplit(sigs, MaxSigsToConfirm)
+			sigsBatch, err := utils.BatchSplit(sigs, MaxSigsToConfirm)
 			if err != nil { // this should never happen
 				txm.lggr.Fatalw("failed to batch signatures", "error", err)
 				break // exit switch
@@ -434,7 +438,7 @@ func (txm *Txm) confirm(ctx context.Context) {
 			}
 			wg.Wait() // wait for processing to finish
 		}
-		tick = time.After(relayutils.WithJitter(txm.cfg.ConfirmPollPeriod()))
+		tick = time.After(utils.WithJitter(txm.cfg.ConfirmPollPeriod()))
 	}
 }
 

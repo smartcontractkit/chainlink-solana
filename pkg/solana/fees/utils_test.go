@@ -1,10 +1,14 @@
 package fees
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"testing"
 
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCalculateFee(t *testing.T) {
@@ -30,4 +34,40 @@ func TestCalculateFee(t *testing.T) {
 			assert.Equal(t, v.expected, CalculateFee(v.base, v.max, v.min, v.count))
 		})
 	}
+}
+
+func TestParseBlock(t *testing.T) {
+	// file contains legacy + v0 transactions
+	// https://explorer.solana.com/block/265989914
+	testBlockData, err := os.ReadFile("./blockdata.json")
+	require.NoError(t, err)
+	blockRes := &rpc.GetBlockResult{}
+	require.NoError(t, json.Unmarshal(testBlockData, blockRes))
+	assert.Equal(t, 728, len(blockRes.Transactions))
+
+	// happy path - filtered for non-vote txs
+	out, err := ParseBlock(blockRes)
+	require.NoError(t, err)
+	assert.Equal(t, len(out.Prices), len(out.Fees))
+	assert.Equal(t, 278, len(out.Prices))
+
+	// fail nil
+	_, err = ParseBlock(nil)
+	require.Error(t, err)
+
+	// skip on nil meta
+	out, err = ParseBlock(&rpc.GetBlockResult{
+		Transactions: []rpc.TransactionWithMeta{{}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 0, len(out.Prices))
+
+	// error on failed tx parsing
+	_, err = ParseBlock(&rpc.GetBlockResult{
+		Transactions: []rpc.TransactionWithMeta{{
+			Transaction: &rpc.DataBytesOrJSON{},
+			Meta:        &rpc.TransactionMeta{},
+		}},
+	})
+	assert.Error(t, err)
 }

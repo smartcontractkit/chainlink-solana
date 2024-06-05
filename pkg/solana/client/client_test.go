@@ -82,6 +82,13 @@ func TestClient_Reader_Integration(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(1), res.Value.Lamports)
 	assert.Equal(t, "NativeLoader1111111111111111111111111111111", res.Value.Owner.String())
+
+	// get block + check for nonzero values
+	block, err := c.GetLatestBlock()
+	require.NoError(t, err)
+	assert.NotEqual(t, solana.Hash{}, block.Blockhash)
+	assert.NotEqual(t, uint64(0), block.ParentSlot)
+	assert.NotEqual(t, uint64(0), block.ParentSlot)
 }
 
 func TestClient_Reader_ChainID(t *testing.T) {

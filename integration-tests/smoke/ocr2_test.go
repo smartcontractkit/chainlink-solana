@@ -129,12 +129,12 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 			}
 			for successFullRounds < *config.OCR2.Smoke.NumberOfRounds {
 				time.Sleep(time.Second * 6)
-				require.Less(t, stuck, 10, "Rounds have been stuck for more than 10 iterations")
+				require.Less(t, stuck, 10, fmt.Sprintf("%s: Rounds have been stuck for more than 10 iterations", name))
 				log.Info().Str("Transmission", sg.OcrAddress).Msg("Inspecting transmissions")
 				transmissions, err := sg.FetchTransmissions(sg.OcrAddress)
 				require.NoError(t, err)
 				if len(transmissions) <= 1 {
-					log.Info().Str("Contract", sg.OcrAddress).Str("No", "Transmissions")
+					log.Info().Str("Contract", sg.OcrAddress).Msg(fmt.Sprintf("%s: No Transmissions", name))
 					stuck++
 					continue
 				}
@@ -143,11 +143,11 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 					prevRound = currentRound
 				}
 				if currentRound.RoundID <= prevRound.RoundID {
-					log.Info().Str("Transmission", sg.OcrAddress).Msg("No new transmissions")
+					log.Info().Str("Transmission", sg.OcrAddress).Msg(fmt.Sprintf("%s: No new transmissions", name))
 					stuck++
 					continue
 				}
-				log.Info().Str("Contract", sg.OcrAddress).Interface("Answer", currentRound.Answer).Int64("RoundID", currentRound.Answer).Msg("New answer found")
+				log.Info().Str("Contract", sg.OcrAddress).Interface("Answer", currentRound.Answer).Int64("RoundID", currentRound.Answer).Msg(fmt.Sprintf("%s: New answer found", name))
 				require.Equal(t, currentRound.Answer, int64(5), fmt.Sprintf("Actual: %d, Expected: 5", currentRound.Answer))
 				require.Less(t, prevRound.RoundID, currentRound.RoundID, fmt.Sprintf("Expected round %d to be less than %d", prevRound.RoundID, currentRound.RoundID))
 				prevRound = currentRound
