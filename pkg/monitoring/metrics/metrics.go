@@ -87,6 +87,18 @@ func init() {
 		},
 		[]string{"chain", "url"},
 	)
+
+	// init gauge for network fees
+	gauges[types.NetworkFeesMetric] = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: types.NetworkFeesMetric,
+		},
+		[]string{
+			"type",      // compute budget price, total fee
+			"operation", // avg, median, upper/lower quartile, min, max
+			"chain",
+		},
+	)
 }
 
 type FeedInput struct {
