@@ -4,6 +4,9 @@ package types
 const (
 	SlotHeightType   = "slot_height"
 	SlotHeightMetric = "sol_" + SlotHeightType
+
+	NetworkFeesType   = "network_fees"
+	NetworkFeesMetric = "sol_" + NetworkFeesType
 )
 
 // SlotHeight type wraps the uint64 type returned by the RPC call

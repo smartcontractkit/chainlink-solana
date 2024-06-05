@@ -45,6 +45,32 @@ func (_m *ChainReader) GetBalance(ctx context.Context, account solana.PublicKey,
 	return r0, r1
 }
 
+// GetLatestBlock provides a mock function with given fields: ctx, commitment
+func (_m *ChainReader) GetLatestBlock(ctx context.Context, commitment rpc.CommitmentType) (*rpc.GetBlockResult, error) {
+	ret := _m.Called(ctx, commitment)
+
+	var r0 *rpc.GetBlockResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, rpc.CommitmentType) (*rpc.GetBlockResult, error)); ok {
+		return rf(ctx, commitment)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, rpc.CommitmentType) *rpc.GetBlockResult); ok {
+		r0 = rf(ctx, commitment)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*rpc.GetBlockResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, rpc.CommitmentType) error); ok {
+		r1 = rf(ctx, commitment)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetLatestTransmission provides a mock function with given fields: ctx, account, commitment
 func (_m *ChainReader) GetLatestTransmission(ctx context.Context, account solana.PublicKey, commitment rpc.CommitmentType) (pkgsolana.Answer, uint64, error) {
 	ret := _m.Called(ctx, account, commitment)
