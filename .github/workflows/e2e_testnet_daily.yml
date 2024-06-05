@@ -23,10 +23,6 @@ on:
         type: string
   schedule:
     - cron: '0 6 * * *'
-env:
-  CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
-  CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
-
 # Only run 1 of this workflow at a time per PR
 env:
   CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
