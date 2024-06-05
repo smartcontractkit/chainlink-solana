@@ -1,11 +1,8 @@
 package common
 
 import (
-	"bytes"
-	"encoding/hex"
 	"fmt"
 	"math/big"
-	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -13,11 +10,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
-	"golang.org/x/crypto/curve25519"
 	"gopkg.in/guregu/null.v4"
-
-	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
-	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
 	ctf_test_env "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
@@ -106,15 +99,6 @@ type NodeKeysBundle struct {
 	TXKey   *client.TxKey
 }
 
-// OCR2 keys are in format OCR2<key_type>_<network>_<key>
-func stripKeyPrefix(key string) string {
-	chunks := strings.Split(key, "_")
-	if len(chunks) == 3 {
-		return chunks[2]
-	}
-	return key
-}
-
 func New(testConfig *tc.TestConfig) *Common {
 	var c *Common
 
@@ -191,42 +175,6 @@ func (c *Common) CreateNodeKeysBundle(nodes []*client.ChainlinkClient) ([]client
 		})
 	}
 	return nkb, nil
-}
-
-func createOracleIdentities(nkb []client.NodeKeysBundle) ([]confighelper.OracleIdentityExtra, error) {
-	oracleIdentities := make([]confighelper.OracleIdentityExtra, 0)
-	for _, nodeKeys := range nkb {
-		offChainPubKeyTemp, err := hex.DecodeString(stripKeyPrefix(nodeKeys.OCR2Key.Data.Attributes.OffChainPublicKey))
-		if err != nil {
-			return nil, err
-		}
-		onChainPubKey, err := hex.DecodeString(stripKeyPrefix(nodeKeys.OCR2Key.Data.Attributes.OnChainPublicKey))
-		if err != nil {
-			return nil, err
-		}
-		cfgPubKeyTemp, err := hex.DecodeString(stripKeyPrefix(nodeKeys.OCR2Key.Data.Attributes.ConfigPublicKey))
-		if err != nil {
-			return nil, err
-		}
-		cfgPubKeyBytes := [curve25519.PointSize]byte{}
-		copy(cfgPubKeyBytes[:], cfgPubKeyTemp)
-		offChainPubKey := [curve25519.PointSize]byte{}
-		copy(offChainPubKey[:], offChainPubKeyTemp)
-		oracleIdentities = append(oracleIdentities, confighelper.OracleIdentityExtra{
-			OracleIdentity: confighelper.OracleIdentity{
-				OffchainPublicKey: offChainPubKey,
-				OnchainPublicKey:  onChainPubKey,
-				PeerID:            nodeKeys.PeerID,
-				TransmitAccount:   types.Account(nodeKeys.TXKey.Data.Attributes.PublicKey),
-			},
-			ConfigEncryptionPublicKey: cfgPubKeyBytes,
-		})
-	}
-	// program sorts oracles (need to pre-sort to allow correct onchainConfig generation)
-	sort.Slice(oracleIdentities, func(i, j int) bool {
-		return bytes.Compare(oracleIdentities[i].OracleIdentity.OnchainPublicKey, oracleIdentities[j].OracleIdentity.OnchainPublicKey) < 0
-	})
-	return oracleIdentities, nil
 }
 
 func FundOracles(c *solclient.Client, nkb []client.NodeKeysBundle, amount *big.Float) error {
