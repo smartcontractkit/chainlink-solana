@@ -162,22 +162,22 @@ func (o *OCR2Config) Default() {
 		UserSecret: o.Secret,
 		ProposalID: o.ProposalID,
 		OffchainConfig: OffchainConfig{
-			DeltaProgressNanoseconds:          int64(20000000000),
-			DeltaResendNanoseconds:            int64(50000000000),
-			DeltaRoundNanoseconds:             int64(1000000000),
-			DeltaGraceNanoseconds:             int64(4000000000),
-			DeltaStageNanoseconds:             int64(50000000000),
+			DeltaProgressNanoseconds:          int64(8000000000),  // 8s
+			DeltaResendNanoseconds:            int64(5000000000),  // 5s
+			DeltaRoundNanoseconds:             int64(3000000000),  // 3s
+			DeltaGraceNanoseconds:             int64(400000000),   // 400ms
+			DeltaStageNanoseconds:             int64(10000000000), // 10s
 			RMax:                              3,
 			S:                                 s,
 			OffchainPublicKeys:                offchainPublicKeys,
 			PeerIds:                           peerIds,
 			ConfigPublicKeys:                  configPublicKeys,
 			ReportingPluginConfig:             o.OffChainConfig.OffchainConfig.ReportingPluginConfig,
-			MaxDurationQueryNanoseconds:       int64(3000000000),
-			MaxDurationObservationNanoseconds: int64(3000000000),
-			MaxDurationReportNanoseconds:      int64(100000000),
-			MaxDurationShouldAcceptFinalizedReportNanoseconds:  int64(100000000),
-			MaxDurationShouldTransmitAcceptedReportNanoseconds: int64(100000000),
+			MaxDurationQueryNanoseconds:       int64(0),
+			MaxDurationObservationNanoseconds: int64(1000000000), // 1s
+			MaxDurationReportNanoseconds:      int64(1000000000), // 1s
+			MaxDurationShouldAcceptFinalizedReportNanoseconds:  int64(1000000000), // 1s
+			MaxDurationShouldTransmitAcceptedReportNanoseconds: int64(1000000000), // 1s
 		},
 	}
 	o.PayeeConfig = &PayeeConfig{
