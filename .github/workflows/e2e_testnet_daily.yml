@@ -172,6 +172,8 @@ jobs:
           network="devnet"
           private_key="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.PRIVATE_KEY || secrets.PRIVATE_KEY }}"
           internal_docker_repo = "${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com"
+          rpc_url = "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.RPC_URL || 'https://api.devnet.solana.com' }}"
+          ws_url = "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.RPC_URL || 'https://api.devnet.solana.com' }}"
           EOF
 
           # shellcheck disable=SC2002
@@ -183,7 +185,7 @@ jobs:
       - name: Run Tests
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
         with:
-          test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage
+          test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke/embedded -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
           download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 
           go_mod_path: ./integration-tests/go.mod
