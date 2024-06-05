@@ -225,7 +225,10 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 		return ch.getClient()
 	}
 	ch.txm = txm.NewTxm(ch.id, tc, cfg, ks, lggr)
-	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, ch.Reader)
+	bc := func() (monitor.BalanceClient, error) {
+		return ch.getClient()
+	}
+	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
 	return &ch, nil
 }
 

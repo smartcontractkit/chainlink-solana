@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 )
 
 const (
@@ -51,6 +52,7 @@ type Writer interface {
 var _ ReaderWriter = (*Client)(nil)
 
 type Client struct {
+	url             string
 	rpc             *rpc.Client
 	skipPreflight   bool // to enable or disable preflight checks
 	commitment      rpc.CommitmentType
@@ -65,6 +67,7 @@ type Client struct {
 
 func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration, log logger.Logger) (*Client, error) {
 	return &Client{
+		url:             endpoint,
 		rpc:             rpc.New(endpoint),
 		skipPreflight:   cfg.SkipPreflight(),
 		commitment:      cfg.Commitment(),
@@ -74,6 +77,13 @@ func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration,
 		log:             log,
 		requestGroup:    &singleflight.Group{},
 	}, nil
+}
+
+func (c *Client) latency(name string) func() {
+	start := time.Now()
+	return func() {
+		monitor.SetClientLatency(time.Since(start), name, c.url)
+	}
 }
 
 func (c *Client) Balance(addr solana.PublicKey) (uint64, error) {

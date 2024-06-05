@@ -122,7 +122,7 @@ func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes
 	}
 
 	cfg := configWatcher.chain.Config()
-	transmissionsCache := NewTransmissionsCache(transmissionsID, cfg, configWatcher.reader, r.lggr)
+	transmissionsCache := NewTransmissionsCache(transmissionsID, relayConfig.ChainID, cfg, configWatcher.reader, r.lggr)
 	return &medianProvider{
 		configProvider:     configWatcher,
 		transmissionsCache: transmissionsCache,
@@ -194,7 +194,7 @@ func newConfigProvider(ctx context.Context, lggr logger.Logger, chain Chain, arg
 	if err != nil {
 		return nil, fmt.Errorf("error in NewMedianProvider.chain.Reader: %w", err)
 	}
-	stateCache := NewStateCache(stateID, chain.Config(), reader, lggr)
+	stateCache := NewStateCache(stateID, relayConfig.ChainID, chain.Config(), reader, lggr)
 	return &configProvider{
 		chainID:                relayConfig.ChainID,
 		stateID:                stateID,
