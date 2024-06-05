@@ -56,7 +56,6 @@ jobs:
       contents: read
     name: Check If Solana Test Image Exists
     runs-on: ubuntu-latest
-    needs: [get_solana_sha]
     outputs:
       exists: ${{ steps.check-image.outputs.exists }}
     steps:
@@ -65,7 +64,7 @@ jobs:
         uses: smartcontractkit/chainlink-github-actions/docker/image-exists@fc3e0df622521019f50d772726d6bf8dc919dd38 # v2.3.19
         with:
           repository: chainlink-solana-tests
-          tag: ${{ needs.get_solana_sha.outputs.sha }}
+          tag: github.sha
           AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
 
