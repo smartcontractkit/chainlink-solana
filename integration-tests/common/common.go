@@ -13,12 +13,10 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
-	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/curve25519"
 	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
-	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
@@ -29,7 +27,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/sol"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
-	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -240,47 +237,6 @@ func FundOracles(c *solclient.Client, nkb []client.NodeKeysBundle, amount *big.F
 		}
 	}
 	return nil
-}
-
-// OffChainConfigParamsFromNodes creates contracts.OffChainAggregatorV2Config
-func OffChainConfigParamsFromNodes(nodeCount int, nkb []client.NodeKeysBundle) (contracts.OffChainAggregatorV2Config, error) {
-	oi, err := createOracleIdentities(nkb)
-	if err != nil {
-		return contracts.OffChainAggregatorV2Config{}, err
-	}
-	s := make([]int, 0)
-	for i := 0; i < nodeCount; i++ {
-		s = append(s, 1)
-	}
-	faultyNodes := 0
-	if nodeCount > 1 {
-		faultyNodes = nodeCount/3 - 1
-	}
-	if faultyNodes == 0 {
-		faultyNodes = 1
-	}
-	log.Debug().Int("Nodes", faultyNodes).Msg("Faulty nodes")
-	return contracts.OffChainAggregatorV2Config{
-		DeltaProgress: 2 * time.Second,
-		DeltaResend:   5 * time.Second,
-		DeltaRound:    1 * time.Second,
-		DeltaGrace:    500 * time.Millisecond,
-		DeltaStage:    10 * time.Second,
-		RMax:          3,
-		S:             s,
-		Oracles:       oi,
-		ReportingPluginConfig: median.OffchainConfig{
-			AlphaReportPPB: uint64(0),
-			AlphaAcceptPPB: uint64(0),
-		}.Encode(),
-		MaxDurationQuery:                        20 * time.Millisecond,
-		MaxDurationObservation:                  500 * time.Millisecond,
-		MaxDurationReport:                       500 * time.Millisecond,
-		MaxDurationShouldAcceptFinalizedReport:  500 * time.Millisecond,
-		MaxDurationShouldTransmitAcceptedReport: 500 * time.Millisecond,
-		F:                                       faultyNodes,
-		OnchainConfig:                           []byte{},
-	}, nil
 }
 
 func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo, mockURL string, isK8s bool) error {
