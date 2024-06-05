@@ -64,7 +64,7 @@ jobs:
         uses: smartcontractkit/chainlink-github-actions/docker/image-exists@fc3e0df622521019f50d772726d6bf8dc919dd38 # v2.3.19
         with:
           repository: chainlink-solana-tests
-          tag: { { github.sha } }
+          tag: ${{ github.sha }}
           AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
 
@@ -157,12 +157,12 @@ jobs:
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
           repository: smartcontractkit/chainlink-solana
-          ref: { { github.sha } }
+          ref: ${{ github.sha }}
       - name: Build Test Image
         if: (needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch') && needs.solana-test-image-exists.outputs.exists == 'false'
         uses: ./.github/actions/build-test-image
         with:
-          tag: { { github.sha } }
+          tag: ${{ github.sha }}
           artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
