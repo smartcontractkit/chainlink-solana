@@ -130,7 +130,7 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 			prevRound := gauntlet.Transmission{
 				RoundID: 0,
 			}
-			for successFullRounds < *config.OCR2.Smoke.NumberOfRounds {
+			for successFullRounds < *config.OCR2.NumberOfRounds {
 				time.Sleep(time.Second * 6)
 				require.Less(t, stuck, 10, fmt.Sprintf("%s: Rounds have been stuck for more than 10 iterations", name))
 				log.Info().Str("Transmission", sg.OcrAddress).Msg("Inspecting transmissions")

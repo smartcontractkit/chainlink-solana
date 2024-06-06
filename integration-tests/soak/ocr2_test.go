@@ -131,7 +131,7 @@ func TestSolanaOCRV2Soak(t *testing.T) {
 			prevRound := gauntlet.Transmission{
 				RoundID: 0,
 			}
-			for successFullRounds < *config.OCR2.Smoke.NumberOfRounds {
+			for successFullRounds < *config.OCR2.NumberOfRounds {
 				// Since it is a soak bumping the stuck count
 				require.Less(t, stuck, 100, "Rounds have been stuck for more than 10 iterations")
 				log.Info().Str("Transmission", sg.OcrAddress).Msg("Inspecting transmissions")

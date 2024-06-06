@@ -42,7 +42,12 @@ devnet_image = "solanalabs/solana:v1.17.34"
 [OCR2]
 node_count = 6
 test_duration = "50m"
+number_of_rounds = 2
 
 [OCR2.Smoke]
-number_of_rounds = 2
+enabled = true
+
+[OCR2.Soak]
+enabled = false
+
 
