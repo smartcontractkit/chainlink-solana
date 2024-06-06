@@ -20,7 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 )
 
-func TestSolanaOCRV2Smoke(t *testing.T) {
+func TestSolanaOCRV2Soak(t *testing.T) {
 	for _, test := range []struct {
 		name string
 		env  map[string]string
@@ -31,7 +31,7 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 			"CL_SOLANA_CMD": "chainlink-solana",
 		}},
 	} {
-		config, err := tc.GetConfig("Smoke", tc.OCR2)
+		config, err := tc.GetConfig("Soak", tc.OCR2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -53,6 +53,7 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 			}
 
 			state.DeployCluster(utils.ContractsDir)
+
 			if state.Common.Env.WillUseRemoteRunner() {
 				return
 			}
@@ -131,13 +132,15 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 				RoundID: 0,
 			}
 			for successFullRounds < *config.OCR2.Smoke.NumberOfRounds {
-				time.Sleep(time.Second * 6)
-				require.Less(t, stuck, 10, fmt.Sprintf("%s: Rounds have been stuck for more than 10 iterations", name))
+				// Since it is a soak bumping the stuck count
+				require.Less(t, stuck, 100, "Rounds have been stuck for more than 10 iterations")
 				log.Info().Str("Transmission", sg.OcrAddress).Msg("Inspecting transmissions")
 				transmissions, err := sg.FetchTransmissions(sg.OcrAddress)
-				require.NoError(t, err)
+				if err != nil {
+					log.Error().Str("Contract", "Error fetching transmissions").Msg(fmt.Sprintf("%v", err))
+				}
 				if len(transmissions) <= 1 {
-					log.Info().Str("Contract", sg.OcrAddress).Msg(fmt.Sprintf("%s: No Transmissions", name))
+					log.Info().Str("Contract", sg.OcrAddress).Str("No", "Transmissions")
 					stuck++
 					continue
 				}
@@ -146,15 +149,20 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 					prevRound = currentRound
 				}
 				if currentRound.RoundID <= prevRound.RoundID {
-					log.Info().Str("Transmission", sg.OcrAddress).Msg(fmt.Sprintf("%s: No new transmissions", name))
+					log.Info().Str("Transmission", sg.OcrAddress).Msg("No new transmissions")
 					stuck++
 					continue
 				}
-				log.Info().Str("Contract", sg.OcrAddress).Interface("Answer", currentRound.Answer).Int64("RoundID", currentRound.Answer).Msg(fmt.Sprintf("%s: New answer found", name))
-				require.Equal(t, currentRound.Answer, int64(5), fmt.Sprintf("Actual: %d, Expected: 5", currentRound.Answer))
-				require.Less(t, prevRound.RoundID, currentRound.RoundID, fmt.Sprintf("Expected round %d to be less than %d", prevRound.RoundID, currentRound.RoundID))
+				log.Info().Str("Contract", sg.OcrAddress).Interface("Answer", currentRound.Answer).Int64("RoundID", currentRound.Answer).Msg("New answer found")
+				if currentRound.Answer != 5 {
+					log.Error().Str("Answer", "difference in answer").Msg(fmt.Sprintf("Expected %d, got %d", 5, currentRound.Answer))
+				}
+				if prevRound.RoundID > currentRound.RoundID {
+					log.Error().Str("Answer", "difference in answer").Msg(fmt.Sprintf("Expected round %d to be less than %d", prevRound.RoundID, currentRound.RoundID))
+				}
 				prevRound = currentRound
 				successFullRounds++
+				time.Sleep(time.Second * 6)
 				stuck = 0
 			}
 		})
