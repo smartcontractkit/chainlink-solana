@@ -8,9 +8,9 @@ set -ex
 # get this scripts directory
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
-helm repo update
-
 cd "$SCRIPT_DIR"/../ || exit 1
+
+helm repo update
 
 # parse out quotes if they exist in the string
 temp="${1%\"}"
@@ -21,6 +21,12 @@ OIFS=$IFS
 IFS=' '
 for x in $tosplit
 do
-    go test -c ./"${x}"
+    if [ "$x" = "load" ]; then
+      echo "Changing directory and executing go test -c ./... for 'load' package"
+      pushd "./load" && go test -c -tags embed -o .. ./...
+      popd
+    else
+      go test -c -tags embed ./"${x}"
+    fi
 done
 IFS=$OIFS
