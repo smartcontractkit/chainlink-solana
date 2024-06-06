@@ -1,4 +1,4 @@
-package smoke
+package soak
 
 import (
 	"fmt"
