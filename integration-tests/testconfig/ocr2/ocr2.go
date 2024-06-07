@@ -2,6 +2,8 @@ package ocr2
 
 import (
 	"errors"
+	"os"
+	"strconv"
 	"time"
 )
 
@@ -67,18 +69,24 @@ func (o *SmokeConfig) Validate() error {
 	return nil
 }
 
+// TODO - Currently CTF still uses env vars for soak tests so to keep the approach unified we export the variables here until that is solved
 func (o *SoakConfig) Validate() error {
 	if o.Enabled == nil {
 		return errors.New("enabled must be set for OCR2.Soak")
 	}
 
 	if *o.Enabled {
+		os.Setenv("TEST_SUITE", "soak")
+
 		if o.RemoteRunnerImage == nil {
 			return errors.New("remote_runner_image must be set for OCR2.Soak")
 		}
+
+		os.Setenv("ENV_JOB_IMAGE", *o.RemoteRunnerImage)
 		if o.DetachRunner == nil {
 			return errors.New("detach_runner must be set for OCR2.Soak")
 		}
+		os.Setenv("DETACH_RUNNER", strconv.FormatBool(*o.DetachRunner))
 	}
 
 	return nil

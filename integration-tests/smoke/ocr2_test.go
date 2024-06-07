@@ -150,7 +150,7 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 					stuck++
 					continue
 				}
-				log.Info().Str("Contract", sg.OcrAddress).Interface("Answer", currentRound.Answer).Int64("RoundID", currentRound.Answer).Msg(fmt.Sprintf("%s: New answer found", name))
+				log.Info().Str("Contract", sg.OcrAddress).Interface("Answer", currentRound.Answer).Int64("RoundID", currentRound.RoundID).Msg(fmt.Sprintf("%s: New answer found", name))
 				require.Equal(t, currentRound.Answer, int64(5), fmt.Sprintf("Actual: %d, Expected: 5", currentRound.Answer))
 				require.Less(t, prevRound.RoundID, currentRound.RoundID, fmt.Sprintf("Expected round %d to be less than %d", prevRound.RoundID, currentRound.RoundID))
 				prevRound = currentRound

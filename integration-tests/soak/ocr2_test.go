@@ -153,7 +153,7 @@ func TestSolanaOCRV2Soak(t *testing.T) {
 					stuck++
 					continue
 				}
-				log.Info().Str("Contract", sg.OcrAddress).Interface("Answer", currentRound.Answer).Int64("RoundID", currentRound.Answer).Msg("New answer found")
+				log.Info().Str("Contract", sg.OcrAddress).Interface("Answer", currentRound.Answer).Int64("RoundID", currentRound.RoundID).Msg("New answer found")
 				if currentRound.Answer != 5 {
 					log.Error().Str("Answer", "difference in answer").Msg(fmt.Sprintf("Expected %d, got %d", 5, currentRound.Answer))
 				}

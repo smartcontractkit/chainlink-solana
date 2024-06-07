@@ -1,0 +1,114 @@
+name: on_demand_soak_test
+on:
+  workflow_dispatch:
+    inputs:
+      base64_config:
+        description: Your .toml file as base64
+        required: true
+      cl_image_tag:
+        description: Your .toml file as base64
+        required: true
+        default: develop
+        type: string
+env:
+  CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
+  CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
+  MOD_CACHE_VERSION: 1
+
+jobs:
+  check_test_compilation:
+    name: Check integration test compilation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+      - name: Setup go
+        uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
+        with:
+          go-version-file: "go.mod"
+          check-latest: true
+          cache: true
+      - run: cd ./integration-tests && go test -run=xxx ./...
+
+  get_projectserum_version:
+    name: Get ProjectSerum Version
+    environment: integration
+    runs-on: ubuntu-latest
+    outputs:
+      projectserum_version: ${{ steps.psversion.outputs.projectserum_version }}
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+      - name: Get ProjectSerum Version
+        id: psversion
+        uses: ./.github/actions/projectserum_version
+
+  e2e_custom_build_artifacts:
+    name: E2E Custom Build Artifacts
+    environment: integration
+    permissions:
+      id-token: write
+      contents: read
+    runs-on: ubuntu-latest-32cores-128GB
+    needs: [get_projectserum_version]
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+      - name: Build contracts
+        uses: ./.github/actions/build_contract_artifacts
+        with:
+          image: projectserum/build
+          image-version: ${{ needs.get_projectserum_version.outputs.projectserum_version }}
+
+  e2e_custom_run_smoke_tests:
+    name: Run on demand soak test
+    environment: integration
+    permissions:
+      checks: write
+      pull-requests: write
+      id-token: write
+      contents: read
+    runs-on: ubuntu-latest-16cores-64GB
+
+    needs: [e2e_custom_build_artifacts, check_test_compilation]
+    env:
+      TEST_ARGS: -test.timeout 30m
+      TEST_LOG_LEVEL: debug
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      BASE64_CONFIG_OVERRIDE: ${{ github.event.inputs.base64_config }}
+    steps:
+      - name: Collect Metrics
+        id: collect-gha-metrics
+        uses: smartcontractkit/push-gha-metrics-action@dea9b546553cb4ca936607c2267a09c004e4ab3f # v3.0.0
+        with:
+          id: solana-e2e-soak
+          org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
+          basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
+          this-job-name: Run on demand soak test
+          test-results-file: '{"testType":"go","filePath":"/tmp/gotest.log"}'
+        continue-on-error: true
+      - name: Checkout the repo
+        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+      - name: Install Solana CLI # required for ensuring the local test validator is configured correctly
+        run: ./scripts/install-solana-ci.sh
+      - name: Install gauntlet
+        uses: ./.github/actions/build-gauntlet
+      - name: Run Tests
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
+        with:
+          test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Soak -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage
+          test_download_vendor_packages_command: cd ./integration-tests && go mod download
+          download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 
+          go_mod_path: ./integration-tests/go.mod
+          cl_repo: ${{ env.CL_ECR }}
+          cl_image_tag: ${{ github.event.inputs.cl_image_tag }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
+          artifacts_name: smoke-test-logs
+          artifacts_location: ./integration-tests/smoke/logs/
+          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
+          cache_key_id: solana-e2e-${{ env.MOD_CACHE_VERSION }}
+          cache_restore_only: "false"
