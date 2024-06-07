@@ -97,7 +97,7 @@ jobs:
         # shellcheck disable=SC2086
         run: |
           BASE64_CONFIG_OVERRIDE=$(jq -r '.inputs.base64_config' "$GITHUB_EVENT_PATH")
-          echo ::add-mask::$BASE64_CONFIG_OVERRIDE
+          echo "::add-mask::$BASE64_CONFIG_OVERRIDE"
           echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> "$GITHUB_ENV"
       - name: Run Tests
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
