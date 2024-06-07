@@ -93,15 +93,16 @@ jobs:
         run: ./scripts/install-solana-ci.sh
       - name: Install gauntlet
         uses: ./.github/actions/build-gauntlet
-      - name: Get Slack config and mask base64 config
+      - name: Mask base64 config
+        # shellcheck disable=SC2086
         run: |
-          BASE64_CONFIG_OVERRIDE=$(jq -r '.inputs.base64_config' $GITHUB_EVENT_PATH)
+          BASE64_CONFIG_OVERRIDE=$(jq -r '.inputs.base64_config' "$GITHUB_EVENT_PATH")
           echo ::add-mask::$BASE64_CONFIG_OVERRIDE
-          echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> $GITHUB_ENV
+          echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> "$GITHUB_ENV"
       - name: Run Tests
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
         with:
-          test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Soak -json $(args) ./soak 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage
+          test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Soak/embedded -json $(args) ./soak 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
           download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 
           go_mod_path: ./integration-tests/go.mod

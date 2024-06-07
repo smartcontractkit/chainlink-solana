@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/common"
@@ -70,9 +69,7 @@ func TestSolanaOCRV2Soak(t *testing.T) {
 
 			if *config.Common.InsideK8s {
 				t.Cleanup(func() {
-					if err = actions.TeardownRemoteSuite(t, state.Common.Env.Cfg.Namespace, state.Clients.ChainlinkClient.ChainlinkClientK8s, nil, nil, nil); err != nil {
-						log.Error().Err(err).Msg("Error tearing down environment")
-					}
+					state.Common.Env.Shutdown()
 				})
 			}
 			state.SetupClients()

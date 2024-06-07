@@ -44,6 +44,10 @@ func (o *Config) Validate() error {
 		return errors.New("OCR2.Smoke or OCR2.Soak must be defined")
 	}
 
+	if *o.Smoke.Enabled && *o.Soak.Enabled {
+		return errors.New("Only one can be enabled either soak or smoke")
+	}
+
 	err = o.Smoke.Validate()
 	if err != nil {
 		return err
