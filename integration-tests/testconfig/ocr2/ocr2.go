@@ -48,14 +48,18 @@ func (o *Config) Validate() error {
 		return errors.New("Only one can be enabled either soak or smoke")
 	}
 
-	err = o.Smoke.Validate()
-	if err != nil {
-		return err
+	if *o.Smoke.Enabled {
+		err = o.Smoke.Validate()
+		if err != nil {
+			return err
+		}
 	}
 
-	err = o.Soak.Validate()
-	if err != nil {
-		return err
+	if *o.Soak.Enabled {
+		err = o.Soak.Validate()
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
