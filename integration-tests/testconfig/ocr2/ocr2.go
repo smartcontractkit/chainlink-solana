@@ -2,24 +2,14 @@ package ocr2
 
 import (
 	"errors"
-	"os"
-	"strconv"
 	"time"
 )
 
 type Config struct {
-	Smoke              *SmokeConfig `toml:"Smoke"`
-	NodeCount          *int         `toml:"node_count"`
-	NumberOfRounds     *int         `toml:"number_of_rounds"`
-	TestDuration       *string      `toml:"test_duration"`
+	NodeCount          *int    `toml:"node_count"`
+	NumberOfRounds     *int    `toml:"number_of_rounds"`
+	TestDuration       *string `toml:"test_duration"`
 	TestDurationParsed *time.Duration
-	Soak               *SoakConfig `toml:"Soak"`
-}
-
-type SoakConfig struct {
-	Enabled           *bool   `toml:"enabled"`
-	DetachRunner      *bool   `toml:"detach_runner"`
-	RemoteRunnerImage *string `toml:"remote_runner_image"`
 }
 
 func (o *Config) Validate() error {
@@ -38,63 +28,6 @@ func (o *Config) Validate() error {
 
 	if o.NumberOfRounds == nil {
 		return errors.New("number_of_rounds must be set for OCR2")
-	}
-
-	if o.Smoke.Enabled == nil && o.Soak.Enabled == nil {
-		return errors.New("OCR2.Smoke or OCR2.Soak must be defined")
-	}
-
-	if *o.Smoke.Enabled && *o.Soak.Enabled {
-		return errors.New("Only one can be enabled either soak or smoke")
-	}
-
-	if *o.Smoke.Enabled {
-		err = o.Smoke.Validate()
-		if err != nil {
-			return err
-		}
-	}
-
-	if *o.Soak.Enabled {
-		err = o.Soak.Validate()
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-type SmokeConfig struct {
-	Enabled *bool `toml:"enabled"`
-}
-
-func (o *SmokeConfig) Validate() error {
-	if o.Enabled == nil {
-		return errors.New("enabled must be set for OCR2.Smoke")
-	}
-
-	return nil
-}
-
-// TODO - Currently CTF still uses env vars for soak tests so to keep the approach unified we export the variables here until that is solved
-func (o *SoakConfig) Validate() error {
-	if o.Enabled == nil {
-		return errors.New("enabled must be set for OCR2.Soak")
-	}
-
-	if *o.Enabled {
-		os.Setenv("TEST_SUITE", "soak")
-
-		if o.RemoteRunnerImage == nil {
-			return errors.New("remote_runner_image must be set for OCR2.Soak")
-		}
-
-		os.Setenv("ENV_JOB_IMAGE", *o.RemoteRunnerImage)
-		if o.DetachRunner == nil {
-			return errors.New("detach_runner must be set for OCR2.Soak")
-		}
-		os.Setenv("DETACH_RUNNER", strconv.FormatBool(*o.DetachRunner))
 	}
 
 	return nil
