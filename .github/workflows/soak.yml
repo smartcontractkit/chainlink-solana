@@ -10,6 +10,11 @@ on:
         required: true
         default: develop
         type: string
+      test_runner_tag:
+        description: Remote runner tag that will run the tests
+        default: develop
+        required: true
+        type: string
 env:
   CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
   CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
@@ -75,6 +80,9 @@ jobs:
       TEST_ARGS: -test.timeout 30m
       TEST_LOG_LEVEL: debug
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TEST_SUITE: soak
+      DETACH_RUNNER: true
+      ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-solana-tests:${{ github.event.inputs.test_runner_tag }}
     steps:
       - name: Collect Metrics
         id: collect-gha-metrics

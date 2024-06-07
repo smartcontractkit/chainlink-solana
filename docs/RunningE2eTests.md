@@ -36,16 +36,11 @@ By default all values are pulled either from `default.toml` or if we create an `
 
 ### On demand soak test
 
-In the .toml file under [OCR2.Soak]. Additionally, [OCR2.Smoke] needs to be disabled.
-
-- `enabled = true`
-- `remote_runner_image = <image>` - This can be fetched from the build test image job
-- `detach_runner = true` - Runs the tests in the remote runner
-
-Navigate to the [workflow](https://github.com/smartcontractkit/chainlink-solana/actions/workflows/soak.yml). The workflow takes in 2 parameters:
+Navigate to the [workflow](https://github.com/smartcontractkit/chainlink-solana/actions/workflows/soak.yml). The workflow takes in 3 parameters:
 
 - Base64 string of the .toml configuration
 - Core image tag which defaults to develop
+- Test runner tag, only tag needs to be supplied
 
 Create an `overrides.toml` file in `integration-tests/testconfig` and run `cat overrides.toml | base64`. `inside_k8` needs to be set to true in the .toml in order to run the tests in kubernetes.
 
@@ -53,6 +48,9 @@ Create an `overrides.toml` file in `integration-tests/testconfig` and run `cat o
 
 If you want to kick off the test from local:
 
-- Base64 the config
+- `export TEST_SUITE: soak`
+- `export DETACH_RUNNER: true`
+- `export ENV_JOB_IMAGE: <internal_repo>/chainlink-solana-tests:<tag>`
+- Base64 the .toml config
 - Run `export BASE64_CONFIG_OVERRIDE="<config>"`
 - cd integration-tests/soak && go test -timeout 24h -count=1 -run TestSolanaOCRV2Soak -test.timeout 30m;
