@@ -6,7 +6,7 @@ on:
         description: Your .toml file as base64
         required: true
       cl_image_tag:
-        description: Your .toml file as base64
+        description: Core image tag
         required: true
         default: develop
         type: string
@@ -75,7 +75,6 @@ jobs:
       TEST_ARGS: -test.timeout 30m
       TEST_LOG_LEVEL: debug
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      BASE64_CONFIG_OVERRIDE: ${{ github.event.inputs.base64_config }}
     steps:
       - name: Collect Metrics
         id: collect-gha-metrics
@@ -94,6 +93,11 @@ jobs:
         run: ./scripts/install-solana-ci.sh
       - name: Install gauntlet
         uses: ./.github/actions/build-gauntlet
+      - name: Get Slack config and mask base64 config
+        run: |
+          BASE64_CONFIG_OVERRIDE=$(jq -r '.inputs.base64_config' $GITHUB_EVENT_PATH)
+          echo ::add-mask::$BASE64_CONFIG_OVERRIDE
+          echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> $GITHUB_ENV
       - name: Run Tests
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
         with:
