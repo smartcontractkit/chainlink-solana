@@ -69,7 +69,10 @@ func TestSolanaOCRV2Soak(t *testing.T) {
 
 			if *config.Common.InsideK8s {
 				t.Cleanup(func() {
-					state.Common.Env.Shutdown()
+					err = state.Common.Env.Shutdown()
+					if err != nil {
+						log.Err(err)
+					}
 				})
 			}
 			state.SetupClients()

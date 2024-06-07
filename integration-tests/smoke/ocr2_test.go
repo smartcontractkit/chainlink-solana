@@ -66,11 +66,13 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 			require.NoError(t, err)
 			state.Gauntlet = sg
 
-			if *config.Common.InsideK8s {
-				t.Cleanup(func() {
-					state.Common.Env.Shutdown()
-				})
-			}
+			t.Cleanup(func() {
+				err = state.Common.Env.Shutdown()
+				if err != nil {
+					log.Err(err)
+				}
+			})
+
 			state.SetupClients()
 			require.NoError(t, err)
 
