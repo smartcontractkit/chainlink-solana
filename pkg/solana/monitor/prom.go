@@ -44,3 +44,10 @@ func SetClientLatency(d time.Duration, request, url string) {
 		"url":     url,
 	}).Set(float64(d.Milliseconds()))
 }
+
+func GetClientLatency(request, url string) (prometheus.Gauge, error) {
+	return promClientReq.GetMetricWith(prometheus.Labels{
+		"request": request,
+		"url":     url,
+	})
+}
