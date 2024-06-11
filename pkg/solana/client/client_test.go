@@ -13,12 +13,15 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 )
 
 func TestClient_Reader_Integration(t *testing.T) {
@@ -291,4 +294,23 @@ func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 	endBal, err := c.Balance(pubKey)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(5_000), initBal-endBal)
+}
+
+func TestClientLatency(t *testing.T) {
+	c := Client{}
+	v := 100
+	n := t.Name() + uuid.NewString()
+	f := func() {
+		done := c.latency(n)
+		defer done()
+		time.Sleep(time.Duration(v) * time.Millisecond)
+	}
+	f()
+	g, err := monitor.GetClientLatency(n, c.url)
+	require.NoError(t, err)
+	val := testutil.ToFloat64(g)
+
+	// check within expected range
+	assert.GreaterOrEqual(t, val, float64(v))
+	assert.LessOrEqual(t, val, float64(v)*1.05)
 }
