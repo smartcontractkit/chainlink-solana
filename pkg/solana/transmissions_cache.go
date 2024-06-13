@@ -17,6 +17,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 )
 
 type TransmissionsCache struct {
@@ -24,6 +25,7 @@ type TransmissionsCache struct {
 
 	// on-chain program + 2x state accounts (state + transmissions)
 	TransmissionsID solana.PublicKey
+	chainID         string
 
 	ansLock sync.RWMutex
 	answer  Answer
@@ -39,9 +41,10 @@ type TransmissionsCache struct {
 	stopCh services.StopChan
 }
 
-func NewTransmissionsCache(transmissionsID solana.PublicKey, cfg config.Config, reader client.Reader, lggr logger.Logger) *TransmissionsCache {
+func NewTransmissionsCache(transmissionsID solana.PublicKey, chainID string, cfg config.Config, reader client.Reader, lggr logger.Logger) *TransmissionsCache {
 	return &TransmissionsCache{
 		TransmissionsID: transmissionsID,
+		chainID:         chainID,
 		reader:          reader,
 		lggr:            lggr,
 		cfg:             cfg,
@@ -120,11 +123,13 @@ func (c *TransmissionsCache) fetchLatestTransmission(ctx context.Context) error 
 	}
 	c.lggr.Debugf("latest transmission fetched for account: %s, result: %v", c.TransmissionsID, answer)
 
+	timestamp := time.Now()
+	monitor.SetCacheTimestamp(timestamp, "ocr2_median_transmissions", c.chainID, c.TransmissionsID.String())
 	// acquire lock and write to state
 	c.ansLock.Lock()
 	defer c.ansLock.Unlock()
 	c.answer = answer
-	c.ansTime = time.Now()
+	c.ansTime = timestamp
 	return nil
 }
 
