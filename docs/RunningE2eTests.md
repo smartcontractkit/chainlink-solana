@@ -41,6 +41,7 @@ Navigate to the [workflow](https://github.com/smartcontractkit/chainlink-solana/
 - Base64 string of the .toml configuration
 - Core image tag which defaults to develop
 - Test runner tag, only tag needs to be supplied
+    - In order to create the test image a label needs to be added to the PR `build-test-image` which will start building it on every push.
 
 Create an `overrides.toml` file in `integration-tests/testconfig` and run `cat overrides.toml | base64`. `inside_k8` needs to be set to true in the .toml in order to run the tests in kubernetes.
 
