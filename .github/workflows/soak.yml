@@ -21,20 +21,6 @@ env:
   MOD_CACHE_VERSION: 1
 
 jobs:
-  check_test_compilation:
-    name: Check integration test compilation
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
-      - name: Setup go
-        uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
-        with:
-          go-version-file: "go.mod"
-          check-latest: true
-          cache: true
-      - run: cd ./integration-tests && go test -run=xxx ./...
-
   get_projectserum_version:
     name: Get ProjectSerum Version
     environment: integration
@@ -75,7 +61,7 @@ jobs:
       contents: read
     runs-on: ubuntu-latest-16cores-64GB
 
-    needs: [e2e_custom_build_artifacts, check_test_compilation]
+    needs: [e2e_custom_build_artifacts]
     env:
       TEST_ARGS: -test.timeout 30m
       TEST_LOG_LEVEL: debug

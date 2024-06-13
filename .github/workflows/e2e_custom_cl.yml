@@ -133,6 +133,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [e2e_custom_build_artifacts]
     steps:
+      - name: Check for Skip Tests Label
+        if: contains(join(github.event.pull_request.labels.*.name, ' '), 'build-test-image')
       - name: Collect Metrics
         id: collect-gha-metrics
         uses: smartcontractkit/push-gha-metrics-action@v1
