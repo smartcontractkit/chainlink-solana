@@ -3,7 +3,7 @@
         "@chainlink/solana-sdk": "../ts",
         "@project-serum/anchor": "^0.25.0",
         "@solana/spl-token": "^0.3.5",
-        "@solana/web3.js": "^1.50.1",
+        "@solana/web3.js": "^1.50.1 <=1.92.3",
         "@types/chai": "^4.2.22",
         "@types/mocha": "^9.0.0",
         "@types/node": "^14.14.37",
