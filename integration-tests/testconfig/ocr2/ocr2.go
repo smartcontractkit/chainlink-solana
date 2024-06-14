@@ -6,9 +6,9 @@ import (
 )
 
 type Config struct {
-	Smoke              *SmokeConfig `toml:"Smoke"`
-	NodeCount          *int         `toml:"node_count"`
-	TestDuration       *string      `toml:"test_duration"`
+	NodeCount          *int    `toml:"node_count"`
+	NumberOfRounds     *int    `toml:"number_of_rounds"`
+	TestDuration       *string `toml:"test_duration"`
 	TestDurationParsed *time.Duration
 }
 
@@ -26,24 +26,9 @@ func (o *Config) Validate() error {
 	}
 	o.TestDurationParsed = &duration
 
-	if o.Smoke == nil {
-		return errors.New("smoke must be defined")
-	}
-	err = o.Smoke.Validate()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-type SmokeConfig struct {
-	NumberOfRounds *int `toml:"number_of_rounds"`
-}
-
-func (o *SmokeConfig) Validate() error {
 	if o.NumberOfRounds == nil {
-		return errors.New("number_of_rounds must be set")
+		return errors.New("number_of_rounds must be set for OCR2")
 	}
+
 	return nil
 }

@@ -13,6 +13,10 @@ inputs:
     description: The path for downloading the built artifacts
     required: false
     default: contracts/target/deploy
+  suites:
+    description: The test suites to build into the image
+    default: smoke soak
+    required: false
   QA_AWS_ROLE_TO_ASSUME:
     description: The AWS role to assume as the CD user, if any. Used in configuring the docker/login-action
     required: true
@@ -57,7 +61,7 @@ runs:
         build-args: |
           BASE_IMAGE=${{ inputs.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ inputs.QA_AWS_REGION }}.amazonaws.com/test-base-image
           IMAGE_VERSION=${{ steps.version.outputs.version }}
-          SUITES="smoke"
+          SUITES="${{ inputs.suites }}"
         AWS_REGION: ${{ inputs.QA_AWS_REGION }}
         AWS_ROLE_TO_ASSUME: ${{ inputs.QA_AWS_ROLE_TO_ASSUME }}
     - name: Print Image Built

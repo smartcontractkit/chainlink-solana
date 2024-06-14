@@ -1,29 +1,24 @@
-name: E2E Soak Test
+name: on_demand_soak_test
 on:
-  schedule:
-    - cron: '0 0 * * *'
   workflow_dispatch:
     inputs:
-      cl_branch_ref:
-        description: Chainlink repo branch to integrate with
+      base64_config:
+        description: Your .toml file as base64
+        required: true
+      cl_image_tag:
+        description: Core image tag
         required: true
         default: develop
         type: string
-      ttl:
-        description: The total time for the test to live
+      test_runner_tag:
+        description: Remote runner tag that will run the tests
+        default: develop
         required: true
-        default: 3h
         type: string
-      node_count:
-        description: The number of chainlink nodes to use
-        required: true
-        default: '5'
-        type: string
-
 env:
-  REF_NAME: ${{ github.head_ref || github.ref_name }}
-  ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-solana-tests:${{ github.sha }}
+  CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
   CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
+  MOD_CACHE_VERSION: 1
 
 jobs:
   get_projectserum_version:
@@ -38,121 +33,81 @@ jobs:
       - name: Get ProjectSerum Version
         id: psversion
         uses: ./.github/actions/projectserum_version
-  test-image-exists:
-    environment: integration
-    permissions:
-      checks: write
-      pull-requests: write
-      id-token: write
-      contents: read
-    name: Check If Solana Test Image Exists
-    runs-on: ubuntu-latest
-    outputs:
-      exists: ${{ steps.check-image.outputs.exists }}
-    steps:
-      - name: Check if image exists
-        id: check-image
-        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
-        with:
-          repository: chainlink-solana-tests
-          tag: ${{ github.sha }}
-          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
 
-  soak_testing_build_contracts:
-    name: Soak Testing Build Contracts
+  e2e_custom_build_artifacts:
+    name: E2E Custom Build Artifacts
     environment: integration
     permissions:
       id-token: write
       contents: read
-    runs-on: ubuntu-latest
-    needs: [get_projectserum_version, test-image-exists]
-    # container:
-    #   image: projectserum/build:${{ needs.get_projectserum_version.outputs.projectserum_version }}
-    #   env:
-    #     RUSTUP_HOME: "/root/.rustup"
-    #     FORCE_COLOR: 1
+    runs-on: ubuntu-latest-32cores-128GB
+    needs: [get_projectserum_version]
     steps:
       - name: Checkout the repo
         uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
       - name: Build contracts
-        if: needs.test-image-exists.outputs.exists == 'false'
         uses: ./.github/actions/build_contract_artifacts
         with:
           image: projectserum/build
           image-version: ${{ needs.get_projectserum_version.outputs.projectserum_version }}
 
-  soak_testing_build_custom_chainlink_image:
-    name: Soak Testing Build Custom Chainlink Image
-    runs-on: ubuntu-latest
-    environment: integration
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - name: Check if image exists
-        id: check-image
-        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
-        with:
-          repository: chainlink
-          tag: solana.${{ github.sha }}
-          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-      - name: Build Image
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
-        with:
-          should_checkout: true
-          cl_repo: smartcontractkit/chainlink
-          cl_ref: ${{ github.event.inputs.cl_branch_ref }}
-          dep_solana_sha: ${{ github.sha }}
-          push_tag: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink:solana.${{ github.sha }}
-          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-
-  soak_testing_run_test:
-    name: Soak Testing Run Test
+  e2e_custom_run_smoke_tests:
+    name: Run on demand soak test
     environment: integration
     permissions:
       checks: write
       pull-requests: write
       id-token: write
       contents: read
-    runs-on: ubuntu-latest
-    needs: [soak_testing_build_contracts, soak_testing_build_custom_chainlink_image]
+    runs-on: ubuntu-latest-16cores-64GB
+
+    needs: [e2e_custom_build_artifacts]
     env:
-      DETACH_RUNNER: false
-      TEST_SUITE: soak
-      TEST_ARGS: -test.timeout 4h
-      CHAINLINK_COMMIT_SHA: ${{ github.sha }}
-      CHAINLINK_ENV_USER: ${{ github.actor }}
+      TEST_ARGS: -test.timeout 30m
       TEST_LOG_LEVEL: debug
-      TTL: ${{ github.event.inputs.ttl }}
-      NODE_COUNT: ${{ github.event.inputs.node_count }}
-      SELECTED_NETWORKS: SIMULATED
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TEST_SUITE: soak
+      DETACH_RUNNER: true
+      ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-solana-tests:${{ github.event.inputs.test_runner_tag }}
     steps:
+      - name: Collect Metrics
+        id: collect-gha-metrics
+        uses: smartcontractkit/push-gha-metrics-action@dea9b546553cb4ca936607c2267a09c004e4ab3f # v3.0.0
+        with:
+          id: solana-e2e-soak
+          org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
+          basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
+          this-job-name: Run on demand soak test
+          test-results-file: '{"testType":"go","filePath":"/tmp/gotest.log"}'
+        continue-on-error: true
       - name: Checkout the repo
         uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
-        with:
-          ref: ${{ env.REF_NAME }}
-      - name: Build Test Image
-        uses: ./.github/actions/build-test-image
-        with:
-          artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
-          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
+      - name: Install Solana CLI # required for ensuring the local test validator is configured correctly
+        run: ./scripts/install-solana-ci.sh
+      - name: Install gauntlet
+        uses: ./.github/actions/build-gauntlet
+      - name: Mask base64 config
+        # shellcheck disable=SC2086
+        run: |
+          BASE64_CONFIG_OVERRIDE=$(jq -r '.inputs.base64_config' "$GITHUB_EVENT_PATH")
+          echo "::add-mask::$BASE64_CONFIG_OVERRIDE"
+          echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> "$GITHUB_ENV"
       - name: Run Tests
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
         with:
-          test_command_to_run: cd ./integration-tests && go test -timeout 5h -count=1 -json $(args) ./soak 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage
+          test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Soak/embedded -json $(args) ./soak 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage
+          test_download_vendor_packages_command: cd ./integration-tests && go mod download
+          download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 
           go_mod_path: ./integration-tests/go.mod
-          cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
-          cl_image_tag: solana.${{ github.sha }}
-          artifacts_location: /home/runner/work/chainlink-solana/chainlink-solana/integration-tests/soak/logs
-          publish_report_paths: ./tests-soak-report.xml
-          publish_check_name: Soak Test Results
+          cl_repo: ${{ env.CL_ECR }}
+          cl_image_tag: ${{ github.event.inputs.cl_image_tag }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
+          artifacts_name: smoke-test-logs
+          artifacts_location: ./integration-tests/smoke/logs/
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
-          should_cleanup: false
+          cache_key_id: solana-e2e-${{ env.MOD_CACHE_VERSION }}
+          cache_restore_only: "false"
