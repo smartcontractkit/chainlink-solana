@@ -2,7 +2,7 @@ ARG BASE_IMAGE
 ARG IMAGE_VERSION=latest
 FROM ${BASE_IMAGE}:${IMAGE_VERSION}
 
-ARG SUITES=smoke
+ARG SUITES=smoke soak
 
 COPY . testdir/
 WORKDIR /go/testdir

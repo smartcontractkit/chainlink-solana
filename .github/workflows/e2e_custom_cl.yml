@@ -47,6 +47,27 @@ jobs:
         id: psversion
         uses: ./.github/actions/projectserum_version
 
+  solana-test-image-exists:
+    environment: integration
+    permissions:
+      checks: write
+      pull-requests: write
+      id-token: write
+      contents: read
+    name: Check If Solana Test Image Exists
+    runs-on: ubuntu-latest
+    outputs:
+      exists: ${{ steps.check-image.outputs.exists }}
+    steps:
+      - name: Check if image exists
+        id: check-image
+        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@fc3e0df622521019f50d772726d6bf8dc919dd38 # v2.3.19
+        with:
+          repository: chainlink-solana-tests
+          tag: ${{ github.sha }}
+          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+          AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+
   e2e_custom_build_artifacts:
     name: E2E Custom Build Artifacts
     environment: integration
@@ -55,11 +76,6 @@ jobs:
       contents: read
     runs-on: ubuntu-latest-32cores-128GB
     needs: [get_projectserum_version]
-    # container:
-    #   image: projectserum/build:${{ needs.get_projectserum_version.outputs.projectserum_version }}
-    #   env:
-    #     RUSTUP_HOME: "/root/.rustup"
-    #     FORCE_COLOR: 1
     steps:
       - name: Checkout the repo
         uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
@@ -107,6 +123,36 @@ jobs:
           push_tag: ${{ env.CL_ECR }}:solana.${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref || github.sha }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+
+  build_test_image:
+    environment: integration
+    if: contains(join(github.event.pull_request.labels.*.name, ' '), 'build-test-image')
+    permissions:
+      id-token: write
+      contents: read
+    name: Build Test Image
+    runs-on: ubuntu-latest
+    needs: [e2e_custom_build_artifacts]
+    steps:
+      - name: Collect Metrics
+        id: collect-gha-metrics
+        uses: smartcontractkit/push-gha-metrics-action@v1
+        with:
+          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+          this-job-name: Build Test Image
+        continue-on-error: true
+      - name: Checkout the repo
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Build Image
+        uses: ./.github/actions/build-test-image
+        with:
+          artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
+          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+          QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
 
   e2e_custom_run_smoke_tests:
     name: E2E Custom Run Smoke Tests
