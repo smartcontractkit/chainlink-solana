@@ -12,13 +12,13 @@ log_producer_timeout="10s"
 log_producer_retry_limit=10
 
 [Network]
-selected_networks=["SIMULATED"] # Not needed for Solana but mandatory from CTF (do not change)
+selected_networks=["SIMULATED_NONDEV"] # Not needed for Solana but mandatory from CTF (do not change)
 
 [Network.RpcHttpUrls]
-simulated = ["http://127.0.0.1"] # Not needed for Solana but mandatory from CTF (do not change)
+simulated_nondev = ["http://127.0.0.1"] # Not needed for Solana but mandatory from CTF (do not change)
 
 [Network.RpcWsUrls]
-simulated = ["wss://127.0.0.1"] # Not needed for Solana but mandatory from CTF (do not change)
+simulated_nondev = ["wss://127.0.0.1"] # Not needed for Solana but mandatory from CTF (do not change)
 
 # Testnet program ID's
 [SolanaConfig]
