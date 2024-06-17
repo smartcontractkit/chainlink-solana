@@ -12,16 +12,13 @@ log_producer_timeout="10s"
 log_producer_retry_limit=10
 
 [Network]
-selected_networks=["ETHEREUM_MAINNET"] # Default config that is required from CTF
+selected_networks=["SIMULATED"] # Not needed for Solana but mandatory from CTF (do not change)
 
 [Network.RpcHttpUrls]
-ethereum_mainnet = ["http://127.0.0.1"] # Default config that is required from CTF
+simulated = ["http://127.0.0.1"] # Not needed for Solana but mandatory from CTF (do not change)
 
 [Network.RpcWsUrls]
-ethereum_mainnet = ["wss://127.0.0.1"] # Default config that is required from CTF
-
-[Network.WalletKeys]
-ethereum_mainnet = ["5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a"] # Default config that is required from CTF
+simulated = ["wss://127.0.0.1"] # Not needed for Solana but mandatory from CTF (do not change)
 
 # Testnet program ID's
 [SolanaConfig]
