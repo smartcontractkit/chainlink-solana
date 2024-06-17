@@ -1,5 +1,6 @@
 package smoke
 
+
 import (
 	"fmt"
 	"maps"
