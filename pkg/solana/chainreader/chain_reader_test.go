@@ -548,7 +548,7 @@ type wrappedTestChainReader struct {
 	test            *testing.T
 	service         *chainreader.SolanaChainReaderService
 	client          *mockedRPCClient
-	tester          ChainReaderInterfaceTester
+	tester          ChainReaderInterfaceTester[*testing.T]
 	testStructQueue []*TestStruct
 }
 
@@ -624,7 +624,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 
 		r.client.SetNext(bts, nil, 0)
 	case AnyContractName + MethodReturningSeenStruct:
-		nextStruct := CreateTestStruct(0, r.tester)
+		nextStruct := CreateTestStruct[*testing.T](0, r.tester)
 		r.testStructQueue = append(r.testStructQueue, &nextStruct)
 
 		a, b = getAddresses(r.test, r.tester, 5, 6)
@@ -670,7 +670,7 @@ func (r *wrappedTestChainReader) QueryKey(ctx context.Context, contractName stri
 	return nil, nil
 }
 
-func getAddresses(t *testing.T, tester ChainReaderInterfaceTester, a, b int) (ag_solana.PublicKey, ag_solana.PublicKey) {
+func getAddresses(t *testing.T, tester ChainReaderInterfaceTester[*testing.T], a, b int) (ag_solana.PublicKey, ag_solana.PublicKey) {
 	t.Helper()
 
 	bindings := tester.GetBindings(t)
@@ -843,7 +843,9 @@ const (
 )
 
 // Required to allow test skipping to be on the same goroutine
-type skipEventsChainReaderTester struct{ ChainReaderInterfaceTester }
+type skipEventsChainReaderTester struct {
+	ChainReaderInterfaceTester[*testing.T]
+}
 
 func (s *skipEventsChainReaderTester) GetChainReader(t *testing.T) types.ContractReader {
 	return &skipEventsChainReader{

@@ -11,14 +11,20 @@ log_targets=["file"]
 log_producer_timeout="10s"
 log_producer_retry_limit=10
 
+####################################################################################
+# TODO - Workaround due to lack of non-evm support in CTF and core
 [Network]
-selected_networks=["SIMULATED"] # Not needed for Solana but mandatory from CTF (do not change)
+selected_networks=["SEPOLIA"]
 
 [Network.RpcHttpUrls]
-simulated = ["http://127.0.0.1"] # Not needed for Solana but mandatory from CTF (do not change)
+sepolia = ["https://sepolia.drpc.org"]
 
 [Network.RpcWsUrls]
-simulated = ["wss://127.0.0.1"] # Not needed for Solana but mandatory from CTF (do not change)
+sepolia = ["wss://sepolia.drpc.org"]
+
+[Network.WalletKeys]
+sepolia = ["5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a"]
+####################################################################################
 
 # Testnet program ID's
 [SolanaConfig]
