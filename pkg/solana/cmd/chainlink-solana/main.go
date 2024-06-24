@@ -9,6 +9,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -50,7 +51,7 @@ type pluginRelayer struct {
 	loop.Plugin
 }
 
-func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore loop.Keystore) (loop.Relayer, error) {
+func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore loop.Keystore, capRegistry core.CapabilitiesRegistry) (loop.Relayer, error) {
 	d := toml.NewDecoder(strings.NewReader(config))
 	d.DisallowUnknownFields()
 	var cfg struct {
@@ -69,7 +70,7 @@ func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chain: %w", err)
 	}
-	ra := &loop.RelayerAdapter{Relayer: solana.NewRelayer(c.Logger, chain), RelayerExt: chain}
+	ra := &loop.RelayerAdapter{Relayer: solana.NewRelayer(c.Logger, chain, capRegistry), RelayerExt: chain}
 
 	c.SubService(ra)
 
