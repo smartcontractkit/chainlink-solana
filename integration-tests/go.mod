@@ -14,11 +14,11 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/pelletier/go-toml/v2 v2.2.2
 	github.com/rs/zerolog v1.31.0
-	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240620164046-1c03d0a97b20
+	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240624150733-1eff5dedc985
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240605170242-555ff582f36a
-	github.com/smartcontractkit/chainlink-testing-framework v1.31.1
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240620205937-a95a3903500f
-	github.com/smartcontractkit/chainlink/v2 v2.10.0-beta0.0.20240620205937-a95a3903500f
+	github.com/smartcontractkit/chainlink-testing-framework v1.31.4
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240624222515-76bdd9d93c84
+	github.com/smartcontractkit/chainlink/v2 v2.10.0-beta0.0.20240624222515-76bdd9d93c84
 	github.com/smartcontractkit/libocr v0.0.0-20240419185742-fd3cab206b2c
 	github.com/smartcontractkit/seth v1.0.12
 	github.com/stretchr/testify v1.9.0
