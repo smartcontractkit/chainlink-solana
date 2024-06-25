@@ -34,4 +34,24 @@ By default all values are pulled either from `default.toml` or if we create an `
 
 `cd integration-tests/smoke && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke -test.timeout 30m;`
 
+### On demand soak test
 
+Navigate to the [workflow](https://github.com/smartcontractkit/chainlink-solana/actions/workflows/soak.yml). The workflow takes in 3 parameters:
+
+- Base64 string of the .toml configuration
+- Core image tag which defaults to develop
+- Test runner tag, only tag needs to be supplied
+    - In order to create the test image a label needs to be added to the PR `build-test-image` which will start building it on every push.
+
+Create an `overrides.toml` file in `integration-tests/testconfig` and run `cat overrides.toml | base64`. `inside_k8` needs to be set to true in the .toml in order to run the tests in kubernetes.
+
+#### Local
+
+If you want to kick off the test from local:
+
+- `export TEST_SUITE: soak`
+- `export DETACH_RUNNER: true`
+- `export ENV_JOB_IMAGE: <internal_repo>/chainlink-solana-tests:<tag>`
+- Base64 the .toml config
+- Run `export BASE64_CONFIG_OVERRIDE="<config>"`
+- cd integration-tests/soak && go test -timeout 24h -count=1 -run TestSolanaOCRV2Soak -test.timeout 30m;

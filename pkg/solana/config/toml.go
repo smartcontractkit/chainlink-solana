@@ -176,6 +176,9 @@ func setFromChain(c, f *Chain) {
 	if f.FeeBumpPeriod != nil {
 		c.FeeBumpPeriod = f.FeeBumpPeriod
 	}
+	if f.BlockHistoryPollPeriod != nil {
+		c.BlockHistoryPollPeriod = f.BlockHistoryPollPeriod
+	}
 }
 
 func (c *TOMLConfig) ValidateConfig() (err error) {
@@ -266,6 +269,10 @@ func (c *TOMLConfig) ComputeUnitPriceDefault() uint64 {
 
 func (c *TOMLConfig) FeeBumpPeriod() time.Duration {
 	return c.Chain.FeeBumpPeriod.Duration()
+}
+
+func (c *TOMLConfig) BlockHistoryPollPeriod() time.Duration {
+	return c.Chain.BlockHistoryPollPeriod.Duration()
 }
 
 func (c *TOMLConfig) ListNodes() Nodes {

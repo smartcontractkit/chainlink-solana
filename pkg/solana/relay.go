@@ -11,12 +11,12 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
-	relaylogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 )
 
@@ -35,7 +35,7 @@ type Relayer struct {
 }
 
 // Note: constructed in core
-func NewRelayer(lggr logger.Logger, chain Chain) *Relayer {
+func NewRelayer(lggr logger.Logger, chain Chain, capabilitiesRegistry core.CapabilitiesRegistry) *Relayer {
 	return &Relayer{
 		lggr:   lggr,
 		chain:  chain,
@@ -81,6 +81,14 @@ func (r *Relayer) NewLLOProvider(rargs relaytypes.RelayArgs, pargs relaytypes.Pl
 	return nil, errors.New("data streams is not supported for solana")
 }
 
+func (r *Relayer) NewCCIPCommitProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.CCIPCommitProvider, error) {
+	return nil, errors.New("ccip.commit is not supported for solana")
+}
+
+func (r *Relayer) NewCCIPExecProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.CCIPExecProvider, error) {
+	return nil, errors.New("ccip.exec is not supported for solana")
+}
+
 func (r *Relayer) NewConfigProvider(args relaytypes.RelayArgs) (relaytypes.ConfigProvider, error) {
 	ctx, cancel := r.stopCh.NewCtx()
 	defer cancel()
@@ -103,7 +111,7 @@ func (r *Relayer) NewContractStateReader(config []byte) (relaytypes.ContractStat
 func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MedianProvider, error) {
 	ctx, cancel := r.stopCh.NewCtx()
 	defer cancel()
-	lggr := relaylogger.Named(r.lggr, "MedianProvider")
+	lggr := logger.Named(r.lggr, "MedianProvider")
 	configWatcher, err := newConfigProvider(ctx, lggr, r.chain, rargs)
 	if err != nil {
 		return nil, err
@@ -127,7 +135,7 @@ func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes
 	}
 
 	cfg := configWatcher.chain.Config()
-	transmissionsCache := NewTransmissionsCache(transmissionsID, cfg, configWatcher.reader, r.lggr)
+	transmissionsCache := NewTransmissionsCache(transmissionsID, relayConfig.ChainID, cfg, configWatcher.reader, r.lggr)
 	return &medianProvider{
 		configProvider:     configWatcher,
 		transmissionsCache: transmissionsCache,
@@ -172,7 +180,7 @@ type configProvider struct {
 }
 
 func newConfigProvider(ctx context.Context, lggr logger.Logger, chain Chain, args relaytypes.RelayArgs) (*configProvider, error) {
-	lggr = relaylogger.Named(lggr, "ConfigProvider")
+	lggr = logger.Named(lggr, "ConfigProvider")
 	var relayConfig RelayConfig
 	err := json.Unmarshal(args.RelayConfig, &relayConfig)
 	if err != nil {
@@ -199,7 +207,7 @@ func newConfigProvider(ctx context.Context, lggr logger.Logger, chain Chain, arg
 	if err != nil {
 		return nil, fmt.Errorf("error in NewMedianProvider.chain.Reader: %w", err)
 	}
-	stateCache := NewStateCache(stateID, chain.Config(), reader, lggr)
+	stateCache := NewStateCache(stateID, relayConfig.ChainID, chain.Config(), reader, lggr)
 	return &configProvider{
 		chainID:                relayConfig.ChainID,
 		stateID:                stateID,

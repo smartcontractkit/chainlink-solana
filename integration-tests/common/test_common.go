@@ -107,6 +107,10 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 	if *m.Config.TestConfig.Common.InsideK8s {
 		m.DeployEnv(contractsDir)
 
+		if m.Common.Env.WillUseRemoteRunner() {
+			return
+		}
+
 		// Setting up the URLs
 		m.Common.ChainDetails.RPCURLExternal = m.Common.Env.URLs["sol"][0]
 		m.Common.ChainDetails.WSURLExternal = m.Common.Env.URLs["sol"][1]
@@ -181,7 +185,9 @@ func (m *OCRv2TestState) DeployEnv(contractsDir string) {
 	err := m.Common.Env.Run()
 	require.NoError(m.Config.T, err)
 
-	m.UploadProgramBinaries(contractsDir)
+	if !m.Common.Env.WillUseRemoteRunner() {
+		m.UploadProgramBinaries(contractsDir)
+	}
 }
 
 func (m *OCRv2TestState) NewSolanaClientSetup(networkSettings *solclient.SolNetwork) (*solclient.Client, error) {

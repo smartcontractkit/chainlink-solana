@@ -12,12 +12,13 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 )
 
 var (
@@ -28,6 +29,7 @@ type StateCache struct {
 	services.StateMachine
 	// on-chain program + 2x state accounts (state + transmissions)
 	StateID solana.PublicKey
+	chainID string
 
 	stateLock sync.RWMutex
 	state     State
@@ -43,9 +45,10 @@ type StateCache struct {
 	stopCh services.StopChan
 }
 
-func NewStateCache(stateID solana.PublicKey, cfg config.Config, reader client.Reader, lggr logger.Logger) *StateCache {
+func NewStateCache(stateID solana.PublicKey, chainID string, cfg config.Config, reader client.Reader, lggr logger.Logger) *StateCache {
 	return &StateCache{
 		StateID: stateID,
+		chainID: chainID,
 		reader:  reader,
 		lggr:    lggr,
 		cfg:     cfg,
@@ -124,11 +127,13 @@ func (c *StateCache) fetchState(ctx context.Context) error {
 
 	c.lggr.Debugf("state fetched for account: %s, result (config digest): %v", c.StateID, hex.EncodeToString(state.Config.LatestConfigDigest[:]))
 
+	timestamp := time.Now()
+	monitor.SetCacheTimestamp(timestamp, "ocr2_median_state", c.chainID, c.StateID.String())
 	// acquire lock and write to state
 	c.stateLock.Lock()
 	defer c.stateLock.Unlock()
 	c.state = state
-	c.stateTime = time.Now()
+	c.stateTime = timestamp
 	return nil
 }
 

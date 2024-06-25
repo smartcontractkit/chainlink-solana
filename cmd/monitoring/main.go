@@ -77,11 +77,16 @@ func main() {
 	)
 	slotHeightSourceFactory := monitoring.NewSlotHeightSourceFactory(
 		chainReader,
-		logger.With(log, "component", "souce-slot-height"),
+		logger.With(log, "component", "source-slot-height"),
+	)
+	networkFeesSourceFactory := monitoring.NewNetworkFeesSourceFactory(
+		chainReader,
+		logger.With(log, "component", "source-network-fees"),
 	)
 	monitor.NetworkSourceFactories = append(monitor.NetworkSourceFactories,
 		nodeBalancesSourceFactory,
 		slotHeightSourceFactory,
+		networkFeesSourceFactory,
 	)
 
 	// exporter names
@@ -121,9 +126,14 @@ func main() {
 		logger.With(log, "component", promExporter),
 		metrics.NewSlotHeight(logger.With(log, "component", promMetrics)),
 	)
+	networkFeesExporterFactory := exporter.NewNetworkFeesFactory(
+		logger.With(log, "component", promExporter),
+		metrics.NewNetworkFees(logger.With(log, "component", promMetrics)),
+	)
 	monitor.NetworkExporterFactories = append(monitor.NetworkExporterFactories,
 		nodeBalancesExporterFactory,
 		slotHeightExporterFactory,
+		networkFeesExporterFactory,
 	)
 
 	monitor.Run()

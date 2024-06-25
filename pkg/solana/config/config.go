@@ -27,7 +27,8 @@ var defaultConfigSet = configSet{
 	ComputeUnitPriceMax:     1_000,
 	ComputeUnitPriceMin:     0,
 	ComputeUnitPriceDefault: 0,
-	FeeBumpPeriod:           3 * time.Second,
+	FeeBumpPeriod:           3 * time.Second, // set to 0 to disable fee bumping
+	BlockHistoryPollPeriod:  5 * time.Second,
 }
 
 //go:generate mockery --name Config --output ./mocks/ --case=underscore --filename config.go
@@ -49,6 +50,7 @@ type Config interface {
 	ComputeUnitPriceMin() uint64
 	ComputeUnitPriceDefault() uint64
 	FeeBumpPeriod() time.Duration
+	BlockHistoryPollPeriod() time.Duration
 }
 
 // opt: remove
@@ -69,6 +71,7 @@ type configSet struct {
 	ComputeUnitPriceMin     uint64
 	ComputeUnitPriceDefault uint64
 	FeeBumpPeriod           time.Duration
+	BlockHistoryPollPeriod  time.Duration
 }
 
 type Chain struct {
@@ -87,6 +90,7 @@ type Chain struct {
 	ComputeUnitPriceMin     *uint64
 	ComputeUnitPriceDefault *uint64
 	FeeBumpPeriod           *config.Duration
+	BlockHistoryPollPeriod  *config.Duration
 }
 
 func (c *Chain) SetDefaults() {
@@ -135,6 +139,9 @@ func (c *Chain) SetDefaults() {
 	}
 	if c.FeeBumpPeriod == nil {
 		c.FeeBumpPeriod = config.MustNewDuration(defaultConfigSet.FeeBumpPeriod)
+	}
+	if c.BlockHistoryPollPeriod == nil {
+		c.BlockHistoryPollPeriod = config.MustNewDuration(defaultConfigSet.BlockHistoryPollPeriod)
 	}
 }
 

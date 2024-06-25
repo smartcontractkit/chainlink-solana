@@ -1,11 +1,8 @@
 package common
 
 import (
-	"bytes"
-	"encoding/hex"
 	"fmt"
 	"math/big"
-	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -13,13 +10,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
-	"github.com/rs/zerolog/log"
-	"golang.org/x/crypto/curve25519"
 	"gopkg.in/guregu/null.v4"
-
-	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
-	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
-	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
 	ctf_test_env "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
@@ -29,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/sol"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
-	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -107,15 +97,6 @@ type NodeKeysBundle struct {
 	OCR2Key *client.OCR2Key
 	PeerID  string
 	TXKey   *client.TxKey
-}
-
-// OCR2 keys are in format OCR2<key_type>_<network>_<key>
-func stripKeyPrefix(key string) string {
-	chunks := strings.Split(key, "_")
-	if len(chunks) == 3 {
-		return chunks[2]
-	}
-	return key
 }
 
 func New(testConfig *tc.TestConfig) *Common {
@@ -196,42 +177,6 @@ func (c *Common) CreateNodeKeysBundle(nodes []*client.ChainlinkClient) ([]client
 	return nkb, nil
 }
 
-func createOracleIdentities(nkb []client.NodeKeysBundle) ([]confighelper.OracleIdentityExtra, error) {
-	oracleIdentities := make([]confighelper.OracleIdentityExtra, 0)
-	for _, nodeKeys := range nkb {
-		offChainPubKeyTemp, err := hex.DecodeString(stripKeyPrefix(nodeKeys.OCR2Key.Data.Attributes.OffChainPublicKey))
-		if err != nil {
-			return nil, err
-		}
-		onChainPubKey, err := hex.DecodeString(stripKeyPrefix(nodeKeys.OCR2Key.Data.Attributes.OnChainPublicKey))
-		if err != nil {
-			return nil, err
-		}
-		cfgPubKeyTemp, err := hex.DecodeString(stripKeyPrefix(nodeKeys.OCR2Key.Data.Attributes.ConfigPublicKey))
-		if err != nil {
-			return nil, err
-		}
-		cfgPubKeyBytes := [curve25519.PointSize]byte{}
-		copy(cfgPubKeyBytes[:], cfgPubKeyTemp)
-		offChainPubKey := [curve25519.PointSize]byte{}
-		copy(offChainPubKey[:], offChainPubKeyTemp)
-		oracleIdentities = append(oracleIdentities, confighelper.OracleIdentityExtra{
-			OracleIdentity: confighelper.OracleIdentity{
-				OffchainPublicKey: offChainPubKey,
-				OnchainPublicKey:  onChainPubKey,
-				PeerID:            nodeKeys.PeerID,
-				TransmitAccount:   types.Account(nodeKeys.TXKey.Data.Attributes.PublicKey),
-			},
-			ConfigEncryptionPublicKey: cfgPubKeyBytes,
-		})
-	}
-	// program sorts oracles (need to pre-sort to allow correct onchainConfig generation)
-	sort.Slice(oracleIdentities, func(i, j int) bool {
-		return bytes.Compare(oracleIdentities[i].OracleIdentity.OnchainPublicKey, oracleIdentities[j].OracleIdentity.OnchainPublicKey) < 0
-	})
-	return oracleIdentities, nil
-}
-
 func FundOracles(c *solclient.Client, nkb []client.NodeKeysBundle, amount *big.Float) error {
 	for _, nk := range nkb {
 		addr := nk.TXKey.Data.Attributes.PublicKey
@@ -240,47 +185,6 @@ func FundOracles(c *solclient.Client, nkb []client.NodeKeysBundle, amount *big.F
 		}
 	}
 	return nil
-}
-
-// OffChainConfigParamsFromNodes creates contracts.OffChainAggregatorV2Config
-func OffChainConfigParamsFromNodes(nodeCount int, nkb []client.NodeKeysBundle) (contracts.OffChainAggregatorV2Config, error) {
-	oi, err := createOracleIdentities(nkb)
-	if err != nil {
-		return contracts.OffChainAggregatorV2Config{}, err
-	}
-	s := make([]int, 0)
-	for i := 0; i < nodeCount; i++ {
-		s = append(s, 1)
-	}
-	faultyNodes := 0
-	if nodeCount > 1 {
-		faultyNodes = nodeCount/3 - 1
-	}
-	if faultyNodes == 0 {
-		faultyNodes = 1
-	}
-	log.Debug().Int("Nodes", faultyNodes).Msg("Faulty nodes")
-	return contracts.OffChainAggregatorV2Config{
-		DeltaProgress: 2 * time.Second,
-		DeltaResend:   5 * time.Second,
-		DeltaRound:    1 * time.Second,
-		DeltaGrace:    500 * time.Millisecond,
-		DeltaStage:    10 * time.Second,
-		RMax:          3,
-		S:             s,
-		Oracles:       oi,
-		ReportingPluginConfig: median.OffchainConfig{
-			AlphaReportPPB: uint64(0),
-			AlphaAcceptPPB: uint64(0),
-		}.Encode(),
-		MaxDurationQuery:                        20 * time.Millisecond,
-		MaxDurationObservation:                  500 * time.Millisecond,
-		MaxDurationReport:                       500 * time.Millisecond,
-		MaxDurationShouldAcceptFinalizedReport:  500 * time.Millisecond,
-		MaxDurationShouldTransmitAcceptedReport: 500 * time.Millisecond,
-		F:                                       faultyNodes,
-		OnchainConfig:                           []byte{},
-	}, nil
 }
 
 func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo, mockURL string, isK8s bool) error {
