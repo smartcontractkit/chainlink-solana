@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
@@ -34,7 +35,7 @@ type Relayer struct {
 }
 
 // Note: constructed in core
-func NewRelayer(lggr logger.Logger, chain Chain) *Relayer {
+func NewRelayer(lggr logger.Logger, chain Chain, capabilitiesRegistry core.CapabilitiesRegistry) *Relayer {
 	return &Relayer{
 		lggr:   lggr,
 		chain:  chain,
