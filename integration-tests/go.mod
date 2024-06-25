@@ -14,11 +14,11 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/pelletier/go-toml/v2 v2.2.2
 	github.com/rs/zerolog v1.31.0
-	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240625121357-c5cacc30ee06
-	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240605170242-555ff582f36a
-	github.com/smartcontractkit/chainlink-testing-framework v1.31.1
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240620205937-a95a3903500f
-	github.com/smartcontractkit/chainlink/v2 v2.10.0-beta0.0.20240620205937-a95a3903500f
+	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240625074419-c278d083facf
+	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240625075314-affd4529a8f5
+	github.com/smartcontractkit/chainlink-testing-framework v1.31.4
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240625105952-e5dc01e84406
+	github.com/smartcontractkit/chainlink/v2 v2.10.0-beta0.0.20240625105952-e5dc01e84406
 	github.com/smartcontractkit/libocr v0.0.0-20240419185742-fd3cab206b2c
 	github.com/smartcontractkit/seth v1.0.12
 	github.com/stretchr/testify v1.9.0
@@ -361,7 +361,7 @@ require (
 	github.com/smartcontractkit/chainlink-cosmos v0.4.1-0.20240524214833-c362c2ebbd2d // indirect
 	github.com/smartcontractkit/chainlink-data-streams v0.0.0-20240220203239-09be0ea34540 // indirect
 	github.com/smartcontractkit/chainlink-feeds v0.0.0-20240522213638-159fb2d99917 // indirect
-	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20240531021326-99118e47f696 // indirect
+	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20240625074951-06ab5e670dba // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/grafana v0.0.0-20240405215812-5a72bc9af239 // indirect
 	github.com/smartcontractkit/chainlink-vrf v0.0.0-20240222010609-cd67d123c772 // indirect
 	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20230906073235-9e478e5e19f1 // indirect
