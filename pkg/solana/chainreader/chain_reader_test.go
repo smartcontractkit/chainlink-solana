@@ -664,6 +664,12 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 	return r.service.GetLatestValue(ctx, contractName, method, params, returnVal)
 }
 
+// BatchGetLatestValue implements the types.ContractReader interface.
+func (r *wrappedTestChainReader) BatchGetLatestValue(_ context.Context, _ types.BatchGetLatestValueRequest) (types.BatchGetLatestValueResult, error) {
+	r.test.Skip("BatchGetLatestValue is not yet supported in Solana")
+	return nil, nil
+}
+
 // QueryKey implements the types.ContractReader interface.
 func (r *wrappedTestChainReader) QueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
 	r.test.Skip("QueryKey is not yet supported in Solana")
@@ -703,6 +709,10 @@ func (r *chainReaderInterfaceTester) SetLatestValue(t *testing.T, testStruct *Te
 	}
 
 	r.reader.testStructQueue = append(r.reader.testStructQueue, testStruct)
+}
+
+func (r *chainReaderInterfaceTester) SetBatchLatestValues(t *testing.T, _ BatchCallEntry) {
+	t.Skip("GetBatchLatestValues is not yet supported in Solana")
 }
 
 func (r *chainReaderInterfaceTester) TriggerEvent(t *testing.T, testStruct *TestStruct) {
@@ -865,6 +875,11 @@ func (s *skipEventsChainReader) GetLatestValue(ctx context.Context, contractName
 	}
 
 	return s.ContractReader.GetLatestValue(ctx, contractName, method, params, returnVal)
+}
+
+func (s *skipEventsChainReader) BatchGetLatestValue(_ context.Context, _ types.BatchGetLatestValueRequest) (types.BatchGetLatestValueResult, error) {
+	s.t.Skip("BatchGetLatestValue is not yet supported in Solana")
+	return nil, nil
 }
 
 func (s *skipEventsChainReader) QueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {

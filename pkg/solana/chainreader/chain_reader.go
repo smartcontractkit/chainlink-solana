@@ -169,6 +169,11 @@ func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, contractN
 	return nil
 }
 
+// BatchGetLatestValue implements the types.ContractReader interface.
+func (s *SolanaChainReaderService) BatchGetLatestValue(_ context.Context, _ types.BatchGetLatestValueRequest) (types.BatchGetLatestValueResult, error) {
+	return nil, errors.New("unimplemented")
+}
+
 // QueryKey implements the types.ContractReader interface.
 func (s *SolanaChainReaderService) QueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
 	return nil, errors.New("unimplemented")
