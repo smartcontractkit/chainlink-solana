@@ -13,14 +13,15 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/pkg/errors"
+	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/db"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 )
 
 func TestClient_Reader_Integration(t *testing.T) {
@@ -32,7 +33,7 @@ func TestClient_Reader_Integration(t *testing.T) {
 
 	requestTimeout := 5 * time.Second
 	lggr := logger.Test(t)
-	cfg := config.NewConfig(db.ChainCfg{}, lggr)
+	cfg := config.NewDefault()
 
 	c, err := NewClient(url, cfg, requestTimeout, lggr)
 	require.NoError(t, err)
@@ -84,6 +85,13 @@ func TestClient_Reader_Integration(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(1), res.Value.Lamports)
 	assert.Equal(t, "NativeLoader1111111111111111111111111111111", res.Value.Owner.String())
+
+	// get block + check for nonzero values
+	block, err := c.GetLatestBlock()
+	require.NoError(t, err)
+	assert.NotEqual(t, solana.Hash{}, block.Blockhash)
+	assert.NotEqual(t, uint64(0), block.ParentSlot)
+	assert.NotEqual(t, uint64(0), block.ParentSlot)
 }
 
 func TestClient_Reader_ChainID(t *testing.T) {
@@ -106,7 +114,7 @@ func TestClient_Reader_ChainID(t *testing.T) {
 
 	requestTimeout := 5 * time.Second
 	lggr := logger.Test(t)
-	cfg := config.NewConfig(db.ChainCfg{}, lggr)
+	cfg := config.NewDefault()
 	c, err := NewClient(mockServer.URL, cfg, requestTimeout, lggr)
 	require.NoError(t, err)
 
@@ -127,7 +135,7 @@ func TestClient_Writer_Integration(t *testing.T) {
 
 	requestTimeout := 5 * time.Second
 	lggr := logger.Test(t)
-	cfg := config.NewConfig(db.ChainCfg{}, lggr)
+	cfg := config.NewDefault()
 
 	ctx := context.Background()
 	c, err := NewClient(url, cfg, requestTimeout, lggr)
@@ -135,10 +143,10 @@ func TestClient_Writer_Integration(t *testing.T) {
 
 	// create + sign transaction
 	createTx := func(to solana.PublicKey) *solana.Transaction {
-		hash, err := c.LatestBlockhash()
-		assert.NoError(t, err)
+		hash, hashErr := c.LatestBlockhash()
+		assert.NoError(t, hashErr)
 
-		tx, err := solana.NewTransaction(
+		tx, txErr := solana.NewTransaction(
 			[]solana.Instruction{
 				system.NewTransferInstruction(
 					1,
@@ -149,8 +157,8 @@ func TestClient_Writer_Integration(t *testing.T) {
 			hash.Value.Blockhash,
 			solana.TransactionPayer(pubKey),
 		)
-		assert.NoError(t, err)
-		_, err = tx.Sign(
+		assert.NoError(t, txErr)
+		_, signErr := tx.Sign(
 			func(key solana.PublicKey) *solana.PrivateKey {
 				if pubKey.Equals(key) {
 					return &privKey
@@ -158,7 +166,7 @@ func TestClient_Writer_Integration(t *testing.T) {
 				return nil
 			},
 		)
-		assert.NoError(t, err)
+		assert.NoError(t, signErr)
 		return tx
 	}
 
@@ -213,7 +221,7 @@ func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 	// create client
 	requestTimeout := 5 * time.Second
 	lggr := logger.Test(t)
-	cfg := config.NewConfig(db.ChainCfg{}, lggr)
+	cfg := config.NewDefault()
 	c, err := NewClient(url, cfg, requestTimeout, lggr)
 	require.NoError(t, err)
 
@@ -257,8 +265,8 @@ func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 	for i := 0; i < n; i++ {
 		go func(i int) {
 			time.Sleep(time.Duration(rand.Intn(500)) * time.Millisecond) // randomly submit txs
-			sig, err := c.SendTx(ctx, tx)
-			assert.NoError(t, errors.Wrapf(err, "try #%d", i))
+			sig, sendErr := c.SendTx(ctx, tx)
+			assert.NoError(t, sendErr)
 			sigs[i] = sig
 			wg.Done()
 		}(i)
@@ -272,8 +280,8 @@ func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 
 	// try waiting for tx to execute - reduce flakiness
 	require.Eventually(t, func() bool {
-		res, err := c.SignatureStatuses(ctx, []solana.Signature{sigs[0]})
-		require.NoError(t, err)
+		res, statusErr := c.SignatureStatuses(ctx, []solana.Signature{sigs[0]})
+		require.NoError(t, statusErr)
 		require.Equal(t, 1, len(res))
 		if res[0] == nil {
 			return false
@@ -286,4 +294,23 @@ func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 	endBal, err := c.Balance(pubKey)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(5_000), initBal-endBal)
+}
+
+func TestClientLatency(t *testing.T) {
+	c := Client{}
+	v := 100
+	n := t.Name() + uuid.NewString()
+	f := func() {
+		done := c.latency(n)
+		defer done()
+		time.Sleep(time.Duration(v) * time.Millisecond)
+	}
+	f()
+	g, err := monitor.GetClientLatency(n, c.url)
+	require.NoError(t, err)
+	val := testutil.ToFloat64(g)
+
+	// check within expected range
+	assert.GreaterOrEqual(t, val, float64(v))
+	assert.LessOrEqual(t, val, float64(v)*1.05)
 }

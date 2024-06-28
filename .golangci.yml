@@ -1,3 +1,5 @@
+run:
+  timeout: 15m0s
 linters:
   enable:
     - exhaustive
@@ -7,15 +9,18 @@ linters:
     - gosec
     - misspell
     - rowserrcheck
-  disable:
-    # These are all considered deprecated: https://github.com/golangci/golangci-lint/issues/1841
-    - deadcode
-    - structcheck
-    - unused
-    - varcheck
+    - errorlint
+    - unconvert
+    - sqlclosecheck
+    - noctx
+    - whitespace
+    - depguard
+    - containedctx
 linters-settings:
   exhaustive:
     default-signifies-exhaustive: true
+  goimports:
+    local-prefixes: github.com/smartcontractkit/chainlink-solana
   golint:
     min-confidence: 1.0
   gosec:
@@ -28,6 +33,9 @@ linters-settings:
   govet:
     # report about shadowed variables
     check-shadowing: true
+  errorlint:
+    # Allow formatting of errors without %w
+    errorf: false
   revive:
     confidence: 0.8
     rules:
@@ -38,10 +46,10 @@ linters-settings:
       - name: error-return
       - name: error-strings
       - name: error-naming
-      # - name: exported
+      - name: exported
       - name: if-return
       - name: increment-decrement
-      # - name: var-naming
+      - name: var-naming
       - name: var-declaration
       - name: package-comments
       - name: range
@@ -60,30 +68,54 @@ linters-settings:
       - name: struct-tag
       # - name: string-format
       - name: string-of-int
-      # - name: range-val-address
+      - name: range-val-address
       - name: range-val-in-closure
       - name: modifies-value-receiver
       - name: modifies-parameter
       - name: identical-branches
       - name: get-return
       # - name: flag-parameter
-      # - name: early-return
+      - name: early-return
       - name: defer
       - name: constant-logical-expr
       # - name: confusing-naming
       # - name: confusing-results
       - name: bool-literal-in-expr
       - name: atomic
+  depguard:
+    rules:
+      main:
+        list-mode: lax
+        deny:
+          - pkg: "cosmossdk.io/errors"
+            desc: Use the standard library instead
+          - pkg: "github.com/ethereum/go-ethereum"
+            desc: This is chain must be isolated from ethereum
+          - pkg: "github.com/go-gorm/gorm"
+            desc: Use github.com/jmoiron/sqlx directly instead
+          - pkg: "github.com/gofrs/uuid"
+            desc: Use github.com/google/uuid instead
+          - pkg: "github.com/pkg/errors"
+            desc: Use the standard library instead, for example https://pkg.go.dev/errors#Join
+          - pkg: "github.com/satori/go.uuid"
+            desc: Use github.com/google/uuid instead
+          - pkg: "github.com/test-go/testify/assert"
+            desc: Use github.com/stretchr/testify/assert instead
+          - pkg: "github.com/test-go/testify/mock"
+            desc: Use github.com/stretchr/testify/mock instead
+          - pkg: "github.com/test-go/testify/require"
+            desc: Use github.com/stretchr/testify/require instead
+          - pkg: "go.uber.org/multierr"
+            desc: Use the standard library instead, for example https://pkg.go.dev/errors#Join
+          - pkg: "gopkg.in/guregu/null.v1"
+            desc: Use gopkg.in/guregu/null.v4 instead
+          - pkg: "gopkg.in/guregu/null.v2"
+            desc: Use gopkg.in/guregu/null.v4 instead
+          - pkg: "gopkg.in/guregu/null.v3"
+            desc: Use gopkg.in/guregu/null.v4 instead
 issues:
   exclude-rules:
     - path: test
       text: "^G404:"
       linters:
         - gosec
-  include:
-    # Enable GoDoc comment checks.
-    - EXC0002
-    - EXC0011
-    - EXC0012
-    - EXC0013
-    - EXC0014

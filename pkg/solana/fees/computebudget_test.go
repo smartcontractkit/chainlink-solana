@@ -32,7 +32,7 @@ func TestSetComputeUnitPrice(t *testing.T) {
 		currentCount := len(tx.Message.Instructions)
 		assert.Greater(t, currentCount, instructionCount)
 		assert.Equal(t, 2, currentCount)
-		assert.Equal(t, COMPUTE_BUDGET_PROGRAM, tx.Message.AccountKeys[tx.Message.Instructions[0].ProgramIDIndex].String())
+		assert.Equal(t, ComputeBudgetProgram, tx.Message.AccountKeys[tx.Message.Instructions[0].ProgramIDIndex].String())
 		data, err := ComputeUnitPrice(1).Data()
 		assert.NoError(t, err)
 		assert.Equal(t, data, []byte(tx.Message.Instructions[0].Data))
@@ -58,11 +58,10 @@ func TestSetComputeUnitPrice(t *testing.T) {
 		// accounts should not have changed
 		assert.Equal(t, accountCount, len(tx.Message.AccountKeys))
 		assert.Equal(t, 2, len(tx.Message.Instructions))
-		assert.Equal(t, COMPUTE_BUDGET_PROGRAM, tx.Message.AccountKeys[tx.Message.Instructions[0].ProgramIDIndex].String())
+		assert.Equal(t, ComputeBudgetProgram, tx.Message.AccountKeys[tx.Message.Instructions[0].ProgramIDIndex].String())
 		data, err := ComputeUnitPrice(1).Data()
 		assert.NoError(t, err)
 		assert.Equal(t, data, []byte(tx.Message.Instructions[0].Data))
-
 	})
 
 	// // not a valid test, account must exist for tx to be added
@@ -99,5 +98,24 @@ func TestSetComputeUnitPrice(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, data, []byte(tx.Message.Instructions[1].Data))
 	})
+}
 
+func TestParseComputeUnitPrice(t *testing.T) {
+	data, err := ComputeUnitPrice(100).Data()
+	assert.NoError(t, err)
+
+	v, err := ParseComputeUnitPrice(data)
+	assert.NoError(t, err)
+	assert.Equal(t, ComputeUnitPrice(100), v)
+
+	_, err = ParseComputeUnitPrice([]byte{})
+	assert.ErrorContains(t, err, "invalid length")
+	tooLong := [10]byte{}
+	_, err = ParseComputeUnitPrice(tooLong[:])
+	assert.ErrorContains(t, err, "invalid length")
+
+	invalidData := data
+	invalidData[0] = InstructionRequestHeapFrame
+	_, err = ParseComputeUnitPrice(invalidData)
+	assert.ErrorContains(t, err, "not SetComputeUnitPrice identifier")
 }

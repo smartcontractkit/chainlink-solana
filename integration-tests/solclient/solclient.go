@@ -10,9 +10,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
 	"github.com/gagliardetto/solana-go"
@@ -87,14 +84,6 @@ type Client struct {
 	// WS websocket client
 	WS        *ws.Client
 	LinkToken *LinkToken
-}
-
-func (c *Client) BalanceAt(ctx context.Context, address common.Address) (*big.Int, error) {
-	panic("implement me")
-}
-
-func (c *Client) GetTxReceipt(txHash common.Hash) (*types.Receipt, error) {
-	panic("implement me")
 }
 
 func (c *Client) GetNetworkType() string {
@@ -472,22 +461,6 @@ func (c *Client) LatestBlockNumber(ctx context.Context) (uint64, error) {
 	panic("implement me")
 }
 
-func (c *Client) DeployContract(contractName string, deployer blockchain.ContractDeployer) (*common.Address, *types.Transaction, interface{}, error) {
-	panic("implement me")
-}
-
-func (c *Client) TransactionOpts(from *blockchain.EthereumWallet) (*bind.TransactOpts, error) {
-	panic("implement me")
-}
-
-func (c *Client) ProcessTransaction(tx *types.Transaction) error {
-	panic("implement me")
-}
-
-func (c *Client) IsTxConfirmed(txHash common.Hash) (bool, error) {
-	panic("implement me")
-}
-
 func (c *Client) GasStats() *blockchain.GasStats {
 	panic("implement me")
 }
@@ -497,7 +470,6 @@ func (c *Client) AddHeaderEventSubscription(key string, subscriber blockchain.He
 }
 
 func SendFunds(senderPrivateKey string, receiverPublicKey string, lamports uint64, rpcClient *rpc.Client, wsClient *ws.Client) error {
-
 	// Convert the private key string to a byte slice
 	var privateKeyBytes []byte
 	err := json.Unmarshal([]byte(senderPrivateKey), &privateKeyBytes)

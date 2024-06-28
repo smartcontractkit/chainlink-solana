@@ -2,6 +2,7 @@ package txm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -10,15 +11,14 @@ import (
 	solanaGo "github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
-
-	relayutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
 )
 
 const (
@@ -41,12 +41,12 @@ type Txm struct {
 	lggr    logger.Logger
 	chSend  chan pendingTx
 	chSim   chan pendingTx
-	chStop  chan struct{}
+	chStop  services.StopChan
 	done    sync.WaitGroup
 	cfg     config.Config
 	txs     PendingTxContext
 	ks      SimpleKeystore
-	client  *relayutils.LazyLoad[solanaClient.ReaderWriter]
+	client  *utils.LazyLoad[client.ReaderWriter]
 	fee     fees.Estimator
 }
 
@@ -58,7 +58,7 @@ type pendingTx struct {
 }
 
 // NewTxm creates a txm. Uses simulation so should only be used to send txes to trusted contracts i.e. OCR.
-func NewTxm(chainID string, tc func() (solanaClient.ReaderWriter, error), cfg config.Config, ks SimpleKeystore, lggr logger.Logger) *Txm {
+func NewTxm(chainID string, tc func() (client.ReaderWriter, error), cfg config.Config, ks SimpleKeystore, lggr logger.Logger) *Txm {
 	return &Txm{
 		lggr:   lggr,
 		chSend: make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
@@ -67,7 +67,7 @@ func NewTxm(chainID string, tc func() (solanaClient.ReaderWriter, error), cfg co
 		cfg:    cfg,
 		txs:    newPendingTxContextWithProm(chainID),
 		ks:     ks,
-		client: relayutils.NewLazyLoad(tc),
+		client: utils.NewLazyLoad(tc),
 	}
 }
 
@@ -80,8 +80,8 @@ func (txm *Txm) Start(ctx context.Context) error {
 		switch strings.ToLower(txm.cfg.FeeEstimatorMode()) {
 		case "fixed":
 			estimator, err = fees.NewFixedPriceEstimator(txm.cfg)
-		case "recentfees":
-			estimator, err = fees.NewRecentFeeEstimator(txm.cfg)
+		case "blockhistory":
+			estimator, err = fees.NewBlockHistoryEstimator(txm.client, txm.cfg, txm.lggr)
 		default:
 			err = fmt.Errorf("unknown solana fee estimator type: %s", txm.cfg.FeeEstimatorMode())
 		}
@@ -101,7 +101,7 @@ func (txm *Txm) Start(ctx context.Context) error {
 
 func (txm *Txm) run() {
 	defer txm.done.Done()
-	ctx, cancel := relayutils.ContextFromChan(txm.chStop)
+	ctx, cancel := txm.chStop.NewCtx()
 	defer cancel()
 
 	// start confirmer + simulator
@@ -140,7 +140,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 	// fetch client
 	client, clientErr := txm.client.Get()
 	if clientErr != nil {
-		return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, errors.Wrap(clientErr, "failed to get client in soltxm.sendWithRetry")
+		return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, fmt.Errorf("failed to get client in soltxm.sendWithRetry: %w", clientErr)
 	}
 
 	// get key
@@ -148,9 +148,12 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 	// https://github.com/gagliardetto/solana-go/blob/main/transaction.go#L252
 	key := baseTx.Message.AccountKeys[0].String()
 
+	// only calculate base price once
+	// prevent underlying base changing when bumping (could occur with RPC based estimation)
+	basePrice := txm.fee.BaseComputeUnitPrice()
 	getFee := func(count uint) fees.ComputeUnitPrice {
 		fee := fees.CalculateFee(
-			txm.fee.BaseComputeUnitPrice(),
+			basePrice,
 			txm.cfg.ComputeUnitPriceMax(),
 			txm.cfg.ComputeUnitPriceMin(),
 			count,
@@ -170,11 +173,11 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 		// sign tx
 		txMsg, marshalErr := newTx.Message.MarshalBinary()
 		if marshalErr != nil {
-			return solanaGo.Transaction{}, errors.Wrap(marshalErr, "error in soltxm.SendWithRetry.MarshalBinary")
+			return solanaGo.Transaction{}, fmt.Errorf("error in soltxm.SendWithRetry.MarshalBinary: %w", marshalErr)
 		}
 		sigBytes, signErr := txm.ks.Sign(context.TODO(), key, txMsg)
 		if signErr != nil {
-			return solanaGo.Transaction{}, errors.Wrap(signErr, "error in soltxm.SendWithRetry.Sign")
+			return solanaGo.Transaction{}, fmt.Errorf("error in soltxm.SendWithRetry.Sign: %w", signErr)
 		}
 		var finalSig [64]byte
 		copy(finalSig[:], sigBytes)
@@ -196,14 +199,14 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 	if initSendErr != nil {
 		cancel()                           // cancel context when exiting early
 		txm.txs.OnError(sig, TxFailReject) // increment failed metric
-		return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, errors.Wrap(initSendErr, "tx failed initial transmit")
+		return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, fmt.Errorf("tx failed initial transmit: %w", initSendErr)
 	}
 
 	// store tx signature + cancel function
 	id, initStoreErr := txm.txs.New(sig, cancel)
 	if initStoreErr != nil {
 		cancel() // cancel context when exiting early
-		return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, errors.Wrapf(initStoreErr, "failed to save tx signature (%s) to inflight txs", sig)
+		return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, fmt.Errorf("failed to save tx signature (%s) to inflight txs: %w", sig, initStoreErr)
 	}
 
 	// used for tracking rebroadcasting only in SendWithRetry
@@ -234,7 +237,8 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 				return
 			case <-tick:
 				var shouldBump bool
-				if time.Since(bumpTime) > txm.cfg.FeeBumpPeriod() {
+				// bump if period > 0 and past time
+				if txm.cfg.FeeBumpPeriod() != 0 && time.Since(bumpTime) > txm.cfg.FeeBumpPeriod() {
 					bumpCount++
 					bumpTime = time.Now()
 					shouldBump = true
@@ -343,7 +347,7 @@ func (txm *Txm) confirm(ctx context.Context) {
 			}
 
 			// batch sigs no more than MaxSigsToConfirm each
-			sigsBatch, err := relayutils.BatchSplit(sigs, MaxSigsToConfirm)
+			sigsBatch, err := utils.BatchSplit(sigs, MaxSigsToConfirm)
 			if err != nil { // this should never happen
 				txm.lggr.Fatalw("failed to batch signatures", "error", err)
 				break // exit switch
@@ -434,7 +438,7 @@ func (txm *Txm) confirm(ctx context.Context) {
 			}
 			wg.Wait() // wait for processing to finish
 		}
-		tick = time.After(relayutils.WithJitter(txm.cfg.ConfirmPollPeriod()))
+		tick = time.After(utils.WithJitter(txm.cfg.ConfirmPollPeriod()))
 	}
 }
 
@@ -491,7 +495,7 @@ func (txm *Txm) simulate(ctx context.Context) {
 			// unrecognized errors (indicates more concerning failures)
 			default:
 				txm.txs.OnError(msg.signature, TxFailSimOther) // cancel retry
-				txm.lggr.Warnw("simulate: unrecognized error", "id", msg.id, "signature", msg.signature, "result", res)
+				txm.lggr.Errorw("simulate: unrecognized error", "id", msg.id, "signature", msg.signature, "result", res)
 				continue
 			}
 		}
@@ -514,7 +518,7 @@ func (txm *Txm) Enqueue(accountID string, tx *solanaGo.Transaction) error {
 	// https://github.com/gagliardetto/solana-go/blob/main/transaction.go#L252
 	_, err := txm.ks.Sign(context.TODO(), tx.Message.AccountKeys[0].String(), nil)
 	if err != nil {
-		return errors.Wrap(err, "error in soltxm.Enqueue.GetKey")
+		return fmt.Errorf("error in soltxm.Enqueue.GetKey: %w", err)
 	}
 
 	msg := pendingTx{
@@ -526,7 +530,7 @@ func (txm *Txm) Enqueue(accountID string, tx *solanaGo.Transaction) error {
 	case txm.chSend <- msg:
 	default:
 		txm.lggr.Errorw("failed to enqeue tx", "queueFull", len(txm.chSend) == MaxQueueLen, "tx", msg)
-		return errors.Errorf("failed to enqueue transaction for %s", accountID)
+		return fmt.Errorf("failed to enqueue transaction for %s", accountID)
 	}
 	return nil
 }

@@ -5,8 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
@@ -51,14 +49,14 @@ func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.Co
 	for _, transmitter := range cfg.Transmitters {
 		pubKey, err := solana.PublicKeyFromBase58(string(transmitter))
 		if err != nil {
-			return digest, errors.Wrapf(err, "error on parsing base58 encoded public key %s", transmitter)
+			return digest, fmt.Errorf("error on parsing base58 encoded public key %s: %w", transmitter, err)
 		}
 		if _, err := buf.Write(pubKey.Bytes()); err != nil {
 			return digest, err
 		}
 	}
 
-	if err := binary.Write(buf, binary.BigEndian, byte(cfg.F)); err != nil {
+	if err := binary.Write(buf, binary.BigEndian, cfg.F); err != nil {
 		return digest, err
 	}
 

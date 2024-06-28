@@ -114,6 +114,32 @@ func (_m *ReaderWriter) GetFeeForMessage(msg string) (uint64, error) {
 	return r0, r1
 }
 
+// GetLatestBlock provides a mock function with given fields:
+func (_m *ReaderWriter) GetLatestBlock() (*rpc.GetBlockResult, error) {
+	ret := _m.Called()
+
+	var r0 *rpc.GetBlockResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (*rpc.GetBlockResult, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() *rpc.GetBlockResult); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*rpc.GetBlockResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // LatestBlockhash provides a mock function with given fields:
 func (_m *ReaderWriter) LatestBlockhash() (*rpc.GetLatestBlockhashResult, error) {
 	ret := _m.Called()

@@ -1,0 +1,38 @@
+name: UpstreamTracker
+on: 
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 1' # check monday at midnight UTC
+  
+jobs:
+  SIMD-Update-Checker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check For Updates In Past Week
+        id: updates
+        run: |
+          # new PRs
+          OPEN=$(curl https://api.github.com/repos/solana-foundation/solana-improvement-documents/pulls\?state=open\&per_page=100 | jq --arg t "$(date -d '7 days ago' +%s)" -r '.[] | select (.created_at | . == null or fromdateiso8601 > ($t|tonumber)) | "- \(.html_url)"')
+          # macos
+          # OPEN=$(curl https://api.github.com/repos/solana-foundation/solana-improvement-documents/pulls\?state\=open\&per_page\=100 | jq --arg t "$(date -v-7d +%s)" -r '.[] | select (.created_at | . == null or fromdateiso8601 > ($t|tonumber)) | "- \(.html_url)"')
+
+          # closed PRs
+          CLOSED=$(curl https://api.github.com/repos/solana-foundation/solana-improvement-documents/pulls\?state=closed\&per_page=100 | jq --arg t "$(date -d '7 days ago' +%s)" -r '.[] | select (.closed_at | . == null or fromdateiso8601 > ($t|tonumber)) | "- \(.html_url)"')
+          # macos
+          # CLOSED=$(curl https://api.github.com/repos/solana-foundation/solana-improvement-documents/pulls\?state\=closed\&per_page\=100 | jq --arg t "$(date -v-7d +%s)" -r '.[] | select (.created_at | . == null or fromdateiso8601 > ($t|tonumber)) | "- \(.html_url)"')
+
+          echo "open<<EOF" >> $GITHUB_OUTPUT
+          echo "$OPEN" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "closed<<EOF" >> $GITHUB_OUTPUT
+          echo "$CLOSED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+        if: steps.updates.outputs.open || steps.updates.outputs.closed
+      - name: Open Issue
+        if: steps.updates.outputs.open || steps.updates.outputs.closed
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # TODO: update assignee to teams when GH supports it
+        run: gh issue create -a aalu1418 -t "SIMD Updates - $(date)" -l "[auto] SIMD Updates" -b $'## Opened\n${{ steps.updates.outputs.open}}\n\n## Closed\n${{ steps.updates.outputs.closed}}'

@@ -96,6 +96,8 @@ export default class OCR2InspectResponses extends SolanaCommand {
     super(flags, args)
   }
 
+  toHexString = (n: number[]) => Buffer.from(n).toString('hex')
+
   execute = async () => {
     const ocr2 = getContract(CONTRACT_LIST.OCR_2, '')
     const program = this.loadProgram(ocr2.idl, ocr2.programId.toString())
@@ -109,7 +111,7 @@ export default class OCR2InspectResponses extends SolanaCommand {
 
     - Latest Transmitter: ${onChainState.config.latestTransmitter}
     - Latest Aggregator Round ID: ${onChainState.config.latestAggregatorRoundId}
-    - Latest Config Digest: ${onChainState.config.latestConfigDigest}
+    - Latest Config Digest: 0x${this.toHexString(onChainState.config.latestConfigDigest)}
     - Latest Config Block Number: ${onChainState.config.latestConfigBlockNumber}
     `,
     )

@@ -3,167 +3,94 @@ package common
 import (
 	"fmt"
 	"math/big"
-	"os"
-	"strings"
-	"sync"
+	"net/http"
 	"testing"
 	"time"
 
-	"github.com/onsi/gomega"
-	"github.com/rs/zerolog"
+	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/gagliardetto/solana-go/rpc/ws"
+	"github.com/go-resty/resty/v2"
+	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v4"
 
-	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/test_env"
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
-	"github.com/smartcontractkit/chainlink-testing-framework/logging"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/osutil"
-	"github.com/smartcontractkit/chainlink/integration-tests/testconfig"
-
-	"golang.org/x/sync/errgroup"
+	test_env_ctf "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
+
+	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/store/models"
+
+	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig"
 )
 
-const (
-	ContractsStateFile        = "contracts-chaos-state.json"
-	NewRoundCheckTimeout      = 120 * time.Second
-	NewSoakRoundsCheckTimeout = 3 * time.Hour
-	NewRoundCheckPollInterval = 1 * time.Second
-	SourceChangeInterval      = 5 * time.Second
-	ChaosAwaitingApply        = 1 * time.Minute
-	// ChaosGroupFaulty Group of faulty nodes, even if they fail OCR must work
-	ChaosGroupFaulty = "chaosGroupFaulty"
-	// ChaosGroupYellow if nodes from that group fail we may not work while some experiments are going
-	// but after experiment it must recover
-	ChaosGroupYellow = "chaosGroupYellow"
-	// ChaosGroupLeftHalf an equal half of all nodes
-	ChaosGroupLeftHalf = "chaosGroupLeftHalf"
-	// ChaosGroupRightHalf an equal half of all nodes
-	ChaosGroupRightHalf = "chaosGroupRightHalf"
-	// ChaosGroupOnline a group of nodes that are working
-	ChaosGroupOnline = "chaosGroupOnline"
-	// UntilStop some chaos experiments doesn't respect absence of duration and got recovered immediately, so we enforce duration
-	UntilStop = 666 * time.Hour
-)
-
-type Contracts struct {
-	BAC       *solclient.AccessController
-	RAC       *solclient.AccessController
-	OCR2      *solclient.OCRv2
-	Store     *solclient.Store
-	StoreAuth string
+type OCRv2TestState struct {
+	ContractDeployer   *solclient.ContractDeployer
+	LinkToken          *solclient.LinkToken
+	ContractsNodeSetup map[int]*ContractNodeInfo
+	Clients            *Clients
+	Common             *Common
+	Config             *Config
+	Gauntlet           *gauntlet.SolanaGauntlet
 }
 
-type OCR2OnChainConfig struct {
-	Oracles    []Operator `json:"oracles"`
-	F          int        `json:"f"`
-	ProposalId string     `json:"proposalId"`
+type Clients struct {
+	SolanaClient    *solclient.Client
+	KillgraveClient *test_env_ctf.Killgrave
+	ChainlinkClient *ChainlinkClient
 }
 
-type OffchainConfig struct {
-	DeltaProgressNanoseconds                           int64                 `json:"deltaProgressNanoseconds"`
-	DeltaResendNanoseconds                             int64                 `json:"deltaResendNanoseconds"`
-	DeltaRoundNanoseconds                              int64                 `json:"deltaRoundNanoseconds"`
-	DeltaGraceNanoseconds                              int64                 `json:"deltaGraceNanoseconds"`
-	DeltaStageNanoseconds                              int64                 `json:"deltaStageNanoseconds"`
-	RMax                                               int                   `json:"rMax"`
-	S                                                  []int                 `json:"s"`
-	OffchainPublicKeys                                 []string              `json:"offchainPublicKeys"`
-	PeerIds                                            []string              `json:"peerIds"`
-	ReportingPluginConfig                              ReportingPluginConfig `json:"reportingPluginConfig"`
-	MaxDurationQueryNanoseconds                        int64                 `json:"maxDurationQueryNanoseconds"`
-	MaxDurationObservationNanoseconds                  int64                 `json:"maxDurationObservationNanoseconds"`
-	MaxDurationReportNanoseconds                       int64                 `json:"maxDurationReportNanoseconds"`
-	MaxDurationShouldAcceptFinalizedReportNanoseconds  int64                 `json:"maxDurationShouldAcceptFinalizedReportNanoseconds"`
-	MaxDurationShouldTransmitAcceptedReportNanoseconds int64                 `json:"maxDurationShouldTransmitAcceptedReportNanoseconds"`
-	ConfigPublicKeys                                   []string              `json:"configPublicKeys"`
+type ChainlinkClient struct {
+	ChainlinkClientDocker *test_env.ClCluster
+	ChainlinkClientK8s    []*client.ChainlinkK8sClient
+	ChainlinkNodes        []*client.ChainlinkClient
+	NKeys                 []client.NodeKeysBundle
+	AccountAddresses      []string
 }
 
-type ReportingPluginConfig struct {
-	AlphaReportInfinite bool `json:"alphaReportInfinite"`
-	AlphaReportPpb      int  `json:"alphaReportPpb"`
-	AlphaAcceptInfinite bool `json:"alphaAcceptInfinite"`
-	AlphaAcceptPpb      int  `json:"alphaAcceptPpb"`
-	DeltaCNanoseconds   int  `json:"deltaCNanoseconds"`
+type Config struct {
+	T          *testing.T
+	TestConfig *testconfig.TestConfig
+	Resty      *resty.Client
+	err        error
 }
 
-// TODO - Decouple all OCR2 config structs to be reusable between chains
-type OCROffChainConfig struct {
-	ProposalId     string         `json:"proposalId"`
-	OffchainConfig OffchainConfig `json:"offchainConfig"`
-	UserSecret     string         `json:"userSecret"`
-}
-
-type Operator struct {
-	Signer      string `json:"signer"`
-	Transmitter string `json:"transmitter"`
-	Payee       string `json:"payee"`
-}
-
-type PayeeConfig struct {
-	Operators  []Operator `json:"operators"`
-	ProposalId string     `json:"proposalId"`
-}
-
-type ProposalAcceptConfig struct {
-	ProposalId     string         `json:"proposalId"`
-	Version        int            `json:"version"`
-	F              int            `json:"f"`
-	Oracles        []Operator     `json:"oracles"`
-	OffchainConfig OffchainConfig `json:"offchainConfig"`
-	RandomSecret   string         `json:"randomSecret"`
-}
-
-func NewOCRv2State(t *testing.T, contracts int, namespacePrefix string, env string, isK8s bool, testConfig *testconfig.TestConfig) (*OCRv2TestState, error) {
-
-	c, err := New(env, isK8s).Default(t, namespacePrefix)
+func NewOCRv2State(t *testing.T, contracts int, namespacePrefix string, testConfig *testconfig.TestConfig) (*OCRv2TestState, error) {
+	c, err := New(testConfig).Default(t, namespacePrefix)
 	if err != nil {
 		return nil, err
 	}
 	state := &OCRv2TestState{
-		Mu:                 &sync.Mutex{},
-		LastRoundTime:      make(map[string]time.Time),
 		ContractsNodeSetup: make(map[int]*ContractNodeInfo),
 		Common:             c,
-		Client:             &solclient.Client{},
-		T:                  t,
-		L:                  log.Logger,
-		TestConfig:         testConfig,
-	}
-	if state.T != nil {
-		state.L = logging.GetTestLogger(state.T)
+		Clients: &Clients{
+			SolanaClient:    &solclient.Client{},
+			ChainlinkClient: &ChainlinkClient{},
+		},
+		Config: &Config{
+			T:          t,
+			TestConfig: testConfig,
+			Resty:      nil,
+			err:        nil,
+		},
 	}
 
-	state.Client.Config = state.Client.Config.Default()
+	state.Clients.SolanaClient.Config = state.Clients.SolanaClient.Config.Default()
 	for i := 0; i < contracts; i++ {
 		state.ContractsNodeSetup[i] = &ContractNodeInfo{}
 		state.ContractsNodeSetup[i].BootstrapNodeIdx = 0
-		for n := 1; n < state.Common.NodeCount; n++ {
+		for n := 1; n < *state.Config.TestConfig.OCR2.NodeCount; n++ {
 			state.ContractsNodeSetup[i].NodesIdx = append(state.ContractsNodeSetup[i].NodesIdx, n)
 		}
 	}
 	return state, nil
-}
-
-type OCRv2TestState struct {
-	Mu                 *sync.Mutex
-	ChainlinkNodesK8s  []*client.ChainlinkK8sClient
-	ChainlinkNodes     []*client.ChainlinkClient
-	ContractDeployer   *solclient.ContractDeployer
-	LinkToken          *solclient.LinkToken
-	Contracts          []Contracts
-	ContractsNodeSetup map[int]*ContractNodeInfo
-	NodeKeysBundle     []client.NodeKeysBundle
-	Client             *solclient.Client
-	RoundsFound        int
-	LastRoundTime      map[string]time.Time
-	err                error
-	T                  *testing.T
-	Common             *Common
-	L                  zerolog.Logger
-	TestConfig         *testconfig.TestConfig
 }
 
 type ContractsState struct {
@@ -176,53 +103,72 @@ type ContractsState struct {
 	OCRVault      string `json:"ocr_vault"`
 }
 
-func (m *OCRv2TestState) LabelChaosGroups() {
-	m.LabelChaosGroup(1, 5, ChaosGroupFaulty)
-	m.LabelChaosGroup(6, 19, ChaosGroupOnline)
-	m.LabelChaosGroup(0, 8, ChaosGroupYellow)
-	m.LabelChaosGroup(0, 9, ChaosGroupLeftHalf)
-	m.LabelChaosGroup(10, 19, ChaosGroupRightHalf)
-}
-
 func (m *OCRv2TestState) DeployCluster(contractsDir string) {
-	if m.Common.IsK8s {
+	if *m.Config.TestConfig.Common.InsideK8s {
 		m.DeployEnv(contractsDir)
+
+		if m.Common.Env.WillUseRemoteRunner() {
+			return
+		}
+
+		// Setting up the URLs
+		m.Common.ChainDetails.RPCURLExternal = m.Common.Env.URLs["sol"][0]
+		m.Common.ChainDetails.WSURLExternal = m.Common.Env.URLs["sol"][1]
+
+		if *m.Config.TestConfig.Common.Network == "devnet" {
+			m.Common.ChainDetails.RPCUrl = *m.Config.TestConfig.Common.RPCURL
+			m.Common.ChainDetails.RPCURLExternal = *m.Config.TestConfig.Common.RPCURL
+			m.Common.ChainDetails.WSURLExternal = *m.Config.TestConfig.Common.WsURL
+		}
+
+		m.Common.ChainDetails.MockserverURLInternal = m.Common.Env.URLs["qa_mock_adapter_internal"][0]
+		m.Common.ChainDetails.MockServerEndpoint = "five"
 	} else {
 		env, err := test_env.NewTestEnv()
-		require.NoError(m.T, err)
-		sol := test_env_sol.NewSolana([]string{env.Network.Name})
+		require.NoError(m.Config.T, err)
+		sol := test_env_sol.NewSolana([]string{env.DockerNetwork.Name}, *m.Config.TestConfig.Common.DevnetImage, m.Common.AccountDetails.PublicKey)
 		err = sol.StartContainer()
-		require.NoError(m.T, err)
-		m.Common.SolanaUrl = sol.InternalHttpUrl
+		require.NoError(m.Config.T, err)
+
+		// Setting the External RPC url for Gauntlet
+		m.Common.ChainDetails.RPCUrl = sol.InternalHTTPURL
+		m.Common.ChainDetails.RPCURLExternal = sol.ExternalHTTPURL
+		m.Common.ChainDetails.WSURLExternal = sol.ExternalWsURL
+
+		if *m.Config.TestConfig.Common.Network == "devnet" {
+			m.Common.ChainDetails.RPCUrl = *m.Config.TestConfig.Common.RPCURL
+			m.Common.ChainDetails.RPCURLExternal = *m.Config.TestConfig.Common.RPCURL
+			m.Common.ChainDetails.WSURLExternal = *m.Config.TestConfig.Common.WsURL
+		}
+
 		b, err := test_env.NewCLTestEnvBuilder().
 			WithNonEVM().
-			WithTestInstance(m.T).
-			WithTestConfig(m.TestConfig).
+			WithTestInstance(m.Config.T).
+			WithTestConfig(m.Config.TestConfig).
 			WithMockAdapter().
-			WithCLNodeConfig(m.Common.DefaultNodeConfig()).
-			WithCLNodes(m.Common.NodeCount).
-			WithCLNodeOptions(m.Common.NodeOpts...).
+			WithCLNodes(*m.Config.TestConfig.OCR2.NodeCount).
+			WithCLNodeOptions(m.Common.TestEnvDetails.NodeOpts...).
 			WithStandardCleanup().
 			WithTestEnv(env)
-		require.NoError(m.T, err)
+		require.NoError(m.Config.T, err)
 		env, err = b.Build()
-		require.NoError(m.T, err)
+		require.NoError(m.Config.T, err)
 		m.Common.DockerEnv = &SolCLClusterTestEnv{
 			CLClusterTestEnv: env,
 			Sol:              sol,
 			Killgrave:        env.MockAdapter,
 		}
+		// Setting up Mock adapter
+		m.Clients.KillgraveClient = env.MockAdapter
+		m.Common.ChainDetails.MockserverURLInternal = m.Clients.KillgraveClient.InternalEndpoint
+		m.Common.ChainDetails.MockServerEndpoint = "mockserver-bridge"
+		err = m.Clients.KillgraveClient.SetAdapterBasedIntValuePath("/mockserver-bridge", []string{http.MethodGet, http.MethodPost}, 5)
+		require.NoError(m.Config.T, err, "Failed to set mock adapter value")
 	}
-	m.SetupClients()
-	m.DeployContracts(contractsDir)
-	m.CreateJobs()
-}
 
-func (m *OCRv2TestState) LabelChaosGroup(startInstance int, endInstance int, group string) {
-	for i := startInstance; i <= endInstance; i++ {
-		m.err = m.Common.Env.Client.AddLabel(m.Common.Env.Cfg.Namespace, fmt.Sprintf("instance=%d", i), fmt.Sprintf("%s=1", group))
-		require.NoError(m.T, m.err)
-	}
+	m.SetupClients()
+	m.SetChainlinkNodes()
+	m.DeployContracts(contractsDir)
 }
 
 // UploadProgramBinaries uploads programs binary files to solana-validator container
@@ -230,429 +176,191 @@ func (m *OCRv2TestState) LabelChaosGroup(startInstance int, endInstance int, gro
 // can't expose UDP ports required to copy .so chunks when deploying
 func (m *OCRv2TestState) UploadProgramBinaries(contractsDir string) {
 	pl, err := m.Common.Env.Client.ListPods(m.Common.Env.Cfg.Namespace, "app=sol")
-	require.NoError(m.T, err)
+	require.NoError(m.Config.T, err)
 	_, _, _, err = m.Common.Env.Client.CopyToPod(m.Common.Env.Cfg.Namespace, contractsDir, fmt.Sprintf("%s/%s:/programs", m.Common.Env.Cfg.Namespace, pl.Items[0].Name), "sol-val")
-	require.NoError(m.T, err)
+	require.NoError(m.Config.T, err)
 }
 
 func (m *OCRv2TestState) DeployEnv(contractsDir string) {
 	err := m.Common.Env.Run()
-	require.NoError(m.T, err)
+	require.NoError(m.Config.T, err)
 
-	m.Common.SolanaUrl = m.Common.Env.URLs[m.Client.Config.Name][0]
-	m.UploadProgramBinaries(contractsDir)
+	if !m.Common.Env.WillUseRemoteRunner() {
+		m.UploadProgramBinaries(contractsDir)
+	}
 }
 
 func (m *OCRv2TestState) NewSolanaClientSetup(networkSettings *solclient.SolNetwork) (*solclient.Client, error) {
-	if m.Common.IsK8s {
+	if *m.Config.TestConfig.Common.InsideK8s {
 		networkSettings.URLs = m.Common.Env.URLs[networkSettings.Name]
 	} else {
 		networkSettings.URLs = []string{
-			m.Common.DockerEnv.Sol.ExternalHttpUrl,
-			m.Common.DockerEnv.Sol.ExternalWsUrl,
+			m.Common.DockerEnv.Sol.ExternalHTTPURL,
+			m.Common.DockerEnv.Sol.ExternalWsURL,
 		}
 	}
 	ec, err := solclient.NewClient(networkSettings)
 	if err != nil {
 		return nil, err
 	}
-	m.L.Info().
+	log.Info().
 		Interface("URLs", networkSettings.URLs).
 		Msg("Connected Solana client")
 	return ec, nil
-
 }
 
 func (m *OCRv2TestState) SetupClients() {
-	m.Client, m.err = m.NewSolanaClientSetup(m.Client.Config)
-	require.NoError(m.T, m.err)
-	if m.Common.IsK8s {
-		m.ChainlinkNodesK8s, m.err = client.ConnectChainlinkNodes(m.Common.Env)
-		require.NoError(m.T, m.err)
+	solClient, err := m.NewSolanaClientSetup(m.Clients.SolanaClient.Config)
+	m.Clients.SolanaClient = solClient
+	require.NoError(m.Config.T, err)
+	if *m.Config.TestConfig.Common.InsideK8s {
+		m.Clients.ChainlinkClient.ChainlinkClientK8s, err = client.ConnectChainlinkNodes(m.Common.Env)
+		require.NoError(m.Config.T, err)
 	} else {
-		m.ChainlinkNodes = m.Common.DockerEnv.ClCluster.NodeAPIs()
-	}
-}
-
-func (m *OCRv2TestState) initializeNodesInContractsMap() {
-	for i := 0; i < len(m.ContractsNodeSetup); i++ {
-		for _, nodeIndex := range m.ContractsNodeSetup[i].NodesIdx {
-			if m.Common.IsK8s {
-				m.ContractsNodeSetup[i].NodesK8s = append(m.ContractsNodeSetup[i].NodesK8s, m.ChainlinkNodesK8s[nodeIndex])
-			} else {
-				m.ContractsNodeSetup[i].Nodes = append(m.ContractsNodeSetup[i].Nodes, m.ChainlinkNodes[nodeIndex])
-			}
-			m.ContractsNodeSetup[i].NodeKeysBundle = append(m.ContractsNodeSetup[i].NodeKeysBundle, m.NodeKeysBundle[nodeIndex])
-		}
-		if m.Common.IsK8s {
-			m.ContractsNodeSetup[i].BootstrapNodeK8s = m.ChainlinkNodesK8s[m.ContractsNodeSetup[i].BootstrapNodeIdx]
-		} else {
-			m.ContractsNodeSetup[i].BootstrapNode = m.ChainlinkNodes[m.ContractsNodeSetup[i].BootstrapNodeIdx]
-		}
-		m.ContractsNodeSetup[i].BootstrapNodeKeysBundle = m.NodeKeysBundle[m.ContractsNodeSetup[i].BootstrapNodeIdx]
+		m.Clients.ChainlinkClient.ChainlinkClientDocker = m.Common.DockerEnv.ClCluster
 	}
 }
 
 // DeployContracts deploys contracts
 func (m *OCRv2TestState) DeployContracts(contractsDir string) {
-	if m.Common.IsK8s {
-		m.NodeKeysBundle, m.err = m.Common.CreateNodeKeysBundle(m.GetChainlinkNodes())
-	} else {
-		m.NodeKeysBundle, m.err = m.Common.CreateNodeKeysBundle(m.Common.DockerEnv.ClCluster.NodeAPIs())
-	}
-	require.NoError(m.T, m.err)
-	cd, err := solclient.NewContractDeployer(m.Client, nil)
-	require.NoError(m.T, err)
-	err = cd.LoadPrograms(contractsDir)
-	require.NoError(m.T, err)
-	if m.Common.IsK8s {
+	var err error
+	m.Clients.ChainlinkClient.NKeys, err = m.Common.CreateNodeKeysBundle(m.Clients.ChainlinkClient.ChainlinkNodes)
+	require.NoError(m.Config.T, err)
+	cd, err := solclient.NewContractDeployer(m.Clients.SolanaClient, nil)
+	require.NoError(m.Config.T, err)
+	if *m.Config.TestConfig.Common.InsideK8s {
 		err = cd.DeployAnchorProgramsRemote(contractsDir, m.Common.Env)
 	} else {
 		err = cd.DeployAnchorProgramsRemoteDocker(contractsDir, m.Common.DockerEnv.Sol)
 	}
-	require.NoError(m.T, err)
-	cd.RegisterAnchorPrograms()
-	require.NoError(m.T, cd.ValidateProgramsDeployed())
-	m.Client.LinkToken, err = cd.DeployLinkTokenContract()
-	require.NoError(m.T, err)
-	err = FundOracles(m.Client, m.NodeKeysBundle, big.NewFloat(1e4))
-	require.NoError(m.T, err)
-
-	m.initializeNodesInContractsMap()
-	g := errgroup.Group{}
-	for i := 0; i < len(m.ContractsNodeSetup); i++ {
-		i := i
-		g.Go(func() error {
-			cd, err := solclient.NewContractDeployer(m.Client, m.Client.LinkToken)
-			require.NoError(m.T, err)
-			err = cd.GenerateAuthorities([]string{"vault", "store"})
-			require.NoError(m.T, err)
-			bac, err := cd.DeployOCRv2AccessController()
-			require.NoError(m.T, err)
-			rac, err := cd.DeployOCRv2AccessController()
-			require.NoError(m.T, err)
-			err = m.Client.WaitForEvents()
-			require.NoError(m.T, err)
-
-			store, err := cd.DeployOCRv2Store(bac.Address())
-			require.NoError(m.T, err)
-
-			err = cd.CreateFeed("Feed", uint8(18), 10, 1024)
-			require.NoError(m.T, err)
-
-			ocr2, err := cd.InitOCR2(bac.Address(), rac.Address())
-			require.NoError(m.T, err)
-
-			storeAuth := cd.Accounts.Authorities["store"].PublicKey.String()
-			err = bac.AddAccess(storeAuth)
-			require.NoError(m.T, err)
-			err = m.Client.WaitForEvents()
-			require.NoError(m.T, err)
-
-			err = store.SetWriter(storeAuth)
-			require.NoError(m.T, err)
-			err = store.SetValidatorConfig(80000)
-			require.NoError(m.T, err)
-			err = m.Client.WaitForEvents()
-			require.NoError(m.T, err)
-
-			var nodeCount int
-			if m.Common.IsK8s {
-				nodeCount = len(m.ContractsNodeSetup[i].NodesK8s)
-			} else {
-				nodeCount = len(m.ContractsNodeSetup[i].Nodes)
-			}
-			ocConfig, err := OffChainConfigParamsFromNodes(nodeCount, m.ContractsNodeSetup[i].NodeKeysBundle)
-			require.NoError(m.T, err)
-
-			err = ocr2.Configure(ocConfig)
-			require.NoError(m.T, err)
-			m.Mu.Lock()
-			m.Contracts = append(m.Contracts, Contracts{
-				BAC:       bac,
-				RAC:       rac,
-				OCR2:      ocr2,
-				Store:     store,
-				StoreAuth: storeAuth,
-			})
-			m.Mu.Unlock()
-			return nil
-		})
-	}
-	require.NoError(m.T, g.Wait())
-	for i := 0; i < len(m.ContractsNodeSetup); i++ {
-		m.ContractsNodeSetup[i].OCR2 = m.Contracts[i].OCR2
-		m.ContractsNodeSetup[i].Store = m.Contracts[i].Store
-	}
+	require.NoError(m.Config.T, err)
 }
 
 // CreateJobs creating OCR jobs and EA stubs
 func (m *OCRv2TestState) CreateJobs() {
-	var nodes []*client.ChainlinkClient
-	var mockInternalUrl string
-	if m.Common.IsK8s {
-		nodes = m.GetChainlinkNodes()
-		mockInternalUrl = m.Common.Env.URLs["qa_mock_adapter_internal"][0]
-	} else {
-		nodes = m.Common.DockerEnv.ClCluster.NodeAPIs()
-		mockInternalUrl = m.Common.DockerEnv.Killgrave.InternalEndpoint
+	// Setting up RPC
+	c := rpc.New(*m.Config.TestConfig.Common.RPCURL)
+	wsc, err := ws.Connect(testcontext.Get(m.Config.T), *m.Config.TestConfig.Common.WsURL)
+	require.NoError(m.Config.T, err, "Error connecting to websocket client")
+
+	relayConfig := job.JSONConfig{
+		"nodeEndpointHTTP": m.Common.ChainDetails.RPCUrl,
+		"ocr2ProgramID":    m.Common.ChainDetails.ProgramAddresses.OCR2,
+		"transmissionsID":  m.Gauntlet.FeedAddress,
+		"storeProgramID":   m.Common.ChainDetails.ProgramAddresses.Store,
+		"chainID":          m.Common.ChainDetails.ChainID,
 	}
-	m.L.Info().Str("Url", mockInternalUrl).Msg("Mock adapter url")
-	m.err = m.Common.CreateSolanaChainAndNode(nodes)
-	require.NoError(m.T, m.err)
-	m.err = CreateBridges(m.ContractsNodeSetup, mockInternalUrl, m.Common.IsK8s)
-	require.NoError(m.T, m.err)
-	g := errgroup.Group{}
-	for i := 0; i < len(m.ContractsNodeSetup); i++ {
-		i := i
-		g.Go(func() error {
-			m.err = m.Common.CreateJobsForContract(m.ContractsNodeSetup[i])
-			require.NoError(m.T, m.err)
-			return nil
-		})
-	}
-	require.NoError(m.T, g.Wait())
-}
-
-func (m *OCRv2TestState) ValidateNoRoundsAfter(chaosStartTime time.Time) {
-	m.RoundsFound = 0
-	for _, c := range m.Contracts {
-		m.LastRoundTime[c.OCR2.Address()] = chaosStartTime
-	}
-	gom := gomega.NewWithT(m.T)
-	gom.Consistently(func(g gomega.Gomega) {
-		for _, c := range m.Contracts {
-			_, timestamp, _, err := c.Store.GetLatestRoundData()
-			g.Expect(err).ShouldNot(gomega.HaveOccurred())
-			roundTime := time.Unix(int64(timestamp), 0)
-			g.Expect(roundTime.Before(m.LastRoundTime[c.OCR2.Address()])).Should(gomega.BeTrue())
-		}
-	}, NewRoundCheckTimeout, NewRoundCheckPollInterval).Should(gomega.Succeed())
-}
-
-type Answer struct {
-	Answer    uint64
-	Timestamp uint64
-	Error     error
-}
-
-func (m *OCRv2TestState) ValidateRoundsAfter(chaosStartTime time.Time, timeout time.Duration, rounds int) {
-	m.RoundsFound = 0
-	for _, c := range m.Contracts {
-		m.LastRoundTime[c.OCR2.Address()] = chaosStartTime
-	}
-	roundsFound := 0
-	gom := gomega.NewWithT(m.T)
-	gom.Eventually(func(g gomega.Gomega) {
-		answers := make(map[string]*Answer)
-		for _, c := range m.Contracts {
-			answer, timestamp, _, err := c.Store.GetLatestRoundData()
-			g.Expect(err).ShouldNot(gomega.HaveOccurred())
-			answers[c.OCR2.Address()] = &Answer{Answer: answer, Timestamp: timestamp, Error: err}
-		}
-		for ci, a := range answers {
-			answerTime := time.Unix(int64(a.Timestamp), 0)
-			if answerTime.After(m.LastRoundTime[ci]) {
-				m.LastRoundTime[ci] = answerTime
-				roundsFound++
-				m.L.Debug().Str("Contract", ci).Interface("Answer", a).Int("RoundsFound", roundsFound).Msg("New answer found")
-			} else {
-				m.L.Debug().Str("Contract", ci).Interface("Answer", a).Msg("Answer has not changed")
-			}
-		}
-		g.Expect(roundsFound).To(gomega.BeNumerically(">=", rounds*len(m.Contracts)))
-	}, timeout, NewRoundCheckPollInterval).Should(gomega.Succeed())
-}
-
-func (m *OCRv2TestState) GenerateOnChainConfig(nodeKeys []client.NodeKeysBundle, vaultAddress string, proposalId string) (OCR2OnChainConfig, error) {
-
-	var oracles []Operator
-
-	for _, nodeKey := range nodeKeys {
-		oracles = append(oracles, Operator{
-			Signer:      strings.Replace(nodeKey.OCR2Key.Data.Attributes.OnChainPublicKey, "ocr2on_solana_", "", 1),
-			Transmitter: nodeKey.TXKey.Data.Attributes.PublicKey,
-			Payee:       vaultAddress,
-		})
-	}
-
-	return OCR2OnChainConfig{
-		Oracles:    oracles,
-		F:          1,
-		ProposalId: proposalId,
-	}, nil
-}
-
-func (m *OCRv2TestState) GenerateOffChainConfig(
-	nodeKeysBundle []client.NodeKeysBundle,
-	proposalId string,
-	reportingConfig ReportingPluginConfig,
-	deltaProgressNanoseconds int64,
-	deltaResendNanoseconds int64,
-	deltaRoundNanoseconds int64,
-	deltaGraceNanoseconds int64,
-	deltaStageNanoseconds int64,
-	rMax int,
-	maxDurationQueryNanoseconds int64,
-	maxDurationObservationNanoseconds int64,
-	maxDurationReportNanoseconds int64,
-	maxDurationShouldAcceptFinalizedReportNanoseconds int64,
-	maxDurationShouldTransmitAcceptedReportNanoseconds int64,
-	secret string,
-
-) OCROffChainConfig {
-
-	offchainPublicKeys := make([]string, len(nodeKeysBundle))
-	peerIds := make([]string, len(nodeKeysBundle))
-	configPublicKeys := make([]string, len(nodeKeysBundle))
-	s := make([]int, len(nodeKeysBundle))
-
-	for i := range s {
-		s[i] = 1
-	}
-
-	for i, bundle := range nodeKeysBundle {
-		offchainPublicKeys[i] = strings.Replace(bundle.OCR2Key.Data.Attributes.OffChainPublicKey, "ocr2off_solana_", "", 1)
-		peerIds[i] = bundle.PeerID
-		configPublicKeys[i] = strings.Replace(bundle.OCR2Key.Data.Attributes.ConfigPublicKey, "ocr2cfg_solana_", "", 1)
-	}
-
-	offChainConfig := OCROffChainConfig{
-		ProposalId: proposalId,
-		OffchainConfig: OffchainConfig{
-			DeltaProgressNanoseconds:          deltaProgressNanoseconds,
-			DeltaResendNanoseconds:            deltaResendNanoseconds,
-			DeltaRoundNanoseconds:             deltaRoundNanoseconds,
-			DeltaGraceNanoseconds:             deltaGraceNanoseconds,
-			DeltaStageNanoseconds:             deltaStageNanoseconds,
-			RMax:                              rMax,
-			S:                                 s,
-			OffchainPublicKeys:                offchainPublicKeys,
-			PeerIds:                           peerIds,
-			ConfigPublicKeys:                  configPublicKeys,
-			ReportingPluginConfig:             reportingConfig,
-			MaxDurationQueryNanoseconds:       maxDurationQueryNanoseconds,
-			MaxDurationObservationNanoseconds: maxDurationObservationNanoseconds,
-			MaxDurationReportNanoseconds:      maxDurationReportNanoseconds,
-			MaxDurationShouldAcceptFinalizedReportNanoseconds:  maxDurationShouldAcceptFinalizedReportNanoseconds,
-			MaxDurationShouldTransmitAcceptedReportNanoseconds: maxDurationShouldTransmitAcceptedReportNanoseconds,
+	boostratInternalIP := m.Clients.ChainlinkClient.ChainlinkNodes[0].InternalIP()
+	bootstrapPeers := []client.P2PData{
+		{
+			InternalIP:   boostratInternalIP,
+			InternalPort: "6690",
+			PeerID:       m.Clients.ChainlinkClient.NKeys[0].PeerID,
 		},
-		UserSecret: secret,
+	}
+	jobSpec := &client.OCR2TaskJobSpec{
+		Name:    fmt.Sprintf("sol-OCRv2-%s-%s", "bootstrap", uuid.New().String()),
+		JobType: "bootstrap",
+		OCR2OracleSpec: job.OCR2OracleSpec{
+			ContractID:                        m.Gauntlet.OcrAddress,
+			Relay:                             m.Common.ChainDetails.ChainName,
+			RelayConfig:                       relayConfig,
+			P2PV2Bootstrappers:                pq.StringArray{bootstrapPeers[0].P2PV2Bootstrapper()},
+			OCRKeyBundleID:                    null.StringFrom(m.Clients.ChainlinkClient.NKeys[0].OCR2Key.Data.ID),
+			TransmitterID:                     null.StringFrom(m.Clients.ChainlinkClient.NKeys[0].TXKey.Data.ID),
+			ContractConfigConfirmations:       1,
+			ContractConfigTrackerPollInterval: models.Interval(15 * time.Second),
+		},
+	}
+	sourceValueBridge := client.BridgeTypeAttributes{
+		Name:        "mockserver-bridge",
+		URL:         fmt.Sprintf("%s/%s", m.Common.ChainDetails.MockserverURLInternal, m.Common.ChainDetails.MockServerEndpoint),
+		RequestData: "{}",
 	}
 
-	return offChainConfig
+	observationSource := client.ObservationSourceSpecBridge(&sourceValueBridge)
+	bridgeInfo := BridgeInfo{ObservationSource: observationSource}
+
+	err = m.Clients.ChainlinkClient.ChainlinkNodes[0].MustCreateBridge(&sourceValueBridge)
+	require.NoError(m.Config.T, err, "Error creating bridge")
+
+	_, err = m.Clients.ChainlinkClient.ChainlinkNodes[0].MustCreateJob(jobSpec)
+	require.NoError(m.Config.T, err, "Error creating job")
+
+	for nIdx, node := range m.Clients.ChainlinkClient.ChainlinkNodes {
+		// Skipping bootstrap
+		if nIdx == 0 {
+			continue
+		}
+		if *m.Config.TestConfig.Common.Network == "localnet" {
+			err = m.Clients.SolanaClient.Fund(m.Clients.ChainlinkClient.NKeys[nIdx].TXKey.Data.ID, big.NewFloat(1e4))
+			require.NoError(m.Config.T, err, "Error sending funds")
+		} else {
+			err = solclient.SendFunds(*m.Config.TestConfig.Common.PrivateKey, m.Clients.ChainlinkClient.NKeys[nIdx].TXKey.Data.ID, 100000000, c, wsc)
+			require.NoError(m.Config.T, err, "Error sending funds")
+		}
+
+		sourceValueBridge := client.BridgeTypeAttributes{
+			Name:        "mockserver-bridge",
+			URL:         fmt.Sprintf("%s/%s", m.Common.ChainDetails.MockserverURLInternal, m.Common.ChainDetails.MockServerEndpoint),
+			RequestData: "{}",
+		}
+
+		_, err := node.CreateBridge(&sourceValueBridge)
+		require.NoError(m.Config.T, err, "Error creating bridge")
+
+		jobSpec := &client.OCR2TaskJobSpec{
+			Name:              fmt.Sprintf("sol-OCRv2-%d-%s", nIdx, uuid.New().String()),
+			JobType:           "offchainreporting2",
+			ObservationSource: bridgeInfo.ObservationSource,
+			OCR2OracleSpec: job.OCR2OracleSpec{
+				ContractID:                        m.Gauntlet.OcrAddress,
+				Relay:                             m.Common.ChainDetails.ChainName,
+				RelayConfig:                       relayConfig,
+				P2PV2Bootstrappers:                pq.StringArray{bootstrapPeers[0].P2PV2Bootstrapper()},
+				OCRKeyBundleID:                    null.StringFrom(m.Clients.ChainlinkClient.NKeys[nIdx].OCR2Key.Data.ID),
+				TransmitterID:                     null.StringFrom(m.Clients.ChainlinkClient.NKeys[nIdx].TXKey.Data.ID),
+				ContractConfigConfirmations:       1,
+				ContractConfigTrackerPollInterval: models.Interval(15 * time.Second),
+				PluginType:                        "median",
+				PluginConfig:                      PluginConfigToTomlFormat(observationSource),
+			},
+		}
+		_, err = node.MustCreateJob(jobSpec)
+		require.NoError(m.Config.T, err, "Error creating job")
+	}
 }
 
-func (m *OCRv2TestState) GeneratePayees(nodeKeys []client.NodeKeysBundle, vaultAddress string, proposalId string) PayeeConfig {
-	var operators []Operator
-	for _, key := range nodeKeys {
-		operators = append(operators, Operator{
-			Signer:      strings.Replace(key.OCR2Key.Data.Attributes.OnChainPublicKey, "ocr2on_solana_", "", 1),
-			Transmitter: key.TXKey.Data.Attributes.PublicKey,
-			Payee:       vaultAddress,
-		})
-	}
-
-	return PayeeConfig{
-		Operators:  operators,
-		ProposalId: proposalId,
-	}
-}
-
-func (m *OCRv2TestState) GenerateProposalAcceptConfig(
-	proposalId string,
-	version int,
-	f int,
-	oracles []Operator,
-	offChainConfig OffchainConfig,
-	randomSecret string,
-
-) ProposalAcceptConfig {
-	return ProposalAcceptConfig{
-		ProposalId:     proposalId,
-		Version:        version,
-		F:              f,
-		Oracles:        oracles,
-		OffchainConfig: offChainConfig,
-		RandomSecret:   randomSecret,
-	}
-}
-
-func (m *OCRv2TestState) ConfigureGauntlet(secret string) map[string]string {
-	err := os.Setenv("SECRET", secret)
-	if err != nil {
-		panic("Error setting SECRET")
-	}
-	rpcUrl, exists := os.LookupEnv("RPC_URL")
-	if !exists {
-		panic("Please define RPC_URL")
-	}
-
-	wsUrl, exists := os.LookupEnv("WS_URL")
-	if !exists {
-		panic("Please define WS_URL")
-	}
-	privateKey, exists := os.LookupEnv("PRIVATE_KEY")
-	if !exists {
-		panic("Please define PRIVATE_KEY")
-	}
-	programIdOCR2, exists := os.LookupEnv("PROGRAM_ID_OCR2")
-	if !exists {
-		panic("Please define PROGRAM_ID_OCR2")
-	}
-
-	programIdAccessController, exists := os.LookupEnv("PROGRAM_ID_ACCESS_CONTROLLER")
-	if !exists {
-		panic("Please define PROGRAM_ID_ACCESS_CONTROLLER")
-	}
-
-	programIdStore, exists := os.LookupEnv("PROGRAM_ID_STORE")
-	if !exists {
-		panic("Please define PROGRAM_ID_STORE")
-	}
-
-	linkToken, exists := os.LookupEnv("LINK_TOKEN")
-	if !exists {
-		panic("Please define LINK_TOKEN")
-	}
-
-	vault, exists := os.LookupEnv("VAULT_ADDRESS")
-	if !exists {
-		panic("Please define VAULT_ADDRESS")
-	}
-
-	return map[string]string{
-		"NODE_URL":                     rpcUrl,
-		"WS_URL":                       wsUrl,
-		"PRIVATE_KEY":                  privateKey,
-		"PROGRAM_ID_OCR2":              programIdOCR2,
-		"PROGRAM_ID_ACCESS_CONTROLLER": programIdAccessController,
-		"PROGRAM_ID_STORE":             programIdStore,
-		"LINK":                         linkToken,
-		"VAULT":                        vault,
-	}
-
-}
-
-// GauntletEnvToRemoteRunner Setup the environment variables that will be needed inside the remote runner
-func (m *OCRv2TestState) GauntletEnvToRemoteRunner() {
-	osutil.SetupEnvVarsForRemoteRunner([]string{
-		"RPC_URL",
-		"WS_URL",
-		"PRIVATE_KEY",
-		"PROGRAM_ID_OCR2",
-		"PROGRAM_ID_ACCESS_CONTROLLER",
-		"PROGRAM_ID_STORE",
-		"LINK_TOKEN",
-		"VAULT_ADDRESS",
-	})
-}
-
-func (m *OCRv2TestState) GetChainlinkNodes() []*client.ChainlinkClient {
+func (m *OCRv2TestState) SetChainlinkNodes() {
 	// retrieve client from K8s client
 	chainlinkNodes := []*client.ChainlinkClient{}
-	for i := range m.ChainlinkNodesK8s {
-		chainlinkNodes = append(chainlinkNodes, m.ChainlinkNodesK8s[i].ChainlinkClient)
+	if *m.Config.TestConfig.Common.InsideK8s {
+		for i := range m.Clients.ChainlinkClient.ChainlinkClientK8s {
+			chainlinkNodes = append(chainlinkNodes, m.Clients.ChainlinkClient.ChainlinkClientK8s[i].ChainlinkClient)
+		}
+	} else {
+		chainlinkNodes = append(chainlinkNodes, m.Clients.ChainlinkClient.ChainlinkClientDocker.NodeAPIs()...)
 	}
-	return chainlinkNodes
+	m.Clients.ChainlinkClient.ChainlinkNodes = chainlinkNodes
+}
+
+func formatBuffer(buf []byte) string {
+	if len(buf) == 0 {
+		return ""
+	}
+	result := fmt.Sprintf("%d", buf[0])
+	for _, b := range buf[1:] {
+		result += fmt.Sprintf(",%d", b)
+	}
+	return result
+}
+
+func GetLatestRound(transmissions []gauntlet.Transmission) gauntlet.Transmission {
+	highestRound := transmissions[0]
+	for _, t := range transmissions[1:] {
+		if t.RoundID > highestRound.RoundID {
+			highestRound = t
+		}
+	}
+	return highestRound
 }

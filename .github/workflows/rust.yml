@@ -1,6 +1,9 @@
 name: rust
 on:
   pull_request:
+  push:
+    branches:
+      - develop
 
 defaults:
   run:
@@ -14,7 +17,7 @@ jobs:
       projectserum_version: ${{ steps.psversion.outputs.projectserum_version }}
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
       - name: Get ProjectSerum Version
         id: psversion
         uses: ./.github/actions/projectserum_version
@@ -23,74 +26,97 @@ jobs:
     name: Rust Run Anchor Tests
     runs-on: ubuntu-latest
     needs: [get_projectserum_version]
-    container:
-      image: backpackapp/build:${{ needs.get_projectserum_version.outputs.projectserum_version }}
-      env:
-        RUSTUP_HOME: "/root/.rustup"
-        FORCE_COLOR: 1
-
     steps:
-    - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+    - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
     - name: Cache cargo registry
-      uses: actions/cache@v2.1.7
+      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         path: ~/.cargo/registry
         key: ${{ runner.os }}-v2-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Cache cargo index
-      uses: actions/cache@v2.1.7
+      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         path: ~/.cargo/git
         key: ${{ runner.os }}-v2-cargo-index-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Cache cargo target dir
-      uses: actions/cache@v2.1.7
+      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         path: contracts/target
         key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
-    - run: solana-keygen new -o id.json --no-bip39-passphrase
-    - name: Compile typescript client
+    - name: run tests
+      env:
+        psversion: ${{ needs.get_projectserum_version.outputs.projectserum_version }}
       run: |
-       cd ../ts
-       yarn install --frozen-lockfile
-       yarn build
-    - run: yarn install --frozen-lockfile
-    - run: anchor test
-    - run: |
-       cd examples/hello-world
-       yarn install --frozen-lockfile
-       anchor test
+        docker run -v "$(pwd)/../":/repo backpackapp/build:"${psversion}" bash -c "\
+          set -eoux pipefail &&\
+          RUSTUP_HOME=\"/root/.rustup\" &&\
+          FORCE_COLOR=1 &&\
+          cd /repo/contracts &&\
+          solana-keygen new -o id.json --no-bip39-passphrase &&\
+          cd /repo/ts &&\
+          yarn install --frozen-lockfile &&\
+          yarn build &&\
+          cd /repo/contracts &&\
+          yarn install --frozen-lockfile &&\
+          anchor test &&\
+          cd /repo/contracts/examples/hello-world &&\
+          yarn install --frozen-lockfile &&\
+          anchor test"
+
+    # - run: solana-keygen new -o id.json --no-bip39-passphrase
+    # - name: Compile typescript client
+    #   run: |
+    #    cd ../ts
+    #    yarn install --frozen-lockfile
+    #    yarn build
+    # - name: anchor test contracts
+    #   run: |
+    #     yarn install --frozen-lockfile
+    #     anchor test
+    # - name: anchor test hello-world
+    #   run: |
+    #    cd examples/hello-world
+    #    yarn install --frozen-lockfile
+    #    anchor test
 
   rust_lint:
     name: Rust Lint
     runs-on: ubuntu-latest
     needs: [get_projectserum_version]
-    container:
-      image: backpackapp/build:${{ needs.get_projectserum_version.outputs.projectserum_version }}
-      env:
-        RUSTUP_HOME: "/root/.rustup"
-        FORCE_COLOR: 1
-
     steps:
-    - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+    - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
     - name: Cache cargo registry
-      uses: actions/cache@v2.1.7
+      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         path: ~/.cargo/registry
         key: ${{ runner.os }}-v2-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Cache cargo index
-      uses: actions/cache@v2.1.7
+      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         path: ~/.cargo/git
         key: ${{ runner.os }}-v2-cargo-index-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Cache cargo target dir
-      uses: actions/cache@v2.1.7
+      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         path: contracts/target
         key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
-    - run: cargo check
-    - run: cargo clippy -- -D warnings
+    - name: cargo check
+      env:
+        psversion: ${{ needs.get_projectserum_version.outputs.projectserum_version }}
+      run: |
+        docker run -v "$(pwd)/../":/repo backpackapp/build:"${psversion}" bash -c "\
+          set -eoux pipefail &&\
+          RUSTUP_HOME=\"/root/.rustup\" &&\
+          FORCE_COLOR=1 &&\
+          cd /repo/contracts &&\
+          cargo check &&\
+          cargo clippy -- -D warnings"
+
+    # - run: cargo check
+    # - run: cargo clippy -- -D warnings

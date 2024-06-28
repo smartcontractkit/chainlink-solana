@@ -8,10 +8,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
-
-	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 )
 
 // Config defines the monitor configuration.
@@ -24,12 +21,16 @@ type Keystore interface {
 	Accounts(ctx context.Context) ([]string, error)
 }
 
+type BalanceClient interface {
+	Balance(addr solana.PublicKey) (uint64, error)
+}
+
 // NewBalanceMonitor returns a balance monitoring services.Service which reports the SOL balance of all ks keys to prometheus.
-func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, newReader func() (solanaClient.Reader, error)) types.Service {
+func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, newReader func() (BalanceClient, error)) services.Service {
 	return newBalanceMonitor(chainID, cfg, lggr, ks, newReader)
 }
 
-func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, newReader func() (solanaClient.Reader, error)) *balanceMonitor {
+func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, newReader func() (BalanceClient, error)) *balanceMonitor {
 	b := balanceMonitor{
 		chainID:   chainID,
 		cfg:       cfg,
@@ -49,12 +50,13 @@ type balanceMonitor struct {
 	cfg       Config
 	lggr      logger.Logger
 	ks        Keystore
-	newReader func() (solanaClient.Reader, error)
+	newReader func() (BalanceClient, error)
 	updateFn  func(acc solana.PublicKey, lamports uint64) // overridable for testing
 
-	reader solanaClient.Reader
+	reader BalanceClient
 
-	stop, done chan struct{}
+	stop services.StopChan
+	done chan struct{}
 }
 
 func (b *balanceMonitor) Name() string {
@@ -82,7 +84,7 @@ func (b *balanceMonitor) HealthReport() map[string]error {
 
 func (b *balanceMonitor) monitor() {
 	defer close(b.done)
-	ctx, cancel := utils.ContextFromChan(b.stop)
+	ctx, cancel := b.stop.NewCtx()
 	defer cancel()
 
 	tick := time.After(utils.WithJitter(b.cfg.BalancePollPeriod()))
@@ -98,7 +100,7 @@ func (b *balanceMonitor) monitor() {
 }
 
 // getReader returns the cached solanaClient.Reader, or creates a new one if nil.
-func (b *balanceMonitor) getReader() (solanaClient.Reader, error) {
+func (b *balanceMonitor) getReader() (BalanceClient, error) {
 	if b.reader == nil {
 		var err error
 		b.reader, err = b.newReader()

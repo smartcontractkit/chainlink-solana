@@ -3,15 +3,16 @@ package solana
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/gagliardetto/solana-go"
-	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logger"
 )
 
 var _ types.ContractTransmitter = (*Transmitter)(nil)
@@ -33,7 +34,7 @@ func (c *Transmitter) Transmit(
 ) error {
 	blockhash, err := c.reader.LatestBlockhash()
 	if err != nil {
-		return errors.Wrap(err, "error on Transmit.GetRecentBlockhash")
+		return fmt.Errorf("error on Transmit.GetRecentBlockhash: %w", err)
 	}
 	if blockhash == nil || blockhash.Value == nil {
 		return errors.New("nil pointer returned from Transmit.GetRecentBlockhash")
@@ -43,7 +44,7 @@ func (c *Transmitter) Transmit(
 	seeds := [][]byte{[]byte("store"), c.stateID.Bytes()}
 	storeAuthority, storeNonce, err := solana.FindProgramAddress(seeds, c.programID)
 	if err != nil {
-		return errors.Wrap(err, "error on Transmit.FindProgramAddress")
+		return fmt.Errorf("error on Transmit.FindProgramAddress: %w", err)
 	}
 
 	accounts := []*solana.AccountMeta{
@@ -78,13 +79,15 @@ func (c *Transmitter) Transmit(
 		solana.TransactionPayer(c.transmissionSigner),
 	)
 	if err != nil {
-		return errors.Wrap(err, "error on Transmit.NewTransaction")
+		return fmt.Errorf("error on Transmit.NewTransaction: %w", err)
 	}
 
 	// pass transmit payload to tx manager queue
 	c.lggr.Debugf("Queuing transmit tx: state (%s) + transmissions (%s)", c.stateID.String(), c.transmissionsID.String())
-	err = c.txManager.Enqueue(c.stateID.String(), tx)
-	return errors.Wrap(err, "error on Transmit.txManager.Enqueue")
+	if err = c.txManager.Enqueue(c.stateID.String(), tx); err != nil {
+		return fmt.Errorf("error on Transmit.txManager.Enqueue: %w", err)
+	}
+	return nil
 }
 
 func (c *Transmitter) LatestConfigDigestAndEpoch(

@@ -2,6 +2,7 @@ package monitoring
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -10,17 +11,18 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
-	"go.uber.org/multierr"
 
-	relayMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/event"
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 )
 
 func NewEnvelopeSourceFactory(
 	client ChainReader,
-	log relayMonitoring.Logger,
-) relayMonitoring.SourceFactory {
+	log commonMonitoring.Logger,
+) commonMonitoring.SourceFactory {
 	return &envelopeSourceFactory{
 		client,
 		log,
@@ -29,16 +31,16 @@ func NewEnvelopeSourceFactory(
 
 type envelopeSourceFactory struct {
 	client ChainReader
-	log    relayMonitoring.Logger
+	log    commonMonitoring.Logger
 }
 
 func (s *envelopeSourceFactory) NewSource(
-	_ relayMonitoring.ChainConfig,
-	feedConfig relayMonitoring.FeedConfig,
-) (relayMonitoring.Source, error) {
-	solanaFeedConfig, ok := feedConfig.(SolanaFeedConfig)
+	_ commonMonitoring.ChainConfig,
+	feedConfig commonMonitoring.FeedConfig,
+) (commonMonitoring.Source, error) {
+	solanaFeedConfig, ok := feedConfig.(config.SolanaFeedConfig)
 	if !ok {
-		return nil, fmt.Errorf("expected feedConfig to be of type SolanaFeedConfig not %T", feedConfig)
+		return nil, fmt.Errorf("expected feedConfig to be of type config.SolanaFeedConfig not %T", feedConfig)
 	}
 	return &envelopeSource{
 		s.client,
@@ -53,8 +55,8 @@ func (s *envelopeSourceFactory) GetType() string {
 
 type envelopeSource struct {
 	client     ChainReader
-	feedConfig SolanaFeedConfig
-	log        relayMonitoring.Logger
+	feedConfig config.SolanaFeedConfig
+	log        commonMonitoring.Logger
 }
 
 func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
@@ -66,7 +68,7 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode ContractConfig from on-chain state: %w", err)
 	}
-	envelope := relayMonitoring.Envelope{
+	envelope := commonMonitoring.Envelope{
 		ConfigDigest: state.Config.LatestConfigDigest,
 		Epoch:        state.Config.Epoch,
 		Round:        state.Config.Round,
@@ -87,7 +89,7 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 		envelopeMu.Lock()
 		defer envelopeMu.Unlock()
 		if transmissionErr != nil {
-			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("failed to fetch latest on-chain transmission: %w", transmissionErr))
+			envelopeErr = errors.Join(envelopeErr, fmt.Errorf("failed to fetch latest on-chain transmission: %w", transmissionErr))
 			return
 		}
 		envelope.LatestAnswer = answer.Data
@@ -99,7 +101,7 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 		envelopeMu.Lock()
 		defer envelopeMu.Unlock()
 		if linkBalanceErr != nil {
-			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("failed to get the feed's link balance: %w", linkBalanceErr))
+			envelopeErr = errors.Join(envelopeErr, fmt.Errorf("failed to get the feed's link balance: %w", linkBalanceErr))
 			return
 		}
 		envelope.LinkBalance = linkBalance
@@ -110,7 +112,7 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 		envelopeMu.Lock()
 		defer envelopeMu.Unlock()
 		if juelsErr != nil {
-			envelopeErr = multierr.Combine(envelopeErr, fmt.Errorf("Failed to fetch Juels/FeeCoin: %w", juelsErr))
+			envelopeErr = errors.Join(envelopeErr, fmt.Errorf("Failed to fetch Juels/FeeCoin: %w", juelsErr))
 			return
 		}
 		envelope.JuelsPerFeeCoin = juelsPerLamport

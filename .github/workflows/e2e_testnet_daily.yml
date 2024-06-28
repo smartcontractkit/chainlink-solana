@@ -23,9 +23,11 @@ on:
         type: string
   schedule:
     - cron: '0 6 * * *'
+# Only run 1 of this workflow at a time per PR
 env:
   CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
   CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
+  MOD_CACHE_VERSION: 1
 
 # Only run 1 of this workflow at a time per PR
 concurrency:
@@ -33,141 +35,49 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  changes:
-    environment: integration
-    name: Check Paths That Require Tests To Run
+  check_test_compilation:
+    name: Check integration test compilation
     runs-on: ubuntu-latest
     steps:
-      - name: Collect Metrics
-        id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@0281b09807758be1dcc41651e44e62b353808c47 # v2.1.0
+      - name: Checkout sources
+        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+      - name: Setup go
+        uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
         with:
-          org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
-          basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
-          hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
-          this-job-name: Check Paths That Require Tests To Run
-        continue-on-error: true
-      - name: Checkout the repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-      - uses: dorny/paths-filter@4512585405083f25c027a35db413c2b3b9006d50 # v2.11.1
-        id: changes
-        with:
-          filters: |
-            src:
-              - '**/*.go'
-              - '**/*go.sum'
-              - '**/*go.mod'
-              - '.github/workflows/integration-tests.yml'
-              - '**/*Dockerfile'
-              - 'core/**/config/**/*.toml'
-    outputs:
-      src: ${{ steps.changes.outputs.src }}
-  get_solana_sha:
-    name: Get Solana Sha From Go Mod
-    environment: Integration
-    runs-on: ubuntu-latest
-    outputs:
-      sha: ${{ github.sha }}
-    steps:
-      - name: Checkout the repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
-        with:
-          only-modules: "true"
-      - name: Get the sha from go mod
-        id: getshortsha
-        run: |
-          short_sha=$(git rev-parse --short HEAD)
-          echo "short sha is: ${short_sha}"
-          echo "short_sha=${short_sha}" >> "$GITHUB_OUTPUT"
-      - name: Checkout solana
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-        with:
-          repository: smartcontractkit/chainlink-solana
-          ref: develop
-          fetch-depth: 0
-          path: solanapath
+          go-version-file: "go.mod"
+          check-latest: true
+          cache: true
+      - run: cd ./integration-tests && go test -run=xxx ./...
 
   get_projectserum_version:
     name: Get ProjectSerum Version
     environment: integration
     runs-on: ubuntu-latest
-    needs: [ get_solana_sha ]
     outputs:
       projectserum_version: ${{ steps.psversion.outputs.projectserum_version }}
     steps:
-      - name: Checkout the solana repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-        with:
-          repository: smartcontractkit/chainlink-solana
-          ref: ${{ needs.get_solana_sha.outputs.sha }}
+      - name: Checkout the repo
+        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
       - name: Get ProjectSerum Version
         id: psversion
-        uses: smartcontractkit/chainlink-solana/.github/actions/projectserum_version@4b971869e26b79c7ce3fb7c98005cc2e3f350915 # stable action on Oct 12 2022
-
-  solana-test-image-exists:
-    environment: integration
-    permissions:
-      checks: write
-      pull-requests: write
-      id-token: write
-      contents: read
-    name: Check If Solana Test Image Exists
-    runs-on: ubuntu-latest
-    needs: [ get_solana_sha ]
-    outputs:
-      exists: ${{ steps.check-image.outputs.exists }}
-    steps:
-      - name: Check if image exists
-        id: check-image
-        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@e865e376b8c2d594028c8d645dd6c47169b72974 # v2.2.16
-        with:
-          repository: chainlink-solana-tests
-          tag: ${{ needs.get_solana_sha.outputs.sha }}
-          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+        uses: ./.github/actions/projectserum_version
 
   e2e_custom_build_artifacts:
-    name: Solana Build Artifacts
-    runs-on: ubuntu20.04-16cores-64GB
-    needs:
-      [
-        changes,
-        get_projectserum_version,
-        solana-test-image-exists,
-        get_solana_sha,
-      ]
-    container:
-      image: backpackapp/build:${{ needs.get_projectserum_version.outputs.projectserum_version }}
-      env:
-        RUSTUP_HOME: "/root/.rustup"
-        FORCE_COLOR: 1
+    name: E2E Custom Build Artifacts
+    environment: integration
+    permissions:
+      id-token: write
+      contents: read
+    runs-on: ubuntu-latest-32cores-128GB
+    needs: [get_projectserum_version]
     steps:
-      - name: Collect Metrics
-        if: needs.changes.outputs.src == 'true'
-        id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@0281b09807758be1dcc41651e44e62b353808c47 # v2.1.0
-        with:
-          org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
-          basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
-          hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
-          this-job-name: Solana Build Artifacts
-        continue-on-error: true
-      - name: Checkout the solana repo
-        # Use v3.6.0 because the custom runner (container configured above)
-        # doesn't have node20 installed which is required for versions >=4
-        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
-        with:
-          repository: smartcontractkit/chainlink-solana
-          ref: ${{ needs.get_solana_sha.outputs.sha }}
+      - name: Checkout the repo
+        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
       - name: Build contracts
-        if: needs.changes.outputs.src == 'true' && needs.solana-test-image-exists.outputs.exists == 'false'
-        uses: smartcontractkit/chainlink-solana/.github/actions/build_contract_artifacts@21675b3a7dcdff8e790391708d4763020cace21e # stable action on December 18 2023
+        uses: ./.github/actions/build_contract_artifacts
         with:
-          ref: ${{ needs.get_solana_sha.outputs.sha }}
+          image: backpackapp/build
+          image-version: ${{ needs.get_projectserum_version.outputs.projectserum_version }}
 
   e2e_custom_build_custom_chainlink_image:
     name: E2E Custom Build Custom CL Image
@@ -176,109 +86,99 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Check if image exists
         id: check-image
-        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@ad22fbd6f4d108b82aaf49b527bcf40f32babea8 # v2.2.1
+        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
         with:
           repository: chainlink
-          tag: solana.${{ github.sha }}
+          tag: solana.${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref || github.sha }}
           AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       - name: Build Image
         if: steps.check-image.outputs.exists == 'false'
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@d5ab9fe53da374dd789b5d9ef10f3282197e088d # we will want to switch to this once cosmos settles back down 336617ae6d70fec60c15cc3382e17a4d2615a801 # v2.2.0
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
         with:
+          should_checkout: true
           cl_repo: smartcontractkit/chainlink
-          cl_ref: ${{ github.event.inputs.cl_branch_ref }}
+          cl_ref: ${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref }}
           dep_solana_sha: ${{ github.event.pull_request.head.sha }}
-          push_tag: ${{ env.CL_ECR }}:solana.${{ github.sha }}
+          push_tag: ${{ env.CL_ECR }}:solana.${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref || github.sha }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
 
-  build_test_image:
-    environment: integration
-    permissions:
-      id-token: write
-      contents: read
-    name: Build Test Image
-    runs-on: ubuntu-latest
-    needs: [e2e_custom_build_artifacts, changes, solana-test-image-exists, get_solana_sha]
-    steps:
-      - name: Collect Metrics
-        id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@0281b09807758be1dcc41651e44e62b353808c47 # v2.1.0
-        with:
-          org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
-          basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
-          hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
-          this-job-name: Build Test Image
-        continue-on-error: true
-      - name: Checkout the repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
-      - name: Build Test Image
-        if: needs.changes.outputs.src == 'true' && needs.solana-test-image-exists.outputs.exists == 'false'
-        uses: ./.github/actions/build-test-image
-        with:
-          tag: ${{ needs.get_solana_sha.outputs.sha }}
-          artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
-          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
-      - run: echo "this exists so we don't have to run anything else if the build is skipped"
-        if: needs.changes.outputs.src == 'false' || needs.solana-test-image-exists.outputs.exists == 'true'
-
-  e2e_custom_run_daily_testnet_smoke_tests:
-    name: E2E Run Daily Smoke Tests
+  e2e_custom_run_smoke_tests:
+    name: E2E Custom Run Smoke Tests
     environment: integration
     permissions:
       checks: write
       pull-requests: write
       id-token: write
       contents: read
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-16cores-64GB
 
-    needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image, build_test_image]
+    needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image, check_test_compilation]
     env:
       TEST_SUITE: smoke
       TEST_ARGS: -test.timeout 30m
-      CHAINLINK_COMMIT_SHA: ${{ github.sha }}
-      CHAINLINK_ENV_USER: ${{ github.actor }}
       TEST_LOG_LEVEL: debug
-      SELECTED_NETWORKS: SIMULATED
-      RPC_URL: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.RPC_URL || 'https://api.devnet.solana.com' }}
-      WS_URL: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.WS_URL || 'wss://api.devnet.solana.com/' }}
-      PROGRAM_ID_OCR2: cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ
-      PROGRAM_ID_ACCESS_CONTROLLER: 9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW
-      PROGRAM_ID_STORE: HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny
-      LINK_TOKEN: 7CF1GrsZsny5j9JESPj98MdYVZK38RE8ZpmTEMwECK4c
-      VAULT_ADDRESS: FdM4dnhVpFQfjPqNG6LEfzArhuGhUjtidYu89qtGwJCS
-      PRIVATE_KEY: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.PRIVATE_KEY || secrets.PRIVATE_KEY }}
-      INTERNAL_DOCKER_REPO: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Collect Metrics
         id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@0281b09807758be1dcc41651e44e62b353808c47 # v2.1.0
+        uses: smartcontractkit/push-gha-metrics-action@dea9b546553cb4ca936607c2267a09c004e4ab3f # v3.0.0
         with:
+          id: solana-e2e-daily
           org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
           basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
           hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
-          this-job-name: E2E Run Daily Smoke Tests
+          this-job-name: E2E Custom Run Daily Smoke Tests
+          test-results-file: '{"testType":"go","filePath":"/tmp/gotest.log"}'
         continue-on-error: true
       - name: Checkout the repo
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+      - name: Install Solana CLI # required for ensuring the local test validator is configured correctly
+        run: ./scripts/install-solana-ci.sh
+      - name: Install gauntlet
+        uses: ./.github/actions/build-gauntlet
+      - name: Generate config overrides
+        run: | # https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/README.md
+          cat << EOF > config.toml
+          [ChainlinkImage]
+          image="${{ env.CL_ECR }}"
+          version="solana.${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref || github.sha }}"
+          [Common]
+          user="${{ github.actor }}"
+          network="devnet"
+          private_key="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.PRIVATE_KEY || secrets.PRIVATE_KEY }}"
+          internal_docker_repo = "${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com"
+          rpc_url = "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.RPC_URL || 'https://api.devnet.solana.com' }}"
+          ws_url = "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.RPC_URL || 'https://api.devnet.solana.com' }}"
+          EOF
+
+          # shellcheck disable=SC2002
+          BASE64_CONFIG_OVERRIDE=$(cat config.toml | base64 -w 0)
+          # shellcheck disable=SC2086
+          echo ::add-mask::$BASE64_CONFIG_OVERRIDE
+          # shellcheck disable=SC2086
+          echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> $GITHUB_ENV
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@ad22fbd6f4d108b82aaf49b527bcf40f32babea8 # v2.2.1
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
         with:
-          test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaGauntletOCRV2Smoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestfmt
+          test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke/embedded -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage
+          test_download_vendor_packages_command: cd ./integration-tests && go mod download
+          download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 
           go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ env.CL_ECR }}
-          cl_image_tag: solana.${{ github.sha }}
-          artifacts_location: /home/runner/work/chainlink-solana/chainlink-solana/integration-tests/logs
+          cl_image_tag: solana.${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
+          artifacts_name: smoke-test-logs
+          artifacts_location: ./integration-tests/smoke/logs/
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
-          should_cleanup: false
+          cache_key_id: solana-e2e-${{ env.MOD_CACHE_VERSION }}
+          cache_restore_only: "false"

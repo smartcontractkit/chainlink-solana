@@ -21,13 +21,20 @@ const (
 	// ReportLen data (61 bytes)
 	MedianLen       uint64 = 16
 	JuelsLen        uint64 = 8
-	ReportHeaderLen uint64 = 4 + 1 + 32 // timestamp (uint32) + number of observers (uint8) + observer array [32]uint8
+	TimestampLen    uint64 = 4  // timestamp (uint32)
+	ObsCountLen     uint64 = 1  // number of observers (uint8)
+	ObsArrLen       uint64 = 32 // observer array [32]
+	ReportHeaderLen uint64 = TimestampLen + ObsCountLen + ObsArrLen
 	ReportLen       uint64 = ReportHeaderLen + MedianLen + JuelsLen
 
 	// MaxOracles is the maximum number of oracles that can be stored onchain
 	MaxOracles = 19
 	// MaxOffchainConfigLen is the maximum byte length for the encoded offchainconfig
 	MaxOffchainConfigLen = 4096
+
+	// Additional lengths for data packed into tx (transmitter.go)
+	StoreNonceLen    = 1
+	ReportContextLen = 3 * 32 // https://github.com/smartcontractkit/chainlink-common/blob/acef4a2b681f9e05bffd70d212ceee1ea1e526dd/pkg/utils/report.go#L12
 )
 
 // State is the struct representing the contract state

@@ -10,6 +10,7 @@ import RDD from '../../../../lib/rdd'
 
 type Input = {
   description: string
+  lastConfigDigest: string
   decimals: string | number
   minAnswer: string | number
   maxAnswer: string | number
@@ -56,6 +57,7 @@ export default class OCR2Inspect extends SolanaCommand {
 
     return {
       description: aggregator.name,
+      lastConfigDigest: aggregator.config.lastConfigDigest,
       decimals: aggregator.decimals,
       minAnswer: aggregator.minSubmissionValue,
       maxAnswer: aggregator.maxSubmissionValue,
@@ -181,6 +183,8 @@ export default class OCR2Inspect extends SolanaCommand {
       )
     })
 
+    const configDigestHex = `0x${this.toHexString(onChainState.config.latestConfigDigest)}`
+
     const input = this.makeInput(this.flags.input)
     // If input does not exist, just print config
     if (!input) {
@@ -192,6 +196,7 @@ export default class OCR2Inspect extends SolanaCommand {
          - Observation Payment: ${onChainState.config.billing.observationPaymentGjuels}
          - Requester Access Controller: ${onChainState.config.requesterAccessController}
          - Billing Access Controller: ${onChainState.config.billingAccessController}
+         - Latest Config Digest: ${configDigestHex}
       `,
       )
       return {
@@ -228,6 +233,7 @@ export default class OCR2Inspect extends SolanaCommand {
     )
 
     const inspections: inspection.Inspection[] = [
+      inspection.makeInspection(configDigestHex, input.lastConfigDigest, 'Config Digest'),
       inspection.makeInspection(
         toComparableNumber(onChainState.config.minAnswer),
         toComparableNumber(input.minAnswer),

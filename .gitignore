@@ -44,8 +44,14 @@ tests-smoke-report.xml
 overrides.toml
 
 # Test & linter reports
+.test_summary/
 *report.xml
 *report.json
 *.out
 *coverage*
 eslint-report.json
+.run.id
+override*.toml
+# go work files
+go.work*
+gauntlet-*/
