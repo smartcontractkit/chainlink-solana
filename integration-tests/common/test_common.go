@@ -238,9 +238,9 @@ func (m *OCRv2TestState) DeployContracts(contractsDir string) {
 
 // CreateJobs creating OCR jobs and EA stubs
 func (m *OCRv2TestState) CreateJobs() {
-	// Setting up RPC
-	c := rpc.New(*m.Config.TestConfig.Common.RPCURL)
-	wsc, err := ws.Connect(testcontext.Get(m.Config.T), *m.Config.TestConfig.Common.WsURL)
+	// Setting up RPC used for external network funding
+	c := rpc.New(m.Common.ChainDetails.RPCURLExternal)
+	wsc, err := ws.Connect(testcontext.Get(m.Config.T), m.Common.ChainDetails.WSURLExternal)
 	require.NoError(m.Config.T, err, "Error connecting to websocket client")
 
 	relayConfig := job.JSONConfig{
