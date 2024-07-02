@@ -84,8 +84,10 @@ func (c *Transmitter) Transmit(
 
 	// pass transmit payload to tx manager queue
 	c.lggr.Debugf("Queuing transmit tx: state (%s) + transmissions (%s)", c.stateID.String(), c.transmissionsID.String())
-	err = c.txManager.Enqueue(c.stateID.String(), tx)
-	return fmt.Errorf("error on Transmit.txManager.Enqueue: %w", err)
+	if err = c.txManager.Enqueue(c.stateID.String(), tx); err != nil {
+		return fmt.Errorf("error on Transmit.txManager.Enqueue: %w", err)
+	}
+	return nil
 }
 
 func (c *Transmitter) LatestConfigDigestAndEpoch(

@@ -301,7 +301,7 @@ func GetConfig(configurationName string, product Product) (TestConfig, error) {
 	var handleSpecialOverrides = func(logger zerolog.Logger, filename, configurationName string, target *TestConfig, content []byte, product Product) error {
 		switch product {
 		default:
-			err := ctf_config.BytesToAnyTomlStruct(logger, filename, configurationName, &testConfig, content)
+			err := ctf_config.BytesToAnyTomlStruct(logger, filename, configurationName, target, content)
 			if err != nil {
 				return fmt.Errorf("error reading file %s: %w", filename, err)
 			}
@@ -324,7 +324,7 @@ func GetConfig(configurationName string, product Product) (TestConfig, error) {
 				return TestConfig{}, fmt.Errorf("error reading embedded config: %w", err)
 			}
 
-			err = handleSpecialOverrides(logger, fileName, configurationName, &testConfig, file, product)
+			err = handleSpecialOverrides(logger, fileName, "", &testConfig, file, product) // use empty configurationName to read default config
 			if err != nil {
 				return TestConfig{}, fmt.Errorf("error unmarshalling embedded config: %w", err)
 			}
@@ -349,7 +349,7 @@ func GetConfig(configurationName string, product Product) (TestConfig, error) {
 			return TestConfig{}, fmt.Errorf("error reading file %s: %w", filePath, err)
 		}
 
-		err = handleSpecialOverrides(logger, fileName, configurationName, &testConfig, content, product)
+		err = handleSpecialOverrides(logger, fileName, "", &testConfig, content, product) // use empty configurationName to read default config
 		if err != nil {
 			return TestConfig{}, fmt.Errorf("error reading file %s: %w", filePath, err)
 		}
@@ -364,7 +364,7 @@ func GetConfig(configurationName string, product Product) (TestConfig, error) {
 			return TestConfig{}, err
 		}
 
-		err = handleSpecialOverrides(logger, Base64OverrideEnvVarName, configurationName, &testConfig, decoded, product)
+		err = handleSpecialOverrides(logger, Base64OverrideEnvVarName, "", &testConfig, decoded, product) // use empty configurationName to read default config
 		if err != nil {
 			return TestConfig{}, fmt.Errorf("error unmarshaling base64 config: %w", err)
 		}

@@ -100,6 +100,10 @@ func (r *Relayer) NewConfigProvider(args relaytypes.RelayArgs) (relaytypes.Confi
 	return configWatcher, err
 }
 
+func (r *Relayer) NewChainWriter(_ []byte) (relaytypes.ChainWriter, error) {
+	return nil, errors.New("chain writer is not supported for solana")
+}
+
 func (r *Relayer) NewContractReader(_ []byte) (relaytypes.ContractReader, error) {
 	return nil, errors.New("contract reader is not supported for solana")
 }
