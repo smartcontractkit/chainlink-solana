@@ -259,12 +259,12 @@ func (m *OCRv2TestState) CreateJobs() {
 		},
 	}
 	jobSpec := &client.OCR2TaskJobSpec{
-		Name:    fmt.Sprintf("sol-OCRv2-%s-%s", "bootstrap", uuid.New().String()),
-		JobType: "bootstrap",
+		Name:        fmt.Sprintf("sol-OCRv2-%s-%s", "bootstrap", uuid.New().String()),
+		JobType:     "bootstrap",
+		Relay:       m.Common.ChainDetails.ChainName,
+		RelayConfig: relayConfig,
 		OCR2OracleSpec: job.OCR2OracleSpec{
 			ContractID:                        m.Gauntlet.OcrAddress,
-			Relay:                             m.Common.ChainDetails.ChainName,
-			RelayConfig:                       relayConfig,
 			P2PV2Bootstrappers:                pq.StringArray{bootstrapPeers[0].P2PV2Bootstrapper()},
 			OCRKeyBundleID:                    null.StringFrom(m.Clients.ChainlinkClient.NKeys[0].OCR2Key.Data.ID),
 			TransmitterID:                     null.StringFrom(m.Clients.ChainlinkClient.NKeys[0].TXKey.Data.ID),
@@ -313,10 +313,10 @@ func (m *OCRv2TestState) CreateJobs() {
 			Name:              fmt.Sprintf("sol-OCRv2-%d-%s", nIdx, uuid.New().String()),
 			JobType:           "offchainreporting2",
 			ObservationSource: bridgeInfo.ObservationSource,
+			Relay:             m.Common.ChainDetails.ChainName,
+			RelayConfig:       relayConfig,
 			OCR2OracleSpec: job.OCR2OracleSpec{
 				ContractID:                        m.Gauntlet.OcrAddress,
-				Relay:                             m.Common.ChainDetails.ChainName,
-				RelayConfig:                       relayConfig,
 				P2PV2Bootstrappers:                pq.StringArray{bootstrapPeers[0].P2PV2Bootstrapper()},
 				OCRKeyBundleID:                    null.StringFrom(m.Clients.ChainlinkClient.NKeys[nIdx].OCR2Key.Data.ID),
 				TransmitterID:                     null.StringFrom(m.Clients.ChainlinkClient.NKeys[nIdx].TXKey.Data.ID),
