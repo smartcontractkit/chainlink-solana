@@ -3,7 +3,7 @@ import { join } from 'path'
 
 export enum CONTRACT_LIST {
   ACCESS_CONTROLLER = 'access_controller',
-  OCR_2 = 'ocr2',
+  OCR_2 = 'ocr_2',
   STORE = 'store',
   TOKEN = 'token',
 }
