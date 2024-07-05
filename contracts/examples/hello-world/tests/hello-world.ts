@@ -43,14 +43,14 @@ describe("hello-world", () => {
           header + (liveLength + historicalLength) * transmissionSize
         ),
       }).rpc({ commitment: "confirmed" });
-    console.log("deployed store")
+    console.log("deployed store");
 
     await storeProgram.methods.setWriter(owner.publicKey).accounts({
       feed: feed.publicKey,
       owner: owner.publicKey,
       authority: owner.publicKey,
     }).rpc({ commitment: "confirmed" });
-    console.log("set writer on store")
+    console.log("set writer on store");
 
     const scale = new BN(10).pow(new BN(decimals));
     // Scale answer to enough decimals
@@ -62,7 +62,7 @@ describe("hello-world", () => {
         feed: feed.publicKey,
         authority: owner.publicKey,
     }).rpc({ commitment: "confirmed" });
-    console.log("value written to store")
+    console.log("value written to store");
 
     // Add your test here.
     tx = await program.methods.execute().accounts({
