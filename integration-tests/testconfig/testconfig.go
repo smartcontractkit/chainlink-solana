@@ -105,6 +105,11 @@ func (c *TestConfig) GetNodeConfigTOML() (string, error) {
 	baseConfig.P2P.V2.DeltaReconcile = fiveSecondDuration
 	baseConfig.P2P.V2.ListenAddresses = &[]string{"0.0.0.0:6690"}
 
+	// disable all EVM networks
+	for i := range baseConfig.EVM {
+		baseConfig.EVM[i].Enabled = ptr.Ptr(false)
+	}
+
 	return baseConfig.TOMLString()
 }
 
