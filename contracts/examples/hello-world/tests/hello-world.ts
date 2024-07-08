@@ -42,7 +42,7 @@ describe("hello-world", () => {
           feed,
           header + (liveLength + historicalLength) * transmissionSize
         ),
-      }).rpc({ commitment: "confirmed" });
+      ]).rpc({ commitment: "confirmed" });
     console.log("deployed store");
 
     await storeProgram.methods.setWriter(owner.publicKey).accounts({

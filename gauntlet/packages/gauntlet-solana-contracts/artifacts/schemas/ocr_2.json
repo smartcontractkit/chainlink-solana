@@ -1,6 +1,6 @@
 {
   "version": "1.0.1",
-  "name": "ocr2",
+  "name": "ocr_2",
   "constants": [
     {
       "name": "MAX_ORACLES",
