@@ -100,7 +100,7 @@ func (r *Relayer) NewConfigProvider(args relaytypes.RelayArgs) (relaytypes.Confi
 	return configWatcher, err
 }
 
-func (r *Relayer) NewChainWriter(_ []byte) (relaytypes.ChainWriter, error) {
+func (r *Relayer) NewChainWriter(_ context.Context, _ []byte) (relaytypes.ChainWriter, error) {
 	return nil, errors.New("chain writer is not supported for solana")
 }
 
