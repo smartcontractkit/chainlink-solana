@@ -169,8 +169,8 @@ func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, contractN
 	return nil
 }
 
-// BatchGetLatestValue implements the types.ContractReader interface.
-func (s *SolanaChainReaderService) BatchGetLatestValue(_ context.Context, _ types.BatchGetLatestValueRequest) (types.BatchGetLatestValueResult, error) {
+// BatchGetLatestValues implements the types.ContractReader interface.
+func (s *SolanaChainReaderService) BatchGetLatestValues(_ context.Context, _ types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
 	return nil, errors.New("unimplemented")
 }
 

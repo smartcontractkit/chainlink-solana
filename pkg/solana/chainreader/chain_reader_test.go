@@ -459,18 +459,6 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 							},
 						},
 					},
-					DifferentMethodReturningUint64: {
-						AnchorIDL: fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""),
-						Encoding:  config.EncodingTypeBorsh,
-						Procedures: []config.ChainReaderProcedure{
-							{
-								IDLAccount: "SimpleUint64Value",
-								OutputModifications: codeccommon.ModifiersConfig{
-									&codeccommon.PropertyExtractorConfig{FieldName: "I"},
-								},
-							},
-						},
-					},
 					MethodReturningUint64Slice: {
 						AnchorIDL: fmt.Sprintf(baseIDL, uint64SliceBaseTypeIDL, ""),
 						Encoding:  config.EncodingTypeBincode,
@@ -609,7 +597,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 		}
 
 		r.client.SetNext(bts, nil, 0)
-	case AnySecondContractName + MethodReturningUint64, AnyContractName + DifferentMethodReturningUint64:
+	case AnySecondContractName + MethodReturningUint64, AnyContractName:
 		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""), config.EncodingTypeBorsh)
 		onChainStruct := struct {
 			I uint64
@@ -627,7 +615,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 		nextStruct := CreateTestStruct[*testing.T](0, r.tester)
 		r.testStructQueue = append(r.testStructQueue, &nextStruct)
 
-		a, b = getAddresses(r.test, r.tester, 5, 6)
+		a, b = getAddresses(r.test, r.tester, 4, 5)
 
 		fallthrough
 	default:
@@ -664,9 +652,9 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 	return r.service.GetLatestValue(ctx, contractName, method, params, returnVal)
 }
 
-// BatchGetLatestValue implements the types.ContractReader interface.
-func (r *wrappedTestChainReader) BatchGetLatestValue(_ context.Context, _ types.BatchGetLatestValueRequest) (types.BatchGetLatestValueResult, error) {
-	r.test.Skip("BatchGetLatestValue is not yet supported in Solana")
+// BatchGetLatestValues implements the types.ContractReader interface.
+func (r *wrappedTestChainReader) BatchGetLatestValues(_ context.Context, _ types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
+	r.test.Skip("BatchGetLatestValues is not yet supported in Solana")
 	return nil, nil
 }
 
@@ -724,11 +712,10 @@ func (r *chainReaderInterfaceTester) GetBindings(t *testing.T) []types.BoundCont
 		{Name: strings.Join([]string{AnyContractName, MethodTakingLatestParamsReturningTestStruct, "0"}, "."), Address: r.address[0], Pending: true},
 		{Name: strings.Join([]string{AnyContractName, MethodTakingLatestParamsReturningTestStruct, "1"}, "."), Address: r.address[1], Pending: true},
 		{Name: strings.Join([]string{AnyContractName, MethodReturningUint64, "0"}, "."), Address: r.address[2], Pending: true},
-		{Name: strings.Join([]string{AnyContractName, DifferentMethodReturningUint64, "0"}, "."), Address: r.address[3], Pending: true},
-		{Name: strings.Join([]string{AnyContractName, MethodReturningUint64Slice, "0"}, "."), Address: r.address[4], Pending: true},
-		{Name: strings.Join([]string{AnyContractName, MethodReturningSeenStruct, "0"}, "."), Address: r.address[5], Pending: true},
-		{Name: strings.Join([]string{AnyContractName, MethodReturningSeenStruct, "1"}, "."), Address: r.address[6], Pending: true},
-		{Name: strings.Join([]string{AnySecondContractName, MethodReturningUint64, "0"}, "."), Address: r.address[7], Pending: true},
+		{Name: strings.Join([]string{AnyContractName, MethodReturningUint64Slice, "0"}, "."), Address: r.address[3], Pending: true},
+		{Name: strings.Join([]string{AnyContractName, MethodReturningSeenStruct, "0"}, "."), Address: r.address[4], Pending: true},
+		{Name: strings.Join([]string{AnyContractName, MethodReturningSeenStruct, "1"}, "."), Address: r.address[5], Pending: true},
+		{Name: strings.Join([]string{AnySecondContractName, MethodReturningUint64, "0"}, "."), Address: r.address[6], Pending: true},
 	}
 }
 
@@ -877,8 +864,8 @@ func (s *skipEventsChainReader) GetLatestValue(ctx context.Context, contractName
 	return s.ContractReader.GetLatestValue(ctx, contractName, method, params, returnVal)
 }
 
-func (s *skipEventsChainReader) BatchGetLatestValue(_ context.Context, _ types.BatchGetLatestValueRequest) (types.BatchGetLatestValueResult, error) {
-	s.t.Skip("BatchGetLatestValue is not yet supported in Solana")
+func (s *skipEventsChainReader) BatchGetLatestValues(_ context.Context, _ types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
+	s.t.Skip("BatchGetLatestValues is not yet supported in Solana")
 	return nil, nil
 }
 
