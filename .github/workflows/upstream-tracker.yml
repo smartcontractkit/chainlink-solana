@@ -60,6 +60,7 @@ jobs:
             echo "## Agave Wiki"; 
             echo "[${{ steps.updates.outputs.wikirange }}](https://github.com/anza-xyz/agave/wiki/_compare/${{steps.updates.outputs.wikirange }})"; 
             echo "\`\`\`diff"; 
+            # shellcheck disable=SC1003
             echo -e "${{ steps.updates.outputs.wiki }}" | tr -d '\'; # unescape + remove remaining backticks
             echo "\`\`\`"; 
           } >>  output.md
