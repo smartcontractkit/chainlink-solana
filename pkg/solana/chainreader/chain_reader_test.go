@@ -719,13 +719,13 @@ func (r *chainReaderInterfaceTester) TriggerEvent(t *testing.T, testStruct *Test
 
 func (r *chainReaderInterfaceTester) GetBindings(t *testing.T) []types.BoundContract {
 	return []types.BoundContract{
-		{Name: strings.Join([]string{AnyContractName, MethodTakingLatestParamsReturningTestStruct, "0"}, "."), Address: r.address[0], Pending: true},
-		{Name: strings.Join([]string{AnyContractName, MethodTakingLatestParamsReturningTestStruct, "1"}, "."), Address: r.address[1], Pending: true},
-		{Name: strings.Join([]string{AnyContractName, MethodReturningUint64, "0"}, "."), Address: r.address[2], Pending: true},
-		{Name: strings.Join([]string{AnyContractName, MethodReturningUint64Slice, "0"}, "."), Address: r.address[3], Pending: true},
-		{Name: strings.Join([]string{AnyContractName, MethodReturningSeenStruct, "0"}, "."), Address: r.address[4], Pending: true},
-		{Name: strings.Join([]string{AnyContractName, MethodReturningSeenStruct, "1"}, "."), Address: r.address[5], Pending: true},
-		{Name: strings.Join([]string{AnySecondContractName, MethodReturningUint64, "0"}, "."), Address: r.address[6], Pending: true},
+		{Name: strings.Join([]string{AnyContractName, MethodTakingLatestParamsReturningTestStruct, "0"}, "."), Address: r.address[0]},
+		{Name: strings.Join([]string{AnyContractName, MethodTakingLatestParamsReturningTestStruct, "1"}, "."), Address: r.address[1]},
+		{Name: strings.Join([]string{AnyContractName, MethodReturningUint64, "0"}, "."), Address: r.address[2]},
+		{Name: strings.Join([]string{AnyContractName, MethodReturningUint64Slice, "0"}, "."), Address: r.address[3]},
+		{Name: strings.Join([]string{AnyContractName, MethodReturningSeenStruct, "0"}, "."), Address: r.address[4]},
+		{Name: strings.Join([]string{AnyContractName, MethodReturningSeenStruct, "1"}, "."), Address: r.address[5]},
+		{Name: strings.Join([]string{AnySecondContractName, MethodReturningUint64, "0"}, "."), Address: r.address[6]},
 	}
 }
 
