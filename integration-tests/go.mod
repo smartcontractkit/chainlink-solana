@@ -15,10 +15,10 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.2
 	github.com/rs/zerolog v1.31.0
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240712101200-5b11e6cc6e86
-	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240710164543-c4891620b6dd
+	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240712132946-267a37c5ac6e
 	github.com/smartcontractkit/chainlink-testing-framework v1.32.2
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240712093950-14ade151fb28
-	github.com/smartcontractkit/chainlink/v2 v2.10.0-beta0.0.20240712093950-14ade151fb28
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240712150704-055a9d24f80a
+	github.com/smartcontractkit/chainlink/v2 v2.10.0-beta0.0.20240712150704-055a9d24f80a
 	github.com/smartcontractkit/libocr v0.0.0-20240702141926-063ceef8c42e
 	github.com/smartcontractkit/seth v1.0.12
 	github.com/stretchr/testify v1.9.0
