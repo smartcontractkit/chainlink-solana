@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-solana/integration-tests
 
-go 1.21.7
+go 1.22.5
 
 replace github.com/smartcontractkit/chainlink-solana => ../
 
@@ -14,11 +14,11 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/pelletier/go-toml/v2 v2.2.2
 	github.com/rs/zerolog v1.31.0
-	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240710114009-3df55c8b7e75
-	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240708150922-0546185ead68
-	github.com/smartcontractkit/chainlink-testing-framework v1.31.10
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240710151026-df3b03391fed
-	github.com/smartcontractkit/chainlink/v2 v2.10.0-beta0.0.20240710151026-df3b03391fed
+	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240712101200-5b11e6cc6e86
+	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240710164543-c4891620b6dd
+	github.com/smartcontractkit/chainlink-testing-framework v1.32.2
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240712093950-14ade151fb28
+	github.com/smartcontractkit/chainlink/v2 v2.10.0-beta0.0.20240712093950-14ade151fb28
 	github.com/smartcontractkit/libocr v0.0.0-20240702141926-063ceef8c42e
 	github.com/smartcontractkit/seth v1.0.12
 	github.com/stretchr/testify v1.9.0
@@ -361,7 +361,7 @@ require (
 	github.com/smartcontractkit/chainlink-automation v1.0.4 // indirect
 	github.com/smartcontractkit/chainlink-cosmos v0.4.1-0.20240710121324-3ed288aa9b45 // indirect
 	github.com/smartcontractkit/chainlink-data-streams v0.0.0-20240702145022-37a2c3a742d1 // indirect
-	github.com/smartcontractkit/chainlink-feeds v0.0.0-20240708122322-f972e7dee350 // indirect
+	github.com/smartcontractkit/chainlink-feeds v0.0.0-20240710170203-5b41615da827 // indirect
 	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20240709043547-03612098f799 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/grafana v0.0.0-20240405215812-5a72bc9af239 // indirect
 	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20230906073235-9e478e5e19f1 // indirect
