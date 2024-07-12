@@ -14,7 +14,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/pelletier/go-toml/v2 v2.2.2
 	github.com/rs/zerolog v1.31.0
-	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240711122109-db6b639317b1
+	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240712101200-5b11e6cc6e86
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240710164543-c4891620b6dd
 	github.com/smartcontractkit/chainlink-testing-framework v1.32.2
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240712093950-14ade151fb28
