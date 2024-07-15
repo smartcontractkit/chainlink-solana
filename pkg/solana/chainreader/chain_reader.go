@@ -189,7 +189,6 @@ func (s *SolanaChainReaderService) QueryKey(ctx context.Context, contractName st
 // ReplaySequence implements the types.ContractReader interface.
 func (s *SolanaChainReaderService) ReplaySequence(_ context.Context, _, _ string, _ string) error {
 	return errors.New("unimplemented")
-
 }
 
 // CreateContractType implements the ContractTypeProvider interface and allows the chain reader
