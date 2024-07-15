@@ -666,6 +666,12 @@ func (r *wrappedTestChainReader) QueryKey(ctx context.Context, contractName stri
 	return nil, nil
 }
 
+// ReplaySequence implements the types.ContractReader interface.
+func (r *wrappedTestChainReader) ReplaySequence(_ context.Context, _, _ string, _ string) error {
+	r.test.Skip("ReplaySequence is not yet supported in Solana")
+	return nil
+}
+
 func getAddresses(t *testing.T, tester ChainReaderInterfaceTester[*testing.T], a, b int) (ag_solana.PublicKey, ag_solana.PublicKey) {
 	t.Helper()
 
@@ -713,8 +719,9 @@ func (r *chainReaderInterfaceTester) SetBatchLatestValues(t *testing.T, _ BatchC
 	t.Skip("GetBatchLatestValues is not yet supported in Solana")
 }
 
-func (r *chainReaderInterfaceTester) TriggerEvent(t *testing.T, testStruct *TestStruct) {
+func (r *chainReaderInterfaceTester) TriggerEvent(t *testing.T, _ *TestStruct) string {
 	t.Skip("Events are not yet supported in Solana")
+	return ""
 }
 
 func (r *chainReaderInterfaceTester) GetBindings(t *testing.T) []types.BoundContract {
@@ -882,4 +889,9 @@ func (s *skipEventsChainReader) BatchGetLatestValues(_ context.Context, _ types.
 func (s *skipEventsChainReader) QueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
 	s.t.Skip("QueryKey is not yet supported in Solana")
 	return nil, nil
+}
+
+func (s *skipEventsChainReader) ReplaySequence(_ context.Context, _, _ string, _ string) error {
+	s.t.Skip("ReplaySequence is not yet supported in Solana")
+	return nil
 }

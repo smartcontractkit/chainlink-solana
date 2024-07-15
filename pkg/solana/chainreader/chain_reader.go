@@ -92,6 +92,12 @@ func (s *SolanaChainReaderService) HealthReport() map[string]error {
 	return map[string]error{s.Name(): s.Healthy()}
 }
 
+// Bind implements the types.ContractReader interface and allows new contract bindings to be added
+// to the service.
+func (s *SolanaChainReaderService) Bind(_ context.Context, bindings []types.BoundContract) error {
+	return s.bindings.Bind(bindings)
+}
+
 // GetLatestValue implements the types.ContractReader interface and requests and parses on-chain
 // data named by the provided contract, method, and params.
 func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, contractName, method string, _ primitives.ConfidenceLevel, params any, returnVal any) error {
@@ -180,10 +186,10 @@ func (s *SolanaChainReaderService) QueryKey(ctx context.Context, contractName st
 	return nil, errors.New("unimplemented")
 }
 
-// Bind implements the types.ContractReader interface and allows new contract bindings to be added
-// to the service.
-func (s *SolanaChainReaderService) Bind(_ context.Context, bindings []types.BoundContract) error {
-	return s.bindings.Bind(bindings)
+// ReplaySequence implements the types.ContractReader interface.
+func (s *SolanaChainReaderService) ReplaySequence(_ context.Context, _, _ string, _ string) error {
+	return errors.New("unimplemented")
+
 }
 
 // CreateContractType implements the ContractTypeProvider interface and allows the chain reader
