@@ -167,28 +167,32 @@ func TestCache(t *testing.T) {
 	}))
 
 	lggr := logger.Test(t)
-	stateCache := StateCache{
-		StateID: solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
-		cfg:     config.NewDefault(),
-		reader:  testSetupReader(t, mockServer.URL),
-		lggr:    lggr,
-	}
+	stateCache := NewStateCache(
+		solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
+		"test-chain-id",
+		config.NewDefault(),
+		testSetupReader(t, mockServer.URL),
+		lggr,
+	)
 	require.NoError(t, stateCache.Start(ctx))
 	require.NoError(t, stateCache.Close())
-	require.NoError(t, stateCache.fetchState(ctx))
-	assert.Equal(t, "GADeYvXjPwZP7ds1yDY9VFp12bNjdxT1YyksMvFGK9xn", stateCache.state.Transmissions.String())
-	assert.True(t, !stateCache.stateTime.IsZero())
+	require.NoError(t, stateCache.Fetch(ctx))
+	state, err := stateCache.ReadState()
+	require.NoError(t, err)
+	assert.Equal(t, "GADeYvXjPwZP7ds1yDY9VFp12bNjdxT1YyksMvFGK9xn", state.Transmissions.String())
+	assert.True(t, !stateCache.Timestamp().IsZero())
 
-	transmissionsCache := TransmissionsCache{
-		TransmissionsID: solana.MustPublicKeyFromBase58("11111111111111111111111111111112"),
-		cfg:             config.NewDefault(),
-		reader:          testSetupReader(t, mockServer.URL),
-		lggr:            lggr,
-	}
+	transmissionsCache := NewTransmissionsCache(
+		solana.MustPublicKeyFromBase58("11111111111111111111111111111112"),
+		"test-chain-id",
+		config.NewDefault(),
+		testSetupReader(t, mockServer.URL),
+		lggr,
+	)
 	require.NoError(t, transmissionsCache.Start(ctx))
 	require.NoError(t, transmissionsCache.Close())
 
-	require.NoError(t, transmissionsCache.fetchLatestTransmission(ctx))
+	require.NoError(t, transmissionsCache.Fetch(ctx))
 	answer, err := transmissionsCache.ReadAnswer()
 	assert.NoError(t, err)
 	assert.Equal(t, expectedTime, answer.Timestamp)

@@ -2,23 +2,17 @@ package solana
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"sync"
-	"time"
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 )
 
 var (
@@ -26,115 +20,20 @@ var (
 )
 
 type StateCache struct {
-	services.StateMachine
-	// on-chain program + 2x state accounts (state + transmissions)
-	StateID solana.PublicKey
-	chainID string
-
-	stateLock sync.RWMutex
-	state     State
-	stateTime time.Time
-
-	// dependencies
-	reader client.Reader
-	cfg    config.Config
-	lggr   logger.Logger
-
-	// polling
-	done   chan struct{}
-	stopCh services.StopChan
+	*client.Cache[State]
 }
 
 func NewStateCache(stateID solana.PublicKey, chainID string, cfg config.Config, reader client.Reader, lggr logger.Logger) *StateCache {
-	return &StateCache{
-		StateID: stateID,
-		chainID: chainID,
-		reader:  reader,
-		lggr:    lggr,
-		cfg:     cfg,
+	name := "ocr2_median_state"
+	getter := func(ctx context.Context) (State, uint64, error) {
+		return GetState(ctx, reader, stateID, cfg.Commitment())
 	}
-}
-
-// Start polling
-func (c *StateCache) Start(ctx context.Context) error {
-	return c.StartOnce("pollState", func() error {
-		c.done = make(chan struct{})
-		c.stopCh = make(chan struct{})
-		// We synchronously update the config on start so that
-		// when OCR starts there is config available (if possible).
-		// Avoids confusing "contract has not been configured" OCR errors.
-		err := c.fetchState(ctx)
-		if err != nil {
-			c.lggr.Warnf("error in initial PollState.fetchState %s", err)
-		}
-		go c.PollState()
-		return nil
-	})
-}
-
-// PollState contains the state and transmissions polling implementation
-func (c *StateCache) PollState() {
-	defer close(c.done)
-	ctx, cancel := c.stopCh.NewCtx()
-	defer cancel()
-	c.lggr.Debugf("Starting state polling for state: %s", c.StateID)
-	tick := time.After(0)
-	for {
-		select {
-		case <-ctx.Done():
-			c.lggr.Debugf("Stopping state polling for state: %s", c.StateID)
-			return
-		case <-tick:
-			// async poll both ocr2 states
-			start := time.Now()
-			err := c.fetchState(ctx)
-			if err != nil {
-				c.lggr.Errorf("error in PollState.fetchState %s", err)
-			}
-			// Note negative duration will be immediately ready
-			tick = time.After(utils.WithJitter(c.cfg.OCR2CachePollPeriod()) - time.Since(start))
-		}
-	}
-}
-
-// Close stops the polling
-func (c *StateCache) Close() error {
-	return c.StopOnce("pollState", func() error {
-		close(c.stopCh)
-		<-c.done
-		return nil
-	})
+	return &StateCache{client.NewCache(name, stateID, chainID, cfg, getter, logger.With(lggr, "cache", name))}
 }
 
 // ReadState reads the latest state from memory with mutex and errors if timeout is exceeded
 func (c *StateCache) ReadState() (State, error) {
-	c.stateLock.RLock()
-	defer c.stateLock.RUnlock()
-
-	var err error
-	if time.Since(c.stateTime) > c.cfg.OCR2CacheTTL() {
-		err = errors.New("error in ReadState: stale state data, polling is likely experiencing errors")
-	}
-	return c.state, err
-}
-
-func (c *StateCache) fetchState(ctx context.Context) error {
-	c.lggr.Debugf("fetch state for account: %s", c.StateID.String())
-	state, _, err := GetState(ctx, c.reader, c.StateID, c.cfg.Commitment())
-	if err != nil {
-		return err
-	}
-
-	c.lggr.Debugf("state fetched for account: %s, result (config digest): %v", c.StateID, hex.EncodeToString(state.Config.LatestConfigDigest[:]))
-
-	timestamp := time.Now()
-	monitor.SetCacheTimestamp(timestamp, "ocr2_median_state", c.chainID, c.StateID.String())
-	// acquire lock and write to state
-	c.stateLock.Lock()
-	defer c.stateLock.Unlock()
-	c.state = state
-	c.stateTime = timestamp
-	return nil
+	return c.Read()
 }
 
 func GetState(ctx context.Context, reader client.AccountReader, account solana.PublicKey, commitment rpc.CommitmentType) (State, uint64, error) {
