@@ -3,6 +3,7 @@ package chainreader_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -24,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader"
@@ -102,7 +104,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 
 		var result modifiedStructWithNestedStruct
 
-		require.NoError(t, svc.GetLatestValue(ctx, Namespace, NamedMethod, nil, &result))
+		require.NoError(t, svc.GetLatestValue(ctx, Namespace, NamedMethod, primitives.Unconfirmed, nil, &result))
 		assert.Equal(t, expected.InnerStruct, result.InnerStruct)
 		assert.Equal(t, expected.Value, result.V)
 		assert.Equal(t, expected.TimeVal, result.TimeVal)
@@ -130,7 +132,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 
 		var result modifiedStructWithNestedStruct
 
-		assert.ErrorIs(t, svc.GetLatestValue(ctx, Namespace, NamedMethod, nil, &result), expectedErr)
+		assert.ErrorIs(t, svc.GetLatestValue(ctx, Namespace, NamedMethod, primitives.Unconfirmed, nil, &result), expectedErr)
 	})
 
 	t.Run("Method Not Found", func(t *testing.T) {
@@ -151,7 +153,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 
 		var result modifiedStructWithNestedStruct
 
-		assert.NotNil(t, svc.GetLatestValue(ctx, Namespace, "Unknown", nil, &result))
+		assert.NotNil(t, svc.GetLatestValue(ctx, Namespace, "Unknown", primitives.Unconfirmed, nil, &result))
 	})
 
 	t.Run("Namespace Not Found", func(t *testing.T) {
@@ -172,7 +174,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 
 		var result modifiedStructWithNestedStruct
 
-		assert.NotNil(t, svc.GetLatestValue(ctx, "Unknown", "Unknown", nil, &result))
+		assert.NotNil(t, svc.GetLatestValue(ctx, "Unknown", "Unknown", primitives.Unconfirmed, nil, &result))
 	})
 
 	t.Run("Bind Success", func(t *testing.T) {
@@ -356,7 +358,7 @@ func (_m *mockedRPCClient) ReadAll(_ context.Context, pk ag_solana.PublicKey, _ 
 	}
 
 	if len(_m.sequence) == 0 {
-		panic("no values to return")
+		return nil, errors.New(" no values to return")
 	}
 
 	next := _m.sequence[0]
@@ -413,7 +415,7 @@ func (r *chainReaderInterfaceTester) Name() string {
 }
 
 func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
-	r.address = make([]string, 8)
+	r.address = make([]string, 7)
 	for idx := range r.address {
 		r.address[idx] = ag_solana.NewWallet().PublicKey().String()
 	}
@@ -448,18 +450,6 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 						},
 					},
 					MethodReturningUint64: {
-						AnchorIDL: fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""),
-						Encoding:  config.EncodingTypeBorsh,
-						Procedures: []config.ChainReaderProcedure{
-							{
-								IDLAccount: "SimpleUint64Value",
-								OutputModifications: codeccommon.ModifiersConfig{
-									&codeccommon.PropertyExtractorConfig{FieldName: "I"},
-								},
-							},
-						},
-					},
-					DifferentMethodReturningUint64: {
 						AnchorIDL: fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""),
 						Encoding:  config.EncodingTypeBorsh,
 						Procedures: []config.ChainReaderProcedure{
@@ -572,7 +562,7 @@ func (r *wrappedTestChainReader) Name() string {
 	return "wrappedTestChainReader"
 }
 
-func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractName string, method string, params, returnVal any) error {
+func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractName string, method string, confidenceLevel primitives.ConfidenceLevel, params, returnVal any) error {
 	var (
 		a ag_solana.PublicKey
 		b ag_solana.PublicKey
@@ -609,7 +599,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 		}
 
 		r.client.SetNext(bts, nil, 0)
-	case AnySecondContractName + MethodReturningUint64, AnyContractName + DifferentMethodReturningUint64:
+	case AnySecondContractName + MethodReturningUint64, AnyContractName:
 		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""), config.EncodingTypeBorsh)
 		onChainStruct := struct {
 			I uint64
@@ -627,7 +617,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 		nextStruct := CreateTestStruct[*testing.T](0, r.tester)
 		r.testStructQueue = append(r.testStructQueue, &nextStruct)
 
-		a, b = getAddresses(r.test, r.tester, 5, 6)
+		a, b = getAddresses(r.test, r.tester, 4, 5)
 
 		fallthrough
 	default:
@@ -661,7 +651,13 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 		r.client.SetForAddress(b, bts, nil, 50*time.Millisecond)
 	}
 
-	return r.service.GetLatestValue(ctx, contractName, method, params, returnVal)
+	return r.service.GetLatestValue(ctx, contractName, method, confidenceLevel, params, returnVal)
+}
+
+// BatchGetLatestValues implements the types.ContractReader interface.
+func (r *wrappedTestChainReader) BatchGetLatestValues(_ context.Context, _ types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
+	r.test.Skip("BatchGetLatestValues is not yet supported in Solana")
+	return nil, nil
 }
 
 // QueryKey implements the types.ContractReader interface.
@@ -691,10 +687,18 @@ func (r *wrappedTestChainReader) CreateContractType(contractName, itemType strin
 	return r.service.CreateContractType(contractName, itemType, forEncoding)
 }
 
-// SetLatestValue is expected to return the same bound contract and method in the same test
+func (r *chainReaderInterfaceTester) SetUintLatestValue(t *testing.T, _ uint64, _ ExpectedGetLatestValueArgs) {
+	t.Skip("SetUintLatestValue is not yet supported in Solana")
+}
+
+func (r *chainReaderInterfaceTester) GenerateBlocksTillConfidenceLevel(t *testing.T, _, _ string, _ primitives.ConfidenceLevel) {
+	t.Skip("GenerateBlocksTillConfidenceLevel is not yet supported in Solana")
+}
+
+// SetTestStructLatestValue is expected to return the same bound contract and method in the same test
 // Any setup required for this should be done in Setup.
 // The contract should take a LatestParams as the params and return the nth TestStruct set
-func (r *chainReaderInterfaceTester) SetLatestValue(t *testing.T, testStruct *TestStruct) {
+func (r *chainReaderInterfaceTester) SetTestStructLatestValue(t *testing.T, testStruct *TestStruct) {
 	if r.reader == nil {
 		r.reader = &wrappedTestChainReader{
 			test:   t,
@@ -705,20 +709,23 @@ func (r *chainReaderInterfaceTester) SetLatestValue(t *testing.T, testStruct *Te
 	r.reader.testStructQueue = append(r.reader.testStructQueue, testStruct)
 }
 
+func (r *chainReaderInterfaceTester) SetBatchLatestValues(t *testing.T, _ BatchCallEntry) {
+	t.Skip("GetBatchLatestValues is not yet supported in Solana")
+}
+
 func (r *chainReaderInterfaceTester) TriggerEvent(t *testing.T, testStruct *TestStruct) {
 	t.Skip("Events are not yet supported in Solana")
 }
 
 func (r *chainReaderInterfaceTester) GetBindings(t *testing.T) []types.BoundContract {
 	return []types.BoundContract{
-		{Name: strings.Join([]string{AnyContractName, MethodTakingLatestParamsReturningTestStruct, "0"}, "."), Address: r.address[0], Pending: true},
-		{Name: strings.Join([]string{AnyContractName, MethodTakingLatestParamsReturningTestStruct, "1"}, "."), Address: r.address[1], Pending: true},
-		{Name: strings.Join([]string{AnyContractName, MethodReturningUint64, "0"}, "."), Address: r.address[2], Pending: true},
-		{Name: strings.Join([]string{AnyContractName, DifferentMethodReturningUint64, "0"}, "."), Address: r.address[3], Pending: true},
-		{Name: strings.Join([]string{AnyContractName, MethodReturningUint64Slice, "0"}, "."), Address: r.address[4], Pending: true},
-		{Name: strings.Join([]string{AnyContractName, MethodReturningSeenStruct, "0"}, "."), Address: r.address[5], Pending: true},
-		{Name: strings.Join([]string{AnyContractName, MethodReturningSeenStruct, "1"}, "."), Address: r.address[6], Pending: true},
-		{Name: strings.Join([]string{AnySecondContractName, MethodReturningUint64, "0"}, "."), Address: r.address[7], Pending: true},
+		{Name: strings.Join([]string{AnyContractName, MethodTakingLatestParamsReturningTestStruct, "0"}, "."), Address: r.address[0]},
+		{Name: strings.Join([]string{AnyContractName, MethodTakingLatestParamsReturningTestStruct, "1"}, "."), Address: r.address[1]},
+		{Name: strings.Join([]string{AnyContractName, MethodReturningUint64, "0"}, "."), Address: r.address[2]},
+		{Name: strings.Join([]string{AnyContractName, MethodReturningUint64Slice, "0"}, "."), Address: r.address[3]},
+		{Name: strings.Join([]string{AnyContractName, MethodReturningSeenStruct, "0"}, "."), Address: r.address[4]},
+		{Name: strings.Join([]string{AnyContractName, MethodReturningSeenStruct, "1"}, "."), Address: r.address[5]},
+		{Name: strings.Join([]string{AnySecondContractName, MethodReturningUint64, "0"}, "."), Address: r.address[6]},
 	}
 }
 
@@ -859,12 +866,17 @@ type skipEventsChainReader struct {
 	t *testing.T
 }
 
-func (s *skipEventsChainReader) GetLatestValue(ctx context.Context, contractName string, method string, params, returnVal any) error {
+func (s *skipEventsChainReader) GetLatestValue(ctx context.Context, contractName string, method string, confidenceLevel primitives.ConfidenceLevel, params, returnVal any) error {
 	if contractName == AnyContractName && method == EventName {
 		s.t.Skip("Events are not yet supported in Solana")
 	}
 
-	return s.ContractReader.GetLatestValue(ctx, contractName, method, params, returnVal)
+	return s.ContractReader.GetLatestValue(ctx, contractName, method, confidenceLevel, params, returnVal)
+}
+
+func (s *skipEventsChainReader) BatchGetLatestValues(_ context.Context, _ types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
+	s.t.Skip("BatchGetLatestValues is not yet supported in Solana")
+	return nil, nil
 }
 
 func (s *skipEventsChainReader) QueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
