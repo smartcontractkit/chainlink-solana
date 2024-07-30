@@ -108,6 +108,10 @@ func (r *Relayer) NewContractReader(_ []byte) (relaytypes.ContractReader, error)
 	return nil, errors.New("contract reader is not supported for solana")
 }
 
+func (r *Relayer) NewContractStateReader(config []byte) (relaytypes.ContractStateReader, error) {
+	return nil, errors.New("contract state reader is not supported for solana")
+}
+
 func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MedianProvider, error) {
 	ctx, cancel := r.stopCh.NewCtx()
 	defer cancel()

@@ -312,12 +312,12 @@ func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error
 		},
 	}
 	jobSpec := &client.OCR2TaskJobSpec{
-		Name:    fmt.Sprintf("sol-OCRv2-%s-%s", "bootstrap", uuid.New().String()),
-		JobType: "bootstrap",
+		Name:        fmt.Sprintf("sol-OCRv2-%s-%s", "bootstrap", uuid.New().String()),
+		JobType:     "bootstrap",
+		Relay:       c.ChainDetails.ChainName,
+		RelayConfig: relayConfig,
 		OCR2OracleSpec: job.OCR2OracleSpec{
 			ContractID:                        contractNodeInfo.OCR2.Address(),
-			Relay:                             c.ChainDetails.ChainName,
-			RelayConfig:                       relayConfig,
 			P2PV2Bootstrappers:                pq.StringArray{bootstrapPeers[0].P2PV2Bootstrapper()},
 			OCRKeyBundleID:                    null.StringFrom(contractNodeInfo.BootstrapNodeKeysBundle.OCR2Key.Data.ID),
 			TransmitterID:                     null.StringFrom(contractNodeInfo.BootstrapNodeKeysBundle.TXKey.Data.ID),
@@ -342,10 +342,10 @@ func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error
 			Name:              fmt.Sprintf("sol-OCRv2-%d-%s", nIdx, uuid.New().String()),
 			JobType:           "offchainreporting2",
 			ObservationSource: contractNodeInfo.BridgeInfos[nIdx].ObservationSource,
+			Relay:             c.ChainDetails.ChainName,
+			RelayConfig:       relayConfig,
 			OCR2OracleSpec: job.OCR2OracleSpec{
 				ContractID:                        contractNodeInfo.OCR2.Address(),
-				Relay:                             c.ChainDetails.ChainName,
-				RelayConfig:                       relayConfig,
 				P2PV2Bootstrappers:                pq.StringArray{bootstrapPeers[0].P2PV2Bootstrapper()},
 				OCRKeyBundleID:                    null.StringFrom(contractNodeInfo.NodeKeysBundle[nIdx].OCR2Key.Data.ID),
 				TransmitterID:                     null.StringFrom(contractNodeInfo.NodeKeysBundle[nIdx].TXKey.Data.ID),
