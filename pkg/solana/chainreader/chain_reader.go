@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -93,7 +94,7 @@ func (s *SolanaChainReaderService) HealthReport() map[string]error {
 
 // GetLatestValue implements the types.ContractReader interface and requests and parses on-chain
 // data named by the provided contract, method, and params.
-func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, contractName, method string, params any, returnVal any) error {
+func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, contractName, method string, _ primitives.ConfidenceLevel, params any, returnVal any) error {
 	if err := s.Ready(); err != nil {
 		return err
 	}
@@ -167,6 +168,11 @@ func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, contractN
 	wg.Wait()
 
 	return nil
+}
+
+// BatchGetLatestValues implements the types.ContractReader interface.
+func (s *SolanaChainReaderService) BatchGetLatestValues(_ context.Context, _ types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
+	return nil, errors.New("unimplemented")
 }
 
 // QueryKey implements the types.ContractReader interface.
