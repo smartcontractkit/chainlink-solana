@@ -31,11 +31,6 @@ func NewStateCache(stateID solana.PublicKey, chainID string, cfg config.Config, 
 	return &StateCache{client.NewCache(name, stateID, chainID, cfg, getter, logger.With(lggr, "cache", name))}
 }
 
-// ReadState reads the latest state from memory with mutex and errors if timeout is exceeded
-func (c *StateCache) ReadState() (State, error) {
-	return c.Read()
-}
-
 func GetState(ctx context.Context, reader client.AccountReader, account solana.PublicKey, commitment rpc.CommitmentType) (State, uint64, error) {
 	res, err := reader.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		Commitment: commitment,

@@ -59,7 +59,7 @@ func (c *Cache[R]) Name() string {
 
 // Start polling
 func (c *Cache[R]) Start(ctx context.Context) error {
-	return c.StartOnce("cache", func() error {
+	return c.StartOnce("cache_"+c.metricName, func() error {
 		c.done = make(chan struct{})
 		c.stopCh = make(chan struct{})
 		// We synchronously update the config on start so that
@@ -76,7 +76,7 @@ func (c *Cache[R]) Start(ctx context.Context) error {
 
 // Close stops the polling
 func (c *Cache[R]) Close() error {
-	return c.StopOnce("cache", func() error {
+	return c.StopOnce("cache_"+c.metricName, func() error {
 		close(c.stopCh)
 		<-c.done
 		return nil
@@ -107,7 +107,7 @@ func (c *Cache[R]) Poll() {
 	}
 }
 
-// ReadAnswer reads the latest state from memory with mutex and errors if timeout is exceeded
+// Read reads the latest result from memory with mutex and errors if timeout is exceeded
 func (c *Cache[R]) Read() (R, error) {
 	c.resLock.RLock()
 	defer c.resLock.RUnlock()

@@ -97,7 +97,7 @@ func (c *Transmitter) LatestConfigDigestAndEpoch(
 	epoch uint32,
 	err error,
 ) {
-	state, err := c.stateCache.ReadState()
+	state, err := c.stateCache.Read()
 	return state.Config.LatestConfigDigest, state.Config.Epoch, err
 }
 

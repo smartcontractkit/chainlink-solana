@@ -27,10 +27,6 @@ func NewTransmissionsCache(transmissionsID solana.PublicKey, chainID string, cfg
 	return &TransmissionsCache{client.NewCache(name, transmissionsID, chainID, cfg, getter, logger.With(lggr, "cache", name))}
 }
 
-func (c *TransmissionsCache) ReadAnswer() (Answer, error) {
-	return c.Read()
-}
-
 func GetLatestTransmission(ctx context.Context, reader client.AccountReader, account solana.PublicKey, commitment rpc.CommitmentType) (Answer, uint64, error) {
 	// query for transmission header
 	headerStart := AccountDiscriminatorLen // skip account discriminator

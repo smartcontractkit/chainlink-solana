@@ -177,7 +177,7 @@ func TestCache(t *testing.T) {
 	require.NoError(t, stateCache.Start(ctx))
 	require.NoError(t, stateCache.Close())
 	require.NoError(t, stateCache.Fetch(ctx))
-	state, err := stateCache.ReadState()
+	state, err := stateCache.Read()
 	require.NoError(t, err)
 	assert.Equal(t, "GADeYvXjPwZP7ds1yDY9VFp12bNjdxT1YyksMvFGK9xn", state.Transmissions.String())
 	assert.True(t, !stateCache.Timestamp().IsZero())
@@ -193,7 +193,7 @@ func TestCache(t *testing.T) {
 	require.NoError(t, transmissionsCache.Close())
 
 	require.NoError(t, transmissionsCache.Fetch(ctx))
-	answer, err := transmissionsCache.ReadAnswer()
+	answer, err := transmissionsCache.Read()
 	assert.NoError(t, err)
 	assert.Equal(t, expectedTime, answer.Timestamp)
 	assert.Equal(t, expectedAns, answer.Data.String())
