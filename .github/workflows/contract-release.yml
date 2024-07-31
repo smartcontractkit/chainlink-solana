@@ -31,6 +31,7 @@ jobs:
           psversion: ${{ needs.get_projectserum_version.outputs.projectserum_version }}
         run: |
           docker run -v "$(pwd)":/repo backpackapp/build:"${psversion}" bash -c "\
+            cd /repo &&\
             anchor build &&\
             chown -R $(id -u):$(id -g) /repo"
       - name: Generate archive
