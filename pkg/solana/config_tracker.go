@@ -21,7 +21,7 @@ func (c *ConfigTracker) Notify() <-chan struct{} {
 // LatestConfigDetails returns information about the latest configuration,
 // but not the configuration itself.
 func (c *ConfigTracker) LatestConfigDetails(ctx context.Context) (changedInBlock uint64, configDigest types.ConfigDigest, err error) {
-	state, err := c.stateCache.ReadState()
+	state, err := c.stateCache.Read()
 	return state.Config.LatestConfigBlockNumber, state.Config.LatestConfigDigest, err
 }
 
@@ -66,7 +66,7 @@ func ConfigFromState(state State) (types.ContractConfig, error) {
 
 // LatestConfig returns the latest configuration.
 func (c *ConfigTracker) LatestConfig(ctx context.Context, changedInBlock uint64) (types.ContractConfig, error) {
-	state, err := c.stateCache.ReadState()
+	state, err := c.stateCache.Read()
 	if err != nil {
 		return types.ContractConfig{}, err
 	}

@@ -222,7 +222,7 @@ func newConfigProvider(ctx context.Context, lggr logger.Logger, chain Chain, arg
 }
 
 func (c *configProvider) Name() string {
-	return c.stateCache.lggr.Name()
+	return c.stateCache.Name()
 }
 
 func (c *configProvider) Start(ctx context.Context) error {
@@ -260,7 +260,7 @@ type medianProvider struct {
 }
 
 func (p *medianProvider) Name() string {
-	return p.stateCache.lggr.Name()
+	return p.stateCache.Name()
 }
 
 // start both cache services
