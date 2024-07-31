@@ -1,5 +1,5 @@
-import * as anchor from "@project-serum/anchor";
-import { BN } from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
+import { BN } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 
 export const CHAINLINK_AGGREGATOR_PROGRAM_ID = new PublicKey(
@@ -41,7 +41,8 @@ export class OCR2Feed {
 
   public onRound(feed: PublicKey, callback: (round: Round) => void): number {
     return this.provider.connection.onLogs(feed, (event, ctx) => {
-      this._parser.parseLogs(event.logs, (log) => {
+
+      for (const log of this._parser.parseLogs(event.logs)) {
         if (log.name != "NewTransmission") {
           return;
         }
@@ -49,7 +50,7 @@ export class OCR2Feed {
         parsed.feed = feed;
         parsed.slot = ctx.slot;
         callback(parsed);
-      });
+      }
     });
   }
 

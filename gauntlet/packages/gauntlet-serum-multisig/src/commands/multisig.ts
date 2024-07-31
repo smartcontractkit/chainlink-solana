@@ -1,7 +1,7 @@
 import { SolanaCommand, utils } from '@chainlink/gauntlet-solana'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { PublicKey, Keypair, TransactionInstruction, SystemProgram, AccountMeta } from '@solana/web3.js'
-import { Idl, Program } from '@project-serum/anchor'
+import { Program, Idl } from '@coral-xyz/anchor'
 import { MAX_BUFFER_SIZE } from '../lib/constants'
 import { isDeepEqual } from '../lib/utils'
 import { CONTRACT_LIST, getContract } from '../lib/contracts'
@@ -35,7 +35,7 @@ type ProposalState = {
 export const wrapCommand = (command) => {
   return class Multisig extends SolanaCommand {
     command: SolanaCommand
-    program: Program<any>
+    program: Program<Idl>
     multisigAddress: PublicKey
 
     static id = `${command.id}:multisig`

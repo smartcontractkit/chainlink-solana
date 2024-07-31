@@ -1,6 +1,6 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { parseIdlErrors, ProgramError, utils } from '@project-serum/anchor'
+import { parseIdlErrors, ProgramError, utils } from '@coral-xyz/anchor'
 import { Keypair, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js'
 import { createHash } from 'crypto'
 import * as secp256k1 from 'secp256k1'

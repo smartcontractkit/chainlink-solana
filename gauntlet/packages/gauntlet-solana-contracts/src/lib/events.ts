@@ -1,5 +1,5 @@
 import { Connection, PublicKey } from '@solana/web3.js'
-import { Program } from '@project-serum/anchor'
+import { Program } from '@coral-xyz/anchor'
 import { provider } from '@chainlink/gauntlet-solana'
 import { BN } from '@chainlink/gauntlet-core/dist/utils'
 

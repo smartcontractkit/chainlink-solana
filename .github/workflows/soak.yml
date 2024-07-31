@@ -40,15 +40,13 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    runs-on: ubuntu-latest-32cores-128GB
-    needs: [get_projectserum_version]
     steps:
       - name: Checkout the repo
         uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
       - name: Build contracts
         uses: ./.github/actions/build_contract_artifacts
         with:
-          image: projectserum/build
+          image: backpackapp/build
           image-version: ${{ needs.get_projectserum_version.outputs.projectserum_version }}
 
   e2e_custom_run_smoke_tests:

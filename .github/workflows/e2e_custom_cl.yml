@@ -82,7 +82,7 @@ jobs:
       - name: Build contracts
         uses: ./.github/actions/build_contract_artifacts
         with:
-          image: projectserum/build
+          image: backpackapp/build
           image-version: ${{ needs.get_projectserum_version.outputs.projectserum_version }}
 
   e2e_custom_build_custom_chainlink_image:

@@ -6,6 +6,18 @@ use arrayvec::arrayvec;
 
 declare_id!("9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW");
 
+#[error_code]
+pub enum ErrorCode {
+    #[msg("Unauthorized")]
+    Unauthorized = 0,
+
+    #[msg("Invalid input")]
+    InvalidInput = 1,
+
+    #[msg("Access list is full")]
+    Full = 2,
+}
+
 #[constant]
 pub const MAX_ADDRS: usize = 64;
 
@@ -53,7 +65,7 @@ pub mod access_controller {
     pub fn add_access(ctx: Context<AddAccess>) -> Result<()> {
         let mut state = ctx.accounts.state.load_mut()?;
         // if the len reaches array len, we're at capacity
-        require!(state.access_list.remaining_capacity() > 0, Full);
+        require!(state.access_list.remaining_capacity() > 0, ErrorCode::Full);
 
         let address = ctx.accounts.address.key();
 
@@ -83,18 +95,6 @@ pub mod access_controller {
 pub fn has_access(loader: &AccountLoader<AccessController>, address: &Pubkey) -> Result<bool> {
     let state = loader.load()?;
     Ok(state.access_list.binary_search(address).is_ok())
-}
-
-#[error_code]
-pub enum ErrorCode {
-    #[msg("Unauthorized")]
-    Unauthorized = 0,
-
-    #[msg("Invalid input")]
-    InvalidInput = 1,
-
-    #[msg("Access list is full")]
-    Full = 2,
 }
 
 #[derive(Accounts)]

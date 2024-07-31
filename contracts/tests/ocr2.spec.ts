@@ -1,5 +1,5 @@
-import * as anchor from "@project-serum/anchor";
-import { ProgramError, BN } from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
+import { ProgramError, BN } from "@coral-xyz/anchor";
 import * as borsh from "borsh";
 import {
   LAMPORTS_PER_SOL,
@@ -54,9 +54,9 @@ class Round extends Assignable {}
 const header = 8 + 192; // account discriminator + header
 const transmissionSize = 48;
 
-describe("ocr2", async () => {
+describe("ocr2", () => {
   // Configure the client to use the local cluster.
-  const provider = anchor.AnchorProvider.env();
+  const provider = anchor.AnchorProvider.local();
   anchor.setProvider(provider);
 
   // Generate a new wallet keypair and airdrop SOL
@@ -1138,7 +1138,7 @@ describe("ocr2", async () => {
       await provider.connection.getAccountInfo(provider.wallet.publicKey)
     ).lamports;
 
-    await program.rpc.close({
+    let tx = await program.rpc.close({
       accounts: {
         state: state.publicKey,
         receiver: provider.wallet.publicKey,
@@ -1149,7 +1149,17 @@ describe("ocr2", async () => {
         tokenProgram: TOKEN_PROGRAM_ID,
       },
       remainingAccounts: payees,
+      preInstructions: [
+        // close seems to consume just over 200k units for some reason now
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 })
+      ]
     });
+    // Print out program log so we can see total units consumed
+    await provider.connection.confirmTransaction(tx);
+    let t = await provider.connection.getTransaction(tx, {
+      commitment: "confirmed",
+    });
+    console.log(t.meta.logMessages);
 
     let afterBalance = (
       await provider.connection.getAccountInfo(provider.wallet.publicKey)

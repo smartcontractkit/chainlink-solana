@@ -1,6 +1,6 @@
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand } from '@chainlink/gauntlet-solana'
-import { PublicKey, TransactionInstruction, AccountMeta } from '@solana/web3.js'
+import { PublicKey, TransactionInstruction, AccountMeta, ComputeBudgetProgram } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../lib/contracts'
 
 export default abstract class Close extends SolanaCommand {
@@ -45,6 +45,10 @@ export default abstract class Close extends SolanaCommand {
         ...extraAccounts,
       })
       .remainingAccounts(remainingAccounts)
+      .preInstructions([
+        // close seems to consume just over 200k units for some reason now
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
+      ])
       .instruction()
 
     return [ix]

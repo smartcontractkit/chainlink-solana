@@ -16,8 +16,8 @@ STORE_PROGRAM_ID=$(solana-keygen pubkey ./contracts/artifacts/$network/store-key
 echo $STORE_PROGRAM_ID > ./contracts/artifacts/$network/store-keypair.pub
 
 # solana-keygen new -o ./contracts/artifacts/$network/ocr2-keypair.json
-OCR2_PROGRAM_ID=$(solana-keygen pubkey ./contracts/artifacts/$network/ocr2-keypair.json)
-echo $OCR2_PROGRAM_ID > ./contracts/artifacts/$network/ocr2-keypair.pub
+OCR2_PROGRAM_ID=$(solana-keygen pubkey ./contracts/artifacts/$network/ocr_2-keypair.json)
+echo $OCR2_PROGRAM_ID > ./contracts/artifacts/$network/ocr_2-keypair.pub
 
 mkdir -p ./contracts/target/deploy
 cp ./contracts/artifacts/$network/*.json ./contracts/target/deploy

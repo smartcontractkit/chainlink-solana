@@ -1,5 +1,5 @@
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token'
-import { utils } from '@project-serum/anchor'
+import { utils } from '@coral-xyz/anchor'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import Close from '../../abstract/close'

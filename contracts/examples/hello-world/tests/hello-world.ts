@@ -1,6 +1,6 @@
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import * as fs from "fs";
-import { Program, BN } from "@project-serum/anchor";
+import { Program, BN } from "@coral-xyz/anchor";
 import { HelloWorld } from "../target/types/hello_world";
 
 const CHAINLINK_PROGRAM_ID = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny";
@@ -42,13 +42,15 @@ describe("hello-world", () => {
           feed,
           header + (liveLength + historicalLength) * transmissionSize
         ),
-      ]).rpc();
+      ]).rpc({ commitment: "confirmed" });
+    console.log("deployed store");
 
     await storeProgram.methods.setWriter(owner.publicKey).accounts({
       feed: feed.publicKey,
       owner: owner.publicKey,
       authority: owner.publicKey,
-    }).rpc();
+    }).rpc({ commitment: "confirmed" });
+    console.log("set writer on store");
 
     const scale = new BN(10).pow(new BN(decimals));
     // Scale answer to enough decimals
@@ -59,8 +61,8 @@ describe("hello-world", () => {
         store: store.publicKey,
         feed: feed.publicKey,
         authority: owner.publicKey,
-    }).rpc();
-    await provider.connection.confirmTransaction(tx);
+    }).rpc({ commitment: "confirmed" });
+    console.log("value written to store");
 
     // Add your test here.
     tx = await program.methods.execute().accounts({

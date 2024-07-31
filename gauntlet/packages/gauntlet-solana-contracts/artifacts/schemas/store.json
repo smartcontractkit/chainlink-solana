@@ -472,7 +472,7 @@
             "name": "RoundData",
             "fields": [
               {
-                "name": "round_id",
+                "name": "roundId",
                 "type": "u32"
               }
             ]
