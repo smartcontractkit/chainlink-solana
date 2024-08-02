@@ -115,7 +115,7 @@ func TestTxm_Integration(t *testing.T) {
 			// load test: try to overload txs, confirm, or simulation
 			for i := 0; i < 1000; i++ {
 				assert.NoError(t, txm.Enqueue(fmt.Sprintf("load_%d", i), createTx(loadTestKey.PublicKey(), loadTestKey.PublicKey(), loadTestKey.PublicKey(), uint64(i))))
-				time.Sleep(10 * time.Millisecond) // ~100 txs per second (note: have run 5ms delays for ~200tx/s succesfully)
+				time.Sleep(10 * time.Millisecond) // ~100 txs per second (note: have run 5ms delays for ~200tx/s successfully)
 			}
 
 			// check to make sure all txs are closed out from inflight list (longest should last MaxConfirmTimeout)

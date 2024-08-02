@@ -8,7 +8,7 @@
 The main test config logic resides in the `integration-tests/testconfig/` directory. Everything is configured using TOML. The minimum OCR2 required values can be located at `integration-tests/testconfig/default.toml`, these values default to running the tests locally in docker using devnet.
 
 ### Combinations
-There are a few possibile combinations to run tests that we support.
+There are a few possible combinations to run tests that we support.
 
 **Devnet** 
 Devnet requires previously deployed programs that are owned by the person running the tests. The program ID's are required for testnet, but ignored in localnet.

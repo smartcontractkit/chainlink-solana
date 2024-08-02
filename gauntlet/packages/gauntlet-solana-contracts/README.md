@@ -104,7 +104,7 @@ If any error occurs, the flow can be started from that point, using the previous
 SKIP_PROMPTS=true yarn gauntlet ocr2:setup:flow --network=local --withReport --start=<step number>
 ```
 
-After the flow has finished succesfully, more transmissions can be executed, either by:
+After the flow has finished successfully, more transmissions can be executed, either by:
 
 ```
 SKIP_PROMPTS=true yarn gauntlet ocr2:setup:flow --network=local --withReport --start=12 --round=2
