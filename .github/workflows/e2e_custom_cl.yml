@@ -103,7 +103,15 @@ jobs:
         with:
           name: artifacts
           path: ./temp/artifacts
+      - name: hash current artifacts
+        id: current
+        run: |
+          cd ./temp/artifacts # need to be in directory for hashes to  compare without path differences
+          # shellcheck disable=SC2035
+          echo "hash=$(sha1sum * | sha1sum)" >> "$GITHUB_OUTPUT"
+          
       - name: build contracts
+        id: previous
         run: |
           # TODO: make dynamic container
           # docker run -d -v "$(pwd)":/repo --name build-container projectserum/build:v0.25.0 tail -f /dev/null
@@ -120,13 +128,24 @@ jobs:
           docker stop build-container
           docker rm build-container
 
+          # copy + save hash
+          cp ${{ env.CONTRACT_ARTIFACTS_PATH }}/* ./temp/artifacts/previous
+          cd ./temp/artifacts/previous # need to be in directory for hashes to  compare without path differences
+          # shellcheck disable=SC2035
+          echo "hash=$(sha1sum * | sha1sum)" >> "$GITHUB_OUTPUT"
+          
+        
       - name: compare hashes
+        id: check
         run: |
-          echo "current:  $(sha1sum ./temp/artifacts/* | sha1sum)" # get hash of current artifacts       
-          mkdir -p temp/artifacts/previous
-          cp ${{ env.CONTRACT_ARTIFACTS_PATH }}/* temp/artifacts/previous
-          echo "previous: $(sha1sum ${{ env.CONTRACT_ARTIFACTS_PATH }}/* | sha1sum)" # get hash of previous artifacts
+          echo "previous: ${{ steps.previous.outputs.hash }}"
+          echo "current:  ${{ steps.current.outputs.hash }}"
+
+          if [ "${{ steps.previous.outputs.hash }}" != "${{ steps.current.outputs.hash }}" ]; then
+            echo "continue=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/upload-artifact@v4
+        if: steps.check.outputs.continue
         with:
           name: artifacts
           path: ./temp/artifacts/ # combine artifacts
