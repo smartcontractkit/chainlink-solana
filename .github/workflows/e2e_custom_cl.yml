@@ -129,6 +129,7 @@ jobs:
           docker rm build-container
 
           # copy + save hash
+          mkdir ./temp/artifacts/previous
           cp ${{ env.CONTRACT_ARTIFACTS_PATH }}/* ./temp/artifacts/previous
           cd ./temp/artifacts/previous # need to be in directory for hashes to  compare without path differences
           # shellcheck disable=SC2035
