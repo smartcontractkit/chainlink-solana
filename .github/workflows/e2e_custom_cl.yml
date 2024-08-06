@@ -108,12 +108,8 @@ jobs:
       contents: read
     runs-on: ubuntu-latest-32cores-128GB
     needs: [contract-changes,get_projectserum_version]
+    if: needs.contract-changes.outputs.changed == 'true'
     steps:
-      # TODO: make this if conditional control workflow execution
-      - name: Changes to develop branch detected
-        if: needs.contract-changes.outputs.changed == 'true'
-        run: |
-          echo "changes detected!"
       - name: Checkout previous release
         uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
         with:
@@ -150,14 +146,10 @@ jobs:
       id-token: write
       contents: read
     needs: [contract-changes,e2e_custom_build_artifacts,e2e_custom_build_previous_artifacts]
+    if: needs.contract-changes.outputs.changed == 'true'
     outputs:
       changed: ${{ steps.check.outputs.continue }}
     steps:
-      # TODO: make this if conditional control workflow execution
-      - name: Changes to develop branch detected
-        if: needs.contract-changes.outputs.changed == 'true'
-        run: |
-          echo "changes detected!"
       - uses: actions/download-artifact@v4
         with:
           name: artifacts
@@ -352,22 +344,13 @@ jobs:
       contents: read
     runs-on: ubuntu-latest-16cores-64GB
     needs: [contract-changes,e2e_program_upgrade_generate_artifacts,e2e_custom_build_custom_chainlink_image, check_test_compilation]
+    if: needs.contract-changes.outputs.changed == 'true' && needs.e2e_program_upgrade_generate_artifacts.outputs.changed == 'true'
     env:
       TEST_SUITE: smoke
       TEST_ARGS: -test.timeout 30m
       TEST_LOG_LEVEL: debug
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      # TODO: make this if conditional control workflow execution
-      - name: Changes to develop branch detected
-        if: needs.contract-changes.outputs.changed == 'true'
-        run: |
-          echo "file changes detected!"
-      # TODO: make this if conditional control workflow execution
-      - name: Changes from pinned release detected
-        if: needs.e2e_program_upgrade_generate_artifacts.outputs.changed == 'true'
-        run: |
-          echo "program changes detected!"
       - name: Collect Metrics
         id: collect-gha-metrics
         uses: smartcontractkit/push-gha-metrics-action@dea9b546553cb4ca936607c2267a09c004e4ab3f # v3.0.0
