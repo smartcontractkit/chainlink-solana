@@ -48,10 +48,10 @@ jobs:
         uses: ./.github/actions/projectserum_version
 
   contract-changes:
-    name: check for contract changes from develop
+    name: Check for contract changes
     runs-on: ubuntu-latest
     outputs:
-      changed: ${{ steps.changes.outputs.contracts == 'true' }}
+      changed: ${{ steps.changes.outputs.contracts }}
     steps:
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
         id: changes
@@ -107,11 +107,11 @@ jobs:
       id-token: write
       contents: read
     runs-on: ubuntu-latest-32cores-128GB
-    needs: [contract-changes,e2e_custom_build_artifacts, get_projectserum_version]
+    needs: [contract-changes,get_projectserum_version]
     steps:
       # TODO: make this if conditional control workflow execution
       - name: Changes to develop branch detected
-        if: needs.contract-changes.outputs.changed
+        if: needs.contract-changes.outputs.changed == 'true'
         run: |
           echo "changes detected!"
       - name: Checkout previous release
@@ -119,17 +119,6 @@ jobs:
         with:
           ref: v1.0.2 # pinned to latest deployed release
           # ref: v1.1.0
-      - uses: actions/download-artifact@v4
-        with:
-          name: artifacts
-          path: ./temp/artifacts
-      - name: hash current artifacts
-        id: current
-        run: |
-          cd ./temp/artifacts # need to be in directory for hashes to  compare without path differences
-          # shellcheck disable=SC2035
-          echo "hash=$(sha1sum * | sha1sum)" >> "$GITHUB_OUTPUT"
-          
       - name: build contracts
         id: previous
         run: |
@@ -149,15 +138,46 @@ jobs:
           # clean up the container
           docker stop build-container
           docker rm build-container
+      - uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-previous
+          path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
 
-          # copy + save hash
-          mkdir ./temp/artifacts/previous
-          cp ${{ env.CONTRACT_ARTIFACTS_PATH }}/* ./temp/artifacts/previous
+  e2e_program_upgrade_generate_artifacts:
+    name: Combine artifacts for upgrade test
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    needs: [contract-changes,e2e_custom_build_artifacts,e2e_custom_build_previous_artifacts]
+    outputs:
+      changed: ${{ steps.check.outputs.continue }}
+    steps:
+      # TODO: make this if conditional control workflow execution
+      - name: Changes to develop branch detected
+        if: needs.contract-changes.outputs.changed == 'true'
+        run: |
+          echo "changes detected!"
+      - uses: actions/download-artifact@v4
+        with:
+          name: artifacts
+          path: ./temp/artifacts
+      - name: hash current artifacts
+        id: current
+        run: |
+          cd ./temp/artifacts # need to be in directory for hashes to  compare without path differences
+          # shellcheck disable=SC2035
+          echo "hash=$(sha1sum * | sha1sum)" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: artifacts-previous
+          path: ./temp/artifacts/previous
+      - name: hash previous artifacts
+        id: previous
+        run: |
           cd ./temp/artifacts/previous # need to be in directory for hashes to  compare without path differences
           # shellcheck disable=SC2035
           echo "hash=$(sha1sum * | sha1sum)" >> "$GITHUB_OUTPUT"
-          
-        
       - name: compare hashes
         id: check
         run: |
@@ -304,9 +324,9 @@ jobs:
           # shellcheck disable=SC2086
           echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> $GITHUB_ENV
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@fc3e0df622521019f50d772726d6bf8dc919dd38 # v2.3.19
         with:
-          test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci= -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
+          test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
           download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 
           go_mod_path: ./integration-tests/go.mod
@@ -331,8 +351,7 @@ jobs:
       id-token: write
       contents: read
     runs-on: ubuntu-latest-16cores-64GB
-
-    needs: [contract-changes,e2e_custom_build_previous_artifacts,e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image, check_test_compilation]
+    needs: [contract-changes,e2e_program_upgrade_generate_artifacts,e2e_custom_build_custom_chainlink_image, check_test_compilation]
     env:
       TEST_SUITE: smoke
       TEST_ARGS: -test.timeout 30m
@@ -341,9 +360,14 @@ jobs:
     steps:
       # TODO: make this if conditional control workflow execution
       - name: Changes to develop branch detected
-        if: needs.contract-changes.outputs.changed
+        if: needs.contract-changes.outputs.changed == 'true'
         run: |
-          echo "changes detected!"
+          echo "file changes detected!"
+      # TODO: make this if conditional control workflow execution
+      - name: Changes from pinned release detected
+        if: needs.e2e_program_upgrade_generate_artifacts.outputs.changed == 'true'
+        run: |
+          echo "program changes detected!"
       - name: Collect Metrics
         id: collect-gha-metrics
         uses: smartcontractkit/push-gha-metrics-action@dea9b546553cb4ca936607c2267a09c004e4ab3f # v3.0.0
@@ -390,7 +414,7 @@ jobs:
       - name: Run Upgrade Test
         run: |
           echo "TODO: implement OCR2 upgrade test!"
-      #   uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
+      #   uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@fc3e0df622521019f50d772726d6bf8dc919dd38 # v2.3.19
       #   with:
       #     test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci= -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
       #     test_download_vendor_packages_command: cd ./integration-tests && go mod download
