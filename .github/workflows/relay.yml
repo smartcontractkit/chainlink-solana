@@ -33,8 +33,14 @@ jobs:
         run: go install github.com/smartcontractkit/chainlink-testing-framework/tools/gotestloghelper@latest
       - name: Check go mod tidy
         run: |
-          go mod tidy
-          echo "if this fails run 'go mod tidy' to fix"
+          make gomodtidy
+          echo "if this fails run 'make gomodtidy' to fix"
+          git diff --minimal --exit-code
+      - name: Check go generate
+        run: |
+          make rm-mocked
+          make generate
+          echo "if this fails run 'make generate' to fix"
           git diff --stat --exit-code
       - name: Install Solana CLI
         run: ./scripts/install-solana-ci.sh
