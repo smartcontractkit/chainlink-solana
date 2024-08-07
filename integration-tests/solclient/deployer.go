@@ -510,7 +510,7 @@ func (c *ContractDeployer) DeployAnchorProgramsRemoteDocker(contractsDir string,
 	if err != nil {
 		return err
 	}
-	log.Debug().Interface("Binaries", contractBinaries).Msg("Program binaries")
+	log.Info().Interface("Binaries", contractBinaries).Msg("Program binaries")
 	g := errgroup.Group{}
 	for _, bin := range contractBinaries {
 		bin := bin

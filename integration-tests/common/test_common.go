@@ -168,7 +168,6 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 
 	m.SetupClients()
 	m.SetChainlinkNodes()
-	m.DeployContracts(contractsDir)
 }
 
 // UploadProgramBinaries uploads programs binary files to solana-validator container
