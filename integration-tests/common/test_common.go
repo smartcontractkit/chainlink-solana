@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -221,16 +223,44 @@ func (m *OCRv2TestState) SetupClients() {
 }
 
 // DeployContracts deploys contracts
-func (m *OCRv2TestState) DeployContracts(contractsDir string) {
+// baseDir is the root folder where contracts are stored
+// subDir allows for pointing to a subdirectory within baseDir (can be left empty)
+func (m *OCRv2TestState) DeployContracts(baseDir, subDir string) {
 	var err error
 	m.Clients.ChainlinkClient.NKeys, err = m.Common.CreateNodeKeysBundle(m.Clients.ChainlinkClient.ChainlinkNodes)
 	require.NoError(m.Config.T, err)
 	cd, err := solclient.NewContractDeployer(m.Clients.SolanaClient, nil)
 	require.NoError(m.Config.T, err)
 	if *m.Config.TestConfig.Common.InsideK8s {
-		err = cd.DeployAnchorProgramsRemote(contractsDir, m.Common.Env)
+		err = cd.DeployAnchorProgramsRemote(baseDir, m.Common.Env)
 	} else {
-		err = cd.DeployAnchorProgramsRemoteDocker(contractsDir, m.Common.DockerEnv.Sol)
+		err = cd.DeployAnchorProgramsRemoteDocker(baseDir, subDir, m.Common.DockerEnv.Sol, solclient.BuildProgramIDKeypairPath)
+	}
+	require.NoError(m.Config.T, err)
+}
+
+func (m *OCRv2TestState) UpgradeContracts(baseDir, subDir string) {
+	cd, err := solclient.NewContractDeployer(m.Clients.SolanaClient, nil)
+	require.NoError(m.Config.T, err)
+
+	// fetch corresponding program address for program
+	programIDBuilder := func(programName string) string {
+		// remove extra directories + .so suffix from lookup
+		programName, _ = strings.CutSuffix(filepath.Base(programName), ".so")
+		ids := map[string]string{
+			"ocr_2":             m.Common.ChainDetails.ProgramAddresses.OCR2,
+			"access_controller": m.Common.ChainDetails.ProgramAddresses.AccessController,
+			"store":             m.Common.ChainDetails.ProgramAddresses.Store,
+		}
+		val, ok := ids[programName]
+		require.True(m.Config.T, ok, fmt.Sprintf("unable to find corresponding key (%s) within %+v", programName, ids))
+		return val
+	}
+
+	if *m.Config.TestConfig.Common.InsideK8s {
+		err = fmt.Errorf("not implemented")
+	} else {
+		err = cd.DeployAnchorProgramsRemoteDocker(baseDir, subDir, m.Common.DockerEnv.Sol, programIDBuilder)
 	}
 	require.NoError(m.Config.T, err)
 }

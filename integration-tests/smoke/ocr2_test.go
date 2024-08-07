@@ -38,13 +38,13 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			_, sg := startOCR2DataFeedsSmokeTest(t, test.name, test.env, config)
+			_, sg := startOCR2DataFeedsSmokeTest(t, test.name, test.env, config, "")
 			validateRounds(t, test.name, sg, *config.OCR2.NumberOfRounds)
 		})
 	}
 }
 
-func startOCR2DataFeedsSmokeTest(t *testing.T, testname string, testenv map[string]string, config tc.TestConfig) (*common.OCRv2TestState, *gauntlet.SolanaGauntlet) {
+func startOCR2DataFeedsSmokeTest(t *testing.T, testname string, testenv map[string]string, config tc.TestConfig, subDir string) (*common.OCRv2TestState, *gauntlet.SolanaGauntlet) {
 	name := "gauntlet-" + testname
 	state, err := common.NewOCRv2State(t, 1, name, &config)
 	require.NoError(t, err, "Could not setup the ocrv2 state")
@@ -58,7 +58,7 @@ func startOCR2DataFeedsSmokeTest(t *testing.T, testname string, testenv map[stri
 	}
 
 	state.DeployCluster(utils.ContractsDir)
-	state.DeployContracts(utils.ContractsDir)
+	state.DeployContracts(utils.ContractsDir, subDir)
 	if state.Common.Env.WillUseRemoteRunner() {
 		return state, nil
 	}

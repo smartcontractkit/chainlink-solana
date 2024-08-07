@@ -361,12 +361,18 @@ func (c *ContractDeployer) DeployProgramRemote(programName string, env *environm
 	return nil
 }
 
-func (c *ContractDeployer) DeployProgramRemoteLocal(programName string, sol *test_env_sol.Solana) error {
+func BuildProgramIDKeypairPath(programName string) string {
+	programKeyFileName := strings.Replace(programName, ".so", keypairSuffix, -1)
+	return filepath.Join("programs", programKeyFileName)
+}
+
+// DeployProgramRemoteLocal takes in a programIDBuilder which allows for building the program keypair path from the name or passing the deployed program address
+func (c *ContractDeployer) DeployProgramRemoteLocal(programName string, sol *test_env_sol.Solana, programIDBuilder func(string) string) error {
 	log.Info().Str("Program", programName).Msg("Deploying program")
 	programPath := filepath.Join("programs", programName)
-	programKeyFileName := strings.Replace(programName, ".so", keypairSuffix, -1)
-	programKeyFilePath := filepath.Join("programs", programKeyFileName)
-	cmd := fmt.Sprintf("solana program deploy --program-id %s %s", programKeyFilePath, programPath)
+
+	cmd := fmt.Sprintf("solana program deploy --program-id %s %s", programIDBuilder(programName), programPath)
+	log.Info().Str("Cmd", cmd).Msg("Deploying " + programName)
 	_, res, err := sol.Container.Exec(context.Background(), strings.Split(cmd, " "))
 	if err != nil {
 		return err
@@ -505,17 +511,17 @@ func (c *ContractDeployer) DeployAnchorProgramsRemote(contractsDir string, env *
 	return g.Wait()
 }
 
-func (c *ContractDeployer) DeployAnchorProgramsRemoteDocker(contractsDir string, sol *test_env_sol.Solana) error {
-	contractBinaries, err := c.Client.ListDirFilenamesByExt(contractsDir, ".so")
+func (c *ContractDeployer) DeployAnchorProgramsRemoteDocker(baseDir, subDir string, sol *test_env_sol.Solana, programIDBuilder func(string) string) error {
+	contractBinaries, err := c.Client.ListDirFilenamesByExt(filepath.Join(baseDir, subDir), ".so")
 	if err != nil {
 		return err
 	}
-	log.Info().Interface("Binaries", contractBinaries).Msg("Program binaries")
+	log.Info().Interface("Binaries", contractBinaries).Msg(fmt.Sprintf("Program binaries [%s]", filepath.Join("programs", subDir)))
 	g := errgroup.Group{}
 	for _, bin := range contractBinaries {
 		bin := bin
 		g.Go(func() error {
-			return c.DeployProgramRemoteLocal(bin, sol)
+			return c.DeployProgramRemoteLocal(filepath.Join(subDir, bin), sol, programIDBuilder)
 		})
 	}
 	return g.Wait()
