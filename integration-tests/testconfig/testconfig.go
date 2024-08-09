@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
+	"errors"
 
 	"github.com/barkimedes/go-deepcopy"
 	"github.com/google/uuid"
@@ -48,10 +48,11 @@ type TestConfig struct {
 }
 
 const (
-	E2E_TEST_COMMON_RPC_URL_ENV     = "E2E_TEST_COMMON_RPC_URL"
-	E2E_TEST_COMMON_WS_URL_ENV      = "E2E_TEST_COMMON_WS_URL"
-	E2E_TEST_COMMON_PRIVATE_KEY_ENV = "E2E_TEST_COMMON_PRIVATE_KEY" // Private key in byte format [12, 12 ...]
-	E2E_TEST_SOLANA_SECRET          = "E2E_TEST_SOLANA_SECRET"
+	E2E_TEST_COMMON_RPC_URL_ENV = "E2E_TEST_COMMON_RPC_URL" // revive:disable-line:var-naming
+	E2E_TEST_COMMON_WS_URL_ENV  = "E2E_TEST_COMMON_WS_URL"  // revive:disable-line:var-naming
+	// Private key in byte format [12, 12 ...]
+	E2E_TEST_COMMON_PRIVATE_KEY_ENV = "E2E_TEST_COMMON_PRIVATE_KEY" // revive:disable-line:var-naming
+	E2E_TEST_SOLANA_SECRET          = "E2E_TEST_SOLANA_SECRET"      // revive:disable-line:var-naming
 )
 
 // Read config values from environment variables
@@ -106,8 +107,8 @@ func (c *TestConfig) ReadFromEnvVar() error {
 		c.Logging.Loki.BearerToken = &lokiBearerToken
 	}
 
-	grafanaBaseUrl := ctf_config.MustReadEnvVar_String(ctf_config.E2E_TEST_GRAFANA_BASE_URL_ENV)
-	if grafanaBaseUrl != "" {
+	grafanaBaseURL := ctf_config.MustReadEnvVar_String(ctf_config.E2E_TEST_GRAFANA_BASE_URL_ENV)
+	if grafanaBaseURL != "" {
 		if c.Logging == nil {
 			c.Logging = &ctf_config.LoggingConfig{}
 		}
@@ -115,11 +116,11 @@ func (c *TestConfig) ReadFromEnvVar() error {
 			c.Logging.Grafana = &ctf_config.GrafanaConfig{}
 		}
 		logger.Info().Msgf("Using %s env var to override Logging.Grafana.BaseUrl", ctf_config.E2E_TEST_GRAFANA_BASE_URL_ENV)
-		c.Logging.Grafana.BaseUrl = &grafanaBaseUrl
+		c.Logging.Grafana.BaseUrl = &grafanaBaseURL
 	}
 
-	grafanaDashboardUrl := ctf_config.MustReadEnvVar_String(ctf_config.E2E_TEST_GRAFANA_DASHBOARD_URL_ENV)
-	if grafanaDashboardUrl != "" {
+	grafanaDashboardURL := ctf_config.MustReadEnvVar_String(ctf_config.E2E_TEST_GRAFANA_DASHBOARD_URL_ENV)
+	if grafanaDashboardURL != "" {
 		if c.Logging == nil {
 			c.Logging = &ctf_config.LoggingConfig{}
 		}
@@ -127,7 +128,7 @@ func (c *TestConfig) ReadFromEnvVar() error {
 			c.Logging.Grafana = &ctf_config.GrafanaConfig{}
 		}
 		logger.Info().Msgf("Using %s env var to override Logging.Grafana.DashboardUrl", ctf_config.E2E_TEST_GRAFANA_DASHBOARD_URL_ENV)
-		c.Logging.Grafana.DashboardUrl = &grafanaDashboardUrl
+		c.Logging.Grafana.DashboardUrl = &grafanaDashboardURL
 	}
 
 	grafanaBearerToken := ctf_config.MustReadEnvVar_String(ctf_config.E2E_TEST_GRAFANA_BEARER_TOKEN_ENV)
@@ -169,13 +170,13 @@ func (c *TestConfig) ReadFromEnvVar() error {
 		c.Network.WalletKeys = walletKeys
 	}
 
-	rpcHttpUrls := ctf_config.ReadEnvVarGroupedMap(ctf_config.E2E_TEST_RPC_HTTP_URL_ENV, ctf_config.E2E_TEST_RPC_HTTP_URLS_ENV)
-	if len(rpcHttpUrls) > 0 {
+	rpcHTTPUrls := ctf_config.ReadEnvVarGroupedMap(ctf_config.E2E_TEST_RPC_HTTP_URL_ENV, ctf_config.E2E_TEST_RPC_HTTP_URLS_ENV)
+	if len(rpcHTTPUrls) > 0 {
 		if c.Network == nil {
 			c.Network = &ctf_config.NetworkConfig{}
 		}
 		logger.Info().Msgf("Using %s and/or %s env vars to override Network.RpcHttpUrls", ctf_config.E2E_TEST_RPC_HTTP_URL_ENV, ctf_config.E2E_TEST_RPC_HTTP_URLS_ENV)
-		c.Network.RpcHttpUrls = rpcHttpUrls
+		c.Network.RpcHttpUrls = rpcHTTPUrls
 	}
 
 	rpcWsUrls := ctf_config.ReadEnvVarGroupedMap(ctf_config.E2E_TEST_RPC_WS_URL_ENV, ctf_config.E2E_TEST_RPC_WS_URLS_ENV)
@@ -561,13 +562,13 @@ func GetConfig(configurationName string, product Product) (TestConfig, error) {
 	logger.Info().Msg("Loading config values from default ~/.testsecrets env file")
 	err = ctf_config.LoadSecretEnvsFromFiles()
 	if err != nil {
-		return TestConfig{}, errors.Wrapf(err, "error reading test config values from ~/.testsecrets file")
+		return TestConfig{}, fmt.Errorf("error reading test config values from ~/.testsecrets file: %w", err)
 	}
 
 	logger.Info().Msg("Reading values from environment variables")
 	err = testConfig.ReadFromEnvVar()
 	if err != nil {
-		return TestConfig{}, errors.Wrapf(err, "error reading test config values from env vars")
+		return TestConfig{}, fmt.Errorf("error reading test config values from env vars: %w", err)
 	}
 
 	logger.Debug().Msg("Validating test config")
