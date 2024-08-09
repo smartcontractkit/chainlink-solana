@@ -137,7 +137,6 @@ jobs:
         run: | # https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/README.md
           cat << EOF > config.toml
           [ChainlinkImage]
-          image="${{ env.CL_ECR }}"
           version="solana.${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref || github.sha }}"
           [Common]
           user="${{ github.actor }}"
@@ -156,6 +155,7 @@ jobs:
         with:
           test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke/embedded -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
+          test_config_override_base64: ${{ env.BASE64_CONFIG_OVERRIDE }}
           test_secrets_override_base64: ${{ secrets[inputs.test_secrets_override_key] }}
           download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 
           go_mod_path: ./integration-tests/go.mod
@@ -170,6 +170,7 @@ jobs:
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
           cache_key_id: solana-e2e-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "false"
+          DEFAULT_CHAINLINK_IMAGE: ${{ env.CL_ECR }}
         env:
           E2E_TEST_COMMON_PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }} # default private key
           E2E_TEST_COMMON_RPC_URL: https://api.devnet.solana.com # default url

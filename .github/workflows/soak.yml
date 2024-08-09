@@ -100,6 +100,7 @@ jobs:
         with:
           test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Soak/embedded -json $(args) ./soak 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
+          test_config_override_base64: ${{ env.BASE64_CONFIG_OVERRIDE }}
           test_secrets_override_base64: ${{ secrets[inputs.test_secrets_override_key] }}
           download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 
           go_mod_path: ./integration-tests/go.mod

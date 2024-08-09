@@ -397,6 +397,7 @@ jobs:
         with:
           test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2UpgradeSmoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
+          test_config_override_base64: ${{ env.BASE64_CONFIG_OVERRIDE }}
           download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 
           go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ env.CL_ECR }}
