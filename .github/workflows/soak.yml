@@ -114,3 +114,5 @@ jobs:
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
           cache_key_id: solana-e2e-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "false"
+        env:
+          E2E_TEST_SOLANA_SECRET: thisisatestingonlysecret

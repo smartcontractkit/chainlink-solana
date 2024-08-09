@@ -411,4 +411,6 @@ jobs:
           cache_key_id: solana-e2e-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "false"
           DEFAULT_CHAINLINK_IMAGE: ${{ env.CHAINLINK_IMAGE }}
+        env:
+          E2E_TEST_SOLANA_SECRET: thisisatestingonlysecret
           
