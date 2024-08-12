@@ -38,6 +38,9 @@ ifeq ($(OSFLAG),$(OSX))
 	asdf plugin add actionlint || true
 	asdf plugin add shellcheck || true
 	asdf plugin add kubectl || true
+	asdf plugin add yarn || true
+	asdf plugin add golangci-lint || true
+	asdf plugin add mockery || true
 	asdf install
 	go install github.com/smartcontractkit/chainlink-testing-framework/tools/gotestloghelper@latest
 endif
