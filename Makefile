@@ -29,6 +29,7 @@ ifeq ($(OSFLAG),$(WINDOWS))
 	exit 1
 endif
 ifeq ($(OSFLAG),$(OSX))
+	brew install gpg
 	brew install asdf
 	asdf plugin-add nodejs || true
 	asdf plugin-add rust || true
