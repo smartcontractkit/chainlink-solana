@@ -31,18 +31,18 @@ jobs:
           WIKI="${WIKI//$'\n'/\\n}" # preserve new line
           printf -v WIKI "%q " "$WIKI" # escape chars that may cause issues
 
-          echo "open<<EOF" >> $GITHUB_OUTPUT
-          echo "$OPEN" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "open<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$OPEN" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
 
-          echo "closed<<EOF" >> $GITHUB_OUTPUT
-          echo "$CLOSED" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "closed<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$CLOSED" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
 
-          echo "wiki<<EOF" >> $GITHUB_OUTPUT
-          echo "$WIKI" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          echo "wikirange=$WIKIRANGE" >> $GITHUB_OUTPUT
+          echo "wiki<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$WIKI" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "wikirange=$WIKIRANGE" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
         if: steps.updates.outputs.open || steps.updates.outputs.closed || steps.updates.outputs.wiki
       - name: Open Issue
