@@ -106,10 +106,12 @@ describe("ocr2", () => {
     schema: borsh.Schema,
     classType: any
   ): Promise<any> => {
-    let tx = await workspace.Store.rpc.query(scope, {
-      accounts: { feed },
-      options: { commitment: "confirmed" },
-    });
+    let tx = await workspace.Store.methods
+      .query(scope)
+      .accounts({ feed })
+      .rpc();
+
+    await provider.connection.confirmTransaction(tx, "confirmed")
     let t = await provider.connection.getTransaction(tx, {
       commitment: "confirmed",
     });
@@ -901,7 +903,7 @@ describe("ocr2", () => {
     for (let i = 2; i <= rounds; i++) {
       let transmitTx = await transmit(feed.publicKey, i, i, new BN(i));
 
-      await provider.connection.confirmTransaction(transmitTx);
+      await provider.connection.confirmTransaction(transmitTx, "confirmed");
       let t = await provider.connection.getTransaction(transmitTx, {
         commitment: "confirmed",
       });
@@ -1011,7 +1013,7 @@ describe("ocr2", () => {
       computePriceMicroLamports,
       juelsPerLamport,
     );
-    await provider.connection.confirmTransaction(tx);
+    await provider.connection.confirmTransaction(tx, "confirmed");
     let t = await provider.connection.getTransaction(tx, { commitment: "confirmed" });
     console.log(t.meta.logMessages); // 195_785/195_997
     account = await program.account.state.fetch(state.publicKey, 'confirmed');
@@ -1155,7 +1157,7 @@ describe("ocr2", () => {
       ]
     });
     // Print out program log so we can see total units consumed
-    await provider.connection.confirmTransaction(tx);
+    await provider.connection.confirmTransaction(tx, "confirmed");
     let t = await provider.connection.getTransaction(tx, {
       commitment: "confirmed",
     });
@@ -1280,7 +1282,7 @@ describe("ocr2", () => {
 
     // submit, then read from the feed to ensure it works fine
     let transmitTx = await transmit(feed.publicKey, 1, 1, new BN(100));
-    await provider.connection.confirmTransaction(transmitTx);
+    await provider.connection.confirmTransaction(transmitTx, "confirmed");
     let t = await provider.connection.getTransaction(transmitTx, {
       commitment: "confirmed",
     });
