@@ -111,7 +111,7 @@ describe("ocr2", () => {
       .accounts({ feed })
       .rpc();
 
-    await provider.connection.confirmTransaction(tx, "confirmed")
+    await provider.connection.confirmTransaction(tx, "confirmed");
     let t = await provider.connection.getTransaction(tx, {
       commitment: "confirmed",
     });
@@ -134,7 +134,7 @@ describe("ocr2", () => {
     epoch: number,
     round: number,
     answer: BN,
-    computeUnitPrice: number = 0,
+    computeUnitPrice?: number,
     juels: Buffer = Buffer.from([0, 0, 0, 0, 0, 0, 0, 2]) // juels per lamport (2)
   ): Promise<string> => {
     let account = await program.account.state.fetch(state.publicKey);
@@ -211,8 +211,12 @@ describe("ocr2", () => {
     const transmitter = oracles[0].transmitter;
 
     const tx = new Transaction();
-    if (computeUnitPrice > 0) {
-      tx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: computeUnitPrice }))
+    if (computeUnitPrice != undefined) {
+      tx.add(
+        ComputeBudgetProgram.setComputeUnitPrice({
+          microLamports: computeUnitPrice,
+        })
+      );
     }
     tx.add(
       new TransactionInstruction({
@@ -231,7 +235,11 @@ describe("ocr2", () => {
             isSigner: false,
           },
           { pubkey: storeAuthority, isWritable: false, isSigner: false },
-          { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isWritable: false, isSigner: false },
+          {
+            pubkey: SYSVAR_INSTRUCTIONS_PUBKEY,
+            isWritable: false,
+            isSigner: false,
+          },
         ],
         data: Buffer.concat([
           Buffer.from([storeNonce]),
@@ -257,13 +265,18 @@ describe("ocr2", () => {
 
   it("Funds the payer", async () => {
     await provider.connection.confirmTransaction(
-    await provider.connection.requestAirdrop(
-      fromWallet.publicKey,
-      LAMPORTS_PER_SOL * 1000
-    ), "confirmed");
+      await provider.connection.requestAirdrop(
+        fromWallet.publicKey,
+        LAMPORTS_PER_SOL * 1000
+      ),
+      "confirmed"
+    );
 
     await provider.connection.confirmTransaction(
-      await provider.connection.requestAirdrop(payer.publicKey, LAMPORTS_PER_SOL * 1000),
+      await provider.connection.requestAirdrop(
+        payer.publicKey,
+        LAMPORTS_PER_SOL * 1000
+      ),
       "confirmed"
     );
   });
@@ -942,13 +955,13 @@ describe("ocr2", () => {
     // can still pay out oracles even if a token account is closed
 
     // Close oracle0's token account
-    let oracle = oracles[0]
+    let oracle = oracles[0];
     let tx = await closeAccount(
       provider.connection,
       fromWallet,
       oracle.payee.address, // account
       recipientTokenAccount.address, // destination
-      oracle.transmitter, // authority
+      oracle.transmitter // authority
     );
     await provider.connection.confirmTransaction(tx);
 
@@ -992,69 +1005,85 @@ describe("ocr2", () => {
     }
   });
 
-  it("Transmit reimburses for setComputeUnitPrice", async () => {
-    const transmitter = oracles[0].transmitter.publicKey;
+  let computePriceArr = [undefined, 0, 10, 100, 10_000, 100_000, 1_000_000];
+  computePriceArr.forEach((computePriceMicroLamports, offset) => {
+    it(
+      "Transmit reimburses for setComputeUnitPrice: " +
+        computePriceMicroLamports,
+      async () => {
+        const transmitter = oracles[0].transmitter.publicKey;
 
-    let account = await program.account.state.fetch(state.publicKey);
-    let currentOracles = account.oracles.xs.slice(0, account.oracles.len);
-    // get the transmitter
-    let i = currentOracles.findIndex((o) => o.transmitter.equals(transmitter));
-    let oracle = currentOracles[i];
-    console.log(oracle);
-    let before = oracle.paymentGjuels;
-    
-    let computePriceMicroLamports = 10;
-    let juelsPerLamport = Buffer.from([0, 0, 0, 0, 59, 154, 202, 0]); // 1 gjuel (to_be_bytes)
-    let tx = await transmit(
-      feed.publicKey,
-      rounds + 1,
-      rounds + 1,
-      new BN(rounds + 2),
-      computePriceMicroLamports,
-      juelsPerLamport,
+        let account = await program.account.state.fetch(state.publicKey);
+        let currentOracles = account.oracles.xs.slice(0, account.oracles.len);
+        // get the transmitter
+        let i = currentOracles.findIndex((o) =>
+          o.transmitter.equals(transmitter)
+        );
+        let oracle = currentOracles[i];
+        console.log(oracle);
+        let before = oracle.paymentGjuels;
+
+        let juelsPerLamport = Buffer.from([0, 0, 0, 0, 59, 154, 202, 0]); // 1 gjuel (to_be_bytes)
+        let tx = await transmit(
+          feed.publicKey,
+          rounds + 1 + offset,
+          rounds + 1 + offset,
+          new BN(rounds + 2),
+          computePriceMicroLamports,
+          juelsPerLamport
+        );
+        await provider.connection.confirmTransaction(tx, "confirmed");
+        let t = await provider.connection.getTransaction(tx, {
+          commitment: "confirmed",
+        });
+        console.log(t.meta.logMessages); // 195_785/195_997
+        account = await program.account.state.fetch(
+          state.publicKey,
+          "confirmed"
+        );
+        currentOracles = account.oracles.xs.slice(0, account.oracles.len);
+        // get the transmitter
+        oracle = currentOracles[i];
+        let after = oracle.paymentGjuels;
+
+        let payment = after.sub(before).toNumber();
+        let execUnits = 25_000 * (f + 1) + 21_000;
+        let computeUnitCostLamports =
+          (execUnits * computePriceMicroLamports) / Math.pow(10, 6);
+        let lamportsPerSignature = 5000;
+        let signers = 1;
+        let computeUnitCostGjuels = Math.ceil(
+          ((computeUnitCostLamports || 0) + lamportsPerSignature * signers) * 1
+        ); // 1 lamport = 1 gjuel, use 0 if computeUnitCostLamports is NaN
+        assert.equal(payment, transmissionPayment + computeUnitCostGjuels);
+
+        // payOracles to clean up the payment state for the next test
+        let payees = currentOracles.map((oracle) => {
+          return { pubkey: oracle.payee, isWritable: true, isSigner: false };
+        });
+        tx = await program.rpc.payOracles({
+          accounts: {
+            state: state.publicKey,
+            authority: owner.publicKey,
+            accessController: billingAccessController.publicKey,
+            tokenReceiver: recipientTokenAccount.address,
+            tokenVault: tokenVault,
+            vaultAuthority: vaultAuthority,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          },
+          remainingAccounts: payees,
+        });
+        await provider.connection.confirmTransaction(tx);
+      }
     );
-    await provider.connection.confirmTransaction(tx, "confirmed");
-    let t = await provider.connection.getTransaction(tx, { commitment: "confirmed" });
-    console.log(t.meta.logMessages); // 195_785/195_997
-    account = await program.account.state.fetch(state.publicKey, 'confirmed');
-    currentOracles = account.oracles.xs.slice(0, account.oracles.len);
-    // get the transmitter
-    oracle = currentOracles[i];
-    let after = oracle.paymentGjuels;
-    
-    let payment = after.sub(before).toNumber();
-    let execUnits = (25_000 * (f+1) + 21_000);
-    let computeUnitCostLamports = execUnits * computePriceMicroLamports / Math.pow(10, 6);
-    let lamportsPerSignature = 5000;
-    let signers = 1;
-    let computeUnitCostGjuels = Math.ceil((computeUnitCostLamports + lamportsPerSignature * signers) * 1); // 1 lamport = 1 gjuel
-    assert.equal(payment, transmissionPayment + computeUnitCostGjuels);
-
-    // payOracles to clean up the payment state for the next test
-    let payees = currentOracles.map((oracle) => {
-      return { pubkey: oracle.payee, isWritable: true, isSigner: false };
-    });
-    tx = await program.rpc.payOracles({
-      accounts: {
-        state: state.publicKey,
-        authority: owner.publicKey,
-        accessController: billingAccessController.publicKey,
-        tokenReceiver: recipientTokenAccount.address,
-        tokenVault: tokenVault,
-        vaultAuthority: vaultAuthority,
-        tokenProgram: TOKEN_PROGRAM_ID,
-      },
-      remainingAccounts: payees,
-    });
-    await provider.connection.confirmTransaction(tx);
   });
 
   it("Transmit does not fail on juelsPerFeecoin edge cases", async () => {
     // zero value u64 juelsPerFeecoin
     await transmit(
       feed.publicKey,
-      rounds + 2,
-      rounds + 2,
+      rounds + computePriceArr.length + 1,
+      rounds + computePriceArr.length + 1,
       new BN(rounds + 1),
       0,
       Buffer.from([0, 0, 0, 0, 0, 0, 0, 0])
@@ -1063,8 +1092,8 @@ describe("ocr2", () => {
     // max value u64 juelsPerFeecoin
     await transmit(
       feed.publicKey,
-      rounds + 3,
-      rounds + 3,
+      rounds + computePriceArr.length + 2,
+      rounds + computePriceArr.length + 2,
       new BN(rounds + 2),
       0,
       Buffer.from([127, 127, 127, 127, 127, 127, 127, 127])
@@ -1153,8 +1182,8 @@ describe("ocr2", () => {
       remainingAccounts: payees,
       preInstructions: [
         // close seems to consume just over 200k units for some reason now
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 })
-      ]
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
+      ],
     });
     // Print out program log so we can see total units consumed
     await provider.connection.confirmTransaction(tx, "confirmed");
@@ -1296,5 +1325,4 @@ describe("ocr2", () => {
     );
     assert.equal(new BN(round.answer, 10, "le").toNumber(), 100);
   });
-
 });
