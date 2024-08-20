@@ -112,6 +112,7 @@ type TOMLConfig struct {
 	// Do not access directly, use [IsEnabled]
 	Enabled *bool
 	Chain
+	MultiNode
 	Nodes Nodes
 }
 
@@ -279,8 +280,13 @@ func (c *TOMLConfig) ListNodes() Nodes {
 	return c.Nodes
 }
 
+func (c *TOMLConfig) MultiNodeConfig() *MultiNode {
+	return &c.MultiNode
+}
+
 func NewDefault() *TOMLConfig {
 	cfg := &TOMLConfig{}
-	cfg.SetDefaults()
+	cfg.Chain.SetDefaults()
+	cfg.MultiNode.SetDefaults()
 	return cfg
 }

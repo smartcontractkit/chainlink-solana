@@ -1,6 +1,7 @@
 package solana
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -174,7 +175,7 @@ func TestSolanaChain_VerifiedClient(t *testing.T) {
 	testChain.id = "incorrect"
 	c, err = testChain.verifiedClient(node)
 	assert.NoError(t, err)
-	_, err = c.ChainID()
+	_, err = c.ChainID(context.Background())
 	// expect error from id mismatch (even if using a cached client) when performing RPC calls
 	assert.Error(t, err)
 	assert.Equal(t, fmt.Sprintf("client returned mismatched chain id (expected: %s, got: %s): %s", "incorrect", "devnet", node.URL), err.Error())

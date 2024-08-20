@@ -114,7 +114,8 @@ func (v *verifiedCachedClient) verifyChainID() (bool, error) {
 	v.chainIDVerifiedLock.Lock()
 	defer v.chainIDVerifiedLock.Unlock()
 
-	v.chainID, err = v.ReaderWriter.ChainID()
+	strID, err := v.ReaderWriter.ChainID(context.Background())
+	v.chainID = strID.String()
 	if err != nil {
 		v.chainIDVerified = false
 		return v.chainIDVerified, fmt.Errorf("failed to fetch ChainID in verifiedCachedClient: %w", err)
@@ -186,13 +187,13 @@ func (v *verifiedCachedClient) LatestBlockhash() (*rpc.GetLatestBlockhashResult,
 	return v.ReaderWriter.LatestBlockhash()
 }
 
-func (v *verifiedCachedClient) ChainID() (string, error) {
+func (v *verifiedCachedClient) ChainID(ctx context.Context) (client.StringID, error) {
 	verified, err := v.verifyChainID()
 	if !verified {
 		return "", err
 	}
 
-	return v.chainID, nil
+	return client.StringID(v.chainID), nil
 }
 
 func (v *verifiedCachedClient) GetFeeForMessage(msg string) (uint64, error) {

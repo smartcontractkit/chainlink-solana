@@ -76,7 +76,7 @@ func TestClient_Reader_Integration(t *testing.T) {
 	assert.Equal(t, uint64(5000), fee)
 
 	// get chain ID based on gensis hash
-	network, err := c.ChainID()
+	network, err := c.ChainID(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, "localnet", network)
 
@@ -120,7 +120,7 @@ func TestClient_Reader_ChainID(t *testing.T) {
 
 	// get chain ID based on gensis hash
 	for _, n := range networks {
-		network, err := c.ChainID()
+		network, err := c.ChainID(context.Background())
 		assert.NoError(t, err)
 		assert.Equal(t, n, network)
 	}
