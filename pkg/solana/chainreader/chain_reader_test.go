@@ -621,7 +621,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 
 		fallthrough
 	default:
-		if r.testStructQueue == nil || len(r.testStructQueue) == 0 {
+		if len(r.testStructQueue) == 0 {
 			r.test.FailNow()
 		}
 

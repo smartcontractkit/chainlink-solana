@@ -33,7 +33,7 @@ type OffchainConfig struct {
 	RMax                                               int                   `json:"rMax"`
 	S                                                  []int                 `json:"s"`
 	OffchainPublicKeys                                 []string              `json:"offchainPublicKeys"`
-	PeerIds                                            []string              `json:"peerIds"`
+	PeerIDs                                            []string              `json:"peerIds"`
 	ReportingPluginConfig                              ReportingPluginConfig `json:"reportingPluginConfig"`
 	MaxDurationQueryNanoseconds                        int64                 `json:"maxDurationQueryNanoseconds"`
 	MaxDurationObservationNanoseconds                  int64                 `json:"maxDurationObservationNanoseconds"`
@@ -145,7 +145,7 @@ func (o *OCR2Config) Default() {
 		DeltaCNanoseconds:   0,
 	}
 	offchainPublicKeys := make([]string, len(o.NodeKeys))
-	peerIds := make([]string, len(o.NodeKeys))
+	peerIDs := make([]string, len(o.NodeKeys))
 	configPublicKeys := make([]string, len(o.NodeKeys))
 	s := make([]int, len(o.NodeKeys))
 
@@ -155,7 +155,7 @@ func (o *OCR2Config) Default() {
 
 	for i, key := range o.NodeKeys {
 		offchainPublicKeys[i] = strings.Replace(key.OCR2Key.Data.Attributes.OffChainPublicKey, "ocr2off_solana_", "", 1)
-		peerIds[i] = key.PeerID
+		peerIDs[i] = key.PeerID
 		configPublicKeys[i] = strings.Replace(key.OCR2Key.Data.Attributes.ConfigPublicKey, "ocr2cfg_solana_", "", 1)
 	}
 	o.OffChainConfig = &OCROffChainConfig{
@@ -170,7 +170,7 @@ func (o *OCR2Config) Default() {
 			RMax:                              3,
 			S:                                 s,
 			OffchainPublicKeys:                offchainPublicKeys,
-			PeerIds:                           peerIds,
+			PeerIDs:                           peerIDs,
 			ConfigPublicKeys:                  configPublicKeys,
 			ReportingPluginConfig:             o.OffChainConfig.OffchainConfig.ReportingPluginConfig,
 			MaxDurationQueryNanoseconds:       int64(0),
