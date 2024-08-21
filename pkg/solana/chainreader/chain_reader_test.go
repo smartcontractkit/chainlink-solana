@@ -43,9 +43,9 @@ func TestSolanaChainReaderService_ReaderInterface(t *testing.T) {
 	t.Parallel()
 
 	it := &chainReaderInterfaceTester{}
-	RunChainReaderInterfaceTests(t, it)
+	RunChainReaderInterfaceTests(t, it, true)
 	lsIt := &skipEventsChainReaderTester{ChainReaderInterfaceTester: commontestutils.WrapChainReaderTesterForLoop(it)}
-	RunChainReaderInterfaceTests(t, lsIt)
+	RunChainReaderInterfaceTests(t, lsIt, true)
 }
 
 func TestSolanaChainReaderService_ServiceCtx(t *testing.T) {
@@ -555,6 +555,11 @@ func (r *wrappedTestChainReader) Ready() error {
 }
 
 func (r *wrappedTestChainReader) HealthReport() map[string]error {
+	return nil
+}
+
+func (r *chainReaderInterfaceTester) GetChainWriter(t *testing.T) types.ChainWriter {
+	t.Skip("ChainWriter is not yet supported on Solana")
 	return nil
 }
 
