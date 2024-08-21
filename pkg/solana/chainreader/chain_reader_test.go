@@ -43,9 +43,9 @@ func TestSolanaChainReaderService_ReaderInterface(t *testing.T) {
 	t.Parallel()
 
 	it := &chainReaderInterfaceTester{}
-	RunChainReaderInterfaceTests(t, it, true)
-	lsIt := &skipEventsChainReaderTester{ChainReaderInterfaceTester: commontestutils.WrapChainReaderTesterForLoop(it)}
-	RunChainReaderInterfaceTests(t, lsIt, true)
+	RunChainComponentsInterfaceTests(t, it, true)
+	lsIt := &skipEventsChainReaderTester{ChainComponentsInterfaceTester: commontestutils.WrapChainComponentsTesterForLoop(it)}
+	RunChainComponentsInterfaceTests(t, lsIt, true)
 }
 
 func TestSolanaChainReaderService_ServiceCtx(t *testing.T) {
@@ -538,7 +538,7 @@ type wrappedTestChainReader struct {
 	test            *testing.T
 	service         *chainreader.SolanaChainReaderService
 	client          *mockedRPCClient
-	tester          ChainReaderInterfaceTester[*testing.T]
+	tester          ChainComponentsInterfaceTester[*testing.T]
 	testStructQueue []*TestStruct
 }
 
@@ -671,7 +671,7 @@ func (r *wrappedTestChainReader) QueryKey(ctx context.Context, contractName stri
 	return nil, nil
 }
 
-func getAddresses(t *testing.T, tester ChainReaderInterfaceTester[*testing.T], a, b int) (ag_solana.PublicKey, ag_solana.PublicKey) {
+func getAddresses(t *testing.T, tester ChainComponentsInterfaceTester[*testing.T], a, b int) (ag_solana.PublicKey, ag_solana.PublicKey) {
 	t.Helper()
 
 	bindings := tester.GetBindings(t)
@@ -856,12 +856,12 @@ const (
 
 // Required to allow test skipping to be on the same goroutine
 type skipEventsChainReaderTester struct {
-	ChainReaderInterfaceTester[*testing.T]
+	ChainComponentsInterfaceTester[*testing.T]
 }
 
 func (s *skipEventsChainReaderTester) GetChainReader(t *testing.T) types.ContractReader {
 	return &skipEventsChainReader{
-		ContractReader: s.ChainReaderInterfaceTester.GetChainReader(t),
+		ContractReader: s.ChainComponentsInterfaceTester.GetChainReader(t),
 		t:              t,
 	}
 }
