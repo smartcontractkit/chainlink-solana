@@ -52,6 +52,10 @@ ifneq ($(CI),true)
 endif
 endif
 
+.PHONY: nix-flake-update
+nix-flake-update:
+	docker run -it --rm -v $(shell pwd):/repo -e NIX_USER_CONF_FILES=/repo/nix.conf --workdir /repo nixos/nix:latest /bin/sh -c "nix flake update"
+
 .PHONY: projectserum_version
 projectserum_version:
 	@echo "${PROJECT_SERUM_VERSION}"
