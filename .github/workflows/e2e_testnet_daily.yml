@@ -7,20 +7,10 @@ on:
         required: true
         default: develop
         type: string
-      RPC_URL:
-        description: RPC URL for the tests
-        required: true
-        default: https://api.devnet.solana.com
-        type: string
-      WS_URL:
-        description: WS URL for the tests
-        required: true
-        default: wss://api.devnet.solana.com/
-        type: string
-      PRIVATE_KEY:
-        description: Private key in byte format [12, 12 ...]
-        required: true
-        type: string
+      test_secrets_override_key:
+        description: 'Key to run tests with custom test secrets like ws url, rpc url, private key, etc.'
+        required: false
+        type: string         
   schedule:
     - cron: '0 6 * * *'
 # Only run 1 of this workflow at a time per PR
@@ -152,10 +142,7 @@ jobs:
           [Common]
           user="${{ github.actor }}"
           network="devnet"
-          private_key="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.PRIVATE_KEY || secrets.PRIVATE_KEY }}"
           internal_docker_repo = "${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com"
-          rpc_url = "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.RPC_URL || 'https://api.devnet.solana.com' }}"
-          ws_url = "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.RPC_URL || 'https://api.devnet.solana.com' }}"
           EOF
 
           # shellcheck disable=SC2002
@@ -165,10 +152,11 @@ jobs:
           # shellcheck disable=SC2086
           echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> $GITHUB_ENV
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@aa8eea635029ab8d95abd3c206f56dae1e22e623 # v2.3.28
         with:
           test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke/embedded -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
+          test_secrets_override_base64: ${{ secrets[inputs.test_secrets_override_key] }}
           download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 
           go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ env.CL_ECR }}
@@ -182,3 +170,7 @@ jobs:
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
           cache_key_id: solana-e2e-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "false"
+        env:
+          E2E_TEST_COMMON_PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }} # default private key
+          E2E_TEST_COMMON_RPC_URL: https://api.devnet.solana.com # default url
+          E2E_TEST_COMMON_WS_URL: https://api.devnet.solana.com # default url

@@ -3,12 +3,13 @@ package testconfig
 import (
 	"embed"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"log"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/barkimedes/go-deepcopy"
 	"github.com/google/uuid"
@@ -44,6 +45,185 @@ type TestConfig struct {
 	// getter funcs for passing parameters
 	GetChainID func() string
 	GetURL     func() string
+}
+
+const (
+	E2E_TEST_COMMON_RPC_URL_ENV     = "E2E_TEST_COMMON_RPC_URL"
+	E2E_TEST_COMMON_WS_URL_ENV      = "E2E_TEST_COMMON_WS_URL"
+	E2E_TEST_COMMON_PRIVATE_KEY_ENV = "E2E_TEST_COMMON_PRIVATE_KEY" // Private key in byte format [12, 12 ...]
+	E2E_TEST_SOLANA_SECRET          = "E2E_TEST_SOLANA_SECRET"
+)
+
+// Read config values from environment variables
+func (c *TestConfig) ReadFromEnvVar() error {
+	logger := logging.GetTestLogger(nil)
+
+	lokiTenantID := ctf_config.MustReadEnvVar_String(ctf_config.E2E_TEST_LOKI_TENANT_ID_ENV)
+	if lokiTenantID != "" {
+		if c.Logging == nil {
+			c.Logging = &ctf_config.LoggingConfig{}
+		}
+		if c.Logging.Loki == nil {
+			c.Logging.Loki = &ctf_config.LokiConfig{}
+		}
+		logger.Info().Msgf("Using %s env var to override Logging.Loki.TenantId", ctf_config.E2E_TEST_LOKI_TENANT_ID_ENV)
+		c.Logging.Loki.TenantId = &lokiTenantID
+	}
+
+	lokiEndpoint := ctf_config.MustReadEnvVar_String(ctf_config.E2E_TEST_LOKI_ENDPOINT_ENV)
+	if lokiEndpoint != "" {
+		if c.Logging == nil {
+			c.Logging = &ctf_config.LoggingConfig{}
+		}
+		if c.Logging.Loki == nil {
+			c.Logging.Loki = &ctf_config.LokiConfig{}
+		}
+		logger.Info().Msgf("Using %s env var to override Logging.Loki.Endpoint", ctf_config.E2E_TEST_LOKI_ENDPOINT_ENV)
+		c.Logging.Loki.Endpoint = &lokiEndpoint
+	}
+
+	lokiBasicAuth := ctf_config.MustReadEnvVar_String(ctf_config.E2E_TEST_LOKI_BASIC_AUTH_ENV)
+	if lokiBasicAuth != "" {
+		if c.Logging == nil {
+			c.Logging = &ctf_config.LoggingConfig{}
+		}
+		if c.Logging.Loki == nil {
+			c.Logging.Loki = &ctf_config.LokiConfig{}
+		}
+		logger.Info().Msgf("Using %s env var to override Logging.Loki.BasicAuth", ctf_config.E2E_TEST_LOKI_BASIC_AUTH_ENV)
+		c.Logging.Loki.BasicAuth = &lokiBasicAuth
+	}
+
+	lokiBearerToken := ctf_config.MustReadEnvVar_String(ctf_config.E2E_TEST_LOKI_BEARER_TOKEN_ENV)
+	if lokiBearerToken != "" {
+		if c.Logging == nil {
+			c.Logging = &ctf_config.LoggingConfig{}
+		}
+		if c.Logging.Loki == nil {
+			c.Logging.Loki = &ctf_config.LokiConfig{}
+		}
+		logger.Info().Msgf("Using %s env var to override Logging.Loki.BearerToken", ctf_config.E2E_TEST_LOKI_BEARER_TOKEN_ENV)
+		c.Logging.Loki.BearerToken = &lokiBearerToken
+	}
+
+	grafanaBaseUrl := ctf_config.MustReadEnvVar_String(ctf_config.E2E_TEST_GRAFANA_BASE_URL_ENV)
+	if grafanaBaseUrl != "" {
+		if c.Logging == nil {
+			c.Logging = &ctf_config.LoggingConfig{}
+		}
+		if c.Logging.Grafana == nil {
+			c.Logging.Grafana = &ctf_config.GrafanaConfig{}
+		}
+		logger.Info().Msgf("Using %s env var to override Logging.Grafana.BaseUrl", ctf_config.E2E_TEST_GRAFANA_BASE_URL_ENV)
+		c.Logging.Grafana.BaseUrl = &grafanaBaseUrl
+	}
+
+	grafanaDashboardUrl := ctf_config.MustReadEnvVar_String(ctf_config.E2E_TEST_GRAFANA_DASHBOARD_URL_ENV)
+	if grafanaDashboardUrl != "" {
+		if c.Logging == nil {
+			c.Logging = &ctf_config.LoggingConfig{}
+		}
+		if c.Logging.Grafana == nil {
+			c.Logging.Grafana = &ctf_config.GrafanaConfig{}
+		}
+		logger.Info().Msgf("Using %s env var to override Logging.Grafana.DashboardUrl", ctf_config.E2E_TEST_GRAFANA_DASHBOARD_URL_ENV)
+		c.Logging.Grafana.DashboardUrl = &grafanaDashboardUrl
+	}
+
+	grafanaBearerToken := ctf_config.MustReadEnvVar_String(ctf_config.E2E_TEST_GRAFANA_BEARER_TOKEN_ENV)
+	if grafanaBearerToken != "" {
+		if c.Logging == nil {
+			c.Logging = &ctf_config.LoggingConfig{}
+		}
+		if c.Logging.Grafana == nil {
+			c.Logging.Grafana = &ctf_config.GrafanaConfig{}
+		}
+		logger.Info().Msgf("Using %s env var to override Logging.Grafana.BearerToken", ctf_config.E2E_TEST_GRAFANA_BEARER_TOKEN_ENV)
+		c.Logging.Grafana.BearerToken = &grafanaBearerToken
+	}
+
+	chainlinkImage := ctf_config.MustReadEnvVar_String(ctf_config.E2E_TEST_CHAINLINK_IMAGE_ENV)
+	if chainlinkImage != "" {
+		if c.ChainlinkImage == nil {
+			c.ChainlinkImage = &ctf_config.ChainlinkImageConfig{}
+		}
+		logger.Info().Msgf("Using %s env var to override ChainlinkImage.Image", ctf_config.E2E_TEST_CHAINLINK_IMAGE_ENV)
+		c.ChainlinkImage.Image = &chainlinkImage
+	}
+
+	chainlinkUpgradeImage := ctf_config.MustReadEnvVar_String(ctf_config.E2E_TEST_CHAINLINK_UPGRADE_IMAGE_ENV)
+	if chainlinkUpgradeImage != "" {
+		if c.ChainlinkUpgradeImage == nil {
+			c.ChainlinkUpgradeImage = &ctf_config.ChainlinkImageConfig{}
+		}
+		logger.Info().Msgf("Using %s env var to override ChainlinkUpgradeImage.Image", ctf_config.E2E_TEST_CHAINLINK_UPGRADE_IMAGE_ENV)
+		c.ChainlinkUpgradeImage.Image = &chainlinkUpgradeImage
+	}
+
+	walletKeys := ctf_config.ReadEnvVarGroupedMap(ctf_config.E2E_TEST_WALLET_KEY_ENV, ctf_config.E2E_TEST_WALLET_KEYS_ENV)
+	if len(walletKeys) > 0 {
+		if c.Network == nil {
+			c.Network = &ctf_config.NetworkConfig{}
+		}
+		logger.Info().Msgf("Using %s and/or %s env vars to override Network.WalletKeys", ctf_config.E2E_TEST_WALLET_KEY_ENV, ctf_config.E2E_TEST_WALLET_KEYS_ENV)
+		c.Network.WalletKeys = walletKeys
+	}
+
+	rpcHttpUrls := ctf_config.ReadEnvVarGroupedMap(ctf_config.E2E_TEST_RPC_HTTP_URL_ENV, ctf_config.E2E_TEST_RPC_HTTP_URLS_ENV)
+	if len(rpcHttpUrls) > 0 {
+		if c.Network == nil {
+			c.Network = &ctf_config.NetworkConfig{}
+		}
+		logger.Info().Msgf("Using %s and/or %s env vars to override Network.RpcHttpUrls", ctf_config.E2E_TEST_RPC_HTTP_URL_ENV, ctf_config.E2E_TEST_RPC_HTTP_URLS_ENV)
+		c.Network.RpcHttpUrls = rpcHttpUrls
+	}
+
+	rpcWsUrls := ctf_config.ReadEnvVarGroupedMap(ctf_config.E2E_TEST_RPC_WS_URL_ENV, ctf_config.E2E_TEST_RPC_WS_URLS_ENV)
+	if len(rpcWsUrls) > 0 {
+		if c.Network == nil {
+			c.Network = &ctf_config.NetworkConfig{}
+		}
+		logger.Info().Msgf("Using %s and/or %s env vars to override Network.RpcWsUrls", ctf_config.E2E_TEST_RPC_WS_URL_ENV, ctf_config.E2E_TEST_RPC_WS_URLS_ENV)
+		c.Network.RpcWsUrls = rpcWsUrls
+	}
+
+	commonRPCURL := ctf_config.MustReadEnvVar_String(E2E_TEST_COMMON_RPC_URL_ENV)
+	if commonRPCURL != "" {
+		if c.Common == nil {
+			c.Common = &Common{}
+		}
+		logger.Info().Msgf("Using %s env var to override Common.RPCURL", E2E_TEST_COMMON_RPC_URL_ENV)
+		c.Common.RPCURL = &commonRPCURL
+	}
+
+	commonWSURL := ctf_config.MustReadEnvVar_String(E2E_TEST_COMMON_WS_URL_ENV)
+	if commonWSURL != "" {
+		if c.Common == nil {
+			c.Common = &Common{}
+		}
+		logger.Info().Msgf("Using %s env var to override Common.WsURL", E2E_TEST_COMMON_WS_URL_ENV)
+		c.Common.WsURL = &commonWSURL
+	}
+
+	commonPrivateKey := ctf_config.MustReadEnvVar_String(E2E_TEST_COMMON_PRIVATE_KEY_ENV)
+	if commonPrivateKey != "" {
+		if c.Common == nil {
+			c.Common = &Common{}
+		}
+		logger.Info().Msgf("Using %s env var to override Common.PrivateKey", E2E_TEST_COMMON_PRIVATE_KEY_ENV)
+		c.Common.PrivateKey = &commonPrivateKey
+	}
+
+	solanaSecret := ctf_config.MustReadEnvVar_String(E2E_TEST_SOLANA_SECRET)
+	if solanaSecret != "" {
+		if c.SolanaConfig == nil {
+			c.SolanaConfig = &SolanaConfig{}
+		}
+		logger.Info().Msgf("Using %s env var to override SolanaConfig.Secret", E2E_TEST_SOLANA_SECRET)
+		c.SolanaConfig.Secret = &solanaSecret
+	}
+
+	return nil
 }
 
 func (c *TestConfig) GetLoggingConfig() *ctf_config.LoggingConfig {
@@ -176,16 +356,16 @@ type Common struct {
 	InsideK8s *bool   `toml:"inside_k8"`
 	User      *string `toml:"user"`
 	// if rpc requires api key to be passed as an HTTP header
-	RPCURL             *string `toml:"rpc_url"`
-	WsURL              *string `toml:"ws_url"`
-	PrivateKey         *string `toml:"private_key"`
+	RPCURL             *string `toml:"-"`
+	WsURL              *string `toml:"-"`
+	PrivateKey         *string `toml:"-"`
 	Stateful           *bool   `toml:"stateful_db"`
 	InternalDockerRepo *string `toml:"internal_docker_repo"`
 	DevnetImage        *string `toml:"devnet_image"`
 }
 
 type SolanaConfig struct {
-	Secret                    *string `toml:"secret"`
+	Secret                    *string `toml:"-"`
 	OCR2ProgramID             *string `toml:"ocr2_program_id"`
 	AccessControllerProgramID *string `toml:"access_controller_program_id"`
 	StoreProgramID            *string `toml:"store_program_id"`
@@ -376,6 +556,18 @@ func GetConfig(configurationName string, product Product) (TestConfig, error) {
 	err := testConfig.readNetworkConfiguration()
 	if err != nil {
 		return TestConfig{}, fmt.Errorf("error reading network config: %w", err)
+	}
+
+	logger.Info().Msg("Loading config values from default ~/.testsecrets env file")
+	err = ctf_config.LoadSecretEnvsFromFiles()
+	if err != nil {
+		return TestConfig{}, errors.Wrapf(err, "error reading test config values from ~/.testsecrets file")
+	}
+
+	logger.Info().Msg("Reading values from environment variables")
+	err = testConfig.ReadFromEnvVar()
+	if err != nil {
+		return TestConfig{}, errors.Wrapf(err, "error reading test config values from env vars")
 	}
 
 	logger.Debug().Msg("Validating test config")
