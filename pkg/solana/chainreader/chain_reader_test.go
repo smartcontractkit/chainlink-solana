@@ -534,6 +534,10 @@ func (r *chainReaderInterfaceTester) GetChainReader(t *testing.T) types.Contract
 	return r.reader
 }
 
+func (r *chainReaderInterfaceTester) StartChainReader(t *testing.T) {}
+
+func (r *chainReaderInterfaceTester) CloseChainReader(t *testing.T) {}
+
 type wrappedTestChainReader struct {
 	test            *testing.T
 	service         *chainreader.SolanaChainReaderService
