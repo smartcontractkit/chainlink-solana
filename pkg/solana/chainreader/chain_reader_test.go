@@ -534,8 +534,6 @@ func (r *chainReaderInterfaceTester) GetChainReader(t *testing.T) types.Contract
 	return r.reader
 }
 
-func (r *chainReaderInterfaceTester) Start(t *testing.T) {}
-
 func (r *chainReaderInterfaceTester) Close(t *testing.T) {}
 
 type wrappedTestChainReader struct {
