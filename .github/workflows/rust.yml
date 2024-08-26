@@ -106,11 +106,12 @@ jobs:
         path: contracts/target
         key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
     
-    - name: format (cargo, go, yarn)
+    - name: format contracts + artifacts
       run: |
         yarn install --frozen-lockfile
         cd ../ # back to root
         make format-contracts
+        echo "run 'make format-contracts' if this fails"
         git diff --stat --exit-code
 
     - name: cargo check

@@ -21,7 +21,9 @@ describe("hello-world", () => {
     const store = anchor.web3.Keypair.generate();
     const feed = anchor.web3.Keypair.generate();
 
-    let storeIdl = JSON.parse(fs.readFileSync("../../target/idl/store.json", "utf-8"));
+    let storeIdl = JSON.parse(
+      fs.readFileSync("../../target/idl/store.json", "utf-8")
+    );
     const storeProgram = new Program(storeIdl, CHAINLINK_PROGRAM_ID, provider);
 
     // Create a feed
@@ -42,14 +44,18 @@ describe("hello-world", () => {
           feed,
           header + (liveLength + historicalLength) * transmissionSize
         ),
-      ]).rpc({ commitment: "confirmed" });
+      ])
+      .rpc({ commitment: "confirmed" });
     console.log("deployed store");
 
-    await storeProgram.methods.setWriter(owner.publicKey).accounts({
-      feed: feed.publicKey,
-      owner: owner.publicKey,
-      authority: owner.publicKey,
-    }).rpc({ commitment: "confirmed" });
+    await storeProgram.methods
+      .setWriter(owner.publicKey)
+      .accounts({
+        feed: feed.publicKey,
+        owner: owner.publicKey,
+        authority: owner.publicKey,
+      })
+      .rpc({ commitment: "confirmed" });
     console.log("set writer on store");
 
     const scale = new BN(10).pow(new BN(decimals));
@@ -57,20 +63,28 @@ describe("hello-world", () => {
     let answer = new BN(1).mul(scale);
     let round = { timestamp: new BN(1), answer };
 
-    let tx = await storeProgram.methods.submit(round).accounts({
+    let tx = await storeProgram.methods
+      .submit(round)
+      .accounts({
         store: store.publicKey,
         feed: feed.publicKey,
         authority: owner.publicKey,
-    }).rpc({ commitment: "confirmed" });
+      })
+      .rpc({ commitment: "confirmed" });
     console.log("value written to store");
 
     // Add your test here.
-    tx = await program.methods.execute().accounts({
+    tx = await program.methods
+      .execute()
+      .accounts({
         chainlinkFeed: feed.publicKey,
         chainlinkProgram: CHAINLINK_PROGRAM_ID,
-    }).rpc({ commitment: "confirmed" });
+      })
+      .rpc({ commitment: "confirmed" });
     console.log("Your transaction signature", tx);
-    let t = await provider.connection.getTransaction(tx, { commitment: "confirmed" });
+    let t = await provider.connection.getTransaction(tx, {
+      commitment: "confirmed",
+    });
     console.log(t.meta.logMessages);
   });
 });
