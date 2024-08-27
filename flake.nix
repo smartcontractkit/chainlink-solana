@@ -11,14 +11,14 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; overlays = [ rust-overlay.overlays.default ]; };
-      in rec {
+      in {
         devShell = pkgs.callPackage ./shell.nix {
           inherit pkgs;
           scriptDir = toString ./.; # converts the flakes'root dir to string
         };
 
         packages = {
-          solana-test-validator = pkgs.stdenv.mkDerivation  rec{
+          solana-test-validator = pkgs.stdenv.mkDerivation rec {
             name = "solana-test-validator";
             src = ./ops/scripts; 
             installPhase = ''
@@ -27,6 +27,7 @@
               cp $src/setup-test-validator/localnet.down.sh $out/bin/
               chmod +x $out/bin/${name}
             '';
-        }
-      });
+          };
+        };
+    });
 }
