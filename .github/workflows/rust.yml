@@ -105,6 +105,14 @@ jobs:
       with:
         path: contracts/target
         key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: format contracts + artifacts
+      run: |
+        yarn install --frozen-lockfile
+        cd ../ # back to root
+        make format-contracts
+        echo "run 'make format-contracts' if this fails"
+        git diff --stat --exit-code
 
     - name: cargo check
       env:
@@ -117,6 +125,3 @@ jobs:
           cd /repo/contracts &&\
           cargo check &&\
           cargo clippy -- -D warnings"
-
-    # - run: cargo check
-    # - run: cargo clippy -- -D warnings

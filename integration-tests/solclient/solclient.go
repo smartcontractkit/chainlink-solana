@@ -292,8 +292,8 @@ func (c *Client) AirdropAddresses(addr []string, solAmount uint64) error {
 func (c *Client) ListDirFilenamesByExt(dir string, ext string) ([]string, error) {
 	keyFiles := make([]string, 0)
 	err := filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
-		if info.IsDir() {
-			return nil
+		if info.IsDir() && info.Name() != filepath.Base(dir) {
+			return filepath.SkipDir // only check first depth of folders
 		}
 		if filepath.Ext(path) == ext {
 			keyFiles = append(keyFiles, info.Name())

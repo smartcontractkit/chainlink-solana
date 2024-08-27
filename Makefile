@@ -29,6 +29,7 @@ ifeq ($(OSFLAG),$(WINDOWS))
 	exit 1
 endif
 ifeq ($(OSFLAG),$(OSX))
+	brew install gpg
 	brew install asdf
 	asdf plugin-add nodejs || true
 	asdf plugin-add rust || true
@@ -38,6 +39,9 @@ ifeq ($(OSFLAG),$(OSX))
 	asdf plugin add actionlint || true
 	asdf plugin add shellcheck || true
 	asdf plugin add kubectl || true
+	asdf plugin add yarn || true
+	asdf plugin add golangci-lint || true
+	asdf plugin add mockery || true
 	asdf install
 	go install github.com/smartcontractkit/chainlink-testing-framework/tools/gotestloghelper@latest
 endif
@@ -47,6 +51,10 @@ ifneq ($(CI),true)
 	sh <(curl -L https://nixos-nix-install-tests.cachix.org/serve/vij683ly7sl95nnhb67bdjjfabclr85m/install) --daemon --tarball-url-prefix https://nixos-nix-install-tests.cachix.org/serve --nix-extra-conf-file ./nix.conf
 endif
 endif
+
+.PHONY: nix-flake-update
+nix-flake-update:
+	docker run -it --rm -v $(shell pwd):/repo -e NIX_USER_CONF_FILES=/repo/nix.conf --workdir /repo nixos/nix:latest /bin/sh -c "nix flake update"
 
 .PHONY: projectserum_version
 projectserum_version:
@@ -119,3 +127,7 @@ upgrade-e2e-solana-image:
 .PHONY: update-e2e-core-deps
 upgrade-e2e-core-deps:
 	cd ./integration-tests && ../scripts/update-e2e.sh
+
+.PHONY: format-contracts
+format-contracts:
+	cd ./contracts && cargo fmt && go fmt ./... && yarn format 

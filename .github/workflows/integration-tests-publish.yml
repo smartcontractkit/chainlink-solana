@@ -73,3 +73,12 @@ jobs:
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
+      - name: Notify Slack
+        # Only run this notification for merge to develop failures
+        if: failure() && github.event_name != 'workflow_dispatch'
+        uses: slackapi/slack-github-action@6c661ce58804a1a20f6dc5fbee7f0381b469e001 # v1.25.0
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
+        with:
+          channel-id: "#team-test-tooling-internal"
+          slack-message: ":x: :mild-panic-intensifies: Publish Integration Test Image failed: \n${{ format('https://github.com/{0}/actions/runs/{1}', github.repository, github.run_id) }}\nRepository: Solana\n${{ format('Notifying <!subteam^{0}|{0}>', secrets.GUARDIAN_SLACK_NOTIFICATION_HANDLE)}}"

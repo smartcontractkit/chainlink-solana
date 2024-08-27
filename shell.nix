@@ -4,7 +4,7 @@ pkgs.mkShell {
   nativeBuildInputs = with pkgs; [
     (rust-bin.stable.latest.default.override { extensions = ["rust-src"]; })
     # lld_11
-    llvm_11
+    llvm_12
     stdenv.cc.cc.lib
     pkg-config
     openssl
