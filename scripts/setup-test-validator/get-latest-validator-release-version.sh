@@ -8,6 +8,8 @@
     if [ -z $version ]; then
       exit 3
     fi
+    # Remove the "v" prefix
+    version=${version#v}
     echo $version
 )
 errorCode=$?
