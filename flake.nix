@@ -12,6 +12,21 @@
       let
         pkgs = import nixpkgs { inherit system; overlays = [ rust-overlay.overlays.default ]; };
       in rec {
-        devShell = pkgs.callPackage ./shell.nix {};
+        devShell = pkgs.callPackage ./shell.nix {
+          inherit pkgs;
+          scriptDir = toString ./.; # converts the flakes'root dir to string
+        };
+
+        packages = {
+          solana-test-validator = pkgs.stdenv.mkDerivation  rec{
+            name = "solana-test-validator";
+            src = ./ops/scripts; 
+            installPhase = ''
+              mkdir -p $out/bin
+              cp $src/setup-test-validator/localnet.sh $out/bin/${name}
+              cp $src/setup-test-validator/localnet.down.sh $out/bin/
+              chmod +x $out/bin/${name}
+            '';
+        }
       });
 }
