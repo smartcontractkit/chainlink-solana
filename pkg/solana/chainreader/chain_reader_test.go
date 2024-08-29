@@ -534,7 +534,9 @@ func (r *chainReaderInterfaceTester) GetChainReader(t *testing.T) types.Contract
 	return r.reader
 }
 
-func (r *chainReaderInterfaceTester) Close(t *testing.T) {}
+func (r *chainReaderInterfaceTester) Close(t *testing.T) {
+	require.NoError(t, r.reader.Close())
+}
 
 type wrappedTestChainReader struct {
 	test            *testing.T
