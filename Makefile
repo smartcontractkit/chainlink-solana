@@ -127,3 +127,7 @@ upgrade-e2e-solana-image:
 .PHONY: update-e2e-core-deps
 upgrade-e2e-core-deps:
 	cd ./integration-tests && ../scripts/update-e2e.sh
+
+.PHONY: format-contracts
+format-contracts:
+	cd ./contracts && cargo fmt && go fmt ./... && yarn format 
