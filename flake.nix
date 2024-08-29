@@ -20,7 +20,7 @@
         packages = {
           solana-test-validator = pkgs.stdenv.mkDerivation rec {
             name = "solana-test-validator";
-            src = ./ops/scripts; 
+            src = ./scripts; 
             installPhase = ''
               mkdir -p $out/bin
               cp $src/setup-test-validator/localnet.sh $out/bin/${name}
