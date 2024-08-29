@@ -23,7 +23,7 @@ docker run -d \
   --name "${container_name}" \
   --entrypoint /bin/sh \
   "solanalabs/solana:${container_version}" \
-  -c "solana-test-validator --log && echo 'Validator started successfully'"
+  -c "solana-test-validator && echo 'Validator started successfully'"
   # 	--network-alias "${container_name}" \
   # 	--network chainlink \
 
