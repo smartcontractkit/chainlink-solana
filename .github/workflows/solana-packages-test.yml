@@ -16,12 +16,14 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
           extra_nix_config: "sandbox = false"
 
+      - name: Build and test solana-test-validator
+        run: nix run .#solana-test-validator
+
       - name: Build solana-cli-env
         run: nix build .#solana-cli-env --print-out-paths
 
       - name: Test solana-cli-shell
-        run: nix develop .#solana-cli'
+        run: nix develop .#solana-cli
 
-      - name: Build and test solana-test-validator
-        run: nix run .#solana-test-validator
+
         
