@@ -11,6 +11,7 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; overlays = [ rust-overlay.overlays.default ]; };
+        # import solana packages
         solanaPkgs = pkgs.callPackage ./solana.nix {};
       in {
         formatter = pkgs.nixpkgs-fmt;
@@ -20,27 +21,15 @@
             inherit pkgs;
             scriptDir = toString ./.; # converts the flakes'root dir to string
           };
-          
-          solana-cli = pkgs.mkShell {
-            buildInputs = pkgs.lib.optionals pkgs.stdenv.isLinux [
-              solanaPkgs.binaries.x86_64-linux
-            ] ++ pkgs.lib.optionals (pkgs.stdenv.isDarwin && pkgs.stdenv.hostPlatform.isAarch64) [
-              solanaPkgs.binaries.aarch64-apple-darwin
-            ];
-            shellHook = solanaPkgs.shellHook;
-          };
+          # interactive shell with Solana CLI tool accessibility
+          solana-cli = solanaPkgs.solana-cli-shell;
         };
 
         packages = {
+          # dockerized Solana test validator
           solana-test-validator = solanaPkgs.solana-test-validator;
-          solana-cli-env = pkgs.buildEnv {
-            name = "solana-cli-env";
-            paths = pkgs.lib.optionals pkgs.stdenv.isLinux [
-              solanaPkgs.binaries.x86_64-linux
-            ] ++ pkgs.lib.optionals (pkgs.stdenv.isDarwin && pkgs.stdenv.hostPlatform.isAarch64) [
-              solanaPkgs.binaries.aarch64-apple-darwin
-            ];
-          };
+          # environment package for Solana CLI
+          solana-cli-env = solanaPkgs.solana-cli-env;
         };
     });
 }
