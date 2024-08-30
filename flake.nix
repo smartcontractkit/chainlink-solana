@@ -33,6 +33,14 @@
 
         packages = {
           solana-test-validator = solanaPkgs.solana-test-validator;
+          solana-cli-env = pkgs.buildEnv {
+            name = "solana-cli-env";
+            paths = pkgs.lib.optionals pkgs.stdenv.isLinux [
+              solanaPkgs.binaries.x86_64-linux
+            ] ++ pkgs.lib.optionals (pkgs.stdenv.isDarwin && pkgs.stdenv.hostPlatform.isAarch64) [
+              solanaPkgs.binaries.aarch64-apple-darwin
+            ];
+          };
         };
     });
 }
