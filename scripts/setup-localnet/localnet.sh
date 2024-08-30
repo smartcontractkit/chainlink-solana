@@ -6,7 +6,7 @@ cpu_struct="linux";
 # Clean up first
 bash "$(dirname -- "$0";)/localnet.down.sh"
 
-container_version=v$(bash $(dirname -- "$0";)/get-latest-validator-release-version.sh)
+container_version=v1.18.22
 container_name="chainlink-solana.test-validator"
 
 echo "Starting $container_name@$container_version"

@@ -6,7 +6,7 @@
 # It provides two derivations, one for x86_64-linux and another for aarch64-apple-darwin.
 # Each derivation downloads the corresponding Solana release.
 let
-  version = "v1.99.22";
+  version = "v1.18.22";
   getBinDerivation =
     {
       name,
@@ -83,7 +83,6 @@ in
       mkdir -p $out/bin
       cp $src/localnet.sh $out/bin/${name}
       cp $src/localnet.down.sh $out/bin/
-      cp $src/get-latest-validator-release-version.sh $out/bin/
       chmod +x $out/bin/${name}
     '';
   };
