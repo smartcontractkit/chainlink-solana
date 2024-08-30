@@ -17,7 +17,15 @@ jobs:
           extra_nix_config: "sandbox = false"
 
       - name: Build and test solana-test-validator
-        run: nix run .#solana-test-validator
+        run: |
+          nix run .#solana-test-validator &
+          sleep 10
+          if curl --fail http://127.0.0.1:8899; then
+            echo "Validator is running and accessible"
+          else
+            echo "Failed to connect to the validator"
+            exit 1
+          fi
 
       - name: Build solana-cli-env
         run: nix build .#solana-cli-env --print-out-paths
