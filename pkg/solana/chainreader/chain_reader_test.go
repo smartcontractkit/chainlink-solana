@@ -520,9 +520,7 @@ func (r *chainReaderInterfaceTester) GetChainReader(t *testing.T) types.Contract
 
 	require.NoError(t, svc.Start(context.Background()))
 	t.Cleanup(func() {
-		if svc.Ready() == nil {
-			require.NoError(t, svc.Close())
-		}
+		require.NoError(t, svc.Close())
 	})
 
 	if r.reader == nil {
@@ -627,7 +625,10 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 
 		fallthrough
 	default:
+		// If you called a method and the service is not started
 		if r.service.Ready() != nil {
+			// Start service again so it's gracefully closed by the cleanup function later.
+			require.NoError(r.test, r.service.Start(ctx))
 			return errors.New("service not ready")
 		}
 
