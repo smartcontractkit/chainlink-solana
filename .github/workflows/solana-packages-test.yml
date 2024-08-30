@@ -19,21 +19,6 @@ jobs:
       - name: Build and test solana-test-validator
         run: nix run .#solana-test-validator
 
-      - name: Check if validator is running
-        run: |
-          for i in {1..10}; do
-            if curl --fail http://127.0.0.1:8899; then
-              echo "Localnet is running and accessible"
-              break
-            else
-              echo "Waiting for the localnet to start..."
-              sleep 3
-            fi
-            if [ $i -eq 30 ]; then
-              echo "Localnet did not start within the expected time."
-              exit 1
-            fi
-
       - name: Build solana-cli-env
         run: nix build .#solana-cli-env --print-out-paths
 
