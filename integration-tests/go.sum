@@ -809,6 +809,7 @@ github.com/grafana/gomemcache v0.0.0-20231023152154-6947259a0586 h1:/of8Z8taCPft
 github.com/grafana/gomemcache v0.0.0-20231023152154-6947259a0586/go.mod h1:PGk3RjYHpxMM8HFPhKKo+vve3DdlPUELZLSDEFehPuU=
 github.com/grafana/grafana-foundation-sdk/go v0.0.0-20240326122733-6f96a993222b h1:Msqs1nc2qWMxTriDCITKl58Td+7Md/RURmUmH7RXKns=
 github.com/grafana/grafana-foundation-sdk/go v0.0.0-20240326122733-6f96a993222b/go.mod h1:WtWosval1KCZP9BGa42b8aVoJmVXSg0EvQXi9LDSVZQ=
+github.com/grafana/grafana-foundation-sdk/go v0.0.0-20240717180137-18b7def9b008/go.mod h1:WtWosval1KCZP9BGa42b8aVoJmVXSg0EvQXi9LDSVZQ=
 github.com/grafana/loki v1.6.2-0.20231215164305-b51b7d7b5503 h1:gdrsYbmk8822v6qvPwZO5DC6QjnAW7uKJ9YXnoUmV8c=
 github.com/grafana/loki v1.6.2-0.20231215164305-b51b7d7b5503/go.mod h1:d8seWXCEXkL42mhuIJYcGi6DxfehzoIpLrMQWJojvOo=
 github.com/grafana/loki/pkg/push v0.0.0-20231201111602-11ef833ed3e4 h1:wQ0FnSeebhJIBkgYOD06Mxk9HV2KhtEG0hp/7R+5RUQ=
