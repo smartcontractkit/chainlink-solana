@@ -44,7 +44,7 @@ do
     exit 0
   fi
 
-  if [[ $output == *"Incompatible CPU detected"* ]]; then
+  if [[ $output == *"Incompatible CPU detected"* || $output == *"Aborted"* ]]; then
     echo ""
     echo "solanalabs/solana docker image only supports linux/amd64"
     exit 1
@@ -53,7 +53,7 @@ do
   current_time=$(date +%s)
   elapsed_time=$((current_time - start_time))
 
-  if (( elapsed_time > 60 )); then
+  if (( elapsed_time > 10 )); then
     echo "Error: Command did not become ready within 10 seconds"
     exit 1
   fi

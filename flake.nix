@@ -11,24 +11,28 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; overlays = [ rust-overlay.overlays.default ]; };
+        solanaPkgs = pkgs.callPackage ./solana.nix {};
       in {
-        devShell = pkgs.callPackage ./shell.nix {
-          inherit pkgs;
-          scriptDir = toString ./.; # converts the flakes'root dir to string
+        formatter = pkgs.nixpkgs-fmt;
+
+        devShells = {
+          default = pkgs.callPackage ./shell.nix {
+            inherit pkgs;
+            scriptDir = toString ./.; # converts the flakes'root dir to string
+          };
+          
+          solana-cli = pkgs.mkShell {
+            buildInputs = pkgs.lib.optionals pkgs.stdenv.isLinux [
+              solanaPkgs.binaries.x86_64-linux
+            ] ++ pkgs.lib.optionals (pkgs.stdenv.isDarwin && pkgs.stdenv.hostPlatform.isAarch64) [
+              solanaPkgs.binaries.aarch64-apple-darwin
+            ];
+            shellHook = solanaPkgs.shellHook;
+          };
         };
 
         packages = {
-          solana-test-validator = pkgs.stdenv.mkDerivation rec {
-            name = "solana-test-validator";
-            src = ./scripts/setup-test-validator; 
-            installPhase = ''
-              mkdir -p $out/bin
-              cp $src/localnet.sh $out/bin/${name}
-              cp $src/localnet.down.sh $out/bin/
-              cp $src/get-latest-validator-release-version.sh $out/bin/
-              chmod +x $out/bin/${name}
-            '';
-          };
+          solana-test-validator = solanaPkgs.solana-test-validator;
         };
     });
 }
