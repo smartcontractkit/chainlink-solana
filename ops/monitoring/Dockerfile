@@ -1,6 +1,6 @@
 # Build image
 
-FROM golang:1.21.10 AS build
+FROM golang:1.22.6 AS build
 
 # OS dependencies
 RUN apt-get update && apt-get install -y wget gcc
