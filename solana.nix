@@ -39,19 +39,27 @@ let
       sha256 = "sha256-eqJcoheUCACcIfNNgMGhbhYnAyAy9PGarlWhzr4JpbU=";
     };
   };
-
-  targetBinary =
-    pkgs.lib.optionals pkgs.stdenv.isLinux [
+in
+{
+  # Provides environment package for Solana CLI
+  solana-cli-env = pkgs.buildEnv {
+    name = "solana-cli-env";
+    paths = pkgs.lib.optionals pkgs.stdenv.isLinux [
       solanaBinaries.x86_64-linux
     ]
     ++ pkgs.lib.optionals (pkgs.stdenv.isDarwin && pkgs.stdenv.hostPlatform.isAarch64) [
       solanaBinaries.aarch64-apple-darwin
     ];
-in
-{
+  };
+
   # Provides interactive shell with Solana CLI tool accessibility.
   solana-cli-shell = pkgs.mkShell {
-    buildInputs = [ targetBinary ];
+    buildInputs = pkgs.lib.optionals pkgs.stdenv.isLinux [
+      solanaBinaries.x86_64-linux
+    ]
+    ++ pkgs.lib.optionals (pkgs.stdenv.isDarwin && pkgs.stdenv.hostPlatform.isAarch64) [
+      solanaBinaries.aarch64-apple-darwin
+    ];
     shellHook = ''
       echo "===================================================="
       echo "Welcome to the Solana CLI dev shell."
@@ -63,12 +71,6 @@ in
       solana config get
       echo "===================================================="
     '';
-  };
-
-  # Provides environment package for Solana CLI
-  solana-cli-env = pkgs.buildEnv {
-    name = "solana-cli-env";
-    paths = [ targetBinary ];
   };
 
   # Provides dockerized Solana test validator accessibility.
