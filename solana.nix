@@ -3,8 +3,7 @@
   pkgs ? import <nixpkgs> { inherit system; },
 }:
 
-# It provides two derivations, one for x86_64-linux and another for aarch64-apple-darwin.
-# Each derivation downloads the corresponding Solana release.
+# Solana integration
 let
   version = "v1.18.22";
   getBinDerivation =
@@ -27,6 +26,8 @@ let
       '';
     };
 
+  # It provides two derivations, one for x86_64-linux and another for aarch64-apple-darwin.
+  # Each derivation downloads the corresponding Solana release.
   solanaBinaries = {
     x86_64-linux = getBinDerivation {
       name = "solana-cli-x86_64-linux";
@@ -52,7 +53,7 @@ in
     ];
   };
 
-  # Provides interactive shell with Solana CLI tool accessibility.
+  # Provides interactive dev shell with Solana CLI tool accessibility.
   solana-cli-shell = pkgs.mkShell {
     buildInputs = pkgs.lib.optionals pkgs.stdenv.isLinux [
       solanaBinaries.x86_64-linux
@@ -73,8 +74,7 @@ in
     '';
   };
 
-  # Provides dockerized Solana test validator accessibility.
-  # https://hub.docker.com/r/solanalabs/solana/
+  # Provides dockerized Solana test validator accessibility. https://hub.docker.com/r/solanalabs/solana
   # Currently the official docker image only supports x86_64-linux.(https://github.com/anza-xyz/agave/tree/master/sdk/docker-solana)
   solana-test-validator = pkgs.stdenv.mkDerivation rec {
     name = "solana-test-validator";
