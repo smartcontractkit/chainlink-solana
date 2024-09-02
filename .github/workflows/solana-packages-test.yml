@@ -1,8 +1,8 @@
 on:
+  pull_request:
   push:
     branches:
-      - BCI-4073-nix-test-validator
-  workflow_dispatch:
+      - develop
 
 jobs:
   solana-packages-test:
