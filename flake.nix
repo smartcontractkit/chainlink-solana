@@ -16,10 +16,7 @@
         formatter = pkgs.nixpkgs-fmt;
 
         devShells = {
-          default = pkgs.callPackage ./shell.nix {
-            inherit pkgs;
-            scriptDir = toString ./.;
-          };
+          default = pkgs.callPackage ./shell.nix ;
           solana-cli = solanaPkgs.solana-cli-shell;
         };
 
