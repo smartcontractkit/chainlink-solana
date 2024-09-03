@@ -8,12 +8,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-
-	"github.com/smartcontractkit/chainlink/v2/common/types"
 )
 
 type sendOnlyClient[
-	CHAIN_ID types.ID,
+	CHAIN_ID ID,
 ] interface {
 	Close()
 	ChainID(context.Context) (CHAIN_ID, error)
@@ -22,7 +20,7 @@ type sendOnlyClient[
 
 // SendOnlyNode represents one node used as a sendonly
 type SendOnlyNode[
-	CHAIN_ID types.ID,
+	CHAIN_ID ID,
 	RPC any,
 ] interface {
 	// Start may attempt to connect to the node, but should only return error for misconfiguration - never for temporary errors.
@@ -42,7 +40,7 @@ type SendOnlyNode[
 // It only supports sending transactions
 // It must use an http(s) url
 type sendOnlyNode[
-	CHAIN_ID types.ID,
+	CHAIN_ID ID,
 	RPC sendOnlyClient[CHAIN_ID],
 ] struct {
 	services.StateMachine
@@ -61,7 +59,7 @@ type sendOnlyNode[
 
 // NewSendOnlyNode returns a new sendonly node
 func NewSendOnlyNode[
-	CHAIN_ID types.ID,
+	CHAIN_ID ID,
 	RPC sendOnlyClient[CHAIN_ID],
 ](
 	lggr logger.Logger,

@@ -3,8 +3,6 @@ package client
 import (
 	"fmt"
 	"time"
-
-	"github.com/smartcontractkit/chainlink/v2/common/internal/utils"
 )
 
 // verifyLoop may only be triggered once, on Start, if initial chain ID check
@@ -16,7 +14,7 @@ func (s *sendOnlyNode[CHAIN_ID, RPC]) verifyLoop() {
 	ctx, cancel := s.chStop.NewCtx()
 	defer cancel()
 
-	backoff := utils.NewRedialBackoff()
+	backoff := NewRedialBackoff()
 	for {
 		select {
 		case <-ctx.Done():
