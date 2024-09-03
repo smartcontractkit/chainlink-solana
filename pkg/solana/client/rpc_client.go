@@ -24,8 +24,6 @@ func (s StringID) String() string {
 	return string(s)
 }
 
-// TODO: ChainReaderWriter needs ChainID() (string, error)
-// TODO: We probably don't need this though?
 var _ ReaderWriter = (*RpcClient)(nil)
 
 type Head struct {
@@ -60,6 +58,8 @@ type RpcClient struct {
 	// provides a duplicate function call suppression mechanism
 	requestGroup *singleflight.Group
 }
+
+// TODO: BCI-4061: Implement RPC Client for MultiNode
 
 func (c *RpcClient) Dial(ctx context.Context) error {
 	//TODO implement me

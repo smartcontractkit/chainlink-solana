@@ -110,8 +110,7 @@ type node[
 	// wg waits for subsidiary goroutines
 	wg sync.WaitGroup
 
-	aliveLoopSub      Subscription
-	finalizedBlockSub Subscription
+	healthCheckSubs []Subscription
 }
 
 func NewNode[
@@ -180,9 +179,7 @@ func (n *node[CHAIN_ID, HEAD, RPC]) RPC() RPC {
 // unsubscribeAllExceptAliveLoop is not thread-safe; it should only be called
 // while holding the stateMu lock.
 func (n *node[CHAIN_ID, HEAD, RPC]) unsubscribeAllExceptAliveLoop() {
-	aliveLoopSub := n.aliveLoopSub
-	finalizedBlockSub := n.finalizedBlockSub
-	n.rpc.UnsubscribeAllExcept(aliveLoopSub, finalizedBlockSub)
+	n.rpc.UnsubscribeAllExcept(n.healthCheckSubs...)
 }
 
 func (n *node[CHAIN_ID, HEAD, RPC]) UnsubscribeAllExceptAliveLoop() {

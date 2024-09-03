@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"slices"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink/v2/common/types"
 )
 
 var (
@@ -40,7 +42,7 @@ type SendTxRPCClient[TX any] interface {
 	SendTransaction(ctx context.Context, tx TX) error
 }
 
-func NewTransactionSender[TX any, CHAIN_ID ID, RPC SendTxRPCClient[TX]](
+func NewTransactionSender[TX any, CHAIN_ID types.ID, RPC SendTxRPCClient[TX]](
 	lggr logger.Logger,
 	chainID CHAIN_ID,
 	chainFamily string,
@@ -62,7 +64,7 @@ func NewTransactionSender[TX any, CHAIN_ID ID, RPC SendTxRPCClient[TX]](
 	}
 }
 
-type TransactionSender[TX any, CHAIN_ID ID, RPC SendTxRPCClient[TX]] struct {
+type TransactionSender[TX any, CHAIN_ID types.ID, RPC SendTxRPCClient[TX]] struct {
 	services.StateMachine
 	chainID           CHAIN_ID
 	chainFamily       string
@@ -133,12 +135,6 @@ func (txSender *TransactionSender[TX, CHAIN_ID, RPC]) SendTransaction(ctx contex
 			}
 		}()
 	})
-	if err != nil {
-		primaryNodeWg.Wait()
-		close(txResultsToReport)
-		close(txResults)
-		return 0, err
-	}
 
 	// This needs to be done in parallel so the reporting knows when it's done (when the channel is closed)
 	txSender.wg.Add(1)
@@ -148,6 +144,10 @@ func (txSender *TransactionSender[TX, CHAIN_ID, RPC]) SendTransaction(ctx contex
 		close(txResultsToReport)
 		close(txResults)
 	}()
+
+	if err != nil {
+		return 0, err
+	}
 
 	txSender.wg.Add(1)
 	go txSender.reportSendTxAnomalies(tx, txResultsToReport)
@@ -167,7 +167,7 @@ func (txSender *TransactionSender[TX, CHAIN_ID, RPC]) broadcastTxAsync(ctx conte
 
 func (txSender *TransactionSender[TX, CHAIN_ID, RPC]) reportSendTxAnomalies(tx TX, txResults <-chan sendTxResult) {
 	defer txSender.wg.Done()
-	resultsByCode := sendTxErrors{}
+	resultsByCode := sendTxResults{}
 	// txResults eventually will be closed
 	for txResult := range txResults {
 		resultsByCode[txResult.ResultCode] = append(resultsByCode[txResult.ResultCode], txResult.Err)
@@ -180,9 +180,9 @@ func (txSender *TransactionSender[TX, CHAIN_ID, RPC]) reportSendTxAnomalies(tx T
 	}
 }
 
-type sendTxErrors map[SendTxReturnCode][]error
+type sendTxResults map[SendTxReturnCode][]error
 
-func aggregateTxResults(resultsByCode sendTxErrors) (returnCode SendTxReturnCode, txResult error, err error) {
+func aggregateTxResults(resultsByCode sendTxResults) (returnCode SendTxReturnCode, txResult error, err error) {
 	severeCode, severeErrors, hasSevereErrors := findFirstIn(resultsByCode, sendTxSevereErrors)
 	successCode, successResults, hasSuccess := findFirstIn(resultsByCode, sendTxSuccessfulCodes)
 	if hasSuccess {
@@ -191,7 +191,7 @@ func aggregateTxResults(resultsByCode sendTxErrors) (returnCode SendTxReturnCode
 		if hasSevereErrors {
 			const errMsg = "found contradictions in nodes replies on SendTransaction: got success and severe error"
 			// return success, since at least 1 node has accepted our broadcasted Tx, and thus it can now be included onchain
-			return successCode, successResults[0], fmt.Errorf(errMsg)
+			return successCode, successResults[0], errors.New(errMsg)
 		}
 
 		// other errors are temporary - we are safe to return success
@@ -208,7 +208,7 @@ func aggregateTxResults(resultsByCode sendTxErrors) (returnCode SendTxReturnCode
 	}
 
 	err = fmt.Errorf("expected at least one response on SendTransaction")
-	return 0, err, err
+	return Retryable, err, err
 }
 
 func (txSender *TransactionSender[TX, CHAIN_ID, RPC]) collectTxResults(ctx context.Context, tx TX, healthyNodesNum int, txResults <-chan sendTxResult) (SendTxReturnCode, error) {
@@ -216,7 +216,7 @@ func (txSender *TransactionSender[TX, CHAIN_ID, RPC]) collectTxResults(ctx conte
 		return 0, ErroringNodeError
 	}
 	requiredResults := int(math.Ceil(float64(healthyNodesNum) * sendTxQuorum))
-	errorsByCode := sendTxErrors{}
+	errorsByCode := sendTxResults{}
 	var softTimeoutChan <-chan time.Time
 	var resultsCount int
 loop:

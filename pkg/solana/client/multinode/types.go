@@ -6,14 +6,9 @@ import (
 	"math/big"
 )
 
-// A chain-agnostic generic interface to represent the following native types on various chains:
-// PublicKey, Address, Account, BlockHash, TxHash
-type Hashable interface {
-	fmt.Stringer
-	comparable
-
-	Bytes() []byte
-}
+// ID represents the base type, for any chain's ID.
+// It should be convertible to a string, that can uniquely identify this chain
+type ID fmt.Stringer
 
 // Subscription represents an event subscription where events are
 // delivered on a data channel.
@@ -30,7 +25,7 @@ type Subscription interface {
 	Err() <-chan error
 }
 
-// RPCClient includes all the necessary generalized RPC methods along with any additional chain-specific methods.
+// RPCClient includes all the necessary generalized RPC methods used by Node to perform health checks
 type RPCClient[
 	CHAIN_ID ID,
 	HEAD Head,
@@ -103,22 +98,4 @@ func MaxTotalDifficulty(a, b *big.Int) *big.Int {
 	}
 
 	return big.NewInt(0).Set(b)
-}
-
-// ID represents the base type, for any chain's ID.
-// It should be convertible to a string, that can uniquely identify this chain
-type ID fmt.Stringer
-
-type multiNodeContextKey int
-
-const (
-	contextKeyHeathCheckRequest multiNodeContextKey = iota + 1
-)
-
-func CtxAddHealthCheckFlag(ctx context.Context) context.Context {
-	return context.WithValue(ctx, contextKeyHeathCheckRequest, struct{}{})
-}
-
-func CtxIsHeathCheckRequest(ctx context.Context) bool {
-	return ctx.Value(contextKeyHeathCheckRequest) != nil
 }

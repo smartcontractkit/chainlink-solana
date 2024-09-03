@@ -2,8 +2,6 @@ package client
 
 import (
 	"fmt"
-
-	"github.com/smartcontractkit/chainlink/v2/common/types"
 )
 
 const (
@@ -14,7 +12,7 @@ const (
 )
 
 type NodeSelector[
-	CHAIN_ID types.ID,
+	CHAIN_ID ID,
 	RPC any,
 ] interface {
 	// Select returns a Node, or nil if none can be selected.
@@ -25,7 +23,7 @@ type NodeSelector[
 }
 
 func newNodeSelector[
-	CHAIN_ID types.ID,
+	CHAIN_ID ID,
 	RPC any,
 ](selectionMode string, nodes []Node[CHAIN_ID, RPC]) NodeSelector[CHAIN_ID, RPC] {
 	switch selectionMode {
