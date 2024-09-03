@@ -43,9 +43,9 @@ func TestSolanaChainReaderService_ReaderInterface(t *testing.T) {
 	t.Parallel()
 
 	it := &chainReaderInterfaceTester{}
-	RunChainComponentsInterfaceTests(t, it, true)
-	lsIt := &skipEventsChainReaderTester{ChainComponentsInterfaceTester: commontestutils.WrapChainComponentsTesterForLoop(it)}
-	RunChainComponentsInterfaceTests(t, lsIt, true)
+	RunContractReaderInterfaceTests(t, it, true)
+	lsIt := &skipEventsChainReaderTester{ChainComponentsInterfaceTester: commontestutils.WrapContractReaderTesterForLoop(it)}
+	RunContractReaderInterfaceTests(t, lsIt, true)
 }
 
 func TestSolanaChainReaderService_ServiceCtx(t *testing.T) {
@@ -698,6 +698,9 @@ func (r *chainReaderInterfaceTester) SetUintLatestValue(t *testing.T, _ uint64, 
 
 func (r *chainReaderInterfaceTester) GenerateBlocksTillConfidenceLevel(t *testing.T, _, _ string, _ primitives.ConfidenceLevel) {
 	t.Skip("GenerateBlocksTillConfidenceLevel is not yet supported in Solana")
+}
+
+func (r *chainReaderInterfaceTester) DirtyContracts() {
 }
 
 // SetTestStructLatestValue is expected to return the same bound contract and method in the same test
