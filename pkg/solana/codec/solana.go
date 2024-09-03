@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/mitchellh/mapstructure"
+	"github.com/go-viper/mapstructure/v2"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
