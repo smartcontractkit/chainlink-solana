@@ -83,4 +83,5 @@ func (c *MultiNode) FinalizedBlockOffset() uint32 {
 
 func (c *MultiNode) SetDefaults() {
 	// TODO: Set defaults for MultiNode config https://smartcontract-it.atlassian.net/browse/BCI-4065
+	c.multiNodeEnabled = false
 }
