@@ -6,8 +6,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-
-	"github.com/smartcontractkit/chainlink/v2/common/types"
 )
 
 // Poller is a component that polls a function at a given interval
@@ -44,7 +42,7 @@ func NewPoller[
 	return p, channel
 }
 
-var _ types.Subscription = &Poller[any]{}
+var _ Subscription = &Poller[any]{}
 
 func (p *Poller[T]) start(ctx context.Context) error {
 	p.eng.Go(p.pollingLoop)

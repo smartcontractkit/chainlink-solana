@@ -14,7 +14,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink/v2/common/types"
 )
 
 var (
@@ -42,7 +41,7 @@ type SendTxRPCClient[TX any] interface {
 	SendTransaction(ctx context.Context, tx TX) error
 }
 
-func NewTransactionSender[TX any, CHAIN_ID types.ID, RPC SendTxRPCClient[TX]](
+func NewTransactionSender[TX any, CHAIN_ID ID, RPC SendTxRPCClient[TX]](
 	lggr logger.Logger,
 	chainID CHAIN_ID,
 	chainFamily string,
@@ -64,7 +63,7 @@ func NewTransactionSender[TX any, CHAIN_ID types.ID, RPC SendTxRPCClient[TX]](
 	}
 }
 
-type TransactionSender[TX any, CHAIN_ID types.ID, RPC SendTxRPCClient[TX]] struct {
+type TransactionSender[TX any, CHAIN_ID ID, RPC SendTxRPCClient[TX]] struct {
 	services.StateMachine
 	chainID           CHAIN_ID
 	chainFamily       string
