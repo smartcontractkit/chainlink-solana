@@ -14,7 +14,7 @@
         solanaPkgs = pkgs.callPackage ./solana.nix {};
       in rec {
         devShells = {
-          default = pkgs.callPackage ./shell.nix ;
+          default = pkgs.callPackage ./shell.nix {};
           solana-cli = solanaPkgs.solana-cli-shell;
         };
 
