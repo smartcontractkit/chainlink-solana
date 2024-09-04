@@ -79,7 +79,7 @@ func TestClient_Reader_Integration(t *testing.T) {
 	// get chain ID based on gensis hash
 	network, err := c.ChainID(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, "localnet", network)
+	assert.Equal(t, mn.StringID("localnet"), network)
 
 	// get account info (also tested inside contract_test)
 	res, err := c.GetAccountInfoWithOpts(context.TODO(), solana.PublicKey{}, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentFinalized})
