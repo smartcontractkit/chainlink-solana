@@ -587,16 +587,10 @@ func GetConfig(configurationName string, product Product) (TestConfig, error) {
 
 func (c *TestConfig) readNetworkConfiguration() error {
 	// currently we need to read that kind of secrets only for network configuration
-	if c == nil {
+	if c.Network == nil {
 		c.Network = &ctf_config.NetworkConfig{}
 	}
-
 	c.Network.UpperCaseNetworkNames()
-	err := c.Network.Default()
-	if err != nil {
-		return fmt.Errorf("error reading default network config: %w", err)
-	}
-
 	return nil
 }
 
