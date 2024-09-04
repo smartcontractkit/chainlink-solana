@@ -518,11 +518,6 @@ func (r *chainReaderInterfaceTester) GetChainReader(t *testing.T) types.Contract
 		t.FailNow()
 	}
 
-	require.NoError(t, svc.Start(context.Background()))
-	t.Cleanup(func() {
-		_ = svc.Close()
-	})
-
 	if r.reader == nil {
 		r.reader = &wrappedTestChainReader{tester: r}
 	}
@@ -536,6 +531,10 @@ func (r *chainReaderInterfaceTester) GetChainReader(t *testing.T) types.Contract
 
 func (r *chainReaderInterfaceTester) Close(t *testing.T) {
 	require.NoError(t, r.reader.service.Close())
+}
+
+func (r *chainReaderInterfaceTester) Start(t *testing.T) {
+	require.NoError(t, r.reader.service.Start(context.Background()))
 }
 
 type wrappedTestChainReader struct {
@@ -626,8 +625,8 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 		fallthrough
 	default:
 		// If you called a method and the service is not started
-		if r.service.Ready() != nil {
-			return errors.New("service not ready")
+		if err := r.service.Ready(); err != nil {
+			return fmt.Errorf("service not ready. err: %w", err)
 		}
 
 		if len(r.testStructQueue) == 0 {
