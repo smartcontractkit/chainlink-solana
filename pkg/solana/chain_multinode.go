@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"sync"
 	"time"
 
 	solanago "github.com/gagliardetto/solana-go"
@@ -40,13 +39,11 @@ type multiNodeChain struct {
 	services.StateMachine
 	id             string
 	cfg            *config.TOMLConfig
-	multiNode      *mn.MultiNode[mn.StringID, *client.RpcClient]
-	txSender       *mn.TransactionSender[*solanago.Transaction, mn.StringID, *client.RpcClient]
+	multiNode      *mn.MultiNode[mn.StringID, *client.RPCClient]
+	txSender       *mn.TransactionSender[*solanago.Transaction, mn.StringID, *client.RPCClient]
 	txm            *txm.Txm
 	balanceMonitor services.Service
 	lggr           logger.Logger
-
-	clientLock sync.RWMutex
 }
 
 func newMultiNodeChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.Logger) (*multiNodeChain, error) {
@@ -58,29 +55,29 @@ func newMultiNodeChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr
 
 	mnCfg := cfg.MultiNodeConfig()
 
-	var nodes []mn.Node[mn.StringID, *client.RpcClient]
+	var nodes []mn.Node[mn.StringID, *client.RPCClient]
 
 	for i, nodeInfo := range cfg.ListNodes() {
 		// create client and check
-		rpcClient, err := client.NewRpcClient(nodeInfo.URL.String(), cfg, DefaultRequestTimeout, logger.Named(lggr, "Client."+*nodeInfo.Name))
+		rpcClient, err := client.NewRPCClient(nodeInfo.URL.String(), cfg, DefaultRequestTimeout, logger.Named(lggr, "Client."+*nodeInfo.Name))
 		if err != nil {
 			lggr.Warnw("failed to create client", "name", *nodeInfo.Name, "solana-url", nodeInfo.URL.String(), "err", err.Error())
 			continue
 		}
 
-		newNode := mn.NewNode[mn.StringID, *client.Head, *client.RpcClient](
+		newNode := mn.NewNode[mn.StringID, *client.Head, *client.RPCClient](
 			mnCfg, mnCfg, lggr, *nodeInfo.URL.URL(), nil, *nodeInfo.Name,
 			int32(i), mn.StringID(id), 0, rpcClient, chainFamily)
 
 		nodes = append(nodes, newNode)
 	}
 
-	multiNode := mn.NewMultiNode[mn.StringID, *client.RpcClient](
+	multiNode := mn.NewMultiNode[mn.StringID, *client.RPCClient](
 		lggr,
 		mn.NodeSelectionModeRoundRobin,
 		time.Duration(0), // TODO: set lease duration
 		nodes,
-		[]mn.SendOnlyNode[mn.StringID, *client.RpcClient]{}, // TODO: no send only nodes?
+		[]mn.SendOnlyNode[mn.StringID, *client.RPCClient]{}, // TODO: no send only nodes?
 		mn.StringID(id),
 		chainFamily,
 		time.Duration(0), // TODO: set deathDeclarationDelay
@@ -90,7 +87,7 @@ func newMultiNodeChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr
 		return 0 // TODO ClassifySendError(err, clientErrors, logger.Sugared(logger.Nop()), tx, common.Address{}, false)
 	}
 
-	txSender := mn.NewTransactionSender[*solanago.Transaction, mn.StringID, *client.RpcClient](
+	txSender := mn.NewTransactionSender[*solanago.Transaction, mn.StringID, *client.RPCClient](
 		lggr,
 		mn.StringID(id),
 		chainFamily,
