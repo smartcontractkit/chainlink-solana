@@ -9,31 +9,31 @@ import (
 
 var (
 	promPoolRPCNodeTransitionsToAlive = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "pool_rpc_node_num_transitions_to_alive",
+		Name: "solana_pool_rpc_node_num_transitions_to_alive",
 		Help: transitionString(NodeStateAlive),
 	}, []string{"chainID", "nodeName"})
 	promPoolRPCNodeTransitionsToInSync = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "pool_rpc_node_num_transitions_to_in_sync",
+		Name: "solana_pool_rpc_node_num_transitions_to_in_sync",
 		Help: fmt.Sprintf("%s to %s", transitionString(NodeStateOutOfSync), NodeStateAlive),
 	}, []string{"chainID", "nodeName"})
 	promPoolRPCNodeTransitionsToOutOfSync = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "pool_rpc_node_num_transitions_to_out_of_sync",
+		Name: "solana_pool_rpc_node_num_transitions_to_out_of_sync",
 		Help: transitionString(NodeStateOutOfSync),
 	}, []string{"chainID", "nodeName"})
 	promPoolRPCNodeTransitionsToUnreachable = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "pool_rpc_node_num_transitions_to_unreachable",
+		Name: "solana_pool_rpc_node_num_transitions_to_unreachable",
 		Help: transitionString(NodeStateUnreachable),
 	}, []string{"chainID", "nodeName"})
 	promPoolRPCNodeTransitionsToInvalidChainID = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "pool_rpc_node_num_transitions_to_invalid_chain_id",
+		Name: "solana_pool_rpc_node_num_transitions_to_invalid_chain_id",
 		Help: transitionString(NodeStateInvalidChainID),
 	}, []string{"chainID", "nodeName"})
 	promPoolRPCNodeTransitionsToUnusable = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "pool_rpc_node_num_transitions_to_unusable",
+		Name: "solana_pool_rpc_node_num_transitions_to_unusable",
 		Help: transitionString(NodeStateUnusable),
 	}, []string{"chainID", "nodeName"})
 	promPoolRPCNodeTransitionsToSyncing = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "pool_rpc_node_num_transitions_to_syncing",
+		Name: "solana_pool_rpc_node_num_transitions_to_syncing",
 		Help: transitionString(NodeStateSyncing),
 	}, []string{"chainID", "nodeName"})
 )

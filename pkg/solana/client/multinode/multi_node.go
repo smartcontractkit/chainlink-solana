@@ -18,7 +18,7 @@ import (
 var (
 	// PromMultiNodeRPCNodeStates reports current RPC node state
 	PromMultiNodeRPCNodeStates = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "multi_node_states",
+		Name: "solana_multi_node_states",
 		Help: "The number of RPC nodes currently in the given state for the given chain",
 	}, []string{"network", "chainId", "state"})
 	ErroringNodeError = fmt.Errorf("no live nodes available")
