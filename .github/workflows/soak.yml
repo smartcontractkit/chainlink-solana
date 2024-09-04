@@ -3,8 +3,12 @@ on:
   workflow_dispatch:
     inputs:
       base64_config:
-        description: Your .toml file as base64
+        description: Your .toml file as base64 (must NOT contain test secrets)
         required: true
+      test_secrets_override_key:
+        description: 'Key to run tests with custom test secrets like ws url, rpc url, private key, etc.'
+        required: false
+        type: string        
       cl_image_tag:
         description: Core image tag
         required: true
@@ -92,10 +96,12 @@ jobs:
           echo "::add-mask::$BASE64_CONFIG_OVERRIDE"
           echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> "$GITHUB_ENV"
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@fdaf56b1df7248d18e30ad09982d03ec67d6b71c # v2.3.29
         with:
           test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Soak/embedded -json $(args) ./soak 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
+          test_config_override_base64: ${{ env.BASE64_CONFIG_OVERRIDE }}
+          test_secrets_override_base64: ${{ secrets[inputs.test_secrets_override_key] }}
           download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 
           go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ env.CL_ECR }}
@@ -109,3 +115,5 @@ jobs:
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
           cache_key_id: solana-e2e-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "false"
+        env:
+          E2E_TEST_SOLANA_SECRET: thisisatestingonlysecret

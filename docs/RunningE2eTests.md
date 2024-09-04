@@ -15,7 +15,7 @@ Devnet requires previously deployed programs that are owned by the person runnin
 
 - `Common.network` needs to be set to `devnet` which will instruct the tests to run against devnet
 - `ocr2_program_id`, `access_controller_program_id`, `store_program_id`, `link_token_address`, `vault_address` need to be set so the tests know what programs to use so we avoid deploying each time.
-- `rpc_url` and `ws_url` need to be set
+- `E2E_TEST_COMMON_RPC_URL` and `E2E_TEST_COMMON_WS_URL` need to be set
 
 **Localnet**
 Setting localnet will instruct the tests to run in localnet, the program ID's are not taken from the TOML in this scenario, but rather defined in the `integration-tests/config/config.go`.
