@@ -301,7 +301,6 @@ jobs:
         run: | # https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/README.md
           cat << EOF > config.toml
           [ChainlinkImage]
-          image="${{ env.CL_ECR }}"
           version="solana.${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref || github.sha }}"
           [Common]
           user="${{ github.actor }}"
@@ -315,10 +314,11 @@ jobs:
           # shellcheck disable=SC2086
           echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> $GITHUB_ENV
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@fc3e0df622521019f50d772726d6bf8dc919dd38 # v2.3.19
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@00c164251be2a7c5b2b23a6e5f7014982f232c14 # v2.3.31
         with:
           test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
+          test_config_override_base64: ${{ env.BASE64_CONFIG_OVERRIDE }}
           download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 
           go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ env.CL_ECR }}
@@ -332,6 +332,9 @@ jobs:
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
           cache_key_id: solana-e2e-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "false"
+        env:
+          E2E_TEST_CHAINLINK_IMAGE: ${{ env.CL_ECR }}          
+          E2E_TEST_SOLANA_SECRET: thisisatestingonlysecret
 
   e2e_program_upgrade_tests:
     name: E2E Program Upgrade Tests
@@ -394,10 +397,11 @@ jobs:
           # shellcheck disable=SC2086
           echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> $GITHUB_ENV
       - name: Run Upgrade Test
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@fc3e0df622521019f50d772726d6bf8dc919dd38 # v2.3.19
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@00c164251be2a7c5b2b23a6e5f7014982f232c14 # v2.3.31
         with:
           test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2UpgradeSmoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
+          test_config_override_base64: ${{ env.BASE64_CONFIG_OVERRIDE }}
           download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 
           go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ env.CL_ECR }}
@@ -411,3 +415,7 @@ jobs:
           QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
           cache_key_id: solana-e2e-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "false"
+        env:
+          E2E_TEST_CHAINLINK_IMAGE: ${{ env.CL_ECR }}          
+          E2E_TEST_SOLANA_SECRET: thisisatestingonlysecret
+          
