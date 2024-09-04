@@ -80,12 +80,12 @@ func (f *feesExporter) Export(ctx context.Context, data interface{}) {
 
 	fee, err := mathutil.Avg(feeArr...)
 	if err != nil {
-		f.log.Errorf("fee average: %w", err)
+		f.log.Errorf("fee average: %v", err)
 		return
 	}
 	computeUnits, err := mathutil.Avg(computeUnitsArr...)
 	if err != nil {
-		f.log.Errorf("computeUnits average: %w", err)
+		f.log.Errorf("computeUnits average: %v", err)
 		return
 	}
 

@@ -29,6 +29,7 @@ type TxManager interface {
 var _ relaytypes.Relayer = &Relayer{} //nolint:staticcheck
 
 type Relayer struct {
+	services.StateMachine
 	lggr   logger.Logger
 	chain  Chain
 	stopCh services.StopChan
@@ -49,17 +50,21 @@ func (r *Relayer) Name() string {
 
 // Start starts the relayer respecting the given context.
 func (r *Relayer) Start(context.Context) error {
-	// No subservices started on relay start, but when the first job is started
-	if r.chain == nil {
-		return errors.New("Solana unavailable")
-	}
-	return nil
+	return r.StartOnce("SolanaRelayer", func() error {
+		// No subservices started on relay start, but when the first job is started
+		if r.chain == nil {
+			return errors.New("Solana unavailable")
+		}
+		return nil
+	})
 }
 
 // Close will close all open subservices
 func (r *Relayer) Close() error {
-	close(r.stopCh)
-	return nil
+	return r.StopOnce("SolanaRelayer", func() error {
+		close(r.stopCh)
+		return nil
+	})
 }
 
 func (r *Relayer) Ready() error {

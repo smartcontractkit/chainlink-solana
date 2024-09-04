@@ -38,7 +38,7 @@ inside_k8 = false
 network = "localnet"
 user = "default"
 stateful_db = false
-devnet_image = "solanalabs/solana:v1.18.22"
+devnet_image = "solanalabs/solana:v1.18.23"
 
 [OCR2]
 node_count = 6
