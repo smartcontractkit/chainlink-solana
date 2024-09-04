@@ -31,17 +31,14 @@ access_controller_program_id = "9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW"
 store_program_id = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny"
 link_token_address = "7CF1GrsZsny5j9JESPj98MdYVZK38RE8ZpmTEMwECK4c"
 vault_address = "FdM4dnhVpFQfjPqNG6LEfzArhuGhUjtidYu89qtGwJCS"
-secret="thisisatestingonlysecret"
 
 [Common]
-rpc_url = "https://api.devnet.solana.com"
-ws_url = "wss://api.devnet.solana.com/"
 internal_docker_repo = "public.ecr.aws/chainlink"
 inside_k8 = false 
 network = "localnet"
 user = "default"
 stateful_db = false
-devnet_image = "solanalabs/solana:v1.18.22"
+devnet_image = "solanalabs/solana:v1.18.23"
 
 [OCR2]
 node_count = 6
