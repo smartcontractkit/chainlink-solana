@@ -44,6 +44,8 @@ else
   sed -i -e "s~$containerVersion~$latestContainer~" scripts/setup-localnet/localnet.sh
   sed -i -e "s~$nixVersion~$latestNix~" solana.nix
 fi
-cd ..
+
+# Update the Nix hashes
+"$(dirname -- "$0")/update-solana-nix-hashes.sh" "$latestTag"
 
 echo "Done"

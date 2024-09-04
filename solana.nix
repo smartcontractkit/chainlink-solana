@@ -28,16 +28,24 @@ let
 
   # It provides two derivations, one for x86_64-linux and another for aarch64-apple-darwin.
   # Each derivation downloads the corresponding Solana release.
+
+  # The SHA256 hashes below are automatically updated by action.(dependency-updates.yml)
+  # The update script(./scripts/update-solana-nix-hashes.sh) looks for the BEGIN and END markers to locate the lines to modify.
+  # Do not modify these markers or the lines between them manually.
   solanaBinaries = {
     x86_64-linux = getBinDerivation {
       name = "solana-cli-x86_64-linux";
       filename = "solana-release-x86_64-unknown-linux-gnu.tar.bz2";
-      sha256 = "sha256-bgT7Xqnz6V8tsv5WSESbSUfJCPfGWjGHGYvpEG0myxk=";
+      ### BEGIN_LINUX_SHA256 ###
+      sha256 = "sha256-L7N8z1MjDWkSoOKLAe4y/iuKTRgLpqg2mDpb9h1RXH0=";
+      ### END_LINUX_SHA256 ###
     };
     aarch64-apple-darwin = getBinDerivation {
       name = "solana-cli-aarch64-apple-darwin";
       filename = "solana-release-aarch64-apple-darwin.tar.bz2";
-      sha256 = "sha256-eqJcoheUCACcIfNNgMGhbhYnAyAy9PGarlWhzr4JpbU=";
+      ### BEGIN_DARWIN_SHA256 ###
+      sha256 = "sha256-D6hJL3yQncHltuWtF4QMAzvp/s7LV/S3NHwHiJG8wQ0=";
+      ### END_DARWIN_SHA256 ###
     };
   };
 in
