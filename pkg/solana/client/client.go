@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
+
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"golang.org/x/sync/singleflight"
@@ -33,7 +35,7 @@ type Reader interface {
 	Balance(addr solana.PublicKey) (uint64, error)
 	SlotHeight() (uint64, error)
 	LatestBlockhash() (*rpc.GetLatestBlockhashResult, error)
-	ChainID(ctx context.Context) (StringID, error)
+	ChainID(ctx context.Context) (mn.StringID, error)
 	GetFeeForMessage(msg string) (uint64, error)
 	GetLatestBlock() (*rpc.GetBlockResult, error)
 }
@@ -142,7 +144,7 @@ func (c *Client) LatestBlockhash() (*rpc.GetLatestBlockhashResult, error) {
 	return v.(*rpc.GetLatestBlockhashResult), err
 }
 
-func (c *Client) ChainID(ctx context.Context) (StringID, error) {
+func (c *Client) ChainID(ctx context.Context) (mn.StringID, error) {
 	done := c.latency("chain_id")
 	defer done()
 
@@ -168,7 +170,7 @@ func (c *Client) ChainID(ctx context.Context) (StringID, error) {
 		c.log.Warnf("unknown genesis hash - assuming solana chain is 'localnet'")
 		network = "localnet"
 	}
-	return StringID(network), nil
+	return mn.StringID(network), nil
 }
 
 func (c *Client) GetFeeForMessage(msg string) (uint64, error) {

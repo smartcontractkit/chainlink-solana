@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -39,8 +40,8 @@ type multiNodeChain struct {
 	services.StateMachine
 	id             string
 	cfg            *config.TOMLConfig
-	multiNode      *mn.MultiNode[client.StringID, *client.RpcClient]
-	txSender       *mn.TransactionSender[*solanago.Transaction, client.StringID, *client.RpcClient]
+	multiNode      *mn.MultiNode[mn.StringID, *client.RpcClient]
+	txSender       *mn.TransactionSender[*solanago.Transaction, mn.StringID, *client.RpcClient]
 	txm            *txm.Txm
 	balanceMonitor services.Service
 	lggr           logger.Logger
@@ -57,7 +58,7 @@ func newMultiNodeChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr
 
 	mnCfg := cfg.MultiNodeConfig()
 
-	var nodes []mn.Node[client.StringID, *client.RpcClient]
+	var nodes []mn.Node[mn.StringID, *client.RpcClient]
 
 	for i, nodeInfo := range cfg.ListNodes() {
 		// create client and check
@@ -67,20 +68,20 @@ func newMultiNodeChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr
 			continue
 		}
 
-		newNode := mn.NewNode[client.StringID, *client.Head, *client.RpcClient](
+		newNode := mn.NewNode[mn.StringID, *client.Head, *client.RpcClient](
 			mnCfg, mnCfg, lggr, *nodeInfo.URL.URL(), nil, *nodeInfo.Name,
-			int32(i), client.StringID(id), 0, rpcClient, chainFamily)
+			int32(i), mn.StringID(id), 0, rpcClient, chainFamily)
 
 		nodes = append(nodes, newNode)
 	}
 
-	multiNode := mn.NewMultiNode[client.StringID, *client.RpcClient](
+	multiNode := mn.NewMultiNode[mn.StringID, *client.RpcClient](
 		lggr,
 		mn.NodeSelectionModeRoundRobin,
 		time.Duration(0), // TODO: set lease duration
 		nodes,
-		[]mn.SendOnlyNode[client.StringID, *client.RpcClient]{}, // TODO: no send only nodes?
-		client.StringID(id),
+		[]mn.SendOnlyNode[mn.StringID, *client.RpcClient]{}, // TODO: no send only nodes?
+		mn.StringID(id),
 		chainFamily,
 		time.Duration(0), // TODO: set deathDeclarationDelay
 	)
@@ -89,9 +90,9 @@ func newMultiNodeChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr
 		return 0 // TODO ClassifySendError(err, clientErrors, logger.Sugared(logger.Nop()), tx, common.Address{}, false)
 	}
 
-	txSender := mn.NewTransactionSender[*solanago.Transaction, client.StringID, *client.RpcClient](
+	txSender := mn.NewTransactionSender[*solanago.Transaction, mn.StringID, *client.RpcClient](
 		lggr,
-		client.StringID(id),
+		mn.StringID(id),
 		chainFamily,
 		multiNode,
 		classifySendError,

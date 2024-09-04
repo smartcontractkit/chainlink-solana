@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
@@ -122,7 +123,7 @@ func TestClient_Reader_ChainID(t *testing.T) {
 	for _, n := range networks {
 		network, err := c.ChainID(context.Background())
 		assert.NoError(t, err)
-		assert.Equal(t, n, network)
+		assert.Equal(t, mn.StringID(n), network)
 	}
 }
 

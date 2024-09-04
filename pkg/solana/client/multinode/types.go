@@ -10,6 +10,13 @@ import (
 // It should be convertible to a string, that can uniquely identify this chain
 type ID fmt.Stringer
 
+// StringID enables using string directly as a ChainID
+type StringID string
+
+func (s StringID) String() string {
+	return string(s)
+}
+
 // Subscription represents an event subscription where events are
 // delivered on a data channel.
 // This is a generic interface for Subscription to represent used by clients.

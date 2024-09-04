@@ -18,12 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 )
 
-type StringID string
-
-func (s StringID) String() string {
-	return string(s)
-}
-
 var _ ReaderWriter = (*RpcClient)(nil)
 
 type Head struct {
@@ -178,7 +172,7 @@ func (c *RpcClient) LatestBlockhash() (*rpc.GetLatestBlockhashResult, error) {
 	return v.(*rpc.GetLatestBlockhashResult), err
 }
 
-func (c *RpcClient) ChainID(ctx context.Context) (StringID, error) {
+func (c *RpcClient) ChainID(ctx context.Context) (mn.StringID, error) {
 	done := c.latency("chain_id")
 	defer done()
 
@@ -204,7 +198,7 @@ func (c *RpcClient) ChainID(ctx context.Context) (StringID, error) {
 		c.log.Warnf("unknown genesis hash - assuming solana chain is 'localnet'")
 		network = "localnet"
 	}
-	return StringID(network), nil
+	return mn.StringID(network), nil
 }
 
 func (c *RpcClient) GetFeeForMessage(msg string) (uint64, error) {

@@ -22,6 +22,8 @@ import (
 	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
+	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
@@ -187,13 +189,13 @@ func (v *verifiedCachedClient) LatestBlockhash() (*rpc.GetLatestBlockhashResult,
 	return v.ReaderWriter.LatestBlockhash()
 }
 
-func (v *verifiedCachedClient) ChainID(ctx context.Context) (client.StringID, error) {
+func (v *verifiedCachedClient) ChainID(ctx context.Context) (mn.StringID, error) {
 	verified, err := v.verifyChainID()
 	if !verified {
 		return "", err
 	}
 
-	return client.StringID(v.chainID), nil
+	return mn.StringID(v.chainID), nil
 }
 
 func (v *verifiedCachedClient) GetFeeForMessage(msg string) (uint64, error) {

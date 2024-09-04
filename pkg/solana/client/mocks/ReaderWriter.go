@@ -6,6 +6,7 @@ import (
 	context "context"
 
 	rpc "github.com/gagliardetto/solana-go/rpc"
+	multinode "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 	mock "github.com/stretchr/testify/mock"
 
 	solana "github.com/gagliardetto/solana-go"
@@ -44,27 +45,27 @@ func (_m *ReaderWriter) Balance(addr solana.PublicKey) (uint64, error) {
 	return r0, r1
 }
 
-// ChainID provides a mock function with given fields:
-func (_m *ReaderWriter) ChainID() (string, error) {
-	ret := _m.Called()
+// ChainID provides a mock function with given fields: ctx
+func (_m *ReaderWriter) ChainID(ctx context.Context) (multinode.StringID, error) {
+	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ChainID")
 	}
 
-	var r0 string
+	var r0 multinode.StringID
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (string, error)); ok {
-		return rf()
+	if rf, ok := ret.Get(0).(func(context.Context) (multinode.StringID, error)); ok {
+		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) multinode.StringID); ok {
+		r0 = rf(ctx)
 	} else {
-		r0 = ret.Get(0).(string)
+		r0 = ret.Get(0).(multinode.StringID)
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
