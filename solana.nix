@@ -5,7 +5,7 @@
 
 # Solana integration
 let
-  version = "v1.18.22";
+  version = "v1.18.23";
   getBinDerivation =
     {
       name,
