@@ -529,11 +529,11 @@ func (r *chainReaderInterfaceTester) GetChainReader(t *testing.T) types.Contract
 	return r.reader
 }
 
-func (r *chainReaderInterfaceTester) Close(t *testing.T) {
+func (r *chainReaderInterfaceTester) CloseChainReader(t *testing.T) {
 	require.NoError(t, r.reader.service.Close())
 }
 
-func (r *chainReaderInterfaceTester) Start(t *testing.T) {
+func (r *chainReaderInterfaceTester) StartChainReader(t *testing.T) {
 	require.NoError(t, r.reader.service.Start(context.Background()))
 }
 
@@ -575,6 +575,12 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 		a ag_solana.PublicKey
 		b ag_solana.PublicKey
 	)
+
+	// If you called the method and the service is not started
+	if err := r.service.Ready(); err != nil {
+		return fmt.Errorf("service not ready. err: %w", err)
+	}
+
 	switch contractName + method {
 	case AnyContractName + EventName:
 		r.test.Skip("Events are not yet supported in Solana")
@@ -629,11 +635,6 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, contractNam
 
 		fallthrough
 	default:
-		// If you called a method and the service is not started
-		if err := r.service.Ready(); err != nil {
-			return fmt.Errorf("service not ready. err: %w", err)
-		}
-
 		if len(r.testStructQueue) == 0 {
 			r.test.FailNow()
 		}
