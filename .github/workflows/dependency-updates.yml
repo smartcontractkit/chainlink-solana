@@ -10,7 +10,7 @@ jobs:
     with:
       reviewers: aalu1418
       run: |
-        make upgrade-e2e-solana-image
+        make upgrade-solana-image
         image=$(curl https://api.github.com/repos/solana-labs/solana/releases/latest | jq -r '.tag_name')
 
         # outputs
