@@ -67,15 +67,7 @@ func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore 
 		KeyStore: keystore,
 	}
 
-	var chain solana.Chain
-	var err error
-
-	if cfg.Solana.MultiNodeConfig().MultiNodeEnabled() {
-		chain, err = solana.NewMultiNodeChain(&cfg.Solana, opts)
-	} else {
-		chain, err = solana.NewChain(&cfg.Solana, opts)
-	}
-
+	chain, err := solana.NewChain(&cfg.Solana, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chain: %w", err)
 	}
