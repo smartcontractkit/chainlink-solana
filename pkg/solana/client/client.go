@@ -70,6 +70,7 @@ type Client struct {
 	requestGroup *singleflight.Group
 
 	// MultiNode
+	pollInterval               time.Duration
 	finalizedBlockPollInterval time.Duration
 	stateMu                    sync.RWMutex // protects state* fields
 	subs                       map[ethereum.Subscription]struct{}
@@ -97,6 +98,7 @@ func NewClient(endpoint string, cfg *config.TOMLConfig, requestTimeout time.Dura
 		contextDuration:            requestTimeout,
 		log:                        log,
 		requestGroup:               &singleflight.Group{},
+		pollInterval:               cfg.PollInterval(),
 		finalizedBlockPollInterval: cfg.FinalizedBlockPollInterval(),
 	}, nil
 }
@@ -113,6 +115,8 @@ func (h *Head) BlockNumber() int64 {
 }
 
 func (h *Head) BlockDifficulty() *big.Int {
+	// TODO: Is difficulty relevant for Solana?
+	// TODO: If not, then remove changes to it in latestBlockInfo
 	return nil
 }
 
@@ -130,7 +134,18 @@ func (c *Client) Dial(ctx context.Context) error {
 }
 
 func (c *Client) SubscribeToHeads(ctx context.Context) (<-chan *Head, mn.Subscription, error) {
-	// TODO: BlockPollInternal
+	if c.pollInterval == 0 {
+		return nil, nil, errors.New("PollInterval is 0")
+	}
+	timeout := c.pollInterval
+	poller, channel := mn.NewPoller[*Head](c.pollInterval, c.LatestBlock, timeout, c.log)
+	if err := poller.Start(ctx); err != nil {
+		return nil, nil, err
+	}
+	return channel, &poller, nil
+}
+
+func (c *Client) SubscribeToFinalizedHeads(ctx context.Context) (<-chan *Head, mn.Subscription, error) {
 	if c.finalizedBlockPollInterval == 0 {
 		return nil, nil, errors.New("FinalizedBlockPollInterval is 0")
 	}
@@ -140,7 +155,22 @@ func (c *Client) SubscribeToHeads(ctx context.Context) (<-chan *Head, mn.Subscri
 		return nil, nil, err
 	}
 	return channel, &poller, nil
-	panic("implement me")
+}
+
+func (c *Client) LatestBlock(ctx context.Context) (*Head, error) {
+	latestBlockHash, err := c.rpc.GetLatestBlockhash(ctx, c.commitment)
+	if err != nil {
+		return nil, err
+	}
+
+	latestBlock, err := c.rpc.GetBlock(ctx, latestBlockHash.Value.LastValidBlockHeight)
+	if err != nil {
+		return nil, err
+	}
+
+	head := &Head{GetBlockResult: *latestBlock}
+	c.onNewHead(ctx, c.chStopInFlight, head)
+	return head, nil
 }
 
 func (c *Client) LatestFinalizedBlock(ctx context.Context) (*Head, error) {
@@ -162,19 +192,30 @@ func (c *Client) LatestFinalizedBlock(ctx context.Context) (*Head, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Head{GetBlockResult: *resp}, nil
+
+	head := &Head{GetBlockResult: *resp}
+	c.onNewFinalizedHead(ctx, c.chStopInFlight, head)
+	return head, nil
 }
 
-func (c *Client) SubscribeToFinalizedHeads(ctx context.Context) (<-chan *Head, mn.Subscription, error) {
-	if c.finalizedBlockPollInterval == 0 {
-		return nil, nil, errors.New("FinalizedBlockPollInterval is 0")
+func (c *Client) onNewHead(ctx context.Context, requestCh <-chan struct{}, head *Head) {
+	if head == nil {
+		return
 	}
-	timeout := c.finalizedBlockPollInterval
-	poller, channel := mn.NewPoller[*Head](c.finalizedBlockPollInterval, c.LatestFinalizedBlock, timeout, c.log)
-	if err := poller.Start(ctx); err != nil {
-		return nil, nil, err
+
+	c.chainInfoLock.Lock()
+	defer c.chainInfoLock.Unlock()
+	if !mn.CtxIsHeathCheckRequest(ctx) {
+		c.highestUserObservations.BlockNumber = max(c.highestUserObservations.BlockNumber, head.BlockNumber())
+		c.highestUserObservations.TotalDifficulty = mn.MaxTotalDifficulty(c.highestUserObservations.TotalDifficulty, head.BlockDifficulty())
 	}
-	return channel, &poller, nil
+	select {
+	case <-requestCh: // no need to update latestChainInfo, as rpcClient already started new life cycle
+		return
+	default:
+		c.latestChainInfo.BlockNumber = head.BlockNumber()
+		c.latestChainInfo.TotalDifficulty = head.BlockDifficulty()
+	}
 }
 
 func (c *Client) onNewFinalizedHead(ctx context.Context, requestCh <-chan struct{}, head *Head) {
