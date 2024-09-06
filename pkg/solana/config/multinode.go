@@ -3,7 +3,6 @@ package config
 import "time"
 
 type MultiNode struct {
-	// TODO: Determine current config overlap https://smartcontract-it.atlassian.net/browse/BCI-4065
 	// Feature flag
 	multiNodeEnabled bool
 
@@ -13,6 +12,7 @@ type MultiNode struct {
 	selectionMode              string
 	syncThreshold              uint32
 	nodeIsSyncingEnabled       bool
+	leaseDuration              time.Duration
 	finalizedBlockPollInterval time.Duration
 	enforceRepeatableRead      bool
 	deathDeclarationDelay      time.Duration
@@ -82,6 +82,23 @@ func (c *MultiNode) FinalizedBlockOffset() uint32 {
 }
 
 func (c *MultiNode) SetDefaults() {
-	// TODO: Set defaults for MultiNode config https://smartcontract-it.atlassian.net/browse/BCI-4065
 	c.multiNodeEnabled = false
+
+	// Node Configs
+	c.pollFailureThreshold = 5
+	c.pollInterval = 10 * time.Second
+	c.selectionMode = "HighestHead"
+	c.syncThreshold = 5
+	c.leaseDuration = 0
+	c.nodeIsSyncingEnabled = false
+	c.finalizedBlockPollInterval = 5 * time.Second
+	c.enforceRepeatableRead = false
+	c.deathDeclarationDelay = 10 * time.Second
+
+	// Chain Configs
+	c.nodeNoNewHeadsThreshold = 10 * time.Second      // TODO: Value?
+	c.noNewFinalizedHeadsThreshold = 10 * time.Second // TODO: Value?
+	c.finalityDepth = 0                               // TODO: Value?
+	c.finalityTagEnabled = false                      // TODO: Value?
+	c.finalizedBlockOffset = 0                        // TODO: Value?
 }

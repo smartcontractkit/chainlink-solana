@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum"
 	"math/big"
+	"sync"
 	"time"
 
 	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
@@ -66,6 +68,37 @@ type Client struct {
 
 	// provides a duplicate function call suppression mechanism
 	requestGroup *singleflight.Group
+
+	// MultiNode
+	finalizedBlockPollInterval time.Duration
+	stateMu                    sync.RWMutex // protects state* fields
+	subs                       map[ethereum.Subscription]struct{}
+
+	// chStopInFlight can be closed to immediately cancel all in-flight requests on
+	// this RpcClient. Closing and replacing should be serialized through
+	// stateMu since it can happen on state transitions as well as RpcClient Close.
+	chStopInFlight chan struct{}
+
+	chainInfoLock sync.RWMutex
+	// intercepted values seen by callers of the rpcClient excluding health check calls. Need to ensure MultiNode provides repeatable read guarantee
+	highestUserObservations mn.ChainInfo
+	// most recent chain info observed during current lifecycle (reseted on DisconnectAll)
+	latestChainInfo mn.ChainInfo
+}
+
+func NewClient(endpoint string, cfg *config.TOMLConfig, requestTimeout time.Duration, log logger.Logger) (*Client, error) {
+	return &Client{
+		url:                        endpoint,
+		rpc:                        rpc.New(endpoint),
+		skipPreflight:              cfg.SkipPreflight(),
+		commitment:                 cfg.Commitment(),
+		maxRetries:                 cfg.MaxRetries(),
+		txTimeout:                  cfg.TxTimeout(),
+		contextDuration:            requestTimeout,
+		log:                        log,
+		requestGroup:               &singleflight.Group{},
+		finalizedBlockPollInterval: cfg.FinalizedBlockPollInterval(),
+	}, nil
 }
 
 type Head struct {
@@ -87,68 +120,151 @@ func (h *Head) IsValid() bool {
 	return true
 }
 
-func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration, log logger.Logger) (*Client, error) {
-	return &Client{
-		url:             endpoint,
-		rpc:             rpc.New(endpoint),
-		skipPreflight:   cfg.SkipPreflight(),
-		commitment:      cfg.Commitment(),
-		maxRetries:      cfg.MaxRetries(),
-		txTimeout:       cfg.TxTimeout(),
-		contextDuration: requestTimeout,
-		log:             log,
-		requestGroup:    &singleflight.Group{},
-	}, nil
-}
-
 var _ mn.RPCClient[mn.StringID, *Head] = (*Client)(nil)
 var _ mn.SendTxRPCClient[*solana.Transaction] = (*Client)(nil)
 
-// TODO: BCI-4061: Implement Client for MultiNode
-
 func (c *Client) Dial(ctx context.Context) error {
-	//TODO implement me
+	// TODO: is there any work to do here? Doesn't seem like we have to dial anything
+	// TODO: Could maybe do a version check here?
 	panic("implement me")
 }
 
 func (c *Client) SubscribeToHeads(ctx context.Context) (<-chan *Head, mn.Subscription, error) {
-	//TODO implement me
+	// TODO: BlockPollInternal
+	if c.finalizedBlockPollInterval == 0 {
+		return nil, nil, errors.New("FinalizedBlockPollInterval is 0")
+	}
+	timeout := c.finalizedBlockPollInterval
+	poller, channel := mn.NewPoller[*Head](c.finalizedBlockPollInterval, c.LatestFinalizedBlock, timeout, c.log)
+	if err := poller.Start(ctx); err != nil {
+		return nil, nil, err
+	}
+	return channel, &poller, nil
 	panic("implement me")
+}
+
+func (c *Client) LatestFinalizedBlock(ctx context.Context) (*Head, error) {
+	// TODO: Do we need this?
+	// capture chStopInFlight to ensure we are not updating chainInfo with observations related to previous life cycle
+	//ctx, cancel, chStopInFlight, _, _ := c.acquireQueryCtx(ctx, c.rpcTimeout)
+
+	// TODO: Is this really the way to implement this?
+	latestBH, err := c.rpc.GetLatestBlockhash(ctx, c.commitment)
+	if err != nil {
+		return nil, err
+	}
+
+	var finalityDepth uint64 = 1 // TODO: Value?
+
+	latestFinalizedBH := latestBH.Value.LastValidBlockHeight - finalityDepth // TODO: subtract finality depth?
+
+	resp, err := c.rpc.GetBlock(ctx, latestFinalizedBH)
+	if err != nil {
+		return nil, err
+	}
+	return &Head{GetBlockResult: *resp}, nil
 }
 
 func (c *Client) SubscribeToFinalizedHeads(ctx context.Context) (<-chan *Head, mn.Subscription, error) {
-	//TODO implement me
-	panic("implement me")
+	if c.finalizedBlockPollInterval == 0 {
+		return nil, nil, errors.New("FinalizedBlockPollInterval is 0")
+	}
+	timeout := c.finalizedBlockPollInterval
+	poller, channel := mn.NewPoller[*Head](c.finalizedBlockPollInterval, c.LatestFinalizedBlock, timeout, c.log)
+	if err := poller.Start(ctx); err != nil {
+		return nil, nil, err
+	}
+	return channel, &poller, nil
+}
+
+func (c *Client) onNewFinalizedHead(ctx context.Context, requestCh <-chan struct{}, head *Head) {
+	if head == nil {
+		return
+	}
+	c.chainInfoLock.Lock()
+	defer c.chainInfoLock.Unlock()
+	if !mn.CtxIsHeathCheckRequest(ctx) {
+		c.highestUserObservations.FinalizedBlockNumber = max(c.highestUserObservations.FinalizedBlockNumber, head.BlockNumber())
+	}
+	select {
+	case <-requestCh: // no need to update latestChainInfo, as rpcClient already started new life cycle
+		return
+	default:
+		c.latestChainInfo.FinalizedBlockNumber = head.BlockNumber()
+	}
 }
 
 func (c *Client) Ping(ctx context.Context) error {
-	//TODO implement me
-	panic("implement me")
+	/* TODO: Should we use this health check for ping or somewhere?
+	health, err := c.rpc.GetHealth(ctx)
+	if err != nil {
+		return false, err
+	}
+	return health == rpc.HealthOk, nil
+	*/
+
+	version, err := c.rpc.GetVersion(ctx)
+	if err != nil {
+		return fmt.Errorf("ping failed: %v", err)
+	}
+	c.log.Debugf("ping client version: %s", version.SolanaCore)
+	return err
 }
 
 func (c *Client) IsSyncing(ctx context.Context) (bool, error) {
-	//TODO implement me
-	panic("implement me")
+	// TODO: is this relevant?
+	return false, nil
 }
 
 func (c *Client) UnsubscribeAllExcept(subs ...mn.Subscription) {
-	//TODO implement me
-	panic("implement me")
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+
+	keepSubs := map[mn.Subscription]struct{}{}
+	for _, sub := range subs {
+		keepSubs[sub] = struct{}{}
+	}
+
+	for sub := range c.subs {
+		if _, keep := keepSubs[sub]; !keep {
+			sub.Unsubscribe()
+			delete(c.subs, sub)
+		}
+	}
+}
+
+// cancelInflightRequests closes and replaces the chStopInFlight
+func (c *Client) cancelInflightRequests() {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	close(c.chStopInFlight)
+	c.chStopInFlight = make(chan struct{})
 }
 
 func (c *Client) Close() {
-	//TODO implement me
-	panic("implement me")
+	defer func() {
+		err := c.rpc.Close()
+		if err != nil {
+			c.log.Errorf("error closing rpc: %v", err)
+		}
+	}()
+	c.cancelInflightRequests()
+	c.UnsubscribeAllExcept()
+	c.chainInfoLock.Lock()
+	c.latestChainInfo = mn.ChainInfo{}
+	c.chainInfoLock.Unlock()
 }
 
 func (c *Client) GetInterceptedChainInfo() (latest, highestUserObservations mn.ChainInfo) {
-	//TODO implement me
-	panic("implement me")
+	c.chainInfoLock.Lock()
+	defer c.chainInfoLock.Unlock()
+	return c.latestChainInfo, c.highestUserObservations
 }
 
 func (c *Client) SendTransaction(ctx context.Context, tx *solana.Transaction) error {
-	// TODO: Implement
-	return nil
+	// TODO: Is this all we need to do here?
+	_, err := c.SendTx(ctx, tx)
+	return err
 }
 
 func (c *Client) latency(name string) func() {
