@@ -10,7 +10,7 @@ jobs:
     with:
       reviewers: aalu1418
       run: |
-        make upgrade-e2e-solana-image
+        make upgrade-solana-image
         image=$(curl https://api.github.com/repos/solana-labs/solana/releases/latest | jq -r '.tag_name')
 
         # outputs
@@ -28,15 +28,15 @@ jobs:
         # get CTF version in core
         git clone https://github.com/smartcontractkit/chainlink.git temp-chainlink
         cd temp-chainlink/integration-tests
-        coreVersion=$(go list -m github.com/smartcontractkit/chainlink-testing-framework | awk '{print $NF}')
+        coreVersion=$(go list -m github.com/smartcontractkit/chainlink-testing-framework/lib | awk '{print $NF}')
         cd ../../
         rm -rf temp-chainlink
-        echo "chainlink/integration-tests CTF: $coreVersion"
+        echo "chainlink/integration-tests CTF/lib: $coreVersion"
 
         # get CTF version in solana
         cd integration-tests
-        solVersion=$(go list -m github.com/smartcontractkit/chainlink-testing-framework | awk '{print $NF}')
-        echo "chainlink-solana/integration-tests CTF: $solVersion"
+        solVersion=$(go list -m github.com/smartcontractkit/chainlink-testing-framework/lib | awk '{print $NF}')
+        echo "chainlink-solana/integration-tests CTF/lib: $solVersion"
         cd ../
         
         # compare versions

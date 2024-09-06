@@ -43,9 +43,9 @@ func TestSolanaChainReaderService_ReaderInterface(t *testing.T) {
 	t.Parallel()
 
 	it := &chainReaderInterfaceTester{}
-	RunChainReaderInterfaceTests(t, it)
-	lsIt := &skipEventsChainReaderTester{ChainReaderInterfaceTester: commontestutils.WrapChainReaderTesterForLoop(it)}
-	RunChainReaderInterfaceTests(t, lsIt)
+	RunContractReaderInterfaceTests(t, it, true)
+	lsIt := &skipEventsChainReaderTester{ChainComponentsInterfaceTester: commontestutils.WrapContractReaderTesterForLoop(it)}
+	RunContractReaderInterfaceTests(t, lsIt, true)
 }
 
 func TestSolanaChainReaderService_ServiceCtx(t *testing.T) {
@@ -538,7 +538,7 @@ type wrappedTestChainReader struct {
 	test            *testing.T
 	service         *chainreader.SolanaChainReaderService
 	client          *mockedRPCClient
-	tester          ChainReaderInterfaceTester[*testing.T]
+	tester          ChainComponentsInterfaceTester[*testing.T]
 	testStructQueue []*TestStruct
 }
 
@@ -555,6 +555,11 @@ func (r *wrappedTestChainReader) Ready() error {
 }
 
 func (r *wrappedTestChainReader) HealthReport() map[string]error {
+	return nil
+}
+
+func (r *chainReaderInterfaceTester) GetChainWriter(t *testing.T) types.ChainWriter {
+	t.Skip("ChainWriter is not yet supported on Solana")
 	return nil
 }
 
@@ -666,7 +671,7 @@ func (r *wrappedTestChainReader) QueryKey(ctx context.Context, contractName stri
 	return nil, nil
 }
 
-func getAddresses(t *testing.T, tester ChainReaderInterfaceTester[*testing.T], a, b int) (ag_solana.PublicKey, ag_solana.PublicKey) {
+func getAddresses(t *testing.T, tester ChainComponentsInterfaceTester[*testing.T], a, b int) (ag_solana.PublicKey, ag_solana.PublicKey) {
 	t.Helper()
 
 	bindings := tester.GetBindings(t)
@@ -693,6 +698,9 @@ func (r *chainReaderInterfaceTester) SetUintLatestValue(t *testing.T, _ uint64, 
 
 func (r *chainReaderInterfaceTester) GenerateBlocksTillConfidenceLevel(t *testing.T, _, _ string, _ primitives.ConfidenceLevel) {
 	t.Skip("GenerateBlocksTillConfidenceLevel is not yet supported in Solana")
+}
+
+func (r *chainReaderInterfaceTester) DirtyContracts() {
 }
 
 // SetTestStructLatestValue is expected to return the same bound contract and method in the same test
@@ -851,12 +859,12 @@ const (
 
 // Required to allow test skipping to be on the same goroutine
 type skipEventsChainReaderTester struct {
-	ChainReaderInterfaceTester[*testing.T]
+	ChainComponentsInterfaceTester[*testing.T]
 }
 
 func (s *skipEventsChainReaderTester) GetChainReader(t *testing.T) types.ContractReader {
 	return &skipEventsChainReader{
-		ContractReader: s.ChainReaderInterfaceTester.GetChainReader(t),
+		ContractReader: s.ChainComponentsInterfaceTester.GetChainReader(t),
 		t:              t,
 	}
 }
