@@ -110,12 +110,12 @@ func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, readIdent
 		return fmt.Errorf("%w: no contract for read identifier %s", types.ErrInvalidType, readIdentifier)
 	}
 
-	addresMappings, err := decodeAddressMappings(values.address)
+	addressMappings, err := decodeAddressMappings(values.address)
 	if err != nil {
 		return fmt.Errorf("%w: %s", types.ErrInvalidConfig, err)
 	}
 
-	addresses, ok := addresMappings[values.readName]
+	addresses, ok := addressMappings[values.readName]
 	if !ok {
 		return fmt.Errorf("%w: no addresses for readName %s", types.ErrInvalidConfig, values.readName)
 	}
@@ -316,8 +316,6 @@ func (r *accountDataReader) ReadAll(ctx context.Context, pk ag_solana.PublicKey,
 }
 
 func decodeAddressMappings(encoded string) (map[string][]string, error) {
-	var mappings map[string][]string
-
 	decoded, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
 		return nil, err
@@ -330,5 +328,5 @@ func decodeAddressMappings(encoded string) (map[string][]string, error) {
 		return nil, err
 	}
 
-	return mappings, nil
+	return readAddresses, nil
 }
