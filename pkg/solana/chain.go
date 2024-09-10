@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -232,7 +233,38 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 	return &ch, nil
 }
 
-// ChainService interface
+func (c *chain) LatestHead(_ context.Context) (relaytypes.Head, error) {
+	sc, err := c.getClient()
+	if err != nil {
+		return types.Head{}, err
+	}
+
+	latestBlock, err := sc.GetLatestBlock()
+	if err != nil {
+		return types.Head{}, nil
+	}
+
+	if latestBlock.BlockHeight == nil {
+		return relaytypes.Head{}, fmt.Errorf("client returned nil latest block height")
+	}
+
+	if latestBlock.BlockTime == nil {
+		return relaytypes.Head{}, fmt.Errorf("client returned nil block time")
+	}
+
+	hashBytes, err := latestBlock.Blockhash.MarshalText()
+	if err != nil {
+		return relaytypes.Head{}, err
+	}
+
+	return types.Head{
+		Identifier: strconv.FormatUint(*latestBlock.BlockHeight, 10),
+		Hash:       hashBytes,
+		Timestamp:  uint64(latestBlock.BlockTime.Time().Unix()),
+	}, nil
+}
+
+// Implement [types.GetChainStatus] interface
 func (c *chain) GetChainStatus(ctx context.Context) (relaytypes.ChainStatus, error) {
 	toml, err := c.cfg.TOMLString()
 	if err != nil {
