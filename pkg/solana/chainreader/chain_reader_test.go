@@ -43,7 +43,7 @@ func TestSolanaChainReaderService_ReaderInterface(t *testing.T) {
 	// TODO fix Solana tests
 	t.Skip()
 	t.Parallel()
-	
+
 	it := &chainReaderInterfaceTester{}
 	RunContractReaderInterfaceTests(t, it, true)
 	lsIt := &skipEventsChainReaderTester{ChainComponentsInterfaceTester: commontestutils.WrapContractReaderTesterForLoop(it)}
