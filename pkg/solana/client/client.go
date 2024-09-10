@@ -84,6 +84,9 @@ func (h *Head) BlockDifficulty() *big.Int {
 }
 
 func (h *Head) IsValid() bool {
+	if h.BlockHeight == nil {
+		return false
+	}
 	return true
 }
 

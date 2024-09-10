@@ -238,11 +238,14 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 		var nodes []mn.Node[mn.StringID, *client.Client]
 
 		for i, nodeInfo := range cfg.ListNodes() {
+			if nodeInfo == nil || nodeInfo.Name == nil || nodeInfo.URL == nil {
+				return nil, fmt.Errorf("node config contains nil: %+v", nodeInfo)
+			}
 			// create client and check
 			rpcClient, err := client.NewClient(nodeInfo.URL.String(), cfg, DefaultRequestTimeout, logger.Named(lggr, "Client."+*nodeInfo.Name))
 			if err != nil {
 				lggr.Warnw("failed to create client", "name", *nodeInfo.Name, "solana-url", nodeInfo.URL.String(), "err", err.Error())
-				continue
+				return nil, fmt.Errorf("failed to create client: %w", err)
 			}
 
 			newNode := mn.NewNode[mn.StringID, *client.Head, *client.Client](
@@ -255,7 +258,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 		multiNode := mn.NewMultiNode[mn.StringID, *client.Client](
 			lggr,
 			mn.NodeSelectionModeRoundRobin,
-			time.Minute, // TODO: set lease duration
+			0,
 			nodes,
 			[]mn.SendOnlyNode[mn.StringID, *client.Client]{},
 			mn.StringID(id),
@@ -263,7 +266,8 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 			mnCfg.DeathDeclarationDelay(),
 		)
 
-		// TODO: implement error classification
+		// TODO: implement error classification; move logic to separate file if large
+		// TODO: might be useful to reference anza-xyz/agave@master/sdk/src/transaction/error.rs
 		classifySendError := func(tx *solanago.Transaction, err error) mn.SendTxReturnCode {
 			return 0 // TODO ClassifySendError(err, clientErrors, logger.Sugared(logger.Nop()), tx, common.Address{}, false)
 		}
