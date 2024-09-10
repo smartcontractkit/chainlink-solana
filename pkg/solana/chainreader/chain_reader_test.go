@@ -41,7 +41,7 @@ const (
 
 func TestSolanaChainReaderService_ReaderInterface(t *testing.T) {
 	// TODO fix Solana tests
-	t.Skip()
+	t.Skip("Disabled during contract reader merge.")
 	t.Parallel()
 
 	it := &chainReaderInterfaceTester{}
