@@ -21,6 +21,13 @@
         packages = {
           solana-test-validator = solanaPkgs.solana-test-validator;
           solana-cli-env = solanaPkgs.solana-cli-env;
+          solana-build-programs = pkgs.writeShellScriptBin "solana-build-programs" ''
+            time ./scripts/anchor-build-with-program-id.sh "$1" "$2" "$3"
+          '';
+        };
+
+        apps.build-programs = flake-utils.lib.mkApp {
+          drv = packages.solana-build-programs;
         };
     });
 }
