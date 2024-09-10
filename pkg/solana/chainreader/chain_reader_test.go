@@ -42,7 +42,6 @@ const (
 func TestSolanaChainReaderService_ReaderInterface(t *testing.T) {
 	// TODO fix Solana tests
 	t.Skip()
-
 	t.Parallel()
 	
 	it := &chainReaderInterfaceTester{}
