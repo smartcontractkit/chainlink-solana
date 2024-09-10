@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 
 	ag_solana "github.com/gagliardetto/solana-go"
@@ -94,13 +95,16 @@ func (s *SolanaChainReaderService) HealthReport() map[string]error {
 
 // GetLatestValue implements the types.ContractReader interface and requests and parses on-chain
 // data named by the provided contract, method, and params.
-func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, contractName, method string, _ primitives.ConfidenceLevel, params any, returnVal any) error {
+func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, readIdentifier string, _ primitives.ConfidenceLevel, params any, returnVal any) error {
 	if err := s.Ready(); err != nil {
 		return err
 	}
 
 	s.wg.Add(1)
 	defer s.wg.Done()
+
+	split := strings.Split(readIdentifier, ".")
+	contractName, method := split[0], split[1]
 
 	bindings, err := s.bindings.GetReadBindings(contractName, method)
 	if err != nil {
@@ -176,7 +180,7 @@ func (s *SolanaChainReaderService) BatchGetLatestValues(_ context.Context, _ typ
 }
 
 // QueryKey implements the types.ContractReader interface.
-func (s *SolanaChainReaderService) QueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
+func (s *SolanaChainReaderService) QueryKey(_ context.Context, _ types.BoundContract, _ query.KeyFilter, _ query.LimitAndSort, _ any) ([]types.Sequence, error) {
 	return nil, errors.New("unimplemented")
 }
 
@@ -184,6 +188,10 @@ func (s *SolanaChainReaderService) QueryKey(ctx context.Context, contractName st
 // to the service.
 func (s *SolanaChainReaderService) Bind(_ context.Context, bindings []types.BoundContract) error {
 	return s.bindings.Bind(bindings)
+}
+
+func (s *SolanaChainReaderService) Unbind(_ context.Context, _ []types.BoundContract) error {
+	return errors.New("unimplemented")
 }
 
 // CreateContractType implements the ContractTypeProvider interface and allows the chain reader
