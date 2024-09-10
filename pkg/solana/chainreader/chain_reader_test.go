@@ -518,7 +518,7 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 	}
 }
 
-func (r *chainReaderInterfaceTester) GetChainReader(t *testing.T) types.ContractReader {
+func (r *chainReaderInterfaceTester) GetContractReader(t *testing.T) types.ContractReader {
 	client := new(mockedRPCClient)
 	svc, err := chainreader.NewChainReaderService(logger.Test(t), client, r.conf)
 	if err != nil {
@@ -879,9 +879,9 @@ type skipEventsChainReaderTester struct {
 	ChainComponentsInterfaceTester[*testing.T]
 }
 
-func (s *skipEventsChainReaderTester) GetChainReader(t *testing.T) types.ContractReader {
+func (s *skipEventsChainReaderTester) GetContractReader(t *testing.T) types.ContractReader {
 	return &skipEventsChainReader{
-		ContractReader: s.ChainComponentsInterfaceTester.GetChainReader(t),
+		ContractReader: s.ChainComponentsInterfaceTester.GetContractReader(t),
 		t:              t,
 	}
 }
