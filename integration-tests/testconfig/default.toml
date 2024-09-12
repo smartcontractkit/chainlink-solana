@@ -38,7 +38,7 @@ inside_k8 = false
 network = "localnet"
 user = "default"
 stateful_db = false
-devnet_image = "anzaxyz/agave:v1.18.23"
+devnet_image = "anzaxyz/agave:v2.0.8"
 
 [OCR2]
 node_count = 6

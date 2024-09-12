@@ -15,12 +15,19 @@ echo "Current Version in Localnet Container: $localnetVersion"
 nixVersion=$(grep -oh "version = \"v[0-9]*.[0-9]*.[0-9]*\"" solana.nix)
 echo "Current Version in Nix packages: $nixVersion"
 
-latestTag=$(curl https://api.github.com/repos/anza-xyz/agave/releases/latest | jq -r '.tag_name')
+mainnetTag=$(curl https://api.github.com/repos/anza-xyz/agave/releases/latest | jq -r '.tag_name')
+latestTag=$mainnetTag
+
+if [[ -n "$1" ]]; then
+    latestTag=$1
+    echo "WARNING: User Specified Version Overrides Latest Mainnet: $latestTag"
+fi
+
 latestVersion="anzaxyz/agave:$latestTag"
 latestCLI="release.anza.xyz/$latestTag"
 latestLocalnet="container_version=$latestTag"
 latestNix="version = \"$latestTag\""
-echo "Latest Solana Mainnet Version: $latestTag"
+echo "Latest Solana Mainnet Version: $mainnetTag"
 
 if [ "$testVersion" = "$latestVersion" ] && [ "$cliVersion" = "$latestCLI" ] ; then
   echo "Solana Versions Are Up To Date"
