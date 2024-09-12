@@ -145,7 +145,7 @@ func (txSender *TransactionSender[TX, CHAIN_ID, RPC]) SendTransaction(ctx contex
 	}()
 
 	if err != nil {
-		return 0, err
+		return Retryable, err
 	}
 
 	txSender.wg.Add(1)
@@ -212,7 +212,7 @@ func aggregateTxResults(resultsByCode sendTxResults) (returnCode SendTxReturnCod
 
 func (txSender *TransactionSender[TX, CHAIN_ID, RPC]) collectTxResults(ctx context.Context, tx TX, healthyNodesNum int, txResults <-chan sendTxResult) (SendTxReturnCode, error) {
 	if healthyNodesNum == 0 {
-		return 0, ErroringNodeError
+		return Retryable, ErroringNodeError
 	}
 	requiredResults := int(math.Ceil(float64(healthyNodesNum) * sendTxQuorum))
 	errorsByCode := sendTxResults{}
@@ -223,7 +223,7 @@ loop:
 		select {
 		case <-ctx.Done():
 			txSender.lggr.Debugw("Failed to collect of the results before context was done", "tx", tx, "errorsByCode", errorsByCode)
-			return 0, ctx.Err()
+			return Retryable, ctx.Err()
 		case result := <-txResults:
 			errorsByCode[result.ResultCode] = append(errorsByCode[result.ResultCode], result.Err)
 			resultsCount++
