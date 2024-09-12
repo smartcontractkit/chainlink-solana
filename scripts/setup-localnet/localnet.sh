@@ -22,7 +22,7 @@ docker run -d \
   -p 127.0.0.1:9900:9900 \
   --name "${container_name}" \
   --entrypoint /bin/sh \
-  "solanalabs/solana:${container_version}" \
+  "anzaxyz/agave:${container_version}" \
   -c "solana-test-validator && echo 'Validator started successfully'"
   # 	--network-alias "${container_name}" \
   # 	--network chainlink \
