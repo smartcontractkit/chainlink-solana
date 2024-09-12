@@ -250,7 +250,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 
 			newNode := mn.NewNode[mn.StringID, *client.Head, *client.Client](
 				mnCfg, mnCfg, lggr, *nodeInfo.URL.URL(), nil, *nodeInfo.Name,
-				int32(i), mn.StringID(id), 0, rpcClient, chainFamily)
+				i, mn.StringID(id), 0, rpcClient, chainFamily)
 
 			nodes = append(nodes, newNode)
 		}

@@ -41,8 +41,8 @@ func (s priorityLevelNodeSelector[CHAIN_ID, RPC]) Select() Node[CHAIN_ID, RPC] {
 	priorityLevel := nodes[len(nodes)-1].priority
 
 	// NOTE: Inc returns the number after addition, so we must -1 to get the "current" counter
-	count := s.roundRobinCount[priorityLevel].Add(1) - 1
-	idx := int(count % uint32(len(nodes)))
+	count := int(s.roundRobinCount[priorityLevel].Add(1) - 1)
+	idx := count % len(nodes)
 
 	return nodes[idx].node
 }

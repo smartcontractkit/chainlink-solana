@@ -68,7 +68,7 @@ type RPCClient[
 
 // Head is the interface required by the NodeClient
 type Head interface {
-	BlockNumber() int64
+	BlockNumber() uint64
 	BlockDifficulty() *big.Int
 	IsValid() bool
 }
@@ -86,8 +86,8 @@ type PoolChainInfoProvider interface {
 
 // ChainInfo - defines RPC's or MultiNode's view on the chain
 type ChainInfo struct {
-	BlockNumber          int64
-	FinalizedBlockNumber int64
+	BlockNumber          uint64
+	FinalizedBlockNumber uint64
 	TotalDifficulty      *big.Int
 }
 
