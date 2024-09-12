@@ -23,7 +23,7 @@
           solana-cli-env = solanaPkgs.solana-cli-env;
         };
 
-        apps.build-programs = flake-utils.lib.mkApp {
+        apps.solana-build-programs = flake-utils.lib.mkApp {
           drv = solanaPkgs.solana-build-programs;
         };
     });
