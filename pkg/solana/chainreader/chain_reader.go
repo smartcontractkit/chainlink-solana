@@ -2,6 +2,7 @@ package chainreader
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -30,6 +31,7 @@ type SolanaChainReaderService struct {
 
 	// internal values
 	bindings namespaceBindings
+	lookup   *lookup
 
 	// service state management
 	wg sync.WaitGroup
@@ -47,6 +49,7 @@ func NewChainReaderService(lggr logger.Logger, dataReader BinaryDataReader, cfg 
 		lggr:     logger.Named(lggr, ServiceName),
 		client:   dataReader,
 		bindings: namespaceBindings{},
+		lookup:   newLookup(),
 	}
 
 	if err := svc.init(cfg.Namespaces); err != nil {
@@ -94,7 +97,7 @@ func (s *SolanaChainReaderService) HealthReport() map[string]error {
 
 // GetLatestValue implements the types.ContractReader interface and requests and parses on-chain
 // data named by the provided contract, method, and params.
-func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, contractName, method string, _ primitives.ConfidenceLevel, params any, returnVal any) error {
+func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, readIdentifier string, _ primitives.ConfidenceLevel, params any, returnVal any) error {
 	if err := s.Ready(); err != nil {
 		return err
 	}
@@ -102,9 +105,28 @@ func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, contractN
 	s.wg.Add(1)
 	defer s.wg.Done()
 
-	bindings, err := s.bindings.GetReadBindings(contractName, method)
+	values, ok := s.lookup.getContractForReadIdentifiers(readIdentifier)
+	if !ok {
+		return fmt.Errorf("%w: no contract for read identifier %s", types.ErrInvalidType, readIdentifier)
+	}
+
+	addressMappings, err := decodeAddressMappings(values.address)
+	if err != nil {
+		return fmt.Errorf("%w: %s", types.ErrInvalidConfig, err)
+	}
+
+	addresses, ok := addressMappings[values.readName]
+	if !ok {
+		return fmt.Errorf("%w: no addresses for readName %s", types.ErrInvalidConfig, values.readName)
+	}
+
+	bindings, err := s.bindings.GetReadBindings(values.contract, values.readName)
 	if err != nil {
 		return err
+	}
+
+	if len(addresses) != len(bindings) {
+		return fmt.Errorf("%w: addresses and bindings lengths do not match", types.ErrInvalidConfig)
 	}
 
 	localCtx, localCancel := context.WithCancel(ctx)
@@ -141,11 +163,11 @@ func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, contractN
 			}
 
 			wg.Add(1)
-			go func(ctx context.Context, rb readBinding, res *loadedResult) {
+			go func(ctx context.Context, rb readBinding, res *loadedResult, address string) {
 				defer wg.Done()
 
-				rb.PreLoad(ctx, res)
-			}(localCtx, binding, results[idx])
+				rb.PreLoad(ctx, address, res)
+			}(localCtx, binding, results[idx], addresses[idx])
 		}
 	}
 
@@ -154,7 +176,7 @@ func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, contractN
 	// in the case of no preloading, GetLatestValue will load and decode in
 	// sequence.
 	for idx, binding := range bindings {
-		if err := binding.GetLatestValue(ctx, params, returnVal, results[idx]); err != nil {
+		if err := binding.GetLatestValue(ctx, addresses[idx], params, returnVal, results[idx]); err != nil {
 			localCancel()
 
 			wg.Wait()
@@ -176,20 +198,43 @@ func (s *SolanaChainReaderService) BatchGetLatestValues(_ context.Context, _ typ
 }
 
 // QueryKey implements the types.ContractReader interface.
-func (s *SolanaChainReaderService) QueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
+func (s *SolanaChainReaderService) QueryKey(_ context.Context, _ types.BoundContract, _ query.KeyFilter, _ query.LimitAndSort, _ any) ([]types.Sequence, error) {
 	return nil, errors.New("unimplemented")
 }
 
 // Bind implements the types.ContractReader interface and allows new contract bindings to be added
 // to the service.
 func (s *SolanaChainReaderService) Bind(_ context.Context, bindings []types.BoundContract) error {
-	return s.bindings.Bind(bindings)
+	for _, binding := range bindings {
+		if err := s.bindings.Bind(binding); err != nil {
+			return err
+		}
+
+		s.lookup.bindAddressForContract(binding.Name, binding.Address)
+	}
+
+	return nil
+}
+
+// Unbind implements the types.ContractReader interface and allows existing contract bindings to be removed
+// from the service.
+func (s *SolanaChainReaderService) Unbind(_ context.Context, bindings []types.BoundContract) error {
+	for _, binding := range bindings {
+		s.lookup.unbindAddressForContract(binding.Name, binding.Address)
+	}
+
+	return nil
 }
 
 // CreateContractType implements the ContractTypeProvider interface and allows the chain reader
 // service to explicitly define the expected type for a grpc server to provide.
-func (s *SolanaChainReaderService) CreateContractType(contractName, itemType string, forEncoding bool) (any, error) {
-	return s.bindings.CreateType(contractName, itemType, forEncoding)
+func (s *SolanaChainReaderService) CreateContractType(readIdentifier string, forEncoding bool) (any, error) {
+	values, ok := s.lookup.getContractForReadIdentifiers(readIdentifier)
+	if !ok {
+		return nil, fmt.Errorf("%w: no contract for read identifier", types.ErrInvalidConfig)
+	}
+
+	return s.bindings.CreateType(values.contract, values.readName, forEncoding)
 }
 
 func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainReaderMethods) error {
@@ -204,6 +249,8 @@ func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainReader
 			if err != nil {
 				return err
 			}
+
+			s.lookup.addReadNameForContract(namespace, methodName)
 
 			for _, procedure := range method.Procedures {
 				mod, err := procedure.OutputModifications.ToModifier(codec.DecoderHooks...)
@@ -266,4 +313,20 @@ func (r *accountDataReader) ReadAll(ctx context.Context, pk ag_solana.PublicKey,
 	bts := result.Value.Data.GetBinary()
 
 	return bts, nil
+}
+
+func decodeAddressMappings(encoded string) (map[string][]string, error) {
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return nil, err
+	}
+
+	var readAddresses map[string][]string
+
+	err = json.Unmarshal(decoded, &readAddresses)
+	if err != nil {
+		return nil, err
+	}
+
+	return readAddresses, nil
 }

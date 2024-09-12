@@ -1,11 +1,11 @@
 #!/bin/bash
 set -e
 
-cliVersion=$(grep -oh "release.solana.com/v[0-9]*.[0-9]*.[0-9]*" scripts/install-solana-ci.sh)
+cliVersion=$(grep -oh "release.anza.xyz/v[0-9]*.[0-9]*.[0-9]*" scripts/install-solana-ci.sh)
 echo "Current Test CLI Version: $cliVersion"
 
 cd integration-tests
-testVersion=$(grep -oh "solanalabs/solana:v[0-9]*.[0-9]*.[0-9]*" testconfig/default.toml) 
+testVersion=$(grep -oh "anzaxyz/agave:v[0-9]*.[0-9]*.[0-9]*" testconfig/default.toml) 
 echo "Current E2E Test Version: $testVersion"
 cd ..
 
@@ -15,9 +15,9 @@ echo "Current Version in Localnet Container: $localnetVersion"
 nixVersion=$(grep -oh "version = \"v[0-9]*.[0-9]*.[0-9]*\"" solana.nix)
 echo "Current Version in Nix packages: $nixVersion"
 
-latestTag=$(curl https://api.github.com/repos/solana-labs/solana/releases/latest | jq -r '.tag_name')
-latestVersion="solanalabs/solana:$latestTag"
-latestCLI="release.solana.com/$latestTag"
+latestTag=$(curl https://api.github.com/repos/anza-xyz/agave/releases/latest | jq -r '.tag_name')
+latestVersion="anzaxyz/agave:$latestTag"
+latestCLI="release.anza.xyz/$latestTag"
 latestLocalnet="container_version=$latestTag"
 latestNix="version = \"$latestTag\""
 echo "Latest Solana Mainnet Version: $latestTag"
