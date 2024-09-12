@@ -150,10 +150,10 @@ func (n *node[CHAIN_ID, HEAD, RPC]) isFinalizedBlockOutOfSync() bool {
 	highestObservedByCaller := n.poolInfoProvider.HighestUserObservations()
 	latest, _ := n.rpc.GetInterceptedChainInfo()
 	if n.chainCfg.FinalityTagEnabled() {
-		return latest.FinalizedBlockNumber < highestObservedByCaller.FinalizedBlockNumber-uint64(n.chainCfg.FinalizedBlockOffset())
+		return latest.FinalizedBlockNumber < highestObservedByCaller.FinalizedBlockNumber-int64(n.chainCfg.FinalizedBlockOffset())
 	}
 
-	return latest.BlockNumber < highestObservedByCaller.BlockNumber-uint64(n.chainCfg.FinalizedBlockOffset())
+	return latest.BlockNumber < highestObservedByCaller.BlockNumber-int64(n.chainCfg.FinalizedBlockOffset())
 }
 
 // StateAndLatest returns nodeState with the latest ChainInfo observed by Node during current lifecycle.

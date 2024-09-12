@@ -335,7 +335,7 @@ func (n *node[CHAIN_ID, HEAD, RPC]) onNewHead(lggr logger.SugaredLogger, chainIn
 	chainInfo.BlockNumber = head.BlockNumber()
 
 	if !n.chainCfg.FinalityTagEnabled() {
-		latestFinalizedBN := max(head.BlockNumber()-uint64(n.chainCfg.FinalityDepth()), 0)
+		latestFinalizedBN := max(head.BlockNumber()-int64(n.chainCfg.FinalityDepth()), 0)
 		if latestFinalizedBN > chainInfo.FinalizedBlockNumber {
 			promPoolRPCNodeHighestFinalizedBlock.WithLabelValues(n.chainID.String(), n.name).Set(float64(latestFinalizedBN))
 			chainInfo.FinalizedBlockNumber = latestFinalizedBN
@@ -368,7 +368,7 @@ func (n *node[CHAIN_ID, HEAD, RPC]) isOutOfSyncWithPool(localState ChainInfo) (o
 	mode := n.nodePoolCfg.SelectionMode()
 	switch mode {
 	case NodeSelectionModeHighestHead, NodeSelectionModeRoundRobin, NodeSelectionModePriorityLevel:
-		return localState.BlockNumber < ci.BlockNumber-uint64(threshold), ln
+		return localState.BlockNumber < ci.BlockNumber-int64(threshold), ln
 	case NodeSelectionModeTotalDifficulty:
 		bigThreshold := big.NewInt(int64(threshold))
 		return localState.TotalDifficulty.Cmp(bigmath.Sub(ci.TotalDifficulty, bigThreshold)) < 0, ln

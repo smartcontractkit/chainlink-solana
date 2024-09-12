@@ -1,5 +1,7 @@
 package client
 
+import "math"
+
 type highestHeadNodeSelector[
 	CHAIN_ID ID,
 	RPC any,
@@ -13,7 +15,7 @@ func NewHighestHeadNodeSelector[
 }
 
 func (s highestHeadNodeSelector[CHAIN_ID, RPC]) Select() Node[CHAIN_ID, RPC] {
-	var highestHeadNumber uint64
+	var highestHeadNumber int64 = math.MinInt64
 	var highestHeadNodes []Node[CHAIN_ID, RPC]
 	for _, n := range s {
 		state, currentChainInfo := n.StateAndLatest()

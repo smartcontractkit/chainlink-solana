@@ -72,11 +72,12 @@ type Head struct {
 	rpc.GetBlockResult
 }
 
-func (h *Head) BlockNumber() uint64 {
+func (h *Head) BlockNumber() int64 {
 	if h.BlockHeight == nil {
 		return 0
 	}
-	return *h.BlockHeight
+	//nolint:gosec
+	return int64(*h.BlockHeight)
 }
 
 func (h *Head) BlockDifficulty() *big.Int {
