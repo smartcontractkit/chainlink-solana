@@ -94,4 +94,15 @@ in
       chmod +x $out/bin/${name}
     '';
   };
+
+  solana-build-programs = pkgs.writeShellScriptBin "solana-build-programs" ''
+    #!/usr/bin/env bash
+    set -e
+    script_path="./scripts/anchor-build-with-program-id.sh"
+    if [ ! -f "$script_path" ]; then
+      echo "Error: Script not found at $script_path"
+      exit 1
+    fi
+    "$script_path" "$@"
+  '';
 }

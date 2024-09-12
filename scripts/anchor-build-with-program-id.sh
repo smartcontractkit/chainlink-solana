@@ -2,12 +2,27 @@
 
 set -e
 
-ACCESS_CONTROLLER_PROGRAM_ID=$1
-STORE_PROGRAM_ID=$2
-OCR2_PROGRAM_ID=$3
+# Function to print usage
+print_usage() {
+  echo "Usage: $0 <program1_name> <program1_id> [<program2_name> <program2_id> ...]"
+  echo "Example: $0 access-controller ACCE55C0NTR0LLRED000000000000000 store 5T0REP2OGR4M0000000000000000000"
+}
+
+# Check if at least two arguments are provided
+if [ "$#" -lt 2 ]; then
+  echo "Error: Insufficient arguments."
+  print_usage
+  exit 1
+fi
+
+# Check if the number of arguments is even
+if [ $((${#} % 2)) -ne 0 ]; then
+  echo "Error: Each program must have a name and an ID."
+  print_usage
+  exit 1
+fi
 
 echo "Current directory: $(pwd)"
-echo "Contents of ./contracts directory:"
 
 WORKSPACE=./contracts/
 echo "Workspace contents:"
@@ -18,18 +33,30 @@ replaceDeclaredProgramId() {
   local program_id="$2"
 
   if [ "$(uname -s)" = "Darwin" ]; then
-    # macOS (Darwin) version
     sed -i '' "/^declare_id!/s/\"[^\"]*\"/\"$program_id\"/" "$file"
   else
-    # Linux and other Unix-like systems
     sed -i "/^declare_id!/s/\"[^\"]*\"/\"$program_id\"/" "$file"
   fi
 }
 
-replaceDeclaredProgramId "$WORKSPACE/programs/access-controller/src/lib.rs" "$ACCESS_CONTROLLER_PROGRAM_ID"
-replaceDeclaredProgramId "$WORKSPACE/programs/store/src/lib.rs" "$STORE_PROGRAM_ID"
-replaceDeclaredProgramId "$WORKSPACE/programs/ocr_2/src/lib.rs" "$OCR2_PROGRAM_ID"
+# Process each program
+while [ "$#" -gt 0 ]; do
+  program_name="$1"
+  program_id="$2"
+  shift 2
 
+  program_path="$WORKSPACE/programs/$program_name/src/lib.rs"
+  if [ -f "$program_path" ]; then
+    echo "Processing $program_name with ID $program_id"
+    replaceDeclaredProgramId "$program_path" "$program_id"
+  else
+    echo "Warning: Program file not found for $program_name"
+    exit 1
+  fi
+done
+
+# Compile the programs
+# NOTE:Currently Anchor compiles whole workspace, but in the future we may need to compile only the programs as required
 docker run --rm -it -v $WORKSPACE:/workdir backpackapp/build:v0.29.0 /bin/bash -c "anchor build"
 
 echo "Build complete. Artifacts are located in $WORKSPACE/target/deploy"
