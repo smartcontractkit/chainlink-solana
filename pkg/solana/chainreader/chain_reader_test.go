@@ -545,11 +545,11 @@ func (r *chainReaderInterfaceTester) GetContractReader(t *testing.T) types.Contr
 	return r.reader
 }
 
-func (r *chainReaderInterfaceTester) CloseChainReader(t *testing.T) {
+func (r *chainReaderInterfaceTester) CloseContractReader(t *testing.T) {
 	require.NoError(t, r.reader.service.Close())
 }
 
-func (r *chainReaderInterfaceTester) StartChainReader(t *testing.T) {
+func (r *chainReaderInterfaceTester) StartContractReader(t *testing.T) {
 	require.NoError(t, r.reader.service.Start(context.Background()))
 }
 
