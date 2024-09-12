@@ -238,10 +238,6 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 		var nodes []mn.Node[mn.StringID, *client.Client]
 
 		for i, nodeInfo := range cfg.ListNodes() {
-			if nodeInfo == nil || nodeInfo.Name == nil || nodeInfo.URL == nil {
-				return nil, fmt.Errorf("node config contains nil: %+v", nodeInfo)
-			}
-			// create client and check
 			rpcClient, err := client.NewClient(nodeInfo.URL.String(), cfg, DefaultRequestTimeout, logger.Named(lggr, "Client."+*nodeInfo.Name))
 			if err != nil {
 				lggr.Warnw("failed to create client", "name", *nodeInfo.Name, "solana-url", nodeInfo.URL.String(), "err", err.Error())
