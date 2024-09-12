@@ -194,9 +194,6 @@ func (c *TOMLConfig) ValidateConfig() (err error) {
 	}
 
 	for _, node := range c.Nodes {
-		if node == nil {
-			err = errors.Join(err, config.ErrMissing{Name: "Node", Msg: "required for all nodes"})
-		}
 		if node.Name == nil {
 			err = errors.Join(err, config.ErrMissing{Name: "Name", Msg: "required for all nodes"})
 		} else if *node.Name == "" {
