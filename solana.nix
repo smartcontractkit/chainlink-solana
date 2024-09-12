@@ -97,12 +97,18 @@ in
 
   solana-build-programs = pkgs.stdenv.mkDerivation rec {
     name = "solana-build-programs";
-    src = ./scripts;  
-    installPhase = ''
-      echo "Contents of src directory:"
-      ls -la $src
+    srcs = [ 
+      (builtins.toPath ./scripts/anchor-build-with-program-id.sh)
+      (builtins.toPath ./contracts)
+     ];
+    unpackPhase = ''
       mkdir -p $out/bin
-      cp $src/anchor-build-with-program-id.sh $out/bin/
+      for src in $srcs; do
+        echo "Unpacking $src"
+        cp -r $src $out/bin
+      done
+    '';
+    installPhase = ''
       cat << EOF > $out/bin/solana-build-programs
       #!/usr/bin/env bash
       set -e
