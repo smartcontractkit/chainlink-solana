@@ -11,8 +11,8 @@ container_name="chainlink-solana.test-validator"
 
 echo "Starting $container_name@$container_version"
 
-# NOTE: solanalabs/solana docker image only supports linux/amd64
-# https://hub.docker.com/r/solanalabs/solana/tags
+# NOTE: anzaxyz/agave docker image only supports linux/amd64
+# https://hub.docker.com/r/anzaxyz/agave/tags
 # If you are running on an ARM machine, Following error will be thrown:
 # "Incompatible CPU detected: missing AVX support. Please build from source on the target "
 docker run -d \
@@ -22,7 +22,7 @@ docker run -d \
   -p 127.0.0.1:9900:9900 \
   --name "${container_name}" \
   --entrypoint /bin/sh \
-  "solanalabs/solana:${container_version}" \
+  "anzaxyz/agave:${container_version}" \
   -c "solana-test-validator && echo 'Validator started successfully'"
   # 	--network-alias "${container_name}" \
   # 	--network chainlink \
@@ -46,7 +46,7 @@ do
 
   if [[ $output == *"Incompatible CPU detected"* || $output == *"Aborted"* ]]; then
     echo ""
-    echo "solanalabs/solana docker image only supports linux/amd64"
+    echo "anzaxyz/agave docker image only supports linux/amd64"
     exit 1
   fi
 
