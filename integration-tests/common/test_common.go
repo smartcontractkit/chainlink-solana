@@ -218,7 +218,7 @@ func (m *OCRv2TestState) SetupClients() {
 		m.Clients.ChainlinkClient.ChainlinkClientK8s, err = client.ConnectChainlinkNodes(m.Common.Env)
 		require.NoError(m.Config.T, err)
 	} else {
-		m.Clients.ChainlinkClient.ChainlinkClientDocker = m.Common.DockerEnv.ClCluster
+		m.Clients.ChainlinkClient.ChainlinkClientDocker = m.Common.DockerEnv.CLClusterTestEnv.ClCluster
 	}
 }
 

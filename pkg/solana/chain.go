@@ -7,6 +7,7 @@ import (
 	"io"
 	"math/big"
 	"math/rand"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,7 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
@@ -299,20 +299,51 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 	return &ch, nil
 }
 
-// ChainService interface
-func (c *chain) GetChainStatus(ctx context.Context) (relaytypes.ChainStatus, error) {
+func (c *chain) LatestHead(_ context.Context) (types.Head, error) {
+	sc, err := c.getClient()
+	if err != nil {
+		return types.Head{}, err
+	}
+
+	latestBlock, err := sc.GetLatestBlock()
+	if err != nil {
+		return types.Head{}, nil
+	}
+
+	if latestBlock.BlockHeight == nil {
+		return types.Head{}, fmt.Errorf("client returned nil latest block height")
+	}
+
+	if latestBlock.BlockTime == nil {
+		return types.Head{}, fmt.Errorf("client returned nil block time")
+	}
+
+	hashBytes, err := latestBlock.Blockhash.MarshalText()
+	if err != nil {
+		return types.Head{}, err
+	}
+
+	return types.Head{
+		Height:    strconv.FormatUint(*latestBlock.BlockHeight, 10),
+		Hash:      hashBytes,
+		Timestamp: uint64(latestBlock.BlockTime.Time().Unix()),
+	}, nil
+}
+
+// Implement [types.GetChainStatus] interface
+func (c *chain) GetChainStatus(ctx context.Context) (types.ChainStatus, error) {
 	toml, err := c.cfg.TOMLString()
 	if err != nil {
-		return relaytypes.ChainStatus{}, err
+		return types.ChainStatus{}, err
 	}
-	return relaytypes.ChainStatus{
+	return types.ChainStatus{
 		ID:      c.id,
 		Enabled: c.cfg.IsEnabled(),
 		Config:  toml,
 	}, nil
 }
 
-func (c *chain) ListNodeStatuses(ctx context.Context, pageSize int32, pageToken string) (stats []relaytypes.NodeStatus, nextPageToken string, total int, err error) {
+func (c *chain) ListNodeStatuses(ctx context.Context, pageSize int32, pageToken string) (stats []types.NodeStatus, nextPageToken string, total int, err error) {
 	return chains.ListNodeStatuses(int(pageSize), pageToken, c.listNodeStatuses)
 }
 
@@ -320,8 +351,8 @@ func (c *chain) Transact(ctx context.Context, from, to string, amount *big.Int, 
 	return c.sendTx(ctx, from, to, amount, balanceCheck)
 }
 
-func (c *chain) listNodeStatuses(start, end int) ([]relaytypes.NodeStatus, int, error) {
-	stats := make([]relaytypes.NodeStatus, 0)
+func (c *chain) listNodeStatuses(start, end int) ([]types.NodeStatus, int, error) {
+	stats := make([]types.NodeStatus, 0)
 	total := len(c.cfg.Nodes)
 	if start >= total {
 		return stats, total, chains.ErrOutOfRange

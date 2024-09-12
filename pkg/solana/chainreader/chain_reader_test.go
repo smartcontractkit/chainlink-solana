@@ -2,6 +2,7 @@ package chainreader_test
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -40,8 +41,6 @@ const (
 )
 
 func TestSolanaChainReaderService_ReaderInterface(t *testing.T) {
-	// TODO fix Solana tests
-	t.Skip("Disabled during contract reader merge.")
 	t.Parallel()
 
 	it := &chainReaderInterfaceTester{}
@@ -51,9 +50,6 @@ func TestSolanaChainReaderService_ReaderInterface(t *testing.T) {
 }
 
 func TestSolanaChainReaderService_ServiceCtx(t *testing.T) {
-	// TODO fix Solana tests
-	t.Skip()
-
 	t.Parallel()
 
 	ctx := tests.Context(t)
@@ -112,7 +108,12 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 
 		var result modifiedStructWithNestedStruct
 
-		require.NoError(t, svc.GetLatestValue(ctx, types.BoundContract{Name: Namespace}.ReadIdentifier(NamedMethod), primitives.Unconfirmed, nil, &result))
+		binding := types.BoundContract{
+			Name:    Namespace,
+			Address: "",
+		}
+
+		require.NoError(t, svc.GetLatestValue(ctx, binding.ReadIdentifier(NamedMethod), primitives.Unconfirmed, nil, &result))
 		assert.Equal(t, expected.InnerStruct, result.InnerStruct)
 		assert.Equal(t, expected.Value, result.V)
 		assert.Equal(t, expected.TimeVal, result.TimeVal)
@@ -140,7 +141,14 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 
 		var result modifiedStructWithNestedStruct
 
-		assert.ErrorIs(t, svc.GetLatestValue(ctx, types.BoundContract{Name: Namespace}.ReadIdentifier(NamedMethod), primitives.Unconfirmed, nil, &result), expectedErr)
+		pubKey := solana.NewWallet().PublicKey()
+		binding := types.BoundContract{
+			Name:    Namespace,
+			Address: pubKey.String(),
+		}
+
+		assert.NoError(t, svc.Bind(ctx, []types.BoundContract{binding}))
+		assert.ErrorIs(t, svc.GetLatestValue(ctx, binding.ReadIdentifier(NamedMethod), primitives.Unconfirmed, nil, &result), expectedErr)
 	})
 
 	t.Run("Method Not Found", func(t *testing.T) {
@@ -518,7 +526,7 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 	}
 }
 
-func (r *chainReaderInterfaceTester) GetChainReader(t *testing.T) types.ContractReader {
+func (r *chainReaderInterfaceTester) GetContractReader(t *testing.T) types.ContractReader {
 	client := new(mockedRPCClient)
 	svc, err := chainreader.NewChainReaderService(logger.Test(t), client, r.conf)
 	if err != nil {
@@ -580,9 +588,13 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 		a ag_solana.PublicKey
 		b ag_solana.PublicKey
 	)
+	parts := strings.Split(readIdentifier, "-")
+	if len(parts) < 3 {
+		panic("unexpected readIdentifier length")
+	}
 
-	split := strings.Split(readIdentifier, ".")
-	contractName, method := split[0], split[1]
+	contractName := parts[1]
+	method := parts[2]
 
 	switch contractName + method {
 	case AnyContractName + EventName:
@@ -634,7 +646,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 		nextStruct := CreateTestStruct[*testing.T](0, r.tester)
 		r.testStructQueue = append(r.testStructQueue, &nextStruct)
 
-		a, b = getAddresses(r.test, r.tester, 4, 5)
+		a, b = getAddresses(r.test, r.tester, AnyContractName, MethodReturningSeenStruct)
 
 		fallthrough
 	default:
@@ -643,7 +655,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 		}
 
 		if contractName+method != AnyContractName+MethodReturningSeenStruct {
-			a, b = getAddresses(r.test, r.tester, 0, 1)
+			a, b = getAddresses(r.test, r.tester, AnyContractName, MethodTakingLatestParamsReturningTestStruct)
 		}
 
 		nextTestStruct := r.testStructQueue[0]
@@ -683,30 +695,66 @@ func (r *wrappedTestChainReader) QueryKey(_ context.Context, _ types.BoundContra
 	return nil, nil
 }
 
-func getAddresses(t *testing.T, tester ChainComponentsInterfaceTester[*testing.T], a, b int) (ag_solana.PublicKey, ag_solana.PublicKey) {
+func getAddresses(t *testing.T, tester ChainComponentsInterfaceTester[*testing.T], contractName, readName string) (ag_solana.PublicKey, ag_solana.PublicKey) {
 	t.Helper()
 
-	bindings := tester.GetBindings(t)
 	fn := ag_solana.MustPublicKeyFromBase58
 
-	return fn(bindings[a].Address), fn(bindings[b].Address)
+	var (
+		addresses []string
+		found     bool
+	)
+
+	for _, binding := range tester.GetBindings(t) {
+		if binding.Name == contractName {
+			encoded, err := base64.StdEncoding.DecodeString(binding.Address)
+			if err != nil {
+				t.Logf("%s", err)
+				t.FailNow()
+			}
+
+			var readAddresses map[string][]string
+
+			err = json.Unmarshal(encoded, &readAddresses)
+			if err != nil {
+				t.Logf("%s", err)
+				t.FailNow()
+			}
+
+			var ok bool
+
+			addresses, ok = readAddresses[readName]
+			if !ok {
+				t.Log("no addresses found")
+				t.FailNow()
+			}
+
+			found = true
+		}
+	}
+
+	if !found {
+		t.Log("no addresses found")
+		t.FailNow()
+	}
+
+	return fn(addresses[0]), fn(addresses[1])
 }
 
 func (r *wrappedTestChainReader) Bind(ctx context.Context, bindings []types.BoundContract) error {
 	return r.service.Bind(ctx, bindings)
 }
 
-func (r *wrappedTestChainReader) Unbind(_ context.Context, _ []types.BoundContract) error {
-	r.test.Skip("Unbind is not yet supported in Solana")
-	return nil
+func (r *wrappedTestChainReader) Unbind(ctx context.Context, bindings []types.BoundContract) error {
+	return r.service.Unbind(ctx, bindings)
 }
 
-func (r *wrappedTestChainReader) CreateContractType(contractName, itemType string, forEncoding bool) (any, error) {
-	if AnyContractName+EventName == contractName+itemType {
+func (r *wrappedTestChainReader) CreateContractType(readIdentifier string, forEncoding bool) (any, error) {
+	if strings.HasSuffix(readIdentifier, AnyContractName+EventName) {
 		r.test.Skip("Events are not yet supported in Solana")
 	}
 
-	return r.service.CreateContractType(contractName, itemType, forEncoding)
+	return r.service.CreateContractType(readIdentifier, forEncoding)
 }
 
 func (r *chainReaderInterfaceTester) SetUintLatestValue(t *testing.T, _ uint64, _ ExpectedGetLatestValueArgs) {
@@ -743,14 +791,28 @@ func (r *chainReaderInterfaceTester) TriggerEvent(t *testing.T, testStruct *Test
 }
 
 func (r *chainReaderInterfaceTester) GetBindings(t *testing.T) []types.BoundContract {
+	mainContractMethods := map[string][]string{
+		MethodTakingLatestParamsReturningTestStruct: {r.address[0], r.address[1]},
+		MethodReturningUint64:                       {r.address[2]},
+		MethodReturningUint64Slice:                  {r.address[3]},
+		MethodReturningSeenStruct:                   {r.address[4], r.address[5]},
+	}
+
+	addrBts, err := json.Marshal(mainContractMethods)
+	if err != nil {
+		t.Log(err.Error())
+		t.FailNow()
+	}
+
+	secondAddrBts, err := json.Marshal(map[string][]string{MethodReturningUint64: {r.address[6]}})
+	if err != nil {
+		t.Log(err.Error())
+		t.FailNow()
+	}
+
 	return []types.BoundContract{
-		{Name: strings.Join([]string{AnyContractName, MethodTakingLatestParamsReturningTestStruct, "0"}, "."), Address: r.address[0]},
-		{Name: strings.Join([]string{AnyContractName, MethodTakingLatestParamsReturningTestStruct, "1"}, "."), Address: r.address[1]},
-		{Name: strings.Join([]string{AnyContractName, MethodReturningUint64, "0"}, "."), Address: r.address[2]},
-		{Name: strings.Join([]string{AnyContractName, MethodReturningUint64Slice, "0"}, "."), Address: r.address[3]},
-		{Name: strings.Join([]string{AnyContractName, MethodReturningSeenStruct, "0"}, "."), Address: r.address[4]},
-		{Name: strings.Join([]string{AnyContractName, MethodReturningSeenStruct, "1"}, "."), Address: r.address[5]},
-		{Name: strings.Join([]string{AnySecondContractName, MethodReturningUint64, "0"}, "."), Address: r.address[6]},
+		{Name: AnyContractName, Address: base64.StdEncoding.EncodeToString(addrBts)},
+		{Name: AnySecondContractName, Address: base64.StdEncoding.EncodeToString(secondAddrBts)},
 	}
 }
 
@@ -879,9 +941,9 @@ type skipEventsChainReaderTester struct {
 	ChainComponentsInterfaceTester[*testing.T]
 }
 
-func (s *skipEventsChainReaderTester) GetChainReader(t *testing.T) types.ContractReader {
+func (s *skipEventsChainReaderTester) GetContractReader(t *testing.T) types.ContractReader {
 	return &skipEventsChainReader{
-		ContractReader: s.ChainComponentsInterfaceTester.GetChainReader(t),
+		ContractReader: s.ChainComponentsInterfaceTester.GetContractReader(t),
 		t:              t,
 	}
 }
@@ -892,8 +954,13 @@ type skipEventsChainReader struct {
 }
 
 func (s *skipEventsChainReader) GetLatestValue(ctx context.Context, readIdentifier string, confidenceLevel primitives.ConfidenceLevel, params, returnVal any) error {
-	split := strings.Split(readIdentifier, ".")
-	contractName, method := split[0], split[1]
+	parts := strings.Split(readIdentifier, "-")
+	if len(parts) < 3 {
+		panic("unexpected readIdentifier length")
+	}
+
+	contractName := parts[1]
+	method := parts[2]
 
 	if contractName == AnyContractName && method == EventName {
 		s.t.Skip("Events are not yet supported in Solana")
