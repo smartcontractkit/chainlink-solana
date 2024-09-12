@@ -95,14 +95,31 @@ in
     '';
   };
 
-  solana-build-programs = pkgs.writeShellScriptBin "solana-build-programs" ''
-    #!/usr/bin/env bash
-    set -e
-    script_path="./scripts/anchor-build-with-program-id.sh"
-    if [ ! -f "$script_path" ]; then
-      echo "Error: Script not found at $script_path"
-      exit 1
-    fi
-    "$script_path" "$@"
-  '';
+  solana-build-programs = pkgs.stdenv.mkDerivation rec {
+    name = "solana-build-programs";
+    src = ./scripts;  
+    installPhase = ''
+      echo "Contents of src directory:"
+      ls -la $src
+      mkdir -p $out/bin
+      cp $src/anchor-build-with-program-id.sh $out/bin/
+      cat << EOF > $out/bin/solana-build-programs
+      #!/usr/bin/env bash
+      set -e
+      SCRIPT_DIR="\$(dirname "\$0")"
+      ANCHOR_SCRIPT="\$SCRIPT_DIR/anchor-build-with-program-id.sh"
+      echo "Looking for script at: \$ANCHOR_SCRIPT"
+      if [ ! -f "\$ANCHOR_SCRIPT" ]; then
+        echo "Error: anchor-build-with-program-id.sh not found"
+        echo "Contents of \$SCRIPT_DIR:"
+        ls -la "\$SCRIPT_DIR"
+        exit 1
+      fi
+      exec "\$ANCHOR_SCRIPT" "\$@"
+      EOF
+      chmod +x $out/bin/solana-build-programs $out/bin/anchor-build-with-program-id.sh
+      echo "Contents of $out/bin:"
+      ls -la $out/bin
+    '';
+  };
 }
