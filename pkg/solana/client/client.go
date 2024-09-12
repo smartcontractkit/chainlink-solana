@@ -84,10 +84,7 @@ func (h *Head) BlockDifficulty() *big.Int {
 }
 
 func (h *Head) IsValid() bool {
-	if h.BlockHeight == nil {
-		return false
-	}
-	return true
+	return h.BlockHeight != nil
 }
 
 func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration, log logger.Logger) (*Client, error) {
