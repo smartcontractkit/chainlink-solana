@@ -82,7 +82,7 @@ echo "Build complete. Copying artifacts to $OUTPUT_DIR"
 
 # Copy artifacts to the specified output directory
 cp "$WORKSPACE/target/deploy/"*.so "$OUTPUT_DIR/"
-cp "$WORKSPACE/target/deploy/"*.json "$OUTPUT_DIR/"
+# cp "$WORKSPACE/target/deploy/"*.json "$OUTPUT_DIR/"
 cp "$WORKSPACE/target/idl/"*.json "$OUTPUT_DIR/"
 
 # Save the program IDs to the output directory
