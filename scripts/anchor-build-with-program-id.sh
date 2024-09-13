@@ -4,18 +4,28 @@ set -e
 
 # Function to print usage
 print_usage() {
-  echo "Usage: $0 <program1_name> <program1_id> [<program2_name> <program2_id> ...]"
-  echo "Example: $0 access-controller ACCE55C0NTR0LLRED000000000000000 store 5T0REP2OGR4M0000000000000000000"
+  echo "Usage: $0 --output-dir <output_directory> <program1_name> <program1_id> [<program2_name> <program2_id> ...]"
+  echo "Example: $0 --output-dir ./dist/contracts access-controller ACCE55C0NTR0LLRED000000000000000 store 5T0REP2OGR4M0000000000000000000"
 }
 
-# Check if at least two arguments are provided
-if [ "$#" -lt 2 ]; then
+# Check if at least three arguments are provided (including --output-dir)
+if [ "$#" -lt 3 ]; then
   echo "Error: Insufficient arguments."
   print_usage
   exit 1
 fi
 
-# Check if the number of arguments is even
+# Parse arguments
+if [ "$1" == "--output-dir" ]; then
+  OUTPUT_DIR="$2"
+  shift 2
+else
+  echo "Error: --output-dir must be specified."
+  print_usage
+  exit 1
+fi
+
+# Check if the number of remaining arguments is even
 if [ $((${#} % 2)) -ne 0 ]; then
   echo "Error: Each program must have a name and an ID."
   print_usage
@@ -24,9 +34,18 @@ fi
 
 echo "Current directory: $(pwd)"
 
-WORKSPACE=./contracts/
-echo "Workspace contents:"
-ls $WORKSPACE
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo "Script directory: $SCRIPT_DIR"
+
+# Copy the contracts to the output directory
+echo "Copying contracts to output directory: $OUTPUT_DIR"
+mkdir -p "$OUTPUT_DIR"
+cp -R "$SCRIPT_DIR/contracts" "$OUTPUT_DIR"
+
+WORKSPACE="$OUTPUT_DIR/contracts"
+
+# Ensure all files are writable
+chmod -R u+rw "$WORKSPACE"
 
 replaceDeclaredProgramId() {
   local file="$1"
@@ -49,21 +68,33 @@ while [ "$#" -gt 0 ]; do
   if [ -f "$program_path" ]; then
     echo "Processing $program_name with ID $program_id"
     replaceDeclaredProgramId "$program_path" "$program_id"
+    echo $program_id >"$OUTPUT_DIR/$program_name.pub"
   else
-    echo "Warning: Program file not found for $program_name"
+    echo "Error: Program file not found for $program_name at $program_path"
     exit 1
   fi
 done
 
 # Compile the programs
-# NOTE:Currently Anchor compiles whole workspace, but in the future we may need to compile only the programs as required
-docker run --rm -it -v $WORKSPACE:/workdir backpackapp/build:v0.29.0 /bin/bash -c "anchor build"
+docker run --rm -v "$WORKSPACE":/workdir backpackapp/build:v0.29.0 /bin/bash -c "anchor build"
 
-echo "Build complete. Artifacts are located in $WORKSPACE/target/deploy"
-ls $WORKSPACE/target/deploy
+echo "Build complete. Copying artifacts to $OUTPUT_DIR"
 
-mkdir -p $WORKSPACE/artifacts/
-cp -r $WORKSPACE/target/deploy/*.so $WORKSPACE/artifacts/
-cp -r $WORKSPACE/target/idl/*.json $WORKSPACE/artifacts/
+# Copy artifacts to the specified output directory
+cp "$WORKSPACE/target/deploy/"*.so "$OUTPUT_DIR/"
+cp "$WORKSPACE/target/deploy/"*.json "$OUTPUT_DIR/"
+cp "$WORKSPACE/target/idl/"*.json "$OUTPUT_DIR/"
 
-echo "Artifacts and metadata copied to $WORKSPACE/artifacts/"
+# Save the program IDs to the output directory
+while [ "$#" -gt 0 ]; do
+  program_name="$1"
+  program_id="$2"
+  shift 2
+
+  $program_id >"$OUTPUT_DIR/$program_name.pub"
+done
+
+echo "Artifacts and program ids copied to $OUTPUT_DIR"
+
+# clean up
+rm -rf "$WORKSPACE"
