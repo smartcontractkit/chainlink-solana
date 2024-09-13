@@ -507,9 +507,6 @@ require (
 exclude github.com/chaos-mesh/chaos-mesh/api/v1alpha1 v0.0.0-20220226050744-799408773657
 
 replace (
-	// until merged upstream: https://github.com/omissis/go-jsonschema/pull/264
-	github.com/atombender/go-jsonschema => github.com/nolag/go-jsonschema v0.16.0-rtinianov
-
 	github.com/go-kit/log => github.com/go-kit/log v0.2.1
 
 	// replicating the replace directive on cosmos SDK
