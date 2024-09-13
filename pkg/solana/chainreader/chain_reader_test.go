@@ -551,6 +551,8 @@ func (r *chainReaderInterfaceTester) GetContractReader(t *testing.T) types.Contr
 }
 
 type wrappedTestChainReader struct {
+	types.UnimplementedContractReader
+
 	test            *testing.T
 	service         *chainreader.SolanaChainReaderService
 	client          *mockedRPCClient
