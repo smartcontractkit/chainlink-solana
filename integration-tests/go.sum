@@ -817,8 +817,8 @@ github.com/grafana/regexp v0.0.0-20221122212121-6b5c0a4cb7fd h1:PpuIBO5P3e9hpqBD
 github.com/grafana/regexp v0.0.0-20221122212121-6b5c0a4cb7fd/go.mod h1:M5qHK+eWfAv8VR/265dIuEpL3fNfeC21tXXp9itM24A=
 github.com/graph-gophers/dataloader v5.0.0+incompatible h1:R+yjsbrNq1Mo3aPG+Z/EKYrXrXXUNJHOgbRt+U6jOug=
 github.com/graph-gophers/dataloader v5.0.0+incompatible/go.mod h1:jk4jk0c5ZISbKaMe8WsVopGB5/15GvGHMdMdPtwlRp4=
-github.com/graph-gophers/graphql-go v1.3.0 h1:Eb9x/q6MFpCLz7jBCiP/WTxjSDrYLR1QY41SORZyNJ0=
-github.com/graph-gophers/graphql-go v1.3.0/go.mod h1:9CQHMSxwO4MprSdzoIEobiHpoLtHm77vfxsvsIN5Vuc=
+github.com/graph-gophers/graphql-go v1.5.0 h1:fDqblo50TEpD0LY7RXk/LFVYEVqo3+tXMNMPSVXA1yc=
+github.com/graph-gophers/graphql-go v1.5.0/go.mod h1:YtmJZDLbF1YYNrlNAuiO5zAStUWc3XZT07iGsVqe1Os=
 github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 h1:+ngKgrYPPJrOjhax5N+uePQ0Fh1Z7PheYoUI/0nzkPA=
 github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79/go.mod h1:FecbI9+v66THATjSRHfNgh1IVFe/9kFxbXtjV0ctIMA=
 github.com/grpc-ecosystem/go-grpc-middleware v1.0.0/go.mod h1:FiyG127CGDf3tlThmgyCl78X/SZQqEOJBCDaAfeWzPs=
@@ -1402,8 +1402,8 @@ github.com/smartcontractkit/chainlink-data-streams v0.0.0-20240906125718-9f0a98d
 github.com/smartcontractkit/chainlink-data-streams v0.0.0-20240906125718-9f0a98d32fbc/go.mod h1:PwPcmQNAzVmU8r8JWKrDRgvXesDwxnqbMD6DvYt/Z7M=
 github.com/smartcontractkit/chainlink-feeds v0.0.0-20240910155501-42f20443189f h1:p4p3jBT91EQyLuAMvHD+zNJsuAYI/QjJbzuGUJ7wIgg=
 github.com/smartcontractkit/chainlink-feeds v0.0.0-20240910155501-42f20443189f/go.mod h1:FLlWBt2hwiMVgt9AcSo6wBJYIRd/nsc8ENbV1Wir1bw=
-github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20240911160128-83c49f033146 h1:2HLPLiJO5+c+Fjp+c5VEAHxp10oF0h3k9s+9izihUvA=
-github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20240911160128-83c49f033146/go.mod h1:ec/a20UZ7YRK4oxJcnTBFzp1+DBcJcwqEaerUMsktMs=
+github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20240911194142-506bc469d8ae h1:d+B8y2Nd/PrnPMNoaSPn3eDgUgxcVcIqAxGrvYu/gGw=
+github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20240911194142-506bc469d8ae/go.mod h1:ec/a20UZ7YRK4oxJcnTBFzp1+DBcJcwqEaerUMsktMs=
 github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.5 h1:Owb1MQZn0NZHwtZAnPZE6TVoTx6xLrfPaUdeOYswE9M=
 github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.5/go.mod h1:hS4yNF94C1lkS9gvtFXW8Km8K9NzGeR20aNfkqo5qbE=
 github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.50.0 h1:VIxK8u0Jd0Q/VuhmsNm6Bls6Tb31H/sA3A/rbc5hnhg=
@@ -1414,8 +1414,8 @@ github.com/smartcontractkit/chainlink-testing-framework/wasp v1.50.0 h1:gfhfTn7H
 github.com/smartcontractkit/chainlink-testing-framework/wasp v1.50.0/go.mod h1:tqajhpUJA/9OaMCLitghBXjAgqYO4i27St0F4TUO3+M=
 github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240910220528-150634e5880d h1:hSCZqU+qRJFbPyYrSNKnwxyV6guQk6Q0T57lrMkGc4o=
 github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240910220528-150634e5880d/go.mod h1:v+ChFUEH0OmOsuM+IDQD1zGi+epTx6L47a1Nc8hZzhw=
-github.com/smartcontractkit/chainlink/v2 v2.14.0-mercury-20240807.0.20240911175355-9eb801069a30 h1:djB51VvvmYL2fP0hOL/px04sTqGipnlXHABtyfWeIy4=
-github.com/smartcontractkit/chainlink/v2 v2.14.0-mercury-20240807.0.20240911175355-9eb801069a30/go.mod h1:PAygo7yv7UxVYVrrNQ8zf9P/6gfvR/Uub3IZLlDbLIo=
+github.com/smartcontractkit/chainlink/v2 v2.14.0-mercury-20240807.0.20240913180906-baf36ec4df51 h1:Qq9KanNvCV402Oq1D6qtANZRBg3NXGdmEZrf4GIv8N8=
+github.com/smartcontractkit/chainlink/v2 v2.14.0-mercury-20240807.0.20240913180906-baf36ec4df51/go.mod h1:rXBE4rza3906v3hSxGhqG23ZHSiree6hDjo3cKK2OhI=
 github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 h1:12ijqMM9tvYVEm+nR826WsrNi6zCKpwBhuApq127wHs=
 github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7/go.mod h1:FX7/bVdoep147QQhsOPkYsPEXhGZjeYx6lBSaSXtZOA=
 github.com/smartcontractkit/libocr v0.0.0-20240717100443-f6226e09bee7 h1:e38V5FYE7DA1JfKXeD5Buo/7lczALuVXlJ8YNTAUxcw=
