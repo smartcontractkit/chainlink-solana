@@ -68,7 +68,6 @@ while [ "$#" -gt 0 ]; do
   if [ -f "$program_path" ]; then
     echo "Processing $program_name with ID $program_id"
     replaceDeclaredProgramId "$program_path" "$program_id"
-    echo $program_id >"$OUTPUT_DIR/$program_name.pub"
   else
     echo "Error: Program file not found for $program_name at $program_path"
     exit 1
@@ -81,18 +80,8 @@ docker run --rm -v "$WORKSPACE":/workdir backpackapp/build:v0.29.0 /bin/bash -c 
 echo "Build complete. Copying artifacts to $OUTPUT_DIR"
 
 # Copy artifacts to the specified output directory
+# TODO: only copy requested artifacts - but folder name is somehow different...
 cp "$WORKSPACE/target/deploy/"*.so "$OUTPUT_DIR/"
-# cp "$WORKSPACE/target/deploy/"*.json "$OUTPUT_DIR/"
-cp "$WORKSPACE/target/idl/"*.json "$OUTPUT_DIR/"
-
-# Save the program IDs to the output directory
-while [ "$#" -gt 0 ]; do
-  program_name="$1"
-  program_id="$2"
-  shift 2
-
-  $program_id >"$OUTPUT_DIR/$program_name.pub"
-done
 
 echo "Artifacts and program ids copied to $OUTPUT_DIR"
 
