@@ -430,7 +430,40 @@ func (r *chainReaderInterfaceTester) Name() string {
 	return "Solana"
 }
 
-func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
+func (r *chainReaderInterfaceTester) Setup(t *testing.T, started bool) {
+	r.setupChainReader(t, started)
+}
+
+func (r *chainReaderInterfaceTester) setupChainReader(t *testing.T, started bool) {
+	t.Cleanup(func() {
+		if started {
+			require.NoError(t, r.reader.Close())
+		}
+	})
+
+	r.setChainReaderConfig(t)
+
+	client := new(mockedRPCClient)
+	svc, err := chainreader.NewChainReaderService(logger.Test(t), client, r.conf)
+	if err != nil {
+		t.Logf("chain reader service was not able to start: %s", err.Error())
+		t.FailNow()
+	}
+
+	if started {
+		require.NoError(t, svc.Start(tests.Context(t)))
+	}
+
+	if r.reader == nil {
+		r.reader = &wrappedTestChainReader{tester: r}
+	}
+
+	r.reader.test = t
+	r.reader.service = svc
+	r.reader.client = client
+}
+
+func (r *chainReaderInterfaceTester) setChainReaderConfig(t *testing.T) {
 	r.address = make([]string, 7)
 	for idx := range r.address {
 		r.address[idx] = ag_solana.NewWallet().PublicKey().String()
@@ -527,30 +560,7 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 }
 
 func (r *chainReaderInterfaceTester) GetContractReader(t *testing.T) types.ContractReader {
-	client := new(mockedRPCClient)
-	svc, err := chainreader.NewChainReaderService(logger.Test(t), client, r.conf)
-	if err != nil {
-		t.Logf("chain reader service was not able to start: %s", err.Error())
-		t.FailNow()
-	}
-
-	if r.reader == nil {
-		r.reader = &wrappedTestChainReader{tester: r}
-	}
-
-	r.reader.test = t
-	r.reader.service = svc
-	r.reader.client = client
-
 	return r.reader
-}
-
-func (r *chainReaderInterfaceTester) CloseContractReader(t *testing.T) {
-	require.NoError(t, r.reader.service.Close())
-}
-
-func (r *chainReaderInterfaceTester) StartContractReader(t *testing.T) {
-	require.NoError(t, r.reader.service.Start(context.Background()))
 }
 
 type wrappedTestChainReader struct {
