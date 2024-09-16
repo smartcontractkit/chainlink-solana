@@ -16,7 +16,7 @@ require (
 	github.com/hashicorp/go-plugin v1.6.2-0.20240829161738-06afb6d7ae99
 	github.com/pelletier/go-toml/v2 v2.2.0
 	github.com/prometheus/client_golang v1.17.0
-	github.com/smartcontractkit/chainlink-common v0.2.2-0.20240915235808-392195f7dc63
+	github.com/smartcontractkit/chainlink-common v0.2.2-0.20240916214706-e7280848cd7b
 	github.com/smartcontractkit/libocr v0.0.0-20240702141926-063ceef8c42e
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
