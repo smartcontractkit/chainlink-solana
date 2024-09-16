@@ -10,12 +10,12 @@ import (
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
@@ -158,7 +158,7 @@ func TestEnvelopeSource(t *testing.T) {
 	).Return(fakeTxResult, nil)
 
 	// Call Fetch
-	lgr, logs := logger.TestLoggerObserved(t, zapcore.DebugLevel)
+	lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 	factory := NewEnvelopeSourceFactory(chainReader, lgr)
 	source, err := factory.NewSource(chainConfig, feedConfig)
 	require.NoError(t, err)
