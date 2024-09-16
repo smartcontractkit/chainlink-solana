@@ -431,22 +431,22 @@ func (r *chainReaderInterfaceTester) Name() string {
 }
 
 func (r *chainReaderInterfaceTester) Setup(t *testing.T, started bool) {
-	r.setupChainReader(t, started)
+	r.setContractReader(t, started)
 }
 
-func (r *chainReaderInterfaceTester) setupChainReader(t *testing.T, started bool) {
+func (r *chainReaderInterfaceTester) setContractReader(t *testing.T, started bool) {
 	t.Cleanup(func() {
 		if started {
 			require.NoError(t, r.reader.Close())
 		}
 	})
 
-	r.setChainReaderConfig(t)
+	r.setContractReaderConfig(t)
 
 	client := new(mockedRPCClient)
 	svc, err := chainreader.NewChainReaderService(logger.Test(t), client, r.conf)
 	if err != nil {
-		t.Logf("chain reader service was not able to start: %s", err.Error())
+		t.Logf("contract reader service was not able to start: %s", err.Error())
 		t.FailNow()
 	}
 
@@ -463,7 +463,7 @@ func (r *chainReaderInterfaceTester) setupChainReader(t *testing.T, started bool
 	r.reader.client = client
 }
 
-func (r *chainReaderInterfaceTester) setChainReaderConfig(t *testing.T) {
+func (r *chainReaderInterfaceTester) setContractReaderConfig(t *testing.T) {
 	r.address = make([]string, 7)
 	for idx := range r.address {
 		r.address[idx] = ag_solana.NewWallet().PublicKey().String()
