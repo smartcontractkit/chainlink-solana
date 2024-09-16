@@ -74,7 +74,7 @@ func (s *envelopeSource) setJuelsPerLamport(v uint64) error {
 
 func (s *envelopeSource) readJuelsPerLamport() uint64 {
 	s.lock.RLock()
-	s.lock.RUnlock()
+	defer s.lock.RUnlock()
 	return s.cacheJuelsPerLamport
 }
 
