@@ -144,7 +144,7 @@ func (s *envelopeSource) getLinkBalance(ctx context.Context, tokenVault solana.P
 		return nil, fmt.Errorf("failed to parse link balance value: %s", linkBalanceRes.Value.Amount)
 	}
 	if linkBalance.Cmp(zeroBigInt) == 0 {
-		return nil, fmt.Errorf("contract's LINK balance should not be zero")
+		s.log.Warnw("contract's LINK balance should not be zero", "token_vautlt", tokenVault)
 	}
 	return linkBalance, nil
 }
