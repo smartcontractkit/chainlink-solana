@@ -11,12 +11,12 @@ jobs:
       reviewers: aalu1418
       run: |
         make upgrade-solana-image
-        image=$(curl https://api.github.com/repos/solana-labs/solana/releases/latest | jq -r '.tag_name')
+        image=$(curl https://api.github.com/repos/anza-xyz/agave/releases/latest | jq -r '.tag_name')
 
         # outputs
         echo "name=bump/solana-$image" >> "$GITHUB_OUTPUT"
         echo "prTitle=[automated] bump solana image to $image" >> "$GITHUB_OUTPUT"
-        echo "prBody=Latest Solana mainnet release is [$image](https://github.com/solana-labs/solana/releases/latest)" >> "$GITHUB_OUTPUT"
+        echo "prBody=Latest Solana mainnet release is [$image](https://github.com/anza-xyz/agave/releases/latest)" >> "$GITHUB_OUTPUT"
         echo "commitString=[automated] bump solana dependencies" >> "$GITHUB_OUTPUT"
     secrets: inherit
   E2E-Testing-Dependencies:

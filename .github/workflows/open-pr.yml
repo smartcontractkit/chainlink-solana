@@ -83,4 +83,5 @@ jobs:
           branch: ${{ steps.run.outputs.name }} 
           reviewers: ${{ inputs.reviewers }}
           body: ${{ steps.run.outputs.prBody }}
+          labels: "[auto] Upstream Updates"
           token: ${{ steps.token.outputs.access-token }}
