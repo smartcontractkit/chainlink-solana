@@ -430,7 +430,40 @@ func (r *chainReaderInterfaceTester) Name() string {
 	return "Solana"
 }
 
-func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
+func (r *chainReaderInterfaceTester) Setup(t *testing.T, started bool) {
+	r.setContractReader(t, started)
+}
+
+func (r *chainReaderInterfaceTester) setContractReader(t *testing.T, started bool) {
+	t.Cleanup(func() {
+		if started {
+			require.NoError(t, r.reader.Close())
+		}
+	})
+
+	r.setContractReaderConfig(t)
+
+	client := new(mockedRPCClient)
+	svc, err := chainreader.NewChainReaderService(logger.Test(t), client, r.conf)
+	if err != nil {
+		t.Logf("contract reader service was not able to start: %s", err.Error())
+		t.FailNow()
+	}
+
+	if started {
+		require.NoError(t, svc.Start(tests.Context(t)))
+	}
+
+	if r.reader == nil {
+		r.reader = &wrappedTestChainReader{tester: r}
+	}
+
+	r.reader.test = t
+	r.reader.service = svc
+	r.reader.client = client
+}
+
+func (r *chainReaderInterfaceTester) setContractReaderConfig(t *testing.T) {
 	r.address = make([]string, 7)
 	for idx := range r.address {
 		r.address[idx] = ag_solana.NewWallet().PublicKey().String()
@@ -527,26 +560,6 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 }
 
 func (r *chainReaderInterfaceTester) GetContractReader(t *testing.T) types.ContractReader {
-	client := new(mockedRPCClient)
-	svc, err := chainreader.NewChainReaderService(logger.Test(t), client, r.conf)
-	if err != nil {
-		t.Logf("chain reader service was not able to start: %s", err.Error())
-		t.FailNow()
-	}
-
-	require.NoError(t, svc.Start(context.Background()))
-	t.Cleanup(func() {
-		require.NoError(t, svc.Close())
-	})
-
-	if r.reader == nil {
-		r.reader = &wrappedTestChainReader{tester: r}
-	}
-
-	r.reader.test = t
-	r.reader.service = svc
-	r.reader.client = client
-
 	return r.reader
 }
 
@@ -590,6 +603,12 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 		a ag_solana.PublicKey
 		b ag_solana.PublicKey
 	)
+
+	// If you called the method and the service is not started
+	if err := r.service.Ready(); err != nil {
+		return fmt.Errorf("service not ready. err: %w", err)
+	}
+
 	parts := strings.Split(readIdentifier, "-")
 	if len(parts) < 3 {
 		panic("unexpected readIdentifier length")
