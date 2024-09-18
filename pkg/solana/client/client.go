@@ -108,9 +108,11 @@ type Head struct {
 }
 
 func (h *Head) BlockNumber() int64 {
-	if h.BlockHeight == nil {
+	if !h.IsValid() {
 		return 0
 	}
+	// nolint:gosec
+	// G115: integer overflow conversion uint64 -&gt; int64
 	return int64(*h.BlockHeight)
 }
 
@@ -121,7 +123,7 @@ func (h *Head) BlockDifficulty() *big.Int {
 }
 
 func (h *Head) IsValid() bool {
-	return true
+	return h.BlockHeight != nil
 }
 
 var _ mn.RPCClient[mn.StringID, *Head] = (*Client)(nil)

@@ -42,11 +42,13 @@ func TestPreload(t *testing.T) {
 			err:   make(chan error, 1),
 		}
 
-		binding.PreLoad(ctx, loaded)
+		pubKey := solana.NewWallet().PublicKey()
+
+		binding.PreLoad(ctx, pubKey.String(), loaded)
 
 		var result testStruct
 
-		err = binding.GetLatestValue(ctx, nil, &result, loaded)
+		err = binding.GetLatestValue(ctx, pubKey.String(), nil, &result, loaded)
 		elapsed := time.Since(start)
 
 		require.NoError(t, err)
@@ -74,15 +76,16 @@ func TestPreload(t *testing.T) {
 			cancel(expectedErr)
 		}()
 
+		pubKey := solana.NewWallet().PublicKey()
 		loaded := &loadedResult{
 			value: make(chan []byte, 1),
 			err:   make(chan error, 1),
 		}
 		start := time.Now()
-		binding.PreLoad(ctx, loaded)
+		binding.PreLoad(ctx, pubKey.String(), loaded)
 
 		var result testStruct
-		err := binding.GetLatestValue(ctx, nil, &result, loaded)
+		err := binding.GetLatestValue(ctx, pubKey.String(), nil, &result, loaded)
 		elapsed := time.Since(start)
 
 		assert.ErrorIs(t, err, ctx.Err())
@@ -102,14 +105,15 @@ func TestPreload(t *testing.T) {
 		reader.On("ReadAll", mock.Anything, mock.Anything, mock.Anything).
 			Return([]byte{}, expectedErr)
 
+		pubKey := solana.NewWallet().PublicKey()
 		loaded := &loadedResult{
 			value: make(chan []byte, 1),
 			err:   make(chan error, 1),
 		}
-		binding.PreLoad(ctx, loaded)
+		binding.PreLoad(ctx, pubKey.String(), loaded)
 
 		var result testStruct
-		err := binding.GetLatestValue(ctx, nil, &result, loaded)
+		err := binding.GetLatestValue(ctx, pubKey.String(), nil, &result, loaded)
 
 		assert.ErrorIs(t, err, expectedErr)
 	})

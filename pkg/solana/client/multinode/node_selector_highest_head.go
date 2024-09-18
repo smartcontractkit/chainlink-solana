@@ -1,8 +1,6 @@
 package client
 
-import (
-	"math"
-)
+import "math"
 
 type highestHeadNodeSelector[
 	CHAIN_ID ID,

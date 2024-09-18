@@ -120,8 +120,8 @@ lint-go-integration-tests:
 lint-go-relay:
 	cd ./pkg && golangci-lint --max-issues-per-linter 0 --max-same-issues 0 --color=always --exclude=dot-imports --timeout 10m --out-format checkstyle:golangci-lint-relay-report.xml run
 
-.PHONY: upgrade-e2e-solana-image
-upgrade-e2e-solana-image:
+.PHONY: upgrade-solana-image
+upgrade-solana-image:
 	./scripts/update-solana.sh
 
 .PHONY: update-e2e-core-deps

@@ -4,16 +4,14 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strconv"
-	"strings"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 type readBinding interface {
-	PreLoad(context.Context, *loadedResult)
-	GetLatestValue(ctx context.Context, params, returnVal any, preload *loadedResult) error
-	Bind(types.BoundContract) error
+	PreLoad(context.Context, string, *loadedResult)
+	GetLatestValue(ctx context.Context, address string, params, returnVal any, preload *loadedResult) error
 	CreateType(bool) (any, error)
 }
 
@@ -111,34 +109,22 @@ func (b namespaceBindings) CreateType(namespace, methodName string, forEncoding 
 	return reflect.New(reflect.StructOf(fields)).Interface(), nil
 }
 
-func (b namespaceBindings) Bind(boundContracts []types.BoundContract) error {
-	for _, bc := range boundContracts {
-		parts := strings.Split(bc.Name, ".")
-		if len(parts) != 3 {
-			return fmt.Errorf("%w: BoundContract.Name must follow pattern of [namespace.method.procedure_idx]", types.ErrInvalidConfig)
-		}
+func (b namespaceBindings) Bind(binding types.BoundContract) error {
+	_, nbsExist := b[binding.Name]
+	if !nbsExist {
+		return fmt.Errorf("%w: no namespace named %s", types.ErrInvalidConfig, binding.Name)
+	}
 
-		nbs, nbsExist := b[parts[0]]
-		if !nbsExist {
-			return fmt.Errorf("%w: no namespace named %s for %s", types.ErrInvalidConfig, parts[0], bc.Name)
-		}
+	readAddresses, err := decodeAddressMappings(binding.Address)
+	if err != nil {
+		return err
+	}
 
-		mbs, mbsExists := nbs[parts[1]]
-		if !mbsExists {
-			return fmt.Errorf("%w: no method named %s for %s", types.ErrInvalidConfig, parts[1], bc.Name)
-		}
-
-		val, err := strconv.Atoi(parts[2])
-		if err != nil {
-			return fmt.Errorf("%w: procedure index not parsable for %s", types.ErrInvalidConfig, bc.Name)
-		}
-
-		if len(mbs) <= val {
-			return fmt.Errorf("%w: no procedure for index %d for %s", types.ErrInvalidConfig, val, bc.Name)
-		}
-
-		if err := mbs[val].Bind(bc); err != nil {
-			return err
+	for readName, addresses := range readAddresses {
+		for idx, address := range addresses {
+			if _, err := solana.PublicKeyFromBase58(address); err != nil {
+				return fmt.Errorf("%w: invalid address binding for %s at index %d: %s", types.ErrInvalidConfig, readName, idx, err.Error())
+			}
 		}
 	}
 

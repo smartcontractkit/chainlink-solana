@@ -35,8 +35,8 @@ func (s *roundRobinSelector[CHAIN_ID, RPC]) Select() Node[CHAIN_ID, RPC] {
 	}
 
 	// NOTE: Inc returns the number after addition, so we must -1 to get the "current" counter
-	count := s.roundRobinCount.Add(1) - 1
-	idx := int(count % uint32(nNodes))
+	count := int(s.roundRobinCount.Add(1) - 1)
+	idx := count % nNodes
 
 	return liveNodes[idx]
 }
