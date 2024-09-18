@@ -48,7 +48,7 @@ runs:
       uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/mod-version@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
       with:
         go-project-path: ./integration-tests
-        module-name: github.com/smartcontractkit/chainlink-testing-framework
+        module-name: github.com/smartcontractkit/chainlink-testing-framework/lib
         enforce-semantic-tag: false
     - name: Build and Publish Test Runner
       if: steps.check-image.outputs.exists == 'false'

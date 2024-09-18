@@ -7,7 +7,7 @@ import (
 
 	ocr2_config "github.com/smartcontractkit/chainlink-solana/integration-tests/config"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/gauntlet"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/gauntlet"
 )
 
 var (

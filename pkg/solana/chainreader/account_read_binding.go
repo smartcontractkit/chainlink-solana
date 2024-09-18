@@ -20,7 +20,6 @@ type BinaryDataReader interface {
 // `idlAccount` refers to the account name in the IDL for which the codec has a type mapping.
 type accountReadBinding struct {
 	idlAccount string
-	account    solana.PublicKey
 	codec      types.RemoteCodec
 	reader     BinaryDataReader
 	opts       *rpc.GetAccountInfoOpts
@@ -37,12 +36,19 @@ func newAccountReadBinding(acct string, codec types.RemoteCodec, reader BinaryDa
 
 var _ readBinding = &accountReadBinding{}
 
-func (b *accountReadBinding) PreLoad(ctx context.Context, result *loadedResult) {
+func (b *accountReadBinding) PreLoad(ctx context.Context, address string, result *loadedResult) {
 	if result == nil {
 		return
 	}
 
-	bts, err := b.reader.ReadAll(ctx, b.account, b.opts)
+	account, err := solana.PublicKeyFromBase58(address)
+	if err != nil {
+		result.err <- err
+
+		return
+	}
+
+	bts, err := b.reader.ReadAll(ctx, account, b.opts)
 	if err != nil {
 		result.err <- fmt.Errorf("%w: failed to get binary data", err)
 
@@ -57,7 +63,7 @@ func (b *accountReadBinding) PreLoad(ctx context.Context, result *loadedResult) 
 	}
 }
 
-func (b *accountReadBinding) GetLatestValue(ctx context.Context, _ any, outVal any, result *loadedResult) error {
+func (b *accountReadBinding) GetLatestValue(ctx context.Context, address string, _ any, outVal any, result *loadedResult) error {
 	var (
 		bts []byte
 		err error
@@ -79,23 +85,17 @@ func (b *accountReadBinding) GetLatestValue(ctx context.Context, _ any, outVal a
 			return err
 		}
 	} else {
-		if bts, err = b.reader.ReadAll(ctx, b.account, b.opts); err != nil {
+		account, err := solana.PublicKeyFromBase58(address)
+		if err != nil {
+			return err
+		}
+
+		if bts, err = b.reader.ReadAll(ctx, account, b.opts); err != nil {
 			return fmt.Errorf("%w: failed to get binary data", err)
 		}
 	}
 
 	return b.codec.Decode(ctx, bts, outVal, b.idlAccount)
-}
-
-func (b *accountReadBinding) Bind(contract types.BoundContract) error {
-	account, err := solana.PublicKeyFromBase58(contract.Address)
-	if err != nil {
-		return err
-	}
-
-	b.account = account
-
-	return nil
 }
 
 func (b *accountReadBinding) CreateType(_ bool) (any, error) {
