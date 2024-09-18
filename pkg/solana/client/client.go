@@ -73,10 +73,11 @@ type Head struct {
 }
 
 func (h *Head) BlockNumber() int64 {
-	if h.BlockHeight == nil {
+	if !h.IsValid() {
 		return 0
 	}
-	//nolint:gosec
+	// nolint:gosec
+	// G115: integer overflow conversion uint64 -&gt; int64
 	return int64(*h.BlockHeight)
 }
 

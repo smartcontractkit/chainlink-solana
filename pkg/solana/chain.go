@@ -236,6 +236,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 		mnCfg := cfg.MultiNodeConfig()
 
 		var nodes []mn.Node[mn.StringID, *client.Client]
+		var sendOnlyNodes []mn.SendOnlyNode[mn.StringID, *client.Client]
 
 		for i, nodeInfo := range cfg.ListNodes() {
 			rpcClient, err := client.NewClient(nodeInfo.URL.String(), cfg, DefaultRequestTimeout, logger.Named(lggr, "Client."+*nodeInfo.Name))
@@ -248,7 +249,11 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 				mnCfg, mnCfg, lggr, *nodeInfo.URL.URL(), nil, *nodeInfo.Name,
 				i, mn.StringID(id), 0, rpcClient, chainFamily)
 
-			nodes = append(nodes, newNode)
+			if nodeInfo.SendOnly {
+				sendOnlyNodes = append(sendOnlyNodes, newNode)
+			} else {
+				nodes = append(nodes, newNode)
+			}
 		}
 
 		multiNode := mn.NewMultiNode[mn.StringID, *client.Client](
@@ -256,7 +261,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 			mn.NodeSelectionModeRoundRobin,
 			0,
 			nodes,
-			[]mn.SendOnlyNode[mn.StringID, *client.Client]{},
+			sendOnlyNodes,
 			mn.StringID(id),
 			chainFamily,
 			mnCfg.DeathDeclarationDelay(),

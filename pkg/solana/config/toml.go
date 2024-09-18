@@ -105,6 +105,7 @@ func setFromNode(n, f *Node) {
 	if f.URL != nil {
 		n.URL = f.URL
 	}
+	n.SendOnly = f.SendOnly
 }
 
 type TOMLConfig struct {
@@ -192,20 +193,6 @@ func (c *TOMLConfig) ValidateConfig() (err error) {
 	if len(c.Nodes) == 0 {
 		err = errors.Join(err, config.ErrMissing{Name: "Nodes", Msg: "must have at least one node"})
 	}
-
-	for _, node := range c.Nodes {
-		if node.Name == nil {
-			err = errors.Join(err, config.ErrMissing{Name: "Name", Msg: "required for all nodes"})
-		} else if *node.Name == "" {
-			err = errors.Join(err, config.ErrEmpty{Name: "Name", Msg: "required for all nodes"})
-		}
-		if node.URL == nil {
-			err = errors.Join(err, config.ErrMissing{Name: "URL", Msg: "required for all nodes"})
-		} else if (*url.URL)(node.URL) == nil {
-			err = errors.Join(err, config.ErrEmpty{Name: "URL", Msg: "required for all nodes"})
-		}
-	}
-
 	return
 }
 

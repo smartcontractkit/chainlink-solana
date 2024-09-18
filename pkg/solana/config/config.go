@@ -146,8 +146,9 @@ func (c *Chain) SetDefaults() {
 }
 
 type Node struct {
-	Name *string
-	URL  *config.URL
+	Name     *string
+	URL      *config.URL
+	SendOnly bool
 }
 
 func (n *Node) ValidateConfig() (err error) {
