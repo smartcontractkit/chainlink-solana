@@ -21,12 +21,12 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink/integration-tests/types/config/node"
 
-	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/config"
-	k8s_config "github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
-	"github.com/smartcontractkit/chainlink-testing-framework/logging"
+	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
+	k8s_config "github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/config"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/osutil"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/osutil"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
 
 	ocr2_config "github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig/ocr2"
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"

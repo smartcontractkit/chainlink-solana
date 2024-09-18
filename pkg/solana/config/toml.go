@@ -105,6 +105,7 @@ func setFromNode(n, f *Node) {
 	if f.URL != nil {
 		n.URL = f.URL
 	}
+	n.SendOnly = f.SendOnly
 }
 
 type TOMLConfig struct {

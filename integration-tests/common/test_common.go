@@ -18,8 +18,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v4"
 
-	test_env_ctf "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
+	test_env_ctf "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
@@ -218,7 +218,7 @@ func (m *OCRv2TestState) SetupClients() {
 		m.Clients.ChainlinkClient.ChainlinkClientK8s, err = client.ConnectChainlinkNodes(m.Common.Env)
 		require.NoError(m.Config.T, err)
 	} else {
-		m.Clients.ChainlinkClient.ChainlinkClientDocker = m.Common.DockerEnv.ClCluster
+		m.Clients.ChainlinkClient.ChainlinkClientDocker = m.Common.DockerEnv.CLClusterTestEnv.ClCluster
 	}
 }
 
