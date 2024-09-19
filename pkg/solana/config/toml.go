@@ -130,6 +130,7 @@ func (c *TOMLConfig) SetFrom(f *TOMLConfig) {
 	}
 	setFromChain(&c.Chain, &f.Chain)
 	c.Nodes.SetFrom(&f.Nodes)
+	c.MultiNode.SetFrom(&f.MultiNode)
 }
 
 func setFromChain(c, f *Chain) {

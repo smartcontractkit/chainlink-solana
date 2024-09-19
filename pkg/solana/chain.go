@@ -259,7 +259,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 		multiNode := mn.NewMultiNode[mn.StringID, *client.Client](
 			lggr,
 			mn.NodeSelectionModeRoundRobin,
-			0,
+			mnCfg.LeaseDuration(),
 			nodes,
 			sendOnlyNodes,
 			mn.StringID(id),
