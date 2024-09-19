@@ -297,6 +297,50 @@ func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 	assert.Equal(t, uint64(5_000), initBal-endBal)
 }
 
+func TestClient_Subscriptions_Integration(t *testing.T) {
+	// TODO: Test subscribing to heads and finalized heads
+	// TODO: Ensure chain info is updated on new heads
+	// TODO: Test Dial, Close, IsSyncing, GetInterceptedChainInfo
+
+	// TODO: Create server for testing??
+	url := SetupLocalSolNode(t)
+	privKey, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	pubKey := privKey.PublicKey()
+	FundTestAccounts(t, []solana.PublicKey{pubKey}, url)
+
+	requestTimeout := 5 * time.Second
+	lggr := logger.Test(t)
+	cfg := config.NewDefault()
+
+	ctx := context.Background()
+	c, err := NewClient(url, cfg, requestTimeout, lggr)
+	require.NoError(t, err)
+
+	ch, sub, err := c.SubscribeToHeads(ctx)
+	defer sub.Unsubscribe()
+	require.NoError(t, err)
+
+	// TODO: How do we test this?
+	// check for new heads
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		for {
+			select {
+			case head := <-ch:
+				t.Logf("New head: %v", head)
+				wg.Done()
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	wg.Wait()
+
+}
+
 func TestClientLatency(t *testing.T) {
 	c := Client{}
 	v := 100

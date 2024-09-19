@@ -117,6 +117,44 @@ func TestSolanaChain_GetClient(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestSolanaChain_MultiNode(t *testing.T) {
+	// TODO: Set up chain with MultiNode enabled
+
+	ch := solcfg.Chain{}
+	ch.SetDefaults()
+	cfg := &solcfg.TOMLConfig{
+		ChainID: ptr("devnet"),
+		Chain:   ch,
+	}
+	testChain := chain{
+		id:          "devnet",
+		cfg:         cfg,
+		lggr:        logger.Test(t),
+		clientCache: map[string]*verifiedCachedClient{},
+	}
+
+
+
+	cfg.Nodes = []*solcfg.Node{
+		{
+			Name: ptr("devnet"),
+			URL:  config.MustParseURL(mockServer.URL + "/1"),
+		},
+		{
+			Name: ptr("devnet"),
+			URL:  config.MustParseURL(mockServer.URL + "/2"),
+		},
+	}
+	_, err := testChain.getClient()
+	assert.NoError(t, err)
+
+	// TODO: Start MultiNode and ensure we can call getClient()
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+	}
+}
+
 func TestSolanaChain_VerifiedClient(t *testing.T) {
 	called := false
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

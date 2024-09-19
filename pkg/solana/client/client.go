@@ -132,6 +132,13 @@ var _ mn.SendTxRPCClient[*solana.Transaction] = (*Client)(nil)
 func (c *Client) Dial(ctx context.Context) error {
 	// TODO: is there any work to do here? Doesn't seem like we have to dial anything
 	// TODO: Could maybe do a version check here?
+	/* TODO: Should we use this health check?
+	health, err := c.rpc.GetHealth(ctx)
+	if err != nil {
+		return false, err
+	}
+	return health == rpc.HealthOk, nil
+	*/
 	panic("implement me")
 }
 
@@ -186,7 +193,7 @@ func (c *Client) LatestFinalizedBlock(ctx context.Context) (*Head, error) {
 		return nil, err
 	}
 
-	var finalityDepth uint64 = 1 // TODO: Value?
+	var finalityDepth uint64 = 1 // TODO: Get value from config
 
 	latestFinalizedBH := latestBH.Value.LastValidBlockHeight - finalityDepth // TODO: subtract finality depth?
 
@@ -238,14 +245,6 @@ func (c *Client) onNewFinalizedHead(ctx context.Context, requestCh <-chan struct
 }
 
 func (c *Client) Ping(ctx context.Context) error {
-	/* TODO: Should we use this health check for ping or somewhere?
-	health, err := c.rpc.GetHealth(ctx)
-	if err != nil {
-		return false, err
-	}
-	return health == rpc.HealthOk, nil
-	*/
-
 	version, err := c.rpc.GetVersion(ctx)
 	if err != nil {
 		return fmt.Errorf("ping failed: %v", err)
