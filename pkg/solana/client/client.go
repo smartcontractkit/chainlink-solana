@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
+
+	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -33,7 +36,7 @@ type Reader interface {
 	Balance(addr solana.PublicKey) (uint64, error)
 	SlotHeight() (uint64, error)
 	LatestBlockhash() (*rpc.GetLatestBlockhashResult, error)
-	ChainID() (string, error)
+	ChainID(ctx context.Context) (mn.StringID, error)
 	GetFeeForMessage(msg string) (uint64, error)
 	GetLatestBlock() (*rpc.GetBlockResult, error)
 }
@@ -65,6 +68,27 @@ type Client struct {
 	requestGroup *singleflight.Group
 }
 
+type Head struct {
+	rpc.GetBlockResult
+}
+
+func (h *Head) BlockNumber() int64 {
+	if !h.IsValid() {
+		return 0
+	}
+	// nolint:gosec
+	// G115: integer overflow conversion uint64 -&gt; int64
+	return int64(*h.BlockHeight)
+}
+
+func (h *Head) BlockDifficulty() *big.Int {
+	return nil
+}
+
+func (h *Head) IsValid() bool {
+	return h.BlockHeight != nil
+}
+
 func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration, log logger.Logger) (*Client, error) {
 	return &Client{
 		url:             endpoint,
@@ -77,6 +101,56 @@ func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration,
 		log:             log,
 		requestGroup:    &singleflight.Group{},
 	}, nil
+}
+
+var _ mn.RPCClient[mn.StringID, *Head] = (*Client)(nil)
+var _ mn.SendTxRPCClient[*solana.Transaction] = (*Client)(nil)
+
+// TODO: BCI-4061: Implement Client for MultiNode
+
+func (c *Client) Dial(ctx context.Context) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Client) SubscribeToHeads(ctx context.Context) (<-chan *Head, mn.Subscription, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Client) SubscribeToFinalizedHeads(ctx context.Context) (<-chan *Head, mn.Subscription, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Client) Ping(ctx context.Context) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Client) IsSyncing(ctx context.Context) (bool, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Client) UnsubscribeAllExcept(subs ...mn.Subscription) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Client) Close() {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Client) GetInterceptedChainInfo() (latest, highestUserObservations mn.ChainInfo) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c *Client) SendTransaction(ctx context.Context, tx *solana.Transaction) error {
+	// TODO: Implement
+	return nil
 }
 
 func (c *Client) latency(name string) func() {
@@ -142,11 +216,11 @@ func (c *Client) LatestBlockhash() (*rpc.GetLatestBlockhashResult, error) {
 	return v.(*rpc.GetLatestBlockhashResult), err
 }
 
-func (c *Client) ChainID() (string, error) {
+func (c *Client) ChainID(ctx context.Context) (mn.StringID, error) {
 	done := c.latency("chain_id")
 	defer done()
 
-	ctx, cancel := context.WithTimeout(context.Background(), c.contextDuration)
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
 	v, err, _ := c.requestGroup.Do("GetGenesisHash", func() (interface{}, error) {
 		return c.rpc.GetGenesisHash(ctx)
@@ -168,7 +242,7 @@ func (c *Client) ChainID() (string, error) {
 		c.log.Warnf("unknown genesis hash - assuming solana chain is 'localnet'")
 		network = "localnet"
 	}
-	return network, nil
+	return mn.StringID(network), nil
 }
 
 func (c *Client) GetFeeForMessage(msg string) (uint64, error) {

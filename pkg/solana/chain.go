@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	"math/rand"
 	"strconv"
@@ -21,6 +22,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+
+	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -85,6 +88,10 @@ type chain struct {
 	balanceMonitor services.Service
 	lggr           logger.Logger
 
+	// if multiNode is enabled, the clientCache will not be used
+	multiNode *mn.MultiNode[mn.StringID, *client.Client]
+	txSender  *mn.TransactionSender[*solanago.Transaction, mn.StringID, *client.Client]
+
 	// tracking node chain id for verification
 	clientCache map[string]*verifiedCachedClient // map URL -> {client, chainId} [mainnet/testnet/devnet/localnet]
 	clientLock  sync.RWMutex
@@ -114,7 +121,8 @@ func (v *verifiedCachedClient) verifyChainID() (bool, error) {
 	v.chainIDVerifiedLock.Lock()
 	defer v.chainIDVerifiedLock.Unlock()
 
-	v.chainID, err = v.ReaderWriter.ChainID()
+	strID, err := v.ReaderWriter.ChainID(context.Background())
+	v.chainID = strID.String()
 	if err != nil {
 		v.chainIDVerified = false
 		return v.chainIDVerified, fmt.Errorf("failed to fetch ChainID in verifiedCachedClient: %w", err)
@@ -186,13 +194,13 @@ func (v *verifiedCachedClient) LatestBlockhash() (*rpc.GetLatestBlockhashResult,
 	return v.ReaderWriter.LatestBlockhash()
 }
 
-func (v *verifiedCachedClient) ChainID() (string, error) {
+func (v *verifiedCachedClient) ChainID(ctx context.Context) (mn.StringID, error) {
 	verified, err := v.verifyChainID()
 	if !verified {
 		return "", err
 	}
 
-	return v.chainID, nil
+	return mn.StringID(v.chainID), nil
 }
 
 func (v *verifiedCachedClient) GetFeeForMessage(msg string) (uint64, error) {
@@ -221,6 +229,66 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 		lggr:        logger.Named(lggr, "Chain"),
 		clientCache: map[string]*verifiedCachedClient{},
 	}
+
+	if cfg.MultiNodeEnabled() {
+		chainFamily := "solana"
+
+		mnCfg := cfg.MultiNodeConfig()
+
+		var nodes []mn.Node[mn.StringID, *client.Client]
+		var sendOnlyNodes []mn.SendOnlyNode[mn.StringID, *client.Client]
+
+		for i, nodeInfo := range cfg.ListNodes() {
+			rpcClient, err := client.NewClient(nodeInfo.URL.String(), cfg, DefaultRequestTimeout, logger.Named(lggr, "Client."+*nodeInfo.Name))
+			if err != nil {
+				lggr.Warnw("failed to create client", "name", *nodeInfo.Name, "solana-url", nodeInfo.URL.String(), "err", err.Error())
+				return nil, fmt.Errorf("failed to create client: %w", err)
+			}
+
+			newNode := mn.NewNode[mn.StringID, *client.Head, *client.Client](
+				mnCfg, mnCfg, lggr, *nodeInfo.URL.URL(), nil, *nodeInfo.Name,
+				i, mn.StringID(id), 0, rpcClient, chainFamily)
+
+			if nodeInfo.SendOnly {
+				sendOnlyNodes = append(sendOnlyNodes, newNode)
+			} else {
+				nodes = append(nodes, newNode)
+			}
+		}
+
+		multiNode := mn.NewMultiNode[mn.StringID, *client.Client](
+			lggr,
+			mn.NodeSelectionModeRoundRobin,
+			0,
+			nodes,
+			sendOnlyNodes,
+			mn.StringID(id),
+			chainFamily,
+			mnCfg.DeathDeclarationDelay(),
+		)
+
+		// TODO: implement error classification; move logic to separate file if large
+		// TODO: might be useful to reference anza-xyz/agave@master/sdk/src/transaction/error.rs
+		classifySendError := func(tx *solanago.Transaction, err error) mn.SendTxReturnCode {
+			return 0 // TODO ClassifySendError(err, clientErrors, logger.Sugared(logger.Nop()), tx, common.Address{}, false)
+		}
+
+		txSender := mn.NewTransactionSender[*solanago.Transaction, mn.StringID, *client.Client](
+			lggr,
+			mn.StringID(id),
+			chainFamily,
+			multiNode,
+			classifySendError,
+			0, // use the default value provided by the implementation
+		)
+
+		ch.multiNode = multiNode
+		ch.txSender = txSender
+
+		// clientCache will not be used if multinode is enabled
+		ch.clientCache = nil
+	}
+
 	tc := func() (client.ReaderWriter, error) {
 		return ch.getClient()
 	}
@@ -330,6 +398,10 @@ func (c *chain) ChainID() string {
 
 // getClient returns a client, randomly selecting one from available and valid nodes
 func (c *chain) getClient() (client.ReaderWriter, error) {
+	if c.cfg.MultiNodeEnabled() {
+		return c.multiNode.SelectRPC()
+	}
+
 	var node *config.Node
 	var client client.ReaderWriter
 	nodes := c.cfg.ListNodes()
@@ -409,7 +481,12 @@ func (c *chain) Start(ctx context.Context) error {
 		c.lggr.Debug("Starting txm")
 		c.lggr.Debug("Starting balance monitor")
 		var ms services.MultiStart
-		return ms.Start(ctx, c.txm, c.balanceMonitor)
+		startAll := []services.StartClose{c.txm, c.balanceMonitor}
+		if c.cfg.MultiNodeEnabled() {
+			c.lggr.Debug("Starting multinode")
+			startAll = append(startAll, c.multiNode, c.txSender)
+		}
+		return ms.Start(ctx, startAll...)
 	})
 }
 
@@ -418,7 +495,12 @@ func (c *chain) Close() error {
 		c.lggr.Debug("Stopping")
 		c.lggr.Debug("Stopping txm")
 		c.lggr.Debug("Stopping balance monitor")
-		return services.CloseAll(c.txm, c.balanceMonitor)
+		closeAll := []io.Closer{c.txm, c.balanceMonitor}
+		if c.cfg.MultiNodeEnabled() {
+			c.lggr.Debug("Stopping multinode")
+			closeAll = append(closeAll, c.multiNode, c.txSender)
+		}
+		return services.CloseAll(closeAll...)
 	})
 }
 

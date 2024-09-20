@@ -16,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -174,7 +175,7 @@ func TestSolanaChain_VerifiedClient(t *testing.T) {
 	testChain.id = "incorrect"
 	c, err = testChain.verifiedClient(node)
 	assert.NoError(t, err)
-	_, err = c.ChainID()
+	_, err = c.ChainID(tests.Context(t))
 	// expect error from id mismatch (even if using a cached client) when performing RPC calls
 	assert.Error(t, err)
 	assert.Equal(t, fmt.Sprintf("client returned mismatched chain id (expected: %s, got: %s): %s", "incorrect", "devnet", node.URL), err.Error())

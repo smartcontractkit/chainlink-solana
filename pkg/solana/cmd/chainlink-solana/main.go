@@ -66,10 +66,12 @@ func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore 
 		Logger:   c.Logger,
 		KeyStore: keystore,
 	}
+
 	chain, err := solana.NewChain(&cfg.Solana, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chain: %w", err)
 	}
+
 	ra := &loop.RelayerAdapter{Relayer: solana.NewRelayer(c.Logger, chain, capRegistry), RelayerExt: chain}
 
 	c.SubService(ra)
