@@ -32,7 +32,7 @@ type MultiNode struct {
 }
 
 func (c *MultiNode) MultiNodeEnabled() bool {
-	return *c.multiNodeEnabled
+	return c.multiNodeEnabled != nil && *c.multiNodeEnabled
 }
 
 func (c *MultiNode) PollFailureThreshold() uint32 {
