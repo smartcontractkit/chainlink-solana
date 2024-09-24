@@ -25,6 +25,8 @@ import (
 const ServiceName = "SolanaChainReader"
 
 type SolanaChainReaderService struct {
+	types.UnimplementedContractReader
+
 	// provided values
 	lggr   logger.Logger
 	client BinaryDataReader
