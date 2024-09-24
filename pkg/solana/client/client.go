@@ -117,7 +117,7 @@ func (h *Head) BlockNumber() int64 {
 }
 
 func (h *Head) BlockDifficulty() *big.Int {
-	// TODO: Not relevant for Solana?
+	// Not relevant for Solana
 	return nil
 }
 
@@ -157,17 +157,17 @@ func (c *Client) SubscribeToFinalizedHeads(ctx context.Context) (<-chan *Head, m
 }
 
 func (c *Client) LatestBlock(ctx context.Context) (*Head, error) {
-	latestBlockHash, err := c.rpc.GetLatestBlockhash(ctx, c.commitment)
+	latestBlockHeight, err := c.rpc.GetBlockHeight(ctx, rpc.CommitmentConfirmed)
 	if err != nil {
 		return nil, err
 	}
 
-	latestBlock, err := c.rpc.GetBlock(ctx, latestBlockHash.Value.LastValidBlockHeight)
+	block, err := c.rpc.GetBlock(ctx, latestBlockHeight)
 	if err != nil {
 		return nil, err
 	}
 
-	head := &Head{GetBlockResult: *latestBlock}
+	head := &Head{GetBlockResult: *block}
 	c.onNewHead(ctx, c.chStopInFlight, head)
 	return head, nil
 }

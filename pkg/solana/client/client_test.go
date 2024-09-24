@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -297,13 +298,7 @@ func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 	assert.Equal(t, uint64(5_000), initBal-endBal)
 }
 
-/*
 func TestClient_Subscriptions_Integration(t *testing.T) {
-	// TODO: Test subscribing to heads and finalized heads
-	// TODO: Ensure chain info is updated on new heads
-	// TODO: Test Dial, Close, IsSyncing, GetInterceptedChainInfo
-
-	// TODO: Create server for testing??
 	url := SetupLocalSolNode(t)
 	privKey, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
@@ -313,35 +308,45 @@ func TestClient_Subscriptions_Integration(t *testing.T) {
 	requestTimeout := 5 * time.Second
 	lggr := logger.Test(t)
 	cfg := config.NewDefault()
+	// Enable MultiNode
+	cfg.MultiNode.SetDefaults(true)
 
-	ctx := context.Background()
 	c, err := NewClient(url, cfg, requestTimeout, lggr)
 	require.NoError(t, err)
 
-	ch, sub, err := c.SubscribeToHeads(ctx)
-	defer sub.Unsubscribe()
+	err = c.Ping(tests.Context(t))
 	require.NoError(t, err)
 
-	// TODO: How do we test this?
-	// check for new heads
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		for {
-			select {
-			case head := <-ch:
-				t.Logf("New head: %v", head)
-				wg.Done()
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
+	ch, sub, err := c.SubscribeToHeads(tests.Context(t))
+	require.NoError(t, err)
+	defer sub.Unsubscribe()
 
-	wg.Wait()
+	finalizedCh, finalizedSub, err := c.SubscribeToFinalizedHeads(tests.Context(t))
+	require.NoError(t, err)
+	defer finalizedSub.Unsubscribe()
 
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(tests.Context(t), time.Minute)
+	defer cancel()
+
+	select {
+	case head := <-ch:
+		require.NotEqual(t, solana.Hash{}, head.Blockhash)
+		latest, _ := c.GetInterceptedChainInfo()
+		require.Equal(t, head.BlockNumber(), latest.BlockNumber)
+	case <-ctx.Done():
+		t.Fatal("failed to receive head: ", ctx.Err())
+	}
+
+	select {
+	case finalizedHead := <-finalizedCh:
+		require.NotEqual(t, solana.Hash{}, finalizedHead.Blockhash)
+		latest, _ := c.GetInterceptedChainInfo()
+		require.Equal(t, finalizedHead.BlockNumber(), latest.FinalizedBlockNumber)
+	case <-ctx.Done():
+		t.Fatal("failed to receive finalized head: ", ctx.Err())
+	}
 }
-*/
 
 func TestClientLatency(t *testing.T) {
 	c := Client{}
