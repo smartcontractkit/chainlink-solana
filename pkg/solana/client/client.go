@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum"
 	"math/big"
 	"sync"
 	"time"
@@ -73,7 +72,7 @@ type Client struct {
 	pollInterval               time.Duration
 	finalizedBlockPollInterval time.Duration
 	stateMu                    sync.RWMutex // protects state* fields
-	subs                       map[ethereum.Subscription]struct{}
+	subs                       map[mn.Subscription]struct{}
 
 	// chStopInFlight can be closed to immediately cancel all in-flight requests on
 	// this RpcClient. Closing and replacing should be serialized through
