@@ -106,55 +106,55 @@ func (c *MultiNode) SetDefaults() {
 	c.finalizedBlockOffset = ptr(uint32(0))
 }
 
-func (mn *MultiNode) SetFrom(fs *MultiNode) {
+func (c *MultiNode) SetFrom(fs *MultiNode) {
 	if fs.multiNodeEnabled != nil {
-		mn.multiNodeEnabled = fs.multiNodeEnabled
+		c.multiNodeEnabled = fs.multiNodeEnabled
 	}
 
 	// Node Configs
 	if fs.pollFailureThreshold != nil {
-		mn.pollFailureThreshold = fs.pollFailureThreshold
+		c.pollFailureThreshold = fs.pollFailureThreshold
 	}
 	if fs.pollInterval != nil {
-		mn.pollInterval = fs.pollInterval
+		c.pollInterval = fs.pollInterval
 	}
 	if fs.selectionMode != nil {
-		mn.selectionMode = fs.selectionMode
+		c.selectionMode = fs.selectionMode
 	}
 	if fs.syncThreshold != nil {
-		mn.syncThreshold = fs.syncThreshold
+		c.syncThreshold = fs.syncThreshold
 	}
 	if fs.nodeIsSyncingEnabled != nil {
-		mn.nodeIsSyncingEnabled = fs.nodeIsSyncingEnabled
+		c.nodeIsSyncingEnabled = fs.nodeIsSyncingEnabled
 	}
 	if fs.leaseDuration != nil {
-		mn.leaseDuration = fs.leaseDuration
+		c.leaseDuration = fs.leaseDuration
 	}
 	if fs.finalizedBlockPollInterval != nil {
-		mn.finalizedBlockPollInterval = fs.finalizedBlockPollInterval
+		c.finalizedBlockPollInterval = fs.finalizedBlockPollInterval
 	}
 	if fs.enforceRepeatableRead != nil {
-		mn.enforceRepeatableRead = fs.enforceRepeatableRead
+		c.enforceRepeatableRead = fs.enforceRepeatableRead
 	}
 	if fs.deathDeclarationDelay != nil {
-		mn.deathDeclarationDelay = fs.deathDeclarationDelay
+		c.deathDeclarationDelay = fs.deathDeclarationDelay
 	}
 
 	// Chain Configs
 	if fs.nodeNoNewHeadsThreshold != nil {
-		mn.nodeNoNewHeadsThreshold = fs.nodeNoNewHeadsThreshold
+		c.nodeNoNewHeadsThreshold = fs.nodeNoNewHeadsThreshold
 	}
 	if fs.noNewFinalizedHeadsThreshold != nil {
-		mn.noNewFinalizedHeadsThreshold = fs.noNewFinalizedHeadsThreshold
+		c.noNewFinalizedHeadsThreshold = fs.noNewFinalizedHeadsThreshold
 	}
 	if fs.finalityDepth != nil {
-		mn.finalityDepth = fs.finalityDepth
+		c.finalityDepth = fs.finalityDepth
 	}
 	if fs.finalityTagEnabled != nil {
-		mn.finalityTagEnabled = fs.finalityTagEnabled
+		c.finalityTagEnabled = fs.finalityTagEnabled
 	}
 	if fs.finalizedBlockOffset != nil {
-		mn.finalizedBlockOffset = fs.finalizedBlockOffset
+		c.finalizedBlockOffset = fs.finalizedBlockOffset
 	}
 }
 

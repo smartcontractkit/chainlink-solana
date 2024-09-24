@@ -3,7 +3,6 @@ package solana
 import (
 	"errors"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"io"
 	"net/http"
 	"net/http/httptest"
