@@ -1,12 +1,14 @@
 package config
 
 import (
-	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
+
+	client "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 )
 
 type MultiNode struct {
-	// TODO: Make these pointers; update SetFrom and SetDefaults to handle nil values
 	// Feature flag
 	multiNodeEnabled *bool
 
@@ -78,31 +80,30 @@ func (c *MultiNode) FinalityTagEnabled() bool { return *c.finalityTagEnabled }
 func (c *MultiNode) FinalizedBlockOffset() uint32 { return *c.finalizedBlockOffset }
 
 func (c *MultiNode) SetDefaults() {
-	c.multiNodeEnabled = new(bool)
+	c.multiNodeEnabled = ptr(false)
 
 	// Node Configs
-	defaultPollFailureThreshold := uint32(5)
-	c.pollFailureThreshold = &defaultPollFailureThreshold
+	c.pollFailureThreshold = ptr(uint32(5))
 	c.pollInterval = config.MustNewDuration(10 * time.Second)
 
-	highestHead := "HighestHead"
-	c.selectionMode = &highestHead
+	c.selectionMode = ptr(client.NodeSelectionModePriorityLevel)
 
-	syncThreshold := uint32(5)
-	c.syncThreshold = &syncThreshold
+	c.syncThreshold = ptr(uint32(5))
 
-	c.leaseDuration = config.MustNewDuration(time.Minute) // TODO: default value?
-	c.nodeIsSyncingEnabled = new(bool)                    // // TODO: default false?
+	// Period at which we verify if active node is still highest block number
+	c.leaseDuration = config.MustNewDuration(time.Minute)
+
+	c.nodeIsSyncingEnabled = ptr(false)
 	c.finalizedBlockPollInterval = config.MustNewDuration(5 * time.Second)
-	c.enforceRepeatableRead = new(bool)
+	c.enforceRepeatableRead = ptr(true)
 	c.deathDeclarationDelay = config.MustNewDuration(10 * time.Second)
 
 	// Chain Configs
-	c.nodeNoNewHeadsThreshold = config.MustNewDuration(10 * time.Second)      // TODO: Value?
-	c.noNewFinalizedHeadsThreshold = config.MustNewDuration(10 * time.Second) // TODO: Value?
-	c.finalityDepth = new(uint32)                                             // TODO: default value?
-	c.finalityTagEnabled = new(bool)                                          // TODO: default false?
-	c.finalizedBlockOffset = new(uint32)                                      // TODO: default value?
+	c.nodeNoNewHeadsThreshold = config.MustNewDuration(10 * time.Second)
+	c.noNewFinalizedHeadsThreshold = config.MustNewDuration(10 * time.Second)
+	c.finalityDepth = ptr(uint32(0))
+	c.finalityTagEnabled = ptr(true)
+	c.finalizedBlockOffset = ptr(uint32(0))
 }
 
 func (mn *MultiNode) SetFrom(fs *MultiNode) {
@@ -155,4 +156,8 @@ func (mn *MultiNode) SetFrom(fs *MultiNode) {
 	if fs.finalizedBlockOffset != nil {
 		mn.finalizedBlockOffset = fs.finalizedBlockOffset
 	}
+}
+
+func ptr[T any](v T) *T {
+	return &v
 }
