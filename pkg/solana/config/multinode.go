@@ -1,12 +1,14 @@
 package config
 
 import (
-	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
+
+	client "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 )
 
 type MultiNode struct {
-	// TODO: Make these pointers; update SetFrom and SetDefaults to handle nil values
 	// Feature flag
 	multiNodeEnabled *bool
 
@@ -30,7 +32,7 @@ type MultiNode struct {
 }
 
 func (c *MultiNode) MultiNodeEnabled() bool {
-	return *c.multiNodeEnabled
+	return c.multiNodeEnabled != nil && *c.multiNodeEnabled
 }
 
 func (c *MultiNode) PollFailureThreshold() uint32 {
@@ -78,81 +80,84 @@ func (c *MultiNode) FinalityTagEnabled() bool { return *c.finalityTagEnabled }
 func (c *MultiNode) FinalizedBlockOffset() uint32 { return *c.finalizedBlockOffset }
 
 func (c *MultiNode) SetDefaults() {
-	c.multiNodeEnabled = new(bool)
+	c.multiNodeEnabled = ptr(false)
 
 	// Node Configs
-	defaultPollFailureThreshold := uint32(5)
-	c.pollFailureThreshold = &defaultPollFailureThreshold
+	c.pollFailureThreshold = ptr(uint32(5))
 	c.pollInterval = config.MustNewDuration(10 * time.Second)
 
-	highestHead := "HighestHead"
-	c.selectionMode = &highestHead
+	c.selectionMode = ptr(client.NodeSelectionModePriorityLevel)
 
-	syncThreshold := uint32(5)
-	c.syncThreshold = &syncThreshold
+	c.syncThreshold = ptr(uint32(5))
 
-	c.leaseDuration = config.MustNewDuration(time.Minute) // TODO: default value?
-	c.nodeIsSyncingEnabled = new(bool)                    // // TODO: default false?
+	// Period at which we verify if active node is still highest block number
+	c.leaseDuration = config.MustNewDuration(time.Minute)
+
+	c.nodeIsSyncingEnabled = ptr(false)
 	c.finalizedBlockPollInterval = config.MustNewDuration(5 * time.Second)
-	c.enforceRepeatableRead = new(bool)
+	c.enforceRepeatableRead = ptr(true)
 	c.deathDeclarationDelay = config.MustNewDuration(10 * time.Second)
 
 	// Chain Configs
-	c.nodeNoNewHeadsThreshold = config.MustNewDuration(10 * time.Second)      // TODO: Value?
-	c.noNewFinalizedHeadsThreshold = config.MustNewDuration(10 * time.Second) // TODO: Value?
-	c.finalityDepth = new(uint32)                                             // TODO: default value?
-	c.finalityTagEnabled = new(bool)                                          // TODO: default false?
-	c.finalizedBlockOffset = new(uint32)                                      // TODO: default value?
+	c.nodeNoNewHeadsThreshold = config.MustNewDuration(10 * time.Second)
+	c.noNewFinalizedHeadsThreshold = config.MustNewDuration(10 * time.Second)
+	c.finalityDepth = ptr(uint32(0))
+	c.finalityTagEnabled = ptr(true)
+	c.finalizedBlockOffset = ptr(uint32(0))
 }
 
-func (mn *MultiNode) SetFrom(fs *MultiNode) {
+func (c *MultiNode) SetFrom(fs *MultiNode) {
 	if fs.multiNodeEnabled != nil {
-		mn.multiNodeEnabled = fs.multiNodeEnabled
+		c.multiNodeEnabled = fs.multiNodeEnabled
 	}
 
 	// Node Configs
 	if fs.pollFailureThreshold != nil {
-		mn.pollFailureThreshold = fs.pollFailureThreshold
+		c.pollFailureThreshold = fs.pollFailureThreshold
 	}
 	if fs.pollInterval != nil {
-		mn.pollInterval = fs.pollInterval
+		c.pollInterval = fs.pollInterval
 	}
 	if fs.selectionMode != nil {
-		mn.selectionMode = fs.selectionMode
+		c.selectionMode = fs.selectionMode
 	}
 	if fs.syncThreshold != nil {
-		mn.syncThreshold = fs.syncThreshold
+		c.syncThreshold = fs.syncThreshold
 	}
 	if fs.nodeIsSyncingEnabled != nil {
-		mn.nodeIsSyncingEnabled = fs.nodeIsSyncingEnabled
+		c.nodeIsSyncingEnabled = fs.nodeIsSyncingEnabled
 	}
 	if fs.leaseDuration != nil {
-		mn.leaseDuration = fs.leaseDuration
+		c.leaseDuration = fs.leaseDuration
 	}
 	if fs.finalizedBlockPollInterval != nil {
-		mn.finalizedBlockPollInterval = fs.finalizedBlockPollInterval
+		c.finalizedBlockPollInterval = fs.finalizedBlockPollInterval
 	}
 	if fs.enforceRepeatableRead != nil {
-		mn.enforceRepeatableRead = fs.enforceRepeatableRead
+		c.enforceRepeatableRead = fs.enforceRepeatableRead
 	}
 	if fs.deathDeclarationDelay != nil {
-		mn.deathDeclarationDelay = fs.deathDeclarationDelay
+		c.deathDeclarationDelay = fs.deathDeclarationDelay
 	}
 
 	// Chain Configs
 	if fs.nodeNoNewHeadsThreshold != nil {
-		mn.nodeNoNewHeadsThreshold = fs.nodeNoNewHeadsThreshold
+		c.nodeNoNewHeadsThreshold = fs.nodeNoNewHeadsThreshold
 	}
 	if fs.noNewFinalizedHeadsThreshold != nil {
-		mn.noNewFinalizedHeadsThreshold = fs.noNewFinalizedHeadsThreshold
+		c.noNewFinalizedHeadsThreshold = fs.noNewFinalizedHeadsThreshold
 	}
 	if fs.finalityDepth != nil {
-		mn.finalityDepth = fs.finalityDepth
+		c.finalityDepth = fs.finalityDepth
 	}
 	if fs.finalityTagEnabled != nil {
-		mn.finalityTagEnabled = fs.finalityTagEnabled
+		c.finalityTagEnabled = fs.finalityTagEnabled
 	}
 	if fs.finalizedBlockOffset != nil {
-		mn.finalizedBlockOffset = fs.finalizedBlockOffset
+		c.finalizedBlockOffset = fs.finalizedBlockOffset
 	}
+}
+
+func ptr[T any](v T) *T {
+	return &v
 }

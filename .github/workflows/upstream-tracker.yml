@@ -65,4 +65,4 @@ jobs:
             echo "\`\`\`"; 
           } >>  output.md
           
-          gh issue create -a aalu1418 -t "Upstream Updates - $(date)" -l "[auto] Upstream Updates" -F output.md
+          gh issue create -a aalu1418 -t "Upstream Updates - $(date)" -l "AUTO: Upstream Updates" -F output.md

@@ -43,9 +43,9 @@ func (s *envelopeSourceFactory) NewSource(
 		return nil, fmt.Errorf("expected feedConfig to be of type config.SolanaFeedConfig not %T", feedConfig)
 	}
 	return &envelopeSource{
-		s.client,
-		solanaFeedConfig,
-		s.log,
+		client:     s.client,
+		feedConfig: solanaFeedConfig,
+		log:        s.log,
 	}, nil
 }
 
@@ -57,6 +57,25 @@ type envelopeSource struct {
 	client     ChainReader
 	feedConfig config.SolanaFeedConfig
 	log        commonMonitoring.Logger
+
+	// these values are cached because transactions can be pruned from an RPC node
+	// if no transactions are found and without a cache, the `getJuelsPerLamport` call will block the entire source.Fetch
+	lock                 sync.RWMutex
+	cacheJuelsPerLamport uint64
+}
+
+func (s *envelopeSource) setJuelsPerLamport(v uint64) error {
+	s.lock.Lock()
+	s.cacheJuelsPerLamport = v
+	s.lock.Unlock()
+
+	return nil
+}
+
+func (s *envelopeSource) readJuelsPerLamport() uint64 {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.cacheJuelsPerLamport
 }
 
 func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
@@ -144,7 +163,7 @@ func (s *envelopeSource) getLinkBalance(ctx context.Context, tokenVault solana.P
 		return nil, fmt.Errorf("failed to parse link balance value: %s", linkBalanceRes.Value.Amount)
 	}
 	if linkBalance.Cmp(zeroBigInt) == 0 {
-		return nil, fmt.Errorf("contract's LINK balance should not be zero")
+		s.log.Warnw("contract's LINK balance should not be zero", "token_vautlt", tokenVault)
 	}
 	return linkBalance, nil
 }
@@ -163,7 +182,9 @@ func (s *envelopeSource) getJuelsPerLamport(ctx context.Context) (*big.Int, erro
 		return nil, fmt.Errorf("failed to fetch tx signatures for state account '%s': %w", s.feedConfig.StateAccountBase58, err)
 	}
 	if len(txSigs) == 0 {
-		return nil, fmt.Errorf("found no transactions from state account '%s'", s.feedConfig.StateAccountBase58)
+		val := s.readJuelsPerLamport()
+		s.log.Warnw("no transactions found, falling back to cached value - history may have been pruned (cached_value=0 indicates pruned txs encountered on startup)", "state_account", s.feedConfig.StateAccountBase58, "cached_value", val)
+		return new(big.Int).SetUint64(val), nil
 	}
 	for _, txSig := range txSigs {
 		if txSig.Err != nil {
@@ -197,11 +218,11 @@ func (s *envelopeSource) getJuelsPerLamport(ctx context.Context) (*big.Int, erro
 			if !isNewTransmission {
 				continue
 			}
+			// don't block on zero value - handling zero values should happen on the consumer
 			if newTransmission.JuelsPerLamport == 0 {
-				s.log.Infow("zero value for juels/lamport feed is not supported")
-				continue
+				s.log.Warnw("zero value for juels/lamport feed is not supported")
 			}
-			return new(big.Int).SetUint64(newTransmission.JuelsPerLamport), nil
+			return new(big.Int).SetUint64(newTransmission.JuelsPerLamport), s.setJuelsPerLamport(newTransmission.JuelsPerLamport)
 		}
 	}
 	return nil, fmt.Errorf("no correct NewTransmission event found in the last %d transactions on contract state '%s'", txSigsPageSize, s.feedConfig.StateAccountBase58)

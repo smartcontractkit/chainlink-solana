@@ -230,7 +230,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 		clientCache: map[string]*verifiedCachedClient{},
 	}
 
-	if cfg.MultiNodeEnabled() {
+	if cfg.MultiNode.MultiNodeEnabled() {
 		chainFamily := "solana"
 
 		mnCfg := cfg.MultiNodeConfig()
@@ -258,7 +258,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 
 		multiNode := mn.NewMultiNode[mn.StringID, *client.Client](
 			lggr,
-			mn.NodeSelectionModeRoundRobin,
+			mnCfg.SelectionMode(),
 			mnCfg.LeaseDuration(),
 			nodes,
 			sendOnlyNodes,
@@ -398,7 +398,7 @@ func (c *chain) ChainID() string {
 
 // getClient returns a client, randomly selecting one from available and valid nodes
 func (c *chain) getClient() (client.ReaderWriter, error) {
-	if c.cfg.MultiNodeEnabled() {
+	if c.cfg.MultiNode.MultiNodeEnabled() {
 		return c.multiNode.SelectRPC()
 	}
 
@@ -482,7 +482,7 @@ func (c *chain) Start(ctx context.Context) error {
 		c.lggr.Debug("Starting balance monitor")
 		var ms services.MultiStart
 		startAll := []services.StartClose{c.txm, c.balanceMonitor}
-		if c.cfg.MultiNodeEnabled() {
+		if c.cfg.MultiNode.MultiNodeEnabled() {
 			c.lggr.Debug("Starting multinode")
 			startAll = append(startAll, c.multiNode, c.txSender)
 		}
@@ -496,7 +496,7 @@ func (c *chain) Close() error {
 		c.lggr.Debug("Stopping txm")
 		c.lggr.Debug("Stopping balance monitor")
 		closeAll := []io.Closer{c.txm, c.balanceMonitor}
-		if c.cfg.MultiNodeEnabled() {
+		if c.cfg.MultiNode.MultiNodeEnabled() {
 			c.lggr.Debug("Stopping multinode")
 			closeAll = append(closeAll, c.multiNode, c.txSender)
 		}

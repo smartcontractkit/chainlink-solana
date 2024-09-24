@@ -113,8 +113,8 @@ type TOMLConfig struct {
 	// Do not access directly, use [IsEnabled]
 	Enabled *bool
 	Chain
-	MultiNode
-	Nodes Nodes
+	MultiNode MultiNode
+	Nodes     Nodes
 }
 
 func (c *TOMLConfig) IsEnabled() bool {
