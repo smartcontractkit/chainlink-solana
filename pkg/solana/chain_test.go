@@ -47,9 +47,12 @@ func TestSolanaChain_GetClient(t *testing.T) {
 
 	ch := solcfg.Chain{}
 	ch.SetDefaults()
+	mn := solcfg.MultiNode{}
+	mn.SetDefaults(false)
 	cfg := &solcfg.TOMLConfig{
-		ChainID: ptr("devnet"),
-		Chain:   ch,
+		ChainID:   ptr("devnet"),
+		Chain:     ch,
+		MultiNode: mn,
 	}
 	testChain := chain{
 		id:          "devnet",
@@ -117,24 +120,28 @@ func TestSolanaChain_GetClient(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestSolanaChain_MultiNode(t *testing.T) {
-	// TODO: Set up chain with MultiNode enabled
+func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		out := fmt.Sprintf(TestSolanaGenesisHashTemplate, client.MainnetGenesisHash) // mainnet genesis hash
+		if !strings.Contains(r.URL.Path, "/mismatch") {
+			// devnet gensis hash
+			out = fmt.Sprintf(TestSolanaGenesisHashTemplate, client.DevnetGenesisHash)
+		}
+		_, err := w.Write([]byte(out))
+		require.NoError(t, err)
+	}))
+	defer mockServer.Close()
 
 	ch := solcfg.Chain{}
 	ch.SetDefaults()
+	mn := solcfg.MultiNode{}
+	mn.SetDefaults(true)
+
 	cfg := &solcfg.TOMLConfig{
-		ChainID: ptr("devnet"),
-		Chain:   ch,
+		ChainID:   ptr("devnet"),
+		Chain:     ch,
+		MultiNode: mn,
 	}
-	testChain := chain{
-		id:          "devnet",
-		cfg:         cfg,
-		lggr:        logger.Test(t),
-		clientCache: map[string]*verifiedCachedClient{},
-	}
-
-
-
 	cfg.Nodes = []*solcfg.Node{
 		{
 			Name: ptr("devnet"),
@@ -145,14 +152,19 @@ func TestSolanaChain_MultiNode(t *testing.T) {
 			URL:  config.MustParseURL(mockServer.URL + "/2"),
 		},
 	}
-	_, err := testChain.getClient()
+
+	testChain, err := newChain("devnet", cfg, nil, logger.Test(t))
+	require.NoError(t, err)
+
+	err = testChain.multiNode.Start(tests.Context(t))
 	assert.NoError(t, err)
 
-	// TODO: Start MultiNode and ensure we can call getClient()
+	selectedClient, err := testChain.getClient()
+	assert.NoError(t, err)
 
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-	}
+	id, err := selectedClient.ChainID(tests.Context(t))
+	assert.NoError(t, err)
+	assert.Equal(t, "devnet", id.String())
 }
 
 func TestSolanaChain_VerifiedClient(t *testing.T) {

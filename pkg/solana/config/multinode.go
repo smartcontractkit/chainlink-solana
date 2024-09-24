@@ -79,8 +79,8 @@ func (c *MultiNode) FinalityTagEnabled() bool { return *c.finalityTagEnabled }
 
 func (c *MultiNode) FinalizedBlockOffset() uint32 { return *c.finalizedBlockOffset }
 
-func (c *MultiNode) SetDefaults() {
-	c.multiNodeEnabled = ptr(false)
+func (c *MultiNode) SetDefaults(enabled bool) {
+	c.multiNodeEnabled = ptr(enabled)
 
 	// Node Configs
 	c.pollFailureThreshold = ptr(uint32(5))

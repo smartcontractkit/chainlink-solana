@@ -289,6 +289,6 @@ func (c *TOMLConfig) MultiNodeConfig() *MultiNode {
 func NewDefault() *TOMLConfig {
 	cfg := &TOMLConfig{}
 	cfg.Chain.SetDefaults()
-	cfg.MultiNode.SetDefaults()
+	cfg.MultiNode.SetDefaults(false)
 	return cfg
 }

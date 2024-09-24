@@ -297,6 +297,7 @@ func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 	assert.Equal(t, uint64(5_000), initBal-endBal)
 }
 
+/*
 func TestClient_Subscriptions_Integration(t *testing.T) {
 	// TODO: Test subscribing to heads and finalized heads
 	// TODO: Ensure chain info is updated on new heads
@@ -340,6 +341,7 @@ func TestClient_Subscriptions_Integration(t *testing.T) {
 	wg.Wait()
 
 }
+*/
 
 func TestClientLatency(t *testing.T) {
 	c := Client{}

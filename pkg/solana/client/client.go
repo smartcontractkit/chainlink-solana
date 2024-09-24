@@ -98,8 +98,8 @@ func NewClient(endpoint string, cfg *config.TOMLConfig, requestTimeout time.Dura
 		contextDuration:            requestTimeout,
 		log:                        log,
 		requestGroup:               &singleflight.Group{},
-		pollInterval:               cfg.PollInterval(),
-		finalizedBlockPollInterval: cfg.FinalizedBlockPollInterval(),
+		pollInterval:               cfg.MultiNode.PollInterval(),
+		finalizedBlockPollInterval: cfg.MultiNode.FinalizedBlockPollInterval(),
 	}, nil
 }
 
@@ -117,8 +117,7 @@ func (h *Head) BlockNumber() int64 {
 }
 
 func (h *Head) BlockDifficulty() *big.Int {
-	// TODO: Is difficulty relevant for Solana?
-	// TODO: If not, then remove changes to it in latestBlockInfo
+	// TODO: Not relevant for Solana?
 	return nil
 }
 
@@ -130,16 +129,7 @@ var _ mn.RPCClient[mn.StringID, *Head] = (*Client)(nil)
 var _ mn.SendTxRPCClient[*solana.Transaction] = (*Client)(nil)
 
 func (c *Client) Dial(ctx context.Context) error {
-	// TODO: is there any work to do here? Doesn't seem like we have to dial anything
-	// TODO: Could maybe do a version check here?
-	/* TODO: Should we use this health check?
-	health, err := c.rpc.GetHealth(ctx)
-	if err != nil {
-		return false, err
-	}
-	return health == rpc.HealthOk, nil
-	*/
-	panic("implement me")
+	return nil
 }
 
 func (c *Client) SubscribeToHeads(ctx context.Context) (<-chan *Head, mn.Subscription, error) {
@@ -187,22 +177,17 @@ func (c *Client) LatestFinalizedBlock(ctx context.Context) (*Head, error) {
 	// capture chStopInFlight to ensure we are not updating chainInfo with observations related to previous life cycle
 	//ctx, cancel, chStopInFlight, _, _ := c.acquireQueryCtx(ctx, c.rpcTimeout)
 
-	// TODO: Is this really the way to implement this?
-	latestBH, err := c.rpc.GetLatestBlockhash(ctx, c.commitment)
+	finalizedBlockHeight, err := c.rpc.GetBlockHeight(ctx, rpc.CommitmentFinalized)
 	if err != nil {
 		return nil, err
 	}
 
-	var finalityDepth uint64 = 1 // TODO: Get value from config
-
-	latestFinalizedBH := latestBH.Value.LastValidBlockHeight - finalityDepth // TODO: subtract finality depth?
-
-	resp, err := c.rpc.GetBlock(ctx, latestFinalizedBH)
+	block, err := c.rpc.GetBlock(ctx, finalizedBlockHeight)
 	if err != nil {
 		return nil, err
 	}
 
-	head := &Head{GetBlockResult: *resp}
+	head := &Head{GetBlockResult: *block}
 	c.onNewFinalizedHead(ctx, c.chStopInFlight, head)
 	return head, nil
 }
@@ -254,7 +239,7 @@ func (c *Client) Ping(ctx context.Context) error {
 }
 
 func (c *Client) IsSyncing(ctx context.Context) (bool, error) {
-	// TODO: is this relevant?
+	// Not relevant for Solana
 	return false, nil
 }
 
