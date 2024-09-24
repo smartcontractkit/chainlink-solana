@@ -194,9 +194,12 @@ func TestSolanaChain_VerifiedClient(t *testing.T) {
 
 	ch := solcfg.Chain{}
 	ch.SetDefaults()
+	mn := solcfg.MultiNode{}
+	mn.SetDefaults(false)
 	cfg := &solcfg.TOMLConfig{
-		ChainID: ptr("devnet"),
-		Chain:   ch,
+		ChainID:   ptr("devnet"),
+		Chain:     ch,
+		MultiNode: mn,
 	}
 	testChain := chain{
 		cfg:         cfg,
@@ -241,10 +244,13 @@ func TestSolanaChain_VerifiedClient_ParallelClients(t *testing.T) {
 
 	ch := solcfg.Chain{}
 	ch.SetDefaults()
+	mn := solcfg.MultiNode{}
+	mn.SetDefaults(false)
 	cfg := &solcfg.TOMLConfig{
-		ChainID: ptr("devnet"),
-		Enabled: ptr(true),
-		Chain:   ch,
+		ChainID:   ptr("devnet"),
+		Enabled:   ptr(true),
+		Chain:     ch,
+		MultiNode: mn,
 	}
 	testChain := chain{
 		id:          "devnet",
