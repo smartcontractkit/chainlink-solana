@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -144,4 +145,37 @@ func (s *signatureList) Wait(index int) {
 	s.lock.RUnlock()
 
 	wg.Wait()
+}
+
+type SetTxConfig func(*TxConfig)
+
+func SetTimeout(t time.Duration) SetTxConfig {
+	return func(cfg *TxConfig) {
+		cfg.Timeout = t
+	}
+}
+func SetFeeBumpPeriod(t time.Duration) SetTxConfig {
+	return func(cfg *TxConfig) {
+		cfg.FeeBumpPeriod = t
+	}
+}
+func SetBaseComputeUnitPrice(v uint64) SetTxConfig {
+	return func(cfg *TxConfig) {
+		cfg.BaseComputeUnitPrice = v
+	}
+}
+func SetComputeUnitPriceMin(v uint64) SetTxConfig {
+	return func(cfg *TxConfig) {
+		cfg.ComputeUnitPriceMin = v
+	}
+}
+func SetComputeUnitPriceMax(v uint64) SetTxConfig {
+	return func(cfg *TxConfig) {
+		cfg.ComputeUnitPriceMax = v
+	}
+}
+func SetComputeUnitLimit(v uint32) SetTxConfig {
+	return func(cfg *TxConfig) {
+		cfg.ComputeUnitLimit = v
+	}
 }

@@ -23,7 +23,6 @@ func TestSet(t *testing.T) {
 			return ComputeUnitLimit(v)
 		}, SetComputeUnitLimit, false)
 	})
-
 }
 
 func testSet[V instruction](t *testing.T, builder func(uint) V, setter func(*solana.Transaction, V) error, expectFirstInstruction bool) {

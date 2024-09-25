@@ -100,7 +100,6 @@ func encode[V constraints.Unsigned](identifier computeBudgetInstruction, val V) 
 func ParseComputeUnitPrice(data []byte) (ComputeUnitPrice, error) {
 	v, err := parse(InstructionSetComputeUnitPrice, data, binary.LittleEndian.Uint64)
 	return ComputeUnitPrice(v), err
-
 }
 
 func ParseComputeUnitLimit(data []byte) (ComputeUnitLimit, error) {

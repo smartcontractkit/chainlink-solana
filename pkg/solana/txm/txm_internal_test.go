@@ -71,8 +71,9 @@ func getTx(t *testing.T, val uint64, keystore SimpleKeystore, price fees.Compute
 
 	return &base, func(price fees.ComputeUnitPrice) *solana.Transaction {
 		tx := base
-		// add fee
+		// add fee parameters
 		require.NoError(t, fees.SetComputeUnitPrice(&tx, price))
+		require.NoError(t, fees.SetComputeUnitLimit(&tx, 200_000)) // default
 
 		// sign tx
 		txMsg, err := tx.Message.MarshalBinary()
@@ -646,6 +647,7 @@ func TestTxm_Enqueue(t *testing.T) {
 	lggr := logger.Test(t)
 	cfg := config.NewDefault()
 	mc := mocks.NewReaderWriter(t)
+	ctx := tests.Context(t)
 
 	// mock solana keystore
 	mkey := keyMocks.NewSimpleKeystore(t)
@@ -684,6 +686,9 @@ func TestTxm_Enqueue(t *testing.T) {
 	txm := NewTxm("enqueue_test", func() (client.ReaderWriter, error) {
 		return mc, nil
 	}, cfg, mkey, lggr)
+
+	require.ErrorContains(t, txm.Enqueue("txmUnstarted", &solana.Transaction{}), "not started")
+	require.NoError(t, txm.Start(ctx))
 
 	txs := []struct {
 		name string
