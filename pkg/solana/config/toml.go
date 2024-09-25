@@ -277,6 +277,10 @@ func (c *TOMLConfig) BlockHistoryPollPeriod() time.Duration {
 	return c.Chain.BlockHistoryPollPeriod.Duration()
 }
 
+func (c *TOMLConfig) ComputeUnitLimitDefault() uint32 {
+	return *c.Chain.ComputeUnitLimitDefault
+}
+
 func (c *TOMLConfig) ListNodes() Nodes {
 	return c.Nodes
 }
