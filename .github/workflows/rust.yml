@@ -28,17 +28,11 @@ jobs:
     needs: [get_projectserum_version]
     steps:
     - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
-    - name: Cache cargo registry
-      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
-      with:
-        path: ~/.cargo/registry
-        key: ${{ runner.os }}-v2-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
     - name: Cache cargo index
       uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
-        path: ~/.cargo/git
-        key: ${{ runner.os }}-v2-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+        path: ~/.cargo
+        key: ${{ runner.os }}-v2-cargo-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Cache cargo target dir
       uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
@@ -50,10 +44,11 @@ jobs:
       env:
         psversion: ${{ needs.get_projectserum_version.outputs.projectserum_version }}
       run: |
-        docker run -v "$(pwd)/../":/repo backpackapp/build:"${psversion}" bash -c "\
+        docker run -v ~/.cargo:/.cargo -v "$(pwd)/../":/repo backpackapp/build:"${psversion}" bash -c "\
           set -eoux pipefail &&\
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
+          cp -rn /.cargo/. /root/.cargo &&\
           cd /repo/contracts &&\
           solana-keygen new -o id.json --no-bip39-passphrase &&\
           cd /repo/ts &&\
@@ -64,23 +59,10 @@ jobs:
           anchor test &&\
           cd /repo/contracts/examples/hello-world &&\
           yarn install --frozen-lockfile &&\
-          anchor test"
-
-    # - run: solana-keygen new -o id.json --no-bip39-passphrase
-    # - name: Compile typescript client
-    #   run: |
-    #    cd ../ts
-    #    yarn install --frozen-lockfile
-    #    yarn build
-    # - name: anchor test contracts
-    #   run: |
-    #     yarn install --frozen-lockfile
-    #     anchor test
-    # - name: anchor test hello-world
-    #   run: |
-    #    cd examples/hello-world
-    #    yarn install --frozen-lockfile
-    #    anchor test
+          anchor test &&\
+          chmod -R 755 /repo/contracts/target &&\
+          rm -rf /.cargo/* && cp -r /root/.cargo/. /.cargo &&\
+          chmod -R 755 /.cargo"
 
   rust_lint:
     name: Rust Lint
