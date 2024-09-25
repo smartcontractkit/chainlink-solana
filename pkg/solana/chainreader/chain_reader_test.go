@@ -857,7 +857,7 @@ func fullStructIDL(t *testing.T) string {
 	return fmt.Sprintf(
 		baseIDL,
 		strings.Join([]string{testStructAIDL, testStructBIDL}, ","),
-		strings.Join([]string{midLevelStructIDL, innerStructIDL}, ","),
+		strings.Join([]string{midLevelDynamicStructIDL, midLevelStaticStructIDL, innerDynamicStructIDL, innerStaticStructIDL}, ","),
 	)
 }
 
@@ -877,7 +877,8 @@ const (
 				{"name": "field","type": {"option": "i32"}},
 				{"name": "differentField","type": "string"},
 				{"name": "bigField","type": "i128"},
-				{"name": "nestedStruct","type": {"defined": "MidLevelStruct"}}
+				{"name": "nestedDynamicStruct","type": {"defined": "MidLevelDynamicStruct"}},
+				{"name": "nestedStaticStruct","type": {"defined": "MidLevelStaticStruct"}}
 			]
 		}
 	}`
@@ -895,24 +896,46 @@ const (
 		}
 	}`
 
-	midLevelStructIDL = `{
-		"name": "MidLevelStruct",
+	midLevelDynamicStructIDL = `{
+		"name": "MidLevelDynamicStruct",
 		"type": {
 			"kind": "struct",
 			"fields": [
 				{"name": "fixedBytes", "type": {"array": ["u8",2]}},
-				{"name": "inner", "type": {"defined": "InnerTestStruct"}}
+				{"name": "inner", "type": {"defined": "InnerDynamicTestStruct"}}
 			]
 		}
 	}`
 
-	innerStructIDL = `{
-		"name": "InnerTestStruct",
+	midLevelStaticStructIDL = `{
+		"name": "MidLevelStaticStruct",
+		"type": {
+			"kind": "struct",
+			"fields": [
+				{"name": "fixedBytes", "type": {"array": ["u8",2]}},
+				{"name": "inner", "type": {"defined": "InnerStaticTestStruct"}}
+			]
+		}
+	}`
+
+	innerDynamicStructIDL = `{
+		"name": "InnerDynamicTestStruct",
 		"type": {
 			"kind": "struct",
 			"fields": [
 				{"name": "i", "type": "i32"},
 				{"name": "s", "type": "string"}
+			]
+		}
+	}`
+
+	innerStaticStructIDL = `{
+		"name": "InnerStaticTestStruct",
+		"type": {
+			"kind": "struct",
+			"fields": [
+				{"name": "i", "type": "i32"},
+				{"name": "a", "type": "bytes"}
 			]
 		}
 	}`
