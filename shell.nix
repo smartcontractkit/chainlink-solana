@@ -16,7 +16,7 @@ pkgs.mkShell {
 
     # Golang
     # Keep this golang version in sync with the version in .tool-versions please
-    go_1_22
+    go_1_23
     gopls
     delve
     golangci-lint
