@@ -177,8 +177,11 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 	}
 
 	// add compute unit limit instruction - static for the transaction
-	if computeUnitLimitErr := fees.SetComputeUnitLimit(&baseTx, fees.ComputeUnitLimit(txcfg.ComputeUnitLimit)); computeUnitLimitErr != nil {
-		return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, fmt.Errorf("failed to add compute unit limit instruction: %w", computeUnitLimitErr)
+	// skip if compute unit limit = 0 (otherwise would always fail)
+	if txcfg.ComputeUnitLimit != 0 {
+		if computeUnitLimitErr := fees.SetComputeUnitLimit(&baseTx, fees.ComputeUnitLimit(txcfg.ComputeUnitLimit)); computeUnitLimitErr != nil {
+			return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, fmt.Errorf("failed to add compute unit limit instruction: %w", computeUnitLimitErr)
+		}
 	}
 
 	buildTx := func(base solanaGo.Transaction, retryCount uint) (solanaGo.Transaction, error) {

@@ -50,7 +50,7 @@ func (p soltxmProm) getInflight() float64 {
 }
 
 // create placeholder transaction and returns func for signed tx with fee
-func getTx(t *testing.T, val uint64, keystore SimpleKeystore, price fees.ComputeUnitPrice) (*solana.Transaction, func(fees.ComputeUnitPrice) *solana.Transaction) {
+func getTx(t *testing.T, val uint64, keystore SimpleKeystore, price fees.ComputeUnitPrice) (*solana.Transaction, func(fees.ComputeUnitPrice, bool) *solana.Transaction) {
 	pubkey := solana.PublicKey{}
 
 	// create transfer tx
@@ -69,11 +69,13 @@ func getTx(t *testing.T, val uint64, keystore SimpleKeystore, price fees.Compute
 
 	base := *tx // tx to send to txm, txm will add fee & sign
 
-	return &base, func(price fees.ComputeUnitPrice) *solana.Transaction {
+	return &base, func(price fees.ComputeUnitPrice, addLimit bool) *solana.Transaction {
 		tx := base
 		// add fee parameters
 		require.NoError(t, fees.SetComputeUnitPrice(&tx, price))
-		require.NoError(t, fees.SetComputeUnitLimit(&tx, 200_000)) // default
+		if addLimit {
+			require.NoError(t, fees.SetComputeUnitLimit(&tx, 200_000)) // default
+		}
 
 		// sign tx
 		txMsg, err := tx.Message.MarshalBinary()
@@ -167,12 +169,12 @@ func TestTxm(t *testing.T) {
 
 				sendCount := 0
 				var countRW sync.RWMutex
-				mc.On("SendTx", mock.Anything, signed(0)).Run(func(mock.Arguments) {
+				mc.On("SendTx", mock.Anything, signed(0, true)).Run(func(mock.Arguments) {
 					countRW.Lock()
 					sendCount++
 					countRW.Unlock()
 				}).After(500*time.Millisecond).Return(sig, nil)
-				mc.On("SimulateTx", mock.Anything, signed(0), mock.Anything).Return(&rpc.SimulateTransactionResult{}, nil).Once()
+				mc.On("SimulateTx", mock.Anything, signed(0, true), mock.Anything).Return(&rpc.SimulateTransactionResult{}, nil).Once()
 
 				// handle signature status calls
 				count := 0
@@ -220,7 +222,7 @@ func TestTxm(t *testing.T) {
 				wg.Add(1)
 
 				// should only be called once (tx does not start retry, confirming, or simulation)
-				mc.On("SendTx", mock.Anything, signed(0)).Run(func(mock.Arguments) {
+				mc.On("SendTx", mock.Anything, signed(0, true)).Run(func(mock.Arguments) {
 					wg.Done()
 				}).Return(solana.Signature{}, errors.New("FAIL")).Once()
 
@@ -244,8 +246,8 @@ func TestTxm(t *testing.T) {
 				var wg sync.WaitGroup
 				wg.Add(1)
 
-				mc.On("SendTx", mock.Anything, signed(0)).Return(sig, nil)
-				mc.On("SimulateTx", mock.Anything, signed(0), mock.Anything).Run(func(mock.Arguments) {
+				mc.On("SendTx", mock.Anything, signed(0, true)).Return(sig, nil)
+				mc.On("SimulateTx", mock.Anything, signed(0, true), mock.Anything).Run(func(mock.Arguments) {
 					wg.Done()
 				}).Return(&rpc.SimulateTransactionResult{
 					Err: "FAIL",
@@ -274,12 +276,12 @@ func TestTxm(t *testing.T) {
 				var wg sync.WaitGroup
 				wg.Add(1)
 
-				mc.On("SendTx", mock.Anything, signed(0)).Return(sig, nil)
-				mc.On("SendTx", mock.Anything, signed(1)).Return(retry0, nil)
-				mc.On("SendTx", mock.Anything, signed(2)).Return(retry1, nil)
-				mc.On("SendTx", mock.Anything, signed(3)).Return(retry2, nil).Maybe()
-				mc.On("SendTx", mock.Anything, signed(4)).Return(retry3, nil).Maybe()
-				mc.On("SimulateTx", mock.Anything, signed(0), mock.Anything).Run(func(mock.Arguments) {
+				mc.On("SendTx", mock.Anything, signed(0, true)).Return(sig, nil)
+				mc.On("SendTx", mock.Anything, signed(1, true)).Return(retry0, nil)
+				mc.On("SendTx", mock.Anything, signed(2, true)).Return(retry1, nil)
+				mc.On("SendTx", mock.Anything, signed(3, true)).Return(retry2, nil).Maybe()
+				mc.On("SendTx", mock.Anything, signed(4, true)).Return(retry3, nil).Maybe()
+				mc.On("SimulateTx", mock.Anything, signed(0, true), mock.Anything).Run(func(mock.Arguments) {
 					wg.Done()
 				}).Return(&rpc.SimulateTransactionResult{}, errors.New("FAIL")).Once()
 				// all signature statuses are nil, handled automatically
@@ -312,8 +314,8 @@ func TestTxm(t *testing.T) {
 						0, map[string]int{"Custom": 6003},
 					},
 				}
-				mc.On("SendTx", mock.Anything, signed(0)).Return(sig, nil)
-				mc.On("SimulateTx", mock.Anything, signed(0), mock.Anything).Run(func(mock.Arguments) {
+				mc.On("SendTx", mock.Anything, signed(0, true)).Return(sig, nil)
+				mc.On("SimulateTx", mock.Anything, signed(0, true), mock.Anything).Run(func(mock.Arguments) {
 					wg.Done()
 				}).Return(&rpc.SimulateTransactionResult{
 					Err: tempErr,
@@ -342,8 +344,8 @@ func TestTxm(t *testing.T) {
 				var wg sync.WaitGroup
 				wg.Add(3)
 
-				mc.On("SendTx", mock.Anything, signed(0)).Return(sig, nil)
-				mc.On("SimulateTx", mock.Anything, signed(0), mock.Anything).Run(func(mock.Arguments) {
+				mc.On("SendTx", mock.Anything, signed(0, true)).Return(sig, nil)
+				mc.On("SimulateTx", mock.Anything, signed(0, true), mock.Anything).Run(func(mock.Arguments) {
 					wg.Done()
 				}).Return(&rpc.SimulateTransactionResult{
 					Err: "BlockhashNotFound",
@@ -384,8 +386,8 @@ func TestTxm(t *testing.T) {
 				var wg sync.WaitGroup
 				wg.Add(2)
 
-				mc.On("SendTx", mock.Anything, signed(0)).Return(sig, nil)
-				mc.On("SimulateTx", mock.Anything, signed(0), mock.Anything).Run(func(mock.Arguments) {
+				mc.On("SendTx", mock.Anything, signed(0, true)).Return(sig, nil)
+				mc.On("SimulateTx", mock.Anything, signed(0, true), mock.Anything).Run(func(mock.Arguments) {
 					wg.Done()
 				}).Return(&rpc.SimulateTransactionResult{
 					Err: "AlreadyProcessed",
@@ -425,12 +427,12 @@ func TestTxm(t *testing.T) {
 				var wg sync.WaitGroup
 				wg.Add(1)
 
-				mc.On("SendTx", mock.Anything, signed(0)).Return(sig, nil)
-				mc.On("SendTx", mock.Anything, signed(1)).Return(retry0, nil)
-				mc.On("SendTx", mock.Anything, signed(2)).Return(retry1, nil)
-				mc.On("SendTx", mock.Anything, signed(3)).Return(retry2, nil).Maybe()
-				mc.On("SendTx", mock.Anything, signed(4)).Return(retry3, nil).Maybe()
-				mc.On("SimulateTx", mock.Anything, signed(0), mock.Anything).Run(func(mock.Arguments) {
+				mc.On("SendTx", mock.Anything, signed(0, true)).Return(sig, nil)
+				mc.On("SendTx", mock.Anything, signed(1, true)).Return(retry0, nil)
+				mc.On("SendTx", mock.Anything, signed(2, true)).Return(retry1, nil)
+				mc.On("SendTx", mock.Anything, signed(3, true)).Return(retry2, nil).Maybe()
+				mc.On("SendTx", mock.Anything, signed(4, true)).Return(retry3, nil).Maybe()
+				mc.On("SimulateTx", mock.Anything, signed(0, true), mock.Anything).Run(func(mock.Arguments) {
 					wg.Done()
 				}).Return(&rpc.SimulateTransactionResult{}, nil).Once()
 
@@ -466,12 +468,12 @@ func TestTxm(t *testing.T) {
 				var wg sync.WaitGroup
 				wg.Add(1)
 
-				mc.On("SendTx", mock.Anything, signed(0)).Return(sig, nil)
-				mc.On("SendTx", mock.Anything, signed(1)).Return(retry0, nil)
-				mc.On("SendTx", mock.Anything, signed(2)).Return(retry1, nil)
-				mc.On("SendTx", mock.Anything, signed(3)).Return(retry2, nil).Maybe()
-				mc.On("SendTx", mock.Anything, signed(4)).Return(retry3, nil).Maybe()
-				mc.On("SimulateTx", mock.Anything, signed(0), mock.Anything).Run(func(mock.Arguments) {
+				mc.On("SendTx", mock.Anything, signed(0, true)).Return(sig, nil)
+				mc.On("SendTx", mock.Anything, signed(1, true)).Return(retry0, nil)
+				mc.On("SendTx", mock.Anything, signed(2, true)).Return(retry1, nil)
+				mc.On("SendTx", mock.Anything, signed(3, true)).Return(retry2, nil).Maybe()
+				mc.On("SendTx", mock.Anything, signed(4, true)).Return(retry3, nil).Maybe()
+				mc.On("SimulateTx", mock.Anything, signed(0, true), mock.Anything).Run(func(mock.Arguments) {
 					wg.Done()
 				}).Return(&rpc.SimulateTransactionResult{}, nil).Once()
 
@@ -510,8 +512,8 @@ func TestTxm(t *testing.T) {
 				var wg sync.WaitGroup
 				wg.Add(1)
 
-				mc.On("SendTx", mock.Anything, signed(0)).Return(sig, nil)
-				mc.On("SimulateTx", mock.Anything, signed(0), mock.Anything).Run(func(mock.Arguments) {
+				mc.On("SendTx", mock.Anything, signed(0, true)).Return(sig, nil)
+				mc.On("SimulateTx", mock.Anything, signed(0, true), mock.Anything).Run(func(mock.Arguments) {
 					wg.Done()
 				}).Return(&rpc.SimulateTransactionResult{}, nil).Once()
 
@@ -548,12 +550,12 @@ func TestTxm(t *testing.T) {
 				var wg sync.WaitGroup
 				wg.Add(2)
 
-				mc.On("SendTx", mock.Anything, signed(0)).Return(sig, nil)
-				mc.On("SendTx", mock.Anything, signed(1)).Return(retry0, nil)
-				mc.On("SendTx", mock.Anything, signed(2)).Return(retry1, nil)
-				mc.On("SendTx", mock.Anything, signed(3)).Return(retry2, nil).Maybe()
-				mc.On("SendTx", mock.Anything, signed(4)).Return(retry3, nil).Maybe()
-				mc.On("SimulateTx", mock.Anything, signed(0), mock.Anything).Run(func(mock.Arguments) {
+				mc.On("SendTx", mock.Anything, signed(0, true)).Return(sig, nil)
+				mc.On("SendTx", mock.Anything, signed(1, true)).Return(retry0, nil)
+				mc.On("SendTx", mock.Anything, signed(2, true)).Return(retry1, nil)
+				mc.On("SendTx", mock.Anything, signed(3, true)).Return(retry2, nil).Maybe()
+				mc.On("SendTx", mock.Anything, signed(4, true)).Return(retry3, nil).Maybe()
+				mc.On("SimulateTx", mock.Anything, signed(0, true), mock.Anything).Run(func(mock.Arguments) {
 					wg.Done()
 				}).Return(&rpc.SimulateTransactionResult{}, nil).Once()
 
@@ -585,21 +587,16 @@ func TestTxm(t *testing.T) {
 				sig := getSig()
 				tx, signed := getTx(t, 11, mkey, 0)
 
-				// disable fee bumping
 				defaultFeeBumpPeriod := cfg.FeeBumpPeriod()
-				cfg.Chain.FeeBumpPeriod = relayconfig.MustNewDuration(0)
-				defer func() {
-					cfg.Chain.FeeBumpPeriod = relayconfig.MustNewDuration(defaultFeeBumpPeriod) // reset
-				}()
 
 				sendCount := 0
 				var countRW sync.RWMutex
-				mc.On("SendTx", mock.Anything, signed(0)).Run(func(mock.Arguments) {
+				mc.On("SendTx", mock.Anything, signed(0, true)).Run(func(mock.Arguments) {
 					countRW.Lock()
 					sendCount++
 					countRW.Unlock()
 				}).Return(sig, nil) // only sends one transaction type (no bumping)
-				mc.On("SimulateTx", mock.Anything, signed(0), mock.Anything).Return(&rpc.SimulateTransactionResult{}, nil).Once()
+				mc.On("SimulateTx", mock.Anything, signed(0, true), mock.Anything).Return(&rpc.SimulateTransactionResult{}, nil).Once()
 
 				// handle signature status calls
 				var wg sync.WaitGroup
@@ -619,8 +616,8 @@ func TestTxm(t *testing.T) {
 					return
 				}
 
-				// send tx
-				assert.NoError(t, txm.Enqueue(t.Name(), tx))
+				// send tx - with disabled fee bumping
+				assert.NoError(t, txm.Enqueue(t.Name(), tx, SetFeeBumpPeriod(0)))
 				wg.Wait()
 
 				// no transactions stored inflight txs list
@@ -630,6 +627,41 @@ func TestTxm(t *testing.T) {
 				t.Logf("sendTx received %d calls", sendCount)
 				assert.Greater(t, sendCount, 2)
 				countRW.RUnlock()
+
+				// panic if sendTx called after context cancelled
+				mc.On("SendTx", mock.Anything, tx).Panic("SendTx should not be called anymore").Maybe()
+
+				// check prom metric
+				prom.success++
+				prom.assertEqual(t)
+			})
+
+			// compute unit limit disabled
+			t.Run("computeUnitLimitDisabled", func(t *testing.T) {
+				sig := getSig()
+				tx, signed := getTx(t, 12, mkey, 0)
+
+				// should only match transaction without compute unit limit
+				assert.Len(t, signed(0, false).Message.Instructions, 2)
+				mc.On("SendTx", mock.Anything, signed(0, false)).Return(sig, nil) // only sends one transaction type (no bumping)
+				mc.On("SimulateTx", mock.Anything, signed(0, false), mock.Anything).Return(&rpc.SimulateTransactionResult{}, nil).Once()
+
+				// handle signature status calls
+				var wg sync.WaitGroup
+				wg.Add(1)
+				statuses[sig] = func() *rpc.SignatureStatusesResult {
+					defer wg.Done()
+					return &rpc.SignatureStatusesResult{
+						ConfirmationStatus: rpc.ConfirmationStatusConfirmed,
+					}
+				}
+
+				// send tx - with disabled fee bumping and disabled compute unit limit
+				assert.NoError(t, txm.Enqueue(t.Name(), tx, SetFeeBumpPeriod(0), SetComputeUnitLimit(0)))
+				wg.Wait()
+
+				// no transactions stored inflight txs list
+				waitFor(empty)
 
 				// panic if sendTx called after context cancelled
 				mc.On("SendTx", mock.Anything, tx).Panic("SendTx should not be called anymore").Maybe()

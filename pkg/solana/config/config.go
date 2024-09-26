@@ -29,7 +29,7 @@ var defaultConfigSet = Chain{
 	ComputeUnitPriceDefault: ptr(uint64(0)),
 	FeeBumpPeriod:           config.MustNewDuration(3 * time.Second), // set to 0 to disable fee bumping
 	BlockHistoryPollPeriod:  config.MustNewDuration(5 * time.Second),
-	ComputeUnitLimitDefault: ptr(uint32(200_000)),
+	ComputeUnitLimitDefault: ptr(uint32(200_000)), // set to 0 to disable adding compute unit limit
 }
 
 //go:generate mockery --name Config --output ./mocks/ --case=underscore --filename config.go
