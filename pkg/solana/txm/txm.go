@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
@@ -32,7 +33,10 @@ var _ services.Service = (*Txm)(nil)
 //go:generate mockery --name SimpleKeystore --output ./mocks/ --case=underscore --filename simple_keystore.go
 type SimpleKeystore interface {
 	Sign(ctx context.Context, account string, data []byte) (signature []byte, err error)
+	Accounts(ctx context.Context) (accounts []string, err error)
 }
+
+var _ loop.Keystore = (SimpleKeystore)(nil)
 
 // Txm manages transactions for the solana blockchain.
 // simple implementation with no persistently stored txs

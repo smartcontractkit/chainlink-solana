@@ -1,18 +1,24 @@
 package solana
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -20,6 +26,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 )
 
 const TestSolanaGenesisHashTemplate = `{"jsonrpc":"2.0","result":"%s","id":1}`
@@ -237,4 +245,69 @@ func TestSolanaChain_VerifiedClient_ParallelClients(t *testing.T) {
 
 func ptr[T any](t T) *T {
 	return &t
+}
+
+func TestChain_Transact(t *testing.T) {
+	ctx := tests.Context(t)
+	url := client.SetupLocalSolNode(t)
+	lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
+
+	// transaction parameters
+	sender, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	receiver, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	amount := big.NewInt(100_000_000_000 - 5_000) // total balance - tx fee
+	client.FundTestAccounts(t, solana.PublicKeySlice{sender.PublicKey()}, url)
+
+	// configuration
+	cfg := solcfg.NewDefault()
+	cfg.Nodes = append(cfg.Nodes, &solcfg.Node{
+		Name:     ptr("localnet-" + t.Name()),
+		URL:      config.MustParseURL(url),
+		SendOnly: false,
+	})
+
+	// mocked keystore
+	mkey := mocks.NewSimpleKeystore(t)
+	mkey.On("Sign", mock.Anything, sender.PublicKey().String(), mock.Anything).Return(func(_ context.Context, _ string, data []byte) []byte {
+		sig, _ := sender.Sign(data)
+		return sig[:]
+	}, nil)
+
+	c, err := newChain("localnet", cfg, mkey, lgr)
+	require.NoError(t, err)
+	require.NoError(t, c.txm.Start(ctx))
+
+	require.NoError(t, c.Transact(ctx, sender.PublicKey().String(), receiver.PublicKey().String(), amount, true))
+	tests.AssertLogEventually(t, logs, "tx state: confirmed")
+	tests.AssertLogEventually(t, logs, "stopped tx retry")
+	require.NoError(t, c.txm.Close())
+
+	filteredLogs := logs.FilterMessage("tx state: confirmed").All()
+	require.Len(t, filteredLogs, 1)
+	sig, ok := filteredLogs[0].ContextMap()["signature"]
+	require.True(t, ok)
+
+	// inspect transaction
+	solClient := rpc.New(url)
+	res, err := solClient.GetTransaction(ctx, solana.MustSignatureFromBase58(sig.(string)), &rpc.GetTransactionOpts{Commitment: "confirmed"})
+	require.NoError(t, err)
+	require.Nil(t, res.Meta.Err) // no error
+
+	// validate balances change as expected
+	require.Equal(t, amount.Uint64()+5_000, res.Meta.PreBalances[0])
+	require.Zero(t, res.Meta.PostBalances[0])
+	require.Zero(t, res.Meta.PreBalances[1])
+	require.Equal(t, amount.Uint64(), res.Meta.PostBalances[1])
+
+	tx, err := res.Transaction.GetTransaction()
+	require.NoError(t, err)
+	require.Len(t, tx.Message.Instructions, 3)
+	price, err := fees.ParseComputeUnitPrice(tx.Message.Instructions[0].Data)
+	require.NoError(t, err)
+	assert.Equal(t, fees.ComputeUnitPrice(0), price)
+	limit, err := fees.ParseComputeUnitLimit(tx.Message.Instructions[2].Data)
+	require.NoError(t, err)
+	assert.Equal(t, fees.ComputeUnitLimit(500), limit)
 }
