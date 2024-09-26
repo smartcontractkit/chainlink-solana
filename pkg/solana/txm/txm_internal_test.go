@@ -647,6 +647,7 @@ func TestTxm_Enqueue(t *testing.T) {
 	lggr := logger.Test(t)
 	cfg := config.NewDefault()
 	mc := mocks.NewReaderWriter(t)
+	mc.On("SendTx", mock.Anything, mock.Anything).Return(solana.Signature{}, nil).Maybe()
 	ctx := tests.Context(t)
 
 	// mock solana keystore
@@ -689,6 +690,7 @@ func TestTxm_Enqueue(t *testing.T) {
 
 	require.ErrorContains(t, txm.Enqueue("txmUnstarted", &solana.Transaction{}), "not started")
 	require.NoError(t, txm.Start(ctx))
+	t.Cleanup(func() { require.NoError(t, txm.Close()) })
 
 	txs := []struct {
 		name string
