@@ -82,18 +82,18 @@ func SetComputeUnitPrice(tx *solana.Transaction, price ComputeUnitPrice) error {
 	// find ComputeBudget program to accounts if it exists
 	// reimplements HasAccount to retrieve index: https://github.com/gagliardetto/solana-go/blob/618f56666078f8131a384ab27afd918d248c08b7/message.go#L233
 	var exists bool
-	var programIdx uint16
+	var programIdx int
 	for i, a := range tx.Message.AccountKeys {
 		if a.Equals(price.ProgramID()) {
 			exists = true
-			programIdx = uint16(i)
+			programIdx = i
 			break
 		}
 	}
 	// if it doesn't exist, add to account keys
 	if !exists {
 		tx.Message.AccountKeys = append(tx.Message.AccountKeys, price.ProgramID())
-		programIdx = uint16(len(tx.Message.AccountKeys) - 1) // last index of account keys
+		programIdx = len(tx.Message.AccountKeys) - 1 // last index of account keys
 
 		// https://github.com/gagliardetto/solana-go/blob/618f56666078f8131a384ab27afd918d248c08b7/transaction.go#L293
 		tx.Message.Header.NumReadonlyUnsignedAccounts++
@@ -107,7 +107,7 @@ func SetComputeUnitPrice(tx *solana.Transaction, price ComputeUnitPrice) error {
 
 	// compiled instruction
 	instruction := solana.CompiledInstruction{
-		ProgramIDIndex: programIdx,
+		ProgramIDIndex: uint16(programIdx), //nolint:gosec // max value would exceed tx size
 		Data:           data,
 	}
 
@@ -115,7 +115,7 @@ func SetComputeUnitPrice(tx *solana.Transaction, price ComputeUnitPrice) error {
 	var found bool
 	var instructionIdx int
 	for i := range tx.Message.Instructions {
-		if tx.Message.Instructions[i].ProgramIDIndex == programIdx &&
+		if int(tx.Message.Instructions[i].ProgramIDIndex) == programIdx &&
 			len(tx.Message.Instructions[i].Data) > 0 &&
 			tx.Message.Instructions[i].Data[0] == InstructionSetComputeUnitPrice {
 			found = true
