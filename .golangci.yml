@@ -150,3 +150,7 @@ issues:
       text: "^G404:"
       linters:
         - gosec
+    - path: _test.go
+      text: "G115:" # ignore integer overflow in test conversions
+      linters:
+        - gosec

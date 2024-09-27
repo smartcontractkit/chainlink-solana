@@ -122,7 +122,7 @@ func (c *Chain) SetDefaults() {
 		c.Commitment = (*string)(&defaultConfigSet.Commitment)
 	}
 	if c.MaxRetries == nil && defaultConfigSet.MaxRetries != nil {
-		i := int64(*defaultConfigSet.MaxRetries)
+		i := int64(*defaultConfigSet.MaxRetries) //nolint:gosec // reasonable default value does not cause overflow
 		c.MaxRetries = &i
 	}
 	if c.FeeEstimatorMode == nil {
