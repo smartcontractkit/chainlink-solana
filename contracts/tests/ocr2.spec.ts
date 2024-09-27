@@ -249,6 +249,11 @@ describe("ocr2", () => {
         ]),
       })
     );
+    tx.add(
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: 200_000, // use default limit
+      })
+    );
 
     try {
       return await provider.sendAndConfirm(tx, [transmitter]);
@@ -914,7 +919,7 @@ describe("ocr2", () => {
 
   it("Transmit a bunch of rounds to check ringbuffer wraparound", async () => {
     for (let i = 2; i <= rounds; i++) {
-      let transmitTx = await transmit(feed.publicKey, i, i, new BN(i));
+      let transmitTx = await transmit(feed.publicKey, i, i, new BN(i), i);
 
       await provider.connection.confirmTransaction(transmitTx, "confirmed");
       let t = await provider.connection.getTransaction(transmitTx, {
