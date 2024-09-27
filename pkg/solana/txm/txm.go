@@ -166,12 +166,12 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 
 	// base compute unit price should only be calculated once
 	// prevent underlying base changing when bumping (could occur with RPC based estimation)
-	getFee := func(count uint) fees.ComputeUnitPrice {
+	getFee := func(count int) fees.ComputeUnitPrice {
 		fee := fees.CalculateFee(
 			txcfg.BaseComputeUnitPrice,
 			txcfg.ComputeUnitPriceMax,
 			txcfg.ComputeUnitPriceMin,
-			count,
+			uint(count), //nolint:gosec // reasonable number of bumps should never cause overflow
 		)
 		return fees.ComputeUnitPrice(fee)
 	}
@@ -184,7 +184,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 		}
 	}
 
-	buildTx := func(base solanaGo.Transaction, retryCount uint) (solanaGo.Transaction, error) {
+	buildTx := func(base solanaGo.Transaction, retryCount int) (solanaGo.Transaction, error) {
 		newTx := base // make copy
 
 		// set fee
@@ -247,7 +247,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 	go func(baseTx, currentTx solanaGo.Transaction) {
 		deltaT := 1 // ms
 		tick := time.After(0)
-		bumpCount := uint(0)
+		bumpCount := 0
 		bumpTime := time.Now()
 		var wg sync.WaitGroup
 
@@ -276,7 +276,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 						return // exit func if cannot build tx for retrying
 					}
 					ind := sigs.Allocate()
-					if uint(ind) != bumpCount {
+					if ind != bumpCount {
 						txm.lggr.Errorw("INVARIANT VIOLATION: index (%d) != bumpCount (%d)", ind, bumpCount)
 						return
 					}
@@ -284,7 +284,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 
 				// take currentTx and broadcast, if bumped fee -> save signature to list
 				wg.Add(1)
-				go func(bump bool, count uint, retryTx solanaGo.Transaction) {
+				go func(bump bool, count int, retryTx solanaGo.Transaction) {
 					defer wg.Done()
 
 					retrySig, retrySendErr := client.SendTx(ctx, &retryTx)
@@ -304,7 +304,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 							txm.lggr.Warnw("error in adding retry transaction", "error", retryStoreErr, "id", id)
 							return
 						}
-						if setErr := sigs.Set(int(count), retrySig); setErr != nil {
+						if setErr := sigs.Set(count, retrySig); setErr != nil {
 							// this should never happen
 							txm.lggr.Errorw("INVARIANT VIOLATION", "error", setErr)
 						}
@@ -315,7 +315,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 					wait := make(chan struct{})
 					go func() {
 						defer close(wait)
-						sigs.Wait(int(count)) // wait until bump tx has set the tx signature to compare rebroadcast signatures
+						sigs.Wait(count) // wait until bump tx has set the tx signature to compare rebroadcast signatures
 					}()
 					select {
 					case <-ctx.Done():
@@ -324,7 +324,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 					}
 
 					// this should never happen (should match the signature saved to sigs)
-					if fetchedSig, fetchErr := sigs.Get(int(count)); fetchErr != nil || retrySig != fetchedSig {
+					if fetchedSig, fetchErr := sigs.Get(count); fetchErr != nil || retrySig != fetchedSig {
 						txm.lggr.Errorw("original signature does not match retry signature", "expectedSignatures", sigs.List(), "receivedSignature", retrySig, "error", fetchErr)
 					}
 				}(shouldBump, bumpCount, currentTx)

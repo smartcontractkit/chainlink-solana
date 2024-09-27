@@ -56,7 +56,7 @@ func (c ReportCodec) BuildReport(oo []median.ParsedAttributedObservation) (types
 	binary.BigEndian.PutUint32(time, timestamp)
 	report = append(report, time[:]...)
 
-	observersCount := uint8(n)
+	observersCount := uint8(n) //nolint:gosec // count can never be 0, and oracle network will never be larger than 255
 	report = append(report, observersCount)
 
 	report = append(report, observers[:]...)

@@ -32,11 +32,11 @@ func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.Co
 		return digest, err
 	}
 
-	if err := binary.Write(buf, binary.BigEndian, uint32(cfg.ConfigCount)); err != nil {
+	if err := binary.Write(buf, binary.BigEndian, uint32(cfg.ConfigCount)); err != nil { //nolint:gosec // max onchain config count is u32
 		return digest, err
 	}
 
-	if err := binary.Write(buf, binary.BigEndian, uint8(len(cfg.Signers))); err != nil {
+	if err := binary.Write(buf, binary.BigEndian, uint8(len(cfg.Signers))); err != nil { //nolint:gosec // cannot be negative and protocol does not allow more than 255 signers
 		return digest, err
 	}
 
@@ -60,7 +60,7 @@ func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.Co
 		return digest, err
 	}
 
-	if err := binary.Write(buf, binary.BigEndian, uint32(len(cfg.OnchainConfig))); err != nil {
+	if err := binary.Write(buf, binary.BigEndian, uint32(len(cfg.OnchainConfig))); err != nil { //nolint:gosec // cannot be negative and omax u32 exceeds max onchain config length
 		return digest, err
 	}
 
@@ -72,7 +72,7 @@ func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.Co
 		return digest, err
 	}
 
-	if err := binary.Write(buf, binary.BigEndian, uint32(len(cfg.OffchainConfig))); err != nil {
+	if err := binary.Write(buf, binary.BigEndian, uint32(len(cfg.OffchainConfig))); err != nil { //nolint:gosec // cannot be negative and max u32 exceeds max offchain config length
 		return digest, err
 	}
 

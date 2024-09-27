@@ -327,7 +327,7 @@ func (c *chain) LatestHead(_ context.Context) (types.Head, error) {
 	return types.Head{
 		Height:    strconv.FormatUint(*latestBlock.BlockHeight, 10),
 		Hash:      hashBytes,
-		Timestamp: uint64(latestBlock.BlockTime.Time().Unix()),
+		Timestamp: uint64(latestBlock.BlockTime.Time().Unix()), //nolint:gosec // blocktime will never be negative (pre 1970)
 	}, nil
 }
 
