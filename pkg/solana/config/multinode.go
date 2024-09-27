@@ -80,6 +80,7 @@ func (c *MultiNode) FinalityTagEnabled() bool { return *c.finalityTagEnabled }
 func (c *MultiNode) FinalizedBlockOffset() uint32 { return *c.finalizedBlockOffset }
 
 func (c *MultiNode) SetDefaults() {
+	// Default disabled
 	c.multiNodeEnabled = ptr(false)
 
 	// Node Configs
@@ -90,7 +91,6 @@ func (c *MultiNode) SetDefaults() {
 
 	c.syncThreshold = ptr(uint32(5))
 
-	// Period at which we verify if active node is still highest block number
 	c.leaseDuration = config.MustNewDuration(time.Minute)
 
 	c.nodeIsSyncingEnabled = ptr(false)
@@ -106,58 +106,56 @@ func (c *MultiNode) SetDefaults() {
 	c.finalizedBlockOffset = ptr(uint32(0))
 }
 
-func (c *MultiNode) SetFrom(fs *MultiNode) {
-	if fs.multiNodeEnabled != nil {
-		c.multiNodeEnabled = fs.multiNodeEnabled
+func (c *MultiNode) SetFrom(f *MultiNode) {
+	if f.multiNodeEnabled != nil {
+		c.multiNodeEnabled = f.multiNodeEnabled
 	}
 
+	// TODO: Try using reflection here to loop through each one
+
 	// Node Configs
-	if fs.pollFailureThreshold != nil {
-		c.pollFailureThreshold = fs.pollFailureThreshold
+	if f.pollFailureThreshold != nil {
+		c.pollFailureThreshold = f.pollFailureThreshold
 	}
-	if fs.pollInterval != nil {
-		c.pollInterval = fs.pollInterval
+	if f.pollInterval != nil {
+		c.pollInterval = f.pollInterval
 	}
-	if fs.selectionMode != nil {
-		c.selectionMode = fs.selectionMode
+	if f.selectionMode != nil {
+		c.selectionMode = f.selectionMode
 	}
-	if fs.syncThreshold != nil {
-		c.syncThreshold = fs.syncThreshold
+	if f.syncThreshold != nil {
+		c.syncThreshold = f.syncThreshold
 	}
-	if fs.nodeIsSyncingEnabled != nil {
-		c.nodeIsSyncingEnabled = fs.nodeIsSyncingEnabled
+	if f.nodeIsSyncingEnabled != nil {
+		c.nodeIsSyncingEnabled = f.nodeIsSyncingEnabled
 	}
-	if fs.leaseDuration != nil {
-		c.leaseDuration = fs.leaseDuration
+	if f.leaseDuration != nil {
+		c.leaseDuration = f.leaseDuration
 	}
-	if fs.finalizedBlockPollInterval != nil {
-		c.finalizedBlockPollInterval = fs.finalizedBlockPollInterval
+	if f.finalizedBlockPollInterval != nil {
+		c.finalizedBlockPollInterval = f.finalizedBlockPollInterval
 	}
-	if fs.enforceRepeatableRead != nil {
-		c.enforceRepeatableRead = fs.enforceRepeatableRead
+	if f.enforceRepeatableRead != nil {
+		c.enforceRepeatableRead = f.enforceRepeatableRead
 	}
-	if fs.deathDeclarationDelay != nil {
-		c.deathDeclarationDelay = fs.deathDeclarationDelay
+	if f.deathDeclarationDelay != nil {
+		c.deathDeclarationDelay = f.deathDeclarationDelay
 	}
 
 	// Chain Configs
-	if fs.nodeNoNewHeadsThreshold != nil {
-		c.nodeNoNewHeadsThreshold = fs.nodeNoNewHeadsThreshold
+	if f.nodeNoNewHeadsThreshold != nil {
+		c.nodeNoNewHeadsThreshold = f.nodeNoNewHeadsThreshold
 	}
-	if fs.noNewFinalizedHeadsThreshold != nil {
-		c.noNewFinalizedHeadsThreshold = fs.noNewFinalizedHeadsThreshold
+	if f.noNewFinalizedHeadsThreshold != nil {
+		c.noNewFinalizedHeadsThreshold = f.noNewFinalizedHeadsThreshold
 	}
-	if fs.finalityDepth != nil {
-		c.finalityDepth = fs.finalityDepth
+	if f.finalityDepth != nil {
+		c.finalityDepth = f.finalityDepth
 	}
-	if fs.finalityTagEnabled != nil {
-		c.finalityTagEnabled = fs.finalityTagEnabled
+	if f.finalityTagEnabled != nil {
+		c.finalityTagEnabled = f.finalityTagEnabled
 	}
-	if fs.finalizedBlockOffset != nil {
-		c.finalizedBlockOffset = fs.finalizedBlockOffset
+	if f.finalizedBlockOffset != nil {
+		c.finalizedBlockOffset = f.finalizedBlockOffset
 	}
-}
-
-func ptr[T any](v T) *T {
-	return &v
 }
