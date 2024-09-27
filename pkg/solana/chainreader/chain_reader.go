@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+	"github.com/smartcontractkit/chainlink-common/pkg/values"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -107,22 +108,22 @@ func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, readIdent
 	s.wg.Add(1)
 	defer s.wg.Done()
 
-	values, ok := s.lookup.getContractForReadIdentifiers(readIdentifier)
+	vals, ok := s.lookup.getContractForReadIdentifiers(readIdentifier)
 	if !ok {
 		return fmt.Errorf("%w: no contract for read identifier %s", types.ErrInvalidType, readIdentifier)
 	}
 
-	addressMappings, err := decodeAddressMappings(values.address)
+	addressMappings, err := decodeAddressMappings(vals.address)
 	if err != nil {
 		return fmt.Errorf("%w: %s", types.ErrInvalidConfig, err)
 	}
 
-	addresses, ok := addressMappings[values.readName]
+	addresses, ok := addressMappings[vals.readName]
 	if !ok {
-		return fmt.Errorf("%w: no addresses for readName %s", types.ErrInvalidConfig, values.readName)
+		return fmt.Errorf("%w: no addresses for readName %s", types.ErrInvalidConfig, vals.readName)
 	}
 
-	bindings, err := s.bindings.GetReadBindings(values.contract, values.readName)
+	bindings, err := s.bindings.GetReadBindings(vals.contract, vals.readName)
 	if err != nil {
 		return err
 	}
@@ -131,6 +132,38 @@ func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, readIdent
 		return fmt.Errorf("%w: addresses and bindings lengths do not match", types.ErrInvalidConfig)
 	}
 
+	// if the returnVal is not a *values.Value, run normally without using the ptrToValue
+	ptrToValue, isValue := returnVal.(*values.Value)
+	if !isValue {
+		return s.runAllBindings(ctx, bindings, addresses, params, returnVal)
+	}
+
+	// if the returnVal is a *values.Value, create the type from the contract, run normally, and wrap the value
+	contractType, err := s.bindings.CreateType(vals.contract, vals.readName, false)
+	if err != nil {
+		return err
+	}
+
+	if err = s.runAllBindings(ctx, bindings, addresses, params, contractType); err != nil {
+		return err
+	}
+
+	value, err := values.Wrap(contractType)
+	if err != nil {
+		return err
+	}
+
+	*ptrToValue = value
+
+	return nil
+}
+
+func (s *SolanaChainReaderService) runAllBindings(
+	ctx context.Context,
+	bindings []readBinding,
+	addresses []string,
+	params, returnVal any,
+) error {
 	localCtx, localCancel := context.WithCancel(ctx)
 
 	// the wait group ensures GetLatestValue returns only after all go-routines have completed

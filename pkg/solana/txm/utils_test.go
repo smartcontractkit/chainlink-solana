@@ -3,6 +3,7 @@ package txm
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -72,4 +73,26 @@ func TestSignatureList_AllocateWaitSet(t *testing.T) {
 	assert.NoError(t, sigs.Set(ind2, solana.Signature{1}))
 	assert.NoError(t, sigs.Set(ind1, solana.Signature{1}))
 	wg.Wait()
+}
+
+func TestSetTxConfig(t *testing.T) {
+	cfg := TxConfig{}
+
+	for _, v := range []SetTxConfig{
+		SetTimeout(1 * time.Second),
+		SetFeeBumpPeriod(2 * time.Second),
+		SetBaseComputeUnitPrice(3),
+		SetComputeUnitPriceMin(4),
+		SetComputeUnitPriceMax(5),
+		SetComputeUnitLimit(6),
+	} {
+		v(&cfg)
+	}
+
+	assert.Equal(t, 1*time.Second, cfg.Timeout)
+	assert.Equal(t, 2*time.Second, cfg.FeeBumpPeriod)
+	assert.Equal(t, uint64(3), cfg.BaseComputeUnitPrice)
+	assert.Equal(t, uint64(4), cfg.ComputeUnitPriceMin)
+	assert.Equal(t, uint64(5), cfg.ComputeUnitPriceMax)
+	assert.Equal(t, uint32(6), cfg.ComputeUnitLimit)
 }

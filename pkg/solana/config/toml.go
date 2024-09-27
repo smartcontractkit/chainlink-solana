@@ -250,7 +250,7 @@ func (c *TOMLConfig) MaxRetries() *uint {
 	if *c.Chain.MaxRetries < 0 {
 		return nil // interpret negative numbers as nil (prevents unlikely case of overflow)
 	}
-	mr := uint(*c.Chain.MaxRetries)
+	mr := uint(*c.Chain.MaxRetries) //nolint:gosec // overflow check is handled above
 	return &mr
 }
 
@@ -278,12 +278,21 @@ func (c *TOMLConfig) BlockHistoryPollPeriod() time.Duration {
 	return c.Chain.BlockHistoryPollPeriod.Duration()
 }
 
+func (c *TOMLConfig) ComputeUnitLimitDefault() uint32 {
+	return *c.Chain.ComputeUnitLimitDefault
+}
+
 func (c *TOMLConfig) ListNodes() Nodes {
 	return c.Nodes
 }
 
 func (c *TOMLConfig) MultiNodeConfig() *MultiNode {
 	return &c.MultiNode
+}
+
+func (c *TOMLConfig) SetDefaults() {
+	c.Chain.SetDefaults()
+	c.MultiNode.SetDefaults()
 }
 
 func NewDefault() *TOMLConfig {
