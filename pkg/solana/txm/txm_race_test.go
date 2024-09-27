@@ -51,6 +51,8 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 	cfg.On("ComputeUnitPriceMax").Return(uint64(10))
 	cfg.On("ComputeUnitPriceMin").Return(uint64(0))
 	cfg.On("FeeBumpPeriod").Return(txRetryDuration / 6)
+	cfg.On("TxRetryTimeout").Return(txRetryDuration)
+	cfg.On("ComputeUnitLimitDefault").Return(uint32(200_000)) // default value, cannot not use 0
 	// keystore mock
 	ks.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
 
@@ -69,7 +71,7 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 		_, _, _, err := txm.sendWithRetry(
 			tests.Context(t),
 			tx,
-			txRetryDuration,
+			txm.defaultTxConfig(),
 		)
 		require.NoError(t, err)
 
@@ -205,12 +207,14 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 		// client mock - first tx is always successful
 		tx0 := NewTestTx()
 		require.NoError(t, fees.SetComputeUnitPrice(&tx0, 0))
+		require.NoError(t, fees.SetComputeUnitLimit(&tx0, 200_000))
 		tx0.Signatures = make([]solanaGo.Signature, 1)
 		client.On("SendTx", mock.Anything, &tx0).Return(solanaGo.Signature{1}, nil)
 
 		// init bump tx fails, rebroadcast is successful
 		tx1 := NewTestTx()
 		require.NoError(t, fees.SetComputeUnitPrice(&tx1, 1))
+		require.NoError(t, fees.SetComputeUnitLimit(&tx1, 200_000))
 		tx1.Signatures = make([]solanaGo.Signature, 1)
 		client.On("SendTx", mock.Anything, &tx1).Return(solanaGo.Signature{}, fmt.Errorf("BUMP FAILED")).Once()
 		client.On("SendTx", mock.Anything, &tx1).Return(solanaGo.Signature{2}, nil)
@@ -218,6 +222,7 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 		// init bump tx success, rebroadcast fails
 		tx2 := NewTestTx()
 		require.NoError(t, fees.SetComputeUnitPrice(&tx2, 2))
+		require.NoError(t, fees.SetComputeUnitLimit(&tx2, 200_000))
 		tx2.Signatures = make([]solanaGo.Signature, 1)
 		client.On("SendTx", mock.Anything, &tx2).Return(solanaGo.Signature{3}, nil).Once()
 		client.On("SendTx", mock.Anything, &tx2).Return(solanaGo.Signature{}, fmt.Errorf("REBROADCAST FAILED"))
@@ -225,6 +230,7 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 		// always successful
 		tx3 := NewTestTx()
 		require.NoError(t, fees.SetComputeUnitPrice(&tx3, 4))
+		require.NoError(t, fees.SetComputeUnitLimit(&tx3, 200_000))
 		tx3.Signatures = make([]solanaGo.Signature, 1)
 		client.On("SendTx", mock.Anything, &tx3).Return(solanaGo.Signature{4}, nil)
 

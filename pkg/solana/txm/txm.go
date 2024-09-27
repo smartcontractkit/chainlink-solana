@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
@@ -32,7 +33,10 @@ var _ services.Service = (*Txm)(nil)
 //go:generate mockery --name SimpleKeystore --output ./mocks/ --case=underscore --filename simple_keystore.go
 type SimpleKeystore interface {
 	Sign(ctx context.Context, account string, data []byte) (signature []byte, err error)
+	Accounts(ctx context.Context) (accounts []string, err error)
 }
+
+var _ loop.Keystore = (SimpleKeystore)(nil)
 
 // Txm manages transactions for the solana blockchain.
 // simple implementation with no persistently stored txs
@@ -50,9 +54,21 @@ type Txm struct {
 	fee     fees.Estimator
 }
 
+type TxConfig struct {
+	Timeout time.Duration // transaction broadcast timeout
+
+	// compute unit price config
+	FeeBumpPeriod        time.Duration // how often to bump fee
+	BaseComputeUnitPrice uint64        // starting price
+	ComputeUnitPriceMin  uint64        // min price
+	ComputeUnitPriceMax  uint64        // max price
+
+	ComputeUnitLimit uint32 // compute unit limit
+}
+
 type pendingTx struct {
 	tx        *solanaGo.Transaction
-	timeout   time.Duration
+	cfg       TxConfig
 	signature solanaGo.Signature
 	id        uuid.UUID
 }
@@ -112,7 +128,7 @@ func (txm *Txm) run() {
 		select {
 		case msg := <-txm.chSend:
 			// process tx (pass tx copy)
-			tx, id, sig, err := txm.sendWithRetry(ctx, *msg.tx, msg.timeout)
+			tx, id, sig, err := txm.sendWithRetry(ctx, *msg.tx, msg.cfg)
 			if err != nil {
 				txm.lggr.Errorw("failed to send transaction", "error", err)
 				txm.client.Reset() // clear client if tx fails immediately (potentially bad RPC)
@@ -136,7 +152,7 @@ func (txm *Txm) run() {
 	}
 }
 
-func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transaction, timeout time.Duration) (solanaGo.Transaction, uuid.UUID, solanaGo.Signature, error) {
+func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transaction, txcfg TxConfig) (solanaGo.Transaction, uuid.UUID, solanaGo.Signature, error) {
 	// fetch client
 	client, clientErr := txm.client.Get()
 	if clientErr != nil {
@@ -148,17 +164,24 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 	// https://github.com/gagliardetto/solana-go/blob/main/transaction.go#L252
 	key := baseTx.Message.AccountKeys[0].String()
 
-	// only calculate base price once
+	// base compute unit price should only be calculated once
 	// prevent underlying base changing when bumping (could occur with RPC based estimation)
-	basePrice := txm.fee.BaseComputeUnitPrice()
 	getFee := func(count int) fees.ComputeUnitPrice {
 		fee := fees.CalculateFee(
-			basePrice,
-			txm.cfg.ComputeUnitPriceMax(),
-			txm.cfg.ComputeUnitPriceMin(),
+			txcfg.BaseComputeUnitPrice,
+			txcfg.ComputeUnitPriceMax,
+			txcfg.ComputeUnitPriceMin,
 			uint(count), //nolint:gosec // reasonable number of bumps should never cause overflow
 		)
 		return fees.ComputeUnitPrice(fee)
+	}
+
+	// add compute unit limit instruction - static for the transaction
+	// skip if compute unit limit = 0 (otherwise would always fail)
+	if txcfg.ComputeUnitLimit != 0 {
+		if computeUnitLimitErr := fees.SetComputeUnitLimit(&baseTx, fees.ComputeUnitLimit(txcfg.ComputeUnitLimit)); computeUnitLimitErr != nil {
+			return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, fmt.Errorf("failed to add compute unit limit instruction: %w", computeUnitLimitErr)
+		}
 	}
 
 	buildTx := func(base solanaGo.Transaction, retryCount int) (solanaGo.Transaction, error) {
@@ -192,7 +215,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 	}
 
 	// create timeout context
-	ctx, cancel := context.WithTimeout(chanCtx, timeout)
+	ctx, cancel := context.WithTimeout(chanCtx, txcfg.Timeout)
 
 	// send initial tx (do not retry and exit early if fails)
 	sig, initSendErr := client.SendTx(ctx, &initTx)
@@ -238,7 +261,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 			case <-tick:
 				var shouldBump bool
 				// bump if period > 0 and past time
-				if txm.cfg.FeeBumpPeriod() != 0 && time.Since(bumpTime) > txm.cfg.FeeBumpPeriod() {
+				if txcfg.FeeBumpPeriod != 0 && time.Since(bumpTime) > txcfg.FeeBumpPeriod {
 					bumpCount++
 					bumpTime = time.Now()
 					shouldBump = true
@@ -503,7 +526,11 @@ func (txm *Txm) simulate(ctx context.Context) {
 }
 
 // Enqueue enqueue a msg destined for the solana chain.
-func (txm *Txm) Enqueue(accountID string, tx *solanaGo.Transaction) error {
+func (txm *Txm) Enqueue(accountID string, tx *solanaGo.Transaction, txCfgs ...SetTxConfig) error {
+	if err := txm.Ready(); err != nil {
+		return fmt.Errorf("error in soltxm.Enqueue: %w", err)
+	}
+
 	// validate nil pointer
 	if tx == nil {
 		return errors.New("error in soltxm.Enqueue: tx is nil pointer")
@@ -521,9 +548,15 @@ func (txm *Txm) Enqueue(accountID string, tx *solanaGo.Transaction) error {
 		return fmt.Errorf("error in soltxm.Enqueue.GetKey: %w", err)
 	}
 
+	// apply changes to default config
+	cfg := txm.defaultTxConfig()
+	for _, v := range txCfgs {
+		v(&cfg)
+	}
+
 	msg := pendingTx{
-		tx:      tx,
-		timeout: txm.cfg.TxRetryTimeout(),
+		tx:  tx,
+		cfg: cfg,
 	}
 
 	select {
@@ -556,7 +589,18 @@ func (txm *Txm) Healthy() error {
 
 // Ready service is ready
 func (txm *Txm) Ready() error {
-	return nil
+	return txm.starter.Ready()
 }
 
 func (txm *Txm) HealthReport() map[string]error { return map[string]error{txm.Name(): txm.Healthy()} }
+
+func (txm *Txm) defaultTxConfig() TxConfig {
+	return TxConfig{
+		Timeout:              txm.cfg.TxRetryTimeout(),
+		FeeBumpPeriod:        txm.cfg.FeeBumpPeriod(),
+		BaseComputeUnitPrice: txm.fee.BaseComputeUnitPrice(),
+		ComputeUnitPriceMin:  txm.cfg.ComputeUnitPriceMin(),
+		ComputeUnitPriceMax:  txm.cfg.ComputeUnitPriceMax(),
+		ComputeUnitLimit:     txm.cfg.ComputeUnitLimitDefault(),
+	}
+}

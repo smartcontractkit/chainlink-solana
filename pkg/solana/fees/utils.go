@@ -71,7 +71,7 @@ func ParseBlock(res *rpc.GetBlockResult) (out BlockData, err error) {
 		var price ComputeUnitPrice // default 0
 		for _, instruction := range baseTx.Message.Instructions {
 			// find instructions for compute budget program
-			if baseTx.Message.AccountKeys[instruction.ProgramIDIndex] == solana.MustPublicKeyFromBase58(ComputeBudgetProgram) {
+			if baseTx.Message.AccountKeys[instruction.ProgramIDIndex] == ComputeBudgetProgram {
 				parsed, parseErr := ParseComputeUnitPrice(instruction.Data)
 				// if compute unit price found, break instruction loop
 				// only one compute unit price tx is allowed
