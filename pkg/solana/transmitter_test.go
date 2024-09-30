@@ -9,13 +9,35 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
-	txmmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 )
+
+// custom mock txm instead of mockery generated because SetTxConfig causes circular imports
+// and only one function is needed to be mocked
+type verifyTxSize struct {
+	t *testing.T
+	s *solana.PrivateKey
+}
+
+func (txm verifyTxSize) Enqueue(_ string, tx *solana.Transaction, _ ...txm.SetTxConfig) error {
+	// additional components that transaction manager adds to the transaction
+	require.NoError(txm.t, fees.SetComputeUnitPrice(tx, 0))
+	require.NoError(txm.t, fees.SetComputeUnitLimit(tx, 0))
+
+	_, err := tx.Sign(func(_ solana.PublicKey) *solana.PrivateKey { return txm.s })
+	require.NoError(txm.t, err)
+
+	data, err := tx.MarshalBinary()
+	require.NoError(txm.t, err)
+	require.LessOrEqual(txm.t, len(data), 1232, "exceeds maximum solana transaction size")
+	assert.Equal(txm.t, 936, len(data), "does not match expected ocr2 transmit transaction size")
+
+	return nil
+}
 
 func TestTransmitter_TxSize(t *testing.T) {
 	mustNewRandomPublicKey := func() solana.PublicKey {
@@ -27,24 +49,10 @@ func TestTransmitter_TxSize(t *testing.T) {
 	signer, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 
-	txm := txmmocks.NewTxManager(t)
-	txm.On("Enqueue", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		tx, ok := args[1].(*solana.Transaction)
-		require.True(t, ok)
-
-		// additional components that transaction manager adds to the transaction
-		require.NoError(t, fees.SetComputeUnitPrice(tx, 0))
-		require.NoError(t, fees.SetComputeUnitLimit(tx, 0))
-
-		_, err := tx.Sign(func(_ solana.PublicKey) *solana.PrivateKey { return &signer })
-		require.NoError(t, err)
-
-		data, err := tx.MarshalBinary()
-		require.NoError(t, err)
-		require.LessOrEqual(t, len(data), 1232, "exceeds maximum solana transaction size")
-		assert.Equal(t, 936, len(data), "does not match expected ocr2 transmit transaction size")
-
-	}).Return(nil)
+	mockTxm := verifyTxSize{
+		t: t,
+		s: &signer,
+	}
 
 	rw := clientmocks.NewReaderWriter(t)
 	rw.On("LatestBlockhash").Return(&rpc.GetLatestBlockhashResult{
@@ -60,7 +68,7 @@ func TestTransmitter_TxSize(t *testing.T) {
 		reader:             rw,
 		stateCache:         &StateCache{},
 		lggr:               logger.Test(t),
-		txManager:          txm,
+		txManager:          mockTxm,
 	}
 
 	sigs := []types.AttributedOnchainSignature{}

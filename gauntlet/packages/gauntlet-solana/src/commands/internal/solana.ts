@@ -110,21 +110,21 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     return await sendAndConfirmRawTransaction(this.provider.connection, signedTx.serialize())
   }
 
-  sendTxWithIDL =
-    (sendAction: (...args: any) => Promise<TransactionSignature>, idl: Idl) =>
-    async (...args): Promise<TransactionSignature> => {
-      try {
-        return await sendAction(...args)
-      } catch (e) {
-        // Translate IDL error
-        const idlErrors = parseIdlErrors(idl)
-        let translatedErr = ProgramError.parse(e, idlErrors)
-        if (translatedErr === null) {
-          throw e
-        }
-        throw translatedErr
+  sendTxWithIDL = (sendAction: (...args: any) => Promise<TransactionSignature>, idl: Idl) => async (
+    ...args
+  ): Promise<TransactionSignature> => {
+    try {
+      return await sendAction(...args)
+    } catch (e) {
+      // Translate IDL error
+      const idlErrors = parseIdlErrors(idl)
+      let translatedErr = ProgramError.parse(e, idlErrors)
+      if (translatedErr === null) {
+        throw e
       }
+      throw translatedErr
     }
+  }
 
   simulateTx = async (signer: PublicKey, txInstructions: TransactionInstruction[], feePayer?: PublicKey) => {
     try {
