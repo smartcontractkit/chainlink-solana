@@ -22,6 +22,7 @@ import (
 
 var _ TxManager = (*txm.Txm)(nil)
 
+//go:generate mockery --name TxManager --output ./txm/mocks/ --case=underscore --filename txm.go
 type TxManager interface {
 	Enqueue(accountID string, msg *solana.Transaction, txCfgs ...txm.SetTxConfig) error
 }

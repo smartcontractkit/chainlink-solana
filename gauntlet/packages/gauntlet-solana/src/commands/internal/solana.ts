@@ -87,6 +87,10 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     } = {},
   ): Promise<TransactionSignature> => {
     const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
+
+    if (!overrides.units && !!this.flags.computeUnits) overrides.units = this.flags.computeUnits
+    if (!overrides.price && !!this.flags.computePrice) overrides.price = this.flags.computePrice
+
     if (overrides.units) logger.info(`Sending transaction with custom unit limit: ${overrides.units}`)
     if (overrides.price) logger.info(`Sending transaction with custom unit price: ${overrides.price}`)
     const tx = makeTx(
@@ -106,21 +110,21 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     return await sendAndConfirmRawTransaction(this.provider.connection, signedTx.serialize())
   }
 
-  sendTxWithIDL = (sendAction: (...args: any) => Promise<TransactionSignature>, idl: Idl) => async (
-    ...args
-  ): Promise<TransactionSignature> => {
-    try {
-      return await sendAction(...args)
-    } catch (e) {
-      // Translate IDL error
-      const idlErrors = parseIdlErrors(idl)
-      let translatedErr = ProgramError.parse(e, idlErrors)
-      if (translatedErr === null) {
-        throw e
+  sendTxWithIDL =
+    (sendAction: (...args: any) => Promise<TransactionSignature>, idl: Idl) =>
+    async (...args): Promise<TransactionSignature> => {
+      try {
+        return await sendAction(...args)
+      } catch (e) {
+        // Translate IDL error
+        const idlErrors = parseIdlErrors(idl)
+        let translatedErr = ProgramError.parse(e, idlErrors)
+        if (translatedErr === null) {
+          throw e
+        }
+        throw translatedErr
       }
-      throw translatedErr
     }
-  }
 
   simulateTx = async (signer: PublicKey, txInstructions: TransactionInstruction[], feePayer?: PublicKey) => {
     try {
