@@ -1,9 +1,11 @@
 package config
 
 import (
-	"github.com/smartcontractkit/chainlink-common/pkg/config"
-	client "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
+
+	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 )
 
 // MultiNodeConfig is a wrapper to provide required functions while keeping configs Public
@@ -101,7 +103,7 @@ func (c *MultiNodeConfig) SetDefaults() {
 	}
 	// Selection mode defaults to priority level to enable using node priorities
 	if c.MultiNode.SelectionMode == nil {
-		c.MultiNode.SelectionMode = ptr(client.NodeSelectionModePriorityLevel)
+		c.MultiNode.SelectionMode = ptr(mn.NodeSelectionModePriorityLevel)
 	}
 	// The sync threshold is set to 5 to allow for some flexibility in node synchronization before considering it out of sync.
 	if c.MultiNode.SyncThreshold == nil {
