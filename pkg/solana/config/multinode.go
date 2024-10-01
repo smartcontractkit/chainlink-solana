@@ -80,30 +80,70 @@ func (c *MultiNode) FinalityTagEnabled() bool { return *c.finalityTagEnabled }
 func (c *MultiNode) FinalizedBlockOffset() uint32 { return *c.finalizedBlockOffset }
 
 func (c *MultiNode) SetDefaults() {
-	// Default disabled
-	c.multiNodeEnabled = ptr(false)
+	// MultiNode is disabled as it's not fully implemented yet: BCFR-122
+	if c.multiNodeEnabled == nil {
+		c.multiNodeEnabled = ptr(false)
+	}
 
-	// Node Configs
-	c.pollFailureThreshold = ptr(uint32(5))
-	c.pollInterval = config.MustNewDuration(10 * time.Second)
+	/* Node Configs */
+	// Failure threshold for polling set to 5 to tolerate some polling failures before taking action.
+	if c.pollFailureThreshold == nil {
+		c.pollFailureThreshold = ptr(uint32(5))
+	}
+	// Poll interval is set to 10 seconds to ensure timely updates while minimizing resource usage.
+	if c.pollInterval == nil {
+		c.pollInterval = config.MustNewDuration(10 * time.Second)
+	}
+	// Selection mode defaults to priority level to enable using node priorities
+	if c.selectionMode == nil {
+		c.selectionMode = ptr(client.NodeSelectionModePriorityLevel)
+	}
+	// The sync threshold is set to 5 to allow for some flexibility in node synchronization before considering it out of sync.
+	if c.syncThreshold == nil {
+		c.syncThreshold = ptr(uint32(5))
+	}
+	// Lease duration is set to 1 minute by default to allow node locks for a reasonable amount of time.
+	if c.leaseDuration == nil {
+		c.leaseDuration = config.MustNewDuration(time.Minute)
+	}
+	// Node syncing is not relevant for Solana and is disabled by default.
+	if c.nodeIsSyncingEnabled == nil {
+		c.nodeIsSyncingEnabled = ptr(false)
+	}
+	// The finalized block polling interval is set to 5 seconds to ensure timely updates while minimizing resource usage.
+	if c.finalizedBlockPollInterval == nil {
+		c.finalizedBlockPollInterval = config.MustNewDuration(5 * time.Second)
+	}
+	// Repeatable read guarantee should be enforced by default.
+	if c.enforceRepeatableRead == nil {
+		c.enforceRepeatableRead = ptr(true)
+	}
+	// The delay before declaring a node dead is set to 10 seconds to give nodes time to recover from temporary issues.
+	if c.deathDeclarationDelay == nil {
+		c.deathDeclarationDelay = config.MustNewDuration(10 * time.Second)
+	}
 
-	c.selectionMode = ptr(client.NodeSelectionModePriorityLevel)
-
-	c.syncThreshold = ptr(uint32(5))
-
-	c.leaseDuration = config.MustNewDuration(time.Minute)
-
-	c.nodeIsSyncingEnabled = ptr(false)
-	c.finalizedBlockPollInterval = config.MustNewDuration(5 * time.Second)
-	c.enforceRepeatableRead = ptr(true)
-	c.deathDeclarationDelay = config.MustNewDuration(10 * time.Second)
-
-	// Chain Configs
-	c.nodeNoNewHeadsThreshold = config.MustNewDuration(10 * time.Second)
-	c.noNewFinalizedHeadsThreshold = config.MustNewDuration(10 * time.Second)
-	c.finalityDepth = ptr(uint32(0))
-	c.finalityTagEnabled = ptr(true)
-	c.finalizedBlockOffset = ptr(uint32(0))
+	/* Chain Configs */
+	// Threshold for no new heads is set to 10 seconds, assuming that heads should update at a reasonable pace.
+	if c.nodeNoNewHeadsThreshold == nil {
+		c.nodeNoNewHeadsThreshold = config.MustNewDuration(10 * time.Second)
+	}
+	// Similar to heads, finalized heads should be updated within 10 seconds.
+	if c.noNewFinalizedHeadsThreshold == nil {
+		c.noNewFinalizedHeadsThreshold = config.MustNewDuration(10 * time.Second)
+	}
+	// Finality tags are used in Solana and enabled by default.
+	if c.finalityTagEnabled == nil {
+		c.finalityTagEnabled = ptr(true)
+	}
+	// Finality depth will not be used since finality tags are enabled.
+	if c.finalityDepth == nil {
+		c.finalityDepth = ptr(uint32(0))
+	}
+	// Finalized block offset will not be used since finality tags are enabled.
+	if c.finalizedBlockOffset == nil {
+		c.finalizedBlockOffset = ptr(uint32(0))
+	}
 }
 
 func (c *MultiNode) SetFrom(f *MultiNode) {
