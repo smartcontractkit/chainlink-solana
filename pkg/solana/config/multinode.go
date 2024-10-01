@@ -5,159 +5,202 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
-	client "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
+	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 )
+
+// MultiNodeConfig is a wrapper to provide required functions while keeping configs Public
+type MultiNodeConfig struct {
+	MultiNode
+}
 
 type MultiNode struct {
 	// Feature flag
-	multiNodeEnabled *bool
+	Enabled *bool
 
 	// Node Configs
-	pollFailureThreshold       *uint32
-	pollInterval               *config.Duration
-	selectionMode              *string
-	syncThreshold              *uint32
-	nodeIsSyncingEnabled       *bool
-	leaseDuration              *config.Duration
-	finalizedBlockPollInterval *config.Duration
-	enforceRepeatableRead      *bool
-	deathDeclarationDelay      *config.Duration
+	PollFailureThreshold       *uint32
+	PollInterval               *config.Duration
+	SelectionMode              *string
+	SyncThreshold              *uint32
+	NodeIsSyncingEnabled       *bool
+	LeaseDuration              *config.Duration
+	FinalizedBlockPollInterval *config.Duration
+	EnforceRepeatableRead      *bool
+	DeathDeclarationDelay      *config.Duration
 
 	// Chain Configs
-	nodeNoNewHeadsThreshold      *config.Duration
-	noNewFinalizedHeadsThreshold *config.Duration
-	finalityDepth                *uint32
-	finalityTagEnabled           *bool
-	finalizedBlockOffset         *uint32
+	NodeNoNewHeadsThreshold      *config.Duration
+	NoNewFinalizedHeadsThreshold *config.Duration
+	FinalityDepth                *uint32
+	FinalityTagEnabled           *bool
+	FinalizedBlockOffset         *uint32
 }
 
-func (c *MultiNode) MultiNodeEnabled() bool {
-	return c.multiNodeEnabled != nil && *c.multiNodeEnabled
+func (c *MultiNodeConfig) Enabled() bool {
+	return c.MultiNode.Enabled != nil && *c.MultiNode.Enabled
 }
 
-func (c *MultiNode) PollFailureThreshold() uint32 {
-	return *c.pollFailureThreshold
+func (c *MultiNodeConfig) PollFailureThreshold() uint32 {
+	return *c.MultiNode.PollFailureThreshold
 }
 
-func (c *MultiNode) PollInterval() time.Duration {
-	return c.pollInterval.Duration()
+func (c *MultiNodeConfig) PollInterval() time.Duration {
+	return c.MultiNode.PollInterval.Duration()
 }
 
-func (c *MultiNode) SelectionMode() string {
-	return *c.selectionMode
+func (c *MultiNodeConfig) SelectionMode() string {
+	return *c.MultiNode.SelectionMode
 }
 
-func (c *MultiNode) SyncThreshold() uint32 {
-	return *c.syncThreshold
+func (c *MultiNodeConfig) SyncThreshold() uint32 {
+	return *c.MultiNode.SyncThreshold
 }
 
-func (c *MultiNode) NodeIsSyncingEnabled() bool {
-	return *c.nodeIsSyncingEnabled
+func (c *MultiNodeConfig) NodeIsSyncingEnabled() bool {
+	return *c.MultiNode.NodeIsSyncingEnabled
 }
 
-func (c *MultiNode) LeaseDuration() time.Duration { return c.leaseDuration.Duration() }
+func (c *MultiNodeConfig) LeaseDuration() time.Duration { return c.MultiNode.LeaseDuration.Duration() }
 
-func (c *MultiNode) FinalizedBlockPollInterval() time.Duration {
-	return c.finalizedBlockPollInterval.Duration()
+func (c *MultiNodeConfig) FinalizedBlockPollInterval() time.Duration {
+	return c.MultiNode.FinalizedBlockPollInterval.Duration()
 }
 
-func (c *MultiNode) EnforceRepeatableRead() bool { return *c.enforceRepeatableRead }
+func (c *MultiNodeConfig) EnforceRepeatableRead() bool { return *c.MultiNode.EnforceRepeatableRead }
 
-func (c *MultiNode) DeathDeclarationDelay() time.Duration { return c.deathDeclarationDelay.Duration() }
-
-func (c *MultiNode) NodeNoNewHeadsThreshold() time.Duration {
-	return c.nodeNoNewHeadsThreshold.Duration()
+func (c *MultiNodeConfig) DeathDeclarationDelay() time.Duration {
+	return c.MultiNode.DeathDeclarationDelay.Duration()
 }
 
-func (c *MultiNode) NoNewFinalizedHeadsThreshold() time.Duration {
-	return c.noNewFinalizedHeadsThreshold.Duration()
+func (c *MultiNodeConfig) NodeNoNewHeadsThreshold() time.Duration {
+	return c.MultiNode.NodeNoNewHeadsThreshold.Duration()
 }
 
-func (c *MultiNode) FinalityDepth() uint32 { return *c.finalityDepth }
+func (c *MultiNodeConfig) NoNewFinalizedHeadsThreshold() time.Duration {
+	return c.MultiNode.NoNewFinalizedHeadsThreshold.Duration()
+}
 
-func (c *MultiNode) FinalityTagEnabled() bool { return *c.finalityTagEnabled }
+func (c *MultiNodeConfig) FinalityDepth() uint32 { return *c.MultiNode.FinalityDepth }
 
-func (c *MultiNode) FinalizedBlockOffset() uint32 { return *c.finalizedBlockOffset }
+func (c *MultiNodeConfig) FinalityTagEnabled() bool { return *c.MultiNode.FinalityTagEnabled }
 
-func (c *MultiNode) SetDefaults(enabled bool) {
-	c.multiNodeEnabled = ptr(enabled)
+func (c *MultiNodeConfig) FinalizedBlockOffset() uint32 { return *c.MultiNode.FinalizedBlockOffset }
+
+func (c *MultiNodeConfig) SetDefaults() {
+	// MultiNode is disabled as it's not fully implemented yet: BCFR-122
+	if c.MultiNode.Enabled == nil {
+		c.MultiNode.Enabled = ptr(false)
+	}
+
+	/* Node Configs */
+	// Failure threshold for polling set to 5 to tolerate some polling failures before taking action.
+	if c.MultiNode.PollFailureThreshold == nil {
+		c.MultiNode.PollFailureThreshold = ptr(uint32(5))
+	}
+	// Poll interval is set to 10 seconds to ensure timely updates while minimizing resource usage.
+	if c.MultiNode.PollInterval == nil {
+		c.MultiNode.PollInterval = config.MustNewDuration(10 * time.Second)
+	}
+	// Selection mode defaults to priority level to enable using node priorities
+	if c.MultiNode.SelectionMode == nil {
+		c.MultiNode.SelectionMode = ptr(mn.NodeSelectionModePriorityLevel)
+	}
+	// The sync threshold is set to 5 to allow for some flexibility in node synchronization before considering it out of sync.
+	if c.MultiNode.SyncThreshold == nil {
+		c.MultiNode.SyncThreshold = ptr(uint32(5))
+	}
+	// Lease duration is set to 1 minute by default to allow node locks for a reasonable amount of time.
+	if c.MultiNode.LeaseDuration == nil {
+		c.MultiNode.LeaseDuration = config.MustNewDuration(time.Minute)
+	}
+	// Node syncing is not relevant for Solana and is disabled by default.
+	if c.MultiNode.NodeIsSyncingEnabled == nil {
+		c.MultiNode.NodeIsSyncingEnabled = ptr(false)
+	}
+	// The finalized block polling interval is set to 5 seconds to ensure timely updates while minimizing resource usage.
+	if c.MultiNode.FinalizedBlockPollInterval == nil {
+		c.MultiNode.FinalizedBlockPollInterval = config.MustNewDuration(5 * time.Second)
+	}
+	// Repeatable read guarantee should be enforced by default.
+	if c.MultiNode.EnforceRepeatableRead == nil {
+		c.MultiNode.EnforceRepeatableRead = ptr(true)
+	}
+	// The delay before declaring a node dead is set to 10 seconds to give nodes time to recover from temporary issues.
+	if c.MultiNode.DeathDeclarationDelay == nil {
+		c.MultiNode.DeathDeclarationDelay = config.MustNewDuration(10 * time.Second)
+	}
+
+	/* Chain Configs */
+	// Threshold for no new heads is set to 10 seconds, assuming that heads should update at a reasonable pace.
+	if c.MultiNode.NodeNoNewHeadsThreshold == nil {
+		c.MultiNode.NodeNoNewHeadsThreshold = config.MustNewDuration(10 * time.Second)
+	}
+	// Similar to heads, finalized heads should be updated within 10 seconds.
+	if c.MultiNode.NoNewFinalizedHeadsThreshold == nil {
+		c.MultiNode.NoNewFinalizedHeadsThreshold = config.MustNewDuration(10 * time.Second)
+	}
+	// Finality tags are used in Solana and enabled by default.
+	if c.MultiNode.FinalityTagEnabled == nil {
+		c.MultiNode.FinalityTagEnabled = ptr(true)
+	}
+	// Finality depth will not be used since finality tags are enabled.
+	if c.MultiNode.FinalityDepth == nil {
+		c.MultiNode.FinalityDepth = ptr(uint32(0))
+	}
+	// Finalized block offset will not be used since finality tags are enabled.
+	if c.MultiNode.FinalizedBlockOffset == nil {
+		c.MultiNode.FinalizedBlockOffset = ptr(uint32(0))
+	}
+}
+
+func (c *MultiNodeConfig) SetFrom(f *MultiNodeConfig) {
+	if f.MultiNode.Enabled != nil {
+		c.MultiNode.Enabled = f.MultiNode.Enabled
+	}
 
 	// Node Configs
-	c.pollFailureThreshold = ptr(uint32(5))
-	c.pollInterval = config.MustNewDuration(10 * time.Second)
-
-	c.selectionMode = ptr(client.NodeSelectionModePriorityLevel)
-
-	c.syncThreshold = ptr(uint32(5))
-
-	// Period at which we verify if active node is still highest block number
-	c.leaseDuration = config.MustNewDuration(time.Minute)
-
-	c.nodeIsSyncingEnabled = ptr(false)
-	c.finalizedBlockPollInterval = config.MustNewDuration(5 * time.Second)
-	c.enforceRepeatableRead = ptr(true)
-	c.deathDeclarationDelay = config.MustNewDuration(10 * time.Second)
-
-	// Chain Configs
-	c.nodeNoNewHeadsThreshold = config.MustNewDuration(10 * time.Second)
-	c.noNewFinalizedHeadsThreshold = config.MustNewDuration(10 * time.Second)
-	c.finalityDepth = ptr(uint32(0))
-	c.finalityTagEnabled = ptr(true)
-	c.finalizedBlockOffset = ptr(uint32(0))
-}
-
-func (c *MultiNode) SetFrom(fs *MultiNode) {
-	if fs.multiNodeEnabled != nil {
-		c.multiNodeEnabled = fs.multiNodeEnabled
+	if f.MultiNode.PollFailureThreshold != nil {
+		c.MultiNode.PollFailureThreshold = f.MultiNode.PollFailureThreshold
 	}
-
-	// Node Configs
-	if fs.pollFailureThreshold != nil {
-		c.pollFailureThreshold = fs.pollFailureThreshold
+	if f.MultiNode.PollInterval != nil {
+		c.MultiNode.PollInterval = f.MultiNode.PollInterval
 	}
-	if fs.pollInterval != nil {
-		c.pollInterval = fs.pollInterval
+	if f.MultiNode.SelectionMode != nil {
+		c.MultiNode.SelectionMode = f.MultiNode.SelectionMode
 	}
-	if fs.selectionMode != nil {
-		c.selectionMode = fs.selectionMode
+	if f.MultiNode.SyncThreshold != nil {
+		c.MultiNode.SyncThreshold = f.MultiNode.SyncThreshold
 	}
-	if fs.syncThreshold != nil {
-		c.syncThreshold = fs.syncThreshold
+	if f.MultiNode.NodeIsSyncingEnabled != nil {
+		c.MultiNode.NodeIsSyncingEnabled = f.MultiNode.NodeIsSyncingEnabled
 	}
-	if fs.nodeIsSyncingEnabled != nil {
-		c.nodeIsSyncingEnabled = fs.nodeIsSyncingEnabled
+	if f.MultiNode.LeaseDuration != nil {
+		c.MultiNode.LeaseDuration = f.MultiNode.LeaseDuration
 	}
-	if fs.leaseDuration != nil {
-		c.leaseDuration = fs.leaseDuration
+	if f.MultiNode.FinalizedBlockPollInterval != nil {
+		c.MultiNode.FinalizedBlockPollInterval = f.MultiNode.FinalizedBlockPollInterval
 	}
-	if fs.finalizedBlockPollInterval != nil {
-		c.finalizedBlockPollInterval = fs.finalizedBlockPollInterval
+	if f.MultiNode.EnforceRepeatableRead != nil {
+		c.MultiNode.EnforceRepeatableRead = f.MultiNode.EnforceRepeatableRead
 	}
-	if fs.enforceRepeatableRead != nil {
-		c.enforceRepeatableRead = fs.enforceRepeatableRead
-	}
-	if fs.deathDeclarationDelay != nil {
-		c.deathDeclarationDelay = fs.deathDeclarationDelay
+	if f.MultiNode.DeathDeclarationDelay != nil {
+		c.MultiNode.DeathDeclarationDelay = f.MultiNode.DeathDeclarationDelay
 	}
 
 	// Chain Configs
-	if fs.nodeNoNewHeadsThreshold != nil {
-		c.nodeNoNewHeadsThreshold = fs.nodeNoNewHeadsThreshold
+	if f.MultiNode.NodeNoNewHeadsThreshold != nil {
+		c.MultiNode.NodeNoNewHeadsThreshold = f.MultiNode.NodeNoNewHeadsThreshold
 	}
-	if fs.noNewFinalizedHeadsThreshold != nil {
-		c.noNewFinalizedHeadsThreshold = fs.noNewFinalizedHeadsThreshold
+	if f.MultiNode.NoNewFinalizedHeadsThreshold != nil {
+		c.MultiNode.NoNewFinalizedHeadsThreshold = f.MultiNode.NoNewFinalizedHeadsThreshold
 	}
-	if fs.finalityDepth != nil {
-		c.finalityDepth = fs.finalityDepth
+	if f.MultiNode.FinalityDepth != nil {
+		c.MultiNode.FinalityDepth = f.MultiNode.FinalityDepth
 	}
-	if fs.finalityTagEnabled != nil {
-		c.finalityTagEnabled = fs.finalityTagEnabled
+	if f.MultiNode.FinalityTagEnabled != nil {
+		c.MultiNode.FinalityTagEnabled = f.MultiNode.FinalityTagEnabled
 	}
-	if fs.finalizedBlockOffset != nil {
-		c.finalizedBlockOffset = fs.finalizedBlockOffset
+	if f.MultiNode.FinalizedBlockOffset != nil {
+		c.MultiNode.FinalizedBlockOffset = f.MultiNode.FinalizedBlockOffset
 	}
-}
-
-func ptr[T any](v T) *T {
-	return &v
 }

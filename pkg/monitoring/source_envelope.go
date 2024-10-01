@@ -237,9 +237,9 @@ func getLinkAvailableForPayment(state pkgSolana.State, linkBalance *big.Int) (*b
 	}
 	var countUnpaidRounds, reimbursements uint64 = 0, 0
 	for _, oracle := range oracles {
-		numRounds := int(state.Config.LatestAggregatorRoundID) - int(oracle.FromRoundID)
-		if numRounds < 0 {
-			numRounds = 0
+		numRounds := uint32(0) // prevent overflow if RoundID is larger than latest aggregator RoundID
+		if state.Config.LatestAggregatorRoundID >= oracle.FromRoundID {
+			numRounds = state.Config.LatestAggregatorRoundID - oracle.FromRoundID
 		}
 		countUnpaidRounds += uint64(numRounds)
 		reimbursements += oracle.Payment

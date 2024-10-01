@@ -171,7 +171,7 @@ func (m *OCRv2) makeDigest() ([]byte, error) {
 		return nil, err
 	}
 	hasher := sha256.New()
-	hasher.Write(append([]byte{}, uint8(proposal.Oracles.Len)))
+	hasher.Write(append([]byte{}, uint8(proposal.Oracles.Len))) //nolint:gosec // number of oracles cannot exceed 225
 	for _, oracle := range proposal.Oracles.Xs[:proposal.Oracles.Len] {
 		hasher.Write(oracle.Signer.Key[:])
 		hasher.Write(oracle.Transmitter.Bytes())
@@ -182,7 +182,7 @@ func (m *OCRv2) makeDigest() ([]byte, error) {
 	hasher.Write(proposal.TokenMint.Bytes())
 	header := make([]byte, 8+4)
 	binary.BigEndian.PutUint64(header, proposal.OffchainConfig.Version)
-	binary.BigEndian.PutUint32(header[8:], uint32(proposal.OffchainConfig.Len))
+	binary.BigEndian.PutUint32(header[8:], uint32(proposal.OffchainConfig.Len)) // nolint:gosec
 	hasher.Write(header)
 	hasher.Write(proposal.OffchainConfig.Xs[:proposal.OffchainConfig.Len])
 	return hasher.Sum(nil), nil
@@ -334,7 +334,7 @@ func (m *OCRv2) proposeConfig(ocConfig contracts.OffChainAggregatorV2Config) err
 		[]solana.Instruction{
 			ocr_2.NewProposeConfigInstruction(
 				oracles,
-				uint8(ocConfig.F),
+				uint8(ocConfig.F), //nolint:gosec // F cannot exceed max oracles (255)
 				m.Proposal.PublicKey(),
 				m.Owner.PublicKey(),
 			).Build(),

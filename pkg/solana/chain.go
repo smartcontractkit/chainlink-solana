@@ -230,7 +230,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 		clientCache: map[string]*verifiedCachedClient{},
 	}
 
-	if cfg.MultiNode.MultiNodeEnabled() {
+	if cfg.MultiNodeConfig().Enabled() {
 		chainFamily := "solana"
 
 		mnCfg := cfg.MultiNodeConfig()
@@ -327,7 +327,7 @@ func (c *chain) LatestHead(_ context.Context) (types.Head, error) {
 	return types.Head{
 		Height:    strconv.FormatUint(*latestBlock.BlockHeight, 10),
 		Hash:      hashBytes,
-		Timestamp: uint64(latestBlock.BlockTime.Time().Unix()),
+		Timestamp: uint64(latestBlock.BlockTime.Time().Unix()), //nolint:gosec // blocktime will never be negative (pre 1970)
 	}, nil
 }
 
@@ -398,7 +398,7 @@ func (c *chain) ChainID() string {
 
 // getClient returns a client, randomly selecting one from available and valid nodes
 func (c *chain) getClient() (client.ReaderWriter, error) {
-	if c.cfg.MultiNode.MultiNodeEnabled() {
+	if c.cfg.MultiNode.Enabled() {
 		return c.multiNode.SelectRPC()
 	}
 
@@ -482,7 +482,7 @@ func (c *chain) Start(ctx context.Context) error {
 		c.lggr.Debug("Starting balance monitor")
 		var ms services.MultiStart
 		startAll := []services.StartClose{c.txm, c.balanceMonitor}
-		if c.cfg.MultiNode.MultiNodeEnabled() {
+		if c.cfg.MultiNode.Enabled() {
 			c.lggr.Debug("Starting multinode")
 			startAll = append(startAll, c.multiNode, c.txSender)
 		}
@@ -496,7 +496,7 @@ func (c *chain) Close() error {
 		c.lggr.Debug("Stopping txm")
 		c.lggr.Debug("Stopping balance monitor")
 		closeAll := []io.Closer{c.txm, c.balanceMonitor}
-		if c.cfg.MultiNode.MultiNodeEnabled() {
+		if c.cfg.MultiNode.Enabled() {
 			c.lggr.Debug("Stopping multinode")
 			closeAll = append(closeAll, c.multiNode, c.txSender)
 		}
@@ -561,8 +561,15 @@ func (c *chain) sendTx(ctx context.Context, from, to string, amount *big.Int, ba
 		}
 	}
 
-	txm := c.TxManager()
-	err = txm.Enqueue("", tx)
+	chainTxm := c.TxManager()
+	err = chainTxm.Enqueue("", tx,
+		txm.SetComputeUnitLimit(500), // reduce from default 200K limit - should only take 450 compute units
+		// no fee bumping and no additional fee - makes validating balance accurate
+		txm.SetComputeUnitPriceMax(0),
+		txm.SetComputeUnitPriceMin(0),
+		txm.SetBaseComputeUnitPrice(0),
+		txm.SetFeeBumpPeriod(0),
+	)
 	if err != nil {
 		return fmt.Errorf("transaction failed: %w", err)
 	}

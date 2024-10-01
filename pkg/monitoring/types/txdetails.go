@@ -144,7 +144,7 @@ func ParseTx(tx *solanaGo.Transaction, programAddr solanaGo.PublicKey) (TxDetail
 		}
 
 		// find compute budget program instruction
-		if tx.Message.AccountKeys[instruction.ProgramIDIndex] == solanaGo.MustPublicKeyFromBase58(fees.ComputeBudgetProgram) {
+		if tx.Message.AccountKeys[instruction.ProgramIDIndex] == fees.ComputeBudgetProgram {
 			// parsing compute unit price
 			var err error
 			txDetails.ComputeUnitPrice, err = fees.ParseComputeUnitPrice(instruction.Data)
