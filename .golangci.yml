@@ -3,7 +3,7 @@ run:
 linters:
   enable:
     - exhaustive
-    - copyloopvar
+    - exportloopref
     - revive
     - goimports
     - gosec
