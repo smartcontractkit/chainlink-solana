@@ -22,7 +22,7 @@ jobs:
         id: psversion
         uses: ./.github/actions/projectserum_version
 
-  build_image_test:
+  build_wrapped_anchor_image:
     name: build image test
     runs-on: ubuntu-latest
     needs: [get_projectserum_version]
@@ -44,43 +44,30 @@ jobs:
       run: |
         docker buildx build . -t chainlink-solana:build --build-arg ANCHOR_CLI=${{ needs.get_projectserum_version.outputs.projectserum_version }}
         docker save chainlink-solana > docker-build.tar
-    - name: load cached image
-      if: steps.cache-image.outputs.cache-hit == 'true'
-      run: |
-        docker load --input docker-build.tar
-    - name: build from cached artifacts
-      run: |
-        docker run -v "$(pwd)/../":/workdir chainlink-solana:build bash -c "cd /workdir/contracts && anchor build && chmod -R 755 ./target"
 
   rust_run_anchor_tests:
     name: Rust Run Anchor Tests
     runs-on: ubuntu-latest
-    needs: [get_projectserum_version]
+    needs: [get_projectserum_version, build_wrapped_anchor_image]
     steps:
     - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
-    - name: Cache cargo registry
-      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
-      with:
-        path: ~/.cargo/registry
-        key: ${{ runner.os }}-v2-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
-    - name: Cache cargo index
-      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
-      with:
-        path: ~/.cargo/git
-        key: ${{ runner.os }}-v2-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-
     - name: Cache cargo target dir
       uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         path: contracts/target
         key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-
-    - name: run tests
-      env:
-        psversion: ${{ needs.get_projectserum_version.outputs.projectserum_version }}
+    - name: cache docker build image
+      id: cache-image
+      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+      with:
+        path: contracts/docker-build.tar
+        key: ${{ runner.os }}-docker-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('**/Cargo.lock') }}'
+    - name: load cached image
       run: |
-        docker run -v "$(pwd)/../":/repo backpackapp/build:"${psversion}" bash -c "\
+        docker load --input docker-build.tar
+    - name: run tests
+      run: |
+        docker run -v "$(pwd)/../":/repo chainlink-solana:build bash -c "\
           set -eoux pipefail &&\
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
@@ -92,50 +79,31 @@ jobs:
           cd /repo/contracts &&\
           yarn install --frozen-lockfile &&\
           anchor test &&\
+          chmod -R 755 ./target &&\
           cd /repo/contracts/examples/hello-world &&\
           yarn install --frozen-lockfile &&\
           anchor test"
 
-    # - run: solana-keygen new -o id.json --no-bip39-passphrase
-    # - name: Compile typescript client
-    #   run: |
-    #    cd ../ts
-    #    yarn install --frozen-lockfile
-    #    yarn build
-    # - name: anchor test contracts
-    #   run: |
-    #     yarn install --frozen-lockfile
-    #     anchor test
-    # - name: anchor test hello-world
-    #   run: |
-    #    cd examples/hello-world
-    #    yarn install --frozen-lockfile
-    #    anchor test
-
   rust_lint:
     name: Rust Lint
     runs-on: ubuntu-latest
-    needs: [get_projectserum_version]
+    needs: [get_projectserum_version, build_wrapped_anchor_image]
     steps:
     - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
-    - name: Cache cargo registry
-      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
-      with:
-        path: ~/.cargo/registry
-        key: ${{ runner.os }}-v2-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
-    - name: Cache cargo index
-      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
-      with:
-        path: ~/.cargo/git
-        key: ${{ runner.os }}-v2-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-
     - name: Cache cargo target dir
       uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         path: contracts/target
         key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-    
+    - name: cache docker build image
+      id: cache-image
+      uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+      with:
+        path: contracts/docker-build.tar
+        key: ${{ runner.os }}-docker-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('**/Cargo.lock') }}'
+    - name: load cached image
+      run: |
+        docker load --input docker-build.tar
     - name: format contracts + artifacts
       run: |
         yarn install --frozen-lockfile
@@ -145,10 +113,8 @@ jobs:
         git diff --stat --exit-code
 
     - name: cargo check
-      env:
-        psversion: ${{ needs.get_projectserum_version.outputs.projectserum_version }}
       run: |
-        docker run -v "$(pwd)/../":/repo backpackapp/build:"${psversion}" bash -c "\
+        docker run -v "$(pwd)/../":/repo chainlink-solana:build bash -c "\
           set -eoux pipefail &&\
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
