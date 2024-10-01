@@ -5,13 +5,10 @@ export const makeTx = (
   opts?: TransactionBlockhashCtor,
   overrides: { price?: number; units?: number } = {},
 ): Transaction => {
-  if (overrides.price && overrides.units)
-    throw new Error('Cannot set limit for units and price in the same transaction')
+  let initialTx = new Transaction(opts)
 
-  let computeIx: TransactionInstruction
-  if (overrides.price) computeIx = ComputeBudgetProgram.setComputeUnitPrice({ microLamports: overrides.price })
-  if (overrides.units) computeIx = ComputeBudgetProgram.setComputeUnitLimit({ units: overrides.units })
-  const initialTx = computeIx ? new Transaction(opts).add(computeIx) : new Transaction(opts)
+  if (overrides.price) initialTx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: overrides.price }))
+  if (overrides.units) initialTx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: overrides.units }))
 
   return rawTx.reduce((tx, instruction) => tx.add(instruction), initialTx)
 }
