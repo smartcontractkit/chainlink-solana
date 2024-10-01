@@ -2,9 +2,9 @@ ARG ANCHOR_CLI
 
 FROM backpackapp/build:${ANCHOR_CLI}
 
-RUN git clone https://github.com/smartcontractkit/chainlink-solana.git /chainlink-solana
+COPY . /contracts
 
-RUN cd /chainlink-solana/contracts && anchor build
+RUN cd /contracts && anchor build
 
 # only keep downloaded artifacts in /root/.cargo cached
-RUN rm -rf /chainlink-solana
+RUN rm -rf /contracts
