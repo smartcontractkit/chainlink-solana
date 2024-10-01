@@ -113,7 +113,7 @@ type TOMLConfig struct {
 	// Do not access directly, use [IsEnabled]
 	Enabled *bool
 	Chain
-	MultiNode MultiNode
+	MultiNode MultiNodeConfig
 	Nodes     Nodes
 }
 
@@ -286,7 +286,7 @@ func (c *TOMLConfig) ListNodes() Nodes {
 	return c.Nodes
 }
 
-func (c *TOMLConfig) MultiNodeConfig() *MultiNode {
+func (c *TOMLConfig) MultiNodeConfig() *MultiNodeConfig {
 	return &c.MultiNode
 }
 
