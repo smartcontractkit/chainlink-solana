@@ -103,7 +103,8 @@ func NewClient(endpoint string, cfg *config.TOMLConfig, requestTimeout time.Dura
 }
 
 type Head struct {
-	rpc.GetBlockResult
+	BlockHeight *uint64
+	BlockHash   *solana.Hash
 }
 
 func (h *Head) BlockNumber() int64 {
@@ -121,7 +122,7 @@ func (h *Head) BlockDifficulty() *big.Int {
 }
 
 func (h *Head) IsValid() bool {
-	return h.BlockHeight != nil
+	return h.BlockHeight != nil && h.BlockHash != nil
 }
 
 var _ mn.RPCClient[mn.StringID, *Head] = (*Client)(nil)
@@ -158,46 +159,17 @@ func (c *Client) SubscribeToFinalizedHeads(ctx context.Context) (<-chan *Head, m
 func (c *Client) LatestBlock(ctx context.Context) (*Head, error) {
 	// capture chStopInFlight to ensure we are not updating chainInfo with observations related to previous life cycle
 	//ctx, cancel, chStopInFlight, _, _ := c.acquireQueryCtx(ctx, c.rpcTimeout)
-
-	latestBlockHeight, err := c.rpc.GetBlockHeight(ctx, rpc.CommitmentConfirmed)
+	result, err := c.rpc.GetLatestBlockhash(ctx, rpc.CommitmentConfirmed)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: Trying to see if retries will fix testing issue
-	retries := 5 // Number of retries
-	for i := 0; i < retries; i++ {
-		block, err := c.rpc.GetBlock(ctx, latestBlockHeight)
-		if err == nil {
-			head := &Head{GetBlockResult: *block}
-			c.onNewHead(ctx, c.chStopInFlight, head)
-			return head, nil
-		}
-
-		// Log the error or handle as needed
-		fmt.Printf("Error fetching block: %v\n", err)
-
-		// Retry after a short delay
-		time.Sleep(2 * time.Second)
+	head := &Head{
+		BlockHeight: &result.Value.LastValidBlockHeight,
+		BlockHash:   &result.Value.Blockhash,
 	}
-
-	return nil, fmt.Errorf("failed to fetch block after %d retries", retries)
-
-	/*
-		latestBlockHeight, err := c.rpc.GetBlockHeight(ctx, rpc.CommitmentConfirmed)
-		if err != nil {
-			return nil, err
-		}
-
-		block, err := c.rpc.GetBlock(ctx, latestBlockHeight)
-		if err != nil {
-			return nil, err
-		}
-
-		head := &Head{GetBlockResult: *block}
-		c.onNewHead(ctx, c.chStopInFlight, head)
-		return head, nil
-	*/
+	c.onNewHead(ctx, c.chStopInFlight, head)
+	return head, nil
 }
 
 func (c *Client) LatestFinalizedBlock(ctx context.Context) (*Head, error) {
@@ -205,17 +177,15 @@ func (c *Client) LatestFinalizedBlock(ctx context.Context) (*Head, error) {
 	// capture chStopInFlight to ensure we are not updating chainInfo with observations related to previous life cycle
 	//ctx, cancel, chStopInFlight, _, _ := c.acquireQueryCtx(ctx, c.rpcTimeout)
 
-	finalizedBlockHeight, err := c.rpc.GetBlockHeight(ctx, rpc.CommitmentFinalized)
+	result, err := c.rpc.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
 	if err != nil {
 		return nil, err
 	}
 
-	block, err := c.rpc.GetBlock(ctx, finalizedBlockHeight)
-	if err != nil {
-		return nil, err
+	head := &Head{
+		BlockHeight: &result.Value.LastValidBlockHeight,
+		BlockHash:   &result.Value.Blockhash,
 	}
-
-	head := &Head{GetBlockResult: *block}
 	c.onNewFinalizedHead(ctx, c.chStopInFlight, head)
 	return head, nil
 }

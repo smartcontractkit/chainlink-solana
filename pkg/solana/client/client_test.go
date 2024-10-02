@@ -333,7 +333,7 @@ func TestClient_Subscriptions_Integration(t *testing.T) {
 
 	select {
 	case head := <-ch:
-		require.NotEqual(t, solana.Hash{}, head.Blockhash)
+		require.NotEqual(t, solana.Hash{}, head.BlockHash)
 		latest, _ := c.GetInterceptedChainInfo()
 		require.Equal(t, head.BlockNumber(), latest.BlockNumber)
 	case <-ctx.Done():
@@ -342,7 +342,7 @@ func TestClient_Subscriptions_Integration(t *testing.T) {
 
 	select {
 	case finalizedHead := <-finalizedCh:
-		require.NotEqual(t, solana.Hash{}, finalizedHead.Blockhash)
+		require.NotEqual(t, solana.Hash{}, finalizedHead.BlockHash)
 		latest, _ := c.GetInterceptedChainInfo()
 		require.Equal(t, finalizedHead.BlockNumber(), latest.FinalizedBlockNumber)
 	case <-ctx.Done():
