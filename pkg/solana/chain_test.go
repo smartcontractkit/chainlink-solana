@@ -142,7 +142,11 @@ func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
 
 	ch := solcfg.Chain{}
 	ch.SetDefaults()
-	mn := solcfg.MultiNodeConfig{}
+	mn := solcfg.MultiNodeConfig{
+		MultiNode: solcfg.MultiNode{
+			Enabled: ptr(true),
+		},
+	}
 	mn.SetDefaults()
 
 	cfg := &solcfg.TOMLConfig{
