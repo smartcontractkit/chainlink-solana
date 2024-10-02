@@ -33,7 +33,7 @@ jobs:
       uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         path: contracts/docker-build.tar
-        key: ${{ runner.os }}-docker-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('**/Cargo.lock') }}'
+        key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('**/Cargo.lock') }}
     - name: build & save image
       if: steps.cache-image.outputs.cache-hit != 'true'
       run: |
@@ -61,7 +61,7 @@ jobs:
       uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         path: contracts/docker-build.tar
-        key: ${{ runner.os }}-docker-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('**/Cargo.lock') }}'
+        key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('**/Cargo.lock') }}
     - name: load cached image
       run: |
         docker load --input docker-build.tar
@@ -101,7 +101,7 @@ jobs:
       uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         path: contracts/docker-build.tar
-        key: ${{ runner.os }}-docker-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('**/Cargo.lock') }}'
+        key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('**/Cargo.lock') }}
     - name: load cached image
       run: |
         docker load --input docker-build.tar
