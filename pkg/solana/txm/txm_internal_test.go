@@ -112,7 +112,7 @@ func TestTxm(t *testing.T) {
 
 			txm := NewTxm(id, func() (client.ReaderWriter, error) {
 				return mc, nil
-			}, cfg, mkey, lggr)
+			}, cfg, nil, mkey, lggr)
 			require.NoError(t, txm.Start(ctx))
 
 			// tracking prom metrics
@@ -718,7 +718,7 @@ func TestTxm_Enqueue(t *testing.T) {
 
 	txm := NewTxm("enqueue_test", func() (client.ReaderWriter, error) {
 		return mc, nil
-	}, cfg, mkey, lggr)
+	}, cfg, nil, mkey, lggr)
 
 	require.ErrorContains(t, txm.Enqueue("txmUnstarted", &solana.Transaction{}), "not started")
 	require.NoError(t, txm.Start(ctx))
