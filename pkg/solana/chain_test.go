@@ -171,8 +171,8 @@ func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
 	err = testChain.Start(tests.Context(t))
 	require.NoError(t, err)
 	defer func() {
-		err := testChain.Close()
-		require.NoError(t, err)
+		closeErr := testChain.Close()
+		require.NoError(t, closeErr)
 	}()
 
 	selectedClient, err := testChain.getClient()
