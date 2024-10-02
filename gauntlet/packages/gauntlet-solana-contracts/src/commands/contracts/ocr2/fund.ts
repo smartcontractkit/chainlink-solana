@@ -4,9 +4,10 @@ import { PublicKey } from '@solana/web3.js'
 import { createTransferInstruction, getAssociatedTokenAddress } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
+import { TOKEN_DECIMALS } from '../../../lib/constants'
 
 type Input = {
-  amount: number
+  amount: number | string
   link: string
 }
 
@@ -14,7 +15,7 @@ export default class Fund extends SolanaCommand {
   static id = 'ocr2:fund'
   static category = CONTRACT_LIST.OCR_2
 
-  static examples = ['yarn gauntlet ocr2:fund --network=devnet --amount=[AMOUNT] [AGGREGATOR_ADDRESS]']
+  static examples = ['yarn gauntlet ocr2:fund --network=devnet --amount=[AMOUNT in LINK] [AGGREGATOR_ADDRESS]']
 
   input: Input
 
@@ -39,7 +40,7 @@ export default class Fund extends SolanaCommand {
     const link = this.flags.link || process.env.LINK
     this.require(link, 'Please provide a link address with --link or env LINK')
     return {
-      amount: this.flags.amount,
+      amount: (BigInt(this.flags.amount) * BigInt(10) ** BigInt(TOKEN_DECIMALS)).toString(),
       link: this.flags.link || process.env.LINK,
     }
   }
@@ -57,7 +58,7 @@ export default class Fund extends SolanaCommand {
     const from = await getAssociatedTokenAddress(linkPublicKey, signer)
     const amount = new BN(this.input.amount)
     logger.loading(
-      `Transferring ${amount.toString()} tokens to ${state.toString()} aggregator token vault ${tokenVault.toString()}...`,
+      `Transferring ${amount.toString()} (${this.flags.amount}) tokens to ${state.toString()} aggregator token vault ${tokenVault.toString()}...`,
     )
 
     const ix = createTransferInstruction(from, tokenVault, signer, amount.toNumber())

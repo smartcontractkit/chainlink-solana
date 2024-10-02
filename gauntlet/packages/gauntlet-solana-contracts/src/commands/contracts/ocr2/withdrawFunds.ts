@@ -5,6 +5,7 @@ import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { utils } from '@coral-xyz/anchor'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
+import { TOKEN_DECIMALS } from '../../../lib/constants'
 
 type Input = {
   amountGjuels: number | string
@@ -16,7 +17,7 @@ export default class WithdrawFunds extends SolanaCommand {
   static category = CONTRACT_LIST.OCR_2
 
   static examples = [
-    'yarn gauntlet ocr2:withdraw_funds --network=devnet --amount=NUM_GJUELS --recipient=YOUR_LINK_ACCOUNT AGGREGATOR_ADDR',
+    'yarn gauntlet ocr2:withdraw_funds --network=devnet --amount=NUM_LINK --recipient=YOUR_LINK_ACCOUNT AGGREGATOR_ADDR',
     'yarn gauntlet ocr2:withdraw_funds --network=devnet --amount=100 --recipient=FTH1Kqvr5BhiAA786DdQVBQYJ1bs5XhKwTEETKCqYwMh 9hBz81AnfoeGgqVqQHKBiAXGJ2hKAs7A2KYFxn5yGgat',
   ]
 
@@ -26,7 +27,7 @@ export default class WithdrawFunds extends SolanaCommand {
     if (userInput) return userInput as Input
 
     if (!this.flags.amount) {
-      throw Error('Please specify --amount to withdraw')
+      throw Error('Please specify --amount to withdraw (in LINK)')
     }
 
     if (!this.flags.recipient) {
@@ -34,7 +35,7 @@ export default class WithdrawFunds extends SolanaCommand {
     }
 
     return {
-      amountGjuels: this.flags.amount,
+      amountGjuels: (BigInt(this.flags.amount) * BigInt(10) ** BigInt(TOKEN_DECIMALS)).toString(),
       recipient: new PublicKey(this.flags.recipient),
     }
   }
@@ -67,6 +68,10 @@ export default class WithdrawFunds extends SolanaCommand {
     )
 
     const billingAC = new PublicKey(info.config.billingAccessController)
+
+    logger.loading(
+      `Withdrawing ${this.input.amountGjuels} (${this.flags.amount}) tokens from ${state.toString()} aggregator token vault ${tokenVault.toString()}...`,
+    )
 
     const data = await this.program.methods
       .withdrawFunds(new BN(this.input.amountGjuels))
