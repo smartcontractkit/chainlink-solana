@@ -33,7 +33,7 @@ jobs:
       uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         path: contracts/docker-build.tar
-        key: ${{ runner.os }}-docker-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('**/Cargo.lock') }}'
+        key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('**/Cargo.lock') }}
     - name: build & save image
       if: steps.cache-image.outputs.cache-hit != 'true'
       run: |
@@ -61,7 +61,7 @@ jobs:
       uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         path: contracts/docker-build.tar
-        key: ${{ runner.os }}-docker-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('**/Cargo.lock') }}'
+        key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('**/Cargo.lock') }}
     - name: load cached image
       run: |
         docker load --input docker-build.tar
@@ -74,14 +74,14 @@ jobs:
           cd /repo/contracts &&\
           solana-keygen new -o id.json --no-bip39-passphrase &&\
           cd /repo/ts &&\
-          yarn install --frozen-lockfile &&\
-          yarn build &&\
+          pnpm install --frozen-lockfile &&\
+          pnpm build &&\
           cd /repo/contracts &&\
-          yarn install --frozen-lockfile &&\
+          pnpm install --frozen-lockfile &&\
           anchor test &&\
           chmod -R 755 ./target &&\
           cd /repo/contracts/examples/hello-world &&\
-          yarn install --frozen-lockfile &&\
+          pnpm install --frozen-lockfile &&\
           anchor test &&\
           chmod -R 755 ./target"
 
@@ -101,13 +101,14 @@ jobs:
       uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
       with:
         path: contracts/docker-build.tar
-        key: ${{ runner.os }}-docker-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('**/Cargo.lock') }}'
+        key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('**/Cargo.lock') }}
     - name: load cached image
       run: |
         docker load --input docker-build.tar
     - name: format contracts + artifacts
       run: |
-        yarn install --frozen-lockfile
+        npm install -g pnpm
+        pnpm install --frozen-lockfile
         cd ../ # back to root
         make format-contracts
         echo "run 'make format-contracts' if this fails"
