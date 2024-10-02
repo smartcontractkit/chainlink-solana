@@ -99,6 +99,7 @@ func NewClient(endpoint string, cfg *config.TOMLConfig, requestTimeout time.Dura
 		requestGroup:               &singleflight.Group{},
 		pollInterval:               cfg.MultiNode.PollInterval(),
 		finalizedBlockPollInterval: cfg.MultiNode.FinalizedBlockPollInterval(),
+		chStopInFlight:             make(chan struct{}),
 	}, nil
 }
 

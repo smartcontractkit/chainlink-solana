@@ -168,8 +168,12 @@ func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
 	testChain, err := newChain("devnet", cfg, nil, logger.Test(t))
 	require.NoError(t, err)
 
-	err = testChain.multiNode.Start(tests.Context(t))
-	assert.NoError(t, err)
+	err = testChain.Start(tests.Context(t))
+	require.NoError(t, err)
+	defer func() {
+		err := testChain.Close()
+		require.NoError(t, err)
+	}()
 
 	selectedClient, err := testChain.getClient()
 	assert.NoError(t, err)
