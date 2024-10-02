@@ -90,7 +90,7 @@ type chain struct {
 
 	// if multiNode is enabled, the clientCache will not be used
 	multiNode *mn.MultiNode[mn.StringID, *client.Client]
-	txSender  *mn.TransactionSender[*solanago.Transaction, mn.StringID, *client.Client]
+	txSender  *mn.TransactionSender[*solanago.Transaction, solanago.Signature, mn.StringID, *client.Client]
 
 	// tracking node chain id for verification
 	clientCache map[string]*verifiedCachedClient // map URL -> {client, chainId} [mainnet/testnet/devnet/localnet]
@@ -267,18 +267,12 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 			mnCfg.DeathDeclarationDelay(),
 		)
 
-		// TODO: implement error classification; move logic to separate file if large
-		// TODO: might be useful to reference anza-xyz/agave@master/sdk/src/transaction/error.rs
-		classifySendError := func(tx *solanago.Transaction, err error) mn.SendTxReturnCode {
-			return 0 // TODO ClassifySendError(err, clientErrors, logger.Sugared(logger.Nop()), tx, common.Address{}, false)
-		}
-
-		txSender := mn.NewTransactionSender[*solanago.Transaction, mn.StringID, *client.Client](
+		txSender := mn.NewTransactionSender[*solanago.Transaction, solanago.Signature, mn.StringID, *client.Client](
 			lggr,
 			mn.StringID(id),
 			chainFamily,
 			multiNode,
-			classifySendError,
+			ClassifySendError,
 			0, // use the default value provided by the implementation
 		)
 
@@ -292,7 +286,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 	tc := func() (client.ReaderWriter, error) {
 		return ch.getClient()
 	}
-	ch.txm = txm.NewTxm(ch.id, tc, cfg, ch.multiNode, ks, lggr)
+	ch.txm = txm.NewTxm(ch.id, tc, cfg, ch.multiNode, ch.txSender, ks, lggr)
 	bc := func() (monitor.BalanceClient, error) {
 		return ch.getClient()
 	}

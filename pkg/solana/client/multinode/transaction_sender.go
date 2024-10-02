@@ -28,31 +28,32 @@ var (
 // (e.g. Successful, Fatal, Retryable, etc.)
 type TxErrorClassifier[TX any] func(tx TX, err error) SendTxReturnCode
 
-type sendTxResult struct {
+type sendTxResult[RESULT any] struct {
 	Err        error
 	ResultCode SendTxReturnCode
+	Result     *RESULT
 }
 
 const sendTxQuorum = 0.7
 
 // SendTxRPCClient - defines interface of an RPC used by TransactionSender to broadcast transaction
-type SendTxRPCClient[TX any] interface {
+type SendTxRPCClient[TX any, RESULT any] interface {
 	// SendTransaction errors returned should include name or other unique identifier of the RPC
-	SendTransaction(ctx context.Context, tx TX) error
+	SendTransaction(ctx context.Context, tx TX) (*RESULT, error)
 }
 
-func NewTransactionSender[TX any, CHAIN_ID ID, RPC SendTxRPCClient[TX]](
+func NewTransactionSender[TX any, RESULT any, CHAIN_ID ID, RPC SendTxRPCClient[TX, RESULT]](
 	lggr logger.Logger,
 	chainID CHAIN_ID,
 	chainFamily string,
 	multiNode *MultiNode[CHAIN_ID, RPC],
 	txErrorClassifier TxErrorClassifier[TX],
 	sendTxSoftTimeout time.Duration,
-) *TransactionSender[TX, CHAIN_ID, RPC] {
+) *TransactionSender[TX, RESULT, CHAIN_ID, RPC] {
 	if sendTxSoftTimeout == 0 {
 		sendTxSoftTimeout = QueryTimeout / 2
 	}
-	return &TransactionSender[TX, CHAIN_ID, RPC]{
+	return &TransactionSender[TX, RESULT, CHAIN_ID, RPC]{
 		chainID:           chainID,
 		chainFamily:       chainFamily,
 		lggr:              logger.Sugared(lggr).Named("TransactionSender").With("chainID", chainID.String()),
@@ -63,7 +64,7 @@ func NewTransactionSender[TX any, CHAIN_ID ID, RPC SendTxRPCClient[TX]](
 	}
 }
 
-type TransactionSender[TX any, CHAIN_ID ID, RPC SendTxRPCClient[TX]] struct {
+type TransactionSender[TX any, RESULT any, CHAIN_ID ID, RPC SendTxRPCClient[TX, RESULT]] struct {
 	services.StateMachine
 	chainID           CHAIN_ID
 	chainFamily       string
@@ -94,9 +95,9 @@ type TransactionSender[TX any, CHAIN_ID ID, RPC SendTxRPCClient[TX]] struct {
 // * If there is at least one terminal error - returns terminal error
 // * If there is both success and terminal error - returns success and reports invariant violation
 // * Otherwise, returns any (effectively random) of the errors.
-func (txSender *TransactionSender[TX, CHAIN_ID, RPC]) SendTransaction(ctx context.Context, tx TX) (SendTxReturnCode, error) {
-	txResults := make(chan sendTxResult)
-	txResultsToReport := make(chan sendTxResult)
+func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ctx context.Context, tx TX) (*RESULT, SendTxReturnCode, error) {
+	txResults := make(chan sendTxResult[RESULT])
+	txResultsToReport := make(chan sendTxResult[RESULT])
 	primaryNodeWg := sync.WaitGroup{}
 
 	ctx, cancel := txSender.chStop.Ctx(ctx)
@@ -145,7 +146,7 @@ func (txSender *TransactionSender[TX, CHAIN_ID, RPC]) SendTransaction(ctx contex
 	}()
 
 	if err != nil {
-		return Retryable, err
+		return nil, Retryable, err
 	}
 
 	txSender.wg.Add(1)
@@ -154,34 +155,34 @@ func (txSender *TransactionSender[TX, CHAIN_ID, RPC]) SendTransaction(ctx contex
 	return txSender.collectTxResults(ctx, tx, healthyNodesNum, txResults)
 }
 
-func (txSender *TransactionSender[TX, CHAIN_ID, RPC]) broadcastTxAsync(ctx context.Context, rpc RPC, tx TX) sendTxResult {
-	txErr := rpc.SendTransaction(ctx, tx)
+func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) broadcastTxAsync(ctx context.Context, rpc RPC, tx TX) sendTxResult[RESULT] {
+	result, txErr := rpc.SendTransaction(ctx, tx)
 	txSender.lggr.Debugw("Node sent transaction", "tx", tx, "err", txErr)
 	resultCode := txSender.txErrorClassifier(tx, txErr)
 	if !slices.Contains(sendTxSuccessfulCodes, resultCode) {
 		txSender.lggr.Warnw("RPC returned error", "tx", tx, "err", txErr)
 	}
-	return sendTxResult{Err: txErr, ResultCode: resultCode}
+	return sendTxResult[RESULT]{Err: txErr, ResultCode: resultCode, Result: result}
 }
 
-func (txSender *TransactionSender[TX, CHAIN_ID, RPC]) reportSendTxAnomalies(tx TX, txResults <-chan sendTxResult) {
+func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) reportSendTxAnomalies(tx TX, txResults <-chan sendTxResult[RESULT]) {
 	defer txSender.wg.Done()
-	resultsByCode := sendTxResults{}
+	resultsByCode := sendTxResults[RESULT]{}
 	// txResults eventually will be closed
 	for txResult := range txResults {
-		resultsByCode[txResult.ResultCode] = append(resultsByCode[txResult.ResultCode], txResult.Err)
+		resultsByCode[txResult.ResultCode] = append(resultsByCode[txResult.ResultCode], txResult)
 	}
 
-	_, _, criticalErr := aggregateTxResults(resultsByCode)
+	_, _, _, criticalErr := aggregateTxResults[RESULT](resultsByCode)
 	if criticalErr != nil {
 		txSender.lggr.Criticalw("observed invariant violation on SendTransaction", "tx", tx, "resultsByCode", resultsByCode, "err", criticalErr)
 		PromMultiNodeInvariantViolations.WithLabelValues(txSender.chainFamily, txSender.chainID.String(), criticalErr.Error()).Inc()
 	}
 }
 
-type sendTxResults map[SendTxReturnCode][]error
+type sendTxResults[RESULT any] map[SendTxReturnCode][]sendTxResult[RESULT]
 
-func aggregateTxResults(resultsByCode sendTxResults) (returnCode SendTxReturnCode, txResult error, err error) {
+func aggregateTxResults[RESULT any](resultsByCode sendTxResults[RESULT]) (result *RESULT, returnCode SendTxReturnCode, txResult error, err error) {
 	severeCode, severeErrors, hasSevereErrors := findFirstIn(resultsByCode, sendTxSevereErrors)
 	successCode, successResults, hasSuccess := findFirstIn(resultsByCode, sendTxSuccessfulCodes)
 	if hasSuccess {
@@ -190,32 +191,32 @@ func aggregateTxResults(resultsByCode sendTxResults) (returnCode SendTxReturnCod
 		if hasSevereErrors {
 			const errMsg = "found contradictions in nodes replies on SendTransaction: got success and severe error"
 			// return success, since at least 1 node has accepted our broadcasted Tx, and thus it can now be included onchain
-			return successCode, successResults[0], errors.New(errMsg)
+			return successResults[0].Result, successCode, successResults[0].Err, errors.New(errMsg)
 		}
 
 		// other errors are temporary - we are safe to return success
-		return successCode, successResults[0], nil
+		return successResults[0].Result, successCode, successResults[0].Err, nil
 	}
 
 	if hasSevereErrors {
-		return severeCode, severeErrors[0], nil
+		return nil, severeCode, severeErrors[0].Err, nil
 	}
 
 	// return temporary error
 	for code, result := range resultsByCode {
-		return code, result[0], nil
+		return nil, code, result[0].Err, nil
 	}
 
 	err = fmt.Errorf("expected at least one response on SendTransaction")
-	return Retryable, err, err
+	return nil, Retryable, err, err
 }
 
-func (txSender *TransactionSender[TX, CHAIN_ID, RPC]) collectTxResults(ctx context.Context, tx TX, healthyNodesNum int, txResults <-chan sendTxResult) (SendTxReturnCode, error) {
+func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) collectTxResults(ctx context.Context, tx TX, healthyNodesNum int, txResults <-chan sendTxResult[RESULT]) (*RESULT, SendTxReturnCode, error) {
 	if healthyNodesNum == 0 {
-		return Retryable, ErroringNodeError
+		return nil, Retryable, ErroringNodeError
 	}
 	requiredResults := int(math.Ceil(float64(healthyNodesNum) * sendTxQuorum))
-	errorsByCode := sendTxResults{}
+	errorsByCode := sendTxResults[RESULT]{}
 	var softTimeoutChan <-chan time.Time
 	var resultsCount int
 loop:
@@ -223,9 +224,9 @@ loop:
 		select {
 		case <-ctx.Done():
 			txSender.lggr.Debugw("Failed to collect of the results before context was done", "tx", tx, "errorsByCode", errorsByCode)
-			return Retryable, ctx.Err()
+			return nil, Retryable, ctx.Err()
 		case result := <-txResults:
-			errorsByCode[result.ResultCode] = append(errorsByCode[result.ResultCode], result.Err)
+			errorsByCode[result.ResultCode] = append(errorsByCode[result.ResultCode], result)
 			resultsCount++
 			if slices.Contains(sendTxSuccessfulCodes, result.ResultCode) || resultsCount >= requiredResults {
 				break loop
@@ -245,17 +246,17 @@ loop:
 	}
 
 	// ignore critical error as it's reported in reportSendTxAnomalies
-	returnCode, result, _ := aggregateTxResults(errorsByCode)
-	return returnCode, result
+	result, returnCode, resultErr, _ := aggregateTxResults(errorsByCode)
+	return result, returnCode, resultErr
 }
 
-func (txSender *TransactionSender[TX, CHAIN_ID, RPC]) Start(ctx context.Context) error {
+func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) Start(ctx context.Context) error {
 	return txSender.StartOnce("TransactionSender", func() error {
 		return nil
 	})
 }
 
-func (txSender *TransactionSender[TX, CHAIN_ID, RPC]) Close() error {
+func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) Close() error {
 	return txSender.StopOnce("TransactionSender", func() error {
 		close(txSender.chStop)
 		txSender.wg.Wait()

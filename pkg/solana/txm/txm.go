@@ -53,8 +53,9 @@ type Txm struct {
 	ks      SimpleKeystore
 	fee     fees.Estimator
 
-	// Use multiNode for client selection if set
+	// Use multiNode for client selection if set, and txSender for sending transactions to all RPCs.
 	multiNode *mn.MultiNode[mn.StringID, *client.Client]
+	txSender  *mn.TransactionSender[*solanaGo.Transaction, solanaGo.Signature, mn.StringID, *client.Client]
 
 	// If multiNode is disabled, use lazy load to fetch client
 	client *utils.LazyLoad[client.ReaderWriter]
@@ -80,7 +81,10 @@ type pendingTx struct {
 }
 
 // NewTxm creates a txm. Uses simulation so should only be used to send txes to trusted contracts i.e. OCR.
-func NewTxm(chainID string, tc func() (client.ReaderWriter, error), cfg config.Config, multiNode *mn.MultiNode[mn.StringID, *client.Client], ks SimpleKeystore, lggr logger.Logger) *Txm {
+func NewTxm(chainID string, tc func() (client.ReaderWriter, error), cfg config.Config,
+	multiNode *mn.MultiNode[mn.StringID, *client.Client],
+	txSender *mn.TransactionSender[*solanaGo.Transaction, solanaGo.Signature, mn.StringID, *client.Client],
+	ks SimpleKeystore, lggr logger.Logger) *Txm {
 	return &Txm{
 		lggr:      lggr,
 		chSend:    make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
@@ -90,6 +94,7 @@ func NewTxm(chainID string, tc func() (client.ReaderWriter, error), cfg config.C
 		txs:       newPendingTxContextWithProm(chainID),
 		ks:        ks,
 		multiNode: multiNode,
+		txSender:  txSender,
 		client:    utils.NewLazyLoad(tc),
 	}
 }
@@ -104,6 +109,24 @@ func (txm *Txm) getClient() (client.ReaderWriter, error) {
 		return txm.multiNode.SelectRPC()
 	}
 	return txm.client.Get()
+}
+
+// sendTx uses the transaction sender if MultiNode is enabled, otherwise sends the
+// transaction using a single client
+func (txm *Txm) sendTx(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error) {
+	if txm.multiNodeEnabled() {
+		result, _, err := txm.txSender.SendTransaction(ctx, tx)
+		if err != nil {
+			return solanaGo.Signature{}, err
+		}
+		return *result, err
+	}
+
+	client, err := txm.getClient()
+	if err != nil {
+		return solanaGo.Signature{}, err
+	}
+	return client.SendTx(ctx, tx)
 }
 
 // Start subscribes to queuing channel and processes them.
@@ -174,12 +197,6 @@ func (txm *Txm) run() {
 }
 
 func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transaction, txcfg TxConfig) (solanaGo.Transaction, uuid.UUID, solanaGo.Signature, error) {
-	// fetch client
-	client, clientErr := txm.getClient()
-	if clientErr != nil {
-		return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, fmt.Errorf("failed to get client in soltxm.sendWithRetry: %w", clientErr)
-	}
-
 	// get key
 	// fee payer account is index 0 account
 	// https://github.com/gagliardetto/solana-go/blob/main/transaction.go#L252
@@ -239,7 +256,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 	ctx, cancel := context.WithTimeout(chanCtx, txcfg.Timeout)
 
 	// send initial tx (do not retry and exit early if fails)
-	sig, initSendErr := client.SendTx(ctx, &initTx)
+	sig, initSendErr := txm.sendTx(ctx, &initTx)
 	if initSendErr != nil {
 		cancel()                           // cancel context when exiting early
 		txm.txs.OnError(sig, TxFailReject) // increment failed metric
@@ -308,7 +325,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 				go func(bump bool, count int, retryTx solanaGo.Transaction) {
 					defer wg.Done()
 
-					retrySig, retrySendErr := client.SendTx(ctx, &retryTx)
+					retrySig, retrySendErr := txm.sendTx(ctx, &retryTx)
 					// this could occur if endpoint goes down or if ctx cancelled
 					if retrySendErr != nil {
 						if strings.Contains(retrySendErr.Error(), "context canceled") || strings.Contains(retrySendErr.Error(), "context deadline exceeded") {

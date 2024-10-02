@@ -65,7 +65,7 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 		}
 
 		// build minimal txm
-		txm := NewTxm("retry_race", getClient, cfg, nil, ks, lggr)
+		txm := NewTxm("retry_race", getClient, cfg, nil, nil, ks, lggr)
 		txm.fee = fee
 
 		_, _, _, err := txm.sendWithRetry(

@@ -127,7 +127,7 @@ func (h *Head) IsValid() bool {
 }
 
 var _ mn.RPCClient[mn.StringID, *Head] = (*Client)(nil)
-var _ mn.SendTxRPCClient[*solana.Transaction] = (*Client)(nil)
+var _ mn.SendTxRPCClient[*solana.Transaction, solana.Signature] = (*Client)(nil)
 
 func (c *Client) Dial(ctx context.Context) error {
 	return nil
@@ -315,10 +315,12 @@ func (c *Client) GetInterceptedChainInfo() (latest, highestUserObservations mn.C
 	return c.latestChainInfo, c.highestUserObservations
 }
 
-func (c *Client) SendTransaction(ctx context.Context, tx *solana.Transaction) error {
-	// TODO: Use Transaction Sender
-	_, err := c.SendTx(ctx, tx)
-	return err
+func (c *Client) SendTransaction(ctx context.Context, tx *solana.Transaction) (*solana.Signature, error) {
+	sig, err := c.SendTx(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	return &sig, err
 }
 
 func (c *Client) latency(name string) func() {
