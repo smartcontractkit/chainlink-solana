@@ -286,10 +286,6 @@ func (c *TOMLConfig) ListNodes() Nodes {
 	return c.Nodes
 }
 
-func (c *TOMLConfig) MultiNodeConfig() *MultiNodeConfig {
-	return &c.MultiNode
-}
-
 func (c *TOMLConfig) SetDefaults() {
 	c.Chain.SetDefaults()
 	c.MultiNode.SetDefaults()
