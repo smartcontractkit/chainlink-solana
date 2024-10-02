@@ -256,6 +256,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 			}
 		}
 
+		// TODO: Should this be *clinet.ReaderWriter instead of Client? And Client IS a ReaderWriter
 		multiNode := mn.NewMultiNode[mn.StringID, *client.Client](
 			lggr,
 			mnCfg.SelectionMode(),
@@ -292,7 +293,8 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 	tc := func() (client.ReaderWriter, error) {
 		return ch.getClient()
 	}
-	ch.txm = txm.NewTxm(ch.id, tc, cfg, ks, lggr)
+	// TODO: Pass MultiNode config as txm needs to know if multinode is enabled
+	ch.txm = txm.NewTxm(ch.id, tc, cfg, ch.multiNode, ks, lggr)
 	bc := func() (monitor.BalanceClient, error) {
 		return ch.getClient()
 	}
@@ -397,6 +399,7 @@ func (c *chain) ChainID() string {
 }
 
 // getClient returns a client, randomly selecting one from available and valid nodes
+// If multinode is enabled, it will return a client using the multinode selection instead.
 func (c *chain) getClient() (client.ReaderWriter, error) {
 	if c.cfg.MultiNode.Enabled() {
 		return c.multiNode.SelectRPC()

@@ -238,7 +238,7 @@ func (c *Client) Ping(ctx context.Context) error {
 }
 
 func (c *Client) IsSyncing(ctx context.Context) (bool, error) {
-	// Not relevant for Solana
+	// Not in use for Solana
 	return false, nil
 }
 
@@ -288,7 +288,7 @@ func (c *Client) GetInterceptedChainInfo() (latest, highestUserObservations mn.C
 }
 
 func (c *Client) SendTransaction(ctx context.Context, tx *solana.Transaction) error {
-	// TODO: Is this all we need to do here?
+	// TODO: Use Transaction Sender
 	_, err := c.SendTx(ctx, tx)
 	return err
 }

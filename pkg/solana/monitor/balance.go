@@ -99,16 +99,22 @@ func (b *balanceMonitor) monitor() {
 	}
 }
 
+// TODO: Use MultiNode for selection if enabled
 // getReader returns the cached solanaClient.Reader, or creates a new one if nil.
 func (b *balanceMonitor) getReader() (BalanceClient, error) {
-	if b.reader == nil {
-		var err error
-		b.reader, err = b.newReader()
-		if err != nil {
-			return nil, err
+	// TODO: Use MultiNode for selection if enabled
+	return b.newReader()
+
+	/*
+		if b.reader == nil {
+			var err error
+			b.reader, err = b.newReader()
+			if err != nil {
+				return nil, err
+			}
 		}
-	}
-	return b.reader, nil
+		return b.reader, nil
+	*/
 }
 
 func (b *balanceMonitor) updateBalances(ctx context.Context) {

@@ -309,7 +309,9 @@ func TestClient_Subscriptions_Integration(t *testing.T) {
 	lggr := logger.Test(t)
 	cfg := config.NewDefault()
 	// Enable MultiNode
-	cfg.MultiNode.SetDefaults(true)
+	enabled := true
+	cfg.MultiNode.SetDefaults()
+	cfg.Enabled = &enabled
 
 	c, err := NewClient(url, cfg, requestTimeout, lggr)
 	require.NoError(t, err)

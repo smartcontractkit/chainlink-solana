@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 	"strings"
 	"sync"
 	"time"
@@ -52,6 +53,9 @@ type Txm struct {
 	ks      SimpleKeystore
 	client  *utils.LazyLoad[client.ReaderWriter]
 	fee     fees.Estimator
+
+	// Use multiNode for client selection if not nil
+	multiNode *mn.MultiNode[mn.StringID, *client.Client]
 }
 
 type TxConfig struct {
@@ -74,16 +78,17 @@ type pendingTx struct {
 }
 
 // NewTxm creates a txm. Uses simulation so should only be used to send txes to trusted contracts i.e. OCR.
-func NewTxm(chainID string, tc func() (client.ReaderWriter, error), cfg config.Config, ks SimpleKeystore, lggr logger.Logger) *Txm {
+func NewTxm(chainID string, tc func() (client.ReaderWriter, error), cfg config.Config, multiNode *mn.MultiNode[mn.StringID, *client.Client], ks SimpleKeystore, lggr logger.Logger) *Txm {
 	return &Txm{
-		lggr:   lggr,
-		chSend: make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
-		chSim:  make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
-		chStop: make(chan struct{}),
-		cfg:    cfg,
-		txs:    newPendingTxContextWithProm(chainID),
-		ks:     ks,
-		client: utils.NewLazyLoad(tc),
+		lggr:      lggr,
+		chSend:    make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
+		chSim:     make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
+		chStop:    make(chan struct{}),
+		cfg:       cfg,
+		txs:       newPendingTxContextWithProm(chainID),
+		ks:        ks,
+		multiNode: multiNode,
+		client:    utils.NewLazyLoad(tc),
 	}
 }
 
@@ -115,6 +120,17 @@ func (txm *Txm) Start(ctx context.Context) error {
 	})
 }
 
+func (txm *Txm) multiNodeEnabled() bool {
+	return txm.multiNode != nil
+}
+
+func (txm *Txm) getClient() (client.ReaderWriter, error) {
+	if txm.multiNodeEnabled() {
+		return txm.multiNode.SelectRPC()
+	}
+	return txm.client.Get()
+}
+
 func (txm *Txm) run() {
 	defer txm.done.Done()
 	ctx, cancel := txm.chStop.NewCtx()
@@ -131,8 +147,10 @@ func (txm *Txm) run() {
 			tx, id, sig, err := txm.sendWithRetry(ctx, *msg.tx, msg.cfg)
 			if err != nil {
 				txm.lggr.Errorw("failed to send transaction", "error", err)
-				txm.client.Reset() // clear client if tx fails immediately (potentially bad RPC)
-				continue           // skip remainining
+				if !txm.multiNodeEnabled() {
+					txm.client.Reset() // clear client if tx fails immediately (potentially bad RPC)
+				}
+				continue // skip remainining
 			}
 
 			// send tx + signature to simulation queue
@@ -154,7 +172,7 @@ func (txm *Txm) run() {
 
 func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transaction, txcfg TxConfig) (solanaGo.Transaction, uuid.UUID, solanaGo.Signature, error) {
 	// fetch client
-	client, clientErr := txm.client.Get()
+	client, clientErr := txm.getClient()
 	if clientErr != nil {
 		return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, fmt.Errorf("failed to get client in soltxm.sendWithRetry: %w", clientErr)
 	}
@@ -363,7 +381,7 @@ func (txm *Txm) confirm(ctx context.Context) {
 			}
 
 			// get client
-			client, err := txm.client.Get()
+			client, err := txm.getClient()
 			if err != nil {
 				txm.lggr.Errorw("failed to get client in soltxm.confirm", "error", err)
 				break // exit switch
@@ -477,7 +495,7 @@ func (txm *Txm) simulate(ctx context.Context) {
 			return
 		case msg := <-txm.chSim:
 			// get client
-			client, err := txm.client.Get()
+			client, err := txm.getClient()
 			if err != nil {
 				txm.lggr.Errorw("failed to get client in soltxm.simulate", "error", err)
 				continue

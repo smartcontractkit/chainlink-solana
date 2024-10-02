@@ -298,6 +298,6 @@ func (c *TOMLConfig) SetDefaults() {
 func NewDefault() *TOMLConfig {
 	cfg := &TOMLConfig{}
 	cfg.Chain.SetDefaults()
-	cfg.MultiNode.SetDefaults(false)
+	cfg.MultiNode.SetDefaults()
 	return cfg
 }
