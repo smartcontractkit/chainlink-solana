@@ -256,7 +256,6 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 			}
 		}
 
-		// TODO: Should this be *clinet.ReaderWriter instead of Client? And Client IS a ReaderWriter
 		multiNode := mn.NewMultiNode[mn.StringID, *client.Client](
 			lggr,
 			mnCfg.SelectionMode(),
