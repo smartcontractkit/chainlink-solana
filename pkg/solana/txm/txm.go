@@ -51,11 +51,13 @@ type Txm struct {
 	cfg     config.Config
 	txs     PendingTxContext
 	ks      SimpleKeystore
-	client  *utils.LazyLoad[client.ReaderWriter]
 	fee     fees.Estimator
 
-	// Use multiNode for client selection if not nil
+	// Use multiNode for client selection if set
 	multiNode *mn.MultiNode[mn.StringID, *client.Client]
+
+	// If multiNode is disabled, use lazy load to fetch client
+	client *utils.LazyLoad[client.ReaderWriter]
 }
 
 type TxConfig struct {
@@ -92,6 +94,18 @@ func NewTxm(chainID string, tc func() (client.ReaderWriter, error), cfg config.C
 	}
 }
 
+func (txm *Txm) multiNodeEnabled() bool {
+	return txm.multiNode != nil
+}
+
+// getClient returns a client selected by multiNode if enabled, otherwise returns a client from the lazy load
+func (txm *Txm) getClient() (client.ReaderWriter, error) {
+	if txm.multiNodeEnabled() {
+		return txm.multiNode.SelectRPC()
+	}
+	return txm.client.Get()
+}
+
 // Start subscribes to queuing channel and processes them.
 func (txm *Txm) Start(ctx context.Context) error {
 	return txm.starter.StartOnce("solana_txm", func() error {
@@ -118,17 +132,6 @@ func (txm *Txm) Start(ctx context.Context) error {
 		go txm.run()
 		return nil
 	})
-}
-
-func (txm *Txm) multiNodeEnabled() bool {
-	return txm.multiNode != nil
-}
-
-func (txm *Txm) getClient() (client.ReaderWriter, error) {
-	if txm.multiNodeEnabled() {
-		return txm.multiNode.SelectRPC()
-	}
-	return txm.client.Get()
 }
 
 func (txm *Txm) run() {

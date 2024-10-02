@@ -26,19 +26,20 @@ type BalanceClient interface {
 }
 
 // NewBalanceMonitor returns a balance monitoring services.Service which reports the SOL balance of all ks keys to prometheus.
-func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, newReader func() (BalanceClient, error)) services.Service {
-	return newBalanceMonitor(chainID, cfg, lggr, ks, newReader)
+func NewBalanceMonitor(chainID string, cfg Config, multiNodeEnabled bool, lggr logger.Logger, ks Keystore, newReader func() (BalanceClient, error)) services.Service {
+	return newBalanceMonitor(chainID, cfg, multiNodeEnabled, lggr, ks, newReader)
 }
 
-func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, newReader func() (BalanceClient, error)) *balanceMonitor {
+func newBalanceMonitor(chainID string, cfg Config, multiNodeEnabled bool, lggr logger.Logger, ks Keystore, newReader func() (BalanceClient, error)) *balanceMonitor {
 	b := balanceMonitor{
-		chainID:   chainID,
-		cfg:       cfg,
-		lggr:      logger.Named(lggr, "BalanceMonitor"),
-		ks:        ks,
-		newReader: newReader,
-		stop:      make(chan struct{}),
-		done:      make(chan struct{}),
+		chainID:          chainID,
+		cfg:              cfg,
+		lggr:             logger.Named(lggr, "BalanceMonitor"),
+		ks:               ks,
+		newReader:        newReader,
+		multiNodeEnabled: multiNodeEnabled,
+		stop:             make(chan struct{}),
+		done:             make(chan struct{}),
 	}
 	b.updateFn = b.updateProm
 	return &b
@@ -53,7 +54,8 @@ type balanceMonitor struct {
 	newReader func() (BalanceClient, error)
 	updateFn  func(acc solana.PublicKey, lamports uint64) // overridable for testing
 
-	reader BalanceClient
+	multiNodeEnabled bool
+	reader           BalanceClient
 
 	stop services.StopChan
 	done chan struct{}
@@ -99,22 +101,22 @@ func (b *balanceMonitor) monitor() {
 	}
 }
 
-// TODO: Use MultiNode for selection if enabled
 // getReader returns the cached solanaClient.Reader, or creates a new one if nil.
 func (b *balanceMonitor) getReader() (BalanceClient, error) {
-	// TODO: Use MultiNode for selection if enabled
-	return b.newReader()
+	if b.multiNodeEnabled {
+		// Allow MultiNode to select the reader
+		return b.newReader()
+	}
 
-	/*
-		if b.reader == nil {
-			var err error
-			b.reader, err = b.newReader()
-			if err != nil {
-				return nil, err
-			}
+	// Self leasing wth cached reader
+	if b.reader == nil {
+		var err error
+		b.reader, err = b.newReader()
+		if err != nil {
+			return nil, err
 		}
-		return b.reader, nil
-	*/
+	}
+	return b.reader, nil
 }
 
 func (b *balanceMonitor) updateBalances(ctx context.Context) {

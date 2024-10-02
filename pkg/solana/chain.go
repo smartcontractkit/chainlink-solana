@@ -293,12 +293,11 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 	tc := func() (client.ReaderWriter, error) {
 		return ch.getClient()
 	}
-	// TODO: Pass MultiNode config as txm needs to know if multinode is enabled
 	ch.txm = txm.NewTxm(ch.id, tc, cfg, ch.multiNode, ks, lggr)
 	bc := func() (monitor.BalanceClient, error) {
 		return ch.getClient()
 	}
-	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
+	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, cfg.MultiNode.Enabled(), lggr, ks, bc)
 	return &ch, nil
 }
 
