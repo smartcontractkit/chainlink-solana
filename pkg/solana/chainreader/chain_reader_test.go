@@ -414,6 +414,7 @@ func (_m *mockedRPCClient) SetForAddress(pk ag_solana.PublicKey, bts []byte, err
 }
 
 type chainReaderInterfaceTester struct {
+	TestSelectionSupport
 	conf    config.ChainReader
 	address []string
 	reader  *wrappedTestChainReader
