@@ -51,10 +51,10 @@ type Txm struct {
 	txs     PendingTxContext
 	ks      SimpleKeystore
 	fee     fees.Estimator
-
-	multiNodeEnabled bool
-	tc               func() (client.ReaderWriter, error)
-
+	tc      func() (client.ReaderWriter, error)
+	// lazyLoadClient uses a single client until encountering an error.
+	// Disabled when using MultiNode to always get a healthy client.
+	lazyLoadClient bool
 	// If multiNode is disabled, use lazy load to fetch client
 	client *utils.LazyLoad[client.ReaderWriter]
 }
@@ -81,25 +81,25 @@ type pendingTx struct {
 // NewTxm creates a txm. Uses simulation so should only be used to send txes to trusted contracts i.e. OCR.
 func NewTxm(chainID string, tc func() (client.ReaderWriter, error), cfg *config.TOMLConfig, ks SimpleKeystore, lggr logger.Logger) *Txm {
 	return &Txm{
-		lggr:             lggr,
-		chSend:           make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
-		chSim:            make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
-		chStop:           make(chan struct{}),
-		cfg:              cfg,
-		txs:              newPendingTxContextWithProm(chainID),
-		ks:               ks,
-		multiNodeEnabled: cfg.MultiNode.Enabled(),
-		tc:               tc,
-		client:           utils.NewLazyLoad(tc),
+		lggr:           lggr,
+		chSend:         make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
+		chSim:          make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
+		chStop:         make(chan struct{}),
+		cfg:            cfg,
+		txs:            newPendingTxContextWithProm(chainID),
+		ks:             ks,
+		tc:             tc,
+		lazyLoadClient: !cfg.MultiNode.Enabled(),
+		client:         utils.NewLazyLoad(tc),
 	}
 }
 
 // getClient returns a client selected by multiNode if enabled, otherwise returns a client from the lazy load
 func (txm *Txm) getClient() (client.ReaderWriter, error) {
-	if txm.multiNodeEnabled {
-		return txm.tc()
+	if txm.lazyLoadClient {
+		return txm.client.Get()
 	}
-	return txm.client.Get()
+	return txm.tc()
 }
 
 // Start subscribes to queuing channel and processes them.
