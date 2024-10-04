@@ -112,7 +112,7 @@ func TestTxm(t *testing.T) {
 
 			txm := NewTxm(id, func() (client.ReaderWriter, error) {
 				return mc, nil
-			}, nil, cfg, mkey, lggr)
+			}, cfg, mkey, lggr)
 			require.NoError(t, txm.Start(ctx))
 
 			// tracking prom metrics
