@@ -50,8 +50,8 @@ type Txm struct {
 	cfg     config.Config
 	txs     PendingTxContext
 	ks      SimpleKeystore
-	fee     fees.Estimator
 	client  *utils.LazyLoad[client.ReaderWriter]
+	fee     fees.Estimator
 }
 
 type TxConfig struct {

@@ -718,7 +718,7 @@ func TestTxm_Enqueue(t *testing.T) {
 
 	txm := NewTxm("enqueue_test", func() (client.ReaderWriter, error) {
 		return mc, nil
-	}, cfg, nil, mkey, lggr)
+	}, cfg, mkey, lggr)
 
 	require.ErrorContains(t, txm.Enqueue("txmUnstarted", &solana.Transaction{}), "not started")
 	require.NoError(t, txm.Start(ctx))
