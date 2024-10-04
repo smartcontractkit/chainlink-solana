@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
-	"sync"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
@@ -13,8 +11,6 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/services"
-
 	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
@@ -67,297 +63,20 @@ type Client struct {
 
 	// provides a duplicate function call suppression mechanism
 	requestGroup *singleflight.Group
-
-	// MultiNode
-	pollInterval               time.Duration
-	finalizedBlockPollInterval time.Duration
-	stateMu                    sync.RWMutex // protects state* fields
-	subsSliceMu                sync.RWMutex
-	subs                       map[mn.Subscription]struct{}
-
-	// chStopInFlight can be closed to immediately cancel all in-flight requests on
-	// this RpcClient. Closing and replacing should be serialized through
-	// stateMu since it can happen on state transitions as well as RpcClient Close.
-	chStopInFlight chan struct{}
-
-	chainInfoLock sync.RWMutex
-	// intercepted values seen by callers of the rpcClient excluding health check calls. Need to ensure MultiNode provides repeatable read guarantee
-	highestUserObservations mn.ChainInfo
-	// most recent chain info observed during current lifecycle (reseted on DisconnectAll)
-	latestChainInfo mn.ChainInfo
 }
 
-func NewClient(endpoint string, cfg *config.TOMLConfig, requestTimeout time.Duration, log logger.Logger) (*Client, error) {
+func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration, log logger.Logger) (*Client, error) {
 	return &Client{
-		url:                        endpoint,
-		rpc:                        rpc.New(endpoint),
-		skipPreflight:              cfg.SkipPreflight(),
-		commitment:                 cfg.Commitment(),
-		maxRetries:                 cfg.MaxRetries(),
-		txTimeout:                  cfg.TxTimeout(),
-		contextDuration:            requestTimeout,
-		log:                        log,
-		requestGroup:               &singleflight.Group{},
-		pollInterval:               cfg.MultiNode.PollInterval(),
-		finalizedBlockPollInterval: cfg.MultiNode.FinalizedBlockPollInterval(),
-		chStopInFlight:             make(chan struct{}),
-		subs:                       make(map[mn.Subscription]struct{}),
+		url:             endpoint,
+		rpc:             rpc.New(endpoint),
+		skipPreflight:   cfg.SkipPreflight(),
+		commitment:      cfg.Commitment(),
+		maxRetries:      cfg.MaxRetries(),
+		txTimeout:       cfg.TxTimeout(),
+		contextDuration: requestTimeout,
+		log:             log,
+		requestGroup:    &singleflight.Group{},
 	}, nil
-}
-
-type Head struct {
-	BlockHeight *uint64
-	BlockHash   *solana.Hash
-}
-
-func (h *Head) BlockNumber() int64 {
-	if !h.IsValid() {
-		return 0
-	}
-	// nolint:gosec
-	// G115: integer overflow conversion uint64 -&gt; int64
-	return int64(*h.BlockHeight)
-}
-
-func (h *Head) BlockDifficulty() *big.Int {
-	// Not relevant for Solana
-	return nil
-}
-
-func (h *Head) IsValid() bool {
-	return h.BlockHeight != nil && h.BlockHash != nil
-}
-
-var _ mn.RPCClient[mn.StringID, *Head] = (*Client)(nil)
-var _ mn.SendTxRPCClient[*solana.Transaction, solana.Signature] = (*Client)(nil)
-
-// registerSub adds the sub to the rpcClient list
-func (c *Client) registerSub(sub mn.Subscription, stopInFLightCh chan struct{}) error {
-	c.subsSliceMu.Lock()
-	defer c.subsSliceMu.Unlock()
-	// ensure that the `sub` belongs to current life cycle of the `rpcClient` and it should not be killed due to
-	// previous `DisconnectAll` call.
-	select {
-	case <-stopInFLightCh:
-		sub.Unsubscribe()
-		return fmt.Errorf("failed to register subscription - all in-flight requests were canceled")
-	default:
-	}
-	// TODO: BCI-3358 - delete sub when caller unsubscribes.
-	c.subs[sub] = struct{}{}
-	return nil
-}
-
-func (c *Client) Dial(ctx context.Context) error {
-	return nil
-}
-
-func (c *Client) SubscribeToHeads(ctx context.Context) (<-chan *Head, mn.Subscription, error) {
-	ctx, cancel, chStopInFlight, _ := c.acquireQueryCtx(ctx, c.contextDuration)
-	defer cancel()
-
-	if c.pollInterval == 0 {
-		return nil, nil, errors.New("PollInterval is 0")
-	}
-	timeout := c.pollInterval
-	poller, channel := mn.NewPoller[*Head](c.pollInterval, c.LatestBlock, timeout, c.log)
-	if err := poller.Start(ctx); err != nil {
-		return nil, nil, err
-	}
-
-	err := c.registerSub(&poller, chStopInFlight)
-	if err != nil {
-		poller.Unsubscribe()
-		return nil, nil, err
-	}
-
-	return channel, &poller, nil
-}
-
-func (c *Client) SubscribeToFinalizedHeads(ctx context.Context) (<-chan *Head, mn.Subscription, error) {
-	ctx, cancel, chStopInFlight, _ := c.acquireQueryCtx(ctx, c.contextDuration)
-	defer cancel()
-
-	if c.finalizedBlockPollInterval == 0 {
-		return nil, nil, errors.New("FinalizedBlockPollInterval is 0")
-	}
-	timeout := c.finalizedBlockPollInterval
-	poller, channel := mn.NewPoller[*Head](c.finalizedBlockPollInterval, c.LatestFinalizedBlock, timeout, c.log)
-	if err := poller.Start(ctx); err != nil {
-		return nil, nil, err
-	}
-
-	err := c.registerSub(&poller, chStopInFlight)
-	if err != nil {
-		poller.Unsubscribe()
-		return nil, nil, err
-	}
-
-	return channel, &poller, nil
-}
-
-func (c *Client) LatestBlock(ctx context.Context) (*Head, error) {
-	// capture chStopInFlight to ensure we are not updating chainInfo with observations related to previous life cycle
-	ctx, cancel, chStopInFlight, rawRPC := c.acquireQueryCtx(ctx, c.contextDuration)
-	defer cancel()
-
-	result, err := rawRPC.GetLatestBlockhash(ctx, rpc.CommitmentConfirmed)
-	if err != nil {
-		return nil, err
-	}
-
-	head := &Head{
-		BlockHeight: &result.Value.LastValidBlockHeight,
-		BlockHash:   &result.Value.Blockhash,
-	}
-	c.onNewHead(ctx, chStopInFlight, head)
-	return head, nil
-}
-
-func (c *Client) LatestFinalizedBlock(ctx context.Context) (*Head, error) {
-	ctx, cancel, chStopInFlight, rawRPC := c.acquireQueryCtx(ctx, c.contextDuration)
-	defer cancel()
-
-	result, err := rawRPC.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
-	if err != nil {
-		return nil, err
-	}
-
-	head := &Head{
-		BlockHeight: &result.Value.LastValidBlockHeight,
-		BlockHash:   &result.Value.Blockhash,
-	}
-	c.onNewFinalizedHead(ctx, chStopInFlight, head)
-	return head, nil
-}
-
-func (c *Client) onNewHead(ctx context.Context, requestCh <-chan struct{}, head *Head) {
-	if head == nil {
-		return
-	}
-
-	c.chainInfoLock.Lock()
-	defer c.chainInfoLock.Unlock()
-	if !mn.CtxIsHeathCheckRequest(ctx) {
-		c.highestUserObservations.BlockNumber = max(c.highestUserObservations.BlockNumber, head.BlockNumber())
-	}
-	select {
-	case <-requestCh: // no need to update latestChainInfo, as rpcClient already started new life cycle
-		return
-	default:
-		c.latestChainInfo.BlockNumber = head.BlockNumber()
-	}
-}
-
-func (c *Client) onNewFinalizedHead(ctx context.Context, requestCh <-chan struct{}, head *Head) {
-	if head == nil {
-		return
-	}
-	c.chainInfoLock.Lock()
-	defer c.chainInfoLock.Unlock()
-	if !mn.CtxIsHeathCheckRequest(ctx) {
-		c.highestUserObservations.FinalizedBlockNumber = max(c.highestUserObservations.FinalizedBlockNumber, head.BlockNumber())
-	}
-	select {
-	case <-requestCh: // no need to update latestChainInfo, as rpcClient already started new life cycle
-		return
-	default:
-		c.latestChainInfo.FinalizedBlockNumber = head.BlockNumber()
-	}
-}
-
-// makeQueryCtx returns a context that cancels if:
-// 1. Passed in ctx cancels
-// 2. Passed in channel is closed
-// 3. Default timeout is reached (queryTimeout)
-func makeQueryCtx(ctx context.Context, ch services.StopChan, timeout time.Duration) (context.Context, context.CancelFunc) {
-	var chCancel, timeoutCancel context.CancelFunc
-	ctx, chCancel = ch.Ctx(ctx)
-	ctx, timeoutCancel = context.WithTimeout(ctx, timeout)
-	cancel := func() {
-		chCancel()
-		timeoutCancel()
-	}
-	return ctx, cancel
-}
-
-func (c *Client) acquireQueryCtx(parentCtx context.Context, timeout time.Duration) (ctx context.Context, cancel context.CancelFunc,
-	chStopInFlight chan struct{}, raw *rpc.Client) {
-	// Need to wrap in mutex because state transition can cancel and replace context
-	c.stateMu.RLock()
-	chStopInFlight = c.chStopInFlight
-	cp := *c.rpc
-	raw = &cp
-	c.stateMu.RUnlock()
-	ctx, cancel = makeQueryCtx(parentCtx, chStopInFlight, timeout)
-	return
-}
-
-func (c *Client) Ping(ctx context.Context) error {
-	version, err := c.rpc.GetVersion(ctx)
-	if err != nil {
-		return fmt.Errorf("ping failed: %v", err)
-	}
-	c.log.Debugf("ping client version: %s", version.SolanaCore)
-	return err
-}
-
-func (c *Client) IsSyncing(ctx context.Context) (bool, error) {
-	// Not in use for Solana
-	return false, nil
-}
-
-func (c *Client) UnsubscribeAllExcept(subs ...mn.Subscription) {
-	c.subsSliceMu.Lock()
-	defer c.subsSliceMu.Unlock()
-
-	keepSubs := map[mn.Subscription]struct{}{}
-	for _, sub := range subs {
-		keepSubs[sub] = struct{}{}
-	}
-
-	for sub := range c.subs {
-		if _, keep := keepSubs[sub]; !keep {
-			sub.Unsubscribe()
-			delete(c.subs, sub)
-		}
-	}
-}
-
-// cancelInflightRequests closes and replaces the chStopInFlight
-func (c *Client) cancelInflightRequests() {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	close(c.chStopInFlight)
-	c.chStopInFlight = make(chan struct{})
-}
-
-func (c *Client) Close() {
-	defer func() {
-		err := c.rpc.Close()
-		if err != nil {
-			c.log.Errorf("error closing rpc: %v", err)
-		}
-	}()
-	c.cancelInflightRequests()
-	c.UnsubscribeAllExcept()
-	c.chainInfoLock.Lock()
-	c.latestChainInfo = mn.ChainInfo{}
-	c.chainInfoLock.Unlock()
-}
-
-func (c *Client) GetInterceptedChainInfo() (latest, highestUserObservations mn.ChainInfo) {
-	c.chainInfoLock.Lock()
-	defer c.chainInfoLock.Unlock()
-	return c.latestChainInfo, c.highestUserObservations
-}
-
-func (c *Client) SendTransaction(ctx context.Context, tx *solana.Transaction) (*solana.Signature, error) {
-	sig, err := c.SendTx(ctx, tx)
-	if err != nil {
-		return nil, err
-	}
-	return &sig, err
 }
 
 func (c *Client) latency(name string) func() {

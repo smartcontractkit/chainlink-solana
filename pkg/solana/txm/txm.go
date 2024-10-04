@@ -51,13 +51,14 @@ type Txm struct {
 	txs     PendingTxContext
 	ks      SimpleKeystore
 	fee     fees.Estimator
-
-	multiNodeEnabled bool
 	// sendTx is an override for sending transactions rather than using a single client
 	// Enabling MultiNode uses this function to send transactions to all RPCs
 	sendTx func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error)
-	tc     func() (client.ReaderWriter, error)
 
+	tc func() (client.ReaderWriter, error)
+	// lazyLoadClient uses a single client until encountering an error.
+	// Disabled when using MultiNode to always get a healthy client.
+	lazyLoadClient bool
 	// If multiNode is disabled, use lazy load to fetch client
 	client *utils.LazyLoad[client.ReaderWriter]
 }
@@ -93,7 +94,6 @@ func NewTxm(chainID string, tc func() (client.ReaderWriter, error),
 		cfg:    cfg,
 		txs:    newPendingTxContextWithProm(chainID),
 		ks:     ks,
-		sendTx: sendTx,
 		tc:     tc,
 		client: utils.NewLazyLoad(tc),
 	}
@@ -101,10 +101,10 @@ func NewTxm(chainID string, tc func() (client.ReaderWriter, error),
 
 // getClient returns a client selected by multiNode if enabled, otherwise returns a client from the lazy load
 func (txm *Txm) getClient() (client.ReaderWriter, error) {
-	if txm.multiNodeEnabled {
-		return txm.tc()
+	if txm.sendTx {
+		return txm.client.Get()
 	}
-	return txm.client.Get()
+	return txm.tc()
 }
 
 // SendTx sends a transaction using a single client or an override sendTx function

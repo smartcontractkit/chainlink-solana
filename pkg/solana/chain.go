@@ -89,8 +89,8 @@ type chain struct {
 	lggr           logger.Logger
 
 	// if multiNode is enabled, the clientCache will not be used
-	multiNode *mn.MultiNode[mn.StringID, *client.Client]
-	txSender  *mn.TransactionSender[*solanago.Transaction, solanago.Signature, mn.StringID, *client.Client]
+	multiNode *mn.MultiNode[mn.StringID, *client.MultiNodeClient]
+	txSender  *mn.TransactionSender[*solanago.Transaction, solanago.Signature, mn.StringID, *client.MultiNodeClient]
 
 	// tracking node chain id for verification
 	clientCache map[string]*verifiedCachedClient // map URL -> {client, chainId} [mainnet/testnet/devnet/localnet]
@@ -237,28 +237,29 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 
 		mnCfg := &cfg.MultiNode
 
-		var nodes []mn.Node[mn.StringID, *client.Client]
-		var sendOnlyNodes []mn.SendOnlyNode[mn.StringID, *client.Client]
+		var nodes []mn.Node[mn.StringID, *client.MultiNodeClient]
+		var sendOnlyNodes []mn.SendOnlyNode[mn.StringID, *client.MultiNodeClient]
 
 		for i, nodeInfo := range cfg.ListNodes() {
-			rpcClient, err := client.NewClient(nodeInfo.URL.String(), cfg, DefaultRequestTimeout, logger.Named(lggr, "Client."+*nodeInfo.Name))
+			rpcClient, err := client.NewMultiNodeClient(nodeInfo.URL.String(), cfg, DefaultRequestTimeout, logger.Named(lggr, "Client."+*nodeInfo.Name))
 			if err != nil {
 				lggr.Warnw("failed to create client", "name", *nodeInfo.Name, "solana-url", nodeInfo.URL.String(), "err", err.Error())
 				return nil, fmt.Errorf("failed to create client: %w", err)
 			}
 
-			newNode := mn.NewNode[mn.StringID, *client.Head, *client.Client](
-				mnCfg, mnCfg, lggr, *nodeInfo.URL.URL(), nil, *nodeInfo.Name,
-				i, mn.StringID(id), 0, rpcClient, chainFamily)
-
 			if nodeInfo.SendOnly {
-				sendOnlyNodes = append(sendOnlyNodes, newNode)
+				newSendOnly := mn.NewSendOnlyNode[mn.StringID, *client.MultiNodeClient](
+					lggr, *nodeInfo.URL.URL(), *nodeInfo.Name, mn.StringID(id), rpcClient)
+				sendOnlyNodes = append(sendOnlyNodes, newSendOnly)
 			} else {
+				newNode := mn.NewNode[mn.StringID, *client.Head, *client.MultiNodeClient](
+					mnCfg, mnCfg, lggr, *nodeInfo.URL.URL(), nil, *nodeInfo.Name,
+					i, mn.StringID(id), 0, rpcClient, chainFamily)
 				nodes = append(nodes, newNode)
 			}
 		}
 
-		multiNode := mn.NewMultiNode[mn.StringID, *client.Client](
+		multiNode := mn.NewMultiNode[mn.StringID, *client.MultiNodeClient](
 			lggr,
 			mnCfg.SelectionMode(),
 			mnCfg.LeaseDuration(),
@@ -269,7 +270,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 			mnCfg.DeathDeclarationDelay(),
 		)
 
-		txSender := mn.NewTransactionSender[*solanago.Transaction, solanago.Signature, mn.StringID, *client.Client](
+		txSender := mn.NewTransactionSender[*solanago.Transaction, solanago.Signature, mn.StringID, *client.MultiNodeClient](
 			lggr,
 			mn.StringID(id),
 			chainFamily,
@@ -300,12 +301,15 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 	tc := func() (client.ReaderWriter, error) {
 		return ch.getClient()
 	}
+	cacheReader := !cfg.MultiNode.Enabled()
 
-	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
+	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, cacheReader, ks, lggr)
 	bc := func() (monitor.BalanceClient, error) {
 		return ch.getClient()
 	}
-	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
+
+	// disable caching reader for MultiNode to always get a healthy client
+	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc, cacheReader)
 	return &ch, nil
 }
 
