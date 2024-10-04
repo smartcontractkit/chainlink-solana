@@ -29,7 +29,7 @@ Available networks with declared IDs:
 
 ## Test
 
-Make sure to run `yarn install` to fetch mocha and other test dependencies.
+Make sure to run `pnpm i` to fetch mocha and other test dependencies.
 
 Start a dockerized shell that contains Solana and Anchor:
 

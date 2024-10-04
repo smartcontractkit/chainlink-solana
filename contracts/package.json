@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "@chainlink/solana-sdk": "../ts",
+    "@chainlink/solana-sdk": "link:../ts",
     "@coral-xyz/anchor": "^0.29.0",
     "@solana/spl-token": "^0.3.5",
     "@solana/web3.js": "^1.50.1 <=1.92.3",
@@ -20,7 +20,7 @@
     "typescript": "^4.5.4"
   },
   "scripts": {
-    "format": "yarn prettier --write .",
-    "test": "yarn upgrade @chainlink/solana-sdk && ts-mocha -t 1000000 tests/*.ts"
+    "format": "pnpm prettier --write .",
+    "test": "pnpm up @chainlink/solana-sdk && ts-mocha -t 1000000 tests/*.ts"
   }
 }
