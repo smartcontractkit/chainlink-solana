@@ -26,20 +26,19 @@ type BalanceClient interface {
 }
 
 // NewBalanceMonitor returns a balance monitoring services.Service which reports the SOL balance of all ks keys to prometheus.
-func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, newReader func() (BalanceClient, error), cacheReader bool) services.Service {
-	return newBalanceMonitor(chainID, cfg, lggr, ks, newReader, cacheReader)
+func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, newReader func() (BalanceClient, error)) services.Service {
+	return newBalanceMonitor(chainID, cfg, lggr, ks, newReader)
 }
 
-func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, newReader func() (BalanceClient, error), cacheReader bool) *balanceMonitor {
+func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, newReader func() (BalanceClient, error)) *balanceMonitor {
 	b := balanceMonitor{
-		chainID:     chainID,
-		cfg:         cfg,
-		lggr:        logger.Named(lggr, "BalanceMonitor"),
-		ks:          ks,
-		cacheReader: cacheReader,
-		newReader:   newReader,
-		stop:        make(chan struct{}),
-		done:        make(chan struct{}),
+		chainID:   chainID,
+		cfg:       cfg,
+		lggr:      logger.Named(lggr, "BalanceMonitor"),
+		ks:        ks,
+		newReader: newReader,
+		stop:      make(chan struct{}),
+		done:      make(chan struct{}),
 	}
 	b.updateFn = b.updateProm
 	return &b
@@ -54,10 +53,7 @@ type balanceMonitor struct {
 	newReader func() (BalanceClient, error)
 	updateFn  func(acc solana.PublicKey, lamports uint64) // overridable for testing
 
-	// cacheReader will use a single reader until encountering an error.
-	// Disabled when using MultiNode to always get a healthy client.
-	cacheReader bool
-	reader      BalanceClient
+	reader BalanceClient
 
 	stop services.StopChan
 	done chan struct{}
@@ -105,11 +101,6 @@ func (b *balanceMonitor) monitor() {
 
 // getReader returns the cached solanaClient.Reader, or creates a new one if nil.
 func (b *balanceMonitor) getReader() (BalanceClient, error) {
-	if !b.cacheReader {
-		return b.newReader()
-	}
-
-	// Use cached reader if available
 	if b.reader == nil {
 		var err error
 		b.reader, err = b.newReader()
