@@ -297,10 +297,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 	bc := func() (monitor.BalanceClient, error) {
 		return ch.getClient()
 	}
-
-	// disable caching reader for MultiNode to always get a healthy client
-	cacheReader := !cfg.MultiNode.Enabled()
-	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc, cacheReader)
+	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
 	return &ch, nil
 }
 
