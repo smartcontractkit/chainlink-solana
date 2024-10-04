@@ -51,8 +51,7 @@ type Txm struct {
 	txs     PendingTxContext
 	ks      SimpleKeystore
 	fee     fees.Estimator
-	// If multiNode is disabled, use lazy load to fetch client
-	client *utils.LazyLoad[client.ReaderWriter]
+	client  *utils.LazyLoad[client.ReaderWriter]
 }
 
 type TxConfig struct {

@@ -46,7 +46,7 @@ func TestBalanceMonitor(t *testing.T) {
 		exp = append(exp, update{acc.String(), expBals[i]})
 	}
 	cfg := &config{balancePollPeriod: time.Second}
-	b := newBalanceMonitor(chainID, cfg, logger.Test(t), ks, nil, true)
+	b := newBalanceMonitor(chainID, cfg, logger.Test(t), ks, nil)
 	var got []update
 	done := make(chan struct{})
 	b.updateFn = func(acc solana.PublicKey, lamports uint64) {
