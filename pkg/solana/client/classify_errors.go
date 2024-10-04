@@ -1,4 +1,4 @@
-package solana
+package client
 
 import (
 	"github.com/gagliardetto/solana-go"

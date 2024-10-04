@@ -275,7 +275,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 			mn.StringID(id),
 			chainFamily,
 			multiNode,
-			ClassifySendError,
+			client.ClassifySendError,
 			0, // use the default value provided by the implementation
 		)
 

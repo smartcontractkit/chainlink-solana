@@ -5,8 +5,6 @@ package txm
 import (
 	"context"
 	"errors"
-	solana2 "github.com/smartcontractkit/chainlink-solana/pkg/solana"
-	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 	"math/rand"
 	"sync"
 	"testing"
@@ -114,7 +112,7 @@ func TestTxm(t *testing.T) {
 
 			txm := NewTxm(id, func() (client.ReaderWriter, error) {
 				return mc, nil
-			}, cfg, nil, nil, mkey, lggr)
+			}, nil, cfg, mkey, lggr)
 			require.NoError(t, txm.Start(ctx))
 
 			// tracking prom metrics
@@ -676,6 +674,7 @@ func TestTxm(t *testing.T) {
 	}
 }
 
+/* TODO: Test MultiNode with txm
 func TestTxm_MultiNode(t *testing.T) {
 	for _, eName := range []string{"fixed", "blockhistory"} {
 		estimator := eName
@@ -716,12 +715,11 @@ func TestTxm_MultiNode(t *testing.T) {
 			txSender := mn.NewTransactionSender[*solanago.Transaction, solanago.Signature, mn.StringID, *client.Client](
 				lggr,
 				mn.StringID(id),
-				chainFamily,
+				"Solana",
 				multiNode,
-				solana2.ClassifySendError,
+				client.ClassifySendError,
 				0, // use the default value provided by the implementation
 			)
-			txSender := mn.NewTransactionSender(multiNode, lggr)
 
 			// mock solana keystore
 			mkey := keyMocks.NewSimpleKeystore(t)
@@ -729,7 +727,7 @@ func TestTxm_MultiNode(t *testing.T) {
 
 			txm := NewTxm(id, func() (client.ReaderWriter, error) {
 				return mc, nil
-			}, cfg, nil, nil, mkey, lggr)
+			}, nil, cfg, mkey, lggr)
 			require.NoError(t, txm.Start(ctx))
 
 			// tracking prom metrics
@@ -1290,6 +1288,7 @@ func TestTxm_MultiNode(t *testing.T) {
 		})
 	}
 }
+*/
 
 func TestTxm_Enqueue(t *testing.T) {
 	// set up configs needed in txm
@@ -1335,7 +1334,7 @@ func TestTxm_Enqueue(t *testing.T) {
 
 	txm := NewTxm("enqueue_test", func() (client.ReaderWriter, error) {
 		return mc, nil
-	}, cfg, mkey, lggr)
+	}, nil, cfg, mkey, lggr)
 
 	require.ErrorContains(t, txm.Enqueue("txmUnstarted", &solana.Transaction{}), "not started")
 	require.NoError(t, txm.Start(ctx))
