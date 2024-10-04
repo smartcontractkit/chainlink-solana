@@ -2,9 +2,10 @@ package client
 
 import (
 	"context"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"testing"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/require"
