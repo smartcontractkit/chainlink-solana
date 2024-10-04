@@ -50,17 +50,11 @@ type Txm struct {
 	cfg     config.Config
 	txs     PendingTxContext
 	ks      SimpleKeystore
+	client  *utils.LazyLoad[client.ReaderWriter]
 	fee     fees.Estimator
 	// sendTx is an override for sending transactions rather than using a single client
 	// Enabling MultiNode uses this function to send transactions to all RPCs
 	sendTx func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error)
-
-	tc func() (client.ReaderWriter, error)
-	// lazyLoadClient uses a single client until encountering an error.
-	// Disabled when using MultiNode to always get a healthy client.
-	lazyLoadClient bool
-	// If multiNode is disabled, use lazy load to fetch client
-	client *utils.LazyLoad[client.ReaderWriter]
 }
 
 type TxConfig struct {
@@ -94,29 +88,19 @@ func NewTxm(chainID string, tc func() (client.ReaderWriter, error),
 		cfg:    cfg,
 		txs:    newPendingTxContextWithProm(chainID),
 		ks:     ks,
-		tc:     tc,
 		client: utils.NewLazyLoad(tc),
+		sendTx: sendTx,
 	}
-}
-
-// getClient returns a client selected by multiNode if enabled, otherwise returns a client from the lazy load
-func (txm *Txm) getClient() (client.ReaderWriter, error) {
-	if txm.sendTx {
-		return txm.client.Get()
-	}
-	return txm.tc()
 }
 
 // SendTx sends a transaction using a single client or an override sendTx function
 func (txm *Txm) SendTx(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error) {
 	if txm.sendTx != nil {
-		// Use override sendTx function
-		// MultiNode uses this function to send transactions to all RPCs
 		return txm.sendTx(ctx, tx)
 	}
 
 	// Send tx using a single RPC client
-	client, err := txm.getClient()
+	client, err := txm.client.Get()
 	if err != nil {
 		return solanaGo.Signature{}, err
 	}
@@ -393,7 +377,7 @@ func (txm *Txm) confirm(ctx context.Context) {
 			}
 
 			// get client
-			client, err := txm.getClient()
+			client, err := txm.client.Get()
 			if err != nil {
 				txm.lggr.Errorw("failed to get client in soltxm.confirm", "error", err)
 				break // exit switch
@@ -507,7 +491,7 @@ func (txm *Txm) simulate(ctx context.Context) {
 			return
 		case msg := <-txm.chSim:
 			// get client
-			client, err := txm.getClient()
+			client, err := txm.client.Get()
 			if err != nil {
 				txm.lggr.Errorw("failed to get client in soltxm.simulate", "error", err)
 				continue
