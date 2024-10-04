@@ -230,10 +230,10 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 		clientCache: map[string]*verifiedCachedClient{},
 	}
 
-	if cfg.MultiNodeConfig().Enabled() {
+	if cfg.MultiNode.Enabled() {
 		chainFamily := "solana"
 
-		mnCfg := cfg.MultiNodeConfig()
+		mnCfg := &cfg.MultiNode
 
 		var nodes []mn.Node[mn.StringID, *client.Client]
 		var sendOnlyNodes []mn.SendOnlyNode[mn.StringID, *client.Client]

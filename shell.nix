@@ -26,6 +26,7 @@ pkgs.mkShell {
     nodePackages.typescript
     nodePackages.typescript-language-server
     nodePackages.npm
+    nodePackages.pnpm
     # Keep this nodejs version in sync with the version in .tool-versions please
     nodejs-18_x
     (yarn.override { nodejs = nodejs-18_x; })
