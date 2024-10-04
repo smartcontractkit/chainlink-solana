@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 )
@@ -53,8 +52,8 @@ type Txm struct {
 	ks      SimpleKeystore
 	fee     fees.Estimator
 
-	// Use multiNode for client selection if set
-	multiNode *mn.MultiNode[mn.StringID, *client.Client]
+	multiNodeEnabled bool
+	tc               func() (client.ReaderWriter, error)
 
 	// If multiNode is disabled, use lazy load to fetch client
 	client *utils.LazyLoad[client.ReaderWriter]
@@ -80,28 +79,25 @@ type pendingTx struct {
 }
 
 // NewTxm creates a txm. Uses simulation so should only be used to send txes to trusted contracts i.e. OCR.
-func NewTxm(chainID string, tc func() (client.ReaderWriter, error), cfg config.Config, multiNode *mn.MultiNode[mn.StringID, *client.Client], ks SimpleKeystore, lggr logger.Logger) *Txm {
+func NewTxm(chainID string, tc func() (client.ReaderWriter, error), cfg *config.TOMLConfig, ks SimpleKeystore, lggr logger.Logger) *Txm {
 	return &Txm{
-		lggr:      lggr,
-		chSend:    make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
-		chSim:     make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
-		chStop:    make(chan struct{}),
-		cfg:       cfg,
-		txs:       newPendingTxContextWithProm(chainID),
-		ks:        ks,
-		multiNode: multiNode,
-		client:    utils.NewLazyLoad(tc),
+		lggr:             lggr,
+		chSend:           make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
+		chSim:            make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
+		chStop:           make(chan struct{}),
+		cfg:              cfg,
+		txs:              newPendingTxContextWithProm(chainID),
+		ks:               ks,
+		multiNodeEnabled: cfg.MultiNode.Enabled(),
+		tc:               tc,
+		client:           utils.NewLazyLoad(tc),
 	}
-}
-
-func (txm *Txm) multiNodeEnabled() bool {
-	return txm.multiNode != nil
 }
 
 // getClient returns a client selected by multiNode if enabled, otherwise returns a client from the lazy load
 func (txm *Txm) getClient() (client.ReaderWriter, error) {
-	if txm.multiNodeEnabled() {
-		return txm.multiNode.SelectRPC()
+	if txm.multiNodeEnabled {
+		return txm.tc()
 	}
 	return txm.client.Get()
 }
@@ -150,10 +146,8 @@ func (txm *Txm) run() {
 			tx, id, sig, err := txm.sendWithRetry(ctx, *msg.tx, msg.cfg)
 			if err != nil {
 				txm.lggr.Errorw("failed to send transaction", "error", err)
-				if !txm.multiNodeEnabled() {
-					txm.client.Reset() // clear client if tx fails immediately (potentially bad RPC)
-				}
-				continue // skip remainining
+				txm.client.Reset() // clear client if tx fails immediately (potentially bad RPC)
+				continue           // skip remainining
 			}
 
 			// send tx + signature to simulation queue

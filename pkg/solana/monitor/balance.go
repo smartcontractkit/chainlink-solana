@@ -2,6 +2,7 @@ package monitor
 
 import (
 	"context"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
@@ -26,18 +27,18 @@ type BalanceClient interface {
 }
 
 // NewBalanceMonitor returns a balance monitoring services.Service which reports the SOL balance of all ks keys to prometheus.
-func NewBalanceMonitor(chainID string, cfg Config, multiNodeEnabled bool, lggr logger.Logger, ks Keystore, newReader func() (BalanceClient, error)) services.Service {
-	return newBalanceMonitor(chainID, cfg, multiNodeEnabled, lggr, ks, newReader)
+func NewBalanceMonitor(chainID string, cfg *config.TOMLConfig, lggr logger.Logger, ks Keystore, newReader func() (BalanceClient, error)) services.Service {
+	return newBalanceMonitor(chainID, cfg, lggr, ks, newReader)
 }
 
-func newBalanceMonitor(chainID string, cfg Config, multiNodeEnabled bool, lggr logger.Logger, ks Keystore, newReader func() (BalanceClient, error)) *balanceMonitor {
+func newBalanceMonitor(chainID string, cfg *config.TOMLConfig, lggr logger.Logger, ks Keystore, newReader func() (BalanceClient, error)) *balanceMonitor {
 	b := balanceMonitor{
 		chainID:          chainID,
 		cfg:              cfg,
 		lggr:             logger.Named(lggr, "BalanceMonitor"),
 		ks:               ks,
 		newReader:        newReader,
-		multiNodeEnabled: multiNodeEnabled,
+		multiNodeEnabled: cfg.MultiNode.Enabled(),
 		stop:             make(chan struct{}),
 		done:             make(chan struct{}),
 	}
