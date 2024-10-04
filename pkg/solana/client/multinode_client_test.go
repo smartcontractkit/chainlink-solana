@@ -2,18 +2,18 @@ package client
 
 import (
 	"context"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"testing"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
-func TestMultiNodeClient_Subscriptions_Integration(t *testing.T) {
+func TestMultiNodeClient_Subscriptions(t *testing.T) {
 	url := SetupLocalSolNode(t)
 	privKey, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
@@ -25,7 +25,6 @@ func TestMultiNodeClient_Subscriptions_Integration(t *testing.T) {
 	cfg := config.NewDefault()
 	// Enable MultiNode
 	enabled := true
-	cfg.MultiNode.SetDefaults()
 	cfg.Enabled = &enabled
 
 	c, err := NewMultiNodeClient(url, cfg, requestTimeout, lggr)
