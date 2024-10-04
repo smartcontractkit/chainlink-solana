@@ -301,15 +301,11 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 	tc := func() (client.ReaderWriter, error) {
 		return ch.getClient()
 	}
-	cacheReader := !cfg.MultiNode.Enabled()
-
-	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, cacheReader, ks, lggr)
+	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
 	bc := func() (monitor.BalanceClient, error) {
 		return ch.getClient()
 	}
-
-	// disable caching reader for MultiNode to always get a healthy client
-	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc, cacheReader)
+	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
 	return &ch, nil
 }
 
