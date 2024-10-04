@@ -72,6 +72,7 @@ type Client struct {
 	pollInterval               time.Duration
 	finalizedBlockPollInterval time.Duration
 	stateMu                    sync.RWMutex // protects state* fields
+	subsSliceMu                sync.RWMutex
 	subs                       map[mn.Subscription]struct{}
 
 	// chStopInFlight can be closed to immediately cancel all in-flight requests on
@@ -100,6 +101,7 @@ func NewClient(endpoint string, cfg *config.TOMLConfig, requestTimeout time.Dura
 		pollInterval:               cfg.MultiNode.PollInterval(),
 		finalizedBlockPollInterval: cfg.MultiNode.FinalizedBlockPollInterval(),
 		chStopInFlight:             make(chan struct{}),
+		subs:                       make(map[mn.Subscription]struct{}),
 	}, nil
 }
 
@@ -129,11 +131,31 @@ func (h *Head) IsValid() bool {
 var _ mn.RPCClient[mn.StringID, *Head] = (*Client)(nil)
 var _ mn.SendTxRPCClient[*solana.Transaction, solana.Signature] = (*Client)(nil)
 
+// registerSub adds the sub to the rpcClient list
+func (c *Client) registerSub(sub mn.Subscription, stopInFLightCh chan struct{}) error {
+	c.subsSliceMu.Lock()
+	defer c.subsSliceMu.Unlock()
+	// ensure that the `sub` belongs to current life cycle of the `rpcClient` and it should not be killed due to
+	// previous `DisconnectAll` call.
+	select {
+	case <-stopInFLightCh:
+		sub.Unsubscribe()
+		return fmt.Errorf("failed to register subscription - all in-flight requests were canceled")
+	default:
+	}
+	// TODO: BCI-3358 - delete sub when caller unsubscribes.
+	c.subs[sub] = struct{}{}
+	return nil
+}
+
 func (c *Client) Dial(ctx context.Context) error {
 	return nil
 }
 
 func (c *Client) SubscribeToHeads(ctx context.Context) (<-chan *Head, mn.Subscription, error) {
+	ctx, cancel, chStopInFlight, _ := c.acquireQueryCtx(ctx, c.contextDuration)
+	defer cancel()
+
 	if c.pollInterval == 0 {
 		return nil, nil, errors.New("PollInterval is 0")
 	}
@@ -142,10 +164,20 @@ func (c *Client) SubscribeToHeads(ctx context.Context) (<-chan *Head, mn.Subscri
 	if err := poller.Start(ctx); err != nil {
 		return nil, nil, err
 	}
+
+	err := c.registerSub(&poller, chStopInFlight)
+	if err != nil {
+		poller.Unsubscribe()
+		return nil, nil, err
+	}
+
 	return channel, &poller, nil
 }
 
 func (c *Client) SubscribeToFinalizedHeads(ctx context.Context) (<-chan *Head, mn.Subscription, error) {
+	ctx, cancel, chStopInFlight, _ := c.acquireQueryCtx(ctx, c.contextDuration)
+	defer cancel()
+
 	if c.finalizedBlockPollInterval == 0 {
 		return nil, nil, errors.New("FinalizedBlockPollInterval is 0")
 	}
@@ -154,6 +186,13 @@ func (c *Client) SubscribeToFinalizedHeads(ctx context.Context) (<-chan *Head, m
 	if err := poller.Start(ctx); err != nil {
 		return nil, nil, err
 	}
+
+	err := c.registerSub(&poller, chStopInFlight)
+	if err != nil {
+		poller.Unsubscribe()
+		return nil, nil, err
+	}
+
 	return channel, &poller, nil
 }
 
@@ -201,14 +240,12 @@ func (c *Client) onNewHead(ctx context.Context, requestCh <-chan struct{}, head 
 	defer c.chainInfoLock.Unlock()
 	if !mn.CtxIsHeathCheckRequest(ctx) {
 		c.highestUserObservations.BlockNumber = max(c.highestUserObservations.BlockNumber, head.BlockNumber())
-		c.highestUserObservations.TotalDifficulty = mn.MaxTotalDifficulty(c.highestUserObservations.TotalDifficulty, head.BlockDifficulty())
 	}
 	select {
 	case <-requestCh: // no need to update latestChainInfo, as rpcClient already started new life cycle
 		return
 	default:
 		c.latestChainInfo.BlockNumber = head.BlockNumber()
-		c.latestChainInfo.TotalDifficulty = head.BlockDifficulty()
 	}
 }
 
@@ -271,8 +308,8 @@ func (c *Client) IsSyncing(ctx context.Context) (bool, error) {
 }
 
 func (c *Client) UnsubscribeAllExcept(subs ...mn.Subscription) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
+	c.subsSliceMu.Lock()
+	defer c.subsSliceMu.Unlock()
 
 	keepSubs := map[mn.Subscription]struct{}{}
 	for _, sub := range subs {

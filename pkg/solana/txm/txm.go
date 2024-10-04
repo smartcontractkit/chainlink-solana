@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 )
@@ -53,9 +52,11 @@ type Txm struct {
 	ks      SimpleKeystore
 	fee     fees.Estimator
 
-	// Use multiNode for client selection if set, and txSender for sending transactions to all RPCs.
-	multiNode *mn.MultiNode[mn.StringID, *client.Client]
-	txSender  *mn.TransactionSender[*solanaGo.Transaction, solanaGo.Signature, mn.StringID, *client.Client]
+	multiNodeEnabled bool
+	// sendTx is an override for sending transactions rather than using a single client
+	// Enabling MultiNode uses this function to send transactions to all RPCs
+	sendTx func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error)
+	tc     func() (client.ReaderWriter, error)
 
 	// If multiNode is disabled, use lazy load to fetch client
 	client *utils.LazyLoad[client.ReaderWriter]
@@ -81,47 +82,40 @@ type pendingTx struct {
 }
 
 // NewTxm creates a txm. Uses simulation so should only be used to send txes to trusted contracts i.e. OCR.
-func NewTxm(chainID string, tc func() (client.ReaderWriter, error), cfg config.Config,
-	multiNode *mn.MultiNode[mn.StringID, *client.Client],
-	txSender *mn.TransactionSender[*solanaGo.Transaction, solanaGo.Signature, mn.StringID, *client.Client],
-	ks SimpleKeystore, lggr logger.Logger) *Txm {
+func NewTxm(chainID string, tc func() (client.ReaderWriter, error),
+	sendTx func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error),
+	cfg config.Config, ks SimpleKeystore, lggr logger.Logger) *Txm {
 	return &Txm{
-		lggr:      lggr,
-		chSend:    make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
-		chSim:     make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
-		chStop:    make(chan struct{}),
-		cfg:       cfg,
-		txs:       newPendingTxContextWithProm(chainID),
-		ks:        ks,
-		multiNode: multiNode,
-		txSender:  txSender,
-		client:    utils.NewLazyLoad(tc),
+		lggr:   lggr,
+		chSend: make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
+		chSim:  make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
+		chStop: make(chan struct{}),
+		cfg:    cfg,
+		txs:    newPendingTxContextWithProm(chainID),
+		ks:     ks,
+		sendTx: sendTx,
+		tc:     tc,
+		client: utils.NewLazyLoad(tc),
 	}
-}
-
-func (txm *Txm) multiNodeEnabled() bool {
-	return txm.multiNode != nil
 }
 
 // getClient returns a client selected by multiNode if enabled, otherwise returns a client from the lazy load
 func (txm *Txm) getClient() (client.ReaderWriter, error) {
-	if txm.multiNodeEnabled() {
-		return txm.multiNode.SelectRPC()
+	if txm.multiNodeEnabled {
+		return txm.tc()
 	}
 	return txm.client.Get()
 }
 
-// sendTx uses the transaction sender if MultiNode is enabled, otherwise sends the
-// transaction using a single client
-func (txm *Txm) sendTx(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error) {
-	if txm.multiNodeEnabled() {
-		result, _, err := txm.txSender.SendTransaction(ctx, tx)
-		if err != nil {
-			return solanaGo.Signature{}, err
-		}
-		return *result, err
+// SendTx sends a transaction using a single client or an override sendTx function
+func (txm *Txm) SendTx(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error) {
+	if txm.sendTx != nil {
+		// Use override sendTx function
+		// MultiNode uses this function to send transactions to all RPCs
+		return txm.sendTx(ctx, tx)
 	}
 
+	// Send tx using a single RPC client
 	client, err := txm.getClient()
 	if err != nil {
 		return solanaGo.Signature{}, err
@@ -173,10 +167,8 @@ func (txm *Txm) run() {
 			tx, id, sig, err := txm.sendWithRetry(ctx, *msg.tx, msg.cfg)
 			if err != nil {
 				txm.lggr.Errorw("failed to send transaction", "error", err)
-				if !txm.multiNodeEnabled() {
-					txm.client.Reset() // clear client if tx fails immediately (potentially bad RPC)
-				}
-				continue // skip remainining
+				txm.client.Reset() // clear client if tx fails immediately (potentially bad RPC)
+				continue           // skip remainining
 			}
 
 			// send tx + signature to simulation queue
@@ -256,7 +248,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 	ctx, cancel := context.WithTimeout(chanCtx, txcfg.Timeout)
 
 	// send initial tx (do not retry and exit early if fails)
-	sig, initSendErr := txm.sendTx(ctx, &initTx)
+	sig, initSendErr := txm.SendTx(ctx, &initTx)
 	if initSendErr != nil {
 		cancel()                           // cancel context when exiting early
 		txm.txs.OnError(sig, TxFailReject) // increment failed metric
@@ -325,7 +317,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 				go func(bump bool, count int, retryTx solanaGo.Transaction) {
 					defer wg.Done()
 
-					retrySig, retrySendErr := txm.sendTx(ctx, &retryTx)
+					retrySig, retrySendErr := txm.SendTx(ctx, &retryTx)
 					// this could occur if endpoint goes down or if ctx cancelled
 					if retrySendErr != nil {
 						if strings.Contains(retrySendErr.Error(), "context canceled") || strings.Contains(retrySendErr.Error(), "context deadline exceeded") {

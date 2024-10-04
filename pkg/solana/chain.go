@@ -230,10 +230,12 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 		clientCache: map[string]*verifiedCachedClient{},
 	}
 
-	if cfg.MultiNodeConfig().Enabled() {
+	var sendTx func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error)
+
+	if cfg.MultiNode.Enabled() {
 		chainFamily := "solana"
 
-		mnCfg := cfg.MultiNodeConfig()
+		mnCfg := &cfg.MultiNode
 
 		var nodes []mn.Node[mn.StringID, *client.Client]
 		var sendOnlyNodes []mn.SendOnlyNode[mn.StringID, *client.Client]
@@ -281,16 +283,29 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 
 		// clientCache will not be used if multinode is enabled
 		ch.clientCache = nil
+
+		sendTx = func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error) {
+			// Send tx using MultiNode transaction sender
+			result, _, err := ch.txSender.SendTransaction(ctx, tx)
+			if err != nil {
+				return solanago.Signature{}, err
+			}
+			if result == nil {
+				return solanago.Signature{}, errors.New("tx sender returned nil signature")
+			}
+			return *result, err
+		}
 	}
 
 	tc := func() (client.ReaderWriter, error) {
 		return ch.getClient()
 	}
-	ch.txm = txm.NewTxm(ch.id, tc, cfg, ch.multiNode, ch.txSender, ks, lggr)
+
+	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
 	bc := func() (monitor.BalanceClient, error) {
 		return ch.getClient()
 	}
-	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, cfg.MultiNode.Enabled(), lggr, ks, bc)
+	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
 	return &ch, nil
 }
 
