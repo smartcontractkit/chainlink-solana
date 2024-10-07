@@ -113,8 +113,8 @@ type TOMLConfig struct {
 	// Do not access directly, use [IsEnabled]
 	Enabled *bool
 	Chain
-	MultiNode
-	Nodes Nodes
+	MultiNode MultiNodeConfig
+	Nodes     Nodes
 }
 
 func (c *TOMLConfig) IsEnabled() bool {
@@ -130,6 +130,7 @@ func (c *TOMLConfig) SetFrom(f *TOMLConfig) {
 	}
 	setFromChain(&c.Chain, &f.Chain)
 	c.Nodes.SetFrom(&f.Nodes)
+	c.MultiNode.SetFrom(&f.MultiNode)
 }
 
 func setFromChain(c, f *Chain) {
@@ -283,10 +284,6 @@ func (c *TOMLConfig) ComputeUnitLimitDefault() uint32 {
 
 func (c *TOMLConfig) ListNodes() Nodes {
 	return c.Nodes
-}
-
-func (c *TOMLConfig) MultiNodeConfig() *MultiNode {
-	return &c.MultiNode
 }
 
 func (c *TOMLConfig) SetDefaults() {
