@@ -8,6 +8,8 @@ import (
 	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 )
 
+// Solana error patters
+// https://github.com/anza-xyz/agave/blob/master/sdk/src/transaction/error.rs
 var (
 	ErrAccountInUse                          = regexp.MustCompile(`Account in use`)
 	ErrAccountLoadedTwice                    = regexp.MustCompile(`Account loaded twice`)
@@ -50,7 +52,7 @@ var (
 )
 
 // Define a map to associate regex patterns with SendTxReturnCode
-var errorPatterns = map[*regexp.Regexp]mn.SendTxReturnCode{
+var errCodes = map[*regexp.Regexp]mn.SendTxReturnCode{
 	ErrAccountInUse:                          mn.Retryable,
 	ErrAccountLoadedTwice:                    mn.Retryable,
 	ErrAccountNotFound:                       mn.Retryable,
@@ -101,7 +103,7 @@ func ClassifySendError(tx *solana.Transaction, err error) mn.SendTxReturnCode {
 	}
 
 	errMsg := err.Error()
-	for pattern, code := range errorPatterns {
+	for pattern, code := range errCodes {
 		if pattern.MatchString(errMsg) {
 			return code
 		}
