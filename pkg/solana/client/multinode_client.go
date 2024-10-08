@@ -46,8 +46,6 @@ var _ mn.SendTxRPCClient[*solana.Transaction, solana.Signature] = (*MultiNodeCli
 type MultiNodeClient struct {
 	Client
 	cfg         *config.TOMLConfig
-	log         logger.Logger
-	rpc         *rpc.Client
 	stateMu     sync.RWMutex // protects state* fields
 	subsSliceMu sync.RWMutex
 	subs        map[mn.Subscription]struct{}
@@ -73,8 +71,6 @@ func NewMultiNodeClient(endpoint string, cfg *config.TOMLConfig, requestTimeout 
 	return &MultiNodeClient{
 		Client:         *client,
 		cfg:            cfg,
-		log:            log,
-		rpc:            rpc.New(endpoint),
 		subs:           make(map[mn.Subscription]struct{}),
 		chStopInFlight: make(chan struct{}),
 	}, nil
