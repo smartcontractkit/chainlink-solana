@@ -530,6 +530,7 @@ func TestSolanaChain_MultiNode_Txm(t *testing.T) {
 
 	// setup receiver key
 	privKeyReceiver, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
 	pubKeyReceiver := privKeyReceiver.PublicKey()
 
 	// mocked keystore
@@ -562,8 +563,8 @@ func TestSolanaChain_MultiNode_Txm(t *testing.T) {
 	createTx := func(signer solana.PublicKey, sender solana.PublicKey, receiver solana.PublicKey, amt uint64) *solana.Transaction {
 		selectedClient, err = testChain.getClient()
 		assert.NoError(t, err)
-		hash, err := selectedClient.LatestBlockhash()
-		assert.NoError(t, err)
+		hash, hashErr := selectedClient.LatestBlockhash()
+		assert.NoError(t, hashErr)
 		tx, err := solana.NewTransaction(
 			[]solana.Instruction{
 				system.NewTransferInstruction(
