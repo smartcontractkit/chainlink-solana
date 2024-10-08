@@ -1,100 +1,110 @@
 package client
 
 import (
+	"regexp"
+
 	"github.com/gagliardetto/solana-go"
+
 	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
-	"strings"
 )
 
-// ClassifySendError returns the corresponding SendTxReturnCode based on the error.
-// Errors derived from anza-xyz/agave@master/sdk/src/transaction/error.rs
+var (
+	ErrAccountInUse                          = regexp.MustCompile(`Account in use`)
+	ErrAccountLoadedTwice                    = regexp.MustCompile(`Account loaded twice`)
+	ErrAccountNotFound                       = regexp.MustCompile(`Attempt to debit an account but found no record of a prior credit\.`)
+	ErrProgramAccountNotFound                = regexp.MustCompile(`Attempt to load a program that does not exist`)
+	ErrInsufficientFundsForFee               = regexp.MustCompile(`Insufficient funds for fee`)
+	ErrInvalidAccountForFee                  = regexp.MustCompile(`This account may not be used to pay transaction fees`)
+	ErrAlreadyProcessed                      = regexp.MustCompile(`This transaction has already been processed`)
+	ErrBlockhashNotFound                     = regexp.MustCompile(`Blockhash not found`)
+	ErrInstructionError                      = regexp.MustCompile(`Error processing Instruction \d+: .+`)
+	ErrCallChainTooDeep                      = regexp.MustCompile(`Loader call chain is too deep`)
+	ErrMissingSignatureForFee                = regexp.MustCompile(`Transaction requires a fee but has no signature present`)
+	ErrInvalidAccountIndex                   = regexp.MustCompile(`Transaction contains an invalid account reference`)
+	ErrSignatureFailure                      = regexp.MustCompile(`Transaction did not pass signature verification`)
+	ErrInvalidProgramForExecution            = regexp.MustCompile(`This program may not be used for executing instructions`)
+	ErrSanitizeFailure                       = regexp.MustCompile(`Transaction failed to sanitize accounts offsets correctly`)
+	ErrClusterMaintenance                    = regexp.MustCompile(`Transactions are currently disabled due to cluster maintenance`)
+	ErrAccountBorrowOutstanding              = regexp.MustCompile(`Transaction processing left an account with an outstanding borrowed reference`)
+	ErrWouldExceedMaxBlockCostLimit          = regexp.MustCompile(`Transaction would exceed max Block Cost Limit`)
+	ErrUnsupportedVersion                    = regexp.MustCompile(`Transaction version is unsupported`)
+	ErrInvalidWritableAccount                = regexp.MustCompile(`Transaction loads a writable account that cannot be written`)
+	ErrWouldExceedMaxAccountCostLimit        = regexp.MustCompile(`Transaction would exceed max account limit within the block`)
+	ErrWouldExceedAccountDataBlockLimit      = regexp.MustCompile(`Transaction would exceed account data limit within the block`)
+	ErrTooManyAccountLocks                   = regexp.MustCompile(`Transaction locked too many accounts`)
+	ErrAddressLookupTableNotFound            = regexp.MustCompile(`Transaction loads an address table account that doesn't exist`)
+	ErrInvalidAddressLookupTableOwner        = regexp.MustCompile(`Transaction loads an address table account with an invalid owner`)
+	ErrInvalidAddressLookupTableData         = regexp.MustCompile(`Transaction loads an address table account with invalid data`)
+	ErrInvalidAddressLookupTableIndex        = regexp.MustCompile(`Transaction address table lookup uses an invalid index`)
+	ErrInvalidRentPayingAccount              = regexp.MustCompile(`Transaction leaves an account with a lower balance than rent-exempt minimum`)
+	ErrWouldExceedMaxVoteCostLimit           = regexp.MustCompile(`Transaction would exceed max Vote Cost Limit`)
+	ErrWouldExceedAccountDataTotalLimit      = regexp.MustCompile(`Transaction would exceed total account data limit`)
+	ErrDuplicateInstruction                  = regexp.MustCompile(`Transaction contains a duplicate instruction \(\d+\) that is not allowed`)
+	ErrInsufficientFundsForRent              = regexp.MustCompile(`Transaction results in an account \(\d+\) with insufficient funds for rent`)
+	ErrMaxLoadedAccountsDataSizeExceeded     = regexp.MustCompile(`Transaction exceeded max loaded accounts data size cap`)
+	ErrInvalidLoadedAccountsDataSizeLimit    = regexp.MustCompile(`LoadedAccountsDataSizeLimit set for transaction must be greater than 0\.`)
+	ErrResanitizationNeeded                  = regexp.MustCompile(`Sanitized transaction differed before/after feature activation\. Needs to be resanitized\.`)
+	ErrProgramExecutionTemporarilyRestricted = regexp.MustCompile(`Execution of the program referenced by account at index \d+ is temporarily restricted\.`)
+	ErrUnbalancedTransaction                 = regexp.MustCompile(`Sum of account balances before and after transaction do not match`)
+	ErrProgramCacheHitMaxLimit               = regexp.MustCompile(`Program cache hit max limit`)
+)
+
+// Define a map to associate regex patterns with SendTxReturnCode
+var errorPatterns = map[*regexp.Regexp]mn.SendTxReturnCode{
+	ErrAccountInUse:                          mn.Retryable,
+	ErrAccountLoadedTwice:                    mn.Retryable,
+	ErrAccountNotFound:                       mn.Retryable,
+	ErrProgramAccountNotFound:                mn.Fatal,
+	ErrInsufficientFundsForFee:               mn.InsufficientFunds,
+	ErrInvalidAccountForFee:                  mn.Unsupported,
+	ErrAlreadyProcessed:                      mn.TransactionAlreadyKnown,
+	ErrBlockhashNotFound:                     mn.Retryable,
+	ErrInstructionError:                      mn.Retryable,
+	ErrCallChainTooDeep:                      mn.Retryable,
+	ErrMissingSignatureForFee:                mn.Retryable,
+	ErrInvalidAccountIndex:                   mn.Retryable,
+	ErrSignatureFailure:                      mn.Fatal,
+	ErrInvalidProgramForExecution:            mn.Retryable,
+	ErrSanitizeFailure:                       mn.Fatal,
+	ErrClusterMaintenance:                    mn.Retryable,
+	ErrAccountBorrowOutstanding:              mn.Retryable,
+	ErrWouldExceedMaxBlockCostLimit:          mn.ExceedsMaxFee,
+	ErrUnsupportedVersion:                    mn.Unsupported,
+	ErrInvalidWritableAccount:                mn.Retryable,
+	ErrWouldExceedMaxAccountCostLimit:        mn.ExceedsMaxFee,
+	ErrWouldExceedAccountDataBlockLimit:      mn.ExceedsMaxFee,
+	ErrTooManyAccountLocks:                   mn.Retryable,
+	ErrAddressLookupTableNotFound:            mn.Retryable,
+	ErrInvalidAddressLookupTableOwner:        mn.Retryable,
+	ErrInvalidAddressLookupTableData:         mn.Retryable,
+	ErrInvalidAddressLookupTableIndex:        mn.Retryable,
+	ErrInvalidRentPayingAccount:              mn.Retryable,
+	ErrWouldExceedMaxVoteCostLimit:           mn.Retryable,
+	ErrWouldExceedAccountDataTotalLimit:      mn.Retryable,
+	ErrMaxLoadedAccountsDataSizeExceeded:     mn.Retryable,
+	ErrInvalidLoadedAccountsDataSizeLimit:    mn.Retryable,
+	ErrResanitizationNeeded:                  mn.Retryable,
+	ErrUnbalancedTransaction:                 mn.Retryable,
+	ErrProgramCacheHitMaxLimit:               mn.Retryable,
+	ErrInsufficientFundsForRent:              mn.InsufficientFunds,
+	ErrDuplicateInstruction:                  mn.Fatal,
+	ErrProgramExecutionTemporarilyRestricted: mn.Retryable,
+}
+
+// ClassifySendError implements TxErrorClassifier required for MultiNode TransactionSender
+var _ mn.TxErrorClassifier[*solana.Transaction] = ClassifySendError
+
+// ClassifySendError returns the corresponding return code based on the error.
 func ClassifySendError(tx *solana.Transaction, err error) mn.SendTxReturnCode {
 	if err == nil {
 		return mn.Successful
 	}
 
 	errMsg := err.Error()
-
-	// TODO: Ensure correct error classification for each error message.
-	// TODO: is strings.Contains good enough for error classification?
-	switch {
-	case strings.Contains(errMsg, "Account in use"):
-		return mn.TransactionAlreadyKnown
-	case strings.Contains(errMsg, "Account loaded twice"):
-		return mn.Retryable
-	case strings.Contains(errMsg, "Attempt to debit an account but found no record of a prior credit"):
-		return mn.Retryable
-	case strings.Contains(errMsg, "Attempt to load a program that does not exist"):
-		return mn.Fatal
-	case strings.Contains(errMsg, "Insufficient funds for fee"):
-		return mn.InsufficientFunds
-	case strings.Contains(errMsg, "This account may not be used to pay transaction fees"):
-		return mn.Unsupported
-	case strings.Contains(errMsg, "This transaction has already been processed"):
-		return mn.TransactionAlreadyKnown
-	case strings.Contains(errMsg, "Blockhash not found"):
-		return mn.Retryable
-	case strings.Contains(errMsg, "Error processing Instruction"):
-		return mn.Retryable
-	case strings.Contains(errMsg, "Loader call chain is too deep"):
-		return mn.Retryable
-	case strings.Contains(errMsg, "Transaction requires a fee but has no signature present"):
-		return mn.Retryable
-	case strings.Contains(errMsg, "Transaction contains an invalid account reference"):
-		return mn.Unsupported
-	case strings.Contains(errMsg, "Transaction did not pass signature verification"):
-		return mn.Fatal
-	case strings.Contains(errMsg, "This program may not be used for executing instructions"):
-		return mn.Unsupported
-	case strings.Contains(errMsg, "Transaction failed to sanitize accounts offsets correctly"):
-		return mn.Fatal
-	case strings.Contains(errMsg, "Transactions are currently disabled due to cluster maintenance"):
-		return mn.Retryable
-	case strings.Contains(errMsg, "Transaction processing left an account with an outstanding borrowed reference"):
-		return mn.Fatal
-	case strings.Contains(errMsg, "Transaction would exceed max Block Cost Limit"):
-		return mn.ExceedsMaxFee
-	case strings.Contains(errMsg, "Transaction version is unsupported"):
-		return mn.Unsupported
-	case strings.Contains(errMsg, "Transaction loads a writable account that cannot be written"):
-		return mn.Unsupported
-	case strings.Contains(errMsg, "Transaction would exceed max account limit within the block"):
-		return mn.ExceedsMaxFee
-	case strings.Contains(errMsg, "Transaction would exceed account data limit within the block"):
-		return mn.ExceedsMaxFee
-	case strings.Contains(errMsg, "Transaction locked too many accounts"):
-		return mn.Fatal
-	case strings.Contains(errMsg, "Transaction loads an address table account that doesn't exist"):
-		return mn.Unsupported
-	case strings.Contains(errMsg, "Transaction loads an address table account with an invalid owner"):
-		return mn.Unsupported
-	case strings.Contains(errMsg, "Transaction loads an address table account with invalid data"):
-		return mn.Unsupported
-	case strings.Contains(errMsg, "Transaction address table lookup uses an invalid index"):
-		return mn.Unsupported
-	case strings.Contains(errMsg, "Transaction leaves an account with a lower balance than rent-exempt minimum"):
-		return mn.Fatal
-	case strings.Contains(errMsg, "Transaction would exceed max Vote Cost Limit"):
-		return mn.ExceedsMaxFee
-	case strings.Contains(errMsg, "Transaction would exceed total account data limit"):
-		return mn.ExceedsMaxFee
-	case strings.Contains(errMsg, "Transaction contains a duplicate instruction"):
-		return mn.Fatal
-	case strings.Contains(errMsg, "Transaction results in an account with insufficient funds for rent"):
-		return mn.InsufficientFunds
-	case strings.Contains(errMsg, "Transaction exceeded max loaded accounts data size cap"):
-		return mn.Unsupported
-	case strings.Contains(errMsg, "LoadedAccountsDataSizeLimit set for transaction must be greater than 0"):
-		return mn.Fatal
-	case strings.Contains(errMsg, "Sanitized transaction differed before/after feature activation"):
-		return mn.Fatal
-	case strings.Contains(errMsg, "Execution of the program referenced by account at index is temporarily restricted"):
-		return mn.Unsupported
-	case strings.Contains(errMsg, "Sum of account balances before and after transaction do not match"):
-		return mn.Fatal
-	case strings.Contains(errMsg, "Program cache hit max limit"):
-		return mn.Retryable
-	default:
-		return mn.Retryable
+	for pattern, code := range errorPatterns {
+		if pattern.MatchString(errMsg) {
+			return code
+		}
 	}
+	return mn.Retryable
 }

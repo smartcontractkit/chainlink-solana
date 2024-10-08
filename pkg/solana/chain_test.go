@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/gagliardetto/solana-go/programs/system"
+	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 	"io"
 	"math/big"
 	"net/http"
@@ -369,4 +371,127 @@ func TestChain_Transact(t *testing.T) {
 	limit, err := fees.ParseComputeUnitLimit(tx.Message.Instructions[2].Data)
 	require.NoError(t, err)
 	assert.Equal(t, fees.ComputeUnitLimit(500), limit)
+}
+
+func TestChain_MultiNode_TransactionSender(t *testing.T) {
+	ctx := tests.Context(t)
+	url := client.SetupLocalSolNode(t)
+	lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
+
+	// transaction parameters
+	sender, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	receiver, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	client.FundTestAccounts(t, solana.PublicKeySlice{sender.PublicKey()}, url)
+
+	// configuration
+	cfg := solcfg.NewDefault()
+	cfg.MultiNode.MultiNode.Enabled = ptr(true)
+	cfg.Nodes = append(cfg.Nodes,
+		&solcfg.Node{
+			Name:     ptr("localnet-" + t.Name() + "-primary-1"),
+			URL:      config.MustParseURL(url),
+			SendOnly: false,
+		},
+		&solcfg.Node{
+			Name:     ptr("localnet-" + t.Name() + "-primary-2"),
+			URL:      config.MustParseURL(url),
+			SendOnly: false,
+		},
+		&solcfg.Node{
+			Name:     ptr("localnet-" + t.Name() + "-sendonly-1"),
+			URL:      config.MustParseURL(url),
+			SendOnly: true,
+		},
+		&solcfg.Node{
+			Name:     ptr("localnet-" + t.Name() + "-sendonly-1"),
+			URL:      config.MustParseURL(url),
+			SendOnly: true,
+		},
+	)
+
+	// mocked keystore
+	mkey := mocks.NewSimpleKeystore(t)
+	c, err := newChain("localnet", cfg, mkey, lgr)
+	require.NoError(t, err)
+	require.NoError(t, c.Start(ctx))
+
+	t.Run("successful transaction", func(t *testing.T) {
+		// create + sign transaction
+		createTx := func(to solana.PublicKey) *solana.Transaction {
+			cl, err := c.getClient()
+			require.NoError(t, err)
+
+			hash, hashErr := cl.LatestBlockhash()
+			assert.NoError(t, hashErr)
+
+			tx, txErr := solana.NewTransaction(
+				[]solana.Instruction{
+					system.NewTransferInstruction(
+						1,
+						sender.PublicKey(),
+						to,
+					).Build(),
+				},
+				hash.Value.Blockhash,
+				solana.TransactionPayer(sender.PublicKey()),
+			)
+			assert.NoError(t, txErr)
+			_, signErr := tx.Sign(
+				func(key solana.PublicKey) *solana.PrivateKey {
+					if sender.PublicKey().Equals(key) {
+						return &sender
+					}
+					return nil
+				},
+			)
+			assert.NoError(t, signErr)
+			return tx
+		}
+
+		// Send tx using transaction sender
+		sig, code, err := c.txSender.SendTransaction(ctx, createTx(receiver.PublicKey()))
+		require.NoError(t, err)
+		require.Equal(t, mn.Successful, code)
+		require.NotEmpty(t, sig)
+	})
+
+	t.Run("unsigned transaction error", func(t *testing.T) {
+		// create + sign transaction
+		unsignedTx := func(to solana.PublicKey) *solana.Transaction {
+			cl, err := c.getClient()
+			require.NoError(t, err)
+
+			hash, hashErr := cl.LatestBlockhash()
+			assert.NoError(t, hashErr)
+
+			tx, txErr := solana.NewTransaction(
+				[]solana.Instruction{
+					system.NewTransferInstruction(
+						1,
+						sender.PublicKey(),
+						to,
+					).Build(),
+				},
+				hash.Value.Blockhash,
+				solana.TransactionPayer(sender.PublicKey()),
+			)
+			assert.NoError(t, txErr)
+			return tx
+		}
+
+		// Send tx using transaction sender
+		sig, code, err := c.txSender.SendTransaction(ctx, unsignedTx(receiver.PublicKey()))
+		require.Error(t, err)
+		require.Equal(t, mn.Fatal, code)
+		require.Empty(t, sig)
+	})
+
+	t.Run("empty transaction", func(t *testing.T) {
+		sig, code, err := c.txSender.SendTransaction(ctx, &solana.Transaction{})
+		require.Error(t, err)
+		require.Equal(t, mn.Fatal, code)
+		require.Empty(t, sig)
+	})
 }
