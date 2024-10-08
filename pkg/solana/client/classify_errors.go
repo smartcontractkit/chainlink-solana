@@ -51,7 +51,7 @@ var (
 	ErrProgramCacheHitMaxLimit               = regexp.MustCompile(`Program cache hit max limit`)
 )
 
-// Define a map to associate regex patterns with SendTxReturnCode
+// errCodes maps regex patterns to corresponding return code
 var errCodes = map[*regexp.Regexp]mn.SendTxReturnCode{
 	ErrAccountInUse:                          mn.Retryable,
 	ErrAccountLoadedTwice:                    mn.Retryable,
