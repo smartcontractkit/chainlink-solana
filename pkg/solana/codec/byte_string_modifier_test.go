@@ -18,8 +18,6 @@ func TestSolanaAddressModifier(t *testing.T) {
 	// Valid Solana address (32 bytes, Base58 encoded)
 	validAddressStr := "9nQhQ7iCyY5SgAX2Zm4DtxNh9Ubc4vbiLkiYbX43SDXY"
 	validAddressBytes := solana.MustPublicKeyFromBase58(validAddressStr).Bytes()
-
-	// Invalid Solana addresses
 	invalidLengthAddressStr := "abc123"
 
 	t.Run("EncodeAddress encodes valid Solana address bytes", func(t *testing.T) {
@@ -54,6 +52,6 @@ func TestSolanaAddressModifier(t *testing.T) {
 	})
 
 	t.Run("Length returns 32 for Solana addresses", func(t *testing.T) {
-		assert.Equal(t, 32, modifier.Length())
+		assert.Equal(t, solana.PublicKeyLength, modifier.Length())
 	})
 }

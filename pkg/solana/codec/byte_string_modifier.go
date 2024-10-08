@@ -22,12 +22,10 @@ func (s SolanaAddressModifier) EncodeAddress(bytes []byte) (string, error) {
 
 // DecodeAddress decodes a Base58-encoded Solana address into a 32-byte array.
 func (s SolanaAddressModifier) DecodeAddress(str string) ([]byte, error) {
-	// Validate the length of the address
 	if len(str) != 44 {
 		return nil, fmt.Errorf("%w: got length %d, expected 44 for address %s", commontypes.ErrInvalidType, len(str), str)
 	}
 
-	// Decode the Base58 string into a PublicKey
 	pubkey, err := solana.PublicKeyFromBase58(str)
 	if err != nil {
 		return nil, fmt.Errorf("%w: failed to decode Base58 address: %s", commontypes.ErrInvalidType, err)
@@ -38,5 +36,5 @@ func (s SolanaAddressModifier) DecodeAddress(str string) ([]byte, error) {
 
 // Length returns the expected length of a Solana address in bytes (32 bytes).
 func (s SolanaAddressModifier) Length() int {
-	return 32
+	return solana.PublicKeyLength
 }
