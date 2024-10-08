@@ -4,7 +4,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/assert"
 
 	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
@@ -63,9 +62,7 @@ func TestClassifySendError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.errMsg, func(t *testing.T) {
-			tx := &solana.Transaction{}  // Dummy transaction
-			err := errors.New(tt.errMsg) // Create a standard Go error with the message
-			result := ClassifySendError(tx, err)
+			result := ClassifySendError(nil, errors.New(tt.errMsg))
 			assert.Equal(t, tt.expectedCode, result, "Expected %v but got %v for error message: %s", tt.expectedCode, result, tt.errMsg)
 		})
 	}

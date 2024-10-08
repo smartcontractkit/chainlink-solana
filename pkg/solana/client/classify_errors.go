@@ -97,7 +97,7 @@ var errCodes = map[*regexp.Regexp]mn.SendTxReturnCode{
 var _ mn.TxErrorClassifier[*solana.Transaction] = ClassifySendError
 
 // ClassifySendError returns the corresponding return code based on the error.
-func ClassifySendError(tx *solana.Transaction, err error) mn.SendTxReturnCode {
+func ClassifySendError(_ *solana.Transaction, err error) mn.SendTxReturnCode {
 	if err == nil {
 		return mn.Successful
 	}

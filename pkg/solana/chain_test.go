@@ -11,19 +11,19 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/google/uuid"
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/config"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
@@ -126,61 +126,6 @@ func TestSolanaChain_GetClient(t *testing.T) {
 	}
 	_, err = testChain.getClient()
 	assert.NoError(t, err)
-}
-
-func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		out := fmt.Sprintf(TestSolanaGenesisHashTemplate, client.MainnetGenesisHash) // mainnet genesis hash
-		if !strings.Contains(r.URL.Path, "/mismatch") {
-			// devnet gensis hash
-			out = fmt.Sprintf(TestSolanaGenesisHashTemplate, client.DevnetGenesisHash)
-		}
-		_, err := w.Write([]byte(out))
-		require.NoError(t, err)
-	}))
-	defer mockServer.Close()
-
-	ch := solcfg.Chain{}
-	ch.SetDefaults()
-	mn := solcfg.MultiNodeConfig{
-		MultiNode: solcfg.MultiNode{
-			Enabled: ptr(true),
-		},
-	}
-	mn.SetDefaults()
-
-	cfg := &solcfg.TOMLConfig{
-		ChainID:   ptr("devnet"),
-		Chain:     ch,
-		MultiNode: mn,
-	}
-	cfg.Nodes = []*solcfg.Node{
-		{
-			Name: ptr("devnet"),
-			URL:  config.MustParseURL(mockServer.URL + "/1"),
-		},
-		{
-			Name: ptr("devnet"),
-			URL:  config.MustParseURL(mockServer.URL + "/2"),
-		},
-	}
-
-	testChain, err := newChain("devnet", cfg, nil, logger.Test(t))
-	require.NoError(t, err)
-
-	err = testChain.Start(tests.Context(t))
-	require.NoError(t, err)
-	defer func() {
-		closeErr := testChain.Close()
-		require.NoError(t, closeErr)
-	}()
-
-	selectedClient, err := testChain.getClient()
-	assert.NoError(t, err)
-
-	id, err := selectedClient.ChainID(tests.Context(t))
-	assert.NoError(t, err)
-	assert.Equal(t, "devnet", id.String())
 }
 
 func TestSolanaChain_VerifiedClient(t *testing.T) {
@@ -373,6 +318,61 @@ func TestChain_Transact(t *testing.T) {
 	assert.Equal(t, fees.ComputeUnitLimit(500), limit)
 }
 
+func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		out := fmt.Sprintf(TestSolanaGenesisHashTemplate, client.MainnetGenesisHash) // mainnet genesis hash
+		if !strings.Contains(r.URL.Path, "/mismatch") {
+			// devnet gensis hash
+			out = fmt.Sprintf(TestSolanaGenesisHashTemplate, client.DevnetGenesisHash)
+		}
+		_, err := w.Write([]byte(out))
+		require.NoError(t, err)
+	}))
+	defer mockServer.Close()
+
+	ch := solcfg.Chain{}
+	ch.SetDefaults()
+	mn := solcfg.MultiNodeConfig{
+		MultiNode: solcfg.MultiNode{
+			Enabled: ptr(true),
+		},
+	}
+	mn.SetDefaults()
+
+	cfg := &solcfg.TOMLConfig{
+		ChainID:   ptr("devnet"),
+		Chain:     ch,
+		MultiNode: mn,
+	}
+	cfg.Nodes = []*solcfg.Node{
+		{
+			Name: ptr("devnet"),
+			URL:  config.MustParseURL(mockServer.URL + "/1"),
+		},
+		{
+			Name: ptr("devnet"),
+			URL:  config.MustParseURL(mockServer.URL + "/2"),
+		},
+	}
+
+	testChain, err := newChain("devnet", cfg, nil, logger.Test(t))
+	require.NoError(t, err)
+
+	err = testChain.Start(tests.Context(t))
+	require.NoError(t, err)
+	defer func() {
+		closeErr := testChain.Close()
+		require.NoError(t, closeErr)
+	}()
+
+	selectedClient, err := testChain.getClient()
+	assert.NoError(t, err)
+
+	id, err := selectedClient.ChainID(tests.Context(t))
+	assert.NoError(t, err)
+	assert.Equal(t, "devnet", id.String())
+}
+
 func TestChain_MultiNode_TransactionSender(t *testing.T) {
 	ctx := tests.Context(t)
 	url := client.SetupLocalSolNode(t)
@@ -391,22 +391,22 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 	cfg.Nodes = append(cfg.Nodes,
 		&solcfg.Node{
 			Name:     ptr("localnet-" + t.Name() + "-primary-1"),
-			URL:      config.MustParseURL(url),
+			URL:      config.MustParseURL(client.SetupLocalSolNode(t)),
 			SendOnly: false,
 		},
 		&solcfg.Node{
 			Name:     ptr("localnet-" + t.Name() + "-primary-2"),
-			URL:      config.MustParseURL(url),
+			URL:      config.MustParseURL(client.SetupLocalSolNode(t)),
 			SendOnly: false,
 		},
 		&solcfg.Node{
 			Name:     ptr("localnet-" + t.Name() + "-sendonly-1"),
-			URL:      config.MustParseURL(url),
+			URL:      config.MustParseURL(client.SetupLocalSolNode(t)),
 			SendOnly: true,
 		},
 		&solcfg.Node{
 			Name:     ptr("localnet-" + t.Name() + "-sendonly-1"),
-			URL:      config.MustParseURL(url),
+			URL:      config.MustParseURL(client.SetupLocalSolNode(t)),
 			SendOnly: true,
 		},
 	)
@@ -416,6 +416,9 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 	c, err := newChain("localnet", cfg, mkey, lgr)
 	require.NoError(t, err)
 	require.NoError(t, c.Start(ctx))
+	defer func() {
+		require.NoError(t, c.Close())
+	}()
 
 	t.Run("successful transaction", func(t *testing.T) {
 		// create + sign transaction
@@ -494,4 +497,116 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 		require.Equal(t, mn.Fatal, code)
 		require.Empty(t, sig)
 	})
+}
+
+func TestSolanaChain_MultiNode_Txm(t *testing.T) {
+	cfg := solcfg.NewDefault()
+	cfg.MultiNode.MultiNode.Enabled = ptr(true)
+	cfg.Nodes = []*solcfg.Node{
+		{
+			Name: ptr("primary-1"),
+			URL:  config.MustParseURL(client.SetupLocalSolNode(t)),
+		},
+		{
+			Name: ptr("primary-2"),
+			URL:  config.MustParseURL(client.SetupLocalSolNode(t)),
+		},
+		{
+			Name:     ptr("sendonly-1"),
+			URL:      config.MustParseURL(client.SetupLocalSolNode(t)),
+			SendOnly: true,
+		},
+		{
+			Name:     ptr("sendonly-2"),
+			URL:      config.MustParseURL(client.SetupLocalSolNode(t)),
+			SendOnly: true,
+		},
+	}
+
+	// setup keys
+	key, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	pubKey := key.PublicKey()
+
+	// setup receiver key
+	privKeyReceiver, err := solana.NewRandomPrivateKey()
+	pubKeyReceiver := privKeyReceiver.PublicKey()
+
+	// mocked keystore
+	mkey := mocks.NewSimpleKeystore(t)
+	mkey.On("Sign", mock.Anything, pubKey.String(), mock.Anything).Return(func(_ context.Context, _ string, data []byte) []byte {
+		sig, _ := key.Sign(data)
+		return sig[:]
+	}, nil)
+	mkey.On("Sign", mock.Anything, pubKeyReceiver.String(), mock.Anything).Return([]byte{}, config.KeyNotFoundError{ID: pubKeyReceiver.String(), KeyType: "Solana"})
+
+	testChain, err := newChain("localnet", cfg, mkey, logger.Test(t))
+	require.NoError(t, err)
+
+	err = testChain.Start(tests.Context(t))
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, testChain.Close())
+	}()
+
+	// fund keys
+	client.FundTestAccounts(t, []solana.PublicKey{pubKey}, cfg.Nodes[0].URL.String())
+
+	// track initial balance
+	selectedClient, err := testChain.getClient()
+	require.NoError(t, err)
+	receiverBal, err := selectedClient.Balance(pubKeyReceiver)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(0), receiverBal)
+
+	createTx := func(signer solana.PublicKey, sender solana.PublicKey, receiver solana.PublicKey, amt uint64) *solana.Transaction {
+		selectedClient, err = testChain.getClient()
+		assert.NoError(t, err)
+		hash, err := selectedClient.LatestBlockhash()
+		assert.NoError(t, err)
+		tx, err := solana.NewTransaction(
+			[]solana.Instruction{
+				system.NewTransferInstruction(
+					amt,
+					sender,
+					receiver,
+				).Build(),
+			},
+			hash.Value.Blockhash,
+			solana.TransactionPayer(signer),
+		)
+		require.NoError(t, err)
+		return tx
+	}
+
+	// Send funds twice, along with an invalid transaction
+	require.NoError(t, testChain.txm.Enqueue("test_success", createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)))
+	time.Sleep(500 * time.Millisecond) // pause 0.5s for new blockhash
+	require.NoError(t, testChain.txm.Enqueue("test_success_2", createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)))
+	require.Error(t, testChain.txm.Enqueue("test_invalidSigner", createTx(pubKeyReceiver, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL))) // cannot sign tx before enqueuing
+
+	// wait for all txes to finish
+	ctx, cancel := context.WithCancel(tests.Context(t))
+	t.Cleanup(cancel)
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+loop:
+	for {
+		select {
+		case <-ctx.Done():
+			assert.Equal(t, 0, testChain.txm.InflightTxs())
+			break loop
+		case <-ticker.C:
+			if testChain.txm.InflightTxs() == 0 {
+				cancel() // exit for loop
+			}
+		}
+	}
+
+	// verify funds were transferred through transaction sender
+	selectedClient, err = testChain.getClient()
+	assert.NoError(t, err)
+	receiverBal, err = selectedClient.Balance(pubKeyReceiver)
+	assert.NoError(t, err)
+	require.Equal(t, 2*solana.LAMPORTS_PER_SOL, receiverBal)
 }
