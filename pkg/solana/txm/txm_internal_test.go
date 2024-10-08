@@ -680,6 +680,7 @@ func TestTxm_Enqueue(t *testing.T) {
 	cfg := config.NewDefault()
 	mc := mocks.NewReaderWriter(t)
 	mc.On("SendTx", mock.Anything, mock.Anything).Return(solana.Signature{}, nil).Maybe()
+	mc.On("SimulateTx", mock.Anything, mock.Anything, mock.Anything).Return(&rpc.SimulateTransactionResult{}, nil).Maybe()
 	ctx := tests.Context(t)
 
 	// mock solana keystore

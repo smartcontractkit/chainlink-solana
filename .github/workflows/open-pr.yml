@@ -23,6 +23,9 @@ jobs:
           go-version-file: "go.mod"
           check-latest: true
           cache: true
+      - uses: cachix/install-nix-action@3715ab1a11cac9e991980d7b4a28d80c7ebdd8f9 # nix:v2.24.6
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
       - name: Run changes
         id: run
         run: ${{ inputs.run }}

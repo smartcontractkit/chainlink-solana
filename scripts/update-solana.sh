@@ -41,7 +41,7 @@ else
   cd integration-tests
   sed -i -e "s~$testVersion~$latestVersion~" testconfig/default.toml
   cd ..
-  sed -i -e "s~$containerVersion~$latestContainer~" scripts/setup-localnet/localnet.sh
+  sed -i -e "s~$localnetVersion~$latestLocalnet~" scripts/setup-localnet/localnet.sh
   sed -i -e "s~$nixVersion~$latestNix~" solana.nix
 fi
 
