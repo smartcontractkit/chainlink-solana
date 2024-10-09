@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"strconv"
 	"strings"
@@ -18,6 +19,8 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/libocr/commontypes"
 
 	codeccommon "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
@@ -662,10 +665,6 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 
 		fallthrough
 	default:
-		// Isolate test until we have InputModifications
-		if strings.Contains(r.test.Name(), "wraps_config_with_modifiers_using_its_own_mapstructure_overrides") {
-			r.test.Skip("Isolating test until we have InputModifications")
-		}
 
 		if len(r.testStructQueue) == 0 {
 			r.test.FailNow()
@@ -681,9 +680,44 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 		// split into two encoded parts to test the preloading function
 		cdc := makeTestCodec(r.test, fullStructIDL(r.test), config.EncodingTypeBorsh)
 
-		bts, err := cdc.Encode(ctx, nextTestStruct, "TestStructB")
-		if err != nil {
-			r.test.FailNow()
+		var bts []byte
+		var err error
+		if strings.Contains(r.test.Name(), "wraps_config_with_modifiers_using_its_own_mapstructure_overrides") {
+			// TODO: This is a temporary solution. We are manually retyping this struct to avoid breaking unrelated tests.
+			// Once input modifiers are fully implemented, revisit this code and remove this manual struct conversion
+			tempStruct := struct {
+				Field               *int32
+				OracleID            commontypes.OracleID
+				OracleIDs           [32]commontypes.OracleID
+				Account             []byte
+				AccountStr          []byte
+				Accounts            [][]byte
+				DifferentField      string
+				BigField            *big.Int
+				NestedDynamicStruct MidLevelDynamicTestStruct
+				NestedStaticStruct  MidLevelStaticTestStruct
+			}{
+				Field:               nextTestStruct.Field,
+				OracleID:            nextTestStruct.OracleID,
+				OracleIDs:           nextTestStruct.OracleIDs,
+				Account:             nextTestStruct.Account,
+				AccountStr:          nextTestStruct.Account, // This test needs AccountStr to be a byte slice
+				Accounts:            nextTestStruct.Accounts,
+				DifferentField:      nextTestStruct.DifferentField,
+				BigField:            nextTestStruct.BigField,
+				NestedDynamicStruct: nextTestStruct.NestedDynamicStruct,
+				NestedStaticStruct:  nextTestStruct.NestedStaticStruct,
+			}
+
+			bts, err = cdc.Encode(ctx, tempStruct, "TestStructB")
+			if err != nil {
+				r.test.FailNow()
+			}
+		} else {
+			bts, err = cdc.Encode(ctx, nextTestStruct, "TestStructB")
+			if err != nil {
+				r.test.FailNow()
+			}
 		}
 
 		// make part A return slower than part B
