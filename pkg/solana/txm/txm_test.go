@@ -56,11 +56,11 @@ func TestTxm_EstimateAndSetComputeUnitLimit(t *testing.T) {
 		client.On("LatestBlockhash").Return(&rpc.GetLatestBlockhashResult{
 			Value: &rpc.LatestBlockhashResult{
 				LastValidBlockHeight: 100,
-				Blockhash: solana.Hash{},
+				Blockhash:            solana.Hash{},
 			},
 		}, nil).Once()
 		client.On("SimulateTx", mock.Anything, mock.Anything, mock.Anything).Return(&rpc.SimulateTransactionResult{
-			Err: nil,
+			Err:           nil,
 			UnitsConsumed: &usedCompute,
 		}, nil).Once()
 		tx := createTx(t, client, pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
@@ -76,7 +76,7 @@ func TestTxm_EstimateAndSetComputeUnitLimit(t *testing.T) {
 		client.On("LatestBlockhash").Return(&rpc.GetLatestBlockhashResult{
 			Value: &rpc.LatestBlockhashResult{
 				LastValidBlockHeight: 100,
-				Blockhash: solana.Hash{},
+				Blockhash:            solana.Hash{},
 			},
 		}, nil).Once()
 		client.On("SimulateTx", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("failed to simulate")).Once()
@@ -89,7 +89,7 @@ func TestTxm_EstimateAndSetComputeUnitLimit(t *testing.T) {
 		client.On("LatestBlockhash").Return(&rpc.GetLatestBlockhashResult{
 			Value: &rpc.LatestBlockhashResult{
 				LastValidBlockHeight: 100,
-				Blockhash: solana.Hash{},
+				Blockhash:            solana.Hash{},
 			},
 		}, nil).Once()
 		client.On("SimulateTx", mock.Anything, mock.Anything, mock.Anything).Return(&rpc.SimulateTransactionResult{
