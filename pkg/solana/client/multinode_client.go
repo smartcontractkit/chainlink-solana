@@ -94,6 +94,7 @@ func (m *MultiNodeClient) registerSub(sub mn.Subscription, stopInFLightCh chan s
 }
 
 func (m *MultiNodeClient) Dial(ctx context.Context) error {
+	// Not relevant for Solana as the RPCs don't need to be dialled.
 	return nil
 }
 
