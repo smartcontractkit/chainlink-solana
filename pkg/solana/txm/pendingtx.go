@@ -230,12 +230,19 @@ func (c *pendingTxContextWithProm) OnError(sig solana.Signature, errType int) uu
 			promSolTxmRevertTxs.WithLabelValues(c.chainID).Add(1)
 		case TxFailDrop:
 			promSolTxmDropTxs.WithLabelValues(c.chainID).Add(1)
-		case TxFailSimRevert:
-			promSolTxmSimRevertTxs.WithLabelValues(c.chainID).Add(1)
-		case TxFailSimOther:
-			promSolTxmSimOtherTxs.WithLabelValues(c.chainID).Add(1)
 		}
 		// increment total errors
+		promSolTxmErrorTxs.WithLabelValues(c.chainID).Add(1)
+	}
+
+	// Increment simulation error metrics even if no tx found for sig
+	// Simulation could have occurred before initial broadcast so tx was never stored
+	switch errType {
+	case TxFailSimRevert:
+		promSolTxmSimRevertTxs.WithLabelValues(c.chainID).Add(1)
+		promSolTxmErrorTxs.WithLabelValues(c.chainID).Add(1)
+	case TxFailSimOther:
+		promSolTxmSimOtherTxs.WithLabelValues(c.chainID).Add(1)
 		promSolTxmErrorTxs.WithLabelValues(c.chainID).Add(1)
 	}
 

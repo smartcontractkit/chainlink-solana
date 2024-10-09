@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
+	"math/big"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+	bigmath "github.com/smartcontractkit/chainlink-common/pkg/utils/big_math"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -23,9 +26,10 @@ import (
 )
 
 const (
-	MaxQueueLen      = 1000
-	MaxRetryTimeMs   = 250 // max tx retry time (exponential retry will taper to retry every 0.25s)
-	MaxSigsToConfirm = 256 // max number of signatures in GetSignatureStatus call
+	MaxQueueLen                    = 1000
+	MaxRetryTimeMs                 = 250 // max tx retry time (exponential retry will taper to retry every 0.25s)
+	MaxSigsToConfirm               = 256 // max number of signatures in GetSignatureStatus call
+	EstimateComputeUnitLimitBuffer = 10  // percent buffer added on top of estimated compute unit limits to account for any variance
 )
 
 var _ services.Service = (*Txm)(nil)
@@ -63,7 +67,8 @@ type TxConfig struct {
 	ComputeUnitPriceMin  uint64        // min price
 	ComputeUnitPriceMax  uint64        // max price
 
-	ComputeUnitLimit uint32 // compute unit limit
+	EstimateComputeUnitLimit bool   // enable compute limit estimations using simulation
+	ComputeUnitLimit         uint32 // compute unit limit
 }
 
 type pendingTx struct {
@@ -120,9 +125,15 @@ func (txm *Txm) run() {
 	ctx, cancel := txm.chStop.NewCtx()
 	defer cancel()
 
-	// start confirmer + simulator
+	// start confirmer
 	go txm.confirm(ctx)
-	go txm.simulate(ctx)
+
+	// Only start the simualtion go routine if the EstimateComputeUnitLimit feature is disabled
+	// Otherwise, EstimateComputeUnitLimit will handle simulation before broadcasting transactions
+	if !txm.cfg.EstimateComputeUnitLimit() {
+		// start simulator
+		go txm.simulate(ctx)
+	}
 
 	for {
 		select {
@@ -174,6 +185,12 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 			uint(count), //nolint:gosec // reasonable number of bumps should never cause overflow
 		)
 		return fees.ComputeUnitPrice(fee)
+	}
+
+	if txcfg.EstimateComputeUnitLimit {
+		if computeUnitLimitErr := txm.EstimateAndSetComputeUnitLimit(chanCtx, &baseTx); computeUnitLimitErr != nil {
+			return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, fmt.Errorf("failed to estimate and set compute unit limit: %w", computeUnitLimitErr)
+		}
 	}
 
 	// add compute unit limit instruction - static for the transaction
@@ -568,6 +585,65 @@ func (txm *Txm) Enqueue(accountID string, tx *solanaGo.Transaction, txCfgs ...Se
 	return nil
 }
 
+func (txm *Txm) EstimateAndSetComputeUnitLimit(ctx context.Context, tx *solanaGo.Transaction) (err error) {
+	// get client
+	client, err := txm.client.Get()
+	if err != nil {
+		txm.lggr.Errorw("failed to get client", "error", err)
+		return err
+	}
+
+	res, err := client.SimulateTx(ctx, tx, nil) // use default options (does not verify signatures)
+	if err != nil {
+		// This error can occur if endpoint goes down or if invalid signature
+		txm.lggr.Errorw("failed to simulate tx", "error", err)
+		return err
+	}
+
+	// Return error if response err is non-nil to avoid broadcasting a tx destined to fail
+	if res.Err != nil {
+		// handle various errors
+		// https://github.com/solana-labs/solana/blob/master/sdk/src/transaction/error.rs
+		// ---
+		errStr := fmt.Sprintf("%v", res.Err) // convert to string to handle various interfaces
+		sig := solanaGo.Signature{}
+		if len(tx.Signatures) > 0 {
+			sig = tx.Signatures[0]
+		}
+		switch {
+		// transaction will encounter execution error/revert
+		case strings.Contains(errStr, "InstructionError"):
+			txm.txs.OnError(sig, TxFailSimRevert)
+			txm.lggr.Debugw("simulate: InstructionError", "result", res)
+		// unrecognized errors (indicates more concerning failures)
+		default:
+			txm.txs.OnError(sig, TxFailSimOther)
+			txm.lggr.Errorw("simulate: unrecognized error", "result", res)
+		}
+		return fmt.Errorf("simulated tx returned error: %w", err)
+	}
+
+	if res.UnitsConsumed == nil || *res.UnitsConsumed == 0 {
+		txm.lggr.Debug("failed to get units consumed for tx")
+		// Do not return error to allow falling back to default compute unit limit
+		return nil
+	}
+
+	computeUnitLimit := *res.UnitsConsumed
+
+	// Add buffer to the used compute estimate
+	computeUnitLimit = bigmath.AddPercentage(new(big.Int).SetUint64(computeUnitLimit), EstimateComputeUnitLimitBuffer).Uint64()
+
+	if computeUnitLimit > math.MaxUint32 {
+		txm.lggr.Debugw("compute units used with buffer greater than uint32 max", "computeUnitLimit", computeUnitLimit)
+		// Do not return error to allow falling back to default compute unit limit
+		return nil
+	}
+
+	err = fees.SetComputeUnitLimit(tx, fees.ComputeUnitLimit(computeUnitLimit))
+	return err
+}
+
 func (txm *Txm) InflightTxs() int {
 	return len(txm.txs.ListAll())
 }
@@ -596,11 +672,12 @@ func (txm *Txm) HealthReport() map[string]error { return map[string]error{txm.Na
 
 func (txm *Txm) defaultTxConfig() TxConfig {
 	return TxConfig{
-		Timeout:              txm.cfg.TxRetryTimeout(),
-		FeeBumpPeriod:        txm.cfg.FeeBumpPeriod(),
-		BaseComputeUnitPrice: txm.fee.BaseComputeUnitPrice(),
-		ComputeUnitPriceMin:  txm.cfg.ComputeUnitPriceMin(),
-		ComputeUnitPriceMax:  txm.cfg.ComputeUnitPriceMax(),
-		ComputeUnitLimit:     txm.cfg.ComputeUnitLimitDefault(),
+		Timeout:                  txm.cfg.TxRetryTimeout(),
+		FeeBumpPeriod:            txm.cfg.FeeBumpPeriod(),
+		BaseComputeUnitPrice:     txm.fee.BaseComputeUnitPrice(),
+		ComputeUnitPriceMin:      txm.cfg.ComputeUnitPriceMin(),
+		ComputeUnitPriceMax:      txm.cfg.ComputeUnitPriceMax(),
+		ComputeUnitLimit:         txm.cfg.ComputeUnitLimitDefault(),
+		EstimateComputeUnitLimit: txm.cfg.EstimateComputeUnitLimit(),
 	}
 }

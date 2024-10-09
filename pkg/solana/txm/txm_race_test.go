@@ -53,6 +53,7 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 	cfg.On("FeeBumpPeriod").Return(txRetryDuration / 6)
 	cfg.On("TxRetryTimeout").Return(txRetryDuration)
 	cfg.On("ComputeUnitLimitDefault").Return(uint32(200_000)) // default value, cannot not use 0
+	cfg.On("EstimateComputeUnitLimit").Return(false)
 	// keystore mock
 	ks.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
 
