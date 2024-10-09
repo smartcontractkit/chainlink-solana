@@ -128,7 +128,7 @@ func (txm *Txm) run() {
 	// start confirmer
 	go txm.confirm(ctx)
 
-	// Only start the simualtion go routine if the EstimateComputeUnitLimit feature is disabled
+	// Only start the simulation go routine if the EstimateComputeUnitLimit feature is disabled
 	// Otherwise, EstimateComputeUnitLimit will handle simulation before broadcasting transactions
 	if !txm.cfg.EstimateComputeUnitLimit() {
 		// start simulator
