@@ -83,7 +83,7 @@ func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch state from on-chain: %w", err)
 	}
-	contractConfig, err := pkgSolana.ConfigFromState(state)
+	contractConfig, err := pkgSolana.ConfigFromState(ctx, state)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode ContractConfig from on-chain state: %w", err)
 	}
