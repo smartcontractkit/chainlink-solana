@@ -14,7 +14,6 @@ import (
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	solanatxm "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 
@@ -23,7 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
-func TestTxm_EstimateAndSetComputeUnitLimit(t *testing.T) {
+func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 	t.Parallel()
 
 	ctx := tests.Context(t)
@@ -64,9 +63,7 @@ func TestTxm_EstimateAndSetComputeUnitLimit(t *testing.T) {
 			UnitsConsumed: &usedCompute,
 		}, nil).Once()
 		tx := createTx(t, client, pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
-		err := txm.EstimateAndSetComputeUnitLimit(ctx, tx)
-		require.NoError(t, err)
-		computeUnitLimit, err := fees.ParseComputeUnitLimit(tx.Message.Instructions[1].Data)
+		computeUnitLimit, err := txm.EstimateComputeUnitLimit(ctx, tx)
 		require.NoError(t, err)
 		usedComputeWithBuffer := bigmath.AddPercentage(new(big.Int).SetUint64(usedCompute), solanatxm.EstimateComputeUnitLimitBuffer).Uint64()
 		require.Equal(t, usedComputeWithBuffer, uint64(computeUnitLimit))
@@ -81,7 +78,7 @@ func TestTxm_EstimateAndSetComputeUnitLimit(t *testing.T) {
 		}, nil).Once()
 		client.On("SimulateTx", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("failed to simulate")).Once()
 		tx := createTx(t, client, pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
-		err := txm.EstimateAndSetComputeUnitLimit(ctx, tx)
+		_, err := txm.EstimateComputeUnitLimit(ctx, tx)
 		require.Error(t, err)
 	})
 
@@ -96,8 +93,24 @@ func TestTxm_EstimateAndSetComputeUnitLimit(t *testing.T) {
 			Err: errors.New("InstructionError"),
 		}, nil).Once()
 		tx := createTx(t, client, pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
-		err := txm.EstimateAndSetComputeUnitLimit(ctx, tx)
+		_, err := txm.EstimateComputeUnitLimit(ctx, tx)
 		require.Error(t, err)
+	})
+
+	t.Run("simulation returns nil err with 0 compute unit limit", func(t *testing.T) {
+		client.On("LatestBlockhash").Return(&rpc.GetLatestBlockhashResult{
+			Value: &rpc.LatestBlockhashResult{
+				LastValidBlockHeight: 100,
+				Blockhash:            solana.Hash{},
+			},
+		}, nil).Once()
+		client.On("SimulateTx", mock.Anything, mock.Anything, mock.Anything).Return(&rpc.SimulateTransactionResult{
+			Err:           nil,
+		}, nil).Once()
+		tx := createTx(t, client, pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
+		computeUnitLimit, err := txm.EstimateComputeUnitLimit(ctx, tx)
+		require.NoError(t, err)
+		require.Equal(t, uint32(0), computeUnitLimit)
 	})
 }
 

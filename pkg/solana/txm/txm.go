@@ -140,18 +140,14 @@ func (txm *Txm) run() {
 				continue           // skip remainining
 			}
 
-			// Only add tx to simulation queue if the EstimateComputeUnitLimit feature is disabled
-			// Otherwise, the tx would have been simulated before broadcast
-			if !msg.cfg.EstimateComputeUnitLimit {
-				// send tx + signature to simulation queue
-				msg.tx = &tx
-				msg.signature = sig
-				msg.id = id
-				select {
-				case txm.chSim <- msg:
-				default:
-					txm.lggr.Warnw("failed to enqeue tx for simulation", "queueFull", len(txm.chSend) == MaxQueueLen, "tx", msg)
-				}
+			// send tx + signature to simulation queue
+			msg.tx = &tx
+			msg.signature = sig
+			msg.id = id
+			select {
+			case txm.chSim <- msg:
+			default:
+				txm.lggr.Warnw("failed to enqeue tx for simulation", "queueFull", len(txm.chSend) == MaxQueueLen, "tx", msg)
 			}
 
 			txm.lggr.Debugw("transaction sent", "signature", sig.String(), "id", id)
@@ -183,12 +179,6 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 			uint(count), //nolint:gosec // reasonable number of bumps should never cause overflow
 		)
 		return fees.ComputeUnitPrice(fee)
-	}
-
-	if txcfg.EstimateComputeUnitLimit {
-		if computeUnitLimitErr := txm.EstimateAndSetComputeUnitLimit(chanCtx, &baseTx); computeUnitLimitErr != nil {
-			return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, fmt.Errorf("failed to estimate and set compute unit limit: %w", computeUnitLimitErr)
-		}
 	}
 
 	// add compute unit limit instruction - static for the transaction
@@ -491,18 +481,8 @@ func (txm *Txm) simulate(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case msg := <-txm.chSim:
-			// get client
-			client, err := txm.client.Get()
+			res, err := txm.simulateTx(ctx, msg.tx)
 			if err != nil {
-				txm.lggr.Errorw("failed to get client in soltxm.simulate", "error", err)
-				continue
-			}
-
-			res, err := client.SimulateTx(ctx, msg.tx, nil) // use default options (does not verify signatures)
-			if err != nil {
-				// this error can occur if endpoint goes down or if invalid signature (invalid signature should occur further upstream in sendWithRetry)
-				// allow retry to continue in case temporary endpoint failure (if still invalid, confirm or timeout will cleanup)
-				txm.lggr.Debugw("failed to simulate tx", "id", msg.id, "signature", msg.signature, "error", err)
 				continue
 			}
 
@@ -511,31 +491,7 @@ func (txm *Txm) simulate(ctx context.Context) {
 				continue
 			}
 
-			// handle various errors
-			// https://github.com/solana-labs/solana/blob/master/sdk/src/transaction/error.rs
-			// ---
-			errStr := fmt.Sprintf("%v", res.Err) // convert to string to handle various interfaces
-			switch {
-			// blockhash not found when simulating, occurs when network bank has not seen the given blockhash or tx is too old
-			// let confirmation process clean up
-			case strings.Contains(errStr, "BlockhashNotFound"):
-				txm.lggr.Debugw("simulate: BlockhashNotFound", "id", msg.id, "signature", msg.signature, "result", res)
-				continue
-			// transaction will encounter execution error/revert, mark as reverted to remove from confirmation + retry
-			case strings.Contains(errStr, "InstructionError"):
-				txm.txs.OnError(msg.signature, TxFailSimRevert) // cancel retry
-				txm.lggr.Debugw("simulate: InstructionError", "id", msg.id, "signature", msg.signature, "result", res)
-				continue
-			// transaction is already processed in the chain, letting txm confirmation handle
-			case strings.Contains(errStr, "AlreadyProcessed"):
-				txm.lggr.Debugw("simulate: AlreadyProcessed", "id", msg.id, "signature", msg.signature, "result", res)
-				continue
-			// unrecognized errors (indicates more concerning failures)
-			default:
-				txm.txs.OnError(msg.signature, TxFailSimOther) // cancel retry
-				txm.lggr.Errorw("simulate: unrecognized error", "id", msg.id, "signature", msg.signature, "result", res)
-				continue
-			}
+			txm.processSimulationError(msg.id, msg.signature, res)
 		}
 	}
 }
@@ -569,6 +525,17 @@ func (txm *Txm) Enqueue(accountID string, tx *solanaGo.Transaction, txCfgs ...Se
 		v(&cfg)
 	}
 
+	if cfg.EstimateComputeUnitLimit {
+		computeUnitLimit, err := txm.EstimateComputeUnitLimit(context.TODO(), tx)
+		if err != nil {
+			return fmt.Errorf("transaction failed simulation: %w", err)
+		}
+		// If estimation returns 0 compute unit limit without error, fallback to original config
+		if computeUnitLimit != 0 {
+			cfg.ComputeUnitLimit = computeUnitLimit
+		}
+	}
+
 	msg := pendingTx{
 		tx:  tx,
 		cfg: cfg,
@@ -583,63 +550,80 @@ func (txm *Txm) Enqueue(accountID string, tx *solanaGo.Transaction, txCfgs ...Se
 	return nil
 }
 
-func (txm *Txm) EstimateAndSetComputeUnitLimit(ctx context.Context, tx *solanaGo.Transaction) (err error) {
-	// get client
-	client, err := txm.client.Get()
+func (txm *Txm) EstimateComputeUnitLimit(ctx context.Context, tx *solanaGo.Transaction) (uint32, error) {
+	res, err := txm.simulateTx(ctx, tx)
 	if err != nil {
-		txm.lggr.Errorw("failed to get client", "error", err)
-		return err
-	}
-
-	res, err := client.SimulateTx(ctx, tx, nil) // use default options (does not verify signatures)
-	if err != nil {
-		// This error can occur if endpoint goes down or if invalid signature
-		txm.lggr.Errorw("failed to simulate tx", "error", err)
-		return err
+		return 0, err
 	}
 
 	// Return error if response err is non-nil to avoid broadcasting a tx destined to fail
 	if res.Err != nil {
-		// handle various errors
-		// https://github.com/solana-labs/solana/blob/master/sdk/src/transaction/error.rs
-		// ---
-		errStr := fmt.Sprintf("%v", res.Err) // convert to string to handle various interfaces
 		sig := solanaGo.Signature{}
 		if len(tx.Signatures) > 0 {
 			sig = tx.Signatures[0]
 		}
-		switch {
-		// transaction will encounter execution error/revert
-		case strings.Contains(errStr, "InstructionError"):
-			txm.txs.OnError(sig, TxFailSimRevert)
-			txm.lggr.Debugw("simulate: InstructionError", "result", res)
-		// unrecognized errors (indicates more concerning failures)
-		default:
-			txm.txs.OnError(sig, TxFailSimOther)
-			txm.lggr.Errorw("simulate: unrecognized error", "result", res)
-		}
-		return fmt.Errorf("simulated tx returned error: %w", err)
+		txm.processSimulationError(uuid.Nil, sig, res)
+		return 0, fmt.Errorf("simulated tx returned error: %v", res.Err)
 	}
 
 	if res.UnitsConsumed == nil || *res.UnitsConsumed == 0 {
 		txm.lggr.Debug("failed to get units consumed for tx")
 		// Do not return error to allow falling back to default compute unit limit
-		return nil
+		return 0, nil
 	}
 
-	computeUnitLimit := *res.UnitsConsumed
+	unitsConsumed := *res.UnitsConsumed
 
 	// Add buffer to the used compute estimate
-	computeUnitLimit = bigmath.AddPercentage(new(big.Int).SetUint64(computeUnitLimit), EstimateComputeUnitLimitBuffer).Uint64()
+	unitsConsumed = bigmath.AddPercentage(new(big.Int).SetUint64(unitsConsumed), EstimateComputeUnitLimitBuffer).Uint64()
 
-	if computeUnitLimit > math.MaxUint32 {
-		txm.lggr.Debugw("compute units used with buffer greater than uint32 max", "computeUnitLimit", computeUnitLimit)
+	if unitsConsumed > math.MaxUint32 {
+		txm.lggr.Debug("compute units used with buffer greater than uint32 max", "unitsConsumed", unitsConsumed)
 		// Do not return error to allow falling back to default compute unit limit
-		return nil
+		return 0, nil
 	}
 
-	err = fees.SetComputeUnitLimit(tx, fees.ComputeUnitLimit(computeUnitLimit))
-	return err
+	return uint32(unitsConsumed), nil
+}
+
+func (txm *Txm) simulateTx(ctx context.Context, tx *solanaGo.Transaction) (res *rpc.SimulateTransactionResult, err error) {
+	// get client
+	client, err := txm.client.Get()
+	if err != nil {
+		txm.lggr.Errorw("failed to get client", "error", err)
+		return
+	}
+
+	res, err = client.SimulateTx(ctx, tx, nil) // use default options (does not verify signatures)
+	if err != nil {
+		// This error can occur if endpoint goes down or if invalid signature
+		txm.lggr.Errorw("failed to simulate tx", "error", err)
+		return
+	}
+	return
+}
+
+func (txm *Txm) processSimulationError(id uuid.UUID, sig solanaGo.Signature, res *rpc.SimulateTransactionResult) {
+	// handle various errors
+	// https://github.com/solana-labs/solana/blob/master/sdk/src/transaction/error.rs
+	errStr := fmt.Sprintf("%v", res.Err) // convert to string to handle various interfaces
+	switch {
+	// blockhash not found when simulating, occurs when network bank has not seen the given blockhash or tx is too old
+	// let confirmation process clean up
+	case strings.Contains(errStr, "BlockhashNotFound"):
+		txm.lggr.Debugw("simulate: BlockhashNotFound", "id", id, "signature", sig, "result", res)
+	// transaction will encounter execution error/revert, mark as reverted to remove from confirmation + retry
+	case strings.Contains(errStr, "InstructionError"):
+		txm.txs.OnError(sig, TxFailSimRevert) // cancel retry
+		txm.lggr.Debugw("simulate: InstructionError", "id", id, "signature", sig, "result", res)
+	// transaction is already processed in the chain, letting txm confirmation handle
+	case strings.Contains(errStr, "AlreadyProcessed"):
+		txm.lggr.Debugw("simulate: AlreadyProcessed", "id", id, "signature", sig, "result", res)
+	// unrecognized errors (indicates more concerning failures)
+	default:
+		txm.txs.OnError(sig, TxFailSimOther) // cancel retry
+		txm.lggr.Errorw("simulate: unrecognized error", "id", id, "signature", sig, "result", res)
+	}
 }
 
 func (txm *Txm) InflightTxs() int {
