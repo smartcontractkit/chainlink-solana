@@ -101,6 +101,6 @@ func (c *Transmitter) LatestConfigDigestAndEpoch(
 	return state.Config.LatestConfigDigest, state.Config.Epoch, err
 }
 
-func (c *Transmitter) FromAccount() (types.Account, error) {
+func (c *Transmitter) FromAccount(ctx context.Context) (types.Account, error) {
 	return types.Account(c.transmissionSigner.String()), nil
 }
