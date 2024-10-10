@@ -141,7 +141,7 @@ func (txm *Txm) run() {
 			}
 
 			// Only add tx to simulation queue if the EstimateComputeUnitLimit feature is disabled
-			// The tx was simulated before broadcast
+			// Otherwise, the tx would have been simulated before broadcast
 			if !msg.cfg.EstimateComputeUnitLimit {
 				// send tx + signature to simulation queue
 				msg.tx = &tx
