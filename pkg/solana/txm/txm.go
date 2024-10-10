@@ -125,15 +125,9 @@ func (txm *Txm) run() {
 	ctx, cancel := txm.chStop.NewCtx()
 	defer cancel()
 
-	// start confirmer
+	// start confirmer + simulator
 	go txm.confirm(ctx)
-
-	// Only start the simulation go routine if the EstimateComputeUnitLimit feature is disabled
-	// Otherwise, EstimateComputeUnitLimit will handle simulation before broadcasting transactions
-	if !txm.cfg.EstimateComputeUnitLimit() {
-		// start simulator
-		go txm.simulate(ctx)
-	}
+	go txm.simulate(ctx)
 
 	for {
 		select {
@@ -146,14 +140,18 @@ func (txm *Txm) run() {
 				continue           // skip remainining
 			}
 
-			// send tx + signature to simulation queue
-			msg.tx = &tx
-			msg.signature = sig
-			msg.id = id
-			select {
-			case txm.chSim <- msg:
-			default:
-				txm.lggr.Warnw("failed to enqeue tx for simulation", "queueFull", len(txm.chSend) == MaxQueueLen, "tx", msg)
+			// Only add tx to simulation queue if the EstimateComputeUnitLimit feature is disabled
+			// The tx was simulated before broadcast
+			if !msg.cfg.EstimateComputeUnitLimit {
+				// send tx + signature to simulation queue
+				msg.tx = &tx
+				msg.signature = sig
+				msg.id = id
+				select {
+				case txm.chSim <- msg:
+				default:
+					txm.lggr.Warnw("failed to enqeue tx for simulation", "queueFull", len(txm.chSend) == MaxQueueLen, "tx", msg)
+				}
 			}
 
 			txm.lggr.Debugw("transaction sent", "signature", sig.String(), "id", id)
