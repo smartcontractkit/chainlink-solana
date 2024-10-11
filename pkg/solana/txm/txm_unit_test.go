@@ -105,7 +105,7 @@ func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 			},
 		}, nil).Once()
 		client.On("SimulateTx", mock.Anything, mock.Anything, mock.Anything).Return(&rpc.SimulateTransactionResult{
-			Err:           nil,
+			Err: nil,
 		}, nil).Once()
 		tx := createTx(t, client, pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
 		computeUnitLimit, err := txm.EstimateComputeUnitLimit(ctx, tx)
