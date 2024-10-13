@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
@@ -28,19 +29,20 @@ func TestSetupLocalSolNode_SimultaneousNetworks(t *testing.T) {
 
 	// check & fund address
 	checkFunded := func(t *testing.T, url string) {
+		ctx := tests.Context(t)
 		// create client
 		c, err := NewClient(url, cfg, requestTimeout, lggr)
 		require.NoError(t, err)
 
 		// check init balance
-		bal, err := c.Balance(pubkey)
+		bal, err := c.Balance(ctx, pubkey)
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(0), bal)
 
 		FundTestAccounts(t, []solana.PublicKey{pubkey}, url)
 
 		// check end balance
-		bal, err = c.Balance(pubkey)
+		bal, err = c.Balance(ctx, pubkey)
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(100_000_000_000), bal) // once funds get sent to the system program it should be unrecoverable (so this number should remain > 0)
 	}

@@ -24,7 +24,7 @@ import (
 var _ TxManager = (*txm.Txm)(nil)
 
 type TxManager interface {
-	Enqueue(accountID string, msg *solana.Transaction, txCfgs ...txm.SetTxConfig) error
+	Enqueue(ctx context.Context, accountID string, msg *solana.Transaction, txCfgs ...txm.SetTxConfig) error
 }
 
 var _ relaytypes.Relayer = &Relayer{} //nolint:staticcheck
