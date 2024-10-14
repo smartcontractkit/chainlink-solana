@@ -1040,11 +1040,6 @@ func (s *skipEventsChainReader) GetLatestValue(ctx context.Context, readIdentifi
 		s.t.Skip("Events are not yet supported in Solana")
 	}
 
-	// Isolate test until we have InputModifications
-	if strings.Contains(s.t.Name(), "wraps_config_with_modifiers_using_its_own_mapstructure_overrides") {
-		s.t.Skip("Isolating test until we have InputModifications")
-	}
-
 	return s.ContractReader.GetLatestValue(ctx, readIdentifier, confidenceLevel, params, returnVal)
 }
 
