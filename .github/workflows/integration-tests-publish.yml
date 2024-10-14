@@ -3,8 +3,8 @@ name: Integration Tests Publish
 
 on:
   push:
-    branches:
-      - develop
+#    branches:
+#      - develop
   workflow_dispatch:
 
 env:
