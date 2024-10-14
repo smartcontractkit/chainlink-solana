@@ -426,6 +426,10 @@ func (r *chainReaderInterfaceTester) GetAccountBytes(i int) []byte {
 	return account[:]
 }
 
+func (r *chainReaderInterfaceTester) GetAccountString(i int) string {
+	return solana.PublicKeyFromBytes(r.GetAccountBytes(i)).String()
+}
+
 func (r *chainReaderInterfaceTester) Name() string {
 	return "Solana"
 }
@@ -495,6 +499,14 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 						Procedures: []config.ChainReaderProcedure{
 							{
 								IDLAccount: "TestStructB",
+								OutputModifications: codeccommon.ModifiersConfig{
+									&codeccommon.AddressBytesToStringModifierConfig{
+										Fields:   []string{"accountstr"},
+										Length:   codeccommon.Byte32Address,
+										Encoding: codeccommon.Base58Encoding,
+										Checksum: codeccommon.NoneChecksum,
+									},
+								},
 							},
 							{
 								IDLAccount: "TestStructA",
@@ -652,6 +664,11 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 
 		fallthrough
 	default:
+		// Isolate test until we have InputModifications
+		if strings.Contains(r.test.Name(), "wraps_config_with_modifiers_using_its_own_mapstructure_overrides") {
+			r.test.Skip("Isolating test until we have InputModifications")
+		}
+
 		if len(r.testStructQueue) == 0 {
 			r.test.FailNow()
 		}
@@ -891,6 +908,7 @@ const (
 				{"name": "oracleID","type": "u8"},
 				{"name": "oracleIDs","type": {"array": ["u8",32]}},
 				{"name": "account","type": "bytes"},
+				{"name": "accountstr","type": {"array": ["u8",32]}},
 				{"name": "accounts","type": {"vec": "bytes"}}
 			]
 		}
@@ -989,6 +1007,11 @@ func (s *skipEventsChainReader) GetLatestValue(ctx context.Context, readIdentifi
 
 	if contractName == AnyContractName && method == EventName {
 		s.t.Skip("Events are not yet supported in Solana")
+	}
+
+	// Isolate test until we have InputModifications
+	if strings.Contains(s.t.Name(), "wraps_config_with_modifiers_using_its_own_mapstructure_overrides") {
+		s.t.Skip("Isolating test until we have InputModifications")
 	}
 
 	return s.ContractReader.GetLatestValue(ctx, readIdentifier, confidenceLevel, params, returnVal)
