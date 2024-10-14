@@ -6,6 +6,8 @@ import (
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
 func TestConfigDigester(t *testing.T) {
@@ -22,10 +24,10 @@ func TestConfigDigester(t *testing.T) {
 	var state State
 	err = bin.NewBorshDecoder(mockState.Raw).Decode(&state)
 	require.NoError(t, err)
-	config, err := ConfigFromState(state)
+	config, err := ConfigFromState(tests.Context(t), state)
 	require.NoError(t, err)
 
-	actualDigest, err := digester.ConfigDigest(config)
+	actualDigest, err := digester.ConfigDigest(tests.Context(t), config)
 	require.NoError(t, err)
 
 	expectedDigest := mockState.ConfigDigestHex
