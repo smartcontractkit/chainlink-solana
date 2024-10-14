@@ -504,8 +504,7 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 								IDLAccount: "TestStructB",
 								OutputModifications: codeccommon.ModifiersConfig{
 									&codeccommon.AddressBytesToStringModifierConfig{
-										Fields:   []string{"Accountstr"},
-										Modifier: codec.SolanaAddressModifier{},
+										Fields: []string{"Accountstr"},
 									},
 								},
 							},

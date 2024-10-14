@@ -12,6 +12,7 @@ import (
 	ag_solana "github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
+	codeccommon "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -288,6 +289,8 @@ func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainReader
 			s.lookup.addReadNameForContract(namespace, methodName)
 
 			for _, procedure := range method.Procedures {
+				injectAddressModifier(&procedure)
+
 				mod, err := procedure.OutputModifications.ToModifier(codec.DecoderHooks...)
 				if err != nil {
 					return err
@@ -309,6 +312,17 @@ func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainReader
 	}
 
 	return nil
+}
+
+// injectAddressModifierForSolana injects the AddressModifier into OutputModifications for Solana procedures.
+// Since AddressModifier can't be serialized, it is applied during runtime.
+func injectAddressModifier(procedure *config.ChainReaderProcedure) {
+	for i, modConfig := range procedure.OutputModifications {
+		if addrModifierConfig, ok := modConfig.(*codeccommon.AddressBytesToStringModifierConfig); ok {
+			addrModifierConfig.Modifier = codec.SolanaAddressModifier{}
+			procedure.OutputModifications[i] = addrModifierConfig
+		}
+	}
 }
 
 func createRPCOpts(opts *config.RPCOpts) *rpc.GetAccountInfoOpts {
