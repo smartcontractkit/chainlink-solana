@@ -37,7 +37,7 @@ func (h *Head) BlockDifficulty() *big.Int {
 }
 
 func (h *Head) IsValid() bool {
-	return h.BlockHeight != nil && h.BlockHash != nil
+	return h != nil && h.BlockHeight != nil && h.BlockHash != nil
 }
 
 var _ mn.RPCClient[mn.StringID, *Head] = (*MultiNodeClient)(nil)
@@ -94,6 +94,7 @@ func (m *MultiNodeClient) registerSub(sub mn.Subscription, stopInFLightCh chan s
 }
 
 func (m *MultiNodeClient) Dial(ctx context.Context) error {
+	// Not relevant for Solana as the RPCs don't need to be dialled.
 	return nil
 }
 

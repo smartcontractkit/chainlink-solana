@@ -81,7 +81,7 @@ func NewTxm(chainID string, tc func() (client.ReaderWriter, error),
 	sendTx func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error),
 	cfg config.Config, ks SimpleKeystore, lggr logger.Logger) *Txm {
 	return &Txm{
-		lggr:   lggr,
+		lggr:   logger.Named(lggr, "Txm"),
 		chSend: make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
 		chSim:  make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
 		chStop: make(chan struct{}),
@@ -109,7 +109,7 @@ func (txm *Txm) SendTx(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.
 
 // Start subscribes to queuing channel and processes them.
 func (txm *Txm) Start(ctx context.Context) error {
-	return txm.starter.StartOnce("solana_txm", func() error {
+	return txm.StartOnce("Txm", func() error {
 		// determine estimator type
 		var estimator fees.Estimator
 		var err error
@@ -588,23 +588,13 @@ func (txm *Txm) InflightTxs() int {
 
 // Close close service
 func (txm *Txm) Close() error {
-	return txm.starter.StopOnce("solanatxm", func() error {
+	return txm.StopOnce("Txm", func() error {
 		close(txm.chStop)
 		txm.done.Wait()
 		return txm.fee.Close()
 	})
 }
-func (txm *Txm) Name() string { return "solanatxm" }
-
-// Healthy service is healthy
-func (txm *Txm) Healthy() error {
-	return nil
-}
-
-// Ready service is ready
-func (txm *Txm) Ready() error {
-	return txm.starter.Ready()
-}
+func (txm *Txm) Name() string { return txm.lggr.Name() }
 
 func (txm *Txm) HealthReport() map[string]error { return map[string]error{txm.Name(): txm.Healthy()} }
 
