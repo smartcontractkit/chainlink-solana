@@ -37,7 +37,7 @@ func (h *Head) BlockDifficulty() *big.Int {
 }
 
 func (h *Head) IsValid() bool {
-	return h.BlockHeight != nil && h.BlockHash != nil
+	return h != nil && h.BlockHeight != nil && h.BlockHash != nil
 }
 
 var _ mn.RPCClient[mn.StringID, *Head] = (*MultiNodeClient)(nil)
