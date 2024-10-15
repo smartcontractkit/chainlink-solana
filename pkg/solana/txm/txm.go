@@ -41,17 +41,17 @@ var _ loop.Keystore = (SimpleKeystore)(nil)
 // Txm manages transactions for the solana blockchain.
 // simple implementation with no persistently stored txs
 type Txm struct {
-	starter services.StateMachine
-	lggr    logger.Logger
-	chSend  chan pendingTx
-	chSim   chan pendingTx
-	chStop  services.StopChan
-	done    sync.WaitGroup
-	cfg     config.Config
-	txs     PendingTxContext
-	ks      SimpleKeystore
-	client  *utils.LazyLoad[client.ReaderWriter]
-	fee     fees.Estimator
+	services.StateMachine
+	lggr   logger.Logger
+	chSend chan pendingTx
+	chSim  chan pendingTx
+	chStop services.StopChan
+	done   sync.WaitGroup
+	cfg    config.Config
+	txs    PendingTxContext
+	ks     SimpleKeystore
+	client *utils.LazyLoad[client.ReaderWriter]
+	fee    fees.Estimator
 	// sendTx is an override for sending transactions rather than using a single client
 	// Enabling MultiNode uses this function to send transactions to all RPCs
 	sendTx func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error)
