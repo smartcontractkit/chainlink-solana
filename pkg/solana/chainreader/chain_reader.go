@@ -289,7 +289,7 @@ func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainReader
 			s.lookup.addReadNameForContract(namespace, methodName)
 
 			for _, procedure := range method.Procedures {
-				injectAddressModifier(&procedure)
+				injectSolanaSpecificCodecModifiers(&procedure)
 
 				mod, err := procedure.OutputModifications.ToModifier(codec.DecoderHooks...)
 				if err != nil {
@@ -314,9 +314,8 @@ func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainReader
 	return nil
 }
 
-// injectAddressModifierForSolana injects the AddressModifier into OutputModifications for Solana procedures.
-// Since AddressModifier can't be serialized, it is applied during runtime.
-func injectAddressModifier(procedure *config.ChainReaderProcedure) {
+// injectSolanaSpecificCodecModifiers injects the AddressModifier into OutputModifications for Solana procedures.
+func injectSolanaSpecificCodecModifiers(procedure *config.ChainReaderProcedure) {
 	for i, modConfig := range procedure.OutputModifications {
 		if addrModifierConfig, ok := modConfig.(*codeccommon.AddressBytesToStringModifierConfig); ok {
 			addrModifierConfig.Modifier = codec.SolanaAddressModifier{}
