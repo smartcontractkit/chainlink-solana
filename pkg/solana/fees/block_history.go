@@ -3,8 +3,6 @@ package fees
 import (
 	"context"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 	"sync"
 	"time"
 
@@ -13,7 +11,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mathutil"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 )
 
 var _ Estimator = &blockHistoryEstimator{}
