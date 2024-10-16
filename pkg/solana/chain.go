@@ -23,10 +23,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
-	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
-
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 )
@@ -301,7 +301,11 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 	tc := func() (client.ReaderWriter, error) {
 		return ch.getClient()
 	}
-	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
+
+	// Use lazy loader if MultiNode is disabled
+	loader := internal.NewLoader(!cfg.MultiNode.Enabled(), tc)
+
+	ch.txm = txm.NewTxm(ch.id, loader, sendTx, cfg, ks, lggr)
 	bc := func() (monitor.BalanceClient, error) {
 		return ch.getClient()
 	}

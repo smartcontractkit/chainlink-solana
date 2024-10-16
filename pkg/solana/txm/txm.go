@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 	"strings"
 	"sync"
 	"time"
@@ -17,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 )
@@ -50,7 +51,7 @@ type Txm struct {
 	cfg    config.Config
 	txs    PendingTxContext
 	ks     SimpleKeystore
-	client *utils.LazyLoad[client.ReaderWriter]
+	client internal.Loader[client.ReaderWriter]
 	fee    fees.Estimator
 	// sendTx is an override for sending transactions rather than using a single client
 	// Enabling MultiNode uses this function to send transactions to all RPCs
@@ -77,9 +78,10 @@ type pendingTx struct {
 }
 
 // NewTxm creates a txm. Uses simulation so should only be used to send txes to trusted contracts i.e. OCR.
-func NewTxm(chainID string, tc func() (client.ReaderWriter, error),
+func NewTxm(chainID string, client internal.Loader[client.ReaderWriter],
 	sendTx func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error),
 	cfg config.Config, ks SimpleKeystore, lggr logger.Logger) *Txm {
+
 	return &Txm{
 		lggr:   logger.Named(lggr, "Txm"),
 		chSend: make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
@@ -88,7 +90,7 @@ func NewTxm(chainID string, tc func() (client.ReaderWriter, error),
 		cfg:    cfg,
 		txs:    newPendingTxContextWithProm(chainID),
 		ks:     ks,
-		client: utils.NewLazyLoad(tc),
+		client: client,
 		sendTx: sendTx,
 	}
 }

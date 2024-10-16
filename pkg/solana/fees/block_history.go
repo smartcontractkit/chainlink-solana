@@ -3,6 +3,8 @@ package fees
 import (
 	"context"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 	"sync"
 	"time"
 
@@ -11,7 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mathutil"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
@@ -22,7 +23,7 @@ type blockHistoryEstimator struct {
 	chStop  chan struct{}
 	done    sync.WaitGroup
 
-	client *utils.LazyLoad[client.ReaderWriter]
+	client internal.Loader[client.ReaderWriter]
 	cfg    config.Config
 	lgr    logger.Logger
 
@@ -33,7 +34,7 @@ type blockHistoryEstimator struct {
 // NewBlockHistoryEstimator creates a new fee estimator that parses historical fees from a fetched block
 // Note: getRecentPrioritizationFees is not used because it provides the lowest prioritization fee for an included tx in the block
 // which is not effective enough for increasing the chances of block inclusion
-func NewBlockHistoryEstimator(c *utils.LazyLoad[client.ReaderWriter], cfg config.Config, lgr logger.Logger) (*blockHistoryEstimator, error) {
+func NewBlockHistoryEstimator(c internal.Loader[client.ReaderWriter], cfg config.Config, lgr logger.Logger) (*blockHistoryEstimator, error) {
 	return &blockHistoryEstimator{
 		chStop: make(chan struct{}),
 		client: c,

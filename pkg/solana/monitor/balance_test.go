@@ -61,7 +61,11 @@ func TestBalanceMonitor(t *testing.T) {
 			close(done)
 		}
 	}
-	b.reader = client
+
+	getClient := func() (BalanceClient, error) {
+		return client, nil
+	}
+	b.reader = internal.NewLoader[BalanceClient](true, getClient)
 
 	require.NoError(t, b.Start(tests.Context(t)))
 	t.Cleanup(func() {

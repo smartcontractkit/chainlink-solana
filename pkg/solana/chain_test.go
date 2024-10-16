@@ -565,7 +565,7 @@ func TestSolanaChain_MultiNode_Txm(t *testing.T) {
 		assert.NoError(t, err)
 		hash, hashErr := selectedClient.LatestBlockhash()
 		assert.NoError(t, hashErr)
-		tx, err := solana.NewTransaction(
+		tx, txErr := solana.NewTransaction(
 			[]solana.Instruction{
 				system.NewTransferInstruction(
 					amt,
@@ -576,7 +576,7 @@ func TestSolanaChain_MultiNode_Txm(t *testing.T) {
 			hash.Value.Blockhash,
 			solana.TransactionPayer(signer),
 		)
-		require.NoError(t, err)
+		require.NoError(t, txErr)
 		return tx
 	}
 

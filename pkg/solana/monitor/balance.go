@@ -9,6 +9,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 )
 
 // Config defines the monitor configuration.
@@ -53,7 +55,7 @@ type balanceMonitor struct {
 	newReader func() (BalanceClient, error)
 	updateFn  func(acc solana.PublicKey, lamports uint64) // overridable for testing
 
-	reader BalanceClient
+	reader internal.Loader[BalanceClient]
 
 	stop services.StopChan
 	done chan struct{}
@@ -99,18 +101,6 @@ func (b *balanceMonitor) monitor() {
 	}
 }
 
-// getReader returns the cached solanaClient.Reader, or creates a new one if nil.
-func (b *balanceMonitor) getReader() (BalanceClient, error) {
-	if b.reader == nil {
-		var err error
-		b.reader, err = b.newReader()
-		if err != nil {
-			return nil, err
-		}
-	}
-	return b.reader, nil
-}
-
 func (b *balanceMonitor) updateBalances(ctx context.Context) {
 	keys, err := b.ks.Accounts(ctx)
 	if err != nil {
@@ -120,7 +110,7 @@ func (b *balanceMonitor) updateBalances(ctx context.Context) {
 	if len(keys) == 0 {
 		return
 	}
-	reader, err := b.getReader()
+	reader, err := b.reader.Get()
 	if err != nil {
 		b.lggr.Errorw("Failed to get client", "err", err)
 		return
@@ -148,6 +138,6 @@ func (b *balanceMonitor) updateBalances(ctx context.Context) {
 	}
 	if !gotSomeBals {
 		// Try a new client next time.
-		b.reader = nil
+		b.reader.Reset()
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
@@ -32,6 +33,18 @@ type sendTxResult[RESULT any] struct {
 	Err        error
 	ResultCode SendTxReturnCode
 	Result     *RESULT
+}
+
+// TODO: Implement using this instead...?
+type SendTxResult interface {
+	Code() SendTxReturnCode
+	Error() error
+}
+
+type SolanaTxResult struct {
+	code SendTxReturnCode
+	err  error
+	sig  solana.Signature
 }
 
 const sendTxQuorum = 0.7
