@@ -19,6 +19,7 @@ import (
 	cfgmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/config/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	feemocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/fees/mocks"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 	ksmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 
 	"github.com/stretchr/testify/assert"
@@ -65,7 +66,8 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 		}
 
 		// build minimal txm
-		txm := NewTxm("retry_race", getClient, nil, cfg, ks, lggr)
+		loader := internal.NewLoader(true, getClient)
+		txm := NewTxm("retry_race", loader, nil, cfg, ks, lggr)
 		txm.fee = fee
 
 		_, _, _, err := txm.sendWithRetry(
