@@ -81,7 +81,6 @@ type pendingTx struct {
 func NewTxm(chainID string, client internal.Loader[client.ReaderWriter],
 	sendTx func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error),
 	cfg config.Config, ks SimpleKeystore, lggr logger.Logger) *Txm {
-
 	return &Txm{
 		lggr:   logger.Named(lggr, "Txm"),
 		chSend: make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
