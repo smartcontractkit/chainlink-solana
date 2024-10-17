@@ -89,7 +89,7 @@ func (c *MultiNodeConfig) FinalizedBlockOffset() uint32 { return *c.MultiNode.Fi
 func (c *MultiNodeConfig) SetDefaults() {
 	// MultiNode is disabled as it's not fully implemented yet: BCFR-122
 	if c.MultiNode.Enabled == nil {
-		c.MultiNode.Enabled = ptr(true)
+		c.MultiNode.Enabled = ptr(false)
 	}
 
 	/* Node Configs */
