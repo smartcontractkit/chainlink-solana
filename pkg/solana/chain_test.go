@@ -427,7 +427,7 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 			cl, err := c.getClient()
 			require.NoError(t, err)
 
-			hash, hashErr := cl.LatestBlockhash()
+			hash, hashErr := cl.LatestBlockhash(tests.Context(t))
 			assert.NoError(t, hashErr)
 
 			tx, txErr := solana.NewTransaction(
@@ -467,7 +467,7 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 			cl, err := c.getClient()
 			require.NoError(t, err)
 
-			hash, hashErr := cl.LatestBlockhash()
+			hash, hashErr := cl.LatestBlockhash(tests.Context(t))
 			assert.NoError(t, hashErr)
 
 			tx, txErr := solana.NewTransaction(
@@ -557,14 +557,14 @@ func TestSolanaChain_MultiNode_Txm(t *testing.T) {
 	// track initial balance
 	selectedClient, err := testChain.getClient()
 	require.NoError(t, err)
-	receiverBal, err := selectedClient.Balance(pubKeyReceiver)
+	receiverBal, err := selectedClient.Balance(tests.Context(t), pubKeyReceiver)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(0), receiverBal)
 
 	createTx := func(signer solana.PublicKey, sender solana.PublicKey, receiver solana.PublicKey, amt uint64) *solana.Transaction {
 		selectedClient, err = testChain.getClient()
 		assert.NoError(t, err)
-		hash, hashErr := selectedClient.LatestBlockhash()
+		hash, hashErr := selectedClient.LatestBlockhash(tests.Context(t))
 		assert.NoError(t, hashErr)
 		tx, txErr := solana.NewTransaction(
 			[]solana.Instruction{
@@ -582,10 +582,10 @@ func TestSolanaChain_MultiNode_Txm(t *testing.T) {
 	}
 
 	// Send funds twice, along with an invalid transaction
-	require.NoError(t, testChain.txm.Enqueue("test_success", createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)))
+	require.NoError(t, testChain.txm.Enqueue(tests.Context(t), "test_success", createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)))
 	time.Sleep(500 * time.Millisecond) // pause 0.5s for new blockhash
-	require.NoError(t, testChain.txm.Enqueue("test_success_2", createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)))
-	require.Error(t, testChain.txm.Enqueue("test_invalidSigner", createTx(pubKeyReceiver, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL))) // cannot sign tx before enqueuing
+	require.NoError(t, testChain.txm.Enqueue(tests.Context(t), "test_success_2", createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)))
+	require.Error(t, testChain.txm.Enqueue(tests.Context(t), "test_invalidSigner", createTx(pubKeyReceiver, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL))) // cannot sign tx before enqueuing
 
 	// wait for all txes to finish
 	ctx, cancel := context.WithCancel(tests.Context(t))
@@ -608,7 +608,7 @@ loop:
 	// verify funds were transferred through transaction sender
 	selectedClient, err = testChain.getClient()
 	assert.NoError(t, err)
-	receiverBal, err = selectedClient.Balance(pubKeyReceiver)
+	receiverBal, err = selectedClient.Balance(tests.Context(t), pubKeyReceiver)
 	assert.NoError(t, err)
 	require.Equal(t, 2*solana.LAMPORTS_PER_SOL, receiverBal)
 }
