@@ -24,13 +24,8 @@ var (
 	}, []string{"network", "chainId", "invariant"})
 )
 
-// TxErrorClassifier - defines interface of a function that transforms raw RPC error into the SendTxReturnCode enum
-// (e.g. Successful, Fatal, Retryable, etc.)
-type TxErrorClassifier[TX any] func(tx TX, err error) SendTxReturnCode
-
 type SendTxResult interface {
 	Code() SendTxReturnCode
-	SetCode(code SendTxReturnCode)
 	TxError() error
 }
 
@@ -47,7 +42,6 @@ func NewTransactionSender[TX any, RESULT SendTxResult, CHAIN_ID ID, RPC SendTxRP
 	chainID CHAIN_ID,
 	chainFamily string,
 	multiNode *MultiNode[CHAIN_ID, RPC],
-	txErrorClassifier TxErrorClassifier[TX],
 	sendTxSoftTimeout time.Duration,
 ) *TransactionSender[TX, RESULT, CHAIN_ID, RPC] {
 	if sendTxSoftTimeout == 0 {
@@ -58,7 +52,6 @@ func NewTransactionSender[TX any, RESULT SendTxResult, CHAIN_ID ID, RPC SendTxRP
 		chainFamily:       chainFamily,
 		lggr:              logger.Sugared(lggr).Named("TransactionSender").With("chainID", chainID.String()),
 		multiNode:         multiNode,
-		txErrorClassifier: txErrorClassifier,
 		sendTxSoftTimeout: sendTxSoftTimeout,
 		chStop:            make(services.StopChan),
 	}
@@ -70,7 +63,6 @@ type TransactionSender[TX any, RESULT SendTxResult, CHAIN_ID ID, RPC SendTxRPCCl
 	chainFamily       string
 	lggr              logger.SugaredLogger
 	multiNode         *MultiNode[CHAIN_ID, RPC]
-	txErrorClassifier TxErrorClassifier[TX]
 	sendTxSoftTimeout time.Duration // defines max waiting time from first response til responses evaluation
 
 	wg     sync.WaitGroup // waits for all reporting goroutines to finish
@@ -158,11 +150,9 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) broadcastTxAsync(ctx context.Context, rpc RPC, tx TX) RESULT {
 	result := rpc.SendTransaction(ctx, tx)
 	txSender.lggr.Debugw("Node sent transaction", "tx", tx, "err", result.TxError())
-	resultCode := txSender.txErrorClassifier(tx, result.TxError())
-	if !slices.Contains(sendTxSuccessfulCodes, resultCode) {
+	if !slices.Contains(sendTxSuccessfulCodes, result.Code()) {
 		txSender.lggr.Warnw("RPC returned error", "tx", tx, "err", result.TxError())
 	}
-	result.SetCode(resultCode)
 	return result
 }
 

@@ -93,9 +93,6 @@ var errCodes = map[*regexp.Regexp]mn.SendTxReturnCode{
 	ErrProgramExecutionTemporarilyRestricted: mn.Retryable,
 }
 
-// ClassifySendError implements TxErrorClassifier required for MultiNode TransactionSender
-var _ mn.TxErrorClassifier[*solana.Transaction] = ClassifySendError
-
 // ClassifySendError returns the corresponding return code based on the error.
 func ClassifySendError(_ *solana.Transaction, err error) mn.SendTxReturnCode {
 	if err == nil {
