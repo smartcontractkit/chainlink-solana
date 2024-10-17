@@ -90,7 +90,7 @@ type chain struct {
 
 	// if multiNode is enabled, the clientCache will not be used
 	multiNode *mn.MultiNode[mn.StringID, *client.MultiNodeClient]
-	txSender  *mn.TransactionSender[*solanago.Transaction, solanago.Signature, mn.StringID, *client.MultiNodeClient]
+	txSender  *mn.TransactionSender[*solanago.Transaction, *client.SendTxResult, mn.StringID, *client.MultiNodeClient]
 
 	// tracking node chain id for verification
 	clientCache map[string]*verifiedCachedClient // map URL -> {client, chainId} [mainnet/testnet/devnet/localnet]
@@ -270,7 +270,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 			mnCfg.DeathDeclarationDelay(),
 		)
 
-		txSender := mn.NewTransactionSender[*solanago.Transaction, solanago.Signature, mn.StringID, *client.MultiNodeClient](
+		txSender := mn.NewTransactionSender[*solanago.Transaction, *client.SendTxResult, mn.StringID, *client.MultiNodeClient](
 			lggr,
 			mn.StringID(id),
 			chainFamily,
@@ -287,14 +287,17 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 
 		sendTx = func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error) {
 			// Send tx using MultiNode transaction sender
-			result, _, err := ch.txSender.SendTransaction(ctx, tx)
+			result, err := ch.txSender.SendTransaction(ctx, tx)
 			if err != nil {
 				return solanago.Signature{}, err
 			}
 			if result == nil {
-				return solanago.Signature{}, errors.New("tx sender returned nil signature")
+				return solanago.Signature{}, errors.New("tx sender returned nil result")
 			}
-			return *result, err
+			if (*result).Signature().IsZero() {
+				return solanago.Signature{}, errors.New("tx sender returned empty signature")
+			}
+			return (*result).Signature(), nil
 		}
 	}
 

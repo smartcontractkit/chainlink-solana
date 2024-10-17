@@ -455,10 +455,12 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 		}
 
 		// Send tx using transaction sender
-		sig, code, err := c.txSender.SendTransaction(ctx, createTx(receiver.PublicKey()))
+		result, err := c.txSender.SendTransaction(ctx, createTx(receiver.PublicKey()))
 		require.NoError(t, err)
-		require.Equal(t, mn.Successful, code)
-		require.NotEmpty(t, sig)
+		require.NotNil(t, result)
+		require.NotNil(t, *result)
+		require.Equal(t, mn.Successful, (*result).Code())
+		require.NotEmpty(t, (*result).Signature())
 	})
 
 	t.Run("unsigned transaction error", func(t *testing.T) {
@@ -486,17 +488,23 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 		}
 
 		// Send tx using transaction sender
-		sig, code, err := c.txSender.SendTransaction(ctx, unsignedTx(receiver.PublicKey()))
-		require.Error(t, err)
-		require.Equal(t, mn.Fatal, code)
-		require.Empty(t, sig)
+		result, err := c.txSender.SendTransaction(ctx, unsignedTx(receiver.PublicKey()))
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.NotNil(t, *result)
+		require.Error(t, (*result).TxError())
+		require.Equal(t, mn.Fatal, (*result).Code())
+		require.Empty(t, (*result).Signature())
 	})
 
 	t.Run("empty transaction", func(t *testing.T) {
-		sig, code, err := c.txSender.SendTransaction(ctx, &solana.Transaction{})
-		require.Error(t, err)
-		require.Equal(t, mn.Fatal, code)
-		require.Empty(t, sig)
+		result, err := c.txSender.SendTransaction(ctx, &solana.Transaction{})
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.NotNil(t, *result)
+		require.Error(t, (*result).TxError())
+		require.Equal(t, mn.Fatal, (*result).Code())
+		require.Empty(t, (*result).Signature())
 	})
 }
 

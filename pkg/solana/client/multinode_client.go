@@ -41,7 +41,7 @@ func (h *Head) IsValid() bool {
 }
 
 var _ mn.RPCClient[mn.StringID, *Head] = (*MultiNodeClient)(nil)
-var _ mn.SendTxRPCClient[*solana.Transaction, solana.Signature] = (*MultiNodeClient)(nil)
+var _ mn.SendTxRPCClient[*solana.Transaction, *SendTxResult] = (*MultiNodeClient)(nil)
 
 type MultiNodeClient struct {
 	Client
@@ -300,10 +300,37 @@ func (m *MultiNodeClient) GetInterceptedChainInfo() (latest, highestUserObservat
 	return m.latestChainInfo, m.highestUserObservations
 }
 
-func (m *MultiNodeClient) SendTransaction(ctx context.Context, tx *solana.Transaction) (*solana.Signature, error) {
+type SendTxResult struct {
+	err  error
+	code mn.SendTxReturnCode
+	sig  solana.Signature
+}
+
+var _ mn.SendTxResult = (*SendTxResult)(nil)
+
+func (r *SendTxResult) TxError() error {
+	return r.err
+}
+
+func (r *SendTxResult) Code() mn.SendTxReturnCode {
+	return r.code
+}
+
+func (r *SendTxResult) SetCode(code mn.SendTxReturnCode) {
+	r.code = code
+}
+
+func (r *SendTxResult) Signature() solana.Signature {
+	return r.sig
+}
+
+func (m *MultiNodeClient) SendTransaction(ctx context.Context, tx *solana.Transaction) *SendTxResult {
+	var sendTxResult = &SendTxResult{}
 	sig, err := m.SendTx(ctx, tx)
 	if err != nil {
-		return nil, err
+		sendTxResult.err = err
+		return sendTxResult
 	}
-	return &sig, nil
+	sendTxResult.sig = sig
+	return sendTxResult
 }
