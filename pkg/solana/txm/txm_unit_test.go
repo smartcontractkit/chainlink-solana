@@ -52,7 +52,7 @@ func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 
 	t.Run("successfully sets estimated compute unit limit", func(t *testing.T) {
 		usedCompute := uint64(100)
-		client.On("LatestBlockhash").Return(&rpc.GetLatestBlockhashResult{
+		client.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{
 			Value: &rpc.LatestBlockhashResult{
 				LastValidBlockHeight: 100,
 				Blockhash:            solana.Hash{},
@@ -70,7 +70,7 @@ func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 	})
 
 	t.Run("failed to simulate tx", func(t *testing.T) {
-		client.On("LatestBlockhash").Return(&rpc.GetLatestBlockhashResult{
+		client.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{
 			Value: &rpc.LatestBlockhashResult{
 				LastValidBlockHeight: 100,
 				Blockhash:            solana.Hash{},
@@ -83,7 +83,7 @@ func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 	})
 
 	t.Run("simulation returns error for tx", func(t *testing.T) {
-		client.On("LatestBlockhash").Return(&rpc.GetLatestBlockhashResult{
+		client.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{
 			Value: &rpc.LatestBlockhashResult{
 				LastValidBlockHeight: 100,
 				Blockhash:            solana.Hash{},
@@ -98,7 +98,7 @@ func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 	})
 
 	t.Run("simulation returns nil err with 0 compute unit limit", func(t *testing.T) {
-		client.On("LatestBlockhash").Return(&rpc.GetLatestBlockhashResult{
+		client.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{
 			Value: &rpc.LatestBlockhashResult{
 				LastValidBlockHeight: 100,
 				Blockhash:            solana.Hash{},
