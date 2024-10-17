@@ -300,17 +300,13 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 		}
 	}
 
-	tc := func() (client.ReaderWriter, error) {
-		return ch.getClient()
-	}
-
 	// Use lazy loader if MultiNode is disabled
-	loader := internal.NewLoader(!cfg.MultiNode.Enabled(), tc)
+	lazyLoad := !cfg.MultiNode.Enabled()
 
-	ch.txm = txm.NewTxm(ch.id, loader, sendTx, cfg, ks, lggr)
-	bc := func() (monitor.BalanceClient, error) {
-		return ch.getClient()
-	}
+	tc := internal.NewLoader(lazyLoad, func() (client.ReaderWriter, error) { return ch.getClient() })
+	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
+
+	bc := internal.NewLoader(lazyLoad, func() (monitor.BalanceClient, error) { return ch.getClient() })
 	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
 	return &ch, nil
 }
