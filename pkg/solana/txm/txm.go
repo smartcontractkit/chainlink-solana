@@ -530,7 +530,7 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	}
 
 	if cfg.EstimateComputeUnitLimit {
-		computeUnitLimit, err := txm.EstimateComputeUnitLimit(context.TODO(), tx)
+		computeUnitLimit, err := txm.EstimateComputeUnitLimit(ctx, tx)
 		if err != nil {
 			return fmt.Errorf("transaction failed simulation: %w", err)
 		}
