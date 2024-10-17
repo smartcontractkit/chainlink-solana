@@ -128,6 +128,61 @@ func TestSolanaChain_GetClient(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		out := fmt.Sprintf(TestSolanaGenesisHashTemplate, client.MainnetGenesisHash) // mainnet genesis hash
+		if !strings.Contains(r.URL.Path, "/mismatch") {
+			// devnet gensis hash
+			out = fmt.Sprintf(TestSolanaGenesisHashTemplate, client.DevnetGenesisHash)
+		}
+		_, err := w.Write([]byte(out))
+		require.NoError(t, err)
+	}))
+	defer mockServer.Close()
+
+	ch := solcfg.Chain{}
+	ch.SetDefaults()
+	mn := solcfg.MultiNodeConfig{
+		MultiNode: solcfg.MultiNode{
+			Enabled: ptr(true),
+		},
+	}
+	mn.SetDefaults()
+
+	cfg := &solcfg.TOMLConfig{
+		ChainID:   ptr("devnet"),
+		Chain:     ch,
+		MultiNode: mn,
+	}
+	cfg.Nodes = []*solcfg.Node{
+		{
+			Name: ptr("devnet"),
+			URL:  config.MustParseURL(mockServer.URL + "/1"),
+		},
+		{
+			Name: ptr("devnet"),
+			URL:  config.MustParseURL(mockServer.URL + "/2"),
+		},
+	}
+
+	testChain, err := newChain("devnet", cfg, nil, logger.Test(t))
+	require.NoError(t, err)
+
+	err = testChain.Start(tests.Context(t))
+	require.NoError(t, err)
+	defer func() {
+		closeErr := testChain.Close()
+		require.NoError(t, closeErr)
+	}()
+
+	selectedClient, err := testChain.getClient()
+	assert.NoError(t, err)
+
+	id, err := selectedClient.ChainID(tests.Context(t))
+	assert.NoError(t, err)
+	assert.Equal(t, "devnet", id.String())
+}
+
 func TestSolanaChain_VerifiedClient(t *testing.T) {
 	ctx := tests.Context(t)
 	called := false
