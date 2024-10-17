@@ -28,19 +28,19 @@ type BalanceClient interface {
 }
 
 // NewBalanceMonitor returns a balance monitoring services.Service which reports the SOL balance of all ks keys to prometheus.
-func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, newReader func() (BalanceClient, error)) services.Service {
-	return newBalanceMonitor(chainID, cfg, lggr, ks, newReader)
+func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, reader internal.Loader[BalanceClient]) services.Service {
+	return newBalanceMonitor(chainID, cfg, lggr, ks, reader)
 }
 
-func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, newReader func() (BalanceClient, error)) *balanceMonitor {
+func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, reader internal.Loader[BalanceClient]) *balanceMonitor {
 	b := balanceMonitor{
-		chainID:   chainID,
-		cfg:       cfg,
-		lggr:      logger.Named(lggr, "BalanceMonitor"),
-		ks:        ks,
-		newReader: newReader,
-		stop:      make(chan struct{}),
-		done:      make(chan struct{}),
+		chainID: chainID,
+		cfg:     cfg,
+		lggr:    logger.Named(lggr, "BalanceMonitor"),
+		ks:      ks,
+		reader:  reader,
+		stop:    make(chan struct{}),
+		done:    make(chan struct{}),
 	}
 	b.updateFn = b.updateProm
 	return &b
@@ -48,12 +48,11 @@ func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keysto
 
 type balanceMonitor struct {
 	services.StateMachine
-	chainID   string
-	cfg       Config
-	lggr      logger.Logger
-	ks        Keystore
-	newReader func() (BalanceClient, error)
-	updateFn  func(acc solana.PublicKey, lamports uint64) // overridable for testing
+	chainID  string
+	cfg      Config
+	lggr     logger.Logger
+	ks       Keystore
+	updateFn func(acc solana.PublicKey, lamports uint64) // overridable for testing
 
 	reader internal.Loader[BalanceClient]
 
