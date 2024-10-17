@@ -59,6 +59,7 @@ func TestSolanaChain_GetClient(t *testing.T) {
 		ChainID: ptr("devnet"),
 		Chain:   ch,
 	}
+	cfg.SetDefaults()
 	testChain := chain{
 		id:          "devnet",
 		cfg:         cfg,
@@ -125,7 +126,63 @@ func TestSolanaChain_GetClient(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		out := fmt.Sprintf(TestSolanaGenesisHashTemplate, client.MainnetGenesisHash) // mainnet genesis hash
+		if !strings.Contains(r.URL.Path, "/mismatch") {
+			// devnet gensis hash
+			out = fmt.Sprintf(TestSolanaGenesisHashTemplate, client.DevnetGenesisHash)
+		}
+		_, err := w.Write([]byte(out))
+		require.NoError(t, err)
+	}))
+	defer mockServer.Close()
+
+	ch := solcfg.Chain{}
+	ch.SetDefaults()
+	mn := solcfg.MultiNodeConfig{
+		MultiNode: solcfg.MultiNode{
+			Enabled: ptr(true),
+		},
+	}
+	mn.SetDefaults()
+
+	cfg := &solcfg.TOMLConfig{
+		ChainID:   ptr("devnet"),
+		Chain:     ch,
+		MultiNode: mn,
+	}
+	cfg.Nodes = []*solcfg.Node{
+		{
+			Name: ptr("devnet"),
+			URL:  config.MustParseURL(mockServer.URL + "/1"),
+		},
+		{
+			Name: ptr("devnet"),
+			URL:  config.MustParseURL(mockServer.URL + "/2"),
+		},
+	}
+
+	testChain, err := newChain("devnet", cfg, nil, logger.Test(t))
+	require.NoError(t, err)
+
+	err = testChain.Start(tests.Context(t))
+	require.NoError(t, err)
+	defer func() {
+		closeErr := testChain.Close()
+		require.NoError(t, closeErr)
+	}()
+
+	selectedClient, err := testChain.getClient()
+	assert.NoError(t, err)
+
+	id, err := selectedClient.ChainID(tests.Context(t))
+	assert.NoError(t, err)
+	assert.Equal(t, "devnet", id.String())
+}
+
 func TestSolanaChain_VerifiedClient(t *testing.T) {
+	ctx := tests.Context(t)
 	called := false
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		out := `{ "jsonrpc": "2.0", "result": 1234, "id": 1 }` // getSlot response
@@ -156,6 +213,8 @@ func TestSolanaChain_VerifiedClient(t *testing.T) {
 		ChainID: ptr("devnet"),
 		Chain:   ch,
 	}
+	cfg.SetDefaults()
+
 	testChain := chain{
 		cfg:         cfg,
 		lggr:        logger.Test(t),
@@ -175,7 +234,7 @@ func TestSolanaChain_VerifiedClient(t *testing.T) {
 	// retrieve cached client and retrieve slot height
 	c, err := testChain.verifiedClient(node)
 	require.NoError(t, err)
-	slot, err := c.SlotHeight()
+	slot, err := c.SlotHeight(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(1234), slot)
 
@@ -204,6 +263,7 @@ func TestSolanaChain_VerifiedClient_ParallelClients(t *testing.T) {
 		Enabled: ptr(true),
 		Chain:   ch,
 	}
+	cfg.SetDefaults()
 	testChain := chain{
 		id:          "devnet",
 		cfg:         cfg,

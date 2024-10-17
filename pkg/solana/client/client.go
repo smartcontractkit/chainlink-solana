@@ -4,17 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"time"
-
-	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"golang.org/x/sync/singleflight"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
+	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 )
@@ -33,12 +30,12 @@ type ReaderWriter interface {
 
 type Reader interface {
 	AccountReader
-	Balance(addr solana.PublicKey) (uint64, error)
-	SlotHeight() (uint64, error)
-	LatestBlockhash() (*rpc.GetLatestBlockhashResult, error)
+	Balance(ctx context.Context, addr solana.PublicKey) (uint64, error)
+	SlotHeight(ctx context.Context) (uint64, error)
+	LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockhashResult, error)
 	ChainID(ctx context.Context) (mn.StringID, error)
-	GetFeeForMessage(msg string) (uint64, error)
-	GetLatestBlock() (*rpc.GetBlockResult, error)
+	GetFeeForMessage(ctx context.Context, msg string) (uint64, error)
+	GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error)
 }
 
 // AccountReader is an interface that allows users to pass either the solana rpc client or the relay client
@@ -68,27 +65,6 @@ type Client struct {
 	requestGroup *singleflight.Group
 }
 
-type Head struct {
-	rpc.GetBlockResult
-}
-
-func (h *Head) BlockNumber() int64 {
-	if !h.IsValid() {
-		return 0
-	}
-	// nolint:gosec
-	// G115: integer overflow conversion uint64 -&gt; int64
-	return int64(*h.BlockHeight)
-}
-
-func (h *Head) BlockDifficulty() *big.Int {
-	return nil
-}
-
-func (h *Head) IsValid() bool {
-	return h.BlockHeight != nil
-}
-
 func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration, log logger.Logger) (*Client, error) {
 	return &Client{
 		url:             endpoint,
@@ -103,56 +79,6 @@ func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration,
 	}, nil
 }
 
-var _ mn.RPCClient[mn.StringID, *Head] = (*Client)(nil)
-var _ mn.SendTxRPCClient[*solana.Transaction] = (*Client)(nil)
-
-// TODO: BCI-4061: Implement Client for MultiNode
-
-func (c *Client) Dial(ctx context.Context) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c *Client) SubscribeToHeads(ctx context.Context) (<-chan *Head, mn.Subscription, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c *Client) SubscribeToFinalizedHeads(ctx context.Context) (<-chan *Head, mn.Subscription, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c *Client) Ping(ctx context.Context) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c *Client) IsSyncing(ctx context.Context) (bool, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c *Client) UnsubscribeAllExcept(subs ...mn.Subscription) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c *Client) Close() {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c *Client) GetInterceptedChainInfo() (latest, highestUserObservations mn.ChainInfo) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c *Client) SendTransaction(ctx context.Context, tx *solana.Transaction) error {
-	// TODO: Implement
-	return nil
-}
-
 func (c *Client) latency(name string) func() {
 	start := time.Now()
 	return func() {
@@ -160,11 +86,11 @@ func (c *Client) latency(name string) func() {
 	}
 }
 
-func (c *Client) Balance(addr solana.PublicKey) (uint64, error) {
+func (c *Client) Balance(ctx context.Context, addr solana.PublicKey) (uint64, error) {
 	done := c.latency("balance")
 	defer done()
 
-	ctx, cancel := context.WithTimeout(context.Background(), c.contextDuration)
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
 
 	v, err, _ := c.requestGroup.Do(fmt.Sprintf("GetBalance(%s)", addr.String()), func() (interface{}, error) {
@@ -177,15 +103,15 @@ func (c *Client) Balance(addr solana.PublicKey) (uint64, error) {
 	return res.Value, err
 }
 
-func (c *Client) SlotHeight() (uint64, error) {
-	return c.SlotHeightWithCommitment(rpc.CommitmentProcessed) // get the latest slot height
+func (c *Client) SlotHeight(ctx context.Context) (uint64, error) {
+	return c.SlotHeightWithCommitment(ctx, rpc.CommitmentProcessed) // get the latest slot height
 }
 
-func (c *Client) SlotHeightWithCommitment(commitment rpc.CommitmentType) (uint64, error) {
+func (c *Client) SlotHeightWithCommitment(ctx context.Context, commitment rpc.CommitmentType) (uint64, error) {
 	done := c.latency("slot_height")
 	defer done()
 
-	ctx, cancel := context.WithTimeout(context.Background(), c.contextDuration)
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
 	v, err, _ := c.requestGroup.Do("GetSlotHeight", func() (interface{}, error) {
 		return c.rpc.GetSlot(ctx, commitment)
@@ -203,11 +129,11 @@ func (c *Client) GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicK
 	return c.rpc.GetAccountInfoWithOpts(ctx, addr, opts)
 }
 
-func (c *Client) LatestBlockhash() (*rpc.GetLatestBlockhashResult, error) {
+func (c *Client) LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockhashResult, error) {
 	done := c.latency("latest_blockhash")
 	defer done()
 
-	ctx, cancel := context.WithTimeout(context.Background(), c.contextDuration)
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
 
 	v, err, _ := c.requestGroup.Do("GetLatestBlockhash", func() (interface{}, error) {
@@ -245,13 +171,13 @@ func (c *Client) ChainID(ctx context.Context) (mn.StringID, error) {
 	return mn.StringID(network), nil
 }
 
-func (c *Client) GetFeeForMessage(msg string) (uint64, error) {
+func (c *Client) GetFeeForMessage(ctx context.Context, msg string) (uint64, error) {
 	done := c.latency("fee_for_message")
 	defer done()
 
 	// msg is base58 encoded data
 
-	ctx, cancel := context.WithTimeout(context.Background(), c.contextDuration)
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
 	res, err := c.rpc.GetFeeForMessage(ctx, msg, c.commitment)
 	if err != nil {
@@ -328,9 +254,9 @@ func (c *Client) SendTx(ctx context.Context, tx *solana.Transaction) (solana.Sig
 	return c.rpc.SendTransactionWithOpts(ctx, tx, opts)
 }
 
-func (c *Client) GetLatestBlock() (*rpc.GetBlockResult, error) {
+func (c *Client) GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error) {
 	// get latest confirmed slot
-	slot, err := c.SlotHeightWithCommitment(c.commitment)
+	slot, err := c.SlotHeightWithCommitment(ctx, c.commitment)
 	if err != nil {
 		return nil, fmt.Errorf("GetLatestBlock.SlotHeight: %w", err)
 	}
@@ -338,7 +264,7 @@ func (c *Client) GetLatestBlock() (*rpc.GetBlockResult, error) {
 	// get block based on slot
 	done := c.latency("latest_block")
 	defer done()
-	ctx, cancel := context.WithTimeout(context.Background(), c.txTimeout)
+	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
 	defer cancel()
 	v, err, _ := c.requestGroup.Do("GetBlockWithOpts", func() (interface{}, error) {
 		version := uint64(0) // pull all tx types (legacy + v0)

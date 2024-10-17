@@ -104,7 +104,7 @@ func TestTxm(t *testing.T) {
 			cfg := config.NewDefault()
 			cfg.Chain.FeeEstimatorMode = &estimator
 			mc := mocks.NewReaderWriter(t)
-			mc.On("GetLatestBlock").Return(&rpc.GetBlockResult{}, nil).Maybe()
+			mc.On("GetLatestBlock", mock.Anything).Return(&rpc.GetBlockResult{}, nil).Maybe()
 
 			// mock solana keystore
 			mkey := keyMocks.NewSimpleKeystore(t)
@@ -196,7 +196,7 @@ func TestTxm(t *testing.T) {
 				}
 
 				// send tx
-				assert.NoError(t, txm.Enqueue(t.Name(), tx))
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx))
 				wg.Wait()
 
 				// no transactions stored inflight txs list
@@ -227,7 +227,7 @@ func TestTxm(t *testing.T) {
 				}).Return(solana.Signature{}, errors.New("FAIL")).Once()
 
 				// tx should be able to queue
-				assert.NoError(t, txm.Enqueue(t.Name(), tx))
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx))
 				wg.Wait() // wait to be picked up and processed
 
 				// no transactions stored inflight txs list
@@ -255,7 +255,7 @@ func TestTxm(t *testing.T) {
 				// signature status is nil (handled automatically)
 
 				// tx should be able to queue
-				assert.NoError(t, txm.Enqueue(t.Name(), tx))
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx))
 				wg.Wait()      // wait to be picked up and processed
 				waitFor(empty) // txs cleared quickly
 
@@ -287,7 +287,7 @@ func TestTxm(t *testing.T) {
 				// all signature statuses are nil, handled automatically
 
 				// tx should be able to queue
-				assert.NoError(t, txm.Enqueue(t.Name(), tx))
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx))
 				wg.Wait()      // wait to be picked up and processed
 				waitFor(empty) // txs cleared after timeout
 
@@ -323,7 +323,7 @@ func TestTxm(t *testing.T) {
 				// all signature statuses are nil, handled automatically
 
 				// tx should be able to queue
-				assert.NoError(t, txm.Enqueue(t.Name(), tx))
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx))
 				wg.Wait()      // wait to be picked up and processed
 				waitFor(empty) // txs cleared after timeout
 
@@ -366,7 +366,7 @@ func TestTxm(t *testing.T) {
 				}
 
 				// tx should be able to queue
-				assert.NoError(t, txm.Enqueue(t.Name(), tx))
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx))
 				wg.Wait()      // wait to be picked up and processed
 				waitFor(empty) // txs cleared after timeout
 
@@ -403,7 +403,7 @@ func TestTxm(t *testing.T) {
 				}
 
 				// tx should be able to queue
-				assert.NoError(t, txm.Enqueue(t.Name(), tx))
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx))
 				wg.Wait()      // wait to be picked up and processed
 				waitFor(empty) // txs cleared after timeout
 
@@ -444,7 +444,7 @@ func TestTxm(t *testing.T) {
 				}
 
 				// tx should be able to queue
-				assert.NoError(t, txm.Enqueue(t.Name(), tx))
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx))
 				wg.Wait()      // wait to be picked up and processed
 				waitFor(empty) // inflight txs cleared after timeout
 
@@ -492,7 +492,7 @@ func TestTxm(t *testing.T) {
 				}
 
 				// tx should be able to queue
-				assert.NoError(t, txm.Enqueue(t.Name(), tx))
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx))
 				wg.Wait()      // wait to be picked up and processed
 				waitFor(empty) // inflight txs cleared after timeout
 
@@ -526,7 +526,7 @@ func TestTxm(t *testing.T) {
 				}
 
 				// tx should be able to queue
-				assert.NoError(t, txm.Enqueue(t.Name(), tx))
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx))
 				wg.Wait()      // wait to be picked up and processed
 				waitFor(empty) // inflight txs cleared after timeout
 
@@ -568,7 +568,7 @@ func TestTxm(t *testing.T) {
 				}
 
 				// send tx
-				assert.NoError(t, txm.Enqueue(t.Name(), tx))
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx))
 				wg.Wait()
 
 				// no transactions stored inflight txs list
@@ -617,7 +617,7 @@ func TestTxm(t *testing.T) {
 				}
 
 				// send tx - with disabled fee bumping
-				assert.NoError(t, txm.Enqueue(t.Name(), tx, SetFeeBumpPeriod(0)))
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, SetFeeBumpPeriod(0)))
 				wg.Wait()
 
 				// no transactions stored inflight txs list
@@ -657,7 +657,7 @@ func TestTxm(t *testing.T) {
 				}
 
 				// send tx - with disabled fee bumping and disabled compute unit limit
-				assert.NoError(t, txm.Enqueue(t.Name(), tx, SetFeeBumpPeriod(0), SetComputeUnitLimit(0)))
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, SetFeeBumpPeriod(0), SetComputeUnitLimit(0)))
 				wg.Wait()
 
 				// no transactions stored inflight txs list
@@ -721,7 +721,7 @@ func TestTxm_Enqueue(t *testing.T) {
 		return mc, nil
 	}, cfg, mkey, lggr)
 
-	require.ErrorContains(t, txm.Enqueue("txmUnstarted", &solana.Transaction{}), "not started")
+	require.ErrorContains(t, txm.Enqueue(ctx, "txmUnstarted", &solana.Transaction{}), "not started")
 	require.NoError(t, txm.Start(ctx))
 	t.Cleanup(func() { require.NoError(t, txm.Close()) })
 
@@ -739,10 +739,10 @@ func TestTxm_Enqueue(t *testing.T) {
 	for _, run := range txs {
 		t.Run(run.name, func(t *testing.T) {
 			if !run.fail {
-				assert.NoError(t, txm.Enqueue(run.name, run.tx))
+				assert.NoError(t, txm.Enqueue(ctx, run.name, run.tx))
 				return
 			}
-			assert.Error(t, txm.Enqueue(run.name, run.tx))
+			assert.Error(t, txm.Enqueue(ctx, run.name, run.tx))
 		})
 	}
 }
