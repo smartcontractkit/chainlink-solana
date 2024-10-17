@@ -75,5 +75,5 @@ func (c *ConfigTracker) LatestConfig(ctx context.Context, changedInBlock uint64)
 
 // LatestBlockHeight returns the height of the most recent block in the chain.
 func (c *ConfigTracker) LatestBlockHeight(ctx context.Context) (blockHeight uint64, err error) {
-	return c.reader.SlotHeight() // this returns the latest slot height through CommitmentProcessed
+	return c.reader.SlotHeight(ctx) // this returns the latest slot height through CommitmentProcessed
 }

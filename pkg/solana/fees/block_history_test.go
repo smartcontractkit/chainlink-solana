@@ -9,6 +9,7 @@ import (
 
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
@@ -47,7 +48,7 @@ func TestBlockHistoryEstimator(t *testing.T) {
 	estimator, err := NewBlockHistoryEstimator(rwLoader, cfg, lgr)
 	require.NoError(t, err)
 
-	rw.On("GetLatestBlock").Return(blockRes, nil).Once()
+	rw.On("GetLatestBlock", mock.Anything).Return(blockRes, nil).Once()
 	require.NoError(t, estimator.Start(ctx))
 	tests.AssertLogEventually(t, logs, "BlockHistoryEstimator: updated")
 	assert.Equal(t, uint64(55000), estimator.readRawPrice())
@@ -61,22 +62,22 @@ func TestBlockHistoryEstimator(t *testing.T) {
 	assert.Equal(t, estimator.readRawPrice(), estimator.BaseComputeUnitPrice())
 
 	// failed to get latest block
-	rw.On("GetLatestBlock").Return(nil, fmt.Errorf("fail rpc call")).Once()
+	rw.On("GetLatestBlock", mock.Anything).Return(nil, fmt.Errorf("fail rpc call")).Once()
 	tests.AssertLogEventually(t, logs, "failed to get block")
 	assert.Equal(t, validPrice, estimator.BaseComputeUnitPrice(), "price should not change when getPrice fails")
 
 	// failed to parse block
-	rw.On("GetLatestBlock").Return(nil, nil).Once()
+	rw.On("GetLatestBlock", mock.Anything).Return(nil, nil).Once()
 	tests.AssertLogEventually(t, logs, "failed to parse block")
 	assert.Equal(t, validPrice, estimator.BaseComputeUnitPrice(), "price should not change when getPrice fails")
 
 	// failed to calculate median
-	rw.On("GetLatestBlock").Return(&rpc.GetBlockResult{}, nil).Once()
+	rw.On("GetLatestBlock", mock.Anything).Return(&rpc.GetBlockResult{}, nil).Once()
 	tests.AssertLogEventually(t, logs, "failed to find median")
 	assert.Equal(t, validPrice, estimator.BaseComputeUnitPrice(), "price should not change when getPrice fails")
 
 	// back to happy path
-	rw.On("GetLatestBlock").Return(blockRes, nil).Once()
+	rw.On("GetLatestBlock", mock.Anything).Return(blockRes, nil).Once()
 	tests.AssertEventually(t, func() bool {
 		return logs.FilterMessageSnippet("BlockHistoryEstimator: updated").Len() == 2
 	})
