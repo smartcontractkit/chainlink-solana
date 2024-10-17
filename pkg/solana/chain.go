@@ -89,8 +89,8 @@ type chain struct {
 	lggr           logger.Logger
 
 	// if multiNode is enabled, the clientCache will not be used
-	multiNode *mn.MultiNode[mn.StringID, *client.Client]
-	txSender  *mn.TransactionSender[*solanago.Transaction, mn.StringID, *client.Client]
+	multiNode *mn.MultiNode[mn.StringID, *client.MultiNodeClient]
+	txSender  *mn.TransactionSender[*solanago.Transaction, mn.StringID, *client.MultiNodeClient]
 
 	// tracking node chain id for verification
 	clientCache map[string]*verifiedCachedClient // map URL -> {client, chainId} [mainnet/testnet/devnet/localnet]
@@ -235,28 +235,29 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 
 		mnCfg := &cfg.MultiNode
 
-		var nodes []mn.Node[mn.StringID, *client.Client]
-		var sendOnlyNodes []mn.SendOnlyNode[mn.StringID, *client.Client]
+		var nodes []mn.Node[mn.StringID, *client.MultiNodeClient]
+		var sendOnlyNodes []mn.SendOnlyNode[mn.StringID, *client.MultiNodeClient]
 
 		for i, nodeInfo := range cfg.ListNodes() {
-			rpcClient, err := client.NewClient(nodeInfo.URL.String(), cfg, DefaultRequestTimeout, logger.Named(lggr, "Client."+*nodeInfo.Name))
+			rpcClient, err := client.NewMultiNodeClient(nodeInfo.URL.String(), cfg, DefaultRequestTimeout, logger.Named(lggr, "Client."+*nodeInfo.Name))
 			if err != nil {
 				lggr.Warnw("failed to create client", "name", *nodeInfo.Name, "solana-url", nodeInfo.URL.String(), "err", err.Error())
 				return nil, fmt.Errorf("failed to create client: %w", err)
 			}
 
-			newNode := mn.NewNode[mn.StringID, *client.Head, *client.Client](
-				mnCfg, mnCfg, lggr, *nodeInfo.URL.URL(), nil, *nodeInfo.Name,
-				i, mn.StringID(id), 0, rpcClient, chainFamily)
-
 			if nodeInfo.SendOnly {
-				sendOnlyNodes = append(sendOnlyNodes, newNode)
+				newSendOnly := mn.NewSendOnlyNode[mn.StringID, *client.MultiNodeClient](
+					lggr, *nodeInfo.URL.URL(), *nodeInfo.Name, mn.StringID(id), rpcClient)
+				sendOnlyNodes = append(sendOnlyNodes, newSendOnly)
 			} else {
+				newNode := mn.NewNode[mn.StringID, *client.Head, *client.MultiNodeClient](
+					mnCfg, mnCfg, lggr, *nodeInfo.URL.URL(), nil, *nodeInfo.Name,
+					i, mn.StringID(id), 0, rpcClient, chainFamily)
 				nodes = append(nodes, newNode)
 			}
 		}
 
-		multiNode := mn.NewMultiNode[mn.StringID, *client.Client](
+		multiNode := mn.NewMultiNode[mn.StringID, *client.MultiNodeClient](
 			lggr,
 			mnCfg.SelectionMode(),
 			mnCfg.LeaseDuration(),
@@ -273,7 +274,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 			return 0 // TODO ClassifySendError(err, clientErrors, logger.Sugared(logger.Nop()), tx, common.Address{}, false)
 		}
 
-		txSender := mn.NewTransactionSender[*solanago.Transaction, mn.StringID, *client.Client](
+		txSender := mn.NewTransactionSender[*solanago.Transaction, mn.StringID, *client.MultiNodeClient](
 			lggr,
 			mn.StringID(id),
 			chainFamily,
@@ -395,6 +396,7 @@ func (c *chain) ChainID() string {
 }
 
 // getClient returns a client, randomly selecting one from available and valid nodes
+// If multinode is enabled, it will return a client using the multinode selection instead.
 func (c *chain) getClient() (client.ReaderWriter, error) {
 	if c.cfg.MultiNode.Enabled() {
 		return c.multiNode.SelectRPC()
