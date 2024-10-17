@@ -2,13 +2,12 @@ package smoke
 
 import (
 	"fmt"
+	"github.com/rs/zerolog/log"
+	"github.com/stretchr/testify/require"
 	"maps"
 	"os/exec"
 	"testing"
 	"time"
-
-	"github.com/rs/zerolog/log"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 
