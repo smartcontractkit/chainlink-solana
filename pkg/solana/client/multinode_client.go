@@ -316,10 +316,6 @@ func (r *SendTxResult) Code() mn.SendTxReturnCode {
 	return r.code
 }
 
-func (r *SendTxResult) SetCode(code mn.SendTxReturnCode) {
-	r.code = code
-}
-
 func (r *SendTxResult) Signature() solana.Signature {
 	return r.sig
 }
@@ -327,6 +323,7 @@ func (r *SendTxResult) Signature() solana.Signature {
 func (m *MultiNodeClient) SendTransaction(ctx context.Context, tx *solana.Transaction) *SendTxResult {
 	var sendTxResult = &SendTxResult{}
 	sig, err := m.SendTx(ctx, tx)
+	sendTxResult.code = ClassifySendError(tx, err)
 	if err != nil {
 		sendTxResult.err = err
 		return sendTxResult
