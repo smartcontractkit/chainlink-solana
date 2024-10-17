@@ -116,7 +116,7 @@ func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 
 func createTx(t *testing.T, client solanaClient.ReaderWriter, signer solana.PublicKey, sender solana.PublicKey, receiver solana.PublicKey, amt uint64) *solana.Transaction {
 	// create transfer tx
-	hash, err := client.LatestBlockhash()
+	hash, err := client.LatestBlockhash(tests.Context(t))
 	require.NoError(t, err)
 	tx, err := solana.NewTransaction(
 		[]solana.Instruction{
