@@ -17,9 +17,9 @@ type ReaderWriter struct {
 	mock.Mock
 }
 
-// Balance provides a mock function with given fields: addr
-func (_m *ReaderWriter) Balance(addr solana.PublicKey) (uint64, error) {
-	ret := _m.Called(addr)
+// Balance provides a mock function with given fields: ctx, addr
+func (_m *ReaderWriter) Balance(ctx context.Context, addr solana.PublicKey) (uint64, error) {
+	ret := _m.Called(ctx, addr)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Balance")
@@ -27,17 +27,17 @@ func (_m *ReaderWriter) Balance(addr solana.PublicKey) (uint64, error) {
 
 	var r0 uint64
 	var r1 error
-	if rf, ok := ret.Get(0).(func(solana.PublicKey) (uint64, error)); ok {
-		return rf(addr)
+	if rf, ok := ret.Get(0).(func(context.Context, solana.PublicKey) (uint64, error)); ok {
+		return rf(ctx, addr)
 	}
-	if rf, ok := ret.Get(0).(func(solana.PublicKey) uint64); ok {
-		r0 = rf(addr)
+	if rf, ok := ret.Get(0).(func(context.Context, solana.PublicKey) uint64); ok {
+		r0 = rf(ctx, addr)
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func(solana.PublicKey) error); ok {
-		r1 = rf(addr)
+	if rf, ok := ret.Get(1).(func(context.Context, solana.PublicKey) error); ok {
+		r1 = rf(ctx, addr)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -103,9 +103,9 @@ func (_m *ReaderWriter) GetAccountInfoWithOpts(ctx context.Context, addr solana.
 	return r0, r1
 }
 
-// GetFeeForMessage provides a mock function with given fields: msg
-func (_m *ReaderWriter) GetFeeForMessage(msg string) (uint64, error) {
-	ret := _m.Called(msg)
+// GetFeeForMessage provides a mock function with given fields: ctx, msg
+func (_m *ReaderWriter) GetFeeForMessage(ctx context.Context, msg string) (uint64, error) {
+	ret := _m.Called(ctx, msg)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetFeeForMessage")
@@ -113,17 +113,17 @@ func (_m *ReaderWriter) GetFeeForMessage(msg string) (uint64, error) {
 
 	var r0 uint64
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (uint64, error)); ok {
-		return rf(msg)
+	if rf, ok := ret.Get(0).(func(context.Context, string) (uint64, error)); ok {
+		return rf(ctx, msg)
 	}
-	if rf, ok := ret.Get(0).(func(string) uint64); ok {
-		r0 = rf(msg)
+	if rf, ok := ret.Get(0).(func(context.Context, string) uint64); ok {
+		r0 = rf(ctx, msg)
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(msg)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, msg)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -131,9 +131,9 @@ func (_m *ReaderWriter) GetFeeForMessage(msg string) (uint64, error) {
 	return r0, r1
 }
 
-// GetLatestBlock provides a mock function with given fields:
-func (_m *ReaderWriter) GetLatestBlock() (*rpc.GetBlockResult, error) {
-	ret := _m.Called()
+// GetLatestBlock provides a mock function with given fields: ctx
+func (_m *ReaderWriter) GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error) {
+	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetLatestBlock")
@@ -141,19 +141,19 @@ func (_m *ReaderWriter) GetLatestBlock() (*rpc.GetBlockResult, error) {
 
 	var r0 *rpc.GetBlockResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (*rpc.GetBlockResult, error)); ok {
-		return rf()
+	if rf, ok := ret.Get(0).(func(context.Context) (*rpc.GetBlockResult, error)); ok {
+		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func() *rpc.GetBlockResult); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) *rpc.GetBlockResult); ok {
+		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*rpc.GetBlockResult)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -161,9 +161,9 @@ func (_m *ReaderWriter) GetLatestBlock() (*rpc.GetBlockResult, error) {
 	return r0, r1
 }
 
-// LatestBlockhash provides a mock function with given fields:
-func (_m *ReaderWriter) LatestBlockhash() (*rpc.GetLatestBlockhashResult, error) {
-	ret := _m.Called()
+// LatestBlockhash provides a mock function with given fields: ctx
+func (_m *ReaderWriter) LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockhashResult, error) {
+	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for LatestBlockhash")
@@ -171,19 +171,19 @@ func (_m *ReaderWriter) LatestBlockhash() (*rpc.GetLatestBlockhashResult, error)
 
 	var r0 *rpc.GetLatestBlockhashResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (*rpc.GetLatestBlockhashResult, error)); ok {
-		return rf()
+	if rf, ok := ret.Get(0).(func(context.Context) (*rpc.GetLatestBlockhashResult, error)); ok {
+		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func() *rpc.GetLatestBlockhashResult); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) *rpc.GetLatestBlockhashResult); ok {
+		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*rpc.GetLatestBlockhashResult)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -281,9 +281,9 @@ func (_m *ReaderWriter) SimulateTx(ctx context.Context, tx *solana.Transaction, 
 	return r0, r1
 }
 
-// SlotHeight provides a mock function with given fields:
-func (_m *ReaderWriter) SlotHeight() (uint64, error) {
-	ret := _m.Called()
+// SlotHeight provides a mock function with given fields: ctx
+func (_m *ReaderWriter) SlotHeight(ctx context.Context) (uint64, error) {
+	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SlotHeight")
@@ -291,17 +291,17 @@ func (_m *ReaderWriter) SlotHeight() (uint64, error) {
 
 	var r0 uint64
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return rf()
+	if rf, ok := ret.Get(0).(func(context.Context) (uint64, error)); ok {
+		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func() uint64); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) uint64); ok {
+		r0 = rf(ctx)
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}

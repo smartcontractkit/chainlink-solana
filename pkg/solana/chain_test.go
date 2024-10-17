@@ -129,6 +129,7 @@ func TestSolanaChain_GetClient(t *testing.T) {
 }
 
 func TestSolanaChain_VerifiedClient(t *testing.T) {
+	ctx := tests.Context(t)
 	called := false
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		out := `{ "jsonrpc": "2.0", "result": 1234, "id": 1 }` // getSlot response
@@ -180,7 +181,7 @@ func TestSolanaChain_VerifiedClient(t *testing.T) {
 	// retrieve cached client and retrieve slot height
 	c, err := testChain.verifiedClient(node)
 	require.NoError(t, err)
-	slot, err := c.SlotHeight()
+	slot, err := c.SlotHeight(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(1234), slot)
 

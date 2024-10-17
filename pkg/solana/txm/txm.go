@@ -132,6 +132,9 @@ func (txm *Txm) Start(ctx context.Context) error {
 
 		txm.done.Add(3) // waitgroup: tx retry, confirmer, simulator
 		go txm.run()
+		go txm.confirm()
+		go txm.simulate()
+
 		return nil
 	})
 }
@@ -140,10 +143,6 @@ func (txm *Txm) run() {
 	defer txm.done.Done()
 	ctx, cancel := txm.chStop.NewCtx()
 	defer cancel()
-
-	// start confirmer + simulator
-	go txm.confirm(ctx)
-	go txm.simulate(ctx)
 
 	for {
 		select {
@@ -173,7 +172,7 @@ func (txm *Txm) run() {
 	}
 }
 
-func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transaction, txcfg TxConfig) (solanaGo.Transaction, uuid.UUID, solanaGo.Signature, error) {
+func (txm *Txm) sendWithRetry(ctx context.Context, baseTx solanaGo.Transaction, txcfg TxConfig) (solanaGo.Transaction, uuid.UUID, solanaGo.Signature, error) {
 	// get key
 	// fee payer account is index 0 account
 	// https://github.com/gagliardetto/solana-go/blob/main/transaction.go#L252
@@ -199,7 +198,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 		}
 	}
 
-	buildTx := func(base solanaGo.Transaction, retryCount int) (solanaGo.Transaction, error) {
+	buildTx := func(ctx context.Context, base solanaGo.Transaction, retryCount int) (solanaGo.Transaction, error) {
 		newTx := base // make copy
 
 		// set fee
@@ -213,7 +212,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 		if marshalErr != nil {
 			return solanaGo.Transaction{}, fmt.Errorf("error in soltxm.SendWithRetry.MarshalBinary: %w", marshalErr)
 		}
-		sigBytes, signErr := txm.ks.Sign(context.TODO(), key, txMsg)
+		sigBytes, signErr := txm.ks.Sign(ctx, key, txMsg)
 		if signErr != nil {
 			return solanaGo.Transaction{}, fmt.Errorf("error in soltxm.SendWithRetry.Sign: %w", signErr)
 		}
@@ -224,13 +223,13 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 		return newTx, nil
 	}
 
-	initTx, initBuildErr := buildTx(baseTx, 0)
+	initTx, initBuildErr := buildTx(ctx, baseTx, 0)
 	if initBuildErr != nil {
 		return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, initBuildErr
 	}
 
 	// create timeout context
-	ctx, cancel := context.WithTimeout(chanCtx, txcfg.Timeout)
+	ctx, cancel := context.WithTimeout(ctx, txcfg.Timeout)
 
 	// send initial tx (do not retry and exit early if fails)
 	sig, initSendErr := txm.SendTx(ctx, &initTx)
@@ -256,10 +255,12 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 
 	txm.lggr.Debugw("tx initial broadcast", "id", id, "signature", sig)
 
+	txm.done.Add(1)
 	// retry with exponential backoff
 	// until context cancelled by timeout or called externally
 	// pass in copy of baseTx (used to build new tx with bumped fee) and broadcasted tx == initTx (used to retry tx without bumping)
-	go func(baseTx, currentTx solanaGo.Transaction) {
+	go func(ctx context.Context, baseTx, currentTx solanaGo.Transaction) {
+		defer txm.done.Done()
 		deltaT := 1 // ms
 		tick := time.After(0)
 		bumpCount := 0
@@ -271,7 +272,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 			case <-ctx.Done():
 				// stop sending tx after retry tx ctx times out (does not stop confirmation polling for tx)
 				wg.Wait()
-				txm.lggr.Debugw("stopped tx retry", "id", id, "signatures", sigs.List())
+				txm.lggr.Debugw("stopped tx retry", "id", id, "signatures", sigs.List(), "err", context.Cause(ctx))
 				return
 			case <-tick:
 				var shouldBump bool
@@ -285,7 +286,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 				// if fee should be bumped, build new tx and replace currentTx
 				if shouldBump {
 					var retryBuildErr error
-					currentTx, retryBuildErr = buildTx(baseTx, bumpCount)
+					currentTx, retryBuildErr = buildTx(ctx, baseTx, bumpCount)
 					if retryBuildErr != nil {
 						txm.lggr.Errorw("failed to build bumped retry tx", "error", retryBuildErr, "id", id)
 						return // exit func if cannot build tx for retrying
@@ -352,7 +353,7 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 			}
 			tick = time.After(time.Duration(deltaT) * time.Millisecond)
 		}
-	}(baseTx, initTx)
+	}(ctx, baseTx, initTx)
 
 	// return signed tx, id, signature for use in simulation
 	return initTx, id, sig, nil
@@ -360,8 +361,10 @@ func (txm *Txm) sendWithRetry(chanCtx context.Context, baseTx solanaGo.Transacti
 
 // goroutine that polls to confirm implementation
 // cancels the exponential retry once confirmed
-func (txm *Txm) confirm(ctx context.Context) {
+func (txm *Txm) confirm() {
 	defer txm.done.Done()
+	ctx, cancel := txm.chStop.NewCtx()
+	defer cancel()
 
 	tick := time.After(0)
 	for {
@@ -456,7 +459,6 @@ func (txm *Txm) confirm(ctx context.Context) {
 
 			// waitgroup for processing
 			var wg sync.WaitGroup
-			wg.Add(len(sigsBatch))
 
 			// loop through batch
 			for i := 0; i < len(sigsBatch); i++ {
@@ -464,10 +466,10 @@ func (txm *Txm) confirm(ctx context.Context) {
 				statuses, err := client.SignatureStatuses(ctx, sigsBatch[i])
 				if err != nil {
 					txm.lggr.Errorw("failed to get signature statuses in soltxm.confirm", "error", err)
-					wg.Done() // don't block if exit early
-					break     // exit for loop
+					break // exit for loop
 				}
 
+				wg.Add(1)
 				// nonblocking: process batches as soon as they come in
 				go func(index int) {
 					defer wg.Done()
@@ -483,8 +485,10 @@ func (txm *Txm) confirm(ctx context.Context) {
 // goroutine that simulates tx (use a bounded number of goroutines to pick from queue?)
 // simulate can cancel the send retry function early in the tx management process
 // additionally, it can provide reasons for why a tx failed in the logs
-func (txm *Txm) simulate(ctx context.Context) {
+func (txm *Txm) simulate() {
 	defer txm.done.Done()
+	ctx, cancel := txm.chStop.NewCtx()
+	defer cancel()
 
 	for {
 		select {
@@ -541,7 +545,7 @@ func (txm *Txm) simulate(ctx context.Context) {
 }
 
 // Enqueue enqueue a msg destined for the solana chain.
-func (txm *Txm) Enqueue(accountID string, tx *solanaGo.Transaction, txCfgs ...SetTxConfig) error {
+func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Transaction, txCfgs ...SetTxConfig) error {
 	if err := txm.Ready(); err != nil {
 		return fmt.Errorf("error in soltxm.Enqueue: %w", err)
 	}
@@ -558,7 +562,7 @@ func (txm *Txm) Enqueue(accountID string, tx *solanaGo.Transaction, txCfgs ...Se
 	// validate expected key exists by trying to sign with it
 	// fee payer account is index 0 account
 	// https://github.com/gagliardetto/solana-go/blob/main/transaction.go#L252
-	_, err := txm.ks.Sign(context.TODO(), tx.Message.AccountKeys[0].String(), nil)
+	_, err := txm.ks.Sign(ctx, tx.Message.AccountKeys[0].String(), nil)
 	if err != nil {
 		return fmt.Errorf("error in soltxm.Enqueue.GetKey: %w", err)
 	}

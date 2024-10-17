@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -20,7 +19,7 @@ var _ Estimator = &blockHistoryEstimator{}
 
 type blockHistoryEstimator struct {
 	starter services.StateMachine
-	chStop  chan struct{}
+	chStop  services.StopChan
 	done    sync.WaitGroup
 
 	client internal.Loader[client.ReaderWriter]
@@ -55,19 +54,20 @@ func (bhe *blockHistoryEstimator) Start(ctx context.Context) error {
 
 func (bhe *blockHistoryEstimator) run() {
 	defer bhe.done.Done()
+	ctx, cancel := bhe.chStop.NewCtx()
+	defer cancel()
 
-	tick := time.After(0)
+	ticker := services.NewTicker(bhe.cfg.BlockHistoryPollPeriod())
+	defer ticker.Stop()
 	for {
 		select {
-		case <-bhe.chStop:
+		case <-ctx.Done():
 			return
-		case <-tick:
-			if err := bhe.calculatePrice(); err != nil {
+		case <-ticker.C:
+			if err := bhe.calculatePrice(ctx); err != nil {
 				bhe.lgr.Error(fmt.Errorf("BlockHistoryEstimator failed to fetch price: %w", err))
 			}
 		}
-
-		tick = time.After(utils.WithJitter(bhe.cfg.BlockHistoryPollPeriod()))
 	}
 }
 
@@ -99,7 +99,7 @@ func (bhe *blockHistoryEstimator) readRawPrice() uint64 {
 	return bhe.price
 }
 
-func (bhe *blockHistoryEstimator) calculatePrice() error {
+func (bhe *blockHistoryEstimator) calculatePrice(ctx context.Context) error {
 	// fetch client
 	c, err := bhe.client.Get()
 	if err != nil {
@@ -107,7 +107,7 @@ func (bhe *blockHistoryEstimator) calculatePrice() error {
 	}
 
 	// get latest block based on configured confirmation
-	block, err := c.GetLatestBlock()
+	block, err := c.GetLatestBlock(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get block in blockHistoryEstimator.getFee: %w", err)
 	}

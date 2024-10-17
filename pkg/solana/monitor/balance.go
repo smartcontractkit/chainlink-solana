@@ -24,7 +24,7 @@ type Keystore interface {
 }
 
 type BalanceClient interface {
-	Balance(addr solana.PublicKey) (uint64, error)
+	Balance(ctx context.Context, addr solana.PublicKey) (uint64, error)
 }
 
 // NewBalanceMonitor returns a balance monitoring services.Service which reports the SOL balance of all ks keys to prometheus.
@@ -102,6 +102,9 @@ func (b *balanceMonitor) monitor() {
 }
 
 func (b *balanceMonitor) updateBalances(ctx context.Context) {
+	ctx, cancel := b.stop.Ctx(ctx)
+	defer cancel()
+
 	keys, err := b.ks.Accounts(ctx)
 	if err != nil {
 		b.lggr.Errorw("Failed to get keys", "err", err)
@@ -119,7 +122,7 @@ func (b *balanceMonitor) updateBalances(ctx context.Context) {
 	for _, k := range keys {
 		// Check for shutdown signal, since Balance blocks and may be slow.
 		select {
-		case <-b.stop:
+		case <-ctx.Done():
 			return
 		default:
 		}
@@ -128,7 +131,7 @@ func (b *balanceMonitor) updateBalances(ctx context.Context) {
 			b.lggr.Errorw("Failed parse public key", "account", k, "err", err)
 			continue
 		}
-		lamports, err := reader.Balance(pubKey)
+		lamports, err := reader.Balance(ctx, pubKey)
 		if err != nil {
 			b.lggr.Errorw("Failed to get balance", "account", k, "err", err)
 			continue
