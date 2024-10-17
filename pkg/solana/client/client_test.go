@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -26,6 +27,7 @@ import (
 )
 
 func TestClient_Reader_Integration(t *testing.T) {
+	ctx := tests.Context(t)
 	url := SetupLocalSolNode(t)
 	privKey, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
@@ -40,21 +42,21 @@ func TestClient_Reader_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	// check balance
-	bal, err := c.Balance(pubKey)
+	bal, err := c.Balance(ctx, pubKey)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(100_000_000_000), bal) // once funds get sent to the system program it should be unrecoverable (so this number should remain > 0)
 
 	// check SlotHeight
-	slot0, err := c.SlotHeight()
+	slot0, err := c.SlotHeight(ctx)
 	assert.NoError(t, err)
 	assert.Greater(t, slot0, uint64(0))
 	time.Sleep(time.Second)
-	slot1, err := c.SlotHeight()
+	slot1, err := c.SlotHeight(ctx)
 	assert.NoError(t, err)
 	assert.Greater(t, slot1, slot0)
 
 	// fetch recent blockhash
-	hash, err := c.LatestBlockhash()
+	hash, err := c.LatestBlockhash(ctx)
 	assert.NoError(t, err)
 	assert.NotEqual(t, hash.Value.Blockhash, solana.Hash{}) // not an empty hash
 
@@ -72,7 +74,7 @@ func TestClient_Reader_Integration(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	fee, err := c.GetFeeForMessage(tx.Message.ToBase64())
+	fee, err := c.GetFeeForMessage(ctx, tx.Message.ToBase64())
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(5000), fee)
 
@@ -82,13 +84,13 @@ func TestClient_Reader_Integration(t *testing.T) {
 	assert.Equal(t, mn.StringID("localnet"), network)
 
 	// get account info (also tested inside contract_test)
-	res, err := c.GetAccountInfoWithOpts(context.TODO(), solana.PublicKey{}, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentFinalized})
+	res, err := c.GetAccountInfoWithOpts(ctx, solana.PublicKey{}, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentFinalized})
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(1), res.Value.Lamports)
 	assert.Equal(t, "NativeLoader1111111111111111111111111111111", res.Value.Owner.String())
 
 	// get block + check for nonzero values
-	block, err := c.GetLatestBlock()
+	block, err := c.GetLatestBlock(ctx)
 	require.NoError(t, err)
 	assert.NotEqual(t, solana.Hash{}, block.Blockhash)
 	assert.NotEqual(t, uint64(0), block.ParentSlot)
@@ -96,6 +98,7 @@ func TestClient_Reader_Integration(t *testing.T) {
 }
 
 func TestClient_Reader_ChainID(t *testing.T) {
+	ctx := tests.Context(t)
 	genesisHashes := []string{
 		DevnetGenesisHash,  // devnet
 		TestnetGenesisHash, // testnet
@@ -121,7 +124,7 @@ func TestClient_Reader_ChainID(t *testing.T) {
 
 	// get chain ID based on gensis hash
 	for _, n := range networks {
-		network, err := c.ChainID(context.Background())
+		network, err := c.ChainID(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, mn.StringID(n), network)
 	}
@@ -138,13 +141,13 @@ func TestClient_Writer_Integration(t *testing.T) {
 	lggr := logger.Test(t)
 	cfg := config.NewDefault()
 
-	ctx := context.Background()
+	ctx := tests.Context(t)
 	c, err := NewClient(url, cfg, requestTimeout, lggr)
 	require.NoError(t, err)
 
 	// create + sign transaction
 	createTx := func(to solana.PublicKey) *solana.Transaction {
-		hash, hashErr := c.LatestBlockhash()
+		hash, hashErr := c.LatestBlockhash(ctx)
 		assert.NoError(t, hashErr)
 
 		tx, txErr := solana.NewTransaction(
@@ -212,6 +215,7 @@ func TestClient_Writer_Integration(t *testing.T) {
 }
 
 func TestClient_SendTxDuplicates_Integration(t *testing.T) {
+	ctx := tests.Context(t)
 	// set up environment
 	url := SetupLocalSolNode(t)
 	privKey, err := solana.NewRandomPrivateKey()
@@ -227,10 +231,10 @@ func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	// fetch recent blockhash
-	hash, err := c.LatestBlockhash()
+	hash, err := c.LatestBlockhash(ctx)
 	assert.NoError(t, err)
 
-	initBal, err := c.Balance(pubKey)
+	initBal, err := c.Balance(ctx, pubKey)
 	assert.NoError(t, err)
 
 	// create + sign tx
@@ -261,7 +265,6 @@ func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 	n := 5
 	sigs := make([]solana.Signature, n)
 	var wg sync.WaitGroup
-	ctx := context.Background()
 	wg.Add(5)
 	for i := 0; i < n; i++ {
 		go func(i int) {
@@ -292,7 +295,7 @@ func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 
 	// expect one sender has only sent one tx
 	// original balance - current bal = 5000 lamports (tx fee)
-	endBal, err := c.Balance(pubKey)
+	endBal, err := c.Balance(ctx, pubKey)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(5_000), initBal-endBal)
 }
