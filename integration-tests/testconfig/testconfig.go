@@ -273,6 +273,9 @@ func (c *TestConfig) GetNodeConfigTOML() (string, error) {
 				URL:  config.MustParseURL(url),
 			},
 		},
+		MultiNode: solcfg.MultiNodeConfig{
+			MultiNode: solcfg.MultiNode{Enabled: ptr.Ptr(true)},
+		},
 	}
 	baseConfig := node.NewBaseConfig()
 	baseConfig.Solana = solcfg.TOMLConfigs{
