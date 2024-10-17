@@ -108,7 +108,7 @@ type verifiedCachedClient struct {
 	client.ReaderWriter
 }
 
-func (v *verifiedCachedClient) verifyChainID() (bool, error) {
+func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) {
 	v.chainIDVerifiedLock.RLock()
 	if v.chainIDVerified {
 		v.chainIDVerifiedLock.RUnlock()
@@ -121,7 +121,7 @@ func (v *verifiedCachedClient) verifyChainID() (bool, error) {
 	v.chainIDVerifiedLock.Lock()
 	defer v.chainIDVerifiedLock.Unlock()
 
-	strID, err := v.ReaderWriter.ChainID(context.Background())
+	strID, err := v.ReaderWriter.ChainID(ctx)
 	v.chainID = strID.String()
 	if err != nil {
 		v.chainIDVerified = false
@@ -141,7 +141,7 @@ func (v *verifiedCachedClient) verifyChainID() (bool, error) {
 }
 
 func (v *verifiedCachedClient) SendTx(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error) {
-	verified, err := v.verifyChainID()
+	verified, err := v.verifyChainID(ctx)
 	if !verified {
 		return [64]byte{}, err
 	}
@@ -150,7 +150,7 @@ func (v *verifiedCachedClient) SendTx(ctx context.Context, tx *solanago.Transact
 }
 
 func (v *verifiedCachedClient) SimulateTx(ctx context.Context, tx *solanago.Transaction, opts *rpc.SimulateTransactionOpts) (*rpc.SimulateTransactionResult, error) {
-	verified, err := v.verifyChainID()
+	verified, err := v.verifyChainID(ctx)
 	if !verified {
 		return nil, err
 	}
@@ -159,7 +159,7 @@ func (v *verifiedCachedClient) SimulateTx(ctx context.Context, tx *solanago.Tran
 }
 
 func (v *verifiedCachedClient) SignatureStatuses(ctx context.Context, sigs []solanago.Signature) ([]*rpc.SignatureStatusesResult, error) {
-	verified, err := v.verifyChainID()
+	verified, err := v.verifyChainID(ctx)
 	if !verified {
 		return nil, err
 	}
@@ -167,35 +167,35 @@ func (v *verifiedCachedClient) SignatureStatuses(ctx context.Context, sigs []sol
 	return v.ReaderWriter.SignatureStatuses(ctx, sigs)
 }
 
-func (v *verifiedCachedClient) Balance(addr solanago.PublicKey) (uint64, error) {
-	verified, err := v.verifyChainID()
+func (v *verifiedCachedClient) Balance(ctx context.Context, addr solanago.PublicKey) (uint64, error) {
+	verified, err := v.verifyChainID(ctx)
 	if !verified {
 		return 0, err
 	}
 
-	return v.ReaderWriter.Balance(addr)
+	return v.ReaderWriter.Balance(ctx, addr)
 }
 
-func (v *verifiedCachedClient) SlotHeight() (uint64, error) {
-	verified, err := v.verifyChainID()
+func (v *verifiedCachedClient) SlotHeight(ctx context.Context) (uint64, error) {
+	verified, err := v.verifyChainID(ctx)
 	if !verified {
 		return 0, err
 	}
 
-	return v.ReaderWriter.SlotHeight()
+	return v.ReaderWriter.SlotHeight(ctx)
 }
 
-func (v *verifiedCachedClient) LatestBlockhash() (*rpc.GetLatestBlockhashResult, error) {
-	verified, err := v.verifyChainID()
+func (v *verifiedCachedClient) LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockhashResult, error) {
+	verified, err := v.verifyChainID(ctx)
 	if !verified {
 		return nil, err
 	}
 
-	return v.ReaderWriter.LatestBlockhash()
+	return v.ReaderWriter.LatestBlockhash(ctx)
 }
 
 func (v *verifiedCachedClient) ChainID(ctx context.Context) (mn.StringID, error) {
-	verified, err := v.verifyChainID()
+	verified, err := v.verifyChainID(ctx)
 	if !verified {
 		return "", err
 	}
@@ -203,17 +203,17 @@ func (v *verifiedCachedClient) ChainID(ctx context.Context) (mn.StringID, error)
 	return mn.StringID(v.chainID), nil
 }
 
-func (v *verifiedCachedClient) GetFeeForMessage(msg string) (uint64, error) {
-	verified, err := v.verifyChainID()
+func (v *verifiedCachedClient) GetFeeForMessage(ctx context.Context, msg string) (uint64, error) {
+	verified, err := v.verifyChainID(ctx)
 	if !verified {
 		return 0, err
 	}
 
-	return v.ReaderWriter.GetFeeForMessage(msg)
+	return v.ReaderWriter.GetFeeForMessage(ctx, msg)
 }
 
 func (v *verifiedCachedClient) GetAccountInfoWithOpts(ctx context.Context, addr solanago.PublicKey, opts *rpc.GetAccountInfoOpts) (*rpc.GetAccountInfoResult, error) {
-	verified, err := v.verifyChainID()
+	verified, err := v.verifyChainID(ctx)
 	if !verified {
 		return nil, err
 	}
@@ -294,20 +294,18 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 		return ch.getClient()
 	}
 	ch.txm = txm.NewTxm(ch.id, tc, cfg, ks, lggr)
-	bc := func() (monitor.BalanceClient, error) {
-		return ch.getClient()
-	}
+	bc := func() (monitor.BalanceClient, error) { return ch.getClient() }
 	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
 	return &ch, nil
 }
 
-func (c *chain) LatestHead(_ context.Context) (types.Head, error) {
+func (c *chain) LatestHead(ctx context.Context) (types.Head, error) {
 	sc, err := c.getClient()
 	if err != nil {
 		return types.Head{}, err
 	}
 
-	latestBlock, err := sc.GetLatestBlock()
+	latestBlock, err := sc.GetLatestBlock(ctx)
 	if err != nil {
 		return types.Head{}, nil
 	}
@@ -538,7 +536,7 @@ func (c *chain) sendTx(ctx context.Context, from, to string, amount *big.Int, ba
 	}
 	amountI := amount.Uint64()
 
-	blockhash, err := reader.LatestBlockhash()
+	blockhash, err := reader.LatestBlockhash(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get latest block hash: %w", err)
 	}
@@ -558,13 +556,13 @@ func (c *chain) sendTx(ctx context.Context, from, to string, amount *big.Int, ba
 	}
 
 	if balanceCheck {
-		if err = solanaValidateBalance(reader, fromKey, amountI, tx.Message.ToBase64()); err != nil {
+		if err = solanaValidateBalance(ctx, reader, fromKey, amountI, tx.Message.ToBase64()); err != nil {
 			return fmt.Errorf("failed to validate balance: %w", err)
 		}
 	}
 
 	chainTxm := c.TxManager()
-	err = chainTxm.Enqueue("", tx,
+	err = chainTxm.Enqueue(ctx, "", tx,
 		txm.SetComputeUnitLimit(500), // reduce from default 200K limit - should only take 450 compute units
 		// no fee bumping and no additional fee - makes validating balance accurate
 		txm.SetComputeUnitPriceMax(0),
@@ -578,13 +576,13 @@ func (c *chain) sendTx(ctx context.Context, from, to string, amount *big.Int, ba
 	return nil
 }
 
-func solanaValidateBalance(reader client.Reader, from solanago.PublicKey, amount uint64, msg string) error {
-	balance, err := reader.Balance(from)
+func solanaValidateBalance(ctx context.Context, reader client.Reader, from solanago.PublicKey, amount uint64, msg string) error {
+	balance, err := reader.Balance(ctx, from)
 	if err != nil {
 		return err
 	}
 
-	fee, err := reader.GetFeeForMessage(msg)
+	fee, err := reader.GetFeeForMessage(ctx, msg)
 	if err != nil {
 		return err
 	}

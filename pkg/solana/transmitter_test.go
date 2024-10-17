@@ -1,15 +1,18 @@
 package solana
 
 import (
+	"context"
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
@@ -23,7 +26,7 @@ type verifyTxSize struct {
 	s *solana.PrivateKey
 }
 
-func (txm verifyTxSize) Enqueue(_ string, tx *solana.Transaction, _ ...txm.SetTxConfig) error {
+func (txm verifyTxSize) Enqueue(_ context.Context, _ string, tx *solana.Transaction, _ ...txm.SetTxConfig) error {
 	// additional components that transaction manager adds to the transaction
 	require.NoError(txm.t, fees.SetComputeUnitPrice(tx, 0))
 	require.NoError(txm.t, fees.SetComputeUnitLimit(tx, 0))
@@ -55,7 +58,7 @@ func TestTransmitter_TxSize(t *testing.T) {
 	}
 
 	rw := clientmocks.NewReaderWriter(t)
-	rw.On("LatestBlockhash").Return(&rpc.GetLatestBlockhashResult{
+	rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{
 		Value: &rpc.LatestBlockhashResult{},
 	}, nil)
 
