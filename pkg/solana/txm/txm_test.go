@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 
@@ -73,7 +74,8 @@ func TestTxm_Integration(t *testing.T) {
 			getClient := func() (solanaClient.ReaderWriter, error) {
 				return client, nil
 			}
-			txm := txm.NewTxm("localnet", getClient, cfg, mkey, lggr)
+			loader := internal.NewLoader(true, getClient)
+			txm := txm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
 
 			// track initial balance
 			initBal, err := client.Balance(ctx, pubKey)
