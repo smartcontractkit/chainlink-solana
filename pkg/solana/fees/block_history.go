@@ -220,10 +220,13 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 		go func(s uint64) {
 			defer wg.Done()
 
-			// Acquire semaphore
-			semaphore <- struct{}{}
+			select {
+			case semaphore <- struct{}{}:
+				// Acquired semaphore
+			case <-ctx.Done():
+				return
+			}
 			defer func() { <-semaphore }()
-
 			// Fetch the block details
 			block, errGetBlock := c.GetBlock(ctx, s)
 			if errGetBlock != nil || block == nil {
@@ -259,18 +262,16 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 
 	wg.Wait()
 
-	// Safely read allPrices by copying it under mutex
+	// Safely read allPrices
 	mu.Lock()
-	copiedPrices := make([]ComputeUnitPrice, len(allPrices))
-	copy(copiedPrices, allPrices)
-	mu.Unlock()
+	defer mu.Unlock()
 
-	if len(copiedPrices) == 0 {
+	if len(allPrices) == 0 {
 		return fmt.Errorf("no compute unit prices collected")
 	}
 
 	// Calculate the median of all collected compute unit prices
-	medianPrice, err := mathutil.Median(copiedPrices...)
+	medianPrice, err := mathutil.Median(allPrices...)
 	if err != nil {
 		return fmt.Errorf("failed to calculate median price: %w", err)
 	}
@@ -280,13 +281,12 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 	bhe.price = uint64(medianPrice)
 	bhe.lock.Unlock()
 
-	// Log using the copied slice to avoid data race
 	bhe.lgr.Debugw("BlockHistoryEstimator: updated",
 		"method", bhe.estimationMethod.String(),
 		"computeUnitPriceMedian", medianPrice,
 		"latestSlot", currentSlot,
-		"numBlocks", len(copiedPrices),
-		"pricesCollected", copiedPrices,
+		"numBlocks", len(allPrices),
+		"pricesCollected", allPrices,
 	)
 
 	return nil
