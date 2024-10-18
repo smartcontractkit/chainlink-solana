@@ -31,6 +31,7 @@ var defaultConfigSet = Chain{
 	BlockHistoryPollPeriod:   config.MustNewDuration(5 * time.Second),
 	ComputeUnitLimitDefault:  ptr(uint32(200_000)), // set to 0 to disable adding compute unit limit
 	EstimateComputeUnitLimit: ptr(false),           // set to false to disable compute unit limit estimation
+	BlockHistoryDepth:        ptr(uint64(20)),      // number of blocks to fetch for multiple blocks fee estimation
 }
 
 //go:generate mockery --name Config --output ./mocks/ --case=underscore --filename config.go
@@ -53,6 +54,7 @@ type Config interface {
 	ComputeUnitPriceDefault() uint64
 	FeeBumpPeriod() time.Duration
 	BlockHistoryPollPeriod() time.Duration
+	BlockHistoryDepth() uint64
 	ComputeUnitLimitDefault() uint32
 	EstimateComputeUnitLimit() bool
 }
@@ -74,6 +76,7 @@ type Chain struct {
 	ComputeUnitPriceDefault  *uint64
 	FeeBumpPeriod            *config.Duration
 	BlockHistoryPollPeriod   *config.Duration
+	BlockHistoryDepth        *uint64
 	ComputeUnitLimitDefault  *uint32
 	EstimateComputeUnitLimit *bool
 }
@@ -126,6 +129,9 @@ func (c *Chain) SetDefaults() {
 	}
 	if c.BlockHistoryPollPeriod == nil {
 		c.BlockHistoryPollPeriod = defaultConfigSet.BlockHistoryPollPeriod
+	}
+	if c.BlockHistoryDepth == nil {
+		c.BlockHistoryDepth = defaultConfigSet.BlockHistoryDepth
 	}
 	if c.ComputeUnitLimitDefault == nil {
 		c.ComputeUnitLimitDefault = defaultConfigSet.ComputeUnitLimitDefault
