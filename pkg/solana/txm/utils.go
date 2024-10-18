@@ -179,3 +179,8 @@ func SetComputeUnitLimit(v uint32) SetTxConfig {
 		cfg.ComputeUnitLimit = v
 	}
 }
+func SetEstimateComputeUnitLimit(v bool) SetTxConfig {
+	return func(cfg *TxConfig) {
+		cfg.EstimateComputeUnitLimit = v
+	}
+}
