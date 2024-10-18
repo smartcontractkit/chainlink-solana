@@ -22,11 +22,12 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
-
-	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 )
@@ -90,7 +91,7 @@ type chain struct {
 
 	// if multiNode is enabled, the clientCache will not be used
 	multiNode *mn.MultiNode[mn.StringID, *client.MultiNodeClient]
-	txSender  *mn.TransactionSender[*solanago.Transaction, mn.StringID, *client.MultiNodeClient]
+	txSender  *mn.TransactionSender[*solanago.Transaction, *client.SendTxResult, mn.StringID, *client.MultiNodeClient]
 
 	// tracking node chain id for verification
 	clientCache map[string]*verifiedCachedClient // map URL -> {client, chainId} [mainnet/testnet/devnet/localnet]
@@ -230,6 +231,8 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 		clientCache: map[string]*verifiedCachedClient{},
 	}
 
+	var sendTx func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error)
+
 	if cfg.MultiNode.Enabled() {
 		chainFamily := "solana"
 
@@ -268,18 +271,11 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 			mnCfg.DeathDeclarationDelay(),
 		)
 
-		// TODO: implement error classification; move logic to separate file if large
-		// TODO: might be useful to reference anza-xyz/agave@master/sdk/src/transaction/error.rs
-		classifySendError := func(tx *solanago.Transaction, err error) mn.SendTxReturnCode {
-			return 0 // TODO ClassifySendError(err, clientErrors, logger.Sugared(logger.Nop()), tx, common.Address{}, false)
-		}
-
-		txSender := mn.NewTransactionSender[*solanago.Transaction, mn.StringID, *client.MultiNodeClient](
+		txSender := mn.NewTransactionSender[*solanago.Transaction, *client.SendTxResult, mn.StringID, *client.MultiNodeClient](
 			lggr,
 			mn.StringID(id),
 			chainFamily,
 			multiNode,
-			classifySendError,
 			0, // use the default value provided by the implementation
 		)
 
@@ -288,13 +284,34 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 
 		// clientCache will not be used if multinode is enabled
 		ch.clientCache = nil
+
+		sendTx = func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error) {
+			// Send tx using MultiNode transaction sender
+			result, err := ch.txSender.SendTransaction(ctx, tx)
+			if err != nil {
+				return solanago.Signature{}, err
+			}
+			if result == nil {
+				return solanago.Signature{}, errors.New("tx sender returned nil result")
+			}
+			if result.Signature().IsZero() {
+				return solanago.Signature{}, errors.New("tx sender returned empty signature")
+			}
+			return result.Signature(), nil
+		}
 	}
 
-	tc := func() (client.ReaderWriter, error) {
-		return ch.getClient()
+	var tc internal.Loader[client.ReaderWriter]
+	var bc internal.Loader[monitor.BalanceClient]
+	if cfg.MultiNode.Enabled() {
+		tc = internal.NewLoader[client.ReaderWriter](func() (client.ReaderWriter, error) { return ch.multiNode.SelectRPC() })
+		bc = internal.NewLoader[monitor.BalanceClient](func() (monitor.BalanceClient, error) { return ch.multiNode.SelectRPC() })
+	} else {
+		tc = utils.NewLazyLoad(func() (client.ReaderWriter, error) { return ch.getClient() })
+		bc = utils.NewLazyLoad(func() (monitor.BalanceClient, error) { return ch.getClient() })
 	}
-	ch.txm = txm.NewTxm(ch.id, tc, cfg, ks, lggr)
-	bc := func() (monitor.BalanceClient, error) { return ch.getClient() }
+
+	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
 	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
 	return &ch, nil
 }
