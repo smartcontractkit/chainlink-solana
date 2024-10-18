@@ -259,6 +259,10 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 
 	wg.Wait()
 
+	// Safely read allPrices
+	mu.Lock()
+	defer mu.Unlock()
+
 	if len(allPrices) == 0 {
 		return fmt.Errorf("no compute unit prices collected")
 	}
