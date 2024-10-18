@@ -212,8 +212,8 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 	semaphore := make(chan struct{}, 10)
 
 	// Iterate over the confirmed slots in reverse order to fetch most recent blocks first
-	// Iterate until we have collected the desired number of blocks or we run out of slots
-	for i := len(*confirmedSlots) - 1; i >= 0 && uint64(len(allPrices)) < desiredBlockCount; i-- {
+	// Iterate until we run out of slots
+	for i := len(*confirmedSlots) - 1; i >= 0; i-- {
 		slot := (*confirmedSlots)[i]
 
 		wg.Add(1)
@@ -248,12 +248,12 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 				return
 			}
 
-			// Append the median compute unit price
+			// Append the median compute unit price if we haven't reached our desiredBlockCount
 			mu.Lock()
+			defer mu.Unlock()
 			if uint64(len(allPrices)) < desiredBlockCount {
 				allPrices = append(allPrices, blockMedian)
 			}
-			mu.Unlock()
 		}(slot)
 	}
 
