@@ -264,6 +264,15 @@ func (c *TestConfig) GetNodeConfigTOML() (string, error) {
 		url = c.GetURL()
 	}
 
+	// TODO: Does the simulated default actually create new heads/ finalized heads?
+	// TODO: If not, then those tests will fail on CI and only work with actual RPCs.
+	mnConfig := solcfg.MultiNodeConfig{
+		MultiNode: solcfg.MultiNode{
+			Enabled: ptr.Ptr(true),
+		},
+	}
+	mnConfig.SetDefaults()
+
 	solConfig := solcfg.TOMLConfig{
 		Enabled: ptr.Ptr(true),
 		ChainID: ptr.Ptr(chainID),
@@ -273,6 +282,7 @@ func (c *TestConfig) GetNodeConfigTOML() (string, error) {
 				URL:  config.MustParseURL(url),
 			},
 		},
+		MultiNode: mnConfig,
 	}
 	baseConfig := node.NewBaseConfig()
 	baseConfig.Solana = solcfg.TOMLConfigs{
