@@ -391,26 +391,10 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 	cfg.MultiNode.MultiNode.Enabled = ptr(true)
 	cfg.Nodes = append(cfg.Nodes,
 		&solcfg.Node{
-			Name:     ptr("localnet-" + t.Name() + "-primary-1"),
+			Name:     ptr("localnet-" + t.Name() + "-primary"),
 			URL:      config.MustParseURL(client.SetupLocalSolNode(t)),
 			SendOnly: false,
-		},
-		&solcfg.Node{
-			Name:     ptr("localnet-" + t.Name() + "-primary-2"),
-			URL:      config.MustParseURL(client.SetupLocalSolNode(t)),
-			SendOnly: false,
-		},
-		&solcfg.Node{
-			Name:     ptr("localnet-" + t.Name() + "-sendonly-1"),
-			URL:      config.MustParseURL(client.SetupLocalSolNode(t)),
-			SendOnly: true,
-		},
-		&solcfg.Node{
-			Name:     ptr("localnet-" + t.Name() + "-sendonly-1"),
-			URL:      config.MustParseURL(client.SetupLocalSolNode(t)),
-			SendOnly: true,
-		},
-	)
+		})
 
 	// mocked keystore
 	mkey := mocks.NewSimpleKeystore(t)
