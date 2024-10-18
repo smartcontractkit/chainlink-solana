@@ -391,26 +391,10 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 	cfg.MultiNode.MultiNode.Enabled = ptr(true)
 	cfg.Nodes = append(cfg.Nodes,
 		&solcfg.Node{
-			Name:     ptr("localnet-" + t.Name() + "-primary-1"),
+			Name:     ptr("localnet-" + t.Name() + "-primary"),
 			URL:      config.MustParseURL(client.SetupLocalSolNode(t)),
 			SendOnly: false,
-		},
-		&solcfg.Node{
-			Name:     ptr("localnet-" + t.Name() + "-primary-2"),
-			URL:      config.MustParseURL(client.SetupLocalSolNode(t)),
-			SendOnly: false,
-		},
-		&solcfg.Node{
-			Name:     ptr("localnet-" + t.Name() + "-sendonly-1"),
-			URL:      config.MustParseURL(client.SetupLocalSolNode(t)),
-			SendOnly: true,
-		},
-		&solcfg.Node{
-			Name:     ptr("localnet-" + t.Name() + "-sendonly-1"),
-			URL:      config.MustParseURL(client.SetupLocalSolNode(t)),
-			SendOnly: true,
-		},
-	)
+		})
 
 	// mocked keystore
 	mkey := mocks.NewSimpleKeystore(t)
@@ -458,9 +442,8 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 		result, err := c.txSender.SendTransaction(ctx, createTx(receiver.PublicKey()))
 		require.NoError(t, err)
 		require.NotNil(t, result)
-		require.NotNil(t, *result)
-		require.Equal(t, mn.Successful, (*result).Code())
-		require.NotEmpty(t, (*result).Signature())
+		require.Equal(t, mn.Successful, result.Code())
+		require.NotEmpty(t, result.Signature())
 	})
 
 	t.Run("unsigned transaction error", func(t *testing.T) {
@@ -491,20 +474,18 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 		result, err := c.txSender.SendTransaction(ctx, unsignedTx(receiver.PublicKey()))
 		require.NoError(t, err)
 		require.NotNil(t, result)
-		require.NotNil(t, *result)
-		require.Error(t, (*result).TxError())
-		require.Equal(t, mn.Fatal, (*result).Code())
-		require.Empty(t, (*result).Signature())
+		require.Error(t, result.TxError())
+		require.Equal(t, mn.Fatal, result.Code())
+		require.Empty(t, result.Signature())
 	})
 
 	t.Run("empty transaction", func(t *testing.T) {
 		result, err := c.txSender.SendTransaction(ctx, &solana.Transaction{})
 		require.NoError(t, err)
 		require.NotNil(t, result)
-		require.NotNil(t, *result)
-		require.Error(t, (*result).TxError())
-		require.Equal(t, mn.Fatal, (*result).Code())
-		require.Empty(t, (*result).Signature())
+		require.Error(t, result.TxError())
+		require.Equal(t, mn.Fatal, result.Code())
+		require.Empty(t, result.Signature())
 	})
 }
 
@@ -513,22 +494,8 @@ func TestSolanaChain_MultiNode_Txm(t *testing.T) {
 	cfg.MultiNode.MultiNode.Enabled = ptr(true)
 	cfg.Nodes = []*solcfg.Node{
 		{
-			Name: ptr("primary-1"),
+			Name: ptr("primary"),
 			URL:  config.MustParseURL(client.SetupLocalSolNode(t)),
-		},
-		{
-			Name: ptr("primary-2"),
-			URL:  config.MustParseURL(client.SetupLocalSolNode(t)),
-		},
-		{
-			Name:     ptr("sendonly-1"),
-			URL:      config.MustParseURL(client.SetupLocalSolNode(t)),
-			SendOnly: true,
-		},
-		{
-			Name:     ptr("sendonly-2"),
-			URL:      config.MustParseURL(client.SetupLocalSolNode(t)),
-			SendOnly: true,
 		},
 	}
 

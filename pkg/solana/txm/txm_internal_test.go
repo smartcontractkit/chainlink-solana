@@ -5,7 +5,6 @@ package txm
 import (
 	"context"
 	"errors"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 	"math/rand"
 	"sync"
 	"testing"
@@ -28,6 +27,7 @@ import (
 
 	relayconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
@@ -111,10 +111,7 @@ func TestTxm(t *testing.T) {
 			mkey := keyMocks.NewSimpleKeystore(t)
 			mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
 
-			getClient := func() (client.ReaderWriter, error) {
-				return mc, nil
-			}
-			loader := internal.NewLoader(true, getClient)
+			loader := utils.NewLazyLoad(func() (client.ReaderWriter, error) { return mc, nil })
 			txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
 			require.NoError(t, txm.Start(ctx))
 
@@ -720,10 +717,7 @@ func TestTxm_Enqueue(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	getClient := func() (client.ReaderWriter, error) {
-		return mc, nil
-	}
-	loader := internal.NewLoader(true, getClient)
+	loader := utils.NewLazyLoad(func() (client.ReaderWriter, error) { return mc, nil })
 	txm := NewTxm("enqueue_test", loader, nil, cfg, mkey, lggr)
 
 	require.ErrorContains(t, txm.Enqueue(ctx, "txmUnstarted", &solana.Transaction{}), "not started")

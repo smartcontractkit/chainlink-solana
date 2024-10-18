@@ -14,11 +14,11 @@ import (
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 	solanatxm "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	bigmath "github.com/smartcontractkit/chainlink-common/pkg/utils/big_math"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
@@ -46,7 +46,7 @@ func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 	cfg := config.NewDefault()
 	client := clientmocks.NewReaderWriter(t)
 	require.NoError(t, err)
-	loader := internal.NewLoader(true, func() (solanaClient.ReaderWriter, error) { return client, nil })
+	loader := utils.NewLazyLoad(func() (solanaClient.ReaderWriter, error) { return client, nil })
 	txm := solanatxm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
 
 	t.Run("successfully sets estimated compute unit limit", func(t *testing.T) {
