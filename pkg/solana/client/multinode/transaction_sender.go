@@ -113,17 +113,17 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 		primaryNodeWg.Add(1)
 		go func() {
 			defer primaryNodeWg.Done()
-			result := txSender.broadcastTxAsync(ctx, rpc, tx)
+			r := txSender.broadcastTxAsync(ctx, rpc, tx)
 			select {
 			case <-ctx.Done():
 				return
-			case txResults <- result:
+			case txResults <- r:
 			}
 
 			select {
 			case <-ctx.Done():
 				return
-			case txResultsToReport <- result:
+			case txResultsToReport <- r:
 			}
 		}()
 	})
@@ -216,10 +216,10 @@ loop:
 		case <-ctx.Done():
 			txSender.lggr.Debugw("Failed to collect of the results before context was done", "tx", tx, "errorsByCode", errorsByCode)
 			return result, ctx.Err()
-		case result := <-txResults:
-			errorsByCode[result.Code()] = append(errorsByCode[result.Code()], result)
+		case r := <-txResults:
+			errorsByCode[r.Code()] = append(errorsByCode[r.Code()], r)
 			resultsCount++
-			if slices.Contains(sendTxSuccessfulCodes, result.Code()) || resultsCount >= requiredResults {
+			if slices.Contains(sendTxSuccessfulCodes, r.Code()) || resultsCount >= requiredResults {
 				break loop
 			}
 		case <-softTimeoutChan:
