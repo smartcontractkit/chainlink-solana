@@ -16,12 +16,12 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/pelletier/go-toml/v2 v2.2.2
 	github.com/rs/zerolog v1.33.0
-	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241017135127-b283b1e14fa6
-	github.com/smartcontractkit/chainlink-solana v1.1.1-0.20241010140936-4e1d0ae8315a
+	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241018163014-a9f995ebb98b
+	github.com/smartcontractkit/chainlink-solana v1.1.1-0.20241017134533-5459a1034ecd
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.11
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.1
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20241017214158-315746307aa7
-	github.com/smartcontractkit/chainlink/v2 v2.14.0-mercury-20240807.0.20241017214158-315746307aa7
+	github.com/smartcontractkit/chainlink/v2 v2.14.0-mercury-20240807.0.20241018161821-cbfb1fffe09b
 	github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12
 	github.com/stretchr/testify v1.9.0
 	github.com/testcontainers/testcontainers-go v0.33.0
@@ -385,11 +385,11 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.27 // indirect
 	github.com/smartcontractkit/chainlink-automation v1.0.5-0.20241009152924-78acf196c332 // indirect
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20241017140434-6757be193e1c // indirect
-	github.com/smartcontractkit/chainlink-cosmos v0.5.1 // indirect
-	github.com/smartcontractkit/chainlink-data-streams v0.1.0 // indirect
+	github.com/smartcontractkit/chainlink-cosmos v0.5.2-0.20241017133723-5277829bd53f // indirect
+	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20241018134907-a00ba3729b5e // indirect
 	github.com/smartcontractkit/chainlink-feeds v0.1.1 // indirect
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.3.0 // indirect
-	github.com/smartcontractkit/chainlink-starknet/relayer v0.1.0 // indirect
+	github.com/smartcontractkit/chainlink-starknet/relayer v0.1.1-0.20241017135645-176a23722fd8 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.50.0 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.50.0 // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
