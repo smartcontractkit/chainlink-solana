@@ -264,8 +264,14 @@ func (c *TestConfig) GetNodeConfigTOML() (string, error) {
 		url = c.GetURL()
 	}
 
+	// TODO: Does the simulated default actually create new heads/ finalized heads?
+	// TODO: If not, then those tests will fail on CI and only work with actual RPCs.
 	mnConfig := solcfg.MultiNodeConfig{
-		MultiNode: solcfg.MultiNode{Enabled: ptr.Ptr(true)},
+		MultiNode: solcfg.MultiNode{
+			Enabled:                      ptr.Ptr(true),
+			NodeNoNewHeadsThreshold:      config.MustNewDuration(time.Minute),
+			NoNewFinalizedHeadsThreshold: config.MustNewDuration(2 * time.Minute),
+		},
 	}
 	mnConfig.SetDefaults()
 
