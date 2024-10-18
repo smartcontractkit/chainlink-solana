@@ -17,7 +17,7 @@ require (
 	github.com/jpillora/backoff v1.0.0
 	github.com/pelletier/go-toml/v2 v2.2.0
 	github.com/prometheus/client_golang v1.17.0
-	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241011160913-5d432bcdc2e8
+	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241018163014-a9f995ebb98b
 	github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
