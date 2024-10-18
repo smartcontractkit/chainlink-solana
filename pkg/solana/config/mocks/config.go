@@ -158,6 +158,24 @@ func (_m *Config) ConfirmPollPeriod() time.Duration {
 	return r0
 }
 
+// EstimateComputeUnitLimit provides a mock function with given fields:
+func (_m *Config) EstimateComputeUnitLimit() bool {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for EstimateComputeUnitLimit")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // FeeBumpPeriod provides a mock function with given fields:
 func (_m *Config) FeeBumpPeriod() time.Duration {
 	ret := _m.Called()
