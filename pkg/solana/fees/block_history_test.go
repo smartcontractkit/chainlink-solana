@@ -98,8 +98,8 @@ func TestBlockHistoryEstimator_LatestBlock(t *testing.T) {
 
 func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 	min := uint64(100)
-	max := uint64(100_000)          // Adjusted max to accommodate realistic compute unit prices
-	blockHistoryDepth := uint64(12) // Number of blocks to consider
+	max := uint64(100_000)
+	blockHistoryDepth := uint64(12)
 
 	// Set up mocks
 	rw := clientmock.NewReaderWriter(t)
@@ -139,7 +139,6 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		testPrices = append(testPrices, medianPrice)
 	}
 
-	// Mock RPC calls
 	testSlotsResult := rpc.BlocksResult(testSlots)
 	rw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil).Once()
 	rw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
