@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
@@ -19,7 +20,6 @@ import (
 	cfgmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/config/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	feemocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/fees/mocks"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 	ksmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 
 	"github.com/stretchr/testify/assert"
@@ -62,12 +62,10 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 	tx := NewTestTx()
 
 	testRunner := func(t *testing.T, client solanaClient.ReaderWriter) {
-		getClient := func() (solanaClient.ReaderWriter, error) {
-			return client, nil
-		}
-
 		// build minimal txm
-		loader := internal.NewLoader(true, getClient)
+		loader := utils.NewLazyLoad(func() (solanaClient.ReaderWriter, error) {
+			return client, nil
+		})
 		txm := NewTxm("retry_race", loader, nil, cfg, ks, lggr)
 		txm.fee = fee
 

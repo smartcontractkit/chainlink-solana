@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
@@ -293,20 +294,24 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 			if result == nil {
 				return solanago.Signature{}, errors.New("tx sender returned nil result")
 			}
-			if (*result).Signature().IsZero() {
+			if result.Signature().IsZero() {
 				return solanago.Signature{}, errors.New("tx sender returned empty signature")
 			}
-			return (*result).Signature(), nil
+			return result.Signature(), nil
 		}
 	}
 
-	// Use lazy loader if MultiNode is disabled
-	lazyLoad := !cfg.MultiNode.Enabled()
+	var tc internal.Loader[client.ReaderWriter]
+	var bc internal.Loader[monitor.BalanceClient]
+	if cfg.MultiNode.Enabled() {
+		tc = internal.NewLoader[client.ReaderWriter](func() (client.ReaderWriter, error) { return ch.multiNode.SelectRPC() })
+		bc = internal.NewLoader[monitor.BalanceClient](func() (monitor.BalanceClient, error) { return ch.multiNode.SelectRPC() })
+	} else {
+		tc = utils.NewLazyLoad(func() (client.ReaderWriter, error) { return ch.getClient() })
+		bc = utils.NewLazyLoad(func() (monitor.BalanceClient, error) { return ch.getClient() })
+	}
 
-	tc := internal.NewLoader(lazyLoad, func() (client.ReaderWriter, error) { return ch.getClient() })
 	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
-
-	bc := internal.NewLoader(lazyLoad, func() (monitor.BalanceClient, error) { return ch.getClient() })
 	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
 	return &ch, nil
 }

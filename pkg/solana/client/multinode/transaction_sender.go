@@ -87,7 +87,7 @@ type TransactionSender[TX any, RESULT SendTxResult, CHAIN_ID ID, RPC SendTxRPCCl
 // * If there is at least one terminal error - returns terminal error
 // * If there is both success and terminal error - returns success and reports invariant violation
 // * Otherwise, returns any (effectively random) of the errors.
-func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ctx context.Context, tx TX) (*RESULT, error) {
+func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ctx context.Context, tx TX) (result RESULT, err error) {
 	txResults := make(chan RESULT)
 	txResultsToReport := make(chan RESULT)
 	primaryNodeWg := sync.WaitGroup{}
@@ -96,7 +96,7 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 	defer cancel()
 
 	healthyNodesNum := 0
-	err := txSender.multiNode.DoAll(ctx, func(ctx context.Context, rpc RPC, isSendOnly bool) {
+	err = txSender.multiNode.DoAll(ctx, func(ctx context.Context, rpc RPC, isSendOnly bool) {
 		if isSendOnly {
 			txSender.wg.Add(1)
 			go func() {
@@ -138,7 +138,7 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 	}()
 
 	if err != nil {
-		return nil, err
+		return result, err
 	}
 
 	txSender.wg.Add(1)
@@ -173,7 +173,7 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) reportSendTxAnomal
 
 type sendTxResults[RESULT any] map[SendTxReturnCode][]RESULT
 
-func aggregateTxResults[RESULT any](resultsByCode sendTxResults[RESULT]) (result *RESULT, err error) {
+func aggregateTxResults[RESULT any](resultsByCode sendTxResults[RESULT]) (result RESULT, err error) {
 	_, severeErrors, hasSevereErrors := findFirstIn(resultsByCode, sendTxSevereErrors)
 	_, successResults, hasSuccess := findFirstIn(resultsByCode, sendTxSuccessfulCodes)
 	if hasSuccess {
@@ -182,29 +182,29 @@ func aggregateTxResults[RESULT any](resultsByCode sendTxResults[RESULT]) (result
 		if hasSevereErrors {
 			const errMsg = "found contradictions in nodes replies on SendTransaction: got success and severe error"
 			// return success, since at least 1 node has accepted our broadcasted Tx, and thus it can now be included onchain
-			return &successResults[0], errors.New(errMsg)
+			return successResults[0], errors.New(errMsg)
 		}
 
 		// other errors are temporary - we are safe to return success
-		return &successResults[0], nil
+		return successResults[0], nil
 	}
 
 	if hasSevereErrors {
-		return &severeErrors[0], nil
+		return severeErrors[0], nil
 	}
 
 	// return temporary error
-	for _, result := range resultsByCode {
-		return &result[0], nil
+	for _, r := range resultsByCode {
+		return r[0], nil
 	}
 
 	err = fmt.Errorf("expected at least one response on SendTransaction")
-	return nil, err
+	return result, err
 }
 
-func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) collectTxResults(ctx context.Context, tx TX, healthyNodesNum int, txResults <-chan RESULT) (*RESULT, error) {
+func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) collectTxResults(ctx context.Context, tx TX, healthyNodesNum int, txResults <-chan RESULT) (result RESULT, err error) {
 	if healthyNodesNum == 0 {
-		return nil, ErroringNodeError
+		return result, ErroringNodeError
 	}
 	requiredResults := int(math.Ceil(float64(healthyNodesNum) * sendTxQuorum))
 	errorsByCode := sendTxResults[RESULT]{}
@@ -215,7 +215,7 @@ loop:
 		select {
 		case <-ctx.Done():
 			txSender.lggr.Debugw("Failed to collect of the results before context was done", "tx", tx, "errorsByCode", errorsByCode)
-			return nil, ctx.Err()
+			return result, ctx.Err()
 		case result := <-txResults:
 			errorsByCode[result.Code()] = append(errorsByCode[result.Code()], result)
 			resultsCount++
@@ -237,7 +237,7 @@ loop:
 	}
 
 	// ignore critical error as it's reported in reportSendTxAnomalies
-	result, _ := aggregateTxResults(errorsByCode)
+	result, _ = aggregateTxResults(errorsByCode)
 	return result, nil
 }
 
