@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	"github.com/gagliardetto/solana-go"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 

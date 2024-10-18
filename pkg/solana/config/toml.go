@@ -282,6 +282,10 @@ func (c *TOMLConfig) ComputeUnitLimitDefault() uint32 {
 	return *c.Chain.ComputeUnitLimitDefault
 }
 
+func (c *TOMLConfig) EstimateComputeUnitLimit() bool {
+	return *c.Chain.EstimateComputeUnitLimit
+}
+
 func (c *TOMLConfig) ListNodes() Nodes {
 	return c.Nodes
 }
