@@ -189,15 +189,6 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 	tests.AssertLogEventually(t, logs, "failed to get blocks with limit")
 	assert.Equal(t, estimator.BaseComputeUnitPrice(), estimator.readRawPrice(), "Price should not change when getPrice fails")
 
-	// Failed to get block
-	rw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil)
-	rw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
-		Return(&testSlotsResult, nil)
-	rw.On("GetBlock", mock.Anything, mock.Anything).
-		Return(nil, fmt.Errorf("failed to get block"))
-	tests.AssertLogEventually(t, logs, "get block returned err or nil block")
-	assert.Equal(t, estimator.BaseComputeUnitPrice(), estimator.readRawPrice(), "Price should not change when getPrice fails")
-
 	// Close the estimator
 	require.NoError(t, estimator.Close())
 }

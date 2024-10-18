@@ -220,18 +220,13 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 		go func(s uint64) {
 			defer wg.Done()
 
-			select {
-			case semaphore <- struct{}{}:
-				// Acquired semaphore
-			case <-ctx.Done():
-				return
-			}
+			// Acquire semaphore
+			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 			// Fetch the block details
 			block, errGetBlock := c.GetBlock(ctx, s)
 			if errGetBlock != nil || block == nil {
 				// Failed to get block at slot || no block found at slot: skip.
-				bhe.lgr.Debugw("get block returned err or nil block", "err", errGetBlock, "slot", s)
 				return
 			}
 
@@ -239,7 +234,6 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 			feeData, errParseBlock := ParseBlock(block)
 			if errParseBlock != nil {
 				// Failed to parse block at slot: skip.
-				bhe.lgr.Debugw("failed to parse block at slot", "err", errParseBlock, "slot", s)
 				return
 			}
 
@@ -247,7 +241,6 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 			blockMedian, errMedian := mathutil.Median(feeData.Prices...)
 			if errMedian != nil {
 				//Failed to calculate median for slot: skip.
-				bhe.lgr.Debugw("failed to calculate median for slot", "err", errMedian, "slot", s)
 				return
 			}
 
