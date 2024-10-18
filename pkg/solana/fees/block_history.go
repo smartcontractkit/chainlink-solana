@@ -259,16 +259,18 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 
 	wg.Wait()
 
-	// Safely read allPrices
+	// Safely read allPrices by copying it under mutex
 	mu.Lock()
-	defer mu.Unlock()
+	copiedPrices := make([]ComputeUnitPrice, len(allPrices))
+	copy(copiedPrices, allPrices)
+	mu.Unlock()
 
-	if len(allPrices) == 0 {
+	if len(copiedPrices) == 0 {
 		return fmt.Errorf("no compute unit prices collected")
 	}
 
 	// Calculate the median of all collected compute unit prices
-	medianPrice, err := mathutil.Median(allPrices...)
+	medianPrice, err := mathutil.Median(copiedPrices...)
 	if err != nil {
 		return fmt.Errorf("failed to calculate median price: %w", err)
 	}
@@ -278,12 +280,13 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 	bhe.price = uint64(medianPrice)
 	bhe.lock.Unlock()
 
+	// Log using the copied slice to avoid data race
 	bhe.lgr.Debugw("BlockHistoryEstimator: updated",
 		"method", bhe.estimationMethod.String(),
 		"computeUnitPriceMedian", medianPrice,
 		"latestSlot", currentSlot,
-		"numBlocks", len(allPrices),
-		"pricesCollected", allPrices,
+		"numBlocks", len(copiedPrices),
+		"pricesCollected", copiedPrices,
 	)
 
 	return nil
