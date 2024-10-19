@@ -99,7 +99,7 @@ func TestBlockHistoryEstimator_LatestBlock(t *testing.T) {
 func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 	min := uint64(100)
 	max := uint64(100_000)
-	blockHistoryDepth := uint64(12)
+	blockHistoryDepth := uint64(6)
 
 	// Set up mocks
 	rw := clientmock.NewReaderWriter(t)
@@ -110,7 +110,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 	cfg.On("ComputeUnitPriceDefault").Return(uint64(100))
 	cfg.On("ComputeUnitPriceMin").Return(min)
 	cfg.On("ComputeUnitPriceMax").Return(max)
-	cfg.On("BlockHistoryPollPeriod").Return(1 * time.Second)
+	cfg.On("BlockHistoryPollPeriod").Return(3 * time.Second)
 	cfg.On("BlockHistoryDepth").Return(blockHistoryDepth)
 	lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 	ctx := tests.Context(t)
@@ -167,27 +167,51 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 	}
 
 	// Error handling scenarios
-	// failed to get client
-	rwFail := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
-		return nil, fmt.Errorf("fail client load")
+	t.Run("desiredBlockCount is zero", func(t *testing.T) {
+		err = estimator.calculatePriceFromMultipleBlocks(ctx, 0)
+		require.Error(t, err)
+		assert.Equal(t, "desiredBlockCount is zero", err.Error())
 	})
 
-	estimator, err = NewBlockHistoryEstimator(rwFail, cfg, lgr, MultipleBlocksEstimator)
-	require.NoError(t, err)
-	require.NoError(t, estimator.Start(ctx))
-	tests.AssertLogEventually(t, logs, "failed to get client")
+	t.Run("failed to get client", func(t *testing.T) {
+		rwFail := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
+			return nil, fmt.Errorf("fail client load")
+		})
+		estimator, err := NewBlockHistoryEstimator(rwFail, cfg, lgr, MultipleBlocksEstimator)
+		require.NoError(t, err)
+		require.NoError(t, estimator.Start(ctx))
+		tests.AssertLogEventually(t, logs, "failed to get client")
+	})
 
-	// Failed to get current slot
-	rw.On("SlotHeight", mock.Anything).Return(uint64(0), fmt.Errorf("failed to get current slot")).Once()
-	tests.AssertLogEventually(t, logs, "failed to get current slot")
-	assert.Equal(t, estimator.BaseComputeUnitPrice(), estimator.readRawPrice(), "Price should not change when getPrice fails")
+	t.Run("failed to get current slot", func(t *testing.T) {
+		rw.On("SlotHeight", mock.Anything).Return(uint64(0), fmt.Errorf("failed to get current slot")).Once()
+		tests.AssertLogEventually(t, logs, "failed to get current slot")
+		assert.Equal(t, estimator.BaseComputeUnitPrice(), estimator.readRawPrice(), "Price should not change when getPrice fails")
+	})
 
-	// Failed to get blocks with limit
-	rw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil).Once()
-	rw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
-		Return(nil, fmt.Errorf("failed to get blocks with limit")).Once()
-	tests.AssertLogEventually(t, logs, "failed to get blocks with limit")
-	assert.Equal(t, estimator.BaseComputeUnitPrice(), estimator.readRawPrice(), "Price should not change when getPrice fails")
+	t.Run("current slot is less than desired block count", func(t *testing.T) {
+		rw.On("SlotHeight", mock.Anything).Return(uint64(5), nil).Once()
+		err = estimator.calculatePriceFromMultipleBlocks(ctx, 10)
+		require.Error(t, err)
+		assert.Equal(t, "current slot is less than desired block count", err.Error())
+	})
+
+	t.Run("failed to get blocks with limit", func(t *testing.T) {
+		rw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil).Once()
+		rw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil, fmt.Errorf("failed to get blocks with limit")).Once()
+		tests.AssertLogEventually(t, logs, "failed to get blocks with limit")
+		assert.Equal(t, estimator.BaseComputeUnitPrice(), estimator.readRawPrice(), "Price should not change when getPrice fails")
+	})
+
+	t.Run("no compute unit prices collected", func(t *testing.T) {
+		rw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil).Once()
+		rw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
+			Return(&rpc.BlocksResult{}, nil).Once()
+		err = estimator.calculatePriceFromMultipleBlocks(ctx, 10)
+		require.Error(t, err)
+		assert.Equal(t, "no compute unit prices collected", err.Error())
+	})
 
 	// Close the estimator
 	require.NoError(t, estimator.Close())

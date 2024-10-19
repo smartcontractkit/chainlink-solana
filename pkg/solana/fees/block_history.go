@@ -23,7 +23,7 @@ const (
 	MultipleBlocksEstimator
 )
 
-const maxblockHistoryDepth = 20
+const MAX_BLOCK_HISTORY_DEPTH = 20
 
 func (em EstimationMethod) String() string {
 	switch em {
@@ -125,7 +125,7 @@ func (bhe *blockHistoryEstimator) calculatePrice(ctx context.Context) error {
 	case LatestBlockEstimator:
 		return bhe.calculatePriceFromLatestBlock(ctx)
 	case MultipleBlocksEstimator:
-		return bhe.calculatePriceFromMultipleBlocks(ctx)
+		return bhe.calculatePriceFromMultipleBlocks(ctx, bhe.cfg.BlockHistoryDepth())
 	default:
 		return fmt.Errorf("unknown estimation method")
 	}
@@ -171,7 +171,16 @@ func (bhe *blockHistoryEstimator) calculatePriceFromLatestBlock(ctx context.Cont
 	return nil
 }
 
-func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.Context) error {
+func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.Context, desiredBlockCount uint64) error {
+	if desiredBlockCount == 0 {
+		return fmt.Errorf("desiredBlockCount is zero")
+	}
+
+	if desiredBlockCount > MAX_BLOCK_HISTORY_DEPTH {
+		// Limit the desired block count to maxblockHistoryDepth
+		desiredBlockCount = MAX_BLOCK_HISTORY_DEPTH
+	}
+
 	// fetch client
 	c, err := bhe.client.Get()
 	if err != nil {
@@ -183,18 +192,6 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 	if err != nil {
 		return fmt.Errorf("failed to get current slot: %w", err)
 	}
-
-	desiredBlockCount := bhe.cfg.BlockHistoryDepth()
-	if desiredBlockCount == 0 {
-		return fmt.Errorf("desiredBlockCount is zero")
-	} else if desiredBlockCount > maxblockHistoryDepth {
-		// Limit the desired block count to maxblockHistoryDepth
-		desiredBlockCount = maxblockHistoryDepth
-	}
-
-	allPrices := make([]ComputeUnitPrice, 0, desiredBlockCount)
-	var wg sync.WaitGroup
-	var mu sync.Mutex
 
 	// Determine the starting slot for fetching blocks
 	if currentSlot < desiredBlockCount {
@@ -208,8 +205,11 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 		return fmt.Errorf("failed to get blocks with limit: %w", err)
 	}
 
-	// Implement a semaphore to limit concurrency (avoid hitting rate limits)
+	// limit concurrency (avoid hitting rate limits)
 	semaphore := make(chan struct{}, 10)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	allPrices := make([]ComputeUnitPrice, 0, desiredBlockCount)
 
 	// Iterate over the confirmed slots in reverse order to fetch most recent blocks first
 	// Iterate until we run out of slots
@@ -219,10 +219,9 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 		wg.Add(1)
 		go func(s uint64) {
 			defer wg.Done()
-
-			// Acquire semaphore
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
+
 			// Fetch the block details
 			block, errGetBlock := c.GetBlock(ctx, s)
 			if errGetBlock != nil || block == nil {
@@ -254,10 +253,6 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 	}
 
 	wg.Wait()
-
-	// Safely read allPrices
-	mu.Lock()
-	defer mu.Unlock()
 
 	if len(allPrices) == 0 {
 		return fmt.Errorf("no compute unit prices collected")
