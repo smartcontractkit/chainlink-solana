@@ -546,11 +546,6 @@ func (r *chainReaderInterfaceTester) GetContractReader(t *testing.T) types.Contr
 		t.FailNow()
 	}
 
-	require.NoError(t, svc.Start(context.Background()))
-	t.Cleanup(func() {
-		require.NoError(t, svc.Close())
-	})
-
 	if r.reader == nil {
 		r.reader = &wrappedTestChainReader{tester: r}
 	}
@@ -560,6 +555,18 @@ func (r *chainReaderInterfaceTester) GetContractReader(t *testing.T) types.Contr
 	r.reader.client = client
 
 	return r.reader
+}
+
+func (r *chainReaderInterfaceTester) StartServices(ctx context.Context, t *testing.T) {
+	require.NotNil(t, r.reader)
+	require.NotNil(t, r.reader.service)
+	require.NoError(t, r.reader.service.Start(ctx))
+}
+
+func (r *chainReaderInterfaceTester) CloseServices(t *testing.T) {
+	require.NotNil(t, r.reader)
+	require.NotNil(t, r.reader.service)
+	require.NoError(t, r.reader.service.Close())
 }
 
 type wrappedTestChainReader struct {
@@ -602,6 +609,11 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 		a ag_solana.PublicKey
 		b ag_solana.PublicKey
 	)
+
+	if err := r.service.Ready(); err != nil {
+		return fmt.Errorf("service not ready. err: %w", err)
+	}
+
 	parts := strings.Split(readIdentifier, "-")
 	if len(parts) < 3 {
 		panic("unexpected readIdentifier length")
