@@ -90,7 +90,7 @@ func getTx(t *testing.T, val uint64, keystore SimpleKeystore, price fees.Compute
 }
 
 func TestTxm(t *testing.T) {
-	for _, eName := range []string{"fixed", "blockhistory"} {
+	for _, eName := range []string{"fixed", "latestblockhistory", "multipleblockshistory"} {
 		estimator := eName
 		t.Run("estimator-"+estimator, func(t *testing.T) {
 			t.Parallel() // run estimator tests in parallel
@@ -105,6 +105,7 @@ func TestTxm(t *testing.T) {
 			cfg.Chain.FeeEstimatorMode = &estimator
 			mc := mocks.NewReaderWriter(t)
 			mc.On("GetLatestBlock", mock.Anything).Return(&rpc.GetBlockResult{}, nil).Maybe()
+			mc.On("SlotHeight", mock.Anything).Return(uint64(0), nil).Maybe()
 
 			// mock solana keystore
 			mkey := keyMocks.NewSimpleKeystore(t)
