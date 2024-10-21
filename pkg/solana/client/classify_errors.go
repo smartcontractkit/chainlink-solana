@@ -51,14 +51,12 @@ var (
 	ErrProgramCacheHitMaxLimit               = regexp.MustCompile(`Program cache hit max limit`)
 )
 
-// errCodes maps regex patterns to corresponding return code
+// errCodes maps regex patterns to their corresponding return code
+// errors are considered Retryable by default if not in this map
 var errCodes = map[*regexp.Regexp]mn.SendTxReturnCode{
-	ErrInsufficientFundsForFee:        mn.InsufficientFunds,
-	ErrAlreadyProcessed:               mn.TransactionAlreadyKnown,
-	ErrWouldExceedMaxBlockCostLimit:   mn.ExceedsMaxFee,
-	ErrUnsupportedVersion:             mn.Unsupported,
-	ErrWouldExceedMaxAccountCostLimit: mn.ExceedsMaxFee,
-	ErrInsufficientFundsForRent:       mn.InsufficientFunds,
+	ErrAlreadyProcessed:         mn.TransactionAlreadyKnown, // Transaction was already processed and thus known by the RPC
+	ErrInsufficientFundsForFee:  mn.InsufficientFunds,
+	ErrInsufficientFundsForRent: mn.InsufficientFunds,
 }
 
 // ClassifySendError returns the corresponding return code based on the error.
