@@ -439,9 +439,9 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 		}
 
 		// Send tx using transaction sender
-		result, err := c.txSender.SendTransaction(ctx, createTx(receiver.PublicKey()))
-		require.NoError(t, err)
+		result := c.txSender.SendTransaction(ctx, createTx(receiver.PublicKey()))
 		require.NotNil(t, result)
+		require.NoError(t, result.Error())
 		require.Equal(t, mn.Successful, result.Code())
 		require.NotEmpty(t, result.Signature())
 	})
@@ -471,18 +471,18 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 		}
 
 		// Send tx using transaction sender
-		result, err := c.txSender.SendTransaction(ctx, unsignedTx(receiver.PublicKey()))
-		require.NoError(t, err)
+		result := c.txSender.SendTransaction(ctx, unsignedTx(receiver.PublicKey()))
 		require.NotNil(t, result)
+		require.NoError(t, result.Error())
 		require.Error(t, result.TxError())
 		require.Equal(t, mn.Fatal, result.Code())
 		require.Empty(t, result.Signature())
 	})
 
 	t.Run("empty transaction", func(t *testing.T) {
-		result, err := c.txSender.SendTransaction(ctx, &solana.Transaction{})
-		require.NoError(t, err)
+		result := c.txSender.SendTransaction(ctx, &solana.Transaction{})
 		require.NotNil(t, result)
+		require.NoError(t, result.Error())
 		require.Error(t, result.TxError())
 		require.Equal(t, mn.Fatal, result.Code())
 		require.Empty(t, result.Signature())
@@ -558,7 +558,26 @@ func TestSolanaChain_MultiNode_Txm(t *testing.T) {
 
 	// Send funds twice, along with an invalid transaction
 	require.NoError(t, testChain.txm.Enqueue(tests.Context(t), "test_success", createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)))
-	time.Sleep(500 * time.Millisecond) // pause 0.5s for new blockhash
+
+	// Wait for new block hash
+	currentBh, err := selectedClient.LatestBlockhash(tests.Context(t))
+	require.NoError(t, err)
+	timeout := time.After(time.Minute)
+
+NewBlockHash:
+	for {
+		select {
+		case <-timeout:
+			t.Fatal("timed out waiting for new block hash")
+		default:
+			newBh, err := selectedClient.LatestBlockhash(tests.Context(t))
+			require.NoError(t, err)
+			if newBh.Value.LastValidBlockHeight > currentBh.Value.LastValidBlockHeight {
+				break NewBlockHash
+			}
+		}
+	}
+
 	require.NoError(t, testChain.txm.Enqueue(tests.Context(t), "test_success_2", createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)))
 	require.Error(t, testChain.txm.Enqueue(tests.Context(t), "test_invalidSigner", createTx(pubKeyReceiver, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL))) // cannot sign tx before enqueuing
 

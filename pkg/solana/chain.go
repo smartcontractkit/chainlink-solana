@@ -233,6 +233,9 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 
 	var sendTx func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error)
 
+	var tc internal.Loader[client.ReaderWriter] = utils.NewLazyLoad(func() (client.ReaderWriter, error) { return ch.getClient() })
+	var bc internal.Loader[monitor.BalanceClient] = utils.NewLazyLoad(func() (monitor.BalanceClient, error) { return ch.getClient() })
+
 	if cfg.MultiNode.Enabled() {
 		chainFamily := "solana"
 
@@ -276,6 +279,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 			mn.StringID(id),
 			chainFamily,
 			multiNode,
+			client.NewSendTxResult,
 			0, // use the default value provided by the implementation
 		)
 
@@ -287,9 +291,9 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 
 		sendTx = func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error) {
 			// Send tx using MultiNode transaction sender
-			result, err := ch.txSender.SendTransaction(ctx, tx)
-			if err != nil {
-				return solanago.Signature{}, err
+			result := ch.txSender.SendTransaction(ctx, tx)
+			if result.Error() != nil {
+				return solanago.Signature{}, result.Error()
 			}
 			if result == nil {
 				return solanago.Signature{}, errors.New("tx sender returned nil result")
@@ -299,16 +303,9 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 			}
 			return result.Signature(), nil
 		}
-	}
 
-	var tc internal.Loader[client.ReaderWriter]
-	var bc internal.Loader[monitor.BalanceClient]
-	if cfg.MultiNode.Enabled() {
 		tc = internal.NewLoader[client.ReaderWriter](func() (client.ReaderWriter, error) { return ch.multiNode.SelectRPC() })
 		bc = internal.NewLoader[monitor.BalanceClient](func() (monitor.BalanceClient, error) { return ch.multiNode.SelectRPC() })
-	} else {
-		tc = utils.NewLazyLoad(func() (client.ReaderWriter, error) { return ch.getClient() })
-		bc = utils.NewLazyLoad(func() (monitor.BalanceClient, error) { return ch.getClient() })
 	}
 
 	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
