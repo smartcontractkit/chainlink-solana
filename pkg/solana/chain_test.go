@@ -405,41 +405,40 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 		require.NoError(t, c.Close())
 	}()
 
+	createTx := func(from solana.PrivateKey, to solana.PrivateKey) *solana.Transaction {
+		cl, err := c.getClient()
+		require.NoError(t, err)
+
+		hash, hashErr := cl.LatestBlockhash(tests.Context(t))
+		assert.NoError(t, hashErr)
+
+		tx, txErr := solana.NewTransaction(
+			[]solana.Instruction{
+				system.NewTransferInstruction(
+					1,
+					from.PublicKey(),
+					to.PublicKey(),
+				).Build(),
+			},
+			hash.Value.Blockhash,
+			solana.TransactionPayer(from.PublicKey()),
+		)
+		assert.NoError(t, txErr)
+		_, signErr := tx.Sign(
+			func(key solana.PublicKey) *solana.PrivateKey {
+				if from.PublicKey().Equals(key) {
+					return &from
+				}
+				return nil
+			},
+		)
+		assert.NoError(t, signErr)
+		return tx
+	}
+
 	t.Run("successful transaction", func(t *testing.T) {
-		// create + sign transaction
-		createTx := func(to solana.PublicKey) *solana.Transaction {
-			cl, err := c.getClient()
-			require.NoError(t, err)
-
-			hash, hashErr := cl.LatestBlockhash(tests.Context(t))
-			assert.NoError(t, hashErr)
-
-			tx, txErr := solana.NewTransaction(
-				[]solana.Instruction{
-					system.NewTransferInstruction(
-						1,
-						sender.PublicKey(),
-						to,
-					).Build(),
-				},
-				hash.Value.Blockhash,
-				solana.TransactionPayer(sender.PublicKey()),
-			)
-			assert.NoError(t, txErr)
-			_, signErr := tx.Sign(
-				func(key solana.PublicKey) *solana.PrivateKey {
-					if sender.PublicKey().Equals(key) {
-						return &sender
-					}
-					return nil
-				},
-			)
-			assert.NoError(t, signErr)
-			return tx
-		}
-
 		// Send tx using transaction sender
-		result := c.txSender.SendTransaction(ctx, createTx(receiver.PublicKey()))
+		result := c.txSender.SendTransaction(ctx, createTx(sender, receiver))
 		require.NotNil(t, result)
 		require.NoError(t, result.Error())
 		require.Equal(t, mn.Successful, result.Code())
@@ -570,8 +569,8 @@ NewBlockHash:
 		case <-timeout:
 			t.Fatal("timed out waiting for new block hash")
 		default:
-			newBh, err := selectedClient.LatestBlockhash(tests.Context(t))
-			require.NoError(t, err)
+			newBh, bhErr := selectedClient.LatestBlockhash(tests.Context(t))
+			require.NoError(t, bhErr)
 			if newBh.Value.LastValidBlockHeight > currentBh.Value.LastValidBlockHeight {
 				break NewBlockHash
 			}
