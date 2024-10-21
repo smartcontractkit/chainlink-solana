@@ -569,8 +569,8 @@ NewBlockHash:
 		case <-timeout:
 			t.Fatal("timed out waiting for new block hash")
 		default:
-			newBh, err := selectedClient.LatestBlockhash(tests.Context(t))
-			require.NoError(t, err)
+			newBh, bhErr := selectedClient.LatestBlockhash(tests.Context(t))
+			require.NoError(t, bhErr)
 			if newBh.Value.LastValidBlockHeight > currentBh.Value.LastValidBlockHeight {
 				break NewBlockHash
 			}
