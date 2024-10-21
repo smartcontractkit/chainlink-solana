@@ -51,46 +51,12 @@ var (
 	ErrProgramCacheHitMaxLimit               = regexp.MustCompile(`Program cache hit max limit`)
 )
 
-// errCodes maps regex patterns to corresponding return code
+// errCodes maps regex patterns to their corresponding return code
+// errors are considered Retryable by default if not in this map
 var errCodes = map[*regexp.Regexp]mn.SendTxReturnCode{
-	ErrAccountInUse:                          mn.Retryable,
-	ErrAccountLoadedTwice:                    mn.Retryable,
-	ErrAccountNotFound:                       mn.Retryable,
-	ErrProgramAccountNotFound:                mn.Fatal,
-	ErrInsufficientFundsForFee:               mn.InsufficientFunds,
-	ErrInvalidAccountForFee:                  mn.Unsupported,
-	ErrAlreadyProcessed:                      mn.TransactionAlreadyKnown,
-	ErrBlockhashNotFound:                     mn.Retryable,
-	ErrInstructionError:                      mn.Retryable,
-	ErrCallChainTooDeep:                      mn.Retryable,
-	ErrMissingSignatureForFee:                mn.Retryable,
-	ErrInvalidAccountIndex:                   mn.Retryable,
-	ErrSignatureFailure:                      mn.Fatal,
-	ErrInvalidProgramForExecution:            mn.Retryable,
-	ErrSanitizeFailure:                       mn.Fatal,
-	ErrClusterMaintenance:                    mn.Retryable,
-	ErrAccountBorrowOutstanding:              mn.Retryable,
-	ErrWouldExceedMaxBlockCostLimit:          mn.ExceedsMaxFee,
-	ErrUnsupportedVersion:                    mn.Unsupported,
-	ErrInvalidWritableAccount:                mn.Retryable,
-	ErrWouldExceedMaxAccountCostLimit:        mn.ExceedsMaxFee,
-	ErrWouldExceedAccountDataBlockLimit:      mn.ExceedsMaxFee,
-	ErrTooManyAccountLocks:                   mn.Retryable,
-	ErrAddressLookupTableNotFound:            mn.Retryable,
-	ErrInvalidAddressLookupTableOwner:        mn.Retryable,
-	ErrInvalidAddressLookupTableData:         mn.Retryable,
-	ErrInvalidAddressLookupTableIndex:        mn.Retryable,
-	ErrInvalidRentPayingAccount:              mn.Retryable,
-	ErrWouldExceedMaxVoteCostLimit:           mn.Retryable,
-	ErrWouldExceedAccountDataTotalLimit:      mn.Retryable,
-	ErrMaxLoadedAccountsDataSizeExceeded:     mn.Retryable,
-	ErrInvalidLoadedAccountsDataSizeLimit:    mn.Retryable,
-	ErrResanitizationNeeded:                  mn.Retryable,
-	ErrUnbalancedTransaction:                 mn.Retryable,
-	ErrProgramCacheHitMaxLimit:               mn.Retryable,
-	ErrInsufficientFundsForRent:              mn.InsufficientFunds,
-	ErrDuplicateInstruction:                  mn.Fatal,
-	ErrProgramExecutionTemporarilyRestricted: mn.Retryable,
+	ErrAlreadyProcessed:         mn.TransactionAlreadyKnown, // Transaction was already processed and thus known by the RPC
+	ErrInsufficientFundsForFee:  mn.InsufficientFunds,
+	ErrInsufficientFundsForRent: mn.InsufficientFunds,
 }
 
 // ClassifySendError returns the corresponding return code based on the error.
