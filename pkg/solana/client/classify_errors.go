@@ -54,9 +54,9 @@ var (
 // errCodes maps regex patterns to their corresponding return code
 // errors are considered Retryable by default if not in this map
 var errCodes = map[*regexp.Regexp]mn.SendTxReturnCode{
-	ErrAlreadyProcessed:         mn.TransactionAlreadyKnown, // Transaction was already processed and thus known by the RPC
-	ErrInsufficientFundsForFee:  mn.InsufficientFunds,
-	ErrInsufficientFundsForRent: mn.InsufficientFunds,
+	ErrSanitizeFailure:         mn.Fatal,                   // Transaction formatting is invalid and cannot be processed or retried
+	ErrAlreadyProcessed:        mn.TransactionAlreadyKnown, // Transaction was already processed and thus known by the RPC
+	ErrInsufficientFundsForFee: mn.InsufficientFunds,       // Transaction was rejected due to insufficient funds for gas fees
 }
 
 // ClassifySendError returns the corresponding return code based on the error.

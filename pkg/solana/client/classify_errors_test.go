@@ -28,13 +28,13 @@ func TestClassifySendError(t *testing.T) {
 		{"Transaction contains an invalid account reference", mn.Retryable},
 		{"Transaction did not pass signature verification", mn.Retryable},
 		{"This program may not be used for executing instructions", mn.Retryable},
-		{"Transaction failed to sanitize accounts offsets correctly", mn.Retryable},
+		{"Transaction failed to sanitize accounts offsets correctly", mn.Fatal},
 		{"Transactions are currently disabled due to cluster maintenance", mn.Retryable},
 		{"Transaction processing left an account with an outstanding borrowed reference", mn.Retryable},
-		{"Transaction would exceed max Block Cost Limit", mn.ExceedsMaxFee},
-		{"Transaction version is unsupported", mn.Unsupported},
+		{"Transaction would exceed max Block Cost Limit", mn.Retryable},
+		{"Transaction version is unsupported", mn.Retryable},
 		{"Transaction loads a writable account that cannot be written", mn.Retryable},
-		{"Transaction would exceed max account limit within the block", mn.ExceedsMaxFee},
+		{"Transaction would exceed max account limit within the block", mn.Retryable},
 		{"Transaction would exceed account data limit within the block", mn.Retryable},
 		{"Transaction locked too many accounts", mn.Retryable},
 		{"Address lookup table not found", mn.Retryable},
@@ -51,7 +51,7 @@ func TestClassifySendError(t *testing.T) {
 		{"Program cache hit max limit", mn.Retryable},
 
 		// Dynamic error cases
-		{"Transaction results in an account (123) with insufficient funds for rent", mn.InsufficientFunds},
+		{"Transaction results in an account (123) with insufficient funds for rent", mn.Retryable},
 		{"Error processing Instruction 2: Some error details", mn.Retryable},
 		{"Execution of the program referenced by account at index 3 is temporarily restricted.", mn.Retryable},
 
