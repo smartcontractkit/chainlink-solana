@@ -292,16 +292,13 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 		sendTx = func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error) {
 			// Send tx using MultiNode transaction sender
 			result := ch.txSender.SendTransaction(ctx, tx)
-			if result.Error() != nil {
-				return solanago.Signature{}, result.Error()
-			}
 			if result == nil {
 				return solanago.Signature{}, errors.New("tx sender returned nil result")
 			}
-			if result.Signature().IsZero() {
-				return solanago.Signature{}, errors.New("tx sender returned empty signature")
+			if result.Error() != nil {
+				return solanago.Signature{}, result.Error()
 			}
-			return result.Signature(), nil
+			return result.Signature(), result.TxError()
 		}
 
 		tc = internal.NewLoader[client.ReaderWriter](func() (client.ReaderWriter, error) { return ch.multiNode.SelectRPC() })
