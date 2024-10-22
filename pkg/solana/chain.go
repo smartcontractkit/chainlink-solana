@@ -231,10 +231,11 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 		clientCache: map[string]*verifiedCachedClient{},
 	}
 
-	var sendTx func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error)
-
 	var tc internal.Loader[client.ReaderWriter] = utils.NewLazyLoad(func() (client.ReaderWriter, error) { return ch.getClient() })
 	var bc internal.Loader[monitor.BalanceClient] = utils.NewLazyLoad(func() (monitor.BalanceClient, error) { return ch.getClient() })
+
+	// txm will default to sending transactions using a single RPC client if sendTx is nil
+	var sendTx func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error)
 
 	if cfg.MultiNode.Enabled() {
 		chainFamily := "solana"
@@ -289,8 +290,8 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 		// clientCache will not be used if multinode is enabled
 		ch.clientCache = nil
 
+		// Send tx using MultiNode transaction sender
 		sendTx = func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error) {
-			// Send tx using MultiNode transaction sender
 			result := ch.txSender.SendTransaction(ctx, tx)
 			if result == nil {
 				return solanago.Signature{}, errors.New("tx sender returned nil result")
