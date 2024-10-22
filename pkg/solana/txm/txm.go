@@ -86,6 +86,17 @@ type pendingTx struct {
 func NewTxm(chainID string, client internal.Loader[client.ReaderWriter],
 	sendTx func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error),
 	cfg config.Config, ks SimpleKeystore, lggr logger.Logger) *Txm {
+	if sendTx == nil {
+		// default sendTx using a single RPC
+		sendTx = func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error) {
+			c, err := client.Get()
+			if err != nil {
+				return solanaGo.Signature{}, err
+			}
+			return c.SendTx(ctx, tx)
+		}
+	}
+
 	return &Txm{
 		lggr:   logger.Named(lggr, "Txm"),
 		chSend: make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
@@ -97,20 +108,6 @@ func NewTxm(chainID string, client internal.Loader[client.ReaderWriter],
 		client: client,
 		sendTx: sendTx,
 	}
-}
-
-// SendTx sends a transaction using a single client or an override sendTx function
-func (txm *Txm) SendTx(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error) {
-	if txm.sendTx != nil {
-		return txm.sendTx(ctx, tx)
-	}
-
-	// Send tx using a single RPC client
-	client, err := txm.client.Get()
-	if err != nil {
-		return solanaGo.Signature{}, err
-	}
-	return client.SendTx(ctx, tx)
 }
 
 // Start subscribes to queuing channel and processes them.
@@ -237,7 +234,7 @@ func (txm *Txm) sendWithRetry(ctx context.Context, baseTx solanaGo.Transaction, 
 	ctx, cancel := context.WithTimeout(ctx, txcfg.Timeout)
 
 	// send initial tx (do not retry and exit early if fails)
-	sig, initSendErr := txm.SendTx(ctx, &initTx)
+	sig, initSendErr := txm.sendTx(ctx, &initTx)
 	if initSendErr != nil {
 		cancel()                           // cancel context when exiting early
 		txm.txs.OnError(sig, TxFailReject) // increment failed metric
@@ -308,7 +305,7 @@ func (txm *Txm) sendWithRetry(ctx context.Context, baseTx solanaGo.Transaction, 
 				go func(bump bool, count int, retryTx solanaGo.Transaction) {
 					defer wg.Done()
 
-					retrySig, retrySendErr := txm.SendTx(ctx, &retryTx)
+					retrySig, retrySendErr := txm.sendTx(ctx, &retryTx)
 					// this could occur if endpoint goes down or if ctx cancelled
 					if retrySendErr != nil {
 						if strings.Contains(retrySendErr.Error(), "context canceled") || strings.Contains(retrySendErr.Error(), "context deadline exceeded") {
