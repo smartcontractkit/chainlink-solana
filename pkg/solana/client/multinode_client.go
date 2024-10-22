@@ -333,12 +333,7 @@ func (r *SendTxResult) Signature() solana.Signature {
 
 func (m *MultiNodeClient) SendTransaction(ctx context.Context, tx *solana.Transaction) *SendTxResult {
 	var sendTxResult = &SendTxResult{}
-	sig, txErr := m.SendTx(ctx, tx)
-	sendTxResult.code = ClassifySendError(tx, txErr)
-	if txErr != nil {
-		sendTxResult.txErr = txErr
-		return sendTxResult
-	}
-	sendTxResult.sig = sig
+	sendTxResult.sig, sendTxResult.txErr = m.SendTx(ctx, tx)
+	sendTxResult.code = ClassifySendError(tx, sendTxResult.txErr)
 	return sendTxResult
 }
