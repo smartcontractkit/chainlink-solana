@@ -292,7 +292,8 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 
 		// Send tx using MultiNode transaction sender
 		sendTx = func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error) {
-			result := ch.txSender.SendTransaction(ctx, tx)
+			// Use empty context since individual RPC timeouts are handled by the client
+			result := ch.txSender.SendTransaction(context.Background(), tx)
 			if result == nil {
 				return solanago.Signature{}, errors.New("tx sender returned nil result")
 			}

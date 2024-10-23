@@ -310,9 +310,12 @@ type SendTxResult struct {
 var _ mn.SendTxResult = (*SendTxResult)(nil)
 
 func NewSendTxResult(err error) *SendTxResult {
-	return &SendTxResult{
-		err: err,
+	result := &SendTxResult{
+		err:   err,
+		txErr: err,
 	}
+	result.code = ClassifySendError(nil, err)
+	return result
 }
 
 func (r *SendTxResult) Error() error {
