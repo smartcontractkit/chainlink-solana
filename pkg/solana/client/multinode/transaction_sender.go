@@ -100,7 +100,8 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 		return txSender.newResult(errors.New("TransactionSender not started"))
 	}
 
-	ctx, _ = txSender.chStop.Ctx(ctx)
+	ctx, cancel := txSender.chStop.Ctx(ctx)
+	defer cancel()
 
 	healthyNodesNum := 0
 	err := txSender.multiNode.DoAll(ctx, func(ctx context.Context, rpc RPC, isSendOnly bool) {

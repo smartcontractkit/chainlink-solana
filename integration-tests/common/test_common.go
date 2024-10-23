@@ -119,8 +119,8 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 
 		if *m.Config.TestConfig.Common.Network == "devnet" {
 			m.Common.ChainDetails.RPCUrl = *m.Config.TestConfig.Common.RPCURL
-			m.Common.ChainDetails.RPCURLExternal = *m.Config.TestConfig.Common.RPCURL
-			m.Common.ChainDetails.WSURLExternal = *m.Config.TestConfig.Common.WsURL
+			m.Common.ChainDetails.RPCURLExternal = (*m.Config.TestConfig.Common.RPCURL)[0]
+			m.Common.ChainDetails.WSURLExternal = (*m.Config.TestConfig.Common.WsURL)[0]
 		}
 
 		m.Common.ChainDetails.MockserverURLInternal = m.Common.Env.URLs["qa_mock_adapter_internal"][0]
@@ -133,14 +133,14 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		require.NoError(m.Config.T, err)
 
 		// Setting the External RPC url for Gauntlet
-		m.Common.ChainDetails.RPCUrl = sol.InternalHTTPURL
+		m.Common.ChainDetails.RPCUrl = []string{sol.InternalHTTPURL}
 		m.Common.ChainDetails.RPCURLExternal = sol.ExternalHTTPURL
 		m.Common.ChainDetails.WSURLExternal = sol.ExternalWsURL
 
 		if *m.Config.TestConfig.Common.Network == "devnet" {
 			m.Common.ChainDetails.RPCUrl = *m.Config.TestConfig.Common.RPCURL
-			m.Common.ChainDetails.RPCURLExternal = *m.Config.TestConfig.Common.RPCURL
-			m.Common.ChainDetails.WSURLExternal = *m.Config.TestConfig.Common.WsURL
+			m.Common.ChainDetails.RPCURLExternal = (*m.Config.TestConfig.Common.RPCURL)[0]
+			m.Common.ChainDetails.WSURLExternal = (*m.Config.TestConfig.Common.WsURL)[0]
 		}
 
 		b, err := test_env.NewCLTestEnvBuilder().

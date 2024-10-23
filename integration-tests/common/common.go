@@ -51,7 +51,7 @@ type TestEnvDetails struct {
 type ChainDetails struct {
 	ChainName             string
 	ChainID               string
-	RPCUrl                string
+	RPCUrl                []string
 	RPCURLExternal        string
 	WSURLExternal         string
 	ProgramAddresses      *chainConfig.ProgramAddresses
@@ -116,7 +116,7 @@ func New(testConfig *tc.TestConfig) *Common {
 		config = chainConfig.DevnetConfig()
 		privateKeyString = *testConfig.Common.PrivateKey
 
-		if *testConfig.Common.RPCURL != "" {
+		if len(*testConfig.Common.RPCURL) > 0 {
 			config.RPCUrl = *testConfig.Common.RPCURL
 			config.WSUrl = *testConfig.Common.WsURL
 			config.ProgramAddresses = &chainConfig.ProgramAddresses{
@@ -146,7 +146,7 @@ func New(testConfig *tc.TestConfig) *Common {
 	}
 	// provide getters for TestConfig (pointers to chain details)
 	c.TestConfig.GetChainID = func() string { return c.ChainDetails.ChainID }
-	c.TestConfig.GetURL = func() string { return c.ChainDetails.RPCUrl }
+	c.TestConfig.GetURL = func() []string { return c.ChainDetails.RPCUrl }
 
 	return c
 }

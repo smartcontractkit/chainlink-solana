@@ -97,14 +97,17 @@ func (c *MultiNode[CHAIN_ID, RPC]) DoAll(baseCtx context.Context, do func(ctx co
 
 		callsCompleted := 0
 		for _, n := range c.primaryNodes {
+			c.lggr.Debugw("DoAll", "node", n.Name())
 			select {
 			case <-ctx.Done():
 				err = ctx.Err()
 				return
 			default:
 				if n.State() != NodeStateAlive {
+					c.lggr.Debugw("DoAll: Node is not alive", "node", n.Name())
 					continue
 				}
+				c.lggr.Debugw("DoAll: Calling do on primary node", "node", n.Name())
 				do(ctx, n.RPC(), false)
 				callsCompleted++
 			}
