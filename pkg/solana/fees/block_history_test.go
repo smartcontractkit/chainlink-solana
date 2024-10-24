@@ -24,80 +24,188 @@ import (
 	cfgmock "github.com/smartcontractkit/chainlink-solana/pkg/solana/config/mocks"
 )
 
-func TestBlockHistoryEstimator_LatestBlock(t *testing.T) {
+func TestBlockHistoryEstimator_InvalidBlockHistorySize(t *testing.T) {
+	// Helper variables for tests
 	min := uint64(10)
 	max := uint64(1000)
-	priceDefault := uint64(100)
-	depth := uint64(1)
+	defaultPrice := uint64(100)
+	invalidDepth := uint64(0) // Invalid value to trigger default case
+	pollPeriod := 1 * time.Second
 
+	// Setup
 	rw := clientmock.NewReaderWriter(t)
 	rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
 		return rw, nil
 	})
 	cfg := cfgmock.NewConfig(t)
-	cfg.On("ComputeUnitPriceDefault").Return(priceDefault)
-	cfg.On("ComputeUnitPriceMin").Return(min)
-	cfg.On("ComputeUnitPriceMax").Return(max)
-	cfg.On("BlockHistoryPollPeriod").Return(100 * time.Millisecond)
-	cfg.On("BlockHistorySize").Return(depth)
-	lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
+	setupConfigMock(cfg, defaultPrice, min, max, pollPeriod, invalidDepth)
+	lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
 	ctx := tests.Context(t)
+	estimator := initializeEstimator(t, rwLoader, cfg, lgr, ctx)
 
-	// file contains legacy + v0 transactions
-	testBlockData, err := os.ReadFile("./blockdata.json")
-	require.NoError(t, err)
-	blockRes := &rpc.GetBlockResult{}
-	require.NoError(t, json.Unmarshal(testBlockData, blockRes))
+	// Call calculatePrice and expect an error due to invalid BlockHistorySize
+	err := estimator.calculatePrice(ctx)
+	require.Error(t, err, "Expected error for invalid block history size")
+	assert.Equal(t, "invalid block history depth: 0", err.Error(), "Unexpected error message for invalid block history size")
 
-	// happy path
-	estimator, err := NewBlockHistoryEstimator(rwLoader, cfg, lgr)
-	require.NoError(t, err)
+	// Ensure the compute unit price remains at the default value
+	cfg.On("ComputeUnitPriceMax").Return(max)
+	assert.Equal(t, defaultPrice, estimator.BaseComputeUnitPrice(), "Price should remain at default for invalid block history size")
+}
 
-	rw.On("GetLatestBlock", mock.Anything).Return(blockRes, nil).Once()
-	require.NoError(t, estimator.Start(ctx))
-	tests.AssertLogEventually(t, logs, "BlockHistoryEstimator: updated")
-	assert.Equal(t, uint64(55000), estimator.readRawPrice())
+func TestBlockHistoryEstimator_LatestBlock(t *testing.T) {
+	// Helper variables for tests
+	min := uint64(10)
+	max := uint64(100_000)
+	defaultPrice := uint64(100)
+	depth := uint64(1) // 1 is LatestBlockEstimator
+	pollPeriod := 100 * time.Millisecond
 
-	// min/max gates
-	assert.Equal(t, max, estimator.BaseComputeUnitPrice())
-	estimator.price = 0
-	assert.Equal(t, min, estimator.BaseComputeUnitPrice())
-	validPrice := uint64(100)
-	estimator.price = validPrice
-	assert.Equal(t, estimator.readRawPrice(), estimator.BaseComputeUnitPrice())
+	// Grabbing last block of multiple_blocks file to use as latest block
+	testBlocks := readMultipleBlocksFromFile(t, "./multiple_blocks_data.json")
+	lastBlock := testBlocks[len(testBlocks)-1]
+	lastBlockFeeData, _ := ParseBlock(lastBlock)
+	lastBlockMedianPrice, _ := mathutil.Median(lastBlockFeeData.Prices...)
 
-	// failed to get latest block
-	rw.On("GetLatestBlock", mock.Anything).Return(nil, fmt.Errorf("fail rpc call")).Once()
-	tests.AssertLogEventually(t, logs, "failed to get block")
-	assert.Equal(t, validPrice, estimator.BaseComputeUnitPrice(), "price should not change when getPrice fails")
+	t.Run("Successful Estimation", func(t *testing.T) {
+		// Setup
+		rw := clientmock.NewReaderWriter(t)
+		rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
+			return rw, nil
+		})
+		cfg := cfgmock.NewConfig(t)
+		setupConfigMock(cfg, defaultPrice, min, max, pollPeriod, depth)
+		rw.On("GetLatestBlock", mock.Anything).Return(lastBlock, nil)
+		lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
+		ctx := tests.Context(t)
+		estimator := initializeEstimator(t, rwLoader, cfg, lgr, ctx)
 
-	// failed to parse block
-	rw.On("GetLatestBlock", mock.Anything).Return(nil, nil).Once()
-	tests.AssertLogEventually(t, logs, "failed to parse block")
-	assert.Equal(t, validPrice, estimator.BaseComputeUnitPrice(), "price should not change when getPrice fails")
-
-	// failed to calculate median
-	rw.On("GetLatestBlock", mock.Anything).Return(&rpc.GetBlockResult{}, nil).Once()
-	tests.AssertLogEventually(t, logs, "failed to find median")
-	assert.Equal(t, validPrice, estimator.BaseComputeUnitPrice(), "price should not change when getPrice fails")
-
-	// back to happy path
-	rw.On("GetLatestBlock", mock.Anything).Return(blockRes, nil).Once()
-	tests.AssertEventually(t, func() bool {
-		return logs.FilterMessageSnippet("BlockHistoryEstimator: updated").Len() == 2
+		// Assert the computed price matches the expected price
+		require.NoError(t, estimator.calculatePrice(ctx), "Failed to calculate price")
+		cfg.On("ComputeUnitPriceMin").Return(min)
+		cfg.On("ComputeUnitPriceMax").Return(max)
+		assert.Equal(t, uint64(lastBlockMedianPrice), estimator.BaseComputeUnitPrice())
 	})
-	assert.Equal(t, uint64(55000), estimator.readRawPrice())
-	require.NoError(t, estimator.Close())
 
-	// failed to get client
-	rwFail := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
-		return nil, fmt.Errorf("fail client load")
+	t.Run("Min Gate: Price Should Be Floored at Min", func(t *testing.T) {
+		// Setup
+		rw := clientmock.NewReaderWriter(t)
+		rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
+			return rw, nil
+		})
+		cfg := cfgmock.NewConfig(t)
+		tmpMin := uint64(lastBlockMedianPrice) + 100 // Set min higher than the median price
+		setupConfigMock(cfg, defaultPrice, tmpMin, max, pollPeriod, depth)
+		rw.On("GetLatestBlock", mock.Anything).Return(lastBlock, nil)
+		lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
+		ctx := tests.Context(t)
+		estimator := initializeEstimator(t, rwLoader, cfg, lgr, ctx)
+
+		// Call calculatePrice and ensure no error
+		// Assert the compute unit price is floored at min
+		require.NoError(t, estimator.calculatePrice(ctx), "Failed to calculate price with price below min")
+		cfg.On("ComputeUnitPriceMin").Return(tmpMin)
+		assert.Equal(t, tmpMin, estimator.BaseComputeUnitPrice(), "Price should be floored at min")
 	})
-	estimator, err = NewBlockHistoryEstimator(rwFail, cfg, lgr)
-	require.NoError(t, err)
-	require.NoError(t, estimator.Start(ctx))
-	tests.AssertLogEventually(t, logs, "failed to get client")
-	require.NoError(t, estimator.Close())
+
+	t.Run("Max Gate: Price Should Be Capped at Max", func(t *testing.T) {
+		// Setup
+		rw := clientmock.NewReaderWriter(t)
+		rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
+			return rw, nil
+		})
+		cfg := cfgmock.NewConfig(t)
+		tmpMax := uint64(lastBlockMedianPrice) - 100 // Set max lower than the median price
+		setupConfigMock(cfg, defaultPrice, min, tmpMax, pollPeriod, depth)
+		rw.On("GetLatestBlock", mock.Anything).Return(lastBlock, nil)
+		lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
+		ctx := tests.Context(t)
+		estimator := initializeEstimator(t, rwLoader, cfg, lgr, ctx)
+
+		// Call calculatePrice and ensure no error
+		// Assert the compute unit price is capped at max
+		require.NoError(t, estimator.calculatePrice(ctx), "Failed to calculate price with price above max")
+		cfg.On("ComputeUnitPriceMax").Return(tmpMax)
+		cfg.On("ComputeUnitPriceMin").Return(min)
+		assert.Equal(t, tmpMax, estimator.BaseComputeUnitPrice(), "Price should be capped at max")
+	})
+
+	t.Run("Failed to Get Latest Block", func(t *testing.T) {
+		// Setup
+		rw := clientmock.NewReaderWriter(t)
+		rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
+			return rw, nil
+		})
+		cfg := cfgmock.NewConfig(t)
+		setupConfigMock(cfg, defaultPrice, min, max, pollPeriod, depth)
+		rw.On("GetLatestBlock", mock.Anything).Return(nil, fmt.Errorf("fail rpc call")) // Mock GetLatestBlock returning error
+		// Initialize logger and context
+		lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
+		ctx := tests.Context(t)
+		estimator := initializeEstimator(t, rwLoader, cfg, lgr, ctx)
+
+		// Ensure the price remains unchanged
+		require.Error(t, estimator.calculatePrice(ctx), "Expected error when GetLatestBlock fails")
+		cfg.On("ComputeUnitPriceMax").Return(max)
+		assert.Equal(t, uint64(100), estimator.BaseComputeUnitPrice(), "Price should not change when GetLatestBlock fails")
+	})
+
+	t.Run("Failed to Parse Block", func(t *testing.T) {
+		// Setup
+		rw := clientmock.NewReaderWriter(t)
+		rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
+			return rw, nil
+		})
+		cfg := cfgmock.NewConfig(t)
+		setupConfigMock(cfg, defaultPrice, min, max, pollPeriod, depth)
+		rw.On("GetLatestBlock", mock.Anything).Return(nil, nil) // Mock GetLatestBlock returning nil
+		lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
+		ctx := tests.Context(t)
+		estimator := initializeEstimator(t, rwLoader, cfg, lgr, ctx)
+
+		// Ensure the price remains unchanged
+		require.Error(t, estimator.calculatePrice(ctx), "Expected error when parsing fails")
+		cfg.On("ComputeUnitPriceMax").Return(max)
+		assert.Equal(t, uint64(100), estimator.BaseComputeUnitPrice(), "Price should not change when parsing fails")
+	})
+
+	t.Run("Failed to Calculate Median", func(t *testing.T) {
+		// Setup
+		rw := clientmock.NewReaderWriter(t)
+		rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
+			return rw, nil
+		})
+		cfg := cfgmock.NewConfig(t)
+		setupConfigMock(cfg, defaultPrice, min, max, pollPeriod, depth)
+		rw.On("GetLatestBlock", mock.Anything).Return(&rpc.GetBlockResult{}, nil) // Mock GetLatestBlock returning empty block
+		lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
+		ctx := tests.Context(t)
+		estimator := initializeEstimator(t, rwLoader, cfg, lgr, ctx)
+
+		// Ensure the price remains unchanged
+		require.Error(t, estimator.calculatePrice(ctx), "Expected error when median calculation fails")
+		cfg.On("ComputeUnitPriceMax").Return(max)
+		assert.Equal(t, uint64(100), estimator.BaseComputeUnitPrice(), "Price should not change when median calculation fails")
+	})
+
+	t.Run("Failed to Get Client", func(t *testing.T) {
+		// Setup
+		rwFailLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
+			// Return error to simulate failure to get client
+			return nil, fmt.Errorf("fail client load")
+		})
+		cfg := cfgmock.NewConfig(t)
+		setupConfigMock(cfg, defaultPrice, min, max, pollPeriod, depth)
+		lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
+		ctx := tests.Context(t)
+		estimator := initializeEstimator(t, rwFailLoader, cfg, lgr, ctx)
+
+		// Call calculatePrice and expect an error
+		// Ensure the price remains unchanged
+		require.Error(t, estimator.calculatePrice(ctx), "Expected error when getting client fails")
+		cfg.On("ComputeUnitPriceMax").Return(max)
+		assert.Equal(t, defaultPrice, estimator.BaseComputeUnitPrice(), "Price should remain at default when client fails")
+	})
 }
 
 func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
@@ -108,34 +216,8 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 	defaultPrice := uint64(100)
 	pollPeriod := 3 * time.Second
 
-	// Helper funcs
-	setupConfigMock := func(cfg *cfgmock.Config, defaultPrice uint64, min, max uint64, pollPeriod time.Duration, depth uint64) {
-		cfg.On("ComputeUnitPriceDefault").Return(defaultPrice).Once()
-		cfg.On("ComputeUnitPriceMin").Return(min).Once()
-		cfg.On("ComputeUnitPriceMax").Return(max).Once()
-		cfg.On("BlockHistoryPollPeriod").Return(pollPeriod).Once()
-		cfg.On("BlockHistorySize").Return(depth)
-	}
-
-	initializeEstimator := func(t *testing.T, rwLoader *utils.LazyLoad[client.ReaderWriter], cfg *cfgmock.Config, lgr logger.Logger, ctx context.Context) *blockHistoryEstimator {
-		estimator, err := NewBlockHistoryEstimator(rwLoader, cfg, lgr)
-		require.NoError(t, err, "Failed to create BlockHistoryEstimator")
-
-		require.NoError(t, estimator.Start(ctx), "Failed to start BlockHistoryEstimator")
-
-		// Ensure estimator is closed after the test
-		t.Cleanup(func() {
-			require.NoError(t, estimator.Close(), "Failed to close BlockHistoryEstimator")
-		})
-
-		return estimator
-	}
-
 	// Read multiple blocks from JSON file
-	testBlocksData, err := os.ReadFile("./multiple_blocks_data.json")
-	require.NoError(t, err)
-	var testBlocks []*rpc.GetBlockResult
-	require.NoError(t, json.Unmarshal(testBlocksData, &testBlocks))
+	testBlocks := readMultipleBlocksFromFile(t, "./multiple_blocks_data.json")
 	require.GreaterOrEqual(t, len(testBlocks), int(depth), "Not enough blocks in JSON to match BlockHistorySize")
 
 	// Extract slots and compute unit prices from the blocks
@@ -155,8 +237,9 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		testPrices = append(testPrices, medianPrice)
 	}
 	testSlotsResult := rpc.BlocksResult(testSlots)
+	multipleBlocksMedian, _ := mathutil.Median(testPrices...)
 
-	t.Run("Successful MultipleBlocksEstimator", func(t *testing.T) {
+	t.Run("Successful Estimation", func(t *testing.T) {
 		// Setup
 		rw := clientmock.NewReaderWriter(t)
 		rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
@@ -178,14 +261,73 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		// Calculate expected median price from all the blocks and check estimated price
 		require.NoError(t, estimator.calculatePrice(ctx))
 		expectedMedianPrice, err := mathutil.Median(testPrices...)
-		require.NoError(t, err)
+		require.NoError(t, err, "Failed to calculate price")
+		cfg.On("ComputeUnitPriceMax").Return(max)
 		assert.Equal(t, uint64(expectedMedianPrice), estimator.BaseComputeUnitPrice())
+	})
+
+	t.Run("Min Gate: Price Should Be Floored at Min", func(t *testing.T) {
+		// Setup
+		rw := clientmock.NewReaderWriter(t)
+		rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
+			return rw, nil
+		})
+		cfg := cfgmock.NewConfig(t)
+		// Set min higher than the median price
+		tmpMin := uint64(multipleBlocksMedian) + 100
+		setupConfigMock(cfg, defaultPrice, tmpMin, max, pollPeriod, depth)
+		rw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil)
+		rw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
+			Return(&testSlotsResult, nil)
+		for i, slot := range testSlots {
+			rw.On("GetBlock", mock.Anything, slot).
+				Return(testBlocks[i], nil)
+		}
+		lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
+		ctx := tests.Context(t)
+		estimator := initializeEstimator(t, rwLoader, cfg, lgr, ctx)
+
+		// Call calculatePrice and ensure no error
+		// Assert the compute unit price is floored at min
+		require.NoError(t, estimator.calculatePrice(ctx), "Failed to calculate price with price below min")
+		cfg.On("ComputeUnitPriceMin").Return(tmpMin)
+		assert.Equal(t, tmpMin, estimator.BaseComputeUnitPrice(), "Price should be floored at min")
+	})
+
+	t.Run("Max Gate: Price Should Be Capped at Max", func(t *testing.T) {
+		// Setup
+		rw := clientmock.NewReaderWriter(t)
+		rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
+			return rw, nil
+		})
+		cfg := cfgmock.NewConfig(t)
+		tmpMax := uint64(multipleBlocksMedian) - 100
+		// Set tmpMax lower than the median price
+		setupConfigMock(cfg, defaultPrice, min, tmpMax, pollPeriod, depth)
+		rw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil)
+		rw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
+			Return(&testSlotsResult, nil)
+		for i, slot := range testSlots {
+			rw.On("GetBlock", mock.Anything, slot).
+				Return(testBlocks[i], nil)
+		}
+		lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
+		ctx := tests.Context(t)
+		estimator := initializeEstimator(t, rwLoader, cfg, lgr, ctx)
+
+		// Call calculatePrice and ensure no error
+		// Assert the compute unit price is capped at max
+		require.NoError(t, estimator.calculatePrice(ctx), "Failed to calculate price with price above max")
+		cfg.On("ComputeUnitPriceMax").Return(tmpMax)
+		cfg.On("ComputeUnitPriceMin").Return(min)
+		assert.Equal(t, tmpMax, estimator.BaseComputeUnitPrice(), "Price should be capped at max")
 	})
 
 	// Error handling scenarios
 	t.Run("failed to get client", func(t *testing.T) {
 		// Setup
 		rwFailLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
+			// Return error to simulate failure to get client
 			return nil, fmt.Errorf("fail client load")
 		})
 		cfg := cfgmock.NewConfig(t)
@@ -195,7 +337,8 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		estimator := initializeEstimator(t, rwFailLoader, cfg, lgr, tests.Context(t))
 
 		// ensure the price remains unchanged
-		require.Error(t, estimator.calculatePrice(ctx))
+		require.Error(t, estimator.calculatePrice(ctx), "Expected error when getting client fails")
+		cfg.On("ComputeUnitPriceMax").Return(max)
 		assert.Equal(t, uint64(100), estimator.BaseComputeUnitPrice())
 	})
 
@@ -208,12 +351,13 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		cfg := cfgmock.NewConfig(t)
 		ctx := tests.Context(t)
 		setupConfigMock(cfg, defaultPrice, min, max, pollPeriod, depth)
-		rw.On("SlotHeight", mock.Anything).Return(uint64(0), fmt.Errorf("failed to get current slot"))
+		rw.On("SlotHeight", mock.Anything).Return(uint64(0), fmt.Errorf("failed to get current slot")) // Mock SlotHeight returning error
 		lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
 		estimator := initializeEstimator(t, rwLoader, cfg, lgr, tests.Context(t))
 
 		// ensure the price remains unchanged
-		require.Error(t, estimator.calculatePrice(ctx))
+		require.Error(t, estimator.calculatePrice(ctx), "Expected error when getting current slot fails")
+		cfg.On("ComputeUnitPriceMax").Return(max)
 		assert.Equal(t, uint64(100), estimator.BaseComputeUnitPrice())
 	})
 
@@ -227,11 +371,12 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		setupConfigMock(cfg, defaultPrice, min, max, pollPeriod, depth)
 		lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
 		ctx := tests.Context(t)
-		rw.On("SlotHeight", mock.Anything).Return(uint64(2), nil) // Mock SlotHeight returning less than desiredBlockCount
+		rw.On("SlotHeight", mock.Anything).Return(depth-1, nil) // Mock SlotHeight returning less than desiredBlockCount
 		estimator := initializeEstimator(t, rwLoader, cfg, lgr, ctx)
 
 		// ensure the price remains unchanged
-		require.Error(t, estimator.calculatePrice(ctx))
+		require.Error(t, estimator.calculatePrice(ctx), "Expected error when current slot is less than desired block count")
+		cfg.On("ComputeUnitPriceMax").Return(max)
 		assert.Equal(t, uint64(100), estimator.BaseComputeUnitPrice())
 	})
 
@@ -246,12 +391,13 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		setupConfigMock(cfg, defaultPrice, min, max, pollPeriod, depth)
 		rw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil)
 		rw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
-			Return(nil, fmt.Errorf("failed to get blocks with limit"))
+			Return(nil, fmt.Errorf("failed to get blocks with limit")) // Mock GetBlocksWithLimit returning error
 		lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
 		estimator := initializeEstimator(t, rwLoader, cfg, lgr, tests.Context(t))
 
 		// ensure the price remains unchanged
-		require.Error(t, estimator.calculatePrice(ctx))
+		require.Error(t, estimator.calculatePrice(ctx), "Expected error when getting blocks with limit fails")
+		cfg.On("ComputeUnitPriceMax").Return(max)
 		assert.Equal(t, uint64(100), estimator.BaseComputeUnitPrice())
 	})
 
@@ -265,14 +411,47 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		ctx := tests.Context(t)
 		setupConfigMock(cfg, defaultPrice, min, max, pollPeriod, depth)
 		rw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil)
-		emptyBlocks := rpc.BlocksResult{}
+		emptyBlocks := rpc.BlocksResult{} // No blocks with compute unit prices
 		rw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
 			Return(&emptyBlocks, nil)
 		lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
 		estimator := initializeEstimator(t, rwLoader, cfg, lgr, tests.Context(t))
 
 		// Assert failure and ensure the price remains unchanged
-		require.Error(t, estimator.calculatePrice(ctx))
+		require.Error(t, estimator.calculatePrice(ctx), "Expected error when no compute unit prices are collected")
+		cfg.On("ComputeUnitPriceMax").Return(max)
 		assert.Equal(t, uint64(100), estimator.BaseComputeUnitPrice())
 	})
+}
+
+// setupConfigMock configures the Config mock with necessary return values.
+func setupConfigMock(cfg *cfgmock.Config, defaultPrice uint64, min, max uint64, pollPeriod time.Duration, depth uint64) {
+	cfg.On("ComputeUnitPriceDefault").Return(defaultPrice).Once()
+	cfg.On("ComputeUnitPriceMin").Return(min).Once()
+	cfg.On("BlockHistoryPollPeriod").Return(pollPeriod).Once()
+	cfg.On("BlockHistorySize").Return(depth)
+}
+
+// initializeEstimator initializes, starts, and ensures cleanup of the BlockHistoryEstimator.
+func initializeEstimator(t *testing.T, rwLoader *utils.LazyLoad[client.ReaderWriter], cfg *cfgmock.Config, lgr logger.Logger, ctx context.Context) *blockHistoryEstimator {
+	estimator, err := NewBlockHistoryEstimator(rwLoader, cfg, lgr)
+	require.NoError(t, err, "Failed to create BlockHistoryEstimator")
+
+	require.NoError(t, estimator.Start(ctx), "Failed to start BlockHistoryEstimator")
+
+	// Ensure estimator is closed after the test
+	t.Cleanup(func() {
+		require.NoError(t, estimator.Close(), "Failed to close BlockHistoryEstimator")
+	})
+
+	return estimator
+}
+
+func readMultipleBlocksFromFile(t *testing.T, filePath string) []*rpc.GetBlockResult {
+	// Read multiple blocks from JSON file
+	testBlocksData, err := os.ReadFile(filePath)
+	require.NoError(t, err)
+	var testBlocks []*rpc.GetBlockResult
+	require.NoError(t, json.Unmarshal(testBlocksData, &testBlocks))
+	return testBlocks
 }
