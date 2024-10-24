@@ -44,7 +44,7 @@ type TestConfig struct {
 
 	// getter funcs for passing parameters
 	GetChainID func() string
-	GetURL     func() string
+	GetURL     func() []string
 }
 
 const (
@@ -188,8 +188,8 @@ func (c *TestConfig) ReadFromEnvVar() error {
 		c.Network.RpcWsUrls = rpcWsUrls
 	}
 
-	commonRPCURL := ctf_config.MustReadEnvVar_String(E2E_TEST_COMMON_RPC_URL_ENV)
-	if commonRPCURL != "" {
+	commonRPCURL := ctf_config.MustReadEnvVar_Strings(E2E_TEST_COMMON_RPC_URL_ENV, ",")
+	if len(commonRPCURL) > 0 {
 		if c.Common == nil {
 			c.Common = &Common{}
 		}
@@ -197,8 +197,8 @@ func (c *TestConfig) ReadFromEnvVar() error {
 		c.Common.RPCURL = &commonRPCURL
 	}
 
-	commonWSURL := ctf_config.MustReadEnvVar_String(E2E_TEST_COMMON_WS_URL_ENV)
-	if commonWSURL != "" {
+	commonWSURL := ctf_config.MustReadEnvVar_Strings(E2E_TEST_COMMON_WS_URL_ENV, ",")
+	if len(commonWSURL) > 0 {
 		if c.Common == nil {
 			c.Common = &Common{}
 		}
@@ -256,7 +256,8 @@ func (c *TestConfig) GetNodeConfig() *ctf_config.NodeConfig {
 }
 
 func (c *TestConfig) GetNodeConfigTOML() (string, error) {
-	var chainID, url string
+	var chainID string
+	var url []string
 	if c.GetChainID != nil {
 		chainID = c.GetChainID()
 	}
@@ -264,15 +265,26 @@ func (c *TestConfig) GetNodeConfigTOML() (string, error) {
 		url = c.GetURL()
 	}
 
-	solConfig := solcfg.TOMLConfig{
-		Enabled: ptr.Ptr(true),
-		ChainID: ptr.Ptr(chainID),
-		Nodes: []*solcfg.Node{
-			{
-				Name: ptr.Ptr("primary"),
-				URL:  config.MustParseURL(url),
-			},
+	mnConfig := solcfg.MultiNodeConfig{
+		MultiNode: solcfg.MultiNode{
+			Enabled: ptr.Ptr(true),
 		},
+	}
+	mnConfig.SetDefaults()
+
+	var nodes []*solcfg.Node
+	for i, u := range url {
+		nodes = append(nodes, &solcfg.Node{
+			Name: ptr.Ptr(fmt.Sprintf("primary-%d", i)),
+			URL:  config.MustParseURL(u),
+		})
+	}
+
+	solConfig := solcfg.TOMLConfig{
+		Enabled:   ptr.Ptr(true),
+		ChainID:   ptr.Ptr(chainID),
+		Nodes:     nodes,
+		MultiNode: mnConfig,
 	}
 	baseConfig := node.NewBaseConfig()
 	baseConfig.Solana = solcfg.TOMLConfigs{
@@ -357,12 +369,12 @@ type Common struct {
 	InsideK8s *bool   `toml:"inside_k8"`
 	User      *string `toml:"user"`
 	// if rpc requires api key to be passed as an HTTP header
-	RPCURL             *string `toml:"-"`
-	WsURL              *string `toml:"-"`
-	PrivateKey         *string `toml:"-"`
-	Stateful           *bool   `toml:"stateful_db"`
-	InternalDockerRepo *string `toml:"internal_docker_repo"`
-	DevnetImage        *string `toml:"devnet_image"`
+	RPCURL             *[]string `toml:"-"`
+	WsURL              *[]string `toml:"-"`
+	PrivateKey         *string   `toml:"-"`
+	Stateful           *bool     `toml:"stateful_db"`
+	InternalDockerRepo *string   `toml:"internal_docker_repo"`
+	DevnetImage        *string   `toml:"devnet_image"`
 }
 
 type SolanaConfig struct {

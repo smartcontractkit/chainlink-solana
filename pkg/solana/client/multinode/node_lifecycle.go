@@ -167,7 +167,8 @@ func (n *node[CHAIN_ID, HEAD, RPC]) aliveLoop() {
 			_, latestChainInfo := n.StateAndLatest()
 			if outOfSync, liveNodes := n.isOutOfSyncWithPool(latestChainInfo); outOfSync {
 				// note: there must be another live node for us to be out of sync
-				lggr.Errorw("RPC endpoint has fallen behind", "blockNumber", latestChainInfo.BlockNumber, "totalDifficulty", latestChainInfo.TotalDifficulty, "nodeState", n.getCachedState())
+				highest := n.HighestUserObservations()
+				lggr.Errorw("RPC endpoint has fallen behind", "blockNumber", latestChainInfo.BlockNumber, "highestBlockNumber", highest.BlockNumber, "totalDifficulty", latestChainInfo.TotalDifficulty, "nodeState", n.getCachedState())
 				if liveNodes < 2 {
 					lggr.Criticalf("RPC endpoint has fallen behind; %s %s", msgCannotDisable, msgDegradedState)
 					continue

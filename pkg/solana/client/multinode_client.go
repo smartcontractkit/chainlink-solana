@@ -37,7 +37,7 @@ func (h *Head) BlockDifficulty() *big.Int {
 }
 
 func (h *Head) IsValid() bool {
-	return h != nil && h.BlockHeight != nil && h.BlockHash != nil
+	return h != nil && h.BlockHeight != nil && *h.BlockHeight > 0 && h.BlockHash != nil
 }
 
 var _ mn.RPCClient[mn.StringID, *Head] = (*MultiNodeClient)(nil)
@@ -107,7 +107,13 @@ func (m *MultiNodeClient) SubscribeToHeads(ctx context.Context) (<-chan *Head, m
 		return nil, nil, errors.New("PollInterval is 0")
 	}
 	timeout := pollInterval
-	poller, channel := mn.NewPoller[*Head](pollInterval, m.LatestBlock, timeout, m.log)
+	poller, channel := mn.NewPoller[*Head](pollInterval, func(pollRequestCtx context.Context) (*Head, error) {
+		if mn.CtxIsHeathCheckRequest(ctx) {
+			pollRequestCtx = mn.CtxAddHealthCheckFlag(pollRequestCtx)
+		}
+		return m.LatestBlock(pollRequestCtx)
+	}, timeout, m.log)
+
 	if err := poller.Start(ctx); err != nil {
 		return nil, nil, err
 	}
@@ -130,7 +136,12 @@ func (m *MultiNodeClient) SubscribeToFinalizedHeads(ctx context.Context) (<-chan
 		return nil, nil, errors.New("FinalizedBlockPollInterval is 0")
 	}
 	timeout := finalizedBlockPollInterval
-	poller, channel := mn.NewPoller[*Head](finalizedBlockPollInterval, m.LatestFinalizedBlock, timeout, m.log)
+	poller, channel := mn.NewPoller[*Head](finalizedBlockPollInterval, func(pollRequestCtx context.Context) (*Head, error) {
+		if mn.CtxIsHeathCheckRequest(ctx) {
+			pollRequestCtx = mn.CtxAddHealthCheckFlag(pollRequestCtx)
+		}
+		return m.LatestFinalizedBlock(pollRequestCtx)
+	}, timeout, m.log)
 	if err := poller.Start(ctx); err != nil {
 		return nil, nil, err
 	}
@@ -158,6 +169,10 @@ func (m *MultiNodeClient) LatestBlock(ctx context.Context) (*Head, error) {
 		BlockHeight: &result.Value.LastValidBlockHeight,
 		BlockHash:   &result.Value.Blockhash,
 	}
+	if !head.IsValid() {
+		return nil, errors.New("invalid head")
+	}
+
 	m.onNewHead(ctx, chStopInFlight, head)
 	return head, nil
 }
@@ -175,6 +190,10 @@ func (m *MultiNodeClient) LatestFinalizedBlock(ctx context.Context) (*Head, erro
 		BlockHeight: &result.Value.LastValidBlockHeight,
 		BlockHash:   &result.Value.Blockhash,
 	}
+	if !head.IsValid() {
+		return nil, errors.New("invalid head")
+	}
+
 	m.onNewFinalizedHead(ctx, chStopInFlight, head)
 	return head, nil
 }

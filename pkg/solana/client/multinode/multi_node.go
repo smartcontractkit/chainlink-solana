@@ -103,8 +103,10 @@ func (c *MultiNode[CHAIN_ID, RPC]) DoAll(baseCtx context.Context, do func(ctx co
 				return
 			default:
 				if n.State() != NodeStateAlive {
+					c.lggr.Warnw("DoAll: Node is not alive", "node", n.Name())
 					continue
 				}
+				c.lggr.Debugw("DoAll: Calling do on primary node", "node", n.Name())
 				do(ctx, n.RPC(), false)
 				callsCompleted++
 			}
