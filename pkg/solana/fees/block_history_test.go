@@ -163,19 +163,20 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 			return rw, nil
 		})
 		cfg := cfgmock.NewConfig(t)
+		ctx := tests.Context(t)
 		setupConfigMock(cfg, defaultPrice, min, max, pollPeriod, depth)
-		rw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil).Times(1)
+		rw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil)
 		rw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
-			Return(&testSlotsResult, nil).Times(1)
+			Return(&testSlotsResult, nil)
 		for i, slot := range testSlots {
 			rw.On("GetBlock", mock.Anything, slot).
-				Return(testBlocks[i], nil).Times(1)
+				Return(testBlocks[i], nil)
 		}
-		lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
+		lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
 		estimator := initializeEstimator(t, rwLoader, cfg, lgr, tests.Context(t))
 
 		// Calculate expected median price from all the blocks and check estimated price
-		tests.AssertLogEventually(t, logs, "BlockHistoryEstimator: updated")
+		require.NoError(t, estimator.calculatePrice(ctx))
 		expectedMedianPrice, err := mathutil.Median(testPrices...)
 		require.NoError(t, err)
 		assert.Equal(t, uint64(expectedMedianPrice), estimator.BaseComputeUnitPrice())
@@ -188,12 +189,13 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 			return nil, fmt.Errorf("fail client load")
 		})
 		cfg := cfgmock.NewConfig(t)
+		ctx := tests.Context(t)
 		setupConfigMock(cfg, defaultPrice, min, max, pollPeriod, depth)
-		lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
+		lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
 		estimator := initializeEstimator(t, rwFailLoader, cfg, lgr, tests.Context(t))
 
-		// Assert failure and ensure the price remains unchanged
-		tests.AssertLogEventually(t, logs, "failed to get client")
+		// ensure the price remains unchanged
+		require.Error(t, estimator.calculatePrice(ctx))
 		assert.Equal(t, uint64(100), estimator.BaseComputeUnitPrice())
 	})
 
@@ -204,13 +206,14 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 			return rw, nil
 		})
 		cfg := cfgmock.NewConfig(t)
+		ctx := tests.Context(t)
 		setupConfigMock(cfg, defaultPrice, min, max, pollPeriod, depth)
-		rw.On("SlotHeight", mock.Anything).Return(uint64(0), fmt.Errorf("failed to get current slot")).Times(1)
-		lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
+		rw.On("SlotHeight", mock.Anything).Return(uint64(0), fmt.Errorf("failed to get current slot"))
+		lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
 		estimator := initializeEstimator(t, rwLoader, cfg, lgr, tests.Context(t))
 
-		// Assert failure and ensure the price remains unchanged
-		tests.AssertLogEventually(t, logs, "failed to get current slot")
+		// ensure the price remains unchanged
+		require.Error(t, estimator.calculatePrice(ctx))
 		assert.Equal(t, uint64(100), estimator.BaseComputeUnitPrice())
 	})
 
@@ -222,13 +225,13 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		})
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, min, max, pollPeriod, depth)
-		lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
+		lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
 		ctx := tests.Context(t)
-		rw.On("SlotHeight", mock.Anything).Return(uint64(2), nil).Once() // Mock SlotHeight returning less than desiredBlockCount
+		rw.On("SlotHeight", mock.Anything).Return(uint64(2), nil) // Mock SlotHeight returning less than desiredBlockCount
 		estimator := initializeEstimator(t, rwLoader, cfg, lgr, ctx)
 
-		// Assert failure and ensure the price remains unchanged
-		tests.AssertLogEventually(t, logs, "current slot is less than desired block count")
+		// ensure the price remains unchanged
+		require.Error(t, estimator.calculatePrice(ctx))
 		assert.Equal(t, uint64(100), estimator.BaseComputeUnitPrice())
 	})
 
@@ -239,15 +242,16 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 			return rw, nil
 		})
 		cfg := cfgmock.NewConfig(t)
+		ctx := tests.Context(t)
 		setupConfigMock(cfg, defaultPrice, min, max, pollPeriod, depth)
-		rw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil).Times(1)
+		rw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil)
 		rw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
-			Return(nil, fmt.Errorf("failed to get blocks with limit")).Times(1)
-		lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
+			Return(nil, fmt.Errorf("failed to get blocks with limit"))
+		lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
 		estimator := initializeEstimator(t, rwLoader, cfg, lgr, tests.Context(t))
 
-		// Assert failure and ensure the price remains unchanged
-		tests.AssertLogEventually(t, logs, "failed to get blocks with limit")
+		// ensure the price remains unchanged
+		require.Error(t, estimator.calculatePrice(ctx))
 		assert.Equal(t, uint64(100), estimator.BaseComputeUnitPrice())
 	})
 
@@ -258,16 +262,17 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 			return rw, nil
 		})
 		cfg := cfgmock.NewConfig(t)
+		ctx := tests.Context(t)
 		setupConfigMock(cfg, defaultPrice, min, max, pollPeriod, depth)
-		rw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil).Once()
+		rw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil)
 		emptyBlocks := rpc.BlocksResult{}
 		rw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
-			Return(&emptyBlocks, nil).Once()
-		lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
+			Return(&emptyBlocks, nil)
+		lgr, _ := logger.TestObserved(t, zapcore.DebugLevel)
 		estimator := initializeEstimator(t, rwLoader, cfg, lgr, tests.Context(t))
 
 		// Assert failure and ensure the price remains unchanged
-		tests.AssertLogEventually(t, logs, "no compute unit prices collected")
+		require.Error(t, estimator.calculatePrice(ctx))
 		assert.Equal(t, uint64(100), estimator.BaseComputeUnitPrice())
 	})
 }
