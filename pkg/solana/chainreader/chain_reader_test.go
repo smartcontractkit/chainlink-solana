@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"strconv"
 	"strings"
@@ -18,6 +19,8 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/libocr/commontypes"
 
 	codeccommon "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
@@ -426,6 +429,10 @@ func (r *chainReaderInterfaceTester) GetAccountBytes(i int) []byte {
 	return account[:]
 }
 
+func (r *chainReaderInterfaceTester) GetAccountString(i int) string {
+	return solana.PublicKeyFromBytes(r.GetAccountBytes(i)).String()
+}
+
 func (r *chainReaderInterfaceTester) Name() string {
 	return "Solana"
 }
@@ -495,6 +502,11 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 						Procedures: []config.ChainReaderProcedure{
 							{
 								IDLAccount: "TestStructB",
+								OutputModifications: codeccommon.ModifiersConfig{
+									&codeccommon.AddressBytesToStringModifierConfig{
+										Fields: []string{"Accountstruct.Accountstr"},
+									},
+								},
 							},
 							{
 								IDLAccount: "TestStructA",
@@ -652,6 +664,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 
 		fallthrough
 	default:
+
 		if len(r.testStructQueue) == 0 {
 			r.test.FailNow()
 		}
@@ -666,9 +679,51 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 		// split into two encoded parts to test the preloading function
 		cdc := makeTestCodec(r.test, fullStructIDL(r.test), config.EncodingTypeBorsh)
 
-		bts, err := cdc.Encode(ctx, nextTestStruct, "TestStructB")
-		if err != nil {
-			r.test.FailNow()
+		var bts []byte
+		var err error
+		if strings.Contains(r.test.Name(), "wraps_config_with_modifiers_using_its_own_mapstructure_overrides") {
+			// TODO: This is a temporary solution. We are manually retyping this struct to avoid breaking unrelated tests.
+			// Once input modifiers are fully implemented, revisit this code and remove this manual struct conversion
+			tempStruct := struct {
+				Field         *int32
+				OracleID      commontypes.OracleID
+				OracleIDs     [32]commontypes.OracleID
+				AccountStruct struct {
+					Account    []byte
+					AccountStr []byte
+				}
+				Accounts            [][]byte
+				DifferentField      string
+				BigField            *big.Int
+				NestedDynamicStruct MidLevelDynamicTestStruct
+				NestedStaticStruct  MidLevelStaticTestStruct
+			}{
+				Field:     nextTestStruct.Field,
+				OracleID:  nextTestStruct.OracleID,
+				OracleIDs: nextTestStruct.OracleIDs,
+				AccountStruct: struct {
+					Account    []byte
+					AccountStr []byte
+				}{
+					Account:    nextTestStruct.AccountStruct.Account,
+					AccountStr: nextTestStruct.AccountStruct.Account,
+				},
+				Accounts:            nextTestStruct.Accounts,
+				DifferentField:      nextTestStruct.DifferentField,
+				BigField:            nextTestStruct.BigField,
+				NestedDynamicStruct: nextTestStruct.NestedDynamicStruct,
+				NestedStaticStruct:  nextTestStruct.NestedStaticStruct,
+			}
+
+			bts, err = cdc.Encode(ctx, tempStruct, "TestStructB")
+			if err != nil {
+				r.test.FailNow()
+			}
+		} else {
+			bts, err = cdc.Encode(ctx, nextTestStruct, "TestStructB")
+			if err != nil {
+				r.test.FailNow()
+			}
 		}
 
 		// make part A return slower than part B
@@ -857,7 +912,7 @@ func fullStructIDL(t *testing.T) string {
 	return fmt.Sprintf(
 		baseIDL,
 		strings.Join([]string{testStructAIDL, testStructBIDL}, ","),
-		strings.Join([]string{midLevelDynamicStructIDL, midLevelStaticStructIDL, innerDynamicStructIDL, innerStaticStructIDL}, ","),
+		strings.Join([]string{midLevelDynamicStructIDL, midLevelStaticStructIDL, innerDynamicStructIDL, innerStaticStructIDL, accountStructIDL}, ","),
 	)
 }
 
@@ -890,8 +945,19 @@ const (
 			"fields": [
 				{"name": "oracleID","type": "u8"},
 				{"name": "oracleIDs","type": {"array": ["u8",32]}},
-				{"name": "account","type": "bytes"},
+				{"name": "accountstruct","type": {"defined": "accountstruct"}},
 				{"name": "accounts","type": {"vec": "bytes"}}
+			]
+		}
+	}`
+
+	accountStructIDL = `{
+		"name": "accountstruct",
+		"type": {
+			"kind": "struct",
+			"fields": [
+				{"name": "account", "type": "bytes"},
+				{"name": "accountstr", "type": {"array": ["u8",32]}}
 			]
 		}
 	}`
