@@ -20,8 +20,8 @@ require (
 	github.com/smartcontractkit/chainlink-solana v1.1.1-0.20241017193838-6c937ac2d042
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.11
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.1
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20241022235015-12174c79c4d1
-	github.com/smartcontractkit/chainlink/v2 v2.14.0-mercury-20240807.0.20241022235015-12174c79c4d1
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20241023133158-a0d8e6e88867
+	github.com/smartcontractkit/chainlink/v2 v2.14.0-mercury-20240807.0.20241023133158-a0d8e6e88867
 	github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12
 	github.com/stretchr/testify v1.9.0
 	github.com/testcontainers/testcontainers-go v0.33.0
@@ -384,7 +384,7 @@ require (
 	github.com/slack-go/slack v0.12.2 // indirect
 	github.com/smartcontractkit/chain-selectors v1.0.27 // indirect
 	github.com/smartcontractkit/chainlink-automation v1.0.5-0.20241009152924-78acf196c332 // indirect
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20241021132654-e5f3ecb77638 // indirect
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20241022184834-e8564a286a47 // indirect
 	github.com/smartcontractkit/chainlink-cosmos v0.5.2-0.20241017133723-5277829bd53f // indirect
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20241018134907-a00ba3729b5e // indirect
 	github.com/smartcontractkit/chainlink-feeds v0.1.1 // indirect
