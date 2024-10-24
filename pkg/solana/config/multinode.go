@@ -147,9 +147,9 @@ func (c *MultiNodeConfig) SetDefaults() {
 	if c.MultiNode.FinalityDepth == nil {
 		c.MultiNode.FinalityDepth = ptr(uint32(0))
 	}
-	// Finalized block offset will not be used since finality tags are enabled.
+	// Finalized block offset allows for RPCs to be slightly behind the finalized block.
 	if c.MultiNode.FinalizedBlockOffset == nil {
-		c.MultiNode.FinalizedBlockOffset = ptr(uint32(0))
+		c.MultiNode.FinalizedBlockOffset = ptr(uint32(5))
 	}
 }
 

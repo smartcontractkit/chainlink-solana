@@ -107,7 +107,13 @@ func (m *MultiNodeClient) SubscribeToHeads(ctx context.Context) (<-chan *Head, m
 		return nil, nil, errors.New("PollInterval is 0")
 	}
 	timeout := pollInterval
-	poller, channel := mn.NewPoller[*Head](pollInterval, m.LatestBlock, timeout, m.log)
+	poller, channel := mn.NewPoller[*Head](pollInterval, func(pollRequestCtx context.Context) (*Head, error) {
+		if mn.CtxIsHeathCheckRequest(ctx) {
+			pollRequestCtx = mn.CtxAddHealthCheckFlag(pollRequestCtx)
+		}
+		return m.LatestBlock(pollRequestCtx)
+	}, timeout, m.log)
+
 	if err := poller.Start(ctx); err != nil {
 		return nil, nil, err
 	}
@@ -130,7 +136,12 @@ func (m *MultiNodeClient) SubscribeToFinalizedHeads(ctx context.Context) (<-chan
 		return nil, nil, errors.New("FinalizedBlockPollInterval is 0")
 	}
 	timeout := finalizedBlockPollInterval
-	poller, channel := mn.NewPoller[*Head](finalizedBlockPollInterval, m.LatestFinalizedBlock, timeout, m.log)
+	poller, channel := mn.NewPoller[*Head](finalizedBlockPollInterval, func(pollRequestCtx context.Context) (*Head, error) {
+		if mn.CtxIsHeathCheckRequest(ctx) {
+			pollRequestCtx = mn.CtxAddHealthCheckFlag(pollRequestCtx)
+		}
+		return m.LatestFinalizedBlock(pollRequestCtx)
+	}, timeout, m.log)
 	if err := poller.Start(ctx); err != nil {
 		return nil, nil, err
 	}
