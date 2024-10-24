@@ -62,7 +62,10 @@ func TestBalanceMonitor(t *testing.T) {
 			close(done)
 		}
 	}
-	b.reader = client
+
+	b.reader = internal.NewLoader[BalanceClient](func() (BalanceClient, error) {
+		return client, nil
+	})
 
 	servicetest.Run(t, b)
 	select {

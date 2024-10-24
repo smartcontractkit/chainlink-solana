@@ -27,6 +27,7 @@ import (
 
 	relayconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
@@ -110,9 +111,8 @@ func TestTxm(t *testing.T) {
 			mkey := keyMocks.NewSimpleKeystore(t)
 			mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
 
-			txm := NewTxm(id, func() (client.ReaderWriter, error) {
-				return mc, nil
-			}, cfg, mkey, lggr)
+			loader := utils.NewLazyLoad(func() (client.ReaderWriter, error) { return mc, nil })
+			txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
 			require.NoError(t, txm.Start(ctx))
 
 			// tracking prom metrics
@@ -717,9 +717,8 @@ func TestTxm_Enqueue(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	txm := NewTxm("enqueue_test", func() (client.ReaderWriter, error) {
-		return mc, nil
-	}, cfg, mkey, lggr)
+	loader := utils.NewLazyLoad(func() (client.ReaderWriter, error) { return mc, nil })
+	txm := NewTxm("enqueue_test", loader, nil, cfg, mkey, lggr)
 
 	require.ErrorContains(t, txm.Enqueue(ctx, "txmUnstarted", &solana.Transaction{}), "not started")
 	require.NoError(t, txm.Start(ctx))
