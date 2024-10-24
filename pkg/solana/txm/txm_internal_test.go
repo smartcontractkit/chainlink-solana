@@ -105,6 +105,7 @@ func TestTxm(t *testing.T) {
 			cfg.Chain.FeeEstimatorMode = &estimator
 			mc := mocks.NewReaderWriter(t)
 			mc.On("GetLatestBlock", mock.Anything).Return(&rpc.GetBlockResult{}, nil).Maybe()
+			mc.On("SlotHeight", mock.Anything).Return(uint64(0), nil).Maybe()
 
 			// mock solana keystore
 			mkey := keyMocks.NewSimpleKeystore(t)

@@ -103,6 +103,66 @@ func (_m *ReaderWriter) GetAccountInfoWithOpts(ctx context.Context, addr solana.
 	return r0, r1
 }
 
+// GetBlock provides a mock function with given fields: ctx, slot
+func (_m *ReaderWriter) GetBlock(ctx context.Context, slot uint64) (*rpc.GetBlockResult, error) {
+	ret := _m.Called(ctx, slot)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetBlock")
+	}
+
+	var r0 *rpc.GetBlockResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint64) (*rpc.GetBlockResult, error)); ok {
+		return rf(ctx, slot)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uint64) *rpc.GetBlockResult); ok {
+		r0 = rf(ctx, slot)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*rpc.GetBlockResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uint64) error); ok {
+		r1 = rf(ctx, slot)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetBlocksWithLimit provides a mock function with given fields: ctx, startSlot, limit
+func (_m *ReaderWriter) GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit uint64) (*rpc.BlocksResult, error) {
+	ret := _m.Called(ctx, startSlot, limit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetBlocksWithLimit")
+	}
+
+	var r0 *rpc.BlocksResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, uint64) (*rpc.BlocksResult, error)); ok {
+		return rf(ctx, startSlot, limit)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, uint64) *rpc.BlocksResult); ok {
+		r0 = rf(ctx, startSlot, limit)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*rpc.BlocksResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uint64, uint64) error); ok {
+		r1 = rf(ctx, startSlot, limit)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetFeeForMessage provides a mock function with given fields: ctx, msg
 func (_m *ReaderWriter) GetFeeForMessage(ctx context.Context, msg string) (uint64, error) {
 	ret := _m.Called(ctx, msg)
