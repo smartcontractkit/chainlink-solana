@@ -504,7 +504,7 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 								IDLAccount: "TestStructB",
 								OutputModifications: codeccommon.ModifiersConfig{
 									&codeccommon.AddressBytesToStringModifierConfig{
-										Fields: []string{"Accountstr"},
+										Fields: []string{"Accountstruct.Accountstr"},
 									},
 								},
 							},
@@ -685,22 +685,29 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 			// TODO: This is a temporary solution. We are manually retyping this struct to avoid breaking unrelated tests.
 			// Once input modifiers are fully implemented, revisit this code and remove this manual struct conversion
 			tempStruct := struct {
-				Field               *int32
-				OracleID            commontypes.OracleID
-				OracleIDs           [32]commontypes.OracleID
-				Account             []byte
-				AccountStr          []byte
+				Field         *int32
+				OracleID      commontypes.OracleID
+				OracleIDs     [32]commontypes.OracleID
+				AccountStruct struct {
+					Account    []byte
+					AccountStr []byte
+				}
 				Accounts            [][]byte
 				DifferentField      string
 				BigField            *big.Int
 				NestedDynamicStruct MidLevelDynamicTestStruct
 				NestedStaticStruct  MidLevelStaticTestStruct
 			}{
-				Field:               nextTestStruct.Field,
-				OracleID:            nextTestStruct.OracleID,
-				OracleIDs:           nextTestStruct.OracleIDs,
-				Account:             nextTestStruct.Account,
-				AccountStr:          nextTestStruct.Account, // This test needs AccountStr to be a byte slice
+				Field:     nextTestStruct.Field,
+				OracleID:  nextTestStruct.OracleID,
+				OracleIDs: nextTestStruct.OracleIDs,
+				AccountStruct: struct {
+					Account    []byte
+					AccountStr []byte
+				}{
+					Account:    nextTestStruct.AccountStruct.Account,
+					AccountStr: nextTestStruct.AccountStruct.Account,
+				},
 				Accounts:            nextTestStruct.Accounts,
 				DifferentField:      nextTestStruct.DifferentField,
 				BigField:            nextTestStruct.BigField,
@@ -905,7 +912,7 @@ func fullStructIDL(t *testing.T) string {
 	return fmt.Sprintf(
 		baseIDL,
 		strings.Join([]string{testStructAIDL, testStructBIDL}, ","),
-		strings.Join([]string{midLevelDynamicStructIDL, midLevelStaticStructIDL, innerDynamicStructIDL, innerStaticStructIDL}, ","),
+		strings.Join([]string{midLevelDynamicStructIDL, midLevelStaticStructIDL, innerDynamicStructIDL, innerStaticStructIDL, accountStructIDL}, ","),
 	)
 }
 
@@ -938,9 +945,19 @@ const (
 			"fields": [
 				{"name": "oracleID","type": "u8"},
 				{"name": "oracleIDs","type": {"array": ["u8",32]}},
-				{"name": "account","type": "bytes"},
-				{"name": "accountstr","type": {"array": ["u8",32]}},
+				{"name": "accountstruct","type": {"defined": "accountstruct"}},
 				{"name": "accounts","type": {"vec": "bytes"}}
+			]
+		}
+	}`
+
+	accountStructIDL = `{
+		"name": "accountstruct",
+		"type": {
+			"kind": "struct",
+			"fields": [
+				{"name": "account", "type": "bytes"},
+				{"name": "accountstr", "type": {"array": ["u8",32]}}
 			]
 		}
 	}`
