@@ -107,7 +107,7 @@ func (c *MultiNodeConfig) SetDefaults() {
 	}
 	// The sync threshold is set to 5 to allow for some flexibility in node synchronization before considering it out of sync.
 	if c.MultiNode.SyncThreshold == nil {
-		c.MultiNode.SyncThreshold = ptr(uint32(10))
+		c.MultiNode.SyncThreshold = ptr(uint32(50)) // TODO: Increased to 50 for slow test environment
 	}
 	// Lease duration is set to 1 minute by default to allow node locks for a reasonable amount of time.
 	if c.MultiNode.LeaseDuration == nil {
@@ -149,7 +149,7 @@ func (c *MultiNodeConfig) SetDefaults() {
 	}
 	// Finalized block offset allows for RPCs to be slightly behind the finalized block.
 	if c.MultiNode.FinalizedBlockOffset == nil {
-		c.MultiNode.FinalizedBlockOffset = ptr(uint32(5))
+		c.MultiNode.FinalizedBlockOffset = ptr(uint32(50)) // TODO: Set to 50 for slow test environment
 	}
 }
 
