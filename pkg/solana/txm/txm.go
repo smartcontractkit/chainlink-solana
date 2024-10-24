@@ -101,7 +101,7 @@ func (txm *Txm) Start(ctx context.Context) error {
 		switch strings.ToLower(txm.cfg.FeeEstimatorMode()) {
 		case "fixed":
 			estimator, err = fees.NewFixedPriceEstimator(txm.cfg)
-		case "blockhkistory":
+		case "blockhistory":
 			estimator, err = fees.NewBlockHistoryEstimator(txm.client, txm.cfg, txm.lggr)
 		default:
 			err = fmt.Errorf("unknown solana fee estimator type: %s", txm.cfg.FeeEstimatorMode())
