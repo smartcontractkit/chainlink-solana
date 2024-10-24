@@ -90,7 +90,7 @@ func getTx(t *testing.T, val uint64, keystore SimpleKeystore, price fees.Compute
 }
 
 func TestTxm(t *testing.T) {
-	for _, eName := range []string{"fixed", "latestblockhistory", "multipleblockshistory"} {
+	for _, eName := range []string{"fixed", "blockhistory"} {
 		estimator := eName
 		t.Run("estimator-"+estimator, func(t *testing.T) {
 			t.Parallel() // run estimator tests in parallel

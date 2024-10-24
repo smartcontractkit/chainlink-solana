@@ -26,7 +26,7 @@ import (
 )
 
 func TestTxm_Integration(t *testing.T) {
-	for _, eName := range []string{"fixed", "latestblockhistory", "multipleblockshistory"} {
+	for _, eName := range []string{"fixed", "blockhistory"} {
 		estimator := eName
 		t.Run("estimator-"+estimator, func(t *testing.T) {
 			t.Parallel() // run estimator tests in parallel

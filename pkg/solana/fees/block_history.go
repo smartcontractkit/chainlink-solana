@@ -16,26 +16,6 @@ import (
 
 var _ Estimator = &blockHistoryEstimator{}
 
-type EstimationMethod int
-
-const (
-	LatestBlockEstimator EstimationMethod = iota
-	MultipleBlocksEstimator
-)
-
-const MAX_BLOCK_HISTORY_DEPTH = 20
-
-func (em EstimationMethod) String() string {
-	switch em {
-	case LatestBlockEstimator:
-		return "LatestBlock"
-	case MultipleBlocksEstimator:
-		return "MultipleBlocks"
-	default:
-		return "UnknownMethod"
-	}
-}
-
 type blockHistoryEstimator struct {
 	starter services.StateMachine
 	chStop  services.StopChan
@@ -45,22 +25,20 @@ type blockHistoryEstimator struct {
 	cfg    config.Config
 	lgr    logger.Logger
 
-	price            uint64
-	lock             sync.RWMutex
-	estimationMethod EstimationMethod
+	price uint64
+	lock  sync.RWMutex
 }
 
 // NewBlockHistoryEstimator creates a new fee estimator that parses historical fees from a fetched block
 // Note: getRecentPrioritizationFees is not used because it provides the lowest prioritization fee for an included tx in the block
 // which is not effective enough for increasing the chances of block inclusion
-func NewBlockHistoryEstimator(c *utils.LazyLoad[client.ReaderWriter], cfg config.Config, lgr logger.Logger, method EstimationMethod) (*blockHistoryEstimator, error) {
+func NewBlockHistoryEstimator(c *utils.LazyLoad[client.ReaderWriter], cfg config.Config, lgr logger.Logger) (*blockHistoryEstimator, error) {
 	return &blockHistoryEstimator{
-		chStop:           make(chan struct{}),
-		client:           c,
-		cfg:              cfg,
-		lgr:              lgr,
-		price:            cfg.ComputeUnitPriceDefault(), // use default value
-		estimationMethod: method,
+		chStop: make(chan struct{}),
+		client: c,
+		cfg:    cfg,
+		lgr:    lgr,
+		price:  cfg.ComputeUnitPriceDefault(), // use default value
 	}, nil
 }
 
@@ -121,13 +99,13 @@ func (bhe *blockHistoryEstimator) readRawPrice() uint64 {
 }
 
 func (bhe *blockHistoryEstimator) calculatePrice(ctx context.Context) error {
-	switch bhe.estimationMethod {
-	case LatestBlockEstimator:
+	switch {
+	case bhe.cfg.BlockHistorySize() == 1:
 		return bhe.calculatePriceFromLatestBlock(ctx)
-	case MultipleBlocksEstimator:
-		return bhe.calculatePriceFromMultipleBlocks(ctx, bhe.cfg.BlockHistoryDepth())
+	case bhe.cfg.BlockHistorySize() > 1:
+		return bhe.calculatePriceFromMultipleBlocks(ctx, bhe.cfg.BlockHistorySize())
 	default:
-		return fmt.Errorf("unknown estimation method")
+		return fmt.Errorf("invalid block history depth: %d", bhe.cfg.BlockHistorySize())
 	}
 }
 
@@ -161,7 +139,6 @@ func (bhe *blockHistoryEstimator) calculatePriceFromLatestBlock(ctx context.Cont
 	bhe.price = uint64(v) // ComputeUnitPrice is uint64 underneath
 	bhe.lock.Unlock()
 	bhe.lgr.Debugw("BlockHistoryEstimator: updated",
-		"method", bhe.estimationMethod.String(),
 		"computeUnitPrice", v,
 		"blockhash", block.Blockhash,
 		"slot", block.ParentSlot+1,
@@ -172,15 +149,6 @@ func (bhe *blockHistoryEstimator) calculatePriceFromLatestBlock(ctx context.Cont
 }
 
 func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.Context, desiredBlockCount uint64) error {
-	if desiredBlockCount == 0 {
-		return fmt.Errorf("desiredBlockCount is zero")
-	}
-
-	if desiredBlockCount > MAX_BLOCK_HISTORY_DEPTH {
-		// Limit the desired block count to maxblockHistoryDepth
-		desiredBlockCount = MAX_BLOCK_HISTORY_DEPTH
-	}
-
 	// fetch client
 	c, err := bhe.client.Get()
 	if err != nil {
@@ -270,7 +238,6 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 	bhe.lock.Unlock()
 
 	bhe.lgr.Debugw("BlockHistoryEstimator: updated",
-		"method", bhe.estimationMethod.String(),
 		"computeUnitPriceMedian", medianPrice,
 		"latestSlot", currentSlot,
 		"numBlocks", len(allPrices),
