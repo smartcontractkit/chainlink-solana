@@ -36,7 +36,6 @@ func TestBlockHistoryEstimator(t *testing.T) {
 	cfg.On("BlockHistoryPollPeriod").Return(100 * time.Millisecond)
 	lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 	ctx := tests.Context(t)
-
 	// file contains legacy + v0 transactions
 	testBlockData, err := os.ReadFile("./blockdata.json")
 	require.NoError(t, err)
