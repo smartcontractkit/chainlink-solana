@@ -17,11 +17,11 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.2
 	github.com/rs/zerolog v1.33.0
 	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241023204219-86c89e29937d
-	github.com/smartcontractkit/chainlink-solana v1.1.1-0.20241017193838-6c937ac2d042
-	github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.11
+	github.com/smartcontractkit/chainlink-solana v1.1.1-0.20241024132041-a3eb2e31b4c4
+	github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.12
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.1
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20241023133158-a0d8e6e88867
-	github.com/smartcontractkit/chainlink/v2 v2.14.0-mercury-20240807.0.20241023133158-a0d8e6e88867
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20241024193849-da5910eda988
+	github.com/smartcontractkit/chainlink/v2 v2.14.0-mercury-20240807.0.20241024193849-da5910eda988
 	github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12
 	github.com/stretchr/testify v1.9.0
 	github.com/testcontainers/testcontainers-go v0.33.0
@@ -381,7 +381,7 @@ require (
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/slack-go/slack v0.12.2 // indirect
+	github.com/slack-go/slack v0.15.0 // indirect
 	github.com/smartcontractkit/chain-selectors v1.0.27 // indirect
 	github.com/smartcontractkit/chainlink-automation v1.0.5-0.20241009152924-78acf196c332 // indirect
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20241022184834-e8564a286a47 // indirect
