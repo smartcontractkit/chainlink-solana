@@ -65,7 +65,8 @@ func (p *Poller[T]) Err() <-chan error {
 }
 
 func (p *Poller[T]) pollingLoop(ctx context.Context) {
-	ticker := time.NewTicker(p.pollingInterval)
+	tickerCfg := services.TickerConfig{Initial: 0, JitterPct: services.DefaultJitter}
+	ticker := tickerCfg.NewTicker(p.pollingInterval)
 	defer ticker.Stop()
 
 	for {

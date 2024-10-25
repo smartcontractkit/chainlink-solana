@@ -99,7 +99,7 @@ func (c *MultiNodeConfig) SetDefaults() {
 	}
 	// Poll interval is set to 10 seconds to ensure timely updates while minimizing resource usage.
 	if c.MultiNode.PollInterval == nil {
-		c.MultiNode.PollInterval = config.MustNewDuration(10 * time.Second)
+		c.MultiNode.PollInterval = config.MustNewDuration(15 * time.Second)
 	}
 	// Selection mode defaults to priority level to enable using node priorities
 	if c.MultiNode.SelectionMode == nil {
@@ -107,7 +107,7 @@ func (c *MultiNodeConfig) SetDefaults() {
 	}
 	// The sync threshold is set to 5 to allow for some flexibility in node synchronization before considering it out of sync.
 	if c.MultiNode.SyncThreshold == nil {
-		c.MultiNode.SyncThreshold = ptr(uint32(160)) // TODO: Increased to 200 for slow test environment RPCs that are always behind
+		c.MultiNode.SyncThreshold = ptr(uint32(160)) // TODO: Increased to 160 for slow test environment RPCs that are always behind
 	}
 	// Lease duration is set to 1 minute by default to allow node locks for a reasonable amount of time.
 	if c.MultiNode.LeaseDuration == nil {
@@ -119,7 +119,7 @@ func (c *MultiNodeConfig) SetDefaults() {
 	}
 	// The finalized block polling interval is set to 5 seconds to ensure timely updates while minimizing resource usage.
 	if c.MultiNode.FinalizedBlockPollInterval == nil {
-		c.MultiNode.FinalizedBlockPollInterval = config.MustNewDuration(15 * time.Second)
+		c.MultiNode.FinalizedBlockPollInterval = config.MustNewDuration(5 * time.Second)
 	}
 	// Repeatable read guarantee should be enforced by default.
 	if c.MultiNode.EnforceRepeatableRead == nil {
