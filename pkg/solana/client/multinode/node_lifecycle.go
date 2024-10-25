@@ -128,7 +128,6 @@ func (n *node[CHAIN_ID, HEAD, RPC]) aliveLoop() {
 		}
 	}
 
-	localHighestChainInfo, _ := n.rpc.GetInterceptedChainInfo()
 	var pollFailures uint32
 
 	for {
@@ -167,8 +166,8 @@ func (n *node[CHAIN_ID, HEAD, RPC]) aliveLoop() {
 			_, latestChainInfo := n.StateAndLatest()
 			if outOfSync, liveNodes := n.isOutOfSyncWithPool(latestChainInfo); outOfSync {
 				// note: there must be another live node for us to be out of sync
-				highest := n.HighestUserObservations()
-				lggr.Errorw("RPC endpoint has fallen behind", "blockNumber", latestChainInfo.BlockNumber, "highestBlockNumber", highest.BlockNumber, "totalDifficulty", latestChainInfo.TotalDifficulty, "nodeState", n.getCachedState())
+				_, highest := n.poolInfoProvider.LatestChainInfo()
+				lggr.Errorw("RPC endpoint has fallen behind", "blockNumber", latestChainInfo.BlockNumber, "bestLatestBlockNumber", highest.BlockNumber, "totalDifficulty", latestChainInfo.TotalDifficulty, "nodeState", n.getCachedState())
 				if liveNodes < 2 {
 					lggr.Criticalf("RPC endpoint has fallen behind; %s %s", msgCannotDisable, msgDegradedState)
 					continue
@@ -182,7 +181,9 @@ func (n *node[CHAIN_ID, HEAD, RPC]) aliveLoop() {
 				n.declareUnreachable()
 				return
 			}
-			receivedNewHead := n.onNewHead(lggr, &localHighestChainInfo, bh)
+
+			_, latestChainInfo := n.StateAndLatest()
+			receivedNewHead := n.onNewHead(lggr, &latestChainInfo, bh)
 			if receivedNewHead && noNewHeadsTimeoutThreshold > 0 {
 				headsSub.ResetTimer(noNewHeadsTimeoutThreshold)
 			}
@@ -193,7 +194,8 @@ func (n *node[CHAIN_ID, HEAD, RPC]) aliveLoop() {
 		case <-headsSub.NoNewHeads:
 			// We haven't received a head on the channel for at least the
 			// threshold amount of time, mark it broken
-			lggr.Errorw(fmt.Sprintf("RPC endpoint detected out of sync; no new heads received for %s (last head received was %v)", noNewHeadsTimeoutThreshold, localHighestChainInfo.BlockNumber), "nodeState", n.getCachedState(), "latestReceivedBlockNumber", localHighestChainInfo.BlockNumber, "noNewHeadsTimeoutThreshold", noNewHeadsTimeoutThreshold)
+			_, latestChainInfo := n.StateAndLatest()
+			lggr.Errorw(fmt.Sprintf("RPC endpoint detected out of sync; no new heads received for %s (last head received was %v)", noNewHeadsTimeoutThreshold, latestChainInfo.BlockNumber), "nodeState", n.getCachedState(), "latestReceivedBlockNumber", latestChainInfo.BlockNumber, "noNewHeadsTimeoutThreshold", noNewHeadsTimeoutThreshold)
 			if n.poolInfoProvider != nil {
 				if l, _ := n.poolInfoProvider.LatestChainInfo(); l < 2 {
 					lggr.Criticalf("RPC endpoint detected out of sync; %s %s", msgCannotDisable, msgDegradedState)
@@ -212,14 +214,16 @@ func (n *node[CHAIN_ID, HEAD, RPC]) aliveLoop() {
 				return
 			}
 
-			receivedNewHead := n.onNewFinalizedHead(lggr, &localHighestChainInfo, latestFinalized)
+			_, latestChainInfo := n.StateAndLatest()
+			receivedNewHead := n.onNewFinalizedHead(lggr, &latestChainInfo, latestFinalized)
 			if receivedNewHead && noNewFinalizedBlocksTimeoutThreshold > 0 {
 				finalizedHeadsSub.ResetTimer(noNewFinalizedBlocksTimeoutThreshold)
 			}
 		case <-finalizedHeadsSub.NoNewHeads:
 			// We haven't received a finalized head on the channel for at least the
 			// threshold amount of time, mark it broken
-			lggr.Errorw(fmt.Sprintf("RPC's finalized state is out of sync; no new finalized heads received for %s (last finalized head received was %v)", noNewFinalizedBlocksTimeoutThreshold, localHighestChainInfo.FinalizedBlockNumber), "latestReceivedBlockNumber", localHighestChainInfo.BlockNumber)
+			_, latestChainInfo := n.StateAndLatest()
+			lggr.Errorw(fmt.Sprintf("RPC's finalized state is out of sync; no new finalized heads received for %s (last finalized head received was %v)", noNewFinalizedBlocksTimeoutThreshold, latestChainInfo.FinalizedBlockNumber), "latestReceivedBlockNumber", latestChainInfo.BlockNumber)
 			if n.poolInfoProvider != nil {
 				if l, _ := n.poolInfoProvider.LatestChainInfo(); l < 2 {
 					lggr.Criticalf("RPC's finalized state is out of sync; %s %s", msgCannotDisable, msgDegradedState)
@@ -436,7 +440,6 @@ func (n *node[CHAIN_ID, HEAD, RPC]) outOfSyncLoop(syncIssues syncStatus) {
 		lggr.Tracew("Successfully subscribed to finalized heads feed on out-of-sync RPC node")
 	}
 
-	_, localHighestChainInfo := n.rpc.GetInterceptedChainInfo()
 	for {
 		if syncIssues == syncStatusSynced {
 			// back in-sync! flip back into alive loop
@@ -455,13 +458,14 @@ func (n *node[CHAIN_ID, HEAD, RPC]) outOfSyncLoop(syncIssues syncStatus) {
 				return
 			}
 
-			if !n.onNewHead(lggr, &localHighestChainInfo, head) {
+			_, latestChainInfo := n.StateAndLatest()
+			if !n.onNewHead(lggr, &latestChainInfo, head) {
 				continue
 			}
 
 			// received a new head - clear NoNewHead flag
 			syncIssues &= ^syncStatusNoNewHead
-			if outOfSync, _ := n.isOutOfSyncWithPool(localHighestChainInfo); !outOfSync {
+			if outOfSync, _ := n.isOutOfSyncWithPool(latestChainInfo); !outOfSync {
 				// we caught up with the pool - clear NotInSyncWithPool flag
 				syncIssues &= ^syncStatusNotInSyncWithPool
 			} else {
@@ -501,7 +505,8 @@ func (n *node[CHAIN_ID, HEAD, RPC]) outOfSyncLoop(syncIssues syncStatus) {
 				continue
 			}
 
-			receivedNewHead := n.onNewFinalizedHead(lggr, &localHighestChainInfo, latestFinalized)
+			_, latestChainInfo := n.StateAndLatest()
+			receivedNewHead := n.onNewFinalizedHead(lggr, &latestChainInfo, latestFinalized)
 			if !receivedNewHead {
 				continue
 			}
