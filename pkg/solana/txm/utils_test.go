@@ -29,15 +29,15 @@ func TestSortSignaturesAndResults(t *testing.T) {
 	sig, statuses, err = SortSignaturesAndResults(sig, statuses)
 	require.NoError(t, err)
 
-	// new expected order [1, 3, 0, 2]
+	// new expected order [1, 0, 3, 2]
 	assert.Equal(t, rpc.SignatureStatusesResult{ConfirmationStatus: rpc.ConfirmationStatusConfirmed}, *statuses[0])
-	assert.Equal(t, rpc.SignatureStatusesResult{ConfirmationStatus: rpc.ConfirmationStatusConfirmed, Err: "ERROR"}, *statuses[1])
-	assert.Equal(t, rpc.SignatureStatusesResult{ConfirmationStatus: rpc.ConfirmationStatusProcessed}, *statuses[2])
+	assert.Equal(t, rpc.SignatureStatusesResult{ConfirmationStatus: rpc.ConfirmationStatusProcessed}, *statuses[1])
+	assert.Equal(t, rpc.SignatureStatusesResult{ConfirmationStatus: rpc.ConfirmationStatusConfirmed, Err: "ERROR"}, *statuses[2])
 	assert.True(t, nil == statuses[3])
 
 	assert.Equal(t, solana.Signature{1}, sig[0])
-	assert.Equal(t, solana.Signature{3}, sig[1])
-	assert.Equal(t, solana.Signature{0}, sig[2])
+	assert.Equal(t, solana.Signature{0}, sig[1])
+	assert.Equal(t, solana.Signature{3}, sig[2])
 	assert.Equal(t, solana.Signature{2}, sig[3])
 }
 

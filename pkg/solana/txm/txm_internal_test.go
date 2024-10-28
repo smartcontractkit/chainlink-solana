@@ -192,6 +192,11 @@ func TestTxm(t *testing.T) {
 						out.ConfirmationStatus = rpc.ConfirmationStatusConfirmed
 						return
 					}
+
+					if count == 3 {
+						out.ConfirmationStatus = rpc.ConfirmationStatusFinalized
+						return
+					}
 					return nil
 				}
 
