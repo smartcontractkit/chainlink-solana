@@ -37,13 +37,13 @@ type PendingTxContext interface {
 }
 
 type pendingTx struct {
-	tx               solana.Transaction
-	cfg              TxConfig
-	signatures       []solana.Signature
-	id               string
-	createTs         time.Time
+	tx          solana.Transaction
+	cfg         TxConfig
+	signatures  []solana.Signature
+	id          string
+	createTs    time.Time
 	retentionTs time.Time
-	state            TxState
+	state       TxState
 }
 
 var _ PendingTxContext = &pendingTxContext{}

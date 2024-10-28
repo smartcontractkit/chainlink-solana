@@ -31,18 +31,19 @@ import (
 )
 
 type soltxmProm struct {
-	id                                                        string
-	success, error, revert, reject, drop, simRevert, simOther float64
+	id                                                                     string
+	confirmed, error, revert, reject, drop, simRevert, simOther, finalized float64
 }
 
 func (p soltxmProm) assertEqual(t *testing.T) {
-	assert.Equal(t, p.success, testutil.ToFloat64(promSolTxmSuccessTxs.WithLabelValues(p.id)), "mismatch: success")
+	assert.Equal(t, p.confirmed, testutil.ToFloat64(promSolTxmSuccessTxs.WithLabelValues(p.id)), "mismatch: success")
 	assert.Equal(t, p.error, testutil.ToFloat64(promSolTxmErrorTxs.WithLabelValues(p.id)), "mismatch: error")
 	assert.Equal(t, p.revert, testutil.ToFloat64(promSolTxmRevertTxs.WithLabelValues(p.id)), "mismatch: revert")
 	assert.Equal(t, p.reject, testutil.ToFloat64(promSolTxmRejectTxs.WithLabelValues(p.id)), "mismatch: reject")
 	assert.Equal(t, p.drop, testutil.ToFloat64(promSolTxmDropTxs.WithLabelValues(p.id)), "mismatch: drop")
 	assert.Equal(t, p.simRevert, testutil.ToFloat64(promSolTxmSimRevertTxs.WithLabelValues(p.id)), "mismatch: simRevert")
 	assert.Equal(t, p.simOther, testutil.ToFloat64(promSolTxmSimOtherTxs.WithLabelValues(p.id)), "mismatch: simOther")
+	assert.Equal(t, p.finalized, testutil.ToFloat64(promSolTxmFinalizedTxs.WithLabelValues(p.id)), "mismatch: finalized")
 }
 
 func (p soltxmProm) getInflight() float64 {
@@ -50,7 +51,7 @@ func (p soltxmProm) getInflight() float64 {
 }
 
 // create placeholder transaction and returns func for signed tx with fee
-func getTx(t *testing.T, val uint64, keystore SimpleKeystore, price fees.ComputeUnitPrice) (*solana.Transaction, func(fees.ComputeUnitPrice, bool) *solana.Transaction) {
+func getTx(t *testing.T, val uint64, keystore SimpleKeystore) (*solana.Transaction, func(fees.ComputeUnitPrice, bool) *solana.Transaction) {
 	pubkey := solana.PublicKey{}
 
 	// create transfer tx
@@ -160,12 +161,12 @@ func TestTxm(t *testing.T) {
 				}, nil,
 			)
 
-			// happy path (send => simulate success => tx: nil => tx: processed => tx: confirmed => done)
+			// happy path (send => simulate success => tx: nil => tx: processed => tx: confirmed => finalized => done)
 			t.Run("happyPath", func(t *testing.T) {
 				sig := getSig()
-				tx, signed := getTx(t, 0, mkey, 0)
+				tx, signed := getTx(t, 0, mkey)
 				var wg sync.WaitGroup
-				wg.Add(3)
+				wg.Add(1)
 
 				sendCount := 0
 				var countRW sync.RWMutex
@@ -180,7 +181,6 @@ func TestTxm(t *testing.T) {
 				count := 0
 				statuses[sig] = func() (out *rpc.SignatureStatusesResult) {
 					defer func() { count++ }()
-					defer wg.Done()
 
 					out = &rpc.SignatureStatusesResult{}
 					if count == 1 {
@@ -195,6 +195,7 @@ func TestTxm(t *testing.T) {
 
 					if count == 3 {
 						out.ConfirmationStatus = rpc.ConfirmationStatusFinalized
+						wg.Done()
 						return
 					}
 					return nil
@@ -216,13 +217,14 @@ func TestTxm(t *testing.T) {
 				mc.On("SendTx", mock.Anything, tx).Panic("SendTx should not be called anymore").Maybe()
 
 				// check prom metric
-				prom.success++
+				prom.confirmed++
+				prom.finalized++
 				prom.assertEqual(t)
 			})
 
 			// fail on initial transmit (RPC immediate rejects)
 			t.Run("fail_initialTx", func(t *testing.T) {
-				tx, signed := getTx(t, 1, mkey, 0)
+				tx, signed := getTx(t, 1, mkey)
 				var wg sync.WaitGroup
 				wg.Add(1)
 
@@ -246,7 +248,7 @@ func TestTxm(t *testing.T) {
 
 			// tx fails simulation (simulation error)
 			t.Run("fail_simulation", func(t *testing.T) {
-				tx, signed := getTx(t, 2, mkey, 0)
+				tx, signed := getTx(t, 2, mkey)
 				sig := getSig()
 				var wg sync.WaitGroup
 				wg.Add(1)
@@ -272,7 +274,7 @@ func TestTxm(t *testing.T) {
 
 			// tx fails simulation (rpc error, timeout should clean up b/c sig status will be nil)
 			t.Run("fail_simulation_confirmNil", func(t *testing.T) {
-				tx, signed := getTx(t, 3, mkey, 0)
+				tx, signed := getTx(t, 3, mkey)
 				sig := getSig()
 				retry0 := getSig()
 				retry1 := getSig()
@@ -308,7 +310,7 @@ func TestTxm(t *testing.T) {
 			// tx fails simulation with an InstructionError (indicates reverted execution)
 			// manager should cancel sending retry immediately + increment reverted prom metric
 			t.Run("fail_simulation_instructionError", func(t *testing.T) {
-				tx, signed := getTx(t, 4, mkey, 0)
+				tx, signed := getTx(t, 4, mkey)
 				sig := getSig()
 				var wg sync.WaitGroup
 				wg.Add(1)
@@ -342,12 +344,12 @@ func TestTxm(t *testing.T) {
 			})
 
 			// tx fails simulation with BlockHashNotFound error
-			// txm should continue to confirm tx (in this case it will succeed)
+			// txm should continue to finalize tx (in this case it will succeed)
 			t.Run("fail_simulation_blockhashNotFound", func(t *testing.T) {
-				tx, signed := getTx(t, 5, mkey, 0)
+				tx, signed := getTx(t, 5, mkey)
 				sig := getSig()
 				var wg sync.WaitGroup
-				wg.Add(3)
+				wg.Add(2)
 
 				mc.On("SendTx", mock.Anything, signed(0, true)).Return(sig, nil)
 				mc.On("SimulateTx", mock.Anything, signed(0, true), mock.Anything).Run(func(mock.Arguments) {
@@ -360,11 +362,15 @@ func TestTxm(t *testing.T) {
 				count := 0
 				statuses[sig] = func() (out *rpc.SignatureStatusesResult) {
 					defer func() { count++ }()
-					defer wg.Done()
 
 					out = &rpc.SignatureStatusesResult{}
-					if count == 1 {
+					if count == 0 {
 						out.ConfirmationStatus = rpc.ConfirmationStatusConfirmed
+						return
+					}
+					if count == 1 {
+						out.ConfirmationStatus = rpc.ConfirmationStatusFinalized
+						wg.Done()
 						return
 					}
 					return nil
@@ -376,7 +382,8 @@ func TestTxm(t *testing.T) {
 				waitFor(empty) // txs cleared after timeout
 
 				// check prom metric
-				prom.success++
+				prom.confirmed++
+				prom.finalized++
 				prom.assertEqual(t)
 
 				// panic if sendTx called after context cancelled
@@ -386,7 +393,7 @@ func TestTxm(t *testing.T) {
 			// tx fails simulation with AlreadyProcessed error
 			// txm should continue to confirm tx (in this case it will revert)
 			t.Run("fail_simulation_alreadyProcessed", func(t *testing.T) {
-				tx, signed := getTx(t, 6, mkey, 0)
+				tx, signed := getTx(t, 6, mkey)
 				sig := getSig()
 				var wg sync.WaitGroup
 				wg.Add(2)
@@ -423,7 +430,7 @@ func TestTxm(t *testing.T) {
 
 			// tx passes sim, never passes processed (timeout should cleanup)
 			t.Run("fail_confirm_processed", func(t *testing.T) {
-				tx, signed := getTx(t, 7, mkey, 0)
+				tx, signed := getTx(t, 7, mkey)
 				sig := getSig()
 				retry0 := getSig()
 				retry1 := getSig()
@@ -464,7 +471,7 @@ func TestTxm(t *testing.T) {
 
 			// tx passes sim, shows processed, moves to nil (timeout should cleanup)
 			t.Run("fail_confirm_processedToNil", func(t *testing.T) {
-				tx, signed := getTx(t, 8, mkey, 0)
+				tx, signed := getTx(t, 8, mkey)
 				sig := getSig()
 				retry0 := getSig()
 				retry1 := getSig()
@@ -512,7 +519,7 @@ func TestTxm(t *testing.T) {
 
 			// tx passes sim, errors on confirm
 			t.Run("fail_confirm_revert", func(t *testing.T) {
-				tx, signed := getTx(t, 9, mkey, 0)
+				tx, signed := getTx(t, 9, mkey)
 				sig := getSig()
 				var wg sync.WaitGroup
 				wg.Add(1)
@@ -546,7 +553,7 @@ func TestTxm(t *testing.T) {
 
 			// tx passes sim, first retried TXs get dropped
 			t.Run("success_retryTx", func(t *testing.T) {
-				tx, signed := getTx(t, 10, mkey, 0)
+				tx, signed := getTx(t, 10, mkey)
 				sig := getSig()
 				retry0 := getSig()
 				retry1 := getSig()
@@ -568,7 +575,7 @@ func TestTxm(t *testing.T) {
 				statuses[retry1] = func() (out *rpc.SignatureStatusesResult) {
 					defer wg.Done()
 					return &rpc.SignatureStatusesResult{
-						ConfirmationStatus: rpc.ConfirmationStatusConfirmed,
+						ConfirmationStatus: rpc.ConfirmationStatusFinalized,
 					}
 				}
 
@@ -583,16 +590,14 @@ func TestTxm(t *testing.T) {
 				mc.On("SendTx", mock.Anything, tx).Panic("SendTx should not be called anymore").Maybe()
 
 				// check prom metric
-				prom.success++
+				prom.finalized++
 				prom.assertEqual(t)
 			})
 
 			// fee bumping disabled
 			t.Run("feeBumpingDisabled", func(t *testing.T) {
 				sig := getSig()
-				tx, signed := getTx(t, 11, mkey, 0)
-
-				defaultFeeBumpPeriod := cfg.FeeBumpPeriod()
+				tx, signed := getTx(t, 11, mkey)
 
 				sendCount := 0
 				var countRW sync.RWMutex
@@ -607,13 +612,16 @@ func TestTxm(t *testing.T) {
 				var wg sync.WaitGroup
 				wg.Add(1)
 				count := 0
-				start := time.Now()
 				statuses[sig] = func() (out *rpc.SignatureStatusesResult) {
 					defer func() { count++ }()
 
 					out = &rpc.SignatureStatusesResult{}
-					if time.Since(start) > 2*defaultFeeBumpPeriod {
+					if count == 1 {
 						out.ConfirmationStatus = rpc.ConfirmationStatusConfirmed
+						return
+					}
+					if count == 2 {
+						out.ConfirmationStatus = rpc.ConfirmationStatusFinalized
 						wg.Done()
 						return
 					}
@@ -637,14 +645,15 @@ func TestTxm(t *testing.T) {
 				mc.On("SendTx", mock.Anything, tx).Panic("SendTx should not be called anymore").Maybe()
 
 				// check prom metric
-				prom.success++
+				prom.confirmed++
+				prom.finalized++
 				prom.assertEqual(t)
 			})
 
 			// compute unit limit disabled
 			t.Run("computeUnitLimitDisabled", func(t *testing.T) {
 				sig := getSig()
-				tx, signed := getTx(t, 12, mkey, 0)
+				tx, signed := getTx(t, 12, mkey)
 
 				// should only match transaction without compute unit limit
 				assert.Len(t, signed(0, false).Message.Instructions, 2)
@@ -654,10 +663,18 @@ func TestTxm(t *testing.T) {
 				// handle signature status calls
 				var wg sync.WaitGroup
 				wg.Add(1)
+				count := 0
 				statuses[sig] = func() *rpc.SignatureStatusesResult {
-					defer wg.Done()
-					return &rpc.SignatureStatusesResult{
-						ConfirmationStatus: rpc.ConfirmationStatusConfirmed,
+					defer func() { count++ }()
+					if count == 0 {
+						return &rpc.SignatureStatusesResult{
+							ConfirmationStatus: rpc.ConfirmationStatusConfirmed,
+						}
+					} else {
+						wg.Done()
+						return &rpc.SignatureStatusesResult{
+							ConfirmationStatus: rpc.ConfirmationStatusFinalized,
+						}
 					}
 				}
 
@@ -672,7 +689,8 @@ func TestTxm(t *testing.T) {
 				mc.On("SendTx", mock.Anything, tx).Panic("SendTx should not be called anymore").Maybe()
 
 				// check prom metric
-				prom.success++
+				prom.confirmed++
+				prom.finalized++
 				prom.assertEqual(t)
 			})
 		})
