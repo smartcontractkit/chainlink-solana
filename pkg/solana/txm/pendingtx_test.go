@@ -80,18 +80,13 @@ func TestPendingTxContext_new(t *testing.T) {
 	require.True(t, exists)
 	require.Equal(t, msg.id, id)
 
-	// Check it exists in all tx map
-	tx, exists := txs.allTxs[msg.id]
+	// Check it exists in broadcasted map
+	tx, exists := txs.broadcastedTxs[msg.id]
 	require.True(t, exists)
 	require.Equal(t, sig, tx.signatures[0])
 
 	// Check status is Broadcasted
 	require.Equal(t, Broadcasted, tx.state)
-
-	// Check it exists in broadcasted map
-	tx, exists = txs.broadcastedTxs[msg.id]
-	require.True(t, exists)
-	require.Equal(t, sig, tx.signatures[0])
 
 	// Check it does not exist in confirmed map
 	tx, exists = txs.confirmedTxs[msg.id]
@@ -125,15 +120,8 @@ func TestPendingTxContext_add_signature(t *testing.T) {
 	require.True(t, exists)
 	require.Equal(t, msg.id, id)
 
-	// Check all tx map
-	tx, exists := txs.allTxs[msg.id]
-	require.True(t, exists)
-	require.Len(t, tx.signatures, 2)
-	require.Equal(t, sig1, tx.signatures[0])
-	require.Equal(t, sig2, tx.signatures[1])
-
 	// Check broadcasted map
-	tx, exists = txs.broadcastedTxs[msg.id]
+	tx, exists := txs.broadcastedTxs[msg.id]
 	require.True(t, exists)
 	require.Len(t, tx.signatures, 2)
 	require.Equal(t, sig1, tx.signatures[0])
@@ -171,18 +159,13 @@ func TestPendingTxContext_on_broadcasted_processed(t *testing.T) {
 		require.True(t, exists)
 		require.Equal(t, msg.id, id)
 
-		// Check it exists in all tx map
-		tx, exists := txs.allTxs[msg.id]
+		// Check it exists in broadcasted map
+		tx, exists := txs.broadcastedTxs[msg.id]
 		require.True(t, exists)
 		require.Equal(t, sig, tx.signatures[0])
 
 		// Check status is Processed
 		require.Equal(t, Processed, tx.state)
-
-		// Check it exists in broadcasted map
-		tx, exists = txs.broadcastedTxs[msg.id]
-		require.True(t, exists)
-		require.Equal(t, sig, tx.signatures[0])
 
 		// Check it does not exist in confirmed map
 		tx, exists = txs.confirmedTxs[msg.id]
@@ -290,22 +273,17 @@ func TestPendingTxContext_on_confirmed(t *testing.T) {
 		require.True(t, exists)
 		require.Equal(t, msg.id, id)
 
-		// Check it exists in all tx map
-		tx, exists := txs.allTxs[msg.id]
-		require.True(t, exists)
-		require.Equal(t, sig, tx.signatures[0])
-
-		// Check status is Confirmed
-		require.Equal(t, Confirmed, tx.state)
-
 		// Check it does not exist in broadcasted map
-		tx, exists = txs.broadcastedTxs[msg.id]
+		tx, exists := txs.broadcastedTxs[msg.id]
 		require.False(t, exists)
 
 		// Check it exists in confirmed map
 		tx, exists = txs.confirmedTxs[msg.id]
 		require.True(t, exists)
 		require.Equal(t, sig, tx.signatures[0])
+
+		// Check status is Confirmed
+		require.Equal(t, Confirmed, tx.state)
 
 		// Check it does not exist in finalized map
 		tx, exists = txs.finalizedErroredTxs[msg.id]
@@ -381,18 +359,8 @@ func TestPendingTxContext_on_finalized(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
-		// Check it exists in all tx map
-		tx, exists := txs.allTxs[msg.id]
-		require.True(t, exists)
-		require.Len(t, tx.signatures, 2)
-		require.Equal(t, sig1, tx.signatures[0])
-		require.Equal(t, sig2, tx.signatures[1])
-
-		// Check status is Finalized
-		require.Equal(t, Finalized, tx.state)
-
 		// Check it does not exist in broadcasted map
-		tx, exists = txs.broadcastedTxs[msg.id]
+		tx, exists := txs.broadcastedTxs[msg.id]
 		require.False(t, exists)
 
 		// Check it does not exist in confirmed map
@@ -405,6 +373,9 @@ func TestPendingTxContext_on_finalized(t *testing.T) {
 		require.Len(t, tx.signatures, 2)
 		require.Equal(t, sig1, tx.signatures[0])
 		require.Equal(t, sig2, tx.signatures[1])
+
+		// Check status is Finalized
+		require.Equal(t, Finalized, tx.state)
 
 		// Check sigs do no exist in signature map
 		_, exists = txs.sigToID[sig1]
@@ -441,18 +412,8 @@ func TestPendingTxContext_on_finalized(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
-		// Check it exists in all tx map
-		tx, exists := txs.allTxs[msg.id]
-		require.True(t, exists)
-		require.Len(t, tx.signatures, 2)
-		require.Equal(t, sig1, tx.signatures[0])
-		require.Equal(t, sig2, tx.signatures[1])
-
-		// Check status is Finalized
-		require.Equal(t, Finalized, tx.state)
-
 		// Check it does not exist in broadcasted map
-		tx, exists = txs.broadcastedTxs[msg.id]
+		tx, exists := txs.broadcastedTxs[msg.id]
 		require.False(t, exists)
 
 		// Check it does not exist in confirmed map
@@ -465,6 +426,9 @@ func TestPendingTxContext_on_finalized(t *testing.T) {
 		require.Len(t, tx.signatures, 2)
 		require.Equal(t, sig1, tx.signatures[0])
 		require.Equal(t, sig2, tx.signatures[1])
+
+		// Check status is Finalized
+		require.Equal(t, Finalized, tx.state)
 
 		// Check sigs do no exist in signature map
 		_, exists = txs.sigToID[sig1]
@@ -508,16 +472,8 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		id := txs.OnError(sig, 0)
 		require.Equal(t, msg.id, id)
 
-		// Check it exists in all tx map
-		tx, exists := txs.allTxs[msg.id]
-		require.True(t, exists)
-		require.Equal(t, sig, tx.signatures[0])
-
-		// Check status is Finalized
-		require.Equal(t, Errored, tx.state)
-
 		// Check it does not exist in broadcasted map
-		tx, exists = txs.broadcastedTxs[msg.id]
+		tx, exists := txs.broadcastedTxs[msg.id]
 		require.False(t, exists)
 
 		// Check it does not exist in confirmed map
@@ -528,6 +484,9 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		tx, exists = txs.finalizedErroredTxs[msg.id]
 		require.True(t, exists)
 		require.Equal(t, sig, tx.signatures[0])
+
+		// Check status is Finalized
+		require.Equal(t, Errored, tx.state)
 
 		// Check sigs do no exist in signature map
 		_, exists = txs.sigToID[sig]
@@ -551,16 +510,8 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		id = txs.OnError(sig, 0)
 		require.Equal(t, msg.id, id)
 
-		// Check it exists in all tx map
-		tx, exists := txs.allTxs[msg.id]
-		require.True(t, exists)
-		require.Equal(t, sig, tx.signatures[0])
-
-		// Check status is Finalized
-		require.Equal(t, Errored, tx.state)
-
 		// Check it does not exist in broadcasted map
-		tx, exists = txs.broadcastedTxs[msg.id]
+		tx, exists := txs.broadcastedTxs[msg.id]
 		require.False(t, exists)
 
 		// Check it does not exist in confirmed map
@@ -571,6 +522,9 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		tx, exists = txs.finalizedErroredTxs[msg.id]
 		require.True(t, exists)
 		require.Equal(t, sig, tx.signatures[0])
+
+		// Check status is Finalized
+		require.Equal(t, Errored, tx.state)
 
 		// Check sigs do no exist in signature map
 		_, exists = txs.sigToID[sig]
@@ -650,11 +604,8 @@ func TestPendingTxContext_remove(t *testing.T) {
 	// Remove broadcasted transaction
 	id = txs.Remove(broadcastedSig1)
 	require.Equal(t, broadcastedMsg.id, id)
-	// Check removed from all tx map
-	_, exists := txs.allTxs[broadcastedMsg.id]
-	require.False(t, exists)
 	// Check removed from broadcasted map
-	_, exists = txs.broadcastedTxs[broadcastedMsg.id]
+	_, exists := txs.broadcastedTxs[broadcastedMsg.id]
 	require.False(t, exists)
 	// Check all signatures removed from sig map
 	_, exists = txs.sigToID[broadcastedSig1]
@@ -665,9 +616,6 @@ func TestPendingTxContext_remove(t *testing.T) {
 	// Remove processed transaction
 	id = txs.Remove(processedSig)
 	require.Equal(t, processedMsg.id, id)
-	// Check removed from all tx map
-	_, exists = txs.allTxs[processedMsg.id]
-	require.False(t, exists)
 	// Check removed from broadcasted map
 	_, exists = txs.broadcastedTxs[processedMsg.id]
 	require.False(t, exists)
@@ -678,9 +626,6 @@ func TestPendingTxContext_remove(t *testing.T) {
 	// Remove confirmed transaction
 	id = txs.Remove(confirmedSig)
 	require.Equal(t, confirmedMsg.id, id)
-	// Check removed from all tx map
-	_, exists = txs.allTxs[confirmedMsg.id]
-	require.False(t, exists)
 	// Check removed from confirmed map
 	_, exists = txs.confirmedTxs[confirmedMsg.id]
 	require.False(t, exists)
