@@ -196,7 +196,9 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 			block, errGetBlock := c.GetBlock(ctx, s)
 			if errGetBlock != nil || block == nil {
 				// Failed to get block at slot || no block found at slot
-				bhe.lgr.Errorw("BlockHistoryEstimator: failed to get block", "slot", s, "error", errGetBlock)
+				if errGetBlock != nil {
+					bhe.lgr.Errorw("BlockHistoryEstimator: failed to get block", "slot", s, "error", errGetBlock)
+				}
 				return
 			}
 
