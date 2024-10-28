@@ -33,6 +33,10 @@ type blockHistoryEstimator struct {
 // Note: getRecentPrioritizationFees is not used because it provides the lowest prioritization fee for an included tx in the block
 // which is not effective enough for increasing the chances of block inclusion
 func NewBlockHistoryEstimator(c *utils.LazyLoad[client.ReaderWriter], cfg config.Config, lgr logger.Logger) (*blockHistoryEstimator, error) {
+	if cfg.BlockHistorySize() < 1 {
+		return nil, fmt.Errorf("invalid block history depth: %d", cfg.BlockHistorySize())
+	}
+
 	return &blockHistoryEstimator{
 		chStop: make(chan struct{}),
 		client: c,
@@ -100,12 +104,10 @@ func (bhe *blockHistoryEstimator) readRawPrice() uint64 {
 
 func (bhe *blockHistoryEstimator) calculatePrice(ctx context.Context) error {
 	switch {
-	case bhe.cfg.BlockHistorySize() == 1:
-		return bhe.calculatePriceFromLatestBlock(ctx)
 	case bhe.cfg.BlockHistorySize() > 1:
 		return bhe.calculatePriceFromMultipleBlocks(ctx, bhe.cfg.BlockHistorySize())
 	default:
-		return fmt.Errorf("invalid block history depth: %d", bhe.cfg.BlockHistorySize())
+		return bhe.calculatePriceFromLatestBlock(ctx)
 	}
 }
 
