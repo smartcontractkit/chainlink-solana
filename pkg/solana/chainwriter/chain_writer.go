@@ -43,9 +43,98 @@ type MethodConfig struct {
 	DataType           any
 	DecodedTypeName    string
 	ChainSpecificName  string
-	AddressLocations   []string
-	Signers            []solana.AccountMeta
-	Writables          []solana.AccountMeta
+	Accounts           []Account
+	LookupTables       []LookupTable
+}
+
+type Account interface {
+}
+
+type AccountConstant struct {
+	Address    string
+	IsSigner   bool
+	IsWritable bool
+}
+
+type AccountLookup struct {
+	Location   string
+	IsSigner   bool
+	IsWritable bool
+}
+
+type PDALookup struct {
+	PublicKey  solana.PublicKey
+	Seeds      [][]byte
+	IsSigner   bool
+	IsWritable bool
+}
+
+type LookupTable struct {
+	Address        solana.PublicKey
+	Identifier     Account
+	AccountIndices []int
+}
+
+func (s *SolanaChainWriterService) GetAddresses(decoded any, accounts []Account) ([]*solana.AccountMeta, error) {
+	var addresses []*solana.AccountMeta
+	for _, accountConfig := range accounts {
+		switch lookupType := accountConfig.(type) {
+		case AccountConstant:
+			address, err := solana.PublicKeyFromBase58(lookupType.Address)
+			if err != nil {
+				return nil, fmt.Errorf("error getting account from constant: %w", err)
+			}
+			addresses = append(addresses, &solana.AccountMeta{
+				PublicKey:  address,
+				IsSigner:   lookupType.IsSigner,
+				IsWritable: lookupType.IsWritable,
+			})
+		case AccountLookup:
+			derivedAddresses, err := GetAddressAtLocation(decoded, lookupType.Location)
+			if err != nil {
+				return nil, fmt.Errorf("error getting account from lookup: %w", err)
+			}
+			for _, address := range derivedAddresses {
+				addresses = append(addresses, &solana.AccountMeta{
+					PublicKey:  address,
+					IsSigner:   lookupType.IsSigner,
+					IsWritable: lookupType.IsWritable,
+				})
+			}
+		case PDALookup:
+			pda, _, err := solana.FindProgramAddress(lookupType.Seeds, lookupType.PublicKey)
+			if err != nil {
+				return nil, fmt.Errorf("error finding program address: %w", err)
+			}
+			addresses = append(addresses, &solana.AccountMeta{
+				PublicKey:  pda,
+				IsSigner:   lookupType.IsSigner,
+				IsWritable: lookupType.IsWritable,
+			})
+		default:
+			return nil, fmt.Errorf("unsupported account type: %T", lookupType)
+		}
+	}
+	return addresses, nil
+}
+
+func (s *SolanaChainWriterService) GetLookupTables(decoded any, accounts []*solana.AccountMeta, lookupTables []LookupTable) (map[solana.PublicKey]solana.PublicKeySlice, error) {
+	tables := make(map[solana.PublicKey]solana.PublicKeySlice)
+	for _, lookupTable := range lookupTables {
+		if reflect.TypeOf(lookupTable.Identifier) == reflect.TypeOf(LookupTable{}) {
+			return nil, fmt.Errorf("nested lookup tables are not supported")
+		}
+		// ids, err := s.GetAddresses(decoded, []Account{lookupTable.Identifier})
+		// if err != nil {
+		// 	return nil, fmt.Errorf("error getting account from lookup table: %w", err)
+		// }
+		addresses := make(solana.PublicKeySlice, len(lookupTable.AccountIndices))
+		for i, index := range lookupTable.AccountIndices {
+			addresses[i] = accounts[index].PublicKey
+		}
+		tables[lookupTable.Address] = addresses
+	}
+	return tables, nil
 }
 
 func NewSolanaChainWriterService(reader client.Reader, txm txm.Txm, ge fees.Estimator, config ChainWriterConfig) *SolanaChainWriterService {
@@ -81,9 +170,13 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	decoded := reflect.New(reflect.TypeOf(methodConfig.DataType)).Interface()
 	err = cwCodec.Decode(ctx, data, decoded, methodConfig.DecodedTypeName)
 
-	accounts, err := GetAddressesFromDecodedData(decoded, methodConfig.AddressLocations)
+	accounts, err := s.GetAddresses(decoded, methodConfig.Accounts)
 	if err != nil {
 		return fmt.Errorf("error getting addresses from decoded data: %w", err)
+	}
+	lookupTables, err := s.GetLookupTables(decoded, accounts, methodConfig.LookupTables)
+	if err != nil {
+		return fmt.Errorf("error getting lookup tables from decoded data: %w", err)
 	}
 
 	blockhash, err := s.reader.LatestBlockhash(ctx)
@@ -102,6 +195,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		},
 		blockhash.Value.Blockhash,
 		solana.TransactionPayer(feePayer.PublicKey),
+		solana.TransactionAddressTables(lookupTables),
 	)
 	if err != nil {
 		return fmt.Errorf("error creating new transaction: %w", err)
@@ -117,11 +211,6 @@ var (
 	_ services.Service  = &SolanaChainWriterService{}
 	_ types.ChainWriter = &SolanaChainWriterService{}
 )
-
-func getAccounts(contractName string, method string, args any) (accounts []*solana.AccountMeta, feePayer *solana.AccountMeta, err error) {
-	// TO DO: Use on-chain team's helper functions to get the accounts from CCIP related metadata.
-	return nil, nil, nil
-}
 
 // GetTransactionStatus returns the current status of a transaction in the underlying chain's TXM.
 func (s *SolanaChainWriterService) GetTransactionStatus(ctx context.Context, transactionID string) (types.TransactionStatus, error) {
