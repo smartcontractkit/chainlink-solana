@@ -165,10 +165,10 @@ func (n *node[CHAIN_ID, HEAD, RPC]) aliveLoop() {
 				n.declareUnreachable()
 				return
 			}
-			_, latestChainInfo := n.StateAndLatest()
-			if outOfSync, liveNodes := n.isOutOfSyncWithPool(latestChainInfo); outOfSync {
+			if outOfSync, liveNodes := n.isOutOfSyncWithPool(); outOfSync {
 				// note: there must be another live node for us to be out of sync
 				_, highest := n.poolInfoProvider.LatestChainInfo()
+				_, latestChainInfo := n.StateAndLatest()
 				lggr.Errorw("RPC endpoint has fallen behind", "blockNumber", latestChainInfo.BlockNumber, "bestLatestBlockNumber", highest.BlockNumber, "totalDifficulty", latestChainInfo.TotalDifficulty, "nodeState", n.getCachedState())
 				if liveNodes < 2 {
 					lggr.Criticalf("RPC endpoint has fallen behind; %s %s", msgCannotDisable, msgDegradedState)
@@ -357,7 +357,7 @@ const (
 // isOutOfSyncWithPool returns outOfSync true if num or td is more than SyncThresold behind the best node.
 // Always returns outOfSync false for SyncThreshold 0.
 // liveNodes is only included when outOfSync is true.
-func (n *node[CHAIN_ID, HEAD, RPC]) isOutOfSyncWithPool(localState ChainInfo) (outOfSync bool, liveNodes int) {
+func (n *node[CHAIN_ID, HEAD, RPC]) isOutOfSyncWithPool() (outOfSync bool, liveNodes int) {
 	if n.poolInfoProvider == nil {
 		n.lfcLog.Warn("skipping sync state against the pool - should only occur in tests")
 		return // skip for tests
@@ -368,13 +368,14 @@ func (n *node[CHAIN_ID, HEAD, RPC]) isOutOfSyncWithPool(localState ChainInfo) (o
 	}
 	// Check against best node
 	ln, ci := n.poolInfoProvider.LatestChainInfo()
+	_, localChainInfo := n.StateAndLatest()
 	mode := n.nodePoolCfg.SelectionMode()
 	switch mode {
 	case NodeSelectionModeHighestHead, NodeSelectionModeRoundRobin, NodeSelectionModePriorityLevel:
-		return localState.BlockNumber < ci.BlockNumber-int64(threshold), ln
+		return localChainInfo.BlockNumber < ci.BlockNumber-int64(threshold), ln
 	case NodeSelectionModeTotalDifficulty:
 		bigThreshold := big.NewInt(int64(threshold))
-		return localState.TotalDifficulty.Cmp(bigmath.Sub(ci.TotalDifficulty, bigThreshold)) < 0, ln
+		return localChainInfo.TotalDifficulty.Cmp(bigmath.Sub(ci.TotalDifficulty, bigThreshold)) < 0, ln
 	default:
 		panic("unrecognized NodeSelectionMode: " + mode)
 	}
@@ -463,7 +464,7 @@ func (n *node[CHAIN_ID, HEAD, RPC]) outOfSyncLoop(syncIssues syncStatus) {
 
 			// received a new head - clear NoNewHead flag
 			syncIssues &= ^syncStatusNoNewHead
-			if outOfSync, _ := n.isOutOfSyncWithPool(localHighestChainInfo); !outOfSync {
+			if outOfSync, _ := n.isOutOfSyncWithPool(); !outOfSync {
 				// we caught up with the pool - clear NotInSyncWithPool flag
 				syncIssues &= ^syncStatusNotInSyncWithPool
 			} else {
