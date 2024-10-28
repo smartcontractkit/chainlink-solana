@@ -195,21 +195,27 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 			// Fetch the block details
 			block, errGetBlock := c.GetBlock(ctx, s)
 			if errGetBlock != nil || block == nil {
-				// Failed to get block at slot || no block found at slot: skip.
+				// Failed to get block at slot || no block found at slot
+				bhe.lgr.Errorw("BlockHistoryEstimator: failed to get block", "slot", s, "error", errGetBlock)
 				return
 			}
 
 			// Parse the block to extract compute unit prices
 			feeData, errParseBlock := ParseBlock(block)
 			if errParseBlock != nil {
-				// Failed to parse block at slot: skip.
+				bhe.lgr.Errorw("BlockHistoryEstimator: failed to parse block", "slot", s, "error", errParseBlock)
+				return
+			}
+
+			// When no relevant transactions for compute unit price are found in this block, we can skip it.
+			if len(feeData.Prices) == 0 {
 				return
 			}
 
 			// Calculate the median compute unit price for the block
 			blockMedian, errMedian := mathutil.Median(feeData.Prices...)
 			if errMedian != nil {
-				//Failed to calculate median for slot: skip.
+				bhe.lgr.Errorw("BlockHistoryEstimator: failed to calculate median price", "slot", s, "error", errMedian)
 				return
 			}
 
