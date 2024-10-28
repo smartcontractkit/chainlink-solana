@@ -227,8 +227,8 @@ func (txm *Txm) sendWithRetry(ctx context.Context, msg pendingTx) (solanaGo.Tran
 	// send initial tx (do not retry and exit early if fails)
 	sig, initSendErr := client.SendTx(ctx, &initTx)
 	if initSendErr != nil {
-		cancel()                           // cancel context when exiting early
-		txm.txs.OnError(sig, TxFailReject) // increment failed metric
+		cancel()                                                         // cancel context when exiting early
+		txm.txs.OnError(sig, txm.cfg.TxRetentionTimeout(), TxFailReject) // increment failed metric
 		return solanaGo.Transaction{}, "", solanaGo.Signature{}, fmt.Errorf("tx failed initial transmit: %w", initSendErr)
 	}
 
@@ -410,7 +410,7 @@ func (txm *Txm) confirm() {
 
 						// check confirm timeout exceeded
 						if txm.txs.Expired(s[i], txm.cfg.TxConfirmTimeout()) {
-							id := txm.txs.OnError(s[i], TxFailDrop)
+							id := txm.txs.OnError(s[i], txm.cfg.TxRetentionTimeout(), TxFailDrop)
 							txm.lggr.Infow("failed to find transaction within confirm timeout", "id", id, "signature", s[i], "timeoutSeconds", txm.cfg.TxConfirmTimeout())
 						}
 						continue
@@ -418,7 +418,7 @@ func (txm *Txm) confirm() {
 
 					// if signature has an error, end polling
 					if res[i].Err != nil {
-						id := txm.txs.OnError(s[i], TxFailRevert)
+						id := txm.txs.OnError(s[i], txm.cfg.TxRetentionTimeout(), TxFailRevert)
 						txm.lggr.Debugw("tx state: failed",
 							"id", id,
 							"signature", s[i],
@@ -439,7 +439,7 @@ func (txm *Txm) confirm() {
 						}
 						// check confirm timeout exceeded if TxConfirmTimeout set
 						if txm.cfg.TxConfirmTimeout() != 0*time.Second && txm.txs.Expired(s[i], txm.cfg.TxConfirmTimeout()) {
-							id := txm.txs.OnError(s[i], TxFailDrop)
+							id := txm.txs.OnError(s[i], txm.cfg.TxRetentionTimeout(), TxFailDrop)
 							txm.lggr.Debugw("tx failed to move beyond 'processed' within confirm timeout", "id", id, "signature", s[i], "timeoutSeconds", txm.cfg.TxConfirmTimeout())
 						}
 						continue
@@ -455,7 +455,7 @@ func (txm *Txm) confirm() {
 						}
 						// check confirm timeout exceeded if TxConfirmTimeout set
 						if txm.cfg.TxConfirmTimeout() != 0*time.Second && txm.txs.Expired(s[i], txm.cfg.TxConfirmTimeout()) {
-							id := txm.txs.OnError(s[i], TxFailDrop)
+							id := txm.txs.OnError(s[i], txm.cfg.TxRetentionTimeout(), TxFailDrop)
 							txm.lggr.Debugw("tx failed to move beyond 'processed' within confirm timeout", "id", id, "signature", s[i], "timeoutSeconds", txm.cfg.TxConfirmTimeout())
 						}
 						continue
@@ -463,20 +463,11 @@ func (txm *Txm) confirm() {
 
 					// if signature is finalized, end polling
 					if res[i].ConfirmationStatus == rpc.ConfirmationStatusFinalized {
-						id, err := txm.txs.OnFinalized(s[i])
+						id, err := txm.txs.OnFinalized(s[i], txm.cfg.TxRetentionTimeout())
 						if err != nil {
 							txm.lggr.Errorw("failed to update transaction state to finalized", "id", id, "signature", s[i])
 						} else {
 							txm.lggr.Debugw("updated transaction state to finalized", "id", id, "signature", s[i])
-						}
-						// If tx retention is set to 0, immediately drop the transaction once it is considered finalized
-						// Remove after OnFinalized so metrics are properly incremented
-						if txm.cfg.TxRetentionTimeout() == 0 {
-							id := txm.txs.Remove(s[i])
-							if id == "" {
-								txm.lggr.Errorw("failed to remove transaction from storage", "id", id, "signature", s[i])
-							}
-							continue
 						}
 						continue
 					}
@@ -555,7 +546,7 @@ func (txm *Txm) reap() {
 		case <-ctx.Done():
 			return
 		case <-tick:
-			txm.txs.TrimFinalizedErroredTxs(txm.cfg.TxRetentionTimeout())
+			txm.txs.TrimFinalizedErroredTxs()
 		}
 		tick = time.After(utils.WithJitter(TxReapInterval))
 	}
@@ -705,14 +696,14 @@ func (txm *Txm) processSimulationError(id string, sig solanaGo.Signature, res *r
 			txm.lggr.Debugw("simulate: BlockhashNotFound", "id", id, "signature", sig, "result", res)
 		// transaction will encounter execution error/revert, mark as reverted to remove from confirmation + retry
 		case strings.Contains(errStr, "InstructionError"):
-			txm.txs.OnError(sig, TxFailSimRevert) // cancel retry
+			txm.txs.OnError(sig, txm.cfg.TxRetentionTimeout(), TxFailSimRevert) // cancel retry
 			txm.lggr.Debugw("simulate: InstructionError", "id", id, "signature", sig, "result", res)
 		// transaction is already processed in the chain, letting txm confirmation handle
 		case strings.Contains(errStr, "AlreadyProcessed"):
 			txm.lggr.Debugw("simulate: AlreadyProcessed", "id", id, "signature", sig, "result", res)
 		// unrecognized errors (indicates more concerning failures)
 		default:
-			txm.txs.OnError(sig, TxFailSimOther) // cancel retry
+			txm.txs.OnError(sig, txm.cfg.TxRetentionTimeout(), TxFailSimOther) // cancel retry
 			txm.lggr.Errorw("simulate: unrecognized error", "id", id, "signature", sig, "result", res)
 		}
 	}

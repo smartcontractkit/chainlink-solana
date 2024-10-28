@@ -27,13 +27,13 @@ type PendingTxContext interface {
 	// OnConfirmed marks transaction as Confirmed and moves it from broadcast map to confirmed map
 	OnConfirmed(sig solana.Signature) (string, error)
 	// OnFinalized marks transaction as Finalized, moves it from confirmed map to finalized map, removes signatures from signature map to stop confirmation checks
-	OnFinalized(sig solana.Signature) (string, error)
+	OnFinalized(sig solana.Signature, retentionTimeout time.Duration) (string, error)
 	// OnError marks transaction as errored, matches err type using enum, moves it from confirmed map to finalized map, removes signatures from signature map to stop confirmation checks
-	OnError(sig solana.Signature, errType int) string
+	OnError(sig solana.Signature, retentionTimeout time.Duration, errType int) string
 	// GetTxState returns the transaction state for the provided ID if it exists
 	GetTxState(id string) (TxState, error)
 	// TrimFinalizedErroredTxs removes transactions that have reaches their retention time
-	TrimFinalizedErroredTxs(retentionTimeout time.Duration)
+	TrimFinalizedErroredTxs()
 }
 
 type pendingTx struct {
@@ -42,7 +42,7 @@ type pendingTx struct {
 	signatures       []solana.Signature
 	id               string
 	createTs         time.Time
-	finalizedErrorTs time.Time
+	retentionTs time.Time
 	state            TxState
 }
 
@@ -283,7 +283,7 @@ func (c *pendingTxContext) OnConfirmed(sig solana.Signature) (string, error) {
 	return id, nil
 }
 
-func (c *pendingTxContext) OnFinalized(sig solana.Signature) (string, error) {
+func (c *pendingTxContext) OnFinalized(sig solana.Signature, retentionTimeout time.Duration) (string, error) {
 	// check if already cancelled
 	c.lock.RLock()
 	id, sigExists := c.sigToID[sig]
@@ -292,8 +292,9 @@ func (c *pendingTxContext) OnFinalized(sig solana.Signature) (string, error) {
 		return id, errors.New("signature does not exist")
 	}
 	// Allow transactions to transition from broadcasted, processed, or confirmed state in case there are delays between status checks
-	_, broadcastedExists := c.broadcastedTxs[id]
-	_, confirmedExists := c.confirmedTxs[id]
+	var broadcastedExists, confirmedExists bool
+	_, broadcastedExists = c.broadcastedTxs[id]
+	_, confirmedExists = c.confirmedTxs[id]
 	if !broadcastedExists && !confirmedExists {
 		c.lock.RUnlock()
 		return id, errors.New("id does not exist in broadcasted or confirmed map")
@@ -306,11 +307,11 @@ func (c *pendingTxContext) OnFinalized(sig solana.Signature) (string, error) {
 	if _, exists := c.sigToID[sig]; !exists {
 		return id, errors.New("signature does not exist")
 	}
-	var tx pendingTx
-	if tempTx, broadcastedExists := c.broadcastedTxs[id]; broadcastedExists {
+	var tx, tempTx pendingTx
+	if tempTx, broadcastedExists = c.broadcastedTxs[id]; broadcastedExists {
 		tx = tempTx
 	}
-	if tempTx, confirmedExists := c.confirmedTxs[id]; confirmedExists {
+	if tempTx, confirmedExists = c.confirmedTxs[id]; confirmedExists {
 		tx = tempTx
 	}
 	if !broadcastedExists && !confirmedExists {
@@ -322,26 +323,30 @@ func (c *pendingTxContext) OnFinalized(sig solana.Signature) (string, error) {
 		cancel() // cancel context
 		delete(c.cancelBy, id)
 	}
-	// set current timestamp when transitioning to finalized map
-	// later used for transaction retention
-	tx.finalizedErrorTs = time.Now()
-	// update tx state to Finalized
-	tx.state = Finalized
-	// move transaction from confirmed to finalized map
-	c.finalizedErroredTxs[id] = tx
-	if broadcastedExists {
-		delete(c.broadcastedTxs, id)
-	} else if confirmedExists {
-		delete(c.confirmedTxs, id)
-	}
+	// delete from broadcasted map, if exists
+	delete(c.broadcastedTxs, id)
+	// delete from confirmed map, if exists
+	delete(c.confirmedTxs, id)
 	// remove all related signatures from the sigToID map to skip picking up this tx in the confirmation logic
 	for _, s := range tx.signatures {
 		delete(c.sigToID, s)
 	}
+	// if retention duration is set to 0, delete transaction from storage
+	// otherwise, move to finalized map
+	if retentionTimeout == 0 {
+		return id, nil
+	}
+	// set current timestamp when transitioning to finalized map
+	// later used for transaction retention
+	tx.retentionTs = time.Now().Add(retentionTimeout)
+	// update tx state to Finalized
+	tx.state = Finalized
+	// move transaction from confirmed to finalized map
+	c.finalizedErroredTxs[id] = tx
 	return id, nil
 }
 
-func (c *pendingTxContext) OnError(sig solana.Signature, _ int) string {
+func (c *pendingTxContext) OnError(sig solana.Signature, retentionTimeout time.Duration, _ int) string {
 	// check if already cancelled
 	c.lock.RLock()
 	id, sigExists := c.sigToID[sig]
@@ -350,8 +355,9 @@ func (c *pendingTxContext) OnError(sig solana.Signature, _ int) string {
 		return ""
 	}
 	// transaction can transition from any non-finalized state
-	_, broadcastedExists := c.broadcastedTxs[id]
-	_, confirmedExists := c.confirmedTxs[id]
+	var broadcastedExists, confirmedExists bool
+	_, broadcastedExists = c.broadcastedTxs[id]
+	_, confirmedExists = c.confirmedTxs[id]
 	// transcation does not exist in any tx maps
 	if !broadcastedExists && !confirmedExists {
 		c.lock.RUnlock()
@@ -365,11 +371,11 @@ func (c *pendingTxContext) OnError(sig solana.Signature, _ int) string {
 	if _, exists := c.sigToID[sig]; !exists {
 		return ""
 	}
-	var tx pendingTx
-	if tempTx, broadcastedExists := c.broadcastedTxs[id]; broadcastedExists {
+	var tx, tempTx pendingTx
+	if tempTx, broadcastedExists = c.broadcastedTxs[id]; broadcastedExists {
 		tx = tempTx
 	}
-	if tempTx, confirmedExists := c.confirmedTxs[id]; confirmedExists {
+	if tempTx, confirmedExists = c.confirmedTxs[id]; confirmedExists {
 		tx = tempTx
 	}
 	// transcation does not exist in any non-finalized maps
@@ -382,14 +388,6 @@ func (c *pendingTxContext) OnError(sig solana.Signature, _ int) string {
 		cancel() // cancel context
 		delete(c.cancelBy, id)
 	}
-
-	// set current timestamp when transitioning to finalized map
-	// later used for transaction retention
-	tx.finalizedErrorTs = time.Now()
-	// update tx state to Errored
-	tx.state = Errored
-	// move transaction from broadcasted to error map
-	c.finalizedErroredTxs[id] = tx
 	// delete from broadcasted map, if exists
 	delete(c.broadcastedTxs, id)
 	// delete from confirmed map, if exists
@@ -398,6 +396,18 @@ func (c *pendingTxContext) OnError(sig solana.Signature, _ int) string {
 	for _, s := range tx.signatures {
 		delete(c.sigToID, s)
 	}
+	// if retention duration is set to 0, delete transaction from storage
+	// otherwise, move to finalized map
+	if retentionTimeout == 0 {
+		return id
+	}
+	// set current timestamp when transitioning to finalized map
+	// later used for transaction retention
+	tx.retentionTs = time.Now().Add(retentionTimeout)
+	// update tx state to Errored
+	tx.state = Errored
+	// move transaction from broadcasted to error map
+	c.finalizedErroredTxs[id] = tx
 	return id
 }
 
@@ -417,11 +427,11 @@ func (c *pendingTxContext) GetTxState(id string) (TxState, error) {
 }
 
 // TrimFinalizedErroredTxs deletes transactions from the finalized/errored map and the allTxs map after the retention period has passed
-func (c *pendingTxContext) TrimFinalizedErroredTxs(retentionTimeout time.Duration) {
+func (c *pendingTxContext) TrimFinalizedErroredTxs() {
 	c.lock.RLock()
 	var expiredIDs []string
 	for id, tx := range c.finalizedErroredTxs {
-		if time.Since(tx.finalizedErrorTs) > retentionTimeout {
+		if time.Now().After(tx.retentionTs) {
 			expiredIDs = append(expiredIDs, id)
 		}
 	}
@@ -492,15 +502,15 @@ func (c *pendingTxContextWithProm) Expired(sig solana.Signature, lifespan time.D
 }
 
 // Success - tx finalized
-func (c *pendingTxContextWithProm) OnFinalized(sig solana.Signature) (string, error) {
-	id, err := c.pendingTx.OnFinalized(sig) // empty ID indicates already previously removed
-	if id != "" && err == nil {             // increment if tx was not removed
+func (c *pendingTxContextWithProm) OnFinalized(sig solana.Signature, retentionTimeout time.Duration) (string, error) {
+	id, err := c.pendingTx.OnFinalized(sig, retentionTimeout) // empty ID indicates already previously removed
+	if id != "" && err == nil {                               // increment if tx was not removed
 		promSolTxmFinalizedTxs.WithLabelValues(c.chainID).Add(1)
 	}
 	return id, err
 }
 
-func (c *pendingTxContextWithProm) OnError(sig solana.Signature, errType int) string {
+func (c *pendingTxContextWithProm) OnError(sig solana.Signature, retentionTimeout time.Duration, errType int) string {
 	// special RPC rejects transaction (signature will not be valid)
 	if errType == TxFailReject {
 		promSolTxmRejectTxs.WithLabelValues(c.chainID).Add(1)
@@ -508,7 +518,7 @@ func (c *pendingTxContextWithProm) OnError(sig solana.Signature, errType int) st
 		return ""
 	}
 
-	id := c.pendingTx.OnError(sig, errType) // empty ID indicates already removed
+	id := c.pendingTx.OnError(sig, retentionTimeout, errType) // empty ID indicates already removed
 	if id != "" {
 		switch errType {
 		case TxFailRevert:
@@ -538,6 +548,6 @@ func (c *pendingTxContextWithProm) GetTxState(id string) (TxState, error) {
 	return c.pendingTx.GetTxState(id)
 }
 
-func (c *pendingTxContextWithProm) TrimFinalizedErroredTxs(retentionTimeout time.Duration) {
-	c.pendingTx.TrimFinalizedErroredTxs(retentionTimeout)
+func (c *pendingTxContextWithProm) TrimFinalizedErroredTxs() {
+	c.pendingTx.TrimFinalizedErroredTxs()
 }
