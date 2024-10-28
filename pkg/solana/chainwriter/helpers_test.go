@@ -1,6 +1,7 @@
 package chainwriter_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
@@ -50,9 +51,13 @@ func TestHelperLookupFunction(t *testing.T) {
 		"Messages.TokenAmounts.SourceTokenAddress",
 		"Messages.TokenAmounts.DestTokenAddress",
 	}
-
-	derivedAddresses, err := chainwriter.GetAddressesFromDecodedData(exampleDecoded, addressLocations)
-	assert.NoError(t, err)
+	derivedAddresses := make([]solana.PublicKey, 0)
+	for _, location := range addressLocations {
+		addr, err := chainwriter.GetAddressAtLocation(exampleDecoded, location)
+		assert.NoError(t, err)
+		fmt.Println(len(addr))
+		derivedAddresses = append(derivedAddresses, addr...)
+	}
 	assert.Equal(t, 8, len(derivedAddresses))
 
 	// Create a map of the expected addresses for fast lookup
@@ -63,7 +68,7 @@ func TestHelperLookupFunction(t *testing.T) {
 
 	// Verify that each derived address matches an expected address
 	for _, derivedAddr := range derivedAddresses {
-		derivedBytes := derivedAddr.PublicKey.Bytes()
+		derivedBytes := derivedAddr.Bytes()
 		assert.True(t, expectedAddresses[string(derivedBytes)], "Address not found in expected list")
 	}
 }

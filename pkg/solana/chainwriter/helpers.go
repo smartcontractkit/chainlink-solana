@@ -9,30 +9,22 @@ import (
 	"github.com/gagliardetto/solana-go"
 )
 
-// GetAddressesFromDecodedData parses through nested types and arrays to find all address locations.
-func GetAddressesFromDecodedData(decoded any, addressLocations []string) ([]*solana.AccountMeta, error) {
-	var addresses []*solana.AccountMeta
+// GetAddressAtLocation parses through nested types and arrays to find all address locations.
+func GetAddressAtLocation(decoded any, location string) ([]solana.PublicKey, error) {
+	var addresses []solana.PublicKey
 
-	for _, location := range addressLocations {
-		path := strings.Split(location, ".")
+	path := strings.Split(location, ".")
 
-		addressList, err := traversePath(decoded, path)
-		if err != nil {
-			return nil, err
-		}
+	addressList, err := traversePath(decoded, path)
+	if err != nil {
+		return nil, err
+	}
 
-		for _, value := range addressList {
-			if byteArray, ok := value.([]byte); ok {
-				// TODO: How to handle IsSigner and IsWritable?
-				accountMeta := &solana.AccountMeta{
-					PublicKey:  solana.PublicKeyFromBytes(byteArray),
-					IsSigner:   false,
-					IsWritable: true,
-				}
-				addresses = append(addresses, accountMeta)
-			} else {
-				return nil, fmt.Errorf("invalid address format at path: %s", location)
-			}
+	for _, value := range addressList {
+		if byteArray, ok := value.([]byte); ok {
+			addresses = append(addresses, solana.PublicKeyFromBytes(byteArray))
+		} else {
+			return nil, fmt.Errorf("invalid address format at path: %s", location)
 		}
 	}
 
