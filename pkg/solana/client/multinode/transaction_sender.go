@@ -100,8 +100,6 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 		return txSender.newResult(errors.New("TransactionSender not started"))
 	}
 
-	ctx, _ = txSender.chStop.Ctx(ctx)
-
 	healthyNodesNum := 0
 	err := txSender.multiNode.DoAll(ctx, func(ctx context.Context, rpc RPC, isSendOnly bool) {
 		if isSendOnly {
@@ -155,7 +153,7 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 }
 
 func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) broadcastTxAsync(ctx context.Context, rpc RPC, tx TX) RESULT {
-	result := rpc.SendTransaction(ctx, tx)
+	result := rpc.SendTransaction(context.WithoutCancel(ctx), tx) // let rpc handle tx timeouts
 	txSender.lggr.Debugw("Node sent transaction", "tx", tx, "err", result.TxError())
 	if !slices.Contains(sendTxSuccessfulCodes, result.Code()) {
 		txSender.lggr.Warnw("RPC returned error", "tx", tx, "err", result.TxError())
@@ -181,8 +179,8 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) reportSendTxAnomal
 type sendTxResults[RESULT any] map[SendTxReturnCode][]RESULT
 
 func aggregateTxResults[RESULT any](resultsByCode sendTxResults[RESULT]) (result RESULT, criticalErr error) {
-	_, severeErrors, hasSevereErrors := findFirstIn(resultsByCode, sendTxSevereErrors)
-	_, successResults, hasSuccess := findFirstIn(resultsByCode, sendTxSuccessfulCodes)
+	severeErrors, hasSevereErrors := findFirstIn(resultsByCode, sendTxSevereErrors)
+	successResults, hasSuccess := findFirstIn(resultsByCode, sendTxSuccessfulCodes)
 	if hasSuccess {
 		// We assume that primary node would never report false positive txResult for a transaction.
 		// Thus, if such case occurs it's probably due to misconfiguration or a bug and requires manual intervention.
@@ -213,6 +211,8 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) collectTxResults(c
 	if healthyNodesNum == 0 {
 		return txSender.newResult(ErroringNodeError)
 	}
+	ctx, cancel := txSender.chStop.Ctx(ctx)
+	defer cancel()
 	requiredResults := int(math.Ceil(float64(healthyNodesNum) * sendTxQuorum))
 	errorsByCode := sendTxResults[RESULT]{}
 	var softTimeoutChan <-chan time.Time
@@ -263,13 +263,12 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) Close() error {
 }
 
 // findFirstIn - returns the first existing key and value for the slice of keys
-func findFirstIn[K comparable, V any](set map[K]V, keys []K) (K, V, bool) {
+func findFirstIn[K comparable, V any](set map[K]V, keys []K) (V, bool) {
 	for _, k := range keys {
 		if v, ok := set[k]; ok {
-			return k, v, true
+			return v, true
 		}
 	}
-	var zeroK K
 	var zeroV V
-	return zeroK, zeroV, false
+	return zeroV, false
 }
