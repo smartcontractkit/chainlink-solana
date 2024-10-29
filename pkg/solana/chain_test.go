@@ -340,11 +340,11 @@ func TestChain_Transact(t *testing.T) {
 	require.NoError(t, c.txm.Start(ctx))
 
 	require.NoError(t, c.Transact(ctx, sender.PublicKey().String(), receiver.PublicKey().String(), amount, true))
-	tests.AssertLogEventually(t, logs, "tx state: confirmed")
+	tests.AssertLogEventually(t, logs, "marking transaction as confirmed")
 	tests.AssertLogEventually(t, logs, "stopped tx retry")
 	require.NoError(t, c.txm.Close())
 
-	filteredLogs := logs.FilterMessage("tx state: confirmed").All()
+	filteredLogs := logs.FilterMessage("marking transaction as confirmed").All()
 	require.Len(t, filteredLogs, 1)
 	sig, ok := filteredLogs[0].ContextMap()["signature"]
 	require.True(t, ok)

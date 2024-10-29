@@ -433,9 +433,9 @@ func (txm *Txm) confirm() {
 						// update transaction state in local memory
 						id, err := txm.txs.OnProcessed(s[i])
 						if err != nil {
-							txm.lggr.Errorw("failed to update transaction state to processed", "signature", s[i])
+							txm.lggr.Errorw("failed to mark transaction as processed", "signature", s[i])
 						} else {
-							txm.lggr.Debugw("updated transaction state to processed", "id", id, "signature", s[i])
+							txm.lggr.Debugw("marking transaction as processed", "id", id, "signature", s[i])
 						}
 						// check confirm timeout exceeded if TxConfirmTimeout set
 						if txm.cfg.TxConfirmTimeout() != 0*time.Second && txm.txs.Expired(s[i], txm.cfg.TxConfirmTimeout()) {
@@ -449,9 +449,9 @@ func (txm *Txm) confirm() {
 					if res[i].ConfirmationStatus == rpc.ConfirmationStatusConfirmed {
 						id, err := txm.txs.OnConfirmed(s[i])
 						if err != nil {
-							txm.lggr.Errorw("failed to update transaction state to confirmed", "id", id, "signature", s[i])
+							txm.lggr.Errorw("failed to mark transaction as confirmed", "id", id, "signature", s[i])
 						} else {
-							txm.lggr.Debugw("updated transaction state to confirmed", "id", id, "signature", s[i])
+							txm.lggr.Debugw("marking transaction as confirmed", "id", id, "signature", s[i])
 						}
 						// check confirm timeout exceeded if TxConfirmTimeout set
 						if txm.cfg.TxConfirmTimeout() != 0*time.Second && txm.txs.Expired(s[i], txm.cfg.TxConfirmTimeout()) {
@@ -465,9 +465,9 @@ func (txm *Txm) confirm() {
 					if res[i].ConfirmationStatus == rpc.ConfirmationStatusFinalized {
 						id, err := txm.txs.OnFinalized(s[i], txm.cfg.TxRetentionTimeout())
 						if err != nil {
-							txm.lggr.Errorw("failed to update transaction state to finalized", "id", id, "signature", s[i])
+							txm.lggr.Errorw("failed to mark transaction as finalized", "id", id, "signature", s[i])
 						} else {
-							txm.lggr.Debugw("updated transaction state to finalized", "id", id, "signature", s[i])
+							txm.lggr.Debugw("marking transaction as finalized", "id", id, "signature", s[i])
 						}
 						continue
 					}
