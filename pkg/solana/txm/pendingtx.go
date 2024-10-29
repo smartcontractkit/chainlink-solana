@@ -219,9 +219,15 @@ func (c *pendingTxContext) OnProcessed(sig solana.Signature) (string, error) {
 		return id, errors.New("signature does not exist")
 	}
 	// Transactions should only move to processed from broadcasted
-	if _, exists := c.broadcastedTxs[id]; !exists {
+	tx, exists := c.broadcastedTxs[id]
+	if !exists {
 		c.lock.RUnlock()
 		return id, errors.New("id does not exist in broadcasted map")
+	}
+	// Check if tranasction already in processed state
+	if tx.state == Processed {
+		c.lock.RUnlock()
+		return id, nil
 	}
 	c.lock.RUnlock()
 
@@ -235,7 +241,7 @@ func (c *pendingTxContext) OnProcessed(sig solana.Signature) (string, error) {
 	if _, exists := c.broadcastedTxs[id]; !exists {
 		return id, errors.New("id does not exist in brooadcasted map")
 	}
-	tx := c.broadcastedTxs[id]
+	tx = c.broadcastedTxs[id]
 	// update tx state to Processed
 	tx.state = Processed
 	// save updated tx back to the broadcasted map
@@ -250,6 +256,11 @@ func (c *pendingTxContext) OnConfirmed(sig solana.Signature) (string, error) {
 	if !sigExists {
 		c.lock.RUnlock()
 		return id, errors.New("signature does not exist")
+	}
+	// Check if transaction already in confirmed state
+	if tx, exists := c.confirmedTxs[id]; exists && tx.state == Confirmed {
+		c.lock.RUnlock()
+		return id, nil
 	}
 	// Transactions should only move to confirmed from broadcasted/processed
 	if _, exists := c.broadcastedTxs[id]; !exists {

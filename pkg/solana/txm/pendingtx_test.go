@@ -246,6 +246,25 @@ func TestPendingTxContext_on_broadcasted_processed(t *testing.T) {
 		_, err = txs.OnProcessed(sig)
 		require.Error(t, err)
 	})
+
+	t.Run("no-op if transaction already in processed state", func(t *testing.T) {
+		sig := randomSignature(t)
+
+		// Create new transaction
+		msg := pendingTx{id: uuid.NewString()}
+		err := txs.New(msg, sig, cancel)
+		require.NoError(t, err)
+
+		// Transition to processed state
+		id, err := txs.OnProcessed(sig)
+		require.NoError(t, err)
+		require.Equal(t, msg.id, id)
+
+		// No error if OnProcessed called again
+		id, err = txs.OnProcessed(sig)
+		require.NoError(t, err)
+		require.Equal(t, msg.id, id)
+	})
 }
 
 func TestPendingTxContext_on_confirmed(t *testing.T) {
@@ -338,6 +357,30 @@ func TestPendingTxContext_on_confirmed(t *testing.T) {
 		// Transition back to confirmed state
 		_, err = txs.OnConfirmed(sig)
 		require.Error(t, err)
+	})
+
+	t.Run("no-op if transaction already in confirmed state", func(t *testing.T) {
+		sig := randomSignature(t)
+
+		// Create new transaction
+		msg := pendingTx{id: uuid.NewString()}
+		err := txs.New(msg, sig, cancel)
+		require.NoError(t, err)
+
+		// Transition to processed state
+		id, err := txs.OnProcessed(sig)
+		require.NoError(t, err)
+		require.Equal(t, msg.id, id)
+
+		// Transition to confirmed state
+		id, err = txs.OnConfirmed(sig)
+		require.NoError(t, err)
+		require.Equal(t, msg.id, id)
+
+		// No error if OnConfirmed called again
+		id, err = txs.OnConfirmed(sig)
+		require.NoError(t, err)
+		require.Equal(t, msg.id, id)
 	})
 }
 
