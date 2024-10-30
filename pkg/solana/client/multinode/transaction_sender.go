@@ -157,9 +157,9 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 
 func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) broadcastTxAsync(ctx context.Context, rpc RPC, tx TX) RESULT {
 	result := rpc.SendTransaction(ctx, tx)
-	txSender.lggr.Debugw("Node sent transaction", "tx", tx, "err", result.TxError(), "elapsedTimeSeconds")
+	txSender.lggr.Debugw("Node sent transaction", "tx", tx, "err", result.TxError())
 	if !slices.Contains(sendTxSuccessfulCodes, result.Code()) {
-		txSender.lggr.Warnw("RPC returned error", "tx", tx, "err", result.TxError(), "elapsedTimeSeconds")
+		txSender.lggr.Warnw("RPC returned error", "tx", tx, "err", result.TxError())
 	}
 	return result
 }
