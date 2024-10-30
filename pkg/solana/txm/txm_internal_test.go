@@ -681,6 +681,14 @@ func TestTxm_Enqueue(t *testing.T) {
 	mc := mocks.NewReaderWriter(t)
 	mc.On("SendTx", mock.Anything, mock.Anything).Return(solana.Signature{}, nil).Maybe()
 	mc.On("SimulateTx", mock.Anything, mock.Anything, mock.Anything).Return(&rpc.SimulateTransactionResult{}, nil).Maybe()
+	mc.On("SignatureStatuses", mock.Anything, mock.AnythingOfType("[]solana.Signature")).Return(
+		func(_ context.Context, sigs []solana.Signature) (out []*rpc.SignatureStatusesResult) {
+			for i := 0; i < len(sigs); i++ {
+				out = append(out, &rpc.SignatureStatusesResult{})
+			}
+			return out
+		}, nil,
+	).Maybe()
 	ctx := tests.Context(t)
 
 	// mock solana keystore
