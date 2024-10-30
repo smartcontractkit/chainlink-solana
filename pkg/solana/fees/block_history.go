@@ -179,7 +179,7 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 	semaphore := make(chan struct{}, 10)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	allPrices := make([]ComputeUnitPrice, 0, desiredBlockCount)
+	blockMedians := make([]ComputeUnitPrice, 0, desiredBlockCount)
 
 	// Iterate over the confirmed slots in reverse order to fetch most recent blocks first
 	// Iterate until we run out of slots
@@ -224,34 +224,34 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 			// Append the median compute unit price if we haven't reached our desiredBlockCount
 			mu.Lock()
 			defer mu.Unlock()
-			if uint64(len(allPrices)) < desiredBlockCount {
-				allPrices = append(allPrices, blockMedian)
+			if uint64(len(blockMedians)) < desiredBlockCount {
+				blockMedians = append(blockMedians, blockMedian)
 			}
 		}(slot)
 	}
 
 	wg.Wait()
 
-	if len(allPrices) == 0 {
+	if len(blockMedians) == 0 {
 		return fmt.Errorf("no compute unit prices collected")
 	}
 
-	// Calculate the median of all collected compute unit prices
-	medianPrice, err := mathutil.Median(allPrices...)
+	// Calculate avg from medians of the blocks.
+	avgOfMedians, err := mathutil.Avg(blockMedians...)
 	if err != nil {
-		return fmt.Errorf("failed to calculate median price: %w", err)
+		return fmt.Errorf("failed to calculate price from avg of medians: %w", err)
 	}
 
-	// Update the current price to the median of the last desiredBlockCount
+	// Update the current price to the calculated average (avg of medians of the last desiredBlockCount)
 	bhe.lock.Lock()
-	bhe.price = uint64(medianPrice)
+	bhe.price = uint64(avgOfMedians)
 	bhe.lock.Unlock()
 
 	bhe.lgr.Debugw("BlockHistoryEstimator: updated",
-		"computeUnitPriceMedian", medianPrice,
+		"computeUnitPriceMedian", avgOfMedians,
 		"latestSlot", currentSlot,
-		"numBlocks", len(allPrices),
-		"pricesCollected", allPrices,
+		"numBlocks", len(blockMedians),
+		"pricesCollected", blockMedians,
 	)
 
 	return nil
