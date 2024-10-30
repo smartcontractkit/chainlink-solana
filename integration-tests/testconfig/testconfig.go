@@ -280,11 +280,17 @@ func (c *TestConfig) GetNodeConfigTOML() (string, error) {
 		})
 	}
 
+	chainCfg := solcfg.Chain{
+		TxTimeout: config.MustNewDuration(2 * time.Minute),
+	}
+	chainCfg.SetDefaults()
+
 	solConfig := solcfg.TOMLConfig{
 		Enabled:   ptr.Ptr(true),
 		ChainID:   ptr.Ptr(chainID),
 		Nodes:     nodes,
 		MultiNode: mnConfig,
+		Chain:     chainCfg,
 	}
 	baseConfig := node.NewBaseConfig()
 	baseConfig.Solana = solcfg.TOMLConfigs{
