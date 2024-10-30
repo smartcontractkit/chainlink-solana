@@ -92,6 +92,7 @@ type TransactionSender[TX any, RESULT SendTxResult, CHAIN_ID ID, RPC SendTxRPCCl
 // * If there is both success and terminal error - returns success and reports invariant violation
 // * Otherwise, returns any (effectively random) of the errors.
 func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ctx context.Context, tx TX) RESULT {
+	elapsed := time.Now()
 	txResults := make(chan RESULT)
 	txResultsToReport := make(chan RESULT)
 	primaryNodeWg := sync.WaitGroup{}
@@ -149,6 +150,7 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 	txSender.wg.Add(1)
 	go txSender.reportSendTxAnomalies(tx, txResultsToReport)
 
+	txSender.lggr.Debugw("Collecting Tx Results", "elapsedTimeSeconds", time.Since(elapsed).Seconds())
 	return txSender.collectTxResults(ctx, tx, healthyNodesNum, txResults)
 }
 
