@@ -44,6 +44,25 @@ type RegistryTokenState struct {
 	PoolAssociatedTokenAccount [32]byte `json:"pool_associated_token_account"`
 }
 
+inputParams := []{
+	generatedReports,
+	rs,
+	vs,
+	..
+}
+
+inputParams := []{
+	merketRoots,
+	generatedReports,
+	rs,
+	vs,
+	..
+}
+
+CW.SubmitTransaction(address, "router", "executeReport", inputParams, ...)
+
+SubmitReport([]report, ...)
+
 func TestGetAddresses(t *testing.T) {
 	registryAddress := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6A"
 	routerProgramAddress := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6B"
@@ -64,10 +83,10 @@ func TestGetAddresses(t *testing.T) {
 		DataType:           reflect.TypeOf(ExecutionReportSingleChain{}),
 		DecodedTypeName:    "ExecutionReportSingleChain",
 		ChainSpecificName:  "execute",
-		DerivedLookupTables: []chainwriter.DerivedLookupTable{
+		LookupTables: []chainwriter.LookupTable{
 			{
 				Name: "RegistryTokenState",
-				Identifier: chainwriter.PDALookup{
+				Accounts: chainwriter.PDALookups{
 					Name: "RegistryTokenState",
 					PublicKey: chainwriter.AccountConstant{
 						Address:    registryAddress,
@@ -80,43 +99,17 @@ func TestGetAddresses(t *testing.T) {
 					},
 					IsSigner:   false,
 					IsWritable: false,
-				},
-				EncodedTypeIDL: registryTokenStateIDL,
-				Locations: []chainwriter.AccountLookup{
-					{
-						Name:       "PoolProgram",
-						Location:   "PoolProgram",
-						IsSigner:   false,
-						IsWritable: false,
-					},
-					{
-						Name:       "PoolConfig",
-						Location:   "PoolConfig",
-						IsSigner:   false,
-						IsWritable: false,
-					},
-					{
-						Name:       "TokenProgram",
-						Location:   "TokenProgram",
-						IsSigner:   false,
-						IsWritable: false,
-					},
-					{
-						Name:       "TokenState",
-						Location:   "TokenState",
-						IsSigner:   false,
-						IsWritable: false,
-					},
-					{
-						Name:       "PoolAssociatedTokenAccount",
-						Location:   "PoolAssociatedTokenAccount",
-						IsSigner:   false,
-						IsWritable: false,
-					},
-				},
+				} --> ["a", "b", "c"] each being a PDA account for a token which are address lookup table accounts,
 			},
 		},
 		Accounts: []chainwriter.Lookup{
+			// Account constant
+			// Account Lookup - Based on data from input parameters
+			// Lookup Table content - Get all the accounts from a lookup table
+			// PDA Account Lookup - Based on another account and a seed/s
+			// Nested PDA Account with seeds from:
+				// input paramters
+				// constant
 			chainwriter.PDALookup{
 				Name: "PerChainRateLimit",
 				PublicKey: chainwriter.AccountConstant{
@@ -131,13 +124,37 @@ func TestGetAddresses(t *testing.T) {
 				IsSigner:   false,
 				IsWritable: false,
 			},
+			{
+				Name: "RegistryTokenState",
+					Accounts: chainwriter.PDALookups{
+						Name: "RegistryTokenState",
+						PublicKey: chainwriter.AccountConstant{
+							Address:    registryAddress,
+							IsSigner:   false,
+							IsWritable: false,
+						},
+						AddressSeeds: nil,
+						ValueSeeds: []chainwriter.ValueLookup{
+							{Location: "Message.TokenAmounts.DestTokenAddress"},
+						},
+						IsSigner:   false,
+						IsWritable: false,
+					},
+			} 
+			// Lookup Table content - Get all the accounts from a lookup table
+			chainWriter.AccountsFromLookupTable: { // Just include all the accounts within the RegistryTokenState lookup table.
+				LookupTablesName: "RegistryTokenState",
+				IncludeIndexes: [1,4] // WE DON"T NEED THIS RIGHT NOW
+			},
+			// Account Lookup - Based on data from input parameters
 			chainwriter.AccountLookup{
 				Name:       "TokenAccount",
 				Location:   "Message.TokenAmounts.DestTokenAddress",
 				IsSigner:   false,
 				IsWritable: false,
 			},
-			chainwriter.PDALookup{
+			// PDA Account Lookup -
+			chainwriter.PDALookups{
 				Name: "ReceiverAssociatedTokenAccount",
 				PublicKey: chainwriter.AccountLookup{
 					Name:       "TokenAccount",
@@ -174,6 +191,7 @@ func TestGetAddresses(t *testing.T) {
 				IsSigner:   false,
 				IsWritable: false,
 			},
+			// Account constant
 			chainwriter.AccountConstant{
 				Name:       "RouterProgram",
 				Address:    routerProgramAddress,
