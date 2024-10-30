@@ -100,8 +100,11 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 		return txSender.newResult(errors.New("TransactionSender not started"))
 	}
 
+	txSenderCtx, cancel := txSender.chStop.NewCtx()
+	defer cancel()
+
 	healthyNodesNum := 0
-	err := txSender.multiNode.DoAll(context.WithoutCancel(ctx), func(ctx context.Context, rpc RPC, isSendOnly bool) {
+	err := txSender.multiNode.DoAll(txSenderCtx, func(ctx context.Context, rpc RPC, isSendOnly bool) {
 		if isSendOnly {
 			txSender.wg.Add(1)
 			go func() {
@@ -149,7 +152,7 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 	txSender.wg.Add(1)
 	go txSender.reportSendTxAnomalies(tx, txResultsToReport)
 
-	return txSender.collectTxResults(context.WithoutCancel(ctx), tx, healthyNodesNum, txResults)
+	return txSender.collectTxResults(ctx, tx, healthyNodesNum, txResults)
 }
 
 func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) broadcastTxAsync(ctx context.Context, rpc RPC, tx TX) RESULT {
