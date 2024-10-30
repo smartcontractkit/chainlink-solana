@@ -100,11 +100,8 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 		return txSender.newResult(errors.New("TransactionSender not started"))
 	}
 
-	txSenderCtx, cancel := txSender.chStop.NewCtx()
-	defer cancel()
-
 	healthyNodesNum := 0
-	err := txSender.multiNode.DoAll(txSenderCtx, func(ctx context.Context, rpc RPC, isSendOnly bool) {
+	err := txSender.multiNode.DoAll(context.WithoutCancel(ctx), func(ctx context.Context, rpc RPC, isSendOnly bool) {
 		if isSendOnly {
 			txSender.wg.Add(1)
 			go func() {
@@ -158,9 +155,9 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) broadcastTxAsync(ctx context.Context, rpc RPC, tx TX) RESULT {
 	elapsedTime := time.Now()
 	result := rpc.SendTransaction(ctx, tx)
-	txSender.lggr.Debugw("Node sent transaction", "tx", tx, "err", result.TxError(), "elapsedTime", time.Since(elapsedTime))
+	txSender.lggr.Debugw("Node sent transaction", "tx", tx, "err", result.TxError(), "elapsedTimeSeconds", time.Since(elapsedTime).Seconds())
 	if !slices.Contains(sendTxSuccessfulCodes, result.Code()) {
-		txSender.lggr.Warnw("RPC returned error", "tx", tx, "err", result.TxError(), "elapsedTime", time.Since(elapsedTime))
+		txSender.lggr.Warnw("RPC returned error", "tx", tx, "err", result.TxError(), "elapsedTimeSeconds", time.Since(elapsedTime).Seconds())
 	}
 	return result
 }
