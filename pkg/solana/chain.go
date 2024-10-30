@@ -292,6 +292,8 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 
 		// Send tx using MultiNode transaction sender
 		sendTx = func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error) {
+			// TODO: For testing
+			ch.lggr.Debug("TxTimeoutSeconds: ", cfg.TxTimeout().Seconds())
 			result := ch.txSender.SendTransaction(ctx, tx)
 			if result == nil {
 				return solanago.Signature{}, errors.New("tx sender returned nil result")
