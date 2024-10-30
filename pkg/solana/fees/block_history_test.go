@@ -196,6 +196,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		require.NoError(t, err, "Failed to parse block at slot %d", slot)
 		require.NotEmpty(t, feeData.Prices, "No compute unit prices found in block at slot %d", slot)
 		medianPrice, err := mathutil.Median(feeData.Prices...)
+		require.NoError(t, err, "Failed to calculate median price for block at slot %d", slot)
 		testPrices = append(testPrices, medianPrice)
 	}
 	testSlotsResult := rpc.BlocksResult(testSlots)
