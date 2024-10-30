@@ -156,11 +156,10 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 }
 
 func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) broadcastTxAsync(ctx context.Context, rpc RPC, tx TX) RESULT {
-	elapsedTime := time.Now()
 	result := rpc.SendTransaction(ctx, tx)
-	txSender.lggr.Debugw("Node sent transaction", "tx", tx, "err", result.TxError(), "elapsedTimeSeconds", time.Since(elapsedTime).Seconds())
+	txSender.lggr.Debugw("Node sent transaction", "tx", tx, "err", result.TxError(), "elapsedTimeSeconds")
 	if !slices.Contains(sendTxSuccessfulCodes, result.Code()) {
-		txSender.lggr.Warnw("RPC returned error", "tx", tx, "err", result.TxError(), "elapsedTimeSeconds", time.Since(elapsedTime).Seconds())
+		txSender.lggr.Warnw("RPC returned error", "tx", tx, "err", result.TxError(), "elapsedTimeSeconds")
 	}
 	return result
 }
@@ -219,12 +218,11 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) collectTxResults(c
 	errorsByCode := sendTxResults[RESULT]{}
 	var softTimeoutChan <-chan time.Time
 	var resultsCount int
-	elapsedTime := time.Now()
 loop:
 	for {
 		select {
 		case <-ctx.Done():
-			txSender.lggr.Debugw("Failed to collect of the results before context was done", "tx", tx, "errorsByCode", errorsByCode, "elapsedTimeSeconds", time.Since(elapsedTime).Seconds())
+			txSender.lggr.Debugw("Failed to collect of the results before context was done", "tx", tx, "errorsByCode", errorsByCode)
 			return txSender.newResult(ctx.Err())
 		case r := <-txResults:
 			errorsByCode[r.Code()] = append(errorsByCode[r.Code()], r)
