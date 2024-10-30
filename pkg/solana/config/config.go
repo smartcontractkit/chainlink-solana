@@ -54,9 +54,9 @@ type Config interface {
 	ComputeUnitPriceDefault() uint64
 	FeeBumpPeriod() time.Duration
 	BlockHistoryPollPeriod() time.Duration
-	BlockHistorySize() uint64
 	ComputeUnitLimitDefault() uint32
 	EstimateComputeUnitLimit() bool
+	BlockHistorySize() uint64
 }
 
 type Chain struct {
@@ -76,9 +76,9 @@ type Chain struct {
 	ComputeUnitPriceDefault  *uint64
 	FeeBumpPeriod            *config.Duration
 	BlockHistoryPollPeriod   *config.Duration
-	BlockHistorySize         *uint64
 	ComputeUnitLimitDefault  *uint32
 	EstimateComputeUnitLimit *bool
+	BlockHistorySize         *uint64
 }
 
 func (c *Chain) SetDefaults() {
@@ -130,14 +130,14 @@ func (c *Chain) SetDefaults() {
 	if c.BlockHistoryPollPeriod == nil {
 		c.BlockHistoryPollPeriod = defaultConfigSet.BlockHistoryPollPeriod
 	}
-	if c.BlockHistorySize == nil {
-		c.BlockHistorySize = defaultConfigSet.BlockHistorySize
-	}
 	if c.ComputeUnitLimitDefault == nil {
 		c.ComputeUnitLimitDefault = defaultConfigSet.ComputeUnitLimitDefault
 	}
 	if c.EstimateComputeUnitLimit == nil {
 		c.EstimateComputeUnitLimit = defaultConfigSet.EstimateComputeUnitLimit
+	}
+	if c.BlockHistorySize == nil {
+		c.BlockHistorySize = defaultConfigSet.BlockHistorySize
 	}
 }
 
