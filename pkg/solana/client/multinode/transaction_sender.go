@@ -151,6 +151,12 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 	go txSender.reportSendTxAnomalies(tx, txResultsToReport)
 
 	txSender.lggr.Debugw("Collecting Tx Results", "elapsedTimeSeconds", time.Since(elapsed).Seconds())
+	select {
+	case <-ctx.Done():
+		txSender.lggr.Errorw("ctx cancelled before collect results", "elapsedTimeSeconds", time.Since(elapsed).Seconds())
+	default:
+		break
+	}
 	return txSender.collectTxResults(ctx, tx, healthyNodesNum, txResults)
 }
 
