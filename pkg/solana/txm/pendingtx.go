@@ -11,6 +11,8 @@ import (
 	"golang.org/x/exp/maps"
 )
 
+var ErrAlreadyInExpectedState = errors.New("transaction already in expected state")
+
 type PendingTxContext interface {
 	// New adds a new tranasction in Broadcasted state to the storage
 	New(msg pendingTx, sig solana.Signature, cancel context.CancelFunc) error
@@ -197,6 +199,10 @@ func (c *pendingTxContext) ListAll() []solana.Signature {
 func (c *pendingTxContext) Expired(sig solana.Signature, confirmationTimeout time.Duration) bool {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
+	// confirmationTimeout set to 0 disables the expiration check
+	if confirmationTimeout == 0 {
+		return false
+	}
 	id, exists := c.sigToID[sig]
 	if !exists {
 		return false // return expired = false if timestamp does not exist (likely cleaned up by something else previously)
@@ -227,7 +233,7 @@ func (c *pendingTxContext) OnProcessed(sig solana.Signature) (string, error) {
 	// Check if tranasction already in processed state
 	if tx.state == Processed {
 		c.lock.RUnlock()
-		return id, nil
+		return id, ErrAlreadyInExpectedState
 	}
 	c.lock.RUnlock()
 
@@ -260,7 +266,7 @@ func (c *pendingTxContext) OnConfirmed(sig solana.Signature) (string, error) {
 	// Check if transaction already in confirmed state
 	if tx, exists := c.confirmedTxs[id]; exists && tx.state == Confirmed {
 		c.lock.RUnlock()
-		return id, nil
+		return id, ErrAlreadyInExpectedState
 	}
 	// Transactions should only move to confirmed from broadcasted/processed
 	if _, exists := c.broadcastedTxs[id]; !exists {

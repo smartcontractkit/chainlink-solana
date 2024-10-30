@@ -232,10 +232,6 @@ func (txm *Txm) sendWithRetry(ctx context.Context, msg pendingTx) (solanaGo.Tran
 		return solanaGo.Transaction{}, "", solanaGo.Signature{}, fmt.Errorf("tx failed initial transmit: %w", initSendErr)
 	}
 
-	// Generate unique ID if one is not provided
-	if msg.id == "" {
-		msg.id = uuid.New().String()
-	}
 	// store tx signature + cancel function
 	initStoreErr := txm.txs.New(msg, sig, cancel)
 	if initStoreErr != nil {
@@ -432,9 +428,9 @@ func (txm *Txm) confirm() {
 					if res[i].ConfirmationStatus == rpc.ConfirmationStatusProcessed {
 						// update transaction state in local memory
 						id, err := txm.txs.OnProcessed(s[i])
-						if err != nil {
+						if err != nil && !errors.Is(err, ErrAlreadyInExpectedState) {
 							txm.lggr.Errorw("failed to mark transaction as processed", "signature", s[i])
-						} else {
+						} else if err == nil {
 							txm.lggr.Debugw("marking transaction as processed", "id", id, "signature", s[i])
 						}
 						// check confirm timeout exceeded if TxConfirmTimeout set
@@ -448,9 +444,9 @@ func (txm *Txm) confirm() {
 					// if signature is confirmed, end polling
 					if res[i].ConfirmationStatus == rpc.ConfirmationStatusConfirmed {
 						id, err := txm.txs.OnConfirmed(s[i])
-						if err != nil {
+						if err != nil && !errors.Is(err, ErrAlreadyInExpectedState) {
 							txm.lggr.Errorw("failed to mark transaction as confirmed", "id", id, "signature", s[i])
-						} else {
+						} else if err == nil {
 							txm.lggr.Debugw("marking transaction as confirmed", "id", id, "signature", s[i])
 						}
 						// check confirm timeout exceeded if TxConfirmTimeout set
@@ -553,7 +549,7 @@ func (txm *Txm) reap() {
 }
 
 // Enqueue enqueues a msg destined for the solana chain.
-func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Transaction, txCfgs ...SetTxConfig) error {
+func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Transaction, txID *string, txCfgs ...SetTxConfig) error {
 	if err := txm.Ready(); err != nil {
 		return fmt.Errorf("error in soltxm.Enqueue: %w", err)
 	}
@@ -592,9 +588,15 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 		}
 	}
 
+	// Use transaction ID provided by caller if set
+	id := uuid.New().String()
+	if txID != nil && *txID != "" {
+		id = *txID
+	}
 	msg := pendingTx{
 		tx:  *tx,
 		cfg: cfg,
+		id:  id,
 	}
 
 	select {

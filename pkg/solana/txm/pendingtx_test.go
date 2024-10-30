@@ -247,7 +247,7 @@ func TestPendingTxContext_on_broadcasted_processed(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("no-op if transaction already in processed state", func(t *testing.T) {
+	t.Run("predefined error if transaction already in processed state", func(t *testing.T) {
 		sig := randomSignature(t)
 
 		// Create new transaction
@@ -262,7 +262,7 @@ func TestPendingTxContext_on_broadcasted_processed(t *testing.T) {
 
 		// No error if OnProcessed called again
 		id, err = txs.OnProcessed(sig)
-		require.NoError(t, err)
+		require.ErrorIs(t, err, ErrAlreadyInExpectedState)
 		require.Equal(t, msg.id, id)
 	})
 }
@@ -359,7 +359,7 @@ func TestPendingTxContext_on_confirmed(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("no-op if transaction already in confirmed state", func(t *testing.T) {
+	t.Run("predefined error if transaction already in confirmed state", func(t *testing.T) {
 		sig := randomSignature(t)
 
 		// Create new transaction
@@ -379,7 +379,7 @@ func TestPendingTxContext_on_confirmed(t *testing.T) {
 
 		// No error if OnConfirmed called again
 		id, err = txs.OnConfirmed(sig)
-		require.NoError(t, err)
+		require.ErrorIs(t, err, ErrAlreadyInExpectedState)
 		require.Equal(t, msg.id, id)
 	})
 }
@@ -814,7 +814,15 @@ func TestPendingTxContext_expired(t *testing.T) {
 	err := txs.New(msg, sig, cancel)
 	assert.NoError(t, err)
 
-	assert.True(t, txs.Expired(sig, 0*time.Second))   // expired for 0s lifetime
+	msg, exists := txs.broadcastedTxs[msg.id]
+	require.True(t, exists)
+
+	// Set createTs to 10 seconds ago
+	msg.createTs = time.Now().Add(-10 * time.Second)
+	txs.broadcastedTxs[msg.id] = msg
+
+	assert.False(t, txs.Expired(sig, 0*time.Second))  // false if timeout 0
+	assert.True(t, txs.Expired(sig, 5*time.Second))   // expired for 5s lifetime
 	assert.False(t, txs.Expired(sig, 60*time.Second)) // not expired for 60s lifetime
 
 	assert.Equal(t, msg.id, txs.Remove(sig))
