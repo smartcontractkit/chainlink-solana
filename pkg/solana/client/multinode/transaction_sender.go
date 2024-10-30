@@ -101,7 +101,7 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 	}
 
 	healthyNodesNum := 0
-	err := txSender.multiNode.DoAll(ctx, func(ctx context.Context, rpc RPC, isSendOnly bool) {
+	err := txSender.multiNode.DoAll(context.WithoutCancel(ctx), func(ctx context.Context, rpc RPC, isSendOnly bool) {
 		if isSendOnly {
 			txSender.wg.Add(1)
 			go func() {
@@ -211,8 +211,6 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) collectTxResults(c
 	if healthyNodesNum == 0 {
 		return txSender.newResult(ErroringNodeError)
 	}
-	ctx, cancel := txSender.chStop.Ctx(ctx)
-	defer cancel()
 	requiredResults := int(math.Ceil(float64(healthyNodesNum) * sendTxQuorum))
 	errorsByCode := sendTxResults[RESULT]{}
 	var softTimeoutChan <-chan time.Time
