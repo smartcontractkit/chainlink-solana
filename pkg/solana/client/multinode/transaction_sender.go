@@ -92,7 +92,6 @@ type TransactionSender[TX any, RESULT SendTxResult, CHAIN_ID ID, RPC SendTxRPCCl
 // * If there is both success and terminal error - returns success and reports invariant violation
 // * Otherwise, returns any (effectively random) of the errors.
 func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ctx context.Context, tx TX) RESULT {
-	elapsed := time.Now()
 	txResults := make(chan RESULT)
 	txResultsToReport := make(chan RESULT)
 	primaryNodeWg := sync.WaitGroup{}
@@ -150,14 +149,7 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 	txSender.wg.Add(1)
 	go txSender.reportSendTxAnomalies(tx, txResultsToReport)
 
-	txSender.lggr.Debugw("Collecting Tx Results", "elapsedTimeSeconds", time.Since(elapsed).Seconds())
-	select {
-	case <-ctx.Done():
-		txSender.lggr.Errorw("ctx cancelled before collect results", "elapsedTimeSeconds", time.Since(elapsed).Seconds())
-	default:
-		break
-	}
-	return txSender.collectTxResults(ctx, tx, healthyNodesNum, txResults)
+	return txSender.collectTxResults(context.WithoutCancel(ctx), tx, healthyNodesNum, txResults)
 }
 
 func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) broadcastTxAsync(ctx context.Context, rpc RPC, tx TX) RESULT {
@@ -224,11 +216,12 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) collectTxResults(c
 	errorsByCode := sendTxResults[RESULT]{}
 	var softTimeoutChan <-chan time.Time
 	var resultsCount int
+	elapsedTime := time.Now()
 loop:
 	for {
 		select {
 		case <-ctx.Done():
-			txSender.lggr.Debugw("Failed to collect of the results before context was done", "tx", tx, "errorsByCode", errorsByCode)
+			txSender.lggr.Debugw("Failed to collect of the results before context was done", "tx", tx, "errorsByCode", errorsByCode, "elapsedTimeSeconds", time.Since(elapsedTime).Seconds())
 			return txSender.newResult(ctx.Err())
 		case r := <-txResults:
 			errorsByCode[r.Code()] = append(errorsByCode[r.Code()], r)
