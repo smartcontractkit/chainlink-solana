@@ -2,6 +2,8 @@
 
 NODE_VERSION=18
 
+cd ../smoke || exit
+
 echo "Switching to required Node.js version $NODE_VERSION..."
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
