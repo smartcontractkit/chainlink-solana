@@ -135,7 +135,7 @@ func TestBlockHistoryEstimator_LatestBlock(t *testing.T) {
 		assert.Equal(t, uint64(100), estimator.BaseComputeUnitPrice(), "Price should not change when parsing fails")
 	})
 
-	t.Run("Failed to Calculate Median", func(t *testing.T) {
+	t.Run("no compute unit prices collected", func(t *testing.T) {
 		// Setup
 		rw := clientmock.NewReaderWriter(t)
 		rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
@@ -147,7 +147,7 @@ func TestBlockHistoryEstimator_LatestBlock(t *testing.T) {
 		estimator := initializeEstimator(tests.Context(t), t, rwLoader, cfg, logger.Test(t))
 
 		// Ensure the price remains unchanged
-		require.Error(t, estimator.calculatePrice(tests.Context(t)), "Expected error when median calculation fails")
+		require.EqualError(t, estimator.calculatePrice(tests.Context(t)), errNoComputeUnitPriceCollected.Error(), "Expected error when no compute unit prices are collected")
 		cfg.On("ComputeUnitPriceMax").Return(max)
 		assert.Equal(t, uint64(100), estimator.BaseComputeUnitPrice(), "Price should not change when median calculation fails")
 	})
@@ -339,7 +339,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		estimator := initializeEstimator(tests.Context(t), t, rwLoader, cfg, logger.Test(t))
 
 		// Price should remain unchanged
-		require.Error(t, estimator.calculatePrice(tests.Context(t)), "Expected error when no compute unit prices are collected")
+		require.EqualError(t, estimator.calculatePrice(tests.Context(t)), errNoComputeUnitPriceCollected.Error(), "Expected error when no compute unit prices are collected")
 		cfg.On("ComputeUnitPriceMax").Return(max)
 		assert.Equal(t, defaultPrice, estimator.BaseComputeUnitPrice())
 	})

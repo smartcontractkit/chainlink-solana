@@ -16,6 +16,8 @@ import (
 
 var _ Estimator = &blockHistoryEstimator{}
 
+var errNoComputeUnitPriceCollected = fmt.Errorf("no compute unit prices collected")
+
 type blockHistoryEstimator struct {
 	starter services.StateMachine
 	chStop  services.StopChan
@@ -130,6 +132,10 @@ func (bhe *blockHistoryEstimator) calculatePriceFromLatestBlock(ctx context.Cont
 		return fmt.Errorf("failed to parse block: %w", err)
 	}
 
+	if len(feeData.Prices) == 0 {
+		return errNoComputeUnitPriceCollected
+	}
+
 	// take median of returned fee values
 	v, err := mathutil.Median(feeData.Prices...)
 	if err != nil {
@@ -194,11 +200,13 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 
 			// Fetch the block details
 			block, errGetBlock := c.GetBlock(ctx, s)
-			if errGetBlock != nil || block == nil {
-				// Failed to get block at slot || no block found at slot
-				if errGetBlock != nil {
-					bhe.lgr.Errorw("BlockHistoryEstimator: failed to get block", "slot", s, "error", errGetBlock)
-				}
+			if errGetBlock != nil {
+				bhe.lgr.Errorw("BlockHistoryEstimator: failed to get block at slot", "slot", s, "error", errGetBlock)
+				return
+			}
+
+			// No block found at slot. Not logging since not all slots may have a block.
+			if block == nil {
 				return
 			}
 
@@ -210,6 +218,7 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 			}
 
 			// When no relevant transactions for compute unit price are found in this block, we can skip it.
+			// No need to log this as an error. It is expected behavior.
 			if len(feeData.Prices) == 0 {
 				return
 			}
@@ -233,7 +242,7 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 	wg.Wait()
 
 	if len(blockMedians) == 0 {
-		return fmt.Errorf("no compute unit prices collected")
+		return errNoComputeUnitPriceCollected
 	}
 
 	// Calculate avg from medians of the blocks.
