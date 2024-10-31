@@ -246,7 +246,7 @@ func (txm *Txm) sendWithRetry(ctx context.Context, msg pendingTx) (solanaGo.Tran
 		return solanaGo.Transaction{}, "", solanaGo.Signature{}, fmt.Errorf("failed to save initial signature in signature list: %w", initSetErr)
 	}
 
-	txm.lggr.Debugw("tx initial broadcast", "id", msg.id,  "fee", getFee(0), "signature", sig)
+	txm.lggr.Debugw("tx initial broadcast", "id", msg.id, "fee", getFee(0), "signature", sig)
 
 	txm.done.Add(1)
 	// retry with exponential backoff
