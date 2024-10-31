@@ -246,7 +246,7 @@ func (txm *Txm) sendWithRetry(ctx context.Context, msg pendingTx) (solanaGo.Tran
 		return solanaGo.Transaction{}, "", solanaGo.Signature{}, fmt.Errorf("failed to save initial signature in signature list: %w", initSetErr)
 	}
 
-	txm.lggr.Debugw("tx initial broadcast", "id", msg.id, "signature", sig)
+	txm.lggr.Debugw("tx initial broadcast", "id", msg.id,  "fee", getFee(0), "signature", sig)
 
 	txm.done.Add(1)
 	// retry with exponential backoff
@@ -448,11 +448,6 @@ func (txm *Txm) confirm() {
 							txm.lggr.Errorw("failed to mark transaction as confirmed", "id", id, "signature", s[i])
 						} else if err == nil {
 							txm.lggr.Debugw("marking transaction as confirmed", "id", id, "signature", s[i])
-						}
-						// check confirm timeout exceeded if TxConfirmTimeout set
-						if txm.cfg.TxConfirmTimeout() != 0*time.Second && txm.txs.Expired(s[i], txm.cfg.TxConfirmTimeout()) {
-							id := txm.txs.OnError(s[i], txm.cfg.TxRetentionTimeout(), TxFailDrop)
-							txm.lggr.Debugw("tx failed to move beyond 'processed' within confirm timeout", "id", id, "signature", s[i], "timeoutSeconds", txm.cfg.TxConfirmTimeout())
 						}
 						continue
 					}
