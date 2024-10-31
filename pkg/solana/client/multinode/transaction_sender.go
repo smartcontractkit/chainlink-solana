@@ -101,7 +101,13 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 	}
 
 	txSenderCtx, cancel := txSender.chStop.NewCtx()
-	defer cancel()
+	reportWg := sync.WaitGroup{}
+	defer func() {
+		go func() {
+			reportWg.Wait()
+			cancel()
+		}()
+	}()
 
 	healthyNodesNum := 0
 	err := txSender.multiNode.DoAll(txSenderCtx, func(ctx context.Context, rpc RPC, isSendOnly bool) {
@@ -150,7 +156,11 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 	}
 
 	txSender.wg.Add(1)
-	go txSender.reportSendTxAnomalies(tx, txResultsToReport)
+	reportWg.Add(1)
+	go func() {
+		txSender.reportSendTxAnomalies(tx, txResultsToReport)
+		reportWg.Done()
+	}()
 
 	return txSender.collectTxResults(ctx, tx, healthyNodesNum, txResults)
 }
