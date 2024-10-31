@@ -354,14 +354,6 @@ func (r *SendTxResult) Signature() solana.Signature {
 }
 
 func (m *MultiNodeClient) SendTransaction(ctx context.Context, tx *solana.Transaction) *SendTxResult {
-	// TODO: Debugging check if ctx is already cancelled
-	select {
-	case <-ctx.Done():
-		// TODO: This context would be from the TxSenderCtx and not sendTx()
-		m.log.Errorf("SendTransaction: context already cancelled")
-	default:
-		break
-	}
 	var sendTxResult = &SendTxResult{}
 	sendTxResult.sig, sendTxResult.txErr = m.SendTx(ctx, tx)
 	sendTxResult.code = ClassifySendError(tx, sendTxResult.txErr)

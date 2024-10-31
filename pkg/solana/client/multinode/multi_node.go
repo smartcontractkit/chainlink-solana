@@ -97,15 +97,12 @@ func (c *MultiNode[CHAIN_ID, RPC]) DoAll(ctx context.Context, do func(ctx contex
 		for _, n := range c.primaryNodes {
 			select {
 			case <-ctx.Done():
-				c.lggr.Errorw("DoAll: Context done on primary node", "err", ctx.Err())
 				err = ctx.Err()
 				return
 			default:
 				if n.State() != NodeStateAlive {
-					c.lggr.Warnw("DoAll: Node is not alive", "node", n.Name())
 					continue
 				}
-				c.lggr.Debugw("DoAll: Calling do on primary node", "node", n.Name())
 				do(ctx, n.RPC(), false)
 				callsCompleted++
 			}
@@ -117,7 +114,6 @@ func (c *MultiNode[CHAIN_ID, RPC]) DoAll(ctx context.Context, do func(ctx contex
 		for _, n := range c.sendOnlyNodes {
 			select {
 			case <-ctx.Done():
-				c.lggr.Errorw("DoAll: Context done on send only node", "err", ctx.Err())
 				err = ctx.Err()
 				return
 			default:
