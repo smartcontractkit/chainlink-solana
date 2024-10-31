@@ -92,6 +92,7 @@ type TransactionSender[TX any, RESULT SendTxResult, CHAIN_ID ID, RPC SendTxRPCCl
 // * If there is both success and terminal error - returns success and reports invariant violation
 // * Otherwise, returns any (effectively random) of the errors.
 func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ctx context.Context, tx TX) RESULT {
+	startTime := time.Now()
 	txResults := make(chan RESULT)
 	txResultsToReport := make(chan RESULT)
 	primaryNodeWg := sync.WaitGroup{}
@@ -146,13 +147,14 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 	}()
 
 	if err != nil {
+		txSender.lggr.Errorw("Failed to broadcast transaction", "tx", tx, "err", err)
 		return txSender.newResult(err)
 	}
 
 	txSender.wg.Add(1)
 	go txSender.reportSendTxAnomalies(tx, txResultsToReport)
 
-	return txSender.collectTxResults(ctx, tx, healthyNodesNum, txResults)
+	return txSender.collectTxResults(ctx, tx, healthyNodesNum, txResults, startTime)
 }
 
 func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) broadcastTxAsync(ctx context.Context, rpc RPC, tx TX) RESULT {
@@ -210,7 +212,7 @@ func aggregateTxResults[RESULT any](resultsByCode sendTxResults[RESULT]) (result
 	return result, criticalErr
 }
 
-func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) collectTxResults(ctx context.Context, tx TX, healthyNodesNum int, txResults <-chan RESULT) RESULT {
+func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) collectTxResults(ctx context.Context, tx TX, healthyNodesNum int, txResults <-chan RESULT, startTime time.Time) RESULT {
 	if healthyNodesNum == 0 {
 		return txSender.newResult(ErroringNodeError)
 	}
@@ -222,7 +224,7 @@ loop:
 	for {
 		select {
 		case <-ctx.Done():
-			txSender.lggr.Debugw("Failed to collect of the results before context was done", "tx", tx, "errorsByCode", errorsByCode)
+			txSender.lggr.Debugw("Failed to collect of the results before context was done", "tx", tx, "errorsByCode", errorsByCode, "elapsedTime", time.Since(startTime).Seconds())
 			return txSender.newResult(ctx.Err())
 		case r := <-txResults:
 			errorsByCode[r.Code()] = append(errorsByCode[r.Code()], r)

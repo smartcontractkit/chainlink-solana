@@ -242,6 +242,11 @@ func (c *Client) SendTx(ctx context.Context, tx *solana.Transaction) (solana.Sig
 	done := c.latency("send_tx")
 	defer done()
 
+	elapsedTime := time.Now()
+	defer func() {
+		c.log.Debugw("Client SendTx() elapsed time", "time", time.Since(elapsedTime).Seconds())
+	}()
+	c.log.Debugw("Client SendTx()", "timeout", c.txTimeout)
 	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
 	defer cancel()
 

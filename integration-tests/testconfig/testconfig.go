@@ -267,7 +267,8 @@ func (c *TestConfig) GetNodeConfigTOML() (string, error) {
 
 	mnConfig := solcfg.MultiNodeConfig{
 		MultiNode: solcfg.MultiNode{
-			Enabled: ptr.Ptr(true),
+			Enabled:       ptr.Ptr(true),
+			SyncThreshold: ptr.Ptr(uint32(170)),
 		},
 	}
 	mnConfig.SetDefaults()
@@ -283,6 +284,7 @@ func (c *TestConfig) GetNodeConfigTOML() (string, error) {
 	chainCfg := solcfg.Chain{
 		// Increase timeout for TransactionSender
 		TxTimeout: config.MustNewDuration(2 * time.Minute),
+		// TODO: Increase TxRetryTimeout?
 	}
 	chainCfg.SetDefaults()
 
