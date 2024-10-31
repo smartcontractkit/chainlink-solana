@@ -153,7 +153,6 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 	}()
 
 	if err != nil {
-		txSender.lggr.Errorw("Failed to broadcast transaction", "tx", tx, "err", err)
 		return txSender.newResult(err)
 	}
 
