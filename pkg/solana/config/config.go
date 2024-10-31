@@ -23,7 +23,7 @@ var defaultConfigSet = Chain{
 	MaxRetries:          ptr(int64(0)), // max number of retries (default = 0). when config.MaxRetries < 0), interpreted as MaxRetries = nil and rpc node will do a reasonable number of retries
 
 	// fee estimator
-	FeeEstimatorMode:         ptr("fixed"),
+	FeeEstimatorMode:         ptr("blockhistory"),
 	ComputeUnitPriceMax:      ptr(uint64(1_000)),
 	ComputeUnitPriceMin:      ptr(uint64(0)),
 	ComputeUnitPriceDefault:  ptr(uint64(0)),
@@ -31,7 +31,7 @@ var defaultConfigSet = Chain{
 	BlockHistoryPollPeriod:   config.MustNewDuration(5 * time.Second),
 	ComputeUnitLimitDefault:  ptr(uint32(200_000)), // set to 0 to disable adding compute unit limit
 	EstimateComputeUnitLimit: ptr(false),           // set to false to disable compute unit limit estimation
-	BlockHistorySize:         ptr(uint64(1)),       // 1: LatestBlockEstimator; >1: MultipleBlocksEstimator where n is number of blocks.
+	BlockHistorySize:         ptr(uint64(15)),      // 1: LatestBlockEstimator; >1: MultipleBlocksEstimator where n is number of blocks.
 }
 
 //go:generate mockery --name Config --output ./mocks/ --case=underscore --filename config.go
