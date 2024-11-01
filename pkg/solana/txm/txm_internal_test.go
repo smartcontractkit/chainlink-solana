@@ -135,6 +135,7 @@ func TestTxm(t *testing.T) {
 				return mc, nil
 			}, cfg, mkey, lggr)
 			require.NoError(t, txm.Start(ctx))
+			t.Cleanup(func () { require.NoError(t, txm.Close())})
 
 			// tracking prom metrics
 			prom := soltxmProm{id: id}
@@ -775,6 +776,7 @@ func TestTxm_disabled_confirm_timeout_with_retention(t *testing.T) {
 		return mc, nil
 	}, cfg, mkey, lggr)
 	require.NoError(t, txm.Start(ctx))
+	t.Cleanup(func () { require.NoError(t, txm.Close())})
 
 	// tracking prom metrics
 	prom := soltxmProm{id: id}
@@ -843,10 +845,18 @@ func TestTxm_disabled_confirm_timeout_with_retention(t *testing.T) {
 	prom.finalized++
 	prom.assertEqual(t)
 
-	// check if transaction still stored by checking its status
+	// check transaction status which should still be stored
 	status, err := txm.GetTransactionStatus(ctx, testTxID)
 	require.NoError(t, err)
 	require.Equal(t, types.Finalized, status)
+
+	// Sleep until retention period has passed for transaction and for another reap cycle to run
+	time.Sleep(10 *time.Second)
+
+	// check if transaction has been purged from memory
+	status, err = txm.GetTransactionStatus(ctx, testTxID)
+	require.Error(t, err)
+	require.Equal(t, types.Unknown, status)
 }
 
 func TestTxm_compute_unit_limit_estimation(t *testing.T) {
@@ -877,6 +887,7 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 		return mc, nil
 	}, cfg, mkey, lggr)
 	require.NoError(t, txm.Start(ctx))
+	t.Cleanup(func () { require.NoError(t, txm.Close())})
 
 	// tracking prom metrics
 	prom := soltxmProm{id: id}

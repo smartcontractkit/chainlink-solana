@@ -424,7 +424,7 @@ func (txm *Txm) confirm() {
 						continue
 					}
 
-					// if signature is processed, keep polling
+					// if signature is processed, keep polling for confirmed or finalized status
 					if res[i].ConfirmationStatus == rpc.ConfirmationStatusProcessed {
 						// update transaction state in local memory
 						id, err := txm.txs.OnProcessed(s[i])
@@ -441,7 +441,7 @@ func (txm *Txm) confirm() {
 						continue
 					}
 
-					// if signature is confirmed, end polling
+					// if signature is confirmed, keep polling for finalized status
 					if res[i].ConfirmationStatus == rpc.ConfirmationStatusConfirmed {
 						id, err := txm.txs.OnConfirmed(s[i])
 						if err != nil && !errors.Is(err, ErrAlreadyInExpectedState) {
