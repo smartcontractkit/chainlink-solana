@@ -235,7 +235,7 @@ func (txm *Txm) sendWithRetry(ctx context.Context, baseTx solanaGo.Transaction, 
 		cancel() // cancel context when exiting early
 		return solanaGo.Transaction{}, uuid.Nil, solanaGo.Signature{}, fmt.Errorf("failed to save tx signature (%s) to inflight txs: %w", sig, initStoreErr)
 	}
-
+	//
 	// used for tracking rebroadcasting only in SendWithRetry
 	var sigs signatureList
 	sigs.Allocate()
