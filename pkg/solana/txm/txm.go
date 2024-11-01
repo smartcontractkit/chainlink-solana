@@ -170,10 +170,9 @@ func (txm *Txm) sendWithRetry(ctx context.Context, baseTx solanaGo.Transaction, 
 
 	// base compute unit price should only be calculated once
 	// prevent underlying base changing when bumping (could occur with RPC based estimation)
-	baseFee := txm.fee.BaseComputeUnitPrice()
 	getFee := func(count int) fees.ComputeUnitPrice {
 		fee := fees.CalculateFee(
-			baseFee,
+			txcfg.BaseComputeUnitPrice,
 			txcfg.ComputeUnitPriceMax,
 			txcfg.ComputeUnitPriceMin,
 			uint(count), //nolint:gosec // reasonable number of bumps should never cause overflow
