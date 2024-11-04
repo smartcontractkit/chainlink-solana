@@ -68,6 +68,8 @@ func TestGetAddresses(t *testing.T) {
 			},
 		},
 		EncodedTypeIDL:    executionReportSingleChainIDL,
+		// Location in the args where the object to decode is located.
+		DecodeLocation:    "Report",
 		DataType:          reflect.TypeOf(ExecutionReportSingleChain{}),
 		DecodedTypeName:   "ExecutionReportSingleChain",
 		ChainSpecificName: "execute",
