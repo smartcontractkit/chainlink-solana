@@ -39,6 +39,7 @@ type ProgramConfig struct {
 }
 
 type MethodConfig struct {
+	FromAddress        string
 	InputModifications commoncodec.ModifiersConfig
 	EncodedTypeIDL     string
 	DecodeLocation     string
@@ -428,15 +429,22 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	if err != nil {
 		return fmt.Errorf("error unmarshalling IDL: %w", err)
 	}
+	// create codec from configured method IDL
 	cwCodec, err := codec.NewIDLAccountCodec(idl, binary.LittleEndian())
 	if err != nil {
 		return fmt.Errorf("error creating new IDLAccountCodec: %w", err)
 	}
+	// get inner encoded data from the encoded args
+	encoded, err := GetValueAtLocation(data, methodConfig.DecodeLocation)
+	if err != nil {
+		return fmt.Errorf("error getting value at location: %w", err)
+	}
 
 	// Create an instance of the type defined by methodConfig.DataType
 	decoded := reflect.New(methodConfig.DataType).Interface()
-	err = cwCodec.Decode(ctx, data, decoded, methodConfig.DecodedTypeName)
+	err = cwCodec.Decode(ctx, encoded[0], decoded, methodConfig.DecodedTypeName)
 
+	// Configure debug ID
 	debugID := ""
 	if methodConfig.DebugIDLocation != "" {
 		debugID, err = GetDebugIDAtLocation(decoded, methodConfig.DebugIDLocation)
@@ -444,20 +452,20 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 			return errorWithDebugID(fmt.Errorf("error getting debug ID from decoded data: %w", err), debugID)
 		}
 	}
-	derivedTableAccounts, lookupTableAddresses, derivedTableMap, err := s.getDerivedTableMap(ctx, methodConfig.DerivedLookupTables, debugID)
+
+	// Read lookup tables from on-chain
+	lookupTableAddresses, derivedTableMap, err := s.getDerivedTableMap(ctx, methodConfig.DerivedLookupTables, debugID)
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error getting readable table map: %w", err), debugID)
 	}
+
+	// Lookup configured account addresses from decoded data
 	accounts, err := s.GetAddresses(ctx, decoded, methodConfig.Accounts, derivedTableMap, debugID)
-	accounts = append(accounts, derivedTableAccounts...)
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error getting addresses from decoded data: %w", err), debugID)
 	}
-	lookupTables, err := s.GetLookupTables(ctx, append(methodConfig.LookupTables, lookupTableAddresses...), debugID)
-	if err != nil {
-		return errorWithDebugID(fmt.Errorf("error getting lookup tables from decoded data: %w", err), debugID)
-	}
 
+	// get current latest blockhash, this can be overwritten by the TXM
 	blockhash, err := s.reader.LatestBlockhash(ctx)
 
 	programId, err := solana.PublicKeyFromBase58(contractName)
@@ -465,17 +473,26 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("Error getting programId: %w", err), debugID)
 	}
 
-	// This isn't a real method, TBD how we will get this
-	feePayer := accounts[0]
+	// Re-encode payload, apply modifiers and borsh-encode
+	encodedPayload, err := cwCodec.Encode(ctx, decoded, methodConfig.DecodedTypeName)
+	if err != nil {
+		return errorWithDebugID(fmt.Errorf("error encoding data: %w", err), debugID)
+	}
+
+	feePayer, err := solana.PublicKeyFromBase58(methodConfig.FromAddress)
+	if err != nil {
+		return errorWithDebugID(fmt.Errorf("error getting fee payer: %w", err), debugID)
+	}
 
 	tx, err := solana.NewTransaction(
 		[]solana.Instruction{
-			solana.NewInstruction(programId, accounts, data),
+			solana.NewInstruction(programId, accounts, encodedPayload),
 		},
 		blockhash.Value.Blockhash,
-		solana.TransactionPayer(feePayer.PublicKey),
-		solana.TransactionAddressTables(lookupTables),
+		solana.TransactionPayer(feePayer),
+		solana.TransactionAddressTables(lookupTableAddresses),
 	)
+
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error creating new transaction: %w", err), debugID)
 	}
