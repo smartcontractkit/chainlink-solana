@@ -7,35 +7,9 @@ import (
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
+
+	ccipocr3 "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
-
-type ExecutionReportSingleChain struct {
-	SourceChainSelector uint64                `json:"source_chain_selector"`
-	Message             Any2SolanaRampMessage `json:"message"`
-	Root                [32]byte              `json:"root"`
-	Proofs              [][]byte              `json:"proofs"`
-}
-
-type Any2SolanaRampMessage struct {
-	Header    RampMessageHeader `json:"header"`
-	Sender    []byte            `json:"sender"`
-	Data      []byte            `json:"data"`
-	Receiver  [32]byte          `json:"receiver"`
-	ExtraArgs SolanaExtraArgs   `json:"extra_args"`
-}
-
-type RampMessageHeader struct {
-	MessageID           [32]byte `json:"message_id"`
-	SourceChainSelector uint64   `json:"source_chain_selector"`
-	DestChainSelector   uint64   `json:"dest_chain_selector"`
-	SequenceNumber      uint64   `json:"sequence_number"`
-	Nonce               uint64   `json:"nonce"`
-}
-
-type SolanaExtraArgs struct {
-	ComputeUnits             uint32 `json:"compute_units"`
-	AllowOutOfOrderExecution bool   `json:"allow_out_of_order_execution"`
-}
 
 type RegistryTokenState struct {
 	PoolProgram                [32]byte `json:"pool_program"`
@@ -56,22 +30,24 @@ func TestGetAddresses(t *testing.T) {
 	sysvarProgramAddress := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6G"
 	commonAddressesLookupTable := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6H"
 	routerLookupTable := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6I"
+	userAddress := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6J"
 
 	executionReportSingleChainIDL := `{"name":"ExecutionReportSingleChain","type":{"kind":"struct","fields":[{"name":"source_chain_selector","type":"u64"},{"name":"message","type":{"defined":"Any2SolanaRampMessage"}},{"name":"root","type":{"array":["u8",32]}},{"name":"proofs","type":{"vec":{"array":["u8",32]}}}]}},{"name":"Any2SolanaRampMessage","type":{"kind":"struct","fields":[{"name":"header","type":{"defined":"RampMessageHeader"}},{"name":"sender","type":{"vec":"u8"}},{"name":"data","type":{"vec":"u8"}},{"name":"receiver","type":{"array":["u8",32]}},{"name":"extra_args","type":{"defined":"SolanaExtraArgs"}}]}},{"name":"RampMessageHeader","type":{"kind":"struct","fields":[{"name":"message_id","type":{"array":["u8",32]}},{"name":"source_chain_selector","type":"u64"},{"name":"dest_chain_selector","type":"u64"},{"name":"sequence_number","type":"u64"},{"name":"nonce","type":"u64"}]}},{"name":"SolanaExtraArgs","type":{"kind":"struct","fields":[{"name":"compute_units","type":"u32"},{"name":"allow_out_of_order_execution","type":"bool"}]}}`
-	// registryTokenStateIDL := `{"name":"RegistryTokenState","type":"struct","fields":[{"name":"pool_program","type":{"array":[{"type":"u8"},32]}},{"name":"pool_config","type":{"array":[{"type":"u8"},32]}},{"name":"token_program","type":{"array":[{"type":"u8"},32]}},{"name":"token_state","type":{"array":[{"type":"u8"},32]}},{"name":"pool_associated_token_account","type":{"array":[{"type":"u8"},32]}}]}`
+	commitInputIDL := `{"name":"CommitInput","type":{"kind":"struct","fields":[{"name":"price_updates","type":{"defined":"PriceUpdates"}},{"name":"merkle_root","type":{"defined":"MerkleRoot"}}]}},{"name":"PriceUpdates","type":{"kind":"struct","fields":[{"name":"token_price_updates","type":{"vec":{"defined":"TokenPriceUpdate"}}},{"name":"gas_price_updates","type":{"vec":{"defined":"GasPriceUpdate"}}}]}},{"name":"TokenPriceUpdate","type":{"kind":"struct","fields":[{"name":"source_token","type":"publicKey"},{"name":"usd_per_token","type":{"array":["u8",28]}}]}},{"name":"GasPriceUpdate","type":{"kind":"struct","fields":[{"name":"dest_chain_selector","type":"u64"},{"name":"usd_per_unit_gas","type":{"array":["u8",28]}}]}},{"name":"MerkleRoot","type":{"kind":"struct","fields":[{"name":"source_chain_selector","type":"u64"},{"name":"on_ramp_address","type":{"vec":"u8"}},{"name":"min_seq_nr","type":"u64"},{"name":"max_seq_nr","type":"u64"},{"name":"merkle_root","type":{"array":["u8",32]}}]}}`
 
 	executeConfig := chainwriter.MethodConfig{
+		FromAddress: userAddress,
 		InputModifications: commoncodec.ModifiersConfig{
 			// remove merkle root since it isn't a part of the on-chain type
 			&commoncodec.DropModifierConfig{
 				Fields: []string{"Message.ExtraArgs.MerkleRoot"},
 			},
 		},
-		EncodedTypeIDL:    executionReportSingleChainIDL,
+		EncodedTypeIDL: executionReportSingleChainIDL,
 		// Location in the args where the object to decode is located.
 		DecodeLocation:    "Report",
-		DataType:          reflect.TypeOf(ExecutionReportSingleChain{}),
-		DecodedTypeName:   "ExecutionReportSingleChain",
+		DataType:          reflect.TypeOf(ccipocr3.ExecutePluginReportSingleChain{}),
+		DecodedTypeName:   "ExecutePluginReportSingleChain",
 		ChainSpecificName: "execute",
 		// LookupTables are on-chain stores of accounts. They can be used in two ways:
 		// 1. As a way to store a list of accounts that are all associated together (i.e. Token State registry)
@@ -145,7 +121,7 @@ func TestGetAddresses(t *testing.T) {
 			// Lookup Table content - Get the accounts from the derived lookup table above
 			chainwriter.AccountsFromLookupTable{
 				LookupTablesName: "RegistryTokenState",
-				IncludeIndexes:   []int{1, 4}, // If left empty, all addresses will be included.
+				IncludeIndexes:   []int{}, // If left empty, all addresses will be included. Otherwise, only the specified indexes will be included.
 			},
 			// Account Lookup - Based on data from input parameters
 			// In this case, the user wants to add the destination token addresses to the transaction.
@@ -283,11 +259,78 @@ func TestGetAddresses(t *testing.T) {
 		DebugIDLocation: "Message.MessageID",
 	}
 
+	commitConfig := chainwriter.MethodConfig{
+		FromAddress:        userAddress,
+		InputModifications: nil,
+		EncodedTypeIDL:     commitInputIDL,
+		DecodeLocation:     "Report",
+		DataType:           reflect.TypeOf(ccipocr3.CommitPluginReport{}),
+		DecodedTypeName:    "CommitPluginReport",
+		ChainSpecificName:  "commit",
+		LookupTables: chainwriter.LookupTables{
+			StaticLookupTables: []string{
+				commonAddressesLookupTable,
+				routerLookupTable,
+			},
+		},
+		Accounts: []chainwriter.Lookup{
+
+			// PDA lookup to get the Router Report Accounts.
+			chainwriter.PDALookups{
+				Name: "RouterReportAccount",
+				// The public key is a constant Router address.
+				PublicKey: chainwriter.AccountConstant{
+					Address:    routerProgramAddress,
+					IsSigner:   false,
+					IsWritable: false,
+				},
+				Seeds: []chainwriter.Lookup{
+					chainwriter.ValueLookup{
+						// The seed is the merkle root of the report, as passed into the input params.
+						Location: "args.MerkleRoots",
+					},
+				},
+				IsSigner:   false,
+				IsWritable: false,
+			},
+			// Account constant
+			chainwriter.AccountConstant{
+				Name:       "CPISigner",
+				Address:    cpiSignerAddress,
+				IsSigner:   true,
+				IsWritable: false,
+			},
+			// Account constant
+			chainwriter.AccountConstant{
+				Name:       "SystemProgram",
+				Address:    systemProgramAddress,
+				IsSigner:   true,
+				IsWritable: false,
+			},
+			// Account constant
+			chainwriter.AccountConstant{
+				Name:       "ComputeBudgetProgram",
+				Address:    computeBudgetProgramAddress,
+				IsSigner:   true,
+				IsWritable: false,
+			},
+			// Account constant
+			chainwriter.AccountConstant{
+				Name:       "SysvarProgram",
+				Address:    sysvarProgramAddress,
+				IsSigner:   true,
+				IsWritable: false,
+			},
+		},
+		DebugIDLocation: "",
+	}
+
 	chainWriterConfig := chainwriter.ChainWriterConfig{
 		Programs: map[string]chainwriter.ProgramConfig{
 			"ccip-router": {
 				Methods: map[string]chainwriter.MethodConfig{
 					"execute": executeConfig,
+					"commit":  commitConfig,
 				},
 				IDL: "ccip-router",
 			},
