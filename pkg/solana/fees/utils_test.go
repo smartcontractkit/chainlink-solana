@@ -1,9 +1,7 @@
 package fees
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/gagliardetto/solana-go/rpc"
@@ -37,19 +35,15 @@ func TestCalculateFee(t *testing.T) {
 }
 
 func TestParseBlock(t *testing.T) {
-	// file contains legacy + v0 transactions
-	// https://explorer.solana.com/block/265989914
-	testBlockData, err := os.ReadFile("./blockdata.json")
-	require.NoError(t, err)
-	blockRes := &rpc.GetBlockResult{}
-	require.NoError(t, json.Unmarshal(testBlockData, blockRes))
-	assert.Equal(t, 728, len(blockRes.Transactions))
+	testBlocks := readMultipleBlocksFromFile(t, "./multiple_blocks_data.json")
+	lastBlock := testBlocks[len(testBlocks)-1]
+	assert.Equal(t, 3, len(lastBlock.Transactions))
 
 	// happy path - filtered for non-vote txs
-	out, err := ParseBlock(blockRes)
+	out, err := ParseBlock(lastBlock)
 	require.NoError(t, err)
 	assert.Equal(t, len(out.Prices), len(out.Fees))
-	assert.Equal(t, 278, len(out.Prices))
+	assert.Equal(t, 2, len(out.Prices))
 
 	// fail nil
 	_, err = ParseBlock(nil)
