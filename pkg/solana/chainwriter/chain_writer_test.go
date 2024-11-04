@@ -94,11 +94,9 @@ func TestGetAddresses(t *testing.T) {
 							IsSigner:   false,
 							IsWritable: false,
 						},
-						// AddressSeeds would be used if the user needed to look up addresses to use as seeds, which isn't the case here.
-						AddressSeeds: nil,
-						// ValueSeeds tells the ChainWriter where to look in the input parameters to get the seeds for the PDA account.
-						ValueSeeds: []chainwriter.ValueLookup{
-							{Location: "Message.TokenAmounts.DestTokenAddress"},
+						// Seeds would be used if the user needed to look up addresses to use as seeds, which isn't the case here.
+						Seeds: []chainwriter.Lookup{
+							chainwriter.ValueLookup{Location: "Message.TokenAmounts.DestTokenAddress"},
 						},
 						IsSigner:   false,
 						IsWritable: false,
@@ -126,7 +124,7 @@ func TestGetAddresses(t *testing.T) {
 			// 		-> constant
 			// 	PDALookups can resolve to multiple addresses if:
 			// 		A) The PublicKey lookup resolves to multiple addresses (i.e. multiple token addresses)
-			// 		B) The AddressSeeds or ValueSeeds resolve to multiple values
+			// 		B) The Seeds or ValueSeeds resolve to multiple values
 			chainwriter.PDALookups{
 				Name: "PerChainRateLimit",
 				// PublicKey is a constant account in this case, not a lookup.
@@ -135,11 +133,9 @@ func TestGetAddresses(t *testing.T) {
 					IsSigner:   false,
 					IsWritable: false,
 				},
-				AddressSeeds: nil,
 				// Similar to the RegistryTokenState above, the user is looking up PDA accounts based on the dest tokens.
-				ValueSeeds: []chainwriter.ValueLookup{
-					// If there are multiple tokens within the report, this will result in multiple PDA accounts
-					{Location: "Message.TokenAmounts.DestTokenAddress"},
+				Seeds: []chainwriter.Lookup{
+					chainwriter.ValueLookup{Location: "Message.TokenAmounts.DestTokenAddress"},
 				},
 				IsSigner:   false,
 				IsWritable: false,
@@ -171,7 +167,7 @@ func TestGetAddresses(t *testing.T) {
 					IsWritable: false,
 				},
 				// The seed is the receiver address.
-				AddressSeeds: []chainwriter.Lookup{
+				Seeds: []chainwriter.Lookup{
 					chainwriter.AccountLookup{
 						Name:       "Receiver",
 						Location:   "Message.Receiver",
@@ -196,10 +192,9 @@ func TestGetAddresses(t *testing.T) {
 					IsSigner:   false,
 					IsWritable: false,
 				},
-				AddressSeeds: nil,
 				// The seed, once again, is the destination token address.
-				ValueSeeds: []chainwriter.ValueLookup{
-					{Location: "Message.TokenAmounts.DestTokenAddress"},
+				Seeds: []chainwriter.Lookup{
+					chainwriter.ValueLookup{Location: "Message.TokenAmounts.DestTokenAddress"},
 				},
 				IsSigner:   false,
 				IsWritable: false,
@@ -227,10 +222,11 @@ func TestGetAddresses(t *testing.T) {
 					IsSigner:   false,
 					IsWritable: false,
 				},
-				AddressSeeds: nil,
-				ValueSeeds: []chainwriter.ValueLookup{
-					// The seed is the merkle root of the report, as passed into the input params.
-					{Location: "args.MerkleRoot"},
+				Seeds: []chainwriter.Lookup{
+					chainwriter.ValueLookup{
+						// The seed is the merkle root of the report, as passed into the input params.
+						Location: "args.MerkleRoot",
+					},
 				},
 				IsSigner:   false,
 				IsWritable: false,
@@ -244,12 +240,11 @@ func TestGetAddresses(t *testing.T) {
 					IsSigner:   false,
 					IsWritable: false,
 				},
-				AddressSeeds: nil,
 				// In this case, the user configured multiple seeds. These will be used in conjunction
 				// with the public key to generate one or multiple PDA accounts.
-				ValueSeeds: []chainwriter.ValueLookup{
-					{Location: "Message.Receiver"},
-					{Location: "Message.DestChainSelector"},
+				Seeds: []chainwriter.Lookup{
+					chainwriter.ValueLookup{Location: "Message.Receiver"},
+					chainwriter.ValueLookup{Location: "Message.DestChainSelector"},
 				},
 			},
 			// Account constant
