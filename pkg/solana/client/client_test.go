@@ -95,6 +95,36 @@ func TestClient_Reader_Integration(t *testing.T) {
 	assert.NotEqual(t, solana.Hash{}, block.Blockhash)
 	assert.NotEqual(t, uint64(0), block.ParentSlot)
 	assert.NotEqual(t, uint64(0), block.ParentSlot)
+
+	// GetBlock
+	// Test fetching a valid block
+	block, err = c.GetBlock(ctx, slot0)
+	assert.NoError(t, err)
+	assert.NotNil(t, block)
+	assert.Equal(t, slot0, block.ParentSlot+1)
+	assert.NotEqual(t, solana.Hash{}, block.Blockhash)
+
+	// Test fetching a block with an invalid future slot
+	futureSlot := slot0 + 1000000
+	block, err = c.GetBlock(ctx, futureSlot)
+	assert.Error(t, err)
+	assert.Nil(t, block)
+
+	// GetBlocksWithLimit
+	// Define the limit of blocks to fetch and calculate the start slot
+	limit := uint64(10)
+	startSlot := slot0 - limit + 1
+
+	// Fetch blocks with limit
+	blocksResult, err := c.GetBlocksWithLimit(ctx, startSlot, limit)
+	assert.NoError(t, err)
+	assert.NotNil(t, blocksResult)
+
+	// Verify that the slots returned are within the expected range
+	for _, slot := range *blocksResult {
+		assert.GreaterOrEqual(t, slot, startSlot)
+		assert.LessOrEqual(t, slot, slot0)
+	}
 }
 
 func TestClient_Reader_ChainID(t *testing.T) {
