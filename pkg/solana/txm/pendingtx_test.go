@@ -262,7 +262,7 @@ func TestPendingTxContext_on_broadcasted_processed(t *testing.T) {
 
 		// No error if OnProcessed called again
 		id, err = txs.OnProcessed(sig)
-		require.ErrorIs(t, err, ErrAlreadyInExpectedState)
+		require.ErrorIs(t, err, ErrAlreadyInExpectedState(Processed))
 		require.Equal(t, msg.id, id)
 	})
 }
@@ -379,7 +379,7 @@ func TestPendingTxContext_on_confirmed(t *testing.T) {
 
 		// No error if OnConfirmed called again
 		id, err = txs.OnConfirmed(sig)
-		require.ErrorIs(t, err, ErrAlreadyInExpectedState)
+		require.ErrorIs(t, err, ErrAlreadyInExpectedState(Confirmed))
 		require.Equal(t, msg.id, id)
 	})
 }

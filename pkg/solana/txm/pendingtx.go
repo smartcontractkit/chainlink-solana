@@ -11,7 +11,9 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-var ErrAlreadyInExpectedState = errors.New("transaction already in expected state")
+func ErrAlreadyInExpectedState(state TxState) error {
+    return errors.New(fmt.Sprintf("transaction already in expected state: %s", state.String()))
+}
 
 type PendingTxContext interface {
 	// New adds a new tranasction in Broadcasted state to the storage
@@ -93,7 +95,7 @@ func (c *pendingTxContext) New(tx pendingTx, sig solana.Signature, cancel contex
 		return errors.New("signature already exists")
 	}
 	if _, exists := c.broadcastedTxs[tx.id]; exists {
-		return errors.New("tx id already exists")
+		return errors.New("tx id already exists in broadcasted map")
 	}
 	// save cancel func
 	c.cancelBy[tx.id] = cancel
@@ -233,7 +235,7 @@ func (c *pendingTxContext) OnProcessed(sig solana.Signature) (string, error) {
 	// Check if tranasction already in processed state
 	if tx.state == Processed {
 		c.lock.RUnlock()
-		return id, ErrAlreadyInExpectedState
+		return id, ErrAlreadyInExpectedState(Processed)
 	}
 	c.lock.RUnlock()
 
@@ -266,7 +268,7 @@ func (c *pendingTxContext) OnConfirmed(sig solana.Signature) (string, error) {
 	// Check if transaction already in confirmed state
 	if tx, exists := c.confirmedTxs[id]; exists && tx.state == Confirmed {
 		c.lock.RUnlock()
-		return id, ErrAlreadyInExpectedState
+		return id, ErrAlreadyInExpectedState(Confirmed)
 	}
 	// Transactions should only move to confirmed from broadcasted/processed
 	if _, exists := c.broadcastedTxs[id]; !exists {

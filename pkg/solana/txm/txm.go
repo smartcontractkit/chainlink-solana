@@ -428,7 +428,7 @@ func (txm *Txm) confirm() {
 					if res[i].ConfirmationStatus == rpc.ConfirmationStatusProcessed {
 						// update transaction state in local memory
 						id, err := txm.txs.OnProcessed(s[i])
-						if err != nil && !errors.Is(err, ErrAlreadyInExpectedState) {
+						if err != nil && !errors.Is(err, ErrAlreadyInExpectedState(Processed)) {
 							txm.lggr.Errorw("failed to mark transaction as processed", "signature", s[i])
 						} else if err == nil {
 							txm.lggr.Debugw("marking transaction as processed", "id", id, "signature", s[i])
@@ -444,7 +444,7 @@ func (txm *Txm) confirm() {
 					// if signature is confirmed, keep polling for finalized status
 					if res[i].ConfirmationStatus == rpc.ConfirmationStatusConfirmed {
 						id, err := txm.txs.OnConfirmed(s[i])
-						if err != nil && !errors.Is(err, ErrAlreadyInExpectedState) {
+						if err != nil && !errors.Is(err, ErrAlreadyInExpectedState(Confirmed)) {
 							txm.lggr.Errorw("failed to mark transaction as confirmed", "id", id, "signature", s[i])
 						} else if err == nil {
 							txm.lggr.Debugw("marking transaction as confirmed", "id", id, "signature", s[i])
@@ -607,7 +607,7 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 func (txm *Txm) GetTransactionStatus(ctx context.Context, transactionID string) (commontypes.TransactionStatus, error) {
 	state, err := txm.txs.GetTxState(transactionID)
 	if err != nil {
-		return commontypes.Unknown, fmt.Errorf("failed to find transaction with id: %s", transactionID)
+		return commontypes.Unknown, fmt.Errorf("failed to find transaction with id %s: %w", transactionID, err)
 	}
 
 	switch state {
