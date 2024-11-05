@@ -29,6 +29,7 @@ var defaultConfigSet = Chain{
 	ComputeUnitPriceDefault:  ptr(uint64(0)),
 	FeeBumpPeriod:            config.MustNewDuration(3 * time.Second), // set to 0 to disable fee bumping
 	BlockHistoryPollPeriod:   config.MustNewDuration(5 * time.Second),
+	BlockHistorySize:         ptr(uint64(1)),       // 1: uses latest block; >1: Uses multiple blocks, where n is number of blocks. DISCLAIMER: 1:1 ratio between n and RPC calls.
 	ComputeUnitLimitDefault:  ptr(uint32(200_000)), // set to 0 to disable adding compute unit limit
 	EstimateComputeUnitLimit: ptr(false),           // set to false to disable compute unit limit estimation
 }
@@ -53,6 +54,7 @@ type Config interface {
 	ComputeUnitPriceDefault() uint64
 	FeeBumpPeriod() time.Duration
 	BlockHistoryPollPeriod() time.Duration
+	BlockHistorySize() uint64
 	ComputeUnitLimitDefault() uint32
 	EstimateComputeUnitLimit() bool
 }
@@ -74,6 +76,7 @@ type Chain struct {
 	ComputeUnitPriceDefault  *uint64
 	FeeBumpPeriod            *config.Duration
 	BlockHistoryPollPeriod   *config.Duration
+	BlockHistorySize         *uint64
 	ComputeUnitLimitDefault  *uint32
 	EstimateComputeUnitLimit *bool
 }
@@ -126,6 +129,9 @@ func (c *Chain) SetDefaults() {
 	}
 	if c.BlockHistoryPollPeriod == nil {
 		c.BlockHistoryPollPeriod = defaultConfigSet.BlockHistoryPollPeriod
+	}
+	if c.BlockHistorySize == nil {
+		c.BlockHistorySize = defaultConfigSet.BlockHistorySize
 	}
 	if c.ComputeUnitLimitDefault == nil {
 		c.ComputeUnitLimitDefault = defaultConfigSet.ComputeUnitLimitDefault
