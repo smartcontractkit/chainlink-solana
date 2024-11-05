@@ -100,7 +100,6 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 		return txSender.newResult(errors.New("TransactionSender not started"))
 	}
 
-	// Must wait for reportSendTxAnomalies and collectTxResults to complete before cancelling the context
 	txSenderCtx, cancel := txSender.chStop.NewCtx()
 	reportWg := sync.WaitGroup{}
 	defer func() {
