@@ -98,10 +98,10 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 		txResultsToReport := make(chan RESULT)
 		primaryNodeWg := sync.WaitGroup{}
 
-		_, cancel := txSender.chStop.Ctx(ctx)
+		txSenderCtx, cancel := txSender.chStop.Ctx(ctx)
 
 		healthyNodesNum := 0
-		err := txSender.multiNode.DoAll(ctx, func(ctx context.Context, rpc RPC, isSendOnly bool) {
+		err := txSender.multiNode.DoAll(txSenderCtx, func(ctx context.Context, rpc RPC, isSendOnly bool) {
 			if isSendOnly {
 				txSender.wg.Add(1)
 				go func() {
@@ -142,7 +142,7 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 			primaryNodeWg.Wait()
 			close(txResultsToReport)
 			close(txResults)
-			cancel() // TODO: Will this guarantee that collectTxResults will read the last result before ctx.Done()?
+			cancel()
 		}()
 
 		if err != nil {
