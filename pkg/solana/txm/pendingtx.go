@@ -12,7 +12,7 @@ import (
 )
 
 func ErrAlreadyInExpectedState(state TxState) error {
-    return errors.New(fmt.Sprintf("transaction already in expected state: %s", state.String()))
+    return fmt.Errorf("transaction already in expected state: %s", state.String())
 }
 
 type PendingTxContext interface {
