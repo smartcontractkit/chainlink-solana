@@ -515,6 +515,7 @@ func TestSolanaChain_MultiNode_Txm(t *testing.T) {
 		return sig[:]
 	}, nil)
 	mkey.On("Sign", mock.Anything, pubKeyReceiver.String(), mock.Anything).Return([]byte{}, config.KeyNotFoundError{ID: pubKeyReceiver.String(), KeyType: "Solana"})
+	mkey.On("Accounts", mock.Anything).Return([]string{key.String()}, nil).Maybe()
 
 	testChain, err := newChain("localnet", cfg, mkey, logger.Test(t))
 	require.NoError(t, err)
