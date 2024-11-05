@@ -440,8 +440,8 @@ func (txm *Txm) confirm() {
 					if res[i].ConfirmationStatus == rpc.ConfirmationStatusProcessed {
 						// update transaction state in local memory
 						id, err := txm.txs.OnProcessed(s[i])
-						if err != nil && !errors.Is(err, ErrAlreadyInExpectedState(Processed)) {
-							txm.lggr.Errorw("failed to mark transaction as processed", "signature", s[i])
+						if err != nil && !errors.Is(err, ErrAlreadyInExpectedState) {
+							txm.lggr.Errorw("failed to mark transaction as processed", "signature", s[i], "error", err)
 						} else if err == nil {
 							txm.lggr.Debugw("marking transaction as processed", "id", id, "signature", s[i])
 						}
@@ -456,8 +456,8 @@ func (txm *Txm) confirm() {
 					// if signature is confirmed, keep polling for finalized status
 					if res[i].ConfirmationStatus == rpc.ConfirmationStatusConfirmed {
 						id, err := txm.txs.OnConfirmed(s[i])
-						if err != nil && !errors.Is(err, ErrAlreadyInExpectedState(Confirmed)) {
-							txm.lggr.Errorw("failed to mark transaction as confirmed", "id", id, "signature", s[i])
+						if err != nil && !errors.Is(err, ErrAlreadyInExpectedState) {
+							txm.lggr.Errorw("failed to mark transaction as confirmed", "id", id, "signature", s[i], "error", err)
 						} else if err == nil {
 							txm.lggr.Debugw("marking transaction as confirmed", "id", id, "signature", s[i])
 						}
@@ -468,7 +468,7 @@ func (txm *Txm) confirm() {
 					if res[i].ConfirmationStatus == rpc.ConfirmationStatusFinalized {
 						id, err := txm.txs.OnFinalized(s[i], txm.cfg.TxRetentionTimeout())
 						if err != nil {
-							txm.lggr.Errorw("failed to mark transaction as finalized", "id", id, "signature", s[i])
+							txm.lggr.Errorw("failed to mark transaction as finalized", "id", id, "signature", s[i], "error", err)
 						} else {
 							txm.lggr.Debugw("marking transaction as finalized", "id", id, "signature", s[i])
 						}

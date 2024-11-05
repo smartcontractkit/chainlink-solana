@@ -11,9 +11,7 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-func ErrAlreadyInExpectedState(state TxState) error {
-	return fmt.Errorf("transaction already in expected state: %s", state.String())
-}
+var ErrAlreadyInExpectedState = errors.New("transaction already in expected state")
 
 type PendingTxContext interface {
 	// New adds a new tranasction in Broadcasted state to the storage
@@ -235,7 +233,7 @@ func (c *pendingTxContext) OnProcessed(sig solana.Signature) (string, error) {
 	// Check if tranasction already in processed state
 	if tx.state == Processed {
 		c.lock.RUnlock()
-		return id, ErrAlreadyInExpectedState(Processed)
+		return id, ErrAlreadyInExpectedState
 	}
 	c.lock.RUnlock()
 
@@ -268,7 +266,7 @@ func (c *pendingTxContext) OnConfirmed(sig solana.Signature) (string, error) {
 	// Check if transaction already in confirmed state
 	if tx, exists := c.confirmedTxs[id]; exists && tx.state == Confirmed {
 		c.lock.RUnlock()
-		return id, ErrAlreadyInExpectedState(Confirmed)
+		return id, ErrAlreadyInExpectedState
 	}
 	// Transactions should only move to confirmed from broadcasted/processed
 	if _, exists := c.broadcastedTxs[id]; !exists {
