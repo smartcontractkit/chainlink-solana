@@ -22,6 +22,7 @@ import (
 
 	relayconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
@@ -70,10 +71,8 @@ func TestTxm_Integration(t *testing.T) {
 			cfg.Chain.FeeEstimatorMode = &estimator
 			client, err := solanaClient.NewClient(url, cfg, 2*time.Second, lggr)
 			require.NoError(t, err)
-			getClient := func() (solanaClient.ReaderWriter, error) {
-				return client, nil
-			}
-			txm := txm.NewTxm("localnet", getClient, cfg, mkey, lggr)
+			loader := utils.NewLazyLoad(func() (solanaClient.ReaderWriter, error) { return client, nil })
+			txm := txm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
 
 			// track initial balance
 			initBal, err := client.Balance(ctx, pubKey)
