@@ -269,6 +269,7 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) Start(ctx context.
 
 func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) Close() error {
 	return txSender.StopOnce("TransactionSender", func() error {
+		txSender.lggr.Debug("Closing TransactionSender")
 		close(txSender.chStop)
 		txSender.wg.Wait()
 		return nil
