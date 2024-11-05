@@ -773,9 +773,8 @@ func TestTxm_disabled_confirm_timeout_with_retention(t *testing.T) {
 	mkey := keyMocks.NewSimpleKeystore(t)
 	mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
 
-	txm := NewTxm(id, func() (client.ReaderWriter, error) {
-		return mc, nil
-	}, cfg, mkey, lggr)
+	loader := utils.NewLazyLoad(func() (client.ReaderWriter, error) { return mc, nil })
+	txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
 	require.NoError(t, txm.Start(ctx))
 	t.Cleanup(func () { require.NoError(t, txm.Close())})
 
@@ -884,9 +883,8 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 	mkey := keyMocks.NewSimpleKeystore(t)
 	mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
 
-	txm := NewTxm(id, func() (client.ReaderWriter, error) {
-		return mc, nil
-	}, cfg, mkey, lggr)
+	loader := utils.NewLazyLoad(func() (client.ReaderWriter, error) { return mc, nil })
+	txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
 	require.NoError(t, txm.Start(ctx))
 	t.Cleanup(func () { require.NoError(t, txm.Close())})
 
