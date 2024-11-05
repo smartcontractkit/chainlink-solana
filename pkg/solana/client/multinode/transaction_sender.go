@@ -92,79 +92,73 @@ type TransactionSender[TX any, RESULT SendTxResult, CHAIN_ID ID, RPC SendTxRPCCl
 // * If there is both success and terminal error - returns success and reports invariant violation
 // * Otherwise, returns any (effectively random) of the errors.
 func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ctx context.Context, tx TX) RESULT {
-	txResults := make(chan RESULT)
-	txResultsToReport := make(chan RESULT)
-	primaryNodeWg := sync.WaitGroup{}
+	var result RESULT
+	if !txSender.IfStarted(func() {
+		txResults := make(chan RESULT)
+		txResultsToReport := make(chan RESULT)
+		primaryNodeWg := sync.WaitGroup{}
 
-	if txSender.State() != "Started" {
-		return txSender.newResult(errors.New("TransactionSender not started"))
-	}
+		ctx, cancel := txSender.chStop.Ctx(ctx)
 
-	txSenderCtx, cancel := txSender.chStop.NewCtx()
-	reportWg := sync.WaitGroup{}
-	defer func() {
-		go func() {
-			reportWg.Wait()
-			cancel()
-		}()
-	}()
+		healthyNodesNum := 0
+		err := txSender.multiNode.DoAll(ctx, func(ctx context.Context, rpc RPC, isSendOnly bool) {
+			if isSendOnly {
+				txSender.wg.Add(1)
+				go func() {
+					defer txSender.wg.Done()
+					// Send-only nodes' results are ignored as they tend to return false-positive responses.
+					// Broadcast to them is necessary to speed up the propagation of TX in the network.
+					_ = txSender.broadcastTxAsync(ctx, rpc, tx)
+				}()
+				return
+			}
 
-	healthyNodesNum := 0
-	err := txSender.multiNode.DoAll(txSenderCtx, func(ctx context.Context, rpc RPC, isSendOnly bool) {
-		if isSendOnly {
-			txSender.wg.Add(1)
+			// Primary Nodes
+			healthyNodesNum++
+			primaryNodeWg.Add(1)
 			go func() {
-				defer txSender.wg.Done()
-				// Send-only nodes' results are ignored as they tend to return false-positive responses.
-				// Broadcast to them is necessary to speed up the propagation of TX in the network.
-				_ = txSender.broadcastTxAsync(ctx, rpc, tx)
+				defer primaryNodeWg.Done()
+				r := txSender.broadcastTxAsync(ctx, rpc, tx)
+				select {
+				case <-ctx.Done():
+					txSender.lggr.Warnw("Failed to send tx results", "err", ctx.Err())
+					return
+				case txResults <- r:
+				}
+
+				select {
+				case <-ctx.Done():
+					txSender.lggr.Warnw("Failed to send tx results to report", "err", ctx.Err())
+					return
+				case txResultsToReport <- r:
+				}
 			}()
+		})
+
+		// This needs to be done in parallel so the reporting knows when it's done (when the channel is closed)
+		txSender.wg.Add(1)
+		go func() {
+			defer txSender.wg.Done()
+			primaryNodeWg.Wait()
+			close(txResultsToReport)
+			close(txResults)
+			cancel() // TODO: Will this guarantee that collectTxResults will read the last result before ctx.Done()?
+		}()
+
+		if err != nil {
+			result = txSender.newResult(err)
 			return
 		}
 
-		// Primary Nodes
-		healthyNodesNum++
-		primaryNodeWg.Add(1)
-		go func() {
-			defer primaryNodeWg.Done()
-			r := txSender.broadcastTxAsync(ctx, rpc, tx)
-			select {
-			case <-ctx.Done():
-				txSender.lggr.Warnw("Failed to send tx results", "err", ctx.Err())
-				return
-			case txResults <- r:
-			}
+		txSender.wg.Add(1)
+		go txSender.reportSendTxAnomalies(tx, txResultsToReport)
 
-			select {
-			case <-ctx.Done():
-				txSender.lggr.Warnw("Failed to send tx results to report", "err", ctx.Err())
-				return
-			case txResultsToReport <- r:
-			}
-		}()
-	})
-
-	// This needs to be done in parallel so the reporting knows when it's done (when the channel is closed)
-	txSender.wg.Add(1)
-	go func() {
-		defer txSender.wg.Done()
-		primaryNodeWg.Wait()
-		close(txResultsToReport)
-		close(txResults)
-	}()
-
-	if err != nil {
-		return txSender.newResult(err)
+		result = txSender.collectTxResults(ctx, tx, healthyNodesNum, txResults)
+	}) {
+		result = txSender.newResult(errors.New("TransactionSender not started"))
 	}
 
-	txSender.wg.Add(1)
-	reportWg.Add(1)
-	go func() {
-		defer reportWg.Done()
-		txSender.reportSendTxAnomalies(tx, txResultsToReport)
-	}()
-
-	return txSender.collectTxResults(ctx, tx, healthyNodesNum, txResults)
+	return result
 }
 
 func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) broadcastTxAsync(ctx context.Context, rpc RPC, tx TX) RESULT {
@@ -258,6 +252,7 @@ loop:
 
 	// ignore critical error as it's reported in reportSendTxAnomalies
 	result, _ := aggregateTxResults(errorsByCode)
+	txSender.lggr.Debugw("Collected results", "errorsByCode", errorsByCode, "result", result)
 	return result
 }
 
