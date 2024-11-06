@@ -240,7 +240,7 @@ func (txm *Txm) sendWithRetry(ctx context.Context, msg pendingTx) (solanaGo.Tran
 	sig, initSendErr := txm.sendTx(ctx, &initTx)
 	if initSendErr != nil {
 		cancel()                                                         // cancel context when exiting early
-		txm.txs.OnError(sig, txm.cfg.TxRetentionTimeout(), TxFailReject) // increment failed metric
+		txm.txs.OnError(sig, txm.cfg.TxRetentionTimeout(), TxFailReject) //nolint // no need to check error since only incrementing metric here
 		return solanaGo.Transaction{}, "", solanaGo.Signature{}, fmt.Errorf("tx failed initial transmit: %w", initSendErr)
 	}
 
@@ -705,22 +705,33 @@ func (txm *Txm) processSimulationError(id string, sig solanaGo.Signature, res *r
 		// handle various errors
 		// https://github.com/solana-labs/solana/blob/master/sdk/src/transaction/error.rs
 		errStr := fmt.Sprintf("%v", res.Err) // convert to string to handle various interfaces
+		logValues := []interface{}{
+			"id", id,
+			"signature", sig,
+			"result", res,
+		}
 		switch {
 		// blockhash not found when simulating, occurs when network bank has not seen the given blockhash or tx is too old
 		// let confirmation process clean up
 		case strings.Contains(errStr, "BlockhashNotFound"):
-			txm.lggr.Debugw("simulate: BlockhashNotFound", "id", id, "signature", sig, "result", res)
+			txm.lggr.Debugw("simulate: BlockhashNotFound", logValues...)
 		// transaction will encounter execution error/revert, mark as reverted to remove from confirmation + retry
 		case strings.Contains(errStr, "InstructionError"):
-			txm.txs.OnError(sig, txm.cfg.TxRetentionTimeout(), TxFailSimRevert) // cancel retry
-			txm.lggr.Debugw("simulate: InstructionError", "id", id, "signature", sig, "result", res)
+			_, err := txm.txs.OnError(sig, txm.cfg.TxRetentionTimeout(), TxFailSimRevert) // cancel retry
+			if err != nil {
+				logValues = append(logValues, "stateTransitionErr", err)
+			}
+			txm.lggr.Debugw("simulate: InstructionError", logValues...)
 		// transaction is already processed in the chain, letting txm confirmation handle
 		case strings.Contains(errStr, "AlreadyProcessed"):
-			txm.lggr.Debugw("simulate: AlreadyProcessed", "id", id, "signature", sig, "result", res)
+			txm.lggr.Debugw("simulate: AlreadyProcessed", logValues...)
 		// unrecognized errors (indicates more concerning failures)
 		default:
-			txm.txs.OnError(sig, txm.cfg.TxRetentionTimeout(), TxFailSimOther) // cancel retry
-			txm.lggr.Errorw("simulate: unrecognized error", "id", id, "signature", sig, "result", res)
+			_, err := txm.txs.OnError(sig, txm.cfg.TxRetentionTimeout(), TxFailSimOther) // cancel retry
+			if err != nil {
+				logValues = append(logValues, "stateTransitionErr", err)
+			}
+			txm.lggr.Errorw("simulate: unrecognized error", logValues...)
 		}
 	}
 }

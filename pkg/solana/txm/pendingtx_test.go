@@ -265,7 +265,7 @@ func TestPendingTxContext_on_broadcasted_processed(t *testing.T) {
 		require.Equal(t, msg.id, id)
 
 		// No error if OnProcessed called again
-		id, err = txs.OnProcessed(sig)
+		_, err = txs.OnProcessed(sig)
 		require.ErrorIs(t, err, ErrAlreadyInExpectedState)
 	})
 }
@@ -382,7 +382,7 @@ func TestPendingTxContext_on_confirmed(t *testing.T) {
 		require.Equal(t, msg.id, id)
 
 		// No error if OnConfirmed called again
-		id, err = txs.OnConfirmed(sig)
+		_, err = txs.OnConfirmed(sig)
 		require.ErrorIs(t, err, ErrAlreadyInExpectedState)
 	})
 }
@@ -896,11 +896,11 @@ func TestPendingTxContext_race(t *testing.T) {
 		wg.Add(2)
 
 		go func() {
-			assert.NotPanics(t, func() { txCtx.Remove(solana.Signature{}) })
+			assert.NotPanics(t, func() { txCtx.Remove(solana.Signature{}) }) //nolint // no need to check error
 			wg.Done()
 		}()
 		go func() {
-			assert.NotPanics(t, func() { txCtx.Remove(solana.Signature{}) })
+			assert.NotPanics(t, func() { txCtx.Remove(solana.Signature{}) }) //nolint // no need to check error
 			wg.Done()
 		}()
 

@@ -563,7 +563,7 @@ func (c *pendingTxContextWithProm) OnError(sig solana.Signature, retentionTimeou
 	}
 
 	id, err := c.pendingTx.OnError(sig, retentionTimeout, errType) // err indicates transaction not found so may already be removed
-	if err != nil {
+	if err == nil {
 		switch errType {
 		case TxFailRevert:
 			promSolTxmRevertTxs.WithLabelValues(c.chainID).Add(1)
