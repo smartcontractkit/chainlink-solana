@@ -41,13 +41,12 @@ type ProgramConfig struct {
 type MethodConfig struct {
 	FromAddress        string
 	InputModifications commoncodec.ModifiersConfig
-	EncodedTypeIDL     string
 	DecodeLocation     string
 	DataType           reflect.Type
 	DecodedTypeName    string
 	ChainSpecificName  string
-	Accounts           []Lookup
 	LookupTables       LookupTables
+	Accounts           []Lookup
 	// Location in the decoded data where the debug ID is stored
 	DebugIDLocation string
 }
@@ -423,17 +422,6 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return fmt.Errorf("Unable to convert args to []byte")
 	}
 
-	// decode data
-	var idl codec.IDL
-	err := json.Unmarshal([]byte(methodConfig.EncodedTypeIDL), &idl)
-	if err != nil {
-		return fmt.Errorf("error unmarshalling IDL: %w", err)
-	}
-	// create codec from configured method IDL
-	cwCodec, err := codec.NewIDLAccountCodec(idl, binary.LittleEndian())
-	if err != nil {
-		return fmt.Errorf("error creating new IDLAccountCodec: %w", err)
-	}
 	// get inner encoded data from the encoded args
 	encoded, err := GetValueAtLocation(data, methodConfig.DecodeLocation)
 	if err != nil {
@@ -442,7 +430,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 
 	// Create an instance of the type defined by methodConfig.DataType
 	decoded := reflect.New(methodConfig.DataType).Interface()
-	err = cwCodec.Decode(ctx, encoded[0], decoded, methodConfig.DecodedTypeName)
+	err = s.codec.Decode(ctx, encoded[0], decoded, methodConfig.DecodedTypeName)
 
 	// Configure debug ID
 	debugID := ""
@@ -473,8 +461,8 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("Error getting programId: %w", err), debugID)
 	}
 
-	// Re-encode payload, apply modifiers and borsh-encode
-	encodedPayload, err := cwCodec.Encode(ctx, decoded, methodConfig.DecodedTypeName)
+	// Encode payload for chain, apply modifiers and borsh-encode
+	encodedPayload, err := s.codec.Encode(ctx, args, codec.WrapItemType(contract, method, true))
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error encoding data: %w", err), debugID)
 	}
@@ -497,7 +485,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("error creating new transaction: %w", err), debugID)
 	}
 
-	if err = s.txm.Enqueue(ctx, accounts[0].PublicKey.String(), tx); err != nil {
+	if err = s.txm.Enqueue(ctx, accounts[0].PublicKey.String(), tx, transactionID); err != nil {
 		return errorWithDebugID(fmt.Errorf("error on sending trasnaction to TXM: %w", err), debugID)
 	}
 	return nil

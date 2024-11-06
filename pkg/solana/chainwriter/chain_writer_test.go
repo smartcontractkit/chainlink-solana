@@ -33,7 +33,6 @@ func TestGetAddresses(t *testing.T) {
 	userAddress := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6J"
 
 	executionReportSingleChainIDL := `{"name":"ExecutionReportSingleChain","type":{"kind":"struct","fields":[{"name":"source_chain_selector","type":"u64"},{"name":"message","type":{"defined":"Any2SolanaRampMessage"}},{"name":"root","type":{"array":["u8",32]}},{"name":"proofs","type":{"vec":{"array":["u8",32]}}}]}},{"name":"Any2SolanaRampMessage","type":{"kind":"struct","fields":[{"name":"header","type":{"defined":"RampMessageHeader"}},{"name":"sender","type":{"vec":"u8"}},{"name":"data","type":{"vec":"u8"}},{"name":"receiver","type":{"array":["u8",32]}},{"name":"extra_args","type":{"defined":"SolanaExtraArgs"}}]}},{"name":"RampMessageHeader","type":{"kind":"struct","fields":[{"name":"message_id","type":{"array":["u8",32]}},{"name":"source_chain_selector","type":"u64"},{"name":"dest_chain_selector","type":"u64"},{"name":"sequence_number","type":"u64"},{"name":"nonce","type":"u64"}]}},{"name":"SolanaExtraArgs","type":{"kind":"struct","fields":[{"name":"compute_units","type":"u32"},{"name":"allow_out_of_order_execution","type":"bool"}]}}`
-	commitInputIDL := `{"name":"CommitInput","type":{"kind":"struct","fields":[{"name":"price_updates","type":{"defined":"PriceUpdates"}},{"name":"merkle_root","type":{"defined":"MerkleRoot"}}]}},{"name":"PriceUpdates","type":{"kind":"struct","fields":[{"name":"token_price_updates","type":{"vec":{"defined":"TokenPriceUpdate"}}},{"name":"gas_price_updates","type":{"vec":{"defined":"GasPriceUpdate"}}}]}},{"name":"TokenPriceUpdate","type":{"kind":"struct","fields":[{"name":"source_token","type":"publicKey"},{"name":"usd_per_token","type":{"array":["u8",28]}}]}},{"name":"GasPriceUpdate","type":{"kind":"struct","fields":[{"name":"dest_chain_selector","type":"u64"},{"name":"usd_per_unit_gas","type":{"array":["u8",28]}}]}},{"name":"MerkleRoot","type":{"kind":"struct","fields":[{"name":"source_chain_selector","type":"u64"},{"name":"on_ramp_address","type":{"vec":"u8"}},{"name":"min_seq_nr","type":"u64"},{"name":"max_seq_nr","type":"u64"},{"name":"merkle_root","type":{"array":["u8",32]}}]}}`
 
 	executeConfig := chainwriter.MethodConfig{
 		FromAddress: userAddress,
@@ -43,7 +42,6 @@ func TestGetAddresses(t *testing.T) {
 				Fields: []string{"Message.ExtraArgs.MerkleRoot"},
 			},
 		},
-		EncodedTypeIDL: executionReportSingleChainIDL,
 		// Location in the args where the object to decode is located.
 		DecodeLocation:    "Report",
 		DataType:          reflect.TypeOf(ccipocr3.ExecutePluginReportSingleChain{}),
@@ -262,7 +260,6 @@ func TestGetAddresses(t *testing.T) {
 	commitConfig := chainwriter.MethodConfig{
 		FromAddress:        userAddress,
 		InputModifications: nil,
-		EncodedTypeIDL:     commitInputIDL,
 		DecodeLocation:     "Report",
 		DataType:           reflect.TypeOf(ccipocr3.CommitPluginReport{}),
 		DecodedTypeName:    "CommitPluginReport",
@@ -332,7 +329,7 @@ func TestGetAddresses(t *testing.T) {
 					"execute": executeConfig,
 					"commit":  commitConfig,
 				},
-				IDL: "ccip-router",
+				IDL: executionReportSingleChainIDL,
 			},
 		},
 	}
