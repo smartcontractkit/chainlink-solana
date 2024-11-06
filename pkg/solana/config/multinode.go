@@ -97,7 +97,7 @@ func (c *MultiNodeConfig) SetDefaults() {
 	if c.MultiNode.PollFailureThreshold == nil {
 		c.MultiNode.PollFailureThreshold = ptr(uint32(5))
 	}
-	// Poll interval is set to 10 seconds to ensure timely updates while minimizing resource usage.
+	// Poll interval is set to 15 seconds to ensure timely updates while minimizing resource usage.
 	if c.MultiNode.PollInterval == nil {
 		c.MultiNode.PollInterval = config.MustNewDuration(15 * time.Second)
 	}
@@ -105,7 +105,7 @@ func (c *MultiNodeConfig) SetDefaults() {
 	if c.MultiNode.SelectionMode == nil {
 		c.MultiNode.SelectionMode = ptr(mn.NodeSelectionModePriorityLevel)
 	}
-	// The sync threshold is set to 5 to allow for some flexibility in node synchronization before considering it out of sync.
+	// The sync threshold is set to 10 to allow for some flexibility in node synchronization before considering it out of sync.
 	if c.MultiNode.SyncThreshold == nil {
 		c.MultiNode.SyncThreshold = ptr(uint32(10))
 	}
