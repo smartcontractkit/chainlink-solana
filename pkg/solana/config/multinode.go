@@ -149,7 +149,7 @@ func (c *MultiNodeConfig) SetDefaults() {
 	}
 	// Finalized block offset allows for RPCs to be slightly behind the finalized block.
 	if c.MultiNode.FinalizedBlockOffset == nil {
-		c.MultiNode.FinalizedBlockOffset = ptr(uint32(50)) // TODO: Set to 50 for slow test environment
+		c.MultiNode.FinalizedBlockOffset = ptr(uint32(50))
 	}
 }
 

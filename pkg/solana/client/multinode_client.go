@@ -102,7 +102,8 @@ func (m *MultiNodeClient) SubscribeToHeads(ctx context.Context) (<-chan *Head, m
 	ctx, cancel, chStopInFlight, _ := m.acquireQueryCtx(ctx, m.cfg.TxTimeout())
 	defer cancel()
 
-	pollInterval := m.cfg.MultiNode.FinalizedBlockPollInterval() // TODO: Should have HeadPollInterval separate from Version Poll interval
+	// TODO: BCFR-1070 - Add BlockPollInterval
+	pollInterval := m.cfg.MultiNode.FinalizedBlockPollInterval() // Use same interval as finalized polling
 	if pollInterval == 0 {
 		return nil, nil, errors.New("PollInterval is 0")
 	}
