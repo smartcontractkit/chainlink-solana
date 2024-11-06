@@ -418,21 +418,24 @@ func (txm *Txm) confirm() {
 
 						// check confirm timeout exceeded
 						if txm.txs.Expired(s[i], txm.cfg.TxConfirmTimeout()) {
-							id := txm.txs.OnError(s[i], txm.cfg.TxRetentionTimeout(), TxFailDrop)
-							txm.lggr.Infow("failed to find transaction within confirm timeout", "id", id, "signature", s[i], "timeoutSeconds", txm.cfg.TxConfirmTimeout())
+							id, err := txm.txs.OnError(s[i], txm.cfg.TxRetentionTimeout(), TxFailDrop)
+							if err != nil {
+								txm.lggr.Infow("failed to mark transaction as errored", "id", id, "signature", s[i], "timeoutSeconds", txm.cfg.TxConfirmTimeout(), "error", err)
+							} else {
+								txm.lggr.Infow("failed to find transaction within confirm timeout", "id", id, "signature", s[i], "timeoutSeconds", txm.cfg.TxConfirmTimeout())
+							}
 						}
 						continue
 					}
 
 					// if signature has an error, end polling
 					if res[i].Err != nil {
-						id := txm.txs.OnError(s[i], txm.cfg.TxRetentionTimeout(), TxFailRevert)
-						txm.lggr.Debugw("tx state: failed",
-							"id", id,
-							"signature", s[i],
-							"error", res[i].Err,
-							"status", res[i].ConfirmationStatus,
-						)
+						id, err := txm.txs.OnError(s[i], txm.cfg.TxRetentionTimeout(), TxFailRevert)
+						if err != nil {
+							txm.lggr.Infow("failed to mark transaction as errored", "id", id, "signature", s[i], "error", err)
+						} else {
+							txm.lggr.Debugw("tx state: failed", "id", id, "signature", s[i], "error", res[i].Err, "status", res[i].ConfirmationStatus)
+						}
 						continue
 					}
 
@@ -447,8 +450,12 @@ func (txm *Txm) confirm() {
 						}
 						// check confirm timeout exceeded if TxConfirmTimeout set
 						if txm.cfg.TxConfirmTimeout() != 0*time.Second && txm.txs.Expired(s[i], txm.cfg.TxConfirmTimeout()) {
-							id := txm.txs.OnError(s[i], txm.cfg.TxRetentionTimeout(), TxFailDrop)
-							txm.lggr.Debugw("tx failed to move beyond 'processed' within confirm timeout", "id", id, "signature", s[i], "timeoutSeconds", txm.cfg.TxConfirmTimeout())
+							id, err := txm.txs.OnError(s[i], txm.cfg.TxRetentionTimeout(), TxFailDrop)
+							if err != nil {
+								txm.lggr.Infow("failed to mark transaction as errored", "id", id, "signature", s[i], "timeoutSeconds", txm.cfg.TxConfirmTimeout(), "error", err)
+							} else {
+								txm.lggr.Debugw("tx failed to move beyond 'processed' within confirm timeout", "id", id, "signature", s[i], "timeoutSeconds", txm.cfg.TxConfirmTimeout())
+							}
 						}
 						continue
 					}

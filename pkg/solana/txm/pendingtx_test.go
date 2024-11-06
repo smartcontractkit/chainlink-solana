@@ -54,12 +54,15 @@ func TestPendingTxContext_add_remove_multiple(t *testing.T) {
 
 	// stop all sub processes
 	for i := 0; i < len(list); i++ {
-		id := txs.Remove(list[i])
+		id, err := txs.Remove(list[i])
+		assert.NoError(t, err)
 		assert.Equal(t, n-i-1, len(txs.ListAll()))
 		assert.Equal(t, ids[list[i]], id)
 
 		// second remove should not return valid id - already removed
-		assert.Equal(t, "", txs.Remove(list[i]))
+		id, err = txs.Remove(list[i])
+		require.Error(t, err)
+		assert.Equal(t, "", id)
 	}
 	wg.Wait()
 }
@@ -239,7 +242,8 @@ func TestPendingTxContext_on_broadcasted_processed(t *testing.T) {
 		require.NoError(t, err)
 
 		// Transition to errored state
-		id := txs.OnError(sig, retentionTimeout, 0)
+		id, err := txs.OnError(sig, retentionTimeout, 0)
+		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
 		// Transition back to processed state
@@ -351,7 +355,8 @@ func TestPendingTxContext_on_confirmed(t *testing.T) {
 		require.NoError(t, err)
 
 		// Transition to errored state
-		id := txs.OnError(sig, retentionTimeout, 0)
+		id, err := txs.OnError(sig, retentionTimeout, 0)
+		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
 		// Transition back to confirmed state
@@ -535,7 +540,8 @@ func TestPendingTxContext_on_finalized(t *testing.T) {
 		require.NoError(t, err)
 
 		// Transition to errored state
-		id := txs.OnError(sig, retentionTimeout, 0)
+		id, err := txs.OnError(sig, retentionTimeout, 0)
+		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
 		// Transition back to confirmed state
@@ -559,7 +565,8 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		require.NoError(t, err)
 
 		// Transition to errored state
-		id := txs.OnError(sig, retentionTimeout, 0)
+		id, err := txs.OnError(sig, retentionTimeout, 0)
+		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
 		// Check it does not exist in broadcasted map
@@ -598,7 +605,8 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		require.Equal(t, msg.id, id)
 
 		// Transition to errored state
-		id = txs.OnError(sig, retentionTimeout, 0)
+		id, err = txs.OnError(sig, retentionTimeout, 0)
+		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
 		// Check it does not exist in broadcasted map
@@ -637,7 +645,8 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		require.Equal(t, msg.id, id)
 
 		// Transition to errored state
-		id = txs.OnError(sig, 0*time.Second, 0)
+		id, err = txs.OnError(sig, 0*time.Second, 0)
+		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
 		// Check it does not exist in broadcasted map
@@ -671,7 +680,8 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		require.Equal(t, msg.id, id)
 
 		// Transition back to confirmed state
-		id = txs.OnError(sig, retentionTimeout, 0)
+		id, err = txs.OnError(sig, retentionTimeout, 0)
+		require.Error(t, err)
 		require.Equal(t, "", id)
 	})
 }
@@ -725,11 +735,13 @@ func TestPendingTxContext_remove(t *testing.T) {
 	erroredMsg := pendingTx{id: uuid.NewString()}
 	err = txs.New(erroredMsg, erroredSig, cancel)
 	require.NoError(t, err)
-	id = txs.OnError(erroredSig, retentionTimeout, 0)
+	id, err = txs.OnError(erroredSig, retentionTimeout, 0)
+	require.NoError(t, err)
 	require.Equal(t, erroredMsg.id, id)
 
 	// Remove broadcasted transaction
-	id = txs.Remove(broadcastedSig1)
+	id, err = txs.Remove(broadcastedSig1)
+	require.NoError(t, err)
 	require.Equal(t, broadcastedMsg.id, id)
 	// Check removed from broadcasted map
 	_, exists := txs.broadcastedTxs[broadcastedMsg.id]
@@ -741,7 +753,8 @@ func TestPendingTxContext_remove(t *testing.T) {
 	require.False(t, exists)
 
 	// Remove processed transaction
-	id = txs.Remove(processedSig)
+	id, err = txs.Remove(processedSig)
+	require.NoError(t, err)
 	require.Equal(t, processedMsg.id, id)
 	// Check removed from broadcasted map
 	_, exists = txs.broadcastedTxs[processedMsg.id]
@@ -751,7 +764,8 @@ func TestPendingTxContext_remove(t *testing.T) {
 	require.False(t, exists)
 
 	// Remove confirmed transaction
-	id = txs.Remove(confirmedSig)
+	id, err = txs.Remove(confirmedSig)
+	require.NoError(t, err)
 	require.Equal(t, confirmedMsg.id, id)
 	// Check removed from confirmed map
 	_, exists = txs.confirmedTxs[confirmedMsg.id]
@@ -761,11 +775,13 @@ func TestPendingTxContext_remove(t *testing.T) {
 	require.False(t, exists)
 
 	// Check remove cannot be called on finalized transaction
-	id = txs.Remove(finalizedSig)
+	id, err = txs.Remove(finalizedSig)
+	require.Error(t, err)
 	require.Equal(t, "", id)
 
 	// Check remove cannot be called on errored transaction
-	id = txs.Remove(erroredSig)
+	id, err = txs.Remove(erroredSig)
+	require.Error(t, err)
 	require.Equal(t, "", id)
 
 	// Check sig list is empty after all removals
@@ -825,7 +841,9 @@ func TestPendingTxContext_expired(t *testing.T) {
 	assert.True(t, txs.Expired(sig, 5*time.Second))   // expired for 5s lifetime
 	assert.False(t, txs.Expired(sig, 60*time.Second)) // not expired for 60s lifetime
 
-	assert.Equal(t, msg.id, txs.Remove(sig))
+	id, err := txs.Remove(sig)
+	assert.NoError(t, err)
+	assert.Equal(t, msg.id, id)
 	assert.False(t, txs.Expired(sig, 60*time.Second)) // no longer exists, should return false
 }
 
