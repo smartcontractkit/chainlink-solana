@@ -103,7 +103,8 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 			if isSendOnly {
 				txSender.wg.Add(1)
 				go func() {
-					ctx, cancel := txSender.chStop.Ctx(context.WithoutCancel(ctx))
+					var cancel context.CancelFunc
+					ctx, cancel = txSender.chStop.Ctx(context.WithoutCancel(ctx))
 					defer cancel()
 					defer txSender.wg.Done()
 					// Send-only nodes' results are ignored as they tend to return false-positive responses.
@@ -117,7 +118,8 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 			healthyNodesNum++
 			primaryNodeWg.Add(1)
 			go func() {
-				ctx, cancel := txSender.chStop.Ctx(context.WithoutCancel(ctx))
+				var cancel context.CancelFunc
+				ctx, cancel = txSender.chStop.Ctx(context.WithoutCancel(ctx))
 				defer cancel()
 				defer primaryNodeWg.Done()
 				r := txSender.broadcastTxAsync(ctx, rpc, tx)
