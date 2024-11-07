@@ -102,23 +102,21 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 		err := txSender.multiNode.DoAll(ctx, func(ctx context.Context, rpc RPC, isSendOnly bool) {
 			if isSendOnly {
 				txSender.wg.Add(1)
-				go func() {
-					//nolint:shadow
+				go func(ctx context.Context) {
 					ctx, cancel := txSender.chStop.Ctx(context.WithoutCancel(ctx))
 					defer cancel()
 					defer txSender.wg.Done()
 					// Send-only nodes' results are ignored as they tend to return false-positive responses.
 					// Broadcast to them is necessary to speed up the propagation of TX in the network.
 					_ = txSender.broadcastTxAsync(ctx, rpc, tx)
-				}()
+				}(ctx)
 				return
 			}
 
 			// Primary Nodes
 			healthyNodesNum++
 			primaryNodeWg.Add(1)
-			go func() {
-				//nolint:shadow
+			go func(ctx context.Context) {
 				ctx, cancel := txSender.chStop.Ctx(context.WithoutCancel(ctx))
 				defer cancel()
 				defer primaryNodeWg.Done()
@@ -136,7 +134,7 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 					return
 				case txResultsToReport <- r:
 				}
-			}()
+			}(ctx)
 		})
 
 		// This needs to be done in parallel so the reporting knows when it's done (when the channel is closed)
