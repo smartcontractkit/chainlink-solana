@@ -103,8 +103,8 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 			if isSendOnly {
 				txSender.wg.Add(1)
 				go func() {
-					var cancel context.CancelFunc
-					ctx, cancel = txSender.chStop.Ctx(context.WithoutCancel(ctx))
+					//nolint:shadow
+					ctx, cancel := txSender.chStop.Ctx(context.WithoutCancel(ctx))
 					defer cancel()
 					defer txSender.wg.Done()
 					// Send-only nodes' results are ignored as they tend to return false-positive responses.
@@ -118,21 +118,21 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 			healthyNodesNum++
 			primaryNodeWg.Add(1)
 			go func() {
-				var cancel context.CancelFunc
-				ctx, cancel = txSender.chStop.Ctx(context.WithoutCancel(ctx))
+				//nolint:shadow
+				ctx, cancel := txSender.chStop.Ctx(context.WithoutCancel(ctx))
 				defer cancel()
 				defer primaryNodeWg.Done()
 				r := txSender.broadcastTxAsync(ctx, rpc, tx)
 				select {
 				case <-ctx.Done():
-					txSender.lggr.Warnw("Failed to send tx results", "err", ctx.Err())
+					txSender.lggr.Debugw("Failed to send tx results", "err", ctx.Err())
 					return
 				case txResults <- r:
 				}
 
 				select {
 				case <-ctx.Done():
-					txSender.lggr.Warnw("Failed to send tx results to report", "err", ctx.Err())
+					txSender.lggr.Debugw("Failed to send tx results to report", "err", ctx.Err())
 					return
 				case txResultsToReport <- r:
 				}
@@ -167,7 +167,7 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) broadcastTxAsync(ctx context.Context, rpc RPC, tx TX) RESULT {
 	result := rpc.SendTransaction(ctx, tx)
 	txSender.lggr.Debugw("Node sent transaction", "tx", tx, "err", result.TxError())
-	if !slices.Contains(sendTxSuccessfulCodes, result.Code()) {
+	if !slices.Contains(sendTxSuccessfulCodes, result.Code()) && ctx.Err() == nil {
 		txSender.lggr.Warnw("RPC returned error", "tx", tx, "err", result.TxError())
 	}
 	return result
