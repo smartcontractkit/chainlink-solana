@@ -188,9 +188,9 @@ func SetTimeout(t time.Duration) SetTxConfig {
 		cfg.Timeout = t
 	}
 }
-func SetFeeBumpPeriod(t time.Duration) SetTxConfig {
+func SetFeeBumpFixedPeriod(t time.Duration) SetTxConfig {
 	return func(cfg *TxConfig) {
-		cfg.FeeBumpPeriod = t
+		cfg.FeeBumpFixedPeriod = t
 	}
 }
 func SetBaseComputeUnitPrice(v uint64) SetTxConfig {

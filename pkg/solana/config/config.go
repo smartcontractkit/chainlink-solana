@@ -28,7 +28,10 @@ var defaultConfigSet = Chain{
 	ComputeUnitPriceMax:      ptr(uint64(1_000)),
 	ComputeUnitPriceMin:      ptr(uint64(0)),
 	ComputeUnitPriceDefault:  ptr(uint64(0)),
-	FeeBumpPeriod:            config.MustNewDuration(3 * time.Second), // set to 0 to disable fee bumping
+	FeeBumpEnabled:           ptr(true),    // set to false to disable fee bumping
+	FeeBumpCriteria:          ptr("fixed"), // "fixed": bumps fees on FeeBumpFixedPeriod; "expiration": bumps fees on FeeBumpExpirationPeriod
+	FeeBumpFixedPeriod:       config.MustNewDuration(3 * time.Second),
+	FeeBumpExpirationPeriod:  config.MustNewDuration(1 * time.Minute), // expiration is between (0.4 * 150) and (0.8 * 150) blocks. This is between 1 and 2 minutes.
 	BlockHistoryPollPeriod:   config.MustNewDuration(5 * time.Second),
 	BlockHistorySize:         ptr(uint64(1)),       // 1: uses latest block; >1: Uses multiple blocks, where n is number of blocks. DISCLAIMER: 1:1 ratio between n and RPC calls.
 	ComputeUnitLimitDefault:  ptr(uint32(200_000)), // set to 0 to disable adding compute unit limit
@@ -54,7 +57,10 @@ type Config interface {
 	ComputeUnitPriceMax() uint64
 	ComputeUnitPriceMin() uint64
 	ComputeUnitPriceDefault() uint64
-	FeeBumpPeriod() time.Duration
+	FeeBumpEnabled() bool
+	FeeBumpCriteria() string
+	FeeBumpFixedPeriod() time.Duration
+	FeeBumpExpirationPeriod() time.Duration
 	BlockHistoryPollPeriod() time.Duration
 	BlockHistorySize() uint64
 	ComputeUnitLimitDefault() uint32
@@ -77,7 +83,10 @@ type Chain struct {
 	ComputeUnitPriceMax      *uint64
 	ComputeUnitPriceMin      *uint64
 	ComputeUnitPriceDefault  *uint64
-	FeeBumpPeriod            *config.Duration
+	FeeBumpEnabled           *bool
+	FeeBumpCriteria          *string
+	FeeBumpFixedPeriod       *config.Duration
+	FeeBumpExpirationPeriod  *config.Duration
 	BlockHistoryPollPeriod   *config.Duration
 	BlockHistorySize         *uint64
 	ComputeUnitLimitDefault  *uint32
@@ -130,8 +139,17 @@ func (c *Chain) SetDefaults() {
 	if c.ComputeUnitPriceDefault == nil {
 		c.ComputeUnitPriceDefault = defaultConfigSet.ComputeUnitPriceDefault
 	}
-	if c.FeeBumpPeriod == nil {
-		c.FeeBumpPeriod = defaultConfigSet.FeeBumpPeriod
+	if c.FeeBumpEnabled == nil {
+		c.FeeBumpEnabled = defaultConfigSet.FeeBumpEnabled
+	}
+	if c.FeeBumpCriteria == nil {
+		c.FeeBumpCriteria = defaultConfigSet.FeeBumpCriteria
+	}
+	if c.FeeBumpFixedPeriod == nil {
+		c.FeeBumpFixedPeriod = defaultConfigSet.FeeBumpFixedPeriod
+	}
+	if c.FeeBumpExpirationPeriod == nil {
+		c.FeeBumpExpirationPeriod = defaultConfigSet.FeeBumpExpirationPeriod
 	}
 	if c.BlockHistoryPollPeriod == nil {
 		c.BlockHistoryPollPeriod = defaultConfigSet.BlockHistoryPollPeriod

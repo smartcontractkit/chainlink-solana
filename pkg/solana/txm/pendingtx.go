@@ -30,6 +30,10 @@ type PendingTxContext interface {
 	ListAll() []solana.Signature
 	// Expired returns whether or not confirmation timeout amount of time has passed since creation
 	Expired(sig solana.Signature, confirmationTimeout time.Duration) bool
+	// IsExpiredForBump checks if the transaction identified by the given signature has expired and should be bumped.
+	IsExpiredForBump(sig solana.Signature, bumpExpiration time.Duration) bool
+	// UpdateTimestampWhenBumped updates the createTs of a broadcasted transaction to the current time when bumping it.
+	UpdateTimestampWhenBumped(id string) error
 	// OnProcessed marks transactions as Processed
 	OnProcessed(sig solana.Signature) (string, error)
 	// OnConfirmed marks transaction as Confirmed and moves it from broadcast map to confirmed map
@@ -228,6 +232,41 @@ func (c *pendingTxContext) Expired(sig solana.Signature, confirmationTimeout tim
 		return time.Since(tx.createTs) > confirmationTimeout
 	}
 	return false // return expired = false if tx does not exist (likely cleaned up by something else previously)
+}
+
+// IsExpiredForBump checks if the transaction identified by the given signature has expired and should be bumped.
+func (c *pendingTxContext) IsExpiredForBump(sig solana.Signature, bumpExpiration time.Duration) bool {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	id, exists := c.sigToID[sig]
+	if !exists {
+		return false // return expired = false if sig does not exist (likely cleaned up by something else previously)
+	}
+
+	// Check in broadcasted transactions if the transaction has expired and should be bumped
+	if tx, exists := c.broadcastedTxs[id]; exists {
+		return time.Since(tx.createTs) > bumpExpiration
+	}
+
+	return false // Transaction not found in either map
+}
+
+// UpdateTimestampWhenBumped updates the createTs of a broadcasted transaction to the current time when bumping it.
+func (c *pendingTxContext) UpdateTimestampWhenBumped(id string) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	// Check if transaction exists in broadcasted transactions
+	tx, exists := c.broadcastedTxs[id]
+	if !exists {
+		return ErrTransactionNotFound
+	}
+	// Update the timestamp to the current time
+	// Save the updated transaction back to the broadcasted map
+	tx.createTs = time.Now()
+	c.broadcastedTxs[id] = tx
+	return nil
 }
 
 func (c *pendingTxContext) OnProcessed(sig solana.Signature) (string, error) {
@@ -594,4 +633,16 @@ func (c *pendingTxContextWithProm) GetTxState(id string) (TxState, error) {
 
 func (c *pendingTxContextWithProm) TrimFinalizedErroredTxs() {
 	c.pendingTx.TrimFinalizedErroredTxs()
+}
+
+func (c *pendingTxContextWithProm) IsExpiredForBump(sig solana.Signature, bumpExpiration time.Duration) bool {
+	expired := c.pendingTx.IsExpiredForBump(sig, bumpExpiration)
+	if expired {
+		promSolTxmExpiredBumps.WithLabelValues(c.chainID).Inc()
+	}
+	return expired
+}
+
+func (c *pendingTxContextWithProm) UpdateTimestampWhenBumped(id string) error {
+	return c.pendingTx.UpdateTimestampWhenBumped(id)
 }

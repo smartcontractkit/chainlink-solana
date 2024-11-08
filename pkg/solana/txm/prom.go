@@ -47,4 +47,9 @@ var (
 		Name: "solana_txm_tx_error_sim_other",
 		Help: "Number of transactions that failed simulation with an unrecognized error. Note: tx may still be included onchain",
 	}, []string{"chainID"})
+	// New metric for tracking expired transactions eligible for fee bumping
+	promSolTxmExpiredBumps = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "solana_txm_tx_expired_bumps_total",
+		Help: "Total number of transactions expired and eligible for fee bumping when using FeeBumpCriteria='expiration'",
+	}, []string{"chainID"})
 )

@@ -194,12 +194,66 @@ func (_m *Config) EstimateComputeUnitLimit() bool {
 	return r0
 }
 
-// FeeBumpPeriod provides a mock function with given fields:
-func (_m *Config) FeeBumpPeriod() time.Duration {
+// FeeBumpCriteria provides a mock function with given fields:
+func (_m *Config) FeeBumpCriteria() string {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for FeeBumpPeriod")
+		panic("no return value specified for FeeBumpCriteria")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// FeeBumpEnabled provides a mock function with given fields:
+func (_m *Config) FeeBumpEnabled() bool {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for FeeBumpEnabled")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// FeeBumpExpirationPeriod provides a mock function with given fields:
+func (_m *Config) FeeBumpExpirationPeriod() time.Duration {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for FeeBumpExpirationPeriod")
+	}
+
+	var r0 time.Duration
+	if rf, ok := ret.Get(0).(func() time.Duration); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(time.Duration)
+	}
+
+	return r0
+}
+
+// FeeBumpFixedPeriod provides a mock function with given fields:
+func (_m *Config) FeeBumpFixedPeriod() time.Duration {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for FeeBumpFixedPeriod")
 	}
 
 	var r0 time.Duration

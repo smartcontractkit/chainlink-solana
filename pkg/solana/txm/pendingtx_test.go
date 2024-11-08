@@ -908,6 +908,242 @@ func TestPendingTxContext_race(t *testing.T) {
 	})
 }
 
+func TestPendingTxContext_IsExpiredForBump(t *testing.T) {
+	// Define test cases
+	tests := []struct {
+		name           string
+		setupFunc      func(t *testing.T, txs *pendingTxContext) ([]solana.Signature, []solana.Signature)
+		sig            solana.Signature
+		bumpExpiration time.Duration
+	}{
+		{
+			name: "Transaction is expired for bumping",
+			setupFunc: func(t *testing.T, txs *pendingTxContext) (nonExp []solana.Signature, exp []solana.Signature) {
+				sig := randomSignature(t)
+				exp = append(exp, sig)
+				setupTransaction(t, txs, uuid.NewString(), sig, -10*time.Second) // 10 seconds ago
+				return nil, exp
+			},
+			bumpExpiration: 5 * time.Second,
+		},
+		{
+			name: "Transaction is not expired for bumping",
+			setupFunc: func(t *testing.T, txs *pendingTxContext) (nonExp []solana.Signature, exp []solana.Signature) {
+				sig := randomSignature(t)
+				nonExp = append(nonExp, sig)
+				setupTransaction(t, txs, uuid.NewString(), sig, -2*time.Second) // 2 seconds ago
+				return nonExp, nil
+			},
+			bumpExpiration: 5 * time.Second,
+		},
+		{
+			name: "Non-existent signature should not be expired",
+			setupFunc: func(t *testing.T, txs *pendingTxContext) (nonExp []solana.Signature, exp []solana.Signature) {
+				// Return a signature that hasn't been added
+				nonExp = append(nonExp, randomSignature(t))
+				return nonExp, nil
+			},
+			bumpExpiration: 5 * time.Second,
+		},
+		{
+			name: "Multiple transactions, some expired and some not",
+			setupFunc: func(t *testing.T, txs *pendingTxContext) (nonExp []solana.Signature, exp []solana.Signature) {
+				// Create multiple transactions
+				numTransactions := 3
+				// Create expired transactions
+				for i := 0; i < numTransactions; i++ {
+					sig := randomSignature(t)
+					exp = append(exp, sig)
+					setupTransaction(t, txs, uuid.NewString(), sig, -10*time.Second) // 10 seconds ago
+				}
+				// Create non-expired transactions
+				for i := 0; i < numTransactions; i++ {
+					sig := randomSignature(t)
+					nonExp = append(nonExp, sig)
+					setupTransaction(t, txs, uuid.NewString(), sig, -2*time.Second) // 2 seconds ago
+				}
+
+				return nonExp, exp
+			},
+			bumpExpiration: 5 * time.Second,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			// get signatures to test for expired and non-expired transactions
+			txs := newPendingTxContext()
+			nonExp, exp := tt.setupFunc(t, txs)
+
+			// non-expired transactions should not be expired
+			for _, sig := range nonExp {
+				require.False(t, txs.IsExpiredForBump(sig, tt.bumpExpiration), "nonExpired signatures where marked as expired")
+			}
+
+			// expired transactions should be expired
+			for _, sig := range exp {
+				require.True(t, txs.IsExpiredForBump(sig, tt.bumpExpiration), "expired signatures where marked as non-expired")
+			}
+		})
+	}
+}
+
+func TestPendingTxContext_IsExpiredForBump_ConcurrentAccess(t *testing.T) {
+	// Create multiple transactions
+	txs := newPendingTxContext()
+	numTransactions := 100
+	signatures := make([]solana.Signature, numTransactions)
+
+	for i := 0; i < numTransactions; i++ {
+		sig := randomSignature(t)
+		signatures[i] = sig
+
+		if i%2 == 0 { // Set even indices as expired
+			setupTransaction(t, txs, uuid.NewString(), sig, -10*time.Second) // 10 seconds ago
+		} else { // Set odd indices as not expired
+			setupTransaction(t, txs, uuid.NewString(), sig, -2*time.Second) // 2 seconds ago
+		}
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(numTransactions)
+	results := make(chan bool, numTransactions)
+
+	for _, sig := range signatures {
+		go func(s solana.Signature) {
+			expired := txs.IsExpiredForBump(s, 5*time.Second)
+			results <- expired // collect results
+			wg.Done()
+		}(sig)
+	}
+
+	wg.Wait()
+	close(results)
+
+	// Verify results
+	countExpired := 0
+	for expired := range results {
+		if expired {
+			countExpired++
+		}
+	}
+
+	// half of the transactions should be expired
+	require.Equal(t, numTransactions/2, countExpired, "Half of the transactions should be expired for bumping")
+}
+func TestPendingTxContext_UpdateTimestampWhenBumped(t *testing.T) {
+	txs := newPendingTxContext()
+
+	// Create a transaction that is expired
+	txID := uuid.NewString()
+	sig := randomSignature(t)
+	setupTransaction(t, txs, txID, sig, -10*time.Second) // 10 seconds ago
+	require.True(t, txs.IsExpiredForBump(sig, 5*time.Second), "Transaction should be expired before updating timestamp")
+	require.NoError(t, txs.UpdateTimestampWhenBumped(txID)) // update timestamp
+	require.False(t, txs.IsExpiredForBump(sig, 5*time.Second), "Transaction should not be expired after updating timestamp")
+}
+
+func TestPendingTxContext_UpdateTimestampWhenBumped_MultipleBumps(t *testing.T) {
+	txs := newPendingTxContext()
+	txID := uuid.NewString()
+	sig := randomSignature(t)
+	bumpExpiration := 5 * time.Second
+
+	// Create a transaction that is expired
+	setupTransaction(t, txs, txID, sig, -10*time.Second)
+	require.True(t, txs.IsExpiredForBump(sig, bumpExpiration))
+
+	// Perform multiple fee bumps
+	for i := 0; i < 3; i++ {
+		require.NoError(t, txs.UpdateTimestampWhenBumped(txID))
+
+		// after bump, transaction should not be expired
+		require.False(t, txs.IsExpiredForBump(sig, bumpExpiration))
+
+		// Simulate time passing less than bumpExpiration
+		advanceTime(txs, txID, -2*time.Second)
+
+		// Check again before bumpExpiration
+		require.False(t, txs.IsExpiredForBump(sig, bumpExpiration), "Transaction should not be expired yet")
+
+		// Simulate time passing to exceed bumpExpiration
+		advanceTime(txs, txID, -4*time.Second)
+	}
+
+	// After sufficient time, transaction should be expired again
+	require.True(t, txs.IsExpiredForBump(sig, bumpExpiration))
+}
+
+func TestPendingTxContext_UpdateTimestampWhenBumped_NonExistentTransaction(t *testing.T) {
+	txs := newPendingTxContext()
+	nonExistentTxID := uuid.NewString()
+
+	err := txs.UpdateTimestampWhenBumped(nonExistentTxID)
+	require.Error(t, err)
+	require.Equal(t, ErrTransactionNotFound, err)
+}
+
+func TestPendingTxContext_UpdateTimestampWhenBumped_ConcurrentAccess(t *testing.T) {
+	txs := newPendingTxContext()
+	numTransactions := 100
+	txIDs := make([]string, numTransactions)
+	sigs := make([]solana.Signature, numTransactions)
+
+	// Create transactions with createTs set to past time (expired)
+	for i := 0; i < numTransactions; i++ {
+		txID := uuid.NewString()
+		sig := randomSignature(t)
+		setupTransaction(t, txs, txID, sig, -10*time.Second)
+
+		txIDs[i] = txID
+		sigs[i] = sig
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(numTransactions)
+	// Update timestamps concurrently
+	for i := 0; i < numTransactions; i++ {
+		go func(idx int) {
+			defer wg.Done()
+			err := txs.UpdateTimestampWhenBumped(txIDs[idx])
+			require.NoError(t, err)
+		}(i)
+	}
+	wg.Wait()
+
+	// Verify that none of the transactions are expired
+	bumpExpiration := 5 * time.Second
+	for _, sig := range sigs {
+		require.False(t, txs.IsExpiredForBump(sig, bumpExpiration), "Transaction should not be expired after concurrent timestamp updates")
+	}
+}
+
+// advanceTime is a helper func to manipulate createTs directly and avoid sleeping.
+func advanceTime(txs *pendingTxContext, txID string, timeOffset time.Duration) {
+	txs.lock.Lock()
+	defer txs.lock.Unlock()
+	tx := txs.broadcastedTxs[txID]
+	tx.createTs = tx.createTs.Add(timeOffset)
+	txs.broadcastedTxs[txID] = tx
+}
+
+// setupTransaction is a helper function to set up a transaction with a specified time offset
+func setupTransaction(t *testing.T, txs *pendingTxContext, txID string, sig solana.Signature, timeOffset time.Duration) {
+	// Create a new transaction
+	msg := pendingTx{
+		id: txID,
+	}
+	err := txs.New(msg, sig, func() {})
+	require.NoError(t, err)
+
+	// Manually set the createTs to simulate expiration or non-expiration
+	txs.lock.Lock()
+	tx := txs.broadcastedTxs[txID]
+	tx.createTs = time.Now().Add(timeOffset)
+	txs.broadcastedTxs[txID] = tx
+	txs.lock.Unlock()
+}
+
 func randomSignature(t *testing.T) solana.Signature {
 	// make random signature
 	sig := make([]byte, 64)

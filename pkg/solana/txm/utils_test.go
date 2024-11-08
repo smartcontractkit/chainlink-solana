@@ -80,7 +80,7 @@ func TestSetTxConfig(t *testing.T) {
 
 	for _, v := range []SetTxConfig{
 		SetTimeout(1 * time.Second),
-		SetFeeBumpPeriod(2 * time.Second),
+		SetFeeBumpFixedPeriod(2 * time.Second),
 		SetBaseComputeUnitPrice(3),
 		SetComputeUnitPriceMin(4),
 		SetComputeUnitPriceMax(5),
@@ -90,7 +90,7 @@ func TestSetTxConfig(t *testing.T) {
 	}
 
 	assert.Equal(t, 1*time.Second, cfg.Timeout)
-	assert.Equal(t, 2*time.Second, cfg.FeeBumpPeriod)
+	assert.Equal(t, 2*time.Second, cfg.FeeBumpFixedPeriod)
 	assert.Equal(t, uint64(3), cfg.BaseComputeUnitPrice)
 	assert.Equal(t, uint64(4), cfg.ComputeUnitPriceMin)
 	assert.Equal(t, uint64(5), cfg.ComputeUnitPriceMax)

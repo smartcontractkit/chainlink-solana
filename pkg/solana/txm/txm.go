@@ -33,6 +33,11 @@ const (
 	MaxSigsToConfirm               = 256              // max number of signatures in GetSignatureStatus call
 	EstimateComputeUnitLimitBuffer = 10               // percent buffer added on top of estimated compute unit limits to account for any variance
 	TxReapInterval                 = 10 * time.Second // interval of time between reaping transactions that have met the retention threshold
+	FeeEstimatorModeFixed          = "fixed"
+	FeeEstimatorModeBlockHistory   = "blockhistory"
+	FeeBumpCriteriaFixed           = "fixed"
+	FeeBumpCriteriaExpiration      = "expiration"
+	FeeBumpCriteriaNone            = "none"
 )
 
 var _ services.Service = (*Txm)(nil)
@@ -68,10 +73,14 @@ type TxConfig struct {
 	Timeout time.Duration // transaction broadcast timeout
 
 	// compute unit price config
-	FeeBumpPeriod        time.Duration // how often to bump fee
-	BaseComputeUnitPrice uint64        // starting price
-	ComputeUnitPriceMin  uint64        // min price
-	ComputeUnitPriceMax  uint64        // max price
+	FeeBumpEnabled          bool          // enable fee bumping
+	FeeBumpCriteria         string        // criteria for bumping fee
+	FeeBumpFixedPeriod      time.Duration // how often to bump fee if we use bumpCriteria = 'fixed'
+	FeeBumpExpirationPeriod time.Duration // duration after which a transaction is considered expired when using bumpCriteria = 'expiration'
+
+	BaseComputeUnitPrice uint64 // starting price
+	ComputeUnitPriceMin  uint64 // min price
+	ComputeUnitPriceMax  uint64 // max price
 
 	EstimateComputeUnitLimit bool   // enable compute limit estimations using simulation
 	ComputeUnitLimit         uint32 // compute unit limit
@@ -108,25 +117,15 @@ func NewTxm(chainID string, client internal.Loader[client.ReaderWriter],
 // Start subscribes to queuing channel and processes them.
 func (txm *Txm) Start(ctx context.Context) error {
 	return txm.StartOnce("Txm", func() error {
-		// determine estimator type
-		var estimator fees.Estimator
-		var err error
-		switch strings.ToLower(txm.cfg.FeeEstimatorMode()) {
-		case "fixed":
-			estimator, err = fees.NewFixedPriceEstimator(txm.cfg)
-		case "blockhistory":
-			estimator, err = fees.NewBlockHistoryEstimator(txm.client, txm.cfg, txm.lggr)
-		default:
-			err = fmt.Errorf("unknown solana fee estimator type: %s", txm.cfg.FeeEstimatorMode())
+		// validate config
+		if err := txm.validateConfig(); err != nil {
+			return fmt.Errorf("configuration validation failed: %w", err)
 		}
-		if err != nil {
-			return err
-		}
-		txm.fee = estimator
+
+		// start loops
 		if err := txm.fee.Start(ctx); err != nil {
 			return err
 		}
-
 		txm.done.Add(3) // waitgroup: tx retry, confirmer, simulator
 		go txm.run()
 		go txm.confirm()
@@ -140,6 +139,39 @@ func (txm *Txm) Start(ctx context.Context) error {
 
 		return nil
 	})
+}
+
+// validateConfig validates consistency of configs when starting the services.
+func (txm *Txm) validateConfig() (err error) {
+	// Validate fee estimator configuration
+	var estimator fees.Estimator
+	switch strings.ToLower(txm.cfg.FeeEstimatorMode()) {
+	case FeeEstimatorModeFixed:
+		estimator, err = fees.NewFixedPriceEstimator(txm.cfg)
+	case FeeEstimatorModeBlockHistory:
+		estimator, err = fees.NewBlockHistoryEstimator(txm.client, txm.cfg, txm.lggr)
+	default:
+		err = fmt.Errorf("unknown solana fee estimator type: %s", txm.cfg.FeeEstimatorMode())
+	}
+	if err != nil {
+		return err
+	}
+	txm.fee = estimator
+
+	// Validate fee bumping configuration
+	if txm.cfg.FeeBumpEnabled() {
+		if txm.cfg.FeeBumpCriteria() != FeeBumpCriteriaFixed && txm.cfg.FeeBumpCriteria() != FeeBumpCriteriaExpiration && txm.cfg.FeeBumpCriteria() != FeeBumpCriteriaNone {
+			return errors.New("invalid FeeBumpCriteria; must be 'fixed', 'expiration' or 'none'")
+		}
+		if txm.cfg.FeeBumpCriteria() == FeeBumpCriteriaFixed && txm.cfg.FeeBumpFixedPeriod() <= 0 {
+			return errors.New("FeeBumpFixedPeriod must be greater than zero for 'fixed' criteria")
+		}
+		if txm.cfg.FeeBumpCriteria() == FeeBumpCriteriaExpiration && txm.cfg.FeeBumpExpirationPeriod() <= 0 {
+			return errors.New("FeeBumpExpirationPeriod must be greater than zero for 'expiration' criteria")
+		}
+	}
+
+	return err
 }
 
 func (txm *Txm) run() {
@@ -266,10 +298,16 @@ func (txm *Txm) sendWithRetry(ctx context.Context, msg pendingTx) (solanaGo.Tran
 	// pass in copy of baseTx (used to build new tx with bumped fee) and broadcasted tx == initTx (used to retry tx without bumping)
 	go func(ctx context.Context, baseTx, currentTx solanaGo.Transaction) {
 		defer txm.done.Done()
-		deltaT := 1 // ms
+		var deltaT time.Duration
+		if msg.cfg.FeeBumpCriteria == FeeBumpCriteriaExpiration {
+			// Set the tick interval to a reasonable duration for expiration criteria
+			deltaT = msg.cfg.FeeBumpExpirationPeriod / 2
+		} else {
+			deltaT = time.Duration(1) * time.Millisecond // Start with 1ms for other criteria
+		}
 		tick := time.After(0)
 		bumpCount := 0
-		bumpTime := time.Now()
+		fixedBumpTime := time.Now()
 		var wg sync.WaitGroup
 
 		for {
@@ -281,25 +319,40 @@ func (txm *Txm) sendWithRetry(ctx context.Context, msg pendingTx) (solanaGo.Tran
 				return
 			case <-tick:
 				var shouldBump bool
-				// bump if period > 0 and past time
-				if msg.cfg.FeeBumpPeriod != 0 && time.Since(bumpTime) > msg.cfg.FeeBumpPeriod {
-					bumpCount++
-					bumpTime = time.Now()
-					shouldBump = true
-				}
 
-				// if fee should be bumped, build new tx and replace currentTx
-				if shouldBump {
-					var retryBuildErr error
-					currentTx, retryBuildErr = buildTx(ctx, baseTx, bumpCount)
-					if retryBuildErr != nil {
-						txm.lggr.Errorw("failed to build bumped retry tx", "error", retryBuildErr, "id", msg.id)
-						return // exit func if cannot build tx for retrying
+				// check if fee bumping is enabled and what criteria to use
+				if msg.cfg.FeeBumpEnabled {
+					switch msg.cfg.FeeBumpCriteria {
+					case FeeBumpCriteriaFixed:
+						if time.Since(fixedBumpTime) > msg.cfg.FeeBumpFixedPeriod {
+							shouldBump = true
+							fixedBumpTime = time.Now()
+						}
+					case FeeBumpCriteriaExpiration:
+						if txm.txs.IsExpiredForBump(sig, msg.cfg.FeeBumpExpirationPeriod) {
+							shouldBump = true
+						}
+					case FeeBumpCriteriaNone:
+						// It should be false at this point, but just to be explicit
+						shouldBump = false
+					default:
+						txm.lggr.Errorw("unknown fee bump criteria", "criteria", msg.cfg.FeeBumpCriteria)
 					}
-					ind := sigs.Allocate()
-					if ind != bumpCount {
-						txm.lggr.Errorw("INVARIANT VIOLATION: index (%d) != bumpCount (%d)", ind, bumpCount)
-						return
+
+					// if fee should be bumped, build new tx and replace currentTx
+					if shouldBump {
+						bumpCount++
+						var retryBuildErr error
+						currentTx, retryBuildErr = buildTx(ctx, baseTx, bumpCount)
+						if retryBuildErr != nil {
+							txm.lggr.Errorw("failed to build bumped retry tx", "error", retryBuildErr, "id", msg.id)
+							return // exit func if cannot build tx for retrying
+						}
+						ind := sigs.Allocate()
+						if ind != bumpCount {
+							txm.lggr.Errorw("INVARIANT VIOLATION: index (%d) != bumpCount (%d)", ind, bumpCount)
+							return
+						}
 					}
 				}
 
@@ -323,6 +376,11 @@ func (txm *Txm) sendWithRetry(ctx context.Context, msg pendingTx) (solanaGo.Tran
 					if bump {
 						if retryStoreErr := txm.txs.AddSignature(msg.id, retrySig); retryStoreErr != nil {
 							txm.lggr.Warnw("error in adding retry transaction", "error", retryStoreErr, "id", msg.id)
+							return
+						}
+						// Update createTs to the last bump time
+						if updateErr := txm.txs.UpdateTimestampWhenBumped(msg.id); updateErr != nil {
+							txm.lggr.Warnw("error updating createTs for transaction", "error", updateErr, "id", msg.id)
 							return
 						}
 						if setErr := sigs.Set(count, retrySig); setErr != nil {
@@ -351,12 +409,17 @@ func (txm *Txm) sendWithRetry(ctx context.Context, msg pendingTx) (solanaGo.Tran
 				}(shouldBump, bumpCount, currentTx)
 			}
 
-			// exponential increase in wait time, capped at 250ms
-			deltaT *= 2
-			if deltaT > MaxRetryTimeMs {
-				deltaT = MaxRetryTimeMs
+			if msg.cfg.FeeBumpCriteria == FeeBumpCriteriaExpiration {
+				// Use fixed tick interval for expiration criteria
+				tick = time.After(deltaT)
+			} else {
+				// Exponential backoff for other criteria
+				deltaT *= 2
+				if deltaT > MaxRetryTimeMs {
+					deltaT = MaxRetryTimeMs
+				}
+				tick = time.After(deltaT)
 			}
-			tick = time.After(time.Duration(deltaT) * time.Millisecond)
 		}
 	}(ctx, baseTx, initTx)
 
@@ -755,7 +818,10 @@ func (txm *Txm) HealthReport() map[string]error { return map[string]error{txm.Na
 func (txm *Txm) defaultTxConfig() TxConfig {
 	return TxConfig{
 		Timeout:                  txm.cfg.TxRetryTimeout(),
-		FeeBumpPeriod:            txm.cfg.FeeBumpPeriod(),
+		FeeBumpEnabled:           txm.cfg.FeeBumpEnabled(),
+		FeeBumpCriteria:          txm.cfg.FeeBumpCriteria(),
+		FeeBumpExpirationPeriod:  txm.cfg.FeeBumpExpirationPeriod(),
+		FeeBumpFixedPeriod:       txm.cfg.FeeBumpFixedPeriod(),
 		BaseComputeUnitPrice:     txm.fee.BaseComputeUnitPrice(),
 		ComputeUnitPriceMin:      txm.cfg.ComputeUnitPriceMin(),
 		ComputeUnitPriceMax:      txm.cfg.ComputeUnitPriceMax(),

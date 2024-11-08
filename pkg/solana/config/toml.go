@@ -179,8 +179,17 @@ func setFromChain(c, f *Chain) {
 	if f.ComputeUnitPriceDefault != nil {
 		c.ComputeUnitPriceDefault = f.ComputeUnitPriceDefault
 	}
-	if f.FeeBumpPeriod != nil {
-		c.FeeBumpPeriod = f.FeeBumpPeriod
+	if f.FeeBumpEnabled != nil {
+		c.FeeBumpEnabled = f.FeeBumpEnabled
+	}
+	if f.FeeBumpCriteria != nil {
+		c.FeeBumpCriteria = f.FeeBumpCriteria
+	}
+	if f.FeeBumpFixedPeriod != nil {
+		c.FeeBumpFixedPeriod = f.FeeBumpFixedPeriod
+	}
+	if f.FeeBumpExpirationPeriod != nil {
+		c.FeeBumpExpirationPeriod = f.FeeBumpExpirationPeriod
 	}
 	if f.BlockHistoryPollPeriod != nil {
 		c.BlockHistoryPollPeriod = f.BlockHistoryPollPeriod
@@ -279,8 +288,20 @@ func (c *TOMLConfig) ComputeUnitPriceDefault() uint64 {
 	return *c.Chain.ComputeUnitPriceDefault
 }
 
-func (c *TOMLConfig) FeeBumpPeriod() time.Duration {
-	return c.Chain.FeeBumpPeriod.Duration()
+func (c *TOMLConfig) FeeBumpEnabled() bool {
+	return *c.Chain.FeeBumpEnabled
+}
+
+func (c *TOMLConfig) FeeBumpCriteria() string {
+	return *c.Chain.FeeBumpCriteria
+}
+
+func (c *TOMLConfig) FeeBumpFixedPeriod() time.Duration {
+	return c.Chain.FeeBumpFixedPeriod.Duration()
+}
+
+func (c *TOMLConfig) FeeBumpExpirationPeriod() time.Duration {
+	return c.Chain.FeeBumpExpirationPeriod.Duration()
 }
 
 func (c *TOMLConfig) BlockHistoryPollPeriod() time.Duration {
