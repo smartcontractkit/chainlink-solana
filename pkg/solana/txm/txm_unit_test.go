@@ -14,6 +14,7 @@ import (
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	solanatxm "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 
@@ -25,7 +26,6 @@ import (
 
 func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 	t.Parallel()
-
 	ctx := tests.Context(t)
 
 	// setup mock keystore
@@ -57,7 +57,17 @@ func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 				Blockhash:            solana.Hash{},
 			},
 		}, nil).Once()
-		client.On("SimulateTx", mock.Anything, mock.Anything, mock.Anything).Return(&rpc.SimulateTransactionResult{
+		client.On("SimulateTx", mock.Anything, mock.IsType(&solana.Transaction{}), mock.IsType(&rpc.SimulateTransactionOpts{})).Run(func(args mock.Arguments) {
+			// Validate max compute unit limit is set in transaction
+			tx := args.Get(1).(*solana.Transaction)
+			limit, err := fees.ParseComputeUnitLimit(tx.Message.Instructions[1].Data)
+			require.NoError(t, err)
+			require.Equal(t, fees.ComputeUnitLimit(solanatxm.MaxComputeUnitLimit), limit)
+
+			// Validate signature verification is enabled
+			opts := args.Get(2).(*rpc.SimulateTransactionOpts)
+			require.True(t, opts.SigVerify)
+		}).Return(&rpc.SimulateTransactionResult{
 			Err:           nil,
 			UnitsConsumed: &usedCompute,
 		}, nil).Once()

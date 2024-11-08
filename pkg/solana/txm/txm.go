@@ -28,9 +28,10 @@ import (
 
 const (
 	MaxQueueLen                    = 1000
-	MaxRetryTimeMs                 = 250 // max tx retry time (exponential retry will taper to retry every 0.25s)
-	MaxSigsToConfirm               = 256 // max number of signatures in GetSignatureStatus call
-	EstimateComputeUnitLimitBuffer = 10  // percent buffer added on top of estimated compute unit limits to account for any variance
+	MaxRetryTimeMs                 = 250       // max tx retry time (exponential retry will taper to retry every 0.25s)
+	MaxSigsToConfirm               = 256       // max number of signatures in GetSignatureStatus call
+	EstimateComputeUnitLimitBuffer = 10        // percent buffer added on top of estimated compute unit limits to account for any variance
+	MaxComputeUnitLimit            = 1_400_000 // max compute unit limit a transaction can have
 )
 
 var _ services.Service = (*Txm)(nil)
@@ -613,7 +614,17 @@ func (txm *Txm) simulateTx(ctx context.Context, tx *solanaGo.Transaction) (res *
 		return
 	}
 
-	res, err = client.SimulateTx(ctx, tx, nil) // use default options (does not verify signatures)
+	// Copy tx to avoid changing the original tx
+	txCopy := *tx
+
+	// Set max compute unit limit when simulating a transaction to avoid getting an error for exceeding the default 200k compute unit limit
+	if computeUnitLimitErr := fees.SetComputeUnitLimit(&txCopy, fees.ComputeUnitLimit(MaxComputeUnitLimit)); computeUnitLimitErr != nil {
+		txm.lggr.Errorw("failed to set compute unit limit when simulating tx", "error", computeUnitLimitErr)
+		return nil, computeUnitLimitErr
+	}
+
+	// Simulate with signature verification since it can have a significant impact on compute units
+	res, err = client.SimulateTx(ctx, &txCopy, &rpc.SimulateTransactionOpts{SigVerify: true})
 	if err != nil {
 		// This error can occur if endpoint goes down or if invalid signature
 		txm.lggr.Errorw("failed to simulate tx", "error", err)
