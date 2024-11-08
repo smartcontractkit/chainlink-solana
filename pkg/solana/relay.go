@@ -154,7 +154,7 @@ func (r *Relayer) NewMedianProvider(ctx context.Context, rargs relaytypes.RelayA
 	}
 
 	cfg := configWatcher.chain.Config()
-	transmissionsCache := NewTransmissionsCache(transmissionsID, relayConfig.ChainID, cfg, configWatcher.reader, r.lggr)
+	transmissionsCache := NewTransmissionsCache(transmissionsID, relayConfig.ChainID, cfg, configWatcher.chain.Reader, r.lggr)
 	return &medianProvider{
 		configProvider:     configWatcher,
 		transmissionsCache: transmissionsCache,
@@ -169,7 +169,7 @@ func (r *Relayer) NewMedianProvider(ctx context.Context, rargs relaytypes.RelayA
 			storeProgramID:     configWatcher.storeProgramID,
 			transmissionsID:    transmissionsID,
 			transmissionSigner: transmitterAccount,
-			reader:             configWatcher.reader,
+			reader:             configWatcher.chain.Reader,
 			stateCache:         configWatcher.stateCache,
 			lggr:               r.lggr,
 			txManager:          configWatcher.chain.TxManager(),
@@ -187,6 +187,8 @@ func (r *Relayer) NewAutomationProvider(ctx context.Context, rargs relaytypes.Re
 
 var _ relaytypes.ConfigProvider = &configProvider{}
 
+type GetReader func() (client.Reader, error)
+
 type configProvider struct {
 	services.StateMachine
 	chainID                            string
@@ -195,7 +197,7 @@ type configProvider struct {
 	offchainConfigDigester             types.OffchainConfigDigester
 	configTracker                      types.ContractConfigTracker
 	chain                              Chain
-	reader                             client.Reader
+	reader                             GetReader
 }
 
 func newConfigProvider(_ context.Context, lggr logger.Logger, chain Chain, args relaytypes.RelayArgs) (*configProvider, error) {
@@ -222,11 +224,7 @@ func newConfigProvider(_ context.Context, lggr logger.Logger, chain Chain, args 
 		StateID:   stateID,
 	}
 
-	reader, err := chain.Reader()
-	if err != nil {
-		return nil, fmt.Errorf("error in NewMedianProvider.chain.Reader: %w", err)
-	}
-	stateCache := NewStateCache(stateID, relayConfig.ChainID, chain.Config(), reader, lggr)
+	stateCache := NewStateCache(stateID, relayConfig.ChainID, chain.Config(), chain.Reader, lggr)
 	return &configProvider{
 		chainID:                relayConfig.ChainID,
 		stateID:                stateID,
@@ -234,9 +232,8 @@ func newConfigProvider(_ context.Context, lggr logger.Logger, chain Chain, args 
 		storeProgramID:         storeProgramID,
 		stateCache:             stateCache,
 		offchainConfigDigester: offchainConfigDigester,
-		configTracker:          &ConfigTracker{stateCache: stateCache, reader: reader},
+		configTracker:          &ConfigTracker{stateCache: stateCache, reader: chain.Reader},
 		chain:                  chain,
-		reader:                 reader,
 	}, nil
 }
 

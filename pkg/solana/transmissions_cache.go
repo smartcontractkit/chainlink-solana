@@ -19,7 +19,7 @@ type TransmissionsCache struct {
 	*client.Cache[Answer]
 }
 
-func NewTransmissionsCache(transmissionsID solana.PublicKey, chainID string, cfg config.Config, reader client.Reader, lggr logger.Logger) *TransmissionsCache {
+func NewTransmissionsCache(transmissionsID solana.PublicKey, chainID string, cfg config.Config, reader GetReader, lggr logger.Logger) *TransmissionsCache {
 	name := "ocr2_median_transmissions"
 	getter := func(ctx context.Context) (Answer, uint64, error) {
 		return GetLatestTransmission(ctx, reader, transmissionsID, cfg.Commitment())
@@ -27,11 +27,17 @@ func NewTransmissionsCache(transmissionsID solana.PublicKey, chainID string, cfg
 	return &TransmissionsCache{client.NewCache(name, transmissionsID, chainID, cfg, getter, logger.With(lggr, "cache", name))}
 }
 
-func GetLatestTransmission(ctx context.Context, reader client.AccountReader, account solana.PublicKey, commitment rpc.CommitmentType) (Answer, uint64, error) {
+func GetLatestTransmission(ctx context.Context, reader GetReader, account solana.PublicKey, commitment rpc.CommitmentType) (Answer, uint64, error) {
 	// query for transmission header
 	headerStart := AccountDiscriminatorLen // skip account discriminator
 	headerLen := TransmissionsHeaderLen
-	res, err := reader.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
+
+	r, err := reader()
+	if err != nil {
+		return Answer{}, 0, fmt.Errorf("failed to get reader: %w", err)
+	}
+
+	res, err := r.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
 		Commitment: commitment,
 		DataSlice: &rpc.DataSlice{
@@ -71,7 +77,7 @@ func GetLatestTransmission(ctx context.Context, reader client.AccountReader, acc
 
 	transmissionOffset := AccountDiscriminatorLen + TransmissionsHeaderMaxSize + (uint64(cursor) * transmissionLen)
 
-	res, err = reader.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
+	res, err = r.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",
 		Commitment: commitment,
 		DataSlice: &rpc.DataSlice{

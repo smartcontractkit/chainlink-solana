@@ -106,8 +106,10 @@ func TestGetState(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
+	reader := func() (client.Reader, error) { return testSetupReader(t, mockServer.URL), nil }
+
 	// happy path does not error (actual state decoding handled in types_test)
-	_, _, err := GetState(context.TODO(), testSetupReader(t, mockServer.URL), solana.PublicKey{}, "")
+	_, _, err := GetState(context.TODO(), reader, solana.PublicKey{}, "")
 	require.NoError(t, err)
 }
 
@@ -132,7 +134,7 @@ func TestGetLatestTransmission(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	reader := testSetupReader(t, mockServer.URL)
+	reader := func() (client.Reader, error) { return testSetupReader(t, mockServer.URL), nil }
 	a, _, err := GetLatestTransmission(context.TODO(), reader, solana.PublicKey{}, "")
 	assert.NoError(t, err)
 	assert.Equal(t, expectedTime, a.Timestamp)
@@ -166,12 +168,14 @@ func TestCache(t *testing.T) {
 		w.Write(testTransmissionsResponse(t, body, 0)) //nolint:errcheck
 	}))
 
+	reader := func() (client.Reader, error) { return testSetupReader(t, mockServer.URL), nil }
+
 	lggr := logger.Test(t)
 	stateCache := NewStateCache(
 		solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
 		"test-chain-id",
 		config.NewDefault(),
-		testSetupReader(t, mockServer.URL),
+		reader,
 		lggr,
 	)
 	require.NoError(t, stateCache.Start(ctx))
@@ -186,7 +190,7 @@ func TestCache(t *testing.T) {
 		solana.MustPublicKeyFromBase58("11111111111111111111111111111112"),
 		"test-chain-id",
 		config.NewDefault(),
-		testSetupReader(t, mockServer.URL),
+		reader,
 		lggr,
 	)
 	require.NoError(t, transmissionsCache.Start(ctx))
@@ -220,7 +224,7 @@ func TestNilPointerHandling(t *testing.T) {
 	defer mockServer.Close()
 
 	errString := "nil pointer returned in "
-	reader := testSetupReader(t, mockServer.URL)
+	reader := func() (client.Reader, error) { return testSetupReader(t, mockServer.URL), nil }
 
 	// fail on get state query
 	_, _, err := GetState(context.TODO(), reader, solana.PublicKey{}, "")

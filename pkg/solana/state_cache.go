@@ -23,7 +23,7 @@ type StateCache struct {
 	*client.Cache[State]
 }
 
-func NewStateCache(stateID solana.PublicKey, chainID string, cfg config.Config, reader client.Reader, lggr logger.Logger) *StateCache {
+func NewStateCache(stateID solana.PublicKey, chainID string, cfg config.Config, reader GetReader, lggr logger.Logger) *StateCache {
 	name := "ocr2_median_state"
 	getter := func(ctx context.Context) (State, uint64, error) {
 		return GetState(ctx, reader, stateID, cfg.Commitment())
@@ -31,8 +31,13 @@ func NewStateCache(stateID solana.PublicKey, chainID string, cfg config.Config, 
 	return &StateCache{client.NewCache(name, stateID, chainID, cfg, getter, logger.With(lggr, "cache", name))}
 }
 
-func GetState(ctx context.Context, reader client.AccountReader, account solana.PublicKey, commitment rpc.CommitmentType) (State, uint64, error) {
-	res, err := reader.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
+func GetState(ctx context.Context, reader GetReader, account solana.PublicKey, commitment rpc.CommitmentType) (State, uint64, error) {
+	r, err := reader()
+	if err != nil {
+		return State{}, 0, fmt.Errorf("failed to get reader: %w", err)
+	}
+
+	res, err := r.GetAccountInfoWithOpts(ctx, account, &rpc.GetAccountInfoOpts{
 		Commitment: commitment,
 		Encoding:   "base64",
 	})
