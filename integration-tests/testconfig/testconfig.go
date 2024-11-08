@@ -193,8 +193,8 @@ func (c *TestConfig) ReadFromEnvVar() error {
 		if c.Common == nil {
 			c.Common = &Common{}
 		}
-		logger.Info().Msgf("Using %s env var to override Common.RPCURL", E2E_TEST_COMMON_RPC_URL_ENV)
-		c.Common.RPCURL = &commonRPCURL
+		logger.Info().Msgf("Using %s env var to override Common.RPCURLs", E2E_TEST_COMMON_RPC_URL_ENV)
+		c.Common.RPCURLs = &commonRPCURL
 	}
 
 	commonWSURL := ctf_config.MustReadEnvVar_Strings(E2E_TEST_COMMON_WS_URL_ENV, ",")
@@ -202,8 +202,8 @@ func (c *TestConfig) ReadFromEnvVar() error {
 		if c.Common == nil {
 			c.Common = &Common{}
 		}
-		logger.Info().Msgf("Using %s env var to override Common.WsURL", E2E_TEST_COMMON_WS_URL_ENV)
-		c.Common.WsURL = &commonWSURL
+		logger.Info().Msgf("Using %s env var to override Common.WsURLs", E2E_TEST_COMMON_WS_URL_ENV)
+		c.Common.WsURLs = &commonWSURL
 	}
 
 	commonPrivateKey := ctf_config.MustReadEnvVar_String(E2E_TEST_COMMON_PRIVATE_KEY_ENV)
@@ -377,8 +377,8 @@ type Common struct {
 	InsideK8s *bool   `toml:"inside_k8"`
 	User      *string `toml:"user"`
 	// if rpc requires api key to be passed as an HTTP header
-	RPCURL             *[]string `toml:"-"`
-	WsURL              *[]string `toml:"-"`
+	RPCURLs            *[]string `toml:"-"`
+	WsURLs             *[]string `toml:"-"`
 	PrivateKey         *string   `toml:"-"`
 	Stateful           *bool     `toml:"stateful_db"`
 	InternalDockerRepo *string   `toml:"internal_docker_repo"`
@@ -430,10 +430,10 @@ func (c *Common) Validate() error {
 		if c.PrivateKey == nil {
 			return fmt.Errorf("private_key must be set")
 		}
-		if c.RPCURL == nil {
+		if c.RPCURLs == nil {
 			return fmt.Errorf("rpc_url must be set")
 		}
-		if c.WsURL == nil {
+		if c.WsURLs == nil {
 			return fmt.Errorf("rpc_url must be set")
 		}
 
