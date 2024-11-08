@@ -4,9 +4,9 @@ import (
 	"context"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 )
 
 //go:generate mockery --name ChainReader --output ./mocks/
