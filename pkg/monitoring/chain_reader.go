@@ -2,9 +2,9 @@ package monitoring
 
 import (
 	"context"
-
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 )
@@ -31,11 +31,13 @@ type chainReader struct {
 }
 
 func (c *chainReader) GetState(ctx context.Context, account solana.PublicKey, commitment rpc.CommitmentType) (state pkgSolana.State, blockHeight uint64, err error) {
-	return pkgSolana.GetState(ctx, c.client, account, commitment)
+	getReader := func() (client.AccountReader, error) { return c.client, nil }
+	return pkgSolana.GetState(ctx, getReader, account, commitment)
 }
 
 func (c *chainReader) GetLatestTransmission(ctx context.Context, account solana.PublicKey, commitment rpc.CommitmentType) (answer pkgSolana.Answer, blockHeight uint64, err error) {
-	return pkgSolana.GetLatestTransmission(ctx, c.client, account, commitment)
+	getReader := func() (client.AccountReader, error) { return c.client, nil }
+	return pkgSolana.GetLatestTransmission(ctx, getReader, account, commitment)
 }
 
 func (c *chainReader) GetTokenAccountBalance(ctx context.Context, account solana.PublicKey, commitment rpc.CommitmentType) (out *rpc.GetTokenAccountBalanceResult, err error) {

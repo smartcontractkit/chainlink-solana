@@ -197,7 +197,6 @@ type configProvider struct {
 	offchainConfigDigester             types.OffchainConfigDigester
 	configTracker                      types.ContractConfigTracker
 	chain                              Chain
-	reader                             GetReader
 }
 
 func newConfigProvider(_ context.Context, lggr logger.Logger, chain Chain, args relaytypes.RelayArgs) (*configProvider, error) {
