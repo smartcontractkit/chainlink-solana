@@ -179,6 +179,9 @@ func setFromChain(c, f *Chain) {
 	if f.ComputeUnitPriceDefault != nil {
 		c.ComputeUnitPriceDefault = f.ComputeUnitPriceDefault
 	}
+	if f.FeeBumpCriteria != nil {
+		c.FeeBumpCriteria = f.FeeBumpCriteria
+	}
 	if f.FeeBumpPeriod != nil {
 		c.FeeBumpPeriod = f.FeeBumpPeriod
 	}
@@ -277,6 +280,10 @@ func (c *TOMLConfig) ComputeUnitPriceMin() uint64 {
 
 func (c *TOMLConfig) ComputeUnitPriceDefault() uint64 {
 	return *c.Chain.ComputeUnitPriceDefault
+}
+
+func (c *TOMLConfig) FeeBumpCriteria() string {
+	return *c.Chain.FeeBumpCriteria
 }
 
 func (c *TOMLConfig) FeeBumpPeriod() time.Duration {

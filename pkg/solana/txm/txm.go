@@ -68,7 +68,8 @@ type TxConfig struct {
 	Timeout time.Duration // transaction broadcast timeout
 
 	// compute unit price config
-	FeeBumpPeriod        time.Duration // how often to bump fee
+	FeeBumpCriteria      string        // "fixed-interval": bump every fixed period. "expiration": bump based on blockhash expiration
+	FeeBumpPeriod        time.Duration // "fixed-interval": how often to bump. "expiration": how often to check if should blockhash has expired and we need to bump
 	BaseComputeUnitPrice uint64        // starting price
 	ComputeUnitPriceMin  uint64        // min price
 	ComputeUnitPriceMax  uint64        // max price
@@ -755,6 +756,7 @@ func (txm *Txm) HealthReport() map[string]error { return map[string]error{txm.Na
 func (txm *Txm) defaultTxConfig() TxConfig {
 	return TxConfig{
 		Timeout:                  txm.cfg.TxRetryTimeout(),
+		FeeBumpCriteria:          txm.cfg.FeeBumpCriteria(),
 		FeeBumpPeriod:            txm.cfg.FeeBumpPeriod(),
 		BaseComputeUnitPrice:     txm.fee.BaseComputeUnitPrice(),
 		ComputeUnitPriceMin:      txm.cfg.ComputeUnitPriceMin(),

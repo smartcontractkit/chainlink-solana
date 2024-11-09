@@ -188,6 +188,11 @@ func SetTimeout(t time.Duration) SetTxConfig {
 		cfg.Timeout = t
 	}
 }
+func SetFeeBumpCriteria(s string) SetTxConfig {
+	return func(cfg *TxConfig) {
+		cfg.FeeBumpCriteria = s
+	}
+}
 func SetFeeBumpPeriod(t time.Duration) SetTxConfig {
 	return func(cfg *TxConfig) {
 		cfg.FeeBumpPeriod = t

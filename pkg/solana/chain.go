@@ -580,6 +580,7 @@ func (c *chain) sendTx(ctx context.Context, from, to string, amount *big.Int, ba
 		txm.SetComputeUnitPriceMax(0),
 		txm.SetComputeUnitPriceMin(0),
 		txm.SetBaseComputeUnitPrice(0),
+		txm.SetFeeBumpCriteria("fixed-interval"),
 		txm.SetFeeBumpPeriod(0),
 	)
 	if err != nil {

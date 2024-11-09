@@ -28,6 +28,7 @@ var defaultConfigSet = Chain{
 	ComputeUnitPriceMax:      ptr(uint64(1_000)),
 	ComputeUnitPriceMin:      ptr(uint64(0)),
 	ComputeUnitPriceDefault:  ptr(uint64(0)),
+	FeeBumpCriteria:          ptr("fixed-interval"),                   // "interval": bumps fees every FeeBumpPeriod intervals; "expiration": checks if should bump fees every FeeBumpPeriod based on blockhash expiration
 	FeeBumpPeriod:            config.MustNewDuration(3 * time.Second), // set to 0 to disable fee bumping
 	BlockHistoryPollPeriod:   config.MustNewDuration(5 * time.Second),
 	BlockHistorySize:         ptr(uint64(1)),       // 1: uses latest block; >1: Uses multiple blocks, where n is number of blocks. DISCLAIMER: 1:1 ratio between n and RPC calls.
@@ -54,6 +55,7 @@ type Config interface {
 	ComputeUnitPriceMax() uint64
 	ComputeUnitPriceMin() uint64
 	ComputeUnitPriceDefault() uint64
+	FeeBumpCriteria() string
 	FeeBumpPeriod() time.Duration
 	BlockHistoryPollPeriod() time.Duration
 	BlockHistorySize() uint64
@@ -77,6 +79,7 @@ type Chain struct {
 	ComputeUnitPriceMax      *uint64
 	ComputeUnitPriceMin      *uint64
 	ComputeUnitPriceDefault  *uint64
+	FeeBumpCriteria          *string
 	FeeBumpPeriod            *config.Duration
 	BlockHistoryPollPeriod   *config.Duration
 	BlockHistorySize         *uint64
@@ -129,6 +132,9 @@ func (c *Chain) SetDefaults() {
 	}
 	if c.ComputeUnitPriceDefault == nil {
 		c.ComputeUnitPriceDefault = defaultConfigSet.ComputeUnitPriceDefault
+	}
+	if c.FeeBumpCriteria == nil {
+		c.FeeBumpCriteria = defaultConfigSet.FeeBumpCriteria
 	}
 	if c.FeeBumpPeriod == nil {
 		c.FeeBumpPeriod = defaultConfigSet.FeeBumpPeriod

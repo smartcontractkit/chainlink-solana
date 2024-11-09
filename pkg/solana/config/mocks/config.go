@@ -194,6 +194,24 @@ func (_m *Config) EstimateComputeUnitLimit() bool {
 	return r0
 }
 
+// FeeBumpCriteria provides a mock function with given fields:
+func (_m *Config) FeeBumpCriteria() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for FeeBumpCriteria")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
 // FeeBumpPeriod provides a mock function with given fields:
 func (_m *Config) FeeBumpPeriod() time.Duration {
 	ret := _m.Called()
