@@ -123,14 +123,12 @@ func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) SendTransaction(ct
 				r := txSender.broadcastTxAsync(ctx, rpc, tx)
 				select {
 				case <-ctx.Done():
-					txSender.lggr.Debugw("Failed to send tx results", "err", ctx.Err())
 					return
 				case txResults <- r:
 				}
 
 				select {
 				case <-ctx.Done():
-					txSender.lggr.Debugw("Failed to send tx results to report", "err", ctx.Err())
 					return
 				case txResultsToReport <- r:
 				}
