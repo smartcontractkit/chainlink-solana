@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 	"golang.org/x/exp/maps"
 )
 
@@ -30,6 +31,10 @@ type PendingTxContext interface {
 	ListAll() []solana.Signature
 	// Expired returns whether or not confirmation timeout amount of time has passed since creation
 	Expired(sig solana.Signature, confirmationTimeout time.Duration) bool
+	// IsBlockhashExpired returns whether or not the blockhash of a transaction has expired when compared to currHeight. Useful to check if should be bumped.
+	IsBlockhashExpired(id string, currHeight uint64) bool
+	// UpdateBlockhash updates the last valid block height for a transaction when expired and needs bumping in the context of FeeBumpCriteria='expiration'.
+	UpdateBlockhash(id string, blockhashResult *rpc.GetLatestBlockhashResult) error
 	// OnProcessed marks transactions as Processed
 	OnProcessed(sig solana.Signature) (string, error)
 	// OnConfirmed marks transaction as Confirmed and moves it from broadcast map to confirmed map
@@ -45,13 +50,14 @@ type PendingTxContext interface {
 }
 
 type pendingTx struct {
-	tx          solana.Transaction
-	cfg         TxConfig
-	signatures  []solana.Signature
-	id          string
-	createTs    time.Time
-	retentionTs time.Time
-	state       TxState
+	tx                   solana.Transaction
+	cfg                  TxConfig
+	signatures           []solana.Signature
+	id                   string
+	createTs             time.Time
+	retentionTs          time.Time
+	state                TxState
+	lastValidBlockHeight uint64
 }
 
 var _ PendingTxContext = &pendingTxContext{}
@@ -269,6 +275,30 @@ func (c *pendingTxContext) OnProcessed(sig solana.Signature) (string, error) {
 		c.broadcastedTxs[id] = tx
 		return id, nil
 	})
+}
+
+// IsBlockhashExpired returns whether or not the blockhash of a transaction has expired when compared to currHeight. Useful to check if should be bumped.
+func (c *pendingTxContext) IsBlockhashExpired(id string, currHeight uint64) bool {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	tx, exists := c.broadcastedTxs[id]
+	if !exists {
+		return false
+	}
+	return tx.lastValidBlockHeight < currHeight
+}
+
+// UpdateBlockhash updates the blockhash and last valid block height for a transaction when expired and needs bumping in the context of FeeBumpCriteria='expiration'.
+func (c *pendingTxContext) UpdateBlockhash(id string, blockhashResult *rpc.GetLatestBlockhashResult) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if tx, exists := c.broadcastedTxs[id]; exists {
+		tx.tx.Message.RecentBlockhash = blockhashResult.Value.Blockhash
+		tx.lastValidBlockHeight = blockhashResult.Value.LastValidBlockHeight
+		c.broadcastedTxs[id] = tx
+		return nil
+	}
+	return fmt.Errorf("transaction not found for id: %s", id)
 }
 
 func (c *pendingTxContext) OnConfirmed(sig solana.Signature) (string, error) {
@@ -543,6 +573,14 @@ func (c *pendingTxContextWithProm) ListAll() []solana.Signature {
 
 func (c *pendingTxContextWithProm) Expired(sig solana.Signature, lifespan time.Duration) bool {
 	return c.pendingTx.Expired(sig, lifespan)
+}
+
+func (c *pendingTxContextWithProm) IsBlockhashExpired(id string, currHeight uint64) bool {
+	return c.pendingTx.IsBlockhashExpired(id, currHeight)
+}
+
+func (c *pendingTxContextWithProm) UpdateBlockhash(id string, blockhashResult *rpc.GetLatestBlockhashResult) error {
+	return c.pendingTx.UpdateBlockhash(id, blockhashResult)
 }
 
 // Success - tx finalized

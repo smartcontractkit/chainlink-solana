@@ -53,7 +53,8 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 	// config mock
 	cfg.On("ComputeUnitPriceMax").Return(uint64(10))
 	cfg.On("ComputeUnitPriceMin").Return(uint64(0))
-	cfg.On("FeeBumpCriteria").Return("fixed-interval")
+	cfg.On("ComputeUnitPriceDefault").Return(uint64(0))
+	cfg.On("FeeBumpCriteria").Return("fixed-intervals")
 	cfg.On("FeeBumpPeriod").Return(txRetryDuration / 6)
 	cfg.On("TxRetryTimeout").Return(txRetryDuration)
 	cfg.On("ComputeUnitLimitDefault").Return(uint32(200_000)) // default value, cannot not use 0
