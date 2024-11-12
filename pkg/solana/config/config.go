@@ -28,7 +28,7 @@ var defaultConfigSet = Chain{
 	ComputeUnitPriceMax:      ptr(uint64(1_000)),
 	ComputeUnitPriceMin:      ptr(uint64(0)),
 	ComputeUnitPriceDefault:  ptr(uint64(0)),
-	FeeBumpCriteria:          ptr("fixed-interval"),                   // "interval": bumps fees every FeeBumpPeriod intervals; "expiration": checks if should bump fees every FeeBumpPeriod based on blockhash expiration
+	FeeBumpCriteria:          ptr("fixed-intervals"),                  // "fixed-intervals": bumps fees every FeeBumpPeriod interval; "expiration": checks if should bump fees every FeeBumpPeriod based on blockhash expiration
 	FeeBumpPeriod:            config.MustNewDuration(3 * time.Second), // set to 0 to disable fee bumping
 	BlockHistoryPollPeriod:   config.MustNewDuration(5 * time.Second),
 	BlockHistorySize:         ptr(uint64(1)),       // 1: uses latest block; >1: Uses multiple blocks, where n is number of blocks. DISCLAIMER: 1:1 ratio between n and RPC calls.
