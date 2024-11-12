@@ -287,11 +287,11 @@ func TestChain_Transact(t *testing.T) {
 	require.NoError(t, c.txm.Start(ctx))
 
 	require.NoError(t, c.Transact(ctx, sender.PublicKey().String(), receiver.PublicKey().String(), amount, true))
-	tests.AssertLogEventually(t, logs, "tx state: confirmed")
+	tests.AssertLogEventually(t, logs, "marking transaction as confirmed")
 	tests.AssertLogEventually(t, logs, "stopped tx retry")
 	require.NoError(t, c.txm.Close())
 
-	filteredLogs := logs.FilterMessage("tx state: confirmed").All()
+	filteredLogs := logs.FilterMessage("marking transaction as confirmed").All()
 	require.Len(t, filteredLogs, 1)
 	sig, ok := filteredLogs[0].ContextMap()["signature"]
 	require.True(t, ok)
@@ -515,6 +515,7 @@ func TestSolanaChain_MultiNode_Txm(t *testing.T) {
 		return sig[:]
 	}, nil)
 	mkey.On("Sign", mock.Anything, pubKeyReceiver.String(), mock.Anything).Return([]byte{}, config.KeyNotFoundError{ID: pubKeyReceiver.String(), KeyType: "Solana"})
+	mkey.On("Accounts", mock.Anything).Return([]string{pubKey.String()}, nil).Maybe()
 
 	testChain, err := newChain("localnet", cfg, mkey, logger.Test(t))
 	require.NoError(t, err)
@@ -556,7 +557,7 @@ func TestSolanaChain_MultiNode_Txm(t *testing.T) {
 	}
 
 	// Send funds twice, along with an invalid transaction
-	require.NoError(t, testChain.txm.Enqueue(tests.Context(t), "test_success", createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)))
+	require.NoError(t, testChain.txm.Enqueue(tests.Context(t), "test_success", createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL), nil))
 
 	// Wait for new block hash
 	currentBh, err := selectedClient.LatestBlockhash(tests.Context(t))
@@ -577,8 +578,8 @@ NewBlockHash:
 		}
 	}
 
-	require.NoError(t, testChain.txm.Enqueue(tests.Context(t), "test_success_2", createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)))
-	require.Error(t, testChain.txm.Enqueue(tests.Context(t), "test_invalidSigner", createTx(pubKeyReceiver, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL))) // cannot sign tx before enqueuing
+	require.NoError(t, testChain.txm.Enqueue(tests.Context(t), "test_success_2", createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL), nil))
+	require.Error(t, testChain.txm.Enqueue(tests.Context(t), "test_invalidSigner", createTx(pubKeyReceiver, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL), nil)) // cannot sign tx before enqueuing
 
 	// wait for all txes to finish
 	ctx, cancel := context.WithCancel(tests.Context(t))

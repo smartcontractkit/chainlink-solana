@@ -322,6 +322,24 @@ func (_m *Config) TxConfirmTimeout() time.Duration {
 	return r0
 }
 
+// TxRetentionTimeout provides a mock function with given fields:
+func (_m *Config) TxRetentionTimeout() time.Duration {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for TxRetentionTimeout")
+	}
+
+	var r0 time.Duration
+	if rf, ok := ret.Get(0).(func() time.Duration); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(time.Duration)
+	}
+
+	return r0
+}
+
 // TxRetryTimeout provides a mock function with given fields:
 func (_m *Config) TxRetryTimeout() time.Duration {
 	ret := _m.Called()

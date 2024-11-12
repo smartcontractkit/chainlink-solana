@@ -574,7 +574,7 @@ func (c *chain) sendTx(ctx context.Context, from, to string, amount *big.Int, ba
 	}
 
 	chainTxm := c.TxManager()
-	err = chainTxm.Enqueue(ctx, "", tx,
+	err = chainTxm.Enqueue(ctx, "", tx, nil,
 		txm.SetComputeUnitLimit(500), // reduce from default 200K limit - should only take 450 compute units
 		// no fee bumping and no additional fee - makes validating balance accurate
 		txm.SetComputeUnitPriceMax(0),
