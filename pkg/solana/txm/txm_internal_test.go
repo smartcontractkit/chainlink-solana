@@ -805,6 +805,7 @@ func TestTxm_disabled_confirm_timeout_with_retention(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
+	mc.On("SlotHeight", mock.Anything).Return(uint64(1000), nil)
 	mc.On("SendTx", mock.Anything, signed(0, true, computeUnitLimitDefault)).Return(sig, nil)
 	mc.On("SendTx", mock.Anything, signed(1, true, computeUnitLimitDefault)).Return(retry0, nil).Maybe()
 	mc.On("SendTx", mock.Anything, signed(2, true, computeUnitLimitDefault)).Return(retry1, nil).Maybe()
@@ -916,6 +917,8 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 
 		computeUnitConsumed := uint64(1_000_000)
 		computeUnitLimit := fees.ComputeUnitLimit(uint32(bigmath.AddPercentage(new(big.Int).SetUint64(computeUnitConsumed), EstimateComputeUnitLimitBuffer).Uint64()))
+
+		mc.On("SlotHeight", mock.Anything).Return(uint64(1000), nil)
 		mc.On("SendTx", mock.Anything, signed(0, true, computeUnitLimit)).Return(sig, nil)
 		// First simulated before broadcast without signature or compute unit limit set
 		mc.On("SimulateTx", mock.Anything, tx, mock.Anything).Run(func(mock.Arguments) {
@@ -973,6 +976,7 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 		tx, signed := getTx(t, 1, mkey)
 		sig := randomSignature(t)
 
+		mc.On("SlotHeight", mock.Anything).Return(uint64(1000), nil)
 		mc.On("SendTx", mock.Anything, signed(0, true, fees.ComputeUnitLimit(0))).Return(sig, nil).Panic("SendTx should never be called").Maybe()
 		mc.On("SimulateTx", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("simulation failed")).Once()
 
@@ -985,6 +989,7 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 		tx, signed := getTx(t, 1, mkey)
 		sig := randomSignature(t)
 
+		mc.On("SlotHeight", mock.Anything).Return(uint64(1000), nil)
 		mc.On("SendTx", mock.Anything, signed(0, true, fees.ComputeUnitLimit(0))).Return(sig, nil).Panic("SendTx should never be called").Maybe()
 		mc.On("SimulateTx", mock.Anything, tx, mock.Anything).Return(&rpc.SimulateTransactionResult{Err: errors.New("tx err")}, nil).Once()
 
