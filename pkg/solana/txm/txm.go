@@ -73,8 +73,8 @@ type TxConfig struct {
 	Timeout time.Duration // transaction broadcast timeout
 
 	// compute unit price config
-	FeeBumpCriteria      string        // "fixed-interval": bump every fixed period. "expiration": bump based on blockhash expiration
-	FeeBumpPeriod        time.Duration // "fixed-interval": how often to bump. "expiration": how often to check if should blockhash has expired and we need to bump
+	FeeBumpCriteria      string        // "fixed-intervals": bump every fixed period. "expiration": bump based on blockhash expiration
+	FeeBumpPeriod        time.Duration // "fixed-intervals": how often to bump. "expiration": how often to check if should blockhash has expired and we need to bump
 	BaseComputeUnitPrice uint64        // starting price
 	ComputeUnitPriceMin  uint64        // min price
 	ComputeUnitPriceMax  uint64        // max price
@@ -359,35 +359,41 @@ func (txm *Txm) getFee(count int) fees.ComputeUnitPrice {
 func (txm *Txm) bumpFeeAndUpdateBlockhash(ctx context.Context, txID string, bumpTime time.Time) (shouldBump bool, needBlockhashUpdate bool, newBumpTime time.Time, err error) {
 	// helper function to get current height
 	getCurrentHeight := func(ctx context.Context) (uint64, error) {
-		client, err := txm.client.Get()
-		if err != nil {
-			return 0, err
+		client, errClient := txm.client.Get()
+		if errClient != nil {
+			return 0, errClient
 		}
 
-		currHeight, err := client.SlotHeight(ctx)
-		if err != nil {
-			return 0, err
+		currHeight, errSlot := client.SlotHeight(ctx)
+		if errSlot != nil {
+			return 0, errSlot
 		}
 
 		return currHeight, nil
 	}
 
 	newBumpTime = bumpTime
+	currHeight, err := getCurrentHeight(ctx)
+	if err != nil {
+		return false, false, bumpTime, fmt.Errorf("failed to get current height: %w", err)
+	}
+
 	// Check if fee bumping is enabled and decide based on the criteria
 	if txm.cfg.FeeBumpPeriod() > 0 {
 		switch txm.cfg.FeeBumpCriteria() {
 		case FeeBumpCriteriaFixedIntervals:
-			// Bump the fee at fixed intervals
+			// Bump the fee at fixed intervals. We may want to bump without blockhash being expired.
 			if time.Since(bumpTime) >= txm.cfg.FeeBumpPeriod() {
 				shouldBump = true
 				newBumpTime = time.Now()
 			}
-		case FeeBumpCriteriaExpiration:
-			// Bump the fee if the blockhash has expired
-			currHeight, err := getCurrentHeight(ctx)
-			if err != nil {
-				return false, false, bumpTime, fmt.Errorf("failed to get current height: %w", err)
+
+			// in case blockhash has expired, we need to update it.
+			if txm.txs.IsBlockhashExpired(txID, currHeight) {
+				needBlockhashUpdate = true
 			}
+		case FeeBumpCriteriaExpiration:
+			// Bump the fee only if the blockhash has expired
 			if txm.txs.IsBlockhashExpired(txID, currHeight) {
 				shouldBump = true
 				needBlockhashUpdate = true
@@ -420,7 +426,7 @@ func (txm *Txm) prepareRetryTx(ctx context.Context, baseTx solanaGo.Transaction,
 		return blockhashResult, nil
 	}
 
-	// We need to update blockhash in retryTx and pendingTx context if it has expired. Only meaningful for FeeBumpCriteria='expiration'.
+	// We need to update blockhash in retryTx and pendingTx context if it has expired
 	if needBlockhashUpdate {
 		// Updates Blockhash and LastValidBlockHeight in the retry transaction
 		blockhashResult, err := getLatestBlockhash(ctx)
