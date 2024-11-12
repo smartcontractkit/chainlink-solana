@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1029,6 +1030,101 @@ func TestGetTxState(t *testing.T) {
 	state, err = txs.GetTxState("unknown id")
 	require.Error(t, err)
 	require.Equal(t, NotFound, state)
+}
+
+func TestIsBlockhashExpired(t *testing.T) {
+	t.Parallel()
+	currHeight := uint64(100)
+	txs := newPendingTxContext()
+
+	t.Run("returns true when transaction is expired", func(t *testing.T) {
+		txID := uuid.NewString()
+		pTx := pendingTx{id: txID, lastValidBlockHeight: currHeight - 1}
+		txs.broadcastedTxs[txID] = pTx
+		require.True(t, txs.IsBlockhashExpired(txID, currHeight), "Transaction should be expired")
+	})
+
+	t.Run("returns false when transaction is not expired (equal lastValidBlockHeight)", func(t *testing.T) {
+		txID := uuid.NewString()
+		pTx := pendingTx{id: txID, lastValidBlockHeight: currHeight}
+		txs.broadcastedTxs[txID] = pTx
+		require.False(t, txs.IsBlockhashExpired(txID, currHeight), "Transaction should not be expired")
+	})
+
+	t.Run("returns false when transaction is not expired (greater lastValidBlockHeight)", func(t *testing.T) {
+		txID := uuid.NewString()
+		pTx := pendingTx{id: txID, lastValidBlockHeight: currHeight + 10}
+		txs.broadcastedTxs[txID] = pTx
+		require.False(t, txs.IsBlockhashExpired(txID, currHeight), "Transaction should not be expired")
+	})
+
+	t.Run("returns false when transaction does not exist", func(t *testing.T) {
+		txID := uuid.NewString()
+		require.False(t, txs.IsBlockhashExpired(txID, currHeight), "Unknown transaction should not be expired")
+	})
+}
+
+func TestUpdateBlockhash(t *testing.T) {
+	t.Parallel()
+	txs := newPendingTxContext()
+
+	t.Run("successfully updates blockhash and lastValidBlockHeight for existing transaction", func(t *testing.T) {
+		// Create transaction with initial values
+		txID := uuid.NewString()
+		sig := randomSignature(t)
+		oldHash, _ := solana.HashFromBase58("oldHash")
+		msg := pendingTx{
+			id: txID,
+			tx: solana.Transaction{
+				Message: solana.Message{
+					RecentBlockhash: oldHash,
+				},
+			},
+			lastValidBlockHeight: 100,
+		}
+
+		// Add the transaction to broadcastedTxs
+		err := txs.New(msg, sig, func() {})
+		require.NoError(t, err)
+
+		// Update the transaction with new blockhash and lastValidBlockHeight
+		newHash, _ := solana.HashFromBase58("newHash")
+		newLastValidBlockHeight := uint64(200)
+		blockhashResult := &rpc.GetLatestBlockhashResult{
+			Value: &rpc.LatestBlockhashResult{
+				Blockhash:            newHash,
+				LastValidBlockHeight: newLastValidBlockHeight,
+			},
+		}
+		require.NoError(t, txs.UpdateBlockhash(txID, blockhashResult))
+
+		// Lock to read the updated transaction
+		txs.lock.RLock()
+		updatedTx, exists := txs.broadcastedTxs[txID]
+		txs.lock.RUnlock()
+
+		// Check that the transaction exists and RecentBlockhash and lastValidBlockHeight have been updated
+		require.True(t, exists, "Transaction should exist in broadcastedTxs")
+		require.Equal(t, newHash, updatedTx.tx.Message.RecentBlockhash, "RecentBlockhash should be updated")
+		require.Equal(t, newLastValidBlockHeight, updatedTx.lastValidBlockHeight, "lastValidBlockHeight should be updated")
+	})
+
+	t.Run("returns error when transaction does not exist", func(t *testing.T) {
+		// Use a random txID that is not in broadcastedTxs
+		txID := uuid.NewString()
+		someHash, _ := solana.HashFromBase58("someBlockhash")
+		blockhashResult := &rpc.GetLatestBlockhashResult{
+			Value: &rpc.LatestBlockhashResult{
+				Blockhash:            someHash,
+				LastValidBlockHeight: uint64(150),
+			},
+		}
+
+		// Expect an error indicating the transaction was not found
+		err := txs.UpdateBlockhash(txID, blockhashResult)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "transaction not found for id")
+	})
 }
 
 func randomSignature(t *testing.T) solana.Signature {

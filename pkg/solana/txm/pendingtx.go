@@ -31,9 +31,9 @@ type PendingTxContext interface {
 	ListAll() []solana.Signature
 	// Expired returns whether or not confirmation timeout amount of time has passed since creation
 	Expired(sig solana.Signature, confirmationTimeout time.Duration) bool
-	// IsBlockhashExpired returns whether or not the blockhash of a transaction has expired when compared to currHeight. Useful to check if should be bumped.
+	// IsBlockhashExpired returns whether or not the blockhash of a transaction has expired when compared to currHeight.
 	IsBlockhashExpired(id string, currHeight uint64) bool
-	// UpdateBlockhash updates the last valid block height for a transaction when expired and needs bumping in the context of FeeBumpCriteria='expiration'.
+	// UpdateBlockhash updates the blockhash and last valid height for a transaction when expired and needs bumping.
 	UpdateBlockhash(id string, blockhashResult *rpc.GetLatestBlockhashResult) error
 	// OnProcessed marks transactions as Processed
 	OnProcessed(sig solana.Signature) (string, error)
@@ -277,7 +277,7 @@ func (c *pendingTxContext) OnProcessed(sig solana.Signature) (string, error) {
 	})
 }
 
-// IsBlockhashExpired returns whether or not the blockhash of a transaction has expired when compared to currHeight. Useful to check if should be bumped.
+// IsBlockhashExpired returns whether or not the blockhash of a transaction has expired when compared to currHeight.
 func (c *pendingTxContext) IsBlockhashExpired(id string, currHeight uint64) bool {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -288,7 +288,7 @@ func (c *pendingTxContext) IsBlockhashExpired(id string, currHeight uint64) bool
 	return tx.lastValidBlockHeight < currHeight
 }
 
-// UpdateBlockhash updates the blockhash and last valid block height for a transaction when expired and needs bumping in the context of FeeBumpCriteria='expiration'.
+// UpdateBlockhash updates the blockhash and last valid height for a transaction when expired and needs bumping.
 func (c *pendingTxContext) UpdateBlockhash(id string, blockhashResult *rpc.GetLatestBlockhashResult) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
