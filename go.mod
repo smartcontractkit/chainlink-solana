@@ -13,11 +13,11 @@ require (
 	github.com/gagliardetto/utilz v0.1.1
 	github.com/go-viper/mapstructure/v2 v2.1.0
 	github.com/google/uuid v1.6.0
-	github.com/hashicorp/go-plugin v1.6.2-0.20240829161738-06afb6d7ae99
+	github.com/hashicorp/go-plugin v1.6.2
 	github.com/jpillora/backoff v1.0.0
 	github.com/pelletier/go-toml/v2 v2.2.0
 	github.com/prometheus/client_golang v1.17.0
-	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241023204219-86c89e29937d
+	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241112140826-0e2daed34ef6
 	github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
