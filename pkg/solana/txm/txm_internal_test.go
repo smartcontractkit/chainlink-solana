@@ -1003,6 +1003,7 @@ func TestTxm_Enqueue(t *testing.T) {
 	lggr := logger.Test(t)
 	cfg := config.NewDefault()
 	mc := mocks.NewReaderWriter(t)
+	mc.On("SlotHeight", mock.Anything).Return(uint64(1000), nil).Maybe()
 	mc.On("SendTx", mock.Anything, mock.Anything).Return(solana.Signature{}, nil).Maybe()
 	mc.On("SimulateTx", mock.Anything, mock.Anything, mock.Anything).Return(&rpc.SimulateTransactionResult{}, nil).Maybe()
 	mc.On("SignatureStatuses", mock.Anything, mock.AnythingOfType("[]solana.Signature")).Return(
