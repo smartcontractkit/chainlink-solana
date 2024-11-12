@@ -84,14 +84,10 @@ func TestTxm_Integration(t *testing.T) {
 			// already started
 			assert.Error(t, txm.Start(ctx))
 
-			getLatestBlockhash := func() (solana.Hash, uint64) {
-				hash, err := client.LatestBlockhash(ctx)
-				require.NoError(t, err)
-				return hash.Value.Blockhash, hash.Value.LastValidBlockHeight
-			}
-
-			createTx := func(hash solana.Hash, signer solana.PublicKey, sender solana.PublicKey, receiver solana.PublicKey, amt uint64) *solana.Transaction {
+			createTx := func(signer solana.PublicKey, sender solana.PublicKey, receiver solana.PublicKey, amt uint64) (*solana.Transaction, uint64) {
 				// create transfer tx
+				hash, err := client.LatestBlockhash(ctx)
+				assert.NoError(t, err)
 				tx, err := solana.NewTransaction(
 					[]solana.Instruction{
 						system.NewTransferInstruction(
@@ -100,28 +96,30 @@ func TestTxm_Integration(t *testing.T) {
 							receiver,
 						).Build(),
 					},
-					hash,
+					hash.Value.Blockhash,
 					solana.TransactionPayer(signer),
 				)
 				require.NoError(t, err)
-				return tx
+				return tx, hash.Value.LastValidBlockHeight
 			}
 
 			// enqueue txs (must pass to move on to load test)
-			blockhash1, lastValidBlockHeight1 := getLatestBlockhash()
-			require.NoError(t, txm.Enqueue(ctx, "test_success_0", createTx(blockhash1, pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL), nil, lastValidBlockHeight1))
-			require.Error(t, txm.Enqueue(ctx, "test_invalidSigner", createTx(blockhash1, pubKeyReceiver, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL), nil, lastValidBlockHeight1)) // cannot sign tx before enqueuing
-			require.NoError(t, txm.Enqueue(ctx, "test_invalidReceiver", createTx(blockhash1, pubKey, pubKey, solana.PublicKey{}, solana.LAMPORTS_PER_SOL), nil, lastValidBlockHeight1))
-
-			// use new blockhash
-			blockhash2, lastValidBlockHeight2 := getLatestBlockhash()
-			require.NoError(t, txm.Enqueue(ctx, "test_success_1", createTx(blockhash2, pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL), nil, lastValidBlockHeight2))
-			require.NoError(t, txm.Enqueue(ctx, "test_txFail", createTx(blockhash2, pubKey, pubKey, pubKeyReceiver, 1000*solana.LAMPORTS_PER_SOL), nil, lastValidBlockHeight2))
+			tx1, lastValidBlockHeight1 := createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
+			require.NoError(t, txm.Enqueue(ctx, "test_success_0", tx1, nil, lastValidBlockHeight1))
+			tx2, lastValidBlockHeight2 := createTx(pubKeyReceiver, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
+			require.Error(t, txm.Enqueue(ctx, "test_invalidSigner", tx2, nil, lastValidBlockHeight2)) // cannot sign tx before enqueuing
+			tx3, lastValidBlockHeight3 := createTx(pubKey, pubKey, solana.PublicKey{}, solana.LAMPORTS_PER_SOL)
+			require.NoError(t, txm.Enqueue(ctx, "test_invalidReceiver", tx3, nil, lastValidBlockHeight3))
+			time.Sleep(500 * time.Millisecond) // pause 0.5s for new blockhash
+			tx4, lastValidBlockHeight4 := createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
+			require.NoError(t, txm.Enqueue(ctx, "test_success_1", tx4, nil, lastValidBlockHeight4))
+			tx5, lastValidBlockHeight5 := createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
+			require.NoError(t, txm.Enqueue(ctx, "test_txFail", tx5, nil, lastValidBlockHeight5))
 
 			// load test: try to overload txs, confirm, or simulation
 			for i := 0; i < 1000; i++ {
-				blockhash, lastValidBlockHeight := getLatestBlockhash()
-				assert.NoError(t, txm.Enqueue(ctx, fmt.Sprintf("load_%d", i), createTx(blockhash, loadTestKey.PublicKey(), loadTestKey.PublicKey(), loadTestKey.PublicKey(), uint64(i)), nil, lastValidBlockHeight))
+				tx, lastValidBlockHeight := createTx(loadTestKey.PublicKey(), loadTestKey.PublicKey(), loadTestKey.PublicKey(), uint64(i))
+				assert.NoError(t, txm.Enqueue(ctx, fmt.Sprintf("load_%d", i), tx, nil, lastValidBlockHeight))
 				time.Sleep(10 * time.Millisecond) // ~100 txs per second (note: have run 5ms delays for ~200tx/s succesfully)
 			}
 
