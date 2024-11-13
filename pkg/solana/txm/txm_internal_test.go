@@ -1078,3 +1078,292 @@ func TestTxm_Enqueue(t *testing.T) {
 		})
 	}
 }
+func TestTxm_fee_bumping(t *testing.T) {
+	tests := []struct {
+		name                string
+		feeBumpCriteria     string
+		txRetentionTimeout  time.Duration
+		txConfirmTimeout    time.Duration
+		expectedSendCount   int
+		expectedPromMetrics soltxmProm
+	}{
+		{
+			name:               "fixed intervals",
+			feeBumpCriteria:    FeeBumpCriteriaFixedIntervals,
+			txConfirmTimeout:   7 * time.Second,
+			txRetentionTimeout: 3 * time.Second,
+			expectedPromMetrics: soltxmProm{
+				confirmed: 1,
+				finalized: 1,
+			},
+		},
+		{
+			name:               "expiration",
+			feeBumpCriteria:    FeeBumpCriteriaExpiration,
+			txConfirmTimeout:   3 * time.Second,
+			txRetentionTimeout: 7 * time.Second,
+			expectedPromMetrics: soltxmProm{
+				confirmed: 1,
+				finalized: 1,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Configure short timeouts for testing
+			estimator := "fixed"
+			id := "mocknet-" + estimator + "-" + uuid.NewString()
+			t.Logf("Starting fee bumping test: %s", id)
+
+			ctx := context.Background()
+			lggr := logger.Test(t)
+
+			// Set short TxConfirmTimeout and TxRetentionTimeout
+			cfg := config.NewDefault()
+			cfg.Chain.FeeEstimatorMode = &estimator
+			cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(tt.txRetentionTimeout)
+			cfg.Chain.TxConfirmTimeout = relayconfig.MustNewDuration(tt.txConfirmTimeout)
+			cfg.Chain.FeeBumpCriteria = &tt.feeBumpCriteria
+			computeUnitLimitDefault := fees.ComputeUnitLimit(cfg.ComputeUnitLimitDefault())
+
+			// Initialize mocked Solana client
+			mc := mocks.NewReaderWriter(t)
+			mc.On("GetLatestBlock", mock.Anything).Return(&rpc.GetBlockResult{}, nil).Maybe()
+			mc.On("SlotHeight", mock.Anything).Return(uint64(1000), nil).Maybe()
+			mc.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{
+				Value: &rpc.LatestBlockhashResult{
+					LastValidBlockHeight: 1100, // expired because slotHeight is 1000. Will retry.
+					Blockhash:            solana.Hash{},
+				},
+			}, nil).Maybe()
+
+			// mock solana keystore
+			mkey := keyMocks.NewSimpleKeystore(t)
+			mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
+
+			loader := utils.NewLazyLoad(func() (client.ReaderWriter, error) { return mc, nil })
+			txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
+			require.NoError(t, txm.Start(ctx))
+			t.Cleanup(func() { require.NoError(t, txm.Close()) })
+
+			// tracking prom metrics
+			prom := soltxmProm{id: id}
+
+			// handle signature statuses calls
+			statuses := map[solana.Signature]func() *rpc.SignatureStatusesResult{}
+			mc.On("SignatureStatuses", mock.Anything, mock.AnythingOfType("[]solana.Signature")).Return(
+				func(_ context.Context, sigs []solana.Signature) (out []*rpc.SignatureStatusesResult) {
+					for i := range sigs {
+						get, exists := statuses[sigs[i]]
+						if !exists {
+							out = append(out, nil)
+							continue
+						}
+						out = append(out, get())
+					}
+					return out
+				}, nil,
+			)
+
+			// Prepare transaction expired and bump that won't get through
+			tx, signed := getTx(t, 1000, mkey)
+			sig := randomSignature(t)
+			retry0 := randomSignature(t)
+			var wg sync.WaitGroup
+			wg.Add(2)
+
+			mc.On("SlotHeight", mock.Anything).Return(uint64(1200), nil)
+			sendCount := 0
+			var countRW sync.RWMutex
+			mc.On("SendTx", mock.Anything, signed(0, true, computeUnitLimitDefault)).Run(func(mock.Arguments) {
+				countRW.Lock()
+				sendCount++
+				countRW.Unlock()
+			}).After(500*time.Millisecond).Return(sig, nil)
+			mc.On("SendTx", mock.Anything, signed(1, true, computeUnitLimitDefault)).Run(func(mock.Arguments) {
+				countRW.Lock()
+				sendCount++
+				countRW.Unlock()
+			}).After(500*time.Millisecond).Return(retry0, nil)
+			mc.On("SimulateTx", mock.Anything, signed(0, true, computeUnitLimitDefault), mock.Anything).Run(func(mock.Arguments) {
+				wg.Done()
+			}).Return(&rpc.SimulateTransactionResult{}, nil).Once()
+
+			// We want the bumped tx to be processed, confirmed and finalized.
+			statuses[sig] = func() (out *rpc.SignatureStatusesResult) {
+				out = &rpc.SignatureStatusesResult{}
+				return
+			}
+			statusCount := 0
+			statuses[retry0] = func() (out *rpc.SignatureStatusesResult) {
+				defer func() { statusCount++ }()
+				out = &rpc.SignatureStatusesResult{}
+				if statusCount == 1 {
+					out.ConfirmationStatus = rpc.ConfirmationStatusConfirmed
+					return
+				}
+				if statusCount == 2 {
+					out.ConfirmationStatus = rpc.ConfirmationStatusFinalized
+					wg.Done()
+					return
+				}
+				out.ConfirmationStatus = rpc.ConfirmationStatusProcessed
+				return
+			}
+
+			// tx should be able to queue
+			testTxID := uuid.New().String()
+			assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, uint64(0)))
+			wg.Wait()                                                       // wait to be picked up and processed
+			waitFor(t, tt.txConfirmTimeout+1*time.Second, txm, prom, empty) // inflight txs cleared after timeout
+
+			// transaction should be sent multiple times
+			countRW.RLock()
+			assert.Greater(t, sendCount, 2)
+			countRW.RUnlock()
+
+			// panic if sendTx called after context cancelled
+			mc.On("SendTx", mock.Anything, tx).Panic("SendTx should not be called anymore").Maybe()
+
+			// check prom metric
+			prom.confirmed++ // bumped tx should be confirmed
+			prom.finalized++ // bumped tx should be finalized
+			prom.assertEqual(t)
+
+			// check transaction status which should still be stored
+			status, err := txm.GetTransactionStatus(ctx, testTxID)
+			require.NoError(t, err)
+			require.Equal(t, types.Finalized, status)
+
+			// Sleep until retention period has passed for transaction and for another reap cycle to run
+			time.Sleep(tt.txRetentionTimeout + 1*time.Second)
+
+			// check if transaction has been purged from memory
+			status, err = txm.GetTransactionStatus(ctx, testTxID)
+			require.Error(t, err)
+			require.Equal(t, types.Unknown, status)
+		})
+	}
+}
+
+func TestTxm_no_fee_bumping(t *testing.T) {
+	// Configure short timeouts for testing
+	estimator := "fixed"
+	id := "mocknet-" + estimator + "-" + uuid.NewString()
+	t.Logf("Starting no fee bumping test: %s", id)
+
+	ctx := context.Background()
+	lggr := logger.Test(t)
+
+	// Set short TxConfirmTimeout and TxRetentionTimeout
+	cfg := config.NewDefault()
+	cfg.Chain.FeeEstimatorMode = &estimator
+	cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(5 * time.Second)
+	cfg.Chain.TxConfirmTimeout = relayconfig.MustNewDuration(2 * time.Second)
+	feeBumpCriteriaNone := FeeBumpCriteriaNone
+	cfg.Chain.FeeBumpCriteria = &feeBumpCriteriaNone
+	cfg.Chain.FeeBumpPeriod = relayconfig.MustNewDuration(0 * time.Second)
+	computeUnitLimitDefault := fees.ComputeUnitLimit(cfg.ComputeUnitLimitDefault())
+
+	// Initialize mocked Solana client
+	mc := mocks.NewReaderWriter(t)
+	mc.On("GetLatestBlock", mock.Anything).Return(&rpc.GetBlockResult{}, nil).Maybe()
+	mc.On("SlotHeight", mock.Anything).Return(uint64(1000), nil).Maybe()
+	mc.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{
+		Value: &rpc.LatestBlockhashResult{
+			LastValidBlockHeight: 1100, // expired because slotHeight is 1000. Won't retry.
+			Blockhash:            solana.Hash{},
+		},
+	}, nil).Maybe()
+
+	// mock solana keystore
+	mkey := keyMocks.NewSimpleKeystore(t)
+	mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
+
+	loader := utils.NewLazyLoad(func() (client.ReaderWriter, error) { return mc, nil })
+	txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
+	require.NoError(t, txm.Start(ctx))
+	t.Cleanup(func() { require.NoError(t, txm.Close()) })
+
+	// tracking prom metrics
+	prom := soltxmProm{id: id}
+
+	// handle signature statuses calls
+	statuses := map[solana.Signature]func() *rpc.SignatureStatusesResult{}
+	mc.On("SignatureStatuses", mock.Anything, mock.AnythingOfType("[]solana.Signature")).Return(
+		func(_ context.Context, sigs []solana.Signature) (out []*rpc.SignatureStatusesResult) {
+			for i := range sigs {
+				get, exists := statuses[sigs[i]]
+				if !exists {
+					out = append(out, nil)
+					continue
+				}
+				out = append(out, get())
+			}
+			return out
+		}, nil,
+	)
+
+	// Prepare transaction that won't get through
+	tx, signed := getTx(t, 1000, mkey)
+	sig := randomSignature(t)
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	mc.On("SlotHeight", mock.Anything).Return(uint64(1200), nil)
+	sendCount := 0
+	var countRW sync.RWMutex
+	mc.On("SendTx", mock.Anything, signed(0, true, computeUnitLimitDefault)).Run(func(mock.Arguments) {
+		countRW.Lock()
+		sendCount++
+		countRW.Unlock()
+	}).After(500*time.Millisecond).Return(sig, nil)
+	mc.On("SimulateTx", mock.Anything, signed(0, true, computeUnitLimitDefault), mock.Anything).Run(func(mock.Arguments) {
+		wg.Done()
+	}).Return(&rpc.SimulateTransactionResult{}, nil).Once()
+
+	// We don't want the tx to go through.
+	statuses[sig] = func() (out *rpc.SignatureStatusesResult) {
+		out = &rpc.SignatureStatusesResult{}
+		out.ConfirmationStatus = rpc.ConfirmationStatusProcessed
+		return
+	}
+
+	// tx should be able to queue
+	testTxID := uuid.New().String()
+	assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, uint64(0)))
+	wg.Wait() // wait to be picked up and processed
+
+	// check transaction is pending
+	status, err := txm.GetTransactionStatus(ctx, testTxID)
+	require.NoError(t, err)
+	require.Equal(t, types.Pending, status)
+
+	// inflight txs cleared after timeout
+	waitFor(t, cfg.Chain.TxRetentionTimeout.Duration()+1*time.Second, txm, prom, empty)
+
+	// transaction should be sent multiple times but shouldn't get through
+	countRW.RLock()
+	assert.Greater(t, sendCount, 1)
+	countRW.RUnlock()
+
+	// check transaction is failed
+	status, err = txm.GetTransactionStatus(ctx, testTxID)
+	require.NoError(t, err)
+	require.Equal(t, types.Failed, status)
+
+	// panic if sendTx called after context cancelled
+	mc.On("SendTx", mock.Anything, tx).Panic("SendTx should not be called anymore").Maybe()
+
+	// check prom metric. Bumped tx should be dropped an errored.
+	prom.error++
+	prom.drop++
+	prom.assertEqual(t)
+
+	// check transaction was deleted from memory
+	time.Sleep(cfg.Chain.TxRetentionTimeout.Duration() + 3*time.Second)
+	status, err = txm.GetTransactionStatus(ctx, testTxID)
+	require.Error(t, err)
+	require.Equal(t, types.Unknown, status)
+}
