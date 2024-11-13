@@ -17,7 +17,7 @@ var _ types.ContractTransmitter = (*Transmitter)(nil)
 
 type Transmitter struct {
 	stateID, programID, storeProgramID, transmissionsID, transmissionSigner solana.PublicKey
-	reader                                                                  GetReader
+	getReader                                                               GetReader
 	stateCache                                                              *StateCache
 	lggr                                                                    logger.Logger
 	txManager                                                               TxManager
@@ -30,7 +30,7 @@ func (c *Transmitter) Transmit(
 	report types.Report,
 	sigs []types.AttributedOnchainSignature,
 ) error {
-	reader, err := c.reader()
+	reader, err := c.getReader()
 	if err != nil {
 		return fmt.Errorf("error on Transmit.Reader: %w", err)
 	}

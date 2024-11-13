@@ -69,7 +69,7 @@ func TestTransmitter_TxSize(t *testing.T) {
 		storeProgramID:     mustNewRandomPublicKey(),
 		transmissionsID:    mustNewRandomPublicKey(),
 		transmissionSigner: signer.PublicKey(),
-		reader:             func() (client.Reader, error) { return rw, nil },
+		getReader:          func() (client.Reader, error) { return rw, nil },
 		stateCache:         &StateCache{},
 		lggr:               logger.Test(t),
 		txManager:          mockTxm,
