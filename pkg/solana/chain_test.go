@@ -472,8 +472,7 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 		// Send tx using transaction sender
 		result := c.txSender.SendTransaction(ctx, unsignedTx(receiver.PublicKey()))
 		require.NotNil(t, result)
-		require.NoError(t, result.Error())
-		require.Error(t, result.TxError())
+		require.Error(t, result.Error())
 		require.Equal(t, mn.Fatal, result.Code())
 		require.Empty(t, result.Signature())
 	})
@@ -481,8 +480,7 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 	t.Run("empty transaction", func(t *testing.T) {
 		result := c.txSender.SendTransaction(ctx, &solana.Transaction{})
 		require.NotNil(t, result)
-		require.NoError(t, result.Error())
-		require.Error(t, result.TxError())
+		require.Error(t, result.Error())
 		require.Equal(t, mn.Fatal, result.Code())
 		require.Empty(t, result.Signature())
 	})
