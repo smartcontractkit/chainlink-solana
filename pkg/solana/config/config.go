@@ -32,7 +32,7 @@ var defaultConfigSet = Chain{
 	BlockHistoryPollPeriod:   config.MustNewDuration(5 * time.Second),
 	BlockHistorySize:         ptr(uint64(1)),       // 1: uses latest block; >1: Uses multiple blocks, where n is number of blocks. DISCLAIMER: 1:1 ratio between n and RPC calls.
 	ComputeUnitLimitDefault:  ptr(uint32(200_000)), // set to 0 to disable adding compute unit limit
-	EstimateComputeUnitLimit: ptr(false),           // set to false to disable compute unit limit estimation
+	EstimateComputeUnitLimit: ptr(true),           // set to false to disable compute unit limit estimation
 }
 
 //go:generate mockery --name Config --output ./mocks/ --case=underscore --filename config.go
