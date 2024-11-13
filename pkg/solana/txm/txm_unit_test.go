@@ -61,7 +61,7 @@ func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 		client.On("SimulateTx", mock.Anything, mock.IsType(&solana.Transaction{}), mock.IsType(&rpc.SimulateTransactionOpts{})).Run(func(args mock.Arguments) {
 			// Validate max compute unit limit is set in transaction
 			tx := args.Get(1).(*solana.Transaction)
-			limit, err := fees.ParseComputeUnitLimit(tx.Message.Instructions[1].Data)
+			limit, err := fees.ParseComputeUnitLimit(tx.Message.Instructions[len(tx.Message.Instructions)-1].Data)
 			require.NoError(t, err)
 			require.Equal(t, fees.ComputeUnitLimit(solanatxm.MaxComputeUnitLimit), limit)
 
