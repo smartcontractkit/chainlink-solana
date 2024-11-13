@@ -169,7 +169,7 @@ func (r *Relayer) NewMedianProvider(ctx context.Context, rargs relaytypes.RelayA
 			storeProgramID:     configWatcher.storeProgramID,
 			transmissionsID:    transmissionsID,
 			transmissionSigner: transmitterAccount,
-			reader:             configWatcher.chain.Reader,
+			getReader:          configWatcher.chain.Reader,
 			stateCache:         configWatcher.stateCache,
 			lggr:               r.lggr,
 			txManager:          configWatcher.chain.TxManager(),
