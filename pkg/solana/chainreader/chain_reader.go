@@ -2,14 +2,12 @@ package chainreader
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
 	"sync"
 
-	ag_solana "github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
 	codeccommon "github.com/smartcontractkit/chainlink-common/pkg/codec"
@@ -18,7 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-	"github.com/smartcontractkit/chainlink-common/pkg/values"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -31,7 +28,7 @@ type SolanaChainReaderService struct {
 
 	// provided values
 	lggr   logger.Logger
-	client BinaryDataReader
+	client MultipleAccountGetter
 
 	// internal values
 	bindings namespaceBindings
@@ -48,7 +45,7 @@ var (
 )
 
 // NewChainReaderService is a constructor for a new ChainReaderService for Solana. Returns a nil service on error.
-func NewChainReaderService(lggr logger.Logger, dataReader BinaryDataReader, cfg config.ChainReader) (*SolanaChainReaderService, error) {
+func NewChainReaderService(lggr logger.Logger, dataReader MultipleAccountGetter, cfg config.ChainReader) (*SolanaChainReaderService, error) {
 	svc := &SolanaChainReaderService{
 		lggr:     logger.Named(lggr, ServiceName),
 		client:   dataReader,
@@ -114,123 +111,73 @@ func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, readIdent
 		return fmt.Errorf("%w: no contract for read identifier %s", types.ErrInvalidType, readIdentifier)
 	}
 
-	addressMappings, err := decodeAddressMappings(vals.address)
-	if err != nil {
-		return fmt.Errorf("%w: %s", types.ErrInvalidConfig, err)
+	batch := []call{
+		{
+			ContractName: vals.contract,
+			ReadName:     vals.readName,
+			Params:       params,
+			ReturnVal:    returnVal,
+		},
 	}
 
-	addresses, ok := addressMappings[vals.readName]
-	if !ok {
-		return fmt.Errorf("%w: no addresses for readName %s", types.ErrInvalidConfig, vals.readName)
-	}
-
-	bindings, err := s.bindings.GetReadBindings(vals.contract, vals.readName)
-	if err != nil {
-		return err
-	}
-
-	if len(addresses) != len(bindings) {
-		return fmt.Errorf("%w: addresses and bindings lengths do not match", types.ErrInvalidConfig)
-	}
-
-	// if the returnVal is not a *values.Value, run normally without using the ptrToValue
-	ptrToValue, isValue := returnVal.(*values.Value)
-	if !isValue {
-		return s.runAllBindings(ctx, bindings, addresses, params, returnVal)
-	}
-
-	// if the returnVal is a *values.Value, create the type from the contract, run normally, and wrap the value
-	contractType, err := s.bindings.CreateType(vals.contract, vals.readName, false)
+	results, err := doMethodBatchCall(ctx, s.client, s.bindings, batch)
 	if err != nil {
 		return err
 	}
 
-	if err = s.runAllBindings(ctx, bindings, addresses, params, contractType); err != nil {
-		return err
+	if len(results) != len(batch) {
+		return fmt.Errorf("%w: unexpected number of results", types.ErrInternal)
 	}
 
-	value, err := values.Wrap(contractType)
-	if err != nil {
-		return err
+	if results[0].err != nil {
+		return fmt.Errorf("%w: %s", types.ErrInternal, results[0].err)
 	}
-
-	*ptrToValue = value
-
-	return nil
-}
-
-func (s *SolanaChainReaderService) runAllBindings(
-	ctx context.Context,
-	bindings []readBinding,
-	addresses []string,
-	params, returnVal any,
-) error {
-	localCtx, localCancel := context.WithCancel(ctx)
-
-	// the wait group ensures GetLatestValue returns only after all go-routines have completed
-	var wg sync.WaitGroup
-
-	results := make(map[int]*loadedResult)
-
-	if len(bindings) > 1 {
-		// might go for some guardrails when dealing with multiple bindings
-		// the returnVal should be compatible with multiple passes by the codec decoder
-		// this should only apply to types struct{} and map[any]any
-		tReturnVal := reflect.TypeOf(returnVal)
-		if tReturnVal.Kind() == reflect.Pointer {
-			tReturnVal = reflect.Indirect(reflect.ValueOf(returnVal)).Type()
-		}
-
-		switch tReturnVal.Kind() {
-		case reflect.Struct, reflect.Map:
-		default:
-			localCancel()
-
-			wg.Wait()
-
-			return fmt.Errorf("%w: multiple bindings is only supported for struct and map", types.ErrInvalidType)
-		}
-
-		// for multiple bindings, preload the remote data in parallel
-		for idx, binding := range bindings {
-			results[idx] = &loadedResult{
-				value: make(chan []byte, 1),
-				err:   make(chan error, 1),
-			}
-
-			wg.Add(1)
-			go func(ctx context.Context, rb readBinding, res *loadedResult, address string) {
-				defer wg.Done()
-
-				rb.PreLoad(ctx, address, res)
-			}(localCtx, binding, results[idx], addresses[idx])
-		}
-	}
-
-	// in the case of parallel preloading, GetLatestValue will still run in
-	// sequence because the function will block until the data is loaded.
-	// in the case of no preloading, GetLatestValue will load and decode in
-	// sequence.
-	for idx, binding := range bindings {
-		if err := binding.GetLatestValue(ctx, addresses[idx], params, returnVal, results[idx]); err != nil {
-			localCancel()
-
-			wg.Wait()
-
-			return err
-		}
-	}
-
-	localCancel()
-
-	wg.Wait()
 
 	return nil
 }
 
 // BatchGetLatestValues implements the types.ContractReader interface.
-func (s *SolanaChainReaderService) BatchGetLatestValues(_ context.Context, _ types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
-	return nil, errors.New("unimplemented")
+func (s *SolanaChainReaderService) BatchGetLatestValues(ctx context.Context, request types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
+	idxLookup := make(map[types.BoundContract][]int)
+	batch := []call{}
+
+	for bound, req := range request {
+		idxLookup[bound] = make([]int, len(req))
+
+		for idx, readReq := range req {
+			idxLookup[bound][idx] = len(batch)
+			batch = append(batch, call{
+				ContractName: bound.Name,
+				ReadName:     readReq.ReadName,
+				Params:       readReq.Params,
+				ReturnVal:    readReq.ReturnVal,
+			})
+		}
+	}
+
+	results, err := doMethodBatchCall(ctx, s.client, s.bindings, batch)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(results) != len(batch) {
+		return nil, errors.New("unexpected number of results")
+	}
+
+	result := make(types.BatchGetLatestValuesResult)
+
+	for bound, idxs := range idxLookup {
+		result[bound] = make(types.ContractBatchResults, len(idxs))
+
+		for idx, callIdx := range idxs {
+			res := types.BatchReadResult{ReadName: results[callIdx].readName}
+			res.SetResult(results[callIdx].returnVal, results[callIdx].err)
+
+			result[bound][idx] = res
+		}
+	}
+
+	return result, nil
 }
 
 // QueryKey implements the types.ContractReader interface.
@@ -288,26 +235,25 @@ func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainReader
 
 			s.lookup.addReadNameForContract(namespace, methodName)
 
-			for _, procedure := range method.Procedures {
-				injectAddressModifier(procedure.OutputModifications)
+			procedure := method.Procedure
 
-				mod, err := procedure.OutputModifications.ToModifier(codec.DecoderHooks...)
-				if err != nil {
-					return err
-				}
+			injectAddressModifier(procedure.OutputModifications)
 
-				codecWithModifiers, err := codec.NewNamedModifierCodec(idlCodec, procedure.IDLAccount, mod)
-				if err != nil {
-					return err
-				}
-
-				s.bindings.AddReadBinding(namespace, methodName, newAccountReadBinding(
-					procedure.IDLAccount,
-					codecWithModifiers,
-					s.client,
-					createRPCOpts(procedure.RPCOpts),
-				))
+			mod, err := procedure.OutputModifications.ToModifier(codec.DecoderHooks...)
+			if err != nil {
+				return err
 			}
+
+			codecWithModifiers, err := codec.NewNamedModifierCodec(idlCodec, procedure.IDLAccount, mod)
+			if err != nil {
+				return err
+			}
+
+			s.bindings.AddReadBinding(namespace, methodName, newAccountReadBinding(
+				procedure.IDLAccount,
+				codecWithModifiers,
+				createRPCOpts(procedure.RPCOpts),
+			))
 		}
 	}
 
@@ -353,7 +299,7 @@ func NewAccountDataReader(client *rpc.Client) *accountDataReader {
 	return &accountDataReader{client: client}
 }
 
-func (r *accountDataReader) ReadAll(ctx context.Context, pk ag_solana.PublicKey, opts *rpc.GetAccountInfoOpts) ([]byte, error) {
+func (r *accountDataReader) ReadAll(ctx context.Context, pk solana.PublicKey, opts *rpc.GetAccountInfoOpts) ([]byte, error) {
 	result, err := r.client.GetAccountInfoWithOpts(ctx, pk, opts)
 	if err != nil {
 		return nil, err
@@ -362,20 +308,4 @@ func (r *accountDataReader) ReadAll(ctx context.Context, pk ag_solana.PublicKey,
 	bts := result.Value.Data.GetBinary()
 
 	return bts, nil
-}
-
-func decodeAddressMappings(encoded string) (map[string][]string, error) {
-	decoded, err := base64.StdEncoding.DecodeString(encoded)
-	if err != nil {
-		return nil, err
-	}
-
-	var readAddresses map[string][]string
-
-	err = json.Unmarshal(decoded, &readAddresses)
-	if err != nil {
-		return nil, err
-	}
-
-	return readAddresses, nil
 }

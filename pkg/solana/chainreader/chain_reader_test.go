@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -78,11 +77,6 @@ func TestSolanaChainReaderService_ServiceCtx(t *testing.T) {
 }
 
 func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
-	// TODO fix Solana tests
-	t.Skip()
-
-	t.Parallel()
-
 	ctx := tests.Context(t)
 
 	// encode values from unmodified test struct to be read and decoded
@@ -107,16 +101,20 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			require.NoError(t, svc.Close())
 		})
 
-		client.SetNext(encoded, nil, 0)
+		pk := solana.NewWallet().PublicKey()
+
+		client.SetForAddress(pk, encoded, nil, 0)
 
 		var result modifiedStructWithNestedStruct
 
 		binding := types.BoundContract{
 			Name:    Namespace,
-			Address: "",
+			Address: pk.String(),
 		}
 
+		require.NoError(t, svc.Bind(ctx, []types.BoundContract{binding}))
 		require.NoError(t, svc.GetLatestValue(ctx, binding.ReadIdentifier(NamedMethod), primitives.Unconfirmed, nil, &result))
+
 		assert.Equal(t, expected.InnerStruct, result.InnerStruct)
 		assert.Equal(t, expected.Value, result.V)
 		assert.Equal(t, expected.TimeVal, result.TimeVal)
@@ -151,7 +149,11 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		}
 
 		assert.NoError(t, svc.Bind(ctx, []types.BoundContract{binding}))
-		assert.ErrorIs(t, svc.GetLatestValue(ctx, binding.ReadIdentifier(NamedMethod), primitives.Unconfirmed, nil, &result), expectedErr)
+
+		err = svc.GetLatestValue(ctx, binding.ReadIdentifier(NamedMethod), primitives.Unconfirmed, nil, &result)
+
+		assert.Contains(t, err.Error(), chainreader.ErrMissingAccountData.Error())
+		assert.ErrorIs(t, err, types.ErrInternal)
 	})
 
 	t.Run("Method Not Found", func(t *testing.T) {
@@ -194,33 +196,6 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		var result modifiedStructWithNestedStruct
 
 		assert.NotNil(t, svc.GetLatestValue(ctx, types.BoundContract{Name: "Unknown"}.ReadIdentifier("Unknown"), primitives.Unconfirmed, nil, &result))
-	})
-
-	t.Run("Bind Success", func(t *testing.T) {
-		t.Parallel()
-
-		_, conf := newTestConfAndCodec(t)
-
-		client := new(mockedRPCClient)
-		svc, err := chainreader.NewChainReaderService(logger.Test(t), client, conf)
-
-		require.NoError(t, err)
-		require.NotNil(t, svc)
-		require.NoError(t, svc.Start(ctx))
-
-		t.Cleanup(func() {
-			require.NoError(t, svc.Close())
-		})
-
-		pk := ag_solana.NewWallet().PublicKey()
-		err = svc.Bind(ctx, []types.BoundContract{
-			{
-				Address: pk.String(),
-				Name:    fmt.Sprintf("%s.%s.%d", Namespace, NamedMethod, 0),
-			},
-		})
-
-		assert.NoError(t, err)
 	})
 
 	t.Run("Bind Errors", func(t *testing.T) {
@@ -315,12 +290,10 @@ func newTestConfAndCodec(t *testing.T) (types.RemoteCodec, config.ChainReader) {
 				Methods: map[string]config.ChainDataReader{
 					NamedMethod: {
 						AnchorIDL: rawIDL,
-						Procedures: []config.ChainReaderProcedure{
-							{
-								IDLAccount: testutils.TestStructWithNestedStruct,
-								OutputModifications: codeccommon.ModifiersConfig{
-									&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},
-								},
+						Procedure: config.ChainReaderProcedure{
+							IDLAccount: testutils.TestStructWithNestedStruct,
+							OutputModifications: codeccommon.ModifiersConfig{
+								&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},
 							},
 						},
 					},
@@ -358,36 +331,21 @@ type mockedRPCClient struct {
 	sequence          []mockedRPCCall
 }
 
-func (_m *mockedRPCClient) ReadAll(_ context.Context, pk ag_solana.PublicKey, _ *rpc.GetAccountInfoOpts) ([]byte, error) {
-	_m.mu.Lock()
-	defer _m.mu.Unlock()
+func (_m *mockedRPCClient) GetMultipleAccountData(_ context.Context, keys ...solana.PublicKey) ([][]byte, error) {
+	result := make([][]byte, len(keys))
 
-	if _m.responseByAddress == nil {
-		_m.responseByAddress = make(map[string]mockedRPCCall)
-	}
+	for idx, key := range keys {
+		call, ok := _m.responseByAddress[key.String()]
+		if !ok || call.err != nil {
+			result[idx] = nil
 
-	if resp, ok := _m.responseByAddress[pk.String()]; ok {
-		if resp.delay > 0 {
-			time.Sleep(resp.delay)
+			continue
 		}
 
-		delete(_m.responseByAddress, pk.String())
-
-		return resp.bts, resp.err
+		result[idx] = call.bts
 	}
 
-	if len(_m.sequence) == 0 {
-		return nil, errors.New(" no values to return")
-	}
-
-	next := _m.sequence[0]
-	_m.sequence = _m.sequence[1:len(_m.sequence)]
-
-	if next.delay > 0 {
-		time.Sleep(next.delay)
-	}
-
-	return next.bts, next.err
+	return result, nil
 }
 
 func (_m *mockedRPCClient) SetNext(bts []byte, err error, delay time.Duration) {
@@ -425,9 +383,13 @@ type chainReaderInterfaceTester struct {
 
 func (r *chainReaderInterfaceTester) GetAccountBytes(i int) []byte {
 	account := [20]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+
 	account[i%20] += byte(i)
 	account[(i+3)%20] += byte(i + 3)
-	return account[:]
+
+	pk := solana.PublicKeyFromBytes(account[:])
+
+	return pk.Bytes()
 }
 
 func (r *chainReaderInterfaceTester) GetAccountString(i int) string {
@@ -456,64 +418,48 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 					MethodTakingLatestParamsReturningTestStruct: {
 						AnchorIDL: fullStructIDL(t),
 						Encoding:  config.EncodingTypeBorsh,
-						Procedures: []config.ChainReaderProcedure{
-							{
-								IDLAccount: "TestStructB",
-								RPCOpts: &config.RPCOpts{
-									Encoding:   &encodingBase64,
-									Commitment: &commitment,
-									DataSlice: &rpc.DataSlice{
-										Offset: &offset,
-										Length: &length,
-									},
+						Procedure: config.ChainReaderProcedure{
+							IDLAccount: "TestStruct",
+							RPCOpts: &config.RPCOpts{
+								Encoding:   &encodingBase64,
+								Commitment: &commitment,
+								DataSlice: &rpc.DataSlice{
+									Offset: &offset,
+									Length: &length,
 								},
-							},
-							{
-								IDLAccount: "TestStructA",
 							},
 						},
 					},
 					MethodReturningUint64: {
 						AnchorIDL: fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""),
 						Encoding:  config.EncodingTypeBorsh,
-						Procedures: []config.ChainReaderProcedure{
-							{
-								IDLAccount: "SimpleUint64Value",
-								OutputModifications: codeccommon.ModifiersConfig{
-									&codeccommon.PropertyExtractorConfig{FieldName: "I"},
-								},
+						Procedure: config.ChainReaderProcedure{
+							IDLAccount: "SimpleUint64Value",
+							OutputModifications: codeccommon.ModifiersConfig{
+								&codeccommon.PropertyExtractorConfig{FieldName: "I"},
 							},
 						},
 					},
 					MethodReturningUint64Slice: {
 						AnchorIDL: fmt.Sprintf(baseIDL, uint64SliceBaseTypeIDL, ""),
 						Encoding:  config.EncodingTypeBincode,
-						Procedures: []config.ChainReaderProcedure{
-							{
-								IDLAccount: "Uint64Slice",
-								OutputModifications: codeccommon.ModifiersConfig{
-									&codeccommon.PropertyExtractorConfig{FieldName: "Vals"},
-								},
+						Procedure: config.ChainReaderProcedure{
+							IDLAccount: "Uint64Slice",
+							OutputModifications: codeccommon.ModifiersConfig{
+								&codeccommon.PropertyExtractorConfig{FieldName: "Vals"},
 							},
 						},
 					},
 					MethodReturningSeenStruct: {
 						AnchorIDL: fullStructIDL(t),
 						Encoding:  config.EncodingTypeBorsh,
-						Procedures: []config.ChainReaderProcedure{
-							{
-								IDLAccount: "TestStructB",
-								OutputModifications: codeccommon.ModifiersConfig{
-									&codeccommon.AddressBytesToStringModifierConfig{
-										Fields: []string{"Accountstruct.Accountstr"},
-									},
+						Procedure: config.ChainReaderProcedure{
+							IDLAccount: "TestStruct",
+							OutputModifications: codeccommon.ModifiersConfig{
+								&codeccommon.AddressBytesToStringModifierConfig{
+									Fields: []string{"Accountstruct.Accountstr"},
 								},
-							},
-							{
-								IDLAccount: "TestStructA",
-								OutputModifications: codeccommon.ModifiersConfig{
-									&codeccommon.HardCodeModifierConfig{OffChainValues: map[string]any{"ExtraField": AnyExtraValue}},
-								},
+								&codeccommon.HardCodeModifierConfig{OffChainValues: map[string]any{"ExtraField": AnyExtraValue}},
 							},
 						},
 					},
@@ -524,12 +470,10 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 					MethodReturningUint64: {
 						AnchorIDL: fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""),
 						Encoding:  config.EncodingTypeBorsh,
-						Procedures: []config.ChainReaderProcedure{
-							{
-								IDLAccount: "SimpleUint64Value",
-								OutputModifications: codeccommon.ModifiersConfig{
-									&codeccommon.PropertyExtractorConfig{FieldName: "I"},
-								},
+						Procedure: config.ChainReaderProcedure{
+							IDLAccount: "SimpleUint64Value",
+							OutputModifications: codeccommon.ModifiersConfig{
+								&codeccommon.PropertyExtractorConfig{FieldName: "I"},
 							},
 						},
 					},
@@ -600,9 +544,11 @@ func (r *wrappedTestChainReader) Name() string {
 
 func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentifier string, confidenceLevel primitives.ConfidenceLevel, params, returnVal any) error {
 	var (
-		a ag_solana.PublicKey
-		b ag_solana.PublicKey
+		bts  []byte
+		acct int
+		err  error
 	)
+
 	parts := strings.Split(readIdentifier, "-")
 	if len(parts) < 3 {
 		panic("unexpected readIdentifier length")
@@ -610,6 +556,10 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 
 	contractName := parts[1]
 	method := parts[2]
+
+	if contractName == AnySecondContractName {
+		acct = 1
+	}
 
 	switch contractName + method {
 	case AnyContractName + EventName:
@@ -622,13 +572,11 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 			I: AnyValueToReadWithoutAnArgument,
 		}
 
-		bts, err := cdc.Encode(ctx, onChainStruct, "SimpleUint64Value")
+		bts, err = cdc.Encode(ctx, onChainStruct, "SimpleUint64Value")
 		if err != nil {
 			r.test.Log(err.Error())
 			r.test.FailNow()
 		}
-
-		r.client.SetNext(bts, nil, 0)
 	case AnyContractName + MethodReturningUint64Slice:
 		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, uint64SliceBaseTypeIDL, ""), config.EncodingTypeBincode)
 		onChainStruct := struct {
@@ -637,12 +585,10 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 			Vals: AnySliceToReadWithoutAnArgument,
 		}
 
-		bts, err := cdc.Encode(ctx, onChainStruct, "Uint64Slice")
+		bts, err = cdc.Encode(ctx, onChainStruct, "Uint64Slice")
 		if err != nil {
 			r.test.FailNow()
 		}
-
-		r.client.SetNext(bts, nil, 0)
 	case AnySecondContractName + MethodReturningUint64, AnyContractName:
 		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""), config.EncodingTypeBorsh)
 		onChainStruct := struct {
@@ -651,27 +597,18 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 			I: AnyDifferentValueToReadWithoutAnArgument,
 		}
 
-		bts, err := cdc.Encode(ctx, onChainStruct, "SimpleUint64Value")
+		bts, err = cdc.Encode(ctx, onChainStruct, "SimpleUint64Value")
 		if err != nil {
 			r.test.FailNow()
 		}
-
-		r.client.SetNext(bts, nil, 0)
 	case AnyContractName + MethodReturningSeenStruct:
 		nextStruct := CreateTestStruct[*testing.T](0, r.tester)
 		r.testStructQueue = append(r.testStructQueue, &nextStruct)
 
-		a, b = getAddresses(r.test, r.tester, AnyContractName, MethodReturningSeenStruct)
-
 		fallthrough
 	default:
-
 		if len(r.testStructQueue) == 0 {
 			r.test.FailNow()
-		}
-
-		if contractName+method != AnyContractName+MethodReturningSeenStruct {
-			a, b = getAddresses(r.test, r.tester, AnyContractName, MethodTakingLatestParamsReturningTestStruct)
 		}
 
 		nextTestStruct := r.testStructQueue[0]
@@ -680,8 +617,6 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 		// split into two encoded parts to test the preloading function
 		cdc := makeTestCodec(r.test, fullStructIDL(r.test), config.EncodingTypeBorsh)
 
-		var bts []byte
-		var err error
 		if strings.Contains(r.test.Name(), "wraps_config_with_modifiers_using_its_own_mapstructure_overrides") {
 			// TODO: This is a temporary solution. We are manually retyping this struct to avoid breaking unrelated tests.
 			// Once input modifiers are fully implemented, revisit this code and remove this manual struct conversion
@@ -716,27 +651,19 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 				NestedStaticStruct:  nextTestStruct.NestedStaticStruct,
 			}
 
-			bts, err = cdc.Encode(ctx, tempStruct, "TestStructB")
+			bts, err = cdc.Encode(ctx, tempStruct, "TestStruct")
 			if err != nil {
 				r.test.FailNow()
 			}
 		} else {
-			bts, err = cdc.Encode(ctx, nextTestStruct, "TestStructB")
+			bts, err = cdc.Encode(ctx, nextTestStruct, "TestStruct")
 			if err != nil {
 				r.test.FailNow()
 			}
 		}
-
-		// make part A return slower than part B
-		r.client.SetForAddress(a, bts, nil, 300*time.Millisecond)
-
-		bts, err = cdc.Encode(ctx, nextTestStruct, "TestStructA")
-		if err != nil {
-			r.test.FailNow()
-		}
-
-		r.client.SetForAddress(b, bts, nil, 50*time.Millisecond)
 	}
+
+	r.client.SetForAddress(ag_solana.PublicKey(r.tester.GetAccountBytes(acct)), bts, nil, 0)
 
 	return r.service.GetLatestValue(ctx, readIdentifier, confidenceLevel, params, returnVal)
 }
@@ -849,28 +776,9 @@ func (r *chainReaderInterfaceTester) TriggerEvent(t *testing.T, testStruct *Test
 }
 
 func (r *chainReaderInterfaceTester) GetBindings(t *testing.T) []types.BoundContract {
-	mainContractMethods := map[string][]string{
-		MethodTakingLatestParamsReturningTestStruct: {r.address[0], r.address[1]},
-		MethodReturningUint64:                       {r.address[2]},
-		MethodReturningUint64Slice:                  {r.address[3]},
-		MethodReturningSeenStruct:                   {r.address[4], r.address[5]},
-	}
-
-	addrBts, err := json.Marshal(mainContractMethods)
-	if err != nil {
-		t.Log(err.Error())
-		t.FailNow()
-	}
-
-	secondAddrBts, err := json.Marshal(map[string][]string{MethodReturningUint64: {r.address[6]}})
-	if err != nil {
-		t.Log(err.Error())
-		t.FailNow()
-	}
-
 	return []types.BoundContract{
-		{Name: AnyContractName, Address: base64.StdEncoding.EncodeToString(addrBts)},
-		{Name: AnySecondContractName, Address: base64.StdEncoding.EncodeToString(secondAddrBts)},
+		{Name: AnyContractName, Address: solana.PublicKeyFromBytes(r.GetAccountBytes(0)).String()},
+		{Name: AnySecondContractName, Address: solana.PublicKeyFromBytes(r.GetAccountBytes(1)).String()},
 	}
 }
 
@@ -912,7 +820,7 @@ func fullStructIDL(t *testing.T) string {
 
 	return fmt.Sprintf(
 		baseIDL,
-		strings.Join([]string{testStructAIDL, testStructBIDL}, ","),
+		testStructIDL,
 		strings.Join([]string{midLevelDynamicStructIDL, midLevelStaticStructIDL, innerDynamicStructIDL, innerStaticStructIDL, accountStructIDL}, ","),
 	)
 }
@@ -925,8 +833,8 @@ const (
 		"types": [%s]
 	}`
 
-	testStructAIDL = `{
-		"name": "TestStructA",
+	testStructIDL = `{
+		"name": "TestStruct",
 		"type": {
 			"kind": "struct",
 			"fields": [
@@ -934,20 +842,12 @@ const (
 				{"name": "differentField","type": "string"},
 				{"name": "bigField","type": "i128"},
 				{"name": "nestedDynamicStruct","type": {"defined": "MidLevelDynamicStruct"}},
-				{"name": "nestedStaticStruct","type": {"defined": "MidLevelStaticStruct"}}
-			]
-		}
-	}`
-
-	testStructBIDL = `{
-		"name": "TestStructB",
-		"type": {
-			"kind": "struct",
-			"fields": [
+				{"name": "nestedStaticStruct","type": {"defined": "MidLevelStaticStruct"}},
 				{"name": "oracleID","type": "u8"},
 				{"name": "oracleIDs","type": {"array": ["u8",32]}},
 				{"name": "accountstruct","type": {"defined": "accountstruct"}},
 				{"name": "accounts","type": {"vec": "bytes"}}
+
 			]
 		}
 	}`
