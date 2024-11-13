@@ -321,18 +321,16 @@ func (m *MultiNodeClient) GetInterceptedChainInfo() (latest, highestUserObservat
 }
 
 type SendTxResult struct {
-	err   error
-	txErr error
-	code  mn.SendTxReturnCode
-	sig   solana.Signature
+	err  error
+	code mn.SendTxReturnCode
+	sig  solana.Signature
 }
 
 var _ mn.SendTxResult = (*SendTxResult)(nil)
 
 func NewSendTxResult(err error) *SendTxResult {
 	result := &SendTxResult{
-		err:   err,
-		txErr: err,
+		err: err,
 	}
 	result.code = ClassifySendError(nil, err)
 	return result
@@ -340,10 +338,6 @@ func NewSendTxResult(err error) *SendTxResult {
 
 func (r *SendTxResult) Error() error {
 	return r.err
-}
-
-func (r *SendTxResult) TxError() error {
-	return r.txErr
 }
 
 func (r *SendTxResult) Code() mn.SendTxReturnCode {
@@ -356,7 +350,7 @@ func (r *SendTxResult) Signature() solana.Signature {
 
 func (m *MultiNodeClient) SendTransaction(ctx context.Context, tx *solana.Transaction) *SendTxResult {
 	var sendTxResult = &SendTxResult{}
-	sendTxResult.sig, sendTxResult.txErr = m.SendTx(ctx, tx)
-	sendTxResult.code = ClassifySendError(tx, sendTxResult.txErr)
+	sendTxResult.sig, sendTxResult.err = m.SendTx(ctx, tx)
+	sendTxResult.code = ClassifySendError(tx, sendTxResult.err)
 	return sendTxResult
 }
