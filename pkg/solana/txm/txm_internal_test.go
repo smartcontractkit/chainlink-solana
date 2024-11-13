@@ -910,6 +910,8 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 	t.Run("simulation_succeeds", func(t *testing.T) {
 		// Test tx is not discarded due to confirm timeout and tracked to finalization
 		tx, signed := getTx(t, 1, mkey)
+		// add signature and compute unit limit to tx for simulation (excludes compute unit price)
+		simulateTx := addSigAndLimitToTx(t, mkey, solana.PublicKey{}, *tx, MaxComputeUnitLimit)
 		sig := randomSignature(t)
 		var wg sync.WaitGroup
 		wg.Add(3)
@@ -917,11 +919,11 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 		computeUnitConsumed := uint64(1_000_000)
 		computeUnitLimit := fees.ComputeUnitLimit(uint32(bigmath.AddPercentage(new(big.Int).SetUint64(computeUnitConsumed), EstimateComputeUnitLimitBuffer).Uint64()))
 		mc.On("SendTx", mock.Anything, signed(0, true, computeUnitLimit)).Return(sig, nil)
-		// First simulated before broadcast without signature or compute unit limit set
-		mc.On("SimulateTx", mock.Anything, tx, mock.Anything).Run(func(mock.Arguments) {
+		// First simulation before broadcast with signature and max compute unit limit set
+		mc.On("SimulateTx", mock.Anything, simulateTx, mock.Anything).Run(func(mock.Arguments) {
 			wg.Done()
 		}).Return(&rpc.SimulateTransactionResult{UnitsConsumed: &computeUnitConsumed}, nil).Once()
-		// Second simulated after broadcast with signature and compute unit limit set
+		// Second simulation after broadcast with signature and compute unit limit set
 		mc.On("SimulateTx", mock.Anything, signed(0, true, computeUnitLimit), mock.Anything).Run(func(mock.Arguments) {
 			wg.Done()
 		}).Return(&rpc.SimulateTransactionResult{UnitsConsumed: &computeUnitConsumed}, nil).Once()
@@ -982,11 +984,13 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 
 	t.Run("simulation_returns_error", func(t *testing.T) {
 		// Test tx is not discarded due to confirm timeout and tracked to finalization
-		tx, signed := getTx(t, 1, mkey)
+		tx, _ := getTx(t, 1, mkey)
+		// add signature and compute unit limit to tx for simulation (excludes compute unit price)
+		simulateTx := addSigAndLimitToTx(t, mkey, solana.PublicKey{}, *tx, MaxComputeUnitLimit)
 		sig := randomSignature(t)
-
-		mc.On("SendTx", mock.Anything, signed(0, true, fees.ComputeUnitLimit(0))).Return(sig, nil).Panic("SendTx should never be called").Maybe()
-		mc.On("SimulateTx", mock.Anything, tx, mock.Anything).Return(&rpc.SimulateTransactionResult{Err: errors.New("tx err")}, nil).Once()
+		mc.On("SendTx", mock.Anything, mock.Anything).Return(sig, nil).Panic("SendTx should never be called").Maybe()
+		// First simulation before broadcast with max compute unit limit
+		mc.On("SimulateTx", mock.Anything, simulateTx, mock.Anything).Return(&rpc.SimulateTransactionResult{Err: errors.New("tx err")}, nil).Once()
 
 		// tx should NOT be able to queue
 		assert.Error(t, txm.Enqueue(ctx, t.Name(), tx, nil))
@@ -1071,4 +1075,18 @@ func TestTxm_Enqueue(t *testing.T) {
 			assert.Error(t, txm.Enqueue(ctx, run.name, run.tx, nil))
 		})
 	}
+}
+
+func addSigAndLimitToTx(t *testing.T, keystore SimpleKeystore, pubkey solana.PublicKey, tx solana.Transaction, limit fees.ComputeUnitLimit) *solana.Transaction {
+	txCopy := tx
+	// sign tx
+	txMsg, err := tx.Message.MarshalBinary()
+	require.NoError(t, err)
+	sigBytes, err := keystore.Sign(context.Background(), pubkey.String(), txMsg)
+	require.NoError(t, err)
+	var sig [64]byte
+	copy(sig[:], sigBytes)
+	txCopy.Signatures = append(txCopy.Signatures, sig)
+	require.NoError(t, fees.SetComputeUnitLimit(&txCopy, limit))
+	return &txCopy
 }

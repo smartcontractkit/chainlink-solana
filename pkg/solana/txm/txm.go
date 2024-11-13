@@ -617,7 +617,7 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	select {
 	case txm.chSend <- msg:
 	default:
-		txm.lggr.Errorw("failed to enqeue tx", "queueFull", len(txm.chSend) == MaxQueueLen, "tx", msg)
+		txm.lggr.Errorw("failed to enqueue tx", "queueFull", len(txm.chSend) == MaxQueueLen, "tx", msg)
 		return fmt.Errorf("failed to enqueue transaction for %s", accountID)
 	}
 	return nil
@@ -647,7 +647,28 @@ func (txm *Txm) GetTransactionStatus(ctx context.Context, transactionID string) 
 // EstimateComputeUnitLimit estimates the compute unit limit needed for a transaction.
 // It simulates the provided transaction to determine the used compute and applies a buffer to it.
 func (txm *Txm) EstimateComputeUnitLimit(ctx context.Context, tx *solanaGo.Transaction) (uint32, error) {
-	res, err := txm.simulateTx(ctx, tx)
+	txCopy := *tx
+
+	// Set max compute unit limit when simulating a transaction to avoid getting an error for exceeding the default 200k compute unit limit
+	if computeUnitLimitErr := fees.SetComputeUnitLimit(&txCopy, fees.ComputeUnitLimit(MaxComputeUnitLimit)); computeUnitLimitErr != nil {
+		txm.lggr.Errorw("failed to set compute unit limit when simulating tx", "error", computeUnitLimitErr)
+		return 0, computeUnitLimitErr
+	}
+
+	// Sign and set signature in tx copy for simulation
+	txMsg, marshalErr := txCopy.Message.MarshalBinary()
+	if marshalErr != nil {
+		return 0, fmt.Errorf("failed to marshal tx message: %w", marshalErr)
+	}
+	sigBytes, signErr := txm.ks.Sign(ctx, txCopy.Message.AccountKeys[0].String(), txMsg)
+	if signErr != nil {
+		return 0, fmt.Errorf("failed to sign transaction: %w", signErr)
+	}
+	var sig [64]byte
+	copy(sig[:], sigBytes)
+	txCopy.Signatures = append(txCopy.Signatures, sig)
+
+	res, err := txm.simulateTx(ctx, &txCopy)
 	if err != nil {
 		return 0, err
 	}
@@ -655,8 +676,8 @@ func (txm *Txm) EstimateComputeUnitLimit(ctx context.Context, tx *solanaGo.Trans
 	// Return error if response err is non-nil to avoid broadcasting a tx destined to fail
 	if res.Err != nil {
 		sig := solanaGo.Signature{}
-		if len(tx.Signatures) > 0 {
-			sig = tx.Signatures[0]
+		if len(txCopy.Signatures) > 0 {
+			sig = txCopy.Signatures[0]
 		}
 		txm.processSimulationError("", sig, res)
 		return 0, fmt.Errorf("simulated tx returned error: %v", res.Err)
@@ -691,17 +712,8 @@ func (txm *Txm) simulateTx(ctx context.Context, tx *solanaGo.Transaction) (res *
 		return
 	}
 
-	// Copy tx to avoid changing the original tx
-	txCopy := *tx
-
-	// Set max compute unit limit when simulating a transaction to avoid getting an error for exceeding the default 200k compute unit limit
-	if computeUnitLimitErr := fees.SetComputeUnitLimit(&txCopy, fees.ComputeUnitLimit(MaxComputeUnitLimit)); computeUnitLimitErr != nil {
-		txm.lggr.Errorw("failed to set compute unit limit when simulating tx", "error", computeUnitLimitErr)
-		return nil, computeUnitLimitErr
-	}
-
 	// Simulate with signature verification since it can have a significant impact on compute units
-	res, err = client.SimulateTx(ctx, &txCopy, &rpc.SimulateTransactionOpts{SigVerify: true})
+	res, err = client.SimulateTx(ctx, tx, &rpc.SimulateTransactionOpts{SigVerify: true})
 	if err != nil {
 		// This error can occur if endpoint goes down or if invalid signature
 		txm.lggr.Errorw("failed to simulate tx", "error", err)

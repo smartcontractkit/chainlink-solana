@@ -30,6 +30,7 @@ func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 
 	// setup mock keystore
 	mkey := keyMocks.NewSimpleKeystore(t)
+	mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
 
 	// setup key
 	key, err := solana.NewRandomPrivateKey()
