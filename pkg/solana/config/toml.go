@@ -155,6 +155,9 @@ func setFromChain(c, f *Chain) {
 	if f.TxConfirmTimeout != nil {
 		c.TxConfirmTimeout = f.TxConfirmTimeout
 	}
+	if f.TxRetentionTimeout != nil {
+		c.TxRetentionTimeout = f.TxRetentionTimeout
+	}
 	if f.SkipPreflight != nil {
 		c.SkipPreflight = f.SkipPreflight
 	}
@@ -238,6 +241,9 @@ func (c *TOMLConfig) TxConfirmTimeout() time.Duration {
 	return c.Chain.TxConfirmTimeout.Duration()
 }
 
+func (c *TOMLConfig) TxRetentionTimeout() time.Duration {
+	return c.Chain.TxRetentionTimeout.Duration()
+}
 func (c *TOMLConfig) SkipPreflight() bool {
 	return *c.Chain.SkipPreflight
 }

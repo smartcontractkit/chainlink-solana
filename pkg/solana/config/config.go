@@ -17,7 +17,8 @@ var defaultConfigSet = Chain{
 	OCR2CacheTTL:        config.MustNewDuration(time.Minute),            // stale cache deadline
 	TxTimeout:           config.MustNewDuration(time.Minute),            // timeout for send tx method in client
 	TxRetryTimeout:      config.MustNewDuration(10 * time.Second),       // duration for tx rebroadcasting to RPC node
-	TxConfirmTimeout:    config.MustNewDuration(30 * time.Second),       // duration before discarding tx as unconfirmed
+	TxConfirmTimeout:    config.MustNewDuration(30 * time.Second),       // duration before discarding tx as unconfirmed. Set to 0 to disable discarding tx.
+	TxRetentionTimeout:  config.MustNewDuration(0 * time.Second),        // duration to retain transactions after being marked as finalized or errored. Set to 0 to immediately drop transactions.
 	SkipPreflight:       ptr(true),                                      // to enable or disable preflight checks
 	Commitment:          ptr(string(rpc.CommitmentConfirmed)),
 	MaxRetries:          ptr(int64(0)), // max number of retries (default = 0). when config.MaxRetries < 0), interpreted as MaxRetries = nil and rpc node will do a reasonable number of retries
@@ -43,6 +44,7 @@ type Config interface {
 	TxTimeout() time.Duration
 	TxRetryTimeout() time.Duration
 	TxConfirmTimeout() time.Duration
+	TxRetentionTimeout() time.Duration
 	SkipPreflight() bool
 	Commitment() rpc.CommitmentType
 	MaxRetries() *uint
@@ -67,6 +69,7 @@ type Chain struct {
 	TxTimeout                *config.Duration
 	TxRetryTimeout           *config.Duration
 	TxConfirmTimeout         *config.Duration
+	TxRetentionTimeout       *config.Duration
 	SkipPreflight            *bool
 	Commitment               *string
 	MaxRetries               *int64
@@ -102,6 +105,9 @@ func (c *Chain) SetDefaults() {
 	}
 	if c.TxConfirmTimeout == nil {
 		c.TxConfirmTimeout = defaultConfigSet.TxConfirmTimeout
+	}
+	if c.TxRetentionTimeout == nil {
+		c.TxRetentionTimeout = defaultConfigSet.TxRetentionTimeout
 	}
 	if c.SkipPreflight == nil {
 		c.SkipPreflight = defaultConfigSet.SkipPreflight
