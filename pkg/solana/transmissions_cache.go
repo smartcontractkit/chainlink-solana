@@ -19,21 +19,21 @@ type TransmissionsCache struct {
 	*client.Cache[Answer]
 }
 
-func NewTransmissionsCache(transmissionsID solana.PublicKey, chainID string, cfg config.Config, reader GetReader, lggr logger.Logger) *TransmissionsCache {
+func NewTransmissionsCache(transmissionsID solana.PublicKey, chainID string, cfg config.Config, getReader GetReader, lggr logger.Logger) *TransmissionsCache {
 	name := "ocr2_median_transmissions"
 	getter := func(ctx context.Context) (Answer, uint64, error) {
-		getAccountReader := func() (client.AccountReader, error) { return reader() }
+		getAccountReader := func() (client.AccountReader, error) { return getReader() }
 		return GetLatestTransmission(ctx, getAccountReader, transmissionsID, cfg.Commitment())
 	}
 	return &TransmissionsCache{client.NewCache(name, transmissionsID, chainID, cfg, getter, logger.With(lggr, "cache", name))}
 }
 
-func GetLatestTransmission(ctx context.Context, reader GetAccountReader, account solana.PublicKey, commitment rpc.CommitmentType) (Answer, uint64, error) {
+func GetLatestTransmission(ctx context.Context, getReader GetAccountReader, account solana.PublicKey, commitment rpc.CommitmentType) (Answer, uint64, error) {
 	// query for transmission header
 	headerStart := AccountDiscriminatorLen // skip account discriminator
 	headerLen := TransmissionsHeaderLen
 
-	r, err := reader()
+	r, err := getReader()
 	if err != nil {
 		return Answer{}, 0, fmt.Errorf("failed to get reader: %w", err)
 	}
