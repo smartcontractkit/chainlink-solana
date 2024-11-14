@@ -22,7 +22,6 @@ while IFS= read -r line; do
     fi
 done < <(sudo go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke/embedded -test.timeout 30m 2>&1)
 
-
 # Capture the PID of the background process
 READER_PID=$!
 
