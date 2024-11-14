@@ -68,13 +68,13 @@ func scanFixedLengthArray(name string, maxLength int, src interface{}, dest []by
 	return nil
 }
 
-type SubKeyPaths [][]string
+type SubkeyPaths [][]string
 
-func (k SubKeyPaths) Value() (driver.Value, error) {
+func (k SubkeyPaths) Value() (driver.Value, error) {
 	return json.Marshal([][]string(k))
 }
 
-func (p *SubKeyPaths) Scan(src interface{}) error {
+func (p *SubkeyPaths) Scan(src interface{}) error {
 	var bSrc []byte
 	switch src := src.(type) {
 	case string:
@@ -82,7 +82,7 @@ func (p *SubKeyPaths) Scan(src interface{}) error {
 	case []byte:
 		bSrc = src
 	default:
-		return fmt.Errorf("can't scan %T into SubKeyPaths", src)
+		return fmt.Errorf("can't scan %T into SubkeyPaths", src)
 	}
 
 	if len(bSrc) == 0 || string(bSrc) == "null" {
@@ -91,7 +91,7 @@ func (p *SubKeyPaths) Scan(src interface{}) error {
 
 	err := json.Unmarshal(bSrc, p)
 	if err != nil {
-		return fmt.Errorf("failed to scan %v into SubKeyPaths: %w", string(bSrc), err)
+		return fmt.Errorf("failed to scan %v into SubkeyPaths: %w", string(bSrc), err)
 	}
 
 	return nil

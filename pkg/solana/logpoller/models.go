@@ -14,7 +14,7 @@ type Filter struct {
 	EventSig      []byte
 	StartingBlock int64
 	EventIDL      string
-	SubKeyPaths   SubKeyPaths
+	SubkeyPaths   SubkeyPaths
 	Retention     time.Duration
 	MaxLogsKept   int64
 }
@@ -26,10 +26,10 @@ type Log struct {
 	LogIndex       int64
 	BlockHash      Hash
 	BlockNumber    int64
-	BLockTimestamp time.Time
+	BlockTimestamp time.Time
 	Address        PublicKey
 	EventSig       []byte
-	SubKeyValues   pq.ByteaArray
+	SubkeyValues   pq.ByteaArray
 	TxHash         Signature
 	Data           []byte
 	CreatedAt      time.Time

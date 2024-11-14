@@ -93,9 +93,9 @@ func (q *queryArgs) withEventIDL(eventIDL string) *queryArgs {
 	return q.withField("event_idl", eventIDL)
 }
 
-// withSubKeyPaths sets the SubKeyPaths field in queryArgs.
-func (q *queryArgs) withSubKeyPaths(subKeyPaths [][]string) *queryArgs {
-	return q.withField("sub_key_paths", subKeyPaths)
+// withSubkeyPaths sets the SubkeyPaths field in queryArgs.
+func (q *queryArgs) withSubkeyPaths(subkeyPaths [][]string) *queryArgs {
+	return q.withField("subkey_paths", subkeyPaths)
 }
 
 // withRetention sets the Retention field in queryArgs.
@@ -143,9 +143,9 @@ func (q *queryArgs) withBlockTimestamp(blockTimestamp time.Time) *queryArgs {
 	return q.withField("block_timestamp", blockTimestamp)
 }
 
-// withSubKeyValues sets the SubKeyValues field in Log.
-func (q *queryArgs) withSubKeyValues(subKeyValues pq.ByteaArray) *queryArgs {
-	return q.withField("sub_key_values", subKeyValues)
+// withSubkeyValues sets the SubkeyValues field in Log.
+func (q *queryArgs) withSubkeyValues(subkeyValues pq.ByteaArray) *queryArgs {
+	return q.withField("subkey_values", subkeyValues)
 }
 
 // withTxHash sets the TxHash field in Log.

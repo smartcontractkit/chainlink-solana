@@ -46,7 +46,7 @@ func (o *DSORM) InsertFilter(ctx context.Context, filter Filter) (id int64, err 
 		withEventSig(filter.EventSig).
 		withStartingBlock(filter.StartingBlock).
 		withEventIDL(filter.EventIDL).
-		withSubKeyPaths(filter.SubKeyPaths).
+		withSubkeyPaths(filter.SubkeyPaths).
 		toArgs()
 	if err != nil {
 		return 0, err
@@ -56,9 +56,9 @@ func (o *DSORM) InsertFilter(ctx context.Context, filter Filter) (id int64, err 
 	// https://github.com/jmoiron/sqlx/issues/91, https://github.com/jmoiron/sqlx/issues/428
 	query := `
 		INSERT INTO solana.log_poller_filters
-		    (chain_id, name, address, event_name, event_sig, starting_block, event_idl, sub_key_paths, retention, max_logs_kept)
-	  		VALUES (:chain_id, :name, :address, :event_name, :event_sig, :starting_block, :event_idl, :sub_key_paths, :retention, :max_logs_kept)
-		ON CONFLICT  (solana.f_log_poller_filter_hash(name, chain_id, address, event_sig, sub_key_paths))
+		    (chain_id, name, address, event_name, event_sig, starting_block, event_idl, subkey_paths, retention, max_logs_kept)
+	  		VALUES (:chain_id, :name, :address, :event_name, :event_sig, :starting_block, :event_idl, :subkey_paths, :retention, :max_logs_kept)
+		ON CONFLICT  (solana.f_log_poller_filter_hash(name, chain_id, address, event_sig, subkey_paths))
 		DO UPDATE SET retention=:retention ::::BIGINT, max_logs_kept=:max_logs_kept ::::NUMERIC, starting_block=:starting_block ::::NUMERIC 
 		RETURNING id;`
 
@@ -74,7 +74,7 @@ func (o *DSORM) InsertFilter(ctx context.Context, filter Filter) (id int64, err 
 
 // GetFilterByID returns filter by ID
 func (o *DSORM) GetFilterByID(ctx context.Context, id int64) (Filter, error) {
-	query := `SELECT id, name, address, event_name, event_sig, starting_block, event_idl, sub_key_paths, retention, max_logs_kept
+	query := `SELECT id, name, address, event_name, event_sig, starting_block, event_idl, subkey_paths, retention, max_logs_kept
 		FROM solana.log_poller_filters WHERE id = $1`
 	var result Filter
 	err := o.ds.GetContext(ctx, &result, query, id)

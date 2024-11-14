@@ -30,57 +30,94 @@ func TestLogPollerFilters(t *testing.T) {
 	privateKey, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 	pubKey := privateKey.PublicKey()
-	filters := []Filter{
-		{
-			Name:          "happy path",
-			Address:       PublicKey(pubKey),
-			EventName:     "event",
-			EventSig:      []byte{1, 2, 3},
-			StartingBlock: 1,
-			EventIDL:      "{}",
-			SubKeyPaths:   SubKeyPaths([][]string{{"a", "b"}, {"c"}}),
-			Retention:     1000,
-			MaxLogsKept:   3,
-		},
-		{
-			Name:          "empty sub key paths",
-			Address:       PublicKey(pubKey),
-			EventName:     "event",
-			EventSig:      []byte{1, 2, 3},
-			StartingBlock: 1,
-			EventIDL:      "{}",
-			SubKeyPaths:   SubKeyPaths([][]string{}),
-			Retention:     1000,
-			MaxLogsKept:   3,
-		},
-		{
-			Name:          "nil sub key paths",
-			Address:       PublicKey(pubKey),
-			EventName:     "event",
-			EventSig:      []byte{1, 2, 3},
-			StartingBlock: 1,
-			EventIDL:      "{}",
-			SubKeyPaths:   nil,
-			Retention:     1000,
-			MaxLogsKept:   3,
-		},
-	}
+	t.Run("Ensure all fields are readable/writable", func(t *testing.T) {
+		filters := []Filter{
+			{
+				Name:          "happy path",
+				Address:       PublicKey(pubKey),
+				EventName:     "event",
+				EventSig:      []byte{1, 2, 3},
+				StartingBlock: 1,
+				EventIDL:      "{}",
+				SubkeyPaths:   SubkeyPaths([][]string{{"a", "b"}, {"c"}}),
+				Retention:     1000,
+				MaxLogsKept:   3,
+			},
+			{
+				Name:          "empty sub key paths",
+				Address:       PublicKey(pubKey),
+				EventName:     "event",
+				EventSig:      []byte{1, 2, 3},
+				StartingBlock: 1,
+				EventIDL:      "{}",
+				SubkeyPaths:   SubkeyPaths([][]string{}),
+				Retention:     1000,
+				MaxLogsKept:   3,
+			},
+			{
+				Name:          "nil sub key paths",
+				Address:       PublicKey(pubKey),
+				EventName:     "event",
+				EventSig:      []byte{1, 2, 3},
+				StartingBlock: 1,
+				EventIDL:      "{}",
+				SubkeyPaths:   nil,
+				Retention:     1000,
+				MaxLogsKept:   3,
+			},
+		}
 
-	for _, filter := range filters {
-		t.Run("Save filter: "+filter.Name, func(t *testing.T) {
-			ctx := tests.Context(t)
-			id, err := orm.InsertFilter(ctx, filter)
-			require.NoError(t, err)
-			filter.ID = id
-			dbFilter, err := orm.GetFilterByID(ctx, id)
-			require.NoError(t, err)
-			require.Equal(t, filter, dbFilter)
+		for _, filter := range filters {
+			t.Run("Read/write filter: "+filter.Name, func(t *testing.T) {
+				ctx := tests.Context(t)
+				id, err := orm.InsertFilter(ctx, filter)
+				require.NoError(t, err)
+				filter.ID = id
+				dbFilter, err := orm.GetFilterByID(ctx, id)
+				require.NoError(t, err)
+				require.Equal(t, filter, dbFilter)
 
-			// subsequent insert of the same filter won't produce new db row
-			secondID, err := orm.InsertFilter(ctx, filter)
-			require.NoError(t, err)
-			require.Equal(t, secondID, id)
-		})
+				// subsequent insert of the same filter won't produce new db row
+				secondID, err := orm.InsertFilter(ctx, filter)
+				require.NoError(t, err)
+				require.Equal(t, secondID, id)
+			})
+		}
+	})
+	t.Run("Subsequent insert does not produce a new id", func(t *testing.T) {
+		filter := newRandomFilter(t)
+		ctx := tests.Context(t)
+		firstID, err := orm.InsertFilter(ctx, filter)
+		require.NoError(t, err)
+		secondID, err := orm.InsertFilter(ctx, filter)
+		require.NoError(t, err)
+		require.Equal(t, firstID, secondID)
+	})
+	t.Run("Returns and error if name is not unique", func(t *testing.T) {
+		filter := newRandomFilter(t)
+		ctx := tests.Context(t)
+		_, err = orm.InsertFilter(ctx, filter)
+		require.NoError(t, err)
+		filter.EventSig = []byte(uuid.NewString())
+		_, err = orm.InsertFilter(ctx, filter)
+		require.EqualError(t, err, `ERROR: duplicate key value violates unique constraint "solana_log_poller_filter_name" (SQLSTATE 23505)`)
+	})
+}
+
+func newRandomFilter(t *testing.T) Filter {
+	privateKey, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	pubKey := privateKey.PublicKey()
+	return Filter{
+		Name:          uuid.NewString(),
+		Address:       PublicKey(pubKey),
+		EventName:     "event",
+		EventSig:      []byte{1, 2, 3},
+		StartingBlock: 1,
+		EventIDL:      "{}",
+		SubkeyPaths:   [][]string{{"a", "b"}, {"c"}},
+		Retention:     1000,
+		MaxLogsKept:   3,
 	}
 }
 
@@ -105,7 +142,7 @@ func TestLogPollerLogs(t *testing.T) {
 		EventSig:      []byte{1, 2, 3},
 		StartingBlock: 1,
 		EventIDL:      "{}",
-		SubKeyPaths:   [][]string{{"a", "b"}, {"c"}},
+		SubkeyPaths:   [][]string{{"a", "b"}, {"c"}},
 		Retention:     1000,
 		MaxLogsKept:   3,
 	})
@@ -119,17 +156,22 @@ func TestLogPollerLogs(t *testing.T) {
 		LogIndex:       1,
 		BlockHash:      Hash(pubKey),
 		BlockNumber:    10,
-		BLockTimestamp: time.Now(),
+		BlockTimestamp: time.Unix(1731590113, 0),
 		Address:        PublicKey(pubKey),
 		EventSig:       []byte{3, 2, 1},
-		SubKeyValues:   pq.ByteaArray([][]byte{{3, 2, 1}, {1}, {1, 2}, pubKey.Bytes()}),
+		SubkeyValues:   pq.ByteaArray([][]byte{{3, 2, 1}, {1}, {1, 2}, pubKey.Bytes()}),
 		TxHash:         Signature(signature),
 		Data:           data,
 	}
 	err = orm.InsertLogs(ctx, []Log{log})
 	require.NoError(t, err)
+	// insert of the same Log should not produce two instances
+	err = orm.InsertLogs(ctx, []Log{log})
+	require.NoError(t, err)
 	dbLogs, err := orm.SelectLogs(ctx, 0, 100, log.Address, log.EventSig)
 	require.NoError(t, err)
 	require.Len(t, dbLogs, 1)
+	log.ID = dbLogs[0].ID
+	log.CreatedAt = dbLogs[0].CreatedAt
 	require.Equal(t, log, dbLogs[0])
 }
