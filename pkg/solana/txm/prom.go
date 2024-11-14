@@ -11,6 +11,10 @@ var (
 		Name: "solana_txm_tx_success",
 		Help: "Number of transactions that are included and successfully executed on chain",
 	}, []string{"chainID"})
+	promSolTxmFinalizedTxs = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "solana_txm_tx_finalized",
+		Help: "Number of transactions that are finalized on chain",
+	}, []string{"chainID"})
 
 	// inflight transactions
 	promSolTxmPendingTxs = promauto.NewGaugeVec(prometheus.GaugeOpts{

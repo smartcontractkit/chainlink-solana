@@ -11,16 +11,41 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 )
 
+type TxState int
+
 // tx not found
+// < tx errored
+// < tx broadcasted
 // < tx processed
-// < tx confirmed/finalized + revert
-// < tx confirmed/finalized + success
+// < tx confirmed
+// < tx finalized
 const (
-	NotFound = iota
+	NotFound TxState = iota
+	Errored
+	Broadcasted
 	Processed
-	ConfirmedRevert
-	ConfirmedSuccess
+	Confirmed
+	Finalized
 )
+
+func (s TxState) String() string {
+	switch s {
+	case NotFound:
+		return "NotFound"
+	case Errored:
+		return "Errored"
+	case Broadcasted:
+		return "Broadcasted"
+	case Processed:
+		return "Processed"
+	case Confirmed:
+		return "Confirmed"
+	case Finalized:
+		return "Finalized"
+	default:
+		return fmt.Sprintf("TxState(%d)", s)
+	}
+}
 
 type statuses struct {
 	sigs []solana.Signature
@@ -53,7 +78,7 @@ func SortSignaturesAndResults(sigs []solana.Signature, res []*rpc.SignatureStatu
 	return s.sigs, s.res, nil
 }
 
-func convertStatus(res *rpc.SignatureStatusesResult) uint {
+func convertStatus(res *rpc.SignatureStatusesResult) TxState {
 	if res == nil {
 		return NotFound
 	}
@@ -62,12 +87,21 @@ func convertStatus(res *rpc.SignatureStatusesResult) uint {
 		return Processed
 	}
 
-	if res.ConfirmationStatus == rpc.ConfirmationStatusConfirmed ||
-		res.ConfirmationStatus == rpc.ConfirmationStatusFinalized {
+	if res.ConfirmationStatus == rpc.ConfirmationStatusConfirmed {
+		// If result contains error, consider the transaction errored to avoid wasted resources on re-org and expiration protection
 		if res.Err != nil {
-			return ConfirmedRevert
+			return Errored
 		}
-		return ConfirmedSuccess
+		return Confirmed
+	}
+
+	if res.ConfirmationStatus == rpc.ConfirmationStatusFinalized {
+		// If result contains error, consider the transaction errored
+		// Should be caught earlier but checked here in case confirmed is skipped due to delays or slow polling
+		if res.Err != nil {
+			return Errored
+		}
+		return Finalized
 	}
 
 	return NotFound
