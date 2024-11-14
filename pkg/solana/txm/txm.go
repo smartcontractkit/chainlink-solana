@@ -712,8 +712,8 @@ func (txm *Txm) simulateTx(ctx context.Context, tx *solanaGo.Transaction) (res *
 		return
 	}
 
-	// Simulate with signature verification since it can have a significant impact on compute units
-	res, err = client.SimulateTx(ctx, tx, &rpc.SimulateTransactionOpts{SigVerify: true})
+	// Simulate with signature verification enabled since it can have an impact on the compute units used
+	res, err = client.SimulateTx(ctx, tx, &rpc.SimulateTransactionOpts{SigVerify: true, Commitment: txm.cfg.Commitment()})
 	if err != nil {
 		// This error can occur if endpoint goes down or if invalid signature
 		txm.lggr.Errorw("failed to simulate tx", "error", err)
