@@ -76,22 +76,8 @@ func TestLogPollerFilters(t *testing.T) {
 				dbFilter, err := orm.GetFilterByID(ctx, id)
 				require.NoError(t, err)
 				require.Equal(t, filter, dbFilter)
-
-				// subsequent insert of the same filter won't produce new db row
-				secondID, err := orm.InsertFilter(ctx, filter)
-				require.NoError(t, err)
-				require.Equal(t, secondID, id)
 			})
 		}
-	})
-	t.Run("Subsequent insert does not produce a new id", func(t *testing.T) {
-		filter := newRandomFilter(t)
-		ctx := tests.Context(t)
-		firstID, err := orm.InsertFilter(ctx, filter)
-		require.NoError(t, err)
-		secondID, err := orm.InsertFilter(ctx, filter)
-		require.NoError(t, err)
-		require.Equal(t, firstID, secondID)
 	})
 	t.Run("Returns and error if name is not unique", func(t *testing.T) {
 		filter := newRandomFilter(t)

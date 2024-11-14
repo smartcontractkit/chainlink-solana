@@ -58,8 +58,6 @@ func (o *DSORM) InsertFilter(ctx context.Context, filter Filter) (id int64, err 
 		INSERT INTO solana.log_poller_filters
 		    (chain_id, name, address, event_name, event_sig, starting_block, event_idl, subkey_paths, retention, max_logs_kept)
 	  		VALUES (:chain_id, :name, :address, :event_name, :event_sig, :starting_block, :event_idl, :subkey_paths, :retention, :max_logs_kept)
-		ON CONFLICT  (solana.f_log_poller_filter_hash(name, chain_id, address, event_sig, subkey_paths))
-		DO UPDATE SET retention=:retention ::::BIGINT, max_logs_kept=:max_logs_kept ::::NUMERIC, starting_block=:starting_block ::::NUMERIC 
 		RETURNING id;`
 
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
