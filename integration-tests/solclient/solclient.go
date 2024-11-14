@@ -481,7 +481,7 @@ func SendFunds(senderPrivateKey string, receiverPublicKey string, lamports uint6
 	accountTo := solana.MustPublicKeyFromBase58(receiverPublicKey)
 
 	// Get recent blockhash
-	recent, err := rpcClient.GetRecentBlockhash(context.Background(), rpc.CommitmentFinalized)
+	recent, err := rpcClient.GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
 	if err != nil {
 		return err
 	}
