@@ -2,13 +2,10 @@ package chainwriter_test
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
-
-	ccipocr3 "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 type RegistryTokenState struct {
@@ -42,10 +39,6 @@ func TestGetAddresses(t *testing.T) {
 				Fields: []string{"Message.ExtraArgs.MerkleRoot"},
 			},
 		},
-		// Location in the args where the object to decode is located.
-		DecodeLocation:    "Report",
-		DataType:          reflect.TypeOf(ccipocr3.ExecutePluginReportSingleChain{}),
-		DecodedTypeName:   "ExecutePluginReportSingleChain",
 		ChainSpecificName: "execute",
 		// LookupTables are on-chain stores of accounts. They can be used in two ways:
 		// 1. As a way to store a list of accounts that are all associated together (i.e. Token State registry)
@@ -72,7 +65,7 @@ func TestGetAddresses(t *testing.T) {
 						},
 						// Seeds would be used if the user needed to look up addresses to use as seeds, which isn't the case here.
 						Seeds: []chainwriter.Lookup{
-							chainwriter.ValueLookup{Location: "Message.TokenAmounts.DestTokenAddress"},
+							chainwriter.AccountLookup{Location: "Message.TokenAmounts.DestTokenAddress"},
 						},
 						IsSigner:   false,
 						IsWritable: false,
@@ -111,7 +104,7 @@ func TestGetAddresses(t *testing.T) {
 				},
 				// Similar to the RegistryTokenState above, the user is looking up PDA accounts based on the dest tokens.
 				Seeds: []chainwriter.Lookup{
-					chainwriter.ValueLookup{Location: "Message.TokenAmounts.DestTokenAddress"},
+					chainwriter.AccountLookup{Location: "Message.TokenAmounts.DestTokenAddress"},
 				},
 				IsSigner:   false,
 				IsWritable: false,
@@ -170,7 +163,7 @@ func TestGetAddresses(t *testing.T) {
 				},
 				// The seed, once again, is the destination token address.
 				Seeds: []chainwriter.Lookup{
-					chainwriter.ValueLookup{Location: "Message.TokenAmounts.DestTokenAddress"},
+					chainwriter.AccountLookup{Location: "Message.TokenAmounts.DestTokenAddress"},
 				},
 				IsSigner:   false,
 				IsWritable: false,
@@ -199,7 +192,7 @@ func TestGetAddresses(t *testing.T) {
 					IsWritable: false,
 				},
 				Seeds: []chainwriter.Lookup{
-					chainwriter.ValueLookup{
+					chainwriter.AccountLookup{
 						// The seed is the merkle root of the report, as passed into the input params.
 						Location: "args.MerkleRoot",
 					},
@@ -219,8 +212,8 @@ func TestGetAddresses(t *testing.T) {
 				// In this case, the user configured multiple seeds. These will be used in conjunction
 				// with the public key to generate one or multiple PDA accounts.
 				Seeds: []chainwriter.Lookup{
-					chainwriter.ValueLookup{Location: "Message.Receiver"},
-					chainwriter.ValueLookup{Location: "Message.DestChainSelector"},
+					chainwriter.AccountLookup{Location: "Message.Receiver"},
+					chainwriter.AccountLookup{Location: "Message.DestChainSelector"},
 				},
 			},
 			// Account constant
@@ -253,16 +246,13 @@ func TestGetAddresses(t *testing.T) {
 			},
 		},
 		// TBD where this will be in the report
-		// This will be appended to every error message (after args are decoded).
+		// This will be appended to every error message
 		DebugIDLocation: "Message.MessageID",
 	}
 
 	commitConfig := chainwriter.MethodConfig{
 		FromAddress:        userAddress,
 		InputModifications: nil,
-		DecodeLocation:     "Report",
-		DataType:           reflect.TypeOf(ccipocr3.CommitPluginReport{}),
-		DecodedTypeName:    "CommitPluginReport",
 		ChainSpecificName:  "commit",
 		LookupTables: chainwriter.LookupTables{
 			StaticLookupTables: []string{
@@ -282,7 +272,7 @@ func TestGetAddresses(t *testing.T) {
 					IsWritable: false,
 				},
 				Seeds: []chainwriter.Lookup{
-					chainwriter.ValueLookup{
+					chainwriter.AccountLookup{
 						// The seed is the merkle root of the report, as passed into the input params.
 						Location: "args.MerkleRoots",
 					},
