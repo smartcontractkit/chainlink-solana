@@ -19,11 +19,10 @@ type TransmissionsCache struct {
 	*client.Cache[Answer]
 }
 
-func NewTransmissionsCache(transmissionsID solana.PublicKey, chainID string, cfg config.Config, getReader GetReader, lggr logger.Logger) *TransmissionsCache {
+func NewTransmissionsCache(transmissionsID solana.PublicKey, chainID string, cfg config.Config, getReader GetAccountReader, lggr logger.Logger) *TransmissionsCache {
 	name := "ocr2_median_transmissions"
 	getter := func(ctx context.Context) (Answer, uint64, error) {
-		getAccountReader := func() (client.AccountReader, error) { return getReader() }
-		return GetLatestTransmission(ctx, getAccountReader, transmissionsID, cfg.Commitment())
+		return GetLatestTransmission(ctx, getReader, transmissionsID, cfg.Commitment())
 	}
 	return &TransmissionsCache{client.NewCache(name, transmissionsID, chainID, cfg, getter, logger.With(lggr, "cache", name))}
 }

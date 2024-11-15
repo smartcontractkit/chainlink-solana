@@ -21,7 +21,7 @@ func TestLatestBlockHeight(t *testing.T) {
 
 	ctx := context.Background()
 	c := &ConfigTracker{
-		reader: func() (client.Reader, error) { return testSetupReader(t, mockServer.URL), nil },
+		getReader: func() (client.Reader, error) { return testSetupReader(t, mockServer.URL), nil },
 	}
 
 	h, err := c.LatestBlockHeight(ctx)

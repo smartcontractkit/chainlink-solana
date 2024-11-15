@@ -106,9 +106,10 @@ func TestGetState(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	reader := func() (client.AccountReader, error) { return testSetupReader(t, mockServer.URL), nil }
+	reader := testSetupReader(t, mockServer.URL)
+	getReader := func() (client.AccountReader, error) { return reader, nil }
 	// happy path does not error (actual state decoding handled in types_test)
-	_, _, err := GetState(context.TODO(), reader, solana.PublicKey{}, "")
+	_, _, err := GetState(context.TODO(), getReader, solana.PublicKey{}, "")
 	require.NoError(t, err)
 }
 
@@ -133,18 +134,19 @@ func TestGetLatestTransmission(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	reader := func() (client.AccountReader, error) { return testSetupReader(t, mockServer.URL), nil }
-	a, _, err := GetLatestTransmission(context.TODO(), reader, solana.PublicKey{}, "")
+	reader := testSetupReader(t, mockServer.URL)
+	getReader := func() (client.AccountReader, error) { return reader, nil }
+	a, _, err := GetLatestTransmission(context.TODO(), getReader, solana.PublicKey{}, "")
 	assert.NoError(t, err)
 	assert.Equal(t, expectedTime, a.Timestamp)
 	assert.Equal(t, expectedAns, a.Data.String())
 
 	// fail if returned transmission header is too short
-	_, _, err = GetLatestTransmission(context.TODO(), reader, solana.PublicKey{}, "")
+	_, _, err = GetLatestTransmission(context.TODO(), getReader, solana.PublicKey{}, "")
 	assert.Error(t, err)
 
 	// fail if returned transmission is too short
-	_, _, err = GetLatestTransmission(context.TODO(), reader, solana.PublicKey{}, "")
+	_, _, err = GetLatestTransmission(context.TODO(), getReader, solana.PublicKey{}, "")
 	assert.Error(t, err)
 }
 
@@ -167,14 +169,16 @@ func TestCache(t *testing.T) {
 		w.Write(testTransmissionsResponse(t, body, 0)) //nolint:errcheck
 	}))
 
-	reader := func() (client.Reader, error) { return testSetupReader(t, mockServer.URL), nil }
+	reader := testSetupReader(t, mockServer.URL)
+	getReader := func() (client.Reader, error) { return reader, nil }
+	getAccountReader := func() (client.AccountReader, error) { return reader, nil }
 
 	lggr := logger.Test(t)
 	stateCache := NewStateCache(
 		solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
 		"test-chain-id",
 		config.NewDefault(),
-		reader,
+		getReader,
 		lggr,
 	)
 	require.NoError(t, stateCache.Start(ctx))
@@ -189,7 +193,7 @@ func TestCache(t *testing.T) {
 		solana.MustPublicKeyFromBase58("11111111111111111111111111111112"),
 		"test-chain-id",
 		config.NewDefault(),
-		reader,
+		getAccountReader,
 		lggr,
 	)
 	require.NoError(t, transmissionsCache.Start(ctx))
@@ -223,17 +227,19 @@ func TestNilPointerHandling(t *testing.T) {
 	defer mockServer.Close()
 
 	errString := "nil pointer returned in "
-	reader := func() (client.AccountReader, error) { return testSetupReader(t, mockServer.URL), nil }
+
+	reader := testSetupReader(t, mockServer.URL)
+	getReader := func() (client.AccountReader, error) { return reader, nil }
 
 	// fail on get state query
-	_, _, err := GetState(context.TODO(), reader, solana.PublicKey{}, "")
+	_, _, err := GetState(context.TODO(), getReader, solana.PublicKey{}, "")
 	assert.EqualError(t, err, errString+"GetState.GetAccountInfoWithOpts")
 
 	// fail on transmissions header query
-	_, _, err = GetLatestTransmission(context.TODO(), reader, solana.PublicKey{}, "")
+	_, _, err = GetLatestTransmission(context.TODO(), getReader, solana.PublicKey{}, "")
 	assert.EqualError(t, err, errString+"GetLatestTransmission.GetAccountInfoWithOpts.Header")
 
 	passFirst = true // allow proper response for header query, fail on transmission
-	_, _, err = GetLatestTransmission(context.TODO(), reader, solana.PublicKey{}, "")
+	_, _, err = GetLatestTransmission(context.TODO(), getReader, solana.PublicKey{}, "")
 	assert.EqualError(t, err, errString+"GetLatestTransmission.GetAccountInfoWithOpts.Transmission")
 }

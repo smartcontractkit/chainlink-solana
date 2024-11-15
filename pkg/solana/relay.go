@@ -154,7 +154,8 @@ func (r *Relayer) NewMedianProvider(ctx context.Context, rargs relaytypes.RelayA
 	}
 
 	cfg := configWatcher.chain.Config()
-	transmissionsCache := NewTransmissionsCache(transmissionsID, relayConfig.ChainID, cfg, configWatcher.chain.Reader, r.lggr)
+	getReader := func() (client.AccountReader, error) { return configWatcher.chain.Reader() }
+	transmissionsCache := NewTransmissionsCache(transmissionsID, relayConfig.ChainID, cfg, getReader, r.lggr)
 	return &medianProvider{
 		configProvider:     configWatcher,
 		transmissionsCache: transmissionsCache,
@@ -186,8 +187,6 @@ func (r *Relayer) NewAutomationProvider(ctx context.Context, rargs relaytypes.Re
 }
 
 var _ relaytypes.ConfigProvider = &configProvider{}
-
-type GetReader func() (client.Reader, error)
 
 type configProvider struct {
 	services.StateMachine
@@ -231,7 +230,7 @@ func newConfigProvider(_ context.Context, lggr logger.Logger, chain Chain, args 
 		storeProgramID:         storeProgramID,
 		stateCache:             stateCache,
 		offchainConfigDigester: offchainConfigDigester,
-		configTracker:          &ConfigTracker{stateCache: stateCache, reader: chain.Reader},
+		configTracker:          &ConfigTracker{stateCache: stateCache, getReader: chain.Reader},
 		chain:                  chain,
 	}, nil
 }

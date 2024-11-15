@@ -9,7 +9,7 @@ import (
 
 type ConfigTracker struct {
 	stateCache *StateCache
-	reader     GetReader
+	getReader  GetReader
 }
 
 func (c *ConfigTracker) Notify() <-chan struct{} {
@@ -73,7 +73,7 @@ func (c *ConfigTracker) LatestConfig(ctx context.Context, changedInBlock uint64)
 
 // LatestBlockHeight returns the height of the most recent block in the chain.
 func (c *ConfigTracker) LatestBlockHeight(ctx context.Context) (blockHeight uint64, err error) {
-	reader, err := c.reader()
+	reader, err := c.getReader()
 	if err != nil {
 		return 0, err
 	}
