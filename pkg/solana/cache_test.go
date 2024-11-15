@@ -170,7 +170,6 @@ func TestCache(t *testing.T) {
 	}))
 
 	reader := testSetupReader(t, mockServer.URL)
-	getReader := func() (client.Reader, error) { return reader, nil }
 	getAccountReader := func() (client.AccountReader, error) { return reader, nil }
 
 	lggr := logger.Test(t)
@@ -178,7 +177,7 @@ func TestCache(t *testing.T) {
 		solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
 		"test-chain-id",
 		config.NewDefault(),
-		getReader,
+		getAccountReader,
 		lggr,
 	)
 	require.NoError(t, stateCache.Start(ctx))

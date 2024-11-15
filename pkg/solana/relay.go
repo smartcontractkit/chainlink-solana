@@ -222,7 +222,8 @@ func newConfigProvider(_ context.Context, lggr logger.Logger, chain Chain, args 
 		StateID:   stateID,
 	}
 
-	stateCache := NewStateCache(stateID, relayConfig.ChainID, chain.Config(), chain.Reader, lggr)
+	getAccountReader := func() (client.AccountReader, error) { return chain.Reader() }
+	stateCache := NewStateCache(stateID, relayConfig.ChainID, chain.Config(), getAccountReader, lggr)
 	return &configProvider{
 		chainID:                relayConfig.ChainID,
 		stateID:                stateID,

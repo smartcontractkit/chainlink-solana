@@ -26,11 +26,10 @@ type StateCache struct {
 type GetReader func() (client.Reader, error)
 type GetAccountReader func() (client.AccountReader, error)
 
-func NewStateCache(stateID solana.PublicKey, chainID string, cfg config.Config, getReader GetReader, lggr logger.Logger) *StateCache {
+func NewStateCache(stateID solana.PublicKey, chainID string, cfg config.Config, getReader GetAccountReader, lggr logger.Logger) *StateCache {
 	name := "ocr2_median_state"
 	getter := func(ctx context.Context) (State, uint64, error) {
-		getAccountReader := func() (client.AccountReader, error) { return getReader() }
-		return GetState(ctx, getAccountReader, stateID, cfg.Commitment())
+		return GetState(ctx, getReader, stateID, cfg.Commitment())
 	}
 	return &StateCache{client.NewCache(name, stateID, chainID, cfg, getter, logger.With(lggr, "cache", name))}
 }
