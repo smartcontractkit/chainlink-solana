@@ -10,12 +10,12 @@ import (
 )
 
 // GetAddressAtLocation parses through nested types and arrays to find all address locations.
-func GetAddressAtLocation(decoded any, location string, debugID string) ([]solana.PublicKey, error) {
+func GetAddressAtLocation(args any, location string, debugID string) ([]solana.PublicKey, error) {
 	var addresses []solana.PublicKey
 
 	path := strings.Split(location, ".")
 
-	addressList, err := traversePath(decoded, path)
+	addressList, err := traversePath(args, path)
 	if err != nil {
 		return nil, err
 	}
@@ -31,8 +31,8 @@ func GetAddressAtLocation(decoded any, location string, debugID string) ([]solan
 	return addresses, nil
 }
 
-func GetDebugIDAtLocation(decoded any, location string) (string, error) {
-	debugIDList, err := GetValueAtLocation(decoded, location)
+func GetDebugIDAtLocation(args any, location string) (string, error) {
+	debugIDList, err := GetValueAtLocation(args, location)
 	if err != nil {
 		return "", err
 	}
@@ -43,10 +43,10 @@ func GetDebugIDAtLocation(decoded any, location string) (string, error) {
 	return debugID, nil
 }
 
-func GetValueAtLocation(decoded any, location string) ([][]byte, error) {
+func GetValueAtLocation(args any, location string) ([][]byte, error) {
 	path := strings.Split(location, ".")
 
-	valueList, err := traversePath(decoded, path)
+	valueList, err := traversePath(args, path)
 	if err != nil {
 		return nil, err
 	}

@@ -2,16 +2,13 @@ package chainwriter
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math/big"
-	"reflect"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
-	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
@@ -41,17 +38,15 @@ type ProgramConfig struct {
 type MethodConfig struct {
 	FromAddress        string
 	InputModifications commoncodec.ModifiersConfig
-	DecodeLocation     string
-	DataType           reflect.Type
-	DecodedTypeName    string
 	ChainSpecificName  string
 	LookupTables       LookupTables
 	Accounts           []Lookup
-	// Location in the decoded data where the debug ID is stored
+	// Location in the args where the debug ID is stored
 	DebugIDLocation string
 }
 
 type Lookup interface {
+	Resolve(ctx context.Context, args any, derivedTableMap map[string]map[string][]*solana.AccountMeta, debugID string) ([]*solana.AccountMeta, error)
 }
 
 // AccountConstant represents a fixed address, provided in Base58 format, converted into a `solana.PublicKey`.
@@ -62,7 +57,7 @@ type AccountConstant struct {
 	IsWritable bool
 }
 
-// AccountLookup dynamically derives an account address from decoded data using a specified location path.
+// AccountLookup dynamically derives an account address from args using a specified location path.
 type AccountLookup struct {
 	Name       string
 	Location   string
@@ -94,10 +89,8 @@ type LookupTables struct {
 
 // DerivedLookupTable represents a lookup table that is used to derive addresses for a program.
 type DerivedLookupTable struct {
-	Name           string
-	Accounts       Lookup
-	EncodedTypeIDL string
-	DecodedType    reflect.Type
+	Name     string
+	Accounts Lookup
 }
 
 // AccountsFromLookupTable extracts accounts from a lookup table that was previously read and stored in memory.
@@ -121,7 +114,7 @@ for Solana transactions. It handles constant addresses, dynamic lookups, program
 
 ### Parameters:
 - `ctx`: Context for request lifecycle management.
-- `decoded`: Decoded data used for dynamic lookups.
+- `args`: Input arguments used for dynamic lookups.
 - `accounts`: List of `Lookup` configurations specifying how addresses are derived.
 - `derivedTableMap`: Map of pre-loaded lookup table addresses.
 - `debugID`: Debug identifier for tracing errors.
@@ -135,12 +128,12 @@ for Solana transactions. It handles constant addresses, dynamic lookups, program
   - Example: A pre-defined fee payer or system account.
 
 2. **AccountLookup**:
-  - Dynamically derived from decoded data using a specified location path (e.g., `user.walletAddress`).
+  - Dynamically derived from input args using a specified location path (e.g., `user.walletAddress`).
   - If the lookup table is pre-loaded, the address is fetched from `derivedTableMap`.
 
 3. **PDALookups**:
   - Generates Program Derived Addresses (PDA) by combining a derived public key with one or more seeds.
-  - Seeds can be `AddressSeeds` (public keys from the decoded data) or `ValueSeeds` (byte arrays).
+  - Seeds can be `AddressSeeds` (public keys from the input args) or `ValueSeeds` (byte arrays).
   - Ensures there is only one public key if multiple seeds are provided.
 
 ### Error Handling:
@@ -148,10 +141,10 @@ for Solana transactions. It handles constant addresses, dynamic lookups, program
 */
 // GetAddresses resolves account addresses from various `Lookup` configurations to build the required `solana.AccountMeta` list
 // for Solana transactions.
-func (s *SolanaChainWriterService) GetAddresses(ctx context.Context, decoded any, accounts []Lookup, derivedTableMap map[string][]*solana.AccountMeta, debugID string) ([]*solana.AccountMeta, error) {
+func GetAddresses(ctx context.Context, args any, accounts []Lookup, derivedTableMap map[string]map[string][]*solana.AccountMeta, debugID string) ([]*solana.AccountMeta, error) {
 	var addresses []*solana.AccountMeta
 	for _, accountConfig := range accounts {
-		meta, err := s.getAccountMeta(ctx, decoded, accountConfig, derivedTableMap, debugID)
+		meta, err := accountConfig.Resolve(ctx, args, derivedTableMap, debugID)
 		if err != nil {
 			return nil, err
 		}
@@ -160,42 +153,22 @@ func (s *SolanaChainWriterService) GetAddresses(ctx context.Context, decoded any
 	return addresses, nil
 }
 
-// getAccountMeta processes a single account configuration and returns the corresponding `solana.AccountMeta` slice.
-func (s *SolanaChainWriterService) getAccountMeta(ctx context.Context, decoded any, accountConfig Lookup, derivedTableMap map[string][]*solana.AccountMeta, debugID string) ([]*solana.AccountMeta, error) {
-	switch lookup := accountConfig.(type) {
-	case AccountConstant:
-		return s.handleAccountConstant(lookup, debugID)
-	case AccountLookup:
-		return s.handleAccountLookup(decoded, lookup, derivedTableMap, debugID)
-	case PDALookups:
-		return s.handlePDALookup(ctx, decoded, lookup, derivedTableMap, debugID)
-	default:
-		return nil, errorWithDebugID(fmt.Errorf("unsupported account type: %T", lookup), debugID)
-	}
-}
-
-// handleAccountConstant processes an `AccountConstant` and returns the corresponding `solana.AccountMeta`.
-func (s *SolanaChainWriterService) handleAccountConstant(lookup AccountConstant, debugID string) ([]*solana.AccountMeta, error) {
-	address, err := solana.PublicKeyFromBase58(lookup.Address)
+func (ac AccountConstant) Resolve(_ context.Context, _ any, _ map[string]map[string][]*solana.AccountMeta, debugID string) ([]*solana.AccountMeta, error) {
+	address, err := solana.PublicKeyFromBase58(ac.Address)
 	if err != nil {
 		return nil, errorWithDebugID(fmt.Errorf("error getting account from constant: %w", err), debugID)
 	}
 	return []*solana.AccountMeta{
 		{
 			PublicKey:  address,
-			IsSigner:   lookup.IsSigner,
-			IsWritable: lookup.IsWritable,
+			IsSigner:   ac.IsSigner,
+			IsWritable: ac.IsWritable,
 		},
 	}, nil
 }
 
-// handleAccountLookup processes an `AccountLookup` by either fetching from the lookup table or dynamically deriving the address.
-func (s *SolanaChainWriterService) handleAccountLookup(decoded any, lookup AccountLookup, derivedTableMap map[string][]*solana.AccountMeta, debugID string) ([]*solana.AccountMeta, error) {
-	if derivedAddresses, ok := derivedTableMap[lookup.Name]; ok {
-		return derivedAddresses, nil
-	}
-
-	derivedAddresses, err := GetAddressAtLocation(decoded, lookup.Location, debugID)
+func (al AccountLookup) Resolve(_ context.Context, args any, _ map[string]map[string][]*solana.AccountMeta, debugID string) ([]*solana.AccountMeta, error) {
+	derivedAddresses, err := GetAddressAtLocation(args, al.Location, debugID)
 	if err != nil {
 		return nil, errorWithDebugID(fmt.Errorf("error getting account from lookup: %w", err), debugID)
 	}
@@ -204,37 +177,66 @@ func (s *SolanaChainWriterService) handleAccountLookup(decoded any, lookup Accou
 	for _, address := range derivedAddresses {
 		metas = append(metas, &solana.AccountMeta{
 			PublicKey:  address,
-			IsSigner:   lookup.IsSigner,
-			IsWritable: lookup.IsWritable,
+			IsSigner:   al.IsSigner,
+			IsWritable: al.IsWritable,
 		})
 	}
 	return metas, nil
 }
 
-// handlePDALookup processes a `PDALookups` by resolving seeds and generating the PDA address.
-func (s *SolanaChainWriterService) handlePDALookup(ctx context.Context, decoded any, lookup PDALookups, derivedTableMap map[string][]*solana.AccountMeta, debugID string) ([]*solana.AccountMeta, error) {
-	publicKeys, err := s.GetAddresses(ctx, decoded, []Lookup{lookup.PublicKey}, derivedTableMap, debugID)
+func (alt AccountsFromLookupTable) Resolve(_ context.Context, _ any, derivedTableMap map[string]map[string][]*solana.AccountMeta, debugID string) ([]*solana.AccountMeta, error) {
+	// Fetch the inner map for the specified lookup table name
+	innerMap, ok := derivedTableMap[alt.LookupTablesName]
+	if !ok {
+		return nil, errorWithDebugID(fmt.Errorf("lookup table not found: %s", alt.LookupTablesName), debugID)
+	}
+
+	var result []*solana.AccountMeta
+
+	// If no indices are specified, include all addresses
+	if len(alt.IncludeIndexes) == 0 {
+		for _, metas := range innerMap {
+			result = append(result, metas...)
+		}
+		return result, nil
+	}
+
+	// Otherwise, include only addresses at the specified indices
+	for publicKey, metas := range innerMap {
+		for _, index := range alt.IncludeIndexes {
+			if index < 0 || index >= len(metas) {
+				return nil, errorWithDebugID(fmt.Errorf("invalid index %d for account %s in lookup table %s", index, publicKey, alt.LookupTablesName), debugID)
+			}
+			result = append(result, metas[index])
+		}
+	}
+
+	return result, nil
+}
+
+func (pda PDALookups) Resolve(ctx context.Context, args any, derivedTableMap map[string]map[string][]*solana.AccountMeta, debugID string) ([]*solana.AccountMeta, error) {
+	publicKeys, err := GetAddresses(ctx, args, []Lookup{pda.PublicKey}, derivedTableMap, debugID)
 	if err != nil {
 		return nil, errorWithDebugID(fmt.Errorf("error getting public key for PDALookups: %w", err), debugID)
 	}
 
-	seeds, err := s.getSeedBytes(ctx, lookup, decoded, derivedTableMap, debugID)
+	seeds, err := getSeedBytes(ctx, pda, args, derivedTableMap, debugID)
 	if err != nil {
 		return nil, errorWithDebugID(fmt.Errorf("error getting seeds for PDALookups: %w", err), debugID)
 	}
 
-	return s.generatePDAs(publicKeys, seeds, lookup, debugID)
+	return generatePDAs(publicKeys, seeds, pda, debugID)
 }
 
 // getSeedBytes extracts the seeds for the PDALookups.
-// It handles both AddressSeeds (which are public keys) and ValueSeeds (which are byte arrays from decoded data).
-func (s *SolanaChainWriterService) getSeedBytes(ctx context.Context, lookup PDALookups, decoded any, derivedTableMap map[string][]*solana.AccountMeta, debugID string) ([][]byte, error) {
+// It handles both AddressSeeds (which are public keys) and ValueSeeds (which are byte arrays from input args).
+func getSeedBytes(ctx context.Context, lookup PDALookups, args any, derivedTableMap map[string]map[string][]*solana.AccountMeta, debugID string) ([][]byte, error) {
 	var seedBytes [][]byte
 
 	// Process AddressSeeds first (e.g., public keys)
-	for _, seed := range lookup.AddressSeeds {
+	for _, seed := range lookup.Seeds {
 		// Get the address(es) at the seed location
-		seedAddresses, err := s.GetAddresses(ctx, decoded, []Lookup{seed}, derivedTableMap, debugID)
+		seedAddresses, err := GetAddresses(ctx, args, []Lookup{seed}, derivedTableMap, debugID)
 		if err != nil {
 			return nil, errorWithDebugID(fmt.Errorf("error getting address seed: %w", err), debugID)
 		}
@@ -245,23 +247,11 @@ func (s *SolanaChainWriterService) getSeedBytes(ctx context.Context, lookup PDAL
 		}
 	}
 
-	// Process ValueSeeds (e.g., raw byte values found in decoded data)
-	for _, valueSeed := range lookup.ValueSeeds {
-		// Get the byte array value at the seed location
-		values, err := GetValueAtLocation(decoded, valueSeed.Location)
-		if err != nil {
-			return nil, errorWithDebugID(fmt.Errorf("error getting value seed: %w", err), debugID)
-		}
-
-		// Add each value seed (which is a byte array)
-		seedBytes = append(seedBytes, values...)
-	}
-
 	return seedBytes, nil
 }
 
 // generatePDAs generates program-derived addresses (PDAs) from public keys and seeds.
-func (s *SolanaChainWriterService) generatePDAs(publicKeys []*solana.AccountMeta, seeds [][]byte, lookup PDALookups, debugID string) ([]*solana.AccountMeta, error) {
+func generatePDAs(publicKeys []*solana.AccountMeta, seeds [][]byte, lookup PDALookups, debugID string) ([]*solana.AccountMeta, error) {
 	if len(seeds) > 1 && len(publicKeys) > 1 {
 		return nil, errorWithDebugID(fmt.Errorf("multiple public keys and multiple seeds are not allowed"), debugID)
 	}
@@ -281,41 +271,71 @@ func (s *SolanaChainWriterService) generatePDAs(publicKeys []*solana.AccountMeta
 	return addresses, nil
 }
 
-func (s *SolanaChainWriterService) getDerivedTableMap(ctx context.Context, lookupTables []DerivedLookupTable, debugID string) ([]*solana.AccountMeta, []string, map[string][]*solana.AccountMeta, error) {
-	var accounts []*solana.AccountMeta
-	var lookupTableAddresses []string
-	var addressMap = make(map[string][]*solana.AccountMeta)
+func (s *SolanaChainWriterService) getDerivedTableMap(ctx context.Context, lookupTables LookupTables, debugID string) (map[string]map[string][]*solana.AccountMeta, map[solana.PublicKey]solana.PublicKeySlice, error) {
+	derivedTableMap := make(map[string]map[string][]*solana.AccountMeta)
+	staticTableMap := make(map[solana.PublicKey]solana.PublicKeySlice)
 
-	for _, lookup := range lookupTables {
-		lookupTableMap, tableAddresses, err := s.LoadTable(lookup, ctx, s.reader, addressMap, debugID)
+	// Read derived lookup tables
+	for _, derivedLookup := range lookupTables.DerivedLookupTables {
+		lookupTableMap, _, err := s.LoadTable(derivedLookup, ctx, s.reader, derivedTableMap, debugID)
 		if err != nil {
-			return nil, nil, nil, errorWithDebugID(fmt.Errorf("error loading lookup table: %w", err), debugID)
+			return nil, nil, errorWithDebugID(fmt.Errorf("error loading derived lookup table: %w", err), debugID)
 		}
-		for _, address := range tableAddresses {
-			lookupTableAddresses = append(lookupTableAddresses, address.PublicKey.String())
-		}
-		for name, addressList := range lookupTableMap {
-			for _, address := range addressList {
-				accounts = append(accounts, address)
+
+		// Merge the loaded table map into the result
+		for tableName, innerMap := range lookupTableMap {
+			if derivedTableMap[tableName] == nil {
+				derivedTableMap[tableName] = make(map[string][]*solana.AccountMeta)
 			}
-			addressMap[name] = addressList
+			for accountKey, metas := range innerMap {
+				derivedTableMap[tableName][accountKey] = metas
+			}
 		}
 	}
-	return accounts, lookupTableAddresses, addressMap, nil
+
+	// Read static lookup tables
+	for _, staticTable := range lookupTables.StaticLookupTables {
+		// Parse the static table address
+		tableAddress, err := solana.PublicKeyFromBase58(staticTable)
+		if err != nil {
+			return nil, nil, errorWithDebugID(fmt.Errorf("invalid static lookup table address: %s, error: %w", staticTable, err), debugID)
+		}
+
+		// Fetch the account info for the static table
+		accountInfo, err := s.reader.GetAccountInfoWithOpts(ctx, tableAddress, &rpc.GetAccountInfoOpts{
+			Encoding:   "base64",
+			Commitment: rpc.CommitmentConfirmed,
+		})
+		if err != nil || accountInfo == nil || accountInfo.Value == nil {
+			return nil, nil, errorWithDebugID(fmt.Errorf("error fetching account info for static table: %s, error: %w", staticTable, err), debugID)
+		}
+
+		// Decode the account data into an array of public keys
+		addresses, err := decodeLookupTable(accountInfo.Value.Data.GetBinary())
+		if err != nil {
+			return nil, nil, errorWithDebugID(fmt.Errorf("error decoding static lookup table data for %s: %w", staticTable, err), debugID)
+		}
+
+		// Add the static lookup table to the map
+		staticTableMap[tableAddress] = addresses
+	}
+
+	return derivedTableMap, staticTableMap, nil
 }
 
-// LoadTable fetches addresses specified by Identifier, loads data for each, and decodes it into solana.PublicKey slices.
-func (s *SolanaChainWriterService) LoadTable(rlt DerivedLookupTable, ctx context.Context, reader client.Reader, derivedTableMap map[string][]*solana.AccountMeta, debugID string) (map[string][]*solana.AccountMeta, []*solana.AccountMeta, error) {
-	// Use GetAddresses to resolve all addresses specified by Identifier.
-	lookupTableAddresses, err := s.GetAddresses(ctx, nil, []Lookup{rlt.Identifier}, derivedTableMap, debugID)
+func (s *SolanaChainWriterService) LoadTable(rlt DerivedLookupTable, ctx context.Context, reader client.Reader, derivedTableMap map[string]map[string][]*solana.AccountMeta, debugID string) (map[string]map[string][]*solana.AccountMeta, []*solana.AccountMeta, error) {
+	// Resolve all addresses specified by the identifier
+	lookupTableAddresses, err := GetAddresses(ctx, nil, []Lookup{rlt.Accounts}, nil, debugID)
 	if err != nil {
 		return nil, nil, errorWithDebugID(fmt.Errorf("error resolving addresses for lookup table: %w", err), debugID)
 	}
 
-	// Map to store address metadata grouped by location.
-	resultMap := make(map[string][]*solana.AccountMeta)
+	resultMap := make(map[string]map[string][]*solana.AccountMeta)
+	var lookupTableMetas []*solana.AccountMeta
+
+	// Iterate over each address of the lookup table
 	for _, addressMeta := range lookupTableAddresses {
-		// Fetch account data for each resolved address.
+		// Fetch account info
 		accountInfo, err := reader.GetAccountInfoWithOpts(ctx, addressMeta.PublicKey, &rpc.GetAccountInfoOpts{
 			Encoding:   "base64",
 			Commitment: rpc.CommitmentConfirmed,
@@ -324,77 +344,31 @@ func (s *SolanaChainWriterService) LoadTable(rlt DerivedLookupTable, ctx context
 			return nil, nil, errorWithDebugID(fmt.Errorf("error fetching account info for address %s: %w", addressMeta.PublicKey.String(), err), debugID)
 		}
 
-		// Decode account data based on the IDL specified in EncodedTypeIDL.
-		decodedData, err := rlt.decodeAccountData(accountInfo.Value.Data.GetBinary(), debugID)
-		if err != nil {
-			return nil, nil, errorWithDebugID(fmt.Errorf("error decoding data for address %s: %w", addressMeta.PublicKey.String(), err), debugID)
-		}
-
-		// Get derived addresses from the decoded data for each location specified.
-		for _, location := range rlt.Locations {
-			derivedAddresses, err := s.GetAddresses(ctx, decodedData, []Lookup{location}, derivedTableMap, debugID)
-			if err != nil {
-				return nil, nil, errorWithDebugID(fmt.Errorf("error resolving derived addresses: %w", err), debugID)
-			}
-			resultMap[fmt.Sprintf("%s.%s", rlt.Name, location.Name)] = derivedAddresses
-		}
-	}
-	return resultMap, lookupTableAddresses, nil
-}
-
-// Decode account data for the DerivedLookupTable based on its EncodedTypeIDL.
-func (rlt *DerivedLookupTable) decodeAccountData(data []byte, debugID string) (any, error) {
-	var idl codec.IDL
-	err := json.Unmarshal([]byte(rlt.EncodedTypeIDL), &idl)
-	if err != nil {
-		return nil, errorWithDebugID(fmt.Errorf("error unmarshalling IDL: %w", err), debugID)
-	}
-
-	cwCodec, err := codec.NewIDLAccountCodec(idl, binary.LittleEndian())
-	if err != nil {
-		return nil, errorWithDebugID(fmt.Errorf("error creating IDLAccountCodec: %w", err), debugID)
-	}
-
-	decoded := reflect.New(rlt.DecodedType).Interface()
-	err = cwCodec.Decode(nil, data, decoded, "")
-	if err != nil {
-		return nil, errorWithDebugID(fmt.Errorf("error decoding account data: %w", err), debugID)
-	}
-	return decoded, nil
-}
-
-func (s *SolanaChainWriterService) GetLookupTables(ctx context.Context, lookupTables []string, debugID string) (map[solana.PublicKey]solana.PublicKeySlice, error) {
-	tables := make(map[solana.PublicKey]solana.PublicKeySlice)
-
-	for _, addressStr := range lookupTables {
-		// Convert the string address to solana.PublicKey
-		tableAddress, err := solana.PublicKeyFromBase58(addressStr)
-		if err != nil {
-			return nil, errorWithDebugID(fmt.Errorf("invalid lookup table address: %s, error: %w", addressStr, err), debugID)
-		}
-
-		// Fetch the lookup table data from the blockchain
-		accountInfo, err := s.reader.GetAccountInfoWithOpts(ctx, tableAddress, &rpc.GetAccountInfoOpts{
-			Encoding:   "base64",
-			Commitment: rpc.CommitmentConfirmed,
-		})
-		if err != nil {
-			return nil, errorWithDebugID(fmt.Errorf("error fetching account info for lookup table %s: %w", addressStr, err), debugID)
-		}
-		if accountInfo == nil || accountInfo.Value == nil {
-			return nil, errorWithDebugID(fmt.Errorf("no data found for lookup table at address: %s", addressStr), debugID)
-		}
-
-		// Decode and extract public keys within the lookup table
+		// Decode the account data into an array of public keys
 		addresses, err := decodeLookupTable(accountInfo.Value.Data.GetBinary())
 		if err != nil {
-			return nil, errorWithDebugID(fmt.Errorf("error decoding lookup table data for %s: %w", addressStr, err), debugID)
+			return nil, nil, errorWithDebugID(fmt.Errorf("error decoding lookup table data for address %s: %w", addressMeta.PublicKey.String(), err), debugID)
 		}
 
-		// Add the addresses to the lookup table map
-		tables[tableAddress] = addresses
+		// Create the inner map for this lookup table
+		if resultMap[rlt.Name] == nil {
+			resultMap[rlt.Name] = make(map[string][]*solana.AccountMeta)
+		}
+
+		// Populate the inner map (keyed by the account public key)
+		for _, addr := range addresses {
+			resultMap[rlt.Name][addr.String()] = append(resultMap[rlt.Name][addr.String()], &solana.AccountMeta{
+				PublicKey:  addr,
+				IsSigner:   false,
+				IsWritable: false,
+			})
+		}
+
+		// Add the current lookup table address to the list of metas
+		lookupTableMetas = append(lookupTableMetas, addressMeta)
 	}
-	return tables, nil
+
+	return resultMap, lookupTableMetas, nil
 }
 
 func decodeLookupTable(data []byte) (solana.PublicKeySlice, error) {
@@ -413,63 +387,109 @@ func decodeLookupTable(data []byte) (solana.PublicKeySlice, error) {
 	return addresses, nil
 }
 
+func (s *SolanaChainWriterService) FilterLookupTableAddresses(
+	accounts []*solana.AccountMeta,
+	derivedTableMap map[string]map[string][]*solana.AccountMeta,
+	staticTableMap map[solana.PublicKey]solana.PublicKeySlice,
+	debugID string,
+) map[solana.PublicKey]solana.PublicKeySlice {
+	filteredLookupTables := make(map[solana.PublicKey]solana.PublicKeySlice)
+
+	// Build a hash set of account public keys for fast lookup
+	usedAccounts := make(map[string]struct{})
+	for _, account := range accounts {
+		usedAccounts[account.PublicKey.String()] = struct{}{}
+	}
+
+	// Filter derived lookup tables
+	for _, innerMap := range derivedTableMap {
+		for innerIdentifier, metas := range innerMap {
+			tableKey, err := solana.PublicKeyFromBase58(innerIdentifier)
+			if err != nil {
+				errorWithDebugID(fmt.Errorf("error parsing lookup table key: %w", err), debugID)
+			}
+
+			// Collect public keys that are actually used
+			var usedAddresses solana.PublicKeySlice
+			for _, meta := range metas {
+				if _, exists := usedAccounts[meta.PublicKey.String()]; exists {
+					usedAddresses = append(usedAddresses, meta.PublicKey)
+				}
+			}
+
+			// Add to the filtered map if there are any used addresses
+			if len(usedAddresses) > 0 {
+				filteredLookupTables[tableKey] = usedAddresses
+			}
+		}
+	}
+
+	// Filter static lookup tables
+	for tableKey, addresses := range staticTableMap {
+		var usedAddresses solana.PublicKeySlice
+		for _, staticAddress := range addresses {
+			if _, exists := usedAccounts[staticAddress.String()]; exists {
+				usedAddresses = append(usedAddresses, staticAddress)
+			}
+		}
+
+		// Add to the filtered map if there are any used addresses
+		if len(usedAddresses) > 0 {
+			filteredLookupTables[tableKey] = usedAddresses
+		}
+	}
+
+	return filteredLookupTables
+}
+
 func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contractName, method string, args any, transactionID string, toAddress string, meta *types.TxMeta, value *big.Int) error {
 	programConfig := s.config.Programs[contractName]
 	methodConfig := programConfig.Methods[method]
 
-	data, ok := args.([]byte)
-	if !ok {
-		return fmt.Errorf("Unable to convert args to []byte")
-	}
-
-	// get inner encoded data from the encoded args
-	encoded, err := GetValueAtLocation(data, methodConfig.DecodeLocation)
-	if err != nil {
-		return fmt.Errorf("error getting value at location: %w", err)
-	}
-
-	// Create an instance of the type defined by methodConfig.DataType
-	decoded := reflect.New(methodConfig.DataType).Interface()
-	err = s.codec.Decode(ctx, encoded[0], decoded, methodConfig.DecodedTypeName)
-
 	// Configure debug ID
 	debugID := ""
 	if methodConfig.DebugIDLocation != "" {
-		debugID, err = GetDebugIDAtLocation(decoded, methodConfig.DebugIDLocation)
+		debugID, err := GetDebugIDAtLocation(args, methodConfig.DebugIDLocation)
 		if err != nil {
-			return errorWithDebugID(fmt.Errorf("error getting debug ID from decoded data: %w", err), debugID)
+			return errorWithDebugID(fmt.Errorf("error getting debug ID from input args: %w", err), debugID)
 		}
 	}
 
-	// Read lookup tables from on-chain
-	lookupTableAddresses, derivedTableMap, err := s.getDerivedTableMap(ctx, methodConfig.DerivedLookupTables, debugID)
+	// Fetch derived and static table maps
+	derivedTableMap, staticTableMap, err := s.getDerivedTableMap(ctx, methodConfig.LookupTables, debugID)
 	if err != nil {
-		return errorWithDebugID(fmt.Errorf("error getting readable table map: %w", err), debugID)
+		return errorWithDebugID(fmt.Errorf("error getting lookup tables: %w", err), debugID)
 	}
 
-	// Lookup configured account addresses from decoded data
-	accounts, err := s.GetAddresses(ctx, decoded, methodConfig.Accounts, derivedTableMap, debugID)
+	// Resolve account metas
+	accounts, err := GetAddresses(ctx, args, methodConfig.Accounts, derivedTableMap, debugID)
 	if err != nil {
-		return errorWithDebugID(fmt.Errorf("error getting addresses from decoded data: %w", err), debugID)
+		return errorWithDebugID(fmt.Errorf("error resolving account addresses: %w", err), debugID)
 	}
 
-	// get current latest blockhash, this can be overwritten by the TXM
+	// Filter the lookup table addresses based on which accounts are actually used
+	filteredLookupTableMap := s.FilterLookupTableAddresses(accounts, derivedTableMap, staticTableMap, debugID)
+
+	// Fetch latest blockhash
 	blockhash, err := s.reader.LatestBlockhash(ctx)
+	if err != nil {
+		return errorWithDebugID(fmt.Errorf("error fetching latest blockhash: %w", err), debugID)
+	}
 
+	// Prepare transaction
 	programId, err := solana.PublicKeyFromBase58(contractName)
 	if err != nil {
-		return errorWithDebugID(fmt.Errorf("Error getting programId: %w", err), debugID)
-	}
-
-	// Encode payload for chain, apply modifiers and borsh-encode
-	encodedPayload, err := s.codec.Encode(ctx, args, codec.WrapItemType(contract, method, true))
-	if err != nil {
-		return errorWithDebugID(fmt.Errorf("error encoding data: %w", err), debugID)
+		return errorWithDebugID(fmt.Errorf("error parsing program ID: %w", err), debugID)
 	}
 
 	feePayer, err := solana.PublicKeyFromBase58(methodConfig.FromAddress)
 	if err != nil {
-		return errorWithDebugID(fmt.Errorf("error getting fee payer: %w", err), debugID)
+		return errorWithDebugID(fmt.Errorf("error parsing fee payer address: %w", err), debugID)
+	}
+
+	encodedPayload, err := s.codec.Encode(ctx, args, codec.WrapItemType(contractName, method, true))
+	if err != nil {
+		return errorWithDebugID(fmt.Errorf("error encoding transaction payload: %w", err), debugID)
 	}
 
 	tx, err := solana.NewTransaction(
@@ -478,16 +498,17 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		},
 		blockhash.Value.Blockhash,
 		solana.TransactionPayer(feePayer),
-		solana.TransactionAddressTables(lookupTableAddresses),
+		solana.TransactionAddressTables(filteredLookupTableMap),
 	)
-
 	if err != nil {
-		return errorWithDebugID(fmt.Errorf("error creating new transaction: %w", err), debugID)
+		return errorWithDebugID(fmt.Errorf("error constructing transaction: %w", err), debugID)
 	}
 
+	// Enqueue transaction
 	if err = s.txm.Enqueue(ctx, accounts[0].PublicKey.String(), tx, transactionID); err != nil {
-		return errorWithDebugID(fmt.Errorf("error on sending trasnaction to TXM: %w", err), debugID)
+		return errorWithDebugID(fmt.Errorf("error enqueuing transaction: %w", err), debugID)
 	}
+
 	return nil
 }
 
