@@ -693,11 +693,11 @@ func (txm *Txm) EstimateComputeUnitLimit(ctx context.Context, tx *solanaGo.Trans
 
 	// Add buffer to the used compute estimate
 	unitsConsumed = bigmath.AddPercentage(new(big.Int).SetUint64(unitsConsumed), EstimateComputeUnitLimitBuffer).Uint64()
-	
+
 	// Ensure unitsConsumed does not exceed the max compute unit limit for a transaction after adding buffer
 	unitsConsumed = mathutil.Min(unitsConsumed, MaxComputeUnitLimit)
 
-	return uint32(unitsConsumed), nil
+	return uint32(unitsConsumed), nil //nolint // unitsConsumed can only be a maximum of 1.4M
 }
 
 // simulateTx simulates transactions using the SimulateTx client method
