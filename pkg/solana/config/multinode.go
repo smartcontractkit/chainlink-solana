@@ -97,17 +97,17 @@ func (c *MultiNodeConfig) SetDefaults() {
 	if c.MultiNode.PollFailureThreshold == nil {
 		c.MultiNode.PollFailureThreshold = ptr(uint32(5))
 	}
-	// Poll interval is set to 10 seconds to ensure timely updates while minimizing resource usage.
+	// Poll interval is set to 15 seconds to ensure timely updates while minimizing resource usage.
 	if c.MultiNode.PollInterval == nil {
-		c.MultiNode.PollInterval = config.MustNewDuration(10 * time.Second)
+		c.MultiNode.PollInterval = config.MustNewDuration(15 * time.Second)
 	}
 	// Selection mode defaults to priority level to enable using node priorities
 	if c.MultiNode.SelectionMode == nil {
 		c.MultiNode.SelectionMode = ptr(mn.NodeSelectionModePriorityLevel)
 	}
-	// The sync threshold is set to 5 to allow for some flexibility in node synchronization before considering it out of sync.
+	// The sync threshold is set to 10 to allow for some flexibility in node synchronization before considering it out of sync.
 	if c.MultiNode.SyncThreshold == nil {
-		c.MultiNode.SyncThreshold = ptr(uint32(5))
+		c.MultiNode.SyncThreshold = ptr(uint32(10))
 	}
 	// Lease duration is set to 1 minute by default to allow node locks for a reasonable amount of time.
 	if c.MultiNode.LeaseDuration == nil {
@@ -125,19 +125,19 @@ func (c *MultiNodeConfig) SetDefaults() {
 	if c.MultiNode.EnforceRepeatableRead == nil {
 		c.MultiNode.EnforceRepeatableRead = ptr(true)
 	}
-	// The delay before declaring a node dead is set to 10 seconds to give nodes time to recover from temporary issues.
+	// The delay before declaring a node dead is set to 20 seconds to give nodes time to recover from temporary issues.
 	if c.MultiNode.DeathDeclarationDelay == nil {
-		c.MultiNode.DeathDeclarationDelay = config.MustNewDuration(10 * time.Second)
+		c.MultiNode.DeathDeclarationDelay = config.MustNewDuration(20 * time.Second)
 	}
 
 	/* Chain Configs */
-	// Threshold for no new heads is set to 10 seconds, assuming that heads should update at a reasonable pace.
+	// Threshold for no new heads is set to 20 seconds, assuming that heads should update at a reasonable pace.
 	if c.MultiNode.NodeNoNewHeadsThreshold == nil {
-		c.MultiNode.NodeNoNewHeadsThreshold = config.MustNewDuration(10 * time.Second)
+		c.MultiNode.NodeNoNewHeadsThreshold = config.MustNewDuration(20 * time.Second)
 	}
-	// Similar to heads, finalized heads should be updated within 10 seconds.
+	// Similar to heads, finalized heads should be updated within 20 seconds.
 	if c.MultiNode.NoNewFinalizedHeadsThreshold == nil {
-		c.MultiNode.NoNewFinalizedHeadsThreshold = config.MustNewDuration(10 * time.Second)
+		c.MultiNode.NoNewFinalizedHeadsThreshold = config.MustNewDuration(20 * time.Second)
 	}
 	// Finality tags are used in Solana and enabled by default.
 	if c.MultiNode.FinalityTagEnabled == nil {
@@ -147,9 +147,9 @@ func (c *MultiNodeConfig) SetDefaults() {
 	if c.MultiNode.FinalityDepth == nil {
 		c.MultiNode.FinalityDepth = ptr(uint32(0))
 	}
-	// Finalized block offset will not be used since finality tags are enabled.
+	// Finalized block offset allows for RPCs to be slightly behind the finalized block.
 	if c.MultiNode.FinalizedBlockOffset == nil {
-		c.MultiNode.FinalizedBlockOffset = ptr(uint32(0))
+		c.MultiNode.FinalizedBlockOffset = ptr(uint32(50))
 	}
 }
 

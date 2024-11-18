@@ -5,9 +5,9 @@
         "Method": {
           "anchorIDL": "test idl 1",
           "encoding": "invalid",
-          "procedures": [{
+          "procedure": {
             "idlAccount": "StructWithNestedStruct"
-          }]
+          }
         }
       }
     }

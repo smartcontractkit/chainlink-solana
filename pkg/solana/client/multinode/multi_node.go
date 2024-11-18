@@ -372,6 +372,6 @@ func (c *MultiNode[CHAIN_ID, RPC]) report(nodesStateInfo []nodeWithState) {
 		c.lggr.Criticalw(rerr.Error(), "nodeStates", nodesStateInfo)
 		c.SvcErrBuffer.Append(rerr)
 	} else if dead > 0 {
-		c.lggr.Errorw(fmt.Sprintf("At least one primary node is dead: %d/%d nodes are alive", live, total), "nodeStates", nodesStateInfo)
+		c.lggr.Warnw(fmt.Sprintf("At least one primary node is dead: %d/%d nodes are alive", live, total), "nodeStates", nodesStateInfo)
 	}
 }

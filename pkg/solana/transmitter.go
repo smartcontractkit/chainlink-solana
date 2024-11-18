@@ -11,15 +11,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
-
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 )
 
 var _ types.ContractTransmitter = (*Transmitter)(nil)
 
 type Transmitter struct {
 	stateID, programID, storeProgramID, transmissionsID, transmissionSigner solana.PublicKey
-	reader                                                                  client.Reader
+	getReader                                                               GetReader
 	stateCache                                                              *StateCache
 	lggr                                                                    logger.Logger
 	txManager                                                               TxManager
@@ -32,7 +30,12 @@ func (c *Transmitter) Transmit(
 	report types.Report,
 	sigs []types.AttributedOnchainSignature,
 ) error {
-	blockhash, err := c.reader.LatestBlockhash(ctx)
+	reader, err := c.getReader()
+	if err != nil {
+		return fmt.Errorf("error on Transmit.Reader: %w", err)
+	}
+
+	blockhash, err := reader.LatestBlockhash(ctx)
 	if err != nil {
 		return fmt.Errorf("error on Transmit.GetRecentBlockhash: %w", err)
 	}

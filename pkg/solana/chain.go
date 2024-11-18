@@ -296,10 +296,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 			if result == nil {
 				return solanago.Signature{}, errors.New("tx sender returned nil result")
 			}
-			if result.Error() != nil {
-				return solanago.Signature{}, result.Error()
-			}
-			return result.Signature(), result.TxError()
+			return result.Signature(), result.Error()
 		}
 
 		tc = internal.NewLoader[client.ReaderWriter](func() (client.ReaderWriter, error) { return ch.multiNode.SelectRPC() })

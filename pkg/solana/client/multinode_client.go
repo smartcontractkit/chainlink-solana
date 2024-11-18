@@ -37,7 +37,7 @@ func (h *Head) BlockDifficulty() *big.Int {
 }
 
 func (h *Head) IsValid() bool {
-	return h != nil && h.BlockHeight != nil && h.BlockHash != nil
+	return h != nil && h.BlockHeight != nil && *h.BlockHeight > 0 && h.BlockHash != nil
 }
 
 var _ mn.RPCClient[mn.StringID, *Head] = (*MultiNodeClient)(nil)
@@ -102,12 +102,19 @@ func (m *MultiNodeClient) SubscribeToHeads(ctx context.Context) (<-chan *Head, m
 	ctx, cancel, chStopInFlight, _ := m.acquireQueryCtx(ctx, m.cfg.TxTimeout())
 	defer cancel()
 
-	pollInterval := m.cfg.MultiNode.PollInterval()
+	// TODO: BCFR-1070 - Add BlockPollInterval
+	pollInterval := m.cfg.MultiNode.FinalizedBlockPollInterval() // Use same interval as finalized polling
 	if pollInterval == 0 {
 		return nil, nil, errors.New("PollInterval is 0")
 	}
 	timeout := pollInterval
-	poller, channel := mn.NewPoller[*Head](pollInterval, m.LatestBlock, timeout, m.log)
+	poller, channel := mn.NewPoller[*Head](pollInterval, func(pollRequestCtx context.Context) (*Head, error) {
+		if mn.CtxIsHeathCheckRequest(ctx) {
+			pollRequestCtx = mn.CtxAddHealthCheckFlag(pollRequestCtx)
+		}
+		return m.LatestBlock(pollRequestCtx)
+	}, timeout, m.log)
+
 	if err := poller.Start(ctx); err != nil {
 		return nil, nil, err
 	}
@@ -130,7 +137,12 @@ func (m *MultiNodeClient) SubscribeToFinalizedHeads(ctx context.Context) (<-chan
 		return nil, nil, errors.New("FinalizedBlockPollInterval is 0")
 	}
 	timeout := finalizedBlockPollInterval
-	poller, channel := mn.NewPoller[*Head](finalizedBlockPollInterval, m.LatestFinalizedBlock, timeout, m.log)
+	poller, channel := mn.NewPoller[*Head](finalizedBlockPollInterval, func(pollRequestCtx context.Context) (*Head, error) {
+		if mn.CtxIsHeathCheckRequest(ctx) {
+			pollRequestCtx = mn.CtxAddHealthCheckFlag(pollRequestCtx)
+		}
+		return m.LatestFinalizedBlock(pollRequestCtx)
+	}, timeout, m.log)
 	if err := poller.Start(ctx); err != nil {
 		return nil, nil, err
 	}
@@ -158,6 +170,10 @@ func (m *MultiNodeClient) LatestBlock(ctx context.Context) (*Head, error) {
 		BlockHeight: &result.Value.LastValidBlockHeight,
 		BlockHash:   &result.Value.Blockhash,
 	}
+	if !head.IsValid() {
+		return nil, errors.New("invalid head")
+	}
+
 	m.onNewHead(ctx, chStopInFlight, head)
 	return head, nil
 }
@@ -175,6 +191,10 @@ func (m *MultiNodeClient) LatestFinalizedBlock(ctx context.Context) (*Head, erro
 		BlockHeight: &result.Value.LastValidBlockHeight,
 		BlockHash:   &result.Value.Blockhash,
 	}
+	if !head.IsValid() {
+		return nil, errors.New("invalid head")
+	}
+
 	m.onNewFinalizedHead(ctx, chStopInFlight, head)
 	return head, nil
 }
@@ -301,18 +321,16 @@ func (m *MultiNodeClient) GetInterceptedChainInfo() (latest, highestUserObservat
 }
 
 type SendTxResult struct {
-	err   error
-	txErr error
-	code  mn.SendTxReturnCode
-	sig   solana.Signature
+	err  error
+	code mn.SendTxReturnCode
+	sig  solana.Signature
 }
 
 var _ mn.SendTxResult = (*SendTxResult)(nil)
 
 func NewSendTxResult(err error) *SendTxResult {
 	result := &SendTxResult{
-		err:   err,
-		txErr: err,
+		err: err,
 	}
 	result.code = ClassifySendError(nil, err)
 	return result
@@ -320,10 +338,6 @@ func NewSendTxResult(err error) *SendTxResult {
 
 func (r *SendTxResult) Error() error {
 	return r.err
-}
-
-func (r *SendTxResult) TxError() error {
-	return r.txErr
 }
 
 func (r *SendTxResult) Code() mn.SendTxReturnCode {
@@ -336,7 +350,7 @@ func (r *SendTxResult) Signature() solana.Signature {
 
 func (m *MultiNodeClient) SendTransaction(ctx context.Context, tx *solana.Transaction) *SendTxResult {
 	var sendTxResult = &SendTxResult{}
-	sendTxResult.sig, sendTxResult.txErr = m.SendTx(ctx, tx)
-	sendTxResult.code = ClassifySendError(tx, sendTxResult.txErr)
+	sendTxResult.sig, sendTxResult.err = m.SendTx(ctx, tx)
+	sendTxResult.code = ClassifySendError(tx, sendTxResult.err)
 	return sendTxResult
 }

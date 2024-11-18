@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
@@ -68,7 +69,7 @@ func TestTransmitter_TxSize(t *testing.T) {
 		storeProgramID:     mustNewRandomPublicKey(),
 		transmissionsID:    mustNewRandomPublicKey(),
 		transmissionSigner: signer.PublicKey(),
-		reader:             rw,
+		getReader:          func() (client.Reader, error) { return rw, nil },
 		stateCache:         &StateCache{},
 		lggr:               logger.Test(t),
 		txManager:          mockTxm,

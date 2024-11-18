@@ -51,7 +51,7 @@ type TestEnvDetails struct {
 type ChainDetails struct {
 	ChainName             string
 	ChainID               string
-	RPCUrl                string
+	RPCUrls               []string
 	RPCURLExternal        string
 	WSURLExternal         string
 	ProgramAddresses      *chainConfig.ProgramAddresses
@@ -116,9 +116,9 @@ func New(testConfig *tc.TestConfig) *Common {
 		config = chainConfig.DevnetConfig()
 		privateKeyString = *testConfig.Common.PrivateKey
 
-		if *testConfig.Common.RPCURL != "" {
-			config.RPCUrl = *testConfig.Common.RPCURL
-			config.WSUrl = *testConfig.Common.WsURL
+		if len(*testConfig.Common.RPCURLs) > 0 {
+			config.RPCUrls = *testConfig.Common.RPCURLs
+			config.WSUrls = *testConfig.Common.WsURLs
 			config.ProgramAddresses = &chainConfig.ProgramAddresses{
 				OCR2:             *testConfig.SolanaConfig.OCR2ProgramID,
 				AccessController: *testConfig.SolanaConfig.AccessControllerProgramID,
@@ -130,7 +130,7 @@ func New(testConfig *tc.TestConfig) *Common {
 	c = &Common{
 		ChainDetails: &ChainDetails{
 			ChainID:          config.ChainID,
-			RPCUrl:           config.RPCUrl,
+			RPCUrls:          config.RPCUrls,
 			ChainName:        config.ChainName,
 			ProgramAddresses: config.ProgramAddresses,
 		},
@@ -146,7 +146,7 @@ func New(testConfig *tc.TestConfig) *Common {
 	}
 	// provide getters for TestConfig (pointers to chain details)
 	c.TestConfig.GetChainID = func() string { return c.ChainDetails.ChainID }
-	c.TestConfig.GetURL = func() string { return c.ChainDetails.RPCUrl }
+	c.TestConfig.GetURL = func() []string { return c.ChainDetails.RPCUrls }
 
 	return c
 }
@@ -298,7 +298,7 @@ func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error
 		bootstrapNodeInternalIP = contractNodeInfo.BootstrapNode.InternalIP()
 	}
 	relayConfig := job.JSONConfig{
-		"nodeEndpointHTTP": c.ChainDetails.RPCUrl,
+		"nodeEndpointHTTP": c.ChainDetails.RPCUrls,
 		"ocr2ProgramID":    contractNodeInfo.OCR2.ProgramAddress(),
 		"transmissionsID":  contractNodeInfo.Store.TransmissionsAddress(),
 		"storeProgramID":   contractNodeInfo.Store.ProgramAddress(),
