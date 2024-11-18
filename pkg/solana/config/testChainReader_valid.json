@@ -5,14 +5,14 @@
         "Method": {
           "anchorIDL": "test idl 1",
           "encoding": "borsh",
-          "procedures": [{
+          "procedure": {
             "idlAccount": "StructWithNestedStruct"
-          }]
+          }
         },
         "MethodWithOpts": {
           "anchorIDL": "test idl 2",
           "encoding": "borsh",
-          "procedures": [{
+          "procedure": {
             "idlAccount": "StructWithNestedStruct",
             "outputModifications": [{
               "Type": "extract property",
@@ -26,7 +26,7 @@
                 "length": 10
               }
             }
-          }]
+          }
         }
       }
     },
@@ -35,9 +35,9 @@
         "Method": {
           "anchorIDL": "test idl 3",
           "encoding": "bincode",
-          "procedures": [{
+          "procedure": {
             "idlAccount": "StructWithNestedStruct"
-          }]
+          }
         }
       }
     }
