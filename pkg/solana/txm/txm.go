@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"strings"
 	"sync"
@@ -20,6 +19,7 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	bigmath "github.com/smartcontractkit/chainlink-common/pkg/utils/big_math"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/mathutil"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -693,12 +693,9 @@ func (txm *Txm) EstimateComputeUnitLimit(ctx context.Context, tx *solanaGo.Trans
 
 	// Add buffer to the used compute estimate
 	unitsConsumed = bigmath.AddPercentage(new(big.Int).SetUint64(unitsConsumed), EstimateComputeUnitLimitBuffer).Uint64()
-
-	if unitsConsumed > math.MaxUint32 {
-		txm.lggr.Debug("compute units used with buffer greater than uint32 max", "unitsConsumed", unitsConsumed)
-		// Do not return error to allow falling back to default compute unit limit
-		return 0, nil
-	}
+	
+	// Ensure unitsConsumed does not exceed the max compute unit limit for a transaction after adding buffer
+	unitsConsumed = mathutil.Min(unitsConsumed, MaxComputeUnitLimit)
 
 	return uint32(unitsConsumed), nil
 }

@@ -122,6 +122,34 @@ func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, uint32(0), computeUnitLimit)
 	})
+
+	t.Run("simulation returns max compute unit limit if adding buffer exceeds it", func(t *testing.T) {
+		usedCompute := uint64(1_400_000)
+		client.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{
+			Value: &rpc.LatestBlockhashResult{
+				LastValidBlockHeight: 100,
+				Blockhash:            solana.Hash{},
+			},
+		}, nil).Once()
+		client.On("SimulateTx", mock.Anything, mock.IsType(&solana.Transaction{}), mock.IsType(&rpc.SimulateTransactionOpts{})).Run(func(args mock.Arguments) {
+			// Validate max compute unit limit is set in transaction
+			tx := args.Get(1).(*solana.Transaction)
+			limit, err := fees.ParseComputeUnitLimit(tx.Message.Instructions[len(tx.Message.Instructions)-1].Data)
+			require.NoError(t, err)
+			require.Equal(t, fees.ComputeUnitLimit(solanatxm.MaxComputeUnitLimit), limit)
+
+			// Validate signature verification is enabled
+			opts := args.Get(2).(*rpc.SimulateTransactionOpts)
+			require.True(t, opts.SigVerify)
+		}).Return(&rpc.SimulateTransactionResult{
+			Err:           nil,
+			UnitsConsumed: &usedCompute,
+		}, nil).Once()
+		tx := createTx(t, client, pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
+		computeUnitLimit, err := txm.EstimateComputeUnitLimit(ctx, tx)
+		require.NoError(t, err)
+		require.Equal(t, uint32(1_400_000), computeUnitLimit)
+	})
 }
 
 func createTx(t *testing.T, client solanaClient.ReaderWriter, signer solana.PublicKey, sender solana.PublicKey, receiver solana.PublicKey, amt uint64) *solana.Transaction {
