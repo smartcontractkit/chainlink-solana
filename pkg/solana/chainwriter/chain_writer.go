@@ -2,6 +2,7 @@ package chainwriter
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
+	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
@@ -22,8 +24,8 @@ type SolanaChainWriterService struct {
 	reader client.Reader
 	txm    txm.Txm
 	ge     fees.Estimator
-	codec  types.Codec
 	config ChainWriterConfig
+	codecs map[string]types.Codec
 }
 
 type ChainWriterConfig struct {
@@ -99,13 +101,56 @@ type AccountsFromLookupTable struct {
 	IncludeIndexes   []int
 }
 
-func NewSolanaChainWriterService(reader client.Reader, txm txm.Txm, ge fees.Estimator, config ChainWriterConfig) *SolanaChainWriterService {
+func NewSolanaChainWriterService(reader client.Reader, txm txm.Txm, ge fees.Estimator, config ChainWriterConfig) (*SolanaChainWriterService, error) {
+	codecs, err := parseIDLCodecs(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse IDL codecs: %w", err)
+	}
+
 	return &SolanaChainWriterService{
 		reader: reader,
 		txm:    txm,
 		ge:     ge,
 		config: config,
+		codecs: codecs,
+	}, nil
+}
+
+func parseIDLCodecs(config ChainWriterConfig) (map[string]types.Codec, error) {
+	codecs := make(map[string]types.Codec)
+	for program, programConfig := range config.Programs {
+		var idl codec.IDL
+		if err := json.Unmarshal([]byte(programConfig.IDL), &idl); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal IDL: %w", err)
+		}
+		idlCodec, err := codec.NewIDLAccountCodec(idl, binary.LittleEndian())
+		if err != nil {
+			return nil, fmt.Errorf("failed to create codec from IDL: %w", err)
+		}
+		for method, methodConfig := range programConfig.Methods {
+			if methodConfig.InputModifications != nil {
+				modConfig, err := methodConfig.InputModifications.ToModifier(codec.DecoderHooks...)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create input modifications: %w", err)
+				}
+				// add mods to codec
+				idlCodec, err = codec.NewNamedModifierCodec(idlCodec, WrapItemType(program, method, true), modConfig)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create named codec: %w", err)
+				}
+			}
+		}
+		codecs[program] = idlCodec
 	}
+	return codecs, nil
+}
+
+func WrapItemType(programName, itemType string, isParams bool) string {
+	if isParams {
+		return fmt.Sprintf("params.%s.%s", programName, itemType)
+	}
+
+	return fmt.Sprintf("return.%s.%s", programName, itemType)
 }
 
 /*
@@ -487,7 +532,8 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("error parsing fee payer address: %w", err), debugID)
 	}
 
-	encodedPayload, err := s.codec.Encode(ctx, args, codec.WrapItemType(contractName, method, true))
+	codec := s.codecs[contractName]
+	encodedPayload, err := codec.Encode(ctx, args, WrapItemType(contractName, method, true))
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error encoding transaction payload: %w", err), debugID)
 	}
@@ -505,7 +551,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	}
 
 	// Enqueue transaction
-	if err = s.txm.Enqueue(ctx, accounts[0].PublicKey.String(), tx, transactionID); err != nil {
+	if err = s.txm.Enqueue(ctx, accounts[0].PublicKey.String(), tx, &transactionID); err != nil {
 		return errorWithDebugID(fmt.Errorf("error enqueuing transaction: %w", err), debugID)
 	}
 
