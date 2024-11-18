@@ -267,7 +267,7 @@ func (c *TestConfig) GetNodeConfigTOML() (string, error) {
 
 	mnConfig := solcfg.MultiNodeConfig{
 		MultiNode: solcfg.MultiNode{
-			Enabled:       ptr.Ptr(true),
+			Enabled:       ptr.Ptr(false),
 			SyncThreshold: ptr.Ptr(uint32(170)),
 		},
 	}
