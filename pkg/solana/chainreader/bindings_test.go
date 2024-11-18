@@ -58,6 +58,6 @@ func (_m *mockBinding) CreateType(b bool) (any, error) {
 	return ret.Get(0), ret.Error(1)
 }
 
-func (_ *mockBinding) Decode(_ context.Context, _ []byte, _ any) error {
+func (_m *mockBinding) Decode(_ context.Context, _ []byte, _ any) error {
 	return nil
 }

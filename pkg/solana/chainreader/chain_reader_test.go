@@ -2,7 +2,6 @@ package chainreader_test
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -678,52 +677,6 @@ func (r *wrappedTestChainReader) BatchGetLatestValues(_ context.Context, _ types
 func (r *wrappedTestChainReader) QueryKey(_ context.Context, _ types.BoundContract, _ query.KeyFilter, _ query.LimitAndSort, _ any) ([]types.Sequence, error) {
 	r.test.Skip("QueryKey is not yet supported in Solana")
 	return nil, nil
-}
-
-func getAddresses(t *testing.T, tester ChainComponentsInterfaceTester[*testing.T], contractName, readName string) (ag_solana.PublicKey, ag_solana.PublicKey) {
-	t.Helper()
-
-	fn := ag_solana.MustPublicKeyFromBase58
-
-	var (
-		addresses []string
-		found     bool
-	)
-
-	for _, binding := range tester.GetBindings(t) {
-		if binding.Name == contractName {
-			encoded, err := base64.StdEncoding.DecodeString(binding.Address)
-			if err != nil {
-				t.Logf("%s", err)
-				t.FailNow()
-			}
-
-			var readAddresses map[string][]string
-
-			err = json.Unmarshal(encoded, &readAddresses)
-			if err != nil {
-				t.Logf("%s", err)
-				t.FailNow()
-			}
-
-			var ok bool
-
-			addresses, ok = readAddresses[readName]
-			if !ok {
-				t.Log("no addresses found")
-				t.FailNow()
-			}
-
-			found = true
-		}
-	}
-
-	if !found {
-		t.Log("no addresses found")
-		t.FailNow()
-	}
-
-	return fn(addresses[0]), fn(addresses[1])
 }
 
 func (r *wrappedTestChainReader) Bind(ctx context.Context, bindings []types.BoundContract) error {
