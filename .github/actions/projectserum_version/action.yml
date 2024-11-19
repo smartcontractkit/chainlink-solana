@@ -14,4 +14,3 @@ runs:
       run: |
         PSVERSION=$(make projectserum_version)
         echo "PSVERSION=${PSVERSION}" >>$GITHUB_OUTPUT
-EVM2AnyRampMessage

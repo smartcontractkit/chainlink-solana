@@ -8,14 +8,6 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 )
 
-type RegistryTokenState struct {
-	PoolProgram                [32]byte `json:"pool_program"`
-	PoolConfig                 [32]byte `json:"pool_config"`
-	TokenProgram               [32]byte `json:"token_program"`
-	TokenState                 [32]byte `json:"token_state"`
-	PoolAssociatedTokenAccount [32]byte `json:"pool_associated_token_account"`
-}
-
 func TestGetAddresses(t *testing.T) {
 	// Fake constant addresses for the purpose of this example.
 	registryAddress := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6A"
@@ -95,7 +87,7 @@ func TestGetAddresses(t *testing.T) {
 			// 		A) The PublicKey lookup resolves to multiple addresses (i.e. multiple token addresses)
 			// 		B) The Seeds or ValueSeeds resolve to multiple values
 			chainwriter.PDALookups{
-				Name: "PerChainRateLimit",
+				Name: "PerChainConfig",
 				// PublicKey is a constant account in this case, not a lookup.
 				PublicKey: chainwriter.AccountConstant{
 					Address:    registryAddress,
@@ -105,6 +97,7 @@ func TestGetAddresses(t *testing.T) {
 				// Similar to the RegistryTokenState above, the user is looking up PDA accounts based on the dest tokens.
 				Seeds: []chainwriter.Lookup{
 					chainwriter.AccountLookup{Location: "Message.TokenAmounts.DestTokenAddress"},
+					chainwriter.AccountLookup{Location: "Message.Header.DestChainSelector"},
 				},
 				IsSigner:   false,
 				IsWritable: false,
@@ -182,6 +175,22 @@ func TestGetAddresses(t *testing.T) {
 				IsSigner:   false,
 				IsWritable: false,
 			},
+			// PDA lookup to get the Router Chain Config
+			chainwriter.PDALookups{
+				Name: "RouterChainConfig",
+				// The public key is a constant Router address.
+				PublicKey: chainwriter.AccountConstant{
+					Address:    routerProgramAddress,
+					IsSigner:   false,
+					IsWritable: false,
+				},
+				Seeds: []chainwriter.Lookup{
+					chainwriter.AccountLookup{Location: "Message.Header.DestChainSelector"},
+					chainwriter.AccountLookup{Location: "Message.Header.SourceChainSelector"},
+				},
+				IsSigner:   false,
+				IsWritable: false,
+			},
 			// PDA lookup to get the Router Report Accounts.
 			chainwriter.PDALookups{
 				Name: "RouterReportAccount",
@@ -213,7 +222,7 @@ func TestGetAddresses(t *testing.T) {
 				// with the public key to generate one or multiple PDA accounts.
 				Seeds: []chainwriter.Lookup{
 					chainwriter.AccountLookup{Location: "Message.Receiver"},
-					chainwriter.AccountLookup{Location: "Message.DestChainSelector"},
+					chainwriter.AccountLookup{Location: "Message.Header.DestChainSelector"},
 				},
 			},
 			// Account constant
@@ -261,7 +270,20 @@ func TestGetAddresses(t *testing.T) {
 			},
 		},
 		Accounts: []chainwriter.Lookup{
-
+			// Account constant
+			chainwriter.AccountConstant{
+				Name:       "RouterProgram",
+				Address:    routerProgramAddress,
+				IsSigner:   false,
+				IsWritable: false,
+			},
+			// Account constant
+			chainwriter.AccountConstant{
+				Name:       "RouterAccountConfig",
+				Address:    routerAccountConfigAddress,
+				IsSigner:   false,
+				IsWritable: false,
+			},
 			// PDA lookup to get the Router Report Accounts.
 			chainwriter.PDALookups{
 				Name: "RouterReportAccount",
@@ -278,13 +300,6 @@ func TestGetAddresses(t *testing.T) {
 					},
 				},
 				IsSigner:   false,
-				IsWritable: false,
-			},
-			// Account constant
-			chainwriter.AccountConstant{
-				Name:       "CPISigner",
-				Address:    cpiSignerAddress,
-				IsSigner:   true,
 				IsWritable: false,
 			},
 			// Account constant
