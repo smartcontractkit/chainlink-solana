@@ -242,6 +242,23 @@ func TestClient_Writer_Integration(t *testing.T) {
 
 	assert.Nil(t, statuses[0].Err)
 	assert.NotNil(t, statuses[1].Err)
+
+	getTxResult, err := c.GetTransaction(ctx, sigSuccess, nil)
+	assert.NoError(t, err)
+	assert.NotNil(t, getTxResult)
+
+	sigs, err := c.GetSignaturesForAddressWithOpts(ctx, pubKey, nil)
+	assert.NoError(t, err)
+	requiredSigs := map[solana.Signature]bool{
+		sigSuccess: false,
+		sigFail:    false,
+	}
+	for _, sig := range sigs {
+		if _, required := requiredSigs[sig.Signature]; required {
+			requiredSigs[sig.Signature] = true
+		}
+	}
+	require.True(t, requiredSigs[sigSuccess] && requiredSigs[sigFail])
 }
 
 func TestClient_SendTxDuplicates_Integration(t *testing.T) {

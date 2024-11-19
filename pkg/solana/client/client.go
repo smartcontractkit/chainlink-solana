@@ -122,6 +122,39 @@ func (c *Client) SlotHeightWithCommitment(ctx context.Context, commitment rpc.Co
 	return v.(uint64), err
 }
 
+func (c *Client) GetSignaturesForAddressWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error) {
+	done := c.latency("signatures_for_address")
+	defer done()
+
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+	if opts == nil {
+		opts = &rpc.GetSignaturesForAddressOpts{}
+	}
+	if opts.Commitment == "" {
+		opts.Commitment = c.commitment
+	}
+	return c.rpc.GetSignaturesForAddressWithOpts(ctx, addr, opts)
+}
+
+func (c *Client) GetTransaction(ctx context.Context, txHash solana.Signature, opts *rpc.GetTransactionOpts) (*rpc.GetTransactionResult, error) {
+	done := c.latency("transaction")
+	defer done()
+
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+
+	if opts == nil {
+		opts = &rpc.GetTransactionOpts{
+			Encoding: solana.EncodingBase64,
+		}
+	}
+	if opts.Commitment == "" {
+		opts.Commitment = c.commitment
+	}
+	return c.rpc.GetTransaction(ctx, txHash, opts)
+}
+
 func (c *Client) GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetAccountInfoOpts) (*rpc.GetAccountInfoResult, error) {
 	done := c.latency("account_info")
 	defer done()
