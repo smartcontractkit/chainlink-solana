@@ -25,8 +25,8 @@ type ChainDataReader struct {
 	AnchorIDL string `json:"anchorIDL" toml:"anchorIDL"`
 	// Encoding defines the type of encoding used for on-chain data. Currently supported
 	// are 'borsh' and 'bincode'.
-	Encoding   EncodingType           `json:"encoding" toml:"encoding"`
-	Procedures []ChainReaderProcedure `json:"procedures" toml:"procedures"`
+	Encoding  EncodingType         `json:"encoding" toml:"encoding"`
+	Procedure ChainReaderProcedure `json:"procedure" toml:"procedure"`
 }
 
 type EncodingType int

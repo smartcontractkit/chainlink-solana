@@ -90,28 +90,24 @@ var validChainReaderConfig = config.ChainReader{
 				"Method": {
 					AnchorIDL: "test idl 1",
 					Encoding:  config.EncodingTypeBorsh,
-					Procedures: []config.ChainReaderProcedure{
-						{
-							IDLAccount: testutils.TestStructWithNestedStruct,
-						},
+					Procedure: config.ChainReaderProcedure{
+						IDLAccount: testutils.TestStructWithNestedStruct,
 					},
 				},
 				"MethodWithOpts": {
 					AnchorIDL: "test idl 2",
 					Encoding:  config.EncodingTypeBorsh,
-					Procedures: []config.ChainReaderProcedure{
-						{
-							IDLAccount: testutils.TestStructWithNestedStruct,
-							OutputModifications: codeccommon.ModifiersConfig{
-								&codeccommon.PropertyExtractorConfig{FieldName: "DurationVal"},
-							},
-							RPCOpts: &config.RPCOpts{
-								Encoding:   &encodingBase64,
-								Commitment: &commitment,
-								DataSlice: &rpc.DataSlice{
-									Offset: &offset,
-									Length: &length,
-								},
+					Procedure: config.ChainReaderProcedure{
+						IDLAccount: testutils.TestStructWithNestedStruct,
+						OutputModifications: codeccommon.ModifiersConfig{
+							&codeccommon.PropertyExtractorConfig{FieldName: "DurationVal"},
+						},
+						RPCOpts: &config.RPCOpts{
+							Encoding:   &encodingBase64,
+							Commitment: &commitment,
+							DataSlice: &rpc.DataSlice{
+								Offset: &offset,
+								Length: &length,
 							},
 						},
 					},
@@ -123,10 +119,8 @@ var validChainReaderConfig = config.ChainReader{
 				"Method": {
 					AnchorIDL: "test idl 3",
 					Encoding:  config.EncodingTypeBincode,
-					Procedures: []config.ChainReaderProcedure{
-						{
-							IDLAccount: testutils.TestStructWithNestedStruct,
-						},
+					Procedure: config.ChainReaderProcedure{
+						IDLAccount: testutils.TestStructWithNestedStruct,
 					},
 				},
 			},
