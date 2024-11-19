@@ -8,8 +8,6 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 )
 
-//go:generate mockery --name NodeBalances --output ./mocks/
-
 type NodeBalances interface {
 	SetBalance(balance uint64, address, operator string)
 	Cleanup(address, operator string)

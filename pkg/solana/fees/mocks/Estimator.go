@@ -13,6 +13,14 @@ type Estimator struct {
 	mock.Mock
 }
 
+type Estimator_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *Estimator) EXPECT() *Estimator_Expecter {
+	return &Estimator_Expecter{mock: &_m.Mock}
+}
+
 // BaseComputeUnitPrice provides a mock function with given fields:
 func (_m *Estimator) BaseComputeUnitPrice() uint64 {
 	ret := _m.Called()
@@ -29,6 +37,33 @@ func (_m *Estimator) BaseComputeUnitPrice() uint64 {
 	}
 
 	return r0
+}
+
+// Estimator_BaseComputeUnitPrice_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BaseComputeUnitPrice'
+type Estimator_BaseComputeUnitPrice_Call struct {
+	*mock.Call
+}
+
+// BaseComputeUnitPrice is a helper method to define mock.On call
+func (_e *Estimator_Expecter) BaseComputeUnitPrice() *Estimator_BaseComputeUnitPrice_Call {
+	return &Estimator_BaseComputeUnitPrice_Call{Call: _e.mock.On("BaseComputeUnitPrice")}
+}
+
+func (_c *Estimator_BaseComputeUnitPrice_Call) Run(run func()) *Estimator_BaseComputeUnitPrice_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Estimator_BaseComputeUnitPrice_Call) Return(_a0 uint64) *Estimator_BaseComputeUnitPrice_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Estimator_BaseComputeUnitPrice_Call) RunAndReturn(run func() uint64) *Estimator_BaseComputeUnitPrice_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // Close provides a mock function with given fields:
@@ -49,6 +84,33 @@ func (_m *Estimator) Close() error {
 	return r0
 }
 
+// Estimator_Close_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Close'
+type Estimator_Close_Call struct {
+	*mock.Call
+}
+
+// Close is a helper method to define mock.On call
+func (_e *Estimator_Expecter) Close() *Estimator_Close_Call {
+	return &Estimator_Close_Call{Call: _e.mock.On("Close")}
+}
+
+func (_c *Estimator_Close_Call) Run(run func()) *Estimator_Close_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Estimator_Close_Call) Return(_a0 error) *Estimator_Close_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Estimator_Close_Call) RunAndReturn(run func() error) *Estimator_Close_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Start provides a mock function with given fields: _a0
 func (_m *Estimator) Start(_a0 context.Context) error {
 	ret := _m.Called(_a0)
@@ -65,6 +127,34 @@ func (_m *Estimator) Start(_a0 context.Context) error {
 	}
 
 	return r0
+}
+
+// Estimator_Start_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Start'
+type Estimator_Start_Call struct {
+	*mock.Call
+}
+
+// Start is a helper method to define mock.On call
+//   - _a0 context.Context
+func (_e *Estimator_Expecter) Start(_a0 interface{}) *Estimator_Start_Call {
+	return &Estimator_Start_Call{Call: _e.mock.On("Start", _a0)}
+}
+
+func (_c *Estimator_Start_Call) Run(run func(_a0 context.Context)) *Estimator_Start_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *Estimator_Start_Call) Return(_a0 error) *Estimator_Start_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Estimator_Start_Call) RunAndReturn(run func(context.Context) error) *Estimator_Start_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // NewEstimator creates a new instance of Estimator. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

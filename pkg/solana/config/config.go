@@ -35,7 +35,6 @@ var defaultConfigSet = Chain{
 	EstimateComputeUnitLimit: ptr(false),           // set to false to disable compute unit limit estimation
 }
 
-//go:generate mockery --name Config --output ./mocks/ --case=underscore --filename config.go
 type Config interface {
 	BalancePollPeriod() time.Duration
 	ConfirmPollPeriod() time.Duration
