@@ -37,6 +37,7 @@ type Reader interface {
 	ChainID(ctx context.Context) (mn.StringID, error)
 	GetFeeForMessage(ctx context.Context, msg string) (uint64, error)
 	GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error)
+	GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64, commitment *rpc.CommitmentType) (rpc.BlocksResult, error)
 	GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit uint64) (*rpc.BlocksResult, error)
 	GetBlock(ctx context.Context, slot uint64) (*rpc.GetBlockResult, error)
 }
@@ -163,6 +164,18 @@ func (c *Client) GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicK
 	defer cancel()
 	opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
 	return c.rpc.GetAccountInfoWithOpts(ctx, addr, opts)
+}
+
+func (c *Client) GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64, commitment *rpc.CommitmentType) (out rpc.BlocksResult, err error) {
+	done := c.latency("blocks")
+	defer done()
+
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+	if commitment == nil {
+		commitment = &c.commitment
+	}
+	return c.rpc.GetBlocks(ctx, startSlot, endSlot, *commitment)
 }
 
 func (c *Client) LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockhashResult, error) {
