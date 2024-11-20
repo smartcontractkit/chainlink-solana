@@ -7,8 +7,6 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 )
 
-//go:generate mockery --name Fees --output ./mocks/
-
 type Fees interface {
 	Set(txFee uint64, computeUnitPrice fees.ComputeUnitPrice, feedInput FeedInput)
 	Cleanup(feedInput FeedInput)

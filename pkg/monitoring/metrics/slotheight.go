@@ -7,8 +7,6 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 )
 
-//go:generate mockery --name SlotHeight --output ./mocks/
-
 type SlotHeight interface {
 	Set(slot types.SlotHeight, chain, url string)
 	Cleanup()

@@ -14,14 +14,80 @@ type Fees struct {
 	mock.Mock
 }
 
+type Fees_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *Fees) EXPECT() *Fees_Expecter {
+	return &Fees_Expecter{mock: &_m.Mock}
+}
+
 // Cleanup provides a mock function with given fields: feedInput
 func (_m *Fees) Cleanup(feedInput metrics.FeedInput) {
 	_m.Called(feedInput)
 }
 
+// Fees_Cleanup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Cleanup'
+type Fees_Cleanup_Call struct {
+	*mock.Call
+}
+
+// Cleanup is a helper method to define mock.On call
+//   - feedInput metrics.FeedInput
+func (_e *Fees_Expecter) Cleanup(feedInput interface{}) *Fees_Cleanup_Call {
+	return &Fees_Cleanup_Call{Call: _e.mock.On("Cleanup", feedInput)}
+}
+
+func (_c *Fees_Cleanup_Call) Run(run func(feedInput metrics.FeedInput)) *Fees_Cleanup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(metrics.FeedInput))
+	})
+	return _c
+}
+
+func (_c *Fees_Cleanup_Call) Return() *Fees_Cleanup_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *Fees_Cleanup_Call) RunAndReturn(run func(metrics.FeedInput)) *Fees_Cleanup_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Set provides a mock function with given fields: txFee, computeUnitPrice, feedInput
 func (_m *Fees) Set(txFee uint64, computeUnitPrice fees.ComputeUnitPrice, feedInput metrics.FeedInput) {
 	_m.Called(txFee, computeUnitPrice, feedInput)
+}
+
+// Fees_Set_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Set'
+type Fees_Set_Call struct {
+	*mock.Call
+}
+
+// Set is a helper method to define mock.On call
+//   - txFee uint64
+//   - computeUnitPrice fees.ComputeUnitPrice
+//   - feedInput metrics.FeedInput
+func (_e *Fees_Expecter) Set(txFee interface{}, computeUnitPrice interface{}, feedInput interface{}) *Fees_Set_Call {
+	return &Fees_Set_Call{Call: _e.mock.On("Set", txFee, computeUnitPrice, feedInput)}
+}
+
+func (_c *Fees_Set_Call) Run(run func(txFee uint64, computeUnitPrice fees.ComputeUnitPrice, feedInput metrics.FeedInput)) *Fees_Set_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(uint64), args[1].(fees.ComputeUnitPrice), args[2].(metrics.FeedInput))
+	})
+	return _c
+}
+
+func (_c *Fees_Set_Call) Return() *Fees_Set_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *Fees_Set_Call) RunAndReturn(run func(uint64, fees.ComputeUnitPrice, metrics.FeedInput)) *Fees_Set_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // NewFees creates a new instance of Fees. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

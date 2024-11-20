@@ -7,8 +7,6 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 )
 
-//go:generate mockery --name NetworkFees --output ./mocks/
-
 type NetworkFees interface {
 	Set(slot NetworkFeesInput, chain string)
 	Cleanup()

@@ -11,8 +11,8 @@ CONTRACTS=${REPO}/contracts
 # install go
 apt-get update
 apt-get install -y wget
-wget https://golang.org/dl/go1.21.7.linux-amd64.tar.gz
-tar -xvf go1.21.7.linux-amd64.tar.gz
+wget https://golang.org/dl/go1.22.8.linux-amd64.tar.gz
+tar -xvf go1.22.8.linux-amd64.tar.gz
 mv go /usr/local
 export PATH=/usr/local/go/bin:$PATH
 export GOPATH=$HOME/go
