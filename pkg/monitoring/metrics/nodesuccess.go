@@ -6,8 +6,6 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 )
 
-//go:generate mockery --name NodeSuccess --output ./mocks/
-
 type NodeSuccess interface {
 	Add(count int, i NodeFeedInput)
 	Cleanup(i NodeFeedInput)
