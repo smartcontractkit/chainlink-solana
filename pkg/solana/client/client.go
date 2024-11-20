@@ -23,7 +23,6 @@ const (
 	MainnetGenesisHash = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
 )
 
-//go:generate mockery --name ReaderWriter --output ./mocks/
 type ReaderWriter interface {
 	Writer
 	Reader

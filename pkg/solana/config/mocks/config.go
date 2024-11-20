@@ -14,6 +14,14 @@ type Config struct {
 	mock.Mock
 }
 
+type Config_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *Config) EXPECT() *Config_Expecter {
+	return &Config_Expecter{mock: &_m.Mock}
+}
+
 // BalancePollPeriod provides a mock function with given fields:
 func (_m *Config) BalancePollPeriod() time.Duration {
 	ret := _m.Called()
@@ -30,6 +38,33 @@ func (_m *Config) BalancePollPeriod() time.Duration {
 	}
 
 	return r0
+}
+
+// Config_BalancePollPeriod_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BalancePollPeriod'
+type Config_BalancePollPeriod_Call struct {
+	*mock.Call
+}
+
+// BalancePollPeriod is a helper method to define mock.On call
+func (_e *Config_Expecter) BalancePollPeriod() *Config_BalancePollPeriod_Call {
+	return &Config_BalancePollPeriod_Call{Call: _e.mock.On("BalancePollPeriod")}
+}
+
+func (_c *Config_BalancePollPeriod_Call) Run(run func()) *Config_BalancePollPeriod_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_BalancePollPeriod_Call) Return(_a0 time.Duration) *Config_BalancePollPeriod_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_BalancePollPeriod_Call) RunAndReturn(run func() time.Duration) *Config_BalancePollPeriod_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // BlockHistoryPollPeriod provides a mock function with given fields:
@@ -50,6 +85,33 @@ func (_m *Config) BlockHistoryPollPeriod() time.Duration {
 	return r0
 }
 
+// Config_BlockHistoryPollPeriod_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BlockHistoryPollPeriod'
+type Config_BlockHistoryPollPeriod_Call struct {
+	*mock.Call
+}
+
+// BlockHistoryPollPeriod is a helper method to define mock.On call
+func (_e *Config_Expecter) BlockHistoryPollPeriod() *Config_BlockHistoryPollPeriod_Call {
+	return &Config_BlockHistoryPollPeriod_Call{Call: _e.mock.On("BlockHistoryPollPeriod")}
+}
+
+func (_c *Config_BlockHistoryPollPeriod_Call) Run(run func()) *Config_BlockHistoryPollPeriod_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_BlockHistoryPollPeriod_Call) Return(_a0 time.Duration) *Config_BlockHistoryPollPeriod_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_BlockHistoryPollPeriod_Call) RunAndReturn(run func() time.Duration) *Config_BlockHistoryPollPeriod_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // BlockHistorySize provides a mock function with given fields:
 func (_m *Config) BlockHistorySize() uint64 {
 	ret := _m.Called()
@@ -66,6 +128,33 @@ func (_m *Config) BlockHistorySize() uint64 {
 	}
 
 	return r0
+}
+
+// Config_BlockHistorySize_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BlockHistorySize'
+type Config_BlockHistorySize_Call struct {
+	*mock.Call
+}
+
+// BlockHistorySize is a helper method to define mock.On call
+func (_e *Config_Expecter) BlockHistorySize() *Config_BlockHistorySize_Call {
+	return &Config_BlockHistorySize_Call{Call: _e.mock.On("BlockHistorySize")}
+}
+
+func (_c *Config_BlockHistorySize_Call) Run(run func()) *Config_BlockHistorySize_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_BlockHistorySize_Call) Return(_a0 uint64) *Config_BlockHistorySize_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_BlockHistorySize_Call) RunAndReturn(run func() uint64) *Config_BlockHistorySize_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // Commitment provides a mock function with given fields:
@@ -86,6 +175,33 @@ func (_m *Config) Commitment() rpc.CommitmentType {
 	return r0
 }
 
+// Config_Commitment_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Commitment'
+type Config_Commitment_Call struct {
+	*mock.Call
+}
+
+// Commitment is a helper method to define mock.On call
+func (_e *Config_Expecter) Commitment() *Config_Commitment_Call {
+	return &Config_Commitment_Call{Call: _e.mock.On("Commitment")}
+}
+
+func (_c *Config_Commitment_Call) Run(run func()) *Config_Commitment_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_Commitment_Call) Return(_a0 rpc.CommitmentType) *Config_Commitment_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_Commitment_Call) RunAndReturn(run func() rpc.CommitmentType) *Config_Commitment_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ComputeUnitLimitDefault provides a mock function with given fields:
 func (_m *Config) ComputeUnitLimitDefault() uint32 {
 	ret := _m.Called()
@@ -102,6 +218,33 @@ func (_m *Config) ComputeUnitLimitDefault() uint32 {
 	}
 
 	return r0
+}
+
+// Config_ComputeUnitLimitDefault_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ComputeUnitLimitDefault'
+type Config_ComputeUnitLimitDefault_Call struct {
+	*mock.Call
+}
+
+// ComputeUnitLimitDefault is a helper method to define mock.On call
+func (_e *Config_Expecter) ComputeUnitLimitDefault() *Config_ComputeUnitLimitDefault_Call {
+	return &Config_ComputeUnitLimitDefault_Call{Call: _e.mock.On("ComputeUnitLimitDefault")}
+}
+
+func (_c *Config_ComputeUnitLimitDefault_Call) Run(run func()) *Config_ComputeUnitLimitDefault_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_ComputeUnitLimitDefault_Call) Return(_a0 uint32) *Config_ComputeUnitLimitDefault_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_ComputeUnitLimitDefault_Call) RunAndReturn(run func() uint32) *Config_ComputeUnitLimitDefault_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // ComputeUnitPriceDefault provides a mock function with given fields:
@@ -122,6 +265,33 @@ func (_m *Config) ComputeUnitPriceDefault() uint64 {
 	return r0
 }
 
+// Config_ComputeUnitPriceDefault_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ComputeUnitPriceDefault'
+type Config_ComputeUnitPriceDefault_Call struct {
+	*mock.Call
+}
+
+// ComputeUnitPriceDefault is a helper method to define mock.On call
+func (_e *Config_Expecter) ComputeUnitPriceDefault() *Config_ComputeUnitPriceDefault_Call {
+	return &Config_ComputeUnitPriceDefault_Call{Call: _e.mock.On("ComputeUnitPriceDefault")}
+}
+
+func (_c *Config_ComputeUnitPriceDefault_Call) Run(run func()) *Config_ComputeUnitPriceDefault_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_ComputeUnitPriceDefault_Call) Return(_a0 uint64) *Config_ComputeUnitPriceDefault_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_ComputeUnitPriceDefault_Call) RunAndReturn(run func() uint64) *Config_ComputeUnitPriceDefault_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ComputeUnitPriceMax provides a mock function with given fields:
 func (_m *Config) ComputeUnitPriceMax() uint64 {
 	ret := _m.Called()
@@ -138,6 +308,33 @@ func (_m *Config) ComputeUnitPriceMax() uint64 {
 	}
 
 	return r0
+}
+
+// Config_ComputeUnitPriceMax_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ComputeUnitPriceMax'
+type Config_ComputeUnitPriceMax_Call struct {
+	*mock.Call
+}
+
+// ComputeUnitPriceMax is a helper method to define mock.On call
+func (_e *Config_Expecter) ComputeUnitPriceMax() *Config_ComputeUnitPriceMax_Call {
+	return &Config_ComputeUnitPriceMax_Call{Call: _e.mock.On("ComputeUnitPriceMax")}
+}
+
+func (_c *Config_ComputeUnitPriceMax_Call) Run(run func()) *Config_ComputeUnitPriceMax_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_ComputeUnitPriceMax_Call) Return(_a0 uint64) *Config_ComputeUnitPriceMax_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_ComputeUnitPriceMax_Call) RunAndReturn(run func() uint64) *Config_ComputeUnitPriceMax_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // ComputeUnitPriceMin provides a mock function with given fields:
@@ -158,6 +355,33 @@ func (_m *Config) ComputeUnitPriceMin() uint64 {
 	return r0
 }
 
+// Config_ComputeUnitPriceMin_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ComputeUnitPriceMin'
+type Config_ComputeUnitPriceMin_Call struct {
+	*mock.Call
+}
+
+// ComputeUnitPriceMin is a helper method to define mock.On call
+func (_e *Config_Expecter) ComputeUnitPriceMin() *Config_ComputeUnitPriceMin_Call {
+	return &Config_ComputeUnitPriceMin_Call{Call: _e.mock.On("ComputeUnitPriceMin")}
+}
+
+func (_c *Config_ComputeUnitPriceMin_Call) Run(run func()) *Config_ComputeUnitPriceMin_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_ComputeUnitPriceMin_Call) Return(_a0 uint64) *Config_ComputeUnitPriceMin_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_ComputeUnitPriceMin_Call) RunAndReturn(run func() uint64) *Config_ComputeUnitPriceMin_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ConfirmPollPeriod provides a mock function with given fields:
 func (_m *Config) ConfirmPollPeriod() time.Duration {
 	ret := _m.Called()
@@ -174,6 +398,33 @@ func (_m *Config) ConfirmPollPeriod() time.Duration {
 	}
 
 	return r0
+}
+
+// Config_ConfirmPollPeriod_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ConfirmPollPeriod'
+type Config_ConfirmPollPeriod_Call struct {
+	*mock.Call
+}
+
+// ConfirmPollPeriod is a helper method to define mock.On call
+func (_e *Config_Expecter) ConfirmPollPeriod() *Config_ConfirmPollPeriod_Call {
+	return &Config_ConfirmPollPeriod_Call{Call: _e.mock.On("ConfirmPollPeriod")}
+}
+
+func (_c *Config_ConfirmPollPeriod_Call) Run(run func()) *Config_ConfirmPollPeriod_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_ConfirmPollPeriod_Call) Return(_a0 time.Duration) *Config_ConfirmPollPeriod_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_ConfirmPollPeriod_Call) RunAndReturn(run func() time.Duration) *Config_ConfirmPollPeriod_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // EstimateComputeUnitLimit provides a mock function with given fields:
@@ -194,6 +445,33 @@ func (_m *Config) EstimateComputeUnitLimit() bool {
 	return r0
 }
 
+// Config_EstimateComputeUnitLimit_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EstimateComputeUnitLimit'
+type Config_EstimateComputeUnitLimit_Call struct {
+	*mock.Call
+}
+
+// EstimateComputeUnitLimit is a helper method to define mock.On call
+func (_e *Config_Expecter) EstimateComputeUnitLimit() *Config_EstimateComputeUnitLimit_Call {
+	return &Config_EstimateComputeUnitLimit_Call{Call: _e.mock.On("EstimateComputeUnitLimit")}
+}
+
+func (_c *Config_EstimateComputeUnitLimit_Call) Run(run func()) *Config_EstimateComputeUnitLimit_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_EstimateComputeUnitLimit_Call) Return(_a0 bool) *Config_EstimateComputeUnitLimit_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_EstimateComputeUnitLimit_Call) RunAndReturn(run func() bool) *Config_EstimateComputeUnitLimit_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FeeBumpPeriod provides a mock function with given fields:
 func (_m *Config) FeeBumpPeriod() time.Duration {
 	ret := _m.Called()
@@ -212,6 +490,33 @@ func (_m *Config) FeeBumpPeriod() time.Duration {
 	return r0
 }
 
+// Config_FeeBumpPeriod_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FeeBumpPeriod'
+type Config_FeeBumpPeriod_Call struct {
+	*mock.Call
+}
+
+// FeeBumpPeriod is a helper method to define mock.On call
+func (_e *Config_Expecter) FeeBumpPeriod() *Config_FeeBumpPeriod_Call {
+	return &Config_FeeBumpPeriod_Call{Call: _e.mock.On("FeeBumpPeriod")}
+}
+
+func (_c *Config_FeeBumpPeriod_Call) Run(run func()) *Config_FeeBumpPeriod_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_FeeBumpPeriod_Call) Return(_a0 time.Duration) *Config_FeeBumpPeriod_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_FeeBumpPeriod_Call) RunAndReturn(run func() time.Duration) *Config_FeeBumpPeriod_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FeeEstimatorMode provides a mock function with given fields:
 func (_m *Config) FeeEstimatorMode() string {
 	ret := _m.Called()
@@ -228,6 +533,33 @@ func (_m *Config) FeeEstimatorMode() string {
 	}
 
 	return r0
+}
+
+// Config_FeeEstimatorMode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FeeEstimatorMode'
+type Config_FeeEstimatorMode_Call struct {
+	*mock.Call
+}
+
+// FeeEstimatorMode is a helper method to define mock.On call
+func (_e *Config_Expecter) FeeEstimatorMode() *Config_FeeEstimatorMode_Call {
+	return &Config_FeeEstimatorMode_Call{Call: _e.mock.On("FeeEstimatorMode")}
+}
+
+func (_c *Config_FeeEstimatorMode_Call) Run(run func()) *Config_FeeEstimatorMode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_FeeEstimatorMode_Call) Return(_a0 string) *Config_FeeEstimatorMode_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_FeeEstimatorMode_Call) RunAndReturn(run func() string) *Config_FeeEstimatorMode_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // MaxRetries provides a mock function with given fields:
@@ -250,6 +582,33 @@ func (_m *Config) MaxRetries() *uint {
 	return r0
 }
 
+// Config_MaxRetries_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MaxRetries'
+type Config_MaxRetries_Call struct {
+	*mock.Call
+}
+
+// MaxRetries is a helper method to define mock.On call
+func (_e *Config_Expecter) MaxRetries() *Config_MaxRetries_Call {
+	return &Config_MaxRetries_Call{Call: _e.mock.On("MaxRetries")}
+}
+
+func (_c *Config_MaxRetries_Call) Run(run func()) *Config_MaxRetries_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_MaxRetries_Call) Return(_a0 *uint) *Config_MaxRetries_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_MaxRetries_Call) RunAndReturn(run func() *uint) *Config_MaxRetries_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // OCR2CachePollPeriod provides a mock function with given fields:
 func (_m *Config) OCR2CachePollPeriod() time.Duration {
 	ret := _m.Called()
@@ -266,6 +625,33 @@ func (_m *Config) OCR2CachePollPeriod() time.Duration {
 	}
 
 	return r0
+}
+
+// Config_OCR2CachePollPeriod_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'OCR2CachePollPeriod'
+type Config_OCR2CachePollPeriod_Call struct {
+	*mock.Call
+}
+
+// OCR2CachePollPeriod is a helper method to define mock.On call
+func (_e *Config_Expecter) OCR2CachePollPeriod() *Config_OCR2CachePollPeriod_Call {
+	return &Config_OCR2CachePollPeriod_Call{Call: _e.mock.On("OCR2CachePollPeriod")}
+}
+
+func (_c *Config_OCR2CachePollPeriod_Call) Run(run func()) *Config_OCR2CachePollPeriod_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_OCR2CachePollPeriod_Call) Return(_a0 time.Duration) *Config_OCR2CachePollPeriod_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_OCR2CachePollPeriod_Call) RunAndReturn(run func() time.Duration) *Config_OCR2CachePollPeriod_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // OCR2CacheTTL provides a mock function with given fields:
@@ -286,6 +672,33 @@ func (_m *Config) OCR2CacheTTL() time.Duration {
 	return r0
 }
 
+// Config_OCR2CacheTTL_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'OCR2CacheTTL'
+type Config_OCR2CacheTTL_Call struct {
+	*mock.Call
+}
+
+// OCR2CacheTTL is a helper method to define mock.On call
+func (_e *Config_Expecter) OCR2CacheTTL() *Config_OCR2CacheTTL_Call {
+	return &Config_OCR2CacheTTL_Call{Call: _e.mock.On("OCR2CacheTTL")}
+}
+
+func (_c *Config_OCR2CacheTTL_Call) Run(run func()) *Config_OCR2CacheTTL_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_OCR2CacheTTL_Call) Return(_a0 time.Duration) *Config_OCR2CacheTTL_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_OCR2CacheTTL_Call) RunAndReturn(run func() time.Duration) *Config_OCR2CacheTTL_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SkipPreflight provides a mock function with given fields:
 func (_m *Config) SkipPreflight() bool {
 	ret := _m.Called()
@@ -302,6 +715,33 @@ func (_m *Config) SkipPreflight() bool {
 	}
 
 	return r0
+}
+
+// Config_SkipPreflight_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SkipPreflight'
+type Config_SkipPreflight_Call struct {
+	*mock.Call
+}
+
+// SkipPreflight is a helper method to define mock.On call
+func (_e *Config_Expecter) SkipPreflight() *Config_SkipPreflight_Call {
+	return &Config_SkipPreflight_Call{Call: _e.mock.On("SkipPreflight")}
+}
+
+func (_c *Config_SkipPreflight_Call) Run(run func()) *Config_SkipPreflight_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_SkipPreflight_Call) Return(_a0 bool) *Config_SkipPreflight_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_SkipPreflight_Call) RunAndReturn(run func() bool) *Config_SkipPreflight_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // TxConfirmTimeout provides a mock function with given fields:
@@ -322,6 +762,33 @@ func (_m *Config) TxConfirmTimeout() time.Duration {
 	return r0
 }
 
+// Config_TxConfirmTimeout_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TxConfirmTimeout'
+type Config_TxConfirmTimeout_Call struct {
+	*mock.Call
+}
+
+// TxConfirmTimeout is a helper method to define mock.On call
+func (_e *Config_Expecter) TxConfirmTimeout() *Config_TxConfirmTimeout_Call {
+	return &Config_TxConfirmTimeout_Call{Call: _e.mock.On("TxConfirmTimeout")}
+}
+
+func (_c *Config_TxConfirmTimeout_Call) Run(run func()) *Config_TxConfirmTimeout_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_TxConfirmTimeout_Call) Return(_a0 time.Duration) *Config_TxConfirmTimeout_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_TxConfirmTimeout_Call) RunAndReturn(run func() time.Duration) *Config_TxConfirmTimeout_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // TxRetentionTimeout provides a mock function with given fields:
 func (_m *Config) TxRetentionTimeout() time.Duration {
 	ret := _m.Called()
@@ -338,6 +805,33 @@ func (_m *Config) TxRetentionTimeout() time.Duration {
 	}
 
 	return r0
+}
+
+// Config_TxRetentionTimeout_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TxRetentionTimeout'
+type Config_TxRetentionTimeout_Call struct {
+	*mock.Call
+}
+
+// TxRetentionTimeout is a helper method to define mock.On call
+func (_e *Config_Expecter) TxRetentionTimeout() *Config_TxRetentionTimeout_Call {
+	return &Config_TxRetentionTimeout_Call{Call: _e.mock.On("TxRetentionTimeout")}
+}
+
+func (_c *Config_TxRetentionTimeout_Call) Run(run func()) *Config_TxRetentionTimeout_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_TxRetentionTimeout_Call) Return(_a0 time.Duration) *Config_TxRetentionTimeout_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_TxRetentionTimeout_Call) RunAndReturn(run func() time.Duration) *Config_TxRetentionTimeout_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // TxRetryTimeout provides a mock function with given fields:
@@ -358,6 +852,33 @@ func (_m *Config) TxRetryTimeout() time.Duration {
 	return r0
 }
 
+// Config_TxRetryTimeout_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TxRetryTimeout'
+type Config_TxRetryTimeout_Call struct {
+	*mock.Call
+}
+
+// TxRetryTimeout is a helper method to define mock.On call
+func (_e *Config_Expecter) TxRetryTimeout() *Config_TxRetryTimeout_Call {
+	return &Config_TxRetryTimeout_Call{Call: _e.mock.On("TxRetryTimeout")}
+}
+
+func (_c *Config_TxRetryTimeout_Call) Run(run func()) *Config_TxRetryTimeout_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_TxRetryTimeout_Call) Return(_a0 time.Duration) *Config_TxRetryTimeout_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_TxRetryTimeout_Call) RunAndReturn(run func() time.Duration) *Config_TxRetryTimeout_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // TxTimeout provides a mock function with given fields:
 func (_m *Config) TxTimeout() time.Duration {
 	ret := _m.Called()
@@ -374,6 +895,33 @@ func (_m *Config) TxTimeout() time.Duration {
 	}
 
 	return r0
+}
+
+// Config_TxTimeout_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TxTimeout'
+type Config_TxTimeout_Call struct {
+	*mock.Call
+}
+
+// TxTimeout is a helper method to define mock.On call
+func (_e *Config_Expecter) TxTimeout() *Config_TxTimeout_Call {
+	return &Config_TxTimeout_Call{Call: _e.mock.On("TxTimeout")}
+}
+
+func (_c *Config_TxTimeout_Call) Run(run func()) *Config_TxTimeout_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_TxTimeout_Call) Return(_a0 time.Duration) *Config_TxTimeout_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_TxTimeout_Call) RunAndReturn(run func() time.Duration) *Config_TxTimeout_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // NewConfig creates a new instance of Config. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

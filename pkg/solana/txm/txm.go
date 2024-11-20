@@ -38,7 +38,6 @@ const (
 
 var _ services.Service = (*Txm)(nil)
 
-//go:generate mockery --name SimpleKeystore --output ./mocks/ --case=underscore --filename simple_keystore.go
 type SimpleKeystore interface {
 	Sign(ctx context.Context, account string, data []byte) (signature []byte, err error)
 	Accounts(ctx context.Context) (accounts []string, err error)

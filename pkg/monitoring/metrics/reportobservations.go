@@ -6,8 +6,6 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/types"
 )
 
-//go:generate mockery --name ReportObservations --output ./mocks/
-
 type ReportObservations interface {
 	SetCount(count uint8, feedInput FeedInput)
 	Cleanup(feedInput FeedInput)
