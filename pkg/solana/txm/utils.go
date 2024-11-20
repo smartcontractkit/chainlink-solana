@@ -26,6 +26,7 @@ const (
 	Processed
 	Confirmed
 	Finalized
+	FatallyErrored
 )
 
 func (s TxState) String() string {
@@ -42,6 +43,8 @@ func (s TxState) String() string {
 		return "Confirmed"
 	case Finalized:
 		return "Finalized"
+	case FatallyErrored:
+		return "FatallyErrored"
 	default:
 		return fmt.Sprintf("TxState(%d)", s)
 	}
