@@ -47,7 +47,7 @@ type processEventJob struct {
 }
 
 func (j *processEventJob) String() string {
-	return fmt.Sprintf("processEventJob for event: %s", j.event.FunctionName)
+	return "processEventJob"
 }
 
 func (j *processEventJob) Run(_ context.Context) error {
