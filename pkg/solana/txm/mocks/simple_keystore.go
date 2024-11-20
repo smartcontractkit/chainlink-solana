@@ -13,6 +13,14 @@ type SimpleKeystore struct {
 	mock.Mock
 }
 
+type SimpleKeystore_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *SimpleKeystore) EXPECT() *SimpleKeystore_Expecter {
+	return &SimpleKeystore_Expecter{mock: &_m.Mock}
+}
+
 // Accounts provides a mock function with given fields: ctx
 func (_m *SimpleKeystore) Accounts(ctx context.Context) ([]string, error) {
 	ret := _m.Called(ctx)
@@ -43,6 +51,34 @@ func (_m *SimpleKeystore) Accounts(ctx context.Context) ([]string, error) {
 	return r0, r1
 }
 
+// SimpleKeystore_Accounts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Accounts'
+type SimpleKeystore_Accounts_Call struct {
+	*mock.Call
+}
+
+// Accounts is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *SimpleKeystore_Expecter) Accounts(ctx interface{}) *SimpleKeystore_Accounts_Call {
+	return &SimpleKeystore_Accounts_Call{Call: _e.mock.On("Accounts", ctx)}
+}
+
+func (_c *SimpleKeystore_Accounts_Call) Run(run func(ctx context.Context)) *SimpleKeystore_Accounts_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *SimpleKeystore_Accounts_Call) Return(accounts []string, err error) *SimpleKeystore_Accounts_Call {
+	_c.Call.Return(accounts, err)
+	return _c
+}
+
+func (_c *SimpleKeystore_Accounts_Call) RunAndReturn(run func(context.Context) ([]string, error)) *SimpleKeystore_Accounts_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Sign provides a mock function with given fields: ctx, account, data
 func (_m *SimpleKeystore) Sign(ctx context.Context, account string, data []byte) ([]byte, error) {
 	ret := _m.Called(ctx, account, data)
@@ -71,6 +107,36 @@ func (_m *SimpleKeystore) Sign(ctx context.Context, account string, data []byte)
 	}
 
 	return r0, r1
+}
+
+// SimpleKeystore_Sign_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Sign'
+type SimpleKeystore_Sign_Call struct {
+	*mock.Call
+}
+
+// Sign is a helper method to define mock.On call
+//   - ctx context.Context
+//   - account string
+//   - data []byte
+func (_e *SimpleKeystore_Expecter) Sign(ctx interface{}, account interface{}, data interface{}) *SimpleKeystore_Sign_Call {
+	return &SimpleKeystore_Sign_Call{Call: _e.mock.On("Sign", ctx, account, data)}
+}
+
+func (_c *SimpleKeystore_Sign_Call) Run(run func(ctx context.Context, account string, data []byte)) *SimpleKeystore_Sign_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].([]byte))
+	})
+	return _c
+}
+
+func (_c *SimpleKeystore_Sign_Call) Return(signature []byte, err error) *SimpleKeystore_Sign_Call {
+	_c.Call.Return(signature, err)
+	return _c
+}
+
+func (_c *SimpleKeystore_Sign_Call) RunAndReturn(run func(context.Context, string, []byte) ([]byte, error)) *SimpleKeystore_Sign_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // NewSimpleKeystore creates a new instance of SimpleKeystore. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

@@ -1,0 +1,39 @@
+dir: "{{ .InterfaceDir }}/mocks"
+mockname: "{{ .InterfaceName }}"
+outpkg: mocks
+filename: "{{ .InterfaceName | snakecase }}.go"
+packages:
+  github.com/smartcontractkit/chainlink-solana/pkg/monitoring:
+    interfaces:
+      ChainReader:
+  github.com/smartcontractkit/chainlink-solana/pkg/monitoring/metrics:
+    interfaces:
+      FeedBalances:
+      Fees:
+        config:
+          filename: "Fees.go"
+      NetworkFees:
+      NodeBalances:
+      NodeSuccess:
+      ReportObservations:
+      SlotHeight:
+  github.com/smartcontractkit/chainlink-solana/pkg/solana/client:
+    interfaces:
+      ReaderWriter:
+  github.com/smartcontractkit/chainlink-solana/pkg/solana/config:
+    interfaces:
+      Config:
+        config:
+          filename: config.go
+          case: underscore
+  github.com/smartcontractkit/chainlink-solana/pkg/solana/fees:
+    interfaces:
+      Estimator:
+        config:
+          filename: "Estimator.go"
+  github.com/smartcontractkit/chainlink-solana/pkg/solana/txm:
+    interfaces:
+      SimpleKeystore:
+        config:
+          filename: simple_keystore.go
+          case: underscore

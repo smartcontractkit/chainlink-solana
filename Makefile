@@ -111,6 +111,7 @@ rm-mocked:
 .PHONY: generate
 generate: mockery gomods
 	gomods -w go generate -x ./...
+	mockery
 
 .PHONY: lint-go-integration-tests
 lint-go-integration-tests:
