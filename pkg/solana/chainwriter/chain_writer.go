@@ -212,7 +212,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	}
 
 	// Fetch derived and static table maps
-	derivedTableMap, staticTableMap, err := s.getDerivedTableMap(ctx, methodConfig.LookupTables, debugID)
+	derivedTableMap, staticTableMap, err := s.ResolveLookupTables(ctx, methodConfig.LookupTables, debugID)
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error getting lookup tables: %w", err), debugID)
 	}
