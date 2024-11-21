@@ -182,13 +182,13 @@ func generatePDAs(publicKeys []*solana.AccountMeta, seeds [][]byte, lookup PDALo
 	return addresses, nil
 }
 
-func (s *SolanaChainWriterService) ResolveLookupTables(ctx context.Context, lookupTables LookupTables, debugID string) (map[string]map[string][]*solana.AccountMeta, map[solana.PublicKey]solana.PublicKeySlice, error) {
+func (s *SolanaChainWriterService) ResolveLookupTables(ctx context.Context, args any, lookupTables LookupTables, debugID string) (map[string]map[string][]*solana.AccountMeta, map[solana.PublicKey]solana.PublicKeySlice, error) {
 	derivedTableMap := make(map[string]map[string][]*solana.AccountMeta)
 	staticTableMap := make(map[solana.PublicKey]solana.PublicKeySlice)
 
 	// Read derived lookup tables
 	for _, derivedLookup := range lookupTables.DerivedLookupTables {
-		lookupTableMap, _, err := s.LoadTable(derivedLookup, ctx, s.reader, derivedTableMap, debugID)
+		lookupTableMap, _, err := s.LoadTable(ctx, args, derivedLookup, s.reader, derivedTableMap, debugID)
 		if err != nil {
 			return nil, nil, errorWithDebugID(fmt.Errorf("error loading derived lookup table: %w", err), debugID)
 		}
@@ -219,9 +219,9 @@ func (s *SolanaChainWriterService) ResolveLookupTables(ctx context.Context, look
 	return derivedTableMap, staticTableMap, nil
 }
 
-func (s *SolanaChainWriterService) LoadTable(rlt DerivedLookupTable, ctx context.Context, reader client.Reader, derivedTableMap map[string]map[string][]*solana.AccountMeta, debugID string) (map[string]map[string][]*solana.AccountMeta, []*solana.AccountMeta, error) {
+func (s *SolanaChainWriterService) LoadTable(ctx context.Context, args any, rlt DerivedLookupTable, reader client.Reader, derivedTableMap map[string]map[string][]*solana.AccountMeta, debugID string) (map[string]map[string][]*solana.AccountMeta, []*solana.AccountMeta, error) {
 	// Resolve all addresses specified by the identifier
-	lookupTableAddresses, err := GetAddresses(ctx, nil, []Lookup{rlt.Accounts}, nil, debugID)
+	lookupTableAddresses, err := GetAddresses(ctx, args, []Lookup{rlt.Accounts}, nil, debugID)
 	if err != nil {
 		return nil, nil, errorWithDebugID(fmt.Errorf("error resolving addresses for lookup table: %w", err), debugID)
 	}
