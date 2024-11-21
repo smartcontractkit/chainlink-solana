@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
+	addresslookuptable "github.com/gagliardetto/solana-go/programs/address-lookup-table"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 )
@@ -181,7 +182,7 @@ func generatePDAs(publicKeys []*solana.AccountMeta, seeds [][]byte, lookup PDALo
 	return addresses, nil
 }
 
-func (s *SolanaChainWriterService) getDerivedTableMap(ctx context.Context, lookupTables LookupTables, debugID string) (map[string]map[string][]*solana.AccountMeta, map[solana.PublicKey]solana.PublicKeySlice, error) {
+func (s *SolanaChainWriterService) ResolveLookupTables(ctx context.Context, lookupTables LookupTables, debugID string) (map[string]map[string][]*solana.AccountMeta, map[solana.PublicKey]solana.PublicKeySlice, error) {
 	derivedTableMap := make(map[string]map[string][]*solana.AccountMeta)
 	staticTableMap := make(map[solana.PublicKey]solana.PublicKeySlice)
 
@@ -211,23 +212,8 @@ func (s *SolanaChainWriterService) getDerivedTableMap(ctx context.Context, looku
 			return nil, nil, errorWithDebugID(fmt.Errorf("invalid static lookup table address: %s, error: %w", staticTable, err), debugID)
 		}
 
-		// Fetch the account info for the static table
-		accountInfo, err := s.reader.GetAccountInfoWithOpts(ctx, tableAddress, &rpc.GetAccountInfoOpts{
-			Encoding:   "base64",
-			Commitment: rpc.CommitmentConfirmed,
-		})
-		if err != nil || accountInfo == nil || accountInfo.Value == nil {
-			return nil, nil, errorWithDebugID(fmt.Errorf("error fetching account info for static table: %s, error: %w", staticTable, err), debugID)
-		}
-
-		// Decode the account data into an array of public keys
-		addresses, err := decodeLookupTable(accountInfo.Value.Data.GetBinary())
-		if err != nil {
-			return nil, nil, errorWithDebugID(fmt.Errorf("error decoding static lookup table data for %s: %w", staticTable, err), debugID)
-		}
-
-		// Add the static lookup table to the map
-		staticTableMap[tableAddress] = addresses
+		addressses, err := getLookupTableAddress(ctx, s.reader, tableAddress, debugID)
+		staticTableMap[tableAddress] = addressses
 	}
 
 	return derivedTableMap, staticTableMap, nil
@@ -246,18 +232,9 @@ func (s *SolanaChainWriterService) LoadTable(rlt DerivedLookupTable, ctx context
 	// Iterate over each address of the lookup table
 	for _, addressMeta := range lookupTableAddresses {
 		// Fetch account info
-		accountInfo, err := reader.GetAccountInfoWithOpts(ctx, addressMeta.PublicKey, &rpc.GetAccountInfoOpts{
-			Encoding:   "base64",
-			Commitment: rpc.CommitmentConfirmed,
-		})
-		if err != nil || accountInfo == nil || accountInfo.Value == nil {
-			return nil, nil, errorWithDebugID(fmt.Errorf("error fetching account info for address %s: %w", addressMeta.PublicKey.String(), err), debugID)
-		}
-
-		// Decode the account data into an array of public keys
-		addresses, err := decodeLookupTable(accountInfo.Value.Data.GetBinary())
+		addresses, err := getLookupTableAddress(ctx, reader, addressMeta.PublicKey, debugID)
 		if err != nil {
-			return nil, nil, errorWithDebugID(fmt.Errorf("error decoding lookup table data for address %s: %w", addressMeta.PublicKey.String(), err), debugID)
+			return nil, nil, errorWithDebugID(fmt.Errorf("error fetching lookup table address: %w", err), debugID)
 		}
 
 		// Create the inner map for this lookup table
@@ -267,7 +244,7 @@ func (s *SolanaChainWriterService) LoadTable(rlt DerivedLookupTable, ctx context
 
 		// Populate the inner map (keyed by the account public key)
 		for _, addr := range addresses {
-			resultMap[rlt.Name][addr.String()] = append(resultMap[rlt.Name][addr.String()], &solana.AccountMeta{
+			resultMap[rlt.Name][addressMeta.PublicKey.String()] = append(resultMap[rlt.Name][addressMeta.PublicKey.String()], &solana.AccountMeta{
 				PublicKey:  addr,
 				IsSigner:   false,
 				IsWritable: false,
@@ -281,18 +258,19 @@ func (s *SolanaChainWriterService) LoadTable(rlt DerivedLookupTable, ctx context
 	return resultMap, lookupTableMetas, nil
 }
 
-func decodeLookupTable(data []byte) (solana.PublicKeySlice, error) {
-	// Example logic to decode lookup table data; you may need to adjust based on the actual format of the data.
-	var addresses solana.PublicKeySlice
+func getLookupTableAddress(ctx context.Context, reader client.Reader, tableAddress solana.PublicKey, debugID string) (solana.PublicKeySlice, error) {
+	// Fetch the account info for the static table
+	accountInfo, err := reader.GetAccountInfoWithOpts(ctx, tableAddress, &rpc.GetAccountInfoOpts{
+		Encoding:   "base64",
+		Commitment: rpc.CommitmentConfirmed,
+	})
 
-	// Assuming the data is a list of 32-byte public keys in binary format:
-	for i := 0; i < len(data); i += solana.PublicKeyLength {
-		if i+solana.PublicKeyLength > len(data) {
-			return nil, fmt.Errorf("invalid lookup table data length")
-		}
-		address := solana.PublicKeyFromBytes(data[i : i+solana.PublicKeyLength])
-		addresses = append(addresses, address)
+	if err != nil || accountInfo == nil || accountInfo.Value == nil {
+		return nil, errorWithDebugID(fmt.Errorf("error fetching account info for table: %s, error: %w", tableAddress.String(), err), debugID)
 	}
-
-	return addresses, nil
+	alt, err := addresslookuptable.DecodeAddressLookupTableState(accountInfo.GetBinary())
+	if err != nil {
+		return nil, errorWithDebugID(fmt.Errorf("error decoding address lookup table state: %w", err), debugID)
+	}
+	return alt.Addresses, nil
 }

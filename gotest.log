@@ -1,0 +1,72 @@
+[0;31m📦 github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter[0m
+exit status 1
+  [0;31m❌ TestLookupTables[0;37m (30.07s)[0m
+    ports.go:37: found open port: 54520
+    ports.go:37: found open port: 8536
+    test_helpers.go:50: API server not ready yet (attempt 1)
+    test_helpers.go:50: API server not ready yet (attempt 2)
+    test_helpers.go:50: API server not ready yet (attempt 3)
+    test_helpers.go:50: API server not ready yet (attempt 4)
+    test_helpers.go:50: API server not ready yet (attempt 5)
+    test_helpers.go:50: API server not ready yet (attempt 6)
+    test_helpers.go:50: API server not ready yet (attempt 7)
+    test_helpers.go:50: API server not ready yet (attempt 8)
+    test_helpers.go:50: API server not ready yet (attempt 9)
+    test_helpers.go:50: API server not ready yet (attempt 10)
+    test_helpers.go:50: API server not ready yet (attempt 11)
+    test_helpers.go:50: API server not ready yet (attempt 12)
+    test_helpers.go:50: API server not ready yet (attempt 13)
+    test_helpers.go:50: API server not ready yet (attempt 14)
+    test_helpers.go:50: API server not ready yet (attempt 15)
+    test_helpers.go:50: API server not ready yet (attempt 16)
+    test_helpers.go:50: API server not ready yet (attempt 17)
+    test_helpers.go:50: API server not ready yet (attempt 18)
+    test_helpers.go:50: API server not ready yet (attempt 19)
+    test_helpers.go:50: API server not ready yet (attempt 20)
+    test_helpers.go:50: API server not ready yet (attempt 21)
+    test_helpers.go:50: API server not ready yet (attempt 22)
+    test_helpers.go:50: API server not ready yet (attempt 23)
+    test_helpers.go:50: API server not ready yet (attempt 24)
+    test_helpers.go:50: API server not ready yet (attempt 25)
+    test_helpers.go:50: API server not ready yet (attempt 26)
+    test_helpers.go:50: API server not ready yet (attempt 27)
+    test_helpers.go:50: API server not ready yet (attempt 28)
+    test_helpers.go:50: API server not ready yet (attempt 29)
+    test_helpers.go:50: API server not ready yet (attempt 30)
+    test_helpers.go:57: Cmd output: 
+        Notice! No wallet available. `solana airdrop` localnet SOL after creating one
+        
+        Ledger location: /var/folders/p4/jlx3pf896blgl6tcj0xbkhvm0000gn/T/TestLookupTables940285115/001
+        Log: /var/folders/p4/jlx3pf896blgl6tcj0xbkhvm0000gn/T/TestLookupTables940285115/001/validator.log
+        Initializing...
+        Error: failed to start validator: Failed to create ledger at /var/folders/p4/jlx3pf896blgl6tcj0xbkhvm0000gn/T/TestLookupTables940285115/001: blockstore error
+        
+        Cmd error: 
+    test_helpers.go:59: 
+        	Error Trace:	/Users/silaslenihan/Desktop/repos/chainlink-solana/pkg/solana/client/test_helpers.go:59
+        	            				/Users/silaslenihan/Desktop/repos/chainlink-solana/pkg/solana/chainwriter/lookups_test.go:148
+        	Error:      	Should be true
+        	Test:       	TestLookupTables
+    test_helpers.go:37: 
+        	Error Trace:	/Users/silaslenihan/Desktop/repos/chainlink-solana/pkg/solana/client/test_helpers.go:37
+        	            				/Users/silaslenihan/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.23.1.darwin-arm64/src/testing/testing.go:1176
+        	            				/Users/silaslenihan/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.23.1.darwin-arm64/src/testing/testing.go:1354
+        	            				/Users/silaslenihan/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.23.1.darwin-arm64/src/testing/testing.go:1684
+        	            				/Users/silaslenihan/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.23.1.darwin-arm64/src/runtime/panic.go:629
+        	            				/Users/silaslenihan/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.23.1.darwin-arm64/src/testing/testing.go:1006
+        	            				/Users/silaslenihan/Desktop/repos/chainlink-solana/pkg/solana/client/test_helpers.go:59
+        	            				/Users/silaslenihan/Desktop/repos/chainlink-solana/pkg/solana/chainwriter/lookups_test.go:148
+        	Error:      	"exit status 1" does not contain "signal: killed"
+        	Test:       	TestLookupTables
+        	Messages:   	exit status 1
+    test_helpers.go:38: solana-test-validator
+         stdout: 
+        Notice! No wallet available. `solana airdrop` localnet SOL after creating one
+        
+        Ledger location: /var/folders/p4/jlx3pf896blgl6tcj0xbkhvm0000gn/T/TestLookupTables940285115/001
+        Log: /var/folders/p4/jlx3pf896blgl6tcj0xbkhvm0000gn/T/TestLookupTables940285115/001/validator.log
+        Initializing...
+        Error: failed to start validator: Failed to create ledger at /var/folders/p4/jlx3pf896blgl6tcj0xbkhvm0000gn/T/TestLookupTables940285115/001: blockstore error
+        
+         stderr: 
+
