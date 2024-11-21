@@ -19,6 +19,7 @@ type TxState int
 // < tx processed
 // < tx confirmed
 // < tx finalized
+// < tx fatallyErrored
 const (
 	NotFound TxState = iota
 	Errored

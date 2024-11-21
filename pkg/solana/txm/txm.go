@@ -430,6 +430,8 @@ func (txm *Txm) confirm() {
 
 					// if signature has an error, end polling
 					if res[i].Err != nil {
+						// Process error to determine the corresponding state and type.
+						// Skip marking as errored if error considered to not be a failure.
 						if txState, errType := txm.processError(s[i], res[i].Err, false); errType != NoFailure {
 							id, err := txm.txs.OnError(s[i], txm.cfg.TxRetentionTimeout(), txState, errType)
 							if err != nil {
@@ -541,6 +543,8 @@ func (txm *Txm) simulate() {
 			if len(msg.signatures) == 0 {
 				continue
 			}
+			// Process error to determine the corresponding state and type.
+			// Certain errors can be considered not to be failures during simulation to allow the process to continue
 			if txState, errType := txm.processError(msg.signatures[0], res.Err, true); errType != NoFailure {
 				id, err := txm.txs.OnError(msg.signatures[0], txm.cfg.TxRetentionTimeout(), txState, errType)
 				if err != nil {
@@ -692,6 +696,8 @@ func (txm *Txm) EstimateComputeUnitLimit(ctx context.Context, tx *solanaGo.Trans
 		if len(txCopy.Signatures) > 0 {
 			sig = txCopy.Signatures[0]
 		}
+		// Process error to determine the corresponding state and type.
+		// Certain errors can be considered not to be failures during simulation to allow the process to continue
 		if txState, errType := txm.processError(sig, res.Err, true); errType != NoFailure {
 			err := txm.txs.OnPrebroadcastError(id, txm.cfg.TxRetentionTimeout(), txState, errType)
 			if err != nil {

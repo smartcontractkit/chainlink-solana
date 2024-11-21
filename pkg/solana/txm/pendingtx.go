@@ -36,7 +36,7 @@ type PendingTxContext interface {
 	OnConfirmed(sig solana.Signature) (string, error)
 	// OnFinalized marks transaction as Finalized, moves it from the broadcasted or confirmed map to finalized map, removes signatures from signature map to stop confirmation checks
 	OnFinalized(sig solana.Signature, retentionTimeout time.Duration) (string, error)
-	// OnPrebroadcastError adds transaction that have not yet been broadcasted to the finalized/errored map as errored, matches err type using enum
+	// OnPrebroadcastError adds transaction that has not yet been broadcasted to the finalized/errored map as errored, matches err type using enum
 	OnPrebroadcastError(id string, retentionTimeout time.Duration, txState TxState, errType TxErrType) error
 	// OnError marks transaction as errored, matches err type using enum, moves it from the broadcasted or confirmed map to finalized/errored map, removes signatures from signature map to stop confirmation checks
 	OnError(sig solana.Signature, retentionTimeout time.Duration, txState TxState, errType TxErrType) (string, error)
@@ -46,6 +46,7 @@ type PendingTxContext interface {
 	TrimFinalizedErroredTxs() int
 }
 
+// finishedTx is used to store info required to track transactions to finality or error
 type pendingTx struct {
 	tx         solana.Transaction
 	cfg        TxConfig
@@ -55,6 +56,7 @@ type pendingTx struct {
 	state      TxState
 }
 
+// finishedTx is used to store minimal info specifically for finalized or errored transactions for external status checks
 type finishedTx struct {
 	id          string
 	retentionTs time.Time
@@ -408,7 +410,7 @@ func (c *pendingTxContext) OnPrebroadcastError(id string, retentionTimeout time.
 		return err
 	}
 
-	// upgrade to write lock if sig exists
+	// upgrade to write lock if id does not exist in other maps and is not in expected state already
 	_, err = c.withWriteLock(func() (string, error) {
 		if tx, exists := c.finalizedErroredTxs[id]; exists && tx.state == txState {
 			return "", ErrAlreadyInExpectedState
@@ -641,17 +643,17 @@ func incrementErrorMetrics(errType TxErrType, chainID string) {
 		// Return early if no failure identified
 		return
 	case TxFailReject:
-		promSolTxmRejectTxs.WithLabelValues(chainID).Add(1)
+		promSolTxmRejectTxs.WithLabelValues(chainID).Inc()
 	case TxFailRevert:
-		promSolTxmRevertTxs.WithLabelValues(chainID).Add(1)
+		promSolTxmRevertTxs.WithLabelValues(chainID).Inc()
 	case TxFailDrop:
-		promSolTxmDropTxs.WithLabelValues(chainID).Add(1)
+		promSolTxmDropTxs.WithLabelValues(chainID).Inc()
 	case TxFailSimRevert:
-		promSolTxmSimRevertTxs.WithLabelValues(chainID).Add(1)
+		promSolTxmSimRevertTxs.WithLabelValues(chainID).Inc()
 	case TxFailSimOther:
-		promSolTxmSimOtherTxs.WithLabelValues(chainID).Add(1)
+		promSolTxmSimOtherTxs.WithLabelValues(chainID).Inc()
 	}
-	promSolTxmErrorTxs.WithLabelValues(chainID).Add(1)
+	promSolTxmErrorTxs.WithLabelValues(chainID).Inc()
 }
 
 func (c *pendingTxContextWithProm) GetTxState(id string) (TxState, error) {
