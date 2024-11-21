@@ -569,7 +569,9 @@ func (txm *Txm) reap() {
 			return
 		case <-tick:
 			reapCount := txm.txs.TrimFinalizedErroredTxs()
-			txm.lggr.Debugf("Reaped %d finalized or errored transactions", reapCount)
+			if reapCount > 0 {
+				txm.lggr.Debugf("Reaped %d finalized or errored transactions", reapCount)
+			}
 		}
 		tick = time.After(utils.WithJitter(TxReapInterval))
 	}

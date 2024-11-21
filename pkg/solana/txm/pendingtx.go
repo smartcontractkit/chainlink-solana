@@ -58,7 +58,6 @@ type pendingTx struct {
 
 // finishedTx is used to store minimal info specifically for finalized or errored transactions for external status checks
 type finishedTx struct {
-	id          string
 	retentionTs time.Time
 	state       TxState
 }
@@ -380,7 +379,6 @@ func (c *pendingTxContext) OnFinalized(sig solana.Signature, retentionTimeout ti
 			return id, nil
 		}
 		finalizedTx := finishedTx{
-			id:          id,
 			state:       Finalized,
 			retentionTs: time.Now().Add(retentionTimeout),
 		}
@@ -421,7 +419,6 @@ func (c *pendingTxContext) OnPrebroadcastError(id string, retentionTimeout time.
 			return "", ErrIDAlreadyExists
 		}
 		erroredTx := finishedTx{
-			id:          id,
 			state:       txState,
 			retentionTs: time.Now().Add(retentionTimeout),
 		}
@@ -488,7 +485,6 @@ func (c *pendingTxContext) OnError(sig solana.Signature, retentionTimeout time.D
 			return id, nil
 		}
 		erroredTx := finishedTx{
-			id:          id,
 			state:       txState,
 			retentionTs: time.Now().Add(retentionTimeout),
 		}

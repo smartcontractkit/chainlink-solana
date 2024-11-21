@@ -924,32 +924,34 @@ func TestPendingTxContext_trim_finalized_errored_txs(t *testing.T) {
 	txs := newPendingTxContext()
 
 	// Create new finalized transaction with retention ts in the past and add to map
-	finalizedMsg1 := finishedTx{id: uuid.NewString(), retentionTs: time.Now().Add(-2 * time.Second)}
-	txs.finalizedErroredTxs[finalizedMsg1.id] = finalizedMsg1
+	finalizedMsg1 := finishedTx{retentionTs: time.Now().Add(-2 * time.Second)}
+	finalizedMsg1ID := uuid.NewString()
+	txs.finalizedErroredTxs[finalizedMsg1ID] = finalizedMsg1
 
 	// Create new finalized transaction with retention ts in the future and add to map
-	finalizedMsg2 := finishedTx{id: uuid.NewString(), retentionTs: time.Now().Add(1 * time.Second)}
-	txs.finalizedErroredTxs[finalizedMsg2.id] = finalizedMsg2
+	finalizedMsg2 := finishedTx{retentionTs: time.Now().Add(1 * time.Second)}
+	finalizedMsg2ID := uuid.NewString()
+	txs.finalizedErroredTxs[finalizedMsg2ID] = finalizedMsg2
 
 	// Create new finalized transaction with retention ts in the past and add to map
-	erroredMsg := finishedTx{id: uuid.NewString(), retentionTs: time.Now().Add(-2 * time.Second)}
-	txs.finalizedErroredTxs[erroredMsg.id] = erroredMsg
+	erroredMsg := finishedTx{retentionTs: time.Now().Add(-2 * time.Second)}
+	erroredMsgID := uuid.NewString()
+	txs.finalizedErroredTxs[erroredMsgID] = erroredMsg
 
 	// Delete finalized/errored transactions that have passed the retention period
 	txs.TrimFinalizedErroredTxs()
 
 	// Check finalized message past retention is deleted
-	_, exists := txs.finalizedErroredTxs[finalizedMsg1.id]
+	_, exists := txs.finalizedErroredTxs[finalizedMsg1ID]
 	require.False(t, exists)
 
 	// Check errored message past retention is deleted
-	_, exists = txs.finalizedErroredTxs[erroredMsg.id]
+	_, exists = txs.finalizedErroredTxs[erroredMsgID]
 	require.False(t, exists)
 
 	// Check finalized message within retention period still exists
-	msg, exists := txs.finalizedErroredTxs[finalizedMsg2.id]
+	_, exists = txs.finalizedErroredTxs[finalizedMsg2ID]
 	require.True(t, exists)
-	require.Equal(t, finalizedMsg2.id, msg.id)
 }
 
 func TestPendingTxContext_expired(t *testing.T) {
