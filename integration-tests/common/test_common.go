@@ -253,7 +253,10 @@ func (m *OCRv2TestState) UpgradeContracts(baseDir, subDir string) {
 			"store":             m.Common.ChainDetails.ProgramAddresses.Store,
 		}
 		val, ok := ids[programName]
-		require.True(m.Config.T, ok, fmt.Sprintf("unable to find corresponding key (%s) within %+v", programName, ids))
+		if !ok {
+			val = solclient.BuildProgramIDKeypairPath(programName)
+			log.Warn().Str("Program", programName).Msg(fmt.Sprintf("falling back to path (%s) unable to find corresponding key (%s) within %+v", val, programName, ids))
+		}
 		return val
 	}
 
