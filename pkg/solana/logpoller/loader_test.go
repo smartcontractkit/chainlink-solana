@@ -33,10 +33,9 @@ var (
 
 func TestEncodedLogCollector_StartClose(t *testing.T) {
 	client := new(mocks.RPCClient)
-	parser := new(mocks.ProgramEventProcessor)
 	ctx := tests.Context(t)
 
-	collector := logpoller.NewEncodedLogCollector(client, parser, logger.Nop())
+	collector := logpoller.NewEncodedLogCollector(client, nil, logger.Nop())
 
 	assert.NoError(t, collector.Start(ctx))
 	assert.NoError(t, collector.Close())
