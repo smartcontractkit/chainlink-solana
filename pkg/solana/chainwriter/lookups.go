@@ -79,15 +79,15 @@ func (ac AccountConstant) Resolve(_ context.Context, _ any, _ map[string]map[str
 }
 
 func (al AccountLookup) Resolve(_ context.Context, args any, _ map[string]map[string][]*solana.AccountMeta, debugID string) ([]*solana.AccountMeta, error) {
-	derivedAddresses, err := GetAddressAtLocation(args, al.Location, debugID)
+	derivedValues, err := GetValuesAtLocation(args, al.Location, debugID)
 	if err != nil {
 		return nil, errorWithDebugID(fmt.Errorf("error getting account from lookup: %w", err), debugID)
 	}
 
 	var metas []*solana.AccountMeta
-	for _, address := range derivedAddresses {
+	for _, address := range derivedValues {
 		metas = append(metas, &solana.AccountMeta{
-			PublicKey:  address,
+			PublicKey:  solana.PublicKeyFromBytes(address),
 			IsSigner:   al.IsSigner,
 			IsWritable: al.IsWritable,
 		})
@@ -146,16 +146,26 @@ func getSeedBytes(ctx context.Context, lookup PDALookups, args any, derivedTable
 
 	// Process AddressSeeds first (e.g., public keys)
 	for _, seed := range lookup.Seeds {
-		// Get the address(es) at the seed location
-		seedAddresses, err := GetAddresses(ctx, args, []Lookup{seed}, derivedTableMap, debugID)
-		if err != nil {
-			return nil, errorWithDebugID(fmt.Errorf("error getting address seed: %w", err), debugID)
+		if lookupSeed, ok := seed.(AccountLookup); ok {
+			// Get the values at the seed location
+			bytes, err := GetValuesAtLocation(args, lookupSeed.Location, debugID)
+			if err != nil {
+				return nil, errorWithDebugID(fmt.Errorf("error getting address seed: %w", err), debugID)
+			}
+			seedBytes = append(seedBytes, bytes...)
+		} else {
+			// Get the address(es) at the seed location
+			seedAddresses, err := GetAddresses(ctx, args, []Lookup{seed}, derivedTableMap, debugID)
+			if err != nil {
+				return nil, errorWithDebugID(fmt.Errorf("error getting address seed: %w", err), debugID)
+			}
+
+			// Add each address seed as bytes
+			for _, address := range seedAddresses {
+				seedBytes = append(seedBytes, address.PublicKey.Bytes())
+			}
 		}
 
-		// Add each address seed as bytes
-		for _, address := range seedAddresses {
-			seedBytes = append(seedBytes, address.PublicKey.Bytes())
-		}
 	}
 
 	return seedBytes, nil

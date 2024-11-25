@@ -29,7 +29,6 @@ type InnerArgs struct {
 }
 
 func TestAccountContant(t *testing.T) {
-
 	t.Run("AccountConstant resolves valid address", func(t *testing.T) {
 		expectedAddr := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6M"
 		expectedMeta := []*solana.AccountMeta{
@@ -131,22 +130,117 @@ func TestAccountLookups(t *testing.T) {
 }
 
 func TestPDALookups(t *testing.T) {
-	// TODO: May require deploying a program to test
-	// t.Run("PDALookup resolves valid address", func(t *testing.T) {
-	// 	expectedAddr := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6M"
-	// 	expectedMeta := []*solana.AccountMeta{
-	// 		{
-	// 			PublicKey:  solana.MustPublicKeyFromBase58(expectedAddr),
-	// 			IsSigner:   true,
-	// 			IsWritable: true,
-	// 		},
-	// 	}
-	// 	lookupConfig := chainwriter.PDALookups{
-	// 		Name: "TestAccount",
-	// 		PublicKey:
-	// 	}
+	programID := solana.SystemProgramID
 
-	// })
+	t.Run("PDALookup resolves valid PDA with constant address seeds", func(t *testing.T) {
+		privKey, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+		seed := privKey.PublicKey()
+
+		pda, _, err := solana.FindProgramAddress([][]byte{seed.Bytes()}, programID)
+		require.NoError(t, err)
+
+		expectedMeta := []*solana.AccountMeta{
+			{
+				PublicKey:  pda,
+				IsSigner:   false,
+				IsWritable: true,
+			},
+		}
+
+		pdaLookup := chainwriter.PDALookups{
+			Name:      "TestPDA",
+			PublicKey: chainwriter.AccountConstant{Name: "ProgramID", Address: programID.String()},
+			Seeds: []chainwriter.Lookup{
+				chainwriter.AccountConstant{Name: "seed", Address: seed.String()},
+			},
+			IsSigner:   false,
+			IsWritable: true,
+		}
+
+		ctx := context.Background()
+		result, err := pdaLookup.Resolve(ctx, nil, nil, "")
+		require.NoError(t, err)
+		require.Equal(t, expectedMeta, result)
+	})
+	t.Run("PDALookup resolves valid PDA with non-address lookup seeds", func(t *testing.T) {
+		seed1 := []byte("test_seed")
+		seed2 := []byte("another_seed")
+
+		pda, _, err := solana.FindProgramAddress([][]byte{seed1, seed2}, programID)
+		require.NoError(t, err)
+
+		expectedMeta := []*solana.AccountMeta{
+			{
+				PublicKey:  pda,
+				IsSigner:   false,
+				IsWritable: true,
+			},
+		}
+
+		pdaLookup := chainwriter.PDALookups{
+			Name:      "TestPDA",
+			PublicKey: chainwriter.AccountConstant{Name: "ProgramID", Address: programID.String()},
+			Seeds: []chainwriter.Lookup{
+				chainwriter.AccountLookup{Name: "seed1", Location: "test_seed"},
+				chainwriter.AccountLookup{Name: "seed2", Location: "another_seed"},
+			},
+			IsSigner:   false,
+			IsWritable: true,
+		}
+
+		ctx := context.Background()
+		args := map[string]interface{}{
+			"test_seed":    seed1,
+			"another_seed": seed2,
+		}
+
+		result, err := pdaLookup.Resolve(ctx, args, nil, "")
+		require.NoError(t, err)
+		require.Equal(t, expectedMeta, result)
+	})
+
+	t.Run("PDALookup resolves valid PDA with address lookup seeds", func(t *testing.T) {
+		privKey1, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+		seed1 := privKey1.PublicKey()
+
+		privKey2, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+		seed2 := privKey2.PublicKey()
+
+		pda, _, err := solana.FindProgramAddress([][]byte{seed1.Bytes(), seed2.Bytes()}, programID)
+		require.NoError(t, err)
+
+		expectedMeta := []*solana.AccountMeta{
+			{
+				PublicKey:  pda,
+				IsSigner:   false,
+				IsWritable: true,
+			},
+		}
+
+		pdaLookup := chainwriter.PDALookups{
+			Name:      "TestPDA",
+			PublicKey: chainwriter.AccountConstant{Name: "ProgramID", Address: programID.String()},
+			Seeds: []chainwriter.Lookup{
+				chainwriter.AccountLookup{Name: "seed1", Location: "test_seed"},
+				chainwriter.AccountLookup{Name: "seed2", Location: "another_seed"},
+			},
+			IsSigner:   false,
+			IsWritable: true,
+		}
+
+		ctx := context.Background()
+		args := map[string]interface{}{
+			"test_seed":    seed1,
+			"another_seed": seed2,
+		}
+
+		result, err := pdaLookup.Resolve(ctx, args, nil, "")
+		require.NoError(t, err)
+		require.Equal(t, expectedMeta, result)
+	})
 }
 
 func TestLookupTables(t *testing.T) {

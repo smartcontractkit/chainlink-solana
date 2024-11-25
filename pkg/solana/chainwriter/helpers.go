@@ -9,9 +9,9 @@ import (
 	"github.com/gagliardetto/solana-go"
 )
 
-// GetAddressAtLocation parses through nested types and arrays to find all address locations.
-func GetAddressAtLocation(args any, location string, debugID string) ([]solana.PublicKey, error) {
-	var addresses []solana.PublicKey
+// GetValuesAtLocation parses through nested types and arrays to find all locations of values
+func GetValuesAtLocation(args any, location string, debugID string) ([][]byte, error) {
+	var vals [][]byte
 
 	path := strings.Split(location, ".")
 
@@ -22,13 +22,15 @@ func GetAddressAtLocation(args any, location string, debugID string) ([]solana.P
 
 	for _, value := range addressList {
 		if byteArray, ok := value.([]byte); ok {
-			addresses = append(addresses, solana.PublicKeyFromBytes(byteArray))
+			vals = append(vals, byteArray)
+		} else if address, ok := value.(solana.PublicKey); ok {
+			vals = append(vals, address.Bytes())
 		} else {
-			return nil, errorWithDebugID(fmt.Errorf("invalid address format at path: %s", location), debugID)
+			return nil, errorWithDebugID(fmt.Errorf("invalid value format at path: %s", location), debugID)
 		}
 	}
 
-	return addresses, nil
+	return vals, nil
 }
 
 func GetDebugIDAtLocation(args any, location string) (string, error) {
@@ -83,6 +85,7 @@ func traversePath(data any, path []string) ([]any, error) {
 	if val.Kind() == reflect.Ptr {
 		val = val.Elem()
 	}
+	fmt.Printf("Current path: %v, Current value type: %v\n", path, val.Kind())
 
 	switch val.Kind() {
 	case reflect.Struct:
@@ -105,6 +108,13 @@ func traversePath(data any, path []string) ([]any, error) {
 		}
 		return nil, errors.New("no matching field found in array")
 
+	case reflect.Map:
+		key := reflect.ValueOf(path[0])
+		value := val.MapIndex(key)
+		if !value.IsValid() {
+			return nil, errors.New("key not found: " + path[0])
+		}
+		return traversePath(value.Interface(), path[1:])
 	default:
 		if len(path) == 1 && val.Kind() == reflect.Slice && val.Type().Elem().Kind() == reflect.Uint8 {
 			return []any{val.Interface()}, nil
