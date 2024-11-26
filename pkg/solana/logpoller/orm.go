@@ -119,8 +119,8 @@ func (o *DSORM) insertLogsWithinTx(ctx context.Context, logs []Log, tx sqlutil.D
 
 func (o *DSORM) validateLogs(logs []Log) error {
 	for _, log := range logs {
-		if o.chainID != log.ChainId {
-			return fmt.Errorf("invalid chainID in log got %v want %v", log.ChainId, o.chainID)
+		if o.chainID != log.ChainID {
+			return fmt.Errorf("invalid chainID in log got %v want %v", log.ChainID, o.chainID)
 		}
 	}
 	return nil

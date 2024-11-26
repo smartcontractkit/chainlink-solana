@@ -21,8 +21,8 @@ type Filter struct {
 
 type Log struct {
 	ID             int64
-	FilterId       int64
-	ChainId        string
+	FilterID       int64
+	ChainID        string
 	LogIndex       int64
 	BlockHash      Hash
 	BlockNumber    int64

@@ -137,8 +137,8 @@ func TestLogPollerLogs(t *testing.T) {
 	signature, err := privateKey.Sign(data)
 	require.NoError(t, err)
 	log := Log{
-		FilterId:       filterID,
-		ChainId:        chainID,
+		FilterID:       filterID,
+		ChainID:        chainID,
 		LogIndex:       1,
 		BlockHash:      Hash(pubKey),
 		BlockNumber:    10,
