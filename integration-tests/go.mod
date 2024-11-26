@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-solana/integration-tests
 
-go 1.22.8
+go 1.23
 
 toolchain go1.23.2
 
@@ -18,8 +18,8 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241112140826-0e2daed34ef6
 	github.com/smartcontractkit/chainlink-solana v1.1.1-0.20241104202120-39cabce465f6
-	github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.13
-	github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.5
+	github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.17-0.20241126090304-4c8999d6fd9a
+	github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.9
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20241028185036-c645d6db311d
 	github.com/smartcontractkit/chainlink/v2 v2.14.0-mercury-20240807.0.20241111141533-bb0b7e51595c
 	github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12
@@ -497,15 +497,15 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/api v0.31.1 // indirect
+	k8s.io/api v0.31.2 // indirect
 	k8s.io/apiextensions-apiserver v0.31.0 // indirect
-	k8s.io/apimachinery v0.31.1 // indirect
-	k8s.io/cli-runtime v0.31.1 // indirect
-	k8s.io/client-go v0.31.1 // indirect
-	k8s.io/component-base v0.31.1 // indirect
+	k8s.io/apimachinery v0.31.2 // indirect
+	k8s.io/cli-runtime v0.31.2 // indirect
+	k8s.io/client-go v0.31.2 // indirect
+	k8s.io/component-base v0.31.2 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240709000822-3c01b740850f // indirect
-	k8s.io/kubectl v0.31.1 // indirect
+	k8s.io/kubectl v0.31.2 // indirect
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8 // indirect
 	pgregory.net/rapid v1.1.0 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
