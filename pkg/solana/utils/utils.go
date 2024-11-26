@@ -4,13 +4,27 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/pelletier/go-toml/v2"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 	"github.com/test-go/testify/require"
+)
+
+var (
+	_, b, _, _ = runtime.Caller(0)
+	// ProjectRoot Root folder of this project
+	ProjectRoot = filepath.Join(filepath.Dir(b), "/../../..")
+	// ContractsDir path to our contracts
+	ContractsDir       = filepath.Join(ProjectRoot, "contracts", "target", "deploy")
+	PathToAnchorConfig = filepath.Join(ProjectRoot, "contracts", "Anchor.toml")
 )
 
 func LamportsToSol(lamports uint64) float64 { return internal.LamportsToSol(lamports) }
@@ -60,7 +74,7 @@ func sendTransaction(ctx context.Context, rpcClient *rpc.Client, t *testing.T, i
 
 	var txStatus rpc.ConfirmationStatusType
 	count := 0
-	for txStatus != rpc.ConfirmationStatusConfirmed && txStatus != rpc.ConfirmationStatusFinalized {
+	for txStatus != rpc.ConfirmationStatusType(commitment) && txStatus != rpc.ConfirmationStatusFinalized {
 		count++
 		statusRes, sigErr := rpcClient.GetSignatureStatuses(ctx, true, txsig)
 		require.NoError(t, sigErr)
@@ -68,7 +82,7 @@ func sendTransaction(ctx context.Context, rpcClient *rpc.Client, t *testing.T, i
 			txStatus = statusRes.Value[0].ConfirmationStatus
 		}
 		time.Sleep(100 * time.Millisecond)
-		if count > 50 {
+		if count > 500 {
 			require.NoError(t, fmt.Errorf("unable to find transaction within timeout"))
 		}
 	}
@@ -175,4 +189,28 @@ func FundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoCli
 			require.NoError(t, fmt.Errorf("unable to find transaction within timeout"))
 		}
 	}
+}
+
+func DeployAllPrograms(t *testing.T, pathToAnchorConfig string, admin solana.PrivateKey) *rpc.Client {
+	return rpc.New(SetupTestValidatorWithAnchorPrograms(t, pathToAnchorConfig, admin.PublicKey().String()))
+}
+
+func SetupTestValidatorWithAnchorPrograms(t *testing.T, pathToAnchorConfig string, upgradeAuthority string) string {
+	anchorData := struct {
+		Programs struct {
+			Localnet map[string]string
+		}
+	}{}
+
+	// upload programs to validator
+	anchorBytes, err := os.ReadFile(pathToAnchorConfig)
+	require.NoError(t, err)
+	require.NoError(t, toml.Unmarshal(anchorBytes, &anchorData))
+
+	flags := []string{}
+	for k, v := range anchorData.Programs.Localnet {
+		flags = append(flags, "--upgradeable-program", v, filepath.Join(ContractsDir, k+".so"), upgradeAuthority)
+	}
+	url, _ := client.SetupLocalSolNodeWithFlags(t, flags...)
+	return url
 }
