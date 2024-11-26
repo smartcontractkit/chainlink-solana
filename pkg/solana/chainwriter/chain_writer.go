@@ -131,10 +131,10 @@ for Solana transactions. It handles constant addresses, dynamic lookups, program
 */
 // GetAddresses resolves account addresses from various `Lookup` configurations to build the required `solana.AccountMeta` list
 // for Solana transactions.
-func GetAddresses(ctx context.Context, args any, accounts []Lookup, derivedTableMap map[string]map[string][]*solana.AccountMeta, debugID string) ([]*solana.AccountMeta, error) {
+func GetAddresses(ctx context.Context, args any, accounts []Lookup, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.Reader) ([]*solana.AccountMeta, error) {
 	var addresses []*solana.AccountMeta
 	for _, accountConfig := range accounts {
-		meta, err := accountConfig.Resolve(ctx, args, derivedTableMap, debugID)
+		meta, err := accountConfig.Resolve(ctx, args, derivedTableMap, reader)
 		if err != nil {
 			return nil, err
 		}
@@ -147,7 +147,6 @@ func (s *SolanaChainWriterService) FilterLookupTableAddresses(
 	accounts []*solana.AccountMeta,
 	derivedTableMap map[string]map[string][]*solana.AccountMeta,
 	staticTableMap map[solana.PublicKey]solana.PublicKeySlice,
-	debugID string,
 ) map[solana.PublicKey]solana.PublicKeySlice {
 	filteredLookupTables := make(map[solana.PublicKey]solana.PublicKeySlice)
 
@@ -162,7 +161,7 @@ func (s *SolanaChainWriterService) FilterLookupTableAddresses(
 		for innerIdentifier, metas := range innerMap {
 			tableKey, err := solana.PublicKeyFromBase58(innerIdentifier)
 			if err != nil {
-				errorWithDebugID(fmt.Errorf("error parsing lookup table key: %w", err), debugID)
+				fmt.Errorf("error parsing lookup table key: %w", err)
 			}
 
 			// Collect public keys that are actually used
@@ -212,19 +211,19 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	}
 
 	// Fetch derived and static table maps
-	derivedTableMap, staticTableMap, err := s.ResolveLookupTables(ctx, args, methodConfig.LookupTables, debugID)
+	derivedTableMap, staticTableMap, err := s.ResolveLookupTables(ctx, args, methodConfig.LookupTables)
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error getting lookup tables: %w", err), debugID)
 	}
 
 	// Resolve account metas
-	accounts, err := GetAddresses(ctx, args, methodConfig.Accounts, derivedTableMap, debugID)
+	accounts, err := GetAddresses(ctx, args, methodConfig.Accounts, derivedTableMap, s.reader)
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error resolving account addresses: %w", err), debugID)
 	}
 
 	// Filter the lookup table addresses based on which accounts are actually used
-	filteredLookupTableMap := s.FilterLookupTableAddresses(accounts, derivedTableMap, staticTableMap, debugID)
+	filteredLookupTableMap := s.FilterLookupTableAddresses(accounts, derivedTableMap, staticTableMap)
 
 	// Fetch latest blockhash
 	blockhash, err := s.reader.LatestBlockhash(ctx)

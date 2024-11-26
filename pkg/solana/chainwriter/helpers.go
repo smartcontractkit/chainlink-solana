@@ -10,9 +10,8 @@ import (
 )
 
 // GetValuesAtLocation parses through nested types and arrays to find all locations of values
-func GetValuesAtLocation(args any, location string, debugID string) ([][]byte, error) {
+func GetValuesAtLocation(args any, location string) ([][]byte, error) {
 	var vals [][]byte
-
 	path := strings.Split(location, ".")
 
 	addressList, err := traversePath(args, path)
@@ -26,7 +25,7 @@ func GetValuesAtLocation(args any, location string, debugID string) ([][]byte, e
 		} else if address, ok := value.(solana.PublicKey); ok {
 			vals = append(vals, address.Bytes())
 		} else {
-			return nil, errorWithDebugID(fmt.Errorf("invalid value format at path: %s", location), debugID)
+			return nil, fmt.Errorf("invalid value format at path: %s", location)
 		}
 	}
 
@@ -85,7 +84,6 @@ func traversePath(data any, path []string) ([]any, error) {
 	if val.Kind() == reflect.Ptr {
 		val = val.Elem()
 	}
-	fmt.Printf("Current path: %v, Current value type: %v\n", path, val.Kind())
 
 	switch val.Kind() {
 	case reflect.Struct:
