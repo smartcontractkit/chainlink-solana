@@ -53,33 +53,7 @@ func TestEncodedLogCollector_ParseSingleEvent(t *testing.T) {
 		require.NoError(t, collector.Close())
 	})
 
-	slot := uint64(42)
-	sig := solana.Signature{2, 1, 4, 2}
-	blockHeight := uint64(21)
-
-	client.EXPECT().GetLatestBlockhash(mock.Anything, rpc.CommitmentFinalized).Return(&rpc.GetLatestBlockhashResult{
-		RPCContext: rpc.RPCContext{
-			Context: rpc.Context{
-				Slot: slot,
-			},
-		},
-	}, nil)
-
-	client.EXPECT().GetBlocks(mock.Anything, uint64(1), mock.MatchedBy(func(val *uint64) bool {
-		return val != nil && *val == slot
-	}), mock.Anything).Return(rpc.BlocksResult{slot}, nil)
-
-	client.EXPECT().GetBlockWithOpts(mock.Anything, slot, mock.Anything).Return(&rpc.GetBlockResult{
-		Transactions: []rpc.TransactionWithMeta{
-			{
-				Meta: &rpc.TransactionMeta{
-					LogMessages: messages,
-				},
-			},
-		},
-		Signatures:  []solana.Signature{sig},
-		BlockHeight: &blockHeight,
-	}, nil).Twice()
+	clientExpectSingleEvent(client)
 
 	tests.AssertEventually(t, func() bool {
 		return parser.Called()
@@ -363,4 +337,34 @@ func (p *testParser) Called() bool {
 
 func (p *testParser) Count() uint64 {
 	return p.count.Load()
+}
+
+func clientExpectSingleEvent(client *mocks.RPCClient) {
+	slot := uint64(42)
+	sig := solana.Signature{2, 1, 4, 2}
+	blockHeight := uint64(21)
+
+	client.EXPECT().GetLatestBlockhash(mock.Anything, rpc.CommitmentFinalized).Return(&rpc.GetLatestBlockhashResult{
+		RPCContext: rpc.RPCContext{
+			Context: rpc.Context{
+				Slot: slot,
+			},
+		},
+	}, nil)
+
+	client.EXPECT().GetBlocks(mock.Anything, uint64(1), mock.MatchedBy(func(val *uint64) bool {
+		return val != nil && *val == slot
+	}), mock.Anything).Return(rpc.BlocksResult{slot}, nil)
+
+	client.EXPECT().GetBlockWithOpts(mock.Anything, slot, mock.Anything).Return(&rpc.GetBlockResult{
+		Transactions: []rpc.TransactionWithMeta{
+			{
+				Meta: &rpc.TransactionMeta{
+					LogMessages: messages,
+				},
+			},
+		},
+		Signatures:  []solana.Signature{sig},
+		BlockHeight: &blockHeight,
+	}, nil).Twice()
 }

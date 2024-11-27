@@ -40,3 +40,4 @@ packages:
   github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller:
     interfaces:
       RPCClient:
+      EventSaver:
