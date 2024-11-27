@@ -37,3 +37,6 @@ packages:
         config:
           filename: simple_keystore.go
           case: underscore
+  github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller:
+    interfaces:
+      RPCClient:

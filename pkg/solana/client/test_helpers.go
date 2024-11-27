@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"os/exec"
+	"strconv"
 	"testing"
 	"time"
 
@@ -15,17 +16,34 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
-// SetupLocalSolNode sets up a local solana node via solana cli, and returns the url
 func SetupLocalSolNode(t *testing.T) string {
+	t.Helper()
+
+	url, _ := SetupLocalSolNodeWithFlags(t)
+
+	return url
+}
+
+// SetupLocalSolNode sets up a local solana node via solana cli, and returns the url
+func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) {
+	t.Helper()
+
 	port := utils.MustRandomPort(t)
+	portInt, _ := strconv.Atoi(port)
+
 	faucetPort := utils.MustRandomPort(t)
 	url := "http://127.0.0.1:" + port
-	cmd := exec.Command("solana-test-validator",
+	wsURL := "ws://127.0.0.1:" + strconv.Itoa(portInt+1)
+
+	args := append([]string{
 		"--reset",
 		"--rpc-port", port,
 		"--faucet-port", faucetPort,
 		"--ledger", t.TempDir(),
-	)
+	}, flags...)
+
+	cmd := exec.Command("solana-test-validator", args...)
+
 	var stdErr bytes.Buffer
 	cmd.Stderr = &stdErr
 	var stdOut bytes.Buffer
@@ -57,10 +75,13 @@ func SetupLocalSolNode(t *testing.T) string {
 		t.Logf("Cmd output: %s\nCmd error: %s\n", stdOut.String(), stdErr.String())
 	}
 	require.True(t, ready)
-	return url
+
+	return url, wsURL
 }
 
 func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
+	t.Helper()
+
 	for i := range keys {
 		account := keys[i].String()
 		_, err := exec.Command("solana", "airdrop", "100",
