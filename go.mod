@@ -1,8 +1,6 @@
 module github.com/smartcontractkit/chainlink-solana
 
-go 1.22.0
-
-toolchain go1.23.2
+go 1.23.3
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
@@ -17,7 +15,7 @@ require (
 	github.com/jpillora/backoff v1.0.0
 	github.com/pelletier/go-toml/v2 v2.2.0
 	github.com/prometheus/client_golang v1.17.0
-	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241120190613-262c6d8a55e1
+	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241127162636-07aa781ee1f4
 	github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
