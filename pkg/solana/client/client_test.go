@@ -261,6 +261,35 @@ func TestClient_Writer_Integration(t *testing.T) {
 	require.True(t, requiredSigs[sigSuccess] && requiredSigs[sigFail])
 }
 
+func TestClient_GetBlocks(t *testing.T) {
+	url := SetupLocalSolNode(t)
+	privKey, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	pubKey := privKey.PublicKey()
+	FundTestAccounts(t, []solana.PublicKey{pubKey}, url)
+
+	requestTimeout := 5 * time.Second
+	lggr := logger.Test(t)
+	cfg := config.NewDefault()
+
+	ctx := tests.Context(t)
+	c, err := NewClient(url, cfg, requestTimeout, lggr)
+	require.NoError(t, err)
+
+	// Verify we can retrieve blocks
+	startSlot := uint64(1)
+	endSlot := uint64(6)
+	require.Eventually(t,
+		func() bool {
+			blocks, err := c.GetBlocks(ctx, startSlot, &endSlot)
+			if err != nil {
+				return false
+			}
+			return len(blocks) == 5
+		},
+		requestTimeout, 500*time.Millisecond)
+}
+
 func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 	ctx := tests.Context(t)
 	// set up environment
