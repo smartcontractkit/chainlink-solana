@@ -36,14 +36,20 @@ const (
 	MaxComputeUnitLimit            = 1_400_000        // max compute unit limit a transaction can have
 )
 
-var _ services.Service = (*Txm)(nil)
-
 type SimpleKeystore interface {
 	Sign(ctx context.Context, account string, data []byte) (signature []byte, err error)
 	Accounts(ctx context.Context) (accounts []string, err error)
 }
 
 var _ loop.Keystore = (SimpleKeystore)(nil)
+
+type TxManager interface {
+	services.Service
+	Enqueue(ctx context.Context, accountID string, tx *solanaGo.Transaction, txID *string, txCfgs ...SetTxConfig) error
+	GetTransactionStatus(ctx context.Context, transactionID string) (commontypes.TransactionStatus, error)
+}
+
+var _ TxManager = (*Txm)(nil)
 
 // Txm manages transactions for the solana blockchain.
 // simple implementation with no persistently stored txs

@@ -21,7 +21,7 @@ import (
 
 type SolanaChainWriterService struct {
 	reader client.Reader
-	txm    txm.Txm
+	txm    txm.TxManager
 	ge     fees.Estimator
 	config ChainWriterConfig
 	codecs map[string]types.Codec
@@ -46,7 +46,7 @@ type MethodConfig struct {
 	DebugIDLocation string
 }
 
-func NewSolanaChainWriterService(reader client.Reader, txm txm.Txm, ge fees.Estimator, config ChainWriterConfig) (*SolanaChainWriterService, error) {
+func NewSolanaChainWriterService(reader client.Reader, txm txm.TxManager, ge fees.Estimator, config ChainWriterConfig) (*SolanaChainWriterService, error) {
 	codecs, err := parseIDLCodecs(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse IDL codecs: %w", err)
@@ -275,7 +275,7 @@ var (
 
 // GetTransactionStatus returns the current status of a transaction in the underlying chain's TXM.
 func (s *SolanaChainWriterService) GetTransactionStatus(ctx context.Context, transactionID string) (types.TransactionStatus, error) {
-	return types.Unknown, nil
+	return s.txm.GetTransactionStatus(ctx, transactionID)
 }
 
 // GetFeeComponents retrieves the associated gas costs for executing a transaction.
