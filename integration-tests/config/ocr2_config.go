@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/client"
+	client "github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 )
 
 type OCR2Config struct {

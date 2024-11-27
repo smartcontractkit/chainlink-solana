@@ -1,6 +1,8 @@
 module github.com/smartcontractkit/chainlink-solana/integration-tests
 
-go 1.23.3
+go 1.23
+
+toolchain go1.23.2
 
 replace github.com/smartcontractkit/chainlink-solana => ../
 
@@ -14,12 +16,13 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/rs/zerolog v1.33.0
-	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241127162636-07aa781ee1f4
-	github.com/smartcontractkit/chainlink-solana v1.1.1-0.20241127162920-081640608cd9
-	github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.13
-	github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.5
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20241028185036-c645d6db311d
-	github.com/smartcontractkit/chainlink/v2 v2.14.0-mercury-20240807.0.20241127200605-786894ba3036
+	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241125150608-97ceadb2072d
+	github.com/smartcontractkit/chainlink-solana v1.1.1-0.20241127190942-9a418b680971
+	github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.17
+	github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.9
+	github.com/smartcontractkit/chainlink/deployment v0.0.0-20241127192805-54ea74a13bfe
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20241127192805-54ea74a13bfe
+	github.com/smartcontractkit/chainlink/v2 v2.14.0-mercury-20240807.0.20241127192805-54ea74a13bfe
 	github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12
 	github.com/stretchr/testify v1.9.0
 	github.com/testcontainers/testcontainers-go v0.34.0
@@ -35,7 +38,7 @@ require (
 	cosmossdk.io/core v0.5.1 // indirect
 	cosmossdk.io/depinject v1.0.0-alpha.4 // indirect
 	cosmossdk.io/errors v1.0.1 // indirect
-	cosmossdk.io/math v1.3.0 // indirect
+	cosmossdk.io/math v1.4.0 // indirect
 	dario.cat/mergo v1.0.1 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
@@ -390,13 +393,13 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/slack-go/slack v0.15.0 // indirect
 	github.com/smartcontractkit/chain-selectors v1.0.31 // indirect
-	github.com/smartcontractkit/chainlink-automation v1.0.5-0.20241009152924-78acf196c332 // indirect
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20241126213415-2f00a319d84b // indirect
-	github.com/smartcontractkit/chainlink-cosmos v0.5.2-0.20241126213129-304be43f0162 // indirect
+	github.com/smartcontractkit/chainlink-automation v0.8.1 // indirect
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20241125151847-c63f5f567fcd // indirect
+	github.com/smartcontractkit/chainlink-cosmos v0.5.2-0.20241017133723-5277829bd53f // indirect
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20241114154055-8d29ea018b57 // indirect
 	github.com/smartcontractkit/chainlink-feeds v0.1.1 // indirect
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.3.0 // indirect
-	github.com/smartcontractkit/chainlink-starknet/relayer v0.1.1-0.20241127172448-dd45de3c939e // indirect
+	github.com/smartcontractkit/chainlink-starknet/relayer v0.1.1-0.20241017135645-176a23722fd8 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.50.0 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.50.2 // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
@@ -504,15 +507,15 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/api v0.31.1 // indirect
+	k8s.io/api v0.31.2 // indirect
 	k8s.io/apiextensions-apiserver v0.31.0 // indirect
-	k8s.io/apimachinery v0.31.1 // indirect
-	k8s.io/cli-runtime v0.31.1 // indirect
-	k8s.io/client-go v0.31.1 // indirect
-	k8s.io/component-base v0.31.1 // indirect
+	k8s.io/apimachinery v0.31.2 // indirect
+	k8s.io/cli-runtime v0.31.2 // indirect
+	k8s.io/client-go v0.31.2 // indirect
+	k8s.io/component-base v0.31.2 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240709000822-3c01b740850f // indirect
-	k8s.io/kubectl v0.31.1 // indirect
+	k8s.io/kubectl v0.31.2 // indirect
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8 // indirect
 	pgregory.net/rapid v1.1.0 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
@@ -524,5 +527,13 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-// replicating the replace directive on cosmos SDK
-replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
+replace (
+	// geth wants v2.3.4 but that is incompatible with github.com/cometbft/cometbft v0.37.5 which when bumped is incompatible with github.com/cosmos/cosmos-sdk
+	// This line can be removed after these imports are bumped or removed.
+	github.com/btcsuite/btcd/btcec/v2 => github.com/btcsuite/btcd/btcec/v2 v2.3.2
+
+	// replicating the replace directive on cosmos SDK
+	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
+
+	github.com/sourcegraph/sourcegraph/lib => github.com/sourcegraph/sourcegraph-public-snapshot/lib v0.0.0-20240822153003-c864f15af264
+)

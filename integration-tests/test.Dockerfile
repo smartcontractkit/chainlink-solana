@@ -3,6 +3,7 @@ ARG IMAGE_VERSION=latest
 FROM ${BASE_IMAGE}:${IMAGE_VERSION}
 
 ARG SUITES=smoke soak
+ENV GOTOOLCHAIN=auto
 
 COPY . testdir/
 WORKDIR /go/testdir
