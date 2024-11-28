@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
