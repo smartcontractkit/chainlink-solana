@@ -532,8 +532,8 @@ func (r *wrappedTestChainReader) HealthReport() map[string]error {
 	return nil
 }
 
-func (r *chainReaderInterfaceTester) GetChainWriter(t *testing.T) types.ChainWriter {
-	t.Skip("ChainWriter is not yet supported on Solana")
+func (r *chainReaderInterfaceTester) GetContractWriter(t *testing.T) types.ContractWriter {
+	t.Skip("ContractWriter is not yet supported on Solana")
 	return nil
 }
 

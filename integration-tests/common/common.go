@@ -19,7 +19,7 @@ import (
 	mock_adapter "github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/mock-adapter"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/sol"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/client"
+	client "github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
