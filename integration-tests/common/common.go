@@ -10,6 +10,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+	"gopkg.in/guregu/null.v4"
+
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	ctf_test_env "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/environment"
@@ -384,10 +386,14 @@ func BuildNodeContractPairID(node *client.ChainlinkClient, ocr2Addr string) (str
 func (c *Common) Default(t *testing.T, namespacePrefix string) (*Common, error) {
 	productName := "data-feedsv2.0"
 	nsLabels, err := environment.GetRequiredChainLinkNamespaceLabels(productName, "soak")
-	require.NoError(o.t, err, "Error creating required chain.link labels for namespace")
+	if err != nil {
+		return nil, err
+	}
 
 	workloadPodLabels, err := environment.GetRequiredChainLinkWorkloadAndPodLabels(productName, "soak")
-	require.NoError(o.t, err, "Error creating required chain.link labels for workloads and pods")
+	if err != nil {
+		return nil, err
+	}
 
 	c.TestEnvDetails.K8Config = &environment.Config{
 		NamespacePrefix: fmt.Sprintf("solana-%s", namespacePrefix),
