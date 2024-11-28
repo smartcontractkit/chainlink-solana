@@ -121,8 +121,8 @@ func (r *Relayer) NewConfigProvider(ctx context.Context, args relaytypes.RelayAr
 	return configWatcher, err
 }
 
-func (r *Relayer) NewChainWriter(_ context.Context, _ []byte) (relaytypes.ChainWriter, error) {
-	return nil, errors.New("chain writer is not supported for solana")
+func (r *Relayer) NewContractWriter(_ context.Context, _ []byte) (relaytypes.ContractWriter, error) {
+	return nil, errors.New("contract writer is not supported for solana")
 }
 
 func (r *Relayer) NewContractReader(ctx context.Context, _ []byte) (relaytypes.ContractReader, error) {

@@ -18,8 +18,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/chains"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
@@ -49,6 +49,7 @@ const DefaultRequestTimeout = 30 * time.Second
 type ChainOpts struct {
 	Logger   logger.Logger
 	KeyStore core.Keystore
+	DS       sqlutil.DataSource
 }
 
 func (o *ChainOpts) Validate() (err error) {
@@ -61,6 +62,9 @@ func (o *ChainOpts) Validate() (err error) {
 	if o.KeyStore == nil {
 		err = errors.Join(err, required("KeyStore"))
 	}
+	if o.DS == nil {
+		err = errors.Join(err, required("DataSource"))
+	}
 	return
 }
 
@@ -72,7 +76,7 @@ func NewChain(cfg *config.TOMLConfig, opts ChainOpts) (Chain, error) {
 	if !cfg.IsEnabled() {
 		return nil, fmt.Errorf("cannot create new chain with ID %s: chain is disabled", *cfg.ChainID)
 	}
-	c, err := newChain(*cfg.ChainID, cfg, opts.KeyStore, opts.Logger)
+	c, err := newChain(*cfg.ChainID, cfg, opts.KeyStore, opts.Logger, opts.DS)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +226,7 @@ func (v *verifiedCachedClient) GetAccountInfoWithOpts(ctx context.Context, addr 
 	return v.ReaderWriter.GetAccountInfoWithOpts(ctx, addr, opts)
 }
 
-func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.Logger) (*chain, error) {
+func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.Logger, ds sqlutil.DataSource) (*chain, error) {
 	lggr = logger.With(lggr, "chainID", id, "chain", "solana")
 	var ch = chain{
 		id:          id,
