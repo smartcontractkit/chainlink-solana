@@ -55,7 +55,7 @@ func NewNamedModifierCodec(original types.RemoteCodec, itemType string, modifier
 		return nil, err
 	}
 
-	_, err = modCodec.CreateType(itemType, true)
+	// _, err = modCodec.CreateType(itemType, true)
 
 	return modCodec, err
 }
