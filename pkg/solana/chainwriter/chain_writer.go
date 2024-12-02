@@ -68,7 +68,7 @@ func parseIDLCodecs(config ChainWriterConfig) (map[string]types.Codec, error) {
 		if err := json.Unmarshal([]byte(programConfig.IDL), &idl); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal IDL: %w", err)
 		}
-		idlCodec, err := codec.NewIDLAccountCodec(idl, binary.LittleEndian())
+		idlCodec, err := codec.NewIDLInstructionsCodec(idl, binary.LittleEndian())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create codec from IDL: %w", err)
 		}
@@ -79,7 +79,7 @@ func parseIDLCodecs(config ChainWriterConfig) (map[string]types.Codec, error) {
 					return nil, fmt.Errorf("failed to create input modifications: %w", err)
 				}
 				// add mods to codec
-				idlCodec, err = codec.NewNamedModifierCodec(idlCodec, WrapItemType(program, method, true), modConfig)
+				idlCodec, err = codec.NewNamedModifierCodec(idlCodec, method, modConfig)
 				if err != nil {
 					return nil, fmt.Errorf("failed to create named codec: %w", err)
 				}
@@ -88,14 +88,6 @@ func parseIDLCodecs(config ChainWriterConfig) (map[string]types.Codec, error) {
 		codecs[program] = idlCodec
 	}
 	return codecs, nil
-}
-
-func WrapItemType(programName, itemType string, isParams bool) string {
-	if isParams {
-		return fmt.Sprintf("params.%s.%s", programName, itemType)
-	}
-
-	return fmt.Sprintf("return.%s.%s", programName, itemType)
 }
 
 /*
@@ -243,7 +235,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	}
 
 	codec := s.codecs[contractName]
-	encodedPayload, err := codec.Encode(ctx, args, WrapItemType(contractName, method, true))
+	encodedPayload, err := codec.Encode(ctx, args, method)
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error encoding transaction payload: %w", err), debugID)
 	}

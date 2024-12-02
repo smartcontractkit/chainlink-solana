@@ -102,8 +102,8 @@ func TestConfig() {
 			},
 			// Lookup Table content - Get the accounts from the derived lookup table above
 			AccountsFromLookupTable{
-				LookupTablesName: "RegistryTokenState",
-				IncludeIndexes:   []int{}, // If left empty, all addresses will be included. Otherwise, only the specified indexes will be included.
+				LookupTableName: "RegistryTokenState",
+				IncludeIndexes:  []int{}, // If left empty, all addresses will be included. Otherwise, only the specified indexes will be included.
 			},
 			// Account Lookup - Based on data from input parameters
 			// In this case, the user wants to add the destination token addresses to the transaction.

@@ -3,7 +3,10 @@ package chainwriter_test
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"math/big"
+	"os"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -15,6 +18,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	relayconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -35,7 +39,155 @@ func TestChainWriter_GetAddresses(t *testing.T) {}
 
 func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {}
 
-func TestChainWriter_SubmitTransaction(t *testing.T) {}
+func TestChainWriter_SubmitTransaction(t *testing.T) {
+	t.Parallel()
+
+	ctx := tests.Context(t)
+	lggr := logger.Test(t)
+	cfg := config.NewDefault()
+	// Retain transactions after finality or error to maintain their status in memory
+	cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(5 * time.Second)
+	// Disable bumping to avoid issues with send tx mocking
+	cfg.Chain.FeeBumpPeriod = relayconfig.MustNewDuration(0 * time.Second)
+	rw := clientmocks.NewReaderWriter(t)
+	rw.On("GetLatestBlock", mock.Anything).Return(&rpc.GetBlockResult{}, nil).Maybe()
+	rw.On("SlotHeight", mock.Anything).Return(uint64(0), nil).Maybe()
+	loader := utils.NewLazyLoad(func() (client.ReaderWriter, error) { return rw, nil })
+	ge := feemocks.NewEstimator(t)
+	// mock solana keystore
+	keystore := keyMocks.NewSimpleKeystore(t)
+	keystore.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil).Maybe()
+
+	// initialize and start TXM
+	txm := txm.NewTxm(uuid.NewString(), loader, nil, cfg, keystore, lggr)
+	require.NoError(t, txm.Start(ctx))
+	t.Cleanup(func() { require.NoError(t, txm.Close()) })
+
+	idlJSON, err := os.ReadFile("../../../contracts/target/idl/write_test.json")
+	require.NoError(t, err)
+	// TODO: Get IDL and address
+	programID := chainwriter.GetRandomPubKey(t).String()
+	programIDL := string(idlJSON)
+
+	args := map[string]interface{}{
+		"seed1":        []byte("data"),
+		"lookup_table": chainwriter.GetRandomPubKey(t),
+	}
+	fmt.Println(args)
+
+	adminPk, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+
+	admin := adminPk.PublicKey()
+
+	// TODO: Replace all random and create mocks
+	cwConfig := chainwriter.ChainWriterConfig{
+		Programs: map[string]chainwriter.ProgramConfig{
+			"write_test": {
+				Methods: map[string]chainwriter.MethodConfig{
+					"initialize": {
+						FromAddress: admin.String(),
+						InputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.DropModifierConfig{
+								// Drop seed1 since it shouldn't be in the instruction data
+								Fields: []string{"seed1"},
+							},
+						},
+						ChainSpecificName: "initialize",
+						LookupTables: chainwriter.LookupTables{
+							DerivedLookupTables: []chainwriter.DerivedLookupTable{
+								{
+									Name: "DerivedTable",
+									Accounts: chainwriter.PDALookups{
+										Name:      "DataAccountPDA",
+										PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: programID},
+										Seeds: []chainwriter.Lookup{
+											// extract seed1 for PDA lookup
+											chainwriter.AccountLookup{Name: "seed1", Location: "seed1"},
+										},
+										IsSigner:   false,
+										IsWritable: false,
+										InternalField: chainwriter.InternalField{
+											Type:     reflect.TypeOf(DataAccount{}),
+											Location: "LookupTable",
+										},
+									},
+								},
+							},
+							StaticLookupTables: []string{chainwriter.GetRandomPubKey(t).String()},
+						},
+						Accounts: []chainwriter.Lookup{
+							chainwriter.AccountConstant{
+								Name:       "Constant",
+								Address:    chainwriter.GetRandomPubKey(t).String(),
+								IsSigner:   false,
+								IsWritable: false,
+							},
+							chainwriter.AccountLookup{
+								Name:       "LookupTable",
+								Location:   "lookup_table",
+								IsSigner:   false,
+								IsWritable: false,
+							},
+							chainwriter.PDALookups{
+								Name:      "DataAccountPDA",
+								PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: programID},
+								Seeds: []chainwriter.Lookup{
+									// extract seed1 for PDA lookup
+									chainwriter.AccountLookup{Name: "seed1", Location: "seed1"},
+								},
+								IsSigner:   false,
+								IsWritable: false,
+								// Just get the address of the account, nothing internal.
+								InternalField: chainwriter.InternalField{},
+							},
+							chainwriter.AccountsFromLookupTable{
+								LookupTableName: "DerivedTable",
+								IncludeIndexes:  []int{0},
+							},
+						},
+					},
+				},
+				IDL: programIDL,
+			},
+		},
+	}
+
+	// initialize chain writer
+	cw, err := chainwriter.NewSolanaChainWriterService(rw, txm, ge, cwConfig)
+	require.NoError(t, err)
+
+	t.Run("fails with invalid ABI", func(t *testing.T) {
+		invalidCWConfig := chainwriter.ChainWriterConfig{
+			Programs: map[string]chainwriter.ProgramConfig{
+				"write_test": {
+					Methods: map[string]chainwriter.MethodConfig{
+						"invalid": {
+							ChainSpecificName: "invalid",
+						},
+					},
+					IDL: "",
+				},
+			},
+		}
+
+		_, err := chainwriter.NewSolanaChainWriterService(rw, txm, ge, invalidCWConfig)
+		require.Error(t, err)
+	})
+
+	t.Run("Submits transaction successfully", func(t *testing.T) {
+		rw.On("GetAccountInfoWithOpts", mock.Anything, mock.Anything, mock.Anything).Return(&rpc.GetAccountInfoResult{
+			RPCContext: rpc.RPCContext{},
+			Value:      &rpc.Account{},
+		}, nil).Maybe()
+		args := map[string]interface{}{
+			"lookupTable": chainwriter.GetRandomPubKey(t).String(),
+			"seed1":       []byte("data"),
+		}
+		err := cw.SubmitTransaction(ctx, "write_test", "initialize", args, "1", programID, nil, nil)
+		fmt.Println(err)
+	})
+}
 
 func TestChainWriter_GetTransactionStatus(t *testing.T) {
 	t.Parallel()

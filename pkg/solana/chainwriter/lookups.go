@@ -69,8 +69,8 @@ type DerivedLookupTable struct {
 
 // AccountsFromLookupTable extracts accounts from a lookup table that was previously read and stored in memory.
 type AccountsFromLookupTable struct {
-	LookupTablesName string
-	IncludeIndexes   []int
+	LookupTableName string
+	IncludeIndexes  []int
 }
 
 func (ac AccountConstant) Resolve(_ context.Context, _ any, _ map[string]map[string][]*solana.AccountMeta, _ client.Reader) ([]*solana.AccountMeta, error) {
@@ -106,9 +106,9 @@ func (al AccountLookup) Resolve(_ context.Context, args any, _ map[string]map[st
 
 func (alt AccountsFromLookupTable) Resolve(_ context.Context, _ any, derivedTableMap map[string]map[string][]*solana.AccountMeta, _ client.Reader) ([]*solana.AccountMeta, error) {
 	// Fetch the inner map for the specified lookup table name
-	innerMap, ok := derivedTableMap[alt.LookupTablesName]
+	innerMap, ok := derivedTableMap[alt.LookupTableName]
 	if !ok {
-		return nil, fmt.Errorf("lookup table not found: %s", alt.LookupTablesName)
+		return nil, fmt.Errorf("lookup table not found: %s", alt.LookupTableName)
 	}
 
 	var result []*solana.AccountMeta
@@ -125,7 +125,7 @@ func (alt AccountsFromLookupTable) Resolve(_ context.Context, _ any, derivedTabl
 	for publicKey, metas := range innerMap {
 		for _, index := range alt.IncludeIndexes {
 			if index < 0 || index >= len(metas) {
-				return nil, fmt.Errorf("invalid index %d for account %s in lookup table %s", index, publicKey, alt.LookupTablesName)
+				return nil, fmt.Errorf("invalid index %d for account %s in lookup table %s", index, publicKey, alt.LookupTableName)
 			}
 			result = append(result, metas[index])
 		}
@@ -161,6 +161,7 @@ func (pda PDALookups) Resolve(ctx context.Context, args any, derivedTableMap map
 			Encoding:   "base64",
 			Commitment: rpc.CommitmentFinalized,
 		})
+		fmt.Printf("Accounts Info: %+v", accountInfo)
 
 		if err != nil || accountInfo == nil || accountInfo.Value == nil {
 			return nil, fmt.Errorf("error fetching account info for PDA account: %s, error: %w", accountMeta.PublicKey.String(), err)
