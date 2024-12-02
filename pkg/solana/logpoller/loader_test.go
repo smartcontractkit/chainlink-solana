@@ -3,6 +3,7 @@ package logpoller_test
 import (
 	"context"
 	"crypto/rand"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -83,6 +84,143 @@ func TestEncodedLogCollector_ParseSingleEvent(t *testing.T) {
 
 	tests.AssertEventually(t, func() bool {
 		return parser.Called()
+	})
+
+	client.AssertExpectations(t)
+}
+
+func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
+	t.Parallel()
+
+	client := new(mocks.RPCClient)
+	parser := new(testParser)
+	ctx := tests.Context(t)
+
+	collector := logpoller.NewEncodedLogCollector(client, parser, logger.Nop())
+
+	require.NoError(t, collector.Start(ctx))
+	t.Cleanup(func() {
+		require.NoError(t, collector.Close())
+	})
+
+	var latest atomic.Uint64
+
+	latest.Store(uint64(40))
+
+	slots := []uint64{43, 42}
+	sigs := make([]solana.Signature, len(slots))
+	hashes := make([]solana.Hash, len(slots))
+
+	for idx := range len(sigs) {
+		_, _ = rand.Read(sigs[idx][:])
+		_, _ = rand.Read(hashes[idx][:])
+	}
+
+	client.EXPECT().
+		GetLatestBlockhash(mock.Anything, rpc.CommitmentFinalized).
+		RunAndReturn(func(ctx context.Context, ct rpc.CommitmentType) (*rpc.GetLatestBlockhashResult, error) {
+			defer func() {
+				latest.Store(latest.Load() + 2)
+			}()
+
+			return &rpc.GetLatestBlockhashResult{
+				RPCContext: rpc.RPCContext{
+					Context: rpc.Context{
+						Slot: latest.Load(),
+					},
+				},
+			}, nil
+		})
+
+	client.EXPECT().
+		GetBlocks(mock.Anything, mock.MatchedBy(func(val uint64) bool {
+			return val > uint64(0)
+		}), mock.MatchedBy(func(val *uint64) bool {
+			return val != nil && *val <= latest.Load()
+		}), mock.Anything).
+		RunAndReturn(func(_ context.Context, u1 uint64, u2 *uint64, _ rpc.CommitmentType) (rpc.BlocksResult, error) {
+			blocks := make([]uint64, *u2-u1+1)
+			for idx := range blocks {
+				blocks[idx] = u1 + uint64(idx)
+			}
+
+			return rpc.BlocksResult(blocks), nil
+		})
+
+	client.EXPECT().
+		GetBlockWithOpts(mock.Anything, mock.MatchedBy(func(val uint64) bool {
+			return true
+		}), mock.Anything).
+		RunAndReturn(func(_ context.Context, slot uint64, _ *rpc.GetBlockOpts) (*rpc.GetBlockResult, error) {
+			slotIdx := -1
+			for idx, slt := range slots {
+				if slt == slot {
+					slotIdx = idx
+
+					break
+				}
+			}
+
+			if slot == 42 {
+				// force slot 42 to return after 43
+				time.Sleep(1 * time.Second)
+			}
+
+			height := slot - 1
+
+			if slotIdx == -1 {
+				var hash solana.Hash
+				_, _ = rand.Read(hash[:])
+
+				return &rpc.GetBlockResult{
+					Blockhash:    hash,
+					Transactions: []rpc.TransactionWithMeta{},
+					Signatures:   []solana.Signature{},
+					BlockHeight:  &height,
+				}, nil
+			}
+
+			return &rpc.GetBlockResult{
+				Blockhash: hashes[slotIdx],
+				Transactions: []rpc.TransactionWithMeta{
+					{
+						Meta: &rpc.TransactionMeta{
+							LogMessages: messages,
+						},
+					},
+				},
+				Signatures:  []solana.Signature{sigs[slotIdx]},
+				BlockHeight: &height,
+			}, nil
+		})
+
+	tests.AssertEventually(t, func() bool {
+		return reflect.DeepEqual(parser.Events(), []logpoller.ProgramEvent{
+			{
+				BlockData: logpoller.BlockData{
+					SlotNumber:          42,
+					BlockHeight:         41,
+					BlockHash:           hashes[1],
+					TransactionHash:     sigs[1],
+					TransactionIndex:    0,
+					TransactionLogIndex: 0,
+				},
+				Prefix: ">",
+				Data:   "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
+			},
+			{
+				BlockData: logpoller.BlockData{
+					SlotNumber:          43,
+					BlockHeight:         42,
+					BlockHash:           hashes[0],
+					TransactionHash:     sigs[0],
+					TransactionIndex:    0,
+					TransactionLogIndex: 0,
+				},
+				Prefix: ">",
+				Data:   "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
+			},
+		})
 	})
 
 	client.AssertExpectations(t)
@@ -347,12 +485,16 @@ func (p *testBlockProducer) GetTransaction(_ context.Context, sig solana.Signatu
 
 type testParser struct {
 	called atomic.Bool
-	count  atomic.Uint64
+	mu     sync.Mutex
+	events []logpoller.ProgramEvent
 }
 
 func (p *testParser) Process(event logpoller.ProgramEvent) error {
 	p.called.Store(true)
-	p.count.Store(p.count.Load() + 1)
+
+	p.mu.Lock()
+	p.events = append(p.events, event)
+	p.mu.Unlock()
 
 	return nil
 }
@@ -362,5 +504,15 @@ func (p *testParser) Called() bool {
 }
 
 func (p *testParser) Count() uint64 {
-	return p.count.Load()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	return uint64(len(p.events))
+}
+
+func (p *testParser) Events() []logpoller.ProgramEvent {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	return p.events
 }
