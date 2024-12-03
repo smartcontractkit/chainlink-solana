@@ -21,7 +21,7 @@ import (
 	test_env_ctf "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/client"
+	client "github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
