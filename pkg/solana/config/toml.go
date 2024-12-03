@@ -12,6 +12,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+
+	mnCfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode/config"
 )
 
 type TOMLConfigs []*TOMLConfig
@@ -113,7 +115,7 @@ type TOMLConfig struct {
 	// Do not access directly, use [IsEnabled]
 	Enabled *bool
 	Chain
-	MultiNode MultiNodeConfig
+	MultiNode mnCfg.MultiNodeConfig
 	Nodes     Nodes
 }
 
