@@ -19,12 +19,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
+	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
 var _ TxManager = (*txm.Txm)(nil)
 
 type TxManager interface {
-	Enqueue(ctx context.Context, accountID string, tx *solana.Transaction, txID *string, txCfgs ...txm.SetTxConfig) error
+	Enqueue(ctx context.Context, accountID string, tx *solana.Transaction, txID *string, txCfgs ...txmutils.SetTxConfig) error
 }
 
 var _ relaytypes.Relayer = &Relayer{} //nolint:staticcheck
