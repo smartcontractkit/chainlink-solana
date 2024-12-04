@@ -55,12 +55,18 @@ func (j *processEventJob) Run(_ context.Context) error {
 	return j.parser.Process(j.event)
 }
 
+type wrappedParser interface {
+	ProgramEventProcessor
+	ExpectBlock(uint64)
+	ExpectTxs(uint64, int)
+}
+
 // getTransactionsFromBlockJob is a job that fetches transaction signatures from a block and loads
 // the job queue with getTransactionLogsJobs for each transaction found in the block.
 type getTransactionsFromBlockJob struct {
 	slotNumber uint64
 	client     RPCClient
-	parser     *orderedParser
+	parser     wrappedParser
 	chJobs     chan Job
 }
 
