@@ -191,7 +191,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GetContractReader(t T) types.
 	return svc
 }
 
-func (it *SolanaChainComponentsInterfaceTester[T]) GetChainWriter(t T) types.ChainWriter {
+func (it *SolanaChainComponentsInterfaceTester[T]) GetContractWriter(t T) types.ContractWriter {
 	return nil
 }
 
