@@ -18,9 +18,9 @@ require (
 	github.com/smartcontractkit/chainlink-solana v1.1.1-0.20241204153209-c3a71b0eef99
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.18
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.9
-	github.com/smartcontractkit/chainlink/deployment v0.0.0-20241127192805-54ea74a13bfe
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20241205141804-d2cb377507b5
-	github.com/smartcontractkit/chainlink/v2 v2.14.0-mercury-20240807.0.20241205141804-d2cb377507b5
+	github.com/smartcontractkit/chainlink/deployment v0.0.0-20241205144849-138d4c51ad0d
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20241205144849-138d4c51ad0d
+	github.com/smartcontractkit/chainlink/v2 v2.14.0-mercury-20240807.0.20241205144849-138d4c51ad0d
 	github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12
 	github.com/stretchr/testify v1.9.0
 	github.com/testcontainers/testcontainers-go v0.34.0
