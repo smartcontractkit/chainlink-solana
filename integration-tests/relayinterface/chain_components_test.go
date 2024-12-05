@@ -1,7 +1,7 @@
 /*
-Package components contains the interface tests for chain components.
+Package relayinterface contains the interface tests for chain components.
 */
-package components
+package relayinterface
 
 import (
 	"context"
@@ -330,7 +330,7 @@ func (h *helper) sendInstruction(
 
 	ctx := tests.Context(t)
 
-	recent, err := h.rpcClient.GetRecentBlockhash(ctx, rpc.CommitmentFinalized)
+	recent, err := h.rpcClient.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
 	require.NoError(t, err)
 
 	tx, err := solana.NewTransaction(

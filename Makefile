@@ -92,6 +92,10 @@ test_smoke:
 	cd ./integration-tests &&\
 	SELECTED_NETWORKS=SIMULATED go test -timeout 24h -count=1 -json $(args) -run TestSolanaOCRV2Smoke ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -json -tlogprefix -singlepackage -color
 
+test_relay_integration:
+	cd ./integration-tests &&\
+	go test -timeout 20m -count=1 -json $(args) ./relayinterface/... 2>&1 | tee /tmp/gotest.log | gotestloghelper -json -tlogprefix -singlepackage -color
+
 .PHONY: gomods
 gomods: ## Install gomods
 	go install github.com/jmank88/gomods@v0.1.3
