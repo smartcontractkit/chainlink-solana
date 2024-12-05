@@ -8,6 +8,10 @@ on:
         required: true
         default: develop
         type: string
+      team:
+        description: Team to run the tests for (e.g. BIX, CCIP)
+        required: true
+        type: string        
 
 env:
   CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
@@ -335,6 +339,7 @@ jobs:
         env:
           E2E_TEST_CHAINLINK_IMAGE: ${{ env.CL_ECR }}          
           E2E_TEST_SOLANA_SECRET: thisisatestingonlysecret
+          CHAINLINK_USER_TEAM: ${{ github.event.inputs.team || 'BIX' }}
 
   e2e_program_upgrade_tests:
     name: E2E Program Upgrade Tests

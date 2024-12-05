@@ -11,6 +11,10 @@ on:
         description: 'Key to run tests with custom test secrets like ws url, rpc url, private key, etc.'
         required: false
         type: string         
+      team:
+        description: Team to run the tests for (e.g. BIX, CCIP)
+        required: true
+        type: string                
   schedule:
     - cron: '0 6 * * *'
 # Only run 1 of this workflow at a time per PR
@@ -176,3 +180,4 @@ jobs:
           E2E_TEST_COMMON_RPC_URL: https://api.devnet.solana.com # default url
           E2E_TEST_COMMON_WS_URL: https://api.devnet.solana.com # default url
           E2E_TEST_SOLANA_SECRET: thisisatestingonlysecret
+          CHAINLINK_USER_TEAM: ${{ github.event.inputs.team || 'BIX' }}
