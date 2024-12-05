@@ -3,13 +3,12 @@ package testconfig
 import (
 	"embed"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"strings"
 	"time"
-
-	"errors"
 
 	"github.com/barkimedes/go-deepcopy"
 	"github.com/google/uuid"
@@ -29,6 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
 	ocr2_config "github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig/ocr2"
+	mnCfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode/config"
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
@@ -265,8 +265,8 @@ func (c *TestConfig) GetNodeConfigTOML() (string, error) {
 		url = c.GetURL()
 	}
 
-	mnConfig := solcfg.MultiNodeConfig{
-		MultiNode: solcfg.MultiNode{
+	mnConfig := mnCfg.MultiNodeConfig{
+		MultiNode: mnCfg.MultiNode{
 			Enabled:       ptr.Ptr(true),
 			SyncThreshold: ptr.Ptr(uint32(170)),
 		},
