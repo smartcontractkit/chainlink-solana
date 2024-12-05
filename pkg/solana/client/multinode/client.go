@@ -60,8 +60,24 @@ func (m *MultiNodeClient[RPC, HEAD]) LenSubs() int {
 	return len(m.subs)
 }
 
+// removeClosedSubscriptions removes any subscriptions that have been closed
+func (m *MultiNodeClient[RPC, HEAD]) removeClosedSubscriptions() {
+	m.subsSliceMu.Lock()
+	defer m.subsSliceMu.Unlock()
+	for sub := range m.subs {
+		select {
+		case _, ok := <-sub.Err():
+			if !ok {
+				delete(m.subs, sub)
+			}
+		default:
+		}
+	}
+}
+
 // RegisterSub adds the sub to the rpcClient list
 func (m *MultiNodeClient[RPC, HEAD]) RegisterSub(sub Subscription, stopInFLightCh chan struct{}) error {
+	defer m.removeClosedSubscriptions()
 	m.subsSliceMu.Lock()
 	defer m.subsSliceMu.Unlock()
 	// ensure that the `sub` belongs to current life cycle of the `rpcClient` and it should not be killed due to
@@ -72,7 +88,6 @@ func (m *MultiNodeClient[RPC, HEAD]) RegisterSub(sub Subscription, stopInFLightC
 		return fmt.Errorf("failed to register subscription - all in-flight requests were canceled")
 	default:
 	}
-	// TODO: BCI-3358 - delete sub when caller unsubscribes.
 	m.subs[sub] = struct{}{}
 	return nil
 }

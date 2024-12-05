@@ -94,6 +94,19 @@ func TestMultiNodeClient_HeadSubscriptions(t *testing.T) {
 			t.Fatal("failed to receive finalized head: ", ctx.Err())
 		}
 	})
+
+	t.Run("Remove Closed Subscriptions", func(t *testing.T) {
+		_, sub1, err := c.SubscribeToHeads(tests.Context(t))
+		require.NoError(t, err)
+		require.Equal(t, 1, c.LenSubs())
+		sub1.Unsubscribe()
+
+		_, sub2, err := c.SubscribeToHeads(tests.Context(t))
+		require.NoError(t, err)
+		defer sub2.Unsubscribe()
+		// Ensure sub1 was removed since it was closed
+		require.Equal(t, 1, c.LenSubs())
+	})
 }
 
 type mockSub struct {
