@@ -108,6 +108,16 @@ func TestMultiNodeClient_HeadSubscriptions(t *testing.T) {
 		sub2.Unsubscribe()
 		require.Equal(t, 0, c.LenSubs())
 	})
+
+	t.Run("Ensure no deadlock on UnsubscribeAll", func(t *testing.T) {
+		_, _, err := c.SubscribeToHeads(tests.Context(t))
+		require.NoError(t, err)
+		require.Equal(t, 1, c.LenSubs())
+		_, _, err = c.SubscribeToFinalizedHeads(tests.Context(t))
+		require.NoError(t, err)
+		require.Equal(t, 2, c.LenSubs())
+		c.UnsubscribeAllExcept()
+	})
 }
 
 type mockSub struct {

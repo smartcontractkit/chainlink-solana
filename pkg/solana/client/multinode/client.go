@@ -272,7 +272,10 @@ func (m *MultiNodeClient[RPC, HEAD]) UnsubscribeAllExcept(subs ...Subscription) 
 
 	for sub := range m.subs {
 		if _, keep := keepSubs[sub]; !keep {
+			// Release lock to avoid deadlock on unsubscribe
+			m.subsSliceMu.Unlock()
 			sub.Unsubscribe()
+			m.subsSliceMu.Lock()
 			delete(m.subs, sub)
 		}
 	}
