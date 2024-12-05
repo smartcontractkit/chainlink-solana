@@ -29,6 +29,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
+	mnCfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode/config"
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
@@ -335,8 +336,8 @@ func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
 
 	ch := solcfg.Chain{}
 	ch.SetDefaults()
-	mnCfg := solcfg.MultiNodeConfig{
-		MultiNode: solcfg.MultiNode{
+	mnCfg := mnCfg.MultiNodeConfig{
+		MultiNode: mnCfg.MultiNode{
 			Enabled: ptr(true),
 		},
 	}
