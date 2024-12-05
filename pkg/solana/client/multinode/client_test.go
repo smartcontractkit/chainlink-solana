@@ -95,17 +95,18 @@ func TestMultiNodeClient_HeadSubscriptions(t *testing.T) {
 		}
 	})
 
-	t.Run("Remove Closed Subscriptions", func(t *testing.T) {
+	t.Run("Remove Subscription on Unsubscribe", func(t *testing.T) {
 		_, sub1, err := c.SubscribeToHeads(tests.Context(t))
 		require.NoError(t, err)
 		require.Equal(t, 1, c.LenSubs())
-		sub1.Unsubscribe()
-
-		_, sub2, err := c.SubscribeToHeads(tests.Context(t))
+		_, sub2, err := c.SubscribeToFinalizedHeads(tests.Context(t))
 		require.NoError(t, err)
-		defer sub2.Unsubscribe()
-		// Ensure sub1 was removed since it was closed
+		require.Equal(t, 2, c.LenSubs())
+
+		sub1.Unsubscribe()
 		require.Equal(t, 1, c.LenSubs())
+		sub2.Unsubscribe()
+		require.Equal(t, 0, c.LenSubs())
 	})
 }
 
@@ -129,7 +130,7 @@ func TestMultiNodeClient_RegisterSubs(t *testing.T) {
 
 	t.Run("registerSub", func(t *testing.T) {
 		sub := newMockSub()
-		err := c.RegisterSub(sub, make(chan struct{}))
+		err := c.registerSub(sub, make(chan struct{}))
 		require.NoError(t, err)
 		require.Equal(t, 1, c.LenSubs())
 		c.UnsubscribeAllExcept()
@@ -139,7 +140,7 @@ func TestMultiNodeClient_RegisterSubs(t *testing.T) {
 		chStopInFlight := make(chan struct{})
 		close(chStopInFlight)
 		sub := newMockSub()
-		err := c.RegisterSub(sub, chStopInFlight)
+		err := c.registerSub(sub, chStopInFlight)
 		require.Error(t, err)
 		require.Equal(t, true, sub.unsubscribed)
 	})
@@ -148,9 +149,9 @@ func TestMultiNodeClient_RegisterSubs(t *testing.T) {
 		chStopInFlight := make(chan struct{})
 		sub1 := newMockSub()
 		sub2 := newMockSub()
-		err := c.RegisterSub(sub1, chStopInFlight)
+		err := c.registerSub(sub1, chStopInFlight)
 		require.NoError(t, err)
-		err = c.RegisterSub(sub2, chStopInFlight)
+		err = c.registerSub(sub2, chStopInFlight)
 		require.NoError(t, err)
 		require.Equal(t, 2, c.LenSubs())
 

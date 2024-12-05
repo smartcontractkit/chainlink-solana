@@ -37,6 +37,19 @@ type MultiNodeClient[RPC any, HEAD Head] struct {
 	latestChainInfo ChainInfo
 }
 
+// WrappedSubscription is used to ensure that the subscription is removed from the client when unsubscribed
+type WrappedSubscription struct {
+	Subscription
+	removeSub func(sub Subscription)
+}
+
+func (w *WrappedSubscription) Unsubscribe() {
+	w.Subscription.Unsubscribe()
+	if w.removeSub != nil {
+		w.removeSub(w)
+	}
+}
+
 func NewMultiNodeClient[RPC any, HEAD Head](
 	cfg *mnCfg.MultiNodeConfig, rpc *RPC, ctxTimeout time.Duration, log logger.Logger,
 	latestBlock func(ctx context.Context, rpc *RPC) (HEAD, error),
@@ -60,24 +73,14 @@ func (m *MultiNodeClient[RPC, HEAD]) LenSubs() int {
 	return len(m.subs)
 }
 
-// removeClosedSubscriptions removes any subscriptions that have been closed
-func (m *MultiNodeClient[RPC, HEAD]) removeClosedSubscriptions() {
+func (m *MultiNodeClient[RPC, HEAD]) removeSubscription(sub Subscription) {
 	m.subsSliceMu.Lock()
 	defer m.subsSliceMu.Unlock()
-	for sub := range m.subs {
-		select {
-		case _, ok := <-sub.Err():
-			if !ok {
-				delete(m.subs, sub)
-			}
-		default:
-		}
-	}
+	delete(m.subs, sub)
 }
 
-// RegisterSub adds the sub to the rpcClient list
-func (m *MultiNodeClient[RPC, HEAD]) RegisterSub(sub Subscription, stopInFLightCh chan struct{}) error {
-	defer m.removeClosedSubscriptions()
+// registerSub adds the sub to the rpcClient list
+func (m *MultiNodeClient[RPC, HEAD]) registerSub(sub Subscription, stopInFLightCh chan struct{}) error {
 	m.subsSliceMu.Lock()
 	defer m.subsSliceMu.Unlock()
 	// ensure that the `sub` belongs to current life cycle of the `rpcClient` and it should not be killed due to
@@ -148,13 +151,18 @@ func (m *MultiNodeClient[RPC, HEAD]) SubscribeToHeads(ctx context.Context) (<-ch
 		return nil, nil, err
 	}
 
-	err := m.RegisterSub(&poller, chStopInFlight)
+	sub := &WrappedSubscription{
+		Subscription: &poller,
+		removeSub:    m.removeSubscription,
+	}
+
+	err := m.registerSub(sub, chStopInFlight)
 	if err != nil {
-		poller.Unsubscribe()
+		sub.Unsubscribe()
 		return nil, nil, err
 	}
 
-	return channel, &poller, nil
+	return channel, sub, nil
 }
 
 func (m *MultiNodeClient[RPC, HEAD]) SubscribeToFinalizedHeads(ctx context.Context) (<-chan HEAD, Subscription, error) {
@@ -176,13 +184,18 @@ func (m *MultiNodeClient[RPC, HEAD]) SubscribeToFinalizedHeads(ctx context.Conte
 		return nil, nil, err
 	}
 
-	err := m.RegisterSub(&poller, chStopInFlight)
+	sub := &WrappedSubscription{
+		Subscription: &poller,
+		removeSub:    m.removeSubscription,
+	}
+
+	err := m.registerSub(sub, chStopInFlight)
 	if err != nil {
 		poller.Unsubscribe()
 		return nil, nil, err
 	}
 
-	return channel, &poller, nil
+	return channel, sub, nil
 }
 
 func (m *MultiNodeClient[RPC, HEAD]) OnNewHead(ctx context.Context, requestCh <-chan struct{}, head HEAD) {
