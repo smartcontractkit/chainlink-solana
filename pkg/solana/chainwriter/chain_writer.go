@@ -27,6 +27,7 @@ type SolanaChainWriterService struct {
 	codecs map[string]types.Codec
 }
 
+//nolint // ignoring naming suggestion
 type ChainWriterConfig struct {
 	Programs map[string]ProgramConfig
 }
@@ -285,7 +286,7 @@ func (s *SolanaChainWriterService) GetFeeComponents(ctx context.Context) (*types
 
 	fee := s.ge.BaseComputeUnitPrice()
 	return &types.ChainFeeComponents{
-		ExecutionFee:        big.NewInt(int64(fee)),
+		ExecutionFee:        new(big.Int).SetUint64(fee),
 		DataAvailabilityFee: nil,
 	}, nil
 }
