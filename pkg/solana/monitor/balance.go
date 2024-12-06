@@ -9,6 +9,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 )
 
 // Config defines the monitor configuration.
@@ -22,23 +24,23 @@ type Keystore interface {
 }
 
 type BalanceClient interface {
-	Balance(addr solana.PublicKey) (uint64, error)
+	Balance(ctx context.Context, addr solana.PublicKey) (uint64, error)
 }
 
 // NewBalanceMonitor returns a balance monitoring services.Service which reports the SOL balance of all ks keys to prometheus.
-func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, newReader func() (BalanceClient, error)) services.Service {
-	return newBalanceMonitor(chainID, cfg, lggr, ks, newReader)
+func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, reader internal.Loader[BalanceClient]) services.Service {
+	return newBalanceMonitor(chainID, cfg, lggr, ks, reader)
 }
 
-func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, newReader func() (BalanceClient, error)) *balanceMonitor {
+func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, reader internal.Loader[BalanceClient]) *balanceMonitor {
 	b := balanceMonitor{
-		chainID:   chainID,
-		cfg:       cfg,
-		lggr:      logger.Named(lggr, "BalanceMonitor"),
-		ks:        ks,
-		newReader: newReader,
-		stop:      make(chan struct{}),
-		done:      make(chan struct{}),
+		chainID: chainID,
+		cfg:     cfg,
+		lggr:    logger.Named(lggr, "BalanceMonitor"),
+		ks:      ks,
+		reader:  reader,
+		stop:    make(chan struct{}),
+		done:    make(chan struct{}),
 	}
 	b.updateFn = b.updateProm
 	return &b
@@ -46,14 +48,13 @@ func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keysto
 
 type balanceMonitor struct {
 	services.StateMachine
-	chainID   string
-	cfg       Config
-	lggr      logger.Logger
-	ks        Keystore
-	newReader func() (BalanceClient, error)
-	updateFn  func(acc solana.PublicKey, lamports uint64) // overridable for testing
+	chainID  string
+	cfg      Config
+	lggr     logger.Logger
+	ks       Keystore
+	updateFn func(acc solana.PublicKey, lamports uint64) // overridable for testing
 
-	reader BalanceClient
+	reader internal.Loader[BalanceClient]
 
 	stop services.StopChan
 	done chan struct{}
@@ -64,14 +65,14 @@ func (b *balanceMonitor) Name() string {
 }
 
 func (b *balanceMonitor) Start(context.Context) error {
-	return b.StartOnce("SolanaBalanceMonitor", func() error {
+	return b.StartOnce("BalanceMonitor", func() error {
 		go b.monitor()
 		return nil
 	})
 }
 
 func (b *balanceMonitor) Close() error {
-	return b.StopOnce("SolanaBalanceMonitor", func() error {
+	return b.StopOnce("BalanceMonitor", func() error {
 		close(b.stop)
 		<-b.done
 		return nil
@@ -99,19 +100,10 @@ func (b *balanceMonitor) monitor() {
 	}
 }
 
-// getReader returns the cached solanaClient.Reader, or creates a new one if nil.
-func (b *balanceMonitor) getReader() (BalanceClient, error) {
-	if b.reader == nil {
-		var err error
-		b.reader, err = b.newReader()
-		if err != nil {
-			return nil, err
-		}
-	}
-	return b.reader, nil
-}
-
 func (b *balanceMonitor) updateBalances(ctx context.Context) {
+	ctx, cancel := b.stop.Ctx(ctx)
+	defer cancel()
+
 	keys, err := b.ks.Accounts(ctx)
 	if err != nil {
 		b.lggr.Errorw("Failed to get keys", "err", err)
@@ -120,7 +112,7 @@ func (b *balanceMonitor) updateBalances(ctx context.Context) {
 	if len(keys) == 0 {
 		return
 	}
-	reader, err := b.getReader()
+	reader, err := b.reader.Get()
 	if err != nil {
 		b.lggr.Errorw("Failed to get client", "err", err)
 		return
@@ -129,7 +121,7 @@ func (b *balanceMonitor) updateBalances(ctx context.Context) {
 	for _, k := range keys {
 		// Check for shutdown signal, since Balance blocks and may be slow.
 		select {
-		case <-b.stop:
+		case <-ctx.Done():
 			return
 		default:
 		}
@@ -138,7 +130,7 @@ func (b *balanceMonitor) updateBalances(ctx context.Context) {
 			b.lggr.Errorw("Failed parse public key", "account", k, "err", err)
 			continue
 		}
-		lamports, err := reader.Balance(pubKey)
+		lamports, err := reader.Balance(ctx, pubKey)
 		if err != nil {
 			b.lggr.Errorw("Failed to get balance", "account", k, "err", err)
 			continue
@@ -148,6 +140,6 @@ func (b *balanceMonitor) updateBalances(ctx context.Context) {
 	}
 	if !gotSomeBals {
 		// Try a new client next time.
-		b.reader = nil
+		b.reader.Reset()
 	}
 }

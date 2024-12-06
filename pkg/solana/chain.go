@@ -18,15 +18,16 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/chains"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
-
-	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 )
@@ -48,6 +49,7 @@ const DefaultRequestTimeout = 30 * time.Second
 type ChainOpts struct {
 	Logger   logger.Logger
 	KeyStore core.Keystore
+	DS       sqlutil.DataSource
 }
 
 func (o *ChainOpts) Validate() (err error) {
@@ -60,6 +62,9 @@ func (o *ChainOpts) Validate() (err error) {
 	if o.KeyStore == nil {
 		err = errors.Join(err, required("KeyStore"))
 	}
+	if o.DS == nil {
+		err = errors.Join(err, required("DataSource"))
+	}
 	return
 }
 
@@ -71,7 +76,7 @@ func NewChain(cfg *config.TOMLConfig, opts ChainOpts) (Chain, error) {
 	if !cfg.IsEnabled() {
 		return nil, fmt.Errorf("cannot create new chain with ID %s: chain is disabled", *cfg.ChainID)
 	}
-	c, err := newChain(*cfg.ChainID, cfg, opts.KeyStore, opts.Logger)
+	c, err := newChain(*cfg.ChainID, cfg, opts.KeyStore, opts.Logger, opts.DS)
 	if err != nil {
 		return nil, err
 	}
@@ -89,8 +94,8 @@ type chain struct {
 	lggr           logger.Logger
 
 	// if multiNode is enabled, the clientCache will not be used
-	multiNode *mn.MultiNode[mn.StringID, *client.Client]
-	txSender  *mn.TransactionSender[*solanago.Transaction, mn.StringID, *client.Client]
+	multiNode *mn.MultiNode[mn.StringID, *client.MultiNodeClient]
+	txSender  *mn.TransactionSender[*solanago.Transaction, *client.SendTxResult, mn.StringID, *client.MultiNodeClient]
 
 	// tracking node chain id for verification
 	clientCache map[string]*verifiedCachedClient // map URL -> {client, chainId} [mainnet/testnet/devnet/localnet]
@@ -108,7 +113,7 @@ type verifiedCachedClient struct {
 	client.ReaderWriter
 }
 
-func (v *verifiedCachedClient) verifyChainID() (bool, error) {
+func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) {
 	v.chainIDVerifiedLock.RLock()
 	if v.chainIDVerified {
 		v.chainIDVerifiedLock.RUnlock()
@@ -121,7 +126,7 @@ func (v *verifiedCachedClient) verifyChainID() (bool, error) {
 	v.chainIDVerifiedLock.Lock()
 	defer v.chainIDVerifiedLock.Unlock()
 
-	strID, err := v.ReaderWriter.ChainID(context.Background())
+	strID, err := v.ReaderWriter.ChainID(ctx)
 	v.chainID = strID.String()
 	if err != nil {
 		v.chainIDVerified = false
@@ -141,7 +146,7 @@ func (v *verifiedCachedClient) verifyChainID() (bool, error) {
 }
 
 func (v *verifiedCachedClient) SendTx(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error) {
-	verified, err := v.verifyChainID()
+	verified, err := v.verifyChainID(ctx)
 	if !verified {
 		return [64]byte{}, err
 	}
@@ -150,7 +155,7 @@ func (v *verifiedCachedClient) SendTx(ctx context.Context, tx *solanago.Transact
 }
 
 func (v *verifiedCachedClient) SimulateTx(ctx context.Context, tx *solanago.Transaction, opts *rpc.SimulateTransactionOpts) (*rpc.SimulateTransactionResult, error) {
-	verified, err := v.verifyChainID()
+	verified, err := v.verifyChainID(ctx)
 	if !verified {
 		return nil, err
 	}
@@ -159,7 +164,7 @@ func (v *verifiedCachedClient) SimulateTx(ctx context.Context, tx *solanago.Tran
 }
 
 func (v *verifiedCachedClient) SignatureStatuses(ctx context.Context, sigs []solanago.Signature) ([]*rpc.SignatureStatusesResult, error) {
-	verified, err := v.verifyChainID()
+	verified, err := v.verifyChainID(ctx)
 	if !verified {
 		return nil, err
 	}
@@ -167,35 +172,35 @@ func (v *verifiedCachedClient) SignatureStatuses(ctx context.Context, sigs []sol
 	return v.ReaderWriter.SignatureStatuses(ctx, sigs)
 }
 
-func (v *verifiedCachedClient) Balance(addr solanago.PublicKey) (uint64, error) {
-	verified, err := v.verifyChainID()
+func (v *verifiedCachedClient) Balance(ctx context.Context, addr solanago.PublicKey) (uint64, error) {
+	verified, err := v.verifyChainID(ctx)
 	if !verified {
 		return 0, err
 	}
 
-	return v.ReaderWriter.Balance(addr)
+	return v.ReaderWriter.Balance(ctx, addr)
 }
 
-func (v *verifiedCachedClient) SlotHeight() (uint64, error) {
-	verified, err := v.verifyChainID()
+func (v *verifiedCachedClient) SlotHeight(ctx context.Context) (uint64, error) {
+	verified, err := v.verifyChainID(ctx)
 	if !verified {
 		return 0, err
 	}
 
-	return v.ReaderWriter.SlotHeight()
+	return v.ReaderWriter.SlotHeight(ctx)
 }
 
-func (v *verifiedCachedClient) LatestBlockhash() (*rpc.GetLatestBlockhashResult, error) {
-	verified, err := v.verifyChainID()
+func (v *verifiedCachedClient) LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockhashResult, error) {
+	verified, err := v.verifyChainID(ctx)
 	if !verified {
 		return nil, err
 	}
 
-	return v.ReaderWriter.LatestBlockhash()
+	return v.ReaderWriter.LatestBlockhash(ctx)
 }
 
 func (v *verifiedCachedClient) ChainID(ctx context.Context) (mn.StringID, error) {
-	verified, err := v.verifyChainID()
+	verified, err := v.verifyChainID(ctx)
 	if !verified {
 		return "", err
 	}
@@ -203,17 +208,17 @@ func (v *verifiedCachedClient) ChainID(ctx context.Context) (mn.StringID, error)
 	return mn.StringID(v.chainID), nil
 }
 
-func (v *verifiedCachedClient) GetFeeForMessage(msg string) (uint64, error) {
-	verified, err := v.verifyChainID()
+func (v *verifiedCachedClient) GetFeeForMessage(ctx context.Context, msg string) (uint64, error) {
+	verified, err := v.verifyChainID(ctx)
 	if !verified {
 		return 0, err
 	}
 
-	return v.ReaderWriter.GetFeeForMessage(msg)
+	return v.ReaderWriter.GetFeeForMessage(ctx, msg)
 }
 
 func (v *verifiedCachedClient) GetAccountInfoWithOpts(ctx context.Context, addr solanago.PublicKey, opts *rpc.GetAccountInfoOpts) (*rpc.GetAccountInfoResult, error) {
-	verified, err := v.verifyChainID()
+	verified, err := v.verifyChainID(ctx)
 	if !verified {
 		return nil, err
 	}
@@ -221,7 +226,7 @@ func (v *verifiedCachedClient) GetAccountInfoWithOpts(ctx context.Context, addr 
 	return v.ReaderWriter.GetAccountInfoWithOpts(ctx, addr, opts)
 }
 
-func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.Logger) (*chain, error) {
+func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.Logger, ds sqlutil.DataSource) (*chain, error) {
 	lggr = logger.With(lggr, "chainID", id, "chain", "solana")
 	var ch = chain{
 		id:          id,
@@ -230,36 +235,43 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 		clientCache: map[string]*verifiedCachedClient{},
 	}
 
-	if cfg.MultiNodeEnabled() {
+	var tc internal.Loader[client.ReaderWriter] = utils.NewLazyLoad(func() (client.ReaderWriter, error) { return ch.getClient() })
+	var bc internal.Loader[monitor.BalanceClient] = utils.NewLazyLoad(func() (monitor.BalanceClient, error) { return ch.getClient() })
+
+	// txm will default to sending transactions using a single RPC client if sendTx is nil
+	var sendTx func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error)
+
+	if cfg.MultiNode.Enabled() {
 		chainFamily := "solana"
 
-		mnCfg := cfg.MultiNodeConfig()
+		mnCfg := &cfg.MultiNode
 
-		var nodes []mn.Node[mn.StringID, *client.Client]
-		var sendOnlyNodes []mn.SendOnlyNode[mn.StringID, *client.Client]
+		var nodes []mn.Node[mn.StringID, *client.MultiNodeClient]
+		var sendOnlyNodes []mn.SendOnlyNode[mn.StringID, *client.MultiNodeClient]
 
 		for i, nodeInfo := range cfg.ListNodes() {
-			rpcClient, err := client.NewClient(nodeInfo.URL.String(), cfg, DefaultRequestTimeout, logger.Named(lggr, "Client."+*nodeInfo.Name))
+			rpcClient, err := client.NewMultiNodeClient(nodeInfo.URL.String(), cfg, DefaultRequestTimeout, logger.Named(lggr, "Client."+*nodeInfo.Name))
 			if err != nil {
 				lggr.Warnw("failed to create client", "name", *nodeInfo.Name, "solana-url", nodeInfo.URL.String(), "err", err.Error())
 				return nil, fmt.Errorf("failed to create client: %w", err)
 			}
 
-			newNode := mn.NewNode[mn.StringID, *client.Head, *client.Client](
-				mnCfg, mnCfg, lggr, *nodeInfo.URL.URL(), nil, *nodeInfo.Name,
-				i, mn.StringID(id), 0, rpcClient, chainFamily)
-
 			if nodeInfo.SendOnly {
-				sendOnlyNodes = append(sendOnlyNodes, newNode)
+				newSendOnly := mn.NewSendOnlyNode[mn.StringID, *client.MultiNodeClient](
+					lggr, *nodeInfo.URL.URL(), *nodeInfo.Name, mn.StringID(id), rpcClient)
+				sendOnlyNodes = append(sendOnlyNodes, newSendOnly)
 			} else {
+				newNode := mn.NewNode[mn.StringID, *client.Head, *client.MultiNodeClient](
+					mnCfg, mnCfg, lggr, *nodeInfo.URL.URL(), nil, *nodeInfo.Name,
+					i, mn.StringID(id), 0, rpcClient, chainFamily)
 				nodes = append(nodes, newNode)
 			}
 		}
 
-		multiNode := mn.NewMultiNode[mn.StringID, *client.Client](
+		multiNode := mn.NewMultiNode[mn.StringID, *client.MultiNodeClient](
 			lggr,
-			mn.NodeSelectionModeRoundRobin,
-			0,
+			mnCfg.SelectionMode(),
+			mnCfg.LeaseDuration(),
 			nodes,
 			sendOnlyNodes,
 			mn.StringID(id),
@@ -267,18 +279,12 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 			mnCfg.DeathDeclarationDelay(),
 		)
 
-		// TODO: implement error classification; move logic to separate file if large
-		// TODO: might be useful to reference anza-xyz/agave@master/sdk/src/transaction/error.rs
-		classifySendError := func(tx *solanago.Transaction, err error) mn.SendTxReturnCode {
-			return 0 // TODO ClassifySendError(err, clientErrors, logger.Sugared(logger.Nop()), tx, common.Address{}, false)
-		}
-
-		txSender := mn.NewTransactionSender[*solanago.Transaction, mn.StringID, *client.Client](
+		txSender := mn.NewTransactionSender[*solanago.Transaction, *client.SendTxResult, mn.StringID, *client.MultiNodeClient](
 			lggr,
 			mn.StringID(id),
 			chainFamily,
 			multiNode,
-			classifySendError,
+			client.NewSendTxResult,
 			0, // use the default value provided by the implementation
 		)
 
@@ -287,26 +293,32 @@ func newChain(id string, cfg *config.TOMLConfig, ks loop.Keystore, lggr logger.L
 
 		// clientCache will not be used if multinode is enabled
 		ch.clientCache = nil
+
+		// Send tx using MultiNode transaction sender
+		sendTx = func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error) {
+			result := ch.txSender.SendTransaction(ctx, tx)
+			if result == nil {
+				return solanago.Signature{}, errors.New("tx sender returned nil result")
+			}
+			return result.Signature(), result.Error()
+		}
+
+		tc = internal.NewLoader[client.ReaderWriter](func() (client.ReaderWriter, error) { return ch.multiNode.SelectRPC() })
+		bc = internal.NewLoader[monitor.BalanceClient](func() (monitor.BalanceClient, error) { return ch.multiNode.SelectRPC() })
 	}
 
-	tc := func() (client.ReaderWriter, error) {
-		return ch.getClient()
-	}
-	ch.txm = txm.NewTxm(ch.id, tc, cfg, ks, lggr)
-	bc := func() (monitor.BalanceClient, error) {
-		return ch.getClient()
-	}
+	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
 	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
 	return &ch, nil
 }
 
-func (c *chain) LatestHead(_ context.Context) (types.Head, error) {
+func (c *chain) LatestHead(ctx context.Context) (types.Head, error) {
 	sc, err := c.getClient()
 	if err != nil {
 		return types.Head{}, err
 	}
 
-	latestBlock, err := sc.GetLatestBlock()
+	latestBlock, err := sc.GetLatestBlock(ctx)
 	if err != nil {
 		return types.Head{}, nil
 	}
@@ -397,8 +409,9 @@ func (c *chain) ChainID() string {
 }
 
 // getClient returns a client, randomly selecting one from available and valid nodes
+// If multinode is enabled, it will return a client using the multinode selection instead.
 func (c *chain) getClient() (client.ReaderWriter, error) {
-	if c.cfg.MultiNodeEnabled() {
+	if c.cfg.MultiNode.Enabled() {
 		return c.multiNode.SelectRPC()
 	}
 
@@ -482,7 +495,7 @@ func (c *chain) Start(ctx context.Context) error {
 		c.lggr.Debug("Starting balance monitor")
 		var ms services.MultiStart
 		startAll := []services.StartClose{c.txm, c.balanceMonitor}
-		if c.cfg.MultiNodeEnabled() {
+		if c.cfg.MultiNode.Enabled() {
 			c.lggr.Debug("Starting multinode")
 			startAll = append(startAll, c.multiNode, c.txSender)
 		}
@@ -496,7 +509,7 @@ func (c *chain) Close() error {
 		c.lggr.Debug("Stopping txm")
 		c.lggr.Debug("Stopping balance monitor")
 		closeAll := []io.Closer{c.txm, c.balanceMonitor}
-		if c.cfg.MultiNodeEnabled() {
+		if c.cfg.MultiNode.Enabled() {
 			c.lggr.Debug("Stopping multinode")
 			closeAll = append(closeAll, c.multiNode, c.txSender)
 		}
@@ -536,7 +549,7 @@ func (c *chain) sendTx(ctx context.Context, from, to string, amount *big.Int, ba
 	}
 	amountI := amount.Uint64()
 
-	blockhash, err := reader.LatestBlockhash()
+	blockhash, err := reader.LatestBlockhash(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get latest block hash: %w", err)
 	}
@@ -556,13 +569,13 @@ func (c *chain) sendTx(ctx context.Context, from, to string, amount *big.Int, ba
 	}
 
 	if balanceCheck {
-		if err = solanaValidateBalance(reader, fromKey, amountI, tx.Message.ToBase64()); err != nil {
+		if err = solanaValidateBalance(ctx, reader, fromKey, amountI, tx.Message.ToBase64()); err != nil {
 			return fmt.Errorf("failed to validate balance: %w", err)
 		}
 	}
 
 	chainTxm := c.TxManager()
-	err = chainTxm.Enqueue("", tx,
+	err = chainTxm.Enqueue(ctx, "", tx, nil,
 		txm.SetComputeUnitLimit(500), // reduce from default 200K limit - should only take 450 compute units
 		// no fee bumping and no additional fee - makes validating balance accurate
 		txm.SetComputeUnitPriceMax(0),
@@ -576,13 +589,13 @@ func (c *chain) sendTx(ctx context.Context, from, to string, amount *big.Int, ba
 	return nil
 }
 
-func solanaValidateBalance(reader client.Reader, from solanago.PublicKey, amount uint64, msg string) error {
-	balance, err := reader.Balance(from)
+func solanaValidateBalance(ctx context.Context, reader client.Reader, from solanago.PublicKey, amount uint64, msg string) error {
+	balance, err := reader.Balance(ctx, from)
 	if err != nil {
 		return err
 	}
 
-	fee, err := reader.GetFeeForMessage(msg)
+	fee, err := reader.GetFeeForMessage(ctx, msg)
 	if err != nil {
 		return err
 	}

@@ -10,10 +10,11 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/rs/zerolog/log"
-	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 
-	ocr_2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr_2"
+	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
+
+	"github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr_2"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 )
 
@@ -254,6 +255,7 @@ func (m *OCRv2) Configure(cfg contracts.OffChainAggregatorV2Config) error {
 		cfg.S,
 		cfg.Oracles,
 		cfg.ReportingPluginConfig,
+		nil,
 		cfg.MaxDurationQuery.Duration(),
 		cfg.MaxDurationObservation.Duration(),
 		cfg.MaxDurationReport.Duration(),

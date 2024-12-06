@@ -111,6 +111,7 @@ rm-mocked:
 .PHONY: generate
 generate: mockery gomods
 	gomods -w go generate -x ./...
+	mockery
 
 .PHONY: lint-go-integration-tests
 lint-go-integration-tests:
@@ -130,4 +131,4 @@ upgrade-e2e-core-deps:
 
 .PHONY: format-contracts
 format-contracts:
-	cd ./contracts && cargo fmt && go fmt ./... && yarn format 
+	cd ./contracts && cargo fmt && go fmt ./... && pnpm format 

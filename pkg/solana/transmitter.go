@@ -11,15 +11,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
-
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 )
 
 var _ types.ContractTransmitter = (*Transmitter)(nil)
 
 type Transmitter struct {
 	stateID, programID, storeProgramID, transmissionsID, transmissionSigner solana.PublicKey
-	reader                                                                  client.Reader
+	getReader                                                               GetReader
 	stateCache                                                              *StateCache
 	lggr                                                                    logger.Logger
 	txManager                                                               TxManager
@@ -32,7 +30,12 @@ func (c *Transmitter) Transmit(
 	report types.Report,
 	sigs []types.AttributedOnchainSignature,
 ) error {
-	blockhash, err := c.reader.LatestBlockhash()
+	reader, err := c.getReader()
+	if err != nil {
+		return fmt.Errorf("error on Transmit.Reader: %w", err)
+	}
+
+	blockhash, err := reader.LatestBlockhash(ctx)
 	if err != nil {
 		return fmt.Errorf("error on Transmit.GetRecentBlockhash: %w", err)
 	}
@@ -84,7 +87,7 @@ func (c *Transmitter) Transmit(
 
 	// pass transmit payload to tx manager queue
 	c.lggr.Debugf("Queuing transmit tx: state (%s) + transmissions (%s)", c.stateID.String(), c.transmissionsID.String())
-	if err = c.txManager.Enqueue(c.stateID.String(), tx); err != nil {
+	if err = c.txManager.Enqueue(ctx, c.stateID.String(), tx, nil); err != nil {
 		return fmt.Errorf("error on Transmit.txManager.Enqueue: %w", err)
 	}
 	return nil
@@ -101,6 +104,6 @@ func (c *Transmitter) LatestConfigDigestAndEpoch(
 	return state.Config.LatestConfigDigest, state.Config.Epoch, err
 }
 
-func (c *Transmitter) FromAccount() (types.Account, error) {
+func (c *Transmitter) FromAccount(ctx context.Context) (types.Account, error) {
 	return types.Account(c.transmissionSigner.String()), nil
 }

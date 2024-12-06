@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 )
 
 func TestLatestBlockHeight(t *testing.T) {
@@ -19,7 +21,7 @@ func TestLatestBlockHeight(t *testing.T) {
 
 	ctx := context.Background()
 	c := &ConfigTracker{
-		reader: testSetupReader(t, mockServer.URL),
+		getReader: func() (client.Reader, error) { return testSetupReader(t, mockServer.URL), nil },
 	}
 
 	h, err := c.LatestBlockHeight(ctx)

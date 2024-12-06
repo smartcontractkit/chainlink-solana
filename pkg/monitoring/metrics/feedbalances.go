@@ -8,8 +8,6 @@ import (
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
 )
 
-//go:generate mockery --name FeedBalances --output ./mocks/
-
 type FeedBalances interface {
 	Exists(balanceAccountName string) (*prometheus.GaugeVec, bool)
 	SetBalance(balance uint64, balanceAccountName string, feedInput FeedInput)

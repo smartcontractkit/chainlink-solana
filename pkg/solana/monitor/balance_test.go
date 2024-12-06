@@ -9,9 +9,11 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
@@ -36,13 +38,12 @@ func TestBalanceMonitor(t *testing.T) {
 		"1.000000000",
 	}
 
-	client := new(mocks.ReaderWriter)
-	client.Test(t)
+	client := mocks.NewReaderWriter(t)
 	type update struct{ acc, bal string }
 	var exp []update
 	for i := range bals {
 		acc := ks[i]
-		client.On("Balance", acc).Return(bals[i], nil)
+		client.On("Balance", mock.Anything, acc).Return(bals[i], nil)
 		exp = append(exp, update{acc.String(), expBals[i]})
 	}
 	cfg := &config{balancePollPeriod: time.Second}
@@ -61,13 +62,12 @@ func TestBalanceMonitor(t *testing.T) {
 			close(done)
 		}
 	}
-	b.reader = client
 
-	require.NoError(t, b.Start(tests.Context(t)))
-	t.Cleanup(func() {
-		assert.NoError(t, b.Close())
-		client.AssertExpectations(t)
+	b.reader = internal.NewLoader[BalanceClient](func() (BalanceClient, error) {
+		return client, nil
 	})
+
+	servicetest.Run(t, b)
 	select {
 	case <-time.After(tests.WaitTimeout(t)):
 		t.Fatal("timed out waiting for balance monitor")

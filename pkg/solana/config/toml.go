@@ -113,8 +113,8 @@ type TOMLConfig struct {
 	// Do not access directly, use [IsEnabled]
 	Enabled *bool
 	Chain
-	MultiNode
-	Nodes Nodes
+	MultiNode MultiNodeConfig
+	Nodes     Nodes
 }
 
 func (c *TOMLConfig) IsEnabled() bool {
@@ -130,6 +130,7 @@ func (c *TOMLConfig) SetFrom(f *TOMLConfig) {
 	}
 	setFromChain(&c.Chain, &f.Chain)
 	c.Nodes.SetFrom(&f.Nodes)
+	c.MultiNode.SetFrom(&f.MultiNode)
 }
 
 func setFromChain(c, f *Chain) {
@@ -153,6 +154,9 @@ func setFromChain(c, f *Chain) {
 	}
 	if f.TxConfirmTimeout != nil {
 		c.TxConfirmTimeout = f.TxConfirmTimeout
+	}
+	if f.TxRetentionTimeout != nil {
+		c.TxRetentionTimeout = f.TxRetentionTimeout
 	}
 	if f.SkipPreflight != nil {
 		c.SkipPreflight = f.SkipPreflight
@@ -180,6 +184,9 @@ func setFromChain(c, f *Chain) {
 	}
 	if f.BlockHistoryPollPeriod != nil {
 		c.BlockHistoryPollPeriod = f.BlockHistoryPollPeriod
+	}
+	if f.BlockHistorySize != nil {
+		c.BlockHistorySize = f.BlockHistorySize
 	}
 }
 
@@ -234,6 +241,9 @@ func (c *TOMLConfig) TxConfirmTimeout() time.Duration {
 	return c.Chain.TxConfirmTimeout.Duration()
 }
 
+func (c *TOMLConfig) TxRetentionTimeout() time.Duration {
+	return c.Chain.TxRetentionTimeout.Duration()
+}
 func (c *TOMLConfig) SkipPreflight() bool {
 	return *c.Chain.SkipPreflight
 }
@@ -277,16 +287,20 @@ func (c *TOMLConfig) BlockHistoryPollPeriod() time.Duration {
 	return c.Chain.BlockHistoryPollPeriod.Duration()
 }
 
+func (c *TOMLConfig) BlockHistorySize() uint64 {
+	return *c.Chain.BlockHistorySize
+}
+
 func (c *TOMLConfig) ComputeUnitLimitDefault() uint32 {
 	return *c.Chain.ComputeUnitLimitDefault
 }
 
-func (c *TOMLConfig) ListNodes() Nodes {
-	return c.Nodes
+func (c *TOMLConfig) EstimateComputeUnitLimit() bool {
+	return *c.Chain.EstimateComputeUnitLimit
 }
 
-func (c *TOMLConfig) MultiNodeConfig() *MultiNode {
-	return &c.MultiNode
+func (c *TOMLConfig) ListNodes() Nodes {
+	return c.Nodes
 }
 
 func (c *TOMLConfig) SetDefaults() {

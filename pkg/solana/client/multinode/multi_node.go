@@ -90,11 +90,9 @@ func (c *MultiNode[CHAIN_ID, RPC]) ChainID() CHAIN_ID {
 	return c.chainID
 }
 
-func (c *MultiNode[CHAIN_ID, RPC]) DoAll(baseCtx context.Context, do func(ctx context.Context, rpc RPC, isSendOnly bool)) error {
+func (c *MultiNode[CHAIN_ID, RPC]) DoAll(ctx context.Context, do func(ctx context.Context, rpc RPC, isSendOnly bool)) error {
 	var err error
 	ok := c.IfNotStopped(func() {
-		ctx, _ := c.chStop.Ctx(baseCtx)
-
 		callsCompleted := 0
 		for _, n := range c.primaryNodes {
 			select {
@@ -132,13 +130,13 @@ func (c *MultiNode[CHAIN_ID, RPC]) DoAll(baseCtx context.Context, do func(ctx co
 	return err
 }
 
-func (c *MultiNode[CHAIN_ID, RPC]) NodeStates() map[string]NodeState {
-	states := map[string]NodeState{}
+func (c *MultiNode[CHAIN_ID, RPC]) NodeStates() map[string]string {
+	states := map[string]string{}
 	for _, n := range c.primaryNodes {
-		states[n.String()] = n.State()
+		states[n.Name()] = n.State().String()
 	}
 	for _, n := range c.sendOnlyNodes {
-		states[n.String()] = n.State()
+		states[n.Name()] = n.State().String()
 	}
 	return states
 }
@@ -374,6 +372,6 @@ func (c *MultiNode[CHAIN_ID, RPC]) report(nodesStateInfo []nodeWithState) {
 		c.lggr.Criticalw(rerr.Error(), "nodeStates", nodesStateInfo)
 		c.SvcErrBuffer.Append(rerr)
 	} else if dead > 0 {
-		c.lggr.Errorw(fmt.Sprintf("At least one primary node is dead: %d/%d nodes are alive", live, total), "nodeStates", nodesStateInfo)
+		c.lggr.Warnw(fmt.Sprintf("At least one primary node is dead: %d/%d nodes are alive", live, total), "nodeStates", nodesStateInfo)
 	}
 }

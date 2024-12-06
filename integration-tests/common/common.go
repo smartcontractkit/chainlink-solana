@@ -19,7 +19,7 @@ import (
 	mock_adapter "github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/mock-adapter"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/sol"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/client"
+	client "github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -51,7 +51,7 @@ type TestEnvDetails struct {
 type ChainDetails struct {
 	ChainName             string
 	ChainID               string
-	RPCUrl                string
+	RPCUrls               []string
 	RPCURLExternal        string
 	WSURLExternal         string
 	ProgramAddresses      *chainConfig.ProgramAddresses
@@ -116,9 +116,9 @@ func New(testConfig *tc.TestConfig) *Common {
 		config = chainConfig.DevnetConfig()
 		privateKeyString = *testConfig.Common.PrivateKey
 
-		if *testConfig.Common.RPCURL != "" {
-			config.RPCUrl = *testConfig.Common.RPCURL
-			config.WSUrl = *testConfig.Common.WsURL
+		if len(*testConfig.Common.RPCURLs) > 0 {
+			config.RPCUrls = *testConfig.Common.RPCURLs
+			config.WSUrls = *testConfig.Common.WsURLs
 			config.ProgramAddresses = &chainConfig.ProgramAddresses{
 				OCR2:             *testConfig.SolanaConfig.OCR2ProgramID,
 				AccessController: *testConfig.SolanaConfig.AccessControllerProgramID,
@@ -130,7 +130,7 @@ func New(testConfig *tc.TestConfig) *Common {
 	c = &Common{
 		ChainDetails: &ChainDetails{
 			ChainID:          config.ChainID,
-			RPCUrl:           config.RPCUrl,
+			RPCUrls:          config.RPCUrls,
 			ChainName:        config.ChainName,
 			ProgramAddresses: config.ProgramAddresses,
 		},
@@ -146,7 +146,7 @@ func New(testConfig *tc.TestConfig) *Common {
 	}
 	// provide getters for TestConfig (pointers to chain details)
 	c.TestConfig.GetChainID = func() string { return c.ChainDetails.ChainID }
-	c.TestConfig.GetURL = func() string { return c.ChainDetails.RPCUrl }
+	c.TestConfig.GetURL = func() []string { return c.ChainDetails.RPCUrls }
 
 	return c
 }
@@ -298,7 +298,7 @@ func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error
 		bootstrapNodeInternalIP = contractNodeInfo.BootstrapNode.InternalIP()
 	}
 	relayConfig := job.JSONConfig{
-		"nodeEndpointHTTP": c.ChainDetails.RPCUrl,
+		"nodeEndpointHTTP": c.ChainDetails.RPCUrls,
 		"ocr2ProgramID":    contractNodeInfo.OCR2.ProgramAddress(),
 		"transmissionsID":  contractNodeInfo.Store.TransmissionsAddress(),
 		"storeProgramID":   contractNodeInfo.Store.ProgramAddress(),
@@ -384,10 +384,24 @@ func BuildNodeContractPairID(node *client.ChainlinkClient, ocr2Addr string) (str
 }
 
 func (c *Common) Default(t *testing.T, namespacePrefix string) (*Common, error) {
+	productName := "data-feedsv2.0"
+	nsLabels, err := environment.GetRequiredChainLinkNamespaceLabels(productName, "soak")
+	if err != nil {
+		return nil, err
+	}
+
+	workloadPodLabels, err := environment.GetRequiredChainLinkWorkloadAndPodLabels(productName, "soak")
+	if err != nil {
+		return nil, err
+	}
+
 	c.TestEnvDetails.K8Config = &environment.Config{
 		NamespacePrefix: fmt.Sprintf("solana-%s", namespacePrefix),
 		TTL:             c.TestEnvDetails.TestDuration,
 		Test:            t,
+		Labels:          nsLabels,
+		WorkloadLabels:  workloadPodLabels,
+		PodLabels:       workloadPodLabels,
 	}
 
 	if *c.TestConfig.Common.InsideK8s {

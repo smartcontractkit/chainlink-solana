@@ -5,13 +5,11 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
-
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 )
 
 type ConfigTracker struct {
 	stateCache *StateCache
-	reader     client.Reader
+	getReader  GetReader
 }
 
 func (c *ConfigTracker) Notify() <-chan struct{} {
@@ -25,7 +23,7 @@ func (c *ConfigTracker) LatestConfigDetails(ctx context.Context) (changedInBlock
 	return state.Config.LatestConfigBlockNumber, state.Config.LatestConfigDigest, err
 }
 
-func ConfigFromState(state State) (types.ContractConfig, error) {
+func ConfigFromState(ctx context.Context, state State) (types.ContractConfig, error) {
 	pubKeys := []types.OnchainPublicKey{}
 	accounts := []types.Account{}
 	oracles, err := state.Oracles.Data()
@@ -43,7 +41,7 @@ func ConfigFromState(state State) (types.ContractConfig, error) {
 		Max: state.Config.MaxAnswer.BigInt(),
 	}
 
-	onchainConfig, err := median.StandardOnchainConfigCodec{}.Encode(onchainConfigStruct)
+	onchainConfig, err := median.StandardOnchainConfigCodec{}.Encode(ctx, onchainConfigStruct)
 	if err != nil {
 		return types.ContractConfig{}, err
 	}
@@ -70,10 +68,14 @@ func (c *ConfigTracker) LatestConfig(ctx context.Context, changedInBlock uint64)
 	if err != nil {
 		return types.ContractConfig{}, err
 	}
-	return ConfigFromState(state)
+	return ConfigFromState(ctx, state)
 }
 
 // LatestBlockHeight returns the height of the most recent block in the chain.
 func (c *ConfigTracker) LatestBlockHeight(ctx context.Context) (blockHeight uint64, err error) {
-	return c.reader.SlotHeight() // this returns the latest slot height through CommitmentProcessed
+	reader, err := c.getReader()
+	if err != nil {
+		return 0, err
+	}
+	return reader.SlotHeight(ctx) // this returns the latest slot height through CommitmentProcessed
 }

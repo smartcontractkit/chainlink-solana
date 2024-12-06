@@ -21,7 +21,7 @@ import (
 	test_env_ctf "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/client"
+	client "github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -118,9 +118,9 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		m.Common.ChainDetails.WSURLExternal = m.Common.Env.URLs["sol"][1]
 
 		if *m.Config.TestConfig.Common.Network == "devnet" {
-			m.Common.ChainDetails.RPCUrl = *m.Config.TestConfig.Common.RPCURL
-			m.Common.ChainDetails.RPCURLExternal = *m.Config.TestConfig.Common.RPCURL
-			m.Common.ChainDetails.WSURLExternal = *m.Config.TestConfig.Common.WsURL
+			m.Common.ChainDetails.RPCUrls = *m.Config.TestConfig.Common.RPCURLs
+			m.Common.ChainDetails.RPCURLExternal = (*m.Config.TestConfig.Common.RPCURLs)[0]
+			m.Common.ChainDetails.WSURLExternal = (*m.Config.TestConfig.Common.WsURLs)[0]
 		}
 
 		m.Common.ChainDetails.MockserverURLInternal = m.Common.Env.URLs["qa_mock_adapter_internal"][0]
@@ -133,14 +133,14 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		require.NoError(m.Config.T, err)
 
 		// Setting the External RPC url for Gauntlet
-		m.Common.ChainDetails.RPCUrl = sol.InternalHTTPURL
+		m.Common.ChainDetails.RPCUrls = []string{sol.InternalHTTPURL}
 		m.Common.ChainDetails.RPCURLExternal = sol.ExternalHTTPURL
 		m.Common.ChainDetails.WSURLExternal = sol.ExternalWsURL
 
 		if *m.Config.TestConfig.Common.Network == "devnet" {
-			m.Common.ChainDetails.RPCUrl = *m.Config.TestConfig.Common.RPCURL
-			m.Common.ChainDetails.RPCURLExternal = *m.Config.TestConfig.Common.RPCURL
-			m.Common.ChainDetails.WSURLExternal = *m.Config.TestConfig.Common.WsURL
+			m.Common.ChainDetails.RPCUrls = *m.Config.TestConfig.Common.RPCURLs
+			m.Common.ChainDetails.RPCURLExternal = (*m.Config.TestConfig.Common.RPCURLs)[0]
+			m.Common.ChainDetails.WSURLExternal = (*m.Config.TestConfig.Common.WsURLs)[0]
 		}
 
 		b, err := test_env.NewCLTestEnvBuilder().
@@ -253,7 +253,10 @@ func (m *OCRv2TestState) UpgradeContracts(baseDir, subDir string) {
 			"store":             m.Common.ChainDetails.ProgramAddresses.Store,
 		}
 		val, ok := ids[programName]
-		require.True(m.Config.T, ok, fmt.Sprintf("unable to find corresponding key (%s) within %+v", programName, ids))
+		if !ok {
+			val = solclient.BuildProgramIDKeypairPath(programName)
+			log.Warn().Str("Program", programName).Msg(fmt.Sprintf("falling back to path (%s) unable to find corresponding key (%s) within %+v", val, programName, ids))
+		}
 		return val
 	}
 
@@ -273,7 +276,7 @@ func (m *OCRv2TestState) CreateJobs() {
 	require.NoError(m.Config.T, err, "Error connecting to websocket client")
 
 	relayConfig := job.JSONConfig{
-		"nodeEndpointHTTP": m.Common.ChainDetails.RPCUrl,
+		"nodeEndpointHTTP": m.Common.ChainDetails.RPCUrls,
 		"ocr2ProgramID":    m.Common.ChainDetails.ProgramAddresses.OCR2,
 		"transmissionsID":  m.Gauntlet.FeedAddress,
 		"storeProgramID":   m.Common.ChainDetails.ProgramAddresses.Store,

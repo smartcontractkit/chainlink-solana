@@ -1,6 +1,7 @@
 package solana
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"math/big"
@@ -15,7 +16,7 @@ var _ median.ReportCodec = (*ReportCodec)(nil)
 
 type ReportCodec struct{}
 
-func (c ReportCodec) BuildReport(oo []median.ParsedAttributedObservation) (types.Report, error) {
+func (c ReportCodec) BuildReport(ctx context.Context, oo []median.ParsedAttributedObservation) (types.Report, error) {
 	n := len(oo)
 	if n == 0 {
 		return nil, fmt.Errorf("cannot build report from empty attributed observations")
@@ -78,7 +79,7 @@ func (c ReportCodec) BuildReport(oo []median.ParsedAttributedObservation) (types
 	return types.Report(report), nil
 }
 
-func (c ReportCodec) MedianFromReport(report types.Report) (*big.Int, error) {
+func (c ReportCodec) MedianFromReport(ctx context.Context, report types.Report) (*big.Int, error) {
 	// report should contain timestamp + observers + median + juels per eth
 	if len(report) != int(ReportLen) {
 		return nil, fmt.Errorf("report length mismatch: %d (received), %d (expected)", len(report), ReportLen)
@@ -91,7 +92,7 @@ func (c ReportCodec) MedianFromReport(report types.Report) (*big.Int, error) {
 	return bigbigendian.DeserializeSigned(int(MedianLen), median)
 }
 
-func (c ReportCodec) MaxReportLength(n int) (int, error) {
+func (c ReportCodec) MaxReportLength(ctx context.Context, n int) (int, error) {
 	return int(ReportLen), nil
 }
 

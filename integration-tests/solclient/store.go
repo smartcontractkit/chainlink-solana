@@ -8,6 +8,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/contracts/generated/store"
 	relaySol "github.com/smartcontractkit/chainlink-solana/pkg/solana"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 )
 
 type Store struct {
@@ -19,7 +20,8 @@ type Store struct {
 }
 
 func (m *Store) GetLatestRoundData() (uint64, uint64, uint64, error) {
-	a, _, err := relaySol.GetLatestTransmission(context.Background(), m.Client.RPC, m.Feed.PublicKey(), rpc.CommitmentConfirmed)
+	getReader := func() (client.AccountReader, error) { return m.Client.RPC, nil }
+	a, _, err := relaySol.GetLatestTransmission(context.Background(), getReader, m.Feed.PublicKey(), rpc.CommitmentConfirmed)
 	if err != nil {
 		return 0, 0, 0, err
 	}

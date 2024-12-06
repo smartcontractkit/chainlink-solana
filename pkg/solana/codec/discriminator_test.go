@@ -6,8 +6,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )

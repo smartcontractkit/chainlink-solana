@@ -1,6 +1,7 @@
 package solana
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
@@ -20,7 +21,7 @@ type OffchainConfigDigester struct {
 }
 
 // ConfigDigest is meant to do the same thing as config_digest_from_data from the program.
-func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.ConfigDigest, error) {
+func (d OffchainConfigDigester) ConfigDigest(ctx context.Context, cfg types.ContractConfig) (types.ConfigDigest, error) {
 	digest := types.ConfigDigest{}
 	buf := sha256.New()
 
@@ -85,7 +86,7 @@ func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.Co
 		return digest, fmt.Errorf("incorrect hash size %d, expected %d", n, len(digest))
 	}
 
-	pre, err := d.ConfigDigestPrefix()
+	pre, err := d.ConfigDigestPrefix(ctx)
 	if err != nil {
 		return digest, err
 	}
@@ -95,6 +96,6 @@ func (d OffchainConfigDigester) ConfigDigest(cfg types.ContractConfig) (types.Co
 }
 
 // This should return the same constant value on every invocation
-func (OffchainConfigDigester) ConfigDigestPrefix() (types.ConfigDigestPrefix, error) {
+func (OffchainConfigDigester) ConfigDigestPrefix(ctx context.Context) (types.ConfigDigestPrefix, error) {
 	return types.ConfigDigestPrefixSolana, nil
 }
