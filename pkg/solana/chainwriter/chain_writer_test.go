@@ -42,14 +42,12 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 
 	// expected account meta for constant account
 	constantAccountMeta := &solana.AccountMeta{
-		PublicKey:  chainwriter.GetRandomPubKey(t),
 		IsSigner:   true,
 		IsWritable: true,
 	}
 
 	// expected account meta for account lookup
 	accountLookupMeta := &solana.AccountMeta{
-		PublicKey:  chainwriter.GetRandomPubKey(t),
 		IsSigner:   true,
 		IsWritable: false,
 	}
@@ -71,19 +69,12 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 	// mock data account response from program
 	lookupTablePubkey := mockDataAccountLookupTable(t, rw, pda2)
 	// mock fetch lookup table addresses call
-	storedPubKey := chainwriter.GetRandomPubKey(t)
-	mockFetchLookupTableAddresses(t, rw, lookupTablePubkey, []solana.PublicKey{storedPubKey})
+	storedPubKeys := chainwriter.CreateTestPubKeys(t, 3)
+	mockFetchLookupTableAddresses(t, rw, lookupTablePubkey, storedPubKeys)
 	// expected account meta for derived table lookup
 	derivedTablePdaLookupMeta := &solana.AccountMeta{
-		PublicKey:  storedPubKey,
 		IsSigner:   false,
 		IsWritable: true,
-	}
-
-	args := map[string]interface{}{
-		"lookup_table": accountLookupMeta.PublicKey.Bytes(),
-		"seed1":        seed1,
-		"seed2":        seed2,
 	}
 
 	lookupTableConfig := chainwriter.LookupTables{
@@ -109,38 +100,49 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		StaticLookupTables: nil,
 	}
 
-	accountLookupConfig := []chainwriter.Lookup{
-		chainwriter.AccountConstant{
-			Name:       "Constant",
-			Address:    constantAccountMeta.PublicKey.String(),
-			IsSigner:   constantAccountMeta.IsSigner,
-			IsWritable: constantAccountMeta.IsWritable,
-		},
-		chainwriter.AccountLookup{
-			Name:       "LookupTable",
-			Location:   "lookup_table",
-			IsSigner:   accountLookupMeta.IsSigner,
-			IsWritable: accountLookupMeta.IsWritable,
-		},
-		chainwriter.PDALookups{
-			Name:      "DataAccountPDA",
-			PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: solana.SystemProgramID.String()},
-			Seeds: []chainwriter.Lookup{
-				// extract seed1 for PDA lookup
-				chainwriter.AccountLookup{Name: "seed1", Location: "seed1"},
-			},
-			IsSigner:   pdaLookupMeta.IsSigner,
-			IsWritable: pdaLookupMeta.IsWritable,
-			// Just get the address of the account, nothing internal.
-			InternalField: chainwriter.InternalField{},
-		},
-		chainwriter.AccountsFromLookupTable{
-			LookupTableName: "DerivedTable",
-			IncludeIndexes:  []int{0},
-		},
-	}
-
 	t.Run("resolve addresses from different types of lookups", func(t *testing.T) {
+		constantAccountMeta.PublicKey = chainwriter.GetRandomPubKey(t)
+		accountLookupMeta.PublicKey = chainwriter.GetRandomPubKey(t)
+		// correlates to DerivedTable index in account lookup config
+		derivedTablePdaLookupMeta.PublicKey = storedPubKeys[0]
+
+		args := map[string]interface{}{
+			"lookup_table": accountLookupMeta.PublicKey.Bytes(),
+			"seed1":        seed1,
+			"seed2":        seed2,
+		}
+
+		accountLookupConfig := []chainwriter.Lookup{
+			chainwriter.AccountConstant{
+				Name:       "Constant",
+				Address:    constantAccountMeta.PublicKey.String(),
+				IsSigner:   constantAccountMeta.IsSigner,
+				IsWritable: constantAccountMeta.IsWritable,
+			},
+			chainwriter.AccountLookup{
+				Name:       "LookupTable",
+				Location:   "lookup_table",
+				IsSigner:   accountLookupMeta.IsSigner,
+				IsWritable: accountLookupMeta.IsWritable,
+			},
+			chainwriter.PDALookups{
+				Name:      "DataAccountPDA",
+				PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: solana.SystemProgramID.String()},
+				Seeds: []chainwriter.Lookup{
+					// extract seed1 for PDA lookup
+					chainwriter.AccountLookup{Name: "seed1", Location: "seed1"},
+				},
+				IsSigner:   pdaLookupMeta.IsSigner,
+				IsWritable: pdaLookupMeta.IsWritable,
+				// Just get the address of the account, nothing internal.
+				InternalField: chainwriter.InternalField{},
+			},
+			chainwriter.AccountsFromLookupTable{
+				LookupTableName: "DerivedTable",
+				IncludeIndexes:  []int{0},
+			},
+		}
+
 		// Fetch derived table map
 		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
 		require.NoError(t, err)
@@ -171,6 +173,56 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		require.Equal(t, derivedTablePdaLookupMeta.PublicKey, accounts[3].PublicKey)
 		require.Equal(t, derivedTablePdaLookupMeta.IsSigner, accounts[3].IsSigner)
 		require.Equal(t, derivedTablePdaLookupMeta.IsWritable, accounts[3].IsWritable)
+	})
+
+	t.Run("resolve addresses for multiple indices from derived lookup table", func(t *testing.T) {
+		args := map[string]interface{}{
+			"seed2": seed2,
+		}
+
+		accountLookupConfig := []chainwriter.Lookup{
+			chainwriter.AccountsFromLookupTable{
+				LookupTableName: "DerivedTable",
+				IncludeIndexes:  []int{0, 2},
+			},
+		}
+
+		// Fetch derived table map
+		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
+		require.NoError(t, err)
+
+		// Resolve account metas
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
+		require.NoError(t, err)
+
+		require.Len(t, accounts, 2)
+		require.Equal(t, storedPubKeys[0], accounts[0].PublicKey)
+		require.Equal(t, storedPubKeys[2], accounts[1].PublicKey)
+	})
+
+	t.Run("resolve all addresses from derived lookup table if indices not specified", func(t *testing.T) {
+		args := map[string]interface{}{
+			"seed2": seed2,
+		}
+
+		accountLookupConfig := []chainwriter.Lookup{
+			chainwriter.AccountsFromLookupTable{
+				LookupTableName: "DerivedTable",
+			},
+		}
+
+		// Fetch derived table map
+		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
+		require.NoError(t, err)
+
+		// Resolve account metas
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
+		require.NoError(t, err)
+
+		require.Len(t, accounts, 3)
+		for i, storedPubkey := range storedPubKeys {
+			require.Equal(t, storedPubkey, accounts[i].PublicKey)
+		}
 	})
 }
 
