@@ -174,6 +174,133 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 	})
 }
 
+func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
+	ctx := tests.Context(t)
+
+	// mock client
+	rw := clientmocks.NewReaderWriter(t)
+	// mock estimator
+	ge := feemocks.NewEstimator(t)
+	// mock txm
+	txm := txmMocks.NewTxManager(t)
+
+	// initialize chain writer
+	cw, err := chainwriter.NewSolanaChainWriterService(rw, txm, ge, chainwriter.ChainWriterConfig{})
+	require.NoError(t, err)
+
+	programID := chainwriter.GetRandomPubKey(t)
+	seed1 := []byte("seed1")
+	pda1 := mustFindPdaProgramAddress(t, [][]byte{seed1}, programID)
+	// mock data account response from program
+	lookupTablePubkey := mockDataAccountLookupTable(t, rw, pda1)
+	// mock fetch lookup table addresses call
+	storedPubKey := chainwriter.GetRandomPubKey(t)
+	mockFetchLookupTableAddresses(t, rw, lookupTablePubkey, []solana.PublicKey{storedPubKey})
+
+	unusedProgramID := chainwriter.GetRandomPubKey(t)
+	seed2 := []byte("seed2")
+	unusedPda := mustFindPdaProgramAddress(t, [][]byte{seed2}, unusedProgramID)
+	// mock data account response from program
+	unusedLookupTable := mockDataAccountLookupTable(t, rw, unusedPda)
+	// mock fetch lookup table addresses call
+	unusedKeys := chainwriter.GetRandomPubKey(t)
+	mockFetchLookupTableAddresses(t, rw, unusedLookupTable, []solana.PublicKey{unusedKeys})
+
+	// mock static lookup table calls
+	staticLookupTablePubkey1 := chainwriter.GetRandomPubKey(t)
+	mockFetchLookupTableAddresses(t, rw, staticLookupTablePubkey1, chainwriter.CreateTestPubKeys(t, 2))
+	staticLookupTablePubkey2 := chainwriter.GetRandomPubKey(t)
+	mockFetchLookupTableAddresses(t, rw, staticLookupTablePubkey2, chainwriter.CreateTestPubKeys(t, 2))
+
+	lookupTableConfig := chainwriter.LookupTables{
+		DerivedLookupTables: []chainwriter.DerivedLookupTable{
+			{
+				Name: "DerivedTable",
+				Accounts: chainwriter.PDALookups{
+					Name:      "DataAccountPDA",
+					PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: programID.String()},
+					Seeds: []chainwriter.Lookup{
+						// extract seed2 for PDA lookup
+						chainwriter.AccountLookup{Name: "seed1", Location: "seed1"},
+					},
+					IsSigner:   true,
+					IsWritable: true,
+					InternalField: chainwriter.InternalField{
+						Type:     reflect.TypeOf(DataAccount{}),
+						Location: "LookupTable",
+					},
+				},
+			},
+			{
+				Name: "MiscDerivedTable",
+				Accounts: chainwriter.PDALookups{
+					Name:      "MiscPDA",
+					PublicKey: chainwriter.AccountConstant{Name: "UnusedAccount", Address: unusedProgramID.String()},
+					Seeds: []chainwriter.Lookup{
+						// extract seed2 for PDA lookup
+						chainwriter.AccountLookup{Name: "seed2", Location: "seed2"},
+					},
+					IsSigner:   true,
+					IsWritable: true,
+					InternalField: chainwriter.InternalField{
+						Type:     reflect.TypeOf(DataAccount{}),
+						Location: "LookupTable",
+					},
+				},
+			},
+		},
+		StaticLookupTables: []string{staticLookupTablePubkey1.String(), staticLookupTablePubkey2.String()},
+	}
+
+	args := map[string]interface{}{
+		"seed1":        seed1,
+		"seed2":        seed2,
+	}
+
+	t.Run("returns filtered map with only relevant addresses required by account lookup config", func(t *testing.T) {
+		accountLookupConfig := []chainwriter.Lookup{
+			chainwriter.AccountsFromLookupTable{
+				LookupTableName: "DerivedTable",
+				IncludeIndexes:  []int{0},
+			},
+		}
+
+		// Fetch derived table map
+		derivedTableMap, staticTableMap, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
+		require.NoError(t, err)
+
+		// Resolve account metas
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
+		require.NoError(t, err)
+
+		// Filter the lookup table addresses based on which accounts are actually used
+		filteredLookupTableMap := cw.FilterLookupTableAddresses(accounts, derivedTableMap, staticTableMap)
+
+		// Filter map should only contain the address for the DerivedTable lookup defined in the account lookup config
+		require.Len(t, filteredLookupTableMap, len(accounts))
+		entry, exists := filteredLookupTableMap[lookupTablePubkey]
+		require.True(t, exists)
+		require.Len(t, entry, 1)
+		require.Equal(t, storedPubKey, entry[0])
+	})
+
+	t.Run("returns empty map if empty account lookup config provided", func(t *testing.T) {
+		accountLookupConfig := []chainwriter.Lookup{}
+
+		// Fetch derived table map
+		derivedTableMap, staticTableMap, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
+		require.NoError(t, err)
+
+		// Resolve account metas
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
+		require.NoError(t, err)
+
+		// Filter the lookup table addresses based on which accounts are actually used
+		filteredLookupTableMap := cw.FilterLookupTableAddresses(accounts, derivedTableMap, staticTableMap)
+		require.Empty(t, filteredLookupTableMap)
+	})
+}
+
 func TestChainWriter_SubmitTransaction(t *testing.T) {
 	t.Parallel()
 
