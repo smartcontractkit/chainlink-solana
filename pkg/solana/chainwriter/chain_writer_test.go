@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"math/big"
-	"os"
 	"reflect"
 	"testing"
 
@@ -24,6 +23,8 @@ import (
 	feemocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/fees/mocks"
 	txmMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 )
+
+var writeTestIdlJson = `{"version": "0.1.0","name": "write_test","instructions": [{"name": "initialize","accounts": [{"name": "dataAccount","isMut": true,"isSigner": false,"docs": ["PDA account, derived from seeds and created by the System Program in this instruction"]},{"name": "admin","isMut": true,"isSigner": true,"docs": ["Admin account that pays for PDA creation and signs the transaction"]},{"name": "systemProgram","isMut": false,"isSigner": false,"docs": ["System Program is required for PDA creation"]}],"args": [{"name": "lookupTable","type": "publicKey"}]}],"accounts": [{"name": "DataAccount","type": {"kind": "struct","fields": [{"name": "version","type": "u8"},{"name": "administrator","type": "publicKey"},{"name": "pendingAdministrator","type": "publicKey"},{"name": "lookupTable","type": "publicKey"}]}}]}`
 
 func TestChainWriter_GetAddresses(t *testing.T) {
 	ctx := tests.Context(t)
@@ -189,11 +190,6 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 	require.NoError(t, err)
 	admin := adminPk.PublicKey()
 
-	idlJSON, err := os.ReadFile("../../../contracts/target/idl/write_test.json")
-	require.NoError(t, err)
-	// TODO: Get IDL and address
-	programIDL := string(idlJSON)
-
 	account1 := chainwriter.GetRandomPubKey(t)
 	account2 := chainwriter.GetRandomPubKey(t)
 
@@ -276,7 +272,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 						},
 					},
 				},
-				IDL: programIDL,
+				IDL: writeTestIdlJson,
 			},
 		},
 	}
@@ -334,13 +330,13 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 			// match transaction fields to ensure it was built as expected
 			require.Equal(t, recentBlockHash, tx.Message.RecentBlockhash)
 			require.Len(t, tx.Message.Instructions, 1)
-			require.Len(t, tx.Message.AccountKeys, 5)              // fee payer + derived accounts
-			require.Equal(t, admin, tx.Message.AccountKeys[0])     // fee payer
-			require.Equal(t, account1, tx.Message.AccountKeys[1])  // account constant
-			require.Equal(t, account2, tx.Message.AccountKeys[2])  // account lookup
-			require.Equal(t, account3, tx.Message.AccountKeys[3])  // pda lookup
+			require.Len(t, tx.Message.AccountKeys, 5)                    // fee payer + derived accounts
+			require.Equal(t, admin, tx.Message.AccountKeys[0])           // fee payer
+			require.Equal(t, account1, tx.Message.AccountKeys[1])        // account constant
+			require.Equal(t, account2, tx.Message.AccountKeys[2])        // account lookup
+			require.Equal(t, account3, tx.Message.AccountKeys[3])        // pda lookup
 			require.Equal(t, configProgramID, tx.Message.AccountKeys[4]) // instruction program ID
-			require.Len(t, tx.Message.AddressTableLookups, 1)      // address table look contains entry
+			require.Len(t, tx.Message.AddressTableLookups, 1)            // address table look contains entry
 			addressTableLookup := tx.Message.AddressTableLookups[0].AccountKey
 			require.Equal(t, derivedLookupTablePubkey, addressTableLookup) // address table
 			return true
