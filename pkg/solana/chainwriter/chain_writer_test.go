@@ -330,15 +330,14 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 			// match transaction fields to ensure it was built as expected
 			require.Equal(t, recentBlockHash, tx.Message.RecentBlockhash)
 			require.Len(t, tx.Message.Instructions, 1)
-			require.Len(t, tx.Message.AccountKeys, 5)                    // fee payer + derived accounts
-			require.Equal(t, admin, tx.Message.AccountKeys[0])           // fee payer
-			require.Equal(t, account1, tx.Message.AccountKeys[1])        // account constant
-			require.Equal(t, account2, tx.Message.AccountKeys[2])        // account lookup
-			require.Equal(t, account3, tx.Message.AccountKeys[3])        // pda lookup
-			require.Equal(t, configProgramID, tx.Message.AccountKeys[4]) // instruction program ID
-			require.Len(t, tx.Message.AddressTableLookups, 1)            // address table look contains entry
-			addressTableLookup := tx.Message.AddressTableLookups[0].AccountKey
-			require.Equal(t, derivedLookupTablePubkey, addressTableLookup) // address table
+			require.Len(t, tx.Message.AccountKeys, 5)                                                // fee payer + derived accounts
+			require.Equal(t, admin, tx.Message.AccountKeys[0])                                       // fee payer
+			require.Equal(t, account1, tx.Message.AccountKeys[1])                                    // account constant
+			require.Equal(t, account2, tx.Message.AccountKeys[2])                                    // account lookup
+			require.Equal(t, account3, tx.Message.AccountKeys[3])                                    // pda lookup
+			require.Equal(t, configProgramID, tx.Message.AccountKeys[4])                             // instruction program ID
+			require.Len(t, tx.Message.AddressTableLookups, 1)                                        // address table look contains entry
+			require.Equal(t, derivedLookupTablePubkey, tx.Message.AddressTableLookups[0].AccountKey) // address table
 			return true
 		}), &txID).Return(nil).Once()
 

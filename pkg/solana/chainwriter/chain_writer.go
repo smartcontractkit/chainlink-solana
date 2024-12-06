@@ -153,7 +153,7 @@ func (s *SolanaChainWriterService) FilterLookupTableAddresses(
 		for innerIdentifier, metas := range innerMap {
 			tableKey, err := solana.PublicKeyFromBase58(innerIdentifier)
 			if err != nil {
-				fmt.Errorf("error parsing lookup table key: %w", err)
+				continue
 			}
 
 			// Collect public keys that are actually used
