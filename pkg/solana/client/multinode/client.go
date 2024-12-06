@@ -37,19 +37,6 @@ type MultiNodeClient[RPC any, HEAD Head] struct {
 	latestChainInfo ChainInfo
 }
 
-// ManagedSubscription is used to ensure that the subscription is removed from the client when unsubscribed
-type ManagedSubscription struct {
-	Subscription
-	removeSub func(sub Subscription)
-}
-
-func (w *ManagedSubscription) Unsubscribe() {
-	w.Subscription.Unsubscribe()
-	if w.removeSub != nil {
-		w.removeSub(w)
-	}
-}
-
 func NewMultiNodeClient[RPC any, HEAD Head](
 	cfg *mnCfg.MultiNodeConfig, rpc *RPC, ctxTimeout time.Duration, log logger.Logger,
 	latestBlock func(ctx context.Context, rpc *RPC) (HEAD, error),
@@ -73,12 +60,6 @@ func (m *MultiNodeClient[RPC, HEAD]) LenSubs() int {
 	return len(m.subs)
 }
 
-func (m *MultiNodeClient[RPC, HEAD]) removeSubscription(sub Subscription) {
-	m.subsSliceMu.Lock()
-	defer m.subsSliceMu.Unlock()
-	delete(m.subs, sub)
-}
-
 // registerSub adds the sub to the rpcClient list
 func (m *MultiNodeClient[RPC, HEAD]) registerSub(sub Subscription, stopInFLightCh chan struct{}) error {
 	m.subsSliceMu.Lock()
@@ -93,6 +74,12 @@ func (m *MultiNodeClient[RPC, HEAD]) registerSub(sub Subscription, stopInFLightC
 	}
 	m.subs[sub] = struct{}{}
 	return nil
+}
+
+func (m *MultiNodeClient[RPC, HEAD]) removeSub(sub Subscription) {
+	m.subsSliceMu.Lock()
+	defer m.subsSliceMu.Unlock()
+	delete(m.subs, sub)
 }
 
 func (m *MultiNodeClient[RPC, HEAD]) LatestBlock(ctx context.Context) (HEAD, error) {
@@ -152,8 +139,8 @@ func (m *MultiNodeClient[RPC, HEAD]) SubscribeToHeads(ctx context.Context) (<-ch
 	}
 
 	sub := &ManagedSubscription{
-		Subscription: &poller,
-		removeSub:    m.removeSubscription,
+		Subscription:  &poller,
+		onUnsubscribe: m.removeSub,
 	}
 
 	err := m.registerSub(sub, chStopInFlight)
@@ -185,8 +172,8 @@ func (m *MultiNodeClient[RPC, HEAD]) SubscribeToFinalizedHeads(ctx context.Conte
 	}
 
 	sub := &ManagedSubscription{
-		Subscription: &poller,
-		removeSub:    m.removeSubscription,
+		Subscription:  &poller,
+		onUnsubscribe: m.removeSub,
 	}
 
 	err := m.registerSub(sub, chStopInFlight)

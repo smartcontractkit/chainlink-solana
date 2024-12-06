@@ -32,6 +32,19 @@ type Subscription interface {
 	Err() <-chan error
 }
 
+// ManagedSubscription is a Subscription which contains an onUnsubscribe callback
+type ManagedSubscription struct {
+	Subscription
+	onUnsubscribe func(sub Subscription)
+}
+
+func (w *ManagedSubscription) Unsubscribe() {
+	w.Subscription.Unsubscribe()
+	if w.onUnsubscribe != nil {
+		w.onUnsubscribe(w)
+	}
+}
+
 // RPCClient includes all the necessary generalized RPC methods used by Node to perform health checks
 type RPCClient[
 	CHAIN_ID ID,
