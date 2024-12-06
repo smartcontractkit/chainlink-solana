@@ -117,6 +117,7 @@ func TestMultiNodeClient_HeadSubscriptions(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 2, c.LenSubs())
 		c.UnsubscribeAllExcept()
+		require.Equal(t, 0, c.LenSubs())
 	})
 }
 

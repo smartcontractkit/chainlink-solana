@@ -37,13 +37,13 @@ type MultiNodeClient[RPC any, HEAD Head] struct {
 	latestChainInfo ChainInfo
 }
 
-// WrappedSubscription is used to ensure that the subscription is removed from the client when unsubscribed
-type WrappedSubscription struct {
+// ManagedSubscription is used to ensure that the subscription is removed from the client when unsubscribed
+type ManagedSubscription struct {
 	Subscription
 	removeSub func(sub Subscription)
 }
 
-func (w *WrappedSubscription) Unsubscribe() {
+func (w *ManagedSubscription) Unsubscribe() {
 	w.Subscription.Unsubscribe()
 	if w.removeSub != nil {
 		w.removeSub(w)
@@ -151,7 +151,7 @@ func (m *MultiNodeClient[RPC, HEAD]) SubscribeToHeads(ctx context.Context) (<-ch
 		return nil, nil, err
 	}
 
-	sub := &WrappedSubscription{
+	sub := &ManagedSubscription{
 		Subscription: &poller,
 		removeSub:    m.removeSubscription,
 	}
@@ -184,7 +184,7 @@ func (m *MultiNodeClient[RPC, HEAD]) SubscribeToFinalizedHeads(ctx context.Conte
 		return nil, nil, err
 	}
 
-	sub := &WrappedSubscription{
+	sub := &ManagedSubscription{
 		Subscription: &poller,
 		removeSub:    m.removeSubscription,
 	}
