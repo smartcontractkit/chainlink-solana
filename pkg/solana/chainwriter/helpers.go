@@ -11,7 +11,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/test-go/testify/require"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
@@ -61,11 +61,11 @@ func GetValueAtLocation(args any, location string) ([][]byte, error) {
 
 	var values [][]byte
 	for _, value := range valueList {
-		if byteArray, ok := value.([]byte); ok {
-			values = append(values, byteArray)
-		} else {
+		byteArray, ok := value.([]byte)
+		if !ok {
 			return nil, fmt.Errorf("invalid value format at path: %s", location)
 		}
+		values = append(values, byteArray)
 	}
 
 	return values, nil

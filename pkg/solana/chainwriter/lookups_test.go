@@ -8,7 +8,10 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
@@ -17,9 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
-
-	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
-	"github.com/test-go/testify/require"
 )
 
 type TestArgs struct {
@@ -54,12 +54,13 @@ func TestAccountContant(t *testing.T) {
 			IsSigner:   true,
 			IsWritable: true,
 		}
-		result, err := constantConfig.Resolve(nil, nil, nil, nil)
+		result, err := constantConfig.Resolve(tests.Context(t), nil, nil, nil)
 		require.NoError(t, err)
 		require.Equal(t, expectedMeta, result)
 	})
 }
 func TestAccountLookups(t *testing.T) {
+	ctx := tests.Context(t)
 	t.Run("AccountLookup resolves valid address with just one address", func(t *testing.T) {
 		expectedAddr := chainwriter.GetRandomPubKey(t)
 		testArgs := TestArgs{
@@ -81,7 +82,7 @@ func TestAccountLookups(t *testing.T) {
 			IsSigner:   true,
 			IsWritable: true,
 		}
-		result, err := lookupConfig.Resolve(nil, testArgs, nil, nil)
+		result, err := lookupConfig.Resolve(ctx, testArgs, nil, nil)
 		require.NoError(t, err)
 		require.Equal(t, expectedMeta, result)
 	})
@@ -115,7 +116,7 @@ func TestAccountLookups(t *testing.T) {
 			IsSigner:   true,
 			IsWritable: true,
 		}
-		result, err := lookupConfig.Resolve(nil, testArgs, nil, nil)
+		result, err := lookupConfig.Resolve(ctx, testArgs, nil, nil)
 		require.NoError(t, err)
 		for i, meta := range result {
 			require.Equal(t, expectedMeta[i], meta)
@@ -136,7 +137,7 @@ func TestAccountLookups(t *testing.T) {
 			IsSigner:   true,
 			IsWritable: true,
 		}
-		_, err := lookupConfig.Resolve(nil, testArgs, nil, nil)
+		_, err := lookupConfig.Resolve(ctx, testArgs, nil, nil)
 		require.Error(t, err)
 	})
 }
@@ -211,8 +212,6 @@ func TestPDALookups(t *testing.T) {
 	})
 
 	t.Run("PDALookup fails with missing seeds", func(t *testing.T) {
-		programID := solana.SystemProgramID
-
 		pdaLookup := chainwriter.PDALookups{
 			Name:      "TestPDA",
 			PublicKey: chainwriter.AccountConstant{Name: "ProgramID", Address: programID.String()},
@@ -301,8 +300,8 @@ func TestLookupTables(t *testing.T) {
 			DerivedLookupTables: nil,
 			StaticLookupTables:  []string{table.String()},
 		}
-		_, staticTableMap, err := cw.ResolveLookupTables(ctx, nil, lookupConfig)
-		require.NoError(t, err)
+		_, staticTableMap, resolveErr := cw.ResolveLookupTables(ctx, nil, lookupConfig)
+		require.NoError(t, resolveErr)
 		require.Equal(t, pubKeys, staticTableMap[table])
 	})
 	t.Run("Derived lookup table resolves properly with constant address", func(t *testing.T) {
@@ -322,8 +321,8 @@ func TestLookupTables(t *testing.T) {
 			},
 			StaticLookupTables: nil,
 		}
-		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, nil, lookupConfig)
-		require.NoError(t, err)
+		derivedTableMap, _, resolveErr := cw.ResolveLookupTables(ctx, nil, lookupConfig)
+		require.NoError(t, resolveErr)
 
 		addresses, ok := derivedTableMap["DerivedTable"][table.String()]
 		require.True(t, ok)

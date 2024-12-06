@@ -13,9 +13,10 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pelletier/go-toml/v2"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
-	"github.com/test-go/testify/require"
 )
 
 var (

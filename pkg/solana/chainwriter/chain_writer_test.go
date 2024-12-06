@@ -24,7 +24,7 @@ import (
 	txmMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 )
 
-var writeTestIdlJson = `{"version": "0.1.0","name": "write_test","instructions": [{"name": "initialize","accounts": [{"name": "dataAccount","isMut": true,"isSigner": false,"docs": ["PDA account, derived from seeds and created by the System Program in this instruction"]},{"name": "admin","isMut": true,"isSigner": true,"docs": ["Admin account that pays for PDA creation and signs the transaction"]},{"name": "systemProgram","isMut": false,"isSigner": false,"docs": ["System Program is required for PDA creation"]}],"args": [{"name": "lookupTable","type": "publicKey"}]}],"accounts": [{"name": "DataAccount","type": {"kind": "struct","fields": [{"name": "version","type": "u8"},{"name": "administrator","type": "publicKey"},{"name": "pendingAdministrator","type": "publicKey"},{"name": "lookupTable","type": "publicKey"}]}}]}`
+var writeTestIdlJSON = `{"version": "0.1.0","name": "write_test","instructions": [{"name": "initialize","accounts": [{"name": "dataAccount","isMut": true,"isSigner": false,"docs": ["PDA account, derived from seeds and created by the System Program in this instruction"]},{"name": "admin","isMut": true,"isSigner": true,"docs": ["Admin account that pays for PDA creation and signs the transaction"]},{"name": "systemProgram","isMut": false,"isSigner": false,"docs": ["System Program is required for PDA creation"]}],"args": [{"name": "lookupTable","type": "publicKey"}]}],"accounts": [{"name": "DataAccount","type": {"kind": "struct","fields": [{"name": "version","type": "u8"},{"name": "administrator","type": "publicKey"},{"name": "pendingAdministrator","type": "publicKey"},{"name": "lookupTable","type": "publicKey"}]}}]}`
 
 func TestChainWriter_GetAddresses(t *testing.T) {
 	ctx := tests.Context(t)
@@ -422,7 +422,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 						},
 					},
 				},
-				IDL: writeTestIdlJson,
+				IDL: writeTestIdlJSON,
 			},
 		},
 	}
@@ -601,8 +601,8 @@ func mustBorshEncodeStruct(t *testing.T, data interface{}) []byte {
 	return buf.Bytes()
 }
 
-func mustFindPdaProgramAddress(t *testing.T, seeds [][]byte, programId solana.PublicKey) solana.PublicKey {
-	pda, _, err := solana.FindProgramAddress(seeds, programId)
+func mustFindPdaProgramAddress(t *testing.T, seeds [][]byte, programID solana.PublicKey) solana.PublicKey {
+	pda, _, err := solana.FindProgramAddress(seeds, programID)
 	require.NoError(t, err)
 	return pda
 }

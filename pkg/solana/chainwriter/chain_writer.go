@@ -202,7 +202,8 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	// Configure debug ID
 	debugID := ""
 	if methodConfig.DebugIDLocation != "" {
-		debugID, err := GetDebugIDAtLocation(args, methodConfig.DebugIDLocation)
+		var err error
+		debugID, err = GetDebugIDAtLocation(args, methodConfig.DebugIDLocation)
 		if err != nil {
 			return errorWithDebugID(fmt.Errorf("error getting debug ID from input args: %w", err), debugID)
 		}
@@ -236,7 +237,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	}
 
 	// Prepare transaction
-	programId, err := solana.PublicKeyFromBase58(contractName)
+	programID, err := solana.PublicKeyFromBase58(contractName)
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error parsing program ID: %w", err), debugID)
 	}
@@ -248,7 +249,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 
 	tx, err := solana.NewTransaction(
 		[]solana.Instruction{
-			solana.NewInstruction(programId, accounts, encodedPayload),
+			solana.NewInstruction(programID, accounts, encodedPayload),
 		},
 		blockhash.Value.Blockhash,
 		solana.TransactionPayer(feePayer),
