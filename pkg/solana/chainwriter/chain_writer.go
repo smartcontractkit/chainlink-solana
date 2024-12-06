@@ -190,8 +190,14 @@ func (s *SolanaChainWriterService) FilterLookupTableAddresses(
 }
 
 func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contractName, method string, args any, transactionID string, toAddress string, meta *types.TxMeta, value *big.Int) error {
-	programConfig := s.config.Programs[contractName]
-	methodConfig := programConfig.Methods[method]
+	programConfig, exists := s.config.Programs[contractName]
+	if !exists {
+		return fmt.Errorf("failed to find program config for contract name: %s", contractName)
+	}
+	methodConfig, exists := programConfig.Methods[method]
+	if !exists {
+		return fmt.Errorf("failed to find method config for method: %s", method)
+	}
 
 	// Configure debug ID
 	debugID := ""

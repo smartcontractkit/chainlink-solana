@@ -1,20 +1,21 @@
 package chainwriter_test
 
 import (
+	"bytes"
 	"errors"
-	"fmt"
 	"math/big"
 	"os"
 	"reflect"
 	"testing"
 
+	ag_binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
+	addresslookuptable "github.com/gagliardetto/solana-go/programs/address-lookup-table"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
@@ -24,52 +25,202 @@ import (
 	txmMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 )
 
-func TestChainWriter_GetAddresses(t *testing.T) {}
+func TestChainWriter_GetAddresses(t *testing.T) {
+	ctx := tests.Context(t)
 
-func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {}
+	// mock client
+	rw := clientmocks.NewReaderWriter(t)
+	// mock estimator
+	ge := feemocks.NewEstimator(t)
+	// mock txm
+	txm := txmMocks.NewTxManager(t)
+
+	// initialize chain writer
+	cw, err := chainwriter.NewSolanaChainWriterService(rw, txm, ge, chainwriter.ChainWriterConfig{})
+	require.NoError(t, err)
+
+	// expected account meta for constant account
+	constantAccountMeta := &solana.AccountMeta{
+		PublicKey:  chainwriter.GetRandomPubKey(t),
+		IsSigner:   true,
+		IsWritable: true,
+	}
+
+	// expected account meta for account lookup
+	accountLookupMeta := &solana.AccountMeta{
+		PublicKey:  chainwriter.GetRandomPubKey(t),
+		IsSigner:   true,
+		IsWritable: false,
+	}
+
+	// setup pda account address
+	seed1 := []byte("seed1")
+	pda1 := mustFindPdaProgramAddress(t, [][]byte{seed1}, solana.SystemProgramID)
+	// expected account meta for pda lookup
+	pdaLookupMeta := &solana.AccountMeta{
+		PublicKey:  pda1,
+		IsSigner:   false,
+		IsWritable: false,
+	}
+
+	// setup pda account with inner field lookup
+	programID := chainwriter.GetRandomPubKey(t)
+	seed2 := []byte("seed2")
+	pda2 := mustFindPdaProgramAddress(t, [][]byte{seed2}, programID)
+	// mock data account response from program
+	lookupTablePubkey := mockDataAccountLookupTable(t, rw, pda2)
+	// mock fetch lookup table addresses call
+	storedPubKey := chainwriter.GetRandomPubKey(t)
+	mockFetchLookupTableAddresses(t, rw, lookupTablePubkey, []solana.PublicKey{storedPubKey})
+	// expected account meta for derived table lookup
+	derivedTablePdaLookupMeta := &solana.AccountMeta{
+		PublicKey:  storedPubKey,
+		IsSigner:   false,
+		IsWritable: true,
+	}
+
+	args := map[string]interface{}{
+		"lookup_table": accountLookupMeta.PublicKey.Bytes(),
+		"seed1":        seed1,
+		"seed2":        seed2,
+	}
+
+	lookupTableConfig := chainwriter.LookupTables{
+		DerivedLookupTables: []chainwriter.DerivedLookupTable{
+			{
+				Name: "DerivedTable",
+				Accounts: chainwriter.PDALookups{
+					Name:      "DataAccountPDA",
+					PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: programID.String()},
+					Seeds: []chainwriter.Lookup{
+						// extract seed2 for PDA lookup
+						chainwriter.AccountLookup{Name: "seed2", Location: "seed2"},
+					},
+					IsSigner:   derivedTablePdaLookupMeta.IsSigner,
+					IsWritable: derivedTablePdaLookupMeta.IsWritable,
+					InternalField: chainwriter.InternalField{
+						Type:     reflect.TypeOf(DataAccount{}),
+						Location: "LookupTable",
+					},
+				},
+			},
+		},
+		StaticLookupTables: nil,
+	}
+
+	accountLookupConfig := []chainwriter.Lookup{
+		chainwriter.AccountConstant{
+			Name:       "Constant",
+			Address:    constantAccountMeta.PublicKey.String(),
+			IsSigner:   constantAccountMeta.IsSigner,
+			IsWritable: constantAccountMeta.IsWritable,
+		},
+		chainwriter.AccountLookup{
+			Name:       "LookupTable",
+			Location:   "lookup_table",
+			IsSigner:   accountLookupMeta.IsSigner,
+			IsWritable: accountLookupMeta.IsWritable,
+		},
+		chainwriter.PDALookups{
+			Name:      "DataAccountPDA",
+			PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: solana.SystemProgramID.String()},
+			Seeds: []chainwriter.Lookup{
+				// extract seed1 for PDA lookup
+				chainwriter.AccountLookup{Name: "seed1", Location: "seed1"},
+			},
+			IsSigner:   pdaLookupMeta.IsSigner,
+			IsWritable: pdaLookupMeta.IsWritable,
+			// Just get the address of the account, nothing internal.
+			InternalField: chainwriter.InternalField{},
+		},
+		chainwriter.AccountsFromLookupTable{
+			LookupTableName: "DerivedTable",
+			IncludeIndexes:  []int{0},
+		},
+	}
+
+	t.Run("resolve addresses from different types of lookups", func(t *testing.T) {
+		// Fetch derived table map
+		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
+		require.NoError(t, err)
+
+		// Resolve account metas
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
+		require.NoError(t, err)
+
+		// account metas should be returned in the same order as the provided account lookup configs
+		require.Len(t, accounts, 4)
+
+		// Validate account constant
+		require.Equal(t, constantAccountMeta.PublicKey, accounts[0].PublicKey)
+		require.Equal(t, constantAccountMeta.IsSigner, accounts[0].IsSigner)
+		require.Equal(t, constantAccountMeta.IsWritable, accounts[0].IsWritable)
+
+		// Validate account lookup
+		require.Equal(t, accountLookupMeta.PublicKey, accounts[1].PublicKey)
+		require.Equal(t, accountLookupMeta.IsSigner, accounts[1].IsSigner)
+		require.Equal(t, accountLookupMeta.IsWritable, accounts[1].IsWritable)
+
+		// Validate pda lookup
+		require.Equal(t, pdaLookupMeta.PublicKey, accounts[2].PublicKey)
+		require.Equal(t, pdaLookupMeta.IsSigner, accounts[2].IsSigner)
+		require.Equal(t, pdaLookupMeta.IsWritable, accounts[2].IsWritable)
+
+		// Validate pda lookup with inner field from derived table
+		require.Equal(t, derivedTablePdaLookupMeta.PublicKey, accounts[3].PublicKey)
+		require.Equal(t, derivedTablePdaLookupMeta.IsSigner, accounts[3].IsSigner)
+		require.Equal(t, derivedTablePdaLookupMeta.IsWritable, accounts[3].IsWritable)
+	})
+}
 
 func TestChainWriter_SubmitTransaction(t *testing.T) {
 	t.Parallel()
 
 	ctx := tests.Context(t)
+	// mock client
 	rw := clientmocks.NewReaderWriter(t)
-	rw.On("GetLatestBlock", mock.Anything).Return(&rpc.GetBlockResult{}, nil).Maybe()
-	rw.On("SlotHeight", mock.Anything).Return(uint64(0), nil).Maybe()
+	// mock estimator
 	ge := feemocks.NewEstimator(t)
-
 	// mock txm
 	txm := txmMocks.NewTxManager(t)
+
+	// setup admin key
+	adminPk, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	admin := adminPk.PublicKey()
 
 	idlJSON, err := os.ReadFile("../../../contracts/target/idl/write_test.json")
 	require.NoError(t, err)
 	// TODO: Get IDL and address
-	programID := chainwriter.GetRandomPubKey(t).String()
 	programIDL := string(idlJSON)
 
-	args := map[string]interface{}{
-		"seed1":        []byte("data"),
-		"lookup_table": chainwriter.GetRandomPubKey(t),
-	}
-	fmt.Println(args)
+	account1 := chainwriter.GetRandomPubKey(t)
+	account2 := chainwriter.GetRandomPubKey(t)
 
-	adminPk, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
+	seed1 := []byte("seed1")
+	account3 := mustFindPdaProgramAddress(t, [][]byte{seed1}, solana.SystemProgramID)
 
-	admin := adminPk.PublicKey()
+	// create lookup table addresses
+	seed2 := []byte("seed2")
+	programID := chainwriter.GetRandomPubKey(t)
+	derivedTablePda := mustFindPdaProgramAddress(t, [][]byte{seed2}, programID)
+	// mock data account response from program
+	derivedLookupTablePubkey := mockDataAccountLookupTable(t, rw, derivedTablePda)
+	// mock fetch lookup table addresses call
+	derivedLookupKeys := chainwriter.CreateTestPubKeys(t, 1)
+	mockFetchLookupTableAddresses(t, rw, derivedLookupTablePubkey, derivedLookupKeys)
 
-	// TODO: Replace all random and create mocks
+	// mock static lookup table call
+	staticLookupTablePubkey := chainwriter.GetRandomPubKey(t)
+	staticLookupKeys := chainwriter.CreateTestPubKeys(t, 2)
+	mockFetchLookupTableAddresses(t, rw, staticLookupTablePubkey, staticLookupKeys)
+
 	cwConfig := chainwriter.ChainWriterConfig{
 		Programs: map[string]chainwriter.ProgramConfig{
-			"write_test": {
+			"39vbQVpEMtZtg3e6ZSE7nBSzmNZptmW45WnLkbqEe4TU": {
 				Methods: map[string]chainwriter.MethodConfig{
 					"initialize": {
-						FromAddress: admin.String(),
-						InputModifications: commoncodec.ModifiersConfig{
-							&commoncodec.DropModifierConfig{
-								// Drop seed1 since it shouldn't be in the instruction data
-								Fields: []string{"seed1"},
-							},
-						},
+						FromAddress:       admin.String(),
 						ChainSpecificName: "initialize",
 						LookupTables: chainwriter.LookupTables{
 							DerivedLookupTables: []chainwriter.DerivedLookupTable{
@@ -77,10 +228,10 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 									Name: "DerivedTable",
 									Accounts: chainwriter.PDALookups{
 										Name:      "DataAccountPDA",
-										PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: programID},
+										PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: programID.String()},
 										Seeds: []chainwriter.Lookup{
-											// extract seed1 for PDA lookup
-											chainwriter.AccountLookup{Name: "seed1", Location: "seed1"},
+											// extract seed2 for PDA lookup
+											chainwriter.AccountLookup{Name: "seed2", Location: "seed2"},
 										},
 										IsSigner:   false,
 										IsWritable: false,
@@ -91,12 +242,12 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 									},
 								},
 							},
-							StaticLookupTables: []string{chainwriter.GetRandomPubKey(t).String()},
+							StaticLookupTables: []string{staticLookupTablePubkey.String()},
 						},
 						Accounts: []chainwriter.Lookup{
 							chainwriter.AccountConstant{
 								Name:       "Constant",
-								Address:    chainwriter.GetRandomPubKey(t).String(),
+								Address:    account1.String(),
 								IsSigner:   false,
 								IsWritable: false,
 							},
@@ -108,7 +259,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 							},
 							chainwriter.PDALookups{
 								Name:      "DataAccountPDA",
-								PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: programID},
+								PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: solana.SystemProgramID.String()},
 								Seeds: []chainwriter.Lookup{
 									// extract seed1 for PDA lookup
 									chainwriter.AccountLookup{Name: "seed1", Location: "seed1"},
@@ -152,17 +303,57 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("Submits transaction successfully", func(t *testing.T) {
-		rw.On("GetAccountInfoWithOpts", mock.Anything, mock.Anything, mock.Anything).Return(&rpc.GetAccountInfoResult{
-			RPCContext: rpc.RPCContext{},
-			Value:      &rpc.Account{},
-		}, nil).Maybe()
+	t.Run("fails to encode payload if args with missing values provided", func(t *testing.T) {
+		txID := uuid.NewString()
+		args := map[string]interface{}{}
+		submitErr := cw.SubmitTransaction(ctx, "39vbQVpEMtZtg3e6ZSE7nBSzmNZptmW45WnLkbqEe4TU", "initialize", args, txID, programID.String(), nil, nil)
+		require.Error(t, submitErr)
+	})
+
+	t.Run("fails if invalid contract name provided", func(t *testing.T) {
+		txID := uuid.NewString()
+		args := map[string]interface{}{}
+		submitErr := cw.SubmitTransaction(ctx, "write_test", "initialize", args, txID, programID.String(), nil, nil)
+		require.Error(t, submitErr)
+	})
+
+	t.Run("fails if invalid method provided", func(t *testing.T) {
+		txID := uuid.NewString()
+		args := map[string]interface{}{}
+		submitErr := cw.SubmitTransaction(ctx, "39vbQVpEMtZtg3e6ZSE7nBSzmNZptmW45WnLkbqEe4TU", "badMethod", args, txID, programID.String(), nil, nil)
+		require.Error(t, submitErr)
+	})
+
+	t.Run("submits transaction successfully", func(t *testing.T) {
+		recentBlockHash := solana.Hash{}
+		rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Once()
+		txID := uuid.NewString()
+		configProgramID := solana.MustPublicKeyFromBase58("39vbQVpEMtZtg3e6ZSE7nBSzmNZptmW45WnLkbqEe4TU")
+
+		txm.On("Enqueue", mock.Anything, account1.String(), mock.MatchedBy(func(tx *solana.Transaction) bool {
+			// match transaction fields to ensure it was built as expected
+			require.Equal(t, recentBlockHash, tx.Message.RecentBlockhash)
+			require.Len(t, tx.Message.Instructions, 1)
+			require.Len(t, tx.Message.AccountKeys, 5)              // fee payer + derived accounts
+			require.Equal(t, admin, tx.Message.AccountKeys[0])     // fee payer
+			require.Equal(t, account1, tx.Message.AccountKeys[1])  // account constant
+			require.Equal(t, account2, tx.Message.AccountKeys[2])  // account lookup
+			require.Equal(t, account3, tx.Message.AccountKeys[3])  // pda lookup
+			require.Equal(t, configProgramID, tx.Message.AccountKeys[4]) // instruction program ID
+			require.Len(t, tx.Message.AddressTableLookups, 1)      // address table look contains entry
+			addressTableLookup := tx.Message.AddressTableLookups[0].AccountKey
+			require.Equal(t, derivedLookupTablePubkey, addressTableLookup) // address table
+			return true
+		}), &txID).Return(nil).Once()
+
 		args := map[string]interface{}{
-			"lookupTable": chainwriter.GetRandomPubKey(t).String(),
-			"seed1":       []byte("data"),
+			"lookupTable":  chainwriter.GetRandomPubKey(t).Bytes(),
+			"lookup_table": account2.Bytes(),
+			"seed1":        seed1,
+			"seed2":        seed2,
 		}
-		err := cw.SubmitTransaction(ctx, "write_test", "initialize", args, "1", programID, nil, nil)
-		fmt.Println(err)
+		submitErr := cw.SubmitTransaction(ctx, "39vbQVpEMtZtg3e6ZSE7nBSzmNZptmW45WnLkbqEe4TU", "initialize", args, txID, programID.String(), nil, nil)
+		require.NoError(t, submitErr)
 	})
 }
 
@@ -256,4 +447,47 @@ func TestChainWriter_GetFeeComponents(t *testing.T) {
 		_, err = cwNoEstimator.GetFeeComponents(ctx)
 		require.Error(t, err)
 	})
+}
+
+func mustBorshEncodeStruct(t *testing.T, data interface{}) []byte {
+	buf := new(bytes.Buffer)
+	err := ag_binary.NewBorshEncoder(buf).Encode(data)
+	require.NoError(t, err)
+	return buf.Bytes()
+}
+
+func mustFindPdaProgramAddress(t *testing.T, seeds [][]byte, programId solana.PublicKey) solana.PublicKey {
+	pda, _, err := solana.FindProgramAddress(seeds, programId)
+	require.NoError(t, err)
+	return pda
+}
+
+func mockDataAccountLookupTable(t *testing.T, rw *clientmocks.ReaderWriter, pda solana.PublicKey) solana.PublicKey {
+	lookupTablePubkey := chainwriter.GetRandomPubKey(t)
+	dataAccount := DataAccount{
+		Discriminator:        [8]byte{},
+		Version:              1,
+		Administrator:        chainwriter.GetRandomPubKey(t),
+		PendingAdministrator: chainwriter.GetRandomPubKey(t),
+		LookupTable:          lookupTablePubkey,
+	}
+	dataAccountBytes := mustBorshEncodeStruct(t, dataAccount)
+	rw.On("GetAccountInfoWithOpts", mock.Anything, pda, mock.Anything).Return(&rpc.GetAccountInfoResult{
+		RPCContext: rpc.RPCContext{},
+		Value:      &rpc.Account{Data: rpc.DataBytesOrJSONFromBytes(dataAccountBytes)},
+	}, nil)
+	return lookupTablePubkey
+}
+
+func mockFetchLookupTableAddresses(t *testing.T, rw *clientmocks.ReaderWriter, lookupTablePubkey solana.PublicKey, storedPubkeys []solana.PublicKey) {
+	var lookupTablePubkeySlice solana.PublicKeySlice
+	lookupTablePubkeySlice.Append(storedPubkeys...)
+	lookupTableState := addresslookuptable.AddressLookupTableState{
+		Addresses: lookupTablePubkeySlice,
+	}
+	lookupTableStateBytes := mustBorshEncodeStruct(t, lookupTableState)
+	rw.On("GetAccountInfoWithOpts", mock.Anything, lookupTablePubkey, mock.Anything).Return(&rpc.GetAccountInfoResult{
+		RPCContext: rpc.RPCContext{},
+		Value:      &rpc.Account{Data: rpc.DataBytesOrJSONFromBytes(lookupTableStateBytes)},
+	}, nil)
 }

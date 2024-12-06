@@ -9,6 +9,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	addresslookuptable "github.com/gagliardetto/solana-go/programs/address-lookup-table"
 	"github.com/gagliardetto/solana-go/rpc"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 )
 
@@ -326,8 +327,8 @@ func (s *SolanaChainWriterService) LoadTable(ctx context.Context, args any, rlt 
 		for _, addr := range addresses {
 			resultMap[rlt.Name][addressMeta.PublicKey.String()] = append(resultMap[rlt.Name][addressMeta.PublicKey.String()], &solana.AccountMeta{
 				PublicKey:  addr,
-				IsSigner:   false,
-				IsWritable: false,
+				IsSigner:   addressMeta.IsSigner,
+				IsWritable: addressMeta.IsWritable,
 			})
 		}
 

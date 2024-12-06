@@ -79,7 +79,7 @@ func TestConfig() {
 			// 3. Lookup Table content - Get all the accounts from a lookup table
 			// 4. PDA Account Lookup - Based on another account and a seed/s
 			//	Nested PDA Account with seeds from:
-			// 		-> input paramters
+			// 		-> input parameters
 			// 		-> constant
 			// 	PDALookups can resolve to multiple addresses if:
 			// 		A) The PublicKey lookup resolves to multiple addresses (i.e. multiple token addresses)

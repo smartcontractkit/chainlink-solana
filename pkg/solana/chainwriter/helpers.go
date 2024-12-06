@@ -11,8 +11,9 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 	"github.com/test-go/testify/require"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 // GetValuesAtLocation parses through nested types and arrays to find all locations of values
