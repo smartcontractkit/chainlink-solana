@@ -101,7 +101,6 @@ macro_rules! arrayvec {
                     None
                 }
             }
-
         }
 
         impl std::ops::Deref for $name {
