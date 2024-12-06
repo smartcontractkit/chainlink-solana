@@ -253,8 +253,8 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 	}
 
 	args := map[string]interface{}{
-		"seed1":        seed1,
-		"seed2":        seed2,
+		"seed1": seed1,
+		"seed2": seed2,
 	}
 
 	t.Run("returns filtered map with only relevant addresses required by account lookup config", func(t *testing.T) {
@@ -286,6 +286,29 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 
 	t.Run("returns empty map if empty account lookup config provided", func(t *testing.T) {
 		accountLookupConfig := []chainwriter.Lookup{}
+
+		// Fetch derived table map
+		derivedTableMap, staticTableMap, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
+		require.NoError(t, err)
+
+		// Resolve account metas
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
+		require.NoError(t, err)
+
+		// Filter the lookup table addresses based on which accounts are actually used
+		filteredLookupTableMap := cw.FilterLookupTableAddresses(accounts, derivedTableMap, staticTableMap)
+		require.Empty(t, filteredLookupTableMap)
+	})
+
+	t.Run("returns empty map if only constant account lookup required", func(t *testing.T) {
+		accountLookupConfig := []chainwriter.Lookup{
+			chainwriter.AccountConstant{
+				Name:       "Constant",
+				Address:    chainwriter.GetRandomPubKey(t).String(),
+				IsSigner:   false,
+				IsWritable: false,
+			},
+		}
 
 		// Fetch derived table map
 		derivedTableMap, staticTableMap, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)

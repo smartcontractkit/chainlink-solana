@@ -12,10 +12,9 @@ pub mod write_test {
         data.administrator = ctx.accounts.admin.key();
         data.pending_administrator = Pubkey::default();
         data.lookup_table = lookup_table;
-    
+
         Ok(())
     }
-    
 }
 
 #[derive(Accounts)]
