@@ -223,20 +223,20 @@ func TestTxm_ProcessError(t *testing.T) {
 	})
 	t.Run("process unknown error", func(t *testing.T) {
 		t.Parallel()
-				err := map[string][]interface{}{
-					"MadeUpError": {
-						0, map[string]int{"Custom": 6003},
-					},
-				}
-				// returns fatal error if InstructionError encountered during simulation
-				txState, errType := txm.ProcessError(solana.Signature{}, err, true)
-				require.Equal(t, solanatxm.TxFailSimOther, errType)
-				require.Equal(t, solanatxm.Errored, txState) // default enum value
+		err := map[string][]interface{}{
+			"MadeUpError": {
+				0, map[string]int{"Custom": 6003},
+			},
+		}
+		// returns fatal error if InstructionError encountered during simulation
+		txState, errType := txm.ProcessError(solana.Signature{}, err, true)
+		require.Equal(t, solanatxm.TxFailSimOther, errType)
+		require.Equal(t, solanatxm.Errored, txState) // default enum value
 
-				// returns fatal error if InstructionError encountered during normal processing
-				txState, errType = txm.ProcessError(solana.Signature{}, err, false)
-				require.Equal(t, solanatxm.TxFailRevert, errType)
-				require.Equal(t, solanatxm.Errored, txState) // default enum value
+		// returns fatal error if InstructionError encountered during normal processing
+		txState, errType = txm.ProcessError(solana.Signature{}, err, false)
+		require.Equal(t, solanatxm.TxFailRevert, errType)
+		require.Equal(t, solanatxm.Errored, txState) // default enum value
 	})
 }
 
