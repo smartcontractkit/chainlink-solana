@@ -136,6 +136,44 @@ func testSet[V instruction](t *testing.T, builder func(uint) V, setter func(*sol
 		assert.NoError(t, err)
 		assert.Equal(t, data, []byte(tx.Message.Instructions[computeIndex].Data))
 	})
+
+	t.Run("with_lookuptables", func(t *testing.T) {
+		t.Parallel()
+		receiver, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+
+		// build base tx (no fee)
+		tx, err := solana.NewTransaction([]solana.Instruction{
+			system.NewTransferInstruction(
+				0,
+				key.PublicKey(),
+				receiver.PublicKey(),
+			).Build(),
+		},
+			solana.Hash{},
+			solana.TransactionAddressTables(map[solana.PublicKey]solana.PublicKeySlice{
+				solana.PublicKey{}: solana.PublicKeySlice{receiver.PublicKey()},
+			}),
+		)
+		require.NoError(t, err)
+
+		// check current account indices
+		assert.Equal(t, 1, len(tx.Message.Instructions))
+		assert.Equal(t, []uint16{0, 2}, tx.Message.Instructions[0].Accounts)
+
+		// add fee
+		require.NoError(t, setter(tx, builder(0)))
+
+		// evaluate
+		assert.Equal(t, 2, len(tx.Message.Instructions))
+		computeUnitIndex := getIndex(len(tx.Message.Instructions))
+		transferIndex := 0
+		if computeUnitIndex == transferIndex {
+			transferIndex = 1
+		}
+		assert.Equal(t, uint16(2), tx.Message.Instructions[computeUnitIndex].ProgramIDIndex)
+		assert.Equal(t, []uint16{0, 3}, tx.Message.Instructions[transferIndex].Accounts)
+	})
 }
 
 func TestParse(t *testing.T) {
