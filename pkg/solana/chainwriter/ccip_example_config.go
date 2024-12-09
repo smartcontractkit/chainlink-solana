@@ -79,7 +79,7 @@ func TestConfig() {
 			// 3. Lookup Table content - Get all the accounts from a lookup table
 			// 4. PDA Account Lookup - Based on another account and a seed/s
 			//	Nested PDA Account with seeds from:
-			// 		-> input paramters
+			// 		-> input parameters
 			// 		-> constant
 			// 	PDALookups can resolve to multiple addresses if:
 			// 		A) The PublicKey lookup resolves to multiple addresses (i.e. multiple token addresses)
@@ -102,8 +102,8 @@ func TestConfig() {
 			},
 			// Lookup Table content - Get the accounts from the derived lookup table above
 			AccountsFromLookupTable{
-				LookupTablesName: "RegistryTokenState",
-				IncludeIndexes:   []int{}, // If left empty, all addresses will be included. Otherwise, only the specified indexes will be included.
+				LookupTableName: "RegistryTokenState",
+				IncludeIndexes:  []int{}, // If left empty, all addresses will be included. Otherwise, only the specified indexes will be included.
 			},
 			// Account Lookup - Based on data from input parameters
 			// In this case, the user wants to add the destination token addresses to the transaction.

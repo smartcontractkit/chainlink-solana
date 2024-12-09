@@ -2,24 +2,24 @@ package chainwriter_test
 
 import (
 	"context"
-	"crypto/sha256"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
-
-	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
-	"github.com/test-go/testify/require"
 )
 
 type TestArgs struct {
@@ -40,7 +40,7 @@ type DataAccount struct {
 
 func TestAccountContant(t *testing.T) {
 	t.Run("AccountConstant resolves valid address", func(t *testing.T) {
-		expectedAddr := getRandomPubKey(t)
+		expectedAddr := chainwriter.GetRandomPubKey(t)
 		expectedMeta := []*solana.AccountMeta{
 			{
 				PublicKey:  expectedAddr,
@@ -54,14 +54,15 @@ func TestAccountContant(t *testing.T) {
 			IsSigner:   true,
 			IsWritable: true,
 		}
-		result, err := constantConfig.Resolve(nil, nil, nil, nil)
+		result, err := constantConfig.Resolve(tests.Context(t), nil, nil, nil)
 		require.NoError(t, err)
 		require.Equal(t, expectedMeta, result)
 	})
 }
 func TestAccountLookups(t *testing.T) {
+	ctx := tests.Context(t)
 	t.Run("AccountLookup resolves valid address with just one address", func(t *testing.T) {
-		expectedAddr := getRandomPubKey(t)
+		expectedAddr := chainwriter.GetRandomPubKey(t)
 		testArgs := TestArgs{
 			Inner: []InnerArgs{
 				{Address: expectedAddr.Bytes()},
@@ -81,14 +82,14 @@ func TestAccountLookups(t *testing.T) {
 			IsSigner:   true,
 			IsWritable: true,
 		}
-		result, err := lookupConfig.Resolve(nil, testArgs, nil, nil)
+		result, err := lookupConfig.Resolve(ctx, testArgs, nil, nil)
 		require.NoError(t, err)
 		require.Equal(t, expectedMeta, result)
 	})
 
 	t.Run("AccountLookup resolves valid address with just multiple addresses", func(t *testing.T) {
-		expectedAddr1 := getRandomPubKey(t)
-		expectedAddr2 := getRandomPubKey(t)
+		expectedAddr1 := chainwriter.GetRandomPubKey(t)
+		expectedAddr2 := chainwriter.GetRandomPubKey(t)
 
 		testArgs := TestArgs{
 			Inner: []InnerArgs{
@@ -115,7 +116,7 @@ func TestAccountLookups(t *testing.T) {
 			IsSigner:   true,
 			IsWritable: true,
 		}
-		result, err := lookupConfig.Resolve(nil, testArgs, nil, nil)
+		result, err := lookupConfig.Resolve(ctx, testArgs, nil, nil)
 		require.NoError(t, err)
 		for i, meta := range result {
 			require.Equal(t, expectedMeta[i], meta)
@@ -123,7 +124,7 @@ func TestAccountLookups(t *testing.T) {
 	})
 
 	t.Run("AccountLookup fails when address isn't in args", func(t *testing.T) {
-		expectedAddr := getRandomPubKey(t)
+		expectedAddr := chainwriter.GetRandomPubKey(t)
 
 		testArgs := TestArgs{
 			Inner: []InnerArgs{
@@ -136,7 +137,7 @@ func TestAccountLookups(t *testing.T) {
 			IsSigner:   true,
 			IsWritable: true,
 		}
-		_, err := lookupConfig.Resolve(nil, testArgs, nil, nil)
+		_, err := lookupConfig.Resolve(ctx, testArgs, nil, nil)
 		require.Error(t, err)
 	})
 }
@@ -145,7 +146,7 @@ func TestPDALookups(t *testing.T) {
 	programID := solana.SystemProgramID
 
 	t.Run("PDALookup resolves valid PDA with constant address seeds", func(t *testing.T) {
-		seed := getRandomPubKey(t)
+		seed := chainwriter.GetRandomPubKey(t)
 
 		pda, _, err := solana.FindProgramAddress([][]byte{seed.Bytes()}, programID)
 		require.NoError(t, err)
@@ -211,8 +212,6 @@ func TestPDALookups(t *testing.T) {
 	})
 
 	t.Run("PDALookup fails with missing seeds", func(t *testing.T) {
-		programID := solana.SystemProgramID
-
 		pdaLookup := chainwriter.PDALookups{
 			Name:      "TestPDA",
 			PublicKey: chainwriter.AccountConstant{Name: "ProgramID", Address: programID.String()},
@@ -234,8 +233,8 @@ func TestPDALookups(t *testing.T) {
 	})
 
 	t.Run("PDALookup resolves valid PDA with address lookup seeds", func(t *testing.T) {
-		seed1 := getRandomPubKey(t)
-		seed2 := getRandomPubKey(t)
+		seed1 := chainwriter.GetRandomPubKey(t)
+		seed2 := chainwriter.GetRandomPubKey(t)
 
 		pda, _, err := solana.FindProgramAddress([][]byte{seed1.Bytes(), seed2.Bytes()}, programID)
 		require.NoError(t, err)
@@ -292,22 +291,22 @@ func TestLookupTables(t *testing.T) {
 
 	txm := txm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
 
-	cw, err := chainwriter.NewSolanaChainWriterService(solanaClient, *txm, nil, chainwriter.ChainWriterConfig{})
+	cw, err := chainwriter.NewSolanaChainWriterService(solanaClient, txm, nil, chainwriter.ChainWriterConfig{})
 
 	t.Run("StaticLookup table resolves properly", func(t *testing.T) {
-		pubKeys := createTestPubKeys(t, 8)
-		table := CreateTestLookupTable(ctx, t, rpcClient, sender, pubKeys)
+		pubKeys := chainwriter.CreateTestPubKeys(t, 8)
+		table := chainwriter.CreateTestLookupTable(ctx, t, rpcClient, sender, pubKeys)
 		lookupConfig := chainwriter.LookupTables{
 			DerivedLookupTables: nil,
 			StaticLookupTables:  []string{table.String()},
 		}
-		_, staticTableMap, err := cw.ResolveLookupTables(ctx, nil, lookupConfig)
-		require.NoError(t, err)
+		_, staticTableMap, resolveErr := cw.ResolveLookupTables(ctx, nil, lookupConfig)
+		require.NoError(t, resolveErr)
 		require.Equal(t, pubKeys, staticTableMap[table])
 	})
 	t.Run("Derived lookup table resolves properly with constant address", func(t *testing.T) {
-		pubKeys := createTestPubKeys(t, 8)
-		table := CreateTestLookupTable(ctx, t, rpcClient, sender, pubKeys)
+		pubKeys := chainwriter.CreateTestPubKeys(t, 8)
+		table := chainwriter.CreateTestLookupTable(ctx, t, rpcClient, sender, pubKeys)
 		lookupConfig := chainwriter.LookupTables{
 			DerivedLookupTables: []chainwriter.DerivedLookupTable{
 				{
@@ -322,8 +321,8 @@ func TestLookupTables(t *testing.T) {
 			},
 			StaticLookupTables: nil,
 		}
-		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, nil, lookupConfig)
-		require.NoError(t, err)
+		derivedTableMap, _, resolveErr := cw.ResolveLookupTables(ctx, nil, lookupConfig)
+		require.NoError(t, resolveErr)
 
 		addresses, ok := derivedTableMap["DerivedTable"][table.String()]
 		require.True(t, ok)
@@ -333,7 +332,7 @@ func TestLookupTables(t *testing.T) {
 	})
 
 	t.Run("Derived lookup table fails with invalid address", func(t *testing.T) {
-		invalidTable := getRandomPubKey(t)
+		invalidTable := chainwriter.GetRandomPubKey(t)
 
 		lookupConfig := chainwriter.LookupTables{
 			DerivedLookupTables: []chainwriter.DerivedLookupTable{
@@ -356,7 +355,7 @@ func TestLookupTables(t *testing.T) {
 	})
 
 	t.Run("Static lookup table fails with invalid address", func(t *testing.T) {
-		invalidTable := getRandomPubKey(t)
+		invalidTable := chainwriter.GetRandomPubKey(t)
 
 		lookupConfig := chainwriter.LookupTables{
 			DerivedLookupTables: nil,
@@ -369,8 +368,8 @@ func TestLookupTables(t *testing.T) {
 	})
 
 	t.Run("Derived lookup table resolves properly with account lookup address", func(t *testing.T) {
-		pubKeys := createTestPubKeys(t, 8)
-		table := CreateTestLookupTable(ctx, t, rpcClient, sender, pubKeys)
+		pubKeys := chainwriter.CreateTestPubKeys(t, 8)
+		table := chainwriter.CreateTestLookupTable(ctx, t, rpcClient, sender, pubKeys)
 		lookupConfig := chainwriter.LookupTables{
 			DerivedLookupTables: []chainwriter.DerivedLookupTable{
 				{
@@ -405,10 +404,10 @@ func TestLookupTables(t *testing.T) {
 		// Deployed write_test contract
 		programID := solana.MustPublicKeyFromBase58("39vbQVpEMtZtg3e6ZSE7nBSzmNZptmW45WnLkbqEe4TU")
 
-		lookupKeys := createTestPubKeys(t, 5)
-		lookupTable := CreateTestLookupTable(ctx, t, rpcClient, sender, lookupKeys)
+		lookupKeys := chainwriter.CreateTestPubKeys(t, 5)
+		lookupTable := chainwriter.CreateTestLookupTable(ctx, t, rpcClient, sender, lookupKeys)
 
-		InitializeDataAccount(ctx, t, rpcClient, programID, sender, lookupTable)
+		chainwriter.InitializeDataAccount(ctx, t, rpcClient, programID, sender, lookupTable)
 
 		args := map[string]interface{}{
 			"seed1": []byte("data"),
@@ -445,77 +444,4 @@ func TestLookupTables(t *testing.T) {
 			require.Equal(t, lookupKeys[i], address.PublicKey)
 		}
 	})
-}
-
-func InitializeDataAccount(
-	ctx context.Context,
-	t *testing.T,
-	client *rpc.Client,
-	programID solana.PublicKey,
-	admin solana.PrivateKey,
-	lookupTable solana.PublicKey,
-) {
-	pda, _, err := solana.FindProgramAddress([][]byte{[]byte("data")}, programID)
-	require.NoError(t, err)
-
-	discriminator := getDiscriminator("initialize")
-
-	instructionData := append(discriminator[:], lookupTable.Bytes()...)
-
-	instruction := solana.NewInstruction(
-		programID,
-		solana.AccountMetaSlice{
-			solana.Meta(pda).WRITE(),
-			solana.Meta(admin.PublicKey()).SIGNER().WRITE(),
-			solana.Meta(solana.SystemProgramID),
-		},
-		instructionData,
-	)
-
-	// Send and confirm the transaction
-	utils.SendAndConfirm(ctx, t, client, []solana.Instruction{instruction}, admin, rpc.CommitmentFinalized)
-}
-
-func getDiscriminator(instruction string) [8]byte {
-	fullHash := sha256.Sum256([]byte("global:" + instruction))
-	var discriminator [8]byte
-	copy(discriminator[:], fullHash[:8])
-	return discriminator
-}
-
-func getRandomPubKey(t *testing.T) solana.PublicKey {
-	privKey, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
-	return privKey.PublicKey()
-}
-
-func createTestPubKeys(t *testing.T, num int) solana.PublicKeySlice {
-	addresses := make([]solana.PublicKey, num)
-	for i := 0; i < num; i++ {
-		addresses[i] = getRandomPubKey(t)
-	}
-	return addresses
-}
-
-func CreateTestLookupTable(ctx context.Context, t *testing.T, c *rpc.Client, sender solana.PrivateKey, addresses []solana.PublicKey) solana.PublicKey {
-	// Create lookup tables
-	slot, serr := c.GetSlot(ctx, rpc.CommitmentFinalized)
-	require.NoError(t, serr)
-	table, instruction, ierr := utils.NewCreateLookupTableInstruction(
-		sender.PublicKey(),
-		sender.PublicKey(),
-		slot,
-	)
-	require.NoError(t, ierr)
-	utils.SendAndConfirm(ctx, t, c, []solana.Instruction{instruction}, sender, rpc.CommitmentConfirmed)
-
-	// add entries to lookup table
-	utils.SendAndConfirm(ctx, t, c, []solana.Instruction{
-		utils.NewExtendLookupTableInstruction(
-			table, sender.PublicKey(), sender.PublicKey(),
-			addresses,
-		),
-	}, sender, rpc.CommitmentConfirmed)
-
-	return table
 }

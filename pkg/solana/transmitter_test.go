@@ -17,7 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
+	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
 // custom mock txm instead of mockery generated because SetTxConfig causes circular imports

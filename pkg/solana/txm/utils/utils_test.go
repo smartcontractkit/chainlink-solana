@@ -1,4 +1,4 @@
-package txm
+package utils
 
 import (
 	"sync"
@@ -42,7 +42,7 @@ func TestSortSignaturesAndResults(t *testing.T) {
 }
 
 func TestSignatureList_AllocateWaitSet(t *testing.T) {
-	sigs := signatureList{}
+	sigs := SignatureList{}
 	assert.Equal(t, 0, sigs.Length())
 
 	// can't set without pre-allocating

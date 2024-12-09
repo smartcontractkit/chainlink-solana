@@ -21,12 +21,13 @@ import (
 
 type SolanaChainWriterService struct {
 	reader client.Reader
-	txm    txm.Txm
+	txm    txm.TxManager
 	ge     fees.Estimator
 	config ChainWriterConfig
 	codecs map[string]types.Codec
 }
 
+// nolint // ignoring naming suggestion
 type ChainWriterConfig struct {
 	Programs map[string]ProgramConfig
 }
@@ -46,7 +47,7 @@ type MethodConfig struct {
 	DebugIDLocation string
 }
 
-func NewSolanaChainWriterService(reader client.Reader, txm txm.Txm, ge fees.Estimator, config ChainWriterConfig) (*SolanaChainWriterService, error) {
+func NewSolanaChainWriterService(reader client.Reader, txm txm.TxManager, ge fees.Estimator, config ChainWriterConfig) (*SolanaChainWriterService, error) {
 	codecs, err := parseIDLCodecs(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse IDL codecs: %w", err)
@@ -68,7 +69,7 @@ func parseIDLCodecs(config ChainWriterConfig) (map[string]types.Codec, error) {
 		if err := json.Unmarshal([]byte(programConfig.IDL), &idl); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal IDL: %w", err)
 		}
-		idlCodec, err := codec.NewIDLAccountCodec(idl, binary.LittleEndian())
+		idlCodec, err := codec.NewIDLInstructionsCodec(idl, binary.LittleEndian())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create codec from IDL: %w", err)
 		}
@@ -79,7 +80,7 @@ func parseIDLCodecs(config ChainWriterConfig) (map[string]types.Codec, error) {
 					return nil, fmt.Errorf("failed to create input modifications: %w", err)
 				}
 				// add mods to codec
-				idlCodec, err = codec.NewNamedModifierCodec(idlCodec, WrapItemType(program, method, true), modConfig)
+				idlCodec, err = codec.NewNamedModifierCodec(idlCodec, method, modConfig)
 				if err != nil {
 					return nil, fmt.Errorf("failed to create named codec: %w", err)
 				}
@@ -88,14 +89,6 @@ func parseIDLCodecs(config ChainWriterConfig) (map[string]types.Codec, error) {
 		codecs[program] = idlCodec
 	}
 	return codecs, nil
-}
-
-func WrapItemType(programName, itemType string, isParams bool) string {
-	if isParams {
-		return fmt.Sprintf("params.%s.%s", programName, itemType)
-	}
-
-	return fmt.Sprintf("return.%s.%s", programName, itemType)
 }
 
 /*
@@ -161,7 +154,7 @@ func (s *SolanaChainWriterService) FilterLookupTableAddresses(
 		for innerIdentifier, metas := range innerMap {
 			tableKey, err := solana.PublicKeyFromBase58(innerIdentifier)
 			if err != nil {
-				fmt.Errorf("error parsing lookup table key: %w", err)
+				continue
 			}
 
 			// Collect public keys that are actually used
@@ -198,16 +191,29 @@ func (s *SolanaChainWriterService) FilterLookupTableAddresses(
 }
 
 func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contractName, method string, args any, transactionID string, toAddress string, meta *types.TxMeta, value *big.Int) error {
-	programConfig := s.config.Programs[contractName]
-	methodConfig := programConfig.Methods[method]
+	programConfig, exists := s.config.Programs[contractName]
+	if !exists {
+		return fmt.Errorf("failed to find program config for contract name: %s", contractName)
+	}
+	methodConfig, exists := programConfig.Methods[method]
+	if !exists {
+		return fmt.Errorf("failed to find method config for method: %s", method)
+	}
 
 	// Configure debug ID
 	debugID := ""
 	if methodConfig.DebugIDLocation != "" {
-		debugID, err := GetDebugIDAtLocation(args, methodConfig.DebugIDLocation)
+		var err error
+		debugID, err = GetDebugIDAtLocation(args, methodConfig.DebugIDLocation)
 		if err != nil {
 			return errorWithDebugID(fmt.Errorf("error getting debug ID from input args: %w", err), debugID)
 		}
+	}
+
+	codec := s.codecs[contractName]
+	encodedPayload, err := codec.Encode(ctx, args, method)
+	if err != nil {
+		return errorWithDebugID(fmt.Errorf("error encoding transaction payload: %w", err), debugID)
 	}
 
 	// Fetch derived and static table maps
@@ -232,7 +238,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	}
 
 	// Prepare transaction
-	programId, err := solana.PublicKeyFromBase58(contractName)
+	programID, err := solana.PublicKeyFromBase58(contractName)
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error parsing program ID: %w", err), debugID)
 	}
@@ -242,15 +248,9 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("error parsing fee payer address: %w", err), debugID)
 	}
 
-	codec := s.codecs[contractName]
-	encodedPayload, err := codec.Encode(ctx, args, WrapItemType(contractName, method, true))
-	if err != nil {
-		return errorWithDebugID(fmt.Errorf("error encoding transaction payload: %w", err), debugID)
-	}
-
 	tx, err := solana.NewTransaction(
 		[]solana.Instruction{
-			solana.NewInstruction(programId, accounts, encodedPayload),
+			solana.NewInstruction(programID, accounts, encodedPayload),
 		},
 		blockhash.Value.Blockhash,
 		solana.TransactionPayer(feePayer),
@@ -269,13 +269,13 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 }
 
 var (
-	_ services.Service  = &SolanaChainWriterService{}
-	_ types.ChainWriter = &SolanaChainWriterService{}
+	_ services.Service     = &SolanaChainWriterService{}
+	_ types.ContractWriter = &SolanaChainWriterService{}
 )
 
 // GetTransactionStatus returns the current status of a transaction in the underlying chain's TXM.
 func (s *SolanaChainWriterService) GetTransactionStatus(ctx context.Context, transactionID string) (types.TransactionStatus, error) {
-	return types.Unknown, nil
+	return s.txm.GetTransactionStatus(ctx, transactionID)
 }
 
 // GetFeeComponents retrieves the associated gas costs for executing a transaction.
@@ -286,7 +286,7 @@ func (s *SolanaChainWriterService) GetFeeComponents(ctx context.Context) (*types
 
 	fee := s.ge.BaseComputeUnitPrice()
 	return &types.ChainFeeComponents{
-		ExecutionFee:        big.NewInt(int64(fee)),
+		ExecutionFee:        new(big.Int).SetUint64(fee),
 		DataAvailabilityFee: nil,
 	}, nil
 }

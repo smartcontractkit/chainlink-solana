@@ -25,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
+	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
 const (
@@ -36,14 +37,20 @@ const (
 	MaxComputeUnitLimit            = 1_400_000        // max compute unit limit a transaction can have
 )
 
-var _ services.Service = (*Txm)(nil)
-
 type SimpleKeystore interface {
 	Sign(ctx context.Context, account string, data []byte) (signature []byte, err error)
 	Accounts(ctx context.Context) (accounts []string, err error)
 }
 
 var _ loop.Keystore = (SimpleKeystore)(nil)
+
+type TxManager interface {
+	services.Service
+	Enqueue(ctx context.Context, accountID string, tx *solanaGo.Transaction, txID *string, txCfgs ...txmutils.SetTxConfig) error
+	GetTransactionStatus(ctx context.Context, transactionID string) (commontypes.TransactionStatus, error)
+}
+
+var _ TxManager = (*Txm)(nil)
 
 // Txm manages transactions for the solana blockchain.
 // simple implementation with no persistently stored txs
@@ -62,19 +69,6 @@ type Txm struct {
 	// sendTx is an override for sending transactions rather than using a single client
 	// Enabling MultiNode uses this function to send transactions to all RPCs
 	sendTx func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error)
-}
-
-type TxConfig struct {
-	Timeout time.Duration // transaction broadcast timeout
-
-	// compute unit price config
-	FeeBumpPeriod        time.Duration // how often to bump fee
-	BaseComputeUnitPrice uint64        // starting price
-	ComputeUnitPriceMin  uint64        // min price
-	ComputeUnitPriceMax  uint64        // max price
-
-	EstimateComputeUnitLimit bool   // enable compute limit estimations using simulation
-	ComputeUnitLimit         uint32 // compute unit limit
 }
 
 // NewTxm creates a txm. Uses simulation so should only be used to send txes to trusted contracts i.e. OCR.
@@ -744,15 +738,15 @@ func (txm *Txm) GetTransactionStatus(ctx context.Context, transactionID string) 
 	}
 
 	switch state {
-	case Broadcasted:
+	case txmutils.Broadcasted:
 		return commontypes.Pending, nil
-	case Processed, Confirmed:
+	case txmutils.Processed, txmutils.Confirmed:
 		return commontypes.Unconfirmed, nil
-	case Finalized:
+	case txmutils.Finalized:
 		return commontypes.Finalized, nil
-	case Errored:
+	case txmutils.Errored:
 		return commontypes.Failed, nil
-	case FatallyErrored:
+	case txmutils.FatallyErrored:
 		return commontypes.Fatal, nil
 	default:
 		return commontypes.Unknown, fmt.Errorf("found unknown transaction state: %s", state.String())
@@ -915,7 +909,7 @@ func (txm *Txm) ProcessError(sig solanaGo.Signature, resErr interface{}, simulat
 				errType = TxFailSimOther
 			}
 			txm.lggr.Errorw("unrecognized error", logValues...)
-			return Errored, errType
+			return txmutils.Errored, errType
 		}
 	}
 	return
@@ -938,8 +932,8 @@ func (txm *Txm) Name() string { return txm.lggr.Name() }
 
 func (txm *Txm) HealthReport() map[string]error { return map[string]error{txm.Name(): txm.Healthy()} }
 
-func (txm *Txm) defaultTxConfig() TxConfig {
-	return TxConfig{
+func (txm *Txm) defaultTxConfig() txmutils.TxConfig {
+	return txmutils.TxConfig{
 		Timeout:                  txm.cfg.TxRetryTimeout(),
 		FeeBumpPeriod:            txm.cfg.FeeBumpPeriod(),
 		BaseComputeUnitPrice:     txm.fee.BaseComputeUnitPrice(),

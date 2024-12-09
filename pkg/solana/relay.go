@@ -19,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
+	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
 var _ TxManager = (*txm.Txm)(nil)
