@@ -148,7 +148,7 @@ jobs:
 
       - name: load cached image
         run: |
-          docker load --input ./contracts/docker-build.tar
+          docker load --input docker-build.tar
 
       - name: Setup go
         uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
@@ -161,7 +161,7 @@ jobs:
         run: go install github.com/smartcontractkit/chainlink-testing-framework/tools/gotestloghelper@latest
 
       - name: Install Solana CLI
-        run: ./scripts/install-solana-ci.sh
+        run: ../scripts/install-solana-ci.sh
 
       - name: Test Relay Interfaces
         run: |
