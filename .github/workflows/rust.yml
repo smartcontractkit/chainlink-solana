@@ -167,7 +167,7 @@ jobs:
         run: |
           set -eoux pipefail
           # compile artifacts
-          cd contracts && solana-keygen new -o id.json --no-bip39-passphrase
+          solana-keygen new -o id.json --no-bip39-passphrase
           docker run -v "$(pwd)/../":/repo chainlink-solana:build bash -c "\
             set -eoux pipefail &&\
             RUSTUP_HOME=\"/root/.rustup\" &&\
