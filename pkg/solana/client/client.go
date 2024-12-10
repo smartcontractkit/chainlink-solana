@@ -41,6 +41,7 @@ type Reader interface {
 	GetTransaction(ctx context.Context, txHash solana.Signature, opts *rpc.GetTransactionOpts) (*rpc.GetTransactionResult, error)
 	GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64) (rpc.BlocksResult, error)
 	GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit uint64) (*rpc.BlocksResult, error)
+	GetBlockWithOpts(context.Context, uint64, *rpc.GetBlockOpts) (*rpc.GetBlockResult, error)
 	GetBlock(ctx context.Context, slot uint64) (*rpc.GetBlockResult, error)
 	GetSignaturesForAddressWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error)
 }
@@ -344,6 +345,15 @@ func (c *Client) GetLatestBlockHeight(ctx context.Context) (uint64, error) {
 		return c.rpc.GetBlockHeight(ctx, c.commitment)
 	})
 	return v.(uint64), err
+}
+
+func (c *Client) GetBlockWithOpts(ctx context.Context, slot uint64, opts *rpc.GetBlockOpts) (*rpc.GetBlockResult, error) {
+	// get block based on slot with custom options set
+	done := c.latency("get_block_with_opts")
+	defer done()
+	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
+	defer cancel()
+	return c.rpc.GetBlockWithOpts(ctx, slot, opts)
 }
 
 func (c *Client) GetBlock(ctx context.Context, slot uint64) (*rpc.GetBlockResult, error) {

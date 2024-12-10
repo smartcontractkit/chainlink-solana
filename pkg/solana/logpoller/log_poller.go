@@ -7,6 +7,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 )
 
 var (
@@ -24,17 +26,21 @@ type ORM interface {
 type LogPoller struct {
 	services.Service
 	eng *services.Engine
-
-	lggr logger.SugaredLogger
-	orm  ORM
+	services.StateMachine
+	lggr      logger.SugaredLogger
+	orm       ORM
+	client    client.Reader
+	collector *EncodedLogCollector
 
 	filters *filters
+	events  []ProgramEvent
 }
 
-func New(lggr logger.SugaredLogger, orm ORM) *LogPoller {
+func New(lggr logger.SugaredLogger, orm ORM, cl client.Reader) *LogPoller {
 	lggr = logger.Sugared(logger.Named(lggr, "LogPoller"))
 	lp := &LogPoller{
 		orm:     orm,
+		client:  cl,
 		lggr:    lggr,
 		filters: newFilters(lggr, orm),
 	}
@@ -44,12 +50,19 @@ func New(lggr logger.SugaredLogger, orm ORM) *LogPoller {
 		Start: lp.start,
 	}.NewServiceEngine(lggr)
 	lp.lggr = lp.eng.SugaredLogger
+	lp.collector = NewEncodedLogCollector(lp.client, lp, lp.lggr)
+
 	return lp
 }
 
 func (lp *LogPoller) start(context.Context) error {
 	lp.eng.Go(lp.run)
 	lp.eng.Go(lp.backgroundWorkerRun)
+	return nil
+}
+
+func (lp LogPoller) Process(event ProgramEvent) error {
+	// process stream of events coming from event loader
 	return nil
 }
 
