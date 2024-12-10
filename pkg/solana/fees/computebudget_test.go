@@ -6,6 +6,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
+	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -135,6 +136,55 @@ func testSet[V instruction](t *testing.T, builder func(uint) V, setter func(*sol
 		data, err := builder(100).Data()
 		assert.NoError(t, err)
 		assert.Equal(t, data, []byte(tx.Message.Instructions[computeIndex].Data))
+	})
+
+	t.Run("with_lookuptables", func(t *testing.T) {
+		t.Parallel()
+
+		// build base tx (no fee)
+		tx, err := solana.NewTransaction([]solana.Instruction{
+			system.NewTransferInstruction(
+				1,
+				solana.PublicKey{1},
+				solana.PublicKey{2},
+			).Build(),
+			token.NewTransferInstruction(
+				uint64(1),
+				solana.PublicKey{11},
+				solana.PublicKey{12},
+				solana.PublicKey{13},
+				[]solana.PublicKey{
+					solana.PublicKey{14},
+				},
+			).Build(),
+		},
+			solana.Hash{},
+			solana.TransactionAddressTables(map[solana.PublicKey]solana.PublicKeySlice{
+				solana.PublicKey{}: solana.PublicKeySlice{solana.PublicKey{1}, solana.PublicKey{2}, solana.PublicKey{11}, solana.PublicKey{12}, solana.PublicKey{13}, solana.PublicKey{14}},
+			}),
+		)
+		require.NoError(t, err)
+
+		// check current account indices
+		assert.Equal(t, 2, len(tx.Message.Instructions))
+		assert.Equal(t, []uint16{0, 4}, tx.Message.Instructions[0].Accounts)
+		assert.Equal(t, []uint16{5, 6, 7, 1}, tx.Message.Instructions[1].Accounts)
+		assert.Equal(t, 4, len(tx.Message.AccountKeys))
+
+		// add fee
+		require.NoError(t, setter(tx, builder(0)))
+
+		// evaluate
+		assert.Equal(t, 3, len(tx.Message.Instructions))
+		computeUnitIndex := getIndex(len(tx.Message.Instructions))
+		transferIndex := 0
+		if computeUnitIndex == transferIndex {
+			transferIndex = 1
+		}
+		assert.Equal(t, 5, len(tx.Message.AccountKeys))
+		assert.Equal(t, uint16(4), tx.Message.Instructions[computeUnitIndex].ProgramIDIndex)
+		assert.Equal(t, []uint16{0, 5}, tx.Message.Instructions[transferIndex].Accounts)
+		assert.Equal(t, []uint16{6, 7, 8, 1}, tx.Message.Instructions[transferIndex+1].Accounts)
 	})
 }
 

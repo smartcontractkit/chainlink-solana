@@ -36,8 +36,11 @@ type Reader interface {
 	ChainID(ctx context.Context) (mn.StringID, error)
 	GetFeeForMessage(ctx context.Context, msg string) (uint64, error)
 	GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error)
+	GetTransaction(ctx context.Context, txHash solana.Signature, opts *rpc.GetTransactionOpts) (*rpc.GetTransactionResult, error)
+	GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64) (rpc.BlocksResult, error)
 	GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit uint64) (*rpc.BlocksResult, error)
 	GetBlock(ctx context.Context, slot uint64) (*rpc.GetBlockResult, error)
+	GetSignaturesForAddressWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error)
 }
 
 // AccountReader is an interface that allows users to pass either the solana rpc client or the relay client
@@ -121,6 +124,43 @@ func (c *Client) SlotHeightWithCommitment(ctx context.Context, commitment rpc.Co
 	return v.(uint64), err
 }
 
+func (c *Client) GetSignaturesForAddressWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error) {
+	done := c.latency("signatures_for_address")
+	defer done()
+
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+	if opts == nil {
+		opts = &rpc.GetSignaturesForAddressOpts{}
+	}
+	if opts.Commitment == "" {
+		opts.Commitment = c.commitment
+	}
+	return c.rpc.GetSignaturesForAddressWithOpts(ctx, addr, opts)
+}
+
+func (c *Client) GetTransaction(ctx context.Context, txHash solana.Signature, opts *rpc.GetTransactionOpts) (*rpc.GetTransactionResult, error) {
+	done := c.latency("transaction")
+	defer done()
+
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+
+	if opts == nil {
+		opts = &rpc.GetTransactionOpts{
+			Encoding: solana.EncodingBase64,
+		}
+	}
+	if opts.Commitment == "" {
+		opts.Commitment = c.commitment
+	}
+
+	v, err, _ := c.requestGroup.Do("GetTransaction", func() (interface{}, error) {
+		return c.rpc.GetTransaction(ctx, txHash, opts)
+	})
+	return v.(*rpc.GetTransactionResult), err
+}
+
 func (c *Client) GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetAccountInfoOpts) (*rpc.GetAccountInfoResult, error) {
 	done := c.latency("account_info")
 	defer done()
@@ -129,6 +169,19 @@ func (c *Client) GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicK
 	defer cancel()
 	opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
 	return c.rpc.GetAccountInfoWithOpts(ctx, addr, opts)
+}
+
+func (c *Client) GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64) (out rpc.BlocksResult, err error) {
+	done := c.latency("blocks")
+	defer done()
+
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+
+	v, err, _ := c.requestGroup.Do("GetBlocks", func() (interface{}, error) {
+		return c.rpc.GetBlocks(ctx, startSlot, endSlot, c.commitment)
+	})
+	return v.(rpc.BlocksResult), err
 }
 
 func (c *Client) LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockhashResult, error) {

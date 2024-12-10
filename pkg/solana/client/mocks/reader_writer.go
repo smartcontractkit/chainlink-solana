@@ -257,6 +257,66 @@ func (_c *ReaderWriter_GetBlock_Call) RunAndReturn(run func(context.Context, uin
 	return _c
 }
 
+// GetBlocks provides a mock function with given fields: ctx, startSlot, endSlot
+func (_m *ReaderWriter) GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64) (rpc.BlocksResult, error) {
+	ret := _m.Called(ctx, startSlot, endSlot)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetBlocks")
+	}
+
+	var r0 rpc.BlocksResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, *uint64) (rpc.BlocksResult, error)); ok {
+		return rf(ctx, startSlot, endSlot)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, *uint64) rpc.BlocksResult); ok {
+		r0 = rf(ctx, startSlot, endSlot)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(rpc.BlocksResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uint64, *uint64) error); ok {
+		r1 = rf(ctx, startSlot, endSlot)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ReaderWriter_GetBlocks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetBlocks'
+type ReaderWriter_GetBlocks_Call struct {
+	*mock.Call
+}
+
+// GetBlocks is a helper method to define mock.On call
+//   - ctx context.Context
+//   - startSlot uint64
+//   - endSlot *uint64
+func (_e *ReaderWriter_Expecter) GetBlocks(ctx interface{}, startSlot interface{}, endSlot interface{}) *ReaderWriter_GetBlocks_Call {
+	return &ReaderWriter_GetBlocks_Call{Call: _e.mock.On("GetBlocks", ctx, startSlot, endSlot)}
+}
+
+func (_c *ReaderWriter_GetBlocks_Call) Run(run func(ctx context.Context, startSlot uint64, endSlot *uint64)) *ReaderWriter_GetBlocks_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uint64), args[2].(*uint64))
+	})
+	return _c
+}
+
+func (_c *ReaderWriter_GetBlocks_Call) Return(_a0 rpc.BlocksResult, _a1 error) *ReaderWriter_GetBlocks_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *ReaderWriter_GetBlocks_Call) RunAndReturn(run func(context.Context, uint64, *uint64) (rpc.BlocksResult, error)) *ReaderWriter_GetBlocks_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetBlocksWithLimit provides a mock function with given fields: ctx, startSlot, limit
 func (_m *ReaderWriter) GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit uint64) (*rpc.BlocksResult, error) {
 	ret := _m.Called(ctx, startSlot, limit)
@@ -428,6 +488,126 @@ func (_c *ReaderWriter_GetLatestBlock_Call) Return(_a0 *rpc.GetBlockResult, _a1 
 }
 
 func (_c *ReaderWriter_GetLatestBlock_Call) RunAndReturn(run func(context.Context) (*rpc.GetBlockResult, error)) *ReaderWriter_GetLatestBlock_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetSignaturesForAddressWithOpts provides a mock function with given fields: ctx, addr, opts
+func (_m *ReaderWriter) GetSignaturesForAddressWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error) {
+	ret := _m.Called(ctx, addr, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSignaturesForAddressWithOpts")
+	}
+
+	var r0 []*rpc.TransactionSignature
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, solana.PublicKey, *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error)); ok {
+		return rf(ctx, addr, opts)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, solana.PublicKey, *rpc.GetSignaturesForAddressOpts) []*rpc.TransactionSignature); ok {
+		r0 = rf(ctx, addr, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*rpc.TransactionSignature)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, solana.PublicKey, *rpc.GetSignaturesForAddressOpts) error); ok {
+		r1 = rf(ctx, addr, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ReaderWriter_GetSignaturesForAddressWithOpts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSignaturesForAddressWithOpts'
+type ReaderWriter_GetSignaturesForAddressWithOpts_Call struct {
+	*mock.Call
+}
+
+// GetSignaturesForAddressWithOpts is a helper method to define mock.On call
+//   - ctx context.Context
+//   - addr solana.PublicKey
+//   - opts *rpc.GetSignaturesForAddressOpts
+func (_e *ReaderWriter_Expecter) GetSignaturesForAddressWithOpts(ctx interface{}, addr interface{}, opts interface{}) *ReaderWriter_GetSignaturesForAddressWithOpts_Call {
+	return &ReaderWriter_GetSignaturesForAddressWithOpts_Call{Call: _e.mock.On("GetSignaturesForAddressWithOpts", ctx, addr, opts)}
+}
+
+func (_c *ReaderWriter_GetSignaturesForAddressWithOpts_Call) Run(run func(ctx context.Context, addr solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts)) *ReaderWriter_GetSignaturesForAddressWithOpts_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(solana.PublicKey), args[2].(*rpc.GetSignaturesForAddressOpts))
+	})
+	return _c
+}
+
+func (_c *ReaderWriter_GetSignaturesForAddressWithOpts_Call) Return(_a0 []*rpc.TransactionSignature, _a1 error) *ReaderWriter_GetSignaturesForAddressWithOpts_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *ReaderWriter_GetSignaturesForAddressWithOpts_Call) RunAndReturn(run func(context.Context, solana.PublicKey, *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error)) *ReaderWriter_GetSignaturesForAddressWithOpts_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetTransaction provides a mock function with given fields: ctx, txHash, opts
+func (_m *ReaderWriter) GetTransaction(ctx context.Context, txHash solana.Signature, opts *rpc.GetTransactionOpts) (*rpc.GetTransactionResult, error) {
+	ret := _m.Called(ctx, txHash, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetTransaction")
+	}
+
+	var r0 *rpc.GetTransactionResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, solana.Signature, *rpc.GetTransactionOpts) (*rpc.GetTransactionResult, error)); ok {
+		return rf(ctx, txHash, opts)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, solana.Signature, *rpc.GetTransactionOpts) *rpc.GetTransactionResult); ok {
+		r0 = rf(ctx, txHash, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*rpc.GetTransactionResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, solana.Signature, *rpc.GetTransactionOpts) error); ok {
+		r1 = rf(ctx, txHash, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ReaderWriter_GetTransaction_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetTransaction'
+type ReaderWriter_GetTransaction_Call struct {
+	*mock.Call
+}
+
+// GetTransaction is a helper method to define mock.On call
+//   - ctx context.Context
+//   - txHash solana.Signature
+//   - opts *rpc.GetTransactionOpts
+func (_e *ReaderWriter_Expecter) GetTransaction(ctx interface{}, txHash interface{}, opts interface{}) *ReaderWriter_GetTransaction_Call {
+	return &ReaderWriter_GetTransaction_Call{Call: _e.mock.On("GetTransaction", ctx, txHash, opts)}
+}
+
+func (_c *ReaderWriter_GetTransaction_Call) Run(run func(ctx context.Context, txHash solana.Signature, opts *rpc.GetTransactionOpts)) *ReaderWriter_GetTransaction_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(solana.Signature), args[2].(*rpc.GetTransactionOpts))
+	})
+	return _c
+}
+
+func (_c *ReaderWriter_GetTransaction_Call) Return(_a0 *rpc.GetTransactionResult, _a1 error) *ReaderWriter_GetTransaction_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *ReaderWriter_GetTransaction_Call) RunAndReturn(run func(context.Context, solana.Signature, *rpc.GetTransactionOpts) (*rpc.GetTransactionResult, error)) *ReaderWriter_GetTransaction_Call {
 	_c.Call.Return(run)
 	return _c
 }

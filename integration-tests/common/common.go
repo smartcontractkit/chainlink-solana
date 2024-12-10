@@ -384,10 +384,24 @@ func BuildNodeContractPairID(node *client.ChainlinkClient, ocr2Addr string) (str
 }
 
 func (c *Common) Default(t *testing.T, namespacePrefix string) (*Common, error) {
+	productName := "data-feedsv2.0"
+	nsLabels, err := environment.GetRequiredChainLinkNamespaceLabels(productName, "soak")
+	if err != nil {
+		return nil, err
+	}
+
+	workloadPodLabels, err := environment.GetRequiredChainLinkWorkloadAndPodLabels(productName, "soak")
+	if err != nil {
+		return nil, err
+	}
+
 	c.TestEnvDetails.K8Config = &environment.Config{
 		NamespacePrefix: fmt.Sprintf("solana-%s", namespacePrefix),
 		TTL:             c.TestEnvDetails.TestDuration,
 		Test:            t,
+		Labels:          nsLabels,
+		WorkloadLabels:  workloadPodLabels,
+		PodLabels:       workloadPodLabels,
 	}
 
 	if *c.TestConfig.Common.InsideK8s {
