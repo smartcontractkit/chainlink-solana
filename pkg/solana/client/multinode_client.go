@@ -42,8 +42,8 @@ var _ mn.RPCClient[mn.StringID, *Head] = (*MultiNodeClient)(nil)
 var _ mn.SendTxRPCClient[*solana.Transaction, *SendTxResult] = (*MultiNodeClient)(nil)
 
 type MultiNodeClient struct {
-	Client
-	*mn.MultiNodeClient[rpc.Client, *Head]
+	*Client
+	*mn.MultiNodeAdapter[rpc.Client, *Head]
 	cfg *config.TOMLConfig
 }
 
@@ -52,15 +52,15 @@ func NewMultiNodeClient(endpoint string, cfg *config.TOMLConfig, requestTimeout 
 	if err != nil {
 		return nil, err
 	}
-	multiNodeClient, err := mn.NewMultiNodeClient[rpc.Client, *Head](
+	multiNodeClient, err := mn.NewMultiNodeAdapter[rpc.Client, *Head](
 		&cfg.MultiNode, client.rpc, client.contextDuration, client.log, LatestBlock, LatestFinalizedBlock)
 	if err != nil {
 		return nil, err
 	}
 	return &MultiNodeClient{
-		Client:          *client,
-		MultiNodeClient: multiNodeClient,
-		cfg:             cfg,
+		Client:           client,
+		MultiNodeAdapter: multiNodeClient,
+		cfg:              cfg,
 	}, nil
 }
 
@@ -112,7 +112,7 @@ func (m *MultiNodeClient) Close() {
 			m.Client.log.Errorf("error closing rpc: %v", err)
 		}
 	}()
-	m.MultiNodeClient.Close()
+	m.MultiNodeAdapter.Close()
 }
 
 type SendTxResult struct {
