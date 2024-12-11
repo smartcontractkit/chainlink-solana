@@ -11,10 +11,6 @@ type MultiNodeConfig struct {
 	MultiNode
 }
 
-func ptr[T any](t T) *T {
-	return &t
-}
-
 type MultiNode struct {
 	// Feature flag
 	Enabled *bool
