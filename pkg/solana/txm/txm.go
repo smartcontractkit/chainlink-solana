@@ -860,7 +860,7 @@ func (txm *Txm) ProcessError(sig solanaGo.Signature, resErr interface{}, simulat
 			if simulation {
 				return txState, NoFailure
 			}
-			return Errored, errType
+			return txmutils.Errored, errType
 		// transaction is already processed in the chain
 		case strings.Contains(errStr, "AlreadyProcessed"):
 			txm.lggr.Debugw("AlreadyProcessed", logValues...)
@@ -869,39 +869,39 @@ func (txm *Txm) ProcessError(sig solanaGo.Signature, resErr interface{}, simulat
 			if simulation {
 				return txState, NoFailure
 			}
-			return Errored, errType
+			return txmutils.Errored, errType
 		// transaction will encounter execution error/revert
 		case strings.Contains(errStr, "InstructionError"):
 			txm.lggr.Debugw("InstructionError", logValues...)
-			return FatallyErrored, errType
+			return txmutils.FatallyErrored, errType
 		// transaction contains an invalid account reference
 		case strings.Contains(errStr, "InvalidAccountIndex"):
 			txm.lggr.Debugw("InvalidAccountIndex", logValues...)
-			return FatallyErrored, errType
+			return txmutils.FatallyErrored, errType
 		// transaction loads a writable account that cannot be written
 		case strings.Contains(errStr, "InvalidWritableAccount"):
 			txm.lggr.Debugw("InvalidWritableAccount", logValues...)
-			return FatallyErrored, errType
+			return txmutils.FatallyErrored, errType
 		// address lookup table not found
 		case strings.Contains(errStr, "AddressLookupTableNotFound"):
 			txm.lggr.Debugw("AddressLookupTableNotFound", logValues...)
-			return FatallyErrored, errType
+			return txmutils.FatallyErrored, errType
 		// attempted to lookup addresses from an invalid account
 		case strings.Contains(errStr, "InvalidAddressLookupTableData"):
 			txm.lggr.Debugw("InvalidAddressLookupTableData", logValues...)
-			return FatallyErrored, errType
+			return txmutils.FatallyErrored, errType
 		// address table lookup uses an invalid index
 		case strings.Contains(errStr, "InvalidAddressLookupTableIndex"):
 			txm.lggr.Debugw("InvalidAddressLookupTableIndex", logValues...)
-			return FatallyErrored, errType
+			return txmutils.FatallyErrored, errType
 		// attempt to debit an account but found no record of a prior credit.
 		case strings.Contains(errStr, "AccountNotFound"):
 			txm.lggr.Debugw("AccountNotFound", logValues...)
-			return FatallyErrored, errType
+			return txmutils.FatallyErrored, errType
 		// attempt to load a program that does not exist
 		case strings.Contains(errStr, "ProgramAccountNotFound"):
 			txm.lggr.Debugw("ProgramAccountNotFound", logValues...)
-			return FatallyErrored, errType
+			return txmutils.FatallyErrored, errType
 		// unrecognized errors (indicates more concerning failures)
 		default:
 			// if simulating, return TxFailSimOther if error unknown

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -210,6 +211,7 @@ func SetupTestValidatorWithAnchorPrograms(t *testing.T, pathToAnchorConfig strin
 
 	flags := []string{}
 	for k, v := range anchorData.Programs.Localnet {
+		k = strings.Replace(k, "-", "_", -1)
 		flags = append(flags, "--upgradeable-program", v, filepath.Join(ContractsDir, k+".so"), upgradeAuthority)
 	}
 	url, _ := client.SetupLocalSolNodeWithFlags(t, flags...)

@@ -1,0 +1,92 @@
+[0;31m📦 github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter[0m
+exit status 1
+  [0;31m❌ TestLookupTables[0;37m (30.04s)[0m
+    ports.go:37: found open port: 41544
+    ports.go:37: found open port: 39418
+    utils.go:215: API server not ready yet (attempt 1)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 2)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 3)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 4)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 5)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 6)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 7)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 8)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 9)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 10)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 11)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 12)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 13)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 14)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 15)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 16)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 17)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 18)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 19)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 20)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 21)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 22)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 23)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 24)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 25)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 26)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 27)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 28)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 29)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: API server not ready yet (attempt 30)
+    utils.go:215: Error from API server: rpc call getHealth() on http://127.0.0.1:41544: Post "http://127.0.0.1:41544": dial tcp 127.0.0.1:41544: connect: connection refused
+    utils.go:215: Cmd output: Error: program file does not exist: /Users/silaslenihan/Desktop/repos/chainlink-solana/contracts/target/deploy/contract-reader-interface.so
+        
+        Cmd error: 
+    utils.go:215: 
+        	Error Trace:	/Users/silaslenihan/Desktop/repos/chainlink-solana/pkg/solana/client/test_helpers.go:78
+        	            				/Users/silaslenihan/Desktop/repos/chainlink-solana/pkg/solana/utils/utils.go:215
+        	            				/Users/silaslenihan/Desktop/repos/chainlink-solana/pkg/solana/chainwriter/lookups_test.go:279
+        	Error:      	Should be true
+        	Test:       	TestLookupTables
+    test_helpers.go:55: 
+        	Error Trace:	/Users/silaslenihan/Desktop/repos/chainlink-solana/pkg/solana/client/test_helpers.go:55
+        	            				/Users/silaslenihan/.asdf/installs/golang/1.23.3/go/src/testing/testing.go:1176
+        	            				/Users/silaslenihan/.asdf/installs/golang/1.23.3/go/src/testing/testing.go:1354
+        	            				/Users/silaslenihan/.asdf/installs/golang/1.23.3/go/src/testing/testing.go:1684
+        	            				/Users/silaslenihan/.asdf/installs/golang/1.23.3/go/src/runtime/panic.go:629
+        	            				/Users/silaslenihan/.asdf/installs/golang/1.23.3/go/src/testing/testing.go:1006
+        	            				/Users/silaslenihan/Desktop/repos/chainlink-solana/pkg/solana/client/test_helpers.go:78
+        	            				/Users/silaslenihan/Desktop/repos/chainlink-solana/pkg/solana/utils/utils.go:215
+        	            				/Users/silaslenihan/Desktop/repos/chainlink-solana/pkg/solana/chainwriter/lookups_test.go:279
+        	Error:      	"exit status 1" does not contain "signal: killed"
+        	Test:       	TestLookupTables
+        	Messages:   	exit status 1
+    test_helpers.go:56: solana-test-validator
+         stdout: Error: program file does not exist: /Users/silaslenihan/Desktop/repos/chainlink-solana/contracts/target/deploy/contract-reader-interface.so
+        
+         stderr: 
+
