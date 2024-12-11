@@ -116,6 +116,7 @@ func TestMultiNodeClient_HeadSubscriptions(t *testing.T) {
 	})
 
 	t.Run("Remove Subscription on Unsubscribe", func(t *testing.T) {
+		c := newTestClient(t)
 		_, sub1, err := c.SubscribeToHeads(tests.Context(t))
 		require.NoError(t, err)
 		require.Equal(t, 1, c.LenSubs())
@@ -130,6 +131,7 @@ func TestMultiNodeClient_HeadSubscriptions(t *testing.T) {
 	})
 
 	t.Run("Ensure no deadlock on UnsubscribeAll", func(t *testing.T) {
+		c := newTestClient(t)
 		_, _, err := c.SubscribeToHeads(tests.Context(t))
 		require.NoError(t, err)
 		require.Equal(t, 1, c.LenSubs())
@@ -159,41 +161,60 @@ func (s *mockSub) Err() <-chan error {
 func TestMultiNodeClient_RegisterSubs(t *testing.T) {
 	t.Run("registerSub", func(t *testing.T) {
 		c := newTestClient(t)
-		sub := newMockSub()
+		mockSub := newMockSub()
+		sub := &ManagedSubscription{
+			Subscription:  mockSub,
+			onUnsubscribe: c.removeSub,
+		}
 		err := c.registerSub(sub, make(chan struct{}))
 		require.NoError(t, err)
 		require.Equal(t, 1, c.LenSubs())
 		c.UnsubscribeAllExcept()
+		require.Equal(t, 0, c.LenSubs())
+		require.Equal(t, true, mockSub.unsubscribed)
 	})
 
 	t.Run("chStopInFlight returns error and unsubscribes", func(t *testing.T) {
 		c := newTestClient(t)
 		chStopInFlight := make(chan struct{})
 		close(chStopInFlight)
-		sub := newMockSub()
+		mockSub := newMockSub()
+		sub := &ManagedSubscription{
+			Subscription:  mockSub,
+			onUnsubscribe: c.removeSub,
+		}
 		err := c.registerSub(sub, chStopInFlight)
 		require.Error(t, err)
-		require.Equal(t, true, sub.unsubscribed)
+		require.Equal(t, true, mockSub.unsubscribed)
 	})
 
 	t.Run("UnsubscribeAllExcept", func(t *testing.T) {
 		c := newTestClient(t)
 		chStopInFlight := make(chan struct{})
-		sub1 := newMockSub()
-		sub2 := newMockSub()
+		mockSub1 := newMockSub()
+		sub1 := &ManagedSubscription{
+			Subscription:  mockSub1,
+			onUnsubscribe: c.removeSub,
+		}
+		mockSub2 := newMockSub()
+		sub2 := &ManagedSubscription{
+			Subscription:  mockSub2,
+			onUnsubscribe: c.removeSub,
+		}
 		err := c.registerSub(sub1, chStopInFlight)
 		require.NoError(t, err)
 		err = c.registerSub(sub2, chStopInFlight)
 		require.NoError(t, err)
 		require.Equal(t, 2, c.LenSubs())
 
+		// Ensure passed sub is not removed
 		c.UnsubscribeAllExcept(sub1)
 		require.Equal(t, 1, c.LenSubs())
-		require.Equal(t, true, sub2.unsubscribed)
-		require.Equal(t, false, sub1.unsubscribed)
+		require.Equal(t, true, mockSub2.unsubscribed)
+		require.Equal(t, false, mockSub1.unsubscribed)
 
 		c.UnsubscribeAllExcept()
 		require.Equal(t, 0, c.LenSubs())
-		require.Equal(t, true, sub1.unsubscribed)
+		require.Equal(t, true, mockSub1.unsubscribed)
 	})
 }
