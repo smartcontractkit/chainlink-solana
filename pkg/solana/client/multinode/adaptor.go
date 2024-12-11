@@ -13,7 +13,8 @@ import (
 	mnCfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode/config"
 )
 
-type MultiNodeClient[RPC any, HEAD Head] struct {
+// MultiNodeAdapter is used to integrate multinode into chain-specific clients
+type MultiNodeAdapter[RPC any, HEAD Head] struct {
 	cfg         *mnCfg.MultiNodeConfig
 	log         logger.Logger
 	rpc         *RPC
@@ -26,23 +27,23 @@ type MultiNodeClient[RPC any, HEAD Head] struct {
 	latestFinalizedBlock func(ctx context.Context, rpc *RPC) (HEAD, error)
 
 	// chStopInFlight can be closed to immediately cancel all in-flight requests on
-	// this RpcClient. Closing and replacing should be serialized through
-	// stateMu since it can happen on state transitions as well as RpcClient Close.
+	// this RpcMultiNodeAdapter. Closing and replacing should be serialized through
+	// stateMu since it can happen on state transitions as well as RpcMultiNodeAdapter Close.
 	chStopInFlight chan struct{}
 
 	chainInfoLock sync.RWMutex
-	// intercepted values seen by callers of the rpcClient excluding health check calls. Need to ensure MultiNode provides repeatable read guarantee
+	// intercepted values seen by callers of the rpcMultiNodeAdapter excluding health check calls. Need to ensure MultiNode provides repeatable read guarantee
 	highestUserObservations ChainInfo
 	// most recent chain info observed during current lifecycle (reseted on DisconnectAll)
 	latestChainInfo ChainInfo
 }
 
-func NewMultiNodeClient[RPC any, HEAD Head](
+func NewMultiNodeAdapter[RPC any, HEAD Head](
 	cfg *mnCfg.MultiNodeConfig, rpc *RPC, ctxTimeout time.Duration, log logger.Logger,
 	latestBlock func(ctx context.Context, rpc *RPC) (HEAD, error),
 	latestFinalizedBlock func(ctx context.Context, rpc *RPC) (HEAD, error),
-) (*MultiNodeClient[RPC, HEAD], error) {
-	return &MultiNodeClient[RPC, HEAD]{
+) (*MultiNodeAdapter[RPC, HEAD], error) {
+	return &MultiNodeAdapter[RPC, HEAD]{
 		cfg:                  cfg,
 		rpc:                  rpc,
 		log:                  log,
@@ -54,17 +55,15 @@ func NewMultiNodeClient[RPC any, HEAD Head](
 	}, nil
 }
 
-func (m *MultiNodeClient[RPC, HEAD]) LenSubs() int {
+func (m *MultiNodeAdapter[RPC, HEAD]) LenSubs() int {
 	m.subsSliceMu.RLock()
 	defer m.subsSliceMu.RUnlock()
 	return len(m.subs)
 }
 
-// registerSub adds the sub to the rpcClient list
-func (m *MultiNodeClient[RPC, HEAD]) registerSub(sub Subscription, stopInFLightCh chan struct{}) error {
-	m.subsSliceMu.Lock()
-	defer m.subsSliceMu.Unlock()
-	// ensure that the `sub` belongs to current life cycle of the `rpcClient` and it should not be killed due to
+// registerSub adds the sub to the rpcMultiNodeAdapter list
+func (m *MultiNodeAdapter[RPC, HEAD]) registerSub(sub *ManagedSubscription, stopInFLightCh chan struct{}) error {
+	// ensure that the `sub` belongs to current life cycle of the `rpcMultiNodeAdapter` and it should not be killed due to
 	// previous `DisconnectAll` call.
 	select {
 	case <-stopInFLightCh:
@@ -72,17 +71,19 @@ func (m *MultiNodeClient[RPC, HEAD]) registerSub(sub Subscription, stopInFLightC
 		return fmt.Errorf("failed to register subscription - all in-flight requests were canceled")
 	default:
 	}
+	m.subsSliceMu.Lock()
+	defer m.subsSliceMu.Unlock()
 	m.subs[sub] = struct{}{}
 	return nil
 }
 
-func (m *MultiNodeClient[RPC, HEAD]) removeSub(sub Subscription) {
+func (m *MultiNodeAdapter[RPC, HEAD]) removeSub(sub Subscription) {
 	m.subsSliceMu.Lock()
 	defer m.subsSliceMu.Unlock()
 	delete(m.subs, sub)
 }
 
-func (m *MultiNodeClient[RPC, HEAD]) LatestBlock(ctx context.Context) (HEAD, error) {
+func (m *MultiNodeAdapter[RPC, HEAD]) LatestBlock(ctx context.Context) (HEAD, error) {
 	// capture chStopInFlight to ensure we are not updating chainInfo with observations related to previous life cycle
 	ctx, cancel, chStopInFlight, rpc := m.AcquireQueryCtx(ctx, m.ctxTimeout)
 	defer cancel()
@@ -96,11 +97,11 @@ func (m *MultiNodeClient[RPC, HEAD]) LatestBlock(ctx context.Context) (HEAD, err
 		return head, errors.New("invalid head")
 	}
 
-	m.OnNewHead(ctx, chStopInFlight, head)
+	m.onNewHead(ctx, chStopInFlight, head)
 	return head, nil
 }
 
-func (m *MultiNodeClient[RPC, HEAD]) LatestFinalizedBlock(ctx context.Context) (HEAD, error) {
+func (m *MultiNodeAdapter[RPC, HEAD]) LatestFinalizedBlock(ctx context.Context) (HEAD, error) {
 	ctx, cancel, chStopInFlight, rpc := m.AcquireQueryCtx(ctx, m.ctxTimeout)
 	defer cancel()
 
@@ -113,11 +114,11 @@ func (m *MultiNodeClient[RPC, HEAD]) LatestFinalizedBlock(ctx context.Context) (
 		return head, errors.New("invalid head")
 	}
 
-	m.OnNewFinalizedHead(ctx, chStopInFlight, head)
+	m.onNewFinalizedHead(ctx, chStopInFlight, head)
 	return head, nil
 }
 
-func (m *MultiNodeClient[RPC, HEAD]) SubscribeToHeads(ctx context.Context) (<-chan HEAD, Subscription, error) {
+func (m *MultiNodeAdapter[RPC, HEAD]) SubscribeToHeads(ctx context.Context) (<-chan HEAD, Subscription, error) {
 	ctx, cancel, chStopInFlight, _ := m.AcquireQueryCtx(ctx, m.ctxTimeout)
 	defer cancel()
 
@@ -152,7 +153,7 @@ func (m *MultiNodeClient[RPC, HEAD]) SubscribeToHeads(ctx context.Context) (<-ch
 	return channel, sub, nil
 }
 
-func (m *MultiNodeClient[RPC, HEAD]) SubscribeToFinalizedHeads(ctx context.Context) (<-chan HEAD, Subscription, error) {
+func (m *MultiNodeAdapter[RPC, HEAD]) SubscribeToFinalizedHeads(ctx context.Context) (<-chan HEAD, Subscription, error) {
 	ctx, cancel, chStopInFlight, _ := m.AcquireQueryCtx(ctx, m.ctxTimeout)
 	defer cancel()
 
@@ -185,7 +186,7 @@ func (m *MultiNodeClient[RPC, HEAD]) SubscribeToFinalizedHeads(ctx context.Conte
 	return channel, sub, nil
 }
 
-func (m *MultiNodeClient[RPC, HEAD]) OnNewHead(ctx context.Context, requestCh <-chan struct{}, head HEAD) {
+func (m *MultiNodeAdapter[RPC, HEAD]) onNewHead(ctx context.Context, requestCh <-chan struct{}, head HEAD) {
 	if !head.IsValid() {
 		return
 	}
@@ -196,14 +197,14 @@ func (m *MultiNodeClient[RPC, HEAD]) OnNewHead(ctx context.Context, requestCh <-
 		m.highestUserObservations.BlockNumber = max(m.highestUserObservations.BlockNumber, head.BlockNumber())
 	}
 	select {
-	case <-requestCh: // no need to update latestChainInfo, as rpcClient already started new life cycle
+	case <-requestCh: // no need to update latestChainInfo, as rpcMultiNodeAdapter already started new life cycle
 		return
 	default:
 		m.latestChainInfo.BlockNumber = head.BlockNumber()
 	}
 }
 
-func (m *MultiNodeClient[RPC, HEAD]) OnNewFinalizedHead(ctx context.Context, requestCh <-chan struct{}, head HEAD) {
+func (m *MultiNodeAdapter[RPC, HEAD]) onNewFinalizedHead(ctx context.Context, requestCh <-chan struct{}, head HEAD) {
 	if !head.IsValid() {
 		return
 	}
@@ -214,7 +215,7 @@ func (m *MultiNodeClient[RPC, HEAD]) OnNewFinalizedHead(ctx context.Context, req
 		m.highestUserObservations.FinalizedBlockNumber = max(m.highestUserObservations.FinalizedBlockNumber, head.BlockNumber())
 	}
 	select {
-	case <-requestCh: // no need to update latestChainInfo, as rpcClient already started new life cycle
+	case <-requestCh: // no need to update latestChainInfo, as rpcMultiNodeAdapter already started new life cycle
 		return
 	default:
 		m.latestChainInfo.FinalizedBlockNumber = head.BlockNumber()
@@ -236,7 +237,7 @@ func MakeQueryCtx(ctx context.Context, ch services.StopChan, timeout time.Durati
 	return ctx, cancel
 }
 
-func (m *MultiNodeClient[RPC, HEAD]) AcquireQueryCtx(parentCtx context.Context, timeout time.Duration) (ctx context.Context, cancel context.CancelFunc,
+func (m *MultiNodeAdapter[RPC, HEAD]) AcquireQueryCtx(parentCtx context.Context, timeout time.Duration) (ctx context.Context, cancel context.CancelFunc,
 	chStopInFlight chan struct{}, raw *RPC) {
 	// Need to wrap in mutex because state transition can cancel and replace context
 	m.stateMu.RLock()
@@ -248,43 +249,43 @@ func (m *MultiNodeClient[RPC, HEAD]) AcquireQueryCtx(parentCtx context.Context, 
 	return
 }
 
-func (m *MultiNodeClient[RPC, HEAD]) UnsubscribeAllExcept(subs ...Subscription) {
+func (m *MultiNodeAdapter[RPC, HEAD]) UnsubscribeAllExcept(subs ...Subscription) {
 	m.subsSliceMu.Lock()
-	defer m.subsSliceMu.Unlock()
-
 	keepSubs := map[Subscription]struct{}{}
 	for _, sub := range subs {
 		keepSubs[sub] = struct{}{}
 	}
 
+	var unsubs []Subscription
 	for sub := range m.subs {
 		if _, keep := keepSubs[sub]; !keep {
-			// Release lock to avoid deadlock on unsubscribe
-			m.subsSliceMu.Unlock()
-			sub.Unsubscribe()
-			m.subsSliceMu.Lock()
-			delete(m.subs, sub)
+			unsubs = append(unsubs, sub)
 		}
+	}
+	m.subsSliceMu.Unlock()
+
+	for _, sub := range unsubs {
+		sub.Unsubscribe()
 	}
 }
 
-// CancelInflightRequests closes and replaces the chStopInFlight
-func (m *MultiNodeClient[RPC, HEAD]) CancelInflightRequests() {
+// cancelInflightRequests closes and replaces the chStopInFlight
+func (m *MultiNodeAdapter[RPC, HEAD]) cancelInflightRequests() {
 	m.stateMu.Lock()
 	defer m.stateMu.Unlock()
 	close(m.chStopInFlight)
 	m.chStopInFlight = make(chan struct{})
 }
 
-func (m *MultiNodeClient[RPC, HEAD]) Close() {
-	m.CancelInflightRequests()
+func (m *MultiNodeAdapter[RPC, HEAD]) Close() {
+	m.cancelInflightRequests()
 	m.UnsubscribeAllExcept()
 	m.chainInfoLock.Lock()
 	m.latestChainInfo = ChainInfo{}
 	m.chainInfoLock.Unlock()
 }
 
-func (m *MultiNodeClient[RPC, HEAD]) GetInterceptedChainInfo() (latest, highestUserObservations ChainInfo) {
+func (m *MultiNodeAdapter[RPC, HEAD]) GetInterceptedChainInfo() (latest, highestUserObservations ChainInfo) {
 	m.chainInfoLock.Lock()
 	defer m.chainInfoLock.Unlock()
 	return m.latestChainInfo, m.highestUserObservations
