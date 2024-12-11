@@ -27,6 +27,7 @@ test = "pnpm run test"
 
 [programs.localnet]
 access_controller = "9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW"
+contract-reader-interface = "6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE"
 log-read-test = "J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4"
 ocr_2 = "cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ" # need to rename the idl to satisfy anchor.js...
 store = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny"

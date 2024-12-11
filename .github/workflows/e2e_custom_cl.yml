@@ -423,4 +423,5 @@ jobs:
         env:
           E2E_TEST_CHAINLINK_IMAGE: ${{ env.CL_ECR }}          
           E2E_TEST_SOLANA_SECRET: thisisatestingonlysecret
+          CHAINLINK_USER_TEAM: ${{ github.event.inputs.team || 'BIX' }}
           
