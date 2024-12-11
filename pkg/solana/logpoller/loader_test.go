@@ -63,7 +63,7 @@ func TestEncodedLogCollector_ParseSingleEvent(t *testing.T) {
 	latest.Store(uint64(40))
 
 	client.EXPECT().
-		GetLatestBlockhash(mock.Anything, rpc.CommitmentFinalized).
+		LatestBlockhash(mock.Anything).
 		RunAndReturn(latestBlockhashReturnFunc(&latest))
 
 	client.EXPECT().
@@ -71,7 +71,6 @@ func TestEncodedLogCollector_ParseSingleEvent(t *testing.T) {
 			mock.Anything,
 			mock.MatchedBy(getBlocksStartValMatcher),
 			mock.MatchedBy(getBlocksEndValMatcher(&latest)),
-			rpc.CommitmentFinalized,
 		).
 		RunAndReturn(getBlocksReturnFunc(false))
 
@@ -139,7 +138,7 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 	}
 
 	client.EXPECT().
-		GetLatestBlockhash(mock.Anything, rpc.CommitmentFinalized).
+		LatestBlockhash(mock.Anything).
 		RunAndReturn(latestBlockhashReturnFunc(&latest))
 
 	client.EXPECT().
@@ -147,7 +146,6 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 			mock.Anything,
 			mock.MatchedBy(getBlocksStartValMatcher),
 			mock.MatchedBy(getBlocksEndValMatcher(&latest)),
-			rpc.CommitmentFinalized,
 		).
 		RunAndReturn(getBlocksReturnFunc(false))
 
@@ -298,7 +296,7 @@ func TestEncodedLogCollector_BackfillForAddress(t *testing.T) {
 
 	// GetLatestBlockhash might be called at start-up; make it take some time because the result isn't needed for this test
 	client.EXPECT().
-		GetLatestBlockhash(mock.Anything, rpc.CommitmentFinalized).
+		LatestBlockhash(mock.Anything).
 		RunAndReturn(latestBlockhashReturnFunc(&latest)).
 		After(2 * time.Second).
 		Maybe()
@@ -308,7 +306,6 @@ func TestEncodedLogCollector_BackfillForAddress(t *testing.T) {
 			mock.Anything,
 			mock.MatchedBy(getBlocksStartValMatcher),
 			mock.MatchedBy(getBlocksEndValMatcher(&latest)),
-			rpc.CommitmentFinalized,
 		).
 		RunAndReturn(getBlocksReturnFunc(true))
 
@@ -455,7 +452,7 @@ func (p *testBlockProducer) Count() uint64 {
 	return p.count
 }
 
-func (p *testBlockProducer) GetLatestBlockhash(_ context.Context, _ rpc.CommitmentType) (out *rpc.GetLatestBlockhashResult, err error) {
+func (p *testBlockProducer) LatestBlockhash(_ context.Context) (out *rpc.GetLatestBlockhashResult, err error) {
 	p.b.Helper()
 
 	p.mu.Lock()
@@ -474,7 +471,7 @@ func (p *testBlockProducer) GetLatestBlockhash(_ context.Context, _ rpc.Commitme
 	}, nil
 }
 
-func (p *testBlockProducer) GetBlocks(_ context.Context, startSlot uint64, endSlot *uint64, _ rpc.CommitmentType) (out rpc.BlocksResult, err error) {
+func (p *testBlockProducer) GetBlocks(_ context.Context, startSlot uint64, endSlot *uint64) (out rpc.BlocksResult, err error) {
 	p.b.Helper()
 
 	p.mu.Lock()
@@ -486,7 +483,7 @@ func (p *testBlockProducer) GetBlocks(_ context.Context, startSlot uint64, endSl
 		blocks[idx] = startSlot + uint64(idx)
 	}
 
-	return rpc.BlocksResult(blocks), nil
+	return blocks, nil
 }
 
 func (p *testBlockProducer) GetBlockWithOpts(_ context.Context, block uint64, opts *rpc.GetBlockOpts) (*rpc.GetBlockResult, error) {
@@ -589,8 +586,8 @@ func (p *testParser) Events() []logpoller.ProgramEvent {
 	return p.events
 }
 
-func latestBlockhashReturnFunc(latest *atomic.Uint64) func(context.Context, rpc.CommitmentType) (*rpc.GetLatestBlockhashResult, error) {
-	return func(ctx context.Context, ct rpc.CommitmentType) (*rpc.GetLatestBlockhashResult, error) {
+func latestBlockhashReturnFunc(latest *atomic.Uint64) func(context.Context) (*rpc.GetLatestBlockhashResult, error) {
+	return func(ctx context.Context) (*rpc.GetLatestBlockhashResult, error) {
 		defer func() {
 			latest.Store(latest.Load() + 2)
 		}()
@@ -608,8 +605,8 @@ func latestBlockhashReturnFunc(latest *atomic.Uint64) func(context.Context, rpc.
 	}
 }
 
-func getBlocksReturnFunc(empty bool) func(context.Context, uint64, *uint64, rpc.CommitmentType) (rpc.BlocksResult, error) {
-	return func(_ context.Context, u1 uint64, u2 *uint64, _ rpc.CommitmentType) (rpc.BlocksResult, error) {
+func getBlocksReturnFunc(empty bool) func(context.Context, uint64, *uint64) (rpc.BlocksResult, error) {
+	return func(_ context.Context, u1 uint64, u2 *uint64) (rpc.BlocksResult, error) {
 		blocks := []uint64{}
 
 		if !empty {
@@ -619,7 +616,7 @@ func getBlocksReturnFunc(empty bool) func(context.Context, uint64, *uint64, rpc.
 			}
 		}
 
-		return rpc.BlocksResult(blocks), nil
+		return blocks, nil
 	}
 }
 
