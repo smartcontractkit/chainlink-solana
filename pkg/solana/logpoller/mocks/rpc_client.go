@@ -85,9 +85,9 @@ func (_c *RPCClient_GetBlockWithOpts_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
-// GetBlocks provides a mock function with given fields: ctx, startSlot, endSlot, commitment
-func (_m *RPCClient) GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64, commitment rpc.CommitmentType) (rpc.BlocksResult, error) {
-	ret := _m.Called(ctx, startSlot, endSlot, commitment)
+// GetBlocks provides a mock function with given fields: ctx, startSlot, endSlot
+func (_m *RPCClient) GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64) (rpc.BlocksResult, error) {
+	ret := _m.Called(ctx, startSlot, endSlot)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetBlocks")
@@ -95,19 +95,19 @@ func (_m *RPCClient) GetBlocks(ctx context.Context, startSlot uint64, endSlot *u
 
 	var r0 rpc.BlocksResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, *uint64, rpc.CommitmentType) (rpc.BlocksResult, error)); ok {
-		return rf(ctx, startSlot, endSlot, commitment)
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, *uint64) (rpc.BlocksResult, error)); ok {
+		return rf(ctx, startSlot, endSlot)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, *uint64, rpc.CommitmentType) rpc.BlocksResult); ok {
-		r0 = rf(ctx, startSlot, endSlot, commitment)
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, *uint64) rpc.BlocksResult); ok {
+		r0 = rf(ctx, startSlot, endSlot)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(rpc.BlocksResult)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, uint64, *uint64, rpc.CommitmentType) error); ok {
-		r1 = rf(ctx, startSlot, endSlot, commitment)
+	if rf, ok := ret.Get(1).(func(context.Context, uint64, *uint64) error); ok {
+		r1 = rf(ctx, startSlot, endSlot)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -124,14 +124,13 @@ type RPCClient_GetBlocks_Call struct {
 //   - ctx context.Context
 //   - startSlot uint64
 //   - endSlot *uint64
-//   - commitment rpc.CommitmentType
-func (_e *RPCClient_Expecter) GetBlocks(ctx interface{}, startSlot interface{}, endSlot interface{}, commitment interface{}) *RPCClient_GetBlocks_Call {
-	return &RPCClient_GetBlocks_Call{Call: _e.mock.On("GetBlocks", ctx, startSlot, endSlot, commitment)}
+func (_e *RPCClient_Expecter) GetBlocks(ctx interface{}, startSlot interface{}, endSlot interface{}) *RPCClient_GetBlocks_Call {
+	return &RPCClient_GetBlocks_Call{Call: _e.mock.On("GetBlocks", ctx, startSlot, endSlot)}
 }
 
-func (_c *RPCClient_GetBlocks_Call) Run(run func(ctx context.Context, startSlot uint64, endSlot *uint64, commitment rpc.CommitmentType)) *RPCClient_GetBlocks_Call {
+func (_c *RPCClient_GetBlocks_Call) Run(run func(ctx context.Context, startSlot uint64, endSlot *uint64)) *RPCClient_GetBlocks_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(uint64), args[2].(*uint64), args[3].(rpc.CommitmentType))
+		run(args[0].(context.Context), args[1].(uint64), args[2].(*uint64))
 	})
 	return _c
 }
@@ -141,66 +140,7 @@ func (_c *RPCClient_GetBlocks_Call) Return(out rpc.BlocksResult, err error) *RPC
 	return _c
 }
 
-func (_c *RPCClient_GetBlocks_Call) RunAndReturn(run func(context.Context, uint64, *uint64, rpc.CommitmentType) (rpc.BlocksResult, error)) *RPCClient_GetBlocks_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetLatestBlockhash provides a mock function with given fields: ctx, commitment
-func (_m *RPCClient) GetLatestBlockhash(ctx context.Context, commitment rpc.CommitmentType) (*rpc.GetLatestBlockhashResult, error) {
-	ret := _m.Called(ctx, commitment)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetLatestBlockhash")
-	}
-
-	var r0 *rpc.GetLatestBlockhashResult
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, rpc.CommitmentType) (*rpc.GetLatestBlockhashResult, error)); ok {
-		return rf(ctx, commitment)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, rpc.CommitmentType) *rpc.GetLatestBlockhashResult); ok {
-		r0 = rf(ctx, commitment)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*rpc.GetLatestBlockhashResult)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, rpc.CommitmentType) error); ok {
-		r1 = rf(ctx, commitment)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// RPCClient_GetLatestBlockhash_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetLatestBlockhash'
-type RPCClient_GetLatestBlockhash_Call struct {
-	*mock.Call
-}
-
-// GetLatestBlockhash is a helper method to define mock.On call
-//   - ctx context.Context
-//   - commitment rpc.CommitmentType
-func (_e *RPCClient_Expecter) GetLatestBlockhash(ctx interface{}, commitment interface{}) *RPCClient_GetLatestBlockhash_Call {
-	return &RPCClient_GetLatestBlockhash_Call{Call: _e.mock.On("GetLatestBlockhash", ctx, commitment)}
-}
-
-func (_c *RPCClient_GetLatestBlockhash_Call) Run(run func(ctx context.Context, commitment rpc.CommitmentType)) *RPCClient_GetLatestBlockhash_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(rpc.CommitmentType))
-	})
-	return _c
-}
-
-func (_c *RPCClient_GetLatestBlockhash_Call) Return(out *rpc.GetLatestBlockhashResult, err error) *RPCClient_GetLatestBlockhash_Call {
-	_c.Call.Return(out, err)
-	return _c
-}
-
-func (_c *RPCClient_GetLatestBlockhash_Call) RunAndReturn(run func(context.Context, rpc.CommitmentType) (*rpc.GetLatestBlockhashResult, error)) *RPCClient_GetLatestBlockhash_Call {
+func (_c *RPCClient_GetBlocks_Call) RunAndReturn(run func(context.Context, uint64, *uint64) (rpc.BlocksResult, error)) *RPCClient_GetBlocks_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -261,6 +201,64 @@ func (_c *RPCClient_GetSignaturesForAddressWithOpts_Call) Return(_a0 []*rpc.Tran
 }
 
 func (_c *RPCClient_GetSignaturesForAddressWithOpts_Call) RunAndReturn(run func(context.Context, solana.PublicKey, *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error)) *RPCClient_GetSignaturesForAddressWithOpts_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LatestBlockhash provides a mock function with given fields: ctx
+func (_m *RPCClient) LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockhashResult, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LatestBlockhash")
+	}
+
+	var r0 *rpc.GetLatestBlockhashResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (*rpc.GetLatestBlockhashResult, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) *rpc.GetLatestBlockhashResult); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*rpc.GetLatestBlockhashResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// RPCClient_LatestBlockhash_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LatestBlockhash'
+type RPCClient_LatestBlockhash_Call struct {
+	*mock.Call
+}
+
+// LatestBlockhash is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *RPCClient_Expecter) LatestBlockhash(ctx interface{}) *RPCClient_LatestBlockhash_Call {
+	return &RPCClient_LatestBlockhash_Call{Call: _e.mock.On("LatestBlockhash", ctx)}
+}
+
+func (_c *RPCClient_LatestBlockhash_Call) Run(run func(ctx context.Context)) *RPCClient_LatestBlockhash_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *RPCClient_LatestBlockhash_Call) Return(out *rpc.GetLatestBlockhashResult, err error) *RPCClient_LatestBlockhash_Call {
+	_c.Call.Return(out, err)
+	return _c
+}
+
+func (_c *RPCClient_LatestBlockhash_Call) RunAndReturn(run func(context.Context) (*rpc.GetLatestBlockhashResult, error)) *RPCClient_LatestBlockhash_Call {
 	_c.Call.Return(run)
 	return _c
 }
