@@ -151,6 +151,17 @@ func set(tx *solana.Transaction, baseData instruction, appendToFront bool) error
 
 		// https://github.com/gagliardetto/solana-go/blob/618f56666078f8131a384ab27afd918d248c08b7/transaction.go#L293
 		tx.Message.Header.NumReadonlyUnsignedAccounts++
+
+		// lookup table addresses are indexed after the tx.Message.AccountKeys
+		// higher indices must be increased
+		// https://github.com/gagliardetto/solana-go/blob/da2193071f56059aa35010a239cece016c4e827f/transaction.go#L440
+		for i, ix := range tx.Message.Instructions {
+			for j, v := range ix.Accounts {
+				if int(v) >= programIdx {
+					tx.Message.Instructions[i].Accounts[j]++
+				}
+			}
+		}
 	}
 
 	// get instruction data

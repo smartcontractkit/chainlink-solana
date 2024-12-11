@@ -19,6 +19,11 @@ on:
         default: develop
         required: true
         type: string
+      team:
+        description: Team to run the tests for (e.g. BIX, CCIP)
+        required: true
+        type: string
+        default: BIX
 env:
   CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
   CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
@@ -41,6 +46,7 @@ jobs:
   e2e_custom_build_artifacts:
     name: E2E Custom Build Artifacts
     environment: integration
+    runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: read
@@ -117,3 +123,4 @@ jobs:
           cache_restore_only: "false"
         env:
           E2E_TEST_SOLANA_SECRET: thisisatestingonlysecret
+          CHAINLINK_USER_TEAM: ${{ inputs.team }}
