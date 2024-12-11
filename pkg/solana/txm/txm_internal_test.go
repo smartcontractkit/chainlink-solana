@@ -935,7 +935,7 @@ func TestTxm_disabled_confirm_timeout_with_retention(t *testing.T) {
 		// check transaction status which should still be stored
 		status, err := txm.GetTransactionStatus(ctx, testTxID)
 		require.NoError(t, err)
-		require.Equal(t, types.Failed, status)
+		require.Equal(t, types.Fatal, status)
 
 		// Sleep until retention period has passed for transaction and for another reap cycle to run
 		time.Sleep(15 * time.Second)
@@ -1089,7 +1089,7 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 		// tx should be stored in-memory and moved to errored state
 		status, err := txm.GetTransactionStatus(ctx, txID)
 		require.NoError(t, err)
-		require.Equal(t, commontypes.Failed, status)
+		require.Equal(t, commontypes.Fatal, status)
 	})
 }
 

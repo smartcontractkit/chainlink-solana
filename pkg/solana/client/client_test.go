@@ -278,14 +278,12 @@ func TestClient_GetBlocks(t *testing.T) {
 
 	// Verify we can retrieve blocks
 	startSlot := uint64(1)
-	endSlot := uint64(6)
+	endSlot := uint64(10)
 	require.Eventually(t,
 		func() bool {
 			blocks, err := c.GetBlocks(ctx, startSlot, &endSlot)
-			if err != nil {
-				return false
-			}
-			return len(blocks) == 5
+			require.NoError(t, err) // don't mask error within false
+			return len(blocks) >= 2 // slots != blocks (expect multiple blocks for 10 slots)
 		},
 		requestTimeout, 500*time.Millisecond)
 }
