@@ -8,13 +8,12 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/require"
 
 	_ "github.com/jackc/pgx/v4/stdlib"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/pg"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/stretchr/testify/require"
 )
 
 // NOTE: at the moment it's not possible to run all db tests at once. This issue will be addressed separately
