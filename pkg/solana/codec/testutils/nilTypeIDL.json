@@ -1,0 +1,12 @@
+{
+  "name": "NilType",
+  "accounts": [
+    {
+      "name": "NilAccount",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    }
+  ]
+}

@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"time"
 
-	ag_solana "github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go"
 )
 
 var (
@@ -45,9 +45,15 @@ var (
 		BasicVector: []string{"some string", "another string"},
 		TimeVal:     683_100_000,
 		DurationVal: 42 * time.Second,
-		PublicKey:   ag_solana.NewWallet().PublicKey(),
+		PublicKey:   solana.NewWallet().PublicKey(),
 		EnumVal:     0,
 	}
+	TestItemType            = "TestItem"
+	TestItemSliceType       = "TestItemSliceType"
+	TestItemArray1Type      = "TestItemArray1Type"
+	TestItemArray2Type      = "TestItemArray2Type"
+	TestItemWithConfigExtra = "TestItemWithConfigExtra"
+	NilType                 = "NilType"
 )
 
 type StructWithNestedStruct struct {
@@ -59,7 +65,7 @@ type StructWithNestedStruct struct {
 	BasicVector      []string
 	TimeVal          int64
 	DurationVal      time.Duration
-	PublicKey        ag_solana.PublicKey
+	PublicKey        solana.PublicKey
 	EnumVal          uint8
 }
 
@@ -86,3 +92,36 @@ var JSONIDLWithAllTypes string
 
 //go:embed circularDepIDL.json
 var CircularDepIDL string
+
+const SizeItemType = "item for size"
+
+//go:embed test_item_type/itemIDL.json
+var itemTypeJSONIDL string
+
+//go:embed test_item_slice_type/itemSliceTypeIDL.json
+var itemSliceTypeJSONIDL string
+
+//go:embed itemArray1TypeIDL.json
+var itemArray1TypeJSONIDL string
+
+//go:embed itemArray2TypeIDL.json
+var itemArray2TypeJSONIDL string
+
+//go:embed sizeItemTypeIDL.json
+var sizeItemTypeJSONIDL string
+
+//go:embed itemWithConfigExtraIDL.json
+var itemWithConfigExtraJSONIDL string
+
+//go:embed nilTypeIDL.json
+var nilTypeJSONIDL string
+
+var CodecDefs = map[string]string{
+	//TestItemType:      itemTypeJSONIDL,
+	TestItemSliceType: itemSliceTypeJSONIDL,
+	//TestItemArray1Type:      itemArray1TypeJSONIDL,
+	//TestItemArray2Type:      itemArray2TypeJSONIDL,
+	//sizeItemType:            sizeItemTypeJSONIDL,
+	//TestItemWithConfigExtra: itemWithConfigExtraJSONIDL,
+	//NilType:                 nilTypeJSONIDL,
+}

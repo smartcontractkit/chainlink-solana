@@ -12,16 +12,16 @@ import (
 
 const discriminatorLength = 8
 
-func NewDiscriminator(name string) encodings.TypeCodec {
+func NewDiscriminator(name string) *Discriminator {
 	sum := sha256.Sum256([]byte("account:" + name))
-	return &discriminator{hashPrefix: sum[:discriminatorLength]}
+	return &Discriminator{hashPrefix: sum[:discriminatorLength]}
 }
 
-type discriminator struct {
+type Discriminator struct {
 	hashPrefix []byte
 }
 
-func (d discriminator) Encode(value any, into []byte) ([]byte, error) {
+func (d Discriminator) Encode(value any, into []byte) ([]byte, error) {
 	if value == nil {
 		return append(into, d.hashPrefix...), nil
 	}
@@ -44,7 +44,7 @@ func (d discriminator) Encode(value any, into []byte) ([]byte, error) {
 	return append(into, *raw...), nil
 }
 
-func (d discriminator) Decode(encoded []byte) (any, []byte, error) {
+func (d Discriminator) Decode(encoded []byte) (any, []byte, error) {
 	raw, remaining, err := encodings.SafeDecode(encoded, discriminatorLength, func(raw []byte) []byte { return raw })
 	if err != nil {
 		return nil, nil, err
@@ -57,15 +57,15 @@ func (d discriminator) Decode(encoded []byte) (any, []byte, error) {
 	return &raw, remaining, nil
 }
 
-func (d discriminator) GetType() reflect.Type {
+func (d Discriminator) GetType() reflect.Type {
 	// Pointer type so that nil can inject values and so that the NamedCodec won't wrap with no-nil pointer.
 	return reflect.TypeOf(&[]byte{})
 }
 
-func (d discriminator) Size(_ int) (int, error) {
+func (d Discriminator) Size(_ int) (int, error) {
 	return discriminatorLength, nil
 }
 
-func (d discriminator) FixedSize() (int, error) {
+func (d Discriminator) FixedSize() (int, error) {
 	return discriminatorLength, nil
 }

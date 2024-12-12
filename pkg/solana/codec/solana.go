@@ -20,16 +20,17 @@ Modifiers can be provided to assist in modifying property names, adding properti
 package codec
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
+	"reflect"
 
 	"github.com/go-viper/mapstructure/v2"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/codec"
-	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
+	commonencodings "github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
+	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 const (
@@ -42,15 +43,85 @@ const (
 // Eg: int32 in a go struct from a plugin could require a *big.Int in Pack for int24, if it fits, we shouldn't care.
 // SliceToArrayVerifySizeHook verifies that slices have the correct size when converting to an array
 // EpochToTimeHook allows multiple conversions: time.Time -> int64; int64 -> time.Time; *big.Int -> time.Time; and more
-var DecoderHooks = []mapstructure.DecodeHookFunc{codec.EpochToTimeHook, codec.BigIntHook, codec.SliceToArrayVerifySizeHook}
+var DecoderHooks = []mapstructure.DecodeHookFunc{commoncodec.EpochToTimeHook, commoncodec.BigIntHook, commoncodec.SliceToArrayVerifySizeHook}
 
-func NewNamedModifierCodec(original types.RemoteCodec, itemType string, modifier codec.Modifier) (types.RemoteCodec, error) {
-	mod, err := codec.NewByItemTypeModifier(map[string]codec.Modifier{itemType: modifier})
+type solanaCodec struct {
+	*encoder
+	*decoder
+	*ParsedTypes
+}
+
+func (s solanaCodec) CreateType(itemType string, forEncoding bool) (any, error) {
+	var itemTypes map[string]Entry
+	if forEncoding {
+		itemTypes = s.EncoderDefs
+	} else {
+		itemTypes = s.DecoderDefs
+	}
+
+	def, ok := itemTypes[itemType]
+	if !ok {
+		return nil, fmt.Errorf("%w: cannot find type name %q", commontypes.ErrInvalidType, itemType)
+	}
+
+	// we don't need double pointers, and they can also mess up reflection variable creation and mapstruct decode
+	if def.GetType().Kind() == reflect.Pointer {
+		return reflect.New(def.GetCodecType().GetType().Elem()).Interface(), nil
+	}
+
+	return reflect.New(def.GetType()).Interface(), nil
+}
+
+// NewCodec creates a new [commoncommontypes.RemoteCodec] for EVM.
+// Note that names in the ABI are converted to Go names using [abi.ToCamelCase],
+// this is per convention in [abi.MakeTopics], [abi.Arguments.Pack] etc.
+// This allows names on-chain to be in go convention when generated.
+// It means that if you need to use a [commoncodec.Modifier] to reference a field
+// you need to use the Go name instead of the name on-chain.
+// eg: rename FooBar -> Bar, not foo_bar_ to Bar if the name on-chain is foo_bar_
+func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
+	parsed := &ParsedTypes{
+		EncoderDefs: map[string]Entry{},
+		DecoderDefs: map[string]Entry{},
+	}
+
+	for k, v := range conf.Configs {
+		var idl IDL
+		if err := json.Unmarshal([]byte(v.IDL), &idl); err != nil {
+			return nil, err
+		}
+
+		mod, err := v.ModifierConfigs.ToModifier(DecoderHooks...)
+		if err != nil {
+			return nil, err
+		}
+
+		var newEntry Entry
+		if v.AccountDef != nil && v.EventDef != nil {
+			return nil, fmt.Errorf("can't have both account and event definitions in codec config")
+		} else if v.AccountDef != nil {
+			newEntry, err = NewEntry(*v.AccountDef, idl.Types, true, mod, binary.LittleEndian())
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			// TODO
+			return nil, fmt.Errorf("event definition parsing is not implemented")
+		}
+		parsed.EncoderDefs[k] = newEntry
+		parsed.DecoderDefs[k] = newEntry
+	}
+
+	return parsed.ToCodec()
+}
+
+func NewNamedModifierCodec(original commontypes.RemoteCodec, itemType string, modifier commoncodec.Modifier) (commontypes.RemoteCodec, error) {
+	mod, err := commoncodec.NewByItemTypeModifier(map[string]commoncodec.Modifier{itemType: modifier})
 	if err != nil {
 		return nil, err
 	}
 
-	modCodec, err := codec.NewModifierCodec(original, mod, DecoderHooks...)
+	modCodec, err := commoncodec.NewModifierCodec(original, mod, DecoderHooks...)
 	if err != nil {
 		return nil, err
 	}
@@ -60,18 +131,17 @@ func NewNamedModifierCodec(original types.RemoteCodec, itemType string, modifier
 	return modCodec, err
 }
 
-func NewIDLInstructionsCodec(idl IDL, builder encodings.Builder) (types.RemoteCodec, error) {
-	typeCodecs := make(encodings.LenientCodecFromTypeCodec)
-	caser := cases.Title(language.English)
+func NewIDLInstructionsCodec(idl IDL, builder commonencodings.Builder) (commontypes.RemoteCodec, error) {
+	typeCodecs := make(commonencodings.LenientCodecFromTypeCodec)
 	refs := &codecRefs{
 		builder:      builder,
-		codecs:       make(map[string]encodings.TypeCodec),
+		codecs:       make(map[string]commonencodings.TypeCodec),
 		typeDefs:     idl.Types,
 		dependencies: make(map[string][]string),
 	}
 
 	for _, instruction := range idl.Instructions {
-		name, instCodec, err := asStruct(instruction.Args, refs, instruction.Name, caser, false)
+		name, instCodec, err := asStruct(instruction.Args, refs, instruction.Name, false)
 		if err != nil {
 			return nil, err
 		}
@@ -83,21 +153,21 @@ func NewIDLInstructionsCodec(idl IDL, builder encodings.Builder) (types.RemoteCo
 }
 
 // NewIDLAccountCodec is for Anchor custom types
-func NewIDLAccountCodec(idl IDL, builder encodings.Builder) (types.RemoteCodec, error) {
+func NewIDLAccountCodec(idl IDL, builder commonencodings.Builder) (commontypes.RemoteCodec, error) {
 	return newIDLCoded(idl, builder, idl.Accounts, true)
 }
 
-func NewIDLDefinedTypesCodec(idl IDL, builder encodings.Builder) (types.RemoteCodec, error) {
+func NewIDLDefinedTypesCodec(idl IDL, builder commonencodings.Builder) (commontypes.RemoteCodec, error) {
 	return newIDLCoded(idl, builder, idl.Types, false)
 }
 
 func newIDLCoded(
-	idl IDL, builder encodings.Builder, from IdlTypeDefSlice, includeDiscriminator bool) (types.RemoteCodec, error) {
-	typeCodecs := make(encodings.LenientCodecFromTypeCodec)
+	idl IDL, builder commonencodings.Builder, from IdlTypeDefSlice, includeDiscriminator bool) (commontypes.RemoteCodec, error) {
+	typeCodecs := make(commonencodings.LenientCodecFromTypeCodec)
 
 	refs := &codecRefs{
 		builder:      builder,
-		codecs:       make(map[string]encodings.TypeCodec),
+		codecs:       make(map[string]commonencodings.TypeCodec),
 		typeDefs:     idl.Types,
 		dependencies: make(map[string][]string),
 	}
@@ -105,11 +175,11 @@ func newIDLCoded(
 	for _, def := range from {
 		var (
 			name     string
-			accCodec encodings.TypeCodec
+			accCodec commonencodings.TypeCodec
 			err      error
 		)
 
-		name, accCodec, err = createNamedCodec(def, refs, includeDiscriminator)
+		name, accCodec, err = createCodecType(def, refs, includeDiscriminator)
 		if err != nil {
 			return nil, err
 		}
@@ -121,32 +191,31 @@ func newIDLCoded(
 }
 
 type codecRefs struct {
-	builder      encodings.Builder
-	codecs       map[string]encodings.TypeCodec
+	builder      commonencodings.Builder
+	codecs       map[string]commonencodings.TypeCodec
 	typeDefs     IdlTypeDefSlice
 	dependencies map[string][]string
 }
 
-func createNamedCodec(
+func createCodecType(
 	def IdlTypeDef,
 	refs *codecRefs,
 	includeDiscriminator bool,
-) (string, encodings.TypeCodec, error) {
-	caser := cases.Title(language.English)
+) (string, commonencodings.TypeCodec, error) {
 	name := def.Name
 
 	switch def.Type.Kind {
 	case IdlTypeDefTyKindStruct:
-		return asStruct(*def.Type.Fields, refs, name, caser, includeDiscriminator)
+		return asStruct(*def.Type.Fields, refs, name, includeDiscriminator)
 	case IdlTypeDefTyKindEnum:
 		variants := def.Type.Variants
 		if !variants.IsAllUint8() {
-			return name, nil, fmt.Errorf("%w: variants are not supported", types.ErrInvalidConfig)
+			return name, nil, fmt.Errorf("%w: variants are not supported", commontypes.ErrInvalidConfig)
 		}
 
 		return name, refs.builder.Uint8(), nil
 	default:
-		return name, nil, fmt.Errorf(unknownIDLFormat, types.ErrInvalidConfig, def.Type.Kind)
+		return name, nil, fmt.Errorf(unknownIDLFormat, commontypes.ErrInvalidConfig, def.Type.Kind)
 	}
 }
 
@@ -154,17 +223,16 @@ func asStruct(
 	fields []IdlField,
 	refs *codecRefs,
 	name string, // name is the struct name and can be used in dependency checks
-	caser cases.Caser,
 	includeDiscriminator bool,
-) (string, encodings.TypeCodec, error) {
+) (string, commonencodings.TypeCodec, error) {
 	desLen := 0
 	if includeDiscriminator {
 		desLen = 1
 	}
-	named := make([]encodings.NamedTypeCodec, len(fields)+desLen)
+	named := make([]commonencodings.NamedTypeCodec, len(fields)+desLen)
 
 	if includeDiscriminator {
-		named[0] = encodings.NamedTypeCodec{Name: "Discriminator" + name, Codec: NewDiscriminator(name)}
+		named[0] = commonencodings.NamedTypeCodec{Name: "Discriminator" + name, Codec: NewDiscriminator(name)}
 	}
 
 	for idx, field := range fields {
@@ -175,10 +243,10 @@ func asStruct(
 			return name, nil, err
 		}
 
-		named[idx+desLen] = encodings.NamedTypeCodec{Name: caser.String(fieldName), Codec: typedCodec}
+		named[idx+desLen] = commonencodings.NamedTypeCodec{Name: fieldName, Codec: typedCodec}
 	}
 
-	structCodec, err := encodings.NewStructCodec(named)
+	structCodec, err := commonencodings.NewStructCodec(named)
 	if err != nil {
 		return name, nil, err
 	}
@@ -186,7 +254,7 @@ func asStruct(
 	return name, structCodec, nil
 }
 
-func processFieldType(parentTypeName string, idlType IdlType, refs *codecRefs) (encodings.TypeCodec, error) {
+func processFieldType(parentTypeName string, idlType IdlType, refs *codecRefs) (commonencodings.TypeCodec, error) {
 	switch true {
 	case idlType.IsString():
 		return getCodecByStringType(idlType.GetString(), refs.builder)
@@ -201,13 +269,13 @@ func processFieldType(parentTypeName string, idlType IdlType, refs *codecRefs) (
 	case idlType.IsIdlTypeVec():
 		return asVec(parentTypeName, idlType.GetIdlTypeVec(), refs)
 	default:
-		return nil, fmt.Errorf("%w: unknown IDL type def", types.ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: unknown IDL type def", commontypes.ErrInvalidConfig)
 	}
 }
 
-func asDefined(parentTypeName string, definedName *IdlTypeDefined, refs *codecRefs) (encodings.TypeCodec, error) {
+func asDefined(parentTypeName string, definedName *IdlTypeDefined, refs *codecRefs) (commonencodings.TypeCodec, error) {
 	if definedName == nil {
-		return nil, fmt.Errorf("%w: defined type name should not be nil", types.ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: defined type name should not be nil", commontypes.ErrInvalidConfig)
 	}
 
 	// already exists as a type in the typed codecs
@@ -217,19 +285,19 @@ func asDefined(parentTypeName string, definedName *IdlTypeDefined, refs *codecRe
 
 	// nextDef should not have a dependency on definedName
 	if !validDependency(refs, parentTypeName, definedName.Defined) {
-		return nil, fmt.Errorf("%w: circular dependency detected on %s -> %s relation", types.ErrInvalidConfig, parentTypeName, definedName.Defined)
+		return nil, fmt.Errorf("%w: circular dependency detected on %s -> %s relation", commontypes.ErrInvalidConfig, parentTypeName, definedName.Defined)
 	}
 
 	// codec by defined type doesn't exist
 	// process it using the provided typeDefs
 	nextDef := refs.typeDefs.GetByName(definedName.Defined)
 	if nextDef == nil {
-		return nil, fmt.Errorf("%w: IDL type does not exist for name %s", types.ErrInvalidConfig, definedName.Defined)
+		return nil, fmt.Errorf("%w: IDL type does not exist for name %s", commontypes.ErrInvalidConfig, definedName.Defined)
 	}
 
 	saveDependency(refs, parentTypeName, definedName.Defined)
 
-	newTypeName, newTypeCodec, err := createNamedCodec(*nextDef, refs, false)
+	newTypeName, newTypeCodec, err := createCodecType(*nextDef, refs, false)
 	if err != nil {
 		return nil, err
 	}
@@ -240,16 +308,16 @@ func asDefined(parentTypeName string, definedName *IdlTypeDefined, refs *codecRe
 	return newTypeCodec, nil
 }
 
-func asArray(parentTypeName string, idlArray *IdlTypeArray, refs *codecRefs) (encodings.TypeCodec, error) {
+func asArray(parentTypeName string, idlArray *IdlTypeArray, refs *codecRefs) (commonencodings.TypeCodec, error) {
 	codec, err := processFieldType(parentTypeName, idlArray.Thing, refs)
 	if err != nil {
 		return nil, err
 	}
 
-	return encodings.NewArray(idlArray.Num, codec)
+	return commonencodings.NewArray(idlArray.Num, codec)
 }
 
-func asVec(parentTypeName string, idlVec *IdlTypeVec, refs *codecRefs) (encodings.TypeCodec, error) {
+func asVec(parentTypeName string, idlVec *IdlTypeVec, refs *codecRefs) (commonencodings.TypeCodec, error) {
 	codec, err := processFieldType(parentTypeName, idlVec.Vec, refs)
 	if err != nil {
 		return nil, err
@@ -260,10 +328,10 @@ func asVec(parentTypeName string, idlVec *IdlTypeVec, refs *codecRefs) (encoding
 		return nil, err
 	}
 
-	return encodings.NewSlice(codec, b)
+	return commonencodings.NewSlice(codec, b)
 }
 
-func getCodecByStringType(curType IdlTypeAsString, builder encodings.Builder) (encodings.TypeCodec, error) {
+func getCodecByStringType(curType IdlTypeAsString, builder commonencodings.Builder) (commonencodings.TypeCodec, error) {
 	switch curType {
 	case IdlTypeBool:
 		return builder.Bool(), nil
@@ -278,11 +346,11 @@ func getCodecByStringType(curType IdlTypeAsString, builder encodings.Builder) (e
 	case IdlTypeBytes, IdlTypePublicKey, IdlTypeHash:
 		return getByteCodecByStringType(curType, builder)
 	default:
-		return nil, fmt.Errorf(unknownIDLFormat, types.ErrInvalidConfig, curType)
+		return nil, fmt.Errorf(unknownIDLFormat, commontypes.ErrInvalidConfig, curType)
 	}
 }
 
-func getIntCodecByStringType(curType IdlTypeAsString, builder encodings.Builder) (encodings.TypeCodec, error) {
+func getIntCodecByStringType(curType IdlTypeAsString, builder commonencodings.Builder) (commonencodings.TypeCodec, error) {
 	switch curType {
 	case IdlTypeI8:
 		return builder.Int8(), nil
@@ -295,11 +363,11 @@ func getIntCodecByStringType(curType IdlTypeAsString, builder encodings.Builder)
 	case IdlTypeI128:
 		return builder.BigInt(16, true)
 	default:
-		return nil, fmt.Errorf(unknownIDLFormat, types.ErrInvalidConfig, curType)
+		return nil, fmt.Errorf(unknownIDLFormat, commontypes.ErrInvalidConfig, curType)
 	}
 }
 
-func getUIntCodecByStringType(curType IdlTypeAsString, builder encodings.Builder) (encodings.TypeCodec, error) {
+func getUIntCodecByStringType(curType IdlTypeAsString, builder commonencodings.Builder) (commonencodings.TypeCodec, error) {
 	switch curType {
 	case IdlTypeU8:
 		return builder.Uint8(), nil
@@ -312,22 +380,22 @@ func getUIntCodecByStringType(curType IdlTypeAsString, builder encodings.Builder
 	case IdlTypeU128:
 		return builder.BigInt(16, true)
 	default:
-		return nil, fmt.Errorf(unknownIDLFormat, types.ErrInvalidConfig, curType)
+		return nil, fmt.Errorf(unknownIDLFormat, commontypes.ErrInvalidConfig, curType)
 	}
 }
 
-func getTimeCodecByStringType(curType IdlTypeAsString, builder encodings.Builder) (encodings.TypeCodec, error) {
+func getTimeCodecByStringType(curType IdlTypeAsString, builder commonencodings.Builder) (commonencodings.TypeCodec, error) {
 	switch curType {
 	case IdlTypeUnixTimestamp:
 		return builder.Int64(), nil
 	case IdlTypeDuration:
 		return NewDuration(builder), nil
 	default:
-		return nil, fmt.Errorf(unknownIDLFormat, types.ErrInvalidConfig, curType)
+		return nil, fmt.Errorf(unknownIDLFormat, commontypes.ErrInvalidConfig, curType)
 	}
 }
 
-func getByteCodecByStringType(curType IdlTypeAsString, builder encodings.Builder) (encodings.TypeCodec, error) {
+func getByteCodecByStringType(curType IdlTypeAsString, builder commonencodings.Builder) (commonencodings.TypeCodec, error) {
 	switch curType {
 	case IdlTypeBytes:
 		b, err := builder.Int(4)
@@ -335,11 +403,11 @@ func getByteCodecByStringType(curType IdlTypeAsString, builder encodings.Builder
 			return nil, err
 		}
 
-		return encodings.NewSlice(builder.Uint8(), b)
+		return commonencodings.NewSlice(builder.Uint8(), b)
 	case IdlTypePublicKey, IdlTypeHash:
-		return encodings.NewArray(DefaultHashBitLength, builder.Uint8())
+		return commonencodings.NewArray(DefaultHashBitLength, builder.Uint8())
 	default:
-		return nil, fmt.Errorf(unknownIDLFormat, types.ErrInvalidConfig, curType)
+		return nil, fmt.Errorf(unknownIDLFormat, commontypes.ErrInvalidConfig, curType)
 	}
 }
 

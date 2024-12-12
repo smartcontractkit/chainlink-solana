@@ -1,0 +1,38 @@
+{
+  "version": "0.1.0",
+  "name": "item_for_size",
+  "instructions": [
+    {
+      "name": "ProcessItemForSize",
+      "accounts": [
+        {
+          "name": "ItemForSize",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "ItemForSize",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "Stuff",
+            "type": {
+              "vec": "i128"
+            }
+          },
+          {
+            "name": "OtherStuff",
+            "type": "i128"
+          }
+        ]
+      }
+    }
+  ],
+  "types": []
+}

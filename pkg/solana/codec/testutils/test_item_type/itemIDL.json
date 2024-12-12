@@ -6,7 +6,7 @@
       "name": "processTestItemType",
       "accounts": [
         {
-          "name": "testItem",
+          "name": "TestStruct",
           "isMut": true,
           "isSigner": false
         }
@@ -16,17 +16,17 @@
   ],
   "accounts": [
     {
-      "name": "TestItem",
+      "name": "TestStruct",
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "field", "type": "i32" },
-          { "name": "differentField", "type": "string" },
-          { "name": "oracleId", "type": "u8" },
-          { "name": "oracleIds", "type": { "array": ["u8", 32] } },
-          { "name": "accountStruct", "type": { "defined": "AccountStruct" } },
-          { "name": "accounts", "type": { "vec": "publicKey" } },
-          { "name": "bigField", "type": "i128" },
+          { "name": "Field", "type": "i32" },
+          { "name": "OracleId", "type": "u8" },
+          { "name": "OracleIds", "type": { "array": ["u8", 32] } },
+          { "name": "AccountStruct", "type": { "defined": "AccountStruct" } },
+          { "name": "Accounts", "type": { "vec": "publicKey" } },
+          { "name": "DifferentField", "type": "string" },
+          { "name": "BigField", "type": "i128" },
           { "name": "NestedDynamicStruct", "type": { "defined": "NestedDynamic" } },
           { "name": "NestedStaticStruct", "type": { "defined": "NestedStatic" } }
         ]
@@ -39,8 +39,8 @@
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "account", "type": "publicKey" },
-          { "name": "accountStr", "type": "publicKey" }
+          { "name": "Account", "type": "publicKey" },
+          { "name": "AccountStr", "type": "publicKey" }
         ]
       }
     },
@@ -49,8 +49,8 @@
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "intVal", "type": "i64" },
-          { "name": "s", "type": "string" }
+          { "name": "IntVal", "type": "i64" },
+          { "name": "S", "type": "string" }
         ]
       }
     },
@@ -59,8 +59,8 @@
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "fixedBytes", "type": { "array": ["u8", 2] } },
-          { "name": "inner", "type": { "defined": "InnerDynamic" } }
+          { "name": "FixedBytes", "type": { "array": ["u8", 2] } },
+          { "name": "Inner", "type": { "defined": "InnerDynamic" } }
         ]
       }
     },
@@ -69,8 +69,8 @@
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "intVal", "type": "i64" },
-          { "name": "a", "type": "publicKey" }
+          { "name": "IntVal", "type": "i64" },
+          { "name": "A", "type": "publicKey" }
         ]
       }
     },
@@ -79,8 +79,8 @@
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "fixedBytes", "type": { "array": ["u8", 2] } },
-          { "name": "inner", "type": { "defined": "InnerStatic" } }
+          { "name": "FixedBytes", "type": { "array": ["u8", 2] } },
+          { "name": "Inner", "type": { "defined": "InnerStatic" } }
         ]
       }
     }
