@@ -132,7 +132,8 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		filter := Filter{Name: filterName}
 		err := fs.RegisterFilter(tests.Context(t), filter)
 		require.Error(t, err)
-		// can readd after db issue is resolved
+
+		// can read after db issue is resolved
 		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(int64(1), nil).Once()
 		err = fs.RegisterFilter(tests.Context(t), filter)
 		require.NoError(t, err)
