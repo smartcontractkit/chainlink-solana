@@ -16,6 +16,22 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
+type TestArgs struct {
+	Inner []InnerArgs
+}
+
+type InnerArgs struct {
+	Address []byte
+}
+
+type DataAccount struct {
+	Discriminator        [8]byte
+	Version              uint8
+	Administrator        solana.PublicKey
+	PendingAdministrator solana.PublicKey
+	LookupTable          solana.PublicKey
+}
+
 // GetValuesAtLocation parses through nested types and arrays to find all locations of values
 func GetValuesAtLocation(args any, location string) ([][]byte, error) {
 	var vals [][]byte
@@ -139,7 +155,7 @@ func InitializeDataAccount(
 	pda, _, err := solana.FindProgramAddress([][]byte{[]byte("data")}, programID)
 	require.NoError(t, err)
 
-	discriminator := GetDiscriminator("initialize")
+	discriminator := GetDiscriminator("initialize_lookup_table")
 
 	instructionData := append(discriminator[:], lookupTable.Bytes()...)
 

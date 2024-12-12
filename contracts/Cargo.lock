@@ -2681,13 +2681,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "write-test"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
-]
-
-[[package]]
 name = "zerocopy"
 version = "0.7.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"

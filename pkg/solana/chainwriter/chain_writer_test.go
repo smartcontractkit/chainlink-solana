@@ -18,13 +18,14 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/testutils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	feemocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/fees/mocks"
 	txmMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 )
 
-var writeTestIdlJSON = `{"version": "0.1.0","name": "write_test","instructions": [{"name": "initialize","accounts": [{"name": "dataAccount","isMut": true,"isSigner": false,"docs": ["PDA account, derived from seeds and created by the System Program in this instruction"]},{"name": "admin","isMut": true,"isSigner": true,"docs": ["Admin account that pays for PDA creation and signs the transaction"]},{"name": "systemProgram","isMut": false,"isSigner": false,"docs": ["System Program is required for PDA creation"]}],"args": [{"name": "lookupTable","type": "publicKey"}]}],"accounts": [{"name": "DataAccount","type": {"kind": "struct","fields": [{"name": "version","type": "u8"},{"name": "administrator","type": "publicKey"},{"name": "pendingAdministrator","type": "publicKey"},{"name": "lookupTable","type": "publicKey"}]}}]}`
+var testContractIDLJson = `{"version":"0.1.0","name":"contract_reader_interface","instructions":[{"name":"initialize","accounts":[{"name":"data","isMut":true,"isSigner":false},{"name":"signer","isMut":true,"isSigner":true},{"name":"systemProgram","isMut":false,"isSigner":false}],"args":[{"name":"testIdx","type":"u64"},{"name":"value","type":"u64"}]},{"name":"initializeLookupTable","accounts":[{"name":"writeDataAccount","isMut":true,"isSigner":false,"docs":["PDA for LookupTableDataAccount, derived from seeds and created by the System Program"]},{"name":"admin","isMut":true,"isSigner":true,"docs":["Admin account that pays for PDA creation and signs the transaction"]},{"name":"systemProgram","isMut":false,"isSigner":false,"docs":["System Program required for PDA creation"]}],"args":[{"name":"lookupTable","type":"publicKey"}]}],"accounts":[{"name":"LookupTableDataAccount","type":{"kind":"struct","fields":[{"name":"version","type":"u8"},{"name":"administrator","type":"publicKey"},{"name":"pendingAdministrator","type":"publicKey"},{"name":"lookupTable","type":"publicKey"}]}},{"name":"DataAccount","type":{"kind":"struct","fields":[{"name":"idx","type":"u64"},{"name":"bump","type":"u8"},{"name":"u64Value","type":"u64"},{"name":"u64Slice","type":{"vec":"u64"}}]}}]}`
 
 func TestChainWriter_GetAddresses(t *testing.T) {
 	ctx := tests.Context(t)
@@ -37,7 +38,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 	txm := txmMocks.NewTxManager(t)
 
 	// initialize chain writer
-	cw, err := chainwriter.NewSolanaChainWriterService(rw, txm, ge, chainwriter.ChainWriterConfig{})
+	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, ge, chainwriter.ChainWriterConfig{})
 	require.NoError(t, err)
 
 	// expected account meta for constant account
@@ -91,7 +92,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 					IsSigner:   derivedTablePdaLookupMeta.IsSigner,
 					IsWritable: derivedTablePdaLookupMeta.IsWritable,
 					InternalField: chainwriter.InternalField{
-						Type:     reflect.TypeOf(DataAccount{}),
+						Type:     reflect.TypeOf(chainwriter.DataAccount{}),
 						Location: "LookupTable",
 					},
 				},
@@ -237,7 +238,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 	txm := txmMocks.NewTxManager(t)
 
 	// initialize chain writer
-	cw, err := chainwriter.NewSolanaChainWriterService(rw, txm, ge, chainwriter.ChainWriterConfig{})
+	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, ge, chainwriter.ChainWriterConfig{})
 	require.NoError(t, err)
 
 	programID := chainwriter.GetRandomPubKey(t)
@@ -278,7 +279,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 					IsSigner:   true,
 					IsWritable: true,
 					InternalField: chainwriter.InternalField{
-						Type:     reflect.TypeOf(DataAccount{}),
+						Type:     reflect.TypeOf(chainwriter.DataAccount{}),
 						Location: "LookupTable",
 					},
 				},
@@ -295,7 +296,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 					IsSigner:   true,
 					IsWritable: true,
 					InternalField: chainwriter.InternalField{
-						Type:     reflect.TypeOf(DataAccount{}),
+						Type:     reflect.TypeOf(chainwriter.DataAccount{}),
 						Location: "LookupTable",
 					},
 				},
@@ -415,11 +416,11 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 
 	cwConfig := chainwriter.ChainWriterConfig{
 		Programs: map[string]chainwriter.ProgramConfig{
-			"39vbQVpEMtZtg3e6ZSE7nBSzmNZptmW45WnLkbqEe4TU": {
+			"6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE": {
 				Methods: map[string]chainwriter.MethodConfig{
-					"initialize": {
+					"initializeLookupTable": {
 						FromAddress:       admin.String(),
-						ChainSpecificName: "initialize",
+						ChainSpecificName: "initializeLookupTable",
 						LookupTables: chainwriter.LookupTables{
 							DerivedLookupTables: []chainwriter.DerivedLookupTable{
 								{
@@ -434,7 +435,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 										IsSigner:   false,
 										IsWritable: false,
 										InternalField: chainwriter.InternalField{
-											Type:     reflect.TypeOf(DataAccount{}),
+											Type:     reflect.TypeOf(chainwriter.DataAccount{}),
 											Location: "LookupTable",
 										},
 									},
@@ -474,19 +475,19 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 						},
 					},
 				},
-				IDL: writeTestIdlJSON,
+				IDL: testContractIDLJson,
 			},
 		},
 	}
 
 	// initialize chain writer
-	cw, err := chainwriter.NewSolanaChainWriterService(rw, txm, ge, cwConfig)
+	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, ge, cwConfig)
 	require.NoError(t, err)
 
 	t.Run("fails with invalid ABI", func(t *testing.T) {
 		invalidCWConfig := chainwriter.ChainWriterConfig{
 			Programs: map[string]chainwriter.ProgramConfig{
-				"write_test": {
+				"invalid_program": {
 					Methods: map[string]chainwriter.MethodConfig{
 						"invalid": {
 							ChainSpecificName: "invalid",
@@ -497,28 +498,28 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 			},
 		}
 
-		_, err := chainwriter.NewSolanaChainWriterService(rw, txm, ge, invalidCWConfig)
+		_, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, ge, invalidCWConfig)
 		require.Error(t, err)
 	})
 
 	t.Run("fails to encode payload if args with missing values provided", func(t *testing.T) {
 		txID := uuid.NewString()
 		args := map[string]interface{}{}
-		submitErr := cw.SubmitTransaction(ctx, "39vbQVpEMtZtg3e6ZSE7nBSzmNZptmW45WnLkbqEe4TU", "initialize", args, txID, programID.String(), nil, nil)
+		submitErr := cw.SubmitTransaction(ctx, "6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE", "initializeLookupTable", args, txID, programID.String(), nil, nil)
 		require.Error(t, submitErr)
 	})
 
 	t.Run("fails if invalid contract name provided", func(t *testing.T) {
 		txID := uuid.NewString()
 		args := map[string]interface{}{}
-		submitErr := cw.SubmitTransaction(ctx, "write_test", "initialize", args, txID, programID.String(), nil, nil)
+		submitErr := cw.SubmitTransaction(ctx, "contract_reader_interface", "initializeLookupTable", args, txID, programID.String(), nil, nil)
 		require.Error(t, submitErr)
 	})
 
 	t.Run("fails if invalid method provided", func(t *testing.T) {
 		txID := uuid.NewString()
 		args := map[string]interface{}{}
-		submitErr := cw.SubmitTransaction(ctx, "39vbQVpEMtZtg3e6ZSE7nBSzmNZptmW45WnLkbqEe4TU", "badMethod", args, txID, programID.String(), nil, nil)
+		submitErr := cw.SubmitTransaction(ctx, "6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE", "badMethod", args, txID, programID.String(), nil, nil)
 		require.Error(t, submitErr)
 	})
 
@@ -526,7 +527,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 		recentBlockHash := solana.Hash{}
 		rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Once()
 		txID := uuid.NewString()
-		configProgramID := solana.MustPublicKeyFromBase58("39vbQVpEMtZtg3e6ZSE7nBSzmNZptmW45WnLkbqEe4TU")
+		configProgramID := solana.MustPublicKeyFromBase58("6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE")
 
 		txm.On("Enqueue", mock.Anything, account1.String(), mock.MatchedBy(func(tx *solana.Transaction) bool {
 			// match transaction fields to ensure it was built as expected
@@ -549,7 +550,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 			"seed1":        seed1,
 			"seed2":        seed2,
 		}
-		submitErr := cw.SubmitTransaction(ctx, "39vbQVpEMtZtg3e6ZSE7nBSzmNZptmW45WnLkbqEe4TU", "initialize", args, txID, programID.String(), nil, nil)
+		submitErr := cw.SubmitTransaction(ctx, "6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE", "initializeLookupTable", args, txID, programID.String(), nil, nil)
 		require.NoError(t, submitErr)
 	})
 }
@@ -565,7 +566,7 @@ func TestChainWriter_GetTransactionStatus(t *testing.T) {
 	txm := txmMocks.NewTxManager(t)
 
 	// initialize chain writer
-	cw, err := chainwriter.NewSolanaChainWriterService(rw, txm, ge, chainwriter.ChainWriterConfig{})
+	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, ge, chainwriter.ChainWriterConfig{})
 	require.NoError(t, err)
 
 	t.Run("returns unknown with error if ID not found", func(t *testing.T) {
@@ -628,7 +629,7 @@ func TestChainWriter_GetFeeComponents(t *testing.T) {
 	// mock txm
 	txm := txmMocks.NewTxManager(t)
 
-	cw, err := chainwriter.NewSolanaChainWriterService(rw, txm, ge, chainwriter.ChainWriterConfig{})
+	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, ge, chainwriter.ChainWriterConfig{})
 	require.NoError(t, err)
 
 	t.Run("returns valid compute unit price", func(t *testing.T) {
@@ -639,7 +640,7 @@ func TestChainWriter_GetFeeComponents(t *testing.T) {
 	})
 
 	t.Run("fails if gas estimator not set", func(t *testing.T) {
-		cwNoEstimator, err := chainwriter.NewSolanaChainWriterService(rw, txm, nil, chainwriter.ChainWriterConfig{})
+		cwNoEstimator, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, nil, chainwriter.ChainWriterConfig{})
 		require.NoError(t, err)
 		_, err = cwNoEstimator.GetFeeComponents(ctx)
 		require.Error(t, err)
@@ -661,7 +662,7 @@ func mustFindPdaProgramAddress(t *testing.T, seeds [][]byte, programID solana.Pu
 
 func mockDataAccountLookupTable(t *testing.T, rw *clientmocks.ReaderWriter, pda solana.PublicKey) solana.PublicKey {
 	lookupTablePubkey := chainwriter.GetRandomPubKey(t)
-	dataAccount := DataAccount{
+	dataAccount := chainwriter.DataAccount{
 		Discriminator:        [8]byte{},
 		Version:              1,
 		Administrator:        chainwriter.GetRandomPubKey(t),

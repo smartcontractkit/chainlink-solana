@@ -162,7 +162,6 @@ func (pda PDALookups) Resolve(ctx context.Context, args any, derivedTableMap map
 			Encoding:   "base64",
 			Commitment: rpc.CommitmentFinalized,
 		})
-		fmt.Printf("Accounts Info: %+v", accountInfo)
 
 		if err != nil || accountInfo == nil || accountInfo.Value == nil {
 			return nil, fmt.Errorf("error fetching account info for PDA account: %s, error: %w", accountMeta.PublicKey.String(), err)

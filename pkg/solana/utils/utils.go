@@ -16,6 +16,8 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 )
@@ -159,7 +161,8 @@ func NewExtendLookupTableInstruction(
 	)
 }
 
-func FundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoClient *rpc.Client, t *testing.T) {
+func FundAccounts(t *testing.T, accounts []solana.PrivateKey, solanaGoClient *rpc.Client) {
+	ctx := tests.Context(t)
 	sigs := []solana.Signature{}
 	for _, v := range accounts {
 		sig, err := solanaGoClient.RequestAirdrop(ctx, v.PublicKey(), 1000*solana.LAMPORTS_PER_SOL, rpc.CommitmentFinalized)
@@ -193,11 +196,7 @@ func FundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoCli
 	}
 }
 
-func DeployAllPrograms(t *testing.T, pathToAnchorConfig string, admin solana.PrivateKey) *rpc.Client {
-	return rpc.New(SetupTestValidatorWithAnchorPrograms(t, pathToAnchorConfig, admin.PublicKey().String()))
-}
-
-func SetupTestValidatorWithAnchorPrograms(t *testing.T, pathToAnchorConfig string, upgradeAuthority string) string {
+func SetupTestValidatorWithAnchorPrograms(t *testing.T, upgradeAuthority string, programs []string) (string, string) {
 	anchorData := struct {
 		Programs struct {
 			Localnet map[string]string
@@ -205,15 +204,17 @@ func SetupTestValidatorWithAnchorPrograms(t *testing.T, pathToAnchorConfig strin
 	}{}
 
 	// upload programs to validator
-	anchorBytes, err := os.ReadFile(pathToAnchorConfig)
+	anchorBytes, err := os.ReadFile(PathToAnchorConfig)
 	require.NoError(t, err)
 	require.NoError(t, toml.Unmarshal(anchorBytes, &anchorData))
 
-	flags := []string{}
-	for k, v := range anchorData.Programs.Localnet {
+	flags := []string{"--warp-slot", "42"}
+	for i := range programs {
+		k := programs[i]
+		v := anchorData.Programs.Localnet[k]
 		k = strings.Replace(k, "-", "_", -1)
 		flags = append(flags, "--upgradeable-program", v, filepath.Join(ContractsDir, k+".so"), upgradeAuthority)
 	}
-	url, _ := client.SetupLocalSolNodeWithFlags(t, flags...)
-	return url
+	rpcURL, wsURL := client.SetupLocalSolNodeWithFlags(t, flags...)
+	return rpcURL, wsURL
 }

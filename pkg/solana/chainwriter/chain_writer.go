@@ -10,6 +10,7 @@ import (
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
@@ -19,13 +20,24 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 )
 
+const ServiceName = "SolanaChainWriter"
+
 type SolanaChainWriterService struct {
+	lggr   logger.Logger
 	reader client.Reader
 	txm    txm.TxManager
 	ge     fees.Estimator
 	config ChainWriterConfig
+
 	codecs map[string]types.Codec
+
+	services.StateMachine
 }
+
+var (
+	_ services.Service     = &SolanaChainWriterService{}
+	_ types.ContractWriter = &SolanaChainWriterService{}
+)
 
 // nolint // ignoring naming suggestion
 type ChainWriterConfig struct {
@@ -47,13 +59,14 @@ type MethodConfig struct {
 	DebugIDLocation string
 }
 
-func NewSolanaChainWriterService(reader client.Reader, txm txm.TxManager, ge fees.Estimator, config ChainWriterConfig) (*SolanaChainWriterService, error) {
+func NewSolanaChainWriterService(logger logger.Logger, reader client.Reader, txm txm.TxManager, ge fees.Estimator, config ChainWriterConfig) (*SolanaChainWriterService, error) {
 	codecs, err := parseIDLCodecs(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse IDL codecs: %w", err)
 	}
 
 	return &SolanaChainWriterService{
+		lggr:   logger,
 		reader: reader,
 		txm:    txm,
 		ge:     ge,
@@ -291,22 +304,26 @@ func (s *SolanaChainWriterService) GetFeeComponents(ctx context.Context) (*types
 	}, nil
 }
 
-func (s *SolanaChainWriterService) Start(context.Context) error {
-	return nil
+func (s *SolanaChainWriterService) Start(_ context.Context) error {
+	return s.StartOnce(ServiceName, func() error {
+		return nil
+	})
 }
 
 func (s *SolanaChainWriterService) Close() error {
-	return nil
+	return s.StopOnce(ServiceName, func() error {
+		return nil
+	})
 }
 
 func (s *SolanaChainWriterService) HealthReport() map[string]error {
-	return nil
+	return map[string]error{s.Name(): s.Healthy()}
 }
 
 func (s *SolanaChainWriterService) Name() string {
-	return ""
+	return s.lggr.Name()
 }
 
 func (s *SolanaChainWriterService) Ready() error {
-	return nil
+	return s.StateMachine.Ready()
 }

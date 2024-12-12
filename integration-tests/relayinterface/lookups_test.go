@@ -1,4 +1,4 @@
-package chainwriter_test
+package relayinterface
 
 import (
 	"context"
@@ -21,22 +21,6 @@ import (
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
-
-type TestArgs struct {
-	Inner []InnerArgs
-}
-
-type InnerArgs struct {
-	Address []byte
-}
-
-type DataAccount struct {
-	Discriminator        [8]byte
-	Version              uint8
-	Administrator        solana.PublicKey
-	PendingAdministrator solana.PublicKey
-	LookupTable          solana.PublicKey
-}
 
 func TestAccountContant(t *testing.T) {
 	t.Run("AccountConstant resolves valid address", func(t *testing.T) {
@@ -63,8 +47,8 @@ func TestAccountLookups(t *testing.T) {
 	ctx := tests.Context(t)
 	t.Run("AccountLookup resolves valid address with just one address", func(t *testing.T) {
 		expectedAddr := chainwriter.GetRandomPubKey(t)
-		testArgs := TestArgs{
-			Inner: []InnerArgs{
+		testArgs := chainwriter.TestArgs{
+			Inner: []chainwriter.InnerArgs{
 				{Address: expectedAddr.Bytes()},
 			},
 		}
@@ -91,8 +75,8 @@ func TestAccountLookups(t *testing.T) {
 		expectedAddr1 := chainwriter.GetRandomPubKey(t)
 		expectedAddr2 := chainwriter.GetRandomPubKey(t)
 
-		testArgs := TestArgs{
-			Inner: []InnerArgs{
+		testArgs := chainwriter.TestArgs{
+			Inner: []chainwriter.InnerArgs{
 				{Address: expectedAddr1.Bytes()},
 				{Address: expectedAddr2.Bytes()},
 			},
@@ -126,8 +110,8 @@ func TestAccountLookups(t *testing.T) {
 	t.Run("AccountLookup fails when address isn't in args", func(t *testing.T) {
 		expectedAddr := chainwriter.GetRandomPubKey(t)
 
-		testArgs := TestArgs{
-			Inner: []InnerArgs{
+		testArgs := chainwriter.TestArgs{
+			Inner: []chainwriter.InnerArgs{
 				{Address: expectedAddr.Bytes()},
 			},
 		}
@@ -276,10 +260,10 @@ func TestLookupTables(t *testing.T) {
 	sender, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 
-	url := utils.SetupTestValidatorWithAnchorPrograms(t, utils.PathToAnchorConfig, sender.PublicKey().String())
+	url, _ := utils.SetupTestValidatorWithAnchorPrograms(t, sender.PublicKey().String(), []string{"contract-reader-interface"})
 	rpcClient := rpc.New(url)
 
-	utils.FundAccounts(ctx, []solana.PrivateKey{sender}, rpcClient, t)
+	utils.FundAccounts(t, []solana.PrivateKey{sender}, rpcClient)
 
 	cfg := config.NewDefault()
 	solanaClient, err := client.NewClient(url, cfg, 5*time.Second, nil)
@@ -291,7 +275,7 @@ func TestLookupTables(t *testing.T) {
 
 	txm := txm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
 
-	cw, err := chainwriter.NewSolanaChainWriterService(solanaClient, txm, nil, chainwriter.ChainWriterConfig{})
+	cw, err := chainwriter.NewSolanaChainWriterService(nil, solanaClient, txm, nil, chainwriter.ChainWriterConfig{})
 
 	t.Run("StaticLookup table resolves properly", func(t *testing.T) {
 		pubKeys := chainwriter.CreateTestPubKeys(t, 8)
@@ -384,8 +368,8 @@ func TestLookupTables(t *testing.T) {
 			StaticLookupTables: nil,
 		}
 
-		testArgs := TestArgs{
-			Inner: []InnerArgs{
+		testArgs := chainwriter.TestArgs{
+			Inner: []chainwriter.InnerArgs{
 				{Address: table.Bytes()},
 			},
 		}
@@ -401,8 +385,8 @@ func TestLookupTables(t *testing.T) {
 	})
 
 	t.Run("Derived lookup table resolves properly with PDALookup address", func(t *testing.T) {
-		// Deployed write_test contract
-		programID := solana.MustPublicKeyFromBase58("39vbQVpEMtZtg3e6ZSE7nBSzmNZptmW45WnLkbqEe4TU")
+		// Deployed contract_reader_interface contract
+		programID := solana.MustPublicKeyFromBase58("6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE")
 
 		lookupKeys := chainwriter.CreateTestPubKeys(t, 5)
 		lookupTable := chainwriter.CreateTestLookupTable(ctx, t, rpcClient, sender, lookupKeys)
@@ -426,7 +410,7 @@ func TestLookupTables(t *testing.T) {
 						IsSigner:   false,
 						IsWritable: false,
 						InternalField: chainwriter.InternalField{
-							Type:     reflect.TypeOf(DataAccount{}),
+							Type:     reflect.TypeOf(chainwriter.DataAccount{}),
 							Location: "LookupTable",
 						},
 					},
