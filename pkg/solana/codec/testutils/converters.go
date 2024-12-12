@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils/test_item_type"
 )
 
-func EncodeRequestToTestStruct(request *interfacetests.EncodeRequest) test_item_type.TestStruct {
+func EncodeRequestToTestItem(request *interfacetests.EncodeRequest) test_item_type.TestItem {
 	byt := [32]byte{}
 	for i, v := range request.TestStructs[0].OracleIDs {
 		byt[i] = byte(v)
@@ -24,7 +24,7 @@ func EncodeRequestToTestStruct(request *interfacetests.EncodeRequest) test_item_
 		accs[i] = solana.PublicKeyFromBytes(v)
 	}
 
-	testStruct := test_item_type.TestStruct{
+	testItem := test_item_type.TestItem{
 		Field:     *request.TestStructs[0].Field,
 		OracleId:  uint8(request.TestStructs[0].OracleID),
 		OracleIds: byt,
@@ -50,7 +50,7 @@ func EncodeRequestToTestStruct(request *interfacetests.EncodeRequest) test_item_
 			},
 		},
 	}
-	return testStruct
+	return testItem
 }
 
 func bigIntToBinInt128(val *big.Int) bin.Int128 {
@@ -90,17 +90,17 @@ func oracleIDsToBytes(oracleIDs [32]commontypes.OracleID) [32]byte {
 	return convertedIDs
 }
 
-func ToInternalType(testStruct interfacetests.TestStruct) test_item_type.TestStruct {
-	return test_item_type.TestStruct{
-		Field:               *testStruct.Field,
-		DifferentField:      testStruct.DifferentField,
-		OracleId:            byte(testStruct.OracleID),
-		OracleIds:           oracleIDsToBytes(testStruct.OracleIDs),
-		AccountStruct:       accountStructToInternalType(testStruct.AccountStruct),
-		Accounts:            convertAccounts(testStruct.Accounts),
-		BigField:            bigIntToBinInt128(testStruct.BigField),
-		NestedDynamicStruct: midDynamicToInternalType(testStruct.NestedDynamicStruct),
-		NestedStaticStruct:  midStaticToInternalType(testStruct.NestedStaticStruct),
+func ToInternalType(testItem interfacetests.TestStruct) test_item_type.TestItem {
+	return test_item_type.TestItem{
+		Field:               *testItem.Field,
+		DifferentField:      testItem.DifferentField,
+		OracleId:            byte(testItem.OracleID),
+		OracleIds:           oracleIDsToBytes(testItem.OracleIDs),
+		AccountStruct:       accountStructToInternalType(testItem.AccountStruct),
+		Accounts:            convertAccounts(testItem.Accounts),
+		BigField:            bigIntToBinInt128(testItem.BigField),
+		NestedDynamicStruct: midDynamicToInternalType(testItem.NestedDynamicStruct),
+		NestedStaticStruct:  midStaticToInternalType(testItem.NestedStaticStruct),
 	}
 }
 

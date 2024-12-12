@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
 var (
@@ -116,9 +118,20 @@ var itemWithConfigExtraJSONIDL string
 //go:embed nilTypeIDL.json
 var nilTypeJSONIDL string
 
-var CodecDefs = map[string]string{
-	//TestItemType:      itemTypeJSONIDL,
-	TestItemSliceType: itemSliceTypeJSONIDL,
+type CodecDef struct {
+	IDL      string
+	ItemType codec.ChainConfigType
+}
+
+var CodecDefs = map[string]CodecDef{
+	TestItemType: {
+		IDL:      itemTypeJSONIDL,
+		ItemType: codec.ChainConfigTypeAccountDef,
+	},
+	TestItemSliceType: {
+		IDL:      itemSliceTypeJSONIDL,
+		ItemType: codec.ChainConfigTypeInstructionDef,
+	},
 	//TestItemArray1Type:      itemArray1TypeJSONIDL,
 	//TestItemArray2Type:      itemArray2TypeJSONIDL,
 	//sizeItemType:            sizeItemTypeJSONIDL,

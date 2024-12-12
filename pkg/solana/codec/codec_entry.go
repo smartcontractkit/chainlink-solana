@@ -16,31 +16,31 @@ type Entry interface {
 	Modifier() codec.Modifier
 }
 
-// TODO this can also be an event entry, but anchor-go defines events differently, maybe just have a separate struct and method that satisfy entry interface for events.
-func NewEntry(idlAccount IdlTypeDef, idlTypes IdlTypeDefSlice, includeDiscriminator bool, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
-	refs := &codecRefs{
-		builder:      builder,
-		codecs:       make(map[string]commonencodings.TypeCodec),
-		typeDefs:     idlTypes,
-		dependencies: make(map[string][]string),
-	}
-
-	if mod == nil {
-		mod = codec.MultiModifier{}
-	}
-
-	_, accCodec, err := createCodecType(idlAccount, refs, false)
-	if err != nil {
-		return nil, err
-	}
-
-	entry := &codecEntry{name: idlAccount.Name, includeDiscriminator: includeDiscriminator, codecType: accCodec, typ: accCodec.GetType(), mod: mod}
-	if entry.includeDiscriminator {
-		entry.Discriminator = commonencodings.NamedTypeCodec{Name: "Discriminator" + idlAccount.Name, Codec: NewDiscriminator(idlAccount.Name)}
-	}
-
-	return entry, nil
-}
+//// TODO this can also be an event entry, but anchor-go defines events differently, maybe just have a separate struct and method that satisfy entry interface for events.
+//func NewEntry(idlAccount IdlTypeDef, idlTypes IdlTypeDefSlice, includeDiscriminator bool, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
+//	refs := &codecRefs{
+//		builder:      builder,
+//		codecs:       make(map[string]commonencodings.TypeCodec),
+//		typeDefs:     idlTypes,
+//		dependencies: make(map[string][]string),
+//	}
+//
+//	if mod == nil {
+//		mod = codec.MultiModifier{}
+//	}
+//
+//	_, accCodec, err := createCodecType(idlAccount, refs, false)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	entry := &codecEntry{name: idlAccount.Name, includeDiscriminator: includeDiscriminator, codecType: accCodec, typ: accCodec.GetType(), mod: mod}
+//	if entry.includeDiscriminator {
+//		entry.Discriminator = commonencodings.NamedTypeCodec{Name: "Discriminator" + idlAccount.Name, Codec: NewDiscriminator(idlAccount.Name)}
+//	}
+//
+//	return entry, nil
+//}
 
 type codecEntry struct {
 	name                 string

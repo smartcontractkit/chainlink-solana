@@ -9,7 +9,7 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
-type TestStruct struct {
+type TestItem struct {
 	Field               int32
 	OracleId            uint8
 	OracleIds           [32]uint8
@@ -21,11 +21,11 @@ type TestStruct struct {
 	NestedStaticStruct  NestedStatic
 }
 
-var TestStructDiscriminator = [8]byte{243, 149, 82, 70, 154, 54, 107, 6}
+var TestItemDiscriminator = [8]byte{148, 105, 105, 155, 26, 167, 212, 149}
 
-func (obj TestStruct) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj TestItem) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(TestStructDiscriminator[:], false)
+	err = encoder.WriteBytes(TestItemDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -77,17 +77,17 @@ func (obj TestStruct) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	return nil
 }
 
-func (obj *TestStruct) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *TestItem) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(TestStructDiscriminator[:]) {
+		if !discriminator.Equal(TestItemDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
-				"[243 149 82 70 154 54 107 6]",
+				"[148 105 105 155 26 167 212 149]",
 				fmt.Sprint(discriminator[:]))
 		}
 	}

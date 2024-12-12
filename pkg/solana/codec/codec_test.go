@@ -16,6 +16,7 @@ import (
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils/test_item_slice_type"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils/test_item_type"
 )
 
@@ -52,21 +53,29 @@ func (it *codecInterfaceTester) EncodeFields(t *testing.T, request *EncodeReques
 
 func encodeFieldsOnItem(t *testing.T, request *EncodeRequest) ocr2types.Report {
 	buf := new(bytes.Buffer)
-	if err := testutils.EncodeRequestToTestStruct(request).MarshalWithEncoder(bin.NewBorshEncoder(buf)); err != nil {
+	if err := testutils.EncodeRequestToTestItem(request).MarshalWithEncoder(bin.NewBorshEncoder(buf)); err != nil {
 		require.NoError(t, err)
 	}
 	return buf.Bytes()
 }
 
-func encodeFieldsOnSliceOrArray(_ *testing.T, request *EncodeRequest) []byte {
+func encodeFieldsOnSliceOrArray(t *testing.T, request *EncodeRequest) []byte {
 	args := make([]any, 1)
 	switch request.TestOn {
+	case testutils.TestItemSliceType:
+		testItemSlice := []test_item_type.TestItem{testutils.ToInternalType(request.TestStructs[0])}
+		buf := new(bytes.Buffer)
+		if err := test_item_slice_type.NewTestItemSliceTypeInstructionBuilder().SetTestItemSliceType(testItemSlice).Build().MarshalWithEncoder(bin.NewBorshEncoder(buf)); err != nil {
+			require.NoError(t, err)
+			return nil
+		}
+		return buf.Bytes()
 	case testutils.TestItemArray1Type:
-		args[0] = [1]test_item_type.TestStruct{testutils.ToInternalType(request.TestStructs[0])}
+		args[0] = [1]test_item_type.TestItem{testutils.ToInternalType(request.TestStructs[0])}
 	case testutils.TestItemArray2Type:
-		args[0] = [2]test_item_type.TestStruct{testutils.ToInternalType(request.TestStructs[0]), testutils.ToInternalType(request.TestStructs[1])}
+		args[0] = [2]test_item_type.TestItem{testutils.ToInternalType(request.TestStructs[0]), testutils.ToInternalType(request.TestStructs[1])}
 	default:
-		tmp := make([]test_item_type.TestStruct, len(request.TestStructs))
+		tmp := make([]test_item_type.TestItem, len(request.TestStructs))
 		for i, ts := range request.TestStructs {
 			tmp[i] = testutils.ToInternalType(ts)
 		}
@@ -78,29 +87,20 @@ func encodeFieldsOnSliceOrArray(_ *testing.T, request *EncodeRequest) []byte {
 
 func (it *codecInterfaceTester) GetCodec(t *testing.T) clcommontypes.Codec {
 	codecConfig := codec.Config{Configs: map[string]codec.ChainConfig{}}
-	testStruct := CreateTestStruct[*testing.T](0, it)
+	TestItem := CreateTestStruct[*testing.T](0, it)
 	for k, v := range testutils.CodecDefs {
 		entry := codecConfig.Configs[k]
-		entry.IDL = v
+		entry.IDL = v.IDL
+		entry.Type = v.ItemType
 
-		if slices.Contains([]string{testutils.TestItemSliceType, testutils.TestItemArray1Type, testutils.TestItemArray2Type}, k) {
-			entry.ModifierConfigs = commoncodec.ModifiersConfig{
-				&commoncodec.RenameModifierConfig{Fields: map[string]string{"Items.NestedDynamicStruct.Inner.IntVal": "I"}},
-				&commoncodec.RenameModifierConfig{Fields: map[string]string{"Items.NestedStaticStruct.Inner.IntVal": "I"}},
-				&commoncodec.AddressBytesToStringModifierConfig{
-					Fields:   []string{"Items.AccountStruct.AccountStr"},
-					Modifier: codec.SolanaAddressModifier{},
-				},
-				&commoncodec.WrapperModifierConfig{Fields: map[string]string{"Items.NestedStaticStruct.Inner.IntVal": "I"}},
-			}
-		} else if k != testutils.SizeItemType && k != testutils.NilType {
+		if k != testutils.SizeItemType && k != testutils.NilType {
 			entry.ModifierConfigs = commoncodec.ModifiersConfig{
 				&commoncodec.RenameModifierConfig{Fields: map[string]string{"NestedDynamicStruct.Inner.IntVal": "I"}},
 				&commoncodec.RenameModifierConfig{Fields: map[string]string{"NestedStaticStruct.Inner.IntVal": "I"}},
 			}
 		}
 
-		if slices.Contains([]string{testutils.TestItemType, testutils.TestItemWithConfigExtra}, k) {
+		if slices.Contains([]string{testutils.TestItemType, testutils.TestItemSliceType, testutils.TestItemWithConfigExtra}, k) {
 			addressByteModifier := &commoncodec.AddressBytesToStringModifierConfig{
 				Fields:   []string{"AccountStruct.AccountStr"},
 				Modifier: codec.SolanaAddressModifier{},
@@ -111,8 +111,8 @@ func (it *codecInterfaceTester) GetCodec(t *testing.T) clcommontypes.Codec {
 		if k == testutils.TestItemWithConfigExtra {
 			hardCode := &commoncodec.HardCodeModifierConfig{
 				OnChainValues: map[string]any{
-					"BigField":              testStruct.BigField.String(),
-					"AccountStruct.Account": solana.PublicKeyFromBytes(testStruct.AccountStruct.Account),
+					"BigField":              TestItem.BigField.String(),
+					"AccountStruct.Account": solana.PublicKeyFromBytes(TestItem.AccountStruct.Account),
 				},
 				OffChainValues: map[string]any{"ExtraField": anyExtraValue},
 			}

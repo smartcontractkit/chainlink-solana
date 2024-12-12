@@ -85,34 +85,115 @@ func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
 		DecoderDefs: map[string]Entry{},
 	}
 
-	for k, v := range conf.Configs {
+	for typeName, cfg := range conf.Configs {
 		var idl IDL
-		if err := json.Unmarshal([]byte(v.IDL), &idl); err != nil {
+		var codecType commonencodings.TypeCodec
+
+		if err := json.Unmarshal([]byte(cfg.IDL), &idl); err != nil {
 			return nil, err
 		}
 
-		mod, err := v.ModifierConfigs.ToModifier(DecoderHooks...)
+		refs := &codecRefs{
+			builder:      binary.LittleEndian(),
+			codecs:       make(map[string]commonencodings.TypeCodec),
+			typeDefs:     idl.Types,
+			dependencies: make(map[string][]string),
+		}
+
+		mod, err := cfg.ModifierConfigs.ToModifier(DecoderHooks...)
 		if err != nil {
 			return nil, err
 		}
 
-		var newEntry Entry
-		if v.AccountDef != nil && v.EventDef != nil {
-			return nil, fmt.Errorf("can't have both account and event definitions in codec config")
-		} else if v.AccountDef != nil {
-			newEntry, err = NewEntry(*v.AccountDef, idl.Types, true, mod, binary.LittleEndian())
+		if mod == nil {
+			mod = commoncodec.MultiModifier{}
+		}
+
+		includeDiscriminator := true
+		switch cfg.Type {
+		case ChainConfigTypeAccountDef:
+			var account *IdlTypeDef
+			for _, acc := range idl.Accounts {
+				if acc.Name == typeName {
+					account = &acc
+					break
+				}
+			}
+
+			if account == nil {
+				return nil, fmt.Errorf("account %s not found in IDL", typeName)
+			}
+
+			_, codecType, err = createCodecType(*account, refs, false)
 			if err != nil {
 				return nil, err
 			}
-		} else {
-			// TODO
-			return nil, fmt.Errorf("event definition parsing is not implemented")
+
+			includeDiscriminator = true
+		case ChainConfigTypeInstructionDef:
+			var instruction *IdlInstruction
+			for _, i := range idl.Instructions {
+				fmt.Println("instructions ", i)
+				if i.Name == typeName {
+					instruction = &i
+					break
+				}
+			}
+
+			if instruction == nil {
+				return nil, fmt.Errorf("instruction %s not found in IDL", typeName)
+			}
+
+			_, codecType, err = asStruct(instruction.Args, refs, instruction.Name, false, true)
+			if err != nil {
+				return nil, err
+			}
+
+			//includeDiscriminator = true
+		case ChainConfigTypeEventDef:
+			return nil, fmt.Errorf("TODO, unimplemented type: %s", cfg.Type)
+		default:
+			return nil, fmt.Errorf("unknown type: %s", cfg.Type)
 		}
-		parsed.EncoderDefs[k] = newEntry
-		parsed.DecoderDefs[k] = newEntry
+
+		entry := &codecEntry{name: typeName, includeDiscriminator: includeDiscriminator, codecType: codecType, typ: codecType.GetType(), mod: mod}
+		if entry.includeDiscriminator {
+			fmt.Println("Yes? ", typeName)
+			fmt.Println("discriminator ", "Discriminator"+typeName)
+			entry.Discriminator = commonencodings.NamedTypeCodec{Name: "Discriminator" + typeName, Codec: NewDiscriminator(typeName)}
+		}
+
+		parsed.EncoderDefs[typeName] = entry
+		parsed.DecoderDefs[typeName] = entry
 	}
 
 	return parsed.ToCodec()
+}
+
+// NewIDLAccountCodec is for Anchor custom types
+func NewIDLAccountCodec(idl IDL, builder commonencodings.Builder) (commontypes.RemoteCodec, error) {
+	return newIDLCoded(idl, builder, idl.Accounts, true)
+}
+
+func NewIDLInstructionsCodec(idl IDL, builder commonencodings.Builder) (commontypes.RemoteCodec, error) {
+	typeCodecs := make(commonencodings.LenientCodecFromTypeCodec)
+	refs := &codecRefs{
+		builder:      builder,
+		codecs:       make(map[string]commonencodings.TypeCodec),
+		typeDefs:     idl.Types,
+		dependencies: make(map[string][]string),
+	}
+
+	for _, instruction := range idl.Instructions {
+		name, instCodec, err := asStruct(instruction.Args, refs, instruction.Name, false, false)
+		if err != nil {
+			return nil, err
+		}
+
+		typeCodecs[name] = instCodec
+	}
+
+	return typeCodecs, nil
 }
 
 func NewNamedModifierCodec(original commontypes.RemoteCodec, itemType string, modifier commoncodec.Modifier) (commontypes.RemoteCodec, error) {
@@ -129,32 +210,6 @@ func NewNamedModifierCodec(original commontypes.RemoteCodec, itemType string, mo
 	_, err = modCodec.CreateType(itemType, true)
 
 	return modCodec, err
-}
-
-func NewIDLInstructionsCodec(idl IDL, builder commonencodings.Builder) (commontypes.RemoteCodec, error) {
-	typeCodecs := make(commonencodings.LenientCodecFromTypeCodec)
-	refs := &codecRefs{
-		builder:      builder,
-		codecs:       make(map[string]commonencodings.TypeCodec),
-		typeDefs:     idl.Types,
-		dependencies: make(map[string][]string),
-	}
-
-	for _, instruction := range idl.Instructions {
-		name, instCodec, err := asStruct(instruction.Args, refs, instruction.Name, false)
-		if err != nil {
-			return nil, err
-		}
-
-		typeCodecs[name] = instCodec
-	}
-
-	return typeCodecs, nil
-}
-
-// NewIDLAccountCodec is for Anchor custom types
-func NewIDLAccountCodec(idl IDL, builder commonencodings.Builder) (commontypes.RemoteCodec, error) {
-	return newIDLCoded(idl, builder, idl.Accounts, true)
 }
 
 func NewIDLDefinedTypesCodec(idl IDL, builder commonencodings.Builder) (commontypes.RemoteCodec, error) {
@@ -203,16 +258,14 @@ func createCodecType(
 	includeDiscriminator bool,
 ) (string, commonencodings.TypeCodec, error) {
 	name := def.Name
-
 	switch def.Type.Kind {
 	case IdlTypeDefTyKindStruct:
-		return asStruct(*def.Type.Fields, refs, name, includeDiscriminator)
+		return asStruct(*def.Type.Fields, refs, name, includeDiscriminator, false)
 	case IdlTypeDefTyKindEnum:
 		variants := def.Type.Variants
 		if !variants.IsAllUint8() {
 			return name, nil, fmt.Errorf("%w: variants are not supported", commontypes.ErrInvalidConfig)
 		}
-
 		return name, refs.builder.Uint8(), nil
 	default:
 		return name, nil, fmt.Errorf(unknownIDLFormat, commontypes.ErrInvalidConfig, def.Type.Kind)
@@ -224,11 +277,13 @@ func asStruct(
 	refs *codecRefs,
 	name string, // name is the struct name and can be used in dependency checks
 	includeDiscriminator bool,
+	isInstructionArgs bool,
 ) (string, commonencodings.TypeCodec, error) {
 	desLen := 0
 	if includeDiscriminator {
 		desLen = 1
 	}
+
 	named := make([]commonencodings.NamedTypeCodec, len(fields)+desLen)
 
 	if includeDiscriminator {
@@ -244,6 +299,10 @@ func asStruct(
 		}
 
 		named[idx+desLen] = commonencodings.NamedTypeCodec{Name: fieldName, Codec: typedCodec}
+	}
+
+	if len(named) == 1 && isInstructionArgs && !includeDiscriminator {
+		return name, named[0].Codec, nil
 	}
 
 	structCodec, err := commonencodings.NewStructCodec(named)

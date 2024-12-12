@@ -2,21 +2,10 @@
   "version": "0.1.0",
   "name": "test_item_type",
   "instructions": [
-    {
-      "name": "processTestItemType",
-      "accounts": [
-        {
-          "name": "TestStruct",
-          "isMut": true,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    }
   ],
   "accounts": [
     {
-      "name": "TestStruct",
+      "name": "TestItem",
       "type": {
         "kind": "struct",
         "fields": [
