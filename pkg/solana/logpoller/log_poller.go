@@ -72,9 +72,9 @@ func (lp *LogPoller) start(context.Context) error {
 	return nil
 }
 
-func (lp LogPoller) Process(event ProgramEvent) error {
+func (lp *LogPoller) Process(event ProgramEvent) error {
 	// process stream of events coming from event loader
-
+	lp.events = append(lp.events, event)
 	return nil
 }
 
@@ -107,9 +107,8 @@ func (lp *LogPoller) loadFilters(ctx context.Context) error {
 			lp.lggr.Errorw("Failed loading filters in init logpoller loop, retrying later", "err", err)
 			continue
 		}
-
-		return nil
 	}
+	// unreachable
 }
 
 func (lp *LogPoller) run(ctx context.Context) {
