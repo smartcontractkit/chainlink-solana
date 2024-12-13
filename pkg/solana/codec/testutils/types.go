@@ -9,6 +9,7 @@ import (
 	ag_binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
@@ -97,8 +98,6 @@ var JSONIDLWithAllTypes string
 //go:embed circularDepIDL.json
 var CircularDepIDL string
 
-const SizeItemType = "item for size"
-
 //go:embed itemIDL.json
 var itemTypeJSONIDL string
 
@@ -111,9 +110,6 @@ var itemArray1TypeJSONIDL string
 //go:embed itemArray2TypeIDL.json
 var itemArray2TypeJSONIDL string
 
-//go:embed sizeItemTypeIDL.json
-var sizeItemTypeJSONIDL string
-
 //go:embed nilTypeIDL.json
 var nilTypeJSONIDL string
 
@@ -123,7 +119,7 @@ type CodecDef struct {
 	ItemType    codec.ChainConfigType
 }
 
-// CodecDefs key is codec type name
+// CodecDefs key is codec offchain type name
 var CodecDefs = map[string]CodecDef{
 	TestItemType: {
 		IDL:         itemTypeJSONIDL,
@@ -155,136 +151,6 @@ var CodecDefs = map[string]CodecDef{
 		IDLTypeName: NilType,
 		ItemType:    codec.ChainConfigTypeAccountDef,
 	},
-}
-
-type TestItemWithConfigExtra struct {
-	Field               int32
-	OracleId            uint8
-	OracleIds           [32]uint8
-	AccountStruct       AccountStruct
-	Accounts            []solana.PublicKey
-	DifferentField      string
-	BigField            ag_binary.Int128
-	NestedDynamicStruct NestedDynamic
-	NestedStaticStruct  NestedStatic
-}
-
-var TestItemWithConfigExtraDiscriminator = [8]byte{166, 170, 238, 103, 98, 158, 73, 29}
-
-func (obj TestItemWithConfigExtra) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Write account discriminator:
-	err = encoder.WriteBytes(TestItemWithConfigExtraDiscriminator[:], false)
-	if err != nil {
-		return err
-	}
-	// Serialize `Field` param:
-	err = encoder.Encode(obj.Field)
-	if err != nil {
-		return err
-	}
-	// Serialize `OracleId` param:
-	err = encoder.Encode(obj.OracleId)
-	if err != nil {
-		return err
-	}
-	// Serialize `OracleIds` param:
-	err = encoder.Encode(obj.OracleIds)
-	if err != nil {
-		return err
-	}
-	// Serialize `AccountStruct` param:
-	err = encoder.Encode(obj.AccountStruct)
-	if err != nil {
-		return err
-	}
-	// Serialize `Accounts` param:
-	err = encoder.Encode(obj.Accounts)
-	if err != nil {
-		return err
-	}
-	// Serialize `DifferentField` param:
-	err = encoder.Encode(obj.DifferentField)
-	if err != nil {
-		return err
-	}
-	// Serialize `BigField` param:
-	err = encoder.Encode(obj.BigField)
-	if err != nil {
-		return err
-	}
-	// Serialize `NestedDynamicStruct` param:
-	err = encoder.Encode(obj.NestedDynamicStruct)
-	if err != nil {
-		return err
-	}
-	// Serialize `NestedStaticStruct` param:
-	err = encoder.Encode(obj.NestedStaticStruct)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *TestItemWithConfigExtra) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Read and check account discriminator:
-	{
-		discriminator, err := decoder.ReadTypeID()
-		if err != nil {
-			return err
-		}
-		if !discriminator.Equal(TestItemWithConfigExtraDiscriminator[:]) {
-			return fmt.Errorf(
-				"wrong discriminator: wanted %s, got %s",
-				"[166 170 238 103 98 158 73 29]",
-				fmt.Sprint(discriminator[:]))
-		}
-	}
-	// Deserialize `Field`:
-	err = decoder.Decode(&obj.Field)
-	if err != nil {
-		return err
-	}
-	// Deserialize `OracleId`:
-	err = decoder.Decode(&obj.OracleId)
-	if err != nil {
-		return err
-	}
-	// Deserialize `OracleIds`:
-	err = decoder.Decode(&obj.OracleIds)
-	if err != nil {
-		return err
-	}
-	// Deserialize `AccountStruct`:
-	err = decoder.Decode(&obj.AccountStruct)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Accounts`:
-	err = decoder.Decode(&obj.Accounts)
-	if err != nil {
-		return err
-	}
-	// Deserialize `DifferentField`:
-	err = decoder.Decode(&obj.DifferentField)
-	if err != nil {
-		return err
-	}
-	// Deserialize `BigField`:
-	err = decoder.Decode(&obj.BigField)
-	if err != nil {
-		return err
-	}
-	// Deserialize `NestedDynamicStruct`:
-	err = decoder.Decode(&obj.NestedDynamicStruct)
-	if err != nil {
-		return err
-	}
-	// Deserialize `NestedStaticStruct`:
-	err = decoder.Decode(&obj.NestedStaticStruct)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 type TestItemAsAccount struct {
@@ -690,4 +556,83 @@ func (obj *NestedStatic) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 		return err
 	}
 	return nil
+}
+
+func EncodeRequestToTestItemAsAccount(testStruct interfacetests.TestStruct) TestItemAsAccount {
+	return TestItemAsAccount{
+		Field:               *testStruct.Field,
+		OracleId:            uint8(testStruct.OracleID),
+		OracleIds:           getOracleIds(testStruct),
+		AccountStruct:       getAccountStruct(testStruct),
+		Accounts:            getAccounts(testStruct),
+		DifferentField:      testStruct.DifferentField,
+		BigField:            bigIntToBinInt128(testStruct.BigField),
+		NestedDynamicStruct: getNestedDynamic(testStruct),
+		NestedStaticStruct:  getNestedStatic(testStruct),
+	}
+}
+
+func EncodeRequestToTestItemAsArgs(testStruct interfacetests.TestStruct) TestItemAsArgs {
+	return TestItemAsArgs{
+		Field:               *testStruct.Field,
+		OracleId:            uint8(testStruct.OracleID),
+		OracleIds:           getOracleIds(testStruct),
+		AccountStruct:       getAccountStruct(testStruct),
+		Accounts:            getAccounts(testStruct),
+		DifferentField:      testStruct.DifferentField,
+		BigField:            bigIntToBinInt128(testStruct.BigField),
+		NestedDynamicStruct: getNestedDynamic(testStruct),
+		NestedStaticStruct:  getNestedStatic(testStruct),
+	}
+}
+
+func getOracleIds(testStruct interfacetests.TestStruct) [32]byte {
+	var oracleIds [32]byte
+	for i, v := range testStruct.OracleIDs {
+		oracleIds[i] = byte(v)
+	}
+	return oracleIds
+}
+
+func getAccountStruct(testStruct interfacetests.TestStruct) AccountStruct {
+	k, _ := solana.PublicKeyFromBase58(testStruct.AccountStruct.AccountStr)
+	return AccountStruct{
+		Account:    solana.PublicKeyFromBytes(testStruct.AccountStruct.Account),
+		AccountStr: k,
+	}
+}
+
+func getAccounts(testStruct interfacetests.TestStruct) []solana.PublicKey {
+	accs := make([]solana.PublicKey, len(testStruct.Accounts))
+	for i, v := range testStruct.Accounts {
+		accs[i] = solana.PublicKeyFromBytes(v)
+	}
+	return accs
+}
+
+func getNestedDynamic(testStruct interfacetests.TestStruct) NestedDynamic {
+	return NestedDynamic{
+		FixedBytes: testStruct.NestedDynamicStruct.FixedBytes,
+		Inner: InnerDynamic{
+			IntVal: int64(testStruct.NestedDynamicStruct.Inner.I),
+			S:      testStruct.NestedDynamicStruct.Inner.S,
+		},
+	}
+}
+
+func getNestedStatic(testStruct interfacetests.TestStruct) NestedStatic {
+	return NestedStatic{
+		FixedBytes: testStruct.NestedStaticStruct.FixedBytes,
+		Inner: InnerStatic{
+			IntVal: int64(testStruct.NestedStaticStruct.Inner.I),
+			A:      solana.PublicKeyFromBytes(testStruct.NestedStaticStruct.Inner.A),
+		},
+	}
+}
+
+func bigIntToBinInt128(val *big.Int) ag_binary.Int128 {
+	return ag_binary.Int128{
+		Lo: val.Uint64(),
+		Hi: new(big.Int).Rsh(val, 64).Uint64(),
+	}
 }

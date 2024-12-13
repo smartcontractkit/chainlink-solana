@@ -34,6 +34,7 @@ type codecInterfaceTester struct {
 func (it *codecInterfaceTester) Setup(_ *testing.T) {}
 
 func (it *codecInterfaceTester) GetAccountBytes(_ int) []byte {
+	// TODO solana base58 string can be of variable length, this value is always 44, but it should be able to handle any length 32-44
 	pk := solana.PublicKeyFromBytes([]byte{220, 108, 195, 188, 166, 6, 163, 39, 197, 131, 44, 38, 154, 177, 232, 80, 141, 50, 7, 65, 28, 65, 182, 165, 57, 5, 176, 68, 46, 181, 58, 245})
 	return pk.Bytes()
 }
@@ -77,7 +78,6 @@ func encodeFieldsOnSliceOrArray(t *testing.T, request *EncodeRequest) []byte {
 
 	if err := bin.NewBorshEncoder(buf).Encode(toEncode); err != nil {
 		require.NoError(t, err)
-		return nil
 	}
 	return buf.Bytes()
 }
@@ -85,28 +85,28 @@ func encodeFieldsOnSliceOrArray(t *testing.T, request *EncodeRequest) []byte {
 func (it *codecInterfaceTester) GetCodec(t *testing.T) clcommontypes.Codec {
 	codecConfig := codec.Config{Configs: map[string]codec.ChainConfig{}}
 	TestItem := CreateTestStruct[*testing.T](0, it)
-	for k, v := range testutils.CodecDefs {
-		entry := codecConfig.Configs[k]
-		entry.IDL = v.IDL
-		entry.Type = v.ItemType
-		entry.IDLTypeName = v.IDLTypeName
+	for offChainName, v := range testutils.CodecDefs {
+		codecEntryCfg := codecConfig.Configs[offChainName]
+		codecEntryCfg.IDL = v.IDL
+		codecEntryCfg.Type = v.ItemType
+		codecEntryCfg.OnChainName = v.IDLTypeName
 
-		if k != testutils.SizeItemType && k != testutils.NilType {
-			entry.ModifierConfigs = commoncodec.ModifiersConfig{
+		if offChainName != testutils.NilType {
+			codecEntryCfg.ModifierConfigs = commoncodec.ModifiersConfig{
 				&commoncodec.RenameModifierConfig{Fields: map[string]string{"NestedDynamicStruct.Inner.IntVal": "I"}},
 				&commoncodec.RenameModifierConfig{Fields: map[string]string{"NestedStaticStruct.Inner.IntVal": "I"}},
 			}
 		}
 
-		if slices.Contains([]string{testutils.TestItemType, testutils.TestItemSliceType, testutils.TestItemArray1Type, testutils.TestItemArray2Type, testutils.TestItemWithConfigExtraType}, k) {
+		if slices.Contains([]string{testutils.TestItemType, testutils.TestItemSliceType, testutils.TestItemArray1Type, testutils.TestItemArray2Type, testutils.TestItemWithConfigExtraType}, offChainName) {
 			addressByteModifier := &commoncodec.AddressBytesToStringModifierConfig{
 				Fields:   []string{"AccountStruct.AccountStr"},
 				Modifier: codec.SolanaAddressModifier{},
 			}
-			entry.ModifierConfigs = append(entry.ModifierConfigs, addressByteModifier)
+			codecEntryCfg.ModifierConfigs = append(codecEntryCfg.ModifierConfigs, addressByteModifier)
 		}
 
-		if k == testutils.TestItemWithConfigExtraType {
+		if offChainName == testutils.TestItemWithConfigExtraType {
 			hardCode := &commoncodec.HardCodeModifierConfig{
 				OnChainValues: map[string]any{
 					"BigField":              TestItem.BigField.String(),
@@ -114,9 +114,9 @@ func (it *codecInterfaceTester) GetCodec(t *testing.T) clcommontypes.Codec {
 				},
 				OffChainValues: map[string]any{"ExtraField": anyExtraValue},
 			}
-			entry.ModifierConfigs = append(entry.ModifierConfigs, hardCode)
+			codecEntryCfg.ModifierConfigs = append(codecEntryCfg.ModifierConfigs, hardCode)
 		}
-		codecConfig.Configs[k] = entry
+		codecConfig.Configs[offChainName] = codecEntryCfg
 	}
 
 	c, err := codec.NewCodec(codecConfig)
