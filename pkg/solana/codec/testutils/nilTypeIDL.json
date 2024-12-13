@@ -2,7 +2,7 @@
   "name": "NilType",
   "accounts": [
     {
-      "name": "NilAccount",
+      "name": "NilType",
       "type": {
         "kind": "struct",
         "fields": []

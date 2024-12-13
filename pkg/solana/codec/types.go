@@ -17,6 +17,7 @@ type Config struct {
 
 type ChainConfig struct {
 	IDL             string                      `json:"IDL" toml:"IDL"`
+	IDLTypeName     string                      `json:"IDLTypeName" toml:"IDLTypeName"`
 	Type            ChainConfigType             `json:"type" toml:"type"`
 	ModifierConfigs commoncodec.ModifiersConfig `json:"modifierConfigs,omitempty" toml:"modifierConfigs,omitempty"`
 }

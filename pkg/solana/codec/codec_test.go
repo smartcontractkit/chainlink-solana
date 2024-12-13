@@ -16,8 +16,6 @@ import (
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils/test_item_slice_type"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils/test_item_type"
 )
 
 const anyExtraValue = 3
@@ -25,6 +23,7 @@ const anyExtraValue = 3
 func TestCodec(t *testing.T) {
 	tester := &codecInterfaceTester{}
 	RunCodecInterfaceTests(t, tester)
+	// TODO
 	//RunCodecInterfaceTests(t, looptestutils.WrapCodecTesterForLoop(tester))
 }
 
@@ -34,9 +33,9 @@ type codecInterfaceTester struct {
 
 func (it *codecInterfaceTester) Setup(_ *testing.T) {}
 
-func (it *codecInterfaceTester) GetAccountBytes(i int) []byte {
-	pk, _ := solana.NewRandomPrivateKey()
-	return pk.PublicKey().Bytes()
+func (it *codecInterfaceTester) GetAccountBytes(_ int) []byte {
+	pk := solana.PublicKeyFromBytes([]byte{220, 108, 195, 188, 166, 6, 163, 39, 197, 131, 44, 38, 154, 177, 232, 80, 141, 50, 7, 65, 28, 65, 182, 165, 57, 5, 176, 68, 46, 181, 58, 245})
+	return pk.Bytes()
 }
 
 func (it *codecInterfaceTester) GetAccountString(i int) string {
@@ -53,36 +52,34 @@ func (it *codecInterfaceTester) EncodeFields(t *testing.T, request *EncodeReques
 
 func encodeFieldsOnItem(t *testing.T, request *EncodeRequest) ocr2types.Report {
 	buf := new(bytes.Buffer)
-	if err := testutils.EncodeRequestToTestItem(request).MarshalWithEncoder(bin.NewBorshEncoder(buf)); err != nil {
+	if err := testutils.EncodeRequestToTestItemAsAccount(request.TestStructs[0]).MarshalWithEncoder(bin.NewBorshEncoder(buf)); err != nil {
 		require.NoError(t, err)
 	}
 	return buf.Bytes()
 }
 
 func encodeFieldsOnSliceOrArray(t *testing.T, request *EncodeRequest) []byte {
-	args := make([]any, 1)
+	var toEncode interface{}
+	buf := new(bytes.Buffer)
 	switch request.TestOn {
-	case testutils.TestItemSliceType:
-		testItemSlice := []test_item_type.TestItem{testutils.ToInternalType(request.TestStructs[0])}
-		buf := new(bytes.Buffer)
-		if err := test_item_slice_type.NewTestItemSliceTypeInstructionBuilder().SetTestItemSliceType(testItemSlice).Build().MarshalWithEncoder(bin.NewBorshEncoder(buf)); err != nil {
-			require.NoError(t, err)
-			return nil
-		}
-		return buf.Bytes()
-	case testutils.TestItemArray1Type:
-		args[0] = [1]test_item_type.TestItem{testutils.ToInternalType(request.TestStructs[0])}
-	case testutils.TestItemArray2Type:
-		args[0] = [2]test_item_type.TestItem{testutils.ToInternalType(request.TestStructs[0]), testutils.ToInternalType(request.TestStructs[1])}
+	case TestItemArray1Type:
+		toEncode = [1]testutils.TestItemAsArgs{testutils.EncodeRequestToTestItemAsArgs(request.TestStructs[0])}
+	case TestItemArray2Type:
+		toEncode = [2]testutils.TestItemAsArgs{testutils.EncodeRequestToTestItemAsArgs(request.TestStructs[0]), testutils.EncodeRequestToTestItemAsArgs(request.TestStructs[1])}
 	default:
-		tmp := make([]test_item_type.TestItem, len(request.TestStructs))
-		for i, ts := range request.TestStructs {
-			tmp[i] = testutils.ToInternalType(ts)
+		// encode TestItemSliceType as instruction args (similar to accounts, but no discriminator) because accounts can't be just a vector
+		var itemSliceType []testutils.TestItemAsArgs
+		for _, req := range request.TestStructs {
+			itemSliceType = append(itemSliceType, testutils.EncodeRequestToTestItemAsArgs(req))
 		}
-		args[0] = tmp
+		toEncode = itemSliceType
 	}
 
-	return []byte{}
+	if err := bin.NewBorshEncoder(buf).Encode(toEncode); err != nil {
+		require.NoError(t, err)
+		return nil
+	}
+	return buf.Bytes()
 }
 
 func (it *codecInterfaceTester) GetCodec(t *testing.T) clcommontypes.Codec {
@@ -92,6 +89,7 @@ func (it *codecInterfaceTester) GetCodec(t *testing.T) clcommontypes.Codec {
 		entry := codecConfig.Configs[k]
 		entry.IDL = v.IDL
 		entry.Type = v.ItemType
+		entry.IDLTypeName = v.IDLTypeName
 
 		if k != testutils.SizeItemType && k != testutils.NilType {
 			entry.ModifierConfigs = commoncodec.ModifiersConfig{
@@ -100,7 +98,7 @@ func (it *codecInterfaceTester) GetCodec(t *testing.T) clcommontypes.Codec {
 			}
 		}
 
-		if slices.Contains([]string{testutils.TestItemType, testutils.TestItemSliceType, testutils.TestItemWithConfigExtra}, k) {
+		if slices.Contains([]string{testutils.TestItemType, testutils.TestItemSliceType, testutils.TestItemArray1Type, testutils.TestItemArray2Type, testutils.TestItemWithConfigExtraType}, k) {
 			addressByteModifier := &commoncodec.AddressBytesToStringModifierConfig{
 				Fields:   []string{"AccountStruct.AccountStr"},
 				Modifier: codec.SolanaAddressModifier{},
@@ -108,7 +106,7 @@ func (it *codecInterfaceTester) GetCodec(t *testing.T) clcommontypes.Codec {
 			entry.ModifierConfigs = append(entry.ModifierConfigs, addressByteModifier)
 		}
 
-		if k == testutils.TestItemWithConfigExtra {
+		if k == testutils.TestItemWithConfigExtraType {
 			hardCode := &commoncodec.HardCodeModifierConfig{
 				OnChainValues: map[string]any{
 					"BigField":              TestItem.BigField.String(),

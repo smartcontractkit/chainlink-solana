@@ -1,10 +1,12 @@
 package codec
 
 import (
+	"fmt"
 	"reflect"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/codec"
 	commonencodings "github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 type Entry interface {
@@ -44,6 +46,7 @@ type Entry interface {
 
 type codecEntry struct {
 	name                 string
+	IDLTypeName          string
 	includeDiscriminator bool
 	Discriminator        commonencodings.NamedTypeCodec
 	typ                  reflect.Type
@@ -60,6 +63,12 @@ func (entry *codecEntry) GetCodecType() commonencodings.TypeCodec {
 }
 
 func (entry *codecEntry) Encode(value any, into []byte) ([]byte, error) {
+	if value == nil && entry.typ.Kind() == reflect.Pointer && entry.typ.Elem().Kind() == reflect.Struct && entry.typ.Elem().NumField() == 0 {
+		return []byte{}, nil
+	} else if value == nil {
+		return nil, fmt.Errorf("%w: cannot encode nil value for %s", commontypes.ErrInvalidType, entry.name)
+	}
+
 	encodedVal, err := entry.codecType.Encode(value, into)
 	if err != nil {
 		return nil, err
@@ -67,7 +76,7 @@ func (entry *codecEntry) Encode(value any, into []byte) ([]byte, error) {
 
 	if entry.includeDiscriminator {
 		var byt []byte
-		disc := NewDiscriminator(entry.name)
+		disc := NewDiscriminator(entry.IDLTypeName)
 		encodedDisc, err := disc.Encode(&disc.hashPrefix, byt)
 		if err != nil {
 			return nil, err
