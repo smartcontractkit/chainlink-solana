@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
+	looptestutils "github.com/smartcontractkit/chainlink-common/pkg/loop/testutils"
 	clcommontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
@@ -23,8 +24,7 @@ const anyExtraValue = 3
 func TestCodec(t *testing.T) {
 	tester := &codecInterfaceTester{}
 	RunCodecInterfaceTests(t, tester)
-	// TODO
-	//RunCodecInterfaceTests(t, looptestutils.WrapCodecTesterForLoop(tester))
+	RunCodecInterfaceTests(t, looptestutils.WrapCodecTesterForLoop(tester))
 }
 
 type codecInterfaceTester struct {
