@@ -25,7 +25,7 @@ import (
 	txmMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 )
 
-var testContractIDLJson = `{"version":"0.1.0","name":"contract_reader_interface","instructions":[{"name":"initialize","accounts":[{"name":"data","isMut":true,"isSigner":false},{"name":"signer","isMut":true,"isSigner":true},{"name":"systemProgram","isMut":false,"isSigner":false}],"args":[{"name":"testIdx","type":"u64"},{"name":"value","type":"u64"}]},{"name":"initializeLookupTable","accounts":[{"name":"writeDataAccount","isMut":true,"isSigner":false,"docs":["PDA for LookupTableDataAccount, derived from seeds and created by the System Program"]},{"name":"admin","isMut":true,"isSigner":true,"docs":["Admin account that pays for PDA creation and signs the transaction"]},{"name":"systemProgram","isMut":false,"isSigner":false,"docs":["System Program required for PDA creation"]}],"args":[{"name":"lookupTable","type":"publicKey"}]}],"accounts":[{"name":"LookupTableDataAccount","type":{"kind":"struct","fields":[{"name":"version","type":"u8"},{"name":"administrator","type":"publicKey"},{"name":"pendingAdministrator","type":"publicKey"},{"name":"lookupTable","type":"publicKey"}]}},{"name":"DataAccount","type":{"kind":"struct","fields":[{"name":"idx","type":"u64"},{"name":"bump","type":"u8"},{"name":"u64Value","type":"u64"},{"name":"u64Slice","type":{"vec":"u64"}}]}}]}`
+var testContractIDLJson = `{"version":"0.1.0","name":"contractReaderInterface","instructions":[{"name":"initialize","accounts":[{"name":"data","isMut":true,"isSigner":false},{"name":"signer","isMut":true,"isSigner":true},{"name":"systemProgram","isMut":false,"isSigner":false}],"args":[{"name":"testIdx","type":"u64"},{"name":"value","type":"u64"}]},{"name":"initializeLookupTable","accounts":[{"name":"writeDataAccount","isMut":true,"isSigner":false,"docs":["PDA for LookupTableDataAccount, derived from seeds and created by the System Program"]},{"name":"admin","isMut":true,"isSigner":true,"docs":["Admin account that pays for PDA creation and signs the transaction"]},{"name":"systemProgram","isMut":false,"isSigner":false,"docs":["System Program required for PDA creation"]}],"args":[{"name":"lookupTable","type":"publicKey"}]}],"accounts":[{"name":"LookupTableDataAccount","type":{"kind":"struct","fields":[{"name":"version","type":"u8"},{"name":"administrator","type":"publicKey"},{"name":"pendingAdministrator","type":"publicKey"},{"name":"lookupTable","type":"publicKey"}]}},{"name":"DataAccount","type":{"kind":"struct","fields":[{"name":"idx","type":"u64"},{"name":"bump","type":"u8"},{"name":"u64Value","type":"u64"},{"name":"u64Slice","type":{"vec":"u64"}}]}}]}`
 
 func TestChainWriter_GetAddresses(t *testing.T) {
 	ctx := tests.Context(t)
@@ -401,7 +401,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 
 	// create lookup table addresses
 	seed2 := []byte("seed2")
-	programID := chainwriter.GetRandomPubKey(t)
+	programID := solana.MustPublicKeyFromBase58("6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE")
 	derivedTablePda := mustFindPdaProgramAddress(t, [][]byte{seed2}, programID)
 	// mock data account response from program
 	derivedLookupTablePubkey := mockDataAccountLookupTable(t, rw, derivedTablePda)
@@ -416,7 +416,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 
 	cwConfig := chainwriter.ChainWriterConfig{
 		Programs: map[string]chainwriter.ProgramConfig{
-			"6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE": {
+			"contractReaderInterface": {
 				Methods: map[string]chainwriter.MethodConfig{
 					"initializeLookupTable": {
 						FromAddress:       admin.String(),
@@ -505,21 +505,21 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 	t.Run("fails to encode payload if args with missing values provided", func(t *testing.T) {
 		txID := uuid.NewString()
 		args := map[string]interface{}{}
-		submitErr := cw.SubmitTransaction(ctx, "6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE", "initializeLookupTable", args, txID, programID.String(), nil, nil)
+		submitErr := cw.SubmitTransaction(ctx, "contractReaderInterface", "initializeLookupTable", args, txID, programID.String(), nil, nil)
 		require.Error(t, submitErr)
 	})
 
 	t.Run("fails if invalid contract name provided", func(t *testing.T) {
 		txID := uuid.NewString()
 		args := map[string]interface{}{}
-		submitErr := cw.SubmitTransaction(ctx, "contract_reader_interface", "initializeLookupTable", args, txID, programID.String(), nil, nil)
+		submitErr := cw.SubmitTransaction(ctx, "badContract", "initializeLookupTable", args, txID, programID.String(), nil, nil)
 		require.Error(t, submitErr)
 	})
 
 	t.Run("fails if invalid method provided", func(t *testing.T) {
 		txID := uuid.NewString()
 		args := map[string]interface{}{}
-		submitErr := cw.SubmitTransaction(ctx, "6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE", "badMethod", args, txID, programID.String(), nil, nil)
+		submitErr := cw.SubmitTransaction(ctx, "contractReaderInterface", "badMethod", args, txID, programID.String(), nil, nil)
 		require.Error(t, submitErr)
 	})
 
@@ -527,7 +527,6 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 		recentBlockHash := solana.Hash{}
 		rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Once()
 		txID := uuid.NewString()
-		configProgramID := solana.MustPublicKeyFromBase58("6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE")
 
 		txm.On("Enqueue", mock.Anything, account1.String(), mock.MatchedBy(func(tx *solana.Transaction) bool {
 			// match transaction fields to ensure it was built as expected
@@ -538,7 +537,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 			require.Equal(t, account1, tx.Message.AccountKeys[1])                                    // account constant
 			require.Equal(t, account2, tx.Message.AccountKeys[2])                                    // account lookup
 			require.Equal(t, account3, tx.Message.AccountKeys[3])                                    // pda lookup
-			require.Equal(t, configProgramID, tx.Message.AccountKeys[4])                             // instruction program ID
+			require.Equal(t, programID, tx.Message.AccountKeys[4])                                   // instruction program ID
 			require.Len(t, tx.Message.AddressTableLookups, 1)                                        // address table look contains entry
 			require.Equal(t, derivedLookupTablePubkey, tx.Message.AddressTableLookups[0].AccountKey) // address table
 			return true
@@ -550,7 +549,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 			"seed1":        seed1,
 			"seed2":        seed2,
 		}
-		submitErr := cw.SubmitTransaction(ctx, "6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE", "initializeLookupTable", args, txID, programID.String(), nil, nil)
+		submitErr := cw.SubmitTransaction(ctx, "contractReaderInterface", "initializeLookupTable", args, txID, programID.String(), nil, nil)
 		require.NoError(t, submitErr)
 	})
 }

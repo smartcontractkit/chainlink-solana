@@ -1,7 +1,6 @@
 package relayinterface
 
 import (
-	"context"
 	"reflect"
 	"testing"
 	"time"
@@ -153,7 +152,7 @@ func TestPDALookups(t *testing.T) {
 			IsWritable: true,
 		}
 
-		ctx := context.Background()
+		ctx := tests.Context(t)
 		result, err := pdaLookup.Resolve(ctx, nil, nil, nil)
 		require.NoError(t, err)
 		require.Equal(t, expectedMeta, result)
@@ -184,7 +183,7 @@ func TestPDALookups(t *testing.T) {
 			IsWritable: true,
 		}
 
-		ctx := context.Background()
+		ctx := tests.Context(t)
 		args := map[string]interface{}{
 			"test_seed":    seed1,
 			"another_seed": seed2,
@@ -206,7 +205,7 @@ func TestPDALookups(t *testing.T) {
 			IsWritable: true,
 		}
 
-		ctx := context.Background()
+		ctx := tests.Context(t)
 		args := map[string]interface{}{
 			"test_seed": []byte("data"),
 		}
@@ -242,7 +241,7 @@ func TestPDALookups(t *testing.T) {
 			IsWritable: true,
 		}
 
-		ctx := context.Background()
+		ctx := tests.Context(t)
 		args := map[string]interface{}{
 			"test_seed":    seed1,
 			"another_seed": seed2,

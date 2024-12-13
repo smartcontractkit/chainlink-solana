@@ -251,7 +251,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	}
 
 	// Prepare transaction
-	programID, err := solana.PublicKeyFromBase58(contractName)
+	programID, err := solana.PublicKeyFromBase58(toAddress)
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error parsing program ID: %w", err), debugID)
 	}
@@ -280,11 +280,6 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 
 	return nil
 }
-
-var (
-	_ services.Service     = &SolanaChainWriterService{}
-	_ types.ContractWriter = &SolanaChainWriterService{}
-)
 
 // GetTransactionStatus returns the current status of a transaction in the underlying chain's TXM.
 func (s *SolanaChainWriterService) GetTransactionStatus(ctx context.Context, transactionID string) (types.TransactionStatus, error) {

@@ -212,6 +212,7 @@ func decodeBorshIntoType(data []byte, typ reflect.Type) (interface{}, error) {
 // It handles both AddressSeeds (which are public keys) and ValueSeeds (which are byte arrays from input args).
 func getSeedBytes(ctx context.Context, lookup PDALookups, args any, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.Reader) ([][]byte, error) {
 	var seedBytes [][]byte
+	maxSeedLength := 32
 
 	for _, seed := range lookup.Seeds {
 		if lookupSeed, ok := seed.(AccountLookup); ok {
@@ -220,7 +221,13 @@ func getSeedBytes(ctx context.Context, lookup PDALookups, args any, derivedTable
 			if err != nil {
 				return nil, fmt.Errorf("error getting address seed: %w", err)
 			}
-			seedBytes = append(seedBytes, bytes...)
+			// validate seed length
+			for _, b := range bytes {
+				if len(b) > maxSeedLength {
+					return nil, fmt.Errorf("seed byte array exceeds maximum length of %d: got %d bytes", maxSeedLength, len(b))
+				}
+				seedBytes = append(seedBytes, b)
+			}
 		} else {
 			// Get address seeds from the lookup
 			seedAddresses, err := GetAddresses(ctx, args, []Lookup{seed}, derivedTableMap, reader)
@@ -240,10 +247,9 @@ func getSeedBytes(ctx context.Context, lookup PDALookups, args any, derivedTable
 
 // generatePDAs generates program-derived addresses (PDAs) from public keys and seeds.
 func generatePDAs(publicKeys []*solana.AccountMeta, seeds [][]byte, lookup PDALookups) ([]*solana.AccountMeta, error) {
-	if len(seeds) > 1 && len(publicKeys) > 1 {
-		return nil, fmt.Errorf("multiple public keys and multiple seeds are not allowed")
+	if len(seeds) > 16 {
+		return nil, fmt.Errorf("seed maximum exceeded: %d", len(seeds))
 	}
-
 	var addresses []*solana.AccountMeta
 	for _, publicKeyMeta := range publicKeys {
 		address, _, err := solana.FindProgramAddress(seeds, publicKeyMeta.PublicKey)
