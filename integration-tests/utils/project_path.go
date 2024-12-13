@@ -11,4 +11,5 @@ var (
 	ProjectRoot = filepath.Join(filepath.Dir(b), "/../..")
 	// ContractsDir path to our contracts
 	ContractsDir = filepath.Join(ProjectRoot, "contracts", "target", "deploy")
+	IDLDir       = filepath.Join(ProjectRoot, "contracts", "target", "idl")
 )

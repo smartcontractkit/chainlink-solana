@@ -1,6 +1,10 @@
+# 12/26 - @njegosrailic: I reviewed the codeowners file and confirmed all the teams are appropriate.
+
 # CODEOWNERS Best Practices
 # 1. Per Github docs: "Order is important; the last matching pattern takes the most precedence."
 # Please define less specific codeowner paths before more specific codeowner paths in order for the more specific rule to have priority
+# The following doc explains the CODEOWNERS file syntax:
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners#codeowners-syntax
 
 # global ownership
 * @smartcontractkit/bix-build
@@ -11,11 +15,11 @@
 # gauntlet ownership
 /gauntlet @smartcontractkit/devx @smartcontractkit/bix-build
 
-# relayer ownership
-/pkg @smartcontractkit/bix-build
-
 # monitoring ownership
 /pkg/monitoring @smartcontractkit/realtime
 
+# LOOP Plugin commands
+/pkg/solana/cmd/chainlink-solana @smartcontractkit/foundations @smartcontractkit/bix-build
+
 # CI/CD
-/.github/** @smartcontractkit/releng
+/.github/** @smartcontractkit/releng @smartcontractkit/bix-build
