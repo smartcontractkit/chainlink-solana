@@ -80,9 +80,16 @@ func (entry *codecEntry) GetCodecType() commonencodings.TypeCodec {
 }
 
 func (entry *codecEntry) Encode(value any, into []byte) ([]byte, error) {
-	if value == nil && entry.reflectType.Kind() == reflect.Pointer && entry.reflectType.Elem().Kind() == reflect.Struct && entry.reflectType.Elem().NumField() == 0 {
-		return []byte{}, nil
-	} else if value == nil {
+	// handle nil encoding for empty struct as an empty byte slice
+	t := entry.reflectType
+	if value == nil && t.Kind() == reflect.Pointer {
+		elem := t.Elem()
+		if elem.Kind() == reflect.Struct && elem.NumField() == 0 {
+			return []byte{}, nil
+		}
+	}
+
+	if value == nil {
 		return nil, fmt.Errorf("%w: cannot encode nil value for %s", commontypes.ErrInvalidType, entry.offchainName)
 	}
 
