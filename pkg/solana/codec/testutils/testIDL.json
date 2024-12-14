@@ -1,86 +1,230 @@
 {
   "version": "0.1.0",
-  "name": "test_item_type",
-  "instructions": [
-    {
-      "name": "processTestItemType",
-      "accounts": [
-        {
-          "name": "testItem",
-          "isMut": true,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    }
-  ],
+  "name": "some_test_idl",
   "accounts": [
     {
-      "name": "TestItem",
+      "name": "StructWithNestedStruct",
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "field", "type": "i32" },
-          { "name": "differentField", "type": "string" },
-          { "name": "oracleId", "type": "u8" },
-          { "name": "oracleIds", "type": { "array": ["u8", 32] } },
-          { "name": "accountStruct", "type": { "defined": "AccountStruct" } },
-          { "name": "accounts", "type": { "vec": "publicKey" } },
-          { "name": "bigField", "type": "i128" },
-          { "name": "NestedDynamicStruct", "type": { "defined": "NestedDynamic" } },
-          { "name": "NestedStaticStruct", "type": { "defined": "NestedStatic" } }
+          {
+            "name": "value",
+            "type": "u8"
+          },
+          {
+            "name": "innerStruct",
+            "type": {
+              "defined": "ObjectRef1"
+            }
+          },
+          {
+            "name": "basicNestedArray",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u32",
+                    3
+                  ]
+                },
+                3
+              ]
+            }
+          },
+          {
+            "name": "option",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "definedArray",
+            "type": {
+              "array": [
+                {
+                  "defined": "ObjectRef2"
+                },
+                2
+              ]
+            }
+          },
+          {
+            "name": "basicVector",
+            "type": {
+              "vec": "string"
+            }
+          },
+          {
+            "name": "timeVal",
+            "type": "unixTimestamp"
+          },
+          {
+            "name": "durationVal",
+            "type": "duration"
+          },
+          {
+            "name": "publicKey",
+            "type": "publicKey"
+          },
+          {
+            "name": "enumVal",
+            "type": {
+              "defined": "SimpleEnum"
+            }
+          }
         ]
       }
     }
   ],
   "types": [
     {
-      "name": "AccountStruct",
+      "name": "StructWithNestedStructType",
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "account", "type": "publicKey" },
-          { "name": "accountStr", "type": "publicKey" }
+          {
+            "name": "value",
+            "type": "u8"
+          },
+          {
+            "name": "innerStruct",
+            "type": {
+              "defined": "ObjectRef1"
+            }
+          },
+          {
+            "name": "basicNestedArray",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u32",
+                    3
+                  ]
+                },
+                3
+              ]
+            }
+          },
+          {
+            "name": "option",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "definedArray",
+            "type": {
+              "array": [
+                {
+                  "defined": "ObjectRef2"
+                },
+                2
+              ]
+            }
+          },
+          {
+            "name": "basicVector",
+            "type": {
+              "vec": "string"
+            }
+          },
+          {
+            "name": "timeVal",
+            "type": "unixTimestamp"
+          },
+          {
+            "name": "durationVal",
+            "type": "duration"
+          },
+          {
+            "name": "publicKey",
+            "type": "publicKey"
+          },
+          {
+            "name": "enumVal",
+            "type": {
+              "defined": "SimpleEnum"
+            }
+          }
         ]
       }
     },
     {
-      "name": "InnerDynamic",
+      "name": "ObjectRef1",
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "intVal", "type": "i64" },
-          { "name": "s", "type": "string" }
+          {
+            "name": "prop1",
+            "type": "i8"
+          },
+          {
+            "name": "prop2",
+            "type": "string"
+          },
+          {
+            "name": "prop3",
+            "type": "u128"
+          },
+          {
+            "name": "prop4",
+            "type": "u16"
+          },
+          {
+            "name": "prop5",
+            "type": "u64"
+          },
+          {
+            "name": "prop6",
+            "type": "bool"
+          }
         ]
       }
     },
     {
-      "name": "NestedDynamic",
+      "name": "ObjectRef2",
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "fixedBytes", "type": { "array": ["u8", 2] } },
-          { "name": "inner", "type": { "defined": "InnerDynamic" } }
+          {
+            "name": "prop1",
+            "type": "u32"
+          },
+          {
+            "name": "prop2",
+            "type": "i128"
+          },
+          {
+            "name": "prop3",
+            "type": "i16"
+          },
+          {
+            "name": "prop4",
+            "type": "i32"
+          },
+          {
+            "name": "prop5",
+            "type": "i64"
+          },
+          {
+            "name": "prop6",
+            "type": "bytes"
+          }
         ]
       }
     },
     {
-      "name": "InnerStatic",
+      "name": "SimpleEnum",
       "type": {
-        "kind": "struct",
-        "fields": [
-          { "name": "intVal", "type": "i64" },
-          { "name": "a", "type": "publicKey" }
-        ]
-      }
-    },
-    {
-      "name": "NestedStatic",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          { "name": "fixedBytes", "type": { "array": ["u8", 2] } },
-          { "name": "inner", "type": { "defined": "InnerStatic" } }
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "A"
+          },
+          {
+            "name": "B"
+          }
         ]
       }
     }
