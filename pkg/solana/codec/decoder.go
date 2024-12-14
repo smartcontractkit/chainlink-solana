@@ -9,13 +9,13 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
-type decoder struct {
+type Decoder struct {
 	Definitions map[string]Entry
 }
 
-var _ commontypes.Decoder = &decoder{}
+var _ commontypes.Decoder = &Decoder{}
 
-func (m *decoder) Decode(_ context.Context, raw []byte, into any, itemType string) (err error) {
+func (m *Decoder) Decode(_ context.Context, raw []byte, into any, itemType string) (err error) {
 	item, ok := m.Definitions[itemType]
 	if !ok {
 		return fmt.Errorf("%w: cannot find type %s", commontypes.ErrInvalidType, itemType)
@@ -33,7 +33,7 @@ func (m *decoder) Decode(_ context.Context, raw []byte, into any, itemType strin
 	return codec.Convert(reflect.ValueOf(val), reflect.ValueOf(into), nil)
 }
 
-func (m *decoder) GetMaxDecodingSize(_ context.Context, n int, itemType string) (int, error) {
+func (m *Decoder) GetMaxDecodingSize(_ context.Context, n int, itemType string) (int, error) {
 	entry, ok := m.Definitions[itemType]
 	if !ok {
 		return 0, fmt.Errorf("%w: nil entry", commontypes.ErrInvalidType)

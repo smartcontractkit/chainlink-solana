@@ -47,7 +47,7 @@ var DecoderHooks = []mapstructure.DecodeHookFunc{commoncodec.EpochToTimeHook, co
 
 type solanaCodec struct {
 	*encoder
-	*decoder
+	*Decoder
 	*ParsedTypes
 }
 

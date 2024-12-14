@@ -37,7 +37,7 @@ func NewAccountEntry(offchainName string, idlAccount IdlTypeDef, idlTypes IdlTyp
 		mod = codec.MultiModifier{}
 	}
 
-	entry := &codecEntry{offchainName: offchainName, onchainName: idlAccount.Name, includeDiscriminator: includeDiscriminator, typeCodec: accCodec, reflectType: accCodec.GetType(), mod: mod}
+	entry := &CodecEntry{offchainName: offchainName, onchainName: idlAccount.Name, includeDiscriminator: includeDiscriminator, typeCodec: accCodec, reflectType: accCodec.GetType(), mod: mod}
 	return entry, nil
 }
 
@@ -58,10 +58,10 @@ func NewInstructionArgsEntry(offChainName string, instructions IdlInstruction, i
 		mod = codec.MultiModifier{}
 	}
 
-	return &codecEntry{offchainName: offChainName, onchainName: instructions.Name, typeCodec: instructionCodecArgs, reflectType: instructionCodecArgs.GetType(), mod: mod}, nil
+	return &CodecEntry{offchainName: offChainName, onchainName: instructions.Name, typeCodec: instructionCodecArgs, reflectType: instructionCodecArgs.GetType(), mod: mod}, nil
 }
 
-type codecEntry struct {
+type CodecEntry struct {
 	// TODO this might not be needed in the end, it was handy to make tests simpler
 	offchainName         string
 	onchainName          string
@@ -71,15 +71,15 @@ type codecEntry struct {
 	includeDiscriminator bool
 }
 
-func (entry *codecEntry) GetType() reflect.Type {
+func (entry *CodecEntry) GetType() reflect.Type {
 	return entry.reflectType
 }
 
-func (entry *codecEntry) GetCodecType() commonencodings.TypeCodec {
+func (entry *CodecEntry) GetCodecType() commonencodings.TypeCodec {
 	return entry.typeCodec
 }
 
-func (entry *codecEntry) Encode(value any, into []byte) ([]byte, error) {
+func (entry *CodecEntry) Encode(value any, into []byte) ([]byte, error) {
 	// handle nil encoding for empty struct as an empty byte slice
 	t := entry.reflectType
 	if value == nil && t.Kind() == reflect.Pointer {
@@ -111,13 +111,13 @@ func (entry *codecEntry) Encode(value any, into []byte) ([]byte, error) {
 	return encodedVal, nil
 }
 
-func (entry *codecEntry) Decode(encoded []byte) (any, []byte, error) {
+func (entry *CodecEntry) Decode(encoded []byte) (any, []byte, error) {
 	if entry.includeDiscriminator {
 		encoded = encoded[discriminatorLength:]
 	}
 	return entry.typeCodec.Decode(encoded)
 }
 
-func (entry *codecEntry) Modifier() codec.Modifier {
+func (entry *CodecEntry) Modifier() codec.Modifier {
 	return entry.mod
 }
