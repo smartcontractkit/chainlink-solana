@@ -91,7 +91,7 @@ func (entry *CodecEntry) Encode(value any, into []byte) ([]byte, error) {
 				return []byte{}, nil
 			}
 		}
-		return nil, fmt.Errorf("%w: cannot encode nil value for %s", commontypes.ErrInvalidType, entry.offchainName)
+		return nil, fmt.Errorf("%w: cannot encode nil value for offchainName: %q, onchainName: %q", commontypes.ErrInvalidType, entry.offchainName, entry.onchainName)
 	}
 
 	encodedVal, err := entry.typeCodec.Encode(value, into)
@@ -115,7 +115,7 @@ func (entry *CodecEntry) Encode(value any, into []byte) ([]byte, error) {
 func (entry *CodecEntry) Decode(encoded []byte) (any, []byte, error) {
 	if entry.includeDiscriminator {
 		if len(encoded) < discriminatorLength {
-			return nil, nil, fmt.Errorf("%w: encoded data too short to contain discriminator for %s", commontypes.ErrInvalidType, entry.offchainName)
+			return nil, nil, fmt.Errorf("%w: encoded data too short to contain discriminator for offchainName: %q, onchainName: %q", commontypes.ErrInvalidType, entry.offchainName, entry.onchainName)
 		}
 		encoded = encoded[discriminatorLength:]
 	}

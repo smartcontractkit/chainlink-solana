@@ -37,7 +37,7 @@ import (
 
 const (
 	DefaultHashBitLength = 32
-	unknownIDLFormat     = "%w: unknown IDL type def %s"
+	unknownIDLFormat     = "%w: unknown IDL type def %q"
 )
 
 // BigIntHook allows *big.Int to be represented as any integer type or a string and to go back to them.
@@ -106,12 +106,12 @@ func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
 			}
 
 			if account == nil {
-				return nil, fmt.Errorf("failed to find account %s in IDL", cfg.OnChainName)
+				return nil, fmt.Errorf("failed to find account %q in IDL for offchainName %q", cfg.OnChainName, offChainName)
 			}
 
 			cEntry, err = NewAccountEntry(offChainName, *account, idl.Types, true, mod, binary.LittleEndian())
 			if err != nil {
-				return nil, fmt.Errorf("failed to create %s codec entry: %w", offChainName, err)
+				return nil, fmt.Errorf("failed to create %q codec entry: %w", offChainName, err)
 			}
 		case ChainConfigTypeInstructionDef:
 			var instruction *IdlInstruction
@@ -123,17 +123,17 @@ func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
 			}
 
 			if instruction == nil {
-				return nil, fmt.Errorf("failed to find instruction %s in IDL", cfg.OnChainName)
+				return nil, fmt.Errorf("failed to find instruction %q in IDL for offChainName %q", cfg.OnChainName, offChainName)
 			}
 
 			cEntry, err = NewInstructionArgsEntry(offChainName, *instruction, idl.Types, mod, binary.LittleEndian())
 			if err != nil {
-				return nil, fmt.Errorf("failed to create %s codec entry: %w", offChainName, err)
+				return nil, fmt.Errorf("failed to create %q codec entry: %w", offChainName, err)
 			}
 		case ChainConfigTypeEventDef:
-			return nil, fmt.Errorf("TODO, unimplemented type: %s", cfg.Type)
+			return nil, fmt.Errorf("TODO, unimplemented type: %q", cfg.Type)
 		default:
-			return nil, fmt.Errorf("unknown type: %s", cfg.Type)
+			return nil, fmt.Errorf("unknown type: %q", cfg.Type)
 		}
 
 		parsed.EncoderDefs[offChainName] = cEntry
@@ -318,14 +318,14 @@ func asDefined(parentTypeName string, definedName *IdlTypeDefined, refs *codecRe
 
 	// nextDef should not have a dependency on definedName
 	if !validDependency(refs, parentTypeName, definedName.Defined) {
-		return nil, fmt.Errorf("%w: circular dependency detected on %s -> %s relation", commontypes.ErrInvalidConfig, parentTypeName, definedName.Defined)
+		return nil, fmt.Errorf("%w: circular dependency detected on %q -> %q relation", commontypes.ErrInvalidConfig, parentTypeName, definedName.Defined)
 	}
 
 	// codec by defined type doesn't exist
 	// process it using the provided typeDefs
 	nextDef := refs.typeDefs.GetByName(definedName.Defined)
 	if nextDef == nil {
-		return nil, fmt.Errorf("%w: IDL type does not exist for name %s", commontypes.ErrInvalidConfig, definedName.Defined)
+		return nil, fmt.Errorf("%w: IDL type does not exist for name %q", commontypes.ErrInvalidConfig, definedName.Defined)
 	}
 
 	saveDependency(refs, parentTypeName, definedName.Defined)
