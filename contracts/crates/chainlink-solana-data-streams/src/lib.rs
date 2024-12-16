@@ -53,6 +53,7 @@ impl VerifierInstructions {
         report_config_account: &Pubkey,
         signed_report: Vec<u8>,
     ) -> Instruction {
+
         let accounts = vec![
             AccountMeta::new_readonly(*verifier_account, false),
             AccountMeta::new_readonly(*access_controller_account, false),
