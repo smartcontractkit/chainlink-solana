@@ -21,8 +21,8 @@ func (t *testErrEncodeEntry) Encode(_ interface{}, _ []byte) ([]byte, error) {
 	return nil, fmt.Errorf("encode error")
 }
 
-func (t *testErrEncodeEntry) GetCodecType() commonencodings.TypeCodec {
-	return commonencodings.Empty{}
+func (e *testErrEncodeEntry) GetType() reflect.Type {
+	return commonencodings.Empty{}.GetType()
 }
 
 type testErrEncodeTypeEntry struct {
@@ -42,7 +42,7 @@ func TestEncoder_Encode_Errors(t *testing.T) {
 		_, err := e.Encode(tests.Context(t), nil, "non-existent-type")
 		require.Error(t, err)
 		require.ErrorIs(t, err, commontypes.ErrInvalidType)
-		require.Contains(t, err.Error(), "cannot find definition for non-existent-type")
+		require.Contains(t, err.Error(), "cannot find type non-existent-type")
 	})
 
 	t.Run("error when convert fails because of unexpected type", func(t *testing.T) {
