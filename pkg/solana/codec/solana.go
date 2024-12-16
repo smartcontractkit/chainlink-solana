@@ -1,5 +1,5 @@
 /*
-Package solanacodec provides functions to create a codec from an Anchor IDL. All Anchor primitives map to the following native
+Package codec provides functions to create a codec from an Anchor IDL. All Anchor primitives map to the following native
 Go values:
 
 bool -> bool
@@ -17,7 +17,7 @@ supported at this time.
 
 Modifiers can be provided to assist in modifying property names, adding properties, etc.
 */
-package solanacodec
+package codec
 
 import (
 	"encoding/json"

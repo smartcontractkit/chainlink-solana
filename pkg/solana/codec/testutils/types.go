@@ -11,7 +11,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/solanacodec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
 var (
@@ -117,7 +117,7 @@ var nilTypeJSONIDL string
 type CodecDef struct {
 	IDL         string
 	IDLTypeName string
-	ItemType    solanacodec.ChainConfigType
+	ItemType    codec.ChainConfigType
 }
 
 // CodecDefs key is codec offchain type name
@@ -125,32 +125,32 @@ var CodecDefs = map[string]CodecDef{
 	TestItemType: {
 		IDL:         itemTypeJSONIDL,
 		IDLTypeName: TestItemType,
-		ItemType:    solanacodec.ChainConfigTypeAccountDef,
+		ItemType:    codec.ChainConfigTypeAccountDef,
 	},
 	TestItemSliceType: {
 		IDL:         itemSliceTypeJSONIDL,
 		IDLTypeName: TestItemSliceType,
-		ItemType:    solanacodec.ChainConfigTypeInstructionDef,
+		ItemType:    codec.ChainConfigTypeInstructionDef,
 	},
 	TestItemArray1Type: {
 		IDL:         itemArray1TypeJSONIDL,
 		IDLTypeName: TestItemArray1Type,
-		ItemType:    solanacodec.ChainConfigTypeInstructionDef,
+		ItemType:    codec.ChainConfigTypeInstructionDef,
 	},
 	TestItemArray2Type: {
 		IDL:         itemArray2TypeJSONIDL,
 		IDLTypeName: TestItemArray2Type,
-		ItemType:    solanacodec.ChainConfigTypeInstructionDef,
+		ItemType:    codec.ChainConfigTypeInstructionDef,
 	},
 	TestItemWithConfigExtraType: {
 		IDL:         itemTypeJSONIDL,
 		IDLTypeName: TestItemType,
-		ItemType:    solanacodec.ChainConfigTypeAccountDef,
+		ItemType:    codec.ChainConfigTypeAccountDef,
 	},
 	NilType: {
 		IDL:         nilTypeJSONIDL,
 		IDLTypeName: NilType,
-		ItemType:    solanacodec.ChainConfigTypeAccountDef,
+		ItemType:    codec.ChainConfigTypeAccountDef,
 	},
 }
 

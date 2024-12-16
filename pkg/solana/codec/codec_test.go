@@ -1,4 +1,4 @@
-package solanacodec_test
+package codec_test
 
 import (
 	"bytes"
@@ -15,8 +15,8 @@ import (
 	looptestutils "github.com/smartcontractkit/chainlink-common/pkg/loop/testutils"
 	clcommontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/solanacodec"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/solanacodec/testutils"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
 )
 
 const anyExtraValue = 3
@@ -83,7 +83,7 @@ func encodeFieldsOnSliceOrArray(t *testing.T, request *EncodeRequest) []byte {
 }
 
 func (it *codecInterfaceTester) GetCodec(t *testing.T) clcommontypes.Codec {
-	codecConfig := solanacodec.Config{Configs: map[string]solanacodec.ChainConfig{}}
+	codecConfig := codec.Config{Configs: map[string]codec.ChainConfig{}}
 	TestItem := CreateTestStruct[*testing.T](0, it)
 	for offChainName, v := range testutils.CodecDefs {
 		codecEntryCfg := codecConfig.Configs[offChainName]
@@ -101,7 +101,7 @@ func (it *codecInterfaceTester) GetCodec(t *testing.T) clcommontypes.Codec {
 		if slices.Contains([]string{testutils.TestItemType, testutils.TestItemSliceType, testutils.TestItemArray1Type, testutils.TestItemArray2Type, testutils.TestItemWithConfigExtraType}, offChainName) {
 			addressByteModifier := &commoncodec.AddressBytesToStringModifierConfig{
 				Fields:   []string{"AccountStruct.AccountStr"},
-				Modifier: solanacodec.SolanaAddressModifier{},
+				Modifier: codec.SolanaAddressModifier{},
 			}
 			codecEntryCfg.ModifierConfigs = append(codecEntryCfg.ModifierConfigs, addressByteModifier)
 		}
@@ -119,7 +119,7 @@ func (it *codecInterfaceTester) GetCodec(t *testing.T) clcommontypes.Codec {
 		codecConfig.Configs[offChainName] = codecEntryCfg
 	}
 
-	c, err := solanacodec.NewCodec(codecConfig)
+	c, err := codec.NewCodec(codecConfig)
 	require.NoError(t, err)
 
 	return c

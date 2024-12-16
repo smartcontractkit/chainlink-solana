@@ -1,4 +1,4 @@
-package solanacodec_test
+package codec
 
 import (
 	"fmt"
@@ -10,12 +10,10 @@ import (
 	commonencodings "github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/solanacodec"
 )
 
 type testErrEncodeEntry struct {
-	solanacodec.CodecEntry
+	entry
 	codecType commonencodings.TypeCodec
 }
 
@@ -28,7 +26,7 @@ func (t *testErrEncodeEntry) GetCodecType() commonencodings.TypeCodec {
 }
 
 type testErrEncodeTypeEntry struct {
-	solanacodec.CodecEntry
+	entry
 	tCodec commonencodings.TypeCodec
 }
 
@@ -40,7 +38,7 @@ func TestEncoder_Encode_Errors(t *testing.T) {
 	someType := "some-type"
 
 	t.Run("error when item type not found", func(t *testing.T) {
-		e := &solanacodec.Encoder{Definitions: map[string]solanacodec.Entry{}}
+		e := &Encoder{definitions: map[string]Entry{}}
 		_, err := e.Encode(tests.Context(t), nil, "non-existent-type")
 		require.Error(t, err)
 		require.ErrorIs(t, err, commontypes.ErrInvalidType)
@@ -48,8 +46,8 @@ func TestEncoder_Encode_Errors(t *testing.T) {
 	})
 
 	t.Run("error when convert fails because of unexpected type", func(t *testing.T) {
-		e := &solanacodec.Encoder{
-			Definitions: map[string]solanacodec.Entry{
+		e := &Encoder{
+			definitions: map[string]Entry{
 				someType: &testErrEncodeEntry{},
 			},
 		}
@@ -58,8 +56,8 @@ func TestEncoder_Encode_Errors(t *testing.T) {
 	})
 
 	t.Run("error when entry encode fails", func(t *testing.T) {
-		e := &solanacodec.Encoder{
-			Definitions: map[string]solanacodec.Entry{
+		e := &Encoder{
+			definitions: map[string]Entry{
 				someType: &testErrEncodeEntry{codecType: commonencodings.Empty{}},
 			},
 		}
@@ -83,7 +81,7 @@ func (t testErrGetSize) Size(_ int) (int, error) {
 
 func TestEncoder_GetMaxEncodingSize_Errors(t *testing.T) {
 	t.Run("error when entry for item type is missing", func(t *testing.T) {
-		e := &solanacodec.Encoder{Definitions: map[string]solanacodec.Entry{}}
+		e := &Encoder{definitions: map[string]Entry{}}
 		_, err := e.GetMaxEncodingSize(tests.Context(t), 10, "no-entry-type")
 		require.Error(t, err)
 		require.ErrorIs(t, err, commontypes.ErrInvalidType)
@@ -92,8 +90,8 @@ func TestEncoder_GetMaxEncodingSize_Errors(t *testing.T) {
 
 	t.Run("error when size calculation fails", func(t *testing.T) {
 		someType := "some-type"
-		e := &solanacodec.Encoder{
-			Definitions: map[string]solanacodec.Entry{
+		e := &Encoder{
+			definitions: map[string]Entry{
 				someType: &testErrEncodeTypeEntry{tCodec: testErrGetSize{}},
 			},
 		}

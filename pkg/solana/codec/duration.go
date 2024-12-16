@@ -1,4 +1,4 @@
-package solanacodec
+package codec
 
 import (
 	"fmt"

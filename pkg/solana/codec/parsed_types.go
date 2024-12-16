@@ -1,4 +1,4 @@
-package solanacodec
+package codec
 
 import (
 	"fmt"
@@ -27,14 +27,14 @@ func (parsed *ParsedTypes) ToCodec() (commontypes.RemoteCodec, error) {
 		return nil, err
 	}
 	underlying := &solanaCodec{
-		Encoder:     &Encoder{Definitions: parsed.EncoderDefs},
-		Decoder:     &Decoder{Definitions: parsed.DecoderDefs},
+		Encoder:     &Encoder{definitions: parsed.EncoderDefs},
+		Decoder:     &Decoder{definitions: parsed.DecoderDefs},
 		ParsedTypes: parsed,
 	}
 	return commoncodec.NewModifierCodec(underlying, mod, DecoderHooks...)
 }
 
-// AddEntries extracts the mods from CodecEntry and adds them to modByTypeName use with codec.NewByItemTypeModifier
+// AddEntries extracts the mods from entry and adds them to modByTypeName use with codec.NewByItemTypeModifier
 // Since each input/output can have its own modifications, we need to keep track of them by type name
 func AddEntries(defs map[string]Entry, modByTypeName map[string]commoncodec.Modifier) error {
 	for k, def := range defs {

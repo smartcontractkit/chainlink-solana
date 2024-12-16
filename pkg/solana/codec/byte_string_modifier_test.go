@@ -1,4 +1,4 @@
-package solanacodec_test
+package codec_test
 
 import (
 	"testing"
@@ -9,11 +9,11 @@ import (
 
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/solanacodec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
 func TestSolanaAddressModifier(t *testing.T) {
-	modifier := solanacodec.SolanaAddressModifier{}
+	modifier := codec.SolanaAddressModifier{}
 
 	// Valid Solana address (32 bytes, Base58 encoded)
 	validAddressStr := "9nQhQ7iCyY5SgAX2Zm4DtxNh9Ubc4vbiLkiYbX43SDXY"

@@ -1,4 +1,4 @@
-package solanacodec_test
+package codec_test
 
 import (
 	"encoding/json"
@@ -11,8 +11,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/solanacodec"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/solanacodec/testutils"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
 )
 
 func TestNewIDLAccountCodec(t *testing.T) {
@@ -60,21 +60,21 @@ func TestNewIDLDefinedTypesCodecCodec(t *testing.T) {
 func TestNewIDLCodec_CircularDependency(t *testing.T) {
 	t.Parallel()
 
-	var idl solanacodec.IDL
+	var idl codec.IDL
 	if err := json.Unmarshal([]byte(testutils.CircularDepIDL), &idl); err != nil {
 		t.Logf("failed to unmarshal test IDL: %s", err.Error())
 		t.FailNow()
 	}
 
-	_, err := solanacodec.NewIDLAccountCodec(idl, binary.LittleEndian())
+	_, err := codec.NewIDLAccountCodec(idl, binary.LittleEndian())
 
 	assert.ErrorIs(t, err, types.ErrInvalidConfig)
 }
 
-func newTestIDLAndCodec(t *testing.T, account bool) (string, solanacodec.IDL, types.RemoteCodec) {
+func newTestIDLAndCodec(t *testing.T, account bool) (string, codec.IDL, types.RemoteCodec) {
 	t.Helper()
 
-	var idl solanacodec.IDL
+	var idl codec.IDL
 	if err := json.Unmarshal([]byte(testutils.JSONIDLWithAllTypes), &idl); err != nil {
 		t.Logf("failed to unmarshal test IDL: %s", err.Error())
 		t.FailNow()
@@ -83,9 +83,9 @@ func newTestIDLAndCodec(t *testing.T, account bool) (string, solanacodec.IDL, ty
 	var entry types.RemoteCodec
 	var err error
 	if account {
-		entry, err = solanacodec.NewIDLAccountCodec(idl, binary.LittleEndian())
+		entry, err = codec.NewIDLAccountCodec(idl, binary.LittleEndian())
 	} else {
-		entry, err = solanacodec.NewIDLDefinedTypesCodec(idl, binary.LittleEndian())
+		entry, err = codec.NewIDLDefinedTypesCodec(idl, binary.LittleEndian())
 	}
 
 	if err != nil {

@@ -1,4 +1,4 @@
-package solanacodec
+package codec
 
 import (
 	"fmt"
@@ -15,6 +15,8 @@ type Entry interface {
 	GetCodecType() commonencodings.TypeCodec
 	GetType() reflect.Type
 	Modifier() codec.Modifier
+	Size(numItems int) (int, error)
+	FixedSize() (int, error)
 }
 
 func NewAccountEntry(offchainName string, idlAccount IdlTypeDef, idlTypes IdlTypeDefSlice, includeDiscriminator bool, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
@@ -30,15 +32,14 @@ func NewAccountEntry(offchainName string, idlAccount IdlTypeDef, idlTypes IdlTyp
 		return nil, err
 	}
 
-	entry := &CodecEntry{
+	return &entry{
 		offchainName:         offchainName,
 		onchainName:          idlAccount.Name,
 		includeDiscriminator: includeDiscriminator,
 		typeCodec:            accCodec,
 		reflectType:          accCodec.GetType(),
 		mod:                  ensureModifier(mod),
-	}
-	return entry, nil
+	}, nil
 }
 
 func NewInstructionArgsEntry(offChainName string, instructions IdlInstruction, idlTypes IdlTypeDefSlice, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
@@ -54,7 +55,7 @@ func NewInstructionArgsEntry(offChainName string, instructions IdlInstruction, i
 		return nil, err
 	}
 
-	return &CodecEntry{
+	return &entry{
 		offchainName: offChainName,
 		onchainName:  instructions.Name,
 		typeCodec:    instructionCodecArgs,
@@ -63,7 +64,7 @@ func NewInstructionArgsEntry(offChainName string, instructions IdlInstruction, i
 	}, nil
 }
 
-type CodecEntry struct {
+type entry struct {
 	// TODO this might not be needed in the end, it was handy to make tests simpler
 	offchainName         string
 	onchainName          string
@@ -73,17 +74,17 @@ type CodecEntry struct {
 	includeDiscriminator bool
 }
 
-func (entry *CodecEntry) GetType() reflect.Type {
-	return entry.reflectType
+func (e *entry) GetType() reflect.Type {
+	return e.reflectType
 }
 
-func (entry *CodecEntry) GetCodecType() commonencodings.TypeCodec {
-	return entry.typeCodec
+func (e *entry) GetCodecType() commonencodings.TypeCodec {
+	return e.typeCodec
 }
 
-func (entry *CodecEntry) Encode(value any, into []byte) ([]byte, error) {
+func (e *entry) Encode(value any, into []byte) ([]byte, error) {
 	// Special handling for encoding a nil pointer to an empty struct.
-	t := entry.reflectType
+	t := e.reflectType
 	if value == nil {
 		if t.Kind() == reflect.Pointer {
 			elem := t.Elem()
@@ -91,17 +92,17 @@ func (entry *CodecEntry) Encode(value any, into []byte) ([]byte, error) {
 				return []byte{}, nil
 			}
 		}
-		return nil, fmt.Errorf("%w: cannot encode nil value for offchainName: %q, onchainName: %q", commontypes.ErrInvalidType, entry.offchainName, entry.onchainName)
+		return nil, fmt.Errorf("%w: cannot encode nil value for offchainName: %q, onchainName: %q", commontypes.ErrInvalidType, e.offchainName, e.onchainName)
 	}
 
-	encodedVal, err := entry.typeCodec.Encode(value, into)
+	encodedVal, err := e.typeCodec.Encode(value, into)
 	if err != nil {
 		return nil, err
 	}
 
-	if entry.includeDiscriminator {
+	if e.includeDiscriminator {
 		var byt []byte
-		disc := NewDiscriminator(entry.onchainName)
+		disc := NewDiscriminator(e.onchainName)
 		encodedDisc, err := disc.Encode(&disc.hashPrefix, byt)
 		if err != nil {
 			return nil, err
@@ -112,18 +113,18 @@ func (entry *CodecEntry) Encode(value any, into []byte) ([]byte, error) {
 	return encodedVal, nil
 }
 
-func (entry *CodecEntry) Decode(encoded []byte) (any, []byte, error) {
-	if entry.includeDiscriminator {
+func (e *entry) Decode(encoded []byte) (any, []byte, error) {
+	if e.includeDiscriminator {
 		if len(encoded) < discriminatorLength {
-			return nil, nil, fmt.Errorf("%w: encoded data too short to contain discriminator for offchainName: %q, onchainName: %q", commontypes.ErrInvalidType, entry.offchainName, entry.onchainName)
+			return nil, nil, fmt.Errorf("%w: encoded data too short to contain discriminator for offchainName: %q, onchainName: %q", commontypes.ErrInvalidType, e.offchainName, e.onchainName)
 		}
 		encoded = encoded[discriminatorLength:]
 	}
-	return entry.typeCodec.Decode(encoded)
+	return e.typeCodec.Decode(encoded)
 }
 
-func (entry *CodecEntry) Modifier() codec.Modifier {
-	return entry.mod
+func (e *entry) Modifier() codec.Modifier {
+	return e.mod
 }
 
 func ensureModifier(mod codec.Modifier) codec.Modifier {
@@ -131,4 +132,12 @@ func ensureModifier(mod codec.Modifier) codec.Modifier {
 		return codec.MultiModifier{}
 	}
 	return mod
+}
+
+func (e *entry) Size(numItems int) (int, error) {
+	return e.typeCodec.Size(numItems)
+}
+
+func (e *entry) FixedSize() (int, error) {
+	return e.typeCodec.FixedSize()
 }
