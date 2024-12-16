@@ -17,7 +17,7 @@ supported at this time.
 
 Modifiers can be provided to assist in modifying property names, adding properties, etc.
 */
-package codec
+package solanacodec
 
 import (
 	"encoding/json"
@@ -102,9 +102,9 @@ func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
 		switch cfg.Type {
 		case ChainConfigTypeAccountDef:
 			var account *IdlTypeDef
-			for _, acc := range idl.Accounts {
-				if acc.Name == cfg.OnChainName {
-					account = &acc
+			for i := range idl.Accounts {
+				if idl.Accounts[i].Name == cfg.OnChainName {
+					account = &idl.Accounts[i]
 					break
 				}
 			}
@@ -119,9 +119,9 @@ func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
 			}
 		case ChainConfigTypeInstructionDef:
 			var instruction *IdlInstruction
-			for _, ins := range idl.Instructions {
-				if ins.Name == onChainName {
-					instruction = &ins
+			for i := range idl.Instructions {
+				if idl.Instructions[i].Name == onChainName {
+					instruction = &idl.Instructions[i]
 					break
 				}
 			}

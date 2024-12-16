@@ -31,9 +31,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/solanacodec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/solanacodec/testutils"
 )
 
 const (
@@ -269,16 +269,16 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 	})
 }
 
-func newTestIDLAndCodec(t *testing.T) (string, codec.IDL, types.RemoteCodec) {
+func newTestIDLAndCodec(t *testing.T) (string, solanacodec.IDL, types.RemoteCodec) {
 	t.Helper()
 
-	var idl codec.IDL
+	var idl solanacodec.IDL
 	if err := json.Unmarshal([]byte(testutils.JSONIDLWithAllTypes), &idl); err != nil {
 		t.Logf("failed to unmarshal test IDL: %s", err.Error())
 		t.FailNow()
 	}
 
-	entry, err := codec.NewIDLAccountCodec(idl, binary.LittleEndian())
+	entry, err := solanacodec.NewIDLAccountCodec(idl, binary.LittleEndian())
 	if err != nil {
 		t.Logf("failed to create new codec from test IDL: %s", err.Error())
 		t.FailNow()
@@ -763,13 +763,13 @@ func (r *chainReaderInterfaceTester) MaxWaitTimeForEvents() time.Duration {
 func makeTestCodec(t *testing.T, rawIDL string, encoding config.EncodingType) types.RemoteCodec {
 	t.Helper()
 
-	var idl codec.IDL
+	var idl solanacodec.IDL
 	if err := json.Unmarshal([]byte(rawIDL), &idl); err != nil {
 		t.Logf("failed to unmarshal test IDL: %s", err.Error())
 		t.FailNow()
 	}
 
-	testCodec, err := codec.NewIDLAccountCodec(idl, config.BuilderForEncoding(encoding))
+	testCodec, err := solanacodec.NewIDLAccountCodec(idl, config.BuilderForEncoding(encoding))
 	if err != nil {
 		t.Logf("failed to create new codec from test IDL: %s", err.Error())
 		t.FailNow()

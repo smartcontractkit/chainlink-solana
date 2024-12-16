@@ -17,8 +17,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/solanacodec"
 )
 
 const ServiceName = "SolanaChainReader"
@@ -223,12 +223,12 @@ func (s *SolanaChainReaderService) CreateContractType(readIdentifier string, for
 func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainReaderMethods) error {
 	for namespace, methods := range namespaces {
 		for methodName, method := range methods.Methods {
-			var idl codec.IDL
+			var idl solanacodec.IDL
 			if err := json.Unmarshal([]byte(method.AnchorIDL), &idl); err != nil {
 				return err
 			}
 
-			idlCodec, err := codec.NewIDLAccountCodec(idl, config.BuilderForEncoding(method.Encoding))
+			idlCodec, err := solanacodec.NewIDLAccountCodec(idl, config.BuilderForEncoding(method.Encoding))
 			if err != nil {
 				return err
 			}
@@ -239,12 +239,12 @@ func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainReader
 
 			injectAddressModifier(procedure.OutputModifications)
 
-			mod, err := procedure.OutputModifications.ToModifier(codec.DecoderHooks...)
+			mod, err := procedure.OutputModifications.ToModifier(solanacodec.DecoderHooks...)
 			if err != nil {
 				return err
 			}
 
-			codecWithModifiers, err := codec.NewNamedModifierCodec(idlCodec, procedure.IDLAccount, mod)
+			codecWithModifiers, err := solanacodec.NewNamedModifierCodec(idlCodec, procedure.IDLAccount, mod)
 			if err != nil {
 				return err
 			}
@@ -265,7 +265,7 @@ func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainReader
 func injectAddressModifier(outputModifications codeccommon.ModifiersConfig) {
 	for i, modConfig := range outputModifications {
 		if addrModifierConfig, ok := modConfig.(*codeccommon.AddressBytesToStringModifierConfig); ok {
-			addrModifierConfig.Modifier = codec.SolanaAddressModifier{}
+			addrModifierConfig.Modifier = solanacodec.SolanaAddressModifier{}
 			outputModifications[i] = addrModifierConfig
 		}
 	}

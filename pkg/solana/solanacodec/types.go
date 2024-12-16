@@ -1,4 +1,4 @@
-package codec
+package solanacodec
 
 import commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 

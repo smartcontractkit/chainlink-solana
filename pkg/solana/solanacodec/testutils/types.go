@@ -10,7 +10,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/solanacodec"
 )
 
 var (
@@ -116,7 +117,7 @@ var nilTypeJSONIDL string
 type CodecDef struct {
 	IDL         string
 	IDLTypeName string
-	ItemType    codec.ChainConfigType
+	ItemType    solanacodec.ChainConfigType
 }
 
 // CodecDefs key is codec offchain type name
@@ -124,39 +125,39 @@ var CodecDefs = map[string]CodecDef{
 	TestItemType: {
 		IDL:         itemTypeJSONIDL,
 		IDLTypeName: TestItemType,
-		ItemType:    codec.ChainConfigTypeAccountDef,
+		ItemType:    solanacodec.ChainConfigTypeAccountDef,
 	},
 	TestItemSliceType: {
 		IDL:         itemSliceTypeJSONIDL,
 		IDLTypeName: TestItemSliceType,
-		ItemType:    codec.ChainConfigTypeInstructionDef,
+		ItemType:    solanacodec.ChainConfigTypeInstructionDef,
 	},
 	TestItemArray1Type: {
 		IDL:         itemArray1TypeJSONIDL,
 		IDLTypeName: TestItemArray1Type,
-		ItemType:    codec.ChainConfigTypeInstructionDef,
+		ItemType:    solanacodec.ChainConfigTypeInstructionDef,
 	},
 	TestItemArray2Type: {
 		IDL:         itemArray2TypeJSONIDL,
 		IDLTypeName: TestItemArray2Type,
-		ItemType:    codec.ChainConfigTypeInstructionDef,
+		ItemType:    solanacodec.ChainConfigTypeInstructionDef,
 	},
 	TestItemWithConfigExtraType: {
 		IDL:         itemTypeJSONIDL,
 		IDLTypeName: TestItemType,
-		ItemType:    codec.ChainConfigTypeAccountDef,
+		ItemType:    solanacodec.ChainConfigTypeAccountDef,
 	},
 	NilType: {
 		IDL:         nilTypeJSONIDL,
 		IDLTypeName: NilType,
-		ItemType:    codec.ChainConfigTypeAccountDef,
+		ItemType:    solanacodec.ChainConfigTypeAccountDef,
 	},
 }
 
 type TestItemAsAccount struct {
 	Field               int32
-	OracleId            uint8
-	OracleIds           [32]uint8
+	OracleID            uint8
+	OracleIDs           [32]uint8
 	AccountStruct       AccountStruct
 	Accounts            []solana.PublicKey
 	DifferentField      string
@@ -178,13 +179,13 @@ func (obj TestItemAsAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 	if err != nil {
 		return err
 	}
-	// Serialize `OracleId` param:
-	err = encoder.Encode(obj.OracleId)
+	// Serialize `OracleID` param:
+	err = encoder.Encode(obj.OracleID)
 	if err != nil {
 		return err
 	}
-	// Serialize `OracleIds` param:
-	err = encoder.Encode(obj.OracleIds)
+	// Serialize `OracleIDs` param:
+	err = encoder.Encode(obj.OracleIDs)
 	if err != nil {
 		return err
 	}
@@ -221,7 +222,7 @@ func (obj TestItemAsAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 	return nil
 }
 
-func (obj *TestItemAsAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *TestItemAsAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) error {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
@@ -236,17 +237,17 @@ func (obj *TestItemAsAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 		}
 	}
 	// Deserialize `Field`:
-	err = decoder.Decode(&obj.Field)
+	err := decoder.Decode(&obj.Field)
 	if err != nil {
 		return err
 	}
-	// Deserialize `OracleId`:
-	err = decoder.Decode(&obj.OracleId)
+	// Deserialize `OracleID`:
+	err = decoder.Decode(&obj.OracleID)
 	if err != nil {
 		return err
 	}
-	// Deserialize `OracleIds`:
-	err = decoder.Decode(&obj.OracleIds)
+	// Deserialize `OracleIDs`:
+	err = decoder.Decode(&obj.OracleIDs)
 	if err != nil {
 		return err
 	}
@@ -285,8 +286,8 @@ func (obj *TestItemAsAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 
 type TestItemAsArgs struct {
 	Field               int32
-	OracleId            uint8
-	OracleIds           [32]uint8
+	OracleID            uint8
+	OracleIDs           [32]uint8
 	AccountStruct       AccountStruct
 	Accounts            []solana.PublicKey
 	DifferentField      string
@@ -301,13 +302,13 @@ func (obj TestItemAsArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err er
 	if err != nil {
 		return err
 	}
-	// Serialize `OracleId` param:
-	err = encoder.Encode(obj.OracleId)
+	// Serialize `OracleID` param:
+	err = encoder.Encode(obj.OracleID)
 	if err != nil {
 		return err
 	}
-	// Serialize `OracleIds` param:
-	err = encoder.Encode(obj.OracleIds)
+	// Serialize `OracleIDs` param:
+	err = encoder.Encode(obj.OracleIDs)
 	if err != nil {
 		return err
 	}
@@ -350,13 +351,13 @@ func (obj *TestItemAsArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	if err != nil {
 		return err
 	}
-	// Deserialize `OracleId`:
-	err = decoder.Decode(&obj.OracleId)
+	// Deserialize `OracleID`:
+	err = decoder.Decode(&obj.OracleID)
 	if err != nil {
 		return err
 	}
-	// Deserialize `OracleIds`:
-	err = decoder.Decode(&obj.OracleIds)
+	// Deserialize `OracleIDs`:
+	err = decoder.Decode(&obj.OracleIDs)
 	if err != nil {
 		return err
 	}
@@ -561,8 +562,8 @@ func (obj *NestedStatic) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 func EncodeRequestToTestItemAsAccount(testStruct interfacetests.TestStruct) TestItemAsAccount {
 	return TestItemAsAccount{
 		Field:               *testStruct.Field,
-		OracleId:            uint8(testStruct.OracleID),
-		OracleIds:           getOracleIds(testStruct),
+		OracleID:            uint8(testStruct.OracleID),
+		OracleIDs:           getOracleIDs(testStruct),
 		AccountStruct:       getAccountStruct(testStruct),
 		Accounts:            getAccounts(testStruct),
 		DifferentField:      testStruct.DifferentField,
@@ -575,8 +576,8 @@ func EncodeRequestToTestItemAsAccount(testStruct interfacetests.TestStruct) Test
 func EncodeRequestToTestItemAsArgs(testStruct interfacetests.TestStruct) TestItemAsArgs {
 	return TestItemAsArgs{
 		Field:               *testStruct.Field,
-		OracleId:            uint8(testStruct.OracleID),
-		OracleIds:           getOracleIds(testStruct),
+		OracleID:            uint8(testStruct.OracleID),
+		OracleIDs:           getOracleIDs(testStruct),
 		AccountStruct:       getAccountStruct(testStruct),
 		Accounts:            getAccounts(testStruct),
 		DifferentField:      testStruct.DifferentField,
@@ -586,12 +587,12 @@ func EncodeRequestToTestItemAsArgs(testStruct interfacetests.TestStruct) TestIte
 	}
 }
 
-func getOracleIds(testStruct interfacetests.TestStruct) [32]byte {
-	var oracleIds [32]byte
+func getOracleIDs(testStruct interfacetests.TestStruct) [32]byte {
+	var oracleIDs [32]byte
 	for i, v := range testStruct.OracleIDs {
-		oracleIds[i] = byte(v)
+		oracleIDs[i] = byte(v)
 	}
-	return oracleIds
+	return oracleIDs
 }
 
 func getAccountStruct(testStruct interfacetests.TestStruct) AccountStruct {

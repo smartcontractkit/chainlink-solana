@@ -391,7 +391,7 @@ const programPubKey = "6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE"
 func setupTestValidator(t *testing.T, upgradeAuthority string) (string, string) {
 	t.Helper()
 
-	soPath := filepath.Join(utils.ContractsDir, "contract_reader_interface.so")
+	soPath := filepath.Join(utils.ContractsDir, "contracts/programs/contract-reader-interface/src/lib.rs")
 
 	_, err := os.Stat(soPath)
 	if err != nil {

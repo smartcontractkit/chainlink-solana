@@ -1,4 +1,4 @@
-package codec_test
+package solanacodec_test
 
 import (
 	"fmt"
@@ -9,11 +9,12 @@ import (
 	commonencodings "github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/solanacodec"
 )
 
 type testErrDecodeEntry struct {
-	codec.CodecEntry
+	solanacodec.CodecEntry
 }
 
 func (t *testErrDecodeEntry) Decode(_ []byte) (interface{}, []byte, error) {
@@ -21,7 +22,7 @@ func (t *testErrDecodeEntry) Decode(_ []byte) (interface{}, []byte, error) {
 }
 
 type testErrDecodeRemainingBytes struct {
-	codec.CodecEntry
+	solanacodec.CodecEntry
 }
 
 func (t *testErrDecodeRemainingBytes) Decode(_ []byte) (interface{}, []byte, error) {
@@ -32,8 +33,8 @@ func TestDecoder_Decode_Errors(t *testing.T) {
 	var into interface{}
 	someType := "some-type"
 	t.Run("error when item type not found", func(t *testing.T) {
-		d := &codec.Decoder{Definitions: map[string]codec.Entry{}}
-		d.Definitions[someType] = &codec.CodecEntry{}
+		d := &solanacodec.Decoder{Definitions: map[string]solanacodec.Entry{}}
+		d.Definitions[someType] = &solanacodec.CodecEntry{}
 
 		nonExistentType := "non-existent"
 		err := d.Decode(tests.Context(t), []byte{}, &into, nonExistentType)
@@ -41,20 +42,20 @@ func TestDecoder_Decode_Errors(t *testing.T) {
 	})
 
 	t.Run("error when underlying entry decode fails", func(t *testing.T) {
-		d := &codec.Decoder{Definitions: map[string]codec.Entry{}}
+		d := &solanacodec.Decoder{Definitions: map[string]solanacodec.Entry{}}
 		d.Definitions[someType] = &testErrDecodeEntry{}
 		require.Error(t, d.Decode(tests.Context(t), []byte{}, &into, someType))
 	})
 
 	t.Run("error when remaining bytes exist after decode", func(t *testing.T) {
-		d := &codec.Decoder{Definitions: map[string]codec.Entry{}}
+		d := &solanacodec.Decoder{Definitions: map[string]solanacodec.Entry{}}
 		d.Definitions[someType] = &testErrDecodeRemainingBytes{}
 		require.Error(t, d.Decode(tests.Context(t), []byte{}, &into, someType))
 	})
 }
 
 type testErrGetMaxDecodingSize struct {
-	codec.CodecEntry
+	solanacodec.CodecEntry
 }
 
 type testErrGetMaxDecodingSizeCodecType struct {
@@ -73,8 +74,8 @@ func TestDecoder_GetMaxDecodingSize_Errors(t *testing.T) {
 	someType := "some-type"
 
 	t.Run("error when entry for item type is missing", func(t *testing.T) {
-		d := &codec.Decoder{Definitions: map[string]codec.Entry{}}
-		d.Definitions[someType] = &codec.CodecEntry{}
+		d := &solanacodec.Decoder{Definitions: map[string]solanacodec.Entry{}}
+		d.Definitions[someType] = &solanacodec.CodecEntry{}
 
 		nonExistentType := "non-existent"
 		_, err := d.GetMaxDecodingSize(tests.Context(t), 0, nonExistentType)
@@ -82,7 +83,7 @@ func TestDecoder_GetMaxDecodingSize_Errors(t *testing.T) {
 	})
 
 	t.Run("error when underlying entry decode fails", func(t *testing.T) {
-		d := &codec.Decoder{Definitions: map[string]codec.Entry{}}
+		d := &solanacodec.Decoder{Definitions: map[string]solanacodec.Entry{}}
 		d.Definitions[someType] = &testErrGetMaxDecodingSize{}
 
 		_, err := d.GetMaxDecodingSize(tests.Context(t), 0, someType)
