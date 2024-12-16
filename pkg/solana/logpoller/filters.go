@@ -2,6 +2,7 @@ package logpoller
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"iter"
@@ -9,20 +10,29 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/utils"
 )
 
 type filters struct {
 	orm  ORM
 	lggr logger.SugaredLogger
 
-	filtersByID       map[int64]*Filter
-	filtersByName     map[string]int64
-	filtersByAddress  map[PublicKey]map[EventSignature]map[int64]struct{}
-	filtersToBackfill map[int64]struct{}
-	filtersToDelete   map[int64]Filter
-	filtersMutex      sync.RWMutex
-	loadedFilters     atomic.Bool
+	filtersByID         map[int64]*Filter
+	filtersByName       map[string]int64
+	filtersByAddress    map[PublicKey]map[EventSignature]map[int64]struct{}
+	filtersToBackfill   map[int64]struct{}
+	filtersToDelete     map[int64]Filter
+	filtersMutex        sync.RWMutex
+	loadedFilters       atomic.Bool
+	eventCodecs         map[int64]types.RemoteCodec
+	knownPrograms       map[string]uint // fast lookup to see if a base58-encoded ProgramID matches any registered filters
+	knownDiscriminators map[string]uint // fast lookup by first 10 characters (60-bits) of a base64-encoded discriminator
 }
 
 func newFilters(lggr logger.SugaredLogger, orm ORM) *filters {
@@ -76,6 +86,13 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 		return fmt.Errorf("failed to load filters: %w", err)
 	}
 
+	eventCodec, err := codec.NewIDLEventCodec(filter.EventIDL, config.BuilderForEncoding(config.EncodingTypeBorsh))
+	if err != nil {
+		return fmt.Errorf("invalid event IDL for filter %s: %w", filter.Name, err)
+	}
+
+	filter.EventSig = utils.Discriminator("event", filter.EventName)
+
 	fl.filtersMutex.Lock()
 	defer fl.filtersMutex.Unlock()
 
@@ -118,6 +135,23 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 	if !filter.IsBackfilled {
 		fl.filtersToBackfill[filter.ID] = struct{}{}
 	}
+
+	fl.eventCodecs[filter.ID] = eventCodec
+
+	programID := filter.Address.ToSolana().String()
+	if _, ok := fl.knownPrograms[programID]; !ok {
+		fl.knownPrograms[programID] = 1
+	} else {
+		fl.knownPrograms[programID]++
+	}
+
+	discriminator := base64.StdEncoding.EncodeToString(filter.EventSig[:])[:10]
+	if _, ok := fl.knownPrograms[programID]; !ok {
+		fl.knownDiscriminators[discriminator] = 1
+	} else {
+		fl.knownDiscriminators[discriminator]++
+	}
+
 	return nil
 }
 
@@ -180,6 +214,26 @@ func (fl *filters) removeFilterFromIndexes(filter Filter) {
 	if len(filtersForAddress) == 0 {
 		delete(fl.filtersByAddress, filter.Address)
 	}
+
+	programID := filter.Address.ToSolana().String()
+	if refcount, ok := fl.knownPrograms[programID]; ok {
+		refcount--
+		if refcount > 0 {
+			fl.knownPrograms[programID] = refcount
+		} else {
+			delete(fl.knownPrograms, programID)
+		}
+	}
+
+	discriminator := base64.StdEncoding.EncodeToString(filter.EventSig[:])[:10]
+	if refcount, ok := fl.knownDiscriminators[discriminator]; ok {
+		refcount--
+		if refcount > 0 {
+			fl.knownDiscriminators[discriminator] = refcount
+		} else {
+			delete(fl.knownDiscriminators, discriminator)
+		}
+	}
 }
 
 // MatchingFilters - returns iterator to go through all matching filters.
@@ -208,6 +262,42 @@ func (fl *filters) MatchingFilters(addr PublicKey, eventSignature EventSignature
 			}
 		}
 	}
+}
+
+func (fl *filters) EventCodec(ID int64) types.RemoteCodec {
+	return fl.eventCodecs[ID]
+}
+
+// MatchchingFiltersForEncodedEvent - similar to MatchingFilters but accepts a raw encoded event. Under normal operation,
+// this will be called on every new event that happens on the blockchain, so it's important it returns immediately if it
+// doesn't match any registered filters.
+func (fl *filters) MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[Filter] {
+	if _, ok := fl.knownPrograms[event.Program]; !ok {
+		return nil
+	}
+
+	// The first 64-bits of the event data is the event sig. Because it's base64 encoded, this corresponds to
+	// the first 10 characters plus 4 bits of the 11th character. We can quickly rule it out as not matching any known
+	// discriminators if the first 10 characters don't match. If it passes that initial test, we base64-decode the
+	// first 11 characters, and use the first 8 bytes of that as the event sig to call MatchingFilters. The address
+	// also needs to be base58-decoded to pass to MatchingFilters
+	if _, ok := fl.knownDiscriminators[event.Data[:10]]; !ok {
+		return nil
+	}
+
+	addr, err := solana.PublicKeyFromBase58(event.Program)
+	if err != nil {
+		fl.lggr.Errorw("failed to parse Program ID for event", "EventProgram", event)
+		return nil
+	}
+	decoded, err := base64.StdEncoding.DecodeString(event.Data[:11])
+	if err != nil {
+		fl.lggr.Errorw("failed to decode event data", "EventProgram", event)
+		return nil
+	}
+	eventSig := EventSignature(decoded[:8])
+
+	return fl.MatchingFilters(PublicKey(addr), eventSig)
 }
 
 // GetFiltersToBackfill - returns copy of backfill queue

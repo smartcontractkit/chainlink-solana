@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/lib/pq"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
 type Filter struct {
@@ -13,7 +15,7 @@ type Filter struct {
 	EventName     string
 	EventSig      EventSignature
 	StartingBlock int64
-	EventIDL      string
+	EventIDL      codec.IDL
 	SubkeyPaths   SubkeyPaths
 	Retention     time.Duration
 	MaxLogsKept   int64

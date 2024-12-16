@@ -2,11 +2,17 @@ package logpoller
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
+	"fmt"
+	"math"
+	"reflect"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
@@ -17,11 +23,13 @@ var (
 )
 
 type ORM interface {
+	ChainID() string
 	InsertFilter(ctx context.Context, filter Filter) (id int64, err error)
 	SelectFilters(ctx context.Context) ([]Filter, error)
 	DeleteFilters(ctx context.Context, filters map[int64]Filter) error
 	MarkFilterDeleted(ctx context.Context, id int64) (err error)
 	MarkFilterBackfilled(ctx context.Context, id int64) (err error)
+	InsertLogs(context.Context, []Log) (err error)
 }
 
 type ILogPoller interface {
@@ -40,8 +48,12 @@ type LogPoller struct {
 	client    internal.Loader[client.Reader]
 	collector *EncodedLogCollector
 
-	filters *filters
-	events  []ProgramEvent
+	filters             *filters
+	discriminatorLookup map[string]string
+	events              []ProgramEvent
+	codec               commontypes.RemoteCodec
+
+	chStop services.StopChan
 }
 
 func New(lggr logger.SugaredLogger, orm ORM, cl internal.Loader[client.Reader]) ILogPoller {
@@ -72,10 +84,74 @@ func (lp *LogPoller) start(context.Context) error {
 	return nil
 }
 
-func (lp *LogPoller) Process(event ProgramEvent) error {
-	// process stream of events coming from event loader
-	lp.events = append(lp.events, event)
+func makeLogIndex(txIndex int, txLogIndex uint) int64 {
+	if txIndex < 0 || txIndex > math.MaxUint32 || txLogIndex > math.MaxUint32 {
+		panic(fmt.Sprintf("txIndex or txLogIndex out of range: txIndex=%d, txLogIndex=%d", txIndex, txLogIndex))
+	}
+	return int64(math.MaxUint32*uint32(txIndex) + uint32(txLogIndex))
+}
+
+// Process - process stream of events coming from log ingester
+func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
+	ctx, cancel := utils.ContextFromChan(lp.chStop)
+	defer cancel()
+
+	blockData := programEvent.BlockData
+
+	var logs []Log
+	for filter := range lp.filters.MatchingFiltersForEncodedEvent(programEvent) {
+		log := Log{
+			FilterID:       filter.ID,
+			ChainID:        lp.orm.ChainID(),
+			LogIndex:       makeLogIndex(blockData.TransactionIndex, blockData.TransactionLogIndex),
+			BlockHash:      Hash(blockData.BlockHash),
+			BlockNumber:    int64(blockData.BlockHeight),
+			BlockTimestamp: blockData.BlockTime.Time(), // TODO: is this a timezone safe conversion?
+			Address:        filter.Address,
+			EventSig:       filter.EventSig,
+			TxHash:         Signature(blockData.TransactionHash),
+		}
+
+		log.Data, err = base64.StdEncoding.DecodeString(programEvent.Data)
+		if err != nil {
+			return err
+		}
+
+		var event any
+		err = lp.filters.EventCodec(filter.ID).Decode(ctx, log.Data, &event, filter.EventName)
+		if err != nil {
+			return err
+		}
+
+		err = lp.ExtractSubkeys(reflect.TypeOf(event), filter.SubkeyPaths)
+		if err != nil {
+			return err
+		}
+
+		// TODO: fill in, and keep track of SequenceNumber for each filter. (Initialize from db on LoadFilters, then increment each time?)
+
+		logs = append(logs, log)
+	}
+
+	lp.orm.InsertLogs(ctx, logs)
 	return nil
+}
+
+func (lp *LogPoller) ExtractSubkeys(t reflect.Type, paths SubkeyPaths) error {
+	s := reflect.TypeOf(event)
+	if s.Kind() != reflect.Struct {
+		return fmt.Errorf("event type must be struct, got %v. event=%v", t, event)
+	}
+
+	for _, path := range paths[0] {
+		field, err := s.FieldByName(path)
+		for depth := 0; depth < len(paths); depth++ {
+			for _, path := range paths[depth] {
+				field, err = field.Type.FieldByName(path)
+			}
+		}
+	}
+
 }
 
 // RegisterFilter - refer to filters.RegisterFilter for details.
