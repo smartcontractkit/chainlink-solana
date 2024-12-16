@@ -19,6 +19,16 @@ type Entry interface {
 	FixedSize() (int, error)
 }
 
+type entry struct {
+	// TODO this might not be needed in the end, it was handy to make tests simpler
+	offchainName         string
+	onchainName          string
+	reflectType          reflect.Type
+	typeCodec            commonencodings.TypeCodec
+	mod                  codec.Modifier
+	includeDiscriminator bool
+}
+
 func NewAccountEntry(offchainName string, idlAccount IdlTypeDef, idlTypes IdlTypeDefSlice, includeDiscriminator bool, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
 	refs := &codecRefs{
 		builder:      builder,
@@ -64,24 +74,6 @@ func NewInstructionArgsEntry(offChainName string, instructions IdlInstruction, i
 	}, nil
 }
 
-type entry struct {
-	// TODO this might not be needed in the end, it was handy to make tests simpler
-	offchainName         string
-	onchainName          string
-	reflectType          reflect.Type
-	typeCodec            commonencodings.TypeCodec
-	mod                  codec.Modifier
-	includeDiscriminator bool
-}
-
-func (e *entry) GetType() reflect.Type {
-	return e.reflectType
-}
-
-func (e *entry) GetCodecType() commonencodings.TypeCodec {
-	return e.typeCodec
-}
-
 func (e *entry) Encode(value any, into []byte) ([]byte, error) {
 	// Special handling for encoding a nil pointer to an empty struct.
 	t := e.reflectType
@@ -123,15 +115,16 @@ func (e *entry) Decode(encoded []byte) (any, []byte, error) {
 	return e.typeCodec.Decode(encoded)
 }
 
-func (e *entry) Modifier() codec.Modifier {
-	return e.mod
+func (e *entry) GetCodecType() commonencodings.TypeCodec {
+	return e.typeCodec
 }
 
-func ensureModifier(mod codec.Modifier) codec.Modifier {
-	if mod == nil {
-		return codec.MultiModifier{}
-	}
-	return mod
+func (e *entry) GetType() reflect.Type {
+	return e.reflectType
+}
+
+func (e *entry) Modifier() codec.Modifier {
+	return e.mod
 }
 
 func (e *entry) Size(numItems int) (int, error) {
@@ -140,4 +133,11 @@ func (e *entry) Size(numItems int) (int, error) {
 
 func (e *entry) FixedSize() (int, error) {
 	return e.typeCodec.FixedSize()
+}
+
+func ensureModifier(mod codec.Modifier) codec.Modifier {
+	if mod == nil {
+		return codec.MultiModifier{}
+	}
+	return mod
 }

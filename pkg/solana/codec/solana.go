@@ -53,27 +53,6 @@ type solanaCodec struct {
 	*ParsedTypes
 }
 
-func (s solanaCodec) CreateType(itemType string, forEncoding bool) (any, error) {
-	var itemTypes map[string]Entry
-	if forEncoding {
-		itemTypes = s.EncoderDefs
-	} else {
-		itemTypes = s.DecoderDefs
-	}
-
-	def, ok := itemTypes[itemType]
-	if !ok {
-		return nil, fmt.Errorf("%w: cannot find type name %q", commontypes.ErrInvalidType, itemType)
-	}
-
-	// we don't need double pointers, and they can also mess up reflection variable creation and mapstruct decode
-	if def.GetType().Kind() == reflect.Pointer {
-		return reflect.New(def.GetCodecType().GetType().Elem()).Interface(), nil
-	}
-
-	return reflect.New(def.GetType()).Interface(), nil
-}
-
 // NewCodec creates a new [commoncommontypes.RemoteCodec] for Solana.
 func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
 	parsed := &ParsedTypes{
@@ -187,6 +166,27 @@ func NewNamedModifierCodec(original commontypes.RemoteCodec, itemType string, mo
 
 func NewIDLDefinedTypesCodec(idl IDL, builder commonencodings.Builder) (commontypes.RemoteCodec, error) {
 	return newIDLCoded(idl, builder, idl.Types, false)
+}
+
+func (s solanaCodec) CreateType(itemType string, forEncoding bool) (any, error) {
+	var itemTypes map[string]Entry
+	if forEncoding {
+		itemTypes = s.EncoderDefs
+	} else {
+		itemTypes = s.DecoderDefs
+	}
+
+	def, ok := itemTypes[itemType]
+	if !ok {
+		return nil, fmt.Errorf("%w: cannot find type name %q", commontypes.ErrInvalidType, itemType)
+	}
+
+	// we don't need double pointers, and they can also mess up reflection variable creation and mapstruct decode
+	if def.GetType().Kind() == reflect.Pointer {
+		return reflect.New(def.GetCodecType().GetType().Elem()).Interface(), nil
+	}
+
+	return reflect.New(def.GetType()).Interface(), nil
 }
 
 func newIDLCoded(
