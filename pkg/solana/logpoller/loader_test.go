@@ -128,9 +128,10 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 
 	latest.Store(uint64(40))
 
-	slots := []uint64{43, 42}
+	slots := []uint64{44, 43, 42, 41}
 	sigs := make([]solana.Signature, len(slots))
 	hashes := make([]solana.Hash, len(slots))
+	scrambler := &slotUnsync{ch: make(chan struct{})}
 
 	for idx := range len(sigs) {
 		_, _ = rand.Read(sigs[idx][:])
@@ -162,10 +163,9 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 				}
 			}
 
-			if slot == 42 {
-				// force slot 42 to return after 43
-				time.Sleep(1 * time.Second)
-			}
+			// imitate loading block data out of order
+			// every other block must wait for the block previous
+			scrambler.next()
 
 			height := slot - 1
 
@@ -199,10 +199,22 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 		return reflect.DeepEqual(parser.Events(), []logpoller.ProgramEvent{
 			{
 				BlockData: logpoller.BlockData{
+					SlotNumber:          41,
+					BlockHeight:         40,
+					BlockHash:           hashes[3],
+					TransactionHash:     sigs[3],
+					TransactionIndex:    0,
+					TransactionLogIndex: 0,
+				},
+				Prefix: ">",
+				Data:   "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
+			},
+			{
+				BlockData: logpoller.BlockData{
 					SlotNumber:          42,
 					BlockHeight:         41,
-					BlockHash:           hashes[1],
-					TransactionHash:     sigs[1],
+					BlockHash:           hashes[2],
+					TransactionHash:     sigs[2],
 					TransactionIndex:    0,
 					TransactionLogIndex: 0,
 				},
@@ -213,6 +225,18 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 				BlockData: logpoller.BlockData{
 					SlotNumber:          43,
 					BlockHeight:         42,
+					BlockHash:           hashes[1],
+					TransactionHash:     sigs[1],
+					TransactionIndex:    0,
+					TransactionLogIndex: 0,
+				},
+				Prefix: ">",
+				Data:   "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
+			},
+			{
+				BlockData: logpoller.BlockData{
+					SlotNumber:          44,
+					BlockHeight:         43,
 					BlockHash:           hashes[0],
 					TransactionHash:     sigs[0],
 					TransactionIndex:    0,
@@ -225,6 +249,25 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 	})
 
 	client.AssertExpectations(t)
+}
+
+type slotUnsync struct {
+	ch      chan struct{}
+	waiting atomic.Bool
+}
+
+func (u *slotUnsync) next() {
+	if u.waiting.Load() {
+		u.waiting.Store(false)
+
+		<-u.ch
+
+		return
+	}
+
+	u.waiting.Store(true)
+
+	u.ch <- struct{}{}
 }
 
 func TestEncodedLogCollector_BackfillForAddress(t *testing.T) {

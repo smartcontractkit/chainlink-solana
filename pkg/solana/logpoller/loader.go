@@ -4,8 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
-	"sort"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -280,8 +279,21 @@ func (c *EncodedLogCollector) loadSlotBlocksRange(ctx context.Context, start, en
 		return err
 	}
 
+	// as a safety mechanism, order the blocks ascending (oldest to newest) in the extreme case
+	// that the RPC changes and results get jumbled.
+	slices.SortFunc(result, func(a, b uint64) int {
+		if a < b {
+			return -1
+		} else if a > b {
+			return 1
+		}
+
+		return 0
+	})
+
 	for _, block := range result {
 		c.ordered.ExpectBlock(block)
+
 		select {
 		case <-ctx.Done():
 			return nil
@@ -338,16 +350,12 @@ func newOrderedParser(parser ProgramEventProcessor, lggr logger.Logger) *ordered
 	return op
 }
 
+// ExpectBlock should be called in block order to preserve block progression.
 func (p *orderedParser) ExpectBlock(block uint64) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	p.blocks = append(p.blocks, block)
-
-	// ensure sort ascending
-	sort.Slice(p.blocks, func(i, j int) bool {
-		return p.blocks[i] < p.blocks[j]
-	})
 }
 
 func (p *orderedParser) ExpectTxs(block uint64, quantity int) {
@@ -431,10 +439,8 @@ func (p *orderedParser) run(_ context.Context) {
 }
 
 func (p *orderedParser) sendReadySlots() error {
-	rmvIdx := make([]int, 0)
-
 	// start at the lowest block and find ready blocks
-	for idx, block := range p.blocks {
+	for _, block := range p.blocks {
 		// if no expectations are set, we are still waiting on information for the block.
 		// if expectations set and not met, we are still waiting on information for the block
 		// no other block data should be sent until this is resolved
@@ -446,23 +452,20 @@ func (p *orderedParser) sendReadySlots() error {
 		// if expectations are 0 -> remove and continue
 		if exp == 0 {
 			p.clearExpectations(block)
-			rmvIdx = append(rmvIdx, idx)
+			p.blocks = p.blocks[1:]
 
 			continue
 		}
 
-		// if expectations set and met -> forward, remove, and continue
-
 		// to ensure ordered delivery, break from the loop if a ready block isn't found
-		// this function should be preceded by clearEmptyBlocks
-		rIdx, ok := getIdx(p.ready, block)
-		if !ok {
+		rIdx := slices.Index(p.ready, block)
+		if rIdx < 0 {
 			return nil
 		}
 
 		evts, ok := p.actual[block]
 		if !ok {
-			return errors.New("invalid state")
+			return errInvalidState
 		}
 
 		var errs error
@@ -475,34 +478,16 @@ func (p *orderedParser) sendReadySlots() error {
 			return errs
 		}
 
-		p.ready = remove(p.ready, rIdx)
-		rmvIdx = append(rmvIdx, idx)
+		p.ready = slices.Delete(p.ready, rIdx, rIdx+1)
+		p.blocks = p.blocks[1:]
 
-		delete(p.expect, block)
-		delete(p.actual, block)
-	}
-
-	for count, idx := range rmvIdx {
-		p.blocks = remove(p.blocks, idx-count)
+		p.clearExpectations(block)
 	}
 
 	return nil
 }
 
-func getIdx[T any](slice []T, match T) (int, bool) {
-	for idx, value := range slice {
-		if reflect.DeepEqual(value, match) {
-			return idx, true
-		}
-	}
-
-	return -1, false
-}
-
-func remove[T any](slice []T, s int) []T {
-	return append(slice[:s], slice[s+1:]...)
-}
-
 var (
 	errExpectationsNotSet = errors.New("expectations not set")
+	errInvalidState       = errors.New("invalid state")
 )
