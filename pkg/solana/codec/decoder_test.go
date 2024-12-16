@@ -1,7 +1,6 @@
 package codec_test
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -17,7 +16,7 @@ type testErrDecodeEntry struct {
 	codec.CodecEntry
 }
 
-func (m *testErrDecodeEntry) Decode(_ []byte) (interface{}, []byte, error) {
+func (t *testErrDecodeEntry) Decode(_ []byte) (interface{}, []byte, error) {
 	return nil, nil, fmt.Errorf("decode error")
 }
 
@@ -25,7 +24,7 @@ type testErrDecodeRemainingBytes struct {
 	codec.CodecEntry
 }
 
-func (m *testErrDecodeRemainingBytes) Decode(_ []byte) (interface{}, []byte, error) {
+func (t *testErrDecodeRemainingBytes) Decode(_ []byte) (interface{}, []byte, error) {
 	return nil, []byte{1}, nil
 }
 
@@ -62,16 +61,15 @@ type testErrGetMaxDecodingSizeCodecType struct {
 	commonencodings.Empty
 }
 
-func (m testErrGetMaxDecodingSizeCodecType) Size(_ int) (int, error) {
+func (t testErrGetMaxDecodingSizeCodecType) Size(_ int) (int, error) {
 	return 0, fmt.Errorf("error")
 }
 
-func (m *testErrGetMaxDecodingSize) GetCodecType() commonencodings.TypeCodec {
+func (t *testErrGetMaxDecodingSize) GetCodecType() commonencodings.TypeCodec {
 	return testErrGetMaxDecodingSizeCodecType{}
 }
 
 func TestDecoder_GetMaxDecodingSize_Errors(t *testing.T) {
-	ctx := context.Background()
 	someType := "some-type"
 
 	t.Run("error when entry for item type is missing", func(t *testing.T) {
@@ -79,7 +77,7 @@ func TestDecoder_GetMaxDecodingSize_Errors(t *testing.T) {
 		d.Definitions[someType] = &codec.CodecEntry{}
 
 		nonExistentType := "non-existent"
-		_, err := d.GetMaxDecodingSize(ctx, 0, nonExistentType)
+		_, err := d.GetMaxDecodingSize(tests.Context(t), 0, nonExistentType)
 		require.ErrorIs(t, err, fmt.Errorf("%w: cannot find type %s", commontypes.ErrInvalidType, nonExistentType))
 	})
 
@@ -87,7 +85,7 @@ func TestDecoder_GetMaxDecodingSize_Errors(t *testing.T) {
 		d := &codec.Decoder{Definitions: map[string]codec.Entry{}}
 		d.Definitions[someType] = &testErrGetMaxDecodingSize{}
 
-		_, err := d.GetMaxDecodingSize(ctx, 0, someType)
+		_, err := d.GetMaxDecodingSize(tests.Context(t), 0, someType)
 		require.Error(t, err)
 	})
 }

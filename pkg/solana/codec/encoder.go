@@ -9,13 +9,13 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
-type encoder struct {
+type Encoder struct {
 	Definitions map[string]Entry
 }
 
-var _ commontypes.Encoder = &encoder{}
+var _ commontypes.Encoder = &Encoder{}
 
-func (e *encoder) Encode(_ context.Context, item any, itemType string) (res []byte, err error) {
+func (e *Encoder) Encode(_ context.Context, item any, itemType string) (res []byte, err error) {
 	info, ok := e.Definitions[itemType]
 	if !ok {
 		return nil, fmt.Errorf("%w: cannot find definition for %s", commontypes.ErrInvalidType, itemType)
@@ -42,7 +42,7 @@ func (e *encoder) Encode(_ context.Context, item any, itemType string) (res []by
 	return info.Encode(item, nil)
 }
 
-func (e *encoder) GetMaxEncodingSize(_ context.Context, n int, itemType string) (int, error) {
+func (e *Encoder) GetMaxEncodingSize(_ context.Context, n int, itemType string) (int, error) {
 	entry, ok := e.Definitions[itemType]
 	if !ok {
 		return 0, fmt.Errorf("%w: nil entry", commontypes.ErrInvalidType)

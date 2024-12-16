@@ -27,7 +27,7 @@ func (parsed *ParsedTypes) ToCodec() (commontypes.RemoteCodec, error) {
 		return nil, err
 	}
 	underlying := &solanaCodec{
-		encoder:     &encoder{Definitions: parsed.EncoderDefs},
+		Encoder:     &Encoder{Definitions: parsed.EncoderDefs},
 		Decoder:     &Decoder{Definitions: parsed.DecoderDefs},
 		ParsedTypes: parsed,
 	}
