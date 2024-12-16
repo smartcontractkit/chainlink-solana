@@ -21,7 +21,7 @@ func (t *testErrEncodeEntry) Encode(_ interface{}, _ []byte) ([]byte, error) {
 	return nil, fmt.Errorf("encode error")
 }
 
-func (e *testErrEncodeEntry) GetType() reflect.Type {
+func (t *testErrEncodeEntry) GetType() reflect.Type {
 	return commonencodings.Empty{}.GetType()
 }
 
