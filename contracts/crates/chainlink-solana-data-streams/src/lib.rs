@@ -53,7 +53,6 @@ impl VerifierInstructions {
         report_config_account: &Pubkey,
         signed_report: Vec<u8>,
     ) -> Instruction {
-
         let accounts = vec![
             AccountMeta::new_readonly(*verifier_account, false),
             AccountMeta::new_readonly(*access_controller_account, false),
@@ -79,7 +78,7 @@ impl VerifierInstructions {
 
     /// Helper to compute the verifier config PDA account.
     pub fn get_verifier_config_pda(program_id: &Pubkey) -> Pubkey {
-        Pubkey::find_program_address(&[ b"verifier"], program_id).0
+        Pubkey::find_program_address(&[b"verifier"], program_id).0
     }
 
     /// Helper to compute the report config PDA account. This uses the first 32 bytes of the
