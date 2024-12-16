@@ -1,6 +1,6 @@
 [package]
 name = "chainlink_solana_data_streams"
-description = "Chainlink Data Streams Client for Solana"
+description = "Chainlink Data Streams Uility for Solana. Can be used on-chain/off-chain to get `verify` transaction instructions."
 version = "1.0.0"
 edition = "2018"
 license = "MIT"
