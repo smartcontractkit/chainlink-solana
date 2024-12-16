@@ -1,5 +1,5 @@
 /*
-Package codec provides functions to create a codec from an Anchor IDL. All Anchor primitives map to the following native
+Package solanacodec provides functions to create a codec from an Anchor IDL. All Anchor primitives map to the following native
 Go values:
 
 bool -> bool
@@ -26,6 +26,8 @@ import (
 	"reflect"
 
 	"github.com/go-viper/mapstructure/v2"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	commonencodings "github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
@@ -269,7 +271,7 @@ func asStruct(
 			return name, nil, err
 		}
 
-		named[idx+desLen] = commonencodings.NamedTypeCodec{Name: fieldName, Codec: typedCodec}
+		named[idx+desLen] = commonencodings.NamedTypeCodec{Name: cases.Title(language.English, cases.NoLower).String(fieldName), Codec: typedCodec}
 	}
 
 	// accounts have to be in a struct, instruction args don't
