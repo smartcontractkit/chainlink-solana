@@ -19,6 +19,7 @@ type BlockData struct {
 	SlotNumber          uint64
 	BlockHeight         uint64
 	BlockHash           solana.Hash
+	BlockTime           solana.UnixTimeSeconds
 	TransactionHash     solana.Signature
 	TransactionIndex    int
 	TransactionLogIndex uint
@@ -31,6 +32,7 @@ type ProgramLog struct {
 }
 
 type ProgramEvent struct {
+	Program string
 	BlockData
 	Prefix string
 	Data   string
@@ -78,8 +80,9 @@ func parseProgramLogs(logs []string) []ProgramOutput {
 
 			if len(dataMatches) > 1 {
 				instLogs[lastLogIdx].Events = append(instLogs[lastLogIdx].Events, ProgramEvent{
-					Prefix: prefixBuilder(depth),
-					Data:   dataMatches[1],
+					Program: instLogs[lastLogIdx].Program,
+					Prefix:  prefixBuilder(depth),
+					Data:    dataMatches[1],
 				})
 			}
 		} else if strings.HasPrefix(log, "Log truncated") {
