@@ -327,7 +327,6 @@ type orderedParser struct {
 	parser ProgramEventProcessor
 	mu     sync.Mutex
 	blocks []uint64
-	ready  []uint64
 	expect map[uint64]int
 	actual map[uint64][]ProgramEvent
 }
@@ -336,7 +335,6 @@ func newOrderedParser(parser ProgramEventProcessor, lggr logger.Logger) *ordered
 	op := &orderedParser{
 		parser: parser,
 		blocks: make([]uint64, 0),
-		ready:  make([]uint64, 0),
 		expect: make(map[uint64]int),
 		actual: make(map[uint64][]ProgramEvent),
 	}
@@ -389,7 +387,7 @@ func (p *orderedParser) close() error {
 }
 
 func (p *orderedParser) addToExpectations(evt ProgramEvent) error {
-	expectations, ok := p.expect[evt.SlotNumber]
+	_, ok := p.expect[evt.SlotNumber]
 	if !ok {
 		return fmt.Errorf("%w: %d", errExpectationsNotSet, evt.SlotNumber)
 	}
@@ -400,10 +398,6 @@ func (p *orderedParser) addToExpectations(evt ProgramEvent) error {
 	}
 
 	p.actual[evt.SlotNumber] = append(evts, evt)
-
-	if expectations == len(evts)+1 {
-		p.setReady(evt.SlotNumber)
-	}
 
 	return nil
 }
@@ -425,10 +419,6 @@ func (p *orderedParser) expectations(block uint64) (int, bool, error) {
 func (p *orderedParser) clearExpectations(block uint64) {
 	delete(p.expect, block)
 	delete(p.actual, block)
-}
-
-func (p *orderedParser) setReady(slot uint64) {
-	p.ready = append(p.ready, slot)
 }
 
 func (p *orderedParser) run(_ context.Context) {
@@ -457,12 +447,6 @@ func (p *orderedParser) sendReadySlots() error {
 			continue
 		}
 
-		// to ensure ordered delivery, break from the loop if a ready block isn't found
-		rIdx := slices.Index(p.ready, block)
-		if rIdx < 0 {
-			return nil
-		}
-
 		evts, ok := p.actual[block]
 		if !ok {
 			return errInvalidState
@@ -478,7 +462,6 @@ func (p *orderedParser) sendReadySlots() error {
 			return errs
 		}
 
-		p.ready = slices.Delete(p.ready, rIdx, rIdx+1)
 		p.blocks = p.blocks[1:]
 
 		p.clearExpectations(block)
