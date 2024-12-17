@@ -132,7 +132,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) Setup(t T) {
 						Procedure: config.ChainReaderProcedure{
 							IDLAccount: "DataAccount",
 							OutputModifications: codec.ModifiersConfig{
-								&codec.PropertyExtractorConfig{FieldName: "U64value"},
+								&codec.PropertyExtractorConfig{FieldName: "U64Value"},
 							},
 						},
 					},
@@ -142,7 +142,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) Setup(t T) {
 						Procedure: config.ChainReaderProcedure{
 							IDLAccount: "DataAccount",
 							OutputModifications: codec.ModifiersConfig{
-								&codec.PropertyExtractorConfig{FieldName: "U64slice"},
+								&codec.PropertyExtractorConfig{FieldName: "U64Slice"},
 							},
 						},
 					},
@@ -156,7 +156,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) Setup(t T) {
 						Procedure: config.ChainReaderProcedure{
 							IDLAccount: "DataAccount",
 							OutputModifications: codec.ModifiersConfig{
-								&codec.PropertyExtractorConfig{FieldName: "U64value"},
+								&codec.PropertyExtractorConfig{FieldName: "U64Value"},
 							},
 						},
 					},
