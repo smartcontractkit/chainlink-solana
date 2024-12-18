@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"time"
 
-	ag_binary "github.com/gagliardetto/binary"
+	agbinary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests"
@@ -54,12 +54,7 @@ var (
 		PublicKey:   solana.NewWallet().PublicKey(),
 		EnumVal:     0,
 	}
-	TestItemType                = "TestItem"
-	TestItemSliceType           = "TestItemSliceType"
-	TestItemArray1Type          = "TestItemArray1Type"
-	TestItemArray2Type          = "TestItemArray2Type"
 	TestItemWithConfigExtraType = "TestItemWithConfigExtra"
-	NilType                     = "NilType"
 )
 
 type StructWithNestedStruct struct {
@@ -122,34 +117,34 @@ type CodecDef struct {
 
 // CodecDefs key is codec offchain type name
 var CodecDefs = map[string]CodecDef{
-	TestItemType: {
+	interfacetests.TestItemType: {
 		IDL:         itemTypeJSONIDL,
-		IDLTypeName: TestItemType,
+		IDLTypeName: interfacetests.TestItemType,
 		ItemType:    codec.ChainConfigTypeAccountDef,
 	},
-	TestItemSliceType: {
+	interfacetests.TestItemSliceType: {
 		IDL:         itemSliceTypeJSONIDL,
-		IDLTypeName: TestItemSliceType,
+		IDLTypeName: interfacetests.TestItemSliceType,
 		ItemType:    codec.ChainConfigTypeInstructionDef,
 	},
-	TestItemArray1Type: {
+	interfacetests.TestItemArray1Type: {
 		IDL:         itemArray1TypeJSONIDL,
-		IDLTypeName: TestItemArray1Type,
+		IDLTypeName: interfacetests.TestItemArray1Type,
 		ItemType:    codec.ChainConfigTypeInstructionDef,
 	},
-	TestItemArray2Type: {
+	interfacetests.TestItemArray2Type: {
 		IDL:         itemArray2TypeJSONIDL,
-		IDLTypeName: TestItemArray2Type,
+		IDLTypeName: interfacetests.TestItemArray2Type,
 		ItemType:    codec.ChainConfigTypeInstructionDef,
 	},
 	TestItemWithConfigExtraType: {
 		IDL:         itemTypeJSONIDL,
-		IDLTypeName: TestItemType,
+		IDLTypeName: interfacetests.TestItemType,
 		ItemType:    codec.ChainConfigTypeAccountDef,
 	},
-	NilType: {
+	interfacetests.NilType: {
 		IDL:         nilTypeJSONIDL,
-		IDLTypeName: NilType,
+		IDLTypeName: interfacetests.NilType,
 		ItemType:    codec.ChainConfigTypeAccountDef,
 	},
 }
@@ -161,14 +156,14 @@ type TestItemAsAccount struct {
 	AccountStruct       AccountStruct
 	Accounts            []solana.PublicKey
 	DifferentField      string
-	BigField            ag_binary.Int128
+	BigField            agbinary.Int128
 	NestedDynamicStruct NestedDynamic
 	NestedStaticStruct  NestedStatic
 }
 
 var TestItemDiscriminator = [8]byte{148, 105, 105, 155, 26, 167, 212, 149}
 
-func (obj TestItemAsAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj TestItemAsAccount) MarshalWithEncoder(encoder *agbinary.Encoder) (err error) {
 	// Write account discriminator:
 	err = encoder.WriteBytes(TestItemDiscriminator[:], false)
 	if err != nil {
@@ -222,7 +217,7 @@ func (obj TestItemAsAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 	return nil
 }
 
-func (obj *TestItemAsAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) error {
+func (obj *TestItemAsAccount) UnmarshalWithDecoder(decoder *agbinary.Decoder) error {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
@@ -291,12 +286,12 @@ type TestItemAsArgs struct {
 	AccountStruct       AccountStruct
 	Accounts            []solana.PublicKey
 	DifferentField      string
-	BigField            ag_binary.Int128
+	BigField            agbinary.Int128
 	NestedDynamicStruct NestedDynamic
 	NestedStaticStruct  NestedStatic
 }
 
-func (obj TestItemAsArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj TestItemAsArgs) MarshalWithEncoder(encoder *agbinary.Encoder) (err error) {
 	// Serialize `Field` param:
 	err = encoder.Encode(obj.Field)
 	if err != nil {
@@ -345,7 +340,7 @@ func (obj TestItemAsArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err er
 	return nil
 }
 
-func (obj *TestItemAsArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *TestItemAsArgs) UnmarshalWithDecoder(decoder *agbinary.Decoder) (err error) {
 	// Deserialize `Field`:
 	err = decoder.Decode(&obj.Field)
 	if err != nil {
@@ -399,7 +394,7 @@ type AccountStruct struct {
 	AccountStr solana.PublicKey
 }
 
-func (obj AccountStruct) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj AccountStruct) MarshalWithEncoder(encoder *agbinary.Encoder) (err error) {
 	// Serialize `Account` param:
 	err = encoder.Encode(obj.Account)
 	if err != nil {
@@ -413,7 +408,7 @@ func (obj AccountStruct) MarshalWithEncoder(encoder *ag_binary.Encoder) (err err
 	return nil
 }
 
-func (obj *AccountStruct) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *AccountStruct) UnmarshalWithDecoder(decoder *agbinary.Decoder) (err error) {
 	// Deserialize `Account`:
 	err = decoder.Decode(&obj.Account)
 	if err != nil {
@@ -432,7 +427,7 @@ type InnerDynamic struct {
 	S      string
 }
 
-func (obj InnerDynamic) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj InnerDynamic) MarshalWithEncoder(encoder *agbinary.Encoder) (err error) {
 	// Serialize `IntVal` param:
 	err = encoder.Encode(obj.IntVal)
 	if err != nil {
@@ -446,7 +441,7 @@ func (obj InnerDynamic) MarshalWithEncoder(encoder *ag_binary.Encoder) (err erro
 	return nil
 }
 
-func (obj *InnerDynamic) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *InnerDynamic) UnmarshalWithDecoder(decoder *agbinary.Decoder) (err error) {
 	// Deserialize `IntVal`:
 	err = decoder.Decode(&obj.IntVal)
 	if err != nil {
@@ -465,7 +460,7 @@ type NestedDynamic struct {
 	Inner      InnerDynamic
 }
 
-func (obj NestedDynamic) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj NestedDynamic) MarshalWithEncoder(encoder *agbinary.Encoder) (err error) {
 	// Serialize `FixedBytes` param:
 	err = encoder.Encode(obj.FixedBytes)
 	if err != nil {
@@ -479,7 +474,7 @@ func (obj NestedDynamic) MarshalWithEncoder(encoder *ag_binary.Encoder) (err err
 	return nil
 }
 
-func (obj *NestedDynamic) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *NestedDynamic) UnmarshalWithDecoder(decoder *agbinary.Decoder) (err error) {
 	// Deserialize `FixedBytes`:
 	err = decoder.Decode(&obj.FixedBytes)
 	if err != nil {
@@ -498,7 +493,7 @@ type InnerStatic struct {
 	A      solana.PublicKey
 }
 
-func (obj InnerStatic) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj InnerStatic) MarshalWithEncoder(encoder *agbinary.Encoder) (err error) {
 	// Serialize `IntVal` param:
 	err = encoder.Encode(obj.IntVal)
 	if err != nil {
@@ -512,7 +507,7 @@ func (obj InnerStatic) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error
 	return nil
 }
 
-func (obj *InnerStatic) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *InnerStatic) UnmarshalWithDecoder(decoder *agbinary.Decoder) (err error) {
 	// Deserialize `IntVal`:
 	err = decoder.Decode(&obj.IntVal)
 	if err != nil {
@@ -531,7 +526,7 @@ type NestedStatic struct {
 	Inner      InnerStatic
 }
 
-func (obj NestedStatic) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj NestedStatic) MarshalWithEncoder(encoder *agbinary.Encoder) (err error) {
 	// Serialize `FixedBytes` param:
 	err = encoder.Encode(obj.FixedBytes)
 	if err != nil {
@@ -545,7 +540,7 @@ func (obj NestedStatic) MarshalWithEncoder(encoder *ag_binary.Encoder) (err erro
 	return nil
 }
 
-func (obj *NestedStatic) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *NestedStatic) UnmarshalWithDecoder(decoder *agbinary.Decoder) (err error) {
 	// Deserialize `FixedBytes`:
 	err = decoder.Decode(&obj.FixedBytes)
 	if err != nil {
@@ -631,8 +626,8 @@ func getNestedStatic(testStruct interfacetests.TestStruct) NestedStatic {
 	}
 }
 
-func bigIntToBinInt128(val *big.Int) ag_binary.Int128 {
-	return ag_binary.Int128{
+func bigIntToBinInt128(val *big.Int) agbinary.Int128 {
+	return agbinary.Int128{
 		Lo: val.Uint64(),
 		Hi: new(big.Int).Rsh(val, 64).Uint64(),
 	}
