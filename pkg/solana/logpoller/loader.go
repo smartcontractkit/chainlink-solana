@@ -431,7 +431,7 @@ func (p *orderedParser) run(_ context.Context) {
 
 func (p *orderedParser) sendReadySlots() error {
 	// start at the lowest block and find ready blocks
-	for element := p.blocks.Front(); element != nil; element = element.Next() {
+	for element := p.blocks.Front(); element != nil; element = p.blocks.Front() {
 		block := element.Value.(uint64)
 		// if no expectations are set, we are still waiting on information for the block.
 		// if expectations set and not met, we are still waiting on information for the block
@@ -444,14 +444,7 @@ func (p *orderedParser) sendReadySlots() error {
 		// if expectations are 0 -> remove and continue
 		if exp == 0 {
 			p.clearExpectations(block)
-
-			temp := element.Prev()
 			p.blocks.Remove(element)
-			if temp == nil {
-				break
-			}
-
-			element = temp
 
 			continue
 		}
@@ -471,15 +464,7 @@ func (p *orderedParser) sendReadySlots() error {
 			return errs
 		}
 
-		temp := element.Prev()
 		p.blocks.Remove(element)
-
-		if temp == nil {
-			break
-		}
-
-		element = temp
-
 		p.clearExpectations(block)
 	}
 
