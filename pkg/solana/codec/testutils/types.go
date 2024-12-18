@@ -55,6 +55,7 @@ var (
 		EnumVal:     0,
 	}
 	TestItemWithConfigExtraType = "TestItemWithConfigExtra"
+	TestEventItem               = "TestEventItem"
 )
 
 type StructWithNestedStruct struct {
@@ -146,6 +147,10 @@ var CodecDefs = map[string]CodecDef{
 		IDL:         nilTypeJSONIDL,
 		IDLTypeName: interfacetests.NilType,
 		ItemType:    codec.ChainConfigTypeAccountDef,
+	},
+	TestEventItem:{
+		IDL: 	   ,
+		
 	},
 }
 
