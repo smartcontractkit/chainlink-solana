@@ -40,6 +40,8 @@ const (
 	unknownIDLFormat     = "%w: unknown IDL type def %q"
 )
 
+// DecoderHooks
+//
 // BigIntHook allows *big.Int to be represented as any integer type or a string and to go back to them.
 // Useful for config, or if when a model may use a go type that isn't a *big.Int when Pack expects one.
 // Eg: int32 in a go struct from a plugin could require a *big.Int in Pack for int24, if it fits, we shouldn't care.
