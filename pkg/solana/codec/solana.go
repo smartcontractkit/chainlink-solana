@@ -110,7 +110,22 @@ func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
 				return nil, fmt.Errorf("failed to create %q codec entry: %w", offChainName, err)
 			}
 		case ChainConfigTypeEventDef:
-			return nil, fmt.Errorf("TODO, unimplemented type: %q", cfg.Type)
+			var event *IdlEvent
+			for i := range idl.Events {
+				if idl.Events[i].Name == onChainName {
+					event = &idl.Events[i]
+					break
+				}
+			}
+
+			if event == nil {
+				return nil, fmt.Errorf("failed to find event %q in IDL for offChainName %q", cfg.OnChainName, offChainName)
+			}
+
+			cEntry, err = NewEventArgsEntry(offChainName, *event, idl.Types, true, mod, binary.LittleEndian())
+			if err != nil {
+				return nil, fmt.Errorf("failed to create %q codec entry: %w", offChainName, err)
+			}
 		default:
 			return nil, fmt.Errorf("unknown type: %q", cfg.Type)
 		}

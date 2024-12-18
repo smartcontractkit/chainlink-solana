@@ -79,6 +79,28 @@ func NewInstructionArgsEntry(offChainName string, instructions IdlInstruction, i
 	}, nil
 }
 
+func NewEventArgsEntry(offChainName string, event IdlEvent, idlTypes IdlTypeDefSlice, includeDiscriminator bool, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
+	refs := &codecRefs{
+		builder:      builder,
+		codecs:       make(map[string]commonencodings.TypeCodec),
+		typeDefs:     idlTypes,
+		dependencies: make(map[string][]string),
+	}
+
+	_, eventCodec, err := asStruct(eventFieldsToFields(event.Fields), refs, event.Name, false, false)
+	if err != nil {
+		return nil, err
+	}
+	return &entry{
+		offchainName:         offChainName,
+		onchainName:          event.Name,
+		includeDiscriminator: includeDiscriminator,
+		typeCodec:            eventCodec,
+		reflectType:          eventCodec.GetType(),
+		mod:                  ensureModifier(mod),
+	}, nil
+}
+
 func (e *entry) Encode(value any, into []byte) ([]byte, error) {
 	// Special handling for encoding a nil pointer to an empty struct.
 	t := e.reflectType
@@ -149,4 +171,15 @@ func ensureModifier(mod codec.Modifier) codec.Modifier {
 		return codec.MultiModifier{}
 	}
 	return mod
+}
+
+func eventFieldsToFields(evFields []IdlEventField) []IdlField {
+	idlFields := make([]IdlField, len(evFields))
+	for _, evField := range evFields {
+		idlFields = append(idlFields, IdlField{
+			Name: evField.Name,
+			Type: evField.Type,
+		})
+	}
+	return idlFields
 }
