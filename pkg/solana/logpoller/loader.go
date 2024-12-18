@@ -1,6 +1,7 @@
 package logpoller
 
 import (
+	"container/list"
 	"context"
 	"errors"
 	"fmt"
@@ -326,7 +327,7 @@ type orderedParser struct {
 	// internal state
 	parser ProgramEventProcessor
 	mu     sync.Mutex
-	blocks []uint64
+	blocks *list.List
 	expect map[uint64]int
 	actual map[uint64][]ProgramEvent
 }
@@ -334,7 +335,7 @@ type orderedParser struct {
 func newOrderedParser(parser ProgramEventProcessor, lggr logger.Logger) *orderedParser {
 	op := &orderedParser{
 		parser: parser,
-		blocks: make([]uint64, 0),
+		blocks: list.New(),
 		expect: make(map[uint64]int),
 		actual: make(map[uint64][]ProgramEvent),
 	}
@@ -353,7 +354,7 @@ func (p *orderedParser) ExpectBlock(block uint64) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	p.blocks = append(p.blocks, block)
+	p.blocks.PushBack(block)
 }
 
 func (p *orderedParser) ExpectTxs(block uint64, quantity int) {
@@ -430,7 +431,8 @@ func (p *orderedParser) run(_ context.Context) {
 
 func (p *orderedParser) sendReadySlots() error {
 	// start at the lowest block and find ready blocks
-	for _, block := range p.blocks {
+	for element := p.blocks.Front(); element != nil; element = element.Next() {
+		block := element.Value.(uint64)
 		// if no expectations are set, we are still waiting on information for the block.
 		// if expectations set and not met, we are still waiting on information for the block
 		// no other block data should be sent until this is resolved
@@ -442,7 +444,14 @@ func (p *orderedParser) sendReadySlots() error {
 		// if expectations are 0 -> remove and continue
 		if exp == 0 {
 			p.clearExpectations(block)
-			p.blocks = p.blocks[1:]
+
+			temp := element.Prev()
+			p.blocks.Remove(element)
+			if temp == nil {
+				break
+			}
+
+			element = temp
 
 			continue
 		}
@@ -462,7 +471,14 @@ func (p *orderedParser) sendReadySlots() error {
 			return errs
 		}
 
-		p.blocks = p.blocks[1:]
+		temp := element.Prev()
+		p.blocks.Remove(element)
+
+		if temp == nil {
+			break
+		}
+
+		element = temp
 
 		p.clearExpectations(block)
 	}
