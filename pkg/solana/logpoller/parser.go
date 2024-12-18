@@ -119,7 +119,7 @@ func (v *pgDSLParser) TxHash(prim primitives.TxHash) {
 	v.expression = fmt.Sprintf(
 		"%s = :%s",
 		txHashFieldName,
-		v.args.withIndexedField(txHashFieldName, txHash),
+		v.args.withIndexedField(txHashFieldName, PublicKey(txHash)),
 	)
 }
 
@@ -177,7 +177,7 @@ func (v *pgDSLParser) buildQuery(
 }
 
 func (v *pgDSLParser) whereClause(expressions []query.Expression, limiter query.LimitAndSort) (string, error) {
-	segment := fmt.Sprintf("WHERE %s = :solana_chain_id", chainIDFieldName)
+	segment := fmt.Sprintf("WHERE %s = :chain_id", chainIDFieldName)
 
 	if len(expressions) > 0 {
 		exp, err := v.combineExpressions(expressions, query.AND)

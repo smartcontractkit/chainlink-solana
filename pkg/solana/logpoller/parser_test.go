@@ -38,7 +38,7 @@ func TestDSLParser(t *testing.T) {
 		result, args, err := parser.buildQuery(chainID, expressions, limiter)
 
 		require.NoError(t, err)
-		assert.Equal(t, logsQuery(" WHERE chain_id = :solana_chain_id ORDER BY "+defaultSort), result)
+		assert.Equal(t, logsQuery(" WHERE chain_id = :chain_id ORDER BY "+defaultSort), result)
 
 		assertArgs(t, args, 1)
 	})
@@ -60,7 +60,7 @@ func TestDSLParser(t *testing.T) {
 
 		result, args, err := parser.buildQuery(chainID, expressions, limiter)
 		expected := logsQuery(
-			" WHERE chain_id = :solana_chain_id " +
+			" WHERE chain_id = :chain_id " +
 				"AND (address = :address_0 AND event_sig = :event_sig_0) " +
 				"AND (block_number > :cursor_block_number OR (block_number = :cursor_block_number " +
 				"AND log_index > :cursor_log_index)) " +
@@ -88,7 +88,7 @@ func TestDSLParser(t *testing.T) {
 
 		result, args, err := parser.buildQuery(chainID, expressions, limiter)
 		expected := logsQuery(
-			" WHERE chain_id = :solana_chain_id " +
+			" WHERE chain_id = :chain_id " +
 				"AND (address = :address_0 AND event_sig = :event_sig_0) " +
 				"ORDER BY " + defaultSort + " " +
 				"LIMIT 20")
@@ -108,7 +108,7 @@ func TestDSLParser(t *testing.T) {
 
 		result, args, err := parser.buildQuery(chainID, expressions, limiter)
 		expected := logsQuery(
-			" WHERE chain_id = :solana_chain_id " +
+			" WHERE chain_id = :chain_id " +
 				"ORDER BY block_number DESC, log_index DESC, tx_hash DESC")
 
 		require.NoError(t, err)
@@ -126,7 +126,7 @@ func TestDSLParser(t *testing.T) {
 
 		result, args, err := parser.buildQuery(chainID, expressions, limiter)
 		expected := logsQuery(
-			" WHERE chain_id = :solana_chain_id " +
+			" WHERE chain_id = :chain_id " +
 				"ORDER BY block_number ASC, block_timestamp DESC")
 
 		require.NoError(t, err)
@@ -149,7 +149,7 @@ func TestDSLParser(t *testing.T) {
 
 		result, args, err := parser.buildQuery(chainID, expressions, limiter)
 		expected := logsQuery(
-			" WHERE chain_id = :solana_chain_id " +
+			" WHERE chain_id = :chain_id " +
 				"AND (block_timestamp = :block_timestamp_0 AND tx_hash = :tx_hash_0 " +
 				"AND block_number != :block_number_0) " +
 				"AND (block_number < :cursor_block_number OR (block_number = :cursor_block_number " +
@@ -172,7 +172,7 @@ func TestDSLParser(t *testing.T) {
 
 			result, args, err := parser.buildQuery(chainID, expressions, limiter)
 			expected := logsQuery(
-				" WHERE chain_id = :solana_chain_id " +
+				" WHERE chain_id = :chain_id " +
 					"ORDER BY " + defaultSort)
 
 			require.NoError(t, err)
@@ -188,7 +188,7 @@ func TestDSLParser(t *testing.T) {
 
 			result, args, err := parser.buildQuery(chainID, expressions, limiter)
 			expected := logsQuery(
-				" WHERE chain_id = :solana_chain_id " +
+				" WHERE chain_id = :chain_id " +
 					"ORDER BY " + defaultSort)
 
 			require.NoError(t, err)
@@ -223,7 +223,7 @@ func TestDSLParser(t *testing.T) {
 
 		result, args, err := parser.buildQuery(chainID, expressions, limiter)
 		expected := logsQuery(
-			" WHERE chain_id = :solana_chain_id " +
+			" WHERE chain_id = :chain_id " +
 				"AND (block_timestamp >= :block_timestamp_0 AND tx_hash = :tx_hash_0) " +
 				"ORDER BY " + defaultSort)
 
@@ -265,7 +265,7 @@ func TestDSLParser(t *testing.T) {
 
 		result, args, err := parser.buildQuery(chainID, expressions, limiter)
 		expected := logsQuery(
-			" WHERE chain_id = :solana_chain_id " +
+			" WHERE chain_id = :chain_id " +
 				"AND (block_timestamp = :block_timestamp_0 " +
 				"AND (tx_hash = :tx_hash_0 OR event_sig = :event_sig_0)) " +
 				"ORDER BY " + defaultSort)
