@@ -54,10 +54,10 @@ func TestSolanaChainReaderService_ReaderInterface(t *testing.T) {
 		ContractReaderQueryKeysCanLimitResultsWithCursor,
 	})
 
-	RunContractReaderInterfaceTests(t, it, true)
+	RunContractReaderInterfaceTests(t, it, true, false)
 
 	lsIt := &skipEventsChainReaderTester{ChainComponentsInterfaceTester: commontestutils.WrapContractReaderTesterForLoop(it)}
-	RunContractReaderInterfaceTests(t, lsIt, true)
+	RunContractReaderInterfaceTests(t, lsIt, true, false)
 }
 
 func TestSolanaChainReaderService_ServiceCtx(t *testing.T) {

@@ -86,7 +86,7 @@ func RunChainComponentsInLoopSolanaTests[T TestingT[T]](t T, it ChainComponentsI
 }
 
 func RunContractReaderSolanaTests[T TestingT[T]](t T, it *SolanaChainComponentsInterfaceTester[T]) {
-	RunContractReaderInterfaceTests(t, it, false)
+	RunContractReaderInterfaceTests(t, it, false, false)
 
 	testCases := []Testcase[T]{}
 
@@ -94,7 +94,7 @@ func RunContractReaderSolanaTests[T TestingT[T]](t T, it *SolanaChainComponentsI
 }
 
 func RunContractReaderInLoopTests[T TestingT[T]](t T, it ChainComponentsInterfaceTester[T]) {
-	RunContractReaderInterfaceTests(t, it, false)
+	RunContractReaderInterfaceTests(t, it, false, false)
 
 	testCases := []Testcase[T]{}
 
