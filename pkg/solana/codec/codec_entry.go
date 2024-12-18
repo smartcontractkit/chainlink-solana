@@ -21,11 +21,13 @@ type Entry interface {
 
 type entry struct {
 	// TODO this might not be needed in the end, it was handy to make tests simpler
-	offchainName         string
-	onchainName          string
-	reflectType          reflect.Type
-	typeCodec            commonencodings.TypeCodec
-	mod                  codec.Modifier
+	offchainName string
+	onchainName  string
+	reflectType  reflect.Type
+	typeCodec    commonencodings.TypeCodec
+	mod          codec.Modifier
+	// includeDiscriminator during Encode adds a discriminator to the encoded bytes under an assumption that the provided value didn't have a discriminator.
+	// During Decode includeDiscriminator removes discriminator from bytes under an assumption that the provided struct doesn't need a discriminator.
 	includeDiscriminator bool
 }
 
