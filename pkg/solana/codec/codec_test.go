@@ -44,7 +44,7 @@ func (it *codecInterfaceTester) GetAccountString(i int) string {
 }
 
 func (it *codecInterfaceTester) EncodeFields(t *testing.T, request *EncodeRequest) []byte {
-	if request.TestOn == testutils.TestItemType {
+	if request.TestOn == TestItemType {
 		return encodeFieldsOnItem(t, request)
 	}
 
@@ -91,14 +91,14 @@ func (it *codecInterfaceTester) GetCodec(t *testing.T) clcommontypes.Codec {
 		codecEntryCfg.Type = v.ItemType
 		codecEntryCfg.OnChainName = v.IDLTypeName
 
-		if offChainName != testutils.NilType {
+		if offChainName != NilType {
 			codecEntryCfg.ModifierConfigs = commoncodec.ModifiersConfig{
 				&commoncodec.RenameModifierConfig{Fields: map[string]string{"NestedDynamicStruct.Inner.IntVal": "I"}},
 				&commoncodec.RenameModifierConfig{Fields: map[string]string{"NestedStaticStruct.Inner.IntVal": "I"}},
 			}
 		}
 
-		if slices.Contains([]string{testutils.TestItemType, testutils.TestItemSliceType, testutils.TestItemArray1Type, testutils.TestItemArray2Type, testutils.TestItemWithConfigExtraType}, offChainName) {
+		if slices.Contains([]string{TestItemType, TestItemSliceType, TestItemArray1Type, TestItemArray2Type, testutils.TestItemWithConfigExtraType}, offChainName) {
 			addressByteModifier := &commoncodec.AddressBytesToStringModifierConfig{
 				Fields:   []string{"AccountStruct.AccountStr"},
 				Modifier: codec.SolanaAddressModifier{},
