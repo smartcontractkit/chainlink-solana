@@ -62,7 +62,6 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 
 	// assemble minimal tx for testing retry
 	msg := NewTestMsg()
-
 	testRunner := func(t *testing.T, client solanaClient.ReaderWriter) {
 		// build minimal txm
 		loader := utils.NewLazyLoad(func() (solanaClient.ReaderWriter, error) {
@@ -81,10 +80,8 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 		lastLog := observer.All()[len(observer.All())-1]
 		assert.Contains(t, lastLog.Message, "stopped tx retry") // assert that all retry goroutines exit successfully
 	}
-
+	client := clientmocks.NewReaderWriter(t)
 	t.Run("delay in rebroadcasting tx", func(t *testing.T) {
-		client := clientmocks.NewReaderWriter(t)
-		// client mock
 		txs := map[string]solanaGo.Signature{}
 		var lock sync.RWMutex
 		client.On("SendTx", mock.Anything, mock.Anything).Return(
@@ -121,8 +118,6 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 	})
 
 	t.Run("delay in broadcasting new tx", func(t *testing.T) {
-		client := clientmocks.NewReaderWriter(t)
-		// client mock
 		txs := map[string]solanaGo.Signature{}
 		var lock sync.RWMutex
 		client.On("SendTx", mock.Anything, mock.Anything).Return(
@@ -157,8 +152,6 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 	})
 
 	t.Run("overlapping bumping tx", func(t *testing.T) {
-		client := clientmocks.NewReaderWriter(t)
-		// client mock
 		txs := map[string]solanaGo.Signature{}
 		var lock sync.RWMutex
 		client.On("SendTx", mock.Anything, mock.Anything).Return(
@@ -204,8 +197,7 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 	})
 
 	t.Run("bumping tx errors and ctx cleans up waitgroup blocks", func(t *testing.T) {
-		client := clientmocks.NewReaderWriter(t)
-		// client mock - first tx is always successful
+		// first tx is always successful
 		msg0 := NewTestMsg()
 		require.NoError(t, fees.SetComputeUnitPrice(&msg0.tx, 0))
 		require.NoError(t, fees.SetComputeUnitLimit(&msg0.tx, 200_000))
@@ -217,7 +209,7 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 		require.NoError(t, fees.SetComputeUnitPrice(&msg1.tx, 1))
 		require.NoError(t, fees.SetComputeUnitLimit(&msg1.tx, 200_000))
 		msg1.tx.Signatures = make([]solanaGo.Signature, 1)
-		client.On("SendTx", mock.Anything, &msg1.tx).Return(solanaGo.Signature{}, fmt.Errorf("BUMP FAILED")).Once()
+		client.On("SendTx", mock.Anything, &msg1.tx).Return(solanaGo.Signature{}, fmt.Errorf("BUMP FAILED"))
 		client.On("SendTx", mock.Anything, &msg1.tx).Return(solanaGo.Signature{2}, nil)
 
 		// init bump tx success, rebroadcast fails
@@ -225,7 +217,7 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 		require.NoError(t, fees.SetComputeUnitPrice(&msg2.tx, 2))
 		require.NoError(t, fees.SetComputeUnitLimit(&msg2.tx, 200_000))
 		msg2.tx.Signatures = make([]solanaGo.Signature, 1)
-		client.On("SendTx", mock.Anything, &msg2.tx).Return(solanaGo.Signature{3}, nil).Once()
+		client.On("SendTx", mock.Anything, &msg2.tx).Return(solanaGo.Signature{3}, nil)
 		client.On("SendTx", mock.Anything, &msg2.tx).Return(solanaGo.Signature{}, fmt.Errorf("REBROADCAST FAILED"))
 
 		// always successful
@@ -234,7 +226,6 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 		require.NoError(t, fees.SetComputeUnitLimit(&msg3.tx, 200_000))
 		msg3.tx.Signatures = make([]solanaGo.Signature, 1)
 		client.On("SendTx", mock.Anything, &msg3.tx).Return(solanaGo.Signature{4}, nil)
-
 		testRunner(t, client)
 	})
 }
