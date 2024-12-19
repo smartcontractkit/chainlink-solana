@@ -53,7 +53,7 @@ type solanaCodec struct {
 	*ParsedTypes
 }
 
-// NewCodec creates a new [commoncommontypes.RemoteCodec] for Solana.
+// NewCodec creates a new [commontypes.RemoteCodec] for Solana.
 func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
 	parsed := &ParsedTypes{
 		EncoderDefs: map[string]Entry{},

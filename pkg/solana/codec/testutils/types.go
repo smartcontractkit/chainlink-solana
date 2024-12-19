@@ -98,6 +98,9 @@ var CircularDepIDL string
 //go:embed itemIDL.json
 var itemTypeJSONIDL string
 
+//go:embed eventItemTypeIDL.json
+var eventItemTypeJSONIDL string
+
 //go:embed itemSliceTypeIDL.json
 var itemSliceTypeJSONIDL string
 
@@ -148,9 +151,10 @@ var CodecDefs = map[string]CodecDef{
 		IDLTypeName: interfacetests.NilType,
 		ItemType:    codec.ChainConfigTypeAccountDef,
 	},
-	TestEventItem:{
-		IDL: 	   ,
-		
+	TestEventItem: {
+		IDL:         eventItemTypeJSONIDL,
+		IDLTypeName: interfacetests.TestItemType,
+		ItemType:    codec.ChainConfigTypeEventDef,
 	},
 }
 

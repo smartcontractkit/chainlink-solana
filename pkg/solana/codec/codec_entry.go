@@ -94,10 +94,11 @@ func NewEventArgsEntry(offChainName string, event IdlEvent, idlTypes IdlTypeDefS
 	return &entry{
 		offchainName:         offChainName,
 		onchainName:          event.Name,
-		includeDiscriminator: includeDiscriminator,
 		typeCodec:            eventCodec,
 		reflectType:          eventCodec.GetType(),
 		mod:                  ensureModifier(mod),
+		includeDiscriminator: includeDiscriminator,
+		discriminator:        *NewDiscriminator(event.Name),
 	}, nil
 }
 
@@ -174,7 +175,7 @@ func ensureModifier(mod codec.Modifier) codec.Modifier {
 }
 
 func eventFieldsToFields(evFields []IdlEventField) []IdlField {
-	idlFields := make([]IdlField, len(evFields))
+	var idlFields []IdlField
 	for _, evField := range evFields {
 		idlFields = append(idlFields, IdlField{
 			Name: evField.Name,
