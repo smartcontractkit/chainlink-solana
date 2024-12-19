@@ -33,7 +33,8 @@ func (j retryableJob) Run(ctx context.Context) error {
 }
 
 type eventDetail struct {
-	blockNumber uint64
+	slotNumber  uint64
+	blockHeight uint64
 	blockHash   solana.Hash
 	trxIdx      int
 	trxSig      solana.Signature
@@ -54,12 +55,18 @@ func (j *processEventJob) Run(_ context.Context) error {
 	return j.parser.Process(j.event)
 }
 
+type wrappedParser interface {
+	ProgramEventProcessor
+	ExpectBlock(uint64)
+	ExpectTxs(uint64, int)
+}
+
 // getTransactionsFromBlockJob is a job that fetches transaction signatures from a block and loads
 // the job queue with getTransactionLogsJobs for each transaction found in the block.
 type getTransactionsFromBlockJob struct {
 	slotNumber uint64
 	client     RPCClient
-	parser     ProgramEventProcessor
+	parser     wrappedParser
 	chJobs     chan Job
 }
 
@@ -103,16 +110,19 @@ func (j *getTransactionsFromBlockJob) Run(ctx context.Context) error {
 	}
 
 	detail := eventDetail{
-		blockHash: block.Blockhash,
+		slotNumber: j.slotNumber,
+		blockHash:  block.Blockhash,
 	}
 
 	if block.BlockHeight != nil {
-		detail.blockNumber = *block.BlockHeight
+		detail.blockHeight = *block.BlockHeight
 	}
 
 	if len(block.Transactions) != len(blockSigsOnly.Signatures) {
 		return fmt.Errorf("block %d has %d transactions but %d signatures", j.slotNumber, len(block.Transactions), len(blockSigsOnly.Signatures))
 	}
+
+	j.parser.ExpectTxs(j.slotNumber, len(block.Transactions))
 
 	for idx, trx := range block.Transactions {
 		detail.trxIdx = idx
@@ -130,13 +140,14 @@ func messagesToEvents(messages []string, parser ProgramEventProcessor, detail ev
 	var logIdx uint
 	for _, outputs := range parseProgramLogs(messages) {
 		for _, event := range outputs.Events {
-			logIdx++
-
-			event.BlockNumber = detail.blockNumber
+			event.SlotNumber = detail.slotNumber
+			event.BlockHeight = detail.blockHeight
 			event.BlockHash = detail.blockHash
 			event.TransactionHash = detail.trxSig
 			event.TransactionIndex = detail.trxIdx
 			event.TransactionLogIndex = logIdx
+
+			logIdx++
 
 			chJobs <- &processEventJob{
 				parser: parser,

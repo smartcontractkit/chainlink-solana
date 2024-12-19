@@ -24,7 +24,15 @@ import (
 var _ TxManager = (*txm.Txm)(nil)
 
 type TxManager interface {
-	Enqueue(ctx context.Context, accountID string, tx *solana.Transaction, txID *string, txCfgs ...txm.SetTxConfig) error
+	// Enqueue adds a tx to the txm queue for processing and submitting to the Solana network.
+	// An error is returned if the txm is not ready, if the tx is invalid, or if the queue is full.
+	//
+	// Important Notes:
+	// - The tx must contain at least one account key. The first account will be used to sign the tx (fee payer's public key).
+	// - txCfgs can be used to set custom tx configurations.
+	// - If a txID is provided, it will be used to identify the tx. Otherwise, a random UUID will be generated.
+	// - The caller needs to set the tx.Message.RecentBlockhash and provide the corresponding lastValidBlockHeight. These values are obtained from the GetLatestBlockhash RPC call.
+	Enqueue(ctx context.Context, accountID string, tx *solana.Transaction, txID *string, lastValidBlockHeight uint64, txCfgs ...txm.SetTxConfig) error
 }
 
 var _ relaytypes.Relayer = &Relayer{} //nolint:staticcheck
