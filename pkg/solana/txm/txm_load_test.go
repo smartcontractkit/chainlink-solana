@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
@@ -22,6 +21,7 @@ import (
 
 	relayconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
@@ -83,12 +83,11 @@ func TestTxm_Integration(t *testing.T) {
 
 			// already started
 			assert.Error(t, txm.Start(ctx))
-
-			createTx := func(signer solana.PublicKey, sender solana.PublicKey, receiver solana.PublicKey, amt uint64) *solana.Transaction {
+			createTx := func(signer solana.PublicKey, sender solana.PublicKey, receiver solana.PublicKey, amt uint64) (*solana.Transaction, uint64) {
 				// create transfer tx
-				hash, err := client.LatestBlockhash(ctx)
-				assert.NoError(t, err)
-				tx, err := solana.NewTransaction(
+				hash, blockhashErr := client.LatestBlockhash(ctx)
+				assert.NoError(t, blockhashErr)
+				tx, txErr := solana.NewTransaction(
 					[]solana.Instruction{
 						system.NewTransferInstruction(
 							amt,
@@ -99,22 +98,27 @@ func TestTxm_Integration(t *testing.T) {
 					hash.Value.Blockhash,
 					solana.TransactionPayer(signer),
 				)
-				require.NoError(t, err)
-				return tx
+				require.NoError(t, txErr)
+				return tx, hash.Value.LastValidBlockHeight
 			}
-
 			// enqueue txs (must pass to move on to load test)
-			require.NoError(t, txm.Enqueue(ctx, "test_success_0", createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL), nil))
-			require.Error(t, txm.Enqueue(ctx, "test_invalidSigner", createTx(pubKeyReceiver, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL), nil)) // cannot sign tx before enqueuing
-			require.NoError(t, txm.Enqueue(ctx, "test_invalidReceiver", createTx(pubKey, pubKey, solana.PublicKey{}, solana.LAMPORTS_PER_SOL), nil))
+			tx, lastValidBlockHeight := createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
+			require.NoError(t, txm.Enqueue(ctx, "test_success_0", tx, nil, lastValidBlockHeight))
+			tx2, lastValidBlockHeight2 := createTx(pubKeyReceiver, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
+			require.Error(t, txm.Enqueue(ctx, "test_invalidSigner", tx2, nil, lastValidBlockHeight2)) // cannot sign tx before enqueuing
+			tx3, lastValidBlockHeight3 := createTx(pubKey, pubKey, solana.PublicKey{}, solana.LAMPORTS_PER_SOL)
+			require.NoError(t, txm.Enqueue(ctx, "test_invalidReceiver", tx3, nil, lastValidBlockHeight3))
 			time.Sleep(500 * time.Millisecond) // pause 0.5s for new blockhash
-			require.NoError(t, txm.Enqueue(ctx, "test_success_1", createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL), nil))
-			require.NoError(t, txm.Enqueue(ctx, "test_txFail", createTx(pubKey, pubKey, pubKeyReceiver, 1000*solana.LAMPORTS_PER_SOL), nil))
+			tx4, lastValidBlockHeight4 := createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
+			require.NoError(t, txm.Enqueue(ctx, "test_success_1", tx4, nil, lastValidBlockHeight4))
+			tx5, lastValidBlockHeight5 := createTx(pubKey, pubKey, pubKeyReceiver, 1000*solana.LAMPORTS_PER_SOL)
+			require.NoError(t, txm.Enqueue(ctx, "test_txFail", tx5, nil, lastValidBlockHeight5))
 
 			// load test: try to overload txs, confirm, or simulation
 			for i := 0; i < 1000; i++ {
-				assert.NoError(t, txm.Enqueue(ctx, fmt.Sprintf("load_%d", i), createTx(loadTestKey.PublicKey(), loadTestKey.PublicKey(), loadTestKey.PublicKey(), uint64(i)), nil))
-				time.Sleep(10 * time.Millisecond) // ~100 txs per second (note: have run 5ms delays for ~200tx/s succesfully)
+				tx6, lastValidBlockHeight6 := createTx(loadTestKey.PublicKey(), loadTestKey.PublicKey(), loadTestKey.PublicKey(), uint64(i))
+				assert.NoError(t, txm.Enqueue(ctx, fmt.Sprintf("load_%d", i), tx6, nil, lastValidBlockHeight6))
+				time.Sleep(10 * time.Millisecond) // ~100 txs per second (note: have run 5ms delays for ~200tx/s successfully)
 			}
 
 			// check to make sure all txs are closed out from inflight list (longest should last MaxConfirmTimeout)

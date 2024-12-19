@@ -87,7 +87,7 @@ func (c *Transmitter) Transmit(
 
 	// pass transmit payload to tx manager queue
 	c.lggr.Debugf("Queuing transmit tx: state (%s) + transmissions (%s)", c.stateID.String(), c.transmissionsID.String())
-	if err = c.txManager.Enqueue(ctx, c.stateID.String(), tx, nil); err != nil {
+	if err = c.txManager.Enqueue(ctx, c.stateID.String(), tx, nil, blockhash.Value.LastValidBlockHeight); err != nil {
 		return fmt.Errorf("error on Transmit.txManager.Enqueue: %w", err)
 	}
 	return nil
