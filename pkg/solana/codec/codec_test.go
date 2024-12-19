@@ -45,6 +45,11 @@ func TestCodec(t *testing.T) {
 	})
 }
 
+func FuzzCodec(f *testing.F) {
+	tester := &codecInterfaceTester{}
+	RunCodecInterfaceFuzzTests(f, tester)
+}
+
 type codecInterfaceTester struct {
 	TestSelectionSupport
 }
