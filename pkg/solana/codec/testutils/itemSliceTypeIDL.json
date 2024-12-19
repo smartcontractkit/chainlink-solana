@@ -1,0 +1,89 @@
+{
+  "version": "0.1.0",
+  "name": "test_item_slice_type",
+  "instructions": [
+    {
+      "name": "TestItemSliceType",
+      "accounts": [],
+      "args": [
+        {
+          "name": "TestItemSliceType",
+          "type": {
+            "vec": {
+              "defined": "TestItem"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "TestItem",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "Field", "type": "i32" },
+          { "name": "OracleId", "type": "u8" },
+          { "name": "OracleIds", "type": { "array": ["u8", 32] } },
+          { "name": "AccountStruct", "type": { "defined": "AccountStruct" } },
+          { "name": "Accounts", "type": { "vec": "publicKey" } },
+          { "name": "DifferentField", "type": "string" },
+          { "name": "BigField", "type": "i128" },
+          { "name": "NestedDynamicStruct", "type": { "defined": "NestedDynamic" } },
+          { "name": "NestedStaticStruct", "type": { "defined": "NestedStatic" } }
+        ]
+      }
+    },
+    {
+      "name": "AccountStruct",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "Account", "type": "publicKey" },
+          { "name": "AccountStr", "type": "publicKey" }
+        ]
+      }
+    },
+    {
+      "name": "InnerDynamic",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "IntVal", "type": "i64" },
+          { "name": "S", "type": "string" }
+        ]
+      }
+    },
+    {
+      "name": "NestedDynamic",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "FixedBytes", "type": { "array": ["u8", 2] } },
+          { "name": "Inner", "type": { "defined": "InnerDynamic" } }
+        ]
+      }
+    },
+    {
+      "name": "InnerStatic",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "IntVal", "type": "i64" },
+          { "name": "A", "type": "publicKey" }
+        ]
+      }
+    },
+    {
+      "name": "NestedStatic",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "FixedBytes", "type": { "array": ["u8", 2] } },
+          { "name": "Inner", "type": { "defined": "InnerStatic" } }
+        ]
+      }
+    }
+  ]
+}
