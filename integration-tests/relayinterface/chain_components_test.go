@@ -63,6 +63,12 @@ func TestChainComponents(t *testing.T) {
 		ContractReaderQueryKeyReturnsDataAsValuesDotValue,
 		ContractReaderQueryKeyCanFilterWithValueComparator,
 		ContractReaderQueryKeyCanLimitResultsWithCursor,
+		ContractReaderQueryKeysReturnsDataTwoEventTypes,
+		ContractReaderQueryKeysNotFound,
+		ContractReaderQueryKeysReturnsData,
+		ContractReaderQueryKeysReturnsDataAsValuesDotValue,
+		ContractReaderQueryKeysCanFilterWithValueComparator,
+		ContractReaderQueryKeysCanLimitResultsWithCursor,
 	})
 
 	RunChainComponentsSolanaTests(t, it)

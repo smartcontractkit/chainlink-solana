@@ -45,7 +45,17 @@ func TestSolanaChainReaderService_ReaderInterface(t *testing.T) {
 	t.Parallel()
 
 	it := &chainReaderInterfaceTester{}
+	it.DisableTests([]string{
+		ContractReaderQueryKeysReturnsDataTwoEventTypes,
+		ContractReaderQueryKeysNotFound,
+		ContractReaderQueryKeysReturnsData,
+		ContractReaderQueryKeysReturnsDataAsValuesDotValue,
+		ContractReaderQueryKeysCanFilterWithValueComparator,
+		ContractReaderQueryKeysCanLimitResultsWithCursor,
+	})
+
 	RunContractReaderInterfaceTests(t, it, true)
+
 	lsIt := &skipEventsChainReaderTester{ChainComponentsInterfaceTester: commontestutils.WrapContractReaderTesterForLoop(it)}
 	RunContractReaderInterfaceTests(t, lsIt, true)
 }

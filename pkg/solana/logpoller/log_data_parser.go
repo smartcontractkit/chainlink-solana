@@ -16,7 +16,8 @@ var (
 )
 
 type BlockData struct {
-	BlockNumber         uint64
+	SlotNumber          uint64
+	BlockHeight         uint64
 	BlockHash           solana.Hash
 	TransactionHash     solana.Signature
 	TransactionIndex    int

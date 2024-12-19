@@ -789,6 +789,51 @@ func (_c *Config_TxConfirmTimeout_Call) RunAndReturn(run func() time.Duration) *
 	return _c
 }
 
+// TxExpirationRebroadcast provides a mock function with given fields:
+func (_m *Config) TxExpirationRebroadcast() bool {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for TxExpirationRebroadcast")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// Config_TxExpirationRebroadcast_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TxExpirationRebroadcast'
+type Config_TxExpirationRebroadcast_Call struct {
+	*mock.Call
+}
+
+// TxExpirationRebroadcast is a helper method to define mock.On call
+func (_e *Config_Expecter) TxExpirationRebroadcast() *Config_TxExpirationRebroadcast_Call {
+	return &Config_TxExpirationRebroadcast_Call{Call: _e.mock.On("TxExpirationRebroadcast")}
+}
+
+func (_c *Config_TxExpirationRebroadcast_Call) Run(run func()) *Config_TxExpirationRebroadcast_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_TxExpirationRebroadcast_Call) Return(_a0 bool) *Config_TxExpirationRebroadcast_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_TxExpirationRebroadcast_Call) RunAndReturn(run func() bool) *Config_TxExpirationRebroadcast_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // TxRetentionTimeout provides a mock function with given fields:
 func (_m *Config) TxRetentionTimeout() time.Duration {
 	ret := _m.Called()
