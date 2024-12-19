@@ -9,12 +9,15 @@ import (
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	looptestutils "github.com/smartcontractkit/chainlink-common/pkg/loop/testutils"
 	clcommontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
 )
@@ -25,6 +28,27 @@ func TestCodec(t *testing.T) {
 	tester := &codecInterfaceTester{}
 	RunCodecInterfaceTests(t, tester)
 	RunCodecInterfaceTests(t, looptestutils.WrapCodecTesterForLoop(tester))
+
+	t.Run("Events are encode-able and decode-able for a single item", func(t *testing.T) {
+		ctx := tests.Context(t)
+		item := CreateTestStruct[*testing.T](0, tester)
+		req := &EncodeRequest{TestStructs: []TestStruct{item}, TestOn: testutils.TestEventItem}
+		resp := tester.EncodeFields(t, req)
+
+		codec := tester.GetCodec(t)
+		actualEncoding, err := codec.Encode(ctx, item, testutils.TestEventItem)
+		require.NoError(t, err)
+		assert.Equal(t, resp, actualEncoding)
+
+		into := TestStruct{}
+		require.NoError(t, codec.Decode(ctx, actualEncoding, &into, testutils.TestEventItem))
+		assert.Equal(t, item, into)
+	})
+}
+
+func FuzzCodec(f *testing.F) {
+	tester := &codecInterfaceTester{}
+	RunCodecInterfaceFuzzTests(f, tester)
 }
 
 type codecInterfaceTester struct {
@@ -44,7 +68,7 @@ func (it *codecInterfaceTester) GetAccountString(i int) string {
 }
 
 func (it *codecInterfaceTester) EncodeFields(t *testing.T, request *EncodeRequest) []byte {
-	if request.TestOn == TestItemType {
+	if request.TestOn == TestItemType || request.TestOn == testutils.TestEventItem {
 		return encodeFieldsOnItem(t, request)
 	}
 
@@ -53,6 +77,7 @@ func (it *codecInterfaceTester) EncodeFields(t *testing.T, request *EncodeReques
 
 func encodeFieldsOnItem(t *testing.T, request *EncodeRequest) ocr2types.Report {
 	buf := new(bytes.Buffer)
+	// The underlying TestItemAsAccount adds a discriminator by default while being Borsh encoded.
 	if err := testutils.EncodeRequestToTestItemAsAccount(request.TestStructs[0]).MarshalWithEncoder(bin.NewBorshEncoder(buf)); err != nil {
 		require.NoError(t, err)
 	}
@@ -98,7 +123,7 @@ func (it *codecInterfaceTester) GetCodec(t *testing.T) clcommontypes.Codec {
 			}
 		}
 
-		if slices.Contains([]string{TestItemType, TestItemSliceType, TestItemArray1Type, TestItemArray2Type, testutils.TestItemWithConfigExtraType}, offChainName) {
+		if slices.Contains([]string{TestItemType, TestItemSliceType, TestItemArray1Type, TestItemArray2Type, testutils.TestItemWithConfigExtraType, testutils.TestEventItem}, offChainName) {
 			addressByteModifier := &commoncodec.AddressBytesToStringModifierConfig{
 				Fields:   []string{"AccountStruct.AccountStr"},
 				Modifier: codec.SolanaAddressModifier{},

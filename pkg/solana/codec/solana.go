@@ -64,8 +64,6 @@ func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
 
 	for offChainName, cfg := range conf.Configs {
 		var idl IDL
-		onChainName := cfg.OnChainName
-
 		if err := json.Unmarshal([]byte(cfg.IDL), &idl); err != nil {
 			return nil, err
 		}
@@ -75,46 +73,22 @@ func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
 			return nil, err
 		}
 
+		definition, err := findDefinitionFromIDL(cfg.Type, cfg.OnChainName, idl)
+		if err != nil {
+			return nil, err
+		}
+
 		var cEntry Entry
-		switch cfg.Type {
-		case ChainConfigTypeAccountDef:
-			var account *IdlTypeDef
-			for i := range idl.Accounts {
-				if idl.Accounts[i].Name == cfg.OnChainName {
-					account = &idl.Accounts[i]
-					break
-				}
-			}
-
-			if account == nil {
-				return nil, fmt.Errorf("failed to find account %q in IDL for offchainName %q", cfg.OnChainName, offChainName)
-			}
-
-			cEntry, err = NewAccountEntry(offChainName, *account, idl.Types, true, mod, binary.LittleEndian())
-			if err != nil {
-				return nil, fmt.Errorf("failed to create %q codec entry: %w", offChainName, err)
-			}
-		case ChainConfigTypeInstructionDef:
-			var instruction *IdlInstruction
-			for i := range idl.Instructions {
-				if idl.Instructions[i].Name == onChainName {
-					instruction = &idl.Instructions[i]
-					break
-				}
-			}
-
-			if instruction == nil {
-				return nil, fmt.Errorf("failed to find instruction %q in IDL for offChainName %q", cfg.OnChainName, offChainName)
-			}
-
-			cEntry, err = NewInstructionArgsEntry(offChainName, *instruction, idl.Types, mod, binary.LittleEndian())
-			if err != nil {
-				return nil, fmt.Errorf("failed to create %q codec entry: %w", offChainName, err)
-			}
-		case ChainConfigTypeEventDef:
-			return nil, fmt.Errorf("TODO, unimplemented type: %q", cfg.Type)
-		default:
-			return nil, fmt.Errorf("unknown type: %q", cfg.Type)
+		switch v := definition.(type) {
+		case IdlTypeDef:
+			cEntry, err = NewAccountEntry(offChainName, v, idl.Types, true, mod, binary.LittleEndian())
+		case IdlInstruction:
+			cEntry, err = NewInstructionArgsEntry(offChainName, v, idl.Types, mod, binary.LittleEndian())
+		case IdlEvent:
+			cEntry, err = NewEventArgsEntry(offChainName, v, idl.Types, true, mod, binary.LittleEndian())
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to create %q codec entry: %w", offChainName, err)
 		}
 
 		parsed.EncoderDefs[offChainName] = cEntry
@@ -122,6 +96,36 @@ func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
 	}
 
 	return parsed.ToCodec()
+}
+
+func findDefinitionFromIDL(cfgType ChainConfigType, onChainName string, idl IDL) (interface{}, error) {
+	// not the most efficient way to do this, but these slices should always be very, very small
+	switch cfgType {
+	case ChainConfigTypeAccountDef:
+		for i := range idl.Accounts {
+			if idl.Accounts[i].Name == onChainName {
+				return idl.Accounts[i], nil
+			}
+		}
+		return nil, fmt.Errorf("failed to find account %q in IDL", onChainName)
+
+	case ChainConfigTypeInstructionDef:
+		for i := range idl.Instructions {
+			if idl.Instructions[i].Name == onChainName {
+				return idl.Instructions[i], nil
+			}
+		}
+		return nil, fmt.Errorf("failed to find instruction %q in IDL", onChainName)
+
+	case ChainConfigTypeEventDef:
+		for i := range idl.Events {
+			if idl.Events[i].Name == onChainName {
+				return idl.Events[i], nil
+			}
+		}
+		return nil, fmt.Errorf("failed to find event %q in IDL", onChainName)
+	}
+	return nil, fmt.Errorf("unknown type: %q", cfgType)
 }
 
 // NewIDLAccountCodec is for Anchor custom types

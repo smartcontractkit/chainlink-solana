@@ -34,49 +34,75 @@ type entry struct {
 }
 
 func NewAccountEntry(offchainName string, idlAccount IdlTypeDef, idlTypes IdlTypeDefSlice, includeDiscriminator bool, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
-	refs := &codecRefs{
-		builder:      builder,
-		codecs:       make(map[string]commonencodings.TypeCodec),
-		typeDefs:     idlTypes,
-		dependencies: make(map[string][]string),
-	}
-
-	_, accCodec, err := createCodecType(idlAccount, refs, false)
+	_, accCodec, err := createCodecType(idlAccount, createRefs(idlTypes, builder), false)
 	if err != nil {
 		return nil, err
 	}
 
-	return &entry{
-		offchainName:         offchainName,
-		onchainName:          idlAccount.Name,
-		reflectType:          accCodec.GetType(),
-		typeCodec:            accCodec,
-		mod:                  ensureModifier(mod),
-		includeDiscriminator: includeDiscriminator,
-		discriminator:        *NewDiscriminator(idlAccount.Name),
-	}, nil
+	return newEntry(
+		offchainName,
+		idlAccount.Name,
+		accCodec,
+		includeDiscriminator,
+		mod,
+	), nil
 }
 
 func NewInstructionArgsEntry(offChainName string, instructions IdlInstruction, idlTypes IdlTypeDefSlice, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
-	refs := &codecRefs{
+	_, instructionCodecArgs, err := asStruct(instructions.Args, createRefs(idlTypes, builder), instructions.Name, false, true)
+	if err != nil {
+		return nil, err
+	}
+
+	return newEntry(
+		offChainName,
+		instructions.Name,
+		instructionCodecArgs,
+		// Instruction arguments don't need a discriminator by default
+		false,
+		mod,
+	), nil
+}
+
+func NewEventArgsEntry(offChainName string, event IdlEvent, idlTypes IdlTypeDefSlice, includeDiscriminator bool, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
+	_, eventCodec, err := asStruct(eventFieldsToFields(event.Fields), createRefs(idlTypes, builder), event.Name, false, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return newEntry(
+		offChainName,
+		event.Name,
+		eventCodec,
+		includeDiscriminator,
+		mod,
+	), nil
+}
+
+func newEntry(
+	offchainName, onchainName string,
+	typeCodec commonencodings.TypeCodec,
+	includeDiscriminator bool,
+	mod codec.Modifier,
+) Entry {
+	return &entry{
+		offchainName:         offchainName,
+		onchainName:          onchainName,
+		reflectType:          typeCodec.GetType(),
+		typeCodec:            typeCodec,
+		mod:                  ensureModifier(mod),
+		includeDiscriminator: includeDiscriminator,
+		discriminator:        *NewDiscriminator(onchainName),
+	}
+}
+
+func createRefs(idlTypes IdlTypeDefSlice, builder commonencodings.Builder) *codecRefs {
+	return &codecRefs{
 		builder:      builder,
 		codecs:       make(map[string]commonencodings.TypeCodec),
 		typeDefs:     idlTypes,
 		dependencies: make(map[string][]string),
 	}
-
-	_, instructionCodecArgs, err := asStruct(instructions.Args, refs, instructions.Name, false, true)
-	if err != nil {
-		return nil, err
-	}
-
-	return &entry{
-		offchainName: offChainName,
-		onchainName:  instructions.Name,
-		typeCodec:    instructionCodecArgs,
-		reflectType:  instructionCodecArgs.GetType(),
-		mod:          ensureModifier(mod),
-	}, nil
 }
 
 func (e *entry) Encode(value any, into []byte) ([]byte, error) {
@@ -89,7 +115,8 @@ func (e *entry) Encode(value any, into []byte) ([]byte, error) {
 				return []byte{}, nil
 			}
 		}
-		return nil, fmt.Errorf("%w: cannot encode nil value for offchainName: %q, onchainName: %q", commontypes.ErrInvalidType, e.offchainName, e.onchainName)
+		return nil, fmt.Errorf("%w: cannot encode nil value for offchainName: %q, onchainName: %q",
+			commontypes.ErrInvalidType, e.offchainName, e.onchainName)
 	}
 
 	encodedVal, err := e.typeCodec.Encode(value, into)
@@ -112,11 +139,13 @@ func (e *entry) Encode(value any, into []byte) ([]byte, error) {
 func (e *entry) Decode(encoded []byte) (any, []byte, error) {
 	if e.includeDiscriminator {
 		if len(encoded) < discriminatorLength {
-			return nil, nil, fmt.Errorf("%w: encoded data too short to contain discriminator for offchainName: %q, onchainName: %q", commontypes.ErrInvalidType, e.offchainName, e.onchainName)
+			return nil, nil, fmt.Errorf("%w: encoded data too short to contain discriminator for offchainName: %q, onchainName: %q",
+				commontypes.ErrInvalidType, e.offchainName, e.onchainName)
 		}
 
-		if !bytes.Equal(e.discriminator.hashPrefix, encoded[:8]) {
-			return nil, nil, fmt.Errorf("%w: encoded data has a bad discriminator %v for offchainName: %q, onchainName: %q", commontypes.ErrInvalidType, encoded[:8], e.offchainName, e.onchainName)
+		if !bytes.Equal(e.discriminator.hashPrefix, encoded[:discriminatorLength]) {
+			return nil, nil, fmt.Errorf("%w: encoded data has a bad discriminator %v for offchainName: %q, onchainName: %q",
+				commontypes.ErrInvalidType, encoded[:discriminatorLength], e.offchainName, e.onchainName)
 		}
 
 		encoded = encoded[discriminatorLength:]
@@ -149,4 +178,15 @@ func ensureModifier(mod codec.Modifier) codec.Modifier {
 		return codec.MultiModifier{}
 	}
 	return mod
+}
+
+func eventFieldsToFields(evFields []IdlEventField) []IdlField {
+	var idlFields []IdlField
+	for _, evField := range evFields {
+		idlFields = append(idlFields, IdlField{
+			Name: evField.Name,
+			Type: evField.Type,
+		})
+	}
+	return idlFields
 }
