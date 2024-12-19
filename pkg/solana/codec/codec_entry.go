@@ -96,7 +96,6 @@ func newEntry(
 	}
 }
 
-// createRefs helps avoid code duplication for building the codecRefs.
 func createRefs(idlTypes IdlTypeDefSlice, builder commonencodings.Builder) *codecRefs {
 	return &codecRefs{
 		builder:      builder,
