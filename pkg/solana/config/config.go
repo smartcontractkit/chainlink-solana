@@ -18,20 +18,20 @@ var defaultConfigSet = Chain{
 	TxTimeout:               config.MustNewDuration(time.Minute),            // timeout for send tx method in client
 	TxRetryTimeout:          config.MustNewDuration(10 * time.Second),       // duration for tx rebroadcasting to RPC node
 	TxConfirmTimeout:        config.MustNewDuration(30 * time.Second),       // duration before discarding tx as unconfirmed. Set to 0 to disable discarding tx.
-	TxExpirationRebroadcast: ptr(false),                                     // to enable rebroadcasting of expired transactions
+	TxExpirationRebroadcast: ptr(true),                                      // to enable rebroadcasting of expired transactions
 	TxRetentionTimeout:      config.MustNewDuration(0 * time.Second),        // duration to retain transactions after being marked as finalized or errored. Set to 0 to immediately drop transactions.
 	SkipPreflight:           ptr(true),                                      // to enable or disable preflight checks
 	Commitment:              ptr(string(rpc.CommitmentConfirmed)),
 	MaxRetries:              ptr(int64(0)), // max number of retries (default = 0). when config.MaxRetries < 0), interpreted as MaxRetries = nil and rpc node will do a reasonable number of retries
 
 	// fee estimator
-	FeeEstimatorMode:         ptr("fixed"),
+	FeeEstimatorMode:         ptr("blockhistory"),
 	ComputeUnitPriceMax:      ptr(uint64(1_000)),
 	ComputeUnitPriceMin:      ptr(uint64(0)),
 	ComputeUnitPriceDefault:  ptr(uint64(0)),
 	FeeBumpPeriod:            config.MustNewDuration(3 * time.Second), // set to 0 to disable fee bumping
 	BlockHistoryPollPeriod:   config.MustNewDuration(5 * time.Second),
-	BlockHistorySize:         ptr(uint64(1)),       // 1: uses latest block; >1: Uses multiple blocks, where n is number of blocks. DISCLAIMER: 1:1 ratio between n and RPC calls.
+	BlockHistorySize:         ptr(uint64(15)),      // 1: uses latest block; >1: Uses multiple blocks, where n is number of blocks. DISCLAIMER: 1:1 ratio between n and RPC calls.
 	ComputeUnitLimitDefault:  ptr(uint32(200_000)), // set to 0 to disable adding compute unit limit
 	EstimateComputeUnitLimit: ptr(false),           // set to false to disable compute unit limit estimation
 }
