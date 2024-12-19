@@ -541,7 +541,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 			require.Len(t, tx.Message.AddressTableLookups, 1)                                        // address table look contains entry
 			require.Equal(t, derivedLookupTablePubkey, tx.Message.AddressTableLookups[0].AccountKey) // address table
 			return true
-		}), &txID).Return(nil).Once()
+		}), &txID, mock.Anything).Return(nil).Once()
 
 		args := map[string]interface{}{
 			"lookupTable":  chainwriter.GetRandomPubKey(t).Bytes(),

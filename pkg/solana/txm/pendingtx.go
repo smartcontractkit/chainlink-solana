@@ -11,6 +11,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
+	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
 var (
@@ -54,11 +55,11 @@ type PendingTxContext interface {
 // finishedTx is used to store info required to track transactions to finality or error
 type pendingTx struct {
 	tx                   solana.Transaction
-	cfg                  TxConfig
+	cfg                  txmutils.TxConfig
 	signatures           []solana.Signature
 	id                   string
 	createTs             time.Time
-	state                TxState
+	state                txmutils.TxState
 	lastValidBlockHeight uint64 // to track expiration, equivalent to last valid block number.
 }
 
@@ -234,7 +235,7 @@ func (c *pendingTxContext) ListAllExpiredBroadcastedTxs(currBlockNumber uint64) 
 	defer c.lock.RUnlock()
 	expiredBroadcastedTxs := make([]pendingTx, 0, len(c.broadcastedProcessedTxs)) // worst case, all of them
 	for _, tx := range c.broadcastedProcessedTxs {
-		if tx.state == Broadcasted && tx.lastValidBlockHeight < currBlockNumber {
+		if tx.state == txmutils.Broadcasted && tx.lastValidBlockHeight < currBlockNumber {
 			expiredBroadcastedTxs = append(expiredBroadcastedTxs, tx)
 		}
 	}

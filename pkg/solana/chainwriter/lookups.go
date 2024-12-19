@@ -295,7 +295,7 @@ func (s *SolanaChainWriterService) ResolveLookupTables(ctx context.Context, args
 			return nil, nil, fmt.Errorf("invalid static lookup table address: %s, error: %w", staticTable, err)
 		}
 
-		addressses, err := getLookupTableAddress(ctx, s.reader, tableAddress)
+		addressses, err := getLookupTableAddresses(ctx, s.reader, tableAddress)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error fetching static lookup table address: %w", err)
 		}
@@ -318,7 +318,7 @@ func (s *SolanaChainWriterService) LoadTable(ctx context.Context, args any, rlt 
 	// Iterate over each address of the lookup table
 	for _, addressMeta := range lookupTableAddresses {
 		// Fetch account info
-		addresses, err := getLookupTableAddress(ctx, reader, addressMeta.PublicKey)
+		addresses, err := getLookupTableAddresses(ctx, reader, addressMeta.PublicKey)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error fetching lookup table address: %w", err)
 		}
@@ -344,7 +344,7 @@ func (s *SolanaChainWriterService) LoadTable(ctx context.Context, args any, rlt 
 	return resultMap, lookupTableMetas, nil
 }
 
-func getLookupTableAddress(ctx context.Context, reader client.Reader, tableAddress solana.PublicKey) (solana.PublicKeySlice, error) {
+func getLookupTableAddresses(ctx context.Context, reader client.Reader, tableAddress solana.PublicKey) (solana.PublicKeySlice, error) {
 	// Fetch the account info for the static table
 	accountInfo, err := reader.GetAccountInfoWithOpts(ctx, tableAddress, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",

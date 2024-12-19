@@ -71,14 +71,14 @@ func (_c *TxManager_Close_Call) RunAndReturn(run func() error) *TxManager_Close_
 	return _c
 }
 
-// Enqueue provides a mock function with given fields: ctx, accountID, tx, txID, txCfgs
-func (_m *TxManager) Enqueue(ctx context.Context, accountID string, tx *solana.Transaction, txID *string, txCfgs ...utils.SetTxConfig) error {
+// Enqueue provides a mock function with given fields: ctx, accountID, tx, txID, txLastValidBlockHeight, txCfgs
+func (_m *TxManager) Enqueue(ctx context.Context, accountID string, tx *solana.Transaction, txID *string, txLastValidBlockHeight uint64, txCfgs ...utils.SetTxConfig) error {
 	_va := make([]interface{}, len(txCfgs))
 	for _i := range txCfgs {
 		_va[_i] = txCfgs[_i]
 	}
 	var _ca []interface{}
-	_ca = append(_ca, ctx, accountID, tx, txID)
+	_ca = append(_ca, ctx, accountID, tx, txID, txLastValidBlockHeight)
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
@@ -87,8 +87,8 @@ func (_m *TxManager) Enqueue(ctx context.Context, accountID string, tx *solana.T
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *solana.Transaction, *string, ...utils.SetTxConfig) error); ok {
-		r0 = rf(ctx, accountID, tx, txID, txCfgs...)
+	if rf, ok := ret.Get(0).(func(context.Context, string, *solana.Transaction, *string, uint64, ...utils.SetTxConfig) error); ok {
+		r0 = rf(ctx, accountID, tx, txID, txLastValidBlockHeight, txCfgs...)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -106,21 +106,22 @@ type TxManager_Enqueue_Call struct {
 //   - accountID string
 //   - tx *solana.Transaction
 //   - txID *string
+//   - txLastValidBlockHeight uint64
 //   - txCfgs ...utils.SetTxConfig
-func (_e *TxManager_Expecter) Enqueue(ctx interface{}, accountID interface{}, tx interface{}, txID interface{}, txCfgs ...interface{}) *TxManager_Enqueue_Call {
+func (_e *TxManager_Expecter) Enqueue(ctx interface{}, accountID interface{}, tx interface{}, txID interface{}, txLastValidBlockHeight interface{}, txCfgs ...interface{}) *TxManager_Enqueue_Call {
 	return &TxManager_Enqueue_Call{Call: _e.mock.On("Enqueue",
-		append([]interface{}{ctx, accountID, tx, txID}, txCfgs...)...)}
+		append([]interface{}{ctx, accountID, tx, txID, txLastValidBlockHeight}, txCfgs...)...)}
 }
 
-func (_c *TxManager_Enqueue_Call) Run(run func(ctx context.Context, accountID string, tx *solana.Transaction, txID *string, txCfgs ...utils.SetTxConfig)) *TxManager_Enqueue_Call {
+func (_c *TxManager_Enqueue_Call) Run(run func(ctx context.Context, accountID string, tx *solana.Transaction, txID *string, txLastValidBlockHeight uint64, txCfgs ...utils.SetTxConfig)) *TxManager_Enqueue_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]utils.SetTxConfig, len(args)-4)
-		for i, a := range args[4:] {
+		variadicArgs := make([]utils.SetTxConfig, len(args)-5)
+		for i, a := range args[5:] {
 			if a != nil {
 				variadicArgs[i] = a.(utils.SetTxConfig)
 			}
 		}
-		run(args[0].(context.Context), args[1].(string), args[2].(*solana.Transaction), args[3].(*string), variadicArgs...)
+		run(args[0].(context.Context), args[1].(string), args[2].(*solana.Transaction), args[3].(*string), args[4].(uint64), variadicArgs...)
 	})
 	return _c
 }
@@ -130,7 +131,7 @@ func (_c *TxManager_Enqueue_Call) Return(_a0 error) *TxManager_Enqueue_Call {
 	return _c
 }
 
-func (_c *TxManager_Enqueue_Call) RunAndReturn(run func(context.Context, string, *solana.Transaction, *string, ...utils.SetTxConfig) error) *TxManager_Enqueue_Call {
+func (_c *TxManager_Enqueue_Call) RunAndReturn(run func(context.Context, string, *solana.Transaction, *string, uint64, ...utils.SetTxConfig) error) *TxManager_Enqueue_Call {
 	_c.Call.Return(run)
 	return _c
 }

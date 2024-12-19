@@ -94,7 +94,7 @@ func TestPendingTxContext_new(t *testing.T) {
 	require.Equal(t, sig, tx.signatures[0], "signature should match")
 
 	// Check status is Broadcasted
-	require.Equal(t, Broadcasted, tx.state, "transaction state should be Broadcasted")
+	require.Equal(t, utils.Broadcasted, tx.state, "transaction state should be Broadcasted")
 
 	// Check it does not exist in confirmed nor finalized maps
 	_, exists = txs.confirmedTxs[msg.id]
@@ -1195,12 +1195,12 @@ func TestPendingTxContext_ListAllExpiredBroadcastedTxs(t *testing.T) {
 			setup: func(t *testing.T, ctx *pendingTxContext) {
 				tx1 := pendingTx{
 					id:                   "tx1",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1500,
 				}
 				tx2 := pendingTx{
 					id:                   "tx2",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1600,
 				}
 				ctx.broadcastedProcessedTxs["tx1"] = tx1
@@ -1214,17 +1214,17 @@ func TestPendingTxContext_ListAllExpiredBroadcastedTxs(t *testing.T) {
 			setup: func(t *testing.T, ctx *pendingTxContext) {
 				tx1 := pendingTx{
 					id:                   "tx1",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1000,
 				}
 				tx2 := pendingTx{
 					id:                   "tx2",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1500,
 				}
 				tx3 := pendingTx{
 					id:                   "tx3",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 900,
 				}
 				ctx.broadcastedProcessedTxs["tx1"] = tx1
@@ -1239,12 +1239,12 @@ func TestPendingTxContext_ListAllExpiredBroadcastedTxs(t *testing.T) {
 			setup: func(t *testing.T, ctx *pendingTxContext) {
 				tx1 := pendingTx{
 					id:                   "tx1",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1000,
 				}
 				tx2 := pendingTx{
 					id:                   "tx2",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1500,
 				}
 				ctx.broadcastedProcessedTxs["tx1"] = tx1
@@ -1258,17 +1258,17 @@ func TestPendingTxContext_ListAllExpiredBroadcastedTxs(t *testing.T) {
 			setup: func(t *testing.T, ctx *pendingTxContext) {
 				tx1 := pendingTx{
 					id:                   "tx1",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 800,
 				}
 				tx2 := pendingTx{
 					id:                   "tx2",
-					state:                Processed, // Not Broadcasted
+					state:                utils.Processed, // Not Broadcasted
 					lastValidBlockHeight: 700,
 				}
 				tx3 := pendingTx{
 					id:                   "tx3",
-					state:                Processed, // Not Broadcasted
+					state:                utils.Processed, // Not Broadcasted
 					lastValidBlockHeight: 600,
 				}
 				ctx.broadcastedProcessedTxs["tx1"] = tx1
@@ -1283,17 +1283,17 @@ func TestPendingTxContext_ListAllExpiredBroadcastedTxs(t *testing.T) {
 			setup: func(t *testing.T, ctx *pendingTxContext) {
 				tx1 := pendingTx{
 					id:                   "tx1",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1000,
 				}
 				tx2 := pendingTx{
 					id:                   "tx2",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 999,
 				}
 				tx3 := pendingTx{
 					id:                   "tx3",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1,
 				}
 				ctx.broadcastedProcessedTxs["tx1"] = tx1
