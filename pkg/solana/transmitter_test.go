@@ -27,7 +27,7 @@ type verifyTxSize struct {
 	s *solana.PrivateKey
 }
 
-func (txm verifyTxSize) Enqueue(_ context.Context, _ string, tx *solana.Transaction, txID *string, _ ...txm.SetTxConfig) error {
+func (txm verifyTxSize) Enqueue(_ context.Context, _ string, tx *solana.Transaction, txID *string, _ uint64, _ ...txm.SetTxConfig) error {
 	// additional components that transaction manager adds to the transaction
 	require.NoError(txm.t, fees.SetComputeUnitPrice(tx, 0))
 	require.NoError(txm.t, fees.SetComputeUnitLimit(tx, 0))

@@ -161,7 +161,6 @@ func TestTxm(t *testing.T) {
 					return out
 				}, nil,
 			)
-
 			// happy path (send => simulate success => tx: nil => tx: processed => tx: confirmed => finalized => done)
 			t.Run("happyPath", func(t *testing.T) {
 				sig := randomSignature(t)
@@ -204,7 +203,8 @@ func TestTxm(t *testing.T) {
 
 				// send tx
 				testTxID := uuid.New().String()
-				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID))
+				lastValidBlockHeight := uint64(100)
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
 				wg.Wait()
 
 				// no transactions stored inflight txs list
@@ -240,7 +240,8 @@ func TestTxm(t *testing.T) {
 
 				// tx should be able to queue
 				testTxID := uuid.New().String()
-				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID))
+				lastValidBlockHeight := uint64(100)
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
 				wg.Wait() // wait to be picked up and processed
 
 				// no transactions stored inflight txs list
@@ -272,7 +273,8 @@ func TestTxm(t *testing.T) {
 
 				// tx should be able to queue
 				testTxID := uuid.New().String()
-				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID))
+				lastValidBlockHeight := uint64(100)
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
 				wg.Wait()                                  // wait to be picked up and processed
 				waitFor(t, waitDuration, txm, prom, empty) // txs cleared quickly
 
@@ -308,7 +310,8 @@ func TestTxm(t *testing.T) {
 
 				// tx should be able to queue
 				testTxID := uuid.New().String()
-				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID))
+				lastValidBlockHeight := uint64(100)
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
 				wg.Wait()                                  // wait to be picked up and processed
 				waitFor(t, waitDuration, txm, prom, empty) // txs cleared after timeout
 
@@ -348,7 +351,8 @@ func TestTxm(t *testing.T) {
 
 				// tx should be able to queue
 				testTxID := uuid.New().String()
-				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID))
+				lastValidBlockHeight := uint64(100)
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
 				wg.Wait()                                  // wait to be picked up and processed
 				waitFor(t, waitDuration, txm, prom, empty) // txs cleared after timeout
 
@@ -399,7 +403,8 @@ func TestTxm(t *testing.T) {
 
 				// tx should be able to queue
 				testTxID := uuid.New().String()
-				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID))
+				lastValidBlockHeight := uint64(100)
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
 				wg.Wait()                                  // wait to be picked up and processed
 				waitFor(t, waitDuration, txm, prom, empty) // txs cleared after timeout
 
@@ -441,7 +446,8 @@ func TestTxm(t *testing.T) {
 
 				// tx should be able to queue
 				testTxID := uuid.New().String()
-				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID))
+				lastValidBlockHeight := uint64(100)
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
 				wg.Wait()                                  // wait to be picked up and processed
 				waitFor(t, waitDuration, txm, prom, empty) // txs cleared after timeout
 
@@ -486,7 +492,8 @@ func TestTxm(t *testing.T) {
 
 				// tx should be able to queue
 				testTxID := uuid.New().String()
-				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID))
+				lastValidBlockHeight := uint64(100)
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
 				wg.Wait()                                  // wait to be picked up and processed
 				waitFor(t, waitDuration, txm, prom, empty) // inflight txs cleared after timeout
 
@@ -538,7 +545,8 @@ func TestTxm(t *testing.T) {
 
 				// tx should be able to queue
 				testTxID := uuid.New().String()
-				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID))
+				lastValidBlockHeight := uint64(100)
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
 				wg.Wait()                                  // wait to be picked up and processed
 				waitFor(t, waitDuration, txm, prom, empty) // inflight txs cleared after timeout
 
@@ -576,7 +584,8 @@ func TestTxm(t *testing.T) {
 
 				// tx should be able to queue
 				testTxID := uuid.New().String()
-				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID))
+				lastValidBlockHeight := uint64(100)
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
 				wg.Wait()                                  // wait to be picked up and processed
 				waitFor(t, waitDuration, txm, prom, empty) // inflight txs cleared after timeout
 
@@ -622,7 +631,8 @@ func TestTxm(t *testing.T) {
 
 				// send tx
 				testTxID := uuid.New().String()
-				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID))
+				lastValidBlockHeight := uint64(100)
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
 				wg.Wait()
 
 				// no transactions stored inflight txs list
@@ -676,7 +686,8 @@ func TestTxm(t *testing.T) {
 
 				// send tx - with disabled fee bumping
 				testTxID := uuid.New().String()
-				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, SetFeeBumpPeriod(0)))
+				lastValidBlockHeight := uint64(100)
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight, SetFeeBumpPeriod(0)))
 				wg.Wait()
 
 				// no transactions stored inflight txs list
@@ -728,7 +739,8 @@ func TestTxm(t *testing.T) {
 
 				// send tx - with disabled fee bumping and disabled compute unit limit
 				testTxID := uuid.New().String()
-				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, SetFeeBumpPeriod(0), SetComputeUnitLimit(0)))
+				lastValidBlockHeight := uint64(100)
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight, SetFeeBumpPeriod(0), SetComputeUnitLimit(0)))
 				wg.Wait()
 
 				// no transactions stored inflight txs list
@@ -836,7 +848,8 @@ func TestTxm_disabled_confirm_timeout_with_retention(t *testing.T) {
 
 		// tx should be able to queue
 		testTxID := uuid.New().String()
-		assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID))
+		lastValidBlockHeight := uint64(100)
+		assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
 		wg.Wait()                                   // wait to be picked up and processed
 		waitFor(t, 5*time.Second, txm, prom, empty) // inflight txs cleared after timeout
 
@@ -875,7 +888,8 @@ func TestTxm_disabled_confirm_timeout_with_retention(t *testing.T) {
 
 		// tx should be able to queue
 		testTxID := uuid.NewString()
-		assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID))
+		lastValidBlockHeight := uint64(100)
+		assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
 		wg.Wait()
 		waitFor(t, 5*time.Second, txm, prom, empty) // inflight txs cleared after timeout
 
@@ -920,7 +934,8 @@ func TestTxm_disabled_confirm_timeout_with_retention(t *testing.T) {
 
 		// tx should be able to queue
 		testTxID := uuid.NewString()
-		assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID))
+		lastValidBlockHeight := uint64(100)
+		assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
 		wg.Wait()                                   // wait till send tx
 		waitFor(t, 5*time.Second, txm, prom, empty) // inflight txs cleared after timeout
 
@@ -1040,7 +1055,8 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 
 		// send tx
 		testTxID := uuid.New().String()
-		assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID))
+		lastValidBlockHeight := uint64(100)
+		assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
 		wg.Wait()
 
 		// no transactions stored inflight txs list
@@ -1069,7 +1085,8 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 		mc.On("SimulateTx", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("simulation failed")).Once()
 
 		// tx should NOT be able to queue
-		assert.Error(t, txm.Enqueue(ctx, t.Name(), tx, nil))
+		lastValidBlockHeight := uint64(0)
+		assert.Error(t, txm.Enqueue(ctx, t.Name(), tx, nil, lastValidBlockHeight))
 	})
 
 	t.Run("simulation_returns_error", func(t *testing.T) {
@@ -1084,8 +1101,9 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 		mc.On("SimulateTx", mock.Anything, simulateTx, mock.Anything).Return(&rpc.SimulateTransactionResult{Err: errors.New("InstructionError")}, nil).Once()
 
 		txID := uuid.NewString()
+		lastValidBlockHeight := uint64(100)
 		// tx should NOT be able to queue
-		assert.Error(t, txm.Enqueue(ctx, t.Name(), tx, &txID))
+		assert.Error(t, txm.Enqueue(ctx, t.Name(), tx, &txID, lastValidBlockHeight))
 		// tx should be stored in-memory and moved to errored state
 		status, err := txm.GetTransactionStatus(ctx, txID)
 		require.NoError(t, err)
@@ -1131,6 +1149,7 @@ func TestTxm_Enqueue(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	lastValidBlockHeight := uint64(0)
 	invalidTx, err := solana.NewTransaction(
 		[]solana.Instruction{
 			system.NewTransferInstruction(
@@ -1147,28 +1166,29 @@ func TestTxm_Enqueue(t *testing.T) {
 	loader := utils.NewLazyLoad(func() (client.ReaderWriter, error) { return mc, nil })
 	txm := NewTxm("enqueue_test", loader, nil, cfg, mkey, lggr)
 
-	require.ErrorContains(t, txm.Enqueue(ctx, "txmUnstarted", &solana.Transaction{}, nil), "not started")
+	require.ErrorContains(t, txm.Enqueue(ctx, "txmUnstarted", &solana.Transaction{}, nil, lastValidBlockHeight), "not started")
 	require.NoError(t, txm.Start(ctx))
 	t.Cleanup(func() { require.NoError(t, txm.Close()) })
 
 	txs := []struct {
-		name string
-		tx   *solana.Transaction
-		fail bool
+		name                 string
+		tx                   *solana.Transaction
+		lastValidBlockHeight uint64
+		fail                 bool
 	}{
-		{"success", tx, false},
-		{"invalid_key", invalidTx, true},
-		{"nil_pointer", nil, true},
-		{"empty_tx", &solana.Transaction{}, true},
+		{"success", tx, 100, false},
+		{"invalid_key", invalidTx, 0, true},
+		{"nil_pointer", nil, 0, true},
+		{"empty_tx", &solana.Transaction{}, 0, true},
 	}
 
 	for _, run := range txs {
 		t.Run(run.name, func(t *testing.T) {
 			if !run.fail {
-				assert.NoError(t, txm.Enqueue(ctx, run.name, run.tx, nil))
+				assert.NoError(t, txm.Enqueue(ctx, run.name, run.tx, nil, run.lastValidBlockHeight))
 				return
 			}
-			assert.Error(t, txm.Enqueue(ctx, run.name, run.tx, nil))
+			assert.Error(t, txm.Enqueue(ctx, run.name, run.tx, nil, run.lastValidBlockHeight))
 		})
 	}
 }
@@ -1185,4 +1205,407 @@ func addSigAndLimitToTx(t *testing.T, keystore SimpleKeystore, pubkey solana.Pub
 	txCopy.Signatures = append(txCopy.Signatures, sig)
 	require.NoError(t, fees.SetComputeUnitLimit(&txCopy, limit))
 	return &txCopy
+}
+
+func TestTxm_ExpirationRebroadcast(t *testing.T) {
+	t.Parallel()
+	estimator := "fixed"
+	id := "mocknet-" + estimator + "-" + uuid.NewString()
+	cfg := config.NewDefault()
+	cfg.Chain.FeeEstimatorMode = &estimator
+	cfg.Chain.TxConfirmTimeout = relayconfig.MustNewDuration(5 * time.Second)
+	cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(10 * time.Second) // Enable retention to keep transactions after finality and be able to check their statuses.
+	lggr := logger.Test(t)
+	ctx := tests.Context(t)
+
+	// Helper function to set up common test environment
+	setupTxmTest := func(
+		txExpirationRebroadcast bool,
+		latestBlockhashFunc func() (*rpc.GetLatestBlockhashResult, error),
+		getLatestBlockFunc func() (*rpc.GetBlockResult, error),
+		sendTxFunc func() (solana.Signature, error),
+		statuses map[solana.Signature]func() *rpc.SignatureStatusesResult,
+	) (*Txm, *mocks.ReaderWriter, *keyMocks.SimpleKeystore) {
+		cfg.Chain.TxExpirationRebroadcast = &txExpirationRebroadcast
+
+		mc := mocks.NewReaderWriter(t)
+		if latestBlockhashFunc != nil {
+			mc.On("LatestBlockhash", mock.Anything).Return(
+				func(_ context.Context) (*rpc.GetLatestBlockhashResult, error) {
+					return latestBlockhashFunc()
+				},
+			).Maybe()
+		}
+		if getLatestBlockFunc != nil {
+			mc.On("GetLatestBlock", mock.Anything).Return(
+				func(_ context.Context) (*rpc.GetBlockResult, error) {
+					return getLatestBlockFunc()
+				},
+			).Maybe()
+		}
+		if sendTxFunc != nil {
+			mc.On("SendTx", mock.Anything, mock.Anything).Return(
+				func(_ context.Context, _ *solana.Transaction) (solana.Signature, error) {
+					return sendTxFunc()
+				},
+			).Maybe()
+		}
+
+		mc.On("SimulateTx", mock.Anything, mock.Anything, mock.Anything).Return(&rpc.SimulateTransactionResult{}, nil).Maybe()
+		if statuses != nil {
+			mc.On("SignatureStatuses", mock.Anything, mock.AnythingOfType("[]solana.Signature")).Return(
+				func(_ context.Context, sigs []solana.Signature) ([]*rpc.SignatureStatusesResult, error) {
+					var out []*rpc.SignatureStatusesResult
+					for _, sig := range sigs {
+						getStatus, exists := statuses[sig]
+						if !exists {
+							out = append(out, nil)
+						} else {
+							out = append(out, getStatus())
+						}
+					}
+					return out, nil
+				},
+			).Maybe()
+		}
+
+		mkey := keyMocks.NewSimpleKeystore(t)
+		mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
+
+		loader := utils.NewLazyLoad(func() (client.ReaderWriter, error) { return mc, nil })
+		txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
+		require.NoError(t, txm.Start(ctx))
+		t.Cleanup(func() { require.NoError(t, txm.Close()) })
+
+		return txm, mc, mkey
+	}
+
+	// tracking prom metrics
+	prom := soltxmProm{id: id}
+
+	t.Run("WithRebroadcast", func(t *testing.T) {
+		txExpirationRebroadcast := true
+		statuses := map[solana.Signature]func() *rpc.SignatureStatusesResult{}
+
+		// Mock getLatestBlock to return a value greater than 0 for blockHeight
+		getLatestBlockFunc := func() (*rpc.GetBlockResult, error) {
+			val := uint64(1500)
+			return &rpc.GetBlockResult{
+				BlockHeight: &val,
+			}, nil
+		}
+
+		rebroadcastCount := 0
+		latestBlockhashFunc := func() (*rpc.GetLatestBlockhashResult, error) {
+			defer func() { rebroadcastCount++ }()
+			// rebroadcast call will go through because lastValidBlockHeight is bigger than blockHeight
+			return &rpc.GetLatestBlockhashResult{
+				Value: &rpc.LatestBlockhashResult{
+					LastValidBlockHeight: uint64(2000),
+				},
+			}, nil
+		}
+
+		sig1 := randomSignature(t)
+		sendTxFunc := func() (solana.Signature, error) {
+			return sig1, nil
+		}
+
+		nowTs := time.Now()
+		sigStatusCallCount := 0
+		var wg sync.WaitGroup
+		wg.Add(1)
+		statuses[sig1] = func() *rpc.SignatureStatusesResult {
+			// First transaction should be rebroadcasted.
+			if time.Since(nowTs) < cfg.TxConfirmTimeout()-2*time.Second {
+				return nil
+			}
+			// Second transaction should reach finalization.
+			sigStatusCallCount++
+			if sigStatusCallCount == 1 {
+				return &rpc.SignatureStatusesResult{
+					ConfirmationStatus: rpc.ConfirmationStatusProcessed,
+				}
+			}
+			if sigStatusCallCount == 2 {
+				return &rpc.SignatureStatusesResult{
+					ConfirmationStatus: rpc.ConfirmationStatusConfirmed,
+				}
+			}
+			wg.Done()
+			return &rpc.SignatureStatusesResult{
+				ConfirmationStatus: rpc.ConfirmationStatusFinalized,
+			}
+		}
+
+		txm, _, mkey := setupTxmTest(txExpirationRebroadcast, latestBlockhashFunc, getLatestBlockFunc, sendTxFunc, statuses)
+
+		tx, _ := getTx(t, 0, mkey)
+		txID := "test-rebroadcast"
+		lastValidBlockHeight := uint64(100) // lastValidBlockHeight is smaller than blockHeight
+		assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &txID, lastValidBlockHeight))
+		wg.Wait()
+		waitFor(t, txm.cfg.TxConfirmTimeout(), txm, prom, empty)
+
+		// check prom metric
+		prom.confirmed++
+		prom.finalized++
+		prom.assertEqual(t)
+
+		// Check that transaction for txID has been finalized and rebroadcasted 1 time.
+		status, err := txm.GetTransactionStatus(ctx, txID)
+		require.NoError(t, err)
+		require.Equal(t, types.Finalized, status)
+		require.Equal(t, 1, rebroadcastCount)
+	})
+
+	t.Run("WithoutRebroadcast", func(t *testing.T) {
+		txExpirationRebroadcast := false
+		statuses := map[solana.Signature]func() *rpc.SignatureStatusesResult{}
+		rebroadcastCount := 0
+
+		sig1 := randomSignature(t)
+		sendTxFunc := func() (solana.Signature, error) {
+			return sig1, nil
+		}
+
+		nowTs := time.Now()
+		var wg sync.WaitGroup
+		wg.Add(1)
+		statuses[sig1] = func() *rpc.SignatureStatusesResult {
+			// Transaction remains unconfirmed and should not be rebroadcasted.
+			if time.Since(nowTs) < cfg.TxConfirmTimeout() {
+				return nil
+			}
+			wg.Done()
+			return nil
+		}
+
+		txm, _, mkey := setupTxmTest(txExpirationRebroadcast, nil, nil, sendTxFunc, statuses)
+
+		tx, _ := getTx(t, 5, mkey)
+		txID := "test-no-rebroadcast"
+		lastValidBlockHeight := uint64(0) // original lastValidBlockHeight is invalid
+		assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &txID, lastValidBlockHeight))
+		wg.Wait()
+		waitFor(t, txm.cfg.TxConfirmTimeout(), txm, prom, empty)
+
+		// check prom metric
+		prom.drop++
+		prom.error++
+		prom.assertEqual(t)
+
+		// Check that transaction for txID has not been finalized and has not been rebroadcasted
+		status, err := txm.GetTransactionStatus(ctx, txID)
+		require.NoError(t, err)
+		require.Equal(t, types.Failed, status)
+		require.Equal(t, 0, rebroadcastCount)
+	})
+
+	t.Run("WithMultipleRebroadcast", func(t *testing.T) {
+		txExpirationRebroadcast := true
+		statuses := map[solana.Signature]func() *rpc.SignatureStatusesResult{}
+
+		// Mock getLatestBlock to return a value greater than 0
+		getLatestBlockFunc := func() (*rpc.GetBlockResult, error) {
+			val := uint64(1500)
+			return &rpc.GetBlockResult{
+				BlockHeight: &val,
+			}, nil
+		}
+
+		// Mock LatestBlockhash to return an invalid blockhash in the first 2 attempts to rebroadcast.
+		// the last one is valid because it is greater than the blockHeight
+		rebroadcastCount := 0
+		latestBlockhashFunc := func() (*rpc.GetLatestBlockhashResult, error) {
+			defer func() { rebroadcastCount++ }()
+			if rebroadcastCount < 2 {
+				return &rpc.GetLatestBlockhashResult{
+					Value: &rpc.LatestBlockhashResult{
+						LastValidBlockHeight: uint64(1000),
+					},
+				}, nil
+			}
+			return &rpc.GetLatestBlockhashResult{
+				Value: &rpc.LatestBlockhashResult{
+					LastValidBlockHeight: uint64(2000),
+				},
+			}, nil
+		}
+
+		sig1 := randomSignature(t)
+		sendTxFunc := func() (solana.Signature, error) {
+			return sig1, nil
+		}
+		nowTs := time.Now()
+		sigStatusCallCount := 0
+		var wg sync.WaitGroup
+		wg.Add(1)
+		statuses[sig1] = func() *rpc.SignatureStatusesResult {
+			// transaction should be rebroadcasted multiple times.
+			if time.Since(nowTs) < cfg.TxConfirmTimeout()-2*time.Second {
+				return nil
+			}
+			// Second transaction should reach finalization.
+			sigStatusCallCount++
+			if sigStatusCallCount == 1 {
+				return &rpc.SignatureStatusesResult{
+					ConfirmationStatus: rpc.ConfirmationStatusProcessed,
+				}
+			} else if sigStatusCallCount == 2 {
+				return &rpc.SignatureStatusesResult{
+					ConfirmationStatus: rpc.ConfirmationStatusConfirmed,
+				}
+			}
+			wg.Done()
+			return &rpc.SignatureStatusesResult{
+				ConfirmationStatus: rpc.ConfirmationStatusFinalized,
+			}
+		}
+
+		txm, _, mkey := setupTxmTest(txExpirationRebroadcast, latestBlockhashFunc, getLatestBlockFunc, sendTxFunc, statuses)
+		tx, _ := getTx(t, 0, mkey)
+		txID := "test-rebroadcast"
+		lastValidBlockHeight := uint64(100) // lastValidBlockHeight is smaller than blockHeight
+		assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &txID, lastValidBlockHeight))
+		wg.Wait()
+		waitFor(t, txm.cfg.TxConfirmTimeout(), txm, prom, empty)
+
+		// check prom metric
+		prom.confirmed++
+		prom.finalized++
+		prom.assertEqual(t)
+
+		// Check that transaction for txID has been finalized and rebroadcasted multiple times.
+		status, err := txm.GetTransactionStatus(ctx, txID)
+		require.NoError(t, err)
+		require.Equal(t, types.Finalized, status)
+		require.Equal(t, 3, rebroadcastCount)
+	})
+
+	t.Run("ConfirmedBeforeRebroadcast", func(t *testing.T) {
+		txExpirationRebroadcast := true
+		statuses := map[solana.Signature]func() *rpc.SignatureStatusesResult{}
+		sig1 := randomSignature(t)
+		sendTxFunc := func() (solana.Signature, error) {
+			return sig1, nil
+		}
+
+		// Mock getLatestBlock to return a value greater than 0
+		getLatestBlockFunc := func() (*rpc.GetBlockResult, error) {
+			val := uint64(1500)
+			return &rpc.GetBlockResult{
+				BlockHeight: &val,
+			}, nil
+		}
+
+		rebroadcastCount := 0
+		latestBlockhashFunc := func() (*rpc.GetLatestBlockhashResult, error) {
+			defer func() { rebroadcastCount++ }()
+			return &rpc.GetLatestBlockhashResult{
+				Value: &rpc.LatestBlockhashResult{
+					LastValidBlockHeight: uint64(1000),
+				},
+			}, nil
+		}
+
+		var wg sync.WaitGroup
+		wg.Add(1)
+		count := 0
+		statuses[sig1] = func() *rpc.SignatureStatusesResult {
+			defer func() { count++ }()
+
+			out := &rpc.SignatureStatusesResult{}
+			if count == 1 {
+				out.ConfirmationStatus = rpc.ConfirmationStatusConfirmed
+				return out
+			}
+			if count == 2 {
+				out.ConfirmationStatus = rpc.ConfirmationStatusFinalized
+				wg.Done()
+				return out
+			}
+			out.ConfirmationStatus = rpc.ConfirmationStatusProcessed
+			return out
+		}
+
+		txm, _, mkey := setupTxmTest(txExpirationRebroadcast, latestBlockhashFunc, getLatestBlockFunc, sendTxFunc, statuses)
+		tx, _ := getTx(t, 0, mkey)
+		txID := "test-confirmed-before-rebroadcast"
+		lastValidBlockHeight := uint64(1500) // original lastValidBlockHeight is valid
+		assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &txID, lastValidBlockHeight))
+		wg.Wait()
+		waitFor(t, txm.cfg.TxConfirmTimeout(), txm, prom, empty)
+
+		// check prom metric
+		prom.confirmed++
+		prom.finalized++
+		prom.assertEqual(t)
+
+		// Check that transaction has been finalized without rebroadcast
+		status, err := txm.GetTransactionStatus(ctx, txID)
+		require.NoError(t, err)
+		require.Equal(t, types.Finalized, status)
+		require.Equal(t, 0, rebroadcastCount)
+	})
+
+	t.Run("RebroadcastWithError", func(t *testing.T) {
+		txExpirationRebroadcast := true
+		statuses := map[solana.Signature]func() *rpc.SignatureStatusesResult{}
+
+		// To force rebroadcast, first call needs to be smaller than blockHeight
+		// following rebroadcast call will go through because lastValidBlockHeight will be bigger than blockHeight
+		getLatestBlockFunc := func() (*rpc.GetBlockResult, error) {
+			val := uint64(1500)
+			return &rpc.GetBlockResult{
+				BlockHeight: &val,
+			}, nil
+		}
+
+		rebroadcastCount := 0
+		latestBlockhashFunc := func() (*rpc.GetLatestBlockhashResult, error) {
+			defer func() { rebroadcastCount++ }()
+			return &rpc.GetLatestBlockhashResult{
+				Value: &rpc.LatestBlockhashResult{
+					LastValidBlockHeight: uint64(2000),
+				},
+			}, nil
+		}
+
+		sig1 := randomSignature(t)
+		sendTxFunc := func() (solana.Signature, error) {
+			return sig1, nil
+		}
+
+		var wg sync.WaitGroup
+		wg.Add(1)
+		count := 0
+		statuses[sig1] = func() *rpc.SignatureStatusesResult {
+			defer func() { count++ }()
+			// Transaction remains unconfirmed
+			if count == 1 {
+				wg.Done()
+			}
+			return nil
+		}
+
+		txm, _, mkey := setupTxmTest(txExpirationRebroadcast, latestBlockhashFunc, getLatestBlockFunc, sendTxFunc, statuses)
+		tx, _ := getTx(t, 0, mkey)
+		txID := "test-rebroadcast-error"
+		lastValidBlockHeight := uint64(100) // lastValidBlockHeight is smaller than blockHeight
+		assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &txID, lastValidBlockHeight))
+		wg.Wait()
+		waitFor(t, cfg.TxConfirmTimeout(), txm, prom, empty)
+
+		// check prom metric
+		prom.drop++
+		prom.error++
+		prom.assertEqual(t)
+
+		// Transaction should be moved to failed after trying to rebroadcast 1 time.
+		status, err := txm.GetTransactionStatus(ctx, txID)
+		require.NoError(t, err)
+		require.Equal(t, types.Failed, status)
+		require.Equal(t, 1, rebroadcastCount)
+	})
 }

@@ -667,6 +667,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "chainlink_solana_data_streams"
+version = "1.0.0"
+dependencies = [
+ "borsh 0.10.3",
+ "solana-program",
+ "solana-sdk",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -155,6 +155,9 @@ func setFromChain(c, f *Chain) {
 	if f.TxConfirmTimeout != nil {
 		c.TxConfirmTimeout = f.TxConfirmTimeout
 	}
+	if f.TxExpirationRebroadcast != nil {
+		c.TxExpirationRebroadcast = f.TxExpirationRebroadcast
+	}
 	if f.TxRetentionTimeout != nil {
 		c.TxRetentionTimeout = f.TxRetentionTimeout
 	}
@@ -239,6 +242,10 @@ func (c *TOMLConfig) TxRetryTimeout() time.Duration {
 
 func (c *TOMLConfig) TxConfirmTimeout() time.Duration {
 	return c.Chain.TxConfirmTimeout.Duration()
+}
+
+func (c *TOMLConfig) TxExpirationRebroadcast() bool {
+	return *c.Chain.TxExpirationRebroadcast
 }
 
 func (c *TOMLConfig) TxRetentionTimeout() time.Duration {

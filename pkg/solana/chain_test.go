@@ -536,7 +536,7 @@ func TestSolanaChain_MultiNode_Txm(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(0), receiverBal)
 
-	createTx := func(signer solana.PublicKey, sender solana.PublicKey, receiver solana.PublicKey, amt uint64) *solana.Transaction {
+	createTx := func(signer solana.PublicKey, sender solana.PublicKey, receiver solana.PublicKey, amt uint64) (*solana.Transaction, uint64) {
 		selectedClient, err = testChain.getClient()
 		assert.NoError(t, err)
 		hash, hashErr := selectedClient.LatestBlockhash(tests.Context(t))
@@ -553,11 +553,12 @@ func TestSolanaChain_MultiNode_Txm(t *testing.T) {
 			solana.TransactionPayer(signer),
 		)
 		require.NoError(t, txErr)
-		return tx
+		return tx, hash.Value.LastValidBlockHeight
 	}
 
 	// Send funds twice, along with an invalid transaction
-	require.NoError(t, testChain.txm.Enqueue(tests.Context(t), "test_success", createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL), nil))
+	tx, lastValidBlockHeight := createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
+	require.NoError(t, testChain.txm.Enqueue(tests.Context(t), "test_success", tx, nil, lastValidBlockHeight))
 
 	// Wait for new block hash
 	currentBh, err := selectedClient.LatestBlockhash(tests.Context(t))
@@ -578,8 +579,10 @@ NewBlockHash:
 		}
 	}
 
-	require.NoError(t, testChain.txm.Enqueue(tests.Context(t), "test_success_2", createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL), nil))
-	require.Error(t, testChain.txm.Enqueue(tests.Context(t), "test_invalidSigner", createTx(pubKeyReceiver, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL), nil)) // cannot sign tx before enqueuing
+	tx2, lastValidBlockHeight2 := createTx(pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
+	require.NoError(t, testChain.txm.Enqueue(tests.Context(t), "test_success_2", tx2, nil, lastValidBlockHeight2))
+	tx3, lastValidBlockHeight3 := createTx(pubKeyReceiver, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
+	require.Error(t, testChain.txm.Enqueue(tests.Context(t), "test_invalidSigner", tx3, nil, lastValidBlockHeight3)) // cannot sign tx before enqueuing
 
 	// wait for all txes to finish
 	ctx, cancel := context.WithCancel(tests.Context(t))

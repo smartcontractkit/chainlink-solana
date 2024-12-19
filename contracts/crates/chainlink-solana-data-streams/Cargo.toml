@@ -1,0 +1,25 @@
+[package]
+name = "chainlink_solana_data_streams"
+description = "Chainlink Data Streams Uility for Solana. Can be used on-chain/off-chain to get `verify` transaction instructions."
+version = "1.0.0"
+edition = "2018"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "chainlink_solana_data_streams"
+
+[features]
+default = []
+
+[dependencies]
+borsh = "0.10.3"
+
+[target.'cfg(target_os = "solana")'.dependencies]
+solana-program = "1.17"
+
+[target.'cfg(not(target_os = "solana"))'.dependencies]
+solana-sdk = "1.17"
+
+[dev-dependencies]
+solana-sdk = "1.17"
