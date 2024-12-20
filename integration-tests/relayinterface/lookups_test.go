@@ -126,7 +126,7 @@ func TestAccountLookups(t *testing.T) {
 }
 
 func TestPDALookups(t *testing.T) {
-	programID := solana.SystemProgramID
+	programID := chainwriter.GetRandomPubKey(t)
 
 	t.Run("PDALookup resolves valid PDA with constant address seeds", func(t *testing.T) {
 		seed := chainwriter.GetRandomPubKey(t)
@@ -281,7 +281,7 @@ func TestLookupTables(t *testing.T) {
 		table := chainwriter.CreateTestLookupTable(ctx, t, rpcClient, sender, pubKeys)
 		lookupConfig := chainwriter.LookupTables{
 			DerivedLookupTables: nil,
-			StaticLookupTables:  []string{table.String()},
+			StaticLookupTables:  []solana.PublicKey{table},
 		}
 		_, staticTableMap, resolveErr := cw.ResolveLookupTables(ctx, nil, lookupConfig)
 		require.NoError(t, resolveErr)
@@ -342,7 +342,7 @@ func TestLookupTables(t *testing.T) {
 
 		lookupConfig := chainwriter.LookupTables{
 			DerivedLookupTables: nil,
-			StaticLookupTables:  []string{invalidTable.String()},
+			StaticLookupTables:  []solana.PublicKey{invalidTable},
 		}
 
 		_, _, err = cw.ResolveLookupTables(ctx, nil, lookupConfig)

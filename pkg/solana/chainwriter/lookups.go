@@ -52,14 +52,10 @@ type InternalField struct {
 	Location string
 }
 
-type ValueLookup struct {
-	Location string
-}
-
 // LookupTables represents a list of lookup tables that are used to derive addresses for a program.
 type LookupTables struct {
 	DerivedLookupTables []DerivedLookupTable
-	StaticLookupTables  []string
+	StaticLookupTables  []solana.PublicKey
 }
 
 // DerivedLookupTable represents a lookup table that is used to derive addresses for a program.
@@ -212,19 +208,18 @@ func decodeBorshIntoType(data []byte, typ reflect.Type) (interface{}, error) {
 // It handles both AddressSeeds (which are public keys) and ValueSeeds (which are byte arrays from input args).
 func getSeedBytes(ctx context.Context, lookup PDALookups, args any, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.Reader) ([][]byte, error) {
 	var seedBytes [][]byte
-	maxSeedLength := 32
 
 	for _, seed := range lookup.Seeds {
 		if lookupSeed, ok := seed.(AccountLookup); ok {
-			// Get value from a location (This doens't have to be an address, it can be any value)
+			// Get value from a location (This doesn't have to be an address, it can be any value)
 			bytes, err := GetValuesAtLocation(args, lookupSeed.Location)
 			if err != nil {
 				return nil, fmt.Errorf("error getting address seed: %w", err)
 			}
 			// validate seed length
 			for _, b := range bytes {
-				if len(b) > maxSeedLength {
-					return nil, fmt.Errorf("seed byte array exceeds maximum length of %d: got %d bytes", maxSeedLength, len(b))
+				if len(b) > solana.MaxSeedLength {
+					return nil, fmt.Errorf("seed byte array exceeds maximum length of %d: got %d bytes", solana.MaxSeedLength, len(b))
 				}
 				seedBytes = append(seedBytes, b)
 			}
@@ -247,7 +242,7 @@ func getSeedBytes(ctx context.Context, lookup PDALookups, args any, derivedTable
 
 // generatePDAs generates program-derived addresses (PDAs) from public keys and seeds.
 func generatePDAs(publicKeys []*solana.AccountMeta, seeds [][]byte, lookup PDALookups) ([]*solana.AccountMeta, error) {
-	if len(seeds) > 16 {
+	if len(seeds) > solana.MaxSeeds {
 		return nil, fmt.Errorf("seed maximum exceeded: %d", len(seeds))
 	}
 	var addresses []*solana.AccountMeta
@@ -271,6 +266,8 @@ func (s *SolanaChainWriterService) ResolveLookupTables(ctx context.Context, args
 
 	// Read derived lookup tables
 	for _, derivedLookup := range lookupTables.DerivedLookupTables {
+		// Load the lookup table - note: This could be multiple tables if the lookup is a PDALookups that resovles to more
+		// than one address
 		lookupTableMap, _, err := s.LoadTable(ctx, args, derivedLookup, s.reader, derivedTableMap)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error loading derived lookup table: %w", err)
@@ -289,17 +286,11 @@ func (s *SolanaChainWriterService) ResolveLookupTables(ctx context.Context, args
 
 	// Read static lookup tables
 	for _, staticTable := range lookupTables.StaticLookupTables {
-		// Parse the static table address
-		tableAddress, err := solana.PublicKeyFromBase58(staticTable)
-		if err != nil {
-			return nil, nil, fmt.Errorf("invalid static lookup table address: %s, error: %w", staticTable, err)
-		}
-
-		addressses, err := getLookupTableAddresses(ctx, s.reader, tableAddress)
+		addressses, err := getLookupTableAddresses(ctx, s.reader, staticTable)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error fetching static lookup table address: %w", err)
 		}
-		staticTableMap[tableAddress] = addressses
+		staticTableMap[staticTable] = addressses
 	}
 
 	return derivedTableMap, staticTableMap, nil
@@ -312,15 +303,16 @@ func (s *SolanaChainWriterService) LoadTable(ctx context.Context, args any, rlt 
 		return nil, nil, fmt.Errorf("error resolving addresses for lookup table: %w", err)
 	}
 
+	// Nested map in case the lookup table resolves to multiple addresses
 	resultMap := make(map[string]map[string][]*solana.AccountMeta)
 	var lookupTableMetas []*solana.AccountMeta
 
 	// Iterate over each address of the lookup table
 	for _, addressMeta := range lookupTableAddresses {
-		// Fetch account info
+		// Read the full list of addresses from the lookup table
 		addresses, err := getLookupTableAddresses(ctx, reader, addressMeta.PublicKey)
 		if err != nil {
-			return nil, nil, fmt.Errorf("error fetching lookup table address: %w", err)
+			return nil, nil, fmt.Errorf("error fetching lookup table address: %s, error: %w", addressMeta.PublicKey, err)
 		}
 
 		// Create the inner map for this lookup table

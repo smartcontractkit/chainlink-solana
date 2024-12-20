@@ -135,8 +135,6 @@ for Solana transactions. It handles constant addresses, dynamic lookups, program
 ### Error Handling:
 - Errors are wrapped with the `debugID` for easier tracing.
 */
-// GetAddresses resolves account addresses from various `Lookup` configurations to build the required `solana.AccountMeta` list
-// for Solana transactions.
 func GetAddresses(ctx context.Context, args any, accounts []Lookup, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.Reader) ([]*solana.AccountMeta, error) {
 	var addresses []*solana.AccountMeta
 	for _, accountConfig := range accounts {
@@ -149,6 +147,10 @@ func GetAddresses(ctx context.Context, args any, accounts []Lookup, derivedTable
 	return addresses, nil
 }
 
+// FilterLookupTableAddresses takes a list of accounts and two lookup table maps
+// (one for derived tables, one for static tables) and filters out any addresses that are
+// not used by the accounts. It returns a map of only those lookup table
+// addresses that match entries in `accounts`.
 func (s *SolanaChainWriterService) FilterLookupTableAddresses(
 	accounts []*solana.AccountMeta,
 	derivedTableMap map[string]map[string][]*solana.AccountMeta,
@@ -203,7 +205,30 @@ func (s *SolanaChainWriterService) FilterLookupTableAddresses(
 	return filteredLookupTables
 }
 
-func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contractName, method string, args any, transactionID string, toAddress string, meta *types.TxMeta, value *big.Int) error {
+// SubmitTransaction builds, encodes, and enqueues a transaction using the provided program
+// configuration and method details. It relies on the configured IDL, account lookups, and
+// lookup tables to gather the necessary accounts and data. The function retrieves the latest
+// blockhash and assigns it to the transaction, so callers do not need to provide one.
+//
+// Submissions and retries are handled by the underlying transaction manager. If a “debug ID”
+// location is configured, SubmitTransaction extracts it from the provided `args` and attaches
+// it to errors for easier troubleshooting. Only the first debug ID it encounters will be used.
+//
+// Parameters:
+//   - ctx: The context for cancellation and timeouts.
+//   - contractName: Identifies which Solana program config to use from `s.config.Programs`.
+//   - method: Specifies which method config to invoke within the chosen program config.
+//   - args: Arbitrary arguments that are encoded into the transaction payload and/or used for dynamic address lookups.
+//   - transactionID: A unique identifier for the transaction, used for tracking within the transaction manager.
+//   - toAddress: The on-chain address (program ID) to which the transaction is directed.
+//   - meta: Currently unused; included for interface compatibility.
+//   - value: Currently unused; included for interface compatibility.
+//
+// Returns:
+//
+//	An error if any stage of the transaction preparation or enqueueing fails. A nil return
+//	indicates that the transaction was successfully submitted to the transaction manager.
+func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contractName, method string, args any, transactionID string, toAddress string, _ *types.TxMeta, _ *big.Int) error {
 	programConfig, exists := s.config.Programs[contractName]
 	if !exists {
 		return fmt.Errorf("failed to find program config for contract name: %s", contractName)
@@ -241,6 +266,14 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("error resolving account addresses: %w", err), debugID)
 	}
 
+	feePayer, err := solana.PublicKeyFromBase58(methodConfig.FromAddress)
+	if err != nil {
+		return errorWithDebugID(fmt.Errorf("error parsing fee payer address: %w", err), debugID)
+	}
+
+	accounts = append([]*solana.AccountMeta{solana.Meta(feePayer).SIGNER().WRITE()}, accounts...)
+	accounts = append(accounts, solana.Meta(solana.SystemProgramID))
+
 	// Filter the lookup table addresses based on which accounts are actually used
 	filteredLookupTableMap := s.FilterLookupTableAddresses(accounts, derivedTableMap, staticTableMap)
 
@@ -254,11 +287,6 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	programID, err := solana.PublicKeyFromBase58(toAddress)
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error parsing program ID: %w", err), debugID)
-	}
-
-	feePayer, err := solana.PublicKeyFromBase58(methodConfig.FromAddress)
-	if err != nil {
-		return errorWithDebugID(fmt.Errorf("error parsing fee payer address: %w", err), debugID)
 	}
 
 	tx, err := solana.NewTransaction(

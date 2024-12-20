@@ -61,6 +61,9 @@ func GetDebugIDAtLocation(args any, location string) (string, error) {
 		return "", err
 	}
 
+	if len(debugIDList) == 0 {
+		return "", errors.New("no debug ID found at location: " + location)
+	}
 	// there should only be one debug ID, others will be ignored.
 	debugID := string(debugIDList[0])
 

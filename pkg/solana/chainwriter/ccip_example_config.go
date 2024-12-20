@@ -1,7 +1,7 @@
 package chainwriter
 
 import (
-	"fmt"
+	"github.com/gagliardetto/solana-go"
 )
 
 func TestConfig() {
@@ -13,8 +13,8 @@ func TestConfig() {
 	systemProgramAddress := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6E"
 	computeBudgetProgramAddress := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6F"
 	sysvarProgramAddress := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6G"
-	commonAddressesLookupTable := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6H"
-	routerLookupTable := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6I"
+	commonAddressesLookupTable := solana.MustPublicKeyFromBase58("4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6H")
+	routerLookupTable := solana.MustPublicKeyFromBase58("4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6I")
 	userAddress := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6J"
 
 	executionReportSingleChainIDL := `{"name":"ExecutionReportSingleChain","type":{"kind":"struct","fields":[{"name":"source_chain_selector","type":"u64"},{"name":"message","type":{"defined":"Any2SolanaRampMessage"}},{"name":"root","type":{"array":["u8",32]}},{"name":"proofs","type":{"vec":{"array":["u8",32]}}}]}},{"name":"Any2SolanaRampMessage","type":{"kind":"struct","fields":[{"name":"header","type":{"defined":"RampMessageHeader"}},{"name":"sender","type":{"vec":"u8"}},{"name":"data","type":{"vec":"u8"}},{"name":"receiver","type":{"array":["u8",32]}},{"name":"extra_args","type":{"defined":"SolanaExtraArgs"}}]}},{"name":"RampMessageHeader","type":{"kind":"struct","fields":[{"name":"message_id","type":{"array":["u8",32]}},{"name":"source_chain_selector","type":"u64"},{"name":"dest_chain_selector","type":"u64"},{"name":"sequence_number","type":"u64"},{"name":"nonce","type":"u64"}]}},{"name":"SolanaExtraArgs","type":{"kind":"struct","fields":[{"name":"compute_units","type":"u32"},{"name":"allow_out_of_order_execution","type":"bool"}]}}`
@@ -58,7 +58,7 @@ func TestConfig() {
 			// Static lookup tables are the traditional use case (point 2 above) of Lookup tables. These are lookup
 			// tables which contain commonly used addresses in all CCIP execute transactions. The ChainWriter reads
 			// these lookup tables and appends them to the transaction to reduce the size of the transaction.
-			StaticLookupTables: []string{
+			StaticLookupTables: []solana.PublicKey{
 				commonAddressesLookupTable,
 				routerLookupTable,
 			},
@@ -255,7 +255,7 @@ func TestConfig() {
 		InputModifications: nil,
 		ChainSpecificName:  "commit",
 		LookupTables: LookupTables{
-			StaticLookupTables: []string{
+			StaticLookupTables: []solana.PublicKey{
 				commonAddressesLookupTable,
 				routerLookupTable,
 			},
@@ -329,5 +329,5 @@ func TestConfig() {
 			},
 		},
 	}
-	fmt.Println(chainWriterConfig)
+	_ = chainWriterConfig
 }

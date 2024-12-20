@@ -273,7 +273,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 					Name:      "DataAccountPDA",
 					PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: programID.String()},
 					Seeds: []chainwriter.Lookup{
-						// extract seed2 for PDA lookup
+						// extract seed1 for PDA lookup
 						chainwriter.AccountLookup{Name: "seed1", Location: "seed1"},
 					},
 					IsSigner:   true,
@@ -302,7 +302,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 				},
 			},
 		},
-		StaticLookupTables: []string{staticLookupTablePubkey1.String(), staticLookupTablePubkey2.String()},
+		StaticLookupTables: []solana.PublicKey{staticLookupTablePubkey1, staticLookupTablePubkey2},
 	}
 
 	args := map[string]interface{}{
@@ -441,7 +441,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 									},
 								},
 							},
-							StaticLookupTables: []string{staticLookupTablePubkey.String()},
+							StaticLookupTables: []solana.PublicKey{staticLookupTablePubkey},
 						},
 						Accounts: []chainwriter.Lookup{
 							chainwriter.AccountConstant{
@@ -528,16 +528,18 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 		rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Once()
 		txID := uuid.NewString()
 
-		txm.On("Enqueue", mock.Anything, account1.String(), mock.MatchedBy(func(tx *solana.Transaction) bool {
+		txm.On("Enqueue", mock.Anything, admin.String(), mock.MatchedBy(func(tx *solana.Transaction) bool {
 			// match transaction fields to ensure it was built as expected
 			require.Equal(t, recentBlockHash, tx.Message.RecentBlockhash)
 			require.Len(t, tx.Message.Instructions, 1)
-			require.Len(t, tx.Message.AccountKeys, 5)                                                // fee payer + derived accounts
-			require.Equal(t, admin, tx.Message.AccountKeys[0])                                       // fee payer
-			require.Equal(t, account1, tx.Message.AccountKeys[1])                                    // account constant
-			require.Equal(t, account2, tx.Message.AccountKeys[2])                                    // account lookup
-			require.Equal(t, account3, tx.Message.AccountKeys[3])                                    // pda lookup
-			require.Equal(t, programID, tx.Message.AccountKeys[4])                                   // instruction program ID
+			require.Len(t, tx.Message.AccountKeys, 6)                           // fee payer + derived accounts
+			require.Equal(t, admin, tx.Message.AccountKeys[0])                  // fee payer
+			require.Equal(t, account1, tx.Message.AccountKeys[1])               // account constant
+			require.Equal(t, account2, tx.Message.AccountKeys[2])               // account lookup
+			require.Equal(t, account3, tx.Message.AccountKeys[3])               // pda lookup
+			require.Equal(t, solana.SystemProgramID, tx.Message.AccountKeys[4]) // system program ID
+			require.Equal(t, programID, tx.Message.AccountKeys[5])              // instruction program ID
+			// instruction program ID
 			require.Len(t, tx.Message.AddressTableLookups, 1)                                        // address table look contains entry
 			require.Equal(t, derivedLookupTablePubkey, tx.Message.AddressTableLookups[0].AccountKey) // address table
 			return true
