@@ -70,7 +70,7 @@ func (q *queryArgs) withEventName(eventName string) *queryArgs {
 }
 
 // withEventSig sets the EventSig field in queryArgs.
-func (q *queryArgs) withEventSig(eventSig []byte) *queryArgs {
+func (q *queryArgs) withEventSig(eventSig EventSignature) *queryArgs {
 	return q.withField("event_sig", eventSig)
 }
 
@@ -99,7 +99,7 @@ func (q *queryArgs) withMaxLogsKept(maxLogsKept int64) *queryArgs {
 	return q.withField("max_logs_kept", maxLogsKept)
 }
 
-func newQueryArgsForEvent(chainID string, address PublicKey, eventSig []byte) *queryArgs {
+func newQueryArgsForEvent(chainID string, address PublicKey, eventSig EventSignature) *queryArgs {
 	return newQueryArgs(chainID).
 		withAddress(address).
 		withEventSig(eventSig)
@@ -113,8 +113,17 @@ func (q *queryArgs) withEndBlock(endBlock int64) *queryArgs {
 	return q.withField("end_block", endBlock)
 }
 
+// withIsBackfilled sets the isBackfilled field in queryArgs.
+func (q *queryArgs) withIsBackfilled(isBackfilled bool) *queryArgs {
+	return q.withField("is_backfilled", isBackfilled)
+}
+
 func logsQuery(clause string) string {
 	return fmt.Sprintf(`SELECT %s FROM solana.logs %s`, strings.Join(logsFields[:], ", "), clause)
+}
+
+func filtersQuery(clause string) string {
+	return fmt.Sprintf(`SELECT %s FROM solana.log_poller_filters %s`, strings.Join(filterFields[:], ", "), clause)
 }
 
 func (q *queryArgs) toArgs() (map[string]any, error) {
