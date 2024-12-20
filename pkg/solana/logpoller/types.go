@@ -4,9 +4,12 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"slices"
 
 	"github.com/gagliardetto/solana-go"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
 type PublicKey solana.PublicKey
@@ -76,26 +79,7 @@ func (p SubkeyPaths) Value() (driver.Value, error) {
 }
 
 func (p *SubkeyPaths) Scan(src interface{}) error {
-	var bSrc []byte
-	switch src := src.(type) {
-	case string:
-		bSrc = []byte(src)
-	case []byte:
-		bSrc = src
-	default:
-		return fmt.Errorf("can't scan %T into SubkeyPaths", src)
-	}
-
-	if len(bSrc) == 0 || string(bSrc) == "null" {
-		return nil
-	}
-
-	err := json.Unmarshal(bSrc, p)
-	if err != nil {
-		return fmt.Errorf("failed to scan %v into SubkeyPaths: %w", string(bSrc), err)
-	}
-
-	return nil
+	return scanJson("SubkeyPaths", p, src)
 }
 
 func (p SubkeyPaths) Equal(o SubkeyPaths) bool {
@@ -114,4 +98,51 @@ func (s *EventSignature) Scan(src interface{}) error {
 // Value implements valuer for database/sql.
 func (s EventSignature) Value() (driver.Value, error) {
 	return s[:], nil
+}
+
+type EventTypeProvider interface {
+	CreateType(eventIdl codec.IdlEvent, typedefSlice codec.IdlTypeDefSlice, subKeyPath []string) (any, error)
+}
+
+type EventIdl struct {
+	codec.IdlEvent
+	codec.IdlTypeDefSlice
+}
+
+func (e *EventIdl) Scan(src interface{}) error {
+	return scanJson("EventIdl", e, src)
+}
+
+func (e EventIdl) Value() (driver.Value, error) {
+	return json.Marshal(map[string]any{
+		"IdlEvent":        e.IdlEvent,
+		"IdlTypeDefSlice": e.IdlTypeDefSlice,
+	})
+}
+
+func (p EventIdl) Equal(o EventIdl) bool {
+	return reflect.DeepEqual(p, o)
+}
+
+func scanJson(name string, dest, src interface{}) error {
+	var bSrc []byte
+	switch src := src.(type) {
+	case string:
+		bSrc = []byte(src)
+	case []byte:
+		bSrc = src
+	default:
+		return fmt.Errorf("can't scan %T into %s", src, name)
+	}
+
+	if len(bSrc) == 0 || string(bSrc) == "null" {
+		return nil
+	}
+
+	err := json.Unmarshal(bSrc, dest)
+	if err != nil {
+		return fmt.Errorf("failed to scan %v into %s: %w", string(bSrc), name, err)
+	}
+
+	return nil
 }

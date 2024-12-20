@@ -19,8 +19,6 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 )
 
 var ZeroAddress = [32]byte{}
@@ -53,10 +51,12 @@ func Map[T, V any](ts []T, fn func(T) V) []V {
 	return result
 }
 
-func Discriminator(namespace, name string) logpoller.EventSignature {
+const DiscriminatorLength = 8
+
+func Discriminator(namespace, name string) [DiscriminatorLength]byte {
 	h := sha256.New()
 	h.Write([]byte(fmt.Sprintf("%s:%s", namespace, name)))
-	return logpoller.EventSignature(h.Sum(nil)[:8])
+	return [DiscriminatorLength]byte(h.Sum(nil)[:DiscriminatorLength])
 }
 
 func FundAccounts(ctx context.Context, accounts []solana.PrivateKey, solanaGoClient *rpc.Client, t *testing.T) {
@@ -97,7 +97,7 @@ func IsEvent(event string, data []byte) bool {
 		return false
 	}
 	d := Discriminator("event", event)
-	return bytes.Equal(d, data[:8])
+	return bytes.Equal(d[:], data[:8])
 }
 
 func ParseEvent(logs []string, event string, obj interface{}, print ...bool) error {

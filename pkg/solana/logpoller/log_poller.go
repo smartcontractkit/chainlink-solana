@@ -6,12 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"reflect"
 	"time"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
@@ -19,7 +18,8 @@ import (
 )
 
 var (
-	ErrFilterNameConflict = errors.New("filter with such name already exists")
+	ErrFilterNameConflict       = errors.New("filter with such name already exists")
+	ErrMissingEventTypeProvider = errors.New("cannot start LogPoller without EventTypeProvider")
 )
 
 type ORM interface {
@@ -43,6 +43,7 @@ type LogPoller struct {
 	services.Service
 	eng *services.Engine
 	services.StateMachine
+
 	lggr      logger.SugaredLogger
 	orm       ORM
 	client    internal.Loader[client.Reader]
@@ -51,17 +52,16 @@ type LogPoller struct {
 	filters             *filters
 	discriminatorLookup map[string]string
 	events              []ProgramEvent
-	codec               commontypes.RemoteCodec
-
-	chStop services.StopChan
+	typeProvider        EventTypeProvider
 }
 
-func New(lggr logger.SugaredLogger, orm ORM, cl internal.Loader[client.Reader]) ILogPoller {
+func New(lggr logger.SugaredLogger, orm ORM, cl internal.Loader[client.Reader], typeProvider EventTypeProvider) ILogPoller {
 	lggr = logger.Sugared(logger.Named(lggr, "LogPoller"))
 	lp := &LogPoller{
-		orm:     orm,
-		client:  cl,
-		filters: newFilters(lggr, orm),
+		orm:          orm,
+		client:       cl,
+		filters:      newFilters(lggr, orm),
+		typeProvider: typeProvider,
 	}
 
 	lp.Service, lp.eng = services.Config{
@@ -74,13 +74,17 @@ func New(lggr logger.SugaredLogger, orm ORM, cl internal.Loader[client.Reader]) 
 }
 
 func (lp *LogPoller) start(context.Context) error {
-	lp.eng.Go(lp.run)
-	lp.eng.Go(lp.backgroundWorkerRun)
+	if lp.typeProvider == nil {
+		return ErrMissingEventTypeProvider
+	}
 	cl, err := lp.client.Get()
 	if err != nil {
 		return err
 	}
 	lp.collector = NewEncodedLogCollector(cl, lp, lp.lggr)
+
+	lp.eng.Go(lp.run)
+	lp.eng.Go(lp.backgroundWorkerRun)
 	return nil
 }
 
@@ -93,7 +97,7 @@ func makeLogIndex(txIndex int, txLogIndex uint) int64 {
 
 // Process - process stream of events coming from log ingester
 func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
-	ctx, cancel := utils.ContextFromChan(lp.chStop)
+	ctx, cancel := utils.ContextFromChan(lp.eng.StopChan)
 	defer cancel()
 
 	blockData := programEvent.BlockData
@@ -117,15 +121,14 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 			return err
 		}
 
-		var event any
-		err = lp.filters.EventCodec(filter.ID).Decode(ctx, log.Data, &event, filter.EventName)
-		if err != nil {
-			return err
-		}
+		for _, path := range filter.SubkeyPaths {
 
-		err = lp.ExtractSubkeys(reflect.TypeOf(event), filter.SubkeyPaths)
-		if err != nil {
-			return err
+			var event any
+			event, err = lp.typeProvider.CreateType(filter.EventIdl.IdlEvent, filter.EventIdl.IdlTypeDefSlice, path)
+			bin.UnmarshalBorsh(&event, log.Data)
+			if err != nil {
+				return err
+			}
 		}
 
 		// TODO: fill in, and keep track of SequenceNumber for each filter. (Initialize from db on LoadFilters, then increment each time?)
@@ -135,23 +138,6 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 
 	lp.orm.InsertLogs(ctx, logs)
 	return nil
-}
-
-func (lp *LogPoller) ExtractSubkeys(t reflect.Type, paths SubkeyPaths) error {
-	s := reflect.TypeOf(event)
-	if s.Kind() != reflect.Struct {
-		return fmt.Errorf("event type must be struct, got %v. event=%v", t, event)
-	}
-
-	for _, path := range paths[0] {
-		field, err := s.FieldByName(path)
-		for depth := 0; depth < len(paths); depth++ {
-			for _, path := range paths[depth] {
-				field, err = field.Type.FieldByName(path)
-			}
-		}
-	}
-
 }
 
 // RegisterFilter - refer to filters.RegisterFilter for details.

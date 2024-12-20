@@ -12,10 +12,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/utils"
 )
 
@@ -30,7 +27,6 @@ type filters struct {
 	filtersToDelete     map[int64]Filter
 	filtersMutex        sync.RWMutex
 	loadedFilters       atomic.Bool
-	eventCodecs         map[int64]types.RemoteCodec
 	knownPrograms       map[string]uint // fast lookup to see if a base58-encoded ProgramID matches any registered filters
 	knownDiscriminators map[string]uint // fast lookup by first 10 characters (60-bits) of a base64-encoded discriminator
 }
@@ -86,11 +82,6 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 		return fmt.Errorf("failed to load filters: %w", err)
 	}
 
-	eventCodec, err := codec.NewIDLEventCodec(filter.EventIDL, config.BuilderForEncoding(config.EncodingTypeBorsh))
-	if err != nil {
-		return fmt.Errorf("invalid event IDL for filter %s: %w", filter.Name, err)
-	}
-
 	filter.EventSig = utils.Discriminator("event", filter.EventName)
 
 	fl.filtersMutex.Lock()
@@ -135,8 +126,6 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 	if !filter.IsBackfilled {
 		fl.filtersToBackfill[filter.ID] = struct{}{}
 	}
-
-	fl.eventCodecs[filter.ID] = eventCodec
 
 	programID := filter.Address.ToSolana().String()
 	if _, ok := fl.knownPrograms[programID]; !ok {
@@ -262,10 +251,6 @@ func (fl *filters) MatchingFilters(addr PublicKey, eventSignature EventSignature
 			}
 		}
 	}
-}
-
-func (fl *filters) EventCodec(ID int64) types.RemoteCodec {
-	return fl.eventCodecs[ID]
 }
 
 // MatchchingFiltersForEncodedEvent - similar to MatchingFilters but accepts a raw encoded event. Under normal operation,

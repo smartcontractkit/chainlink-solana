@@ -4,8 +4,6 @@ import (
 	"time"
 
 	"github.com/lib/pq"
-
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
 type Filter struct {
@@ -15,7 +13,7 @@ type Filter struct {
 	EventName     string
 	EventSig      EventSignature
 	StartingBlock int64
-	EventIDL      codec.IDL
+	EventIdl      EventIdl
 	SubkeyPaths   SubkeyPaths
 	Retention     time.Duration
 	MaxLogsKept   int64
@@ -24,7 +22,8 @@ type Filter struct {
 }
 
 func (f Filter) MatchSameLogs(other Filter) bool {
-	return f.Address == other.Address && f.EventSig == other.EventSig && f.EventIDL == other.EventIDL && f.SubkeyPaths.Equal(other.SubkeyPaths)
+	return f.Address == other.Address && f.EventSig == other.EventSig &&
+		f.EventIdl.Equal(other.EventIdl) && f.SubkeyPaths.Equal(other.SubkeyPaths)
 }
 
 type Log struct {

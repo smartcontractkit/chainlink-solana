@@ -27,6 +27,10 @@ func NewORM(chainID string, ds sqlutil.DataSource, lggr logger.Logger) *DSORM {
 	}
 }
 
+func (o *DSORM) ChainID() string {
+	return o.chainID
+}
+
 func (o *DSORM) Transact(ctx context.Context, fn func(*DSORM) error) (err error) {
 	return sqlutil.Transact(ctx, o.new, o.ds, nil, fn)
 }
@@ -48,7 +52,7 @@ func (o *DSORM) InsertFilter(ctx context.Context, filter Filter) (id int64, err 
 		withEventName(filter.EventName).
 		withEventSig(filter.EventSig).
 		withStartingBlock(filter.StartingBlock).
-		withEventIDL(filter.EventIDL).
+		withEventIDL(filter.EventIdl).
 		withSubkeyPaths(filter.SubkeyPaths).
 		withIsBackfilled(filter.IsBackfilled).
 		toArgs()
