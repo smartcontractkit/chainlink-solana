@@ -7,7 +7,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/codec"
+	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -82,7 +82,7 @@ type chainDataProcedureFields struct {
 	IDLAccount string `json:"idlAccount,omitempty"`
 	// OutputModifications provides modifiers to convert chain data format to custom
 	// output formats.
-	OutputModifications codec.ModifiersConfig `json:"outputModifications,omitempty"`
+	OutputModifications commoncodec.ModifiersConfig `json:"outputModifications,omitempty"`
 	// RPCOpts provides optional configurations for commitment, encoding, and data
 	// slice offsets.
 	RPCOpts *RPCOpts `json:"rpcOpts,omitempty"`
