@@ -3,7 +3,6 @@
 package logpoller
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -11,20 +10,19 @@ import (
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/lib/pq"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/pg"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/pg"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
 // NOTE: at the moment it's not possible to run all db tests at once. This issue will be addressed separately
 
 func TestLogPollerFilters(t *testing.T) {
 	lggr := logger.Test(t)
-	dbURL, ok := os.LookupEnv("CL_DATABASE_URL")
-	require.True(t, ok, "CL_DATABASE_URL must be set")
 	chainID := uuid.NewString()
-	dbx := pg.NewSqlxDB(t, dbURL)
+	dbx := pg.NewTestDB(t, pg.TestURL(t))
 	orm := NewORM(chainID, dbx, lggr)
 
 	privateKey, err := solana.NewRandomPrivateKey()
@@ -109,10 +107,8 @@ func newRandomFilter(t *testing.T) Filter {
 
 func TestLogPollerLogs(t *testing.T) {
 	lggr := logger.Test(t)
-	dbURL, ok := os.LookupEnv("CL_DATABASE_URL")
-	require.True(t, ok, "CL_DATABASE_URL must be set")
 	chainID := uuid.NewString()
-	dbx := pg.NewSqlxDB(t, dbURL)
+	dbx := pg.NewTestDB(t, pg.TestURL(t))
 	orm := NewORM(chainID, dbx, lggr)
 
 	privateKey, err := solana.NewRandomPrivateKey()
