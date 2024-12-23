@@ -294,7 +294,12 @@ type accountIDLTypes struct {
 }
 
 func (s *SolanaChainReaderService) addAccountRead(namespace string, itemType string, idl codec.IDL, idlType codec.IdlTypeDef, readDefinition config.ReadDefinition) error {
-	if err := s.addCodecDef(true, namespace, itemType, codec.ChainConfigTypeAccountDef, idl, idlType, readDefinition.InputModifications); err != nil {
+	inputAccountIDLDef := codec.NilIdlTypeDefTy
+	// TODO:
+	//		if hasPDA{
+	//			inputAccountIDLDef = pdaType
+	//		}
+	if err := s.addCodecDef(true, namespace, itemType, codec.ChainConfigTypeAccountDef, idl, inputAccountIDLDef, readDefinition.InputModifications); err != nil {
 		return err
 	}
 

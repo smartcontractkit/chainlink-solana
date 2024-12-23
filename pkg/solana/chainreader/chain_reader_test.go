@@ -454,7 +454,7 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 						ReadType:          config.Account,
 						OutputModifications: codeccommon.ModifiersConfig{
 							&codeccommon.AddressBytesToStringModifierConfig{
-								Fields: []string{"Accountstruct.Accountstr"},
+								Fields: []string{"AccountStruct.AccountStr"},
 							},
 							&codeccommon.HardCodeModifierConfig{OffChainValues: map[string]any{"ExtraField": AnyExtraValue}},
 						},
@@ -810,7 +810,7 @@ const (
 				{"name": "nestedStaticStruct","type": {"defined": "MidLevelStaticStruct"}},
 				{"name": "oracleID","type": "u8"},
 				{"name": "oracleIDs","type": {"array": ["u8",32]}},
-				{"name": "accountstruct","type": {"defined": "accountstruct"}},
+				{"name": "accountStruct","type": {"defined": "accountStruct"}},
 				{"name": "accounts","type": {"vec": "bytes"}}
 
 			]
@@ -818,12 +818,12 @@ const (
 	}`
 
 	accountStructIDL = `{
-		"name": "accountstruct",
+		"name": "accountStruct",
 		"type": {
 			"kind": "struct",
 			"fields": [
 				{"name": "account", "type": "bytes"},
-				{"name": "accountstr", "type": {"array": ["u8",32]}}
+				{"name": "accountStr", "type": {"array": ["u8",32]}}
 			]
 		}
 	}`
