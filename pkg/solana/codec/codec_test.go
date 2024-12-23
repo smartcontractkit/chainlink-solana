@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "embed"
 	"slices"
+	"sync"
 	"testing"
 
 	bin "github.com/gagliardetto/binary"
@@ -52,15 +53,22 @@ func FuzzCodec(f *testing.F) {
 }
 
 type codecInterfaceTester struct {
+	accountBytesMu sync.Mutex
+	accountBytes   []byte
 	TestSelectionSupport
 }
 
 func (it *codecInterfaceTester) Setup(_ *testing.T) {}
 
 func (it *codecInterfaceTester) GetAccountBytes(_ int) []byte {
-	// TODO solana base58 string can be of variable length, this value is always 44, but it should be able to handle any length 32-44
-	pk := solana.PublicKeyFromBytes([]byte{220, 108, 195, 188, 166, 6, 163, 39, 197, 131, 44, 38, 154, 177, 232, 80, 141, 50, 7, 65, 28, 65, 182, 165, 57, 5, 176, 68, 46, 181, 58, 245})
-	return pk.Bytes()
+	it.accountBytesMu.Lock()
+	defer it.accountBytesMu.Unlock()
+	if len(it.accountBytes) != 32 {
+		pk, _ := solana.NewRandomPrivateKey()
+		it.accountBytes = pk.PublicKey().Bytes()
+	}
+
+	return it.accountBytes
 }
 
 func (it *codecInterfaceTester) GetAccountString(i int) string {
