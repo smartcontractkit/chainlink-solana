@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	codeccommon "github.com/smartcontractkit/chainlink-common/pkg/codec"
-	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
@@ -30,7 +29,7 @@ func TestChainReaderConfig(t *testing.T) {
 	t.Run("valid unmarshal", func(t *testing.T) {
 		t.Parallel()
 
-		var result config.ChainReader
+		var result config.ContractReader
 		require.NoError(t, json.Unmarshal([]byte(validJSON), &result))
 		assert.Equal(t, validChainReaderConfig, result)
 	})
@@ -38,7 +37,7 @@ func TestChainReaderConfig(t *testing.T) {
 	t.Run("invalid unmarshal", func(t *testing.T) {
 		t.Parallel()
 
-		var result config.ChainReader
+		var result config.ContractReader
 		require.ErrorIs(t, json.Unmarshal([]byte(invalidJSON), &result), types.ErrInvalidConfig)
 	})
 
@@ -49,31 +48,11 @@ func TestChainReaderConfig(t *testing.T) {
 
 		require.NoError(t, err)
 
-		var conf config.ChainReader
+		var conf config.ContractReader
 
 		require.NoError(t, json.Unmarshal(result, &conf))
 		assert.Equal(t, validChainReaderConfig, conf)
 	})
-}
-
-func TestEncodingType_Fail(t *testing.T) {
-	t.Parallel()
-
-	_, err := json.Marshal(config.EncodingType(100))
-
-	require.NotNil(t, err)
-
-	var tp config.EncodingType
-
-	require.ErrorIs(t, json.Unmarshal([]byte(`42`), &tp), types.ErrInvalidConfig)
-	require.ErrorIs(t, json.Unmarshal([]byte(`"invalid"`), &tp), types.ErrInvalidConfig)
-}
-
-func TestBuilderForEncoding_Default(t *testing.T) {
-	t.Parallel()
-
-	builder := config.BuilderForEncoding(config.EncodingType(100))
-	require.Equal(t, binary.LittleEndian(), builder)
 }
 
 var (
@@ -83,45 +62,33 @@ var (
 	length         = uint64(10)
 )
 
-var validChainReaderConfig = config.ChainReader{
-	Namespaces: map[string]config.ChainReaderMethods{
+var validChainReaderConfig = config.ContractReader{
+	Namespaces: map[string]config.ChainContractReader{
 		"Contract": {
-			Methods: map[string]config.ChainDataReader{
+			Reads: map[string]config.ReadDefinition{
 				"Method": {
-					AnchorIDL: "test idl 1",
-					Encoding:  config.EncodingTypeBorsh,
-					Procedure: config.ChainReaderProcedure{
-						IDLAccount: testutils.TestStructWithNestedStruct,
-					},
+					ChainSpecificName: testutils.TestStructWithNestedStruct,
 				},
 				"MethodWithOpts": {
-					AnchorIDL: "test idl 2",
-					Encoding:  config.EncodingTypeBorsh,
-					Procedure: config.ChainReaderProcedure{
-						IDLAccount: testutils.TestStructWithNestedStruct,
-						OutputModifications: codeccommon.ModifiersConfig{
-							&codeccommon.PropertyExtractorConfig{FieldName: "DurationVal"},
-						},
-						RPCOpts: &config.RPCOpts{
-							Encoding:   &encodingBase64,
-							Commitment: &commitment,
-							DataSlice: &rpc.DataSlice{
-								Offset: &offset,
-								Length: &length,
-							},
+					ChainSpecificName: testutils.TestStructWithNestedStruct,
+					OutputModifications: codeccommon.ModifiersConfig{
+						&codeccommon.PropertyExtractorConfig{FieldName: "DurationVal"},
+					},
+					RPCOpts: &config.RPCOpts{
+						Encoding:   &encodingBase64,
+						Commitment: &commitment,
+						DataSlice: &rpc.DataSlice{
+							Offset: &offset,
+							Length: &length,
 						},
 					},
 				},
 			},
 		},
 		"OtherContract": {
-			Methods: map[string]config.ChainDataReader{
+			Reads: map[string]config.ReadDefinition{
 				"Method": {
-					AnchorIDL: "test idl 3",
-					Encoding:  config.EncodingTypeBincode,
-					Procedure: config.ChainReaderProcedure{
-						IDLAccount: testutils.TestStructWithNestedStruct,
-					},
+					ChainSpecificName: testutils.TestStructWithNestedStruct,
 				},
 			},
 		},

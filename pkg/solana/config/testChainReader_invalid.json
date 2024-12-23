@@ -1,12 +1,35 @@
 {
   "namespaces": {
-    "Contract": {
-      "methods": {
-        "Method": {
-          "anchorIDL": "test idl 1",
-          "encoding": "invalid",
-          "procedure": {
-            "idlAccount": "StructWithNestedStruct"
+    "example_namespace": {
+      "anchorIDL": {
+        "name": "example_invalid_idl_name",
+        "version": "1.0.0"
+      },
+      "reads": {
+        "someRead": {
+          "chainSpecificName": "some_chain_specific_name",
+          "readType": 0,
+          "inputModifications": [
+            {
+              "path": "someInputPath",
+              "action": "replace",
+              "value": "newValue"
+            }
+          ],
+          "outputModifications": [
+            {
+              "path": "someOutputPath",
+              "action": "extract",
+              "value": "desiredField"
+            }
+          ],
+          "rpcOpts": {
+            "encoding": "base64",
+            "commitment": "processed",
+            "dataSlice": {
+              "offset": 0,
+              "length": 32
+            }
           }
         }
       }

@@ -10,7 +10,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
-	codeccommon "github.com/smartcontractkit/chainlink-common/pkg/codec"
+	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -33,6 +33,8 @@ type SolanaChainReaderService struct {
 	// internal values
 	bindings namespaceBindings
 	lookup   *lookup
+	parsed   *codec.ParsedTypes
+	codec    types.RemoteCodec
 
 	// service state management
 	wg sync.WaitGroup
@@ -45,19 +47,25 @@ var (
 )
 
 // NewChainReaderService is a constructor for a new ChainReaderService for Solana. Returns a nil service on error.
-func NewChainReaderService(lggr logger.Logger, dataReader MultipleAccountGetter, cfg config.ChainReader) (*SolanaChainReaderService, error) {
+func NewChainReaderService(lggr logger.Logger, dataReader MultipleAccountGetter, cfg config.ContractReader) (*SolanaChainReaderService, error) {
 	svc := &SolanaChainReaderService{
 		lggr:     logger.Named(lggr, ServiceName),
 		client:   dataReader,
 		bindings: namespaceBindings{},
 		lookup:   newLookup(),
+		parsed:   &codec.ParsedTypes{EncoderDefs: map[string]codec.Entry{}, DecoderDefs: map[string]codec.Entry{}},
 	}
 
 	if err := svc.init(cfg.Namespaces); err != nil {
 		return nil, err
 	}
 
-	return svc, nil
+	if svcCodec, err := svc.parsed.ToCodec(); err != nil {
+		return nil, err
+	} else {
+		svc.codec = svcCodec
+		return svc, nil
+	}
 }
 
 // Name implements the services.ServiceCtx interface and returns the logger service name.
@@ -220,51 +228,106 @@ func (s *SolanaChainReaderService) CreateContractType(readIdentifier string, for
 	return s.bindings.CreateType(values.contract, values.readName, forEncoding)
 }
 
-func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainReaderMethods) error {
-	for namespace, methods := range namespaces {
-		for methodName, method := range methods.Methods {
+func (s *SolanaChainReaderService) addCodecDef(isInput bool, namespace, itemType string, readType codec.ChainConfigType, idl codec.IDL, idlDefinition interface{}, modCfg commoncodec.ModifiersConfig) error {
+	mod, err := modCfg.ToModifier(codec.DecoderHooks...)
+	if err != nil {
+		return err
+	}
+
+	cEntry, err := codec.CreateCodecEntry(idlDefinition, itemType, idl, mod)
+	if err != nil {
+		return err
+	}
+
+	s.parsed.EncoderDefs[codec.WrapItemType(isInput, namespace, itemType, readType)] = cEntry
+	return nil
+}
+
+func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainContractReader) error {
+	for namespace, namespaceReads := range namespaces {
+		for readName, read := range namespaceReads.Reads {
 			var idl codec.IDL
-			if err := json.Unmarshal([]byte(method.AnchorIDL), &idl); err != nil {
+			if err := json.Unmarshal([]byte(namespaceReads.IDL), &idl); err != nil {
 				return err
 			}
 
-			idlCodec, err := codec.NewIDLAccountCodec(idl, config.BuilderForEncoding(method.Encoding))
+			injectAddressModifier(read.InputModifications, read.OutputModifications)
+			idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeAccountDef, read.ChainSpecificName, idl)
 			if err != nil {
 				return err
 			}
 
-			s.lookup.addReadNameForContract(namespace, methodName)
-
-			procedure := method.Procedure
-
-			injectAddressModifier(procedure.OutputModifications)
-
-			mod, err := procedure.OutputModifications.ToModifier(codec.DecoderHooks...)
-			if err != nil {
-				return err
+			switch read.ReadType {
+			case config.Account:
+				accountIDLDef, isOk := idlDef.(codec.IdlTypeDef)
+				if !isOk {
+					return fmt.Errorf("unexpected type %T from IDL definition for account read: %q, with onchain name: %q, of type: %q", accountIDLDef, readName, read.ChainSpecificName, read.ReadType)
+				}
+				if err = s.addAccountRead(namespace, readName, idl, accountIDLTypes{
+					Account: accountIDLDef,
+					Types:   idl.Types,
+				}, read); err != nil {
+					return err
+				}
+			case config.Log:
+				eventIDlDef, isOk := idlDef.(codec.IdlEvent)
+				if !isOk {
+					return fmt.Errorf("unexpected type %T from IDL definition for log read: %q, with onchain name: %q, of type: %q", eventIDlDef, readName, read.ChainSpecificName, read.ReadType)
+				}
+				// TODO s.addLogRead()
+			default:
+				return fmt.Errorf("unexpected read type %q for: %q in namespace: %q", read.ReadType, readName, namespace)
 			}
-
-			codecWithModifiers, err := codec.NewNamedModifierCodec(idlCodec, procedure.IDLAccount, mod)
-			if err != nil {
-				return err
-			}
-
-			s.bindings.AddReadBinding(namespace, methodName, newAccountReadBinding(
-				procedure.IDLAccount,
-				codecWithModifiers,
-				createRPCOpts(procedure.RPCOpts),
-			))
 		}
 	}
 
 	return nil
 }
 
+type accountIDLTypes struct {
+	Account codec.IdlTypeDef
+	Types   codec.IdlTypeDefSlice
+}
+
+func (s *SolanaChainReaderService) addAccountRead(namespace string, itemType string, idl codec.IDL, idlType accountIDLTypes, readDefinition config.ReadDefinition) error {
+	// TODO if readDefinition.HasPDASeedInput{
+	//	 if err := s.addCodecDef(false, namespace, itemType, codec.ChainConfigTypeAccountDef, idl,idlType, readDefinition.InputModifications,; err != nil {
+	//		return err
+	//			}
+	//		}
+
+	if err := s.addCodecDef(false, namespace, itemType, codec.ChainConfigTypeAccountDef, idl, idlType, readDefinition.OutputModifications); err != nil {
+		return err
+	}
+
+	s.lookup.addReadNameForContract(namespace, itemType)
+	s.bindings.AddReadBinding(namespace, itemType, newAccountReadBinding(
+		readDefinition.ChainSpecificName,
+		// TODO codec is not created at this point, set codec for all bindings after init
+		s.codec,
+		createRPCOpts(readDefinition.RPCOpts),
+	))
+
+	return nil
+}
+
+func (s *SolanaChainReaderService) addLogRead() error {
+	// TODO: init codec types and modifiers, do address lookup here if needed? ...
+	return nil
+}
+
 // injectAddressModifier injects AddressModifier into OutputModifications.
 // This is necessary because AddressModifier cannot be serialized and must be applied at runtime.
-func injectAddressModifier(outputModifications codeccommon.ModifiersConfig) {
+func injectAddressModifier(inputModifications, outputModifications commoncodec.ModifiersConfig) {
+	for i, modConfig := range inputModifications {
+		if addrModifierConfig, ok := modConfig.(*commoncodec.AddressBytesToStringModifierConfig); ok {
+			addrModifierConfig.Modifier = codec.SolanaAddressModifier{}
+			outputModifications[i] = addrModifierConfig
+		}
+	}
+
 	for i, modConfig := range outputModifications {
-		if addrModifierConfig, ok := modConfig.(*codeccommon.AddressBytesToStringModifierConfig); ok {
+		if addrModifierConfig, ok := modConfig.(*commoncodec.AddressBytesToStringModifierConfig); ok {
 			addrModifierConfig.Modifier = codec.SolanaAddressModifier{}
 			outputModifications[i] = addrModifierConfig
 		}

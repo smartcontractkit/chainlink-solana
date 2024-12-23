@@ -73,22 +73,14 @@ func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
 			return nil, err
 		}
 
-		definition, err := findDefinitionFromIDL(cfg.Type, cfg.OnChainName, idl)
+		definition, err := FindDefinitionFromIDL(cfg.Type, cfg.OnChainName, idl)
 		if err != nil {
 			return nil, err
 		}
 
-		var cEntry Entry
-		switch v := definition.(type) {
-		case IdlTypeDef:
-			cEntry, err = NewAccountEntry(offChainName, v, idl.Types, true, mod, binary.LittleEndian())
-		case IdlInstruction:
-			cEntry, err = NewInstructionArgsEntry(offChainName, v, idl.Types, mod, binary.LittleEndian())
-		case IdlEvent:
-			cEntry, err = NewEventArgsEntry(offChainName, v, idl.Types, true, mod, binary.LittleEndian())
-		}
+		cEntry, err := CreateCodecEntry(definition, offChainName, idl, mod)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create %q codec entry: %w", offChainName, err)
+			return nil, err
 		}
 
 		parsed.EncoderDefs[offChainName] = cEntry
@@ -98,7 +90,25 @@ func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
 	return parsed.ToCodec()
 }
 
-func findDefinitionFromIDL(cfgType ChainConfigType, onChainName string, idl IDL) (interface{}, error) {
+func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl IDL, mod commoncodec.Modifier) (entry Entry, err error) {
+	switch v := idlDefinition.(type) {
+	case IdlTypeDef:
+		entry, err = NewAccountEntry(offChainName, AccountIDLTypes{Account: v, Types: idl.Types}, true, mod, binary.LittleEndian())
+	case IdlInstruction:
+		entry, err = NewInstructionArgsEntry(offChainName, InstructionArgsIDLTypes{Instruction: v, Types: idl.Types}, mod, binary.LittleEndian())
+	case IdlEvent:
+		entry, err = NewEventArgsEntry(offChainName, EventIDLTypes{Event: v, Types: idl.Types}, true, mod, binary.LittleEndian())
+	default:
+		return nil, fmt.Errorf("unknown codec IDL definition: %T", idlDefinition)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to create %q codec entry: %w", offChainName, err)
+	}
+
+	return entry, nil
+}
+
+func FindDefinitionFromIDL(cfgType ChainConfigType, onChainName string, idl IDL) (interface{}, error) {
 	// not the most efficient way to do this, but these slices should always be very, very small
 	switch cfgType {
 	case ChainConfigTypeAccountDef:
@@ -126,6 +136,14 @@ func findDefinitionFromIDL(cfgType ChainConfigType, onChainName string, idl IDL)
 		return nil, fmt.Errorf("failed to find event %q in IDL", onChainName)
 	}
 	return nil, fmt.Errorf("unknown type: %q", cfgType)
+}
+
+func WrapItemType(isInput bool, contractName, itemType string, readType ChainConfigType) string {
+	if isInput {
+		return fmt.Sprintf("input.%s.%s", contractName, itemType)
+	}
+
+	return fmt.Sprintf("output.%s.%s.%s", readType, contractName, itemType)
 }
 
 // NewIDLAccountCodec is for Anchor custom types

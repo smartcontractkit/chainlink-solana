@@ -33,30 +33,40 @@ type entry struct {
 	discriminator        Discriminator
 }
 
-func NewAccountEntry(offchainName string, idlAccount IdlTypeDef, idlTypes IdlTypeDefSlice, includeDiscriminator bool, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
-	_, accCodec, err := createCodecType(idlAccount, createRefs(idlTypes, builder), false)
+type AccountIDLTypes struct {
+	Account IdlTypeDef
+	Types   IdlTypeDefSlice
+}
+
+func NewAccountEntry(offchainName string, idlTypes AccountIDLTypes, includeDiscriminator bool, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
+	_, accCodec, err := createCodecType(idlTypes.Account, createRefs(idlTypes.Types, builder), false)
 	if err != nil {
 		return nil, err
 	}
 
 	return newEntry(
 		offchainName,
-		idlAccount.Name,
+		idlTypes.Account.Name,
 		accCodec,
 		includeDiscriminator,
 		mod,
 	), nil
 }
 
-func NewInstructionArgsEntry(offChainName string, instructions IdlInstruction, idlTypes IdlTypeDefSlice, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
-	_, instructionCodecArgs, err := asStruct(instructions.Args, createRefs(idlTypes, builder), instructions.Name, false, true)
+type InstructionArgsIDLTypes struct {
+	Instruction IdlInstruction
+	Types       IdlTypeDefSlice
+}
+
+func NewInstructionArgsEntry(offChainName string, idlTypes InstructionArgsIDLTypes, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
+	_, instructionCodecArgs, err := asStruct(idlTypes.Instruction.Args, createRefs(idlTypes.Types, builder), idlTypes.Instruction.Name, false, true)
 	if err != nil {
 		return nil, err
 	}
 
 	return newEntry(
 		offChainName,
-		instructions.Name,
+		idlTypes.Instruction.Name,
 		instructionCodecArgs,
 		// Instruction arguments don't need a discriminator by default
 		false,
@@ -64,15 +74,20 @@ func NewInstructionArgsEntry(offChainName string, instructions IdlInstruction, i
 	), nil
 }
 
-func NewEventArgsEntry(offChainName string, event IdlEvent, idlTypes IdlTypeDefSlice, includeDiscriminator bool, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
-	_, eventCodec, err := asStruct(eventFieldsToFields(event.Fields), createRefs(idlTypes, builder), event.Name, false, false)
+type EventIDLTypes struct {
+	Event IdlEvent
+	Types IdlTypeDefSlice
+}
+
+func NewEventArgsEntry(offChainName string, idlTypes EventIDLTypes, includeDiscriminator bool, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
+	_, eventCodec, err := asStruct(eventFieldsToFields(idlTypes.Event.Fields), createRefs(idlTypes.Types, builder), idlTypes.Event.Name, false, false)
 	if err != nil {
 		return nil, err
 	}
 
 	return newEntry(
 		offChainName,
-		event.Name,
+		idlTypes.Event.Name,
 		eventCodec,
 		includeDiscriminator,
 		mod,
