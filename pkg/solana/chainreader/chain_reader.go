@@ -60,12 +60,15 @@ func NewChainReaderService(lggr logger.Logger, dataReader MultipleAccountGetter,
 		return nil, err
 	}
 
-	if svcCodec, err := svc.parsed.ToCodec(); err != nil {
+	svcCodec, err := svc.parsed.ToCodec()
+	if err != nil {
 		return nil, err
-	} else {
-		svc.codec = svcCodec
-		return svc, nil
 	}
+
+	svc.codec = svcCodec
+
+	svc.bindings.SetCodec(svcCodec)
+	return svc, nil
 }
 
 // Name implements the services.ServiceCtx interface and returns the logger service name.
@@ -122,7 +125,7 @@ func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, readIdent
 	batch := []call{
 		{
 			ContractName: vals.contract,
-			ReadName:     vals.readName,
+			ReadName:     vals.name.onChainName,
 			Params:       params,
 			ReturnVal:    returnVal,
 		},
@@ -225,21 +228,25 @@ func (s *SolanaChainReaderService) CreateContractType(readIdentifier string, for
 		return nil, fmt.Errorf("%w: no contract for read identifier", types.ErrInvalidConfig)
 	}
 
-	return s.bindings.CreateType(values.contract, values.readName, forEncoding)
+	return s.bindings.CreateType(values.contract, values.name.onChainName, forEncoding)
 }
 
-func (s *SolanaChainReaderService) addCodecDef(isInput bool, namespace, itemType string, readType codec.ChainConfigType, idl codec.IDL, idlDefinition interface{}, modCfg commoncodec.ModifiersConfig) error {
+func (s *SolanaChainReaderService) addCodecDef(forEncoding bool, namespace, chainAgnosticName string, readType codec.ChainConfigType, idl codec.IDL, idlDefinition interface{}, modCfg commoncodec.ModifiersConfig) error {
 	mod, err := modCfg.ToModifier(codec.DecoderHooks...)
 	if err != nil {
 		return err
 	}
 
-	cEntry, err := codec.CreateCodecEntry(idlDefinition, itemType, idl, mod)
+	cEntry, err := codec.CreateCodecEntry(idlDefinition, chainAgnosticName, idl, mod)
 	if err != nil {
 		return err
 	}
 
-	s.parsed.EncoderDefs[codec.WrapItemType(isInput, namespace, itemType, readType)] = cEntry
+	if forEncoding {
+		s.parsed.EncoderDefs[codec.WrapItemType(forEncoding, namespace, chainAgnosticName, readType)] = cEntry
+	} else {
+		s.parsed.DecoderDefs[codec.WrapItemType(forEncoding, namespace, chainAgnosticName, readType)] = cEntry
+	}
 	return nil
 }
 
@@ -261,18 +268,15 @@ func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainContra
 			case config.Account:
 				accountIDLDef, isOk := idlDef.(codec.IdlTypeDef)
 				if !isOk {
-					return fmt.Errorf("unexpected type %T from IDL definition for account read: %q, with onchain name: %q, of type: %q", accountIDLDef, readName, read.ChainSpecificName, read.ReadType)
+					return fmt.Errorf("unexpected type %T from IDL definition for account read: %q, with onchain onChainName: %q, of type: %q", accountIDLDef, readName, read.ChainSpecificName, read.ReadType)
 				}
-				if err = s.addAccountRead(namespace, readName, idl, accountIDLTypes{
-					Account: accountIDLDef,
-					Types:   idl.Types,
-				}, read); err != nil {
+				if err = s.addAccountRead(namespace, readName, idl, accountIDLDef, read); err != nil {
 					return err
 				}
 			case config.Log:
 				eventIDlDef, isOk := idlDef.(codec.IdlEvent)
 				if !isOk {
-					return fmt.Errorf("unexpected type %T from IDL definition for log read: %q, with onchain name: %q, of type: %q", eventIDlDef, readName, read.ChainSpecificName, read.ReadType)
+					return fmt.Errorf("unexpected type %T from IDL definition for log read: %q, with onchain onChainName: %q, of type: %q", eventIDlDef, readName, read.ChainSpecificName, read.ReadType)
 				}
 				// TODO s.addLogRead()
 			default:
@@ -289,30 +293,28 @@ type accountIDLTypes struct {
 	Types   codec.IdlTypeDefSlice
 }
 
-func (s *SolanaChainReaderService) addAccountRead(namespace string, itemType string, idl codec.IDL, idlType accountIDLTypes, readDefinition config.ReadDefinition) error {
-	// TODO if readDefinition.HasPDASeedInput{
-	//	 if err := s.addCodecDef(false, namespace, itemType, codec.ChainConfigTypeAccountDef, idl,idlType, readDefinition.InputModifications,; err != nil {
-	//		return err
-	//			}
-	//		}
+func (s *SolanaChainReaderService) addAccountRead(namespace string, itemType string, idl codec.IDL, idlType codec.IdlTypeDef, readDefinition config.ReadDefinition) error {
+	if err := s.addCodecDef(true, namespace, itemType, codec.ChainConfigTypeAccountDef, idl, idlType, readDefinition.InputModifications); err != nil {
+		return err
+	}
 
 	if err := s.addCodecDef(false, namespace, itemType, codec.ChainConfigTypeAccountDef, idl, idlType, readDefinition.OutputModifications); err != nil {
 		return err
 	}
 
-	s.lookup.addReadNameForContract(namespace, itemType)
+	s.lookup.addReadNameForContract(namespace, namePair{
+		onChainName: itemType,
+		genericName: idlType.Name,
+	})
+
 	s.bindings.AddReadBinding(namespace, itemType, newAccountReadBinding(
+		namespace,
 		readDefinition.ChainSpecificName,
+		itemType,
 		// TODO codec is not created at this point, set codec for all bindings after init
-		s.codec,
 		createRPCOpts(readDefinition.RPCOpts),
 	))
 
-	return nil
-}
-
-func (s *SolanaChainReaderService) addLogRead() error {
-	// TODO: init codec types and modifiers, do address lookup here if needed? ...
 	return nil
 }
 

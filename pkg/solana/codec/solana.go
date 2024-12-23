@@ -138,8 +138,8 @@ func FindDefinitionFromIDL(cfgType ChainConfigType, onChainName string, idl IDL)
 	return nil, fmt.Errorf("unknown type: %q", cfgType)
 }
 
-func WrapItemType(isInput bool, contractName, itemType string, readType ChainConfigType) string {
-	if isInput {
+func WrapItemType(forEncoding bool, contractName, itemType string, readType ChainConfigType) string {
+	if forEncoding {
 		return fmt.Sprintf("input.%s.%s", contractName, itemType)
 	}
 

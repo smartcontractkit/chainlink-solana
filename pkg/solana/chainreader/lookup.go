@@ -9,7 +9,11 @@ import (
 type readValues struct {
 	address  string
 	contract string
-	readName string
+	name     namePair
+}
+
+type namePair struct {
+	onChainName, genericName string
 }
 
 // lookup provides basic utilities for mapping a complete readIdentifier to
@@ -17,45 +21,45 @@ type readValues struct {
 type lookup struct {
 	mu sync.RWMutex
 	// contractReadNames maps a contract name to all available readNames (method, log, event, etc.)
-	contractReadNames map[string][]string
+	contractReadNames map[string][]namePair
 	// readIdentifiers maps from a complete readIdentifier string to finite read data
-	// a readIdentifier is a combination of address, contract, and readName as a concatenated string
+	// a readIdentifier is a combination of address, contract, and namePair as a concatenated string
 	readIdentifiers map[string]readValues
 }
 
 func newLookup() *lookup {
 	return &lookup{
-		contractReadNames: make(map[string][]string),
+		contractReadNames: make(map[string][]namePair),
 		readIdentifiers:   make(map[string]readValues),
 	}
 }
 
-func (l *lookup) addReadNameForContract(contract, readName string) {
+func (l *lookup) addReadNameForContract(contract string, name namePair) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
 	readNames, exists := l.contractReadNames[contract]
 	if !exists {
-		readNames = []string{}
+		readNames = []namePair{}
 	}
 
-	l.contractReadNames[contract] = append(readNames, readName)
+	l.contractReadNames[contract] = append(readNames, name)
 }
 
 func (l *lookup) bindAddressForContract(contract, address string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	for _, readName := range l.contractReadNames[contract] {
+	for _, namePair := range l.contractReadNames[contract] {
 		readIdentifier := types.BoundContract{
 			Address: address,
 			Name:    contract,
-		}.ReadIdentifier(readName)
+		}.ReadIdentifier(namePair.onChainName)
 
 		l.readIdentifiers[readIdentifier] = readValues{
 			address:  address,
 			contract: contract,
-			readName: readName,
+			name:     namePair,
 		}
 	}
 }
@@ -64,11 +68,11 @@ func (l *lookup) unbindAddressForContract(contract, address string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	for _, readName := range l.contractReadNames[contract] {
+	for _, namePair := range l.contractReadNames[contract] {
 		readIdentifier := types.BoundContract{
 			Address: address,
 			Name:    contract,
-		}.ReadIdentifier(readName)
+		}.ReadIdentifier(namePair.onChainName)
 
 		delete(l.readIdentifiers, readIdentifier)
 	}

@@ -1,38 +1,192 @@
 {
-  "namespaces": {
-    "example_namespace": {
-      "anchorIDL": {
-        "name": "example_invalid_idl_name",
-        "version": "1.0.0"
-      },
-      "reads": {
-        "someRead": {
-          "chainSpecificName": "some_chain_specific_name",
-          "readType": 0,
-          "inputModifications": [
-            {
-              "path": "someInputPath",
-              "action": "replace",
-              "value": "newValue"
+  "version": "0.1.0",
+  "name": "some_test_idl",
+  "accounts": [
+    {
+      "name": "TestStruct",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "field",
+            "type": {
+              "option": "i32"
             }
-          ],
-          "outputModifications": [
-            {
-              "path": "someOutputPath",
-              "action": "extract",
-              "value": "desiredField"
+          },
+          {
+            "name": "differentField",
+            "type": "string"
+          },
+          {
+            "name": "bigField",
+            "type": "i128"
+          },
+          {
+            "name": "nestedDynamicStruct",
+            "type": {
+              "defined": "MidLevelDynamicStruct"
             }
-          ],
-          "rpcOpts": {
-            "encoding": "base64",
-            "commitment": "processed",
-            "dataSlice": {
-              "offset": 0,
-              "length": 32
+          },
+          {
+            "name": "nestedStaticStruct",
+            "type": {
+              "defined": "MidLevelStaticStruct"
+            }
+          },
+          {
+            "name": "oracleID",
+            "type": "u8"
+          },
+          {
+            "name": "oracleIDs",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "accountstruct",
+            "type": {
+              "defined": "accountstruct"
+            }
+          },
+          {
+            "name": "accounts",
+            "type": {
+              "vec": "bytes"
             }
           }
-        }
+        ]
       }
     }
-  }
+  ],
+  "types": [
+    {
+      "name": "MidLevelDynamicStruct",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fixedBytes",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "inner",
+            "type": {
+              "defined": "InnerDynamicTestStruct"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "MidLevelStaticStruct",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fixedBytes",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "inner",
+            "type": {
+              "defined": "InnerStaticTestStruct"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "InnerDynamicTestStruct",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "i",
+            "type": "i32"
+          },
+          {
+            "name": "s",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InnerStaticTestStruct",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "i",
+            "type": "i32"
+          },
+          {
+            "name": "a",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "accountstruct",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "account",
+            "type": "bytes"
+          },
+          {
+            "name": "accountstr",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SimpleUint64Value",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "i",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Uint64Slice",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vals",
+            "type": {
+              "vec": "u64"
+            }
+          }
+        ]
+      }
+    }
+  ]
 }

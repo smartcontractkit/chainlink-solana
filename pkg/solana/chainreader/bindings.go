@@ -12,6 +12,7 @@ import (
 type readBinding interface {
 	SetAddress(solana.PublicKey)
 	GetAddress() solana.PublicKey
+	SetCodec(types.RemoteCodec)
 	CreateType(bool) (any, error)
 	Decode(context.Context, []byte, any) error
 }
@@ -69,4 +70,12 @@ func (b namespaceBindings) Bind(binding types.BoundContract) error {
 	}
 
 	return nil
+}
+
+func (b namespaceBindings) SetCodec(codec types.RemoteCodec) {
+	for _, nbs := range b {
+		for _, rb := range nbs {
+			rb.SetCodec(codec)
+		}
+	}
 }

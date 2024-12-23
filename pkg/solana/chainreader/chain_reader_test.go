@@ -438,19 +438,20 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 					MethodReturningUint64: {
 						ReadType:          config.Account,
 						ChainSpecificName: "SimpleUint64Value",
-
 						OutputModifications: codeccommon.ModifiersConfig{
 							&codeccommon.PropertyExtractorConfig{FieldName: "I"},
 						},
 					},
 					MethodReturningUint64Slice: {
 						ChainSpecificName: "Uint64Slice",
+						ReadType:          config.Account,
 						OutputModifications: codeccommon.ModifiersConfig{
 							&codeccommon.PropertyExtractorConfig{FieldName: "Vals"},
 						},
 					},
 					MethodReturningSeenStruct: {
 						ChainSpecificName: "TestStruct",
+						ReadType:          config.Account,
 						OutputModifications: codeccommon.ModifiersConfig{
 							&codeccommon.AddressBytesToStringModifierConfig{
 								Fields: []string{"Accountstruct.Accountstr"},
@@ -465,6 +466,7 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 				Reads: map[string]config.ReadDefinition{
 					MethodReturningUint64: {
 						ChainSpecificName: "SimpleUint64Value",
+						ReadType:          config.Account,
 						OutputModifications: codeccommon.ModifiersConfig{
 							&codeccommon.PropertyExtractorConfig{FieldName: "I"},
 						},
@@ -776,19 +778,15 @@ func fullTestIDL(t *testing.T) string {
 
 	// Combine all of the type definitions into one comma-separated string.
 	allTypes := strings.Join([]string{
-		midLevelDynamicStructIDL,
-		midLevelStaticStructIDL,
-		innerDynamicStructIDL,
-		innerStaticStructIDL,
-		accountStructIDL,
+		testStructIDL,
 		uint64BaseTypeIDL,
 		uint64SliceBaseTypeIDL,
 	}, ",")
 
 	return fmt.Sprintf(
 		baseIDL,
-		testStructIDL,
 		allTypes,
+		strings.Join([]string{midLevelDynamicStructIDL, midLevelStaticStructIDL, innerDynamicStructIDL, innerStaticStructIDL, accountStructIDL}, ","),
 	)
 }
 
