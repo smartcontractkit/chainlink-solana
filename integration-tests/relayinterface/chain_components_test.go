@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -36,9 +37,28 @@ import (
 
 func TestChainComponents(t *testing.T) {
 	t.Parallel()
-	it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: &helper{}}
-	it.Init(t)
+	helper := &helper{}
+	helper.Init(t)
 
+	t.Run("RunChainComponentsSolanaTests", func(t *testing.T) {
+		t.Parallel()
+		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper}
+		DisableTests(it)
+		it.Setup(t)
+		RunChainComponentsSolanaTests(t, it)
+	})
+
+	t.Run("RunChainComponentsInLoopSolanaTests", func(t *testing.T) {
+		t.Parallel()
+		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper}
+		DisableTests(it)
+		wrapped := commontestutils.WrapContractReaderTesterForLoop(it)
+		wrapped.Setup(t)
+		RunChainComponentsInLoopSolanaTests(t, wrapped)
+	})
+}
+
+func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 	it.DisableTests([]string{
 		// disable tests that set values
 		ContractReaderGetLatestValueBasedOnConfidenceLevel,
@@ -70,9 +90,6 @@ func TestChainComponents(t *testing.T) {
 		ContractReaderQueryKeysCanFilterWithValueComparator,
 		ContractReaderQueryKeysCanLimitResultsWithCursor,
 	})
-
-	RunChainComponentsSolanaTests(t, it)
-	RunChainComponentsInLoopSolanaTests(t, commontestutils.WrapContractReaderTesterForLoop(it))
 }
 
 func RunChainComponentsSolanaTests[T TestingT[T]](t T, it *SolanaChainComponentsInterfaceTester[T]) {
@@ -86,7 +103,7 @@ func RunChainComponentsInLoopSolanaTests[T TestingT[T]](t T, it ChainComponentsI
 }
 
 func RunContractReaderSolanaTests[T TestingT[T]](t T, it *SolanaChainComponentsInterfaceTester[T]) {
-	RunContractReaderInterfaceTests(t, it, false, false)
+	RunContractReaderInterfaceTests(t, it, false, true)
 
 	testCases := []Testcase[T]{}
 
@@ -94,7 +111,7 @@ func RunContractReaderSolanaTests[T TestingT[T]](t T, it *SolanaChainComponentsI
 }
 
 func RunContractReaderInLoopTests[T TestingT[T]](t T, it ChainComponentsInterfaceTester[T]) {
-	RunContractReaderInterfaceTests(t, it, false, false)
+	RunContractReaderInterfaceTests(t, it, false, true)
 
 	testCases := []Testcase[T]{}
 
@@ -112,11 +129,9 @@ type SolanaChainComponentsInterfaceTesterHelper[T TestingT[T]] interface {
 
 type SolanaChainComponentsInterfaceTester[T TestingT[T]] struct {
 	TestSelectionSupport
-	Helper              SolanaChainComponentsInterfaceTesterHelper[T]
-	cr                  *chainreader.SolanaChainReaderService
-	chainReaderConfig   config.ChainReader
-	accountPubKey       solana.PublicKey
-	secondAccountPubKey solana.PublicKey
+	Helper            SolanaChainComponentsInterfaceTesterHelper[T]
+	cr                *chainreader.SolanaChainReaderService
+	chainReaderConfig config.ChainReader
 }
 
 func (it *SolanaChainComponentsInterfaceTester[T]) Setup(t T) {
@@ -164,9 +179,6 @@ func (it *SolanaChainComponentsInterfaceTester[T]) Setup(t T) {
 			},
 		},
 	}
-
-	it.accountPubKey = it.Helper.CreateAccount(t, AnyValueToReadWithoutAnArgument)
-	it.secondAccountPubKey = it.Helper.CreateAccount(t, AnyDifferentValueToReadWithoutAnArgument)
 }
 
 func (it *SolanaChainComponentsInterfaceTester[T]) Name() string {
@@ -202,10 +214,10 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GetContractWriter(t T) types.
 }
 
 func (it *SolanaChainComponentsInterfaceTester[T]) GetBindings(t T) []types.BoundContract {
-	// at the moment, use only a single account address for everything
+	// Create a new account with fresh state for each test
 	return []types.BoundContract{
-		{Name: AnyContractName, Address: it.accountPubKey.String()},
-		{Name: AnySecondContractName, Address: it.secondAccountPubKey.String()},
+		{Name: AnyContractName, Address: it.Helper.CreateAccount(t, AnyValueToReadWithoutAnArgument).String()},
+		{Name: AnySecondContractName, Address: it.Helper.CreateAccount(t, AnyDifferentValueToReadWithoutAnArgument).String()},
 	}
 }
 
@@ -219,10 +231,6 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GenerateBlocksTillConfidenceL
 
 }
 
-func (it *SolanaChainComponentsInterfaceTester[T]) Init(t T) {
-	it.Helper.Init(t)
-}
-
 type helper struct {
 	programID solana.PublicKey
 	rpcURL    string
@@ -231,6 +239,7 @@ type helper struct {
 	wsClient  *ws.Client
 	idlBts    []byte
 	nonce     uint64
+	nonceMu   sync.Mutex
 }
 
 func (h *helper) Init(t *testing.T) {
@@ -292,10 +301,14 @@ func (h *helper) GetJSONEncodedIDL(t *testing.T) []byte {
 func (h *helper) CreateAccount(t *testing.T, value uint64) solana.PublicKey {
 	t.Helper()
 
+	// avoid collisions in parallel tests
+	h.nonceMu.Lock()
 	h.nonce++
+	nonce := h.nonce
+	h.nonceMu.Unlock()
 
 	bts := make([]byte, 8)
-	binary.LittleEndian.PutUint64(bts, h.nonce*value)
+	binary.LittleEndian.PutUint64(bts, nonce*value)
 
 	pubKey, _, err := solana.FindProgramAddress([][]byte{[]byte("data"), bts}, h.programID)
 	require.NoError(t, err)
@@ -304,7 +317,7 @@ func (h *helper) CreateAccount(t *testing.T, value uint64) solana.PublicKey {
 	privateKey, err := solana.PrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1])
 	require.NoError(t, err)
 
-	h.runInitialize(t, value, pubKey, func(key solana.PublicKey) *solana.PrivateKey {
+	h.runInitialize(t, nonce, value, pubKey, func(key solana.PublicKey) *solana.PrivateKey {
 		return &privateKey
 	}, privateKey.PublicKey())
 
@@ -313,6 +326,7 @@ func (h *helper) CreateAccount(t *testing.T, value uint64) solana.PublicKey {
 
 func (h *helper) runInitialize(
 	t *testing.T,
+	nonce uint64,
 	value uint64,
 	data solana.PublicKey,
 	signerFunc func(key solana.PublicKey) *solana.PrivateKey,
@@ -320,7 +334,7 @@ func (h *helper) runInitialize(
 ) {
 	t.Helper()
 
-	inst, err := contract.NewInitializeInstruction(h.nonce*value, value, data, payer, solana.SystemProgramID).ValidateAndBuild()
+	inst, err := contract.NewInitializeInstruction(nonce*value, value, data, payer, solana.SystemProgramID).ValidateAndBuild()
 	require.NoError(t, err)
 
 	h.sendInstruction(t, inst, signerFunc, payer)
