@@ -49,11 +49,7 @@ func New(lggr logger.SugaredLogger, orm ORM) *LogPoller {
 
 func (lp *LogPoller) start(context.Context) error {
 	lp.eng.Go(lp.run)
-	ticket := services.TickerConfig{
-		Initial:   0,
-		JitterPct: services.DefaultJitter,
-	}.NewTicker(time.Minute)
-	lp.eng.GoTick(ticket, lp.backgroundWorkerRun)
+	lp.eng.Go(lp.backgroundWorkerRun)
 	return nil
 }
 
@@ -113,8 +109,11 @@ func (lp *LogPoller) run(ctx context.Context) {
 			// TODO: NONEVM-916 parse, filters and persist logs
 			// NOTE: removal of filters occurs in the separate goroutine, so there is a chance that upon insert
 			// of log corresponding filter won't be present in the db. Ensure to refilter and retry on insert error
-			for _, filter := range filtersToBackfill {
-				go lp.startFilterBackfill(ctx, filter, block.BlockNumber)
+			for i := range filtersToBackfill {
+				filter := filtersToBackfill[i]
+				lp.eng.Go(func(ctx context.Context) {
+					lp.startFilterBackfill(ctx, filter, block.BlockNumber)
+				})
 			}
 		}
 	}
