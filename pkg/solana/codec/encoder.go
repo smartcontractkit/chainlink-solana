@@ -10,14 +10,14 @@ import (
 
 type Encoder struct {
 	definitions        map[string]Entry
-	codecFromTypeCodec encodings.LenientCodecFromTypeCodec
+	codecFromTypeCodec encodings.CodecFromTypeCodec
 }
 
 var _ commontypes.Encoder = &Encoder{}
 
 func (e *Encoder) Encode(ctx context.Context, item any, itemType string) (res []byte, err error) {
 	if e.codecFromTypeCodec == nil {
-		e.codecFromTypeCodec = make(encodings.LenientCodecFromTypeCodec)
+		e.codecFromTypeCodec = make(encodings.CodecFromTypeCodec)
 		for k, v := range e.definitions {
 			e.codecFromTypeCodec[k] = v
 		}
