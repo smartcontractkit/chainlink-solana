@@ -9,21 +9,27 @@ import (
 )
 
 type Encoder struct {
-	definitions        map[string]Entry
-	codecFromTypeCodec encodings.CodecFromTypeCodec
+	definitions               map[string]Entry
+	lenientCodecFromTypeCodec encodings.LenientCodecFromTypeCodec
 }
 
 var _ commontypes.Encoder = &Encoder{}
 
 func (e *Encoder) Encode(ctx context.Context, item any, itemType string) (res []byte, err error) {
-	if e.codecFromTypeCodec == nil {
-		e.codecFromTypeCodec = make(encodings.CodecFromTypeCodec)
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("recovered from: %v, while encoding %q", r, itemType)
+		}
+	}()
+
+	if e.lenientCodecFromTypeCodec == nil {
+		e.lenientCodecFromTypeCodec = make(encodings.LenientCodecFromTypeCodec)
 		for k, v := range e.definitions {
-			e.codecFromTypeCodec[k] = v
+			e.lenientCodecFromTypeCodec[k] = v
 		}
 	}
 
-	return e.codecFromTypeCodec.Encode(ctx, item, itemType)
+	return e.lenientCodecFromTypeCodec.Encode(ctx, item, itemType)
 }
 
 func (e *Encoder) GetMaxEncodingSize(_ context.Context, n int, itemType string) (int, error) {

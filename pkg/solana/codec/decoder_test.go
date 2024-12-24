@@ -24,7 +24,7 @@ type testErrDecodeRemainingBytes struct {
 }
 
 func (t *testErrDecodeRemainingBytes) Decode(_ []byte) (interface{}, []byte, error) {
-	return nil, []byte{1}, nil
+	return struct{}{}, []byte{1}, nil
 }
 
 func TestDecoder_Decode_Errors(t *testing.T) {
@@ -45,10 +45,10 @@ func TestDecoder_Decode_Errors(t *testing.T) {
 		require.Error(t, d.Decode(tests.Context(t), []byte{}, &into, someType))
 	})
 
-	t.Run("error when remaining bytes exist after decode", func(t *testing.T) {
+	t.Run("remaining bytes exist after decode is ok", func(t *testing.T) {
 		d := &Decoder{definitions: map[string]Entry{}}
 		d.definitions[someType] = &testErrDecodeRemainingBytes{}
-		require.Error(t, d.Decode(tests.Context(t), []byte{}, &into, someType))
+		require.NoError(t, d.Decode(tests.Context(t), []byte{}, &into, someType))
 	})
 }
 
