@@ -27,6 +27,7 @@ import (
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 
 	contract "github.com/smartcontractkit/chainlink-solana/contracts/generated/contract_reader_interface"

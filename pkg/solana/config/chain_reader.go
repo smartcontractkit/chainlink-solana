@@ -9,6 +9,7 @@ import (
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
@@ -56,12 +57,12 @@ type RPCOpts struct {
 }
 
 func (c *ChainContractReader) UnmarshalJSON(bytes []byte) error {
-	rawJson := make(map[string]json.RawMessage)
-	if err := json.Unmarshal(bytes, &rawJson); err != nil {
+	rawJSON := make(map[string]json.RawMessage)
+	if err := json.Unmarshal(bytes, &rawJSON); err != nil {
 		return err
 	}
 
-	idlBytes := rawJson["anchorIDL"]
+	idlBytes := rawJSON["anchorIDL"]
 	var rawString string
 	if err := json.Unmarshal(idlBytes, &rawString); err == nil {
 		if err = json.Unmarshal([]byte(rawString), &c.IDL); err != nil {
@@ -79,11 +80,11 @@ func (c *ChainContractReader) UnmarshalJSON(bytes []byte) error {
 		return fmt.Errorf("namespace idl must have at least one account or event: %w", commontypes.ErrInvalidConfig)
 	}
 
-	if err := json.Unmarshal(rawJson["reads"], &c.Reads); err != nil {
+	if err := json.Unmarshal(rawJSON["reads"], &c.Reads); err != nil {
 		return err
 	}
 
-	if c.Reads == nil || len(c.Reads) == 0 {
+	if len(c.Reads) == 0 {
 		return fmt.Errorf("namespace must have at least one read: %w", commontypes.ErrInvalidConfig)
 	}
 

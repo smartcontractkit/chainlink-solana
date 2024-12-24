@@ -12,6 +12,7 @@ import (
 
 	codeccommon "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
@@ -36,7 +37,6 @@ func TestChainReaderConfig(t *testing.T) {
 		var result config.ContractReader
 		require.NoError(t, json.Unmarshal([]byte(validJSON), &result))
 		assert.Equal(t, validChainReaderConfig, result)
-
 	})
 
 	t.Run("valid unmarshal with idl as string", func(t *testing.T) {
