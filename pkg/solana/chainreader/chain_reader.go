@@ -288,11 +288,6 @@ func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainContra
 	return nil
 }
 
-type accountIDLTypes struct {
-	Account codec.IdlTypeDef
-	Types   codec.IdlTypeDefSlice
-}
-
 func (s *SolanaChainReaderService) addAccountRead(namespace string, itemType string, idl codec.IDL, idlType codec.IdlTypeDef, readDefinition config.ReadDefinition) error {
 	inputAccountIDLDef := codec.NilIdlTypeDefTy
 	// TODO:

@@ -131,48 +131,39 @@ type SolanaChainComponentsInterfaceTester[T TestingT[T]] struct {
 	TestSelectionSupport
 	Helper            SolanaChainComponentsInterfaceTesterHelper[T]
 	cr                *chainreader.SolanaChainReaderService
-	chainReaderConfig config.ChainReader
+	contractReaderConfig config.ContractReader
 }
 
 func (it *SolanaChainComponentsInterfaceTester[T]) Setup(t T) {
 	t.Cleanup(func() {})
 
-	it.chainReaderConfig = config.ChainReader{
-		Namespaces: map[string]config.ChainReaderMethods{
+	it.contractReaderConfig = config.ContractReader{
+		Namespaces: map[string]config.ChainContractReader{
 			AnyContractName: {
-				Methods: map[string]config.ChainDataReader{
+				IDL: string(it.Helper.GetJSONEncodedIDL(t)),
+				Reads: map[string]config.ReadDefinition{
 					MethodReturningUint64: {
-						AnchorIDL: string(it.Helper.GetJSONEncodedIDL(t)),
-						Encoding:  config.EncodingTypeBorsh,
-						Procedure: config.ChainReaderProcedure{
-							IDLAccount: "DataAccount",
-							OutputModifications: codec.ModifiersConfig{
-								&codec.PropertyExtractorConfig{FieldName: "U64Value"},
-							},
+						ChainSpecificName: "DataAccount",
+						ReadType:          config.Account,
+						OutputModifications: codec.ModifiersConfig{
+							&codec.PropertyExtractorConfig{FieldName: "U64Value"},
 						},
 					},
 					MethodReturningUint64Slice: {
-						AnchorIDL: string(it.Helper.GetJSONEncodedIDL(t)),
-						Encoding:  config.EncodingTypeBorsh,
-						Procedure: config.ChainReaderProcedure{
-							IDLAccount: "DataAccount",
-							OutputModifications: codec.ModifiersConfig{
-								&codec.PropertyExtractorConfig{FieldName: "U64Slice"},
-							},
+						ChainSpecificName: "DataAccount",
+						OutputModifications: codec.ModifiersConfig{
+							&codec.PropertyExtractorConfig{FieldName: "U64Slice"},
 						},
 					},
 				},
 			},
 			AnySecondContractName: {
-				Methods: map[string]config.ChainDataReader{
+				IDL: string(it.Helper.GetJSONEncodedIDL(t)),
+				Reads: map[string]config.ReadDefinition{
 					MethodReturningUint64: {
-						AnchorIDL: string(it.Helper.GetJSONEncodedIDL(t)),
-						Encoding:  config.EncodingTypeBorsh,
-						Procedure: config.ChainReaderProcedure{
-							IDLAccount: "DataAccount",
-							OutputModifications: codec.ModifiersConfig{
-								&codec.PropertyExtractorConfig{FieldName: "U64Value"},
-							},
+						ChainSpecificName: "DataAccount",
+						OutputModifications: codec.ModifiersConfig{
+							&codec.PropertyExtractorConfig{FieldName: "U64Value"},
 						},
 					},
 				},
@@ -199,7 +190,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GetContractReader(t T) types.
 		return it.cr
 	}
 
-	svc, err := chainreader.NewChainReaderService(it.Helper.Logger(t), it.Helper.RPCClient(), it.chainReaderConfig)
+	svc, err := chainreader.NewChainReaderService(it.Helper.Logger(t), it.Helper.RPCClient(), it.contractReaderConfig)
 
 	require.NoError(t, err)
 	require.NoError(t, svc.Start(ctx))
