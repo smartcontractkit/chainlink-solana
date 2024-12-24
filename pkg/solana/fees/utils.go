@@ -8,7 +8,7 @@ import (
 )
 
 // returns new fee based on number of times bumped
-func CalculateFee(base, max, min uint64, count uint) uint64 {
+func CalculateFee(base, maxFee, minFee uint64, count uint) uint64 {
 	amount := base
 
 	for i := uint(0); i < count; i++ {
@@ -18,7 +18,7 @@ func CalculateFee(base, max, min uint64, count uint) uint64 {
 			next := amount + amount
 			if next <= amount {
 				// overflowed
-				amount = max
+				amount = maxFee
 				break
 			}
 			amount = next
@@ -26,11 +26,11 @@ func CalculateFee(base, max, min uint64, count uint) uint64 {
 	}
 
 	// respect bounds
-	if amount < min {
-		return min
+	if amount < minFee {
+		return minFee
 	}
-	if amount > max {
-		return max
+	if amount > maxFee {
+		return maxFee
 	}
 	return amount
 }

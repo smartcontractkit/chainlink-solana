@@ -1305,16 +1305,16 @@ func TestPendingTxContext_ListAllExpiredBroadcastedTxs(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for idx := range tests {
+		t.Run(tests[idx].name, func(t *testing.T) {
 			// Initialize a new PendingTxContext
 			ctx := newPendingTxContext()
 
 			// Setup the test case
-			tt.setup(t, ctx)
+			tests[idx].setup(t, ctx)
 
 			// Execute the function under test
-			result := ctx.ListAllExpiredBroadcastedTxs(tt.currBlockHeight)
+			result := ctx.ListAllExpiredBroadcastedTxs(tests[idx].currBlockHeight)
 
 			// Extract the IDs from the result
 			var resultIDs []string
@@ -1323,7 +1323,7 @@ func TestPendingTxContext_ListAllExpiredBroadcastedTxs(t *testing.T) {
 			}
 
 			// Assert that the expected IDs match the result IDs (order does not matter)
-			assert.ElementsMatch(t, tt.expectedTxIDs, resultIDs)
+			assert.ElementsMatch(t, tests[idx].expectedTxIDs, resultIDs)
 		})
 	}
 }

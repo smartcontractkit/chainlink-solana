@@ -93,11 +93,9 @@ func (v *pgDSLParser) Timestamp(prim primitives.Timestamp) {
 		return
 	}
 
-	var tm int64
+	tm := int64(prim.Timestamp) //nolint:gosec // disable G115
 	if prim.Timestamp > math.MaxInt64 {
 		tm = 0
-	} else {
-		tm = int64(prim.Timestamp)
 	}
 
 	v.expression = fmt.Sprintf(
