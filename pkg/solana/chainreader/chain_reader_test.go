@@ -295,7 +295,7 @@ func newTestConfAndCodec(t *testing.T) (types.RemoteCodec, config.ContractReader
 	conf := config.ContractReader{
 		Namespaces: map[string]config.ChainContractReader{
 			Namespace: {
-				IDL: rawIDL,
+				IDL: mustUnmarshalIDL(t, rawIDL),
 				Reads: map[string]config.ReadDefinition{
 					NamedMethod: {
 						ChainSpecificName: testutils.TestStructWithNestedStruct,
@@ -310,6 +310,16 @@ func newTestConfAndCodec(t *testing.T) (types.RemoteCodec, config.ContractReader
 	}
 
 	return testCodec, conf
+}
+
+func mustUnmarshalIDL(t *testing.T, rawIDL string) codec.IDL {
+	var idl codec.IDL
+	if err := json.Unmarshal([]byte(rawIDL), &idl); err != nil {
+		t.Logf("failed to unmarshal test IDL: %s", err.Error())
+		t.FailNow()
+	}
+
+	return idl
 }
 
 type modifiedStructWithNestedStruct struct {
@@ -421,7 +431,7 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 	r.conf = config.ContractReader{
 		Namespaces: map[string]config.ChainContractReader{
 			AnyContractName: {
-				IDL: fullTestIDL(t),
+				IDL: mustUnmarshalIDL(t, fullTestIDL(t)),
 				Reads: map[string]config.ReadDefinition{
 					MethodTakingLatestParamsReturningTestStruct: {
 						ReadType:          config.Account,
@@ -462,7 +472,7 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 				},
 			},
 			AnySecondContractName: {
-				IDL: fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""),
+				IDL: mustUnmarshalIDL(t, fmt.Sprintf(baseIDL, uint64BaseTypeIDL, "")),
 				Reads: map[string]config.ReadDefinition{
 					MethodReturningUint64: {
 						ChainSpecificName: "SimpleUint64Value",
@@ -748,13 +758,7 @@ func (r *chainReaderInterfaceTester) MaxWaitTimeForEvents() time.Duration {
 func makeTestCodec(t *testing.T, rawIDL string) types.RemoteCodec {
 	t.Helper()
 
-	var idl codec.IDL
-	if err := json.Unmarshal([]byte(rawIDL), &idl); err != nil {
-		t.Logf("failed to unmarshal test IDL: %s", err.Error())
-		t.FailNow()
-	}
-
-	testCodec, err := codec.NewIDLAccountCodec(idl, binary.LittleEndian())
+	testCodec, err := codec.NewIDLAccountCodec(mustUnmarshalIDL(t, rawIDL), binary.LittleEndian())
 	if err != nil {
 		t.Logf("failed to create new codec from test IDL: %s", err.Error())
 		t.FailNow()

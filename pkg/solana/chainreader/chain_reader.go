@@ -2,7 +2,6 @@ package chainreader
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -251,15 +250,10 @@ func (s *SolanaChainReaderService) addCodecDef(forEncoding bool, namespace, chai
 }
 
 func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainContractReader) error {
-	for namespace, namespaceReads := range namespaces {
-		for readName, read := range namespaceReads.Reads {
-			var idl codec.IDL
-			if err := json.Unmarshal([]byte(namespaceReads.IDL), &idl); err != nil {
-				return err
-			}
-
+	for namespace, nameSpaceDef := range namespaces {
+		for readName, read := range nameSpaceDef.Reads {
 			injectAddressModifier(read.InputModifications, read.OutputModifications)
-			idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeAccountDef, read.ChainSpecificName, idl)
+			idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeAccountDef, read.ChainSpecificName, nameSpaceDef.IDL)
 			if err != nil {
 				return err
 			}
@@ -270,10 +264,10 @@ func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainContra
 				if !isOk {
 					return fmt.Errorf("unexpected type %T from IDL definition for account read: %q, with onchain onChainName: %q, of type: %q", accountIDLDef, readName, read.ChainSpecificName, read.ReadType)
 				}
-				if err = s.addAccountRead(namespace, readName, idl, accountIDLDef, read); err != nil {
+				if err = s.addAccountRead(namespace, readName, nameSpaceDef.IDL, accountIDLDef, read); err != nil {
 					return err
 				}
-			case config.Log:
+			case config.Event:
 				eventIDlDef, isOk := idlDef.(codec.IdlEvent)
 				if !isOk {
 					return fmt.Errorf("unexpected type %T from IDL definition for log read: %q, with onchain onChainName: %q, of type: %q", eventIDlDef, readName, read.ChainSpecificName, read.ReadType)
