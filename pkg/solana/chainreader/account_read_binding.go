@@ -11,21 +11,19 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
-// accountReadBinding provides decoding and reading Solana Account data using a defined codec. The
-// `idlAccount` refers to the account onChainName in the IDL for which the codec has a type mapping.
+// accountReadBinding provides decoding and reading Solana Account data using a defined codec.
 type accountReadBinding struct {
-	namespace, onChainName, chainAgnosticName string
-	codec                                     types.RemoteCodec
-	key                                       solana.PublicKey
-	opts                                      *rpc.GetAccountInfoOpts
+	namespace, genericName string
+	codec                  types.RemoteCodec
+	key                    solana.PublicKey
+	opts                   *rpc.GetAccountInfoOpts
 }
 
-func newAccountReadBinding(namespace, onChainName, chainAgnosticName string, opts *rpc.GetAccountInfoOpts) *accountReadBinding {
+func newAccountReadBinding(namespace, genericName string, opts *rpc.GetAccountInfoOpts) *accountReadBinding {
 	return &accountReadBinding{
-		namespace:         namespace,
-		onChainName:       onChainName,
-		chainAgnosticName: chainAgnosticName,
-		opts:              opts,
+		namespace:   namespace,
+		genericName: genericName,
+		opts:        opts,
 	}
 }
 
@@ -44,9 +42,9 @@ func (b *accountReadBinding) GetAddress() solana.PublicKey {
 }
 
 func (b *accountReadBinding) CreateType(forEncoding bool) (any, error) {
-	return b.codec.CreateType(codec.WrapItemType(forEncoding, b.namespace, b.chainAgnosticName, codec.ChainConfigTypeAccountDef), forEncoding)
+	return b.codec.CreateType(codec.WrapItemType(forEncoding, b.namespace, b.genericName, codec.ChainConfigTypeAccountDef), forEncoding)
 }
 
 func (b *accountReadBinding) Decode(ctx context.Context, bts []byte, outVal any) error {
-	return b.codec.Decode(ctx, bts, outVal, codec.WrapItemType(false, b.namespace, b.chainAgnosticName, codec.ChainConfigTypeAccountDef))
+	return b.codec.Decode(ctx, bts, outVal, codec.WrapItemType(false, b.namespace, b.genericName, codec.ChainConfigTypeAccountDef))
 }

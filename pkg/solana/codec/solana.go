@@ -73,7 +73,7 @@ func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
 			return nil, err
 		}
 
-		definition, err := FindDefinitionFromIDL(cfg.Type, cfg.OnChainName, idl)
+		definition, err := FindDefinitionFromIDL(cfg.Type, cfg.ChainSpecificName, idl)
 		if err != nil {
 			return nil, err
 		}
@@ -108,32 +108,32 @@ func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl IDL, m
 	return entry, nil
 }
 
-func FindDefinitionFromIDL(cfgType ChainConfigType, onChainName string, idl IDL) (interface{}, error) {
+func FindDefinitionFromIDL(cfgType ChainConfigType, chainSpecificName string, idl IDL) (interface{}, error) {
 	// not the most efficient way to do this, but these slices should always be very, very small
 	switch cfgType {
 	case ChainConfigTypeAccountDef:
 		for i := range idl.Accounts {
-			if idl.Accounts[i].Name == onChainName {
+			if idl.Accounts[i].Name == chainSpecificName {
 				return idl.Accounts[i], nil
 			}
 		}
-		return nil, fmt.Errorf("failed to find account %q in IDL", onChainName)
+		return nil, fmt.Errorf("failed to find account %q in IDL", chainSpecificName)
 
 	case ChainConfigTypeInstructionDef:
 		for i := range idl.Instructions {
-			if idl.Instructions[i].Name == onChainName {
+			if idl.Instructions[i].Name == chainSpecificName {
 				return idl.Instructions[i], nil
 			}
 		}
-		return nil, fmt.Errorf("failed to find instruction %q in IDL", onChainName)
+		return nil, fmt.Errorf("failed to find instruction %q in IDL", chainSpecificName)
 
 	case ChainConfigTypeEventDef:
 		for i := range idl.Events {
-			if idl.Events[i].Name == onChainName {
+			if idl.Events[i].Name == chainSpecificName {
 				return idl.Events[i], nil
 			}
 		}
-		return nil, fmt.Errorf("failed to find event %q in IDL", onChainName)
+		return nil, fmt.Errorf("failed to find event %q in IDL", chainSpecificName)
 	}
 	return nil, fmt.Errorf("unknown type: %q", cfgType)
 }

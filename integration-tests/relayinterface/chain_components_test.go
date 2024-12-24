@@ -6,6 +6,7 @@ package relayinterface
 import (
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
@@ -19,13 +20,14 @@ import (
 	"github.com/gagliardetto/solana-go/text"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/codec"
+	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontestutils "github.com/smartcontractkit/chainlink-common/pkg/loop/testutils"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 
 	contract "github.com/smartcontractkit/chainlink-solana/contracts/generated/contract_reader_interface"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
@@ -105,7 +107,7 @@ func RunChainComponentsInLoopSolanaTests[T TestingT[T]](t T, it ChainComponentsI
 func RunContractReaderSolanaTests[T TestingT[T]](t T, it *SolanaChainComponentsInterfaceTester[T]) {
 	RunContractReaderInterfaceTests(t, it, false, true)
 
-	testCases := []Testcase[T]{}
+	var testCases []Testcase[T]
 
 	RunTests(t, it, testCases)
 }
@@ -113,7 +115,7 @@ func RunContractReaderSolanaTests[T TestingT[T]](t T, it *SolanaChainComponentsI
 func RunContractReaderInLoopTests[T TestingT[T]](t T, it ChainComponentsInterfaceTester[T]) {
 	RunContractReaderInterfaceTests(t, it, false, true)
 
-	testCases := []Testcase[T]{}
+	var testCases []Testcase[T]
 
 	RunTests(t, it, testCases)
 }
@@ -129,8 +131,8 @@ type SolanaChainComponentsInterfaceTesterHelper[T TestingT[T]] interface {
 
 type SolanaChainComponentsInterfaceTester[T TestingT[T]] struct {
 	TestSelectionSupport
-	Helper            SolanaChainComponentsInterfaceTesterHelper[T]
-	cr                *chainreader.SolanaChainReaderService
+	Helper               SolanaChainComponentsInterfaceTesterHelper[T]
+	cr                   *chainreader.SolanaChainReaderService
 	contractReaderConfig config.ContractReader
 }
 
@@ -140,30 +142,30 @@ func (it *SolanaChainComponentsInterfaceTester[T]) Setup(t T) {
 	it.contractReaderConfig = config.ContractReader{
 		Namespaces: map[string]config.ChainContractReader{
 			AnyContractName: {
-				IDL: string(it.Helper.GetJSONEncodedIDL(t)),
+				IDL: mustUnmarshalIDL(t, string(it.Helper.GetJSONEncodedIDL(t))),
 				Reads: map[string]config.ReadDefinition{
 					MethodReturningUint64: {
 						ChainSpecificName: "DataAccount",
 						ReadType:          config.Account,
-						OutputModifications: codec.ModifiersConfig{
-							&codec.PropertyExtractorConfig{FieldName: "U64Value"},
+						OutputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.PropertyExtractorConfig{FieldName: "U64Value"},
 						},
 					},
 					MethodReturningUint64Slice: {
 						ChainSpecificName: "DataAccount",
-						OutputModifications: codec.ModifiersConfig{
-							&codec.PropertyExtractorConfig{FieldName: "U64Slice"},
+						OutputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.PropertyExtractorConfig{FieldName: "U64Slice"},
 						},
 					},
 				},
 			},
 			AnySecondContractName: {
-				IDL: string(it.Helper.GetJSONEncodedIDL(t)),
+				IDL: mustUnmarshalIDL(t, string(it.Helper.GetJSONEncodedIDL(t))),
 				Reads: map[string]config.ReadDefinition{
 					MethodReturningUint64: {
 						ChainSpecificName: "DataAccount",
-						OutputModifications: codec.ModifiersConfig{
-							&codec.PropertyExtractorConfig{FieldName: "U64Value"},
+						OutputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.PropertyExtractorConfig{FieldName: "U64Value"},
 						},
 					},
 				},
@@ -413,4 +415,14 @@ func setupTestValidator(t *testing.T, upgradeAuthority string) (string, string) 
 	}
 
 	return client.SetupLocalSolNodeWithFlags(t, flags...)
+}
+
+func mustUnmarshalIDL[T TestingT[T]](t T, rawIDL string) codec.IDL {
+	var idl codec.IDL
+	if err := json.Unmarshal([]byte(rawIDL), &idl); err != nil {
+		t.Errorf("failed to unmarshal test IDL", err)
+		t.FailNow()
+	}
+
+	return idl
 }

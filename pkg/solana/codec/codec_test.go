@@ -122,7 +122,7 @@ func (it *codecInterfaceTester) GetCodec(t *testing.T) clcommontypes.Codec {
 		codecEntryCfg := codecConfig.Configs[offChainName]
 		codecEntryCfg.IDL = v.IDL
 		codecEntryCfg.Type = v.ItemType
-		codecEntryCfg.OnChainName = v.IDLTypeName
+		codecEntryCfg.ChainSpecificName = v.IDLTypeName
 
 		if offChainName != NilType {
 			codecEntryCfg.ModifierConfigs = commoncodec.ModifiersConfig{

@@ -22,11 +22,11 @@ type Entry interface {
 
 type entry struct {
 	// TODO this might not be needed in the end, it was handy to make tests simpler
-	offchainName string
-	onchainName  string
-	reflectType  reflect.Type
-	typeCodec    commonencodings.TypeCodec
-	mod          codec.Modifier
+	genericName       string
+	chainSpecificName string
+	reflectType       reflect.Type
+	typeCodec         commonencodings.TypeCodec
+	mod               codec.Modifier
 	// includeDiscriminator during Encode adds a discriminator to the encoded bytes under an assumption that the provided value didn't have a discriminator.
 	// During Decode includeDiscriminator removes discriminator from bytes under an assumption that the provided struct doesn't need a discriminator.
 	includeDiscriminator bool
@@ -95,19 +95,19 @@ func NewEventArgsEntry(offChainName string, idlTypes EventIDLTypes, includeDiscr
 }
 
 func newEntry(
-	offchainName, onchainName string,
+	genericName, chainSpecificName string,
 	typeCodec commonencodings.TypeCodec,
 	includeDiscriminator bool,
 	mod codec.Modifier,
 ) Entry {
 	return &entry{
-		offchainName:         offchainName,
-		onchainName:          onchainName,
+		genericName:          genericName,
+		chainSpecificName:    chainSpecificName,
 		reflectType:          typeCodec.GetType(),
 		typeCodec:            typeCodec,
 		mod:                  ensureModifier(mod),
 		includeDiscriminator: includeDiscriminator,
-		discriminator:        *NewDiscriminator(onchainName),
+		discriminator:        *NewDiscriminator(chainSpecificName),
 	}
 }
 
@@ -130,8 +130,8 @@ func (e *entry) Encode(value any, into []byte) ([]byte, error) {
 				return []byte{}, nil
 			}
 		}
-		return nil, fmt.Errorf("%w: cannot encode nil value for offchainName: %q, onchainName: %q",
-			commontypes.ErrInvalidType, e.offchainName, e.onchainName)
+		return nil, fmt.Errorf("%w: cannot encode nil value for genericName: %q, chainSpecificName: %q",
+			commontypes.ErrInvalidType, e.genericName, e.chainSpecificName)
 	}
 
 	encodedVal, err := e.typeCodec.Encode(value, into)
@@ -154,13 +154,13 @@ func (e *entry) Encode(value any, into []byte) ([]byte, error) {
 func (e *entry) Decode(encoded []byte) (any, []byte, error) {
 	if e.includeDiscriminator {
 		if len(encoded) < discriminatorLength {
-			return nil, nil, fmt.Errorf("%w: encoded data too short to contain discriminator for offchainName: %q, onchainName: %q",
-				commontypes.ErrInvalidType, e.offchainName, e.onchainName)
+			return nil, nil, fmt.Errorf("%w: encoded data too short to contain discriminator for genericName: %q, chainSpecificName: %q",
+				commontypes.ErrInvalidType, e.genericName, e.chainSpecificName)
 		}
 
 		if !bytes.Equal(e.discriminator.hashPrefix, encoded[:discriminatorLength]) {
-			return nil, nil, fmt.Errorf("%w: encoded data has a bad discriminator %v for offchainName: %q, onchainName: %q",
-				commontypes.ErrInvalidType, encoded[:discriminatorLength], e.offchainName, e.onchainName)
+			return nil, nil, fmt.Errorf("%w: encoded data has a bad discriminator %v for genericName: %q, chainSpecificName: %q",
+				commontypes.ErrInvalidType, encoded[:discriminatorLength], e.genericName, e.chainSpecificName)
 		}
 
 		encoded = encoded[discriminatorLength:]

@@ -312,16 +312,6 @@ func newTestConfAndCodec(t *testing.T) (types.RemoteCodec, config.ContractReader
 	return testCodec, conf
 }
 
-func mustUnmarshalIDL(t *testing.T, rawIDL string) codec.IDL {
-	var idl codec.IDL
-	if err := json.Unmarshal([]byte(rawIDL), &idl); err != nil {
-		t.Logf("failed to unmarshal test IDL: %s", err.Error())
-		t.FailNow()
-	}
-
-	return idl
-}
-
 type modifiedStructWithNestedStruct struct {
 	V                uint8
 	InnerStruct      testutils.ObjectRef1
@@ -938,4 +928,14 @@ func (s *skipEventsChainReader) BatchGetLatestValues(_ context.Context, _ types.
 func (s *skipEventsChainReader) QueryKey(_ context.Context, _ types.BoundContract, _ query.KeyFilter, _ query.LimitAndSort, _ any) ([]types.Sequence, error) {
 	s.t.Skip("QueryKey is not yet supported in Solana")
 	return nil, nil
+}
+
+func mustUnmarshalIDL(t *testing.T, rawIDL string) codec.IDL {
+	var idl codec.IDL
+	if err := json.Unmarshal([]byte(rawIDL), &idl); err != nil {
+		t.Logf("failed to unmarshal test IDL: %s", err.Error())
+		t.FailNow()
+	}
+
+	return idl
 }
