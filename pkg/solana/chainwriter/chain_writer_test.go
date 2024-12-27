@@ -3,7 +3,9 @@ package chainwriter_test
 import (
 	"bytes"
 	"errors"
+	"io/ioutil"
 	"math/big"
+	"os"
 	"reflect"
 	"testing"
 
@@ -24,8 +26,6 @@ import (
 	feemocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/fees/mocks"
 	txmMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 )
-
-var testContractIDLJson = `{"version":"0.1.0","name":"contractReaderInterface","instructions":[{"name":"initialize","accounts":[{"name":"data","isMut":true,"isSigner":false},{"name":"signer","isMut":true,"isSigner":true},{"name":"systemProgram","isMut":false,"isSigner":false}],"args":[{"name":"testIdx","type":"u64"},{"name":"value","type":"u64"}]},{"name":"initializeLookupTable","accounts":[{"name":"writeDataAccount","isMut":true,"isSigner":false,"docs":["PDA for LookupTableDataAccount, derived from seeds and created by the System Program"]},{"name":"admin","isMut":true,"isSigner":true,"docs":["Admin account that pays for PDA creation and signs the transaction"]},{"name":"systemProgram","isMut":false,"isSigner":false,"docs":["System Program required for PDA creation"]}],"args":[{"name":"lookupTable","type":"publicKey"}]}],"accounts":[{"name":"LookupTableDataAccount","type":{"kind":"struct","fields":[{"name":"version","type":"u8"},{"name":"administrator","type":"publicKey"},{"name":"pendingAdministrator","type":"publicKey"},{"name":"lookupTable","type":"publicKey"}]}},{"name":"DataAccount","type":{"kind":"struct","fields":[{"name":"idx","type":"u64"},{"name":"bump","type":"u8"},{"name":"u64Value","type":"u64"},{"name":"u64Slice","type":{"vec":"u64"}}]}}]}`
 
 func TestChainWriter_GetAddresses(t *testing.T) {
 	ctx := tests.Context(t)
@@ -85,9 +85,9 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 				Accounts: chainwriter.PDALookups{
 					Name:      "DataAccountPDA",
 					PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: programID.String()},
-					Seeds: []chainwriter.Lookup{
+					Seeds: []chainwriter.Seed{
 						// extract seed2 for PDA lookup
-						chainwriter.AccountLookup{Name: "seed2", Location: "seed2"},
+						{Dynamic: chainwriter.AccountLookup{Name: "seed2", Location: "seed2"}},
 					},
 					IsSigner:   derivedTablePdaLookupMeta.IsSigner,
 					IsWritable: derivedTablePdaLookupMeta.IsWritable,
@@ -129,9 +129,9 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 			chainwriter.PDALookups{
 				Name:      "DataAccountPDA",
 				PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: solana.SystemProgramID.String()},
-				Seeds: []chainwriter.Lookup{
+				Seeds: []chainwriter.Seed{
 					// extract seed1 for PDA lookup
-					chainwriter.AccountLookup{Name: "seed1", Location: "seed1"},
+					{Dynamic: chainwriter.AccountLookup{Name: "seed1", Location: "seed1"}},
 				},
 				IsSigner:   pdaLookupMeta.IsSigner,
 				IsWritable: pdaLookupMeta.IsWritable,
@@ -272,9 +272,9 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 				Accounts: chainwriter.PDALookups{
 					Name:      "DataAccountPDA",
 					PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: programID.String()},
-					Seeds: []chainwriter.Lookup{
+					Seeds: []chainwriter.Seed{
 						// extract seed1 for PDA lookup
-						chainwriter.AccountLookup{Name: "seed1", Location: "seed1"},
+						{Dynamic: chainwriter.AccountLookup{Name: "seed1", Location: "seed1"}},
 					},
 					IsSigner:   true,
 					IsWritable: true,
@@ -289,9 +289,9 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 				Accounts: chainwriter.PDALookups{
 					Name:      "MiscPDA",
 					PublicKey: chainwriter.AccountConstant{Name: "UnusedAccount", Address: unusedProgramID.String()},
-					Seeds: []chainwriter.Lookup{
+					Seeds: []chainwriter.Seed{
 						// extract seed2 for PDA lookup
-						chainwriter.AccountLookup{Name: "seed2", Location: "seed2"},
+						{Dynamic: chainwriter.AccountLookup{Name: "seed2", Location: "seed2"}},
 					},
 					IsSigner:   true,
 					IsWritable: true,
@@ -414,6 +414,16 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 	staticLookupKeys := chainwriter.CreateTestPubKeys(t, 2)
 	mockFetchLookupTableAddresses(t, rw, staticLookupTablePubkey, staticLookupKeys)
 
+	jsonFile, err := os.Open("testContractIDL.json")
+	require.NoError(t, err)
+
+	defer jsonFile.Close()
+
+	data, err := ioutil.ReadAll(jsonFile)
+	require.NoError(t, err)
+
+	testContractIDLJson := string(data)
+
 	cwConfig := chainwriter.ChainWriterConfig{
 		Programs: map[string]chainwriter.ProgramConfig{
 			"contractReaderInterface": {
@@ -428,9 +438,9 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 									Accounts: chainwriter.PDALookups{
 										Name:      "DataAccountPDA",
 										PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: programID.String()},
-										Seeds: []chainwriter.Lookup{
+										Seeds: []chainwriter.Seed{
 											// extract seed2 for PDA lookup
-											chainwriter.AccountLookup{Name: "seed2", Location: "seed2"},
+											{Dynamic: chainwriter.AccountLookup{Name: "seed2", Location: "seed2"}},
 										},
 										IsSigner:   false,
 										IsWritable: false,
@@ -459,9 +469,9 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 							chainwriter.PDALookups{
 								Name:      "DataAccountPDA",
 								PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: solana.SystemProgramID.String()},
-								Seeds: []chainwriter.Lookup{
+								Seeds: []chainwriter.Seed{
 									// extract seed1 for PDA lookup
-									chainwriter.AccountLookup{Name: "seed1", Location: "seed1"},
+									{Dynamic: chainwriter.AccountLookup{Name: "seed1", Location: "seed1"}},
 								},
 								IsSigner:   false,
 								IsWritable: false,

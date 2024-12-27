@@ -7,6 +7,8 @@ import (
 	"math/big"
 
 	"github.com/gagliardetto/solana-go"
+	addresslookuptable "github.com/gagliardetto/solana-go/programs/address-lookup-table"
+	"github.com/gagliardetto/solana-go/rpc"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
@@ -80,22 +82,22 @@ func parseIDLCodecs(config ChainWriterConfig) (map[string]types.Codec, error) {
 	for program, programConfig := range config.Programs {
 		var idl codec.IDL
 		if err := json.Unmarshal([]byte(programConfig.IDL), &idl); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal IDL: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal IDL for program: %s, error: %w", program, err)
 		}
 		idlCodec, err := codec.NewIDLInstructionsCodec(idl, binary.LittleEndian())
 		if err != nil {
-			return nil, fmt.Errorf("failed to create codec from IDL: %w", err)
+			return nil, fmt.Errorf("failed to create codec from IDL for program: %s, error: %w", program, err)
 		}
 		for method, methodConfig := range programConfig.Methods {
 			if methodConfig.InputModifications != nil {
 				modConfig, err := methodConfig.InputModifications.ToModifier(codec.DecoderHooks...)
 				if err != nil {
-					return nil, fmt.Errorf("failed to create input modifications: %w", err)
+					return nil, fmt.Errorf("failed to create input modifications for method %s.%s, error: %w", program, method, err)
 				}
 				// add mods to codec
 				idlCodec, err = codec.NewNamedModifierCodec(idlCodec, method, modConfig)
 				if err != nil {
-					return nil, fmt.Errorf("failed to create named codec: %w", err)
+					return nil, fmt.Errorf("failed to create named codec for method %s.%s, error: %w", program, method, err)
 				}
 			}
 		}
@@ -250,6 +252,10 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 
 	codec := s.codecs[contractName]
 	encodedPayload, err := codec.Encode(ctx, args, method)
+
+	discriminator := GetDiscriminator(methodConfig.ChainSpecificName)
+	encodedPayload = append(discriminator[:], encodedPayload...)
+
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error encoding transaction payload: %w", err), debugID)
 	}
@@ -302,7 +308,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	}
 
 	// Enqueue transaction
-	if err = s.txm.Enqueue(ctx, accounts[0].PublicKey.String(), tx, &transactionID, blockhash.Value.LastValidBlockHeight); err != nil {
+	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, tx, &transactionID, blockhash.Value.LastValidBlockHeight); err != nil {
 		return errorWithDebugID(fmt.Errorf("error enqueuing transaction: %w", err), debugID)
 	}
 
@@ -325,6 +331,95 @@ func (s *SolanaChainWriterService) GetFeeComponents(ctx context.Context) (*types
 		ExecutionFee:        new(big.Int).SetUint64(fee),
 		DataAvailabilityFee: nil,
 	}, nil
+}
+
+func (s *SolanaChainWriterService) ResolveLookupTables(ctx context.Context, args any, lookupTables LookupTables) (map[string]map[string][]*solana.AccountMeta, map[solana.PublicKey]solana.PublicKeySlice, error) {
+	derivedTableMap := make(map[string]map[string][]*solana.AccountMeta)
+	staticTableMap := make(map[solana.PublicKey]solana.PublicKeySlice)
+
+	// Read derived lookup tables
+	for _, derivedLookup := range lookupTables.DerivedLookupTables {
+		// Load the lookup table - note: This could be multiple tables if the lookup is a PDALookups that resolves to more
+		// than one address
+		lookupTableMap, err := s.loadTable(ctx, args, derivedLookup)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error loading derived lookup table: %w", err)
+		}
+
+		// Merge the loaded table map into the result
+		for tableName, innerMap := range lookupTableMap {
+			if derivedTableMap[tableName] == nil {
+				derivedTableMap[tableName] = make(map[string][]*solana.AccountMeta)
+			}
+			for accountKey, metas := range innerMap {
+				derivedTableMap[tableName][accountKey] = metas
+			}
+		}
+	}
+
+	// Read static lookup tables
+	for _, staticTable := range lookupTables.StaticLookupTables {
+		addressses, err := getLookupTableAddresses(ctx, s.reader, staticTable)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error fetching static lookup table address: %w", err)
+		}
+		staticTableMap[staticTable] = addressses
+	}
+
+	return derivedTableMap, staticTableMap, nil
+}
+
+func (s *SolanaChainWriterService) loadTable(ctx context.Context, args any, rlt DerivedLookupTable) (map[string]map[string][]*solana.AccountMeta, error) {
+	// Resolve all addresses specified by the identifier
+	lookupTableAddresses, err := GetAddresses(ctx, args, []Lookup{rlt.Accounts}, nil, s.reader)
+	if err != nil {
+		return nil, fmt.Errorf("error resolving addresses for lookup table: %w", err)
+	}
+
+	// Nested map in case the lookup table resolves to multiple addresses
+	resultMap := make(map[string]map[string][]*solana.AccountMeta)
+
+	// Iterate over each address of the lookup table
+	for _, addressMeta := range lookupTableAddresses {
+		// Read the full list of addresses from the lookup table
+		addresses, err := getLookupTableAddresses(ctx, s.reader, addressMeta.PublicKey)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching lookup table address: %s, error: %w", addressMeta.PublicKey, err)
+		}
+
+		// Create the inner map for this lookup table
+		if resultMap[rlt.Name] == nil {
+			resultMap[rlt.Name] = make(map[string][]*solana.AccountMeta)
+		}
+
+		// Populate the inner map (keyed by the account public key)
+		for _, addr := range addresses {
+			resultMap[rlt.Name][addressMeta.PublicKey.String()] = append(resultMap[rlt.Name][addressMeta.PublicKey.String()], &solana.AccountMeta{
+				PublicKey:  addr,
+				IsSigner:   addressMeta.IsSigner,
+				IsWritable: addressMeta.IsWritable,
+			})
+		}
+	}
+
+	return resultMap, nil
+}
+
+func getLookupTableAddresses(ctx context.Context, reader client.Reader, tableAddress solana.PublicKey) (solana.PublicKeySlice, error) {
+	// Fetch the account info for the static table
+	accountInfo, err := reader.GetAccountInfoWithOpts(ctx, tableAddress, &rpc.GetAccountInfoOpts{
+		Encoding:   "base64",
+		Commitment: rpc.CommitmentFinalized,
+	})
+
+	if err != nil || accountInfo == nil || accountInfo.Value == nil {
+		return nil, fmt.Errorf("error fetching account info for table: %s, error: %w", tableAddress.String(), err)
+	}
+	alt, err := addresslookuptable.DecodeAddressLookupTableState(accountInfo.GetBinary())
+	if err != nil {
+		return nil, fmt.Errorf("error decoding address lookup table state: %w", err)
+	}
+	return alt.Addresses, nil
 }
 
 func (s *SolanaChainWriterService) Start(_ context.Context) error {

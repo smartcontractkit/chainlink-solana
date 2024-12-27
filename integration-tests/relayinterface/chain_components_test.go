@@ -393,4 +393,14 @@ func (h *helper) waitForTX(t *testing.T, sig solana.Signature, commitment rpc.Co
 	}
 }
 
+func mustUnmarshalIDL[T TestingT[T]](t T, rawIDL string) codec.IDL {
+	var idl codec.IDL
+	if err := json.Unmarshal([]byte(rawIDL), &idl); err != nil {
+		t.Errorf("failed to unmarshal test IDL", err)
+		t.FailNow()
+	}
+
+	return idl
+}
+
 const programPubKey = "6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE"

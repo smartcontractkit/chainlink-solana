@@ -3,6 +3,7 @@ package chainwriter
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"reflect"
@@ -41,12 +42,15 @@ func GetValuesAtLocation(args any, location string) ([][]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	for _, value := range addressList {
 		if byteArray, ok := value.([]byte); ok {
 			vals = append(vals, byteArray)
 		} else if address, ok := value.(solana.PublicKey); ok {
 			vals = append(vals, address.Bytes())
+		} else if num, ok := value.(uint64); ok {
+			buf := make([]byte, 8)
+			binary.LittleEndian.PutUint64(buf, num)
+			vals = append(vals, buf)
 		} else {
 			return nil, fmt.Errorf("invalid value format at path: %s", location)
 		}

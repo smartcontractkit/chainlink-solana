@@ -145,8 +145,8 @@ func TestPDALookups(t *testing.T) {
 		pdaLookup := chainwriter.PDALookups{
 			Name:      "TestPDA",
 			PublicKey: chainwriter.AccountConstant{Name: "ProgramID", Address: programID.String()},
-			Seeds: []chainwriter.Lookup{
-				chainwriter.AccountConstant{Name: "seed", Address: seed.String()},
+			Seeds: []chainwriter.Seed{
+				{Dynamic: chainwriter.AccountConstant{Name: "seed", Address: seed.String()}},
 			},
 			IsSigner:   false,
 			IsWritable: true,
@@ -175,9 +175,9 @@ func TestPDALookups(t *testing.T) {
 		pdaLookup := chainwriter.PDALookups{
 			Name:      "TestPDA",
 			PublicKey: chainwriter.AccountConstant{Name: "ProgramID", Address: programID.String()},
-			Seeds: []chainwriter.Lookup{
-				chainwriter.AccountLookup{Name: "seed1", Location: "test_seed"},
-				chainwriter.AccountLookup{Name: "seed2", Location: "another_seed"},
+			Seeds: []chainwriter.Seed{
+				{Dynamic: chainwriter.AccountLookup{Name: "seed1", Location: "test_seed"}},
+				{Dynamic: chainwriter.AccountLookup{Name: "seed2", Location: "another_seed"}},
 			},
 			IsSigner:   false,
 			IsWritable: true,
@@ -198,8 +198,8 @@ func TestPDALookups(t *testing.T) {
 		pdaLookup := chainwriter.PDALookups{
 			Name:      "TestPDA",
 			PublicKey: chainwriter.AccountConstant{Name: "ProgramID", Address: programID.String()},
-			Seeds: []chainwriter.Lookup{
-				chainwriter.AccountLookup{Name: "seed1", Location: "MissingSeed"},
+			Seeds: []chainwriter.Seed{
+				{Dynamic: chainwriter.AccountLookup{Name: "seed1", Location: "MissingSeed"}},
 			},
 			IsSigner:   false,
 			IsWritable: true,
@@ -233,9 +233,9 @@ func TestPDALookups(t *testing.T) {
 		pdaLookup := chainwriter.PDALookups{
 			Name:      "TestPDA",
 			PublicKey: chainwriter.AccountConstant{Name: "ProgramID", Address: programID.String()},
-			Seeds: []chainwriter.Lookup{
-				chainwriter.AccountLookup{Name: "seed1", Location: "test_seed"},
-				chainwriter.AccountLookup{Name: "seed2", Location: "another_seed"},
+			Seeds: []chainwriter.Seed{
+				{Dynamic: chainwriter.AccountLookup{Name: "seed1", Location: "test_seed"}},
+				{Dynamic: chainwriter.AccountLookup{Name: "seed2", Location: "another_seed"}},
 			},
 			IsSigner:   false,
 			IsWritable: true,
@@ -403,8 +403,8 @@ func TestLookupTables(t *testing.T) {
 					Accounts: chainwriter.PDALookups{
 						Name:      "DataAccountPDA",
 						PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: programID.String()},
-						Seeds: []chainwriter.Lookup{
-							chainwriter.AccountLookup{Name: "seed1", Location: "seed1"},
+						Seeds: []chainwriter.Seed{
+							{Dynamic: chainwriter.AccountLookup{Name: "seed1", Location: "seed1"}},
 						},
 						IsSigner:   false,
 						IsWritable: false,

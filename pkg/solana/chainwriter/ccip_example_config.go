@@ -47,8 +47,8 @@ func TestConfig() {
 							IsWritable: false,
 						},
 						// Seeds would be used if the user needed to look up addresses to use as seeds, which isn't the case here.
-						Seeds: []Lookup{
-							AccountLookup{Location: "Message.TokenAmounts.DestTokenAddress"},
+						Seeds: []Seed{
+							{Dynamic: AccountLookup{Location: "Message.TokenAmounts.DestTokenAddress"}},
 						},
 						IsSigner:   false,
 						IsWritable: false,
@@ -86,9 +86,9 @@ func TestConfig() {
 					IsWritable: false,
 				},
 				// Similar to the RegistryTokenState above, the user is looking up PDA accounts based on the dest tokens.
-				Seeds: []Lookup{
-					AccountLookup{Location: "Message.TokenAmounts.DestTokenAddress"},
-					AccountLookup{Location: "Message.Header.DestChainSelector"},
+				Seeds: []Seed{
+					{Dynamic: AccountLookup{Location: "Message.TokenAmounts.DestTokenAddress"}},
+					{Dynamic: AccountLookup{Location: "Message.Header.DestChainSelector"}},
 				},
 				IsSigner:   false,
 				IsWritable: false,
@@ -120,13 +120,13 @@ func TestConfig() {
 					IsWritable: false,
 				},
 				// The seed is the receiver address.
-				Seeds: []Lookup{
-					AccountLookup{
+				Seeds: []Seed{
+					{Dynamic: AccountLookup{
 						Name:       "Receiver",
 						Location:   "Message.Receiver",
 						IsSigner:   false,
 						IsWritable: false,
-					},
+					}},
 				},
 			},
 			// Account constant
@@ -146,8 +146,8 @@ func TestConfig() {
 					IsWritable: false,
 				},
 				// The seed, once again, is the destination token address.
-				Seeds: []Lookup{
-					AccountLookup{Location: "Message.TokenAmounts.DestTokenAddress"},
+				Seeds: []Seed{
+					{Dynamic: AccountLookup{Location: "Message.TokenAmounts.DestTokenAddress"}},
 				},
 				IsSigner:   false,
 				IsWritable: false,
@@ -175,9 +175,9 @@ func TestConfig() {
 					IsSigner:   false,
 					IsWritable: false,
 				},
-				Seeds: []Lookup{
-					AccountLookup{Location: "Message.Header.DestChainSelector"},
-					AccountLookup{Location: "Message.Header.SourceChainSelector"},
+				Seeds: []Seed{
+					{Dynamic: AccountLookup{Location: "Message.Header.DestChainSelector"}},
+					{Dynamic: AccountLookup{Location: "Message.Header.SourceChainSelector"}},
 				},
 				IsSigner:   false,
 				IsWritable: false,
@@ -191,11 +191,11 @@ func TestConfig() {
 					IsSigner:   false,
 					IsWritable: false,
 				},
-				Seeds: []Lookup{
-					AccountLookup{
+				Seeds: []Seed{
+					{Dynamic: AccountLookup{
 						// The seed is the merkle root of the report, as passed into the input params.
 						Location: "args.MerkleRoot",
-					},
+					}},
 				},
 				IsSigner:   false,
 				IsWritable: false,
@@ -211,9 +211,9 @@ func TestConfig() {
 				},
 				// In this case, the user configured multiple seeds. These will be used in conjunction
 				// with the public key to generate one or multiple PDA accounts.
-				Seeds: []Lookup{
-					AccountLookup{Location: "Message.Receiver"},
-					AccountLookup{Location: "Message.Header.DestChainSelector"},
+				Seeds: []Seed{
+					{Dynamic: AccountLookup{Location: "Message.Receiver"}},
+					{Dynamic: AccountLookup{Location: "Message.Header.DestChainSelector"}},
 				},
 			},
 			// Account constant
@@ -284,11 +284,11 @@ func TestConfig() {
 					IsSigner:   false,
 					IsWritable: false,
 				},
-				Seeds: []Lookup{
-					AccountLookup{
+				Seeds: []Seed{
+					{Dynamic: AccountLookup{
 						// The seed is the merkle root of the report, as passed into the input params.
 						Location: "args.MerkleRoots",
-					},
+					}},
 				},
 				IsSigner:   false,
 				IsWritable: false,
