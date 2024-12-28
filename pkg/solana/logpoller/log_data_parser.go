@@ -52,7 +52,7 @@ func prefixBuilder(depth int) string {
 	return strings.Repeat(">", depth)
 }
 
-func parseProgramLogs(logs []string) []ProgramOutput {
+func ParseProgramLogs(logs []string) []ProgramOutput {
 	var depth int
 	programs := []string{}
 
@@ -80,9 +80,13 @@ func parseProgramLogs(logs []string) []ProgramOutput {
 			dataMatches := dataMatcher.FindStringSubmatch(log)
 
 			if len(dataMatches) > 1 {
+				txLogIdx := uint(len(instLogs[lastLogIdx].Events))
 				instLogs[lastLogIdx].Events = append(instLogs[lastLogIdx].Events, ProgramEvent{
 					Program: programs[len(programs)-1],
 					Data:    dataMatches[1],
+					BlockData: BlockData{
+						TransactionLogIndex: txLogIdx,
+					},
 				})
 			}
 		} else if strings.HasPrefix(log, "Log truncated") {
