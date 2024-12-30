@@ -94,14 +94,6 @@ var validChainReaderConfig = config.ContractReader{
 					OutputModifications: codeccommon.ModifiersConfig{
 						&codeccommon.PropertyExtractorConfig{FieldName: "DurationVal"},
 					},
-					RPCOpts: &config.RPCOpts{
-						Encoding:   &encodingBase64,
-						Commitment: &commitment,
-						DataSlice: &rpc.DataSlice{
-							Offset: &offset,
-							Length: &length,
-						},
-					},
 				},
 			},
 		},

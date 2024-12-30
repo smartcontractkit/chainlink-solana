@@ -27,15 +27,7 @@
               "FieldName":"DurationVal",
               "Type":"extract property"
             }
-          ],
-          "rpcOpts":{
-            "encoding":"base64",
-            "commitment":"finalized",
-            "dataSlice":{
-              "offset":10,
-              "length":10
-            }
-          }
+          ]
         }
       }
     },

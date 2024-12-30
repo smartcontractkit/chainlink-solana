@@ -19,11 +19,10 @@ type accountReadBinding struct {
 	opts                   *rpc.GetAccountInfoOpts
 }
 
-func newAccountReadBinding(namespace, genericName string, opts *rpc.GetAccountInfoOpts) *accountReadBinding {
+func newAccountReadBinding(namespace, genericName string) *accountReadBinding {
 	return &accountReadBinding{
 		namespace:   namespace,
 		genericName: genericName,
-		opts:        opts,
 	}
 }
 

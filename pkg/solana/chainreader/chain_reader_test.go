@@ -14,7 +14,6 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	ag_solana "github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -413,11 +412,6 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 		r.address[idx] = ag_solana.NewWallet().PublicKey().String()
 	}
 
-	encodingBase64 := solana.EncodingBase64
-	commitment := rpc.CommitmentConfirmed
-	offset := uint64(1)
-	length := uint64(1)
-
 	r.conf = config.ContractReader{
 		Namespaces: map[string]config.ChainContractReader{
 			AnyContractName: {
@@ -426,14 +420,6 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 					MethodTakingLatestParamsReturningTestStruct: {
 						ReadType:          config.Account,
 						ChainSpecificName: "TestStruct",
-						RPCOpts: &config.RPCOpts{
-							Encoding:   &encodingBase64,
-							Commitment: &commitment,
-							DataSlice: &rpc.DataSlice{
-								Offset: &offset,
-								Length: &length,
-							},
-						},
 					},
 					MethodReturningUint64: {
 						ReadType:          config.Account,

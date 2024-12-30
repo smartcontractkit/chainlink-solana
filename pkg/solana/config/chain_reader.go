@@ -4,9 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/rpc"
-
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 
@@ -29,7 +26,6 @@ type ReadDefinition struct {
 	ReadType            ReadType                    `json:"readType,omitempty"`
 	InputModifications  commoncodec.ModifiersConfig `json:"inputModifications,omitempty"`
 	OutputModifications commoncodec.ModifiersConfig `json:"outputModifications,omitempty"`
-	RPCOpts             *RPCOpts                    `json:"rpcOpts,omitempty"`
 }
 
 type ReadType int
@@ -48,12 +44,6 @@ func (r ReadType) String() string {
 	default:
 		return fmt.Sprintf("Unknown(%d)", r)
 	}
-}
-
-type RPCOpts struct {
-	Encoding   *solana.EncodingType `json:"encoding,omitempty"`
-	Commitment *rpc.CommitmentType  `json:"commitment,omitempty"`
-	DataSlice  *rpc.DataSlice       `json:"dataSlice,omitempty"`
 }
 
 func (c *ChainContractReader) UnmarshalJSON(bytes []byte) error {

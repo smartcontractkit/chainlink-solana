@@ -302,7 +302,6 @@ func (s *SolanaChainReaderService) addAccountRead(namespace string, genericName 
 	s.bindings.AddReadBinding(namespace, genericName, newAccountReadBinding(
 		namespace,
 		genericName,
-		createRPCOpts(readDefinition.RPCOpts),
 	))
 
 	return nil
@@ -324,26 +323,6 @@ func injectAddressModifier(inputModifications, outputModifications commoncodec.M
 			outputModifications[i] = addrModifierConfig
 		}
 	}
-}
-
-func createRPCOpts(opts *config.RPCOpts) *rpc.GetAccountInfoOpts {
-	if opts == nil {
-		return nil
-	}
-
-	result := &rpc.GetAccountInfoOpts{
-		DataSlice: opts.DataSlice,
-	}
-
-	if opts.Encoding != nil {
-		result.Encoding = *opts.Encoding
-	}
-
-	if opts.Commitment != nil {
-		result.Commitment = *opts.Commitment
-	}
-
-	return result
 }
 
 type accountDataReader struct {
