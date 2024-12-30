@@ -37,7 +37,7 @@ func TestConfig() {
 					Name: "RegistryTokenState",
 					// In this case, the user configured the lookup table accounts to use a PDALookup, which
 					// generates a list of one of more PDA accounts based on the input parameters. Specifically,
-					// there will be multple PDA accounts if there are multiple addresses in the message, otherwise,
+					// there will be multiple PDA accounts if there are multiple addresses in the message, otherwise,
 					// there will only be one PDA account to read from. The PDA account corresponds to the lookup table.
 					Accounts: PDALookups{
 						Name: "RegistryTokenState",

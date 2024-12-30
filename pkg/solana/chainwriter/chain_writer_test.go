@@ -3,7 +3,6 @@ package chainwriter_test
 import (
 	"bytes"
 	"errors"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"reflect"
@@ -26,6 +25,12 @@ import (
 	feemocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/fees/mocks"
 	txmMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 )
+
+type Arguments struct {
+	LookupTable solana.PublicKey
+	Seed1       []byte
+	Seed2       []byte
+}
 
 func TestChainWriter_GetAddresses(t *testing.T) {
 	ctx := tests.Context(t)
@@ -87,7 +92,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 					PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: programID.String()},
 					Seeds: []chainwriter.Seed{
 						// extract seed2 for PDA lookup
-						{Dynamic: chainwriter.AccountLookup{Name: "seed2", Location: "seed2"}},
+						{Dynamic: chainwriter.AccountLookup{Name: "Seed2", Location: "Seed2"}},
 					},
 					IsSigner:   derivedTablePdaLookupMeta.IsSigner,
 					IsWritable: derivedTablePdaLookupMeta.IsWritable,
@@ -107,10 +112,10 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		// correlates to DerivedTable index in account lookup config
 		derivedTablePdaLookupMeta.PublicKey = storedPubKeys[0]
 
-		args := map[string]interface{}{
-			"lookup_table": accountLookupMeta.PublicKey.Bytes(),
-			"seed1":        seed1,
-			"seed2":        seed2,
+		args := Arguments{
+			LookupTable: accountLookupMeta.PublicKey,
+			Seed1:       seed1,
+			Seed2:       seed2,
 		}
 
 		accountLookupConfig := []chainwriter.Lookup{
@@ -122,7 +127,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 			},
 			chainwriter.AccountLookup{
 				Name:       "LookupTable",
-				Location:   "lookup_table",
+				Location:   "LookupTable",
 				IsSigner:   accountLookupMeta.IsSigner,
 				IsWritable: accountLookupMeta.IsWritable,
 			},
@@ -131,7 +136,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 				PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: solana.SystemProgramID.String()},
 				Seeds: []chainwriter.Seed{
 					// extract seed1 for PDA lookup
-					{Dynamic: chainwriter.AccountLookup{Name: "seed1", Location: "seed1"}},
+					{Dynamic: chainwriter.AccountLookup{Name: "Seed1", Location: "Seed1"}},
 				},
 				IsSigner:   pdaLookupMeta.IsSigner,
 				IsWritable: pdaLookupMeta.IsWritable,
@@ -177,8 +182,8 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 	})
 
 	t.Run("resolve addresses for multiple indices from derived lookup table", func(t *testing.T) {
-		args := map[string]interface{}{
-			"seed2": seed2,
+		args := Arguments{
+			Seed2: seed2,
 		}
 
 		accountLookupConfig := []chainwriter.Lookup{
@@ -202,8 +207,8 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 	})
 
 	t.Run("resolve all addresses from derived lookup table if indices not specified", func(t *testing.T) {
-		args := map[string]interface{}{
-			"seed2": seed2,
+		args := Arguments{
+			Seed2: seed2,
 		}
 
 		accountLookupConfig := []chainwriter.Lookup{
@@ -274,7 +279,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 					PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: programID.String()},
 					Seeds: []chainwriter.Seed{
 						// extract seed1 for PDA lookup
-						{Dynamic: chainwriter.AccountLookup{Name: "seed1", Location: "seed1"}},
+						{Dynamic: chainwriter.AccountLookup{Name: "Seed1", Location: "Seed1"}},
 					},
 					IsSigner:   true,
 					IsWritable: true,
@@ -291,7 +296,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 					PublicKey: chainwriter.AccountConstant{Name: "UnusedAccount", Address: unusedProgramID.String()},
 					Seeds: []chainwriter.Seed{
 						// extract seed2 for PDA lookup
-						{Dynamic: chainwriter.AccountLookup{Name: "seed2", Location: "seed2"}},
+						{Dynamic: chainwriter.AccountLookup{Name: "Seed2", Location: "Seed2"}},
 					},
 					IsSigner:   true,
 					IsWritable: true,
@@ -305,9 +310,9 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 		StaticLookupTables: []solana.PublicKey{staticLookupTablePubkey1, staticLookupTablePubkey2},
 	}
 
-	args := map[string]interface{}{
-		"seed1": seed1,
-		"seed2": seed2,
+	args := Arguments{
+		Seed1: seed1,
+		Seed2: seed2,
 	}
 
 	t.Run("returns filtered map with only relevant addresses required by account lookup config", func(t *testing.T) {
@@ -414,19 +419,14 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 	staticLookupKeys := chainwriter.CreateTestPubKeys(t, 2)
 	mockFetchLookupTableAddresses(t, rw, staticLookupTablePubkey, staticLookupKeys)
 
-	jsonFile, err := os.Open("testContractIDL.json")
-	require.NoError(t, err)
-
-	defer jsonFile.Close()
-
-	data, err := ioutil.ReadAll(jsonFile)
+	data, err := os.ReadFile("testContractIDL.json")
 	require.NoError(t, err)
 
 	testContractIDLJson := string(data)
 
 	cwConfig := chainwriter.ChainWriterConfig{
 		Programs: map[string]chainwriter.ProgramConfig{
-			"contractReaderInterface": {
+			"contract_reader_interface": {
 				Methods: map[string]chainwriter.MethodConfig{
 					"initializeLookupTable": {
 						FromAddress:       admin.String(),
@@ -440,7 +440,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 										PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: programID.String()},
 										Seeds: []chainwriter.Seed{
 											// extract seed2 for PDA lookup
-											{Dynamic: chainwriter.AccountLookup{Name: "seed2", Location: "seed2"}},
+											{Dynamic: chainwriter.AccountLookup{Name: "Seed2", Location: "Seed2"}},
 										},
 										IsSigner:   false,
 										IsWritable: false,
@@ -462,7 +462,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 							},
 							chainwriter.AccountLookup{
 								Name:       "LookupTable",
-								Location:   "lookup_table",
+								Location:   "LookupTable",
 								IsSigner:   false,
 								IsWritable: false,
 							},
@@ -471,7 +471,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 								PublicKey: chainwriter.AccountConstant{Name: "WriteTest", Address: solana.SystemProgramID.String()},
 								Seeds: []chainwriter.Seed{
 									// extract seed1 for PDA lookup
-									{Dynamic: chainwriter.AccountLookup{Name: "seed1", Location: "seed1"}},
+									{Dynamic: chainwriter.AccountLookup{Name: "Seed1", Location: "Seed1"}},
 								},
 								IsSigner:   false,
 								IsWritable: false,
@@ -514,22 +514,24 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 
 	t.Run("fails to encode payload if args with missing values provided", func(t *testing.T) {
 		txID := uuid.NewString()
-		args := map[string]interface{}{}
-		submitErr := cw.SubmitTransaction(ctx, "contractReaderInterface", "initializeLookupTable", args, txID, programID.String(), nil, nil)
+		type InvalidArgs struct{}
+		args := InvalidArgs{}
+		submitErr := cw.SubmitTransaction(ctx, "contract_reader_interface", "initializeLookupTable", args, txID, programID.String(), nil, nil)
 		require.Error(t, submitErr)
 	})
 
 	t.Run("fails if invalid contract name provided", func(t *testing.T) {
 		txID := uuid.NewString()
-		args := map[string]interface{}{}
+		args := Arguments{}
 		submitErr := cw.SubmitTransaction(ctx, "badContract", "initializeLookupTable", args, txID, programID.String(), nil, nil)
 		require.Error(t, submitErr)
 	})
 
 	t.Run("fails if invalid method provided", func(t *testing.T) {
 		txID := uuid.NewString()
-		args := map[string]interface{}{}
-		submitErr := cw.SubmitTransaction(ctx, "contractReaderInterface", "badMethod", args, txID, programID.String(), nil, nil)
+
+		args := Arguments{}
+		submitErr := cw.SubmitTransaction(ctx, "contract_reader_interface", "badMethod", args, txID, programID.String(), nil, nil)
 		require.Error(t, submitErr)
 	})
 
@@ -555,13 +557,13 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 			return true
 		}), &txID, mock.Anything).Return(nil).Once()
 
-		args := map[string]interface{}{
-			"lookupTable":  chainwriter.GetRandomPubKey(t).Bytes(),
-			"lookup_table": account2.Bytes(),
-			"seed1":        seed1,
-			"seed2":        seed2,
+		args := Arguments{
+			LookupTable: account2,
+			Seed1:       seed1,
+			Seed2:       seed2,
 		}
-		submitErr := cw.SubmitTransaction(ctx, "contractReaderInterface", "initializeLookupTable", args, txID, programID.String(), nil, nil)
+
+		submitErr := cw.SubmitTransaction(ctx, "contract_reader_interface", "initializeLookupTable", args, txID, programID.String(), nil, nil)
 		require.NoError(t, submitErr)
 	})
 }

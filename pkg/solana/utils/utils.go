@@ -187,7 +187,6 @@ func FundAccounts(t *testing.T, accounts []solana.PrivateKey, solanaGoClient *rp
 			}
 		}
 		remaining = unconfirmedTxCount
-		fmt.Printf("Waiting for finalized funding on %d addresses\n", remaining)
 
 		time.Sleep(500 * time.Millisecond)
 		if count > 60 {

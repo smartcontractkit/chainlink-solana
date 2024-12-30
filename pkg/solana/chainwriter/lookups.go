@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 )
 
+// Lookup is an interface that defines a method to resolve an address (or multiple addresses) from a given definition.
 type Lookup interface {
 	Resolve(ctx context.Context, args any, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.Reader) ([]*solana.AccountMeta, error)
 }

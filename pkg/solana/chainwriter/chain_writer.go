@@ -11,7 +11,6 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
-	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -31,7 +30,8 @@ type SolanaChainWriterService struct {
 	ge     fees.Estimator
 	config ChainWriterConfig
 
-	codecs map[string]types.Codec
+	parsed  *codec.ParsedTypes
+	encoder types.Encoder
 
 	services.StateMachine
 }
@@ -62,48 +62,54 @@ type MethodConfig struct {
 }
 
 func NewSolanaChainWriterService(logger logger.Logger, reader client.Reader, txm txm.TxManager, ge fees.Estimator, config ChainWriterConfig) (*SolanaChainWriterService, error) {
-	codecs, err := parseIDLCodecs(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse IDL codecs: %w", err)
-	}
-
-	return &SolanaChainWriterService{
+	w := SolanaChainWriterService{
 		lggr:   logger,
 		reader: reader,
 		txm:    txm,
 		ge:     ge,
 		config: config,
-		codecs: codecs,
-	}, nil
+		parsed: &codec.ParsedTypes{EncoderDefs: map[string]codec.Entry{}, DecoderDefs: map[string]codec.Entry{}},
+	}
+
+	if err := w.parsePrograms(config); err != nil {
+		return nil, fmt.Errorf("failed to parse programs: %w", err)
+	}
+
+	var err error
+	if w.encoder, err = w.parsed.ToCodec(); err != nil {
+		return nil, fmt.Errorf("%w: failed to create codec", err)
+	}
+
+	return &w, nil
 }
 
-func parseIDLCodecs(config ChainWriterConfig) (map[string]types.Codec, error) {
-	codecs := make(map[string]types.Codec)
+func (s *SolanaChainWriterService) parsePrograms(config ChainWriterConfig) error {
 	for program, programConfig := range config.Programs {
 		var idl codec.IDL
 		if err := json.Unmarshal([]byte(programConfig.IDL), &idl); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal IDL for program: %s, error: %w", program, err)
-		}
-		idlCodec, err := codec.NewIDLInstructionsCodec(idl, binary.LittleEndian())
-		if err != nil {
-			return nil, fmt.Errorf("failed to create codec from IDL for program: %s, error: %w", program, err)
+			return fmt.Errorf("failed to unmarshal IDL for program: %s, error: %w", program, err)
 		}
 		for method, methodConfig := range programConfig.Methods {
-			if methodConfig.InputModifications != nil {
-				modConfig, err := methodConfig.InputModifications.ToModifier(codec.DecoderHooks...)
-				if err != nil {
-					return nil, fmt.Errorf("failed to create input modifications for method %s.%s, error: %w", program, method, err)
-				}
-				// add mods to codec
-				idlCodec, err = codec.NewNamedModifierCodec(idlCodec, method, modConfig)
-				if err != nil {
-					return nil, fmt.Errorf("failed to create named codec for method %s.%s, error: %w", program, method, err)
-				}
+			idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeInstructionDef, methodConfig.ChainSpecificName, idl)
+			if err != nil {
+				return err
 			}
+
+			inputMod, err := methodConfig.InputModifications.ToModifier(codec.DecoderHooks...)
+			if err != nil {
+				return fmt.Errorf("failed to create input modifications for method %s.%s, error: %w", program, method, err)
+			}
+
+			input, err := codec.CreateCodecEntry(idlDef, methodConfig.ChainSpecificName, idl, inputMod)
+			if err != nil {
+				return fmt.Errorf("failed to create codec entry for method %s.%s, error: %w", program, method, err)
+			}
+
+			s.parsed.EncoderDefs[codec.WrapItemType(true, program, method, "")] = input
 		}
-		codecs[program] = idlCodec
 	}
-	return codecs, nil
+
+	return nil
 }
 
 /*
@@ -250,15 +256,14 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		}
 	}
 
-	codec := s.codecs[contractName]
-	encodedPayload, err := codec.Encode(ctx, args, method)
-
-	discriminator := GetDiscriminator(methodConfig.ChainSpecificName)
-	encodedPayload = append(discriminator[:], encodedPayload...)
+	encodedPayload, err := s.encoder.Encode(ctx, args, codec.WrapItemType(true, contractName, method, ""))
 
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error encoding transaction payload: %w", err), debugID)
 	}
+
+	discriminator := GetDiscriminator(methodConfig.ChainSpecificName)
+	encodedPayload = append(discriminator[:], encodedPayload...)
 
 	// Fetch derived and static table maps
 	derivedTableMap, staticTableMap, err := s.ResolveLookupTables(ctx, args, methodConfig.LookupTables)
