@@ -143,13 +143,6 @@ func TestNewIDLCodec_CircularDependency(t *testing.T) {
 	assert.ErrorIs(t, err, types.ErrInvalidConfig)
 }
 
-func TestNewIDLInstructionCodec(t *testing.T) {
-	t.Parallel()
-
-	var idl codec.IDL
-
-}
-
 func newTestIDLAndCodec(t *testing.T, account bool) (string, codec.IDL, types.RemoteCodec) {
 	t.Helper()
 
