@@ -49,10 +49,8 @@ type LogPoller struct {
 	client    internal.Loader[client.Reader]
 	collector *EncodedLogCollector
 
-	filters             *filters
-	discriminatorLookup map[string]string
-	events              []ProgramEvent
-	typeProvider        EventTypeProvider
+	filters      *filters
+	typeProvider EventTypeProvider
 }
 
 func New(lggr logger.SugaredLogger, orm ORM, cl internal.Loader[client.Reader], typeProvider EventTypeProvider) ILogPoller {
@@ -122,7 +120,6 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 		}
 
 		for _, path := range filter.SubkeyPaths {
-
 			var event any
 			event, err = lp.typeProvider.CreateType(filter.EventIdl.IdlEvent, filter.EventIdl.IdlTypeDefSlice, path)
 			bin.UnmarshalBorsh(&event, log.Data)

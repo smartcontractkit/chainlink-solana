@@ -97,12 +97,6 @@ func TestFilters_RegisterFilter(t *testing.T) {
 				},
 			},
 			{
-				Name: "EventIDL",
-				ModifyField: func(f *Filter) {
-					f.EventIDL = uuid.NewString()
-				},
-			},
-			{
 				Name: "SubkeyPaths",
 				ModifyField: func(f *Filter) {
 					f.SubkeyPaths = [][]string{{uuid.NewString()}}
