@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -65,13 +63,6 @@ func TestChainReaderConfig(t *testing.T) {
 		assert.Equal(t, validChainReaderConfig, conf)
 	})
 }
-
-var (
-	encodingBase64 = solana.EncodingBase64
-	commitment     = rpc.CommitmentFinalized
-	offset         = uint64(10)
-	length         = uint64(10)
-)
 
 var nilIDL = codec.IDL{
 	Version: "0.1.0",

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
@@ -16,7 +15,6 @@ type accountReadBinding struct {
 	namespace, genericName string
 	codec                  types.RemoteCodec
 	key                    solana.PublicKey
-	opts                   *rpc.GetAccountInfoOpts
 }
 
 func newAccountReadBinding(namespace, genericName string) *accountReadBinding {
