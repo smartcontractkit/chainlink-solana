@@ -139,6 +139,10 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 
 		// TODO: fill in, and keep track of SequenceNumber for each filter. (Initialize from db on LoadFilters, then increment each time?)
 
+		expiresAt := time.Now() // TODO: account for possible discrepencies in time? Seems like retention should be passed directly to ORM
+		expiresAt.Add(filter.Retention)
+		log.ExpiresAt = &expiresAt
+
 		logs = append(logs, log)
 	}
 
