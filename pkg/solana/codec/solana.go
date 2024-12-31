@@ -298,8 +298,8 @@ func asStruct(
 		named[idx+desLen] = commonencodings.NamedTypeCodec{Name: cases.Title(language.English, cases.NoLower).String(fieldName), Codec: typedCodec}
 	}
 
-	// accounts have to be in a struct, instruction args don't
-	if len(named) == 1 && isInstructionArgs {
+	// accounts have to be in a struct, instruction args don't if they're an array
+	if len(named) == 1 && isInstructionArgs && (fields[0].Type.IsIdlTypeVec() || fields[0].Type.IsArray()) {
 		return name, named[0].Codec, nil
 	}
 
