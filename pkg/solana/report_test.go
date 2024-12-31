@@ -143,7 +143,6 @@ func TestMedianFromReport(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := tests.Context(t)
 			var pos []median.ParsedAttributedObservation

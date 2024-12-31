@@ -503,7 +503,6 @@ func (c *ContractDeployer) DeployAnchorProgramsRemote(contractsDir string, env *
 	log.Debug().Interface("Binaries", contractBinaries).Msg("Program binaries")
 	g := errgroup.Group{}
 	for _, bin := range contractBinaries {
-		bin := bin
 		g.Go(func() error {
 			return c.DeployProgramRemote(bin, env)
 		})
@@ -519,7 +518,6 @@ func (c *ContractDeployer) DeployAnchorProgramsRemoteDocker(baseDir, subDir stri
 	log.Info().Interface("Binaries", contractBinaries).Msg(fmt.Sprintf("Program binaries [%s]", filepath.Join("programs", subDir)))
 	g := errgroup.Group{}
 	for _, bin := range contractBinaries {
-		bin := bin
 		g.Go(func() error {
 			return c.DeployProgramRemoteLocal(filepath.Join(subDir, bin), sol, programIDBuilder)
 		})
