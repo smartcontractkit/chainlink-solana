@@ -119,14 +119,23 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 			return err
 		}
 
+		subKeyValues := make([]IndexedValue, 0, len(filter.SubkeyPaths))
 		for _, path := range filter.SubkeyPaths {
-			var event any
-			event, err = lp.typeProvider.CreateType(filter.EventIdl.IdlEvent, filter.EventIdl.IdlTypeDefSlice, path)
-			bin.UnmarshalBorsh(&event, log.Data)
+			var subKeyVal any
+			subKeyVal, err = lp.typeProvider.CreateType(filter.EventIdl.IdlEvent, filter.EventIdl.IdlTypeDefSlice, path)
+			bin.UnmarshalBorsh(&subKeyVal, log.Data)
 			if err != nil {
 				return err
 			}
+			indexedVal, err := NewIndexedValue(subKeyVal)
+			if err != nil {
+				return err
+			}
+			subKeyValues = append(subKeyValues, indexedVal)
 		}
+
+		lp.seqNums[filter.ID]++
+		log.SequenceNum = lp.seqNums
 
 		// TODO: fill in, and keep track of SequenceNumber for each filter. (Initialize from db on LoadFilters, then increment each time?)
 
