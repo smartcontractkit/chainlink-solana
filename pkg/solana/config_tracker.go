@@ -31,7 +31,6 @@ func ConfigFromState(ctx context.Context, state State) (types.ContractConfig, er
 		return types.ContractConfig{}, err
 	}
 	for _, o := range oracles {
-		o := o //  https://github.com/golang/go/wiki/CommonMistakes#using-reference-to-loop-iterator-variable
 		pubKeys = append(pubKeys, o.Signer.Key[:])
 		accounts = append(accounts, types.Account(o.Transmitter.String()))
 	}
