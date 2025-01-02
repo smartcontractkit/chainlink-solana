@@ -29,6 +29,7 @@ type filters struct {
 	loadedFilters       atomic.Bool
 	knownPrograms       map[string]uint // fast lookup to see if a base58-encoded ProgramID matches any registered filters
 	knownDiscriminators map[string]uint // fast lookup by first 10 characters (60-bits) of a base64-encoded discriminator
+	seqNums             map[int64]int64
 }
 
 func newFilters(lggr logger.SugaredLogger, orm ORM) *filters {
@@ -36,6 +37,11 @@ func newFilters(lggr logger.SugaredLogger, orm ORM) *filters {
 		orm:  orm,
 		lggr: lggr,
 	}
+}
+
+func (fl *filters) IncrementSeqNums(filterID int64) int64 {
+	fl.seqNums[filterID]++
+	return fl.seqNums[filterID]
 }
 
 // PruneFilters - prunes all filters marked to be deleted from the database and all corresponding logs.
@@ -383,6 +389,11 @@ func (fl *filters) LoadFilters(ctx context.Context) error {
 		if !filter.IsBackfilled {
 			fl.filtersToBackfill[filter.ID] = struct{}{}
 		}
+	}
+
+	fl.seqNums, err = fl.orm.SelectSeqNums(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to select sequence numbers from db: %w", err)
 	}
 
 	fl.loadedFilters.Store(true)

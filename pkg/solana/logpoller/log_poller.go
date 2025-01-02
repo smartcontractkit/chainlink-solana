@@ -30,6 +30,7 @@ type ORM interface {
 	MarkFilterDeleted(ctx context.Context, id int64) (err error)
 	MarkFilterBackfilled(ctx context.Context, id int64) (err error)
 	InsertLogs(context.Context, []Log) (err error)
+	SelectSeqNums(ctx context.Context) (map[int64]int64, error)
 }
 
 type ILogPoller interface {
@@ -134,10 +135,7 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 			subKeyValues = append(subKeyValues, indexedVal)
 		}
 
-		lp.seqNums[filter.ID]++
-		log.SequenceNum = lp.seqNums
-
-		// TODO: fill in, and keep track of SequenceNumber for each filter. (Initialize from db on LoadFilters, then increment each time?)
+		log.SequenceNum = lp.filters.IncrementSeqNums(filter.ID)
 
 		expiresAt := time.Now() // TODO: account for possible discrepencies in time? Seems like retention should be passed directly to ORM
 		expiresAt.Add(filter.Retention)

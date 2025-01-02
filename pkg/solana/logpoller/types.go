@@ -159,16 +159,18 @@ func (v *IndexedValue) FromInt64(i int64) {
 	v.FromUint64(uint64(i + math.MaxInt64))
 }
 
-func (v *IndexedValue) FromUint64(u uint64) []byte {
-	var b []byte
-	binary.BigEndian.PutUint64(b, u)
+func (v *IndexedValue) FromUint64(u uint64) {
+	*v = make([]byte, 8)
+	binary.BigEndian.PutUint64(*v, u)
 }
 
 func (v *IndexedValue) FromFloat64(f float64) {
-	if f >= 0 {
-		v.FromUint64(math.Float64bits(f))
+	if f > 0 {
+		v.FromUint64(math.Float64bits(f) + math.MaxInt64)
+		return
 	}
-	v.FromUint64(math.Float64bits(math.Abs(f)))
+	v.FromUint64(math.MaxInt64 - math.Float64bits(f))
+	return
 }
 
 func NewIndexedValue(typedVal any) (iVal IndexedValue, err error) {
