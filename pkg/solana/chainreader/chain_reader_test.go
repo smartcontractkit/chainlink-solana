@@ -14,7 +14,6 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	ag_solana "github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -54,17 +53,17 @@ func TestSolanaChainReaderService_ReaderInterface(t *testing.T) {
 		ContractReaderQueryKeysCanLimitResultsWithCursor,
 	})
 
-	RunContractReaderInterfaceTests(t, it, true)
+	RunContractReaderInterfaceTests(t, it, true, false)
 
 	lsIt := &skipEventsChainReaderTester{ChainComponentsInterfaceTester: commontestutils.WrapContractReaderTesterForLoop(it)}
-	RunContractReaderInterfaceTests(t, lsIt, true)
+	RunContractReaderInterfaceTests(t, lsIt, true, false)
 }
 
 func TestSolanaChainReaderService_ServiceCtx(t *testing.T) {
 	t.Parallel()
 
 	ctx := tests.Context(t)
-	svc, err := chainreader.NewChainReaderService(logger.Test(t), new(mockedRPCClient), config.ChainReader{})
+	svc, err := chainreader.NewChainReaderService(logger.Test(t), new(mockedRPCClient), config.ContractReader{})
 
 	require.NoError(t, err)
 	require.NotNil(t, svc)
@@ -289,21 +288,19 @@ func newTestIDLAndCodec(t *testing.T) (string, codec.IDL, types.RemoteCodec) {
 	return testutils.JSONIDLWithAllTypes, idl, entry
 }
 
-func newTestConfAndCodec(t *testing.T) (types.RemoteCodec, config.ChainReader) {
+func newTestConfAndCodec(t *testing.T) (types.RemoteCodec, config.ContractReader) {
 	t.Helper()
-
 	rawIDL, _, testCodec := newTestIDLAndCodec(t)
-	conf := config.ChainReader{
-		Namespaces: map[string]config.ChainReaderMethods{
+	conf := config.ContractReader{
+		Namespaces: map[string]config.ChainContractReader{
 			Namespace: {
-				Methods: map[string]config.ChainDataReader{
+				IDL: mustUnmarshalIDL(t, rawIDL),
+				Reads: map[string]config.ReadDefinition{
 					NamedMethod: {
-						AnchorIDL: rawIDL,
-						Procedure: config.ChainReaderProcedure{
-							IDLAccount: testutils.TestStructWithNestedStruct,
-							OutputModifications: codeccommon.ModifiersConfig{
-								&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},
-							},
+						ChainSpecificName: testutils.TestStructWithNestedStruct,
+						ReadType:          config.Account,
+						OutputModifications: codeccommon.ModifiersConfig{
+							&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},
 						},
 					},
 				},
@@ -385,7 +382,7 @@ func (_m *mockedRPCClient) SetForAddress(pk ag_solana.PublicKey, bts []byte, err
 
 type chainReaderInterfaceTester struct {
 	TestSelectionSupport
-	conf    config.ChainReader
+	conf    config.ContractReader
 	address []string
 	reader  *wrappedTestChainReader
 }
@@ -415,75 +412,49 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 		r.address[idx] = ag_solana.NewWallet().PublicKey().String()
 	}
 
-	encodingBase64 := solana.EncodingBase64
-	commitment := rpc.CommitmentConfirmed
-	offset := uint64(1)
-	length := uint64(1)
-
-	r.conf = config.ChainReader{
-		Namespaces: map[string]config.ChainReaderMethods{
+	r.conf = config.ContractReader{
+		Namespaces: map[string]config.ChainContractReader{
 			AnyContractName: {
-				Methods: map[string]config.ChainDataReader{
+				IDL: mustUnmarshalIDL(t, fullTestIDL(t)),
+				Reads: map[string]config.ReadDefinition{
 					MethodTakingLatestParamsReturningTestStruct: {
-						AnchorIDL: fullStructIDL(t),
-						Encoding:  config.EncodingTypeBorsh,
-						Procedure: config.ChainReaderProcedure{
-							IDLAccount: "TestStruct",
-							RPCOpts: &config.RPCOpts{
-								Encoding:   &encodingBase64,
-								Commitment: &commitment,
-								DataSlice: &rpc.DataSlice{
-									Offset: &offset,
-									Length: &length,
-								},
-							},
-						},
+						ReadType:          config.Account,
+						ChainSpecificName: "TestStruct",
 					},
 					MethodReturningUint64: {
-						AnchorIDL: fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""),
-						Encoding:  config.EncodingTypeBorsh,
-						Procedure: config.ChainReaderProcedure{
-							IDLAccount: "SimpleUint64Value",
-							OutputModifications: codeccommon.ModifiersConfig{
-								&codeccommon.PropertyExtractorConfig{FieldName: "I"},
-							},
+						ReadType:          config.Account,
+						ChainSpecificName: "SimpleUint64Value",
+						OutputModifications: codeccommon.ModifiersConfig{
+							&codeccommon.PropertyExtractorConfig{FieldName: "I"},
 						},
 					},
 					MethodReturningUint64Slice: {
-						AnchorIDL: fmt.Sprintf(baseIDL, uint64SliceBaseTypeIDL, ""),
-						Encoding:  config.EncodingTypeBincode,
-						Procedure: config.ChainReaderProcedure{
-							IDLAccount: "Uint64Slice",
-							OutputModifications: codeccommon.ModifiersConfig{
-								&codeccommon.PropertyExtractorConfig{FieldName: "Vals"},
-							},
+						ChainSpecificName: "Uint64Slice",
+						ReadType:          config.Account,
+						OutputModifications: codeccommon.ModifiersConfig{
+							&codeccommon.PropertyExtractorConfig{FieldName: "Vals"},
 						},
 					},
 					MethodReturningSeenStruct: {
-						AnchorIDL: fullStructIDL(t),
-						Encoding:  config.EncodingTypeBorsh,
-						Procedure: config.ChainReaderProcedure{
-							IDLAccount: "TestStruct",
-							OutputModifications: codeccommon.ModifiersConfig{
-								&codeccommon.AddressBytesToStringModifierConfig{
-									Fields: []string{"Accountstruct.Accountstr"},
-								},
-								&codeccommon.HardCodeModifierConfig{OffChainValues: map[string]any{"ExtraField": AnyExtraValue}},
+						ChainSpecificName: "TestStruct",
+						ReadType:          config.Account,
+						OutputModifications: codeccommon.ModifiersConfig{
+							&codeccommon.AddressBytesToStringModifierConfig{
+								Fields: []string{"AccountStruct.AccountStr"},
 							},
+							&codeccommon.HardCodeModifierConfig{OffChainValues: map[string]any{"ExtraField": AnyExtraValue}},
 						},
 					},
 				},
 			},
 			AnySecondContractName: {
-				Methods: map[string]config.ChainDataReader{
+				IDL: mustUnmarshalIDL(t, fmt.Sprintf(baseIDL, uint64BaseTypeIDL, "")),
+				Reads: map[string]config.ReadDefinition{
 					MethodReturningUint64: {
-						AnchorIDL: fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""),
-						Encoding:  config.EncodingTypeBorsh,
-						Procedure: config.ChainReaderProcedure{
-							IDLAccount: "SimpleUint64Value",
-							OutputModifications: codeccommon.ModifiersConfig{
-								&codeccommon.PropertyExtractorConfig{FieldName: "I"},
-							},
+						ChainSpecificName: "SimpleUint64Value",
+						ReadType:          config.Account,
+						OutputModifications: codeccommon.ModifiersConfig{
+							&codeccommon.PropertyExtractorConfig{FieldName: "I"},
 						},
 					},
 				},
@@ -574,7 +545,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 	case AnyContractName + EventName:
 		r.test.Skip("Events are not yet supported in Solana")
 	case AnyContractName + MethodReturningUint64:
-		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""), config.EncodingTypeBorsh)
+		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""))
 		onChainStruct := struct {
 			I uint64
 		}{
@@ -587,7 +558,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 			r.test.FailNow()
 		}
 	case AnyContractName + MethodReturningUint64Slice:
-		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, uint64SliceBaseTypeIDL, ""), config.EncodingTypeBincode)
+		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, uint64SliceBaseTypeIDL, ""))
 		onChainStruct := struct {
 			Vals []uint64
 		}{
@@ -599,7 +570,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 			r.test.FailNow()
 		}
 	case AnySecondContractName + MethodReturningUint64, AnyContractName:
-		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""), config.EncodingTypeBorsh)
+		cdc := makeTestCodec(r.test, fmt.Sprintf(baseIDL, uint64BaseTypeIDL, ""))
 		onChainStruct := struct {
 			I uint64
 		}{
@@ -624,7 +595,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 		r.testStructQueue = r.testStructQueue[1:len(r.testStructQueue)]
 
 		// split into two encoded parts to test the preloading function
-		cdc := makeTestCodec(r.test, fullStructIDL(r.test), config.EncodingTypeBorsh)
+		cdc := makeTestCodec(r.test, fullStructIDL(r.test))
 
 		if strings.Contains(r.test.Name(), "wraps_config_with_modifiers_using_its_own_mapstructure_overrides") {
 			// TODO: This is a temporary solution. We are manually retyping this struct to avoid breaking unrelated tests.
@@ -760,16 +731,10 @@ func (r *chainReaderInterfaceTester) MaxWaitTimeForEvents() time.Duration {
 	return maxWaitTime
 }
 
-func makeTestCodec(t *testing.T, rawIDL string, encoding config.EncodingType) types.RemoteCodec {
+func makeTestCodec(t *testing.T, rawIDL string) types.RemoteCodec {
 	t.Helper()
 
-	var idl codec.IDL
-	if err := json.Unmarshal([]byte(rawIDL), &idl); err != nil {
-		t.Logf("failed to unmarshal test IDL: %s", err.Error())
-		t.FailNow()
-	}
-
-	testCodec, err := codec.NewIDLAccountCodec(idl, config.BuilderForEncoding(encoding))
+	testCodec, err := codec.NewIDLAccountCodec(mustUnmarshalIDL(t, rawIDL), binary.LittleEndian())
 	if err != nil {
 		t.Logf("failed to create new codec from test IDL: %s", err.Error())
 		t.FailNow()
@@ -784,6 +749,23 @@ func fullStructIDL(t *testing.T) string {
 	return fmt.Sprintf(
 		baseIDL,
 		testStructIDL,
+		strings.Join([]string{midLevelDynamicStructIDL, midLevelStaticStructIDL, innerDynamicStructIDL, innerStaticStructIDL, accountStructIDL}, ","),
+	)
+}
+
+func fullTestIDL(t *testing.T) string {
+	t.Helper()
+
+	// Combine all of the type definitions into one comma-separated string.
+	allTypes := strings.Join([]string{
+		testStructIDL,
+		uint64BaseTypeIDL,
+		uint64SliceBaseTypeIDL,
+	}, ",")
+
+	return fmt.Sprintf(
+		baseIDL,
+		allTypes,
 		strings.Join([]string{midLevelDynamicStructIDL, midLevelStaticStructIDL, innerDynamicStructIDL, innerStaticStructIDL, accountStructIDL}, ","),
 	)
 }
@@ -808,7 +790,7 @@ const (
 				{"name": "nestedStaticStruct","type": {"defined": "MidLevelStaticStruct"}},
 				{"name": "oracleID","type": "u8"},
 				{"name": "oracleIDs","type": {"array": ["u8",32]}},
-				{"name": "accountstruct","type": {"defined": "accountstruct"}},
+				{"name": "accountStruct","type": {"defined": "accountStruct"}},
 				{"name": "accounts","type": {"vec": "bytes"}}
 
 			]
@@ -816,12 +798,12 @@ const (
 	}`
 
 	accountStructIDL = `{
-		"name": "accountstruct",
+		"name": "accountStruct",
 		"type": {
 			"kind": "struct",
 			"fields": [
 				{"name": "account", "type": "bytes"},
-				{"name": "accountstr", "type": {"array": ["u8",32]}}
+				{"name": "accountStr", "type": {"array": ["u8",32]}}
 			]
 		}
 	}`
@@ -932,4 +914,14 @@ func (s *skipEventsChainReader) BatchGetLatestValues(_ context.Context, _ types.
 func (s *skipEventsChainReader) QueryKey(_ context.Context, _ types.BoundContract, _ query.KeyFilter, _ query.LimitAndSort, _ any) ([]types.Sequence, error) {
 	s.t.Skip("QueryKey is not yet supported in Solana")
 	return nil, nil
+}
+
+func mustUnmarshalIDL(t *testing.T, rawIDL string) codec.IDL {
+	var idl codec.IDL
+	if err := json.Unmarshal([]byte(rawIDL), &idl); err != nil {
+		t.Logf("failed to unmarshal test IDL: %s", err.Error())
+		t.FailNow()
+	}
+
+	return idl
 }

@@ -1,0 +1,57 @@
+{
+  "namespaces":{
+    "Contract":{
+      "anchorIDL":{
+        "version":"0.1.0",
+        "name":"myProgram",
+        "accounts":[
+          {
+            "name":"NilType",
+            "type":{
+              "kind":"struct",
+              "fields":[
+
+              ]
+            }
+          }
+        ]
+      },
+      "reads":{
+        "Method":{
+          "chainSpecificName":"StructWithNestedStruct"
+        },
+        "MethodWithOpts":{
+          "chainSpecificName":"StructWithNestedStruct",
+          "outputModifications":[
+            {
+              "FieldName":"DurationVal",
+              "Type":"extract property"
+            }
+          ]
+        }
+      }
+    },
+    "OtherContract":{
+      "anchorIDL":{
+        "version":"0.1.0",
+        "name":"myProgram",
+        "accounts":[
+          {
+            "name":"NilType",
+            "type":{
+              "kind":"struct",
+              "fields":[
+
+              ]
+            }
+          }
+        ]
+      },
+      "reads":{
+        "Method":{
+          "chainSpecificName":"StructWithNestedStruct"
+        }
+      }
+    }
+  }
+}

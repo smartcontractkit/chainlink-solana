@@ -77,7 +77,6 @@ func doMethodBatchCall(ctx context.Context, client MultipleAccountGetter, bindin
 				results[idx].err,
 				binding.Decode(ctx, data[idx], results[idx].returnVal),
 			)
-
 			continue
 		}
 

@@ -90,6 +90,17 @@ macro_rules! arrayvec {
                 self.xs[offset..offset + len].copy_from_slice(&data);
                 self.len += len as $capacity_ty;
             }
+
+            /// Removes the last element from the array and returns it.
+            /// Returns `None` if the array is empty.
+            pub fn pop(&mut self) -> Option<$ty> {
+                if self.len > 0 {
+                    self.len -= 1;
+                    Some(self.xs[self.len as usize])
+                } else {
+                    None
+                }
+            }
         }
 
         impl std::ops::Deref for $name {
@@ -125,6 +136,38 @@ mod tests {
         }
     }
     arrayvec!(ArrayVec, u8, u32);
+
+    #[test]
+    fn push_pop() {
+        let mut vec = ArrayVec::new();
+        assert!(vec.is_empty());
+        assert_eq!(vec.pop(), None);
+
+        vec.push(10);
+        assert_eq!(vec.len(), 1);
+        assert_eq!(vec.as_slice(), &[10]);
+
+        vec.push(20);
+        vec.push(30);
+        assert_eq!(vec.len(), 3);
+        assert_eq!(vec.as_slice(), &[10, 20, 30]);
+
+        // Popping elements
+        assert_eq!(vec.pop(), Some(30));
+        assert_eq!(vec.len(), 2);
+        assert_eq!(vec.as_slice(), &[10, 20]);
+
+        assert_eq!(vec.pop(), Some(20));
+        assert_eq!(vec.len(), 1);
+        assert_eq!(vec.as_slice(), &[10]);
+
+        assert_eq!(vec.pop(), Some(10));
+        assert_eq!(vec.len(), 0);
+        assert!(vec.is_empty());
+
+        // Popping from empty vec
+        assert_eq!(vec.pop(), None);
+    }
 
     #[test]
     fn remove() {

@@ -46,6 +46,8 @@ type mockBinding struct {
 	mock.Mock
 }
 
+func (_m *mockBinding) SetCodec(_ types.RemoteCodec) {}
+
 func (_m *mockBinding) SetAddress(_ solana.PublicKey) {}
 
 func (_m *mockBinding) GetAddress() solana.PublicKey {

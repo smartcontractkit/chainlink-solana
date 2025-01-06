@@ -35,7 +35,6 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			_, sg := startOCR2DataFeedsSmokeTest(t, test.name, test.env, config, "")

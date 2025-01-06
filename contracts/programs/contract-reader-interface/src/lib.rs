@@ -17,6 +17,19 @@ pub mod contract_reader_interface {
 
         Ok(())
     }
+
+    pub fn initialize_lookup_table(
+        ctx: Context<InitializeLookupTableData>,
+        lookup_table: Pubkey,
+    ) -> Result<()> {
+        let account = &mut ctx.accounts.write_data_account;
+        account.version = 1;
+        account.administrator = ctx.accounts.admin.key();
+        account.pending_administrator = Pubkey::default();
+        account.lookup_table = lookup_table;
+
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -35,6 +48,34 @@ pub struct Initialize<'info> {
     pub signer: Signer<'info>,
 
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct InitializeLookupTableData<'info> {
+    /// PDA for LookupTableDataAccount, derived from seeds and created by the System Program
+    #[account(
+        init,
+        payer = admin,
+        space = size_of::<LookupTableDataAccount>() + 8,
+        seeds = [b"data"],
+        bump
+    )]
+    pub write_data_account: Account<'info, LookupTableDataAccount>,
+
+    /// Admin account that pays for PDA creation and signs the transaction
+    #[account(mut)]
+    pub admin: Signer<'info>,
+
+    /// System Program required for PDA creation
+    pub system_program: Program<'info, System>,
+}
+
+#[account]
+pub struct LookupTableDataAccount {
+    pub version: u8,                   // Version of the data account
+    pub administrator: Pubkey,         // Administrator public key
+    pub pending_administrator: Pubkey, // Pending administrator public key
+    pub lookup_table: Pubkey,          // Address of the lookup table
 }
 
 #[account]
