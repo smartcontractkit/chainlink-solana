@@ -5,7 +5,83 @@ package contract_reader_interface
 import (
 	"fmt"
 	ag_binary "github.com/gagliardetto/binary"
+	ag_solanago "github.com/gagliardetto/solana-go"
 )
+
+type LookupTableDataAccount struct {
+	Version              uint8
+	Administrator        ag_solanago.PublicKey
+	PendingAdministrator ag_solanago.PublicKey
+	LookupTable          ag_solanago.PublicKey
+}
+
+var LookupTableDataAccountDiscriminator = [8]byte{220, 119, 44, 40, 237, 41, 223, 7}
+
+func (obj LookupTableDataAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(LookupTableDataAccountDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `Administrator` param:
+	err = encoder.Encode(obj.Administrator)
+	if err != nil {
+		return err
+	}
+	// Serialize `PendingAdministrator` param:
+	err = encoder.Encode(obj.PendingAdministrator)
+	if err != nil {
+		return err
+	}
+	// Serialize `LookupTable` param:
+	err = encoder.Encode(obj.LookupTable)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *LookupTableDataAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(LookupTableDataAccountDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[220 119 44 40 237 41 223 7]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Administrator`:
+	err = decoder.Decode(&obj.Administrator)
+	if err != nil {
+		return err
+	}
+	// Deserialize `PendingAdministrator`:
+	err = decoder.Decode(&obj.PendingAdministrator)
+	if err != nil {
+		return err
+	}
+	// Deserialize `LookupTable`:
+	err = decoder.Decode(&obj.LookupTable)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 type DataAccount struct {
 	Idx      uint64

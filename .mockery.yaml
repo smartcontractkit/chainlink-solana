@@ -37,6 +37,7 @@ packages:
         config:
           filename: simple_keystore.go
           case: underscore
+      TxManager:
   github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller:
     interfaces:
       RPCClient:

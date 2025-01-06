@@ -34,8 +34,8 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	solanautils "github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 func TestChainComponents(t *testing.T) {
@@ -242,13 +242,13 @@ func (h *helper) Init(t *testing.T) {
 	privateKey, err := solana.PrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1])
 	require.NoError(t, err)
 
-	h.rpcURL, h.wsURL = setupTestValidator(t, privateKey.PublicKey().String())
+	h.rpcURL, h.wsURL = solanautils.SetupTestValidatorWithAnchorPrograms(t, privateKey.PublicKey().String(), []string{"contract-reader-interface"})
 	h.wsClient, err = ws.Connect(tests.Context(t), h.wsURL)
 	h.rpcClient = rpc.New(h.rpcURL)
 
 	require.NoError(t, err)
 
-	client.FundTestAccounts(t, []solana.PublicKey{privateKey.PublicKey()}, h.rpcURL)
+	solanautils.FundAccounts(t, []solana.PrivateKey{privateKey}, h.rpcClient)
 
 	pubkey, err := solana.PublicKeyFromBase58(programPubKey)
 	require.NoError(t, err)
@@ -393,31 +393,6 @@ func (h *helper) waitForTX(t *testing.T, sig solana.Signature, commitment rpc.Co
 	}
 }
 
-const programPubKey = "6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE"
-
-// upgradeAuthority is admin solana.PrivateKey as string
-func setupTestValidator(t *testing.T, upgradeAuthority string) (string, string) {
-	t.Helper()
-
-	soPath := filepath.Join(utils.ContractsDir, "contract_reader_interface.so")
-
-	_, err := os.Stat(soPath)
-	if err != nil {
-		t.Log(err.Error())
-		t.FailNow()
-	}
-
-	flags := []string{
-		"--warp-slot", "42",
-		"--upgradeable-program",
-		programPubKey,
-		soPath,
-		upgradeAuthority,
-	}
-
-	return client.SetupLocalSolNodeWithFlags(t, flags...)
-}
-
 func mustUnmarshalIDL[T TestingT[T]](t T, rawIDL string) codec.IDL {
 	var idl codec.IDL
 	if err := json.Unmarshal([]byte(rawIDL), &idl); err != nil {
@@ -427,3 +402,5 @@ func mustUnmarshalIDL[T TestingT[T]](t T, rawIDL string) codec.IDL {
 
 	return idl
 }
+
+const programPubKey = "6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE"

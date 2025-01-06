@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
 func TestPendingTxContext_add_remove_multiple(t *testing.T) {
@@ -92,7 +94,7 @@ func TestPendingTxContext_new(t *testing.T) {
 	require.Equal(t, sig, tx.signatures[0], "signature should match")
 
 	// Check status is Broadcasted
-	require.Equal(t, Broadcasted, tx.state, "transaction state should be Broadcasted")
+	require.Equal(t, utils.Broadcasted, tx.state, "transaction state should be Broadcasted")
 
 	// Check it does not exist in confirmed nor finalized maps
 	_, exists = txs.confirmedTxs[msg.id]
@@ -250,7 +252,7 @@ func TestPendingTxContext_on_broadcasted_processed(t *testing.T) {
 		require.Equal(t, sig, tx.signatures[0])
 
 		// Check status is Processed
-		require.Equal(t, Processed, tx.state)
+		require.Equal(t, utils.Processed, tx.state)
 
 		// Check it does not exist in confirmed map
 		_, exists = txs.confirmedTxs[msg.id]
@@ -321,7 +323,7 @@ func TestPendingTxContext_on_broadcasted_processed(t *testing.T) {
 		require.NoError(t, err)
 
 		// Transition to errored state
-		id, err := txs.OnError(sig, retentionTimeout, Errored, 0)
+		id, err := txs.OnError(sig, retentionTimeout, utils.Errored, 0)
 		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
@@ -389,7 +391,7 @@ func TestPendingTxContext_on_confirmed(t *testing.T) {
 		require.Equal(t, sig, tx.signatures[0])
 
 		// Check status is Confirmed
-		require.Equal(t, Confirmed, tx.state)
+		require.Equal(t, utils.Confirmed, tx.state)
 
 		// Check it does not exist in finalized map
 		_, exists = txs.finalizedErroredTxs[msg.id]
@@ -433,7 +435,7 @@ func TestPendingTxContext_on_confirmed(t *testing.T) {
 		require.NoError(t, err)
 
 		// Transition to errored state
-		id, err := txs.OnError(sig, retentionTimeout, Errored, 0)
+		id, err := txs.OnError(sig, retentionTimeout, utils.Errored, 0)
 		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
@@ -503,7 +505,7 @@ func TestPendingTxContext_on_finalized(t *testing.T) {
 		require.True(t, exists)
 
 		// Check status is Finalized
-		require.Equal(t, Finalized, tx.state)
+		require.Equal(t, utils.Finalized, tx.state)
 
 		// Check sigs do no exist in signature map
 		_, exists = txs.sigToID[sig1]
@@ -553,7 +555,7 @@ func TestPendingTxContext_on_finalized(t *testing.T) {
 		require.True(t, exists)
 
 		// Check status is Finalized
-		require.Equal(t, Finalized, tx.state)
+		require.Equal(t, utils.Finalized, tx.state)
 
 		// Check sigs do no exist in signature map
 		_, exists = txs.sigToID[sig1]
@@ -611,7 +613,7 @@ func TestPendingTxContext_on_finalized(t *testing.T) {
 		require.NoError(t, err)
 
 		// Transition to errored state
-		id, err := txs.OnError(sig, retentionTimeout, Errored, 0)
+		id, err := txs.OnError(sig, retentionTimeout, utils.Errored, 0)
 		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
@@ -636,7 +638,7 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		require.NoError(t, err)
 
 		// Transition to errored state
-		id, err := txs.OnError(sig, retentionTimeout, Errored, 0)
+		id, err := txs.OnError(sig, retentionTimeout, utils.Errored, 0)
 		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
@@ -653,7 +655,7 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		require.True(t, exists)
 
 		// Check status is Finalized
-		require.Equal(t, Errored, tx.state)
+		require.Equal(t, utils.Errored, tx.state)
 
 		// Check sigs do no exist in signature map
 		_, exists = txs.sigToID[sig]
@@ -674,7 +676,7 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		require.Equal(t, msg.id, id)
 
 		// Transition to errored state
-		id, err = txs.OnError(sig, retentionTimeout, Errored, 0)
+		id, err = txs.OnError(sig, retentionTimeout, utils.Errored, 0)
 		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
@@ -691,7 +693,7 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		require.True(t, exists)
 
 		// Check status is Finalized
-		require.Equal(t, Errored, tx.state)
+		require.Equal(t, utils.Errored, tx.state)
 
 		// Check sigs do no exist in signature map
 		_, exists = txs.sigToID[sig]
@@ -707,7 +709,7 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		require.NoError(t, err)
 
 		// Transition to fatally errored state
-		id, err := txs.OnError(sig, retentionTimeout, FatallyErrored, 0)
+		id, err := txs.OnError(sig, retentionTimeout, utils.FatallyErrored, 0)
 		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
@@ -720,7 +722,7 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		require.True(t, exists)
 
 		// Check status is Errored
-		require.Equal(t, FatallyErrored, tx.state)
+		require.Equal(t, utils.FatallyErrored, tx.state)
 
 		// Check sigs do no exist in signature map
 		_, exists = txs.sigToID[sig]
@@ -741,7 +743,7 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		require.Equal(t, msg.id, id)
 
 		// Transition to errored state
-		id, err = txs.OnError(sig, 0*time.Second, Errored, 0)
+		id, err = txs.OnError(sig, 0*time.Second, utils.Errored, 0)
 		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
@@ -776,7 +778,7 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		require.Equal(t, msg.id, id)
 
 		// Transition back to confirmed state
-		id, err = txs.OnError(sig, retentionTimeout, Errored, 0)
+		id, err = txs.OnError(sig, retentionTimeout, utils.Errored, 0)
 		require.Error(t, err)
 		require.Equal(t, "", id)
 	})
@@ -792,7 +794,7 @@ func TestPendingTxContext_on_prebroadcast_error(t *testing.T) {
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
 		// Transition to errored state
-		err := txs.OnPrebroadcastError(msg.id, retentionTimeout, Errored, 0)
+		err := txs.OnPrebroadcastError(msg.id, retentionTimeout, utils.Errored, 0)
 		require.NoError(t, err)
 
 		// Check it exists in errored map
@@ -800,7 +802,7 @@ func TestPendingTxContext_on_prebroadcast_error(t *testing.T) {
 		require.True(t, exists)
 
 		// Check status is Errored
-		require.Equal(t, Errored, tx.state)
+		require.Equal(t, utils.Errored, tx.state)
 	})
 
 	t.Run("successfully adds transaction with fatally errored state", func(t *testing.T) {
@@ -808,7 +810,7 @@ func TestPendingTxContext_on_prebroadcast_error(t *testing.T) {
 		msg := pendingTx{id: uuid.NewString()}
 
 		// Transition to fatally errored state
-		err := txs.OnPrebroadcastError(msg.id, retentionTimeout, FatallyErrored, 0)
+		err := txs.OnPrebroadcastError(msg.id, retentionTimeout, utils.FatallyErrored, 0)
 		require.NoError(t, err)
 
 		// Check it exists in errored map
@@ -816,7 +818,7 @@ func TestPendingTxContext_on_prebroadcast_error(t *testing.T) {
 		require.True(t, exists)
 
 		// Check status is Errored
-		require.Equal(t, FatallyErrored, tx.state)
+		require.Equal(t, utils.FatallyErrored, tx.state)
 	})
 
 	t.Run("fails to add transaction to errored map if id exists in another map already", func(t *testing.T) {
@@ -829,7 +831,7 @@ func TestPendingTxContext_on_prebroadcast_error(t *testing.T) {
 		require.NoError(t, err)
 
 		// Transition to errored state
-		err = txs.OnPrebroadcastError(msg.id, retentionTimeout, FatallyErrored, 0)
+		err = txs.OnPrebroadcastError(msg.id, retentionTimeout, utils.FatallyErrored, 0)
 		require.ErrorIs(t, err, ErrIDAlreadyExists)
 	})
 
@@ -837,11 +839,11 @@ func TestPendingTxContext_on_prebroadcast_error(t *testing.T) {
 		txID := uuid.NewString()
 
 		// Transition to errored state
-		err := txs.OnPrebroadcastError(txID, retentionTimeout, Errored, 0)
+		err := txs.OnPrebroadcastError(txID, retentionTimeout, utils.Errored, 0)
 		require.NoError(t, err)
 
 		// Transition back to errored state
-		err = txs.OnPrebroadcastError(txID, retentionTimeout, Errored, 0)
+		err = txs.OnPrebroadcastError(txID, retentionTimeout, utils.Errored, 0)
 		require.ErrorIs(t, err, ErrAlreadyInExpectedState)
 	})
 }
@@ -900,7 +902,7 @@ func TestPendingTxContext_remove(t *testing.T) {
 	erroredMsg := pendingTx{id: erroredID}
 	err = txs.New(erroredMsg, erroredSig, cancel)
 	require.NoError(t, err)
-	id, err = txs.OnError(erroredSig, retentionTimeout, Errored, 0)
+	id, err = txs.OnError(erroredSig, retentionTimeout, utils.Errored, 0)
 	require.NoError(t, err)
 	require.Equal(t, erroredMsg.id, id)
 
@@ -1097,7 +1099,7 @@ func TestGetTxState(t *testing.T) {
 	err := txs.New(broadcastedMsg, broadcastedSig, cancel)
 	require.NoError(t, err)
 
-	var state TxState
+	var state utils.TxState
 	// Create new processed transaction
 	processedMsg := pendingTx{id: uuid.NewString()}
 	err = txs.New(processedMsg, processedSig, cancel)
@@ -1108,7 +1110,7 @@ func TestGetTxState(t *testing.T) {
 	// Check Processed state is returned
 	state, err = txs.GetTxState(processedMsg.id)
 	require.NoError(t, err)
-	require.Equal(t, Processed, state)
+	require.Equal(t, utils.Processed, state)
 
 	// Create new confirmed transaction
 	confirmedMsg := pendingTx{id: uuid.NewString()}
@@ -1120,7 +1122,7 @@ func TestGetTxState(t *testing.T) {
 	// Check Confirmed state is returned
 	state, err = txs.GetTxState(confirmedMsg.id)
 	require.NoError(t, err)
-	require.Equal(t, Confirmed, state)
+	require.Equal(t, utils.Confirmed, state)
 
 	// Create new finalized transaction
 	finalizedMsg := pendingTx{id: uuid.NewString()}
@@ -1132,36 +1134,36 @@ func TestGetTxState(t *testing.T) {
 	// Check Finalized state is returned
 	state, err = txs.GetTxState(finalizedMsg.id)
 	require.NoError(t, err)
-	require.Equal(t, Finalized, state)
+	require.Equal(t, utils.Finalized, state)
 
 	// Create new errored transaction
 	erroredMsg := pendingTx{id: uuid.NewString()}
 	err = txs.New(erroredMsg, erroredSig, cancel)
 	require.NoError(t, err)
-	id, err = txs.OnError(erroredSig, retentionTimeout, Errored, 0)
+	id, err = txs.OnError(erroredSig, retentionTimeout, utils.Errored, 0)
 	require.NoError(t, err)
 	require.Equal(t, erroredMsg.id, id)
 	// Check Errored state is returned
 	state, err = txs.GetTxState(erroredMsg.id)
 	require.NoError(t, err)
-	require.Equal(t, Errored, state)
+	require.Equal(t, utils.Errored, state)
 
 	// Create new fatally errored transaction
 	fatallyErroredMsg := pendingTx{id: uuid.NewString()}
 	err = txs.New(fatallyErroredMsg, fatallyErroredSig, cancel)
 	require.NoError(t, err)
-	id, err = txs.OnError(fatallyErroredSig, retentionTimeout, FatallyErrored, 0)
+	id, err = txs.OnError(fatallyErroredSig, retentionTimeout, utils.FatallyErrored, 0)
 	require.NoError(t, err)
 	require.Equal(t, fatallyErroredMsg.id, id)
 	// Check Errored state is returned
 	state, err = txs.GetTxState(fatallyErroredMsg.id)
 	require.NoError(t, err)
-	require.Equal(t, FatallyErrored, state)
+	require.Equal(t, utils.FatallyErrored, state)
 
 	// Check NotFound state is returned if unknown id provided
 	state, err = txs.GetTxState("unknown id")
 	require.Error(t, err)
-	require.Equal(t, NotFound, state)
+	require.Equal(t, utils.NotFound, state)
 }
 
 func randomSignature(t *testing.T) solana.Signature {
@@ -1193,12 +1195,12 @@ func TestPendingTxContext_ListAllExpiredBroadcastedTxs(t *testing.T) {
 			setup: func(t *testing.T, ctx *pendingTxContext) {
 				tx1 := pendingTx{
 					id:                   "tx1",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1500,
 				}
 				tx2 := pendingTx{
 					id:                   "tx2",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1600,
 				}
 				ctx.broadcastedProcessedTxs["tx1"] = tx1
@@ -1212,17 +1214,17 @@ func TestPendingTxContext_ListAllExpiredBroadcastedTxs(t *testing.T) {
 			setup: func(t *testing.T, ctx *pendingTxContext) {
 				tx1 := pendingTx{
 					id:                   "tx1",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1000,
 				}
 				tx2 := pendingTx{
 					id:                   "tx2",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1500,
 				}
 				tx3 := pendingTx{
 					id:                   "tx3",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 900,
 				}
 				ctx.broadcastedProcessedTxs["tx1"] = tx1
@@ -1237,12 +1239,12 @@ func TestPendingTxContext_ListAllExpiredBroadcastedTxs(t *testing.T) {
 			setup: func(t *testing.T, ctx *pendingTxContext) {
 				tx1 := pendingTx{
 					id:                   "tx1",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1000,
 				}
 				tx2 := pendingTx{
 					id:                   "tx2",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1500,
 				}
 				ctx.broadcastedProcessedTxs["tx1"] = tx1
@@ -1256,17 +1258,17 @@ func TestPendingTxContext_ListAllExpiredBroadcastedTxs(t *testing.T) {
 			setup: func(t *testing.T, ctx *pendingTxContext) {
 				tx1 := pendingTx{
 					id:                   "tx1",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 800,
 				}
 				tx2 := pendingTx{
 					id:                   "tx2",
-					state:                Processed, // Not Broadcasted
+					state:                utils.Processed, // Not Broadcasted
 					lastValidBlockHeight: 700,
 				}
 				tx3 := pendingTx{
 					id:                   "tx3",
-					state:                Processed, // Not Broadcasted
+					state:                utils.Processed, // Not Broadcasted
 					lastValidBlockHeight: 600,
 				}
 				ctx.broadcastedProcessedTxs["tx1"] = tx1
@@ -1281,17 +1283,17 @@ func TestPendingTxContext_ListAllExpiredBroadcastedTxs(t *testing.T) {
 			setup: func(t *testing.T, ctx *pendingTxContext) {
 				tx1 := pendingTx{
 					id:                   "tx1",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1000,
 				}
 				tx2 := pendingTx{
 					id:                   "tx2",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 999,
 				}
 				tx3 := pendingTx{
 					id:                   "tx3",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1,
 				}
 				ctx.broadcastedProcessedTxs["tx1"] = tx1
