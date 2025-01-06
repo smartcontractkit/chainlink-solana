@@ -1,4 +1,4 @@
-package txm
+package utils
 
 import (
 	"errors"
@@ -111,39 +111,39 @@ func convertStatus(res *rpc.SignatureStatusesResult) TxState {
 	return NotFound
 }
 
-type signatureList struct {
+type SignatureList struct {
 	sigs []solana.Signature
 	lock sync.RWMutex
 	wg   []*sync.WaitGroup
 }
 
 // internal function that should be called using the proper lock
-func (s *signatureList) get(index int) (sig solana.Signature, err error) {
+func (s *SignatureList) get(index int) (sig solana.Signature, err error) {
 	if index >= len(s.sigs) {
 		return sig, errors.New("invalid index")
 	}
 	return s.sigs[index], nil
 }
 
-func (s *signatureList) Get(index int) (sig solana.Signature, err error) {
+func (s *SignatureList) Get(index int) (sig solana.Signature, err error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	return s.get(index)
 }
 
-func (s *signatureList) List() []solana.Signature {
+func (s *SignatureList) List() []solana.Signature {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	return s.sigs
 }
 
-func (s *signatureList) Length() int {
+func (s *SignatureList) Length() int {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	return len(s.sigs)
 }
 
-func (s *signatureList) Allocate() (index int) {
+func (s *SignatureList) Allocate() (index int) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -156,7 +156,7 @@ func (s *signatureList) Allocate() (index int) {
 	return len(s.sigs) - 1
 }
 
-func (s *signatureList) Set(index int, sig solana.Signature) error {
+func (s *SignatureList) Set(index int, sig solana.Signature) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -174,7 +174,7 @@ func (s *signatureList) Set(index int, sig solana.Signature) error {
 	return nil
 }
 
-func (s *signatureList) Wait(index int) {
+func (s *SignatureList) Wait(index int) {
 	wg := &sync.WaitGroup{}
 	s.lock.RLock()
 	if index < len(s.wg) {
@@ -183,6 +183,19 @@ func (s *signatureList) Wait(index int) {
 	s.lock.RUnlock()
 
 	wg.Wait()
+}
+
+type TxConfig struct {
+	Timeout time.Duration // transaction broadcast timeout
+
+	// compute unit price config
+	FeeBumpPeriod        time.Duration // how often to bump fee
+	BaseComputeUnitPrice uint64        // starting price
+	ComputeUnitPriceMin  uint64        // min price
+	ComputeUnitPriceMax  uint64        // max price
+
+	EstimateComputeUnitLimit bool   // enable compute limit estimations using simulation
+	ComputeUnitLimit         uint32 // compute unit limit
 }
 
 type SetTxConfig func(*TxConfig)

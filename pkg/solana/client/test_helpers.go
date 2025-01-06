@@ -66,6 +66,7 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 		out, err := client.GetHealth(tests.Context(t))
 		if err != nil || out != rpc.HealthOk {
 			t.Logf("API server not ready yet (attempt %d)\n", i+1)
+			t.Logf("Cmd output: %s\nCmd error: %s\n", stdOut.String(), stdErr.String())
 			continue
 		}
 		ready = true

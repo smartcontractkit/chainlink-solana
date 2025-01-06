@@ -1,13 +1,14 @@
 {
   "namespaces": {
     "Contract": {
-      "methods": {
-        "Method": {
-          "anchorIDL": "test idl 1",
-          "encoding": "invalid",
-          "procedure": {
-            "idlAccount": "StructWithNestedStruct"
-          }
+      "anchorIDL": {
+        "version": "0.1.0",
+        "name": "myProgram"
+      },
+      "OtherContract": {
+        "anchorIDL": {
+          "version": "0.1.0",
+          "name": "myProgram"
         }
       }
     }

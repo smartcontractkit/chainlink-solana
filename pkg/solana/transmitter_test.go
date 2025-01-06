@@ -17,7 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
+	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
 // custom mock txm instead of mockery generated because SetTxConfig causes circular imports
@@ -27,7 +27,7 @@ type verifyTxSize struct {
 	s *solana.PrivateKey
 }
 
-func (txm verifyTxSize) Enqueue(_ context.Context, _ string, tx *solana.Transaction, txID *string, _ uint64, _ ...txm.SetTxConfig) error {
+func (txm verifyTxSize) Enqueue(_ context.Context, _ string, tx *solana.Transaction, txID *string, _ uint64, _ ...txmutils.SetTxConfig) error {
 	// additional components that transaction manager adds to the transaction
 	require.NoError(txm.t, fees.SetComputeUnitPrice(tx, 0))
 	require.NoError(txm.t, fees.SetComputeUnitLimit(tx, 0))

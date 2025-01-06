@@ -7,19 +7,19 @@ import (
 )
 
 type readValues struct {
-	address  string
-	contract string
-	readName string
+	address     string
+	contract    string
+	genericName string
 }
 
 // lookup provides basic utilities for mapping a complete readIdentifier to
 // finite contract read information
 type lookup struct {
 	mu sync.RWMutex
-	// contractReadNames maps a contract name to all available readNames (method, log, event, etc.)
+	// contractReadNames maps a contract name to all available namePairs (method, log, event, etc.)
 	contractReadNames map[string][]string
 	// readIdentifiers maps from a complete readIdentifier string to finite read data
-	// a readIdentifier is a combination of address, contract, and readName as a concatenated string
+	// a readIdentifier is a combination of address, contract, and chainSpecificName as a concatenated string
 	readIdentifiers map[string]readValues
 }
 
@@ -30,7 +30,7 @@ func newLookup() *lookup {
 	}
 }
 
-func (l *lookup) addReadNameForContract(contract, readName string) {
+func (l *lookup) addReadNameForContract(contract string, genericName string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -39,23 +39,23 @@ func (l *lookup) addReadNameForContract(contract, readName string) {
 		readNames = []string{}
 	}
 
-	l.contractReadNames[contract] = append(readNames, readName)
+	l.contractReadNames[contract] = append(readNames, genericName)
 }
 
 func (l *lookup) bindAddressForContract(contract, address string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	for _, readName := range l.contractReadNames[contract] {
+	for _, genericName := range l.contractReadNames[contract] {
 		readIdentifier := types.BoundContract{
 			Address: address,
 			Name:    contract,
-		}.ReadIdentifier(readName)
+		}.ReadIdentifier(genericName)
 
 		l.readIdentifiers[readIdentifier] = readValues{
-			address:  address,
-			contract: contract,
-			readName: readName,
+			address:     address,
+			contract:    contract,
+			genericName: genericName,
 		}
 	}
 }
@@ -64,11 +64,11 @@ func (l *lookup) unbindAddressForContract(contract, address string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	for _, readName := range l.contractReadNames[contract] {
+	for _, genericName := range l.contractReadNames[contract] {
 		readIdentifier := types.BoundContract{
 			Address: address,
 			Name:    contract,
-		}.ReadIdentifier(readName)
+		}.ReadIdentifier(genericName)
 
 		delete(l.readIdentifiers, readIdentifier)
 	}

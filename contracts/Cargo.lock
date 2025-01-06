@@ -7,7 +7,7 @@ name = "access-controller"
 version = "1.0.1"
 dependencies = [
  "anchor-lang",
- "arrayvec 1.0.0",
+ "arrayvec 1.0.1",
  "bytemuck",
  "static_assertions",
 ]
@@ -379,7 +379,7 @@ checksum = "96d30a06541fbafbc7f82ed10c06164cfbd2c401138f6addd8404629c4b16711"
 
 [[package]]
 name = "arrayvec"
-version = "1.0.0"
+version = "1.0.1"
 
 [[package]]
 name = "assert_matches"
@@ -1374,7 +1374,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "arrayref",
- "arrayvec 1.0.0",
+ "arrayvec 1.0.1",
  "bytemuck",
  "solana-program",
  "static_assertions",

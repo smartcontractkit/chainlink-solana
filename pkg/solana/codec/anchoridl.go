@@ -312,6 +312,11 @@ type IdlTypeDefTyEnum struct {
 	Variants IdlEnumVariantSlice `json:"variants,omitempty"`
 }
 
+var NilIdlTypeDefTy = IdlTypeDef{Type: IdlTypeDefTy{
+	Kind:   "struct",
+	Fields: &IdlTypeDefStruct{},
+}}
+
 type IdlTypeDefTy struct {
 	Kind IdlTypeDefTyKind `json:"kind"`
 
