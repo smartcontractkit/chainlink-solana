@@ -511,6 +511,50 @@ func TestTxm(t *testing.T) {
 				mc.On("SendTx", mock.Anything, tx).Panic("SendTx should not be called anymore").Maybe()
 			})
 
+			// tx passes sim, shows processed, stays there (timeout should cleanup eventually)
+			t.Run("fail_confirm_stays_processed", func(t *testing.T) {
+				tx, signed := getTx(t, 8, mkey)
+				sig := randomSignature(t)
+				retry0 := randomSignature(t)
+				retry1 := randomSignature(t)
+				retry2 := randomSignature(t)
+				retry3 := randomSignature(t)
+				var wg sync.WaitGroup
+				wg.Add(1)
+
+				mc.On("SendTx", mock.Anything, signed(0, true, computeUnitLimitDefault)).Return(sig, nil)
+				mc.On("SendTx", mock.Anything, signed(1, true, computeUnitLimitDefault)).Return(retry0, nil)
+				mc.On("SendTx", mock.Anything, signed(2, true, computeUnitLimitDefault)).Return(retry1, nil)
+				mc.On("SendTx", mock.Anything, signed(3, true, computeUnitLimitDefault)).Return(retry2, nil).Maybe()
+				mc.On("SendTx", mock.Anything, signed(4, true, computeUnitLimitDefault)).Return(retry3, nil).Maybe()
+				mc.On("SimulateTx", mock.Anything, signed(0, true, computeUnitLimitDefault), mock.Anything).Run(func(mock.Arguments) {
+					wg.Done()
+				}).Return(&rpc.SimulateTransactionResult{}, nil).Once()
+
+				// It stays processed forever without moving forward.
+				statuses[sig] = func() (out *rpc.SignatureStatusesResult) {
+					return &rpc.SignatureStatusesResult{ConfirmationStatus: rpc.ConfirmationStatusProcessed}
+				}
+
+				// tx should be able to queue
+				testTxID := uuid.New().String()
+				lastValidBlockHeight := uint64(100)
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
+				wg.Wait()                                                // wait to be picked up and processed
+				waitFor(t, waitDuration+1*time.Second, txm, prom, empty) // inflight txs cleared after timeout
+
+				// check prom metric
+				prom.error++
+				prom.drop++
+				prom.assertEqual(t)
+
+				_, err := txm.GetTransactionStatus(ctx, testTxID)
+				require.Error(t, err) // transaction cleared from storage
+
+				// panic if sendTx called after context cancelled
+				mc.On("SendTx", mock.Anything, tx).Panic("SendTx should not be called anymore").Maybe()
+			})
+
 			// tx passes sim, errors on confirm
 			t.Run("fail_confirm_revert", func(t *testing.T) {
 				tx, signed := getTx(t, 9, mkey)

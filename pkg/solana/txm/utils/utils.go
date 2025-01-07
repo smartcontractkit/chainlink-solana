@@ -51,13 +51,6 @@ func (s TxState) String() string {
 	}
 }
 
-type regressionType int
-
-const (
-	FromConfirmed regressionType = iota
-	FromProcessed
-)
-
 type statuses struct {
 	sigs []solana.Signature
 	res  []*rpc.SignatureStatusesResult
