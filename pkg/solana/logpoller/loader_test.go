@@ -3,7 +3,6 @@ package logpoller_test
 import (
 	"context"
 	"crypto/rand"
-	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -78,11 +77,13 @@ func TestEncodedLogCollector_ParseSingleEvent(t *testing.T) {
 		GetBlockWithOpts(mock.Anything, mock.Anything, mock.Anything).
 		RunAndReturn(func(_ context.Context, slot uint64, _ *rpc.GetBlockOpts) (*rpc.GetBlockResult, error) {
 			height := slot - 1
+			timeStamp := solana.UnixTimeSeconds(time.Now().Unix())
 
 			result := rpc.GetBlockResult{
 				Transactions: []rpc.TransactionWithMeta{},
 				Signatures:   []solana.Signature{},
 				BlockHeight:  &height,
+				BlockTime:    &timeStamp,
 			}
 
 			_, _ = rand.Read(result.Blockhash[:])
@@ -132,6 +133,8 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 	hashes := make([]solana.Hash, len(slots))
 	scrambler := &slotUnsync{ch: make(chan struct{})}
 
+	timeStamp := solana.UnixTimeSeconds(time.Now().Unix())
+
 	for idx := range len(sigs) {
 		_, _ = rand.Read(sigs[idx][:])
 		_, _ = rand.Read(hashes[idx][:])
@@ -176,6 +179,7 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 					Transactions: []rpc.TransactionWithMeta{},
 					Signatures:   []solana.Signature{},
 					BlockHeight:  &height,
+					BlockTime:    &timeStamp,
 				}, nil
 			}
 
@@ -190,61 +194,72 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 				},
 				Signatures:  []solana.Signature{sigs[slotIdx]},
 				BlockHeight: &height,
+				BlockTime:   &timeStamp,
 			}, nil
 		})
 
 	tests.AssertEventually(t, func() bool {
-		return reflect.DeepEqual(parser.Events(), []logpoller.ProgramEvent{
-			{
-				BlockData: logpoller.BlockData{
-					SlotNumber:          41,
-					BlockHeight:         40,
-					BlockHash:           hashes[3],
-					TransactionHash:     sigs[3],
-					TransactionIndex:    0,
-					TransactionLogIndex: 0,
-				},
-				Prefix: ">",
-				Data:   "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
-			},
-			{
-				BlockData: logpoller.BlockData{
-					SlotNumber:          42,
-					BlockHeight:         41,
-					BlockHash:           hashes[2],
-					TransactionHash:     sigs[2],
-					TransactionIndex:    0,
-					TransactionLogIndex: 0,
-				},
-				Prefix: ">",
-				Data:   "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
-			},
-			{
-				BlockData: logpoller.BlockData{
-					SlotNumber:          43,
-					BlockHeight:         42,
-					BlockHash:           hashes[1],
-					TransactionHash:     sigs[1],
-					TransactionIndex:    0,
-					TransactionLogIndex: 0,
-				},
-				Prefix: ">",
-				Data:   "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
-			},
-			{
-				BlockData: logpoller.BlockData{
-					SlotNumber:          44,
-					BlockHeight:         43,
-					BlockHash:           hashes[0],
-					TransactionHash:     sigs[0],
-					TransactionIndex:    0,
-					TransactionLogIndex: 0,
-				},
-				Prefix: ">",
-				Data:   "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
-			},
-		})
+		return len(parser.Events()) >= 4
 	})
+
+	assert.Equal(t, []logpoller.ProgramEvent{
+		{
+			BlockData: logpoller.BlockData{
+				SlotNumber:          41,
+				BlockHeight:         40,
+				BlockTime:           timeStamp,
+				BlockHash:           hashes[3],
+				TransactionHash:     sigs[3],
+				TransactionIndex:    0,
+				TransactionLogIndex: 0,
+			},
+			Prefix:  ">",
+			Program: "J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4",
+			Data:    "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
+		},
+		{
+			BlockData: logpoller.BlockData{
+				SlotNumber:          42,
+				BlockHeight:         41,
+				BlockTime:           timeStamp,
+				BlockHash:           hashes[2],
+				TransactionHash:     sigs[2],
+				TransactionIndex:    0,
+				TransactionLogIndex: 0,
+			},
+			Prefix:  ">",
+			Program: "J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4",
+			Data:    "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
+		},
+		{
+			BlockData: logpoller.BlockData{
+				SlotNumber:          43,
+				BlockHeight:         42,
+				BlockTime:           timeStamp,
+				BlockHash:           hashes[1],
+				TransactionHash:     sigs[1],
+				TransactionIndex:    0,
+				TransactionLogIndex: 0,
+			},
+			Prefix:  ">",
+			Program: "J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4",
+			Data:    "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
+		},
+		{
+			BlockData: logpoller.BlockData{
+				SlotNumber:          44,
+				BlockHeight:         43,
+				BlockTime:           timeStamp,
+				BlockHash:           hashes[0],
+				TransactionHash:     sigs[0],
+				TransactionIndex:    0,
+				TransactionLogIndex: 0,
+			},
+			Prefix:  ">",
+			Program: "J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4",
+			Data:    "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
+		},
+	}, parser.Events())
 
 	client.AssertExpectations(t)
 }
@@ -337,12 +352,14 @@ func TestEncodedLogCollector_BackfillForAddress(t *testing.T) {
 			}
 
 			height := slot - 1
+			timeStamp := solana.UnixTimeSeconds(time.Now().Unix())
 
 			if idx == -1 {
 				return &rpc.GetBlockResult{
 					Transactions: []rpc.TransactionWithMeta{},
 					Signatures:   []solana.Signature{},
 					BlockHeight:  &height,
+					BlockTime:    &timeStamp,
 				}, nil
 			}
 
@@ -361,6 +378,7 @@ func TestEncodedLogCollector_BackfillForAddress(t *testing.T) {
 				},
 				Signatures:  []solana.Signature{sigs[idx*2], sigs[(idx*2)+1]},
 				BlockHeight: &height,
+				BlockTime:   &timeStamp,
 			}, nil
 		})
 

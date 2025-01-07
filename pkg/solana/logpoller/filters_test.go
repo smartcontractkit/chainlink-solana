@@ -39,6 +39,12 @@ func TestFilters_LoadFilters(t *testing.T) {
 		happyPath2,
 	}, nil).Once()
 
+	orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{
+		1: 18,
+		2: 25,
+		3: 0,
+	}, nil)
+
 	err := fs.LoadFilters(ctx)
 	require.EqualError(t, err, "failed to select filters from db: db failed")
 	err = fs.LoadFilters(ctx)
@@ -110,6 +116,7 @@ func TestFilters_RegisterFilter(t *testing.T) {
 				const filterName = "Filter"
 				dbFilter := Filter{Name: filterName}
 				orm.On("SelectFilters", mock.Anything).Return([]Filter{dbFilter}, nil).Once()
+				orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil)
 				newFilter := dbFilter
 				tc.ModifyField(&newFilter)
 				err := fs.RegisterFilter(tests.Context(t), newFilter)
@@ -122,6 +129,7 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		fs := newFilters(lggr, orm)
 		const filterName = "Filter"
 		orm.On("SelectFilters", mock.Anything).Return(nil, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(int64(0), errors.New("failed to insert")).Once()
 		filter := Filter{Name: filterName}
 		err := fs.RegisterFilter(tests.Context(t), filter)
@@ -149,6 +157,7 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		fs := newFilters(lggr, orm)
 		const filterName = "Filter"
 		orm.On("SelectFilters", mock.Anything).Return(nil, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 		const filterID = int64(10)
 		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(filterID, nil).Once()
 		err := fs.RegisterFilter(tests.Context(t), Filter{Name: filterName})
@@ -180,6 +189,7 @@ func TestFilters_UnregisterFilter(t *testing.T) {
 		fs := newFilters(lggr, orm)
 		const filterName = "Filter"
 		orm.On("SelectFilters", mock.Anything).Return(nil, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 		err := fs.UnregisterFilter(tests.Context(t), filterName)
 		require.NoError(t, err)
 	})
@@ -189,6 +199,7 @@ func TestFilters_UnregisterFilter(t *testing.T) {
 		const filterName = "Filter"
 		const id int64 = 10
 		orm.On("SelectFilters", mock.Anything).Return([]Filter{{ID: id, Name: filterName}}, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 		orm.On("MarkFilterDeleted", mock.Anything, id).Return(errors.New("db query failed")).Once()
 		err := fs.UnregisterFilter(tests.Context(t), filterName)
 		require.EqualError(t, err, "failed to mark filter deleted: db query failed")
@@ -199,6 +210,7 @@ func TestFilters_UnregisterFilter(t *testing.T) {
 		const filterName = "Filter"
 		const id int64 = 10
 		orm.On("SelectFilters", mock.Anything).Return([]Filter{{ID: id, Name: filterName}}, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 		orm.On("MarkFilterDeleted", mock.Anything, id).Return(nil).Once()
 		err := fs.UnregisterFilter(tests.Context(t), filterName)
 		require.NoError(t, err)
@@ -226,6 +238,9 @@ func TestFilters_PruneFilters(t *testing.T) {
 				Name: "To keep",
 			},
 		}, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{
+			2: 25,
+		}, nil).Once()
 		orm.On("DeleteFilters", mock.Anything, map[int64]Filter{toDelete.ID: toDelete}).Return(nil).Once()
 		err := fs.PruneFilters(tests.Context(t))
 		require.NoError(t, err)
@@ -245,6 +260,10 @@ func TestFilters_PruneFilters(t *testing.T) {
 				ID:   2,
 				Name: "To keep",
 			},
+		}, nil).Once()
+		orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{
+			1: 18,
+			2: 25,
 		}, nil).Once()
 		newToDelete := Filter{
 			ID:   3,
@@ -291,6 +310,12 @@ func TestFilters_MatchingFilters(t *testing.T) {
 		EventSig: expectedFilter1.EventSig,
 	}
 	orm.On("SelectFilters", mock.Anything).Return([]Filter{expectedFilter1, expectedFilter2, sameAddress, sameEventSig}, nil).Once()
+	orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{
+		1: 18,
+		2: 25,
+		3: 14,
+		4: 0,
+	}, nil)
 	filters := newFilters(lggr, orm)
 	err := filters.LoadFilters(tests.Context(t))
 	require.NoError(t, err)
@@ -319,6 +344,10 @@ func TestFilters_GetFiltersToBackfill(t *testing.T) {
 		Name:          "notBackfilled",
 	}
 	orm.EXPECT().SelectFilters(mock.Anything).Return([]Filter{backfilledFilter, notBackfilled}, nil).Once()
+	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{
+		1: 18,
+		2: 25,
+	}, nil)
 	filters := newFilters(lggr, orm)
 	err := filters.LoadFilters(tests.Context(t))
 	require.NoError(t, err)

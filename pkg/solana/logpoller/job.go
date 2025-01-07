@@ -122,8 +122,8 @@ func (j *getTransactionsFromBlockJob) Run(ctx context.Context) error {
 
 	if block.BlockTime == nil {
 		return fmt.Errorf("received block %d from rpc with missing block time", block.BlockHeight)
-		detail.blockTime = *block.BlockTime
 	}
+	detail.blockTime = *block.BlockTime
 
 	if len(block.Transactions) != len(blockSigsOnly.Signatures) {
 		return fmt.Errorf("block %d has %d transactions but %d signatures", block.BlockHeight, len(block.Transactions), len(blockSigsOnly.Signatures))

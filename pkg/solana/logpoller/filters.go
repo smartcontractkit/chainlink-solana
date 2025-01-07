@@ -12,8 +12,6 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/utils"
 )
 
 type filters struct {
@@ -88,8 +86,6 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 		return fmt.Errorf("failed to load filters: %w", err)
 	}
 
-	filter.EventSig = utils.Discriminator("event", filter.EventName)
-
 	fl.filtersMutex.Lock()
 	defer fl.filtersMutex.Unlock()
 
@@ -134,17 +130,17 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 	}
 
 	programID := filter.Address.ToSolana().String()
-	if _, ok := fl.knownPrograms[programID]; !ok {
+	if _, ok = fl.knownPrograms[programID]; !ok {
 		fl.knownPrograms[programID] = 1
 	} else {
 		fl.knownPrograms[programID]++
 	}
 
-	discriminator := base64.StdEncoding.EncodeToString(filter.EventSig[:])[:10]
+	discriminatorHead := filter.Discriminator()[:10]
 	if _, ok := fl.knownPrograms[programID]; !ok {
-		fl.knownDiscriminators[discriminator] = 1
+		fl.knownDiscriminators[discriminatorHead] = 1
 	} else {
-		fl.knownDiscriminators[discriminator]++
+		fl.knownDiscriminators[discriminatorHead]++
 	}
 
 	return nil
@@ -220,13 +216,13 @@ func (fl *filters) removeFilterFromIndexes(filter Filter) {
 		}
 	}
 
-	discriminator := base64.StdEncoding.EncodeToString(filter.EventSig[:])[:10]
-	if refcount, ok := fl.knownDiscriminators[discriminator]; ok {
+	discriminatorHead := filter.Discriminator()[:10]
+	if refcount, ok := fl.knownDiscriminators[discriminatorHead]; ok {
 		refcount--
 		if refcount > 0 {
-			fl.knownDiscriminators[discriminator] = refcount
+			fl.knownDiscriminators[discriminatorHead] = refcount
 		} else {
-			delete(fl.knownDiscriminators, discriminator)
+			delete(fl.knownDiscriminators, discriminatorHead)
 		}
 	}
 }
@@ -345,6 +341,8 @@ func (fl *filters) LoadFilters(ctx context.Context) error {
 	fl.filtersByAddress = make(map[PublicKey]map[EventSignature]map[int64]struct{})
 	fl.filtersToBackfill = make(map[int64]struct{})
 	fl.filtersToDelete = make(map[int64]Filter)
+	fl.knownPrograms = make(map[string]uint)
+	fl.knownDiscriminators = make(map[string]uint)
 
 	filters, err := fl.orm.SelectFilters(ctx)
 	if err != nil {

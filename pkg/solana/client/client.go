@@ -73,10 +73,10 @@ type Client struct {
 	requestGroup *singleflight.Group
 }
 
-func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration, log logger.Logger) (*Client, error) {
-	return &Client{
+// Return both the client and the underlying rpc client for testing
+func NewTestClient(endpoint string, cfg config.Config, requestTimeout time.Duration, log logger.Logger) (*Client, *rpc.Client, error) {
+	rpcClient := Client{
 		url:             endpoint,
-		rpc:             rpc.New(endpoint),
 		skipPreflight:   cfg.SkipPreflight(),
 		commitment:      cfg.Commitment(),
 		maxRetries:      cfg.MaxRetries(),
@@ -84,7 +84,14 @@ func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration,
 		contextDuration: requestTimeout,
 		log:             log,
 		requestGroup:    &singleflight.Group{},
-	}, nil
+	}
+	rpcClient.rpc = rpc.New(endpoint)
+	return &rpcClient, rpcClient.rpc, nil
+}
+
+func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration, log logger.Logger) (*Client, error) {
+	rpcClient, _, err := NewTestClient(endpoint, cfg, requestTimeout, log)
+	return rpcClient, err
 }
 
 func (c *Client) latency(name string) func() {

@@ -1,9 +1,12 @@
 package logpoller
 
 import (
+	"encoding/base64"
 	"time"
 
 	"github.com/lib/pq"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/utils"
 )
 
 type Filter struct {
@@ -24,6 +27,11 @@ type Filter struct {
 func (f Filter) MatchSameLogs(other Filter) bool {
 	return f.Address == other.Address && f.EventSig == other.EventSig &&
 		f.EventIdl.Equal(other.EventIdl) && f.SubkeyPaths.Equal(other.SubkeyPaths)
+}
+
+func (f Filter) Discriminator() string {
+	d := utils.Discriminator("event", f.Name)
+	return base64.StdEncoding.EncodeToString(d[:])
 }
 
 type Log struct {
