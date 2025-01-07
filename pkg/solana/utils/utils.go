@@ -231,9 +231,8 @@ func ConvertAnyToPDASeed(value any) []byte {
 		buf := make([]byte, 8)
 		binary.LittleEndian.PutUint64(buf, num)
 		return buf
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // GetValuesAtLocation parses through nested types and arrays to find all locations of values
@@ -247,11 +246,10 @@ func GetValuesAtLocation(args any, location string) ([][]byte, error) {
 	}
 	for _, value := range addressList {
 		byteArray := ConvertAnyToPDASeed(value)
-		if byteArray != nil {
-			vals = append(vals, byteArray)
-		} else {
+		if byteArray == nil {
 			return nil, fmt.Errorf("invalid value format at path: %s", location)
 		}
+		vals = append(vals, byteArray)
 	}
 
 	return vals, nil

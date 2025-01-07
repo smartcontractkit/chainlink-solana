@@ -36,11 +36,11 @@ import (
 )
 
 const (
-	Namespace       = "NameSpace"
-	NamedMethod     = "NamedMethod1"
-	PDAAccount      = "PDAAccount1"
-	PDAStringSeed   = "Seed"
-	PDANumSeed      = uint64(5)
+	Namespace     = "NameSpace"
+	NamedMethod   = "NamedMethod1"
+	PDAAccount    = "PDAAccount1"
+	PDAStringSeed = "Seed"
+	PDANumSeed    = uint64(5)
 )
 
 var (
