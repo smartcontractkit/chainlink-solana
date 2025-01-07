@@ -511,8 +511,8 @@ func TestTxm(t *testing.T) {
 				mc.On("SendTx", mock.Anything, tx).Panic("SendTx should not be called anymore").Maybe()
 			})
 
-			// tx passes sim, shows processed, stays there (timeout should cleanup eventually)
-			t.Run("fail_confirm_stays_processed", func(t *testing.T) {
+			// tx passes sim, gets processed, regresses to not found, gets rebroadcasted by re-org logic and stuck on processed. Eventually cleaned up by timeout.
+			t.Run("reorged_tx_stucked_on_processed_is_eventually_cleaned_up", func(t *testing.T) {
 				tx, signed := getTx(t, 8, mkey)
 				sig := randomSignature(t)
 				retry0 := randomSignature(t)
@@ -531,17 +531,37 @@ func TestTxm(t *testing.T) {
 					wg.Done()
 				}).Return(&rpc.SimulateTransactionResult{}, nil).Once()
 
-				// It stays processed forever without moving forward.
+				mc.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{
+					Value: &rpc.LatestBlockhashResult{
+						LastValidBlockHeight: uint64(2000),
+					},
+				}, nil).Once()
+
+				// handle signature status calls (initial stays processed => nil, others don't exist)
+				count := 0
 				statuses[sig] = func() (out *rpc.SignatureStatusesResult) {
-					return &rpc.SignatureStatusesResult{ConfirmationStatus: rpc.ConfirmationStatusProcessed}
+					defer func() { count++ }()
+					if count > 4 {
+						return &rpc.SignatureStatusesResult{
+							ConfirmationStatus: rpc.ConfirmationStatusProcessed,
+						}
+					}
+
+					if count > 2 {
+						return nil
+					}
+
+					return &rpc.SignatureStatusesResult{
+						ConfirmationStatus: rpc.ConfirmationStatusProcessed,
+					}
 				}
 
 				// tx should be able to queue
 				testTxID := uuid.New().String()
 				lastValidBlockHeight := uint64(100)
 				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
-				wg.Wait()                                                // wait to be picked up and processed
-				waitFor(t, waitDuration+1*time.Second, txm, prom, empty) // inflight txs cleared after timeout
+				wg.Wait()                                  // wait to be picked up and processed
+				waitFor(t, waitDuration, txm, prom, empty) // inflight txs cleared after timeout
 
 				// check prom metric
 				prom.error++
