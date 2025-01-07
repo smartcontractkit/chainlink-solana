@@ -10,6 +10,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 // Lookup is an interface that defines a method to resolve an address (or multiple addresses) from a given definition.
@@ -90,7 +91,7 @@ func (ac AccountConstant) Resolve(_ context.Context, _ any, _ map[string]map[str
 }
 
 func (al AccountLookup) Resolve(_ context.Context, args any, _ map[string]map[string][]*solana.AccountMeta, _ client.Reader) ([]*solana.AccountMeta, error) {
-	derivedValues, err := GetValuesAtLocation(args, al.Location)
+	derivedValues, err := utils.GetValuesAtLocation(args, al.Location)
 	if err != nil {
 		return nil, fmt.Errorf("error getting account from lookup: %w", err)
 	}
@@ -173,7 +174,7 @@ func (pda PDALookups) Resolve(ctx context.Context, args any, derivedTableMap map
 			return nil, fmt.Errorf("error decoding Borsh data dynamically: %w", err)
 		}
 
-		value, err := GetValuesAtLocation(decoded, pda.InternalField.Location)
+		value, err := utils.GetValuesAtLocation(decoded, pda.InternalField.Location)
 		if err != nil {
 			return nil, fmt.Errorf("error getting value at location: %w", err)
 		}
@@ -222,7 +223,7 @@ func getSeedBytes(ctx context.Context, lookup PDALookups, args any, derivedTable
 			dynamicSeed := seed.Dynamic
 			if lookupSeed, ok := dynamicSeed.(AccountLookup); ok {
 				// Get value from a location (This doens't have to be an address, it can be any value)
-				bytes, err := GetValuesAtLocation(args, lookupSeed.Location)
+				bytes, err := utils.GetValuesAtLocation(args, lookupSeed.Location)
 				if err != nil {
 					return nil, fmt.Errorf("error getting address seed: %w", err)
 				}

@@ -2,6 +2,7 @@ package chainreader_test
 
 import (
 	"context"
+	go_binary "encoding/binary"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -13,7 +14,6 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
-	ag_solana "github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -36,8 +36,15 @@ import (
 )
 
 const (
-	Namespace   = "NameSpace"
-	NamedMethod = "NamedMethod1"
+	Namespace       = "NameSpace"
+	NamedMethod     = "NamedMethod1"
+	PDAAccount      = "PDAAccount1"
+	PDAStringSeed   = "Seed"
+	PDANumSeed      = uint64(5)
+)
+
+var (
+	PDAPublicKeySeed = solana.NewWallet().PublicKey()
 )
 
 func TestSolanaChainReaderService_ReaderInterface(t *testing.T) {
@@ -122,6 +129,54 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 
 		require.NoError(t, svc.Bind(ctx, []types.BoundContract{binding}))
 		require.NoError(t, svc.GetLatestValue(ctx, binding.ReadIdentifier(NamedMethod), primitives.Unconfirmed, nil, &result))
+
+		assert.Equal(t, expected.InnerStruct, result.InnerStruct)
+		assert.Equal(t, expected.Value, result.V)
+		assert.Equal(t, expected.TimeVal, result.TimeVal)
+		assert.Equal(t, expected.DurationVal, result.DurationVal)
+	})
+
+	t.Run("PDA account read successful", func(t *testing.T) {
+		t.Parallel()
+
+		testCodec, conf := newTestConfAndCodec(t)
+		encoded, err := testCodec.Encode(ctx, expected, testutils.TestStructWithNestedStruct)
+
+		require.NoError(t, err)
+
+		client := new(mockedRPCClient)
+		svc, err := chainreader.NewChainReaderService(logger.Test(t), client, conf)
+
+		require.NoError(t, err)
+		require.NotNil(t, svc)
+		require.NoError(t, svc.Start(ctx))
+
+		t.Cleanup(func() {
+			require.NoError(t, svc.Close())
+		})
+
+		programID := solana.NewWallet().PublicKey()
+
+		var result modifiedStructWithNestedStruct
+
+		binding := types.BoundContract{
+			Name:    Namespace,
+			Address: programID.String(), // Set the program ID used to calculate the PDA
+		}
+
+		pdaAccount, _, err := solana.FindProgramAddress([][]byte{
+			[]byte(PDAStringSeed),
+			PDAPublicKeySeed.Bytes(),
+			go_binary.LittleEndian.AppendUint64([]byte{}, PDANumSeed),
+		}, programID)
+		require.NoError(t, err)
+
+		client.SetForAddress(pdaAccount, encoded, nil, 0)
+
+		param := struct{ Parameter uint64 }{Parameter: PDANumSeed}
+
+		require.NoError(t, svc.Bind(ctx, []types.BoundContract{binding}))
+		require.NoError(t, svc.GetLatestValue(ctx, binding.ReadIdentifier(PDAAccount), primitives.Unconfirmed, param, &result))
 
 		assert.Equal(t, expected.InnerStruct, result.InnerStruct)
 		assert.Equal(t, expected.Value, result.V)
@@ -222,7 +277,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			require.NoError(t, svc.Close())
 		})
 
-		pk := ag_solana.NewWallet().PublicKey()
+		pk := solana.NewWallet().PublicKey()
 
 		require.NotNil(t, svc.Bind(ctx, []types.BoundContract{
 			{
@@ -303,6 +358,24 @@ func newTestConfAndCodec(t *testing.T) (types.RemoteCodec, config.ContractReader
 							&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},
 						},
 					},
+					PDAAccount: {
+						ChainSpecificName: testutils.TestStructWithNestedStruct,
+						ReadType:          config.Account,
+						Seeds: []config.Seed{
+							{
+								Value: PDAStringSeed,
+							},
+							{
+								Value: PDAPublicKeySeed,
+							},
+							{
+								Location: "Parameter",
+							},
+						},
+						OutputModifications: codeccommon.ModifiersConfig{
+							&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},
+						},
+					},
 				},
 			},
 		},
@@ -320,7 +393,7 @@ type modifiedStructWithNestedStruct struct {
 	BasicVector      []string
 	TimeVal          int64
 	DurationVal      time.Duration
-	PublicKey        ag_solana.PublicKey
+	PublicKey        solana.PublicKey
 	EnumVal          uint8
 }
 
@@ -365,7 +438,7 @@ func (_m *mockedRPCClient) SetNext(bts []byte, err error, delay time.Duration) {
 	})
 }
 
-func (_m *mockedRPCClient) SetForAddress(pk ag_solana.PublicKey, bts []byte, err error, delay time.Duration) {
+func (_m *mockedRPCClient) SetForAddress(pk solana.PublicKey, bts []byte, err error, delay time.Duration) {
 	_m.mu.Lock()
 	defer _m.mu.Unlock()
 
@@ -409,7 +482,7 @@ func (r *chainReaderInterfaceTester) Name() string {
 func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 	r.address = make([]string, 7)
 	for idx := range r.address {
-		r.address[idx] = ag_solana.NewWallet().PublicKey().String()
+		r.address[idx] = solana.NewWallet().PublicKey().String()
 	}
 
 	r.conf = config.ContractReader{
@@ -643,7 +716,7 @@ func (r *wrappedTestChainReader) GetLatestValue(ctx context.Context, readIdentif
 		}
 	}
 
-	r.client.SetForAddress(ag_solana.PublicKey(r.tester.GetAccountBytes(acct)), bts, nil, 0)
+	r.client.SetForAddress(solana.PublicKey(r.tester.GetAccountBytes(acct)), bts, nil, 0)
 
 	return r.service.GetLatestValue(ctx, readIdentifier, confidenceLevel, params, returnVal)
 }

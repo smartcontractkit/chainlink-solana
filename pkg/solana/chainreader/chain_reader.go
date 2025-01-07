@@ -285,10 +285,6 @@ func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainContra
 
 func (s *SolanaChainReaderService) addAccountRead(namespace string, genericName string, idl codec.IDL, idlType codec.IdlTypeDef, readDefinition config.ReadDefinition) error {
 	inputAccountIDLDef := codec.NilIdlTypeDefTy
-	// TODO:
-	//		if hasPDA{
-	//			inputAccountIDLDef = pdaType
-	//		}
 	if err := s.addCodecDef(true, namespace, genericName, codec.ChainConfigTypeAccountDef, idl, inputAccountIDLDef, readDefinition.InputModifications); err != nil {
 		return err
 	}
@@ -299,10 +295,18 @@ func (s *SolanaChainReaderService) addAccountRead(namespace string, genericName 
 
 	s.lookup.addReadNameForContract(namespace, genericName)
 
-	s.bindings.AddReadBinding(namespace, genericName, newAccountReadBinding(
-		namespace,
-		genericName,
-	))
+	var reader readBinding
+	// Create PDA read binding if Seeds config is non-nil
+	// Note: Empty seeds list is a valid configuration for a PDA so a length check is intentionally skipped
+	if readDefinition.Seeds != nil {
+		if len(readDefinition.Seeds) > solana.MaxSeeds {
+			return fmt.Errorf("read definition contains more seeds (%d) than the max allowed (%d) for PDAs", len(readDefinition.Seeds), solana.MaxSeeds)
+		}
+		reader = newPdaReadBinding(namespace, genericName, readDefinition.Seeds)
+	} else {
+		reader = newAccountReadBinding(namespace, genericName)
+	}
+	s.bindings.AddReadBinding(namespace, genericName, reader)
 
 	return nil
 }

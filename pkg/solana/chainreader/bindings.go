@@ -11,7 +11,7 @@ import (
 
 type readBinding interface {
 	SetAddress(solana.PublicKey)
-	GetAddress() solana.PublicKey
+	GetAddress(params any) (solana.PublicKey, error)
 	SetCodec(types.RemoteCodec)
 	CreateType(bool) (any, error)
 	Decode(context.Context, []byte, any) error

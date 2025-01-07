@@ -34,8 +34,8 @@ func (b *accountReadBinding) SetAddress(key solana.PublicKey) {
 	b.key = key
 }
 
-func (b *accountReadBinding) GetAddress() solana.PublicKey {
-	return b.key
+func (b *accountReadBinding) GetAddress(params any) (solana.PublicKey, error) {
+	return b.key, nil
 }
 
 func (b *accountReadBinding) CreateType(forEncoding bool) (any, error) {

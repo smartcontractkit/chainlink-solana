@@ -3,6 +3,7 @@ package chainreader
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/gagliardetto/solana-go"
 
@@ -38,7 +39,11 @@ func doMethodBatchCall(ctx context.Context, client MultipleAccountGetter, bindin
 			return nil, err
 		}
 
-		keys[idx] = binding.GetAddress()
+		key, err := binding.GetAddress(call.Params)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get address for binding %v: %w", binding, err)
+		}
+		keys[idx] = key
 	}
 
 	// Fetch the account data
