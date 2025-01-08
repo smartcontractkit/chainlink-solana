@@ -39,6 +39,7 @@ type ILogPoller interface {
 	Close() error
 	RegisterFilter(ctx context.Context, filter Filter) error
 	UnregisterFilter(ctx context.Context, name string) error
+	Process(programEvent ProgramEvent) error
 }
 
 type LogPoller struct {
