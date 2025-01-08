@@ -5,9 +5,10 @@ package mocks
 import (
 	context "context"
 
-	rpc "github.com/gagliardetto/solana-go/rpc"
-	multinode "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
+	multinode "github.com/smartcontractkit/chainlink-framework/multinode"
 	mock "github.com/stretchr/testify/mock"
+
+	rpc "github.com/gagliardetto/solana-go/rpc"
 
 	solana "github.com/gagliardetto/solana-go"
 )

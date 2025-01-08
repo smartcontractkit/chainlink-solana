@@ -23,9 +23,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
@@ -263,7 +263,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 				sendOnlyNodes = append(sendOnlyNodes, newSendOnly)
 			} else {
 				newNode := mn.NewNode[mn.StringID, *client.Head, *client.MultiNodeClient](
-					mnCfg, mnCfg, lggr, *nodeInfo.URL.URL(), nil, *nodeInfo.Name,
+					mnCfg, mnCfg, lggr, nodeInfo.URL.URL(), nil, *nodeInfo.Name,
 					i, mn.StringID(id), 0, rpcClient, chainFamily)
 				nodes = append(nodes, newNode)
 			}

@@ -21,15 +21,14 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink/integration-tests/types/config/node"
 
+	ocr2_config "github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig/ocr2"
+	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	k8s_config "github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/osutil"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
-
-	ocr2_config "github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig/ocr2"
-	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
 type TestConfig struct {
@@ -265,13 +264,9 @@ func (c *TestConfig) GetNodeConfigTOML() (string, error) {
 		url = c.GetURL()
 	}
 
-	mnConfig := solcfg.MultiNodeConfig{
-		MultiNode: solcfg.MultiNode{
-			Enabled:       ptr.Ptr(true),
-			SyncThreshold: ptr.Ptr(uint32(170)),
-		},
-	}
-	mnConfig.SetDefaults()
+	mnConfig := solcfg.NewDefaultMultiNodeConfig()
+	mnConfig.MultiNode.Enabled = ptr.Ptr(true)
+	mnConfig.MultiNode.SyncThreshold = ptr.Ptr(uint32(170))
 
 	var nodes []*solcfg.Node
 	for i, u := range url {
