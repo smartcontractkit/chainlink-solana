@@ -81,7 +81,7 @@ func (p SubkeyPaths) Value() (driver.Value, error) {
 }
 
 func (p *SubkeyPaths) Scan(src interface{}) error {
-	return scanJson("SubkeyPaths", p, src)
+	return scanJSON("SubkeyPaths", p, src)
 }
 
 func (p SubkeyPaths) Equal(o SubkeyPaths) bool {
@@ -112,7 +112,7 @@ type EventIdl struct {
 }
 
 func (e *EventIdl) Scan(src interface{}) error {
-	return scanJson("EventIdl", e, src)
+	return scanJSON("EventIdl", e, src)
 }
 
 func (e EventIdl) Value() (driver.Value, error) {
@@ -122,11 +122,11 @@ func (e EventIdl) Value() (driver.Value, error) {
 	})
 }
 
-func (p EventIdl) Equal(o EventIdl) bool {
-	return reflect.DeepEqual(p, o)
+func (e EventIdl) Equal(o EventIdl) bool {
+	return reflect.DeepEqual(e, o)
 }
 
-func scanJson(name string, dest, src interface{}) error {
+func scanJSON(name string, dest, src interface{}) error {
 	var bSrc []byte
 	switch src := src.(type) {
 	case string:
@@ -170,7 +170,6 @@ func (v *IndexedValue) FromFloat64(f float64) {
 		return
 	}
 	v.FromUint64(math.MaxInt64 - math.Float64bits(f))
-	return
 }
 
 func NewIndexedValue(typedVal any) (iVal IndexedValue, err error) {

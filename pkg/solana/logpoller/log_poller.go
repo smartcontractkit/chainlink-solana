@@ -9,6 +9,7 @@ import (
 	"time"
 
 	bin "github.com/gagliardetto/binary"
+	"github.com/lib/pq"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
@@ -120,31 +121,39 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 			return err
 		}
 
-		subKeyValues := make([]IndexedValue, 0, len(filter.SubkeyPaths))
+		log.SubkeyValues = make(pq.ByteaArray, 0, len(filter.SubkeyPaths))
 		for _, path := range filter.SubkeyPaths {
 			var subKeyVal any
 			subKeyVal, err = lp.typeProvider.CreateType(filter.EventIdl.IdlEvent, filter.EventIdl.IdlTypeDefSlice, path)
-			bin.UnmarshalBorsh(&subKeyVal, log.Data)
 			if err != nil {
 				return err
 			}
-			indexedVal, err := NewIndexedValue(subKeyVal)
+			err = bin.UnmarshalBorsh(&subKeyVal, log.Data)
 			if err != nil {
 				return err
 			}
-			subKeyValues = append(subKeyValues, indexedVal)
+			indexedVal, err2 := NewIndexedValue(subKeyVal)
+			if err2 != nil {
+				return err2
+			}
+			err = log.SubkeyValues.Scan(indexedVal)
+			if err != nil {
+				return err
+			}
 		}
 
 		log.SequenceNum = lp.filters.IncrementSeqNums(filter.ID)
 
-		expiresAt := time.Now() // TODO: account for possible discrepencies in time? Seems like retention should be passed directly to ORM
-		expiresAt.Add(filter.Retention)
+		expiresAt := time.Now().Add(filter.Retention).UTC()
 		log.ExpiresAt = &expiresAt
 
 		logs = append(logs, log)
 	}
 
-	lp.orm.InsertLogs(ctx, logs)
+	err = lp.orm.InsertLogs(ctx, logs)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
