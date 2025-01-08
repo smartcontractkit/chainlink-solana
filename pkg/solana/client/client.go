@@ -11,8 +11,8 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
 	mn "github.com/smartcontractkit/chainlink-framework/multinode"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 )
