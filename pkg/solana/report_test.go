@@ -142,11 +142,11 @@ func TestMedianFromReport(t *testing.T) {
 		tt = append(tt, test)
 	}
 
-	for _, tc := range tt {
-		t.Run(tc.name, func(t *testing.T) {
+	for idx := range tt {
+		t.Run(tt[idx].name, func(t *testing.T) {
 			ctx := tests.Context(t)
 			var pos []median.ParsedAttributedObservation
-			for i, obs := range tc.obs {
+			for i, obs := range tt[idx].obs {
 				pos = append(pos, median.ParsedAttributedObservation{
 					Value:           obs,
 					JuelsPerFeeCoin: obs,
@@ -155,15 +155,15 @@ func TestMedianFromReport(t *testing.T) {
 			}
 			report, err := cdc.BuildReport(ctx, pos)
 			require.NoError(t, err)
-			max, err := cdc.MaxReportLength(ctx, len(tc.obs))
+			maxLen, err := cdc.MaxReportLength(ctx, len(tt[idx].obs))
 			require.NoError(t, err)
-			assert.Equal(t, len(report), max)
+			assert.Equal(t, len(report), maxLen)
 			med, err := cdc.MedianFromReport(ctx, report)
 			require.NoError(t, err)
-			assert.Equal(t, tc.expectedMedian.String(), med.String())
+			assert.Equal(t, tt[idx].expectedMedian.String(), med.String())
 			count, err := cdc.ObserversCountFromReport(report)
 			require.NoError(t, err)
-			assert.Equal(t, len(tc.obs), int(count))
+			assert.Equal(t, len(tt[idx].obs), int(count))
 		})
 	}
 }

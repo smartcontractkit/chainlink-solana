@@ -300,8 +300,8 @@ type queue[T any] struct {
 	values []T
 }
 
-func newQueue[T any](len uint) *queue[T] {
-	values := make([]T, len)
+func newQueue[T any](maxLen uint) *queue[T] {
+	values := make([]T, maxLen)
 
 	return &queue[T]{
 		values: values,
