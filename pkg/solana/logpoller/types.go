@@ -1,6 +1,7 @@
 package logpoller
 
 import (
+	"context"
 	"database/sql/driver"
 	"encoding/binary"
 	"encoding/json"
@@ -104,6 +105,11 @@ func (s EventSignature) Value() (driver.Value, error) {
 
 type EventTypeProvider interface {
 	CreateType(eventIdl codec.IdlEvent, typedefSlice codec.IdlTypeDefSlice, subKeyPath []string) (any, error)
+}
+
+type Decoder interface {
+	CreateType(itemType string, _ bool) (any, error)
+	Decode(_ context.Context, raw []byte, into any, itemType string) error
 }
 
 type EventIdl struct {

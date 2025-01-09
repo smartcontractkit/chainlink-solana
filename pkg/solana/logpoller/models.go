@@ -1,7 +1,10 @@
 package logpoller
 
 import (
+	"context"
 	"encoding/base64"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/lib/pq"
@@ -20,8 +23,9 @@ type Filter struct {
 	SubkeyPaths   SubkeyPaths
 	Retention     time.Duration
 	MaxLogsKept   int64
-	IsDeleted     bool // only for internal usage. Values set externally are ignored.
-	IsBackfilled  bool // only for internal usage. Values set externally are ignored.
+	IsDeleted     bool    // only for internal usage. Values set externally are ignored.
+	IsBackfilled  bool    // only for internal usage. Values set externally are ignored.
+	decoder       Decoder // only for internal usage.
 }
 
 func (f Filter) MatchSameLogs(other Filter) bool {
@@ -32,6 +36,22 @@ func (f Filter) MatchSameLogs(other Filter) bool {
 func (f Filter) Discriminator() string {
 	d := utils.Discriminator("event", f.Name)
 	return base64.StdEncoding.EncodeToString(d[:])
+}
+
+func (f *Filter) CreateType(subKeyPath string) (any, error) {
+	itemType := strings.Join([]string{f.Name, subKeyPath}, ".")
+	return f.decoder.CreateType(itemType, false) // TODO: what does bool represent? pass true or false?
+}
+
+func (f *Filter) DecodeSubKey(ctx context.Context, raw []byte, subKeyPath []string) (any, error) {
+	itemType := strings.Join(slices.Concat([]string{f.Name}, subKeyPath), ".")
+
+	val, err := f.decoder.CreateType(itemType, false)
+	if err != nil {
+		return nil, err
+	}
+	err = f.decoder.Decode(ctx, raw, val, itemType)
+	return val, err
 }
 
 type Log struct {

@@ -8,7 +8,6 @@ import (
 	"math"
 	"time"
 
-	bin "github.com/gagliardetto/binary"
 	"github.com/lib/pq"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -56,13 +55,12 @@ type LogPoller struct {
 	typeProvider EventTypeProvider
 }
 
-func New(lggr logger.SugaredLogger, orm ORM, cl internal.Loader[client.Reader], typeProvider EventTypeProvider) ILogPoller {
+func New(lggr logger.SugaredLogger, orm ORM, cl internal.Loader[client.Reader]) ILogPoller {
 	lggr = logger.Sugared(logger.Named(lggr, "LogPoller"))
 	lp := &LogPoller{
-		orm:          orm,
-		client:       cl,
-		filters:      newFilters(lggr, orm),
-		typeProvider: typeProvider,
+		orm:     orm,
+		client:  cl,
+		filters: newFilters(lggr, orm),
 	}
 
 	lp.Service, lp.eng = services.Config{
@@ -103,15 +101,20 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 
 	blockData := programEvent.BlockData
 
+	matchingFilters := lp.filters.MatchingFiltersForEncodedEvent(programEvent)
+	if matchingFilters == nil {
+		return
+	}
+
 	var logs []Log
-	for filter := range lp.filters.MatchingFiltersForEncodedEvent(programEvent) {
+	for filter := range matchingFilters {
 		log := Log{
 			FilterID:       filter.ID,
 			ChainID:        lp.orm.ChainID(),
 			LogIndex:       makeLogIndex(blockData.TransactionIndex, blockData.TransactionLogIndex),
 			BlockHash:      Hash(blockData.BlockHash),
 			BlockNumber:    int64(blockData.BlockHeight),
-			BlockTimestamp: blockData.BlockTime.Time(), // TODO: is this a timezone safe conversion?
+			BlockTimestamp: blockData.BlockTime.Time().UTC(),
 			Address:        filter.Address,
 			EventSig:       filter.EventSig,
 			TxHash:         Signature(blockData.TransactionHash),
@@ -124,18 +127,13 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 
 		log.SubkeyValues = make(pq.ByteaArray, 0, len(filter.SubkeyPaths))
 		for _, path := range filter.SubkeyPaths {
-			var subKeyVal any
-			subKeyVal, err = lp.typeProvider.CreateType(filter.EventIdl.IdlEvent, filter.EventIdl.IdlTypeDefSlice, path)
-			if err != nil {
-				return err
-			}
-			err = bin.UnmarshalBorsh(&subKeyVal, log.Data)
-			if err != nil {
-				return err
-			}
-			indexedVal, err2 := NewIndexedValue(subKeyVal)
+			subKeyVal, err2 := filter.DecodeSubKey(ctx, log.Data, path)
 			if err2 != nil {
 				return err2
+			}
+			indexedVal, err3 := NewIndexedValue(subKeyVal)
+			if err3 != nil {
+				return err3
 			}
 			err = log.SubkeyValues.Scan(indexedVal)
 			if err != nil {
