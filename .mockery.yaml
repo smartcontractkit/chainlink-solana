@@ -41,3 +41,9 @@ packages:
   github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller:
     interfaces:
       RPCClient:
+      ORM:
+        config:
+          inpackage: True
+          dir: "pkg/solana/logpoller"
+          filename: mock_orm.go
+          mockname: mockORM

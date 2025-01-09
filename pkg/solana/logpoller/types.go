@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"slices"
 
 	"github.com/gagliardetto/solana-go"
 )
@@ -95,4 +96,22 @@ func (p *SubkeyPaths) Scan(src interface{}) error {
 	}
 
 	return nil
+}
+
+func (p SubkeyPaths) Equal(o SubkeyPaths) bool {
+	return slices.EqualFunc(p, o, slices.Equal)
+}
+
+const EventSignatureLength = 8
+
+type EventSignature [EventSignatureLength]byte
+
+// Scan implements Scanner for database/sql.
+func (s *EventSignature) Scan(src interface{}) error {
+	return scanFixedLengthArray("EventSignature", EventSignatureLength, src, s[:])
+}
+
+// Value implements valuer for database/sql.
+func (s EventSignature) Value() (driver.Value, error) {
+	return s[:], nil
 }
