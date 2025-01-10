@@ -84,6 +84,22 @@ func errorWithDebugID(err error, debugID string) error {
 // traversePath recursively traverses the given structure based on the provided path.
 func traversePath(data any, path []string) ([]any, error) {
 	if len(path) == 0 {
+		val := reflect.ValueOf(data)
+
+		// If the final data is a slice or array, flatten it into multiple items,
+		if val.Kind() == reflect.Slice || val.Kind() == reflect.Array {
+			// don't flatten []byte
+			if val.Type().Elem().Kind() == reflect.Uint8 {
+				return []any{val.Interface()}, nil
+			}
+
+			var results []any
+			for i := 0; i < val.Len(); i++ {
+				results = append(results, val.Index(i).Interface())
+			}
+			return results, nil
+		}
+		// Otherwise, return just this one item
 		return []any{data}, nil
 	}
 
@@ -124,9 +140,6 @@ func traversePath(data any, path []string) ([]any, error) {
 		}
 		return traversePath(value.Interface(), path[1:])
 	default:
-		if len(path) == 1 && val.Kind() == reflect.Slice && val.Type().Elem().Kind() == reflect.Uint8 {
-			return []any{val.Interface()}, nil
-		}
 		return nil, errors.New("unexpected type encountered at path: " + path[0])
 	}
 }
