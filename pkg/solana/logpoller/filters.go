@@ -126,15 +126,6 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 
 	filter.ID = filterID
 
-	idl := codec.IDL{
-		Events: []codec.IdlEvent{filter.EventIdl.IdlEvent},
-		Types:  filter.EventIdl.IdlTypeDefSlice,
-	}
-	fl.decoders[filter.ID], err = codec.NewIDLEventCodec(idl, binary.LittleEndian())
-	if err != nil {
-		return fmt.Errorf("failed to create event decoder: %w", err)
-	}
-
 	fl.filtersByName[filter.Name] = filter.ID
 	fl.filtersByID[filter.ID] = &filter
 	filtersForAddress, ok := fl.filtersByAddress[filter.Address]
@@ -162,7 +153,7 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 	}
 
 	discriminatorHead := filter.Discriminator()[:10]
-	if _, ok := fl.knownPrograms[programID]; !ok {
+	if _, ok := fl.knownDiscriminators[discriminatorHead]; !ok {
 		fl.knownDiscriminators[discriminatorHead] = 1
 	} else {
 		fl.knownDiscriminators[discriminatorHead]++
