@@ -24,6 +24,15 @@ func (m *MultiNodeWrappedClient) Start(ctx context.Context) error {
 	return m.multiNode.Start(ctx)
 }
 
+func (m *MultiNodeWrappedClient) GetLatestBlockHeight(ctx context.Context) (uint64, error) {
+	r, err := m.multiNode.SelectRPC()
+	if err != nil {
+		return 0, err
+	}
+
+	return r.GetLatestBlockHeight(ctx)
+}
+
 func (m *MultiNodeWrappedClient) SendTx(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
 	r, err := m.multiNode.SelectRPC()
 	if err != nil {
