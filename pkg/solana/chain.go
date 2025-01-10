@@ -94,7 +94,7 @@ type chain struct {
 	lggr           logger.Logger
 
 	// if multiNode is enabled, the clientCache will not be used
-	multiNode *mn.MultiNode[mn.StringID, *client.MultiNodeClient]
+	multiNode *client.MultiNodeWrappedClient
 	txSender  *mn.TransactionSender[*solanago.Transaction, *client.SendTxResult, mn.StringID, *client.MultiNodeClient]
 
 	// tracking node chain id for verification
@@ -288,7 +288,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 			0, // use the default value provided by the implementation
 		)
 
-		ch.multiNode = multiNode
+		ch.multiNode = client.NewMultiNodeWrappedClient(multiNode)
 		ch.txSender = txSender
 
 		// clientCache will not be used if multinode is enabled
@@ -303,8 +303,8 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 			return result.Signature(), result.Error()
 		}
 
-		tc = internal.NewLoader[client.ReaderWriter](func() (client.ReaderWriter, error) { return ch.multiNode.SelectRPC() })
-		bc = internal.NewLoader[monitor.BalanceClient](func() (monitor.BalanceClient, error) { return ch.multiNode.SelectRPC() })
+		tc = internal.NewLoader[client.ReaderWriter](func() (client.ReaderWriter, error) { return ch.multiNode, nil })
+		bc = internal.NewLoader[monitor.BalanceClient](func() (monitor.BalanceClient, error) { return ch.multiNode, nil })
 	}
 
 	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
@@ -412,7 +412,7 @@ func (c *chain) ChainID() string {
 // If multinode is enabled, it will return a client using the multinode selection instead.
 func (c *chain) getClient() (client.ReaderWriter, error) {
 	if c.cfg.MultiNode.Enabled() {
-		return c.multiNode.SelectRPC()
+		return c.multiNode, nil
 	}
 
 	var node *config.Node
