@@ -62,7 +62,8 @@ func TestProcess(t *testing.T) {
 		assert.Equal(t, log, expectedLog)
 		return nil
 	})
-	lp.RegisterFilter(ctx, filter)
+	err := lp.RegisterFilter(ctx, filter)
+	require.NoError(t, err)
 
 	event := struct {
 		a int
@@ -93,5 +94,6 @@ func TestProcess(t *testing.T) {
 	require.NoError(t, err)
 
 	orm.EXPECT().MarkFilterDeleted(mock.Anything, mock.Anything).Return(nil).Once()
-	lp.UnregisterFilter(ctx, filter.Name)
+	err = lp.UnregisterFilter(ctx, filter.Name)
+	require.NoError(t, err)
 }
