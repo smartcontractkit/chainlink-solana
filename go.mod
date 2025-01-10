@@ -17,7 +17,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.2
 	github.com/prometheus/client_golang v1.20.5
 	github.com/smartcontractkit/chainlink-common v0.4.1-0.20241223143929-db7919d60550
-	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250110195236-6cff9bc49452
+	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250110195731-4b8f1e21ba8f
 	github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
