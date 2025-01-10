@@ -110,6 +110,15 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 		fl.removeFilterFromIndexes(*existingFilter)
 	}
 
+	idl := codec.IDL{
+		Events: []codec.IdlEvent{filter.EventIdl.IdlEvent},
+		Types:  filter.EventIdl.IdlTypeDefSlice,
+	}
+	fl.decoders[filter.ID], err = codec.NewIDLEventCodec(idl, binary.LittleEndian())
+	if err != nil {
+		return fmt.Errorf("failed to create event decoder: %w", err)
+	}
+
 	filterID, err := fl.orm.InsertFilter(ctx, filter)
 	if err != nil {
 		return fmt.Errorf("failed to insert filter: %w", err)
