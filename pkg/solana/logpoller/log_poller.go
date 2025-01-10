@@ -143,8 +143,10 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 
 		log.SequenceNum = lp.filters.IncrementSeqNums(filter.ID)
 
-		expiresAt := time.Now().Add(filter.Retention).UTC()
-		log.ExpiresAt = &expiresAt
+		if filter.Retention > 0 {
+			expiresAt := time.Now().Add(filter.Retention).UTC()
+			log.ExpiresAt = &expiresAt
+		}
 
 		logs = append(logs, log)
 	}
