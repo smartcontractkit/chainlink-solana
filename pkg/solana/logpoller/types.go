@@ -103,10 +103,6 @@ func (s EventSignature) Value() (driver.Value, error) {
 	return s[:], nil
 }
 
-type EventTypeProvider interface {
-	CreateType(eventIdl codec.IdlEvent, typedefSlice codec.IdlTypeDefSlice, subKeyPath []string) (any, error)
-}
-
 type Decoder interface {
 	CreateType(itemType string, _ bool) (any, error)
 	Decode(_ context.Context, raw []byte, into any, itemType string) error

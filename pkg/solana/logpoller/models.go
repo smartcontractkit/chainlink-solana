@@ -30,7 +30,7 @@ func (f Filter) MatchSameLogs(other Filter) bool {
 }
 
 func (f Filter) Discriminator() string {
-	d := utils.Discriminator("event", f.Name)
+	d := utils.Discriminator("event", f.EventName)
 	return base64.StdEncoding.EncodeToString(d[:])
 }
 

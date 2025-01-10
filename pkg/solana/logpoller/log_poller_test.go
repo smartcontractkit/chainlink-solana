@@ -3,6 +3,7 @@ package logpoller
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"math/rand"
 	"testing"
 
@@ -18,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/utils"
 )
 
@@ -44,10 +46,35 @@ func TestProcess(t *testing.T) {
 	lggr := logger.Sugared(logger.Test(t))
 	lp := New(lggr, orm, loader)
 
+	var idlTypeInt64 codec.IdlType
+	var idlTypeString codec.IdlType
+
+	err := json.Unmarshal([]byte("\"i64\""), &idlTypeInt64)
+	require.NoError(t, err)
+	err = json.Unmarshal([]byte("\"string\""), &idlTypeString)
+	require.NoError(t, err)
+
+	idl := EventIdl{
+		codec.IdlEvent{
+			Name: "myEvent",
+			Fields: []codec.IdlEventField{{
+				Name: "A",
+				Type: idlTypeInt64,
+			}, {
+				Name: "B",
+				Type: idlTypeString,
+			}},
+		},
+		[]codec.IdlTypeDef{},
+	}
+
 	filter := Filter{
-		Name:     "test filter",
-		Address:  addr,
-		EventSig: eventSig,
+		Name:        "test filter",
+		EventName:   eventName,
+		Address:     addr,
+		EventSig:    eventSig,
+		EventIdl:    idl,
+		SubkeyPaths: [][]string{{"A"}, {"B"}},
 	}
 	orm.EXPECT().SelectFilters(mock.Anything).Return([]Filter{filter}, nil)
 	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{}, nil)
@@ -62,12 +89,12 @@ func TestProcess(t *testing.T) {
 		assert.Equal(t, log, expectedLog)
 		return nil
 	})
-	err := lp.RegisterFilter(ctx, filter)
+	err = lp.RegisterFilter(ctx, filter)
 	require.NoError(t, err)
 
 	event := struct {
-		a int
-		b string
+		A int64
+		B string
 	}{55, "hello"}
 
 	data, err := bin.MarshalBorsh(&event)

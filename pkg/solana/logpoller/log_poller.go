@@ -18,8 +18,7 @@ import (
 )
 
 var (
-	ErrFilterNameConflict       = errors.New("filter with such name already exists")
-	ErrMissingEventTypeProvider = errors.New("cannot start LogPoller without EventTypeProvider")
+	ErrFilterNameConflict = errors.New("filter with such name already exists")
 )
 
 type ORM interface {
@@ -51,8 +50,7 @@ type LogPoller struct {
 	client    internal.Loader[client.Reader]
 	collector *EncodedLogCollector
 
-	filters      *filters
-	typeProvider EventTypeProvider
+	filters *filters
 }
 
 func New(lggr logger.SugaredLogger, orm ORM, cl internal.Loader[client.Reader]) ILogPoller {
@@ -73,9 +71,6 @@ func New(lggr logger.SugaredLogger, orm ORM, cl internal.Loader[client.Reader]) 
 }
 
 func (lp *LogPoller) start(context.Context) error {
-	if lp.typeProvider == nil {
-		return ErrMissingEventTypeProvider
-	}
 	cl, err := lp.client.Get()
 	if err != nil {
 		return err
