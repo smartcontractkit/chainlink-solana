@@ -6,21 +6,18 @@ import (
 
 func TestConfig() {
 	// Fake constant addresses for the purpose of this example.
-	registryAddress := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6A"
 	routerProgramAddress := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6B"
-	routerAccountConfigAddress := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6C"
-	cpiSignerAddress := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6D"
-	systemProgramAddress := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6E"
-	computeBudgetProgramAddress := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6F"
-	sysvarProgramAddress := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6G"
 	commonAddressesLookupTable := solana.MustPublicKeyFromBase58("4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6H")
-	routerLookupTable := solana.MustPublicKeyFromBase58("4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6I")
-	userAddress := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6J"
+
+	computeBudgetProgramAddress := solana.ComputeBudget.String()
+	sysvarInstructionsAddress := solana.SysVarInstructionsPubkey.String()
+
+	fromAddress := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6J"
 
 	executionReportSingleChainIDL := `{"name":"ExecutionReportSingleChain","type":{"kind":"struct","fields":[{"name":"source_chain_selector","type":"u64"},{"name":"message","type":{"defined":"Any2SolanaRampMessage"}},{"name":"root","type":{"array":["u8",32]}},{"name":"proofs","type":{"vec":{"array":["u8",32]}}}]}},{"name":"Any2SolanaRampMessage","type":{"kind":"struct","fields":[{"name":"header","type":{"defined":"RampMessageHeader"}},{"name":"sender","type":{"vec":"u8"}},{"name":"data","type":{"vec":"u8"}},{"name":"receiver","type":{"array":["u8",32]}},{"name":"extra_args","type":{"defined":"SolanaExtraArgs"}}]}},{"name":"RampMessageHeader","type":{"kind":"struct","fields":[{"name":"message_id","type":{"array":["u8",32]}},{"name":"source_chain_selector","type":"u64"},{"name":"dest_chain_selector","type":"u64"},{"name":"sequence_number","type":"u64"},{"name":"nonce","type":"u64"}]}},{"name":"SolanaExtraArgs","type":{"kind":"struct","fields":[{"name":"compute_units","type":"u32"},{"name":"allow_out_of_order_execution","type":"bool"}]}}`
 
 	executeConfig := MethodConfig{
-		FromAddress:        userAddress,
+		FromAddress:        fromAddress,
 		InputModifications: nil,
 		ChainSpecificName:  "execute",
 		// LookupTables are on-chain stores of accounts. They can be used in two ways:
@@ -42,7 +39,7 @@ func TestConfig() {
 					Accounts: PDALookups{
 						Name: "RegistryTokenState",
 						PublicKey: AccountConstant{
-							Address:    registryAddress,
+							Address:    routerProgramAddress,
 							IsSigner:   false,
 							IsWritable: false,
 						},
@@ -60,7 +57,6 @@ func TestConfig() {
 			// these lookup tables and appends them to the transaction to reduce the size of the transaction.
 			StaticLookupTables: []solana.PublicKey{
 				commonAddressesLookupTable,
-				routerLookupTable,
 			},
 		},
 		// The Accounts field is where the user specifies which accounts to include in the transaction. Each Lookup
@@ -77,13 +73,123 @@ func TestConfig() {
 			// 	PDALookups can resolve to multiple addresses if:
 			// 		A) The PublicKey lookup resolves to multiple addresses (i.e. multiple token addresses)
 			// 		B) The Seeds or ValueSeeds resolve to multiple values
+			// PDA lokoup with constant seed
 			PDALookups{
-				Name: "PerChainConfig",
+				Name: "RouterAccountConfig",
+				PublicKey: AccountConstant{
+					Address: routerProgramAddress,
+				},
+				Seeds: []Seed{
+					{Static: []byte("config")},
+				},
+				IsSigner:   false,
+				IsWritable: false,
+			},
+			PDALookups{
+				Name: "SourceChainState",
 				// PublicKey is a constant account in this case, not a lookup.
 				PublicKey: AccountConstant{
-					Address:    registryAddress,
-					IsSigner:   false,
-					IsWritable: false,
+					Address: routerProgramAddress,
+				},
+				// Similar to the RegistryTokenState above, the user is looking up PDA accounts based on the dest tokens.
+				Seeds: []Seed{
+					{Static: []byte("source_chain_state")},
+					{Dynamic: AccountLookup{Location: "Message.Header.DestChainSelector"}},
+				},
+				IsSigner:   false,
+				IsWritable: false,
+			},
+			// PDA lookup to get the Router Report Accounts.
+			PDALookups{
+				Name: "CommitReport",
+				// The public key is a constant Router address.
+				PublicKey: AccountConstant{
+					Address: routerProgramAddress,
+				},
+				Seeds: []Seed{
+					{Static: []byte("commit_report")},
+					{Dynamic: AccountLookup{Location: "Message.Header.DestChainSelector"}},
+					{Dynamic: AccountLookup{
+						// The seed is the merkle root of the report, as passed into the input params.
+						Location: "Info.MerkleRoot",
+					}},
+				},
+				IsSigner:   false,
+				IsWritable: true,
+			},
+			// Static PDA lookup
+			PDALookups{
+				Name: "ExternalExecutionConfig",
+				PublicKey: AccountConstant{
+					Address: routerProgramAddress,
+				},
+				Seeds: []Seed{
+					{Static: []byte("external_execution_config")},
+				},
+				IsSigner:   false,
+				IsWritable: false,
+			},
+			// feePayer/authority address
+			AccountConstant{
+				Name:       "Authority",
+				Address:    fromAddress,
+				IsSigner:   true,
+				IsWritable: true,
+			},
+			// Account constant
+			AccountConstant{
+				Name:       "SystemProgram",
+				Address:    solana.SystemProgramID.String(),
+				IsSigner:   false,
+				IsWritable: false,
+			},
+			// Account constant
+			AccountConstant{
+				Name:       "SysvarInstructions",
+				Address:    sysvarInstructionsAddress,
+				IsSigner:   true,
+				IsWritable: false,
+			},
+			// Static PDA lookup
+			PDALookups{
+				Name: "ExternalTokenPoolsSigner",
+				PublicKey: AccountConstant{
+					Address: routerProgramAddress,
+				},
+				Seeds: []Seed{
+					{Static: []byte("external_token_pools_signer")},
+				},
+				IsSigner:   false,
+				IsWritable: false,
+			},
+			// User specified accounts - formatted as AccountMeta
+			AccountLookup{
+				Name:     "UserAccounts",
+				Location: "Message.ExtraArgs.Accounts",
+			},
+			// PDA Account Lookup - Based on an account lookup and an address lookup
+			PDALookups{
+				Name: "ReceiverAssociatedTokenAccount",
+				PublicKey: AccountConstant{
+					Address: solana.SPLAssociatedTokenAccountProgramID.String(),
+				},
+				Seeds: []Seed{
+					// receiver address
+					{Dynamic: AccountLookup{Location: "Message.Receiver"}},
+					// token program
+					{Dynamic: AccountsFromLookupTable{
+						LookupTableName: "RegistryTokenState",
+						IncludeIndexes:  []int{5},
+					}},
+					// mint
+					{Dynamic: AccountLookup{Location: "Message.TokenAmounts.DestTokenAddress"}},
+				},
+			},
+			PDALookups{
+				Name: "PerChainTokenConfig",
+				// PublicKey is a constant account in this case, not a lookup.
+				PublicKey: AccountConstant{
+					Address: routerProgramAddress,
 				},
 				// Similar to the RegistryTokenState above, the user is looking up PDA accounts based on the dest tokens.
 				Seeds: []Seed{
@@ -98,104 +204,18 @@ func TestConfig() {
 				LookupTableName: "RegistryTokenState",
 				IncludeIndexes:  []int{}, // If left empty, all addresses will be included. Otherwise, only the specified indexes will be included.
 			},
-			// Account Lookup - Based on data from input parameters
-			// In this case, the user wants to add the destination token addresses to the transaction.
-			// Once again, this can be one or multiple addresses.
-			AccountLookup{
-				Name:       "TokenAccount",
-				Location:   "Message.TokenAmounts.DestTokenAddress",
-				IsSigner:   MetaBool{Value: false},
-				IsWritable: MetaBool{Value: false},
-			},
-			// PDA Account Lookup - Based on an account lookup and an address lookup
-			PDALookups{
-				// In this case, the token address is the public key, and the receiver is the seed.
-				// Again, there could be multiple token addresses, in which case this would resolve to
-				// multiple PDA accounts.
-				Name: "ReceiverAssociatedTokenAccount",
-				PublicKey: AccountLookup{
-					Name:       "TokenAccount",
-					Location:   "Message.TokenAmounts.DestTokenAddress",
-					IsSigner:   MetaBool{Value: false},
-					IsWritable: MetaBool{Value: false},
-				},
-				// The seed is the receiver address.
-				Seeds: []Seed{
-					{Dynamic: AccountLookup{
-						Name:       "Receiver",
-						Location:   "Message.Receiver",
-						IsSigner:   MetaBool{Value: false},
-						IsWritable: MetaBool{Value: false},
-					}},
-				},
-			},
-			// Account constant
-			AccountConstant{
-				Name:       "Registry",
-				Address:    registryAddress,
-				IsSigner:   false,
-				IsWritable: false,
-			},
 			// PDA Lookup for the RegistryTokenConfig.
 			PDALookups{
 				Name: "RegistryTokenConfig",
 				// constant public key
 				PublicKey: AccountConstant{
-					Address:    registryAddress,
+					Address:    routerProgramAddress,
 					IsSigner:   false,
 					IsWritable: false,
 				},
 				// The seed, once again, is the destination token address.
 				Seeds: []Seed{
 					{Dynamic: AccountLookup{Location: "Message.TokenAmounts.DestTokenAddress"}},
-				},
-				IsSigner:   false,
-				IsWritable: false,
-			},
-			// Account constant
-			AccountConstant{
-				Name:       "RouterProgram",
-				Address:    routerProgramAddress,
-				IsSigner:   false,
-				IsWritable: false,
-			},
-			// Account constant
-			AccountConstant{
-				Name:       "RouterAccountConfig",
-				Address:    routerAccountConfigAddress,
-				IsSigner:   false,
-				IsWritable: false,
-			},
-			// PDA lookup to get the Router Chain Config
-			PDALookups{
-				Name: "RouterChainConfig",
-				// The public key is a constant Router address.
-				PublicKey: AccountConstant{
-					Address:    routerProgramAddress,
-					IsSigner:   false,
-					IsWritable: false,
-				},
-				Seeds: []Seed{
-					{Dynamic: AccountLookup{Location: "Message.Header.DestChainSelector"}},
-					{Dynamic: AccountLookup{Location: "Message.Header.SourceChainSelector"}},
-				},
-				IsSigner:   false,
-				IsWritable: false,
-			},
-			// PDA lookup to get the Router Report Accounts.
-			PDALookups{
-				Name: "RouterReportAccount",
-				// The public key is a constant Router address.
-				PublicKey: AccountConstant{
-					Address:    routerProgramAddress,
-					IsSigner:   false,
-					IsWritable: false,
-				},
-				Seeds: []Seed{
-					{Dynamic: AccountLookup{
-						// The seed is the merkle root of the report, as passed into the input params.
-						Location: "args.MerkleRoot",
-					}},
 				},
 				IsSigner:   false,
 				IsWritable: false,
@@ -216,31 +236,24 @@ func TestConfig() {
 					{Dynamic: AccountLookup{Location: "Message.Header.DestChainSelector"}},
 				},
 			},
-			// Account constant
-			AccountConstant{
-				Name:       "CPISigner",
-				Address:    cpiSignerAddress,
-				IsSigner:   true,
-				IsWritable: false,
-			},
-			// Account constant
-			AccountConstant{
-				Name:       "SystemProgram",
-				Address:    systemProgramAddress,
-				IsSigner:   true,
+			// PDA lokoup with constant seed
+			PDALookups{
+				Name: "CPISigner",
+				PublicKey: AccountConstant{
+					Address:    routerProgramAddress,
+					IsSigner:   false,
+					IsWritable: false,
+				},
+				Seeds: []Seed{
+					{Static: []byte("external_token_pools_signer")},
+				},
+				IsSigner:   false,
 				IsWritable: false,
 			},
 			// Account constant
 			AccountConstant{
 				Name:       "ComputeBudgetProgram",
 				Address:    computeBudgetProgramAddress,
-				IsSigner:   true,
-				IsWritable: false,
-			},
-			// Account constant
-			AccountConstant{
-				Name:       "SysvarProgram",
-				Address:    sysvarProgramAddress,
 				IsSigner:   true,
 				IsWritable: false,
 			},
@@ -251,16 +264,41 @@ func TestConfig() {
 	}
 
 	commitConfig := MethodConfig{
-		FromAddress:        userAddress,
+		FromAddress:        fromAddress,
 		InputModifications: nil,
 		ChainSpecificName:  "commit",
 		LookupTables: LookupTables{
 			StaticLookupTables: []solana.PublicKey{
 				commonAddressesLookupTable,
-				routerLookupTable,
 			},
 		},
 		Accounts: []Lookup{
+			// Static PDA lookup
+			PDALookups{
+				Name: "RouterAccountConfig",
+				PublicKey: AccountConstant{
+					Address: routerProgramAddress,
+				},
+				Seeds: []Seed{
+					{Static: []byte("config")},
+				},
+				IsSigner:   false,
+				IsWritable: false,
+			},
+			PDALookups{
+				Name: "SourceChainState",
+				// PublicKey is a constant account in this case, not a lookup.
+				PublicKey: AccountConstant{
+					Address: routerProgramAddress,
+				},
+				// Similar to the RegistryTokenState above, the user is looking up PDA accounts based on the dest tokens.
+				Seeds: []Seed{
+					{Static: []byte("source_chain_state")},
+					{Dynamic: AccountLookup{Location: "MerkleRoot.DestChainSelector"}},
+				},
+				IsSigner:   false,
+				IsWritable: false,
+			},
 			// Account constant
 			AccountConstant{
 				Name:       "RouterProgram",
@@ -268,10 +306,31 @@ func TestConfig() {
 				IsSigner:   false,
 				IsWritable: false,
 			},
-			// Account constant
-			AccountConstant{
-				Name:       "RouterAccountConfig",
-				Address:    routerAccountConfigAddress,
+			// PDA lokoup with constant seed
+			PDALookups{
+				Name: "RouterAccountConfig",
+				PublicKey: AccountConstant{
+					Address:    routerProgramAddress,
+					IsSigner:   false,
+					IsWritable: false,
+				},
+				Seeds: []Seed{
+					{Static: []byte("config")},
+				},
+				IsSigner:   false,
+				IsWritable: false,
+			},
+			// PDA lokoup with constant seed
+			PDALookups{
+				Name: "RouterAccountState",
+				PublicKey: AccountConstant{
+					Address:    routerProgramAddress,
+					IsSigner:   false,
+					IsWritable: false,
+				},
+				Seeds: []Seed{
+					{Static: []byte("state")},
+				},
 				IsSigner:   false,
 				IsWritable: false,
 			},
@@ -295,13 +354,6 @@ func TestConfig() {
 			},
 			// Account constant
 			AccountConstant{
-				Name:       "SystemProgram",
-				Address:    systemProgramAddress,
-				IsSigner:   true,
-				IsWritable: false,
-			},
-			// Account constant
-			AccountConstant{
 				Name:       "ComputeBudgetProgram",
 				Address:    computeBudgetProgramAddress,
 				IsSigner:   true,
@@ -309,8 +361,8 @@ func TestConfig() {
 			},
 			// Account constant
 			AccountConstant{
-				Name:       "SysvarProgram",
-				Address:    sysvarProgramAddress,
+				Name:       "SysvarInstructions",
+				Address:    sysvarInstructionsAddress,
 				IsSigner:   true,
 				IsWritable: false,
 			},

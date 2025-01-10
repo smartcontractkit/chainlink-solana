@@ -282,9 +282,6 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("error parsing fee payer address: %w", err), debugID)
 	}
 
-	accounts = append([]*solana.AccountMeta{solana.Meta(feePayer).SIGNER().WRITE()}, accounts...)
-	accounts = append(accounts, solana.Meta(solana.SystemProgramID))
-
 	// Filter the lookup table addresses based on which accounts are actually used
 	filteredLookupTableMap := s.FilterLookupTableAddresses(accounts, derivedTableMap, staticTableMap)
 

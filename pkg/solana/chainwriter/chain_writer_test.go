@@ -455,6 +455,12 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 						},
 						Accounts: []chainwriter.Lookup{
 							chainwriter.AccountConstant{
+								Name:       "feepayer",
+								Address:    admin.String(),
+								IsSigner:   false,
+								IsWritable: false,
+							},
+							chainwriter.AccountConstant{
 								Name:       "Constant",
 								Address:    account1.String(),
 								IsSigner:   false,
@@ -481,6 +487,12 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 							chainwriter.AccountsFromLookupTable{
 								LookupTableName: "DerivedTable",
 								IncludeIndexes:  []int{0},
+							},
+							chainwriter.AccountConstant{
+								Name:       "systemprogram",
+								Address:    solana.SystemProgramID.String(),
+								IsSigner:   false,
+								IsWritable: false,
 							},
 						},
 					},
