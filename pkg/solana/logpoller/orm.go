@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 )
 
 var _ ORM = (*DSORM)(nil)
@@ -198,5 +199,29 @@ func (o *DSORM) SelectLogs(ctx context.Context, start, end int64, address Public
 	if err != nil {
 		return nil, err
 	}
+	return logs, nil
+}
+
+func (o *DSORM) FilteredLogs(ctx context.Context, filter []query.Expression, limitAndSort query.LimitAndSort, _ string) ([]Log, error) {
+	qs, args, err := (&pgDSLParser{}).buildQuery(o.chainID, filter, limitAndSort)
+	if err != nil {
+		return nil, err
+	}
+
+	values, err := args.toArgs()
+	if err != nil {
+		return nil, err
+	}
+
+	query, sqlArgs, err := o.ds.BindNamed(qs, values)
+	if err != nil {
+		return nil, err
+	}
+
+	var logs []Log
+	if err = o.ds.SelectContext(ctx, &logs, query, sqlArgs...); err != nil {
+		return nil, err
+	}
+
 	return logs, nil
 }

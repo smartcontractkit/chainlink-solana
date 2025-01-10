@@ -31,6 +31,12 @@ func (q *queryArgs) withField(fieldName string, value any) *queryArgs {
 	return args
 }
 
+func (q *queryArgs) withIndexedField(fieldName string, value any) string {
+	field, _ := q.withIndexableField(fieldName, value, true)
+
+	return field
+}
+
 func (q *queryArgs) withIndexableField(fieldName string, value any, addIndex bool) (string, *queryArgs) {
 	if addIndex {
 		idx := q.nextIdx(fieldName)

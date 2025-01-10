@@ -20,7 +20,7 @@ import (
 )
 
 func TestSolanaOCRV2Soak(t *testing.T) {
-	for _, test := range []struct {
+	tests := []struct {
 		name string
 		env  map[string]string
 	}{
@@ -29,7 +29,11 @@ func TestSolanaOCRV2Soak(t *testing.T) {
 			"CL_MEDIAN_CMD": "chainlink-feeds",
 			"CL_SOLANA_CMD": "chainlink-solana",
 		}},
-	} {
+	}
+
+	for idx := range tests {
+		test := tests[idx]
+
 		config, err := tc.GetConfig("Soak", tc.OCR2)
 		if err != nil {
 			t.Fatal(err)

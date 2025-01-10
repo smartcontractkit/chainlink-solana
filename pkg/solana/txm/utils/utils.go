@@ -66,7 +66,7 @@ func (s statuses) Swap(i, j int) {
 }
 
 func (s statuses) Less(i, j int) bool {
-	return convertStatus(s.res[i]) > convertStatus(s.res[j]) // returns list with highest first
+	return ConvertStatus(s.res[i]) > ConvertStatus(s.res[j]) // returns list with highest first
 }
 
 func SortSignaturesAndResults(sigs []solana.Signature, res []*rpc.SignatureStatusesResult) ([]solana.Signature, []*rpc.SignatureStatusesResult, error) {
@@ -82,7 +82,7 @@ func SortSignaturesAndResults(sigs []solana.Signature, res []*rpc.SignatureStatu
 	return s.sigs, s.res, nil
 }
 
-func convertStatus(res *rpc.SignatureStatusesResult) TxState {
+func ConvertStatus(res *rpc.SignatureStatusesResult) TxState {
 	if res == nil {
 		return NotFound
 	}
