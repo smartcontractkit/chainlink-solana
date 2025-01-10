@@ -127,7 +127,7 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 
 		log.SubkeyValues = make(pq.ByteaArray, 0, len(filter.SubkeyPaths))
 		for _, path := range filter.SubkeyPaths {
-			subKeyVal, err2 := filter.DecodeSubKey(ctx, log.Data, path)
+			subKeyVal, err2 := lp.filters.DecodeSubKey(ctx, log.Data, filter.ID, path)
 			if err2 != nil {
 				return err2
 			}

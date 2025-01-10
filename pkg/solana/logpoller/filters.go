@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"iter"
 	"maps"
+	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -31,12 +33,14 @@ type filters struct {
 	knownPrograms       map[string]uint // fast lookup to see if a base58-encoded ProgramID matches any registered filters
 	knownDiscriminators map[string]uint // fast lookup by first 10 characters (60-bits) of a base64-encoded discriminator
 	seqNums             map[int64]int64
+	decoders            map[int64]Decoder
 }
 
 func newFilters(lggr logger.SugaredLogger, orm ORM) *filters {
 	return &filters{
-		orm:  orm,
-		lggr: lggr,
+		orm:      orm,
+		lggr:     lggr,
+		decoders: make(map[int64]Decoder),
 	}
 }
 
@@ -117,7 +121,7 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 		Events: []codec.IdlEvent{filter.EventIdl.IdlEvent},
 		Types:  filter.EventIdl.IdlTypeDefSlice,
 	}
-	filter.decoder, err = codec.NewIDLEventCodec(idl, binary.LittleEndian())
+	fl.decoders[filter.ID], err = codec.NewIDLEventCodec(idl, binary.LittleEndian())
 	if err != nil {
 		return fmt.Errorf("failed to create event decoder: %w", err)
 	}
@@ -409,4 +413,17 @@ func (fl *filters) LoadFilters(ctx context.Context) error {
 	fl.loadedFilters.Store(true)
 
 	return nil
+}
+
+func (fl *filters) DecodeSubKey(ctx context.Context, raw []byte, ID int64, subKeyPath []string) (any, error) {
+	eventName := fl.filtersByID[ID].EventName
+	decoder := fl.decoders[ID]
+	itemType := strings.Join(slices.Concat([]string{eventName}, subKeyPath), ".")
+
+	val, err := decoder.CreateType(itemType, false)
+	if err != nil {
+		return nil, err
+	}
+	err = decoder.Decode(ctx, raw, val, itemType)
+	return val, err
 }

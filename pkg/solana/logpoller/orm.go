@@ -152,7 +152,7 @@ func (o *DSORM) insertLogsWithinTx(ctx context.Context, logs []Log, tx sqlutil.D
 					(:filter_id, :chain_id, :log_index, :block_hash, :block_number, :block_timestamp, :address, :event_sig, :subkey_values, :tx_hash, :data, NOW(), :expires_at, :sequence_num)
 				ON CONFLICT DO NOTHING`
 
-		_, err := tx.NamedExecContext(ctx, query, logs[start:end])
+		res, err := tx.NamedExecContext(ctx, query, logs[start:end])
 		if err != nil {
 			if errors.Is(err, context.DeadlineExceeded) && batchInsertSize > 500 {
 				// In case of DB timeouts, try to insert again with a smaller batch upto a limit
@@ -161,6 +161,14 @@ func (o *DSORM) insertLogsWithinTx(ctx context.Context, logs []Log, tx sqlutil.D
 				continue
 			}
 			return err
+		}
+		numRows, err := res.RowsAffected()
+		if err == nil {
+			if numRows != int64(len(logs)) {
+				// This probably just means we're trying to insert the same log twice, but could also be an indication
+				// of other constraint violations
+				o.lggr.Debugf("attempted to insert %d logs, but could only insert %d", len(logs), numRows)
+			}
 		}
 	}
 	return nil
@@ -231,11 +239,18 @@ func (o *DSORM) FilteredLogs(ctx context.Context, filter []query.Expression, lim
 }
 
 func (o *DSORM) SelectSeqNums(ctx context.Context) (map[int64]int64, error) {
-	seqNums := make(map[int64]int64)
-	query := "SELECT id, MAX(sequence_num) FROM solana.logs WHERE chain_id=%s GROUP BY id"
-	err := o.ds.SelectContext(ctx, &seqNums, query, o.chainID)
+	results := make([]struct {
+		FilterID    int64
+		SequenceNum int64
+	}, 0)
+	query := "SELECT filter_id, MAX(sequence_num) AS sequence_num FROM solana.logs WHERE chain_id=$1 GROUP BY filter_id"
+	err := o.ds.SelectContext(ctx, &results, query, o.chainID)
 	if err != nil {
 		return nil, err
+	}
+	seqNums := make(map[int64]int64)
+	for _, row := range results {
+		seqNums[row.FilterID] = row.SequenceNum
 	}
 	return seqNums, nil
 }
