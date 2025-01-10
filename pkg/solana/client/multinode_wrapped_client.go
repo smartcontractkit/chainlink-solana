@@ -20,6 +20,10 @@ func NewMultiNodeWrappedClient(multiNode *mn.MultiNode[mn.StringID, *MultiNodeCl
 	return &MultiNodeWrappedClient{multiNode}
 }
 
+func (m *MultiNodeWrappedClient) Start(ctx context.Context) error {
+	return m.multiNode.Start(ctx)
+}
+
 func (m *MultiNodeWrappedClient) SendTx(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
 	r, err := m.multiNode.SelectRPC()
 	if err != nil {
