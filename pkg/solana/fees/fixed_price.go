@@ -14,10 +14,10 @@ type fixedPriceEstimator struct {
 }
 
 func NewFixedPriceEstimator(cfg config.Config) (Estimator, error) {
-	defaultPrice, min, max := cfg.ComputeUnitPriceDefault(), cfg.ComputeUnitPriceMin(), cfg.ComputeUnitPriceMax()
+	defaultPrice, minPrice, maxPrice := cfg.ComputeUnitPriceDefault(), cfg.ComputeUnitPriceMin(), cfg.ComputeUnitPriceMax()
 
-	if defaultPrice < min || defaultPrice > max {
-		return nil, fmt.Errorf("default price (%d) is not within the min (%d) and max (%d) price bounds", defaultPrice, min, max)
+	if defaultPrice < minPrice || defaultPrice > maxPrice {
+		return nil, fmt.Errorf("default price (%d) is not within the min (%d) and max (%d) price bounds", defaultPrice, minPrice, maxPrice)
 	}
 
 	return &fixedPriceEstimator{

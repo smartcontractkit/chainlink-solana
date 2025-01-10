@@ -25,7 +25,7 @@ var defaultConfigSet = Chain{
 	MaxRetries:              ptr(int64(0)), // max number of retries (default = 0). when config.MaxRetries < 0), interpreted as MaxRetries = nil and rpc node will do a reasonable number of retries
 
 	// fee estimator
-	FeeEstimatorMode:         ptr("fixed"),
+	FeeEstimatorMode:         ptr("fixed"), // "fixed" or "blockhistory"
 	ComputeUnitPriceMax:      ptr(uint64(1_000)),
 	ComputeUnitPriceMin:      ptr(uint64(0)),
 	ComputeUnitPriceDefault:  ptr(uint64(0)),

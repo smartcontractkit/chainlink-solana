@@ -36,6 +36,8 @@ type Reader interface {
 	ChainID(ctx context.Context) (mn.StringID, error)
 	GetFeeForMessage(ctx context.Context, msg string) (uint64, error)
 	GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error)
+	// GetLatestBlockHeight returns the latest block height of the node based on the configured commitment type
+	GetLatestBlockHeight(ctx context.Context) (uint64, error)
 	GetTransaction(ctx context.Context, txHash solana.Signature, opts *rpc.GetTransactionOpts) (*rpc.GetTransactionResult, error)
 	GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64) (rpc.BlocksResult, error)
 	GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit uint64) (*rpc.BlocksResult, error)
@@ -329,6 +331,19 @@ func (c *Client) GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error
 		})
 	})
 	return v.(*rpc.GetBlockResult), err
+}
+
+// GetLatestBlockHeight returns the latest block height of the node based on the configured commitment type
+func (c *Client) GetLatestBlockHeight(ctx context.Context) (uint64, error) {
+	done := c.latency("latest_block_height")
+	defer done()
+	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
+	defer cancel()
+
+	v, err, _ := c.requestGroup.Do("GetBlockHeight", func() (interface{}, error) {
+		return c.rpc.GetBlockHeight(ctx, c.commitment)
+	})
+	return v.(uint64), err
 }
 
 func (c *Client) GetBlock(ctx context.Context, slot uint64) (*rpc.GetBlockResult, error) {

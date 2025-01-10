@@ -73,22 +73,14 @@ func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
 			return nil, err
 		}
 
-		definition, err := findDefinitionFromIDL(cfg.Type, cfg.OnChainName, idl)
+		definition, err := FindDefinitionFromIDL(cfg.Type, cfg.ChainSpecificName, idl)
 		if err != nil {
 			return nil, err
 		}
 
-		var cEntry Entry
-		switch v := definition.(type) {
-		case IdlTypeDef:
-			cEntry, err = NewAccountEntry(offChainName, v, idl.Types, true, mod, binary.LittleEndian())
-		case IdlInstruction:
-			cEntry, err = NewInstructionArgsEntry(offChainName, v, idl.Types, mod, binary.LittleEndian())
-		case IdlEvent:
-			cEntry, err = NewEventArgsEntry(offChainName, v, idl.Types, true, mod, binary.LittleEndian())
-		}
+		cEntry, err := CreateCodecEntry(definition, offChainName, idl, mod)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create %q codec entry: %w", offChainName, err)
+			return nil, err
 		}
 
 		parsed.EncoderDefs[offChainName] = cEntry
@@ -98,34 +90,60 @@ func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
 	return parsed.ToCodec()
 }
 
-func findDefinitionFromIDL(cfgType ChainConfigType, onChainName string, idl IDL) (interface{}, error) {
+func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl IDL, mod commoncodec.Modifier) (entry Entry, err error) {
+	switch v := idlDefinition.(type) {
+	case IdlTypeDef:
+		entry, err = NewAccountEntry(offChainName, AccountIDLTypes{Account: v, Types: idl.Types}, true, mod, binary.LittleEndian())
+	case IdlInstruction:
+		entry, err = NewInstructionArgsEntry(offChainName, InstructionArgsIDLTypes{Instruction: v, Types: idl.Types}, mod, binary.LittleEndian())
+	case IdlEvent:
+		entry, err = NewEventArgsEntry(offChainName, EventIDLTypes{Event: v, Types: idl.Types}, true, mod, binary.LittleEndian())
+	default:
+		return nil, fmt.Errorf("unknown codec IDL definition: %T", idlDefinition)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to create %q codec entry: %w", offChainName, err)
+	}
+
+	return entry, nil
+}
+
+func FindDefinitionFromIDL(cfgType ChainConfigType, chainSpecificName string, idl IDL) (interface{}, error) {
 	// not the most efficient way to do this, but these slices should always be very, very small
 	switch cfgType {
 	case ChainConfigTypeAccountDef:
 		for i := range idl.Accounts {
-			if idl.Accounts[i].Name == onChainName {
+			if idl.Accounts[i].Name == chainSpecificName {
 				return idl.Accounts[i], nil
 			}
 		}
-		return nil, fmt.Errorf("failed to find account %q in IDL", onChainName)
+		return nil, fmt.Errorf("failed to find account %q in IDL", chainSpecificName)
 
 	case ChainConfigTypeInstructionDef:
 		for i := range idl.Instructions {
-			if idl.Instructions[i].Name == onChainName {
+			if idl.Instructions[i].Name == chainSpecificName {
 				return idl.Instructions[i], nil
 			}
 		}
-		return nil, fmt.Errorf("failed to find instruction %q in IDL", onChainName)
+		return nil, fmt.Errorf("failed to find instruction %q in IDL", chainSpecificName)
 
 	case ChainConfigTypeEventDef:
 		for i := range idl.Events {
-			if idl.Events[i].Name == onChainName {
+			if idl.Events[i].Name == chainSpecificName {
 				return idl.Events[i], nil
 			}
 		}
-		return nil, fmt.Errorf("failed to find event %q in IDL", onChainName)
+		return nil, fmt.Errorf("failed to find event %q in IDL", chainSpecificName)
 	}
 	return nil, fmt.Errorf("unknown type: %q", cfgType)
+}
+
+func WrapItemType(forEncoding bool, contractName, itemType string, readType ChainConfigType) string {
+	if forEncoding {
+		return fmt.Sprintf("input.%s.%s", contractName, itemType)
+	}
+
+	return fmt.Sprintf("output.%s.%s.%s", readType, contractName, itemType)
 }
 
 // NewIDLAccountCodec is for Anchor custom types
@@ -280,8 +298,8 @@ func asStruct(
 		named[idx+desLen] = commonencodings.NamedTypeCodec{Name: cases.Title(language.English, cases.NoLower).String(fieldName), Codec: typedCodec}
 	}
 
-	// accounts have to be in a struct, instruction args don't
-	if len(named) == 1 && isInstructionArgs {
+	// accounts have to be in a struct, instruction args don't if they're an array
+	if len(named) == 1 && isInstructionArgs && (fields[0].Type.IsIdlTypeVec() || fields[0].Type.IsArray()) {
 		return name, named[0].Codec, nil
 	}
 

@@ -51,6 +51,19 @@ func TestSolanaAddressModifier(t *testing.T) {
 		assert.Contains(t, err.Error(), commontypes.ErrInvalidType.Error())
 	})
 
+	t.Run("DecodeAddress returns error for address under 32 chars", func(t *testing.T) {
+		// < than 32 chars
+		_, err := modifier.DecodeAddress("1111111111111111111111111111111")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), commontypes.ErrInvalidType.Error())
+	})
+
+	t.Run("DecodeAddress returns error for valid length address not on the ed25519 curve", func(t *testing.T) {
+		_, err := modifier.DecodeAddress("AddressLookupTab1e11111111111111111111111111")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), commontypes.ErrInvalidType.Error())
+	})
+
 	t.Run("Length returns 32 for Solana addresses", func(t *testing.T) {
 		assert.Equal(t, solana.PublicKeyLength, modifier.Length())
 	})

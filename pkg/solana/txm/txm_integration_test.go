@@ -1,14 +1,19 @@
 //go:build integration
 
-package txm_test
+package txm
 
 import (
+	"bytes"
 	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
@@ -24,7 +29,6 @@ import (
 
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 )
 
@@ -65,8 +69,8 @@ func TestTxm_Integration_ExpirationRebroadcast(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			tc := tc
 			t.Parallel()
 			ctx, client, txmInstance, senderPubKey, receiverPubKey, observer := setup(t, url, tc.txExpirationRebroadcast)
 
@@ -104,8 +108,8 @@ func TestTxm_Integration_ExpirationRebroadcast(t *testing.T) {
 			}
 
 			// Verify rebroadcast logs
-			rebroadcastLogs := observer.FilterMessageSnippet("rebroadcast transaction sent").Len()
-			rebroadcastLogs2 := observer.FilterMessageSnippet("transaction expired, rebroadcasting").Len()
+			rebroadcastLogs := observer.FilterMessageSnippet("transaction expired, rebroadcasting").Len()
+			rebroadcastLogs2 := observer.FilterMessageSnippet("expired tx was rebroadcasted successfully").Len()
 			if tc.expectRebroadcast {
 				require.Equal(t, 1, rebroadcastLogs, "Expected rebroadcast log message not found")
 				require.Equal(t, 1, rebroadcastLogs2, "Expected rebroadcast log message not found")
@@ -117,7 +121,7 @@ func TestTxm_Integration_ExpirationRebroadcast(t *testing.T) {
 	}
 }
 
-func setup(t *testing.T, url string, txExpirationRebroadcast bool) (context.Context, *solanaClient.Client, *txm.Txm, solana.PublicKey, solana.PublicKey, *observer.ObservedLogs) {
+func setup(t *testing.T, url string, txExpirationRebroadcast bool) (context.Context, *solanaClient.Client, *Txm, solana.PublicKey, solana.PublicKey, *observer.ObservedLogs) {
 	ctx := tests.Context(t)
 
 	// Generate sender and receiver keys and fund sender account
@@ -139,14 +143,14 @@ func setup(t *testing.T, url string, txExpirationRebroadcast bool) (context.Cont
 	// Set configs
 	cfg := config.NewDefault()
 	cfg.Chain.TxExpirationRebroadcast = &txExpirationRebroadcast
-	cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(10 * time.Second) // to get the finalized tx status
+	cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(1 * time.Minute) // to get the finalized tx status
 
 	// Initialize the Solana client and TXM
 	lggr, obs := logger.TestObserved(t, zapcore.DebugLevel)
 	client, err := solanaClient.NewClient(url, cfg, 2*time.Second, lggr)
 	require.NoError(t, err)
 	loader := utils.NewLazyLoad(func() (solanaClient.ReaderWriter, error) { return client, nil })
-	txmInstance := txm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
+	txmInstance := NewTxm("localnet", loader, nil, cfg, mkey, lggr)
 	servicetest.Run(t, txmInstance)
 
 	return ctx, client, txmInstance, senderPubKey, receiverPubKey, obs
@@ -184,4 +188,186 @@ func createTransaction(ctx context.Context, t *testing.T, client *solanaClient.C
 	require.NoError(t, err)
 
 	return tx, lastValidBlockHeight
+}
+
+func TestTxm_Integration_Reorg(t *testing.T) {
+	t.Parallel()
+	t.Run("no reorg", func(t *testing.T) {
+		// Setup live validator and test environment
+		t.Parallel()
+		url := solanaClient.SetupLocalSolNode(t)
+		ctx, client, txmInstance, senderPubKey, receiverPubKey, observer := setup(t, url, true)
+
+		// Record initial balance
+		initSenderBalance, err := client.Balance(ctx, senderPubKey)
+		require.NoError(t, err)
+		const amount = 1 * solana.LAMPORTS_PER_SOL
+
+		// Create, enqueue and wait for tx finalization
+		txID := "no-reorg"
+		tx, lastValidBlockHeight := createTransaction(ctx, t, client, senderPubKey, receiverPubKey, amount, true)
+		require.NoError(t, txmInstance.Enqueue(ctx, "", tx, &txID, lastValidBlockHeight))
+		require.Eventually(t, func() bool {
+			status, errGetStatus := txmInstance.GetTransactionStatus(ctx, txID)
+			if errGetStatus != nil {
+				return false
+			}
+			return status == types.Finalized
+		}, 60*time.Second, 1*time.Second, "Transaction should eventually reach Finalized status")
+
+		// Verify that reorg was not detected and final balances are correct
+		reorgLogs := observer.FilterMessageSnippet("re-org detected for transaction").Len()
+		require.Equal(t, 0, reorgLogs, "Re-org should not occur")
+		finalSenderBalance, err := client.Balance(ctx, senderPubKey)
+		require.NoError(t, err)
+		finalReceiverBalance, err := client.Balance(ctx, receiverPubKey)
+		require.NoError(t, err)
+		require.Less(t, finalSenderBalance, initSenderBalance, "Sender balance should decrease")
+		require.Equal(t, amount, finalReceiverBalance, "Receiver should receive the transferred amount")
+	})
+
+	t.Run("confirmed reorg: previous tx is replaced and new one is finalized", func(t *testing.T) {
+		// Start live validator and setup test environment
+		t.Parallel()
+		ledgerDir := t.TempDir()
+		port := utils.MustRandomPort(t)
+		faucetPort := utils.MustRandomPort(t)
+		cmd, url := startValidator(t, ledgerDir, port, faucetPort, true)
+		ctx, cl, txmInstance, senderPubKey, receiverPubKey, obs := setup(t, url, true)
+
+		// Back up the ledger after transferring funds
+		cleanLedgerBackupDir := t.TempDir()
+		require.NoError(t, copyDir(ledgerDir, cleanLedgerBackupDir))
+		initSenderBalance, err := cl.Balance(ctx, senderPubKey)
+		require.NoError(t, err)
+
+		// Create TX and wait for it to be confirmed
+		const amount = 1 * solana.LAMPORTS_PER_SOL
+		txID := "reorg-test-tx"
+		tx, lastValidBlockHeight := createTransaction(ctx, t, cl, senderPubKey, receiverPubKey, amount, true)
+		require.NoError(t, txmInstance.Enqueue(ctx, "", tx, &txID, lastValidBlockHeight))
+		require.Eventually(t, func() bool {
+			status, errGetStatus := txmInstance.GetTransactionStatus(ctx, txID)
+			if errGetStatus != nil {
+				return false
+			}
+			if status == types.Unconfirmed {
+				pTx, errPtx := txmInstance.getPendingTx(txID)
+				if errPtx != nil || len(pTx.signatures) == 0 {
+					return false
+				}
+
+				sigStatus, errStat := cl.SignatureStatuses(ctx, pTx.signatures)
+				if errStat != nil || len(sigStatus) == 0 || sigStatus[0] == nil {
+					return false
+				}
+				return sigStatus[0].ConfirmationStatus == rpc.ConfirmationStatusConfirmed
+			}
+			return false
+		}, 60*time.Second, 1*time.Second, "Transaction should reach Confirmed status")
+
+		// Simulate reorg: kill current validator and restart validator with backuped ledger before the tx.
+		// we want ledger as provided, omit --reset
+		require.NoError(t, cmd.Process.Kill())
+		_ = cmd.Wait()
+		require.NoError(t, os.RemoveAll(ledgerDir))
+		require.NoError(t, copyDir(cleanLedgerBackupDir, ledgerDir))
+		startValidator(t, ledgerDir, port, faucetPort, false)
+
+		// Check tx is not finalized yet and reorg is detected
+		status, errGetStatus := txmInstance.GetTransactionStatus(ctx, txID)
+		require.NoError(t, errGetStatus)
+		require.NotEqual(t, types.Finalized, status, "tx should not be finalized after reorg")
+		reorgLogs := obs.FilterMessageSnippet("re-org detected for transaction").Len()
+		require.Equal(t, reorgLogs, 1, "Re-org should be detected")
+		rebroadcastReorgLogs := obs.FilterMessageSnippet("re-orged tx was rebroadcasted successfully").Len()
+		require.Equal(t, rebroadcastReorgLogs, 1, "re-org tx should be rebroadcasted with new blockhash")
+
+		// Wait rebroadcasted tx to be finalized and check final balances
+		require.Eventually(t, func() bool {
+			finalStatus, errAgain := txmInstance.GetTransactionStatus(ctx, txID)
+			if errAgain != nil {
+				return false
+			}
+			return finalStatus == types.Finalized
+		}, 120*time.Second, 5*time.Second, "tx should finalize again after reorg handling")
+		finalSenderBalance, err := cl.Balance(ctx, senderPubKey)
+		require.NoError(t, err)
+		finalReceiverBalance, err := cl.Balance(ctx, receiverPubKey)
+		require.NoError(t, err)
+		require.Less(t, finalSenderBalance, initSenderBalance, "Sender balance should decrease after re-finalization")
+		require.Equal(t, amount, finalReceiverBalance, "Receiver should receive transferred amount after re-finalization")
+		status, errGetStatus = txmInstance.GetTransactionStatus(ctx, txID)
+		require.NoError(t, errGetStatus)
+		require.Equal(t, types.Finalized, status, "tx should be finalized after reorg")
+	})
+}
+
+// startValidator starts a local solana-test-validator and return the cmd to control it.
+func startValidator(
+	t *testing.T,
+	ledgerDir, port, faucetPort string,
+	reset bool,
+) (*exec.Cmd, string) {
+	t.Helper()
+
+	args := []string{
+		"--rpc-port", port,
+		"--faucet-port", faucetPort,
+		"--ledger", ledgerDir,
+	}
+	if reset {
+		args = append([]string{"--reset"}, args...)
+	}
+
+	cmd := exec.Command("solana-test-validator", args...)
+
+	var stdErr, stdOut bytes.Buffer
+	cmd.Stderr = &stdErr
+	cmd.Stdout = &stdOut
+
+	require.NoError(t, cmd.Start(), "failed to start solana-test-validator")
+
+	// The RPC URL
+	url := "http://127.0.0.1:" + port
+
+	// Ensure validator is killed after the test finishes
+	t.Cleanup(func() {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+	})
+
+	// Wait until it's healthy
+	client := rpc.New(url)
+	require.Eventually(t, func() bool {
+		out, err := client.GetHealth(context.Background())
+		return err == nil && out == rpc.HealthOk
+	}, 30*time.Second, 1*time.Second, "Validator should become healthy")
+
+	return cmd, url
+}
+
+// copyDir copies the directory tree.
+func copyDir(src, dst string) error {
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		relPath, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		dstPath := filepath.Join(dst, relPath)
+
+		if info.IsDir() {
+			return os.MkdirAll(dstPath, info.Mode())
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		return os.WriteFile(dstPath, data, info.Mode())
+	})
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	solanatxm "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
+	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
@@ -174,12 +175,12 @@ func TestTxm_ProcessError(t *testing.T) {
 		// returns no failure if BlockhashNotFound encountered during simulation
 		txState, errType := txm.ProcessError(solana.Signature{}, err, true)
 		require.Equal(t, solanatxm.NoFailure, errType)
-		require.Equal(t, solanatxm.NotFound, txState) // default enum value
+		require.Equal(t, txmutils.NotFound, txState) // default enum value
 
 		// returns error if BlockhashNotFound encountered during normal processing
 		txState, errType = txm.ProcessError(solana.Signature{}, err, false)
 		require.Equal(t, solanatxm.TxFailRevert, errType)
-		require.Equal(t, solanatxm.Errored, txState) // default enum value
+		require.Equal(t, txmutils.Errored, txState) // default enum value
 	})
 	t.Run("process AlreadyProcessed error", func(t *testing.T) {
 		t.Parallel()
@@ -191,12 +192,12 @@ func TestTxm_ProcessError(t *testing.T) {
 		// returns no failure if AlreadyProcessed encountered during simulation
 		txState, errType := txm.ProcessError(solana.Signature{}, err, true)
 		require.Equal(t, solanatxm.NoFailure, errType)
-		require.Equal(t, solanatxm.NotFound, txState) // default enum value
+		require.Equal(t, txmutils.NotFound, txState) // default enum value
 
 		// returns error if AlreadyProcessed encountered during normal processing
 		txState, errType = txm.ProcessError(solana.Signature{}, err, false)
 		require.Equal(t, solanatxm.TxFailRevert, errType)
-		require.Equal(t, solanatxm.Errored, txState) // default enum value
+		require.Equal(t, txmutils.Errored, txState) // default enum value
 	})
 	t.Run("process fatal error cases", func(t *testing.T) {
 		t.Parallel()
@@ -212,12 +213,12 @@ func TestTxm_ProcessError(t *testing.T) {
 				// returns fatal error if InstructionError encountered during simulation
 				txState, errType := txm.ProcessError(solana.Signature{}, err, true)
 				require.Equal(t, solanatxm.TxFailSimRevert, errType)
-				require.Equal(t, solanatxm.FatallyErrored, txState) // default enum value
+				require.Equal(t, txmutils.FatallyErrored, txState) // default enum value
 
 				// returns fatal error if InstructionError encountered during normal processing
 				txState, errType = txm.ProcessError(solana.Signature{}, err, false)
 				require.Equal(t, solanatxm.TxFailRevert, errType)
-				require.Equal(t, solanatxm.FatallyErrored, txState) // default enum value
+				require.Equal(t, txmutils.FatallyErrored, txState) // default enum value
 			})
 		}
 	})
@@ -231,12 +232,12 @@ func TestTxm_ProcessError(t *testing.T) {
 		// returns fatal error if InstructionError encountered during simulation
 		txState, errType := txm.ProcessError(solana.Signature{}, err, true)
 		require.Equal(t, solanatxm.TxFailSimOther, errType)
-		require.Equal(t, solanatxm.Errored, txState) // default enum value
+		require.Equal(t, txmutils.Errored, txState) // default enum value
 
 		// returns fatal error if InstructionError encountered during normal processing
 		txState, errType = txm.ProcessError(solana.Signature{}, err, false)
 		require.Equal(t, solanatxm.TxFailRevert, errType)
-		require.Equal(t, solanatxm.Errored, txState) // default enum value
+		require.Equal(t, txmutils.Errored, txState) // default enum value
 	})
 }
 

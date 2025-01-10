@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
+	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
 type Chain interface {
@@ -576,12 +577,12 @@ func (c *chain) sendTx(ctx context.Context, from, to string, amount *big.Int, ba
 
 	chainTxm := c.TxManager()
 	err = chainTxm.Enqueue(ctx, "", tx, nil, blockhash.Value.LastValidBlockHeight,
-		txm.SetComputeUnitLimit(500), // reduce from default 200K limit - should only take 450 compute units
+		txmutils.SetComputeUnitLimit(500), // reduce from default 200K limit - should only take 450 compute units
 		// no fee bumping and no additional fee - makes validating balance accurate
-		txm.SetComputeUnitPriceMax(0),
-		txm.SetComputeUnitPriceMin(0),
-		txm.SetBaseComputeUnitPrice(0),
-		txm.SetFeeBumpPeriod(0),
+		txmutils.SetComputeUnitPriceMax(0),
+		txmutils.SetComputeUnitPriceMin(0),
+		txmutils.SetBaseComputeUnitPrice(0),
+		txmutils.SetFeeBumpPeriod(0),
 	)
 	if err != nil {
 		return fmt.Errorf("transaction failed: %w", err)

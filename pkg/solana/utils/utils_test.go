@@ -1,9 +1,11 @@
-package solana
+package utils_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 func TestLamportsToSol(t *testing.T) {
@@ -19,7 +21,7 @@ func TestLamportsToSol(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.out, LamportsToSol(test.in))
+			assert.Equal(t, test.out, utils.LamportsToSol(test.in))
 		})
 	}
 }

@@ -16,8 +16,8 @@ type Config struct {
 }
 
 type ChainConfig struct {
-	IDL         string `json:"typeIdl" toml:"typeIdl"`
-	OnChainName string `json:"onChainName" toml:"onChainName"`
+	IDL               string `json:"typeIdl" toml:"typeIdl"`
+	ChainSpecificName string `json:"chainSpecificName" toml:"chainSpecificName"`
 	// Type can be Solana Account, Instruction args, or TODO Event
 	Type            ChainConfigType             `json:"type" toml:"type"`
 	ModifierConfigs commoncodec.ModifiersConfig `json:"modifierConfigs,omitempty" toml:"modifierConfigs,omitempty"`

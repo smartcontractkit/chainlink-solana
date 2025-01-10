@@ -13,6 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
+	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
 func TestPendingTxContext_add_remove_multiple(t *testing.T) {
@@ -40,17 +43,19 @@ func TestPendingTxContext_add_remove_multiple(t *testing.T) {
 	for i := 0; i < n; i++ {
 		sig, cancel := newProcess()
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig, cancel)
+		err := txs.New(msg)
+		assert.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig)
 		assert.NoError(t, err)
 		ids[sig] = msg.id
 	}
 
 	// cannot add signature for non existent ID
-	require.Error(t, txs.AddSignature(uuid.New().String(), solana.Signature{}))
+	require.Error(t, txs.AddSignature(func() {}, uuid.New().String(), solana.Signature{}))
 
 	list := make([]string, 0, n)
-	for _, id := range txs.sigToID {
-		list = append(list, id)
+	for _, info := range txs.sigToTxInfo {
+		list = append(list, info.id)
 	}
 	assert.Equal(t, n, len(list))
 
@@ -77,13 +82,15 @@ func TestPendingTxContext_new(t *testing.T) {
 
 	// Create new transaction
 	msg := pendingTx{id: uuid.NewString()}
-	err := txs.New(msg, sig, cancel)
+	err := txs.New(msg)
+	require.NoError(t, err)
+	err = txs.AddSignature(cancel, msg.id, sig)
 	require.NoError(t, err, "expected no error when adding a new transaction")
 
 	// Check it exists in signature map and mapped to the correct txID
-	id, exists := txs.sigToID[sig]
+	txInfo, exists := txs.sigToTxInfo[sig]
 	require.True(t, exists, "signature should exist in sigToID map")
-	require.Equal(t, msg.id, id, "signature should map to correct transaction ID")
+	require.Equal(t, msg.id, txInfo.id, "signature should map to correct transaction ID")
 
 	// Check it exists in broadcasted map and that sigs match
 	tx, exists := txs.broadcastedProcessedTxs[msg.id]
@@ -92,7 +99,7 @@ func TestPendingTxContext_new(t *testing.T) {
 	require.Equal(t, sig, tx.signatures[0], "signature should match")
 
 	// Check status is Broadcasted
-	require.Equal(t, Broadcasted, tx.state, "transaction state should be Broadcasted")
+	require.Equal(t, utils.Broadcasted, tx.state, "transaction state should be Broadcasted")
 
 	// Check it does not exist in confirmed nor finalized maps
 	_, exists = txs.confirmedTxs[msg.id]
@@ -100,32 +107,24 @@ func TestPendingTxContext_new(t *testing.T) {
 	_, exists = txs.finalizedErroredTxs[msg.id]
 	require.False(t, exists, "transaction should not exist in finalizedErroredTxs map")
 
-	// Attempt to add the same transaction again with the same signature
-	err = txs.New(msg, sig, cancel)
-	require.ErrorIs(t, err, ErrSigAlreadyExists, "expected ErrSigAlreadyExists when adding duplicate signature")
-
-	// Attempt to add a new transaction with the same transaction ID but different signature
-	err = txs.New(pendingTx{id: msg.id}, randomSignature(t), cancel)
+	// Attempt to add the same transaction again
+	err = txs.New(msg)
 	require.ErrorIs(t, err, ErrIDAlreadyExists, "expected ErrIDAlreadyExists when adding duplicate transaction ID")
-
-	// Attempt to add a new transaction with a different transaction ID but same signature
-	err = txs.New(pendingTx{id: uuid.NewString()}, sig, cancel)
-	require.ErrorIs(t, err, ErrSigAlreadyExists, "expected ErrSigAlreadyExists when adding duplicate signature")
 
 	// Simulate moving the transaction to confirmedTxs map
 	_, err = txs.OnConfirmed(sig)
 	require.NoError(t, err, "expected no error when confirming transaction")
 
-	// Attempt to add a new transaction with the same ID (now in confirmedTxs) and new signature
-	err = txs.New(pendingTx{id: msg.id}, randomSignature(t), cancel)
+	// Attempt to add a new transaction with the same ID (now in confirmedTxs)
+	err = txs.New(pendingTx{id: msg.id})
 	require.ErrorIs(t, err, ErrIDAlreadyExists, "expected ErrIDAlreadyExists when adding transaction ID that exists in confirmedTxs")
 
 	// Simulate moving the transaction to finalizedErroredTxs map
 	_, err = txs.OnFinalized(sig, 10*time.Second)
 	require.NoError(t, err, "expected no error when finalizing transaction")
 
-	// Attempt to add a new transaction with the same ID (now in finalizedErroredTxs) and new signature
-	err = txs.New(pendingTx{id: msg.id}, randomSignature(t), cancel)
+	// Attempt to add a new transaction with the same ID (now in finalizedErroredTxs)
+	err = txs.New(pendingTx{id: msg.id})
 	require.ErrorIs(t, err, ErrIDAlreadyExists, "expected ErrIDAlreadyExists when adding transaction ID that exists in finalizedErroredTxs")
 }
 
@@ -140,19 +139,21 @@ func TestPendingTxContext_add_signature(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig1, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig1)
 		require.NoError(t, err)
 
-		err = txs.AddSignature(msg.id, sig2)
+		err = txs.AddSignature(cancel, msg.id, sig2)
 		require.NoError(t, err)
 
 		// Check signature map
-		id, exists := txs.sigToID[sig1]
+		txInfo, exists := txs.sigToTxInfo[sig1]
 		require.True(t, exists)
-		require.Equal(t, msg.id, id)
-		id, exists = txs.sigToID[sig2]
+		require.Equal(t, msg.id, txInfo.id)
+		txInfo, exists = txs.sigToTxInfo[sig2]
 		require.True(t, exists)
-		require.Equal(t, msg.id, id)
+		require.Equal(t, msg.id, txInfo.id)
 
 		// Check broadcasted map
 		tx, exists := txs.broadcastedProcessedTxs[msg.id]
@@ -175,10 +176,12 @@ func TestPendingTxContext_add_signature(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig)
 		require.NoError(t, err)
 
-		err = txs.AddSignature(msg.id, sig)
+		err = txs.AddSignature(cancel, msg.id, sig)
 		require.ErrorIs(t, err, ErrSigAlreadyExists)
 	})
 
@@ -188,10 +191,12 @@ func TestPendingTxContext_add_signature(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig1, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig1)
 		require.NoError(t, err)
 
-		err = txs.AddSignature("bad id", sig2)
+		err = txs.AddSignature(cancel, "bad id", sig2)
 		require.ErrorIs(t, err, ErrTransactionNotFound)
 	})
 
@@ -201,7 +206,9 @@ func TestPendingTxContext_add_signature(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig1, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig1)
 		require.NoError(t, err)
 
 		// Transition to processed state
@@ -214,7 +221,7 @@ func TestPendingTxContext_add_signature(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
-		err = txs.AddSignature(msg.id, sig2)
+		err = txs.AddSignature(cancel, msg.id, sig2)
 		require.ErrorIs(t, err, ErrTransactionNotFound)
 	})
 }
@@ -230,7 +237,9 @@ func TestPendingTxContext_on_broadcasted_processed(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig)
 		require.NoError(t, err)
 
 		// Transition to processed state
@@ -239,9 +248,9 @@ func TestPendingTxContext_on_broadcasted_processed(t *testing.T) {
 		require.Equal(t, msg.id, id)
 
 		// Check it exists in signature map
-		id, exists := txs.sigToID[sig]
+		txInfo, exists := txs.sigToTxInfo[sig]
 		require.True(t, exists)
-		require.Equal(t, msg.id, id)
+		require.Equal(t, msg.id, txInfo.id)
 
 		// Check it exists in broadcasted map
 		tx, exists := txs.broadcastedProcessedTxs[msg.id]
@@ -250,7 +259,7 @@ func TestPendingTxContext_on_broadcasted_processed(t *testing.T) {
 		require.Equal(t, sig, tx.signatures[0])
 
 		// Check status is Processed
-		require.Equal(t, Processed, tx.state)
+		require.Equal(t, utils.Processed, tx.state)
 
 		// Check it does not exist in confirmed map
 		_, exists = txs.confirmedTxs[msg.id]
@@ -266,7 +275,9 @@ func TestPendingTxContext_on_broadcasted_processed(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig)
 		require.NoError(t, err)
 
 		// Transition to processed state
@@ -289,7 +300,9 @@ func TestPendingTxContext_on_broadcasted_processed(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig)
 		require.NoError(t, err)
 
 		// Transition to processed state
@@ -317,11 +330,13 @@ func TestPendingTxContext_on_broadcasted_processed(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig)
 		require.NoError(t, err)
 
 		// Transition to errored state
-		id, err := txs.OnError(sig, retentionTimeout, Errored, 0)
+		id, err := txs.OnError(sig, retentionTimeout, utils.Errored, 0)
 		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
@@ -335,7 +350,9 @@ func TestPendingTxContext_on_broadcasted_processed(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig)
 		require.NoError(t, err)
 
 		// Transition to processed state
@@ -360,7 +377,9 @@ func TestPendingTxContext_on_confirmed(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig)
 		require.NoError(t, err)
 
 		// Transition to processed state
@@ -374,9 +393,9 @@ func TestPendingTxContext_on_confirmed(t *testing.T) {
 		require.Equal(t, msg.id, id)
 
 		// Check it exists in signature map
-		id, exists := txs.sigToID[sig]
+		txInfo, exists := txs.sigToTxInfo[sig]
 		require.True(t, exists)
-		require.Equal(t, msg.id, id)
+		require.Equal(t, msg.id, txInfo.id)
 
 		// Check it does not exist in broadcasted map
 		_, exists = txs.broadcastedProcessedTxs[msg.id]
@@ -389,7 +408,7 @@ func TestPendingTxContext_on_confirmed(t *testing.T) {
 		require.Equal(t, sig, tx.signatures[0])
 
 		// Check status is Confirmed
-		require.Equal(t, Confirmed, tx.state)
+		require.Equal(t, utils.Confirmed, tx.state)
 
 		// Check it does not exist in finalized map
 		_, exists = txs.finalizedErroredTxs[msg.id]
@@ -401,7 +420,9 @@ func TestPendingTxContext_on_confirmed(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig)
 		require.NoError(t, err)
 
 		// Transition to processed state
@@ -429,11 +450,13 @@ func TestPendingTxContext_on_confirmed(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig)
 		require.NoError(t, err)
 
 		// Transition to errored state
-		id, err := txs.OnError(sig, retentionTimeout, Errored, 0)
+		id, err := txs.OnError(sig, retentionTimeout, utils.Errored, 0)
 		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
@@ -447,7 +470,9 @@ func TestPendingTxContext_on_confirmed(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig)
 		require.NoError(t, err)
 
 		// Transition to processed state
@@ -478,11 +503,13 @@ func TestPendingTxContext_on_finalized(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig1, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig1)
 		require.NoError(t, err)
 
 		// Add second signature
-		err = txs.AddSignature(msg.id, sig2)
+		err = txs.AddSignature(cancel, msg.id, sig2)
 		require.NoError(t, err)
 
 		// Transition to finalized state
@@ -503,12 +530,12 @@ func TestPendingTxContext_on_finalized(t *testing.T) {
 		require.True(t, exists)
 
 		// Check status is Finalized
-		require.Equal(t, Finalized, tx.state)
+		require.Equal(t, utils.Finalized, tx.state)
 
 		// Check sigs do no exist in signature map
-		_, exists = txs.sigToID[sig1]
+		_, exists = txs.sigToTxInfo[sig1]
 		require.False(t, exists)
-		_, exists = txs.sigToID[sig2]
+		_, exists = txs.sigToTxInfo[sig2]
 		require.False(t, exists)
 	})
 
@@ -518,11 +545,13 @@ func TestPendingTxContext_on_finalized(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig1, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig1)
 		require.NoError(t, err)
 
 		// Add second signature
-		err = txs.AddSignature(msg.id, sig2)
+		err = txs.AddSignature(cancel, msg.id, sig2)
 		require.NoError(t, err)
 
 		// Transition to processed state
@@ -553,12 +582,12 @@ func TestPendingTxContext_on_finalized(t *testing.T) {
 		require.True(t, exists)
 
 		// Check status is Finalized
-		require.Equal(t, Finalized, tx.state)
+		require.Equal(t, utils.Finalized, tx.state)
 
 		// Check sigs do no exist in signature map
-		_, exists = txs.sigToID[sig1]
+		_, exists = txs.sigToTxInfo[sig1]
 		require.False(t, exists)
-		_, exists = txs.sigToID[sig2]
+		_, exists = txs.sigToTxInfo[sig2]
 		require.False(t, exists)
 	})
 
@@ -567,7 +596,9 @@ func TestPendingTxContext_on_finalized(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig1, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig1)
 		require.NoError(t, err)
 
 		// Transition to processed state
@@ -598,7 +629,7 @@ func TestPendingTxContext_on_finalized(t *testing.T) {
 		require.False(t, exists)
 
 		// Check sigs do no exist in signature map
-		_, exists = txs.sigToID[sig1]
+		_, exists = txs.sigToTxInfo[sig1]
 		require.False(t, exists)
 	})
 
@@ -607,11 +638,13 @@ func TestPendingTxContext_on_finalized(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig)
 		require.NoError(t, err)
 
 		// Transition to errored state
-		id, err := txs.OnError(sig, retentionTimeout, Errored, 0)
+		id, err := txs.OnError(sig, retentionTimeout, utils.Errored, 0)
 		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
@@ -632,11 +665,13 @@ func TestPendingTxContext_on_error(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig)
 		require.NoError(t, err)
 
 		// Transition to errored state
-		id, err := txs.OnError(sig, retentionTimeout, Errored, 0)
+		id, err := txs.OnError(sig, retentionTimeout, utils.Errored, 0)
 		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
@@ -653,10 +688,10 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		require.True(t, exists)
 
 		// Check status is Finalized
-		require.Equal(t, Errored, tx.state)
+		require.Equal(t, utils.Errored, tx.state)
 
 		// Check sigs do no exist in signature map
-		_, exists = txs.sigToID[sig]
+		_, exists = txs.sigToTxInfo[sig]
 		require.False(t, exists)
 	})
 
@@ -665,7 +700,9 @@ func TestPendingTxContext_on_error(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig)
 		require.NoError(t, err)
 
 		// Transition to errored state
@@ -674,7 +711,7 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		require.Equal(t, msg.id, id)
 
 		// Transition to errored state
-		id, err = txs.OnError(sig, retentionTimeout, Errored, 0)
+		id, err = txs.OnError(sig, retentionTimeout, utils.Errored, 0)
 		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
@@ -691,10 +728,10 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		require.True(t, exists)
 
 		// Check status is Finalized
-		require.Equal(t, Errored, tx.state)
+		require.Equal(t, utils.Errored, tx.state)
 
 		// Check sigs do no exist in signature map
-		_, exists = txs.sigToID[sig]
+		_, exists = txs.sigToTxInfo[sig]
 		require.False(t, exists)
 	})
 
@@ -703,11 +740,13 @@ func TestPendingTxContext_on_error(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig)
 		require.NoError(t, err)
 
 		// Transition to fatally errored state
-		id, err := txs.OnError(sig, retentionTimeout, FatallyErrored, 0)
+		id, err := txs.OnError(sig, retentionTimeout, utils.FatallyErrored, 0)
 		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
@@ -720,10 +759,10 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		require.True(t, exists)
 
 		// Check status is Errored
-		require.Equal(t, FatallyErrored, tx.state)
+		require.Equal(t, utils.FatallyErrored, tx.state)
 
 		// Check sigs do no exist in signature map
-		_, exists = txs.sigToID[sig]
+		_, exists = txs.sigToTxInfo[sig]
 		require.False(t, exists)
 	})
 
@@ -732,16 +771,18 @@ func TestPendingTxContext_on_error(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig)
 		require.NoError(t, err)
 
-		// Transition to errored state
+		// Transition to confirmed state
 		id, err := txs.OnConfirmed(sig)
 		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
 		// Transition to errored state
-		id, err = txs.OnError(sig, 0*time.Second, Errored, 0)
+		id, err = txs.OnError(sig, 0*time.Second, utils.Errored, 0)
 		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
@@ -758,7 +799,7 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		require.False(t, exists)
 
 		// Check sigs do no exist in signature map
-		_, exists = txs.sigToID[sig]
+		_, exists = txs.sigToTxInfo[sig]
 		require.False(t, exists)
 	})
 
@@ -767,16 +808,18 @@ func TestPendingTxContext_on_error(t *testing.T) {
 
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
-		err := txs.New(msg, sig, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig)
 		require.NoError(t, err)
 
-		// Transition to confirmed state
+		// Transition to finalized state
 		id, err := txs.OnFinalized(sig, retentionTimeout)
 		require.NoError(t, err)
 		require.Equal(t, msg.id, id)
 
-		// Transition back to confirmed state
-		id, err = txs.OnError(sig, retentionTimeout, Errored, 0)
+		// Transition to errored state
+		id, err = txs.OnError(sig, retentionTimeout, txmutils.Errored, 0)
 		require.Error(t, err)
 		require.Equal(t, "", id)
 	})
@@ -792,7 +835,7 @@ func TestPendingTxContext_on_prebroadcast_error(t *testing.T) {
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
 		// Transition to errored state
-		err := txs.OnPrebroadcastError(msg.id, retentionTimeout, Errored, 0)
+		err := txs.OnPrebroadcastError(msg.id, retentionTimeout, utils.Errored, 0)
 		require.NoError(t, err)
 
 		// Check it exists in errored map
@@ -800,7 +843,7 @@ func TestPendingTxContext_on_prebroadcast_error(t *testing.T) {
 		require.True(t, exists)
 
 		// Check status is Errored
-		require.Equal(t, Errored, tx.state)
+		require.Equal(t, utils.Errored, tx.state)
 	})
 
 	t.Run("successfully adds transaction with fatally errored state", func(t *testing.T) {
@@ -808,7 +851,7 @@ func TestPendingTxContext_on_prebroadcast_error(t *testing.T) {
 		msg := pendingTx{id: uuid.NewString()}
 
 		// Transition to fatally errored state
-		err := txs.OnPrebroadcastError(msg.id, retentionTimeout, FatallyErrored, 0)
+		err := txs.OnPrebroadcastError(msg.id, retentionTimeout, utils.FatallyErrored, 0)
 		require.NoError(t, err)
 
 		// Check it exists in errored map
@@ -816,7 +859,7 @@ func TestPendingTxContext_on_prebroadcast_error(t *testing.T) {
 		require.True(t, exists)
 
 		// Check status is Errored
-		require.Equal(t, FatallyErrored, tx.state)
+		require.Equal(t, utils.FatallyErrored, tx.state)
 	})
 
 	t.Run("fails to add transaction to errored map if id exists in another map already", func(t *testing.T) {
@@ -825,11 +868,13 @@ func TestPendingTxContext_on_prebroadcast_error(t *testing.T) {
 		// Create new transaction
 		msg := pendingTx{id: uuid.NewString()}
 		// Add transaction to broadcasted map
-		err := txs.New(msg, sig, cancel)
+		err := txs.New(msg)
+		require.NoError(t, err)
+		err = txs.AddSignature(cancel, msg.id, sig)
 		require.NoError(t, err)
 
 		// Transition to errored state
-		err = txs.OnPrebroadcastError(msg.id, retentionTimeout, FatallyErrored, 0)
+		err = txs.OnPrebroadcastError(msg.id, retentionTimeout, utils.FatallyErrored, 0)
 		require.ErrorIs(t, err, ErrIDAlreadyExists)
 	})
 
@@ -837,11 +882,11 @@ func TestPendingTxContext_on_prebroadcast_error(t *testing.T) {
 		txID := uuid.NewString()
 
 		// Transition to errored state
-		err := txs.OnPrebroadcastError(txID, retentionTimeout, Errored, 0)
+		err := txs.OnPrebroadcastError(txID, retentionTimeout, utils.Errored, 0)
 		require.NoError(t, err)
 
 		// Transition back to errored state
-		err = txs.OnPrebroadcastError(txID, retentionTimeout, Errored, 0)
+		err = txs.OnPrebroadcastError(txID, retentionTimeout, utils.Errored, 0)
 		require.ErrorIs(t, err, ErrAlreadyInExpectedState)
 	})
 }
@@ -867,14 +912,18 @@ func TestPendingTxContext_remove(t *testing.T) {
 
 	// Create new broadcasted transaction with extra sig
 	broadcastedMsg := pendingTx{id: broadcastedID}
-	err := txs.New(broadcastedMsg, broadcastedSig1, cancel)
+	err := txs.New(broadcastedMsg)
 	require.NoError(t, err)
-	err = txs.AddSignature(broadcastedMsg.id, broadcastedSig2)
+	err = txs.AddSignature(cancel, broadcastedMsg.id, broadcastedSig1)
+	require.NoError(t, err)
+	err = txs.AddSignature(cancel, broadcastedMsg.id, broadcastedSig2)
 	require.NoError(t, err)
 
 	// Create new processed transaction
 	processedMsg := pendingTx{id: processedID}
-	err = txs.New(processedMsg, processedSig, cancel)
+	err = txs.New(processedMsg)
+	require.NoError(t, err)
+	err = txs.AddSignature(cancel, processedMsg.id, processedSig)
 	require.NoError(t, err)
 	id, err := txs.OnProcessed(processedSig)
 	require.NoError(t, err)
@@ -882,7 +931,9 @@ func TestPendingTxContext_remove(t *testing.T) {
 
 	// Create new confirmed transaction
 	confirmedMsg := pendingTx{id: confirmedID}
-	err = txs.New(confirmedMsg, confirmedSig, cancel)
+	err = txs.New(confirmedMsg)
+	require.NoError(t, err)
+	err = txs.AddSignature(cancel, confirmedMsg.id, confirmedSig)
 	require.NoError(t, err)
 	id, err = txs.OnConfirmed(confirmedSig)
 	require.NoError(t, err)
@@ -890,7 +941,9 @@ func TestPendingTxContext_remove(t *testing.T) {
 
 	// Create new finalized transaction
 	finalizedMsg := pendingTx{id: finalizedID}
-	err = txs.New(finalizedMsg, finalizedSig, cancel)
+	err = txs.New(finalizedMsg)
+	require.NoError(t, err)
+	err = txs.AddSignature(cancel, finalizedMsg.id, finalizedSig)
 	require.NoError(t, err)
 	id, err = txs.OnFinalized(finalizedSig, retentionTimeout)
 	require.NoError(t, err)
@@ -898,9 +951,11 @@ func TestPendingTxContext_remove(t *testing.T) {
 
 	// Create new errored transaction
 	erroredMsg := pendingTx{id: erroredID}
-	err = txs.New(erroredMsg, erroredSig, cancel)
+	err = txs.New(erroredMsg)
 	require.NoError(t, err)
-	id, err = txs.OnError(erroredSig, retentionTimeout, Errored, 0)
+	err = txs.AddSignature(cancel, erroredMsg.id, erroredSig)
+	require.NoError(t, err)
+	id, err = txs.OnError(erroredSig, retentionTimeout, txmutils.Errored, 0)
 	require.NoError(t, err)
 	require.Equal(t, erroredMsg.id, id)
 
@@ -908,35 +963,41 @@ func TestPendingTxContext_remove(t *testing.T) {
 	id, err = txs.Remove(broadcastedID)
 	require.NoError(t, err)
 	require.Equal(t, broadcastedMsg.id, id)
+
 	// Check removed from broadcasted map
 	_, exists := txs.broadcastedProcessedTxs[broadcastedMsg.id]
 	require.False(t, exists)
+
 	// Check all signatures removed from sig map
-	_, exists = txs.sigToID[broadcastedSig1]
+	_, exists = txs.sigToTxInfo[broadcastedSig1]
 	require.False(t, exists)
-	_, exists = txs.sigToID[broadcastedSig2]
+	_, exists = txs.sigToTxInfo[broadcastedSig2]
 	require.False(t, exists)
 
 	// Remove processed transaction
 	id, err = txs.Remove(processedID)
 	require.NoError(t, err)
 	require.Equal(t, processedMsg.id, id)
+
 	// Check removed from broadcasted map
 	_, exists = txs.broadcastedProcessedTxs[processedMsg.id]
 	require.False(t, exists)
+
 	// Check all signatures removed from sig map
-	_, exists = txs.sigToID[processedSig]
+	_, exists = txs.sigToTxInfo[processedSig]
 	require.False(t, exists)
 
 	// Remove confirmed transaction
 	id, err = txs.Remove(confirmedID)
 	require.NoError(t, err)
 	require.Equal(t, confirmedMsg.id, id)
+
 	// Check removed from confirmed map
 	_, exists = txs.confirmedTxs[confirmedMsg.id]
 	require.False(t, exists)
+
 	// Check all signatures removed from sig map
-	_, exists = txs.sigToID[confirmedSig]
+	_, exists = txs.sigToTxInfo[confirmedSig]
 	require.False(t, exists)
 
 	// Check remove cannot be called on finalized transaction
@@ -995,7 +1056,9 @@ func TestPendingTxContext_expired(t *testing.T) {
 	txID := uuid.NewString()
 
 	msg := pendingTx{id: txID}
-	err := txs.New(msg, sig, cancel)
+	err := txs.New(msg)
+	assert.NoError(t, err)
+	err = txs.AddSignature(cancel, msg.id, sig)
 	assert.NoError(t, err)
 
 	msg, exists := txs.broadcastedProcessedTxs[msg.id]
@@ -1019,15 +1082,16 @@ func TestPendingTxContext_race(t *testing.T) {
 	t.Run("new", func(t *testing.T) {
 		txCtx := newPendingTxContext()
 		var wg sync.WaitGroup
+		txID := uuid.NewString()
 		wg.Add(2)
 		var err [2]error
 
 		go func() {
-			err[0] = txCtx.New(pendingTx{id: uuid.NewString()}, solana.Signature{}, func() {})
+			err[0] = txCtx.New(pendingTx{id: txID})
 			wg.Done()
 		}()
 		go func() {
-			err[1] = txCtx.New(pendingTx{id: uuid.NewString()}, solana.Signature{}, func() {})
+			err[1] = txCtx.New(pendingTx{id: txID})
 			wg.Done()
 		}()
 
@@ -1038,18 +1102,18 @@ func TestPendingTxContext_race(t *testing.T) {
 	t.Run("add signature", func(t *testing.T) {
 		txCtx := newPendingTxContext()
 		msg := pendingTx{id: uuid.NewString()}
-		createErr := txCtx.New(msg, solana.Signature{}, func() {})
+		createErr := txCtx.New(msg)
 		require.NoError(t, createErr)
 		var wg sync.WaitGroup
 		wg.Add(2)
 		var err [2]error
 
 		go func() {
-			err[0] = txCtx.AddSignature(msg.id, solana.Signature{1})
+			err[0] = txCtx.AddSignature(func() {}, msg.id, solana.Signature{1})
 			wg.Done()
 		}()
 		go func() {
-			err[1] = txCtx.AddSignature(msg.id, solana.Signature{1})
+			err[1] = txCtx.AddSignature(func() {}, msg.id, solana.Signature{1})
 			wg.Done()
 		}()
 
@@ -1061,16 +1125,18 @@ func TestPendingTxContext_race(t *testing.T) {
 		txCtx := newPendingTxContext()
 		txID := uuid.NewString()
 		msg := pendingTx{id: txID}
-		err := txCtx.New(msg, solana.Signature{}, func() {})
+		err := txCtx.New(msg)
 		require.NoError(t, err)
 		var wg sync.WaitGroup
 		wg.Add(2)
 
 		go func() {
 			assert.NotPanics(t, func() { txCtx.Remove(txID) }) //nolint // no need to check error
+			assert.NotPanics(t, func() { txCtx.Remove(txID) }) //nolint // no need to check error
 			wg.Done()
 		}()
 		go func() {
+			assert.NotPanics(t, func() { txCtx.Remove(txID) }) //nolint // no need to check error
 			assert.NotPanics(t, func() { txCtx.Remove(txID) }) //nolint // no need to check error
 			wg.Done()
 		}()
@@ -1094,74 +1160,91 @@ func TestGetTxState(t *testing.T) {
 
 	// Create new broadcasted transaction with extra sig
 	broadcastedMsg := pendingTx{id: uuid.NewString()}
-	err := txs.New(broadcastedMsg, broadcastedSig, cancel)
+	err := txs.New(broadcastedMsg)
+	require.NoError(t, err)
+	err = txs.AddSignature(cancel, broadcastedMsg.id, broadcastedSig)
 	require.NoError(t, err)
 
-	var state TxState
 	// Create new processed transaction
+	var state txmutils.TxState
 	processedMsg := pendingTx{id: uuid.NewString()}
-	err = txs.New(processedMsg, processedSig, cancel)
+	err = txs.New(processedMsg)
+	require.NoError(t, err)
+	err = txs.AddSignature(cancel, processedMsg.id, processedSig)
 	require.NoError(t, err)
 	id, err := txs.OnProcessed(processedSig)
 	require.NoError(t, err)
 	require.Equal(t, processedMsg.id, id)
+
 	// Check Processed state is returned
 	state, err = txs.GetTxState(processedMsg.id)
 	require.NoError(t, err)
-	require.Equal(t, Processed, state)
+	require.Equal(t, utils.Processed, state)
 
 	// Create new confirmed transaction
 	confirmedMsg := pendingTx{id: uuid.NewString()}
-	err = txs.New(confirmedMsg, confirmedSig, cancel)
+	err = txs.New(confirmedMsg)
+	require.NoError(t, err)
+	err = txs.AddSignature(cancel, confirmedMsg.id, confirmedSig)
 	require.NoError(t, err)
 	id, err = txs.OnConfirmed(confirmedSig)
 	require.NoError(t, err)
 	require.Equal(t, confirmedMsg.id, id)
+
 	// Check Confirmed state is returned
 	state, err = txs.GetTxState(confirmedMsg.id)
 	require.NoError(t, err)
-	require.Equal(t, Confirmed, state)
+	require.Equal(t, utils.Confirmed, state)
 
 	// Create new finalized transaction
 	finalizedMsg := pendingTx{id: uuid.NewString()}
-	err = txs.New(finalizedMsg, finalizedSig, cancel)
+	err = txs.New(finalizedMsg)
+	require.NoError(t, err)
+	err = txs.AddSignature(cancel, finalizedMsg.id, finalizedSig)
 	require.NoError(t, err)
 	id, err = txs.OnFinalized(finalizedSig, retentionTimeout)
 	require.NoError(t, err)
 	require.Equal(t, finalizedMsg.id, id)
+
 	// Check Finalized state is returned
 	state, err = txs.GetTxState(finalizedMsg.id)
 	require.NoError(t, err)
-	require.Equal(t, Finalized, state)
+	require.Equal(t, utils.Finalized, state)
 
 	// Create new errored transaction
 	erroredMsg := pendingTx{id: uuid.NewString()}
-	err = txs.New(erroredMsg, erroredSig, cancel)
+	err = txs.New(erroredMsg)
 	require.NoError(t, err)
-	id, err = txs.OnError(erroredSig, retentionTimeout, Errored, 0)
+	err = txs.AddSignature(cancel, erroredMsg.id, erroredSig)
+	require.NoError(t, err)
+	id, err = txs.OnError(erroredSig, retentionTimeout, txmutils.Errored, 0)
 	require.NoError(t, err)
 	require.Equal(t, erroredMsg.id, id)
+
 	// Check Errored state is returned
 	state, err = txs.GetTxState(erroredMsg.id)
 	require.NoError(t, err)
-	require.Equal(t, Errored, state)
+	require.Equal(t, utils.Errored, state)
 
 	// Create new fatally errored transaction
 	fatallyErroredMsg := pendingTx{id: uuid.NewString()}
-	err = txs.New(fatallyErroredMsg, fatallyErroredSig, cancel)
+	err = txs.New(fatallyErroredMsg)
 	require.NoError(t, err)
-	id, err = txs.OnError(fatallyErroredSig, retentionTimeout, FatallyErrored, 0)
+	err = txs.AddSignature(cancel, fatallyErroredMsg.id, fatallyErroredSig)
+	require.NoError(t, err)
+	id, err = txs.OnError(fatallyErroredSig, retentionTimeout, txmutils.FatallyErrored, 0)
 	require.NoError(t, err)
 	require.Equal(t, fatallyErroredMsg.id, id)
+
 	// Check Errored state is returned
 	state, err = txs.GetTxState(fatallyErroredMsg.id)
 	require.NoError(t, err)
-	require.Equal(t, FatallyErrored, state)
+	require.Equal(t, utils.FatallyErrored, state)
 
 	// Check NotFound state is returned if unknown id provided
 	state, err = txs.GetTxState("unknown id")
 	require.Error(t, err)
-	require.Equal(t, NotFound, state)
+	require.Equal(t, utils.NotFound, state)
 }
 
 func randomSignature(t *testing.T) solana.Signature {
@@ -1193,12 +1276,12 @@ func TestPendingTxContext_ListAllExpiredBroadcastedTxs(t *testing.T) {
 			setup: func(t *testing.T, ctx *pendingTxContext) {
 				tx1 := pendingTx{
 					id:                   "tx1",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1500,
 				}
 				tx2 := pendingTx{
 					id:                   "tx2",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1600,
 				}
 				ctx.broadcastedProcessedTxs["tx1"] = tx1
@@ -1212,17 +1295,17 @@ func TestPendingTxContext_ListAllExpiredBroadcastedTxs(t *testing.T) {
 			setup: func(t *testing.T, ctx *pendingTxContext) {
 				tx1 := pendingTx{
 					id:                   "tx1",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1000,
 				}
 				tx2 := pendingTx{
 					id:                   "tx2",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1500,
 				}
 				tx3 := pendingTx{
 					id:                   "tx3",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 900,
 				}
 				ctx.broadcastedProcessedTxs["tx1"] = tx1
@@ -1237,12 +1320,12 @@ func TestPendingTxContext_ListAllExpiredBroadcastedTxs(t *testing.T) {
 			setup: func(t *testing.T, ctx *pendingTxContext) {
 				tx1 := pendingTx{
 					id:                   "tx1",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1000,
 				}
 				tx2 := pendingTx{
 					id:                   "tx2",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1500,
 				}
 				ctx.broadcastedProcessedTxs["tx1"] = tx1
@@ -1256,17 +1339,17 @@ func TestPendingTxContext_ListAllExpiredBroadcastedTxs(t *testing.T) {
 			setup: func(t *testing.T, ctx *pendingTxContext) {
 				tx1 := pendingTx{
 					id:                   "tx1",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 800,
 				}
 				tx2 := pendingTx{
 					id:                   "tx2",
-					state:                Processed, // Not Broadcasted
+					state:                utils.Processed, // Not Broadcasted
 					lastValidBlockHeight: 700,
 				}
 				tx3 := pendingTx{
 					id:                   "tx3",
-					state:                Processed, // Not Broadcasted
+					state:                utils.Processed, // Not Broadcasted
 					lastValidBlockHeight: 600,
 				}
 				ctx.broadcastedProcessedTxs["tx1"] = tx1
@@ -1281,17 +1364,17 @@ func TestPendingTxContext_ListAllExpiredBroadcastedTxs(t *testing.T) {
 			setup: func(t *testing.T, ctx *pendingTxContext) {
 				tx1 := pendingTx{
 					id:                   "tx1",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1000,
 				}
 				tx2 := pendingTx{
 					id:                   "tx2",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 999,
 				}
 				tx3 := pendingTx{
 					id:                   "tx3",
-					state:                Broadcasted,
+					state:                utils.Broadcasted,
 					lastValidBlockHeight: 1,
 				}
 				ctx.broadcastedProcessedTxs["tx1"] = tx1
@@ -1303,17 +1386,16 @@ func TestPendingTxContext_ListAllExpiredBroadcastedTxs(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		tt := tt // capture range variable
-		t.Run(tt.name, func(t *testing.T) {
+	for idx := range tests {
+		t.Run(tests[idx].name, func(t *testing.T) {
 			// Initialize a new PendingTxContext
 			ctx := newPendingTxContext()
 
 			// Setup the test case
-			tt.setup(t, ctx)
+			tests[idx].setup(t, ctx)
 
 			// Execute the function under test
-			result := ctx.ListAllExpiredBroadcastedTxs(tt.currBlockHeight)
+			result := ctx.ListAllExpiredBroadcastedTxs(tests[idx].currBlockHeight)
 
 			// Extract the IDs from the result
 			var resultIDs []string
@@ -1322,7 +1404,178 @@ func TestPendingTxContext_ListAllExpiredBroadcastedTxs(t *testing.T) {
 			}
 
 			// Assert that the expected IDs match the result IDs (order does not matter)
-			assert.ElementsMatch(t, tt.expectedTxIDs, resultIDs)
+			assert.ElementsMatch(t, tests[idx].expectedTxIDs, resultIDs)
 		})
 	}
+}
+
+func createTxAndAddSig(t *testing.T, txs *pendingTxContext) (string, solana.Signature) {
+	sig := randomSignature(t)
+	txID := uuid.NewString()
+	tx := pendingTx{id: txID}
+	require.NoError(t, txs.New(tx))
+	require.NoError(t, txs.AddSignature(func() {}, txID, sig))
+	return txID, sig
+}
+
+func TestPendingTxContext_IsTxReorged(t *testing.T) {
+	t.Parallel()
+	txs := newPendingTxContext()
+
+	// This helper creates a brand new transaction/signature,
+	// then sets the in-memory state to the provided memoryState
+	setMemoryState := func(t *testing.T, txs *pendingTxContext, memoryState txmutils.TxState) (txID string, sig solana.Signature) {
+		txID, sig = createTxAndAddSig(t, txs)
+
+		switch memoryState {
+		case txmutils.Processed:
+			_, err := txs.OnProcessed(sig)
+			require.NoError(t, err, "OnProcessed should succeed")
+		case txmutils.Confirmed:
+			_, err := txs.OnProcessed(sig)
+			require.NoError(t, err)
+			_, err = txs.OnConfirmed(sig)
+			require.NoError(t, err, "OnConfirmed should succeed")
+		case txmutils.Broadcasted: // do nothing; newly created sig is in memory=Broadcasted by default
+		default:
+			require.FailNowf(t, "unexpected memory state", "%v", memoryState)
+		}
+		return
+	}
+
+	tests := []struct {
+		name        string
+		memoryState txmutils.TxState
+		chainState  txmutils.TxState
+		wantReorg   bool
+	}{
+		{
+			name:        "non-existent signature => no reorg",
+			memoryState: txmutils.Broadcasted, // doesn't matter, we'll handle this case specially
+			chainState:  txmutils.Broadcasted,
+			wantReorg:   false,
+		},
+		{
+			name:        "memory=Confirmed, chain=Confirmed => no reorg",
+			memoryState: txmutils.Confirmed,
+			chainState:  txmutils.Confirmed,
+			wantReorg:   false,
+		},
+		{
+			name:        "memory=Confirmed, chain=Processed => reorg",
+			memoryState: txmutils.Confirmed,
+			chainState:  txmutils.Processed,
+			wantReorg:   true,
+		},
+		{
+			name:        "memory=Confirmed, chain=NotFound => reorg",
+			memoryState: txmutils.Confirmed,
+			chainState:  txmutils.NotFound,
+			wantReorg:   true,
+		},
+		{
+			name:        "memory=Processed, chain=Confirmed => no reorg",
+			memoryState: txmutils.Processed,
+			chainState:  txmutils.Confirmed,
+			wantReorg:   false,
+		},
+		{
+			name:        "memory=Processed, chain=Processed => no reorg",
+			memoryState: txmutils.Processed,
+			chainState:  txmutils.Processed,
+			wantReorg:   false,
+		},
+		{
+			name:        "memory=Processed, chain=NotFound => reorg",
+			memoryState: txmutils.Processed,
+			chainState:  txmutils.NotFound,
+			wantReorg:   true,
+		},
+		{
+			name:        "memory=Broadcasted, chain=Confirmed => no reorg",
+			memoryState: txmutils.Broadcasted,
+			chainState:  txmutils.Confirmed,
+			wantReorg:   false,
+		},
+		{
+			name:        "memory=Broadcasted, chain=Processed => no reorg",
+			memoryState: txmutils.Broadcasted,
+			chainState:  txmutils.Processed,
+			wantReorg:   false,
+		},
+		{
+			name:        "memory=Broadcasted, chain=NotFound => no reorg",
+			memoryState: txmutils.Broadcasted,
+			chainState:  txmutils.NotFound,
+			wantReorg:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// handle special case
+			if tt.name == "non-existent signature => no reorg" {
+				// don't create any signature in memory
+				txID, hasReorg := txs.IsTxReorged(randomSignature(t), tt.chainState)
+				require.False(t, hasReorg, "expected no reorg for unknown sig")
+				require.Empty(t, txID, "expected empty txID for unknown sig")
+				return
+			}
+
+			// create + set memory state, run IsTxReorged and assert for all other test cases
+			creationTxID, sig := setMemoryState(t, txs, tt.memoryState)
+			returnedTxID, hasReorg := txs.IsTxReorged(sig, tt.chainState)
+			require.Equal(t, creationTxID, returnedTxID, "expected same txID")
+			if tt.wantReorg {
+				require.True(t, hasReorg, "expected reorg for memory=%v, chain=%v", tt.memoryState, tt.chainState)
+			} else {
+				require.False(t, hasReorg, "expected no reorg for memory=%v, chain=%v", tt.memoryState, tt.chainState)
+			}
+		})
+	}
+}
+
+func TestPendingTxContext_GetPendingTx(t *testing.T) {
+	t.Parallel()
+	txs := newPendingTxContext()
+
+	t.Run("successfully retrieve broadcasted transaction", func(t *testing.T) {
+		txID, _ := createTxAndAddSig(t, txs)
+
+		tx, err := txs.GetPendingTx(txID)
+		require.NoError(t, err)
+		require.Equal(t, txID, tx.id)
+		require.Equal(t, utils.Broadcasted, tx.state)
+	})
+
+	t.Run("successfully retrieve processed transaction", func(t *testing.T) {
+		txID, sig := createTxAndAddSig(t, txs)
+		_, err := txs.OnProcessed(sig)
+		require.NoError(t, err)
+
+		tx, err := txs.GetPendingTx(txID)
+		require.NoError(t, err)
+		require.Equal(t, txID, tx.id)
+		require.Equal(t, utils.Processed, tx.state)
+	})
+
+	t.Run("successfully retrieve confirmed transaction", func(t *testing.T) {
+		txID, sig := createTxAndAddSig(t, txs)
+		_, err := txs.OnProcessed(sig)
+		require.NoError(t, err)
+		_, err = txs.OnConfirmed(sig)
+		require.NoError(t, err)
+
+		tx, err := txs.GetPendingTx(txID)
+		require.NoError(t, err)
+		require.Equal(t, txID, tx.id)
+		require.Equal(t, utils.Confirmed, tx.state)
+	})
+
+	t.Run("fail to retrieve non-existent transaction", func(t *testing.T) {
+		_, err := txs.GetPendingTx("non-existent-id")
+		require.ErrorIs(t, err, ErrTransactionNotFound)
+	})
 }

@@ -20,7 +20,7 @@ import (
 )
 
 func TestSolanaOCRV2Smoke(t *testing.T) {
-	for _, test := range []struct {
+	tests := []struct {
 		name string
 		env  map[string]string
 	}{
@@ -29,13 +29,16 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 			"CL_MEDIAN_CMD": "chainlink-feeds",
 			"CL_SOLANA_CMD": "chainlink-solana",
 		}},
-	} {
+	}
+
+	for idx := range tests {
+		test := tests[idx]
+
 		config, err := tc.GetConfig("Smoke", tc.OCR2)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			_, sg := startOCR2DataFeedsSmokeTest(t, test.name, test.env, config, "")
