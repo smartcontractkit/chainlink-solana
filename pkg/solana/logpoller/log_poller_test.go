@@ -105,7 +105,6 @@ func TestProcess(t *testing.T) {
 
 	ev := ProgramEvent{
 		Program: addr.ToSolana().String(),
-		Prefix:  ">",
 		BlockData: BlockData{
 			SlotNumber:          3,
 			BlockHeight:         5,

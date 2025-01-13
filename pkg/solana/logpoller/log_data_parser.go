@@ -34,8 +34,7 @@ type ProgramLog struct {
 type ProgramEvent struct {
 	Program string
 	BlockData
-	Prefix string
-	Data   string
+	Data string
 }
 
 type ProgramOutput struct {
@@ -81,7 +80,6 @@ func parseProgramLogs(logs []string) []ProgramOutput {
 			if len(dataMatches) > 1 {
 				instLogs[lastLogIdx].Events = append(instLogs[lastLogIdx].Events, ProgramEvent{
 					Program: instLogs[lastLogIdx].Program,
-					Prefix:  prefixBuilder(depth),
 					Data:    dataMatches[1],
 				})
 			}
