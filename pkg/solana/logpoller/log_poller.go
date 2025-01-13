@@ -2,8 +2,12 @@ package logpoller
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
 	"time"
+
+	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -19,36 +23,55 @@ type ORM interface {
 	DeleteFilters(ctx context.Context, filters map[int64]Filter) error
 	MarkFilterDeleted(ctx context.Context, id int64) (err error)
 	MarkFilterBackfilled(ctx context.Context, id int64) (err error)
+	GetLatestBlock(ctx context.Context) (int64, error)
+}
+
+type logsLoader interface {
+	BackfillForAddresses(ctx context.Context, addresses []PublicKey, fromSlot, toSlot uint64) (orderedBlocks <-chan Block, cleanUp func(), err error)
 }
 
 type LogPoller struct {
 	services.Service
 	eng *services.Engine
 
-	lggr logger.SugaredLogger
-	orm  ORM
+	lggr              logger.SugaredLogger
+	orm               ORM
+	lastProcessedSlot int64
+	client            RPCClient
+	loader            logsLoader
 
 	filters *filters
 }
 
-func New(lggr logger.SugaredLogger, orm ORM) *LogPoller {
+func New(lggr logger.SugaredLogger, orm ORM, client RPCClient) *LogPoller {
 	lggr = logger.Sugared(logger.Named(lggr, "LogPoller"))
 	lp := &LogPoller{
 		orm:     orm,
 		lggr:    lggr,
 		filters: newFilters(lggr, orm),
+		client:  client,
 	}
 
 	lp.Service, lp.eng = services.Config{
 		Name:  "LogPollerService",
 		Start: lp.start,
+		NewSubServices: func(l logger.Logger) []services.Service {
+			loader := NewEncodedLogCollector(client, lggr)
+			lp.loader = loader
+			return []services.Service{loader}
+		},
 	}.NewServiceEngine(lggr)
 	lp.lggr = lp.eng.SugaredLogger
 	return lp
 }
 
 func (lp *LogPoller) start(context.Context) error {
-	lp.eng.Go(lp.run)
+	lp.eng.GoTick(services.NewTicker(time.Second), func(ctx context.Context) {
+		err := lp.run(ctx)
+		if err != nil {
+			lp.lggr.Errorw("log poller tick failed", "err", err)
+		}
+	})
 	lp.eng.Go(lp.backgroundWorkerRun)
 	return nil
 }
@@ -87,36 +110,144 @@ func (lp *LogPoller) loadFilters(ctx context.Context) error {
 	}
 }
 
-func (lp *LogPoller) run(ctx context.Context) {
-	err := lp.loadFilters(ctx)
+func (lp *LogPoller) getLastProcessedSlot(ctx context.Context) (int64, error) {
+	if lp.lastProcessedSlot != 0 {
+		return lp.lastProcessedSlot, nil
+	}
+
+	latestDBBlock, err := lp.orm.GetLatestBlock(ctx)
+	if err == nil {
+		return latestDBBlock, nil
+	}
+
+	if !errors.Is(err, sql.ErrNoRows) {
+		return 0, fmt.Errorf("error getting latest block from db: %w", err)
+	}
+
+	latestBlock, err := lp.client.GetSlot(ctx, rpc.CommitmentFinalized)
 	if err != nil {
-		lp.lggr.Warnw("Failed loading filters", "err", err)
-		return
+		return 0, fmt.Errorf("error getting latest slot from RPC: %w", err)
 	}
 
-	var blocks chan struct {
-		BlockNumber int64
-		Logs        any // to be defined
+	if latestBlock == 0 {
+		return 0, fmt.Errorf("latest finalized slot is 0 - waiting for next slot to start processing")
+	}
+	return int64(latestBlock) - 1, err
+}
+
+func (lp *LogPoller) backfillFilters(ctx context.Context, filters []Filter, to int64) error {
+	addressesSet := make(map[PublicKey]struct{})
+	addresses := make([]PublicKey, 0, len(filters))
+	minSlot := to
+	for _, filter := range filters {
+		if _, ok := addressesSet[filter.Address]; !ok {
+			addressesSet[filter.Address] = struct{}{}
+			addresses = append(addresses, filter.Address)
+		}
+		if filter.StartingBlock < minSlot {
+			minSlot = filter.StartingBlock
+		}
 	}
 
+	err := lp.processBlocksRange(ctx, addresses, minSlot, to)
+	if err != nil {
+		return err
+	}
+
+	for _, filter := range filters {
+		err = errors.Join(err, lp.filters.MarkFilterBackfilled(ctx, filter.ID))
+	}
+
+	return err
+}
+
+func (lp *LogPoller) processBlocksRange(ctx context.Context, addresses []PublicKey, from, to int64) error {
+	blocks, cleanup, err := lp.loader.BackfillForAddresses(ctx, addresses, uint64(from), uint64(to))
+	if err != nil {
+		return fmt.Errorf("error backfilling filters: %w", err)
+	}
+
+	defer cleanup()
+consumedAllBlocks:
 	for {
 		select {
 		case <-ctx.Done():
-			return
-		case block := <-blocks:
-			filtersToBackfill := lp.filters.GetFiltersToBackfill()
+			return ctx.Err()
+		case block, ok := <-blocks:
+			if !ok {
+				break consumedAllBlocks
+			}
 
-			// TODO: NONEVM-916 parse, filters and persist logs
-			// NOTE: removal of filters occurs in the separate goroutine, so there is a chance that upon insert
-			// of log corresponding filter won't be present in the db. Ensure to refilter and retry on insert error
-			for i := range filtersToBackfill {
-				filter := filtersToBackfill[i]
-				lp.eng.Go(func(ctx context.Context) {
-					lp.startFilterBackfill(ctx, filter, block.BlockNumber)
-				})
+			batch := []Block{block}
+			batch = appendBuffered(blocks, batch)
+			err = lp.processBlocks(ctx, batch)
+			if err != nil {
+				return fmt.Errorf("error processing blocks: %w", err)
 			}
 		}
 	}
+
+	return nil
+}
+
+func appendBuffered(ch <-chan Block, blocks []Block) []Block {
+	for {
+		select {
+		case block, ok := <-ch:
+			if !ok {
+				return blocks
+			}
+
+			blocks = append(blocks, block)
+		default:
+			return blocks
+		}
+	}
+}
+
+func (lp *LogPoller) processBlocks(ctx context.Context, blocks []Block) error {
+	// TODO: add logic implemented by NONEVM-916
+	return nil
+}
+
+func (lp *LogPoller) run(ctx context.Context) error {
+	err := lp.loadFilters(ctx)
+	if err != nil {
+		return fmt.Errorf("failed loading filters: %w", err)
+	}
+
+	lastProcessedSlot, err := lp.getLastProcessedSlot(ctx)
+	if err != nil {
+		return fmt.Errorf("failed getting last processed slot: %w", err)
+	}
+
+	filtersToBackfill := lp.filters.GetFiltersToBackfill()
+	if len(filtersToBackfill) != 0 {
+		lp.lggr.Debugw("Got new filters to backfill", "filters", filtersToBackfill)
+		return lp.backfillFilters(ctx, filtersToBackfill, lastProcessedSlot)
+	}
+
+	addresses, err := lp.filters.GetDistinctAddresses(ctx)
+	if err != nil {
+		return fmt.Errorf("failed getting addresses: %w", err)
+	}
+
+	highestSlot, err := lp.client.GetSlot(ctx, rpc.CommitmentFinalized)
+	if err != nil {
+		return fmt.Errorf("failed getting highest slot: %w", err)
+	}
+
+	if lastProcessedSlot >= int64(highestSlot) {
+		return fmt.Errorf("last processed slot %d is higher than highest RPC slot %d", lastProcessedSlot, highestSlot)
+	}
+
+	err = lp.processBlocksRange(ctx, addresses, lastProcessedSlot, int64(highestSlot))
+	if err != nil {
+		return fmt.Errorf("failed processing block range [%d, %d]: %w", lastProcessedSlot+1, highestSlot, err)
+	}
+
+	lp.lastProcessedSlot = int64(highestSlot)
+	return nil
 }
 
 func (lp *LogPoller) backgroundWorkerRun(ctx context.Context) {
@@ -132,14 +263,5 @@ func (lp *LogPoller) backgroundWorkerRun(ctx context.Context) {
 				lp.lggr.Errorw("Failed to prune filters", "err", err)
 			}
 		}
-	}
-}
-
-func (lp *LogPoller) startFilterBackfill(ctx context.Context, filter Filter, toBlock int64) {
-	// TODO: NONEVM-916 start backfill
-	lp.lggr.Debugw("Starting filter backfill", "filter", filter)
-	err := lp.filters.MarkFilterBackfilled(ctx, filter.ID)
-	if err != nil {
-		lp.lggr.Errorw("Failed to mark filter backfill", "filter", filter, "err", err)
 	}
 }

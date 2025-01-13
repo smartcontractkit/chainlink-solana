@@ -182,6 +182,29 @@ func (fl *filters) removeFilterFromIndexes(filter Filter) {
 	}
 }
 
+func (fl *filters) GetDistinctAddresses(ctx context.Context) ([]PublicKey, error) {
+	err := fl.LoadFilters(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load filters: %w", err)
+	}
+
+	fl.filtersMutex.RLock()
+	defer fl.filtersMutex.RUnlock()
+
+	var result []PublicKey
+	set := map[PublicKey]struct{}{}
+	for _, filter := range fl.filtersByID {
+		if _, ok := set[filter.Address]; ok {
+			continue
+		}
+
+		set[filter.Address] = struct{}{}
+		result = append(result, filter.Address)
+	}
+
+	return result, nil
+}
+
 // MatchingFilters - returns iterator to go through all matching filters.
 // Requires LoadFilters to be called at least once.
 func (fl *filters) MatchingFilters(addr PublicKey, eventSignature EventSignature) iter.Seq[Filter] {

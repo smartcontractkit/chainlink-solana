@@ -32,7 +32,7 @@ func newBlocksSorter(inBlocks <-chan Block, lggr logger.Logger, expectedBlocks [
 		queue:            list.New(),
 		readyBlocks:      make(map[uint64]Block),
 		inBlocks:         inBlocks,
-		outBlocks:        make(chan Block),
+		outBlocks:        make(chan Block, 16),
 		receivedNewBlock: make(chan struct{}, 1),
 		lggr:             lggr,
 	}

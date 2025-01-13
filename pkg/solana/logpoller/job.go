@@ -37,8 +37,3 @@ type eventDetail struct {
 	trxIdx      int
 	trxSig      solana.Signature
 }
-
-type wrappedParser interface {
-	ProgramEventProcessor
-	ExpectBlock(uint64)
-}

@@ -63,7 +63,7 @@ type WorkerGroup struct {
 	// dependencies and configuration
 	maxWorkers    int
 	maxRetryCount uint8
-	lggr          logger.Logger
+	lggr          logger.SugaredLogger
 
 	// worker group state
 	workers       chan *worker
@@ -80,7 +80,7 @@ type WorkerGroup struct {
 	retryMap map[string]retryableJob
 }
 
-func NewWorkerGroup(workers int, lggr logger.Logger) *WorkerGroup {
+func NewWorkerGroup(workers int, lggr logger.SugaredLogger) *WorkerGroup {
 	g := &WorkerGroup{
 		maxWorkers:    workers,
 		maxRetryCount: DefaultMaxRetryCount,
@@ -202,12 +202,10 @@ func (g *WorkerGroup) runRetryQueue(ctx context.Context) {
 				retry.count++
 
 				if retry.count > g.maxRetryCount {
-					g.lggr.Errorf("job %s dropped after max retries", job)
-
-					continue
+					g.lggr.Criticalw("job %s exceeded max retries %d/%d", job, retry.count, g.maxRetryCount)
 				}
 
-				wait := calculateExponentialBackoff(retry.count)
+				wait := calculateExponentialBackoff(min(retry.count, g.maxRetryCount))
 				g.lggr.Errorf("retrying job in %dms", wait/time.Millisecond)
 
 				retry.when = time.Now().Add(wait)

@@ -36,10 +36,14 @@ func (j *getBlockJob) Done() <-chan struct{} {
 
 func (j *getBlockJob) Run(ctx context.Context) error {
 	var excludeRewards bool
+	// TODO: move min version definition to an RPC Client
+	// NOTE: if max supported transaction version is changed after creation of a block that contains transactions of a new version
+	// we at risk of producing duplicate events! To avoid this we'll need to do block based migration.
 	version := uint64(0) // pull all tx types (legacy + v0)
 	block, err := j.client.GetBlockWithOpts(
 		ctx,
 		j.slotNumber,
+		// NOTE: any change to the filtering argmuments may affect calculation of logIndex, which to lead to events duplication.
 		&rpc.GetBlockOpts{
 			Encoding:   solana.EncodingBase64,
 			Commitment: rpc.CommitmentFinalized,

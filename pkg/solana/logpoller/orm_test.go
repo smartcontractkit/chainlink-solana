@@ -3,6 +3,7 @@
 package logpoller
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -204,6 +205,33 @@ func TestLogPollerLogs(t *testing.T) {
 	log.ID = dbLogs[0].ID
 	log.CreatedAt = dbLogs[0].CreatedAt
 	require.Equal(t, log, dbLogs[0])
+}
+
+func TestLogPoller_GetLatestBlock(t *testing.T) {
+	lggr := logger.Test(t)
+	dbx := pg.NewTestDB(t, pg.TestURL(t))
+
+	createLogsForBlocks := func(ctx context.Context, orm *DSORM, blocks ...int64) {
+		filterID, err := orm.InsertFilter(ctx, newRandomFilter(t))
+		require.NoError(t, err)
+		for _, block := range blocks {
+			log := newRandomLog(t, filterID, orm.chainID)
+			log.BlockNumber = block
+			err = orm.InsertLogs(ctx, []Log{log})
+			require.NoError(t, err)
+		}
+	}
+	ctx := tests.Context(t)
+	orm1 := NewORM(uuid.NewString(), dbx, lggr)
+	createLogsForBlocks(tests.Context(t), orm1, 10, 11, 12)
+	orm2 := NewORM(uuid.NewString(), dbx, lggr)
+	createLogsForBlocks(context.Background(), orm2, 100, 110, 120)
+	latestBlockChain1, err := orm1.GetLatestBlock(ctx)
+	require.NoError(t, err)
+	require.Equal(t, int64(12), latestBlockChain1)
+	latestBlockChain2, err := orm2.GetLatestBlock(ctx)
+	require.NoError(t, err)
+	require.Equal(t, int64(120), latestBlockChain2)
 }
 
 func newRandomFilter(t *testing.T) Filter {

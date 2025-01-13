@@ -85,9 +85,11 @@ func (f *getSlotsForAddressJob) run(ctx context.Context) (bool, error) {
 			continue
 		}
 
-		// TODO: ignore slots that are higher than to
-
 		lowestSlot = sig.Slot
+		// RPC may return slots that are higher than requested. Skip them to simplify mental model.
+		if sig.Slot > f.to {
+			continue
+		}
 		f.storeSlot(sig.Slot)
 		if sig.Slot <= f.from {
 			return true, nil
