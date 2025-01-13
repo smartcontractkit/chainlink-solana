@@ -25,6 +25,7 @@ type blocksSorter struct {
 	readyBlocks map[uint64]Block
 }
 
+// newBlocksSorter - returns new instance of blocksSorter that writes blocks into output channel in order defined by expectedBlocks.
 func newBlocksSorter(inBlocks <-chan Block, lggr logger.Logger, expectedBlocks []uint64) (*blocksSorter, <-chan Block) {
 	op := &blocksSorter{
 		queue:            list.New(),
@@ -83,8 +84,14 @@ func (p *blocksSorter) writeOrderedBlocks(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case _, ok := <-p.receivedNewBlock:
-			p.writeReadyBlocks(ctx, ok)
+			p.flushReadyBlocks(ctx)
 			if !ok {
+				p.mu.Lock()
+				// signal to consumer that work is done, when it's actually done
+				if p.queue.Len() == 0 {
+					close(p.outBlocks)
+				}
+				p.mu.Unlock()
 				return
 			}
 		}
@@ -109,30 +116,18 @@ func (p *blocksSorter) readNextReadyBlock() *Block {
 	return &block
 }
 
-// writeReadyBlocks - sends all blocks in order defined by queue to the consumer.
-func (p *blocksSorter) writeReadyBlocks(ctx context.Context, mayHaveMoreWork bool) {
-	// start at the lowest block and find ready blocks
+// flushReadyBlocks - sends all blocks in order defined by queue to the consumer.
+func (p *blocksSorter) flushReadyBlocks(ctx context.Context) {
 	for {
 		block := p.readNextReadyBlock()
 		if block == nil {
-			break
+			return
 		}
 
 		select {
 		case p.outBlocks <- *block:
 		case <-ctx.Done():
-			break
+			return
 		}
-	}
-
-	if mayHaveMoreWork {
-		return
-	}
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.queue.Len() == 0 {
-		// signal to consumer that work is done
-		close(p.outBlocks)
 	}
 }
