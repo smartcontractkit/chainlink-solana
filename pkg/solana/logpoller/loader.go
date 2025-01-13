@@ -59,7 +59,7 @@ func NewEncodedLogCollector(
 	c.Service, c.engine = services.Config{
 		Name: "EncodedLogCollector",
 		NewSubServices: func(lggr logger.Logger) []services.Service {
-			c.workers = NewWorkerGroup(DefaultWorkerCount, lggr)
+			c.workers = NewWorkerGroup(DefaultWorkerCount, logger.Sugared(lggr))
 
 			return []services.Service{c.workers}
 		},

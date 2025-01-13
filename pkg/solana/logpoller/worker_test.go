@@ -20,7 +20,7 @@ import (
 
 func TestWorkerGroup(t *testing.T) {
 	ctx := tests.Context(t)
-	group := logpoller.NewWorkerGroup(5, logger.Nop())
+	group := logpoller.NewWorkerGroup(5, logger.Sugared(logger.Nop()))
 
 	require.NoError(t, group.Start(ctx))
 	t.Cleanup(func() {
@@ -55,7 +55,7 @@ func TestWorkerGroup(t *testing.T) {
 
 func TestWorkerGroup_Retry(t *testing.T) {
 	ctx := tests.Context(t)
-	group := logpoller.NewWorkerGroup(5, logger.Nop())
+	group := logpoller.NewWorkerGroup(5, logger.Sugared(logger.Nop()))
 
 	require.NoError(t, group.Start(ctx))
 	t.Cleanup(func() {
@@ -109,7 +109,7 @@ func TestWorkerGroup_Retry(t *testing.T) {
 
 func TestWorkerGroup_Close(t *testing.T) {
 	ctx := tests.Context(t)
-	group := logpoller.NewWorkerGroup(5, logger.Nop())
+	group := logpoller.NewWorkerGroup(5, logger.Sugared(logger.Nop()))
 
 	require.NoError(t, group.Start(ctx))
 
@@ -176,7 +176,7 @@ func TestWorkerGroup_Close(t *testing.T) {
 func TestWorkerGroup_DoContext(t *testing.T) {
 	t.Run("will not add to queue", func(t *testing.T) {
 		ctx := tests.Context(t)
-		group := logpoller.NewWorkerGroup(2, logger.Nop())
+		group := logpoller.NewWorkerGroup(2, logger.Sugared(logger.Nop()))
 		job := testJob{job: func(ctx context.Context) error { return nil }}
 
 		require.NoError(t, group.Start(ctx))
@@ -201,7 +201,7 @@ func TestWorkerGroup_DoContext(t *testing.T) {
 func BenchmarkWorkerGroup(b *testing.B) {
 	ctx := tests.Context(b)
 
-	group := logpoller.NewWorkerGroup(100, logger.Nop())
+	group := logpoller.NewWorkerGroup(100, logger.Sugared(logger.Nop()))
 	job := testJob{job: func(ctx context.Context) error { return nil }}
 
 	require.NoError(b, group.Start(ctx))

@@ -202,7 +202,7 @@ func (g *WorkerGroup) runRetryQueue(ctx context.Context) {
 				retry.count++
 
 				if retry.count > g.maxRetryCount {
-					g.lggr.Criticalw("job %s exceeded max retries %d/%d", job, retry.count, g.maxRetryCount)
+					g.lggr.Criticalf("job %s exceeded max retries %d/%d", job, retry.count, g.maxRetryCount)
 				}
 
 				wait := calculateExponentialBackoff(min(retry.count, g.maxRetryCount))
