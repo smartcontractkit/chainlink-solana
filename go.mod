@@ -17,7 +17,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/pelletier/go-toml/v2 v2.2.0
 	github.com/prometheus/client_golang v1.17.0
-	github.com/smartcontractkit/chainlink-common v0.4.1-0.20241223143929-db7919d60550
+	github.com/smartcontractkit/chainlink-common v0.4.2-0.20250116214855-f49c5c27db51
 	github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
