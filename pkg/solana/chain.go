@@ -239,7 +239,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 
 	var tc internal.Loader[client.ReaderWriter] = utils.NewLazyLoad(func() (client.ReaderWriter, error) { return ch.getClient() })
 	var bc internal.Loader[monitor.BalanceClient] = utils.NewLazyLoad(func() (monitor.BalanceClient, error) { return ch.getClient() })
-	ch.multiClient = client.NewMultiNodeWrappedClient(ch.getClient)
+	ch.multiClient = client.NewMultiClient(ch.getClient)
 
 	// txm will default to sending transactions using a single RPC client if sendTx is nil
 	var sendTx func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error)
@@ -293,7 +293,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 
 		ch.multiNode = multiNode
 		ch.txSender = txSender
-		ch.multiClient = client.NewMultiNodeWrappedClient(func() (client.ReaderWriter, error) {
+		ch.multiClient = client.NewMultiClient(func() (client.ReaderWriter, error) {
 			return ch.multiNode.SelectRPC()
 		})
 

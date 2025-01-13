@@ -17,7 +17,7 @@ type MultiClient struct {
 	getClient func() (ReaderWriter, error)
 }
 
-func NewMultiNodeWrappedClient(getClient func() (ReaderWriter, error)) *MultiClient {
+func NewMultiClient(getClient func() (ReaderWriter, error)) *MultiClient {
 	return &MultiClient{
 		getClient: getClient,
 	}
