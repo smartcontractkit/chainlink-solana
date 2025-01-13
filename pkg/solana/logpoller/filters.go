@@ -110,6 +110,13 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 		fl.removeFilterFromIndexes(*existingFilter)
 	}
 
+	filterID, err := fl.orm.InsertFilter(ctx, filter)
+	if err != nil {
+		return fmt.Errorf("failed to insert filter: %w", err)
+	}
+
+	filter.ID = filterID
+
 	idl := codec.IDL{
 		Events: []codec.IdlEvent{filter.EventIdl.IdlEvent},
 		Types:  filter.EventIdl.IdlTypeDefSlice,
@@ -118,13 +125,6 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 	if err != nil {
 		return fmt.Errorf("failed to create event decoder: %w", err)
 	}
-
-	filterID, err := fl.orm.InsertFilter(ctx, filter)
-	if err != nil {
-		return fmt.Errorf("failed to insert filter: %w", err)
-	}
-
-	filter.ID = filterID
 
 	fl.filtersByName[filter.Name] = filter.ID
 	fl.filtersByID[filter.ID] = &filter
@@ -279,6 +279,10 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[F
 		return nil
 	}
 
+	if len(event.Data) < 12 {
+		return nil
+	}
+
 	// The first 64-bits of the event data is the event sig. Because it's base64 encoded, this corresponds to
 	// the first 10 characters plus 4 bits of the 11th character. We can quickly rule it out as not matching any known
 	// discriminators if the first 10 characters don't match. If it passes that initial test, we base64-decode the
@@ -293,8 +297,11 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[F
 		fl.lggr.Errorw("failed to parse Program ID for event", "EventProgram", event)
 		return nil
 	}
-	decoded, err := base64.StdEncoding.DecodeString(event.Data[:11])
-	if err != nil {
+
+	// Decoding first 12 characters will give us the first 9 bytes of binary data
+	// The first 8 of those is the discriminator
+	decoded, err := base64.StdEncoding.DecodeString(event.Data[:12])
+	if err != nil || len(decoded) < 8 {
 		fl.lggr.Errorw("failed to decode event data", "EventProgram", event)
 		return nil
 	}
@@ -416,12 +423,18 @@ func (fl *filters) LoadFilters(ctx context.Context) error {
 }
 
 func (fl *filters) DecodeSubKey(ctx context.Context, raw []byte, ID int64, subKeyPath []string) (any, error) {
-	eventName := fl.filtersByID[ID].EventName
-	decoder := fl.decoders[ID]
-	itemType := strings.Join(slices.Concat([]string{eventName}, subKeyPath), ".")
+	filter, ok := fl.filtersByID[ID]
+	if !ok {
+		return nil, fmt.Errorf("filter %d not found", ID)
+	}
+	decoder, ok := fl.decoders[ID]
+	if !ok {
+		return nil, fmt.Errorf("decoder %d not found", ID)
+	}
+	itemType := strings.Join(slices.Concat([]string{filter.EventName}, subKeyPath), ".")
 
 	val, err := decoder.CreateType(itemType, false)
-	if err != nil {
+	if err != nil || val == nil {
 		return nil, err
 	}
 	err = decoder.Decode(ctx, raw, val, itemType)

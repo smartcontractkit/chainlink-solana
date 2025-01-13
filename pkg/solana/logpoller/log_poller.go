@@ -8,7 +8,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/lib/pq"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
@@ -18,7 +17,8 @@ import (
 )
 
 var (
-	ErrFilterNameConflict = errors.New("filter with such name already exists")
+	ErrFilterNameConflict   = errors.New("filter with such name already exists")
+	ErrMissingDiscriminator = errors.New("Solana log is missing discriminator")
 )
 
 type ORM interface {
@@ -115,12 +115,18 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 			TxHash:         Signature(blockData.TransactionHash),
 		}
 
-		log.Data, err = base64.StdEncoding.DecodeString(programEvent.Data)
+		eventData, err := base64.StdEncoding.DecodeString(programEvent.Data)
 		if err != nil {
 			return err
 		}
+		if len(eventData) < 8 {
+			err = fmt.Errorf("Assumption violation: %w, log.Data=%s", ErrMissingDiscriminator, log.Data)
+			lp.lggr.Criticalw(err.Error())
+			return err
+		}
+		log.Data = eventData[8:]
 
-		log.SubkeyValues = make(pq.ByteaArray, 0, len(filter.SubkeyPaths))
+		log.SubkeyValues = make([]IndexedValue, 0, len(filter.SubkeyPaths))
 		for _, path := range filter.SubkeyPaths {
 			subKeyVal, err2 := lp.filters.DecodeSubKey(ctx, log.Data, filter.ID, path)
 			if err2 != nil {
@@ -130,10 +136,7 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 			if err3 != nil {
 				return err3
 			}
-			err = log.SubkeyValues.Scan(indexedVal)
-			if err != nil {
-				return err
-			}
+			log.SubkeyValues = append(log.SubkeyValues, indexedVal)
 		}
 
 		log.SequenceNum = lp.filters.IncrementSeqNums(filter.ID)

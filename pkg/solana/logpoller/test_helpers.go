@@ -39,7 +39,7 @@ func newRandomLog(t *testing.T, filterID int64, chainID string, eventName string
 		BlockTimestamp: time.Unix(1731590113, 0),
 		Address:        PublicKey(pubKey),
 		EventSig:       utils.Discriminator("event", eventName),
-		SubkeyValues:   [][]byte{{3, 2, 1}, {1}, {1, 2}, pubKey.Bytes()},
+		SubkeyValues:   []IndexedValue{{3, 2, 1}, {1}, {1, 2}, pubKey.Bytes()},
 		TxHash:         Signature(signature),
 		Data:           data,
 		SequenceNum:    rand.Int63n(500),

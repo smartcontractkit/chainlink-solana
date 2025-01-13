@@ -157,34 +157,38 @@ func scanJSON(name string, dest, src interface{}) error {
 // way.
 type IndexedValue []byte
 
-func (v *IndexedValue) FromInt64(i int64) {
-	v.FromUint64(uint64(i + math.MaxInt64))
-}
-
 func (v *IndexedValue) FromUint64(u uint64) {
 	*v = make([]byte, 8)
 	binary.BigEndian.PutUint64(*v, u)
 }
 
+func (v *IndexedValue) FromInt64(i int64) {
+	v.FromUint64(uint64(i) + math.MaxInt64 + 1)
+}
+
 func (v *IndexedValue) FromFloat64(f float64) {
 	if f > 0 {
-		v.FromUint64(math.Float64bits(f) + math.MaxInt64)
+		v.FromUint64(math.Float64bits(f) + math.MaxInt64 + 1)
 		return
 	}
-	v.FromUint64(math.MaxInt64 - math.Float64bits(f))
+	v.FromUint64(math.MaxInt64 + 1 - math.Float64bits(f))
 }
 
 func NewIndexedValue(typedVal any) (iVal IndexedValue, err error) {
+	if typedVal == nil {
+		return nil, fmt.Errorf("nil pointer passed to NewIndexedValue")
+	}
+
 	// handle 2 simplest cases first
 	switch t := typedVal.(type) {
 	case []byte:
 		return t, nil
-	case string:
-		return []byte(t), nil
+	case *string:
+		return []byte(*t), nil
 	}
 
 	// handle numeric types
-	v := reflect.ValueOf(typedVal)
+	v := reflect.ValueOf(typedVal).Elem()
 	if v.CanUint() {
 		iVal.FromUint64(v.Uint())
 		return iVal, nil
@@ -199,7 +203,7 @@ func NewIndexedValue(typedVal any) (iVal IndexedValue, err error) {
 	}
 
 	// any length array is fine as long as the element type is byte
-	if t := reflect.TypeOf(typedVal); t.Kind() == reflect.Array {
+	if t := v.Type(); t.Kind() == reflect.Array {
 		if t.Elem().Kind() == reflect.Uint8 {
 			return v.Bytes(), nil
 		}

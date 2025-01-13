@@ -76,8 +76,9 @@ func TestProcess(t *testing.T) {
 		EventIdl:    idl,
 		SubkeyPaths: [][]string{{"A"}, {"B"}},
 	}
-	orm.EXPECT().SelectFilters(mock.Anything).Return([]Filter{filter}, nil)
-	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{}, nil)
+	orm.EXPECT().SelectFilters(mock.Anything).Return([]Filter{filter}, nil).Once()
+	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{}, nil).Once()
+	orm.EXPECT().ChainID().Return(chainID).Once()
 	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, f Filter) (int64, error) {
 		require.Equal(t, f, filter)
 		return filterID, nil
@@ -100,8 +101,6 @@ func TestProcess(t *testing.T) {
 	data, err := bin.MarshalBorsh(&event)
 	require.NoError(t, err)
 	data = append(eventSig[:], data...)
-
-	require.NoError(t, err)
 
 	ev := ProgramEvent{
 		Program: addr.ToSolana().String(),

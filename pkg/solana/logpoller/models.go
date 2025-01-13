@@ -4,8 +4,6 @@ import (
 	"encoding/base64"
 	"time"
 
-	"github.com/lib/pq"
-
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/utils"
 )
 
@@ -29,6 +27,9 @@ func (f Filter) MatchSameLogs(other Filter) bool {
 		f.EventIdl.Equal(other.EventIdl) && f.SubkeyPaths.Equal(other.SubkeyPaths)
 }
 
+// Discriminator returns a 12 character base64-encoded string
+//
+// This is the base64 encoding of the [8]byte discriminator returned by utils.Discriminator
 func (f Filter) Discriminator() string {
 	d := utils.Discriminator("event", f.EventName)
 	return base64.StdEncoding.EncodeToString(d[:])
@@ -44,7 +45,7 @@ type Log struct {
 	BlockTimestamp time.Time
 	Address        PublicKey
 	EventSig       EventSignature
-	SubkeyValues   pq.ByteaArray
+	SubkeyValues   []IndexedValue
 	TxHash         Signature
 	Data           []byte
 	CreatedAt      time.Time
