@@ -37,6 +37,10 @@ type RPCClient interface {
 	GetSignaturesForAddressWithOpts(context.Context, solana.PublicKey, *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error)
 	GetSlot(ctx context.Context, commitment rpc.CommitmentType) (uint64, error)
 }
+
+type WorkerGroup interface {
+	Do(ctx context.Context, job worker.Job) error
+}
 type EncodedLogCollector struct {
 	// service state management
 	services.Service

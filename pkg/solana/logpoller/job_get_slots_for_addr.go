@@ -21,10 +21,10 @@ type getSlotsForAddressJob struct {
 
 	storeSlot func(slot uint64)
 	done      chan struct{}
-	workers   *worker.Group
+	workers   WorkerGroup
 }
 
-func newGetSlotsForAddress(client RPCClient, workers *worker.Group, storeSlot func(uint64), address PublicKey, from, to uint64) *getSlotsForAddressJob {
+func newGetSlotsForAddress(client RPCClient, workers WorkerGroup, storeSlot func(uint64), address PublicKey, from, to uint64) *getSlotsForAddressJob {
 	return &getSlotsForAddressJob{
 		address:   address,
 		client:    client,
@@ -80,30 +80,29 @@ func (f *getSlotsForAddressJob) run(ctx context.Context) (bool, error) {
 	}
 
 	// signatures ordered from newest to oldest, defined in the Solana RPC docs
-	lowestSlot := sigs[0].Slot
 	for _, sig := range sigs {
-		f.beforeSig = sig.Signature
-		if sig.Slot >= lowestSlot {
-			continue
-		}
-
-		lowestSlot = sig.Slot
 		// RPC may return slots that are higher than requested. Skip them to simplify mental model.
 		if sig.Slot > f.to {
 			continue
 		}
-		f.storeSlot(sig.Slot)
-		if sig.Slot <= f.from {
+
+		if sig.Slot < f.from {
 			return true, nil
+		}
+
+		// no need to fetch slot, if transaction failed
+		if sig.Err == nil {
+			f.storeSlot(sig.Slot)
 		}
 	}
 
+	oldestSig := sigs[len(sigs)-1]
 	// to ensure we do not overload RPC perform next call as a separate job
 	err = f.workers.Do(ctx, &getSlotsForAddressJob{
 		address:   f.address,
-		beforeSig: f.beforeSig,
+		beforeSig: oldestSig.Signature,
 		from:      f.from,
-		to:        lowestSlot,
+		to:        oldestSig.Slot,
 		client:    f.client,
 		storeSlot: f.storeSlot,
 		done:      f.done,
