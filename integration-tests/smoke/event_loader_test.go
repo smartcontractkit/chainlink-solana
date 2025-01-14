@@ -282,7 +282,7 @@ func (s *logSender) queueTX(sig solana.Signature, commitment rpc.CommitmentType)
 
 		defer sub.Unsubscribe()
 
-		res, err := sub.Recv()
+		res, err := sub.Recv(context.Background())
 		if err != nil {
 			return err
 		}
