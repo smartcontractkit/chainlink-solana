@@ -6,23 +6,27 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 )
 
 // getBlockJob is a job that fetches transaction signatures from a block and loads
 // the job queue with getTransactionLogsJobs for each transaction found in the block.
 type getBlockJob struct {
-	slotNumber uint64
-	client     RPCClient
-	blocks     chan Block
-	done       chan struct{}
+	slotNumber       uint64
+	client           RPCClient
+	blocks           chan Block
+	done             chan struct{}
+	parseProgramLogs func(logs []string) []ProgramOutput
 }
 
 func newGetBlockJob(client RPCClient, blocks chan Block, slotNumber uint64) *getBlockJob {
 	return &getBlockJob{
-		client:     client,
-		blocks:     blocks,
-		slotNumber: slotNumber,
-		done:       make(chan struct{}),
+		client:           client,
+		blocks:           blocks,
+		slotNumber:       slotNumber,
+		done:             make(chan struct{}),
+		parseProgramLogs: parseProgramLogs,
 	}
 }
 
@@ -36,14 +40,11 @@ func (j *getBlockJob) Done() <-chan struct{} {
 
 func (j *getBlockJob) Run(ctx context.Context) error {
 	var excludeRewards bool
-	// TODO: move min version definition to an RPC Client
-	// NOTE: if max supported transaction version is changed after creation of a block that contains transactions of a new version
-	// we at risk of producing duplicate events! To avoid this we'll need to do block based migration.
-	version := uint64(0) // pull all tx types (legacy + v0)
+	version := client.MaxSupportTransactionVersion
 	block, err := j.client.GetBlockWithOpts(
 		ctx,
 		j.slotNumber,
-		// NOTE: any change to the filtering argmuments may affect calculation of logIndex, which to lead to events duplication.
+		// NOTE: any change to the filtering arguments may affect calculation of logIndex, which to lead to events duplication.
 		&rpc.GetBlockOpts{
 			Encoding:   solana.EncodingBase64,
 			Commitment: rpc.CommitmentFinalized,
@@ -72,10 +73,10 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 		detail.trxIdx = idx
 		tx, err := txWithMeta.GetTransaction()
 		if err != nil {
-			return fmt.Errorf("failed to parse transaction %d in slot %d: %w", idx, txWithMeta.Slot, err)
+			return fmt.Errorf("failed to parse transaction %d in slot %d: %w", idx, j.slotNumber, err)
 		}
 		if len(tx.Signatures) == 0 {
-			return fmt.Errorf("expected all transactions to have at least one signature %d in slot %d", idx, txWithMeta.Slot)
+			return fmt.Errorf("expected all transactions to have at least one signature %d in slot %d", idx, j.slotNumber)
 		}
 		detail.trxSig = tx.Signatures[0] // according to Solana docs fist signature is used as ID
 
@@ -99,11 +100,9 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 }
 
 func (j *getBlockJob) messagesToEvents(messages []string, detail eventDetail) []ProgramEvent {
-	// TODO: changes to parsing might cause changes in logIdx generate, we might want to find a more stable way of doing it.
 	var logIdx uint
-	// TODO: only parse logs produced by CL contracts, otherwise if we enable custom user calls, it will be possible to forge a msg.
 	events := make([]ProgramEvent, 0, len(messages))
-	for _, outputs := range parseProgramLogs(messages) {
+	for _, outputs := range j.parseProgramLogs(messages) {
 		for i, event := range outputs.Events {
 			event.SlotNumber = detail.slotNumber
 			event.BlockHeight = detail.blockHeight

@@ -17,6 +17,10 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 )
 
+// MaxSupportTransactionVersion defines max transaction version to return in responses.
+// If the requested block contains a transaction with a higher version, an error will be returned.
+const MaxSupportTransactionVersion = uint64(0) // (legacy + v0)
+
 const (
 	DevnetGenesisHash  = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
 	TestnetGenesisHash = "4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY"
@@ -324,7 +328,7 @@ func (c *Client) GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error
 	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
 	defer cancel()
 	v, err, _ := c.requestGroup.Do("GetBlockWithOpts", func() (interface{}, error) {
-		version := uint64(0) // pull all tx types (legacy + v0)
+		version := MaxSupportTransactionVersion // pull all tx types (legacy + v0)
 		return c.rpc.GetBlockWithOpts(ctx, slot, &rpc.GetBlockOpts{
 			Commitment:                     c.commitment,
 			MaxSupportedTransactionVersion: &version,
@@ -353,7 +357,7 @@ func (c *Client) GetBlock(ctx context.Context, slot uint64) (*rpc.GetBlockResult
 	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
 	defer cancel()
 	v, err, _ := c.requestGroup.Do("GetBlockWithOpts", func() (interface{}, error) {
-		version := uint64(0) // pull all tx types (legacy + v0)
+		version := MaxSupportTransactionVersion
 		return c.rpc.GetBlockWithOpts(ctx, slot, &rpc.GetBlockOpts{
 			Commitment:                     c.commitment,
 			MaxSupportedTransactionVersion: &version,
