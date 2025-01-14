@@ -98,7 +98,7 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 
 	matchingFilters := lp.filters.MatchingFiltersForEncodedEvent(programEvent)
 	if matchingFilters == nil {
-		return
+		return nil
 	}
 
 	var logs []Log
@@ -115,9 +115,9 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 			TxHash:         Signature(blockData.TransactionHash),
 		}
 
-		eventData, err := base64.StdEncoding.DecodeString(programEvent.Data)
-		if err != nil {
-			return err
+		eventData, decodeErr := base64.StdEncoding.DecodeString(programEvent.Data)
+		if decodeErr != nil {
+			return decodeErr
 		}
 		if len(eventData) < 8 {
 			err = fmt.Errorf("Assumption violation: %w, log.Data=%s", ErrMissingDiscriminator, log.Data)
@@ -128,13 +128,13 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 
 		log.SubkeyValues = make([]IndexedValue, 0, len(filter.SubkeyPaths))
 		for _, path := range filter.SubkeyPaths {
-			subKeyVal, err2 := lp.filters.DecodeSubKey(ctx, log.Data, filter.ID, path)
-			if err2 != nil {
-				return err2
+			subKeyVal, decodeSubKeyErr := lp.filters.DecodeSubKey(ctx, log.Data, filter.ID, path)
+			if decodeSubKeyErr != nil {
+				return decodeSubKeyErr
 			}
-			indexedVal, err3 := NewIndexedValue(subKeyVal)
-			if err3 != nil {
-				return err3
+			indexedVal, newIndexedValErr := NewIndexedValue(subKeyVal)
+			if newIndexedValErr != nil {
+				return newIndexedValErr
 			}
 			log.SubkeyValues = append(log.SubkeyValues, indexedVal)
 		}

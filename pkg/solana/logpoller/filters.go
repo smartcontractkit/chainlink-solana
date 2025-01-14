@@ -493,6 +493,7 @@ func ExtractField(data any, path []string) (any, error) {
 			return nil, fmt.Errorf("key '%s' of map %v does not exist", field, data)
 		}
 		return ExtractField(v.Interface(), path)
+	default:
+		return nil, fmt.Errorf("extracting a field from a %s type is not supported", v.Kind().String())
 	}
-	return nil, fmt.Errorf("extracting a field from a %s type is not supported", v.Kind().String())
 }

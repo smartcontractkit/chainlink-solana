@@ -450,5 +450,4 @@ func TestExtractField(t *testing.T) {
 			assert.Equal(t, c.Result, result)
 		})
 	}
-
 }
