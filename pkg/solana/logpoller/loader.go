@@ -44,14 +44,14 @@ type EncodedLogCollector struct {
 
 	// dependencies and configuration
 	client RPCClient
-	lggr   logger.Logger
+	lggr   logger.SugaredLogger
 
 	workers *worker.Group
 }
 
 func NewEncodedLogCollector(
 	client RPCClient,
-	lggr logger.Logger,
+	lggr logger.SugaredLogger,
 ) *EncodedLogCollector {
 	c := &EncodedLogCollector{
 		client: client,
@@ -110,7 +110,7 @@ func (c *EncodedLogCollector) scheduleBlocksFetching(ctx context.Context, slots 
 	blocks := make(chan Block)
 	getBlocksJobs := make([]*getBlockJob, len(slots))
 	for i, slot := range slots {
-		getBlocksJobs[i] = newGetBlockJob(c.client, blocks, slot)
+		getBlocksJobs[i] = newGetBlockJob(c.client, blocks, c.lggr, slot)
 		err := c.workers.Do(ctx, getBlocksJobs[i])
 		if err != nil {
 			return nil, fmt.Errorf("could not schedule job to fetch blocks for slot: %w", err)

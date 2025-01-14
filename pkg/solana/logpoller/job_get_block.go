@@ -7,6 +7,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 )
 
@@ -18,15 +20,17 @@ type getBlockJob struct {
 	blocks           chan Block
 	done             chan struct{}
 	parseProgramLogs func(logs []string) []ProgramOutput
+	lggr             logger.SugaredLogger
 }
 
-func newGetBlockJob(client RPCClient, blocks chan Block, slotNumber uint64) *getBlockJob {
+func newGetBlockJob(client RPCClient, blocks chan Block, lggr logger.SugaredLogger, slotNumber uint64) *getBlockJob {
 	return &getBlockJob{
 		client:           client,
 		blocks:           blocks,
 		slotNumber:       slotNumber,
 		done:             make(chan struct{}),
 		parseProgramLogs: parseProgramLogs,
+		lggr:             lggr,
 	}
 }
 
@@ -77,6 +81,13 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 		}
 		if len(tx.Signatures) == 0 {
 			return fmt.Errorf("expected all transactions to have at least one signature %d in slot %d", idx, j.slotNumber)
+		}
+		if txWithMeta.Meta == nil {
+			return fmt.Errorf("expected transaction to have meta. signature: %s; slot: %d; idx: %d", tx.Signatures[0], j.slotNumber, idx)
+		}
+		if txWithMeta.Meta.Err != nil {
+			j.lggr.Debugw("Skipping all events of failed transaction", "err", txWithMeta.Meta.Err, "signature", tx.Signatures[0])
+			continue
 		}
 		detail.trxSig = tx.Signatures[0] // according to Solana docs fist signature is used as ID
 
