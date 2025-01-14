@@ -11,6 +11,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/worker"
 )
 
 type Block struct {
@@ -44,7 +46,7 @@ type EncodedLogCollector struct {
 	client RPCClient
 	lggr   logger.Logger
 
-	workers *WorkerGroup
+	workers *worker.Group
 }
 
 func NewEncodedLogCollector(
@@ -59,7 +61,7 @@ func NewEncodedLogCollector(
 	c.Service, c.engine = services.Config{
 		Name: "EncodedLogCollector",
 		NewSubServices: func(lggr logger.Logger) []services.Service {
-			c.workers = NewWorkerGroup(DefaultWorkerCount, logger.Sugared(lggr))
+			c.workers = worker.NewGroup(worker.DefaultWorkerCount, logger.Sugared(lggr))
 
 			return []services.Service{c.workers}
 		},

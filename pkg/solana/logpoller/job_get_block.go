@@ -120,3 +120,11 @@ func (j *getBlockJob) messagesToEvents(messages []string, detail eventDetail) []
 
 	return events
 }
+
+type eventDetail struct {
+	slotNumber  uint64
+	blockHeight uint64
+	blockHash   solana.Hash
+	trxIdx      int
+	trxSig      solana.Signature
+}

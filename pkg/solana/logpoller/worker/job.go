@@ -1,10 +1,8 @@
-package logpoller
+package worker
 
 import (
 	"context"
 	"time"
-
-	"github.com/gagliardetto/solana-go"
 )
 
 // Job is a function that should be run by the worker group. The context provided
@@ -28,12 +26,4 @@ func (j retryableJob) String() string {
 
 func (j retryableJob) Run(ctx context.Context) error {
 	return j.job.Run(ctx)
-}
-
-type eventDetail struct {
-	slotNumber  uint64
-	blockHeight uint64
-	blockHash   solana.Hash
-	trxIdx      int
-	trxSig      solana.Signature
 }

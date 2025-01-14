@@ -6,9 +6,11 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/worker"
 )
 
-var _ Job = (*getSlotsForAddressJob)(nil)
+var _ worker.Job = (*getSlotsForAddressJob)(nil)
 
 type getSlotsForAddressJob struct {
 	address   PublicKey
@@ -19,10 +21,10 @@ type getSlotsForAddressJob struct {
 
 	storeSlot func(slot uint64)
 	done      chan struct{}
-	workers   *WorkerGroup
+	workers   *worker.Group
 }
 
-func newGetSlotsForAddress(client RPCClient, workers *WorkerGroup, storeSlot func(uint64), address PublicKey, from, to uint64) *getSlotsForAddressJob {
+func newGetSlotsForAddress(client RPCClient, workers *worker.Group, storeSlot func(uint64), address PublicKey, from, to uint64) *getSlotsForAddressJob {
 	return &getSlotsForAddressJob{
 		address:   address,
 		client:    client,
