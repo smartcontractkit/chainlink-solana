@@ -175,20 +175,16 @@ func (v *IndexedValue) FromFloat64(f float64) {
 }
 
 func NewIndexedValue(typedVal any) (iVal IndexedValue, err error) {
-	if typedVal == nil {
-		return nil, fmt.Errorf("nil pointer passed to NewIndexedValue")
-	}
-
 	// handle 2 simplest cases first
 	switch t := typedVal.(type) {
 	case []byte:
 		return t, nil
-	case *string:
-		return []byte(*t), nil
+	case string:
+		return []byte(t), nil
 	}
 
 	// handle numeric types
-	v := reflect.ValueOf(typedVal).Elem()
+	v := reflect.ValueOf(typedVal)
 	if v.CanUint() {
 		iVal.FromUint64(v.Uint())
 		return iVal, nil

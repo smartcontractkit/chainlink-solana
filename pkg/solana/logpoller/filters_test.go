@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -386,4 +388,67 @@ func TestFilters_GetFiltersToBackfill(t *testing.T) {
 	orm.EXPECT().InsertFilter(mock.Anything, newFilter).Return(newFilter.ID, nil).Once()
 	require.NoError(t, filters.RegisterFilter(tests.Context(t), newFilter))
 	ensureInQueue(notBackfilled, newFilter)
+}
+
+func TestExtractField(t *testing.T) {
+	type innerInner struct {
+		P string
+		Q int
+	}
+	type innerStruct struct {
+		PtrString    *string
+		ByteSlice    []byte
+		DoubleNested innerInner
+		MapStringInt map[string]int
+		MapIntString map[int]string
+	}
+	myString := "string"
+	myInt32 := int32(16)
+
+	testStruct := struct {
+		A int
+		B string
+		C *int32
+		D innerStruct
+	}{
+		5,
+		"hello",
+		&myInt32,
+		innerStruct{
+			&myString,
+			[]byte("bytes"),
+			innerInner{"goodbye", 8},
+			map[string]int{"key1": 1, "key2": 2},
+			map[int]string{1: "val1", 2: "val2"},
+		},
+	}
+
+	cases := []struct {
+		Name   string
+		Path   string
+		Result any
+	}{
+		{"int from struct", "A", int(5)},
+		{"string from struct", "B", "hello"},
+		{"*int32 from struct", "C", myInt32},
+		{"*string from nested struct", "D.PtrString", myString},
+		{"[]byte from nested struct", "D.ByteSlice", []byte("bytes")},
+		{"string from double-nested struct", "D.DoubleNested.P", "goodbye"},
+		{"map[string]int from nested struct", "D.MapStringInt.key2", 2},
+		{"key in map not found", "D.MapIntString.3", nil},
+		{"non-integer key for map[int]string", "D.MapIntString.NotAnInt", nil},
+		{"invalid field name in nested struct", "D.NoSuchField", nil},
+	}
+	for _, c := range cases {
+		t.Run(c.Name, func(t *testing.T) {
+			result, err := ExtractField(&testStruct, strings.Split(c.Path, "."))
+			if c.Result == nil {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, c.Result, result)
+		})
+	}
+
 }
