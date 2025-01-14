@@ -34,7 +34,7 @@ func (b *accountReadBinding) SetAddress(key solana.PublicKey) {
 	b.key = key
 }
 
-func (b *accountReadBinding) GetAddress(params any) (solana.PublicKey, error) {
+func (b *accountReadBinding) GetAddress(_ context.Context, _ any) (solana.PublicKey, error) {
 	return b.key, nil
 }
 

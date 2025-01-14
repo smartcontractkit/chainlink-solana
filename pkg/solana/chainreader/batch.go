@@ -39,7 +39,7 @@ func doMethodBatchCall(ctx context.Context, client MultipleAccountGetter, bindin
 			return nil, err
 		}
 
-		key, err := binding.GetAddress(call.Params)
+		key, err := binding.GetAddress(ctx, call.Params)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get address for binding %v: %w", binding, err)
 		}

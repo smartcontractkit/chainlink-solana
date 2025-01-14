@@ -25,6 +25,7 @@ import (
 	"math"
 	"reflect"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/go-viper/mapstructure/v2"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -386,6 +387,35 @@ func asVec(parentTypeName string, idlVec *IdlTypeVec, refs *codecRefs) (commonen
 	}
 
 	return commonencodings.NewSlice(codec, b)
+}
+
+func asSeeds(seeds []SeedDefinition) (commonencodings.TypeCodec, error) {
+	named := make([]commonencodings.NamedTypeCodec, len(seeds))
+
+	for idx, field := range seeds {
+		var typedCodec commonencodings.TypeCodec
+		switch field.Type {
+		case SeedPubKey:
+			typedCodec = NewPublicKey()
+		case SeedString:
+			var err error
+			typedCodec, err = binary.NewString(solana.MaxSeedLength, binary.LittleEndian())
+			if err != nil {
+				return nil, fmt.Errorf("failed to create a string codec")
+			}
+		case SeedUint64:
+			typedCodec = binary.LittleEndian().Uint64()
+		default:
+			return nil, fmt.Errorf("%w: unknown seed definition type", commontypes.ErrInvalidConfig)
+		}
+		named[idx] = commonencodings.NamedTypeCodec{Name: cases.Title(language.English, cases.NoLower).String(field.Name), Codec: typedCodec}
+	}
+
+	structCodec, err := commonencodings.NewStructCodec(named)
+	if err != nil {
+		return nil, err
+	}
+	return structCodec, nil
 }
 
 func getCodecByStringType(curType IdlTypeAsString, builder commonencodings.Builder) (commonencodings.TypeCodec, error) {

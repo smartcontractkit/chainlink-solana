@@ -404,3 +404,17 @@ type IdlErrorCode struct {
 	Name string `json:"name"`
 	Msg  string `json:"msg,omitempty"`
 }
+
+// Custom type used for seeds
+type SeedDefinition struct {
+	Name string   `json:"name,omitempty"`
+	Type SeedType `json:"type,omitempty"`
+}
+
+type SeedType int
+
+const (
+	SeedString SeedType = iota
+	SeedUint64
+	SeedPubKey
+)

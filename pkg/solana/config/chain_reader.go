@@ -26,12 +26,8 @@ type ReadDefinition struct {
 	ReadType            ReadType                    `json:"readType,omitempty"`
 	InputModifications  commoncodec.ModifiersConfig `json:"inputModifications,omitempty"`
 	OutputModifications commoncodec.ModifiersConfig `json:"outputModifications,omitempty"`
-	Seeds               []Seed                      `json:"seeds,omitempty"` // Only used for PDA account reads
-}
-
-type Seed struct {
-	Value    any    `json:"value,omitempty"`    // constant value used for its PDA
-	Location string `json:"location,omitempty"` // dot separated location of seed used to search params
+	PDAPrefix           string                      `json:"pdaPrefix,omitempty"` // Only used for PDA account reads
+	Seeds				[]codec.SeedDefinition			`json:"seeds,omitempty"` // Only used for PDA account reads
 }
 
 type ReadType int

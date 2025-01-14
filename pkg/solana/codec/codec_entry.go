@@ -94,6 +94,21 @@ func NewEventArgsEntry(offChainName string, idlTypes EventIDLTypes, includeDiscr
 	), nil
 }
 
+func NewSeedEntry(offchainName string, mod codec.Modifier, seeds []SeedDefinition) (Entry, error) {
+	seedCodec, err := asSeeds(seeds)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create codec entry for seeds: %w", err)
+	}
+
+	return newEntry(
+		offchainName,
+		offchainName, // chain specific name is irrelevant for seeds, reusing the offchain name
+		seedCodec,
+		false, // seeds do not need a discriminator
+		mod,
+	), nil
+}
+
 func newEntry(
 	genericName, chainSpecificName string,
 	typeCodec commonencodings.TypeCodec,

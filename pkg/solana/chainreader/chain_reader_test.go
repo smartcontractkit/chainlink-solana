@@ -36,11 +36,13 @@ import (
 )
 
 const (
-	Namespace     = "NameSpace"
-	NamedMethod   = "NamedMethod1"
-	PDAAccount    = "PDAAccount1"
-	PDAStringSeed = "Seed"
-	PDANumSeed    = uint64(5)
+	Namespace         = "NameSpace"
+	NamedMethod       = "NamedMethod1"
+	PDAAccount        = "PDAAccount1"
+	PDAPrefixString   = "Prefix"
+	PDAPubKeySeedName = "PubKey"
+	PDAUint64SeedName = "Uint64Seed"
+	PDAStringSeedName = "StringSeed"
 )
 
 var (
@@ -164,19 +166,33 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			Address: programID.String(), // Set the program ID used to calculate the PDA
 		}
 
+		uint64Seed := uint64(5)
+		stringSeed := "stringSeed"
+
 		pdaAccount, _, err := solana.FindProgramAddress([][]byte{
-			[]byte(PDAStringSeed),
+			[]byte(PDAPrefixString),
 			PDAPublicKeySeed.Bytes(),
-			go_binary.LittleEndian.AppendUint64([]byte{}, PDANumSeed),
+			go_binary.LittleEndian.AppendUint64([]byte{}, uint64Seed),
+			// []byte(stringSeed),
 		}, programID)
 		require.NoError(t, err)
 
 		client.SetForAddress(pdaAccount, encoded, nil, 0)
 
-		param := struct{ Parameter uint64 }{Parameter: PDANumSeed}
+		fmt.Println("test PDA", pdaAccount)
+		encodedParams := []byte{}
+		encodedParams = append(encodedParams, []byte(PDAPrefixString)...)
+		encodedParams = append(encodedParams, PDAPublicKeySeed.Bytes()...)
+		go_binary.LittleEndian.AppendUint64(encodedParams, uint64Seed)
+		// encodedParams = append(encodedParams, []byte(stringSeed)...)
+		fmt.Println("test param encoded", encodedParams)
 
 		require.NoError(t, svc.Bind(ctx, []types.BoundContract{binding}))
-		require.NoError(t, svc.GetLatestValue(ctx, binding.ReadIdentifier(PDAAccount), primitives.Unconfirmed, param, &result))
+		require.NoError(t, svc.GetLatestValue(ctx, binding.ReadIdentifier(PDAAccount), primitives.Unconfirmed, map[string]any{
+			PDAPubKeySeedName: PDAPublicKeySeed.Bytes(),
+			PDAUint64SeedName: uint64Seed,
+			PDAStringSeedName: stringSeed,
+		}, &result))
 
 		assert.Equal(t, expected.InnerStruct, result.InnerStruct)
 		assert.Equal(t, expected.Value, result.V)
@@ -361,16 +377,20 @@ func newTestConfAndCodec(t *testing.T) (types.RemoteCodec, config.ContractReader
 					PDAAccount: {
 						ChainSpecificName: testutils.TestStructWithNestedStruct,
 						ReadType:          config.Account,
-						Seeds: []config.Seed{
+						PDAPrefix:         PDAPrefixString,
+						Seeds: []codec.SeedDefinition{
 							{
-								Value: PDAStringSeed,
+								Name: PDAPubKeySeedName,
+								Type: codec.SeedPubKey,
 							},
 							{
-								Value: PDAPublicKeySeed,
+								Name: PDAUint64SeedName,
+								Type: codec.SeedUint64,
 							},
-							{
-								Location: "Parameter",
-							},
+							// {
+							// 	Name: PDAStringSeedName,
+							// 	Type: codec.SeedString,
+							// },
 						},
 						OutputModifications: codeccommon.ModifiersConfig{
 							&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},

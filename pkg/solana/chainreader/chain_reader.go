@@ -249,6 +249,24 @@ func (s *SolanaChainReaderService) addCodecDef(forEncoding bool, namespace, gene
 	return nil
 }
 
+func (s *SolanaChainReaderService) addSeedsCodecDef(namespace, genericName string, seedDefs []codec.SeedDefinition, modCfg commoncodec.ModifiersConfig) error {
+	mod, err := modCfg.ToModifier(codec.DecoderHooks...)
+	if err != nil {
+		return err
+	}
+	// Append seed suffix to differentiate the entry for encoding seeds from the account read entry
+	genericSeedName := fmt.Sprintf("%s.%s", genericName, "seed")
+	seedEntry, err := codec.NewSeedEntry(genericSeedName, mod, seedDefs)
+	if err != nil {
+		return fmt.Errorf("failed to create a codec entry for seed definitions %v: %w", seedDefs, err)
+	}
+
+	// Seed codec entry is only used for encoding. Read type is not used by WrapItemType for encoding string.
+	s.parsed.EncoderDefs[codec.WrapItemType(true, namespace, genericSeedName, "")] = seedEntry
+
+	return nil
+}
+
 func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainContractReader) error {
 	for namespace, nameSpaceDef := range namespaces {
 		for genericName, read := range nameSpaceDef.Reads {
@@ -296,13 +314,12 @@ func (s *SolanaChainReaderService) addAccountRead(namespace string, genericName 
 	s.lookup.addReadNameForContract(namespace, genericName)
 
 	var reader readBinding
-	// Create PDA read binding if Seeds config is non-nil
-	// Note: Empty seeds list is a valid configuration for a PDA so a length check is intentionally skipped
-	if readDefinition.Seeds != nil {
-		if len(readDefinition.Seeds) > solana.MaxSeeds {
-			return fmt.Errorf("read definition contains more seeds (%d) than the max allowed (%d) for PDAs", len(readDefinition.Seeds), solana.MaxSeeds)
+	// Create PDA read binding if PDA prefix or seeds configs are populated
+	if len(readDefinition.PDAPrefix) > 0 || len(readDefinition.Seeds) > 0 {
+		if err := s.addSeedsCodecDef(namespace, genericName, readDefinition.Seeds, readDefinition.InputModifications); err != nil {
+			return fmt.Errorf("failed to add codec entry for seed configs: %w", err)
 		}
-		reader = newPdaReadBinding(namespace, genericName, readDefinition.Seeds)
+		reader = newPdaReadBinding(namespace, genericName, readDefinition.PDAPrefix)
 	} else {
 		reader = newAccountReadBinding(namespace, genericName)
 	}
