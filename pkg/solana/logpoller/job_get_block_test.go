@@ -34,6 +34,15 @@ func TestGetBlockJob(t *testing.T) {
 		err := job.Run(tests.Context(t))
 		require.ErrorIs(t, err, expectedError)
 	})
+	t.Run("Error if transaction field is not present", func(t *testing.T) {
+		client := mocks.NewRPCClient(t)
+		lggr := logger.Sugared(logger.Test(t))
+		block := rpc.GetBlockResult{Transactions: []rpc.TransactionWithMeta{{Transaction: nil}}}
+		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
+		job := newGetBlockJob(client, make(chan Block), lggr, slotNumber)
+		err := job.Run(tests.Context(t))
+		require.ErrorContains(t, err, "failed to parse transaction 0 in slot 42: missing transaction field")
+	})
 	t.Run("Error if fails to get transaction", func(t *testing.T) {
 		client := mocks.NewRPCClient(t)
 		lggr := logger.Sugared(logger.Test(t))
@@ -100,7 +109,7 @@ func TestGetBlockJob(t *testing.T) {
 		txWithMeta1 := rpc.TransactionWithMeta{Transaction: txSigToDataBytes(tx1Signature), Meta: &rpc.TransactionMeta{LogMessages: []string{"log1", "log2"}}}
 		txWithMeta2 := rpc.TransactionWithMeta{Transaction: txSigToDataBytes(tx2Signature), Meta: &rpc.TransactionMeta{LogMessages: []string{"log3"}}}
 		// tx3 must be ignored due to error
-		txWithMeta3 := rpc.TransactionWithMeta{Transaction: txSigToDataBytes(tx2Signature), Meta: &rpc.TransactionMeta{LogMessages: []string{"log4"}, Err: fmt.Errorf("some error")}}
+		txWithMeta3 := rpc.TransactionWithMeta{Transaction: txSigToDataBytes(solana.Signature{10, 11}), Meta: &rpc.TransactionMeta{LogMessages: []string{"log4"}, Err: fmt.Errorf("some error")}}
 		height := uint64(41)
 		block := rpc.GetBlockResult{BlockHeight: &height, Blockhash: solana.Hash{1, 2, 3}, Transactions: []rpc.TransactionWithMeta{txWithMeta1, txWithMeta2, txWithMeta3}}
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()

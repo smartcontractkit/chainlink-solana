@@ -2,6 +2,7 @@ package logpoller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
@@ -75,6 +76,9 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 	events := make([]ProgramEvent, 0, len(block.Transactions))
 	for idx, txWithMeta := range block.Transactions {
 		detail.trxIdx = idx
+		if txWithMeta.Transaction == nil {
+			return fmt.Errorf("failed to parse transaction %d in slot %d: %w", idx, j.slotNumber, errors.New("missing transaction field"))
+		}
 		tx, err := txWithMeta.GetTransaction()
 		if err != nil {
 			return fmt.Errorf("failed to parse transaction %d in slot %d: %w", idx, j.slotNumber, err)
