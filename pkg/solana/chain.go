@@ -239,6 +239,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 
 	var tc internal.Loader[client.ReaderWriter] = utils.NewLazyLoad(func() (client.ReaderWriter, error) { return ch.getClient() })
 	var bc internal.Loader[monitor.BalanceClient] = utils.NewLazyLoad(func() (monitor.BalanceClient, error) { return ch.getClient() })
+	// getClient returns random client or if MultiNodeEnabled RPC picked and controlled by MultiNode
 	ch.multiClient = client.NewMultiClient(ch.getClient)
 
 	// txm will default to sending transactions using a single RPC client if sendTx is nil
@@ -293,9 +294,6 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 
 		ch.multiNode = multiNode
 		ch.txSender = txSender
-		ch.multiClient = client.NewMultiClient(func() (client.ReaderWriter, error) {
-			return ch.multiNode.SelectRPC()
-		})
 
 		// clientCache will not be used if multinode is enabled
 		ch.clientCache = nil
