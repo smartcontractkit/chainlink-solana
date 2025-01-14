@@ -13,8 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 )
 
-// getBlockJob is a job that fetches transaction signatures from a block and loads
-// the job queue with getTransactionLogsJobs for each transaction found in the block.
+// getBlockJob is a job that fetches blocks with transactions, coverts logs into ProgramEvents and writes them into blocks channel
 type getBlockJob struct {
 	slotNumber       uint64
 	client           RPCClient
@@ -49,7 +48,7 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 	block, err := j.client.GetBlockWithOpts(
 		ctx,
 		j.slotNumber,
-		// NOTE: any change to the filtering arguments may affect calculation of logIndex, which to lead to events duplication.
+		// NOTE: any change to the filtering arguments may affect calculation of txIndex, which could lead to events duplication.
 		&rpc.GetBlockOpts{
 			Encoding:   solana.EncodingBase64,
 			Commitment: rpc.CommitmentFinalized,

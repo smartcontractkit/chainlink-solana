@@ -12,6 +12,9 @@ import (
 
 var _ worker.Job = (*getSlotsForAddressJob)(nil)
 
+// getSlotsForAddressJob - identifies slots that contain transactions for specified address in range [from, to] and
+// calls storeSlot for each. If single request was not sufficient to identify all slots - schedules a new job. Channel
+// returned by Done() will be closed only when all jobs are done.
 type getSlotsForAddressJob struct {
 	address   PublicKey
 	beforeSig solana.Signature
