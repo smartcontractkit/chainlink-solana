@@ -29,6 +29,14 @@ func TestProcess(t *testing.T) {
 	addr := newRandomPublicKey(t)
 	eventName := "myEvent"
 	eventSig := utils.Discriminator("event", eventName)
+	event := struct {
+		A int64
+		B string
+	}{55, "hello"}
+	subkeyValA, err := NewIndexedValue(event.A)
+	require.NoError(t, err)
+	subkeyValB, err := NewIndexedValue(event.B)
+	require.NoError(t, err)
 
 	filterID := rand.Int63()
 	chainID := uuid.NewString()
@@ -37,8 +45,27 @@ func TestProcess(t *testing.T) {
 	txLogIndex := uint(rand.Uint32())
 
 	expectedLog := newRandomLog(t, filterID, chainID, eventName)
-
+	expectedLog.Address = addr
 	expectedLog.LogIndex = makeLogIndex(txIndex, txLogIndex)
+	expectedLog.SequenceNum = 1
+	expectedLog.SubkeyValues = []IndexedValue{subkeyValA, subkeyValB}
+
+	expectedLog.Data, err = bin.MarshalBorsh(&event)
+	require.NoError(t, err)
+
+	ev := ProgramEvent{
+		Program: addr.ToSolana().String(),
+		BlockData: BlockData{
+			SlotNumber:          uint64(expectedLog.BlockNumber),
+			BlockHeight:         3,
+			BlockHash:           expectedLog.BlockHash.ToSolana(),
+			BlockTime:           solana.UnixTimeSeconds(expectedLog.BlockTimestamp.Unix()),
+			TransactionHash:     expectedLog.TxHash.ToSolana(),
+			TransactionIndex:    txIndex,
+			TransactionLogIndex: txLogIndex,
+		},
+		Data: base64.StdEncoding.EncodeToString(append(eventSig[:], expectedLog.Data...)),
+	}
 
 	orm := newMockORM(t)
 	cl := clientmocks.NewReaderWriter(t)
@@ -49,7 +76,7 @@ func TestProcess(t *testing.T) {
 	var idlTypeInt64 codec.IdlType
 	var idlTypeString codec.IdlType
 
-	err := json.Unmarshal([]byte("\"i64\""), &idlTypeInt64)
+	err = json.Unmarshal([]byte("\"i64\""), &idlTypeInt64)
 	require.NoError(t, err)
 	err = json.Unmarshal([]byte("\"string\""), &idlTypeString)
 	require.NoError(t, err)
@@ -93,28 +120,6 @@ func TestProcess(t *testing.T) {
 	err = lp.RegisterFilter(ctx, filter)
 	require.NoError(t, err)
 
-	event := struct {
-		A int64
-		B string
-	}{55, "hello"}
-
-	data, err := bin.MarshalBorsh(&event)
-	require.NoError(t, err)
-	data = append(eventSig[:], data...)
-
-	ev := ProgramEvent{
-		Program: addr.ToSolana().String(),
-		BlockData: BlockData{
-			SlotNumber:          3,
-			BlockHeight:         5,
-			BlockHash:           solana.HashFromBytes([]byte{1, 2, 3}),
-			BlockTime:           solana.UnixTimeSeconds(expectedLog.BlockTimestamp.Unix()),
-			TransactionHash:     expectedLog.TxHash.ToSolana(),
-			TransactionIndex:    txIndex,
-			TransactionLogIndex: txLogIndex,
-		},
-		Data: base64.StdEncoding.EncodeToString(data),
-	}
 	err = lp.Process(ev)
 	require.NoError(t, err)
 

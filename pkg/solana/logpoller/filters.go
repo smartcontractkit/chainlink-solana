@@ -44,7 +44,9 @@ func newFilters(lggr logger.SugaredLogger, orm ORM) *filters {
 	}
 }
 
-func (fl *filters) IncrementSeqNums(filterID int64) int64 {
+// IncrementSeqNum increments the sequence number for a filterID and returns the new
+// number. This means the sequence number assigned to the first log matched after registration will be 1
+func (fl *filters) IncrementSeqNum(filterID int64) int64 {
 	fl.seqNums[filterID]++
 	return fl.seqNums[filterID]
 }
@@ -245,7 +247,7 @@ func (fl *filters) removeFilterFromIndexes(filter Filter) {
 
 // MatchingFilters - returns iterator to go through all matching filters.
 // Requires LoadFilters to be called at least once.
-func (fl *filters) MatchingFilters(addr PublicKey, eventSignature EventSignature) iter.Seq[Filter] {
+func (fl *filters) matchingFilters(addr PublicKey, eventSignature EventSignature) iter.Seq[Filter] {
 	if !fl.loadedFilters.Load() {
 		fl.lggr.Critical("Invariant violation: expected filters to be loaded before call to MatchingFilters")
 		return nil
@@ -307,7 +309,7 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[F
 	}
 	eventSig := EventSignature(decoded[:8])
 
-	return fl.MatchingFilters(PublicKey(addr), eventSig)
+	return fl.matchingFilters(PublicKey(addr), eventSig)
 }
 
 // GetFiltersToBackfill - returns copy of backfill queue

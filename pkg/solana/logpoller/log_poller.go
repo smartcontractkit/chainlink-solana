@@ -108,7 +108,7 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 			ChainID:        lp.orm.ChainID(),
 			LogIndex:       makeLogIndex(blockData.TransactionIndex, blockData.TransactionLogIndex),
 			BlockHash:      Hash(blockData.BlockHash),
-			BlockNumber:    int64(blockData.BlockHeight),
+			BlockNumber:    int64(blockData.SlotNumber),
 			BlockTimestamp: blockData.BlockTime.Time().UTC(),
 			Address:        filter.Address,
 			EventSig:       filter.EventSig,
@@ -139,7 +139,7 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 			log.SubkeyValues = append(log.SubkeyValues, indexedVal)
 		}
 
-		log.SequenceNum = lp.filters.IncrementSeqNums(filter.ID)
+		log.SequenceNum = lp.filters.IncrementSeqNum(filter.ID)
 
 		if filter.Retention > 0 {
 			expiresAt := time.Now().Add(filter.Retention).UTC()

@@ -149,7 +149,7 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(int64(1), nil).Once()
 		err = fs.RegisterFilter(tests.Context(t), filter)
 		require.NoError(t, err)
-		storedFilters := slices.Collect(fs.MatchingFilters(filter.Address, filter.EventSig))
+		storedFilters := slices.Collect(fs.matchingFilters(filter.Address, filter.EventSig))
 		require.Len(t, storedFilters, 1)
 		filter.ID = 1
 		require.Equal(t, filter, storedFilters[0])
@@ -283,7 +283,7 @@ func TestFilters_PruneFilters(t *testing.T) {
 	})
 }
 
-func TestFilters_MatchingFilters(t *testing.T) {
+func TestFilters_matchingFilters(t *testing.T) {
 	orm := newMockORM(t)
 	lggr := logger.Sugared(logger.Test(t))
 	expectedFilter1 := Filter{
@@ -321,14 +321,14 @@ func TestFilters_MatchingFilters(t *testing.T) {
 	filters := newFilters(lggr, orm)
 	err := filters.LoadFilters(tests.Context(t))
 	require.NoError(t, err)
-	matchingFilters := slices.Collect(filters.MatchingFilters(expectedFilter1.Address, expectedFilter1.EventSig))
+	matchingFilters := slices.Collect(filters.matchingFilters(expectedFilter1.Address, expectedFilter1.EventSig))
 	require.Len(t, matchingFilters, 2)
 	require.Contains(t, matchingFilters, expectedFilter1)
 	require.Contains(t, matchingFilters, expectedFilter2)
 	// if at least one key does not match - returns empty iterator
-	require.Empty(t, slices.Collect(filters.MatchingFilters(newRandomPublicKey(t), expectedFilter1.EventSig)))
-	require.Empty(t, slices.Collect(filters.MatchingFilters(expectedFilter1.Address, newRandomEventSignature(t))))
-	require.Empty(t, slices.Collect(filters.MatchingFilters(newRandomPublicKey(t), newRandomEventSignature(t))))
+	require.Empty(t, slices.Collect(filters.matchingFilters(newRandomPublicKey(t), expectedFilter1.EventSig)))
+	require.Empty(t, slices.Collect(filters.matchingFilters(expectedFilter1.Address, newRandomEventSignature(t))))
+	require.Empty(t, slices.Collect(filters.matchingFilters(newRandomPublicKey(t), newRandomEventSignature(t))))
 }
 
 func TestFilters_GetFiltersToBackfill(t *testing.T) {
