@@ -142,7 +142,7 @@ func (pda PDALookups) Resolve(ctx context.Context, args any, derivedTableMap map
 		return nil, fmt.Errorf("error getting public key for PDALookups: %w", err)
 	}
 
-	seeds, err := getSeedBytes(ctx, pda, args, derivedTableMap, reader)
+	seeds, err := getSeedBytesCombinations(ctx, pda, args, derivedTableMap, reader)
 	if err != nil {
 		return nil, fmt.Errorf("error getting seeds for PDALookups: %w", err)
 	}
@@ -209,29 +209,43 @@ func decodeBorshIntoType(data []byte, typ reflect.Type) (interface{}, error) {
 	return reflect.ValueOf(instance).Elem().Interface(), nil
 }
 
-// getSeedBytes extracts the seeds for the PDALookups.
-// It handles both AddressSeeds (which are public keys) and ValueSeeds (which are byte arrays from input args).
-func getSeedBytes(ctx context.Context, lookup PDALookups, args any, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.Reader) ([][]byte, error) {
-	var seedBytes [][]byte
+// getSeedBytesCombinations extracts the seeds for the PDALookups.
+// The return type is [][][]byte, where each element of the outer slice is
+// one combination of seeds. This handles the case where one seed can resolve
+// to multiple addresses, multiplying the combinations accordingly.
+func getSeedBytesCombinations(
+	ctx context.Context,
+	lookup PDALookups,
+	args any,
+	derivedTableMap map[string]map[string][]*solana.AccountMeta,
+	reader client.Reader,
+) ([][][]byte, error) {
+	allCombinations := [][][]byte{
+		{},
+	}
 
+	// For each seed in the definition, expand the current list of combinations
+	// by all possible values for this seed.
 	for _, seed := range lookup.Seeds {
+		expansions := make([][]byte, 0)
 		if seed.Static != nil {
-			seedBytes = append(seedBytes, seed.Static)
-		}
-		if seed.Dynamic != nil {
+			expansions = append(expansions, seed.Static)
+			// Static and Dynamic seeds are mutually exclusive
+		} else if seed.Dynamic != nil {
 			dynamicSeed := seed.Dynamic
 			if lookupSeed, ok := dynamicSeed.(AccountLookup); ok {
 				// Get value from a location (This doens't have to be an address, it can be any value)
 				bytes, err := GetValuesAtLocation(args, lookupSeed.Location)
 				if err != nil {
-					return nil, fmt.Errorf("error getting address seed: %w", err)
+					return nil, fmt.Errorf("error getting address seed for location %q: %w", lookupSeed.Location, err)
 				}
-				// validate seed length
+				// append each byte array to the expansions
 				for _, b := range bytes {
+					// validate seed length
 					if len(b) > solana.MaxSeedLength {
 						return nil, fmt.Errorf("seed byte array exceeds maximum length of %d: got %d bytes", solana.MaxSeedLength, len(b))
 					}
-					seedBytes = append(seedBytes, b)
+					expansions = append(expansions, b)
 				}
 			} else {
 				// Get address seeds from the lookup
@@ -239,34 +253,60 @@ func getSeedBytes(ctx context.Context, lookup PDALookups, args any, derivedTable
 				if err != nil {
 					return nil, fmt.Errorf("error getting address seed: %w", err)
 				}
-
-				// Add each address seed as bytes
-				for _, address := range seedAddresses {
-					seedBytes = append(seedBytes, address.PublicKey.Bytes())
+				// Add each address seed to the expansions
+				for _, addrMeta := range seedAddresses {
+					b := addrMeta.PublicKey.Bytes()
+					if len(b) > solana.MaxSeedLength {
+						return nil, fmt.Errorf("seed byte array exceeds maximum length of %d: got %d bytes", solana.MaxSeedLength, len(b))
+					}
+					expansions = append(expansions, b)
 				}
 			}
 		}
+
+		// expansions is the list of possible seed bytes for this single seed lookup.
+		// Multiply the existing combinations in allCombinations by each item in expansions.
+		newCombinations := make([][][]byte, 0, len(allCombinations)*len(expansions))
+		for _, existingCombo := range allCombinations {
+			for _, expandedSeed := range expansions {
+				comboCopy := make([][]byte, len(existingCombo)+1)
+				copy(comboCopy, existingCombo)
+				comboCopy[len(existingCombo)] = expandedSeed
+				newCombinations = append(newCombinations, comboCopy)
+			}
+		}
+
+		allCombinations = newCombinations
 	}
 
-	return seedBytes, nil
+	return allCombinations, nil
 }
 
 // generatePDAs generates program-derived addresses (PDAs) from public keys and seeds.
-func generatePDAs(publicKeys []*solana.AccountMeta, seeds [][]byte, lookup PDALookups) ([]*solana.AccountMeta, error) {
-	if len(seeds) > solana.MaxSeeds {
-		return nil, fmt.Errorf("seed maximum exceeded: %d", len(seeds))
-	}
-	var addresses []*solana.AccountMeta
+// it will result in a list of PDAs whose length is the product of the number of public keys
+// and the number of seed combinations.
+func generatePDAs(
+	publicKeys []*solana.AccountMeta,
+	seedCombos [][][]byte,
+	lookup PDALookups,
+) ([]*solana.AccountMeta, error) {
+	var results []*solana.AccountMeta
 	for _, publicKeyMeta := range publicKeys {
-		address, _, err := solana.FindProgramAddress(seeds, publicKeyMeta.PublicKey)
-		if err != nil {
-			return nil, fmt.Errorf("error finding program address: %w", err)
+		for _, combo := range seedCombos {
+			if len(combo) > solana.MaxSeeds {
+				return nil, fmt.Errorf("seed maximum exceeded: %d", len(combo))
+			}
+			address, _, err := solana.FindProgramAddress(combo, publicKeyMeta.PublicKey)
+			if err != nil {
+				return nil, fmt.Errorf("error finding program address: %w", err)
+			}
+			results = append(results, &solana.AccountMeta{
+				PublicKey:  address,
+				IsSigner:   lookup.IsSigner,
+				IsWritable: lookup.IsWritable,
+			})
 		}
-		addresses = append(addresses, &solana.AccountMeta{
-			PublicKey:  address,
-			IsSigner:   lookup.IsSigner,
-			IsWritable: lookup.IsWritable,
-		})
 	}
-	return addresses, nil
+
+	return results, nil
 }
