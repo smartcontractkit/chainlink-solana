@@ -59,6 +59,7 @@ type MethodConfig struct {
 	Accounts           []Lookup
 	// Location in the args where the debug ID is stored
 	DebugIDLocation string
+	ArgsTransform   func(ctx context.Context, cw *SolanaChainWriterService, args any, accounts solana.AccountMetaSlice) (any, error)
 }
 
 func NewSolanaChainWriterService(logger logger.Logger, reader client.Reader, txm txm.TxManager, ge fees.Estimator, config ChainWriterConfig) (*SolanaChainWriterService, error) {
@@ -256,15 +257,6 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		}
 	}
 
-	encodedPayload, err := s.encoder.Encode(ctx, args, codec.WrapItemType(true, contractName, method, ""))
-
-	if err != nil {
-		return errorWithDebugID(fmt.Errorf("error encoding transaction payload: %w", err), debugID)
-	}
-
-	discriminator := GetDiscriminator(methodConfig.ChainSpecificName)
-	encodedPayload = append(discriminator[:], encodedPayload...)
-
 	// Fetch derived and static table maps
 	derivedTableMap, staticTableMap, err := s.ResolveLookupTables(ctx, args, methodConfig.LookupTables)
 	if err != nil {
@@ -285,6 +277,14 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	// Filter the lookup table addresses based on which accounts are actually used
 	filteredLookupTableMap := s.FilterLookupTableAddresses(accounts, derivedTableMap, staticTableMap)
 
+	// Transform args if necessary
+	if methodConfig.ArgsTransform != nil {
+		args, err = methodConfig.ArgsTransform(ctx, s, args, accounts)
+		if err != nil {
+			return errorWithDebugID(fmt.Errorf("error transforming args: %w", err), debugID)
+		}
+	}
+
 	// Fetch latest blockhash
 	blockhash, err := s.reader.LatestBlockhash(ctx)
 	if err != nil {
@@ -296,6 +296,15 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error parsing program ID: %w", err), debugID)
 	}
+
+	encodedPayload, err := s.encoder.Encode(ctx, args, codec.WrapItemType(true, contractName, method, ""))
+
+	if err != nil {
+		return errorWithDebugID(fmt.Errorf("error encoding transaction payload: %w", err), debugID)
+	}
+
+	discriminator := GetDiscriminator(methodConfig.ChainSpecificName)
+	encodedPayload = append(discriminator[:], encodedPayload...)
 
 	tx, err := solana.NewTransaction(
 		[]solana.Instruction{
