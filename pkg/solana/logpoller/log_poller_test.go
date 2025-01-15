@@ -20,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/utils"
 )
 
 func TestProcess(t *testing.T) {
@@ -28,7 +27,7 @@ func TestProcess(t *testing.T) {
 
 	addr := newRandomPublicKey(t)
 	eventName := "myEvent"
-	eventSig := utils.Discriminator("event", eventName)
+	eventSig := Discriminator("event", eventName)
 	event := struct {
 		A int64
 		B string
