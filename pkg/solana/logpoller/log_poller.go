@@ -82,11 +82,11 @@ func (lp *LogPoller) start(context.Context) error {
 	return nil
 }
 
-func makeLogIndex(txIndex int, txLogIndex uint) int64 {
-	if txIndex < 0 || txIndex > math.MaxUint32 || txLogIndex > math.MaxUint32 {
-		panic(fmt.Sprintf("txIndex or txLogIndex out of range: txIndex=%d, txLogIndex=%d", txIndex, txLogIndex))
+func makeLogIndex(txIndex int, txLogIndex uint) (int64, error) {
+	if txIndex > 0 && txIndex < math.MaxInt32 && txLogIndex < math.MaxUint32 {
+		return int64(txIndex<<32) | int64(txLogIndex), nil
 	}
-	return int64(math.MaxUint32*uint32(txIndex) + uint32(txLogIndex))
+	return 0, fmt.Errorf("txIndex or txLogIndex out of range: txIndex=%d, txLogIndex=%d", txIndex, txLogIndex)
 }
 
 // Process - process stream of events coming from log ingester
@@ -103,12 +103,22 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 
 	var logs []Log
 	for filter := range matchingFilters {
+		logIndex, logIndexErr := makeLogIndex(blockData.TransactionIndex, blockData.TransactionLogIndex)
+		if logIndexErr != nil {
+			lp.lggr.Critical(err)
+			return err
+		}
+		if blockData.SlotNumber == math.MaxInt64 {
+			errSlot := fmt.Errorf("slot number %d out of range", blockData.SlotNumber)
+			lp.lggr.Critical(err.Error())
+			return errSlot
+		}
 		log := Log{
 			FilterID:       filter.ID,
 			ChainID:        lp.orm.ChainID(),
-			LogIndex:       makeLogIndex(blockData.TransactionIndex, blockData.TransactionLogIndex),
+			LogIndex:       logIndex,
 			BlockHash:      Hash(blockData.BlockHash),
-			BlockNumber:    int64(blockData.SlotNumber),
+			BlockNumber:    int64(blockData.SlotNumber), //nolint:gosec
 			BlockTimestamp: blockData.BlockTime.Time().UTC(),
 			Address:        filter.Address,
 			EventSig:       filter.EventSig,
@@ -147,6 +157,9 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 		}
 
 		logs = append(logs, log)
+	}
+	if len(logs) == 0 {
+		return nil
 	}
 
 	err = lp.orm.InsertLogs(ctx, logs)

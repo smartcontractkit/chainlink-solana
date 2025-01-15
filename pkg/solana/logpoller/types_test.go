@@ -1,6 +1,7 @@
 package logpoller
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,10 +14,12 @@ func TestIndexedValue(t *testing.T) {
 		lower    any
 		higher   any
 	}{
-		{"int32", int32(-5), int32(5)},
+
+		{"uint64", uint64(math.MaxUint32), uint64(math.MaxUint64)},
+		{"int32", int32(math.MinInt32), int32(math.MaxInt32)},
 		{"int32", int32(-8), int32(-5)},
 		{"int32", int32(5), int32(8)},
-		{"int64", int64(-5), int64(5)},
+		{"int64", int64(math.MinInt64), int64(math.MaxInt64)},
 		{"int64", int64(-8), int64(-5)},
 		{"int64", int64(5), int64(8)},
 		{"float32", float32(-5), float32(5)},

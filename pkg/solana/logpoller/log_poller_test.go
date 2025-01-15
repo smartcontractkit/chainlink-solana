@@ -46,7 +46,8 @@ func TestProcess(t *testing.T) {
 
 	expectedLog := newRandomLog(t, filterID, chainID, eventName)
 	expectedLog.Address = addr
-	expectedLog.LogIndex = makeLogIndex(txIndex, txLogIndex)
+	expectedLog.LogIndex, err = makeLogIndex(txIndex, txLogIndex)
+	require.NoError(t, err)
 	expectedLog.SequenceNum = 1
 	expectedLog.SubkeyValues = []IndexedValue{subkeyValA, subkeyValB}
 

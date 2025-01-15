@@ -148,18 +148,10 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 	}
 
 	programID := filter.Address.ToSolana().String()
-	if _, ok = fl.knownPrograms[programID]; !ok {
-		fl.knownPrograms[programID] = 1
-	} else {
-		fl.knownPrograms[programID]++
-	}
+	fl.knownPrograms[programID]++
 
 	discriminatorHead := filter.Discriminator()[:10]
-	if _, ok := fl.knownDiscriminators[discriminatorHead]; !ok {
-		fl.knownDiscriminators[discriminatorHead] = 1
-	} else {
-		fl.knownDiscriminators[discriminatorHead]++
-	}
+	fl.knownDiscriminators[discriminatorHead]++
 
 	return nil
 }

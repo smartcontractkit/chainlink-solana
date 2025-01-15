@@ -163,7 +163,7 @@ func (v *IndexedValue) FromUint64(u uint64) {
 }
 
 func (v *IndexedValue) FromInt64(i int64) {
-	v.FromUint64(uint64(i) + math.MaxInt64 + 1)
+	v.FromUint64(uint64(i + math.MaxInt64 + 1)) //nolint gosec passing i=math.MaxInt64 and i=math.MinInt64 are proven safe in TestIndexedValue
 }
 
 func (v *IndexedValue) FromFloat64(f float64) {
