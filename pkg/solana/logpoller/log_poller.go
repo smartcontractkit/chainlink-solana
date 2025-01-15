@@ -86,6 +86,12 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 	ctx, cancel := utils.ContextFromChan(lp.eng.StopChan)
 	defer cancel()
 
+	// This should never happen, since the log collector isn't started until after the filters
+	// get loaded. But just in case, return an error if they aren't so the collector knows to retry later.
+	if err = lp.filters.LoadFilters(ctx); err != nil {
+		return err
+	}
+
 	blockData := programEvent.BlockData
 
 	matchingFilters := lp.filters.MatchingFiltersForEncodedEvent(programEvent)
@@ -186,10 +192,10 @@ func (lp *LogPoller) loadFilters(ctx context.Context) error {
 		case <-retryTicker.C:
 		}
 		err := lp.filters.LoadFilters(ctx)
-		if err != nil {
-			lp.lggr.Errorw("Failed loading filters in init logpoller loop, retrying later", "err", err)
-			continue
+		if err == nil {
+			return nil
 		}
+		lp.lggr.Errorw("Failed loading filters in init logpoller loop, retrying later", "err", err)
 	}
 	// unreachable
 }
@@ -200,6 +206,9 @@ func (lp *LogPoller) run(ctx context.Context) {
 		lp.lggr.Warnw("Failed loading filters", "err", err)
 		return
 	}
+
+	// safe to start fetching logs, now that filters are loaded
+	lp.collector.Start(ctx)
 
 	var blocks chan struct {
 		BlockNumber int64

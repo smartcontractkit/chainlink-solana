@@ -241,7 +241,7 @@ func (fl *filters) removeFilterFromIndexes(filter Filter) {
 // Requires LoadFilters to be called at least once.
 func (fl *filters) matchingFilters(addr PublicKey, eventSignature EventSignature) iter.Seq[Filter] {
 	if !fl.loadedFilters.Load() {
-		fl.lggr.Critical("Invariant violation: expected filters to be loaded before call to MatchingFilters")
+		fl.lggr.Critical("Invariant violation: expected filters to be loaded before call to matchingFilters")
 		return nil
 	}
 	return func(yield func(Filter) bool) {
