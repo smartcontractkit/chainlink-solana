@@ -140,6 +140,13 @@ type IdlField struct {
 	Type IdlType  `json:"type"`
 }
 
+// PDA is a struct that does not correlate to an official IDL type
+// It is needed to encode seeds to calculate the address for PDA account reads
+type PDATypeDef struct {
+	Prefix string `json:"prefix,omitempty"`
+	Seeds []IdlField `json:"seeds,omitempty"`
+}
+
 type IdlTypeAsString string
 
 const (
@@ -195,7 +202,7 @@ func (env *IdlType) UnmarshalJSON(data []byte) error {
 
 	switch v := temp.(type) {
 	case string:
-		env.asString = IdlTypeAsString(v)
+		env.AsString = IdlTypeAsString(v)
 	case map[string]interface{}:
 		if len(v) == 0 {
 			return nil
@@ -248,7 +255,7 @@ func (env *IdlType) UnmarshalJSON(data []byte) error {
 
 // Wrapper type:
 type IdlType struct {
-	asString         IdlTypeAsString
+	AsString         IdlTypeAsString
 	asIdlTypeVec     *IdlTypeVec
 	asIdlTypeOption  *IdlTypeOption
 	asIdlTypeDefined *IdlTypeDefined
@@ -256,7 +263,7 @@ type IdlType struct {
 }
 
 func (env *IdlType) IsString() bool {
-	return env.asString != ""
+	return env.AsString != ""
 }
 func (env *IdlType) IsIdlTypeVec() bool {
 	return env.asIdlTypeVec != nil
@@ -273,7 +280,7 @@ func (env *IdlType) IsArray() bool {
 
 // Getters:
 func (env *IdlType) GetString() IdlTypeAsString {
-	return env.asString
+	return env.AsString
 }
 func (env *IdlType) GetIdlTypeVec() *IdlTypeVec {
 	return env.asIdlTypeVec
@@ -404,16 +411,3 @@ type IdlErrorCode struct {
 	Name string `json:"name"`
 	Msg  string `json:"msg,omitempty"`
 }
-
-// Custom type used for seeds
-type SeedDefinition struct {
-	Name string   `json:"name,omitempty"`
-	Type SeedType `json:"type,omitempty"`
-}
-
-type SeedType int
-
-const (
-	SeedPubKey SeedType = iota
-	SeedUint64
-)

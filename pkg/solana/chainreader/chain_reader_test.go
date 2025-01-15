@@ -44,10 +44,6 @@ const (
 	PDAUint64SeedName = "Uint64Seed"
 )
 
-var (
-	PDAPublicKeySeed = solana.NewWallet().PublicKey()
-)
-
 func TestSolanaChainReaderService_ReaderInterface(t *testing.T) {
 	t.Parallel()
 
@@ -130,58 +126,6 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 
 		require.NoError(t, svc.Bind(ctx, []types.BoundContract{binding}))
 		require.NoError(t, svc.GetLatestValue(ctx, binding.ReadIdentifier(NamedMethod), primitives.Unconfirmed, nil, &result))
-
-		assert.Equal(t, expected.InnerStruct, result.InnerStruct)
-		assert.Equal(t, expected.Value, result.V)
-		assert.Equal(t, expected.TimeVal, result.TimeVal)
-		assert.Equal(t, expected.DurationVal, result.DurationVal)
-	})
-
-	t.Run("PDA account read successful", func(t *testing.T) {
-		t.Parallel()
-
-		testCodec, conf := newTestConfAndCodec(t)
-		encoded, err := testCodec.Encode(ctx, expected, testutils.TestStructWithNestedStruct)
-
-		require.NoError(t, err)
-
-		client := new(mockedRPCClient)
-		svc, err := chainreader.NewChainReaderService(logger.Test(t), client, conf)
-
-		require.NoError(t, err)
-		require.NotNil(t, svc)
-		require.NoError(t, svc.Start(ctx))
-
-		t.Cleanup(func() {
-			require.NoError(t, svc.Close())
-		})
-
-		programID := solana.NewWallet().PublicKey()
-
-		var result modifiedStructWithNestedStruct
-
-		binding := types.BoundContract{
-			Name:    Namespace,
-			Address: programID.String(), // Set the program ID used to calculate the PDA
-		}
-
-		uint64Seed := uint64(5)
-
-		pdaAccount, _, err := solana.FindProgramAddress([][]byte{
-			[]byte(PDAPrefixString),
-			PDAPublicKeySeed.Bytes(),
-			go_binary.LittleEndian.AppendUint64([]byte{}, uint64Seed),
-		}, programID)
-		require.NoError(t, err)
-
-		client.SetForAddress(pdaAccount, encoded, nil, 0)
-
-		require.NoError(t, svc.Bind(ctx, []types.BoundContract{binding}))
-		require.NoError(t, svc.GetLatestValue(ctx, binding.ReadIdentifier(PDAAccount), primitives.Unconfirmed, map[string]any{
-			PDAPubKeySeedName: PDAPublicKeySeed,
-			"randomField": "randomValue", // unused field should be ignored by the codec
-			PDAUint64SeedName: uint64Seed,
-		}, &result))
 
 		assert.Equal(t, expected.InnerStruct, result.InnerStruct)
 		assert.Equal(t, expected.Value, result.V)
@@ -326,6 +270,122 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			},
 		}))
 	})
+
+	t.Run("PDA account read success", func(t *testing.T) {
+		t.Parallel()
+
+		pubKey := solana.NewWallet().PublicKey()
+		uint64Seed := uint64(5)
+
+		readDef := config.ReadDefinition{
+			ChainSpecificName: testutils.TestStructWithNestedStruct,
+			ReadType:          config.Account,
+			PDADefiniton: codec.PDATypeDef{
+				Prefix: PDAPrefixString,
+				Seeds: []codec.IdlField{
+					{
+						Name: PDAPubKeySeedName,
+						Type: codec.IdlType{AsString: codec.IdlTypePublicKey},
+					},
+					{
+						Name: PDAUint64SeedName,
+						Type: codec.IdlType{AsString: codec.IdlTypeU64},
+					},
+				},
+			},
+			// InputModifications: codeccommon.ModifiersConfig{
+			// 	&codeccommon.RenameModifierConfig{Fields: map[string]string{"PublicKey": PDAPubKeySeedName}},
+			// },
+			OutputModifications: codeccommon.ModifiersConfig{
+				&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},
+			},
+		}
+		testCodec, conf := newTestConfAndCodecWithInjectibleReadDef(t, PDAAccount, readDef)
+		encoded, err := testCodec.Encode(ctx, expected, testutils.TestStructWithNestedStruct)
+		require.NoError(t, err)
+
+		client := new(mockedRPCClient)
+		svc, err := chainreader.NewChainReaderService(logger.Test(t), client, conf)
+		require.NoError(t, err)
+		require.NotNil(t, svc)
+		require.NoError(t, svc.Start(ctx))
+
+		t.Cleanup(func() {
+			require.NoError(t, svc.Close())
+		})
+
+		programID := solana.NewWallet().PublicKey()
+
+		binding := types.BoundContract{
+			Name:    Namespace,
+			Address: programID.String(), // Set the program ID used to calculate the PDA
+		}
+
+		pdaAccount, _, err := solana.FindProgramAddress([][]byte{
+			[]byte(PDAPrefixString),
+			pubKey.Bytes(),
+			go_binary.LittleEndian.AppendUint64([]byte{}, uint64Seed),
+		}, programID)
+		require.NoError(t, err)
+
+		client.SetForAddress(pdaAccount, encoded, nil, 0)
+
+		require.NoError(t, svc.Bind(ctx, []types.BoundContract{binding}))
+
+		var result modifiedStructWithNestedStruct
+		require.NoError(t, svc.GetLatestValue(ctx, binding.ReadIdentifier(PDAAccount), primitives.Unconfirmed, map[string]any{
+			PDAPubKeySeedName: pubKey,
+			"randomField":     "randomValue", // unused field should be ignored by the codec
+			PDAUint64SeedName: uint64Seed,
+		}, &result))
+
+		assert.Equal(t, expected.InnerStruct, result.InnerStruct)
+		assert.Equal(t, expected.Value, result.V)
+		assert.Equal(t, expected.TimeVal, result.TimeVal)
+		assert.Equal(t, expected.DurationVal, result.DurationVal)
+	})
+
+	t.Run("PDA account read errors if missing param", func(t *testing.T) {
+		readDef := config.ReadDefinition{
+			ChainSpecificName: testutils.TestStructWithNestedStruct,
+			ReadType:          config.Account,
+			PDADefiniton: codec.PDATypeDef{
+				Prefix: PDAPrefixString,
+				Seeds: []codec.IdlField{
+					{
+						Name: PDAPubKeySeedName,
+						Type: codec.IdlType{AsString: codec.IdlTypePublicKey},
+					},
+				},
+			},
+			OutputModifications: codeccommon.ModifiersConfig{
+				&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},
+			},
+		}
+		_, conf := newTestConfAndCodecWithInjectibleReadDef(t, PDAAccount, readDef)
+
+		client := new(mockedRPCClient)
+		svc, err := chainreader.NewChainReaderService(logger.Test(t), client, conf)
+		require.NoError(t, err)
+		require.NotNil(t, svc)
+		require.NoError(t, svc.Start(ctx))
+
+		t.Cleanup(func() {
+			require.NoError(t, svc.Close())
+		})
+
+		binding := types.BoundContract{
+			Name:    Namespace,
+			Address: solana.NewWallet().PublicKey().String(), // Set the program ID used to calculate the PDA
+		}
+
+		require.NoError(t, svc.Bind(ctx, []types.BoundContract{binding}))
+
+		var result modifiedStructWithNestedStruct
+		require.Error(t, svc.GetLatestValue(ctx, binding.ReadIdentifier(PDAAccount), primitives.Unconfirmed, map[string]any{
+			"randomField": "randomValue", // unused field should be ignored by the codec
+		}, &result))
+	})
 }
 
 func newTestIDLAndCodec(t *testing.T) (string, codec.IDL, types.RemoteCodec) {
@@ -363,27 +423,23 @@ func newTestConfAndCodec(t *testing.T) (types.RemoteCodec, config.ContractReader
 							&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},
 						},
 					},
-					PDAAccount: {
-						ChainSpecificName: testutils.TestStructWithNestedStruct,
-						ReadType:          config.Account,
-						PDAPrefix:         PDAPrefixString,
-						Seeds: []codec.SeedDefinition{
-							{
-								Name: PDAPubKeySeedName,
-								Type: codec.SeedPubKey,
-							},
-							{
-								Name: PDAUint64SeedName,
-								Type: codec.SeedUint64,
-							},
-						},
-						// InputModifications: codeccommon.ModifiersConfig{
-						// 	&codeccommon.RenameModifierConfig{Fields: map[string]string{"PublicKey": PDAPubKeySeedName}},
-						// },
-						OutputModifications: codeccommon.ModifiersConfig{
-							&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},
-						},
-					},
+				},
+			},
+		},
+	}
+
+	return testCodec, conf
+}
+
+func newTestConfAndCodecWithInjectibleReadDef(t *testing.T, readDefName string, readDef config.ReadDefinition) (types.RemoteCodec, config.ContractReader) {
+	t.Helper()
+	rawIDL, _, testCodec := newTestIDLAndCodec(t)
+	conf := config.ContractReader{
+		Namespaces: map[string]config.ChainContractReader{
+			Namespace: {
+				IDL: mustUnmarshalIDL(t, rawIDL),
+				Reads: map[string]config.ReadDefinition{
+					readDefName: readDef,
 				},
 			},
 		},

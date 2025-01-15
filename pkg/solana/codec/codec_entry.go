@@ -53,6 +53,22 @@ func NewAccountEntry(offchainName string, idlTypes AccountIDLTypes, includeDiscr
 	), nil
 }
 
+func NewPDAEntry(offchainName string, pdaTypeDef PDATypeDef, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
+	// PDA seeds do not have any dependecies in the IDL so the type def slice can be left empty for refs
+	_, accCodec, err := asStruct(pdaTypeDef.Seeds, createRefs(IdlTypeDefSlice{}, builder), offchainName, false, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return newEntry(
+		offchainName,
+		offchainName, // PDA seeds do not correlate to anything on-chain so reusing offchain name
+		accCodec,
+		false,
+		mod,
+	), nil
+}
+
 type InstructionArgsIDLTypes struct {
 	Instruction IdlInstruction
 	Types       IdlTypeDefSlice
@@ -90,21 +106,6 @@ func NewEventArgsEntry(offChainName string, idlTypes EventIDLTypes, includeDiscr
 		idlTypes.Event.Name,
 		eventCodec,
 		includeDiscriminator,
-		mod,
-	), nil
-}
-
-func NewSeedEntry(offchainName string, mod codec.Modifier, seeds []SeedDefinition) (Entry, error) {
-	seedCodec, err := asSeeds(seeds)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create codec entry for seeds: %w", err)
-	}
-
-	return newEntry(
-		offchainName,
-		offchainName, // chain specific name is irrelevant for seeds, reusing the offchain name
-		seedCodec,
-		false, // seeds do not need a discriminator
 		mod,
 	), nil
 }

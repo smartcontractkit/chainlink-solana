@@ -249,23 +249,6 @@ func (s *SolanaChainReaderService) addCodecDef(forEncoding bool, namespace, gene
 	return nil
 }
 
-func (s *SolanaChainReaderService) addSeedsCodecDef(namespace, genericName string, seedDefs []codec.SeedDefinition, modCfg commoncodec.ModifiersConfig) error {
-	mod, err := modCfg.ToModifier(codec.DecoderHooks...)
-	if err != nil {
-		return err
-	}
-	// Append seed suffix to differentiate the entry for encoding seeds from the account read entry
-	seedEntry, err := codec.NewSeedEntry(genericName, mod, seedDefs)
-	if err != nil {
-		return fmt.Errorf("failed to create a codec entry for seed definitions %v: %w", seedDefs, err)
-	}
-
-	// Seed codec entry is only used for encoding. Read type is not used by WrapItemType for encoding string.
-	s.parsed.EncoderDefs[codec.WrapItemType(true, namespace, genericName, "")] = seedEntry
-
-	return nil
-}
-
 func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainContractReader) error {
 	for namespace, nameSpaceDef := range namespaces {
 		for genericName, read := range nameSpaceDef.Reads {
@@ -309,15 +292,12 @@ func (s *SolanaChainReaderService) addAccountRead(namespace string, genericName 
 
 	var reader readBinding
 	// Create PDA read binding if PDA prefix or seeds configs are populated
-	if len(readDefinition.PDAPrefix) > 0 || len(readDefinition.Seeds) > 0 {
-		if err := s.addSeedsCodecDef(namespace, genericName, readDefinition.Seeds, readDefinition.InputModifications); err != nil {
-			return fmt.Errorf("failed to add codec entry for seed configs: %w", err)
-		}
-		reader = newPdaReadBinding(namespace, genericName, readDefinition.PDAPrefix)
-	} else {
-		if err := s.addCodecDef(true, namespace, genericName, codec.ChainConfigTypeAccountDef, idl, codec.NilIdlTypeDefTy, readDefinition.InputModifications); err != nil {
+	if len(readDefinition.PDADefiniton.Prefix) > 0 || len(readDefinition.PDADefiniton.Seeds) > 0 {
+		if err := s.addCodecDef(true, namespace, genericName, codec.ChainConfigTypeAccountDef, idl, readDefinition.PDADefiniton, readDefinition.InputModifications); err != nil {
 			return err
 		}
+		reader = newPdaReadBinding(namespace, genericName, readDefinition.PDADefiniton.Prefix)
+	} else {
 		reader = newAccountReadBinding(namespace, genericName)
 	}
 	s.bindings.AddReadBinding(namespace, genericName, reader)

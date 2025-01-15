@@ -26,8 +26,7 @@ type ReadDefinition struct {
 	ReadType            ReadType                    `json:"readType,omitempty"`
 	InputModifications  commoncodec.ModifiersConfig `json:"inputModifications,omitempty"`
 	OutputModifications commoncodec.ModifiersConfig `json:"outputModifications,omitempty"`
-	PDAPrefix           string                      `json:"pdaPrefix,omitempty"` // Only used for PDA account reads
-	Seeds				[]codec.SeedDefinition			`json:"seeds,omitempty"` // Only used for PDA account reads
+	PDADefiniton        codec.PDATypeDef           `json:"pdaDefinition,omitempty"` // Only used for PDA account reads
 }
 
 type ReadType int

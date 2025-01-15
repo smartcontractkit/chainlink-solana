@@ -98,6 +98,8 @@ func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl IDL, m
 		entry, err = NewInstructionArgsEntry(offChainName, InstructionArgsIDLTypes{Instruction: v, Types: idl.Types}, mod, binary.LittleEndian())
 	case IdlEvent:
 		entry, err = NewEventArgsEntry(offChainName, EventIDLTypes{Event: v, Types: idl.Types}, true, mod, binary.LittleEndian())
+	case PDATypeDef:
+		entry, err = NewPDAEntry(offChainName, v, mod, binary.LittleEndian())
 	default:
 		return nil, fmt.Errorf("unknown codec IDL definition: %T", idlDefinition)
 	}
@@ -386,29 +388,6 @@ func asVec(parentTypeName string, idlVec *IdlTypeVec, refs *codecRefs) (commonen
 	}
 
 	return commonencodings.NewSlice(codec, b)
-}
-
-func asSeeds(seeds []SeedDefinition) (commonencodings.TypeCodec, error) {
-	named := make([]commonencodings.NamedTypeCodec, len(seeds))
-
-	for idx, field := range seeds {
-		var typedCodec commonencodings.TypeCodec
-		switch field.Type {
-		case SeedPubKey:
-			typedCodec = NewPublicKey()
-		case SeedUint64:
-			typedCodec = binary.LittleEndian().Uint64()
-		default:
-			return nil, fmt.Errorf("%w: unknown seed definition type", commontypes.ErrInvalidConfig)
-		}
-		named[idx] = commonencodings.NamedTypeCodec{Name: cases.Title(language.English, cases.NoLower).String(field.Name), Codec: typedCodec}
-	}
-
-	structCodec, err := commonencodings.NewStructCodec(named)
-	if err != nil {
-		return nil, err
-	}
-	return structCodec, nil
 }
 
 func getCodecByStringType(curType IdlTypeAsString, builder commonencodings.Builder) (commonencodings.TypeCodec, error) {
