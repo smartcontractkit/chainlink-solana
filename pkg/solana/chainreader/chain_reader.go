@@ -255,14 +255,13 @@ func (s *SolanaChainReaderService) addSeedsCodecDef(namespace, genericName strin
 		return err
 	}
 	// Append seed suffix to differentiate the entry for encoding seeds from the account read entry
-	genericSeedName := fmt.Sprintf("%s.%s", genericName, "seed")
-	seedEntry, err := codec.NewSeedEntry(genericSeedName, mod, seedDefs)
+	seedEntry, err := codec.NewSeedEntry(genericName, mod, seedDefs)
 	if err != nil {
 		return fmt.Errorf("failed to create a codec entry for seed definitions %v: %w", seedDefs, err)
 	}
 
 	// Seed codec entry is only used for encoding. Read type is not used by WrapItemType for encoding string.
-	s.parsed.EncoderDefs[codec.WrapItemType(true, namespace, genericSeedName, "")] = seedEntry
+	s.parsed.EncoderDefs[codec.WrapItemType(true, namespace, genericName, "")] = seedEntry
 
 	return nil
 }
@@ -302,11 +301,6 @@ func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainContra
 }
 
 func (s *SolanaChainReaderService) addAccountRead(namespace string, genericName string, idl codec.IDL, idlType codec.IdlTypeDef, readDefinition config.ReadDefinition) error {
-	inputAccountIDLDef := codec.NilIdlTypeDefTy
-	if err := s.addCodecDef(true, namespace, genericName, codec.ChainConfigTypeAccountDef, idl, inputAccountIDLDef, readDefinition.InputModifications); err != nil {
-		return err
-	}
-
 	if err := s.addCodecDef(false, namespace, genericName, codec.ChainConfigTypeAccountDef, idl, idlType, readDefinition.OutputModifications); err != nil {
 		return err
 	}
@@ -321,6 +315,9 @@ func (s *SolanaChainReaderService) addAccountRead(namespace string, genericName 
 		}
 		reader = newPdaReadBinding(namespace, genericName, readDefinition.PDAPrefix)
 	} else {
+		if err := s.addCodecDef(true, namespace, genericName, codec.ChainConfigTypeAccountDef, idl, codec.NilIdlTypeDefTy, readDefinition.InputModifications); err != nil {
+			return err
+		}
 		reader = newAccountReadBinding(namespace, genericName)
 	}
 	s.bindings.AddReadBinding(namespace, genericName, reader)

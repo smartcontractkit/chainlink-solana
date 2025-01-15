@@ -414,7 +414,6 @@ type SeedDefinition struct {
 type SeedType int
 
 const (
-	SeedString SeedType = iota
+	SeedPubKey SeedType = iota
 	SeedUint64
-	SeedPubKey
 )

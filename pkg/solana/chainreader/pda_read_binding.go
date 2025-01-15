@@ -41,13 +41,12 @@ func (b *pdaReadBinding) SetAddress(programID solana.PublicKey) {
 func (b *pdaReadBinding) GetAddress(ctx context.Context, params any) (solana.PublicKey, error) {
 	seedBytes, err := b.buildSeedsSlice(ctx, params)
 	if err != nil {
-		return solana.PublicKey{}, fmt.Errorf("failed build seeds list for PDA generation: %w", err)
+		return solana.PublicKey{}, fmt.Errorf("failed build seeds list for PDA calculation: %w", err)
 	}
 	key, _, err := solana.FindProgramAddress(seedBytes, b.programID)
 	if err != nil {
 		return solana.PublicKey{}, fmt.Errorf("failed find program address for PDA: %w", err)
 	}
-	fmt.Println("calculated PDA", key)
 	return key, nil
 }
 
@@ -64,14 +63,12 @@ func (b *pdaReadBinding) buildSeedsSlice(ctx context.Context, params any) ([][]b
 	// Append the static prefix string first
 	flattenedSeeds = append(flattenedSeeds, []byte(b.prefix)...)
 	// Encode the seeds provided in the params
-	genericSeedName := fmt.Sprintf("%s.%s", b.genericName, "seed")
-	encodedParamSeeds, err := b.codec.Encode(ctx, params, codec.WrapItemType(true, b.namespace, genericSeedName, ""))
+	encodedParamSeeds, err := b.codec.Encode(ctx, params, codec.WrapItemType(true, b.namespace, b.genericName, ""))
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode params into bytes for PDA seeds: %w", err)
 	}
 	// Append the encoded seeds
 	flattenedSeeds = append(flattenedSeeds, encodedParamSeeds...)
-	fmt.Println("params encoded", flattenedSeeds)
 
 	if len(flattenedSeeds) > solana.MaxSeeds*solana.MaxSeedLength {
 		return nil, fmt.Errorf("seeds exceed the maximum allowed length")

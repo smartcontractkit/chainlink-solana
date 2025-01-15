@@ -42,7 +42,6 @@ const (
 	PDAPrefixString   = "Prefix"
 	PDAPubKeySeedName = "PubKey"
 	PDAUint64SeedName = "Uint64Seed"
-	PDAStringSeedName = "StringSeed"
 )
 
 var (
@@ -167,31 +166,21 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		}
 
 		uint64Seed := uint64(5)
-		stringSeed := "stringSeed"
 
 		pdaAccount, _, err := solana.FindProgramAddress([][]byte{
 			[]byte(PDAPrefixString),
 			PDAPublicKeySeed.Bytes(),
 			go_binary.LittleEndian.AppendUint64([]byte{}, uint64Seed),
-			// []byte(stringSeed),
 		}, programID)
 		require.NoError(t, err)
 
 		client.SetForAddress(pdaAccount, encoded, nil, 0)
 
-		fmt.Println("test PDA", pdaAccount)
-		encodedParams := []byte{}
-		encodedParams = append(encodedParams, []byte(PDAPrefixString)...)
-		encodedParams = append(encodedParams, PDAPublicKeySeed.Bytes()...)
-		go_binary.LittleEndian.AppendUint64(encodedParams, uint64Seed)
-		// encodedParams = append(encodedParams, []byte(stringSeed)...)
-		fmt.Println("test param encoded", encodedParams)
-
 		require.NoError(t, svc.Bind(ctx, []types.BoundContract{binding}))
 		require.NoError(t, svc.GetLatestValue(ctx, binding.ReadIdentifier(PDAAccount), primitives.Unconfirmed, map[string]any{
 			PDAPubKeySeedName: PDAPublicKeySeed.Bytes(),
+			"randomField": "randomValue",
 			PDAUint64SeedName: uint64Seed,
-			PDAStringSeedName: stringSeed,
 		}, &result))
 
 		assert.Equal(t, expected.InnerStruct, result.InnerStruct)
@@ -387,10 +376,6 @@ func newTestConfAndCodec(t *testing.T) (types.RemoteCodec, config.ContractReader
 								Name: PDAUint64SeedName,
 								Type: codec.SeedUint64,
 							},
-							// {
-							// 	Name: PDAStringSeedName,
-							// 	Type: codec.SeedString,
-							// },
 						},
 						OutputModifications: codeccommon.ModifiersConfig{
 							&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},

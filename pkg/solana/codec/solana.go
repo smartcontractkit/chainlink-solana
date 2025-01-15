@@ -25,7 +25,6 @@ import (
 	"math"
 	"reflect"
 
-	"github.com/gagliardetto/solana-go"
 	"github.com/go-viper/mapstructure/v2"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -397,12 +396,6 @@ func asSeeds(seeds []SeedDefinition) (commonencodings.TypeCodec, error) {
 		switch field.Type {
 		case SeedPubKey:
 			typedCodec = NewPublicKey()
-		case SeedString:
-			var err error
-			typedCodec, err = binary.NewString(solana.MaxSeedLength, binary.LittleEndian())
-			if err != nil {
-				return nil, fmt.Errorf("failed to create a string codec")
-			}
 		case SeedUint64:
 			typedCodec = binary.LittleEndian().Uint64()
 		default:
