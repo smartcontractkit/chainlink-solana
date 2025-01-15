@@ -169,6 +169,8 @@ func (lp *LogPoller) backfillFilters(ctx context.Context, filters []Filter, to i
 }
 
 func (lp *LogPoller) processBlocksRange(ctx context.Context, addresses []PublicKey, from, to int64) error {
+	// nolint:gosec
+	// G115: integer overflow conversion uint64 -&gt; int64
 	blocks, cleanup, err := lp.loader.BackfillForAddresses(ctx, addresses, uint64(from), uint64(to))
 	if err != nil {
 		return fmt.Errorf("error backfilling filters: %w", err)
