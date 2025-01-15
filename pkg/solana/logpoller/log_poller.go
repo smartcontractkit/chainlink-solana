@@ -134,7 +134,9 @@ func (lp *LogPoller) getLastProcessedSlot(ctx context.Context) (int64, error) {
 	if latestBlock == 0 {
 		return 0, fmt.Errorf("latest finalized slot is 0 - waiting for next slot to start processing")
 	}
-	return int64(latestBlock) - 1, nil
+	// nolint:gosec
+	// G115: integer overflow conversion uint64 -&gt; int64
+	return int64(latestBlock) - 1, nil //
 }
 
 func (lp *LogPoller) backfillFilters(ctx context.Context, filters []Filter, to int64) error {
@@ -237,27 +239,31 @@ func (lp *LogPoller) run(ctx context.Context) error {
 	if len(addresses) == 0 {
 		return nil
 	}
-	highestSlot, err := lp.client.GetSlot(ctx, rpc.CommitmentFinalized)
+	rawHighestSlot, err := lp.client.GetSlot(ctx, rpc.CommitmentFinalized)
 	if err != nil {
 		return fmt.Errorf("failed getting highest slot: %w", err)
 	}
 
-	if lastProcessedSlot > int64(highestSlot) {
+	// nolint:gosec
+	// G115: integer overflow conversion uint64 -&gt; int64
+	highestSlot := int64(rawHighestSlot)
+
+	if lastProcessedSlot > highestSlot {
 		return fmt.Errorf("last processed slot %d is higher than highest RPC slot %d", lastProcessedSlot, highestSlot)
 	}
 
-	if lastProcessedSlot == int64(highestSlot) {
+	if lastProcessedSlot == highestSlot {
 		lp.lggr.Debugw("RPC's latest finalized block is the same as latest processed - skipping", "lastProcessedSlot", lastProcessedSlot)
 		return nil
 	}
 
 	lp.lggr.Debugw("Got new slot range to process", "from", lastProcessedSlot+1, "to", highestSlot)
-	err = lp.processBlocksRange(ctx, addresses, lastProcessedSlot+1, int64(highestSlot))
+	err = lp.processBlocksRange(ctx, addresses, lastProcessedSlot+1, highestSlot)
 	if err != nil {
 		return fmt.Errorf("failed processing block range [%d, %d]: %w", lastProcessedSlot+1, highestSlot, err)
 	}
 
-	lp.lastProcessedSlot = int64(highestSlot)
+	lp.lastProcessedSlot = highestSlot
 	return nil
 }
 

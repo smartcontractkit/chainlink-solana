@@ -57,6 +57,5 @@ func TestBlocksSorter(t *testing.T) {
 		default:
 			require.Fail(t, "expected to channel to be closed")
 		}
-
 	})
 }

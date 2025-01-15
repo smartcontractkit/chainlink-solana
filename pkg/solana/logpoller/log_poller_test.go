@@ -26,16 +26,16 @@ type mockedLP struct {
 }
 
 func newMockedLP(t *testing.T) mockedLP {
-	mockedLP := mockedLP{
+	result := mockedLP{
 		ORM:     NewMockORM(t),
 		Client:  mocks.NewRPCClient(t),
 		Loader:  newMockLogsLoader(t),
 		Filters: newMockFilters(t),
 	}
-	mockedLP.LogPoller = New(logger.TestSugared(t), mockedLP.ORM, mockedLP.Client)
-	mockedLP.LogPoller.loader = mockedLP.Loader
-	mockedLP.LogPoller.filters = mockedLP.Filters
-	return mockedLP
+	result.LogPoller = New(logger.TestSugared(t), result.ORM, result.Client)
+	result.LogPoller.loader = result.Loader
+	result.LogPoller.filters = result.Filters
+	return result
 }
 
 func TestLogPoller_start(t *testing.T) {

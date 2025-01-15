@@ -87,8 +87,8 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 			height := slot - 1
 
 			tx := solana.Transaction{Signatures: []solana.Signature{sigs[slotIdx]}}
-			binaryTx, err := tx.MarshalBinary()
-			require.NoError(t, err)
+			binaryTx, txErr := tx.MarshalBinary()
+			require.NoError(t, txErr)
 			return &rpc.GetBlockResult{
 				Blockhash: hashes[slotIdx],
 				Transactions: []rpc.TransactionWithMeta{
