@@ -358,8 +358,8 @@ func TestFilters_GetFiltersToBackfill(t *testing.T) {
 	require.NoError(t, filters.RegisterFilter(tests.Context(t), notBackfilled))
 	ensureInQueue(notBackfilled)
 	// new filter is always added to the queue
-	newFilter := Filter{Name: "new filter", ID: 3}
-	orm.EXPECT().InsertFilter(mock.Anything, newFilter).Return(newFilter.ID, nil).Once()
+	newFilter := Filter{Name: "new filter"}
+	orm.EXPECT().InsertFilter(mock.Anything, newFilter).Return(3, nil).Once()
 	require.NoError(t, filters.RegisterFilter(tests.Context(t), newFilter))
-	ensureInQueue(notBackfilled, newFilter)
+	ensureInQueue(notBackfilled, Filter{ID: 3, Name: "new filter"})
 }
