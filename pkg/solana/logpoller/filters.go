@@ -216,6 +216,10 @@ func (fl *filters) removeFilterFromIndexes(filter Filter) {
 		delete(fl.filtersByAddress, filter.Address)
 	}
 
+	if _, ok := fl.seqNums[filter.ID]; ok {
+		delete(fl.seqNums, filter.ID)
+	}
+
 	programID := filter.Address.ToSolana().String()
 	if refcount, ok := fl.knownPrograms[programID]; ok {
 		refcount--

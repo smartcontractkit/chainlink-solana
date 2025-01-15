@@ -126,7 +126,7 @@ func (j *getTransactionsFromBlockJob) Run(ctx context.Context) error {
 	detail.blockTime = *block.BlockTime
 
 	if len(block.Transactions) != len(blockSigsOnly.Signatures) {
-		return fmt.Errorf("block %d has %d transactions but %d signatures", block.BlockHeight, len(block.Transactions), len(blockSigsOnly.Signatures))
+		return fmt.Errorf("block %d has %d transactions but %d signatures", j.slotNumber, len(block.Transactions), len(blockSigsOnly.Signatures))
 	}
 
 	j.parser.ExpectTxs(j.slotNumber, len(block.Transactions))
