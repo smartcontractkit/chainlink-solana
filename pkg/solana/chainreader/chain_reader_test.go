@@ -178,8 +178,8 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 
 		require.NoError(t, svc.Bind(ctx, []types.BoundContract{binding}))
 		require.NoError(t, svc.GetLatestValue(ctx, binding.ReadIdentifier(PDAAccount), primitives.Unconfirmed, map[string]any{
-			PDAPubKeySeedName: PDAPublicKeySeed.Bytes(),
-			"randomField": "randomValue",
+			PDAPubKeySeedName: PDAPublicKeySeed,
+			"randomField": "randomValue", // unused field should be ignored by the codec
 			PDAUint64SeedName: uint64Seed,
 		}, &result))
 
@@ -377,6 +377,9 @@ func newTestConfAndCodec(t *testing.T) (types.RemoteCodec, config.ContractReader
 								Type: codec.SeedUint64,
 							},
 						},
+						// InputModifications: codeccommon.ModifiersConfig{
+						// 	&codeccommon.RenameModifierConfig{Fields: map[string]string{"PublicKey": PDAPubKeySeedName}},
+						// },
 						OutputModifications: codeccommon.ModifiersConfig{
 							&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},
 						},
