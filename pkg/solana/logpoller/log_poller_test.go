@@ -18,7 +18,7 @@ import (
 )
 
 type mockedLP struct {
-	ORM       *mockORM
+	ORM       *MockORM
 	Client    *mocks.RPCClient
 	Loader    *mockLogsLoader
 	Filters   *mockFilters
@@ -27,18 +27,14 @@ type mockedLP struct {
 
 func newMockedLP(t *testing.T) mockedLP {
 	mockedLP := mockedLP{
-		ORM:     newMockORM(t),
+		ORM:     NewMockORM(t),
 		Client:  mocks.NewRPCClient(t),
 		Loader:  newMockLogsLoader(t),
 		Filters: newMockFilters(t),
 	}
-	mockedLP.LogPoller = &LogPoller{
-		lggr:    logger.TestSugared(t),
-		orm:     mockedLP.ORM,
-		client:  mockedLP.Client,
-		loader:  mockedLP.Loader,
-		filters: mockedLP.Filters,
-	}
+	mockedLP.LogPoller = New(logger.TestSugared(t), mockedLP.ORM, mockedLP.Client)
+	mockedLP.LogPoller.loader = mockedLP.Loader
+	mockedLP.LogPoller.filters = mockedLP.Filters
 	return mockedLP
 }
 

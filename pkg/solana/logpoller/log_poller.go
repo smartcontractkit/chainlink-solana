@@ -50,6 +50,7 @@ type LogPoller struct {
 	client            RPCClient
 	loader            logsLoader
 	filters           filtersI
+	processBlocks     func(ctx context.Context, blocks []Block) error // TODO: introduced for smoke test. Remove after NONEVM-916 is merged
 }
 
 func New(lggr logger.SugaredLogger, orm ORM, client RPCClient) *LogPoller {
@@ -61,6 +62,8 @@ func New(lggr logger.SugaredLogger, orm ORM, client RPCClient) *LogPoller {
 		client:  client,
 	}
 
+	lp.processBlocks = lp.processBlocksImpl
+
 	lp.Service, lp.eng = services.Config{
 		Name:  "LogPollerService",
 		Start: lp.start,
@@ -71,6 +74,12 @@ func New(lggr logger.SugaredLogger, orm ORM, client RPCClient) *LogPoller {
 		},
 	}.NewServiceEngine(lggr)
 	lp.lggr = lp.eng.SugaredLogger
+	return lp
+}
+
+func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient, processBlocks func(ctx context.Context, blocks []Block) error) *LogPoller {
+	lp := New(lggr, orm, client)
+	lp.processBlocks = processBlocks
 	return lp
 }
 
@@ -204,7 +213,7 @@ func appendBuffered(ch <-chan Block, max int, blocks []Block) []Block {
 	}
 }
 
-func (lp *LogPoller) processBlocks(ctx context.Context, blocks []Block) error {
+func (lp *LogPoller) processBlocksImpl(ctx context.Context, blocks []Block) error {
 	// TODO: add logic implemented by NONEVM-916
 	return nil
 }
@@ -233,10 +242,16 @@ func (lp *LogPoller) run(ctx context.Context) error {
 		return fmt.Errorf("failed getting highest slot: %w", err)
 	}
 
-	if lastProcessedSlot >= int64(highestSlot) {
+	if lastProcessedSlot > int64(highestSlot) {
 		return fmt.Errorf("last processed slot %d is higher than highest RPC slot %d", lastProcessedSlot, highestSlot)
 	}
 
+	if lastProcessedSlot == int64(highestSlot) {
+		lp.lggr.Debugw("RPC's latest finalized block is the same as latest processed - skipping", "lastProcessedSlot", lastProcessedSlot)
+		return nil
+	}
+
+	lp.lggr.Debugw("Got new slot range to process", "from", lastProcessedSlot+1, "to", highestSlot)
 	err = lp.processBlocksRange(ctx, addresses, lastProcessedSlot+1, int64(highestSlot))
 	if err != nil {
 		return fmt.Errorf("failed processing block range [%d, %d]: %w", lastProcessedSlot+1, highestSlot, err)
