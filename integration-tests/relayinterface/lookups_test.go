@@ -127,6 +127,7 @@ func TestAccountLookups(t *testing.T) {
 
 func TestPDALookups(t *testing.T) {
 	programID := chainwriter.GetRandomPubKey(t)
+	ctx := tests.Context(t)
 
 	t.Run("PDALookup resolves valid PDA with constant address seeds", func(t *testing.T) {
 		seed := chainwriter.GetRandomPubKey(t)
@@ -152,7 +153,6 @@ func TestPDALookups(t *testing.T) {
 			IsWritable: true,
 		}
 
-		ctx := tests.Context(t)
 		result, err := pdaLookup.Resolve(ctx, nil, nil, nil)
 		require.NoError(t, err)
 		require.Equal(t, expectedMeta, result)
@@ -183,7 +183,6 @@ func TestPDALookups(t *testing.T) {
 			IsWritable: true,
 		}
 
-		ctx := tests.Context(t)
 		args := map[string]interface{}{
 			"test_seed":    seed1,
 			"another_seed": seed2,
@@ -205,7 +204,6 @@ func TestPDALookups(t *testing.T) {
 			IsWritable: true,
 		}
 
-		ctx := tests.Context(t)
 		args := map[string]interface{}{
 			"test_seed": []byte("data"),
 		}
@@ -241,10 +239,87 @@ func TestPDALookups(t *testing.T) {
 			IsWritable: true,
 		}
 
-		ctx := tests.Context(t)
 		args := map[string]interface{}{
 			"test_seed":    seed1,
 			"another_seed": seed2,
+		}
+
+		result, err := pdaLookup.Resolve(ctx, args, nil, nil)
+		require.NoError(t, err)
+		require.Equal(t, expectedMeta, result)
+	})
+
+	t.Run("PDALookups resolves list of PDAs when a seed is an array", func(t *testing.T) {
+		singleSeed := []byte("test_seed")
+		arraySeed := []solana.PublicKey{chainwriter.GetRandomPubKey(t), chainwriter.GetRandomPubKey(t)}
+
+		expectedMeta := []*solana.AccountMeta{}
+
+		for _, seed := range arraySeed {
+			pda, _, err := solana.FindProgramAddress([][]byte{singleSeed, seed.Bytes()}, programID)
+			require.NoError(t, err)
+			meta := &solana.AccountMeta{
+				PublicKey:  pda,
+				IsSigner:   false,
+				IsWritable: false,
+			}
+			expectedMeta = append(expectedMeta, meta)
+		}
+
+		pdaLookup := chainwriter.PDALookups{
+			Name:      "TestPDA",
+			PublicKey: chainwriter.AccountConstant{Name: "ProgramID", Address: programID.String()},
+			Seeds: []chainwriter.Seed{
+				{Dynamic: chainwriter.AccountLookup{Name: "seed1", Location: "single_seed"}},
+				{Dynamic: chainwriter.AccountLookup{Name: "seed2", Location: "array_seed"}},
+			},
+			IsSigner:   false,
+			IsWritable: false,
+		}
+
+		args := map[string]interface{}{
+			"single_seed": singleSeed,
+			"array_seed":  arraySeed,
+		}
+
+		result, err := pdaLookup.Resolve(ctx, args, nil, nil)
+		require.NoError(t, err)
+		require.Equal(t, expectedMeta, result)
+	})
+
+	t.Run("PDALookups resolves list of PDAs when multiple seeds are arrays", func(t *testing.T) {
+		arraySeed1 := [][]byte{[]byte("test_seed1"), []byte("test_seed2")}
+		arraySeed2 := []solana.PublicKey{chainwriter.GetRandomPubKey(t), chainwriter.GetRandomPubKey(t)}
+
+		expectedMeta := []*solana.AccountMeta{}
+
+		for _, seed1 := range arraySeed1 {
+			for _, seed2 := range arraySeed2 {
+				pda, _, err := solana.FindProgramAddress([][]byte{seed1, seed2.Bytes()}, programID)
+				require.NoError(t, err)
+				meta := &solana.AccountMeta{
+					PublicKey:  pda,
+					IsSigner:   false,
+					IsWritable: false,
+				}
+				expectedMeta = append(expectedMeta, meta)
+			}
+		}
+
+		pdaLookup := chainwriter.PDALookups{
+			Name:      "TestPDA",
+			PublicKey: chainwriter.AccountConstant{Name: "ProgramID", Address: programID.String()},
+			Seeds: []chainwriter.Seed{
+				{Dynamic: chainwriter.AccountLookup{Name: "seed1", Location: "seed1"}},
+				{Dynamic: chainwriter.AccountLookup{Name: "seed2", Location: "seed2"}},
+			},
+			IsSigner:   false,
+			IsWritable: false,
+		}
+
+		args := map[string]interface{}{
+			"seed1": arraySeed1,
+			"seed2": arraySeed2,
 		}
 
 		result, err := pdaLookup.Resolve(ctx, args, nil, nil)

@@ -1,1 +1,123 @@
-{"version":"0.1.0","name":"contractReaderInterface","instructions":[{"name":"initialize","accounts":[{"name":"data","isMut":true,"isSigner":false},{"name":"signer","isMut":true,"isSigner":true},{"name":"systemProgram","isMut":false,"isSigner":false}],"args":[{"name":"testIdx","type":"u64"},{"name":"value","type":"u64"}]},{"name":"initializeLookupTable","accounts":[{"name":"writeDataAccount","isMut":true,"isSigner":false,"docs":["PDA for LookupTableDataAccount, derived from seeds and created by the System Program"]},{"name":"admin","isMut":true,"isSigner":true,"docs":["Admin account that pays for PDA creation and signs the transaction"]},{"name":"systemProgram","isMut":false,"isSigner":false,"docs":["System Program required for PDA creation"]}],"args":[{"name":"lookupTable","type":"publicKey"}]}],"accounts":[{"name":"LookupTableDataAccount","type":{"kind":"struct","fields":[{"name":"version","type":"u8"},{"name":"administrator","type":"publicKey"},{"name":"pendingAdministrator","type":"publicKey"},{"name":"lookupTable","type":"publicKey"}]}},{"name":"DataAccount","type":{"kind":"struct","fields":[{"name":"idx","type":"u64"},{"name":"bump","type":"u8"},{"name":"u64Value","type":"u64"},{"name":"u64Slice","type":{"vec":"u64"}}]}}]}
+{
+    "version": "0.1.0",
+    "name": "contractReaderInterface",
+    "instructions": [
+        {
+            "name": "initialize",
+            "accounts": [
+                {
+                    "name": "data",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "signer",
+                    "isMut": true,
+                    "isSigner": true
+                },
+                {
+                    "name": "systemProgram",
+                    "isMut": false,
+                    "isSigner": false
+                }
+            ],
+            "args": [
+                {
+                    "name": "testIdx",
+                    "type": "u64"
+                },
+                {
+                    "name": "value",
+                    "type": "u64"
+                }
+            ]
+        },
+        {
+            "name": "initializeLookupTable",
+            "accounts": [
+                {
+                    "name": "writeDataAccount",
+                    "isMut": true,
+                    "isSigner": false,
+                    "docs": [
+                        "PDA for LookupTableDataAccount, derived from seeds and created by the System Program"
+                    ]
+                },
+                {
+                    "name": "admin",
+                    "isMut": true,
+                    "isSigner": true,
+                    "docs": [
+                        "Admin account that pays for PDA creation and signs the transaction"
+                    ]
+                },
+                {
+                    "name": "systemProgram",
+                    "isMut": false,
+                    "isSigner": false,
+                    "docs": [
+                        "System Program required for PDA creation"
+                    ]
+                }
+            ],
+            "args": [
+                {
+                    "name": "lookupTable",
+                    "type": "publicKey"
+                }
+            ]
+        }
+    ],
+    "accounts": [
+        {
+            "name": "LookupTableDataAccount",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "version",
+                        "type": "u8"
+                    },
+                    {
+                        "name": "administrator",
+                        "type": "publicKey"
+                    },
+                    {
+                        "name": "pendingAdministrator",
+                        "type": "publicKey"
+                    },
+                    {
+                        "name": "lookupTable",
+                        "type": "publicKey"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "DataAccount",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "idx",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "bump",
+                        "type": "u8"
+                    },
+                    {
+                        "name": "u64Value",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "u64Slice",
+                        "type": {
+                            "vec": "u64"
+                        }
+                    }
+                ]
+            }
+        }
+    ]
+}
