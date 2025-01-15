@@ -187,11 +187,9 @@ func (c *Client) GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint6
 	defer cancel()
 
 	// Incorporate startSlot/endSlot into the key to differentiate concurrent calls with different ranges
-	var endSlotStr string
-	if endSlot == nil {
-		endSlotStr = "nil"
-	} else {
-		endSlotStr = fmt.Sprintf("%d", *endSlot)
+	endSlotStr := "nil"
+	if endSlot != nil {
+		endSlotStr = fmt.Sprint(*endSlot)
 	}
 	key := fmt.Sprintf("GetBlocks(%d,%s)", startSlot, endSlotStr)
 	v, err, _ := c.requestGroup.Do(key, func() (interface{}, error) {
