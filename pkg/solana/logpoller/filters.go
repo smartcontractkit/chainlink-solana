@@ -273,6 +273,10 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[F
 		return nil
 	}
 
+	// If this log message corresponds to an anchor event, then it must begin with an 8 byte discriminator,
+	// which will appear as the first 11 bytes of base64-encoded data. Standard base64 encoding RFC requires
+	// that any base64-encoded string must be padding with the = char to make its length a multiple of 4, so
+	// 12 is the minimum length for a valid anchor event.
 	if len(event.Data) < 12 {
 		return nil
 	}
@@ -280,7 +284,7 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[F
 	// The first 64-bits of the event data is the event sig. Because it's base64 encoded, this corresponds to
 	// the first 10 characters plus 4 bits of the 11th character. We can quickly rule it out as not matching any known
 	// discriminators if the first 10 characters don't match. If it passes that initial test, we base64-decode the
-	// first 11 characters, and use the first 8 bytes of that as the event sig to call MatchingFilters. The address
+	// first 12 characters, and use the first 8 bytes of that as the event sig to call MatchingFilters. The address
 	// also needs to be base58-decoded to pass to MatchingFilters
 	if _, ok := fl.knownDiscriminators[event.Data[:10]]; !ok {
 		return nil
