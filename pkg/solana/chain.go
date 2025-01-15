@@ -34,12 +34,19 @@ import (
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
+type LogPoller interface {
+	Start(context.Context) error
+	Close() error
+	RegisterFilter(ctx context.Context, filter logpoller.Filter) error
+	UnregisterFilter(ctx context.Context, name string) error
+}
+
 type Chain interface {
 	types.ChainService
 
 	ID() string
 	Config() config.Config
-	LogPoller() logpoller.ILogPoller
+	LogPoller() LogPoller
 	TxManager() TxManager
 	// Reader returns a new Reader from the available list of nodes (if there are multiple, it will randomly select one)
 	Reader() (client.Reader, error)
@@ -92,7 +99,7 @@ type chain struct {
 	services.StateMachine
 	id             string
 	cfg            *config.TOMLConfig
-	lp             logpoller.ILogPoller
+	lp             logpoller.LogPoller
 	txm            *txm.Txm
 	balanceMonitor services.Service
 	lggr           logger.Logger
@@ -407,7 +414,7 @@ func (c *chain) Config() config.Config {
 	return c.cfg
 }
 
-func (c *chain) LogPoller() logpoller.ILogPoller {
+func (c *chain) LogPoller() LogPoller {
 	return c.lp
 }
 

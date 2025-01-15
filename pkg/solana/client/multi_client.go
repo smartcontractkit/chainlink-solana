@@ -166,3 +166,12 @@ func (m *MultiClient) GetSignaturesForAddressWithOpts(ctx context.Context, addr 
 
 	return r.GetSignaturesForAddressWithOpts(ctx, addr, opts)
 }
+
+func (m *MultiClient) GetBlockWithOpts(ctx context.Context, slot uint64, opts *rpc.GetBlockOpts) (*rpc.GetBlockResult, error) {
+	r, err := m.getClient()
+	if err != nil {
+		return nil, err
+	}
+
+	return r.GetBlockWithOpts(ctx, slot, opts)
+}

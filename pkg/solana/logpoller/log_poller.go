@@ -32,14 +32,6 @@ type ORM interface {
 	SelectSeqNums(ctx context.Context) (map[int64]int64, error)
 }
 
-type ILogPoller interface {
-	Start(context.Context) error
-	Close() error
-	RegisterFilter(ctx context.Context, filter Filter) error
-	UnregisterFilter(ctx context.Context, name string) error
-	Process(programEvent ProgramEvent) error
-}
-
 type LogPoller struct {
 	services.Service
 	eng *services.Engine
@@ -53,7 +45,7 @@ type LogPoller struct {
 	filters *filters
 }
 
-func New(lggr logger.SugaredLogger, orm ORM, cl internal.Loader[client.Reader]) ILogPoller {
+func New(lggr logger.SugaredLogger, orm ORM, cl internal.Loader[client.Reader]) *LogPoller {
 	lggr = logger.Sugared(logger.Named(lggr, "LogPoller"))
 	lp := &LogPoller{
 		orm:     orm,
