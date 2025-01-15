@@ -27,10 +27,16 @@ type AccountConstant struct {
 
 // AccountLookup dynamically derives an account address from args using a specified location path.
 type AccountLookup struct {
-	Name       string
-	Location   string
-	IsSigner   bool
-	IsWritable bool
+	Name     string
+	Location string
+	// IsSigner and IsWritable can either be a constant bool or a location to a bool
+	IsSigner   MetaBool
+	IsWritable MetaBool
+}
+
+type MetaBool struct {
+	Value    bool
+	Location string
 }
 
 type Seed struct {
@@ -89,21 +95,73 @@ func (ac AccountConstant) Resolve(_ context.Context, _ any, _ map[string]map[str
 	}, nil
 }
 
-func (al AccountLookup) Resolve(_ context.Context, args any, _ map[string]map[string][]*solana.AccountMeta, _ client.Reader) ([]*solana.AccountMeta, error) {
+func (al AccountLookup) Resolve(
+	_ context.Context,
+	args any,
+	_ map[string]map[string][]*solana.AccountMeta,
+	_ client.Reader,
+) ([]*solana.AccountMeta, error) {
 	derivedValues, err := GetValuesAtLocation(args, al.Location)
 	if err != nil {
-		return nil, fmt.Errorf("error getting account from lookup: %w", err)
+		return nil, fmt.Errorf("error getting account from '%s': %w", al.Location, err)
 	}
 
 	var metas []*solana.AccountMeta
-	for _, address := range derivedValues {
+	for i, address := range derivedValues {
+		// Resolve isSigner for this particular pubkey
+		isSigner, err := resolveMetaBool(al.IsSigner, args, i, len(derivedValues))
+		if err != nil {
+			return nil, err
+		}
+
+		// Resolve isWritable
+		isWritable, err := resolveMetaBool(al.IsWritable, args, i, len(derivedValues))
+		if err != nil {
+			return nil, err
+		}
+
 		metas = append(metas, &solana.AccountMeta{
 			PublicKey:  solana.PublicKeyFromBytes(address),
-			IsSigner:   al.IsSigner,
-			IsWritable: al.IsWritable,
+			IsSigner:   isSigner,
+			IsWritable: isWritable,
 		})
 	}
+
 	return metas, nil
+}
+
+func resolveMetaBool(mb MetaBool, args any, pubkeyIndex, pubkeysCount int) (bool, error) {
+	if mb.Location == "" {
+		return mb.Value, nil
+	}
+
+	boolVals, err := GetValuesAtLocation(args, mb.Location)
+	if err != nil {
+		return false, fmt.Errorf("error reading bools from location '%s': %w", mb.Location, err)
+	}
+
+	if len(boolVals) == 0 {
+		return false, fmt.Errorf("no boolean found at location '%s'", mb.Location)
+	}
+
+	// boolVals should always equal the number of pubkeys or 1
+	if len(boolVals) != pubkeysCount && len(boolVals) != 1 {
+		return false, fmt.Errorf(
+			"boolean array length %d doesn't match pubkey count %d for location '%s'",
+			len(boolVals), pubkeysCount, mb.Location,
+		)
+	}
+
+	// a single boolean value is valid to apply to all pubkeys
+	data := boolVals[0]
+
+	if len(boolVals) > 1 {
+		data = boolVals[pubkeyIndex]
+	}
+	if len(data) == 0 {
+		return false, fmt.Errorf("missing data for boolean at index %d in location '%s'", pubkeyIndex, mb.Location)
+	}
+	return data[0] != 0, nil
 }
 
 func (alt AccountsFromLookupTable) Resolve(_ context.Context, _ any, derivedTableMap map[string]map[string][]*solana.AccountMeta, _ client.Reader) ([]*solana.AccountMeta, error) {
