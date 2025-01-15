@@ -54,8 +54,8 @@ func TestBlocksSorter(t *testing.T) {
 		select {
 		case _, ok := <-ch:
 			require.False(t, ok)
-		default:
-			require.Fail(t, "expected to channel to be closed")
+		case <-ctx.Done():
+			require.Fail(t, "expected channel to be closed")
 		}
 	})
 }
