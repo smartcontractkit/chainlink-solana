@@ -128,8 +128,8 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 			chainwriter.AccountLookup{
 				Name:       "LookupTable",
 				Location:   "LookupTable",
-				IsSigner:   accountLookupMeta.IsSigner,
-				IsWritable: accountLookupMeta.IsWritable,
+				IsSigner:   chainwriter.MetaBool{Value: accountLookupMeta.IsSigner},
+				IsWritable: chainwriter.MetaBool{Value: accountLookupMeta.IsWritable},
 			},
 			chainwriter.PDALookups{
 				Name:      "DataAccountPDA",
@@ -463,8 +463,8 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 							chainwriter.AccountLookup{
 								Name:       "LookupTable",
 								Location:   "LookupTable",
-								IsSigner:   false,
-								IsWritable: false,
+								IsSigner:   chainwriter.MetaBool{Value: false},
+								IsWritable: chainwriter.MetaBool{Value: false},
 							},
 							chainwriter.PDALookups{
 								Name:      "DataAccountPDA",

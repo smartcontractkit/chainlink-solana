@@ -21,6 +21,14 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
+type InnerAccountArgs struct {
+	Accounts []*solana.AccountMeta
+}
+
+type TestAccountArgs struct {
+	Inner InnerAccountArgs
+}
+
 func TestAccountContant(t *testing.T) {
 	t.Run("AccountConstant resolves valid address", func(t *testing.T) {
 		expectedAddr := chainwriter.GetRandomPubKey(t)
@@ -62,8 +70,8 @@ func TestAccountLookups(t *testing.T) {
 		lookupConfig := chainwriter.AccountLookup{
 			Name:       "TestAccount",
 			Location:   "Inner.Address",
-			IsSigner:   true,
-			IsWritable: true,
+			IsSigner:   chainwriter.MetaBool{Value: true},
+			IsWritable: chainwriter.MetaBool{Value: true},
 		}
 		result, err := lookupConfig.Resolve(ctx, testArgs, nil, nil)
 		require.NoError(t, err)
@@ -96,8 +104,8 @@ func TestAccountLookups(t *testing.T) {
 		lookupConfig := chainwriter.AccountLookup{
 			Name:       "TestAccount",
 			Location:   "Inner.Address",
-			IsSigner:   true,
-			IsWritable: true,
+			IsSigner:   chainwriter.MetaBool{Value: true},
+			IsWritable: chainwriter.MetaBool{Value: true},
 		}
 		result, err := lookupConfig.Resolve(ctx, testArgs, nil, nil)
 		require.NoError(t, err)
@@ -117,11 +125,200 @@ func TestAccountLookups(t *testing.T) {
 		lookupConfig := chainwriter.AccountLookup{
 			Name:       "InvalidAccount",
 			Location:   "Invalid.Directory",
-			IsSigner:   true,
-			IsWritable: true,
+			IsSigner:   chainwriter.MetaBool{Value: true},
+			IsWritable: chainwriter.MetaBool{Value: true},
 		}
 		_, err := lookupConfig.Resolve(ctx, testArgs, nil, nil)
 		require.Error(t, err)
+	})
+
+	t.Run("AccountLookup works with MetaBool lookups", func(t *testing.T) {
+		accounts := [3]*solana.AccountMeta{}
+
+		for i := 0; i < 3; i++ {
+			accounts[i] = &solana.AccountMeta{
+				PublicKey:  chainwriter.GetRandomPubKey(t),
+				IsSigner:   i%2 == 0,
+				IsWritable: (i+1)%2 == 0,
+			}
+		}
+
+		lookupConfig := chainwriter.AccountLookup{
+			Name:       "InvalidAccount",
+			Location:   "Inner.Accounts.PublicKey",
+			IsSigner:   chainwriter.MetaBool{Location: "Inner.Accounts.IsSigner"},
+			IsWritable: chainwriter.MetaBool{Location: "Inner.Accounts.IsWritable"},
+		}
+
+		args := TestAccountArgs{
+			Inner: InnerAccountArgs{
+				Accounts: accounts[:],
+			},
+		}
+
+		result, err := lookupConfig.Resolve(ctx, args, nil, nil)
+		require.NoError(t, err)
+
+		for i, meta := range result {
+			require.Equal(t, accounts[i], meta)
+		}
+	})
+
+	t.Run("AccountLookup works with MetaBool lookups when a meta field is missing", func(t *testing.T) {
+		accounts := [3]*solana.AccountMeta{}
+
+		for i := 0; i < 3; i++ {
+			accounts[i] = &solana.AccountMeta{
+				PublicKey:  chainwriter.GetRandomPubKey(t),
+				IsWritable: true,
+			}
+		}
+
+		lookupConfig := chainwriter.AccountLookup{
+			Name:       "InvalidAccount",
+			Location:   "Inner.Accounts.PublicKey",
+			IsSigner:   chainwriter.MetaBool{Location: "Inner.Accounts.IsSigner"},
+			IsWritable: chainwriter.MetaBool{Location: "Inner.Accounts.IsWritable"},
+		}
+
+		args := TestAccountArgs{
+			Inner: InnerAccountArgs{
+				Accounts: accounts[:],
+			},
+		}
+
+		result, err := lookupConfig.Resolve(ctx, args, nil, nil)
+		require.NoError(t, err)
+
+		for i, meta := range result {
+			require.Equal(t, accounts[i], meta)
+		}
+	})
+
+	t.Run("AccountLookup works with MetaBool lookups in a different location", func(t *testing.T) {
+		type TestAccountArgsExtended struct {
+			Inner        InnerAccountArgs
+			ExternalBool bool
+		}
+
+		accounts := [3]*solana.AccountMeta{}
+
+		for i := 0; i < 3; i++ {
+			accounts[i] = &solana.AccountMeta{
+				PublicKey:  chainwriter.GetRandomPubKey(t),
+				IsWritable: true,
+				IsSigner:   true,
+			}
+		}
+
+		lookupConfig := chainwriter.AccountLookup{
+			Name:       "InvalidAccount",
+			Location:   "Inner.Accounts.PublicKey",
+			IsSigner:   chainwriter.MetaBool{Location: "ExternalBool"},
+			IsWritable: chainwriter.MetaBool{Location: "ExternalBool"},
+		}
+
+		args := TestAccountArgsExtended{
+			Inner: InnerAccountArgs{
+				Accounts: accounts[:],
+			},
+			ExternalBool: true,
+		}
+
+		result, err := lookupConfig.Resolve(ctx, args, nil, nil)
+		require.NoError(t, err)
+
+		for i, meta := range result {
+			require.Equal(t, accounts[i], meta)
+		}
+	})
+
+	t.Run("AccountLookup fails with MetaBool due to an invalid number of Meta lookups", func(t *testing.T) {
+		type TestAccountArgsExtended struct {
+			Inner         InnerAccountArgs
+			ExternalBools []bool
+		}
+
+		accounts := [3]*solana.AccountMeta{}
+
+		for i := 0; i < 3; i++ {
+			accounts[i] = &solana.AccountMeta{
+				PublicKey:  chainwriter.GetRandomPubKey(t),
+				IsWritable: true,
+				IsSigner:   true,
+			}
+		}
+
+		lookupConfig := chainwriter.AccountLookup{
+			Name:       "InvalidAccount",
+			Location:   "Inner.Accounts.PublicKey",
+			IsSigner:   chainwriter.MetaBool{Location: "ExternalBools"},
+			IsWritable: chainwriter.MetaBool{Location: "ExternalBools"},
+		}
+
+		args := TestAccountArgsExtended{
+			Inner: InnerAccountArgs{
+				Accounts: accounts[:],
+			},
+			ExternalBools: []bool{true, true},
+		}
+
+		_, err := lookupConfig.Resolve(ctx, args, nil, nil)
+		require.Contains(t, err.Error(), "boolean array length 2 doesn't match pubkey count 3 for location")
+	})
+
+	t.Run("AccountLookup fails with MetaBool with an Invalid Location", func(t *testing.T) {
+		accounts := [3]*solana.AccountMeta{}
+
+		for i := 0; i < 3; i++ {
+			accounts[i] = &solana.AccountMeta{
+				PublicKey:  chainwriter.GetRandomPubKey(t),
+				IsWritable: true,
+			}
+		}
+
+		lookupConfig := chainwriter.AccountLookup{
+			Name:       "InvalidAccount",
+			Location:   "Inner.Accounts.PublicKey",
+			IsSigner:   chainwriter.MetaBool{Location: "Invalid.IsSigner"},
+			IsWritable: chainwriter.MetaBool{Location: "Invalid.IsWritable"},
+		}
+
+		args := TestAccountArgs{
+			Inner: InnerAccountArgs{
+				Accounts: accounts[:],
+			},
+		}
+
+		_, err := lookupConfig.Resolve(ctx, args, nil, nil)
+		require.Contains(t, err.Error(), "error reading bools from location")
+	})
+
+	t.Run("AccountLookup fails when MetaBool is an invalid type", func(t *testing.T) {
+		accounts := [3]*solana.AccountMeta{}
+
+		for i := 0; i < 3; i++ {
+			accounts[i] = &solana.AccountMeta{
+				PublicKey:  chainwriter.GetRandomPubKey(t),
+				IsWritable: true,
+			}
+		}
+
+		lookupConfig := chainwriter.AccountLookup{
+			Name:       "InvalidAccount",
+			Location:   "Inner.Accounts.PublicKey",
+			IsSigner:   chainwriter.MetaBool{Location: "Inner"},
+			IsWritable: chainwriter.MetaBool{Location: "Inner"},
+		}
+
+		args := TestAccountArgs{
+			Inner: InnerAccountArgs{
+				Accounts: accounts[:],
+			},
+		}
+
+		_, err := lookupConfig.Resolve(ctx, args, nil, nil)
+		require.Contains(t, err.Error(), "invalid value format at path")
 	})
 }
 
@@ -435,7 +632,7 @@ func TestLookupTables(t *testing.T) {
 					Accounts: chainwriter.AccountLookup{
 						Name:     "TestLookupTable",
 						Location: "Inner.Address",
-						IsSigner: true,
+						IsSigner: chainwriter.MetaBool{Value: true},
 					},
 				},
 			},

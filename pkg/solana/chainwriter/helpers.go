@@ -51,8 +51,14 @@ func GetValuesAtLocation(args any, location string) ([][]byte, error) {
 			buf := make([]byte, 8)
 			binary.LittleEndian.PutUint64(buf, num)
 			vals = append(vals, buf)
+		} else if boolean, ok := value.(bool); ok {
+			if boolean {
+				vals = append(vals, []byte{0x01})
+			} else {
+				vals = append(vals, []byte{0x00})
+			}
 		} else {
-			return nil, fmt.Errorf("invalid value format at path: %s", location)
+			return nil, fmt.Errorf("invalid value format at path: %s, type: %s", location, reflect.TypeOf(value).String())
 		}
 	}
 
