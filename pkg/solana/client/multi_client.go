@@ -6,7 +6,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
-	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
+	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 )
 
 var _ ReaderWriter = (*MultiClient)(nil)
