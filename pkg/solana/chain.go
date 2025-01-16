@@ -96,8 +96,7 @@ func NewChain(cfg *config.TOMLConfig, opts ChainOpts) (Chain, error) {
 var _ Chain = (*chain)(nil)
 
 type chain struct {
-	services.Service
-	engine         *services.Engine
+	services.StateMachine
 	id             string
 	cfg            *config.TOMLConfig
 	lp             logpoller.LogPoller
@@ -248,7 +247,6 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 		clientCache: map[string]*verifiedCachedClient{},
 	}
 
-	var lc internal.Loader[client.Reader] = utils.NewLazyLoad(func() (client.Reader, error) { return ch.getClient() })
 	var tc internal.Loader[client.ReaderWriter] = utils.NewLazyLoad(func() (client.ReaderWriter, error) { return ch.getClient() })
 	var bc internal.Loader[monitor.BalanceClient] = utils.NewLazyLoad(func() (monitor.BalanceClient, error) { return ch.getClient() })
 	// getClient returns random client or if MultiNodeEnabled RPC picked and controlled by MultiNode
@@ -319,7 +317,6 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 			return result.Signature(), result.Error()
 		}
 
-		lc = internal.NewLoader[client.Reader](func() (client.Reader, error) { return ch.multiNode.SelectRPC() })
 		tc = internal.NewLoader[client.ReaderWriter](func() (client.ReaderWriter, error) { return ch.multiNode.SelectRPC() })
 		bc = internal.NewLoader[monitor.BalanceClient](func() (monitor.BalanceClient, error) { return ch.multiNode.SelectRPC() })
 	}
