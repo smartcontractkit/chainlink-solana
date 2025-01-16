@@ -95,8 +95,9 @@ type chain struct {
 	lggr           logger.Logger
 
 	// if multiNode is enabled, the clientCache will not be used
-	multiNode *mn.MultiNode[mn.StringID, *client.MultiNodeClient]
-	txSender  *mn.TransactionSender[*solanago.Transaction, *client.SendTxResult, mn.StringID, *client.MultiNodeClient]
+	multiNode   *mn.MultiNode[mn.StringID, *client.MultiNodeClient]
+	txSender    *mn.TransactionSender[*solanago.Transaction, *client.SendTxResult, mn.StringID, *client.MultiNodeClient]
+	multiClient *client.MultiClient
 
 	// tracking node chain id for verification
 	clientCache map[string]*verifiedCachedClient // map URL -> {client, chainId} [mainnet/testnet/devnet/localnet]
@@ -238,6 +239,8 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 
 	var tc internal.Loader[client.ReaderWriter] = utils.NewLazyLoad(func() (client.ReaderWriter, error) { return ch.getClient() })
 	var bc internal.Loader[monitor.BalanceClient] = utils.NewLazyLoad(func() (monitor.BalanceClient, error) { return ch.getClient() })
+	// getClient returns random client or if MultiNodeEnabled RPC picked and controlled by MultiNode
+	ch.multiClient = client.NewMultiClient(ch.getClient)
 
 	// txm will default to sending transactions using a single RPC client if sendTx is nil
 	var sendTx func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error)
