@@ -271,6 +271,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 	t.Run("PDA account read success", func(t *testing.T) {
 		t.Parallel()
 
+		programID := solana.NewWallet().PublicKey()
 		pubKey := solana.NewWallet().PublicKey()
 		uint64Seed := uint64(5)
 		prefixString := "Prefix"
@@ -278,69 +279,148 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		readDef := config.ReadDefinition{
 			ChainSpecificName: testutils.TestStructWithNestedStruct,
 			ReadType:          config.Account,
-			PDADefiniton: codec.PDATypeDef{
-				Prefix: prefixString,
-				Seeds: []codec.PDASeed{
-					{
-						Name: "PubKey",
-						Type: codec.IdlTypePublicKey,
-					},
-					{
-						Name: "Uint64Seed",
-						Type: codec.IdlTypeU64,
-					},
-				},
-			},
-			InputModifications: codeccommon.ModifiersConfig{
-				&codeccommon.RenameModifierConfig{Fields: map[string]string{"PubKey": "PublicKey"}},
-			},
 			OutputModifications: codeccommon.ModifiersConfig{
 				&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},
 			},
 		}
-		testCodec, conf := newTestConfAndCodecWithInjectibleReadDef(t, PDAAccount, readDef)
-		encoded, err := testCodec.Encode(ctx, expected, testutils.TestStructWithNestedStruct)
-		require.NoError(t, err)
 
-		client := new(mockedRPCClient)
-		svc, err := chainreader.NewChainReaderService(logger.Test(t), client, conf)
-		require.NoError(t, err)
-		require.NotNil(t, svc)
-		require.NoError(t, svc.Start(ctx))
-
-		t.Cleanup(func() {
-			require.NoError(t, svc.Close())
-		})
-
-		programID := solana.NewWallet().PublicKey()
-
-		binding := types.BoundContract{
-			Name:    Namespace,
-			Address: programID.String(), // Set the program ID used to calculate the PDA
+		testCases := []struct {
+			name          string
+			pdaDefinition codec.PDATypeDef
+			inputModifier codeccommon.ModifiersConfig
+			expected      solana.PublicKey
+			params        map[string]any
+		}{
+			{
+				name: "happy path",
+				pdaDefinition: codec.PDATypeDef{
+					Prefix: prefixString,
+					Seeds: []codec.PDASeed{
+						{
+							Name: "PubKey",
+							Type: codec.IdlTypePublicKey,
+						},
+						{
+							Name: "Uint64Seed",
+							Type: codec.IdlTypeU64,
+						},
+					},
+				},
+				expected: mustFindProgramAddress(t, programID, [][]byte{[]byte(prefixString), pubKey.Bytes(), go_binary.LittleEndian.AppendUint64([]byte{}, uint64Seed)}),
+				params: map[string]any{
+					"PubKey":     pubKey,
+					"Uint64Seed": uint64Seed,
+				},
+			},
+			{
+				name: "with modifier and random field",
+				pdaDefinition: codec.PDATypeDef{
+					Prefix: prefixString,
+					Seeds: []codec.PDASeed{
+						{
+							Name: "PubKey",
+							Type: codec.IdlTypePublicKey,
+						},
+						{
+							Name: "Uint64Seed",
+							Type: codec.IdlTypeU64,
+						},
+					},
+				},
+				inputModifier: codeccommon.ModifiersConfig{
+					&codeccommon.RenameModifierConfig{Fields: map[string]string{"PubKey": "PublicKey"}},
+				},
+				expected: mustFindProgramAddress(t, programID, [][]byte{[]byte(prefixString), pubKey.Bytes(), go_binary.LittleEndian.AppendUint64([]byte{}, uint64Seed)}),
+				params: map[string]any{
+					"PublicKey":   pubKey,
+					"randomField": "randomValue", // unused field should be ignored by the codec
+					"Uint64Seed":  uint64Seed,
+				},
+			},
+			{
+				name: "only prefix",
+				pdaDefinition: codec.PDATypeDef{
+					Prefix: prefixString,
+				},
+				expected: mustFindProgramAddress(t, programID, [][]byte{[]byte(prefixString)}),
+				params:   nil,
+			},
+			{
+				name: "no prefix",
+				pdaDefinition: codec.PDATypeDef{
+					Prefix: "",
+					Seeds: []codec.PDASeed{
+						{
+							Name: "PubKey",
+							Type: codec.IdlTypePublicKey,
+						},
+						{
+							Name: "Uint64Seed",
+							Type: codec.IdlTypeU64,
+						},
+					},
+				},
+				expected: mustFindProgramAddress(t, programID, [][]byte{pubKey.Bytes(), go_binary.LittleEndian.AppendUint64([]byte{}, uint64Seed)}),
+				params: map[string]any{
+					"PubKey":     pubKey,
+					"Uint64Seed": uint64Seed,
+				},
+			},
+			{
+				name: "public key seed provided as bytes",
+				pdaDefinition: codec.PDATypeDef{
+					Prefix: prefixString,
+					Seeds: []codec.PDASeed{
+						{
+							Name: "PubKey",
+							Type: codec.IdlTypePublicKey,
+						},
+					},
+				},
+				expected: mustFindProgramAddress(t, programID, [][]byte{[]byte(prefixString), pubKey.Bytes()}),
+				params: map[string]any{
+					"PubKey": pubKey.Bytes(),
+				},
+			},
 		}
 
-		pdaAccount, _, err := solana.FindProgramAddress([][]byte{
-			[]byte(prefixString),
-			pubKey.Bytes(),
-			go_binary.LittleEndian.AppendUint64([]byte{}, uint64Seed),
-		}, programID)
-		require.NoError(t, err)
+		for _, testCase := range testCases {
+			t.Run(testCase.name, func(t *testing.T) {
+				testReadDef := readDef
+				testReadDef.PDADefiniton = testCase.pdaDefinition
+				testReadDef.InputModifications = testCase.inputModifier
+				testCodec, conf := newTestConfAndCodecWithInjectibleReadDef(t, PDAAccount, testReadDef)
+				encoded, err := testCodec.Encode(ctx, expected, testutils.TestStructWithNestedStruct)
+				require.NoError(t, err)
 
-		client.SetForAddress(pdaAccount, encoded, nil, 0)
+				client := new(mockedRPCClient)
+				svc, err := chainreader.NewChainReaderService(logger.Test(t), client, conf)
+				require.NoError(t, err)
+				require.NotNil(t, svc)
+				require.NoError(t, svc.Start(ctx))
 
-		require.NoError(t, svc.Bind(ctx, []types.BoundContract{binding}))
+				t.Cleanup(func() {
+					require.NoError(t, svc.Close())
+				})
 
-		var result modifiedStructWithNestedStruct
-		require.NoError(t, svc.GetLatestValue(ctx, binding.ReadIdentifier(PDAAccount), primitives.Unconfirmed, map[string]any{
-			"PublicKey":   pubKey,
-			"randomField": "randomValue", // unused field should be ignored by the codec
-			"Uint64Seed":  uint64Seed,
-		}, &result))
+				binding := types.BoundContract{
+					Name:    Namespace,
+					Address: programID.String(), // Set the program ID used to calculate the PDA
+				}
 
-		assert.Equal(t, expected.InnerStruct, result.InnerStruct)
-		assert.Equal(t, expected.Value, result.V)
-		assert.Equal(t, expected.TimeVal, result.TimeVal)
-		assert.Equal(t, expected.DurationVal, result.DurationVal)
+				client.SetForAddress(testCase.expected, encoded, nil, 0)
+
+				require.NoError(t, svc.Bind(ctx, []types.BoundContract{binding}))
+
+				var result modifiedStructWithNestedStruct
+				require.NoError(t, svc.GetLatestValue(ctx, binding.ReadIdentifier(PDAAccount), primitives.Unconfirmed, testCase.params, &result))
+
+				assert.Equal(t, expected.InnerStruct, result.InnerStruct)
+				assert.Equal(t, expected.Value, result.V)
+				assert.Equal(t, expected.TimeVal, result.TimeVal)
+				assert.Equal(t, expected.DurationVal, result.DurationVal)
+			})
+		}
 	})
 
 	t.Run("PDA account read errors if missing param", func(t *testing.T) {
@@ -1060,4 +1140,10 @@ func mustUnmarshalIDL(t *testing.T, rawIDL string) codec.IDL {
 	}
 
 	return idl
+}
+
+func mustFindProgramAddress(t *testing.T, programID solana.PublicKey, seeds [][]byte) solana.PublicKey {
+	key, _, err := solana.FindProgramAddress(seeds, programID)
+	require.NoError(t, err)
+	return key
 }
