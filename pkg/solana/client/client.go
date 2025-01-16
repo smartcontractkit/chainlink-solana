@@ -38,7 +38,7 @@ type Reader interface {
 	GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error)
 	// GetLatestBlockHeight returns the latest block height of the node based on the configured commitment type
 	GetLatestBlockHeight(ctx context.Context) (uint64, error)
-	GetTransaction(ctx context.Context, txHash solana.Signature, opts *rpc.GetTransactionOpts) (*rpc.GetTransactionResult, error)
+	GetTransaction(ctx context.Context, txHash solana.Signature) (*rpc.GetTransactionResult, error)
 	GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64) (rpc.BlocksResult, error)
 	GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit uint64) (*rpc.BlocksResult, error)
 	GetBlock(ctx context.Context, slot uint64) (*rpc.GetBlockResult, error)
@@ -145,26 +145,16 @@ func (c *Client) GetSignaturesForAddressWithOpts(ctx context.Context, addr solan
 	return c.rpc.GetSignaturesForAddressWithOpts(ctx, addr, opts)
 }
 
-func (c *Client) GetTransaction(ctx context.Context, txHash solana.Signature, opts *rpc.GetTransactionOpts) (*rpc.GetTransactionResult, error) {
+func (c *Client) GetTransaction(ctx context.Context, txHash solana.Signature) (*rpc.GetTransactionResult, error) {
 	done := c.latency("transaction")
 	defer done()
-
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
-
-	if opts == nil {
-		opts = &rpc.GetTransactionOpts{
-			Encoding: solana.EncodingBase64,
-		}
-	}
-	if opts.Commitment == "" {
-		opts.Commitment = c.commitment
-	}
 
 	// Use txHash in the key so different signatures won't be merged on concurrent calls.
 	key := fmt.Sprintf("GetTransaction(%s)", txHash.String())
 	v, err, _ := c.requestGroup.Do(key, func() (interface{}, error) {
-		return c.rpc.GetTransaction(ctx, txHash, opts)
+		return c.rpc.GetTransaction(ctx, txHash, &rpc.GetTransactionOpts{Encoding: solana.EncodingBase64, Commitment: c.commitment})
 	})
 	return v.(*rpc.GetTransactionResult), err
 }
@@ -359,7 +349,6 @@ func (c *Client) GetLatestBlockHeight(ctx context.Context) (uint64, error) {
 }
 
 func (c *Client) GetBlock(ctx context.Context, slot uint64) (*rpc.GetBlockResult, error) {
-	// get block based on slot
 	done := c.latency("get_block")
 	defer done()
 	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)

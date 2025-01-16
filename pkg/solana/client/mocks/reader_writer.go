@@ -608,9 +608,9 @@ func (_c *ReaderWriter_GetSignaturesForAddressWithOpts_Call) RunAndReturn(run fu
 	return _c
 }
 
-// GetTransaction provides a mock function with given fields: ctx, txHash, opts
-func (_m *ReaderWriter) GetTransaction(ctx context.Context, txHash solana.Signature, opts *rpc.GetTransactionOpts) (*rpc.GetTransactionResult, error) {
-	ret := _m.Called(ctx, txHash, opts)
+// GetTransaction provides a mock function with given fields: ctx, txHash
+func (_m *ReaderWriter) GetTransaction(ctx context.Context, txHash solana.Signature) (*rpc.GetTransactionResult, error) {
+	ret := _m.Called(ctx, txHash)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetTransaction")
@@ -618,19 +618,19 @@ func (_m *ReaderWriter) GetTransaction(ctx context.Context, txHash solana.Signat
 
 	var r0 *rpc.GetTransactionResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, solana.Signature, *rpc.GetTransactionOpts) (*rpc.GetTransactionResult, error)); ok {
-		return rf(ctx, txHash, opts)
+	if rf, ok := ret.Get(0).(func(context.Context, solana.Signature) (*rpc.GetTransactionResult, error)); ok {
+		return rf(ctx, txHash)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, solana.Signature, *rpc.GetTransactionOpts) *rpc.GetTransactionResult); ok {
-		r0 = rf(ctx, txHash, opts)
+	if rf, ok := ret.Get(0).(func(context.Context, solana.Signature) *rpc.GetTransactionResult); ok {
+		r0 = rf(ctx, txHash)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*rpc.GetTransactionResult)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, solana.Signature, *rpc.GetTransactionOpts) error); ok {
-		r1 = rf(ctx, txHash, opts)
+	if rf, ok := ret.Get(1).(func(context.Context, solana.Signature) error); ok {
+		r1 = rf(ctx, txHash)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -646,14 +646,13 @@ type ReaderWriter_GetTransaction_Call struct {
 // GetTransaction is a helper method to define mock.On call
 //   - ctx context.Context
 //   - txHash solana.Signature
-//   - opts *rpc.GetTransactionOpts
-func (_e *ReaderWriter_Expecter) GetTransaction(ctx interface{}, txHash interface{}, opts interface{}) *ReaderWriter_GetTransaction_Call {
-	return &ReaderWriter_GetTransaction_Call{Call: _e.mock.On("GetTransaction", ctx, txHash, opts)}
+func (_e *ReaderWriter_Expecter) GetTransaction(ctx interface{}, txHash interface{}) *ReaderWriter_GetTransaction_Call {
+	return &ReaderWriter_GetTransaction_Call{Call: _e.mock.On("GetTransaction", ctx, txHash)}
 }
 
-func (_c *ReaderWriter_GetTransaction_Call) Run(run func(ctx context.Context, txHash solana.Signature, opts *rpc.GetTransactionOpts)) *ReaderWriter_GetTransaction_Call {
+func (_c *ReaderWriter_GetTransaction_Call) Run(run func(ctx context.Context, txHash solana.Signature)) *ReaderWriter_GetTransaction_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(solana.Signature), args[2].(*rpc.GetTransactionOpts))
+		run(args[0].(context.Context), args[1].(solana.Signature))
 	})
 	return _c
 }
@@ -663,7 +662,7 @@ func (_c *ReaderWriter_GetTransaction_Call) Return(_a0 *rpc.GetTransactionResult
 	return _c
 }
 
-func (_c *ReaderWriter_GetTransaction_Call) RunAndReturn(run func(context.Context, solana.Signature, *rpc.GetTransactionOpts) (*rpc.GetTransactionResult, error)) *ReaderWriter_GetTransaction_Call {
+func (_c *ReaderWriter_GetTransaction_Call) RunAndReturn(run func(context.Context, solana.Signature) (*rpc.GetTransactionResult, error)) *ReaderWriter_GetTransaction_Call {
 	_c.Call.Return(run)
 	return _c
 }
