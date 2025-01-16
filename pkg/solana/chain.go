@@ -99,7 +99,7 @@ type chain struct {
 	services.StateMachine
 	id             string
 	cfg            *config.TOMLConfig
-	lp             logpoller.LogPoller
+	lp             LogPoller
 	txm            *txm.Txm
 	balanceMonitor services.Service
 	lggr           logger.Logger

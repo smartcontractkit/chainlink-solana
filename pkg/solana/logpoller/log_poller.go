@@ -31,7 +31,8 @@ type ORM interface {
 	SelectSeqNums(ctx context.Context) (map[int64]int64, error)
 }
 
-type LogPoller struct {
+type Service struct {
+	services.StateMachine
 	services.Service
 	eng *services.Engine
 
@@ -43,9 +44,9 @@ type LogPoller struct {
 	filters *filters
 }
 
-func New(lggr logger.SugaredLogger, orm ORM, cl client.Reader) *LogPoller {
+func New(lggr logger.SugaredLogger, orm ORM, cl client.Reader) *Service {
 	lggr = logger.Sugared(logger.Named(lggr, "LogPoller"))
-	lp := &LogPoller{
+	lp := &Service{
 		orm:     orm,
 		client:  cl,
 		filters: newFilters(lggr, orm),
@@ -60,7 +61,7 @@ func New(lggr logger.SugaredLogger, orm ORM, cl client.Reader) *LogPoller {
 	return lp
 }
 
-func (lp *LogPoller) start(_ context.Context) error {
+func (lp *Service) start(_ context.Context) error {
 	lp.eng.Go(lp.run)
 	lp.eng.Go(lp.backgroundWorkerRun)
 	return nil
@@ -74,7 +75,7 @@ func makeLogIndex(txIndex int, txLogIndex uint) (int64, error) {
 }
 
 // Process - process stream of events coming from log ingester
-func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
+func (lp *Service) Process(programEvent ProgramEvent) (err error) {
 	ctx, cancel := utils.ContextFromChan(lp.eng.StopChan)
 	defer cancel()
 
@@ -160,20 +161,20 @@ func (lp *LogPoller) Process(programEvent ProgramEvent) (err error) {
 }
 
 // RegisterFilter - refer to filters.RegisterFilter for details.
-func (lp *LogPoller) RegisterFilter(ctx context.Context, filter Filter) error {
+func (lp *Service) RegisterFilter(ctx context.Context, filter Filter) error {
 	ctx, cancel := lp.eng.Ctx(ctx)
 	defer cancel()
 	return lp.filters.RegisterFilter(ctx, filter)
 }
 
 // UnregisterFilter refer to filters.UnregisterFilter for details
-func (lp *LogPoller) UnregisterFilter(ctx context.Context, name string) error {
+func (lp *Service) UnregisterFilter(ctx context.Context, name string) error {
 	ctx, cancel := lp.eng.Ctx(ctx)
 	defer cancel()
 	return lp.filters.UnregisterFilter(ctx, name)
 }
 
-func (lp *LogPoller) loadFilters(ctx context.Context) error {
+func (lp *Service) retryUntilSuccess(ctx context.Context, failMessage string, fn func(context.Context) error) error {
 	retryTicker := services.TickerConfig{Initial: 0, JitterPct: services.DefaultJitter}.NewTicker(time.Second)
 	defer retryTicker.Stop()
 
@@ -183,24 +184,29 @@ func (lp *LogPoller) loadFilters(ctx context.Context) error {
 			return ctx.Err()
 		case <-retryTicker.C:
 		}
-		err := lp.filters.LoadFilters(ctx)
+		err := fn(ctx)
 		if err == nil {
 			return nil
 		}
-		lp.lggr.Errorw("Failed loading filters in init logpoller loop, retrying later", "err", err)
+		lp.lggr.Errorw(failMessage, "err", err)
 	}
 	// unreachable
 }
 
-func (lp *LogPoller) run(ctx context.Context) {
-	err := lp.loadFilters(ctx)
+func (lp *Service) run(ctx context.Context) {
+	err := lp.retryUntilSuccess(ctx, "failed loading filters in init Service loop, retrying later", lp.filters.LoadFilters)
 	if err != nil {
-		lp.lggr.Warnw("Failed loading filters", "err", err)
+		lp.lggr.Warnw("never loaded filters before shutdown", "err", err)
 		return
 	}
 
 	// safe to start fetching logs, now that filters are loaded
-	lp.collector.Start(ctx)
+	err = lp.retryUntilSuccess(ctx, "failed to start EncodedLogCollector, retrying later", lp.collector.Start)
+	if err != nil {
+		lp.lggr.Warnw("EncodedLogCollector never started before shutdown", "err", err)
+		return
+	}
+	defer lp.collector.Close()
 
 	var blocks chan struct {
 		BlockNumber int64
@@ -227,7 +233,7 @@ func (lp *LogPoller) run(ctx context.Context) {
 	}
 }
 
-func (lp *LogPoller) backgroundWorkerRun(ctx context.Context) {
+func (lp *Service) backgroundWorkerRun(ctx context.Context) {
 	pruneFilters := services.NewTicker(time.Minute)
 	defer pruneFilters.Stop()
 	for {
@@ -243,7 +249,7 @@ func (lp *LogPoller) backgroundWorkerRun(ctx context.Context) {
 	}
 }
 
-func (lp *LogPoller) startFilterBackfill(ctx context.Context, filter Filter, toBlock int64) {
+func (lp *Service) startFilterBackfill(ctx context.Context, filter Filter, toBlock int64) {
 	// TODO: NONEVM-916 start backfill
 	lp.lggr.Debugw("Starting filter backfill", "filter", filter)
 	err := lp.filters.MarkFilterBackfilled(ctx, filter.ID)

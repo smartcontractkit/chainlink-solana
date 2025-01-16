@@ -194,6 +194,7 @@ func (fl *filters) removeFilterFromIndexes(filter Filter) {
 	delete(fl.filtersByName, filter.Name)
 	delete(fl.filtersToBackfill, filter.ID)
 	delete(fl.filtersByID, filter.ID)
+	delete(fl.seqNums, filter.ID)
 
 	filtersForAddress, ok := fl.filtersByAddress[filter.Address]
 	if !ok {
@@ -214,10 +215,6 @@ func (fl *filters) removeFilterFromIndexes(filter Filter) {
 
 	if len(filtersForAddress) == 0 {
 		delete(fl.filtersByAddress, filter.Address)
-	}
-
-	if _, ok := fl.seqNums[filter.ID]; ok {
-		delete(fl.seqNums, filter.ID)
 	}
 
 	programID := filter.Address.ToSolana().String()
