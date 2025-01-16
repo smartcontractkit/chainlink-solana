@@ -295,10 +295,10 @@ func (s *SolanaChainReaderService) addAccountRead(namespace string, genericName 
 	// Create PDA read binding if PDA prefix or seeds configs are populated
 	if len(readDefinition.PDADefiniton.Prefix) > 0 || len(readDefinition.PDADefiniton.Seeds) > 0 {
 		inputAccountIDLDef = readDefinition.PDADefiniton
-		reader = newPdaReadBinding(namespace, genericName, readDefinition.PDADefiniton.Prefix)
+		reader = newAccountReadBinding(namespace, genericName, readDefinition.PDADefiniton.Prefix, true)
 	} else {
 		inputAccountIDLDef = codec.NilIdlTypeDefTy
-		reader = newAccountReadBinding(namespace, genericName)
+		reader = newAccountReadBinding(namespace, genericName, "", false)
 	}
 	if err := s.addCodecDef(true, namespace, genericName, codec.ChainConfigTypeAccountDef, idl, inputAccountIDLDef, readDefinition.InputModifications); err != nil {
 		return err
