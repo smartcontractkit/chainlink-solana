@@ -13,7 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 )
 
 var (
@@ -35,17 +34,16 @@ type ORM interface {
 type LogPoller struct {
 	services.Service
 	eng *services.Engine
-	services.StateMachine
 
 	lggr      logger.SugaredLogger
 	orm       ORM
-	client    internal.Loader[client.Reader]
+	client    client.Reader
 	collector *EncodedLogCollector
 
 	filters *filters
 }
 
-func New(lggr logger.SugaredLogger, orm ORM, cl internal.Loader[client.Reader]) *LogPoller {
+func New(lggr logger.SugaredLogger, orm ORM, cl client.Reader) *LogPoller {
 	lggr = logger.Sugared(logger.Named(lggr, "LogPoller"))
 	lp := &LogPoller{
 		orm:     orm,
@@ -62,13 +60,7 @@ func New(lggr logger.SugaredLogger, orm ORM, cl internal.Loader[client.Reader]) 
 	return lp
 }
 
-func (lp *LogPoller) start(context.Context) error {
-	cl, err := lp.client.Get()
-	if err != nil {
-		return err
-	}
-	lp.collector = NewEncodedLogCollector(cl, lp, lp.lggr)
-
+func (lp *LogPoller) start(_ context.Context) error {
 	lp.eng.Go(lp.run)
 	lp.eng.Go(lp.backgroundWorkerRun)
 	return nil

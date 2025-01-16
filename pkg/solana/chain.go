@@ -96,7 +96,8 @@ func NewChain(cfg *config.TOMLConfig, opts ChainOpts) (Chain, error) {
 var _ Chain = (*chain)(nil)
 
 type chain struct {
-	services.StateMachine
+	services.Service
+	engine         *services.Engine
 	id             string
 	cfg            *config.TOMLConfig
 	lp             logpoller.LogPoller
@@ -324,7 +325,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 	}
 
 	// TODO: import typeProvider function from codec package and pass to constructor
-	ch.lp = logpoller.New(logger.Sugared(logger.Named(lggr, "LogPoller")), logpoller.NewORM(ch.ID(), ds, lggr), lc)
+	ch.lp = logpoller.New(logger.Sugared(logger.Named(lggr, "LogPoller")), logpoller.NewORM(ch.ID(), ds, lggr), ch.multiClient)
 	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
 	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
 	return &ch, nil

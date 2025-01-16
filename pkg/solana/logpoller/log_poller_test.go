@@ -11,13 +11,11 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
@@ -69,9 +67,8 @@ func TestProcess(t *testing.T) {
 
 	orm := newMockORM(t)
 	cl := clientmocks.NewReaderWriter(t)
-	loader := commonutils.NewLazyLoad(func() (client.Reader, error) { return cl, nil })
 	lggr := logger.Sugared(logger.Test(t))
-	lp := New(lggr, orm, loader)
+	lp := New(lggr, orm, cl)
 
 	var idlTypeInt64 codec.IdlType
 	var idlTypeString codec.IdlType
