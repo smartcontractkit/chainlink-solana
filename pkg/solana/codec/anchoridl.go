@@ -202,7 +202,7 @@ func (env *IdlType) UnmarshalJSON(data []byte) error {
 
 	switch v := temp.(type) {
 	case string:
-		env.AsString = IdlTypeAsString(v)
+		env.asString = IdlTypeAsString(v)
 	case map[string]interface{}:
 		if len(v) == 0 {
 			return nil
@@ -255,15 +255,21 @@ func (env *IdlType) UnmarshalJSON(data []byte) error {
 
 // Wrapper type:
 type IdlType struct {
-	AsString         IdlTypeAsString
+	asString         IdlTypeAsString
 	asIdlTypeVec     *IdlTypeVec
 	asIdlTypeOption  *IdlTypeOption
 	asIdlTypeDefined *IdlTypeDefined
 	asIdlTypeArray   *IdlTypeArray
 }
 
+func NewIdlStringType(asString IdlTypeAsString) IdlType {
+	return IdlType{
+		asString: asString,
+	}
+}
+
 func (env *IdlType) IsString() bool {
-	return env.AsString != ""
+	return env.asString != ""
 }
 func (env *IdlType) IsIdlTypeVec() bool {
 	return env.asIdlTypeVec != nil
@@ -280,7 +286,7 @@ func (env *IdlType) IsArray() bool {
 
 // Getters:
 func (env *IdlType) GetString() IdlTypeAsString {
-	return env.AsString
+	return env.asString
 }
 func (env *IdlType) GetIdlTypeVec() *IdlTypeVec {
 	return env.asIdlTypeVec

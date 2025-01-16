@@ -285,11 +285,11 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 				Seeds: []codec.IdlField{
 					{
 						Name: PDAPubKeySeedName,
-						Type: codec.IdlType{AsString: codec.IdlTypePublicKey},
+						Type: codec.NewIdlStringType(codec.IdlTypePublicKey),
 					},
 					{
 						Name: PDAUint64SeedName,
-						Type: codec.IdlType{AsString: codec.IdlTypeU64},
+						Type: codec.NewIdlStringType(codec.IdlTypeU64),
 					},
 				},
 			},
@@ -354,7 +354,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 				Seeds: []codec.IdlField{
 					{
 						Name: PDAPubKeySeedName,
-						Type: codec.IdlType{AsString: codec.IdlTypePublicKey},
+						Type: codec.NewIdlStringType(codec.IdlTypePublicKey),
 					},
 				},
 			},
