@@ -291,14 +291,17 @@ func (s *SolanaChainReaderService) addAccountRead(namespace string, genericName 
 	s.lookup.addReadNameForContract(namespace, genericName)
 
 	var reader readBinding
+	var inputAccountIDLDef interface{}
 	// Create PDA read binding if PDA prefix or seeds configs are populated
 	if len(readDefinition.PDADefiniton.Prefix) > 0 || len(readDefinition.PDADefiniton.Seeds) > 0 {
-		if err := s.addCodecDef(true, namespace, genericName, codec.ChainConfigTypeAccountDef, idl, readDefinition.PDADefiniton, readDefinition.InputModifications); err != nil {
-			return err
-		}
+		inputAccountIDLDef = readDefinition.PDADefiniton
 		reader = newPdaReadBinding(namespace, genericName, readDefinition.PDADefiniton.Prefix)
 	} else {
+		inputAccountIDLDef = codec.NilIdlTypeDefTy
 		reader = newAccountReadBinding(namespace, genericName)
+	}
+	if err := s.addCodecDef(true, namespace, genericName, codec.ChainConfigTypeAccountDef, idl, inputAccountIDLDef, readDefinition.InputModifications); err != nil {
+		return err
 	}
 	s.bindings.AddReadBinding(namespace, genericName, reader)
 
