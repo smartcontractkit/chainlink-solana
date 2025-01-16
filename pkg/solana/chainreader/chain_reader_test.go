@@ -36,12 +36,9 @@ import (
 )
 
 const (
-	Namespace         = "NameSpace"
-	NamedMethod       = "NamedMethod1"
-	PDAAccount        = "PDAAccount1"
-	PDAPrefixString   = "Prefix"
-	PDAPubKeySeedName = "PubKey"
-	PDAUint64SeedName = "Uint64Seed"
+	Namespace   = "NameSpace"
+	NamedMethod = "NamedMethod1"
+	PDAAccount  = "PDAAccount1"
 )
 
 func TestSolanaChainReaderService_ReaderInterface(t *testing.T) {
@@ -276,26 +273,27 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 
 		pubKey := solana.NewWallet().PublicKey()
 		uint64Seed := uint64(5)
+		prefixString := "Prefix"
 
 		readDef := config.ReadDefinition{
 			ChainSpecificName: testutils.TestStructWithNestedStruct,
 			ReadType:          config.Account,
 			PDADefiniton: codec.PDATypeDef{
-				Prefix: PDAPrefixString,
+				Prefix: prefixString,
 				Seeds: []codec.IdlField{
 					{
-						Name: PDAPubKeySeedName,
+						Name: "PubKey",
 						Type: codec.NewIdlStringType(codec.IdlTypePublicKey),
 					},
 					{
-						Name: PDAUint64SeedName,
+						Name: "Uint64Seed",
 						Type: codec.NewIdlStringType(codec.IdlTypeU64),
 					},
 				},
 			},
-			// InputModifications: codeccommon.ModifiersConfig{
-			// 	&codeccommon.RenameModifierConfig{Fields: map[string]string{"PublicKey": PDAPubKeySeedName}},
-			// },
+			InputModifications: codeccommon.ModifiersConfig{
+				&codeccommon.RenameModifierConfig{Fields: map[string]string{"PubKey": "PublicKey"}},
+			},
 			OutputModifications: codeccommon.ModifiersConfig{
 				&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},
 			},
@@ -322,7 +320,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		}
 
 		pdaAccount, _, err := solana.FindProgramAddress([][]byte{
-			[]byte(PDAPrefixString),
+			[]byte(prefixString),
 			pubKey.Bytes(),
 			go_binary.LittleEndian.AppendUint64([]byte{}, uint64Seed),
 		}, programID)
@@ -334,9 +332,9 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 
 		var result modifiedStructWithNestedStruct
 		require.NoError(t, svc.GetLatestValue(ctx, binding.ReadIdentifier(PDAAccount), primitives.Unconfirmed, map[string]any{
-			PDAPubKeySeedName: pubKey,
-			"randomField":     "randomValue", // unused field should be ignored by the codec
-			PDAUint64SeedName: uint64Seed,
+			"PublicKey":   pubKey,
+			"randomField": "randomValue", // unused field should be ignored by the codec
+			"Uint64Seed":  uint64Seed,
 		}, &result))
 
 		assert.Equal(t, expected.InnerStruct, result.InnerStruct)
@@ -346,14 +344,15 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 	})
 
 	t.Run("PDA account read errors if missing param", func(t *testing.T) {
+		prefixString := "Prefix"
 		readDef := config.ReadDefinition{
 			ChainSpecificName: testutils.TestStructWithNestedStruct,
 			ReadType:          config.Account,
 			PDADefiniton: codec.PDATypeDef{
-				Prefix: PDAPrefixString,
+				Prefix: prefixString,
 				Seeds: []codec.IdlField{
 					{
-						Name: PDAPubKeySeedName,
+						Name: "PubKey",
 						Type: codec.NewIdlStringType(codec.IdlTypePublicKey),
 					},
 				},
