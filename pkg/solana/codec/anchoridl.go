@@ -144,7 +144,12 @@ type IdlField struct {
 // It is needed to encode seeds to calculate the address for PDA account reads
 type PDATypeDef struct {
 	Prefix string `json:"prefix,omitempty"`
-	Seeds []IdlField `json:"seeds,omitempty"`
+	Seeds []PDASeed `json:"seeds,omitempty"`
+}
+
+type PDASeed struct {
+	Name string `json:"name"`
+	Type IdlTypeAsString `json:"type"`
 }
 
 type IdlTypeAsString string

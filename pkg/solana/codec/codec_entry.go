@@ -55,7 +55,7 @@ func NewAccountEntry(offchainName string, idlTypes AccountIDLTypes, includeDiscr
 
 func NewPDAEntry(offchainName string, pdaTypeDef PDATypeDef, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
 	// PDA seeds do not have any dependecies in the IDL so the type def slice can be left empty for refs
-	_, accCodec, err := asStruct(pdaTypeDef.Seeds, createRefs(IdlTypeDefSlice{}, builder), offchainName, false, false)
+	_, accCodec, err := asStruct(pdaSeedsToIdlField(pdaTypeDef.Seeds), createRefs(IdlTypeDefSlice{}, builder), offchainName, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -217,6 +217,17 @@ func eventFieldsToFields(evFields []IdlEventField) []IdlField {
 		idlFields = append(idlFields, IdlField{
 			Name: evField.Name,
 			Type: evField.Type,
+		})
+	}
+	return idlFields
+}
+
+func pdaSeedsToIdlField(seeds []PDASeed) []IdlField {
+	idlFields := make([]IdlField, 0, len(seeds))
+	for _, seed := range seeds {
+		idlFields = append(idlFields, IdlField{
+			Name: seed.Name,
+			Type: NewIdlStringType(seed.Type),
 		})
 	}
 	return idlFields
