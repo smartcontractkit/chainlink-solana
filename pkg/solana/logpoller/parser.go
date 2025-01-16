@@ -22,6 +22,7 @@ const (
 	addressFieldName   = "address"
 	eventSigFieldName  = "event_sig"
 	defaultSort        = "block_number ASC, log_index ASC"
+	subKeysFieldName   = "subkey_values"
 )
 
 var (
@@ -53,6 +54,80 @@ type pgDSLParser struct {
 var _ primitives.Visitor = (*pgDSLParser)(nil)
 
 func (v *pgDSLParser) Comparator(_ primitives.Comparator) {}
+
+type IndexedValueComparator struct {
+	Value    IndexedValue
+	Operator primitives.ComparisonOperator
+}
+
+type eventBySubkeyFilter struct {
+	SubkeyIndex    uint64
+	ValueComparers []IndexedValueComparator
+}
+
+func (f *eventBySubkeyFilter) Accept(visitor primitives.Visitor) {
+	switch v := visitor.(type) {
+	case *pgDSLParser:
+		v.VisitEventSubkeysByValueFilter(f)
+	}
+}
+
+func NewEventBySubkeyFilter(subkeyIndex uint64, valueComparers []primitives.ValueComparator) (query.Expression, error) {
+	var indexedValueComparators []IndexedValueComparator
+	for _, cmp := range valueComparers {
+		iVal, err := NewIndexedValue(cmp.Value)
+		if err != nil {
+			return query.Expression{}, err
+		}
+		iValCmp := IndexedValueComparator{
+			Value:    iVal,
+			Operator: cmp.Operator,
+		}
+		indexedValueComparators = append(indexedValueComparators, iValCmp)
+	}
+	return query.Expression{
+		Primitive: &eventBySubkeyFilter{
+			SubkeyIndex:    subkeyIndex,
+			ValueComparers: indexedValueComparators,
+		},
+	}, nil
+}
+
+func (v *pgDSLParser) VisitEventSubkeysByValueFilter(p *eventBySubkeyFilter) {
+	if len(p.ValueComparers) > 0 {
+		if p.SubkeyIndex > 3 { // For now, maximum # of fields that can be indexed is 4--we can increase this if needed by adding more db indexes
+			v.err = fmt.Errorf("invalid subkey index: %d", p.SubkeyIndex)
+			return
+		}
+
+		// Add 1 since postgresql arrays are 1-indexed.
+		subkeyIdx := v.args.withIndexedField("subkey_index", p.SubkeyIndex+1)
+
+		comps := make([]string, len(p.ValueComparers))
+		for idx, comp := range p.ValueComparers {
+			comps[idx], v.err = makeComp(comp, v.args, "subkey_value", subkeyIdx, "subkey_values[:%s] %s :%s")
+			if v.err != nil {
+				return
+			}
+		}
+
+		v.expression = strings.Join(comps, " AND ")
+	}
+}
+
+func makeComp(comp IndexedValueComparator, args *queryArgs, field, subfield, pattern string) (string, error) {
+	cmp, err := cmpOpToString(comp.Operator)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf(
+		pattern,
+		subfield,
+		cmp,
+		args.withIndexedField(field, comp.Value),
+	), nil
+}
 
 func (v *pgDSLParser) Block(prim primitives.Block) {
 	cmp, err := cmpOpToString(prim.Operator)

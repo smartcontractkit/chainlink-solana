@@ -14,6 +14,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 )
 
 var (
@@ -31,6 +32,7 @@ type ORM interface {
 	GetLatestBlock(ctx context.Context) (int64, error)
 	InsertLogs(context.Context, []Log) (err error)
 	SelectSeqNums(ctx context.Context) (map[int64]int64, error)
+	FilteredLogs(ctx context.Context, queryFilter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]Log, error)
 }
 
 type logsLoader interface {
@@ -381,4 +383,8 @@ func (lp *Service) backgroundWorkerRun(ctx context.Context) {
 	if err != nil {
 		lp.lggr.Errorw("Failed to prune filters", "err", err)
 	}
+}
+
+func (lp *Service) FilteredLogs(ctx context.Context, queryFilter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]Log, error) {
+	return lp.orm.FilteredLogs(ctx, queryFilter, limitAndSort, queryName)
 }
