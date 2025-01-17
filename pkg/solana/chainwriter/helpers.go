@@ -72,7 +72,7 @@ func GetValuesAtLocation(args any, location string) ([][]byte, error) {
 		} else if arr, ok := value.([32]uint8); ok {
 			vals = append(vals, arr[:])
 		} else {
-			return nil, fmt.Errorf("invalid value format at path: %s", location)
+			return nil, fmt.Errorf("invalid value format at path: %s, type: %s", location, reflect.TypeOf(value).String())
 		}
 	}
 
