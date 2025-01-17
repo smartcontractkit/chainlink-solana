@@ -96,15 +96,10 @@ func (ac AccountConstant) Resolve(_ context.Context, _ any, _ map[string]map[str
 	}, nil
 }
 
-func (al AccountLookup) Resolve(
-	_ context.Context,
-	args any,
-	_ map[string]map[string][]*solana.AccountMeta,
-	_ client.Reader,
-) ([]*solana.AccountMeta, error) {
+func (al AccountLookup) Resolve(_ context.Context, args any, _ map[string]map[string][]*solana.AccountMeta, _ client.Reader) ([]*solana.AccountMeta, error) {
 	derivedValues, err := GetValuesAtLocation(args, al.Location)
 	if err != nil {
-		return nil, fmt.Errorf("error getting account from '%s': %w", al.Location, err)
+		return nil, fmt.Errorf("error getting account from lookup: %w", err)
 	}
 
 	var metas []*solana.AccountMeta
@@ -131,7 +126,6 @@ func (al AccountLookup) Resolve(
 			IsWritable: isWritable,
 		})
 	}
-
 	return metas, nil
 }
 
