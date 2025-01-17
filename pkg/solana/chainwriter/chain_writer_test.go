@@ -730,6 +730,101 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 		submitErr := cw.SubmitTransaction(ctx, "contract_reader_interface", "initializeLookupTable", args, txID, programID.String(), nil, nil)
 		require.NoError(t, submitErr)
 	})
+
+	t.Run("submits transaction successfully with ArgsTransform", func(t *testing.T) {
+		type ArgsPostTransform struct {
+			LookupTable solana.PublicKey
+			Seed1       []byte
+			Seed2       []byte
+			Seed3       string
+		}
+		cwConfigWithArgs := cwConfig
+		programConfig := cwConfigWithArgs.Programs["contract_reader_interface"]
+		rawIDL := cwConfigWithArgs.Programs["contract_reader_interface"].IDL
+
+		var idlMap map[string]interface{}
+		err := json.Unmarshal([]byte(rawIDL), &idlMap)
+		require.NoError(t, err)
+
+		instructions, ok := idlMap["instructions"].([]interface{})
+		require.True(t, ok)
+
+		// Add an additional field to the IDL that will be set in the ArgsTransform
+		// Since it's in the IDL, the codec will require it's present in the args
+		for _, instr := range instructions {
+			instrObj, ok := instr.(map[string]interface{})
+			require.True(t, ok)
+
+			if instrObj["name"] == "initializeLookupTable" {
+				argsArr, ok := instrObj["args"].([]interface{})
+				require.True(t, ok)
+
+				newArg := map[string]interface{}{
+					"name": "seed3",
+					"type": "string",
+				}
+				argsArr = append(argsArr, newArg)
+				instrObj["args"] = argsArr
+			}
+		}
+
+		modifiedIDL, err := json.Marshal(idlMap)
+		require.NoError(t, err)
+
+		programConfig.IDL = string(modifiedIDL)
+		methodConfig := programConfig.Methods["initializeLookupTable"]
+
+		methodConfig.ArgsTransform = func(ctx context.Context, cw *chainwriter.SolanaChainWriterService, args any, accounts solana.AccountMetaSlice) (any, error) {
+			argsPreTransform, ok := args.(Arguments)
+			require.True(t, ok)
+
+			argsTransformed := ArgsPostTransform{
+				LookupTable: argsPreTransform.LookupTable,
+				Seed1:       argsPreTransform.Seed1,
+				Seed2:       seed2,
+				Seed3:       "seed3",
+			}
+
+			return argsTransformed, nil
+		}
+
+		programConfig.Methods["initializeLookupTable"] = methodConfig
+		cwConfigWithArgs.Programs["contract_reader_interface"] = programConfig
+		cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, ge, cwConfig)
+		require.NoError(t, err)
+
+		recentBlockHash := solana.Hash{}
+		rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Once()
+		txID := uuid.NewString()
+
+		// The TX being successfully sent means it was encoded properly, meaning the ArgsTransform worked
+		txm.On("Enqueue", mock.Anything, admin.String(), mock.MatchedBy(func(tx *solana.Transaction) bool {
+			// match transaction fields to ensure it was built as expected
+			require.Equal(t, recentBlockHash, tx.Message.RecentBlockhash)
+			require.Len(t, tx.Message.Instructions, 1)
+			require.Len(t, tx.Message.AccountKeys, 6)                           // fee payer + derived accounts
+			require.Equal(t, admin, tx.Message.AccountKeys[0])                  // fee payer
+			require.Equal(t, account1, tx.Message.AccountKeys[1])               // account constant
+			require.Equal(t, account2, tx.Message.AccountKeys[2])               // account lookup
+			require.Equal(t, account3, tx.Message.AccountKeys[3])               // pda lookup
+			require.Equal(t, solana.SystemProgramID, tx.Message.AccountKeys[4]) // system program ID
+			require.Equal(t, programID, tx.Message.AccountKeys[5])              // instruction program ID
+			// instruction program ID
+			require.Len(t, tx.Message.AddressTableLookups, 1)                                        // address table look contains entry
+			require.Equal(t, derivedLookupTablePubkey, tx.Message.AddressTableLookups[0].AccountKey) // address table
+			return true
+		}), &txID, mock.Anything).Return(nil).Once()
+
+		args := Arguments{
+			LookupTable: account2,
+			Seed1:       seed1,
+			Seed2:       seed2,
+			// intentionally missing Seed3
+		}
+
+		submitErr := cw.SubmitTransaction(ctx, "contract_reader_interface", "initializeLookupTable", args, txID, programID.String(), nil, nil)
+		require.NoError(t, submitErr)
+	})
 }
 
 func TestChainWriter_CCIPOfframp(t *testing.T) {
