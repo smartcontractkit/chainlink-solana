@@ -104,8 +104,8 @@ func TestConfig() {
 			AccountLookup{
 				Name:       "TokenAccount",
 				Location:   "Message.TokenAmounts.DestTokenAddress",
-				IsSigner:   false,
-				IsWritable: false,
+				IsSigner:   MetaBool{Value: false},
+				IsWritable: MetaBool{Value: false},
 			},
 			// PDA Account Lookup - Based on an account lookup and an address lookup
 			PDALookups{
@@ -116,16 +116,16 @@ func TestConfig() {
 				PublicKey: AccountLookup{
 					Name:       "TokenAccount",
 					Location:   "Message.TokenAmounts.DestTokenAddress",
-					IsSigner:   false,
-					IsWritable: false,
+					IsSigner:   MetaBool{Value: false},
+					IsWritable: MetaBool{Value: false},
 				},
 				// The seed is the receiver address.
 				Seeds: []Seed{
 					{Dynamic: AccountLookup{
 						Name:       "Receiver",
 						Location:   "Message.Receiver",
-						IsSigner:   false,
-						IsWritable: false,
+						IsSigner:   MetaBool{Value: false},
+						IsWritable: MetaBool{Value: false},
 					}},
 				},
 			},

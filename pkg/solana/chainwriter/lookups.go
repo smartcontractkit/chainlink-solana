@@ -2,6 +2,7 @@ package chainwriter
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"reflect"
 
@@ -27,10 +28,16 @@ type AccountConstant struct {
 
 // AccountLookup dynamically derives an account address from args using a specified location path.
 type AccountLookup struct {
-	Name       string
-	Location   string
-	IsSigner   bool
-	IsWritable bool
+	Name     string
+	Location string
+	// IsSigner and IsWritable can either be a constant bool or a location to a bitmap which decides the bools
+	IsSigner   MetaBool
+	IsWritable MetaBool
+}
+
+type MetaBool struct {
+	Value          bool
+	BitmapLocation string
 }
 
 type Seed struct {
@@ -89,21 +96,69 @@ func (ac AccountConstant) Resolve(_ context.Context, _ any, _ map[string]map[str
 	}, nil
 }
 
-func (al AccountLookup) Resolve(_ context.Context, args any, _ map[string]map[string][]*solana.AccountMeta, _ client.Reader) ([]*solana.AccountMeta, error) {
+func (al AccountLookup) Resolve(
+	_ context.Context,
+	args any,
+	_ map[string]map[string][]*solana.AccountMeta,
+	_ client.Reader,
+) ([]*solana.AccountMeta, error) {
 	derivedValues, err := GetValuesAtLocation(args, al.Location)
 	if err != nil {
-		return nil, fmt.Errorf("error getting account from lookup: %w", err)
+		return nil, fmt.Errorf("error getting account from '%s': %w", al.Location, err)
 	}
 
 	var metas []*solana.AccountMeta
-	for _, address := range derivedValues {
+	signerIndexes, err := resolveBitMap(al.IsSigner, args, len(derivedValues))
+	if err != nil {
+		return nil, err
+	}
+
+	writerIndexes, err := resolveBitMap(al.IsWritable, args, len(derivedValues))
+	if err != nil {
+		return nil, err
+	}
+
+	for i, address := range derivedValues {
+		// Resolve isSigner for this particular pubkey
+		isSigner := signerIndexes[i]
+
+		// Resolve isWritable
+		isWritable := writerIndexes[i]
+
 		metas = append(metas, &solana.AccountMeta{
 			PublicKey:  solana.PublicKeyFromBytes(address),
-			IsSigner:   al.IsSigner,
-			IsWritable: al.IsWritable,
+			IsSigner:   isSigner,
+			IsWritable: isWritable,
 		})
 	}
+
 	return metas, nil
+}
+
+func resolveBitMap(mb MetaBool, args any, length int) ([]bool, error) {
+	result := make([]bool, length)
+	if mb.BitmapLocation == "" {
+		for i := 0; i < length; i++ {
+			result[i] = mb.Value
+		}
+		return result, nil
+	}
+
+	bitmapVals, err := GetValuesAtLocation(args, mb.BitmapLocation)
+	if err != nil {
+		return []bool{}, fmt.Errorf("error reading bitmap from location '%s': %w", mb.BitmapLocation, err)
+	}
+
+	if len(bitmapVals) != 1 {
+		return []bool{}, fmt.Errorf("bitmap value is not a single value: %v, length: %d", bitmapVals, len(bitmapVals))
+	}
+
+	bitmapInt := binary.LittleEndian.Uint64(bitmapVals[0])
+	for i := 0; i < length; i++ {
+		result[i] = bitmapInt&(1<<i) > 0
+	}
+
+	return result, nil
 }
 
 func (alt AccountsFromLookupTable) Resolve(_ context.Context, _ any, derivedTableMap map[string]map[string][]*solana.AccountMeta, _ client.Reader) ([]*solana.AccountMeta, error) {

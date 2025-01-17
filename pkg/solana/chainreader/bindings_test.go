@@ -50,8 +50,8 @@ func (_m *mockBinding) SetCodec(_ types.RemoteCodec) {}
 
 func (_m *mockBinding) SetAddress(_ solana.PublicKey) {}
 
-func (_m *mockBinding) GetAddress() solana.PublicKey {
-	return solana.PublicKey{}
+func (_m *mockBinding) GetAddress(_ context.Context, _ any) (solana.PublicKey, error) {
+	return solana.PublicKey{}, nil
 }
 
 func (_m *mockBinding) CreateType(b bool) (any, error) {
