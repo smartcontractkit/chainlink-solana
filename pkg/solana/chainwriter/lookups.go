@@ -2,6 +2,7 @@ package chainwriter
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"reflect"
 
@@ -29,14 +30,14 @@ type AccountConstant struct {
 type AccountLookup struct {
 	Name     string
 	Location string
-	// IsSigner and IsWritable can either be a constant bool or a location to a bool
+	// IsSigner and IsWritable can either be a constant bool or a location to a bitmap which decides the bools
 	IsSigner   MetaBool
 	IsWritable MetaBool
 }
 
 type MetaBool struct {
-	Value    bool
-	Location string
+	Value          bool
+	BitmapLocation string
 }
 
 type Seed struct {
@@ -107,18 +108,22 @@ func (al AccountLookup) Resolve(
 	}
 
 	var metas []*solana.AccountMeta
+	signerIndexes, err := resolveBitMap(al.IsSigner, args, len(derivedValues))
+	if err != nil {
+		return nil, err
+	}
+
+	writerIndexes, err := resolveBitMap(al.IsWritable, args, len(derivedValues))
+	if err != nil {
+		return nil, err
+	}
+
 	for i, address := range derivedValues {
 		// Resolve isSigner for this particular pubkey
-		isSigner, err := resolveMetaBool(al.IsSigner, args, i, len(derivedValues))
-		if err != nil {
-			return nil, err
-		}
+		isSigner := signerIndexes[i]
 
 		// Resolve isWritable
-		isWritable, err := resolveMetaBool(al.IsWritable, args, i, len(derivedValues))
-		if err != nil {
-			return nil, err
-		}
+		isWritable := writerIndexes[i]
 
 		metas = append(metas, &solana.AccountMeta{
 			PublicKey:  solana.PublicKeyFromBytes(address),
@@ -130,38 +135,30 @@ func (al AccountLookup) Resolve(
 	return metas, nil
 }
 
-func resolveMetaBool(mb MetaBool, args any, pubkeyIndex, pubkeysCount int) (bool, error) {
-	if mb.Location == "" {
-		return mb.Value, nil
+func resolveBitMap(mb MetaBool, args any, length int) ([]bool, error) {
+	result := make([]bool, length)
+	if mb.BitmapLocation == "" {
+		for i := 0; i < length; i++ {
+			result[i] = mb.Value
+		}
+		return result, nil
 	}
 
-	boolVals, err := GetValuesAtLocation(args, mb.Location)
+	bitmapVals, err := GetValuesAtLocation(args, mb.BitmapLocation)
 	if err != nil {
-		return false, fmt.Errorf("error reading bools from location '%s': %w", mb.Location, err)
+		return []bool{}, fmt.Errorf("error reading bitmap from location '%s': %w", mb.BitmapLocation, err)
 	}
 
-	if len(boolVals) == 0 {
-		return false, fmt.Errorf("no boolean found at location '%s'", mb.Location)
+	if len(bitmapVals) != 1 {
+		return []bool{}, fmt.Errorf("bitmap value is not a single value: %v, length: %d", bitmapVals, len(bitmapVals))
 	}
 
-	// boolVals should always equal the number of pubkeys or 1
-	if len(boolVals) != pubkeysCount && len(boolVals) != 1 {
-		return false, fmt.Errorf(
-			"boolean array length %d doesn't match pubkey count %d for location '%s'",
-			len(boolVals), pubkeysCount, mb.Location,
-		)
+	bitmapInt := binary.LittleEndian.Uint64(bitmapVals[0])
+	for i := 0; i < length; i++ {
+		result[i] = bitmapInt&(1<<i) > 0
 	}
 
-	// a single boolean value is valid to apply to all pubkeys
-	data := boolVals[0]
-
-	if len(boolVals) > 1 {
-		data = boolVals[pubkeyIndex]
-	}
-	if len(data) == 0 {
-		return false, fmt.Errorf("missing data for boolean at index %d in location '%s'", pubkeyIndex, mb.Location)
-	}
-	return data[0] != 0, nil
+	return result, nil
 }
 
 func (alt AccountsFromLookupTable) Resolve(_ context.Context, _ any, derivedTableMap map[string]map[string][]*solana.AccountMeta, _ client.Reader) ([]*solana.AccountMeta, error) {

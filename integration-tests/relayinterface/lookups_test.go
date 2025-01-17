@@ -23,6 +23,7 @@ import (
 
 type InnerAccountArgs struct {
 	Accounts []*solana.AccountMeta
+	Bitmap   uint64
 }
 
 type TestAccountArgs struct {
@@ -132,27 +133,29 @@ func TestAccountLookups(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("AccountLookup works with MetaBool lookups", func(t *testing.T) {
+	t.Run("AccountLookup works with MetaBool bitmap lookups", func(t *testing.T) {
 		accounts := [3]*solana.AccountMeta{}
 
 		for i := 0; i < 3; i++ {
 			accounts[i] = &solana.AccountMeta{
 				PublicKey:  chainwriter.GetRandomPubKey(t),
-				IsSigner:   i%2 == 0,
-				IsWritable: (i+1)%2 == 0,
+				IsSigner:   (i)%2 == 0,
+				IsWritable: (i)%2 == 0,
 			}
 		}
 
 		lookupConfig := chainwriter.AccountLookup{
 			Name:       "InvalidAccount",
 			Location:   "Inner.Accounts.PublicKey",
-			IsSigner:   chainwriter.MetaBool{Location: "Inner.Accounts.IsSigner"},
-			IsWritable: chainwriter.MetaBool{Location: "Inner.Accounts.IsWritable"},
+			IsSigner:   chainwriter.MetaBool{BitmapLocation: "Inner.Bitmap"},
+			IsWritable: chainwriter.MetaBool{BitmapLocation: "Inner.Bitmap"},
 		}
 
 		args := TestAccountArgs{
 			Inner: InnerAccountArgs{
 				Accounts: accounts[:],
+				// should be 101... so {true, false, true}
+				Bitmap: 5,
 			},
 		}
 
@@ -164,41 +167,10 @@ func TestAccountLookups(t *testing.T) {
 		}
 	})
 
-	t.Run("AccountLookup works with MetaBool lookups when a meta field is missing", func(t *testing.T) {
-		accounts := [3]*solana.AccountMeta{}
-
-		for i := 0; i < 3; i++ {
-			accounts[i] = &solana.AccountMeta{
-				PublicKey:  chainwriter.GetRandomPubKey(t),
-				IsWritable: true,
-			}
-		}
-
-		lookupConfig := chainwriter.AccountLookup{
-			Name:       "InvalidAccount",
-			Location:   "Inner.Accounts.PublicKey",
-			IsSigner:   chainwriter.MetaBool{Location: "Inner.Accounts.IsSigner"},
-			IsWritable: chainwriter.MetaBool{Location: "Inner.Accounts.IsWritable"},
-		}
-
-		args := TestAccountArgs{
-			Inner: InnerAccountArgs{
-				Accounts: accounts[:],
-			},
-		}
-
-		result, err := lookupConfig.Resolve(ctx, args, nil, nil)
-		require.NoError(t, err)
-
-		for i, meta := range result {
-			require.Equal(t, accounts[i], meta)
-		}
-	})
-
-	t.Run("AccountLookup works with MetaBool lookups in a different location", func(t *testing.T) {
+	t.Run("AccountLookup fails with MetaBool due to an invalid number of bitmaps", func(t *testing.T) {
 		type TestAccountArgsExtended struct {
-			Inner        InnerAccountArgs
-			ExternalBool bool
+			Inner   InnerAccountArgs
+			Bitmaps []uint64
 		}
 
 		accounts := [3]*solana.AccountMeta{}
@@ -214,60 +186,22 @@ func TestAccountLookups(t *testing.T) {
 		lookupConfig := chainwriter.AccountLookup{
 			Name:       "InvalidAccount",
 			Location:   "Inner.Accounts.PublicKey",
-			IsSigner:   chainwriter.MetaBool{Location: "ExternalBool"},
-			IsWritable: chainwriter.MetaBool{Location: "ExternalBool"},
+			IsSigner:   chainwriter.MetaBool{BitmapLocation: "Bitmaps"},
+			IsWritable: chainwriter.MetaBool{BitmapLocation: "Bitmaps"},
 		}
 
 		args := TestAccountArgsExtended{
 			Inner: InnerAccountArgs{
 				Accounts: accounts[:],
 			},
-			ExternalBool: true,
-		}
-
-		result, err := lookupConfig.Resolve(ctx, args, nil, nil)
-		require.NoError(t, err)
-
-		for i, meta := range result {
-			require.Equal(t, accounts[i], meta)
-		}
-	})
-
-	t.Run("AccountLookup fails with MetaBool due to an invalid number of Meta lookups", func(t *testing.T) {
-		type TestAccountArgsExtended struct {
-			Inner         InnerAccountArgs
-			ExternalBools []bool
-		}
-
-		accounts := [3]*solana.AccountMeta{}
-
-		for i := 0; i < 3; i++ {
-			accounts[i] = &solana.AccountMeta{
-				PublicKey:  chainwriter.GetRandomPubKey(t),
-				IsWritable: true,
-				IsSigner:   true,
-			}
-		}
-
-		lookupConfig := chainwriter.AccountLookup{
-			Name:       "InvalidAccount",
-			Location:   "Inner.Accounts.PublicKey",
-			IsSigner:   chainwriter.MetaBool{Location: "ExternalBools"},
-			IsWritable: chainwriter.MetaBool{Location: "ExternalBools"},
-		}
-
-		args := TestAccountArgsExtended{
-			Inner: InnerAccountArgs{
-				Accounts: accounts[:],
-			},
-			ExternalBools: []bool{true, true},
+			Bitmaps: []uint64{5, 3},
 		}
 
 		_, err := lookupConfig.Resolve(ctx, args, nil, nil)
-		require.Contains(t, err.Error(), "boolean array length 2 doesn't match pubkey count 3 for location")
+		require.Contains(t, err.Error(), "bitmap value is not a single value")
 	})
 
-	t.Run("AccountLookup fails with MetaBool with an Invalid Location", func(t *testing.T) {
+	t.Run("AccountLookup fails with MetaBool with an Invalid BitmapLocation", func(t *testing.T) {
 		accounts := [3]*solana.AccountMeta{}
 
 		for i := 0; i < 3; i++ {
@@ -280,8 +214,8 @@ func TestAccountLookups(t *testing.T) {
 		lookupConfig := chainwriter.AccountLookup{
 			Name:       "InvalidAccount",
 			Location:   "Inner.Accounts.PublicKey",
-			IsSigner:   chainwriter.MetaBool{Location: "Invalid.IsSigner"},
-			IsWritable: chainwriter.MetaBool{Location: "Invalid.IsWritable"},
+			IsSigner:   chainwriter.MetaBool{BitmapLocation: "Invalid.Bitmap"},
+			IsWritable: chainwriter.MetaBool{BitmapLocation: "Invalid.Bitmap"},
 		}
 
 		args := TestAccountArgs{
@@ -291,10 +225,10 @@ func TestAccountLookups(t *testing.T) {
 		}
 
 		_, err := lookupConfig.Resolve(ctx, args, nil, nil)
-		require.Contains(t, err.Error(), "error reading bools from location")
+		require.Contains(t, err.Error(), "error reading bitmap from location")
 	})
 
-	t.Run("AccountLookup fails when MetaBool is an invalid type", func(t *testing.T) {
+	t.Run("AccountLookup fails when MetaBool Bitmap is an invalid type", func(t *testing.T) {
 		accounts := [3]*solana.AccountMeta{}
 
 		for i := 0; i < 3; i++ {
@@ -307,8 +241,8 @@ func TestAccountLookups(t *testing.T) {
 		lookupConfig := chainwriter.AccountLookup{
 			Name:       "InvalidAccount",
 			Location:   "Inner.Accounts.PublicKey",
-			IsSigner:   chainwriter.MetaBool{Location: "Inner"},
-			IsWritable: chainwriter.MetaBool{Location: "Inner"},
+			IsSigner:   chainwriter.MetaBool{BitmapLocation: "Inner"},
+			IsWritable: chainwriter.MetaBool{BitmapLocation: "Inner"},
 		}
 
 		args := TestAccountArgs{
