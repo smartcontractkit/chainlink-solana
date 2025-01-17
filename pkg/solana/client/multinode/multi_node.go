@@ -86,6 +86,10 @@ func NewMultiNode[
 	return c
 }
 
+func (c *MultiNode[CHAIN_ID, RPC]) Name() string {
+	return c.lggr.Name()
+}
+
 func (c *MultiNode[CHAIN_ID, RPC]) ChainID() CHAIN_ID {
 	return c.chainID
 }

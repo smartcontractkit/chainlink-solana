@@ -72,6 +72,10 @@ type TransactionSender[TX any, RESULT SendTxResult, CHAIN_ID ID, RPC SendTxRPCCl
 	chStop services.StopChan
 }
 
+func (txSender *TransactionSender[TX, RESULT, CHAIN_ID, RPC]) Name() string {
+	return txSender.lggr.Name()
+}
+
 // SendTransaction - broadcasts transaction to all the send-only and primary nodes in MultiNode.
 // A returned nil or error does not guarantee that the transaction will or won't be included. Additional checks must be
 // performed to determine the final state.
