@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	"github.com/gagliardetto/solana-go"
+	cciprouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 )
 
 const registryAddress = "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6A"
@@ -19,12 +20,14 @@ func TestConfig() {
 
 	fromAddress := "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6J"
 
+	// NOTE: This is not the real IDL, since the real one is some 3000+ lines long. In the plugin, the IDL will be imported.
 	executionReportSingleChainIDL := `{"name":"ExecutionReportSingleChain","type":{"kind":"struct","fields":[{"name":"source_chain_selector","type":"u64"},{"name":"message","type":{"defined":"Any2SolanaRampMessage"}},{"name":"root","type":{"array":["u8",32]}},{"name":"proofs","type":{"vec":{"array":["u8",32]}}}]}},{"name":"Any2SolanaRampMessage","type":{"kind":"struct","fields":[{"name":"header","type":{"defined":"RampMessageHeader"}},{"name":"sender","type":{"vec":"u8"}},{"name":"data","type":{"vec":"u8"}},{"name":"receiver","type":{"array":["u8",32]}},{"name":"extra_args","type":{"defined":"SolanaExtraArgs"}}]}},{"name":"RampMessageHeader","type":{"kind":"struct","fields":[{"name":"message_id","type":{"array":["u8",32]}},{"name":"source_chain_selector","type":"u64"},{"name":"dest_chain_selector","type":"u64"},{"name":"sequence_number","type":"u64"},{"name":"nonce","type":"u64"}]}},{"name":"SolanaExtraArgs","type":{"kind":"struct","fields":[{"name":"compute_units","type":"u32"},{"name":"allow_out_of_order_execution","type":"bool"}]}}`
 
 	executeConfig := MethodConfig{
 		FromAddress:        fromAddress,
 		InputModifications: nil,
 		ChainSpecificName:  "execute",
+		ArgsTransform:      CCIPArgsTransform,
 		// LookupTables are on-chain stores of accounts. They can be used in two ways:
 		// 1. As a way to store a list of accounts that are all associated together (i.e. Token State registry)
 		// 2. To compress the transactions in a TX and reduce the size of the TX. (The traditional way)
@@ -55,6 +58,7 @@ func TestConfig() {
 						IsSigner:   false,
 						IsWritable: false,
 						InternalField: InternalField{
+							Type:     reflect.TypeOf(cciprouter.TokenAdminRegistry{}),
 							Location: "LookupTable",
 						},
 					},
@@ -403,17 +407,13 @@ func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args a
 				Accounts: PDALookups{
 					Name: "RegistryTokenState",
 					PublicKey: AccountConstant{
-						Address:    registryAddress,
-						IsSigner:   false,
-						IsWritable: false,
+						Address: registryAddress,
 					},
 					Seeds: []Seed{
 						{Dynamic: AccountLookup{Location: "Message.TokenAmounts.DestTokenAddress"}},
 					},
-					IsSigner:   false,
-					IsWritable: false,
 					InternalField: InternalField{
-						Type:     reflect.TypeOf(DataAccount{}),
+						Type:     reflect.TypeOf(cciprouter.TokenAdminRegistry{}),
 						Location: "LookupTable",
 					},
 				},
