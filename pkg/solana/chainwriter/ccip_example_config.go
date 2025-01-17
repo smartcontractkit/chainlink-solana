@@ -1,8 +1,14 @@
 package chainwriter
 
 import (
+	"context"
+	"fmt"
+	"reflect"
+
 	"github.com/gagliardetto/solana-go"
 )
+
+const registryAddress = "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6A"
 
 func TestConfig() {
 	// Fake constant addresses for the purpose of this example.
@@ -330,6 +336,44 @@ func TestConfig() {
 				IsSigner:   false,
 				IsWritable: false,
 			},
+			// Static PDA lookup
+			PDALookups{
+				Name: "GlobalState",
+				PublicKey: AccountConstant{
+					Address: routerProgramAddress,
+				},
+				Seeds: []Seed{
+					{Static: []byte("state")},
+				},
+				IsSigner:   false,
+				IsWritable: false,
+			},
+			// PDA lookup
+			PDALookups{
+				Name: "BillingTokenConfig",
+				PublicKey: AccountConstant{
+					Address: routerProgramAddress,
+				},
+				Seeds: []Seed{
+					{Static: []byte("fee_billing_token_config")},
+					{Dynamic: AccountLookup{Location: "AbstractReport.PriceUpdatesTokenPriceUpdates.TokenPrice.TokenID"}},
+				},
+				IsSigner:   false,
+				IsWritable: false,
+			},
+			// PDA lookup
+			PDALookups{
+				Name: "ChainConfigGasPrice",
+				PublicKey: AccountConstant{
+					Address: routerProgramAddress,
+				},
+				Seeds: []Seed{
+					{Static: []byte("dest_chain_state")},
+					{Dynamic: AccountLookup{Location: "AbstractReport.MerkleRoots.ChainSel"}},
+				},
+				IsSigner:   false,
+				IsWritable: false,
+			},
 		},
 		DebugIDLocation: "",
 	}
@@ -346,4 +390,73 @@ func TestConfig() {
 		},
 	}
 	_ = chainWriterConfig
+}
+
+// This example doesn't contain the complete implementation of the function, since the
+// types needed to transform can't be imported into this repository. However, in production, this
+// function will be implemented in the CCIP plugin, which will have access to all the necessary types.
+func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args any, accounts solana.AccountMetaSlice) (any, error) {
+	TokenPoolLookupTable := LookupTables{
+		DerivedLookupTables: []DerivedLookupTable{
+			{
+				Name: "RegistryTokenState",
+				Accounts: PDALookups{
+					Name: "RegistryTokenState",
+					PublicKey: AccountConstant{
+						Address:    registryAddress,
+						IsSigner:   false,
+						IsWritable: false,
+					},
+					Seeds: []Seed{
+						{Dynamic: AccountLookup{Location: "Message.TokenAmounts.DestTokenAddress"}},
+					},
+					IsSigner:   false,
+					IsWritable: false,
+					InternalField: InternalField{
+						Type:     reflect.TypeOf(DataAccount{}),
+						Location: "LookupTable",
+					},
+				},
+			},
+		}}
+	tableMap, _, err := cw.ResolveLookupTables(ctx, args, TokenPoolLookupTable)
+	if err != nil {
+		return nil, err
+	}
+	registryTables := tableMap["RegistryTokenState"]
+	tokenPoolAddresses := []solana.PublicKey{}
+	for _, table := range registryTables {
+		tokenPoolAddresses = append(tokenPoolAddresses, table[0].PublicKey)
+	}
+
+	tokenIndexes := []uint8{}
+	for i, account := range accounts {
+		for _, address := range tokenPoolAddresses {
+			if account.PublicKey == address {
+				if i > 255 {
+					return nil, fmt.Errorf("index %d out of range for uint8", i)
+				}
+				tokenIndexes = append(tokenIndexes, uint8(i)) //nolint:gosec
+			}
+		}
+	}
+
+	if len(tokenIndexes) != len(tokenPoolAddresses) {
+		return nil, fmt.Errorf("missing token pools in accounts")
+	}
+
+	// Args should be of the following type:
+	// https://github.com/smartcontractkit/chainlink/blob/73f16fec1dcf13d3254d44b3e2df3e36303ce77f/core/capabilities/ccip/ocrimpls/contract_transmitter.go#L82-L90
+	//
+	// struct {
+	// 	ReportContext [2][32]byte
+	// 	Report        []byte
+	// 	Info          ccipocr3.ExecuteReportInfo
+	// }
+	//
+	// Then we need to extend it to include TokenIndexes and return that altered struct.
+	// This is just an example - in the real plugin implementation, the types will be imported.
+	// The token indexes calculation above should be mostly accurate though.
+
+	return args, nil
 }
