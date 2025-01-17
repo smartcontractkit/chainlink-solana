@@ -178,7 +178,7 @@ func (c *Client) TXSync(name string, commitment rpc.CommitmentType, instr []sola
 		return err
 	}
 	defer sub.Unsubscribe()
-	res, err := sub.Recv()
+	res, err := sub.Recv(context.Background())
 	if err != nil {
 		return err
 	}
@@ -196,7 +196,7 @@ func (c *Client) queueTX(sig solana.Signature, commitment rpc.CommitmentType) {
 			return err
 		}
 		defer sub.Unsubscribe()
-		res, err := sub.Recv()
+		res, err := sub.Recv(context.Background())
 		if err != nil {
 			return err
 		}
