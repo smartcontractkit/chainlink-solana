@@ -323,16 +323,7 @@ func (c *Client) GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error
 	// get block based on slot
 	done := c.latency("latest_block")
 	defer done()
-	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
-	defer cancel()
-	v, err, _ := c.requestGroup.Do("GetBlockWithOpts", func() (interface{}, error) {
-		version := uint64(0) // pull all tx types (legacy + v0)
-		return c.rpc.GetBlockWithOpts(ctx, slot, &rpc.GetBlockOpts{
-			Commitment:                     c.commitment,
-			MaxSupportedTransactionVersion: &version,
-		})
-	})
-	return v.(*rpc.GetBlockResult), err
+	return c.GetBlock(ctx, slot)
 }
 
 // GetLatestBlockHeight returns the latest block height of the node based on the configured commitment type
