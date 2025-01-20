@@ -140,6 +140,18 @@ type IdlField struct {
 	Type IdlType  `json:"type"`
 }
 
+// PDA is a struct that does not correlate to an official IDL type
+// It is needed to encode seeds to calculate the address for PDA account reads
+type PDATypeDef struct {
+	Prefix string    `json:"prefix,omitempty"`
+	Seeds  []PDASeed `json:"seeds,omitempty"`
+}
+
+type PDASeed struct {
+	Name string          `json:"name"`
+	Type IdlTypeAsString `json:"type"`
+}
+
 type IdlTypeAsString string
 
 const (
@@ -253,6 +265,12 @@ type IdlType struct {
 	asIdlTypeOption  *IdlTypeOption
 	asIdlTypeDefined *IdlTypeDefined
 	asIdlTypeArray   *IdlTypeArray
+}
+
+func NewIdlStringType(asString IdlTypeAsString) IdlType {
+	return IdlType{
+		asString: asString,
+	}
 }
 
 func (env *IdlType) IsString() bool {

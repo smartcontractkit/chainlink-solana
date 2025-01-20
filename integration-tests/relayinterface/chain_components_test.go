@@ -384,7 +384,7 @@ func (h *helper) waitForTX(t *testing.T, sig solana.Signature, commitment rpc.Co
 
 	defer sub.Unsubscribe()
 
-	res, err := sub.Recv()
+	res, err := sub.Recv(context.Background())
 	require.NoError(t, err)
 
 	if res.Value.Err != nil {

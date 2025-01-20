@@ -284,25 +284,26 @@ func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainContra
 }
 
 func (s *SolanaChainReaderService) addAccountRead(namespace string, genericName string, idl codec.IDL, idlType codec.IdlTypeDef, readDefinition config.ReadDefinition) error {
-	inputAccountIDLDef := codec.NilIdlTypeDefTy
-	// TODO:
-	//		if hasPDA{
-	//			inputAccountIDLDef = pdaType
-	//		}
-	if err := s.addCodecDef(true, namespace, genericName, codec.ChainConfigTypeAccountDef, idl, inputAccountIDLDef, readDefinition.InputModifications); err != nil {
-		return err
-	}
-
 	if err := s.addCodecDef(false, namespace, genericName, codec.ChainConfigTypeAccountDef, idl, idlType, readDefinition.OutputModifications); err != nil {
 		return err
 	}
 
 	s.lookup.addReadNameForContract(namespace, genericName)
 
-	s.bindings.AddReadBinding(namespace, genericName, newAccountReadBinding(
-		namespace,
-		genericName,
-	))
+	var reader readBinding
+	var inputAccountIDLDef interface{}
+	// Create PDA read binding if PDA prefix or seeds configs are populated
+	if len(readDefinition.PDADefiniton.Prefix) > 0 || len(readDefinition.PDADefiniton.Seeds) > 0 {
+		inputAccountIDLDef = readDefinition.PDADefiniton
+		reader = newAccountReadBinding(namespace, genericName, readDefinition.PDADefiniton.Prefix, true)
+	} else {
+		inputAccountIDLDef = codec.NilIdlTypeDefTy
+		reader = newAccountReadBinding(namespace, genericName, "", false)
+	}
+	if err := s.addCodecDef(true, namespace, genericName, codec.ChainConfigTypeAccountDef, idl, inputAccountIDLDef, readDefinition.InputModifications); err != nil {
+		return err
+	}
+	s.bindings.AddReadBinding(namespace, genericName, reader)
 
 	return nil
 }
