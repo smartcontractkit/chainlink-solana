@@ -122,13 +122,13 @@ func (m *MultiClient) GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, 
 	return r.GetLatestBlock(ctx)
 }
 
-func (m *MultiClient) GetTransaction(ctx context.Context, txHash solana.Signature, opts *rpc.GetTransactionOpts) (*rpc.GetTransactionResult, error) {
+func (m *MultiClient) GetTransaction(ctx context.Context, txHash solana.Signature) (*rpc.GetTransactionResult, error) {
 	r, err := m.getClient()
 	if err != nil {
 		return nil, err
 	}
 
-	return r.GetTransaction(ctx, txHash, opts)
+	return r.GetTransaction(ctx, txHash)
 }
 
 func (m *MultiClient) GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64) (rpc.BlocksResult, error) {
