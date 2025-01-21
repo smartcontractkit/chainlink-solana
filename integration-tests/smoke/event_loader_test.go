@@ -25,6 +25,7 @@ import (
 
 	contract "github.com/smartcontractkit/chainlink-solana/contracts/generated/log_read_test"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
@@ -49,7 +50,8 @@ func TestEventLoader(t *testing.T) {
 	require.NoError(t, err)
 
 	rpcURL, wsURL := setupTestValidator(t, privateKey.PublicKey().String())
-	rpcClient := rpc.New(rpcURL)
+	cl, rpcClient, err := client.NewTestClient(rpcURL, config.NewDefault(), 1*time.Second, logger.Nop())
+	require.NoError(t, err)
 	wsClient, err := ws.Connect(ctx, wsURL)
 	require.NoError(t, err)
 
@@ -62,7 +64,7 @@ func TestEventLoader(t *testing.T) {
 	parser := &printParser{t: t}
 	sender := newLogSender(t, rpcClient, wsClient)
 	collector := logpoller.NewEncodedLogCollector(
-		rpcClient,
+		cl,
 		parser,
 		logger.Nop(),
 	)

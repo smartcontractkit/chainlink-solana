@@ -3,18 +3,18 @@
 package logpoller
 
 import (
+	"math/rand"
 	"testing"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/require"
 
 	_ "github.com/jackc/pgx/v4/stdlib"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/pg"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/stretchr/testify/require"
 )
 
 // NOTE: at the moment it's not possible to run all db tests at once. This issue will be addressed separately
@@ -33,7 +33,7 @@ func TestLogPollerFilters(t *testing.T) {
 				EventName:     "event",
 				EventSig:      EventSignature{1, 2, 3},
 				StartingBlock: 1,
-				EventIDL:      "{}",
+				EventIdl:      EventIdl{},
 				SubkeyPaths:   SubkeyPaths([][]string{{"a", "b"}, {"c"}}),
 				Retention:     1000,
 				MaxLogsKept:   3,
@@ -44,7 +44,6 @@ func TestLogPollerFilters(t *testing.T) {
 				EventName:     "event",
 				EventSig:      EventSignature{1, 2, 3},
 				StartingBlock: 1,
-				EventIDL:      "{}",
 				SubkeyPaths:   SubkeyPaths([][]string{}),
 				Retention:     1000,
 				MaxLogsKept:   3,
@@ -55,7 +54,6 @@ func TestLogPollerFilters(t *testing.T) {
 				EventName:     "event",
 				EventSig:      EventSignature{1, 2, 3},
 				StartingBlock: 1,
-				EventIDL:      "{}",
 				SubkeyPaths:   nil,
 				Retention:     1000,
 				MaxLogsKept:   3,
@@ -191,19 +189,35 @@ func TestLogPollerLogs(t *testing.T) {
 	ctx := tests.Context(t)
 	// create filter as it's required for a log
 	filterID, err := orm.InsertFilter(ctx, newRandomFilter(t))
+	filterID2, err := orm.InsertFilter(ctx, newRandomFilter(t))
 	require.NoError(t, err)
 	log := newRandomLog(t, filterID, chainID)
-	err = orm.InsertLogs(ctx, []Log{log})
+	log2 := newRandomLog(t, filterID2, chainID)
+	err = orm.InsertLogs(ctx, []Log{log, log2})
 	require.NoError(t, err)
 	// insert of the same Log should not produce two instances
 	err = orm.InsertLogs(ctx, []Log{log})
 	require.NoError(t, err)
-	dbLogs, err := orm.SelectLogs(ctx, 0, 100, log.Address, log.EventSig)
+
+	dbLogs, err := orm.SelectLogs(ctx, 0, 1000000, log.Address, log.EventSig)
 	require.NoError(t, err)
 	require.Len(t, dbLogs, 1)
 	log.ID = dbLogs[0].ID
 	log.CreatedAt = dbLogs[0].CreatedAt
 	require.Equal(t, log, dbLogs[0])
+
+	dbLogs, err = orm.SelectLogs(ctx, 0, 1000000, log2.Address, log2.EventSig)
+	require.NoError(t, err)
+	require.Len(t, dbLogs, 1)
+	log2.ID = dbLogs[0].ID
+	log2.CreatedAt = dbLogs[0].CreatedAt
+	require.Equal(t, log2, dbLogs[0])
+
+	t.Run("SelectSequenceNums", func(t *testing.T) {
+		seqNums, err := orm.SelectSeqNums(tests.Context(t))
+		require.NoError(t, err)
+		require.Len(t, seqNums, 2)
+	})
 }
 
 func newRandomFilter(t *testing.T) Filter {
@@ -213,7 +227,6 @@ func newRandomFilter(t *testing.T) Filter {
 		EventName:     "event",
 		EventSig:      newRandomEventSignature(t),
 		StartingBlock: 1,
-		EventIDL:      "{}",
 		SubkeyPaths:   [][]string{{"a", "b"}, {"c"}},
 		Retention:     1000,
 		MaxLogsKept:   3,
@@ -230,14 +243,15 @@ func newRandomLog(t *testing.T, filterID int64, chainID string) Log {
 	return Log{
 		FilterID:       filterID,
 		ChainID:        chainID,
-		LogIndex:       1,
+		LogIndex:       rand.Int63n(1000),
 		BlockHash:      Hash(pubKey),
-		BlockNumber:    10,
+		BlockNumber:    rand.Int63n(1000000),
 		BlockTimestamp: time.Unix(1731590113, 0),
 		Address:        PublicKey(pubKey),
 		EventSig:       EventSignature{3, 2, 1},
 		SubkeyValues:   [][]byte{{3, 2, 1}, {1}, {1, 2}, pubKey.Bytes()},
 		TxHash:         Signature(signature),
 		Data:           data,
+		SequenceNum:    rand.Int63n(500),
 	}
 }

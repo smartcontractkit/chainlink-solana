@@ -86,8 +86,8 @@ func (q *queryArgs) withStartingBlock(startingBlock int64) *queryArgs {
 }
 
 // withEventIDL sets the EventIDL field in queryArgs.
-func (q *queryArgs) withEventIDL(eventIDL string) *queryArgs {
-	return q.withField("event_idl", eventIDL)
+func (q *queryArgs) withEventIDL(eventIdl EventIdl) *queryArgs {
+	return q.withField("event_idl", eventIdl)
 }
 
 // withSubkeyPaths sets the SubkeyPaths field in queryArgs.

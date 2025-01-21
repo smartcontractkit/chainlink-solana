@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -38,6 +40,12 @@ func TestFilters_LoadFilters(t *testing.T) {
 		happyPath,
 		happyPath2,
 	}, nil).Once()
+
+	orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{
+		1: 18,
+		2: 25,
+		3: 0,
+	}, nil)
 
 	err := fs.LoadFilters(ctx)
 	require.EqualError(t, err, "failed to select filters from db: db failed")
@@ -97,12 +105,6 @@ func TestFilters_RegisterFilter(t *testing.T) {
 				},
 			},
 			{
-				Name: "EventIDL",
-				ModifyField: func(f *Filter) {
-					f.EventIDL = uuid.NewString()
-				},
-			},
-			{
 				Name: "SubkeyPaths",
 				ModifyField: func(f *Filter) {
 					f.SubkeyPaths = [][]string{{uuid.NewString()}}
@@ -116,6 +118,7 @@ func TestFilters_RegisterFilter(t *testing.T) {
 				const filterName = "Filter"
 				dbFilter := Filter{Name: filterName}
 				orm.On("SelectFilters", mock.Anything).Return([]Filter{dbFilter}, nil).Once()
+				orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil)
 				newFilter := dbFilter
 				tc.ModifyField(&newFilter)
 				err := fs.RegisterFilter(tests.Context(t), newFilter)
@@ -128,11 +131,13 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		fs := newFilters(lggr, orm)
 		const filterName = "Filter"
 		orm.On("SelectFilters", mock.Anything).Return(nil, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(int64(0), errors.New("failed to insert")).Once()
 		filter := Filter{Name: filterName}
 		err := fs.RegisterFilter(tests.Context(t), filter)
 		require.Error(t, err)
-		// can readd after db issue is resolved
+
+		// can read after db issue is resolved
 		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(int64(1), nil).Once()
 		err = fs.RegisterFilter(tests.Context(t), filter)
 		require.NoError(t, err)
@@ -144,7 +149,7 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(int64(1), nil).Once()
 		err = fs.RegisterFilter(tests.Context(t), filter)
 		require.NoError(t, err)
-		storedFilters := slices.Collect(fs.MatchingFilters(filter.Address, filter.EventSig))
+		storedFilters := slices.Collect(fs.matchingFilters(filter.Address, filter.EventSig))
 		require.Len(t, storedFilters, 1)
 		filter.ID = 1
 		require.Equal(t, filter, storedFilters[0])
@@ -154,6 +159,7 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		fs := newFilters(lggr, orm)
 		const filterName = "Filter"
 		orm.On("SelectFilters", mock.Anything).Return(nil, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 		const filterID = int64(10)
 		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(filterID, nil).Once()
 		err := fs.RegisterFilter(tests.Context(t), Filter{Name: filterName})
@@ -185,6 +191,7 @@ func TestFilters_UnregisterFilter(t *testing.T) {
 		fs := newFilters(lggr, orm)
 		const filterName = "Filter"
 		orm.On("SelectFilters", mock.Anything).Return(nil, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 		err := fs.UnregisterFilter(tests.Context(t), filterName)
 		require.NoError(t, err)
 	})
@@ -194,6 +201,7 @@ func TestFilters_UnregisterFilter(t *testing.T) {
 		const filterName = "Filter"
 		const id int64 = 10
 		orm.On("SelectFilters", mock.Anything).Return([]Filter{{ID: id, Name: filterName}}, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 		orm.On("MarkFilterDeleted", mock.Anything, id).Return(errors.New("db query failed")).Once()
 		err := fs.UnregisterFilter(tests.Context(t), filterName)
 		require.EqualError(t, err, "failed to mark filter deleted: db query failed")
@@ -204,6 +212,7 @@ func TestFilters_UnregisterFilter(t *testing.T) {
 		const filterName = "Filter"
 		const id int64 = 10
 		orm.On("SelectFilters", mock.Anything).Return([]Filter{{ID: id, Name: filterName}}, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 		orm.On("MarkFilterDeleted", mock.Anything, id).Return(nil).Once()
 		err := fs.UnregisterFilter(tests.Context(t), filterName)
 		require.NoError(t, err)
@@ -231,6 +240,9 @@ func TestFilters_PruneFilters(t *testing.T) {
 				Name: "To keep",
 			},
 		}, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{
+			2: 25,
+		}, nil).Once()
 		orm.On("DeleteFilters", mock.Anything, map[int64]Filter{toDelete.ID: toDelete}).Return(nil).Once()
 		err := fs.PruneFilters(tests.Context(t))
 		require.NoError(t, err)
@@ -251,6 +263,10 @@ func TestFilters_PruneFilters(t *testing.T) {
 				Name: "To keep",
 			},
 		}, nil).Once()
+		orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{
+			1: 18,
+			2: 25,
+		}, nil).Once()
 		newToDelete := Filter{
 			ID:   3,
 			Name: "To delete 2",
@@ -267,7 +283,7 @@ func TestFilters_PruneFilters(t *testing.T) {
 	})
 }
 
-func TestFilters_MatchingFilters(t *testing.T) {
+func TestFilters_matchingFilters(t *testing.T) {
 	orm := newMockORM(t)
 	lggr := logger.Sugared(logger.Test(t))
 	expectedFilter1 := Filter{
@@ -296,17 +312,23 @@ func TestFilters_MatchingFilters(t *testing.T) {
 		EventSig: expectedFilter1.EventSig,
 	}
 	orm.On("SelectFilters", mock.Anything).Return([]Filter{expectedFilter1, expectedFilter2, sameAddress, sameEventSig}, nil).Once()
+	orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{
+		1: 18,
+		2: 25,
+		3: 14,
+		4: 0,
+	}, nil)
 	filters := newFilters(lggr, orm)
 	err := filters.LoadFilters(tests.Context(t))
 	require.NoError(t, err)
-	matchingFilters := slices.Collect(filters.MatchingFilters(expectedFilter1.Address, expectedFilter1.EventSig))
+	matchingFilters := slices.Collect(filters.matchingFilters(expectedFilter1.Address, expectedFilter1.EventSig))
 	require.Len(t, matchingFilters, 2)
 	require.Contains(t, matchingFilters, expectedFilter1)
 	require.Contains(t, matchingFilters, expectedFilter2)
 	// if at least one key does not match - returns empty iterator
-	require.Empty(t, slices.Collect(filters.MatchingFilters(newRandomPublicKey(t), expectedFilter1.EventSig)))
-	require.Empty(t, slices.Collect(filters.MatchingFilters(expectedFilter1.Address, newRandomEventSignature(t))))
-	require.Empty(t, slices.Collect(filters.MatchingFilters(newRandomPublicKey(t), newRandomEventSignature(t))))
+	require.Empty(t, slices.Collect(filters.matchingFilters(newRandomPublicKey(t), expectedFilter1.EventSig)))
+	require.Empty(t, slices.Collect(filters.matchingFilters(expectedFilter1.Address, newRandomEventSignature(t))))
+	require.Empty(t, slices.Collect(filters.matchingFilters(newRandomPublicKey(t), newRandomEventSignature(t))))
 }
 
 func TestFilters_GetFiltersToBackfill(t *testing.T) {
@@ -324,6 +346,10 @@ func TestFilters_GetFiltersToBackfill(t *testing.T) {
 		Name:          "notBackfilled",
 	}
 	orm.EXPECT().SelectFilters(mock.Anything).Return([]Filter{backfilledFilter, notBackfilled}, nil).Once()
+	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{
+		1: 18,
+		2: 25,
+	}, nil)
 	filters := newFilters(lggr, orm)
 	err := filters.LoadFilters(tests.Context(t))
 	require.NoError(t, err)
@@ -362,4 +388,66 @@ func TestFilters_GetFiltersToBackfill(t *testing.T) {
 	orm.EXPECT().InsertFilter(mock.Anything, newFilter).Return(newFilter.ID, nil).Once()
 	require.NoError(t, filters.RegisterFilter(tests.Context(t), newFilter))
 	ensureInQueue(notBackfilled, newFilter)
+}
+
+func TestExtractField(t *testing.T) {
+	type innerInner struct {
+		P string
+		Q int
+	}
+	type innerStruct struct {
+		PtrString    *string
+		ByteSlice    []byte
+		DoubleNested innerInner
+		MapStringInt map[string]int
+		MapIntString map[int]string
+	}
+	myString := "string"
+	myInt32 := int32(16)
+
+	testStruct := struct {
+		A int
+		B string
+		C *int32
+		D innerStruct
+	}{
+		5,
+		"hello",
+		&myInt32,
+		innerStruct{
+			&myString,
+			[]byte("bytes"),
+			innerInner{"goodbye", 8},
+			map[string]int{"key1": 1, "key2": 2},
+			map[int]string{1: "val1", 2: "val2"},
+		},
+	}
+
+	cases := []struct {
+		Name   string
+		Path   string
+		Result any
+	}{
+		{"int from struct", "A", int(5)},
+		{"string from struct", "B", "hello"},
+		{"*int32 from struct", "C", myInt32},
+		{"*string from nested struct", "D.PtrString", myString},
+		{"[]byte from nested struct", "D.ByteSlice", []byte("bytes")},
+		{"string from double-nested struct", "D.DoubleNested.P", "goodbye"},
+		{"map[string]int from nested struct", "D.MapStringInt.key2", 2},
+		{"key in map not found", "D.MapIntString.3", nil},
+		{"non-integer key for map[int]string", "D.MapIntString.NotAnInt", nil},
+		{"invalid field name in nested struct", "D.NoSuchField", nil},
+	}
+	for _, c := range cases {
+		t.Run(c.Name, func(t *testing.T) {
+			result, err := ExtractField(&testStruct, strings.Split(c.Path, "."))
+			if c.Result == nil {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, c.Result, result)
+		})
+	}
 }

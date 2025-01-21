@@ -21,6 +21,51 @@ func (_m *mockORM) EXPECT() *mockORM_Expecter {
 	return &mockORM_Expecter{mock: &_m.Mock}
 }
 
+// ChainID provides a mock function with given fields:
+func (_m *mockORM) ChainID() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for ChainID")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// mockORM_ChainID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ChainID'
+type mockORM_ChainID_Call struct {
+	*mock.Call
+}
+
+// ChainID is a helper method to define mock.On call
+func (_e *mockORM_Expecter) ChainID() *mockORM_ChainID_Call {
+	return &mockORM_ChainID_Call{Call: _e.mock.On("ChainID")}
+}
+
+func (_c *mockORM_ChainID_Call) Run(run func()) *mockORM_ChainID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *mockORM_ChainID_Call) Return(_a0 string) *mockORM_ChainID_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockORM_ChainID_Call) RunAndReturn(run func() string) *mockORM_ChainID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteFilters provides a mock function with given fields: ctx, filters
 func (_m *mockORM) DeleteFilters(ctx context.Context, filters map[int64]Filter) error {
 	ret := _m.Called(ctx, filters)
@@ -121,6 +166,53 @@ func (_c *mockORM_InsertFilter_Call) Return(id int64, err error) *mockORM_Insert
 }
 
 func (_c *mockORM_InsertFilter_Call) RunAndReturn(run func(context.Context, Filter) (int64, error)) *mockORM_InsertFilter_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// InsertLogs provides a mock function with given fields: _a0, _a1
+func (_m *mockORM) InsertLogs(_a0 context.Context, _a1 []Log) error {
+	ret := _m.Called(_a0, _a1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for InsertLogs")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, []Log) error); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockORM_InsertLogs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InsertLogs'
+type mockORM_InsertLogs_Call struct {
+	*mock.Call
+}
+
+// InsertLogs is a helper method to define mock.On call
+//   - _a0 context.Context
+//   - _a1 []Log
+func (_e *mockORM_Expecter) InsertLogs(_a0 interface{}, _a1 interface{}) *mockORM_InsertLogs_Call {
+	return &mockORM_InsertLogs_Call{Call: _e.mock.On("InsertLogs", _a0, _a1)}
+}
+
+func (_c *mockORM_InsertLogs_Call) Run(run func(_a0 context.Context, _a1 []Log)) *mockORM_InsertLogs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]Log))
+	})
+	return _c
+}
+
+func (_c *mockORM_InsertLogs_Call) Return(err error) *mockORM_InsertLogs_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *mockORM_InsertLogs_Call) RunAndReturn(run func(context.Context, []Log) error) *mockORM_InsertLogs_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -273,6 +365,64 @@ func (_c *mockORM_SelectFilters_Call) Return(_a0 []Filter, _a1 error) *mockORM_S
 }
 
 func (_c *mockORM_SelectFilters_Call) RunAndReturn(run func(context.Context) ([]Filter, error)) *mockORM_SelectFilters_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SelectSeqNums provides a mock function with given fields: ctx
+func (_m *mockORM) SelectSeqNums(ctx context.Context) (map[int64]int64, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SelectSeqNums")
+	}
+
+	var r0 map[int64]int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (map[int64]int64, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) map[int64]int64); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[int64]int64)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// mockORM_SelectSeqNums_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SelectSeqNums'
+type mockORM_SelectSeqNums_Call struct {
+	*mock.Call
+}
+
+// SelectSeqNums is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *mockORM_Expecter) SelectSeqNums(ctx interface{}) *mockORM_SelectSeqNums_Call {
+	return &mockORM_SelectSeqNums_Call{Call: _e.mock.On("SelectSeqNums", ctx)}
+}
+
+func (_c *mockORM_SelectSeqNums_Call) Run(run func(ctx context.Context)) *mockORM_SelectSeqNums_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *mockORM_SelectSeqNums_Call) Return(_a0 map[int64]int64, _a1 error) *mockORM_SelectSeqNums_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *mockORM_SelectSeqNums_Call) RunAndReturn(run func(context.Context) (map[int64]int64, error)) *mockORM_SelectSeqNums_Call {
 	_c.Call.Return(run)
 	return _c
 }

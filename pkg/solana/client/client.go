@@ -41,6 +41,7 @@ type Reader interface {
 	GetTransaction(ctx context.Context, txHash solana.Signature) (*rpc.GetTransactionResult, error)
 	GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64) (rpc.BlocksResult, error)
 	GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit uint64) (*rpc.BlocksResult, error)
+	GetBlockWithOpts(context.Context, uint64, *rpc.GetBlockOpts) (*rpc.GetBlockResult, error)
 	GetBlock(ctx context.Context, slot uint64) (*rpc.GetBlockResult, error)
 	GetSignaturesForAddressWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error)
 }
@@ -73,10 +74,10 @@ type Client struct {
 	requestGroup *singleflight.Group
 }
 
-func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration, log logger.Logger) (*Client, error) {
-	return &Client{
+// Return both the client and the underlying rpc client for testing
+func NewTestClient(endpoint string, cfg config.Config, requestTimeout time.Duration, log logger.Logger) (*Client, *rpc.Client, error) {
+	rpcClient := Client{
 		url:             endpoint,
-		rpc:             rpc.New(endpoint),
 		skipPreflight:   cfg.SkipPreflight(),
 		commitment:      cfg.Commitment(),
 		maxRetries:      cfg.MaxRetries(),
@@ -84,7 +85,14 @@ func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration,
 		contextDuration: requestTimeout,
 		log:             log,
 		requestGroup:    &singleflight.Group{},
-	}, nil
+	}
+	rpcClient.rpc = rpc.New(endpoint)
+	return &rpcClient, rpcClient.rpc, nil
+}
+
+func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration, log logger.Logger) (*Client, error) {
+	rpcClient, _, err := NewTestClient(endpoint, cfg, requestTimeout, log)
+	return rpcClient, err
 }
 
 func (c *Client) latency(name string) func() {
@@ -337,6 +345,15 @@ func (c *Client) GetLatestBlockHeight(ctx context.Context) (uint64, error) {
 		return c.rpc.GetBlockHeight(ctx, c.commitment)
 	})
 	return v.(uint64), err
+}
+
+func (c *Client) GetBlockWithOpts(ctx context.Context, slot uint64, opts *rpc.GetBlockOpts) (*rpc.GetBlockResult, error) {
+	// get block based on slot with custom options set
+	done := c.latency("get_block_with_opts")
+	defer done()
+	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
+	defer cancel()
+	return c.rpc.GetBlockWithOpts(ctx, slot, opts)
 }
 
 func (c *Client) GetBlock(ctx context.Context, slot uint64) (*rpc.GetBlockResult, error) {

@@ -27,8 +27,8 @@ type ProgramEventProcessor interface {
 }
 
 type RPCClient interface {
-	GetLatestBlockhash(ctx context.Context, commitment rpc.CommitmentType) (out *rpc.GetLatestBlockhashResult, err error)
-	GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64, commitment rpc.CommitmentType) (out rpc.BlocksResult, err error)
+	LatestBlockhash(ctx context.Context) (out *rpc.GetLatestBlockhashResult, err error)
+	GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64) (out rpc.BlocksResult, err error)
 	GetBlockWithOpts(context.Context, uint64, *rpc.GetBlockOpts) (*rpc.GetBlockResult, error)
 	GetSignaturesForAddressWithOpts(context.Context, solana.PublicKey, *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error)
 }
@@ -170,7 +170,7 @@ func (c *EncodedLogCollector) runSlotPolling(ctx context.Context) {
 			ctxB, cancel := context.WithTimeout(ctx, c.rpcTimeLimit)
 
 			// not to be run as a job, but as a blocking call
-			result, err := c.client.GetLatestBlockhash(ctxB, rpc.CommitmentFinalized)
+			result, err := c.client.LatestBlockhash(ctxB)
 			if err != nil {
 				c.lggr.Error("failed to get latest blockhash", "err", err)
 				cancel()
@@ -276,7 +276,7 @@ func (c *EncodedLogCollector) loadSlotBlocksRange(ctx context.Context, start, en
 	rpcCtx, cancel := context.WithTimeout(ctx, c.rpcTimeLimit)
 	defer cancel()
 
-	if result, err = c.client.GetBlocks(rpcCtx, start, &end, rpc.CommitmentFinalized); err != nil {
+	if result, err = c.client.GetBlocks(rpcCtx, start, &end); err != nil {
 		return err
 	}
 

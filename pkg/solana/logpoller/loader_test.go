@@ -3,7 +3,6 @@ package logpoller_test
 import (
 	"context"
 	"crypto/rand"
-	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -19,7 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
-	mocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
 )
 
 var (
@@ -63,7 +62,7 @@ func TestEncodedLogCollector_ParseSingleEvent(t *testing.T) {
 	latest.Store(uint64(40))
 
 	client.EXPECT().
-		GetLatestBlockhash(mock.Anything, rpc.CommitmentFinalized).
+		LatestBlockhash(mock.Anything).
 		RunAndReturn(latestBlockhashReturnFunc(&latest))
 
 	client.EXPECT().
@@ -71,7 +70,6 @@ func TestEncodedLogCollector_ParseSingleEvent(t *testing.T) {
 			mock.Anything,
 			mock.MatchedBy(getBlocksStartValMatcher),
 			mock.MatchedBy(getBlocksEndValMatcher(&latest)),
-			rpc.CommitmentFinalized,
 		).
 		RunAndReturn(getBlocksReturnFunc(false))
 
@@ -79,11 +77,13 @@ func TestEncodedLogCollector_ParseSingleEvent(t *testing.T) {
 		GetBlockWithOpts(mock.Anything, mock.Anything, mock.Anything).
 		RunAndReturn(func(_ context.Context, slot uint64, _ *rpc.GetBlockOpts) (*rpc.GetBlockResult, error) {
 			height := slot - 1
+			timeStamp := solana.UnixTimeSeconds(time.Now().Unix())
 
 			result := rpc.GetBlockResult{
 				Transactions: []rpc.TransactionWithMeta{},
 				Signatures:   []solana.Signature{},
 				BlockHeight:  &height,
+				BlockTime:    &timeStamp,
 			}
 
 			_, _ = rand.Read(result.Blockhash[:])
@@ -133,13 +133,15 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 	hashes := make([]solana.Hash, len(slots))
 	scrambler := &slotUnsync{ch: make(chan struct{})}
 
+	timeStamp := solana.UnixTimeSeconds(time.Now().Unix())
+
 	for idx := range len(sigs) {
 		_, _ = rand.Read(sigs[idx][:])
 		_, _ = rand.Read(hashes[idx][:])
 	}
 
 	client.EXPECT().
-		GetLatestBlockhash(mock.Anything, rpc.CommitmentFinalized).
+		LatestBlockhash(mock.Anything).
 		RunAndReturn(latestBlockhashReturnFunc(&latest))
 
 	client.EXPECT().
@@ -147,7 +149,6 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 			mock.Anything,
 			mock.MatchedBy(getBlocksStartValMatcher),
 			mock.MatchedBy(getBlocksEndValMatcher(&latest)),
-			rpc.CommitmentFinalized,
 		).
 		RunAndReturn(getBlocksReturnFunc(false))
 
@@ -178,6 +179,7 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 					Transactions: []rpc.TransactionWithMeta{},
 					Signatures:   []solana.Signature{},
 					BlockHeight:  &height,
+					BlockTime:    &timeStamp,
 				}, nil
 			}
 
@@ -192,61 +194,68 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 				},
 				Signatures:  []solana.Signature{sigs[slotIdx]},
 				BlockHeight: &height,
+				BlockTime:   &timeStamp,
 			}, nil
 		})
 
 	tests.AssertEventually(t, func() bool {
-		return reflect.DeepEqual(parser.Events(), []logpoller.ProgramEvent{
-			{
-				BlockData: logpoller.BlockData{
-					SlotNumber:          41,
-					BlockHeight:         40,
-					BlockHash:           hashes[3],
-					TransactionHash:     sigs[3],
-					TransactionIndex:    0,
-					TransactionLogIndex: 0,
-				},
-				Prefix: ">",
-				Data:   "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
-			},
-			{
-				BlockData: logpoller.BlockData{
-					SlotNumber:          42,
-					BlockHeight:         41,
-					BlockHash:           hashes[2],
-					TransactionHash:     sigs[2],
-					TransactionIndex:    0,
-					TransactionLogIndex: 0,
-				},
-				Prefix: ">",
-				Data:   "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
-			},
-			{
-				BlockData: logpoller.BlockData{
-					SlotNumber:          43,
-					BlockHeight:         42,
-					BlockHash:           hashes[1],
-					TransactionHash:     sigs[1],
-					TransactionIndex:    0,
-					TransactionLogIndex: 0,
-				},
-				Prefix: ">",
-				Data:   "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
-			},
-			{
-				BlockData: logpoller.BlockData{
-					SlotNumber:          44,
-					BlockHeight:         43,
-					BlockHash:           hashes[0],
-					TransactionHash:     sigs[0],
-					TransactionIndex:    0,
-					TransactionLogIndex: 0,
-				},
-				Prefix: ">",
-				Data:   "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
-			},
-		})
+		return len(parser.Events()) >= 4
 	})
+
+	assert.Equal(t, []logpoller.ProgramEvent{
+		{
+			BlockData: logpoller.BlockData{
+				SlotNumber:          41,
+				BlockHeight:         40,
+				BlockTime:           timeStamp,
+				BlockHash:           hashes[3],
+				TransactionHash:     sigs[3],
+				TransactionIndex:    0,
+				TransactionLogIndex: 0,
+			},
+			Program: "J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4",
+			Data:    "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
+		},
+		{
+			BlockData: logpoller.BlockData{
+				SlotNumber:          42,
+				BlockHeight:         41,
+				BlockTime:           timeStamp,
+				BlockHash:           hashes[2],
+				TransactionHash:     sigs[2],
+				TransactionIndex:    0,
+				TransactionLogIndex: 0,
+			},
+			Program: "J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4",
+			Data:    "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
+		},
+		{
+			BlockData: logpoller.BlockData{
+				SlotNumber:          43,
+				BlockHeight:         42,
+				BlockTime:           timeStamp,
+				BlockHash:           hashes[1],
+				TransactionHash:     sigs[1],
+				TransactionIndex:    0,
+				TransactionLogIndex: 0,
+			},
+			Program: "J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4",
+			Data:    "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
+		},
+		{
+			BlockData: logpoller.BlockData{
+				SlotNumber:          44,
+				BlockHeight:         43,
+				BlockTime:           timeStamp,
+				BlockHash:           hashes[0],
+				TransactionHash:     sigs[0],
+				TransactionIndex:    0,
+				TransactionLogIndex: 0,
+			},
+			Program: "J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4",
+			Data:    "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
+		},
+	}, parser.Events())
 
 	client.AssertExpectations(t)
 }
@@ -298,7 +307,7 @@ func TestEncodedLogCollector_BackfillForAddress(t *testing.T) {
 
 	// GetLatestBlockhash might be called at start-up; make it take some time because the result isn't needed for this test
 	client.EXPECT().
-		GetLatestBlockhash(mock.Anything, rpc.CommitmentFinalized).
+		LatestBlockhash(mock.Anything).
 		RunAndReturn(latestBlockhashReturnFunc(&latest)).
 		After(2 * time.Second).
 		Maybe()
@@ -308,7 +317,6 @@ func TestEncodedLogCollector_BackfillForAddress(t *testing.T) {
 			mock.Anything,
 			mock.MatchedBy(getBlocksStartValMatcher),
 			mock.MatchedBy(getBlocksEndValMatcher(&latest)),
-			rpc.CommitmentFinalized,
 		).
 		RunAndReturn(getBlocksReturnFunc(true))
 
@@ -340,12 +348,14 @@ func TestEncodedLogCollector_BackfillForAddress(t *testing.T) {
 			}
 
 			height := slot - 1
+			timeStamp := solana.UnixTimeSeconds(time.Now().Unix())
 
 			if idx == -1 {
 				return &rpc.GetBlockResult{
 					Transactions: []rpc.TransactionWithMeta{},
 					Signatures:   []solana.Signature{},
 					BlockHeight:  &height,
+					BlockTime:    &timeStamp,
 				}, nil
 			}
 
@@ -364,6 +374,7 @@ func TestEncodedLogCollector_BackfillForAddress(t *testing.T) {
 				},
 				Signatures:  []solana.Signature{sigs[idx*2], sigs[(idx*2)+1]},
 				BlockHeight: &height,
+				BlockTime:   &timeStamp,
 			}, nil
 		})
 
@@ -455,7 +466,7 @@ func (p *testBlockProducer) Count() uint64 {
 	return p.count
 }
 
-func (p *testBlockProducer) GetLatestBlockhash(_ context.Context, _ rpc.CommitmentType) (out *rpc.GetLatestBlockhashResult, err error) {
+func (p *testBlockProducer) LatestBlockhash(_ context.Context) (out *rpc.GetLatestBlockhashResult, err error) {
 	p.b.Helper()
 
 	p.mu.Lock()
@@ -474,7 +485,7 @@ func (p *testBlockProducer) GetLatestBlockhash(_ context.Context, _ rpc.Commitme
 	}, nil
 }
 
-func (p *testBlockProducer) GetBlocks(_ context.Context, startSlot uint64, endSlot *uint64, _ rpc.CommitmentType) (out rpc.BlocksResult, err error) {
+func (p *testBlockProducer) GetBlocks(_ context.Context, startSlot uint64, endSlot *uint64) (out rpc.BlocksResult, err error) {
 	p.b.Helper()
 
 	p.mu.Lock()
@@ -486,7 +497,7 @@ func (p *testBlockProducer) GetBlocks(_ context.Context, startSlot uint64, endSl
 		blocks[idx] = startSlot + uint64(idx)
 	}
 
-	return rpc.BlocksResult(blocks), nil
+	return blocks, nil
 }
 
 func (p *testBlockProducer) GetBlockWithOpts(_ context.Context, block uint64, opts *rpc.GetBlockOpts) (*rpc.GetBlockResult, error) {
@@ -589,8 +600,8 @@ func (p *testParser) Events() []logpoller.ProgramEvent {
 	return p.events
 }
 
-func latestBlockhashReturnFunc(latest *atomic.Uint64) func(context.Context, rpc.CommitmentType) (*rpc.GetLatestBlockhashResult, error) {
-	return func(ctx context.Context, ct rpc.CommitmentType) (*rpc.GetLatestBlockhashResult, error) {
+func latestBlockhashReturnFunc(latest *atomic.Uint64) func(context.Context) (*rpc.GetLatestBlockhashResult, error) {
+	return func(ctx context.Context) (*rpc.GetLatestBlockhashResult, error) {
 		defer func() {
 			latest.Store(latest.Load() + 2)
 		}()
@@ -608,8 +619,8 @@ func latestBlockhashReturnFunc(latest *atomic.Uint64) func(context.Context, rpc.
 	}
 }
 
-func getBlocksReturnFunc(empty bool) func(context.Context, uint64, *uint64, rpc.CommitmentType) (rpc.BlocksResult, error) {
-	return func(_ context.Context, u1 uint64, u2 *uint64, _ rpc.CommitmentType) (rpc.BlocksResult, error) {
+func getBlocksReturnFunc(empty bool) func(context.Context, uint64, *uint64) (rpc.BlocksResult, error) {
+	return func(_ context.Context, u1 uint64, u2 *uint64) (rpc.BlocksResult, error) {
 		blocks := []uint64{}
 
 		if !empty {
@@ -619,7 +630,7 @@ func getBlocksReturnFunc(empty bool) func(context.Context, uint64, *uint64, rpc.
 			}
 		}
 
-		return rpc.BlocksResult(blocks), nil
+		return blocks, nil
 	}
 }
 

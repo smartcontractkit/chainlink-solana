@@ -28,16 +28,25 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
+
+type LogPoller interface {
+	Start(context.Context) error
+	Close() error
+	RegisterFilter(ctx context.Context, filter logpoller.Filter) error
+	UnregisterFilter(ctx context.Context, name string) error
+}
 
 type Chain interface {
 	types.ChainService
 
 	ID() string
 	Config() config.Config
+	LogPoller() LogPoller
 	TxManager() TxManager
 	// Reader returns a new Reader from the available list of nodes (if there are multiple, it will randomly select one)
 	Reader() (client.Reader, error)
@@ -90,6 +99,7 @@ type chain struct {
 	services.StateMachine
 	id             string
 	cfg            *config.TOMLConfig
+	lp             LogPoller
 	txm            *txm.Txm
 	balanceMonitor services.Service
 	lggr           logger.Logger
@@ -312,6 +322,8 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 		bc = internal.NewLoader[monitor.BalanceClient](func() (monitor.BalanceClient, error) { return ch.multiNode.SelectRPC() })
 	}
 
+	// TODO: import typeProvider function from codec package and pass to constructor
+	ch.lp = logpoller.New(logger.Sugared(logger.Named(lggr, "LogPoller")), logpoller.NewORM(ch.ID(), ds, lggr), ch.multiClient)
 	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
 	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
 	return &ch, nil
@@ -399,6 +411,10 @@ func (c *chain) ID() string {
 
 func (c *chain) Config() config.Config {
 	return c.cfg
+}
+
+func (c *chain) LogPoller() LogPoller {
+	return c.lp
 }
 
 func (c *chain) TxManager() TxManager {
