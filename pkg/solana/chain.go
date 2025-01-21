@@ -534,7 +534,7 @@ func (c *chain) HealthReport() map[string]error {
 	services.CopyHealth(report, c.txm.HealthReport())
 	services.CopyHealth(report, c.balanceMonitor.HealthReport())
 	if c.cfg.MultiNode.Enabled() {
-		report[c.multiNode.Name()] = c.multiNode.Healthy()
+		services.CopyHealth(report, c.multiNode.HealthReport())
 		report[c.txSender.Name()] = c.txSender.Healthy()
 	}
 	return report
