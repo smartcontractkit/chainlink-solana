@@ -249,7 +249,7 @@ func TestClient_Writer_Integration(t *testing.T) {
 	assert.Nil(t, statuses[0].Err)
 	assert.NotNil(t, statuses[1].Err)
 
-	getTxResult, err := c.GetTransaction(ctx, sigSuccess, nil)
+	getTxResult, err := c.GetTransaction(ctx, sigSuccess)
 	assert.NoError(t, err)
 	assert.NotNil(t, getTxResult)
 

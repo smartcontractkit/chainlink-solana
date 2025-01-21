@@ -229,11 +229,12 @@ func (v *verifiedCachedClient) GetAccountInfoWithOpts(ctx context.Context, addr 
 }
 
 func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.Logger, ds sqlutil.DataSource) (*chain, error) {
+	lggr = logger.Named(lggr, "Chain")
 	lggr = logger.With(lggr, "chainID", id, "chain", "solana")
 	var ch = chain{
 		id:          id,
 		cfg:         cfg,
-		lggr:        logger.Named(lggr, "Chain"),
+		lggr:        lggr,
 		clientCache: map[string]*verifiedCachedClient{},
 	}
 
@@ -531,6 +532,11 @@ func (c *chain) Ready() error {
 func (c *chain) HealthReport() map[string]error {
 	report := map[string]error{c.Name(): c.Healthy()}
 	services.CopyHealth(report, c.txm.HealthReport())
+	services.CopyHealth(report, c.balanceMonitor.HealthReport())
+	if c.cfg.MultiNode.Enabled() {
+		report[c.multiNode.Name()] = c.multiNode.Healthy()
+		report[c.txSender.Name()] = c.txSender.Healthy()
+	}
 	return report
 }
 

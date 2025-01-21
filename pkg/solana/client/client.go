@@ -38,7 +38,7 @@ type Reader interface {
 	GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error)
 	// GetLatestBlockHeight returns the latest block height of the node based on the configured commitment type
 	GetLatestBlockHeight(ctx context.Context) (uint64, error)
-	GetTransaction(ctx context.Context, txHash solana.Signature, opts *rpc.GetTransactionOpts) (*rpc.GetTransactionResult, error)
+	GetTransaction(ctx context.Context, txHash solana.Signature) (*rpc.GetTransactionResult, error)
 	GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64) (rpc.BlocksResult, error)
 	GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit uint64) (*rpc.BlocksResult, error)
 	GetBlock(ctx context.Context, slot uint64) (*rpc.GetBlockResult, error)
@@ -69,6 +69,7 @@ type Client struct {
 	log             logger.Logger
 
 	// provides a duplicate function call suppression mechanism
+	// As a rule of thumb: if two calls passing different arguments must not be merged/deduplicated, then you must incorporate those arguments into the key.
 	requestGroup *singleflight.Group
 }
 
@@ -120,7 +121,10 @@ func (c *Client) SlotHeightWithCommitment(ctx context.Context, commitment rpc.Co
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
-	v, err, _ := c.requestGroup.Do("GetSlotHeight", func() (interface{}, error) {
+
+	// Include the commitment in the requestGroup key so calls with different commitments won't be merged
+	key := fmt.Sprintf("GetSlotHeight(%s)", commitment)
+	v, err, _ := c.requestGroup.Do(key, func() (interface{}, error) {
 		return c.rpc.GetSlot(ctx, commitment)
 	})
 	return v.(uint64), err
@@ -141,24 +145,16 @@ func (c *Client) GetSignaturesForAddressWithOpts(ctx context.Context, addr solan
 	return c.rpc.GetSignaturesForAddressWithOpts(ctx, addr, opts)
 }
 
-func (c *Client) GetTransaction(ctx context.Context, txHash solana.Signature, opts *rpc.GetTransactionOpts) (*rpc.GetTransactionResult, error) {
+func (c *Client) GetTransaction(ctx context.Context, txHash solana.Signature) (*rpc.GetTransactionResult, error) {
 	done := c.latency("transaction")
 	defer done()
-
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
 
-	if opts == nil {
-		opts = &rpc.GetTransactionOpts{
-			Encoding: solana.EncodingBase64,
-		}
-	}
-	if opts.Commitment == "" {
-		opts.Commitment = c.commitment
-	}
-
-	v, err, _ := c.requestGroup.Do("GetTransaction", func() (interface{}, error) {
-		return c.rpc.GetTransaction(ctx, txHash, opts)
+	// Use txHash in the key so different signatures won't be merged on concurrent calls.
+	key := fmt.Sprintf("GetTransaction(%s)", txHash.String())
+	v, err, _ := c.requestGroup.Do(key, func() (interface{}, error) {
+		return c.rpc.GetTransaction(ctx, txHash, &rpc.GetTransactionOpts{Encoding: solana.EncodingBase64, Commitment: c.commitment})
 	})
 	return v.(*rpc.GetTransactionResult), err
 }
@@ -180,7 +176,13 @@ func (c *Client) GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint6
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
 
-	v, err, _ := c.requestGroup.Do("GetBlocks", func() (interface{}, error) {
+	// Incorporate startSlot/endSlot into the key to differentiate concurrent calls with different ranges
+	endSlotStr := "nil"
+	if endSlot != nil {
+		endSlotStr = fmt.Sprint(*endSlot)
+	}
+	key := fmt.Sprintf("GetBlocks(%d,%s)", startSlot, endSlotStr)
+	v, err, _ := c.requestGroup.Do(key, func() (interface{}, error) {
 		return c.rpc.GetBlocks(ctx, startSlot, endSlot, c.commitment)
 	})
 	return v.(rpc.BlocksResult), err
@@ -321,16 +323,7 @@ func (c *Client) GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error
 	// get block based on slot
 	done := c.latency("latest_block")
 	defer done()
-	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
-	defer cancel()
-	v, err, _ := c.requestGroup.Do("GetBlockWithOpts", func() (interface{}, error) {
-		version := uint64(0) // pull all tx types (legacy + v0)
-		return c.rpc.GetBlockWithOpts(ctx, slot, &rpc.GetBlockOpts{
-			Commitment:                     c.commitment,
-			MaxSupportedTransactionVersion: &version,
-		})
-	})
-	return v.(*rpc.GetBlockResult), err
+	return c.GetBlock(ctx, slot)
 }
 
 // GetLatestBlockHeight returns the latest block height of the node based on the configured commitment type
@@ -347,12 +340,15 @@ func (c *Client) GetLatestBlockHeight(ctx context.Context) (uint64, error) {
 }
 
 func (c *Client) GetBlock(ctx context.Context, slot uint64) (*rpc.GetBlockResult, error) {
-	// get block based on slot
 	done := c.latency("get_block")
 	defer done()
 	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
 	defer cancel()
-	v, err, _ := c.requestGroup.Do("GetBlockWithOpts", func() (interface{}, error) {
+
+	// Adding slot to the key so concurrent calls to GetBlock for different slots are not merged. Without including the slot,
+	// it would treat all GetBlock calls as identical and merge them, returning whichever block it fetched first to all callers.
+	key := fmt.Sprintf("GetBlockWithOpts(%d)", slot)
+	v, err, _ := c.requestGroup.Do(key, func() (interface{}, error) {
 		version := uint64(0) // pull all tx types (legacy + v0)
 		return c.rpc.GetBlockWithOpts(ctx, slot, &rpc.GetBlockOpts{
 			Commitment:                     c.commitment,
@@ -369,7 +365,9 @@ func (c *Client) GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit
 	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
 	defer cancel()
 
-	v, err, _ := c.requestGroup.Do("GetBlocksWithLimit", func() (interface{}, error) {
+	// Incorporate startSlot and limit into the key to differentiate on concurrent calls.
+	key := fmt.Sprintf("GetBlocksWithLimit(%d,%d)", startSlot, limit)
+	v, err, _ := c.requestGroup.Do(key, func() (interface{}, error) {
 		return c.rpc.GetBlocksWithLimit(ctx, startSlot, limit, c.commitment)
 	})
 	return v.(*rpc.BlocksResult), err

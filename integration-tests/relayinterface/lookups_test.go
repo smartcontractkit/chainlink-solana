@@ -21,6 +21,15 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
+type InnerAccountArgs struct {
+	Accounts []*solana.AccountMeta
+	Bitmap   uint64
+}
+
+type TestAccountArgs struct {
+	Inner InnerAccountArgs
+}
+
 func TestAccountContant(t *testing.T) {
 	t.Run("AccountConstant resolves valid address", func(t *testing.T) {
 		expectedAddr := chainwriter.GetRandomPubKey(t)
@@ -62,8 +71,8 @@ func TestAccountLookups(t *testing.T) {
 		lookupConfig := chainwriter.AccountLookup{
 			Name:       "TestAccount",
 			Location:   "Inner.Address",
-			IsSigner:   true,
-			IsWritable: true,
+			IsSigner:   chainwriter.MetaBool{Value: true},
+			IsWritable: chainwriter.MetaBool{Value: true},
 		}
 		result, err := lookupConfig.Resolve(ctx, testArgs, nil, nil)
 		require.NoError(t, err)
@@ -96,8 +105,8 @@ func TestAccountLookups(t *testing.T) {
 		lookupConfig := chainwriter.AccountLookup{
 			Name:       "TestAccount",
 			Location:   "Inner.Address",
-			IsSigner:   true,
-			IsWritable: true,
+			IsSigner:   chainwriter.MetaBool{Value: true},
+			IsWritable: chainwriter.MetaBool{Value: true},
 		}
 		result, err := lookupConfig.Resolve(ctx, testArgs, nil, nil)
 		require.NoError(t, err)
@@ -117,11 +126,133 @@ func TestAccountLookups(t *testing.T) {
 		lookupConfig := chainwriter.AccountLookup{
 			Name:       "InvalidAccount",
 			Location:   "Invalid.Directory",
-			IsSigner:   true,
-			IsWritable: true,
+			IsSigner:   chainwriter.MetaBool{Value: true},
+			IsWritable: chainwriter.MetaBool{Value: true},
 		}
 		_, err := lookupConfig.Resolve(ctx, testArgs, nil, nil)
 		require.Error(t, err)
+	})
+
+	t.Run("AccountLookup works with MetaBool bitmap lookups", func(t *testing.T) {
+		accounts := [3]*solana.AccountMeta{}
+
+		for i := 0; i < 3; i++ {
+			accounts[i] = &solana.AccountMeta{
+				PublicKey:  chainwriter.GetRandomPubKey(t),
+				IsSigner:   (i)%2 == 0,
+				IsWritable: (i)%2 == 0,
+			}
+		}
+
+		lookupConfig := chainwriter.AccountLookup{
+			Name:       "InvalidAccount",
+			Location:   "Inner.Accounts.PublicKey",
+			IsSigner:   chainwriter.MetaBool{BitmapLocation: "Inner.Bitmap"},
+			IsWritable: chainwriter.MetaBool{BitmapLocation: "Inner.Bitmap"},
+		}
+
+		args := TestAccountArgs{
+			Inner: InnerAccountArgs{
+				Accounts: accounts[:],
+				// should be 101... so {true, false, true}
+				Bitmap: 5,
+			},
+		}
+
+		result, err := lookupConfig.Resolve(ctx, args, nil, nil)
+		require.NoError(t, err)
+
+		for i, meta := range result {
+			require.Equal(t, accounts[i], meta)
+		}
+	})
+
+	t.Run("AccountLookup fails with MetaBool due to an invalid number of bitmaps", func(t *testing.T) {
+		type TestAccountArgsExtended struct {
+			Inner   InnerAccountArgs
+			Bitmaps []uint64
+		}
+
+		accounts := [3]*solana.AccountMeta{}
+
+		for i := 0; i < 3; i++ {
+			accounts[i] = &solana.AccountMeta{
+				PublicKey:  chainwriter.GetRandomPubKey(t),
+				IsWritable: true,
+				IsSigner:   true,
+			}
+		}
+
+		lookupConfig := chainwriter.AccountLookup{
+			Name:       "InvalidAccount",
+			Location:   "Inner.Accounts.PublicKey",
+			IsSigner:   chainwriter.MetaBool{BitmapLocation: "Bitmaps"},
+			IsWritable: chainwriter.MetaBool{BitmapLocation: "Bitmaps"},
+		}
+
+		args := TestAccountArgsExtended{
+			Inner: InnerAccountArgs{
+				Accounts: accounts[:],
+			},
+			Bitmaps: []uint64{5, 3},
+		}
+
+		_, err := lookupConfig.Resolve(ctx, args, nil, nil)
+		require.Contains(t, err.Error(), "bitmap value is not a single value")
+	})
+
+	t.Run("AccountLookup fails with MetaBool with an Invalid BitmapLocation", func(t *testing.T) {
+		accounts := [3]*solana.AccountMeta{}
+
+		for i := 0; i < 3; i++ {
+			accounts[i] = &solana.AccountMeta{
+				PublicKey:  chainwriter.GetRandomPubKey(t),
+				IsWritable: true,
+			}
+		}
+
+		lookupConfig := chainwriter.AccountLookup{
+			Name:       "InvalidAccount",
+			Location:   "Inner.Accounts.PublicKey",
+			IsSigner:   chainwriter.MetaBool{BitmapLocation: "Invalid.Bitmap"},
+			IsWritable: chainwriter.MetaBool{BitmapLocation: "Invalid.Bitmap"},
+		}
+
+		args := TestAccountArgs{
+			Inner: InnerAccountArgs{
+				Accounts: accounts[:],
+			},
+		}
+
+		_, err := lookupConfig.Resolve(ctx, args, nil, nil)
+		require.Contains(t, err.Error(), "error reading bitmap from location")
+	})
+
+	t.Run("AccountLookup fails when MetaBool Bitmap is an invalid type", func(t *testing.T) {
+		accounts := [3]*solana.AccountMeta{}
+
+		for i := 0; i < 3; i++ {
+			accounts[i] = &solana.AccountMeta{
+				PublicKey:  chainwriter.GetRandomPubKey(t),
+				IsWritable: true,
+			}
+		}
+
+		lookupConfig := chainwriter.AccountLookup{
+			Name:       "InvalidAccount",
+			Location:   "Inner.Accounts.PublicKey",
+			IsSigner:   chainwriter.MetaBool{BitmapLocation: "Inner"},
+			IsWritable: chainwriter.MetaBool{BitmapLocation: "Inner"},
+		}
+
+		args := TestAccountArgs{
+			Inner: InnerAccountArgs{
+				Accounts: accounts[:],
+			},
+		}
+
+		_, err := lookupConfig.Resolve(ctx, args, nil, nil)
+		require.Contains(t, err.Error(), "invalid value format at path")
 	})
 }
 
@@ -435,7 +566,7 @@ func TestLookupTables(t *testing.T) {
 					Accounts: chainwriter.AccountLookup{
 						Name:     "TestLookupTable",
 						Location: "Inner.Address",
-						IsSigner: true,
+						IsSigner: chainwriter.MetaBool{Value: true},
 					},
 				},
 			},

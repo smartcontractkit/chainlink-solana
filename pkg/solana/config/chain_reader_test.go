@@ -43,6 +43,12 @@ func TestChainReaderConfig(t *testing.T) {
 		assert.Equal(t, validChainReaderConfig, result)
 	})
 
+	t.Run("valid unmarshal with PDA account", func(t *testing.T) {
+		var result config.ContractReader
+		require.NoError(t, json.Unmarshal([]byte(validJSONWithIDLAsString), &result))
+		assert.Equal(t, validChainReaderConfig, result)
+	})
+
 	t.Run("invalid unmarshal", func(t *testing.T) {
 		t.Parallel()
 

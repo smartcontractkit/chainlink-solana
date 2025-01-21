@@ -98,6 +98,8 @@ func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl IDL, m
 		entry, err = NewInstructionArgsEntry(offChainName, InstructionArgsIDLTypes{Instruction: v, Types: idl.Types}, mod, binary.LittleEndian())
 	case IdlEvent:
 		entry, err = NewEventArgsEntry(offChainName, EventIDLTypes{Event: v, Types: idl.Types}, true, mod, binary.LittleEndian())
+	case PDATypeDef:
+		entry, err = NewPDAEntry(offChainName, v, mod, binary.LittleEndian())
 	default:
 		return nil, fmt.Errorf("unknown codec IDL definition: %T", idlDefinition)
 	}
