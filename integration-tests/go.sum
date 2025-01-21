@@ -1243,8 +1243,8 @@ github.com/smartcontractkit/chainlink/deployment v0.0.0-20250116221411-f1017f196
 github.com/smartcontractkit/chainlink/deployment v0.0.0-20250116221411-f1017f196025/go.mod h1:iUBNBDqo32gZd3hcenBf2bbOBqY1Y1+GJCNkXQJnZ2w=
 github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250116221411-f1017f196025 h1:iCnm8RGhymDn3vEB89KqmNuFr8EjEGZtBY2AAQWijTg=
 github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250116221411-f1017f196025/go.mod h1:hRrW+Khit75rcWgW79k2fW2B5stK8FOM1Q+5qNIs3sk=
-github.com/smartcontractkit/chainlink/v2 v2.14.0-mercury-20240807.0.20250121174634-ce0b647fd60b h1:qYhn3889i87U946Iyr083A0548yTKPBDjssOm6nzMqs=
-github.com/smartcontractkit/chainlink/v2 v2.14.0-mercury-20240807.0.20250121174634-ce0b647fd60b/go.mod h1:MzD+pl5SNIk7BG8iES5MBI723wCFa64c8izCOjupX9g=
+github.com/smartcontractkit/chainlink/v2 v2.14.0-mercury-20240807.0.20250121175432-3216b9cbfc46 h1:TzsgGJKe8I/kKBtnfq43zdaNYZcCzZiJcn5oIJ0Q/zo=
+github.com/smartcontractkit/chainlink/v2 v2.14.0-mercury-20240807.0.20250121175432-3216b9cbfc46/go.mod h1:gHbUr2s/xt3dF+8ctRZdDtf2l/9MLmUQx/DEWk6GEXE=
 github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 h1:12ijqMM9tvYVEm+nR826WsrNi6zCKpwBhuApq127wHs=
 github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7/go.mod h1:FX7/bVdoep147QQhsOPkYsPEXhGZjeYx6lBSaSXtZOA=
 github.com/smartcontractkit/libocr v0.0.0-20241223215956-e5b78d8e3919 h1:IpGoPTXpvllN38kT2z2j13sifJMz4nbHglidvop7mfg=
