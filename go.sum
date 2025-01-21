@@ -553,8 +553,8 @@ github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ
 github.com/sirupsen/logrus v1.9.3/go.mod h1:naHLuLoDiP4jHNo9R0sCBMtWGeIprob74mVsIT4qYEQ=
 github.com/smartcontractkit/chainlink-common v0.4.2-0.20250116214855-f49c5c27db51 h1:YdjQiEu5uHWM1ApwdV+nLyJmu1+tt3IeiwPKNGoXwBI=
 github.com/smartcontractkit/chainlink-common v0.4.2-0.20250116214855-f49c5c27db51/go.mod h1:yti7e1+G9hhkYhj+L5sVUULn9Bn3bBL5/AxaNqdJ5YQ=
-github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250121164254-dc678c0e2611 h1:NdorbGdw9UCD8ugqjA1KgI5GKCXVlsAtbI/DDcw04Kk=
-github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250121164254-dc678c0e2611/go.mod h1:4JqpgFy01LaqG1yM2iFTzwX3ZgcAvW9WdstBZQgPHzU=
+github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250121205514-f73e2f86c23b h1:TO1pwFeQKDOmv3loFiLJvYhtymuTgQUw9WgtwK1rueg=
+github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250121205514-f73e2f86c23b/go.mod h1:4JqpgFy01LaqG1yM2iFTzwX3ZgcAvW9WdstBZQgPHzU=
 github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 h1:12ijqMM9tvYVEm+nR826WsrNi6zCKpwBhuApq127wHs=
 github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7/go.mod h1:FX7/bVdoep147QQhsOPkYsPEXhGZjeYx6lBSaSXtZOA=
 github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12 h1:NzZGjaqez21I3DU7objl3xExTH4fxYvzTqar8DC6360=

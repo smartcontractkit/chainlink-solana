@@ -18,9 +18,9 @@ require (
 	github.com/smartcontractkit/chainlink-solana v1.1.1-0.20250121190222-468739154f87
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.19
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.9
-	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250121190355-163a4ba6087e
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250121190355-163a4ba6087e
-	github.com/smartcontractkit/chainlink/v2 v2.19.0-ccip1.5.16-alpha.0.0.20250121190355-163a4ba6087e
+	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250121210423-d1cdbfa10968
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250121210423-d1cdbfa10968
+	github.com/smartcontractkit/chainlink/v2 v2.19.0-ccip1.5.16-alpha.0.0.20250121210423-d1cdbfa10968
 	github.com/smartcontractkit/libocr v0.0.0-20241223215956-e5b78d8e3919
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.34.0
@@ -346,7 +346,7 @@ require (
 	github.com/smartcontractkit/chainlink-cosmos v0.5.2-0.20241202195413-82468150ac1e // indirect
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250115135646-ac859d85e7e3 // indirect
 	github.com/smartcontractkit/chainlink-feeds v0.1.1 // indirect
-	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250121164254-dc678c0e2611 // indirect
+	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250121205514-f73e2f86c23b // indirect
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.4.0 // indirect
 	github.com/smartcontractkit/chainlink-starknet/relayer v0.1.1-0.20250117224137-afdcdd75070d // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
