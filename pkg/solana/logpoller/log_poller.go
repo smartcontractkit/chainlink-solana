@@ -152,16 +152,17 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 			TxHash:         Signature(blockData.TransactionHash),
 		}
 
-		eventData, decodeErr := base64.StdEncoding.DecodeString(programEvent.Data)
-		if decodeErr != nil {
-			return decodeErr
+		log.Data, err = base64.StdEncoding.DecodeString(programEvent.Data)
+		if err != nil {
+			return err
 		}
-		if len(eventData) < 8 {
-			err = fmt.Errorf("Assumption violation: %w, log.Data=%s", ErrMissingDiscriminator, log.Data)
+
+		// TODO isn't discrimintaor already checked above in MatchingFiltersForEncodedEvent?
+		if len(log.Data) < 8 {
+			err = fmt.Errorf("assumption violation: %w, log.Data=%s", ErrMissingDiscriminator, log.Data)
 			lp.lggr.Criticalw(err.Error())
 			return err
 		}
-		log.Data = eventData[8:]
 
 		log.SubkeyValues = make([]IndexedValue, 0, len(filter.SubkeyPaths))
 		for _, path := range filter.SubkeyPaths {
@@ -169,7 +170,7 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 			if decodeSubKeyErr != nil {
 				return decodeSubKeyErr
 			}
-			indexedVal, newIndexedValErr := NewIndexedValue(subKeyVal)
+			indexedVal, newIndexedValErr := newIndexedValue(subKeyVal)
 			if newIndexedValErr != nil {
 				return newIndexedValErr
 			}

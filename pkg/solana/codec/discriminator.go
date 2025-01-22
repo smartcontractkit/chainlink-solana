@@ -12,9 +12,19 @@ import (
 
 const discriminatorLength = 8
 
-func NewDiscriminator(name string) *Discriminator {
-	sum := sha256.Sum256([]byte("account:" + name))
-	return &Discriminator{hashPrefix: sum[:discriminatorLength]}
+func NewDiscriminator(name string, isAccount bool) *Discriminator {
+	return &Discriminator{hashPrefix: NewDiscriminatorHashPrefix(name, isAccount)}
+}
+
+func NewDiscriminatorHashPrefix(name string, isAccount bool) []byte {
+	var sum [32]byte
+	if isAccount {
+		sum = sha256.Sum256([]byte("account:" + name))
+	} else {
+		sum = sha256.Sum256([]byte("event:" + name))
+	}
+
+	return sum[:discriminatorLength]
 }
 
 type Discriminator struct {

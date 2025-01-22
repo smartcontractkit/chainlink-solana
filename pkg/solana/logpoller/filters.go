@@ -114,6 +114,17 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 		fl.removeFilterFromIndexes(*existingFilter)
 	}
 
+	cEntry, err := codec.NewEventArgsEntry(filter.EventName, filter.EventIdl.EventIDLTypes, true, nil, binary.LittleEndian())
+	if err != nil {
+		return err
+	}
+
+	decoderTypes := codec.ParsedTypes{DecoderDefs: map[string]codec.Entry{filter.EventName: cEntry}}
+	decoder, err := decoderTypes.ToCodec()
+	if err != nil {
+		return fmt.Errorf("failed to create event decoder: %w", err)
+	}
+
 	filterID, err := fl.orm.InsertFilter(ctx, filter)
 	if err != nil {
 		return fmt.Errorf("failed to insert filter: %w", err)
@@ -121,15 +132,7 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 
 	filter.ID = filterID
 
-	idl := codec.IDL{
-		Events: []codec.IdlEvent{filter.EventIdl.IdlEvent},
-		Types:  filter.EventIdl.IdlTypeDefSlice,
-	}
-	fl.decoders[filter.ID], err = codec.NewIDLEventCodec(idl, binary.LittleEndian())
-	if err != nil {
-		return fmt.Errorf("failed to create event decoder: %w", err)
-	}
-
+	fl.decoders[filter.ID] = decoder
 	fl.filtersByName[filter.Name] = filter.ID
 	fl.filtersByID[filter.ID] = &filter
 	filtersForAddress, ok := fl.filtersByAddress[filter.Address]
@@ -151,9 +154,7 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 
 	programID := filter.Address.ToSolana().String()
 	fl.knownPrograms[programID]++
-
-	discriminatorHead := filter.Discriminator()[:10]
-	fl.knownDiscriminators[discriminatorHead]++
+	fl.knownDiscriminators[filter.Discriminator()]++
 
 	return nil
 }
@@ -229,7 +230,7 @@ func (fl *filters) removeFilterFromIndexes(filter Filter) {
 		}
 	}
 
-	discriminatorHead := filter.Discriminator()[:10]
+	discriminatorHead := filter.Discriminator()
 	if refcount, ok := fl.knownDiscriminators[discriminatorHead]; ok {
 		refcount--
 		if refcount > 0 {
@@ -302,6 +303,15 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[F
 	if len(event.Data) < 12 {
 		return nil
 	}
+
+	discriminator, err := base64.StdEncoding.DecodeString(event.Data[:12])
+	if err != nil {
+		fl.lggr.Errorw("failed to decode event discriminator", "event", event, "err", err)
+		return nil
+	}
+
+	discriminator = discriminator[:8]
+
 	isKnown := func() (ok bool) {
 		fl.filtersMutex.RLock()
 		defer fl.filtersMutex.RUnlock()
@@ -315,7 +325,7 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[F
 		// discriminators if the first 10 characters don't match. If it passes that initial test, we base64-decode the
 		// first 12 characters, and use the first 8 bytes of that as the event sig to call MatchingFilters. The address
 		// also needs to be base58-decoded to pass to MatchingFilters
-		_, ok = fl.knownDiscriminators[event.Data[:10]]
+		_, ok = fl.knownDiscriminators[base64.StdEncoding.EncodeToString(discriminator)]
 		return ok
 	}
 
@@ -329,16 +339,7 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[F
 		return nil
 	}
 
-	// Decoding first 12 characters will give us the first 9 bytes of binary data
-	// The first 8 of those is the discriminator
-	decoded, err := base64.StdEncoding.DecodeString(event.Data[:12])
-	if err != nil || len(decoded) < 8 {
-		fl.lggr.Errorw("failed to decode event data", "EventProgram", event)
-		return nil
-	}
-	eventSig := EventSignature(decoded[:8])
-
-	return fl.matchingFilters(PublicKey(addr), eventSig)
+	return fl.matchingFilters(PublicKey(addr), EventSignature(discriminator))
 }
 
 // GetFiltersToBackfill - returns copy of backfill queue

@@ -148,30 +148,9 @@ func WrapItemType(forEncoding bool, contractName, itemType string, readType Chai
 	return fmt.Sprintf("output.%s.%s.%s", readType, contractName, itemType)
 }
 
-// NewIDLAccountCodec is for Anchor custom types
+// TODO Deprecate and remove this.
 func NewIDLAccountCodec(idl IDL, builder commonencodings.Builder) (commontypes.RemoteCodec, error) {
 	return newIDLCoded(idl, builder, idl.Accounts, true)
-}
-
-func NewIDLInstructionsCodec(idl IDL, builder commonencodings.Builder) (commontypes.RemoteCodec, error) {
-	typeCodecs := make(commonencodings.LenientCodecFromTypeCodec)
-	refs := &codecRefs{
-		builder:      builder,
-		codecs:       make(map[string]commonencodings.TypeCodec),
-		typeDefs:     idl.Types,
-		dependencies: make(map[string][]string),
-	}
-
-	for _, instruction := range idl.Instructions {
-		name, instCodec, err := asStruct(instruction.Args, refs, instruction.Name, false, false)
-		if err != nil {
-			return nil, err
-		}
-
-		typeCodecs[name] = instCodec
-	}
-
-	return typeCodecs, nil
 }
 
 func NewNamedModifierCodec(original commontypes.RemoteCodec, itemType string, modifier commoncodec.Modifier) (commontypes.RemoteCodec, error) {
@@ -190,6 +169,7 @@ func NewNamedModifierCodec(original commontypes.RemoteCodec, itemType string, mo
 	return modCodec, err
 }
 
+// TODO Deprecate and remove this.
 func NewIDLDefinedTypesCodec(idl IDL, builder commonencodings.Builder) (commontypes.RemoteCodec, error) {
 	return newIDLCoded(idl, builder, idl.Types, false)
 }
@@ -254,6 +234,7 @@ type codecRefs struct {
 func createCodecType(
 	def IdlTypeDef,
 	refs *codecRefs,
+	// TODO Deprecated includeDiscriminator is not needed here after NewIDLAccountCodec gets cleaned up
 	includeDiscriminator bool,
 ) (string, commonencodings.TypeCodec, error) {
 	name := def.Name
@@ -275,6 +256,7 @@ func asStruct(
 	fields []IdlField,
 	refs *codecRefs,
 	name string, // name is the struct name and can be used in dependency checks
+	// TODO Deprecated includeDiscriminator is not needed here after NewIDLAccountCodec gets cleaned up
 	includeDiscriminator bool,
 	isInstructionArgs bool,
 ) (string, commonencodings.TypeCodec, error) {
@@ -286,7 +268,7 @@ func asStruct(
 	named := make([]commonencodings.NamedTypeCodec, len(fields)+desLen)
 
 	if includeDiscriminator {
-		named[0] = commonencodings.NamedTypeCodec{Name: "Discriminator" + name, Codec: NewDiscriminator(name)}
+		named[0] = commonencodings.NamedTypeCodec{Name: "Discriminator" + name, Codec: NewDiscriminator(name, true)}
 	}
 
 	for idx, field := range fields {
@@ -490,37 +472,4 @@ func saveDependency(refs *codecRefs, parent, child string) {
 	}
 
 	refs.dependencies[parent] = append(deps, child)
-}
-func NewIDLEventCodec(idl IDL, builder commonencodings.Builder) (commontypes.RemoteCodec, error) {
-	typeCodecs := make(commonencodings.LenientCodecFromTypeCodec)
-	refs := &codecRefs{
-		builder:      builder,
-		codecs:       make(map[string]commonencodings.TypeCodec),
-		typeDefs:     idl.Types,
-		dependencies: make(map[string][]string),
-	}
-
-	for _, event := range idl.Events {
-		name, instCodec, err := asStruct(eventFieldsAsStandardFields(event.Fields), refs, event.Name, false, false)
-		if err != nil {
-			return nil, err
-		}
-
-		typeCodecs[name] = instCodec
-	}
-
-	return typeCodecs, nil
-}
-
-func eventFieldsAsStandardFields(event []IdlEventField) []IdlField {
-	output := make([]IdlField, len(event))
-
-	for idx := range output {
-		output[idx] = IdlField{
-			Name: event[idx].Name,
-			Type: event[idx].Type,
-		}
-	}
-
-	return output
 }

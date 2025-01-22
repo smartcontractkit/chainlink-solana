@@ -2,8 +2,9 @@ package logpoller
 
 import (
 	"encoding/base64"
-	"fmt"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
 type Filter struct {
@@ -30,12 +31,7 @@ func (f Filter) MatchSameLogs(other Filter) bool {
 //
 // This is the base64 encoding of the [8]byte discriminator returned by utils.Discriminator
 func (f Filter) Discriminator() string {
-	d := Discriminator("event", f.EventName)
-	b64encoded := base64.StdEncoding.EncodeToString(d[:])
-	if len(b64encoded) != 12 {
-		panic(fmt.Sprintf("Assumption Violation: expected encoding/base64 to return 12 character base64-encoding, got %d characters", len(b64encoded)))
-	}
-	return b64encoded
+	return base64.StdEncoding.EncodeToString(codec.NewDiscriminatorHashPrefix(f.EventName, false))
 }
 
 type Log struct {
