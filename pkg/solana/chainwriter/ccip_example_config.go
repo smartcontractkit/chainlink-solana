@@ -1,24 +1,11 @@
 package chainwriter
 
 import (
-	"context"
-	"fmt"
 	"reflect"
 
-	ag_binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 )
-
-// should match type from https://github.com/smartcontractkit/chainlink-ccip/blob/6bb9583526ce7c281005d66ffdf4a5300fc8ddc9/chains/solana/gobindings/ccip_router/accounts.go#L707-L713
-type TokenAdminRegistry struct {
-	Version              uint8
-	Administrator        solana.PublicKey
-	PendingAdministrator solana.PublicKey
-	LookupTable          solana.PublicKey
-	WritableIndexes      [2]ag_binary.Uint128
-}
-
-const registryAddress = "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6A"
 
 func TestConfig() {
 	// Fake constant addresses for the purpose of this example.
@@ -36,7 +23,7 @@ func TestConfig() {
 		FromAddress:        fromAddress,
 		InputModifications: nil,
 		ChainSpecificName:  "execute",
-		ArgsTransform:      CCIPArgsTransform,
+		ArgsTransform:      "CCIP",
 		// LookupTables are on-chain stores of accounts. They can be used in two ways:
 		// 1. As a way to store a list of accounts that are all associated together (i.e. Token State registry)
 		// 2. To compress the transactions in a TX and reduce the size of the TX. (The traditional way)
@@ -67,7 +54,7 @@ func TestConfig() {
 						IsSigner:   false,
 						IsWritable: false,
 						InternalField: InternalField{
-							Type:     reflect.TypeOf(TokenAdminRegistry{}),
+							Type:     reflect.TypeOf(ccip_router.TokenAdminRegistry{}),
 							Location: "LookupTable",
 						},
 					},
@@ -403,69 +390,4 @@ func TestConfig() {
 		},
 	}
 	_ = chainWriterConfig
-}
-
-// This example doesn't contain the complete implementation of the function, since the
-// types needed to transform can't be imported into this repository. However, in production, this
-// function will be implemented in the CCIP plugin, which will have access to all the necessary types.
-func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args any, accounts solana.AccountMetaSlice) (any, error) {
-	TokenPoolLookupTable := LookupTables{
-		DerivedLookupTables: []DerivedLookupTable{
-			{
-				Name: "RegistryTokenState",
-				Accounts: PDALookups{
-					Name: "RegistryTokenState",
-					PublicKey: AccountConstant{
-						Address: registryAddress,
-					},
-					Seeds: []Seed{
-						{Dynamic: AccountLookup{Location: "Message.TokenAmounts.DestTokenAddress"}},
-					},
-					InternalField: InternalField{
-						Type:     reflect.TypeOf(TokenAdminRegistry{}),
-						Location: "LookupTable",
-					},
-				},
-			},
-		}}
-	tableMap, _, err := cw.ResolveLookupTables(ctx, args, TokenPoolLookupTable)
-	if err != nil {
-		return nil, err
-	}
-	registryTables := tableMap["RegistryTokenState"]
-	tokenPoolAddresses := []solana.PublicKey{}
-	for _, table := range registryTables {
-		tokenPoolAddresses = append(tokenPoolAddresses, table[0].PublicKey)
-	}
-
-	tokenIndexes := []uint8{}
-	for i, account := range accounts {
-		for _, address := range tokenPoolAddresses {
-			if account.PublicKey == address {
-				if i > 255 {
-					return nil, fmt.Errorf("index %d out of range for uint8", i)
-				}
-				tokenIndexes = append(tokenIndexes, uint8(i)) //nolint:gosec
-			}
-		}
-	}
-
-	if len(tokenIndexes) != len(tokenPoolAddresses) {
-		return nil, fmt.Errorf("missing token pools in accounts")
-	}
-
-	// Args should be of the following type:
-	// https://github.com/smartcontractkit/chainlink/blob/73f16fec1dcf13d3254d44b3e2df3e36303ce77f/core/capabilities/ccip/ocrimpls/contract_transmitter.go#L82-L90
-	//
-	// struct {
-	// 	ReportContext [2][32]byte
-	// 	Report        []byte
-	// 	Info          ccipocr3.ExecuteReportInfo
-	// }
-	//
-	// Then we need to extend it to include TokenIndexes and return that altered struct.
-	// This is just an example - in the real plugin implementation, the types will be imported.
-	// The token indexes calculation above should be mostly accurate though.
-
-	return args, nil
 }

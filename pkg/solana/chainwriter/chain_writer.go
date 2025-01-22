@@ -59,7 +59,7 @@ type MethodConfig struct {
 	Accounts           []Lookup
 	// Location in the args where the debug ID is stored
 	DebugIDLocation string
-	ArgsTransform   func(ctx context.Context, cw *SolanaChainWriterService, args any, accounts solana.AccountMetaSlice) (any, error)
+	ArgsTransform   string
 }
 
 func NewSolanaChainWriterService(logger logger.Logger, reader client.Reader, txm txm.TxManager, ge fees.Estimator, config ChainWriterConfig) (*SolanaChainWriterService, error) {
@@ -278,8 +278,12 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	filteredLookupTableMap := s.FilterLookupTableAddresses(accounts, derivedTableMap, staticTableMap)
 
 	// Transform args if necessary
-	if methodConfig.ArgsTransform != nil {
-		args, err = methodConfig.ArgsTransform(ctx, s, args, accounts)
+	if methodConfig.ArgsTransform != "" {
+		transformFunc, tfErr := FindTransform(methodConfig.ArgsTransform)
+		if tfErr != nil {
+			return errorWithDebugID(fmt.Errorf("error finding transform function: %w", tfErr), debugID)
+		}
+		args, err = transformFunc(ctx, s, args, accounts, toAddress)
 		if err != nil {
 			return errorWithDebugID(fmt.Errorf("error transforming args: %w", err), debugID)
 		}

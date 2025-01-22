@@ -14,6 +14,8 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
@@ -51,6 +53,8 @@ func GetValuesAtLocation(args any, location string) ([][]byte, error) {
 			buf := make([]byte, 8)
 			binary.LittleEndian.PutUint64(buf, num)
 			vals = append(vals, buf)
+		} else if addr, ok := value.(ccipocr3.UnknownAddress); ok {
+			vals = append(vals, addr)
 		} else {
 			return nil, fmt.Errorf("invalid value format at path: %s, type: %s", location, reflect.TypeOf(value).String())
 		}
