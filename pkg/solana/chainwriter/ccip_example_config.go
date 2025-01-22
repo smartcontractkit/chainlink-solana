@@ -5,9 +5,18 @@ import (
 	"fmt"
 	"reflect"
 
+	ag_binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
-	cciprouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 )
+
+// should match type from https://github.com/smartcontractkit/chainlink-ccip/blob/6bb9583526ce7c281005d66ffdf4a5300fc8ddc9/chains/solana/gobindings/ccip_router/accounts.go#L707-L713
+type TokenAdminRegistry struct {
+	Version              uint8
+	Administrator        solana.PublicKey
+	PendingAdministrator solana.PublicKey
+	LookupTable          solana.PublicKey
+	WritableIndexes      [2]ag_binary.Uint128
+}
 
 const registryAddress = "4Nn9dsYBcSTzRbK9hg9kzCUdrCSkMZq1UR6Vw1Tkaf6A"
 
@@ -58,7 +67,7 @@ func TestConfig() {
 						IsSigner:   false,
 						IsWritable: false,
 						InternalField: InternalField{
-							Type:     reflect.TypeOf(cciprouter.TokenAdminRegistry{}),
+							Type:     reflect.TypeOf(TokenAdminRegistry{}),
 							Location: "LookupTable",
 						},
 					},
@@ -413,7 +422,7 @@ func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args a
 						{Dynamic: AccountLookup{Location: "Message.TokenAmounts.DestTokenAddress"}},
 					},
 					InternalField: InternalField{
-						Type:     reflect.TypeOf(cciprouter.TokenAdminRegistry{}),
+						Type:     reflect.TypeOf(TokenAdminRegistry{}),
 						Location: "LookupTable",
 					},
 				},
