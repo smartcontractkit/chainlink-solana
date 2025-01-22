@@ -68,9 +68,10 @@ func TestEventLoader(t *testing.T) {
 	orm := logpoller.NewMockORM(t) // TODO: replace with real DB, when available
 	programPubKey, err := solana.PublicKeyFromBase58(programPubKey)
 	require.NoError(t, err)
-	orm.EXPECT().SelectFilters(mock.Anything).Return([]logpoller.Filter{{IsBackfilled: false, Address: logpoller.PublicKey(programPubKey)}}, nil).Once()
+	orm.EXPECT().SelectFilters(mock.Anything).Return([]logpoller.Filter{{ID: 1, IsBackfilled: false, Address: logpoller.PublicKey(programPubKey)}}, nil).Once()
 	orm.EXPECT().MarkFilterBackfilled(mock.Anything, mock.Anything).Return(nil).Once()
 	orm.EXPECT().GetLatestBlock(mock.Anything).Return(0, sql.ErrNoRows)
+	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{1: 0}, nil).Once()
 	lp := logpoller.NewWithCustomProcessor(logger.TestSugared(t), orm, cl, parser.ProcessBlocks)
 
 	require.NoError(t, lp.Start(ctx))

@@ -95,13 +95,13 @@ func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient
 }
 
 func (lp *Service) start(_ context.Context) error {
-	lp.eng.Go(func(ctx context.Context) {
+	lp.eng.GoTick(services.NewTicker(time.Second), func(ctx context.Context) {
 		err := lp.run(ctx)
 		if err != nil {
 			lp.lggr.Errorw("log poller iteration failed - retrying", "err", err)
 		}
 	})
-	lp.eng.Go(lp.backgroundWorkerRun)
+	lp.eng.GoTick(services.NewTicker(time.Minute), lp.backgroundWorkerRun)
 	return nil
 }
 
@@ -377,17 +377,8 @@ func appendBuffered(ch <-chan Block, max int, blocks []Block) []Block {
 }
 
 func (lp *Service) backgroundWorkerRun(ctx context.Context) {
-	pruneFilters := services.NewTicker(time.Minute)
-	defer pruneFilters.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-pruneFilters.C:
-			err := lp.filters.PruneFilters(ctx)
-			if err != nil {
-				lp.lggr.Errorw("Failed to prune filters", "err", err)
-			}
-		}
+	err := lp.filters.PruneFilters(ctx)
+	if err != nil {
+		lp.lggr.Errorw("Failed to prune filters", "err", err)
 	}
 }

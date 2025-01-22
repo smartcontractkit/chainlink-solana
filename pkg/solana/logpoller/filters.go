@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 
 	"github.com/gagliardetto/solana-go"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -388,6 +389,9 @@ func (fl *filters) LoadFilters(ctx context.Context) error {
 	fl.lggr.Debugw("Loading filters from db")
 	fl.filtersMutex.Lock()
 	defer fl.filtersMutex.Unlock()
+	if fl.loadedFilters.Load() {
+		return nil
+	}
 	// reset filters' indexes to ensure we do not have partial data from the previous run
 	fl.filtersByID = make(map[int64]*Filter)
 	fl.filtersByName = make(map[string]int64)
