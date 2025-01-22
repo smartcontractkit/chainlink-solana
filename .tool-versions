@@ -2,7 +2,7 @@ nodejs 18.20.2
 yarn 1.22.19
 rust 1.59.0
 golang 1.23.3
-golangci-lint 1.60.1
+golangci-lint 1.61.0
 actionlint 1.6.22
 shellcheck 0.8.0
 helm 3.9.4

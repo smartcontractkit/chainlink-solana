@@ -98,6 +98,8 @@ func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl IDL, m
 		entry, err = NewInstructionArgsEntry(offChainName, InstructionArgsIDLTypes{Instruction: v, Types: idl.Types}, mod, binary.LittleEndian())
 	case IdlEvent:
 		entry, err = NewEventArgsEntry(offChainName, EventIDLTypes{Event: v, Types: idl.Types}, true, mod, binary.LittleEndian())
+	case PDATypeDef:
+		entry, err = NewPDAEntry(offChainName, v, mod, binary.LittleEndian())
 	default:
 		return nil, fmt.Errorf("unknown codec IDL definition: %T", idlDefinition)
 	}
@@ -488,4 +490,37 @@ func saveDependency(refs *codecRefs, parent, child string) {
 	}
 
 	refs.dependencies[parent] = append(deps, child)
+}
+func NewIDLEventCodec(idl IDL, builder commonencodings.Builder) (commontypes.RemoteCodec, error) {
+	typeCodecs := make(commonencodings.LenientCodecFromTypeCodec)
+	refs := &codecRefs{
+		builder:      builder,
+		codecs:       make(map[string]commonencodings.TypeCodec),
+		typeDefs:     idl.Types,
+		dependencies: make(map[string][]string),
+	}
+
+	for _, event := range idl.Events {
+		name, instCodec, err := asStruct(eventFieldsAsStandardFields(event.Fields), refs, event.Name, false, false)
+		if err != nil {
+			return nil, err
+		}
+
+		typeCodecs[name] = instCodec
+	}
+
+	return typeCodecs, nil
+}
+
+func eventFieldsAsStandardFields(event []IdlEventField) []IdlField {
+	output := make([]IdlField, len(event))
+
+	for idx := range output {
+		output[idx] = IdlField{
+			Name: event[idx].Name,
+			Type: event[idx].Type,
+		}
+	}
+
+	return output
 }

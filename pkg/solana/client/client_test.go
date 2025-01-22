@@ -20,8 +20,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 
-	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 )
@@ -249,7 +249,7 @@ func TestClient_Writer_Integration(t *testing.T) {
 	assert.Nil(t, statuses[0].Err)
 	assert.NotNil(t, statuses[1].Err)
 
-	getTxResult, err := c.GetTransaction(ctx, sigSuccess, nil)
+	getTxResult, err := c.GetTransaction(ctx, sigSuccess)
 	assert.NoError(t, err)
 	assert.NotNil(t, getTxResult)
 

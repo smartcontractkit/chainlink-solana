@@ -3,8 +3,11 @@ package logpoller
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"iter"
+	"math"
 	"time"
 
 	"github.com/gagliardetto/solana-go/rpc"
@@ -14,16 +17,20 @@ import (
 )
 
 var (
-	ErrFilterNameConflict = errors.New("filter with such name already exists")
+	ErrFilterNameConflict   = errors.New("filter with such name already exists")
+	ErrMissingDiscriminator = errors.New("Solana log is missing discriminator")
 )
 
 type ORM interface {
+	ChainID() string
 	InsertFilter(ctx context.Context, filter Filter) (id int64, err error)
 	SelectFilters(ctx context.Context) ([]Filter, error)
 	DeleteFilters(ctx context.Context, filters map[int64]Filter) error
 	MarkFilterDeleted(ctx context.Context, id int64) (err error)
 	MarkFilterBackfilled(ctx context.Context, id int64) (err error)
 	GetLatestBlock(ctx context.Context) (int64, error)
+	InsertLogs(context.Context, []Log) (err error)
+	SelectSeqNums(ctx context.Context) (map[int64]int64, error)
 }
 
 type logsLoader interface {
@@ -38,9 +45,13 @@ type filtersI interface {
 	GetDistinctAddresses(ctx context.Context) ([]PublicKey, error)
 	GetFiltersToBackfill() []Filter
 	MarkFilterBackfilled(ctx context.Context, filterID int64) error
+	MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[Filter]
+	DecodeSubKey(ctx context.Context, raw []byte, ID int64, subKeyPath []string) (any, error)
+	IncrementSeqNum(filterID int64) int64
 }
 
-type LogPoller struct {
+type Service struct {
+	services.StateMachine
 	services.Service
 	eng *services.Engine
 
@@ -53,13 +64,12 @@ type LogPoller struct {
 	processBlocks     func(ctx context.Context, blocks []Block) error // TODO: introduced for smoke test. Remove after NONEVM-916 is merged
 }
 
-func New(lggr logger.SugaredLogger, orm ORM, client RPCClient) *LogPoller {
+func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient) *Service {
 	lggr = logger.Sugared(logger.Named(lggr, "LogPoller"))
-	lp := &LogPoller{
+	lp := &Service{
 		orm:     orm,
-		lggr:    lggr,
+		client:  cl,
 		filters: newFilters(lggr, orm),
-		client:  client,
 	}
 
 	lp.processBlocks = lp.processBlocksImpl
@@ -68,51 +78,135 @@ func New(lggr logger.SugaredLogger, orm ORM, client RPCClient) *LogPoller {
 		Name:  "LogPollerService",
 		Start: lp.start,
 		NewSubServices: func(l logger.Logger) []services.Service {
-			loader := NewEncodedLogCollector(client, lggr)
+			loader := NewEncodedLogCollector(cl, lggr)
 			lp.loader = loader
 			return []services.Service{loader}
 		},
 	}.NewServiceEngine(lggr)
 	lp.lggr = lp.eng.SugaredLogger
+
 	return lp
 }
 
-func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient, processBlocks func(ctx context.Context, blocks []Block) error) *LogPoller {
+func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient, processBlocks func(ctx context.Context, blocks []Block) error) *Service {
 	lp := New(lggr, orm, client)
 	lp.processBlocks = processBlocks
 	return lp
 }
 
-func (lp *LogPoller) start(ctx context.Context) error {
-	err := lp.filters.LoadFilters(ctx)
-	if err != nil {
-		return fmt.Errorf("failed loading filters: %w", err)
-	}
-	lp.eng.GoTick(services.NewTicker(time.Second), func(ctx context.Context) {
+func (lp *Service) start(_ context.Context) error {
+	lp.eng.Go(func(ctx context.Context) {
 		err := lp.run(ctx)
 		if err != nil {
-			lp.lggr.Errorw("log poller tick failed", "err", err)
+			lp.lggr.Errorw("log poller iteration failed - retrying", "err", err)
 		}
 	})
 	lp.eng.Go(lp.backgroundWorkerRun)
 	return nil
 }
 
+func makeLogIndex(txIndex int, txLogIndex uint) (int64, error) {
+	if txIndex > 0 && txIndex < math.MaxInt32 && txLogIndex < math.MaxUint32 {
+		return int64(txIndex<<32) | int64(txLogIndex), nil
+	}
+	return 0, fmt.Errorf("txIndex or txLogIndex out of range: txIndex=%d, txLogIndex=%d", txIndex, txLogIndex)
+}
+
+// Process - process stream of events coming from log ingester
+func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err error) {
+	// This should never happen, since the log collector isn't started until after the filters
+	// get loaded. But just in case, return an error if they aren't so the collector knows to retry later.
+	if err = lp.filters.LoadFilters(ctx); err != nil {
+		return err
+	}
+
+	blockData := programEvent.BlockData
+
+	matchingFilters := lp.filters.MatchingFiltersForEncodedEvent(programEvent)
+	if matchingFilters == nil {
+		return nil
+	}
+
+	var logs []Log
+	for filter := range matchingFilters {
+		var logIndex int64
+		logIndex, err = makeLogIndex(blockData.TransactionIndex, blockData.TransactionLogIndex)
+		if err != nil {
+			lp.lggr.Criticalw("failed to make log index", "err", err, "tx", programEvent.TransactionHash)
+			return err
+		}
+		if blockData.SlotNumber == math.MaxInt64 {
+			err = fmt.Errorf("slot number %d out of range", blockData.SlotNumber)
+			lp.lggr.Critical(err.Error())
+			return err
+		}
+		log := Log{
+			FilterID:       filter.ID,
+			ChainID:        lp.orm.ChainID(),
+			LogIndex:       logIndex,
+			BlockHash:      Hash(blockData.BlockHash),
+			BlockNumber:    int64(blockData.SlotNumber), //nolint:gosec
+			BlockTimestamp: blockData.BlockTime.Time().UTC(),
+			Address:        filter.Address,
+			EventSig:       filter.EventSig,
+			TxHash:         Signature(blockData.TransactionHash),
+		}
+
+		eventData, decodeErr := base64.StdEncoding.DecodeString(programEvent.Data)
+		if decodeErr != nil {
+			return decodeErr
+		}
+		if len(eventData) < 8 {
+			err = fmt.Errorf("Assumption violation: %w, log.Data=%s", ErrMissingDiscriminator, log.Data)
+			lp.lggr.Criticalw(err.Error())
+			return err
+		}
+		log.Data = eventData[8:]
+
+		log.SubkeyValues = make([]IndexedValue, 0, len(filter.SubkeyPaths))
+		for _, path := range filter.SubkeyPaths {
+			subKeyVal, decodeSubKeyErr := lp.filters.DecodeSubKey(ctx, log.Data, filter.ID, path)
+			if decodeSubKeyErr != nil {
+				return decodeSubKeyErr
+			}
+			indexedVal, newIndexedValErr := NewIndexedValue(subKeyVal)
+			if newIndexedValErr != nil {
+				return newIndexedValErr
+			}
+			log.SubkeyValues = append(log.SubkeyValues, indexedVal)
+		}
+
+		log.SequenceNum = lp.filters.IncrementSeqNum(filter.ID)
+
+		if filter.Retention > 0 {
+			expiresAt := time.Now().Add(filter.Retention).UTC()
+			log.ExpiresAt = &expiresAt
+		}
+
+		logs = append(logs, log)
+	}
+	if len(logs) == 0 {
+		return nil
+	}
+
+	return lp.orm.InsertLogs(ctx, logs)
+}
+
 // RegisterFilter - refer to filters.RegisterFilter for details.
-func (lp *LogPoller) RegisterFilter(ctx context.Context, filter Filter) error {
+func (lp *Service) RegisterFilter(ctx context.Context, filter Filter) error {
 	ctx, cancel := lp.eng.Ctx(ctx)
 	defer cancel()
 	return lp.filters.RegisterFilter(ctx, filter)
 }
 
 // UnregisterFilter refer to filters.UnregisterFilter for details
-func (lp *LogPoller) UnregisterFilter(ctx context.Context, name string) error {
+func (lp *Service) UnregisterFilter(ctx context.Context, name string) error {
 	ctx, cancel := lp.eng.Ctx(ctx)
 	defer cancel()
 	return lp.filters.UnregisterFilter(ctx, name)
 }
 
-func (lp *LogPoller) getLastProcessedSlot(ctx context.Context) (int64, error) {
+func (lp *Service) getLastProcessedSlot(ctx context.Context) (int64, error) {
 	if lp.lastProcessedSlot != 0 {
 		return lp.lastProcessedSlot, nil
 	}
@@ -126,20 +220,20 @@ func (lp *LogPoller) getLastProcessedSlot(ctx context.Context) (int64, error) {
 		return 0, fmt.Errorf("error getting latest block from db: %w", err)
 	}
 
-	latestBlock, err := lp.client.GetSlot(ctx, rpc.CommitmentFinalized)
+	latestFinalizedSlot, err := lp.client.SlotHeightWithCommitment(ctx, rpc.CommitmentFinalized)
 	if err != nil {
 		return 0, fmt.Errorf("error getting latest slot from RPC: %w", err)
 	}
 
-	if latestBlock == 0 {
+	if latestFinalizedSlot == 0 {
 		return 0, fmt.Errorf("latest finalized slot is 0 - waiting for next slot to start processing")
 	}
 	// nolint:gosec
 	// G115: integer overflow conversion uint64 -&gt; int64
-	return int64(latestBlock) - 1, nil //
+	return int64(latestFinalizedSlot) - 1, nil //
 }
 
-func (lp *LogPoller) backfillFilters(ctx context.Context, filters []Filter, to int64) error {
+func (lp *Service) backfillFilters(ctx context.Context, filters []Filter, to int64) error {
 	addressesSet := make(map[PublicKey]struct{})
 	addresses := make([]PublicKey, 0, len(filters))
 	minSlot := to
@@ -168,7 +262,7 @@ func (lp *LogPoller) backfillFilters(ctx context.Context, filters []Filter, to i
 	return err
 }
 
-func (lp *LogPoller) processBlocksRange(ctx context.Context, addresses []PublicKey, from, to int64) error {
+func (lp *Service) processBlocksRange(ctx context.Context, addresses []PublicKey, from, to int64) error {
 	// nolint:gosec
 	// G115: integer overflow conversion uint64 -&gt; int64
 	blocks, cleanup, err := lp.loader.BackfillForAddresses(ctx, addresses, uint64(from), uint64(to))
@@ -199,30 +293,25 @@ consumedAllBlocks:
 	return nil
 }
 
-func appendBuffered(ch <-chan Block, max int, blocks []Block) []Block {
-	for {
-		select {
-		case block, ok := <-ch:
-			if !ok {
-				return blocks
+func (lp *Service) processBlocksImpl(ctx context.Context, blocks []Block) error {
+	for _, block := range blocks {
+		for _, event := range block.Events {
+			err := lp.Process(ctx, event)
+			if err != nil {
+				return fmt.Errorf("error processing event for tx %s in block %d: %w", event.TransactionHash, block.SlotNumber, err)
 			}
-
-			blocks = append(blocks, block)
-			if len(blocks) >= max {
-				return blocks
-			}
-		default:
-			return blocks
 		}
 	}
-}
 
-func (lp *LogPoller) processBlocksImpl(ctx context.Context, blocks []Block) error {
-	// TODO: add logic implemented by NONEVM-916
 	return nil
 }
 
-func (lp *LogPoller) run(ctx context.Context) error {
+func (lp *Service) run(ctx context.Context) error {
+	err := lp.filters.LoadFilters(ctx)
+	if err != nil {
+		return fmt.Errorf("error loading filters: %w", err)
+	}
+
 	lastProcessedSlot, err := lp.getLastProcessedSlot(ctx)
 	if err != nil {
 		return fmt.Errorf("failed getting last processed slot: %w", err)
@@ -241,7 +330,7 @@ func (lp *LogPoller) run(ctx context.Context) error {
 	if len(addresses) == 0 {
 		return nil
 	}
-	rawHighestSlot, err := lp.client.GetSlot(ctx, rpc.CommitmentFinalized)
+	rawHighestSlot, err := lp.client.SlotHeightWithCommitment(ctx, rpc.CommitmentFinalized)
 	if err != nil {
 		return fmt.Errorf("failed getting highest slot: %w", err)
 	}
@@ -269,7 +358,25 @@ func (lp *LogPoller) run(ctx context.Context) error {
 	return nil
 }
 
-func (lp *LogPoller) backgroundWorkerRun(ctx context.Context) {
+func appendBuffered(ch <-chan Block, max int, blocks []Block) []Block {
+	for {
+		select {
+		case block, ok := <-ch:
+			if !ok {
+				return blocks
+			}
+
+			blocks = append(blocks, block)
+			if len(blocks) >= max {
+				return blocks
+			}
+		default:
+			return blocks
+		}
+	}
+}
+
+func (lp *Service) backgroundWorkerRun(ctx context.Context) {
 	pruneFilters := services.NewTicker(time.Minute)
 	defer pruneFilters.Stop()
 	for {

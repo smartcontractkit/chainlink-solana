@@ -33,7 +33,7 @@ type ProgramEventProcessor interface {
 type RPCClient interface {
 	GetBlockWithOpts(context.Context, uint64, *rpc.GetBlockOpts) (*rpc.GetBlockResult, error)
 	GetSignaturesForAddressWithOpts(context.Context, solana.PublicKey, *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error)
-	GetSlot(ctx context.Context, commitment rpc.CommitmentType) (uint64, error)
+	SlotHeightWithCommitment(ctx context.Context, commitment rpc.CommitmentType) (uint64, error)
 }
 
 type WorkerGroup interface {

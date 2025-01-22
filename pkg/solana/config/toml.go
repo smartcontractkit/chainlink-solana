@@ -12,6 +12,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	mn "github.com/smartcontractkit/chainlink-framework/multinode"
+	mnCfg "github.com/smartcontractkit/chainlink-framework/multinode/config"
 )
 
 type TOMLConfigs []*TOMLConfig
@@ -113,7 +115,7 @@ type TOMLConfig struct {
 	// Do not access directly, use [IsEnabled]
 	Enabled *bool
 	Chain
-	MultiNode MultiNodeConfig
+	MultiNode mnCfg.MultiNodeConfig
 	Nodes     Nodes
 }
 
@@ -312,12 +314,57 @@ func (c *TOMLConfig) ListNodes() Nodes {
 
 func (c *TOMLConfig) SetDefaults() {
 	c.Chain.SetDefaults()
-	c.MultiNode.SetDefaults()
+	c.MultiNode.SetFrom(defaultMultiNodeConfig)
 }
 
 func NewDefault() *TOMLConfig {
 	cfg := &TOMLConfig{}
 	cfg.Chain.SetDefaults()
-	cfg.MultiNode.SetDefaults()
+	cfg.MultiNode.SetFrom(defaultMultiNodeConfig)
+	return cfg
+}
+
+var defaultMultiNodeConfig = &mnCfg.MultiNodeConfig{
+	MultiNode: mnCfg.MultiNode{
+		// Have multinode disabled by default
+		Enabled: ptr(false),
+		/* Node Configs */
+		// Failure threshold for polling set to 5 to tolerate some polling failures before taking action.
+		PollFailureThreshold: ptr(uint32(5)),
+		// Poll interval is set to 15 seconds to ensure timely updates while minimizing resource usage.
+		PollInterval: config.MustNewDuration(15 * time.Second),
+		// Selection mode defaults to priority level to enable using node priorities
+		SelectionMode: ptr(mn.NodeSelectionModePriorityLevel),
+		// The sync threshold is set to 10 to allow for some flexibility in node synchronization before considering it out of sync.
+		SyncThreshold: ptr(uint32(10)),
+		// Lease duration is set to 1 minute by default to allow node locks for a reasonable amount of time.
+		LeaseDuration: config.MustNewDuration(time.Minute),
+		// Node syncing is not relevant for Solana and is disabled by default.
+		NodeIsSyncingEnabled: ptr(false),
+		// The new heads polling interval is set to 5 seconds to ensure timely updates while minimizing resource usage.
+		NewHeadsPollInterval: config.MustNewDuration(5 * time.Second),
+		// The finalized block polling interval is set to 5 seconds to ensure timely updates while minimizing resource usage.
+		FinalizedBlockPollInterval: config.MustNewDuration(5 * time.Second),
+		// Repeatable read guarantee should be enforced by default.
+		EnforceRepeatableRead: ptr(true),
+		// The delay before declaring a node dead is set to 20 seconds to give nodes time to recover from temporary issues.
+		DeathDeclarationDelay: config.MustNewDuration(20 * time.Second),
+		/* Chain Configs */
+		// Threshold for no new heads is set to 20 seconds, assuming that heads should update at a reasonable pace.
+		NodeNoNewHeadsThreshold: config.MustNewDuration(20 * time.Second),
+		// Similar to heads, finalized heads should be updated within 20 seconds.
+		NoNewFinalizedHeadsThreshold: config.MustNewDuration(20 * time.Second),
+		// Finality tags are used in Solana and enabled by default.
+		FinalityTagEnabled: ptr(true),
+		// Finality depth will not be used since finality tags are enabled.
+		FinalityDepth: ptr(uint32(0)),
+		// Finalized block offset allows for RPCs to be slightly behind the finalized block.
+		FinalizedBlockOffset: ptr(uint32(50)),
+	},
+}
+
+func NewDefaultMultiNodeConfig() mnCfg.MultiNodeConfig {
+	cfg := mnCfg.MultiNodeConfig{}
+	cfg.SetFrom(defaultMultiNodeConfig)
 	return cfg
 }

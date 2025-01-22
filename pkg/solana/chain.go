@@ -23,21 +23,30 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
+
+type LogPoller interface {
+	Start(context.Context) error
+	Close() error
+	RegisterFilter(ctx context.Context, filter logpoller.Filter) error
+	UnregisterFilter(ctx context.Context, name string) error
+}
 
 type Chain interface {
 	types.ChainService
 
 	ID() string
 	Config() config.Config
+	LogPoller() LogPoller
 	TxManager() TxManager
 	// Reader returns a new Reader from the available list of nodes (if there are multiple, it will randomly select one)
 	Reader() (client.Reader, error)
@@ -90,13 +99,15 @@ type chain struct {
 	services.StateMachine
 	id             string
 	cfg            *config.TOMLConfig
+	lp             LogPoller
 	txm            *txm.Txm
 	balanceMonitor services.Service
 	lggr           logger.Logger
 
 	// if multiNode is enabled, the clientCache will not be used
-	multiNode *mn.MultiNode[mn.StringID, *client.MultiNodeClient]
-	txSender  *mn.TransactionSender[*solanago.Transaction, *client.SendTxResult, mn.StringID, *client.MultiNodeClient]
+	multiNode   *mn.MultiNode[mn.StringID, *client.MultiNodeClient]
+	txSender    *mn.TransactionSender[*solanago.Transaction, *client.SendTxResult, mn.StringID, *client.MultiNodeClient]
+	multiClient *client.MultiClient
 
 	// tracking node chain id for verification
 	clientCache map[string]*verifiedCachedClient // map URL -> {client, chainId} [mainnet/testnet/devnet/localnet]
@@ -228,16 +239,19 @@ func (v *verifiedCachedClient) GetAccountInfoWithOpts(ctx context.Context, addr 
 }
 
 func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.Logger, ds sqlutil.DataSource) (*chain, error) {
+	lggr = logger.Named(lggr, "Chain")
 	lggr = logger.With(lggr, "chainID", id, "chain", "solana")
 	var ch = chain{
 		id:          id,
 		cfg:         cfg,
-		lggr:        logger.Named(lggr, "Chain"),
+		lggr:        lggr,
 		clientCache: map[string]*verifiedCachedClient{},
 	}
 
 	var tc internal.Loader[client.ReaderWriter] = utils.NewLazyLoad(func() (client.ReaderWriter, error) { return ch.getClient() })
 	var bc internal.Loader[monitor.BalanceClient] = utils.NewLazyLoad(func() (monitor.BalanceClient, error) { return ch.getClient() })
+	// getClient returns random client or if MultiNodeEnabled RPC picked and controlled by MultiNode
+	ch.multiClient = client.NewMultiClient(ch.getClient)
 
 	// txm will default to sending transactions using a single RPC client if sendTx is nil
 	var sendTx func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error)
@@ -263,7 +277,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 				sendOnlyNodes = append(sendOnlyNodes, newSendOnly)
 			} else {
 				newNode := mn.NewNode[mn.StringID, *client.Head, *client.MultiNodeClient](
-					mnCfg, mnCfg, lggr, *nodeInfo.URL.URL(), nil, *nodeInfo.Name,
+					mnCfg, mnCfg, lggr, nodeInfo.URL.URL(), nil, *nodeInfo.Name,
 					i, mn.StringID(id), 0, rpcClient, chainFamily)
 				nodes = append(nodes, newNode)
 			}
@@ -308,6 +322,8 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 		bc = internal.NewLoader[monitor.BalanceClient](func() (monitor.BalanceClient, error) { return ch.multiNode.SelectRPC() })
 	}
 
+	// TODO: import typeProvider function from codec package and pass to constructor
+	ch.lp = logpoller.New(logger.Sugared(logger.Named(lggr, "LogPoller")), logpoller.NewORM(ch.ID(), ds, lggr), ch.multiClient)
 	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
 	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
 	return &ch, nil
@@ -395,6 +411,10 @@ func (c *chain) ID() string {
 
 func (c *chain) Config() config.Config {
 	return c.cfg
+}
+
+func (c *chain) LogPoller() LogPoller {
+	return c.lp
 }
 
 func (c *chain) TxManager() TxManager {
@@ -528,6 +548,11 @@ func (c *chain) Ready() error {
 func (c *chain) HealthReport() map[string]error {
 	report := map[string]error{c.Name(): c.Healthy()}
 	services.CopyHealth(report, c.txm.HealthReport())
+	services.CopyHealth(report, c.balanceMonitor.HealthReport())
+	if c.cfg.MultiNode.Enabled() {
+		services.CopyHealth(report, c.multiNode.HealthReport())
+		report[c.txSender.Name()] = c.txSender.Healthy()
+	}
 	return report
 }
 

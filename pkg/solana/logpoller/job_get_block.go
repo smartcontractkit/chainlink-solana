@@ -68,9 +68,15 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 		blockHash:  block.Blockhash,
 	}
 
-	if block.BlockHeight != nil {
-		detail.blockHeight = *block.BlockHeight
+	if block.BlockHeight == nil {
+		return fmt.Errorf("block at slot %d returned from rpc is missing block number", j.slotNumber)
 	}
+	detail.blockHeight = *block.BlockHeight
+
+	if block.BlockTime == nil {
+		return fmt.Errorf("block at slot %d returned from rpc is missing block time", j.slotNumber)
+	}
+	detail.blockTime = *block.BlockTime
 
 	events := make([]ProgramEvent, 0, len(block.Transactions))
 	for idx, txWithMeta := range block.Transactions {
@@ -121,6 +127,7 @@ func (j *getBlockJob) messagesToEvents(messages []string, detail eventDetail) []
 			event.SlotNumber = detail.slotNumber
 			event.BlockHeight = detail.blockHeight
 			event.BlockHash = detail.blockHash
+			event.BlockTime = detail.blockTime
 			event.TransactionHash = detail.trxSig
 			event.TransactionIndex = detail.trxIdx
 			event.TransactionLogIndex = logIdx
@@ -139,6 +146,7 @@ type eventDetail struct {
 	slotNumber  uint64
 	blockHeight uint64
 	blockHash   solana.Hash
+	blockTime   solana.UnixTimeSeconds
 	trxIdx      int
 	trxSig      solana.Signature
 }

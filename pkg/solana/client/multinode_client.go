@@ -12,8 +12,8 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 
-	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
@@ -102,8 +102,7 @@ func (m *MultiNodeClient) SubscribeToHeads(ctx context.Context) (<-chan *Head, m
 	ctx, cancel, chStopInFlight, _ := m.acquireQueryCtx(ctx, m.cfg.TxTimeout())
 	defer cancel()
 
-	// TODO: BCFR-1070 - Add BlockPollInterval
-	pollInterval := m.cfg.MultiNode.FinalizedBlockPollInterval() // Use same interval as finalized polling
+	pollInterval := m.cfg.MultiNode.NewHeadsPollInterval()
 	if pollInterval == 0 {
 		return nil, nil, errors.New("PollInterval is 0")
 	}

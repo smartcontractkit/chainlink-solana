@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
+	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 )
 
 func TestClassifySendError(t *testing.T) {

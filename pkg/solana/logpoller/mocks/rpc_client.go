@@ -145,12 +145,12 @@ func (_c *RPCClient_GetSignaturesForAddressWithOpts_Call) RunAndReturn(run func(
 	return _c
 }
 
-// GetSlot provides a mock function with given fields: ctx, commitment
-func (_m *RPCClient) GetSlot(ctx context.Context, commitment rpc.CommitmentType) (uint64, error) {
+// SlotHeightWithCommitment provides a mock function with given fields: ctx, commitment
+func (_m *RPCClient) SlotHeightWithCommitment(ctx context.Context, commitment rpc.CommitmentType) (uint64, error) {
 	ret := _m.Called(ctx, commitment)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetSlot")
+		panic("no return value specified for SlotHeightWithCommitment")
 	}
 
 	var r0 uint64
@@ -173,31 +173,31 @@ func (_m *RPCClient) GetSlot(ctx context.Context, commitment rpc.CommitmentType)
 	return r0, r1
 }
 
-// RPCClient_GetSlot_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSlot'
-type RPCClient_GetSlot_Call struct {
+// RPCClient_SlotHeightWithCommitment_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlotHeightWithCommitment'
+type RPCClient_SlotHeightWithCommitment_Call struct {
 	*mock.Call
 }
 
-// GetSlot is a helper method to define mock.On call
+// SlotHeightWithCommitment is a helper method to define mock.On call
 //   - ctx context.Context
 //   - commitment rpc.CommitmentType
-func (_e *RPCClient_Expecter) GetSlot(ctx interface{}, commitment interface{}) *RPCClient_GetSlot_Call {
-	return &RPCClient_GetSlot_Call{Call: _e.mock.On("GetSlot", ctx, commitment)}
+func (_e *RPCClient_Expecter) SlotHeightWithCommitment(ctx interface{}, commitment interface{}) *RPCClient_SlotHeightWithCommitment_Call {
+	return &RPCClient_SlotHeightWithCommitment_Call{Call: _e.mock.On("SlotHeightWithCommitment", ctx, commitment)}
 }
 
-func (_c *RPCClient_GetSlot_Call) Run(run func(ctx context.Context, commitment rpc.CommitmentType)) *RPCClient_GetSlot_Call {
+func (_c *RPCClient_SlotHeightWithCommitment_Call) Run(run func(ctx context.Context, commitment rpc.CommitmentType)) *RPCClient_SlotHeightWithCommitment_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(rpc.CommitmentType))
 	})
 	return _c
 }
 
-func (_c *RPCClient_GetSlot_Call) Return(_a0 uint64, _a1 error) *RPCClient_GetSlot_Call {
+func (_c *RPCClient_SlotHeightWithCommitment_Call) Return(_a0 uint64, _a1 error) *RPCClient_SlotHeightWithCommitment_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *RPCClient_GetSlot_Call) RunAndReturn(run func(context.Context, rpc.CommitmentType) (uint64, error)) *RPCClient_GetSlot_Call {
+func (_c *RPCClient_SlotHeightWithCommitment_Call) RunAndReturn(run func(context.Context, rpc.CommitmentType) (uint64, error)) *RPCClient_SlotHeightWithCommitment_Call {
 	_c.Call.Return(run)
 	return _c
 }

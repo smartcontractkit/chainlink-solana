@@ -5,7 +5,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 
-	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
+	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 )
 
 // Solana error patters

@@ -3,17 +3,25 @@ package logpoller
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"math/rand"
 	"sync/atomic"
 	"testing"
 
+	bin "github.com/gagliardetto/binary"
+	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
 )
 
@@ -22,7 +30,7 @@ type mockedLP struct {
 	Client    *mocks.RPCClient
 	Loader    *mockLogsLoader
 	Filters   *mockFilters
-	LogPoller *LogPoller
+	LogPoller *Service
 }
 
 func newMockedLP(t *testing.T) mockedLP {
@@ -38,22 +46,18 @@ func newMockedLP(t *testing.T) mockedLP {
 	return result
 }
 
-func TestLogPoller_start(t *testing.T) {
-	t.Run("Returns error if failed to load filters", func(t *testing.T) {
-		lp := New(logger.TestSugared(t), nil, nil)
-		filtersMock := newMockFilters(t)
-		lp.filters = filtersMock
+func TestLogPoller_run(t *testing.T) {
+	t.Run("Abort run if failed to load filters", func(t *testing.T) {
+		lp := newMockedLP(t)
 		expectedErr := errors.New("failed to load filters")
-		filtersMock.EXPECT().LoadFilters(mock.Anything).Return(expectedErr).Once()
-		err := lp.Start(tests.Context(t))
+		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(expectedErr).Once()
+		err := lp.LogPoller.run(tests.Context(t))
 		require.ErrorIs(t, err, expectedErr)
 	})
-}
-
-func TestLogPoller_run(t *testing.T) {
 	t.Run("Aborts backfill if loader fails", func(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 128
+		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return([]Filter{{StartingBlock: 16}}).Once()
 		expectedErr := errors.New("loaderFailed")
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(16), uint64(128)).Return(nil, nil, expectedErr).Once()
@@ -63,6 +67,7 @@ func TestLogPoller_run(t *testing.T) {
 	t.Run("Backfill happy path", func(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 128
+		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return([]Filter{
 			{ID: 1, StartingBlock: 16, Address: PublicKey{1, 2, 3}},
 			{ID: 2, StartingBlock: 12, Address: PublicKey{1, 2, 3}},
@@ -89,6 +94,7 @@ func TestLogPoller_run(t *testing.T) {
 	t.Run("Returns error, if failed to get address for global backfill", func(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 128
+		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
 		expectedErr := errors.New("failed to load filters")
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return(nil, expectedErr).Once()
@@ -98,6 +104,7 @@ func TestLogPoller_run(t *testing.T) {
 	t.Run("Aborts if there is no addresses", func(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 128
+		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return(nil, nil).Once()
 		err := lp.LogPoller.run(tests.Context(t))
@@ -106,28 +113,31 @@ func TestLogPoller_run(t *testing.T) {
 	t.Run("Returns error, if failed to get latest slot", func(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 128
+		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]PublicKey{{}}, nil).Once()
 		expectedErr := errors.New("RPC failed")
-		lp.Client.EXPECT().GetSlot(mock.Anything, rpc.CommitmentFinalized).Return(0, expectedErr).Once()
+		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(0, expectedErr).Once()
 		err := lp.LogPoller.run(tests.Context(t))
 		require.ErrorIs(t, err, expectedErr)
 	})
 	t.Run("Returns error, if last processed slot is higher than latest finalized", func(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 128
+		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]PublicKey{{}}, nil).Once()
-		lp.Client.EXPECT().GetSlot(mock.Anything, rpc.CommitmentFinalized).Return(16, nil).Once()
+		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(16, nil).Once()
 		err := lp.LogPoller.run(tests.Context(t))
 		require.ErrorContains(t, err, "last processed slot 128 is higher than highest RPC slot 16")
 	})
 	t.Run("Returns error, if fails to do block backfill", func(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 128
+		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]PublicKey{{}}, nil).Once()
-		lp.Client.EXPECT().GetSlot(mock.Anything, rpc.CommitmentFinalized).Return(130, nil).Once()
+		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(130, nil).Once()
 		expectedError := errors.New("failed to start backfill")
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(129), uint64(130)).Return(nil, nil, expectedError).Once()
 		err := lp.LogPoller.run(tests.Context(t))
@@ -136,9 +146,10 @@ func TestLogPoller_run(t *testing.T) {
 	t.Run("Happy path", func(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 128
+		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]PublicKey{{}}, nil).Once()
-		lp.Client.EXPECT().GetSlot(mock.Anything, rpc.CommitmentFinalized).Return(130, nil).Once()
+		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(130, nil).Once()
 		blocks := make(chan Block)
 		close(blocks)
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(129), uint64(130)).Return(blocks, func() {}, nil).Once()
@@ -175,14 +186,14 @@ func TestLogPoller_getLastProcessedSlot(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.ORM.EXPECT().GetLatestBlock(mock.Anything).Return(0, sql.ErrNoRows).Once()
 		expectedError := errors.New("RPC failed")
-		lp.Client.EXPECT().GetSlot(mock.Anything, rpc.CommitmentFinalized).Return(0, expectedError).Once()
+		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(0, expectedError).Once()
 		_, err := lp.LogPoller.getLastProcessedSlot(tests.Context(t))
 		require.ErrorIs(t, err, expectedError)
 	})
 	t.Run("Returns error if genesis block is the latest finalized", func(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.ORM.EXPECT().GetLatestBlock(mock.Anything).Return(0, sql.ErrNoRows).Once()
-		lp.Client.EXPECT().GetSlot(mock.Anything, rpc.CommitmentFinalized).Return(0, nil).Once()
+		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(0, nil).Once()
 		_, err := lp.LogPoller.getLastProcessedSlot(tests.Context(t))
 		require.ErrorContains(t, err, "latest finalized slot is 0 - waiting for next slot to start processing")
 	})
@@ -190,7 +201,7 @@ func TestLogPoller_getLastProcessedSlot(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.ORM.EXPECT().GetLatestBlock(mock.Anything).Return(0, sql.ErrNoRows).Once()
 		const latestFinalized = uint64(10)
-		lp.Client.EXPECT().GetSlot(mock.Anything, rpc.CommitmentFinalized).Return(latestFinalized, nil).Once()
+		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(latestFinalized, nil).Once()
 		actual, err := lp.LogPoller.getLastProcessedSlot(tests.Context(t))
 		require.NoError(t, err)
 		require.Equal(t, int64(latestFinalized-1), actual)
@@ -232,4 +243,109 @@ func TestLogPoller_processBlocksRange(t *testing.T) {
 		err := lp.LogPoller.processBlocksRange(tests.Context(t), nil, 10, 20)
 		require.NoError(t, err)
 	})
+}
+
+func TestProcess(t *testing.T) {
+	ctx := tests.Context(t)
+
+	addr := newRandomPublicKey(t)
+	eventName := "myEvent"
+	eventSig := Discriminator("event", eventName)
+	event := struct {
+		A int64
+		B string
+	}{55, "hello"}
+	subkeyValA, err := NewIndexedValue(event.A)
+	require.NoError(t, err)
+	subkeyValB, err := NewIndexedValue(event.B)
+	require.NoError(t, err)
+
+	filterID := rand.Int63()
+	chainID := uuid.NewString()
+
+	txIndex := int(rand.Int31())
+	txLogIndex := uint(rand.Uint32())
+
+	expectedLog := newRandomLog(t, filterID, chainID, eventName)
+	expectedLog.Address = addr
+	expectedLog.LogIndex, err = makeLogIndex(txIndex, txLogIndex)
+	require.NoError(t, err)
+	expectedLog.SequenceNum = 1
+	expectedLog.SubkeyValues = []IndexedValue{subkeyValA, subkeyValB}
+
+	expectedLog.Data, err = bin.MarshalBorsh(&event)
+	require.NoError(t, err)
+
+	ev := ProgramEvent{
+		Program: addr.ToSolana().String(),
+		BlockData: BlockData{
+			SlotNumber:          uint64(expectedLog.BlockNumber),
+			BlockHeight:         3,
+			BlockHash:           expectedLog.BlockHash.ToSolana(),
+			BlockTime:           solana.UnixTimeSeconds(expectedLog.BlockTimestamp.Unix()),
+			TransactionHash:     expectedLog.TxHash.ToSolana(),
+			TransactionIndex:    txIndex,
+			TransactionLogIndex: txLogIndex,
+		},
+		Data: base64.StdEncoding.EncodeToString(append(eventSig[:], expectedLog.Data...)),
+	}
+
+	orm := NewMockORM(t)
+	cl := mocks.NewRPCClient(t)
+	lggr := logger.Sugared(logger.Test(t))
+	lp := New(lggr, orm, cl)
+
+	var idlTypeInt64 codec.IdlType
+	var idlTypeString codec.IdlType
+
+	err = json.Unmarshal([]byte("\"i64\""), &idlTypeInt64)
+	require.NoError(t, err)
+	err = json.Unmarshal([]byte("\"string\""), &idlTypeString)
+	require.NoError(t, err)
+
+	idl := EventIdl{
+		codec.IdlEvent{
+			Name: "myEvent",
+			Fields: []codec.IdlEventField{{
+				Name: "A",
+				Type: idlTypeInt64,
+			}, {
+				Name: "B",
+				Type: idlTypeString,
+			}},
+		},
+		[]codec.IdlTypeDef{},
+	}
+
+	filter := Filter{
+		Name:        "test filter",
+		EventName:   eventName,
+		Address:     addr,
+		EventSig:    eventSig,
+		EventIdl:    idl,
+		SubkeyPaths: [][]string{{"A"}, {"B"}},
+	}
+	orm.EXPECT().SelectFilters(mock.Anything).Return([]Filter{filter}, nil).Once()
+	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{}, nil).Once()
+	orm.EXPECT().ChainID().Return(chainID).Once()
+	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, f Filter) (int64, error) {
+		require.Equal(t, f, filter)
+		return filterID, nil
+	}).Once()
+
+	orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []Log) error {
+		require.Len(t, logs, 1)
+		log := logs[0]
+		assert.Equal(t, log, expectedLog)
+		return nil
+	})
+	err = lp.RegisterFilter(ctx, filter)
+	require.NoError(t, err)
+
+	err = lp.Process(ctx, ev)
+	require.NoError(t, err)
+
+	orm.EXPECT().MarkFilterDeleted(mock.Anything, mock.Anything).Return(nil).Once()
+	err = lp.UnregisterFilter(ctx, filter.Name)
+	require.NoError(t, err)
 }

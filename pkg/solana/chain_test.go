@@ -26,9 +26,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	mn "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/multinode"
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
@@ -335,12 +335,8 @@ func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
 
 	ch := solcfg.Chain{}
 	ch.SetDefaults()
-	mnCfg := solcfg.MultiNodeConfig{
-		MultiNode: solcfg.MultiNode{
-			Enabled: ptr(true),
-		},
-	}
-	mnCfg.SetDefaults()
+	mnCfg := solcfg.NewDefaultMultiNodeConfig()
+	mnCfg.MultiNode.Enabled = ptr(true)
 
 	cfg := &solcfg.TOMLConfig{
 		ChainID:   ptr("devnet"),

@@ -27,6 +27,7 @@ import (
 
 	contract "github.com/smartcontractkit/chainlink-solana/contracts/generated/log_read_test"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
@@ -51,7 +52,8 @@ func TestEventLoader(t *testing.T) {
 	require.NoError(t, err)
 
 	rpcURL, wsURL := setupTestValidator(t, privateKey.PublicKey().String())
-	rpcClient := rpc.New(rpcURL)
+	cl, rpcClient, err := client.NewTestClient(rpcURL, config.NewDefault(), 1*time.Second, logger.Nop())
+	require.NoError(t, err)
 	wsClient, err := ws.Connect(ctx, wsURL)
 	require.NoError(t, err)
 
@@ -69,7 +71,7 @@ func TestEventLoader(t *testing.T) {
 	orm.EXPECT().SelectFilters(mock.Anything).Return([]logpoller.Filter{{IsBackfilled: false, Address: logpoller.PublicKey(programPubKey)}}, nil).Once()
 	orm.EXPECT().MarkFilterBackfilled(mock.Anything, mock.Anything).Return(nil).Once()
 	orm.EXPECT().GetLatestBlock(mock.Anything).Return(0, sql.ErrNoRows)
-	lp := logpoller.NewWithCustomProcessor(logger.TestSugared(t), orm, rpcClient, parser.ProcessBlocks)
+	lp := logpoller.NewWithCustomProcessor(logger.TestSugared(t), orm, cl, parser.ProcessBlocks)
 
 	require.NoError(t, lp.Start(ctx))
 	t.Cleanup(func() {
@@ -299,7 +301,7 @@ func (s *logSender) queueTX(sig solana.Signature, commitment rpc.CommitmentType)
 
 		defer sub.Unsubscribe()
 
-		res, err := sub.Recv()
+		res, err := sub.Recv(context.Background())
 		if err != nil {
 			return err
 		}

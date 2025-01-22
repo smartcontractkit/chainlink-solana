@@ -4,6 +4,7 @@ package logpoller
 
 import (
 	context "context"
+	iter "iter"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -19,6 +20,67 @@ type mockFilters_Expecter struct {
 
 func (_m *mockFilters) EXPECT() *mockFilters_Expecter {
 	return &mockFilters_Expecter{mock: &_m.Mock}
+}
+
+// DecodeSubKey provides a mock function with given fields: ctx, raw, ID, subKeyPath
+func (_m *mockFilters) DecodeSubKey(ctx context.Context, raw []byte, ID int64, subKeyPath []string) (interface{}, error) {
+	ret := _m.Called(ctx, raw, ID, subKeyPath)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DecodeSubKey")
+	}
+
+	var r0 interface{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, int64, []string) (interface{}, error)); ok {
+		return rf(ctx, raw, ID, subKeyPath)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, int64, []string) interface{}); ok {
+		r0 = rf(ctx, raw, ID, subKeyPath)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(interface{})
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []byte, int64, []string) error); ok {
+		r1 = rf(ctx, raw, ID, subKeyPath)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// mockFilters_DecodeSubKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DecodeSubKey'
+type mockFilters_DecodeSubKey_Call struct {
+	*mock.Call
+}
+
+// DecodeSubKey is a helper method to define mock.On call
+//   - ctx context.Context
+//   - raw []byte
+//   - ID int64
+//   - subKeyPath []string
+func (_e *mockFilters_Expecter) DecodeSubKey(ctx interface{}, raw interface{}, ID interface{}, subKeyPath interface{}) *mockFilters_DecodeSubKey_Call {
+	return &mockFilters_DecodeSubKey_Call{Call: _e.mock.On("DecodeSubKey", ctx, raw, ID, subKeyPath)}
+}
+
+func (_c *mockFilters_DecodeSubKey_Call) Run(run func(ctx context.Context, raw []byte, ID int64, subKeyPath []string)) *mockFilters_DecodeSubKey_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]byte), args[2].(int64), args[3].([]string))
+	})
+	return _c
+}
+
+func (_c *mockFilters_DecodeSubKey_Call) Return(_a0 interface{}, _a1 error) *mockFilters_DecodeSubKey_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *mockFilters_DecodeSubKey_Call) RunAndReturn(run func(context.Context, []byte, int64, []string) (interface{}, error)) *mockFilters_DecodeSubKey_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // GetDistinctAddresses provides a mock function with given fields: ctx
@@ -126,6 +188,52 @@ func (_c *mockFilters_GetFiltersToBackfill_Call) RunAndReturn(run func() []Filte
 	return _c
 }
 
+// IncrementSeqNum provides a mock function with given fields: filterID
+func (_m *mockFilters) IncrementSeqNum(filterID int64) int64 {
+	ret := _m.Called(filterID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IncrementSeqNum")
+	}
+
+	var r0 int64
+	if rf, ok := ret.Get(0).(func(int64) int64); ok {
+		r0 = rf(filterID)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	return r0
+}
+
+// mockFilters_IncrementSeqNum_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IncrementSeqNum'
+type mockFilters_IncrementSeqNum_Call struct {
+	*mock.Call
+}
+
+// IncrementSeqNum is a helper method to define mock.On call
+//   - filterID int64
+func (_e *mockFilters_Expecter) IncrementSeqNum(filterID interface{}) *mockFilters_IncrementSeqNum_Call {
+	return &mockFilters_IncrementSeqNum_Call{Call: _e.mock.On("IncrementSeqNum", filterID)}
+}
+
+func (_c *mockFilters_IncrementSeqNum_Call) Run(run func(filterID int64)) *mockFilters_IncrementSeqNum_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(int64))
+	})
+	return _c
+}
+
+func (_c *mockFilters_IncrementSeqNum_Call) Return(_a0 int64) *mockFilters_IncrementSeqNum_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockFilters_IncrementSeqNum_Call) RunAndReturn(run func(int64) int64) *mockFilters_IncrementSeqNum_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // LoadFilters provides a mock function with given fields: ctx
 func (_m *mockFilters) LoadFilters(ctx context.Context) error {
 	ret := _m.Called(ctx)
@@ -215,6 +323,54 @@ func (_c *mockFilters_MarkFilterBackfilled_Call) Return(_a0 error) *mockFilters_
 }
 
 func (_c *mockFilters_MarkFilterBackfilled_Call) RunAndReturn(run func(context.Context, int64) error) *mockFilters_MarkFilterBackfilled_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// MatchingFiltersForEncodedEvent provides a mock function with given fields: event
+func (_m *mockFilters) MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[Filter] {
+	ret := _m.Called(event)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MatchingFiltersForEncodedEvent")
+	}
+
+	var r0 iter.Seq[Filter]
+	if rf, ok := ret.Get(0).(func(ProgramEvent) iter.Seq[Filter]); ok {
+		r0 = rf(event)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(iter.Seq[Filter])
+		}
+	}
+
+	return r0
+}
+
+// mockFilters_MatchingFiltersForEncodedEvent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MatchingFiltersForEncodedEvent'
+type mockFilters_MatchingFiltersForEncodedEvent_Call struct {
+	*mock.Call
+}
+
+// MatchingFiltersForEncodedEvent is a helper method to define mock.On call
+//   - event ProgramEvent
+func (_e *mockFilters_Expecter) MatchingFiltersForEncodedEvent(event interface{}) *mockFilters_MatchingFiltersForEncodedEvent_Call {
+	return &mockFilters_MatchingFiltersForEncodedEvent_Call{Call: _e.mock.On("MatchingFiltersForEncodedEvent", event)}
+}
+
+func (_c *mockFilters_MatchingFiltersForEncodedEvent_Call) Run(run func(event ProgramEvent)) *mockFilters_MatchingFiltersForEncodedEvent_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(ProgramEvent))
+	})
+	return _c
+}
+
+func (_c *mockFilters_MatchingFiltersForEncodedEvent_Call) Return(_a0 iter.Seq[Filter]) *mockFilters_MatchingFiltersForEncodedEvent_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockFilters_MatchingFiltersForEncodedEvent_Call) RunAndReturn(run func(ProgramEvent) iter.Seq[Filter]) *mockFilters_MatchingFiltersForEncodedEvent_Call {
 	_c.Call.Return(run)
 	return _c
 }
