@@ -730,99 +730,171 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 		submitErr := cw.SubmitTransaction(ctx, "contract_reader_interface", "initializeLookupTable", args, txID, programID.String(), nil, nil)
 		require.NoError(t, submitErr)
 	})
+}
 
-	t.Run("submits transaction successfully with ArgsTransform", func(t *testing.T) {
-		type ArgsPostTransform struct {
-			LookupTable solana.PublicKey
-			Seed1       []byte
-			Seed2       []byte
-			Seed3       string
-		}
-		cwConfigWithArgs := cwConfig
-		programConfig := cwConfigWithArgs.Programs["contract_reader_interface"]
-		rawIDL := cwConfigWithArgs.Programs["contract_reader_interface"].IDL
+func TestChainWriter_CCIPRouter(t *testing.T) {
+	t.Parallel()
 
-		var idlMap map[string]interface{}
-		err := json.Unmarshal([]byte(rawIDL), &idlMap)
-		require.NoError(t, err)
+	ctx := tests.Context(t)
+	// mock client
+	rw := clientmocks.NewReaderWriter(t)
+	// mock estimator
+	ge := feemocks.NewEstimator(t)
+	// mock txm
+	txm := txmMocks.NewTxManager(t)
 
-		instructions, ok := idlMap["instructions"].([]interface{})
-		require.True(t, ok)
+	// setup admin key
+	adminPk, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	admin := adminPk.PublicKey()
 
-		// Add an additional field to the IDL that will be set in the ArgsTransform
-		// Since it's in the IDL, the codec will require it's present in the args
-		for _, instr := range instructions {
-			instrObj, ok := instr.(map[string]interface{})
-			require.True(t, ok)
+	routerAddr := chainwriter.GetRandomPubKey(t)
+	destTokenAddr := chainwriter.GetRandomPubKey(t)
 
-			if instrObj["name"] == "initializeLookupTable" {
-				argsArr, ok := instrObj["args"].([]interface{})
-				require.True(t, ok)
+	pda, _, err := solana.FindProgramAddress([][]byte{[]byte("token_admin_registry"), destTokenAddr.Bytes()}, routerAddr)
+	require.NoError(t, err)
 
-				newArg := map[string]interface{}{
-					"name": "seed3",
-					"type": "string",
-				}
-				argsArr = append(argsArr, newArg)
-				instrObj["args"] = argsArr
-			}
-		}
+	lookupTable := mockTokenAdminRegistryLookupTable(t, rw, pda)
 
-		modifiedIDL, err := json.Marshal(idlMap)
-		require.NoError(t, err)
+	poolKeys := []solana.PublicKey{destTokenAddr}
+	poolKeys = append(poolKeys, chainwriter.CreateTestPubKeys(t, 3)...)
 
-		programConfig.IDL = string(modifiedIDL)
-		methodConfig := programConfig.Methods["initializeLookupTable"]
+	mockFetchLookupTableAddresses(t, rw, lookupTable, poolKeys)
 
-		methodConfig.ArgsTransform = func(ctx context.Context, cw *chainwriter.SolanaChainWriterService, args any, accounts solana.AccountMetaSlice) (any, error) {
-			argsPreTransform, ok := args.(Arguments)
-			require.True(t, ok)
+	// simplified CCIP Config - does not contain full account list
+	ccipCWConfig := chainwriter.ChainWriterConfig{
+		Programs: map[string]chainwriter.ProgramConfig{
+			"ccip_router": {
+				Methods: map[string]chainwriter.MethodConfig{
+					"execute": {
+						FromAddress: admin.String(),
+						InputModifications: []codec.ModifierConfig{
+							&codec.RenameModifierConfig{
+								Fields: map[string]string{"ReportContextByteWords": "ReportContext"},
+							},
+							&codec.RenameModifierConfig{
+								Fields: map[string]string{"ExecutionReport": "AbstractReport"},
+							},
+						},
+						ChainSpecificName: "execute",
+						ArgsTransform:     "CCIP",
+						LookupTables:      chainwriter.LookupTables{},
+						Accounts: []chainwriter.Lookup{
+							chainwriter.AccountConstant{
+								Name:    "testAcc1",
+								Address: chainwriter.GetRandomPubKey(t).String(),
+							},
+							chainwriter.AccountConstant{
+								Name:    "testAcc2",
+								Address: chainwriter.GetRandomPubKey(t).String(),
+							},
+							chainwriter.AccountConstant{
+								Name:    "testAcc3",
+								Address: chainwriter.GetRandomPubKey(t).String(),
+							},
+							chainwriter.AccountConstant{
+								Name:    "poolAddr1",
+								Address: poolKeys[0].String(),
+							},
+							chainwriter.AccountConstant{
+								Name:    "poolAddr2",
+								Address: poolKeys[1].String(),
+							},
+							chainwriter.AccountConstant{
+								Name:    "poolAddr3",
+								Address: poolKeys[2].String(),
+							},
+							chainwriter.AccountConstant{
+								Name:    "poolAddr4",
+								Address: poolKeys[3].String(),
+							},
+						},
+					},
+				},
+				IDL: ccipRouterIDL,
+			},
+		},
+	}
 
-			argsTransformed := ArgsPostTransform{
-				LookupTable: argsPreTransform.LookupTable,
-				Seed1:       argsPreTransform.Seed1,
-				Seed2:       seed2,
-				Seed3:       "seed3",
-			}
+	// initialize chain writer
+	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, ge, ccipCWConfig)
+	require.NoError(t, err)
 
-			return argsTransformed, nil
-		}
-
-		programConfig.Methods["initializeLookupTable"] = methodConfig
-		cwConfigWithArgs.Programs["contract_reader_interface"] = programConfig
-		cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, ge, cwConfig)
-		require.NoError(t, err)
-
-		recentBlockHash := solana.Hash{}
-		rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Once()
+	t.Run("ArgsTransform works", func(t *testing.T) {
 		txID := uuid.NewString()
+		recentBlockHash := solana.Hash{}
 
-		// The TX being successfully sent means it was encoded properly, meaning the ArgsTransform worked
+		rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Once()
 		txm.On("Enqueue", mock.Anything, admin.String(), mock.MatchedBy(func(tx *solana.Transaction) bool {
-			// match transaction fields to ensure it was built as expected
-			require.Equal(t, recentBlockHash, tx.Message.RecentBlockhash)
-			require.Len(t, tx.Message.Instructions, 1)
-			require.Len(t, tx.Message.AccountKeys, 6)                           // fee payer + derived accounts
-			require.Equal(t, admin, tx.Message.AccountKeys[0])                  // fee payer
-			require.Equal(t, account1, tx.Message.AccountKeys[1])               // account constant
-			require.Equal(t, account2, tx.Message.AccountKeys[2])               // account lookup
-			require.Equal(t, account3, tx.Message.AccountKeys[3])               // pda lookup
-			require.Equal(t, solana.SystemProgramID, tx.Message.AccountKeys[4]) // system program ID
-			require.Equal(t, programID, tx.Message.AccountKeys[5])              // instruction program ID
-			// instruction program ID
-			require.Len(t, tx.Message.AddressTableLookups, 1)                                        // address table look contains entry
-			require.Equal(t, derivedLookupTablePubkey, tx.Message.AddressTableLookups[0].AccountKey) // address table
+			txData := tx.Message.Instructions[0].Data
+			payload := txData[8:]
+			var decoded ccip_router.Execute
+			dec := ag_binary.NewBorshDecoder(payload)
+			err := dec.Decode(&decoded)
+			require.NoError(t, err)
+
+			tokenIndexes := *decoded.TokenIndexes
+
+			require.Len(t, tokenIndexes, 1)
+			require.Equal(t, uint8(3), tokenIndexes[0])
 			return true
 		}), &txID, mock.Anything).Return(nil).Once()
 
-		args := Arguments{
-			LookupTable: account2,
-			Seed1:       seed1,
-			Seed2:       seed2,
-			// intentionally missing Seed3
+		abstractReport := ccip_router.ExecutionReportSingleChain{
+			SourceChainSelector: 1,
+			Message: ccip_router.Any2SVMRampMessage{
+				Header: ccip_router.RampMessageHeader{
+					MessageId:           ccipocr3.Bytes32{0x1},
+					SourceChainSelector: 1,
+					DestChainSelector:   2,
+					SequenceNumber:      1,
+					Nonce:               0,
+				},
+				Sender:        admin.Bytes(),
+				Data:          ccipocr3.Bytes{0x1},
+				LogicReceiver: chainwriter.GetRandomPubKey(t),
+				TokenReceiver: admin,
+				TokenAmounts: []ccip_router.Any2SVMTokenTransfer{
+					{
+						SourcePoolAddress: chainwriter.GetRandomPubKey(t).Bytes(),
+						DestTokenAddress:  destTokenAddr,
+						ExtraData:         ccipocr3.Bytes{0x1},
+						Amount:            ccip_router.CrossChainAmount{LeBytes: [32]uint8{0x1}},
+						DestGasAmount:     2,
+					},
+				},
+				ExtraArgs: ccip_router.SVMExtraArgs{
+					ComputeUnits:     1,
+					IsWritableBitmap: 6,
+					Accounts: []solana.PublicKey{
+						chainwriter.GetRandomPubKey(t),
+					},
+				},
+				OnRampAddress: []byte{0x1},
+			},
+			OffchainTokenData: [][]byte{{0x1}},
+			Proofs:            [][32]byte{{0x1}},
 		}
 
-		submitErr := cw.SubmitTransaction(ctx, "contract_reader_interface", "initializeLookupTable", args, txID, programID.String(), nil, nil)
+		// Marshal the abstract report to json just for testing purposes.
+		encodededReport, err := json.Marshal(abstractReport)
+		require.NoError(t, err)
+
+		args := chainwriter.ReportPreTransform{
+			ReportContext: [3][32]uint8{{0x01, 0x02, 0x03}},
+			Report:        encodededReport,
+			Info: ccipocr3.ExecuteReportInfo{
+				{
+					ChainSel:      1,
+					OnRampAddress: chainwriter.GetRandomPubKey(t).Bytes(),
+					SeqNumsRange:  ccipocr3.NewSeqNumRange(1, 2),
+					MerkleRoot:    [32]byte{0x01, 0x02, 0x03},
+				},
+			},
+			AbstractReport: abstractReport,
+		}
+
+		submitErr := cw.SubmitTransaction(ctx, "ccip_router", "execute", args, txID, routerAddr.String(), nil, nil)
 		require.NoError(t, submitErr)
 	})
 }
