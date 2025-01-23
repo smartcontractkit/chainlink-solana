@@ -1,7 +1,6 @@
 package logpoller
 
 import (
-	"encoding/base64"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
@@ -27,11 +26,9 @@ func (f Filter) MatchSameLogs(other Filter) bool {
 		f.EventIdl.Equal(other.EventIdl) && f.SubkeyPaths.Equal(other.SubkeyPaths)
 }
 
-// Discriminator returns a 12 character base64-encoded string
-//
-// This is the base64 encoding of the [8]byte discriminator returned by utils.Discriminator
-func (f Filter) Discriminator() string {
-	return base64.StdEncoding.EncodeToString(codec.NewDiscriminatorHashPrefix(f.EventName, false))
+// DiscriminatorRawBytes returns raw discriminator bytes as a string, this string is not base64 encoded.
+func (f Filter) DiscriminatorRawBytes() string {
+	return string(codec.NewDiscriminatorHashPrefix(f.EventName, false))
 }
 
 type Log struct {

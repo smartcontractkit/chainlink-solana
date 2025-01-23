@@ -2,7 +2,6 @@ package logpoller
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"iter"
@@ -24,24 +23,26 @@ type filters struct {
 	orm  ORM
 	lggr logger.SugaredLogger
 
-	filtersByID         map[int64]*Filter
-	filtersByName       map[string]int64
-	filtersByAddress    map[PublicKey]map[EventSignature]map[int64]struct{}
-	filtersToBackfill   map[int64]struct{}
-	filtersToDelete     map[int64]Filter
-	filtersMutex        sync.RWMutex
-	loadedFilters       atomic.Bool
-	knownPrograms       map[string]uint // fast lookup to see if a base58-encoded ProgramID matches any registered filters
-	knownDiscriminators map[string]uint // fast lookup by first 10 characters (60-bits) of a base64-encoded discriminator
-	seqNums             map[int64]int64
-	decoders            map[int64]Decoder
+	filtersByID            map[int64]*Filter
+	filtersByName          map[string]int64
+	filtersByAddress       map[PublicKey]map[EventSignature]map[int64]struct{}
+	filtersToBackfill      map[int64]struct{}
+	filtersToDelete        map[int64]Filter
+	filtersMutex           sync.RWMutex
+	loadedFilters          atomic.Bool
+	knownPrograms          map[string]uint // fast lookup to see if a base58-encoded ProgramID matches any registered filters
+	knownDiscriminators    map[string]uint // fast lookup by first 10 characters (60-bits) of a base64-encoded discriminator
+	seqNums                map[int64]int64
+	decoders               map[int64]Decoder
+	discriminatorExtractor codec.DiscriminatorExtractor
 }
 
 func newFilters(lggr logger.SugaredLogger, orm ORM) *filters {
 	return &filters{
-		orm:      orm,
-		lggr:     lggr,
-		decoders: make(map[int64]Decoder),
+		orm:                    orm,
+		lggr:                   lggr,
+		decoders:               make(map[int64]Decoder),
+		discriminatorExtractor: codec.NewDiscriminatorExtractor(),
 	}
 }
 
@@ -154,7 +155,7 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 
 	programID := filter.Address.ToSolana().String()
 	fl.knownPrograms[programID]++
-	fl.knownDiscriminators[filter.Discriminator()]++
+	fl.knownDiscriminators[filter.DiscriminatorRawBytes()]++
 
 	return nil
 }
@@ -230,7 +231,7 @@ func (fl *filters) removeFilterFromIndexes(filter Filter) {
 		}
 	}
 
-	discriminatorHead := filter.Discriminator()
+	discriminatorHead := filter.DiscriminatorRawBytes()
 	if refcount, ok := fl.knownDiscriminators[discriminatorHead]; ok {
 		refcount--
 		if refcount > 0 {
@@ -304,14 +305,7 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[F
 		return nil
 	}
 
-	discriminator, err := base64.StdEncoding.DecodeString(event.Data[:12])
-	if err != nil {
-		fl.lggr.Errorw("failed to decode event discriminator", "event", event, "err", err)
-		return nil
-	}
-
-	discriminator = discriminator[:8]
-
+	discriminator := fl.discriminatorExtractor.Extract(event.Data)
 	isKnown := func() (ok bool) {
 		fl.filtersMutex.RLock()
 		defer fl.filtersMutex.RUnlock()
@@ -325,7 +319,7 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[F
 		// discriminators if the first 10 characters don't match. If it passes that initial test, we base64-decode the
 		// first 12 characters, and use the first 8 bytes of that as the event sig to call MatchingFilters. The address
 		// also needs to be base58-decoded to pass to MatchingFilters
-		_, ok = fl.knownDiscriminators[base64.StdEncoding.EncodeToString(discriminator)]
+		_, ok = fl.knownDiscriminators[string(discriminator)]
 		return ok
 	}
 
