@@ -15,14 +15,16 @@ import (
 )
 
 const (
-	blockFieldName     = "block_number"
-	chainIDFieldName   = "chain_id"
-	timestampFieldName = "block_timestamp"
-	txHashFieldName    = "tx_hash"
-	addressFieldName   = "address"
-	eventSigFieldName  = "event_sig"
-	defaultSort        = "block_number ASC, log_index ASC"
-	subKeysFieldName   = "subkey_values"
+	blockFieldName        = "block_number"
+	chainIDFieldName      = "chain_id"
+	timestampFieldName    = "block_timestamp"
+	txHashFieldName       = "tx_hash"
+	addressFieldName      = "address"
+	eventSigFieldName     = "event_sig"
+	defaultSort           = "block_number ASC, log_index ASC"
+	subKeyValuesFieldName = "subkey_values"
+	subKeyValueArg        = "subkey_value"
+	subKeyIndexArgName    = "subkey_index"
 )
 
 var (
@@ -101,11 +103,11 @@ func (v *pgDSLParser) VisitEventSubKeysByValueFilter(p *eventBySubKeyFilter) {
 		}
 
 		// Add 1 since postgresql arrays are 1-indexed.
-		subKeyIdx := v.args.withIndexedField("subkey_index", p.SubKeyIndex+1)
+		subKeyIdx := v.args.withIndexedField(subKeyIndexArgName, p.SubKeyIndex+1)
 
 		comps := make([]string, len(p.ValueComparers))
 		for idx, comp := range p.ValueComparers {
-			comps[idx], v.err = makeComp(comp, v.args, "subkey_value", subKeyIdx, "subkey_values[:%s] %s :%s")
+			comps[idx], v.err = makeComp(comp, v.args, subKeyValueArg, subKeyIdx, subKeyValuesFieldName+"[:%s] %s :%s")
 			if v.err != nil {
 				return
 			}
