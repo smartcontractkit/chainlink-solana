@@ -110,17 +110,17 @@ func (c *EncodedLogCollector) getSlotsToFetch(ctx context.Context, addresses []P
 
 func (c *EncodedLogCollector) scheduleBlocksFetching(ctx context.Context, slots []uint64) (<-chan Block, error) {
 	blocks := make(chan Block)
-	getBlocksJobs := make([]*getBlockJob, len(slots))
+	getBlockJobs := make([]*getBlockJob, len(slots))
 	for i, slot := range slots {
-		getBlocksJobs[i] = newGetBlockJob(c.client, blocks, c.lggr, slot)
-		err := c.workers.Do(ctx, getBlocksJobs[i])
+		getBlockJobs[i] = newGetBlockJob(c.client, blocks, c.lggr, slot)
+		err := c.workers.Do(ctx, getBlockJobs[i])
 		if err != nil {
 			return nil, fmt.Errorf("could not schedule job to fetch blocks for slot: %w", err)
 		}
 	}
 
 	c.engine.Go(func(ctx context.Context) {
-		for _, job := range getBlocksJobs {
+		for _, job := range getBlockJobs {
 			select {
 			case <-ctx.Done():
 				return

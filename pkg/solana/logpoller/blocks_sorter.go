@@ -9,6 +9,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 )
 
+const blocksChBuffer = 16
+
 type blocksSorter struct {
 	// service state management
 	services.Service
@@ -31,7 +33,7 @@ func newBlocksSorter(inBlocks <-chan Block, lggr logger.Logger, expectedBlocks [
 		queue:            list.New(),
 		readyBlocks:      make(map[uint64]Block),
 		inBlocks:         inBlocks,
-		outBlocks:        make(chan Block, 16),
+		outBlocks:        make(chan Block, blocksChBuffer),
 		receivedNewBlock: make(chan struct{}, 1),
 		lggr:             lggr,
 	}

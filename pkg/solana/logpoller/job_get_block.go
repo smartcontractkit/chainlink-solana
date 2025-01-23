@@ -13,7 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 )
 
-// getBlockJob is a job that fetches blocks with transactions, coverts logs into ProgramEvents and writes them into blocks channel
+// getBlockJob is a job that fetches a block with transactions, converts logs into ProgramEvents and writes them into blocks channel
 type getBlockJob struct {
 	slotNumber       uint64
 	client           RPCClient

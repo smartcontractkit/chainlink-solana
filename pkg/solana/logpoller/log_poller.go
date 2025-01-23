@@ -282,7 +282,7 @@ consumedAllBlocks:
 			}
 
 			batch := []Block{block}
-			batch = appendBuffered(blocks, 16, batch)
+			batch = appendBuffered(blocks, blocksChBuffer, batch)
 			err = lp.processBlocks(ctx, batch)
 			if err != nil {
 				return fmt.Errorf("error processing blocks: %w", err)
