@@ -61,7 +61,7 @@ type Service struct {
 	client            RPCClient
 	loader            logsLoader
 	filters           filtersI
-	processBlocks     func(ctx context.Context, blocks []Block) error // TODO: introduced for smoke test. Remove after NONEVM-916 is merged
+	processBlocks     func(ctx context.Context, blocks []Block) error
 }
 
 func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient) *Service {
