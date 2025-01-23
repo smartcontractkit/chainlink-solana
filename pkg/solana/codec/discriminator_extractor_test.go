@@ -13,10 +13,10 @@ func FuzzExtractorHappyPath(f *testing.F) {
 	seeds := []struct {
 		Data string
 	}{
-		{"SGVbG8gd29ybGQ"},   // "Hello world!"
+		{"SGVsbG8gV29ybGQh"}, // Hello world!
 		{"AAAAAAAAAAAA"},     // Zero bytes
 		{"////////////"},     // Max value bytes
-		{"QUJDREVGR0hJSktM"}, // "ABCDEFGHIJKL"
+		{"QUJDREVGR0hJSktM"}, // ABCDEFGHIJKL
 	}
 
 	for _, seed := range seeds {
@@ -25,21 +25,12 @@ func FuzzExtractorHappyPath(f *testing.F) {
 
 	extractor := NewDiscriminatorExtractor()
 	f.Fuzz(func(t *testing.T, testString string) {
-		if len(testString) < 12 {
-			t.Fatalf("test string is shorter than 12 %s", testString)
-		}
-
-		data := testString[:12]
-		std, err := base64.StdEncoding.DecodeString(data)
+		stdDecoded, err := base64.StdEncoding.DecodeString(testString)
 		if err != nil {
-			t.Fatalf("failed to decode test string %s with stdlib", data)
+			t.Fatalf("failed to decode test string %s with stdlib, err: %s", testString, err)
 		}
 
-		if len(std) < 8 {
-			t.Fatal("stdlib decoded < 8 bytes")
-		}
-
-		require.Equal(t, std[:8], extractor.Extract(data))
+		require.Equal(t, stdDecoded[:8], extractor.Extract(testString))
 	})
 }
 

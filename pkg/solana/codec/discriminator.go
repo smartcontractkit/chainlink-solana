@@ -81,7 +81,7 @@ func (d Discriminator) FixedSize() (int, error) {
 }
 
 type DiscriminatorExtractor struct {
-	b64Index [256]byte
+	b64Index [128]byte
 }
 
 // NewDiscriminatorExtractor is optimised to extract discriminators from base64 encoded strings faster than the base64 lib.
