@@ -314,11 +314,6 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[F
 			return ok
 		}
 
-		// The first 64-bits of the event data is the event sig. Because it's base64 encoded, this corresponds to
-		// the first 10 characters plus 4 bits of the 11th character. We can quickly rule it out as not matching any known
-		// discriminators if the first 10 characters don't match. If it passes that initial test, we base64-decode the
-		// first 12 characters, and use the first 8 bytes of that as the event sig to call MatchingFilters. The address
-		// also needs to be base58-decoded to pass to MatchingFilters
 		_, ok = fl.knownDiscriminators[string(discriminator)]
 		return ok
 	}
