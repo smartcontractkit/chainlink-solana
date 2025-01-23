@@ -2,7 +2,6 @@ package codec
 
 import (
 	"encoding/base64"
-	"fmt"
 	mathrand "math/rand"
 	"testing"
 
@@ -27,13 +26,13 @@ func FuzzExtractorHappyPath(f *testing.F) {
 	extractor := NewDiscriminatorExtractor()
 	f.Fuzz(func(t *testing.T, testString string) {
 		if len(testString) < 12 {
-			t.Fatal(fmt.Sprintf("test string is shorter than 12 %s", testString))
+			t.Fatalf("test string is shorter than 12 %s", testString)
 		}
 
 		data := testString[:12]
 		std, err := base64.StdEncoding.DecodeString(data)
 		if err != nil {
-			t.Fatal(fmt.Sprintf("failed to decode test string %s with stdlib", data))
+			t.Fatalf("failed to decode test string %s with stdlib", data)
 		}
 
 		if len(std) < 8 {
