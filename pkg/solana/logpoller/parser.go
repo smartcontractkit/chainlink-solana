@@ -60,19 +60,19 @@ type IndexedValueComparator struct {
 	Operator primitives.ComparisonOperator
 }
 
-type eventBySubkeyFilter struct {
-	SubkeyIndex    uint64
+type eventBySubKeyFilter struct {
+	SubKeyIndex    uint64
 	ValueComparers []IndexedValueComparator
 }
 
-func (f *eventBySubkeyFilter) Accept(visitor primitives.Visitor) {
+func (f *eventBySubKeyFilter) Accept(visitor primitives.Visitor) {
 	switch v := visitor.(type) {
 	case *pgDSLParser:
-		v.VisitEventSubkeysByValueFilter(f)
+		v.VisitEventSubKeysByValueFilter(f)
 	}
 }
 
-func NewEventBySubkeyFilter(subkeyIndex uint64, valueComparers []primitives.ValueComparator) (query.Expression, error) {
+func NewEventBySubKeyFilter(subKeyIndex uint64, valueComparers []primitives.ValueComparator) (query.Expression, error) {
 	var indexedValueComparators []IndexedValueComparator
 	for _, cmp := range valueComparers {
 		iVal, err := NewIndexedValue(cmp.Value)
@@ -86,26 +86,26 @@ func NewEventBySubkeyFilter(subkeyIndex uint64, valueComparers []primitives.Valu
 		indexedValueComparators = append(indexedValueComparators, iValCmp)
 	}
 	return query.Expression{
-		Primitive: &eventBySubkeyFilter{
-			SubkeyIndex:    subkeyIndex,
+		Primitive: &eventBySubKeyFilter{
+			SubKeyIndex:    subKeyIndex,
 			ValueComparers: indexedValueComparators,
 		},
 	}, nil
 }
 
-func (v *pgDSLParser) VisitEventSubkeysByValueFilter(p *eventBySubkeyFilter) {
+func (v *pgDSLParser) VisitEventSubKeysByValueFilter(p *eventBySubKeyFilter) {
 	if len(p.ValueComparers) > 0 {
-		if p.SubkeyIndex > 3 { // For now, maximum # of fields that can be indexed is 4--we can increase this if needed by adding more db indexes
-			v.err = fmt.Errorf("invalid subkey index: %d", p.SubkeyIndex)
+		if p.SubKeyIndex > 3 { // For now, maximum # of fields that can be indexed is 4--we can increase this if needed by adding more db indexes
+			v.err = fmt.Errorf("invalid subKey index: %d", p.SubKeyIndex)
 			return
 		}
 
 		// Add 1 since postgresql arrays are 1-indexed.
-		subkeyIdx := v.args.withIndexedField("subkey_index", p.SubkeyIndex+1)
+		subKeyIdx := v.args.withIndexedField("subkey_index", p.SubKeyIndex+1)
 
 		comps := make([]string, len(p.ValueComparers))
 		for idx, comp := range p.ValueComparers {
-			comps[idx], v.err = makeComp(comp, v.args, "subkey_value", subkeyIdx, "subkey_values[:%s] %s :%s")
+			comps[idx], v.err = makeComp(comp, v.args, "subkey_value", subKeyIdx, "subkey_values[:%s] %s :%s")
 			if v.err != nil {
 				return
 			}

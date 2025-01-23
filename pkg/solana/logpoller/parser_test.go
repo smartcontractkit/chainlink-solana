@@ -201,14 +201,14 @@ func TestDSLParser(t *testing.T) {
 	t.Run("query for event topic", func(t *testing.T) {
 		t.Parallel()
 
-		subkeyFilter, err := NewEventBySubkeyFilter(2, []primitives.ValueComparator{
+		subKeyFilter, err := NewEventBySubKeyFilter(2, []primitives.ValueComparator{
 			{Value: 4, Operator: primitives.Gt},
 			{Value: 7, Operator: primitives.Lt},
 		})
 		require.NoError(t, err)
 
 		parser := &pgDSLParser{}
-		expressions := []query.Expression{subkeyFilter}
+		expressions := []query.Expression{subKeyFilter}
 		limiter := query.LimitAndSort{}
 
 		result, args, err := parser.buildQuery(chainID, expressions, limiter)

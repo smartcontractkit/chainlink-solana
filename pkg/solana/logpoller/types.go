@@ -93,17 +93,17 @@ func scanFixedLengthArray(name string, maxLength int, src interface{}, dest []by
 	return nil
 }
 
-type SubkeyPaths [][]string
+type SubKeyPaths [][]string
 
-func (p SubkeyPaths) Value() (driver.Value, error) {
+func (p SubKeyPaths) Value() (driver.Value, error) {
 	return json.Marshal([][]string(p))
 }
 
-func (p *SubkeyPaths) Scan(src interface{}) error {
-	return scanJSON("SubkeyPaths", p, src)
+func (p *SubKeyPaths) Scan(src interface{}) error {
+	return scanJSON("SubKeyPaths", p, src)
 }
 
-func (p SubkeyPaths) Equal(o SubkeyPaths) bool {
+func (p SubKeyPaths) Equal(o SubKeyPaths) bool {
 	return slices.EqualFunc(p, o, slices.Equal)
 }
 

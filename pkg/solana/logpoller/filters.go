@@ -84,7 +84,7 @@ func (fl *filters) PruneFilters(ctx context.Context) error {
 // that matches filter.EventSig signature will be captured starting from filter.StartingBlock.
 // The filter may be unregistered later by filter.Name.
 // In case of Filter.Name collision (within the chain scope) returns ErrFilterNameConflict if
-// one of the fields defining resulting logs (Address, EventSig, EventIDL, SubkeyPaths) does not match original filter.
+// one of the fields defining resulting logs (Address, EventSig, EventIDL, SubKeyPaths) does not match original filter.
 // Otherwise, updates remaining fields and schedules backfill.
 // Warnings/debug information is keyed by filter name.
 func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
@@ -456,8 +456,8 @@ func (fl *filters) LoadFilters(ctx context.Context) error {
 	return nil
 }
 
-// DecodeSubKey accepts raw Borsh-encoded event data, a filter ID and a subkeyPath. It uses the decoder
-// associated with that filter to decode the event and extract the subkey value from the specified subKeyPath.
+// DecodeSubKey accepts raw Borsh-encoded event data, a filter ID and a subKeyPath. It uses the decoder
+// associated with that filter to decode the event and extract the subKey value from the specified subKeyPath.
 // WARNING: not thread safe, should only be called while fl.filtersMutex is held and after filters have been loaded.
 func (fl *filters) DecodeSubKey(ctx context.Context, raw []byte, ID int64, subKeyPath []string) (any, error) {
 	filter, ok := fl.filtersByID[ID]

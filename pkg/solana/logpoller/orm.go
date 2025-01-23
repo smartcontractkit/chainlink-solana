@@ -53,7 +53,7 @@ func (o *DSORM) InsertFilter(ctx context.Context, filter Filter) (id int64, err 
 		withEventSig(filter.EventSig).
 		withStartingBlock(filter.StartingBlock).
 		withEventIDL(filter.EventIdl).
-		withSubkeyPaths(filter.SubkeyPaths).
+		withSubKeyPaths(filter.SubKeyPaths).
 		withIsBackfilled(filter.IsBackfilled).
 		toArgs()
 	if err != nil {

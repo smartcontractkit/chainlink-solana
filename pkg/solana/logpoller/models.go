@@ -14,7 +14,7 @@ type Filter struct {
 	EventSig      EventSignature
 	StartingBlock int64
 	EventIdl      EventIdl
-	SubkeyPaths   SubkeyPaths
+	SubKeyPaths   SubKeyPaths
 	Retention     time.Duration
 	MaxLogsKept   int64
 	IsDeleted     bool // only for internal usage. Values set externally are ignored.
@@ -23,7 +23,7 @@ type Filter struct {
 
 func (f Filter) MatchSameLogs(other Filter) bool {
 	return f.Address == other.Address && f.EventSig == other.EventSig &&
-		f.EventIdl.Equal(other.EventIdl) && f.SubkeyPaths.Equal(other.SubkeyPaths)
+		f.EventIdl.Equal(other.EventIdl) && f.SubKeyPaths.Equal(other.SubKeyPaths)
 }
 
 // Discriminator returns a 12 character base64-encoded string
@@ -48,7 +48,7 @@ type Log struct {
 	BlockTimestamp time.Time
 	Address        PublicKey
 	EventSig       EventSignature
-	SubkeyValues   []IndexedValue
+	SubKeyValues   []IndexedValue
 	TxHash         Signature
 	Data           []byte
 	CreatedAt      time.Time
