@@ -3,6 +3,7 @@ package codec
 import (
 	"encoding/base64"
 	mathrand "math/rand"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -25,12 +26,20 @@ func FuzzExtractorHappyPath(f *testing.F) {
 
 	extractor := NewDiscriminatorExtractor()
 	f.Fuzz(func(t *testing.T, testString string) {
-		stdDecoded, err := base64.StdEncoding.DecodeString(testString)
-		if err != nil {
-			t.Fatalf("failed to decode test string %s with stdlib, err: %s", testString, err)
+		// Extractor doesn't validate padding, newlines, or tabs
+		if len(testString) < 12 ||
+			strings.Contains(testString, "\n") ||
+			strings.Contains(testString, "\r") ||
+			strings.Contains(testString, "\t") ||
+			strings.HasSuffix(testString, "=") ||
+			strings.HasSuffix(testString, "==") {
+			return
 		}
 
-		require.Equal(t, stdDecoded[:8], extractor.Extract(testString))
+		stdDecoded, err := base64.StdEncoding.DecodeString(testString)
+		if err == nil {
+			require.Equal(t, stdDecoded[:8], extractor.Extract(testString))
+		}
 	})
 }
 

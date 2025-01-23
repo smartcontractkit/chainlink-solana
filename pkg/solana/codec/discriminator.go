@@ -95,7 +95,8 @@ func NewDiscriminatorExtractor() DiscriminatorExtractor {
 }
 
 // Extract most optimally (around 40% faster than std) decodes the first 8 bytes of a base64 encoded string, which corresponds to a Solana discriminator.
-// Extractor expects input of > 12 characters which 8 bytes are extracted from, if the input string is less than 12 characters, this will panic.
+// Extract expects input of > 12 characters which 8 bytes are extracted from, if the input string is less than 12 characters, this will panic.
+// Extract doesn't handle base64 padding because discriminators shouldn't have padding.
 // If string contains non-Base64 characters (e.g., !, @, space) map to index 0 (ASCII 'A'), and won't be accurate.
 func (e *DiscriminatorExtractor) Extract(data string) []byte {
 	var decodeBuffer [9]byte
