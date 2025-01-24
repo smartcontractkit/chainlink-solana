@@ -46,7 +46,7 @@ type filtersI interface {
 	GetFiltersToBackfill() []Filter
 	MarkFilterBackfilled(ctx context.Context, filterID int64) error
 	MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[Filter]
-	DecodeSubKey(ctx context.Context, raw []byte, ID int64, subKeyPath []string) (any, error)
+	DecodeSubKey(ctx context.Context, lggr logger.SugaredLogger, raw []byte, ID int64, subKeyPath []string) (any, error)
 	IncrementSeqNum(filterID int64) int64
 }
 
