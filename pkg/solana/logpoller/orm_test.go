@@ -3,18 +3,18 @@
 package logpoller
 
 import (
-	"math/rand"
+	"context"
 	"testing"
-	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 
 	_ "github.com/jackc/pgx/v4/stdlib"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/pg"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/stretchr/testify/require"
 )
 
 // NOTE: at the moment it's not possible to run all db tests at once. This issue will be addressed separately
@@ -134,7 +134,7 @@ func TestLogPollerFilters(t *testing.T) {
 		ctx := tests.Context(t)
 		filterID, err := orm.InsertFilter(ctx, filter)
 		require.NoError(t, err)
-		log := newRandomLog(t, filterID, chainID)
+		log := newRandomLog(t, filterID, chainID, "myEvent")
 		err = orm.InsertLogs(ctx, []Log{log})
 		require.NoError(t, err)
 		logs, err := orm.SelectLogs(ctx, 0, log.BlockNumber, log.Address, log.EventSig)
@@ -191,8 +191,8 @@ func TestLogPollerLogs(t *testing.T) {
 	filterID, err := orm.InsertFilter(ctx, newRandomFilter(t))
 	filterID2, err := orm.InsertFilter(ctx, newRandomFilter(t))
 	require.NoError(t, err)
-	log := newRandomLog(t, filterID, chainID)
-	log2 := newRandomLog(t, filterID2, chainID)
+	log := newRandomLog(t, filterID, chainID, "myEvent")
+	log2 := newRandomLog(t, filterID2, chainID, "myEvent")
 	err = orm.InsertLogs(ctx, []Log{log, log2})
 	require.NoError(t, err)
 	// insert of the same Log should not produce two instances
@@ -220,6 +220,33 @@ func TestLogPollerLogs(t *testing.T) {
 	})
 }
 
+func TestLogPoller_GetLatestBlock(t *testing.T) {
+	lggr := logger.Test(t)
+	dbx := pg.NewTestDB(t, pg.TestURL(t))
+
+	createLogsForBlocks := func(ctx context.Context, orm *DSORM, blocks ...int64) {
+		filterID, err := orm.InsertFilter(ctx, newRandomFilter(t))
+		require.NoError(t, err)
+		for _, block := range blocks {
+			log := newRandomLog(t, filterID, orm.chainID, "myEvent")
+			log.BlockNumber = block
+			err = orm.InsertLogs(ctx, []Log{log})
+			require.NoError(t, err)
+		}
+	}
+	ctx := tests.Context(t)
+	orm1 := NewORM(uuid.NewString(), dbx, lggr)
+	createLogsForBlocks(tests.Context(t), orm1, 10, 11, 12)
+	orm2 := NewORM(uuid.NewString(), dbx, lggr)
+	createLogsForBlocks(context.Background(), orm2, 100, 110, 120)
+	latestBlockChain1, err := orm1.GetLatestBlock(ctx)
+	require.NoError(t, err)
+	require.Equal(t, int64(12), latestBlockChain1)
+	latestBlockChain2, err := orm2.GetLatestBlock(ctx)
+	require.NoError(t, err)
+	require.Equal(t, int64(120), latestBlockChain2)
+}
+
 func newRandomFilter(t *testing.T) Filter {
 	return Filter{
 		Name:          uuid.NewString(),
@@ -230,28 +257,5 @@ func newRandomFilter(t *testing.T) Filter {
 		SubkeyPaths:   [][]string{{"a", "b"}, {"c"}},
 		Retention:     1000,
 		MaxLogsKept:   3,
-	}
-}
-
-func newRandomLog(t *testing.T, filterID int64, chainID string) Log {
-	privateKey, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
-	pubKey := privateKey.PublicKey()
-	data := []byte("solana is fun")
-	signature, err := privateKey.Sign(data)
-	require.NoError(t, err)
-	return Log{
-		FilterID:       filterID,
-		ChainID:        chainID,
-		LogIndex:       rand.Int63n(1000),
-		BlockHash:      Hash(pubKey),
-		BlockNumber:    rand.Int63n(1000000),
-		BlockTimestamp: time.Unix(1731590113, 0),
-		Address:        PublicKey(pubKey),
-		EventSig:       EventSignature{3, 2, 1},
-		SubkeyValues:   [][]byte{{3, 2, 1}, {1}, {1, 2}, pubKey.Bytes()},
-		TxHash:         Signature(signature),
-		Data:           data,
-		SequenceNum:    rand.Int63n(500),
 	}
 }

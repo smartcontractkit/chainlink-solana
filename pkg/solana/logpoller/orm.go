@@ -238,6 +238,13 @@ func (o *DSORM) FilteredLogs(ctx context.Context, filter []query.Expression, lim
 	return logs, nil
 }
 
+func (o *DSORM) GetLatestBlock(ctx context.Context) (int64, error) {
+	q := `SELECT block_number FROM solana.logs WHERE chain_id = $1 ORDER BY block_number DESC LIMIT 1`
+	var result int64
+	err := o.ds.GetContext(ctx, &result, q, o.chainID)
+	return result, err
+}
+
 func (o *DSORM) SelectSeqNums(ctx context.Context) (map[int64]int64, error) {
 	results := make([]struct {
 		FilterID    int64

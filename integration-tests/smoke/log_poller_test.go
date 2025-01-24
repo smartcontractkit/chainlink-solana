@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -17,6 +18,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/gagliardetto/solana-go/rpc/ws"
 	"github.com/gagliardetto/solana-go/text"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
@@ -63,15 +65,18 @@ func TestEventLoader(t *testing.T) {
 	totalLogsToSend := 30
 	parser := &printParser{t: t}
 	sender := newLogSender(t, rpcClient, wsClient)
-	collector := logpoller.NewEncodedLogCollector(
-		cl,
-		parser,
-		logger.Nop(),
-	)
+	orm := logpoller.NewMockORM(t) // TODO: replace with real DB, when available
+	programPubKey, err := solana.PublicKeyFromBase58(programPubKey)
+	require.NoError(t, err)
+	orm.EXPECT().SelectFilters(mock.Anything).Return([]logpoller.Filter{{ID: 1, IsBackfilled: false, Address: logpoller.PublicKey(programPubKey)}}, nil).Once()
+	orm.EXPECT().MarkFilterBackfilled(mock.Anything, mock.Anything).Return(nil).Once()
+	orm.EXPECT().GetLatestBlock(mock.Anything).Return(0, sql.ErrNoRows)
+	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{1: 0}, nil).Once()
+	lp := logpoller.NewWithCustomProcessor(logger.TestSugared(t), orm, cl, parser.ProcessBlocks)
 
-	require.NoError(t, collector.Start(ctx))
+	require.NoError(t, lp.Start(ctx))
 	t.Cleanup(func() {
-		require.NoError(t, collector.Close())
+		require.NoError(t, lp.Close())
 	})
 
 	go func(ctx context.Context, sender *logSender, privateKey *solana.PrivateKey) {
@@ -145,26 +150,39 @@ type printParser struct {
 	values []uint64
 }
 
-func (p *printParser) Process(evt logpoller.ProgramEvent) error {
-	p.t.Helper()
-
-	data, err := base64.StdEncoding.DecodeString(evt.Data)
-	if err != nil {
-		return err
+func (p *printParser) ProcessBlocks(ctx context.Context, blocks []logpoller.Block) error {
+	for _, b := range blocks {
+		err := p.process(b)
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
+}
+
+func (p *printParser) process(block logpoller.Block) error {
+	p.t.Helper()
 
 	sum := sha256.Sum256([]byte("event:TestEvent"))
 	sig := sum[:8]
 
-	if bytes.Equal(sig, data[:8]) {
-		var event testEvent
-		if err := bin.UnmarshalBorsh(&event, data[8:]); err != nil {
-			return nil
+	for _, evt := range block.Events {
+		data, err := base64.StdEncoding.DecodeString(evt.Data)
+		if err != nil {
+			return err
 		}
 
-		p.mu.Lock()
-		p.values = append(p.values, event.U64Value)
-		p.mu.Unlock()
+		if bytes.Equal(sig, data[:8]) {
+			var event testEvent
+			if err := bin.UnmarshalBorsh(&event, data[8:]); err != nil {
+				return nil
+			}
+
+			p.mu.Lock()
+			p.values = append(p.values, event.U64Value)
+			p.mu.Unlock()
+		}
 	}
 
 	return nil

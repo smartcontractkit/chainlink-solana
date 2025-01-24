@@ -184,3 +184,12 @@ func (m *MultiClient) GetBlockWithOpts(ctx context.Context, slot uint64, opts *r
 
 	return r.GetBlockWithOpts(ctx, slot, opts)
 }
+
+func (m *MultiClient) SlotHeightWithCommitment(ctx context.Context, commitment rpc.CommitmentType) (uint64, error) {
+	r, err := m.getClient()
+	if err != nil {
+		return 0, err
+	}
+
+	return r.SlotHeightWithCommitment(ctx, commitment)
+}

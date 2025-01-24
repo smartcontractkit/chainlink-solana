@@ -18,7 +18,7 @@ import (
 )
 
 func TestFilters_LoadFilters(t *testing.T) {
-	orm := newMockORM(t)
+	orm := NewMockORM(t)
 	fs := newFilters(logger.Sugared(logger.Test(t)), orm)
 	ctx := tests.Context(t)
 	orm.On("SelectFilters", mock.Anything).Return(nil, errors.New("db failed")).Once()
@@ -73,13 +73,13 @@ func TestFilters_LoadFilters(t *testing.T) {
 func TestFilters_RegisterFilter(t *testing.T) {
 	lggr := logger.Sugared(logger.Test(t))
 	t.Run("Returns an error if name is empty", func(t *testing.T) {
-		orm := newMockORM(t)
+		orm := NewMockORM(t)
 		fs := newFilters(lggr, orm)
 		err := fs.RegisterFilter(tests.Context(t), Filter{})
 		require.EqualError(t, err, "name is required")
 	})
 	t.Run("Returns an error if fails to load filters from db", func(t *testing.T) {
-		orm := newMockORM(t)
+		orm := NewMockORM(t)
 		fs := newFilters(lggr, orm)
 		orm.On("SelectFilters", mock.Anything).Return(nil, errors.New("db failed")).Once()
 		err := fs.RegisterFilter(tests.Context(t), Filter{Name: "Filter"})
@@ -113,7 +113,7 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		}
 		for _, tc := range testCases {
 			t.Run(fmt.Sprintf("Updating %s", tc.Name), func(t *testing.T) {
-				orm := newMockORM(t)
+				orm := NewMockORM(t)
 				fs := newFilters(lggr, orm)
 				const filterName = "Filter"
 				dbFilter := Filter{Name: filterName}
@@ -127,7 +127,7 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		}
 	})
 	t.Run("Happy path", func(t *testing.T) {
-		orm := newMockORM(t)
+		orm := NewMockORM(t)
 		fs := newFilters(lggr, orm)
 		const filterName = "Filter"
 		orm.On("SelectFilters", mock.Anything).Return(nil, nil).Once()
@@ -155,7 +155,7 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		require.Equal(t, filter, storedFilters[0])
 	})
 	t.Run("Can reregister after unregister", func(t *testing.T) {
-		orm := newMockORM(t)
+		orm := NewMockORM(t)
 		fs := newFilters(lggr, orm)
 		const filterName = "Filter"
 		orm.On("SelectFilters", mock.Anything).Return(nil, nil).Once()
@@ -180,14 +180,14 @@ func TestFilters_RegisterFilter(t *testing.T) {
 func TestFilters_UnregisterFilter(t *testing.T) {
 	lggr := logger.Sugared(logger.Test(t))
 	t.Run("Returns an error if fails to load filters from db", func(t *testing.T) {
-		orm := newMockORM(t)
+		orm := NewMockORM(t)
 		fs := newFilters(lggr, orm)
 		orm.On("SelectFilters", mock.Anything).Return(nil, errors.New("db failed")).Once()
 		err := fs.UnregisterFilter(tests.Context(t), "Filter")
 		require.EqualError(t, err, "failed to load filters: failed to select filters from db: db failed")
 	})
 	t.Run("Noop if filter is not present", func(t *testing.T) {
-		orm := newMockORM(t)
+		orm := NewMockORM(t)
 		fs := newFilters(lggr, orm)
 		const filterName = "Filter"
 		orm.On("SelectFilters", mock.Anything).Return(nil, nil).Once()
@@ -196,7 +196,7 @@ func TestFilters_UnregisterFilter(t *testing.T) {
 		require.NoError(t, err)
 	})
 	t.Run("Returns error if fails to mark filter as deleted", func(t *testing.T) {
-		orm := newMockORM(t)
+		orm := NewMockORM(t)
 		fs := newFilters(lggr, orm)
 		const filterName = "Filter"
 		const id int64 = 10
@@ -207,7 +207,7 @@ func TestFilters_UnregisterFilter(t *testing.T) {
 		require.EqualError(t, err, "failed to mark filter deleted: db query failed")
 	})
 	t.Run("Happy path", func(t *testing.T) {
-		orm := newMockORM(t)
+		orm := NewMockORM(t)
 		fs := newFilters(lggr, orm)
 		const filterName = "Filter"
 		const id int64 = 10
@@ -226,7 +226,7 @@ func TestFilters_UnregisterFilter(t *testing.T) {
 func TestFilters_PruneFilters(t *testing.T) {
 	lggr := logger.Sugared(logger.Test(t))
 	t.Run("Happy path", func(t *testing.T) {
-		orm := newMockORM(t)
+		orm := NewMockORM(t)
 		fs := newFilters(lggr, orm)
 		toDelete := Filter{
 			ID:        1,
@@ -249,7 +249,7 @@ func TestFilters_PruneFilters(t *testing.T) {
 		require.Len(t, fs.filtersToDelete, 0)
 	})
 	t.Run("If DB removal fails will add filters back into removal slice ", func(t *testing.T) {
-		orm := newMockORM(t)
+		orm := NewMockORM(t)
 		fs := newFilters(lggr, orm)
 		toDelete := Filter{
 			ID:        1,
@@ -283,8 +283,8 @@ func TestFilters_PruneFilters(t *testing.T) {
 	})
 }
 
-func TestFilters_matchingFilters(t *testing.T) {
-	orm := newMockORM(t)
+func TestFilters_MatchingFilters(t *testing.T) {
+	orm := NewMockORM(t)
 	lggr := logger.Sugared(logger.Test(t))
 	expectedFilter1 := Filter{
 		ID:       1,
@@ -332,7 +332,7 @@ func TestFilters_matchingFilters(t *testing.T) {
 }
 
 func TestFilters_GetFiltersToBackfill(t *testing.T) {
-	orm := newMockORM(t)
+	orm := NewMockORM(t)
 	lggr := logger.Sugared(logger.Test(t))
 	backfilledFilter := Filter{
 		ID:            1,
@@ -384,10 +384,10 @@ func TestFilters_GetFiltersToBackfill(t *testing.T) {
 	require.NoError(t, filters.RegisterFilter(tests.Context(t), notBackfilled))
 	ensureInQueue(notBackfilled)
 	// new filter is always added to the queue
-	newFilter := Filter{Name: "new filter", ID: 3}
-	orm.EXPECT().InsertFilter(mock.Anything, newFilter).Return(newFilter.ID, nil).Once()
+	newFilter := Filter{Name: "new filter"}
+	orm.EXPECT().InsertFilter(mock.Anything, newFilter).Return(3, nil).Once()
 	require.NoError(t, filters.RegisterFilter(tests.Context(t), newFilter))
-	ensureInQueue(notBackfilled, newFilter)
+	ensureInQueue(notBackfilled, Filter{ID: 3, Name: "new filter"})
 }
 
 func TestExtractField(t *testing.T) {

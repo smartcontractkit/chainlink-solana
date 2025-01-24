@@ -1,4 +1,4 @@
-package logpoller_test
+package worker_test
 
 import (
 	"context"
@@ -15,12 +15,12 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/worker"
 )
 
 func TestWorkerGroup(t *testing.T) {
 	ctx := tests.Context(t)
-	group := logpoller.NewWorkerGroup(5, logger.Nop())
+	group := worker.NewGroup(5, logger.Sugared(logger.Nop()))
 
 	require.NoError(t, group.Start(ctx))
 	t.Cleanup(func() {
@@ -55,7 +55,7 @@ func TestWorkerGroup(t *testing.T) {
 
 func TestWorkerGroup_Retry(t *testing.T) {
 	ctx := tests.Context(t)
-	group := logpoller.NewWorkerGroup(5, logger.Nop())
+	group := worker.NewGroup(5, logger.Sugared(logger.Nop()))
 
 	require.NoError(t, group.Start(ctx))
 	t.Cleanup(func() {
@@ -109,7 +109,7 @@ func TestWorkerGroup_Retry(t *testing.T) {
 
 func TestWorkerGroup_Close(t *testing.T) {
 	ctx := tests.Context(t)
-	group := logpoller.NewWorkerGroup(5, logger.Nop())
+	group := worker.NewGroup(5, logger.Sugared(logger.Nop()))
 
 	require.NoError(t, group.Start(ctx))
 
@@ -176,7 +176,7 @@ func TestWorkerGroup_Close(t *testing.T) {
 func TestWorkerGroup_DoContext(t *testing.T) {
 	t.Run("will not add to queue", func(t *testing.T) {
 		ctx := tests.Context(t)
-		group := logpoller.NewWorkerGroup(2, logger.Nop())
+		group := worker.NewGroup(2, logger.Sugared(logger.Nop()))
 		job := testJob{job: func(ctx context.Context) error { return nil }}
 
 		require.NoError(t, group.Start(ctx))
@@ -187,13 +187,13 @@ func TestWorkerGroup_DoContext(t *testing.T) {
 			// calling cancel before calling Do should result in an error
 			cancel()
 
-			require.ErrorIs(t, group.Do(ctxB, job), logpoller.ErrContextCancelled)
+			require.ErrorIs(t, group.Do(ctxB, job), worker.ErrContextCancelled)
 		})
 
 		t.Run("if queue closed", func(t *testing.T) {
 			require.NoError(t, group.Close())
 
-			require.ErrorIs(t, group.Do(ctx, job), logpoller.ErrProcessStopped)
+			require.ErrorIs(t, group.Do(ctx, job), worker.ErrProcessStopped)
 		})
 	})
 }
@@ -201,7 +201,7 @@ func TestWorkerGroup_DoContext(t *testing.T) {
 func BenchmarkWorkerGroup(b *testing.B) {
 	ctx := tests.Context(b)
 
-	group := logpoller.NewWorkerGroup(100, logger.Nop())
+	group := worker.NewGroup(100, logger.Sugared(logger.Nop()))
 	job := testJob{job: func(ctx context.Context) error { return nil }}
 
 	require.NoError(b, group.Start(ctx))

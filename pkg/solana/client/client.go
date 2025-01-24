@@ -17,6 +17,10 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 )
 
+// MaxSupportTransactionVersion defines max transaction version to return in responses.
+// If the requested block contains a transaction with a higher version, an error will be returned.
+const MaxSupportTransactionVersion = uint64(0) // (legacy + v0)
+
 const (
 	DevnetGenesisHash  = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
 	TestnetGenesisHash = "4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY"
@@ -44,6 +48,7 @@ type Reader interface {
 	GetBlockWithOpts(context.Context, uint64, *rpc.GetBlockOpts) (*rpc.GetBlockResult, error)
 	GetBlock(ctx context.Context, slot uint64) (*rpc.GetBlockResult, error)
 	GetSignaturesForAddressWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error)
+	SlotHeightWithCommitment(ctx context.Context, commitment rpc.CommitmentType) (uint64, error)
 }
 
 // AccountReader is an interface that allows users to pass either the solana rpc client or the relay client
@@ -372,12 +377,11 @@ func (c *Client) GetBlock(ctx context.Context, slot uint64) (*rpc.GetBlockResult
 	defer done()
 	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
 	defer cancel()
-
 	// Adding slot to the key so concurrent calls to GetBlock for different slots are not merged. Without including the slot,
 	// it would treat all GetBlock calls as identical and merge them, returning whichever block it fetched first to all callers.
 	key := fmt.Sprintf("GetBlockWithOpts(%d)", slot)
 	v, err, _ := c.requestGroup.Do(key, func() (interface{}, error) {
-		version := uint64(0) // pull all tx types (legacy + v0)
+		version := MaxSupportTransactionVersion
 		return c.rpc.GetBlockWithOpts(ctx, slot, &rpc.GetBlockOpts{
 			Commitment:                     c.commitment,
 			MaxSupportedTransactionVersion: &version,

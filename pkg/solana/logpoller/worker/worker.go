@@ -1,4 +1,4 @@
-package logpoller
+package worker
 
 import (
 	"context"
@@ -25,7 +25,7 @@ const (
 	DefaultNotifyRetryDepth = 200
 	// DefaultNotifyQueueDepth is the queue depth at which the worker group will log a warning.
 	DefaultNotifyQueueDepth = 100
-	// DefaultWorkerCount is the default number of workers in a WorkerGroup.
+	// DefaultWorkerCount is the default number of workers in a Group.
 	DefaultWorkerCount = 10
 )
 
@@ -38,10 +38,14 @@ type worker struct {
 
 func (w *worker) Do(ctx context.Context, job Job) {
 	if ctx.Err() == nil {
+		start := time.Now()
+		w.Lggr.Debugf("Starting job %s", job.String())
 		if err := job.Run(ctx); err != nil {
 			w.Lggr.Errorf("job %s failed with error; retrying: %s", job, err)
 			w.Retry <- job
 		}
+		// TODO: add prom metric
+		w.Lggr.Debugf("Finished job %s in %s", job.String(), time.Since(start))
 	}
 
 	// put itself back on the queue when done
@@ -51,7 +55,7 @@ func (w *worker) Do(ctx context.Context, job Job) {
 	}
 }
 
-type WorkerGroup struct {
+type Group struct {
 	// service state management
 	services.Service
 	engine *services.Engine
@@ -59,7 +63,7 @@ type WorkerGroup struct {
 	// dependencies and configuration
 	maxWorkers    int
 	maxRetryCount uint8
-	lggr          logger.Logger
+	lggr          logger.SugaredLogger
 
 	// worker group state
 	workers       chan *worker
@@ -76,8 +80,8 @@ type WorkerGroup struct {
 	retryMap map[string]retryableJob
 }
 
-func NewWorkerGroup(workers int, lggr logger.Logger) *WorkerGroup {
-	g := &WorkerGroup{
+func NewGroup(workers int, lggr logger.SugaredLogger) *Group {
+	g := &Group{
 		maxWorkers:    workers,
 		maxRetryCount: DefaultMaxRetryCount,
 		workers:       make(chan *worker, workers),
@@ -108,9 +112,9 @@ func NewWorkerGroup(workers int, lggr logger.Logger) *WorkerGroup {
 	return g
 }
 
-var _ services.Service = &WorkerGroup{}
+var _ services.Service = &Group{}
 
-func (g *WorkerGroup) start(ctx context.Context) error {
+func (g *Group) start(ctx context.Context) error {
 	g.engine.Go(g.runQueuing)
 	g.engine.Go(g.runProcessing)
 	g.engine.Go(g.runRetryQueue)
@@ -119,7 +123,7 @@ func (g *WorkerGroup) start(ctx context.Context) error {
 	return nil
 }
 
-func (g *WorkerGroup) close() error {
+func (g *Group) close() error {
 	if !g.queueClosed.Load() {
 		g.queueClosed.Store(true)
 		close(g.chStopInputs)
@@ -133,7 +137,7 @@ func (g *WorkerGroup) close() error {
 // time for the queue to open. Or a context can wrap a collection of jobs that
 // need to be run and when the context cancels, the jobs don't get added to the
 // queue.
-func (g *WorkerGroup) Do(ctx context.Context, job Job) error {
+func (g *Group) Do(ctx context.Context, job Job) error {
 	if ctx.Err() != nil {
 		return fmt.Errorf("%w; work not added to queue", ErrContextCancelled)
 	}
@@ -152,7 +156,7 @@ func (g *WorkerGroup) Do(ctx context.Context, job Job) error {
 	}
 }
 
-func (g *WorkerGroup) runQueuing(ctx context.Context) {
+func (g *Group) runQueuing(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -170,7 +174,7 @@ func (g *WorkerGroup) runQueuing(ctx context.Context) {
 	}
 }
 
-func (g *WorkerGroup) runProcessing(ctx context.Context) {
+func (g *Group) runProcessing(ctx context.Context) {
 Loop:
 	for {
 		select {
@@ -184,7 +188,7 @@ Loop:
 	}
 }
 
-func (g *WorkerGroup) runRetryQueue(ctx context.Context) {
+func (g *Group) runRetryQueue(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -198,12 +202,10 @@ func (g *WorkerGroup) runRetryQueue(ctx context.Context) {
 				retry.count++
 
 				if retry.count > g.maxRetryCount {
-					g.lggr.Errorf("job %s dropped after max retries", job)
-
-					continue
+					g.lggr.Criticalf("job %s exceeded max retries %d/%d", job, retry.count, g.maxRetryCount)
 				}
 
-				wait := calculateExponentialBackoff(retry.count)
+				wait := calculateExponentialBackoff(min(retry.count, g.maxRetryCount))
 				g.lggr.Errorf("retrying job in %dms", wait/time.Millisecond)
 
 				retry.when = time.Now().Add(wait)
@@ -230,7 +232,7 @@ func (g *WorkerGroup) runRetryQueue(ctx context.Context) {
 	}
 }
 
-func (g *WorkerGroup) runRetries(ctx context.Context) {
+func (g *Group) runRetries(ctx context.Context) {
 	for {
 		// run timer on minimum backoff
 		timer := time.NewTimer(calculateExponentialBackoff(0))
@@ -266,7 +268,7 @@ func (g *WorkerGroup) runRetries(ctx context.Context) {
 	}
 }
 
-func (g *WorkerGroup) processQueue(ctx context.Context) {
+func (g *Group) processQueue(ctx context.Context) {
 	for {
 		if g.queue.Len() == 0 {
 			break
@@ -289,7 +291,7 @@ func (g *WorkerGroup) processQueue(ctx context.Context) {
 	}
 }
 
-func (g *WorkerGroup) doJob(ctx context.Context, job Job) {
+func (g *Group) doJob(ctx context.Context, job Job) {
 	wkr := <-g.workers
 
 	go wkr.Do(ctx, job)

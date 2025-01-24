@@ -85,66 +85,6 @@ func (_c *RPCClient_GetBlockWithOpts_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
-// GetBlocks provides a mock function with given fields: ctx, startSlot, endSlot
-func (_m *RPCClient) GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64) (rpc.BlocksResult, error) {
-	ret := _m.Called(ctx, startSlot, endSlot)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetBlocks")
-	}
-
-	var r0 rpc.BlocksResult
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, *uint64) (rpc.BlocksResult, error)); ok {
-		return rf(ctx, startSlot, endSlot)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, *uint64) rpc.BlocksResult); ok {
-		r0 = rf(ctx, startSlot, endSlot)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(rpc.BlocksResult)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, uint64, *uint64) error); ok {
-		r1 = rf(ctx, startSlot, endSlot)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// RPCClient_GetBlocks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetBlocks'
-type RPCClient_GetBlocks_Call struct {
-	*mock.Call
-}
-
-// GetBlocks is a helper method to define mock.On call
-//   - ctx context.Context
-//   - startSlot uint64
-//   - endSlot *uint64
-func (_e *RPCClient_Expecter) GetBlocks(ctx interface{}, startSlot interface{}, endSlot interface{}) *RPCClient_GetBlocks_Call {
-	return &RPCClient_GetBlocks_Call{Call: _e.mock.On("GetBlocks", ctx, startSlot, endSlot)}
-}
-
-func (_c *RPCClient_GetBlocks_Call) Run(run func(ctx context.Context, startSlot uint64, endSlot *uint64)) *RPCClient_GetBlocks_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(uint64), args[2].(*uint64))
-	})
-	return _c
-}
-
-func (_c *RPCClient_GetBlocks_Call) Return(out rpc.BlocksResult, err error) *RPCClient_GetBlocks_Call {
-	_c.Call.Return(out, err)
-	return _c
-}
-
-func (_c *RPCClient_GetBlocks_Call) RunAndReturn(run func(context.Context, uint64, *uint64) (rpc.BlocksResult, error)) *RPCClient_GetBlocks_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetSignaturesForAddressWithOpts provides a mock function with given fields: _a0, _a1, _a2
 func (_m *RPCClient) GetSignaturesForAddressWithOpts(_a0 context.Context, _a1 solana.PublicKey, _a2 *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error) {
 	ret := _m.Called(_a0, _a1, _a2)
@@ -205,29 +145,27 @@ func (_c *RPCClient_GetSignaturesForAddressWithOpts_Call) RunAndReturn(run func(
 	return _c
 }
 
-// LatestBlockhash provides a mock function with given fields: ctx
-func (_m *RPCClient) LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockhashResult, error) {
-	ret := _m.Called(ctx)
+// SlotHeightWithCommitment provides a mock function with given fields: ctx, commitment
+func (_m *RPCClient) SlotHeightWithCommitment(ctx context.Context, commitment rpc.CommitmentType) (uint64, error) {
+	ret := _m.Called(ctx, commitment)
 
 	if len(ret) == 0 {
-		panic("no return value specified for LatestBlockhash")
+		panic("no return value specified for SlotHeightWithCommitment")
 	}
 
-	var r0 *rpc.GetLatestBlockhashResult
+	var r0 uint64
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (*rpc.GetLatestBlockhashResult, error)); ok {
-		return rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, rpc.CommitmentType) (uint64, error)); ok {
+		return rf(ctx, commitment)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) *rpc.GetLatestBlockhashResult); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, rpc.CommitmentType) uint64); ok {
+		r0 = rf(ctx, commitment)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*rpc.GetLatestBlockhashResult)
-		}
+		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
+	if rf, ok := ret.Get(1).(func(context.Context, rpc.CommitmentType) error); ok {
+		r1 = rf(ctx, commitment)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -235,30 +173,31 @@ func (_m *RPCClient) LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockha
 	return r0, r1
 }
 
-// RPCClient_LatestBlockhash_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LatestBlockhash'
-type RPCClient_LatestBlockhash_Call struct {
+// RPCClient_SlotHeightWithCommitment_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlotHeightWithCommitment'
+type RPCClient_SlotHeightWithCommitment_Call struct {
 	*mock.Call
 }
 
-// LatestBlockhash is a helper method to define mock.On call
+// SlotHeightWithCommitment is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *RPCClient_Expecter) LatestBlockhash(ctx interface{}) *RPCClient_LatestBlockhash_Call {
-	return &RPCClient_LatestBlockhash_Call{Call: _e.mock.On("LatestBlockhash", ctx)}
+//   - commitment rpc.CommitmentType
+func (_e *RPCClient_Expecter) SlotHeightWithCommitment(ctx interface{}, commitment interface{}) *RPCClient_SlotHeightWithCommitment_Call {
+	return &RPCClient_SlotHeightWithCommitment_Call{Call: _e.mock.On("SlotHeightWithCommitment", ctx, commitment)}
 }
 
-func (_c *RPCClient_LatestBlockhash_Call) Run(run func(ctx context.Context)) *RPCClient_LatestBlockhash_Call {
+func (_c *RPCClient_SlotHeightWithCommitment_Call) Run(run func(ctx context.Context, commitment rpc.CommitmentType)) *RPCClient_SlotHeightWithCommitment_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(context.Context), args[1].(rpc.CommitmentType))
 	})
 	return _c
 }
 
-func (_c *RPCClient_LatestBlockhash_Call) Return(out *rpc.GetLatestBlockhashResult, err error) *RPCClient_LatestBlockhash_Call {
-	_c.Call.Return(out, err)
+func (_c *RPCClient_SlotHeightWithCommitment_Call) Return(_a0 uint64, _a1 error) *RPCClient_SlotHeightWithCommitment_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *RPCClient_LatestBlockhash_Call) RunAndReturn(run func(context.Context) (*rpc.GetLatestBlockhashResult, error)) *RPCClient_LatestBlockhash_Call {
+func (_c *RPCClient_SlotHeightWithCommitment_Call) RunAndReturn(run func(context.Context, rpc.CommitmentType) (uint64, error)) *RPCClient_SlotHeightWithCommitment_Call {
 	_c.Call.Return(run)
 	return _c
 }
