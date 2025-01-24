@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	mn "github.com/smartcontractkit/chainlink-framework/multinode"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
