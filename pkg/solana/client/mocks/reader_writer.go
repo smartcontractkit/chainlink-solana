@@ -609,6 +609,66 @@ func (_c *ReaderWriter_GetLatestBlockHeight_Call) RunAndReturn(run func(context.
 	return _c
 }
 
+// GetMultipleAccountsWithOpts provides a mock function with given fields: ctx, accounts, opts
+func (_m *ReaderWriter) GetMultipleAccountsWithOpts(ctx context.Context, accounts []solana.PublicKey, opts *rpc.GetMultipleAccountsOpts) (*rpc.GetMultipleAccountsResult, error) {
+	ret := _m.Called(ctx, accounts, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetMultipleAccountsWithOpts")
+	}
+
+	var r0 *rpc.GetMultipleAccountsResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []solana.PublicKey, *rpc.GetMultipleAccountsOpts) (*rpc.GetMultipleAccountsResult, error)); ok {
+		return rf(ctx, accounts, opts)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []solana.PublicKey, *rpc.GetMultipleAccountsOpts) *rpc.GetMultipleAccountsResult); ok {
+		r0 = rf(ctx, accounts, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*rpc.GetMultipleAccountsResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []solana.PublicKey, *rpc.GetMultipleAccountsOpts) error); ok {
+		r1 = rf(ctx, accounts, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ReaderWriter_GetMultipleAccountsWithOpts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMultipleAccountsWithOpts'
+type ReaderWriter_GetMultipleAccountsWithOpts_Call struct {
+	*mock.Call
+}
+
+// GetMultipleAccountsWithOpts is a helper method to define mock.On call
+//   - ctx context.Context
+//   - accounts []solana.PublicKey
+//   - opts *rpc.GetMultipleAccountsOpts
+func (_e *ReaderWriter_Expecter) GetMultipleAccountsWithOpts(ctx interface{}, accounts interface{}, opts interface{}) *ReaderWriter_GetMultipleAccountsWithOpts_Call {
+	return &ReaderWriter_GetMultipleAccountsWithOpts_Call{Call: _e.mock.On("GetMultipleAccountsWithOpts", ctx, accounts, opts)}
+}
+
+func (_c *ReaderWriter_GetMultipleAccountsWithOpts_Call) Run(run func(ctx context.Context, accounts []solana.PublicKey, opts *rpc.GetMultipleAccountsOpts)) *ReaderWriter_GetMultipleAccountsWithOpts_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]solana.PublicKey), args[2].(*rpc.GetMultipleAccountsOpts))
+	})
+	return _c
+}
+
+func (_c *ReaderWriter_GetMultipleAccountsWithOpts_Call) Return(out *rpc.GetMultipleAccountsResult, err error) *ReaderWriter_GetMultipleAccountsWithOpts_Call {
+	_c.Call.Return(out, err)
+	return _c
+}
+
+func (_c *ReaderWriter_GetMultipleAccountsWithOpts_Call) RunAndReturn(run func(context.Context, []solana.PublicKey, *rpc.GetMultipleAccountsOpts) (*rpc.GetMultipleAccountsResult, error)) *ReaderWriter_GetMultipleAccountsWithOpts_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetSignaturesForAddressWithOpts provides a mock function with given fields: ctx, addr, opts
 func (_m *ReaderWriter) GetSignaturesForAddressWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error) {
 	ret := _m.Called(ctx, addr, opts)

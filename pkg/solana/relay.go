@@ -16,6 +16,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
@@ -147,8 +150,18 @@ func (r *Relayer) NewContractWriter(_ context.Context, config []byte) (relaytype
 	return chainwriter.NewSolanaChainWriterService(r.lggr, solanaReader, r.chain.TxManager(), r.chain.FeeEstimator(), cfg)
 }
 
-func (r *Relayer) NewContractReader(ctx context.Context, _ []byte) (relaytypes.ContractReader, error) {
-	return nil, errors.New("contract reader is not supported for solana")
+func (r *Relayer) NewContractReader(_ context.Context, chainReaderConfig []byte) (relaytypes.ContractReader, error) {
+	cfg := config.ContractReader{}
+	if err := json.Unmarshal(chainReaderConfig, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshall chain reader config err: %s", err)
+	}
+
+	accountReader, err := r.chain.Reader()
+	if err != nil {
+		return nil, fmt.Errorf("failed to init account reader err: %s", err)
+	}
+
+	return chainreader.NewChainReaderService(r.lggr, &chainreader.RPCClientWrapper{AccountReader: accountReader}, cfg)
 }
 
 func (r *Relayer) NewMedianProvider(ctx context.Context, rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MedianProvider, error) {
