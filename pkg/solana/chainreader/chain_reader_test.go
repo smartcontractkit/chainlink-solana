@@ -294,7 +294,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			{
 				name: "happy path",
 				pdaDefinition: codec.PDATypeDef{
-					Prefix: prefixString,
+					Prefix: []byte(prefixString),
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
@@ -315,7 +315,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			{
 				name: "with modifier and random field",
 				pdaDefinition: codec.PDATypeDef{
-					Prefix: prefixString,
+					Prefix: []byte(prefixString),
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
@@ -340,7 +340,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			{
 				name: "only prefix",
 				pdaDefinition: codec.PDATypeDef{
-					Prefix: prefixString,
+					Prefix: []byte(prefixString),
 				},
 				expected: mustFindProgramAddress(t, programID, [][]byte{[]byte(prefixString)}),
 				params:   nil,
@@ -348,7 +348,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			{
 				name: "no prefix",
 				pdaDefinition: codec.PDATypeDef{
-					Prefix: "",
+					Prefix: nil,
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
@@ -369,7 +369,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			{
 				name: "public key seed provided as bytes",
 				pdaDefinition: codec.PDATypeDef{
-					Prefix: prefixString,
+					Prefix: []byte(prefixString),
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
@@ -429,7 +429,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			ChainSpecificName: testutils.TestStructWithNestedStruct,
 			ReadType:          config.Account,
 			PDADefiniton: codec.PDATypeDef{
-				Prefix: prefixString,
+				Prefix: []byte(prefixString),
 				Seeds: []codec.PDASeed{
 					{
 						Name: "PubKey",

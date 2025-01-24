@@ -298,7 +298,7 @@ func (s *SolanaChainReaderService) addAccountRead(namespace string, genericName 
 		reader = newAccountReadBinding(namespace, genericName, readDefinition.PDADefiniton.Prefix, true)
 	} else {
 		inputAccountIDLDef = codec.NilIdlTypeDefTy
-		reader = newAccountReadBinding(namespace, genericName, "", false)
+		reader = newAccountReadBinding(namespace, genericName, nil, false)
 	}
 	if err := s.addCodecDef(true, namespace, genericName, codec.ChainConfigTypeAccountDef, idl, inputAccountIDLDef, readDefinition.InputModifications); err != nil {
 		return err

@@ -17,10 +17,10 @@ type accountReadBinding struct {
 	codec                  types.RemoteCodec
 	key                    solana.PublicKey
 	isPda                  bool   // flag to signify whether or not the account read is for a PDA
-	prefix                 string // only used for PDA public key calculation
+	prefix                 []byte // only used for PDA public key calculation
 }
 
-func newAccountReadBinding(namespace, genericName, prefix string, isPda bool) *accountReadBinding {
+func newAccountReadBinding(namespace, genericName string, prefix []byte, isPda bool) *accountReadBinding {
 	return &accountReadBinding{
 		namespace:   namespace,
 		genericName: genericName,
@@ -68,7 +68,7 @@ func (b *accountReadBinding) Decode(ctx context.Context, bts []byte, outVal any)
 func (b *accountReadBinding) buildSeedsSlice(ctx context.Context, params any) ([][]byte, error) {
 	flattenedSeeds := make([]byte, 0, solana.MaxSeeds*solana.MaxSeedLength)
 	// Append the static prefix string first
-	flattenedSeeds = append(flattenedSeeds, []byte(b.prefix)...)
+	flattenedSeeds = append(flattenedSeeds, b.prefix...)
 	// Encode the seeds provided in the params
 	encodedParamSeeds, err := b.codec.Encode(ctx, params, codec.WrapItemType(true, b.namespace, b.genericName, ""))
 	if err != nil {

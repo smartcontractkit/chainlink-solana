@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -30,14 +31,13 @@ import (
 	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-
 	contract "github.com/smartcontractkit/chainlink-solana/contracts/generated/contract_reader_interface"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
@@ -51,7 +51,7 @@ func TestChainComponents(t *testing.T) {
 
 	t.Run("RunChainComponentsSolanaTests", func(t *testing.T) {
 		t.Parallel()
-		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper}
+		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}}
 		DisableTests(it)
 		it.Setup(t)
 		RunChainComponentsSolanaTests(t, it)
@@ -59,7 +59,7 @@ func TestChainComponents(t *testing.T) {
 
 	t.Run("RunChainComponentsInLoopSolanaTests", func(t *testing.T) {
 		t.Parallel()
-		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper}
+		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}}
 		DisableTests(it)
 		wrapped := commontestutils.WrapContractReaderTesterForLoop(it)
 		wrapped.Setup(t)
@@ -101,17 +101,17 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 	})
 }
 
-func RunChainComponentsSolanaTests[T TestingT[T]](t T, it *SolanaChainComponentsInterfaceTester[T]) {
+func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInterfaceTester[T]) {
 	RunContractReaderSolanaTests(t, it)
 	// Add ChainWriter tests here
 }
 
-func RunChainComponentsInLoopSolanaTests[T TestingT[T]](t T, it ChainComponentsInterfaceTester[T]) {
+func RunChainComponentsInLoopSolanaTests[T WrappedTestingT[T]](t T, it ChainComponentsInterfaceTester[T]) {
 	RunContractReaderInLoopTests(t, it)
 	// Add ChainWriter tests here
 }
 
-func RunContractReaderSolanaTests[T TestingT[T]](t T, it *SolanaChainComponentsInterfaceTester[T]) {
+func RunContractReaderSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInterfaceTester[T]) {
 	RunContractReaderInterfaceTests(t, it, false, true)
 
 	var testCases []Testcase[T]
@@ -119,7 +119,7 @@ func RunContractReaderSolanaTests[T TestingT[T]](t T, it *SolanaChainComponentsI
 	RunTests(t, it, testCases)
 }
 
-func RunContractReaderInLoopTests[T TestingT[T]](t T, it ChainComponentsInterfaceTester[T]) {
+func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsInterfaceTester[T]) {
 	RunContractReaderInterfaceTests(t, it, false, true)
 
 	var testCases []Testcase[T]
@@ -127,96 +127,34 @@ func RunContractReaderInLoopTests[T TestingT[T]](t T, it ChainComponentsInterfac
 	RunTests(t, it, testCases)
 }
 
-type SolanaChainComponentsInterfaceTesterHelper[T TestingT[T]] interface {
+type SolanaChainComponentsInterfaceTesterHelper[T WrappedTestingT[T]] interface {
 	Init(t T)
 	RPCClient() *chainreader.RPCClientWrapper
 	Context(t T) context.Context
 	Logger(t T) logger.Logger
 	GetJSONEncodedIDL(t T) []byte
-	CreateAccount(t T, it SolanaChainComponentsInterfaceTester[T], value uint64) solana.PublicKey
+	CreateAccount(t T, it SolanaChainComponentsInterfaceTester[T], contractName string, value uint64) solana.PublicKey
 	TXM() *txm.TxManager
 	SolanaClient() *client.Client
 }
 
-type SolanaChainComponentsInterfaceTester[T TestingT[T]] struct {
-	TestSelectionSupport
-	Helper               SolanaChainComponentsInterfaceTesterHelper[T]
-	cr                   *chainreader.SolanaChainReaderService
-	contractReaderConfig config.ContractReader
-	chainWriterConfig    chainwriter.ChainWriterConfig
+type WrappedTestingT[T any] interface {
+	TestingT[T]
+	Name() string
 }
 
+type SolanaChainComponentsInterfaceTester[T WrappedTestingT[T]] struct {
+	TestSelectionSupport
+	Helper        SolanaChainComponentsInterfaceTesterHelper[T]
+	testContext   map[string]uint64
+	testContextMu *sync.RWMutex
+	testIdx       *atomic.Uint64
+}
+
+// ContractReaderConfig and ContractWriterConfig are created when GetContractReader and GetContractWriter are called, respectively,
+// so that a test index can be injected as a PDA seed for each test
 func (it *SolanaChainComponentsInterfaceTester[T]) Setup(t T) {
 	t.Cleanup(func() {})
-
-	it.contractReaderConfig = config.ContractReader{
-		Namespaces: map[string]config.ChainContractReader{
-			AnyContractName: {
-				IDL: mustUnmarshalIDL(t, string(it.Helper.GetJSONEncodedIDL(t))),
-				Reads: map[string]config.ReadDefinition{
-					MethodReturningUint64: {
-						ChainSpecificName: "DataAccount",
-						ReadType:          config.Account,
-						OutputModifications: commoncodec.ModifiersConfig{
-							&commoncodec.PropertyExtractorConfig{FieldName: "U64Value"},
-						},
-					},
-					MethodReturningUint64Slice: {
-						ChainSpecificName: "DataAccount",
-						OutputModifications: commoncodec.ModifiersConfig{
-							&commoncodec.PropertyExtractorConfig{FieldName: "U64Slice"},
-						},
-					},
-				},
-			},
-			AnySecondContractName: {
-				IDL: mustUnmarshalIDL(t, string(it.Helper.GetJSONEncodedIDL(t))),
-				Reads: map[string]config.ReadDefinition{
-					MethodReturningUint64: {
-						ChainSpecificName: "DataAccount",
-						OutputModifications: commoncodec.ModifiersConfig{
-							&commoncodec.PropertyExtractorConfig{FieldName: "U64Value"},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	it.chainWriterConfig = chainwriter.ChainWriterConfig{
-		Programs: map[string]chainwriter.ProgramConfig{
-			AnyContractName: {
-				IDL: string(it.Helper.GetJSONEncodedIDL(t)),
-				Methods: map[string]chainwriter.MethodConfig{
-					"initialize": {
-						FromAddress:        solana.MustPrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1]).PublicKey().String(),
-						InputModifications: nil,
-						ChainSpecificName:  "initialize",
-						LookupTables:       chainwriter.LookupTables{},
-						Accounts: []chainwriter.Lookup{
-							chainwriter.PDALookups{
-								Name: "Account",
-								PublicKey: chainwriter.AccountConstant{
-									Name:    "ProgramID",
-									Address: programPubKey,
-								},
-								Seeds: []chainwriter.Seed{
-									{Static: []byte("data")},
-									{Dynamic: chainwriter.AccountLookup{
-										Name:     "TestIDX",
-										Location: "TestIdx",
-									}},
-								},
-								IsWritable: true,
-								IsSigner:   false,
-							},
-						},
-						DebugIDLocation: "",
-					},
-				},
-			},
-		},
-	}
 }
 
 func (it *SolanaChainComponentsInterfaceTester[T]) Name() string {
@@ -232,34 +170,40 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GetAccountString(i int) strin
 }
 
 func (it *SolanaChainComponentsInterfaceTester[T]) GetContractReader(t T) types.ContractReader {
-	ctx := it.Helper.Context(t)
-	if it.cr != nil {
-		return it.cr
-	}
-
-	svc, err := chainreader.NewChainReaderService(it.Helper.Logger(t), it.Helper.RPCClient(), it.contractReaderConfig)
+	contractReaderConfig := it.buildContractReaderConfig(t)
+	svc, err := chainreader.NewChainReaderService(it.Helper.Logger(t), it.Helper.RPCClient(), contractReaderConfig)
 
 	require.NoError(t, err)
-	require.NoError(t, svc.Start(ctx))
-
-	it.cr = svc
+	servicetest.Run(t, svc)
 
 	return svc
 }
 
 func (it *SolanaChainComponentsInterfaceTester[T]) GetContractWriter(t T) types.ContractWriter {
-	cw, err := chainwriter.NewSolanaChainWriterService(it.Helper.Logger(t), it.Helper.SolanaClient(), *it.Helper.TXM(), nil, it.chainWriterConfig)
+	chainWriterConfig := it.buildContractWriterConfig(t)
+	cw, err := chainwriter.NewSolanaChainWriterService(it.Helper.Logger(t), it.Helper.SolanaClient(), *it.Helper.TXM(), nil, chainWriterConfig)
 	require.NoError(t, err)
 
 	servicetest.Run(t, cw)
 	return cw
 }
 
+func (it *SolanaChainComponentsInterfaceTester[T]) getTestIdx(name string) uint64 {
+	it.testContextMu.Lock()
+	defer it.testContextMu.Unlock()
+	idx, exists := it.testContext[name]
+	if !exists {
+		idx = it.testIdx.Add(1)    // new index is needed so increment the existing
+		it.testContext[name] = idx // set new index in map
+	}
+	return idx
+}
+
 func (it *SolanaChainComponentsInterfaceTester[T]) GetBindings(t T) []types.BoundContract {
 	// Create a new account with fresh state for each test
 	return []types.BoundContract{
-		{Name: AnyContractName, Address: it.Helper.CreateAccount(t, *it, AnyValueToReadWithoutAnArgument).String()},
-		{Name: AnySecondContractName, Address: it.Helper.CreateAccount(t, *it, AnyDifferentValueToReadWithoutAnArgument).String()},
+		{Name: AnyContractName, Address: it.Helper.CreateAccount(t, *it, AnyContractName, AnyValueToReadWithoutAnArgument).String()},
+		{Name: AnySecondContractName, Address: it.Helper.CreateAccount(t, *it, AnySecondContractName, AnyDifferentValueToReadWithoutAnArgument).String()},
 	}
 }
 
@@ -280,8 +224,6 @@ type helper struct {
 	rpcClient *rpc.Client
 	wsClient  *ws.Client
 	idlBts    []byte
-	nonce     uint64
-	nonceMu   sync.Mutex
 	txm       txm.TxManager
 	sc        *client.Client
 }
@@ -371,24 +313,11 @@ func (h *helper) GetJSONEncodedIDL(t *testing.T) []byte {
 	return h.idlBts
 }
 
-func (h *helper) CreateAccount(t *testing.T, it SolanaChainComponentsInterfaceTester[*testing.T], value uint64) solana.PublicKey {
+func (h *helper) CreateAccount(t *testing.T, it SolanaChainComponentsInterfaceTester[*testing.T], contractName string, value uint64) solana.PublicKey {
 	t.Helper()
 
-	// avoid collisions in parallel tests
-	h.nonceMu.Lock()
-	h.nonce++
-	nonce := h.nonce
-	h.nonceMu.Unlock()
-
-	bts := make([]byte, 8)
-	binary.LittleEndian.PutUint64(bts, nonce*value)
-
-	pubKey, _, err := solana.FindProgramAddress([][]byte{[]byte("data"), bts}, h.programID)
-	require.NoError(t, err)
-
-	h.runInitialize(t, it, nonce, value)
-
-	return pubKey
+	h.runInitialize(t, it, contractName, value)
+	return h.programID
 }
 
 type InitializeArgs struct {
@@ -399,25 +328,115 @@ type InitializeArgs struct {
 func (h *helper) runInitialize(
 	t *testing.T,
 	it SolanaChainComponentsInterfaceTester[*testing.T],
-	nonce uint64,
+	contractName string,
 	value uint64,
 ) {
 	t.Helper()
 
 	cw := it.GetContractWriter(t)
 
-	args := InitializeArgs{
-		TestIdx: nonce * value,
-		Value:   value,
+	// Fetch test index from map 
+	it.testContextMu.RLock()
+	defer it.testContextMu.RUnlock()
+	testIdx, exists := it.testContext[t.Name()]
+	if !exists {
+		return
 	}
 
-	buf := make([]byte, 8)
-	binary.LittleEndian.PutUint64(buf, nonce*value)
+	args := InitializeArgs{
+		TestIdx: testIdx,
+		Value: value,
+	}
 
-	SubmitTransactionToCW(t, &it, cw, "initialize", args, types.BoundContract{Name: AnyContractName, Address: h.programID.String()}, types.Finalized)
+	SubmitTransactionToCW(t, &it, cw, "initialize", args, types.BoundContract{Name: contractName, Address: h.programID.String()}, types.Finalized)
 }
 
-func mustUnmarshalIDL[T TestingT[T]](t T, rawIDL string) codec.IDL {
+func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T) config.ContractReader {
+	idx := it.getTestIdx(t.Name())
+	pdaPrefix := []byte("data")
+	pdaPrefix = binary.LittleEndian.AppendUint64(pdaPrefix, idx)
+	return config.ContractReader{
+		Namespaces: map[string]config.ChainContractReader{
+			AnyContractName: {
+				IDL: mustUnmarshalIDL(t, string(it.Helper.GetJSONEncodedIDL(t))),
+				Reads: map[string]config.ReadDefinition{
+					MethodReturningUint64: {
+						ChainSpecificName: "DataAccount",
+						ReadType:          config.Account,
+						PDADefiniton: codec.PDATypeDef{
+							Prefix: pdaPrefix,
+						},
+						OutputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.PropertyExtractorConfig{FieldName: "U64Value"},
+						},
+					},
+					MethodReturningUint64Slice: {
+						ChainSpecificName: "DataAccount",
+						PDADefiniton: codec.PDATypeDef{
+							Prefix: pdaPrefix,
+						},
+						OutputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.PropertyExtractorConfig{FieldName: "U64Slice"},
+						},
+					},
+				},
+			},
+			AnySecondContractName: {
+				IDL: mustUnmarshalIDL(t, string(it.Helper.GetJSONEncodedIDL(t))),
+				Reads: map[string]config.ReadDefinition{
+					MethodReturningUint64: {
+						ChainSpecificName: "DataAccount",
+						PDADefiniton: codec.PDATypeDef{
+							Prefix: pdaPrefix,
+						},
+						OutputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.PropertyExtractorConfig{FieldName: "U64Value"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+}
+
+func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T) chainwriter.ChainWriterConfig {
+	idx := it.getTestIdx(t.Name())
+	testIdx := binary.LittleEndian.AppendUint64([]byte{}, idx)
+	return chainwriter.ChainWriterConfig{
+		Programs: map[string]chainwriter.ProgramConfig{
+			AnyContractName: {
+				IDL: string(it.Helper.GetJSONEncodedIDL(t)),
+				Methods: map[string]chainwriter.MethodConfig{
+					"initialize": {
+						FromAddress:        solana.MustPrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1]).PublicKey().String(),
+						InputModifications: nil,
+						ChainSpecificName:  "initialize",
+						LookupTables:       chainwriter.LookupTables{},
+						Accounts: []chainwriter.Lookup{
+							chainwriter.PDALookups{
+								Name: "Account",
+								PublicKey: chainwriter.AccountConstant{
+									Name:    "ProgramID",
+									Address: programPubKey,
+								},
+								Seeds: []chainwriter.Seed{
+									{Static: []byte("data")},
+									{Static: testIdx},
+								},
+								IsWritable: true,
+								IsSigner:   false,
+							},
+						},
+						DebugIDLocation: "",
+					},
+				},
+			},
+		},
+	}
+}
+
+func mustUnmarshalIDL[T WrappedTestingT[T]](t T, rawIDL string) codec.IDL {
 	var idl codec.IDL
 	if err := json.Unmarshal([]byte(rawIDL), &idl); err != nil {
 		t.Errorf("failed to unmarshal test IDL", err)
