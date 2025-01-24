@@ -114,6 +114,67 @@ func (_c *MockORM_DeleteFilters_Call) RunAndReturn(run func(context.Context, map
 	return _c
 }
 
+// FilteredLogs provides a mock function with given fields: ctx, queryFilter, limitAndSort, queryName
+func (_m *MockORM) FilteredLogs(ctx context.Context, queryFilter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]Log, error) {
+	ret := _m.Called(ctx, queryFilter, limitAndSort, queryName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FilteredLogs")
+	}
+
+	var r0 []Log
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []query.Expression, query.LimitAndSort, string) ([]Log, error)); ok {
+		return rf(ctx, queryFilter, limitAndSort, queryName)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []query.Expression, query.LimitAndSort, string) []Log); ok {
+		r0 = rf(ctx, queryFilter, limitAndSort, queryName)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]Log)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []query.Expression, query.LimitAndSort, string) error); ok {
+		r1 = rf(ctx, queryFilter, limitAndSort, queryName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockORM_FilteredLogs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FilteredLogs'
+type MockORM_FilteredLogs_Call struct {
+	*mock.Call
+}
+
+// FilteredLogs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - queryFilter []query.Expression
+//   - limitAndSort query.LimitAndSort
+//   - queryName string
+func (_e *MockORM_Expecter) FilteredLogs(ctx interface{}, queryFilter interface{}, limitAndSort interface{}, queryName interface{}) *MockORM_FilteredLogs_Call {
+	return &MockORM_FilteredLogs_Call{Call: _e.mock.On("FilteredLogs", ctx, queryFilter, limitAndSort, queryName)}
+}
+
+func (_c *MockORM_FilteredLogs_Call) Run(run func(ctx context.Context, queryFilter []query.Expression, limitAndSort query.LimitAndSort, queryName string)) *MockORM_FilteredLogs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]query.Expression), args[2].(query.LimitAndSort), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *MockORM_FilteredLogs_Call) Return(_a0 []Log, _a1 error) *MockORM_FilteredLogs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockORM_FilteredLogs_Call) RunAndReturn(run func(context.Context, []query.Expression, query.LimitAndSort, string) ([]Log, error)) *MockORM_FilteredLogs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetLatestBlock provides a mock function with given fields: ctx
 func (_m *MockORM) GetLatestBlock(ctx context.Context) (int64, error) {
 	ret := _m.Called(ctx)
@@ -166,67 +227,6 @@ func (_c *MockORM_GetLatestBlock_Call) Return(_a0 int64, _a1 error) *MockORM_Get
 }
 
 func (_c *MockORM_GetLatestBlock_Call) RunAndReturn(run func(context.Context) (int64, error)) *MockORM_GetLatestBlock_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// FilteredLogs provides a mock function with given fields: ctx, queryFilter, limitAndSort, queryName
-func (_m *mockORM) FilteredLogs(ctx context.Context, queryFilter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]Log, error) {
-	ret := _m.Called(ctx, queryFilter, limitAndSort, queryName)
-
-	if len(ret) == 0 {
-		panic("no return value specified for FilteredLogs")
-	}
-
-	var r0 []Log
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []query.Expression, query.LimitAndSort, string) ([]Log, error)); ok {
-		return rf(ctx, queryFilter, limitAndSort, queryName)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, []query.Expression, query.LimitAndSort, string) []Log); ok {
-		r0 = rf(ctx, queryFilter, limitAndSort, queryName)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]Log)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, []query.Expression, query.LimitAndSort, string) error); ok {
-		r1 = rf(ctx, queryFilter, limitAndSort, queryName)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// mockORM_FilteredLogs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FilteredLogs'
-type mockORM_FilteredLogs_Call struct {
-	*mock.Call
-}
-
-// FilteredLogs is a helper method to define mock.On call
-//   - ctx context.Context
-//   - queryFilter []query.Expression
-//   - limitAndSort query.LimitAndSort
-//   - queryName string
-func (_e *mockORM_Expecter) FilteredLogs(ctx interface{}, queryFilter interface{}, limitAndSort interface{}, queryName interface{}) *mockORM_FilteredLogs_Call {
-	return &mockORM_FilteredLogs_Call{Call: _e.mock.On("FilteredLogs", ctx, queryFilter, limitAndSort, queryName)}
-}
-
-func (_c *mockORM_FilteredLogs_Call) Run(run func(ctx context.Context, queryFilter []query.Expression, limitAndSort query.LimitAndSort, queryName string)) *mockORM_FilteredLogs_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].([]query.Expression), args[2].(query.LimitAndSort), args[3].(string))
-	})
-	return _c
-}
-
-func (_c *mockORM_FilteredLogs_Call) Return(_a0 []Log, _a1 error) *mockORM_FilteredLogs_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *mockORM_FilteredLogs_Call) RunAndReturn(run func(context.Context, []query.Expression, query.LimitAndSort, string) ([]Log, error)) *mockORM_FilteredLogs_Call {
 	_c.Call.Return(run)
 	return _c
 }
