@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	clcommontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
@@ -25,6 +26,30 @@ import (
 type verifyTxSize struct {
 	t *testing.T
 	s *solana.PrivateKey
+}
+
+func (txm verifyTxSize) Start(ctx context.Context) error {
+	panic("implement me")
+}
+
+func (txm verifyTxSize) Close() error {
+	panic("implement me")
+}
+
+func (txm verifyTxSize) Ready() error {
+	panic("implement me")
+}
+
+func (txm verifyTxSize) HealthReport() map[string]error {
+	panic("implement me")
+}
+
+func (txm verifyTxSize) Name() string {
+	panic("implement me")
+}
+
+func (txm verifyTxSize) GetTransactionStatus(ctx context.Context, transactionID string) (clcommontypes.TransactionStatus, error) {
+	panic("implement me")
 }
 
 func (txm verifyTxSize) Enqueue(_ context.Context, _ string, tx *solana.Transaction, txID *string, _ uint64, _ ...txmutils.SetTxConfig) error {
