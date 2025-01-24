@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	mn "github.com/smartcontractkit/chainlink-framework/multinode"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -48,6 +49,7 @@ type Chain interface {
 	Config() config.Config
 	LogPoller() LogPoller
 	TxManager() TxManager
+	FeeEstimator() fees.Estimator
 	// Reader returns a new Reader from the available list of nodes (if there are multiple, it will randomly select one)
 	Reader() (client.Reader, error)
 }
@@ -419,6 +421,10 @@ func (c *chain) LogPoller() LogPoller {
 
 func (c *chain) TxManager() TxManager {
 	return c.txm
+}
+
+func (c *chain) FeeEstimator() fees.Estimator {
+	return c.txm.FeeEstimator()
 }
 
 func (c *chain) Reader() (client.Reader, error) {

@@ -25,6 +25,8 @@ import (
 var _ TxManager = (*txm.Txm)(nil)
 
 type TxManager interface {
+	services.Service
+
 	// Enqueue adds a tx to the txm queue for processing and submitting to the Solana network.
 	// An error is returned if the txm is not ready, if the tx is invalid, or if the queue is full.
 	//
@@ -34,6 +36,7 @@ type TxManager interface {
 	// - If a txID is provided, it will be used to identify the tx. Otherwise, a random UUID will be generated.
 	// - The caller needs to set the tx.Message.RecentBlockhash and provide the corresponding lastValidBlockHeight. These values are obtained from the GetLatestBlockhash RPC call.
 	Enqueue(ctx context.Context, accountID string, tx *solana.Transaction, txID *string, lastValidBlockHeight uint64, txCfgs ...txmutils.SetTxConfig) error
+	GetTransactionStatus(ctx context.Context, transactionID string) (relaytypes.TransactionStatus, error)
 }
 
 var _ relaytypes.Relayer = &Relayer{} //nolint:staticcheck
@@ -130,8 +133,18 @@ func (r *Relayer) NewConfigProvider(ctx context.Context, args relaytypes.RelayAr
 	return configWatcher, err
 }
 
-func (r *Relayer) NewContractWriter(_ context.Context, _ []byte) (relaytypes.ContractWriter, error) {
-	return nil, errors.New("contract writer is not supported for solana")
+func (r *Relayer) NewContractWriter(_ context.Context, config []byte) (relaytypes.ContractWriter, error) {
+	cfg := chainwriter.ChainWriterConfig{}
+	if err := json.Unmarshal(config, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshall chain writer config err: %s", err)
+	}
+
+	solanaReader, err := r.chain.Reader()
+	if err != nil {
+		return nil, fmt.Errorf("failed to init solana reader err: %s", err)
+	}
+
+	return chainwriter.NewSolanaChainWriterService(r.lggr, solanaReader, r.chain.TxManager(), r.chain.FeeEstimator(), cfg)
 }
 
 func (r *Relayer) NewContractReader(ctx context.Context, _ []byte) (relaytypes.ContractReader, error) {
