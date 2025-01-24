@@ -157,16 +157,9 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 			return err
 		}
 
-		// TODO isn't discrimintaor already checked above in MatchingFiltersForEncodedEvent?
-		if len(log.Data) < 8 {
-			err = fmt.Errorf("assumption violation: %w, log.Data=%s", ErrMissingDiscriminator, log.Data)
-			lp.lggr.Criticalw(err.Error())
-			return err
-		}
-
 		log.SubkeyValues = make([]IndexedValue, 0, len(filter.SubkeyPaths))
 		for _, path := range filter.SubkeyPaths {
-			subKeyVal, decodeSubKeyErr := lp.filters.DecodeSubKey(ctx, log.Data, filter.ID, path)
+			subKeyVal, decodeSubKeyErr := lp.filters.DecodeSubKey(ctx, lp.lggr, log.Data, filter.ID, path)
 			if decodeSubKeyErr != nil {
 				return decodeSubKeyErr
 			}

@@ -31,7 +31,7 @@ type filters struct {
 	filtersMutex           sync.RWMutex
 	loadedFilters          atomic.Bool
 	knownPrograms          map[string]uint // fast lookup to see if a base58-encoded ProgramID matches any registered filters
-	knownDiscriminators    map[string]uint // fast lookup by first 10 characters (60-bits) of a base64-encoded discriminator
+	knownDiscriminators    map[string]uint // fast lookup based on raw discriminator bytes as string
 	seqNums                map[int64]int64
 	decoders               map[int64]Decoder
 	discriminatorExtractor codec.DiscriminatorExtractor
@@ -231,13 +231,13 @@ func (fl *filters) removeFilterFromIndexes(filter Filter) {
 		}
 	}
 
-	discriminatorHead := filter.DiscriminatorRawBytes()
-	if refcount, ok := fl.knownDiscriminators[discriminatorHead]; ok {
+	discriminator := filter.DiscriminatorRawBytes()
+	if refcount, ok := fl.knownDiscriminators[discriminator]; ok {
 		refcount--
 		if refcount > 0 {
-			fl.knownDiscriminators[discriminatorHead] = refcount
+			fl.knownDiscriminators[discriminator] = refcount
 		} else {
-			delete(fl.knownDiscriminators, discriminatorHead)
+			delete(fl.knownDiscriminators, discriminator)
 		}
 	}
 }
@@ -449,7 +449,7 @@ func (fl *filters) LoadFilters(ctx context.Context) error {
 // DecodeSubKey accepts raw Borsh-encoded event data, a filter ID and a subkeyPath. It uses the decoder
 // associated with that filter to decode the event and extract the subkey value from the specified subKeyPath.
 // WARNING: not thread safe, should only be called while fl.filtersMutex is held and after filters have been loaded.
-func (fl *filters) DecodeSubKey(ctx context.Context, raw []byte, ID int64, subKeyPath []string) (any, error) {
+func (fl *filters) DecodeSubKey(ctx context.Context, lggr logger.SugaredLogger, raw []byte, ID int64, subKeyPath []string) (any, error) {
 	filter, ok := fl.filtersByID[ID]
 	if !ok {
 		return nil, fmt.Errorf("filter %d not found", ID)
@@ -462,8 +462,9 @@ func (fl *filters) DecodeSubKey(ctx context.Context, raw []byte, ID int64, subKe
 	if err != nil || decodedEvent == nil {
 		return nil, err
 	}
-	err = decoder.Decode(ctx, raw, decodedEvent, filter.EventName)
-	if err != nil {
+	if err = decoder.Decode(ctx, raw, decodedEvent, filter.EventName); err != nil {
+		err = fmt.Errorf("failed to decode sub key raw data: %v, for filter: %s, for subKeyPath: %v, err: %w", raw, subKeyPath, filter.Name, err)
+		lggr.Criticalw(err.Error())
 		return nil, err
 	}
 	return ExtractField(decodedEvent, subKeyPath)

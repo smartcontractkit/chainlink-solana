@@ -26,7 +26,7 @@ func (f Filter) MatchSameLogs(other Filter) bool {
 		f.EventIdl.Equal(other.EventIdl) && f.SubkeyPaths.Equal(other.SubkeyPaths)
 }
 
-// DiscriminatorRawBytes returns raw discriminator bytes as a string, this string is not base64 encoded.
+// DiscriminatorRawBytes returns raw discriminator bytes as a string, this string is not base64 encoded and is always len of discriminator which is 8.
 func (f Filter) DiscriminatorRawBytes() string {
 	return string(codec.NewDiscriminatorHashPrefix(f.EventName, false))
 }
