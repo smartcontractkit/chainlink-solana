@@ -34,7 +34,7 @@ func (e *encoder) Encode(ctx context.Context, item any, itemType string) (res []
 	}()
 
 	if e.lenientCodecFromTypeCodec == nil {
-		return nil, fmt.Errorf("encoder is not properly initalised, underlying lenientCodecFromTypeCodec is nil")
+		return nil, fmt.Errorf("encoder is not properly initialised, underlying lenientCodecFromTypeCodec is nil")
 	}
 
 	return e.lenientCodecFromTypeCodec.Encode(ctx, item, itemType)
@@ -42,7 +42,7 @@ func (e *encoder) Encode(ctx context.Context, item any, itemType string) (res []
 
 func (e *encoder) GetMaxEncodingSize(_ context.Context, n int, itemType string) (int, error) {
 	if e.definitions == nil {
-		return 0, fmt.Errorf("encoder is not properly initalised, type definitions are nil")
+		return 0, fmt.Errorf("encoder is not properly initialised, type definitions are nil")
 	}
 
 	entry, ok := e.definitions[itemType]

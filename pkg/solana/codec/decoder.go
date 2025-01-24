@@ -34,7 +34,7 @@ func (d *decoder) Decode(ctx context.Context, raw []byte, into any, itemType str
 	}()
 
 	if d.lenientCodecFromTypeCodec == nil {
-		return fmt.Errorf("decoder is not properly initalised, underlying lenientCodecFromTypeCodec is nil")
+		return fmt.Errorf("decoder is not properly initialised, underlying lenientCodecFromTypeCodec is nil")
 	}
 
 	return d.lenientCodecFromTypeCodec.Decode(ctx, raw, into, itemType)
@@ -42,7 +42,7 @@ func (d *decoder) Decode(ctx context.Context, raw []byte, into any, itemType str
 
 func (d *decoder) GetMaxDecodingSize(_ context.Context, n int, itemType string) (int, error) {
 	if d.definitions == nil {
-		return 0, fmt.Errorf("decoder is not properly initalised, type definitions are nil")
+		return 0, fmt.Errorf("decoder is not properly initialised, type definitions are nil")
 	}
 
 	codecEntry, ok := d.definitions[itemType]
