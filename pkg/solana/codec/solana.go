@@ -50,8 +50,8 @@ const (
 var DecoderHooks = []mapstructure.DecodeHookFunc{commoncodec.EpochToTimeHook, commoncodec.BigIntHook, commoncodec.SliceToArrayVerifySizeHook}
 
 type solanaCodec struct {
-	*Encoder
-	*Decoder
+	commontypes.Encoder
+	commontypes.Decoder
 	*ParsedTypes
 }
 
