@@ -46,7 +46,7 @@ type filtersI interface {
 	GetFiltersToBackfill() []Filter
 	MarkFilterBackfilled(ctx context.Context, filterID int64) error
 	MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[Filter]
-	DecodeSubKey(ctx context.Context, raw []byte, ID int64, subKeyPath []string) (any, error)
+	DecodeSubKey(ctx context.Context, lggr logger.SugaredLogger, raw []byte, ID int64, subKeyPath []string) (any, error)
 	IncrementSeqNum(filterID int64) int64
 }
 
@@ -152,24 +152,18 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 			TxHash:         Signature(blockData.TransactionHash),
 		}
 
-		eventData, decodeErr := base64.StdEncoding.DecodeString(programEvent.Data)
-		if decodeErr != nil {
-			return decodeErr
-		}
-		if len(eventData) < 8 {
-			err = fmt.Errorf("Assumption violation: %w, log.Data=%s", ErrMissingDiscriminator, log.Data)
-			lp.lggr.Criticalw(err.Error())
+		log.Data, err = base64.StdEncoding.DecodeString(programEvent.Data)
+		if err != nil {
 			return err
 		}
-		log.Data = eventData[8:]
 
 		log.SubkeyValues = make([]IndexedValue, 0, len(filter.SubkeyPaths))
 		for _, path := range filter.SubkeyPaths {
-			subKeyVal, decodeSubKeyErr := lp.filters.DecodeSubKey(ctx, log.Data, filter.ID, path)
+			subKeyVal, decodeSubKeyErr := lp.filters.DecodeSubKey(ctx, lp.lggr, log.Data, filter.ID, path)
 			if decodeSubKeyErr != nil {
 				return decodeSubKeyErr
 			}
-			indexedVal, newIndexedValErr := NewIndexedValue(subKeyVal)
+			indexedVal, newIndexedValErr := newIndexedValue(subKeyVal)
 			if newIndexedValErr != nil {
 				return newIndexedValErr
 			}

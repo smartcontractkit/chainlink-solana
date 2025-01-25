@@ -7,6 +7,8 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
 func newRandomPublicKey(t *testing.T) PublicKey {
@@ -36,7 +38,7 @@ func newRandomLog(t *testing.T, filterID int64, chainID string, eventName string
 		BlockNumber:    rand.Int63n(1000000),
 		BlockTimestamp: time.Unix(1731590113, 0).UTC(),
 		Address:        PublicKey(pubKey),
-		EventSig:       Discriminator("event", eventName),
+		EventSig:       EventSignature(codec.NewDiscriminatorHashPrefix(eventName, false)),
 		SubkeyValues:   []IndexedValue{{3, 2, 1}, {1}, {1, 2}, pubKey.Bytes()},
 		TxHash:         Signature(signature),
 		Data:           data,

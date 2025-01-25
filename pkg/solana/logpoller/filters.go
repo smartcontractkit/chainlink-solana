@@ -2,7 +2,6 @@ package logpoller
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"iter"
@@ -24,24 +23,26 @@ type filters struct {
 	orm  ORM
 	lggr logger.SugaredLogger
 
-	filtersByID         map[int64]*Filter
-	filtersByName       map[string]int64
-	filtersByAddress    map[PublicKey]map[EventSignature]map[int64]struct{}
-	filtersToBackfill   map[int64]struct{}
-	filtersToDelete     map[int64]Filter
-	filtersMutex        sync.RWMutex
-	loadedFilters       atomic.Bool
-	knownPrograms       map[string]uint // fast lookup to see if a base58-encoded ProgramID matches any registered filters
-	knownDiscriminators map[string]uint // fast lookup by first 10 characters (60-bits) of a base64-encoded discriminator
-	seqNums             map[int64]int64
-	decoders            map[int64]Decoder
+	filtersByID            map[int64]*Filter
+	filtersByName          map[string]int64
+	filtersByAddress       map[PublicKey]map[EventSignature]map[int64]struct{}
+	filtersToBackfill      map[int64]struct{}
+	filtersToDelete        map[int64]Filter
+	filtersMutex           sync.RWMutex
+	loadedFilters          atomic.Bool
+	knownPrograms          map[string]uint // fast lookup to see if a base58-encoded ProgramID matches any registered filters
+	knownDiscriminators    map[string]uint // fast lookup based on raw discriminator bytes as string
+	seqNums                map[int64]int64
+	decoders               map[int64]Decoder
+	discriminatorExtractor codec.DiscriminatorExtractor
 }
 
 func newFilters(lggr logger.SugaredLogger, orm ORM) *filters {
 	return &filters{
-		orm:      orm,
-		lggr:     lggr,
-		decoders: make(map[int64]Decoder),
+		orm:                    orm,
+		lggr:                   lggr,
+		decoders:               make(map[int64]Decoder),
+		discriminatorExtractor: codec.NewDiscriminatorExtractor(),
 	}
 }
 
@@ -114,6 +115,17 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 		fl.removeFilterFromIndexes(*existingFilter)
 	}
 
+	cEntry, err := codec.NewEventArgsEntry(filter.EventName, filter.EventIdl.EventIDLTypes, true, nil, binary.LittleEndian())
+	if err != nil {
+		return err
+	}
+
+	decoderTypes := codec.ParsedTypes{DecoderDefs: map[string]codec.Entry{filter.EventName: cEntry}}
+	decoder, err := decoderTypes.ToCodec()
+	if err != nil {
+		return fmt.Errorf("failed to create event decoder: %w", err)
+	}
+
 	filterID, err := fl.orm.InsertFilter(ctx, filter)
 	if err != nil {
 		return fmt.Errorf("failed to insert filter: %w", err)
@@ -121,15 +133,7 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 
 	filter.ID = filterID
 
-	idl := codec.IDL{
-		Events: []codec.IdlEvent{filter.EventIdl.IdlEvent},
-		Types:  filter.EventIdl.IdlTypeDefSlice,
-	}
-	fl.decoders[filter.ID], err = codec.NewIDLEventCodec(idl, binary.LittleEndian())
-	if err != nil {
-		return fmt.Errorf("failed to create event decoder: %w", err)
-	}
-
+	fl.decoders[filter.ID] = decoder
 	fl.filtersByName[filter.Name] = filter.ID
 	fl.filtersByID[filter.ID] = &filter
 	filtersForAddress, ok := fl.filtersByAddress[filter.Address]
@@ -151,9 +155,7 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 
 	programID := filter.Address.ToSolana().String()
 	fl.knownPrograms[programID]++
-
-	discriminatorHead := filter.Discriminator()[:10]
-	fl.knownDiscriminators[discriminatorHead]++
+	fl.knownDiscriminators[filter.DiscriminatorRawBytes()]++
 
 	return nil
 }
@@ -229,13 +231,13 @@ func (fl *filters) removeFilterFromIndexes(filter Filter) {
 		}
 	}
 
-	discriminatorHead := filter.Discriminator()[:10]
-	if refcount, ok := fl.knownDiscriminators[discriminatorHead]; ok {
+	discriminator := filter.DiscriminatorRawBytes()
+	if refcount, ok := fl.knownDiscriminators[discriminator]; ok {
 		refcount--
 		if refcount > 0 {
-			fl.knownDiscriminators[discriminatorHead] = refcount
+			fl.knownDiscriminators[discriminator] = refcount
 		} else {
-			delete(fl.knownDiscriminators, discriminatorHead)
+			delete(fl.knownDiscriminators, discriminator)
 		}
 	}
 }
@@ -302,6 +304,8 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[F
 	if len(event.Data) < 12 {
 		return nil
 	}
+
+	discriminator := fl.discriminatorExtractor.Extract(event.Data)
 	isKnown := func() (ok bool) {
 		fl.filtersMutex.RLock()
 		defer fl.filtersMutex.RUnlock()
@@ -310,12 +314,7 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[F
 			return ok
 		}
 
-		// The first 64-bits of the event data is the event sig. Because it's base64 encoded, this corresponds to
-		// the first 10 characters plus 4 bits of the 11th character. We can quickly rule it out as not matching any known
-		// discriminators if the first 10 characters don't match. If it passes that initial test, we base64-decode the
-		// first 12 characters, and use the first 8 bytes of that as the event sig to call MatchingFilters. The address
-		// also needs to be base58-decoded to pass to MatchingFilters
-		_, ok = fl.knownDiscriminators[event.Data[:10]]
+		_, ok = fl.knownDiscriminators[string(discriminator)]
 		return ok
 	}
 
@@ -329,16 +328,7 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[F
 		return nil
 	}
 
-	// Decoding first 12 characters will give us the first 9 bytes of binary data
-	// The first 8 of those is the discriminator
-	decoded, err := base64.StdEncoding.DecodeString(event.Data[:12])
-	if err != nil || len(decoded) < 8 {
-		fl.lggr.Errorw("failed to decode event data", "EventProgram", event)
-		return nil
-	}
-	eventSig := EventSignature(decoded[:8])
-
-	return fl.matchingFilters(PublicKey(addr), eventSig)
+	return fl.matchingFilters(PublicKey(addr), EventSignature(discriminator))
 }
 
 // GetFiltersToBackfill - returns copy of backfill queue
@@ -459,7 +449,7 @@ func (fl *filters) LoadFilters(ctx context.Context) error {
 // DecodeSubKey accepts raw Borsh-encoded event data, a filter ID and a subkeyPath. It uses the decoder
 // associated with that filter to decode the event and extract the subkey value from the specified subKeyPath.
 // WARNING: not thread safe, should only be called while fl.filtersMutex is held and after filters have been loaded.
-func (fl *filters) DecodeSubKey(ctx context.Context, raw []byte, ID int64, subKeyPath []string) (any, error) {
+func (fl *filters) DecodeSubKey(ctx context.Context, lggr logger.SugaredLogger, raw []byte, ID int64, subKeyPath []string) (any, error) {
 	filter, ok := fl.filtersByID[ID]
 	if !ok {
 		return nil, fmt.Errorf("filter %d not found", ID)
@@ -472,8 +462,9 @@ func (fl *filters) DecodeSubKey(ctx context.Context, raw []byte, ID int64, subKe
 	if err != nil || decodedEvent == nil {
 		return nil, err
 	}
-	err = decoder.Decode(ctx, raw, decodedEvent, filter.EventName)
-	if err != nil {
+	if err = decoder.Decode(ctx, raw, decodedEvent, filter.EventName); err != nil {
+		err = fmt.Errorf("failed to decode sub key raw data: %v, for filter: %s, for subKeyPath: %v, err: %w", raw, subKeyPath, filter.Name, err)
+		lggr.Criticalw(err.Error())
 		return nil, err
 	}
 	return ExtractField(decodedEvent, subKeyPath)

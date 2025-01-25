@@ -76,18 +76,26 @@ func (it *codecInterfaceTester) GetAccountString(i int) string {
 }
 
 func (it *codecInterfaceTester) EncodeFields(t *testing.T, request *EncodeRequest) []byte {
-	if request.TestOn == TestItemType || request.TestOn == testutils.TestEventItem {
-		return encodeFieldsOnItem(t, request)
+	if request.TestOn == TestItemType {
+		return encodeFieldsOnItem(t, request, true)
+	} else if request.TestOn == testutils.TestEventItem {
+		return encodeFieldsOnItem(t, request, false)
 	}
 
 	return encodeFieldsOnSliceOrArray(t, request)
 }
 
-func encodeFieldsOnItem(t *testing.T, request *EncodeRequest) ocr2types.Report {
+func encodeFieldsOnItem(t *testing.T, request *EncodeRequest, isAccount bool) ocr2types.Report {
 	buf := new(bytes.Buffer)
-	// The underlying TestItemAsAccount adds a discriminator by default while being Borsh encoded.
-	if err := testutils.EncodeRequestToTestItemAsAccount(request.TestStructs[0]).MarshalWithEncoder(bin.NewBorshEncoder(buf)); err != nil {
-		require.NoError(t, err)
+	// The underlying TestItem adds a discriminator by default while being Borsh encoded.
+	if isAccount {
+		if err := testutils.EncodeRequestToTestItemAsAccount(request.TestStructs[0]).MarshalWithEncoder(bin.NewBorshEncoder(buf)); err != nil {
+			require.NoError(t, err)
+		}
+	} else {
+		if err := testutils.EncodeRequestToTestItemAsEvent(request.TestStructs[0]).MarshalWithEncoder(bin.NewBorshEncoder(buf)); err != nil {
+			require.NoError(t, err)
+		}
 	}
 	return buf.Bytes()
 }
