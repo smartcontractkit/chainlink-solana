@@ -258,7 +258,7 @@ func (h *helper) Init(t *testing.T) {
 }
 
 func (h *helper) RPCClient() *chainreader.RPCClientWrapper {
-	return &chainreader.RPCClientWrapper{Client: h.rpcClient}
+	return &chainreader.RPCClientWrapper{AccountReader: h.rpcClient}
 }
 
 func (h *helper) Context(t *testing.T) context.Context {

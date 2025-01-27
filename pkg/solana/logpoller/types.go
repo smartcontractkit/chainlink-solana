@@ -127,8 +127,7 @@ type Decoder interface {
 }
 
 type EventIdl struct {
-	codec.IdlEvent
-	codec.IdlTypeDefSlice
+	codec.EventIDLTypes
 }
 
 func (e *EventIdl) Scan(src interface{}) error {
@@ -137,8 +136,8 @@ func (e *EventIdl) Scan(src interface{}) error {
 
 func (e EventIdl) Value() (driver.Value, error) {
 	return json.Marshal(map[string]any{
-		"IdlEvent":        e.IdlEvent,
-		"IdlTypeDefSlice": e.IdlTypeDefSlice,
+		"IdlEvent":        e.EventIDLTypes.Event,
+		"IdlTypeDefSlice": e.EventIDLTypes.Types,
 	})
 }
 
@@ -192,7 +191,7 @@ func (v *IndexedValue) FromFloat64(f float64) {
 	v.FromUint64(math.MaxInt64 + 1 - math.Float64bits(f))
 }
 
-func NewIndexedValue(typedVal any) (iVal IndexedValue, err error) {
+func newIndexedValue(typedVal any) (iVal IndexedValue, err error) {
 	// handle 2 simplest cases first
 	switch t := typedVal.(type) {
 	case []byte:

@@ -68,6 +68,15 @@ func (m *MultiClient) GetAccountInfoWithOpts(ctx context.Context, addr solana.Pu
 	return r.GetAccountInfoWithOpts(ctx, addr, opts)
 }
 
+func (m *MultiClient) GetMultipleAccountsWithOpts(ctx context.Context, accounts []solana.PublicKey, opts *rpc.GetMultipleAccountsOpts) (out *rpc.GetMultipleAccountsResult, err error) {
+	r, err := m.getClient()
+	if err != nil {
+		return nil, err
+	}
+
+	return r.GetMultipleAccountsWithOpts(ctx, accounts, opts)
+}
+
 func (m *MultiClient) Balance(ctx context.Context, addr solana.PublicKey) (uint64, error) {
 	r, err := m.getClient()
 	if err != nil {

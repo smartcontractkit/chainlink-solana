@@ -170,11 +170,11 @@ type TestItemAsAccount struct {
 	NestedStaticStruct  NestedStatic
 }
 
-var TestItemDiscriminator = [8]byte{148, 105, 105, 155, 26, 167, 212, 149}
+var TestItemAsAccountDiscriminator = [8]byte{148, 105, 105, 155, 26, 167, 212, 149}
 
 func (obj TestItemAsAccount) MarshalWithEncoder(encoder *agbinary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(TestItemDiscriminator[:], false)
+	err = encoder.WriteBytes(TestItemAsAccountDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
@@ -233,10 +233,140 @@ func (obj *TestItemAsAccount) UnmarshalWithDecoder(decoder *agbinary.Decoder) er
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(TestItemDiscriminator[:]) {
+		if !discriminator.Equal(TestItemAsAccountDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
 				"[148 105 105 155 26 167 212 149]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Field`:
+	err := decoder.Decode(&obj.Field)
+	if err != nil {
+		return err
+	}
+	// Deserialize `OracleID`:
+	err = decoder.Decode(&obj.OracleID)
+	if err != nil {
+		return err
+	}
+	// Deserialize `OracleIDs`:
+	err = decoder.Decode(&obj.OracleIDs)
+	if err != nil {
+		return err
+	}
+	// Deserialize `AccountStruct`:
+	err = decoder.Decode(&obj.AccountStruct)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Accounts`:
+	err = decoder.Decode(&obj.Accounts)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DifferentField`:
+	err = decoder.Decode(&obj.DifferentField)
+	if err != nil {
+		return err
+	}
+	// Deserialize `BigField`:
+	err = decoder.Decode(&obj.BigField)
+	if err != nil {
+		return err
+	}
+	// Deserialize `NestedDynamicStruct`:
+	err = decoder.Decode(&obj.NestedDynamicStruct)
+	if err != nil {
+		return err
+	}
+	// Deserialize `NestedStaticStruct`:
+	err = decoder.Decode(&obj.NestedStaticStruct)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type TestItemAsEvent struct {
+	Field               int32
+	OracleID            uint8
+	OracleIDs           [32]uint8
+	AccountStruct       AccountStruct
+	Accounts            []solana.PublicKey
+	DifferentField      string
+	BigField            agbinary.Int128
+	NestedDynamicStruct NestedDynamic
+	NestedStaticStruct  NestedStatic
+}
+
+var TestItemAsEventDiscriminator = [8]byte{119, 183, 160, 247, 84, 104, 222, 251}
+
+func (obj TestItemAsEvent) MarshalWithEncoder(encoder *agbinary.Encoder) (err error) {
+	// Write event discriminator:
+	err = encoder.WriteBytes(TestItemAsEventDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Field` param:
+	err = encoder.Encode(obj.Field)
+	if err != nil {
+		return err
+	}
+	// Serialize `OracleID` param:
+	err = encoder.Encode(obj.OracleID)
+	if err != nil {
+		return err
+	}
+	// Serialize `OracleIDs` param:
+	err = encoder.Encode(obj.OracleIDs)
+	if err != nil {
+		return err
+	}
+	// Serialize `AccountStruct` param:
+	err = encoder.Encode(obj.AccountStruct)
+	if err != nil {
+		return err
+	}
+	// Serialize `Accounts` param:
+	err = encoder.Encode(obj.Accounts)
+	if err != nil {
+		return err
+	}
+	// Serialize `DifferentField` param:
+	err = encoder.Encode(obj.DifferentField)
+	if err != nil {
+		return err
+	}
+	// Serialize `BigField` param:
+	err = encoder.Encode(obj.BigField)
+	if err != nil {
+		return err
+	}
+	// Serialize `NestedDynamicStruct` param:
+	err = encoder.Encode(obj.NestedDynamicStruct)
+	if err != nil {
+		return err
+	}
+	// Serialize `NestedStaticStruct` param:
+	err = encoder.Encode(obj.NestedStaticStruct)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *TestItemAsEvent) UnmarshalWithDecoder(decoder *agbinary.Decoder) error {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(TestItemAsEventDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[119, 183, 160, 247, 84, 104, 222, 251]",
 				fmt.Sprint(discriminator[:]))
 		}
 	}
@@ -565,6 +695,20 @@ func (obj *NestedStatic) UnmarshalWithDecoder(decoder *agbinary.Decoder) (err er
 
 func EncodeRequestToTestItemAsAccount(testStruct interfacetests.TestStruct) TestItemAsAccount {
 	return TestItemAsAccount{
+		Field:               *testStruct.Field,
+		OracleID:            uint8(testStruct.OracleID),
+		OracleIDs:           getOracleIDs(testStruct),
+		AccountStruct:       getAccountStruct(testStruct),
+		Accounts:            getAccounts(testStruct),
+		DifferentField:      testStruct.DifferentField,
+		BigField:            bigIntToBinInt128(testStruct.BigField),
+		NestedDynamicStruct: getNestedDynamic(testStruct),
+		NestedStaticStruct:  getNestedStatic(testStruct),
+	}
+}
+
+func EncodeRequestToTestItemAsEvent(testStruct interfacetests.TestStruct) TestItemAsEvent {
+	return TestItemAsEvent{
 		Field:               *testStruct.Field,
 		OracleID:            uint8(testStruct.OracleID),
 		OracleIDs:           getOracleIDs(testStruct),

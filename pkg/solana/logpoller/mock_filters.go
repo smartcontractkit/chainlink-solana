@@ -6,6 +6,7 @@ import (
 	context "context"
 	iter "iter"
 
+	logger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -22,9 +23,9 @@ func (_m *mockFilters) EXPECT() *mockFilters_Expecter {
 	return &mockFilters_Expecter{mock: &_m.Mock}
 }
 
-// DecodeSubKey provides a mock function with given fields: ctx, raw, ID, subKeyPath
-func (_m *mockFilters) DecodeSubKey(ctx context.Context, raw []byte, ID int64, subKeyPath []string) (interface{}, error) {
-	ret := _m.Called(ctx, raw, ID, subKeyPath)
+// DecodeSubKey provides a mock function with given fields: ctx, lggr, raw, ID, subKeyPath
+func (_m *mockFilters) DecodeSubKey(ctx context.Context, lggr logger.SugaredLogger, raw []byte, ID int64, subKeyPath []string) (interface{}, error) {
+	ret := _m.Called(ctx, lggr, raw, ID, subKeyPath)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DecodeSubKey")
@@ -32,19 +33,19 @@ func (_m *mockFilters) DecodeSubKey(ctx context.Context, raw []byte, ID int64, s
 
 	var r0 interface{}
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, int64, []string) (interface{}, error)); ok {
-		return rf(ctx, raw, ID, subKeyPath)
+	if rf, ok := ret.Get(0).(func(context.Context, logger.SugaredLogger, []byte, int64, []string) (interface{}, error)); ok {
+		return rf(ctx, lggr, raw, ID, subKeyPath)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, int64, []string) interface{}); ok {
-		r0 = rf(ctx, raw, ID, subKeyPath)
+	if rf, ok := ret.Get(0).(func(context.Context, logger.SugaredLogger, []byte, int64, []string) interface{}); ok {
+		r0 = rf(ctx, lggr, raw, ID, subKeyPath)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(interface{})
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []byte, int64, []string) error); ok {
-		r1 = rf(ctx, raw, ID, subKeyPath)
+	if rf, ok := ret.Get(1).(func(context.Context, logger.SugaredLogger, []byte, int64, []string) error); ok {
+		r1 = rf(ctx, lggr, raw, ID, subKeyPath)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -59,16 +60,17 @@ type mockFilters_DecodeSubKey_Call struct {
 
 // DecodeSubKey is a helper method to define mock.On call
 //   - ctx context.Context
+//   - lggr logger.SugaredLogger
 //   - raw []byte
 //   - ID int64
 //   - subKeyPath []string
-func (_e *mockFilters_Expecter) DecodeSubKey(ctx interface{}, raw interface{}, ID interface{}, subKeyPath interface{}) *mockFilters_DecodeSubKey_Call {
-	return &mockFilters_DecodeSubKey_Call{Call: _e.mock.On("DecodeSubKey", ctx, raw, ID, subKeyPath)}
+func (_e *mockFilters_Expecter) DecodeSubKey(ctx interface{}, lggr interface{}, raw interface{}, ID interface{}, subKeyPath interface{}) *mockFilters_DecodeSubKey_Call {
+	return &mockFilters_DecodeSubKey_Call{Call: _e.mock.On("DecodeSubKey", ctx, lggr, raw, ID, subKeyPath)}
 }
 
-func (_c *mockFilters_DecodeSubKey_Call) Run(run func(ctx context.Context, raw []byte, ID int64, subKeyPath []string)) *mockFilters_DecodeSubKey_Call {
+func (_c *mockFilters_DecodeSubKey_Call) Run(run func(ctx context.Context, lggr logger.SugaredLogger, raw []byte, ID int64, subKeyPath []string)) *mockFilters_DecodeSubKey_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].([]byte), args[2].(int64), args[3].([]string))
+		run(args[0].(context.Context), args[1].(logger.SugaredLogger), args[2].([]byte), args[3].(int64), args[4].([]string))
 	})
 	return _c
 }
@@ -78,7 +80,7 @@ func (_c *mockFilters_DecodeSubKey_Call) Return(_a0 interface{}, _a1 error) *moc
 	return _c
 }
 
-func (_c *mockFilters_DecodeSubKey_Call) RunAndReturn(run func(context.Context, []byte, int64, []string) (interface{}, error)) *mockFilters_DecodeSubKey_Call {
+func (_c *mockFilters_DecodeSubKey_Call) RunAndReturn(run func(context.Context, logger.SugaredLogger, []byte, int64, []string) (interface{}, error)) *mockFilters_DecodeSubKey_Call {
 	_c.Call.Return(run)
 	return _c
 }

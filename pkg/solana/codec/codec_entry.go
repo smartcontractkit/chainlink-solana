@@ -44,11 +44,16 @@ func NewAccountEntry(offchainName string, idlTypes AccountIDLTypes, includeDiscr
 		return nil, err
 	}
 
+	var discriminator *Discriminator
+	if includeDiscriminator {
+		discriminator = NewDiscriminator(idlTypes.Account.Name, true)
+	}
+
 	return newEntry(
 		offchainName,
 		idlTypes.Account.Name,
 		accCodec,
-		includeDiscriminator,
+		discriminator,
 		mod,
 	), nil
 }
@@ -64,7 +69,7 @@ func NewPDAEntry(offchainName string, pdaTypeDef PDATypeDef, mod codec.Modifier,
 		offchainName,
 		offchainName, // PDA seeds do not correlate to anything on-chain so reusing offchain name
 		accCodec,
-		false,
+		nil,
 		mod,
 	), nil
 }
@@ -85,7 +90,7 @@ func NewInstructionArgsEntry(offChainName string, idlTypes InstructionArgsIDLTyp
 		idlTypes.Instruction.Name,
 		instructionCodecArgs,
 		// Instruction arguments don't need a discriminator by default
-		false,
+		nil,
 		mod,
 	), nil
 }
@@ -101,11 +106,16 @@ func NewEventArgsEntry(offChainName string, idlTypes EventIDLTypes, includeDiscr
 		return nil, err
 	}
 
+	var discriminator *Discriminator
+	if includeDiscriminator {
+		discriminator = NewDiscriminator(idlTypes.Event.Name, false)
+	}
+
 	return newEntry(
 		offChainName,
 		idlTypes.Event.Name,
 		eventCodec,
-		includeDiscriminator,
+		discriminator,
 		mod,
 	), nil
 }
@@ -113,18 +123,23 @@ func NewEventArgsEntry(offChainName string, idlTypes EventIDLTypes, includeDiscr
 func newEntry(
 	genericName, chainSpecificName string,
 	typeCodec commonencodings.TypeCodec,
-	includeDiscriminator bool,
+	discriminator *Discriminator,
 	mod codec.Modifier,
 ) Entry {
-	return &entry{
-		genericName:          genericName,
-		chainSpecificName:    chainSpecificName,
-		reflectType:          typeCodec.GetType(),
-		typeCodec:            typeCodec,
-		mod:                  ensureModifier(mod),
-		includeDiscriminator: includeDiscriminator,
-		discriminator:        *NewDiscriminator(chainSpecificName),
+	e := &entry{
+		genericName:       genericName,
+		chainSpecificName: chainSpecificName,
+		reflectType:       typeCodec.GetType(),
+		typeCodec:         typeCodec,
+		mod:               ensureModifier(mod),
 	}
+
+	if discriminator != nil {
+		e.discriminator = *discriminator
+		e.includeDiscriminator = true
+	}
+
+	return e
 }
 
 func createRefs(idlTypes IdlTypeDefSlice, builder commonencodings.Builder) *codecRefs {
@@ -175,8 +190,8 @@ func (e *entry) Decode(encoded []byte) (any, []byte, error) {
 		}
 
 		if !bytes.Equal(e.discriminator.hashPrefix, encoded[:discriminatorLength]) {
-			return nil, nil, fmt.Errorf("%w: encoded data has a bad discriminator %v for genericName: %q, chainSpecificName: %q",
-				commontypes.ErrInvalidType, encoded[:discriminatorLength], e.genericName, e.chainSpecificName)
+			return nil, nil, fmt.Errorf("%w: encoded data has a bad discriminator %v, expected %v, for genericName: %q, chainSpecificName: %q",
+				commontypes.ErrInvalidType, encoded[:discriminatorLength], e.discriminator.hashPrefix, e.genericName, e.chainSpecificName)
 		}
 
 		encoded = encoded[discriminatorLength:]

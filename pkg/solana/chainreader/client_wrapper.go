@@ -5,17 +5,19 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 )
 
 // RPCClientWrapper is a wrapper for an RPC client. This was necessary due to the solana RPC interface not
 // providing directly mockable components in the GetMultipleAccounts response.
 type RPCClientWrapper struct {
-	*rpc.Client
+	client.AccountReader
 }
 
 // GetMultipleAccountData is a helper function that extracts byte data from a GetMultipleAccounts rpc call.
 func (w *RPCClientWrapper) GetMultipleAccountData(ctx context.Context, keys ...solana.PublicKey) ([][]byte, error) {
-	result, err := w.Client.GetMultipleAccountsWithOpts(ctx, keys, &rpc.GetMultipleAccountsOpts{
+	result, err := w.GetMultipleAccountsWithOpts(ctx, keys, &rpc.GetMultipleAccountsOpts{
 		Encoding:   solana.EncodingBase64,
 		Commitment: rpc.CommitmentFinalized,
 	})
@@ -25,20 +27,20 @@ func (w *RPCClientWrapper) GetMultipleAccountData(ctx context.Context, keys ...s
 
 	bts := make([][]byte, len(result.Value))
 
-	for idx, result := range result.Value {
-		if result == nil {
+	for idx, res := range result.Value {
+		if res == nil {
 			return nil, rpc.ErrNotFound
 		}
 
-		if result.Data == nil {
+		if res.Data == nil {
 			return nil, rpc.ErrNotFound
 		}
 
-		if result.Data.GetBinary() == nil {
+		if res.Data.GetBinary() == nil {
 			return nil, rpc.ErrNotFound
 		}
 
-		bts[idx] = result.Data.GetBinary()
+		bts[idx] = res.Data.GetBinary()
 	}
 
 	return bts, nil

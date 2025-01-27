@@ -54,6 +54,7 @@ type Reader interface {
 // AccountReader is an interface that allows users to pass either the solana rpc client or the relay client
 type AccountReader interface {
 	GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetAccountInfoOpts) (*rpc.GetAccountInfoResult, error)
+	GetMultipleAccountsWithOpts(ctx context.Context, accounts []solana.PublicKey, opts *rpc.GetMultipleAccountsOpts) (out *rpc.GetMultipleAccountsResult, err error)
 }
 
 type Writer interface {
@@ -180,6 +181,16 @@ func (c *Client) GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicK
 	defer cancel()
 	opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
 	return c.rpc.GetAccountInfoWithOpts(ctx, addr, opts)
+}
+
+func (c *Client) GetMultipleAccountsWithOpts(ctx context.Context, accounts []solana.PublicKey, opts *rpc.GetMultipleAccountsOpts) (out *rpc.GetMultipleAccountsResult, err error) {
+	done := c.latency("multiple_account_info")
+	defer done()
+
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+	opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
+	return c.rpc.GetMultipleAccountsWithOpts(ctx, accounts, opts)
 }
 
 func (c *Client) GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64) (out rpc.BlocksResult, err error) {

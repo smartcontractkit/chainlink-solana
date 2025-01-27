@@ -35,9 +35,9 @@ func TestIndexedValue(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.typeName, func(t *testing.T) {
-			iVal1, err := NewIndexedValue(c.lower)
+			iVal1, err := newIndexedValue(c.lower)
 			require.NoError(t, err)
-			iVal2, err := NewIndexedValue(c.higher)
+			iVal2, err := newIndexedValue(c.higher)
 			require.NoError(t, err)
 			assert.Less(t, iVal1, iVal2)
 		})
