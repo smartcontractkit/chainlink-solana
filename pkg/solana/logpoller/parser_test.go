@@ -218,9 +218,9 @@ func TestDSLParser(t *testing.T) {
 				"AND subkey_values[:subkey_index_0] > :subkey_value_0 AND subkey_values[:subkey_index_0] < :subkey_value_1 ORDER BY " + defaultSort)
 
 		var iValLower, iValUpper IndexedValue
-		iValLower, err = NewIndexedValue(4)
+		iValLower, err = newIndexedValue(4)
 		require.NoError(t, err)
-		iValUpper, err = NewIndexedValue(7)
+		iValUpper, err = newIndexedValue(7)
 		require.NoError(t, err)
 
 		expectedArgs := map[string]any{

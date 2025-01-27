@@ -77,7 +77,7 @@ func (f *eventBySubKeyFilter) Accept(visitor primitives.Visitor) {
 func NewEventBySubKeyFilter(subKeyIndex uint64, valueComparers []primitives.ValueComparator) (query.Expression, error) {
 	var indexedValueComparators []IndexedValueComparator
 	for _, cmp := range valueComparers {
-		iVal, err := NewIndexedValue(cmp.Value)
+		iVal, err := newIndexedValue(cmp.Value)
 		if err != nil {
 			return query.Expression{}, err
 		}

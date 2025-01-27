@@ -159,7 +159,7 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 			return err
 		}
 
-		log.SubKeyValues = make([]IndexedValue, 0, len(filter.SubkeyPaths))
+		log.SubKeyValues = make([]IndexedValue, 0, len(filter.SubKeyPaths))
 		for _, path := range filter.SubKeyPaths {
 			subKeyVal, decodeSubKeyErr := lp.filters.DecodeSubKey(ctx, lp.lggr, log.Data, filter.ID, path)
 			if decodeSubKeyErr != nil {
