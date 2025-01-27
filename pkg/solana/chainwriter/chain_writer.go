@@ -144,10 +144,10 @@ for Solana transactions. It handles constant addresses, dynamic lookups, program
 ### Error Handling:
 - Errors are wrapped with the `debugID` for easier tracing.
 */
-func GetAddresses(ctx context.Context, args any, accounts []Lookup, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.Reader) ([]*solana.AccountMeta, error) {
+func GetAddresses(ctx context.Context, args any, accounts []Lookup, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.Reader, idl string) ([]*solana.AccountMeta, error) {
 	var addresses []*solana.AccountMeta
 	for _, accountConfig := range accounts {
-		meta, err := accountConfig.Resolve(ctx, args, derivedTableMap, reader)
+		meta, err := accountConfig.Resolve(ctx, args, derivedTableMap, reader, idl)
 		if err != nil {
 			return nil, err
 		}
@@ -258,13 +258,13 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	}
 
 	// Fetch derived and static table maps
-	derivedTableMap, staticTableMap, err := s.ResolveLookupTables(ctx, args, methodConfig.LookupTables)
+	derivedTableMap, staticTableMap, err := s.ResolveLookupTables(ctx, args, methodConfig.LookupTables, programConfig.IDL)
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error getting lookup tables: %w", err), debugID)
 	}
 
 	// Resolve account metas
-	accounts, err := GetAddresses(ctx, args, methodConfig.Accounts, derivedTableMap, s.reader)
+	accounts, err := GetAddresses(ctx, args, methodConfig.Accounts, derivedTableMap, s.reader, programConfig.IDL)
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error resolving account addresses: %w", err), debugID)
 	}
@@ -348,7 +348,7 @@ func (s *SolanaChainWriterService) GetFeeComponents(ctx context.Context) (*types
 	}, nil
 }
 
-func (s *SolanaChainWriterService) ResolveLookupTables(ctx context.Context, args any, lookupTables LookupTables) (map[string]map[string][]*solana.AccountMeta, map[solana.PublicKey]solana.PublicKeySlice, error) {
+func (s *SolanaChainWriterService) ResolveLookupTables(ctx context.Context, args any, lookupTables LookupTables, idl string) (map[string]map[string][]*solana.AccountMeta, map[solana.PublicKey]solana.PublicKeySlice, error) {
 	derivedTableMap := make(map[string]map[string][]*solana.AccountMeta)
 	staticTableMap := make(map[solana.PublicKey]solana.PublicKeySlice)
 
@@ -356,7 +356,7 @@ func (s *SolanaChainWriterService) ResolveLookupTables(ctx context.Context, args
 	for _, derivedLookup := range lookupTables.DerivedLookupTables {
 		// Load the lookup table - note: This could be multiple tables if the lookup is a PDALookups that resolves to more
 		// than one address
-		lookupTableMap, err := s.loadTable(ctx, args, derivedLookup)
+		lookupTableMap, err := s.loadTable(ctx, args, derivedLookup, idl)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error loading derived lookup table: %w", err)
 		}
@@ -384,9 +384,9 @@ func (s *SolanaChainWriterService) ResolveLookupTables(ctx context.Context, args
 	return derivedTableMap, staticTableMap, nil
 }
 
-func (s *SolanaChainWriterService) loadTable(ctx context.Context, args any, rlt DerivedLookupTable) (map[string]map[string][]*solana.AccountMeta, error) {
+func (s *SolanaChainWriterService) loadTable(ctx context.Context, args any, rlt DerivedLookupTable, idl string) (map[string]map[string][]*solana.AccountMeta, error) {
 	// Resolve all addresses specified by the identifier
-	lookupTableAddresses, err := GetAddresses(ctx, args, []Lookup{rlt.Accounts}, nil, s.reader)
+	lookupTableAddresses, err := GetAddresses(ctx, args, []Lookup{rlt.Accounts}, nil, s.reader, idl)
 	if err != nil {
 		return nil, fmt.Errorf("error resolving addresses for lookup table: %w", err)
 	}

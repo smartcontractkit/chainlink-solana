@@ -2,11 +2,10 @@ package chainwriter_test
 
 import (
 	"bytes"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"math/big"
-	"os"
-	"reflect"
 	"testing"
 
 	ag_binary "github.com/gagliardetto/binary"
@@ -39,6 +38,7 @@ type Arguments struct {
 }
 
 var ccipRouterIDL = idl.FetchCCIPRouterIDL()
+var testContractIDL = chainwriter.FetchTestContractIDL()
 
 func TestChainWriter_GetAddresses(t *testing.T) {
 	ctx := tests.Context(t)
@@ -105,7 +105,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 					IsSigner:   derivedTablePdaLookupMeta.IsSigner,
 					IsWritable: derivedTablePdaLookupMeta.IsWritable,
 					InternalField: chainwriter.InternalField{
-						Type:     reflect.TypeOf(chainwriter.DataAccount{}),
+						TypeName: "LookupTableDataAccount",
 						Location: "LookupTable",
 					},
 				},
@@ -158,11 +158,11 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		}
 
 		// Fetch derived table map
-		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
+		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig, testContractIDL)
 		require.NoError(t, err)
 
 		// Resolve account metas
-		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw, testContractIDL)
 		require.NoError(t, err)
 
 		// account metas should be returned in the same order as the provided account lookup configs
@@ -202,11 +202,11 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		}
 
 		// Fetch derived table map
-		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
+		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig, testContractIDL)
 		require.NoError(t, err)
 
 		// Resolve account metas
-		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw, testContractIDL)
 		require.NoError(t, err)
 
 		require.Len(t, accounts, 2)
@@ -226,11 +226,11 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		}
 
 		// Fetch derived table map
-		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
+		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig, testContractIDL)
 		require.NoError(t, err)
 
 		// Resolve account metas
-		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw, testContractIDL)
 		require.NoError(t, err)
 
 		require.Len(t, accounts, 3)
@@ -292,7 +292,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 					IsSigner:   true,
 					IsWritable: true,
 					InternalField: chainwriter.InternalField{
-						Type:     reflect.TypeOf(chainwriter.DataAccount{}),
+						TypeName: "LookupTableDataAccount",
 						Location: "LookupTable",
 					},
 				},
@@ -309,7 +309,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 					IsSigner:   true,
 					IsWritable: true,
 					InternalField: chainwriter.InternalField{
-						Type:     reflect.TypeOf(chainwriter.DataAccount{}),
+						TypeName: "LookupTableDataAccount",
 						Location: "LookupTable",
 					},
 				},
@@ -332,11 +332,11 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 		}
 
 		// Fetch derived table map
-		derivedTableMap, staticTableMap, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
+		derivedTableMap, staticTableMap, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig, testContractIDL)
 		require.NoError(t, err)
 
 		// Resolve account metas
-		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw, testContractIDL)
 		require.NoError(t, err)
 
 		// Filter the lookup table addresses based on which accounts are actually used
@@ -354,11 +354,11 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 		accountLookupConfig := []chainwriter.Lookup{}
 
 		// Fetch derived table map
-		derivedTableMap, staticTableMap, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
+		derivedTableMap, staticTableMap, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig, testContractIDL)
 		require.NoError(t, err)
 
 		// Resolve account metas
-		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw, testContractIDL)
 		require.NoError(t, err)
 
 		// Filter the lookup table addresses based on which accounts are actually used
@@ -377,11 +377,11 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 		}
 
 		// Fetch derived table map
-		derivedTableMap, staticTableMap, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
+		derivedTableMap, staticTableMap, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig, testContractIDL)
 		require.NoError(t, err)
 
 		// Resolve account metas
-		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw, testContractIDL)
 		require.NoError(t, err)
 
 		// Filter the lookup table addresses based on which accounts are actually used
@@ -427,11 +427,6 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 	staticLookupKeys := chainwriter.CreateTestPubKeys(t, 2)
 	mockFetchLookupTableAddresses(t, rw, staticLookupTablePubkey, staticLookupKeys)
 
-	data, err := os.ReadFile("testContractIDL.json")
-	require.NoError(t, err)
-
-	testContractIDLJson := string(data)
-
 	cwConfig := chainwriter.ChainWriterConfig{
 		Programs: map[string]chainwriter.ProgramConfig{
 			"contract_reader_interface": {
@@ -453,7 +448,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 										IsSigner:   false,
 										IsWritable: false,
 										InternalField: chainwriter.InternalField{
-											Type:     reflect.TypeOf(chainwriter.DataAccount{}),
+											TypeName: "LookupTableDataAccount",
 											Location: "LookupTable",
 										},
 									},
@@ -506,7 +501,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 						ArgsTransform: "",
 					},
 				},
-				IDL: testContractIDLJson,
+				IDL: testContractIDL,
 			},
 		},
 	}
@@ -592,14 +587,6 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 func TestChainWriter_CCIPRouter(t *testing.T) {
 	t.Parallel()
 
-	ctx := tests.Context(t)
-	// mock client
-	rw := clientmocks.NewReaderWriter(t)
-	// mock estimator
-	ge := feemocks.NewEstimator(t)
-	// mock txm
-	txm := txmMocks.NewTxManager(t)
-
 	// setup admin key
 	adminPk, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
@@ -608,15 +595,8 @@ func TestChainWriter_CCIPRouter(t *testing.T) {
 	routerAddr := chainwriter.GetRandomPubKey(t)
 	destTokenAddr := chainwriter.GetRandomPubKey(t)
 
-	pda, _, err := solana.FindProgramAddress([][]byte{[]byte("token_admin_registry"), destTokenAddr.Bytes()}, routerAddr)
-	require.NoError(t, err)
-
-	lookupTable := mockTokenAdminRegistryLookupTable(t, rw, pda)
-
 	poolKeys := []solana.PublicKey{destTokenAddr}
 	poolKeys = append(poolKeys, chainwriter.CreateTestPubKeys(t, 3)...)
-
-	mockFetchLookupTableAddresses(t, rw, lookupTable, poolKeys)
 
 	// simplified CCIP Config - does not contain full account list
 	ccipCWConfig := chainwriter.ChainWriterConfig{
@@ -630,7 +610,7 @@ func TestChainWriter_CCIPRouter(t *testing.T) {
 								Fields: map[string]string{"ReportContextByteWords": "ReportContext"},
 							},
 							&codec.RenameModifierConfig{
-								Fields: map[string]string{"ExecutionReport": "AbstractReport"},
+								Fields: map[string]string{"RawExecutionReport": "Report"},
 							},
 						},
 						ChainSpecificName: "execute",
@@ -667,27 +647,70 @@ func TestChainWriter_CCIPRouter(t *testing.T) {
 							},
 						},
 					},
+					"commit": {
+						FromAddress: admin.String(),
+						InputModifications: []codec.ModifierConfig{
+							&codec.RenameModifierConfig{
+								Fields: map[string]string{"ReportContextByteWords": "ReportContext"},
+							},
+							&codec.RenameModifierConfig{
+								Fields: map[string]string{"RawReport": "Report"},
+							},
+						},
+						ChainSpecificName: "commit",
+						ArgsTransform:     "",
+						LookupTables:      chainwriter.LookupTables{},
+						Accounts: []chainwriter.Lookup{
+							chainwriter.AccountConstant{
+								Name:    "testAcc1",
+								Address: chainwriter.GetRandomPubKey(t).String(),
+							},
+							chainwriter.AccountConstant{
+								Name:    "testAcc2",
+								Address: chainwriter.GetRandomPubKey(t).String(),
+							},
+							chainwriter.AccountConstant{
+								Name:    "testAcc3",
+								Address: chainwriter.GetRandomPubKey(t).String(),
+							},
+						},
+					},
 				},
 				IDL: ccipRouterIDL,
 			},
 		},
 	}
 
-	// initialize chain writer
-	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, ge, ccipCWConfig)
-	require.NoError(t, err)
+	ctx := tests.Context(t)
+	// mock client
+	rw := clientmocks.NewReaderWriter(t)
+	// mock estimator
+	ge := feemocks.NewEstimator(t)
 
-	t.Run("ArgsTransform works", func(t *testing.T) {
-		txID := uuid.NewString()
+	t.Run("CCIP execute is encoded successfully and ArgsTransform is applied correctly.", func(t *testing.T) {
+		// mock txm
+		txm := txmMocks.NewTxManager(t)
+		// initialize chain writer
+		cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, ge, ccipCWConfig)
+		require.NoError(t, err)
+
 		recentBlockHash := solana.Hash{}
-
 		rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Once()
+
+		pda, _, err := solana.FindProgramAddress([][]byte{[]byte("token_admin_registry"), destTokenAddr.Bytes()}, routerAddr)
+		require.NoError(t, err)
+
+		lookupTable := mockTokenAdminRegistryLookupTable(t, rw, pda)
+
+		mockFetchLookupTableAddresses(t, rw, lookupTable, poolKeys)
+
+		txID := uuid.NewString()
 		txm.On("Enqueue", mock.Anything, admin.String(), mock.MatchedBy(func(tx *solana.Transaction) bool {
 			txData := tx.Message.Instructions[0].Data
 			payload := txData[8:]
 			var decoded ccip_router.Execute
 			dec := ag_binary.NewBorshDecoder(payload)
-			err := dec.Decode(&decoded)
+			err = dec.Decode(&decoded)
 			require.NoError(t, err)
 
 			tokenIndexes := *decoded.TokenIndexes
@@ -697,61 +720,81 @@ func TestChainWriter_CCIPRouter(t *testing.T) {
 			return true
 		}), &txID, mock.Anything).Return(nil).Once()
 
-		abstractReport := ccip_router.ExecutionReportSingleChain{
-			SourceChainSelector: 1,
-			Message: ccip_router.Any2SVMRampMessage{
-				Header: ccip_router.RampMessageHeader{
-					MessageId:           ccipocr3.Bytes32{0x1},
-					SourceChainSelector: 1,
-					DestChainSelector:   2,
-					SequenceNumber:      1,
-					Nonce:               0,
-				},
-				Sender:        admin.Bytes(),
-				Data:          ccipocr3.Bytes{0x1},
-				LogicReceiver: chainwriter.GetRandomPubKey(t),
-				TokenReceiver: admin,
-				TokenAmounts: []ccip_router.Any2SVMTokenTransfer{
-					{
-						SourcePoolAddress: chainwriter.GetRandomPubKey(t).Bytes(),
-						DestTokenAddress:  destTokenAddr,
-						ExtraData:         ccipocr3.Bytes{0x1},
-						Amount:            ccip_router.CrossChainAmount{LeBytes: [32]uint8{0x1}},
-						DestGasAmount:     2,
+		// stripped back report just for purposes of example
+		abstractReport := ccipocr3.ExecutePluginReportSingleChain{
+			Messages: []ccipocr3.Message{
+				{
+					TokenAmounts: []ccipocr3.RampTokenAmount{
+						{
+							DestTokenAddress: destTokenAddr.Bytes(),
+						},
 					},
 				},
-				ExtraArgs: ccip_router.SVMExtraArgs{
-					ComputeUnits:     1,
-					IsWritableBitmap: 6,
-					Accounts: []solana.PublicKey{
-						chainwriter.GetRandomPubKey(t),
-					},
-				},
-				OnRampAddress: []byte{0x1},
 			},
-			OffchainTokenData: [][]byte{{0x1}},
-			Proofs:            [][32]byte{{0x1}},
 		}
 
 		// Marshal the abstract report to json just for testing purposes.
-		encodededReport, err := json.Marshal(abstractReport)
+		encodedReport, err := json.Marshal(abstractReport)
 		require.NoError(t, err)
 
 		args := chainwriter.ReportPreTransform{
-			ReportContext: [3][32]uint8{{0x01, 0x02, 0x03}},
-			Report:        encodededReport,
+			ReportContext: [2][32]byte{{0x01}, {0x02}},
+			Report:        encodedReport,
 			Info: ccipocr3.ExecuteReportInfo{
-				{
-					ChainSel:      1,
-					OnRampAddress: chainwriter.GetRandomPubKey(t).Bytes(),
-					SeqNumsRange:  ccipocr3.NewSeqNumRange(1, 2),
-					MerkleRoot:    [32]byte{0x01, 0x02, 0x03},
-				},
+				MerkleRoots:     []ccipocr3.MerkleRootChain{},
+				AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{abstractReport},
 			},
-			AbstractReport: abstractReport,
 		}
 
 		submitErr := cw.SubmitTransaction(ctx, "ccip_router", "execute", args, txID, routerAddr.String(), nil, nil)
+		require.NoError(t, submitErr)
+	})
+
+	t.Run("CCIP commit is encoded successfully", func(t *testing.T) {
+		// mock txm
+		txm := txmMocks.NewTxManager(t)
+		// initialize chain writer
+		cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, ge, ccipCWConfig)
+		require.NoError(t, err)
+
+		recentBlockHash := solana.Hash{}
+		rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Once()
+
+		type CommitArgs struct {
+			ReportContext [2][32]byte
+			Report        []byte
+			Rs            [][32]byte
+			Ss            [][32]byte
+			RawVs         [32]byte
+			Info          ccipocr3.CommitReportInfo
+		}
+
+		txID := uuid.NewString()
+
+		// TODO: Replace with actual type from ccipocr3
+		args := CommitArgs{
+			ReportContext: [2][32]byte{{0x01}, {0x02}},
+			Report:        []byte{0x01, 0x02},
+			Rs:            [][32]byte{{0x01, 0x02}},
+			Ss:            [][32]byte{{0x01, 0x02}},
+			RawVs:         [32]byte{0x01, 0x02},
+			Info: ccipocr3.CommitReportInfo{
+				RemoteF:     1,
+				MerkleRoots: []ccipocr3.MerkleRootChain{},
+			},
+		}
+
+		txm.On("Enqueue", mock.Anything, admin.String(), mock.MatchedBy(func(tx *solana.Transaction) bool {
+			txData := tx.Message.Instructions[0].Data
+			payload := txData[8:]
+			var decoded ccip_router.Commit
+			dec := ag_binary.NewBorshDecoder(payload)
+			err := dec.Decode(&decoded)
+			require.NoError(t, err)
+			return true
+		}), &txID, mock.Anything).Return(nil).Once()
+
+		submitErr := cw.SubmitTransaction(ctx, "ccip_router", "commit", args, txID, routerAddr.String(), nil, nil)
 		require.NoError(t, submitErr)
 	})
 }
@@ -864,13 +907,14 @@ func mustFindPdaProgramAddress(t *testing.T, seeds [][]byte, programID solana.Pu
 func mockDataAccountLookupTable(t *testing.T, rw *clientmocks.ReaderWriter, pda solana.PublicKey) solana.PublicKey {
 	lookupTablePubkey := chainwriter.GetRandomPubKey(t)
 	dataAccount := chainwriter.DataAccount{
-		Discriminator:        [8]byte{},
 		Version:              1,
 		Administrator:        chainwriter.GetRandomPubKey(t),
 		PendingAdministrator: chainwriter.GetRandomPubKey(t),
 		LookupTable:          lookupTablePubkey,
 	}
 	dataAccountBytes := mustBorshEncodeStruct(t, dataAccount)
+	// codec will expect discriminator
+	dataAccountBytes = append([]byte{220, 119, 44, 40, 237, 41, 223, 7}, dataAccountBytes...)
 	rw.On("GetAccountInfoWithOpts", mock.Anything, pda, mock.Anything).Return(&rpc.GetAccountInfoResult{
 		RPCContext: rpc.RPCContext{},
 		Value:      &rpc.Account{Data: rpc.DataBytesOrJSONFromBytes(dataAccountBytes)},

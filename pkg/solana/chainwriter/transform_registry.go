@@ -3,7 +3,6 @@ package chainwriter
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
@@ -13,14 +12,14 @@ import (
 // TODO: make this type in the ccipocr3 package
 // TODO: consolidate Info and AbstractReport
 type ReportPreTransform struct {
-	ReportContext  [3][32]byte
+	ReportContext  [2][32]byte
 	Report         []byte
 	Info           ccipocr3.ExecuteReportInfo
 	AbstractReport ccip_router.ExecutionReportSingleChain
 }
 
 type ReportPostTransform struct {
-	ReportContext  [3][32]byte
+	ReportContext  [2][32]byte
 	Report         []byte
 	Info           ccipocr3.ExecuteReportInfo
 	AbstractReport ccip_router.ExecutionReportSingleChain
@@ -51,19 +50,25 @@ func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args a
 					},
 					Seeds: []Seed{
 						{Static: []byte("token_admin_registry")},
-						{Dynamic: AccountLookup{Location: "AbstractReport.Message.TokenAmounts.DestTokenAddress"}},
+						{Dynamic: AccountLookup{Location: "Info.AbstractReports.Messages.TokenAmounts.DestTokenAddress"}},
 					},
 					IsSigner:   false,
 					IsWritable: false,
 					InternalField: InternalField{
-						Type:     reflect.TypeOf(ccip_router.TokenAdminRegistry{}),
+						TypeName: "TokenAdminRegistry",
 						Location: "LookupTable",
 					},
 				},
 			},
 		},
 	}
-	tableMap, _, err := cw.ResolveLookupTables(ctx, args, TokenPoolLookupTable)
+
+	routerProgramConfig, ok := cw.config.Programs["ccip_router"]
+	if !ok {
+		return nil, fmt.Errorf("ccip_router program not found in config")
+	}
+
+	tableMap, _, err := cw.ResolveLookupTables(ctx, args, TokenPoolLookupTable, routerProgramConfig.IDL)
 	if err != nil {
 		return nil, err
 	}

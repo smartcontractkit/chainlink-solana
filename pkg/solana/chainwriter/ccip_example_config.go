@@ -1,10 +1,8 @@
 package chainwriter
 
 import (
-	"reflect"
-
 	"github.com/gagliardetto/solana-go"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	"github.com/smartcontractkit/chainlink-common/pkg/codec"
 )
 
 func TestConfig() {
@@ -20,10 +18,17 @@ func TestConfig() {
 	executionReportSingleChainIDL := `{"name":"ExecutionReportSingleChain","type":{"kind":"struct","fields":[{"name":"source_chain_selector","type":"u64"},{"name":"message","type":{"defined":"Any2SolanaRampMessage"}},{"name":"root","type":{"array":["u8",32]}},{"name":"proofs","type":{"vec":{"array":["u8",32]}}}]}},{"name":"Any2SolanaRampMessage","type":{"kind":"struct","fields":[{"name":"header","type":{"defined":"RampMessageHeader"}},{"name":"sender","type":{"vec":"u8"}},{"name":"data","type":{"vec":"u8"}},{"name":"receiver","type":{"array":["u8",32]}},{"name":"extra_args","type":{"defined":"SolanaExtraArgs"}}]}},{"name":"RampMessageHeader","type":{"kind":"struct","fields":[{"name":"message_id","type":{"array":["u8",32]}},{"name":"source_chain_selector","type":"u64"},{"name":"dest_chain_selector","type":"u64"},{"name":"sequence_number","type":"u64"},{"name":"nonce","type":"u64"}]}},{"name":"SolanaExtraArgs","type":{"kind":"struct","fields":[{"name":"compute_units","type":"u32"},{"name":"allow_out_of_order_execution","type":"bool"}]}}`
 
 	executeConfig := MethodConfig{
-		FromAddress:        fromAddress,
-		InputModifications: nil,
-		ChainSpecificName:  "execute",
-		ArgsTransform:      "CCIP",
+		FromAddress: fromAddress,
+		InputModifications: []codec.ModifierConfig{
+			&codec.RenameModifierConfig{
+				Fields: map[string]string{"ReportContextByteWords": "ReportContext"},
+			},
+			&codec.RenameModifierConfig{
+				Fields: map[string]string{"RawExecutionReport": "Report"},
+			},
+		},
+		ChainSpecificName: "execute",
+		ArgsTransform:     "CCIP",
 		// LookupTables are on-chain stores of accounts. They can be used in two ways:
 		// 1. As a way to store a list of accounts that are all associated together (i.e. Token State registry)
 		// 2. To compress the transactions in a TX and reduce the size of the TX. (The traditional way)
@@ -49,12 +54,12 @@ func TestConfig() {
 						// Seeds would be used if the user needed to look up addresses to use as seeds, which isn't the case here.
 						Seeds: []Seed{
 							{Static: []byte("token_admin_registry")},
-							{Dynamic: AccountLookup{Location: "AbstractReport.Message.TokenAmounts.DestTokenAddress"}},
+							{Dynamic: AccountLookup{Location: "Info.AbstractReports.Messages.TokenAmounts.DestTokenAddress"}},
 						},
 						IsSigner:   false,
 						IsWritable: false,
 						InternalField: InternalField{
-							Type:     reflect.TypeOf(ccip_router.TokenAdminRegistry{}),
+							TypeName: "TokenAdminRegistry",
 							Location: "LookupTable",
 						},
 					},
@@ -102,7 +107,7 @@ func TestConfig() {
 				// Similar to the TokenAdminRegistry above, the user is looking up PDA accounts based on the dest tokens.
 				Seeds: []Seed{
 					{Static: []byte("source_chain_state")},
-					{Dynamic: AccountLookup{Location: "AbstractReport.Message.Header.DestChainSelector"}},
+					{Dynamic: AccountLookup{Location: "Info.AbstractReports.Messages.Header.DestChainSelector"}},
 				},
 				IsSigner:   false,
 				IsWritable: false,
@@ -116,10 +121,10 @@ func TestConfig() {
 				},
 				Seeds: []Seed{
 					{Static: []byte("commit_report")},
-					{Dynamic: AccountLookup{Location: "AbstractReport.Message.Header.DestChainSelector"}},
+					{Dynamic: AccountLookup{Location: "Info.AbstractReports.Messages.Header.DestChainSelector"}},
 					{Dynamic: AccountLookup{
 						// The seed is the merkle root of the report, as passed into the input params.
-						Location: "Info.MerkleRootChain.MerkleRoot",
+						Location: "Info.MerkleRoots.MerkleRoot",
 					}},
 				},
 				IsSigner:   false,
@@ -173,8 +178,8 @@ func TestConfig() {
 			// User specified accounts - formatted as AccountMeta
 			AccountLookup{
 				Name:       "UserAccounts",
-				Location:   "AbstractReport.Message.ExtraArgs.Accounts",
-				IsWritable: MetaBool{BitmapLocation: "AbstractReport.Message.ExtraArgs.AccountsBitmap"},
+				Location:   "Info.AbstractReports.Message.ExtraArgsDecoded.Accounts",
+				IsWritable: MetaBool{BitmapLocation: "Info.AbstractReports.Message.ExtraArgsDecoded.IsWritableBitmap"},
 				IsSigner:   MetaBool{Value: false},
 			},
 			// PDA Account Lookup - Based on an account lookup and an address lookup
@@ -185,14 +190,14 @@ func TestConfig() {
 				},
 				Seeds: []Seed{
 					// receiver address
-					{Dynamic: AccountLookup{Location: "AbstractReport.Message.Receiver"}},
+					{Dynamic: AccountLookup{Location: "Info.AbstractReports.Messages.Receiver"}},
 					// token programs
 					{Dynamic: AccountsFromLookupTable{
 						LookupTableName: "PoolLookupTable",
 						IncludeIndexes:  []int{6},
 					}},
 					// mint
-					{Dynamic: AccountLookup{Location: "AbstractReport.Message.TokenAmounts.DestTokenAddress"}},
+					{Dynamic: AccountLookup{Location: "Info.AbstractReports.Messages.TokenAmounts.DestTokenAddress"}},
 				},
 				IsSigner:   false,
 				IsWritable: false,
@@ -212,7 +217,7 @@ func TestConfig() {
 						IncludeIndexes:  []int{6},
 					}},
 					// mint
-					{Dynamic: AccountLookup{Location: "AbstractReport.Message.TokenAmounts.DestTokenAddress"}},
+					{Dynamic: AccountLookup{Location: "Info.AbstractReports.Messages.TokenAmounts.DestTokenAddress"}},
 				},
 				IsSigner:   false,
 				IsWritable: false,
@@ -226,8 +231,8 @@ func TestConfig() {
 				// Similar to the TokenAdminRegistry above, the user is looking up PDA accounts based on the dest tokens.
 				Seeds: []Seed{
 					{Static: []byte("ccip_tokenpool_billing")},
-					{Dynamic: AccountLookup{Location: "AbstractReport.Message.Header.DestChainSelector"}},
-					{Dynamic: AccountLookup{Location: "AbstractReport.Message.TokenAmounts.DestTokenAddress"}},
+					{Dynamic: AccountLookup{Location: "Info.AbstractReports.Messages.Header.DestChainSelector"}},
+					{Dynamic: AccountLookup{Location: "Info.AbstractReports.Messages.TokenAmounts.DestTokenAddress"}},
 				},
 				IsSigner:   false,
 				IsWritable: false,
@@ -242,8 +247,8 @@ func TestConfig() {
 				},
 				Seeds: []Seed{
 					{Static: []byte("ccip_tokenpool_chainconfig")},
-					{Dynamic: AccountLookup{Location: "AbstractReport.Message.Header.DestChainSelector"}},
-					{Dynamic: AccountLookup{Location: "AbstractReport.Message.TokenAmounts.DestTokenAddress"}},
+					{Dynamic: AccountLookup{Location: "Info.AbstractReports.Messages.Header.DestChainSelector"}},
+					{Dynamic: AccountLookup{Location: "Info.AbstractReports.Messages.TokenAmounts.DestTokenAddress"}},
 				},
 				IsSigner:   false,
 				IsWritable: false,
@@ -260,9 +265,16 @@ func TestConfig() {
 	}
 
 	commitConfig := MethodConfig{
-		FromAddress:        fromAddress,
-		InputModifications: nil,
-		ChainSpecificName:  "commit",
+		FromAddress: fromAddress,
+		InputModifications: []codec.ModifierConfig{
+			&codec.RenameModifierConfig{
+				Fields: map[string]string{"ReportContextByteWords": "ReportContext"},
+			},
+			&codec.RenameModifierConfig{
+				Fields: map[string]string{"RawReport": "Report"},
+			},
+		},
+		ChainSpecificName: "commit",
 		LookupTables: LookupTables{
 			StaticLookupTables: []solana.PublicKey{
 				commonAddressesLookupTable,
@@ -290,7 +302,7 @@ func TestConfig() {
 				// Similar to the TokenAdminRegistry above, the user is looking up PDA accounts based on the dest tokens.
 				Seeds: []Seed{
 					{Static: []byte("source_chain_state")},
-					{Dynamic: AccountLookup{Location: "MerkleRoot.DestChainSelector"}},
+					{Dynamic: AccountLookup{Location: "Info.MerkleRoots.ChainSel"}},
 				},
 				IsSigner:   false,
 				IsWritable: true,
@@ -306,10 +318,10 @@ func TestConfig() {
 				},
 				Seeds: []Seed{
 					{Static: []byte("commit_report")},
-					{Dynamic: AccountLookup{Location: "AbstractReport.MerkleRoots.ChainSel"}},
+					{Dynamic: AccountLookup{Location: "Info.MerkleRoots.ChainSel"}},
 					{Dynamic: AccountLookup{
 						// The seed is the merkle root of the report, as passed into the input params.
-						Location: "AbstractReport.MerkleRoots.MerkleRoot",
+						Location: "Info.MerkleRoots.MerkleRoot",
 					}},
 				},
 				IsSigner:   false,
@@ -356,7 +368,7 @@ func TestConfig() {
 				},
 				Seeds: []Seed{
 					{Static: []byte("fee_billing_token_config")},
-					{Dynamic: AccountLookup{Location: "AbstractReport.PriceUpdatesTokenPriceUpdates.TokenPrice.TokenID"}},
+					{Dynamic: AccountLookup{Location: "Info.TokenPrices.TokenID"}},
 				},
 				IsSigner:   false,
 				IsWritable: false,
@@ -369,7 +381,7 @@ func TestConfig() {
 				},
 				Seeds: []Seed{
 					{Static: []byte("dest_chain_state")},
-					{Dynamic: AccountLookup{Location: "AbstractReport.MerkleRoots.ChainSel"}},
+					{Dynamic: AccountLookup{Location: "Info.MerkleRoots.ChainSel"}},
 				},
 				IsSigner:   false,
 				IsWritable: false,
