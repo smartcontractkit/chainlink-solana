@@ -21,6 +21,7 @@ const (
 	txHashFieldName       = "tx_hash"
 	addressFieldName      = "address"
 	eventSigFieldName     = "event_sig"
+	eventSubkeyFieldName  = "event_subkey"
 	defaultSort           = "block_number ASC, log_index ASC"
 	subKeyValuesFieldName = "subkey_values"
 	subKeyValueArg        = "subkey_value"
@@ -206,11 +207,15 @@ func (v *pgDSLParser) VisitAddressFilter(p *addressFilter) {
 	)
 }
 
-func (v *pgDSLParser) VisitEventSigFilter(p *eventSigFilter) {
+func (v *pgDSLParser) VisitEventSubkeyFilter(p *eventSubkeyFilter) {
+	// TODO: build a proper expression
+	// TODO: the value type will be the off-chain field type that a raw IDL codec would decode into
+	// this value will need to be wrapped in a special type that will encode the value properly for
+	// direct comparison.
 	v.expression = fmt.Sprintf(
 		"%s = :%s",
-		eventSigFieldName,
-		v.args.withIndexedField(eventSigFieldName, p.eventSig),
+		eventSubkeyFieldName,
+		v.args.withIndexedField(eventSubkeyFieldName, p.Subkey),
 	)
 }
 
@@ -488,4 +493,36 @@ func (f *eventSigFilter) Accept(visitor primitives.Visitor) {
 	case *pgDSLParser:
 		v.VisitEventSigFilter(f)
 	}
+}
+
+func (v *pgDSLParser) VisitEventSigFilter(p *eventSigFilter) {
+	v.expression = fmt.Sprintf(
+		"%s = :%s",
+		eventSigFieldName,
+		v.args.withIndexedField(eventSigFieldName, p.eventSig),
+	)
+}
+
+type eventSubkeyFilter struct {
+	Subkey         []string
+	ValueComparers []primitives.ValueComparator
+}
+
+func NewEventSubkeyFilter(subkey []string, valueComparers []primitives.ValueComparator) query.Expression {
+	return query.Expression{Primitive: &eventSubkeyFilter{
+		Subkey:         subkey,
+		ValueComparers: valueComparers,
+	}}
+}
+
+func (f *eventSubkeyFilter) Accept(visitor primitives.Visitor) {
+	switch v := visitor.(type) {
+	case *pgDSLParser:
+		v.VisitEventSubkeyFilter(f)
+	}
+}
+
+// MakeContractReaderCursor is exported to ensure cursor structure remains consistent.
+func FormatContractReaderCursor(log Log) string {
+	return fmt.Sprintf("%d-%d-%s", log.BlockNumber, log.LogIndex, log.TxHash)
 }

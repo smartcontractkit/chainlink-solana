@@ -54,6 +54,10 @@ func TestDSLParser(t *testing.T) {
 		expressions := []query.Expression{
 			NewAddressFilter(pk),
 			NewEventSigFilter([]byte("test")),
+			NewEventSubkeyFilter([]string{"test"}, []primitives.ValueComparator{
+				{Value: 42, Operator: primitives.Gte},
+				{Value: "test_value", Operator: primitives.Eq},
+			}),
 			query.Confidence(primitives.Unconfirmed),
 		}
 		limiter := query.NewLimitAndSort(query.CursorLimit(fmt.Sprintf("10-5-%s", txHash), query.CursorFollowing, 20))
@@ -61,7 +65,7 @@ func TestDSLParser(t *testing.T) {
 		result, args, err := parser.buildQuery(chainID, expressions, limiter)
 		expected := logsQuery(
 			" WHERE chain_id = :chain_id " +
-				"AND (address = :address_0 AND event_sig = :event_sig_0) " +
+				"AND (address = :address_0 AND event_sig = :event_sig_0 AND event_subkey = :event_subkey_0) " +
 				"AND (block_number > :cursor_block_number OR (block_number = :cursor_block_number " +
 				"AND log_index > :cursor_log_index)) " +
 				"ORDER BY block_number ASC, log_index ASC, tx_hash ASC LIMIT 20")
@@ -83,13 +87,17 @@ func TestDSLParser(t *testing.T) {
 		expressions := []query.Expression{
 			NewAddressFilter(pk),
 			NewEventSigFilter([]byte("test")),
+			NewEventSubkeyFilter([]string{"test"}, []primitives.ValueComparator{
+				{Value: 42, Operator: primitives.Gte},
+				{Value: "test_value", Operator: primitives.Eq},
+			}),
 		}
 		limiter := query.NewLimitAndSort(query.CountLimit(20))
 
 		result, args, err := parser.buildQuery(chainID, expressions, limiter)
 		expected := logsQuery(
 			" WHERE chain_id = :chain_id " +
-				"AND (address = :address_0 AND event_sig = :event_sig_0) " +
+				"AND (address = :address_0 AND event_sig = :event_sig_0 AND event_subkey = :event_subkey_0) " +
 				"ORDER BY " + defaultSort + " " +
 				"LIMIT 20")
 
@@ -278,9 +286,10 @@ func TestDSLParser(t *testing.T) {
 	t.Run("nested query deep", func(t *testing.T) {
 		t.Parallel()
 
-		sigFilter := NewEventSigFilter([]byte("test"))
 		parser := &pgDSLParser{}
+		sigFilter := NewEventSigFilter([]byte("test"))
 
+		limiter := query.LimitAndSort{}
 		expressions := []query.Expression{
 			{BoolExpression: query.BoolExpression{
 				Expressions: []query.Expression{
@@ -302,7 +311,6 @@ func TestDSLParser(t *testing.T) {
 				BoolOperator: query.AND,
 			}},
 		}
-		limiter := query.LimitAndSort{}
 
 		result, args, err := parser.buildQuery(chainID, expressions, limiter)
 		expected := logsQuery(

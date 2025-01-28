@@ -2,11 +2,14 @@ package chainreader
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
 
+	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
@@ -35,6 +38,8 @@ func (b *accountReadBinding) SetCodec(codec types.RemoteCodec) {
 	b.codec = codec
 }
 
+func (b *accountReadBinding) SetModifier(commoncodec.Modifier) {}
+
 func (b *accountReadBinding) SetAddress(key solana.PublicKey) {
 	b.key = key
 }
@@ -57,11 +62,11 @@ func (b *accountReadBinding) GetAddress(ctx context.Context, params any) (solana
 }
 
 func (b *accountReadBinding) CreateType(forEncoding bool) (any, error) {
-	return b.codec.CreateType(codec.WrapItemType(forEncoding, b.namespace, b.genericName, codec.ChainConfigTypeAccountDef), forEncoding)
+	return b.codec.CreateType(codec.WrapItemType(forEncoding, b.namespace, b.genericName), forEncoding)
 }
 
 func (b *accountReadBinding) Decode(ctx context.Context, bts []byte, outVal any) error {
-	return b.codec.Decode(ctx, bts, outVal, codec.WrapItemType(false, b.namespace, b.genericName, codec.ChainConfigTypeAccountDef))
+	return b.codec.Decode(ctx, bts, outVal, codec.WrapItemType(false, b.namespace, b.genericName))
 }
 
 // buildSeedsSlice encodes and builds the seedslist to calculate the PDA public key
@@ -70,7 +75,7 @@ func (b *accountReadBinding) buildSeedsSlice(ctx context.Context, params any) ([
 	// Append the static prefix string first
 	flattenedSeeds = append(flattenedSeeds, []byte(b.prefix)...)
 	// Encode the seeds provided in the params
-	encodedParamSeeds, err := b.codec.Encode(ctx, params, codec.WrapItemType(true, b.namespace, b.genericName, ""))
+	encodedParamSeeds, err := b.codec.Encode(ctx, params, codec.WrapItemType(true, b.namespace, b.genericName))
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode params into bytes for PDA seeds: %w", err)
 	}
@@ -98,4 +103,8 @@ func (b *accountReadBinding) buildSeedsSlice(ctx context.Context, params any) ([
 		seedByteArray = append(seedByteArray, flattenedSeeds[startIdx:endIdx])
 	}
 	return seedByteArray, nil
+}
+
+func (b *accountReadBinding) QueryKey(_ context.Context, _ query.KeyFilter, _ query.LimitAndSort, _ any) ([]types.Sequence, error) {
+	return nil, errors.New("unimplemented")
 }

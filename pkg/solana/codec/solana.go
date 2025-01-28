@@ -140,12 +140,12 @@ func FindDefinitionFromIDL(cfgType ChainConfigType, chainSpecificName string, id
 	return nil, fmt.Errorf("unknown type: %q", cfgType)
 }
 
-func WrapItemType(forEncoding bool, contractName, itemType string, readType ChainConfigType) string {
+func WrapItemType(forEncoding bool, contractName, itemType string) string {
 	if forEncoding {
 		return fmt.Sprintf("input.%s.%s", contractName, itemType)
 	}
 
-	return fmt.Sprintf("output.%s.%s.%s", readType, contractName, itemType)
+	return fmt.Sprintf("output.%s.%s", contractName, itemType)
 }
 
 // TODO Deprecate and remove this.
