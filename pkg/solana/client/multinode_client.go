@@ -31,15 +31,8 @@ func (h *Head) BlockNumber() int64 {
 	return int64(*h.BlockHeight)
 }
 
-func (h *Head) BlockDifficulty() *big.Int {
-	// Not relevant for Solana
-	return nil
-}
-
-func (h *Head) GetTotalDifficulty() *big.Int {
-	// Not relevant for Solana
-	return nil
-}
+func (h *Head) BlockDifficulty() *big.Int    { return nil } // Not relevant for Solana
+func (h *Head) GetTotalDifficulty() *big.Int { return nil } // Not relevant for Solana
 
 func (h *Head) IsValid() bool {
 	return h != nil && h.BlockHeight != nil && *h.BlockHeight > 0 && h.BlockHash != nil
