@@ -38,7 +38,7 @@ type DataAccount struct {
 //go:embed testContractIDL.json
 var testContractIDL string
 
-// FetchCCIPRouterIDL returns
+// FetchCCIPRouterIDL returns the IDL for chain components test contract
 func FetchTestContractIDL() string {
 	return testContractIDL
 }

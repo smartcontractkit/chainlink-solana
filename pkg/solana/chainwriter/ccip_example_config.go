@@ -86,7 +86,7 @@ func TestConfig() {
 			// 	PDALookups can resolve to multiple addresses if:
 			// 		A) The PublicKey lookup resolves to multiple addresses (i.e. multiple token addresses)
 			// 		B) The Seeds or ValueSeeds resolve to multiple values
-			// PDA lokoup with constant seed
+			// PDA lookup with constant seed
 			PDALookups{
 				Name: "RouterAccountConfig",
 				PublicKey: AccountConstant{

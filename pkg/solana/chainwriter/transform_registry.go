@@ -9,8 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-// TODO: make this type in the ccipocr3 package
-// TODO: consolidate Info and AbstractReport
+// TODO: make this type in the chainlink-common CW package
 type ReportPreTransform struct {
 	ReportContext  [2][32]byte
 	Report         []byte
@@ -35,9 +34,8 @@ func FindTransform(id string) (func(context.Context, *SolanaChainWriterService, 
 	}
 }
 
-// This example doesn't contain the complete implementation of the function, since the
-// types needed to transform can't be imported into this repository. However, in production, this
-// function will be implemented in the CCIP plugin, which will have access to all the necessary types.
+// This Transform function looks up the token pool addresses in the accounts slice and augments the args
+// with the indexes of the token pool addresses in the accounts slice.
 func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args any, accounts solana.AccountMetaSlice, toAddress string) (any, error) {
 	TokenPoolLookupTable := LookupTables{
 		DerivedLookupTables: []DerivedLookupTable{
