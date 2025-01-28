@@ -36,6 +36,11 @@ func (h *Head) BlockDifficulty() *big.Int {
 	return nil
 }
 
+func (h *Head) GetTotalDifficulty() *big.Int {
+	// Not relevant for Solana
+	return nil
+}
+
 func (h *Head) IsValid() bool {
 	return h != nil && h.BlockHeight != nil && *h.BlockHeight > 0 && h.BlockHash != nil
 }
