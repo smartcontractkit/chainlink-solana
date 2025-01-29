@@ -15,6 +15,12 @@ import (
 
 type ContractReader struct {
 	Namespaces map[string]ChainContractReader `json:"namespaces"`
+	// AddressShareGroups lists namespaces groups that share the same address.
+	// Whichever namespace or i.e. Binding from the list is Bound first will share that address with the rest of the group.
+	// Namespaces that were bound after the first one still have to be Bound to be initialised.
+	// If they are Bound with an empty address string, they will use the address of the first Bound contract.
+	// If they are Bound with a non-empty address string, an error will be thrown unless the address matches the address of the first Bound shared contract.
+	AddressShareGroups [][]string `json:"addressShareGroups,omitempty"`
 }
 
 type ChainContractReader struct {
