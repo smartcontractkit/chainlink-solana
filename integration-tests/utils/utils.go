@@ -15,6 +15,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
@@ -164,4 +165,21 @@ func CreateTestLookupTable(ctx context.Context, t *testing.T, c *rpc.Client, sen
 	}, sender, rpc.CommitmentConfirmed)
 
 	return table
+}
+
+func CreateRandomToken(t *testing.T, admin solana.PrivateKey, tokenProgram solana.PublicKey, client *rpc.Client) solana.PublicKey {
+	ctx := tests.Context(t)
+	mint, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+
+	instructions, err := tokens.CreateToken(ctx, tokenProgram, mint.PublicKey(), admin.PublicKey(), uint8(0), client, rpc.CommitmentFinalized)
+	require.NoError(t, err)
+
+	addMintModifier := func(tx *solana.Transaction, signers map[solana.PublicKey]solana.PrivateKey) error {
+		signers[mint.PublicKey()] = mint
+		return nil
+	}
+
+	utils.SendAndConfirm(ctx, t, client, instructions, admin, rpc.CommitmentFinalized, addMintModifier)
+	return mint.PublicKey()
 }

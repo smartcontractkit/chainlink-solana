@@ -15,6 +15,7 @@ import (
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 )
 
@@ -42,6 +43,35 @@ func SendAndConfirm(ctx context.Context, t *testing.T, rpcClient *rpc.Client, in
 
 func sendTransaction(ctx context.Context, rpcClient *rpc.Client, t *testing.T, instructions []solana.Instruction,
 	signerAndPayer solana.PrivateKey, commitment rpc.CommitmentType, skipPreflight bool, opts ...TxModifier) *rpc.GetTransactionResult {
+	tx := CreateTx(ctx, t, rpcClient, instructions, signerAndPayer, commitment, opts...)
+
+	txsig, err := rpcClient.SendTransactionWithOpts(ctx, tx, rpc.TransactionOpts{SkipPreflight: skipPreflight, PreflightCommitment: rpc.CommitmentProcessed})
+	require.NoError(t, err)
+
+	var txStatus rpc.ConfirmationStatusType
+	count := 0
+	for txStatus != rpc.ConfirmationStatusType(commitment) && txStatus != rpc.ConfirmationStatusFinalized {
+		count++
+		statusRes, sigErr := rpcClient.GetSignatureStatuses(ctx, true, txsig)
+		require.NoError(t, sigErr)
+		if statusRes != nil && len(statusRes.Value) > 0 && statusRes.Value[0] != nil {
+			txStatus = statusRes.Value[0].ConfirmationStatus
+		}
+		time.Sleep(100 * time.Millisecond)
+		if count > 500 {
+			require.NoError(t, fmt.Errorf("unable to find transaction within timeout"))
+		}
+	}
+
+	txres, err := rpcClient.GetTransaction(ctx, txsig, &rpc.GetTransactionOpts{
+		Commitment: commitment,
+	})
+	require.NoError(t, err)
+	return txres
+}
+
+func CreateTx(ctx context.Context, t *testing.T, rpcClient *rpc.Client, instructions []solana.Instruction,
+	signerAndPayer solana.PrivateKey, commitment rpc.CommitmentType, opts ...TxModifier) *solana.Transaction {
 	hashRes, err := rpcClient.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
 	require.NoError(t, err)
 
@@ -67,30 +97,7 @@ func sendTransaction(ctx context.Context, rpcClient *rpc.Client, t *testing.T, i
 		return &priv
 	})
 	require.NoError(t, err)
-
-	txsig, err := rpcClient.SendTransactionWithOpts(ctx, tx, rpc.TransactionOpts{SkipPreflight: skipPreflight, PreflightCommitment: rpc.CommitmentProcessed})
-	require.NoError(t, err)
-
-	var txStatus rpc.ConfirmationStatusType
-	count := 0
-	for txStatus != rpc.ConfirmationStatusType(commitment) && txStatus != rpc.ConfirmationStatusFinalized {
-		count++
-		statusRes, sigErr := rpcClient.GetSignatureStatuses(ctx, true, txsig)
-		require.NoError(t, sigErr)
-		if statusRes != nil && len(statusRes.Value) > 0 && statusRes.Value[0] != nil {
-			txStatus = statusRes.Value[0].ConfirmationStatus
-		}
-		time.Sleep(100 * time.Millisecond)
-		if count > 500 {
-			require.NoError(t, fmt.Errorf("unable to find transaction within timeout"))
-		}
-	}
-
-	txres, err := rpcClient.GetTransaction(ctx, txsig, &rpc.GetTransactionOpts{
-		Commitment: commitment,
-	})
-	require.NoError(t, err)
-	return txres
+	return tx
 }
 
 // InjectAddressModifier injects AddressModifier into InputModifications and OutputModifications.
