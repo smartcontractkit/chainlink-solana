@@ -98,6 +98,16 @@ type AccountsFromLookupTable struct {
 	LookupOpts
 }
 
+type ATALookup struct {
+	// Field that determines whether the ATA lookup is necessary. Basically
+	// just need to check this field exists. Dot separated location.
+	Location string
+	// If the field exists, initialize a ATA account using the Wallet, Token Program, and Mint addresses below
+	WalletAddress Lookup
+	TokenProgram  Lookup
+	MintAddress   Lookup
+}
+
 func (ac AccountConstant) Resolve(_ context.Context, _ any, _ map[string]map[string][]*solana.AccountMeta, _ client.Reader) ([]*solana.AccountMeta, error) {
 	address, err := solana.PublicKeyFromBase58(ac.Address)
 	if err != nil {
