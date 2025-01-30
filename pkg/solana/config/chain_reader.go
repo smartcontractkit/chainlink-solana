@@ -79,8 +79,10 @@ func (c *ContractReader) UnmarshalJSON(bytes []byte) error {
 		return err
 	}
 
-	if err := json.Unmarshal(rawJSON["addressShareGroups"], &c.AddressShareGroups); err != nil {
-		return err
+	if rawJSON["addressShareGroups"] != nil {
+		if err := json.Unmarshal(rawJSON["addressShareGroups"], &c.AddressShareGroups); err != nil {
+			return err
+		}
 	}
 
 	if c.AddressShareGroups != nil {

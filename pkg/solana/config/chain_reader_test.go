@@ -10,6 +10,7 @@ import (
 
 	codeccommon "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
@@ -29,7 +30,7 @@ var validJSON string
 var validJSONWithIDLAsString string
 
 //go:embed test_contract_reader_valid_address_share_groups.json
-var validJsonWithAddressShareGroups string
+var validJSONWithAddressShareGroups string
 
 func TestChainReaderConfig(t *testing.T) {
 	t.Parallel()
@@ -76,7 +77,7 @@ func TestChainReaderConfig(t *testing.T) {
 		t.Parallel()
 
 		var result config.ContractReader
-		require.NoError(t, json.Unmarshal([]byte(validJsonWithAddressShareGroups), &result))
+		require.NoError(t, json.Unmarshal([]byte(validJSONWithAddressShareGroups), &result))
 		assert.Equal(t, validChainReaderConfigWithAddressShareGroups, result)
 	})
 
@@ -84,11 +85,9 @@ func TestChainReaderConfig(t *testing.T) {
 		t.Parallel()
 
 		result, err := json.Marshal(validChainReaderConfig)
-
 		require.NoError(t, err)
 
 		var conf config.ContractReader
-
 		require.NoError(t, json.Unmarshal(result, &conf))
 		assert.Equal(t, validChainReaderConfig, conf)
 	})
