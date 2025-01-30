@@ -3,19 +3,19 @@ package chainwriter
 import (
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
-	"reflect"
 
-	ag_binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
 // Lookup is an interface that defines a method to resolve an address (or multiple addresses) from a given definition.
 type Lookup interface {
-	Resolve(ctx context.Context, args any, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.Reader) ([]*solana.AccountMeta, error)
+	Resolve(ctx context.Context, args any, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.Reader, idl string) ([]*solana.AccountMeta, error)
 }
 
 // AccountConstant represents a fixed address, provided in Base58 format, converted into a `solana.PublicKey`.
@@ -60,7 +60,8 @@ type PDALookups struct {
 }
 
 type InternalField struct {
-	Type     reflect.Type
+	// must map directly to IDL type
+	TypeName string
 	Location string
 }
 
@@ -82,7 +83,7 @@ type AccountsFromLookupTable struct {
 	IncludeIndexes  []int
 }
 
-func (ac AccountConstant) Resolve(_ context.Context, _ any, _ map[string]map[string][]*solana.AccountMeta, _ client.Reader) ([]*solana.AccountMeta, error) {
+func (ac AccountConstant) Resolve(_ context.Context, _ any, _ map[string]map[string][]*solana.AccountMeta, _ client.Reader, _ string) ([]*solana.AccountMeta, error) {
 	address, err := solana.PublicKeyFromBase58(ac.Address)
 	if err != nil {
 		return nil, fmt.Errorf("error getting account from constant: %w", err)
@@ -96,15 +97,10 @@ func (ac AccountConstant) Resolve(_ context.Context, _ any, _ map[string]map[str
 	}, nil
 }
 
-func (al AccountLookup) Resolve(
-	_ context.Context,
-	args any,
-	_ map[string]map[string][]*solana.AccountMeta,
-	_ client.Reader,
-) ([]*solana.AccountMeta, error) {
+func (al AccountLookup) Resolve(_ context.Context, args any, _ map[string]map[string][]*solana.AccountMeta, _ client.Reader, _ string) ([]*solana.AccountMeta, error) {
 	derivedValues, err := GetValuesAtLocation(args, al.Location)
 	if err != nil {
-		return nil, fmt.Errorf("error getting account from '%s': %w", al.Location, err)
+		return nil, fmt.Errorf("error getting account from lookup: %w", err)
 	}
 
 	var metas []*solana.AccountMeta
@@ -131,7 +127,6 @@ func (al AccountLookup) Resolve(
 			IsWritable: isWritable,
 		})
 	}
-
 	return metas, nil
 }
 
@@ -161,7 +156,7 @@ func resolveBitMap(mb MetaBool, args any, length int) ([]bool, error) {
 	return result, nil
 }
 
-func (alt AccountsFromLookupTable) Resolve(_ context.Context, _ any, derivedTableMap map[string]map[string][]*solana.AccountMeta, _ client.Reader) ([]*solana.AccountMeta, error) {
+func (alt AccountsFromLookupTable) Resolve(_ context.Context, _ any, derivedTableMap map[string]map[string][]*solana.AccountMeta, _ client.Reader, _ string) ([]*solana.AccountMeta, error) {
 	// Fetch the inner map for the specified lookup table name
 	innerMap, ok := derivedTableMap[alt.LookupTableName]
 	if !ok {
@@ -191,8 +186,8 @@ func (alt AccountsFromLookupTable) Resolve(_ context.Context, _ any, derivedTabl
 	return result, nil
 }
 
-func (pda PDALookups) Resolve(ctx context.Context, args any, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.Reader) ([]*solana.AccountMeta, error) {
-	publicKeys, err := GetAddresses(ctx, args, []Lookup{pda.PublicKey}, derivedTableMap, reader)
+func (pda PDALookups) Resolve(ctx context.Context, args any, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.Reader, idl string) ([]*solana.AccountMeta, error) {
+	publicKeys, err := GetAddresses(ctx, args, []Lookup{pda.PublicKey}, derivedTableMap, reader, idl)
 	if err != nil {
 		return nil, fmt.Errorf("error getting public key for PDALookups: %w", err)
 	}
@@ -223,9 +218,26 @@ func (pda PDALookups) Resolve(ctx context.Context, args any, derivedTableMap map
 			return nil, fmt.Errorf("error fetching account info for PDA account: %s, error: %w", accountMeta.PublicKey.String(), err)
 		}
 
-		decoded, err := decodeBorshIntoType(accountInfo.GetBinary(), pda.InternalField.Type)
+		var idlCodec codec.IDL
+		if err = json.Unmarshal([]byte(idl), &idlCodec); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal IDL for PDA: %s, error: %w", pda.Name, err)
+		}
+
+		internalType := pda.InternalField.TypeName
+
+		idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeAccountDef, internalType, idlCodec)
 		if err != nil {
-			return nil, fmt.Errorf("error decoding Borsh data dynamically: %w", err)
+			return nil, fmt.Errorf("error finding definition for type %s: %w", internalType, err)
+		}
+
+		input, err := codec.CreateCodecEntry(idlDef, internalType, idlCodec, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create codec entry for method %s, error: %w", internalType, err)
+		}
+
+		decoded, _, err := input.Decode(accountInfo.Value.Data.GetBinary())
+		if err != nil {
+			return nil, fmt.Errorf("error decoding account data: %w", err)
 		}
 
 		value, err := GetValuesAtLocation(decoded, pda.InternalField.Location)
@@ -243,25 +255,6 @@ func (pda PDALookups) Resolve(ctx context.Context, args any, derivedTableMap map
 		})
 	}
 	return result, nil
-}
-
-func decodeBorshIntoType(data []byte, typ reflect.Type) (interface{}, error) {
-	// Ensure the type is a struct
-	if typ.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("provided type is not a struct: %s", typ.Kind())
-	}
-
-	// Create a new instance of the type
-	instance := reflect.New(typ).Interface()
-
-	// Decode using Borsh
-	err := ag_binary.NewBorshDecoder(data).Decode(instance)
-	if err != nil {
-		return nil, fmt.Errorf("error decoding Borsh data: %w", err)
-	}
-
-	// Return the underlying value (not a pointer)
-	return reflect.ValueOf(instance).Elem().Interface(), nil
 }
 
 // getSeedBytesCombinations extracts the seeds for the PDALookups.
@@ -304,7 +297,7 @@ func getSeedBytesCombinations(
 				}
 			} else {
 				// Get address seeds from the lookup
-				seedAddresses, err := GetAddresses(ctx, args, []Lookup{dynamicSeed}, derivedTableMap, reader)
+				seedAddresses, err := GetAddresses(ctx, args, []Lookup{dynamicSeed}, derivedTableMap, reader, "")
 				if err != nil {
 					return nil, fmt.Errorf("error getting address seed: %w", err)
 				}

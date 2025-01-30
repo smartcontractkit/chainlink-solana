@@ -3,6 +3,7 @@ package chainwriter
 import (
 	"context"
 	"crypto/sha256"
+	_ "embed"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -13,6 +14,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
@@ -26,11 +29,18 @@ type InnerArgs struct {
 }
 
 type DataAccount struct {
-	Discriminator        [8]byte
 	Version              uint8
 	Administrator        solana.PublicKey
 	PendingAdministrator solana.PublicKey
 	LookupTable          solana.PublicKey
+}
+
+//go:embed testContractIDL.json
+var testContractIDL string
+
+// FetchCCIPRouterIDL returns the IDL for chain components test contract
+func FetchTestContractIDL() string {
+	return testContractIDL
 }
 
 // GetValuesAtLocation parses through nested types and arrays to find all locations of values
@@ -43,6 +53,12 @@ func GetValuesAtLocation(args any, location string) ([][]byte, error) {
 		return nil, err
 	}
 	for _, value := range addressList {
+		// Dereference if it's a pointer
+		rv := reflect.ValueOf(value)
+		if rv.Kind() == reflect.Ptr && !rv.IsNil() {
+			value = rv.Elem().Interface()
+		}
+
 		if byteArray, ok := value.([]byte); ok {
 			vals = append(vals, byteArray)
 		} else if address, ok := value.(solana.PublicKey); ok {
@@ -51,6 +67,10 @@ func GetValuesAtLocation(args any, location string) ([][]byte, error) {
 			buf := make([]byte, 8)
 			binary.LittleEndian.PutUint64(buf, num)
 			vals = append(vals, buf)
+		} else if addr, ok := value.(ccipocr3.UnknownAddress); ok {
+			vals = append(vals, addr)
+		} else if arr, ok := value.([32]uint8); ok {
+			vals = append(vals, arr[:])
 		} else {
 			return nil, fmt.Errorf("invalid value format at path: %s, type: %s", location, reflect.TypeOf(value).String())
 		}
