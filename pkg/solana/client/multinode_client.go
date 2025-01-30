@@ -10,6 +10,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	mn "github.com/smartcontractkit/chainlink-framework/multinode"
@@ -39,7 +40,7 @@ func (h *Head) IsValid() bool {
 }
 
 var _ mn.RPCClient[mn.StringID, *Head] = (*MultiNodeClient)(nil)
-var _ mn.SendTxRPCClient[*solana.Transaction, *SendTxResult] = (*MultiNodeClient)(nil)
+var _ mn.SendTxRPCClient[*solana.Transaction, solana.Signature] = (*MultiNodeClient)(nil)
 
 type MultiNodeClient struct {
 	Client
@@ -317,37 +318,7 @@ func (m *MultiNodeClient) GetInterceptedChainInfo() (latest, highestUserObservat
 	return m.latestChainInfo, m.highestUserObservations
 }
 
-type SendTxResult struct {
-	err  error
-	code mn.SendTxReturnCode
-	sig  solana.Signature
-}
-
-var _ mn.SendTxResult = (*SendTxResult)(nil)
-
-func NewSendTxResult(err error) *SendTxResult {
-	result := &SendTxResult{
-		err: err,
-	}
-	result.code = ClassifySendError(nil, err)
-	return result
-}
-
-func (r *SendTxResult) Error() error {
-	return r.err
-}
-
-func (r *SendTxResult) Code() mn.SendTxReturnCode {
-	return r.code
-}
-
-func (r *SendTxResult) Signature() solana.Signature {
-	return r.sig
-}
-
-func (m *MultiNodeClient) SendTransaction(ctx context.Context, tx *solana.Transaction) *SendTxResult {
-	var sendTxResult = &SendTxResult{}
-	sendTxResult.sig, sendTxResult.err = m.SendTx(ctx, tx)
-	sendTxResult.code = ClassifySendError(tx, sendTxResult.err)
-	return sendTxResult
+func (m *MultiNodeClient) SendTransaction(ctx context.Context, tx *solana.Transaction) (solana.Signature, mn.SendTxReturnCode, error) {
+	sig, err := m.SendTx(ctx, tx)
+	return sig, ClassifySendError(tx, err), err
 }
