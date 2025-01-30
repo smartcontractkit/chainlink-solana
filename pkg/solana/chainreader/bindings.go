@@ -125,10 +125,8 @@ func (b *bindingsRegistry) handleAddressSharing(boundContract *types.BoundContra
 			return err
 		}
 		shareGroup.address = key
-	}
-
-	if boundContract.Address != shareGroupAddress.String() && boundContract.Address != "" {
-		return fmt.Errorf("binding: %q shares address: %q with namespaceBindings: %v and cannot be bound with a different address", boundContract.Name, shareGroup.address, shareGroup.group)
+	} else if boundContract.Address != shareGroupAddress.String() && boundContract.Address != "" {
+		return fmt.Errorf("namespace: %q shares address: %q with namespaceBindings: %v and cannot be bound with a new address: %s", boundContract.Name, shareGroupAddress, shareGroup.group, boundContract.Address)
 	}
 
 	boundContract.Address = shareGroupAddress.String()

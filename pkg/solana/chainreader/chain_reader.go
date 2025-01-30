@@ -64,11 +64,17 @@ func NewContractReaderService(
 	reader EventsReader,
 ) (*ContractReaderService, error) {
 	svc := &ContractReaderService{
-		lggr:       logger.Named(lggr, ServiceName),
-		client:     dataReader,
-		bdRegistry: bindingsRegistry{},
-		lookup:     newLookup(),
-		parsed:     &codec.ParsedTypes{EncoderDefs: map[string]codec.Entry{}, DecoderDefs: map[string]codec.Entry{}},
+		lggr:   logger.Named(lggr, ServiceName),
+		client: dataReader,
+		bdRegistry: bindingsRegistry{
+			namespaceBindings:  make(map[string]readNameBindings),
+			addressShareGroups: make(map[string]*addressShareGroup),
+		},
+		lookup: newLookup(),
+		parsed: &codec.ParsedTypes{
+			EncoderDefs: map[string]codec.Entry{},
+			DecoderDefs: map[string]codec.Entry{},
+		},
 		filters:  []logpoller.Filter{},
 		reader:   reader,
 	}
@@ -261,6 +267,7 @@ func (s *ContractReaderService) QueryKey(ctx context.Context, contract types.Bou
 // Bind implements the types.ContractReader interface and allows new contract namespaceBindings to be added
 // to the service.
 func (s *ContractReaderService) Bind(_ context.Context, bindings []types.BoundContract) error {
+	fmt.Println("binidngs are  ", bindings)
 	for i := range bindings {
 		if err := s.bdRegistry.Bind(&bindings[i]); err != nil {
 			return err
