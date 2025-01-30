@@ -68,6 +68,36 @@ type IndexedField struct {
 	OnChainPath  string `json:"onChainPath"`
 }
 
+func (c *ContractReader) UnmarshalJSON(bytes []byte) error {
+	rawJSON := make(map[string]json.RawMessage)
+	if err := json.Unmarshal(bytes, &rawJSON); err != nil {
+		return err
+	}
+
+	c.Namespaces = make(map[string]ChainContractReader)
+	if err := json.Unmarshal(rawJSON["namespaces"], &c.Namespaces); err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(rawJSON["addressShareGroups"], &c.AddressShareGroups); err != nil {
+		return err
+	}
+
+	if c.AddressShareGroups != nil {
+		seen := make(map[string][]string)
+		for _, group := range c.AddressShareGroups {
+			for _, namespace := range group {
+				if seenIn, alreadySeen := seen[namespace]; alreadySeen {
+					return fmt.Errorf("namespace %s is already in share group %v: %w", namespace, seenIn, commontypes.ErrInvalidConfig)
+				}
+				seen[namespace] = group
+			}
+		}
+	}
+
+	return nil
+}
+
 func (c *ChainContractReader) UnmarshalJSON(bytes []byte) error {
 	rawJSON := make(map[string]json.RawMessage)
 	if err := json.Unmarshal(bytes, &rawJSON); err != nil {
