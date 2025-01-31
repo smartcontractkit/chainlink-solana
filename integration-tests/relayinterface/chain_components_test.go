@@ -31,7 +31,8 @@ import (
 	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
-	contract "github.com/smartcontractkit/chainlink-solana/contracts/generated/contract_reader_interface"
+	contractprimary "github.com/smartcontractkit/chainlink-solana/contracts/generated/contract_reader_interface"
+	contractsecondary "github.com/smartcontractkit/chainlink-solana/contracts/generated/contract_reader_interface_secondary"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader"
@@ -69,8 +70,7 @@ func TestChainComponents(t *testing.T) {
 
 func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 	it.DisableTests([]string{
-		// disable tests that require secondary program
-		ContractReaderGetLatestValueFromMultipleContractsNamesSameFunction,
+		// disable failing test
 		ContractReaderBatchGetLatestValueMultipleContractNamesSameFunction,
 		// disable tests that set values
 		ContractReaderGetLatestValueBasedOnConfidenceLevel,
@@ -135,7 +135,8 @@ type SolanaChainComponentsInterfaceTesterHelper[T WrappedTestingT[T]] interface 
 	RPCClient() *chainreader.RPCClientWrapper
 	Context(t T) context.Context
 	Logger(t T) logger.Logger
-	GetJSONEncodedIDL(t T) []byte
+	GetPrimaryIDL(t T) []byte
+	GetSecondaryIDL(t T) []byte
 	CreateAccount(t T, it SolanaChainComponentsInterfaceTester[T], contractName string, value uint64) solana.PublicKey
 	TXM() *txm.TxManager
 	SolanaClient() *client.Client
@@ -206,7 +207,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GetBindings(t T) []types.Boun
 	// Create a new account with fresh state for each test
 	return []types.BoundContract{
 		{Name: AnyContractName, Address: it.Helper.CreateAccount(t, *it, AnyContractName, AnyValueToReadWithoutAnArgument).String()},
-		// {Name: AnySecondContractName, Address: it.Helper.CreateAccount(t, *it, AnySecondContractName, AnyDifferentValueToReadWithoutAnArgument).String()},
+		{Name: AnySecondContractName, Address: it.Helper.CreateAccount(t, *it, AnySecondContractName, AnyDifferentValueToReadWithoutAnArgument).String()},
 	}
 }
 
@@ -221,14 +222,16 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GenerateBlocksTillConfidenceL
 }
 
 type helper struct {
-	programID solana.PublicKey
-	rpcURL    string
-	wsURL     string
-	rpcClient *rpc.Client
-	wsClient  *ws.Client
-	idlBts    []byte
-	txm       txm.TxManager
-	sc        *client.Client
+	primaryProgramID   solana.PublicKey
+	secondaryProgramID solana.PublicKey
+	rpcURL             string
+	wsURL              string
+	rpcClient          *rpc.Client
+	wsClient           *ws.Client
+	primaryIdlBts      []byte
+	secondaryIdlBts    []byte
+	txm                txm.TxManager
+	sc                 *client.Client
 }
 
 func (h *helper) Init(t *testing.T) {
@@ -237,7 +240,7 @@ func (h *helper) Init(t *testing.T) {
 	privateKey, err := solana.PrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1])
 	require.NoError(t, err)
 
-	h.rpcURL, h.wsURL = solanautils.SetupTestValidatorWithAnchorPrograms(t, privateKey.PublicKey().String(), []string{"contract-reader-interface"})
+	h.rpcURL, h.wsURL = solanautils.SetupTestValidatorWithAnchorPrograms(t, privateKey.PublicKey().String(), []string{"contract-reader-interface", "contract-reader-interface-secondary"})
 	h.wsClient, err = ws.Connect(tests.Context(t), h.wsURL)
 	h.rpcClient = rpc.New(h.rpcURL)
 
@@ -266,11 +269,16 @@ func (h *helper) Init(t *testing.T) {
 
 	h.txm = txm
 
-	pubkey, err := solana.PublicKeyFromBase58(programPubKey)
+	primaryPubkey, err := solana.PublicKeyFromBase58(primaryProgramPubKey)
 	require.NoError(t, err)
+	contractprimary.SetProgramID(primaryPubkey)
 
-	contract.SetProgramID(pubkey)
-	h.programID = pubkey
+	secondaryPubkey, err := solana.PublicKeyFromBase58(secondaryProgramPubKey)
+	require.NoError(t, err)
+	contractsecondary.SetProgramID(secondaryPubkey)
+
+	h.primaryProgramID = primaryPubkey
+	h.secondaryProgramID = secondaryPubkey
 }
 
 func (h *helper) RPCClient() *chainreader.RPCClientWrapper {
@@ -293,14 +301,34 @@ func (h *helper) Logger(t *testing.T) logger.Logger {
 	return logger.Test(t)
 }
 
-func (h *helper) GetJSONEncodedIDL(t *testing.T) []byte {
+func (h *helper) GetPrimaryIDL(t *testing.T) []byte {
 	t.Helper()
 
-	if h.idlBts != nil {
-		return h.idlBts
+	if h.primaryIdlBts != nil {
+		return h.primaryIdlBts
 	}
 
-	soPath := filepath.Join(utils.IDLDir, "contract_reader_interface.json")
+	bts := h.GetJSONEncodedIDL(t, "contract_reader_interface.json")
+	h.primaryIdlBts = bts
+	return h.primaryIdlBts
+}
+
+func (h *helper) GetSecondaryIDL(t *testing.T) []byte {
+	t.Helper()
+
+	if h.secondaryIdlBts != nil {
+		return h.secondaryIdlBts
+	}
+
+	bts := h.GetJSONEncodedIDL(t, "contract_reader_interface_secondary.json")
+	h.secondaryIdlBts = bts
+	return h.secondaryIdlBts
+}
+
+func (h *helper) GetJSONEncodedIDL(t *testing.T, fileName string) []byte {
+	t.Helper()
+
+	soPath := filepath.Join(utils.IDLDir,  fileName)
 
 	_, err := os.Stat(soPath)
 	if err != nil {
@@ -311,16 +339,22 @@ func (h *helper) GetJSONEncodedIDL(t *testing.T) []byte {
 	bts, err := os.ReadFile(soPath)
 	require.NoError(t, err)
 
-	h.idlBts = bts
-
-	return h.idlBts
+	return bts
 }
 
 func (h *helper) CreateAccount(t *testing.T, it SolanaChainComponentsInterfaceTester[*testing.T], contractName string, value uint64) solana.PublicKey {
 	t.Helper()
 
-	h.runInitialize(t, it, contractName, value)
-	return h.programID
+	var programID solana.PublicKey
+	switch contractName {
+	case AnyContractName:
+		programID = h.primaryProgramID
+	case AnySecondContractName:
+		programID = h.secondaryProgramID
+	}
+
+	h.runInitialize(t, it, contractName, programID, value)
+	return programID
 }
 
 type InitializeArgs struct {
@@ -332,6 +366,7 @@ func (h *helper) runInitialize(
 	t *testing.T,
 	it SolanaChainComponentsInterfaceTester[*testing.T],
 	contractName string,
+	programID solana.PublicKey,
 	value uint64,
 ) {
 	t.Helper()
@@ -351,7 +386,7 @@ func (h *helper) runInitialize(
 		Value: value,
 	}
 
-	SubmitTransactionToCW(t, &it, cw, "initialize", args, types.BoundContract{Name: contractName, Address: h.programID.String()}, types.Finalized)
+	SubmitTransactionToCW(t, &it, cw, "initialize", args, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
 }
 
 func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T) config.ContractReader {
@@ -361,7 +396,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 	return config.ContractReader{
 		Namespaces: map[string]config.ChainContractReader{
 			AnyContractName: {
-				IDL: mustUnmarshalIDL(t, string(it.Helper.GetJSONEncodedIDL(t))),
+				IDL: mustUnmarshalIDL(t, string(it.Helper.GetPrimaryIDL(t))),
 				Reads: map[string]config.ReadDefinition{
 					MethodReturningUint64: {
 						ChainSpecificName: "DataAccount",
@@ -382,13 +417,31 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 							&commoncodec.PropertyExtractorConfig{FieldName: "U64Slice"},
 						},
 					},
+					MethodSettingUint64: {
+						ChainSpecificName: "DataAccount",
+						PDADefiniton: codec.PDATypeDef{
+							Prefix: pdaPrefix,
+						},
+						OutputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.PropertyExtractorConfig{FieldName: "U64Value"},
+						},
+					},
+					MethodReturningAlterableUint64: {
+						ChainSpecificName: "Value",
+						PDADefiniton: codec.PDATypeDef{
+							Prefix: pdaPrefix,
+						},
+						OutputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.PropertyExtractorConfig{FieldName: "U64Value"},
+						},
+					},
 				},
 			},
 			AnySecondContractName: {
-				IDL: mustUnmarshalIDL(t, string(it.Helper.GetJSONEncodedIDL(t))),
+				IDL: mustUnmarshalIDL(t, string(it.Helper.GetSecondaryIDL(t))),
 				Reads: map[string]config.ReadDefinition{
 					MethodReturningUint64: {
-						ChainSpecificName: "DataAccount",
+						ChainSpecificName: "Data",
 						PDADefiniton: codec.PDATypeDef{
 							Prefix: pdaPrefix,
 						},
@@ -400,7 +453,6 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 			},
 		},
 	}
-
 }
 
 func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T) chainwriter.ChainWriterConfig {
@@ -409,7 +461,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 	return chainwriter.ChainWriterConfig{
 		Programs: map[string]chainwriter.ProgramConfig{
 			AnyContractName: {
-				IDL: string(it.Helper.GetJSONEncodedIDL(t)),
+				IDL: string(it.Helper.GetPrimaryIDL(t)),
 				Methods: map[string]chainwriter.MethodConfig{
 					"initialize": {
 						FromAddress:        solana.MustPrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1]).PublicKey().String(),
@@ -421,7 +473,67 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								Name: "Account",
 								PublicKey: chainwriter.AccountConstant{
 									Name:    "ProgramID",
-									Address: programPubKey,
+									Address: primaryProgramPubKey,
+								},
+								Seeds: []chainwriter.Seed{
+									{Static: []byte("data")},
+									{Static: testIdx},
+								},
+								IsWritable: true,
+								IsSigner:   false,
+							},
+							chainwriter.PDALookups{
+								Name: "ValueAccount",
+								PublicKey: chainwriter.AccountConstant{
+									Name:    "ProgramID",
+									Address: primaryProgramPubKey,
+								},
+								Seeds: []chainwriter.Seed{
+									{Static: []byte("val")},
+								},
+								IsWritable: true,
+								IsSigner:   false,
+							},
+						},
+						DebugIDLocation: "",
+					},
+					MethodSettingUint64: {
+						FromAddress:        solana.MustPrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1]).PublicKey().String(),
+						InputModifications: nil,
+						ChainSpecificName: "storeVal",
+						LookupTables:       chainwriter.LookupTables{},
+						Accounts: []chainwriter.Lookup{
+							chainwriter.PDALookups{
+								Name: "Account",
+								PublicKey: chainwriter.AccountConstant{
+									Name:    "ProgramID",
+									Address: primaryProgramPubKey,
+								},
+								Seeds: []chainwriter.Seed{
+									{Static: []byte("val")},
+								},
+								IsWritable: true,
+								IsSigner:   false,
+							},
+						},
+						DebugIDLocation: "",
+					},
+				},
+			},
+			AnySecondContractName: {
+				IDL: string(it.Helper.GetSecondaryIDL(t)),
+				Methods: map[string]chainwriter.MethodConfig{
+					"initialize": {
+						FromAddress:        solana.MustPrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1]).PublicKey().String(),
+						InputModifications: nil,
+						ChainSpecificName:  "initialize",
+						LookupTables:       chainwriter.LookupTables{},
+						Accounts: []chainwriter.Lookup{
+							chainwriter.PDALookups{
+								Name: "Account",
+								PublicKey: chainwriter.AccountConstant{
+									Name:    "ProgramID",
+									Address: secondaryProgramPubKey,
 								},
 								Seeds: []chainwriter.Seed{
 									{Static: []byte("data")},
@@ -449,4 +561,7 @@ func mustUnmarshalIDL[T WrappedTestingT[T]](t T, rawIDL string) codec.IDL {
 	return idl
 }
 
-const programPubKey = "6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE"
+const (
+	primaryProgramPubKey = "6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE"
+	secondaryProgramPubKey = "9SFyk8NmGYh5D612mJwUYhguCRY9cFgaS2vksrigepjf"
+)
