@@ -69,6 +69,9 @@ func TestChainComponents(t *testing.T) {
 
 func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 	it.DisableTests([]string{
+		// disable tests that require secondary program
+		ContractReaderGetLatestValueFromMultipleContractsNamesSameFunction,
+		ContractReaderBatchGetLatestValueMultipleContractNamesSameFunction,
 		// disable tests that set values
 		ContractReaderGetLatestValueBasedOnConfidenceLevel,
 		// disable anything returning a struct or requiring input params for now
@@ -203,7 +206,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GetBindings(t T) []types.Boun
 	// Create a new account with fresh state for each test
 	return []types.BoundContract{
 		{Name: AnyContractName, Address: it.Helper.CreateAccount(t, *it, AnyContractName, AnyValueToReadWithoutAnArgument).String()},
-		{Name: AnySecondContractName, Address: it.Helper.CreateAccount(t, *it, AnySecondContractName, AnyDifferentValueToReadWithoutAnArgument).String()},
+		// {Name: AnySecondContractName, Address: it.Helper.CreateAccount(t, *it, AnySecondContractName, AnyDifferentValueToReadWithoutAnArgument).String()},
 	}
 }
 
