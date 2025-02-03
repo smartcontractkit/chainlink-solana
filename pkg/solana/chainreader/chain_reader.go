@@ -267,13 +267,16 @@ func (s *ContractReaderService) QueryKey(ctx context.Context, contract types.Bou
 // Bind implements the types.ContractReader interface and allows new contract namespaceBindings to be added
 // to the service.
 func (s *ContractReaderService) Bind(_ context.Context, bindings []types.BoundContract) error {
-	fmt.Println("binidngs are  ", bindings)
 	for i := range bindings {
 		if err := s.bdRegistry.Bind(&bindings[i]); err != nil {
 			return err
 		}
 
 		s.lookup.bindAddressForContract(bindings[i].Name, bindings[i].Address)
+		// also bind with an empty address so that we can look up the contract without providing address when calling CR methods
+		if _, isInAShareGroup := s.bdRegistry.getShareGroup(bindings[i]); isInAShareGroup {
+			s.lookup.bindAddressForContract(bindings[i].Name, "")
+		}
 	}
 
 	return nil

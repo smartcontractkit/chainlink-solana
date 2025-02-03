@@ -70,6 +70,10 @@ func (b *bindingsRegistry) CreateType(namespace, readName string, forEncoding bo
 }
 
 func (b *bindingsRegistry) Bind(boundContract *types.BoundContract) error {
+	if boundContract == nil {
+		return fmt.Errorf("%w: bound contract is nil", types.ErrInvalidType)
+	}
+
 	if err := b.handleAddressSharing(boundContract); err != nil {
 		return err
 	}
@@ -81,7 +85,7 @@ func (b *bindingsRegistry) Bind(boundContract *types.BoundContract) error {
 
 	key, err := solana.PublicKeyFromBase58(boundContract.Address)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: failed to parse address: %q for contract %q", types.ErrInvalidConfig, boundContract.Address, boundContract.Name)
 	}
 
 	for _, rBinding := range rBindings {
@@ -109,8 +113,8 @@ func (b *bindingsRegistry) SetModifiers(modifier commoncodec.Modifier) {
 
 
 func (b *bindingsRegistry) handleAddressSharing(boundContract *types.BoundContract) error {
-	shareGroup, sharesAddress := b.addressShareGroups[boundContract.Name]
-	if !sharesAddress {
+	shareGroup, isInAGroup := b.getShareGroup(*boundContract)
+	if !isInAGroup {
 		return nil
 	}
 
@@ -118,19 +122,27 @@ func (b *bindingsRegistry) handleAddressSharing(boundContract *types.BoundContra
 	defer shareGroup.mux.Unlock()
 
 	// set shared address to the binding address
-	shareGroupAddress := shareGroup.address
-	if shareGroupAddress.IsZero() {
+	if shareGroup.address.IsZero() {
 		key, err := solana.PublicKeyFromBase58(boundContract.Address)
 		if err != nil {
 			return err
 		}
-		shareGroup.address = key
-	} else if boundContract.Address != shareGroupAddress.String() && boundContract.Address != "" {
-		return fmt.Errorf("namespace: %q shares address: %q with namespaceBindings: %v and cannot be bound with a new address: %s", boundContract.Name, shareGroupAddress, shareGroup.group, boundContract.Address)
+		b.addressShareGroups[boundContract.Name].address, shareGroup.address = key, key
+	} else if boundContract.Address != shareGroup.address.String() && boundContract.Address != "" {
+		return fmt.Errorf("namespace: %q shares address: %q with namespaceBindings: %v and cannot be bound with a new address: %s", boundContract.Name, shareGroup.address, shareGroup.group, boundContract.Address)
 	}
 
-	boundContract.Address = shareGroupAddress.String()
+	boundContract.Address = shareGroup.address.String()
 	return nil
+}
+
+func (b *bindingsRegistry) getShareGroup(boundContract types.BoundContract) (*addressShareGroup, bool) {
+	shareGroup, sharesAddress := b.addressShareGroups[boundContract.Name]
+	if !sharesAddress {
+		return nil, false
+	}
+
+	return shareGroup, sharesAddress
 }
 
 func (b *bindingsRegistry) initAddressSharing(addressShareGroups [][]string) error {

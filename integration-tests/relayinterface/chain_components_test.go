@@ -18,6 +18,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/gagliardetto/solana-go/rpc/ws"
 	"github.com/gagliardetto/solana-go/text"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
@@ -35,6 +36,12 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+)
+
+const (
+	AnyContractNameWithSharedAddress1 = AnyContractName + "Shared1"
+	AnyContractNameWithSharedAddress2 = AnyContractName + "Shared2"
+	AnyContractNameWithSharedAddress3 = AnyContractName + "Shared3"
 )
 
 func TestChainComponents(t *testing.T) {
@@ -95,7 +102,70 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 }
 
 func RunChainComponentsSolanaTests[T TestingT[T]](t T, it *SolanaChainComponentsInterfaceTester[T]) {
-	RunContractReaderSolanaTests(t, it)
+	testCases := Testcase[T]{
+		Name: "Test address groups where first namespace shares address with second namespace",
+		Test: func(t T) {
+			ctx := tests.Context(t)
+			cfg := it.contractReaderConfig
+			cfg.AddressShareGroups = [][]string{{AnyContractNameWithSharedAddress1, AnyContractNameWithSharedAddress2, AnyContractNameWithSharedAddress3}}
+			cr := it.GetContractReaderWithCustomCfg(t, cfg)
+
+			t.Run("Namespace is part of an address share group that doesn't have a registered address and provides no address during Bind", func(t T) {
+				bound1 := []types.BoundContract{{
+					Name: AnyContractNameWithSharedAddress1,
+				}}
+				require.Error(t, cr.Bind(ctx, bound1))
+			})
+
+			addressToBeShared := it.Helper.CreateAccount(t, AnyValueToReadWithoutAnArgument).String()
+			t.Run("Namespace is part of an address share group that doesn't have a registered address and provides an address during Bind", func(t T) {
+				bound1 := []types.BoundContract{{Name: AnyContractNameWithSharedAddress1, Address: addressToBeShared}}
+
+				require.NoError(t, cr.Bind(ctx, bound1))
+
+				var prim uint64
+				require.NoError(t, cr.GetLatestValue(ctx, bound1[0].ReadIdentifier(MethodReturningUint64), primitives.Unconfirmed, nil, &prim))
+				assert.Equal(t, AnyValueToReadWithoutAnArgument, prim)
+			})
+
+			t.Run("Namespace is part of an address share group that has a registered address and provides that same address during Bind", func(t T) {
+				bound2 := []types.BoundContract{{
+					Name:    AnyContractNameWithSharedAddress2,
+					Address: addressToBeShared}}
+				require.NoError(t, cr.Bind(ctx, bound2))
+
+				var prim uint64
+				require.NoError(t, cr.GetLatestValue(ctx, bound2[0].ReadIdentifier(MethodReturningUint64), primitives.Unconfirmed, nil, &prim))
+				assert.Equal(t, AnyValueToReadWithoutAnArgument, prim)
+				assert.Equal(t, addressToBeShared, bound2[0].Address)
+			})
+
+			t.Run("Namespace is part of an address share group that has a registered address and provides no address during Bind", func(t T) {
+				bound3 := []types.BoundContract{{Name: AnyContractNameWithSharedAddress3}}
+				require.NoError(t, cr.Bind(ctx, bound3))
+
+				var prim uint64
+				require.NoError(t, cr.GetLatestValue(ctx, bound3[0].ReadIdentifier(MethodReturningUint64), primitives.Unconfirmed, nil, &prim))
+				assert.Equal(t, AnyValueToReadWithoutAnArgument, prim)
+				assert.Equal(t, addressToBeShared, bound3[0].Address)
+
+				// when run in a loop Bind address won't be set, so check if CR Method works without set address.
+				prim = 0
+				require.NoError(t, cr.GetLatestValue(ctx, types.BoundContract{
+					Address: "",
+					Name:    AnyContractNameWithSharedAddress3,
+				}.ReadIdentifier(MethodReturningUint64), primitives.Unconfirmed, nil, &prim))
+				assert.Equal(t, AnyValueToReadWithoutAnArgument, prim)
+			})
+
+			t.Run("Namespace is  not part of an address share group that has a registered address and provides no address during Bind", func(t T) {
+				require.Error(t, cr.Bind(ctx, []types.BoundContract{{Name: AnyContractName}}))
+			})
+		},
+	}
+
+	RunTests(t, it, []Testcase[T]{testCases})
+	RunContractReaderTests(t, it)
 	// Add ChainWriter tests here
 }
 
@@ -104,20 +174,12 @@ func RunChainComponentsInLoopSolanaTests[T TestingT[T]](t T, it ChainComponentsI
 	// Add ChainWriter tests here
 }
 
-func RunContractReaderSolanaTests[T TestingT[T]](t T, it *SolanaChainComponentsInterfaceTester[T]) {
+func RunContractReaderTests[T TestingT[T]](t T, it *SolanaChainComponentsInterfaceTester[T]) {
 	RunContractReaderInterfaceTests(t, it, false, true)
-
-	var testCases []Testcase[T]
-
-	RunTests(t, it, testCases)
 }
 
 func RunContractReaderInLoopTests[T TestingT[T]](t T, it ChainComponentsInterfaceTester[T]) {
 	RunContractReaderInterfaceTests(t, it, false, true)
-
-	var testCases []Testcase[T]
-
-	RunTests(t, it, testCases)
 }
 
 type SolanaChainComponentsInterfaceTesterHelper[T TestingT[T]] interface {
@@ -139,26 +201,28 @@ type SolanaChainComponentsInterfaceTester[T TestingT[T]] struct {
 func (it *SolanaChainComponentsInterfaceTester[T]) Setup(t T) {
 	t.Cleanup(func() {})
 
-	it.contractReaderConfig = config.ContractReader{
-		Namespaces: map[string]config.ChainContractReader{
-			AnyContractName: {
-				IDL: mustUnmarshalIDL(t, string(it.Helper.GetJSONEncodedIDL(t))),
-				Reads: map[string]config.ReadDefinition{
-					MethodReturningUint64: {
-						ChainSpecificName: "DataAccount",
-						ReadType:          config.Account,
-						OutputModifications: commoncodec.ModifiersConfig{
-							&commoncodec.PropertyExtractorConfig{FieldName: "U64Value"},
-						},
-					},
-					MethodReturningUint64Slice: {
-						ChainSpecificName: "DataAccount",
-						OutputModifications: commoncodec.ModifiersConfig{
-							&commoncodec.PropertyExtractorConfig{FieldName: "U64Slice"},
-						},
-					},
+	anyContractReadDef := config.ChainContractReader{
+		IDL: mustUnmarshalIDL(t, string(it.Helper.GetJSONEncodedIDL(t))),
+		Reads: map[string]config.ReadDefinition{
+			MethodReturningUint64: {
+				ChainSpecificName: "DataAccount",
+				ReadType:          config.Account,
+				OutputModifications: commoncodec.ModifiersConfig{
+					&commoncodec.PropertyExtractorConfig{FieldName: "U64Value"},
 				},
 			},
+			MethodReturningUint64Slice: {
+				ChainSpecificName: "DataAccount",
+				OutputModifications: commoncodec.ModifiersConfig{
+					&commoncodec.PropertyExtractorConfig{FieldName: "U64Slice"},
+				},
+			},
+		},
+	}
+
+	it.contractReaderConfig = config.ContractReader{
+		Namespaces: map[string]config.ChainContractReader{
+			AnyContractName: anyContractReadDef,
 			AnySecondContractName: {
 				IDL: mustUnmarshalIDL(t, string(it.Helper.GetJSONEncodedIDL(t))),
 				Reads: map[string]config.ReadDefinition{
@@ -170,6 +234,10 @@ func (it *SolanaChainComponentsInterfaceTester[T]) Setup(t T) {
 					},
 				},
 			},
+			// these are for testing shared address groups
+			AnyContractNameWithSharedAddress1: anyContractReadDef,
+			AnyContractNameWithSharedAddress2: anyContractReadDef,
+			AnyContractNameWithSharedAddress3: anyContractReadDef,
 		},
 	}
 }
@@ -199,6 +267,22 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GetContractReader(t T) types.
 		it.Helper.RPCClient(),
 		it.contractReaderConfig,
 		events)
+
+	require.NoError(t, err)
+	require.NoError(t, svc.Start(ctx))
+
+	it.cr = svc
+
+	return svc
+}
+
+func (it *SolanaChainComponentsInterfaceTester[T]) GetContractReaderWithCustomCfg(t T, cfg config.ContractReader) types.ContractReader {
+	ctx := it.Helper.Context(t)
+	if it.cr != nil {
+		return it.cr
+	}
+
+	svc, err := chainreader.NewChainReaderService(it.Helper.Logger(t), it.Helper.RPCClient(), cfg)
 
 	require.NoError(t, err)
 	require.NoError(t, svc.Start(ctx))
