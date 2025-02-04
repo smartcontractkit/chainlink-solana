@@ -7,6 +7,7 @@ import (
 	"io"
 	"math/big"
 	"math/rand"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -150,7 +151,9 @@ func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) 
 
 	// check chainID matches expected chainID
 	expectedChainID := strings.ToLower(v.expectedChainID)
-	if v.chainID != expectedChainID {
+	// if this is localnet, allow any chain ID as long as it's not spoofing an official network
+	ignore := v.chainID == "localnet" && !slices.Contains([]string{"mainnet", "testnet", "devnet"}, expectedChainID)
+	if !ignore && v.chainID != expectedChainID {
 		v.chainIDVerified = false
 		return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", expectedChainID, v.chainID, v.nodeURL)
 	}
