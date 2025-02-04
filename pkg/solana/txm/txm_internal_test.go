@@ -20,20 +20,20 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	relayconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	bigmath "github.com/smartcontractkit/chainlink-common/pkg/utils/big_math"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
-
-	relayconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
-	bigmath "github.com/smartcontractkit/chainlink-common/pkg/utils/big_math"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 type soltxmProm struct {
@@ -136,7 +136,7 @@ func TestTxm(t *testing.T) {
 			mkey := keyMocks.NewSimpleKeystore(t)
 			mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
 
-			loader := utils.NewLazyLoad(func() (client.ReaderWriter, error) { return mc, nil })
+			loader := utils.NewStaticLoader[client.ReaderWriter](mc)
 			txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
 			require.NoError(t, txm.Start(ctx))
 			t.Cleanup(func() { require.NoError(t, txm.Close()) })
@@ -799,7 +799,7 @@ func TestTxm_disabled_confirm_timeout_with_retention(t *testing.T) {
 	mkey := keyMocks.NewSimpleKeystore(t)
 	mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
 
-	loader := utils.NewLazyLoad(func() (client.ReaderWriter, error) { return mc, nil })
+	loader := utils.NewStaticLoader[client.ReaderWriter](mc)
 	txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
 	require.NoError(t, txm.Start(ctx))
 	t.Cleanup(func() { require.NoError(t, txm.Close()) })
@@ -998,7 +998,7 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 	mkey := keyMocks.NewSimpleKeystore(t)
 	mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
 
-	loader := utils.NewLazyLoad(func() (client.ReaderWriter, error) { return mc, nil })
+	loader := utils.NewStaticLoader[client.ReaderWriter](mc)
 	txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
 	require.NoError(t, txm.Start(ctx))
 	t.Cleanup(func() { require.NoError(t, txm.Close()) })
@@ -1175,7 +1175,7 @@ func TestTxm_Enqueue(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	loader := utils.NewLazyLoad(func() (client.ReaderWriter, error) { return mc, nil })
+	loader := utils.NewStaticLoader[client.ReaderWriter](mc)
 	txm := NewTxm("enqueue_test", loader, nil, cfg, mkey, lggr)
 
 	require.ErrorContains(t, txm.Enqueue(ctx, "txmUnstarted", &solana.Transaction{}, nil, lastValidBlockHeight), "not started")
@@ -1284,7 +1284,7 @@ func TestTxm_ExpirationRebroadcast(t *testing.T) {
 		mkey := keyMocks.NewSimpleKeystore(t)
 		mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
 
-		loader := utils.NewLazyLoad(func() (client.ReaderWriter, error) { return mc, nil })
+		loader := utils.NewStaticLoader[client.ReaderWriter](mc)
 		txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
 		require.NoError(t, txm.Start(ctx))
 		t.Cleanup(func() { require.NoError(t, txm.Close()) })
@@ -1669,7 +1669,7 @@ func TestTxm_OnReorg(t *testing.T) {
 		mkey := keyMocks.NewSimpleKeystore(t)
 		mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
 
-		loader := utils.NewLazyLoad(func() (client.ReaderWriter, error) { return mc, nil })
+		loader := utils.NewStaticLoader[client.ReaderWriter](mc)
 		txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
 		require.NoError(t, txm.Start(ctx))
 		t.Cleanup(func() { require.NoError(t, txm.Close()) })

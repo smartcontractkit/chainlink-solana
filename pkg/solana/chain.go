@@ -23,18 +23,16 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	mn "github.com/smartcontractkit/chainlink-framework/multinode"
-
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 type LogPoller interface {
@@ -101,6 +99,7 @@ var _ Chain = (*chain)(nil)
 
 type chain struct {
 	services.StateMachine
+	stopCh         services.StopChan
 	id             string
 	cfg            *config.TOMLConfig
 	lp             LogPoller
@@ -248,14 +247,15 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 	lggr = logger.Named(lggr, "Chain")
 	lggr = logger.With(lggr, "chainID", id, "chain", "solana")
 	var ch = chain{
+		stopCh:      make(services.StopChan),
 		id:          id,
 		cfg:         cfg,
 		lggr:        lggr,
 		clientCache: map[string]*verifiedCachedClient{},
 	}
 
-	var tc internal.Loader[client.ReaderWriter] = utils.NewLazyLoad(func() (client.ReaderWriter, error) { return ch.getClient() })
-	var bc internal.Loader[monitor.BalanceClient] = utils.NewLazyLoad(func() (monitor.BalanceClient, error) { return ch.getClient() })
+	var tc utils.Loader[client.ReaderWriter] = utils.NewLoader(func(ctx context.Context) (client.ReaderWriter, error) { return ch.getClient(ctx) })
+	var bc utils.Loader[monitor.BalanceClient] = utils.NewLoader(func(ctx context.Context) (monitor.BalanceClient, error) { return ch.getClient(ctx) })
 	// getClient returns random client or if MultiNodeEnabled RPC picked and controlled by MultiNode
 	ch.multiClient = client.NewMultiClient(ch.getClient)
 
@@ -323,8 +323,8 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 			return sig, err
 		}
 
-		tc = internal.NewLoader[client.ReaderWriter](func() (client.ReaderWriter, error) { return ch.multiNode.SelectRPC() })
-		bc = internal.NewLoader[monitor.BalanceClient](func() (monitor.BalanceClient, error) { return ch.multiNode.SelectRPC() })
+		tc = utils.NewOnceLoader[client.ReaderWriter](func(ctx context.Context) (client.ReaderWriter, error) { return ch.multiNode.SelectRPC(ctx) })
+		bc = utils.NewOnceLoader[monitor.BalanceClient](func(ctx context.Context) (monitor.BalanceClient, error) { return ch.multiNode.SelectRPC(ctx) })
 	}
 
 	ch.lp = logpoller.New(logger.Sugared(logger.Named(lggr, "LogPoller")), logpoller.NewORM(ch.ID(), ds, lggr), ch.multiClient)
@@ -334,7 +334,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 }
 
 func (c *chain) LatestHead(ctx context.Context) (types.Head, error) {
-	sc, err := c.getClient()
+	sc, err := c.getClient(ctx)
 	if err != nil {
 		return types.Head{}, err
 	}
@@ -430,7 +430,9 @@ func (c *chain) FeeEstimator() fees.Estimator {
 }
 
 func (c *chain) Reader() (client.Reader, error) {
-	return c.getClient()
+	ctx, cancel := c.stopCh.NewCtx()
+	defer cancel()
+	return c.getClient(ctx)
 }
 
 func (c *chain) ChainID() string {
@@ -439,9 +441,9 @@ func (c *chain) ChainID() string {
 
 // getClient returns a client, randomly selecting one from available and valid nodes
 // If multinode is enabled, it will return a client using the multinode selection instead.
-func (c *chain) getClient() (client.ReaderWriter, error) {
+func (c *chain) getClient(ctx context.Context) (client.ReaderWriter, error) {
 	if c.cfg.MultiNode.Enabled() {
-		return c.multiNode.SelectRPC()
+		return c.multiNode.SelectRPC(ctx)
 	}
 
 	var node *config.Node
@@ -534,6 +536,7 @@ func (c *chain) Start(ctx context.Context) error {
 
 func (c *chain) Close() error {
 	return c.StopOnce("Chain", func() error {
+		close(c.stopCh)
 		c.lggr.Debug("Stopping")
 		c.lggr.Debug("Stopping txm")
 		c.lggr.Debug("Stopping balance monitor")
