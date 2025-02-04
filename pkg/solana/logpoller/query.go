@@ -90,9 +90,9 @@ func (q *queryArgs) withEventIDL(eventIdl EventIdl) *queryArgs {
 	return q.withField("event_idl", eventIdl)
 }
 
-// withSubkeyPaths sets the SubkeyPaths field in queryArgs.
-func (q *queryArgs) withSubkeyPaths(subkeyPaths [][]string) *queryArgs {
-	return q.withField("subkey_paths", subkeyPaths)
+// withSubKeyPaths sets the SubKeyPaths field in queryArgs.
+func (q *queryArgs) withSubKeyPaths(subKeyPaths [][]string) *queryArgs {
+	return q.withField("subkey_paths", subKeyPaths)
 }
 
 // withRetention sets the Retention field in queryArgs.

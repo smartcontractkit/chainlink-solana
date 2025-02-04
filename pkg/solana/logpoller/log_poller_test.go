@@ -250,14 +250,14 @@ func TestProcess(t *testing.T) {
 
 	addr := newRandomPublicKey(t)
 	eventName := "myEvent"
-	eventSig := Discriminator("event", eventName)
+	eventSig := EventSignature(codec.NewDiscriminatorHashPrefix(eventName, false))
 	event := struct {
 		A int64
 		B string
 	}{55, "hello"}
-	subkeyValA, err := NewIndexedValue(event.A)
+	subKeyValA, err := newIndexedValue(event.A)
 	require.NoError(t, err)
-	subkeyValB, err := NewIndexedValue(event.B)
+	subKeyValB, err := newIndexedValue(event.B)
 	require.NoError(t, err)
 
 	filterID := rand.Int63()
@@ -271,11 +271,12 @@ func TestProcess(t *testing.T) {
 	expectedLog.LogIndex, err = makeLogIndex(txIndex, txLogIndex)
 	require.NoError(t, err)
 	expectedLog.SequenceNum = 1
-	expectedLog.SubkeyValues = []IndexedValue{subkeyValA, subkeyValB}
+	expectedLog.SubKeyValues = []IndexedValue{subKeyValA, subKeyValB}
 
 	expectedLog.Data, err = bin.MarshalBorsh(&event)
 	require.NoError(t, err)
 
+	expectedLog.Data = append(eventSig[:], expectedLog.Data...)
 	ev := ProgramEvent{
 		Program: addr.ToSolana().String(),
 		BlockData: BlockData{
@@ -287,7 +288,7 @@ func TestProcess(t *testing.T) {
 			TransactionIndex:    txIndex,
 			TransactionLogIndex: txLogIndex,
 		},
-		Data: base64.StdEncoding.EncodeToString(append(eventSig[:], expectedLog.Data...)),
+		Data: base64.StdEncoding.EncodeToString(expectedLog.Data),
 	}
 
 	orm := NewMockORM(t)
@@ -304,7 +305,7 @@ func TestProcess(t *testing.T) {
 	require.NoError(t, err)
 
 	idl := EventIdl{
-		codec.IdlEvent{
+		EventIDLTypes: codec.EventIDLTypes{Event: codec.IdlEvent{
 			Name: "myEvent",
 			Fields: []codec.IdlEventField{{
 				Name: "A",
@@ -314,7 +315,8 @@ func TestProcess(t *testing.T) {
 				Type: idlTypeString,
 			}},
 		},
-		[]codec.IdlTypeDef{},
+			Types: []codec.IdlTypeDef{},
+		},
 	}
 
 	filter := Filter{
@@ -323,7 +325,7 @@ func TestProcess(t *testing.T) {
 		Address:     addr,
 		EventSig:    eventSig,
 		EventIdl:    idl,
-		SubkeyPaths: [][]string{{"A"}, {"B"}},
+		SubKeyPaths: [][]string{{"A"}, {"B"}},
 	}
 	orm.EXPECT().SelectFilters(mock.Anything).Return([]Filter{filter}, nil).Once()
 	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{}, nil).Once()

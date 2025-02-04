@@ -31,24 +31,20 @@ func TestDecoder_Decode_Errors(t *testing.T) {
 	var into interface{}
 	someType := "some-type"
 	t.Run("error when item type not found", func(t *testing.T) {
-		d := &Decoder{definitions: map[string]Entry{}}
-		d.definitions[someType] = &entry{}
-
 		nonExistentType := "non-existent"
-		err := d.Decode(tests.Context(t), []byte{}, &into, nonExistentType)
+		err := newDecoder(map[string]Entry{someType: &entry{}}).
+			Decode(tests.Context(t), []byte{}, &into, nonExistentType)
 		require.ErrorIs(t, err, fmt.Errorf("%w: cannot find type %s", commontypes.ErrInvalidType, nonExistentType))
 	})
 
 	t.Run("error when underlying entry decode fails", func(t *testing.T) {
-		d := &Decoder{definitions: map[string]Entry{}}
-		d.definitions[someType] = &testErrDecodeEntry{}
-		require.Error(t, d.Decode(tests.Context(t), []byte{}, &into, someType))
+		require.Error(t, newDecoder(map[string]Entry{someType: &testErrDecodeEntry{}}).
+			Decode(tests.Context(t), []byte{}, &into, someType))
 	})
 
 	t.Run("remaining bytes exist after decode is ok", func(t *testing.T) {
-		d := &Decoder{definitions: map[string]Entry{}}
-		d.definitions[someType] = &testErrDecodeRemainingBytes{}
-		require.NoError(t, d.Decode(tests.Context(t), []byte{}, &into, someType))
+		require.NoError(t, newDecoder(map[string]Entry{someType: &testErrDecodeRemainingBytes{}}).
+			Decode(tests.Context(t), []byte{}, &into, someType))
 	})
 }
 
@@ -72,19 +68,15 @@ func TestDecoder_GetMaxDecodingSize_Errors(t *testing.T) {
 	someType := "some-type"
 
 	t.Run("error when entry for item type is missing", func(t *testing.T) {
-		d := &Decoder{definitions: map[string]Entry{}}
-		d.definitions[someType] = &entry{}
-
 		nonExistentType := "non-existent"
-		_, err := d.GetMaxDecodingSize(tests.Context(t), 0, nonExistentType)
+		_, err := newDecoder(map[string]Entry{someType: &entry{}}).
+			GetMaxDecodingSize(tests.Context(t), 0, nonExistentType)
 		require.ErrorIs(t, err, fmt.Errorf("%w: cannot find type %s", commontypes.ErrInvalidType, nonExistentType))
 	})
 
 	t.Run("error when underlying entry decode fails", func(t *testing.T) {
-		d := &Decoder{definitions: map[string]Entry{}}
-		d.definitions[someType] = &testErrGetMaxDecodingSize{}
-
-		_, err := d.GetMaxDecodingSize(tests.Context(t), 0, someType)
+		_, err := newDecoder(map[string]Entry{someType: &testErrGetMaxDecodingSize{}}).
+			GetMaxDecodingSize(tests.Context(t), 0, someType)
 		require.Error(t, err)
 	})
 }

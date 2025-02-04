@@ -198,6 +198,47 @@ func TestDSLParser(t *testing.T) {
 		})
 	})
 
+	t.Run("query for event topic", func(t *testing.T) {
+		t.Parallel()
+
+		subKeyFilter, err := NewEventBySubKeyFilter(2, []primitives.ValueComparator{
+			{Value: 4, Operator: primitives.Gt},
+			{Value: 7, Operator: primitives.Lt},
+		})
+		require.NoError(t, err)
+
+		parser := &pgDSLParser{}
+		expressions := []query.Expression{subKeyFilter}
+		limiter := query.LimitAndSort{}
+
+		result, args, err := parser.buildQuery(chainID, expressions, limiter)
+		require.NoError(t, err)
+		expectedQuery := logsQuery(
+			" WHERE chain_id = :chain_id " +
+				"AND subkey_values[:subkey_index_0] > :subkey_value_0 AND subkey_values[:subkey_index_0] < :subkey_value_1 ORDER BY " + defaultSort)
+
+		var iValLower, iValUpper IndexedValue
+		iValLower, err = newIndexedValue(4)
+		require.NoError(t, err)
+		iValUpper, err = newIndexedValue(7)
+		require.NoError(t, err)
+
+		expectedArgs := map[string]any{
+			"chain_id":       chainID,
+			"subkey_index_0": uint64(3),
+			"subkey_value_0": iValLower,
+			"subkey_value_1": iValUpper,
+		}
+
+		require.NoError(t, err)
+		assert.Equal(t, expectedQuery, result)
+
+		var m map[string]any
+		m, err = args.toArgs()
+		require.NoError(t, err)
+		assert.Equal(t, expectedArgs, m)
+	})
+
 	// nested query -> a & (b || c)
 	t.Run("nested query", func(t *testing.T) {
 		t.Parallel()

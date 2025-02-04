@@ -8,14 +8,25 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
-type Encoder struct {
+// encoder should be initialized with newEncoder
+type encoder struct {
 	definitions               map[string]Entry
 	lenientCodecFromTypeCodec encodings.LenientCodecFromTypeCodec
 }
 
-var _ commontypes.Encoder = &Encoder{}
+func newEncoder(definitions map[string]Entry) commontypes.Encoder {
+	lenientCodecFromTypeCodec := make(encodings.LenientCodecFromTypeCodec)
+	for k, v := range definitions {
+		lenientCodecFromTypeCodec[k] = v
+	}
 
-func (e *Encoder) Encode(ctx context.Context, item any, itemType string) (res []byte, err error) {
+	return &encoder{
+		lenientCodecFromTypeCodec: lenientCodecFromTypeCodec,
+		definitions:               definitions,
+	}
+}
+
+func (e *encoder) Encode(ctx context.Context, item any, itemType string) (res []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("recovered from: %v, while encoding %q", r, itemType)
@@ -23,16 +34,17 @@ func (e *Encoder) Encode(ctx context.Context, item any, itemType string) (res []
 	}()
 
 	if e.lenientCodecFromTypeCodec == nil {
-		e.lenientCodecFromTypeCodec = make(encodings.LenientCodecFromTypeCodec)
-		for k, v := range e.definitions {
-			e.lenientCodecFromTypeCodec[k] = v
-		}
+		return nil, fmt.Errorf("encoder is not properly initialised, underlying lenientCodecFromTypeCodec is nil")
 	}
 
 	return e.lenientCodecFromTypeCodec.Encode(ctx, item, itemType)
 }
 
-func (e *Encoder) GetMaxEncodingSize(_ context.Context, n int, itemType string) (int, error) {
+func (e *encoder) GetMaxEncodingSize(_ context.Context, n int, itemType string) (int, error) {
+	if e.definitions == nil {
+		return 0, fmt.Errorf("encoder is not properly initialised, type definitions are nil")
+	}
+
 	entry, ok := e.definitions[itemType]
 	if !ok {
 		return 0, fmt.Errorf("%w: nil entry", commontypes.ErrInvalidType)

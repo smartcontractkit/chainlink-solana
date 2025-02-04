@@ -34,7 +34,7 @@ func TestLogPollerFilters(t *testing.T) {
 				EventSig:      EventSignature{1, 2, 3},
 				StartingBlock: 1,
 				EventIdl:      EventIdl{},
-				SubkeyPaths:   SubkeyPaths([][]string{{"a", "b"}, {"c"}}),
+				SubKeyPaths:   SubKeyPaths([][]string{{"a", "b"}, {"c"}}),
 				Retention:     1000,
 				MaxLogsKept:   3,
 			},
@@ -44,7 +44,7 @@ func TestLogPollerFilters(t *testing.T) {
 				EventName:     "event",
 				EventSig:      EventSignature{1, 2, 3},
 				StartingBlock: 1,
-				SubkeyPaths:   SubkeyPaths([][]string{}),
+				SubKeyPaths:   SubKeyPaths([][]string{}),
 				Retention:     1000,
 				MaxLogsKept:   3,
 			},
@@ -54,7 +54,7 @@ func TestLogPollerFilters(t *testing.T) {
 				EventName:     "event",
 				EventSig:      EventSignature{1, 2, 3},
 				StartingBlock: 1,
-				SubkeyPaths:   nil,
+				SubKeyPaths:   nil,
 				Retention:     1000,
 				MaxLogsKept:   3,
 			},
@@ -254,8 +254,31 @@ func newRandomFilter(t *testing.T) Filter {
 		EventName:     "event",
 		EventSig:      newRandomEventSignature(t),
 		StartingBlock: 1,
-		SubkeyPaths:   [][]string{{"a", "b"}, {"c"}},
+		SubKeyPaths:   [][]string{{"a", "b"}, {"c"}},
 		Retention:     1000,
 		MaxLogsKept:   3,
+	}
+}
+
+func newRandomLog(t *testing.T, filterID int64, chainID string) Log {
+	privateKey, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	pubKey := privateKey.PublicKey()
+	data := []byte("solana is fun")
+	signature, err := privateKey.Sign(data)
+	require.NoError(t, err)
+	return Log{
+		FilterID:       filterID,
+		ChainID:        chainID,
+		LogIndex:       rand.Int63n(1000),
+		BlockHash:      Hash(pubKey),
+		BlockNumber:    rand.Int63n(1000000),
+		BlockTimestamp: time.Unix(1731590113, 0),
+		Address:        PublicKey(pubKey),
+		EventSig:       EventSignature{3, 2, 1},
+		SubKeyValues:   [][]byte{{3, 2, 1}, {1}, {1, 2}, pubKey.Bytes()},
+		TxHash:         Signature(signature),
+		Data:           data,
+		SequenceNum:    rand.Int63n(500),
 	}
 }

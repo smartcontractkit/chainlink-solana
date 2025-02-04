@@ -7,6 +7,7 @@ import (
 	"io"
 	"math/big"
 	"math/rand"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -24,6 +25,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	mn "github.com/smartcontractkit/chainlink-framework/multinode"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -48,6 +51,7 @@ type Chain interface {
 	Config() config.Config
 	LogPoller() LogPoller
 	TxManager() TxManager
+	FeeEstimator() fees.Estimator
 	// Reader returns a new Reader from the available list of nodes (if there are multiple, it will randomly select one)
 	Reader() (client.Reader, error)
 }
@@ -106,7 +110,7 @@ type chain struct {
 
 	// if multiNode is enabled, the clientCache will not be used
 	multiNode   *mn.MultiNode[mn.StringID, *client.MultiNodeClient]
-	txSender    *mn.TransactionSender[*solanago.Transaction, *client.SendTxResult, mn.StringID, *client.MultiNodeClient]
+	txSender    *mn.TransactionSender[*solanago.Transaction, solanago.Signature, mn.StringID, *client.MultiNodeClient]
 	multiClient *client.MultiClient
 
 	// tracking node chain id for verification
@@ -147,7 +151,9 @@ func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) 
 
 	// check chainID matches expected chainID
 	expectedChainID := strings.ToLower(v.expectedChainID)
-	if v.chainID != expectedChainID {
+	// if this is localnet, allow any chain ID as long as it's not spoofing an official network
+	ignore := v.chainID == "localnet" && !slices.Contains([]string{"mainnet", "testnet", "devnet"}, expectedChainID)
+	if !ignore && v.chainID != expectedChainID {
 		v.chainIDVerified = false
 		return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", expectedChainID, v.chainID, v.nodeURL)
 	}
@@ -294,12 +300,14 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 			mnCfg.DeathDeclarationDelay(),
 		)
 
-		txSender := mn.NewTransactionSender[*solanago.Transaction, *client.SendTxResult, mn.StringID, *client.MultiNodeClient](
+		txSender := mn.NewTransactionSender[*solanago.Transaction, solanago.Signature, mn.StringID, *client.MultiNodeClient](
 			lggr,
 			mn.StringID(id),
 			chainFamily,
 			multiNode,
-			client.NewSendTxResult,
+			func(err error) mn.SendTxReturnCode {
+				return client.ClassifySendError(nil, err)
+			},
 			0, // use the default value provided by the implementation
 		)
 
@@ -311,18 +319,14 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 
 		// Send tx using MultiNode transaction sender
 		sendTx = func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error) {
-			result := ch.txSender.SendTransaction(ctx, tx)
-			if result == nil {
-				return solanago.Signature{}, errors.New("tx sender returned nil result")
-			}
-			return result.Signature(), result.Error()
+			sig, _, err := ch.txSender.SendTransaction(ctx, tx)
+			return sig, err
 		}
 
 		tc = internal.NewLoader[client.ReaderWriter](func() (client.ReaderWriter, error) { return ch.multiNode.SelectRPC() })
 		bc = internal.NewLoader[monitor.BalanceClient](func() (monitor.BalanceClient, error) { return ch.multiNode.SelectRPC() })
 	}
 
-	// TODO: import typeProvider function from codec package and pass to constructor
 	ch.lp = logpoller.New(logger.Sugared(logger.Named(lggr, "LogPoller")), logpoller.NewORM(ch.ID(), ds, lggr), ch.multiClient)
 	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
 	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
@@ -419,6 +423,10 @@ func (c *chain) LogPoller() LogPoller {
 
 func (c *chain) TxManager() TxManager {
 	return c.txm
+}
+
+func (c *chain) FeeEstimator() fees.Estimator {
+	return c.txm.FeeEstimator()
 }
 
 func (c *chain) Reader() (client.Reader, error) {

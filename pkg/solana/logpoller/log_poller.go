@@ -14,6 +14,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 )
 
 var (
@@ -31,6 +32,7 @@ type ORM interface {
 	GetLatestBlock(ctx context.Context) (int64, error)
 	InsertLogs(context.Context, []Log) (err error)
 	SelectSeqNums(ctx context.Context) (map[int64]int64, error)
+	FilteredLogs(ctx context.Context, queryFilter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]Log, error)
 }
 
 type logsLoader interface {
@@ -46,7 +48,7 @@ type filtersI interface {
 	GetFiltersToBackfill() []Filter
 	MarkFilterBackfilled(ctx context.Context, filterID int64) error
 	MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[Filter]
-	DecodeSubKey(ctx context.Context, raw []byte, ID int64, subKeyPath []string) (any, error)
+	DecodeSubKey(ctx context.Context, lggr logger.SugaredLogger, raw []byte, ID int64, subKeyPath []string) (any, error)
 	IncrementSeqNum(filterID int64) int64
 }
 
@@ -152,28 +154,22 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 			TxHash:         Signature(blockData.TransactionHash),
 		}
 
-		eventData, decodeErr := base64.StdEncoding.DecodeString(programEvent.Data)
-		if decodeErr != nil {
-			return decodeErr
-		}
-		if len(eventData) < 8 {
-			err = fmt.Errorf("Assumption violation: %w, log.Data=%s", ErrMissingDiscriminator, log.Data)
-			lp.lggr.Criticalw(err.Error())
+		log.Data, err = base64.StdEncoding.DecodeString(programEvent.Data)
+		if err != nil {
 			return err
 		}
-		log.Data = eventData[8:]
 
-		log.SubkeyValues = make([]IndexedValue, 0, len(filter.SubkeyPaths))
-		for _, path := range filter.SubkeyPaths {
-			subKeyVal, decodeSubKeyErr := lp.filters.DecodeSubKey(ctx, log.Data, filter.ID, path)
+		log.SubKeyValues = make([]IndexedValue, 0, len(filter.SubKeyPaths))
+		for _, path := range filter.SubKeyPaths {
+			subKeyVal, decodeSubKeyErr := lp.filters.DecodeSubKey(ctx, lp.lggr, log.Data, filter.ID, path)
 			if decodeSubKeyErr != nil {
 				return decodeSubKeyErr
 			}
-			indexedVal, newIndexedValErr := NewIndexedValue(subKeyVal)
+			indexedVal, newIndexedValErr := newIndexedValue(subKeyVal)
 			if newIndexedValErr != nil {
 				return newIndexedValErr
 			}
-			log.SubkeyValues = append(log.SubkeyValues, indexedVal)
+			log.SubKeyValues = append(log.SubKeyValues, indexedVal)
 		}
 
 		log.SequenceNum = lp.filters.IncrementSeqNum(filter.ID)
@@ -381,4 +377,8 @@ func (lp *Service) backgroundWorkerRun(ctx context.Context) {
 	if err != nil {
 		lp.lggr.Errorw("Failed to prune filters", "err", err)
 	}
+}
+
+func (lp *Service) FilteredLogs(ctx context.Context, queryFilter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]Log, error) {
+	return lp.orm.FilteredLogs(ctx, queryFilter, limitAndSort, queryName)
 }

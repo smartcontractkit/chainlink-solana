@@ -12,9 +12,19 @@ import (
 
 const discriminatorLength = 8
 
-func NewDiscriminator(name string) *Discriminator {
-	sum := sha256.Sum256([]byte("account:" + name))
-	return &Discriminator{hashPrefix: sum[:discriminatorLength]}
+func NewDiscriminator(name string, isAccount bool) *Discriminator {
+	return &Discriminator{hashPrefix: NewDiscriminatorHashPrefix(name, isAccount)}
+}
+
+func NewDiscriminatorHashPrefix(name string, isAccount bool) []byte {
+	var sum [32]byte
+	if isAccount {
+		sum = sha256.Sum256([]byte("account:" + name))
+	} else {
+		sum = sha256.Sum256([]byte("event:" + name))
+	}
+
+	return sum[:discriminatorLength]
 }
 
 type Discriminator struct {
@@ -68,4 +78,48 @@ func (d Discriminator) Size(_ int) (int, error) {
 
 func (d Discriminator) FixedSize() (int, error) {
 	return discriminatorLength, nil
+}
+
+type DiscriminatorExtractor struct {
+	b64Index [128]byte
+}
+
+// NewDiscriminatorExtractor is optimised to extract discriminators from base64 encoded strings faster than the base64 lib.
+func NewDiscriminatorExtractor() DiscriminatorExtractor {
+	instance := DiscriminatorExtractor{}
+	const base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+	for i := 0; i < len(base64Chars); i++ {
+		instance.b64Index[base64Chars[i]] = byte(i)
+	}
+	return instance
+}
+
+// Extract most optimally (around 40% faster than std) decodes the first 8 bytes of a base64 encoded string, which corresponds to a Solana discriminator.
+// Extract expects input of > 12 characters which 8 bytes are extracted from, if the input string is less than 12 characters, this will panic.
+// Extract doesn't handle base64 padding because discriminators shouldn't have padding.
+// If string contains non-Base64 characters (e.g., !, @, space) map to index 0 (ASCII 'A'), and won't be accurate.
+func (e *DiscriminatorExtractor) Extract(data string) []byte {
+	var decodeBuffer [9]byte
+	d := decodeBuffer[:9]
+	s := data[:12]
+
+	// base64 decode
+	for i := 0; i < 3; i++ {
+		// decode base64 chars into associated byte
+		c1 := e.b64Index[s[0]]
+		c2 := e.b64Index[s[1]]
+		c3 := e.b64Index[s[2]]
+		c4 := e.b64Index[s[3]]
+
+		// reconstruct raw bytes
+		d[0] = (c1 << 2) | (c2 >> 4)
+		d[1] = (c2 << 4) | (c3 >> 2)
+		d[2] = (c3 << 6) | c4
+
+		// next 3 bytes and next 4 characters
+		d = d[3:]
+		s = s[4:]
+	}
+
+	return decodeBuffer[:discriminatorLength]
 }

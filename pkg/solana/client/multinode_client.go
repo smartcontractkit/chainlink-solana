@@ -10,6 +10,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	mn "github.com/smartcontractkit/chainlink-framework/multinode"
@@ -31,17 +32,15 @@ func (h *Head) BlockNumber() int64 {
 	return int64(*h.BlockHeight)
 }
 
-func (h *Head) BlockDifficulty() *big.Int {
-	// Not relevant for Solana
-	return nil
-}
+func (h *Head) BlockDifficulty() *big.Int    { return nil } // Not relevant for Solana
+func (h *Head) GetTotalDifficulty() *big.Int { return nil } // Not relevant for Solana
 
 func (h *Head) IsValid() bool {
 	return h != nil && h.BlockHeight != nil && *h.BlockHeight > 0 && h.BlockHash != nil
 }
 
 var _ mn.RPCClient[mn.StringID, *Head] = (*MultiNodeClient)(nil)
-var _ mn.SendTxRPCClient[*solana.Transaction, *SendTxResult] = (*MultiNodeClient)(nil)
+var _ mn.SendTxRPCClient[*solana.Transaction, solana.Signature] = (*MultiNodeClient)(nil)
 
 type MultiNodeClient struct {
 	Client
@@ -108,7 +107,7 @@ func (m *MultiNodeClient) SubscribeToHeads(ctx context.Context) (<-chan *Head, m
 	}
 	timeout := pollInterval
 	poller, channel := mn.NewPoller[*Head](pollInterval, func(pollRequestCtx context.Context) (*Head, error) {
-		if mn.CtxIsHeathCheckRequest(ctx) {
+		if mn.CtxIsHealthCheckRequest(ctx) {
 			pollRequestCtx = mn.CtxAddHealthCheckFlag(pollRequestCtx)
 		}
 		return m.LatestBlock(pollRequestCtx)
@@ -137,7 +136,7 @@ func (m *MultiNodeClient) SubscribeToFinalizedHeads(ctx context.Context) (<-chan
 	}
 	timeout := finalizedBlockPollInterval
 	poller, channel := mn.NewPoller[*Head](finalizedBlockPollInterval, func(pollRequestCtx context.Context) (*Head, error) {
-		if mn.CtxIsHeathCheckRequest(ctx) {
+		if mn.CtxIsHealthCheckRequest(ctx) {
 			pollRequestCtx = mn.CtxAddHealthCheckFlag(pollRequestCtx)
 		}
 		return m.LatestFinalizedBlock(pollRequestCtx)
@@ -205,7 +204,7 @@ func (m *MultiNodeClient) onNewHead(ctx context.Context, requestCh <-chan struct
 
 	m.chainInfoLock.Lock()
 	defer m.chainInfoLock.Unlock()
-	if !mn.CtxIsHeathCheckRequest(ctx) {
+	if !mn.CtxIsHealthCheckRequest(ctx) {
 		m.highestUserObservations.BlockNumber = max(m.highestUserObservations.BlockNumber, head.BlockNumber())
 	}
 	select {
@@ -222,7 +221,7 @@ func (m *MultiNodeClient) onNewFinalizedHead(ctx context.Context, requestCh <-ch
 	}
 	m.chainInfoLock.Lock()
 	defer m.chainInfoLock.Unlock()
-	if !mn.CtxIsHeathCheckRequest(ctx) {
+	if !mn.CtxIsHealthCheckRequest(ctx) {
 		m.highestUserObservations.FinalizedBlockNumber = max(m.highestUserObservations.FinalizedBlockNumber, head.BlockNumber())
 	}
 	select {
@@ -319,37 +318,7 @@ func (m *MultiNodeClient) GetInterceptedChainInfo() (latest, highestUserObservat
 	return m.latestChainInfo, m.highestUserObservations
 }
 
-type SendTxResult struct {
-	err  error
-	code mn.SendTxReturnCode
-	sig  solana.Signature
-}
-
-var _ mn.SendTxResult = (*SendTxResult)(nil)
-
-func NewSendTxResult(err error) *SendTxResult {
-	result := &SendTxResult{
-		err: err,
-	}
-	result.code = ClassifySendError(nil, err)
-	return result
-}
-
-func (r *SendTxResult) Error() error {
-	return r.err
-}
-
-func (r *SendTxResult) Code() mn.SendTxReturnCode {
-	return r.code
-}
-
-func (r *SendTxResult) Signature() solana.Signature {
-	return r.sig
-}
-
-func (m *MultiNodeClient) SendTransaction(ctx context.Context, tx *solana.Transaction) *SendTxResult {
-	var sendTxResult = &SendTxResult{}
-	sendTxResult.sig, sendTxResult.err = m.SendTx(ctx, tx)
-	sendTxResult.code = ClassifySendError(tx, sendTxResult.err)
-	return sendTxResult
+func (m *MultiNodeClient) SendTransaction(ctx context.Context, tx *solana.Transaction) (solana.Signature, mn.SendTxReturnCode, error) {
+	sig, err := m.SendTx(ctx, tx)
+	return sig, ClassifySendError(tx, err), err
 }

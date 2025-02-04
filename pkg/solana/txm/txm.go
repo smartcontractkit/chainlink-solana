@@ -701,6 +701,10 @@ func (txm *Txm) reap() {
 	}
 }
 
+func (txm *Txm) FeeEstimator() fees.Estimator {
+	return txm.fee
+}
+
 // Enqueue enqueues a msg destined for the solana chain.
 func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Transaction, txID *string, txLastValidBlockHeight uint64, txCfgs ...txmutils.SetTxConfig) error {
 	if err := txm.Ready(); err != nil {
