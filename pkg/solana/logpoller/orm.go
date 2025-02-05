@@ -235,7 +235,25 @@ func (o *DSORM) FilteredLogs(ctx context.Context, filter []query.Expression, lim
 		return nil, err
 	}
 
-	return logs, nil
+	// We want each log returned to have a unique (BlockNumber, LogIndex)
+	// There can be duplicates if more than one filter is tracking the same log events.
+	// Keeping both and deduping here greatly simplifies log pruning & retention management
+	type Key struct {
+		blockNumber int64
+		logIndex    int64
+	}
+
+	seen := make(map[Key]struct{}, len(logs))
+	res := make([]Log, 0, len(logs))
+	for _, log := range logs {
+		key := Key{log.BlockNumber, log.LogIndex}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		res = append(res, log)
+	}
+	return res, nil
 }
 
 func (o *DSORM) GetLatestBlock(ctx context.Context) (int64, error) {
