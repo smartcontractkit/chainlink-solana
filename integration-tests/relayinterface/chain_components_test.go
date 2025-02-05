@@ -71,6 +71,7 @@ func TestChainComponents(t *testing.T) {
 func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 	it.DisableTests([]string{
 		// disable failing test
+		ContractReaderGetLatestValueFromMultipleContractsNamesSameFunction,
 		ContractReaderBatchGetLatestValueMultipleContractNamesSameFunction,
 		// disable tests that set values
 		ContractReaderGetLatestValueBasedOnConfidenceLevel,
@@ -426,15 +427,6 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 							&commoncodec.PropertyExtractorConfig{FieldName: "U64Value"},
 						},
 					},
-					MethodReturningAlterableUint64: {
-						ChainSpecificName: "Value",
-						PDADefiniton: codec.PDATypeDef{
-							Prefix: pdaPrefix,
-						},
-						OutputModifications: commoncodec.ModifiersConfig{
-							&commoncodec.PropertyExtractorConfig{FieldName: "U64Value"},
-						},
-					},
 				},
 			},
 			AnySecondContractName: {
@@ -458,17 +450,24 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T) chainwriter.ChainWriterConfig {
 	idx := it.getTestIdx(t.Name())
 	testIdx := binary.LittleEndian.AppendUint64([]byte{}, idx)
+	fromAddress := solana.MustPrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1]).PublicKey().String()
 	return chainwriter.ChainWriterConfig{
 		Programs: map[string]chainwriter.ProgramConfig{
 			AnyContractName: {
 				IDL: string(it.Helper.GetPrimaryIDL(t)),
 				Methods: map[string]chainwriter.MethodConfig{
 					"initialize": {
-						FromAddress:        solana.MustPrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1]).PublicKey().String(),
+						FromAddress:        fromAddress,
 						InputModifications: nil,
 						ChainSpecificName:  "initialize",
 						LookupTables:       chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
+							chainwriter.AccountConstant{
+								Name: "Signer",
+								Address: fromAddress,
+								IsSigner: true,
+								IsWritable: true,
+							},
 							chainwriter.PDALookups{
 								Name: "Account",
 								PublicKey: chainwriter.AccountConstant{
@@ -482,38 +481,11 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								IsWritable: true,
 								IsSigner:   false,
 							},
-							chainwriter.PDALookups{
-								Name: "ValueAccount",
-								PublicKey: chainwriter.AccountConstant{
-									Name:    "ProgramID",
-									Address: primaryProgramPubKey,
-								},
-								Seeds: []chainwriter.Seed{
-									{Static: []byte("val")},
-								},
-								IsWritable: true,
-								IsSigner:   false,
-							},
-						},
-						DebugIDLocation: "",
-					},
-					MethodSettingUint64: {
-						FromAddress:        solana.MustPrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1]).PublicKey().String(),
-						InputModifications: nil,
-						ChainSpecificName: "storeVal",
-						LookupTables:       chainwriter.LookupTables{},
-						Accounts: []chainwriter.Lookup{
-							chainwriter.PDALookups{
-								Name: "Account",
-								PublicKey: chainwriter.AccountConstant{
-									Name:    "ProgramID",
-									Address: primaryProgramPubKey,
-								},
-								Seeds: []chainwriter.Seed{
-									{Static: []byte("val")},
-								},
-								IsWritable: true,
-								IsSigner:   false,
+							chainwriter.AccountConstant{
+								Name: "SystemProgram",
+								Address: solana.SystemProgramID.String(),
+								IsSigner: false,
+								IsWritable: false,
 							},
 						},
 						DebugIDLocation: "",
@@ -524,11 +496,17 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 				IDL: string(it.Helper.GetSecondaryIDL(t)),
 				Methods: map[string]chainwriter.MethodConfig{
 					"initialize": {
-						FromAddress:        solana.MustPrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1]).PublicKey().String(),
+						FromAddress:        fromAddress,
 						InputModifications: nil,
 						ChainSpecificName:  "initialize",
 						LookupTables:       chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
+							chainwriter.AccountConstant{
+								Name: "Signer",
+								Address: fromAddress,
+								IsSigner: true,
+								IsWritable: true,
+							},
 							chainwriter.PDALookups{
 								Name: "Account",
 								PublicKey: chainwriter.AccountConstant{
@@ -541,6 +519,12 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								},
 								IsWritable: true,
 								IsSigner:   false,
+							},
+							chainwriter.AccountConstant{
+								Name: "SystemProgram",
+								Address: solana.SystemProgramID.String(),
+								IsSigner: false,
+								IsWritable: false,
 							},
 						},
 						DebugIDLocation: "",

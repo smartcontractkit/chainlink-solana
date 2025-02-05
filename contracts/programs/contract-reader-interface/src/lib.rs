@@ -15,8 +15,6 @@ pub mod contract_reader_interface {
         account.idx = test_idx;
         account.bump = ctx.bumps.data;
 
-        ctx.accounts.value.u64_value = 0;
-
         Ok(())
     }
 
@@ -30,13 +28,6 @@ pub mod contract_reader_interface {
         account.pending_administrator = Pubkey::default();
         account.lookup_table = lookup_table;
 
-        Ok(())
-    }
-
-    pub fn store_val(ctx: Context<StoreVal>, value: u64) -> Result<()> {
-        let val = &mut ctx.accounts.value;
-        val.u64_value = value;
-        
         Ok(())
     }
 
@@ -79,15 +70,6 @@ pub struct Initialize<'info> {
         bump)]
     pub data: Account<'info, DataAccount>,
 
-    // derived test PDA
-    #[account(
-        init,
-        payer = signer,
-        space = size_of::<Value>() + 8,
-        seeds=[b"val"],
-        bump)]
-    pub value: Account<'info, Value>,
-
     pub system_program: Program<'info, System>,
 }
 
@@ -109,19 +91,6 @@ pub struct InitializeLookupTableData<'info> {
 
     /// System Program required for PDA creation
     pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct StoreVal<'info> {
-    #[account(mut)]
-    pub signer: Signer<'info>,
-
-    // derived test PDA
-    #[account(
-        mut,
-        seeds=[b"val"],
-        bump)]
-    pub value: Account<'info, Value>,
 }
 
 #[derive(Accounts)]
@@ -160,11 +129,6 @@ pub struct DataAccount {
     pub bump: u8,
     pub u64_value: u64,
     pub u64_slice: Vec<u64>,
-}
-
-#[account]
-pub struct Value {
-    pub u64_value: u64
 }
 
 #[account]

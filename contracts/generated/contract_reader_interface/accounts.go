@@ -158,42 +158,631 @@ func (obj *DataAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 	return nil
 }
 
-type Value struct {
-	U64Value uint64
+type TestStruct struct {
+	Idx                 uint64
+	Bump                uint8
+	Field               *int32 `bin:"optional"`
+	OracleId            [32]uint8
+	OracleIds           [32][32]uint8
+	AccountStruct       AccountStruct
+	Accounts            [][]byte
+	DifferentField      string
+	BigField            *[32]uint8 `bin:"optional"`
+	NestedDynamicStruct MidLevelDynamicTestStruct
+	NestedStaticStruct  MidLevelStaticTestStruct
 }
 
-var ValueDiscriminator = [8]byte{135, 158, 244, 117, 72, 203, 24, 194}
+var TestStructDiscriminator = [8]byte{243, 149, 82, 70, 154, 54, 107, 6}
 
-func (obj Value) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj TestStruct) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
-	err = encoder.WriteBytes(ValueDiscriminator[:], false)
+	err = encoder.WriteBytes(TestStructDiscriminator[:], false)
 	if err != nil {
 		return err
 	}
-	// Serialize `U64Value` param:
-	err = encoder.Encode(obj.U64Value)
+	// Serialize `Idx` param:
+	err = encoder.Encode(obj.Idx)
+	if err != nil {
+		return err
+	}
+	// Serialize `Bump` param:
+	err = encoder.Encode(obj.Bump)
+	if err != nil {
+		return err
+	}
+	// Serialize `Field` param (optional):
+	{
+		if obj.Field == nil {
+			err = encoder.WriteBool(false)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = encoder.WriteBool(true)
+			if err != nil {
+				return err
+			}
+			err = encoder.Encode(obj.Field)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	// Serialize `OracleId` param:
+	err = encoder.Encode(obj.OracleId)
+	if err != nil {
+		return err
+	}
+	// Serialize `OracleIds` param:
+	err = encoder.Encode(obj.OracleIds)
+	if err != nil {
+		return err
+	}
+	// Serialize `AccountStruct` param:
+	err = encoder.Encode(obj.AccountStruct)
+	if err != nil {
+		return err
+	}
+	// Serialize `Accounts` param:
+	err = encoder.Encode(obj.Accounts)
+	if err != nil {
+		return err
+	}
+	// Serialize `DifferentField` param:
+	err = encoder.Encode(obj.DifferentField)
+	if err != nil {
+		return err
+	}
+	// Serialize `BigField` param (optional):
+	{
+		if obj.BigField == nil {
+			err = encoder.WriteBool(false)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = encoder.WriteBool(true)
+			if err != nil {
+				return err
+			}
+			err = encoder.Encode(obj.BigField)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	// Serialize `NestedDynamicStruct` param:
+	err = encoder.Encode(obj.NestedDynamicStruct)
+	if err != nil {
+		return err
+	}
+	// Serialize `NestedStaticStruct` param:
+	err = encoder.Encode(obj.NestedStaticStruct)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *Value) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *TestStruct) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Read and check account discriminator:
 	{
 		discriminator, err := decoder.ReadTypeID()
 		if err != nil {
 			return err
 		}
-		if !discriminator.Equal(ValueDiscriminator[:]) {
+		if !discriminator.Equal(TestStructDiscriminator[:]) {
 			return fmt.Errorf(
 				"wrong discriminator: wanted %s, got %s",
-				"[135 158 244 117 72 203 24 194]",
+				"[243 149 82 70 154 54 107 6]",
 				fmt.Sprint(discriminator[:]))
 		}
 	}
-	// Deserialize `U64Value`:
-	err = decoder.Decode(&obj.U64Value)
+	// Deserialize `Idx`:
+	err = decoder.Decode(&obj.Idx)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Bump`:
+	err = decoder.Decode(&obj.Bump)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Field` (optional):
+	{
+		ok, err := decoder.ReadBool()
+		if err != nil {
+			return err
+		}
+		if ok {
+			err = decoder.Decode(&obj.Field)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	// Deserialize `OracleId`:
+	err = decoder.Decode(&obj.OracleId)
+	if err != nil {
+		return err
+	}
+	// Deserialize `OracleIds`:
+	err = decoder.Decode(&obj.OracleIds)
+	if err != nil {
+		return err
+	}
+	// Deserialize `AccountStruct`:
+	err = decoder.Decode(&obj.AccountStruct)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Accounts`:
+	err = decoder.Decode(&obj.Accounts)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DifferentField`:
+	err = decoder.Decode(&obj.DifferentField)
+	if err != nil {
+		return err
+	}
+	// Deserialize `BigField` (optional):
+	{
+		ok, err := decoder.ReadBool()
+		if err != nil {
+			return err
+		}
+		if ok {
+			err = decoder.Decode(&obj.BigField)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	// Deserialize `NestedDynamicStruct`:
+	err = decoder.Decode(&obj.NestedDynamicStruct)
+	if err != nil {
+		return err
+	}
+	// Deserialize `NestedStaticStruct`:
+	err = decoder.Decode(&obj.NestedStaticStruct)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type TestStructData struct {
+	Field               *int32 `bin:"optional"`
+	OracleId            [32]uint8
+	OracleIds           [32][32]uint8
+	AccountStruct       AccountStruct
+	Accounts            [][]byte
+	DifferentField      string
+	BigField            *[32]uint8 `bin:"optional"`
+	NestedDynamicStruct MidLevelDynamicTestStruct
+	NestedStaticStruct  MidLevelStaticTestStruct
+}
+
+var TestStructDataDiscriminator = [8]byte{73, 128, 255, 29, 196, 76, 189, 62}
+
+func (obj TestStructData) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(TestStructDataDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Field` param (optional):
+	{
+		if obj.Field == nil {
+			err = encoder.WriteBool(false)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = encoder.WriteBool(true)
+			if err != nil {
+				return err
+			}
+			err = encoder.Encode(obj.Field)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	// Serialize `OracleId` param:
+	err = encoder.Encode(obj.OracleId)
+	if err != nil {
+		return err
+	}
+	// Serialize `OracleIds` param:
+	err = encoder.Encode(obj.OracleIds)
+	if err != nil {
+		return err
+	}
+	// Serialize `AccountStruct` param:
+	err = encoder.Encode(obj.AccountStruct)
+	if err != nil {
+		return err
+	}
+	// Serialize `Accounts` param:
+	err = encoder.Encode(obj.Accounts)
+	if err != nil {
+		return err
+	}
+	// Serialize `DifferentField` param:
+	err = encoder.Encode(obj.DifferentField)
+	if err != nil {
+		return err
+	}
+	// Serialize `BigField` param (optional):
+	{
+		if obj.BigField == nil {
+			err = encoder.WriteBool(false)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = encoder.WriteBool(true)
+			if err != nil {
+				return err
+			}
+			err = encoder.Encode(obj.BigField)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	// Serialize `NestedDynamicStruct` param:
+	err = encoder.Encode(obj.NestedDynamicStruct)
+	if err != nil {
+		return err
+	}
+	// Serialize `NestedStaticStruct` param:
+	err = encoder.Encode(obj.NestedStaticStruct)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *TestStructData) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(TestStructDataDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[73 128 255 29 196 76 189 62]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Field` (optional):
+	{
+		ok, err := decoder.ReadBool()
+		if err != nil {
+			return err
+		}
+		if ok {
+			err = decoder.Decode(&obj.Field)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	// Deserialize `OracleId`:
+	err = decoder.Decode(&obj.OracleId)
+	if err != nil {
+		return err
+	}
+	// Deserialize `OracleIds`:
+	err = decoder.Decode(&obj.OracleIds)
+	if err != nil {
+		return err
+	}
+	// Deserialize `AccountStruct`:
+	err = decoder.Decode(&obj.AccountStruct)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Accounts`:
+	err = decoder.Decode(&obj.Accounts)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DifferentField`:
+	err = decoder.Decode(&obj.DifferentField)
+	if err != nil {
+		return err
+	}
+	// Deserialize `BigField` (optional):
+	{
+		ok, err := decoder.ReadBool()
+		if err != nil {
+			return err
+		}
+		if ok {
+			err = decoder.Decode(&obj.BigField)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	// Deserialize `NestedDynamicStruct`:
+	err = decoder.Decode(&obj.NestedDynamicStruct)
+	if err != nil {
+		return err
+	}
+	// Deserialize `NestedStaticStruct`:
+	err = decoder.Decode(&obj.NestedStaticStruct)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type AccountStruct struct {
+	Account    []byte
+	AccountStr string
+}
+
+var AccountStructDiscriminator = [8]byte{172, 54, 167, 253, 102, 242, 34, 94}
+
+func (obj AccountStruct) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(AccountStructDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Account` param:
+	err = encoder.Encode(obj.Account)
+	if err != nil {
+		return err
+	}
+	// Serialize `AccountStr` param:
+	err = encoder.Encode(obj.AccountStr)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *AccountStruct) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(AccountStructDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[172 54 167 253 102 242 34 94]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Account`:
+	err = decoder.Decode(&obj.Account)
+	if err != nil {
+		return err
+	}
+	// Deserialize `AccountStr`:
+	err = decoder.Decode(&obj.AccountStr)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type MidLevelDynamicTestStruct struct {
+	FixedBytes [2]uint8
+	Inner      InnerDynamicTestStruct
+}
+
+var MidLevelDynamicTestStructDiscriminator = [8]byte{202, 138, 18, 67, 76, 103, 164, 244}
+
+func (obj MidLevelDynamicTestStruct) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(MidLevelDynamicTestStructDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `FixedBytes` param:
+	err = encoder.Encode(obj.FixedBytes)
+	if err != nil {
+		return err
+	}
+	// Serialize `Inner` param:
+	err = encoder.Encode(obj.Inner)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *MidLevelDynamicTestStruct) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(MidLevelDynamicTestStructDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[202 138 18 67 76 103 164 244]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `FixedBytes`:
+	err = decoder.Decode(&obj.FixedBytes)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Inner`:
+	err = decoder.Decode(&obj.Inner)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type InnerDynamicTestStruct struct {
+	I int64
+	S string
+}
+
+var InnerDynamicTestStructDiscriminator = [8]byte{111, 35, 169, 64, 130, 38, 199, 25}
+
+func (obj InnerDynamicTestStruct) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(InnerDynamicTestStructDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `I` param:
+	err = encoder.Encode(obj.I)
+	if err != nil {
+		return err
+	}
+	// Serialize `S` param:
+	err = encoder.Encode(obj.S)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *InnerDynamicTestStruct) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(InnerDynamicTestStructDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[111 35 169 64 130 38 199 25]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `I`:
+	err = decoder.Decode(&obj.I)
+	if err != nil {
+		return err
+	}
+	// Deserialize `S`:
+	err = decoder.Decode(&obj.S)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type MidLevelStaticTestStruct struct {
+	FixedBytes [2]uint8
+	Inner      InnerStaticTestStruct
+}
+
+var MidLevelStaticTestStructDiscriminator = [8]byte{60, 247, 21, 8, 67, 89, 45, 66}
+
+func (obj MidLevelStaticTestStruct) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(MidLevelStaticTestStructDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `FixedBytes` param:
+	err = encoder.Encode(obj.FixedBytes)
+	if err != nil {
+		return err
+	}
+	// Serialize `Inner` param:
+	err = encoder.Encode(obj.Inner)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *MidLevelStaticTestStruct) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(MidLevelStaticTestStructDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[60 247 21 8 67 89 45 66]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `FixedBytes`:
+	err = decoder.Decode(&obj.FixedBytes)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Inner`:
+	err = decoder.Decode(&obj.Inner)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type InnerStaticTestStruct struct {
+	I int64
+	A []byte
+}
+
+var InnerStaticTestStructDiscriminator = [8]byte{34, 251, 49, 124, 37, 221, 104, 73}
+
+func (obj InnerStaticTestStruct) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(InnerStaticTestStructDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `I` param:
+	err = encoder.Encode(obj.I)
+	if err != nil {
+		return err
+	}
+	// Serialize `A` param:
+	err = encoder.Encode(obj.A)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *InnerStaticTestStruct) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(InnerStaticTestStructDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[34 251 49 124 37 221 104 73]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `I`:
+	err = decoder.Decode(&obj.I)
+	if err != nil {
+		return err
+	}
+	// Deserialize `A`:
+	err = decoder.Decode(&obj.A)
 	if err != nil {
 		return err
 	}
