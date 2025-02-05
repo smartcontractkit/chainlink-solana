@@ -110,7 +110,7 @@ type chain struct {
 
 	// if multiNode is enabled, the clientCache will not be used
 	multiNode   *mn.MultiNode[mn.StringID, *client.MultiNodeClient]
-	txSender    *mn.TransactionSender[*solanago.Transaction, *client.SendTxResult, mn.StringID, *client.MultiNodeClient]
+	txSender    *mn.TransactionSender[*solanago.Transaction, solanago.Signature, mn.StringID, *client.MultiNodeClient]
 	multiClient *client.MultiClient
 
 	// tracking node chain id for verification
@@ -300,12 +300,14 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 			mnCfg.DeathDeclarationDelay(),
 		)
 
-		txSender := mn.NewTransactionSender[*solanago.Transaction, *client.SendTxResult, mn.StringID, *client.MultiNodeClient](
+		txSender := mn.NewTransactionSender[*solanago.Transaction, solanago.Signature, mn.StringID, *client.MultiNodeClient](
 			lggr,
 			mn.StringID(id),
 			chainFamily,
 			multiNode,
-			client.NewSendTxResult,
+			func(err error) mn.SendTxReturnCode {
+				return client.ClassifySendError(nil, err)
+			},
 			0, // use the default value provided by the implementation
 		)
 
@@ -317,11 +319,8 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 
 		// Send tx using MultiNode transaction sender
 		sendTx = func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error) {
-			result := ch.txSender.SendTransaction(ctx, tx)
-			if result == nil {
-				return solanago.Signature{}, errors.New("tx sender returned nil result")
-			}
-			return result.Signature(), result.Error()
+			sig, _, err := ch.txSender.SendTransaction(ctx, tx)
+			return sig, err
 		}
 
 		tc = internal.NewLoader[client.ReaderWriter](func() (client.ReaderWriter, error) { return ch.multiNode.SelectRPC() })
