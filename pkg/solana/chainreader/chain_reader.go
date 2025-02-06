@@ -461,7 +461,7 @@ func toLPFilter(
 		Address:     logpoller.PublicKey(address),
 		EventName:   f.EventName,
 		EventSig:    logpoller.EventSignature([]byte(f.EventName)[:logpoller.EventSignatureLength]),
-		SubKeyPaths: logpoller.SubKeyPaths(subKeyPaths),
+		SubkeyPaths: logpoller.SubKeyPaths(subKeyPaths),
 		Retention:   f.Retention,
 		MaxLogsKept: f.MaxLogsKept,
 	}
