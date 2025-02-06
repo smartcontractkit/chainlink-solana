@@ -4,25 +4,20 @@ import (
 	"context"
 	"fmt"
 
+	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
-// decoder should be initialized with newDecoder
 type decoder struct {
-	definitions               map[string]Entry
-	lenientCodecFromTypeCodec encodings.LenientCodecFromTypeCodec
+	definitions          map[string]Entry
+	lenientFromTypeCodec map[string]encodings.LenientCodecFromTypeCodec
 }
 
 func newDecoder(definitions map[string]Entry) commontypes.Decoder {
-	lenientCodecFromTypeCodec := make(encodings.LenientCodecFromTypeCodec)
-	for k, v := range definitions {
-		lenientCodecFromTypeCodec[k] = v
-	}
-
 	return &decoder{
-		definitions:               definitions,
-		lenientCodecFromTypeCodec: lenientCodecFromTypeCodec,
+		definitions:          definitions,
+		lenientFromTypeCodec: makeCodecFromDefs(definitions),
 	}
 }
 
@@ -33,11 +28,15 @@ func (d *decoder) Decode(ctx context.Context, raw []byte, into any, itemType str
 		}
 	}()
 
-	if d.lenientCodecFromTypeCodec == nil {
-		return fmt.Errorf("decoder is not properly initialised, underlying lenientCodecFromTypeCodec is nil")
+	_, itemType = commoncodec.ItemTyper(itemType).Next()
+	head, tail := commoncodec.ItemTyper(itemType).Next()
+
+	codec, ok := d.lenientFromTypeCodec[head]
+	if !ok {
+		return fmt.Errorf("%w: codec not available for itemType: %s", commontypes.ErrInvalidType, itemType)
 	}
 
-	return d.lenientCodecFromTypeCodec.Decode(ctx, raw, into, itemType)
+	return codec.Decode(ctx, raw, into, tail)
 }
 
 func (d *decoder) GetMaxDecodingSize(_ context.Context, n int, itemType string) (int, error) {
@@ -50,4 +49,22 @@ func (d *decoder) GetMaxDecodingSize(_ context.Context, n int, itemType string) 
 		return 0, fmt.Errorf("%w: nil entry", commontypes.ErrInvalidType)
 	}
 	return codecEntry.GetCodecType().Size(n)
+}
+
+func makeCodecFromDefs(definitions map[string]Entry) map[string]encodings.LenientCodecFromTypeCodec {
+	// itemType is constructed as a dot-separated string of values that separates contract
+	// names from itemType names within the contract
+	lenientFromTypeCodec := make(map[string]encodings.LenientCodecFromTypeCodec)
+	for key, value := range definitions {
+		_, key = commoncodec.ItemTyper(key).Next()
+		head, tail := commoncodec.ItemTyper(key).Next()
+
+		if _, ok := lenientFromTypeCodec[head]; !ok {
+			lenientFromTypeCodec[head] = make(encodings.LenientCodecFromTypeCodec)
+		}
+
+		lenientFromTypeCodec[head][tail] = value
+	}
+
+	return lenientFromTypeCodec
 }

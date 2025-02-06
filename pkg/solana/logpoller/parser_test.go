@@ -50,10 +50,18 @@ func TestDSLParser(t *testing.T) {
 
 		_, _ = rand.Read(pk[:])
 
+		subkey, err := NewEventBySubKeyFilter(0, []primitives.ValueComparator{
+			{Value: 42, Operator: primitives.Gte},
+			{Value: "test_value", Operator: primitives.Eq},
+		})
+
+		require.NoError(t, err)
+
 		parser := &pgDSLParser{}
 		expressions := []query.Expression{
 			NewAddressFilter(pk),
 			NewEventSigFilter([]byte("test")),
+			subkey,
 			query.Confidence(primitives.Unconfirmed),
 		}
 		limiter := query.NewLimitAndSort(query.CursorLimit(fmt.Sprintf("10-5-%s", txHash), query.CursorFollowing, 20))
@@ -61,7 +69,8 @@ func TestDSLParser(t *testing.T) {
 		result, args, err := parser.buildQuery(chainID, expressions, limiter)
 		expected := logsQuery(
 			" WHERE chain_id = :chain_id " +
-				"AND (address = :address_0 AND event_sig = :event_sig_0) " +
+				"AND (address = :address_0 AND event_sig = :event_sig_0 AND subkey_values[:subkey_index_0] >= :subkey_value_0 " +
+				"AND subkey_values[:subkey_index_0] = :subkey_value_1) " +
 				"AND (block_number > :cursor_block_number OR (block_number = :cursor_block_number " +
 				"AND log_index > :cursor_log_index)) " +
 				"ORDER BY block_number ASC, log_index ASC, tx_hash ASC LIMIT 20")
@@ -69,7 +78,7 @@ func TestDSLParser(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, expected, result)
 
-		assertArgs(t, args, 5)
+		assertArgs(t, args, 8)
 	})
 
 	t.Run("query with limit and no order by", func(t *testing.T) {
@@ -79,24 +88,33 @@ func TestDSLParser(t *testing.T) {
 
 		_, _ = rand.Read(pk[:])
 
+		subkey, err := NewEventBySubKeyFilter(0, []primitives.ValueComparator{
+			{Value: 42, Operator: primitives.Gte},
+			{Value: "test_value", Operator: primitives.Eq},
+		})
+
+		require.NoError(t, err)
+
 		parser := &pgDSLParser{}
 		expressions := []query.Expression{
 			NewAddressFilter(pk),
 			NewEventSigFilter([]byte("test")),
+			subkey,
 		}
 		limiter := query.NewLimitAndSort(query.CountLimit(20))
 
 		result, args, err := parser.buildQuery(chainID, expressions, limiter)
 		expected := logsQuery(
 			" WHERE chain_id = :chain_id " +
-				"AND (address = :address_0 AND event_sig = :event_sig_0) " +
+				"AND (address = :address_0 AND event_sig = :event_sig_0 " +
+				"AND subkey_values[:subkey_index_0] >= :subkey_value_0 AND subkey_values[:subkey_index_0] = :subkey_value_1) " +
 				"ORDER BY " + defaultSort + " " +
 				"LIMIT 20")
 
 		require.NoError(t, err)
 		assert.Equal(t, expected, result)
 
-		assertArgs(t, args, 3)
+		assertArgs(t, args, 6)
 	})
 
 	t.Run("query with order by sequence no cursor no limit", func(t *testing.T) {
@@ -278,9 +296,10 @@ func TestDSLParser(t *testing.T) {
 	t.Run("nested query deep", func(t *testing.T) {
 		t.Parallel()
 
-		sigFilter := NewEventSigFilter([]byte("test"))
 		parser := &pgDSLParser{}
+		sigFilter := NewEventSigFilter([]byte("test"))
 
+		limiter := query.LimitAndSort{}
 		expressions := []query.Expression{
 			{BoolExpression: query.BoolExpression{
 				Expressions: []query.Expression{
@@ -302,7 +321,6 @@ func TestDSLParser(t *testing.T) {
 				BoolOperator: query.AND,
 			}},
 		}
-		limiter := query.LimitAndSort{}
 
 		result, args, err := parser.buildQuery(chainID, expressions, limiter)
 		expected := logsQuery(
