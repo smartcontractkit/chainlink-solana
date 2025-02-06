@@ -36,7 +36,7 @@ type ContractReaderService struct {
 	// provided dependencies
 	lggr   logger.Logger
 	client MultipleAccountGetter
-	events EventsReader
+	reader EventsReader
 
 	// internal values
 	bindings namespaceBindings
@@ -60,7 +60,7 @@ func NewContractReaderService(
 	lggr logger.Logger,
 	dataReader MultipleAccountGetter,
 	cfg config.ContractReader,
-	events EventsReader,
+	reader EventsReader,
 ) (*ContractReaderService, error) {
 	svc := &ContractReaderService{
 		lggr:     logger.Named(lggr, ServiceName),
@@ -69,6 +69,7 @@ func NewContractReaderService(
 		lookup:   newLookup(),
 		parsed:   &codec.ParsedTypes{EncoderDefs: map[string]codec.Entry{}, DecoderDefs: map[string]codec.Entry{}},
 		filters:  []logpoller.Filter{},
+		reader:   reader,
 	}
 
 	if err := svc.init(cfg.Namespaces); err != nil {
@@ -100,7 +101,7 @@ func (s *ContractReaderService) Start(ctx context.Context) error {
 	return s.StartOnce(ServiceName, func() error {
 		// registering filters needs a context so we should be able to use the start function context.
 		for _, filter := range s.filters {
-			if err := s.events.RegisterFilter(ctx, filter); err != nil {
+			if err := s.reader.RegisterFilter(ctx, filter); err != nil {
 				return err
 			}
 		}
@@ -342,7 +343,7 @@ func (s *ContractReaderService) init(namespaces map[string]config.ChainContractR
 					nameSpaceDef.ContractAddress,
 					nameSpaceDef.IDL, eventIDlDef,
 					read,
-					s.events,
+					s.reader,
 				); err != nil {
 					return err
 				}
@@ -392,18 +393,21 @@ func (s *ContractReaderService) addEventRead(
 	readDefinition config.ReadDefinition,
 	events EventsReader,
 ) error {
-	subKeys := [][]string{}
-	for _, onChain := range readDefinition.IndexedFields {
-		subKeys = append(subKeys, strings.Split(onChain, "."))
-	}
+	mappedTuples := make(map[string]uint64)
+	subKeys := [4][]string{}
 
-	filter := toLPFilter(readDefinition.PollingFilter, contractAddress, subKeys)
+	applyIndexedFieldTuple(mappedTuples, subKeys, readDefinition.IndexedField0, 0)
+	applyIndexedFieldTuple(mappedTuples, subKeys, readDefinition.IndexedField1, 1)
+	applyIndexedFieldTuple(mappedTuples, subKeys, readDefinition.IndexedField2, 2)
+	applyIndexedFieldTuple(mappedTuples, subKeys, readDefinition.IndexedField3, 3)
+
+	filter := toLPFilter(readDefinition.PollingFilter, contractAddress, subKeys[:])
 
 	s.filters = append(s.filters, filter)
 	s.bindings.AddReadBinding(namespace, genericName, newEventReadBinding(
 		namespace,
 		genericName,
-		readDefinition.IndexedFields,
+		mappedTuples,
 		events,
 		filter.EventSig,
 	))
@@ -460,5 +464,12 @@ func toLPFilter(
 		SubKeyPaths: logpoller.SubKeyPaths(subKeyPaths),
 		Retention:   f.Retention,
 		MaxLogsKept: f.MaxLogsKept,
+	}
+}
+
+func applyIndexedFieldTuple(lookup map[string]uint64, subKeys [4][]string, conf *config.IndexedField, idx uint64) {
+	if conf != nil {
+		lookup[conf.OffChainPath] = idx
+		subKeys[idx] = strings.Split(conf.OnChainPath, ".")
 	}
 }

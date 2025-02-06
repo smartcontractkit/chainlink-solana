@@ -132,7 +132,7 @@ type SolanaChainComponentsInterfaceTesterHelper[T TestingT[T]] interface {
 type SolanaChainComponentsInterfaceTester[T TestingT[T]] struct {
 	TestSelectionSupport
 	Helper               SolanaChainComponentsInterfaceTesterHelper[T]
-	cr                   *chainreader.SolanaChainReaderService
+	cr                   *chainreader.ContractReaderService
 	contractReaderConfig config.ContractReader
 }
 
@@ -192,7 +192,13 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GetContractReader(t T) types.
 		return it.cr
 	}
 
-	svc, err := chainreader.NewChainReaderService(it.Helper.Logger(t), it.Helper.RPCClient(), it.contractReaderConfig)
+	var events chainreader.EventsReader
+
+	svc, err := chainreader.NewContractReaderService(
+		it.Helper.Logger(t),
+		it.Helper.RPCClient(),
+		it.contractReaderConfig,
+		events)
 
 	require.NoError(t, err)
 	require.NoError(t, svc.Start(ctx))

@@ -23,22 +23,22 @@ type eventReadBinding struct {
 	modifier               commoncodec.Modifier
 	key                    solana.PublicKey
 	remapper               remapHelper
-	indexedSubkeys         map[string]string
-	events                 EventsReader
+	indexedSubKeys         map[string]uint64
+	reader                 EventsReader
 	eventSig               [logpoller.EventSignatureLength]byte
 }
 
 func newEventReadBinding(
 	namespace, genericName string,
-	indexedSubkeys map[string]string,
-	events EventsReader,
+	indexedSubKeys map[string]uint64,
+	reader EventsReader,
 	eventSig [logpoller.EventSignatureLength]byte,
 ) *eventReadBinding {
 	binding := &eventReadBinding{
 		namespace:      namespace,
 		genericName:    genericName,
-		indexedSubkeys: indexedSubkeys,
-		events:         events,
+		indexedSubKeys: indexedSubKeys,
+		reader:         reader,
 		eventSig:       eventSig,
 	}
 
@@ -97,12 +97,12 @@ func (b *eventReadBinding) QueryKey(
 	// filter should always use the address and event sig
 	filter.Expressions = append([]query.Expression{
 		logpoller.NewAddressFilter(pubKey),
-		logpoller.NewEventSigFilter(b.eventSig[:]), // TODO: genericName is wrong; need the event sig hash
+		logpoller.NewEventSigFilter(b.eventSig[:]),
 	}, filter.Expressions...)
 
 	itemType := strings.Join([]string{b.namespace, b.genericName}, ".")
 
-	logs, err := b.events.FilteredLogs(ctx, filter.Expressions, limitAndSort, itemType)
+	logs, err := b.reader.FilteredLogs(ctx, filter.Expressions, limitAndSort, itemType)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +127,6 @@ func (b *eventReadBinding) remapPrimitive(expression query.Expression) (query.Ex
 			return query.Expression{}, fmt.Errorf("failed to encode comparator %q: %w", primitive.Name, err)
 		}
 	case *primitives.Confidence:
-		// TODO: maybe use an ignore filter?
 		// confidence is ignored in solana
 	}
 
@@ -135,7 +134,7 @@ func (b *eventReadBinding) remapPrimitive(expression query.Expression) (query.Ex
 }
 
 func (b *eventReadBinding) encodeComparator(comparator *primitives.Comparator) (query.Expression, error) {
-	onChainName, ok := b.indexedSubkeys[comparator.Name]
+	subKeyIndex, ok := b.indexedSubKeys[comparator.Name]
 	if !ok {
 		return query.Expression{}, fmt.Errorf("%w: unknown indexed subkey mapping %s", types.ErrInvalidConfig, comparator.Name)
 	}
@@ -152,7 +151,7 @@ func (b *eventReadBinding) encodeComparator(comparator *primitives.Comparator) (
 		comparator.ValueComparators[idx].Value = newValue
 	}
 
-	return logpoller.NewEventSubkeyFilter(strings.Split(onChainName, "."), comparator.ValueComparators), nil
+	return logpoller.NewEventBySubKeyFilter(subKeyIndex, comparator.ValueComparators)
 }
 
 func (b *eventReadBinding) decodeLogsIntoSequences(
@@ -195,7 +194,6 @@ func (b *eventReadBinding) decodeLogsIntoSequences(
 func (b *eventReadBinding) decodeLog(ctx context.Context, log *logpoller.Log, into any) error {
 	itemType := codec.WrapItemType(false, b.namespace, b.genericName)
 
-	// decode non indexed topics and apply output modifiers
 	if err := b.codec.Decode(ctx, log.Data, into, itemType); err != nil {
 		return fmt.Errorf("%w: failed to decode log data: %s", types.ErrInvalidType, err.Error())
 	}

@@ -117,7 +117,7 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 
 	decoder, err := newDecoder(filter)
 	if err != nil {
-		return fmt.Errorf("failed to create decoder: %w", err)
+		return err
 	}
 
 	filterID, err := fl.orm.InsertFilter(ctx, filter)
@@ -139,8 +139,8 @@ func newDecoder(filter Filter) (Decoder, error) {
 	if err != nil {
 		return nil, err
 	}
-	decoderTypes := codec.ParsedTypes{DecoderDefs: map[string]codec.Entry{filter.EventName: cEntry}}
-	return decoderTypes.ToCodec()
+
+	return codec.EntryAsModifierRemoteCodec(cEntry, filter.EventName)
 }
 
 func (fl *filters) addToIndices(filter Filter, decoder Decoder) error {

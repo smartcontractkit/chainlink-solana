@@ -31,7 +31,10 @@ type ReadDefinition struct {
 	InputModifications  commoncodec.ModifiersConfig `json:"inputModifications,omitempty"`
 	OutputModifications commoncodec.ModifiersConfig `json:"outputModifications,omitempty"`
 	PDADefiniton        codec.PDATypeDef            `json:"pdaDefinition,omitempty"` // Only used for PDA account reads
-	IndexedFields       map[string]string           `json:"indexedFields,omitempty"`
+	IndexedField0       *IndexedField               `json:"indexedField0"`
+	IndexedField1       *IndexedField               `json:"indexedField1"`
+	IndexedField2       *IndexedField               `json:"indexedField2"`
+	IndexedField3       *IndexedField               `json:"indexedField3"`
 	// This will create a log poller filter for this event.
 	*PollingFilter `json:"pollingFilter,omitempty"`
 }
@@ -52,6 +55,11 @@ func (r ReadType) String() string {
 	default:
 		return fmt.Sprintf("Unknown(%d)", r)
 	}
+}
+
+type IndexedField struct {
+	OffChainPath string `json:"offChainPath"`
+	OnChainPath  string `json:"onChainPath"`
 }
 
 func (c *ChainContractReader) UnmarshalJSON(bytes []byte) error {

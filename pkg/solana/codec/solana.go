@@ -83,8 +83,8 @@ func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
 			return nil, err
 		}
 
-		parsed.EncoderDefs[offChainName] = cEntry
-		parsed.DecoderDefs[offChainName] = cEntry
+		parsed.EncoderDefs["input."+offChainName] = cEntry
+		parsed.DecoderDefs["output."+offChainName] = cEntry
 	}
 
 	return parsed.ToCodec()
