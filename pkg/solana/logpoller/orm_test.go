@@ -1,4 +1,3 @@
-// go:build db_tests
 package logpoller
 
 import (
@@ -22,6 +21,9 @@ import (
 )
 
 func TestLogPollerFilters(t *testing.T) {
+	sqltest.SkipInMemory(t)
+	t.Parallel()
+
 	lggr := logger.Test(t)
 
 	privateKey, err := solana.NewRandomPrivateKey()
@@ -199,6 +201,9 @@ func TestLogPollerFilters(t *testing.T) {
 }
 
 func TestLogPollerLogs(t *testing.T) {
+	sqltest.SkipInMemory(t)
+	t.Parallel()
+
 	lggr := logger.Test(t)
 	chainID := uuid.NewString()
 	dbx := sqltest.NewDB(t, sqltest.TestURL(t))
@@ -238,6 +243,8 @@ func TestLogPollerLogs(t *testing.T) {
 }
 
 func TestLogPoller_GetLatestBlock(t *testing.T) {
+	t.Parallel()
+	sqltest.SkipInMemory(t)
 	lggr := logger.Test(t)
 	dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 
@@ -278,6 +285,8 @@ func newRandomFilter(t *testing.T) Filter {
 }
 
 func TestFilteredLogs(t *testing.T) {
+	sqltest.SkipInMemory(t)
+	t.Parallel()
 	lggr := logger.Test(t)
 	dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 	orm := NewORM(chainID, dbx, lggr)
@@ -327,14 +336,14 @@ func TestFilteredLogs(t *testing.T) {
 
 	for _, tt := range tests {
 		data := []byte("non-null data")
-		for i, _ := range tt.input {
+		for i := range tt.input {
 			l := &tt.input[i]
 			l.ChainID = chainID
 			l.FilterID = filterID
 			l.BlockTimestamp = blockTimestamp
 			l.Data = data
 		}
-		for j, _ := range tt.expected {
+		for j := range tt.expected {
 			l := &tt.expected[j]
 			l.ChainID = chainID
 			l.FilterID = filterID
