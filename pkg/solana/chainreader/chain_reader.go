@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 type EventsReader interface {
@@ -311,7 +312,7 @@ func (s *ContractReaderService) addCodecDef(forEncoding bool, namespace, generic
 func (s *ContractReaderService) init(namespaces map[string]config.ChainContractReader) error {
 	for namespace, nameSpaceDef := range namespaces {
 		for genericName, read := range nameSpaceDef.Reads {
-			injectAddressModifier(read.InputModifications, read.OutputModifications)
+			utils.InjectAddressModifier(read.InputModifications, read.OutputModifications)
 
 			switch read.ReadType {
 			case config.Account:
@@ -369,12 +370,12 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 	)
 
 	// Create PDA read binding if PDA prefix or seeds configs are populated
-	if len(readDefinition.PDADefiniton.Prefix) > 0 || len(readDefinition.PDADefiniton.Seeds) > 0 {
+	if readDefinition.PDADefiniton.Prefix != nil || len(readDefinition.PDADefiniton.Seeds) > 0 {
 		inputAccountIDLDef = readDefinition.PDADefiniton
 		reader = newAccountReadBinding(namespace, genericName, readDefinition.PDADefiniton.Prefix, true)
 	} else {
 		inputAccountIDLDef = codec.NilIdlTypeDefTy
-		reader = newAccountReadBinding(namespace, genericName, "", false)
+		reader = newAccountReadBinding(namespace, genericName, nil, false)
 	}
 	if err := s.addCodecDef(true, namespace, genericName, idl, inputAccountIDLDef, readDefinition.InputModifications); err != nil {
 		return err
@@ -413,24 +414,6 @@ func (s *ContractReaderService) addEventRead(
 	))
 
 	return nil
-}
-
-// injectAddressModifier injects AddressModifier into OutputModifications.
-// This is necessary because AddressModifier cannot be serialized and must be applied at runtime.
-func injectAddressModifier(inputModifications, outputModifications commoncodec.ModifiersConfig) {
-	for i, modConfig := range inputModifications {
-		if addrModifierConfig, ok := modConfig.(*commoncodec.AddressBytesToStringModifierConfig); ok {
-			addrModifierConfig.Modifier = codec.SolanaAddressModifier{}
-			outputModifications[i] = addrModifierConfig
-		}
-	}
-
-	for i, modConfig := range outputModifications {
-		if addrModifierConfig, ok := modConfig.(*commoncodec.AddressBytesToStringModifierConfig); ok {
-			addrModifierConfig.Modifier = codec.SolanaAddressModifier{}
-			outputModifications[i] = addrModifierConfig
-		}
-	}
 }
 
 type accountDataReader struct {

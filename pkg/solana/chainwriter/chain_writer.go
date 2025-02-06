@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 const ServiceName = "SolanaChainWriter"
@@ -91,6 +92,7 @@ func (s *SolanaChainWriterService) parsePrograms(config ChainWriterConfig) error
 			return fmt.Errorf("failed to unmarshal IDL for program: %s, error: %w", program, err)
 		}
 		for method, methodConfig := range programConfig.Methods {
+			utils.InjectAddressModifier(methodConfig.InputModifications, nil)
 			idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeInstructionDef, methodConfig.ChainSpecificName, idl)
 			if err != nil {
 				return err
