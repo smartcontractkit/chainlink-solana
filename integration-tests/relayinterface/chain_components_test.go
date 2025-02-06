@@ -28,14 +28,13 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	contract "github.com/smartcontractkit/chainlink-solana/contracts/generated/contract_reader_interface"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 
-	contract "github.com/smartcontractkit/chainlink-solana/contracts/generated/contract_reader_interface"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	solanautils "github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 func TestChainComponents(t *testing.T) {
@@ -242,13 +241,13 @@ func (h *helper) Init(t *testing.T) {
 	privateKey, err := solana.PrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1])
 	require.NoError(t, err)
 
-	h.rpcURL, h.wsURL = solanautils.SetupTestValidatorWithAnchorPrograms(t, privateKey.PublicKey().String(), []string{"contract-reader-interface"})
+	h.rpcURL, h.wsURL = utils.SetupTestValidatorWithAnchorPrograms(t, privateKey.PublicKey().String(), []string{"contract-reader-interface"})
 	h.wsClient, err = ws.Connect(tests.Context(t), h.wsURL)
 	h.rpcClient = rpc.New(h.rpcURL)
 
 	require.NoError(t, err)
 
-	solanautils.FundAccounts(t, []solana.PrivateKey{privateKey}, h.rpcClient)
+	utils.FundAccounts(t, []solana.PrivateKey{privateKey}, h.rpcClient)
 
 	pubkey, err := solana.PublicKeyFromBase58(programPubKey)
 	require.NoError(t, err)

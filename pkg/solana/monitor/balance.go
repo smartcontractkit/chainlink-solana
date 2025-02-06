@@ -8,9 +8,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+	"github.com/smartcontractkit/chainlink-common/pkg/timeutil"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 // Config defines the monitor configuration.
@@ -28,11 +28,11 @@ type BalanceClient interface {
 }
 
 // NewBalanceMonitor returns a balance monitoring services.Service which reports the SOL balance of all ks keys to prometheus.
-func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, reader internal.Loader[BalanceClient]) services.Service {
+func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, reader utils.Loader[BalanceClient]) services.Service {
 	return newBalanceMonitor(chainID, cfg, lggr, ks, reader)
 }
 
-func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, reader internal.Loader[BalanceClient]) *balanceMonitor {
+func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, reader utils.Loader[BalanceClient]) *balanceMonitor {
 	b := balanceMonitor{
 		chainID: chainID,
 		cfg:     cfg,
@@ -54,7 +54,7 @@ type balanceMonitor struct {
 	ks       Keystore
 	updateFn func(acc solana.PublicKey, lamports uint64) // overridable for testing
 
-	reader internal.Loader[BalanceClient]
+	reader utils.Loader[BalanceClient]
 
 	stop services.StopChan
 	done chan struct{}
@@ -88,14 +88,15 @@ func (b *balanceMonitor) monitor() {
 	ctx, cancel := b.stop.NewCtx()
 	defer cancel()
 
-	tick := time.After(utils.WithJitter(b.cfg.BalancePollPeriod()))
+	ticker := timeutil.NewTicker(b.cfg.BalancePollPeriod)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-b.stop:
 			return
-		case <-tick:
+		case <-ticker.C:
 			b.updateBalances(ctx)
-			tick = time.After(utils.WithJitter(b.cfg.BalancePollPeriod()))
+			ticker.Reset()
 		}
 	}
 }
@@ -112,7 +113,7 @@ func (b *balanceMonitor) updateBalances(ctx context.Context) {
 	if len(keys) == 0 {
 		return
 	}
-	reader, err := b.reader.Get()
+	reader, err := b.reader.Get(ctx)
 	if err != nil {
 		b.lggr.Errorw("Failed to get client", "err", err)
 		return

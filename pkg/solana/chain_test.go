@@ -38,6 +38,7 @@ import (
 const TestSolanaGenesisHashTemplate = `{"jsonrpc":"2.0","result":"%s","id":1}`
 
 func TestSolanaChain_GetClient(t *testing.T) {
+	ctx := tests.Context(t)
 	checkOnce := map[string]struct{}{}
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		out := fmt.Sprintf(TestSolanaGenesisHashTemplate, client.MainnetGenesisHash) // mainnet genesis hash
@@ -82,7 +83,7 @@ func TestSolanaChain_GetClient(t *testing.T) {
 			URL:  config.MustParseURL(mockServer.URL + "/2"),
 		},
 	}
-	_, err := testChain.getClient()
+	_, err := testChain.getClient(ctx)
 	assert.NoError(t, err)
 
 	// random nodes (happy path, 1 valid + multiple invalid)
@@ -108,12 +109,12 @@ func TestSolanaChain_GetClient(t *testing.T) {
 			URL:  config.MustParseURL(mockServer.URL + "/mismatch/4"),
 		},
 	}
-	_, err = testChain.getClient()
+	_, err = testChain.getClient(ctx)
 	assert.NoError(t, err)
 
 	// empty nodes response
 	cfg.Nodes = nil
-	_, err = testChain.getClient()
+	_, err = testChain.getClient(ctx)
 	assert.Error(t, err)
 
 	// no valid nodes to select from
@@ -127,7 +128,7 @@ func TestSolanaChain_GetClient(t *testing.T) {
 			URL:  config.MustParseURL(mockServer.URL + "/mismatch/2"),
 		},
 	}
-	_, err = testChain.getClient()
+	_, err = testChain.getClient(ctx)
 	assert.NoError(t, err)
 }
 
@@ -360,10 +361,11 @@ func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
 
 	servicetest.Run(t, testChain)
 
+	ctx := tests.Context(t)
 	var selectedClient client.ReaderWriter
 	require.Eventually(t, func() bool {
 		var cerr error
-		selectedClient, cerr = testChain.getClient()
+		selectedClient, cerr = testChain.getClient(ctx)
 		return cerr == nil
 	}, time.Minute, time.Second, "failed to get a client")
 
@@ -401,12 +403,12 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 	servicetest.Run(t, c)
 
 	require.Eventually(t, func() bool {
-		_, err := c.getClient()
+		_, err := c.getClient(ctx)
 		return err == nil
 	}, time.Minute, time.Second, "failed to get a client")
 
 	t.Run("successful transaction", func(t *testing.T) {
-		cl, err := c.getClient()
+		cl, err := c.getClient(ctx)
 		require.NoError(t, err)
 
 		hash, hashErr := cl.LatestBlockhash(tests.Context(t))
@@ -442,7 +444,7 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 
 	t.Run("unsigned transaction error", func(t *testing.T) {
 		// create + sign transaction
-		cl, err := c.getClient()
+		cl, err := c.getClient(ctx)
 		require.NoError(t, err)
 
 		hash, hashErr := cl.LatestBlockhash(tests.Context(t))
@@ -477,6 +479,7 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 }
 
 func TestSolanaChain_MultiNode_Txm(t *testing.T) {
+	ctx := tests.Context(t)
 	cfg := solcfg.NewDefault()
 	cfg.MultiNode.MultiNode.Enabled = ptr(true)
 	cfg.Nodes = []*solcfg.Node{
@@ -518,14 +521,14 @@ func TestSolanaChain_MultiNode_Txm(t *testing.T) {
 	client.FundTestAccounts(t, []solana.PublicKey{pubKey}, cfg.Nodes[0].URL.String())
 
 	// track initial balance
-	selectedClient, err := testChain.getClient()
+	selectedClient, err := testChain.getClient(ctx)
 	require.NoError(t, err)
 	receiverBal, err := selectedClient.Balance(tests.Context(t), pubKeyReceiver)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(0), receiverBal)
 
 	createTx := func(signer solana.PublicKey, sender solana.PublicKey, receiver solana.PublicKey, amt uint64) (*solana.Transaction, uint64) {
-		selectedClient, err = testChain.getClient()
+		selectedClient, err = testChain.getClient(ctx)
 		assert.NoError(t, err)
 		hash, hashErr := selectedClient.LatestBlockhash(tests.Context(t))
 		assert.NoError(t, hashErr)
@@ -591,7 +594,7 @@ loop:
 	}
 
 	// verify funds were transferred through transaction sender
-	selectedClient, err = testChain.getClient()
+	selectedClient, err = testChain.getClient(ctx)
 	assert.NoError(t, err)
 	receiverBal, err = selectedClient.Balance(tests.Context(t), pubKeyReceiver)
 	assert.NoError(t, err)
