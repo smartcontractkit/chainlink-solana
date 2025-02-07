@@ -120,12 +120,12 @@ func TestSolanaChainReaderService_Start(t *testing.T) {
 	}
 
 	boolType := codec.IdlType{}
-	boolType.UnmarshalJSON([]byte(codec.IdlTypeBool))
+	require.NoError(t, boolType.UnmarshalJSON([]byte("\"bool\"")))
 
 	for _, tt := range testCases {
 		t.Run(tt.Name, func(t *testing.T) {
 			cfg := config.ContractReader{
-				map[string]config.ChainContractReader{
+				Namespaces: map[string]config.ChainContractReader{
 					"myChainReader": {
 						IDL: codec.IDL{
 							Accounts: []codec.IdlTypeDef{{"myAccount",
@@ -139,6 +139,7 @@ func TestSolanaChainReaderService_Start(t *testing.T) {
 							"myRead": tt.ReadDef},
 					},
 				},
+				AddressShareGroups: nil,
 			}
 			er := mocks.NewEventsReader(t)
 			svc, err := chainreader.NewContractReaderService(
