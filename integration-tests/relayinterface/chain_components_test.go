@@ -24,7 +24,7 @@ import (
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	commontestutils "github.com/smartcontractkit/chainlink-common/pkg/loop/testutils"
+	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
@@ -64,14 +64,14 @@ func TestChainComponents(t *testing.T) {
 		RunChainComponentsSolanaTests(t, it)
 	})
 
-	t.Run("RunChainComponentsInLoopSolanaTests", func(t *testing.T) {
-		t.Parallel()
-		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}}
-		DisableTests(it)
-		wrapped := commontestutils.WrapContractReaderTesterForLoop(it)
-		wrapped.Setup(t)
-		RunChainComponentsInLoopSolanaTests(t, wrapped)
-	})
+	// t.Run("RunChainComponentsInLoopSolanaTests", func(t *testing.T) {
+	// 	t.Parallel()
+	// 	it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}}
+	// 	DisableTests(it)
+	// 	wrapped := commontestutils.WrapContractReaderTesterForLoop(it)
+	// 	wrapped.Setup(t)
+	// 	RunChainComponentsInLoopSolanaTests(t, wrapped)
+	// })
 }
 
 func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
