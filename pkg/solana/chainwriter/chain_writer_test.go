@@ -964,9 +964,9 @@ func mockFetchRouterAddress(t *testing.T, rw *clientmocks.ReaderWriter, routerAd
 	pda, _, err := solana.FindProgramAddress([][]byte{[]byte("reference_addresses")}, offrampAddr)
 	require.NoError(t, err)
 	referenceAddresses := ccip_offramp.ReferenceAddresses{
-		Version: 1,
-		Router: routerAddr,
-		FeeQuoter: solana.PublicKey{},
+		Version:            1,
+		Router:             routerAddr,
+		FeeQuoter:          solana.PublicKey{},
 		OfframpLookupTable: solana.PublicKey{},
 	}
 	referenceAddressesBytes := mustBorshEncodeStruct(t, referenceAddresses)

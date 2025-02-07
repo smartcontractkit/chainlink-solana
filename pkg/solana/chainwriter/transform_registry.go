@@ -44,7 +44,7 @@ func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args a
 	}
 	// PDA lookup to fetch router address
 	routerAddrLookup := PDALookups{
-		Name:      "ReferenceAddresses",
+		Name: "ReferenceAddresses",
 		PublicKey: AccountConstant{
 			Address: toAddress,
 		},
@@ -64,7 +64,7 @@ func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args a
 	if len(accountMetas) != 1 {
 		return nil, fmt.Errorf("expect 1 address to be returned for router address, received %d: %w", len(accountMetas), err)
 	}
-	
+
 	routerAddress := accountMetas[0].PublicKey
 	TokenPoolLookupTable := LookupTables{
 		DerivedLookupTables: []DerivedLookupTable{
