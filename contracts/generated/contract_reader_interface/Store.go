@@ -20,7 +20,7 @@ type Store struct {
 	// [1] = [WRITE] testStruct
 	//
 	// [2] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewStoreInstructionBuilder creates a new `Store` instruction builder.
@@ -51,7 +51,7 @@ func (inst *Store) SetSignerAccount(signer ag_solanago.PublicKey) *Store {
 
 // GetSignerAccount gets the "signer" account.
 func (inst *Store) GetSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetTestStructAccount sets the "testStruct" account.
@@ -62,7 +62,7 @@ func (inst *Store) SetTestStructAccount(testStruct ag_solanago.PublicKey) *Store
 
 // GetTestStructAccount gets the "testStruct" account.
 func (inst *Store) GetTestStructAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
@@ -73,7 +73,7 @@ func (inst *Store) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) 
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *Store) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 func (inst Store) Build() *Instruction {
@@ -135,9 +135,9 @@ func (inst *Store) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("       signer", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("   testStruct", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("       signer", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("   testStruct", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice.Get(2)))
 					})
 				})
 		})
