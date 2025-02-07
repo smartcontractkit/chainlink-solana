@@ -15,16 +15,12 @@ pub mod contract_reader_interface_secondary {
         Ok(())
     }
 
-    pub fn store(
-        ctx: Context<StoreTestStruct>,
-        test_idx: u64,
-        data: TestStructData,
-    ) -> Result<()> {
+    pub fn store(ctx: Context<StoreTestStruct>, test_idx: u64, data: TestStructData) -> Result<()> {
         let test_struct_account = &mut ctx.accounts.test_struct.load_init()?;
-    
+
         test_struct_account.idx = test_idx;
         test_struct_account.bump = ctx.bumps.test_struct;
-    
+
         test_struct_account.field = data.field;
         test_struct_account.oracle_id = data.oracle_id;
         test_struct_account.oracle_ids = data.oracle_ids;
@@ -34,7 +30,7 @@ pub mod contract_reader_interface_secondary {
         test_struct_account.account_struct = data.account_struct.clone();
         test_struct_account.nested_dynamic_struct = data.nested_dynamic_struct.clone();
         test_struct_account.nested_static_struct = data.nested_static_struct.clone();
-    
+
         Ok(())
     }
 }
@@ -63,7 +59,7 @@ pub struct StoreTestStruct<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
 
-   #[account(
+    #[account(
         init_if_needed,
         payer = signer,
         space = size_of::<TestStruct>() + 8,
@@ -79,7 +75,7 @@ pub struct StoreTestStruct<'info> {
 pub struct Data {
     pub u64_value: u64,
     pub idx: u64,
-    pub bump: u8
+    pub bump: u8,
 }
 
 #[account(zero_copy)]
@@ -93,7 +89,7 @@ pub struct TestStruct {
     pub oracle_id: u8,
     _padding2: [u8; 15],
     pub oracle_ids: [u8; 32],
-    pub accounts: [[u8;32]; 2],
+    pub accounts: [[u8; 32]; 2],
     pub different_field: [u8; 32], // hiding field since string does not play well with zero copy
     _padding3: [u8; 8],
     pub big_field: i128,
@@ -111,7 +107,7 @@ pub struct TestStructData {
     pub oracle_id: u8,
     _padding1: [u8; 15],
     pub oracle_ids: [u8; 32],
-    pub accounts: [[u8;32]; 2], 
+    pub accounts: [[u8; 32]; 2],
     pub different_field: [u8; 32],
     _padding2: [u8; 8],
     pub big_field: i128,
