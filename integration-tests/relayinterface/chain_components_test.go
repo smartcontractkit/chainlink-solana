@@ -23,6 +23,7 @@ import (
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	commontestutils "github.com/smartcontractkit/chainlink-common/pkg/loop/testutils"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
@@ -56,14 +57,14 @@ func TestChainComponents(t *testing.T) {
 		RunChainComponentsSolanaTests(t, it)
 	})
 
-	// t.Run("RunChainComponentsInLoopSolanaTests", func(t *testing.T) {
-	// 	t.Parallel()
-	// 	it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}}
-	// 	DisableTests(it)
-	// 	wrapped := commontestutils.WrapContractReaderTesterForLoop(it)
-	// 	wrapped.Setup(t)
-	// 	RunChainComponentsInLoopSolanaTests(t, wrapped)
-	// })
+	t.Run("RunChainComponentsInLoopSolanaTests", func(t *testing.T) {
+		t.Parallel()
+		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}}
+		DisableTests(it)
+		wrapped := commontestutils.WrapContractReaderTesterForLoop(it)
+		wrapped.Setup(t)
+		RunChainComponentsInLoopSolanaTests(t, wrapped)
+	})
 }
 
 func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
@@ -116,11 +117,35 @@ func RunContractReaderSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainComp
 	RunTests(t, it, testCases)
 }
 
-func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsInterfaceTester[T]) {
-	RunContractReaderInterfaceTests(t, it, false, true)
+func RunContractReaderInLoopTests[T TestingT[T]](t T, it ChainComponentsInterfaceTester[T]) {
+	//RunContractReaderInterfaceTests(t, it, false, true)
+	testCases := []Testcase[T]{
+		{
+			Name: ContractReaderGetLatestValueWithPrimitiveReturn,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				bindings := it.GetBindings(t)
+				ctx := tests.Context(t)
 
-	var testCases []Testcase[T]
+				bound := BindingsByName(bindings, AnyContractName)[0]
 
+				require.NoError(t, cr.Bind(ctx, bindings))
+
+				type MultiReadResult struct {
+					A uint8
+					B int16
+					U string
+					V bool
+				}
+
+				mRR := MultiReadResult{}
+				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(MultiRead), primitives.Unconfirmed, nil, &mRR))
+
+				expectedMRR := MultiReadResult{A: 1, B: 2, U: "Hello", V: true}
+				require.Equal(t, expectedMRR, mRR)
+			},
+		},
+	}
 	RunTests(t, it, testCases)
 }
 
@@ -405,6 +430,8 @@ func (h *helper) runInitialize(
 	SubmitTransactionToCW(t, &it, cw, MethodSettingStruct, storeStructArgs, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
 }
 
+const MultiRead = "MultiRead"
+
 func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T) config.ContractReader {
 	idx := it.getTestIdx(t.Name())
 	pdaDataPrefix := []byte("data")
@@ -417,10 +444,27 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 			AnyContractName: {
 				IDL: mustUnmarshalIDL(t, string(it.Helper.GetPrimaryIDL(t))),
 				Reads: map[string]config.ReadDefinition{
+					MultiRead: {
+						ChainSpecificName: "MultiRead1",
+						PDADefinition: codec.PDATypeDef{
+							Prefix: []byte("multi_read1"),
+						},
+						OutputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.HardCodeModifierConfig{
+								OffChainValues: map[string]any{"U": "", "V": false},
+							},
+						},
+						MultiReader: &config.MultiReader{Reads: []config.ReadDefinition{
+							{
+								ChainSpecificName: "MultiRead2",
+								PDADefinition:     codec.PDATypeDef{Prefix: []byte("multi_read2")},
+							},
+						}},
+					},
 					MethodReturningUint64: {
 						ChainSpecificName: "DataAccount",
 						ReadType:          config.Account,
-						PDADefiniton: codec.PDATypeDef{
+						PDADefinition: codec.PDATypeDef{
 							Prefix: pdaDataPrefix,
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
@@ -430,7 +474,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					MethodReturningUint64Slice: {
 						ChainSpecificName: "DataAccount",
 						ReadType:          config.Account,
-						PDADefiniton: codec.PDATypeDef{
+						PDADefinition: codec.PDATypeDef{
 							Prefix: pdaDataPrefix,
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
@@ -440,7 +484,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					MethodSettingUint64: {
 						ChainSpecificName: "DataAccount",
 						ReadType:          config.Account,
-						PDADefiniton: codec.PDATypeDef{
+						PDADefinition: codec.PDATypeDef{
 							Prefix: pdaDataPrefix,
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
@@ -450,7 +494,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					MethodReturningSeenStruct: {
 						ChainSpecificName: "TestStruct",
 						ReadType:          config.Account,
-						PDADefiniton: codec.PDATypeDef{
+						PDADefinition: codec.PDATypeDef{
 							Prefix: pdaStructDataPrefix,
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
@@ -472,7 +516,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					},
 					MethodTakingLatestParamsReturningTestStruct: {
 						ChainSpecificName: "TestStruct",
-						PDADefiniton: codec.PDATypeDef{
+						PDADefinition: codec.PDATypeDef{
 							Prefix: pdaStructDataPrefix,
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
@@ -499,7 +543,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 				Reads: map[string]config.ReadDefinition{
 					MethodReturningUint64: {
 						ChainSpecificName: "Data",
-						PDADefiniton: codec.PDATypeDef{
+						PDADefinition: codec.PDATypeDef{
 							Prefix: pdaDataPrefix,
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
@@ -542,6 +586,30 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								Seeds: []chainwriter.Seed{
 									{Static: []byte("data")},
 									{Static: testIdx},
+								},
+								IsWritable: true,
+								IsSigner:   false,
+							},
+							chainwriter.PDALookups{
+								Name: "MultiRead1",
+								PublicKey: chainwriter.AccountConstant{
+									Name:    "ProgramID",
+									Address: primaryProgramPubKey,
+								},
+								Seeds: []chainwriter.Seed{
+									{Static: []byte("multi_read1")},
+								},
+								IsWritable: true,
+								IsSigner:   false,
+							},
+							chainwriter.PDALookups{
+								Name: "MultiRead2",
+								PublicKey: chainwriter.AccountConstant{
+									Name:    "ProgramID",
+									Address: primaryProgramPubKey,
+								},
+								Seeds: []chainwriter.Seed{
+									{Static: []byte("multi_read2")},
 								},
 								IsWritable: true,
 								IsSigner:   false,

@@ -7,9 +7,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/rpc"
-
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -145,13 +142,21 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 
 	values, ok := s.lookup.getContractForReadIdentifiers(readIdentifier)
 	if !ok {
-		return fmt.Errorf("%w: no contract for read identifier %s", types.ErrInvalidType, readIdentifier)
+		return fmt.Errorf("%w: no contract for read identifier: %q", types.ErrInvalidType, readIdentifier)
+	}
+
+	if len(values.multiRead) == 0 {
+		return fmt.Errorf("%w: no reads defined for readIdentifier: %q", types.ErrInvalidConfig, readIdentifier)
+	}
+
+	if len(values.multiRead) > 1 {
+		return doMultiRead(ctx, s.client, s.bindings, values, returnVal)
 	}
 
 	batch := []call{
 		{
 			ContractName: values.contract,
-			ReadName:     values.genericName,
+			ReadName:     values.multiRead[0],
 			Params:       params,
 			ReturnVal:    returnVal,
 		},
@@ -176,7 +181,7 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 // BatchGetLatestValues implements the types.ContractReader interface.
 func (s *ContractReaderService) BatchGetLatestValues(ctx context.Context, request types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
 	idxLookup := make(map[types.BoundContract][]int)
-	batch := []call{}
+	var batch []call
 
 	for bound, req := range request {
 		idxLookup[bound] = make([]int, len(req))
@@ -287,7 +292,11 @@ func (s *ContractReaderService) CreateContractType(readIdentifier string, forEnc
 		return nil, fmt.Errorf("%w: no contract for read identifier", types.ErrInvalidConfig)
 	}
 
-	return s.bindings.CreateType(values.contract, values.genericName, forEncoding)
+	if len(values.multiRead) == 0 {
+		return nil, fmt.Errorf("%w: no reads defined for read identifier", types.ErrInvalidConfig)
+	}
+
+	return s.bindings.CreateType(values.contract, values.multiRead[0], forEncoding)
 }
 
 func (s *ContractReaderService) addCodecDef(forEncoding bool, namespace, genericName string, idl codec.IDL, idlDefinition interface{}, modCfg commoncodec.ModifiersConfig) error {
@@ -362,7 +371,16 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 		return err
 	}
 
-	s.lookup.addReadNameForContract(namespace, genericName)
+	multiRead := []string{genericName}
+	if readDefinition.MultiReader != nil {
+		reads, err := s.addMultiAccountRead(namespace, readDefinition, idl)
+		if err != nil {
+			return err
+		}
+		multiRead = append(multiRead, reads...)
+	}
+
+	s.lookup.addReadNameForContract(namespace, genericName, multiRead)
 
 	var (
 		reader             readBinding
@@ -370,9 +388,9 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 	)
 
 	// Create PDA read binding if PDA prefix or seeds configs are populated
-	if readDefinition.PDADefiniton.Prefix != nil || len(readDefinition.PDADefiniton.Seeds) > 0 {
-		inputAccountIDLDef = readDefinition.PDADefiniton
-		reader = newAccountReadBinding(namespace, genericName, readDefinition.PDADefiniton.Prefix, true)
+	if readDefinition.PDADefinition.Prefix != nil || len(readDefinition.PDADefinition.Seeds) > 0 {
+		inputAccountIDLDef = readDefinition.PDADefinition
+		reader = newAccountReadBinding(namespace, genericName, readDefinition.PDADefinition.Prefix, true)
 	} else {
 		inputAccountIDLDef = codec.NilIdlTypeDefTy
 		reader = newAccountReadBinding(namespace, genericName, nil, false)
@@ -382,8 +400,33 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 	}
 
 	s.bindings.AddReadBinding(namespace, genericName, reader)
-
 	return nil
+}
+
+func (s *SolanaChainReaderService) addMultiAccountRead(namespace string, readDefinition config.ReadDefinition, idl codec.IDL) ([]string, error) {
+	var reads []string
+	for _, mr := range readDefinition.MultiReader.Reads {
+		idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeAccountDef, mr.ChainSpecificName, idl)
+		if err != nil {
+			return nil, err
+		}
+
+		if mr.ReadType != config.Account {
+			return nil, fmt.Errorf("unexpected read type %q for dynamic hard coder read: %q in namespace: %q", mr.ReadType, mr.ChainSpecificName, namespace)
+		}
+
+		accountIDLDef, isOk := idlDef.(codec.IdlTypeDef)
+		if !isOk {
+			return nil, fmt.Errorf("unexpected type %T from IDL definition for account read with chainSpecificName: %q, of type: %q", accountIDLDef, mr.ChainSpecificName, mr.ReadType)
+		}
+
+		if err = s.addAccountRead(namespace, mr.ChainSpecificName, idl, accountIDLDef, mr); err != nil {
+			return nil, fmt.Errorf("failed to add multi-read %q: %w", mr.ChainSpecificName, err)
+		}
+
+		reads = append(reads, mr.ChainSpecificName)
+	}
+	return reads, nil
 }
 
 func (s *ContractReaderService) addEventRead(
@@ -414,25 +457,6 @@ func (s *ContractReaderService) addEventRead(
 	))
 
 	return nil
-}
-
-type accountDataReader struct {
-	client *rpc.Client
-}
-
-func NewAccountDataReader(client *rpc.Client) *accountDataReader {
-	return &accountDataReader{client: client}
-}
-
-func (r *accountDataReader) ReadAll(ctx context.Context, pk solana.PublicKey, opts *rpc.GetAccountInfoOpts) ([]byte, error) {
-	result, err := r.client.GetAccountInfoWithOpts(ctx, pk, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	bts := result.Value.Data.GetBinary()
-
-	return bts, nil
 }
 
 func toLPFilter(

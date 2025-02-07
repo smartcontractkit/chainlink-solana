@@ -353,3 +353,131 @@ func (obj *TestStruct) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	}
 	return nil
 }
+
+type MultiRead1 struct {
+	A uint8
+	B int16
+	C bool
+}
+
+var MultiRead1Discriminator = [8]byte{15, 46, 242, 154, 22, 213, 170, 20}
+
+func (obj MultiRead1) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(MultiRead1Discriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `A` param:
+	err = encoder.Encode(obj.A)
+	if err != nil {
+		return err
+	}
+	// Serialize `B` param:
+	err = encoder.Encode(obj.B)
+	if err != nil {
+		return err
+	}
+	// Serialize `C` param:
+	err = encoder.Encode(obj.C)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *MultiRead1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(MultiRead1Discriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[15 46 242 154 22 213 170 20]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `A`:
+	err = decoder.Decode(&obj.A)
+	if err != nil {
+		return err
+	}
+	// Deserialize `B`:
+	err = decoder.Decode(&obj.B)
+	if err != nil {
+		return err
+	}
+	// Deserialize `C`:
+	err = decoder.Decode(&obj.C)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type MultiRead2 struct {
+	U string
+	V bool
+	W [2]uint64
+}
+
+var MultiRead2Discriminator = [8]byte{17, 116, 102, 101, 239, 43, 252, 86}
+
+func (obj MultiRead2) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(MultiRead2Discriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `U` param:
+	err = encoder.Encode(obj.U)
+	if err != nil {
+		return err
+	}
+	// Serialize `V` param:
+	err = encoder.Encode(obj.V)
+	if err != nil {
+		return err
+	}
+	// Serialize `W` param:
+	err = encoder.Encode(obj.W)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *MultiRead2) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(MultiRead2Discriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[17 116 102 101 239 43 252 86]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `U`:
+	err = decoder.Decode(&obj.U)
+	if err != nil {
+		return err
+	}
+	// Deserialize `V`:
+	err = decoder.Decode(&obj.V)
+	if err != nil {
+		return err
+	}
+	// Deserialize `W`:
+	err = decoder.Decode(&obj.W)
+	if err != nil {
+		return err
+	}
+	return nil
+}

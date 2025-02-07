@@ -25,16 +25,23 @@ type ChainContractReader struct {
 	// TODO ContractPollingFilter same as EVM?
 }
 
+type MultiReader struct {
+	// Reads is a list of reads that is sequentially read to fill out a complete response for the parent read.
+	// Parent ReadDefinition has to define codec modifiers which adds fields that are to be filled out by the reads in Reads.
+	Reads []ReadDefinition `json:"reads,omitempty"`
+}
+
 type ReadDefinition struct {
 	ChainSpecificName   string                      `json:"chainSpecificName"`
 	ReadType            ReadType                    `json:"readType,omitempty"`
 	InputModifications  commoncodec.ModifiersConfig `json:"inputModifications,omitempty"`
 	OutputModifications commoncodec.ModifiersConfig `json:"outputModifications,omitempty"`
-	PDADefiniton        codec.PDATypeDef            `json:"pdaDefinition,omitempty"` // Only used for PDA account reads
-	IndexedField0       *IndexedField               `json:"indexedField0"`
-	IndexedField1       *IndexedField               `json:"indexedField1"`
-	IndexedField2       *IndexedField               `json:"indexedField2"`
-	IndexedField3       *IndexedField               `json:"indexedField3"`
+	PDADefinition       codec.PDATypeDef            `json:"pdaDefinition,omitempty"` // Only used for PDA account reads
+	MultiReader         *MultiReader
+	IndexedField0       *IndexedField `json:"indexedField0"`
+	IndexedField1       *IndexedField `json:"indexedField1"`
+	IndexedField2       *IndexedField `json:"indexedField2"`
+	IndexedField3       *IndexedField `json:"indexedField3"`
 	// This will create a log poller filter for this event.
 	*PollingFilter `json:"pollingFilter,omitempty"`
 }

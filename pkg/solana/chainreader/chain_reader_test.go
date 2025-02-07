@@ -294,7 +294,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			{
 				name: "happy path",
 				pdaDefinition: codec.PDATypeDef{
-					Prefix: prefixBytes,
+					Prefix: []byte(prefixString),
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
@@ -315,7 +315,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			{
 				name: "with modifier and random field",
 				pdaDefinition: codec.PDATypeDef{
-					Prefix: prefixBytes,
+					Prefix: []byte(prefixString),
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
@@ -340,7 +340,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			{
 				name: "only prefix",
 				pdaDefinition: codec.PDATypeDef{
-					Prefix: prefixBytes,
+					Prefix: []byte(prefixString),
 				},
 				expected: mustFindProgramAddress(t, programID, [][]byte{prefixBytes}),
 				params:   nil,
@@ -369,7 +369,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			{
 				name: "public key seed provided as bytes",
 				pdaDefinition: codec.PDATypeDef{
-					Prefix: prefixBytes,
+					Prefix: []byte(prefixString),
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
@@ -387,7 +387,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		for _, testCase := range testCases {
 			t.Run(testCase.name, func(t *testing.T) {
 				testReadDef := readDef
-				testReadDef.PDADefiniton = testCase.pdaDefinition
+				testReadDef.PDADefinition = testCase.pdaDefinition
 				testReadDef.InputModifications = testCase.inputModifier
 				testCodec, conf := newTestConfAndCodecWithInjectibleReadDef(t, PDAAccount, testReadDef)
 				encoded, err := testCodec.Encode(ctx, expected, testutils.TestStructWithNestedStruct)
@@ -428,8 +428,8 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		readDef := config.ReadDefinition{
 			ChainSpecificName: testutils.TestStructWithNestedStruct,
 			ReadType:          config.Account,
-			PDADefiniton: codec.PDATypeDef{
-				Prefix: prefixBytes,
+			PDADefinition: codec.PDATypeDef{
+				Prefix: []byte(prefixString),
 				Seeds: []codec.PDASeed{
 					{
 						Name: "PubKey",
