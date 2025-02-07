@@ -58,7 +58,7 @@ pub struct Initialize<'info> {
 
     // derived test PDA
     #[account(
-        init,
+        init_if_needed,
         payer = signer,
         space = size_of::<DataAccount>() + 8,
         seeds=[b"data".as_ref(), test_idx.to_le_bytes().as_ref()],
@@ -72,7 +72,7 @@ pub struct Initialize<'info> {
 pub struct InitializeLookupTableData<'info> {
     /// PDA for LookupTableDataAccount, derived from seeds and created by the System Program
     #[account(
-        init,
+        init_if_needed,
         payer = admin,
         space = size_of::<LookupTableDataAccount>() + 8,
         seeds = [b"data"],
