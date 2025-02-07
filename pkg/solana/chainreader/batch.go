@@ -13,15 +13,15 @@ import (
 )
 
 type call struct {
-	ContractName, ReadName string
-	Params, ReturnVal      any
+	Namespace, ReadName string
+	Params, ReturnVal   any
 }
 
 type batchResultWithErr struct {
-	address                string
-	contractName, readName string
-	returnVal              any
-	err                    error
+	address             string
+	namespace, readName string
+	returnVal           any
+	err                 error
 }
 
 var (
@@ -66,16 +66,16 @@ func doMultiRead(ctx context.Context, client MultipleAccountGetter, bindings nam
 	return nil
 }
 
-func doMethodBatchCall(ctx context.Context, client MultipleAccountGetter, bindings namespaceBindings, batch []call) ([]batchResultWithErr, error) {
+func doMethodBatchCall(ctx context.Context, client MultipleAccountGetter, bindingsRegistry bindingsRegistry, batch []call) ([]batchResultWithErr, error) {
 	// Create the list of public keys to fetch
 	keys := make([]solana.PublicKey, len(batch))
 	for idx, batchCall := range batch {
-		binding, err := bindings.GetReadBinding(batchCall.ContractName, batchCall.ReadName)
+		rBinding, err := bindingsRegistry.GetReadBinding(batchCall.Namespace, batchCall.ReadName)
 		if err != nil {
 			return nil, fmt.Errorf("%w: read binding not found for contract: %q read: %q: %w", types.ErrInvalidConfig, batchCall.ContractName, batchCall.ReadName, err)
 		}
 
-		keys[idx], err = binding.GetAddress(ctx, batchCall.Params)
+		keys[idx], err = rBinding.GetAddress(ctx, batchCall.Params)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get address for contract: %q read: %q: %w", batchCall.ContractName, batchCall.ReadName, err)
 		}
@@ -92,10 +92,10 @@ func doMethodBatchCall(ctx context.Context, client MultipleAccountGetter, bindin
 	// decode batch call results
 	for idx, batchCall := range batch {
 		results[idx] = batchResultWithErr{
-			address:      keys[idx].String(),
-			contractName: batchCall.ContractName,
-			readName:     batchCall.ReadName,
-			returnVal:    batchCall.ReturnVal,
+			address:   keys[idx].String(),
+			namespace: batchCall.Namespace,
+			readName:  batchCall.ReadName,
+			returnVal: batchCall.ReturnVal,
 		}
 
 		if data[idx] == nil || len(data[idx]) == 0 {
@@ -104,7 +104,7 @@ func doMethodBatchCall(ctx context.Context, client MultipleAccountGetter, bindin
 			continue
 		}
 
-		binding, err := bindings.GetReadBinding(results[idx].contractName, results[idx].readName)
+		rBinding, err := bindingsRegistry.GetReadBinding(results[idx].namespace, results[idx].readName)
 		if err != nil {
 			results[idx].err = err
 
@@ -129,7 +129,7 @@ func decodeReturnVal(ctx context.Context, binding readBinding, raw []byte, retur
 
 	// Otherwise, we need to create an intermediate type, decode into it,
 	// wrap it, and set it back into *values.Value
-	contractType, err := binding.CreateType(false)
+	contractType, err := rBinding.CreateType(false)
 	if err != nil {
 		return err
 	}

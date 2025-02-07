@@ -1,0 +1,21 @@
+{
+  "addressShareGroups": [["a","b","c"],["u","v","w","a"]],
+  "namespaces":{
+    "Contract":{
+      "anchorIDL":{
+        "version":"0.1.0",
+        "name":"myProgram",
+        "accounts":[
+          {
+            "name":"NilType",
+            "type":{
+              "kind":"struct",
+              "fields":[]
+            }
+          }
+        ]
+      },
+      "reads":{"Method":{}}
+    }
+  }
+}
