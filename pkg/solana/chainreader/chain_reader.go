@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/gagliardetto/solana-go"
+
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -403,7 +405,7 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 	return nil
 }
 
-func (s *SolanaChainReaderService) addMultiAccountRead(namespace string, readDefinition config.ReadDefinition, idl codec.IDL) ([]string, error) {
+func (s *ContractReaderService) addMultiAccountRead(namespace string, readDefinition config.ReadDefinition, idl codec.IDL) ([]string, error) {
 	var reads []string
 	for _, mr := range readDefinition.MultiReader.Reads {
 		idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeAccountDef, mr.ChainSpecificName, idl)
