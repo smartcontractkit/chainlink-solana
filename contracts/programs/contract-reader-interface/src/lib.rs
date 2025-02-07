@@ -9,7 +9,6 @@ pub mod contract_reader_interface {
 
     pub fn initialize(ctx: Context<Initialize>, test_idx: u64, value: u64) -> Result<()> {
         let account = &mut ctx.accounts.data;
-
         account.u64_value = value;
         account.u64_slice = [3, 4].to_vec();
         account.idx = test_idx;
@@ -31,28 +30,28 @@ pub mod contract_reader_interface {
         Ok(())
     }
 
-    pub fn store_test_struct(
-            ctx: Context<StoreTestStruct>,
-            test_idx: u64,
-            data: TestStructData,
-        ) -> Result<()> {
-            let test_struct_account = &mut ctx.accounts.test_struct;
+    pub fn store(
+        ctx: Context<StoreTestStruct>,
+        test_idx: u64,
+        data: TestStructData,
+    ) -> Result<()> {
+        let test_struct_account = &mut ctx.accounts.test_struct.load_init()?;
     
-            test_struct_account.idx = test_idx;
-            test_struct_account.bump = ctx.bumps.test_struct;
+        test_struct_account.idx = test_idx;
+        test_struct_account.bump = ctx.bumps.test_struct;
     
-            test_struct_account.field = data.field;
-            test_struct_account.oracle_id = data.oracle_id;
-            test_struct_account.oracle_ids = data.oracle_ids;
-            test_struct_account.account_struct = data.account_struct;
-            test_struct_account.accounts = data.accounts;
-            test_struct_account.different_field = data.different_field;
-            test_struct_account.big_field = data.big_field;
-            test_struct_account.nested_dynamic_struct = data.nested_dynamic_struct;
-            test_struct_account.nested_static_struct = data.nested_static_struct;
+        test_struct_account.field = data.field;
+        test_struct_account.oracle_id = data.oracle_id;
+        test_struct_account.oracle_ids = data.oracle_ids;
+        test_struct_account.accounts = data.accounts;
+        test_struct_account.different_field = data.different_field;
+        test_struct_account.big_field = data.big_field;
+        test_struct_account.account_struct = data.account_struct.clone();
+        test_struct_account.nested_dynamic_struct = data.nested_dynamic_struct.clone();
+        test_struct_account.nested_static_struct = data.nested_static_struct.clone();
     
-            Ok(())
-        }
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -100,17 +99,13 @@ pub struct StoreTestStruct<'info> {
     pub signer: Signer<'info>,
 
    #[account(
-        init,
+        init_if_needed,
         payer = signer,
-        // Add extra buffer for variable fields
-        space = 8 + size_of::<TestStruct>() + 400,
-        seeds = [
-            b"test-struct",
-            test_idx.to_le_bytes().as_ref()
-        ],
+        space = size_of::<TestStruct>() + 8,
+        seeds=[b"struct_data".as_ref(), test_idx.to_le_bytes().as_ref()],
         bump
     )]
-    pub test_struct: Account<'info, TestStruct>,
+    pub test_struct: AccountLoader<'info, TestStruct>,
 
     pub system_program: Program<'info, System>,
 }
@@ -131,62 +126,78 @@ pub struct DataAccount {
     pub u64_slice: Vec<u64>,
 }
 
-#[account]
+#[account(zero_copy)]
+#[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct TestStruct {
     pub idx: u64,
     pub bump: u8,
+    _padding0: [u8; 7],
+    pub field: i32,
+    _padding1: [u8; 4],
+    pub oracle_id: u8,
+    _padding2: [u8; 15],
+    pub oracle_ids: [u8; 32],
+    pub accounts: [[u8;32]; 2],
+    pub different_field: [u8; 32], // hiding field since string does not play well with zero copy
+    _padding3: [u8; 8],
+    pub big_field: i128,
 
-    pub field: Option<i32>,
-    pub oracle_id: [u8; 32],
-    pub oracle_ids: [[u8; 32]; 32],
     pub account_struct: AccountStruct,
-    pub accounts: Vec<Vec<u8>>,
-    pub different_field: String,
-    pub big_field: Option<[u8; 32]>,
-
     pub nested_dynamic_struct: MidLevelDynamicTestStruct,
     pub nested_static_struct: MidLevelStaticTestStruct,
 }
 
-#[account]
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct TestStructData {
-    pub field: Option<i32>,
-    pub oracle_id: [u8; 32],
-    pub oracle_ids: [[u8; 32]; 32],
+    pub field: i32,
+    _padding0: [u8; 4],
+    pub oracle_id: u8,
+    _padding1: [u8; 15],
+    pub oracle_ids: [u8; 32],
+    pub accounts: [[u8;32]; 2], 
+    pub different_field: [u8; 32],
+    _padding2: [u8; 8],
+    pub big_field: i128,
+
     pub account_struct: AccountStruct,
-    pub accounts: Vec<Vec<u8>>,
-    pub different_field: String,
-    pub big_field: Option<[u8; 32]>,
     pub nested_dynamic_struct: MidLevelDynamicTestStruct,
     pub nested_static_struct: MidLevelStaticTestStruct,
 }
 
-#[account]
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct AccountStruct {
-    pub account: Vec<u8>,
-    pub account_str: String,
+    pub account: Pubkey,
+    pub account_str: Pubkey,
 }
 
-#[account]
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct MidLevelDynamicTestStruct {
     pub fixed_bytes: [u8; 2],
+    pub _padding: [u8; 6], // explicit padding to avoid uninitialized bytes for zero_copy
     pub inner: InnerDynamicTestStruct,
 }
 
-#[account]
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct InnerDynamicTestStruct {
     pub i: i64,
-    pub s: String,
+    pub s: [u8; 32],
 }
 
-#[account]
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct MidLevelStaticTestStruct {
     pub fixed_bytes: [u8; 2],
+    pub _padding: [u8; 6], // explicit padding to avoid uninitialized bytes for zero_copy
     pub inner: InnerStaticTestStruct,
 }
 
-#[account]
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct InnerStaticTestStruct {
     pub i: i64,
-    pub a: Vec<u8>,
+    pub a: Pubkey,
 }

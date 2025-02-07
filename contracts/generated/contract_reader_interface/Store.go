@@ -10,8 +10,8 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// StoreTestStruct is the `storeTestStruct` instruction.
-type StoreTestStruct struct {
+// Store is the `store` instruction.
+type Store struct {
 	TestIdx *uint64
 	Data    *TestStructData
 
@@ -23,77 +23,77 @@ type StoreTestStruct struct {
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewStoreTestStructInstructionBuilder creates a new `StoreTestStruct` instruction builder.
-func NewStoreTestStructInstructionBuilder() *StoreTestStruct {
-	nd := &StoreTestStruct{
+// NewStoreInstructionBuilder creates a new `Store` instruction builder.
+func NewStoreInstructionBuilder() *Store {
+	nd := &Store{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
 
 // SetTestIdx sets the "testIdx" parameter.
-func (inst *StoreTestStruct) SetTestIdx(testIdx uint64) *StoreTestStruct {
+func (inst *Store) SetTestIdx(testIdx uint64) *Store {
 	inst.TestIdx = &testIdx
 	return inst
 }
 
 // SetData sets the "data" parameter.
-func (inst *StoreTestStruct) SetData(data TestStructData) *StoreTestStruct {
+func (inst *Store) SetData(data TestStructData) *Store {
 	inst.Data = &data
 	return inst
 }
 
 // SetSignerAccount sets the "signer" account.
-func (inst *StoreTestStruct) SetSignerAccount(signer ag_solanago.PublicKey) *StoreTestStruct {
+func (inst *Store) SetSignerAccount(signer ag_solanago.PublicKey) *Store {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(signer).WRITE().SIGNER()
 	return inst
 }
 
 // GetSignerAccount gets the "signer" account.
-func (inst *StoreTestStruct) GetSignerAccount() *ag_solanago.AccountMeta {
+func (inst *Store) GetSignerAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
 // SetTestStructAccount sets the "testStruct" account.
-func (inst *StoreTestStruct) SetTestStructAccount(testStruct ag_solanago.PublicKey) *StoreTestStruct {
+func (inst *Store) SetTestStructAccount(testStruct ag_solanago.PublicKey) *Store {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(testStruct).WRITE()
 	return inst
 }
 
 // GetTestStructAccount gets the "testStruct" account.
-func (inst *StoreTestStruct) GetTestStructAccount() *ag_solanago.AccountMeta {
+func (inst *Store) GetTestStructAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *StoreTestStruct) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *StoreTestStruct {
+func (inst *Store) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Store {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *StoreTestStruct) GetSystemProgramAccount() *ag_solanago.AccountMeta {
+func (inst *Store) GetSystemProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
-func (inst StoreTestStruct) Build() *Instruction {
+func (inst Store) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_StoreTestStruct,
+		TypeID: Instruction_Store,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst StoreTestStruct) ValidateAndBuild() (*Instruction, error) {
+func (inst Store) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *StoreTestStruct) Validate() error {
+func (inst *Store) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
 		if inst.TestIdx == nil {
@@ -119,11 +119,11 @@ func (inst *StoreTestStruct) Validate() error {
 	return nil
 }
 
-func (inst *StoreTestStruct) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *Store) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("StoreTestStruct")).
+			programBranch.Child(ag_format.Instruction("Store")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
@@ -143,7 +143,7 @@ func (inst *StoreTestStruct) EncodeToTree(parent ag_treeout.Branches) {
 		})
 }
 
-func (obj StoreTestStruct) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj Store) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `TestIdx` param:
 	err = encoder.Encode(obj.TestIdx)
 	if err != nil {
@@ -156,7 +156,7 @@ func (obj StoreTestStruct) MarshalWithEncoder(encoder *ag_binary.Encoder) (err e
 	}
 	return nil
 }
-func (obj *StoreTestStruct) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *Store) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `TestIdx`:
 	err = decoder.Decode(&obj.TestIdx)
 	if err != nil {
@@ -170,16 +170,16 @@ func (obj *StoreTestStruct) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 	return nil
 }
 
-// NewStoreTestStructInstruction declares a new StoreTestStruct instruction with the provided parameters and accounts.
-func NewStoreTestStructInstruction(
+// NewStoreInstruction declares a new Store instruction with the provided parameters and accounts.
+func NewStoreInstruction(
 	// Parameters:
 	testIdx uint64,
 	data TestStructData,
 	// Accounts:
 	signer ag_solanago.PublicKey,
 	testStruct ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *StoreTestStruct {
-	return NewStoreTestStructInstructionBuilder().
+	systemProgram ag_solanago.PublicKey) *Store {
+	return NewStoreInstructionBuilder().
 		SetTestIdx(testIdx).
 		SetData(data).
 		SetSignerAccount(signer).

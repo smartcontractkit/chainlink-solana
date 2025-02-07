@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -17,6 +18,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/gagliardetto/solana-go/rpc/ws"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -29,6 +31,7 @@ import (
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/chainlink-common/pkg/values"
 
 	contractprimary "github.com/smartcontractkit/chainlink-solana/contracts/generated/contract_reader_interface"
 	contractsecondary "github.com/smartcontractkit/chainlink-solana/contracts/generated/contract_reader_interface_secondary"
@@ -42,6 +45,14 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 	solanautils "github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
+)
+
+const (
+	SolanaContractReaderGetLatestValueAsValuesDotValue                                        = "Gets the latest value as a values.Value for Solana"
+	SolanaContractReaderGetLatestValue                                                        = "Gets the latest value for Solana"
+	SolanaContractReaderBatchGetLatestValue                                                   = "BatchGetLatestValues works for Solana"
+	SolanaContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder                  = "BatchGetLatestValues supports same read with different params and results retain order from request for Solana"
+	SolanaContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts = "BatchGetLatestValues supports same read with different params and results retain order from request even with multiple contracts for Solana"
 )
 
 func TestChainComponents(t *testing.T) {
@@ -69,26 +80,32 @@ func TestChainComponents(t *testing.T) {
 
 func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 	it.DisableTests([]string{
+		// solana is a no-op on confidence level
+		ContractReaderGetLatestValueBasedOnConfidenceLevel,
+		// disabling tests that required Solana specific logic. Covered in the Solana specific tests
+		ContractReaderGetLatestValue,
+		ContractReaderGetLatestValueAsValuesDotValue,
+		ContractReaderBatchGetLatestValue,
+		ContractReaderBatchGetLatestValueWithModifiersOwnMapstructureOverride,
+		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder,
+		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
+
 		// disable failing test
 		ContractReaderGetLatestValueFromMultipleContractsNamesSameFunction,
 		ContractReaderBatchGetLatestValueMultipleContractNamesSameFunction,
-		// disable tests that set values
-		ContractReaderGetLatestValueBasedOnConfidenceLevel,
-		// disable anything returning a struct or requiring input params for now
-		ContractReaderGetLatestValueAsValuesDotValue,
-		ContractReaderGetLatestValue,
-		ContractReaderGetLatestValueWithModifiersUsingOwnMapstrctureOverrides,
+		ContractReaderBatchGetLatestValueSetsErrorsProperly,
+		// disable failing tests requiring solana specific implementation
+		SolanaContractReaderGetLatestValue,
+		SolanaContractReaderGetLatestValueAsValuesDotValue,
+		SolanaContractReaderBatchGetLatestValue,
+		SolanaContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder,
+		SolanaContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
+
 		// events not yet supported
 		ContractReaderGetLatestValueGetsLatestForEvent,
 		ContractReaderGetLatestValueBasedOnConfidenceLevelForEvent,
 		ContractReaderGetLatestValueReturnsNotFoundWhenNotTriggeredForEvent,
 		ContractReaderGetLatestValueWithFilteringForEvent,
-		// disable anything in batch relating to input params or structs for now
-		ContractReaderBatchGetLatestValue,
-		ContractReaderBatchGetLatestValueWithModifiersOwnMapstructureOverride,
-		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder,
-		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
-		ContractReaderBatchGetLatestValueSetsErrorsProperly,
 		// query key not implemented yet
 		ContractReaderQueryKeyNotFound,
 		ContractReaderQueryKeyReturnsData,
@@ -117,7 +134,236 @@ func RunChainComponentsInLoopSolanaTests[T WrappedTestingT[T]](t T, it ChainComp
 func RunContractReaderSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInterfaceTester[T]) {
 	RunContractReaderInterfaceTests(t, it, false, true)
 
-	var testCases []Testcase[T]
+	testCases := []Testcase[T] {
+		{
+			Name: SolanaContractReaderGetLatestValue,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				cw := it.GetContractWriter(t)
+				contracts := it.GetBindings(t)
+				ctx := tests.Context(t)
+				firstItem := CreateTestStruct(0, it)
+				testIdx := it.testContext[t.Name()]
+
+				args1 := StoreStructArgs{
+					TestIdx: testIdx,
+					Data: firstItem,
+				}
+				_ = SubmitTransactionToCW(t, it, cw, MethodSettingStruct, args1, contracts[0], types.Unconfirmed)
+
+				secondItem := CreateTestStruct(1, it)
+				args2 := StoreStructArgs{
+					TestIdx: testIdx,
+					Data: secondItem,
+				}
+				_ = SubmitTransactionToCW(t, it, cw, MethodSettingStruct, args2, contracts[0], types.Unconfirmed)
+
+				bound := BindingsByName(contracts, AnyContractName)[0] // minimum of one bound contract expected, otherwise panics
+
+				require.NoError(t, cr.Bind(ctx, contracts))
+
+				actual := &TestStruct{}
+				params := &LatestParams{I: 1}
+				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(MethodTakingLatestParamsReturningTestStruct), primitives.Unconfirmed, params, actual))
+				assert.Equal(t, &firstItem, actual)
+
+				params.I = 2
+				actual = &TestStruct{}
+				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(MethodTakingLatestParamsReturningTestStruct), primitives.Unconfirmed, params, actual))
+				assert.Equal(t, &secondItem, actual)
+			},
+		},
+		{
+			Name: SolanaContractReaderGetLatestValueAsValuesDotValue,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				cw := it.GetContractWriter(t)
+				contracts := it.GetBindings(t)
+				ctx := tests.Context(t)
+				firstItem := CreateTestStruct(0, it)
+				testIdx := it.testContext[t.Name()]
+				args1 := StoreStructArgs{
+					TestIdx: testIdx,
+					Data: firstItem,
+				}
+				_ = SubmitTransactionToCW(t, it, cw, MethodSettingStruct, args1, contracts[0], types.Unconfirmed)
+
+				secondItem := CreateTestStruct(1, it)
+				args2 := StoreStructArgs{
+					TestIdx: testIdx,
+					Data: secondItem,
+				}
+				_ = SubmitTransactionToCW(t, it, cw, MethodSettingStruct, args2, contracts[0], types.Unconfirmed)
+
+				bound := BindingsByName(contracts, AnyContractName)[0] // minimum of one bound contract expected, otherwise panics
+
+				require.NoError(t, cr.Bind(ctx, contracts))
+
+				params := &LatestParams{I: 1}
+				var value values.Value
+
+				err := cr.GetLatestValue(ctx, bound.ReadIdentifier(MethodTakingLatestParamsReturningTestStruct), primitives.Unconfirmed, params, &value)
+				require.NoError(t, err)
+
+				actual := TestStruct{}
+				err = value.UnwrapTo(&actual)
+				require.NoError(t, err)
+				assert.Equal(t, &firstItem, &actual)
+
+				params = &LatestParams{I: 2}
+				err = cr.GetLatestValue(ctx, bound.ReadIdentifier(MethodTakingLatestParamsReturningTestStruct), primitives.Unconfirmed, params, &value)
+				require.NoError(t, err)
+
+				actual = TestStruct{}
+				err = value.UnwrapTo(&actual)
+				require.NoError(t, err)
+				assert.Equal(t, &secondItem, &actual)
+			},
+		},
+		{
+			Name: SolanaContractReaderBatchGetLatestValue,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				cw := it.GetContractWriter(t)
+				bindings := it.GetBindings(t)
+				// setup test data
+				firstItem := CreateTestStruct(1, it)
+				testIdx := it.testContext[t.Name()]
+				args := StoreStructArgs{
+					TestIdx: testIdx,
+					Data: firstItem,
+				}
+				bound := BindingsByName(bindings, AnyContractName)[0]
+
+				batchCallEntry := make(BatchCallEntry)
+				batchCallEntry[bound] = ContractBatchEntry{{Name: MethodTakingLatestParamsReturningTestStruct, ReturnValue: &args}}
+				batchContractWrite(t, it, cw, bindings, batchCallEntry)
+
+				// setup call data
+				params, actual := &LatestParams{I: 1}, &TestStruct{}
+				batchGetLatestValueRequest := make(types.BatchGetLatestValuesRequest)
+				batchGetLatestValueRequest[bound] = []types.BatchRead{
+					{
+						ReadName:  MethodTakingLatestParamsReturningTestStruct,
+						Params:    params,
+						ReturnVal: actual,
+					},
+				}
+
+				ctx := tests.Context(t)
+
+				require.NoError(t, cr.Bind(ctx, bindings))
+				result, err := cr.BatchGetLatestValues(ctx, batchGetLatestValueRequest)
+				require.NoError(t, err)
+
+				anyContractBatch := result[bound]
+				returnValue, err := anyContractBatch[0].GetResult()
+				assert.NoError(t, err)
+				assert.Contains(t, anyContractBatch[0].ReadName, MethodTakingLatestParamsReturningTestStruct)
+				assert.Equal(t, &firstItem, returnValue)
+			},
+		},
+		{
+			Name: SolanaContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				cw := it.GetContractWriter(t)
+				bindings := it.GetBindings(t)
+				batchCallEntry := make(BatchCallEntry)
+				batchGetLatestValueRequest := make(types.BatchGetLatestValuesRequest)
+				bound := BindingsByName(bindings, AnyContractName)[0]
+				testIdx := it.testContext[t.Name()]
+
+				for i := 0; i < 10; i++ {
+					// setup test data
+					ts := CreateTestStruct(i, it)
+					args := StoreStructArgs{
+						TestIdx: testIdx,
+						Data: ts,
+					}
+					batchCallEntry[bound] = append(batchCallEntry[bound], ReadEntry{Name: MethodTakingLatestParamsReturningTestStruct, ReturnValue: &args})
+					// setup call data
+					batchGetLatestValueRequest[bound] = append(
+						batchGetLatestValueRequest[bound],
+						types.BatchRead{ReadName: MethodTakingLatestParamsReturningTestStruct, Params: &LatestParams{I: 1 + i}, ReturnVal: &TestStruct{}},
+					)
+				}
+				batchContractWrite(t, it, cw, bindings, batchCallEntry)
+
+				ctx := tests.Context(t)
+				require.NoError(t, cr.Bind(ctx, bindings))
+
+				result, err := cr.BatchGetLatestValues(ctx, batchGetLatestValueRequest)
+				require.NoError(t, err)
+
+				for i := 0; i < 10; i++ {
+					resultAnyContract, testDataAnyContract := result[bound], batchCallEntry[bound]
+					returnValue, err := resultAnyContract[i].GetResult()
+					assert.NoError(t, err)
+					assert.Contains(t, resultAnyContract[i].ReadName, MethodTakingLatestParamsReturningTestStruct)
+					assert.Equal(t, testDataAnyContract[i].ReturnValue, returnValue)
+				}
+			},
+		},
+		{
+			Name: SolanaContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				cw := it.GetContractWriter(t)
+				bindings := it.GetBindings(t)
+				batchCallEntry := make(BatchCallEntry)
+				batchGetLatestValueRequest := make(types.BatchGetLatestValuesRequest)
+				bound1 := BindingsByName(bindings, AnyContractName)[0]
+				bound2 := BindingsByName(bindings, AnySecondContractName)[0]
+				testIdx := it.testContext[t.Name()]
+
+				for i := 0; i < 10; i++ {
+					// setup test data
+					ts1, ts2 := CreateTestStruct(i, it), CreateTestStruct(i+10, it)
+					args1 := StoreStructArgs{
+						TestIdx: testIdx,
+						Data: ts1,
+					}
+					args2 := StoreStructArgs{
+						TestIdx: testIdx,
+						Data: ts2,
+					}
+					batchCallEntry[bound1] = append(batchCallEntry[bound1], ReadEntry{Name: MethodTakingLatestParamsReturningTestStruct, ReturnValue: &args1})
+					batchCallEntry[bound2] = append(batchCallEntry[bound2], ReadEntry{Name: MethodTakingLatestParamsReturningTestStruct, ReturnValue: &args2})
+					// setup call data
+					batchGetLatestValueRequest[bound1] = append(batchGetLatestValueRequest[bound1], types.BatchRead{ReadName: MethodTakingLatestParamsReturningTestStruct, Params: &LatestParams{I: 1 + i}, ReturnVal: &TestStruct{}})
+					batchGetLatestValueRequest[bound2] = append(batchGetLatestValueRequest[bound2], types.BatchRead{ReadName: MethodTakingLatestParamsReturningTestStruct, Params: &LatestParams{I: 1 + i}, ReturnVal: &TestStruct{}})
+				}
+				batchContractWrite(t, it, cw, bindings, batchCallEntry)
+
+				ctx := tests.Context(t)
+				require.NoError(t, cr.Bind(ctx, bindings))
+
+				result, err := cr.BatchGetLatestValues(ctx, batchGetLatestValueRequest)
+				require.NoError(t, err)
+
+				for idx := 0; idx < 10; idx++ {
+					fmt.Printf("expected: %+v\n", batchCallEntry[bound1][idx].ReturnValue)
+					if val, err := result[bound1][idx].GetResult(); err == nil {
+						fmt.Printf("result: %+v\n", val)
+					}
+				}
+
+				for i := 0; i < 10; i++ {
+					testDataAnyContract, testDataAnySecondContract := batchCallEntry[bound1], batchCallEntry[bound2]
+					resultAnyContract, resultAnySecondContract := result[bound1], result[bound2]
+					returnValueAnyContract, errAnyContract := resultAnyContract[i].GetResult()
+					returnValueAnySecondContract, errAnySecondContract := resultAnySecondContract[i].GetResult()
+					assert.NoError(t, errAnyContract)
+					assert.NoError(t, errAnySecondContract)
+					assert.Contains(t, resultAnyContract[i].ReadName, MethodTakingLatestParamsReturningTestStruct)
+					assert.Contains(t, resultAnySecondContract[i].ReadName, MethodTakingLatestParamsReturningTestStruct)
+					assert.Equal(t, testDataAnyContract[i].ReturnValue, returnValueAnyContract)
+					assert.Equal(t, testDataAnySecondContract[i].ReturnValue, returnValueAnySecondContract)
+				}
+			},
+		},
+	}
 
 	RunTests(t, it, testCases)
 }
@@ -137,7 +383,7 @@ type SolanaChainComponentsInterfaceTesterHelper[T WrappedTestingT[T]] interface 
 	Logger(t T) logger.Logger
 	GetPrimaryIDL(t T) []byte
 	GetSecondaryIDL(t T) []byte
-	CreateAccount(t T, it SolanaChainComponentsInterfaceTester[T], contractName string, value uint64) solana.PublicKey
+	CreateAccount(t T, it SolanaChainComponentsInterfaceTester[T], contractName string, value uint64, testStruct TestStruct) solana.PublicKey
 	TXM() *txm.TxManager
 	SolanaClient() *client.Client
 }
@@ -166,11 +412,15 @@ func (it *SolanaChainComponentsInterfaceTester[T]) Name() string {
 }
 
 func (it *SolanaChainComponentsInterfaceTester[T]) GetAccountBytes(i int) []byte {
-	return nil
+	pubKeyBytes := make([]byte, 32)
+	binary.LittleEndian.PutUint64(pubKeyBytes, uint64(i))
+	return solana.PublicKeyFromBytes(pubKeyBytes).Bytes()
 }
 
 func (it *SolanaChainComponentsInterfaceTester[T]) GetAccountString(i int) string {
-	return ""
+	pubKeyBytes := make([]byte, 32)
+	binary.LittleEndian.PutUint64(pubKeyBytes, uint64(i))
+	return solana.PublicKeyFromBytes(pubKeyBytes).String()
 }
 
 func (it *SolanaChainComponentsInterfaceTester[T]) GetContractReader(t T) types.ContractReader {
@@ -211,9 +461,10 @@ func (it *SolanaChainComponentsInterfaceTester[T]) getTestIdx(name string) uint6
 
 func (it *SolanaChainComponentsInterfaceTester[T]) GetBindings(t T) []types.BoundContract {
 	// Create a new account with fresh state for each test
+	testStruct := CreateTestStruct(0, it)
 	return []types.BoundContract{
-		{Name: AnyContractName, Address: it.Helper.CreateAccount(t, *it, AnyContractName, AnyValueToReadWithoutAnArgument).String()},
-		{Name: AnySecondContractName, Address: it.Helper.CreateAccount(t, *it, AnySecondContractName, AnyDifferentValueToReadWithoutAnArgument).String()},
+		{Name: AnyContractName, Address: it.Helper.CreateAccount(t, *it, AnyContractName, AnyValueToReadWithoutAnArgument, testStruct).String()},
+		// {Name: AnySecondContractName, Address: it.Helper.CreateAccount(t, *it, AnySecondContractName, AnyDifferentValueToReadWithoutAnArgument, testStruct).String()},
 	}
 }
 
@@ -348,7 +599,7 @@ func (h *helper) GetJSONEncodedIDL(t *testing.T, fileName string) []byte {
 	return bts
 }
 
-func (h *helper) CreateAccount(t *testing.T, it SolanaChainComponentsInterfaceTester[*testing.T], contractName string, value uint64) solana.PublicKey {
+func (h *helper) CreateAccount(t *testing.T, it SolanaChainComponentsInterfaceTester[*testing.T], contractName string, value uint64, testStruct TestStruct) solana.PublicKey {
 	t.Helper()
 
 	var programID solana.PublicKey
@@ -359,7 +610,7 @@ func (h *helper) CreateAccount(t *testing.T, it SolanaChainComponentsInterfaceTe
 		programID = h.secondaryProgramID
 	}
 
-	h.runInitialize(t, it, contractName, programID, value)
+	h.runInitialize(t, it, contractName, programID, value, testStruct)
 	return programID
 }
 
@@ -368,12 +619,18 @@ type InitializeArgs struct {
 	Value   uint64
 }
 
+type StoreStructArgs struct {
+	TestIdx uint64
+	Data TestStruct
+}
+
 func (h *helper) runInitialize(
 	t *testing.T,
 	it SolanaChainComponentsInterfaceTester[*testing.T],
 	contractName string,
 	programID solana.PublicKey,
 	value uint64,
+	testStruct TestStruct,
 ) {
 	t.Helper()
 
@@ -387,18 +644,26 @@ func (h *helper) runInitialize(
 		return
 	}
 
-	args := InitializeArgs{
+	initArgs := InitializeArgs{
 		TestIdx: testIdx,
 		Value: value,
 	}
+	SubmitTransactionToCW(t, &it, cw, "initialize", initArgs, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
 
-	SubmitTransactionToCW(t, &it, cw, "initialize", args, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
+	storeStructArgs := StoreStructArgs{
+		TestIdx: testIdx,
+		Data: testStruct,
+	}
+	SubmitTransactionToCW(t, &it, cw, MethodSettingStruct, storeStructArgs, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
 }
 
 func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T) config.ContractReader {
 	idx := it.getTestIdx(t.Name())
-	pdaPrefix := []byte("data")
-	pdaPrefix = binary.LittleEndian.AppendUint64(pdaPrefix, idx)
+	pdaDataPrefix := []byte("data")
+	pdaDataPrefix = binary.LittleEndian.AppendUint64(pdaDataPrefix, idx)
+	pdaStructDataPrefix := []byte("struct_data")
+	pdaStructDataPrefix = binary.LittleEndian.AppendUint64(pdaStructDataPrefix, idx)
+	testStruct := CreateTestStruct(0, it)
 	return config.ContractReader{
 		Namespaces: map[string]config.ChainContractReader{
 			AnyContractName: {
@@ -408,7 +673,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 						ChainSpecificName: "DataAccount",
 						ReadType:          config.Account,
 						PDADefiniton: codec.PDATypeDef{
-							Prefix: pdaPrefix,
+							Prefix: pdaDataPrefix,
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
 							&commoncodec.PropertyExtractorConfig{FieldName: "U64Value"},
@@ -416,8 +681,9 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					},
 					MethodReturningUint64Slice: {
 						ChainSpecificName: "DataAccount",
+						ReadType:          config.Account,
 						PDADefiniton: codec.PDATypeDef{
-							Prefix: pdaPrefix,
+							Prefix: pdaDataPrefix,
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
 							&commoncodec.PropertyExtractorConfig{FieldName: "U64Slice"},
@@ -425,11 +691,57 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					},
 					MethodSettingUint64: {
 						ChainSpecificName: "DataAccount",
+						ReadType:          config.Account,
 						PDADefiniton: codec.PDATypeDef{
-							Prefix: pdaPrefix,
+							Prefix: pdaDataPrefix,
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
 							&commoncodec.PropertyExtractorConfig{FieldName: "U64Value"},
+						},
+					},
+					MethodReturningSeenStruct: {
+						ChainSpecificName: "TestStruct",
+						ReadType:          config.Account,
+						PDADefiniton: codec.PDATypeDef{
+							Prefix: pdaStructDataPrefix,
+						},
+						OutputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.HardCodeModifierConfig{
+								OnChainValues: map[string]any{
+									"DifferentField": copy(make([]byte, 32), []byte(testStruct.DifferentField)),
+									"NestedDynamicStruct.Inner.S": copy(make([]byte, 32), []byte(testStruct.NestedDynamicStruct.Inner.S)),
+								},
+								OffChainValues: map[string]any{
+									"ExtraField": AnyExtraValue,
+									"DifferentField": testStruct.DifferentField,
+									"NestedDynamicStruct.Inner.S": testStruct.NestedDynamicStruct.Inner.S,
+								},
+							},
+							&commoncodec.AddressBytesToStringModifierConfig{
+								Fields: []string{"AccountStruct.AccountStr"},
+							},
+						},
+					},
+					MethodTakingLatestParamsReturningTestStruct: {
+						ChainSpecificName: "TestStruct",
+						PDADefiniton: codec.PDATypeDef{
+							Prefix: pdaStructDataPrefix,
+						},
+						OutputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.HardCodeModifierConfig{
+								OnChainValues: map[string]any{
+									"DifferentField": copy(make([]byte, 32), []byte(testStruct.DifferentField)),
+									"NestedDynamicStruct.Inner.S": copy(make([]byte, 32), []byte(testStruct.NestedDynamicStruct.Inner.S)),
+								},
+								OffChainValues: map[string]any{
+									"ExtraField": AnyExtraValue,
+									"DifferentField": testStruct.DifferentField,
+									"NestedDynamicStruct.Inner.S": testStruct.NestedDynamicStruct.Inner.S,
+								},
+							},
+							&commoncodec.AddressBytesToStringModifierConfig{
+								Fields: []string{"AccountStruct.AccountStr"},
+							},
 						},
 					},
 				},
@@ -440,7 +752,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					MethodReturningUint64: {
 						ChainSpecificName: "Data",
 						PDADefiniton: codec.PDATypeDef{
-							Prefix: pdaPrefix,
+							Prefix: pdaDataPrefix,
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
 							&commoncodec.PropertyExtractorConfig{FieldName: "U64Value"},
@@ -456,6 +768,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 	idx := it.getTestIdx(t.Name())
 	testIdx := binary.LittleEndian.AppendUint64([]byte{}, idx)
 	fromAddress := solana.MustPrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1]).PublicKey().String()
+	testStruct := CreateTestStruct(0, it)
 	return chainwriter.ChainWriterConfig{
 		Programs: map[string]chainwriter.ProgramConfig{
 			AnyContractName: {
@@ -476,7 +789,6 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 							chainwriter.PDALookups{
 								Name: "Account",
 								PublicKey: chainwriter.AccountConstant{
-									Name:    "ProgramID",
 									Address: primaryProgramPubKey,
 								},
 								Seeds: []chainwriter.Seed{
@@ -489,8 +801,61 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 							chainwriter.AccountConstant{
 								Name: "SystemProgram",
 								Address: solana.SystemProgramID.String(),
-								IsSigner: false,
 								IsWritable: false,
+								IsSigner: false,
+							},
+						},
+						DebugIDLocation: "",
+					},
+					MethodSettingStruct: {
+						FromAddress:        fromAddress,
+						InputModifications: []commoncodec.ModifierConfig{
+							&commoncodec.AddressBytesToStringModifierConfig{
+								Fields: []string{"Data.AccountStruct.AccountStr"},
+							},
+							&commoncodec.HardCodeModifierConfig{
+								OnChainValues: map[string]any{
+									"Data.Padding0": []byte{},
+									"Data.Padding1": []byte{},
+									"Data.Padding2": []byte{},
+									"Data.NestedDynamicStruct.Padding": []byte{},
+									"Data.NestedStaticStruct.Padding": []byte{},
+									"Data.DifferentField": copy(make([]byte, 32), []byte(testStruct.DifferentField)),
+									"Data.NestedDynamicStruct.Inner.S": copy(make([]byte, 32), []byte(testStruct.NestedDynamicStruct.Inner.S)),
+								},
+								OffChainValues: map[string]any{
+									"Data.DifferentField": testStruct.DifferentField,
+									"Data.NestedDynamicStruct.Inner.S": testStruct.NestedDynamicStruct.Inner.S,
+								},
+							},
+						},
+						ChainSpecificName: "store",
+						LookupTables:       chainwriter.LookupTables{},
+						Accounts: []chainwriter.Lookup{
+							chainwriter.AccountConstant{
+								Name: "Signer",
+								Address: fromAddress,
+								IsSigner: true,
+								IsWritable: true,
+							},
+							chainwriter.PDALookups{
+								Name: "Account",
+								PublicKey: chainwriter.AccountConstant{
+									Name:    "ProgramID",
+									Address: primaryProgramPubKey,
+								},
+								Seeds: []chainwriter.Seed{
+									{Static: []byte("struct_data")},
+									{Static: testIdx},
+								},
+								IsWritable: true,
+								IsSigner:   false,
+							},
+							chainwriter.AccountConstant{
+								Name: "SystemProgram",
+								Address: solana.SystemProgramID.String(),
+								IsWritable: false,
+								IsSigner: false,
 							},
 						},
 						DebugIDLocation: "",
@@ -526,10 +891,10 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								IsSigner:   false,
 							},
 							chainwriter.AccountConstant{
-								Name: "SystemProgram",
+								Name: "SystemAccount",
 								Address: solana.SystemProgramID.String(),
-								IsSigner: false,
 								IsWritable: false,
+								IsSigner: false,
 							},
 						},
 						DebugIDLocation: "",
@@ -548,6 +913,26 @@ func mustUnmarshalIDL[T WrappedTestingT[T]](t T, rawIDL string) codec.IDL {
 	}
 
 	return idl
+}
+
+// Copied from chainlink-common since this method is not public: https://github.com/smartcontractkit/chainlink-common/blob/aea9294a7d555844336a92c9ffe41219dfb26c68/pkg/types/interfacetests/utils.go#L88
+func batchContractWrite[T TestingT[T]](t T, tester ChainComponentsInterfaceTester[T], cw types.ContractWriter, boundContracts []types.BoundContract, batchCallEntry BatchCallEntry) {
+	nameToAddress := make(map[string]string)
+	for _, bc := range boundContracts {
+		nameToAddress[bc.Name] = bc.Address
+	}
+
+	// For each contract in the batch call entry, submit the read entries to the chain
+	for contract, contractBatch := range batchCallEntry {
+		require.Contains(t, nameToAddress, contract.Name)
+		for _, readEntry := range contractBatch {
+			val, isOk := readEntry.ReturnValue.(*TestStruct)
+			if !isOk {
+				require.Fail(t, "expected *TestStruct for contract: %s read: %s, but received %T", contract.Name, readEntry.Name, readEntry.ReturnValue)
+			}
+			SubmitTransactionToCW(t, tester, cw, MethodSettingStruct, val, types.BoundContract{Name: contract.Name, Address: nameToAddress[contract.Name]}, types.Unconfirmed)
+		}
+	}
 }
 
 const (
