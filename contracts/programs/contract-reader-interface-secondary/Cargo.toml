@@ -1,12 +1,12 @@
 [package]
-name = "contract-reader-interface"
+name = "contract-reader-interface-secondary"
 version = "0.1.0"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "contract_reader_interface"
+name = "contract_reader_interface_secondary"
 
 [features]
 no-entrypoint = []
