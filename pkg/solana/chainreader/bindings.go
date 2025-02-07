@@ -111,7 +111,6 @@ func (b *bindingsRegistry) SetModifiers(modifier commoncodec.Modifier) {
 	}
 }
 
-
 func (b *bindingsRegistry) handleAddressSharing(boundContract *types.BoundContract) error {
 	shareGroup, isInAGroup := b.getShareGroup(*boundContract)
 	if !isInAGroup {
