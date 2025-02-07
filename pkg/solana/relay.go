@@ -162,7 +162,7 @@ func (r *Relayer) NewContractReader(_ context.Context, chainReaderConfig []byte)
 		return nil, fmt.Errorf("failed to init account reader err: %s", err)
 	}
 
-	return chainreader.NewChainReaderService(r.lggr, &chainreader.RPCClientWrapper{AccountReader: accountReader}, cfg)
+	return chainreader.NewContractReaderService(r.lggr, &chainreader.RPCClientWrapper{AccountReader: accountReader}, cfg, r.chain.LogPoller())
 }
 
 func (r *Relayer) NewMedianProvider(ctx context.Context, rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MedianProvider, error) {

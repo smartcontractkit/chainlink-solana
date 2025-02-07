@@ -6,15 +6,19 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 
+	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 )
 
 type readBinding interface {
 	SetAddress(solana.PublicKey)
 	GetAddress(context.Context, any) (solana.PublicKey, error)
 	SetCodec(types.RemoteCodec)
+	SetModifier(commoncodec.Modifier)
 	CreateType(bool) (any, error)
 	Decode(context.Context, []byte, any) error
+	QueryKey(context.Context, query.KeyFilter, query.LimitAndSort, any) ([]types.Sequence, error)
 }
 
 // key is namespace
@@ -72,10 +76,18 @@ func (b namespaceBindings) Bind(binding types.BoundContract) error {
 	return nil
 }
 
-func (b namespaceBindings) SetCodec(codec types.RemoteCodec) {
+func (b namespaceBindings) SetCodecs(codec types.RemoteCodec) {
 	for _, nbs := range b {
 		for _, rb := range nbs {
 			rb.SetCodec(codec)
+		}
+	}
+}
+
+func (b namespaceBindings) SetModifiers(modifier commoncodec.Modifier) {
+	for _, nbs := range b {
+		for _, rb := range nbs {
+			rb.SetModifier(modifier)
 		}
 	}
 }

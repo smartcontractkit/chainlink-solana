@@ -43,6 +43,11 @@ var (
 		"event_idl", "subkey_paths", "retention", "max_logs_kept", "is_deleted", "is_backfilled"}
 )
 
+type IndexedValueComparator struct {
+	Value    IndexedValue
+	Operator primitives.ComparisonOperator
+}
+
 // The parser builds SQL expressions piece by piece for each Accept function call and resets the error and expression
 // values after every call.
 type pgDSLParser struct {
@@ -56,80 +61,6 @@ type pgDSLParser struct {
 var _ primitives.Visitor = (*pgDSLParser)(nil)
 
 func (v *pgDSLParser) Comparator(_ primitives.Comparator) {}
-
-type IndexedValueComparator struct {
-	Value    IndexedValue
-	Operator primitives.ComparisonOperator
-}
-
-type eventBySubKeyFilter struct {
-	SubKeyIndex    uint64
-	ValueComparers []IndexedValueComparator
-}
-
-func (f *eventBySubKeyFilter) Accept(visitor primitives.Visitor) {
-	switch v := visitor.(type) {
-	case *pgDSLParser:
-		v.VisitEventSubKeysByValueFilter(f)
-	}
-}
-
-func NewEventBySubKeyFilter(subKeyIndex uint64, valueComparers []primitives.ValueComparator) (query.Expression, error) {
-	var indexedValueComparators []IndexedValueComparator
-	for _, cmp := range valueComparers {
-		iVal, err := newIndexedValue(cmp.Value)
-		if err != nil {
-			return query.Expression{}, err
-		}
-		iValCmp := IndexedValueComparator{
-			Value:    iVal,
-			Operator: cmp.Operator,
-		}
-		indexedValueComparators = append(indexedValueComparators, iValCmp)
-	}
-	return query.Expression{
-		Primitive: &eventBySubKeyFilter{
-			SubKeyIndex:    subKeyIndex,
-			ValueComparers: indexedValueComparators,
-		},
-	}, nil
-}
-
-func (v *pgDSLParser) VisitEventSubKeysByValueFilter(p *eventBySubKeyFilter) {
-	if len(p.ValueComparers) > 0 {
-		if p.SubKeyIndex > 3 { // For now, maximum # of fields that can be indexed is 4--we can increase this if needed by adding more db indexes
-			v.err = fmt.Errorf("invalid subKey index: %d", p.SubKeyIndex)
-			return
-		}
-
-		// Add 1 since postgresql arrays are 1-indexed.
-		subKeyIdx := v.args.withIndexedField(subKeyIndexArgName, p.SubKeyIndex+1)
-
-		comps := make([]string, len(p.ValueComparers))
-		for idx, comp := range p.ValueComparers {
-			comps[idx], v.err = makeComp(comp, v.args, subKeyValueArg, subKeyIdx, subKeyValuesFieldName+"[:%s] %s :%s")
-			if v.err != nil {
-				return
-			}
-		}
-
-		v.expression = strings.Join(comps, " AND ")
-	}
-}
-
-func makeComp(comp IndexedValueComparator, args *queryArgs, field, subfield, pattern string) (string, error) {
-	cmp, err := cmpOpToString(comp.Operator)
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf(
-		pattern,
-		subfield,
-		cmp,
-		args.withIndexedField(field, comp.Value),
-	), nil
-}
 
 func (v *pgDSLParser) Block(prim primitives.Block) {
 	cmp, err := cmpOpToString(prim.Operator)
@@ -212,6 +143,30 @@ func (v *pgDSLParser) VisitEventSigFilter(p *eventSigFilter) {
 		eventSigFieldName,
 		v.args.withIndexedField(eventSigFieldName, p.eventSig),
 	)
+}
+
+func (v *pgDSLParser) VisitEventSubKeysByValueFilter(p *eventBySubKeyFilter) {
+	if len(p.ValueComparers) > 0 {
+		// For now, maximum # of fields that can be indexed is 4--we can increase this if needed by adding
+		// more db indexes.
+		if p.SubKeyIndex > 3 {
+			v.err = fmt.Errorf("invalid subKey index: %d", p.SubKeyIndex)
+			return
+		}
+
+		// Add 1 since postgresql arrays are 1-indexed.
+		subKeyIdx := v.args.withIndexedField(subKeyIndexArgName, p.SubKeyIndex+1)
+
+		comps := make([]string, len(p.ValueComparers))
+		for idx, comp := range p.ValueComparers {
+			comps[idx], v.err = makeComp(comp, v.args, subKeyValueArg, subKeyIdx, subKeyValuesFieldName+"[:%s] %s :%s")
+			if v.err != nil {
+				return
+			}
+		}
+
+		v.expression = strings.Join(comps, " AND ")
+	}
 }
 
 func (v *pgDSLParser) buildQuery(
@@ -488,4 +443,56 @@ func (f *eventSigFilter) Accept(visitor primitives.Visitor) {
 	case *pgDSLParser:
 		v.VisitEventSigFilter(f)
 	}
+}
+
+type eventBySubKeyFilter struct {
+	SubKeyIndex    uint64
+	ValueComparers []IndexedValueComparator
+}
+
+func NewEventBySubKeyFilter(subKeyIndex uint64, valueComparers []primitives.ValueComparator) (query.Expression, error) {
+	var indexedValueComparators []IndexedValueComparator
+	for _, cmp := range valueComparers {
+		iVal, err := newIndexedValue(cmp.Value)
+		if err != nil {
+			return query.Expression{}, err
+		}
+		iValCmp := IndexedValueComparator{
+			Value:    iVal,
+			Operator: cmp.Operator,
+		}
+		indexedValueComparators = append(indexedValueComparators, iValCmp)
+	}
+	return query.Expression{
+		Primitive: &eventBySubKeyFilter{
+			SubKeyIndex:    subKeyIndex,
+			ValueComparers: indexedValueComparators,
+		},
+	}, nil
+}
+
+func (f *eventBySubKeyFilter) Accept(visitor primitives.Visitor) {
+	switch v := visitor.(type) {
+	case *pgDSLParser:
+		v.VisitEventSubKeysByValueFilter(f)
+	}
+}
+
+// FormatContractReaderCursor is exported to ensure cursor structure remains consistent.
+func FormatContractReaderCursor(log Log) string {
+	return fmt.Sprintf("%d-%d-%s", log.BlockNumber, log.LogIndex, log.TxHash)
+}
+
+func makeComp(comp IndexedValueComparator, args *queryArgs, field, subfield, pattern string) (string, error) {
+	cmp, err := cmpOpToString(comp.Operator)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf(
+		pattern,
+		subfield,
+		cmp,
+		args.withIndexedField(field, comp.Value),
+	), nil
 }

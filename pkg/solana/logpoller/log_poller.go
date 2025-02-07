@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"iter"
 	"math"
+	"slices"
 	"time"
 
 	"github.com/gagliardetto/solana-go/rpc"
@@ -159,8 +160,8 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 			return err
 		}
 
-		log.SubKeyValues = make([]IndexedValue, 0, len(filter.SubKeyPaths))
-		for _, path := range filter.SubKeyPaths {
+		log.SubkeyValues = make([]IndexedValue, 0, len(filter.SubkeyPaths))
+		for _, path := range filter.SubkeyPaths {
 			subKeyVal, decodeSubKeyErr := lp.filters.DecodeSubKey(ctx, lp.lggr, log.Data, filter.ID, path)
 			if decodeSubKeyErr != nil {
 				return decodeSubKeyErr
@@ -169,7 +170,7 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 			if newIndexedValErr != nil {
 				return newIndexedValErr
 			}
-			log.SubKeyValues = append(log.SubKeyValues, indexedVal)
+			log.SubkeyValues = append(log.SubkeyValues, indexedVal)
 		}
 
 		log.SequenceNum = lp.filters.IncrementSeqNum(filter.ID)
@@ -248,6 +249,7 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []Filter, to int
 		return err
 	}
 
+	lp.lggr.Infow("Done backfilling filters", "filters", slices.All(filters))
 	for _, filter := range filters {
 		filterErr := lp.filters.MarkFilterBackfilled(ctx, filter.ID)
 		if filterErr != nil {

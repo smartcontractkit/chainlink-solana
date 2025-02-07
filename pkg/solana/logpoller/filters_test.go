@@ -28,12 +28,15 @@ func TestFilters_LoadFilters(t *testing.T) {
 		IsDeleted: true,
 	}
 	happyPath := Filter{
-		ID:   1,
-		Name: "Happy path",
+		ID:           1,
+		Name:         "Happy path",
+		EventName:    "happyPath1",
+		IsBackfilled: true,
 	}
 	happyPath2 := Filter{
-		ID:   2,
-		Name: "Happy path 2",
+		ID:        2,
+		Name:      "Happy path 2",
+		EventName: "happyPath2",
 	}
 	orm.On("SelectFilters", mock.Anything).Return([]Filter{
 		deleted,
@@ -45,7 +48,7 @@ func TestFilters_LoadFilters(t *testing.T) {
 		1: 18,
 		2: 25,
 		3: 0,
-	}, nil)
+	}, nil).Once()
 
 	err := fs.LoadFilters(ctx)
 	require.EqualError(t, err, "failed to select filters from db: db failed")
@@ -54,20 +57,47 @@ func TestFilters_LoadFilters(t *testing.T) {
 	// only one filter to delete
 	require.Len(t, fs.filtersToDelete, 1)
 	require.Equal(t, deleted, fs.filtersToDelete[deleted.ID])
-	// both happy path are indexed
+	// filtersByAddress only contains not deleted filters
 	require.Len(t, fs.filtersByAddress, 1)
 	require.Len(t, fs.filtersByAddress[happyPath.Address], 1)
 	require.Len(t, fs.filtersByAddress[happyPath.Address][happyPath.EventSig], 2)
-	require.Contains(t, fs.filtersByAddress[happyPath.Address][happyPath.EventSig], happyPath.ID)
-	require.Equal(t, happyPath, *fs.filtersByID[happyPath.ID])
-	require.Contains(t, fs.filtersByAddress[happyPath.Address][happyPath.EventSig], happyPath2.ID)
-	require.Equal(t, happyPath2, *fs.filtersByID[happyPath2.ID])
-	require.Len(t, fs.filtersByName, 2)
-	require.Equal(t, fs.filtersByName[happyPath.Name], happyPath.ID)
-	require.Equal(t, fs.filtersByName[happyPath2.Name], happyPath2.ID)
+	// both filters are properly indexed
+	requireIndexed(t, fs, happyPath)
+	requireIndexed(t, fs, happyPath2)
+	// only happyPath2 requires backfill
+	require.Len(t, fs.filtersToBackfill, 1)
+	require.Contains(t, fs.filtersToBackfill, happyPath2.ID)
 	// any call following successful should be noop
 	err = fs.LoadFilters(ctx)
 	require.NoError(t, err)
+}
+
+func requireIndexed(t *testing.T, fs *filters, f Filter) {
+	require.NotNil(t, fs.filtersByID[f.ID])
+	require.Equal(t, f, *fs.filtersByID[f.ID])
+	require.Equal(t, f.ID, fs.filtersByName[f.Name])
+	byEventSig := fs.filtersByAddress[f.Address]
+	require.NotNil(t, byEventSig)
+	eventSigIDs := byEventSig[f.EventSig]
+	require.Contains(t, eventSigIDs, f.ID)
+	require.Contains(t, fs.decoders, f.ID)
+	require.Contains(t, fs.knownDiscriminators, f.DiscriminatorRawBytes())
+	require.Contains(t, fs.knownPrograms, f.Address.String())
+}
+
+func requireNoInIndices(t *testing.T, fs *filters, f Filter) {
+	require.Nil(t, fs.filtersByID[f.ID])
+	require.NotContains(t, fs.filtersByName, f.Name)
+	require.NotContains(t, fs.filtersByAddress, f.Address)
+	byEventSig := fs.filtersByAddress[f.Address]
+	if byEventSig != nil && byEventSig[f.EventSig] != nil {
+		require.NotContains(t, byEventSig[f.EventSig], f.ID)
+	}
+	require.NotContains(t, fs.decoders, f.ID)
+	require.NotContains(t, fs.knownDiscriminators, f.DiscriminatorRawBytes())
+	require.NotContains(t, fs.knownPrograms, f.Address.String())
+	require.NotContains(t, fs.seqNums, f.ID)
+	require.NotContains(t, fs.filtersToBackfill, f.ID)
 }
 
 func TestFilters_RegisterFilter(t *testing.T) {
@@ -107,7 +137,7 @@ func TestFilters_RegisterFilter(t *testing.T) {
 			{
 				Name: "SubKeyPaths",
 				ModifyField: func(f *Filter) {
-					f.SubKeyPaths = [][]string{{uuid.NewString()}}
+					f.SubkeyPaths = [][]string{{uuid.NewString()}}
 				},
 			},
 		}
@@ -138,7 +168,8 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		require.Error(t, err)
 
 		// can read after db issue is resolved
-		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(int64(1), nil).Once()
+		const filterID = int64(1)
+		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(filterID, nil).Once()
 		err = fs.RegisterFilter(tests.Context(t), filter)
 		require.NoError(t, err)
 		// can update non-primary fields
@@ -146,13 +177,15 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		filter.StartingBlock++
 		filter.Retention++
 		filter.MaxLogsKept++
-		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(int64(1), nil).Once()
+		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(filterID, nil).Once()
 		err = fs.RegisterFilter(tests.Context(t), filter)
 		require.NoError(t, err)
 		storedFilters := slices.Collect(fs.matchingFilters(filter.Address, filter.EventSig))
 		require.Len(t, storedFilters, 1)
 		filter.ID = 1
 		require.Equal(t, filter, storedFilters[0])
+		// all indices contain filter
+		requireIndexed(t, fs, filter)
 	})
 	t.Run("Can reregister after unregister", func(t *testing.T) {
 		orm := NewMockORM(t)
@@ -164,9 +197,11 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(filterID, nil).Once()
 		err := fs.RegisterFilter(tests.Context(t), Filter{Name: filterName})
 		require.NoError(t, err)
+		requireIndexed(t, fs, Filter{Name: filterName, ID: filterID})
 		orm.On("MarkFilterDeleted", mock.Anything, filterID).Return(nil).Once()
 		err = fs.UnregisterFilter(tests.Context(t), filterName)
 		require.NoError(t, err)
+		requireNoInIndices(t, fs, Filter{Name: filterName, ID: filterID})
 		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(filterID+1, nil).Once()
 		err = fs.RegisterFilter(tests.Context(t), Filter{Name: filterName})
 		require.NoError(t, err)
@@ -174,6 +209,7 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		require.Equal(t, Filter{Name: filterName, ID: filterID}, fs.filtersToDelete[filterID])
 		require.Len(t, fs.filtersToBackfill, 1)
 		require.Contains(t, fs.filtersToBackfill, filterID+1)
+		requireIndexed(t, fs, Filter{Name: filterName, ID: filterID + 1})
 	})
 }
 
@@ -211,15 +247,14 @@ func TestFilters_UnregisterFilter(t *testing.T) {
 		fs := newFilters(lggr, orm)
 		const filterName = "Filter"
 		const id int64 = 10
-		orm.On("SelectFilters", mock.Anything).Return([]Filter{{ID: id, Name: filterName}}, nil).Once()
+		f := Filter{ID: id, Name: filterName}
+		orm.On("SelectFilters", mock.Anything).Return([]Filter{f}, nil).Once()
 		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 		orm.On("MarkFilterDeleted", mock.Anything, id).Return(nil).Once()
 		err := fs.UnregisterFilter(tests.Context(t), filterName)
 		require.NoError(t, err)
-		require.Len(t, fs.filtersToDelete, 1)
-		require.Len(t, fs.filtersToBackfill, 0)
-		require.Len(t, fs.filtersByName, 0)
-		require.Len(t, fs.filtersByAddress, 0)
+		require.Contains(t, fs.filtersToDelete, f.ID)
+		requireNoInIndices(t, fs, f)
 	})
 }
 
