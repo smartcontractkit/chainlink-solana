@@ -160,7 +160,7 @@ type IdlField struct {
 // PDA is a struct that does not correlate to an official IDL type
 // It is needed to encode seeds to calculate the address for PDA account reads
 type PDATypeDef struct {
-	Prefix string    `json:"prefix,omitempty"`
+	Prefix []byte    `json:"prefix,omitempty"`
 	Seeds  []PDASeed `json:"seeds,omitempty"`
 }
 

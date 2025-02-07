@@ -282,7 +282,7 @@ func getSeedBytesCombinations(
 		} else if seed.Dynamic != nil {
 			dynamicSeed := seed.Dynamic
 			if lookupSeed, ok := dynamicSeed.(AccountLookup); ok {
-				// Get value from a location (This doens't have to be an address, it can be any value)
+				// Get value from a location (This doesn't have to be an address, it can be any value)
 				bytes, err := GetValuesAtLocation(args, lookupSeed.Location)
 				if err != nil {
 					return nil, fmt.Errorf("error getting address seed for location %q: %w", lookupSeed.Location, err)
