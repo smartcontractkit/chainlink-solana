@@ -90,8 +90,6 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
 
 		// disable failing test
-		ContractReaderGetLatestValueFromMultipleContractsNamesSameFunction,
-		ContractReaderBatchGetLatestValueMultipleContractNamesSameFunction,
 		ContractReaderBatchGetLatestValueSetsErrorsProperly,
 		// disable failing tests requiring solana specific implementation
 		SolanaContractReaderGetLatestValue,
