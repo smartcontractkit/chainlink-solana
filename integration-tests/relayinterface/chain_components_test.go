@@ -464,7 +464,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GetBindings(t T) []types.Boun
 	testStruct := CreateTestStruct(0, it)
 	return []types.BoundContract{
 		{Name: AnyContractName, Address: it.Helper.CreateAccount(t, *it, AnyContractName, AnyValueToReadWithoutAnArgument, testStruct).String()},
-		// {Name: AnySecondContractName, Address: it.Helper.CreateAccount(t, *it, AnySecondContractName, AnyDifferentValueToReadWithoutAnArgument, testStruct).String()},
+		{Name: AnySecondContractName, Address: it.Helper.CreateAccount(t, *it, AnySecondContractName, AnyDifferentValueToReadWithoutAnArgument, testStruct).String()},
 	}
 }
 
@@ -892,6 +892,59 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 							},
 							chainwriter.AccountConstant{
 								Name: "SystemAccount",
+								Address: solana.SystemProgramID.String(),
+								IsWritable: false,
+								IsSigner: false,
+							},
+						},
+						DebugIDLocation: "",
+					},
+					MethodSettingStruct: {
+						FromAddress:        fromAddress,
+						InputModifications: []commoncodec.ModifierConfig{
+							&commoncodec.AddressBytesToStringModifierConfig{
+								Fields: []string{"Data.AccountStruct.AccountStr"},
+							},
+							&commoncodec.HardCodeModifierConfig{
+								OnChainValues: map[string]any{
+									"Data.Padding0": []byte{},
+									"Data.Padding1": []byte{},
+									"Data.Padding2": []byte{},
+									"Data.NestedDynamicStruct.Padding": []byte{},
+									"Data.NestedStaticStruct.Padding": []byte{},
+									"Data.DifferentField": copy(make([]byte, 32), []byte(testStruct.DifferentField)),
+									"Data.NestedDynamicStruct.Inner.S": copy(make([]byte, 32), []byte(testStruct.NestedDynamicStruct.Inner.S)),
+								},
+								OffChainValues: map[string]any{
+									"Data.DifferentField": testStruct.DifferentField,
+									"Data.NestedDynamicStruct.Inner.S": testStruct.NestedDynamicStruct.Inner.S,
+								},
+							},
+						},
+						ChainSpecificName: "store",
+						LookupTables:       chainwriter.LookupTables{},
+						Accounts: []chainwriter.Lookup{
+							chainwriter.AccountConstant{
+								Name: "Signer",
+								Address: fromAddress,
+								IsSigner: true,
+								IsWritable: true,
+							},
+							chainwriter.PDALookups{
+								Name: "Account",
+								PublicKey: chainwriter.AccountConstant{
+									Name:    "ProgramID",
+									Address: secondaryProgramPubKey,
+								},
+								Seeds: []chainwriter.Seed{
+									{Static: []byte("struct_data")},
+									{Static: testIdx},
+								},
+								IsWritable: true,
+								IsSigner:   false,
+							},
+							chainwriter.AccountConstant{
+								Name: "SystemProgram",
 								Address: solana.SystemProgramID.String(),
 								IsWritable: false,
 								IsSigner: false,

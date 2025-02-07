@@ -29,6 +29,8 @@ func init() {
 
 var (
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
+
+	Instruction_Store = ag_binary.TypeID([8]byte{220, 28, 207, 235, 0, 234, 193, 246})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -36,6 +38,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
 	case Instruction_Initialize:
 		return "Initialize"
+	case Instruction_Store:
+		return "Store"
 	default:
 		return ""
 	}
@@ -58,6 +62,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	[]ag_binary.VariantType{
 		{
 			"initialize", (*Initialize)(nil),
+		},
+		{
+			"store", (*Store)(nil),
 		},
 	},
 )
