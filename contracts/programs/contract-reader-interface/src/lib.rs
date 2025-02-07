@@ -76,21 +76,19 @@ pub struct Initialize<'info> {
     pub data: Account<'info, DataAccount>,
 
     #[account(
-            init,
-            payer = signer,
-            space = 100,
-            seeds = [b"multi_read1"],
-            bump
-        )]
+        init_if_needed,
+        payer = signer,
+        space = size_of::<MultiRead1>() + 8,
+        seeds = [b"multi_read1"],
+        bump)]
     pub multi_read1: Account<'info, MultiRead1>,
 
     #[account(
-            init,
-            payer = signer,
-            space = 200,
-            seeds = [b"multi_read2"],
-            bump
-        )]
+        init_if_needed,
+        payer = signer,
+        space = size_of::<MultiRead2>() + 8,
+        seeds = [b"multi_read2"],
+        bump)]
     pub multi_read2: Account<'info, MultiRead2>,
 
     pub system_program: Program<'info, System>,
