@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -37,22 +38,30 @@ type worker struct {
 }
 
 func (w *worker) Do(ctx context.Context, job Job) {
-	if ctx.Err() == nil {
-		start := time.Now()
-		w.Lggr.Debugf("Starting job %s", job.String())
-		if err := job.Run(ctx); err != nil {
-			w.Lggr.Errorf("job %s failed with error; retrying: %s", job, err)
-			w.Retry <- job
-		} else {
-			w.Lggr.Debugf("Finished job %s in %s", job.String(), time.Since(start))
+	defer func() {
+		// put itself back on the queue when done
+		select {
+		case w.Queue <- w:
+		default:
 		}
+	}()
+	if ctx.Err() != nil {
+		return
 	}
 
-	// put itself back on the queue when done
-	select {
-	case w.Queue <- w:
-	default:
+	start := time.Now()
+	w.Lggr.Debugf("Starting job %s", job.String())
+	if err := job.Run(ctx); err != nil {
+		if errors.Is(err, context.Canceled) {
+			w.Lggr.Debugf("job %s was canceled", job.String())
+			return
+		}
+		w.Lggr.Errorf("job %s failed with error; retrying: %s", job, err)
+		w.Retry <- job
+		return
 	}
+
+	w.Lggr.Debugf("Finished job %s in %s", job.String(), time.Since(start))
 }
 
 type Group struct {
@@ -275,7 +284,7 @@ func (g *Group) processQueue(ctx context.Context) {
 		}
 
 		if g.queue.Len() >= DefaultNotifyQueueDepth {
-			g.lggr.Errorf("queue depth: %d", g.queue.Len())
+			g.lggr.Warnf("queue depth is too large: %d", g.queue.Len())
 		}
 
 		value, err := g.queue.Pop()

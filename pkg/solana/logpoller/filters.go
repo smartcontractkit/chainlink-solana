@@ -30,8 +30,8 @@ type filters struct {
 	filtersToDelete        map[int64]Filter
 	filtersMutex           sync.RWMutex
 	loadedFilters          atomic.Bool
-	knownPrograms          map[string]uint // fast lookup to see if a base58-encoded ProgramID matches any registered filters
-	knownDiscriminators    map[string]uint // fast lookup based on raw discriminator bytes as string
+	knownPrograms          map[string]uint         // fast lookup to see if a base58-encoded ProgramID matches any registered filters
+	knownDiscriminators    map[EventSignature]uint // fast lookup based on raw discriminator bytes as string
 	seqNums                map[int64]int64
 	decoders               map[int64]Decoder
 	discriminatorExtractor codec.DiscriminatorExtractor
@@ -179,7 +179,7 @@ func (fl *filters) addToIndices(filter Filter, decoder Decoder) error {
 
 	programID := filter.Address.ToSolana().String()
 	fl.knownPrograms[programID]++
-	fl.knownDiscriminators[filter.DiscriminatorRawBytes()]++
+	fl.knownDiscriminators[filter.EventSig]++
 	return nil
 }
 
@@ -255,13 +255,12 @@ func (fl *filters) removeFilterFromIndexes(filter Filter) {
 		}
 	}
 
-	discriminator := filter.DiscriminatorRawBytes()
-	if refcount, ok := fl.knownDiscriminators[discriminator]; ok {
+	if refcount, ok := fl.knownDiscriminators[filter.EventSig]; ok {
 		refcount--
 		if refcount > 0 {
-			fl.knownDiscriminators[discriminator] = refcount
+			fl.knownDiscriminators[filter.EventSig] = refcount
 		} else {
-			delete(fl.knownDiscriminators, discriminator)
+			delete(fl.knownDiscriminators, filter.EventSig)
 		}
 	}
 }
@@ -338,7 +337,7 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[F
 			return ok
 		}
 
-		_, ok = fl.knownDiscriminators[string(discriminator)]
+		_, ok = fl.knownDiscriminators[discriminator]
 		return ok
 	}
 
@@ -352,7 +351,7 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[F
 		return nil
 	}
 
-	return fl.matchingFilters(PublicKey(addr), EventSignature(discriminator))
+	return fl.matchingFilters(PublicKey(addr), discriminator)
 }
 
 // GetFiltersToBackfill - returns copy of backfill queue
@@ -413,7 +412,7 @@ func (fl *filters) LoadFilters(ctx context.Context) error {
 	fl.filtersToBackfill = make(map[int64]struct{})
 	fl.filtersToDelete = make(map[int64]Filter)
 	fl.knownPrograms = make(map[string]uint)
-	fl.knownDiscriminators = make(map[string]uint)
+	fl.knownDiscriminators = make(map[EventSignature]uint)
 
 	filters, err := fl.orm.SelectFilters(ctx)
 	if err != nil {
