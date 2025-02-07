@@ -17,17 +17,37 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
-//go:embed testChainReader_valid.json
+//go:embed test_contract_reader_invalid.json
+var invalidJSON string
+
+//go:embed test_contract_reader_invalid_address_share_group.json
+var invalidAddressShareGroupsJSON string
+
+//go:embed test_contract_reader_valid.json
 var validJSON string
 
-//go:embed testChainReader_valid_with_IDL_as_string.json
+//go:embed test_contract_reader_valid_with_IDL_as_string.json
 var validJSONWithIDLAsString string
 
-//go:embed testChainReader_invalid.json
-var invalidJSON string
+//go:embed test_contract_reader_valid_address_share_groups.json
+var validJSONWithAddressShareGroups string
 
 func TestChainReaderConfig(t *testing.T) {
 	t.Parallel()
+
+	t.Run("invalid unmarshal", func(t *testing.T) {
+		t.Parallel()
+
+		var result config.ContractReader
+		require.ErrorIs(t, json.Unmarshal([]byte(invalidJSON), &result), types.ErrInvalidConfig)
+	})
+
+	t.Run("invalid address share group unmarshal", func(t *testing.T) {
+		t.Parallel()
+
+		var result config.ContractReader
+		require.ErrorIs(t, json.Unmarshal([]byte(invalidAddressShareGroupsJSON), &result), types.ErrInvalidConfig)
+	})
 
 	t.Run("valid unmarshal with idl as struct", func(t *testing.T) {
 		t.Parallel()
@@ -38,33 +58,36 @@ func TestChainReaderConfig(t *testing.T) {
 	})
 
 	t.Run("valid unmarshal with idl as string", func(t *testing.T) {
+		t.Parallel()
+
 		var result config.ContractReader
 		require.NoError(t, json.Unmarshal([]byte(validJSONWithIDLAsString), &result))
 		assert.Equal(t, validChainReaderConfig, result)
 	})
 
 	t.Run("valid unmarshal with PDA account", func(t *testing.T) {
+		t.Parallel()
+
 		var result config.ContractReader
 		require.NoError(t, json.Unmarshal([]byte(validJSONWithIDLAsString), &result))
 		assert.Equal(t, validChainReaderConfig, result)
 	})
 
-	t.Run("invalid unmarshal", func(t *testing.T) {
+	t.Run("valid unmarshal with address share groups", func(t *testing.T) {
 		t.Parallel()
 
 		var result config.ContractReader
-		require.ErrorIs(t, json.Unmarshal([]byte(invalidJSON), &result), types.ErrInvalidConfig)
+		require.NoError(t, json.Unmarshal([]byte(validJSONWithAddressShareGroups), &result))
+		assert.Equal(t, validChainReaderConfigWithAddressShareGroups, result)
 	})
 
 	t.Run("marshal", func(t *testing.T) {
 		t.Parallel()
 
 		result, err := json.Marshal(validChainReaderConfig)
-
 		require.NoError(t, err)
 
 		var conf config.ContractReader
-
 		require.NoError(t, json.Unmarshal(result, &conf))
 		assert.Equal(t, validChainReaderConfig, conf)
 	})
@@ -100,6 +123,18 @@ var validChainReaderConfig = config.ContractReader{
 				"Method": {
 					ChainSpecificName: testutils.TestStructWithNestedStruct,
 				},
+			},
+		},
+	},
+}
+
+var validChainReaderConfigWithAddressShareGroups = config.ContractReader{
+	AddressShareGroups: [][]string{{"a", "b", "c"}, {"u", "v", "w"}},
+	Namespaces: map[string]config.ChainContractReader{
+		"Contract": {
+			IDL: nilIDL,
+			Reads: map[string]config.ReadDefinition{
+				"Method": {},
 			},
 		},
 	},
