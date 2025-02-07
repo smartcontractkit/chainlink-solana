@@ -269,7 +269,7 @@ func (h *helper) Init(t *testing.T) {
 
 	h.sc = solanaClient
 
-	loader := solanautils.NewLoader[client.ReaderWriter](func(ctx context.Context) (client.ReaderWriter, error) { return solanaClient, nil})
+	loader := solanautils.NewLoader[client.ReaderWriter](func(ctx context.Context) (client.ReaderWriter, error) { return solanaClient, nil })
 	mkey := keyMocks.NewSimpleKeystore(t)
 	mkey.On("Sign", mock.Anything, privateKey.PublicKey().String(), mock.Anything).Return(func(_ context.Context, _ string, data []byte) []byte {
 		sig, _ := privateKey.Sign(data)
@@ -342,7 +342,7 @@ func (h *helper) GetSecondaryIDL(t *testing.T) []byte {
 func (h *helper) GetJSONEncodedIDL(t *testing.T, fileName string) []byte {
 	t.Helper()
 
-	soPath := filepath.Join(utils.IDLDir,  fileName)
+	soPath := filepath.Join(utils.IDLDir, fileName)
 
 	_, err := os.Stat(soPath)
 	if err != nil {
@@ -378,7 +378,7 @@ type InitializeArgs struct {
 
 type StoreStructArgs struct {
 	TestIdx uint64
-	Data TestStruct
+	Data    TestStruct
 }
 
 func (h *helper) runInitialize(
@@ -393,7 +393,7 @@ func (h *helper) runInitialize(
 
 	cw := it.GetContractWriter(t)
 
-	// Fetch test index from map 
+	// Fetch test index from map
 	it.testContextMu.RLock()
 	defer it.testContextMu.RUnlock()
 	testIdx, exists := it.testContext[t.Name()]
@@ -403,13 +403,13 @@ func (h *helper) runInitialize(
 
 	initArgs := InitializeArgs{
 		TestIdx: testIdx,
-		Value: value,
+		Value:   value,
 	}
 	SubmitTransactionToCW(t, &it, cw, "initialize", initArgs, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
 
 	storeStructArgs := StoreStructArgs{
 		TestIdx: testIdx,
-		Data: testStruct,
+		Data:    testStruct,
 	}
 	SubmitTransactionToCW(t, &it, cw, MethodSettingStruct, storeStructArgs, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
 }
@@ -465,12 +465,12 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 						OutputModifications: commoncodec.ModifiersConfig{
 							&commoncodec.HardCodeModifierConfig{
 								OnChainValues: map[string]any{
-									"DifferentField": copy(make([]byte, 32), []byte(testStruct.DifferentField)),
+									"DifferentField":              copy(make([]byte, 32), []byte(testStruct.DifferentField)),
 									"NestedDynamicStruct.Inner.S": copy(make([]byte, 32), []byte(testStruct.NestedDynamicStruct.Inner.S)),
 								},
 								OffChainValues: map[string]any{
-									"ExtraField": AnyExtraValue,
-									"DifferentField": testStruct.DifferentField,
+									"ExtraField":                  AnyExtraValue,
+									"DifferentField":              testStruct.DifferentField,
 									"NestedDynamicStruct.Inner.S": testStruct.NestedDynamicStruct.Inner.S,
 								},
 							},
@@ -487,12 +487,12 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 						OutputModifications: commoncodec.ModifiersConfig{
 							&commoncodec.HardCodeModifierConfig{
 								OnChainValues: map[string]any{
-									"DifferentField": copy(make([]byte, 32), []byte(testStruct.DifferentField)),
+									"DifferentField":              copy(make([]byte, 32), []byte(testStruct.DifferentField)),
 									"NestedDynamicStruct.Inner.S": copy(make([]byte, 32), []byte(testStruct.NestedDynamicStruct.Inner.S)),
 								},
 								OffChainValues: map[string]any{
-									"ExtraField": AnyExtraValue,
-									"DifferentField": testStruct.DifferentField,
+									"ExtraField":                  AnyExtraValue,
+									"DifferentField":              testStruct.DifferentField,
 									"NestedDynamicStruct.Inner.S": testStruct.NestedDynamicStruct.Inner.S,
 								},
 							},
@@ -538,9 +538,9 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						LookupTables:       chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
 							chainwriter.AccountConstant{
-								Name: "Signer",
-								Address: fromAddress,
-								IsSigner: true,
+								Name:       "Signer",
+								Address:    fromAddress,
+								IsSigner:   true,
 								IsWritable: true,
 							},
 							chainwriter.PDALookups{
@@ -556,43 +556,43 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								IsSigner:   false,
 							},
 							chainwriter.AccountConstant{
-								Name: "SystemProgram",
-								Address: solana.SystemProgramID.String(),
+								Name:       "SystemProgram",
+								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
-								IsSigner: false,
+								IsSigner:   false,
 							},
 						},
 						DebugIDLocation: "",
 					},
 					MethodSettingStruct: {
-						FromAddress:        fromAddress,
+						FromAddress: fromAddress,
 						InputModifications: []commoncodec.ModifierConfig{
 							&commoncodec.AddressBytesToStringModifierConfig{
 								Fields: []string{"Data.AccountStruct.AccountStr"},
 							},
 							&commoncodec.HardCodeModifierConfig{
 								OnChainValues: map[string]any{
-									"Data.Padding0": []byte{},
-									"Data.Padding1": []byte{},
-									"Data.Padding2": []byte{},
+									"Data.Padding0":                    []byte{},
+									"Data.Padding1":                    []byte{},
+									"Data.Padding2":                    []byte{},
 									"Data.NestedDynamicStruct.Padding": []byte{},
-									"Data.NestedStaticStruct.Padding": []byte{},
-									"Data.DifferentField": copy(make([]byte, 32), []byte(testStruct.DifferentField)),
+									"Data.NestedStaticStruct.Padding":  []byte{},
+									"Data.DifferentField":              copy(make([]byte, 32), []byte(testStruct.DifferentField)),
 									"Data.NestedDynamicStruct.Inner.S": copy(make([]byte, 32), []byte(testStruct.NestedDynamicStruct.Inner.S)),
 								},
 								OffChainValues: map[string]any{
-									"Data.DifferentField": testStruct.DifferentField,
+									"Data.DifferentField":              testStruct.DifferentField,
 									"Data.NestedDynamicStruct.Inner.S": testStruct.NestedDynamicStruct.Inner.S,
 								},
 							},
 						},
 						ChainSpecificName: "store",
-						LookupTables:       chainwriter.LookupTables{},
+						LookupTables:      chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
 							chainwriter.AccountConstant{
-								Name: "Signer",
-								Address: fromAddress,
-								IsSigner: true,
+								Name:       "Signer",
+								Address:    fromAddress,
+								IsSigner:   true,
 								IsWritable: true,
 							},
 							chainwriter.PDALookups{
@@ -609,10 +609,10 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								IsSigner:   false,
 							},
 							chainwriter.AccountConstant{
-								Name: "SystemProgram",
-								Address: solana.SystemProgramID.String(),
+								Name:       "SystemProgram",
+								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
-								IsSigner: false,
+								IsSigner:   false,
 							},
 						},
 						DebugIDLocation: "",
@@ -629,9 +629,9 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						LookupTables:       chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
 							chainwriter.AccountConstant{
-								Name: "Signer",
-								Address: fromAddress,
-								IsSigner: true,
+								Name:       "Signer",
+								Address:    fromAddress,
+								IsSigner:   true,
 								IsWritable: true,
 							},
 							chainwriter.PDALookups{
@@ -648,43 +648,43 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								IsSigner:   false,
 							},
 							chainwriter.AccountConstant{
-								Name: "SystemAccount",
-								Address: solana.SystemProgramID.String(),
+								Name:       "SystemAccount",
+								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
-								IsSigner: false,
+								IsSigner:   false,
 							},
 						},
 						DebugIDLocation: "",
 					},
 					MethodSettingStruct: {
-						FromAddress:        fromAddress,
+						FromAddress: fromAddress,
 						InputModifications: []commoncodec.ModifierConfig{
 							&commoncodec.AddressBytesToStringModifierConfig{
 								Fields: []string{"Data.AccountStruct.AccountStr"},
 							},
 							&commoncodec.HardCodeModifierConfig{
 								OnChainValues: map[string]any{
-									"Data.Padding0": []byte{},
-									"Data.Padding1": []byte{},
-									"Data.Padding2": []byte{},
+									"Data.Padding0":                    []byte{},
+									"Data.Padding1":                    []byte{},
+									"Data.Padding2":                    []byte{},
 									"Data.NestedDynamicStruct.Padding": []byte{},
-									"Data.NestedStaticStruct.Padding": []byte{},
-									"Data.DifferentField": copy(make([]byte, 32), []byte(testStruct.DifferentField)),
+									"Data.NestedStaticStruct.Padding":  []byte{},
+									"Data.DifferentField":              copy(make([]byte, 32), []byte(testStruct.DifferentField)),
 									"Data.NestedDynamicStruct.Inner.S": copy(make([]byte, 32), []byte(testStruct.NestedDynamicStruct.Inner.S)),
 								},
 								OffChainValues: map[string]any{
-									"Data.DifferentField": testStruct.DifferentField,
+									"Data.DifferentField":              testStruct.DifferentField,
 									"Data.NestedDynamicStruct.Inner.S": testStruct.NestedDynamicStruct.Inner.S,
 								},
 							},
 						},
 						ChainSpecificName: "store",
-						LookupTables:       chainwriter.LookupTables{},
+						LookupTables:      chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
 							chainwriter.AccountConstant{
-								Name: "Signer",
-								Address: fromAddress,
-								IsSigner: true,
+								Name:       "Signer",
+								Address:    fromAddress,
+								IsSigner:   true,
 								IsWritable: true,
 							},
 							chainwriter.PDALookups{
@@ -701,10 +701,10 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								IsSigner:   false,
 							},
 							chainwriter.AccountConstant{
-								Name: "SystemProgram",
-								Address: solana.SystemProgramID.String(),
+								Name:       "SystemProgram",
+								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
-								IsSigner: false,
+								IsSigner:   false,
 							},
 						},
 						DebugIDLocation: "",
@@ -725,27 +725,7 @@ func mustUnmarshalIDL[T WrappedTestingT[T]](t T, rawIDL string) codec.IDL {
 	return idl
 }
 
-// Copied from chainlink-common since this method is not public: https://github.com/smartcontractkit/chainlink-common/blob/aea9294a7d555844336a92c9ffe41219dfb26c68/pkg/types/interfacetests/utils.go#L88
-func batchContractWrite[T TestingT[T]](t T, tester ChainComponentsInterfaceTester[T], cw types.ContractWriter, boundContracts []types.BoundContract, batchCallEntry BatchCallEntry) {
-	nameToAddress := make(map[string]string)
-	for _, bc := range boundContracts {
-		nameToAddress[bc.Name] = bc.Address
-	}
-
-	// For each contract in the batch call entry, submit the read entries to the chain
-	for contract, contractBatch := range batchCallEntry {
-		require.Contains(t, nameToAddress, contract.Name)
-		for _, readEntry := range contractBatch {
-			val, isOk := readEntry.ReturnValue.(*TestStruct)
-			if !isOk {
-				require.Fail(t, "expected *TestStruct for contract: %s read: %s, but received %T", contract.Name, readEntry.Name, readEntry.ReturnValue)
-			}
-			SubmitTransactionToCW(t, tester, cw, MethodSettingStruct, val, types.BoundContract{Name: contract.Name, Address: nameToAddress[contract.Name]}, types.Unconfirmed)
-		}
-	}
-}
-
 const (
-	primaryProgramPubKey = "6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE"
+	primaryProgramPubKey   = "6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE"
 	secondaryProgramPubKey = "9SFyk8NmGYh5D612mJwUYhguCRY9cFgaS2vksrigepjf"
 )
