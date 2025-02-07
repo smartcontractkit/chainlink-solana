@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"iter"
 	"math"
-	"slices"
 	"time"
 
 	"github.com/gagliardetto/solana-go/rpc"
@@ -109,8 +108,8 @@ func (lp *Service) start(_ context.Context) error {
 }
 
 func makeLogIndex(txIndex int, txLogIndex uint) (int64, error) {
-	if txIndex > 0 && txIndex < math.MaxInt32 && txLogIndex < math.MaxUint32 {
-		return int64(txIndex<<32) | int64(txLogIndex), nil
+	if txIndex >= 0 && txIndex < math.MaxInt32 && txLogIndex < math.MaxUint32 {
+		return int64(txIndex<<32) | int64(txLogIndex), nil //nolint:gosec
 	}
 	return 0, fmt.Errorf("txIndex or txLogIndex out of range: txIndex=%d, txLogIndex=%d", txIndex, txLogIndex)
 }
@@ -249,7 +248,7 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []Filter, to int
 		return err
 	}
 
-	lp.lggr.Infow("Done backfilling filters", "filters", slices.All(filters))
+	lp.lggr.Infow("Done backfilling filters", "filters", len(filters), "from", minSlot, "to", to)
 	for _, filter := range filters {
 		filterErr := lp.filters.MarkFilterBackfilled(ctx, filter.ID)
 		if filterErr != nil {
@@ -261,6 +260,7 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []Filter, to int
 }
 
 func (lp *Service) processBlocksRange(ctx context.Context, addresses []PublicKey, from, to int64) error {
+	lp.lggr.Infow("Processing block range", "from", from, "to", to)
 	// nolint:gosec
 	// G115: integer overflow conversion uint64 -&gt; int64
 	blocks, cleanup, err := lp.loader.BackfillForAddresses(ctx, addresses, uint64(from), uint64(to))
@@ -304,8 +304,13 @@ func (lp *Service) processBlocksImpl(ctx context.Context, blocks []Block) error 
 	return nil
 }
 
-func (lp *Service) run(ctx context.Context) error {
-	err := lp.filters.LoadFilters(ctx)
+func (lp *Service) run(ctx context.Context) (err error) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			err = fmt.Errorf("panic recovered: %v", rec)
+		}
+	}()
+	err = lp.filters.LoadFilters(ctx)
 	if err != nil {
 		return fmt.Errorf("error loading filters: %w", err)
 	}
@@ -317,7 +322,7 @@ func (lp *Service) run(ctx context.Context) error {
 
 	filtersToBackfill := lp.filters.GetFiltersToBackfill()
 	if len(filtersToBackfill) != 0 {
-		lp.lggr.Debugw("Got new filters to backfill", "filters", filtersToBackfill)
+		lp.lggr.Debugw("Got new filters to backfill", "filters_len", len(filtersToBackfill))
 		return lp.backfillFilters(ctx, filtersToBackfill, lastProcessedSlot)
 	}
 

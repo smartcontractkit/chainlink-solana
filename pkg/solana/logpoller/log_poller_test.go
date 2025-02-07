@@ -250,7 +250,7 @@ func TestProcess(t *testing.T) {
 
 	addr := newRandomPublicKey(t)
 	eventName := "myEvent"
-	eventSig := EventSignature(codec.NewDiscriminatorHashPrefix(eventName, false))
+	eventSig := NewEventSignatureFromName(eventName)
 	event := struct {
 		A int64
 		B string
