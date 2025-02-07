@@ -121,7 +121,7 @@ func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainCom
 				require.Error(t, cr.Bind(ctx, bound1))
 			})
 
-			addressToBeShared := it.Helper.CreateAccount(t, *it, AnyContractName, AnyValueToReadWithoutAnArgument, TestStruct{}).String()
+			addressToBeShared := it.Helper.CreateAccount(t, *it, AnyContractName, AnyValueToReadWithoutAnArgument, CreateTestStruct(0, it)).String()
 			t.Run("Namespace is part of an address share group that doesn't have a registered address and provides an address during Bind", func(t T) {
 				bound1 := []types.BoundContract{{Name: AnyContractNameWithSharedAddress1, Address: addressToBeShared}}
 
@@ -172,7 +172,7 @@ func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainCom
 				assert.Equal(t, AnyValueToReadWithoutAnArgument, prim)
 			})
 
-			t.Run("Namespace is  not part of an address share group that has a registered address and provides no address during Bind", func(t T) {
+			t.Run("Namespace is not part of an address share group that has a registered address and provides no address during Bind", func(t T) {
 				require.Error(t, cr.Bind(ctx, []types.BoundContract{{Name: AnyContractName}}))
 			})
 		},
@@ -500,21 +500,28 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 	pdaStructDataPrefix := []byte("struct_data")
 	pdaStructDataPrefix = binary.LittleEndian.AppendUint64(pdaStructDataPrefix, idx)
 	testStruct := CreateTestStruct(0, it)
+	uint64ReadDef := config.ReadDefinition{
+		ChainSpecificName: "DataAccount",
+		ReadType:          config.Account,
+		PDADefiniton: codec.PDATypeDef{
+			Prefix: pdaDataPrefix,
+		},
+		OutputModifications: commoncodec.ModifiersConfig{
+			&commoncodec.PropertyExtractorConfig{FieldName: "U64Value"},
+		},
+	}
+	basicContractDef := config.ChainContractReader{
+		IDL: mustUnmarshalIDL(t, string(it.Helper.GetPrimaryIDL(t))),
+		Reads: map[string]config.ReadDefinition{
+			MethodReturningUint64: uint64ReadDef,
+		},
+	}
 	return config.ContractReader{
 		Namespaces: map[string]config.ChainContractReader{
 			AnyContractName: {
 				IDL: mustUnmarshalIDL(t, string(it.Helper.GetPrimaryIDL(t))),
 				Reads: map[string]config.ReadDefinition{
-					MethodReturningUint64: {
-						ChainSpecificName: "DataAccount",
-						ReadType:          config.Account,
-						PDADefiniton: codec.PDATypeDef{
-							Prefix: pdaDataPrefix,
-						},
-						OutputModifications: commoncodec.ModifiersConfig{
-							&commoncodec.PropertyExtractorConfig{FieldName: "U64Value"},
-						},
-					},
+					MethodReturningUint64: uint64ReadDef,
 					MethodReturningUint64Slice: {
 						ChainSpecificName: "DataAccount",
 						ReadType:          config.Account,
@@ -596,6 +603,10 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					},
 				},
 			},
+			// these are for testing shared address groups
+			AnyContractNameWithSharedAddress1: basicContractDef,
+			AnyContractNameWithSharedAddress2: basicContractDef,
+			AnyContractNameWithSharedAddress3: basicContractDef,
 		},
 	}
 }
