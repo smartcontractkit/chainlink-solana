@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -18,7 +17,6 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/gagliardetto/solana-go/rpc/ws"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -31,7 +29,6 @@ import (
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/smartcontractkit/chainlink-common/pkg/values"
 
 	contractprimary "github.com/smartcontractkit/chainlink-solana/contracts/generated/contract_reader_interface"
 	contractsecondary "github.com/smartcontractkit/chainlink-solana/contracts/generated/contract_reader_interface_secondary"
@@ -82,21 +79,13 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 	it.DisableTests([]string{
 		// solana is a no-op on confidence level
 		ContractReaderGetLatestValueBasedOnConfidenceLevel,
-		// disabling tests that required Solana specific logic. Covered in the Solana specific tests
+		// disable failing tests
+		ContractReaderBatchGetLatestValueSetsErrorsProperly,
 		ContractReaderGetLatestValue,
 		ContractReaderGetLatestValueAsValuesDotValue,
 		ContractReaderBatchGetLatestValue,
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder,
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
-
-		// disable failing test
-		ContractReaderBatchGetLatestValueSetsErrorsProperly,
-		// disable failing tests requiring solana specific implementation
-		SolanaContractReaderGetLatestValue,
-		SolanaContractReaderGetLatestValueAsValuesDotValue,
-		SolanaContractReaderBatchGetLatestValue,
-		SolanaContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder,
-		SolanaContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
 
 		// events not yet supported
 		ContractReaderGetLatestValueGetsLatestForEvent,
@@ -131,236 +120,7 @@ func RunChainComponentsInLoopSolanaTests[T WrappedTestingT[T]](t T, it ChainComp
 func RunContractReaderSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInterfaceTester[T]) {
 	RunContractReaderInterfaceTests(t, it, false, true)
 
-	testCases := []Testcase[T] {
-		{
-			Name: SolanaContractReaderGetLatestValue,
-			Test: func(t T) {
-				cr := it.GetContractReader(t)
-				cw := it.GetContractWriter(t)
-				contracts := it.GetBindings(t)
-				ctx := tests.Context(t)
-				firstItem := CreateTestStruct(0, it)
-				testIdx := it.testContext[t.Name()]
-
-				args1 := StoreStructArgs{
-					TestIdx: testIdx,
-					Data: firstItem,
-				}
-				_ = SubmitTransactionToCW(t, it, cw, MethodSettingStruct, args1, contracts[0], types.Unconfirmed)
-
-				secondItem := CreateTestStruct(1, it)
-				args2 := StoreStructArgs{
-					TestIdx: testIdx,
-					Data: secondItem,
-				}
-				_ = SubmitTransactionToCW(t, it, cw, MethodSettingStruct, args2, contracts[0], types.Unconfirmed)
-
-				bound := BindingsByName(contracts, AnyContractName)[0] // minimum of one bound contract expected, otherwise panics
-
-				require.NoError(t, cr.Bind(ctx, contracts))
-
-				actual := &TestStruct{}
-				params := &LatestParams{I: 1}
-				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(MethodTakingLatestParamsReturningTestStruct), primitives.Unconfirmed, params, actual))
-				assert.Equal(t, &firstItem, actual)
-
-				params.I = 2
-				actual = &TestStruct{}
-				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(MethodTakingLatestParamsReturningTestStruct), primitives.Unconfirmed, params, actual))
-				assert.Equal(t, &secondItem, actual)
-			},
-		},
-		{
-			Name: SolanaContractReaderGetLatestValueAsValuesDotValue,
-			Test: func(t T) {
-				cr := it.GetContractReader(t)
-				cw := it.GetContractWriter(t)
-				contracts := it.GetBindings(t)
-				ctx := tests.Context(t)
-				firstItem := CreateTestStruct(0, it)
-				testIdx := it.testContext[t.Name()]
-				args1 := StoreStructArgs{
-					TestIdx: testIdx,
-					Data: firstItem,
-				}
-				_ = SubmitTransactionToCW(t, it, cw, MethodSettingStruct, args1, contracts[0], types.Unconfirmed)
-
-				secondItem := CreateTestStruct(1, it)
-				args2 := StoreStructArgs{
-					TestIdx: testIdx,
-					Data: secondItem,
-				}
-				_ = SubmitTransactionToCW(t, it, cw, MethodSettingStruct, args2, contracts[0], types.Unconfirmed)
-
-				bound := BindingsByName(contracts, AnyContractName)[0] // minimum of one bound contract expected, otherwise panics
-
-				require.NoError(t, cr.Bind(ctx, contracts))
-
-				params := &LatestParams{I: 1}
-				var value values.Value
-
-				err := cr.GetLatestValue(ctx, bound.ReadIdentifier(MethodTakingLatestParamsReturningTestStruct), primitives.Unconfirmed, params, &value)
-				require.NoError(t, err)
-
-				actual := TestStruct{}
-				err = value.UnwrapTo(&actual)
-				require.NoError(t, err)
-				assert.Equal(t, &firstItem, &actual)
-
-				params = &LatestParams{I: 2}
-				err = cr.GetLatestValue(ctx, bound.ReadIdentifier(MethodTakingLatestParamsReturningTestStruct), primitives.Unconfirmed, params, &value)
-				require.NoError(t, err)
-
-				actual = TestStruct{}
-				err = value.UnwrapTo(&actual)
-				require.NoError(t, err)
-				assert.Equal(t, &secondItem, &actual)
-			},
-		},
-		{
-			Name: SolanaContractReaderBatchGetLatestValue,
-			Test: func(t T) {
-				cr := it.GetContractReader(t)
-				cw := it.GetContractWriter(t)
-				bindings := it.GetBindings(t)
-				// setup test data
-				firstItem := CreateTestStruct(1, it)
-				testIdx := it.testContext[t.Name()]
-				args := StoreStructArgs{
-					TestIdx: testIdx,
-					Data: firstItem,
-				}
-				bound := BindingsByName(bindings, AnyContractName)[0]
-
-				batchCallEntry := make(BatchCallEntry)
-				batchCallEntry[bound] = ContractBatchEntry{{Name: MethodTakingLatestParamsReturningTestStruct, ReturnValue: &args}}
-				batchContractWrite(t, it, cw, bindings, batchCallEntry)
-
-				// setup call data
-				params, actual := &LatestParams{I: 1}, &TestStruct{}
-				batchGetLatestValueRequest := make(types.BatchGetLatestValuesRequest)
-				batchGetLatestValueRequest[bound] = []types.BatchRead{
-					{
-						ReadName:  MethodTakingLatestParamsReturningTestStruct,
-						Params:    params,
-						ReturnVal: actual,
-					},
-				}
-
-				ctx := tests.Context(t)
-
-				require.NoError(t, cr.Bind(ctx, bindings))
-				result, err := cr.BatchGetLatestValues(ctx, batchGetLatestValueRequest)
-				require.NoError(t, err)
-
-				anyContractBatch := result[bound]
-				returnValue, err := anyContractBatch[0].GetResult()
-				assert.NoError(t, err)
-				assert.Contains(t, anyContractBatch[0].ReadName, MethodTakingLatestParamsReturningTestStruct)
-				assert.Equal(t, &firstItem, returnValue)
-			},
-		},
-		{
-			Name: SolanaContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder,
-			Test: func(t T) {
-				cr := it.GetContractReader(t)
-				cw := it.GetContractWriter(t)
-				bindings := it.GetBindings(t)
-				batchCallEntry := make(BatchCallEntry)
-				batchGetLatestValueRequest := make(types.BatchGetLatestValuesRequest)
-				bound := BindingsByName(bindings, AnyContractName)[0]
-				testIdx := it.testContext[t.Name()]
-
-				for i := 0; i < 10; i++ {
-					// setup test data
-					ts := CreateTestStruct(i, it)
-					args := StoreStructArgs{
-						TestIdx: testIdx,
-						Data: ts,
-					}
-					batchCallEntry[bound] = append(batchCallEntry[bound], ReadEntry{Name: MethodTakingLatestParamsReturningTestStruct, ReturnValue: &args})
-					// setup call data
-					batchGetLatestValueRequest[bound] = append(
-						batchGetLatestValueRequest[bound],
-						types.BatchRead{ReadName: MethodTakingLatestParamsReturningTestStruct, Params: &LatestParams{I: 1 + i}, ReturnVal: &TestStruct{}},
-					)
-				}
-				batchContractWrite(t, it, cw, bindings, batchCallEntry)
-
-				ctx := tests.Context(t)
-				require.NoError(t, cr.Bind(ctx, bindings))
-
-				result, err := cr.BatchGetLatestValues(ctx, batchGetLatestValueRequest)
-				require.NoError(t, err)
-
-				for i := 0; i < 10; i++ {
-					resultAnyContract, testDataAnyContract := result[bound], batchCallEntry[bound]
-					returnValue, err := resultAnyContract[i].GetResult()
-					assert.NoError(t, err)
-					assert.Contains(t, resultAnyContract[i].ReadName, MethodTakingLatestParamsReturningTestStruct)
-					assert.Equal(t, testDataAnyContract[i].ReturnValue, returnValue)
-				}
-			},
-		},
-		{
-			Name: SolanaContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
-			Test: func(t T) {
-				cr := it.GetContractReader(t)
-				cw := it.GetContractWriter(t)
-				bindings := it.GetBindings(t)
-				batchCallEntry := make(BatchCallEntry)
-				batchGetLatestValueRequest := make(types.BatchGetLatestValuesRequest)
-				bound1 := BindingsByName(bindings, AnyContractName)[0]
-				bound2 := BindingsByName(bindings, AnySecondContractName)[0]
-				testIdx := it.testContext[t.Name()]
-
-				for i := 0; i < 10; i++ {
-					// setup test data
-					ts1, ts2 := CreateTestStruct(i, it), CreateTestStruct(i+10, it)
-					args1 := StoreStructArgs{
-						TestIdx: testIdx,
-						Data: ts1,
-					}
-					args2 := StoreStructArgs{
-						TestIdx: testIdx,
-						Data: ts2,
-					}
-					batchCallEntry[bound1] = append(batchCallEntry[bound1], ReadEntry{Name: MethodTakingLatestParamsReturningTestStruct, ReturnValue: &args1})
-					batchCallEntry[bound2] = append(batchCallEntry[bound2], ReadEntry{Name: MethodTakingLatestParamsReturningTestStruct, ReturnValue: &args2})
-					// setup call data
-					batchGetLatestValueRequest[bound1] = append(batchGetLatestValueRequest[bound1], types.BatchRead{ReadName: MethodTakingLatestParamsReturningTestStruct, Params: &LatestParams{I: 1 + i}, ReturnVal: &TestStruct{}})
-					batchGetLatestValueRequest[bound2] = append(batchGetLatestValueRequest[bound2], types.BatchRead{ReadName: MethodTakingLatestParamsReturningTestStruct, Params: &LatestParams{I: 1 + i}, ReturnVal: &TestStruct{}})
-				}
-				batchContractWrite(t, it, cw, bindings, batchCallEntry)
-
-				ctx := tests.Context(t)
-				require.NoError(t, cr.Bind(ctx, bindings))
-
-				result, err := cr.BatchGetLatestValues(ctx, batchGetLatestValueRequest)
-				require.NoError(t, err)
-
-				for idx := 0; idx < 10; idx++ {
-					fmt.Printf("expected: %+v\n", batchCallEntry[bound1][idx].ReturnValue)
-					if val, err := result[bound1][idx].GetResult(); err == nil {
-						fmt.Printf("result: %+v\n", val)
-					}
-				}
-
-				for i := 0; i < 10; i++ {
-					testDataAnyContract, testDataAnySecondContract := batchCallEntry[bound1], batchCallEntry[bound2]
-					resultAnyContract, resultAnySecondContract := result[bound1], result[bound2]
-					returnValueAnyContract, errAnyContract := resultAnyContract[i].GetResult()
-					returnValueAnySecondContract, errAnySecondContract := resultAnySecondContract[i].GetResult()
-					assert.NoError(t, errAnyContract)
-					assert.NoError(t, errAnySecondContract)
-					assert.Contains(t, resultAnyContract[i].ReadName, MethodTakingLatestParamsReturningTestStruct)
-					assert.Contains(t, resultAnySecondContract[i].ReadName, MethodTakingLatestParamsReturningTestStruct)
-					assert.Equal(t, testDataAnyContract[i].ReturnValue, returnValueAnyContract)
-					assert.Equal(t, testDataAnySecondContract[i].ReturnValue, returnValueAnySecondContract)
-				}
-			},
-		},
-	}
+	var testCases []Testcase[T]
 
 	RunTests(t, it, testCases)
 }
