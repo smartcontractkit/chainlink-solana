@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -14,14 +14,14 @@ type ReportPreTransform struct {
 	ReportContext  [2][32]byte
 	Report         []byte
 	Info           ccipocr3.ExecuteReportInfo
-	AbstractReport ccip_router.ExecutionReportSingleChain
+	AbstractReport ccip_offramp.ExecutionReportSingleChain
 }
 
 type ReportPostTransform struct {
 	ReportContext  [2][32]byte
 	Report         []byte
 	Info           ccipocr3.ExecuteReportInfo
-	AbstractReport ccip_router.ExecutionReportSingleChain
+	AbstractReport ccip_offramp.ExecutionReportSingleChain
 	TokenIndexes   []byte
 }
 
@@ -37,6 +37,35 @@ func FindTransform(id string) (func(context.Context, *SolanaChainWriterService, 
 // This Transform function looks up the token pool addresses in the accounts slice and augments the args
 // with the indexes of the token pool addresses in the accounts slice.
 func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args any, accounts solana.AccountMetaSlice, toAddress string) (any, error) {
+	// Fetch offramp config to use to fetch the router address
+	offrampProgramConfig, ok := cw.config.Programs["ccip-offramp"]
+	if !ok {
+		return nil, fmt.Errorf("ccip-offramp program not found in config")
+	}
+	// PDA lookup to fetch router address
+	routerAddrLookup := PDALookups{
+		Name: "ReferenceAddresses",
+		PublicKey: AccountConstant{
+			Address: toAddress,
+		},
+		Seeds: []Seed{
+			{Static: []byte("reference_addresses")},
+		},
+		// Reads the router address from the reference addresses PDA
+		InternalField: InternalField{
+			TypeName: "ReferenceAddresses",
+			Location: "Router",
+		},
+	}
+	accountMetas, err := routerAddrLookup.Resolve(ctx, nil, nil, cw.reader, offrampProgramConfig.IDL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch the router program address from the reference addresses account: %w", err)
+	}
+	if len(accountMetas) != 1 {
+		return nil, fmt.Errorf("expect 1 address to be returned for router address, received %d: %w", len(accountMetas), err)
+	}
+
+	routerAddress := accountMetas[0].PublicKey
 	TokenPoolLookupTable := LookupTables{
 		DerivedLookupTables: []DerivedLookupTable{
 			{
@@ -44,7 +73,7 @@ func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args a
 				Accounts: PDALookups{
 					Name: "TokenAdminRegistry",
 					PublicKey: AccountConstant{
-						Address: toAddress,
+						Address: routerAddress.String(),
 					},
 					Seeds: []Seed{
 						{Static: []byte("token_admin_registry")},
@@ -61,9 +90,10 @@ func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args a
 		},
 	}
 
-	routerProgramConfig, ok := cw.config.Programs["ccip_router"]
+	// Fetch router config to use to fetch TokenAdminRegistry
+	routerProgramConfig, ok := cw.config.Programs["ccip-router"]
 	if !ok {
-		return nil, fmt.Errorf("ccip_router program not found in config")
+		return nil, fmt.Errorf("ccip-router program not found in config")
 	}
 
 	tableMap, _, err := cw.ResolveLookupTables(ctx, args, TokenPoolLookupTable, routerProgramConfig.IDL)

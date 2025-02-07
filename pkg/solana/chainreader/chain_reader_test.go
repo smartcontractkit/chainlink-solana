@@ -274,7 +274,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		programID := solana.NewWallet().PublicKey()
 		pubKey := solana.NewWallet().PublicKey()
 		uint64Seed := uint64(5)
-		prefixString := "Prefix"
+		prefixBytes := []byte("Prefix")
 
 		readDef := config.ReadDefinition{
 			ChainSpecificName: testutils.TestStructWithNestedStruct,
@@ -294,7 +294,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			{
 				name: "happy path",
 				pdaDefinition: codec.PDATypeDef{
-					Prefix: prefixString,
+					Prefix: prefixBytes,
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
@@ -306,7 +306,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 						},
 					},
 				},
-				expected: mustFindProgramAddress(t, programID, [][]byte{[]byte(prefixString), pubKey.Bytes(), go_binary.LittleEndian.AppendUint64([]byte{}, uint64Seed)}),
+				expected: mustFindProgramAddress(t, programID, [][]byte{prefixBytes, pubKey.Bytes(), go_binary.LittleEndian.AppendUint64([]byte{}, uint64Seed)}),
 				params: map[string]any{
 					"PubKey":     pubKey,
 					"Uint64Seed": uint64Seed,
@@ -315,7 +315,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			{
 				name: "with modifier and random field",
 				pdaDefinition: codec.PDATypeDef{
-					Prefix: prefixString,
+					Prefix: prefixBytes,
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
@@ -330,7 +330,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 				inputModifier: codeccommon.ModifiersConfig{
 					&codeccommon.RenameModifierConfig{Fields: map[string]string{"PubKey": "PublicKey"}},
 				},
-				expected: mustFindProgramAddress(t, programID, [][]byte{[]byte(prefixString), pubKey.Bytes(), go_binary.LittleEndian.AppendUint64([]byte{}, uint64Seed)}),
+				expected: mustFindProgramAddress(t, programID, [][]byte{prefixBytes, pubKey.Bytes(), go_binary.LittleEndian.AppendUint64([]byte{}, uint64Seed)}),
 				params: map[string]any{
 					"PublicKey":   pubKey,
 					"randomField": "randomValue", // unused field should be ignored by the codec
@@ -340,15 +340,15 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			{
 				name: "only prefix",
 				pdaDefinition: codec.PDATypeDef{
-					Prefix: prefixString,
+					Prefix: prefixBytes,
 				},
-				expected: mustFindProgramAddress(t, programID, [][]byte{[]byte(prefixString)}),
+				expected: mustFindProgramAddress(t, programID, [][]byte{prefixBytes}),
 				params:   nil,
 			},
 			{
 				name: "no prefix",
 				pdaDefinition: codec.PDATypeDef{
-					Prefix: "",
+					Prefix: nil,
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
@@ -369,7 +369,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			{
 				name: "public key seed provided as bytes",
 				pdaDefinition: codec.PDATypeDef{
-					Prefix: prefixString,
+					Prefix: prefixBytes,
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
@@ -377,7 +377,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 						},
 					},
 				},
-				expected: mustFindProgramAddress(t, programID, [][]byte{[]byte(prefixString), pubKey.Bytes()}),
+				expected: mustFindProgramAddress(t, programID, [][]byte{prefixBytes, pubKey.Bytes()}),
 				params: map[string]any{
 					"PubKey": pubKey.Bytes(),
 				},
@@ -424,12 +424,12 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 	})
 
 	t.Run("PDA account read errors if missing param", func(t *testing.T) {
-		prefixString := "Prefix"
+		prefixBytes := []byte("Prefix")
 		readDef := config.ReadDefinition{
 			ChainSpecificName: testutils.TestStructWithNestedStruct,
 			ReadType:          config.Account,
 			PDADefiniton: codec.PDATypeDef{
-				Prefix: prefixString,
+				Prefix: prefixBytes,
 				Seeds: []codec.PDASeed{
 					{
 						Name: "PubKey",
