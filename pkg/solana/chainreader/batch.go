@@ -33,13 +33,13 @@ type MultipleAccountGetter interface {
 }
 
 // doMultiRead aggregate results from multiple PDAs from the same contract into one result.
-func doMultiRead(ctx context.Context, client MultipleAccountGetter, bindings namespaceBindings, rv readValues, returnValue any) error {
+func doMultiRead(ctx context.Context, client MultipleAccountGetter, bindings bindingsRegistry, rv readValues, returnValue any) error {
 	batch := make([]call, len(rv.multiRead))
 	for idx, readName := range rv.multiRead {
 		batch[idx] = call{
-			ContractName: rv.contract,
-			ReadName:     readName,
-			ReturnVal:    returnValue,
+			Namespace: rv.contract,
+			ReadName:  readName,
+			ReturnVal: returnValue,
 		}
 	}
 
@@ -72,12 +72,12 @@ func doMethodBatchCall(ctx context.Context, client MultipleAccountGetter, bindin
 	for idx, batchCall := range batch {
 		rBinding, err := bindingsRegistry.GetReadBinding(batchCall.Namespace, batchCall.ReadName)
 		if err != nil {
-			return nil, fmt.Errorf("%w: read binding not found for contract: %q read: %q: %w", types.ErrInvalidConfig, batchCall.ContractName, batchCall.ReadName, err)
+			return nil, fmt.Errorf("%w: read binding not found for contract: %q read: %q: %w", types.ErrInvalidConfig, batchCall.Namespace, batchCall.ReadName, err)
 		}
 
 		keys[idx], err = rBinding.GetAddress(ctx, batchCall.Params)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get address for contract: %q read: %q: %w", batchCall.ContractName, batchCall.ReadName, err)
+			return nil, fmt.Errorf("failed to get address for contract: %q read: %q: %w", batchCall.Namespace, batchCall.ReadName, err)
 		}
 	}
 
@@ -112,7 +112,7 @@ func doMethodBatchCall(ctx context.Context, client MultipleAccountGetter, bindin
 		}
 
 		results[idx].err = errors.Join(
-			decodeReturnVal(ctx, binding, data[idx], results[idx].returnVal),
+			decodeReturnVal(ctx, rBinding, data[idx], results[idx].returnVal),
 			results[idx].err)
 	}
 
@@ -129,7 +129,7 @@ func decodeReturnVal(ctx context.Context, binding readBinding, raw []byte, retur
 
 	// Otherwise, we need to create an intermediate type, decode into it,
 	// wrap it, and set it back into *values.Value
-	contractType, err := rBinding.CreateType(false)
+	contractType, err := binding.CreateType(false)
 	if err != nil {
 		return err
 	}

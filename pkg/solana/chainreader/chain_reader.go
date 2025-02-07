@@ -161,7 +161,7 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 	}
 
 	if len(values.multiRead) > 1 {
-		return doMultiRead(ctx, s.client, s.bindings, values, returnVal)
+		return doMultiRead(ctx, s.client, s.bdRegistry, values, returnVal)
 	}
 
 	batch := []call{
