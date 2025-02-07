@@ -22,8 +22,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 
 	relayconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 
@@ -149,7 +150,7 @@ func setup(t *testing.T, url string, txExpirationRebroadcast bool) (context.Cont
 	lggr, obs := logger.TestObserved(t, zapcore.DebugLevel)
 	client, err := solanaClient.NewClient(url, cfg, 2*time.Second, lggr)
 	require.NoError(t, err)
-	loader := utils.NewLazyLoad(func() (solanaClient.ReaderWriter, error) { return client, nil })
+	loader := utils.NewStaticLoader[solanaClient.ReaderWriter](client)
 	txmInstance := NewTxm("localnet", loader, nil, cfg, mkey, lggr)
 	servicetest.Run(t, txmInstance)
 
@@ -230,8 +231,8 @@ func TestTxm_Integration_Reorg(t *testing.T) {
 		// Start live validator and setup test environment
 		t.Parallel()
 		ledgerDir := t.TempDir()
-		port := utils.MustRandomPort(t)
-		faucetPort := utils.MustRandomPort(t)
+		port := commonutils.MustRandomPort(t)
+		faucetPort := commonutils.MustRandomPort(t)
 		cmd, url := startValidator(t, ledgerDir, port, faucetPort, true)
 		ctx, cl, txmInstance, senderPubKey, receiverPubKey, obs := setup(t, url, true)
 

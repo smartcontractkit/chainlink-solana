@@ -12,6 +12,7 @@ import (
 	codeccommon "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
@@ -23,14 +24,13 @@ func TestNewIDLAccountCodec(t *testing.T) {
 	t.Parallel()
 
 	ctx := tests.Context(t)
-	_, _, entry := newTestIDLAndCodec(t, true)
+	_, _, entry := newTestIDLAndCodec(t, accountIDLType)
 
 	expected := testutils.DefaultTestStruct
 	bts, err := entry.Encode(ctx, expected, testutils.TestStructWithNestedStruct)
 
 	// length of fields + discriminator
 	require.Equal(t, 262, len(bts))
-
 	require.NoError(t, err)
 
 	var decoded testutils.StructWithNestedStruct
@@ -39,12 +39,35 @@ func TestNewIDLAccountCodec(t *testing.T) {
 	require.Equal(t, expected, decoded)
 }
 
+func TestCodecProperties(t *testing.T) {
+	t.Parallel()
+	t.Log("newTestIDLAndCodec does not handle eventIDLType and it looks like there is an attempt to deprecate the methods")
+	t.Skip()
+
+	tester := &codecInterfaceTester{}
+	ctx := tests.Context(t)
+	_, _, entry := newTestIDLAndCodec(t, eventIDLType)
+	t.Log(entry)
+
+	expected := interfacetests.CreateTestStruct(1, tester)
+	bts, err := entry.Encode(ctx, expected, interfacetests.TestItemType)
+
+	// length of fields + discriminator
+	require.Equal(t, 262, len(bts))
+	require.NoError(t, err)
+
+	var decoded interfacetests.TestStruct
+
+	require.NoError(t, entry.Decode(ctx, bts, &decoded, interfacetests.TestItemType))
+	require.Equal(t, expected, decoded)
+}
+
 func TestNewIDLDefinedTypesCodecCodec(t *testing.T) {
 	/// TODO BCI-3155 this should run the codec interface tests
 	t.Parallel()
 
 	ctx := tests.Context(t)
-	_, _, entry := newTestIDLAndCodec(t, false)
+	_, _, entry := newTestIDLAndCodec(t, definedTypesIDLType)
 
 	expected := testutils.DefaultTestStruct
 	bts, err := entry.Encode(ctx, expected, testutils.TestStructWithNestedStructType)
@@ -64,7 +87,7 @@ func TestNewIDLCodec_WithModifiers(t *testing.T) {
 	t.Parallel()
 
 	ctx := tests.Context(t)
-	_, _, idlCodec := newTestIDLAndCodec(t, true)
+	_, _, idlCodec := newTestIDLAndCodec(t, accountIDLType)
 	modConfig := codeccommon.ModifiersConfig{
 		&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},
 	}
@@ -143,20 +166,45 @@ func TestNewIDLCodec_CircularDependency(t *testing.T) {
 	assert.ErrorIs(t, err, types.ErrInvalidConfig)
 }
 
-func newTestIDLAndCodec(t *testing.T, account bool) (string, codec.IDL, types.RemoteCodec) {
+type idlType string
+
+const (
+	accountIDLType      idlType = "account"
+	definedTypesIDLType idlType = "types"
+	instructionIDLType  idlType = "instruction"
+	eventIDLType        idlType = "event"
+)
+
+func newTestIDLAndCodec(t *testing.T, idlTP idlType) (string, codec.IDL, types.RemoteCodec) {
 	t.Helper()
 
+	var idlDef string
+
+	//nolint:exhaustive
+	switch idlTP {
+	case accountIDLType, definedTypesIDLType:
+		idlDef = testutils.JSONIDLWithAllTypes
+	case eventIDLType:
+		defs := testutils.CodecDefs[testutils.TestEventItem]
+		idlDef = defs.IDL
+	}
+
 	var idl codec.IDL
-	if err := json.Unmarshal([]byte(testutils.JSONIDLWithAllTypes), &idl); err != nil {
+	if err := json.Unmarshal([]byte(idlDef), &idl); err != nil {
 		t.Logf("failed to unmarshal test IDL: %s", err.Error())
 		t.FailNow()
 	}
 
-	var entry types.RemoteCodec
-	var err error
-	if account {
+	var (
+		entry types.RemoteCodec
+		err   error
+	)
+
+	//nolint:exhaustive
+	switch idlTP {
+	case accountIDLType:
 		entry, err = codec.NewIDLAccountCodec(idl, binary.LittleEndian())
-	} else {
+	case definedTypesIDLType:
 		entry, err = codec.NewIDLDefinedTypesCodec(idl, binary.LittleEndian())
 	}
 
@@ -165,7 +213,7 @@ func newTestIDLAndCodec(t *testing.T, account bool) (string, codec.IDL, types.Re
 		t.FailNow()
 	}
 
-	require.NotNil(t, entry)
+	require.NotNil(t, entry, "test codec should not be nil")
 
-	return testutils.JSONIDLWithAllTypes, idl, entry
+	return idlDef, idl, entry
 }

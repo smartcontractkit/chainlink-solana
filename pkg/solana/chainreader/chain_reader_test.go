@@ -60,11 +60,11 @@ func TestSolanaChainReaderService_ReaderInterface(t *testing.T) {
 	RunContractReaderInterfaceTests(t, lsIt, true, false)
 }
 
-func TestSolanaChainReaderService_ServiceCtx(t *testing.T) {
+func TestSolanaContractReaderService_ServiceCtx(t *testing.T) {
 	t.Parallel()
 
 	ctx := tests.Context(t)
-	svc, err := chainreader.NewChainReaderService(logger.Test(t), new(mockedRPCClient), config.ContractReader{})
+	svc, err := chainreader.NewContractReaderService(logger.Test(t), new(mockedRPCClient), config.ContractReader{}, nil)
 
 	require.NoError(t, err)
 	require.NotNil(t, svc)
@@ -100,7 +100,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		require.NoError(t, err)
 
 		client := new(mockedRPCClient)
-		svc, err := chainreader.NewChainReaderService(logger.Test(t), client, conf)
+		svc, err := chainreader.NewContractReaderService(logger.Test(t), client, conf, nil)
 
 		require.NoError(t, err)
 		require.NotNil(t, svc)
@@ -137,7 +137,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 
 		client := new(mockedRPCClient)
 		expectedErr := fmt.Errorf("expected error")
-		svc, err := chainreader.NewChainReaderService(logger.Test(t), client, conf)
+		svc, err := chainreader.NewContractReaderService(logger.Test(t), client, conf, nil)
 
 		require.NoError(t, err)
 		require.NotNil(t, svc)
@@ -171,7 +171,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		_, conf := newTestConfAndCodec(t)
 
 		client := new(mockedRPCClient)
-		svc, err := chainreader.NewChainReaderService(logger.Test(t), client, conf)
+		svc, err := chainreader.NewContractReaderService(logger.Test(t), client, conf, nil)
 
 		require.NoError(t, err)
 		require.NotNil(t, svc)
@@ -192,7 +192,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		_, conf := newTestConfAndCodec(t)
 
 		client := new(mockedRPCClient)
-		svc, err := chainreader.NewChainReaderService(logger.Test(t), client, conf)
+		svc, err := chainreader.NewContractReaderService(logger.Test(t), client, conf, nil)
 
 		require.NoError(t, err)
 		require.NotNil(t, svc)
@@ -213,7 +213,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		_, conf := newTestConfAndCodec(t)
 
 		client := new(mockedRPCClient)
-		svc, err := chainreader.NewChainReaderService(logger.Test(t), client, conf)
+		svc, err := chainreader.NewContractReaderService(logger.Test(t), client, conf, nil)
 
 		require.NoError(t, err)
 		require.NotNil(t, svc)
@@ -274,7 +274,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		programID := solana.NewWallet().PublicKey()
 		pubKey := solana.NewWallet().PublicKey()
 		uint64Seed := uint64(5)
-		prefixString := "Prefix"
+		prefixBytes := []byte("Prefix")
 
 		readDef := config.ReadDefinition{
 			ChainSpecificName: testutils.TestStructWithNestedStruct,
@@ -294,7 +294,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			{
 				name: "happy path",
 				pdaDefinition: codec.PDATypeDef{
-					Prefix: prefixString,
+					Prefix: prefixBytes,
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
@@ -306,7 +306,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 						},
 					},
 				},
-				expected: mustFindProgramAddress(t, programID, [][]byte{[]byte(prefixString), pubKey.Bytes(), go_binary.LittleEndian.AppendUint64([]byte{}, uint64Seed)}),
+				expected: mustFindProgramAddress(t, programID, [][]byte{prefixBytes, pubKey.Bytes(), go_binary.LittleEndian.AppendUint64([]byte{}, uint64Seed)}),
 				params: map[string]any{
 					"PubKey":     pubKey,
 					"Uint64Seed": uint64Seed,
@@ -315,7 +315,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			{
 				name: "with modifier and random field",
 				pdaDefinition: codec.PDATypeDef{
-					Prefix: prefixString,
+					Prefix: prefixBytes,
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
@@ -330,7 +330,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 				inputModifier: codeccommon.ModifiersConfig{
 					&codeccommon.RenameModifierConfig{Fields: map[string]string{"PubKey": "PublicKey"}},
 				},
-				expected: mustFindProgramAddress(t, programID, [][]byte{[]byte(prefixString), pubKey.Bytes(), go_binary.LittleEndian.AppendUint64([]byte{}, uint64Seed)}),
+				expected: mustFindProgramAddress(t, programID, [][]byte{prefixBytes, pubKey.Bytes(), go_binary.LittleEndian.AppendUint64([]byte{}, uint64Seed)}),
 				params: map[string]any{
 					"PublicKey":   pubKey,
 					"randomField": "randomValue", // unused field should be ignored by the codec
@@ -340,15 +340,15 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			{
 				name: "only prefix",
 				pdaDefinition: codec.PDATypeDef{
-					Prefix: prefixString,
+					Prefix: prefixBytes,
 				},
-				expected: mustFindProgramAddress(t, programID, [][]byte{[]byte(prefixString)}),
+				expected: mustFindProgramAddress(t, programID, [][]byte{prefixBytes}),
 				params:   nil,
 			},
 			{
 				name: "no prefix",
 				pdaDefinition: codec.PDATypeDef{
-					Prefix: "",
+					Prefix: nil,
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
@@ -369,7 +369,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			{
 				name: "public key seed provided as bytes",
 				pdaDefinition: codec.PDATypeDef{
-					Prefix: prefixString,
+					Prefix: prefixBytes,
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
@@ -377,7 +377,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 						},
 					},
 				},
-				expected: mustFindProgramAddress(t, programID, [][]byte{[]byte(prefixString), pubKey.Bytes()}),
+				expected: mustFindProgramAddress(t, programID, [][]byte{prefixBytes, pubKey.Bytes()}),
 				params: map[string]any{
 					"PubKey": pubKey.Bytes(),
 				},
@@ -394,7 +394,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 				require.NoError(t, err)
 
 				client := new(mockedRPCClient)
-				svc, err := chainreader.NewChainReaderService(logger.Test(t), client, conf)
+				svc, err := chainreader.NewContractReaderService(logger.Test(t), client, conf, nil)
 				require.NoError(t, err)
 				require.NotNil(t, svc)
 				require.NoError(t, svc.Start(ctx))
@@ -424,12 +424,12 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 	})
 
 	t.Run("PDA account read errors if missing param", func(t *testing.T) {
-		prefixString := "Prefix"
+		prefixBytes := []byte("Prefix")
 		readDef := config.ReadDefinition{
 			ChainSpecificName: testutils.TestStructWithNestedStruct,
 			ReadType:          config.Account,
 			PDADefiniton: codec.PDATypeDef{
-				Prefix: prefixString,
+				Prefix: prefixBytes,
 				Seeds: []codec.PDASeed{
 					{
 						Name: "PubKey",
@@ -444,7 +444,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		_, conf := newTestConfAndCodecWithInjectibleReadDef(t, PDAAccount, readDef)
 
 		client := new(mockedRPCClient)
-		svc, err := chainreader.NewChainReaderService(logger.Test(t), client, conf)
+		svc, err := chainreader.NewContractReaderService(logger.Test(t), client, conf, nil)
 		require.NoError(t, err)
 		require.NotNil(t, svc)
 		require.NoError(t, svc.Start(ctx))
@@ -598,9 +598,10 @@ func (_m *mockedRPCClient) SetForAddress(pk solana.PublicKey, bts []byte, err er
 
 type chainReaderInterfaceTester struct {
 	TestSelectionSupport
-	conf    config.ContractReader
-	address []string
-	reader  *wrappedTestChainReader
+	conf        config.ContractReader
+	address     []string
+	reader      *wrappedTestChainReader
+	eventSource chainreader.EventsReader
 }
 
 func (r *chainReaderInterfaceTester) GetAccountBytes(i int) []byte {
@@ -681,7 +682,7 @@ func (r *chainReaderInterfaceTester) Setup(t *testing.T) {
 
 func (r *chainReaderInterfaceTester) GetContractReader(t *testing.T) types.ContractReader {
 	client := new(mockedRPCClient)
-	svc, err := chainreader.NewChainReaderService(logger.Test(t), client, r.conf)
+	svc, err := chainreader.NewContractReaderService(logger.Test(t), client, r.conf, r.eventSource)
 	if err != nil {
 		t.Logf("chain reader service was not able to start: %s", err.Error())
 		t.FailNow()
@@ -707,7 +708,7 @@ type wrappedTestChainReader struct {
 	types.UnimplementedContractReader
 
 	test            *testing.T
-	service         *chainreader.SolanaChainReaderService
+	service         *chainreader.ContractReaderService
 	client          *mockedRPCClient
 	tester          ChainComponentsInterfaceTester[*testing.T]
 	testStructQueue []*TestStruct

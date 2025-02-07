@@ -3,6 +3,9 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"time"
+
+	"github.com/gagliardetto/solana-go"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -15,7 +18,8 @@ type ContractReader struct {
 }
 
 type ChainContractReader struct {
-	codec.IDL `json:"anchorIDL"`
+	codec.IDL       `json:"anchorIDL"`
+	ContractAddress solana.PublicKey `json:"contractAddress"`
 	// Reads key is the off-chain name for this read.
 	Reads map[string]ReadDefinition `json:"reads"`
 	// TODO ContractPollingFilter same as EVM?
@@ -27,6 +31,12 @@ type ReadDefinition struct {
 	InputModifications  commoncodec.ModifiersConfig `json:"inputModifications,omitempty"`
 	OutputModifications commoncodec.ModifiersConfig `json:"outputModifications,omitempty"`
 	PDADefiniton        codec.PDATypeDef            `json:"pdaDefinition,omitempty"` // Only used for PDA account reads
+	IndexedField0       *IndexedField               `json:"indexedField0"`
+	IndexedField1       *IndexedField               `json:"indexedField1"`
+	IndexedField2       *IndexedField               `json:"indexedField2"`
+	IndexedField3       *IndexedField               `json:"indexedField3"`
+	// This will create a log poller filter for this event.
+	*PollingFilter `json:"pollingFilter,omitempty"`
 }
 
 type ReadType int
@@ -45,6 +55,11 @@ func (r ReadType) String() string {
 	default:
 		return fmt.Sprintf("Unknown(%d)", r)
 	}
+}
+
+type IndexedField struct {
+	OffChainPath string `json:"offChainPath"`
+	OnChainPath  string `json:"onChainPath"`
 }
 
 func (c *ChainContractReader) UnmarshalJSON(bytes []byte) error {
@@ -67,7 +82,7 @@ func (c *ChainContractReader) UnmarshalJSON(bytes []byte) error {
 		return fmt.Errorf("anchorIDL field is neither a valid JSON string nor a valid IDL object: %w", err)
 	}
 
-	if len(c.Accounts) == 0 && len(c.Events) == 0 {
+	if len(c.IDL.Accounts) == 0 && len(c.IDL.Events) == 0 {
 		return fmt.Errorf("namespace idl must have at least one account or event: %w", commontypes.ErrInvalidConfig)
 	}
 
@@ -80,4 +95,10 @@ func (c *ChainContractReader) UnmarshalJSON(bytes []byte) error {
 	}
 
 	return nil
+}
+
+type PollingFilter struct {
+	EventName   string        `json:"eventName"`
+	Retention   time.Duration `json:"retention"`   // maximum amount of time to retain logs
+	MaxLogsKept int64         `json:"maxLogsKept"` // maximum number of logs to retain ( 0 = unlimited )
 }

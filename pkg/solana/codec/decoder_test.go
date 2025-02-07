@@ -29,9 +29,9 @@ func (t *testErrDecodeRemainingBytes) Decode(_ []byte) (interface{}, []byte, err
 
 func TestDecoder_Decode_Errors(t *testing.T) {
 	var into interface{}
-	someType := "some-type"
+	someType := "input.Some.Type"
 	t.Run("error when item type not found", func(t *testing.T) {
-		nonExistentType := "non-existent"
+		nonExistentType := "output.Non.Existent"
 		err := newDecoder(map[string]Entry{someType: &entry{}}).
 			Decode(tests.Context(t), []byte{}, &into, nonExistentType)
 		require.ErrorIs(t, err, fmt.Errorf("%w: cannot find type %s", commontypes.ErrInvalidType, nonExistentType))

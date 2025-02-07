@@ -6,6 +6,8 @@ import (
 	"reflect"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/codec"
+	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
+	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 	commonencodings "github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 )
@@ -217,6 +219,13 @@ func (e *entry) Size(numItems int) (int, error) {
 
 func (e *entry) FixedSize() (int, error) {
 	return e.typeCodec.FixedSize()
+}
+
+func EntryAsModifierRemoteCodec(entry Entry, itemType string) (commontypes.RemoteCodec, error) {
+	lenientFromTypeCodec := make(encodings.LenientCodecFromTypeCodec)
+	lenientFromTypeCodec[itemType] = entry
+
+	return commoncodec.NewModifierCodec(lenientFromTypeCodec, entry.Modifier(), DecoderHooks...)
 }
 
 func ensureModifier(mod codec.Modifier) codec.Modifier {

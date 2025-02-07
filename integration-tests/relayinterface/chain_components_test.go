@@ -27,12 +27,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	contract "github.com/smartcontractkit/chainlink-solana/contracts/generated/contract_reader_interface"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 
-	contract "github.com/smartcontractkit/chainlink-solana/contracts/generated/contract_reader_interface"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader"
@@ -141,7 +140,7 @@ type SolanaChainComponentsInterfaceTesterHelper[T TestingT[T]] interface {
 type SolanaChainComponentsInterfaceTester[T TestingT[T]] struct {
 	TestSelectionSupport
 	Helper               SolanaChainComponentsInterfaceTesterHelper[T]
-	cr                   *chainreader.SolanaChainReaderService
+	cr                   *chainreader.ContractReaderService
 	contractReaderConfig config.ContractReader
 	chainWriterConfig    chainwriter.ChainWriterConfig
 }
@@ -237,7 +236,13 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GetContractReader(t T) types.
 		return it.cr
 	}
 
-	svc, err := chainreader.NewChainReaderService(it.Helper.Logger(t), it.Helper.RPCClient(), it.contractReaderConfig)
+	var events chainreader.EventsReader
+
+	svc, err := chainreader.NewContractReaderService(
+		it.Helper.Logger(t),
+		it.Helper.RPCClient(),
+		it.contractReaderConfig,
+		events)
 
 	require.NoError(t, err)
 	require.NoError(t, svc.Start(ctx))
@@ -292,13 +297,13 @@ func (h *helper) Init(t *testing.T) {
 	privateKey, err := solana.PrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1])
 	require.NoError(t, err)
 
-	h.rpcURL, h.wsURL = solanautils.SetupTestValidatorWithAnchorPrograms(t, privateKey.PublicKey().String(), []string{"contract-reader-interface"})
+	h.rpcURL, h.wsURL = utils.SetupTestValidatorWithAnchorPrograms(t, privateKey.PublicKey().String(), []string{"contract-reader-interface"})
 	h.wsClient, err = ws.Connect(tests.Context(t), h.wsURL)
 	h.rpcClient = rpc.New(h.rpcURL)
 
 	require.NoError(t, err)
 
-	solanautils.FundAccounts(t, []solana.PrivateKey{privateKey}, h.rpcClient)
+	utils.FundAccounts(t, []solana.PrivateKey{privateKey}, h.rpcClient)
 
 	cfg := config.NewDefault()
 	cfg.Chain.TxRetentionTimeout = commonconfig.MustNewDuration(10 * time.Minute)
@@ -307,7 +312,7 @@ func (h *helper) Init(t *testing.T) {
 
 	h.sc = solanaClient
 
-	loader := commonutils.NewLazyLoad(func() (client.ReaderWriter, error) { return solanaClient, nil })
+	loader := solanautils.NewLoader[client.ReaderWriter](func(ctx context.Context) (client.ReaderWriter, error) { return solanaClient, nil})
 	mkey := keyMocks.NewSimpleKeystore(t)
 	mkey.On("Sign", mock.Anything, privateKey.PublicKey().String(), mock.Anything).Return(func(_ context.Context, _ string, data []byte) []byte {
 		sig, _ := privateKey.Sign(data)

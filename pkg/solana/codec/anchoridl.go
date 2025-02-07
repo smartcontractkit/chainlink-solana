@@ -119,6 +119,23 @@ func (env *IdlAccountItem) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (env IdlAccountItem) MarshalJSON() ([]byte, error) {
+	if (env.IdlAccount == nil) == (env.IdlAccounts == nil) {
+		return nil, fmt.Errorf("invalid structure: expected either IdlAccount or IdlAccounts to be defined")
+	}
+
+	var result interface{}
+	if env.IdlAccounts != nil {
+		result = map[string]interface{}{
+			"accounts": env.IdlAccounts,
+		}
+	} else {
+		result = env.IdlAccount
+	}
+
+	return json.Marshal(result)
+}
+
 type IdlAccount struct {
 	Docs     []string `json:"docs"` // @custom
 	Name     string   `json:"name"`
@@ -143,7 +160,7 @@ type IdlField struct {
 // PDA is a struct that does not correlate to an official IDL type
 // It is needed to encode seeds to calculate the address for PDA account reads
 type PDATypeDef struct {
-	Prefix string    `json:"prefix,omitempty"`
+	Prefix []byte    `json:"prefix,omitempty"`
 	Seeds  []PDASeed `json:"seeds,omitempty"`
 }
 
@@ -193,6 +210,29 @@ type IdlTypeDefined struct {
 type IdlTypeArray struct {
 	Thing IdlType
 	Num   int
+}
+
+func (env IdlType) MarshalJSON() ([]byte, error) {
+	var result interface{}
+	switch {
+	case env.IsString():
+		result = env.GetString()
+	case env.IsIdlTypeVec():
+		result = env.GetIdlTypeVec()
+	case env.IsIdlTypeOption():
+		result = env.GetIdlTypeOption()
+	case env.IsIdlTypeDefined():
+		result = env.GetIdlTypeDefined()
+	case env.IsArray():
+		array := env.GetArray()
+		result = map[string]interface{}{
+			"array": []interface{}{array.Thing, array.Num},
+		}
+	default:
+		return nil, fmt.Errorf("nil envelope is not supported in IdlType")
+	}
+
+	return json.Marshal(result)
 }
 
 func (env *IdlType) UnmarshalJSON(data []byte) error {

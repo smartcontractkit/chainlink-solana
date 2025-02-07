@@ -14,17 +14,17 @@ var _ ReaderWriter = (*MultiClient)(nil)
 // MultiClient - wrapper over multiple RPCs, underlying provider can be MultiNode or LazyLoader.
 // Main purpose is to eliminate need for frequent error handling on selection of a client.
 type MultiClient struct {
-	getClient func() (ReaderWriter, error)
+	getClient func(context.Context) (ReaderWriter, error)
 }
 
-func NewMultiClient(getClient func() (ReaderWriter, error)) *MultiClient {
+func NewMultiClient(getClient func(context.Context) (ReaderWriter, error)) *MultiClient {
 	return &MultiClient{
 		getClient: getClient,
 	}
 }
 
 func (m *MultiClient) GetLatestBlockHeight(ctx context.Context) (uint64, error) {
-	r, err := m.getClient()
+	r, err := m.getClient(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -33,7 +33,7 @@ func (m *MultiClient) GetLatestBlockHeight(ctx context.Context) (uint64, error) 
 }
 
 func (m *MultiClient) SendTx(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
-	r, err := m.getClient()
+	r, err := m.getClient(ctx)
 	if err != nil {
 		return solana.Signature{}, err
 	}
@@ -42,7 +42,7 @@ func (m *MultiClient) SendTx(ctx context.Context, tx *solana.Transaction) (solan
 }
 
 func (m *MultiClient) SimulateTx(ctx context.Context, tx *solana.Transaction, opts *rpc.SimulateTransactionOpts) (*rpc.SimulateTransactionResult, error) {
-	r, err := m.getClient()
+	r, err := m.getClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func (m *MultiClient) SimulateTx(ctx context.Context, tx *solana.Transaction, op
 }
 
 func (m *MultiClient) SignatureStatuses(ctx context.Context, sigs []solana.Signature) ([]*rpc.SignatureStatusesResult, error) {
-	r, err := m.getClient()
+	r, err := m.getClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func (m *MultiClient) SignatureStatuses(ctx context.Context, sigs []solana.Signa
 }
 
 func (m *MultiClient) GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetAccountInfoOpts) (*rpc.GetAccountInfoResult, error) {
-	r, err := m.getClient()
+	r, err := m.getClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func (m *MultiClient) GetAccountInfoWithOpts(ctx context.Context, addr solana.Pu
 }
 
 func (m *MultiClient) GetMultipleAccountsWithOpts(ctx context.Context, accounts []solana.PublicKey, opts *rpc.GetMultipleAccountsOpts) (out *rpc.GetMultipleAccountsResult, err error) {
-	r, err := m.getClient()
+	r, err := m.getClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func (m *MultiClient) GetMultipleAccountsWithOpts(ctx context.Context, accounts 
 }
 
 func (m *MultiClient) Balance(ctx context.Context, addr solana.PublicKey) (uint64, error) {
-	r, err := m.getClient()
+	r, err := m.getClient(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -87,7 +87,7 @@ func (m *MultiClient) Balance(ctx context.Context, addr solana.PublicKey) (uint6
 }
 
 func (m *MultiClient) SlotHeight(ctx context.Context) (uint64, error) {
-	r, err := m.getClient()
+	r, err := m.getClient(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -96,7 +96,7 @@ func (m *MultiClient) SlotHeight(ctx context.Context) (uint64, error) {
 }
 
 func (m *MultiClient) LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockhashResult, error) {
-	r, err := m.getClient()
+	r, err := m.getClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func (m *MultiClient) LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockh
 }
 
 func (m *MultiClient) ChainID(ctx context.Context) (mn.StringID, error) {
-	r, err := m.getClient()
+	r, err := m.getClient(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -114,7 +114,7 @@ func (m *MultiClient) ChainID(ctx context.Context) (mn.StringID, error) {
 }
 
 func (m *MultiClient) GetFeeForMessage(ctx context.Context, msg string) (uint64, error) {
-	r, err := m.getClient()
+	r, err := m.getClient(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -123,7 +123,7 @@ func (m *MultiClient) GetFeeForMessage(ctx context.Context, msg string) (uint64,
 }
 
 func (m *MultiClient) GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error) {
-	r, err := m.getClient()
+	r, err := m.getClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func (m *MultiClient) GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, 
 }
 
 func (m *MultiClient) GetTransaction(ctx context.Context, txHash solana.Signature) (*rpc.GetTransactionResult, error) {
-	r, err := m.getClient()
+	r, err := m.getClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func (m *MultiClient) GetTransaction(ctx context.Context, txHash solana.Signatur
 }
 
 func (m *MultiClient) GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64) (rpc.BlocksResult, error) {
-	r, err := m.getClient()
+	r, err := m.getClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +150,7 @@ func (m *MultiClient) GetBlocks(ctx context.Context, startSlot uint64, endSlot *
 }
 
 func (m *MultiClient) GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit uint64) (*rpc.BlocksResult, error) {
-	r, err := m.getClient()
+	r, err := m.getClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +159,7 @@ func (m *MultiClient) GetBlocksWithLimit(ctx context.Context, startSlot uint64, 
 }
 
 func (m *MultiClient) GetBlock(ctx context.Context, slot uint64) (*rpc.GetBlockResult, error) {
-	r, err := m.getClient()
+	r, err := m.getClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +168,7 @@ func (m *MultiClient) GetBlock(ctx context.Context, slot uint64) (*rpc.GetBlockR
 }
 
 func (m *MultiClient) GetSignaturesForAddressWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error) {
-	r, err := m.getClient()
+	r, err := m.getClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +177,7 @@ func (m *MultiClient) GetSignaturesForAddressWithOpts(ctx context.Context, addr 
 }
 
 func (m *MultiClient) GetBlockWithOpts(ctx context.Context, slot uint64, opts *rpc.GetBlockOpts) (*rpc.GetBlockResult, error) {
-	r, err := m.getClient()
+	r, err := m.getClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +186,7 @@ func (m *MultiClient) GetBlockWithOpts(ctx context.Context, slot uint64, opts *r
 }
 
 func (m *MultiClient) SlotHeightWithCommitment(ctx context.Context, commitment rpc.CommitmentType) (uint64, error) {
-	r, err := m.getClient()
+	r, err := m.getClient(ctx)
 	if err != nil {
 		return 0, err
 	}

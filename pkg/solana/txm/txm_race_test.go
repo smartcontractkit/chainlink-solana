@@ -9,10 +9,12 @@ import (
 	"time"
 
 	solanaGo "github.com/gagliardetto/solana-go"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
@@ -21,10 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	feemocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/fees/mocks"
 	ksmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 func NewTestMsg() (msg pendingTx) {
@@ -64,9 +63,7 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 	msg := NewTestMsg()
 	testRunner := func(t *testing.T, client solanaClient.ReaderWriter) {
 		// build minimal txm
-		loader := utils.NewLazyLoad(func() (solanaClient.ReaderWriter, error) {
-			return client, nil
-		})
+		loader := utils.NewStaticLoader(client)
 		txm := NewTxm("retry_race", loader, nil, cfg, ks, lggr)
 		txm.fee = fee
 

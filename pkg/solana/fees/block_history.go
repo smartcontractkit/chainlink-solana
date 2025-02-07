@@ -11,7 +11,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 )
 
 var _ Estimator = &blockHistoryEstimator{}
@@ -23,7 +22,7 @@ type blockHistoryEstimator struct {
 	chStop  services.StopChan
 	done    sync.WaitGroup
 
-	client internal.Loader[client.ReaderWriter]
+	client func(context.Context) (client.ReaderWriter, error)
 	cfg    config.Config
 	lgr    logger.Logger
 
@@ -34,7 +33,7 @@ type blockHistoryEstimator struct {
 // NewBlockHistoryEstimator creates a new fee estimator that parses historical fees from a fetched block
 // Note: getRecentPrioritizationFees is not used because it provides the lowest prioritization fee for an included tx in the block
 // which is not effective enough for increasing the chances of block inclusion
-func NewBlockHistoryEstimator(c internal.Loader[client.ReaderWriter], cfg config.Config, lgr logger.Logger) (*blockHistoryEstimator, error) {
+func NewBlockHistoryEstimator(c func(context.Context) (client.ReaderWriter, error), cfg config.Config, lgr logger.Logger) (*blockHistoryEstimator, error) {
 	if cfg.BlockHistorySize() < 1 {
 		return nil, fmt.Errorf("invalid block history depth: %d", cfg.BlockHistorySize())
 	}
@@ -115,7 +114,7 @@ func (bhe *blockHistoryEstimator) calculatePrice(ctx context.Context) error {
 
 func (bhe *blockHistoryEstimator) calculatePriceFromLatestBlock(ctx context.Context) error {
 	// fetch client
-	c, err := bhe.client.Get()
+	c, err := bhe.client(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %w", err)
 	}
@@ -158,7 +157,7 @@ func (bhe *blockHistoryEstimator) calculatePriceFromLatestBlock(ctx context.Cont
 
 func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.Context, desiredBlockCount uint64) error {
 	// fetch client
-	c, err := bhe.client.Get()
+	c, err := bhe.client(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %w", err)
 	}

@@ -213,26 +213,3 @@ func CreateTestPubKeys(t *testing.T, num int) solana.PublicKeySlice {
 	}
 	return addresses
 }
-
-func CreateTestLookupTable(ctx context.Context, t *testing.T, c *rpc.Client, sender solana.PrivateKey, addresses []solana.PublicKey) solana.PublicKey {
-	// Create lookup tables
-	slot, serr := c.GetSlot(ctx, rpc.CommitmentFinalized)
-	require.NoError(t, serr)
-	table, instruction, ierr := utils.NewCreateLookupTableInstruction(
-		sender.PublicKey(),
-		sender.PublicKey(),
-		slot,
-	)
-	require.NoError(t, ierr)
-	utils.SendAndConfirm(ctx, t, c, []solana.Instruction{instruction}, sender, rpc.CommitmentConfirmed)
-
-	// add entries to lookup table
-	utils.SendAndConfirm(ctx, t, c, []solana.Instruction{
-		utils.NewExtendLookupTableInstruction(
-			table, sender.PublicKey(), sender.PublicKey(),
-			addresses,
-		),
-	}, sender, rpc.CommitmentConfirmed)
-
-	return table
-}
