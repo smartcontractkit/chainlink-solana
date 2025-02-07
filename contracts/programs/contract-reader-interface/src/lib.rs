@@ -14,7 +14,7 @@ pub mod contract_reader_interface {
         account.idx = test_idx;
         account.bump = ctx.bumps.data;
 
-        let multi_read1 = &mut ctx.accounts.multi_read1;  
+        let multi_read1 = &mut ctx.accounts.multi_read1;
         multi_read1.a = 1;
         multi_read1.b = 2;
         multi_read1.c = true;
@@ -22,7 +22,7 @@ pub mod contract_reader_interface {
         let multi_read2 = &mut ctx.accounts.multi_read2;
         multi_read2.u = "Hello".to_string();
         multi_read2.v = true;
-        multi_read2.w = [123, 456]; 
+        multi_read2.w = [123, 456];
 
         Ok(())
     }
@@ -75,7 +75,7 @@ pub struct Initialize<'info> {
         bump)]
     pub data: Account<'info, DataAccount>,
 
-      #[account(
+    #[account(
             init,
             payer = signer,
             space = 100,
@@ -84,7 +84,7 @@ pub struct Initialize<'info> {
         )]
     pub multi_read1: Account<'info, MultiRead1>,
 
-        #[account(
+    #[account(
             init,
             payer = signer,
             space = 200,
