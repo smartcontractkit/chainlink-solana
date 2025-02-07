@@ -24,6 +24,8 @@ import (
 )
 
 type EventsReader interface {
+	Start(ctx context.Context) error
+	Ready() error
 	RegisterFilter(context.Context, logpoller.Filter) error
 	FilteredLogs(context.Context, []query.Expression, query.LimitAndSort, string) ([]logpoller.Log, error)
 }
@@ -108,13 +110,24 @@ func (s *ContractReaderService) Name() string {
 // and error.
 func (s *ContractReaderService) Start(ctx context.Context) error {
 	return s.StartOnce(ServiceName, func() error {
+		if len(s.filters) == 0 {
+			// No dependency on EventReader
+			return nil
+		}
+		if s.reader.Ready() != nil {
+			// Start EventReader if it hasn't already been
+			// Lazily starting it here rather than earlier, since nodes running only ordinary DF jobs don't need it
+			err := s.reader.Start(ctx)
+			if err != nil {
+				return fmt.Errorf("%d event filters defined in ChainReader config, but unable to start event reader: %w", len(s.filters), err)
+			}
+		}
 		// registering filters needs a context so we should be able to use the start function context.
 		for _, filter := range s.filters {
 			if err := s.reader.RegisterFilter(ctx, filter); err != nil {
 				return err
 			}
 		}
-
 		return nil
 	})
 }
@@ -483,7 +496,7 @@ func toLPFilter(
 		Address:     logpoller.PublicKey(address),
 		EventName:   f.EventName,
 		EventSig:    logpoller.EventSignature([]byte(f.EventName)[:logpoller.EventSignatureLength]),
-		SubkeyPaths: logpoller.SubKeyPaths(subKeyPaths),
+		SubkeyPaths: subKeyPaths,
 		Retention:   f.Retention,
 		MaxLogsKept: f.MaxLogsKept,
 	}

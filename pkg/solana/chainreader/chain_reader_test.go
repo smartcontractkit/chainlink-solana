@@ -13,8 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cometbft/cometbft/libs/service"
 	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -30,6 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -83,6 +86,100 @@ func TestSolanaContractReaderService_ServiceCtx(t *testing.T) {
 	require.NoError(t, svc.Close())
 	require.Error(t, svc.Ready())
 	require.Error(t, svc.Close())
+}
+
+func TestSolanaChainReaderService_Start(t *testing.T) {
+	t.Parallel()
+
+	ctx := tests.Context(t)
+	lggr := logger.Test(t)
+	rpcClient := new(mockedRPCClient)
+	pk := solana.NewWallet().PublicKey()
+
+	accountReadDef := config.ReadDefinition{
+		ChainSpecificName: "myAccount",
+		ReadType:          config.Account,
+	}
+	eventReadDef := config.ReadDefinition{
+		ChainSpecificName: "myEvent",
+		ReadType:          config.Event,
+		PollingFilter:     &config.PollingFilter{EventName: "myEventSig.........."},
+	}
+
+	testCases := []struct {
+		Name                string
+		ReadDef             config.ReadDefinition
+		StartError          error
+		RegisterFilterError error
+	}{
+		{Name: "no event reads", ReadDef: accountReadDef},
+		{Name: "already started", ReadDef: eventReadDef},
+		{Name: "successful start", ReadDef: eventReadDef},
+		{Name: "unsucessful start", ReadDef: eventReadDef, StartError: fmt.Errorf("failed to start event reader")},
+		{Name: "failed to register filter", ReadDef: eventReadDef, RegisterFilterError: fmt.Errorf("failed to register filter")},
+	}
+
+	boolType := codec.IdlType{}
+	boolType.UnmarshalJSON([]byte(codec.IdlTypeBool))
+
+	for _, tt := range testCases {
+		t.Run(tt.Name, func(t *testing.T) {
+			cfg := config.ContractReader{
+				map[string]config.ChainContractReader{
+					"myChainReader": {
+						IDL: codec.IDL{
+							Accounts: []codec.IdlTypeDef{{"myAccount",
+								codec.IdlTypeDefTy{
+									Kind:   codec.IdlTypeDefTyKindStruct,
+									Fields: &[]codec.IdlField{}}}},
+							Events: []codec.IdlEvent{{Name: "myEvent", Fields: []codec.IdlEventField{{Name: "a", Type: boolType}}}},
+						},
+						ContractAddress: pk,
+						Reads: map[string]config.ReadDefinition{
+							"myRead": tt.ReadDef},
+					},
+				},
+			}
+			er := mocks.NewEventsReader(t)
+			svc, err := chainreader.NewContractReaderService(
+				lggr,
+				rpcClient,
+				cfg, er,
+			)
+			require.NoError(t, err)
+
+			er.On("Ready").Maybe().Return(func() error {
+				if tt.Name == "already started" {
+					return nil
+				}
+				return service.ErrNotStarted
+			}())
+			er.On("Start", mock.Anything).Maybe().Return(tt.StartError)
+			er.On("RegisterFilter", mock.Anything, mock.Anything).Maybe().Return(tt.RegisterFilterError)
+			err = svc.Start(ctx)
+			if tt.StartError != nil || tt.RegisterFilterError != nil {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			var expectedReadyCalls, expectedStartCalls, expectedRegisterFilterCalls int
+			if tt.ReadDef.ReadType == config.Event {
+				expectedStartCalls = 1
+				expectedReadyCalls = 1
+				expectedRegisterFilterCalls = 1
+			}
+			er.AssertNumberOfCalls(t, "Ready", expectedReadyCalls)
+			if tt.Name == "already started" {
+				expectedStartCalls = 0
+			}
+			er.AssertNumberOfCalls(t, "Start", expectedStartCalls)
+			if tt.StartError != nil {
+				expectedRegisterFilterCalls = 0
+			}
+			er.AssertNumberOfCalls(t, "RegisterFilter", expectedRegisterFilterCalls)
+		})
+	}
 }
 
 func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {

@@ -38,6 +38,7 @@ import (
 
 type LogPoller interface {
 	Start(context.Context) error
+	Ready() error
 	Close() error
 	RegisterFilter(ctx context.Context, filter logpoller.Filter) error
 	UnregisterFilter(ctx context.Context, name string) error
@@ -546,6 +547,9 @@ func (c *chain) Close() error {
 		if c.cfg.MultiNode.Enabled() {
 			c.lggr.Debug("Stopping multinode")
 			closeAll = append(closeAll, c.multiNode, c.txSender)
+		}
+		if c.lp.Ready() == nil {
+			c.lp.Close()
 		}
 		return services.CloseAll(closeAll...)
 	})
