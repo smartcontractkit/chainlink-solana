@@ -44,7 +44,7 @@ type ContractReaderService struct {
 	lookup     *lookup
 	parsed     *codec.ParsedTypes
 	codec      types.RemoteCodec
-	filters  []logpoller.Filter
+	filters    []logpoller.Filter
 
 	// service state management
 	wg sync.WaitGroup
@@ -75,8 +75,8 @@ func NewContractReaderService(
 			EncoderDefs: map[string]codec.Entry{},
 			DecoderDefs: map[string]codec.Entry{},
 		},
-		filters:  []logpoller.Filter{},
-		reader:   reader,
+		filters: []logpoller.Filter{},
+		reader:  reader,
 	}
 
 	if err := svc.bdRegistry.initAddressSharing(cfg.AddressShareGroups); err != nil {
@@ -95,7 +95,7 @@ func NewContractReaderService(
 	svc.codec = svcCodec
 
 	svc.bdRegistry.SetCodecs(svcCodec)
-	svc.bindings.SetModifiers(svc.parsed.Modifiers)
+	svc.bdRegistry.SetModifiers(svc.parsed.Modifiers)
 	return svc, nil
 }
 
@@ -228,7 +228,7 @@ func (s *ContractReaderService) BatchGetLatestValues(ctx context.Context, reques
 
 // QueryKey implements the types.ContractReader interface.
 func (s *ContractReaderService) QueryKey(ctx context.Context, contract types.BoundContract, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
-	binding, err := s.bindings.GetReadBinding(contract.Name, filter.Key)
+	binding, err := s.bdRegistry.GetReadBinding(contract.Name, filter.Key)
 	if err != nil {
 		return nil, err
 	}
@@ -418,7 +418,7 @@ func (s *ContractReaderService) addEventRead(
 	filter := toLPFilter(readDefinition.PollingFilter, contractAddress, subKeys[:])
 
 	s.filters = append(s.filters, filter)
-	s.bindings.AddReadBinding(namespace, genericName, newEventReadBinding(
+	s.bdRegistry.AddReadBinding(namespace, genericName, newEventReadBinding(
 		namespace,
 		genericName,
 		mappedTuples,

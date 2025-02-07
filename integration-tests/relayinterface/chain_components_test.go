@@ -282,7 +282,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GetContractReaderWithCustomCf
 		return it.cr
 	}
 
-	svc, err := chainreader.NewChainReaderService(it.Helper.Logger(t), it.Helper.RPCClient(), cfg)
+	svc, err := chainreader.NewContractReaderService(it.Helper.Logger(t), it.Helper.RPCClient(), cfg, nil)
 
 	require.NoError(t, err)
 	require.NoError(t, svc.Start(ctx))
