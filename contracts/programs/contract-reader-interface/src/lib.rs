@@ -42,9 +42,9 @@ pub mod contract_reader_interface {
         test_struct_account.accounts = data.accounts;
         test_struct_account.different_field = data.different_field;
         test_struct_account.big_field = data.big_field;
-        test_struct_account.account_struct = data.account_struct.clone();
-        test_struct_account.nested_dynamic_struct = data.nested_dynamic_struct.clone();
-        test_struct_account.nested_static_struct = data.nested_static_struct.clone();
+        test_struct_account.account_struct = data.account_struct;
+        test_struct_account.nested_dynamic_struct = data.nested_dynamic_struct;
+        test_struct_account.nested_static_struct = data.nested_static_struct;
 
         Ok(())
     }

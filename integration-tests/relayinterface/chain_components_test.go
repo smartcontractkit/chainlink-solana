@@ -44,14 +44,6 @@ import (
 	solanautils "github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
-const (
-	SolanaContractReaderGetLatestValueAsValuesDotValue                                        = "Gets the latest value as a values.Value for Solana"
-	SolanaContractReaderGetLatestValue                                                        = "Gets the latest value for Solana"
-	SolanaContractReaderBatchGetLatestValue                                                   = "BatchGetLatestValues works for Solana"
-	SolanaContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder                  = "BatchGetLatestValues supports same read with different params and results retain order from request for Solana"
-	SolanaContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts = "BatchGetLatestValues supports same read with different params and results retain order from request even with multiple contracts for Solana"
-)
-
 func TestChainComponents(t *testing.T) {
 	t.Parallel()
 	helper := &helper{}
