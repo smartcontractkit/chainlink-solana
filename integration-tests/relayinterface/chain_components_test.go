@@ -140,6 +140,16 @@ func RunChainComponentsSolanaTests[T TestingT[T]](t T, it *SolanaChainComponents
 				assert.Equal(t, addressToBeShared, bound2[0].Address)
 			})
 
+			t.Run("Namespace is part of an address share group that has a registered address and provides a wrong address during Bind", func(t T) {
+				key, err := solana.NewRandomPrivateKey()
+				require.NoError(t, err)
+
+				bound2 := []types.BoundContract{{
+					Name:    AnyContractNameWithSharedAddress2,
+					Address: key.PublicKey().String()}}
+				require.Error(t, cr.Bind(ctx, bound2))
+			})
+
 			t.Run("Namespace is part of an address share group that has a registered address and provides no address during Bind", func(t T) {
 				bound3 := []types.BoundContract{{Name: AnyContractNameWithSharedAddress3}}
 				require.NoError(t, cr.Bind(ctx, bound3))
