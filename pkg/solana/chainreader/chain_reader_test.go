@@ -115,7 +115,7 @@ func TestSolanaChainReaderService_Start(t *testing.T) {
 		{Name: "no event reads", ReadDef: accountReadDef},
 		{Name: "already started", ReadDef: eventReadDef},
 		{Name: "successful start", ReadDef: eventReadDef},
-		{Name: "unsucessful start", ReadDef: eventReadDef, StartError: fmt.Errorf("failed to start event reader")},
+		{Name: "unsuccessful start", ReadDef: eventReadDef, StartError: fmt.Errorf("failed to start event reader")},
 		{Name: "failed to register filter", ReadDef: eventReadDef, RegisterFilterError: fmt.Errorf("failed to register filter")},
 	}
 
@@ -128,8 +128,8 @@ func TestSolanaChainReaderService_Start(t *testing.T) {
 				Namespaces: map[string]config.ChainContractReader{
 					"myChainReader": {
 						IDL: codec.IDL{
-							Accounts: []codec.IdlTypeDef{{"myAccount",
-								codec.IdlTypeDefTy{
+							Accounts: []codec.IdlTypeDef{{Name: "myAccount",
+								Type: codec.IdlTypeDefTy{
 									Kind:   codec.IdlTypeDefTyKindStruct,
 									Fields: &[]codec.IdlField{}}}},
 							Events: []codec.IdlEvent{{Name: "myEvent", Fields: []codec.IdlEventField{{Name: "a", Type: boolType}}}},
