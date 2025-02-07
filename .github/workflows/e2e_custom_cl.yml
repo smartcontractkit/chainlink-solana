@@ -213,7 +213,7 @@ jobs:
         uses: smartcontractkit/chainlink-github-actions/docker/image-exists@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
         with:
           repository: chainlink
-          tag: solana.${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref || github.sha }}
+          tag: solana.${{ github.sha }}
           AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       - name: Build Image
@@ -224,7 +224,7 @@ jobs:
           cl_repo: smartcontractkit/chainlink
           cl_ref: ${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref }}
           dep_solana_sha: ${{ github.event.pull_request.head.sha }}
-          push_tag: ${{ env.CL_ECR }}:solana.${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref || github.sha }}
+          push_tag: ${{ env.CL_ECR }}:solana.${{ github.sha }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
 
@@ -305,7 +305,7 @@ jobs:
         run: | # https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/README.md
           cat << EOF > config.toml
           [ChainlinkImage]
-          version="solana.${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref || github.sha }}"
+          version="solana.${{ github.sha }}"
           [Common]
           user="${{ github.actor }}"
           internal_docker_repo = "${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com"
@@ -326,7 +326,7 @@ jobs:
           download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 
           go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ env.CL_ECR }}
-          cl_image_tag: solana.${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref || github.sha }}
+          cl_image_tag: solana.${{ github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
           aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
           artifacts_name: smoke-test-logs
@@ -389,7 +389,7 @@ jobs:
           cat << EOF > config.toml
           [ChainlinkImage]
           image="${{ env.CL_ECR }}"
-          version="solana.${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref || github.sha }}"
+          version="solana.${{ github.sha }}"
           [Common]
           user="${{ github.actor }}"
           internal_docker_repo = "${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com"
@@ -410,7 +410,7 @@ jobs:
           download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 
           go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ env.CL_ECR }}
-          cl_image_tag: solana.${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref || github.sha }}
+          cl_image_tag: solana.${{ github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
           aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
           artifacts_name: smoke-test-logs
