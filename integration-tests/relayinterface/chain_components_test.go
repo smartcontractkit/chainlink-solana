@@ -86,7 +86,6 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 		ContractReaderGetLatestValue,
 		ContractReaderGetLatestValueAsValuesDotValue,
 		ContractReaderBatchGetLatestValue,
-		ContractReaderBatchGetLatestValueWithModifiersOwnMapstructureOverride,
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder,
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
 
