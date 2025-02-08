@@ -387,7 +387,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		for _, testCase := range testCases {
 			t.Run(testCase.name, func(t *testing.T) {
 				testReadDef := readDef
-				testReadDef.PDADefiniton = testCase.pdaDefinition
+				testReadDef.PDADefinition = testCase.pdaDefinition
 				testReadDef.InputModifications = testCase.inputModifier
 				testCodec, conf := newTestConfAndCodecWithInjectibleReadDef(t, PDAAccount, testReadDef)
 				encoded, err := testCodec.Encode(ctx, expected, testutils.TestStructWithNestedStruct)
@@ -428,7 +428,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		readDef := config.ReadDefinition{
 			ChainSpecificName: testutils.TestStructWithNestedStruct,
 			ReadType:          config.Account,
-			PDADefiniton: codec.PDATypeDef{
+			PDADefinition: codec.PDATypeDef{
 				Prefix: prefixBytes,
 				Seeds: []codec.PDASeed{
 					{

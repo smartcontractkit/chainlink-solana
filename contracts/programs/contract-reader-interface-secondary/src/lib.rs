@@ -1,42 +1,17 @@
 use anchor_lang::prelude::*;
 use std::mem::size_of;
 
-declare_id!("6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE");
+declare_id!("9SFyk8NmGYh5D612mJwUYhguCRY9cFgaS2vksrigepjf");
 
 #[program]
-pub mod contract_reader_interface {
+pub mod contract_reader_interface_secondary {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>, test_idx: u64, value: u64) -> Result<()> {
         let account = &mut ctx.accounts.data;
         account.u64_value = value;
-        account.u64_slice = [3, 4].to_vec();
         account.idx = test_idx;
         account.bump = ctx.bumps.data;
-
-        let multi_read1 = &mut ctx.accounts.multi_read1;
-        multi_read1.a = 1;
-        multi_read1.b = 2;
-        multi_read1.c = true;
-
-        let multi_read2 = &mut ctx.accounts.multi_read2;
-        multi_read2.u = "Hello".to_string();
-        multi_read2.v = true;
-        multi_read2.w = [123, 456];
-
-        Ok(())
-    }
-
-    pub fn initialize_lookup_table(
-        ctx: Context<InitializeLookupTableData>,
-        lookup_table: Pubkey,
-    ) -> Result<()> {
-        let account = &mut ctx.accounts.write_data_account;
-        account.version = 1;
-        account.administrator = ctx.accounts.admin.key();
-        account.pending_administrator = Pubkey::default();
-        account.lookup_table = lookup_table;
-
         Ok(())
     }
 
@@ -70,47 +45,11 @@ pub struct Initialize<'info> {
     #[account(
         init_if_needed,
         payer = signer,
-        space = size_of::<DataAccount>() + 8,
+        space = size_of::<Data>() + 8,
         seeds=[b"data".as_ref(), test_idx.to_le_bytes().as_ref()],
         bump)]
-    pub data: Account<'info, DataAccount>,
+    pub data: Account<'info, Data>,
 
-    #[account(
-        init_if_needed,
-        payer = signer,
-        space = size_of::<MultiRead1>() + 8,
-        seeds = [b"multi_read1"],
-        bump)]
-    pub multi_read1: Account<'info, MultiRead1>,
-
-    #[account(
-        init_if_needed,
-        payer = signer,
-        space = size_of::<MultiRead2>() + 8,
-        seeds = [b"multi_read2"],
-        bump)]
-    pub multi_read2: Account<'info, MultiRead2>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct InitializeLookupTableData<'info> {
-    /// PDA for LookupTableDataAccount, derived from seeds and created by the System Program
-    #[account(
-        init_if_needed,
-        payer = admin,
-        space = size_of::<LookupTableDataAccount>() + 8,
-        seeds = [b"data"],
-        bump
-    )]
-    pub write_data_account: Account<'info, LookupTableDataAccount>,
-
-    /// Admin account that pays for PDA creation and signs the transaction
-    #[account(mut)]
-    pub admin: Signer<'info>,
-
-    /// System Program required for PDA creation
     pub system_program: Program<'info, System>,
 }
 
@@ -133,19 +72,10 @@ pub struct StoreTestStruct<'info> {
 }
 
 #[account]
-pub struct LookupTableDataAccount {
-    pub version: u8,                   // Version of the data account
-    pub administrator: Pubkey,         // Administrator public key
-    pub pending_administrator: Pubkey, // Pending administrator public key
-    pub lookup_table: Pubkey,          // Address of the lookup table
-}
-
-#[account]
-pub struct DataAccount {
+pub struct Data {
+    pub u64_value: u64,
     pub idx: u64,
     pub bump: u8,
-    pub u64_value: u64,
-    pub u64_slice: Vec<u64>,
 }
 
 #[account(zero_copy)]
@@ -222,18 +152,4 @@ pub struct MidLevelStaticTestStruct {
 pub struct InnerStaticTestStruct {
     pub i: i64,
     pub a: Pubkey,
-}
-
-#[account]
-pub struct MultiRead1 {
-    pub a: u8,
-    pub b: i16,
-    pub c: bool,
-}
-
-#[account]
-pub struct MultiRead2 {
-    pub u: String,
-    pub v: bool,
-    pub w: [u64; 2],
 }

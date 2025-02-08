@@ -32,6 +32,7 @@ func TestIndexedValue(t *testing.T) {
 		{"string", "abcd", "abcdef"},
 		{"[]byte", []byte("abcc"), []byte("abcd")},
 		{"[]byte", []byte("abcd"), []byte("abcdef")},
+		{"[2]byte", [2]byte{1, 2}, [2]byte{2, 2}},
 	}
 	for _, c := range cases {
 		t.Run(c.typeName, func(t *testing.T) {

@@ -15,6 +15,12 @@ import (
 
 type ContractReader struct {
 	Namespaces map[string]ChainContractReader `json:"namespaces"`
+	// AddressShareGroups lists namespaces groups that share the same address.
+	// Whichever namespace or i.e. Binding from the list is Bound first will share that address with the rest of the group.
+	// Namespaces that were bound after the first one still have to be Bound to be initialised.
+	// If they are Bound with an empty address string, they will use the address of the first Bound contract.
+	// If they are Bound with a non-empty address string, an error will be thrown unless the address matches the address of the first Bound shared contract.
+	AddressShareGroups [][]string `json:"addressShareGroups,omitempty"`
 }
 
 type ChainContractReader struct {
@@ -25,16 +31,23 @@ type ChainContractReader struct {
 	// TODO ContractPollingFilter same as EVM?
 }
 
+type MultiReader struct {
+	// Reads is a list of reads that is sequentially read to fill out a complete response for the parent read.
+	// Parent ReadDefinition has to define codec modifiers which adds fields that are to be filled out by the reads in Reads.
+	Reads []ReadDefinition `json:"reads,omitempty"`
+}
+
 type ReadDefinition struct {
 	ChainSpecificName   string                      `json:"chainSpecificName"`
 	ReadType            ReadType                    `json:"readType,omitempty"`
 	InputModifications  commoncodec.ModifiersConfig `json:"inputModifications,omitempty"`
 	OutputModifications commoncodec.ModifiersConfig `json:"outputModifications,omitempty"`
-	PDADefiniton        codec.PDATypeDef            `json:"pdaDefinition,omitempty"` // Only used for PDA account reads
-	IndexedField0       *IndexedField               `json:"indexedField0"`
-	IndexedField1       *IndexedField               `json:"indexedField1"`
-	IndexedField2       *IndexedField               `json:"indexedField2"`
-	IndexedField3       *IndexedField               `json:"indexedField3"`
+	PDADefinition       codec.PDATypeDef            `json:"pdaDefinition,omitempty"` // Only used for PDA account reads
+	MultiReader         *MultiReader
+	IndexedField0       *IndexedField `json:"indexedField0"`
+	IndexedField1       *IndexedField `json:"indexedField1"`
+	IndexedField2       *IndexedField `json:"indexedField2"`
+	IndexedField3       *IndexedField `json:"indexedField3"`
 	// This will create a log poller filter for this event.
 	*PollingFilter `json:"pollingFilter,omitempty"`
 }
@@ -60,6 +73,38 @@ func (r ReadType) String() string {
 type IndexedField struct {
 	OffChainPath string `json:"offChainPath"`
 	OnChainPath  string `json:"onChainPath"`
+}
+
+func (c *ContractReader) UnmarshalJSON(bytes []byte) error {
+	rawJSON := make(map[string]json.RawMessage)
+	if err := json.Unmarshal(bytes, &rawJSON); err != nil {
+		return err
+	}
+
+	c.Namespaces = make(map[string]ChainContractReader)
+	if err := json.Unmarshal(rawJSON["namespaces"], &c.Namespaces); err != nil {
+		return err
+	}
+
+	if rawJSON["addressShareGroups"] != nil {
+		if err := json.Unmarshal(rawJSON["addressShareGroups"], &c.AddressShareGroups); err != nil {
+			return err
+		}
+	}
+
+	if c.AddressShareGroups != nil {
+		seen := make(map[string][]string)
+		for _, group := range c.AddressShareGroups {
+			for _, namespace := range group {
+				if seenIn, alreadySeen := seen[namespace]; alreadySeen {
+					return fmt.Errorf("namespace %s is already in share group %v: %w", namespace, seenIn, commontypes.ErrInvalidConfig)
+				}
+				seen[namespace] = group
+			}
+		}
+	}
+
+	return nil
 }
 
 func (c *ChainContractReader) UnmarshalJSON(bytes []byte) error {

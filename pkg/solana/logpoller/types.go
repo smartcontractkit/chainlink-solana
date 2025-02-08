@@ -112,9 +112,17 @@ const EventSignatureLength = 8
 
 type EventSignature [EventSignatureLength]byte
 
+func NewEventSignatureFromName(eventName string) EventSignature {
+	return EventSignature(codec.NewDiscriminatorHashPrefix(eventName, false))
+}
+
 // Scan implements Scanner for database/sql.
 func (s *EventSignature) Scan(src interface{}) error {
 	return scanFixedLengthArray("EventSignature", EventSignatureLength, src, s[:])
+}
+
+func (s EventSignature) String() string {
+	return string(s[:])
 }
 
 // Value implements valuer for database/sql.
@@ -214,6 +222,11 @@ func (v IndexedValues) Value() (driver.Value, error) {
 }
 
 func newIndexedValue(typedVal any) (iVal IndexedValue, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic recovered: %v while creating indexedValue for %T", r, typedVal)
+		}
+	}()
 	// handle 2 simplest cases first
 	switch t := typedVal.(type) {
 	case []byte:
@@ -240,7 +253,15 @@ func newIndexedValue(typedVal any) (iVal IndexedValue, err error) {
 	// any length array is fine as long as the element type is byte
 	if t := v.Type(); t.Kind() == reflect.Array {
 		if t.Elem().Kind() == reflect.Uint8 {
-			return v.Bytes(), nil
+			if v.CanAddr() {
+				return v.Bytes(), nil
+			}
+			result := make([]byte, v.Len())
+			l := v.Len()
+			for i := 0; i < l; i++ {
+				result[i] = byte(v.Index(i).Uint())
+			}
+			return result, nil
 		}
 	}
 	return nil, fmt.Errorf("can't create indexed value from type %T", typedVal)

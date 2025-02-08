@@ -31,12 +31,14 @@ func TestFilters_LoadFilters(t *testing.T) {
 		ID:           1,
 		Name:         "Happy path",
 		EventName:    "happyPath1",
+		EventSig:     NewEventSignatureFromName("happyPath1"),
 		IsBackfilled: true,
 	}
 	happyPath2 := Filter{
 		ID:        2,
 		Name:      "Happy path 2",
 		EventName: "happyPath2",
+		EventSig:  NewEventSignatureFromName("happyPath2"),
 	}
 	orm.On("SelectFilters", mock.Anything).Return([]Filter{
 		deleted,
@@ -59,8 +61,8 @@ func TestFilters_LoadFilters(t *testing.T) {
 	require.Equal(t, deleted, fs.filtersToDelete[deleted.ID])
 	// filtersByAddress only contains not deleted filters
 	require.Len(t, fs.filtersByAddress, 1)
-	require.Len(t, fs.filtersByAddress[happyPath.Address], 1)
-	require.Len(t, fs.filtersByAddress[happyPath.Address][happyPath.EventSig], 2)
+	require.Len(t, fs.filtersByAddress[happyPath.Address], 2)
+	require.Len(t, fs.filtersByAddress[happyPath.Address][happyPath.EventSig], 1)
 	// both filters are properly indexed
 	requireIndexed(t, fs, happyPath)
 	requireIndexed(t, fs, happyPath2)
@@ -81,7 +83,7 @@ func requireIndexed(t *testing.T, fs *filters, f Filter) {
 	eventSigIDs := byEventSig[f.EventSig]
 	require.Contains(t, eventSigIDs, f.ID)
 	require.Contains(t, fs.decoders, f.ID)
-	require.Contains(t, fs.knownDiscriminators, f.DiscriminatorRawBytes())
+	require.Contains(t, fs.knownDiscriminators, f.EventSig)
 	require.Contains(t, fs.knownPrograms, f.Address.String())
 }
 
@@ -94,7 +96,7 @@ func requireNoInIndices(t *testing.T, fs *filters, f Filter) {
 		require.NotContains(t, byEventSig[f.EventSig], f.ID)
 	}
 	require.NotContains(t, fs.decoders, f.ID)
-	require.NotContains(t, fs.knownDiscriminators, f.DiscriminatorRawBytes())
+	require.NotContains(t, fs.knownDiscriminators, f.EventSig)
 	require.NotContains(t, fs.knownPrograms, f.Address.String())
 	require.NotContains(t, fs.seqNums, f.ID)
 	require.NotContains(t, fs.filtersToBackfill, f.ID)
@@ -173,7 +175,6 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		err = fs.RegisterFilter(tests.Context(t), filter)
 		require.NoError(t, err)
 		// can update non-primary fields
-		filter.EventName = uuid.NewString()
 		filter.StartingBlock++
 		filter.Retention++
 		filter.MaxLogsKept++

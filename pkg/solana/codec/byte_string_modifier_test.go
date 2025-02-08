@@ -45,10 +45,10 @@ func TestSolanaAddressModifier(t *testing.T) {
 		assert.Contains(t, err.Error(), commontypes.ErrInvalidType.Error())
 	})
 
-	t.Run("DecodeAddress returns error for zero-value address", func(t *testing.T) {
-		_, err := modifier.DecodeAddress(solana.PublicKey{}.String())
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), commontypes.ErrInvalidType.Error())
+	t.Run("DecodeAddress decodes zero-value address", func(t *testing.T) {
+		decodedBytes, err := modifier.DecodeAddress(solana.PublicKey{}.String())
+		require.NoError(t, err)
+		assert.Equal(t, solana.PublicKey{}.Bytes(), decodedBytes)
 	})
 
 	t.Run("DecodeAddress returns error for address under 32 chars", func(t *testing.T) {

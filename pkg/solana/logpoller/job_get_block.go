@@ -8,6 +8,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
@@ -16,6 +18,7 @@ import (
 // getBlockJob is a job that fetches a block with transactions, converts logs into ProgramEvents and writes them into blocks channel
 type getBlockJob struct {
 	slotNumber       uint64
+	stopCh           services.StopRChan
 	client           RPCClient
 	blocks           chan Block
 	done             chan struct{}
@@ -23,7 +26,7 @@ type getBlockJob struct {
 	lggr             logger.SugaredLogger
 }
 
-func newGetBlockJob(client RPCClient, blocks chan Block, lggr logger.SugaredLogger, slotNumber uint64) *getBlockJob {
+func newGetBlockJob(stopCh services.StopRChan, client RPCClient, blocks chan Block, lggr logger.SugaredLogger, slotNumber uint64) *getBlockJob {
 	return &getBlockJob{
 		client:           client,
 		blocks:           blocks,
@@ -31,6 +34,7 @@ func newGetBlockJob(client RPCClient, blocks chan Block, lggr logger.SugaredLogg
 		done:             make(chan struct{}),
 		parseProgramLogs: parseProgramLogs,
 		lggr:             lggr,
+		stopCh:           stopCh,
 	}
 }
 
@@ -43,6 +47,11 @@ func (j *getBlockJob) Done() <-chan struct{} {
 }
 
 func (j *getBlockJob) Run(ctx context.Context) error {
+	ctx, cancel := j.stopCh.Ctx(ctx)
+	defer cancel()
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 	var excludeRewards bool
 	version := client.MaxSupportTransactionVersion
 	block, err := j.client.GetBlockWithOpts(
@@ -95,7 +104,7 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 			return fmt.Errorf("expected transaction to have meta. signature: %s; slot: %d; idx: %d", tx.Signatures[0], j.slotNumber, idx)
 		}
 		if txWithMeta.Meta.Err != nil {
-			j.lggr.Debugw("Skipping all events of failed transaction", "err", txWithMeta.Meta.Err, "signature", tx.Signatures[0])
+			// silently skip as at the moment there is no way for us to filter transactions produced by our contracts
 			continue
 		}
 		detail.trxSig = tx.Signatures[0] // according to Solana docs fist signature is used as ID
