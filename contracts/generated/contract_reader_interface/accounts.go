@@ -483,7 +483,8 @@ func (obj *MultiRead2) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 }
 
 type BillingTokenConfigWrapper struct {
-	Config BillingTokenConfig
+	Version uint8
+	Config  BillingTokenConfig
 }
 
 var BillingTokenConfigWrapperDiscriminator = [8]byte{63, 178, 72, 57, 171, 66, 44, 151}
@@ -491,6 +492,11 @@ var BillingTokenConfigWrapperDiscriminator = [8]byte{63, 178, 72, 57, 171, 66, 4
 func (obj BillingTokenConfigWrapper) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
 	err = encoder.WriteBytes(BillingTokenConfigWrapperDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
 	if err != nil {
 		return err
 	}
@@ -515,6 +521,11 @@ func (obj *BillingTokenConfigWrapper) UnmarshalWithDecoder(decoder *ag_binary.De
 				"[63 178 72 57 171 66 44 151]",
 				fmt.Sprint(discriminator[:]))
 		}
+	}
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
 	}
 	// Deserialize `Config`:
 	err = decoder.Decode(&obj.Config)

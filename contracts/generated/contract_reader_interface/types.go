@@ -338,12 +338,30 @@ func (obj *InnerStaticTestStruct) UnmarshalWithDecoder(decoder *ag_binary.Decode
 }
 
 type BillingTokenConfig struct {
-	UsdPerToken TimestampedPackedU224
+	Enabled                    bool
+	Mint                       ag_solanago.PublicKey
+	UsdPerToken                TimestampedPackedU224
+	PremiumMultiplierWeiPerEth uint64
 }
 
 func (obj BillingTokenConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Enabled` param:
+	err = encoder.Encode(obj.Enabled)
+	if err != nil {
+		return err
+	}
+	// Serialize `Mint` param:
+	err = encoder.Encode(obj.Mint)
+	if err != nil {
+		return err
+	}
 	// Serialize `UsdPerToken` param:
 	err = encoder.Encode(obj.UsdPerToken)
+	if err != nil {
+		return err
+	}
+	// Serialize `PremiumMultiplierWeiPerEth` param:
+	err = encoder.Encode(obj.PremiumMultiplierWeiPerEth)
 	if err != nil {
 		return err
 	}
@@ -351,8 +369,23 @@ func (obj BillingTokenConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 }
 
 func (obj *BillingTokenConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Enabled`:
+	err = decoder.Decode(&obj.Enabled)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Mint`:
+	err = decoder.Decode(&obj.Mint)
+	if err != nil {
+		return err
+	}
 	// Deserialize `UsdPerToken`:
 	err = decoder.Decode(&obj.UsdPerToken)
+	if err != nil {
+		return err
+	}
+	// Deserialize `PremiumMultiplierWeiPerEth`:
+	err = decoder.Decode(&obj.PremiumMultiplierWeiPerEth)
 	if err != nil {
 		return err
 	}

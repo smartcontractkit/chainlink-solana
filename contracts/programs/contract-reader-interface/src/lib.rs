@@ -109,7 +109,7 @@ pub struct Initialize<'info> {
         payer = signer,
         space = 8 + size_of::<BillingTokenConfigWrapper>(),
         seeds = [
-            b"token_price",
+            b"fee_billing_token_config",
             ADDRESS_1.as_ref()
         ],
         bump
@@ -121,7 +121,7 @@ pub struct Initialize<'info> {
         payer = signer,
         space = 8 + size_of::<BillingTokenConfigWrapper>(),
         seeds = [
-            b"token_price",
+            b"fee_billing_token_config",
             ADDRESS_2.as_ref()
         ],
         bump
@@ -301,18 +301,23 @@ pub const STATIC_VALUE2: [u8; 28] = [
 pub const STATIC_TIMESTAMP2: i64 = 1_800_000_002;
 
 #[account]
-#[derive(Debug)]
+#[derive(InitSpace, Debug)]
 pub struct BillingTokenConfigWrapper {
+    pub version: u8,
     pub config: BillingTokenConfig,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct BillingTokenConfig {
+    pub enabled: bool,
+    pub mint: Pubkey,
+
     pub usd_per_token: TimestampedPackedU224,
+    pub premium_multiplier_wei_per_eth: u64,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct TimestampedPackedU224 {
     pub value: [u8; 28],
-    pub timestamp: i64,
+    pub timestamp: i64, 
 }

@@ -4,11 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
+	"reflect"
 	"strings"
 	"sync"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -16,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
-
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
@@ -173,6 +176,16 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 		},
 	}
 
+	// TODO all of the err messages
+	if values.multiRead[0] == "GetTokenPrices" {
+		err2 := s.handleGetTokenPricesGetLatestValue(ctx, params, values, returnVal)
+		if err2 != nil {
+			return err2
+		}
+
+		return nil
+	}
+
 	results, err := doMethodBatchCall(ctx, s.client, s.bdRegistry, batch)
 	if err != nil {
 		return err
@@ -186,6 +199,98 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 		return fmt.Errorf("%w: %s", types.ErrInternal, results[0].err)
 	}
 
+	return nil
+}
+
+func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(ctx context.Context, params any, values readValues, returnVal any) error {
+	val := reflect.ValueOf(params)
+	if val.Kind() == reflect.Ptr {
+		// Dereference so we can access fields
+		val = val.Elem()
+	}
+
+	// Make sure we actually have a struct
+	if val.Kind() != reflect.Struct {
+		return fmt.Errorf("expected struct, got: %s", val.Kind())
+	}
+
+	// Attempt to get the "Tokens" field
+	field := val.FieldByName("Tokens")
+	if !field.IsValid() {
+		return fmt.Errorf("no field named 'Tokens' found")
+	}
+
+	// Convert that field’s interface value into the correct type
+	tokens, ok := field.Interface().(*[][32]uint8)
+	if !ok {
+		return fmt.Errorf("'Tokens' field is not *[][32]uint8")
+	}
+	programAddress, err := solana.PublicKeyFromBase58(values.address)
+	if err != nil {
+		return fmt.Errorf("%w: failed to parse program address: %q for contract %q", types.ErrInvalidConfig, values.address, values.contract)
+	}
+
+	var pdaAddresses []solana.PublicKey
+	for _, token := range *tokens {
+		tokenAddr := solana.PublicKeyFromBytes(token[:])
+		if tokenAddr.IsOnCurve() && !tokenAddr.IsZero() {
+			return fmt.Errorf("bad token address: %v for contract: %q read: %q", tokenAddr, values.contract, values.multiRead[0])
+		}
+
+		pdaAddress, _, err := solana.FindProgramAddress([][]byte{[]byte("fee_billing_token_config"), tokenAddr.Bytes()}, programAddress)
+		if err != nil {
+			return fmt.Errorf("%w: failed find program address for PDA: %w", types.ErrInvalidConfig, err)
+		}
+
+		pdaAddresses = append(pdaAddresses, pdaAddress)
+	}
+
+	data, err := s.client.GetMultipleAccountData(ctx, pdaAddresses...)
+	if err != nil {
+		return err
+	}
+
+	type TimestampedUnixBig struct {
+		Value     *big.Int `json:"value"`
+		Timestamp uint32   `json:"timestamp"`
+	}
+
+	returnSliceVal := reflect.ValueOf(returnVal)
+	if returnSliceVal.Kind() == reflect.Ptr {
+		returnSliceVal = returnSliceVal.Elem()
+		if returnSliceVal.Kind() == reflect.Ptr {
+			returnSliceVal = returnSliceVal.Elem()
+		}
+		if returnSliceVal.Kind() != reflect.Slice {
+			return fmt.Errorf("expected slice, got: %s", returnSliceVal.Kind())
+		}
+	}
+
+	elemType := returnSliceVal.Type().Elem()
+	newElem := reflect.New(elemType).Elem()
+
+	for _, d := range data {
+		wrapper := fee_quoter.BillingTokenConfigWrapper{}
+		err = wrapper.UnmarshalWithDecoder(bin.NewBorshDecoder(d))
+		if err != nil {
+			return err
+		}
+		v := big.NewInt(0)
+		v.SetBytes(wrapper.Config.UsdPerToken.Value[:])
+
+		valueField := newElem.FieldByName("Value")
+		if !valueField.IsValid() {
+			return errors.New("struct does not have a field named 'Value'")
+		}
+		valueField.Set(reflect.ValueOf(v))
+
+		timestampField := newElem.FieldByName("Timestamp")
+		if !timestampField.IsValid() {
+			return errors.New("struct does not have a field named 'Timestamp'")
+		}
+		timestampField.Set(reflect.ValueOf(uint32(wrapper.Config.UsdPerToken.Timestamp)))
+		returnSliceVal.Set(reflect.Append(returnSliceVal, newElem))
+	}
 	return nil
 }
 

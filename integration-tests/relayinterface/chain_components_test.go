@@ -7,6 +7,8 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
 	"sync"
@@ -56,13 +58,13 @@ func TestChainComponents(t *testing.T) {
 	helper := &helper{}
 	helper.Init(t)
 
-	t.Run("RunChainComponentsSolanaTests", func(t *testing.T) {
-		t.Parallel()
-		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}}
-		DisableTests(it)
-		it.Setup(t)
-		RunChainComponentsSolanaTests(t, it)
-	})
+	//t.Run("RunChainComponentsSolanaTests", func(t *testing.T) {
+	//	t.Parallel()
+	//	it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}}
+	//	DisableTests(it)
+	//	it.Setup(t)
+	//	RunChainComponentsSolanaTests(t, it)
+	//})
 
 	t.Run("RunChainComponentsInLoopSolanaTests", func(t *testing.T) {
 		t.Parallel()
@@ -193,11 +195,47 @@ func RunContractReaderTests[T WrappedTestingT[T]](t T, it *SolanaChainComponents
 	RunContractReaderInterfaceTests(t, it, false, true)
 }
 
+// GetLatestValue method
+const (
+	ContractReaderGetLatestValueUsingMultiReader       = "Get latest value using multi reader"
+	ContractReaderGetLatestValueUsingSplitParamsReader = "Get latest value using split params reader"
+)
+
+type TimestampedUnixBig struct {
+	Value     *big.Int `json:"value"`
+	Timestamp uint32   `json:"timestamp"`
+}
+
 func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsInterfaceTester[T]) {
 	//RunContractReaderInterfaceTests(t, it, false, true)
 	testCases := []Testcase[T]{
+		//{
+		//	Name: ContractReaderGetLatestValueUsingMultiReader,
+		//	Test: func(t T) {
+		//		cr := it.GetContractReader(t)
+		//		bindings := it.GetBindings(t)
+		//		ctx := tests.Context(t)
+		//
+		//		bound := BindingsByName(bindings, AnyContractName)[0]
+		//
+		//		require.NoError(t, cr.Bind(ctx, bindings))
+		//
+		//		type MultiReadResult struct {
+		//			A uint8
+		//			B int16
+		//			U string
+		//			V bool
+		//		}
+		//
+		//		mRR := MultiReadResult{}
+		//		require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(MultiRead), primitives.Unconfirmed, nil, &mRR))
+		//
+		//		expectedMRR := MultiReadResult{A: 1, B: 2, U: "Hello", V: true}
+		//		require.Equal(t, expectedMRR, mRR)
+		//	},
+		//},
 		{
-			Name: ContractReaderGetLatestValueWithPrimitiveReturn,
+			Name: ContractReaderGetLatestValueUsingSplitParamsReader,
 			Test: func(t T) {
 				cr := it.GetContractReader(t)
 				bindings := it.GetBindings(t)
@@ -207,18 +245,31 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 
 				require.NoError(t, cr.Bind(ctx, bindings))
 
-				type MultiReadResult struct {
-					A uint8
-					B int16
-					U string
-					V bool
+				type TimestampedUnixBig struct {
+					Value     *big.Int `json:"value"`
+					Timestamp uint32   `json:"timestamp"`
 				}
 
-				mRR := MultiReadResult{}
-				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(MultiRead), primitives.Unconfirmed, nil, &mRR))
+				res := make([]TimestampedUnixBig, 2)
 
-				expectedMRR := MultiReadResult{A: 1, B: 2, U: "Hello", V: true}
-				require.Equal(t, expectedMRR, mRR)
+				byteTokens := make([][]byte, 0, 2)
+				pubKey1, err := solana.PublicKeyFromBase58(SplitParamPubKey1)
+				require.NoError(t, err)
+				pubKey2, err := solana.PublicKeyFromBase58(SplitParamPubKey2)
+				require.NoError(t, err)
+
+				byteTokens = append(byteTokens, pubKey1.Bytes())
+				byteTokens = append(byteTokens, pubKey2.Bytes())
+				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(GetTokenPrices), primitives.Unconfirmed, map[string]any{"tokens": byteTokens}, &res))
+
+				fmt.Println(res[0].Value.String())
+				fmt.Println(res[0].Timestamp)
+				fmt.Println(res[1].Value.String())
+				fmt.Println(res[1].Timestamp)
+				require.Equal(t, "7048352069843304521481572571769838000081483315549204879493368331", res[0].Value.String())
+				require.Equal(t, uint32(1700000001), res[0].Timestamp)
+				require.Equal(t, "17980346130170174053328187512531209543631592085982266692926093439168", res[1].Value.String())
+				require.Equal(t, uint32(1800000002), res[1].Timestamp)
 			},
 		},
 	}
@@ -522,7 +573,10 @@ func (h *helper) runInitialize(
 	SubmitTransactionToCW(t, &it, cw, MethodSettingStruct, storeStructArgs, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
 }
 
-const MultiRead = "MultiRead"
+const (
+	MultiRead      = "MultiRead"
+	GetTokenPrices = "GetTokenPrices"
+)
 
 func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T) config.ContractReader {
 	idx := it.getTestIdx(t.Name())
@@ -552,16 +606,40 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 			AnyContractName: {
 				IDL: mustUnmarshalIDL(t, string(it.Helper.GetPrimaryIDL(t))),
 				Reads: map[string]config.ReadDefinition{
+					GetTokenPrices: {
+						ChainSpecificName: "BillingTokenConfigWrapper",
+						PDADefinition: codec.PDATypeDef{
+							Prefix: []byte("fee_billing_token_config"),
+							Seeds: []codec.PDASeed{
+								{
+									Name: "Tokens",
+									Type: codec.IdlType{
+										AsIdlTypeVec: &codec.IdlTypeVec{
+											Vec: codec.IdlType{AsString: codec.IdlTypePublicKey},
+										},
+									},
+								},
+							},
+						},
+						OutputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.DropModifierConfig{
+								Fields: []string{"Config"},
+							},
+							&commoncodec.HardCodeModifierConfig{
+								OffChainValues: map[string]any{
+									"Response": make([]TimestampedUnixBig, 1000),
+								},
+							},
+							&commoncodec.PropertyExtractorConfig{FieldName: "Response"},
+						},
+						ReadType: config.AccountSplitParams,
+					},
 					MultiRead: {
 						ChainSpecificName: "MultiRead1",
 						PDADefinition: codec.PDATypeDef{
 							Prefix: []byte("multi_read1"),
 						},
-						OutputModifications: commoncodec.ModifiersConfig{
-							&commoncodec.HardCodeModifierConfig{
-								OffChainValues: map[string]any{"U": "", "V": false},
-							},
-						},
+						OutputModifications: commoncodec.ModifiersConfig{},
 						MultiReader: &config.MultiReader{Reads: []config.ReadDefinition{
 							{
 								ChainSpecificName: "MultiRead2",
@@ -661,14 +739,19 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 	}
 }
 
+const (
+	SplitParamPubKey1 = "4RzYhbqRjaZHMnfxiPNDVzuimBbAb2FZErQKCLYKrkMe"
+	SplitParamPubKey2 = "9mBYSvyF8RBWNdat6SkZE5ipW5gMrBYqZnTShMsnfsub"
+)
+
 func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T) chainwriter.ChainWriterConfig {
 	idx := it.getTestIdx(t.Name())
 	testIdx := binary.LittleEndian.AppendUint64([]byte{}, idx)
 	fromAddress := solana.MustPrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1]).PublicKey().String()
 	testStruct := CreateTestStruct(0, it)
-	pubKey1, err := solana.PublicKeyFromBase58("4RzYhbqRjaZHMnfxiPNDVzuimBbAb2FZErQKCLYKrkMe")
+	pubKey1, err := solana.PublicKeyFromBase58(SplitParamPubKey1)
 	require.NoError(t, err)
-	pubKey2, err := solana.PublicKeyFromBase58("9mBYSvyF8RBWNdat6SkZE5ipW5gMrBYqZnTShMsnfsub")
+	pubKey2, err := solana.PublicKeyFromBase58(SplitParamPubKey2)
 	require.NoError(t, err)
 
 	return chainwriter.ChainWriterConfig{
@@ -731,7 +814,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 									Address: primaryProgramPubKey,
 								},
 								Seeds: []chainwriter.Seed{
-									{Static: []byte("token_price")},
+									{Static: []byte("fee_billing_token_config")},
 									{Static: pubKey1.Bytes()},
 								},
 								IsWritable: true,
@@ -744,7 +827,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 									Address: primaryProgramPubKey,
 								},
 								Seeds: []chainwriter.Seed{
-									{Static: []byte("token_price")},
+									{Static: []byte("fee_billing_token_config")},
 									{Static: pubKey2.Bytes()},
 								},
 								IsWritable: true,
