@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
@@ -176,14 +177,8 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 		},
 	}
 
-	// TODO all of the err messages
 	if values.multiRead[0] == "GetTokenPrices" {
-		err2 := s.handleGetTokenPricesGetLatestValue(ctx, params, values, returnVal)
-		if err2 != nil {
-			return err2
-		}
-
-		return nil
+		return s.handleGetTokenPricesGetLatestValue(ctx, params, values, returnVal)
 	}
 
 	results, err := doMethodBatchCall(ctx, s.client, s.bdRegistry, batch)
@@ -199,98 +194,6 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 		return fmt.Errorf("%w: %s", types.ErrInternal, results[0].err)
 	}
 
-	return nil
-}
-
-func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(ctx context.Context, params any, values readValues, returnVal any) error {
-	val := reflect.ValueOf(params)
-	if val.Kind() == reflect.Ptr {
-		// Dereference so we can access fields
-		val = val.Elem()
-	}
-
-	// Make sure we actually have a struct
-	if val.Kind() != reflect.Struct {
-		return fmt.Errorf("expected struct, got: %s", val.Kind())
-	}
-
-	// Attempt to get the "Tokens" field
-	field := val.FieldByName("Tokens")
-	if !field.IsValid() {
-		return fmt.Errorf("no field named 'Tokens' found")
-	}
-
-	// Convert that field’s interface value into the correct type
-	tokens, ok := field.Interface().(*[][32]uint8)
-	if !ok {
-		return fmt.Errorf("'Tokens' field is not *[][32]uint8")
-	}
-	programAddress, err := solana.PublicKeyFromBase58(values.address)
-	if err != nil {
-		return fmt.Errorf("%w: failed to parse program address: %q for contract %q", types.ErrInvalidConfig, values.address, values.contract)
-	}
-
-	var pdaAddresses []solana.PublicKey
-	for _, token := range *tokens {
-		tokenAddr := solana.PublicKeyFromBytes(token[:])
-		if tokenAddr.IsOnCurve() && !tokenAddr.IsZero() {
-			return fmt.Errorf("bad token address: %v for contract: %q read: %q", tokenAddr, values.contract, values.multiRead[0])
-		}
-
-		pdaAddress, _, err := solana.FindProgramAddress([][]byte{[]byte("fee_billing_token_config"), tokenAddr.Bytes()}, programAddress)
-		if err != nil {
-			return fmt.Errorf("%w: failed find program address for PDA: %w", types.ErrInvalidConfig, err)
-		}
-
-		pdaAddresses = append(pdaAddresses, pdaAddress)
-	}
-
-	data, err := s.client.GetMultipleAccountData(ctx, pdaAddresses...)
-	if err != nil {
-		return err
-	}
-
-	type TimestampedUnixBig struct {
-		Value     *big.Int `json:"value"`
-		Timestamp uint32   `json:"timestamp"`
-	}
-
-	returnSliceVal := reflect.ValueOf(returnVal)
-	if returnSliceVal.Kind() == reflect.Ptr {
-		returnSliceVal = returnSliceVal.Elem()
-		if returnSliceVal.Kind() == reflect.Ptr {
-			returnSliceVal = returnSliceVal.Elem()
-		}
-		if returnSliceVal.Kind() != reflect.Slice {
-			return fmt.Errorf("expected slice, got: %s", returnSliceVal.Kind())
-		}
-	}
-
-	elemType := returnSliceVal.Type().Elem()
-	newElem := reflect.New(elemType).Elem()
-
-	for _, d := range data {
-		wrapper := fee_quoter.BillingTokenConfigWrapper{}
-		err = wrapper.UnmarshalWithDecoder(bin.NewBorshDecoder(d))
-		if err != nil {
-			return err
-		}
-		v := big.NewInt(0)
-		v.SetBytes(wrapper.Config.UsdPerToken.Value[:])
-
-		valueField := newElem.FieldByName("Value")
-		if !valueField.IsValid() {
-			return errors.New("struct does not have a field named 'Value'")
-		}
-		valueField.Set(reflect.ValueOf(v))
-
-		timestampField := newElem.FieldByName("Timestamp")
-		if !timestampField.IsValid() {
-			return errors.New("struct does not have a field named 'Timestamp'")
-		}
-		timestampField.Set(reflect.ValueOf(uint32(wrapper.Config.UsdPerToken.Timestamp)))
-		returnSliceVal.Set(reflect.Append(returnSliceVal, newElem))
-	}
 	return nil
 }
 
@@ -444,7 +347,7 @@ func (s *ContractReaderService) initNamespace(namespaces map[string]config.Chain
 			utils.InjectAddressModifier(read.InputModifications, read.OutputModifications)
 
 			switch read.ReadType {
-			case config.Account, config.AccountPDA, config.AccountSplitParams:
+			case config.Account:
 				idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeAccountDef, read.ChainSpecificName, nameSpaceDef.IDL)
 				if err != nil {
 					return err
@@ -510,10 +413,10 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 	// Create PDA read binding if PDA prefix or seeds configs are populated
 	if readDefinition.PDADefinition.Prefix != nil || len(readDefinition.PDADefinition.Seeds) > 0 {
 		inputAccountIDLDef = readDefinition.PDADefinition
-		reader = newAccountReadBinding(namespace, genericName, readDefinition.PDADefinition.Prefix, readDefinition.ReadType)
+		reader = newAccountReadBinding(namespace, genericName, readDefinition.PDADefinition.Prefix, true)
 	} else {
 		inputAccountIDLDef = codec.NilIdlTypeDefTy
-		reader = newAccountReadBinding(namespace, genericName, nil, config.Account)
+		reader = newAccountReadBinding(namespace, genericName, nil, false)
 	}
 	if err := s.addCodecDef(true, namespace, genericName, idl, inputAccountIDLDef, readDefinition.InputModifications); err != nil {
 		return err
@@ -531,8 +434,8 @@ func (s *ContractReaderService) addMultiAccountRead(namespace string, readDefini
 			return nil, err
 		}
 
-		if mr.ReadType != config.AccountPDA {
-			return nil, fmt.Errorf("unexpected read type %q for multi read: %q in namespace: %q", mr.ReadType, mr.ChainSpecificName, namespace)
+		if mr.ReadType != config.Account {
+			return nil, fmt.Errorf("unexpected read type %q for dynamic hard coder read: %q in namespace: %q", mr.ReadType, mr.ChainSpecificName, namespace)
 		}
 
 		accountIDLDef, isOk := idlDef.(codec.IdlTypeDef)
@@ -599,4 +502,142 @@ func applyIndexedFieldTuple(lookup map[string]uint64, subKeys [4][]string, conf 
 		lookup[conf.OffChainPath] = idx
 		subKeys[idx] = strings.Split(conf.OnChainPath, ".")
 	}
+}
+
+func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
+	ctx context.Context,
+	params any,
+	values readValues,
+	returnVal any,
+) error {
+	pdaAddresses, err := s.getPDAsForGetTokenPrices(params, values)
+	if err != nil {
+		return err
+	}
+
+	data, err := s.client.GetMultipleAccountData(ctx, pdaAddresses...)
+	if err != nil {
+		return fmt.Errorf(
+			"for contract %q read %q: failed to get multiple account data: %w",
+			values.contract, values.multiRead[0], err,
+		)
+	}
+
+	// -------------- Fill out the returnVal slice with data --------------
+	// can't typecast returnVal so we have to use reflection here
+
+	// Ensure `returnVal` is a pointer to a slice we can populate.
+	returnSliceVal := reflect.ValueOf(returnVal)
+	if returnSliceVal.Kind() == reflect.Ptr {
+		returnSliceVal = returnSliceVal.Elem()
+		if returnSliceVal.Kind() == reflect.Ptr {
+			returnSliceVal = returnSliceVal.Elem()
+		}
+	}
+	if returnSliceVal.Kind() != reflect.Slice {
+		return fmt.Errorf(
+			"for contract %q read %q: expected `returnVal` to be a slice, got %s",
+			values.contract, values.multiRead[0], returnSliceVal.Kind(),
+		)
+	}
+
+	elemType := returnSliceVal.Type().Elem()
+	for _, d := range data {
+		var wrapper fee_quoter.BillingTokenConfigWrapper
+		if err = wrapper.UnmarshalWithDecoder(bin.NewBorshDecoder(d)); err != nil {
+			return fmt.Errorf(
+				"for contract %q read %q: failed to unmarshal account data: %w",
+				values.contract, values.multiRead[0], err,
+			)
+		}
+
+		newElem := reflect.New(elemType).Elem()
+
+		valueField := newElem.FieldByName("Value")
+		if !valueField.IsValid() {
+			return fmt.Errorf(
+				"for contract %q read %q: struct type missing `Value` field",
+				values.contract, values.multiRead[0],
+			)
+		}
+		valueField.Set(reflect.ValueOf(big.NewInt(0).SetBytes(wrapper.Config.UsdPerToken.Value[:])))
+
+		timestampField := newElem.FieldByName("Timestamp")
+		if !timestampField.IsValid() {
+			return fmt.Errorf(
+				"for contract %q read %q: struct type missing `Timestamp` field",
+				values.contract, values.multiRead[0],
+			)
+		}
+
+		// nolint:gosec
+		// G115: integer overflow conversion int64 -&gt; uint32
+		timestampField.Set(reflect.ValueOf(uint32(wrapper.Config.UsdPerToken.Timestamp)))
+
+		returnSliceVal.Set(reflect.Append(returnSliceVal, newElem))
+	}
+
+	return nil
+}
+
+func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values readValues) ([]solana.PublicKey, error) {
+	val := reflect.ValueOf(params)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	if val.Kind() != reflect.Struct {
+		return nil, fmt.Errorf(
+			"for contract %q read %q: expected `params` to be a struct, got %s",
+			values.contract, values.multiRead[0], val.Kind(),
+		)
+	}
+
+	field := val.FieldByName("Tokens")
+	if !field.IsValid() {
+		return nil, fmt.Errorf(
+			"for contract %q read %q: no field named 'Tokens' found in params",
+			values.contract, values.multiRead[0],
+		)
+	}
+
+	tokens, ok := field.Interface().(*[][32]uint8)
+	if !ok {
+		return nil, fmt.Errorf(
+			"for contract %q read %q: 'Tokens' field is not of type *[][32]uint8",
+			values.contract, values.multiRead[0],
+		)
+	}
+
+	programAddress, err := solana.PublicKeyFromBase58(values.address)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"for contract %q read %q: %w (could not parse program address %q)",
+			values.contract, values.multiRead[0], types.ErrInvalidConfig, values.address,
+		)
+	}
+
+	// Build the PDA addresses for all tokens.
+	var pdaAddresses []solana.PublicKey
+	for _, token := range *tokens {
+		tokenAddr := solana.PublicKeyFromBytes(token[:])
+		if tokenAddr.IsOnCurve() && !tokenAddr.IsZero() {
+			return nil, fmt.Errorf(
+				"for contract %q read %q: invalid token address %v (on-curve or zero)",
+				values.contract, values.multiRead[0], tokenAddr,
+			)
+		}
+
+		pdaAddress, _, err := solana.FindProgramAddress(
+			[][]byte{[]byte("fee_billing_token_config"), tokenAddr.Bytes()},
+			programAddress,
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"for contract %q read %q: %w (failed to find PDA for token %v)",
+				values.contract, values.multiRead[0], types.ErrInvalidConfig, tokenAddr,
+			)
+		}
+		pdaAddresses = append(pdaAddresses, pdaAddress)
+	}
+	return pdaAddresses, nil
 }

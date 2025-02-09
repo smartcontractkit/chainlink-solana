@@ -58,13 +58,13 @@ func TestChainComponents(t *testing.T) {
 	helper := &helper{}
 	helper.Init(t)
 
-	//t.Run("RunChainComponentsSolanaTests", func(t *testing.T) {
-	//	t.Parallel()
-	//	it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}}
-	//	DisableTests(it)
-	//	it.Setup(t)
-	//	RunChainComponentsSolanaTests(t, it)
-	//})
+	t.Run("RunChainComponentsSolanaTests", func(t *testing.T) {
+		t.Parallel()
+		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}}
+		DisableTests(it)
+		it.Setup(t)
+		RunChainComponentsSolanaTests(t, it)
+	})
 
 	t.Run("RunChainComponentsInLoopSolanaTests", func(t *testing.T) {
 		t.Parallel()
@@ -209,31 +209,31 @@ type TimestampedUnixBig struct {
 func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsInterfaceTester[T]) {
 	//RunContractReaderInterfaceTests(t, it, false, true)
 	testCases := []Testcase[T]{
-		//{
-		//	Name: ContractReaderGetLatestValueUsingMultiReader,
-		//	Test: func(t T) {
-		//		cr := it.GetContractReader(t)
-		//		bindings := it.GetBindings(t)
-		//		ctx := tests.Context(t)
-		//
-		//		bound := BindingsByName(bindings, AnyContractName)[0]
-		//
-		//		require.NoError(t, cr.Bind(ctx, bindings))
-		//
-		//		type MultiReadResult struct {
-		//			A uint8
-		//			B int16
-		//			U string
-		//			V bool
-		//		}
-		//
-		//		mRR := MultiReadResult{}
-		//		require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(MultiRead), primitives.Unconfirmed, nil, &mRR))
-		//
-		//		expectedMRR := MultiReadResult{A: 1, B: 2, U: "Hello", V: true}
-		//		require.Equal(t, expectedMRR, mRR)
-		//	},
-		//},
+		{
+			Name: ContractReaderGetLatestValueUsingMultiReader,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				bindings := it.GetBindings(t)
+				ctx := tests.Context(t)
+
+				bound := BindingsByName(bindings, AnyContractName)[0]
+
+				require.NoError(t, cr.Bind(ctx, bindings))
+
+				type MultiReadResult struct {
+					A uint8
+					B int16
+					U string
+					V bool
+				}
+
+				mRR := MultiReadResult{}
+				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(MultiRead), primitives.Unconfirmed, nil, &mRR))
+
+				expectedMRR := MultiReadResult{A: 1, B: 2, U: "Hello", V: true}
+				require.Equal(t, expectedMRR, mRR)
+			},
+		},
 		{
 			Name: ContractReaderGetLatestValueUsingSplitParamsReader,
 			Test: func(t T) {
@@ -632,7 +632,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 							},
 							&commoncodec.PropertyExtractorConfig{FieldName: "Response"},
 						},
-						ReadType: config.AccountSplitParams,
+						ReadType: config.Account,
 					},
 					MultiRead: {
 						ChainSpecificName: "MultiRead1",
@@ -644,10 +644,10 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 							{
 								ChainSpecificName: "MultiRead2",
 								PDADefinition:     codec.PDATypeDef{Prefix: []byte("multi_read2")},
-								ReadType:          config.AccountPDA,
+								ReadType:          config.Account,
 							},
 						}},
-						ReadType: config.AccountPDA,
+						ReadType: config.Account,
 					},
 					MethodReturningUint64: uint64ReadDef,
 					MethodReturningUint64Slice: {

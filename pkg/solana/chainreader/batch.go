@@ -115,6 +115,7 @@ func doMethodBatchCall(ctx context.Context, client MultipleAccountGetter, bindin
 			decodeReturnVal(ctx, rBinding, data[idx], results[idx].returnVal),
 			results[idx].err)
 	}
+
 	return results, nil
 }
 

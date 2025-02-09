@@ -4,14 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 
 	"github.com/gagliardetto/solana-go"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
@@ -21,16 +19,16 @@ type accountReadBinding struct {
 	namespace, genericName string
 	codec                  types.RemoteCodec
 	key                    solana.PublicKey
-	prefix                 []byte
-	readType               config.ReadType
+	isPda                  bool   // flag to signify whether or not the account read is for a PDA
+	prefix                 []byte // only used for PDA public key calculation
 }
 
-func newAccountReadBinding(namespace, genericName string, prefix []byte, readType config.ReadType) *accountReadBinding {
+func newAccountReadBinding(namespace, genericName string, prefix []byte, isPda bool) *accountReadBinding {
 	return &accountReadBinding{
 		namespace:   namespace,
 		genericName: genericName,
 		prefix:      prefix,
-		readType:    readType,
+		isPda:       isPda,
 	}
 }
 
@@ -48,7 +46,7 @@ func (b *accountReadBinding) SetAddress(key solana.PublicKey) {
 
 func (b *accountReadBinding) GetAddress(ctx context.Context, params any) (solana.PublicKey, error) {
 	// Return the bound key if normal account read
-	if !slices.Contains([]config.ReadType{config.AccountSplitParams, config.AccountPDA}, b.readType) {
+	if !b.isPda {
 		return b.key, nil
 	}
 	// Calculate the public key if PDA account read
@@ -69,10 +67,6 @@ func (b *accountReadBinding) CreateType(forEncoding bool) (any, error) {
 
 func (b *accountReadBinding) Decode(ctx context.Context, bts []byte, outVal any) error {
 	return b.codec.Decode(ctx, bts, outVal, codec.WrapItemType(false, b.namespace, b.genericName))
-}
-
-func (b *accountReadBinding) ReadType() config.ReadType {
-	return b.readType
 }
 
 // buildSeedsSlice encodes and builds the seedslist to calculate the PDA public key

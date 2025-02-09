@@ -12,8 +12,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 )
 
@@ -131,10 +131,6 @@ func (b *eventReadBinding) remapPrimitive(expression query.Expression) (query.Ex
 	}
 
 	return comp, nil
-}
-
-func (b *eventReadBinding) ReadType() config.ReadType {
-	return config.Event
 }
 
 func (b *eventReadBinding) encodeComparator(comparator *primitives.Comparator) (query.Expression, error) {
