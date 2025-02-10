@@ -8,7 +8,6 @@ jobs:
   E2E-Solana-Image:
     uses: ./.github/workflows/open-pr.yml
     with:
-      reviewers: aalu1418
       run: |
         make upgrade-solana-image
         image=$(curl https://api.github.com/repos/anza-xyz/agave/releases/latest | jq -r '.tag_name')
@@ -22,7 +21,6 @@ jobs:
   E2E-Testing-Dependencies:
     uses: ./.github/workflows/open-pr.yml
     with:
-      reviewers: aalu1418
       run: |
 
         # get CTF version in core

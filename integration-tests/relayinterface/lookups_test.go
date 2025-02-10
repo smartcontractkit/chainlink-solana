@@ -48,7 +48,7 @@ func TestAccountContant(t *testing.T) {
 			IsSigner:   true,
 			IsWritable: true,
 		}
-		result, err := constantConfig.Resolve(tests.Context(t), nil, nil, nil, testContractIDL)
+		result, err := constantConfig.Resolve(tests.Context(t), nil, nil, nil)
 		require.NoError(t, err)
 		require.Equal(t, expectedMeta, result)
 	})
@@ -76,7 +76,7 @@ func TestAccountLookups(t *testing.T) {
 			IsSigner:   chainwriter.MetaBool{Value: true},
 			IsWritable: chainwriter.MetaBool{Value: true},
 		}
-		result, err := lookupConfig.Resolve(ctx, testArgs, nil, nil, testContractIDL)
+		result, err := lookupConfig.Resolve(ctx, testArgs, nil, nil)
 		require.NoError(t, err)
 		require.Equal(t, expectedMeta, result)
 	})
@@ -110,7 +110,7 @@ func TestAccountLookups(t *testing.T) {
 			IsSigner:   chainwriter.MetaBool{Value: true},
 			IsWritable: chainwriter.MetaBool{Value: true},
 		}
-		result, err := lookupConfig.Resolve(ctx, testArgs, nil, nil, testContractIDL)
+		result, err := lookupConfig.Resolve(ctx, testArgs, nil, nil)
 		require.NoError(t, err)
 		for i, meta := range result {
 			require.Equal(t, expectedMeta[i], meta)
@@ -131,7 +131,7 @@ func TestAccountLookups(t *testing.T) {
 			IsSigner:   chainwriter.MetaBool{Value: true},
 			IsWritable: chainwriter.MetaBool{Value: true},
 		}
-		_, err := lookupConfig.Resolve(ctx, testArgs, nil, nil, testContractIDL)
+		_, err := lookupConfig.Resolve(ctx, testArgs, nil, nil)
 		require.Error(t, err)
 	})
 
@@ -161,7 +161,7 @@ func TestAccountLookups(t *testing.T) {
 			},
 		}
 
-		result, err := lookupConfig.Resolve(ctx, args, nil, nil, testContractIDL)
+		result, err := lookupConfig.Resolve(ctx, args, nil, nil)
 		require.NoError(t, err)
 
 		for i, meta := range result {
@@ -199,7 +199,7 @@ func TestAccountLookups(t *testing.T) {
 			Bitmaps: []uint64{5, 3},
 		}
 
-		_, err := lookupConfig.Resolve(ctx, args, nil, nil, testContractIDL)
+		_, err := lookupConfig.Resolve(ctx, args, nil, nil)
 		require.Contains(t, err.Error(), "bitmap value is not a single value")
 	})
 
@@ -226,7 +226,7 @@ func TestAccountLookups(t *testing.T) {
 			},
 		}
 
-		_, err := lookupConfig.Resolve(ctx, args, nil, nil, testContractIDL)
+		_, err := lookupConfig.Resolve(ctx, args, nil, nil)
 		require.Contains(t, err.Error(), "error reading bitmap from location")
 	})
 
@@ -253,7 +253,7 @@ func TestAccountLookups(t *testing.T) {
 			},
 		}
 
-		_, err := lookupConfig.Resolve(ctx, args, nil, nil, testContractIDL)
+		_, err := lookupConfig.Resolve(ctx, args, nil, nil)
 		require.Contains(t, err.Error(), "invalid value format at path")
 	})
 }
@@ -286,7 +286,7 @@ func TestPDALookups(t *testing.T) {
 			IsWritable: true,
 		}
 
-		result, err := pdaLookup.Resolve(ctx, nil, nil, nil, testContractIDL)
+		result, err := pdaLookup.Resolve(ctx, nil, nil, nil)
 		require.NoError(t, err)
 		require.Equal(t, expectedMeta, result)
 	})
@@ -321,7 +321,7 @@ func TestPDALookups(t *testing.T) {
 			"another_seed": seed2,
 		}
 
-		result, err := pdaLookup.Resolve(ctx, args, nil, nil, testContractIDL)
+		result, err := pdaLookup.Resolve(ctx, args, nil, nil)
 		require.NoError(t, err)
 		require.Equal(t, expectedMeta, result)
 	})
@@ -341,7 +341,7 @@ func TestPDALookups(t *testing.T) {
 			"test_seed": []byte("data"),
 		}
 
-		_, err := pdaLookup.Resolve(ctx, args, nil, nil, testContractIDL)
+		_, err := pdaLookup.Resolve(ctx, args, nil, nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "key not found")
 	})
@@ -377,7 +377,7 @@ func TestPDALookups(t *testing.T) {
 			"another_seed": seed2,
 		}
 
-		result, err := pdaLookup.Resolve(ctx, args, nil, nil, testContractIDL)
+		result, err := pdaLookup.Resolve(ctx, args, nil, nil)
 		require.NoError(t, err)
 		require.Equal(t, expectedMeta, result)
 	})
@@ -415,7 +415,7 @@ func TestPDALookups(t *testing.T) {
 			"array_seed":  arraySeed,
 		}
 
-		result, err := pdaLookup.Resolve(ctx, args, nil, nil, testContractIDL)
+		result, err := pdaLookup.Resolve(ctx, args, nil, nil)
 		require.NoError(t, err)
 		require.Equal(t, expectedMeta, result)
 	})
@@ -455,7 +455,7 @@ func TestPDALookups(t *testing.T) {
 			"seed2": arraySeed2,
 		}
 
-		result, err := pdaLookup.Resolve(ctx, args, nil, nil, testContractIDL)
+		result, err := pdaLookup.Resolve(ctx, args, nil, nil)
 		require.NoError(t, err)
 		require.Equal(t, expectedMeta, result)
 	})
@@ -491,7 +491,7 @@ func TestLookupTables(t *testing.T) {
 			DerivedLookupTables: nil,
 			StaticLookupTables:  []solana.PublicKey{table},
 		}
-		_, staticTableMap, resolveErr := cw.ResolveLookupTables(ctx, nil, lookupConfig, testContractIDL)
+		_, staticTableMap, resolveErr := cw.ResolveLookupTables(ctx, nil, lookupConfig)
 		require.NoError(t, resolveErr)
 		require.Equal(t, pubKeys, staticTableMap[table])
 	})
@@ -512,7 +512,7 @@ func TestLookupTables(t *testing.T) {
 			},
 			StaticLookupTables: nil,
 		}
-		derivedTableMap, _, resolveErr := cw.ResolveLookupTables(ctx, nil, lookupConfig, testContractIDL)
+		derivedTableMap, _, resolveErr := cw.ResolveLookupTables(ctx, nil, lookupConfig)
 		require.NoError(t, resolveErr)
 
 		addresses, ok := derivedTableMap["DerivedTable"][table.String()]
@@ -540,7 +540,7 @@ func TestLookupTables(t *testing.T) {
 			StaticLookupTables: nil,
 		}
 
-		_, _, err = cw.ResolveLookupTables(ctx, nil, lookupConfig, testContractIDL)
+		_, _, err = cw.ResolveLookupTables(ctx, nil, lookupConfig)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "error fetching account info for table") // Example error message
 	})
@@ -553,7 +553,7 @@ func TestLookupTables(t *testing.T) {
 			StaticLookupTables:  []solana.PublicKey{invalidTable},
 		}
 
-		_, _, err = cw.ResolveLookupTables(ctx, nil, lookupConfig, testContractIDL)
+		_, _, err = cw.ResolveLookupTables(ctx, nil, lookupConfig)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "error fetching account info for table") // Example error message
 	})
@@ -581,7 +581,7 @@ func TestLookupTables(t *testing.T) {
 			},
 		}
 
-		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, testArgs, lookupConfig, testContractIDL)
+		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, testArgs, lookupConfig)
 		require.NoError(t, err)
 
 		addresses, ok := derivedTableMap["DerivedTable"][table.String()]
@@ -619,6 +619,7 @@ func TestLookupTables(t *testing.T) {
 						InternalField: chainwriter.InternalField{
 							TypeName: "LookupTableDataAccount",
 							Location: "LookupTable",
+							IDL:      testContractIDL,
 						},
 					},
 				},
@@ -626,7 +627,7 @@ func TestLookupTables(t *testing.T) {
 			StaticLookupTables: nil,
 		}
 
-		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, args, lookupConfig, testContractIDL)
+		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, args, lookupConfig)
 		require.NoError(t, err)
 
 		addresses, ok := derivedTableMap["DerivedTable"][lookupTable.String()]
