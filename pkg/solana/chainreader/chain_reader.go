@@ -461,8 +461,8 @@ func (s *ContractReaderService) addMultiAccountRead(namespace string, readDefini
 func (s *ContractReaderService) addEventRead(
 	namespace, genericName string,
 	contractAddress solana.PublicKey,
-	_ codec.IDL,
-	_ codec.IdlEvent,
+	idl codec.IDL,
+	eventIdl codec.IdlEvent,
 	readDefinition config.ReadDefinition,
 	events EventsReader,
 ) error {
@@ -474,7 +474,8 @@ func (s *ContractReaderService) addEventRead(
 	applyIndexedFieldTuple(mappedTuples, subKeys, readDefinition.IndexedField2, 2)
 	applyIndexedFieldTuple(mappedTuples, subKeys, readDefinition.IndexedField3, 3)
 
-	filter := toLPFilter(readDefinition.PollingFilter, contractAddress, subKeys[:])
+	filter := toLPFilter(readDefinition.PollingFilter, contractAddress, subKeys[:],
+		codec.EventIDLTypes{Event: eventIdl, Types: idl.Types})
 
 	s.filters = append(s.filters, filter)
 	s.bdRegistry.AddReadBinding(namespace, genericName, newEventReadBinding(
@@ -492,11 +493,13 @@ func toLPFilter(
 	f *config.PollingFilter,
 	address solana.PublicKey,
 	subKeyPaths [][]string,
+	eventIdl codec.EventIDLTypes,
 ) logpoller.Filter {
 	return logpoller.Filter{
 		Address:     logpoller.PublicKey(address),
 		EventName:   f.EventName,
-		EventSig:    logpoller.EventSignature([]byte(f.EventName)[:logpoller.EventSignatureLength]),
+		EventSig:    logpoller.NewEventSignatureFromName(f.EventName),
+		EventIdl:    logpoller.EventIdl(eventIdl),
 		SubkeyPaths: subKeyPaths,
 		Retention:   f.Retention,
 		MaxLogsKept: f.MaxLogsKept,
