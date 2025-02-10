@@ -263,11 +263,6 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 				byteTokens = append(byteTokens, pubKey1.Bytes())
 				byteTokens = append(byteTokens, pubKey2.Bytes())
 				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(GetTokenPrices), primitives.Unconfirmed, map[string]any{"tokens": byteTokens}, &res))
-
-				fmt.Println(res[0].Value.String())
-				fmt.Println(res[0].Timestamp)
-				fmt.Println(res[1].Value.String())
-				fmt.Println(res[1].Timestamp)
 				require.Equal(t, "7048352069843304521481572571769838000081483315549204879493368331", res[0].Value.String())
 				require.Equal(t, uint32(1700000001), res[0].Timestamp)
 				require.Equal(t, "17980346130170174053328187512531209543631592085982266692926093439168", res[1].Value.String())
@@ -563,11 +558,6 @@ func (h *helper) runInitialize(
 		return
 	}
 
-	fmt.Println("testIdx:")
-	for k, v := range it.testContext {
-		fmt.Println("k:", k, "v:", v)
-	}
-
 	initArgs := InitializeArgs{
 		TestIdx: testIdx,
 		Value:   value,
@@ -575,7 +565,8 @@ func (h *helper) runInitialize(
 	SubmitTransactionToCW(t, &it, cw, "initialize", initArgs, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
 
 	h.initOnce.Do(func() {
-		SubmitTransactionToCW(t, &it, cw, "initializeOnce", nil, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
+		SubmitTransactionToCW(t, &it, cw, "initializeMultiReadOnce", nil, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
+		SubmitTransactionToCW(t, &it, cw, "initializeBillingTokeConfigWrapperOnce", nil, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
 	})
 
 	storeStructArgs := StoreStructArgs{
@@ -809,10 +800,10 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						},
 						DebugIDLocation: "",
 					},
-					"initializeOnce": {
+					"initializeMultiReadOnce": {
 						FromAddress:        fromAddress,
 						InputModifications: nil,
-						ChainSpecificName:  "initializeOnce",
+						ChainSpecificName:  "initializeMultiReadOnce",
 						LookupTables:       chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
 							chainwriter.AccountConstant{
@@ -844,6 +835,27 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								},
 								IsWritable: true,
 								IsSigner:   false,
+							},
+							chainwriter.AccountConstant{
+								Name:       "SystemProgram",
+								Address:    solana.SystemProgramID.String(),
+								IsWritable: false,
+								IsSigner:   false,
+							},
+						},
+						DebugIDLocation: "",
+					},
+					"initializeBillingTokeConfigWrapperOnce": {
+						FromAddress:        fromAddress,
+						InputModifications: nil,
+						ChainSpecificName:  "initializeBillingTokeConfigWrapperOnce",
+						LookupTables:       chainwriter.LookupTables{},
+						Accounts: []chainwriter.Lookup{
+							chainwriter.AccountConstant{
+								Name:       "Signer",
+								Address:    fromAddress,
+								IsSigner:   true,
+								IsWritable: true,
 							},
 							chainwriter.PDALookups{
 								Name: "BillingTokenConfigWrapper1",

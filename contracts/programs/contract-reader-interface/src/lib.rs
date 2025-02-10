@@ -18,7 +18,7 @@ pub mod contract_reader_interface {
         Ok(())
     }
 
-    pub fn initialize_once(ctx: Context<InitializeOnce>) -> Result<()> {
+    pub fn initialize_multi_read_once(ctx: Context<InitializeMultiReadOnce>) -> Result<()> {
         let multi_read1 = &mut ctx.accounts.multi_read1;
         multi_read1.a = 1;
         multi_read1.b = 2;
@@ -29,6 +29,12 @@ pub mod contract_reader_interface {
         multi_read2.v = true;
         multi_read2.w = [123, 456];
 
+        Ok(())
+    }
+
+    pub fn initialize_billing_toke_config_wrapper_once(
+        ctx: Context<InitializeBillingTokenConfigWrapperOnce>,
+    ) -> Result<()> {
         let config1 = &mut ctx.accounts.config_wrapper_account1;
         config1.config.usd_per_token = TimestampedPackedU224 {
             value: STATIC_VALUE1,
@@ -96,7 +102,7 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
-pub struct InitializeOnce<'info> {
+pub struct InitializeMultiReadOnce<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
 
@@ -115,6 +121,14 @@ pub struct InitializeOnce<'info> {
         seeds = [b"multi_read2"],
         bump)]
     pub multi_read2: Account<'info, MultiRead2>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct InitializeBillingTokenConfigWrapperOnce<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
 
     #[account(
         init_if_needed,

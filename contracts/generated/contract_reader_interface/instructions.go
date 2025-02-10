@@ -30,7 +30,9 @@ func init() {
 var (
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
-	Instruction_InitializeOnce = ag_binary.TypeID([8]byte{36, 138, 127, 107, 36, 120, 55, 138})
+	Instruction_InitializeMultiReadOnce = ag_binary.TypeID([8]byte{93, 143, 97, 93, 7, 109, 126, 157})
+
+	Instruction_InitializeBillingTokeConfigWrapperOnce = ag_binary.TypeID([8]byte{228, 91, 102, 216, 215, 94, 136, 22})
 
 	Instruction_InitializeLookupTable = ag_binary.TypeID([8]byte{149, 120, 10, 249, 212, 185, 177, 216})
 
@@ -42,8 +44,10 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
 	case Instruction_Initialize:
 		return "Initialize"
-	case Instruction_InitializeOnce:
-		return "InitializeOnce"
+	case Instruction_InitializeMultiReadOnce:
+		return "InitializeMultiReadOnce"
+	case Instruction_InitializeBillingTokeConfigWrapperOnce:
+		return "InitializeBillingTokeConfigWrapperOnce"
 	case Instruction_InitializeLookupTable:
 		return "InitializeLookupTable"
 	case Instruction_Store:
@@ -72,7 +76,10 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"initialize", (*Initialize)(nil),
 		},
 		{
-			"initialize_once", (*InitializeOnce)(nil),
+			"initialize_multi_read_once", (*InitializeMultiReadOnce)(nil),
+		},
+		{
+			"initialize_billing_toke_config_wrapper_once", (*InitializeBillingTokeConfigWrapperOnce)(nil),
 		},
 		{
 			"initialize_lookup_table", (*InitializeLookupTable)(nil),
