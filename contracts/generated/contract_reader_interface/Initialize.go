@@ -19,22 +19,14 @@ type Initialize struct {
 	//
 	// [1] = [WRITE] data
 	//
-	// [2] = [WRITE] multiRead1
-	//
-	// [3] = [WRITE] multiRead2
-	//
-	// [4] = [WRITE] configWrapperAccount1
-	//
-	// [5] = [WRITE] configWrapperAccount2
-	//
-	// [6] = [] systemProgram
+	// [2] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
 func NewInitializeInstructionBuilder() *Initialize {
 	nd := &Initialize{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 7),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
@@ -73,59 +65,15 @@ func (inst *Initialize) GetDataAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetMultiRead1Account sets the "multiRead1" account.
-func (inst *Initialize) SetMultiRead1Account(multiRead1 ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(multiRead1).WRITE()
-	return inst
-}
-
-// GetMultiRead1Account gets the "multiRead1" account.
-func (inst *Initialize) GetMultiRead1Account() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(2)
-}
-
-// SetMultiRead2Account sets the "multiRead2" account.
-func (inst *Initialize) SetMultiRead2Account(multiRead2 ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(multiRead2).WRITE()
-	return inst
-}
-
-// GetMultiRead2Account gets the "multiRead2" account.
-func (inst *Initialize) GetMultiRead2Account() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(3)
-}
-
-// SetConfigWrapperAccount1Account sets the "configWrapperAccount1" account.
-func (inst *Initialize) SetConfigWrapperAccount1Account(configWrapperAccount1 ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(configWrapperAccount1).WRITE()
-	return inst
-}
-
-// GetConfigWrapperAccount1Account gets the "configWrapperAccount1" account.
-func (inst *Initialize) GetConfigWrapperAccount1Account() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(4)
-}
-
-// SetConfigWrapperAccount2Account sets the "configWrapperAccount2" account.
-func (inst *Initialize) SetConfigWrapperAccount2Account(configWrapperAccount2 ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[5] = ag_solanago.Meta(configWrapperAccount2).WRITE()
-	return inst
-}
-
-// GetConfigWrapperAccount2Account gets the "configWrapperAccount2" account.
-func (inst *Initialize) GetConfigWrapperAccount2Account() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(5)
-}
-
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *Initialize) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[6] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *Initialize) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(6)
+	return inst.AccountMetaSlice.Get(2)
 }
 
 func (inst Initialize) Build() *Instruction {
@@ -165,18 +113,6 @@ func (inst *Initialize) Validate() error {
 			return errors.New("accounts.Data is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.MultiRead1 is not set")
-		}
-		if inst.AccountMetaSlice[3] == nil {
-			return errors.New("accounts.MultiRead2 is not set")
-		}
-		if inst.AccountMetaSlice[4] == nil {
-			return errors.New("accounts.ConfigWrapperAccount1 is not set")
-		}
-		if inst.AccountMetaSlice[5] == nil {
-			return errors.New("accounts.ConfigWrapperAccount2 is not set")
-		}
-		if inst.AccountMetaSlice[6] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -198,14 +134,10 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=7]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("               signer", inst.AccountMetaSlice.Get(0)))
-						accountsBranch.Child(ag_format.Meta("                 data", inst.AccountMetaSlice.Get(1)))
-						accountsBranch.Child(ag_format.Meta("           multiRead1", inst.AccountMetaSlice.Get(2)))
-						accountsBranch.Child(ag_format.Meta("           multiRead2", inst.AccountMetaSlice.Get(3)))
-						accountsBranch.Child(ag_format.Meta("configWrapperAccount1", inst.AccountMetaSlice.Get(4)))
-						accountsBranch.Child(ag_format.Meta("configWrapperAccount2", inst.AccountMetaSlice.Get(5)))
-						accountsBranch.Child(ag_format.Meta("        systemProgram", inst.AccountMetaSlice.Get(6)))
+					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("       signer", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("         data", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice.Get(2)))
 					})
 				})
 		})
@@ -246,19 +178,11 @@ func NewInitializeInstruction(
 	// Accounts:
 	signer ag_solanago.PublicKey,
 	data ag_solanago.PublicKey,
-	multiRead1 ag_solanago.PublicKey,
-	multiRead2 ag_solanago.PublicKey,
-	configWrapperAccount1 ag_solanago.PublicKey,
-	configWrapperAccount2 ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
 		SetTestIdx(testIdx).
 		SetValue(value).
 		SetSignerAccount(signer).
 		SetDataAccount(data).
-		SetMultiRead1Account(multiRead1).
-		SetMultiRead2Account(multiRead2).
-		SetConfigWrapperAccount1Account(configWrapperAccount1).
-		SetConfigWrapperAccount2Account(configWrapperAccount2).
 		SetSystemProgramAccount(systemProgram)
 }

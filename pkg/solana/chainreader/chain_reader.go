@@ -168,6 +168,10 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 		return doMultiRead(ctx, s.client, s.bdRegistry, values, returnVal)
 	}
 
+	if values.multiRead[0] == "GetTokenPrices" {
+		return s.handleGetTokenPricesGetLatestValue(ctx, params, values, returnVal)
+	}
+
 	batch := []call{
 		{
 			Namespace: values.contract,
@@ -175,10 +179,6 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 			Params:    params,
 			ReturnVal: returnVal,
 		},
-	}
-
-	if values.multiRead[0] == "GetTokenPrices" {
-		return s.handleGetTokenPricesGetLatestValue(ctx, params, values, returnVal)
 	}
 
 	results, err := doMethodBatchCall(ctx, s.client, s.bdRegistry, batch)

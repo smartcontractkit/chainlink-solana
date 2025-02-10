@@ -55,11 +55,11 @@ const (
 
 func TestChainComponents(t *testing.T) {
 	t.Parallel()
-	helper := &helper{}
-	helper.Init(t)
 
 	t.Run("RunChainComponentsSolanaTests", func(t *testing.T) {
 		t.Parallel()
+		helper := &helper{}
+		helper.Init(t)
 		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}}
 		DisableTests(it)
 		it.Setup(t)
@@ -68,6 +68,8 @@ func TestChainComponents(t *testing.T) {
 
 	t.Run("RunChainComponentsInLoopSolanaTests", func(t *testing.T) {
 		t.Parallel()
+		helper := &helper{}
+		helper.Init(t)
 		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}}
 		DisableTests(it)
 		wrapped := commontestutils.WrapContractReaderTesterForLoop(it)
@@ -197,8 +199,8 @@ func RunContractReaderTests[T WrappedTestingT[T]](t T, it *SolanaChainComponents
 
 // GetLatestValue method
 const (
-	ContractReaderGetLatestValueUsingMultiReader       = "Get latest value using multi reader"
-	ContractReaderGetLatestValueUsingSplitParamsReader = "Get latest value using split params reader"
+	ContractReaderGetLatestValueUsingMultiReader = "Get latest value using multi reader"
+	ContractReaderGetLatestValueGetTokenPrices   = "Get latest value handles get token prices edge case"
 )
 
 type TimestampedUnixBig struct {
@@ -235,7 +237,7 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 			},
 		},
 		{
-			Name: ContractReaderGetLatestValueUsingSplitParamsReader,
+			Name: ContractReaderGetLatestValueGetTokenPrices,
 			Test: func(t T) {
 				cr := it.GetContractReader(t)
 				bindings := it.GetBindings(t)
@@ -253,9 +255,9 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 				res := make([]TimestampedUnixBig, 2)
 
 				byteTokens := make([][]byte, 0, 2)
-				pubKey1, err := solana.PublicKeyFromBase58(SplitParamPubKey1)
+				pubKey1, err := solana.PublicKeyFromBase58(GetTokenPricesPubKey1)
 				require.NoError(t, err)
-				pubKey2, err := solana.PublicKeyFromBase58(SplitParamPubKey2)
+				pubKey2, err := solana.PublicKeyFromBase58(GetTokenPricesPubKey2)
 				require.NoError(t, err)
 
 				byteTokens = append(byteTokens, pubKey1.Bytes())
@@ -395,6 +397,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GenerateBlocksTillConfidenceL
 }
 
 type helper struct {
+	initOnce           sync.Once
 	primaryProgramID   solana.PublicKey
 	secondaryProgramID solana.PublicKey
 	rpcURL             string
@@ -560,16 +563,26 @@ func (h *helper) runInitialize(
 		return
 	}
 
+	fmt.Println("testIdx:")
+	for k, v := range it.testContext {
+		fmt.Println("k:", k, "v:", v)
+	}
+
 	initArgs := InitializeArgs{
 		TestIdx: testIdx,
 		Value:   value,
 	}
 	SubmitTransactionToCW(t, &it, cw, "initialize", initArgs, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
 
+	h.initOnce.Do(func() {
+		SubmitTransactionToCW(t, &it, cw, "initializeOnce", nil, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
+	})
+
 	storeStructArgs := StoreStructArgs{
 		TestIdx: testIdx,
 		Data:    testStruct,
 	}
+	fmt.Println("storeStructArgs", storeStructArgs)
 	SubmitTransactionToCW(t, &it, cw, MethodSettingStruct, storeStructArgs, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
 }
 
@@ -639,7 +652,11 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 						PDADefinition: codec.PDATypeDef{
 							Prefix: []byte("multi_read1"),
 						},
-						OutputModifications: commoncodec.ModifiersConfig{},
+						OutputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.HardCodeModifierConfig{
+								OffChainValues: map[string]any{"U": "", "V": false},
+							},
+						},
 						MultiReader: &config.MultiReader{Reads: []config.ReadDefinition{
 							{
 								ChainSpecificName: "MultiRead2",
@@ -740,8 +757,8 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 }
 
 const (
-	SplitParamPubKey1 = "4RzYhbqRjaZHMnfxiPNDVzuimBbAb2FZErQKCLYKrkMe"
-	SplitParamPubKey2 = "9mBYSvyF8RBWNdat6SkZE5ipW5gMrBYqZnTShMsnfsub"
+	GetTokenPricesPubKey1 = "4RzYhbqRjaZHMnfxiPNDVzuimBbAb2FZErQKCLYKrkMe"
+	GetTokenPricesPubKey2 = "9mBYSvyF8RBWNdat6SkZE5ipW5gMrBYqZnTShMsnfsub"
 )
 
 func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T) chainwriter.ChainWriterConfig {
@@ -749,9 +766,9 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 	testIdx := binary.LittleEndian.AppendUint64([]byte{}, idx)
 	fromAddress := solana.MustPrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1]).PublicKey().String()
 	testStruct := CreateTestStruct(0, it)
-	pubKey1, err := solana.PublicKeyFromBase58(SplitParamPubKey1)
+	pubKey1, err := solana.PublicKeyFromBase58(GetTokenPricesPubKey1)
 	require.NoError(t, err)
-	pubKey2, err := solana.PublicKeyFromBase58(SplitParamPubKey2)
+	pubKey2, err := solana.PublicKeyFromBase58(GetTokenPricesPubKey2)
 	require.NoError(t, err)
 
 	return chainwriter.ChainWriterConfig{
@@ -782,6 +799,27 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								},
 								IsWritable: true,
 								IsSigner:   false,
+							},
+							chainwriter.AccountConstant{
+								Name:       "SystemProgram",
+								Address:    solana.SystemProgramID.String(),
+								IsWritable: false,
+								IsSigner:   false,
+							},
+						},
+						DebugIDLocation: "",
+					},
+					"initializeOnce": {
+						FromAddress:        fromAddress,
+						InputModifications: nil,
+						ChainSpecificName:  "initializeOnce",
+						LookupTables:       chainwriter.LookupTables{},
+						Accounts: []chainwriter.Lookup{
+							chainwriter.AccountConstant{
+								Name:       "Signer",
+								Address:    fromAddress,
+								IsSigner:   true,
+								IsWritable: true,
 							},
 							chainwriter.PDALookups{
 								Name: "MultiRead1",
