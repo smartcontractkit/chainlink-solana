@@ -18,7 +18,7 @@ pub mod contract_reader_interface {
         Ok(())
     }
 
-    pub fn initializeOnce(ctx: Context<InitializeOnce>) -> Result<()> {
+    pub fn initialize_once(ctx: Context<InitializeOnce>) -> Result<()> {
         let multi_read1 = &mut ctx.accounts.multi_read1;
         multi_read1.a = 1;
         multi_read1.b = 2;

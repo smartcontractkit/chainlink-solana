@@ -812,7 +812,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 					"initializeOnce": {
 						FromAddress:        fromAddress,
 						InputModifications: nil,
-						ChainSpecificName:  "initializeOnce",
+						ChainSpecificName:  "initialize_once",
 						LookupTables:       chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
 							chainwriter.AccountConstant{
