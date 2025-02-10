@@ -55,14 +55,21 @@ func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args a
 		InternalField: InternalField{
 			TypeName: "ReferenceAddresses",
 			Location: "Router",
+			IDL:      offrampProgramConfig.IDL,
 		},
 	}
-	accountMetas, err := routerAddrLookup.Resolve(ctx, nil, nil, cw.reader, offrampProgramConfig.IDL)
+	accountMetas, err := routerAddrLookup.Resolve(ctx, nil, nil, cw.reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch the router program address from the reference addresses account: %w", err)
 	}
 	if len(accountMetas) != 1 {
 		return nil, fmt.Errorf("expect 1 address to be returned for router address, received %d: %w", len(accountMetas), err)
+	}
+
+	// Fetch router config to use to fetch TokenAdminRegistry
+	routerProgramConfig, ok := cw.config.Programs["ccip-router"]
+	if !ok {
+		return nil, fmt.Errorf("ccip-router program not found in config")
 	}
 
 	routerAddress := accountMetas[0].PublicKey
@@ -84,19 +91,14 @@ func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args a
 					InternalField: InternalField{
 						TypeName: "TokenAdminRegistry",
 						Location: "LookupTable",
+						IDL:      routerProgramConfig.IDL,
 					},
 				},
 			},
 		},
 	}
 
-	// Fetch router config to use to fetch TokenAdminRegistry
-	routerProgramConfig, ok := cw.config.Programs["ccip-router"]
-	if !ok {
-		return nil, fmt.Errorf("ccip-router program not found in config")
-	}
-
-	tableMap, _, err := cw.ResolveLookupTables(ctx, args, TokenPoolLookupTable, routerProgramConfig.IDL)
+	tableMap, _, err := cw.ResolveLookupTables(ctx, args, TokenPoolLookupTable)
 	if err != nil {
 		return nil, err
 	}
