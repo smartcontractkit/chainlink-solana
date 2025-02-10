@@ -118,7 +118,8 @@ func (s *ContractReaderService) Start(ctx context.Context) error {
 			// Start EventReader if it hasn't already been
 			// Lazily starting it here rather than earlier, since nodes running only ordinary DF jobs don't need it
 			err := s.reader.Start(ctx)
-			if err != nil {
+			if err != nil &&
+				!strings.Contains(err.Error(), "has already been started") { // in case another thread calls Start() after Ready() returns
 				return fmt.Errorf("%d event filters defined in ChainReader config, but unable to start event reader: %w", len(s.filters), err)
 			}
 		}
