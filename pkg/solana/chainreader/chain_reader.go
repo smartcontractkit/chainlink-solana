@@ -629,9 +629,9 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 	var pdaAddresses []solana.PublicKey
 	for _, token := range *tokens {
 		tokenAddr := solana.PublicKeyFromBytes(token[:])
-		if tokenAddr.IsOnCurve() && !tokenAddr.IsZero() {
+		if !tokenAddr.IsOnCurve() || tokenAddr.IsZero() {
 			return nil, fmt.Errorf(
-				"for contract %q read %q: invalid token address %v (on-curve or zero)",
+				"for contract %q read %q: invalid token address %v (off-curve or zero)",
 				values.contract, values.multiRead[0], tokenAddr,
 			)
 		}
