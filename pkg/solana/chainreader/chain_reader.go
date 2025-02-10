@@ -34,6 +34,9 @@ type EventsReader interface {
 
 const ServiceName = "SolanaContractReader"
 
+// TODO NONEVM-1320 fix this edge case
+const GetTokenPrices = "GetTokenPrices"
+
 type ContractReaderService struct {
 	types.UnimplementedContractReader
 
@@ -168,7 +171,8 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 		return doMultiRead(ctx, s.client, s.bdRegistry, values, returnVal)
 	}
 
-	if values.multiRead[0] == "GetTokenPrices" {
+	// TODO this is a temporary edge case - NONEVM-1320
+	if values.multiRead[0] == GetTokenPrices {
 		return s.handleGetTokenPricesGetLatestValue(ctx, params, values, returnVal)
 	}
 
@@ -207,6 +211,11 @@ func (s *ContractReaderService) BatchGetLatestValues(ctx context.Context, reques
 
 		for idx, readReq := range req {
 			idxLookup[bound][idx] = len(batch)
+			// TODO this is a temporary edge case - NONEVM-1320
+			if readReq.ReadName == GetTokenPrices {
+				return nil, fmt.Errorf("%w: %s is not supported in batch requests", types.ErrInvalidType, GetTokenPrices)
+			}
+
 			batch = append(batch, call{
 				Namespace: bound.Name,
 				ReadName:  readReq.ReadName,
