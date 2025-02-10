@@ -10,8 +10,8 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// InitializeMultiReadOnce is the `initializeMultiReadOnce` instruction.
-type InitializeMultiReadOnce struct {
+// Initializemultiread is the `initializemultiread` instruction.
+type Initializemultiread struct {
 
 	// [0] = [WRITE, SIGNER] signer
 	//
@@ -23,76 +23,76 @@ type InitializeMultiReadOnce struct {
 	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
-// NewInitializeMultiReadOnceInstructionBuilder creates a new `InitializeMultiReadOnce` instruction builder.
-func NewInitializeMultiReadOnceInstructionBuilder() *InitializeMultiReadOnce {
-	nd := &InitializeMultiReadOnce{
+// NewInitializemultireadInstructionBuilder creates a new `Initializemultiread` instruction builder.
+func NewInitializemultireadInstructionBuilder() *Initializemultiread {
+	nd := &Initializemultiread{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
 }
 
 // SetSignerAccount sets the "signer" account.
-func (inst *InitializeMultiReadOnce) SetSignerAccount(signer ag_solanago.PublicKey) *InitializeMultiReadOnce {
+func (inst *Initializemultiread) SetSignerAccount(signer ag_solanago.PublicKey) *Initializemultiread {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(signer).WRITE().SIGNER()
 	return inst
 }
 
 // GetSignerAccount gets the "signer" account.
-func (inst *InitializeMultiReadOnce) GetSignerAccount() *ag_solanago.AccountMeta {
+func (inst *Initializemultiread) GetSignerAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetMultiRead1Account sets the "multiRead1" account.
-func (inst *InitializeMultiReadOnce) SetMultiRead1Account(multiRead1 ag_solanago.PublicKey) *InitializeMultiReadOnce {
+func (inst *Initializemultiread) SetMultiRead1Account(multiRead1 ag_solanago.PublicKey) *Initializemultiread {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(multiRead1).WRITE()
 	return inst
 }
 
 // GetMultiRead1Account gets the "multiRead1" account.
-func (inst *InitializeMultiReadOnce) GetMultiRead1Account() *ag_solanago.AccountMeta {
+func (inst *Initializemultiread) GetMultiRead1Account() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetMultiRead2Account sets the "multiRead2" account.
-func (inst *InitializeMultiReadOnce) SetMultiRead2Account(multiRead2 ag_solanago.PublicKey) *InitializeMultiReadOnce {
+func (inst *Initializemultiread) SetMultiRead2Account(multiRead2 ag_solanago.PublicKey) *Initializemultiread {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(multiRead2).WRITE()
 	return inst
 }
 
 // GetMultiRead2Account gets the "multiRead2" account.
-func (inst *InitializeMultiReadOnce) GetMultiRead2Account() *ag_solanago.AccountMeta {
+func (inst *Initializemultiread) GetMultiRead2Account() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *InitializeMultiReadOnce) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *InitializeMultiReadOnce {
+func (inst *Initializemultiread) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Initializemultiread {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *InitializeMultiReadOnce) GetSystemProgramAccount() *ag_solanago.AccountMeta {
+func (inst *Initializemultiread) GetSystemProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice.Get(3)
 }
 
-func (inst InitializeMultiReadOnce) Build() *Instruction {
+func (inst Initializemultiread) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_InitializeMultiReadOnce,
+		TypeID: Instruction_Initializemultiread,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst InitializeMultiReadOnce) ValidateAndBuild() (*Instruction, error) {
+func (inst Initializemultiread) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *InitializeMultiReadOnce) Validate() error {
+func (inst *Initializemultiread) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
@@ -111,11 +111,11 @@ func (inst *InitializeMultiReadOnce) Validate() error {
 	return nil
 }
 
-func (inst *InitializeMultiReadOnce) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *Initializemultiread) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("InitializeMultiReadOnce")).
+			programBranch.Child(ag_format.Instruction("Initializemultiread")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
@@ -133,21 +133,21 @@ func (inst *InitializeMultiReadOnce) EncodeToTree(parent ag_treeout.Branches) {
 		})
 }
 
-func (obj InitializeMultiReadOnce) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj Initializemultiread) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
-func (obj *InitializeMultiReadOnce) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *Initializemultiread) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	return nil
 }
 
-// NewInitializeMultiReadOnceInstruction declares a new InitializeMultiReadOnce instruction with the provided parameters and accounts.
-func NewInitializeMultiReadOnceInstruction(
+// NewInitializemultireadInstruction declares a new Initializemultiread instruction with the provided parameters and accounts.
+func NewInitializemultireadInstruction(
 	// Accounts:
 	signer ag_solanago.PublicKey,
 	multiRead1 ag_solanago.PublicKey,
 	multiRead2 ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *InitializeMultiReadOnce {
-	return NewInitializeMultiReadOnceInstructionBuilder().
+	systemProgram ag_solanago.PublicKey) *Initializemultiread {
+	return NewInitializemultireadInstructionBuilder().
 		SetSignerAccount(signer).
 		SetMultiRead1Account(multiRead1).
 		SetMultiRead2Account(multiRead2).

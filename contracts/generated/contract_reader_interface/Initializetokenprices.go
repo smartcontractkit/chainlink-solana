@@ -10,8 +10,8 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// InitializeBillingTokeConfigWrapperOnce is the `initializeBillingTokeConfigWrapperOnce` instruction.
-type InitializeBillingTokeConfigWrapperOnce struct {
+// Initializetokenprices is the `initializetokenprices` instruction.
+type Initializetokenprices struct {
 
 	// [0] = [WRITE, SIGNER] signer
 	//
@@ -23,76 +23,76 @@ type InitializeBillingTokeConfigWrapperOnce struct {
 	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
-// NewInitializeBillingTokeConfigWrapperOnceInstructionBuilder creates a new `InitializeBillingTokeConfigWrapperOnce` instruction builder.
-func NewInitializeBillingTokeConfigWrapperOnceInstructionBuilder() *InitializeBillingTokeConfigWrapperOnce {
-	nd := &InitializeBillingTokeConfigWrapperOnce{
+// NewInitializetokenpricesInstructionBuilder creates a new `Initializetokenprices` instruction builder.
+func NewInitializetokenpricesInstructionBuilder() *Initializetokenprices {
+	nd := &Initializetokenprices{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
 }
 
 // SetSignerAccount sets the "signer" account.
-func (inst *InitializeBillingTokeConfigWrapperOnce) SetSignerAccount(signer ag_solanago.PublicKey) *InitializeBillingTokeConfigWrapperOnce {
+func (inst *Initializetokenprices) SetSignerAccount(signer ag_solanago.PublicKey) *Initializetokenprices {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(signer).WRITE().SIGNER()
 	return inst
 }
 
 // GetSignerAccount gets the "signer" account.
-func (inst *InitializeBillingTokeConfigWrapperOnce) GetSignerAccount() *ag_solanago.AccountMeta {
+func (inst *Initializetokenprices) GetSignerAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetConfigWrapperAccount1Account sets the "configWrapperAccount1" account.
-func (inst *InitializeBillingTokeConfigWrapperOnce) SetConfigWrapperAccount1Account(configWrapperAccount1 ag_solanago.PublicKey) *InitializeBillingTokeConfigWrapperOnce {
+func (inst *Initializetokenprices) SetConfigWrapperAccount1Account(configWrapperAccount1 ag_solanago.PublicKey) *Initializetokenprices {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(configWrapperAccount1).WRITE()
 	return inst
 }
 
 // GetConfigWrapperAccount1Account gets the "configWrapperAccount1" account.
-func (inst *InitializeBillingTokeConfigWrapperOnce) GetConfigWrapperAccount1Account() *ag_solanago.AccountMeta {
+func (inst *Initializetokenprices) GetConfigWrapperAccount1Account() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetConfigWrapperAccount2Account sets the "configWrapperAccount2" account.
-func (inst *InitializeBillingTokeConfigWrapperOnce) SetConfigWrapperAccount2Account(configWrapperAccount2 ag_solanago.PublicKey) *InitializeBillingTokeConfigWrapperOnce {
+func (inst *Initializetokenprices) SetConfigWrapperAccount2Account(configWrapperAccount2 ag_solanago.PublicKey) *Initializetokenprices {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(configWrapperAccount2).WRITE()
 	return inst
 }
 
 // GetConfigWrapperAccount2Account gets the "configWrapperAccount2" account.
-func (inst *InitializeBillingTokeConfigWrapperOnce) GetConfigWrapperAccount2Account() *ag_solanago.AccountMeta {
+func (inst *Initializetokenprices) GetConfigWrapperAccount2Account() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *InitializeBillingTokeConfigWrapperOnce) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *InitializeBillingTokeConfigWrapperOnce {
+func (inst *Initializetokenprices) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Initializetokenprices {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *InitializeBillingTokeConfigWrapperOnce) GetSystemProgramAccount() *ag_solanago.AccountMeta {
+func (inst *Initializetokenprices) GetSystemProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice.Get(3)
 }
 
-func (inst InitializeBillingTokeConfigWrapperOnce) Build() *Instruction {
+func (inst Initializetokenprices) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_InitializeBillingTokeConfigWrapperOnce,
+		TypeID: Instruction_Initializetokenprices,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst InitializeBillingTokeConfigWrapperOnce) ValidateAndBuild() (*Instruction, error) {
+func (inst Initializetokenprices) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *InitializeBillingTokeConfigWrapperOnce) Validate() error {
+func (inst *Initializetokenprices) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
@@ -111,11 +111,11 @@ func (inst *InitializeBillingTokeConfigWrapperOnce) Validate() error {
 	return nil
 }
 
-func (inst *InitializeBillingTokeConfigWrapperOnce) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *Initializetokenprices) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("InitializeBillingTokeConfigWrapperOnce")).
+			programBranch.Child(ag_format.Instruction("Initializetokenprices")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
@@ -133,21 +133,21 @@ func (inst *InitializeBillingTokeConfigWrapperOnce) EncodeToTree(parent ag_treeo
 		})
 }
 
-func (obj InitializeBillingTokeConfigWrapperOnce) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj Initializetokenprices) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
-func (obj *InitializeBillingTokeConfigWrapperOnce) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *Initializetokenprices) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	return nil
 }
 
-// NewInitializeBillingTokeConfigWrapperOnceInstruction declares a new InitializeBillingTokeConfigWrapperOnce instruction with the provided parameters and accounts.
-func NewInitializeBillingTokeConfigWrapperOnceInstruction(
+// NewInitializetokenpricesInstruction declares a new Initializetokenprices instruction with the provided parameters and accounts.
+func NewInitializetokenpricesInstruction(
 	// Accounts:
 	signer ag_solanago.PublicKey,
 	configWrapperAccount1 ag_solanago.PublicKey,
 	configWrapperAccount2 ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *InitializeBillingTokeConfigWrapperOnce {
-	return NewInitializeBillingTokeConfigWrapperOnceInstructionBuilder().
+	systemProgram ag_solanago.PublicKey) *Initializetokenprices {
+	return NewInitializetokenpricesInstructionBuilder().
 		SetSignerAccount(signer).
 		SetConfigWrapperAccount1Account(configWrapperAccount1).
 		SetConfigWrapperAccount2Account(configWrapperAccount2).

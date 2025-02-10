@@ -520,6 +520,11 @@ func (h *helper) CreateAccount(t *testing.T, it SolanaChainComponentsInterfaceTe
 	switch contractName {
 	case AnyContractName:
 		programID = h.primaryProgramID
+		h.initOnce.Do(func() {
+			cw := it.GetContractWriter(t)
+			SubmitTransactionToCW(t, &it, cw, "initializeMultiRead", nil, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
+			SubmitTransactionToCW(t, &it, cw, "initializeTokenPrices", nil, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
+		})
 	case AnySecondContractName:
 		programID = h.secondaryProgramID
 	}
@@ -564,16 +569,10 @@ func (h *helper) runInitialize(
 	}
 	SubmitTransactionToCW(t, &it, cw, "initialize", initArgs, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
 
-	h.initOnce.Do(func() {
-		SubmitTransactionToCW(t, &it, cw, "initializeMultiReadOnce", nil, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
-		SubmitTransactionToCW(t, &it, cw, "initializeBillingTokeConfigWrapperOnce", nil, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
-	})
-
 	storeStructArgs := StoreStructArgs{
 		TestIdx: testIdx,
 		Data:    testStruct,
 	}
-	fmt.Println("storeStructArgs", storeStructArgs)
 	SubmitTransactionToCW(t, &it, cw, MethodSettingStruct, storeStructArgs, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
 }
 
@@ -800,10 +799,10 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						},
 						DebugIDLocation: "",
 					},
-					"initializeMultiReadOnce": {
+					"initializeMultiRead": {
 						FromAddress:        fromAddress,
 						InputModifications: nil,
-						ChainSpecificName:  "initializeMultiReadOnce",
+						ChainSpecificName:  "initializemultiread",
 						LookupTables:       chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
 							chainwriter.AccountConstant{
@@ -845,10 +844,10 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						},
 						DebugIDLocation: "",
 					},
-					"initializeBillingTokeConfigWrapperOnce": {
+					"initializeTokenPrices": {
 						FromAddress:        fromAddress,
 						InputModifications: nil,
-						ChainSpecificName:  "initializeBillingTokeConfigWrapperOnce",
+						ChainSpecificName:  "initializetokenprices",
 						LookupTables:       chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
 							chainwriter.AccountConstant{
