@@ -2,6 +2,7 @@ package codec_test
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"slices"
 	"sync"
@@ -125,7 +126,7 @@ func encodeFieldsOnSliceOrArray(t *testing.T, request *EncodeRequest) []byte {
 
 func (it *codecInterfaceTester) GetCodec(t *testing.T) clcommontypes.Codec {
 	codecConfig := codec.Config{Configs: map[string]codec.ChainConfig{}}
-	TestItem := CreateTestStruct[*testing.T](0, it)
+	TestItem := CreateTestStruct(0, it)
 	for offChainName, v := range testutils.CodecDefs {
 		codecEntryCfg := codecConfig.Configs[offChainName]
 		codecEntryCfg.IDL = v.IDL
@@ -157,13 +158,13 @@ func (it *codecInterfaceTester) GetCodec(t *testing.T) clcommontypes.Codec {
 			}
 			codecEntryCfg.ModifierConfigs = append(codecEntryCfg.ModifierConfigs, hardCode)
 		}
-		codecConfig.Configs[offChainName] = codecEntryCfg
+		codecConfig.Configs["DummyNamespace."+offChainName] = codecEntryCfg
 	}
 
 	c, err := codec.NewCodec(codecConfig)
 	require.NoError(t, err)
 
-	return c
+	return &compatibleItemTypeCodecWrapper{codec: c}
 }
 
 func (it *codecInterfaceTester) IncludeArrayEncodingSizeEnforcement() bool {
@@ -171,4 +172,36 @@ func (it *codecInterfaceTester) IncludeArrayEncodingSizeEnforcement() bool {
 }
 func (it *codecInterfaceTester) Name() string {
 	return "Solana"
+}
+
+type compatibleItemTypeCodecWrapper struct {
+	codec clcommontypes.RemoteCodec
+}
+
+func (w *compatibleItemTypeCodecWrapper) CreateType(itemType string, forEncoding bool) (any, error) {
+	return w.codec.CreateType(w.wrapItemType(itemType, forEncoding), forEncoding)
+}
+
+func (w *compatibleItemTypeCodecWrapper) Decode(ctx context.Context, raw []byte, into any, itemType string) error {
+	return w.codec.Decode(ctx, raw, into, w.wrapItemType(itemType, false))
+}
+
+func (w *compatibleItemTypeCodecWrapper) Encode(ctx context.Context, item any, itemType string) ([]byte, error) {
+	return w.codec.Encode(ctx, item, w.wrapItemType(itemType, true))
+}
+
+func (w *compatibleItemTypeCodecWrapper) GetMaxDecodingSize(ctx context.Context, n int, itemType string) (int, error) {
+	return w.codec.GetMaxDecodingSize(ctx, n, w.wrapItemType(itemType, false))
+}
+
+func (w *compatibleItemTypeCodecWrapper) GetMaxEncodingSize(ctx context.Context, n int, itemType string) (int, error) {
+	return w.codec.GetMaxEncodingSize(ctx, n, w.wrapItemType(itemType, true))
+}
+
+func (w *compatibleItemTypeCodecWrapper) wrapItemType(itemType string, forEncoding bool) string {
+	if forEncoding {
+		return "input.DummyNamespace." + itemType
+	}
+
+	return "output.DummyNamespace." + itemType
 }

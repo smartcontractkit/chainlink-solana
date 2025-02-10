@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/lib/pq"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
@@ -111,9 +112,17 @@ const EventSignatureLength = 8
 
 type EventSignature [EventSignatureLength]byte
 
+func NewEventSignatureFromName(eventName string) EventSignature {
+	return EventSignature(codec.NewDiscriminatorHashPrefix(eventName, false))
+}
+
 // Scan implements Scanner for database/sql.
 func (s *EventSignature) Scan(src interface{}) error {
 	return scanFixedLengthArray("EventSignature", EventSignatureLength, src, s[:])
+}
+
+func (s EventSignature) String() string {
+	return string(s[:])
 }
 
 // Value implements valuer for database/sql.
@@ -126,19 +135,14 @@ type Decoder interface {
 	Decode(_ context.Context, raw []byte, into any, itemType string) error
 }
 
-type EventIdl struct {
-	codec.EventIDLTypes
-}
+type EventIdl codec.EventIDLTypes
 
 func (e *EventIdl) Scan(src interface{}) error {
 	return scanJSON("EventIdl", e, src)
 }
 
 func (e EventIdl) Value() (driver.Value, error) {
-	return json.Marshal(map[string]any{
-		"IdlEvent":        e.EventIDLTypes.Event,
-		"IdlTypeDefSlice": e.EventIDLTypes.Types,
-	})
+	return json.Marshal(e)
 }
 
 func (e EventIdl) Equal(o EventIdl) bool {
@@ -191,7 +195,38 @@ func (v *IndexedValue) FromFloat64(f float64) {
 	v.FromUint64(math.MaxInt64 + 1 - math.Float64bits(f))
 }
 
+type IndexedValues []IndexedValue
+
+func (v *IndexedValues) Scan(src interface{}) error {
+	byteArray := pq.ByteaArray{}
+	err := byteArray.Scan(src)
+	if err != nil {
+		return fmt.Errorf("failed to scan IndexedValues: %w", err)
+	}
+
+	*v = make([]IndexedValue, 0, len(byteArray))
+	for _, b := range byteArray {
+		*v = append(*v, b)
+	}
+
+	return nil
+}
+
+func (v IndexedValues) Value() (driver.Value, error) {
+	byteArray := make(pq.ByteaArray, len(v))
+	for i, b := range v {
+		byteArray[i] = b
+	}
+
+	return byteArray.Value()
+}
+
 func newIndexedValue(typedVal any) (iVal IndexedValue, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic recovered: %v while creating indexedValue for %T", r, typedVal)
+		}
+	}()
 	// handle 2 simplest cases first
 	switch t := typedVal.(type) {
 	case []byte:
@@ -218,7 +253,15 @@ func newIndexedValue(typedVal any) (iVal IndexedValue, err error) {
 	// any length array is fine as long as the element type is byte
 	if t := v.Type(); t.Kind() == reflect.Array {
 		if t.Elem().Kind() == reflect.Uint8 {
-			return v.Bytes(), nil
+			if v.CanAddr() {
+				return v.Bytes(), nil
+			}
+			result := make([]byte, v.Len())
+			l := v.Len()
+			for i := 0; i < l; i++ {
+				result[i] = byte(v.Index(i).Uint())
+			}
+			return result, nil
 		}
 	}
 	return nil, fmt.Errorf("can't create indexed value from type %T", typedVal)

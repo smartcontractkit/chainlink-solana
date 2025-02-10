@@ -18,6 +18,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 func TestBalanceMonitor(t *testing.T) {
@@ -63,7 +64,7 @@ func TestBalanceMonitor(t *testing.T) {
 		}
 	}
 
-	b.reader = internal.NewLoader[BalanceClient](func() (BalanceClient, error) {
+	b.reader = utils.NewOnceLoader[BalanceClient](func(context.Context) (BalanceClient, error) {
 		return client, nil
 	})
 

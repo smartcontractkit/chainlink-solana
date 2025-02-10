@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mathutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
@@ -27,9 +26,7 @@ func TestBlockHistoryEstimator_InvalidBlockHistorySize(t *testing.T) {
 	// Setup
 	invalidDepth := uint64(0) // Invalid value to trigger error
 	rw := clientmock.NewReaderWriter(t)
-	rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
-		return rw, nil
-	})
+	rwLoader := func(ctx context.Context) (client.ReaderWriter, error) { return rw, nil }
 	cfg := cfgmock.NewConfig(t)
 	cfg.On("BlockHistorySize").Return(invalidDepth)
 
@@ -55,9 +52,7 @@ func TestBlockHistoryEstimator_LatestBlock(t *testing.T) {
 	lastBlockMedianPrice, _ := mathutil.Median(lastBlockFeeData.Prices...)
 
 	rw := clientmock.NewReaderWriter(t)
-	rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
-		return rw, nil
-	})
+	rwLoader := func(ctx context.Context) (client.ReaderWriter, error) { return rw, nil }
 	rw.On("GetLatestBlock", mock.Anything).Return(lastBlock, nil)
 
 	t.Run("Successful Estimation", func(t *testing.T) {
@@ -105,9 +100,7 @@ func TestBlockHistoryEstimator_LatestBlock(t *testing.T) {
 	t.Run("Failed to Get Latest Block", func(t *testing.T) {
 		// Setup
 		rw := clientmock.NewReaderWriter(t)
-		rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
-			return rw, nil
-		})
+		rwLoader := func(ctx context.Context) (client.ReaderWriter, error) { return rw, nil }
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
 		rw.On("GetLatestBlock", mock.Anything).Return(nil, fmt.Errorf("fail rpc call")) // Mock GetLatestBlock returning error
@@ -122,9 +115,7 @@ func TestBlockHistoryEstimator_LatestBlock(t *testing.T) {
 	t.Run("Failed to Parse Block", func(t *testing.T) {
 		// Setup
 		rw := clientmock.NewReaderWriter(t)
-		rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
-			return rw, nil
-		})
+		rwLoader := func(ctx context.Context) (client.ReaderWriter, error) { return rw, nil }
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
 		rw.On("GetLatestBlock", mock.Anything).Return(nil, nil) // Mock GetLatestBlock returning nil
@@ -139,9 +130,7 @@ func TestBlockHistoryEstimator_LatestBlock(t *testing.T) {
 	t.Run("no compute unit prices collected", func(t *testing.T) {
 		// Setup
 		rw := clientmock.NewReaderWriter(t)
-		rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
-			return rw, nil
-		})
+		rwLoader := func(ctx context.Context) (client.ReaderWriter, error) { return rw, nil }
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
 		rw.On("GetLatestBlock", mock.Anything).Return(&rpc.GetBlockResult{}, nil) // Mock GetLatestBlock returning empty block
@@ -155,10 +144,10 @@ func TestBlockHistoryEstimator_LatestBlock(t *testing.T) {
 
 	t.Run("Failed to Get Client", func(t *testing.T) {
 		// Setup
-		rwFailLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
+		rwFailLoader := func(ctx context.Context) (client.ReaderWriter, error) {
 			// Return error to simulate failure to get client
 			return nil, fmt.Errorf("fail client load")
-		})
+		}
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
 		estimator := initializeEstimator(ctx, t, rwFailLoader, cfg, logger.Test(t))
@@ -206,9 +195,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 	multipleBlocksAvg, _ := mathutil.Avg(testPrices...)
 
 	rw := clientmock.NewReaderWriter(t)
-	rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
-		return rw, nil
-	})
+	rwLoader := func(ctx context.Context) (client.ReaderWriter, error) { return rw, nil }
 	rw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil)
 	rw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
 		Return(&testSlotsResult, nil)
@@ -259,10 +246,10 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 	// Error handling scenarios
 	t.Run("failed to get client", func(t *testing.T) {
 		// Setup
-		rwFailLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
+		rwFailLoader := func(context.Context) (client.ReaderWriter, error) {
 			// Return error to simulate failure to get client
 			return nil, fmt.Errorf("fail client load")
-		})
+		}
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
 		estimator := initializeEstimator(ctx, t, rwFailLoader, cfg, logger.Test(t))
@@ -276,9 +263,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 	t.Run("failed to get current slot", func(t *testing.T) {
 		// Setup
 		rw := clientmock.NewReaderWriter(t)
-		rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
-			return rw, nil
-		})
+		rwLoader := func(ctx context.Context) (client.ReaderWriter, error) { return rw, nil }
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
 		rw.On("SlotHeight", mock.Anything).Return(uint64(0), fmt.Errorf("failed to get current slot")) // Mock SlotHeight returning error
@@ -293,9 +278,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 	t.Run("current slot is less than desired block count", func(t *testing.T) {
 		// Setup
 		rw := clientmock.NewReaderWriter(t)
-		rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
-			return rw, nil
-		})
+		rwLoader := func(ctx context.Context) (client.ReaderWriter, error) { return rw, nil }
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
 		rw.On("SlotHeight", mock.Anything).Return(depth-1, nil) // Mock SlotHeight returning less than desiredBlockCount
@@ -310,9 +293,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 	t.Run("failed to get blocks with limit", func(t *testing.T) {
 		// Setup
 		rw := clientmock.NewReaderWriter(t)
-		rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
-			return rw, nil
-		})
+		rwLoader := func(ctx context.Context) (client.ReaderWriter, error) { return rw, nil }
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
 		rw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil)
@@ -329,9 +310,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 	t.Run("no compute unit prices collected", func(t *testing.T) {
 		// Setup
 		rw := clientmock.NewReaderWriter(t)
-		rwLoader := utils.NewLazyLoad(func() (client.ReaderWriter, error) {
-			return rw, nil
-		})
+		rwLoader := func(ctx context.Context) (client.ReaderWriter, error) { return rw, nil }
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
 		rw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil)
@@ -356,7 +335,7 @@ func setupConfigMock(cfg *cfgmock.Config, defaultPrice uint64, minPrice uint64, 
 }
 
 // initializeEstimator initializes, starts, and ensures cleanup of the BlockHistoryEstimator.
-func initializeEstimator(ctx context.Context, t *testing.T, rwLoader *utils.LazyLoad[client.ReaderWriter], cfg *cfgmock.Config, lgr logger.Logger) *blockHistoryEstimator {
+func initializeEstimator(ctx context.Context, t *testing.T, rwLoader func(context.Context) (client.ReaderWriter, error), cfg *cfgmock.Config, lgr logger.Logger) *blockHistoryEstimator {
 	estimator, err := NewBlockHistoryEstimator(rwLoader, cfg, lgr)
 	require.NoError(t, err, "Failed to create BlockHistoryEstimator")
 	require.NoError(t, estimator.Start(ctx), "Failed to start BlockHistoryEstimator")

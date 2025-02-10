@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	idl "github.com/smartcontractkit/chainlink-ccip/chains/solana"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
@@ -37,6 +38,7 @@ type Arguments struct {
 	Seed2       []byte
 }
 
+var ccipOfframpIDL = idl.FetchCCIPOfframpIDL()
 var ccipRouterIDL = idl.FetchCCIPRouterIDL()
 var testContractIDL = chainwriter.FetchTestContractIDL()
 
@@ -584,7 +586,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 	})
 }
 
-func TestChainWriter_CCIPRouter(t *testing.T) {
+func TestChainWriter_CCIPOfframp(t *testing.T) {
 	t.Parallel()
 
 	// setup admin key
@@ -592,6 +594,7 @@ func TestChainWriter_CCIPRouter(t *testing.T) {
 	require.NoError(t, err)
 	admin := adminPk.PublicKey()
 
+	offrampAddr := chainwriter.GetRandomPubKey(t)
 	routerAddr := chainwriter.GetRandomPubKey(t)
 	destTokenAddr := chainwriter.GetRandomPubKey(t)
 
@@ -601,7 +604,7 @@ func TestChainWriter_CCIPRouter(t *testing.T) {
 	// simplified CCIP Config - does not contain full account list
 	ccipCWConfig := chainwriter.ChainWriterConfig{
 		Programs: map[string]chainwriter.ProgramConfig{
-			"ccip_router": {
+			"ccip-offramp": {
 				Methods: map[string]chainwriter.MethodConfig{
 					"execute": {
 						FromAddress: admin.String(),
@@ -676,6 +679,10 @@ func TestChainWriter_CCIPRouter(t *testing.T) {
 						},
 					},
 				},
+				IDL: ccipOfframpIDL,
+			},
+			// Requires only the IDL for the CCIPArgsTransform to fetch the TokenAdminRegistry
+			"ccip-router": {
 				IDL: ccipRouterIDL,
 			},
 		},
@@ -702,13 +709,14 @@ func TestChainWriter_CCIPRouter(t *testing.T) {
 
 		lookupTable := mockTokenAdminRegistryLookupTable(t, rw, pda)
 
+		mockFetchRouterAddress(t, rw, routerAddr, offrampAddr)
 		mockFetchLookupTableAddresses(t, rw, lookupTable, poolKeys)
 
 		txID := uuid.NewString()
 		txm.On("Enqueue", mock.Anything, admin.String(), mock.MatchedBy(func(tx *solana.Transaction) bool {
 			txData := tx.Message.Instructions[0].Data
 			payload := txData[8:]
-			var decoded ccip_router.Execute
+			var decoded ccip_offramp.Execute
 			dec := ag_binary.NewBorshDecoder(payload)
 			err = dec.Decode(&decoded)
 			require.NoError(t, err)
@@ -746,7 +754,7 @@ func TestChainWriter_CCIPRouter(t *testing.T) {
 			},
 		}
 
-		submitErr := cw.SubmitTransaction(ctx, "ccip_router", "execute", args, txID, routerAddr.String(), nil, nil)
+		submitErr := cw.SubmitTransaction(ctx, "ccip-offramp", "execute", args, txID, offrampAddr.String(), nil, nil)
 		require.NoError(t, submitErr)
 	})
 
@@ -787,14 +795,14 @@ func TestChainWriter_CCIPRouter(t *testing.T) {
 		txm.On("Enqueue", mock.Anything, admin.String(), mock.MatchedBy(func(tx *solana.Transaction) bool {
 			txData := tx.Message.Instructions[0].Data
 			payload := txData[8:]
-			var decoded ccip_router.Commit
+			var decoded ccip_offramp.Commit
 			dec := ag_binary.NewBorshDecoder(payload)
 			err := dec.Decode(&decoded)
 			require.NoError(t, err)
 			return true
 		}), &txID, mock.Anything).Return(nil).Once()
 
-		submitErr := cw.SubmitTransaction(ctx, "ccip_router", "commit", args, txID, routerAddr.String(), nil, nil)
+		submitErr := cw.SubmitTransaction(ctx, "ccip-offramp", "commit", args, txID, offrampAddr.String(), nil, nil)
 		require.NoError(t, submitErr)
 	})
 }
@@ -949,5 +957,21 @@ func mockFetchLookupTableAddresses(t *testing.T, rw *clientmocks.ReaderWriter, l
 	rw.On("GetAccountInfoWithOpts", mock.Anything, lookupTablePubkey, mock.Anything).Return(&rpc.GetAccountInfoResult{
 		RPCContext: rpc.RPCContext{},
 		Value:      &rpc.Account{Data: rpc.DataBytesOrJSONFromBytes(lookupTableStateBytes)},
+	}, nil)
+}
+
+func mockFetchRouterAddress(t *testing.T, rw *clientmocks.ReaderWriter, routerAddr, offrampAddr solana.PublicKey) {
+	pda, _, err := solana.FindProgramAddress([][]byte{[]byte("reference_addresses")}, offrampAddr)
+	require.NoError(t, err)
+	referenceAddresses := ccip_offramp.ReferenceAddresses{
+		Version:            1,
+		Router:             routerAddr,
+		FeeQuoter:          solana.PublicKey{},
+		OfframpLookupTable: solana.PublicKey{},
+	}
+	referenceAddressesBytes := mustBorshEncodeStruct(t, referenceAddresses)
+	rw.On("GetAccountInfoWithOpts", mock.Anything, pda, mock.Anything).Return(&rpc.GetAccountInfoResult{
+		RPCContext: rpc.RPCContext{},
+		Value:      &rpc.Account{Data: rpc.DataBytesOrJSONFromBytes(referenceAddressesBytes)},
 	}, nil)
 }

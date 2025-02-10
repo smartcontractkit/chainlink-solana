@@ -18,15 +18,15 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
 	bigmath "github.com/smartcontractkit/chainlink-common/pkg/utils/big_math"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mathutil"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 const (
@@ -65,7 +65,7 @@ type Txm struct {
 	cfg    config.Config
 	txs    PendingTxContext
 	ks     SimpleKeystore
-	client internal.Loader[client.ReaderWriter]
+	client utils.Loader[client.ReaderWriter]
 	fee    fees.Estimator
 	// sendTx is an override for sending transactions rather than using a single client
 	// Enabling MultiNode uses this function to send transactions to all RPCs
@@ -73,13 +73,13 @@ type Txm struct {
 }
 
 // NewTxm creates a txm. Uses simulation so should only be used to send txes to trusted contracts i.e. OCR.
-func NewTxm(chainID string, client internal.Loader[client.ReaderWriter],
+func NewTxm(chainID string, client utils.Loader[client.ReaderWriter],
 	sendTx func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error),
 	cfg config.Config, ks SimpleKeystore, lggr logger.Logger) *Txm {
 	if sendTx == nil {
 		// default sendTx using a single RPC
 		sendTx = func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error) {
-			c, err := client.Get()
+			c, err := client.Get(ctx)
 			if err != nil {
 				return solanaGo.Signature{}, err
 			}
@@ -110,7 +110,7 @@ func (txm *Txm) Start(ctx context.Context) error {
 		case "fixed":
 			estimator, err = fees.NewFixedPriceEstimator(txm.cfg)
 		case "blockhistory":
-			estimator, err = fees.NewBlockHistoryEstimator(txm.client, txm.cfg, txm.lggr)
+			estimator, err = fees.NewBlockHistoryEstimator(txm.client.Get, txm.cfg, txm.lggr)
 		default:
 			err = fmt.Errorf("unknown solana fee estimator type: %s", txm.cfg.FeeEstimatorMode())
 		}
@@ -379,18 +379,19 @@ func (txm *Txm) confirm() {
 	ctx, cancel := txm.chStop.NewCtx()
 	defer cancel()
 
-	tick := time.After(0)
+	ticker := services.NewTicker(txm.cfg.ConfirmPollPeriod())
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-tick:
+		case <-ticker.C:
 			// If no signatures to confirm, we can break loop as there's nothing to process.
 			if txm.InflightTxs() == 0 {
 				break
 			}
 
-			client, err := txm.client.Get()
+			client, err := txm.client.Get(ctx)
 			if err != nil {
 				txm.lggr.Errorw("failed to get client in txm.confirm", "error", err)
 				break
@@ -400,7 +401,7 @@ func (txm *Txm) confirm() {
 				txm.rebroadcastExpiredTxs(ctx, client)
 			}
 		}
-		tick = time.After(utils.WithJitter(txm.cfg.ConfirmPollPeriod()))
+		ticker.Reset()
 	}
 }
 
@@ -409,7 +410,7 @@ func (txm *Txm) confirm() {
 // It handles various scenarios including expirations, errors, and state transitions (broadcasted, processed, confirmed, finalized).
 // Additionally, it detects and manages re-orgs by removing or rebroadcasting transactions as necessary and determines when to end polling cancelling retry loops.
 func (txm *Txm) processConfirmations(ctx context.Context, client client.ReaderWriter) {
-	sigsBatch, err := utils.BatchSplit(txm.txs.ListAllSigs(), MaxSigsToConfirm)
+	sigsBatch, err := commonutils.BatchSplit(txm.txs.ListAllSigs(), MaxSigsToConfirm)
 	if err != nil { // this should never happen
 		txm.lggr.Fatalw("failed to batch signatures", "error", err)
 		return
@@ -686,18 +687,19 @@ func (txm *Txm) reap() {
 	ctx, cancel := txm.chStop.NewCtx()
 	defer cancel()
 
-	tick := time.After(0)
+	ticker := services.NewTicker(TxReapInterval)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-tick:
+		case <-ticker.C:
 			reapCount := txm.txs.TrimFinalizedErroredTxs()
 			if reapCount > 0 {
 				txm.lggr.Debugf("Reaped %d finalized or errored transactions", reapCount)
 			}
 		}
-		tick = time.After(utils.WithJitter(TxReapInterval))
+		ticker.Reset()
 	}
 }
 
@@ -856,7 +858,7 @@ func (txm *Txm) EstimateComputeUnitLimit(ctx context.Context, tx *solanaGo.Trans
 // simulateTx simulates transactions using the SimulateTx client method
 func (txm *Txm) simulateTx(ctx context.Context, tx *solanaGo.Transaction) (res *rpc.SimulateTransactionResult, err error) {
 	// get client
-	client, err := txm.client.Get()
+	client, err := txm.client.Get(ctx)
 	if err != nil {
 		txm.lggr.Errorw("failed to get client", "error", err)
 		return

@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/rpc"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -15,25 +15,35 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+	"github.com/smartcontractkit/chainlink-common/pkg/values"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
-const ServiceName = "SolanaChainReader"
+type EventsReader interface {
+	RegisterFilter(context.Context, logpoller.Filter) error
+	FilteredLogs(context.Context, []query.Expression, query.LimitAndSort, string) ([]logpoller.Log, error)
+}
 
-type SolanaChainReaderService struct {
+const ServiceName = "SolanaContractReader"
+
+type ContractReaderService struct {
 	types.UnimplementedContractReader
 
-	// provided values
+	// provided dependencies
 	lggr   logger.Logger
 	client MultipleAccountGetter
+	reader EventsReader
 
 	// internal values
-	bindings namespaceBindings
-	lookup   *lookup
-	parsed   *codec.ParsedTypes
-	codec    types.RemoteCodec
+	bdRegistry bindingsRegistry
+	lookup     *lookup
+	parsed     *codec.ParsedTypes
+	codec      types.RemoteCodec
+	filters    []logpoller.Filter
 
 	// service state management
 	wg sync.WaitGroup
@@ -41,21 +51,38 @@ type SolanaChainReaderService struct {
 }
 
 var (
-	_ services.Service     = &SolanaChainReaderService{}
-	_ types.ContractReader = &SolanaChainReaderService{}
+	_ services.Service     = &ContractReaderService{}
+	_ types.ContractReader = &ContractReaderService{}
 )
 
-// NewChainReaderService is a constructor for a new ChainReaderService for Solana. Returns a nil service on error.
-func NewChainReaderService(lggr logger.Logger, dataReader MultipleAccountGetter, cfg config.ContractReader) (*SolanaChainReaderService, error) {
-	svc := &SolanaChainReaderService{
-		lggr:     logger.Named(lggr, ServiceName),
-		client:   dataReader,
-		bindings: namespaceBindings{},
-		lookup:   newLookup(),
-		parsed:   &codec.ParsedTypes{EncoderDefs: map[string]codec.Entry{}, DecoderDefs: map[string]codec.Entry{}},
+// NewContractReaderService is a constructor for a new ContractReaderService for Solana. Returns a nil service on error.
+func NewContractReaderService(
+	lggr logger.Logger,
+	dataReader MultipleAccountGetter,
+	cfg config.ContractReader,
+	reader EventsReader,
+) (*ContractReaderService, error) {
+	svc := &ContractReaderService{
+		lggr:   logger.Named(lggr, ServiceName),
+		client: dataReader,
+		bdRegistry: bindingsRegistry{
+			namespaceBindings:  make(map[string]readNameBindings),
+			addressShareGroups: make(map[string]*addressShareGroup),
+		},
+		lookup: newLookup(),
+		parsed: &codec.ParsedTypes{
+			EncoderDefs: map[string]codec.Entry{},
+			DecoderDefs: map[string]codec.Entry{},
+		},
+		filters: []logpoller.Filter{},
+		reader:  reader,
 	}
 
-	if err := svc.init(cfg.Namespaces); err != nil {
+	if err := svc.bdRegistry.initAddressSharing(cfg.AddressShareGroups); err != nil {
+		return nil, err
+	}
+
+	if err := svc.initNamespace(cfg.Namespaces); err != nil {
 		return nil, err
 	}
 
@@ -66,27 +93,35 @@ func NewChainReaderService(lggr logger.Logger, dataReader MultipleAccountGetter,
 
 	svc.codec = svcCodec
 
-	svc.bindings.SetCodec(svcCodec)
+	svc.bdRegistry.SetCodecs(svcCodec)
+	svc.bdRegistry.SetModifiers(svc.parsed.Modifiers)
 	return svc, nil
 }
 
 // Name implements the services.ServiceCtx interface and returns the logger service name.
-func (s *SolanaChainReaderService) Name() string {
+func (s *ContractReaderService) Name() string {
 	return s.lggr.Name()
 }
 
 // Start implements the services.ServiceCtx interface and starts necessary background services.
 // An error is returned if starting any internal services fails. Subsequent calls to Start return
 // and error.
-func (s *SolanaChainReaderService) Start(_ context.Context) error {
+func (s *ContractReaderService) Start(ctx context.Context) error {
 	return s.StartOnce(ServiceName, func() error {
+		// registering filters needs a context so we should be able to use the start function context.
+		for _, filter := range s.filters {
+			if err := s.reader.RegisterFilter(ctx, filter); err != nil {
+				return err
+			}
+		}
+
 		return nil
 	})
 }
 
 // Close implements the services.ServiceCtx interface and stops all background services and cleans
 // up used resources. Subsequent calls to Close return an error.
-func (s *SolanaChainReaderService) Close() error {
+func (s *ContractReaderService) Close() error {
 	return s.StopOnce(ServiceName, func() error {
 		s.wg.Wait()
 
@@ -96,19 +131,19 @@ func (s *SolanaChainReaderService) Close() error {
 
 // Ready implements the services.ServiceCtx interface and returns an error if starting the service
 // encountered any errors or if the service is not ready to serve requests.
-func (s *SolanaChainReaderService) Ready() error {
+func (s *ContractReaderService) Ready() error {
 	return s.StateMachine.Ready()
 }
 
 // HealthReport implements the services.ServiceCtx interface and returns errors for any internal
 // function or service that may have failed.
-func (s *SolanaChainReaderService) HealthReport() map[string]error {
+func (s *ContractReaderService) HealthReport() map[string]error {
 	return map[string]error{s.Name(): s.Healthy()}
 }
 
 // GetLatestValue implements the types.ContractReader interface and requests and parses on-chain
 // data named by the provided contract, method, and params.
-func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, readIdentifier string, _ primitives.ConfidenceLevel, params any, returnVal any) error {
+func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifier string, _ primitives.ConfidenceLevel, params any, returnVal any) error {
 	if err := s.Ready(); err != nil {
 		return err
 	}
@@ -118,19 +153,27 @@ func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, readIdent
 
 	values, ok := s.lookup.getContractForReadIdentifiers(readIdentifier)
 	if !ok {
-		return fmt.Errorf("%w: no contract for read identifier %s", types.ErrInvalidType, readIdentifier)
+		return fmt.Errorf("%w: no contract for read identifier: %q", types.ErrInvalidType, readIdentifier)
+	}
+
+	if len(values.multiRead) == 0 {
+		return fmt.Errorf("%w: no reads defined for readIdentifier: %q", types.ErrInvalidConfig, readIdentifier)
+	}
+
+	if len(values.multiRead) > 1 {
+		return doMultiRead(ctx, s.client, s.bdRegistry, values, returnVal)
 	}
 
 	batch := []call{
 		{
-			ContractName: values.contract,
-			ReadName:     values.genericName,
-			Params:       params,
-			ReturnVal:    returnVal,
+			Namespace: values.contract,
+			ReadName:  values.multiRead[0],
+			Params:    params,
+			ReturnVal: returnVal,
 		},
 	}
 
-	results, err := doMethodBatchCall(ctx, s.client, s.bindings, batch)
+	results, err := doMethodBatchCall(ctx, s.client, s.bdRegistry, batch)
 	if err != nil {
 		return err
 	}
@@ -147,9 +190,9 @@ func (s *SolanaChainReaderService) GetLatestValue(ctx context.Context, readIdent
 }
 
 // BatchGetLatestValues implements the types.ContractReader interface.
-func (s *SolanaChainReaderService) BatchGetLatestValues(ctx context.Context, request types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
+func (s *ContractReaderService) BatchGetLatestValues(ctx context.Context, request types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
 	idxLookup := make(map[types.BoundContract][]int)
-	batch := []call{}
+	var batch []call
 
 	for bound, req := range request {
 		idxLookup[bound] = make([]int, len(req))
@@ -157,15 +200,15 @@ func (s *SolanaChainReaderService) BatchGetLatestValues(ctx context.Context, req
 		for idx, readReq := range req {
 			idxLookup[bound][idx] = len(batch)
 			batch = append(batch, call{
-				ContractName: bound.Name,
-				ReadName:     readReq.ReadName,
-				Params:       readReq.Params,
-				ReturnVal:    readReq.ReturnVal,
+				Namespace: bound.Name,
+				ReadName:  readReq.ReadName,
+				Params:    readReq.Params,
+				ReturnVal: readReq.ReturnVal,
 			})
 		}
 	}
 
-	results, err := doMethodBatchCall(ctx, s.client, s.bindings, batch)
+	results, err := doMethodBatchCall(ctx, s.client, s.bdRegistry, batch)
 	if err != nil {
 		return nil, err
 	}
@@ -191,27 +234,64 @@ func (s *SolanaChainReaderService) BatchGetLatestValues(ctx context.Context, req
 }
 
 // QueryKey implements the types.ContractReader interface.
-func (s *SolanaChainReaderService) QueryKey(_ context.Context, _ types.BoundContract, _ query.KeyFilter, _ query.LimitAndSort, _ any) ([]types.Sequence, error) {
-	return nil, errors.New("unimplemented")
+func (s *ContractReaderService) QueryKey(ctx context.Context, contract types.BoundContract, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
+	binding, err := s.bdRegistry.GetReadBinding(contract.Name, filter.Key)
+	if err != nil {
+		return nil, err
+	}
+
+	_, isValuePtr := sequenceDataType.(*values.Value)
+	if !isValuePtr {
+		return binding.QueryKey(ctx, filter, limitAndSort, sequenceDataType)
+	}
+
+	dataTypeFromReadIdentifier, err := s.CreateContractType(contract.ReadIdentifier(filter.Key), false)
+	if err != nil {
+		return nil, err
+	}
+
+	sequence, err := binding.QueryKey(ctx, filter, limitAndSort, dataTypeFromReadIdentifier)
+	if err != nil {
+		return nil, err
+	}
+
+	sequenceOfValues := make([]types.Sequence, len(sequence))
+	for idx, entry := range sequence {
+		value, err := values.Wrap(entry.Data)
+		if err != nil {
+			return nil, err
+		}
+		sequenceOfValues[idx] = types.Sequence{
+			Cursor: entry.Cursor,
+			Head:   entry.Head,
+			Data:   &value,
+		}
+	}
+
+	return sequenceOfValues, nil
 }
 
-// Bind implements the types.ContractReader interface and allows new contract bindings to be added
+// Bind implements the types.ContractReader interface and allows new contract namespaceBindings to be added
 // to the service.
-func (s *SolanaChainReaderService) Bind(_ context.Context, bindings []types.BoundContract) error {
-	for _, binding := range bindings {
-		if err := s.bindings.Bind(binding); err != nil {
+func (s *ContractReaderService) Bind(_ context.Context, bindings []types.BoundContract) error {
+	for i := range bindings {
+		if err := s.bdRegistry.Bind(&bindings[i]); err != nil {
 			return err
 		}
 
-		s.lookup.bindAddressForContract(binding.Name, binding.Address)
+		s.lookup.bindAddressForContract(bindings[i].Name, bindings[i].Address)
+		// also bind with an empty address so that we can look up the contract without providing address when calling CR methods
+		if _, isInAShareGroup := s.bdRegistry.getShareGroup(bindings[i]); isInAShareGroup {
+			s.lookup.bindAddressForContract(bindings[i].Name, "")
+		}
 	}
 
 	return nil
 }
 
-// Unbind implements the types.ContractReader interface and allows existing contract bindings to be removed
+// Unbind implements the types.ContractReader interface and allows existing contract namespaceBindings to be removed
 // from the service.
-func (s *SolanaChainReaderService) Unbind(_ context.Context, bindings []types.BoundContract) error {
+func (s *ContractReaderService) Unbind(_ context.Context, bindings []types.BoundContract) error {
 	for _, binding := range bindings {
 		s.lookup.unbindAddressForContract(binding.Name, binding.Address)
 	}
@@ -221,16 +301,20 @@ func (s *SolanaChainReaderService) Unbind(_ context.Context, bindings []types.Bo
 
 // CreateContractType implements the ContractTypeProvider interface and allows the chain reader
 // service to explicitly define the expected type for a grpc server to provide.
-func (s *SolanaChainReaderService) CreateContractType(readIdentifier string, forEncoding bool) (any, error) {
+func (s *ContractReaderService) CreateContractType(readIdentifier string, forEncoding bool) (any, error) {
 	values, ok := s.lookup.getContractForReadIdentifiers(readIdentifier)
 	if !ok {
 		return nil, fmt.Errorf("%w: no contract for read identifier", types.ErrInvalidConfig)
 	}
 
-	return s.bindings.CreateType(values.contract, values.genericName, forEncoding)
+	if len(values.multiRead) == 0 {
+		return nil, fmt.Errorf("%w: no reads defined for read identifier", types.ErrInvalidConfig)
+	}
+
+	return s.bdRegistry.CreateType(values.contract, values.multiRead[0], forEncoding)
 }
 
-func (s *SolanaChainReaderService) addCodecDef(forEncoding bool, namespace, genericName string, readType codec.ChainConfigType, idl codec.IDL, idlDefinition interface{}, modCfg commoncodec.ModifiersConfig) error {
+func (s *ContractReaderService) addCodecDef(forEncoding bool, namespace, genericName string, idl codec.IDL, idlDefinition interface{}, modCfg commoncodec.ModifiersConfig) error {
 	mod, err := modCfg.ToModifier(codec.DecoderHooks...)
 	if err != nil {
 		return err
@@ -242,24 +326,25 @@ func (s *SolanaChainReaderService) addCodecDef(forEncoding bool, namespace, gene
 	}
 
 	if forEncoding {
-		s.parsed.EncoderDefs[codec.WrapItemType(forEncoding, namespace, genericName, readType)] = cEntry
+		s.parsed.EncoderDefs[codec.WrapItemType(true, namespace, genericName)] = cEntry
 	} else {
-		s.parsed.DecoderDefs[codec.WrapItemType(forEncoding, namespace, genericName, readType)] = cEntry
+		s.parsed.DecoderDefs[codec.WrapItemType(false, namespace, genericName)] = cEntry
 	}
 	return nil
 }
 
-func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainContractReader) error {
+func (s *ContractReaderService) initNamespace(namespaces map[string]config.ChainContractReader) error {
 	for namespace, nameSpaceDef := range namespaces {
 		for genericName, read := range nameSpaceDef.Reads {
-			injectAddressModifier(read.InputModifications, read.OutputModifications)
-			idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeAccountDef, read.ChainSpecificName, nameSpaceDef.IDL)
-			if err != nil {
-				return err
-			}
+			utils.InjectAddressModifier(read.InputModifications, read.OutputModifications)
 
 			switch read.ReadType {
 			case config.Account:
+				idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeAccountDef, read.ChainSpecificName, nameSpaceDef.IDL)
+				if err != nil {
+					return err
+				}
+
 				accountIDLDef, isOk := idlDef.(codec.IdlTypeDef)
 				if !isOk {
 					return fmt.Errorf("unexpected type %T from IDL definition for account read: %q, with chainSpecificName: %q, of type: %q", accountIDLDef, genericName, read.ChainSpecificName, read.ReadType)
@@ -268,12 +353,25 @@ func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainContra
 					return err
 				}
 			case config.Event:
+				idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeEventDef, read.ChainSpecificName, nameSpaceDef.IDL)
+				if err != nil {
+					return err
+				}
+
 				eventIDlDef, isOk := idlDef.(codec.IdlEvent)
 				if !isOk {
-					return fmt.Errorf("unexpected type %T from IDL definition for log read: %q, with chainSpecificName: %q, of type: %q", eventIDlDef, genericName, read.ChainSpecificName, read.ReadType)
+					return fmt.Errorf("unexpected type %T from IDL definition for event read: %q, with chainSpecificName: %q, of type: %q", eventIDlDef, genericName, read.ChainSpecificName, read.ReadType)
 				}
-				// TODO s.addLogRead()
-				return fmt.Errorf("implement me")
+
+				if err = s.addEventRead(
+					namespace, genericName,
+					nameSpaceDef.ContractAddress,
+					nameSpaceDef.IDL, eventIDlDef,
+					read,
+					s.reader,
+				); err != nil {
+					return err
+				}
 			default:
 				return fmt.Errorf("unexpected read type %q for: %q in namespace: %q", read.ReadType, genericName, namespace)
 			}
@@ -283,64 +381,117 @@ func (s *SolanaChainReaderService) init(namespaces map[string]config.ChainContra
 	return nil
 }
 
-func (s *SolanaChainReaderService) addAccountRead(namespace string, genericName string, idl codec.IDL, idlType codec.IdlTypeDef, readDefinition config.ReadDefinition) error {
-	if err := s.addCodecDef(false, namespace, genericName, codec.ChainConfigTypeAccountDef, idl, idlType, readDefinition.OutputModifications); err != nil {
+func (s *ContractReaderService) addAccountRead(namespace string, genericName string, idl codec.IDL, idlType codec.IdlTypeDef, readDefinition config.ReadDefinition) error {
+	if err := s.addCodecDef(false, namespace, genericName, idl, idlType, readDefinition.OutputModifications); err != nil {
 		return err
 	}
 
-	s.lookup.addReadNameForContract(namespace, genericName)
+	multiRead := []string{genericName}
+	if readDefinition.MultiReader != nil {
+		reads, err := s.addMultiAccountRead(namespace, readDefinition, idl)
+		if err != nil {
+			return err
+		}
+		multiRead = append(multiRead, reads...)
+	}
 
-	var reader readBinding
-	var inputAccountIDLDef interface{}
+	s.lookup.addReadNameForContract(namespace, genericName, multiRead)
+
+	var (
+		reader             readBinding
+		inputAccountIDLDef interface{}
+	)
+
 	// Create PDA read binding if PDA prefix or seeds configs are populated
-	if len(readDefinition.PDADefiniton.Prefix) > 0 || len(readDefinition.PDADefiniton.Seeds) > 0 {
-		inputAccountIDLDef = readDefinition.PDADefiniton
-		reader = newAccountReadBinding(namespace, genericName, readDefinition.PDADefiniton.Prefix, true)
+	if readDefinition.PDADefinition.Prefix != nil || len(readDefinition.PDADefinition.Seeds) > 0 {
+		inputAccountIDLDef = readDefinition.PDADefinition
+		reader = newAccountReadBinding(namespace, genericName, readDefinition.PDADefinition.Prefix, true)
 	} else {
 		inputAccountIDLDef = codec.NilIdlTypeDefTy
-		reader = newAccountReadBinding(namespace, genericName, "", false)
+		reader = newAccountReadBinding(namespace, genericName, nil, false)
 	}
-	if err := s.addCodecDef(true, namespace, genericName, codec.ChainConfigTypeAccountDef, idl, inputAccountIDLDef, readDefinition.InputModifications); err != nil {
+	if err := s.addCodecDef(true, namespace, genericName, idl, inputAccountIDLDef, readDefinition.InputModifications); err != nil {
 		return err
 	}
-	s.bindings.AddReadBinding(namespace, genericName, reader)
+
+	s.bdRegistry.AddReadBinding(namespace, genericName, reader)
+	return nil
+}
+
+func (s *ContractReaderService) addMultiAccountRead(namespace string, readDefinition config.ReadDefinition, idl codec.IDL) ([]string, error) {
+	var reads []string
+	for _, mr := range readDefinition.MultiReader.Reads {
+		idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeAccountDef, mr.ChainSpecificName, idl)
+		if err != nil {
+			return nil, err
+		}
+
+		if mr.ReadType != config.Account {
+			return nil, fmt.Errorf("unexpected read type %q for dynamic hard coder read: %q in namespace: %q", mr.ReadType, mr.ChainSpecificName, namespace)
+		}
+
+		accountIDLDef, isOk := idlDef.(codec.IdlTypeDef)
+		if !isOk {
+			return nil, fmt.Errorf("unexpected type %T from IDL definition for account read with chainSpecificName: %q, of type: %q", accountIDLDef, mr.ChainSpecificName, mr.ReadType)
+		}
+
+		if err = s.addAccountRead(namespace, mr.ChainSpecificName, idl, accountIDLDef, mr); err != nil {
+			return nil, fmt.Errorf("failed to add multi-read %q: %w", mr.ChainSpecificName, err)
+		}
+
+		reads = append(reads, mr.ChainSpecificName)
+	}
+	return reads, nil
+}
+
+func (s *ContractReaderService) addEventRead(
+	namespace, genericName string,
+	contractAddress solana.PublicKey,
+	_ codec.IDL,
+	_ codec.IdlEvent,
+	readDefinition config.ReadDefinition,
+	events EventsReader,
+) error {
+	mappedTuples := make(map[string]uint64)
+	subKeys := [4][]string{}
+
+	applyIndexedFieldTuple(mappedTuples, subKeys, readDefinition.IndexedField0, 0)
+	applyIndexedFieldTuple(mappedTuples, subKeys, readDefinition.IndexedField1, 1)
+	applyIndexedFieldTuple(mappedTuples, subKeys, readDefinition.IndexedField2, 2)
+	applyIndexedFieldTuple(mappedTuples, subKeys, readDefinition.IndexedField3, 3)
+
+	filter := toLPFilter(readDefinition.PollingFilter, contractAddress, subKeys[:])
+
+	s.filters = append(s.filters, filter)
+	s.bdRegistry.AddReadBinding(namespace, genericName, newEventReadBinding(
+		namespace,
+		genericName,
+		mappedTuples,
+		events,
+		filter.EventSig,
+	))
 
 	return nil
 }
 
-// injectAddressModifier injects AddressModifier into OutputModifications.
-// This is necessary because AddressModifier cannot be serialized and must be applied at runtime.
-func injectAddressModifier(inputModifications, outputModifications commoncodec.ModifiersConfig) {
-	for i, modConfig := range inputModifications {
-		if addrModifierConfig, ok := modConfig.(*commoncodec.AddressBytesToStringModifierConfig); ok {
-			addrModifierConfig.Modifier = codec.SolanaAddressModifier{}
-			outputModifications[i] = addrModifierConfig
-		}
-	}
-
-	for i, modConfig := range outputModifications {
-		if addrModifierConfig, ok := modConfig.(*commoncodec.AddressBytesToStringModifierConfig); ok {
-			addrModifierConfig.Modifier = codec.SolanaAddressModifier{}
-			outputModifications[i] = addrModifierConfig
-		}
+func toLPFilter(
+	f *config.PollingFilter,
+	address solana.PublicKey,
+	subKeyPaths [][]string,
+) logpoller.Filter {
+	return logpoller.Filter{
+		Address:     logpoller.PublicKey(address),
+		EventName:   f.EventName,
+		EventSig:    logpoller.EventSignature([]byte(f.EventName)[:logpoller.EventSignatureLength]),
+		SubkeyPaths: logpoller.SubKeyPaths(subKeyPaths),
+		Retention:   f.Retention,
+		MaxLogsKept: f.MaxLogsKept,
 	}
 }
 
-type accountDataReader struct {
-	client *rpc.Client
-}
-
-func NewAccountDataReader(client *rpc.Client) *accountDataReader {
-	return &accountDataReader{client: client}
-}
-
-func (r *accountDataReader) ReadAll(ctx context.Context, pk solana.PublicKey, opts *rpc.GetAccountInfoOpts) ([]byte, error) {
-	result, err := r.client.GetAccountInfoWithOpts(ctx, pk, opts)
-	if err != nil {
-		return nil, err
+func applyIndexedFieldTuple(lookup map[string]uint64, subKeys [4][]string, conf *config.IndexedField, idx uint64) {
+	if conf != nil {
+		lookup[conf.OffChainPath] = idx
+		subKeys[idx] = strings.Split(conf.OnChainPath, ".")
 	}
-
-	bts := result.Value.Data.GetBinary()
-
-	return bts, nil
 }

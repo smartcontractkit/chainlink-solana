@@ -157,3 +157,327 @@ func (obj *DataAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 	}
 	return nil
 }
+
+type TestStruct struct {
+	Idx                 uint64
+	Bump                uint8
+	Padding0            [7]uint8
+	Field               int32
+	Padding1            [4]uint8
+	OracleId            uint8
+	Padding2            [15]uint8
+	OracleIds           [32]uint8
+	Accounts            [2][32]uint8
+	DifferentField      [32]uint8
+	Padding3            [8]uint8
+	BigField            ag_binary.Int128
+	AccountStruct       AccountStruct
+	NestedDynamicStruct MidLevelDynamicTestStruct
+	NestedStaticStruct  MidLevelStaticTestStruct
+}
+
+var TestStructDiscriminator = [8]byte{243, 149, 82, 70, 154, 54, 107, 6}
+
+func (obj TestStruct) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(TestStructDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Idx` param:
+	err = encoder.Encode(obj.Idx)
+	if err != nil {
+		return err
+	}
+	// Serialize `Bump` param:
+	err = encoder.Encode(obj.Bump)
+	if err != nil {
+		return err
+	}
+	// Serialize `Padding0` param:
+	err = encoder.Encode(obj.Padding0)
+	if err != nil {
+		return err
+	}
+	// Serialize `Field` param:
+	err = encoder.Encode(obj.Field)
+	if err != nil {
+		return err
+	}
+	// Serialize `Padding1` param:
+	err = encoder.Encode(obj.Padding1)
+	if err != nil {
+		return err
+	}
+	// Serialize `OracleId` param:
+	err = encoder.Encode(obj.OracleId)
+	if err != nil {
+		return err
+	}
+	// Serialize `Padding2` param:
+	err = encoder.Encode(obj.Padding2)
+	if err != nil {
+		return err
+	}
+	// Serialize `OracleIds` param:
+	err = encoder.Encode(obj.OracleIds)
+	if err != nil {
+		return err
+	}
+	// Serialize `Accounts` param:
+	err = encoder.Encode(obj.Accounts)
+	if err != nil {
+		return err
+	}
+	// Serialize `DifferentField` param:
+	err = encoder.Encode(obj.DifferentField)
+	if err != nil {
+		return err
+	}
+	// Serialize `Padding3` param:
+	err = encoder.Encode(obj.Padding3)
+	if err != nil {
+		return err
+	}
+	// Serialize `BigField` param:
+	err = encoder.Encode(obj.BigField)
+	if err != nil {
+		return err
+	}
+	// Serialize `AccountStruct` param:
+	err = encoder.Encode(obj.AccountStruct)
+	if err != nil {
+		return err
+	}
+	// Serialize `NestedDynamicStruct` param:
+	err = encoder.Encode(obj.NestedDynamicStruct)
+	if err != nil {
+		return err
+	}
+	// Serialize `NestedStaticStruct` param:
+	err = encoder.Encode(obj.NestedStaticStruct)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *TestStruct) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(TestStructDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[243 149 82 70 154 54 107 6]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Idx`:
+	err = decoder.Decode(&obj.Idx)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Bump`:
+	err = decoder.Decode(&obj.Bump)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Padding0`:
+	err = decoder.Decode(&obj.Padding0)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Field`:
+	err = decoder.Decode(&obj.Field)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Padding1`:
+	err = decoder.Decode(&obj.Padding1)
+	if err != nil {
+		return err
+	}
+	// Deserialize `OracleId`:
+	err = decoder.Decode(&obj.OracleId)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Padding2`:
+	err = decoder.Decode(&obj.Padding2)
+	if err != nil {
+		return err
+	}
+	// Deserialize `OracleIds`:
+	err = decoder.Decode(&obj.OracleIds)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Accounts`:
+	err = decoder.Decode(&obj.Accounts)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DifferentField`:
+	err = decoder.Decode(&obj.DifferentField)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Padding3`:
+	err = decoder.Decode(&obj.Padding3)
+	if err != nil {
+		return err
+	}
+	// Deserialize `BigField`:
+	err = decoder.Decode(&obj.BigField)
+	if err != nil {
+		return err
+	}
+	// Deserialize `AccountStruct`:
+	err = decoder.Decode(&obj.AccountStruct)
+	if err != nil {
+		return err
+	}
+	// Deserialize `NestedDynamicStruct`:
+	err = decoder.Decode(&obj.NestedDynamicStruct)
+	if err != nil {
+		return err
+	}
+	// Deserialize `NestedStaticStruct`:
+	err = decoder.Decode(&obj.NestedStaticStruct)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type MultiRead1 struct {
+	A uint8
+	B int16
+	C bool
+}
+
+var MultiRead1Discriminator = [8]byte{15, 46, 242, 154, 22, 213, 170, 20}
+
+func (obj MultiRead1) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(MultiRead1Discriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `A` param:
+	err = encoder.Encode(obj.A)
+	if err != nil {
+		return err
+	}
+	// Serialize `B` param:
+	err = encoder.Encode(obj.B)
+	if err != nil {
+		return err
+	}
+	// Serialize `C` param:
+	err = encoder.Encode(obj.C)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *MultiRead1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(MultiRead1Discriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[15 46 242 154 22 213 170 20]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `A`:
+	err = decoder.Decode(&obj.A)
+	if err != nil {
+		return err
+	}
+	// Deserialize `B`:
+	err = decoder.Decode(&obj.B)
+	if err != nil {
+		return err
+	}
+	// Deserialize `C`:
+	err = decoder.Decode(&obj.C)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type MultiRead2 struct {
+	U string
+	V bool
+	W [2]uint64
+}
+
+var MultiRead2Discriminator = [8]byte{17, 116, 102, 101, 239, 43, 252, 86}
+
+func (obj MultiRead2) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(MultiRead2Discriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `U` param:
+	err = encoder.Encode(obj.U)
+	if err != nil {
+		return err
+	}
+	// Serialize `V` param:
+	err = encoder.Encode(obj.V)
+	if err != nil {
+		return err
+	}
+	// Serialize `W` param:
+	err = encoder.Encode(obj.W)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *MultiRead2) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(MultiRead2Discriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[17 116 102 101 239 43 252 86]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `U`:
+	err = decoder.Decode(&obj.U)
+	if err != nil {
+		return err
+	}
+	// Deserialize `V`:
+	err = decoder.Decode(&obj.V)
+	if err != nil {
+		return err
+	}
+	// Deserialize `W`:
+	err = decoder.Decode(&obj.W)
+	if err != nil {
+		return err
+	}
+	return nil
+}

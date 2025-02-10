@@ -15,18 +15,22 @@ type Initialize struct {
 	TestIdx *uint64
 	Value   *uint64
 
-	// [0] = [WRITE] data
+	// [0] = [WRITE, SIGNER] signer
 	//
-	// [1] = [WRITE, SIGNER] signer
+	// [1] = [WRITE] data
 	//
-	// [2] = [] systemProgram
+	// [2] = [WRITE] multiRead1
+	//
+	// [3] = [WRITE] multiRead2
+	//
+	// [4] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
 func NewInitializeInstructionBuilder() *Initialize {
 	nd := &Initialize{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
 	}
 	return nd
 }
@@ -43,37 +47,59 @@ func (inst *Initialize) SetValue(value uint64) *Initialize {
 	return inst
 }
 
-// SetDataAccount sets the "data" account.
-func (inst *Initialize) SetDataAccount(data ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(data).WRITE()
-	return inst
-}
-
-// GetDataAccount gets the "data" account.
-func (inst *Initialize) GetDataAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
-}
-
 // SetSignerAccount sets the "signer" account.
 func (inst *Initialize) SetSignerAccount(signer ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(signer).WRITE().SIGNER()
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(signer).WRITE().SIGNER()
 	return inst
 }
 
 // GetSignerAccount gets the "signer" account.
 func (inst *Initialize) GetSignerAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[0]
+}
+
+// SetDataAccount sets the "data" account.
+func (inst *Initialize) SetDataAccount(data ag_solanago.PublicKey) *Initialize {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(data).WRITE()
+	return inst
+}
+
+// GetDataAccount gets the "data" account.
+func (inst *Initialize) GetDataAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
+}
+
+// SetMultiRead1Account sets the "multiRead1" account.
+func (inst *Initialize) SetMultiRead1Account(multiRead1 ag_solanago.PublicKey) *Initialize {
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(multiRead1).WRITE()
+	return inst
+}
+
+// GetMultiRead1Account gets the "multiRead1" account.
+func (inst *Initialize) GetMultiRead1Account() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[2]
+}
+
+// SetMultiRead2Account sets the "multiRead2" account.
+func (inst *Initialize) SetMultiRead2Account(multiRead2 ag_solanago.PublicKey) *Initialize {
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(multiRead2).WRITE()
+	return inst
+}
+
+// GetMultiRead2Account gets the "multiRead2" account.
+func (inst *Initialize) GetMultiRead2Account() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[3]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *Initialize) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *Initialize) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[4]
 }
 
 func (inst Initialize) Build() *Instruction {
@@ -107,12 +133,18 @@ func (inst *Initialize) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Data is not set")
-		}
-		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Signer is not set")
 		}
+		if inst.AccountMetaSlice[1] == nil {
+			return errors.New("accounts.Data is not set")
+		}
 		if inst.AccountMetaSlice[2] == nil {
+			return errors.New("accounts.MultiRead1 is not set")
+		}
+		if inst.AccountMetaSlice[3] == nil {
+			return errors.New("accounts.MultiRead2 is not set")
+		}
+		if inst.AccountMetaSlice[4] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -134,10 +166,12 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("         data", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("       signer", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
+					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("       signer", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("         data", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("   multiRead1", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("   multiRead2", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[4]))
 					})
 				})
 		})
@@ -176,13 +210,17 @@ func NewInitializeInstruction(
 	testIdx uint64,
 	value uint64,
 	// Accounts:
-	data ag_solanago.PublicKey,
 	signer ag_solanago.PublicKey,
+	data ag_solanago.PublicKey,
+	multiRead1 ag_solanago.PublicKey,
+	multiRead2 ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
 		SetTestIdx(testIdx).
 		SetValue(value).
-		SetDataAccount(data).
 		SetSignerAccount(signer).
+		SetDataAccount(data).
+		SetMultiRead1Account(multiRead1).
+		SetMultiRead2Account(multiRead2).
 		SetSystemProgramAccount(systemProgram)
 }

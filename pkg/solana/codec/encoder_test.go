@@ -35,14 +35,15 @@ func (e *testErrEncodeTypeEntry) GetCodecType() commonencodings.TypeCodec {
 }
 
 func TestEncoder_Encode_Errors(t *testing.T) {
-	someType := "some-type"
+	someType := "input.Some.Type"
 
 	t.Run("error when item type not found", func(t *testing.T) {
 		_, err := newEncoder(map[string]Entry{}).
-			Encode(tests.Context(t), nil, "non-existent-type")
+			Encode(tests.Context(t), nil, "output.NonExistent.Type")
 		require.Error(t, err)
 		require.ErrorIs(t, err, commontypes.ErrInvalidType)
-		require.Contains(t, err.Error(), "cannot find type non-existent-type")
+		t.Log(err.Error())
+		require.Contains(t, err.Error(), "codec not available for itemType: NonExistent.Type")
 	})
 
 	t.Run("error when convert fails because of unexpected type", func(t *testing.T) {

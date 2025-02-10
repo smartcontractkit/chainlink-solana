@@ -4,17 +4,21 @@ package logpoller
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
+
 	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/pg"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
 // NOTE: at the moment it's not possible to run all db tests at once. This issue will be addressed separately
@@ -33,10 +37,18 @@ func TestLogPollerFilters(t *testing.T) {
 				EventName:     "event",
 				EventSig:      EventSignature{1, 2, 3},
 				StartingBlock: 1,
-				EventIdl:      EventIdl{},
-				SubKeyPaths:   SubKeyPaths([][]string{{"a", "b"}, {"c"}}),
-				Retention:     1000,
-				MaxLogsKept:   3,
+				SubkeyPaths:   SubKeyPaths([][]string{{"a", "b"}, {"c"}}),
+				EventIdl: EventIdl{
+					Event: codec.IdlEvent{
+						Name:   "MyEvent",
+						Fields: []codec.IdlEventField{{Name: "MyField", Type: codec.NewIdlStringType(codec.IdlTypeDuration), Index: true}},
+					},
+					Types: codec.IdlTypeDefSlice{
+						{Name: "NilType", Type: codec.IdlTypeDefTy{Kind: codec.IdlTypeDefTyKindStruct, Fields: &codec.IdlTypeDefStruct{}}},
+					},
+				},
+				Retention:   1000,
+				MaxLogsKept: 3,
 			},
 			{
 				Name:          "empty sub key paths",
@@ -44,7 +56,7 @@ func TestLogPollerFilters(t *testing.T) {
 				EventName:     "event",
 				EventSig:      EventSignature{1, 2, 3},
 				StartingBlock: 1,
-				SubKeyPaths:   SubKeyPaths([][]string{}),
+				SubkeyPaths:   SubKeyPaths([][]string{}),
 				Retention:     1000,
 				MaxLogsKept:   3,
 			},
@@ -54,7 +66,7 @@ func TestLogPollerFilters(t *testing.T) {
 				EventName:     "event",
 				EventSig:      EventSignature{1, 2, 3},
 				StartingBlock: 1,
-				SubKeyPaths:   nil,
+				SubkeyPaths:   nil,
 				Retention:     1000,
 				MaxLogsKept:   3,
 			},
@@ -64,7 +76,7 @@ func TestLogPollerFilters(t *testing.T) {
 			t.Run("Read/write filter: "+filter.Name, func(t *testing.T) {
 				ctx := tests.Context(t)
 				chainID := uuid.NewString()
-				dbx := pg.NewTestDB(t, pg.TestURL(t))
+				dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 				orm := NewORM(chainID, dbx, lggr)
 				id, err := orm.InsertFilter(ctx, filter)
 				require.NoError(t, err)
@@ -72,12 +84,19 @@ func TestLogPollerFilters(t *testing.T) {
 				dbFilter, err := orm.GetFilterByID(ctx, id)
 				require.NoError(t, err)
 				require.Equal(t, filter, dbFilter)
+				dbFilters, err := orm.SelectFilters(ctx)
+				require.NoError(t, err)
+				i := slices.IndexFunc(dbFilters, func(f Filter) bool {
+					return f.ID == id
+				})
+				require.NotEqual(t, -1, i, "Expected filter to be present in slice")
+				require.Equal(t, filter, dbFilters[i])
 			})
 		}
 	})
 	t.Run("Updates non primary fields if name and chainID is not unique", func(t *testing.T) {
 		chainID := uuid.NewString()
-		dbx := pg.NewTestDB(t, pg.TestURL(t))
+		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 		orm := NewORM(chainID, dbx, lggr)
 		filter := newRandomFilter(t)
 		ctx := tests.Context(t)
@@ -97,7 +116,7 @@ func TestLogPollerFilters(t *testing.T) {
 	})
 	t.Run("Allows reuse name of a filter marked as deleted", func(t *testing.T) {
 		chainID := uuid.NewString()
-		dbx := pg.NewTestDB(t, pg.TestURL(t))
+		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 		orm := NewORM(chainID, dbx, lggr)
 		filter := newRandomFilter(t)
 		ctx := tests.Context(t)
@@ -115,7 +134,7 @@ func TestLogPollerFilters(t *testing.T) {
 		require.NotEqual(t, newFilterID, filterID, "expected db to generate new filter as we can not be sure that new one matches the same logs")
 	})
 	t.Run("Allows reuse name for a filter with different chainID", func(t *testing.T) {
-		dbx := pg.NewTestDB(t, pg.TestURL(t))
+		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 		orm1 := NewORM(uuid.NewString(), dbx, lggr)
 		orm2 := NewORM(uuid.NewString(), dbx, lggr)
 		filter := newRandomFilter(t)
@@ -127,14 +146,14 @@ func TestLogPollerFilters(t *testing.T) {
 		require.NotEqual(t, filterID1, filterID2)
 	})
 	t.Run("Deletes log on parent filter deletion", func(t *testing.T) {
-		dbx := pg.NewTestDB(t, pg.TestURL(t))
+		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 		chainID := uuid.NewString()
 		orm := NewORM(chainID, dbx, lggr)
 		filter := newRandomFilter(t)
 		ctx := tests.Context(t)
 		filterID, err := orm.InsertFilter(ctx, filter)
 		require.NoError(t, err)
-		log := newRandomLog(t, filterID, chainID, "myEvent")
+		log := newRandomLog(t, filterID, chainID, "My Event")
 		err = orm.InsertLogs(ctx, []Log{log})
 		require.NoError(t, err)
 		logs, err := orm.SelectLogs(ctx, 0, log.BlockNumber, log.Address, log.EventSig)
@@ -153,7 +172,7 @@ func TestLogPollerFilters(t *testing.T) {
 		require.Len(t, logs, 0)
 	})
 	t.Run("MarkBackfilled updated corresponding filed", func(t *testing.T) {
-		dbx := pg.NewTestDB(t, pg.TestURL(t))
+		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 		chainID := uuid.NewString()
 		orm := NewORM(chainID, dbx, lggr)
 
@@ -183,16 +202,17 @@ func TestLogPollerFilters(t *testing.T) {
 func TestLogPollerLogs(t *testing.T) {
 	lggr := logger.Test(t)
 	chainID := uuid.NewString()
-	dbx := pg.NewTestDB(t, pg.TestURL(t))
+	dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 	orm := NewORM(chainID, dbx, lggr)
 
 	ctx := tests.Context(t)
 	// create filter as it's required for a log
 	filterID, err := orm.InsertFilter(ctx, newRandomFilter(t))
+	require.NoError(t, err)
 	filterID2, err := orm.InsertFilter(ctx, newRandomFilter(t))
 	require.NoError(t, err)
-	log := newRandomLog(t, filterID, chainID, "myEvent")
-	log2 := newRandomLog(t, filterID2, chainID, "myEvent")
+	log := newRandomLog(t, filterID, chainID, "My Event")
+	log2 := newRandomLog(t, filterID2, chainID, "My Event")
 	err = orm.InsertLogs(ctx, []Log{log, log2})
 	require.NoError(t, err)
 	// insert of the same Log should not produce two instances
@@ -222,13 +242,13 @@ func TestLogPollerLogs(t *testing.T) {
 
 func TestLogPoller_GetLatestBlock(t *testing.T) {
 	lggr := logger.Test(t)
-	dbx := pg.NewTestDB(t, pg.TestURL(t))
+	dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 
 	createLogsForBlocks := func(ctx context.Context, orm *DSORM, blocks ...int64) {
 		filterID, err := orm.InsertFilter(ctx, newRandomFilter(t))
 		require.NoError(t, err)
 		for _, block := range blocks {
-			log := newRandomLog(t, filterID, orm.chainID, "myEvent")
+			log := newRandomLog(t, filterID, orm.chainID, "My Event")
 			log.BlockNumber = block
 			err = orm.InsertLogs(ctx, []Log{log})
 			require.NoError(t, err)
@@ -254,31 +274,8 @@ func newRandomFilter(t *testing.T) Filter {
 		EventName:     "event",
 		EventSig:      newRandomEventSignature(t),
 		StartingBlock: 1,
-		SubKeyPaths:   [][]string{{"a", "b"}, {"c"}},
+		SubkeyPaths:   [][]string{{"a", "b"}, {"c"}},
 		Retention:     1000,
 		MaxLogsKept:   3,
-	}
-}
-
-func newRandomLog(t *testing.T, filterID int64, chainID string) Log {
-	privateKey, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
-	pubKey := privateKey.PublicKey()
-	data := []byte("solana is fun")
-	signature, err := privateKey.Sign(data)
-	require.NoError(t, err)
-	return Log{
-		FilterID:       filterID,
-		ChainID:        chainID,
-		LogIndex:       rand.Int63n(1000),
-		BlockHash:      Hash(pubKey),
-		BlockNumber:    rand.Int63n(1000000),
-		BlockTimestamp: time.Unix(1731590113, 0),
-		Address:        PublicKey(pubKey),
-		EventSig:       EventSignature{3, 2, 1},
-		SubKeyValues:   [][]byte{{3, 2, 1}, {1}, {1, 2}, pubKey.Bytes()},
-		TxHash:         Signature(signature),
-		Data:           data,
-		SequenceNum:    rand.Int63n(500),
 	}
 }

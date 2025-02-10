@@ -31,6 +31,8 @@ var (
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
 	Instruction_InitializeLookupTable = ag_binary.TypeID([8]byte{149, 120, 10, 249, 212, 185, 177, 216})
+
+	Instruction_Store = ag_binary.TypeID([8]byte{220, 28, 207, 235, 0, 234, 193, 246})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -40,6 +42,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "Initialize"
 	case Instruction_InitializeLookupTable:
 		return "InitializeLookupTable"
+	case Instruction_Store:
+		return "Store"
 	default:
 		return ""
 	}
@@ -65,6 +69,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"initialize_lookup_table", (*InitializeLookupTable)(nil),
+		},
+		{
+			"store", (*Store)(nil),
 		},
 	},
 )

@@ -38,7 +38,7 @@ func FuzzExtractorHappyPath(f *testing.F) {
 
 		stdDecoded, err := base64.StdEncoding.DecodeString(testString)
 		if err == nil {
-			require.Equal(t, stdDecoded[:8], extractor.Extract(testString))
+			require.Equal(t, [8]byte(stdDecoded[:8]), extractor.Extract(testString))
 		}
 	})
 }
