@@ -900,7 +900,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 			},
 		}
 
-		submitErr := cw.SubmitTransaction(ctx, ccipconsts.ContractNameOffRamp,ccipconsts.MethodExecute, args, txID, offrampAddr.String(), nil, nil)
+		submitErr := cw.SubmitTransaction(ctx, ccipconsts.ContractNameOffRamp, ccipconsts.MethodExecute, args, txID, offrampAddr.String(), nil, nil)
 		require.NoError(t, submitErr)
 	})
 
