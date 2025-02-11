@@ -399,7 +399,6 @@ func (s *ContractReaderService) initNamespace(namespaces map[string]config.Chain
 }
 
 func (s *ContractReaderService) addAccountRead(namespace string, genericName string, idl codec.IDL, idlType codec.IdlTypeDef, readDefinition config.ReadDefinition) error {
-
 	reads := []read{{readName: genericName, useParams: true}}
 	if readDefinition.MultiReader != nil {
 		multiRead, err := s.addMultiAccountReadToCodec(namespace, readDefinition, idl)

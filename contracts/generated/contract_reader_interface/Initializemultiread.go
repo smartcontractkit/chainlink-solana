@@ -20,7 +20,7 @@ type Initializemultiread struct {
 	// [2] = [WRITE] multiRead2
 	//
 	// [3] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-"`
+	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializemultireadInstructionBuilder creates a new `Initializemultiread` instruction builder.
@@ -39,7 +39,7 @@ func (inst *Initializemultiread) SetSignerAccount(signer ag_solanago.PublicKey) 
 
 // GetSignerAccount gets the "signer" account.
 func (inst *Initializemultiread) GetSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(0)
+	return inst.AccountMetaSlice[0]
 }
 
 // SetMultiRead1Account sets the "multiRead1" account.
@@ -50,7 +50,7 @@ func (inst *Initializemultiread) SetMultiRead1Account(multiRead1 ag_solanago.Pub
 
 // GetMultiRead1Account gets the "multiRead1" account.
 func (inst *Initializemultiread) GetMultiRead1Account() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(1)
+	return inst.AccountMetaSlice[1]
 }
 
 // SetMultiRead2Account sets the "multiRead2" account.
@@ -61,7 +61,7 @@ func (inst *Initializemultiread) SetMultiRead2Account(multiRead2 ag_solanago.Pub
 
 // GetMultiRead2Account gets the "multiRead2" account.
 func (inst *Initializemultiread) GetMultiRead2Account() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(2)
+	return inst.AccountMetaSlice[2]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
@@ -72,7 +72,7 @@ func (inst *Initializemultiread) SetSystemProgramAccount(systemProgram ag_solana
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *Initializemultiread) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(3)
+	return inst.AccountMetaSlice[3]
 }
 
 func (inst Initializemultiread) Build() *Instruction {
@@ -124,10 +124,10 @@ func (inst *Initializemultiread) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("       signer", inst.AccountMetaSlice.Get(0)))
-						accountsBranch.Child(ag_format.Meta("   multiRead1", inst.AccountMetaSlice.Get(1)))
-						accountsBranch.Child(ag_format.Meta("   multiRead2", inst.AccountMetaSlice.Get(2)))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("       signer", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("   multiRead1", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("   multiRead2", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
 					})
 				})
 		})
