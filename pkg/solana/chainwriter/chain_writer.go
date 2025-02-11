@@ -30,7 +30,7 @@ const ServiceName = "SolanaChainWriter"
 
 type SolanaChainWriterService struct {
 	lggr   logger.Logger
-	reader client.Reader
+	reader client.MultiClient
 	txm    txm.TxManager
 	ge     fees.Estimator
 	config ChainWriterConfig
@@ -68,7 +68,7 @@ type MethodConfig struct {
 	ArgsTransform   string
 }
 
-func NewSolanaChainWriterService(logger logger.Logger, reader client.Reader, txm txm.TxManager, ge fees.Estimator, config ChainWriterConfig) (*SolanaChainWriterService, error) {
+func NewSolanaChainWriterService(logger logger.Logger, reader client.MultiClient, txm txm.TxManager, ge fees.Estimator, config ChainWriterConfig) (*SolanaChainWriterService, error) {
 	w := SolanaChainWriterService{
 		lggr:   logger,
 		reader: reader,
@@ -151,7 +151,7 @@ for Solana transactions. It handles constant addresses, dynamic lookups, program
 ### Error Handling:
 - Errors are wrapped with the `debugID` for easier tracing.
 */
-func GetAddresses(ctx context.Context, args any, accounts []Lookup, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.Reader) ([]*solana.AccountMeta, error) {
+func GetAddresses(ctx context.Context, args any, accounts []Lookup, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.MultiClient) ([]*solana.AccountMeta, error) {
 	var addresses []*solana.AccountMeta
 	for _, accountConfig := range accounts {
 		meta, err := accountConfig.Resolve(ctx, args, derivedTableMap, reader)
@@ -227,7 +227,7 @@ func (s *SolanaChainWriterService) FilterLookupTableAddresses(
 
 // CreateATAs first checks if a specified location exists, then checks if the accounts derived from the
 // ATALookups in the ChainWriter's configuration exist on-chain and creates them if they do not.
-func CreateATAs(ctx context.Context, args any, lookups []ATALookup, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.Reader, idl string, feePayer solana.PublicKey) ([]solana.Instruction, error) {
+func CreateATAs(ctx context.Context, args any, lookups []ATALookup, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.MultiClient, idl string, feePayer solana.PublicKey) ([]solana.Instruction, error) {
 	createATAInstructions := []solana.Instruction{}
 	for _, lookup := range lookups {
 		// Check if location exists
@@ -562,7 +562,7 @@ func (s *SolanaChainWriterService) loadTable(ctx context.Context, args any, rlt 
 	return resultMap, nil
 }
 
-func getLookupTableAddresses(ctx context.Context, reader client.Reader, tableAddress solana.PublicKey) (solana.PublicKeySlice, error) {
+func getLookupTableAddresses(ctx context.Context, reader client.MultiClient, tableAddress solana.PublicKey) (solana.PublicKeySlice, error) {
 	// Fetch the account info for the static table
 	accountInfo, err := reader.GetAccountInfoWithOpts(ctx, tableAddress, &rpc.GetAccountInfoOpts{
 		Encoding:   "base64",

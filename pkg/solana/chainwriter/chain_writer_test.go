@@ -2,6 +2,7 @@ package chainwriter_test
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"encoding/json"
 	"errors"
@@ -27,6 +28,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/testutils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	feemocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/fees/mocks"
 	txmMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
@@ -47,13 +49,16 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 
 	// mock client
 	rw := clientmocks.NewReaderWriter(t)
+	mc := *client.NewMultiClient(func(context.Context) (client.ReaderWriter, error) {
+		return rw, nil
+	})
 	// mock estimator
 	ge := feemocks.NewEstimator(t)
 	// mock txm
 	txm := txmMocks.NewTxManager(t)
 
 	// initialize chain writer
-	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, ge, chainwriter.ChainWriterConfig{})
+	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, chainwriter.ChainWriterConfig{})
 	require.NoError(t, err)
 
 	// expected account meta for constant account
@@ -165,7 +170,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		require.NoError(t, err)
 
 		// Resolve account metas
-		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, mc)
 		require.NoError(t, err)
 
 		// account metas should be returned in the same order as the provided account lookup configs
@@ -209,7 +214,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		require.NoError(t, err)
 
 		// Resolve account metas
-		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, mc)
 		require.NoError(t, err)
 
 		require.Len(t, accounts, 2)
@@ -233,7 +238,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		require.NoError(t, err)
 
 		// Resolve account metas
-		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, mc)
 		require.NoError(t, err)
 
 		require.Len(t, accounts, 3)
@@ -258,7 +263,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 
 			args := Arguments{}
 
-			accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, nil, rw)
+			accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, nil, mc)
 			require.NoError(t, err)
 			require.Empty(t, accounts)
 		})
@@ -275,7 +280,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 			}
 
 			args := Arguments{}
-			accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, nil, rw)
+			accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, nil, mc)
 			require.Error(t, err)
 			require.Nil(t, accounts)
 		})
@@ -293,7 +298,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 			}
 
 			args := Arguments{}
-			accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, nil, rw)
+			accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, nil, mc)
 			require.NoError(t, err)
 			require.Empty(t, accounts)
 		})
@@ -311,7 +316,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 			}
 
 			args := Arguments{}
-			accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, nil, rw)
+			accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, nil, mc)
 			require.Error(t, err)
 			require.Nil(t, accounts)
 		})
@@ -364,7 +369,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 
 			args := Arguments{}
 
-			accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, nil, rw)
+			accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, nil, mc)
 			require.NoError(t, err)
 			require.Empty(t, accounts)
 		})
@@ -378,7 +383,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 			}
 
 			args := Arguments{}
-			_, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, nil, rw)
+			_, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, nil, mc)
 			require.Error(t, err)
 		})
 	})
@@ -389,13 +394,16 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 
 	// mock client
 	rw := clientmocks.NewReaderWriter(t)
+	mc := *client.NewMultiClient(func(context.Context) (client.ReaderWriter, error) {
+		return rw, nil
+	})
 	// mock estimator
 	ge := feemocks.NewEstimator(t)
 	// mock txm
 	txm := txmMocks.NewTxManager(t)
 
 	// initialize chain writer
-	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, ge, chainwriter.ChainWriterConfig{})
+	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, chainwriter.ChainWriterConfig{})
 	require.NoError(t, err)
 
 	programID := chainwriter.GetRandomPubKey(t)
@@ -482,7 +490,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 		require.NoError(t, err)
 
 		// Resolve account metas
-		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, mc)
 		require.NoError(t, err)
 
 		// Filter the lookup table addresses based on which accounts are actually used
@@ -504,7 +512,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 		require.NoError(t, err)
 
 		// Resolve account metas
-		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, mc)
 		require.NoError(t, err)
 
 		// Filter the lookup table addresses based on which accounts are actually used
@@ -527,7 +535,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 		require.NoError(t, err)
 
 		// Resolve account metas
-		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, mc)
 		require.NoError(t, err)
 
 		// Filter the lookup table addresses based on which accounts are actually used
@@ -542,6 +550,9 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 	ctx := tests.Context(t)
 	// mock client
 	rw := clientmocks.NewReaderWriter(t)
+	mc := *client.NewMultiClient(func(context.Context) (client.ReaderWriter, error) {
+		return rw, nil
+	})
 	// mock estimator
 	ge := feemocks.NewEstimator(t)
 	// mock txm
@@ -654,7 +665,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 	}
 
 	// initialize chain writer
-	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, ge, cwConfig)
+	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, cwConfig)
 	require.NoError(t, err)
 
 	t.Run("fails with invalid ABI", func(t *testing.T) {
@@ -671,7 +682,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 			},
 		}
 
-		_, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, ge, invalidCWConfig)
+		_, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, invalidCWConfig)
 		require.Error(t, err)
 	})
 
@@ -836,6 +847,9 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 	ctx := tests.Context(t)
 	// mock client
 	rw := clientmocks.NewReaderWriter(t)
+	mc := *client.NewMultiClient(func(context.Context) (client.ReaderWriter, error) {
+		return rw, nil
+	})
 	// mock estimator
 	ge := feemocks.NewEstimator(t)
 
@@ -843,7 +857,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 		// mock txm
 		txm := txmMocks.NewTxManager(t)
 		// initialize chain writer
-		cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, ge, ccipCWConfig)
+		cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, ccipCWConfig)
 		require.NoError(t, err)
 
 		recentBlockHash := solana.Hash{}
@@ -907,7 +921,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 		// mock txm
 		txm := txmMocks.NewTxManager(t)
 		// initialize chain writer
-		cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, ge, ccipCWConfig)
+		cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, ccipCWConfig)
 		require.NoError(t, err)
 
 		recentBlockHash := solana.Hash{}
@@ -957,13 +971,17 @@ func TestChainWriter_GetTransactionStatus(t *testing.T) {
 
 	ctx := tests.Context(t)
 	rw := clientmocks.NewReaderWriter(t)
+	mc := *client.NewMultiClient(func(context.Context) (client.ReaderWriter, error) {
+		return rw, nil
+	})
+
 	ge := feemocks.NewEstimator(t)
 
 	// mock txm
 	txm := txmMocks.NewTxManager(t)
 
 	// initialize chain writer
-	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, ge, chainwriter.ChainWriterConfig{})
+	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, chainwriter.ChainWriterConfig{})
 	require.NoError(t, err)
 
 	t.Run("returns unknown with error if ID not found", func(t *testing.T) {
@@ -1020,13 +1038,16 @@ func TestChainWriter_GetFeeComponents(t *testing.T) {
 
 	ctx := tests.Context(t)
 	rw := clientmocks.NewReaderWriter(t)
+	mc := *client.NewMultiClient(func(context.Context) (client.ReaderWriter, error) {
+		return rw, nil
+	})
 	ge := feemocks.NewEstimator(t)
 	ge.On("BaseComputeUnitPrice").Return(uint64(100))
 
 	// mock txm
 	txm := txmMocks.NewTxManager(t)
 
-	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, ge, chainwriter.ChainWriterConfig{})
+	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, chainwriter.ChainWriterConfig{})
 	require.NoError(t, err)
 
 	t.Run("returns valid compute unit price", func(t *testing.T) {
@@ -1037,7 +1058,7 @@ func TestChainWriter_GetFeeComponents(t *testing.T) {
 	})
 
 	t.Run("fails if gas estimator not set", func(t *testing.T) {
-		cwNoEstimator, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), rw, txm, nil, chainwriter.ChainWriterConfig{})
+		cwNoEstimator, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, nil, chainwriter.ChainWriterConfig{})
 		require.NoError(t, err)
 		_, err = cwNoEstimator.GetFeeComponents(ctx)
 		require.Error(t, err)
