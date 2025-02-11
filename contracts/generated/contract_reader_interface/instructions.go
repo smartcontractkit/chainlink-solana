@@ -30,6 +30,10 @@ func init() {
 var (
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
+	Instruction_Initializemultiread = ag_binary.TypeID([8]byte{17, 63, 135, 61, 207, 19, 176, 9})
+
+	Instruction_Initializetokenprices = ag_binary.TypeID([8]byte{48, 105, 228, 116, 187, 196, 252, 244})
+
 	Instruction_InitializeLookupTable = ag_binary.TypeID([8]byte{149, 120, 10, 249, 212, 185, 177, 216})
 
 	Instruction_Store = ag_binary.TypeID([8]byte{220, 28, 207, 235, 0, 234, 193, 246})
@@ -40,6 +44,10 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
 	case Instruction_Initialize:
 		return "Initialize"
+	case Instruction_Initializemultiread:
+		return "Initializemultiread"
+	case Instruction_Initializetokenprices:
+		return "Initializetokenprices"
 	case Instruction_InitializeLookupTable:
 		return "InitializeLookupTable"
 	case Instruction_Store:
@@ -66,6 +74,12 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	[]ag_binary.VariantType{
 		{
 			"initialize", (*Initialize)(nil),
+		},
+		{
+			"initializemultiread", (*Initializemultiread)(nil),
+		},
+		{
+			"initializetokenprices", (*Initializetokenprices)(nil),
 		},
 		{
 			"initialize_lookup_table", (*InitializeLookupTable)(nil),
