@@ -163,23 +163,23 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 		return fmt.Errorf("%w: no contract for read identifier: %q", types.ErrInvalidType, readIdentifier)
 	}
 
-	if len(values.multiRead) == 0 {
+	if len(values.reads) == 0 {
 		return fmt.Errorf("%w: no reads defined for readIdentifier: %q", types.ErrInvalidConfig, readIdentifier)
 	}
 
-	if len(values.multiRead) > 1 {
-		return doMultiRead(ctx, s.client, s.bdRegistry, values, returnVal)
+	if len(values.reads) > 1 {
+		return doMultiRead(ctx, s.client, s.bdRegistry, values, params, returnVal)
 	}
 
 	// TODO this is a temporary edge case - NONEVM-1320
-	if values.multiRead[0] == GetTokenPrices {
+	if values.reads[0].readName == GetTokenPrices {
 		return s.handleGetTokenPricesGetLatestValue(ctx, params, values, returnVal)
 	}
 
 	batch := []call{
 		{
 			Namespace: values.contract,
-			ReadName:  values.multiRead[0],
+			ReadName:  values.reads[0].readName,
 			Params:    params,
 			ReturnVal: returnVal,
 		},
@@ -324,11 +324,11 @@ func (s *ContractReaderService) CreateContractType(readIdentifier string, forEnc
 		return nil, fmt.Errorf("%w: no contract for read identifier", types.ErrInvalidConfig)
 	}
 
-	if len(values.multiRead) == 0 {
+	if len(values.reads) == 0 {
 		return nil, fmt.Errorf("%w: no reads defined for read identifier", types.ErrInvalidConfig)
 	}
 
-	return s.bdRegistry.CreateType(values.contract, values.multiRead[0], forEncoding)
+	return s.bdRegistry.CreateType(values.contract, values.reads[0].readName, forEncoding)
 }
 
 func (s *ContractReaderService) addCodecDef(forEncoding bool, namespace, genericName string, idl codec.IDL, idlDefinition interface{}, modCfg commoncodec.ModifiersConfig) error {
@@ -399,25 +399,32 @@ func (s *ContractReaderService) initNamespace(namespaces map[string]config.Chain
 }
 
 func (s *ContractReaderService) addAccountRead(namespace string, genericName string, idl codec.IDL, idlType codec.IdlTypeDef, readDefinition config.ReadDefinition) error {
-	if err := s.addCodecDef(false, namespace, genericName, idl, idlType, readDefinition.OutputModifications); err != nil {
-		return err
-	}
-
-	multiRead := []string{genericName}
+	reads := []read{{readName: genericName, useParams: true}}
 	if readDefinition.MultiReader != nil {
-		reads, err := s.addMultiAccountRead(namespace, readDefinition, idl)
+		multiRead, err := s.addMultiAccountReadToCodec(namespace, readDefinition, idl)
 		if err != nil {
 			return err
 		}
-		multiRead = append(multiRead, reads...)
+		reads = append(reads, multiRead...)
 	}
 
-	s.lookup.addReadNameForContract(namespace, genericName, multiRead)
+	if err := s.addAccountReadToCodec(namespace, genericName, idl, idlType, readDefinition); err != nil {
+		return err
+	}
 
+	s.lookup.addReadNameForContract(namespace, genericName, reads)
+	return nil
+}
+
+func (s *ContractReaderService) addAccountReadToCodec(namespace string, genericName string, idl codec.IDL, idlType codec.IdlTypeDef, readDefinition config.ReadDefinition) error {
 	var (
 		reader             readBinding
 		inputAccountIDLDef interface{}
 	)
+
+	if err := s.addCodecDef(false, namespace, genericName, idl, idlType, readDefinition.OutputModifications); err != nil {
+		return err
+	}
 
 	// Create PDA read binding if PDA prefix or seeds configs are populated
 	if readDefinition.PDADefinition.Prefix != nil || len(readDefinition.PDADefinition.Seeds) > 0 {
@@ -435,8 +442,8 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 	return nil
 }
 
-func (s *ContractReaderService) addMultiAccountRead(namespace string, readDefinition config.ReadDefinition, idl codec.IDL) ([]string, error) {
-	var reads []string
+func (s *ContractReaderService) addMultiAccountReadToCodec(namespace string, readDefinition config.ReadDefinition, idl codec.IDL) ([]read, error) {
+	var reads []read
 	for _, mr := range readDefinition.MultiReader.Reads {
 		idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeAccountDef, mr.ChainSpecificName, idl)
 		if err != nil {
@@ -452,11 +459,17 @@ func (s *ContractReaderService) addMultiAccountRead(namespace string, readDefini
 			return nil, fmt.Errorf("unexpected type %T from IDL definition for account read with chainSpecificName: %q, of type: %q", accountIDLDef, mr.ChainSpecificName, mr.ReadType)
 		}
 
-		if err = s.addAccountRead(namespace, mr.ChainSpecificName, idl, accountIDLDef, mr); err != nil {
-			return nil, fmt.Errorf("failed to add multi-read %q: %w", mr.ChainSpecificName, err)
+		// multi read defs don't have a generic name as they are accessed from the parent read which does have a generic name.
+		// generic name is used everywhere, so add a prefix to avoid potential collision with generic names of other reads.
+		genericName := "multiread-" + mr.ChainSpecificName
+		if err = s.addAccountReadToCodec(namespace, genericName, idl, accountIDLDef, mr); err != nil {
+			return nil, fmt.Errorf("failed to add read to multi read %q: %w", mr.ChainSpecificName, err)
 		}
 
-		reads = append(reads, mr.ChainSpecificName)
+		reads = append(reads, read{
+			readName:  genericName,
+			useParams: readDefinition.MultiReader.ReuseParams,
+		})
 	}
 	return reads, nil
 }
@@ -528,7 +541,7 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 	if err != nil {
 		return fmt.Errorf(
 			"for contract %q read %q: failed to get multiple account data: %w",
-			values.contract, values.multiRead[0], err,
+			values.contract, values.reads[0].readName, err,
 		)
 	}
 
@@ -546,7 +559,7 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 	if returnSliceVal.Kind() != reflect.Slice {
 		return fmt.Errorf(
 			"for contract %q read %q: expected `returnVal` to be a slice, got %s",
-			values.contract, values.multiRead[0], returnSliceVal.Kind(),
+			values.contract, values.reads[0].readName, returnSliceVal.Kind(),
 		)
 	}
 
@@ -556,7 +569,7 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 		if err = wrapper.UnmarshalWithDecoder(bin.NewBorshDecoder(d)); err != nil {
 			return fmt.Errorf(
 				"for contract %q read %q: failed to unmarshal account data: %w",
-				values.contract, values.multiRead[0], err,
+				values.contract, values.reads[0].readName, err,
 			)
 		}
 
@@ -566,7 +579,7 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 		if !valueField.IsValid() {
 			return fmt.Errorf(
 				"for contract %q read %q: struct type missing `Value` field",
-				values.contract, values.multiRead[0],
+				values.contract, values.reads[0].readName,
 			)
 		}
 		valueField.Set(reflect.ValueOf(big.NewInt(0).SetBytes(wrapper.Config.UsdPerToken.Value[:])))
@@ -575,7 +588,7 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 		if !timestampField.IsValid() {
 			return fmt.Errorf(
 				"for contract %q read %q: struct type missing `Timestamp` field",
-				values.contract, values.multiRead[0],
+				values.contract, values.reads[0].readName,
 			)
 		}
 
@@ -597,7 +610,7 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 	if val.Kind() != reflect.Struct {
 		return nil, fmt.Errorf(
 			"for contract %q read %q: expected `params` to be a struct, got %s",
-			values.contract, values.multiRead[0], val.Kind(),
+			values.contract, values.reads[0].readName, val.Kind(),
 		)
 	}
 
@@ -605,7 +618,7 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 	if !field.IsValid() {
 		return nil, fmt.Errorf(
 			"for contract %q read %q: no field named 'Tokens' found in params",
-			values.contract, values.multiRead[0],
+			values.contract, values.reads[0].readName,
 		)
 	}
 
@@ -613,7 +626,7 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 	if !ok {
 		return nil, fmt.Errorf(
 			"for contract %q read %q: 'Tokens' field is not of type *[][32]uint8",
-			values.contract, values.multiRead[0],
+			values.contract, values.reads[0].readName,
 		)
 	}
 
@@ -621,7 +634,7 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 	if err != nil {
 		return nil, fmt.Errorf(
 			"for contract %q read %q: %w (could not parse program address %q)",
-			values.contract, values.multiRead[0], types.ErrInvalidConfig, values.address,
+			values.contract, values.reads[0].readName, types.ErrInvalidConfig, values.address,
 		)
 	}
 
@@ -632,7 +645,7 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 		if !tokenAddr.IsOnCurve() || tokenAddr.IsZero() {
 			return nil, fmt.Errorf(
 				"for contract %q read %q: invalid token address %v (off-curve or zero)",
-				values.contract, values.multiRead[0], tokenAddr,
+				values.contract, values.reads[0].readName, tokenAddr,
 			)
 		}
 
@@ -643,7 +656,7 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 		if err != nil {
 			return nil, fmt.Errorf(
 				"for contract %q read %q: %w (failed to find PDA for token %v)",
-				values.contract, values.multiRead[0], types.ErrInvalidConfig, tokenAddr,
+				values.contract, values.reads[0].readName, types.ErrInvalidConfig, tokenAddr,
 			)
 		}
 		pdaAddresses = append(pdaAddresses, pdaAddress)

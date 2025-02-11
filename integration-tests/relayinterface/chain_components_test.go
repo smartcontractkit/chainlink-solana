@@ -198,8 +198,9 @@ func RunContractReaderTests[T WrappedTestingT[T]](t T, it *SolanaChainComponents
 
 // GetLatestValue method
 const (
-	ContractReaderGetLatestValueUsingMultiReader = "Get latest value using multi reader"
-	ContractReaderGetLatestValueGetTokenPrices   = "Get latest value handles get token prices edge case"
+	ContractReaderGetLatestValueUsingMultiReader               = "Get latest value using multi reader"
+	ContractReaderGetLatestValueUsingMultiReaderWithParmsReuse = "Get latest value using multi reader with params reuse"
+	ContractReaderGetLatestValueGetTokenPrices                 = "Get latest value handles get token prices edge case"
 )
 
 type TimestampedUnixBig struct {
@@ -232,6 +233,31 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(MultiRead), primitives.Unconfirmed, nil, &mRR))
 
 				expectedMRR := MultiReadResult{A: 1, B: 2, U: "Hello", V: true}
+				require.Equal(t, expectedMRR, mRR)
+			},
+		},
+		{
+			Name: ContractReaderGetLatestValueUsingMultiReaderWithParmsReuse,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				bindings := it.GetBindings(t)
+				ctx := tests.Context(t)
+
+				bound := BindingsByName(bindings, AnyContractName)[0]
+
+				require.NoError(t, cr.Bind(ctx, bindings))
+
+				type MultiReadResult struct {
+					A uint8
+					B int16
+					U string
+					V bool
+				}
+
+				mRR := MultiReadResult{}
+				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(MultiReadWithParamsReuse), primitives.Unconfirmed, map[string]any{"ID": 1}, &mRR))
+
+				expectedMRR := MultiReadResult{A: 10, B: 20, U: "olleH", V: true}
 				require.Equal(t, expectedMRR, mRR)
 			},
 		},
@@ -522,6 +548,7 @@ func (h *helper) CreateAccount(t *testing.T, it SolanaChainComponentsInterfaceTe
 		h.initOnce.Do(func() {
 			cw := it.GetContractWriter(t)
 			SubmitTransactionToCW(t, &it, cw, "initializeMultiRead", nil, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
+			SubmitTransactionToCW(t, &it, cw, "initializeMultiReadWithParams", nil, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
 			SubmitTransactionToCW(t, &it, cw, "initializeTokenPrices", nil, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
 		})
 	case AnySecondContractName:
@@ -576,8 +603,9 @@ func (h *helper) runInitialize(
 }
 
 const (
-	MultiRead      = "MultiRead"
-	GetTokenPrices = "GetTokenPrices"
+	MultiRead                = "MultiRead"
+	MultiReadWithParamsReuse = "MultiReadWithParamsReuse"
+	GetTokenPrices           = "GetTokenPrices"
 )
 
 func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T) config.ContractReader {
@@ -653,6 +681,31 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 								ReadType:          config.Account,
 							},
 						}},
+						ReadType: config.Account,
+					},
+					MultiReadWithParamsReuse: {
+						ChainSpecificName: "MultiRead3",
+						PDADefinition: codec.PDATypeDef{
+							Prefix: []byte("multi_read_with_params3"),
+							Seeds:  []codec.PDASeed{{Name: "ID", Type: codec.IdlType{AsString: codec.IdlTypeU64}}},
+						},
+						OutputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.HardCodeModifierConfig{
+								OffChainValues: map[string]any{"U": "", "V": false},
+							},
+						},
+						MultiReader: &config.MultiReader{
+							ReuseParams: true,
+							Reads: []config.ReadDefinition{
+								{
+									ChainSpecificName: "MultiRead4",
+									PDADefinition: codec.PDATypeDef{
+										Prefix: []byte("multi_read_with_params4"),
+										Seeds:  []codec.PDASeed{{Name: "ID", Type: codec.IdlType{AsString: codec.IdlTypeU64}}},
+									},
+									ReadType: config.Account,
+								},
+							}},
 						ReadType: config.Account,
 					},
 					MethodReturningUint64: uint64ReadDef,
@@ -830,6 +883,53 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								},
 								Seeds: []chainwriter.Seed{
 									{Static: []byte("multi_read2")},
+								},
+								IsWritable: true,
+								IsSigner:   false,
+							},
+							chainwriter.AccountConstant{
+								Name:       "SystemProgram",
+								Address:    solana.SystemProgramID.String(),
+								IsWritable: false,
+								IsSigner:   false,
+							},
+						},
+						DebugIDLocation: "",
+					},
+					"initializeMultiReadWithParams": {
+						FromAddress:        fromAddress,
+						InputModifications: nil,
+						ChainSpecificName:  "initializemultireadwithparams",
+						LookupTables:       chainwriter.LookupTables{},
+						Accounts: []chainwriter.Lookup{
+							chainwriter.AccountConstant{
+								Name:       "Signer",
+								Address:    fromAddress,
+								IsSigner:   true,
+								IsWritable: true,
+							},
+							chainwriter.PDALookups{
+								Name: "MultiRead3",
+								PublicKey: chainwriter.AccountConstant{
+									Name:    "ProgramID",
+									Address: primaryProgramPubKey,
+								},
+								Seeds: []chainwriter.Seed{
+									{Static: []byte("multi_read_with_params3")},
+									{Static: binary.LittleEndian.AppendUint64([]byte{}, 1)},
+								},
+								IsWritable: true,
+								IsSigner:   false,
+							},
+							chainwriter.PDALookups{
+								Name: "MultiRead4",
+								PublicKey: chainwriter.AccountConstant{
+									Name:    "ProgramID",
+									Address: primaryProgramPubKey,
+								},
+								Seeds: []chainwriter.Seed{
+									{Static: []byte("multi_read_with_params4")},
+									{Static: binary.LittleEndian.AppendUint64([]byte{}, 1)},
 								},
 								IsWritable: true,
 								IsSigner:   false,
