@@ -684,9 +684,9 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 						ReadType: config.Account,
 					},
 					MultiReadWithParamsReuse: {
-						ChainSpecificName: "MultiRead1",
+						ChainSpecificName: "MultiRead3",
 						PDADefinition: codec.PDATypeDef{
-							Prefix: []byte("multi_read_with_params1"),
+							Prefix: []byte("multi_read_with_params3"),
 							Seeds:  []codec.PDASeed{{Name: "ID", Type: codec.IdlType{AsString: codec.IdlTypeU64}}},
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
@@ -698,9 +698,9 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 							ReuseParams: true,
 							Reads: []config.ReadDefinition{
 								{
-									ChainSpecificName: "MultiRead2",
+									ChainSpecificName: "MultiRead4",
 									PDADefinition: codec.PDATypeDef{
-										Prefix: []byte("multi_read_with_params2"),
+										Prefix: []byte("multi_read_with_params4"),
 										Seeds:  []codec.PDASeed{{Name: "ID", Type: codec.IdlType{AsString: codec.IdlTypeU64}}},
 									},
 									ReadType: config.Account,
@@ -909,26 +909,26 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								IsWritable: true,
 							},
 							chainwriter.PDALookups{
-								Name: "MultiRead1",
+								Name: "MultiRead3",
 								PublicKey: chainwriter.AccountConstant{
 									Name:    "ProgramID",
 									Address: primaryProgramPubKey,
 								},
 								Seeds: []chainwriter.Seed{
-									{Static: []byte("multi_read_with_params1")},
+									{Static: []byte("multi_read_with_params3")},
 									{Static: binary.LittleEndian.AppendUint64([]byte{}, 1)},
 								},
 								IsWritable: true,
 								IsSigner:   false,
 							},
 							chainwriter.PDALookups{
-								Name: "MultiRead2",
+								Name: "MultiRead4",
 								PublicKey: chainwriter.AccountConstant{
 									Name:    "ProgramID",
 									Address: primaryProgramPubKey,
 								},
 								Seeds: []chainwriter.Seed{
-									{Static: []byte("multi_read_with_params2")},
+									{Static: []byte("multi_read_with_params4")},
 									{Static: binary.LittleEndian.AppendUint64([]byte{}, 1)},
 								},
 								IsWritable: true,

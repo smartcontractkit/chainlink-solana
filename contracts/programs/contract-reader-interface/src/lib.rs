@@ -35,15 +35,15 @@ pub mod contract_reader_interface {
     pub fn initializemultireadwithparams(
         ctx: Context<InitializeMultiReadWithParamsOnce>,
     ) -> Result<()> {
-        let multi_read1 = &mut ctx.accounts.multi_read1;
-        multi_read1.a = 10;
-        multi_read1.b = 20;
-        multi_read1.c = true;
+        let multi_read3 = &mut ctx.accounts.multi_read3;
+        multi_read3.a = 10;
+        multi_read3.b = 20;
+        multi_read3.c = true;
 
-        let multi_read2 = &mut ctx.accounts.multi_read2;
-        multi_read2.u = "olleH".to_string();
-        multi_read2.v = true;
-        multi_read2.w = [321, 654];
+        let multi_read4 = &mut ctx.accounts.multi_read4;
+        multi_read4.u = "olleH".to_string();
+        multi_read4.v = true;
+        multi_read4.w = [321, 654];
 
         Ok(())
     }
@@ -149,24 +149,24 @@ pub struct InitializeMultiReadWithParamsOnce<'info> {
     #[account(
         init_if_needed,
         payer = signer,
-        space = size_of::<MultiRead1>() + 8,
+        space = size_of::<MultiRead3>() + 8,
         seeds = [
-            b"multi_read_with_params1",
+            b"multi_read_with_params3",
             1u64.to_le_bytes().as_ref()
         ],
         bump)]
-    pub multi_read1: Account<'info, MultiRead1>,
+    pub multi_read3: Account<'info, MultiRead3>,
 
     #[account(
         init_if_needed,
         payer = signer,
-        space = size_of::<MultiRead2>() + 8,
+        space = size_of::<MultiRead4>() + 8,
         seeds = [
-            b"multi_read_with_params2",
+            b"multi_read_with_params4",
             1u64.to_le_bytes().as_ref()
         ],
         bump)]
-    pub multi_read2: Account<'info, MultiRead2>,
+    pub multi_read4: Account<'info, MultiRead4>,
 
     pub system_program: Program<'info, System>,
 }
@@ -340,6 +340,20 @@ pub struct MultiRead1 {
 
 #[account]
 pub struct MultiRead2 {
+    pub u: String,
+    pub v: bool,
+    pub w: [u64; 2],
+}
+
+#[account]
+pub struct MultiRead3 {
+    pub a: u8,
+    pub b: i16,
+    pub c: bool,
+}
+
+#[account]
+pub struct MultiRead4 {
     pub u: String,
     pub v: bool,
     pub w: [u64; 2],

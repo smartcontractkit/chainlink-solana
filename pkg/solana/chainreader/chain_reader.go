@@ -399,25 +399,33 @@ func (s *ContractReaderService) initNamespace(namespaces map[string]config.Chain
 }
 
 func (s *ContractReaderService) addAccountRead(namespace string, genericName string, idl codec.IDL, idlType codec.IdlTypeDef, readDefinition config.ReadDefinition) error {
-	if err := s.addCodecDef(false, namespace, genericName, idl, idlType, readDefinition.OutputModifications); err != nil {
-		return err
-	}
 
 	reads := []read{{readName: genericName, useParams: true}}
 	if readDefinition.MultiReader != nil {
-		multiRead, err := s.addMultiAccountRead(namespace, readDefinition, idl)
+		multiRead, err := s.addMultiAccountReadToCodec(namespace, readDefinition, idl)
 		if err != nil {
 			return err
 		}
 		reads = append(reads, multiRead...)
 	}
 
-	s.lookup.addReadNameForContract(namespace, genericName, reads)
+	if err := s.addAccountReadToCodec(namespace, genericName, idl, idlType, readDefinition); err != nil {
+		return err
+	}
 
+	s.lookup.addReadNameForContract(namespace, genericName, reads)
+	return nil
+}
+
+func (s *ContractReaderService) addAccountReadToCodec(namespace string, genericName string, idl codec.IDL, idlType codec.IdlTypeDef, readDefinition config.ReadDefinition) error {
 	var (
 		reader             readBinding
 		inputAccountIDLDef interface{}
 	)
+
+	if err := s.addCodecDef(false, namespace, genericName, idl, idlType, readDefinition.OutputModifications); err != nil {
+		return err
+	}
 
 	// Create PDA read binding if PDA prefix or seeds configs are populated
 	if readDefinition.PDADefinition.Prefix != nil || len(readDefinition.PDADefinition.Seeds) > 0 {
@@ -435,7 +443,7 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 	return nil
 }
 
-func (s *ContractReaderService) addMultiAccountRead(namespace string, readDefinition config.ReadDefinition, idl codec.IDL) ([]read, error) {
+func (s *ContractReaderService) addMultiAccountReadToCodec(namespace string, readDefinition config.ReadDefinition, idl codec.IDL) ([]read, error) {
 	var reads []read
 	for _, mr := range readDefinition.MultiReader.Reads {
 		idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeAccountDef, mr.ChainSpecificName, idl)
@@ -452,12 +460,15 @@ func (s *ContractReaderService) addMultiAccountRead(namespace string, readDefini
 			return nil, fmt.Errorf("unexpected type %T from IDL definition for account read with chainSpecificName: %q, of type: %q", accountIDLDef, mr.ChainSpecificName, mr.ReadType)
 		}
 
-		if err = s.addAccountRead(namespace, mr.ChainSpecificName, idl, accountIDLDef, mr); err != nil {
+		// multi read defs don't have a generic name as they are accessed from the parent read which does have a generic name.
+		// generic name is used everywhere, so add a prefix to avoid potential collision with generic names of other reads.
+		genericName := "multiread-" + mr.ChainSpecificName
+		if err = s.addAccountReadToCodec(namespace, genericName, idl, accountIDLDef, mr); err != nil {
 			return nil, fmt.Errorf("failed to add read to multi read %q: %w", mr.ChainSpecificName, err)
 		}
 
 		reads = append(reads, read{
-			readName:  mr.ChainSpecificName,
+			readName:  genericName,
 			useParams: readDefinition.MultiReader.ReuseParams,
 		})
 	}

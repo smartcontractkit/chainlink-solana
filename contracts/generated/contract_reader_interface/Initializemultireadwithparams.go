@@ -15,9 +15,9 @@ type Initializemultireadwithparams struct {
 
 	// [0] = [WRITE, SIGNER] signer
 	//
-	// [1] = [WRITE] multiRead1
+	// [1] = [WRITE] multiRead3
 	//
-	// [2] = [WRITE] multiRead2
+	// [2] = [WRITE] multiRead4
 	//
 	// [3] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-"`
@@ -42,25 +42,25 @@ func (inst *Initializemultireadwithparams) GetSignerAccount() *ag_solanago.Accou
 	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetMultiRead1Account sets the "multiRead1" account.
-func (inst *Initializemultireadwithparams) SetMultiRead1Account(multiRead1 ag_solanago.PublicKey) *Initializemultireadwithparams {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(multiRead1).WRITE()
+// SetMultiRead3Account sets the "multiRead3" account.
+func (inst *Initializemultireadwithparams) SetMultiRead3Account(multiRead3 ag_solanago.PublicKey) *Initializemultireadwithparams {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(multiRead3).WRITE()
 	return inst
 }
 
-// GetMultiRead1Account gets the "multiRead1" account.
-func (inst *Initializemultireadwithparams) GetMultiRead1Account() *ag_solanago.AccountMeta {
+// GetMultiRead3Account gets the "multiRead3" account.
+func (inst *Initializemultireadwithparams) GetMultiRead3Account() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice.Get(1)
 }
 
-// SetMultiRead2Account sets the "multiRead2" account.
-func (inst *Initializemultireadwithparams) SetMultiRead2Account(multiRead2 ag_solanago.PublicKey) *Initializemultireadwithparams {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(multiRead2).WRITE()
+// SetMultiRead4Account sets the "multiRead4" account.
+func (inst *Initializemultireadwithparams) SetMultiRead4Account(multiRead4 ag_solanago.PublicKey) *Initializemultireadwithparams {
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(multiRead4).WRITE()
 	return inst
 }
 
-// GetMultiRead2Account gets the "multiRead2" account.
-func (inst *Initializemultireadwithparams) GetMultiRead2Account() *ag_solanago.AccountMeta {
+// GetMultiRead4Account gets the "multiRead4" account.
+func (inst *Initializemultireadwithparams) GetMultiRead4Account() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice.Get(2)
 }
 
@@ -99,10 +99,10 @@ func (inst *Initializemultireadwithparams) Validate() error {
 			return errors.New("accounts.Signer is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.MultiRead1 is not set")
+			return errors.New("accounts.MultiRead3 is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.MultiRead2 is not set")
+			return errors.New("accounts.MultiRead4 is not set")
 		}
 		if inst.AccountMetaSlice[3] == nil {
 			return errors.New("accounts.SystemProgram is not set")
@@ -125,8 +125,8 @@ func (inst *Initializemultireadwithparams) EncodeToTree(parent ag_treeout.Branch
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("       signer", inst.AccountMetaSlice.Get(0)))
-						accountsBranch.Child(ag_format.Meta("   multiRead1", inst.AccountMetaSlice.Get(1)))
-						accountsBranch.Child(ag_format.Meta("   multiRead2", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("   multiRead3", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("   multiRead4", inst.AccountMetaSlice.Get(2)))
 						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice.Get(3)))
 					})
 				})
@@ -144,12 +144,12 @@ func (obj *Initializemultireadwithparams) UnmarshalWithDecoder(decoder *ag_binar
 func NewInitializemultireadwithparamsInstruction(
 	// Accounts:
 	signer ag_solanago.PublicKey,
-	multiRead1 ag_solanago.PublicKey,
-	multiRead2 ag_solanago.PublicKey,
+	multiRead3 ag_solanago.PublicKey,
+	multiRead4 ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *Initializemultireadwithparams {
 	return NewInitializemultireadwithparamsInstructionBuilder().
 		SetSignerAccount(signer).
-		SetMultiRead1Account(multiRead1).
-		SetMultiRead2Account(multiRead2).
+		SetMultiRead3Account(multiRead3).
+		SetMultiRead4Account(multiRead4).
 		SetSystemProgramAccount(systemProgram)
 }
