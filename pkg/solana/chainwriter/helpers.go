@@ -25,7 +25,8 @@ type TestArgs struct {
 }
 
 type InnerArgs struct {
-	Address []byte
+	Address       []byte
+	SecondAddress []byte
 }
 
 type DataAccount struct {

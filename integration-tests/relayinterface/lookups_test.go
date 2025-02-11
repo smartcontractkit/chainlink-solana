@@ -1,6 +1,7 @@
 package relayinterface
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -49,7 +50,7 @@ func TestAccountContant(t *testing.T) {
 			IsSigner:   true,
 			IsWritable: true,
 		}
-		result, err := constantConfig.Resolve(tests.Context(t), nil, nil, nil)
+		result, err := constantConfig.Resolve(tests.Context(t), nil, nil, client.MultiClient{})
 		require.NoError(t, err)
 		require.Equal(t, expectedMeta, result)
 	})
@@ -77,7 +78,7 @@ func TestAccountLookups(t *testing.T) {
 			IsSigner:   chainwriter.MetaBool{Value: true},
 			IsWritable: chainwriter.MetaBool{Value: true},
 		}
-		result, err := lookupConfig.Resolve(ctx, testArgs, nil, nil)
+		result, err := lookupConfig.Resolve(ctx, testArgs, nil, client.MultiClient{})
 		require.NoError(t, err)
 		require.Equal(t, expectedMeta, result)
 	})
@@ -111,7 +112,7 @@ func TestAccountLookups(t *testing.T) {
 			IsSigner:   chainwriter.MetaBool{Value: true},
 			IsWritable: chainwriter.MetaBool{Value: true},
 		}
-		result, err := lookupConfig.Resolve(ctx, testArgs, nil, nil)
+		result, err := lookupConfig.Resolve(ctx, testArgs, nil, client.MultiClient{})
 		require.NoError(t, err)
 		for i, meta := range result {
 			require.Equal(t, expectedMeta[i], meta)
@@ -132,7 +133,7 @@ func TestAccountLookups(t *testing.T) {
 			IsSigner:   chainwriter.MetaBool{Value: true},
 			IsWritable: chainwriter.MetaBool{Value: true},
 		}
-		_, err := lookupConfig.Resolve(ctx, testArgs, nil, nil)
+		_, err := lookupConfig.Resolve(ctx, testArgs, nil, client.MultiClient{})
 		require.Error(t, err)
 	})
 
@@ -162,7 +163,7 @@ func TestAccountLookups(t *testing.T) {
 			},
 		}
 
-		result, err := lookupConfig.Resolve(ctx, args, nil, nil)
+		result, err := lookupConfig.Resolve(ctx, args, nil, client.MultiClient{})
 		require.NoError(t, err)
 
 		for i, meta := range result {
@@ -200,7 +201,7 @@ func TestAccountLookups(t *testing.T) {
 			Bitmaps: []uint64{5, 3},
 		}
 
-		_, err := lookupConfig.Resolve(ctx, args, nil, nil)
+		_, err := lookupConfig.Resolve(ctx, args, nil, client.MultiClient{})
 		require.Contains(t, err.Error(), "bitmap value is not a single value")
 	})
 
@@ -227,7 +228,7 @@ func TestAccountLookups(t *testing.T) {
 			},
 		}
 
-		_, err := lookupConfig.Resolve(ctx, args, nil, nil)
+		_, err := lookupConfig.Resolve(ctx, args, nil, client.MultiClient{})
 		require.Contains(t, err.Error(), "error reading bitmap from location")
 	})
 
@@ -254,7 +255,7 @@ func TestAccountLookups(t *testing.T) {
 			},
 		}
 
-		_, err := lookupConfig.Resolve(ctx, args, nil, nil)
+		_, err := lookupConfig.Resolve(ctx, args, nil, client.MultiClient{})
 		require.Contains(t, err.Error(), "invalid value format at path")
 	})
 }
@@ -287,7 +288,7 @@ func TestPDALookups(t *testing.T) {
 			IsWritable: true,
 		}
 
-		result, err := pdaLookup.Resolve(ctx, nil, nil, nil)
+		result, err := pdaLookup.Resolve(ctx, nil, nil, client.MultiClient{})
 		require.NoError(t, err)
 		require.Equal(t, expectedMeta, result)
 	})
@@ -322,7 +323,7 @@ func TestPDALookups(t *testing.T) {
 			"another_seed": seed2,
 		}
 
-		result, err := pdaLookup.Resolve(ctx, args, nil, nil)
+		result, err := pdaLookup.Resolve(ctx, args, nil, client.MultiClient{})
 		require.NoError(t, err)
 		require.Equal(t, expectedMeta, result)
 	})
@@ -342,7 +343,7 @@ func TestPDALookups(t *testing.T) {
 			"test_seed": []byte("data"),
 		}
 
-		_, err := pdaLookup.Resolve(ctx, args, nil, nil)
+		_, err := pdaLookup.Resolve(ctx, args, nil, client.MultiClient{})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "key not found")
 	})
@@ -378,7 +379,7 @@ func TestPDALookups(t *testing.T) {
 			"another_seed": seed2,
 		}
 
-		result, err := pdaLookup.Resolve(ctx, args, nil, nil)
+		result, err := pdaLookup.Resolve(ctx, args, nil, client.MultiClient{})
 		require.NoError(t, err)
 		require.Equal(t, expectedMeta, result)
 	})
@@ -416,7 +417,7 @@ func TestPDALookups(t *testing.T) {
 			"array_seed":  arraySeed,
 		}
 
-		result, err := pdaLookup.Resolve(ctx, args, nil, nil)
+		result, err := pdaLookup.Resolve(ctx, args, nil, client.MultiClient{})
 		require.NoError(t, err)
 		require.Equal(t, expectedMeta, result)
 	})
@@ -456,7 +457,7 @@ func TestPDALookups(t *testing.T) {
 			"seed2": arraySeed2,
 		}
 
-		result, err := pdaLookup.Resolve(ctx, args, nil, nil)
+		result, err := pdaLookup.Resolve(ctx, args, nil, client.MultiClient{})
 		require.NoError(t, err)
 		require.Equal(t, expectedMeta, result)
 	})
@@ -477,13 +478,17 @@ func TestLookupTables(t *testing.T) {
 	solanaClient, err := client.NewClient(url, cfg, 5*time.Second, nil)
 	require.NoError(t, err)
 
+	multiClient := *client.NewMultiClient(func(context.Context) (client.ReaderWriter, error) {
+		return solanaClient, nil
+	})
+
 	loader := solanautils.NewStaticLoader[client.ReaderWriter](solanaClient)
 	mkey := keyMocks.NewSimpleKeystore(t)
 	lggr := logger.Test(t)
 
 	txm := txm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
 
-	cw, err := chainwriter.NewSolanaChainWriterService(nil, solanaClient, txm, nil, chainwriter.ChainWriterConfig{})
+	cw, err := chainwriter.NewSolanaChainWriterService(nil, multiClient, txm, nil, chainwriter.ChainWriterConfig{})
 	require.NoError(t, err)
 
 	t.Run("StaticLookup table resolves properly", func(t *testing.T) {
@@ -657,6 +662,10 @@ func TestCreateATAs(t *testing.T) {
 	solanaClient, err := client.NewClient(url, cfg, 5*time.Second, nil)
 	require.NoError(t, err)
 
+	multiClient := *client.NewMultiClient(func(context.Context) (client.ReaderWriter, error) {
+		return solanaClient, nil
+	})
+
 	t.Run("returns no instructions when no ATA location is found", func(t *testing.T) {
 		lookups := []chainwriter.ATALookup{
 			{
@@ -679,7 +688,7 @@ func TestCreateATAs(t *testing.T) {
 			},
 		}
 
-		ataInstructions, err := chainwriter.CreateATAs(ctx, args, lookups, nil, solanaClient, testContractIDL, feePayer)
+		ataInstructions, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer)
 		require.NoError(t, err)
 		require.Empty(t, ataInstructions)
 	})
@@ -704,7 +713,7 @@ func TestCreateATAs(t *testing.T) {
 			"Addresses": {chainwriter.GetRandomPubKey(t), chainwriter.GetRandomPubKey(t)},
 		}
 
-		_, err := chainwriter.CreateATAs(ctx, args, lookups, nil, solanaClient, testContractIDL, feePayer)
+		_, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer)
 		require.Contains(t, err.Error(), "expected exactly one wallet address, got 2")
 	})
 
@@ -728,7 +737,7 @@ func TestCreateATAs(t *testing.T) {
 			"Addresses": {chainwriter.GetRandomPubKey(t), chainwriter.GetRandomPubKey(t)},
 		}
 
-		_, err := chainwriter.CreateATAs(ctx, args, lookups, nil, solanaClient, testContractIDL, feePayer)
+		_, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer)
 		require.Contains(t, err.Error(), "expected equal number of token programs and mints, got 1 tokenPrograms and 2 mints")
 	})
 
@@ -760,7 +769,7 @@ func TestCreateATAs(t *testing.T) {
 			},
 		}
 
-		ataInstructions, err := chainwriter.CreateATAs(ctx, args, lookups, nil, solanaClient, testContractIDL, feePayer)
+		ataInstructions, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer)
 		require.NoError(t, err)
 
 		tx := solanautils.CreateTx(ctx, t, rpcClient, ataInstructions, sender, rpc.CommitmentFinalized)
@@ -797,16 +806,74 @@ func TestCreateATAs(t *testing.T) {
 			},
 		}
 
-		ataInstructions, err := chainwriter.CreateATAs(ctx, args, lookups, nil, solanaClient, testContractIDL, feePayer)
+		ataInstructions, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer)
 		require.NoError(t, err)
 
 		solanautils.SendAndConfirm(ctx, t, rpcClient, ataInstructions, sender, rpc.CommitmentFinalized)
 		require.True(t, checkIfATAExists(t, rpcClient, ataAddress))
 
 		// now, if we try to create the same ATA again, it should return no instructions
-		ataInstructions, err = chainwriter.CreateATAs(ctx, args, lookups, nil, solanaClient, testContractIDL, feePayer)
+		ataInstructions, err = chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer)
 		require.NoError(t, err)
 		require.Empty(t, ataInstructions)
+	})
+
+	t.Run("successfully creates multiple ATAs when necessary", func(t *testing.T) {
+		tokenProgram := solana.Token2022ProgramID
+
+		const numMints = 3
+		var mints []solana.PublicKey
+		for i := 0; i < numMints; i++ {
+			mintPubKey := utils.CreateRandomToken(t, sender, tokenProgram, rpcClient)
+			mints = append(mints, mintPubKey)
+		}
+
+		var ataAddresses []solana.PublicKey
+		for _, mint := range mints {
+			ataAddress, _, err := tokens.FindAssociatedTokenAddress(tokenProgram, mint, feePayer)
+			require.NoError(t, err)
+			require.False(t, checkIfATAExists(t, rpcClient, ataAddress), "ATA should not exist yet")
+			ataAddresses = append(ataAddresses, ataAddress)
+		}
+
+		lookups := []chainwriter.ATALookup{
+			{
+				Location: "Inner.Address",
+				WalletAddress: chainwriter.AccountConstant{
+					Address: feePayer.String(),
+				},
+				TokenProgram: chainwriter.AccountLookup{
+					Location: "Inner.SecondAddress",
+				},
+				MintAddress: chainwriter.AccountLookup{
+					Location: "Inner.Address",
+				},
+			},
+		}
+
+		args := chainwriter.TestArgs{
+			Inner: []chainwriter.InnerArgs{},
+		}
+		for _, mint := range mints {
+			args.Inner = append(args.Inner, chainwriter.InnerArgs{
+				Address:       mint.Bytes(),
+				SecondAddress: tokenProgram.Bytes(),
+			})
+		}
+
+		ataInstructions, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer)
+		require.NoError(t, err)
+		require.Len(t, ataInstructions, numMints)
+
+		solanautils.SendAndConfirm(ctx, t, rpcClient, ataInstructions, sender, rpc.CommitmentFinalized)
+
+		for _, ataAddress := range ataAddresses {
+			require.True(t, checkIfATAExists(t, rpcClient, ataAddress), "ATA should have been created")
+		}
+
+		ataInstructions, err = chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer)
+		require.NoError(t, err)
+		require.Empty(t, ataInstructions, "No new instructions should be returned if ATAs already exist")
 	})
 }
 

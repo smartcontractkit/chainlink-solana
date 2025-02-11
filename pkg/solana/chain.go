@@ -54,6 +54,7 @@ type Chain interface {
 	FeeEstimator() fees.Estimator
 	// Reader returns a new Reader from the available list of nodes (if there are multiple, it will randomly select one)
 	Reader() (client.Reader, error)
+	MultiClient() *client.MultiClient
 }
 
 // DefaultRequestTimeout is the default Solana client timeout.
@@ -435,6 +436,10 @@ func (c *chain) Reader() (client.Reader, error) {
 	ctx, cancel := c.stopCh.NewCtx()
 	defer cancel()
 	return c.getClient(ctx)
+}
+
+func (c *chain) MultiClient() *client.MultiClient {
+	return c.multiClient
 }
 
 func (c *chain) ChainID() string {

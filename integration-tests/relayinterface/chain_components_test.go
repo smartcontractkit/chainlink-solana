@@ -335,7 +335,7 @@ type SolanaChainComponentsInterfaceTesterHelper[T WrappedTestingT[T]] interface 
 	GetSecondaryIDL(t T) []byte
 	CreateAccount(t T, it SolanaChainComponentsInterfaceTester[T], contractName string, value uint64, testStruct TestStruct) solana.PublicKey
 	TXM() *txm.TxManager
-	SolanaClient() *client.Client
+	MultiClient() *client.MultiClient
 }
 
 type WrappedTestingT[T any] interface {
@@ -407,7 +407,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GetContractReaderWithCustomCf
 
 func (it *SolanaChainComponentsInterfaceTester[T]) GetContractWriter(t T) types.ContractWriter {
 	chainWriterConfig := it.buildContractWriterConfig(t)
-	cw, err := chainwriter.NewSolanaChainWriterService(it.Helper.Logger(t), it.Helper.SolanaClient(), *it.Helper.TXM(), nil, chainWriterConfig)
+	cw, err := chainwriter.NewSolanaChainWriterService(it.Helper.Logger(t), *it.Helper.MultiClient(), *it.Helper.TXM(), nil, chainWriterConfig)
 	require.NoError(t, err)
 
 	servicetest.Run(t, cw)
@@ -513,8 +513,10 @@ func (h *helper) TXM() *txm.TxManager {
 	return &h.txm
 }
 
-func (h *helper) SolanaClient() *client.Client {
-	return h.sc
+func (h *helper) MultiClient() *client.MultiClient {
+	return client.NewMultiClient(func(context.Context) (client.ReaderWriter, error) {
+		return h.sc, nil
+	})
 }
 
 func (h *helper) Context(t *testing.T) context.Context {

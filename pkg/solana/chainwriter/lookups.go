@@ -15,7 +15,7 @@ import (
 
 // Lookup is an interface that defines a method to resolve an address (or multiple addresses) from a given definition.
 type Lookup interface {
-	Resolve(ctx context.Context, args any, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.Reader) ([]*solana.AccountMeta, error)
+	Resolve(ctx context.Context, args any, derivedTableMap map[string]map[string][]*solana.AccountMeta, client client.MultiClient) ([]*solana.AccountMeta, error)
 	IsOptional() bool
 }
 
@@ -108,7 +108,7 @@ type ATALookup struct {
 	MintAddress   Lookup
 }
 
-func (ac AccountConstant) Resolve(_ context.Context, _ any, _ map[string]map[string][]*solana.AccountMeta, _ client.Reader) ([]*solana.AccountMeta, error) {
+func (ac AccountConstant) Resolve(_ context.Context, _ any, _ map[string]map[string][]*solana.AccountMeta, _ client.MultiClient) ([]*solana.AccountMeta, error) {
 	address, err := solana.PublicKeyFromBase58(ac.Address)
 	if err != nil {
 		return nil, fmt.Errorf("error getting account from constant: %w", err)
@@ -122,7 +122,7 @@ func (ac AccountConstant) Resolve(_ context.Context, _ any, _ map[string]map[str
 	}, nil
 }
 
-func (al AccountLookup) Resolve(_ context.Context, args any, _ map[string]map[string][]*solana.AccountMeta, _ client.Reader) ([]*solana.AccountMeta, error) {
+func (al AccountLookup) Resolve(_ context.Context, args any, _ map[string]map[string][]*solana.AccountMeta, _ client.MultiClient) ([]*solana.AccountMeta, error) {
 	derivedValues, err := GetValuesAtLocation(args, al.Location)
 	if err != nil {
 		return nil, fmt.Errorf("error getting account from lookup: %w", err)
@@ -181,7 +181,7 @@ func resolveBitMap(mb MetaBool, args any, length int) ([]bool, error) {
 	return result, nil
 }
 
-func (alt AccountsFromLookupTable) Resolve(_ context.Context, _ any, derivedTableMap map[string]map[string][]*solana.AccountMeta, _ client.Reader) ([]*solana.AccountMeta, error) {
+func (alt AccountsFromLookupTable) Resolve(_ context.Context, _ any, derivedTableMap map[string]map[string][]*solana.AccountMeta, _ client.MultiClient) ([]*solana.AccountMeta, error) {
 	// Fetch the inner map for the specified lookup table name
 	innerMap, ok := derivedTableMap[alt.LookupTableName]
 	if !ok {
@@ -211,13 +211,13 @@ func (alt AccountsFromLookupTable) Resolve(_ context.Context, _ any, derivedTabl
 	return result, nil
 }
 
-func (pda PDALookups) Resolve(ctx context.Context, args any, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.Reader) ([]*solana.AccountMeta, error) {
-	publicKeys, err := GetAddresses(ctx, args, []Lookup{pda.PublicKey}, derivedTableMap, reader)
+func (pda PDALookups) Resolve(ctx context.Context, args any, derivedTableMap map[string]map[string][]*solana.AccountMeta, client client.MultiClient) ([]*solana.AccountMeta, error) {
+	publicKeys, err := GetAddresses(ctx, args, []Lookup{pda.PublicKey}, derivedTableMap, client)
 	if err != nil {
 		return nil, fmt.Errorf("error getting public key for PDALookups: %w", err)
 	}
 
-	seeds, err := getSeedBytesCombinations(ctx, pda, args, derivedTableMap, reader)
+	seeds, err := getSeedBytesCombinations(ctx, pda, args, derivedTableMap, client)
 	if err != nil {
 		return nil, fmt.Errorf("error getting seeds for PDALookups: %w", err)
 	}
@@ -234,7 +234,7 @@ func (pda PDALookups) Resolve(ctx context.Context, args any, derivedTableMap map
 	// If a decoded location is specified, fetch the data at that location
 	var result []*solana.AccountMeta
 	for _, accountMeta := range pdas {
-		accountInfo, err := reader.GetAccountInfoWithOpts(ctx, accountMeta.PublicKey, &rpc.GetAccountInfoOpts{
+		accountInfo, err := client.GetAccountInfoWithOpts(ctx, accountMeta.PublicKey, &rpc.GetAccountInfoOpts{
 			Encoding:   "base64",
 			Commitment: rpc.CommitmentFinalized,
 		})
@@ -291,7 +291,7 @@ func getSeedBytesCombinations(
 	lookup PDALookups,
 	args any,
 	derivedTableMap map[string]map[string][]*solana.AccountMeta,
-	reader client.Reader,
+	client client.MultiClient,
 ) ([][][]byte, error) {
 	allCombinations := [][][]byte{
 		{},
@@ -322,7 +322,7 @@ func getSeedBytesCombinations(
 				}
 			} else {
 				// Get address seeds from the lookup
-				seedAddresses, err := GetAddresses(ctx, args, []Lookup{dynamicSeed}, derivedTableMap, reader)
+				seedAddresses, err := GetAddresses(ctx, args, []Lookup{dynamicSeed}, derivedTableMap, client)
 				if err != nil {
 					return nil, fmt.Errorf("error getting address seed: %w", err)
 				}

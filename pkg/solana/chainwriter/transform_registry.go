@@ -59,7 +59,7 @@ func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args a
 			IDL:      offrampProgramConfig.IDL,
 		},
 	}
-	accountMetas, err := routerAddrLookup.Resolve(ctx, nil, nil, cw.reader)
+	accountMetas, err := routerAddrLookup.Resolve(ctx, nil, nil, cw.client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch the router program address from the reference addresses account: %w", err)
 	}
