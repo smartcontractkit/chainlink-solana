@@ -403,7 +403,7 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 		return err
 	}
 
-	reads := []read{{readName: genericName}}
+	reads := []read{{readName: genericName, useParams: true}}
 	if readDefinition.MultiReader != nil {
 		multiRead, err := s.addMultiAccountRead(namespace, readDefinition, idl)
 		if err != nil {
@@ -457,8 +457,8 @@ func (s *ContractReaderService) addMultiAccountRead(namespace string, readDefini
 		}
 
 		reads = append(reads, read{
-			readName:                mr.ChainSpecificName,
-			reuseParamsForMultiRead: readDefinition.MultiReader.ReuseParams,
+			readName:  mr.ChainSpecificName,
+			useParams: readDefinition.MultiReader.ReuseParams,
 		})
 	}
 	return reads, nil

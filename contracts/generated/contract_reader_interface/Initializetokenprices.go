@@ -20,7 +20,7 @@ type Initializetokenprices struct {
 	// [2] = [WRITE] configWrapperAccount2
 	//
 	// [3] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewInitializetokenpricesInstructionBuilder creates a new `Initializetokenprices` instruction builder.
@@ -39,7 +39,7 @@ func (inst *Initializetokenprices) SetSignerAccount(signer ag_solanago.PublicKey
 
 // GetSignerAccount gets the "signer" account.
 func (inst *Initializetokenprices) GetSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetConfigWrapperAccount1Account sets the "configWrapperAccount1" account.
@@ -50,7 +50,7 @@ func (inst *Initializetokenprices) SetConfigWrapperAccount1Account(configWrapper
 
 // GetConfigWrapperAccount1Account gets the "configWrapperAccount1" account.
 func (inst *Initializetokenprices) GetConfigWrapperAccount1Account() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetConfigWrapperAccount2Account sets the "configWrapperAccount2" account.
@@ -61,7 +61,7 @@ func (inst *Initializetokenprices) SetConfigWrapperAccount2Account(configWrapper
 
 // GetConfigWrapperAccount2Account gets the "configWrapperAccount2" account.
 func (inst *Initializetokenprices) GetConfigWrapperAccount2Account() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
@@ -72,7 +72,7 @@ func (inst *Initializetokenprices) SetSystemProgramAccount(systemProgram ag_sola
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *Initializetokenprices) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst Initializetokenprices) Build() *Instruction {
@@ -124,10 +124,10 @@ func (inst *Initializetokenprices) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("               signer", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("configWrapperAccount1", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("configWrapperAccount2", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("        systemProgram", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("               signer", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("configWrapperAccount1", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("configWrapperAccount2", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("        systemProgram", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})

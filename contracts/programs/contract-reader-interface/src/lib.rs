@@ -32,6 +32,21 @@ pub mod contract_reader_interface {
         Ok(())
     }
 
+    pub fn initializemultireadwithparams(ctx: Context<InitializeMultiReadWithParamsOnce>) -> Result<()> {
+        let multi_read1 = &mut ctx.accounts.multi_read1;
+        multi_read1.a = 10;
+        multi_read1.b = 20;
+        multi_read1.c = true;
+
+        let multi_read2 = &mut ctx.accounts.multi_read2;
+        multi_read2.u = "olleH".to_string();
+        multi_read2.v = true;
+        multi_read2.w = [321, 654];
+
+        Ok(())
+    }
+
+
     pub fn initializetokenprices(
         ctx: Context<InitializeBillingTokenConfigWrapperOnce>,
     ) -> Result<()> {
@@ -119,6 +134,36 @@ pub struct InitializeMultiReadOnce<'info> {
         payer = signer,
         space = size_of::<MultiRead2>() + 8,
         seeds = [b"multi_read2"],
+        bump)]
+    pub multi_read2: Account<'info, MultiRead2>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct InitializeMultiReadWithParamsOnce<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
+    #[account(
+        init_if_needed,
+        payer = signer,
+        space = size_of::<MultiRead1>() + 8,
+        seeds = [
+            b"multi_read_with_params1",
+            1u64.to_le_bytes().as_ref()
+        ],
+        bump)]
+    pub multi_read1: Account<'info, MultiRead1>,
+
+    #[account(
+        init_if_needed,
+        payer = signer,
+        space = size_of::<MultiRead2>() + 8,
+        seeds = [
+            b"multi_read_with_params2",
+            1u64.to_le_bytes().as_ref()
+        ],
         bump)]
     pub multi_read2: Account<'info, MultiRead2>,
 

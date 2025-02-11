@@ -41,7 +41,7 @@ func doMultiRead(ctx context.Context, client MultipleAccountGetter, bindings bin
 			ReadName:  r.readName,
 			ReturnVal: returnValue,
 		}
-		if r.reuseParamsForMultiRead {
+		if r.useParams {
 			batch[idx].Params = params
 		}
 	}

@@ -8,8 +8,8 @@ import (
 
 type read struct {
 	readName string
-	// reuseParamsForMultiRead is used when this read is part of a multi read to determine if it should use parent read params.
-	reuseParamsForMultiRead bool
+	// useParams is used when this read is part of a multi read to determine if it should use parent read params.
+	useParams bool
 }
 
 type readValues struct {
