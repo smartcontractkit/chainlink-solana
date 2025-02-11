@@ -32,7 +32,9 @@ pub mod contract_reader_interface {
         Ok(())
     }
 
-    pub fn initializemultireadwithparams(ctx: Context<InitializeMultiReadWithParamsOnce>) -> Result<()> {
+    pub fn initializemultireadwithparams(
+        ctx: Context<InitializeMultiReadWithParamsOnce>,
+    ) -> Result<()> {
         let multi_read1 = &mut ctx.accounts.multi_read1;
         multi_read1.a = 10;
         multi_read1.b = 20;
@@ -45,7 +47,6 @@ pub mod contract_reader_interface {
 
         Ok(())
     }
-
 
     pub fn initializetokenprices(
         ctx: Context<InitializeBillingTokenConfigWrapperOnce>,

@@ -531,7 +531,7 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 	if err != nil {
 		return fmt.Errorf(
 			"for contract %q read %q: failed to get multiple account data: %w",
-			values.contract, values.reads[0], err,
+			values.contract, values.reads[0].readName, err,
 		)
 	}
 
@@ -549,7 +549,7 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 	if returnSliceVal.Kind() != reflect.Slice {
 		return fmt.Errorf(
 			"for contract %q read %q: expected `returnVal` to be a slice, got %s",
-			values.contract, values.reads[0], returnSliceVal.Kind(),
+			values.contract, values.reads[0].readName, returnSliceVal.Kind(),
 		)
 	}
 
@@ -559,7 +559,7 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 		if err = wrapper.UnmarshalWithDecoder(bin.NewBorshDecoder(d)); err != nil {
 			return fmt.Errorf(
 				"for contract %q read %q: failed to unmarshal account data: %w",
-				values.contract, values.reads[0], err,
+				values.contract, values.reads[0].readName, err,
 			)
 		}
 
@@ -569,7 +569,7 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 		if !valueField.IsValid() {
 			return fmt.Errorf(
 				"for contract %q read %q: struct type missing `Value` field",
-				values.contract, values.reads[0],
+				values.contract, values.reads[0].readName,
 			)
 		}
 		valueField.Set(reflect.ValueOf(big.NewInt(0).SetBytes(wrapper.Config.UsdPerToken.Value[:])))
@@ -578,7 +578,7 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 		if !timestampField.IsValid() {
 			return fmt.Errorf(
 				"for contract %q read %q: struct type missing `Timestamp` field",
-				values.contract, values.reads[0],
+				values.contract, values.reads[0].readName,
 			)
 		}
 
@@ -600,7 +600,7 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 	if val.Kind() != reflect.Struct {
 		return nil, fmt.Errorf(
 			"for contract %q read %q: expected `params` to be a struct, got %s",
-			values.contract, values.reads[0], val.Kind(),
+			values.contract, values.reads[0].readName, val.Kind(),
 		)
 	}
 
@@ -608,7 +608,7 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 	if !field.IsValid() {
 		return nil, fmt.Errorf(
 			"for contract %q read %q: no field named 'Tokens' found in params",
-			values.contract, values.reads[0],
+			values.contract, values.reads[0].readName,
 		)
 	}
 
@@ -616,7 +616,7 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 	if !ok {
 		return nil, fmt.Errorf(
 			"for contract %q read %q: 'Tokens' field is not of type *[][32]uint8",
-			values.contract, values.reads[0],
+			values.contract, values.reads[0].readName,
 		)
 	}
 
@@ -624,7 +624,7 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 	if err != nil {
 		return nil, fmt.Errorf(
 			"for contract %q read %q: %w (could not parse program address %q)",
-			values.contract, values.reads[0], types.ErrInvalidConfig, values.address,
+			values.contract, values.reads[0].readName, types.ErrInvalidConfig, values.address,
 		)
 	}
 
@@ -635,7 +635,7 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 		if !tokenAddr.IsOnCurve() || tokenAddr.IsZero() {
 			return nil, fmt.Errorf(
 				"for contract %q read %q: invalid token address %v (off-curve or zero)",
-				values.contract, values.reads[0], tokenAddr,
+				values.contract, values.reads[0].readName, tokenAddr,
 			)
 		}
 
@@ -646,7 +646,7 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 		if err != nil {
 			return nil, fmt.Errorf(
 				"for contract %q read %q: %w (failed to find PDA for token %v)",
-				values.contract, values.reads[0], types.ErrInvalidConfig, tokenAddr,
+				values.contract, values.reads[0].readName, types.ErrInvalidConfig, tokenAddr,
 			)
 		}
 		pdaAddresses = append(pdaAddresses, pdaAddress)
