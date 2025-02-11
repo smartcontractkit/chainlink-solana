@@ -27,10 +27,6 @@ func (s SolanaAddressModifier) DecodeAddress(str string) ([]byte, error) {
 		return nil, fmt.Errorf("%w: failed to decode Base58 address: %s", commontypes.ErrInvalidType, err)
 	}
 
-	if pubkey.IsZero() {
-		return nil, fmt.Errorf("%w: zero-value address", commontypes.ErrInvalidType)
-	}
-
 	if !pubkey.IsOnCurve() {
 		return nil, fmt.Errorf("%w: address %q with length of %d is not on the ed25519 curve", commontypes.ErrInvalidType, str, len(str))
 	}

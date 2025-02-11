@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
+	"reflect"
 	"strings"
 	"sync"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/rpc"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -31,6 +34,9 @@ type EventsReader interface {
 
 const ServiceName = "SolanaContractReader"
 
+// TODO NONEVM-1320 fix this edge case
+const GetTokenPrices = "GetTokenPrices"
+
 type ContractReaderService struct {
 	types.UnimplementedContractReader
 
@@ -40,11 +46,11 @@ type ContractReaderService struct {
 	reader EventsReader
 
 	// internal values
-	bindings namespaceBindings
-	lookup   *lookup
-	parsed   *codec.ParsedTypes
-	codec    types.RemoteCodec
-	filters  []logpoller.Filter
+	bdRegistry bindingsRegistry
+	lookup     *lookup
+	parsed     *codec.ParsedTypes
+	codec      types.RemoteCodec
+	filters    []logpoller.Filter
 
 	// service state management
 	wg sync.WaitGroup
@@ -64,16 +70,26 @@ func NewContractReaderService(
 	reader EventsReader,
 ) (*ContractReaderService, error) {
 	svc := &ContractReaderService{
-		lggr:     logger.Named(lggr, ServiceName),
-		client:   dataReader,
-		bindings: namespaceBindings{},
-		lookup:   newLookup(),
-		parsed:   &codec.ParsedTypes{EncoderDefs: map[string]codec.Entry{}, DecoderDefs: map[string]codec.Entry{}},
-		filters:  []logpoller.Filter{},
-		reader:   reader,
+		lggr:   logger.Named(lggr, ServiceName),
+		client: dataReader,
+		bdRegistry: bindingsRegistry{
+			namespaceBindings:  make(map[string]readNameBindings),
+			addressShareGroups: make(map[string]*addressShareGroup),
+		},
+		lookup: newLookup(),
+		parsed: &codec.ParsedTypes{
+			EncoderDefs: map[string]codec.Entry{},
+			DecoderDefs: map[string]codec.Entry{},
+		},
+		filters: []logpoller.Filter{},
+		reader:  reader,
 	}
 
-	if err := svc.init(cfg.Namespaces); err != nil {
+	if err := svc.bdRegistry.initAddressSharing(cfg.AddressShareGroups); err != nil {
+		return nil, err
+	}
+
+	if err := svc.initNamespace(cfg.Namespaces); err != nil {
 		return nil, err
 	}
 
@@ -84,9 +100,8 @@ func NewContractReaderService(
 
 	svc.codec = svcCodec
 
-	svc.bindings.SetCodecs(svcCodec)
-	svc.bindings.SetModifiers(svc.parsed.Modifiers)
-
+	svc.bdRegistry.SetCodecs(svcCodec)
+	svc.bdRegistry.SetModifiers(svc.parsed.Modifiers)
 	return svc, nil
 }
 
@@ -145,19 +160,32 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 
 	values, ok := s.lookup.getContractForReadIdentifiers(readIdentifier)
 	if !ok {
-		return fmt.Errorf("%w: no contract for read identifier %s", types.ErrInvalidType, readIdentifier)
+		return fmt.Errorf("%w: no contract for read identifier: %q", types.ErrInvalidType, readIdentifier)
+	}
+
+	if len(values.multiRead) == 0 {
+		return fmt.Errorf("%w: no reads defined for readIdentifier: %q", types.ErrInvalidConfig, readIdentifier)
+	}
+
+	if len(values.multiRead) > 1 {
+		return doMultiRead(ctx, s.client, s.bdRegistry, values, returnVal)
+	}
+
+	// TODO this is a temporary edge case - NONEVM-1320
+	if values.multiRead[0] == GetTokenPrices {
+		return s.handleGetTokenPricesGetLatestValue(ctx, params, values, returnVal)
 	}
 
 	batch := []call{
 		{
-			ContractName: values.contract,
-			ReadName:     values.genericName,
-			Params:       params,
-			ReturnVal:    returnVal,
+			Namespace: values.contract,
+			ReadName:  values.multiRead[0],
+			Params:    params,
+			ReturnVal: returnVal,
 		},
 	}
 
-	results, err := doMethodBatchCall(ctx, s.client, s.bindings, batch)
+	results, err := doMethodBatchCall(ctx, s.client, s.bdRegistry, batch)
 	if err != nil {
 		return err
 	}
@@ -176,23 +204,28 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 // BatchGetLatestValues implements the types.ContractReader interface.
 func (s *ContractReaderService) BatchGetLatestValues(ctx context.Context, request types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
 	idxLookup := make(map[types.BoundContract][]int)
-	batch := []call{}
+	var batch []call
 
 	for bound, req := range request {
 		idxLookup[bound] = make([]int, len(req))
 
 		for idx, readReq := range req {
 			idxLookup[bound][idx] = len(batch)
+			// TODO this is a temporary edge case - NONEVM-1320
+			if readReq.ReadName == GetTokenPrices {
+				return nil, fmt.Errorf("%w: %s is not supported in batch requests", types.ErrInvalidType, GetTokenPrices)
+			}
+
 			batch = append(batch, call{
-				ContractName: bound.Name,
-				ReadName:     readReq.ReadName,
-				Params:       readReq.Params,
-				ReturnVal:    readReq.ReturnVal,
+				Namespace: bound.Name,
+				ReadName:  readReq.ReadName,
+				Params:    readReq.Params,
+				ReturnVal: readReq.ReturnVal,
 			})
 		}
 	}
 
-	results, err := doMethodBatchCall(ctx, s.client, s.bindings, batch)
+	results, err := doMethodBatchCall(ctx, s.client, s.bdRegistry, batch)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +252,7 @@ func (s *ContractReaderService) BatchGetLatestValues(ctx context.Context, reques
 
 // QueryKey implements the types.ContractReader interface.
 func (s *ContractReaderService) QueryKey(ctx context.Context, contract types.BoundContract, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
-	binding, err := s.bindings.GetReadBinding(contract.Name, filter.Key)
+	binding, err := s.bdRegistry.GetReadBinding(contract.Name, filter.Key)
 	if err != nil {
 		return nil, err
 	}
@@ -255,21 +288,25 @@ func (s *ContractReaderService) QueryKey(ctx context.Context, contract types.Bou
 	return sequenceOfValues, nil
 }
 
-// Bind implements the types.ContractReader interface and allows new contract bindings to be added
+// Bind implements the types.ContractReader interface and allows new contract namespaceBindings to be added
 // to the service.
 func (s *ContractReaderService) Bind(_ context.Context, bindings []types.BoundContract) error {
-	for _, binding := range bindings {
-		if err := s.bindings.Bind(binding); err != nil {
+	for i := range bindings {
+		if err := s.bdRegistry.Bind(&bindings[i]); err != nil {
 			return err
 		}
 
-		s.lookup.bindAddressForContract(binding.Name, binding.Address)
+		s.lookup.bindAddressForContract(bindings[i].Name, bindings[i].Address)
+		// also bind with an empty address so that we can look up the contract without providing address when calling CR methods
+		if _, isInAShareGroup := s.bdRegistry.getShareGroup(bindings[i]); isInAShareGroup {
+			s.lookup.bindAddressForContract(bindings[i].Name, "")
+		}
 	}
 
 	return nil
 }
 
-// Unbind implements the types.ContractReader interface and allows existing contract bindings to be removed
+// Unbind implements the types.ContractReader interface and allows existing contract namespaceBindings to be removed
 // from the service.
 func (s *ContractReaderService) Unbind(_ context.Context, bindings []types.BoundContract) error {
 	for _, binding := range bindings {
@@ -287,7 +324,11 @@ func (s *ContractReaderService) CreateContractType(readIdentifier string, forEnc
 		return nil, fmt.Errorf("%w: no contract for read identifier", types.ErrInvalidConfig)
 	}
 
-	return s.bindings.CreateType(values.contract, values.genericName, forEncoding)
+	if len(values.multiRead) == 0 {
+		return nil, fmt.Errorf("%w: no reads defined for read identifier", types.ErrInvalidConfig)
+	}
+
+	return s.bdRegistry.CreateType(values.contract, values.multiRead[0], forEncoding)
 }
 
 func (s *ContractReaderService) addCodecDef(forEncoding bool, namespace, genericName string, idl codec.IDL, idlDefinition interface{}, modCfg commoncodec.ModifiersConfig) error {
@@ -309,7 +350,7 @@ func (s *ContractReaderService) addCodecDef(forEncoding bool, namespace, generic
 	return nil
 }
 
-func (s *ContractReaderService) init(namespaces map[string]config.ChainContractReader) error {
+func (s *ContractReaderService) initNamespace(namespaces map[string]config.ChainContractReader) error {
 	for namespace, nameSpaceDef := range namespaces {
 		for genericName, read := range nameSpaceDef.Reads {
 			utils.InjectAddressModifier(read.InputModifications, read.OutputModifications)
@@ -362,7 +403,16 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 		return err
 	}
 
-	s.lookup.addReadNameForContract(namespace, genericName)
+	multiRead := []string{genericName}
+	if readDefinition.MultiReader != nil {
+		reads, err := s.addMultiAccountRead(namespace, readDefinition, idl)
+		if err != nil {
+			return err
+		}
+		multiRead = append(multiRead, reads...)
+	}
+
+	s.lookup.addReadNameForContract(namespace, genericName, multiRead)
 
 	var (
 		reader             readBinding
@@ -370,9 +420,9 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 	)
 
 	// Create PDA read binding if PDA prefix or seeds configs are populated
-	if readDefinition.PDADefiniton.Prefix != nil || len(readDefinition.PDADefiniton.Seeds) > 0 {
-		inputAccountIDLDef = readDefinition.PDADefiniton
-		reader = newAccountReadBinding(namespace, genericName, readDefinition.PDADefiniton.Prefix, true)
+	if readDefinition.PDADefinition.Prefix != nil || len(readDefinition.PDADefinition.Seeds) > 0 {
+		inputAccountIDLDef = readDefinition.PDADefinition
+		reader = newAccountReadBinding(namespace, genericName, readDefinition.PDADefinition.Prefix, true)
 	} else {
 		inputAccountIDLDef = codec.NilIdlTypeDefTy
 		reader = newAccountReadBinding(namespace, genericName, nil, false)
@@ -381,9 +431,34 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 		return err
 	}
 
-	s.bindings.AddReadBinding(namespace, genericName, reader)
-
+	s.bdRegistry.AddReadBinding(namespace, genericName, reader)
 	return nil
+}
+
+func (s *ContractReaderService) addMultiAccountRead(namespace string, readDefinition config.ReadDefinition, idl codec.IDL) ([]string, error) {
+	var reads []string
+	for _, mr := range readDefinition.MultiReader.Reads {
+		idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeAccountDef, mr.ChainSpecificName, idl)
+		if err != nil {
+			return nil, err
+		}
+
+		if mr.ReadType != config.Account {
+			return nil, fmt.Errorf("unexpected read type %q for dynamic hard coder read: %q in namespace: %q", mr.ReadType, mr.ChainSpecificName, namespace)
+		}
+
+		accountIDLDef, isOk := idlDef.(codec.IdlTypeDef)
+		if !isOk {
+			return nil, fmt.Errorf("unexpected type %T from IDL definition for account read with chainSpecificName: %q, of type: %q", accountIDLDef, mr.ChainSpecificName, mr.ReadType)
+		}
+
+		if err = s.addAccountRead(namespace, mr.ChainSpecificName, idl, accountIDLDef, mr); err != nil {
+			return nil, fmt.Errorf("failed to add multi-read %q: %w", mr.ChainSpecificName, err)
+		}
+
+		reads = append(reads, mr.ChainSpecificName)
+	}
+	return reads, nil
 }
 
 func (s *ContractReaderService) addEventRead(
@@ -405,7 +480,7 @@ func (s *ContractReaderService) addEventRead(
 	filter := toLPFilter(readDefinition.PollingFilter, contractAddress, subKeys[:])
 
 	s.filters = append(s.filters, filter)
-	s.bindings.AddReadBinding(namespace, genericName, newEventReadBinding(
+	s.bdRegistry.AddReadBinding(namespace, genericName, newEventReadBinding(
 		namespace,
 		genericName,
 		mappedTuples,
@@ -414,25 +489,6 @@ func (s *ContractReaderService) addEventRead(
 	))
 
 	return nil
-}
-
-type accountDataReader struct {
-	client *rpc.Client
-}
-
-func NewAccountDataReader(client *rpc.Client) *accountDataReader {
-	return &accountDataReader{client: client}
-}
-
-func (r *accountDataReader) ReadAll(ctx context.Context, pk solana.PublicKey, opts *rpc.GetAccountInfoOpts) ([]byte, error) {
-	result, err := r.client.GetAccountInfoWithOpts(ctx, pk, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	bts := result.Value.Data.GetBinary()
-
-	return bts, nil
 }
 
 func toLPFilter(
@@ -455,4 +511,142 @@ func applyIndexedFieldTuple(lookup map[string]uint64, subKeys [4][]string, conf 
 		lookup[conf.OffChainPath] = idx
 		subKeys[idx] = strings.Split(conf.OnChainPath, ".")
 	}
+}
+
+func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
+	ctx context.Context,
+	params any,
+	values readValues,
+	returnVal any,
+) error {
+	pdaAddresses, err := s.getPDAsForGetTokenPrices(params, values)
+	if err != nil {
+		return err
+	}
+
+	data, err := s.client.GetMultipleAccountData(ctx, pdaAddresses...)
+	if err != nil {
+		return fmt.Errorf(
+			"for contract %q read %q: failed to get multiple account data: %w",
+			values.contract, values.multiRead[0], err,
+		)
+	}
+
+	// -------------- Fill out the returnVal slice with data --------------
+	// can't typecast returnVal so we have to use reflection here
+
+	// Ensure `returnVal` is a pointer to a slice we can populate.
+	returnSliceVal := reflect.ValueOf(returnVal)
+	if returnSliceVal.Kind() == reflect.Ptr {
+		returnSliceVal = returnSliceVal.Elem()
+		if returnSliceVal.Kind() == reflect.Ptr {
+			returnSliceVal = returnSliceVal.Elem()
+		}
+	}
+	if returnSliceVal.Kind() != reflect.Slice {
+		return fmt.Errorf(
+			"for contract %q read %q: expected `returnVal` to be a slice, got %s",
+			values.contract, values.multiRead[0], returnSliceVal.Kind(),
+		)
+	}
+
+	elemType := returnSliceVal.Type().Elem()
+	for _, d := range data {
+		var wrapper fee_quoter.BillingTokenConfigWrapper
+		if err = wrapper.UnmarshalWithDecoder(bin.NewBorshDecoder(d)); err != nil {
+			return fmt.Errorf(
+				"for contract %q read %q: failed to unmarshal account data: %w",
+				values.contract, values.multiRead[0], err,
+			)
+		}
+
+		newElem := reflect.New(elemType).Elem()
+
+		valueField := newElem.FieldByName("Value")
+		if !valueField.IsValid() {
+			return fmt.Errorf(
+				"for contract %q read %q: struct type missing `Value` field",
+				values.contract, values.multiRead[0],
+			)
+		}
+		valueField.Set(reflect.ValueOf(big.NewInt(0).SetBytes(wrapper.Config.UsdPerToken.Value[:])))
+
+		timestampField := newElem.FieldByName("Timestamp")
+		if !timestampField.IsValid() {
+			return fmt.Errorf(
+				"for contract %q read %q: struct type missing `Timestamp` field",
+				values.contract, values.multiRead[0],
+			)
+		}
+
+		// nolint:gosec
+		// G115: integer overflow conversion int64 -&gt; uint32
+		timestampField.Set(reflect.ValueOf(uint32(wrapper.Config.UsdPerToken.Timestamp)))
+
+		returnSliceVal.Set(reflect.Append(returnSliceVal, newElem))
+	}
+
+	return nil
+}
+
+func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values readValues) ([]solana.PublicKey, error) {
+	val := reflect.ValueOf(params)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	if val.Kind() != reflect.Struct {
+		return nil, fmt.Errorf(
+			"for contract %q read %q: expected `params` to be a struct, got %s",
+			values.contract, values.multiRead[0], val.Kind(),
+		)
+	}
+
+	field := val.FieldByName("Tokens")
+	if !field.IsValid() {
+		return nil, fmt.Errorf(
+			"for contract %q read %q: no field named 'Tokens' found in params",
+			values.contract, values.multiRead[0],
+		)
+	}
+
+	tokens, ok := field.Interface().(*[][32]uint8)
+	if !ok {
+		return nil, fmt.Errorf(
+			"for contract %q read %q: 'Tokens' field is not of type *[][32]uint8",
+			values.contract, values.multiRead[0],
+		)
+	}
+
+	programAddress, err := solana.PublicKeyFromBase58(values.address)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"for contract %q read %q: %w (could not parse program address %q)",
+			values.contract, values.multiRead[0], types.ErrInvalidConfig, values.address,
+		)
+	}
+
+	// Build the PDA addresses for all tokens.
+	var pdaAddresses []solana.PublicKey
+	for _, token := range *tokens {
+		tokenAddr := solana.PublicKeyFromBytes(token[:])
+		if !tokenAddr.IsOnCurve() || tokenAddr.IsZero() {
+			return nil, fmt.Errorf(
+				"for contract %q read %q: invalid token address %v (off-curve or zero)",
+				values.contract, values.multiRead[0], tokenAddr,
+			)
+		}
+
+		pdaAddress, _, err := solana.FindProgramAddress(
+			[][]byte{[]byte("fee_billing_token_config"), tokenAddr.Bytes()},
+			programAddress,
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"for contract %q read %q: %w (failed to find PDA for token %v)",
+				values.contract, values.multiRead[0], types.ErrInvalidConfig, tokenAddr,
+			)
+		}
+		pdaAddresses = append(pdaAddresses, pdaAddress)
+	}
+	return pdaAddresses, nil
 }

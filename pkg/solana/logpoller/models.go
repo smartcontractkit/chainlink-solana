@@ -2,8 +2,6 @@ package logpoller
 
 import (
 	"time"
-
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
 type Filter struct {
@@ -22,13 +20,8 @@ type Filter struct {
 }
 
 func (f Filter) MatchSameLogs(other Filter) bool {
-	return f.Address == other.Address && f.EventSig == other.EventSig &&
+	return f.Address == other.Address && f.EventSig == other.EventSig && f.EventName == other.EventName &&
 		f.EventIdl.Equal(other.EventIdl) && f.SubkeyPaths.Equal(other.SubkeyPaths)
-}
-
-// DiscriminatorRawBytes returns raw discriminator bytes as a string, this string is not base64 encoded and is always len of discriminator which is 8.
-func (f Filter) DiscriminatorRawBytes() string {
-	return string(codec.NewDiscriminatorHashPrefix(f.EventName, false))
 }
 
 type Log struct {

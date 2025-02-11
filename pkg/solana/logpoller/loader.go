@@ -112,14 +112,14 @@ func (c *EncodedLogCollector) scheduleBlocksFetching(ctx context.Context, slots 
 	blocks := make(chan Block)
 	getBlockJobs := make([]*getBlockJob, len(slots))
 	for i, slot := range slots {
-		getBlockJobs[i] = newGetBlockJob(c.client, blocks, c.lggr, slot)
+		getBlockJobs[i] = newGetBlockJob(ctx.Done(), c.client, blocks, c.lggr, slot)
 		err := c.workers.Do(ctx, getBlockJobs[i])
 		if err != nil {
 			return nil, fmt.Errorf("could not schedule job to fetch blocks for slot: %w", err)
 		}
 	}
 
-	c.engine.Go(func(ctx context.Context) {
+	go func() {
 		for _, job := range getBlockJobs {
 			select {
 			case <-ctx.Done():
@@ -129,7 +129,7 @@ func (c *EncodedLogCollector) scheduleBlocksFetching(ctx context.Context, slots 
 			}
 		}
 		close(blocks)
-	})
+	}()
 
 	return blocks, nil
 }
@@ -142,6 +142,13 @@ func (c *EncodedLogCollector) BackfillForAddresses(ctx context.Context, addresse
 
 	c.lggr.Debugw("Got all slots that need fetching for backfill operations", "addresses", PublicKeysToString(addresses), "fromSlot", fromSlot, "toSlot", toSlot, "slotsToFetch", slotsToFetch)
 
+	ctx, cancelJobs := context.WithCancel(ctx)
+	defer func() {
+		// if failed to start backfill process - cancel jobs
+		if err != nil {
+			cancelJobs()
+		}
+	}()
 	unorderedBlocks, err := c.scheduleBlocksFetching(ctx, slotsToFetch)
 	if err != nil {
 		return nil, func() {}, fmt.Errorf("failed to schedule blocks to fetch: %w", err)
@@ -153,6 +160,7 @@ func (c *EncodedLogCollector) BackfillForAddresses(ctx context.Context, addresse
 	}
 
 	cleanUp = func() {
+		cancelJobs()
 		err := blocksSorter.Close()
 		if err != nil {
 			blocksSorter.lggr.Errorw("Failed to close blocks sorter", "err", err)

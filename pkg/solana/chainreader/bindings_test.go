@@ -21,13 +21,13 @@ func TestBindings_CreateType(t *testing.T) {
 		t.Parallel()
 
 		expected := 8
+		bdRegistry := bindingsRegistry{namespaceBindings: make(map[string]readNameBindings)}
 		binding := new(mockBinding)
-		bindings := namespaceBindings{}
-		bindings.AddReadBinding("A", "B", binding)
+		bdRegistry.AddReadBinding("A", "B", binding)
 
 		binding.On("CreateType", mock.Anything).Return(expected, nil)
 
-		returned, err := bindings.CreateType("A", "B", true)
+		returned, err := bdRegistry.CreateType("A", "B", true)
 
 		require.NoError(t, err)
 		assert.Equal(t, expected, returned)
@@ -36,9 +36,9 @@ func TestBindings_CreateType(t *testing.T) {
 	t.Run("returns error when binding does not exist", func(t *testing.T) {
 		t.Parallel()
 
-		bindings := namespaceBindings{}
+		bdRegistry := bindingsRegistry{namespaceBindings: make(map[string]readNameBindings)}
 
-		_, err := bindings.CreateType("A", "B", true)
+		_, err := bdRegistry.CreateType("A", "B", true)
 
 		require.ErrorIs(t, err, types.ErrInvalidConfig)
 	})

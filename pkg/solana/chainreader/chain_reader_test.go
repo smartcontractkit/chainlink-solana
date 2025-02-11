@@ -298,11 +298,11 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
-							Type: codec.IdlTypePublicKey,
+							Type: codec.IdlType{AsString: codec.IdlTypePublicKey},
 						},
 						{
 							Name: "Uint64Seed",
-							Type: codec.IdlTypeU64,
+							Type: codec.IdlType{AsString: codec.IdlTypeU64},
 						},
 					},
 				},
@@ -319,11 +319,11 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
-							Type: codec.IdlTypePublicKey,
+							Type: codec.IdlType{AsString: codec.IdlTypePublicKey},
 						},
 						{
 							Name: "Uint64Seed",
-							Type: codec.IdlTypeU64,
+							Type: codec.IdlType{AsString: codec.IdlTypeU64},
 						},
 					},
 				},
@@ -352,11 +352,11 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
-							Type: codec.IdlTypePublicKey,
+							Type: codec.IdlType{AsString: codec.IdlTypePublicKey},
 						},
 						{
 							Name: "Uint64Seed",
-							Type: codec.IdlTypeU64,
+							Type: codec.IdlType{AsString: codec.IdlTypeU64},
 						},
 					},
 				},
@@ -373,7 +373,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
-							Type: codec.IdlTypePublicKey,
+							Type: codec.IdlType{AsString: codec.IdlTypePublicKey},
 						},
 					},
 				},
@@ -387,7 +387,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		for _, testCase := range testCases {
 			t.Run(testCase.name, func(t *testing.T) {
 				testReadDef := readDef
-				testReadDef.PDADefiniton = testCase.pdaDefinition
+				testReadDef.PDADefinition = testCase.pdaDefinition
 				testReadDef.InputModifications = testCase.inputModifier
 				testCodec, conf := newTestConfAndCodecWithInjectibleReadDef(t, PDAAccount, testReadDef)
 				encoded, err := testCodec.Encode(ctx, expected, testutils.TestStructWithNestedStruct)
@@ -428,12 +428,12 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		readDef := config.ReadDefinition{
 			ChainSpecificName: testutils.TestStructWithNestedStruct,
 			ReadType:          config.Account,
-			PDADefiniton: codec.PDATypeDef{
+			PDADefinition: codec.PDATypeDef{
 				Prefix: prefixBytes,
 				Seeds: []codec.PDASeed{
 					{
 						Name: "PubKey",
-						Type: codec.IdlTypePublicKey,
+						Type: codec.IdlType{AsString: codec.IdlTypePublicKey},
 					},
 				},
 			},

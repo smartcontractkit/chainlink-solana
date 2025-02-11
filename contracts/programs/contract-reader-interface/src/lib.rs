@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use solana_program::pubkey;
 use std::mem::size_of;
 
 declare_id!("6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE");
@@ -9,11 +10,42 @@ pub mod contract_reader_interface {
 
     pub fn initialize(ctx: Context<Initialize>, test_idx: u64, value: u64) -> Result<()> {
         let account = &mut ctx.accounts.data;
-
         account.u64_value = value;
         account.u64_slice = [3, 4].to_vec();
         account.idx = test_idx;
         account.bump = ctx.bumps.data;
+
+        Ok(())
+    }
+
+    pub fn initializemultiread(ctx: Context<InitializeMultiReadOnce>) -> Result<()> {
+        let multi_read1 = &mut ctx.accounts.multi_read1;
+        multi_read1.a = 1;
+        multi_read1.b = 2;
+        multi_read1.c = true;
+
+        let multi_read2 = &mut ctx.accounts.multi_read2;
+        multi_read2.u = "Hello".to_string();
+        multi_read2.v = true;
+        multi_read2.w = [123, 456];
+
+        Ok(())
+    }
+
+    pub fn initializetokenprices(
+        ctx: Context<InitializeBillingTokenConfigWrapperOnce>,
+    ) -> Result<()> {
+        let config1 = &mut ctx.accounts.config_wrapper_account1;
+        config1.config.usd_per_token = TimestampedPackedU224 {
+            value: STATIC_VALUE1,
+            timestamp: STATIC_TIMESTAMP1,
+        };
+
+        let config2 = &mut ctx.accounts.config_wrapper_account2;
+        config2.config.usd_per_token = TimestampedPackedU224 {
+            value: STATIC_VALUE2,
+            timestamp: STATIC_TIMESTAMP2,
+        };
 
         Ok(())
     }
@@ -30,22 +62,95 @@ pub mod contract_reader_interface {
 
         Ok(())
     }
+
+    pub fn store(ctx: Context<StoreTestStruct>, test_idx: u64, data: TestStructData) -> Result<()> {
+        let test_struct_account = &mut ctx.accounts.test_struct.load_init()?;
+
+        test_struct_account.idx = test_idx;
+        test_struct_account.bump = ctx.bumps.test_struct;
+
+        test_struct_account.field = data.field;
+        test_struct_account.oracle_id = data.oracle_id;
+        test_struct_account.oracle_ids = data.oracle_ids;
+        test_struct_account.accounts = data.accounts;
+        test_struct_account.different_field = data.different_field;
+        test_struct_account.big_field = data.big_field;
+        test_struct_account.account_struct = data.account_struct;
+        test_struct_account.nested_dynamic_struct = data.nested_dynamic_struct;
+        test_struct_account.nested_static_struct = data.nested_static_struct;
+
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
 #[instruction(test_idx: u64)]
 pub struct Initialize<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
     // derived test PDA
     #[account(
-        init,
+        init_if_needed,
         payer = signer,
         space = size_of::<DataAccount>() + 8,
         seeds=[b"data".as_ref(), test_idx.to_le_bytes().as_ref()],
         bump)]
     pub data: Account<'info, DataAccount>,
 
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct InitializeMultiReadOnce<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
+
+    #[account(
+        init_if_needed,
+        payer = signer,
+        space = size_of::<MultiRead1>() + 8,
+        seeds = [b"multi_read1"],
+        bump)]
+    pub multi_read1: Account<'info, MultiRead1>,
+
+    #[account(
+        init_if_needed,
+        payer = signer,
+        space = size_of::<MultiRead2>() + 8,
+        seeds = [b"multi_read2"],
+        bump)]
+    pub multi_read2: Account<'info, MultiRead2>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct InitializeBillingTokenConfigWrapperOnce<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
+    #[account(
+        init_if_needed,
+        payer = signer,
+        space = size_of::<BillingTokenConfigWrapper>() + 8,
+        seeds = [
+            b"fee_billing_token_config",
+            ADDRESS_1.as_ref()
+        ],
+        bump)]
+    pub config_wrapper_account1: Account<'info, BillingTokenConfigWrapper>,
+
+    #[account(
+        init_if_needed,
+        payer = signer,
+        space = size_of::<BillingTokenConfigWrapper>() + 8,
+        seeds = [
+            b"fee_billing_token_config",
+            ADDRESS_2.as_ref()
+        ],
+        bump)]
+    pub config_wrapper_account2: Account<'info, BillingTokenConfigWrapper>,
 
     pub system_program: Program<'info, System>,
 }
@@ -54,7 +159,7 @@ pub struct Initialize<'info> {
 pub struct InitializeLookupTableData<'info> {
     /// PDA for LookupTableDataAccount, derived from seeds and created by the System Program
     #[account(
-        init,
+        init_if_needed,
         payer = admin,
         space = size_of::<LookupTableDataAccount>() + 8,
         seeds = [b"data"],
@@ -67,6 +172,24 @@ pub struct InitializeLookupTableData<'info> {
     pub admin: Signer<'info>,
 
     /// System Program required for PDA creation
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(test_idx: u64)]
+pub struct StoreTestStruct<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
+    #[account(
+        init_if_needed,
+        payer = signer,
+        space = size_of::<TestStruct>() + 8,
+        seeds=[b"struct_data".as_ref(), test_idx.to_le_bytes().as_ref()],
+        bump
+    )]
+    pub test_struct: AccountLoader<'info, TestStruct>,
+
     pub system_program: Program<'info, System>,
 }
 
@@ -84,4 +207,131 @@ pub struct DataAccount {
     pub bump: u8,
     pub u64_value: u64,
     pub u64_slice: Vec<u64>,
+}
+
+#[account(zero_copy)]
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct TestStruct {
+    pub idx: u64,
+    pub bump: u8,
+    _padding0: [u8; 7],
+    pub field: i32,
+    _padding1: [u8; 4],
+    pub oracle_id: u8,
+    _padding2: [u8; 15],
+    pub oracle_ids: [u8; 32],
+    pub accounts: [[u8; 32]; 2],
+    pub different_field: [u8; 32], // hiding field since string does not play well with zero copy
+    _padding3: [u8; 8],
+    pub big_field: i128,
+
+    pub account_struct: AccountStruct,
+    pub nested_dynamic_struct: MidLevelDynamicTestStruct,
+    pub nested_static_struct: MidLevelStaticTestStruct,
+}
+
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct TestStructData {
+    pub field: i32,
+    _padding0: [u8; 4],
+    pub oracle_id: u8,
+    _padding1: [u8; 15],
+    pub oracle_ids: [u8; 32],
+    pub accounts: [[u8; 32]; 2],
+    pub different_field: [u8; 32],
+    _padding2: [u8; 8],
+    pub big_field: i128,
+
+    pub account_struct: AccountStruct,
+    pub nested_dynamic_struct: MidLevelDynamicTestStruct,
+    pub nested_static_struct: MidLevelStaticTestStruct,
+}
+
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct AccountStruct {
+    pub account: Pubkey,
+    pub account_str: Pubkey,
+}
+
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct MidLevelDynamicTestStruct {
+    pub fixed_bytes: [u8; 2],
+    pub _padding: [u8; 6], // explicit padding to avoid uninitialized bytes for zero_copy
+    pub inner: InnerDynamicTestStruct,
+}
+
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct InnerDynamicTestStruct {
+    pub i: i64,
+    pub s: [u8; 32],
+}
+
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct MidLevelStaticTestStruct {
+    pub fixed_bytes: [u8; 2],
+    pub _padding: [u8; 6], // explicit padding to avoid uninitialized bytes for zero_copy
+    pub inner: InnerStaticTestStruct,
+}
+
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct InnerStaticTestStruct {
+    pub i: i64,
+    pub a: Pubkey,
+}
+
+#[account]
+pub struct MultiRead1 {
+    pub a: u8,
+    pub b: i16,
+    pub c: bool,
+}
+
+#[account]
+pub struct MultiRead2 {
+    pub u: String,
+    pub v: bool,
+    pub w: [u64; 2],
+}
+
+pub const ADDRESS_1: Pubkey = pubkey!("57FUKrjY7Dywph1bqNGztvtTGWcXvk5VLNCfAXtk6jqK");
+pub const ADDRESS_2: Pubkey = pubkey!("47XyyAALxH7WeNT1DGWsPeA8veSVJaF8MHFMqBM5DkP6");
+
+pub const STATIC_VALUE1: [u8; 28] = [
+    0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
+];
+pub const STATIC_TIMESTAMP1: i64 = 1_700_000_001;
+
+pub const STATIC_VALUE2: [u8; 28] = [
+    0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0x00,
+    0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xA0, 0xB0, 0xC0,
+];
+pub const STATIC_TIMESTAMP2: i64 = 1_800_000_002;
+
+#[account]
+#[derive(InitSpace, Debug)]
+pub struct BillingTokenConfigWrapper {
+    pub version: u8,
+    pub config: BillingTokenConfig,
+}
+
+#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
+pub struct BillingTokenConfig {
+    pub enabled: bool,
+    pub mint: Pubkey,
+
+    pub usd_per_token: TimestampedPackedU224,
+    pub premium_multiplier_wei_per_eth: u64,
+}
+
+#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
+pub struct TimestampedPackedU224 {
+    pub value: [u8; 28],
+    pub timestamp: i64,
 }
