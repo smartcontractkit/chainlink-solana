@@ -4,11 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
+	"reflect"
 	"strings"
 	"sync"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -29,6 +33,9 @@ type EventsReader interface {
 }
 
 const ServiceName = "SolanaContractReader"
+
+// TODO NONEVM-1320 fix this edge case
+const GetTokenPrices = "GetTokenPrices"
 
 type ContractReaderService struct {
 	types.UnimplementedContractReader
@@ -164,6 +171,11 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 		return doMultiRead(ctx, s.client, s.bdRegistry, values, returnVal)
 	}
 
+	// TODO this is a temporary edge case - NONEVM-1320
+	if values.multiRead[0] == GetTokenPrices {
+		return s.handleGetTokenPricesGetLatestValue(ctx, params, values, returnVal)
+	}
+
 	batch := []call{
 		{
 			Namespace: values.contract,
@@ -199,6 +211,11 @@ func (s *ContractReaderService) BatchGetLatestValues(ctx context.Context, reques
 
 		for idx, readReq := range req {
 			idxLookup[bound][idx] = len(batch)
+			// TODO this is a temporary edge case - NONEVM-1320
+			if readReq.ReadName == GetTokenPrices {
+				return nil, fmt.Errorf("%w: %s is not supported in batch requests", types.ErrInvalidType, GetTokenPrices)
+			}
+
 			batch = append(batch, call{
 				Namespace: bound.Name,
 				ReadName:  readReq.ReadName,
@@ -494,4 +511,142 @@ func applyIndexedFieldTuple(lookup map[string]uint64, subKeys [4][]string, conf 
 		lookup[conf.OffChainPath] = idx
 		subKeys[idx] = strings.Split(conf.OnChainPath, ".")
 	}
+}
+
+func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
+	ctx context.Context,
+	params any,
+	values readValues,
+	returnVal any,
+) error {
+	pdaAddresses, err := s.getPDAsForGetTokenPrices(params, values)
+	if err != nil {
+		return err
+	}
+
+	data, err := s.client.GetMultipleAccountData(ctx, pdaAddresses...)
+	if err != nil {
+		return fmt.Errorf(
+			"for contract %q read %q: failed to get multiple account data: %w",
+			values.contract, values.multiRead[0], err,
+		)
+	}
+
+	// -------------- Fill out the returnVal slice with data --------------
+	// can't typecast returnVal so we have to use reflection here
+
+	// Ensure `returnVal` is a pointer to a slice we can populate.
+	returnSliceVal := reflect.ValueOf(returnVal)
+	if returnSliceVal.Kind() == reflect.Ptr {
+		returnSliceVal = returnSliceVal.Elem()
+		if returnSliceVal.Kind() == reflect.Ptr {
+			returnSliceVal = returnSliceVal.Elem()
+		}
+	}
+	if returnSliceVal.Kind() != reflect.Slice {
+		return fmt.Errorf(
+			"for contract %q read %q: expected `returnVal` to be a slice, got %s",
+			values.contract, values.multiRead[0], returnSliceVal.Kind(),
+		)
+	}
+
+	elemType := returnSliceVal.Type().Elem()
+	for _, d := range data {
+		var wrapper fee_quoter.BillingTokenConfigWrapper
+		if err = wrapper.UnmarshalWithDecoder(bin.NewBorshDecoder(d)); err != nil {
+			return fmt.Errorf(
+				"for contract %q read %q: failed to unmarshal account data: %w",
+				values.contract, values.multiRead[0], err,
+			)
+		}
+
+		newElem := reflect.New(elemType).Elem()
+
+		valueField := newElem.FieldByName("Value")
+		if !valueField.IsValid() {
+			return fmt.Errorf(
+				"for contract %q read %q: struct type missing `Value` field",
+				values.contract, values.multiRead[0],
+			)
+		}
+		valueField.Set(reflect.ValueOf(big.NewInt(0).SetBytes(wrapper.Config.UsdPerToken.Value[:])))
+
+		timestampField := newElem.FieldByName("Timestamp")
+		if !timestampField.IsValid() {
+			return fmt.Errorf(
+				"for contract %q read %q: struct type missing `Timestamp` field",
+				values.contract, values.multiRead[0],
+			)
+		}
+
+		// nolint:gosec
+		// G115: integer overflow conversion int64 -&gt; uint32
+		timestampField.Set(reflect.ValueOf(uint32(wrapper.Config.UsdPerToken.Timestamp)))
+
+		returnSliceVal.Set(reflect.Append(returnSliceVal, newElem))
+	}
+
+	return nil
+}
+
+func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values readValues) ([]solana.PublicKey, error) {
+	val := reflect.ValueOf(params)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	if val.Kind() != reflect.Struct {
+		return nil, fmt.Errorf(
+			"for contract %q read %q: expected `params` to be a struct, got %s",
+			values.contract, values.multiRead[0], val.Kind(),
+		)
+	}
+
+	field := val.FieldByName("Tokens")
+	if !field.IsValid() {
+		return nil, fmt.Errorf(
+			"for contract %q read %q: no field named 'Tokens' found in params",
+			values.contract, values.multiRead[0],
+		)
+	}
+
+	tokens, ok := field.Interface().(*[][32]uint8)
+	if !ok {
+		return nil, fmt.Errorf(
+			"for contract %q read %q: 'Tokens' field is not of type *[][32]uint8",
+			values.contract, values.multiRead[0],
+		)
+	}
+
+	programAddress, err := solana.PublicKeyFromBase58(values.address)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"for contract %q read %q: %w (could not parse program address %q)",
+			values.contract, values.multiRead[0], types.ErrInvalidConfig, values.address,
+		)
+	}
+
+	// Build the PDA addresses for all tokens.
+	var pdaAddresses []solana.PublicKey
+	for _, token := range *tokens {
+		tokenAddr := solana.PublicKeyFromBytes(token[:])
+		if !tokenAddr.IsOnCurve() || tokenAddr.IsZero() {
+			return nil, fmt.Errorf(
+				"for contract %q read %q: invalid token address %v (off-curve or zero)",
+				values.contract, values.multiRead[0], tokenAddr,
+			)
+		}
+
+		pdaAddress, _, err := solana.FindProgramAddress(
+			[][]byte{[]byte("fee_billing_token_config"), tokenAddr.Bytes()},
+			programAddress,
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"for contract %q read %q: %w (failed to find PDA for token %v)",
+				values.contract, values.multiRead[0], types.ErrInvalidConfig, tokenAddr,
+			)
+		}
+		pdaAddresses = append(pdaAddresses, pdaAddress)
+	}
+	return pdaAddresses, nil
 }

@@ -298,11 +298,11 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
-							Type: codec.IdlTypePublicKey,
+							Type: codec.IdlType{AsString: codec.IdlTypePublicKey},
 						},
 						{
 							Name: "Uint64Seed",
-							Type: codec.IdlTypeU64,
+							Type: codec.IdlType{AsString: codec.IdlTypeU64},
 						},
 					},
 				},
@@ -319,11 +319,11 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
-							Type: codec.IdlTypePublicKey,
+							Type: codec.IdlType{AsString: codec.IdlTypePublicKey},
 						},
 						{
 							Name: "Uint64Seed",
-							Type: codec.IdlTypeU64,
+							Type: codec.IdlType{AsString: codec.IdlTypeU64},
 						},
 					},
 				},
@@ -352,11 +352,11 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
-							Type: codec.IdlTypePublicKey,
+							Type: codec.IdlType{AsString: codec.IdlTypePublicKey},
 						},
 						{
 							Name: "Uint64Seed",
-							Type: codec.IdlTypeU64,
+							Type: codec.IdlType{AsString: codec.IdlTypeU64},
 						},
 					},
 				},
@@ -373,7 +373,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 					Seeds: []codec.PDASeed{
 						{
 							Name: "PubKey",
-							Type: codec.IdlTypePublicKey,
+							Type: codec.IdlType{AsString: codec.IdlTypePublicKey},
 						},
 					},
 				},
@@ -433,7 +433,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 				Seeds: []codec.PDASeed{
 					{
 						Name: "PubKey",
-						Type: codec.IdlTypePublicKey,
+						Type: codec.IdlType{AsString: codec.IdlTypePublicKey},
 					},
 				},
 			},

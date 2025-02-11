@@ -109,6 +109,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 					InternalField: chainwriter.InternalField{
 						TypeName: "LookupTableDataAccount",
 						Location: "LookupTable",
+						IDL:      testContractIDL,
 					},
 				},
 			},
@@ -160,11 +161,11 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		}
 
 		// Fetch derived table map
-		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig, testContractIDL)
+		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
 		require.NoError(t, err)
 
 		// Resolve account metas
-		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw, testContractIDL)
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
 		require.NoError(t, err)
 
 		// account metas should be returned in the same order as the provided account lookup configs
@@ -204,11 +205,11 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		}
 
 		// Fetch derived table map
-		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig, testContractIDL)
+		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
 		require.NoError(t, err)
 
 		// Resolve account metas
-		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw, testContractIDL)
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
 		require.NoError(t, err)
 
 		require.Len(t, accounts, 2)
@@ -228,17 +229,158 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		}
 
 		// Fetch derived table map
-		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig, testContractIDL)
+		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
 		require.NoError(t, err)
 
 		// Resolve account metas
-		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw, testContractIDL)
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
 		require.NoError(t, err)
 
 		require.Len(t, accounts, 3)
 		for i, storedPubkey := range storedPubKeys {
 			require.Equal(t, storedPubkey, accounts[i].PublicKey)
 		}
+	})
+
+	t.Run("optional lookups", func(t *testing.T) {
+		const invalidLocation = "Invalid.Path"
+
+		t.Run("AccountLookup error is skipped when Lookup is optional", func(t *testing.T) {
+			accountLookupConfig := []chainwriter.Lookup{
+				chainwriter.AccountLookup{
+					Name:       "OptionalAccountLookup",
+					Location:   invalidLocation,
+					IsSigner:   chainwriter.MetaBool{Value: false},
+					IsWritable: chainwriter.MetaBool{Value: false},
+					LookupOpts: chainwriter.LookupOpts{Optional: true},
+				},
+			}
+
+			args := Arguments{}
+
+			accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, nil, rw)
+			require.NoError(t, err)
+			require.Empty(t, accounts)
+		})
+
+		t.Run("AccountLookup error is returned when Lookup is required", func(t *testing.T) {
+			accountLookupConfig := []chainwriter.Lookup{
+				chainwriter.AccountLookup{
+					Name:       "NonOptionalAccountLookup",
+					Location:   invalidLocation,
+					IsSigner:   chainwriter.MetaBool{Value: false},
+					IsWritable: chainwriter.MetaBool{Value: false},
+					LookupOpts: chainwriter.LookupOpts{Optional: false},
+				},
+			}
+
+			args := Arguments{}
+			accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, nil, rw)
+			require.Error(t, err)
+			require.Nil(t, accounts)
+		})
+
+		t.Run("PDALookups error is skipped when Lookup is optional", func(t *testing.T) {
+			accountLookupConfig := []chainwriter.Lookup{
+				chainwriter.PDALookups{
+					Name:      "OptionalPDA",
+					PublicKey: chainwriter.AccountConstant{Name: "ProgramID", Address: solana.SystemProgramID.String()},
+					Seeds: []chainwriter.Seed{
+						{Dynamic: chainwriter.AccountLookup{Location: invalidLocation}},
+					},
+					LookupOpts: chainwriter.LookupOpts{Optional: true},
+				},
+			}
+
+			args := Arguments{}
+			accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, nil, rw)
+			require.NoError(t, err)
+			require.Empty(t, accounts)
+		})
+
+		t.Run("PDALookups error is returned when Lookup is required", func(t *testing.T) {
+			accountLookupConfig := []chainwriter.Lookup{
+				chainwriter.PDALookups{
+					Name:      "NonOptionalPDA",
+					PublicKey: chainwriter.AccountConstant{Name: "ProgramID", Address: solana.SystemProgramID.String()},
+					Seeds: []chainwriter.Seed{
+						{Dynamic: chainwriter.AccountLookup{Location: invalidLocation}},
+					},
+					LookupOpts: chainwriter.LookupOpts{Optional: false},
+				},
+			}
+
+			args := Arguments{}
+			accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, nil, rw)
+			require.Error(t, err)
+			require.Nil(t, accounts)
+		})
+
+		t.Run("DerivedLookupTable error is skipped when Lookup is optional", func(t *testing.T) {
+			lookupTables := chainwriter.LookupTables{
+				DerivedLookupTables: []chainwriter.DerivedLookupTable{
+					{
+						Name:     "OptionalDerivedTable",
+						Optional: true,
+						Accounts: chainwriter.AccountLookup{
+							Location: invalidLocation,
+						},
+					},
+				},
+			}
+
+			args := Arguments{}
+			derivedMap, staticMap, err := cw.ResolveLookupTables(ctx, args, lookupTables)
+			require.NoError(t, err)
+			require.Empty(t, derivedMap)
+			require.Empty(t, staticMap)
+		})
+
+		t.Run("DerivedLookupTable error is returned when Lookup is required", func(t *testing.T) {
+			lookupTables := chainwriter.LookupTables{
+				DerivedLookupTables: []chainwriter.DerivedLookupTable{
+					{
+						Name: "NonOptionalDerivedTable",
+						Accounts: chainwriter.AccountLookup{
+							Location: invalidLocation,
+						},
+						Optional: false,
+					},
+				},
+			}
+
+			args := Arguments{}
+			_, _, err := cw.ResolveLookupTables(ctx, args, lookupTables)
+			require.Error(t, err)
+		})
+
+		t.Run("AccountsFromLookupTable error is skipped when Lookup is optional", func(t *testing.T) {
+			accountLookupConfig := []chainwriter.Lookup{
+				chainwriter.AccountsFromLookupTable{
+					LookupTableName: "NonExistent",
+					LookupOpts:      chainwriter.LookupOpts{Optional: true},
+				},
+			}
+
+			args := Arguments{}
+
+			accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, nil, rw)
+			require.NoError(t, err)
+			require.Empty(t, accounts)
+		})
+
+		t.Run("AccountsFromLookupTable error is returned when Lookup is required", func(t *testing.T) {
+			accountLookupConfig := []chainwriter.Lookup{
+				chainwriter.AccountsFromLookupTable{
+					LookupTableName: "NonExistent",
+					LookupOpts:      chainwriter.LookupOpts{Optional: false},
+				},
+			}
+
+			args := Arguments{}
+			_, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, nil, rw)
+			require.Error(t, err)
+		})
 	})
 }
 
@@ -296,6 +438,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 					InternalField: chainwriter.InternalField{
 						TypeName: "LookupTableDataAccount",
 						Location: "LookupTable",
+						IDL:      testContractIDL,
 					},
 				},
 			},
@@ -313,6 +456,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 					InternalField: chainwriter.InternalField{
 						TypeName: "LookupTableDataAccount",
 						Location: "LookupTable",
+						IDL:      testContractIDL,
 					},
 				},
 			},
@@ -334,11 +478,11 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 		}
 
 		// Fetch derived table map
-		derivedTableMap, staticTableMap, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig, testContractIDL)
+		derivedTableMap, staticTableMap, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
 		require.NoError(t, err)
 
 		// Resolve account metas
-		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw, testContractIDL)
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
 		require.NoError(t, err)
 
 		// Filter the lookup table addresses based on which accounts are actually used
@@ -356,11 +500,11 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 		accountLookupConfig := []chainwriter.Lookup{}
 
 		// Fetch derived table map
-		derivedTableMap, staticTableMap, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig, testContractIDL)
+		derivedTableMap, staticTableMap, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
 		require.NoError(t, err)
 
 		// Resolve account metas
-		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw, testContractIDL)
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
 		require.NoError(t, err)
 
 		// Filter the lookup table addresses based on which accounts are actually used
@@ -379,11 +523,11 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 		}
 
 		// Fetch derived table map
-		derivedTableMap, staticTableMap, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig, testContractIDL)
+		derivedTableMap, staticTableMap, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
 		require.NoError(t, err)
 
 		// Resolve account metas
-		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw, testContractIDL)
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, rw)
 		require.NoError(t, err)
 
 		// Filter the lookup table addresses based on which accounts are actually used
@@ -452,6 +596,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 										InternalField: chainwriter.InternalField{
 											TypeName: "LookupTableDataAccount",
 											Location: "LookupTable",
+											IDL:      testContractIDL,
 										},
 									},
 								},
