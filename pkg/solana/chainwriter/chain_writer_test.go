@@ -23,6 +23,7 @@ import (
 	idl "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/testutils"
@@ -749,9 +750,9 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 	// simplified CCIP Config - does not contain full account list
 	ccipCWConfig := chainwriter.ChainWriterConfig{
 		Programs: map[string]chainwriter.ProgramConfig{
-			"ccip-offramp": {
+			ccipconsts.ContractNameOffRamp: {
 				Methods: map[string]chainwriter.MethodConfig{
-					"execute": {
+					ccipconsts.MethodExecute: {
 						FromAddress: admin.String(),
 						InputModifications: []codec.ModifierConfig{
 							&codec.RenameModifierConfig{
@@ -795,7 +796,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 							},
 						},
 					},
-					"commit": {
+					ccipconsts.MethodCommit: {
 						FromAddress: admin.String(),
 						InputModifications: []codec.ModifierConfig{
 							&codec.RenameModifierConfig{
@@ -827,7 +828,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 				IDL: ccipOfframpIDL,
 			},
 			// Requires only the IDL for the CCIPArgsTransform to fetch the TokenAdminRegistry
-			"ccip-router": {
+			ccipconsts.ContractNameRouter: {
 				IDL: ccipRouterIDL,
 			},
 		},
@@ -899,7 +900,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 			},
 		}
 
-		submitErr := cw.SubmitTransaction(ctx, "ccip-offramp", "execute", args, txID, offrampAddr.String(), nil, nil)
+		submitErr := cw.SubmitTransaction(ctx, ccipconsts.ContractNameOffRamp, ccipconsts.MethodExecute, args, txID, offrampAddr.String(), nil, nil)
 		require.NoError(t, submitErr)
 	})
 
@@ -947,7 +948,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 			return true
 		}), &txID, mock.Anything).Return(nil).Once()
 
-		submitErr := cw.SubmitTransaction(ctx, "ccip-offramp", "commit", args, txID, offrampAddr.String(), nil, nil)
+		submitErr := cw.SubmitTransaction(ctx, ccipconsts.ContractNameOffRamp, ccipconsts.MethodCommit, args, txID, offrampAddr.String(), nil, nil)
 		require.NoError(t, submitErr)
 	})
 }

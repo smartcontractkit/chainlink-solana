@@ -33,13 +33,16 @@ type MultipleAccountGetter interface {
 }
 
 // doMultiRead aggregate results from multiple PDAs from the same contract into one result.
-func doMultiRead(ctx context.Context, client MultipleAccountGetter, bindings bindingsRegistry, rv readValues, returnValue any) error {
-	batch := make([]call, len(rv.multiRead))
-	for idx, readName := range rv.multiRead {
+func doMultiRead(ctx context.Context, client MultipleAccountGetter, bindings bindingsRegistry, rv readValues, params, returnValue any) error {
+	batch := make([]call, len(rv.reads))
+	for idx, r := range rv.reads {
 		batch[idx] = call{
 			Namespace: rv.contract,
-			ReadName:  readName,
+			ReadName:  r.readName,
 			ReturnVal: returnValue,
+		}
+		if r.useParams {
+			batch[idx].Params = params
 		}
 	}
 
@@ -49,7 +52,7 @@ func doMultiRead(ctx context.Context, client MultipleAccountGetter, bindings bin
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("failed to do a multiRead: %q on contract: %q with address: %q with: %d total calls:\n", rv.multiRead[0], rv.contract, rv.address, len(rv.multiRead)))
+	sb.WriteString(fmt.Sprintf("failed to do a multiRead: %q on contract: %q with address: %q with: %d total calls:\n", rv.reads[0].readName, rv.contract, rv.address, len(rv.reads)))
 
 	var errCount int
 	for i, r := range results {

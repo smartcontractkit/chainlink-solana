@@ -35,6 +35,8 @@ type MultiReader struct {
 	// Reads is a list of reads that is sequentially read to fill out a complete response for the parent read.
 	// Parent ReadDefinition has to define codec modifiers which adds fields that are to be filled out by the reads in Reads.
 	Reads []ReadDefinition `json:"reads,omitempty"`
+	// ReuseParams If true, params from parent read will be reused for all MultiReader Reads.
+	ReuseParams bool `json:"reuseParams"`
 }
 
 type ReadDefinition struct {
