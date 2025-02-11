@@ -299,8 +299,8 @@ pub struct MultiRead2 {
     pub w: [u64; 2],
 }
 
-pub const ADDRESS_1: Pubkey = pubkey!("4RzYhbqRjaZHMnfxiPNDVzuimBbAb2FZErQKCLYKrkMe");
-pub const ADDRESS_2: Pubkey = pubkey!("9mBYSvyF8RBWNdat6SkZE5ipW5gMrBYqZnTShMsnfsub");
+pub const ADDRESS_1: Pubkey = pubkey!("57FUKrjY7Dywph1bqNGztvtTGWcXvk5VLNCfAXtk6jqK");
+pub const ADDRESS_2: Pubkey = pubkey!("47XyyAALxH7WeNT1DGWsPeA8veSVJaF8MHFMqBM5DkP6");
 
 pub const STATIC_VALUE1: [u8; 28] = [
     0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,

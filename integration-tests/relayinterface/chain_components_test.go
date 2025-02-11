@@ -746,8 +746,8 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 }
 
 const (
-	GetTokenPricesPubKey1 = "4RzYhbqRjaZHMnfxiPNDVzuimBbAb2FZErQKCLYKrkMe"
-	GetTokenPricesPubKey2 = "9mBYSvyF8RBWNdat6SkZE5ipW5gMrBYqZnTShMsnfsub"
+	GetTokenPricesPubKey1 = "57FUKrjY7Dywph1bqNGztvtTGWcXvk5VLNCfAXtk6jqK"
+	GetTokenPricesPubKey2 = "47XyyAALxH7WeNT1DGWsPeA8veSVJaF8MHFMqBM5DkP6"
 )
 
 func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T) chainwriter.ChainWriterConfig {
