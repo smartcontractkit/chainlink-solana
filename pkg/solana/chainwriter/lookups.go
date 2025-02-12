@@ -20,7 +20,7 @@ type Lookup interface {
 }
 
 type LookupOpts struct {
-	Optional bool `json:"optional"`
+	Optional bool `json:"optional,omitempty"`
 }
 
 func (cl LookupOpts) IsOptional() bool {
