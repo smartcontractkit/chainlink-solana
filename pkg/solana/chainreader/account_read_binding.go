@@ -30,11 +30,11 @@ type accountReadBinding struct {
 	outputIDLTypeDef         codec.IdlTypeDef
 }
 
-func newAccountReadBinding(namespace, genericName string, isPda bool, idl codec.IDL, inputIDLType interface{}, outputIDLTypeDef codec.IdlTypeDef, readDefinition config.ReadDefinition) *accountReadBinding {
+func newAccountReadBinding(namespace, genericName string, isPda bool, pdaPrefix []byte, idl codec.IDL, inputIDLType interface{}, outputIDLTypeDef codec.IdlTypeDef, readDefinition config.ReadDefinition) *accountReadBinding {
 	rb := &accountReadBinding{
 		namespace:                namespace,
 		genericName:              genericName,
-		prefix:                   readDefinition.PDADefinition.Prefix,
+		prefix:                   pdaPrefix,
 		isPda:                    isPda,
 		readDefinition:           readDefinition,
 		idl:                      idl,

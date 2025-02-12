@@ -430,7 +430,7 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 		return err
 	}
 
-	s.bdRegistry.AddReadBinding(namespace, genericName, newAccountReadBinding(namespace, genericName, isPDA, idl, inputIDLDef, outputIDLDef, readDefinition))
+	s.bdRegistry.AddReadBinding(namespace, genericName, newAccountReadBinding(namespace, genericName, isPDA, readDefinition.PDADefinition.Prefix, idl, inputIDLDef, outputIDLDef, readDefinition))
 	s.lookup.addReadNameForContract(namespace, genericName, reads)
 	return nil
 }
@@ -464,8 +464,8 @@ func (s *ContractReaderService) addMultiAccountReadToCodec(namespace string, rea
 		isPDA := false
 
 		// Create PDA read binding if PDA prefix or seeds configs are populated
-		if readDefinition.PDADefinition.Prefix != nil || len(readDefinition.PDADefinition.Seeds) > 0 {
-			inputIDLDef = readDefinition.PDADefinition
+		if mr.PDADefinition.Prefix != nil || len(mr.PDADefinition.Seeds) > 0 {
+			inputIDLDef = mr.PDADefinition
 			isPDA = true
 		}
 
@@ -476,7 +476,7 @@ func (s *ContractReaderService) addMultiAccountReadToCodec(namespace string, rea
 			return nil, fmt.Errorf("failed to add read to multi read %q: %w", mr.ChainSpecificName, err)
 		}
 
-		s.bdRegistry.AddReadBinding(namespace, genericName, newAccountReadBinding(namespace, genericName, isPDA, idl, inputIDLDef, accountIDLDef, readDefinition))
+		s.bdRegistry.AddReadBinding(namespace, genericName, newAccountReadBinding(namespace, genericName, isPDA, mr.PDADefinition.Prefix, idl, inputIDLDef, accountIDLDef, readDefinition))
 		reads = append(reads, read{
 			readName:  genericName,
 			useParams: readDefinition.MultiReader.ReuseParams,
