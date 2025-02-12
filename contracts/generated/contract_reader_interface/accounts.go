@@ -13,6 +13,8 @@ type LookupTableDataAccount struct {
 	Administrator        ag_solanago.PublicKey
 	PendingAdministrator ag_solanago.PublicKey
 	LookupTable          ag_solanago.PublicKey
+	Idx                  uint64
+	Bump                 uint8
 }
 
 var LookupTableDataAccountDiscriminator = [8]byte{220, 119, 44, 40, 237, 41, 223, 7}
@@ -40,6 +42,16 @@ func (obj LookupTableDataAccount) MarshalWithEncoder(encoder *ag_binary.Encoder)
 	}
 	// Serialize `LookupTable` param:
 	err = encoder.Encode(obj.LookupTable)
+	if err != nil {
+		return err
+	}
+	// Serialize `Idx` param:
+	err = encoder.Encode(obj.Idx)
+	if err != nil {
+		return err
+	}
+	// Serialize `Bump` param:
+	err = encoder.Encode(obj.Bump)
 	if err != nil {
 		return err
 	}
@@ -77,6 +89,16 @@ func (obj *LookupTableDataAccount) UnmarshalWithDecoder(decoder *ag_binary.Decod
 	}
 	// Deserialize `LookupTable`:
 	err = decoder.Decode(&obj.LookupTable)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Idx`:
+	err = decoder.Decode(&obj.Idx)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Bump`:
+	err = decoder.Decode(&obj.Bump)
 	if err != nil {
 		return err
 	}

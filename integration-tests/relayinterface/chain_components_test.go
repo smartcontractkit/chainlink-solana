@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -18,6 +19,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/gagliardetto/solana-go/rpc/ws"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -31,6 +33,7 @@ import (
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/chainlink-common/pkg/values"
 
 	contractprimary "github.com/smartcontractkit/chainlink-solana/contracts/generated/contract_reader_interface"
 	contractsecondary "github.com/smartcontractkit/chainlink-solana/contracts/generated/contract_reader_interface_secondary"
@@ -184,7 +187,7 @@ func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainCom
 
 	RunTests(t, it, []Testcase[T]{testCases})
 	RunContractReaderTests(t, it)
-	// Add ChainWriter tests here
+	RunChainWriterTests(t, it)
 }
 
 func RunChainComponentsInLoopSolanaTests[T WrappedTestingT[T]](t T, it ChainComponentsInterfaceTester[T]) {
@@ -196,10 +199,72 @@ func RunContractReaderTests[T WrappedTestingT[T]](t T, it *SolanaChainComponents
 	RunContractReaderInterfaceTests(t, it, false, true)
 }
 
+func RunChainWriterTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInterfaceTester[T]) {
+	testCases := []Testcase[T]{
+		{
+			Name: ChainWriterLookupTableTest,
+			Test: func(t T){
+				cr := it.GetContractReader(t)
+				cw := it.GetContractWriter(t)
+				contracts := it.GetBindings(t)
+
+				idx := it.getTestIdx(t.Name())
+				ctx := tests.Context(t)
+				bound := BindingsByName(contracts, AnyContractName)[0]
+				require.NoError(t, cr.Bind(ctx, contracts))
+
+				testIdx := binary.LittleEndian.AppendUint64([]byte{}, idx)
+				dataPDAAccount, _, err := solana.FindProgramAddress([][]byte{[]byte("data"), testIdx}, solana.MustPublicKeyFromBase58(bound.Address))
+				require.NoError(t, err)
+				fmt.Println("Data PDA Account", dataPDAAccount.Bytes())
+
+				// append random addresses to 
+				lookupTableAddresses := make([]solana.PublicKey, 0, 10)
+				for i := 0; i < 9; i++ {
+					pk, err := solana.NewRandomPrivateKey()
+					require.NoError(t, err)
+					lookupTableAddresses = append(lookupTableAddresses, pk.PublicKey())
+				}
+
+				lookupTableAddresses = append(lookupTableAddresses, dataPDAAccount)
+
+				lookupTableAddr := CreateTestLookupTable(ctx, t, it.Helper.SolanaClient(), *it.Helper.TXM(), it.Helper.Sender(), lookupTableAddresses)
+				fmt.Println("lookup table address", lookupTableAddr.String())
+				initLookupTableArgs := LookupTableArgs{
+					TestIdx: idx,
+					LookupTable: lookupTableAddr,
+				}
+
+				SubmitTransactionToCW(t, it, cw, "initializeLookupTable", initLookupTableArgs, bound, types.Finalized)
+
+				dataValue := uint64(1)
+				storeValArgs := DataAccountArgs{
+					TestIdx: idx,
+					Value: dataValue,
+				}
+				SubmitTransactionToCW(t, it, cw, "storeVal", storeValArgs, bound, types.Finalized)
+
+				var value values.Value
+				err = cr.GetLatestValue(ctx, bound.ReadIdentifier(MethodReturningUint64), primitives.Unconfirmed, nil, &value)
+				require.NoError(t, err)
+
+				var prim uint64
+				err = value.UnwrapTo(&prim)
+				require.NoError(t, err)
+
+				assert.Equal(t, dataValue, prim)
+			},
+		},
+	}
+
+	RunTests(t, it, testCases)
+}
+
 // GetLatestValue method
 const (
 	ContractReaderGetLatestValueUsingMultiReader = "Get latest value using multi reader"
 	ContractReaderGetLatestValueGetTokenPrices   = "Get latest value handles get token prices edge case"
+	ChainWriterLookupTableTest = "Set contract value using a lookup table for addresses"
 )
 
 type TimestampedUnixBig struct {
@@ -282,6 +347,7 @@ type SolanaChainComponentsInterfaceTesterHelper[T WrappedTestingT[T]] interface 
 	CreateAccount(t T, it SolanaChainComponentsInterfaceTester[T], contractName string, value uint64, testStruct TestStruct) solana.PublicKey
 	TXM() *txm.TxManager
 	SolanaClient() *client.Client
+	Sender() solana.PrivateKey
 }
 
 type WrappedTestingT[T any] interface {
@@ -402,6 +468,7 @@ type helper struct {
 	secondaryIdlBts    []byte
 	txm                txm.TxManager
 	sc                 *client.Client
+	sender             solana.PrivateKey
 }
 
 func (h *helper) Init(t *testing.T) {
@@ -409,6 +476,7 @@ func (h *helper) Init(t *testing.T) {
 
 	privateKey, err := solana.PrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1])
 	require.NoError(t, err)
+	h.sender = privateKey
 
 	h.rpcURL, h.wsURL = utils.SetupTestValidatorWithAnchorPrograms(t, privateKey.PublicKey().String(), []string{"contract-reader-interface", "contract-reader-interface-secondary"})
 	h.wsClient, err = ws.Connect(tests.Context(t), h.wsURL)
@@ -532,9 +600,18 @@ func (h *helper) CreateAccount(t *testing.T, it SolanaChainComponentsInterfaceTe
 	return programID
 }
 
-type InitializeArgs struct {
+func (h *helper) Sender() solana.PrivateKey {
+	return h.sender
+}
+
+type DataAccountArgs struct {
 	TestIdx uint64
 	Value   uint64
+}
+
+type LookupTableArgs struct {
+	TestIdx uint64
+	LookupTable solana.PublicKey
 }
 
 type StoreStructArgs struct {
@@ -562,7 +639,7 @@ func (h *helper) runInitialize(
 		return
 	}
 
-	initArgs := InitializeArgs{
+	initArgs := DataAccountArgs{
 		TestIdx: testIdx,
 		Value:   value,
 	}
@@ -890,6 +967,94 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						},
 						DebugIDLocation: "",
 					},
+					"initializeLookupTable": {
+						FromAddress:       fromAddress,
+						InputModifications: nil,
+						ChainSpecificName:  "initializelookuptable",
+						LookupTables:       chainwriter.LookupTables{},
+						Accounts: []chainwriter.Lookup{
+							chainwriter.AccountConstant{
+								Name:       "Signer",
+								Address:   fromAddress,
+								IsSigner:   true,
+								IsWritable: true,
+							},
+							chainwriter.PDALookups{
+								Name: "Account",
+								PublicKey: chainwriter.AccountConstant{
+									Address: primaryProgramPubKey,
+								},
+								Seeds: []chainwriter.Seed{
+									{Static: []byte("lookup")},
+									{Static: testIdx},
+								},
+								IsWritable: true,
+								IsSigner:   false,
+							},
+							chainwriter.AccountConstant{
+								Name:       "SystemProgram",
+								Address:    solana.SystemProgramID.String(),
+								IsWritable: false,
+								IsSigner:   false,
+							},
+						},
+						DebugIDLocation: "",
+					},
+					"storeVal": {
+						FromAddress:       fromAddress,
+						InputModifications: nil,
+						ChainSpecificName:  "storeval",
+						LookupTables:       chainwriter.LookupTables{
+							DerivedLookupTables: []chainwriter.DerivedLookupTable{
+								{
+									Name: "LookupTable",
+									Accounts: chainwriter.PDALookups{
+										Name: "LookupTableAccount",
+										PublicKey: chainwriter.AccountConstant{
+											Address: primaryProgramPubKey,
+										},
+										Seeds: []chainwriter.Seed{
+											{Static: []byte("lookup")},
+											{Static: testIdx},
+										},
+										InternalField: chainwriter.InternalField{
+											TypeName: "LookupTableDataAccount",
+											Location: "LookupTable",
+											IDL: string(it.Helper.GetPrimaryIDL(t)),
+										},
+									},
+									
+								},
+							},
+						},
+						Accounts: []chainwriter.Lookup{
+							chainwriter.AccountConstant{
+								Name:       "Signer",
+								Address:   fromAddress,
+								IsSigner:   true,
+								IsWritable: true,
+							},
+							chainwriter.PDALookups{
+								Name: "Account",
+								PublicKey: chainwriter.AccountConstant{
+									Address: primaryProgramPubKey,
+								},
+								Seeds: []chainwriter.Seed{
+									{Static: []byte("data")},
+									{Static: testIdx},
+								},
+								IsWritable: true,
+								IsSigner:   false,
+							},
+							chainwriter.AccountConstant{
+								Name:       "SystemProgram",
+								Address:    solana.SystemProgramID.String(),
+								IsWritable: false,
+								IsSigner:   false,
+							},
+						},
+						DebugIDLocation: "",
+					},
 					MethodSettingStruct: {
 						FromAddress: fromAddress,
 						InputModifications: []commoncodec.ModifierConfig{
@@ -1049,6 +1214,55 @@ func mustUnmarshalIDL[T WrappedTestingT[T]](t T, rawIDL string) codec.IDL {
 	}
 
 	return idl
+}
+
+func CreateTestLookupTable[T WrappedTestingT[T]](ctx context.Context, t T, c *client.Client, txm txm.TxManager,sender solana.PrivateKey, addresses []solana.PublicKey) solana.PublicKey {
+	// Create lookup tables
+	slot, serr := c.SlotHeightWithCommitment(ctx, rpc.CommitmentFinalized)
+	require.NoError(t, serr)
+	table, createTableInstruction, ierr := utils.NewCreateLookupTableInstruction(
+		sender.PublicKey(),
+		sender.PublicKey(),
+		slot,
+	)
+	require.NoError(t, ierr)
+	res, err := c.LatestBlockhash(ctx)
+	require.NoError(t, err)
+
+	tx1, err1 := solana.NewTransaction([]solana.Instruction{createTableInstruction}, res.Value.Blockhash)
+	require.NoError(t, err1)
+	txID1 := uuid.NewString()
+	err = txm.Enqueue(ctx, "", tx1, &txID1, res.Value.LastValidBlockHeight)
+	require.NoError(t, err)
+	pollTxStatusTillCommitment(ctx, t, txm, txID1, types.Finalized)
+
+	res, err = c.LatestBlockhash(ctx)
+	require.NoError(t, err)
+
+	addEntriesInstruction := utils.NewExtendLookupTableInstruction(table, sender.PublicKey(), sender.PublicKey(), addresses)
+	tx2, err2 := solana.NewTransaction([]solana.Instruction{addEntriesInstruction}, res.Value.Blockhash)
+	require.NoError(t, err2)
+	txID2 := uuid.NewString()
+	txm.Enqueue(ctx, "", tx2, &txID2, res.Value.LastValidBlockHeight)
+	pollTxStatusTillCommitment(ctx, t, txm, txID2, types.Finalized)
+
+	return table
+}
+
+func pollTxStatusTillCommitment[T WrappedTestingT[T]](ctx context.Context, t T, txm txm.TxManager, txID string, targetStatus types.TransactionStatus) {
+	var txStatus types.TransactionStatus
+	count := 0
+	for txStatus != targetStatus && txStatus != types.Finalized {
+		count++
+		status, err := txm.GetTransactionStatus(ctx, txID)
+		if err == nil {
+			txStatus = status
+		}
+		time.Sleep(100 * time.Millisecond)
+		if count > 500 {
+			require.NoError(t, fmt.Errorf("unable to find transaction within timeout"))
+		}
+	}
 }
 
 const (
