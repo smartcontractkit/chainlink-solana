@@ -217,15 +217,40 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 
 // BatchGetLatestValues implements the types.ContractReader interface.
 func (s *ContractReaderService) BatchGetLatestValues(ctx context.Context, request types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
-	idxLookup := make(map[types.BoundContract][]int)
-	var batch []call
+	idxLookup := make(map[types.BoundContract]map[int]int)
+	multiIdxLookup := make(map[types.BoundContract]map[int]int)
+	result := make(types.BatchGetLatestValuesResult)
+
+	var (
+		batch            []call
+		multiReadResults []batchResultWithErr
+	)
 
 	for bound, req := range request {
-		idxLookup[bound] = make([]int, len(req))
+		idxLookup[bound] = make(map[int]int)
+		multiIdxLookup[bound] = make(map[int]int)
+		result[bound] = make(types.ContractBatchResults, len(req))
 
 		for idx, readReq := range req {
+			readIdentifier := bound.ReadIdentifier(readReq.ReadName)
+			vals, ok := s.lookup.getContractForReadIdentifiers(readIdentifier)
+			if !ok {
+				return nil, fmt.Errorf("%w: no contract for read identifier: %q", types.ErrInvalidType, readIdentifier)
+			}
+
+			// exclude multi read reads from the big batch request and populate them separately and merge results later.
+			if len(vals.reads) > 1 {
+				err := doMultiRead(ctx, s.client, s.bdRegistry, vals, readReq.Params, readReq.ReturnVal)
+
+				multiIdxLookup[bound][idx] = len(multiReadResults)
+				multiReadResults = append(multiReadResults, batchResultWithErr{address: vals.address, namespace: vals.contract, readName: readReq.ReadName, returnVal: readReq.ReturnVal, err: err})
+
+				continue
+			}
+
 			idxLookup[bound][idx] = len(batch)
-			// TODO this is a temporary edge case - NONEVM-1320
+
+			// TODO: this is a temporary edge case - NONEVM-1320
 			if readReq.ReadName == GetTokenPrices {
 				return nil, fmt.Errorf("%w: %s is not supported in batch requests", types.ErrInvalidType, GetTokenPrices)
 			}
@@ -248,20 +273,25 @@ func (s *ContractReaderService) BatchGetLatestValues(ctx context.Context, reques
 		return nil, errors.New("unexpected number of results")
 	}
 
-	result := make(types.BatchGetLatestValuesResult)
+	populateResultFromLookup(idxLookup, result, results)
+	populateResultFromLookup(multiIdxLookup, result, multiReadResults)
 
+	return result, nil
+}
+
+func populateResultFromLookup(
+	idxLookup map[types.BoundContract]map[int]int,
+	output types.BatchGetLatestValuesResult,
+	results []batchResultWithErr,
+) {
 	for bound, idxs := range idxLookup {
-		result[bound] = make(types.ContractBatchResults, len(idxs))
-
-		for idx, callIdx := range idxs {
+		for reqIdx, callIdx := range idxs {
 			res := types.BatchReadResult{ReadName: results[callIdx].readName}
 			res.SetResult(results[callIdx].returnVal, results[callIdx].err)
 
-			result[bound][idx] = res
+			output[bound][reqIdx] = res
 		}
 	}
-
-	return result, nil
 }
 
 // QueryKey implements the types.ContractReader interface.
