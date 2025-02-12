@@ -28,6 +28,8 @@ import (
 )
 
 type EventsReader interface {
+	Start(ctx context.Context) error
+	Ready() error
 	RegisterFilter(context.Context, logpoller.Filter) error
 	FilteredLogs(context.Context, []query.Expression, query.LimitAndSort, string) ([]logpoller.Log, error)
 }
@@ -115,13 +117,25 @@ func (s *ContractReaderService) Name() string {
 // and error.
 func (s *ContractReaderService) Start(ctx context.Context) error {
 	return s.StartOnce(ServiceName, func() error {
+		if len(s.filters) == 0 {
+			// No dependency on EventReader
+			return nil
+		}
+		if s.reader.Ready() != nil {
+			// Start EventReader if it hasn't already been
+			// Lazily starting it here rather than earlier, since nodes running only ordinary DF jobs don't need it
+			err := s.reader.Start(ctx)
+			if err != nil &&
+				!strings.Contains(err.Error(), "has already been started") { // in case another thread calls Start() after Ready() returns
+				return fmt.Errorf("%d event filters defined in ChainReader config, but unable to start event reader: %w", len(s.filters), err)
+			}
+		}
 		// registering filters needs a context so we should be able to use the start function context.
 		for _, filter := range s.filters {
 			if err := s.reader.RegisterFilter(ctx, filter); err != nil {
 				return err
 			}
 		}
-
 		return nil
 	})
 }
@@ -533,8 +547,8 @@ func (s *ContractReaderService) addAddressResponseHardCoderModifier(namespace st
 func (s *ContractReaderService) addEventRead(
 	namespace, genericName string,
 	contractAddress solana.PublicKey,
-	_ codec.IDL,
-	_ codec.IdlEvent,
+	idl codec.IDL,
+	eventIdl codec.IdlEvent,
 	readDefinition config.ReadDefinition,
 	events EventsReader,
 ) error {
@@ -546,7 +560,8 @@ func (s *ContractReaderService) addEventRead(
 	applyIndexedFieldTuple(mappedTuples, subKeys, readDefinition.IndexedField2, 2)
 	applyIndexedFieldTuple(mappedTuples, subKeys, readDefinition.IndexedField3, 3)
 
-	filter := toLPFilter(readDefinition.PollingFilter, contractAddress, subKeys[:])
+	filter := toLPFilter(readDefinition.PollingFilter, contractAddress, subKeys[:],
+		codec.EventIDLTypes{Event: eventIdl, Types: idl.Types})
 
 	s.filters = append(s.filters, filter)
 	s.bdRegistry.AddReadBinding(namespace, genericName, newEventReadBinding(
@@ -565,12 +580,14 @@ func toLPFilter(
 	f *config.PollingFilter,
 	address solana.PublicKey,
 	subKeyPaths [][]string,
+	eventIdl codec.EventIDLTypes,
 ) logpoller.Filter {
 	return logpoller.Filter{
 		Address:     logpoller.PublicKey(address),
 		EventName:   f.EventName,
-		EventSig:    logpoller.EventSignature([]byte(f.EventName)[:logpoller.EventSignatureLength]),
-		SubkeyPaths: logpoller.SubKeyPaths(subKeyPaths),
+		EventSig:    logpoller.NewEventSignatureFromName(f.EventName),
+		EventIdl:    logpoller.EventIdl(eventIdl),
+		SubkeyPaths: subKeyPaths,
 		Retention:   f.Retention,
 		MaxLogsKept: f.MaxLogsKept,
 	}
