@@ -88,7 +88,25 @@ type AccountsFromLookupTable struct {
 	IncludeIndexes  []int  `json:"includeIndexes"`
 }
 
+func (l Lookup) validate() error {
+	count := 0
+	for _, v := range []bool{l.AccountConstant != nil, l.AccountLookup != nil, l.PDALookups != nil, l.AccountsFromLookupTable != nil} {
+		if v {
+			count++
+		}
+	}
+	if count != 1 {
+		return fmt.Errorf("exactly one of AccountConstant, AccountLookup, PDALookups, or AccountsFromLookupTable must be specified, got %d", count)
+	}
+	return nil
+}
+
 func (l Lookup) Resolve(ctx context.Context, args any, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.Reader) ([]*solana.AccountMeta, error) {
+	// could update this in the future to validate the entire config at initialization time recursively.
+	err := l.validate()
+	if err != nil {
+		return nil, err
+	}
 	if l.AccountConstant != nil {
 		return l.AccountConstant.Resolve()
 	} else if l.AccountLookup != nil {

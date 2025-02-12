@@ -131,19 +131,19 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		}
 
 		accountLookupConfig := []chainwriter.Lookup{
-			chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+			{AccountConstant: &chainwriter.AccountConstant{
 				Name:       "Constant",
 				Address:    constantAccountMeta.PublicKey.String(),
 				IsSigner:   constantAccountMeta.IsSigner,
 				IsWritable: constantAccountMeta.IsWritable,
 			}},
-			chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{
+			{AccountLookup: &chainwriter.AccountLookup{
 				Name:       "LookupTable",
 				Location:   "LookupTable",
 				IsSigner:   chainwriter.MetaBool{Value: accountLookupMeta.IsSigner},
 				IsWritable: chainwriter.MetaBool{Value: accountLookupMeta.IsWritable},
 			}},
-			chainwriter.Lookup{PDALookups: &chainwriter.PDALookups{
+			{PDALookups: &chainwriter.PDALookups{
 				Name:      "DataAccountPDA",
 				PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Name: "WriteTest", Address: solana.SystemProgramID.String()}},
 				Seeds: []chainwriter.Seed{
@@ -155,7 +155,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 				// Just get the address of the account, nothing internal.
 				InternalField: chainwriter.InternalField{},
 			}},
-			chainwriter.Lookup{AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
+			{AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
 				LookupTableName: "DerivedTable",
 				IncludeIndexes:  []int{0},
 			}},
@@ -199,7 +199,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		}
 
 		accountLookupConfig := []chainwriter.Lookup{
-			chainwriter.Lookup{AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
+			{AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
 				LookupTableName: "DerivedTable",
 				IncludeIndexes:  []int{0, 2},
 			}},
@@ -224,7 +224,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		}
 
 		accountLookupConfig := []chainwriter.Lookup{
-			chainwriter.Lookup{AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
+			{AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
 				LookupTableName: "DerivedTable",
 			}},
 		}
@@ -248,7 +248,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 
 		t.Run("AccountLookup error is skipped when Lookup is optional", func(t *testing.T) {
 			accountLookupConfig := []chainwriter.Lookup{
-				chainwriter.Lookup{
+				{
 					AccountLookup: &chainwriter.AccountLookup{
 						Name:       "OptionalAccountLookup",
 						Location:   invalidLocation,
@@ -268,7 +268,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 
 		t.Run("AccountLookup error is returned when Lookup is required", func(t *testing.T) {
 			accountLookupConfig := []chainwriter.Lookup{
-				chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{
+				{AccountLookup: &chainwriter.AccountLookup{
 					Name:       "NonOptionalAccountLookup",
 					Location:   invalidLocation,
 					IsSigner:   chainwriter.MetaBool{Value: false},
@@ -284,7 +284,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 
 		t.Run("PDALookups error is skipped when Lookup is optional", func(t *testing.T) {
 			accountLookupConfig := []chainwriter.Lookup{
-				chainwriter.Lookup{
+				{
 					PDALookups: &chainwriter.PDALookups{
 						Name:      "OptionalPDA",
 						PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Name: "ProgramID", Address: solana.SystemProgramID.String()}},
@@ -304,7 +304,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 
 		t.Run("PDALookups error is returned when Lookup is required", func(t *testing.T) {
 			accountLookupConfig := []chainwriter.Lookup{
-				chainwriter.Lookup{PDALookups: &chainwriter.PDALookups{
+				{PDALookups: &chainwriter.PDALookups{
 					Name:      "NonOptionalPDA",
 					PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Name: "ProgramID", Address: solana.SystemProgramID.String()}},
 					Seeds: []chainwriter.Seed{
@@ -359,7 +359,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 
 		t.Run("AccountsFromLookupTable error is skipped when Lookup is optional", func(t *testing.T) {
 			accountLookupConfig := []chainwriter.Lookup{
-				chainwriter.Lookup{
+				{
 					AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
 						LookupTableName: "NonExistent",
 					},
@@ -376,7 +376,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 
 		t.Run("AccountsFromLookupTable error is returned when Lookup is required", func(t *testing.T) {
 			accountLookupConfig := []chainwriter.Lookup{
-				chainwriter.Lookup{AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
+				{AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
 					LookupTableName: "NonExistent",
 				}},
 			}
@@ -476,7 +476,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 
 	t.Run("returns filtered map with only relevant lookup tables required by account lookup config", func(t *testing.T) {
 		accountLookupConfig := []chainwriter.Lookup{
-			chainwriter.Lookup{AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
+			{AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
 				LookupTableName: "DerivedTable",
 				IncludeIndexes:  []int{0},
 			}},
@@ -519,7 +519,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 
 	t.Run("returns empty map if only constant account lookup required", func(t *testing.T) {
 		accountLookupConfig := []chainwriter.Lookup{
-			chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+			{AccountConstant: &chainwriter.AccountConstant{
 				Name:       "Constant",
 				Address:    chainwriter.GetRandomPubKey(t).String(),
 				IsSigner:   false,
@@ -609,25 +609,25 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 							StaticLookupTables: []solana.PublicKey{staticLookupTablePubkey},
 						},
 						Accounts: []chainwriter.Lookup{
-							chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:       "feepayer",
 								Address:    admin.String(),
 								IsSigner:   false,
 								IsWritable: false,
 							}},
-							chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:       "Constant",
 								Address:    account1.String(),
 								IsSigner:   false,
 								IsWritable: false,
 							}},
-							chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{
+							{AccountLookup: &chainwriter.AccountLookup{
 								Name:       "LookupTable",
 								Location:   "LookupTable",
 								IsSigner:   chainwriter.MetaBool{Value: false},
 								IsWritable: chainwriter.MetaBool{Value: false},
 							}},
-							chainwriter.Lookup{PDALookups: &chainwriter.PDALookups{
+							{PDALookups: &chainwriter.PDALookups{
 								Name:      "DataAccountPDA",
 								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Name: "WriteTest", Address: solana.SystemProgramID.String()}},
 								Seeds: []chainwriter.Seed{
@@ -639,11 +639,11 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 								// Just get the address of the account, nothing internal.
 								InternalField: chainwriter.InternalField{},
 							}},
-							chainwriter.Lookup{AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
+							{AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
 								LookupTableName: "DerivedTable",
 								IncludeIndexes:  []int{0},
 							}},
-							chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:       "systemprogram",
 								Address:    solana.SystemProgramID.String(),
 								IsSigner:   false,
@@ -770,31 +770,31 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 						ArgsTransform:     "CCIP",
 						LookupTables:      chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
-							chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:    "testAcc1",
 								Address: chainwriter.GetRandomPubKey(t).String(),
 							}},
-							chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:    "testAcc2",
 								Address: chainwriter.GetRandomPubKey(t).String(),
 							}},
-							chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:    "testAcc3",
 								Address: chainwriter.GetRandomPubKey(t).String(),
 							}},
-							chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:    "poolAddr1",
 								Address: poolKeys[0].String(),
 							}},
-							chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:    "poolAddr2",
 								Address: poolKeys[1].String(),
 							}},
-							chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:    "poolAddr3",
 								Address: poolKeys[2].String(),
 							}},
-							chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:    "poolAddr4",
 								Address: poolKeys[3].String(),
 							}},
@@ -814,15 +814,15 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 						ArgsTransform:     "",
 						LookupTables:      chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
-							chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:    "testAcc1",
 								Address: chainwriter.GetRandomPubKey(t).String(),
 							}},
-							chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:    "testAcc2",
 								Address: chainwriter.GetRandomPubKey(t).String(),
 							}},
-							chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:    "testAcc3",
 								Address: chainwriter.GetRandomPubKey(t).String(),
 							}},

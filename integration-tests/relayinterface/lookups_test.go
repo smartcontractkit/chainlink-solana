@@ -32,6 +32,23 @@ type TestAccountArgs struct {
 
 var testContractIDL = chainwriter.FetchTestContractIDL()
 
+func TestLookup(t *testing.T) {
+	t.Run("Resolve fails on a lookup with multiple lookup types", func(t *testing.T) {
+		lookupConfig := chainwriter.Lookup{
+			AccountConstant: &chainwriter.AccountConstant{
+				Name:    "TestAccount",
+				Address: "test",
+			},
+			AccountLookup: &chainwriter.AccountLookup{
+				Name:     "TestAccount",
+				Location: "test",
+			},
+		}
+		_, err := lookupConfig.Resolve(nil, nil, nil, nil)
+		require.Contains(t, err.Error(), "exactly one of AccountConstant, AccountLookup, PDALookups, or AccountsFromLookupTable must be specified, got 2")
+	})
+}
+
 func TestAccountContant(t *testing.T) {
 	t.Run("AccountConstant resolves valid address", func(t *testing.T) {
 		expectedAddr := chainwriter.GetRandomPubKey(t)
