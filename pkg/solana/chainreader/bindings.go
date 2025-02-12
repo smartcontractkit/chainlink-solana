@@ -10,11 +10,18 @@ import (
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
 type readBinding interface {
-	SetAddress(solana.PublicKey)
 	GetAddress(context.Context, any) (solana.PublicKey, error)
+	GetGenericName() string
+	GetReadDefinition() config.ReadDefinition
+	GetIDLInfo() (idl codec.IDL, inputIDLTypeDef interface{}, outputIDLTypeDef codec.IdlTypeDef)
+	GetAddressResponseHardCoder() *commoncodec.HardCodeModifierConfig
+	SetAddress(solana.PublicKey)
 	SetCodec(types.RemoteCodec)
 	SetModifier(commoncodec.Modifier)
 	CreateType(bool) (any, error)
@@ -47,9 +54,9 @@ func (b *bindingsRegistry) AddReadBinding(namespace, readName string, rBinding r
 }
 
 func (b *bindingsRegistry) GetReadBinding(namespace, readName string) (readBinding, error) {
-	rBindings, nameSpaceExists := b.namespaceBindings[namespace]
-	if !nameSpaceExists {
-		return nil, fmt.Errorf("%w: no read binding exists for namespace: %q", types.ErrInvalidConfig, namespace)
+	rBindings, err := b.GetReadBindings(namespace)
+	if err != nil {
+		return nil, err
 	}
 
 	rBinding, rBindingExists := rBindings[readName]
@@ -58,6 +65,14 @@ func (b *bindingsRegistry) GetReadBinding(namespace, readName string) (readBindi
 	}
 
 	return rBinding, nil
+}
+
+func (b *bindingsRegistry) GetReadBindings(namespace string) (readNameBindings, error) {
+	rBindings, nameSpaceExists := b.namespaceBindings[namespace]
+	if !nameSpaceExists {
+		return nil, fmt.Errorf("%w: no read binding exists for namespace: %q", types.ErrInvalidConfig, namespace)
+	}
+	return rBindings, nil
 }
 
 func (b *bindingsRegistry) CreateType(namespace, readName string, forEncoding bool) (any, error) {
@@ -112,7 +127,7 @@ func (b *bindingsRegistry) SetModifiers(modifier commoncodec.Modifier) {
 }
 
 func (b *bindingsRegistry) handleAddressSharing(boundContract *types.BoundContract) error {
-	shareGroup, isInAGroup := b.getShareGroup(*boundContract)
+	shareGroup, isInAGroup := b.getShareGroup(boundContract.Name)
 	if !isInAGroup {
 		return nil
 	}
@@ -135,8 +150,8 @@ func (b *bindingsRegistry) handleAddressSharing(boundContract *types.BoundContra
 	return nil
 }
 
-func (b *bindingsRegistry) getShareGroup(boundContract types.BoundContract) (*addressShareGroup, bool) {
-	shareGroup, sharesAddress := b.addressShareGroups[boundContract.Name]
+func (b *bindingsRegistry) getShareGroup(nameSpace string) (*addressShareGroup, bool) {
+	shareGroup, sharesAddress := b.addressShareGroups[nameSpace]
 	if !sharesAddress {
 		return nil, false
 	}
