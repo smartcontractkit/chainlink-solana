@@ -203,7 +203,7 @@ func RunChainWriterTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInt
 	testCases := []Testcase[T]{
 		{
 			Name: ChainWriterLookupTableTest,
-			Test: func(t T){
+			Test: func(t T) {
 				cr := it.GetContractReader(t)
 				cw := it.GetContractWriter(t)
 				contracts := it.GetBindings(t)
@@ -218,11 +218,11 @@ func RunChainWriterTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInt
 				require.NoError(t, err)
 				fmt.Println("Data PDA Account", dataPDAAccount.Bytes())
 
-				// append random addresses to 
+				// append random addresses to lookup table address list
 				lookupTableAddresses := make([]solana.PublicKey, 0, 10)
 				for i := 0; i < 9; i++ {
-					pk, err := solana.NewRandomPrivateKey()
-					require.NoError(t, err)
+					pk, pkErr := solana.NewRandomPrivateKey()
+					require.NoError(t, pkErr)
 					lookupTableAddresses = append(lookupTableAddresses, pk.PublicKey())
 				}
 
@@ -239,7 +239,7 @@ func RunChainWriterTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInt
 				dataValue := uint64(1)
 				storeValArgs := DataAccountArgs{
 					TestIdx: idx,
-					Value: dataValue,
+					Value:   dataValue,
 				}
 				SubmitTransactionToCW(t, it, cw, "storeVal", storeValArgs, bound, types.Finalized)
 
@@ -265,7 +265,7 @@ const (
 	ContractReaderGetLatestValueWithAddressHardcodedIntoResponse = "Get latest value with AddressHardcoded into response"
 	ContractReaderGetLatestValueUsingMultiReaderWithParmsReuse   = "Get latest value using multi reader with params reuse"
 	ContractReaderGetLatestValueGetTokenPrices                   = "Get latest value handles get token prices edge case"
-	ChainWriterLookupTableTest = "Set contract value using a lookup table for addresses"
+	ChainWriterLookupTableTest                                   = "Set contract value using a lookup table for addresses"
 )
 
 type TimestampedUnixBig struct {
@@ -1109,14 +1109,14 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						DebugIDLocation: "",
 					},
 					"initializeLookupTable": {
-						FromAddress:       fromAddress,
+						FromAddress:        fromAddress,
 						InputModifications: nil,
 						ChainSpecificName:  "initializelookuptable",
 						LookupTables:       chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
 							chainwriter.AccountConstant{
 								Name:       "Signer",
-								Address:   fromAddress,
+								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
 							},
@@ -1141,10 +1141,10 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						DebugIDLocation: "",
 					},
 					"storeVal": {
-						FromAddress:       fromAddress,
+						FromAddress:        fromAddress,
 						InputModifications: nil,
 						ChainSpecificName:  "storeval",
-						LookupTables:       chainwriter.LookupTables{
+						LookupTables: chainwriter.LookupTables{
 							DerivedLookupTables: []chainwriter.DerivedLookupTable{
 								{
 									Name: "LookupTable",
@@ -1159,17 +1159,16 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 										InternalField: chainwriter.InternalField{
 											TypeName: "LookupTableDataAccount",
 											Location: "LookupTable",
-											IDL: string(it.Helper.GetPrimaryIDL(t)),
+											IDL:      string(it.Helper.GetPrimaryIDL(t)),
 										},
 									},
-									
 								},
 							},
 						},
 						Accounts: []chainwriter.Lookup{
 							chainwriter.AccountConstant{
 								Name:       "Signer",
-								Address:   fromAddress,
+								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
 							},
@@ -1355,7 +1354,7 @@ func mustUnmarshalIDL[T WrappedTestingT[T]](t T, rawIDL string) codec.IDL {
 	return idl
 }
 
-func CreateTestLookupTable[T WrappedTestingT[T]](ctx context.Context, t T, c *client.Client, txm txm.TxManager,sender solana.PrivateKey, addresses []solana.PublicKey) solana.PublicKey {
+func CreateTestLookupTable[T WrappedTestingT[T]](ctx context.Context, t T, c *client.Client, txm txm.TxManager, sender solana.PrivateKey, addresses []solana.PublicKey) solana.PublicKey {
 	// Create lookup tables
 	slot, serr := c.SlotHeightWithCommitment(ctx, rpc.CommitmentFinalized)
 	require.NoError(t, serr)
@@ -1382,7 +1381,8 @@ func CreateTestLookupTable[T WrappedTestingT[T]](ctx context.Context, t T, c *cl
 	tx2, err2 := solana.NewTransaction([]solana.Instruction{addEntriesInstruction}, res.Value.Blockhash)
 	require.NoError(t, err2)
 	txID2 := uuid.NewString()
-	txm.Enqueue(ctx, "", tx2, &txID2, res.Value.LastValidBlockHeight)
+	err = txm.Enqueue(ctx, "", tx2, &txID2, res.Value.LastValidBlockHeight)
+	require.NoError(t, err)
 	pollTxStatusTillCommitment(ctx, t, txm, txID2, types.Finalized)
 
 	return table

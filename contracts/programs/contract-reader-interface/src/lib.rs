@@ -264,7 +264,7 @@ pub struct StoreVal<'info> {
     pub data: Account<'info, DataAccount>,
 
     /// System Program required for PDA creation
-    pub system_program: Program<'info, System>
+    pub system_program: Program<'info, System>,
 }
 
 #[account]
