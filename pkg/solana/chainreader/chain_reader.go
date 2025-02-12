@@ -312,11 +312,20 @@ func (s *ContractReaderService) Bind(_ context.Context, bindings []types.BoundCo
 
 		s.lookup.bindAddressForContract(bindings[i].Name, bindings[i].Address)
 		// also bind with an empty address so that we can look up the contract without providing address when calling CR methods
-		if _, isInAShareGroup := s.bdRegistry.getShareGroup(bindings[i]); isInAShareGroup {
+		if sg, isInAShareGroup := s.bdRegistry.getShareGroup(bindings[i].Name); isInAShareGroup {
 			s.lookup.bindAddressForContract(bindings[i].Name, "")
+			for _, namespace := range sg.group {
+				if err := s.addAddressResponseHardCoderModifier(namespace, bindings[i].Address); err != nil {
+					return fmt.Errorf("failed to add address response hard coder modifier for contract: %q, : %w", namespace, err)
+				}
+			}
+			return nil
+		}
+
+		if err := s.addAddressResponseHardCoderModifier(bindings[i].Name, bindings[i].Address); err != nil {
+			return fmt.Errorf("failed to add address response hard coder modifier for contract: %q, : %w", bindings[i].Name, err)
 		}
 	}
-
 	return nil
 }
 
@@ -345,7 +354,7 @@ func (s *ContractReaderService) CreateContractType(readIdentifier string, forEnc
 	return s.bdRegistry.CreateType(values.contract, values.reads[0].readName, forEncoding)
 }
 
-func (s *ContractReaderService) addCodecDef(forEncoding bool, namespace, genericName string, idl codec.IDL, idlDefinition interface{}, modCfg commoncodec.ModifiersConfig) error {
+func (s *ContractReaderService) addCodecDef(parsed *codec.ParsedTypes, forEncoding bool, namespace, genericName string, idl codec.IDL, idlDefinition interface{}, modCfg commoncodec.ModifiersConfig) error {
 	mod, err := modCfg.ToModifier(codec.DecoderHooks...)
 	if err != nil {
 		return err
@@ -357,9 +366,9 @@ func (s *ContractReaderService) addCodecDef(forEncoding bool, namespace, generic
 	}
 
 	if forEncoding {
-		s.parsed.EncoderDefs[codec.WrapItemType(true, namespace, genericName)] = cEntry
+		parsed.EncoderDefs[codec.WrapItemType(true, namespace, genericName)] = cEntry
 	} else {
-		s.parsed.DecoderDefs[codec.WrapItemType(false, namespace, genericName)] = cEntry
+		parsed.DecoderDefs[codec.WrapItemType(false, namespace, genericName)] = cEntry
 	}
 	return nil
 }
@@ -412,7 +421,7 @@ func (s *ContractReaderService) initNamespace(namespaces map[string]config.Chain
 	return nil
 }
 
-func (s *ContractReaderService) addAccountRead(namespace string, genericName string, idl codec.IDL, idlType codec.IdlTypeDef, readDefinition config.ReadDefinition) error {
+func (s *ContractReaderService) addAccountRead(namespace string, genericName string, idl codec.IDL, outputIDLDef codec.IdlTypeDef, readDefinition config.ReadDefinition) error {
 	reads := []read{{readName: genericName, useParams: true}}
 	if readDefinition.MultiReader != nil {
 		multiRead, err := s.addMultiAccountReadToCodec(namespace, readDefinition, idl)
@@ -422,38 +431,30 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 		reads = append(reads, multiRead...)
 	}
 
-	if err := s.addAccountReadToCodec(namespace, genericName, idl, idlType, readDefinition); err != nil {
+	var inputIDLDef interface{} = codec.NilIdlTypeDefTy
+	isPDA := false
+
+	// Create PDA read binding if PDA prefix or seeds configs are populated
+	if readDefinition.PDADefinition.Prefix != nil || len(readDefinition.PDADefinition.Seeds) > 0 {
+		inputIDLDef = readDefinition.PDADefinition
+		isPDA = true
+	}
+
+	if err := s.addAccountReadToCodec(s.parsed, namespace, genericName, idl, inputIDLDef, outputIDLDef, readDefinition); err != nil {
 		return err
 	}
 
+	s.bdRegistry.AddReadBinding(namespace, genericName, newAccountReadBinding(namespace, genericName, isPDA, idl, inputIDLDef, outputIDLDef, readDefinition))
 	s.lookup.addReadNameForContract(namespace, genericName, reads)
 	return nil
 }
 
-func (s *ContractReaderService) addAccountReadToCodec(namespace string, genericName string, idl codec.IDL, idlType codec.IdlTypeDef, readDefinition config.ReadDefinition) error {
-	var (
-		reader             readBinding
-		inputAccountIDLDef interface{}
-	)
-
-	if err := s.addCodecDef(false, namespace, genericName, idl, idlType, readDefinition.OutputModifications); err != nil {
+func (s *ContractReaderService) addAccountReadToCodec(parsed *codec.ParsedTypes, namespace string, genericName string, idl codec.IDL, inputIDLDef interface{}, outputIDLDef codec.IdlTypeDef, readDefinition config.ReadDefinition) error {
+	if err := s.addCodecDef(parsed, true, namespace, genericName, idl, inputIDLDef, readDefinition.InputModifications); err != nil {
 		return err
 	}
 
-	// Create PDA read binding if PDA prefix or seeds configs are populated
-	if readDefinition.PDADefinition.Prefix != nil || len(readDefinition.PDADefinition.Seeds) > 0 {
-		inputAccountIDLDef = readDefinition.PDADefinition
-		reader = newAccountReadBinding(namespace, genericName, readDefinition.PDADefinition.Prefix, true)
-	} else {
-		inputAccountIDLDef = codec.NilIdlTypeDefTy
-		reader = newAccountReadBinding(namespace, genericName, nil, false)
-	}
-	if err := s.addCodecDef(true, namespace, genericName, idl, inputAccountIDLDef, readDefinition.InputModifications); err != nil {
-		return err
-	}
-
-	s.bdRegistry.AddReadBinding(namespace, genericName, reader)
-	return nil
+	return s.addCodecDef(parsed, false, namespace, genericName, idl, outputIDLDef, readDefinition.OutputModifications)
 }
 
 func (s *ContractReaderService) addMultiAccountReadToCodec(namespace string, readDefinition config.ReadDefinition, idl codec.IDL) ([]read, error) {
@@ -473,19 +474,74 @@ func (s *ContractReaderService) addMultiAccountReadToCodec(namespace string, rea
 			return nil, fmt.Errorf("unexpected type %T from IDL definition for account read with chainSpecificName: %q, of type: %q", accountIDLDef, mr.ChainSpecificName, mr.ReadType)
 		}
 
+		var inputIDLDef interface{} = codec.NilIdlTypeDefTy
+		isPDA := false
+
+		// Create PDA read binding if PDA prefix or seeds configs are populated
+		if readDefinition.PDADefinition.Prefix != nil || len(readDefinition.PDADefinition.Seeds) > 0 {
+			inputIDLDef = readDefinition.PDADefinition
+			isPDA = true
+		}
+
 		// multi read defs don't have a generic name as they are accessed from the parent read which does have a generic name.
 		// generic name is used everywhere, so add a prefix to avoid potential collision with generic names of other reads.
 		genericName := "multiread-" + mr.ChainSpecificName
-		if err = s.addAccountReadToCodec(namespace, genericName, idl, accountIDLDef, mr); err != nil {
+		if err = s.addAccountReadToCodec(s.parsed, namespace, genericName, idl, inputIDLDef, accountIDLDef, mr); err != nil {
 			return nil, fmt.Errorf("failed to add read to multi read %q: %w", mr.ChainSpecificName, err)
 		}
 
+		s.bdRegistry.AddReadBinding(namespace, genericName, newAccountReadBinding(namespace, genericName, isPDA, idl, inputIDLDef, accountIDLDef, readDefinition))
 		reads = append(reads, read{
 			readName:  genericName,
 			useParams: readDefinition.MultiReader.ReuseParams,
 		})
 	}
 	return reads, nil
+}
+
+func (s *ContractReaderService) addAddressResponseHardCoderModifier(namespace string, addressToHardCode string) error {
+	address, err := solana.PublicKeyFromBase58(addressToHardCode)
+	if err != nil {
+		return fmt.Errorf("failed to parse address: %q", addressToHardCode)
+	}
+
+	rBindings, err := s.bdRegistry.GetReadBindings(namespace)
+	if err != nil {
+		return fmt.Errorf("failed to get read bindings : %w", err)
+	}
+
+	for _, rb := range rBindings {
+		if addressResponseHardCoder := rb.GetAddressResponseHardCoder(); addressResponseHardCoder != nil {
+			hardCoder := rb.GetAddressResponseHardCoder()
+			if hardCoder == nil {
+				continue
+			}
+
+			for k := range hardCoder.OffChainValues {
+				hardCoder.OffChainValues[k] = address
+			}
+
+			idl, inputIDlType, outputIDLType := rb.GetIDLInfo()
+			parsed := &codec.ParsedTypes{
+				EncoderDefs: map[string]codec.Entry{},
+				DecoderDefs: map[string]codec.Entry{},
+			}
+
+			readDef := rb.GetReadDefinition()
+			readDef.OutputModifications = append(readDef.OutputModifications, hardCoder)
+			if err = s.addAccountReadToCodec(parsed, namespace, rb.GetGenericName(), idl, inputIDlType, outputIDLType, readDef); err != nil {
+				return fmt.Errorf("failed to set codec with address response hardcoder for read: %q: %w", rb.GetGenericName(), err)
+			}
+
+			newCodec, err := parsed.ToCodec()
+			if err != nil {
+				return fmt.Errorf("failed to create codec with address response hardcoder for read: %q: %w", rb.GetGenericName(), err)
+			}
+
+			rb.SetCodec(newCodec)
+		}
+	}
+	return nil
 }
 
 func (s *ContractReaderService) addEventRead(
@@ -514,6 +570,7 @@ func (s *ContractReaderService) addEventRead(
 		mappedTuples,
 		events,
 		filter.EventSig,
+		readDefinition,
 	))
 
 	return nil

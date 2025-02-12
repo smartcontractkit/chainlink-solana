@@ -13,6 +13,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 )
@@ -26,6 +28,7 @@ type eventReadBinding struct {
 	indexedSubKeys         map[string]uint64
 	reader                 EventsReader
 	eventSig               [logpoller.EventSignatureLength]byte
+	readDefinition         config.ReadDefinition
 }
 
 func newEventReadBinding(
@@ -33,6 +36,7 @@ func newEventReadBinding(
 	indexedSubKeys map[string]uint64,
 	reader EventsReader,
 	eventSig [logpoller.EventSignatureLength]byte,
+	readDefinition config.ReadDefinition,
 ) *eventReadBinding {
 	binding := &eventReadBinding{
 		namespace:      namespace,
@@ -40,6 +44,7 @@ func newEventReadBinding(
 		indexedSubKeys: indexedSubKeys,
 		reader:         reader,
 		eventSig:       eventSig,
+		readDefinition: readDefinition,
 	}
 
 	binding.remapper = remapHelper{binding.remapPrimitive}
@@ -47,12 +52,28 @@ func newEventReadBinding(
 	return binding
 }
 
-func (b *eventReadBinding) SetAddress(key solana.PublicKey) {
-	b.key = key
-}
-
 func (b *eventReadBinding) GetAddress(_ context.Context, _ any) (solana.PublicKey, error) {
 	return b.key, nil
+}
+
+func (b *eventReadBinding) GetGenericName() string {
+	return b.genericName
+}
+
+func (b *eventReadBinding) GetReadDefinition() config.ReadDefinition {
+	return b.readDefinition
+}
+
+func (b *eventReadBinding) GetIDLInfo() (idl codec.IDL, inputIDLTypeDef interface{}, outputIDLTypeDef codec.IdlTypeDef) {
+	return codec.IDL{}, codec.IdlTypeDef{}, codec.IdlTypeDef{}
+}
+
+func (b *eventReadBinding) GetAddressResponseHardCoder() *commoncodec.HardCodeModifierConfig {
+	return nil
+}
+
+func (b *eventReadBinding) SetAddress(key solana.PublicKey) {
+	b.key = key
 }
 
 func (b *eventReadBinding) SetCodec(codec types.RemoteCodec) {

@@ -45,11 +45,13 @@ type ReadDefinition struct {
 	InputModifications  commoncodec.ModifiersConfig `json:"inputModifications,omitempty"`
 	OutputModifications commoncodec.ModifiersConfig `json:"outputModifications,omitempty"`
 	PDADefinition       codec.PDATypeDef            `json:"pdaDefinition,omitempty"` // Only used for PDA account reads
-	MultiReader         *MultiReader
-	IndexedField0       *IndexedField `json:"indexedField0"`
-	IndexedField1       *IndexedField `json:"indexedField1"`
-	IndexedField2       *IndexedField `json:"indexedField2"`
-	IndexedField3       *IndexedField `json:"indexedField3"`
+	MultiReader         *MultiReader                `json:"multiReader,omitempty"`
+	IndexedField0       *IndexedField               `json:"indexedField0"`
+	IndexedField1       *IndexedField               `json:"indexedField1"`
+	IndexedField2       *IndexedField               `json:"indexedField2"`
+	IndexedField3       *IndexedField               `json:"indexedField3"`
+	// ResponseAddressHardCoder hardcodes the address of the contract into the defined field in the response.
+	ResponseAddressHardCoder *commoncodec.HardCodeModifierConfig `json:"responseAddressHardCoder,omitempty"`
 	// This will create a log poller filter for this event.
 	*PollingFilter `json:"pollingFilter,omitempty"`
 }

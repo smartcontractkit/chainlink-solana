@@ -198,9 +198,10 @@ func RunContractReaderTests[T WrappedTestingT[T]](t T, it *SolanaChainComponents
 
 // GetLatestValue method
 const (
-	ContractReaderGetLatestValueUsingMultiReader               = "Get latest value using multi reader"
-	ContractReaderGetLatestValueUsingMultiReaderWithParmsReuse = "Get latest value using multi reader with params reuse"
-	ContractReaderGetLatestValueGetTokenPrices                 = "Get latest value handles get token prices edge case"
+	ContractReaderGetLatestValueUsingMultiReader                 = "Get latest value using multi reader"
+	ContractReaderGetLatestValueWithAddressHardcodedIntoResponse = "Get latest value with AddressHardcoded into response"
+	ContractReaderGetLatestValueUsingMultiReaderWithParmsReuse   = "Get latest value using multi reader with params reuse"
+	ContractReaderGetLatestValueGetTokenPrices                   = "Get latest value handles get token prices edge case"
 )
 
 type TimestampedUnixBig struct {
@@ -211,6 +212,33 @@ type TimestampedUnixBig struct {
 func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsInterfaceTester[T]) {
 	//RunContractReaderInterfaceTests(t, it, false, true)
 	testCases := []Testcase[T]{
+		{
+			Name: ContractReaderGetLatestValueWithAddressHardcodedIntoResponse,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				bindings := it.GetBindings(t)
+				ctx := tests.Context(t)
+
+				bound := BindingsByName(bindings, AnyContractName)[0]
+				require.NoError(t, cr.Bind(ctx, bindings))
+
+				boundAddress, err := solana.PublicKeyFromBase58(bound.Address)
+				require.NoError(t, err)
+
+				type MultiReadResult struct {
+					A              uint8
+					B              int16
+					SharedAddress  []byte
+					AddressToShare []byte
+				}
+
+				mRR := MultiReadResult{}
+				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(ReadWithAddressHardCodedIntoResponse), primitives.Unconfirmed, nil, &mRR))
+
+				expectedMRR := MultiReadResult{A: 1, B: 2, SharedAddress: boundAddress.Bytes(), AddressToShare: boundAddress.Bytes()}
+				require.Equal(t, expectedMRR, mRR)
+			},
+		},
 		{
 			Name: ContractReaderGetLatestValueUsingMultiReader,
 			Test: func(t T) {
@@ -603,9 +631,10 @@ func (h *helper) runInitialize(
 }
 
 const (
-	MultiRead                = "MultiRead"
-	MultiReadWithParamsReuse = "MultiReadWithParamsReuse"
-	GetTokenPrices           = "GetTokenPrices"
+	MultiRead                            = "MultiRead"
+	ReadWithAddressHardCodedIntoResponse = "ReadWithAddressHardCodedIntoResponse"
+	MultiReadWithParamsReuse             = "MultiReadWithParamsReuse"
+	GetTokenPrices                       = "GetTokenPrices"
 )
 
 func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T) config.ContractReader {
@@ -631,11 +660,43 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 			MethodReturningUint64: uint64ReadDef,
 		},
 	}
+
+	readWithAddressHardCodedIntoResponseDef := config.ReadDefinition{
+		ChainSpecificName: "MultiRead1",
+		ReadType:          config.Account,
+		PDADefinition: codec.PDATypeDef{
+			Prefix: []byte("multi_read1"),
+		},
+		ResponseAddressHardCoder: &commoncodec.HardCodeModifierConfig{
+			// placeholder values, whatever is put as value gets replaced with a solana pub key anyway
+			OffChainValues: map[string]any{
+				"SharedAddress":  solana.PublicKey{},
+				"AddressToShare": solana.PublicKey{},
+			},
+		},
+		OutputModifications: commoncodec.ModifiersConfig{
+			&commoncodec.HardCodeModifierConfig{
+				OffChainValues: map[string]any{"U": "", "V": false},
+			},
+		},
+	}
+
+	multiReadDef := readWithAddressHardCodedIntoResponseDef
+	multiReadDef.ResponseAddressHardCoder = nil
+	multiReadDef.MultiReader = &config.MultiReader{
+		Reads: []config.ReadDefinition{{
+			ChainSpecificName: "MultiRead2",
+			PDADefinition:     codec.PDATypeDef{Prefix: []byte("multi_read2")},
+			ReadType:          config.Account,
+		}},
+	}
+
 	return config.ContractReader{
 		Namespaces: map[string]config.ChainContractReader{
 			AnyContractName: {
 				IDL: mustUnmarshalIDL(t, string(it.Helper.GetPrimaryIDL(t))),
 				Reads: map[string]config.ReadDefinition{
+					ReadWithAddressHardCodedIntoResponse: readWithAddressHardCodedIntoResponseDef,
 					GetTokenPrices: {
 						ChainSpecificName: "BillingTokenConfigWrapper",
 						PDADefinition: codec.PDATypeDef{
@@ -664,25 +725,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 						},
 						ReadType: config.Account,
 					},
-					MultiRead: {
-						ChainSpecificName: "MultiRead1",
-						PDADefinition: codec.PDATypeDef{
-							Prefix: []byte("multi_read1"),
-						},
-						OutputModifications: commoncodec.ModifiersConfig{
-							&commoncodec.HardCodeModifierConfig{
-								OffChainValues: map[string]any{"U": "", "V": false},
-							},
-						},
-						MultiReader: &config.MultiReader{Reads: []config.ReadDefinition{
-							{
-								ChainSpecificName: "MultiRead2",
-								PDADefinition:     codec.PDATypeDef{Prefix: []byte("multi_read2")},
-								ReadType:          config.Account,
-							},
-						}},
-						ReadType: config.Account,
-					},
+					MultiRead: multiReadDef,
 					MultiReadWithParamsReuse: {
 						ChainSpecificName: "MultiRead3",
 						PDADefinition: codec.PDATypeDef{
