@@ -44,23 +44,23 @@ var (
 
 // nolint // ignoring naming suggestion
 type ChainWriterConfig struct {
-	Programs map[string]ProgramConfig
+	Programs map[string]ProgramConfig `json:"programs"`
 }
 
 type ProgramConfig struct {
-	Methods map[string]MethodConfig
-	IDL     string
+	Methods map[string]MethodConfig `json:"methods"`
+	IDL     string                  `json:"idl"`
 }
 
 type MethodConfig struct {
-	FromAddress        string
-	InputModifications commoncodec.ModifiersConfig
-	ChainSpecificName  string
-	LookupTables       LookupTables
-	Accounts           []Lookup
+	FromAddress        string                      `json:"fromAddress"`
+	InputModifications commoncodec.ModifiersConfig `json:"inputModifications,omitempty"`
+	ChainSpecificName  string                      `json:"chainSpecificName"`
+	LookupTables       LookupTables                `json:"lookupTables,omitempty"`
+	Accounts           []Lookup                    `json:"accounts"`
 	// Location in the args where the debug ID is stored
-	DebugIDLocation string
-	ArgsTransform   string
+	DebugIDLocation string `json:"debugIDLocation,omitempty"`
+	ArgsTransform   string `json:"argsTransform,omitempty"`
 }
 
 func NewSolanaChainWriterService(logger logger.Logger, reader client.Reader, txm txm.TxManager, ge fees.Estimator, config ChainWriterConfig) (*SolanaChainWriterService, error) {
