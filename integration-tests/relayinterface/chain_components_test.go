@@ -199,6 +199,7 @@ func RunContractReaderTests[T WrappedTestingT[T]](t T, it *SolanaChainComponents
 // GetLatestValue method
 const (
 	ContractReaderGetLatestValueUsingMultiReader                 = "Get latest value using multi reader"
+	ContractReaderBatchGetLatestValueUsingMultiReader            = "Batch Get latest value using multi reader"
 	ContractReaderGetLatestValueWithAddressHardcodedIntoResponse = "Get latest value with AddressHardcoded into response"
 	ContractReaderGetLatestValueUsingMultiReaderWithParmsReuse   = "Get latest value using multi reader with params reuse"
 	ContractReaderGetLatestValueGetTokenPrices                   = "Get latest value handles get token prices edge case"
@@ -320,6 +321,59 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 				require.Equal(t, uint32(1700000001), res[0].Timestamp)
 				require.Equal(t, "17980346130170174053328187512531209543631592085982266692926093439168", res[1].Value.String())
 				require.Equal(t, uint32(1800000002), res[1].Timestamp)
+			},
+		},
+		{
+			Name: ContractReaderBatchGetLatestValueUsingMultiReader,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				bindings := it.GetBindings(t)
+				ctx := tests.Context(t)
+				bound := BindingsByName(bindings, AnyContractName)[0]
+
+				require.NoError(t, cr.Bind(ctx, bindings))
+
+				type MultiReadResult struct {
+					A uint8
+					B int16
+					U string
+					V bool
+				}
+
+				// setup call data
+				actual := uint64(0)
+				multiParams, multiActual := map[string]any{"ID": 1}, &MultiReadResult{}
+
+				batchGetLatestValueRequest := make(types.BatchGetLatestValuesRequest)
+				batchGetLatestValueRequest[bound] = []types.BatchRead{
+					{
+						ReadName:  MethodReturningUint64,
+						Params:    nil,
+						ReturnVal: &actual,
+					},
+					{
+						ReadName:  MultiReadWithParamsReuse,
+						Params:    multiParams,
+						ReturnVal: multiActual,
+					},
+				}
+
+				result, err := cr.BatchGetLatestValues(ctx, batchGetLatestValueRequest)
+
+				require.NoError(t, err)
+
+				expectedMRR := MultiReadResult{A: 10, B: 20, U: "olleH", V: true}
+				anyContractBatch := result[bound]
+
+				returnValue, err := anyContractBatch[1].GetResult()
+				assert.NoError(t, err)
+				assert.Contains(t, anyContractBatch[1].ReadName, MultiReadWithParamsReuse)
+				require.Equal(t, &expectedMRR, returnValue)
+
+				returnValue, err = anyContractBatch[0].GetResult()
+				assert.NoError(t, err)
+				assert.Contains(t, anyContractBatch[0].ReadName, MethodReturningUint64)
+				assert.Equal(t, AnyValueToReadWithoutAnArgument, *returnValue.(*uint64))
 			},
 		},
 	}
