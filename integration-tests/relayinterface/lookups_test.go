@@ -601,7 +601,7 @@ func TestLookupTables(t *testing.T) {
 		chainwriter.InitializeDataAccount(ctx, t, rpcClient, programID, sender, lookupTable)
 
 		args := map[string]interface{}{
-			"seed1": []byte("data"),
+			"seed1": []byte("lookup"),
 		}
 
 		lookupConfig := chainwriter.LookupTables{

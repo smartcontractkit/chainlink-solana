@@ -52,7 +52,6 @@ pub mod contract_reader_interface {
 
     pub fn initializelookuptable(
         ctx: Context<InitializeLookupTableData>,
-        test_idx: u64,
         lookup_table: Pubkey,
     ) -> Result<()> {
         let account = &mut ctx.accounts.write_data_account;
@@ -60,7 +59,6 @@ pub mod contract_reader_interface {
         account.administrator = ctx.accounts.admin.key();
         account.pending_administrator = Pubkey::default();
         account.lookup_table = lookup_table;
-        account.idx = test_idx;
         account.bump = ctx.bumps.write_data_account;
 
         Ok(())
@@ -178,7 +176,7 @@ pub struct InitializeLookupTableData<'info> {
         init_if_needed,
         payer = admin,
         space = size_of::<LookupTableDataAccount>() + 8,
-        seeds = [b"lookup".as_ref(), test_idx.to_le_bytes().as_ref()],
+        seeds = [b"lookup".as_ref()],
         bump
     )]
     pub write_data_account: Account<'info, LookupTableDataAccount>,
@@ -229,7 +227,6 @@ pub struct LookupTableDataAccount {
     pub administrator: Pubkey,         // Administrator public key
     pub pending_administrator: Pubkey, // Pending administrator public key
     pub lookup_table: Pubkey,          // Address of the lookup table
-    pub idx: u64,
     pub bump: u8,
 }
 

@@ -12,7 +12,6 @@ import (
 
 // Initializelookuptable is the `initializelookuptable` instruction.
 type Initializelookuptable struct {
-	TestIdx     *uint64
 	LookupTable *ag_solanago.PublicKey
 
 	// [0] = [WRITE, SIGNER] admin
@@ -32,12 +31,6 @@ func NewInitializelookuptableInstructionBuilder() *Initializelookuptable {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
-}
-
-// SetTestIdx sets the "testIdx" parameter.
-func (inst *Initializelookuptable) SetTestIdx(testIdx uint64) *Initializelookuptable {
-	inst.TestIdx = &testIdx
-	return inst
 }
 
 // SetLookupTable sets the "lookupTable" parameter.
@@ -105,9 +98,6 @@ func (inst Initializelookuptable) ValidateAndBuild() (*Instruction, error) {
 func (inst *Initializelookuptable) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.TestIdx == nil {
-			return errors.New("TestIdx parameter is not set")
-		}
 		if inst.LookupTable == nil {
 			return errors.New("LookupTable parameter is not set")
 		}
@@ -137,8 +127,7 @@ func (inst *Initializelookuptable) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("    TestIdx", *inst.TestIdx))
+					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("LookupTable", *inst.LookupTable))
 					})
 
@@ -153,11 +142,6 @@ func (inst *Initializelookuptable) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj Initializelookuptable) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `TestIdx` param:
-	err = encoder.Encode(obj.TestIdx)
-	if err != nil {
-		return err
-	}
 	// Serialize `LookupTable` param:
 	err = encoder.Encode(obj.LookupTable)
 	if err != nil {
@@ -166,11 +150,6 @@ func (obj Initializelookuptable) MarshalWithEncoder(encoder *ag_binary.Encoder) 
 	return nil
 }
 func (obj *Initializelookuptable) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `TestIdx`:
-	err = decoder.Decode(&obj.TestIdx)
-	if err != nil {
-		return err
-	}
 	// Deserialize `LookupTable`:
 	err = decoder.Decode(&obj.LookupTable)
 	if err != nil {
@@ -182,14 +161,12 @@ func (obj *Initializelookuptable) UnmarshalWithDecoder(decoder *ag_binary.Decode
 // NewInitializelookuptableInstruction declares a new Initializelookuptable instruction with the provided parameters and accounts.
 func NewInitializelookuptableInstruction(
 	// Parameters:
-	testIdx uint64,
 	lookupTable ag_solanago.PublicKey,
 	// Accounts:
 	admin ag_solanago.PublicKey,
 	writeDataAccount ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *Initializelookuptable {
 	return NewInitializelookuptableInstructionBuilder().
-		SetTestIdx(testIdx).
 		SetLookupTable(lookupTable).
 		SetAdminAccount(admin).
 		SetWriteDataAccountAccount(writeDataAccount).

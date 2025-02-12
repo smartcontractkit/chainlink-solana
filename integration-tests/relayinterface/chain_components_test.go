@@ -231,7 +231,6 @@ func RunChainWriterTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInt
 				lookupTableAddr := CreateTestLookupTable(ctx, t, it.Helper.SolanaClient(), *it.Helper.TXM(), it.Helper.Sender(), lookupTableAddresses)
 				fmt.Println("lookup table address", lookupTableAddr.String())
 				initLookupTableArgs := LookupTableArgs{
-					TestIdx: idx,
 					LookupTable: lookupTableAddr,
 				}
 
@@ -610,7 +609,6 @@ type DataAccountArgs struct {
 }
 
 type LookupTableArgs struct {
-	TestIdx uint64
 	LookupTable solana.PublicKey
 }
 
@@ -986,7 +984,6 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								},
 								Seeds: []chainwriter.Seed{
 									{Static: []byte("lookup")},
-									{Static: testIdx},
 								},
 								IsWritable: true,
 								IsSigner:   false,
@@ -1015,7 +1012,6 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 										},
 										Seeds: []chainwriter.Seed{
 											{Static: []byte("lookup")},
-											{Static: testIdx},
 										},
 										InternalField: chainwriter.InternalField{
 											TypeName: "LookupTableDataAccount",
