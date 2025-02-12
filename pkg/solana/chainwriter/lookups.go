@@ -13,18 +13,12 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
-// Lookup is an interface that defines a method to resolve an address (or multiple addresses) from a given definition.
-type Lookup interface {
-	Resolve(ctx context.Context, args any, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.Reader) ([]*solana.AccountMeta, error)
-	IsOptional() bool
-}
-
-type LookupOpts struct {
-	Optional bool `json:"optional,omitempty"`
-}
-
-func (cl LookupOpts) IsOptional() bool {
-	return cl.Optional
+type Lookup struct {
+	Optional                bool
+	AccountConstant         *AccountConstant         `json:"accountConstant,omitempty"`
+	AccountLookup           *AccountLookup           `json:"accountLookup,omitempty"`
+	PDALookups              *PDALookups              `json:"pdas,omitempty"`
+	AccountsFromLookupTable *AccountsFromLookupTable `json:"accountsFromLookupTable,omitempty"`
 }
 
 // AccountConstant represents a fixed address, provided in Base58 format, converted into a `solana.PublicKey`.
@@ -33,7 +27,6 @@ type AccountConstant struct {
 	Address    string `json:"address"`
 	IsSigner   bool   `json:"isSigner,omitempty"`
 	IsWritable bool   `json:"isWritable,omitempty"`
-	LookupOpts
 }
 
 // AccountLookup dynamically derives an account address from args using a specified location path.
@@ -43,7 +36,6 @@ type AccountLookup struct {
 	// IsSigner and IsWritable can either be a constant bool or a location to a bitmap which decides the bools
 	IsSigner   MetaBool `json:"isSigner,omitempty"`
 	IsWritable MetaBool `json:"isWritable,omitempty"`
-	LookupOpts
 }
 
 type MetaBool struct {
@@ -68,7 +60,6 @@ type PDALookups struct {
 	IsWritable bool   `json:"isWritable,omitempty"`
 	// OPTIONAL: On-chain location and type of desired data from PDA (e.g. a sub-account of the data account)
 	InternalField InternalField `json:"internalField,omitempty"`
-	LookupOpts
 }
 
 type InternalField struct {
@@ -95,10 +86,22 @@ type DerivedLookupTable struct {
 type AccountsFromLookupTable struct {
 	LookupTableName string `json:"lookupTableName"`
 	IncludeIndexes  []int  `json:"includeIndexes"`
-	LookupOpts
 }
 
-func (ac AccountConstant) Resolve(_ context.Context, _ any, _ map[string]map[string][]*solana.AccountMeta, _ client.Reader) ([]*solana.AccountMeta, error) {
+func (l Lookup) Resolve(ctx context.Context, args any, derivedTableMap map[string]map[string][]*solana.AccountMeta, reader client.Reader) ([]*solana.AccountMeta, error) {
+	if l.AccountConstant != nil {
+		return l.AccountConstant.Resolve()
+	} else if l.AccountLookup != nil {
+		return l.AccountLookup.Resolve(args)
+	} else if l.PDALookups != nil {
+		return l.PDALookups.Resolve(ctx, args, derivedTableMap, reader)
+	} else if l.AccountsFromLookupTable != nil {
+		return l.AccountsFromLookupTable.Resolve(derivedTableMap)
+	}
+	return nil, fmt.Errorf("no lookup type specified")
+}
+
+func (ac AccountConstant) Resolve() ([]*solana.AccountMeta, error) {
 	address, err := solana.PublicKeyFromBase58(ac.Address)
 	if err != nil {
 		return nil, fmt.Errorf("error getting account from constant: %w", err)
@@ -112,7 +115,7 @@ func (ac AccountConstant) Resolve(_ context.Context, _ any, _ map[string]map[str
 	}, nil
 }
 
-func (al AccountLookup) Resolve(_ context.Context, args any, _ map[string]map[string][]*solana.AccountMeta, _ client.Reader) ([]*solana.AccountMeta, error) {
+func (al AccountLookup) Resolve(args any) ([]*solana.AccountMeta, error) {
 	derivedValues, err := GetValuesAtLocation(args, al.Location)
 	if err != nil {
 		return nil, fmt.Errorf("error getting account from lookup: %w", err)
@@ -171,7 +174,7 @@ func resolveBitMap(mb MetaBool, args any, length int) ([]bool, error) {
 	return result, nil
 }
 
-func (alt AccountsFromLookupTable) Resolve(_ context.Context, _ any, derivedTableMap map[string]map[string][]*solana.AccountMeta, _ client.Reader) ([]*solana.AccountMeta, error) {
+func (alt AccountsFromLookupTable) Resolve(derivedTableMap map[string]map[string][]*solana.AccountMeta) ([]*solana.AccountMeta, error) {
 	// Fetch the inner map for the specified lookup table name
 	innerMap, ok := derivedTableMap[alt.LookupTableName]
 	if !ok {
@@ -294,9 +297,10 @@ func getSeedBytesCombinations(
 		if seed.Static != nil {
 			expansions = append(expansions, seed.Static)
 			// Static and Dynamic seeds are mutually exclusive
-		} else if seed.Dynamic != nil {
+		} else if !seed.Dynamic.IsNil() {
 			dynamicSeed := seed.Dynamic
-			if lookupSeed, ok := dynamicSeed.(AccountLookup); ok {
+			if dynamicSeed.AccountLookup != nil {
+				lookupSeed := dynamicSeed.AccountLookup
 				// Get value from a location (This doesn't have to be an address, it can be any value)
 				bytes, err := GetValuesAtLocation(args, lookupSeed.Location)
 				if err != nil {
@@ -343,6 +347,10 @@ func getSeedBytesCombinations(
 	}
 
 	return allCombinations, nil
+}
+
+func (l Lookup) IsNil() bool {
+	return l.AccountConstant == nil && l.AccountLookup == nil && l.PDALookups == nil && l.AccountsFromLookupTable == nil
 }
 
 // generatePDAs generates program-derived addresses (PDAs) from public keys and seeds.

@@ -1004,30 +1004,30 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						ChainSpecificName:  "initialize",
 						LookupTables:       chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
-							chainwriter.AccountConstant{
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:       "Signer",
 								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
-							},
-							chainwriter.PDALookups{
+							}},
+							{PDALookups: &chainwriter.PDALookups{
 								Name: "Account",
-								PublicKey: chainwriter.AccountConstant{
+								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
 									Address: primaryProgramPubKey,
-								},
+								}},
 								Seeds: []chainwriter.Seed{
 									{Static: []byte("data")},
 									{Static: testIdx},
 								},
 								IsWritable: true,
 								IsSigner:   false,
-							},
-							chainwriter.AccountConstant{
+							}},
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:       "SystemProgram",
 								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
 								IsSigner:   false,
-							},
+							}},
 						},
 						DebugIDLocation: "",
 					},
@@ -1037,42 +1037,42 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						ChainSpecificName:  "initializemultiread",
 						LookupTables:       chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
-							chainwriter.AccountConstant{
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:       "Signer",
 								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
-							},
-							chainwriter.PDALookups{
+							}},
+							{PDALookups: &chainwriter.PDALookups{
 								Name: "MultiRead1",
-								PublicKey: chainwriter.AccountConstant{
+								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
 									Name:    "ProgramID",
 									Address: primaryProgramPubKey,
-								},
+								}},
 								Seeds: []chainwriter.Seed{
 									{Static: []byte("multi_read1")},
 								},
 								IsWritable: true,
 								IsSigner:   false,
-							},
-							chainwriter.PDALookups{
+							}},
+							{PDALookups: &chainwriter.PDALookups{
 								Name: "MultiRead2",
-								PublicKey: chainwriter.AccountConstant{
+								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
 									Name:    "ProgramID",
 									Address: primaryProgramPubKey,
-								},
+								}},
 								Seeds: []chainwriter.Seed{
 									{Static: []byte("multi_read2")},
 								},
 								IsWritable: true,
 								IsSigner:   false,
-							},
-							chainwriter.AccountConstant{
+							}},
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:       "SystemProgram",
 								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
 								IsSigner:   false,
-							},
+							}},
 						},
 						DebugIDLocation: "",
 					},
@@ -1082,44 +1082,44 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						ChainSpecificName:  "initializemultireadwithparams",
 						LookupTables:       chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
-							chainwriter.AccountConstant{
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:       "Signer",
 								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
-							},
-							chainwriter.PDALookups{
+							}},
+							{PDALookups: &chainwriter.PDALookups{
 								Name: "MultiRead3",
-								PublicKey: chainwriter.AccountConstant{
+								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
 									Name:    "ProgramID",
 									Address: primaryProgramPubKey,
-								},
+								}},
 								Seeds: []chainwriter.Seed{
 									{Static: []byte("multi_read_with_params3")},
 									{Static: binary.LittleEndian.AppendUint64([]byte{}, 1)},
 								},
 								IsWritable: true,
 								IsSigner:   false,
-							},
-							chainwriter.PDALookups{
+							}},
+							{PDALookups: &chainwriter.PDALookups{
 								Name: "MultiRead4",
-								PublicKey: chainwriter.AccountConstant{
+								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
 									Name:    "ProgramID",
 									Address: primaryProgramPubKey,
-								},
+								}},
 								Seeds: []chainwriter.Seed{
 									{Static: []byte("multi_read_with_params4")},
 									{Static: binary.LittleEndian.AppendUint64([]byte{}, 1)},
 								},
 								IsWritable: true,
 								IsSigner:   false,
-							},
-							chainwriter.AccountConstant{
+							}},
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:       "SystemProgram",
 								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
 								IsSigner:   false,
-							},
+							}},
 						},
 						DebugIDLocation: "",
 					},
@@ -1129,44 +1129,44 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						ChainSpecificName:  "initializetokenprices",
 						LookupTables:       chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
-							chainwriter.AccountConstant{
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:       "Signer",
 								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
-							},
-							chainwriter.PDALookups{
+							}},
+							{PDALookups: &chainwriter.PDALookups{
 								Name: "BillingTokenConfigWrapper1",
-								PublicKey: chainwriter.AccountConstant{
+								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
 									Name:    "ProgramID",
 									Address: primaryProgramPubKey,
-								},
+								}},
 								Seeds: []chainwriter.Seed{
 									{Static: []byte("fee_billing_token_config")},
 									{Static: pubKey1.Bytes()},
 								},
 								IsWritable: true,
 								IsSigner:   false,
-							},
-							chainwriter.PDALookups{
+							}},
+							{PDALookups: &chainwriter.PDALookups{
 								Name: "BillingTokenConfigWrapper2",
-								PublicKey: chainwriter.AccountConstant{
+								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
 									Name:    "ProgramID",
 									Address: primaryProgramPubKey,
-								},
+								}},
 								Seeds: []chainwriter.Seed{
 									{Static: []byte("fee_billing_token_config")},
 									{Static: pubKey2.Bytes()},
 								},
 								IsWritable: true,
 								IsSigner:   false,
-							},
-							chainwriter.AccountConstant{
+							}},
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:       "SystemProgram",
 								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
 								IsSigner:   false,
-							},
+							}},
 						},
 						DebugIDLocation: "",
 					},
@@ -1280,31 +1280,31 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						ChainSpecificName: "store",
 						LookupTables:      chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
-							chainwriter.AccountConstant{
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:       "Signer",
 								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
-							},
-							chainwriter.PDALookups{
+							}},
+							{PDALookups: &chainwriter.PDALookups{
 								Name: "Account",
-								PublicKey: chainwriter.AccountConstant{
+								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
 									Name:    "ProgramID",
 									Address: primaryProgramPubKey,
-								},
+								}},
 								Seeds: []chainwriter.Seed{
 									{Static: []byte("struct_data")},
 									{Static: testIdx},
 								},
 								IsWritable: true,
 								IsSigner:   false,
-							},
-							chainwriter.AccountConstant{
+							}},
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:       "SystemProgram",
 								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
 								IsSigner:   false,
-							},
+							}},
 						},
 						DebugIDLocation: "",
 					},
@@ -1319,31 +1319,33 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						ChainSpecificName:  "initialize",
 						LookupTables:       chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
-							chainwriter.AccountConstant{
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:       "Signer",
 								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
-							},
-							chainwriter.PDALookups{
+							}},
+							{PDALookups: &chainwriter.PDALookups{
 								Name: "Account",
-								PublicKey: chainwriter.AccountConstant{
-									Name:    "ProgramID",
-									Address: secondaryProgramPubKey,
-								},
+								PublicKey: chainwriter.Lookup{
+									AccountConstant: &chainwriter.AccountConstant{
+										Name:    "ProgramID",
+										Address: secondaryProgramPubKey, // line ~1338
+									}, // line ~1339 closes AccountConstant
+								}, // line ~1340 closes chainwriter.Lookup
 								Seeds: []chainwriter.Seed{
 									{Static: []byte("data")},
 									{Static: testIdx},
 								},
 								IsWritable: true,
 								IsSigner:   false,
-							},
-							chainwriter.AccountConstant{
+							}},
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:       "SystemAccount",
 								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
 								IsSigner:   false,
-							},
+							}},
 						},
 						DebugIDLocation: "",
 					},
@@ -1372,31 +1374,31 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						ChainSpecificName: "store",
 						LookupTables:      chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
-							chainwriter.AccountConstant{
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:       "Signer",
 								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
-							},
-							chainwriter.PDALookups{
+							}},
+							{PDALookups: &chainwriter.PDALookups{
 								Name: "Account",
-								PublicKey: chainwriter.AccountConstant{
+								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
 									Name:    "ProgramID",
 									Address: secondaryProgramPubKey,
-								},
+								}},
 								Seeds: []chainwriter.Seed{
 									{Static: []byte("struct_data")},
 									{Static: testIdx},
 								},
 								IsWritable: true,
 								IsSigner:   false,
-							},
-							chainwriter.AccountConstant{
+							}},
+							{AccountConstant: &chainwriter.AccountConstant{
 								Name:       "SystemProgram",
 								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
 								IsSigner:   false,
-							},
+							}},
 						},
 						DebugIDLocation: "",
 					},

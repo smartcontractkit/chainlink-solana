@@ -46,9 +46,9 @@ func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args a
 	// PDA lookup to fetch router address
 	routerAddrLookup := PDALookups{
 		Name: "ReferenceAddresses",
-		PublicKey: AccountConstant{
+		PublicKey: Lookup{AccountConstant: &AccountConstant{
 			Address: toAddress,
-		},
+		}},
 		Seeds: []Seed{
 			{Static: []byte("reference_addresses")},
 		},
@@ -78,14 +78,14 @@ func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args a
 		DerivedLookupTables: []DerivedLookupTable{
 			{
 				Name: "PoolLookupTable",
-				Accounts: PDALookups{
+				Accounts: Lookup{PDALookups: &PDALookups{
 					Name: "TokenAdminRegistry",
-					PublicKey: AccountConstant{
+					PublicKey: Lookup{AccountConstant: &AccountConstant{
 						Address: routerAddress.String(),
-					},
+					}},
 					Seeds: []Seed{
 						{Static: []byte("token_admin_registry")},
-						{Dynamic: AccountLookup{Location: "Info.AbstractReports.Messages.TokenAmounts.DestTokenAddress"}},
+						{Dynamic: Lookup{AccountLookup: &AccountLookup{Location: "Info.AbstractReports.Messages.TokenAmounts.DestTokenAddress"}}},
 					},
 					IsSigner:   false,
 					IsWritable: false,
@@ -94,7 +94,7 @@ func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args a
 						Location: "LookupTable",
 						IDL:      routerProgramConfig.IDL,
 					},
-				},
+				}},
 			},
 		},
 	}

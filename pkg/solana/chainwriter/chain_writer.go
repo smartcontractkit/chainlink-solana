@@ -150,7 +150,7 @@ func GetAddresses(ctx context.Context, args any, accounts []Lookup, derivedTable
 	var addresses []*solana.AccountMeta
 	for _, accountConfig := range accounts {
 		meta, err := accountConfig.Resolve(ctx, args, derivedTableMap, reader)
-		if accountConfig.IsOptional() && err != nil {
+		if accountConfig.Optional && err != nil {
 			// skip optional accounts if they are not found
 			continue
 		}
