@@ -6,6 +6,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
+	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -38,9 +39,9 @@ func FindTransform(id string) (func(context.Context, *SolanaChainWriterService, 
 // with the indexes of the token pool addresses in the accounts slice.
 func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args any, accounts solana.AccountMetaSlice, toAddress string) (any, error) {
 	// Fetch offramp config to use to fetch the router address
-	offrampProgramConfig, ok := cw.config.Programs["ccip-offramp"]
+	offrampProgramConfig, ok := cw.config.Programs[ccipconsts.ContractNameOffRamp]
 	if !ok {
-		return nil, fmt.Errorf("ccip-offramp program not found in config")
+		return nil, fmt.Errorf("%s program not found in config", ccipconsts.ContractNameOffRamp)
 	}
 	// PDA lookup to fetch router address
 	routerAddrLookup := PDALookups{
@@ -67,9 +68,9 @@ func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args a
 	}
 
 	// Fetch router config to use to fetch TokenAdminRegistry
-	routerProgramConfig, ok := cw.config.Programs["ccip-router"]
+	routerProgramConfig, ok := cw.config.Programs[ccipconsts.ContractNameRouter]
 	if !ok {
-		return nil, fmt.Errorf("ccip-router program not found in config")
+		return nil, fmt.Errorf("%s program not found in config", ccipconsts.ContractNameRouter)
 	}
 
 	routerAddress := accountMetas[0].PublicKey

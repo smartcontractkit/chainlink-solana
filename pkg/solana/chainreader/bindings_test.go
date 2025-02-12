@@ -12,6 +12,9 @@ import (
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
 func TestBindings_CreateType(t *testing.T) {
@@ -48,13 +51,29 @@ type mockBinding struct {
 	mock.Mock
 }
 
-func (_m *mockBinding) SetCodec(_ types.RemoteCodec) {}
-
-func (_m *mockBinding) SetAddress(_ solana.PublicKey) {}
-
 func (_m *mockBinding) GetAddress(_ context.Context, _ any) (solana.PublicKey, error) {
 	return solana.PublicKey{}, nil
 }
+
+func (_m *mockBinding) GetGenericName() string {
+	return ""
+}
+
+func (_m *mockBinding) GetReadDefinition() config.ReadDefinition {
+	return config.ReadDefinition{}
+}
+
+func (_m *mockBinding) GetIDLInfo() (idl codec.IDL, inputIDLTypeDef interface{}, outputIDLTypeDef codec.IdlTypeDef) {
+	return codec.IDL{}, codec.IdlTypeDef{}, codec.IdlTypeDef{}
+}
+
+func (_m *mockBinding) GetAddressResponseHardCoder() *commoncodec.HardCodeModifierConfig {
+	return &commoncodec.HardCodeModifierConfig{}
+}
+
+func (_m *mockBinding) SetAddress(_ solana.PublicKey) {}
+
+func (_m *mockBinding) SetCodec(_ types.RemoteCodec) {}
 
 func (_m *mockBinding) SetModifier(a commoncodec.Modifier) {
 	_m.Called(a)

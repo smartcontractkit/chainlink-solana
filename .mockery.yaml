@@ -60,4 +60,6 @@ packages:
           dir: "pkg/solana/logpoller"
           filename: mock_orm.go
           mockname: MockORM
-
+  github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader:
+    interfaces:
+      EventsReader:

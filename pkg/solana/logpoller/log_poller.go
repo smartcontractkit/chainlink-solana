@@ -53,7 +53,6 @@ type filtersI interface {
 }
 
 type Service struct {
-	services.StateMachine
 	services.Service
 	eng *services.Engine
 
