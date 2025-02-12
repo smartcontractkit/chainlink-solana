@@ -220,11 +220,26 @@ func (s *ContractReaderService) BatchGetLatestValues(ctx context.Context, reques
 	idxLookup := make(map[types.BoundContract][]int)
 	var batch []call
 
+	// TODO merge these results with the rest of the results
+	var multiReadResults []batchResultWithErr
 	for bound, req := range request {
 		idxLookup[bound] = make([]int, len(req))
-
 		for idx, readReq := range req {
+			readIdentifier := bound.ReadIdentifier(req[0].ReadName)
+			vals, ok := s.lookup.getContractForReadIdentifiers(readIdentifier)
+			if !ok {
+				return nil, fmt.Errorf("%w: no contract for read identifier: %q", types.ErrInvalidType, readIdentifier)
+			}
+
 			idxLookup[bound][idx] = len(batch)
+
+			// TODO exclude multi read reads from the bigh batch request and populate them separately and merge results later.
+			if len(vals.reads) > 1 {
+				err := doMultiRead(ctx, s.client, s.bdRegistry, vals, readReq.Params, readReq.ReturnVal)
+				multiReadResults = append(multiReadResults, batchResultWithErr{address: vals.address, namespace: vals.contract, readName: readIdentifier, returnVal: readReq.ReturnVal, err: err})
+				continue
+			}
+
 			// TODO this is a temporary edge case - NONEVM-1320
 			if readReq.ReadName == GetTokenPrices {
 				return nil, fmt.Errorf("%w: %s is not supported in batch requests", types.ErrInvalidType, GetTokenPrices)
