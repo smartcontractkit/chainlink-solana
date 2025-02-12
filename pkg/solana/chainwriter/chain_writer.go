@@ -70,7 +70,7 @@ type MethodConfig struct {
 }
 
 const (
-	MAX_ATAS = 12
+	maxAtas = 12
 )
 
 func NewSolanaChainWriterService(logger logger.Logger, client client.MultiClient, txm txm.TxManager, ge fees.Estimator, config ChainWriterConfig) (*SolanaChainWriterService, error) {
@@ -92,6 +92,7 @@ func NewSolanaChainWriterService(logger logger.Logger, client client.MultiClient
 		return nil, fmt.Errorf("%w: failed to create codec", err)
 	}
 
+	w.lggr.Info("SolanaChainWriterService initialized")
 	return &w, nil
 }
 
@@ -232,7 +233,7 @@ func (s *SolanaChainWriterService) FilterLookupTableAddresses(
 
 // CreateATAs first checks if a specified location exists, then checks if the accounts derived from the
 // ATALookups in the ChainWriter's configuration exist on-chain and creates them if they do not.
-func CreateATAs(ctx context.Context, args any, lookups []ATALookup, derivedTableMap map[string]map[string][]*solana.AccountMeta, client client.MultiClient, idl string, feePayer solana.PublicKey) ([]solana.Instruction, error) {
+func CreateATAs(ctx context.Context, args any, lookups []ATALookup, derivedTableMap map[string]map[string][]*solana.AccountMeta, client client.MultiClient, idl string, feePayer solana.PublicKey, logger logger.Logger) ([]solana.Instruction, error) {
 	createATAInstructions := []solana.Instruction{}
 	for _, lookup := range lookups {
 		// Check if location exists
@@ -241,6 +242,7 @@ func CreateATAs(ctx context.Context, args any, lookups []ATALookup, derivedTable
 			if err != nil {
 				// field doesn't exist, so ignore ATA creation
 				if errors.Is(err, errFieldNotFound) {
+					logger.Debugw("field not found, skipping ATA creation", "location", lookup.Location)
 					continue
 				}
 				return nil, fmt.Errorf("error getting values at location: %w", err)
@@ -282,6 +284,7 @@ func CreateATAs(ctx context.Context, args any, lookups []ATALookup, derivedTable
 				Commitment: rpc.CommitmentFinalized,
 			})
 			if err == nil {
+				logger.Info("ATA already exists, skipping creation.", lookup.Location)
 				continue
 			}
 			if !strings.Contains(err.Error(), "not found") {
@@ -348,6 +351,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("error getting lookup tables: %w", err), debugID)
 	}
 
+	s.lggr.Info("Resolving account addresses", "contract", contractName, "method", method)
 	// Resolve account metas
 	accounts, err := GetAddresses(ctx, args, methodConfig.Accounts, derivedTableMap, s.client)
 	if err != nil {
@@ -359,11 +363,13 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("error parsing fee payer address: %w", err), debugID)
 	}
 
-	createATAinstructions, err := CreateATAs(ctx, args, methodConfig.ATAs, derivedTableMap, s.client, programConfig.IDL, feePayer)
+	s.lggr.Info("Creating ATAs", "contract", contractName, "method", method)
+	createATAinstructions, err := CreateATAs(ctx, args, methodConfig.ATAs, derivedTableMap, s.client, programConfig.IDL, feePayer, s.lggr)
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error resolving account addresses: %w", err), debugID)
 	}
 
+	s.lggr.Info("Filtering lookup table addresses", "contract", contractName, "method", method)
 	// Filter the lookup table addresses based on which accounts are actually used
 	filteredLookupTableMap := s.FilterLookupTableAddresses(accounts, derivedTableMap, staticTableMap)
 
@@ -373,6 +379,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		if tfErr != nil {
 			return errorWithDebugID(fmt.Errorf("error finding transform function: %w", tfErr), debugID)
 		}
+		s.lggr.Info("Applying args transformation", "contract", contractName, "method", method)
 		args, err = transformFunc(ctx, s, args, accounts, toAddress)
 		if err != nil {
 			return errorWithDebugID(fmt.Errorf("error transforming args: %w", err), debugID)
@@ -385,6 +392,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("error parsing program ID: %w", err), debugID)
 	}
 
+	s.lggr.Info("Encoding transaction payload", "contract", contractName, "method", method)
 	encodedPayload, err := s.encoder.Encode(ctx, args, codec.WrapItemType(true, contractName, method))
 
 	if err != nil {
@@ -401,8 +409,8 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	}
 
 	if len(createATAinstructions) > 0 {
-		if len(createATAinstructions) > MAX_ATAS {
-			return errorWithDebugID(fmt.Errorf("too many ATAs to create: %d, max allowed: %d", len(createATAinstructions), MAX_ATAS), debugID)
+		if len(createATAinstructions) > maxAtas {
+			return errorWithDebugID(fmt.Errorf("too many ATAs to create: %d, max allowed: %d", len(createATAinstructions), maxAtas), debugID)
 		}
 		ataTx, ataErr := solana.NewTransaction(
 			createATAinstructions,
@@ -413,6 +421,9 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 			return errorWithDebugID(fmt.Errorf("error constructing ATA transaction: %w", err), debugID)
 		}
 		ataUUID := fmt.Sprintf("ATA-%s", uuid.NewString())
+
+		s.lggr.Info("Sending create ATA transaction", "contract", contractName, "method", method)
+
 		// Enqueue ATA transaction
 		if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, ataTx, &ataUUID, blockhash.Value.LastValidBlockHeight); err != nil {
 			return errorWithDebugID(fmt.Errorf("error enqueuing transaction: %w", err), debugID)
@@ -440,6 +451,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("error constructing transaction: %w", err), debugID)
 	}
 
+	s.lggr.Info("Sending main transaction", "contract", contractName, "method", method)
 	// Enqueue transaction
 	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, tx, &transactionID, blockhash.Value.LastValidBlockHeight); err != nil {
 		return errorWithDebugID(fmt.Errorf("error enqueuing transaction: %w", err), debugID)
@@ -466,6 +478,7 @@ func (s *SolanaChainWriterService) waitForTxFinality(ctx context.Context, transa
 			}
 			switch status {
 			case types.Finalized:
+				s.lggr.Info("ATA transaction finalized", "transactionID", transactionID)
 				return nil
 			case types.Failed, types.Fatal:
 				return fmt.Errorf("transaction %s failed", transactionID)
@@ -478,6 +491,7 @@ func (s *SolanaChainWriterService) waitForTxFinality(ctx context.Context, transa
 
 // GetTransactionStatus returns the current status of a transaction in the underlying chain's TXM.
 func (s *SolanaChainWriterService) GetTransactionStatus(ctx context.Context, transactionID string) (types.TransactionStatus, error) {
+	s.lggr.Info("Fetching transaction status", "transactionID", transactionID)
 	return s.txm.GetTransactionStatus(ctx, transactionID)
 }
 
@@ -487,6 +501,7 @@ func (s *SolanaChainWriterService) GetFeeComponents(ctx context.Context) (*types
 		return nil, fmt.Errorf("gas estimator not available")
 	}
 
+	s.lggr.Info("Fetching fee components")
 	fee := s.ge.BaseComputeUnitPrice()
 	return &types.ChainFeeComponents{
 		ExecutionFee:        new(big.Int).SetUint64(fee),

@@ -688,7 +688,7 @@ func TestCreateATAs(t *testing.T) {
 			},
 		}
 
-		ataInstructions, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer)
+		ataInstructions, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer, logger.Test(t))
 		require.NoError(t, err)
 		require.Empty(t, ataInstructions)
 	})
@@ -713,7 +713,7 @@ func TestCreateATAs(t *testing.T) {
 			"Addresses": {chainwriter.GetRandomPubKey(t), chainwriter.GetRandomPubKey(t)},
 		}
 
-		_, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer)
+		_, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer, logger.Test(t))
 		require.Contains(t, err.Error(), "expected exactly one wallet address, got 2")
 	})
 
@@ -737,7 +737,7 @@ func TestCreateATAs(t *testing.T) {
 			"Addresses": {chainwriter.GetRandomPubKey(t), chainwriter.GetRandomPubKey(t)},
 		}
 
-		_, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer)
+		_, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer, logger.Test(t))
 		require.Contains(t, err.Error(), "expected equal number of token programs and mints, got 1 tokenPrograms and 2 mints")
 	})
 
@@ -769,7 +769,7 @@ func TestCreateATAs(t *testing.T) {
 			},
 		}
 
-		ataInstructions, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer)
+		ataInstructions, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer, logger.Test(t))
 		require.NoError(t, err)
 
 		tx := solanautils.CreateTx(ctx, t, rpcClient, ataInstructions, sender, rpc.CommitmentFinalized)
@@ -806,14 +806,14 @@ func TestCreateATAs(t *testing.T) {
 			},
 		}
 
-		ataInstructions, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer)
+		ataInstructions, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer, logger.Test(t))
 		require.NoError(t, err)
 
 		solanautils.SendAndConfirm(ctx, t, rpcClient, ataInstructions, sender, rpc.CommitmentFinalized)
 		require.True(t, checkIfATAExists(t, rpcClient, ataAddress))
 
 		// now, if we try to create the same ATA again, it should return no instructions
-		ataInstructions, err = chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer)
+		ataInstructions, err = chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer, logger.Test(t))
 		require.NoError(t, err)
 		require.Empty(t, ataInstructions)
 	})
@@ -861,7 +861,7 @@ func TestCreateATAs(t *testing.T) {
 			})
 		}
 
-		ataInstructions, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer)
+		ataInstructions, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer, logger.Test(t))
 		require.NoError(t, err)
 		require.Len(t, ataInstructions, numMints)
 
@@ -871,7 +871,7 @@ func TestCreateATAs(t *testing.T) {
 			require.True(t, checkIfATAExists(t, rpcClient, ataAddress), "ATA should have been created")
 		}
 
-		ataInstructions, err = chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer)
+		ataInstructions, err = chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer, logger.Test(t))
 		require.NoError(t, err)
 		require.Empty(t, ataInstructions, "No new instructions should be returned if ATAs already exist")
 	})
