@@ -137,8 +137,12 @@ func (r *bindingsRegistry) GetReaders(namespace string) ([]readBinding, error) {
 }
 
 func (r *bindingsRegistry) Bind(ctx context.Context, reg filterRegistrar, binding types.BoundContract) error {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if err := r.handleAddressSharing(binding); err != nil {
+		return err
+	}
 
 	namespace, nbsExist := r.namespaceBindings[binding.Name]
 	if !nbsExist {
@@ -150,35 +154,25 @@ func (r *bindingsRegistry) Bind(ctx context.Context, reg filterRegistrar, bindin
 		return err
 	}
 
-	if err := errors.Join(
+	return errors.Join(
 		namespace.Bind(ctx, reg, address),
 		namespace.BindReaders(ctx, address),
-	); err != nil {
-		return err
-	}
-
-	return nil
+	)
 }
 
-func (r *bindingsRegistry) Unbind(ctx context.Context, reg filterRegistrar, bindings []types.BoundContract) error {
+func (r *bindingsRegistry) Unbind(ctx context.Context, reg filterRegistrar, binding types.BoundContract) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	for _, binding := range bindings {
-		namespace, nbsExist := r.namespaceBindings[binding.Name]
-		if !nbsExist {
-			return fmt.Errorf("%w: no namespace named %s", types.ErrInvalidConfig, binding.Name)
-		}
-
-		if err := errors.Join(
-			namespace.Unbind(ctx, reg),
-			namespace.UnbindReaders(ctx),
-		); err != nil {
-			return err
-		}
+	namespace, nbsExist := r.namespaceBindings[binding.Name]
+	if !nbsExist {
+		return fmt.Errorf("%w: no namespace named %s", types.ErrInvalidConfig, binding.Name)
 	}
 
-	return nil
+	return errors.Join(
+		namespace.Unbind(ctx, reg),
+		namespace.UnbindReaders(ctx),
+	)
 }
 
 func (r *bindingsRegistry) CreateType(namespace, readName string, forEncoding bool) (any, error) {
@@ -191,6 +185,9 @@ func (r *bindingsRegistry) CreateType(namespace, readName string, forEncoding bo
 }
 
 func (r *bindingsRegistry) initAddressSharing(addressShareGroups [][]string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.addressShareGroups = make(map[string]*addressShareGroup)
 
 	for _, group := range addressShareGroups {
@@ -220,6 +217,32 @@ func (r *bindingsRegistry) getShareGroup(nameSpace string) (*addressShareGroup, 
 	return shareGroup, sharesAddress
 }
 
+func (r *bindingsRegistry) handleAddressSharing(boundContract types.BoundContract) error {
+	shareGroup, isInAGroup := r.getShareGroup(boundContract.Name)
+	if !isInAGroup {
+		return nil
+	}
+
+	shareGroup.mux.Lock()
+	defer shareGroup.mux.Unlock()
+
+	// set shared address to the binding address
+	if shareGroup.address.IsZero() {
+		key, err := solana.PublicKeyFromBase58(boundContract.Address)
+		if err != nil {
+			return err
+		}
+
+		r.addressShareGroups[boundContract.Name].address, shareGroup.address = key, key
+	} else if boundContract.Address != shareGroup.address.String() && boundContract.Address != "" {
+		return fmt.Errorf("namespace: %q shares address: %q with namespaceBindings: %v and cannot be bound with a new address: %s", boundContract.Name, shareGroup.address, shareGroup.group, boundContract.Address)
+	}
+
+	boundContract.Address = shareGroup.address.String()
+
+	return nil
+}
+
 type namespaceBinding struct {
 	// static data
 	name string
@@ -234,6 +257,7 @@ func newNamespaceBinding(namespace string) *namespaceBinding {
 	return &namespaceBinding{
 		name:    namespace,
 		readers: make(map[string]readBinding),
+		bound:   make(map[solana.PublicKey]bool),
 	}
 }
 
@@ -256,9 +280,6 @@ func (b *namespaceBinding) SetModifiers(modifier commoncodec.Modifier) {
 }
 
 func (b *namespaceBinding) Bind(ctx context.Context, reg filterRegistrar, address solana.PublicKey) error {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-
 	if b.bindingExists(address) {
 		return nil
 	}
@@ -269,6 +290,9 @@ func (b *namespaceBinding) Bind(ctx context.Context, reg filterRegistrar, addres
 }
 
 func (b *namespaceBinding) BindReaders(ctx context.Context, address solana.PublicKey) error {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
 	var err error
 
 	for _, rb := range b.readers {
@@ -387,28 +411,4 @@ func (b *namespaceBinding) unsetBinding() {
 	defer b.mu.Unlock()
 
 	b.bound = make(map[solana.PublicKey]bool)
-}
-
-func (b *bindingsRegistry) handleAddressSharing(boundContract *types.BoundContract) error {
-	shareGroup, isInAGroup := b.getShareGroup(boundContract.Name)
-	if !isInAGroup {
-		return nil
-	}
-
-	shareGroup.mux.Lock()
-	defer shareGroup.mux.Unlock()
-
-	// set shared address to the binding address
-	if shareGroup.address.IsZero() {
-		key, err := solana.PublicKeyFromBase58(boundContract.Address)
-		if err != nil {
-			return err
-		}
-		b.addressShareGroups[boundContract.Name].address, shareGroup.address = key, key
-	} else if boundContract.Address != shareGroup.address.String() && boundContract.Address != "" {
-		return fmt.Errorf("namespace: %q shares address: %q with namespaceBindings: %v and cannot be bound with a new address: %s", boundContract.Name, shareGroup.address, shareGroup.group, boundContract.Address)
-	}
-
-	boundContract.Address = shareGroup.address.String()
-	return nil
 }

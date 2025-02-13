@@ -348,14 +348,25 @@ func (s *ContractReaderService) Bind(ctx context.Context, bindings []types.Bound
 			return fmt.Errorf("failed to add address response hard coder modifier for contract: %q, : %w", bindings[i].Name, err)
 		}
 	}
+
 	return nil
 }
 
 // Unbind implements the types.ContractReader interface and allows existing contract namespaceBindings to be removed
 // from the service.
 func (s *ContractReaderService) Unbind(ctx context.Context, bindings []types.BoundContract) error {
-	// TODO: unbind is incomplete
-	return s.bdRegistry.Unbind(ctx, s.reader, bindings)
+	for i := range bindings {
+		if err := s.bdRegistry.Unbind(ctx, s.reader, bindings[i]); err != nil {
+			return err
+		}
+
+		s.lookup.unbindAddressForContract(bindings[i].Name, bindings[i].Address)
+
+		// also unbind an empty address if a share group exists
+		s.lookup.unbindAddressForContract(bindings[i].Name, "")
+	}
+
+	return nil
 }
 
 // CreateContractType implements the ContractTypeProvider interface and allows the chain reader
@@ -635,24 +646,6 @@ func toLPFilter(
 		SubkeyPaths: subKeyPaths,
 		Retention:   conf.GetRetention(),
 		MaxLogsKept: conf.GetMaxLogsKept(),
-	}
-}
-
-// injectAddressModifier injects AddressModifier into OutputModifications.
-// This is necessary because AddressModifier cannot be serialized and must be applied at runtime.
-func injectAddressModifier(inputModifications, outputModifications commoncodec.ModifiersConfig) {
-	for i, modConfig := range inputModifications {
-		if addrModifierConfig, ok := modConfig.(*commoncodec.AddressBytesToStringModifierConfig); ok {
-			addrModifierConfig.Modifier = codec.SolanaAddressModifier{}
-			outputModifications[i] = addrModifierConfig
-		}
-	}
-
-	for i, modConfig := range outputModifications {
-		if addrModifierConfig, ok := modConfig.(*commoncodec.AddressBytesToStringModifierConfig); ok {
-			addrModifierConfig.Modifier = codec.SolanaAddressModifier{}
-			outputModifications[i] = addrModifierConfig
-		}
 	}
 }
 

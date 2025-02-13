@@ -101,11 +101,7 @@ func (b *eventReadBinding) Unbind(ctx context.Context) error {
 
 	b.unsetBinding()
 
-	if err := b.Unregister(ctx); err != nil {
-		return err
-	}
-
-	return nil
+	return b.Unregister(ctx)
 }
 
 func (b *eventReadBinding) Register(ctx context.Context) error {
