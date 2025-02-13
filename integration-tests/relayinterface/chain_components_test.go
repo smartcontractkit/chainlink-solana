@@ -724,19 +724,19 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 		ResponseAddressHardCoder: &commoncodec.HardCodeModifierConfig{
 			// placeholder values, whatever is put as value gets replaced with a solana pub key anyway
 			OffChainValues: map[string]any{
-				"SharedAddress":  solana.PublicKey{},
-				"AddressToShare": solana.PublicKey{},
-			},
-		},
-		OutputModifications: commoncodec.ModifiersConfig{
-			&commoncodec.HardCodeModifierConfig{
-				OffChainValues: map[string]any{"U": "", "V": false},
+				"SharedAddress":  "",
+				"AddressToShare": "",
 			},
 		},
 	}
 
 	multiReadDef := readWithAddressHardCodedIntoResponseDef
 	multiReadDef.ResponseAddressHardCoder = nil
+	multiReadDef.OutputModifications = commoncodec.ModifiersConfig{
+		&commoncodec.HardCodeModifierConfig{
+			OffChainValues: map[string]any{"U": "", "V": false},
+		},
+	}
 	multiReadDef.MultiReader = &config.MultiReader{
 		Reads: []config.ReadDefinition{{
 			ChainSpecificName: "MultiRead2",
@@ -745,14 +745,31 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 		}},
 	}
 
+	idl := mustUnmarshalIDL(t, string(it.Helper.GetPrimaryIDL(t)))
+	idl.Accounts = append(idl.Accounts, codec.IdlTypeDef{
+		Name: "USDPerToken",
+		Type: codec.IdlTypeDefTy{
+			Kind: codec.IdlTypeDefTyKindStruct,
+			Fields: &codec.IdlTypeDefStruct{
+				{
+					Name: "tokenPrices",
+					Type: codec.IdlType{
+						AsIdlTypeVec: &codec.IdlTypeVec{Vec: codec.IdlType{AsIdlTypeDefined: &codec.IdlTypeDefined{Defined: "TimestampedPackedU224"}}},
+					},
+				},
+			},
+		},
+	})
+
 	return config.ContractReader{
 		Namespaces: map[string]config.ChainContractReader{
 			AnyContractName: {
-				IDL: mustUnmarshalIDL(t, string(it.Helper.GetPrimaryIDL(t))),
+				IDL: idl,
 				Reads: map[string]config.ReadDefinition{
 					ReadWithAddressHardCodedIntoResponse: readWithAddressHardCodedIntoResponseDef,
 					GetTokenPrices: {
-						ChainSpecificName: "BillingTokenConfigWrapper",
+						ChainSpecificName: "USDPerToken",
+						ReadType:          config.Account,
 						PDADefinition: codec.PDATypeDef{
 							Prefix: []byte("fee_billing_token_config"),
 							Seeds: []codec.PDASeed{
@@ -767,17 +784,8 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 							},
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
-							&commoncodec.DropModifierConfig{
-								Fields: []string{"Config"},
-							},
-							&commoncodec.HardCodeModifierConfig{
-								OffChainValues: map[string]any{
-									"Response": make([]TimestampedUnixBig, 1000),
-								},
-							},
-							&commoncodec.PropertyExtractorConfig{FieldName: "Response"},
+							&commoncodec.PropertyExtractorConfig{FieldName: "TokenPrices"},
 						},
-						ReadType: config.Account,
 					},
 					MultiRead: multiReadDef,
 					MultiReadWithParamsReuse: {

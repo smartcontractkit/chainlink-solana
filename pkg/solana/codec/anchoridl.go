@@ -272,7 +272,7 @@ func (env *IdlType) UnmarshalJSON(data []byte) error {
 			if err := utilz.TranscodeJSON(temp, &target); err != nil {
 				return err
 			}
-			env.asIdlTypeDefined = &target
+			env.AsIdlTypeDefined = &target
 		}
 		if got, ok := v["array"]; ok {
 			if _, ok := got.([]interface{}); !ok {
@@ -303,7 +303,7 @@ type IdlType struct {
 	AsString         IdlTypeAsString
 	AsIdlTypeVec     *IdlTypeVec
 	asIdlTypeOption  *IdlTypeOption
-	asIdlTypeDefined *IdlTypeDefined
+	AsIdlTypeDefined *IdlTypeDefined
 	AsIdlTypeArray   *IdlTypeArray
 }
 
@@ -323,7 +323,7 @@ func (env *IdlType) IsIdlTypeOption() bool {
 	return env.asIdlTypeOption != nil
 }
 func (env *IdlType) IsIdlTypeDefined() bool {
-	return env.asIdlTypeDefined != nil
+	return env.AsIdlTypeDefined != nil
 }
 func (env *IdlType) IsArray() bool {
 	return env.AsIdlTypeArray != nil
@@ -340,7 +340,7 @@ func (env *IdlType) GetIdlTypeOption() *IdlTypeOption {
 	return env.asIdlTypeOption
 }
 func (env *IdlType) GetIdlTypeDefined() *IdlTypeDefined {
-	return env.asIdlTypeDefined
+	return env.AsIdlTypeDefined
 }
 func (env *IdlType) GetArray() *IdlTypeArray {
 	return env.AsIdlTypeArray

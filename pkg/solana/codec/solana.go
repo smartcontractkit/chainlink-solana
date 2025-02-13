@@ -350,6 +350,15 @@ func asDefined(parentTypeName string, definedName *IdlTypeDefined, refs *codecRe
 }
 
 func asArray(parentTypeName string, idlArray *IdlTypeArray, refs *codecRefs) (commonencodings.TypeCodec, error) {
+	if idlArray == nil {
+		return nil, fmt.Errorf("%w: field type cannot be nil", commontypes.ErrInvalidConfig)
+	}
+
+	// better to implement bytes to big int codec modifiers, but this works fine
+	if idlArray.Num == 28 && idlArray.Thing.AsString == IdlTypeU8 {
+		return binary.BigEndian().BigInt(uint(idlArray.Num), false)
+	}
+
 	codec, err := processFieldType(parentTypeName, idlArray.Thing, refs)
 	if err != nil {
 		return nil, err

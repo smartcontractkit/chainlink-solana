@@ -187,7 +187,9 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 
 	// TODO this is a temporary edge case - NONEVM-1320
 	if values.reads[0].readName == GetTokenPrices {
-		return s.handleGetTokenPricesGetLatestValue(ctx, params, values, returnVal)
+		if err := s.handleGetTokenPricesGetLatestValue(ctx, params, values, returnVal); err != nil {
+			return fmt.Errorf("failed to read contract: %q, account: %q err: %w", values.contract, values.reads[0].readName, err)
+		}
 	}
 
 	batch := []call{
@@ -635,7 +637,14 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 	params any,
 	values readValues,
 	returnVal any,
-) error {
+) (err error) {
+	// shouldn't happen, but just to be sure
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic recovered: %v", r)
+		}
+	}()
+
 	pdaAddresses, err := s.getPDAsForGetTokenPrices(params, values)
 	if err != nil {
 		return err
@@ -643,64 +652,69 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 
 	data, err := s.client.GetMultipleAccountData(ctx, pdaAddresses...)
 	if err != nil {
-		return fmt.Errorf(
-			"for contract %q read %q: failed to get multiple account data: %w",
-			values.contract, values.reads[0].readName, err,
-		)
+		return err
 	}
 
-	// -------------- Fill out the returnVal slice with data --------------
-	// can't typecast returnVal so we have to use reflection here
-
-	// Ensure `returnVal` is a pointer to a slice we can populate.
 	returnSliceVal := reflect.ValueOf(returnVal)
-	if returnSliceVal.Kind() == reflect.Ptr {
-		returnSliceVal = returnSliceVal.Elem()
-		if returnSliceVal.Kind() == reflect.Ptr {
-			returnSliceVal = returnSliceVal.Elem()
-		}
+	if returnSliceVal.Kind() != reflect.Ptr {
+		return fmt.Errorf("expected <**[]*struct { Value *big.Int; Timestamp *int64 } Value>, got %q", returnSliceVal.String())
 	}
-	if returnSliceVal.Kind() != reflect.Slice {
-		return fmt.Errorf(
-			"for contract %q read %q: expected `returnVal` to be a slice, got %s",
-			values.contract, values.reads[0].readName, returnSliceVal.Kind(),
-		)
+	returnSliceVal = returnSliceVal.Elem()
+
+	returnSliceValType := returnSliceVal.Type()
+	if returnSliceValType.Kind() != reflect.Ptr {
+		return fmt.Errorf("expected <*[]*struct { Value *big.Int; Timestamp *int64 } Value>, got %q", returnSliceValType.String())
 	}
 
-	elemType := returnSliceVal.Type().Elem()
+	sliceType := returnSliceValType.Elem()
+	if sliceType.Kind() != reflect.Slice {
+		return fmt.Errorf("expected []*struct { Value *big.Int; Timestamp *int64 }, got %q", sliceType.String())
+	}
+
+	if returnSliceVal.IsNil() {
+		// init a slice
+		sliceVal := reflect.MakeSlice(sliceType, 0, 0)
+
+		// create a pointer to that slice to match what slicePtr
+		slicePtr := reflect.New(sliceType)
+		slicePtr.Elem().Set(sliceVal)
+
+		returnSliceVal.Set(slicePtr)
+		returnSliceVal = returnSliceVal.Elem()
+	}
+
+	pointerType := sliceType.Elem()
+	if pointerType.Kind() != reflect.Ptr {
+		return fmt.Errorf("expected *struct { Value *big.Int; Timestamp *int64 }, got %q", pointerType.String())
+	}
+
+	underlyingStruct := pointerType.Elem()
+	if underlyingStruct.Kind() != reflect.Struct {
+		return fmt.Errorf("expected struct { Value *big.Int; Timestamp *int64 }, got %q", underlyingStruct.String())
+	}
+
 	for _, d := range data {
 		var wrapper fee_quoter.BillingTokenConfigWrapper
 		if err = wrapper.UnmarshalWithDecoder(bin.NewBorshDecoder(d)); err != nil {
-			return fmt.Errorf(
-				"for contract %q read %q: failed to unmarshal account data: %w",
-				values.contract, values.reads[0].readName, err,
-			)
+			return err
 		}
 
-		newElem := reflect.New(elemType).Elem()
-
+		newElemPtr := reflect.New(underlyingStruct)
+		newElem := newElemPtr.Elem()
 		valueField := newElem.FieldByName("Value")
 		if !valueField.IsValid() {
-			return fmt.Errorf(
-				"for contract %q read %q: struct type missing `Value` field",
-				values.contract, values.reads[0].readName,
-			)
+			return fmt.Errorf("field `Value` missing from %q", newElem.String())
 		}
-		valueField.Set(reflect.ValueOf(big.NewInt(0).SetBytes(wrapper.Config.UsdPerToken.Value[:])))
 
+		valueField.Set(reflect.ValueOf(big.NewInt(0).SetBytes(wrapper.Config.UsdPerToken.Value[:])))
 		timestampField := newElem.FieldByName("Timestamp")
 		if !timestampField.IsValid() {
-			return fmt.Errorf(
-				"for contract %q read %q: struct type missing `Timestamp` field",
-				values.contract, values.reads[0].readName,
-			)
+			return fmt.Errorf("field `Timestamp` missing from %q", newElem.String())
 		}
-
 		// nolint:gosec
 		// G115: integer overflow conversion int64 -&gt; uint32
-		timestampField.Set(reflect.ValueOf(uint32(wrapper.Config.UsdPerToken.Timestamp)))
-
-		returnSliceVal.Set(reflect.Append(returnSliceVal, newElem))
+		timestampField.Set(reflect.ValueOf(&wrapper.Config.UsdPerToken.Timestamp))
+		returnSliceVal.Set(reflect.Append(returnSliceVal, newElemPtr))
 	}
 
 	return nil
