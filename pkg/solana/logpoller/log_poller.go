@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"iter"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/gagliardetto/solana-go/rpc"
@@ -17,9 +18,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 )
 
+const NoNewReplayRequests = -1
+
 var (
-	ErrFilterNameConflict   = errors.New("filter with such name already exists")
-	ErrMissingDiscriminator = errors.New("Solana log is missing discriminator")
+	ErrFilterNameConflict = errors.New("filter with such name already exists")
 )
 
 type ORM interface {
@@ -30,6 +32,7 @@ type ORM interface {
 	DeleteFilters(ctx context.Context, filters map[int64]Filter) error
 	MarkFilterDeleted(ctx context.Context, id int64) (err error)
 	MarkFilterBackfilled(ctx context.Context, id int64) (err error)
+	UpdateStartingBlocks(ctx context.Context, startingBlock map[int64]int64) (err error)
 	GetLatestBlock(ctx context.Context) (int64, error)
 	InsertLogs(context.Context, []Log) (err error)
 	SelectSeqNums(ctx context.Context) (map[int64]int64, error)
@@ -49,9 +52,16 @@ type filtersI interface {
 	GetDistinctAddresses(ctx context.Context) ([]PublicKey, error)
 	GetFiltersToBackfill() []Filter
 	MarkFilterBackfilled(ctx context.Context, filterID int64) error
+	UpdateStartingBlocks(ctx context.Context, startingBlocks int64) error
 	MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[Filter]
 	DecodeSubKey(ctx context.Context, lggr logger.SugaredLogger, raw []byte, ID int64, subKeyPath []string) (any, error)
 	IncrementSeqNum(filterID int64) int64
+}
+
+type ReplayInfo struct {
+	mut          sync.RWMutex
+	requestBlock int64
+	pending      bool
 }
 
 type Service struct {
@@ -61,6 +71,7 @@ type Service struct {
 	lggr              logger.SugaredLogger
 	orm               ORM
 	lastProcessedSlot int64
+	replay            ReplayInfo
 	client            RPCClient
 	loader            logsLoader
 	filters           filtersI
@@ -87,6 +98,7 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient) *Service {
 		},
 	}.NewServiceEngine(lggr)
 	lp.lggr = lp.eng.SugaredLogger
+	lp.replay.requestBlock = NoNewReplayRequests
 
 	return lp
 }
@@ -210,6 +222,44 @@ func (lp *Service) UnregisterFilter(ctx context.Context, name string) error {
 	return lp.filters.UnregisterFilter(ctx, name)
 }
 
+// Replay submits a new replay request. If there was already a new replay request
+// submitted since the last replay completed, it will be updated to the earlier of the
+// two requested fromBlock's. The expectation is that, on the next timer tick of the
+// LogPoller run loop it will backfill all filters starting from fromBlock. If there
+// are new filters in the backfill queue, with an earlier StartingBlock, then they
+// will get backfilled from there instead.
+func (lp *Service) Replay(ctx context.Context, fromBlock int64) error {
+	ctx, cancel := lp.eng.Ctx(ctx)
+	defer cancel()
+
+	lp.replay.mut.Lock()
+	defer lp.replay.mut.Unlock()
+
+	if lp.replay.requestBlock != NoNewReplayRequests && lp.replay.requestBlock <= fromBlock {
+		// Already requested, no further action required
+		return nil
+	}
+	err := lp.filters.UpdateStartingBlocks(ctx, fromBlock)
+	if err != nil {
+		return err
+	}
+	lp.replay.requestBlock = fromBlock
+
+	return nil
+}
+
+// ReplayPending returns the current replay status of LogPoller. true indicates there is a replay currently in progress.
+// False means there is no replay in progress. Some subtleties to bear in mind:
+//  1. if a new request has been submitted since the last replay finished, but the backfilling hasn't been started yet,
+//     this will still return false.
+//  2. It may also return false if the node is restarted after a replay request was submitted but before it completes,
+//     even though it will still know to finish backfilling everything needed in order to satisfy the replay request.
+func (lp *Service) ReplayPending() bool {
+	lp.replay.mut.RLock()
+	defer lp.replay.mut.RUnlock()
+	return lp.replay.pending
+}
+
 func (lp *Service) getLastProcessedSlot(ctx context.Context) (int64, error) {
 	if lp.lastProcessedSlot != 0 {
 		return lp.lastProcessedSlot, nil
@@ -237,10 +287,28 @@ func (lp *Service) getLastProcessedSlot(ctx context.Context) (int64, error) {
 	return int64(latestFinalizedSlot) - 1, nil //
 }
 
+// checkForReplayRequest checks whether there have been any new replay requests since it was last called,
+// and if so sets the pending flag to true and returns the block number
+func (lp *Service) checkForReplayRequest() int64 {
+	lp.replay.mut.Lock()
+	defer lp.replay.mut.Unlock()
+
+	if lp.replay.requestBlock == NoNewReplayRequests {
+		return NoNewReplayRequests
+	}
+
+	lp.lggr.Infow("starting replay", "replayBlock", lp.replay.requestBlock)
+	lp.replay.pending = true
+	return lp.replay.requestBlock
+}
+
 func (lp *Service) backfillFilters(ctx context.Context, filters []Filter, to int64) error {
+	replayBlock := lp.checkForReplayRequest()
+
 	addressesSet := make(map[PublicKey]struct{})
 	addresses := make([]PublicKey, 0, len(filters))
 	minSlot := to
+
 	for _, filter := range filters {
 		if _, ok := addressesSet[filter.Address]; !ok {
 			addressesSet[filter.Address] = struct{}{}
@@ -257,6 +325,10 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []Filter, to int
 	}
 
 	lp.lggr.Infow("Done backfilling filters", "filters", len(filters), "from", minSlot, "to", to)
+	if replayBlock > 0 {
+		lp.replayComplete(minSlot, to)
+	}
+
 	for _, filter := range filters {
 		filterErr := lp.filters.MarkFilterBackfilled(ctx, filter.ID)
 		if filterErr != nil {
@@ -367,6 +439,20 @@ func (lp *Service) run(ctx context.Context) (err error) {
 
 	lp.lastProcessedSlot = highestSlot
 	return nil
+}
+
+func (lp *Service) replayComplete(from, to int64) {
+	lp.replay.mut.Lock()
+	defer lp.replay.mut.Unlock()
+
+	lp.lggr.Infow("replay complete", "from", from, "to", to)
+
+	lp.replay.pending = false
+	if lp.replay.requestBlock != NoNewReplayRequests && lp.replay.requestBlock < from {
+		// received a new request with lower block number while replaying, we'll process that next time
+		return
+	}
+	lp.replay.requestBlock = NoNewReplayRequests
 }
 
 func appendBuffered(ch <-chan Block, max int, blocks []Block) []Block {

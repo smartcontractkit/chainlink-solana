@@ -178,7 +178,18 @@ func TestLogPollerFilters(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, logs, 0)
 	})
-	t.Run("MarkBackfilled updated corresponding filed", func(t *testing.T) {
+
+	genEnsureIsBackfilled := func(ctx context.Context, orm *DSORM) func([]int64, bool) {
+		return func(filterIDs []int64, expectedIsBackfilled bool) {
+			for _, filterID := range filterIDs {
+				filter, err := orm.GetFilterByID(ctx, filterID)
+				require.NoError(t, err)
+				require.Equal(t, expectedIsBackfilled, filter.IsBackfilled)
+			}
+		}
+	}
+
+	t.Run("MarkBackfilled updated corresponding field", func(t *testing.T) {
 		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 		chainID := uuid.NewString()
 		orm := NewORM(chainID, dbx, lggr)
@@ -187,22 +198,64 @@ func TestLogPollerFilters(t *testing.T) {
 		ctx := tests.Context(t)
 		filter.IsBackfilled = true
 		filterID, err := orm.InsertFilter(ctx, filter)
+		filterIDs := []int64{filterID}
 		require.NoError(t, err)
-		ensureIsBackfilled := func(expectedIsBackfilled bool) {
-			filter, err = orm.GetFilterByID(ctx, filterID)
-			require.NoError(t, err)
-			require.Equal(t, expectedIsBackfilled, filter.IsBackfilled)
-		}
-		ensureIsBackfilled(true)
+
+		ensureIsBackfilled := genEnsureIsBackfilled(ctx, orm)
+
+		ensureIsBackfilled(filterIDs, true)
 		// insert overrides
 		filter.IsBackfilled = false
 		_, err = orm.InsertFilter(ctx, filter)
 		require.NoError(t, err)
-		ensureIsBackfilled(false)
+		ensureIsBackfilled(filterIDs, false)
 		// mark changes value to true
 		err = orm.MarkFilterBackfilled(ctx, filterID)
 		require.NoError(t, err)
-		ensureIsBackfilled(true)
+		ensureIsBackfilled(filterIDs, true)
+	})
+
+	t.Run("UpdateStartingBlocks updates filters correctly", func(t *testing.T) {
+		ctx := tests.Context(t)
+		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
+		chainID := uuid.NewString()
+		orm := NewORM(chainID, dbx, lggr)
+
+		newBackfilledFilter := func(startingBlock int64) Filter {
+			filter := newRandomFilter(t)
+			filter.StartingBlock = startingBlock
+			filter.IsBackfilled = true
+			return filter
+		}
+
+		ensureStartingBlock := func(id int64, expectedStartingBlock int64) {
+			filter, err := orm.GetFilterByID(ctx, id)
+			require.NoError(t, err)
+			require.Equal(t, expectedStartingBlock, filter.StartingBlock)
+		}
+
+		filter1 := newBackfilledFilter(7)
+		id1, err := orm.InsertFilter(ctx, filter1)
+		require.NoError(t, err)
+		filter2 := newBackfilledFilter(13)
+		id2, err := orm.InsertFilter(ctx, filter2)
+		require.NoError(t, err)
+		filter3 := newBackfilledFilter(15)
+		id3, err := orm.InsertFilter(ctx, filter3)
+		require.NoError(t, err)
+
+		ensureIsBackfilled := genEnsureIsBackfilled(ctx, orm)
+
+		startingBlocks := map[int64]int64{id1: 5, id3: 8}
+
+		// update starting blocks
+		err = orm.UpdateStartingBlocks(ctx, startingBlocks)
+		require.NoError(t, err)
+		ensureIsBackfilled([]int64{id1, id3}, false)
+		ensureIsBackfilled([]int64{id2}, true)
+		ensureStartingBlock(id1, 5)
+		ensureStartingBlock(id2, 13)
+		ensureStartingBlock(id3, 8)
 	})
 }
 

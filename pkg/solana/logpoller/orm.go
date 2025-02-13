@@ -127,6 +127,22 @@ func (o *DSORM) MarkFilterBackfilled(ctx context.Context, id int64) (err error) 
 	return err
 }
 
+// UpdateStartingBlocks accepts a map from filter ids to new startingBlock numbers. Each filter corresponding
+// to an id in the map will have its starting_block column updated with the new value. is_backfilled for each
+// filter will also be reset to false
+func (o *DSORM) UpdateStartingBlocks(ctx context.Context, startingBlocks map[int64]int64) (err error) {
+	query := `UPDATE solana.log_poller_filters SET starting_block = $1, is_backfilled = false WHERE id=$2;`
+	return o.Transact(ctx, func(orm *DSORM) error {
+		for id, startingBlock := range startingBlocks {
+			_, err = o.ds.ExecContext(ctx, query, startingBlock, id)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 func (o *DSORM) DeleteFilter(ctx context.Context, id int64) (err error) {
 	query := `DELETE FROM solana.log_poller_filters WHERE id = $1`
 	_, err = o.ds.ExecContext(ctx, query, id)

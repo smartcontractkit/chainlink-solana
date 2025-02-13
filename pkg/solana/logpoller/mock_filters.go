@@ -564,6 +564,53 @@ func (_c *mockFilters_UnregisterFilter_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
+// UpdateStartingBlocks provides a mock function with given fields: ctx, startingBlocks
+func (_m *mockFilters) UpdateStartingBlocks(ctx context.Context, startingBlocks int64) error {
+	ret := _m.Called(ctx, startingBlocks)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateStartingBlocks")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = rf(ctx, startingBlocks)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockFilters_UpdateStartingBlocks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateStartingBlocks'
+type mockFilters_UpdateStartingBlocks_Call struct {
+	*mock.Call
+}
+
+// UpdateStartingBlocks is a helper method to define mock.On call
+//   - ctx context.Context
+//   - startingBlocks int64
+func (_e *mockFilters_Expecter) UpdateStartingBlocks(ctx interface{}, startingBlocks interface{}) *mockFilters_UpdateStartingBlocks_Call {
+	return &mockFilters_UpdateStartingBlocks_Call{Call: _e.mock.On("UpdateStartingBlocks", ctx, startingBlocks)}
+}
+
+func (_c *mockFilters_UpdateStartingBlocks_Call) Run(run func(ctx context.Context, startingBlocks int64)) *mockFilters_UpdateStartingBlocks_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *mockFilters_UpdateStartingBlocks_Call) Return(_a0 error) *mockFilters_UpdateStartingBlocks_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockFilters_UpdateStartingBlocks_Call) RunAndReturn(run func(context.Context, int64) error) *mockFilters_UpdateStartingBlocks_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // newMockFilters creates a new instance of mockFilters. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func newMockFilters(t interface {
