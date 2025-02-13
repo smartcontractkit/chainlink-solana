@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -204,10 +205,16 @@ func InitializeDataAccount(
 }
 
 func GetDiscriminator(instruction string) [8]byte {
-	fullHash := sha256.Sum256([]byte("global:" + instruction))
+	fullHash := sha256.Sum256([]byte("global:" + ToSnakeCase(instruction)))
 	var discriminator [8]byte
 	copy(discriminator[:], fullHash[:8])
 	return discriminator
+}
+
+func ToSnakeCase(s string) string {
+	s = regexp.MustCompile(`([a-z0-9])([A-Z])`).ReplaceAllString(s, "${1}_${2}")
+	s = regexp.MustCompile(`([A-Z]+)([A-Z][a-z])`).ReplaceAllString(s, "${1}_${2}")
+	return strings.ToLower(s)
 }
 
 func GetRandomPubKey(t *testing.T) solana.PublicKey {
