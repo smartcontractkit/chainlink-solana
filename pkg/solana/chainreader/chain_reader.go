@@ -190,6 +190,7 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 		if err := s.handleGetTokenPricesGetLatestValue(ctx, params, values, returnVal); err != nil {
 			return fmt.Errorf("failed to read contract: %q, account: %q err: %w", values.contract, values.reads[0].readName, err)
 		}
+		return nil
 	}
 
 	batch := []call{
