@@ -66,7 +66,7 @@ pub mod contract_reader_interface {
         Ok(())
     }
 
-    pub fn initialize_lookup_table(
+    pub fn initializelookuptable(
         ctx: Context<InitializeLookupTableData>,
         lookup_table: Pubkey,
     ) -> Result<()> {
@@ -75,7 +75,16 @@ pub mod contract_reader_interface {
         account.administrator = ctx.accounts.admin.key();
         account.pending_administrator = Pubkey::default();
         account.lookup_table = lookup_table;
+        account.bump = ctx.bumps.write_data_account;
 
+        Ok(())
+    }
+
+    pub fn storeval(ctx: Context<StoreVal>, test_idx: u64, value: u64) -> Result<()> {
+        let data = &mut ctx.accounts.data;
+        data.bump = ctx.bumps.data;
+        data.idx = test_idx;
+        data.u64_value = value;
         Ok(())
     }
 
@@ -202,20 +211,21 @@ pub struct InitializeBillingTokenConfigWrapperOnce<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(test_idx: u64)]
 pub struct InitializeLookupTableData<'info> {
+    /// Admin account that pays for PDA creation and signs the transaction
+    #[account(mut)]
+    pub admin: Signer<'info>,
+
     /// PDA for LookupTableDataAccount, derived from seeds and created by the System Program
     #[account(
         init_if_needed,
         payer = admin,
         space = size_of::<LookupTableDataAccount>() + 8,
-        seeds = [b"data"],
+        seeds = [b"lookup".as_ref()],
         bump
     )]
     pub write_data_account: Account<'info, LookupTableDataAccount>,
-
-    /// Admin account that pays for PDA creation and signs the transaction
-    #[account(mut)]
-    pub admin: Signer<'info>,
 
     /// System Program required for PDA creation
     pub system_program: Program<'info, System>,
@@ -239,12 +249,31 @@ pub struct StoreTestStruct<'info> {
     pub system_program: Program<'info, System>,
 }
 
+#[derive(Accounts)]
+#[instruction(test_idx: u64)]
+pub struct StoreVal<'info> {
+    /// Admin account that pays for PDA creation and signs the transaction
+    #[account(mut)]
+    pub admin: Signer<'info>,
+
+    // derived test PDA
+    #[account(
+        mut,
+        seeds=[b"data".as_ref(), test_idx.to_le_bytes().as_ref()],
+        bump)]
+    pub data: Account<'info, DataAccount>,
+
+    /// System Program required for PDA creation
+    pub system_program: Program<'info, System>,
+}
+
 #[account]
 pub struct LookupTableDataAccount {
     pub version: u8,                   // Version of the data account
     pub administrator: Pubkey,         // Administrator public key
     pub pending_administrator: Pubkey, // Pending administrator public key
     pub lookup_table: Pubkey,          // Address of the lookup table
+    pub bump: u8,
 }
 
 #[account]
