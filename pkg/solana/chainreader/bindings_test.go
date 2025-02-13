@@ -24,10 +24,10 @@ func TestBindings_CreateType(t *testing.T) {
 		t.Parallel()
 
 		expected := 8
-		bdRegistry := bindingsRegistry{namespaceBindings: make(map[string]readNameBindings)}
+		bdRegistry := newBindingsRegistry()
 		binding := new(mockBinding)
-		bdRegistry.AddReadBinding("A", "B", binding)
 
+		bdRegistry.AddReader("A", "B", binding)
 		binding.On("CreateType", mock.Anything).Return(expected, nil)
 
 		returned, err := bdRegistry.CreateType("A", "B", true)
@@ -39,8 +39,7 @@ func TestBindings_CreateType(t *testing.T) {
 	t.Run("returns error when binding does not exist", func(t *testing.T) {
 		t.Parallel()
 
-		bdRegistry := bindingsRegistry{namespaceBindings: make(map[string]readNameBindings)}
-
+		bdRegistry := newBindingsRegistry()
 		_, err := bdRegistry.CreateType("A", "B", true)
 
 		require.ErrorIs(t, err, types.ErrInvalidConfig)
@@ -50,6 +49,16 @@ func TestBindings_CreateType(t *testing.T) {
 type mockBinding struct {
 	mock.Mock
 }
+
+func (_m *mockBinding) Bind(_ context.Context, _ solana.PublicKey) error { return nil }
+
+func (_m *mockBinding) Unbind(_ context.Context) error { return nil }
+
+func (_m *mockBinding) SetCodec(_ types.RemoteCodec) {}
+
+func (_m *mockBinding) Register(_ context.Context) error { return nil }
+
+func (_m *mockBinding) Unregister(_ context.Context) error { return nil }
 
 func (_m *mockBinding) GetAddress(_ context.Context, _ any) (solana.PublicKey, error) {
 	return solana.PublicKey{}, nil
@@ -70,10 +79,6 @@ func (_m *mockBinding) GetIDLInfo() (idl codec.IDL, inputIDLTypeDef interface{},
 func (_m *mockBinding) GetAddressResponseHardCoder() *commoncodec.HardCodeModifierConfig {
 	return &commoncodec.HardCodeModifierConfig{}
 }
-
-func (_m *mockBinding) SetAddress(_ solana.PublicKey) {}
-
-func (_m *mockBinding) SetCodec(_ types.RemoteCodec) {}
 
 func (_m *mockBinding) SetModifier(a commoncodec.Modifier) {
 	_m.Called(a)

@@ -84,6 +84,12 @@ func TestLogPollerFilters(t *testing.T) {
 				dbFilter, err := orm.GetFilterByID(ctx, id)
 				require.NoError(t, err)
 				require.Equal(t, filter, dbFilter)
+
+				exists, err := orm.HasFilter(ctx, dbFilter.Name)
+
+				require.NoError(t, err)
+				require.True(t, exists)
+
 				dbFilters, err := orm.SelectFilters(ctx)
 				require.NoError(t, err)
 				i := slices.IndexFunc(dbFilters, func(f Filter) bool {

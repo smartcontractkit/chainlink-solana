@@ -5,46 +5,60 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/google/uuid"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 )
 
 type eventReadBinding struct {
+	// dependencies
+	reader   EventsReader
+	remapper remapHelper
+	codec    types.RemoteCodec
+	modifier commoncodec.Modifier
+	conf     config.PollingFilter
+	// filter in eventReadBinding is to be used as an override for lp filter defined in the namespace binding.
+	// If filter is nil, this event should be registered with the lp filter defined in the namespace binding.
+	filter *syncedFilter
+
+	// static data
 	namespace, genericName string
-	codec                  types.RemoteCodec
-	modifier               commoncodec.Modifier
-	key                    solana.PublicKey
-	remapper               remapHelper
-	indexedSubKeys         map[string]uint64
-	reader                 EventsReader
 	eventSig               [logpoller.EventSignatureLength]byte
+	indexedSubKeys         *indexedSubkeys
 	readDefinition         config.ReadDefinition
+
+	// thread protected fields
+	mu             sync.RWMutex
+	key            solana.PublicKey
+	bound          bool
+	registerCalled bool
 }
 
 func newEventReadBinding(
 	namespace, genericName string,
-	indexedSubKeys map[string]uint64,
+	indexedSubKeys *indexedSubkeys,
 	reader EventsReader,
-	eventSig [logpoller.EventSignatureLength]byte,
 	readDefinition config.ReadDefinition,
+	conf config.PollingFilter,
 ) *eventReadBinding {
 	binding := &eventReadBinding{
+		filter:         newSyncedFilter(),
 		namespace:      namespace,
 		genericName:    genericName,
 		indexedSubKeys: indexedSubKeys,
 		reader:         reader,
-		eventSig:       eventSig,
 		readDefinition: readDefinition,
+		conf:           conf,
 	}
 
 	binding.remapper = remapHelper{binding.remapPrimitive}
@@ -52,7 +66,85 @@ func newEventReadBinding(
 	return binding
 }
 
+func (b *eventReadBinding) Bind(ctx context.Context, address solana.PublicKey) error {
+	if b.isBound() {
+		// we are changing contract address reference, so we need to unregister old filter if it exists
+		if err := b.Unregister(ctx); err != nil {
+			return err
+		}
+	}
+
+	// filter isn't required here because the event can also be polled for by the contractBinding common filter.
+	if b.filter != nil {
+		b.filter.SetName(fmt.Sprintf("%s.%s.%s", b.namespace, b.genericName, uuid.NewString()))
+		b.filter.SetAddress(address)
+	}
+
+	b.setBinding(address)
+
+	if b.registered() {
+		return b.Register(ctx)
+	}
+
+	return nil
+}
+
+func (b *eventReadBinding) Unbind(ctx context.Context) error {
+	if !b.isBound() {
+		return nil
+	}
+
+	if b.filter != nil {
+		b.filter.SetAddress(solana.PublicKey{})
+		b.filter.SetName("")
+	}
+
+	b.unsetBinding()
+
+	if err := b.Unregister(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (b *eventReadBinding) Register(ctx context.Context) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.filter == nil {
+		return nil
+	}
+
+	b.registerCalled = true
+
+	// can't be true before filters params are set so there is no race with a bad filter outcome
+	if !b.bound {
+		return nil
+	}
+
+	return b.filter.Register(ctx, b.reader)
+}
+
+func (b *eventReadBinding) Unregister(ctx context.Context) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.filter == nil {
+		return nil
+	}
+
+	if !b.bound {
+		return nil
+	}
+
+	return b.filter.Unregister(ctx, b.reader)
+}
+
 func (b *eventReadBinding) GetAddress(_ context.Context, _ any) (solana.PublicKey, error) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
 	return b.key, nil
 }
 
@@ -72,16 +164,20 @@ func (b *eventReadBinding) GetAddressResponseHardCoder() *commoncodec.HardCodeMo
 	return nil
 }
 
-func (b *eventReadBinding) SetAddress(key solana.PublicKey) {
-	b.key = key
-}
-
 func (b *eventReadBinding) SetCodec(codec types.RemoteCodec) {
 	b.codec = codec
 }
 
 func (b *eventReadBinding) SetModifier(modifier commoncodec.Modifier) {
 	b.modifier = modifier
+}
+
+func (b *eventReadBinding) SetFilter(filter logpoller.Filter) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.filter.SetFilter(filter)
+	b.eventSig = filter.EventSig
 }
 
 func (b *eventReadBinding) CreateType(forEncoding bool) (any, error) {
@@ -155,7 +251,7 @@ func (b *eventReadBinding) remapPrimitive(expression query.Expression) (query.Ex
 }
 
 func (b *eventReadBinding) encodeComparator(comparator *primitives.Comparator) (query.Expression, error) {
-	subKeyIndex, ok := b.indexedSubKeys[comparator.Name]
+	subKeyIndex, ok := b.indexedSubKeys.indexForKey(comparator.Name)
 	if !ok {
 		return query.Expression{}, fmt.Errorf("%w: unknown indexed subkey mapping %s", types.ErrInvalidConfig, comparator.Name)
 	}
@@ -222,6 +318,36 @@ func (b *eventReadBinding) decodeLog(ctx context.Context, log *logpoller.Log, in
 	return nil
 }
 
+func (b *eventReadBinding) isBound() bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.bound
+}
+
+func (b *eventReadBinding) setBinding(binding solana.PublicKey) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.key = binding
+	b.bound = true
+}
+
+func (b *eventReadBinding) unsetBinding() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.key = solana.PublicKey{}
+	b.bound = false
+}
+
+func (b *eventReadBinding) registered() bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.registerCalled
+}
+
 type remapHelper struct {
 	primitive func(query.Expression) (query.Expression, error)
 }
@@ -261,4 +387,26 @@ func (r remapHelper) remapExpression(key string, expression query.Expression) (q
 	}
 
 	return r.primitive(expression)
+}
+
+type indexedSubkeys struct {
+	lookup  map[string]uint64
+	subKeys [4][]string
+}
+
+func newIndexedSubkeys() *indexedSubkeys {
+	return &indexedSubkeys{
+		lookup: make(map[string]uint64),
+	}
+}
+
+func (k *indexedSubkeys) addForIndex(offChainPath, onChainPath string, idx uint64) {
+	k.lookup[offChainPath] = idx
+	k.subKeys[idx] = strings.Split(onChainPath, ".")
+}
+
+func (k *indexedSubkeys) indexForKey(key string) (uint64, bool) {
+	idx, ok := k.lookup[key]
+
+	return idx, ok
 }

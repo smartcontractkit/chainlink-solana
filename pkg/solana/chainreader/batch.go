@@ -33,7 +33,7 @@ type MultipleAccountGetter interface {
 }
 
 // doMultiRead aggregate results from multiple PDAs from the same contract into one result.
-func doMultiRead(ctx context.Context, client MultipleAccountGetter, bindings bindingsRegistry, rv readValues, params, returnValue any) error {
+func doMultiRead(ctx context.Context, client MultipleAccountGetter, bdRegistry *bindingsRegistry, rv readValues, params, returnValue any) error {
 	batch := make([]call, len(rv.reads))
 	for idx, r := range rv.reads {
 		batch[idx] = call{
@@ -46,7 +46,7 @@ func doMultiRead(ctx context.Context, client MultipleAccountGetter, bindings bin
 		}
 	}
 
-	results, err := doMethodBatchCall(ctx, client, bindings, batch)
+	results, err := doMethodBatchCall(ctx, client, bdRegistry, batch)
 	if err != nil {
 		return err
 	}
@@ -69,11 +69,11 @@ func doMultiRead(ctx context.Context, client MultipleAccountGetter, bindings bin
 	return nil
 }
 
-func doMethodBatchCall(ctx context.Context, client MultipleAccountGetter, bindingsRegistry bindingsRegistry, batch []call) ([]batchResultWithErr, error) {
+func doMethodBatchCall(ctx context.Context, client MultipleAccountGetter, bdRegistry *bindingsRegistry, batch []call) ([]batchResultWithErr, error) {
 	// Create the list of public keys to fetch
 	keys := make([]solana.PublicKey, len(batch))
 	for idx, batchCall := range batch {
-		rBinding, err := bindingsRegistry.GetReadBinding(batchCall.Namespace, batchCall.ReadName)
+		rBinding, err := bdRegistry.GetReader(batchCall.Namespace, batchCall.ReadName)
 		if err != nil {
 			return nil, fmt.Errorf("%w: read binding not found for contract: %q read: %q: %w", types.ErrInvalidConfig, batchCall.Namespace, batchCall.ReadName, err)
 		}
@@ -107,7 +107,7 @@ func doMethodBatchCall(ctx context.Context, client MultipleAccountGetter, bindin
 			continue
 		}
 
-		rBinding, err := bindingsRegistry.GetReadBinding(results[idx].namespace, results[idx].readName)
+		rBinding, err := bdRegistry.GetReader(results[idx].namespace, results[idx].readName)
 		if err != nil {
 			results[idx].err = err
 

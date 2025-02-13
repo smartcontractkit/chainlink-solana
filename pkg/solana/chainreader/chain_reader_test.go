@@ -116,7 +116,13 @@ func TestSolanaChainReaderService_Start(t *testing.T) {
 	eventReadDef := config.ReadDefinition{
 		ChainSpecificName: "myEvent",
 		ReadType:          config.Event,
-		PollingFilter:     &config.PollingFilter{EventName: "myEventSig.........."},
+		EventDefinitions: &config.EventDefinitions{
+			IndexedField0: &config.IndexedField{
+				OffChainPath: "A.B",
+				OnChainPath:  "A.B",
+			},
+			PollingFilter: &config.PollingFilter{},
+		},
 	}
 
 	testCases := []struct {
@@ -149,7 +155,6 @@ func TestSolanaChainReaderService_Start(t *testing.T) {
 									Fields: &[]codec.IdlField{}}}},
 							Events: []codec.IdlEvent{{Name: "myEvent", Fields: []codec.IdlEventField{{Name: "a", Type: boolType}}}},
 						},
-						ContractAddress: pk,
 						Reads: map[string]config.ReadDefinition{
 							"myRead": tt.ReadDef},
 					},
@@ -174,6 +179,9 @@ func TestSolanaChainReaderService_Start(t *testing.T) {
 			}())
 			er.On("Start", mock.Anything).Maybe().Return(tt.StartError)
 			er.On("RegisterFilter", mock.Anything, mock.Anything).Maybe().Return(tt.RegisterFilterError)
+
+			require.NoError(t, svc.Bind(ctx, []types.BoundContract{{Address: pk.String(), Name: "myChainReader"}}))
+
 			err = svc.Start(ctx)
 			if tt.ExpectError {
 				assert.Error(t, err)

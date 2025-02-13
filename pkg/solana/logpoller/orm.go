@@ -38,6 +38,29 @@ func (o *DSORM) Transact(ctx context.Context, fn func(*DSORM) error) (err error)
 // new returns a NewORM like o, but backed by ds.
 func (o *DSORM) new(ds sqlutil.DataSource) *DSORM { return NewORM(o.chainID, ds, o.lggr) }
 
+func (o *DSORM) HasFilter(ctx context.Context, name string) (bool, error) {
+	args, err := newQueryArgs(o.chainID).withField("name", name).toArgs()
+	if err != nil {
+		return false, err
+	}
+
+	query := `
+		SELECT id FROM solana.log_poller_filters
+			WHERE is_deleted = false AND chain_id = :chain_id AND name = :name LIMIT 1`
+
+	query, sqlArgs, err := o.ds.BindNamed(query, args)
+	if err != nil {
+		return false, err
+	}
+
+	var id int64
+	if err = o.ds.GetContext(ctx, &id, query, sqlArgs...); err != nil {
+		return false, err
+	}
+
+	return id >= 0, nil
+}
+
 // InsertFilter is idempotent.
 //
 // Each address/event pair must have a unique job id, so it may be removed when the job is deleted.

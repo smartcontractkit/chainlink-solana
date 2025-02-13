@@ -2,6 +2,7 @@ package chainreader
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -13,31 +14,31 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 )
 
+type filterRegistrar interface {
+	HasFilter(context.Context, string) bool
+	RegisterFilter(context.Context, logpoller.Filter) error
+	UnregisterFilter(ctx context.Context, name string) error
+}
+
 type readBinding interface {
+	Bind(context.Context, solana.PublicKey) error
+	Unbind(context.Context) error
 	GetAddress(context.Context, any) (solana.PublicKey, error)
 	GetGenericName() string
 	GetReadDefinition() config.ReadDefinition
 	GetIDLInfo() (idl codec.IDL, inputIDLTypeDef interface{}, outputIDLTypeDef codec.IdlTypeDef)
 	GetAddressResponseHardCoder() *commoncodec.HardCodeModifierConfig
-	SetAddress(solana.PublicKey)
 	SetCodec(types.RemoteCodec)
 	SetModifier(commoncodec.Modifier)
+	Register(context.Context) error
+	Unregister(context.Context) error
 	CreateType(bool) (any, error)
 	Decode(context.Context, []byte, any) error
 	QueryKey(context.Context, query.KeyFilter, query.LimitAndSort, any) ([]types.Sequence, error)
 }
-
-type bindingsRegistry struct {
-	// key is namespace
-	namespaceBindings map[string]readNameBindings
-	// key is namespace
-	addressShareGroups map[string]*addressShareGroup
-}
-
-// key is read name
-type readNameBindings map[string]readBinding
 
 type addressShareGroup struct {
 	address solana.PublicKey
@@ -45,38 +46,143 @@ type addressShareGroup struct {
 	group   []string
 }
 
-func (b *bindingsRegistry) AddReadBinding(namespace, readName string, rBinding readBinding) {
-	if _, nbsExists := b.namespaceBindings[namespace]; !nbsExists {
-		b.namespaceBindings[namespace] = readNameBindings{}
-	}
-
-	b.namespaceBindings[namespace][readName] = rBinding
+type bindingsRegistry struct {
+	mu sync.RWMutex
+	// key is namespace
+	namespaceBindings map[string]*namespaceBinding
+	// key is namespace
+	addressShareGroups map[string]*addressShareGroup
 }
 
-func (b *bindingsRegistry) GetReadBinding(namespace, readName string) (readBinding, error) {
-	rBindings, err := b.GetReadBindings(namespace)
-	if err != nil {
-		return nil, err
+func newBindingsRegistry() *bindingsRegistry {
+	return &bindingsRegistry{
+		namespaceBindings: make(map[string]*namespaceBinding),
 	}
-
-	rBinding, rBindingExists := rBindings[readName]
-	if !rBindingExists {
-		return nil, fmt.Errorf("%w: no read binding exists for namespace: %q read: %q", types.ErrInvalidConfig, namespace, readName)
-	}
-
-	return rBinding, nil
 }
 
-func (b *bindingsRegistry) GetReadBindings(namespace string) (readNameBindings, error) {
-	rBindings, nameSpaceExists := b.namespaceBindings[namespace]
+func (r *bindingsRegistry) SetCodecs(codec types.RemoteCodec) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, nbs := range r.namespaceBindings {
+		nbs.SetCodecs(codec)
+	}
+}
+
+func (r *bindingsRegistry) SetModifiers(modifier commoncodec.Modifier) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, nbs := range r.namespaceBindings {
+		nbs.SetModifiers(modifier)
+	}
+}
+
+func (r *bindingsRegistry) RegisterAll(ctx context.Context) error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, nbs := range r.namespaceBindings {
+		if err := nbs.RegisterReaders(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *bindingsRegistry) UnregisterAll(ctx context.Context) error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, nbs := range r.namespaceBindings {
+		if err := nbs.UnregisterReaders(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *bindingsRegistry) AddReader(namespace, genericName string, reader readBinding) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, nbsExists := r.namespaceBindings[namespace]; !nbsExists {
+		r.namespaceBindings[namespace] = newNamespaceBinding(namespace)
+	}
+
+	r.namespaceBindings[namespace].AddReader(genericName, reader)
+}
+
+func (r *bindingsRegistry) GetReader(namespace, genericName string) (readBinding, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	binding, nbsExists := r.namespaceBindings[namespace]
+	if !nbsExists {
+		return nil, fmt.Errorf("%w: no read binding exists for %s", types.ErrInvalidConfig, namespace)
+	}
+
+	return binding.GetReader(genericName)
+}
+
+func (r *bindingsRegistry) GetReaders(namespace string) ([]readBinding, error) {
+	rBindings, nameSpaceExists := r.namespaceBindings[namespace]
 	if !nameSpaceExists {
 		return nil, fmt.Errorf("%w: no read binding exists for namespace: %q", types.ErrInvalidConfig, namespace)
 	}
-	return rBindings, nil
+
+	return rBindings.GetReaders()
 }
 
-func (b *bindingsRegistry) CreateType(namespace, readName string, forEncoding bool) (any, error) {
-	rBinding, err := b.GetReadBinding(namespace, readName)
+func (r *bindingsRegistry) Bind(ctx context.Context, reg filterRegistrar, binding types.BoundContract) error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	namespace, nbsExist := r.namespaceBindings[binding.Name]
+	if !nbsExist {
+		return fmt.Errorf("%w: no namespace named %s", types.ErrInvalidConfig, binding.Name)
+	}
+
+	address, err := solana.PublicKeyFromBase58(binding.Address)
+	if err != nil {
+		return err
+	}
+
+	if err := errors.Join(
+		namespace.Bind(ctx, reg, address),
+		namespace.BindReaders(ctx, address),
+	); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *bindingsRegistry) Unbind(ctx context.Context, reg filterRegistrar, bindings []types.BoundContract) error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, binding := range bindings {
+		namespace, nbsExist := r.namespaceBindings[binding.Name]
+		if !nbsExist {
+			return fmt.Errorf("%w: no namespace named %s", types.ErrInvalidConfig, binding.Name)
+		}
+
+		if err := errors.Join(
+			namespace.Unbind(ctx, reg),
+			namespace.UnbindReaders(ctx),
+		); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *bindingsRegistry) CreateType(namespace, readName string, forEncoding bool) (any, error) {
+	rBinding, err := r.GetReader(namespace, readName)
 	if err != nil {
 		return nil, err
 	}
@@ -84,46 +190,203 @@ func (b *bindingsRegistry) CreateType(namespace, readName string, forEncoding bo
 	return rBinding.CreateType(forEncoding)
 }
 
-func (b *bindingsRegistry) Bind(boundContract *types.BoundContract) error {
-	if boundContract == nil {
-		return fmt.Errorf("%w: bound contract is nil", types.ErrInvalidType)
-	}
+func (r *bindingsRegistry) initAddressSharing(addressShareGroups [][]string) error {
+	r.addressShareGroups = make(map[string]*addressShareGroup)
 
-	if err := b.handleAddressSharing(boundContract); err != nil {
-		return err
-	}
+	for _, group := range addressShareGroups {
+		shareGroup := &addressShareGroup{
+			address: solana.PublicKey{},
+			group:   group,
+		}
 
-	rBindings, nameSpaceExists := b.namespaceBindings[boundContract.Name]
-	if !nameSpaceExists {
-		return fmt.Errorf("%w: no namespace named: %q", types.ErrInvalidConfig, boundContract.Name)
-	}
+		for _, namespace := range group {
+			if _, alreadySharesAddress := r.addressShareGroups[namespace]; alreadySharesAddress {
+				return fmt.Errorf("namespace %q can't share address with two different groups", namespace)
+			}
 
-	key, err := solana.PublicKeyFromBase58(boundContract.Address)
-	if err != nil {
-		return fmt.Errorf("%w: failed to parse address: %q for contract %q", types.ErrInvalidConfig, boundContract.Address, boundContract.Name)
-	}
-
-	for _, rBinding := range rBindings {
-		rBinding.SetAddress(key)
+			r.addressShareGroups[namespace] = shareGroup
+		}
 	}
 
 	return nil
 }
 
-func (b *bindingsRegistry) SetCodecs(codec types.RemoteCodec) {
-	for _, nbs := range b.namespaceBindings {
-		for _, rb := range nbs {
-			rb.SetCodec(codec)
-		}
+func (r *bindingsRegistry) getShareGroup(nameSpace string) (*addressShareGroup, bool) {
+	shareGroup, sharesAddress := r.addressShareGroups[nameSpace]
+	if !sharesAddress {
+		return nil, false
+	}
+
+	return shareGroup, sharesAddress
+}
+
+type namespaceBinding struct {
+	// static data
+	name string
+
+	// dynamic thread-safe data
+	mu      sync.RWMutex
+	readers map[string]readBinding
+	bound   map[solana.PublicKey]bool
+}
+
+func newNamespaceBinding(namespace string) *namespaceBinding {
+	return &namespaceBinding{
+		name:    namespace,
+		readers: make(map[string]readBinding),
 	}
 }
 
-func (b *bindingsRegistry) SetModifiers(modifier commoncodec.Modifier) {
-	for _, nbs := range b.namespaceBindings {
-		for _, rb := range nbs {
-			rb.SetModifier(modifier)
+func (b *namespaceBinding) SetCodecs(codec types.RemoteCodec) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	for _, rb := range b.readers {
+		rb.SetCodec(codec)
+	}
+}
+
+func (b *namespaceBinding) SetModifiers(modifier commoncodec.Modifier) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	for _, rb := range b.readers {
+		rb.SetModifier(modifier)
+	}
+}
+
+func (b *namespaceBinding) Bind(ctx context.Context, reg filterRegistrar, address solana.PublicKey) error {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	if b.bindingExists(address) {
+		return nil
+	}
+
+	b.setBinding(address)
+
+	return nil
+}
+
+func (b *namespaceBinding) BindReaders(ctx context.Context, address solana.PublicKey) error {
+	var err error
+
+	for _, rb := range b.readers {
+		err = errors.Join(err, rb.Bind(ctx, address))
+	}
+
+	return nil
+}
+
+func (b *namespaceBinding) Unbind(ctx context.Context, reg filterRegistrar) error {
+	if !b.isBound() {
+		return nil
+	}
+
+	b.unsetBinding()
+
+	return nil
+}
+
+func (b *namespaceBinding) UnbindReaders(ctx context.Context) error {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	var err error
+
+	for _, reader := range b.readers {
+		err = errors.Join(reader.Unbind(ctx))
+	}
+
+	return err
+}
+
+func (b *namespaceBinding) AddReader(genericName string, reader readBinding) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.readers[genericName] = reader
+}
+
+func (b *namespaceBinding) GetReader(genericName string) (readBinding, error) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	rbs, rbsExists := b.readers[genericName]
+	if !rbsExists {
+		return nil, fmt.Errorf("%w: no read binding exists for %s", types.ErrInvalidConfig, genericName)
+	}
+
+	return rbs, nil
+}
+
+func (b *namespaceBinding) GetReaders() ([]readBinding, error) {
+	allBindings := make([]readBinding, len(b.readers))
+
+	var idx int
+
+	for _, rBinding := range b.readers {
+		allBindings[idx] = rBinding
+		idx++
+	}
+
+	return allBindings, nil
+}
+
+func (b *namespaceBinding) RegisterReaders(ctx context.Context) error {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	for _, reader := range b.readers {
+		if err := reader.Register(ctx); err != nil {
+			return err
 		}
 	}
+
+	return nil
+}
+
+func (b *namespaceBinding) UnregisterReaders(ctx context.Context) error {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	for _, reader := range b.readers {
+		if err := reader.Unregister(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (b *namespaceBinding) isBound() bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return len(b.bound) > 0
+}
+
+func (b *namespaceBinding) bindingExists(address solana.PublicKey) bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	bound, exists := b.bound[address]
+
+	return exists && bound
+}
+
+func (b *namespaceBinding) setBinding(address solana.PublicKey) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.bound[address] = true
+}
+
+func (b *namespaceBinding) unsetBinding() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.bound = make(map[solana.PublicKey]bool)
 }
 
 func (b *bindingsRegistry) handleAddressSharing(boundContract *types.BoundContract) error {
@@ -147,33 +410,5 @@ func (b *bindingsRegistry) handleAddressSharing(boundContract *types.BoundContra
 	}
 
 	boundContract.Address = shareGroup.address.String()
-	return nil
-}
-
-func (b *bindingsRegistry) getShareGroup(nameSpace string) (*addressShareGroup, bool) {
-	shareGroup, sharesAddress := b.addressShareGroups[nameSpace]
-	if !sharesAddress {
-		return nil, false
-	}
-
-	return shareGroup, sharesAddress
-}
-
-func (b *bindingsRegistry) initAddressSharing(addressShareGroups [][]string) error {
-	b.addressShareGroups = make(map[string]*addressShareGroup)
-	for _, group := range addressShareGroups {
-		shareGroup := &addressShareGroup{
-			address: solana.PublicKey{},
-			group:   group,
-		}
-
-		for _, namespace := range group {
-			if _, alreadySharesAddress := b.addressShareGroups[namespace]; alreadySharesAddress {
-				return fmt.Errorf("namespace %q can't share address with two different groups", namespace)
-			}
-			b.addressShareGroups[namespace] = shareGroup
-		}
-	}
-
 	return nil
 }

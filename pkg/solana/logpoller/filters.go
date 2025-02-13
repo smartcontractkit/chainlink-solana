@@ -81,6 +81,15 @@ func (fl *filters) PruneFilters(ctx context.Context) error {
 	return nil
 }
 
+func (fl *filters) HasFilter(ctx context.Context, name string) bool {
+	exists, err := fl.orm.HasFilter(ctx, name)
+	if err != nil {
+		return false
+	}
+
+	return exists
+}
+
 // RegisterFilter persists provided filter and ensures that any log emitted by a contract with filter.Address
 // that matches filter.EventSig signature will be captured starting from filter.StartingBlock.
 // The filter may be unregistered later by filter.Name.

@@ -24,6 +24,7 @@ var (
 
 type ORM interface {
 	ChainID() string
+	HasFilter(ctx context.Context, name string) (bool, error)
 	InsertFilter(ctx context.Context, filter Filter) (id int64, err error)
 	SelectFilters(ctx context.Context) ([]Filter, error)
 	DeleteFilters(ctx context.Context, filters map[int64]Filter) error
@@ -40,6 +41,7 @@ type logsLoader interface {
 }
 
 type filtersI interface {
+	HasFilter(ctx context.Context, name string) bool
 	RegisterFilter(ctx context.Context, filter Filter) error
 	UnregisterFilter(ctx context.Context, name string) error
 	LoadFilters(ctx context.Context) error
@@ -185,6 +187,13 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 	}
 
 	return lp.orm.InsertLogs(ctx, logs)
+}
+
+func (lp *Service) HasFilter(ctx context.Context, name string) bool {
+	ctx, cancel := lp.eng.Ctx(ctx)
+	defer cancel()
+
+	return lp.filters.HasFilter(ctx, name)
 }
 
 // RegisterFilter - refer to filters.RegisterFilter for details.

@@ -85,6 +85,53 @@ func (_c *EventsReader_FilteredLogs_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// HasFilter provides a mock function with given fields: _a0, _a1
+func (_m *EventsReader) HasFilter(_a0 context.Context, _a1 string) bool {
+	ret := _m.Called(_a0, _a1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for HasFilter")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(context.Context, string) bool); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// EventsReader_HasFilter_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasFilter'
+type EventsReader_HasFilter_Call struct {
+	*mock.Call
+}
+
+// HasFilter is a helper method to define mock.On call
+//   - _a0 context.Context
+//   - _a1 string
+func (_e *EventsReader_Expecter) HasFilter(_a0 interface{}, _a1 interface{}) *EventsReader_HasFilter_Call {
+	return &EventsReader_HasFilter_Call{Call: _e.mock.On("HasFilter", _a0, _a1)}
+}
+
+func (_c *EventsReader_HasFilter_Call) Run(run func(_a0 context.Context, _a1 string)) *EventsReader_HasFilter_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *EventsReader_HasFilter_Call) Return(_a0 bool) *EventsReader_HasFilter_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *EventsReader_HasFilter_Call) RunAndReturn(run func(context.Context, string) bool) *EventsReader_HasFilter_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Ready provides a mock function with given fields:
 func (_m *EventsReader) Ready() error {
 	ret := _m.Called()
@@ -219,6 +266,53 @@ func (_c *EventsReader_Start_Call) Return(_a0 error) *EventsReader_Start_Call {
 }
 
 func (_c *EventsReader_Start_Call) RunAndReturn(run func(context.Context) error) *EventsReader_Start_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UnregisterFilter provides a mock function with given fields: ctx, name
+func (_m *EventsReader) UnregisterFilter(ctx context.Context, name string) error {
+	ret := _m.Called(ctx, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UnregisterFilter")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, name)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// EventsReader_UnregisterFilter_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UnregisterFilter'
+type EventsReader_UnregisterFilter_Call struct {
+	*mock.Call
+}
+
+// UnregisterFilter is a helper method to define mock.On call
+//   - ctx context.Context
+//   - name string
+func (_e *EventsReader_Expecter) UnregisterFilter(ctx interface{}, name interface{}) *EventsReader_UnregisterFilter_Call {
+	return &EventsReader_UnregisterFilter_Call{Call: _e.mock.On("UnregisterFilter", ctx, name)}
+}
+
+func (_c *EventsReader_UnregisterFilter_Call) Run(run func(ctx context.Context, name string)) *EventsReader_UnregisterFilter_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *EventsReader_UnregisterFilter_Call) Return(_a0 error) *EventsReader_UnregisterFilter_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *EventsReader_UnregisterFilter_Call) RunAndReturn(run func(context.Context, string) error) *EventsReader_UnregisterFilter_Call {
 	_c.Call.Return(run)
 	return _c
 }
