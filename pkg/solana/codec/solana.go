@@ -356,6 +356,8 @@ func asArray(parentTypeName string, idlArray *IdlTypeArray, refs *codecRefs) (co
 
 	// better to implement bytes to big int codec modifiers, but this works fine
 	if idlArray.Num == 28 && idlArray.Thing.AsString == IdlTypeU8 {
+		// nolint:gosec
+		// G115: integer overflow conversion int -&gt; uint
 		return binary.BigEndian().BigInt(uint(idlArray.Num), false)
 	}
 
