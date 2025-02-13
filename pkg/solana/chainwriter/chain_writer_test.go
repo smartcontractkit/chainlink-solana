@@ -406,7 +406,8 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 	lookupTablePubkey := mockDataAccountLookupTable(t, rw, pda1)
 	// mock fetch lookup table addresses call
 	storedPubKey := chainwriter.GetRandomPubKey(t)
-	mockFetchLookupTableAddresses(t, rw, lookupTablePubkey, []solana.PublicKey{storedPubKey})
+	unusedKeys := chainwriter.CreateTestPubKeys(t, 2)
+	mockFetchLookupTableAddresses(t, rw, lookupTablePubkey, append([]solana.PublicKey{storedPubKey}, unusedKeys...))
 
 	unusedProgramID := chainwriter.GetRandomPubKey(t)
 	seed2 := []byte("seed2")
@@ -414,8 +415,8 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 	// mock data account response from program
 	unusedLookupTable := mockDataAccountLookupTable(t, rw, unusedPda)
 	// mock fetch lookup table addresses call
-	unusedKeys := chainwriter.GetRandomPubKey(t)
-	mockFetchLookupTableAddresses(t, rw, unusedLookupTable, []solana.PublicKey{unusedKeys})
+	unusedKeys = chainwriter.CreateTestPubKeys(t, 2)
+	mockFetchLookupTableAddresses(t, rw, unusedLookupTable, unusedKeys)
 
 	// mock static lookup table calls
 	staticLookupTablePubkey1 := chainwriter.GetRandomPubKey(t)
@@ -470,7 +471,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 		Seed2: seed2,
 	}
 
-	t.Run("returns filtered map with only relevant addresses required by account lookup config", func(t *testing.T) {
+	t.Run("returns filtered map with only relevant lookup tables required by account lookup config", func(t *testing.T) {
 		accountLookupConfig := []chainwriter.Lookup{
 			chainwriter.AccountsFromLookupTable{
 				LookupTableName: "DerivedTable",
@@ -493,7 +494,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 		require.Len(t, filteredLookupTableMap, len(accounts))
 		entry, exists := filteredLookupTableMap[lookupTablePubkey]
 		require.True(t, exists)
-		require.Len(t, entry, 1)
+		require.Len(t, entry, 3)
 		require.Equal(t, storedPubKey, entry[0])
 	})
 

@@ -172,18 +172,18 @@ func InitializeDataAccount(
 	admin solana.PrivateKey,
 	lookupTable solana.PublicKey,
 ) {
-	pda, _, err := solana.FindProgramAddress([][]byte{[]byte("data")}, programID)
+	pda, _, err := solana.FindProgramAddress([][]byte{[]byte("lookup")}, programID)
 	require.NoError(t, err)
 
-	discriminator := GetDiscriminator("initialize_lookup_table")
+	discriminator := GetDiscriminator("initializelookuptable")
 
 	instructionData := append(discriminator[:], lookupTable.Bytes()...)
 
 	instruction := solana.NewInstruction(
 		programID,
 		solana.AccountMetaSlice{
-			solana.Meta(pda).WRITE(),
 			solana.Meta(admin.PublicKey()).SIGNER().WRITE(),
+			solana.Meta(pda).WRITE(),
 			solana.Meta(solana.SystemProgramID),
 		},
 		instructionData,

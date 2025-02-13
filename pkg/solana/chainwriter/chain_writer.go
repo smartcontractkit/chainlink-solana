@@ -187,33 +187,36 @@ func (s *SolanaChainWriterService) FilterLookupTableAddresses(
 				continue
 			}
 
-			// Collect public keys that are actually used
-			var usedAddresses solana.PublicKeySlice
+			tableAddresses := make(solana.PublicKeySlice, 0, len(metas))
+			foundUsedAddress := false
+			// Parse metas into public keys for filtered lookup table map
 			for _, meta := range metas {
+				tableAddresses = append(tableAddresses, meta.PublicKey)
 				if _, exists := usedAccounts[meta.PublicKey.String()]; exists {
-					usedAddresses = append(usedAddresses, meta.PublicKey)
+					foundUsedAddress = true
 				}
 			}
 
-			// Add to the filtered map if there are any used addresses
-			if len(usedAddresses) > 0 {
-				filteredLookupTables[tableKey] = usedAddresses
+			// Add lookup table to the filtered map if it contains an address used for the tx
+			if foundUsedAddress {
+				filteredLookupTables[tableKey] = tableAddresses
 			}
 		}
 	}
 
 	// Filter static lookup tables
 	for tableKey, addresses := range staticTableMap {
-		var usedAddresses solana.PublicKeySlice
+		foundUsedAddress := false
 		for _, staticAddress := range addresses {
 			if _, exists := usedAccounts[staticAddress.String()]; exists {
-				usedAddresses = append(usedAddresses, staticAddress)
+				foundUsedAddress = true
+				break
 			}
 		}
 
-		// Add to the filtered map if there are any used addresses
-		if len(usedAddresses) > 0 {
-			filteredLookupTables[tableKey] = usedAddresses
+		// Add lookup table to the filtered map if it contains an address used for the tx
+		if foundUsedAddress {
+			filteredLookupTables[tableKey] = addresses
 		}
 	}
 
