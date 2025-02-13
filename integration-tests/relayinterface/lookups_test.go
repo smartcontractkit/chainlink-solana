@@ -44,7 +44,7 @@ func TestLookup(t *testing.T) {
 				Location: "test",
 			},
 		}
-		_, err := lookupConfig.Resolve(nil, nil, nil, nil)
+		_, err := lookupConfig.Resolve(tests.Context(t), nil, nil, nil)
 		require.Contains(t, err.Error(), "exactly one of AccountConstant, AccountLookup, PDALookups, or AccountsFromLookupTable must be specified, got 2")
 	})
 }
