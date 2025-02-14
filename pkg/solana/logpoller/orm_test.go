@@ -214,49 +214,6 @@ func TestLogPollerFilters(t *testing.T) {
 		require.NoError(t, err)
 		ensureIsBackfilled(filterIDs, true)
 	})
-
-	t.Run("UpdateStartingBlocks updates filters correctly", func(t *testing.T) {
-		ctx := tests.Context(t)
-		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
-		chainID := uuid.NewString()
-		orm := NewORM(chainID, dbx, lggr)
-
-		newBackfilledFilter := func(startingBlock int64) Filter {
-			filter := newRandomFilter(t)
-			filter.StartingBlock = startingBlock
-			filter.IsBackfilled = true
-			return filter
-		}
-
-		ensureStartingBlock := func(id int64, expectedStartingBlock int64) {
-			filter, err := orm.GetFilterByID(ctx, id)
-			require.NoError(t, err)
-			require.Equal(t, expectedStartingBlock, filter.StartingBlock)
-		}
-
-		filter1 := newBackfilledFilter(7)
-		id1, err := orm.InsertFilter(ctx, filter1)
-		require.NoError(t, err)
-		filter2 := newBackfilledFilter(13)
-		id2, err := orm.InsertFilter(ctx, filter2)
-		require.NoError(t, err)
-		filter3 := newBackfilledFilter(15)
-		id3, err := orm.InsertFilter(ctx, filter3)
-		require.NoError(t, err)
-
-		ensureIsBackfilled := genEnsureIsBackfilled(ctx, orm)
-
-		startingBlocks := map[int64]int64{id1: 5, id3: 8}
-
-		// update starting blocks
-		err = orm.UpdateStartingBlocks(ctx, startingBlocks)
-		require.NoError(t, err)
-		ensureIsBackfilled([]int64{id1, id3}, false)
-		ensureIsBackfilled([]int64{id2}, true)
-		ensureStartingBlock(id1, 5)
-		ensureStartingBlock(id2, 13)
-		ensureStartingBlock(id3, 8)
-	})
 }
 
 func TestLogPollerLogs(t *testing.T) {

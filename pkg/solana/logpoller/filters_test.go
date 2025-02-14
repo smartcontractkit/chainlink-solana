@@ -514,7 +514,6 @@ func TestFilters_UpdateStartingBlocks(t *testing.T) {
 	cases := []struct {
 		name           string
 		replayBlock    int64
-		dbErr          error
 		expectedBlocks []int64
 	}{
 		{
@@ -525,12 +524,6 @@ func TestFilters_UpdateStartingBlocks(t *testing.T) {
 			name:           "updates StartingBlock of backfilled filter",
 			replayBlock:    53000,
 			expectedBlocks: []int64{53000, origFilters[1].StartingBlock},
-		},
-		{
-			name:           "shouldn't update anything in memory if db update fails",
-			replayBlock:    59700,
-			dbErr:          errors.New("failed to write db"),
-			expectedBlocks: []int64{origFilters[0].StartingBlock, origFilters[1].StartingBlock},
 		},
 	}
 
@@ -556,25 +549,16 @@ func TestFilters_UpdateStartingBlocks(t *testing.T) {
 			filters.filtersByID[ids[0]] = &newFilters[0]
 			filters.filtersByID[ids[1]] = &newFilters[1]
 			filters.filtersToBackfill = map[int64]struct{}{ids[0]: {}}
-			orm.EXPECT().UpdateStartingBlocks(mock.Anything, mock.Anything).Once().Return(tt.dbErr)
+			orm.EXPECT().UpdateStartingBlocks(mock.Anything, mock.Anything).Once().Return(nil)
 			err = filters.UpdateStartingBlocks(ctx, tt.replayBlock)
-			if tt.dbErr != nil {
-				require.Error(t, err)
-				assert.Len(t, filters.filtersToBackfill, 1) // all filters should end up in the backfill queue
-			} else {
-				require.NoError(t, err)
-				assert.Len(t, filters.filtersToBackfill, 2) // all filters should end up in the backfill queue
-			}
+			require.NoError(t, err)
+			assert.Len(t, filters.filtersToBackfill, 2) // all filters should end up in the backfill queue
 
 			for i, id := range ids {
 				assert.Equal(t, tt.expectedBlocks[i], filters.filtersByID[id].StartingBlock,
 					"unexpected starting block for \"%s\" filter", filters.filtersByID[id].Name)
-				if tt.dbErr == nil {
-					assert.False(t, filters.filtersByID[id].IsBackfilled)
-					assert.Contains(t, filters.filtersToBackfill, id)
-				} else {
-					assert.Equal(t, origFilters[i].IsBackfilled, filters.filtersByID[id].IsBackfilled)
-				}
+				assert.False(t, filters.filtersByID[id].IsBackfilled)
+				assert.Contains(t, filters.filtersToBackfill, id)
 			}
 		})
 	}

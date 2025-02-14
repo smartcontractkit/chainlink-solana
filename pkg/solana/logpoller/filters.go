@@ -419,10 +419,6 @@ func (fl *filters) UpdateStartingBlocks(ctx context.Context, startingBlock int64
 		}
 		startingBlocks[id] = newStartingBlock
 	}
-	err := fl.orm.UpdateStartingBlocks(ctx, startingBlocks)
-	if err != nil {
-		return err
-	}
 
 	for id, blk := range startingBlocks {
 		fl.filtersByID[id].IsBackfilled = false

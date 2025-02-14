@@ -32,7 +32,6 @@ type ORM interface {
 	DeleteFilters(ctx context.Context, filters map[int64]Filter) error
 	MarkFilterDeleted(ctx context.Context, id int64) (err error)
 	MarkFilterBackfilled(ctx context.Context, id int64) (err error)
-	UpdateStartingBlocks(ctx context.Context, startingBlock map[int64]int64) (err error)
 	GetLatestBlock(ctx context.Context) (int64, error)
 	InsertLogs(context.Context, []Log) (err error)
 	SelectSeqNums(ctx context.Context) (map[int64]int64, error)
