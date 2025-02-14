@@ -602,53 +602,6 @@ func (_c *MockORM_SelectSeqNums_Call) RunAndReturn(run func(context.Context) (ma
 	return _c
 }
 
-// UpdateStartingBlocks provides a mock function with given fields: ctx, startingBlock
-func (_m *MockORM) UpdateStartingBlocks(ctx context.Context, startingBlock map[int64]int64) error {
-	ret := _m.Called(ctx, startingBlock)
-
-	if len(ret) == 0 {
-		panic("no return value specified for UpdateStartingBlocks")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, map[int64]int64) error); ok {
-		r0 = rf(ctx, startingBlock)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockORM_UpdateStartingBlocks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateStartingBlocks'
-type MockORM_UpdateStartingBlocks_Call struct {
-	*mock.Call
-}
-
-// UpdateStartingBlocks is a helper method to define mock.On call
-//   - ctx context.Context
-//   - startingBlock map[int64]int64
-func (_e *MockORM_Expecter) UpdateStartingBlocks(ctx interface{}, startingBlock interface{}) *MockORM_UpdateStartingBlocks_Call {
-	return &MockORM_UpdateStartingBlocks_Call{Call: _e.mock.On("UpdateStartingBlocks", ctx, startingBlock)}
-}
-
-func (_c *MockORM_UpdateStartingBlocks_Call) Run(run func(ctx context.Context, startingBlock map[int64]int64)) *MockORM_UpdateStartingBlocks_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(map[int64]int64))
-	})
-	return _c
-}
-
-func (_c *MockORM_UpdateStartingBlocks_Call) Return(err error) *MockORM_UpdateStartingBlocks_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockORM_UpdateStartingBlocks_Call) RunAndReturn(run func(context.Context, map[int64]int64) error) *MockORM_UpdateStartingBlocks_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // NewMockORM creates a new instance of MockORM. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockORM(t interface {
