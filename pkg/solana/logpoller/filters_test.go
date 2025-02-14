@@ -489,7 +489,6 @@ func TestFilters_ExtractField(t *testing.T) {
 }
 
 func TestFilters_UpdateStartingBlocks(t *testing.T) {
-	ctx := tests.Context(t)
 	orm := NewMockORM(t)
 	lggr := logger.Sugared(logger.Test(t))
 	filters := newFilters(lggr, orm)
@@ -549,9 +548,7 @@ func TestFilters_UpdateStartingBlocks(t *testing.T) {
 			filters.filtersByID[ids[0]] = &newFilters[0]
 			filters.filtersByID[ids[1]] = &newFilters[1]
 			filters.filtersToBackfill = map[int64]struct{}{ids[0]: {}}
-			orm.EXPECT().UpdateStartingBlocks(mock.Anything, mock.Anything).Once().Return(nil)
-			err = filters.UpdateStartingBlocks(ctx, tt.replayBlock)
-			require.NoError(t, err)
+			filters.UpdateStartingBlocks(tt.replayBlock)
 			assert.Len(t, filters.filtersToBackfill, 2) // all filters should end up in the backfill queue
 
 			for i, id := range ids {

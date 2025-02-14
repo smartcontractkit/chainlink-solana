@@ -18,8 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 )
 
-const NoNewReplayRequests = -1
-
 var (
 	ErrFilterNameConflict = errors.New("filter with such name already exists")
 )
@@ -51,7 +49,7 @@ type filtersI interface {
 	GetDistinctAddresses(ctx context.Context) ([]PublicKey, error)
 	GetFiltersToBackfill() []Filter
 	MarkFilterBackfilled(ctx context.Context, filterID int64) error
-	UpdateStartingBlocks(ctx context.Context, startingBlocks int64) error
+	UpdateStartingBlocks(startingBlocks int64)
 	MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[Filter]
 	DecodeSubKey(ctx context.Context, lggr logger.SugaredLogger, raw []byte, ID int64, subKeyPath []string) (any, error)
 	IncrementSeqNum(filterID int64) int64
@@ -60,7 +58,13 @@ type filtersI interface {
 type ReplayInfo struct {
 	mut          sync.RWMutex
 	requestBlock int64
-	pending      bool
+	status       ReplayStatus
+}
+
+// hasRequest returns true if a new request has been received (since the last request completed),
+// whether or not it is pending yet
+func (r *ReplayInfo) hasRequest() bool {
+	return r.status == ReplayStatusRequested || r.status == ReplayStatusPending
 }
 
 type Service struct {
@@ -97,7 +101,7 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient) *Service {
 		},
 	}.NewServiceEngine(lggr)
 	lp.lggr = lp.eng.SugaredLogger
-	lp.replay.requestBlock = NoNewReplayRequests
+	lp.replay.status = ReplayStatusNoRequest
 
 	return lp
 }
@@ -227,38 +231,35 @@ func (lp *Service) UnregisterFilter(ctx context.Context, name string) error {
 // LogPoller run loop it will backfill all filters starting from fromBlock. If there
 // are new filters in the backfill queue, with an earlier StartingBlock, then they
 // will get backfilled from there instead.
-func (lp *Service) Replay(ctx context.Context, fromBlock int64) error {
-	ctx, cancel := lp.eng.Ctx(ctx)
-	defer cancel()
-
+func (lp *Service) Replay(fromBlock int64) error {
 	lp.replay.mut.Lock()
 	defer lp.replay.mut.Unlock()
 
-	if lp.replay.requestBlock != NoNewReplayRequests && lp.replay.requestBlock <= fromBlock {
+	if lp.replay.hasRequest() && lp.replay.requestBlock <= fromBlock {
 		// Already requested, no further action required
 		lp.lggr.Warnf("Ignoring redundant request to replay from block %d, replay from block %d already requested",
 			fromBlock, lp.replay.requestBlock)
 		return nil
 	}
-	err := lp.filters.UpdateStartingBlocks(ctx, fromBlock)
-	if err != nil {
-		return err
-	}
+	lp.filters.UpdateStartingBlocks(fromBlock)
 	lp.replay.requestBlock = fromBlock
+	if lp.replay.status != ReplayStatusPending {
+		lp.replay.status = ReplayStatusRequested
+	}
 
 	return nil
 }
 
-// ReplayPending returns the current replay status of LogPoller. true indicates there is a replay currently in progress.
-// False means there is no replay in progress. Some subtleties to bear in mind:
-//  1. if a new request has been submitted since the last replay finished, but the backfilling hasn't been started yet,
-//     this will still return false.
-//  2. It may also return false if the node is restarted after a replay request was submitted but before it completes,
-//     even though it will still know to finish backfilling everything needed in order to satisfy the replay request.
-func (lp *Service) ReplayPending() bool {
+// ReplayStatus returns the current replay status of LogPoller:
+//
+// NoRequests - there have not been any replay requests yet since node startup
+// Requested - a replay has been requested, but has not started yet
+// Pending - a replay is currently in progress
+// Complete - there was at least one replay executed since startup, but all have since completed
+func (lp *Service) ReplayStatus() ReplayStatus {
 	lp.replay.mut.RLock()
 	defer lp.replay.mut.RUnlock()
-	return lp.replay.pending
+	return lp.replay.status
 }
 
 func (lp *Service) getLastProcessedSlot(ctx context.Context) (int64, error) {
@@ -290,21 +291,21 @@ func (lp *Service) getLastProcessedSlot(ctx context.Context) (int64, error) {
 
 // checkForReplayRequest checks whether there have been any new replay requests since it was last called,
 // and if so sets the pending flag to true and returns the block number
-func (lp *Service) checkForReplayRequest() int64 {
+func (lp *Service) checkForReplayRequest() bool {
 	lp.replay.mut.Lock()
 	defer lp.replay.mut.Unlock()
 
-	if lp.replay.requestBlock == NoNewReplayRequests {
-		return NoNewReplayRequests
+	if !lp.replay.hasRequest() {
+		return false
 	}
 
 	lp.lggr.Infow("starting replay", "replayBlock", lp.replay.requestBlock)
-	lp.replay.pending = true
-	return lp.replay.requestBlock
+	lp.replay.status = ReplayStatusPending
+	return true
 }
 
 func (lp *Service) backfillFilters(ctx context.Context, filters []Filter, to int64) error {
-	replayBlock := lp.checkForReplayRequest()
+	isReplay := lp.checkForReplayRequest()
 
 	addressesSet := make(map[PublicKey]struct{})
 	addresses := make([]PublicKey, 0, len(filters))
@@ -326,7 +327,7 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []Filter, to int
 	}
 
 	lp.lggr.Infow("Done backfilling filters", "filters", len(filters), "from", minSlot, "to", to)
-	if replayBlock != NoNewReplayRequests {
+	if isReplay {
 		lp.replayComplete(minSlot, to)
 	}
 
@@ -442,18 +443,23 @@ func (lp *Service) run(ctx context.Context) (err error) {
 	return nil
 }
 
-func (lp *Service) replayComplete(from, to int64) {
+// replayComplete is called when a backfill associated with a current pending replay has just completed.
+// Assuming there were no new requests to replay while the backfill was happening, it updates the replay
+// status to ReplayStatusComplete. If there was a request for a lower block number in the meantime, then
+// the status will revert to ReplayStatusRequested
+func (lp *Service) replayComplete(from, to int64) bool {
 	lp.replay.mut.Lock()
 	defer lp.replay.mut.Unlock()
 
 	lp.lggr.Infow("replay complete", "from", from, "to", to)
 
-	lp.replay.pending = false
-	if lp.replay.requestBlock != NoNewReplayRequests && lp.replay.requestBlock < from {
+	if lp.replay.requestBlock < from {
 		// received a new request with lower block number while replaying, we'll process that next time
-		return
+		lp.replay.status = ReplayStatusRequested
+		return false
 	}
-	lp.replay.requestBlock = NoNewReplayRequests
+	lp.replay.status = ReplayStatusComplete
+	return true
 }
 
 func appendBuffered(ch <-chan Block, max int, blocks []Block) []Block {
