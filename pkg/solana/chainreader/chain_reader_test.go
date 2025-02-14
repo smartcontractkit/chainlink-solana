@@ -178,6 +178,7 @@ func TestSolanaChainReaderService_Start(t *testing.T) {
 				return service.ErrNotStarted
 			}())
 			er.On("Start", mock.Anything).Maybe().Return(tt.StartError)
+			er.On("HasFilter", mock.Anything, mock.Anything).Return(false).Maybe()
 			er.On("RegisterFilter", mock.Anything, mock.Anything).Maybe().Return(tt.RegisterFilterError)
 
 			require.NoError(t, svc.Bind(ctx, []types.BoundContract{{Address: pk.String(), Name: "myChainReader"}}))

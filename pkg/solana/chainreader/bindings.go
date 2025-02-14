@@ -42,8 +42,22 @@ type readBinding interface {
 
 type addressShareGroup struct {
 	address solana.PublicKey
-	mux     sync.Mutex
+	mux     sync.RWMutex
 	group   []string
+}
+
+func (g *addressShareGroup) getAddress() solana.PublicKey {
+	g.mux.RLock()
+	defer g.mux.RUnlock()
+
+	return g.address
+}
+
+func (g *addressShareGroup) setAddress(addr solana.PublicKey) {
+	g.mux.Lock()
+	defer g.mux.Unlock()
+
+	g.address = addr
 }
 
 type bindingsRegistry struct {
@@ -136,7 +150,14 @@ func (r *bindingsRegistry) GetReaders(namespace string) ([]readBinding, error) {
 	return rBindings.GetReaders()
 }
 
-func (r *bindingsRegistry) Bind(ctx context.Context, reg filterRegistrar, binding types.BoundContract) error {
+// Bind has a side-effect of updating the bound address to a group shared address.
+//
+// DO NOT CHANGE binding from pointer type.
+func (r *bindingsRegistry) Bind(ctx context.Context, reg filterRegistrar, binding *types.BoundContract) error {
+	if binding == nil {
+		return fmt.Errorf("%w: bound contract is nil", types.ErrInvalidType)
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -217,28 +238,26 @@ func (r *bindingsRegistry) getShareGroup(nameSpace string) (*addressShareGroup, 
 	return shareGroup, sharesAddress
 }
 
-func (r *bindingsRegistry) handleAddressSharing(boundContract types.BoundContract) error {
+func (r *bindingsRegistry) handleAddressSharing(boundContract *types.BoundContract) error {
 	shareGroup, isInAGroup := r.getShareGroup(boundContract.Name)
 	if !isInAGroup {
 		return nil
 	}
 
-	shareGroup.mux.Lock()
-	defer shareGroup.mux.Unlock()
-
 	// set shared address to the binding address
-	if shareGroup.address.IsZero() {
+	if shareGroup.getAddress().IsZero() {
 		key, err := solana.PublicKeyFromBase58(boundContract.Address)
 		if err != nil {
 			return err
 		}
 
-		r.addressShareGroups[boundContract.Name].address, shareGroup.address = key, key
-	} else if boundContract.Address != shareGroup.address.String() && boundContract.Address != "" {
-		return fmt.Errorf("namespace: %q shares address: %q with namespaceBindings: %v and cannot be bound with a new address: %s", boundContract.Name, shareGroup.address, shareGroup.group, boundContract.Address)
+		shareGroup.setAddress(key)
+	} else if boundContract.Address != shareGroup.getAddress().String() && boundContract.Address != "" {
+		return fmt.Errorf("namespace: %q shares address: %q with namespaceBindings: %v and cannot be bound with a new address: %s", boundContract.Name, shareGroup.getAddress(), shareGroup.group, boundContract.Address)
 	}
 
-	boundContract.Address = shareGroup.address.String()
+	// side-effect of updating the bound contract address to group-shared address
+	boundContract.Address = shareGroup.getAddress().String()
 
 	return nil
 }

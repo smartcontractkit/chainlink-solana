@@ -321,22 +321,25 @@ func (s *ContractReaderService) QueryKey(ctx context.Context, contract types.Bou
 	return sequenceOfValues, nil
 }
 
-// Bind implements the types.ContractReader interface and allows new contract namespaceBindings to be added
-// to the service.
+// Bind implements the types.ContractReader interface and allows new contract namespaceBindings to be added to the
+// service.
+//
+// Bind has a side-effect of updating a binding with a shared address if the bound contract has been configured to be
+// part of a share group.
 func (s *ContractReaderService) Bind(ctx context.Context, bindings []types.BoundContract) error {
-	for i := range bindings {
-		if err := s.bdRegistry.Bind(ctx, s.reader, bindings[i]); err != nil {
+	for idx := range bindings {
+		if err := s.bdRegistry.Bind(ctx, s.reader, &bindings[idx]); err != nil {
 			return err
 		}
 
-		s.lookup.bindAddressForContract(bindings[i].Name, bindings[i].Address)
+		s.lookup.bindAddressForContract(bindings[idx].Name, bindings[idx].Address)
 
 		// also bind with an empty address so that we can look up the contract without providing address when calling CR methods
-		if sg, isInAShareGroup := s.bdRegistry.getShareGroup(bindings[i].Name); isInAShareGroup {
-			s.lookup.bindAddressForContract(bindings[i].Name, "")
+		if sg, isInAShareGroup := s.bdRegistry.getShareGroup(bindings[idx].Name); isInAShareGroup {
+			s.lookup.bindAddressForContract(bindings[idx].Name, "")
 
 			for _, namespace := range sg.group {
-				if err := s.addAddressResponseHardCoderModifier(namespace, bindings[i].Address); err != nil {
+				if err := s.addAddressResponseHardCoderModifier(namespace, bindings[idx].Address); err != nil {
 					return fmt.Errorf("failed to add address response hard coder modifier for contract: %q, : %w", namespace, err)
 				}
 			}
@@ -344,8 +347,8 @@ func (s *ContractReaderService) Bind(ctx context.Context, bindings []types.Bound
 			return nil
 		}
 
-		if err := s.addAddressResponseHardCoderModifier(bindings[i].Name, bindings[i].Address); err != nil {
-			return fmt.Errorf("failed to add address response hard coder modifier for contract: %q, : %w", bindings[i].Name, err)
+		if err := s.addAddressResponseHardCoderModifier(bindings[idx].Name, bindings[idx].Address); err != nil {
+			return fmt.Errorf("failed to add address response hard coder modifier for contract: %q, : %w", bindings[idx].Name, err)
 		}
 	}
 
@@ -830,6 +833,10 @@ func setPollingFilterOverrides(common *config.PollingFilter, overrides ...*confi
 	allOverrides := append([]*config.PollingFilter{common}, overrides...)
 
 	for _, override := range allOverrides {
+		if override == nil {
+			continue
+		}
+
 		valOfO := reflect.Indirect(reflect.ValueOf(override))
 		for idx := range valOfF.Type().NumField() {
 			name := valOfO.Type().Field(idx).Name
