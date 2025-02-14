@@ -237,6 +237,8 @@ func (lp *Service) Replay(ctx context.Context, fromBlock int64) error {
 
 	if lp.replay.requestBlock != NoNewReplayRequests && lp.replay.requestBlock <= fromBlock {
 		// Already requested, no further action required
+		lp.lggr.Warnf("Ignoring redundant request to replay from block %d, replay from block %d already requested",
+			fromBlock, lp.replay.requestBlock)
 		return nil
 	}
 	err := lp.filters.UpdateStartingBlocks(ctx, fromBlock)
@@ -325,7 +327,7 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []Filter, to int
 	}
 
 	lp.lggr.Infow("Done backfilling filters", "filters", len(filters), "from", minSlot, "to", to)
-	if replayBlock > 0 {
+	if replayBlock != NoNewReplayRequests {
 		lp.replayComplete(minSlot, to)
 	}
 
