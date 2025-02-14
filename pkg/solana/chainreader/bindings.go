@@ -60,6 +60,13 @@ func (g *addressShareGroup) setAddress(addr solana.PublicKey) {
 	g.address = addr
 }
 
+func (g *addressShareGroup) getGroups() []string {
+	g.mux.RLock()
+	defer g.mux.RUnlock()
+
+	return g.group
+}
+
 type bindingsRegistry struct {
 	mu sync.RWMutex
 	// key is namespace
@@ -229,6 +236,13 @@ func (r *bindingsRegistry) initAddressSharing(addressShareGroups [][]string) err
 	return nil
 }
 
+func (r *bindingsRegistry) GetShares(nameSpace string) (*addressShareGroup, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	return r.getShareGroup(nameSpace)
+}
+
 func (r *bindingsRegistry) getShareGroup(nameSpace string) (*addressShareGroup, bool) {
 	shareGroup, sharesAddress := r.addressShareGroups[nameSpace]
 	if !sharesAddress {
@@ -364,6 +378,9 @@ func (b *namespaceBinding) GetReader(genericName string) (readBinding, error) {
 }
 
 func (b *namespaceBinding) GetReaders() ([]readBinding, error) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
 	allBindings := make([]readBinding, len(b.readers))
 
 	var idx int

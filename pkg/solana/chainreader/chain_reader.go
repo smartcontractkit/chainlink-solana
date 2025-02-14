@@ -335,10 +335,10 @@ func (s *ContractReaderService) Bind(ctx context.Context, bindings []types.Bound
 		s.lookup.bindAddressForContract(bindings[idx].Name, bindings[idx].Address)
 
 		// also bind with an empty address so that we can look up the contract without providing address when calling CR methods
-		if sg, isInAShareGroup := s.bdRegistry.getShareGroup(bindings[idx].Name); isInAShareGroup {
+		if sg, isInAShareGroup := s.bdRegistry.GetShares(bindings[idx].Name); isInAShareGroup {
 			s.lookup.bindAddressForContract(bindings[idx].Name, "")
 
-			for _, namespace := range sg.group {
+			for _, namespace := range sg.getGroups() {
 				if err := s.addAddressResponseHardCoderModifier(namespace, bindings[idx].Address); err != nil {
 					return fmt.Errorf("failed to add address response hard coder modifier for contract: %q, : %w", namespace, err)
 				}
