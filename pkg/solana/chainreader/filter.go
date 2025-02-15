@@ -87,19 +87,6 @@ func (r *syncedFilter) AddressSet() bool {
 	return r.addressSet
 }
 
-func (r *syncedFilter) HasIndexedSubkeys() bool {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	for _, path := range r.filter.SubkeyPaths {
-		if len(path) > 0 {
-			return true
-		}
-	}
-
-	return false
-}
-
 type FilterError struct {
 	Err    error
 	Action string
