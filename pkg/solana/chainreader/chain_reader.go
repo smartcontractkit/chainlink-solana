@@ -696,6 +696,11 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 		return err
 	}
 
+	if len(pdaAddresses) == 0 {
+		s.lggr.Infof("No token addresses found in params: %v that were passed into %q, call to contract: %q with address: %q", params, GetTokenPrices, values.contract, values.address)
+		return nil
+	}
+
 	data, err := s.client.GetMultipleAccountData(ctx, pdaAddresses...)
 	if err != nil {
 		return err
@@ -776,8 +781,14 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 	switch val.Kind() {
 	case reflect.Struct:
 		field = val.FieldByName("Tokens")
+		if !field.IsValid() {
+			field = val.FieldByName("tokens")
+		}
 	case reflect.Map:
 		field = val.MapIndex(reflect.ValueOf("Tokens"))
+		if !field.IsValid() {
+			field = val.MapIndex(reflect.ValueOf("tokens"))
+		}
 	default:
 		return nil, fmt.Errorf(
 			"for contract %q read %q: expected `params` to be a struct or map, got %q: %q",
@@ -792,10 +803,19 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 		)
 	}
 
-	tokens, ok := field.Interface().(*[][32]uint8)
-	if !ok {
+	var tokens [][]uint8
+	switch x := field.Interface().(type) {
+	// this is the type when CR is called as LOOP and creates types from IDL
+	case *[][32]uint8:
+		for _, arr := range *x {
+			tokens = append(tokens, arr[:]) // Slice [32]uint8 → []uint8
+		}
+		// this is the expected type when CR is called directly
+	case [][]uint8:
+		tokens = x
+	default:
 		return nil, fmt.Errorf(
-			"for contract %q read %q: 'Tokens' field is not of type *[][32]uint8",
+			"for contract %q read %q: 'Tokens' field is neither *[][32]uint8 nor [][]uint8",
 			values.contract, values.reads[0].readName,
 		)
 	}
@@ -810,7 +830,7 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 
 	// Build the PDA addresses for all tokens.
 	var pdaAddresses []solana.PublicKey
-	for _, token := range *tokens {
+	for _, token := range tokens {
 		tokenAddr := solana.PublicKeyFromBytes(token[:])
 		if !tokenAddr.IsOnCurve() || tokenAddr.IsZero() {
 			return nil, fmt.Errorf(
