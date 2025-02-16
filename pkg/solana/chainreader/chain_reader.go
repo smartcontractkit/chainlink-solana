@@ -771,18 +771,24 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 	if val.Kind() == reflect.Ptr {
 		val = val.Elem()
 	}
-	if val.Kind() != reflect.Struct {
+
+	var field reflect.Value
+	switch val.Kind() {
+	case reflect.Struct:
+		field = val.FieldByName("Tokens")
+	case reflect.Map:
+		field = val.MapIndex(reflect.ValueOf("Tokens"))
+	default:
 		return nil, fmt.Errorf(
-			"for contract %q read %q: expected `params` to be a struct, got %s",
-			values.contract, values.reads[0].readName, val.Kind(),
+			"for contract %q read %q: expected `params` to be a struct or map, got %q: %q",
+			values.contract, values.reads[0].readName, val.Kind(), val.String(),
 		)
 	}
 
-	field := val.FieldByName("Tokens")
 	if !field.IsValid() {
 		return nil, fmt.Errorf(
-			"for contract %q read %q: no field named 'Tokens' found in params",
-			values.contract, values.reads[0].readName,
+			"for contract %q read %q: no field named 'Tokens' found in kind: %q: %q",
+			values.contract, values.reads[0].readName, val.Kind(), val.String(),
 		)
 	}
 
