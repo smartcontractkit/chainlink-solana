@@ -7,7 +7,9 @@ import (
 	"strings"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 )
@@ -33,7 +35,7 @@ type MultipleAccountGetter interface {
 }
 
 // doMultiRead aggregate results from multiple PDAs from the same contract into one result.
-func doMultiRead(ctx context.Context, client MultipleAccountGetter, bdRegistry *bindingsRegistry, rv readValues, params, returnValue any) error {
+func doMultiRead(ctx context.Context, lggr logger.Logger, client MultipleAccountGetter, bdRegistry *bindingsRegistry, rv readValues, params, returnValue any) error {
 	batch := make([]call, len(rv.reads))
 	for idx, r := range rv.reads {
 		batch[idx] = call{
@@ -46,7 +48,7 @@ func doMultiRead(ctx context.Context, client MultipleAccountGetter, bdRegistry *
 		}
 	}
 
-	results, err := doMethodBatchCall(ctx, client, bdRegistry, batch)
+	results, err := doMethodBatchCall(ctx, lggr, client, bdRegistry, batch)
 	if err != nil {
 		return err
 	}
@@ -69,7 +71,7 @@ func doMultiRead(ctx context.Context, client MultipleAccountGetter, bdRegistry *
 	return nil
 }
 
-func doMethodBatchCall(ctx context.Context, client MultipleAccountGetter, bdRegistry *bindingsRegistry, batch []call) ([]batchResultWithErr, error) {
+func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleAccountGetter, bdRegistry *bindingsRegistry, batch []call) ([]batchResultWithErr, error) {
 	// Create the list of public keys to fetch
 	keys := make([]solana.PublicKey, len(batch))
 	for idx, batchCall := range batch {
@@ -85,12 +87,26 @@ func doMethodBatchCall(ctx context.Context, client MultipleAccountGetter, bdRegi
 	}
 
 	// Fetch the account data
+	results := make([]batchResultWithErr, len(batch))
 	data, err := client.GetMultipleAccountData(ctx, keys...)
 	if err != nil {
+		if errors.Is(err, rpc.ErrNotFound) {
+			var sb strings.Builder
+			sb.WriteString(fmt.Sprintf("failed to get multiple account data with err: %s, now returning empty responses for: \n", err))
+			for i, c := range batch {
+				sb.WriteString(fmt.Sprintf("- call: #%d under namespace %s, with readName: %q and address: %q\n", i+1, c.Namespace, c.ReadName, keys[i]))
+				results[i] = batchResultWithErr{
+					address:   keys[i].String(),
+					namespace: c.Namespace,
+					readName:  c.ReadName,
+					returnVal: c.ReturnVal,
+				}
+			}
+			lggr.Info(sb.String())
+			return results, nil
+		}
 		return nil, err
 	}
-
-	results := make([]batchResultWithErr, len(batch))
 
 	// decode batch call results
 	for idx, batchCall := range batch {

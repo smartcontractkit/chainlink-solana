@@ -261,6 +261,7 @@ func RunChainWriterTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInt
 
 // GetLatestValue method
 const (
+	ContractReaderNotFoundReadsReturnZeroedResponses             = "Get latest value not found reads return zeroed responses"
 	ContractReaderGetLatestValueUsingMultiReader                 = "Get latest value using multi reader"
 	ContractReaderBatchGetLatestValueUsingMultiReader            = "Batch Get latest value using multi reader"
 	ContractReaderGetLatestValueWithAddressHardcodedIntoResponse = "Get latest value with AddressHardcoded into response"
@@ -269,14 +270,50 @@ const (
 	ChainWriterLookupTableTest                                   = "Set contract value using a lookup table for addresses"
 )
 
-type TimestampedUnixBig struct {
-	Value     *big.Int `json:"value"`
-	Timestamp uint32   `json:"timestamp"`
-}
-
 func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsInterfaceTester[T]) {
 	//RunContractReaderInterfaceTests(t, it, false, true)
 	testCases := []Testcase[T]{
+		{
+			Name: ContractReaderNotFoundReadsReturnZeroedResponses,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				bindings := it.GetBindings(t)
+				ctx := tests.Context(t)
+
+				bound := BindingsByName(bindings, AnyContractName)[0]
+				require.NoError(t, cr.Bind(ctx, bindings))
+
+				dAccRes := contractprimary.DataAccount{}
+				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(ReadUninitializedPDA), primitives.Unconfirmed, nil, &dAccRes))
+				require.Equal(t, contractprimary.DataAccount{}, dAccRes)
+
+				mR3Res := contractprimary.MultiRead3{}
+				batchGetLatestValueRequest := make(types.BatchGetLatestValuesRequest)
+				batchGetLatestValueRequest[bound] = []types.BatchRead{
+					{
+						ReadName:  ReadUninitializedPDA,
+						Params:    nil,
+						ReturnVal: &dAccRes,
+					},
+					{
+						ReadName:  MultiReadWithParamsReuse,
+						Params:    map[string]any{"ID": 999},
+						ReturnVal: &mR3Res,
+					},
+				}
+
+				batchResult, err := cr.BatchGetLatestValues(ctx, batchGetLatestValueRequest)
+				require.NoError(t, err)
+
+				result, err := batchResult[bound][0].GetResult()
+				require.NoError(t, err)
+				require.Equal(t, &contractprimary.DataAccount{}, result)
+
+				result, err = batchResult[bound][1].GetResult()
+				require.NoError(t, err)
+				require.Equal(t, &contractprimary.MultiRead3{}, result)
+			},
+		},
 		{
 			Name: ContractReaderGetLatestValueWithAddressHardcodedIntoResponse,
 			Test: func(t T) {
@@ -767,6 +804,7 @@ func (h *helper) runInitialize(
 }
 
 const (
+	ReadUninitializedPDA                 = "ReadUninitializedPDA"
 	MultiRead                            = "MultiRead"
 	ReadWithAddressHardCodedIntoResponse = "ReadWithAddressHardCodedIntoResponse"
 	MultiReadWithParamsReuse             = "MultiReadWithParamsReuse"
@@ -848,6 +886,13 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 			AnyContractName: {
 				IDL: idl,
 				Reads: map[string]config.ReadDefinition{
+					ReadUninitializedPDA: {
+						ChainSpecificName: "DataAccount",
+						ReadType:          config.Account,
+						PDADefinition: codec.PDATypeDef{
+							Prefix: []byte("AAAAAAAAAA"),
+						},
+					},
 					ReadWithAddressHardCodedIntoResponse: readWithAddressHardCodedIntoResponseDef,
 					GetTokenPrices: {
 						ChainSpecificName: "USDPerToken",

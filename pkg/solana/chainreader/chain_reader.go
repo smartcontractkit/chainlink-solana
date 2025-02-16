@@ -183,7 +183,7 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 	}
 
 	if len(values.reads) > 1 {
-		return doMultiRead(ctx, s.client, s.bdRegistry, values, params, returnVal)
+		return doMultiRead(ctx, s.lggr, s.client, s.bdRegistry, values, params, returnVal)
 	}
 
 	// TODO this is a temporary edge case - NONEVM-1320
@@ -203,7 +203,7 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 		},
 	}
 
-	results, err := doMethodBatchCall(ctx, s.client, s.bdRegistry, batch)
+	results, err := doMethodBatchCall(ctx, s.lggr, s.client, s.bdRegistry, batch)
 	if err != nil {
 		return err
 	}
@@ -244,7 +244,7 @@ func (s *ContractReaderService) BatchGetLatestValues(ctx context.Context, reques
 
 			// exclude multi read reads from the big batch request and populate them separately and merge results later.
 			if len(vals.reads) > 1 {
-				err := doMultiRead(ctx, s.client, s.bdRegistry, vals, readReq.Params, readReq.ReturnVal)
+				err := doMultiRead(ctx, s.lggr, s.client, s.bdRegistry, vals, readReq.Params, readReq.ReturnVal)
 
 				multiIdxLookup[bound][idx] = len(multiReadResults)
 				multiReadResults = append(multiReadResults, batchResultWithErr{address: vals.address, namespace: vals.contract, readName: readReq.ReadName, returnVal: readReq.ReturnVal, err: err})
@@ -268,7 +268,7 @@ func (s *ContractReaderService) BatchGetLatestValues(ctx context.Context, reques
 		}
 	}
 
-	results, err := doMethodBatchCall(ctx, s.client, s.bdRegistry, batch)
+	results, err := doMethodBatchCall(ctx, s.lggr, s.client, s.bdRegistry, batch)
 	if err != nil {
 		return nil, err
 	}
