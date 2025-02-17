@@ -13,6 +13,7 @@ import (
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/mitchellh/mapstructure"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
@@ -710,7 +711,30 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 	if returnSliceVal.Kind() != reflect.Ptr {
 		return fmt.Errorf("expected <**[]*struct { Value *big.Int; Timestamp *int64 } Value>, got %q", returnSliceVal.String())
 	}
+
 	returnSliceVal = returnSliceVal.Elem()
+	// if called directly instead of as a loop
+	if returnSliceVal.Kind() == reflect.Slice {
+		underlyingType := returnSliceVal.Type().Elem()
+		if underlyingType.Kind() == reflect.Struct {
+			if _, hasValue := underlyingType.FieldByName("Value"); hasValue {
+				if _, hasTimestamp := underlyingType.FieldByName("Timestamp"); hasTimestamp {
+					sliceVal := reflect.MakeSlice(returnSliceVal.Type(), 0, 0)
+					for _, d := range data {
+						var wrapper fee_quoter.BillingTokenConfigWrapper
+						if err = wrapper.UnmarshalWithDecoder(bin.NewBorshDecoder(d)); err != nil {
+							return err
+						}
+						newElem := reflect.New(underlyingType).Elem()
+						newElem.FieldByName("Value").Set(reflect.ValueOf(big.NewInt(0).SetBytes(wrapper.Config.UsdPerToken.Value[:])))
+						newElem.FieldByName("Timestamp").Set(reflect.ValueOf(uint32(wrapper.Config.UsdPerToken.Timestamp)))
+						sliceVal = reflect.Append(sliceVal, newElem)
+					}
+					return mapstructure.Decode(sliceVal.Interface(), returnVal)
+				}
+			}
+		}
+	}
 
 	returnSliceValType := returnSliceVal.Type()
 	if returnSliceValType.Kind() != reflect.Ptr {

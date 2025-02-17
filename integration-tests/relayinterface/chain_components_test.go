@@ -113,79 +113,113 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 }
 
 func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInterfaceTester[T]) {
-	testCases := Testcase[T]{
-		Name: "Test address groups where first namespace shares address with second namespace",
-		Test: func(t T) {
-			ctx := tests.Context(t)
-			cfg := it.buildContractReaderConfig(t)
-			cfg.AddressShareGroups = [][]string{{AnyContractNameWithSharedAddress1, AnyContractNameWithSharedAddress2, AnyContractNameWithSharedAddress3}}
-			cr := it.GetContractReaderWithCustomCfg(t, cfg)
+	testCases := []Testcase[T]{
+		{
+			Name: "Test address groups where first namespace shares address with second namespace",
+			Test: func(t T) {
+				ctx := tests.Context(t)
+				cfg := it.buildContractReaderConfig(t)
+				cfg.AddressShareGroups = [][]string{{AnyContractNameWithSharedAddress1, AnyContractNameWithSharedAddress2, AnyContractNameWithSharedAddress3}}
+				cr := it.GetContractReaderWithCustomCfg(t, cfg)
 
-			t.Run("Namespace is part of an address share group that doesn't have a registered address and provides no address during Bind", func(t T) {
-				bound1 := []types.BoundContract{{
-					Name: AnyContractNameWithSharedAddress1,
-				}}
-				require.Error(t, cr.Bind(ctx, bound1))
-			})
+				t.Run("Namespace is part of an address share group that doesn't have a registered address and provides no address during Bind", func(t T) {
+					bound1 := []types.BoundContract{{
+						Name: AnyContractNameWithSharedAddress1,
+					}}
+					require.Error(t, cr.Bind(ctx, bound1))
+				})
 
-			addressToBeShared := it.Helper.CreateAccount(t, *it, AnyContractName, AnyValueToReadWithoutAnArgument, CreateTestStruct(0, it)).String()
-			t.Run("Namespace is part of an address share group that doesn't have a registered address and provides an address during Bind", func(t T) {
-				bound1 := []types.BoundContract{{Name: AnyContractNameWithSharedAddress1, Address: addressToBeShared}}
+				addressToBeShared := it.Helper.CreateAccount(t, *it, AnyContractName, AnyValueToReadWithoutAnArgument, CreateTestStruct(0, it)).String()
+				t.Run("Namespace is part of an address share group that doesn't have a registered address and provides an address during Bind", func(t T) {
+					bound1 := []types.BoundContract{{Name: AnyContractNameWithSharedAddress1, Address: addressToBeShared}}
 
-				require.NoError(t, cr.Bind(ctx, bound1))
+					require.NoError(t, cr.Bind(ctx, bound1))
 
-				var prim uint64
-				require.NoError(t, cr.GetLatestValue(ctx, bound1[0].ReadIdentifier(MethodReturningUint64), primitives.Unconfirmed, nil, &prim))
-				assert.Equal(t, AnyValueToReadWithoutAnArgument, prim)
-			})
+					var prim uint64
+					require.NoError(t, cr.GetLatestValue(ctx, bound1[0].ReadIdentifier(MethodReturningUint64), primitives.Unconfirmed, nil, &prim))
+					assert.Equal(t, AnyValueToReadWithoutAnArgument, prim)
+				})
 
-			t.Run("Namespace is part of an address share group that has a registered address and provides that same address during Bind", func(t T) {
-				bound2 := []types.BoundContract{{
-					Name:    AnyContractNameWithSharedAddress2,
-					Address: addressToBeShared}}
-				require.NoError(t, cr.Bind(ctx, bound2))
+				t.Run("Namespace is part of an address share group that has a registered address and provides that same address during Bind", func(t T) {
+					bound2 := []types.BoundContract{{
+						Name:    AnyContractNameWithSharedAddress2,
+						Address: addressToBeShared}}
+					require.NoError(t, cr.Bind(ctx, bound2))
 
-				var prim uint64
-				require.NoError(t, cr.GetLatestValue(ctx, bound2[0].ReadIdentifier(MethodReturningUint64), primitives.Unconfirmed, nil, &prim))
-				assert.Equal(t, AnyValueToReadWithoutAnArgument, prim)
-				assert.Equal(t, addressToBeShared, bound2[0].Address)
-			})
+					var prim uint64
+					require.NoError(t, cr.GetLatestValue(ctx, bound2[0].ReadIdentifier(MethodReturningUint64), primitives.Unconfirmed, nil, &prim))
+					assert.Equal(t, AnyValueToReadWithoutAnArgument, prim)
+					assert.Equal(t, addressToBeShared, bound2[0].Address)
+				})
 
-			t.Run("Namespace is part of an address share group that has a registered address and provides a wrong address during Bind", func(t T) {
-				key, err := solana.NewRandomPrivateKey()
+				t.Run("Namespace is part of an address share group that has a registered address and provides a wrong address during Bind", func(t T) {
+					key, err := solana.NewRandomPrivateKey()
+					require.NoError(t, err)
+
+					bound2 := []types.BoundContract{{
+						Name:    AnyContractNameWithSharedAddress2,
+						Address: key.PublicKey().String()}}
+					require.Error(t, cr.Bind(ctx, bound2))
+				})
+
+				t.Run("Namespace is part of an address share group that has a registered address and provides no address during Bind", func(t T) {
+					bound3 := []types.BoundContract{{Name: AnyContractNameWithSharedAddress3}}
+					require.NoError(t, cr.Bind(ctx, bound3))
+
+					var prim uint64
+					require.NoError(t, cr.GetLatestValue(ctx, bound3[0].ReadIdentifier(MethodReturningUint64), primitives.Unconfirmed, nil, &prim))
+					assert.Equal(t, AnyValueToReadWithoutAnArgument, prim)
+					assert.Equal(t, addressToBeShared, bound3[0].Address)
+
+					// when run in a loop Bind address won't be set, so check if CR Method works without set address.
+					prim = 0
+					require.NoError(t, cr.GetLatestValue(ctx, types.BoundContract{
+						Address: "",
+						Name:    AnyContractNameWithSharedAddress3,
+					}.ReadIdentifier(MethodReturningUint64), primitives.Unconfirmed, nil, &prim))
+					assert.Equal(t, AnyValueToReadWithoutAnArgument, prim)
+				})
+
+				t.Run("Namespace is not part of an address share group that has a registered address and provides no address during Bind", func(t T) {
+					require.Error(t, cr.Bind(ctx, []types.BoundContract{{Name: AnyContractName}}))
+				})
+			},
+		},
+
+		{Name: ContractReaderGetLatestValueGetTokenPrices,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				bindings := it.GetBindings(t)
+				ctx := tests.Context(t)
+
+				bound := BindingsByName(bindings, AnyContractName)[0]
+
+				require.NoError(t, cr.Bind(ctx, bindings))
+
+				type TimestampedUnixBig struct {
+					Value     *big.Int `json:"value"`
+					Timestamp uint32   `json:"timestamp"`
+				}
+
+				res := make([]TimestampedUnixBig, 2)
+
+				byteTokens := make([][]byte, 0, 2)
+				pubKey1, err := solana.PublicKeyFromBase58(GetTokenPricesPubKey1)
+				require.NoError(t, err)
+				pubKey2, err := solana.PublicKeyFromBase58(GetTokenPricesPubKey2)
 				require.NoError(t, err)
 
-				bound2 := []types.BoundContract{{
-					Name:    AnyContractNameWithSharedAddress2,
-					Address: key.PublicKey().String()}}
-				require.Error(t, cr.Bind(ctx, bound2))
-			})
-
-			t.Run("Namespace is part of an address share group that has a registered address and provides no address during Bind", func(t T) {
-				bound3 := []types.BoundContract{{Name: AnyContractNameWithSharedAddress3}}
-				require.NoError(t, cr.Bind(ctx, bound3))
-
-				var prim uint64
-				require.NoError(t, cr.GetLatestValue(ctx, bound3[0].ReadIdentifier(MethodReturningUint64), primitives.Unconfirmed, nil, &prim))
-				assert.Equal(t, AnyValueToReadWithoutAnArgument, prim)
-				assert.Equal(t, addressToBeShared, bound3[0].Address)
-
-				// when run in a loop Bind address won't be set, so check if CR Method works without set address.
-				prim = 0
-				require.NoError(t, cr.GetLatestValue(ctx, types.BoundContract{
-					Address: "",
-					Name:    AnyContractNameWithSharedAddress3,
-				}.ReadIdentifier(MethodReturningUint64), primitives.Unconfirmed, nil, &prim))
-				assert.Equal(t, AnyValueToReadWithoutAnArgument, prim)
-			})
-
-			t.Run("Namespace is not part of an address share group that has a registered address and provides no address during Bind", func(t T) {
-				require.Error(t, cr.Bind(ctx, []types.BoundContract{{Name: AnyContractName}}))
-			})
-		},
+				byteTokens = append(byteTokens, pubKey1.Bytes())
+				byteTokens = append(byteTokens, pubKey2.Bytes())
+				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(GetTokenPrices), primitives.Unconfirmed, map[string]any{"tokens": byteTokens}, &res))
+				require.Equal(t, "7048352069843304521481572571769838000081483315549204879493368331", res[0].Value.String())
+				require.Equal(t, uint32(1700000001), res[0].Timestamp)
+				require.Equal(t, "17980346130170174053328187512531209543631592085982266692926093439168", res[1].Value.String())
+				require.Equal(t, uint32(1800000002), res[1].Timestamp)
+			}},
 	}
 
-	RunTests(t, it, []Testcase[T]{testCases})
+	RunTests(t, it, testCases)
 	RunContractReaderTests(t, it)
 	RunChainWriterTests(t, it)
 }
@@ -334,8 +368,9 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 					AddressToShare []byte
 				}
 
+				c := int16(0)
 				mRR := MultiReadResult{}
-				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(ReadWithAddressHardCodedIntoResponse), primitives.Unconfirmed, nil, &mRR))
+				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(ReadWithAddressHardCodedIntoResponse), primitives.Unconfirmed, nil, &c))
 
 				expectedMRR := MultiReadResult{A: 1, B: 2, SharedAddress: boundAddress.Bytes(), AddressToShare: boundAddress.Bytes()}
 				require.Equal(t, expectedMRR, mRR)
@@ -841,12 +876,8 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 		PDADefinition: codec.PDATypeDef{
 			Prefix: []byte("multi_read1"),
 		},
-		ResponseAddressHardCoder: &commoncodec.HardCodeModifierConfig{
-			// placeholder values, whatever is put as value gets replaced with a solana pub key anyway
-			OffChainValues: map[string]any{
-				"SharedAddress":  "",
-				"AddressToShare": "",
-			},
+		OutputModifications: commoncodec.ModifiersConfig{
+			&commoncodec.PropertyExtractorConfig{FieldName: "B"},
 		},
 	}
 
