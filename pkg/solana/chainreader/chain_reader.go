@@ -727,6 +727,8 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 						}
 						newElem := reflect.New(underlyingType).Elem()
 						newElem.FieldByName("Value").Set(reflect.ValueOf(big.NewInt(0).SetBytes(wrapper.Config.UsdPerToken.Value[:])))
+						// nolint:gosec
+						// G115: integer overflow conversion int64 -&gt; uint32
 						newElem.FieldByName("Timestamp").Set(reflect.ValueOf(uint32(wrapper.Config.UsdPerToken.Timestamp)))
 						sliceVal = reflect.Append(sliceVal, newElem)
 					}
