@@ -178,7 +178,18 @@ func TestLogPollerFilters(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, logs, 0)
 	})
-	t.Run("MarkBackfilled updated corresponding filed", func(t *testing.T) {
+
+	genEnsureIsBackfilled := func(ctx context.Context, orm *DSORM) func([]int64, bool) {
+		return func(filterIDs []int64, expectedIsBackfilled bool) {
+			for _, filterID := range filterIDs {
+				filter, err := orm.GetFilterByID(ctx, filterID)
+				require.NoError(t, err)
+				require.Equal(t, expectedIsBackfilled, filter.IsBackfilled)
+			}
+		}
+	}
+
+	t.Run("MarkBackfilled updated corresponding field", func(t *testing.T) {
 		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 		chainID := uuid.NewString()
 		orm := NewORM(chainID, dbx, lggr)
@@ -187,22 +198,21 @@ func TestLogPollerFilters(t *testing.T) {
 		ctx := tests.Context(t)
 		filter.IsBackfilled = true
 		filterID, err := orm.InsertFilter(ctx, filter)
+		filterIDs := []int64{filterID}
 		require.NoError(t, err)
-		ensureIsBackfilled := func(expectedIsBackfilled bool) {
-			filter, err = orm.GetFilterByID(ctx, filterID)
-			require.NoError(t, err)
-			require.Equal(t, expectedIsBackfilled, filter.IsBackfilled)
-		}
-		ensureIsBackfilled(true)
+
+		ensureIsBackfilled := genEnsureIsBackfilled(ctx, orm)
+
+		ensureIsBackfilled(filterIDs, true)
 		// insert overrides
 		filter.IsBackfilled = false
 		_, err = orm.InsertFilter(ctx, filter)
 		require.NoError(t, err)
-		ensureIsBackfilled(false)
+		ensureIsBackfilled(filterIDs, false)
 		// mark changes value to true
 		err = orm.MarkFilterBackfilled(ctx, filterID)
 		require.NoError(t, err)
-		ensureIsBackfilled(true)
+		ensureIsBackfilled(filterIDs, true)
 	})
 }
 

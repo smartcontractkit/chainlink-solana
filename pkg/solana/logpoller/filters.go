@@ -402,6 +402,31 @@ func (fl *filters) MarkFilterBackfilled(ctx context.Context, filterID int64) err
 	return nil
 }
 
+// UpdateStartingBlocks will update the starting blocks of all backfilled filters to startingBlock
+// and set IsBackfilled=false for them. It will also update the starting blocks of any filters which
+// are already scheduled for backfilling, but only if the new startingBlock is less than the one they
+// currently have set. All filters will then be added to the filtersToBackfill index, so their logs will
+// be (re-)fetched from the specified starting point on the next iteration of the main LogPoller run loop.
+func (fl *filters) UpdateStartingBlocks(startingBlock int64) {
+	fl.filtersMutex.Lock()
+	defer fl.filtersMutex.Unlock()
+
+	startingBlocks := make(map[int64]int64, len(fl.filtersByID))
+	for id, filter := range fl.filtersByID {
+		newStartingBlock := filter.StartingBlock
+		if filter.IsBackfilled || startingBlock < newStartingBlock {
+			newStartingBlock = startingBlock
+		}
+		startingBlocks[id] = newStartingBlock
+	}
+
+	for id, blk := range startingBlocks {
+		fl.filtersByID[id].IsBackfilled = false
+		fl.filtersByID[id].StartingBlock = blk
+		fl.filtersToBackfill[id] = struct{}{}
+	}
+}
+
 // LoadFilters - loads filters from database. Can be called multiple times without side effects.
 func (fl *filters) LoadFilters(ctx context.Context) error {
 	if fl.loadedFilters.Load() {

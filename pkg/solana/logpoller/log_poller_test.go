@@ -209,6 +209,7 @@ func TestLogPoller_getLastProcessedSlot(t *testing.T) {
 }
 
 func TestLogPoller_processBlocksRange(t *testing.T) {
+	t.Parallel()
 	t.Run("Returns error if failed to start backfill", func(t *testing.T) {
 		lp := newMockedLP(t)
 		expectedErr := errors.New("failed to start backfill")
@@ -349,4 +350,81 @@ func TestProcess(t *testing.T) {
 	orm.EXPECT().MarkFilterDeleted(mock.Anything, mock.Anything).Return(nil).Once()
 	err = lp.UnregisterFilter(ctx, filter.Name)
 	require.NoError(t, err)
+}
+
+func Test_LogPoller_Replay(t *testing.T) {
+	t.Parallel()
+	fromBlock := int64(5)
+
+	lp := newMockedLP(t)
+	assertReplayInfo := func(requestBlock int64, status ReplayStatus) {
+		assert.Equal(t, requestBlock, lp.LogPoller.replay.requestBlock)
+		assert.Equal(t, status, lp.LogPoller.replay.status)
+	}
+
+	t.Run("ReplayInfo state initialized properly", func(t *testing.T) {
+		assertReplayInfo(0, ReplayStatusNoRequest)
+	})
+
+	t.Run("ordinary replay request", func(t *testing.T) {
+		lp.Filters.EXPECT().UpdateStartingBlocks(fromBlock).Once()
+		err := lp.LogPoller.Replay(fromBlock)
+		require.NoError(t, err)
+		assertReplayInfo(fromBlock, ReplayStatusRequested)
+	})
+
+	t.Run("redundant replay request", func(t *testing.T) {
+		lp.LogPoller.replay.requestBlock = fromBlock
+		lp.LogPoller.replay.status = ReplayStatusRequested
+		err := lp.LogPoller.Replay(fromBlock + 10)
+		require.NoError(t, err)
+		assertReplayInfo(fromBlock, ReplayStatusRequested)
+	})
+
+	t.Run("replay request updated", func(t *testing.T) {
+		lp.LogPoller.replay.status = ReplayStatusNoRequest
+		lp.Filters.EXPECT().UpdateStartingBlocks(fromBlock - 1).Once()
+		err := lp.LogPoller.Replay(fromBlock - 1)
+		require.NoError(t, err)
+		assertReplayInfo(fromBlock-1, ReplayStatusRequested)
+	})
+
+	t.Run("replay request updated while pending", func(t *testing.T) {
+		lp.LogPoller.replay.requestBlock = fromBlock
+		lp.LogPoller.replay.status = ReplayStatusPending
+		lp.Filters.EXPECT().UpdateStartingBlocks(fromBlock - 1).Once()
+		err := lp.LogPoller.Replay(fromBlock - 1)
+		require.NoError(t, err)
+		assertReplayInfo(fromBlock-1, ReplayStatusPending)
+	})
+
+	t.Run("checkForReplayRequest should not enter pending state if there are no requests", func(t *testing.T) {
+		lp.LogPoller.replay.requestBlock = 400
+		lp.LogPoller.replay.status = ReplayStatusComplete
+		assert.False(t, lp.LogPoller.checkForReplayRequest())
+		assertReplayInfo(400, ReplayStatusComplete)
+		assert.Equal(t, ReplayStatusComplete, lp.LogPoller.ReplayStatus())
+	})
+
+	t.Run("checkForReplayRequest should enter pending state if there is a new request", func(t *testing.T) {
+		lp.LogPoller.replay.status = ReplayStatusRequested
+		lp.LogPoller.replay.requestBlock = 18
+		assert.True(t, lp.LogPoller.checkForReplayRequest())
+		assertReplayInfo(18, ReplayStatusPending)
+		assert.Equal(t, ReplayStatusPending, lp.LogPoller.ReplayStatus())
+	})
+
+	t.Run("replayComplete enters ReplayComplete state", func(t *testing.T) {
+		lp.LogPoller.replay.requestBlock = 10
+		lp.LogPoller.replay.status = ReplayStatusPending
+		lp.LogPoller.replayComplete(8, 20)
+		assertReplayInfo(10, ReplayStatusComplete)
+	})
+
+	t.Run("replayComplete stays in pending state if lower block request received", func(t *testing.T) {
+		lp.LogPoller.replay.requestBlock = 3
+		lp.LogPoller.replay.status = ReplayStatusPending
+		lp.LogPoller.replayComplete(8, 20)
+		assertReplayInfo(3, ReplayStatusRequested)
+	})
 }
