@@ -118,6 +118,12 @@ pub mod contract_reader_interface {
         data.idx = test_idx;
         data.account = account.key();
         data.bump = ctx.bumps.data;
+
+    pub fn create_event(_ctx: Context<Initialize>, str_data: TestStructData) -> Result<()> {
+        emit!(TestEvent {
+            data: str_data,
+        });
+
         Ok(())
     }
 }
@@ -474,4 +480,8 @@ pub struct TimestampedPackedU224 {
 pub enum TokenAccountError {
     #[msg("Uninitialized token account")]
     UninitializedTokenAccount,
+
+#[event]
+pub struct TestEvent {
+    pub data: TestStructData,
 }
