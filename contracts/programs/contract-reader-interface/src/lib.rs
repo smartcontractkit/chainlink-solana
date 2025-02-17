@@ -106,6 +106,14 @@ pub mod contract_reader_interface {
 
         Ok(())
     }
+
+    pub fn create_event(_ctx: Context<Initialize>, str_data: TestStructData) -> Result<()> {
+        emit!(TestEvent {
+            data: str_data,
+        });
+
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -423,4 +431,9 @@ pub struct BillingTokenConfig {
 pub struct TimestampedPackedU224 {
     pub value: [u8; 28],
     pub timestamp: i64,
+}
+
+#[event]
+pub struct TestEvent {
+    pub data: TestStructData,
 }
