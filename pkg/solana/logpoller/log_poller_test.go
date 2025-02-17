@@ -362,7 +362,7 @@ func Test_LogPoller_Replay(t *testing.T) {
 		assert.Equal(t, status, lp.LogPoller.replay.status)
 	}
 
-	t.Run("ReplayInfo state initialized propery", func(t *testing.T) {
+	t.Run("ReplayInfo state initialized properly", func(t *testing.T) {
 		assertReplayInfo(0, ReplayStatusNoRequest)
 	})
 
