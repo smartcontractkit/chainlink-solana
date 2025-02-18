@@ -281,7 +281,7 @@ func CreateATAs(ctx context.Context, args any, lookups []ATALookup, derivedTable
 				Commitment: rpc.CommitmentFinalized,
 			})
 			if err == nil {
-				logger.Info("ATA already exists, skipping creation.", lookup.Location)
+				logger.Infow("ATA already exists, skipping creation.", "location", lookup.Location)
 				continue
 			}
 			if !strings.Contains(err.Error(), "not found") {
@@ -443,7 +443,7 @@ func (s *SolanaChainWriterService) GetFeeComponents(ctx context.Context) (*types
 		return nil, fmt.Errorf("gas estimator not available")
 	}
 
-	s.lggr.Debugw("Fetching fee components")
+	s.lggr.Debug("Fetching fee components")
 	fee := s.ge.BaseComputeUnitPrice()
 	return &types.ChainFeeComponents{
 		ExecutionFee:        new(big.Int).SetUint64(fee),
