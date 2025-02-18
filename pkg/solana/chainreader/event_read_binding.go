@@ -137,6 +137,8 @@ func (b *eventReadBinding) Unregister(ctx context.Context) error {
 	return b.filter.Unregister(ctx, b.reader)
 }
 
+// GetAddress for events returns a static address. Since solana contracts emit events, and not accounts, PDAs are not
+// valid for events.
 func (b *eventReadBinding) GetAddress(_ context.Context, _ any) (solana.PublicKey, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -188,6 +190,52 @@ func (b *eventReadBinding) Decode(ctx context.Context, bts []byte, outVal any) e
 	return b.codec.Decode(ctx, bts, outVal, itemType)
 }
 
+func (b *eventReadBinding) GetLatestValue(ctx context.Context, params, returnVal any) error {
+	itemType := codec.WrapItemType(true, b.namespace, b.genericName)
+
+	pubKey, err := b.GetAddress(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	offChain, err := b.normalizeParams(params, itemType)
+	if err != nil {
+		return err
+	}
+
+	subkeyFilters, err := b.extractFilterSubkeys(offChain)
+	if err != nil {
+		return err
+	}
+
+	allFilters := []query.Expression{
+		logpoller.NewAddressFilter(pubKey),
+		logpoller.NewEventSigFilter(b.eventSig[:]),
+	}
+
+	if len(subkeyFilters) > 0 {
+		allFilters = append(allFilters, query.And(subkeyFilters...))
+	}
+
+	limiter := query.NewLimitAndSort(query.CountLimit(1), query.NewSortBySequence(query.Desc))
+
+	filter, err := logpoller.Where(allFilters...)
+	if err != nil {
+		return err
+	}
+
+	logs, err := b.reader.FilteredLogs(ctx, filter, limiter, b.namespace+"-"+pubKey.String()+"-"+b.genericName)
+	if err != nil {
+		return err
+	}
+
+	if len(logs) == 0 {
+		return fmt.Errorf("%w: no events found", types.ErrNotFound)
+	}
+
+	return asValueDotValue(ctx, b, returnVal, b.wrapDecoderForValuer(&logs[0]))
+}
+
 func (b *eventReadBinding) QueryKey(
 	ctx context.Context,
 	filter query.KeyFilter,
@@ -226,6 +274,59 @@ func (b *eventReadBinding) QueryKey(
 	}
 
 	return sequences, nil
+}
+
+func (b *eventReadBinding) normalizeParams(value any, itemType string) (any, error) {
+	offChain, err := b.codec.CreateType(itemType, true)
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to create type: %w", types.ErrInvalidType, err)
+	}
+
+	// params can be a singular primitive value, a map of values, or a struct
+	// in the case that the input params are presented as a map of values, apply the values to the off-chain type
+	// with solana hooks
+	if err = codec.MapstructureDecode(value, offChain); err != nil {
+		return nil, fmt.Errorf("%w: failed to decode offChain value: %s", types.ErrInternal, err.Error())
+	}
+
+	return offChain, nil
+}
+
+func (b *eventReadBinding) extractFilterSubkeys(offChainParams any) ([]query.Expression, error) {
+	var expressions []query.Expression
+
+	for offChainKey, idx := range b.indexedSubKeys.lookup {
+		itemType := codec.WrapItemType(true, b.namespace, b.genericName+"."+offChainKey)
+
+		fieldVal, err := valueForPath(reflect.ValueOf(offChainParams), offChainKey)
+		if err != nil {
+			return nil, fmt.Errorf("%w: no value for path %s", types.ErrInternal, b.genericName+"."+offChainKey)
+		}
+
+		onChainValue, err := b.modifier.TransformToOnChain(fieldVal, itemType)
+		if err != nil {
+			return nil, fmt.Errorf("%w: failed to apply on-chain transformation for key %s", types.ErrInternal, offChainKey)
+		}
+
+		valOf := reflect.ValueOf(onChainValue)
+
+		// check that onChainValue is not zero value for type
+		if valOf.IsZero() {
+			continue
+		}
+
+		expression, err := logpoller.NewEventBySubKeyFilter(
+			idx,
+			[]primitives.ValueComparator{{Value: reflect.Indirect(valOf).Interface(), Operator: primitives.Eq}},
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		expressions = append(expressions, expression)
+	}
+
+	return expressions, nil
 }
 
 func (b *eventReadBinding) remapPrimitive(expression query.Expression) (query.Expression, error) {
@@ -344,6 +445,12 @@ func (b *eventReadBinding) registered() bool {
 	return b.registerCalled
 }
 
+func (b *eventReadBinding) wrapDecoderForValuer(log *logpoller.Log) func(context.Context, any) error {
+	return func(ctx context.Context, returnVal any) error {
+		return b.decodeLog(ctx, log, returnVal)
+	}
+}
+
 type remapHelper struct {
 	primitive func(query.Expression) (query.Expression, error)
 }
@@ -405,4 +512,37 @@ func (k *indexedSubkeys) indexForKey(key string) (uint64, bool) {
 	idx, ok := k.lookup[key]
 
 	return idx, ok
+}
+
+func valueForPath(from reflect.Value, itemType string) (any, error) {
+	if itemType == "" {
+		return from.Interface(), nil
+	}
+
+	switch from.Kind() {
+	case reflect.Pointer:
+		elem, err := valueForPath(from.Elem(), itemType)
+		if err != nil {
+			return nil, err
+		}
+
+		return elem, nil
+	case reflect.Array, reflect.Slice:
+		return nil, fmt.Errorf("%w: cannot extract a field from an array or slice", types.ErrInvalidType)
+	case reflect.Struct:
+		head, tail := commoncodec.ItemTyper(itemType).Next()
+
+		field := from.FieldByName(head)
+		if !field.IsValid() {
+			return nil, fmt.Errorf("%w: field not found for path %s and itemType %s", types.ErrInvalidType, from, itemType)
+		}
+
+		if tail == "" {
+			return field.Interface(), nil
+		}
+
+		return valueForPath(field, tail)
+	default:
+		return nil, fmt.Errorf("%w: cannot extract a field from kind %s", types.ErrInvalidType, from.Kind())
+	}
 }
