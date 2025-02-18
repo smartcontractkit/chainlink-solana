@@ -119,13 +119,19 @@ pub mod contract_reader_interface {
         data.account = account.key();
         data.bump = ctx.bumps.data;
 
-    pub fn create_event(_ctx: Context<Initialize>, str_data: TestStructData) -> Result<()> {
+    pub fn createevent(_ctx: Context<Events>, data: TestStructData) -> Result<()> {
         emit!(TestEvent {
-            data: str_data,
+            data: data,
         });
 
         Ok(())
     }
+}
+
+#[derive(Accounts)]
+pub struct Events<'info> {
+    pub signer: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
