@@ -76,7 +76,7 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 	results := make([]batchResultWithErr, len(batch))
 
 	// create the list of public keys to fetch
-	keys := []solana.PublicKey{}
+	var keys []solana.PublicKey
 
 	// map batch call index to key index (some calls are event reads and will be handled by a different binding)
 	dataMap := make(map[int]int)
@@ -112,7 +112,6 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 	}
 
 	// Fetch the account data
-	results := make([]batchResultWithErr, len(batch))
 	data, err := client.GetMultipleAccountData(ctx, keys...)
 	if err != nil {
 		return nil, err
