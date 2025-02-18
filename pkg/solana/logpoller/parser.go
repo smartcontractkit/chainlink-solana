@@ -412,12 +412,12 @@ func orderToString(dir query.SortDirection) (string, error) {
 }
 
 type addressFilter struct {
-	address solana.PublicKey
+	address string
 }
 
 func NewAddressFilter(address solana.PublicKey) query.Expression {
 	return query.Expression{
-		Primitive: &addressFilter{address: address},
+		Primitive: &addressFilter{address: address.String()},
 	}
 }
 
