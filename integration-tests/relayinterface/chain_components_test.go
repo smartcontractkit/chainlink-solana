@@ -368,9 +368,8 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 					AddressToShare []byte
 				}
 
-				c := int16(0)
 				mRR := MultiReadResult{}
-				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(ReadWithAddressHardCodedIntoResponse), primitives.Unconfirmed, nil, &c))
+				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(ReadWithAddressHardCodedIntoResponse), primitives.Unconfirmed, nil, &mRR))
 
 				expectedMRR := MultiReadResult{A: 1, B: 2, SharedAddress: boundAddress.Bytes(), AddressToShare: boundAddress.Bytes()}
 				require.Equal(t, expectedMRR, mRR)
