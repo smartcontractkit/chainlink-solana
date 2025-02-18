@@ -290,9 +290,14 @@ func (s *ContractReaderService) QueryKey(ctx context.Context, contract types.Bou
 		return nil, err
 	}
 
+	eBinding, ok := binding.(eventBinding)
+	if !ok {
+		return nil, fmt.Errorf("%w: invalid binding type for %s", types.ErrInvalidType, contract.Name)
+	}
+
 	_, isValuePtr := sequenceDataType.(*values.Value)
 	if !isValuePtr {
-		return binding.QueryKey(ctx, filter, limitAndSort, sequenceDataType)
+		return eBinding.QueryKey(ctx, filter, limitAndSort, sequenceDataType)
 	}
 
 	dataTypeFromReadIdentifier, err := s.CreateContractType(contract.ReadIdentifier(filter.Key), false)
@@ -300,7 +305,7 @@ func (s *ContractReaderService) QueryKey(ctx context.Context, contract types.Bou
 		return nil, err
 	}
 
-	sequence, err := binding.QueryKey(ctx, filter, limitAndSort, dataTypeFromReadIdentifier)
+	sequence, err := eBinding.QueryKey(ctx, filter, limitAndSort, dataTypeFromReadIdentifier)
 	if err != nil {
 		return nil, err
 	}
@@ -463,7 +468,7 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 		isPDA = true
 	}
 
-	if err := s.addAccountReadToCodec(s.parsed, namespace, genericName, idl, inputIDLDef, outputIDLDef, readDefinition); err != nil {
+	if err := s.addReadToCodec(s.parsed, namespace, genericName, idl, inputIDLDef, outputIDLDef, readDefinition); err != nil {
 		return err
 	}
 
@@ -473,7 +478,7 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 	return nil
 }
 
-func (s *ContractReaderService) addAccountReadToCodec(parsed *codec.ParsedTypes, namespace string, genericName string, idl codec.IDL, inputIDLDef interface{}, outputIDLDef codec.IdlTypeDef, readDefinition config.ReadDefinition) error {
+func (s *ContractReaderService) addReadToCodec(parsed *codec.ParsedTypes, namespace string, genericName string, idl codec.IDL, inputIDLDef interface{}, outputIDLDef interface{}, readDefinition config.ReadDefinition) error {
 	if err := s.addCodecDef(parsed, true, namespace, genericName, idl, inputIDLDef, readDefinition.InputModifications); err != nil {
 		return err
 	}
@@ -510,7 +515,7 @@ func (s *ContractReaderService) addMultiAccountReadToCodec(namespace string, rea
 		// multi read defs don't have a generic name as they are accessed from the parent read which does have a generic name.
 		// generic name is used everywhere, so add a prefix to avoid potential collision with generic names of other reads.
 		genericName := "multiread-" + mr.ChainSpecificName
-		if err = s.addAccountReadToCodec(s.parsed, namespace, genericName, idl, inputIDLDef, accountIDLDef, mr); err != nil {
+		if err = s.addReadToCodec(s.parsed, namespace, genericName, idl, inputIDLDef, accountIDLDef, mr); err != nil {
 			return nil, fmt.Errorf("failed to add read to multi read %q: %w", mr.ChainSpecificName, err)
 		}
 
@@ -554,7 +559,7 @@ func (s *ContractReaderService) addAddressResponseHardCoderModifier(namespace st
 
 			readDef := rb.GetReadDefinition()
 			readDef.OutputModifications = append(readDef.OutputModifications, hardCoder)
-			if err = s.addAccountReadToCodec(parsed, namespace, rb.GetGenericName(), idl, inputIDlType, outputIDLType, readDef); err != nil {
+			if err = s.addReadToCodec(parsed, namespace, rb.GetGenericName(), idl, inputIDlType, outputIDLType, readDef); err != nil {
 				return fmt.Errorf("failed to set codec with address response hardcoder for read: %q: %w", rb.GetGenericName(), err)
 			}
 
@@ -604,6 +609,12 @@ func (s *ContractReaderService) addEventRead(
 	applyIndexedFieldTuple(subkeys, conf.IndexedField2, 2)
 	applyIndexedFieldTuple(subkeys, conf.IndexedField3, 3)
 
+	eventDef := codec.EventIDLTypes{Event: eventIdl, Types: idl.Types}
+
+	if err := s.addReadToCodec(s.parsed, namespace, genericName, idl, eventIdl, eventIdl, readDefinition); err != nil {
+		return err
+	}
+
 	reader := newEventReadBinding(
 		namespace,
 		genericName,
@@ -614,7 +625,7 @@ func (s *ContractReaderService) addEventRead(
 	)
 
 	s.shouldStartLP = true
-	reader.SetFilter(toLPFilter(readDefinition.ChainSpecificName, pf, subkeys.subKeys[:], codec.EventIDLTypes{Event: eventIdl, Types: idl.Types}))
+	reader.SetFilter(toLPFilter(readDefinition.ChainSpecificName, pf, subkeys.subKeys[:], eventDef))
 
 	s.bdRegistry.AddReader(namespace, genericName, reader)
 

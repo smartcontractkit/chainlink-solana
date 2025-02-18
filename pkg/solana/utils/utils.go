@@ -15,7 +15,6 @@ import (
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 )
 

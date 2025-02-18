@@ -37,6 +37,10 @@ type readBinding interface {
 	Unregister(context.Context) error
 	CreateType(bool) (any, error)
 	Decode(context.Context, []byte, any) error
+}
+
+type eventBinding interface {
+	GetLatestValue(_ context.Context, params, returnVal any) error
 	QueryKey(context.Context, query.KeyFilter, query.LimitAndSort, any) ([]types.Sequence, error)
 }
 

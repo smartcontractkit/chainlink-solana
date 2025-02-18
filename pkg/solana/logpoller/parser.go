@@ -496,3 +496,22 @@ func makeComp(comp IndexedValueComparator, args *queryArgs, field, subfield, pat
 		args.withIndexedField(field, comp.Value),
 	), nil
 }
+
+// Where is a query.Where wrapper that ignores the Key and returns a slice of query.Expression rather than
+// query.KeyFilter. If no expressions are provided, or an error occurs, an empty slice is returned.
+func Where(expressions ...query.Expression) ([]query.Expression, error) {
+	filter, err := query.Where(
+		"",
+		expressions...,
+	)
+
+	if err != nil {
+		return []query.Expression{}, err
+	}
+
+	if filter.Expressions == nil {
+		return []query.Expression{}, nil
+	}
+
+	return filter.Expressions, nil
+}

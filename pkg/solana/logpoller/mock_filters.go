@@ -564,6 +564,39 @@ func (_c *mockFilters_UnregisterFilter_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
+// UpdateStartingBlocks provides a mock function with given fields: startingBlocks
+func (_m *mockFilters) UpdateStartingBlocks(startingBlocks int64) {
+	_m.Called(startingBlocks)
+}
+
+// mockFilters_UpdateStartingBlocks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateStartingBlocks'
+type mockFilters_UpdateStartingBlocks_Call struct {
+	*mock.Call
+}
+
+// UpdateStartingBlocks is a helper method to define mock.On call
+//   - startingBlocks int64
+func (_e *mockFilters_Expecter) UpdateStartingBlocks(startingBlocks interface{}) *mockFilters_UpdateStartingBlocks_Call {
+	return &mockFilters_UpdateStartingBlocks_Call{Call: _e.mock.On("UpdateStartingBlocks", startingBlocks)}
+}
+
+func (_c *mockFilters_UpdateStartingBlocks_Call) Run(run func(startingBlocks int64)) *mockFilters_UpdateStartingBlocks_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(int64))
+	})
+	return _c
+}
+
+func (_c *mockFilters_UpdateStartingBlocks_Call) Return() *mockFilters_UpdateStartingBlocks_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *mockFilters_UpdateStartingBlocks_Call) RunAndReturn(run func(int64)) *mockFilters_UpdateStartingBlocks_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // newMockFilters creates a new instance of mockFilters. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func newMockFilters(t interface {

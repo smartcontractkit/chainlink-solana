@@ -426,7 +426,7 @@ func TestFilters_GetFiltersToBackfill(t *testing.T) {
 	ensureInQueue(notBackfilled, Filter{ID: 3, Name: "new filter"})
 }
 
-func TestExtractField(t *testing.T) {
+func TestFilters_ExtractField(t *testing.T) {
 	type innerInner struct {
 		P string
 		Q int
@@ -484,6 +484,79 @@ func TestExtractField(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, c.Result, result)
+		})
+	}
+}
+
+func TestFilters_UpdateStartingBlocks(t *testing.T) {
+	orm := NewMockORM(t)
+	lggr := logger.Sugared(logger.Test(t))
+	filters := newFilters(lggr, orm)
+
+	origFilters := []Filter{{
+		ID:            1,
+		Name:          "backfilled",
+		StartingBlock: 29500,
+		IsBackfilled:  true,
+	}, {
+		ID:            2,
+		StartingBlock: 52000,
+		Name:          "notBackfilled",
+	}}
+	ids := make([]int64, 2)
+	for i, filter := range origFilters {
+		ids[i] = filter.ID
+	}
+
+	var err error
+
+	cases := []struct {
+		name           string
+		replayBlock    int64
+		expectedBlocks []int64
+	}{
+		{
+			name:           "updates StartingBlock of both filters",
+			replayBlock:    51500,
+			expectedBlocks: []int64{51500, 51500}},
+		{
+			name:           "updates StartingBlock of backfilled filter",
+			replayBlock:    53000,
+			expectedBlocks: []int64{53000, origFilters[1].StartingBlock},
+		},
+	}
+
+	orm.EXPECT().SelectFilters(mock.Anything).Return(origFilters, nil).Once()
+	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{
+		1: 18,
+		2: 25,
+	}, nil)
+
+	err = filters.LoadFilters(tests.Context(t))
+	require.NoError(t, err)
+	// ensure both filters were loaded
+	require.Equal(t, origFilters[0], *filters.filtersByID[ids[0]])
+	require.Equal(t, origFilters[1], *filters.filtersByID[ids[1]])
+	// ensure non-backfilled filters were added to filtersToBackfill
+	require.Len(t, filters.filtersToBackfill, 1)
+	require.Contains(t, filters.filtersToBackfill, origFilters[1].ID)
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			newFilters := make([]Filter, len(origFilters))
+			copy(newFilters, origFilters)
+			filters.filtersByID[ids[0]] = &newFilters[0]
+			filters.filtersByID[ids[1]] = &newFilters[1]
+			filters.filtersToBackfill = map[int64]struct{}{ids[0]: {}}
+			filters.UpdateStartingBlocks(tt.replayBlock)
+			assert.Len(t, filters.filtersToBackfill, 2) // all filters should end up in the backfill queue
+
+			for i, id := range ids {
+				assert.Equal(t, tt.expectedBlocks[i], filters.filtersByID[id].StartingBlock,
+					"unexpected starting block for \"%s\" filter", filters.filtersByID[id].Name)
+				assert.False(t, filters.filtersByID[id].IsBackfilled)
+				assert.Contains(t, filters.filtersToBackfill, id)
+			}
 		})
 	}
 }
