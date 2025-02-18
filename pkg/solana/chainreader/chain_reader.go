@@ -197,10 +197,11 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 
 	batch := []call{
 		{
-			Namespace: values.contract,
-			ReadName:  values.reads[0].readName,
-			Params:    params,
-			ReturnVal: returnVal,
+			Namespace:               values.contract,
+			ReadName:                values.reads[0].readName,
+			Params:                  params,
+			ReturnVal:               returnVal,
+			ErrOnMissingAccountData: values.reads[0].errOnMissingAccountData,
 		},
 	}
 
@@ -261,10 +262,11 @@ func (s *ContractReaderService) BatchGetLatestValues(ctx context.Context, reques
 			}
 
 			batch = append(batch, call{
-				Namespace: bound.Name,
-				ReadName:  readReq.ReadName,
-				Params:    readReq.Params,
-				ReturnVal: readReq.ReturnVal,
+				Namespace:               bound.Name,
+				ReadName:                readReq.ReadName,
+				Params:                  readReq.Params,
+				ReturnVal:               readReq.ReturnVal,
+				ErrOnMissingAccountData: vals.reads[0].errOnMissingAccountData,
 			})
 		}
 	}
@@ -446,7 +448,7 @@ func (s *ContractReaderService) initNamespace(namespaces map[string]config.Chain
 }
 
 func (s *ContractReaderService) addAccountRead(namespace string, genericName string, idl codec.IDL, outputIDLDef codec.IdlTypeDef, readDefinition config.ReadDefinition) error {
-	reads := []read{{readName: genericName, useParams: true}}
+	reads := []read{{readName: genericName, useParams: true, errOnMissingAccountData: readDefinition.ErrOnMissingAccountData}}
 	if readDefinition.MultiReader != nil {
 		multiRead, err := s.addMultiAccountReadToCodec(namespace, readDefinition, idl)
 		if err != nil {
@@ -517,8 +519,9 @@ func (s *ContractReaderService) addMultiAccountReadToCodec(namespace string, rea
 
 		s.bdRegistry.AddReader(namespace, genericName, newAccountReadBinding(namespace, genericName, isPDA, mr.PDADefinition.Prefix, idl, inputIDLDef, accountIDLDef, readDefinition))
 		reads = append(reads, read{
-			readName:  genericName,
-			useParams: readDefinition.MultiReader.ReuseParams,
+			readName:                genericName,
+			useParams:               readDefinition.MultiReader.ReuseParams,
+			errOnMissingAccountData: mr.ErrOnMissingAccountData,
 		})
 	}
 

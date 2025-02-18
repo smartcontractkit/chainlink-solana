@@ -14,8 +14,9 @@ import (
 )
 
 type call struct {
-	Namespace, ReadName string
-	Params, ReturnVal   any
+	Namespace, ReadName     string
+	Params, ReturnVal       any
+	ErrOnMissingAccountData bool
 }
 
 type batchResultWithErr struct {
@@ -38,9 +39,10 @@ func doMultiRead(ctx context.Context, lggr logger.Logger, client MultipleAccount
 	batch := make([]call, len(rv.reads))
 	for idx, r := range rv.reads {
 		batch[idx] = call{
-			Namespace: rv.contract,
-			ReadName:  r.readName,
-			ReturnVal: returnValue,
+			Namespace:               rv.contract,
+			ReadName:                r.readName,
+			ReturnVal:               returnValue,
+			ErrOnMissingAccountData: r.errOnMissingAccountData,
 		}
 		if r.useParams {
 			batch[idx].Params = params
@@ -103,8 +105,11 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 		}
 
 		if len(data[idx]) == 0 {
+			if batchCall.ErrOnMissingAccountData {
+				results[idx].err = ErrMissingAccountData
+				continue
+			}
 			lggr.Infow("failed to find account, returning zero value instead", "namespace", batchCall.Namespace, "readName", batchCall.ReadName, "address", address)
-			// TODO: add flag to enforce returning an error, e.g. ErrMissingAccountData
 			continue
 		}
 
