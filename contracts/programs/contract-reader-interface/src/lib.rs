@@ -107,9 +107,9 @@ pub mod contract_reader_interface {
         Ok(())
     }
 
-    pub fn create_event(_ctx: Context<Initialize>, str_data: TestStructData) -> Result<()> {
+    pub fn createevent(_ctx: Context<Initialize>, data: TestStructData) -> Result<()> {
         emit!(TestEvent {
-            data: str_data,
+            data: data,
         });
 
         Ok(())

@@ -102,7 +102,7 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 		ContractReaderGetLatestValueWithFilteringForEvent,
 		// query key not implemented yet
 		// ContractReaderQueryKeyNotFound,
-		ContractReaderQueryKeyReturnsData,
+		// ContractReaderQueryKeyReturnsData,
 		ContractReaderQueryKeyReturnsDataAsValuesDotValue,
 		ContractReaderQueryKeyCanFilterWithValueComparator,
 		ContractReaderQueryKeyCanLimitResultsWithCursor,
@@ -797,7 +797,6 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 	pdaStructDataPrefix := []byte("struct_data")
 	pdaStructDataPrefix = binary.LittleEndian.AppendUint64(pdaStructDataPrefix, idx)
 	testStruct := CreateTestStruct(0, it)
-	locator := commoncodec.ElementExtractorLocationFirst
 	uint64ReadDef := config.ReadDefinition{
 		ChainSpecificName: "DataAccount",
 		ReadType:          config.Account,
@@ -983,20 +982,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 						ChainSpecificName: "TestEvent",
 						ReadType:          config.Event,
 						OutputModifications: commoncodec.ModifiersConfig{
-							&commoncodec.ElementExtractorModifierConfig{
-								Extractions: map[string]*commoncodec.ElementExtractorLocation{"Data": &locator},
-							},
-							&commoncodec.HardCodeModifierConfig{
-								OnChainValues: map[string]any{
-									"DifferentField":              copy(make([]byte, 32), []byte(testStruct.DifferentField)),
-									"NestedDynamicStruct.Inner.S": copy(make([]byte, 32), []byte(testStruct.NestedDynamicStruct.Inner.S)),
-								},
-								OffChainValues: map[string]any{
-									"ExtraField":                  AnyExtraValue,
-									"DifferentField":              testStruct.DifferentField,
-									"NestedDynamicStruct.Inner.S": testStruct.NestedDynamicStruct.Inner.S,
-								},
-							},
+							&commoncodec.PropertyExtractorConfig{FieldName: "Data"},
 							&commoncodec.AddressBytesToStringModifierConfig{
 								Fields: []string{"AccountStruct.AccountStr"},
 							},
@@ -1348,6 +1334,43 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								}},
 								Seeds: []chainwriter.Seed{
 									{Static: []byte("struct_data")},
+									{Static: testIdx},
+								},
+								IsWritable: true,
+								IsSigner:   false,
+							}},
+							{AccountConstant: &chainwriter.AccountConstant{
+								Name:       "SystemProgram",
+								Address:    solana.SystemProgramID.String(),
+								IsWritable: false,
+								IsSigner:   false,
+							}},
+						},
+						DebugIDLocation: "",
+					},
+					MethodTriggeringEvent: {
+						FromAddress: fromAddress,
+						InputModifications: []commoncodec.ModifierConfig{
+							&commoncodec.AddressBytesToStringModifierConfig{
+								Fields: []string{"Data.AccountStruct.AccountStr"},
+							},
+						},
+						ChainSpecificName: "createevent",
+						LookupTables:      chainwriter.LookupTables{},
+						Accounts: []chainwriter.Lookup{
+							{AccountConstant: &chainwriter.AccountConstant{
+								Name:       "Signer",
+								Address:    fromAddress,
+								IsSigner:   true,
+								IsWritable: true,
+							}},
+							{PDALookups: &chainwriter.PDALookups{
+								Name: "Account",
+								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+									Address: primaryProgramPubKey,
+								}},
+								Seeds: []chainwriter.Seed{
+									{Static: []byte("data")},
 									{Static: testIdx},
 								},
 								IsWritable: true,
