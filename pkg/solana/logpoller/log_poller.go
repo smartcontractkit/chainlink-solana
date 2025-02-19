@@ -175,17 +175,23 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 			return err
 		}
 
-		log.SubkeyValues = make([]IndexedValue, 0, len(filter.SubkeyPaths))
-		for _, path := range filter.SubkeyPaths {
+		log.SubkeyValues = make([]IndexedValue, len(filter.SubkeyPaths))
+		for idx, path := range filter.SubkeyPaths {
+			if len(path) == 0 {
+				continue
+			}
+
 			subKeyVal, decodeSubKeyErr := lp.filters.DecodeSubKey(ctx, lp.lggr, log.Data, filter.ID, path)
 			if decodeSubKeyErr != nil {
 				return decodeSubKeyErr
 			}
+
 			indexedVal, newIndexedValErr := newIndexedValue(subKeyVal)
 			if newIndexedValErr != nil {
 				return newIndexedValErr
 			}
-			log.SubkeyValues = append(log.SubkeyValues, indexedVal)
+
+			log.SubkeyValues[idx] = indexedVal
 		}
 
 		log.SequenceNum = lp.filters.IncrementSeqNum(filter.ID)

@@ -429,12 +429,16 @@ func (f *addressFilter) Accept(visitor primitives.Visitor) {
 }
 
 type eventSigFilter struct {
-	eventSig []byte
+	eventSig EventSignature
 }
 
 func NewEventSigFilter(sig []byte) query.Expression {
+	var eventSig EventSignature
+
+	copy(eventSig[:], sig[:])
+
 	return query.Expression{
-		Primitive: &eventSigFilter{eventSig: sig},
+		Primitive: &eventSigFilter{eventSig: eventSig},
 	}
 }
 
