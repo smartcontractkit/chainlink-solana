@@ -21,7 +21,7 @@ const (
 	txHashFieldName       = "tx_hash"
 	addressFieldName      = "address"
 	eventSigFieldName     = "event_sig"
-	defaultSort           = "block_number ASC, log_index ASC"
+	defaultSort           = "block_number DESC, log_index DESC"
 	subKeyValuesFieldName = "subkey_values"
 	subKeyValueArg        = "subkey_value"
 	subKeyIndexArgName    = "subkey_index"
@@ -412,12 +412,12 @@ func orderToString(dir query.SortDirection) (string, error) {
 }
 
 type addressFilter struct {
-	address solana.PublicKey
+	address PublicKey
 }
 
 func NewAddressFilter(address solana.PublicKey) query.Expression {
 	return query.Expression{
-		Primitive: &addressFilter{address: address},
+		Primitive: &addressFilter{address: PublicKey(address)},
 	}
 }
 
@@ -429,10 +429,10 @@ func (f *addressFilter) Accept(visitor primitives.Visitor) {
 }
 
 type eventSigFilter struct {
-	eventSig []byte
+	eventSig EventSignature
 }
 
-func NewEventSigFilter(sig []byte) query.Expression {
+func NewEventSigFilter(sig EventSignature) query.Expression {
 	return query.Expression{
 		Primitive: &eventSigFilter{eventSig: sig},
 	}

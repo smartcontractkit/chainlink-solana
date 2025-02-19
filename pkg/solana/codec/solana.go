@@ -430,7 +430,7 @@ func getUIntCodecByStringType(curType IdlTypeAsString, builder commonencodings.B
 	case IdlTypeU64:
 		return builder.Uint64(), nil
 	case IdlTypeU128:
-		return builder.BigInt(16, true)
+		return builder.BigInt(16, false)
 	default:
 		return nil, fmt.Errorf(unknownIDLFormat, commontypes.ErrInvalidConfig, curType)
 	}
