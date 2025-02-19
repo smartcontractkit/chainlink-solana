@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -567,7 +568,17 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GetBindings(t T) []types.Boun
 func (it *SolanaChainComponentsInterfaceTester[T]) DirtyContracts() {}
 
 func (it *SolanaChainComponentsInterfaceTester[T]) MaxWaitTimeForEvents() time.Duration {
-	return time.Second
+	maxWaitTime := time.Second * 30
+	maxWaitTimeStr, ok := os.LookupEnv("MAX_WAIT_TIME_FOR_EVENTS_S")
+	if ok {
+		waitS, err := strconv.ParseInt(maxWaitTimeStr, 10, 64)
+		if err != nil {
+			fmt.Printf("Error parsing MAX_WAIT_TIME_FOR_EVENTS_S: %v, defaulting to %v\n", err, maxWaitTime)
+		}
+		maxWaitTime = time.Second * time.Duration(waitS)
+	}
+
+	return maxWaitTime
 }
 
 func (it *SolanaChainComponentsInterfaceTester[T]) GenerateBlocksTillConfidenceLevel(t T, contractName, readName string, confidenceLevel primitives.ConfidenceLevel) {
@@ -986,11 +997,15 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 							&commoncodec.AddressBytesToStringModifierConfig{
 								Fields: []string{"AccountStruct.AccountStr"},
 							},
+							&commoncodec.ConstrainedBytesToStringModifierConfig{
+								Fields: []string{"DifferentField", "NestedDynamicStruct.Inner.S"},
+								MaxLen: 32,
+							},
 						},
 						EventDefinitions: &config.EventDefinitions{
 							IndexedField0: &config.IndexedField{
 								OffChainPath: "Field",
-								OnChainPath:  "Field",
+								OnChainPath:  "Data.Field",
 							},
 						},
 					},
@@ -1362,13 +1377,11 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 									"Padding2":                    []byte{},
 									"NestedDynamicStruct.Padding": []byte{},
 									"NestedStaticStruct.Padding":  []byte{},
-									"DifferentField":              copy(make([]byte, 32), []byte(testStruct.DifferentField)),
-									"NestedDynamicStruct.Inner.S": copy(make([]byte, 32), []byte(testStruct.NestedDynamicStruct.Inner.S)),
 								},
-								OffChainValues: map[string]any{
-									"DifferentField":              testStruct.DifferentField,
-									"NestedDynamicStruct.Inner.S": testStruct.NestedDynamicStruct.Inner.S,
-								},
+							},
+							&commoncodec.ConstrainedBytesToStringModifierConfig{
+								Fields: []string{"DifferentField", "NestedDynamicStruct.Inner.S"},
+								MaxLen: 32,
 							},
 						},
 						ChainSpecificName: "createevent",

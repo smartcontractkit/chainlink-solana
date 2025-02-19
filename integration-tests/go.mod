@@ -11,11 +11,12 @@ require (
 	github.com/gagliardetto/solana-go v1.12.0
 	github.com/go-resty/resty/v2 v2.15.3
 	github.com/google/uuid v1.6.0
+	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/rs/zerolog v1.33.0
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250206215114-fb6c3c35e8e3
-	github.com/smartcontractkit/chainlink-common v0.4.2-0.20250205141137-8f50d72601bb
+	github.com/smartcontractkit/chainlink-common v0.4.2-0.20250219182448-627ef4d2dd99
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250213035259-e727e73f6181
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.51.0
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.10
@@ -239,7 +240,6 @@ require (
 	github.com/jackc/pgx/v4 v4.18.3 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jmhodges/levigo v1.0.0 // indirect
-	github.com/jmoiron/sqlx v1.4.0 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/jonboulle/clockwork v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
