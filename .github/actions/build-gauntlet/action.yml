@@ -12,7 +12,7 @@ runs:
       id: tool-versions
 
     - name: Setup Node ${{ steps.tool-versions.outputs.nodejs_version }}
-      uses: actions/setup-node@v4.0.2
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ steps.tool-versions.outputs.nodejs_version }}
 
