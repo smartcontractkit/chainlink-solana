@@ -932,7 +932,6 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 	pdaDataPrefix = binary.LittleEndian.AppendUint64(pdaDataPrefix, idx)
 	pdaStructDataPrefix := []byte("struct_data")
 	pdaStructDataPrefix = binary.LittleEndian.AppendUint64(pdaStructDataPrefix, idx)
-	testStruct := CreateTestStruct(0, it)
 	uint64ReadDef := config.ReadDefinition{
 		ChainSpecificName: "DataAccount",
 		ReadType:          config.Account,
@@ -1084,18 +1083,16 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
 							&commoncodec.HardCodeModifierConfig{
-								OnChainValues: map[string]any{
-									"DifferentField":              copy(make([]byte, 32), []byte(testStruct.DifferentField)),
-									"NestedDynamicStruct.Inner.S": copy(make([]byte, 32), []byte(testStruct.NestedDynamicStruct.Inner.S)),
-								},
 								OffChainValues: map[string]any{
-									"ExtraField":                  AnyExtraValue,
-									"DifferentField":              testStruct.DifferentField,
-									"NestedDynamicStruct.Inner.S": testStruct.NestedDynamicStruct.Inner.S,
+									"ExtraField": AnyExtraValue,
 								},
 							},
 							&commoncodec.AddressBytesToStringModifierConfig{
 								Fields: []string{"AccountStruct.AccountStr"},
+							},
+							&commoncodec.ConstrainedBytesToStringModifierConfig{
+								Fields: []string{"DifferentField", "NestedDynamicStruct.Inner.S"},
+								MaxLen: 32,
 							},
 						},
 					},
@@ -1105,19 +1102,12 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 							Prefix: pdaStructDataPrefix,
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
-							&commoncodec.HardCodeModifierConfig{
-								OnChainValues: map[string]any{
-									"DifferentField":              copy(make([]byte, 32), []byte(testStruct.DifferentField)),
-									"NestedDynamicStruct.Inner.S": copy(make([]byte, 32), []byte(testStruct.NestedDynamicStruct.Inner.S)),
-								},
-								OffChainValues: map[string]any{
-									"ExtraField":                  AnyExtraValue,
-									"DifferentField":              testStruct.DifferentField,
-									"NestedDynamicStruct.Inner.S": testStruct.NestedDynamicStruct.Inner.S,
-								},
-							},
 							&commoncodec.AddressBytesToStringModifierConfig{
 								Fields: []string{"AccountStruct.AccountStr"},
+							},
+							&commoncodec.ConstrainedBytesToStringModifierConfig{
+								Fields: []string{"DifferentField", "NestedDynamicStruct.Inner.S"},
+								MaxLen: 32,
 							},
 						},
 					},
@@ -1499,13 +1489,11 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 									"Data.Padding2":                    []byte{},
 									"Data.NestedDynamicStruct.Padding": []byte{},
 									"Data.NestedStaticStruct.Padding":  []byte{},
-									"Data.DifferentField":              copy(make([]byte, 32), []byte(testStruct.DifferentField)),
-									"Data.NestedDynamicStruct.Inner.S": copy(make([]byte, 32), []byte(testStruct.NestedDynamicStruct.Inner.S)),
 								},
-								OffChainValues: map[string]any{
-									"Data.DifferentField":              testStruct.DifferentField,
-									"Data.NestedDynamicStruct.Inner.S": testStruct.NestedDynamicStruct.Inner.S,
-								},
+							},
+							&commoncodec.ConstrainedBytesToStringModifierConfig{
+								Fields: []string{"Data.DifferentField", "Data.NestedDynamicStruct.Inner.S"},
+								MaxLen: 32,
 							},
 						},
 						ChainSpecificName: "store",
