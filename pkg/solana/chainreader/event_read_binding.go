@@ -33,7 +33,7 @@ type eventReadBinding struct {
 
 	// static data
 	namespace, genericName string
-	eventSig               [logpoller.EventSignatureLength]byte
+	eventSig               logpoller.EventSignature
 	indexedSubKeys         *indexedSubkeys
 	readDefinition         config.ReadDefinition
 
@@ -210,7 +210,7 @@ func (b *eventReadBinding) GetLatestValue(ctx context.Context, params, returnVal
 
 	allFilters := []query.Expression{
 		logpoller.NewAddressFilter(pubKey),
-		logpoller.NewEventSigFilter(b.eventSig[:]),
+		logpoller.NewEventSigFilter(b.eventSig),
 	}
 
 	if len(subkeyFilters) > 0 {
@@ -258,7 +258,7 @@ func (b *eventReadBinding) QueryKey(
 	// filter should always use the address and event sig
 	filter.Expressions = append([]query.Expression{
 		logpoller.NewAddressFilter(pubKey),
-		logpoller.NewEventSigFilter(b.eventSig[:]),
+		logpoller.NewEventSigFilter(b.eventSig),
 	}, filter.Expressions...)
 
 	itemType := strings.Join([]string{b.namespace, b.genericName}, ".")

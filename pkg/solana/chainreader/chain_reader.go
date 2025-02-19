@@ -628,6 +628,7 @@ func (s *ContractReaderService) addEventRead(
 	reader.SetFilter(toLPFilter(readDefinition.ChainSpecificName, pf, subkeys.subKeys[:], eventDef))
 
 	s.bdRegistry.AddReader(namespace, genericName, reader)
+	s.lookup.addReadNameForContract(namespace, genericName, []read{{readName: genericName, useParams: false}})
 
 	return nil
 }

@@ -21,15 +21,6 @@ type Block struct {
 	Events     []ProgramEvent
 }
 
-type ProgramEventProcessor interface {
-	// Process should take a ProgramEvent and parseProgramLogs it based on log signature
-	// and expected encoding. Only return errors that cannot be handled and
-	// should exit further transaction processing on the running thread.
-	//
-	// Process should be thread safe.
-	Process(Block) error
-}
-
 type RPCClient interface {
 	GetBlockWithOpts(context.Context, uint64, *rpc.GetBlockOpts) (*rpc.GetBlockResult, error)
 	GetSignaturesForAddressWithOpts(context.Context, solana.PublicKey, *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error)
