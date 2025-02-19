@@ -77,6 +77,12 @@ func GetValuesAtLocation(args any, location string) ([][]byte, error) {
 			vals = append(vals, value.Bytes())
 		case ccipocr3.UnknownAddress:
 			vals = append(vals, value)
+		case ccipocr3.UnknownEncodedAddress:
+			decoded, err := solana.PublicKeyFromBase58(string(value))
+			if err != nil {
+				return nil, err
+			}
+			vals = append(vals, decoded[:])
 		case uint64:
 			buf := make([]byte, 8)
 			binary.LittleEndian.PutUint64(buf, value)
