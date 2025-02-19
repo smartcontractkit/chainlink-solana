@@ -155,7 +155,7 @@ func GetAddresses(ctx context.Context, args any, accounts []Lookup, derivedTable
 	var addresses []*solana.AccountMeta
 	for _, accountConfig := range accounts {
 		meta, err := accountConfig.Resolve(ctx, args, derivedTableMap, client)
-		if accountConfig.Optional && err != nil {
+		if accountConfig.Optional && err != nil && isIgnorableError(err) {
 			// skip optional accounts if they are not found
 			continue
 		}
@@ -165,6 +165,13 @@ func GetAddresses(ctx context.Context, args any, accounts []Lookup, derivedTable
 		addresses = append(addresses, meta...)
 	}
 	return addresses, nil
+}
+
+// These errors are ignorable if the lookup is optional.
+func isIgnorableError(err error) bool {
+	return errors.Is(err, ErrLookupNotFoundAtLocation) ||
+		errors.Is(err, ErrLookupTableNotFound) ||
+		errors.Is(err, ErrGettingSeedAtLocation)
 }
 
 // FilterLookupTableAddresses takes a list of accounts and two lookup table maps
@@ -460,7 +467,7 @@ func (s *SolanaChainWriterService) ResolveLookupTables(ctx context.Context, args
 		// Load the lookup table - note: This could be multiple tables if the lookup is a PDALookups that resolves to more
 		// than one address
 		lookupTableMap, err := s.loadTable(ctx, args, derivedLookup)
-		if derivedLookup.Optional && err != nil {
+		if derivedLookup.Optional && err != nil && isIgnorableError(err) {
 			continue
 		}
 		if err != nil {

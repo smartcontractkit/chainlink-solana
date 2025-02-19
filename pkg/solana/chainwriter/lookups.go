@@ -13,6 +13,12 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
+var (
+	ErrLookupNotFoundAtLocation = fmt.Errorf("error getting account from lookup")
+	ErrLookupTableNotFound      = fmt.Errorf("lookup table not found")
+	ErrGettingSeedAtLocation    = fmt.Errorf("error getting address seed for location")
+)
+
 type Lookup struct {
 	Optional                bool
 	AccountConstant         *AccountConstant         `json:"accountConstant,omitempty"`
@@ -146,7 +152,7 @@ func (ac AccountConstant) Resolve() ([]*solana.AccountMeta, error) {
 func (al AccountLookup) Resolve(args any) ([]*solana.AccountMeta, error) {
 	derivedValues, err := GetValuesAtLocation(args, al.Location)
 	if err != nil {
-		return nil, fmt.Errorf("error getting account from lookup: %w", err)
+		return nil, fmt.Errorf("%w: %v", ErrLookupNotFoundAtLocation, err)
 	}
 
 	var metas []*solana.AccountMeta
@@ -206,7 +212,7 @@ func (alt AccountsFromLookupTable) Resolve(derivedTableMap map[string]map[string
 	// Fetch the inner map for the specified lookup table name
 	innerMap, ok := derivedTableMap[alt.LookupTableName]
 	if !ok {
-		return nil, fmt.Errorf("lookup table not found: %s", alt.LookupTableName)
+		return nil, fmt.Errorf("%w: %s", ErrLookupTableNotFound, alt.LookupTableName)
 	}
 
 	var result []*solana.AccountMeta
@@ -332,7 +338,7 @@ func getSeedBytesCombinations(
 				// Get value from a location (This doesn't have to be an address, it can be any value)
 				bytes, err := GetValuesAtLocation(args, lookupSeed.Location)
 				if err != nil {
-					return nil, fmt.Errorf("error getting address seed for location %q: %w", lookupSeed.Location, err)
+					return nil, fmt.Errorf("%w %q: %w", ErrGettingSeedAtLocation, lookupSeed.Location, err)
 				}
 				// append each byte array to the expansions
 				for _, b := range bytes {
