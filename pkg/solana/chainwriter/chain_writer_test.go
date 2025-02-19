@@ -778,7 +778,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 							},
 						},
 						ChainSpecificName: "execute",
-						ArgsTransform:     "CCIP",
+						ArgsTransform:     "CCIPExecute",
 						LookupTables:      chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
 							{AccountConstant: &chainwriter.AccountConstant{
