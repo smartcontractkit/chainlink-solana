@@ -60,7 +60,7 @@ func TestDSLParser(t *testing.T) {
 		parser := &pgDSLParser{}
 		expressions := []query.Expression{
 			NewAddressFilter(pk),
-			NewEventSigFilter([]byte("test")),
+			NewEventSigFilter(NewEventSignatureFromName("TestEvent")),
 			subkey,
 			query.Confidence(primitives.Unconfirmed),
 		}
@@ -98,7 +98,7 @@ func TestDSLParser(t *testing.T) {
 		parser := &pgDSLParser{}
 		expressions := []query.Expression{
 			NewAddressFilter(pk),
-			NewEventSigFilter([]byte("test")),
+			NewEventSigFilter(NewEventSignatureFromName("TestEvent")),
 			subkey,
 		}
 		limiter := query.NewLimitAndSort(query.CountLimit(20))
@@ -297,7 +297,7 @@ func TestDSLParser(t *testing.T) {
 		t.Parallel()
 
 		parser := &pgDSLParser{}
-		sigFilter := NewEventSigFilter([]byte("test"))
+		sigFilter := NewEventSigFilter(NewEventSignatureFromName("TestEvent"))
 
 		limiter := query.LimitAndSort{}
 		expressions := []query.Expression{
