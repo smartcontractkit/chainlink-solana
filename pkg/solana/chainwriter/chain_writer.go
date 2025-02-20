@@ -281,7 +281,7 @@ func CreateATAs(ctx context.Context, args any, lookups []ATALookup, derivedTable
 				Commitment: rpc.CommitmentFinalized,
 			})
 			if err == nil {
-				logger.Info("ATA already exists, skipping creation.", lookup.Location)
+				logger.Infow("ATA already exists, skipping creation.", "location", lookup.Location)
 				continue
 			}
 			if !strings.Contains(err.Error(), "not found") {
@@ -348,7 +348,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("error getting lookup tables: %w", err), debugID)
 	}
 
-	s.lggr.Debug("Resolving account addresses", "contract", contractName, "method", method)
+	s.lggr.Debugw("Resolving account addresses", "contract", contractName, "method", method)
 	// Resolve account metas
 	accounts, err := GetAddresses(ctx, args, methodConfig.Accounts, derivedTableMap, s.client)
 	if err != nil {
@@ -360,13 +360,13 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("error parsing fee payer address: %w", err), debugID)
 	}
 
-	s.lggr.Debug("Creating ATAs", "contract", contractName, "method", method)
+	s.lggr.Debugw("Creating ATAs", "contract", contractName, "method", method)
 	createATAinstructions, err := CreateATAs(ctx, args, methodConfig.ATAs, derivedTableMap, s.client, programConfig.IDL, feePayer, s.lggr)
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error resolving account addresses: %w", err), debugID)
 	}
 
-	s.lggr.Debug("Filtering lookup table addresses", "contract", contractName, "method", method)
+	s.lggr.Debugw("Filtering lookup table addresses", "contract", contractName, "method", method)
 	// Filter the lookup table addresses based on which accounts are actually used
 	filteredLookupTableMap := s.FilterLookupTableAddresses(accounts, derivedTableMap, staticTableMap)
 
@@ -376,7 +376,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		if tfErr != nil {
 			return errorWithDebugID(fmt.Errorf("error finding transform function: %w", tfErr), debugID)
 		}
-		s.lggr.Debug("Applying args transformation", "contract", contractName, "method", method)
+		s.lggr.Debugw("Applying args transformation", "contract", contractName, "method", method)
 		args, err = transformFunc(ctx, s, args, accounts, toAddress)
 		if err != nil {
 			return errorWithDebugID(fmt.Errorf("error transforming args: %w", err), debugID)
@@ -389,7 +389,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("error parsing program ID: %w", err), debugID)
 	}
 
-	s.lggr.Debug("Encoding transaction payload", "contract", contractName, "method", method)
+	s.lggr.Debugw("Encoding transaction payload", "contract", contractName, "method", method)
 	encodedPayload, err := s.encoder.Encode(ctx, args, codec.WrapItemType(true, contractName, method))
 
 	if err != nil {
@@ -422,7 +422,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("error constructing transaction: %w", err), debugID)
 	}
 
-	s.lggr.Debug("Sending main transaction", "contract", contractName, "method", method)
+	s.lggr.Debugw("Sending main transaction", "contract", contractName, "method", method)
 	// Enqueue transaction
 	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, tx, &transactionID, blockhash.Value.LastValidBlockHeight); err != nil {
 		return errorWithDebugID(fmt.Errorf("error enqueuing transaction: %w", err), debugID)
@@ -433,7 +433,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 
 // GetTransactionStatus returns the current status of a transaction in the underlying chain's TXM.
 func (s *SolanaChainWriterService) GetTransactionStatus(ctx context.Context, transactionID string) (types.TransactionStatus, error) {
-	s.lggr.Debug("Fetching transaction status", "transactionID", transactionID)
+	s.lggr.Debugw("Fetching transaction status", "transactionID", transactionID)
 	return s.txm.GetTransactionStatus(ctx, transactionID)
 }
 
@@ -447,7 +447,7 @@ func (s *SolanaChainWriterService) GetFeeComponents(ctx context.Context) (*types
 	fee := s.ge.BaseComputeUnitPrice()
 	return &types.ChainFeeComponents{
 		ExecutionFee:        new(big.Int).SetUint64(fee),
-		DataAvailabilityFee: nil,
+		DataAvailabilityFee: big.NewInt(0), // required field so return 0 instead of nil
 	}, nil
 }
 

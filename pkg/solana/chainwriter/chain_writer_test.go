@@ -1055,11 +1055,11 @@ func TestChainWriter_GetFeeComponents(t *testing.T) {
 	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, chainwriter.ChainWriterConfig{})
 	require.NoError(t, err)
 
-	t.Run("returns valid compute unit price", func(t *testing.T) {
+	t.Run("returns valid compute unit price and non-nil data availability fee", func(t *testing.T) {
 		feeComponents, err := cw.GetFeeComponents(ctx)
 		require.NoError(t, err)
 		require.Equal(t, big.NewInt(100), feeComponents.ExecutionFee)
-		require.Nil(t, feeComponents.DataAvailabilityFee) // always nil for Solana
+		require.Equal(t, big.NewInt(0), feeComponents.DataAvailabilityFee) // always nil for Solana
 	})
 
 	t.Run("fails if gas estimator not set", func(t *testing.T) {
