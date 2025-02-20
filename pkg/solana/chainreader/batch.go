@@ -76,7 +76,8 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 	results := make([]batchResultWithErr, len(batch))
 
 	// create the list of public keys to fetch
-	var keys []solana.PublicKey
+	// Solana RPC expects at least an empty list, not nil
+	keys := []solana.PublicKey{}
 
 	// map batch call index to key index (some calls are event reads and will be handled by a different binding)
 	dataMap := make(map[int]int)
