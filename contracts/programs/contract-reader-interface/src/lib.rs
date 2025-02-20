@@ -120,7 +120,7 @@ pub mod contract_reader_interface {
         data.bump = ctx.bumps.data;
 
     pub fn createevent(_ctx: Context<Events>, data: TestStructData) -> Result<()> {
-        emit!(TestEvent { data: data });
+        emit!(TestEvent { data });
 
         Ok(())
     }
