@@ -96,14 +96,16 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 		ContractReaderBatchGetLatestValue,
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder,
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
-		// events not yet supported
-		ContractReaderGetLatestValueGetsLatestForEvent,
+
+		// tests to enable
+		// ContractReaderQueryKeyNotFound,
+		// ContractReaderQueryKeyReturnsData,
+		// ContractReaderGetLatestValueGetsLatestForEvent,
 		ContractReaderGetLatestValueBasedOnConfidenceLevelForEvent,
 		ContractReaderGetLatestValueReturnsNotFoundWhenNotTriggeredForEvent,
 		ContractReaderGetLatestValueWithFilteringForEvent,
-		// query key not fully implemented yet
-		ContractReaderQueryKeyReturnsDataAsValuesDotValue,
-		ContractReaderQueryKeyCanLimitResultsWithCursor,
+
+		// QueryKeys not implemented
 		ContractReaderQueryKeysReturnsDataTwoEventTypes,
 		ContractReaderQueryKeysNotFound,
 		ContractReaderQueryKeysReturnsData,
@@ -1110,6 +1112,21 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					EventName: {
 						ChainSpecificName: "TestEvent",
 						ReadType:          config.Event,
+						InputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.PropertyExtractorConfig{
+								FieldName:          "Data",
+								EnablePathTraverse: true,
+							},
+							&commoncodec.AddressBytesToStringModifierConfig{
+								Fields:             []string{"AccountStruct.AccountStr"},
+								EnablePathTraverse: true,
+							},
+							&commoncodec.ConstrainedBytesToStringModifierConfig{
+								Fields:             []string{"DifferentField", "NestedDynamicStruct.Inner.S"},
+								EnablePathTraverse: true,
+								MaxLen:             32,
+							},
+						},
 						OutputModifications: commoncodec.ModifiersConfig{
 							&commoncodec.PropertyExtractorConfig{FieldName: "Data"},
 							&commoncodec.AddressBytesToStringModifierConfig{
