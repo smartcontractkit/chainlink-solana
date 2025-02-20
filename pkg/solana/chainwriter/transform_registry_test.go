@@ -57,7 +57,7 @@ func Test_CCIPExecuteTransform(t *testing.T) {
 			}},
 		},
 	}
-	
+
 	accounts := []*solana.AccountMeta{{PublicKey: poolKeys[0]}, {PublicKey: poolKeys[1]}}
 
 	t.Run("CCIPExecute ArgsTransform includes token indexes", func(t *testing.T) {
@@ -91,7 +91,7 @@ func Test_CCIPCommitTransform(t *testing.T) {
 				TokenPrices: []ccipocr3.TokenPrice{{TokenID: ccipocr3.UnknownEncodedAddress(key1.String())}},
 			},
 		}
-		accounts := []*solana.AccountMeta{{PublicKey: key1},{PublicKey: key2}}
+		accounts := []*solana.AccountMeta{{PublicKey: key1}, {PublicKey: key2}}
 		_, newAccounts, err := chainwriter.CCIPCommitAccountTransform(ctx, nil, args, accounts, offrampAddress.String())
 		require.NoError(t, err)
 		require.Len(t, newAccounts, 2)
@@ -102,7 +102,7 @@ func Test_CCIPCommitTransform(t *testing.T) {
 		}{
 			Info: ccipocr3.CommitReportInfo{},
 		}
-		accounts := []*solana.AccountMeta{{PublicKey: key1},{PublicKey: key2}}
+		accounts := []*solana.AccountMeta{{PublicKey: key1}, {PublicKey: key2}}
 		_, newAccounts, err := chainwriter.CCIPCommitAccountTransform(ctx, nil, args, accounts, offrampAddress.String())
 		require.NoError(t, err)
 		require.Len(t, newAccounts, 1)
