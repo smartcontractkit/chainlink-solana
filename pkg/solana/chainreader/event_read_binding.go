@@ -353,7 +353,7 @@ func (b *eventReadBinding) encodeComparator(comparator *primitives.Comparator) (
 		return query.Expression{}, fmt.Errorf("%w: unknown indexed subkey mapping %s", types.ErrInvalidConfig, comparator.Name)
 	}
 
-	itemType := strings.Join([]string{b.namespace, b.genericName, comparator.Name}, ".")
+	itemType := "input." + strings.Join([]string{b.namespace, b.genericName, comparator.Name}, ".")
 
 	for idx, comp := range comparator.ValueComparators {
 		// need to do a transform and then extract the value for the subkey
