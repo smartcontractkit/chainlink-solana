@@ -18,8 +18,8 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/prometheus/client_golang v1.20.5
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250203132120-f0d42463e405
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250206215114-fb6c3c35e8e3
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250213195517-bb00d60949ab
+	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250213195517-bb00d60949ab
 	github.com/smartcontractkit/chainlink-common v0.4.2-0.20250205141137-8f50d72601bb
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250211162441-3d6cea220efb
 	github.com/smartcontractkit/libocr v0.0.0-20241223215956-e5b78d8e3919
