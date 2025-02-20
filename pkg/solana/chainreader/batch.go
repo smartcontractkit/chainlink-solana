@@ -81,6 +81,8 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 
 	// map batch call index to key index (some calls are event reads and will be handled by a different binding)
 	dataMap := make(map[int]int)
+	eventMap := make(map[int]struct{})
+
 	for idx, batchCall := range batch {
 		rBinding, err := bdRegistry.GetReader(batchCall.Namespace, batchCall.ReadName)
 		if err != nil {
@@ -102,6 +104,7 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 			}
 
 			results[idx].err = eBinding.GetLatestValue(ctx, batchCall.Params, results[idx].returnVal)
+			eventMap[idx] = struct{}{}
 
 			continue
 		}
@@ -120,6 +123,10 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 
 	// decode batch call results
 	for idx, batchCall := range batch {
+		if _, ok := eventMap[idx]; ok {
+			continue
+		}
+
 		dataIdx, ok := dataMap[idx]
 		if !ok {
 			return nil, fmt.Errorf("%w: unexpected data index state", types.ErrInternal)

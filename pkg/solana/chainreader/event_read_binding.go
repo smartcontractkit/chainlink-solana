@@ -300,7 +300,7 @@ func (b *eventReadBinding) extractFilterSubkeys(offChainParams any) ([]query.Exp
 
 		fieldVal, err := valueForPath(reflect.ValueOf(offChainParams), offChainKey)
 		if err != nil {
-			return nil, fmt.Errorf("%w: no value for path %s", types.ErrInternal, b.genericName+"."+offChainKey)
+			return nil, fmt.Errorf("%w: no value for path %s; err: %w", types.ErrInternal, b.genericName+"."+offChainKey, err)
 		}
 
 		onChainValue, err := b.modifier.TransformToOnChain(fieldVal, itemType)
@@ -521,6 +521,10 @@ func valueForPath(from reflect.Value, itemType string) (any, error) {
 
 	switch from.Kind() {
 	case reflect.Pointer:
+		if from.IsNil() {
+			from = reflect.New(from.Type().Elem())
+		}
+
 		elem, err := valueForPath(from.Elem(), itemType)
 		if err != nil {
 			return nil, err
