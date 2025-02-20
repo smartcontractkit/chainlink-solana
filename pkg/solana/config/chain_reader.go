@@ -83,13 +83,14 @@ type MultiReader struct {
 }
 
 type ReadDefinition struct {
-	ChainSpecificName   string                      `json:"chainSpecificName"`
-	ReadType            ReadType                    `json:"readType,omitempty"`
-	InputModifications  commoncodec.ModifiersConfig `json:"inputModifications,omitempty"`
-	OutputModifications commoncodec.ModifiersConfig `json:"outputModifications,omitempty"`
-	PDADefinition       codec.PDATypeDef            `json:"pdaDefinition,omitempty"` // Only used for PDA account reads
-	MultiReader         *MultiReader                `json:"multiReader,omitempty"`
-	EventDefinitions    *EventDefinitions           `json:"eventDefinitions,omitempty"`
+	ChainSpecificName       string                      `json:"chainSpecificName"`
+	ReadType                ReadType                    `json:"readType,omitempty"`
+	ErrOnMissingAccountData bool                        `json:"errOnMissingAccountData,omitempty"`
+	InputModifications      commoncodec.ModifiersConfig `json:"inputModifications,omitempty"`
+	OutputModifications     commoncodec.ModifiersConfig `json:"outputModifications,omitempty"`
+	PDADefinition           codec.PDATypeDef            `json:"pdaDefinition,omitempty"` // Only used for PDA account reads
+	MultiReader             *MultiReader                `json:"multiReader,omitempty"`
+	EventDefinitions        *EventDefinitions           `json:"eventDefinitions,omitempty"`
 	// ResponseAddressHardCoder hardcodes the address of the contract into the defined field in the response.
 	ResponseAddressHardCoder *commoncodec.HardCodeModifierConfig `json:"responseAddressHardCoder,omitempty"`
 }
