@@ -109,7 +109,10 @@ pub mod contract_reader_interface {
 
     pub fn store_token_account(ctx: Context<StoreTokenAccount>, test_idx: u64) -> Result<()> {
         let account = ctx.accounts.token_account.to_account_info();
-        require!(!account.data_is_empty(), TokenAccountError::UninitializedTokenAccount);
+        require!(
+            !account.data_is_empty(),
+            TokenAccountError::UninitializedTokenAccount
+        );
 
         let data = &mut ctx.accounts.data;
         data.idx = test_idx;
@@ -117,7 +120,6 @@ pub mod contract_reader_interface {
         data.bump = ctx.bumps.data;
         Ok(())
     }
-    
 }
 
 #[derive(Accounts)]

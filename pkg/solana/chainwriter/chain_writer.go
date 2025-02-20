@@ -296,8 +296,8 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 
 	if len(methodConfig.ATAs) > 0 {
 		s.lggr.Debugw("Creating ATAs", "contract", contractName, "method", method)
-		createATAInstructions, err := CreateATAs(ctx, args, methodConfig.ATAs, derivedTableMap, s.client, feePayer, s.lggr)
-		if err != nil {
+		createATAInstructions, ataErr := CreateATAs(ctx, args, methodConfig.ATAs, derivedTableMap, s.client, feePayer, s.lggr)
+		if ataErr != nil {
 			return errorWithDebugID(fmt.Errorf("error resolving account addresses: %w", err), debugID)
 		}
 		if err = s.handleATACreation(ctx, createATAInstructions, methodConfig, contractName, method, feePayer); err != nil {
