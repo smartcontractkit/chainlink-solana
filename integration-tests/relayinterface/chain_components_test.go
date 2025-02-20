@@ -88,6 +88,8 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 	it.DisableTests([]string{
 		// solana is a no-op on confidence level
 		ContractReaderGetLatestValueBasedOnConfidenceLevel,
+		ContractReaderGetLatestValueBasedOnConfidenceLevelForEvent,
+
 		// disable failing tests
 		ContractReaderBatchGetLatestValueSetsErrorsProperly,
 		ContractReaderGetLatestValue,
@@ -95,14 +97,6 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 		ContractReaderBatchGetLatestValue,
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder,
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
-
-		// tests to enable
-		// ContractReaderQueryKeyNotFound,
-		// ContractReaderQueryKeyReturnsData,
-		// ContractReaderGetLatestValueGetsLatestForEvent,
-		ContractReaderGetLatestValueBasedOnConfidenceLevelForEvent,
-		ContractReaderGetLatestValueReturnsNotFoundWhenNotTriggeredForEvent,
-		ContractReaderGetLatestValueWithFilteringForEvent,
 
 		// QueryKeys not implemented
 		ContractReaderQueryKeysReturnsDataTwoEventTypes,
@@ -1057,6 +1051,36 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 						},
 					},
 					EventName: {
+						ChainSpecificName: "TestEvent",
+						ReadType:          config.Event,
+						InputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.PropertyExtractorConfig{
+								FieldName:          "Data",
+								EnablePathTraverse: true,
+							},
+							&commoncodec.AddressBytesToStringModifierConfig{
+								Fields:             []string{"AccountStruct.AccountStr"},
+								EnablePathTraverse: true,
+							},
+							&commoncodec.ConstrainedBytesToStringModifierConfig{
+								Fields:             []string{"DifferentField", "NestedDynamicStruct.Inner.S"},
+								EnablePathTraverse: true,
+								MaxLen:             32,
+							},
+						},
+						OutputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.PropertyExtractorConfig{FieldName: "Data"},
+							&commoncodec.AddressBytesToStringModifierConfig{
+								Fields: []string{"AccountStruct.AccountStr"},
+							},
+							&commoncodec.ConstrainedBytesToStringModifierConfig{
+								Fields: []string{"DifferentField", "NestedDynamicStruct.Inner.S"},
+								MaxLen: 32,
+							},
+						},
+						EventDefinitions: &config.EventDefinitions{},
+					},
+					EventWithFilterName: {
 						ChainSpecificName: "TestEvent",
 						ReadType:          config.Event,
 						InputModifications: commoncodec.ModifiersConfig{
