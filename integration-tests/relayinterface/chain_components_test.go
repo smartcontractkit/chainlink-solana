@@ -17,8 +17,6 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/programs/system"
-	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/gagliardetto/solana-go/rpc/ws"
 	"github.com/google/uuid"
@@ -301,29 +299,26 @@ func RunChainWriterTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInt
 				bound := BindingsByName(contracts, AnyContractName)[0]
 				require.NoError(t, cr.Bind(ctx, contracts))
 
-				tokenProgram :=  solana.Token2022ProgramID
+				tokenProgram := solana.Token2022ProgramID
 				feePayerPk := solana.MustPrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1])
-
-				mint, err := CreateToken(ctx, t, it.Helper.SolanaClient(), *it.Helper.TXM(), feePayerPk, tokenProgram)
-				require.NoError(t, err)
-
-				ataAddress, _, err := tokens.FindAssociatedTokenAddress(tokenProgram, mint, feePayerPk.PublicKey())
-				require.NoError(t, err)
+				mint := utils.CreateRandomToken(t, feePayerPk, tokenProgram, it.Helper.RPC())
 
 				wallet, err := solana.NewRandomPrivateKey()
 				require.NoError(t, err)
-				
+
+				ataAddress, _, err := tokens.FindAssociatedTokenAddress(tokenProgram, mint, wallet.PublicKey())
+				require.NoError(t, err)
+
 				args := StoreTokenAccountArgs{
-					TestIdx: idx,
+					TestIdx:      idx,
 					TokenAccount: ataAddress,
 					ATAInfo: ATAInfo{
-						Receiver: wallet.PublicKey(),
-						Wallet: wallet.PublicKey(),
+						Receiver:     wallet.PublicKey(),
+						Wallet:       wallet.PublicKey(),
 						TokenProgram: tokenProgram,
-						Mint: mint,
+						Mint:         mint,
 					},
 				}
-
 				SubmitTransactionToCW(t, it, cw, "storeTokenAccount", args, bound, types.Finalized)
 			},
 		},
@@ -558,6 +553,7 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 type SolanaChainComponentsInterfaceTesterHelper[T WrappedTestingT[T]] interface {
 	Init(t T)
 	RPCClient() *chainreader.RPCClientWrapper
+	RPC() *rpc.Client
 	Context(t T) context.Context
 	Logger(t T) logger.Logger
 	GetPrimaryIDL(t T) []byte
@@ -742,6 +738,10 @@ func (h *helper) RPCClient() *chainreader.RPCClientWrapper {
 	return &chainreader.RPCClientWrapper{AccountReader: h.rpcClient}
 }
 
+func (h *helper) RPC() *rpc.Client {
+	return h.rpcClient
+}
+
 func (h *helper) TXM() *txm.TxManager {
 	return &h.txm
 }
@@ -845,16 +845,16 @@ type StoreStructArgs struct {
 }
 
 type StoreTokenAccountArgs struct {
-	TestIdx uint64
+	TestIdx      uint64
 	TokenAccount solana.PublicKey
-	ATAInfo ATAInfo
+	ATAInfo      ATAInfo
 }
 
 type ATAInfo struct {
-	Receiver solana.PublicKey
-	Wallet solana.PublicKey
+	Receiver     solana.PublicKey
+	Wallet       solana.PublicKey
 	TokenProgram solana.PublicKey
-	Mint solana.PublicKey
+	Mint         solana.PublicKey
 }
 
 func (h *helper) runInitialize(
@@ -1395,14 +1395,14 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						DebugIDLocation: "",
 					},
 					"storeTokenAccount": {
-						FromAddress:        fromAddress,
-						ChainSpecificName:  "storeTokenAccount",
+						FromAddress:       fromAddress,
+						ChainSpecificName: "storeTokenAccount",
 						ATAs: []chainwriter.ATALookup{
 							{
 								Location:      "ATAInfo.Receiver",
 								WalletAddress: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: "ATAInfo.Wallet"}},
-								TokenProgram: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: "ATAInfo.TokenProgram"}},
-								MintAddress: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: "ATAInfo.Mint"}},
+								TokenProgram:  chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: "ATAInfo.TokenProgram"}},
+								MintAddress:   chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: "ATAInfo.Mint"}},
 							},
 						},
 						Accounts: []chainwriter.Lookup{
@@ -1413,9 +1413,9 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								IsWritable: true,
 							}},
 							{AccountLookup: &chainwriter.AccountLookup{
-								Location: "TokenAccount",
+								Location:   "TokenAccount",
 								IsWritable: chainwriter.MetaBool{Value: true},
-								IsSigner: chainwriter.MetaBool{Value: false},
+								IsSigner:   chainwriter.MetaBool{Value: false},
 							}},
 							{PDALookups: &chainwriter.PDALookups{
 								Name: "Account",
@@ -1619,7 +1619,7 @@ func CreateTestLookupTable[T WrappedTestingT[T]](ctx context.Context, t T, c *cl
 	txID1 := uuid.NewString()
 	err = txm.Enqueue(ctx, "", tx1, &txID1, res.Value.LastValidBlockHeight)
 	require.NoError(t, err)
-	pollTxStatusInTXMTillCommitment(ctx, t, txm, txID1, types.Finalized)
+	pollTxStatusTillCommitment(ctx, t, txm, txID1, types.Finalized)
 
 	res, err = c.LatestBlockhash(ctx)
 	require.NoError(t, err)
@@ -1630,63 +1630,12 @@ func CreateTestLookupTable[T WrappedTestingT[T]](ctx context.Context, t T, c *cl
 	txID2 := uuid.NewString()
 	err = txm.Enqueue(ctx, "", tx2, &txID2, res.Value.LastValidBlockHeight)
 	require.NoError(t, err)
-	pollTxStatusInTXMTillCommitment(ctx, t, txm, txID2, types.Finalized)
+	pollTxStatusTillCommitment(ctx, t, txm, txID2, types.Finalized)
 
 	return table
 }
 
-func CreateToken[T WrappedTestingT[T]](ctx context.Context, t T, c *client.Client, txm txm.TxManager, admin solana.PrivateKey, tokenProgram solana.PublicKey) (solana.PublicKey, error) {
-	mint, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
-	// initialize mint account
-	initI, err := system.NewCreateAccountInstruction(1*solana.LAMPORTS_PER_SOL, token.MINT_SIZE, tokenProgram, admin.PublicKey(), mint.PublicKey()).ValidateAndBuild()
-	require.NoError(t, err)
-	// initialize mint
-	mintI, err := token.NewInitializeMintInstruction(0, admin.PublicKey(), admin.PublicKey(), mint.PublicKey(), solana.SysVarRentPubkey).ValidateAndBuild()
-	require.NoError(t, err)
-
-	// ix := []solana.Instruction{initI, mintWrap}
-	res, err := c.LatestBlockhash(ctx)
-	require.NoError(t, err)
-	initTx, err := solana.NewTransaction([]solana.Instruction{initI}, res.Value.Blockhash)
-	require.NoError(t, err)
-	_, err = initTx.PartialSign(func(pub solana.PublicKey) *solana.PrivateKey {
-		return &admin
-	})
-	require.NoError(t, err)
-	// _, err = initTx.PartialSign(func(pub solana.PublicKey) *solana.PrivateKey {
-	// 	return &mint
-	// })
-	// require.NoError(t, err)
-	initSig, err := c.SendTx(ctx, initTx)
-	require.NoError(t, err)
-	err = pollTxStatusOverRPCTillCommitment(ctx, t, c, initSig, rpc.CommitmentFinalized)
-	require.NoError(t, err)
-
-	mintWrap := &tokens.TokenInstruction{mintI, tokenProgram}
-	mintTx, err := solana.NewTransaction([]solana.Instruction{mintWrap}, res.Value.Blockhash)
-	require.NoError(t, err)
-	_, err = mintTx.Sign(func(pub solana.PublicKey) *solana.PrivateKey {
-		return &admin
-	})
-	require.NoError(t, err)
-	mintSig, err := c.SendTx(ctx, initTx)
-	require.NoError(t, err)
-	err = pollTxStatusOverRPCTillCommitment(ctx, t, c, mintSig, rpc.CommitmentFinalized)
-	require.NoError(t, err)
-
-
-	// createTokenTx, err1 := solana.NewTransaction(ix, res.Value.Blockhash)
-	// require.NoError(t, err1)
-	// createTokenTxID := uuid.NewString()
-	// err = txm.Enqueue(ctx, "", createTokenTx, &createTokenTxID, res.Value.LastValidBlockHeight)
-	// require.NoError(t, err)
-	// pollTxStatusTillCommitment(ctx, t, txm, createTokenTxID, types.Finalized)
-
-	return mint.PublicKey(), nil
-}
-
-func pollTxStatusInTXMTillCommitment[T WrappedTestingT[T]](ctx context.Context, t T, txm txm.TxManager, txID string, targetStatus types.TransactionStatus) {
+func pollTxStatusTillCommitment[T WrappedTestingT[T]](ctx context.Context, t T, txm txm.TxManager, txID string, targetStatus types.TransactionStatus) {
 	var txStatus types.TransactionStatus
 	count := 0
 	for txStatus != targetStatus && txStatus != types.Finalized {
@@ -1700,26 +1649,6 @@ func pollTxStatusInTXMTillCommitment[T WrappedTestingT[T]](ctx context.Context, 
 			require.NoError(t, fmt.Errorf("unable to find transaction within timeout"))
 		}
 	}
-}
-
-func pollTxStatusOverRPCTillCommitment[T WrappedTestingT[T]](ctx context.Context, t T, c *client.Client, sig solana.Signature, target rpc.CommitmentType) error {
-	var txStatus rpc.CommitmentType
-	count := 0
-	for txStatus != target && txStatus != rpc.CommitmentFinalized {
-		count++
-		statuses, err := c.SignatureStatuses(ctx, []solana.Signature{sig})
-		if err != nil {
-			return err
-		}
-		if len(statuses) > 0 && statuses[0] != nil {
-			txStatus = rpc.CommitmentType(statuses[0].ConfirmationStatus)
-		}
-		time.Sleep(100 * time.Millisecond)
-		if count > 500 {
-			require.NoError(t, fmt.Errorf("unable to find transaction within timeout"))
-		}
-	}
-	return nil
 }
 
 const (
