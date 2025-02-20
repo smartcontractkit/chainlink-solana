@@ -35,9 +35,8 @@ var (
 	ErrInvalidSortDir      = errors.New("invalid sort direction")
 	ErrInvalidSortType     = errors.New("invalid sort by type")
 
-	logsFields = [...]string{"id", "filter_id", "chain_id", "log_index", "block_hash", "block_number",
-		"block_timestamp", "address", "event_sig", "subkey_values", "tx_hash", "data", "created_at",
-		"expires_at", "sequence_num"}
+	logsFields = [...]string{"chain_id", "log_index", "block_hash", "block_number", "block_timestamp", "address",
+		"event_sig", "tx_hash", "data"}
 
 	filterFields = [...]string{"id", "name", "address", "event_name", "event_sig", "starting_block",
 		"event_idl", "subkey_paths", "retention", "max_logs_kept", "is_deleted", "is_backfilled"}
@@ -387,17 +386,21 @@ func valuesFromCursor(cursor string) (int64, int, []byte, error) {
 		return 0, 0, nil, fmt.Errorf("%w: block number not parsable as int64", ErrInvalidCursorFormat)
 	}
 
-	logIdx, err := strconv.ParseInt(parts[1], 10, 32)
+	logIdx, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil {
-		return 0, 0, nil, fmt.Errorf("%w: log index not parsable as int", ErrInvalidCursorFormat)
+		return 0, 0, nil, fmt.Errorf("%w: log index not parsable as int64", ErrInvalidCursorFormat)
 	}
 
-	txHash, err := solana.PublicKeyFromBase58(parts[2])
+	txHash, err := solana.SignatureFromBase58(parts[2])
 	if err != nil {
 		return 0, 0, nil, fmt.Errorf("%w: invalid transaction hash: %s", ErrInvalidCursorFormat, err.Error())
 	}
 
-	return block, int(logIdx), txHash.Bytes(), nil
+	var txHashBytes []byte
+
+	copy(txHashBytes[:], txHash[:])
+
+	return block, int(logIdx), txHashBytes, nil
 }
 
 func orderToString(dir query.SortDirection) (string, error) {
@@ -480,7 +483,7 @@ func (f *eventBySubKeyFilter) Accept(visitor primitives.Visitor) {
 
 // FormatContractReaderCursor is exported to ensure cursor structure remains consistent.
 func FormatContractReaderCursor(log Log) string {
-	return fmt.Sprintf("%d-%d-%s", log.BlockNumber, log.LogIndex, log.TxHash)
+	return fmt.Sprintf("%d-%d-%s", log.BlockNumber, log.LogIndex, log.TxHash.ToSolana().String())
 }
 
 func makeComp(comp IndexedValueComparator, args *queryArgs, field, subfield, pattern string) (string, error) {
