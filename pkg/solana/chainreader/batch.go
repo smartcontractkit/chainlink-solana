@@ -8,13 +8,15 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 )
 
 type call struct {
-	Namespace, ReadName string
-	Params, ReturnVal   any
+	Namespace, ReadName     string
+	Params, ReturnVal       any
+	ErrOnMissingAccountData bool
 }
 
 type batchResultWithErr struct {
@@ -33,20 +35,21 @@ type MultipleAccountGetter interface {
 }
 
 // doMultiRead aggregate results from multiple PDAs from the same contract into one result.
-func doMultiRead(ctx context.Context, client MultipleAccountGetter, bdRegistry *bindingsRegistry, rv readValues, params, returnValue any) error {
+func doMultiRead(ctx context.Context, lggr logger.Logger, client MultipleAccountGetter, bdRegistry *bindingsRegistry, rv readValues, params, returnValue any) error {
 	batch := make([]call, len(rv.reads))
 	for idx, r := range rv.reads {
 		batch[idx] = call{
-			Namespace: rv.contract,
-			ReadName:  r.readName,
-			ReturnVal: returnValue,
+			Namespace:               rv.contract,
+			ReadName:                r.readName,
+			ReturnVal:               returnValue,
+			ErrOnMissingAccountData: r.errOnMissingAccountData,
 		}
 		if r.useParams {
 			batch[idx].Params = params
 		}
 	}
 
-	results, err := doMethodBatchCall(ctx, client, bdRegistry, batch)
+	results, err := doMethodBatchCall(ctx, lggr, client, bdRegistry, batch)
 	if err != nil {
 		return err
 	}
@@ -69,15 +72,14 @@ func doMultiRead(ctx context.Context, client MultipleAccountGetter, bdRegistry *
 	return nil
 }
 
-func doMethodBatchCall(ctx context.Context, client MultipleAccountGetter, bdRegistry *bindingsRegistry, batch []call) ([]batchResultWithErr, error) {
+func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleAccountGetter, bdRegistry *bindingsRegistry, batch []call) ([]batchResultWithErr, error) {
 	results := make([]batchResultWithErr, len(batch))
 
 	// create the list of public keys to fetch
-	keys := []solana.PublicKey{}
+	var keys []solana.PublicKey
 
 	// map batch call index to key index (some calls are event reads and will be handled by a different binding)
 	dataMap := make(map[int]int)
-
 	for idx, batchCall := range batch {
 		rBinding, err := bdRegistry.GetReader(batchCall.Namespace, batchCall.ReadName)
 		if err != nil {
@@ -129,16 +131,18 @@ func doMethodBatchCall(ctx context.Context, client MultipleAccountGetter, bdRegi
 			returnVal: batchCall.ReturnVal,
 		}
 
-		if data[dataIdx] == nil || len(data[dataIdx]) == 0 {
-			results[idx].err = ErrMissingAccountData
-
+		if len(data[idx]) == 0 {
+			if batchCall.ErrOnMissingAccountData {
+				results[idx].err = ErrMissingAccountData
+				continue
+			}
+			lggr.Infow("failed to find account, returning zero value instead", "namespace", batchCall.Namespace, "readName", batchCall.ReadName, "address", keys[dataIdx].String())
 			continue
 		}
 
 		rBinding, err := bdRegistry.GetReader(results[idx].namespace, results[idx].readName)
 		if err != nil {
 			results[idx].err = err
-
 			continue
 		}
 
