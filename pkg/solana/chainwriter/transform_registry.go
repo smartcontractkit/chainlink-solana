@@ -30,7 +30,7 @@ type ReportPostTransform struct {
 func FindTransform(id string) (func(context.Context, *SolanaChainWriterService, any, solana.AccountMetaSlice, string) (any, solana.AccountMetaSlice, error), error) {
 	switch id {
 	case "CCIPExecute":
-		return CCIPArgsTransform, nil
+		return CCIPExecuteArgsTransform, nil
 	case "CCIPCommit":
 		return CCIPCommitAccountTransform, nil
 	default:
@@ -40,7 +40,7 @@ func FindTransform(id string) (func(context.Context, *SolanaChainWriterService, 
 
 // This Transform function looks up the token pool addresses in the accounts slice and augments the args
 // with the indexes of the token pool addresses in the accounts slice.
-func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args any, accounts solana.AccountMetaSlice, toAddress string) (any, solana.AccountMetaSlice, error) {
+func CCIPExecuteArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args any, accounts solana.AccountMetaSlice, toAddress string) (any, solana.AccountMetaSlice, error) {
 	// Fetch offramp config to use to fetch the router address
 	offrampProgramConfig, ok := cw.config.Programs[ccipconsts.ContractNameOffRamp]
 	if !ok {
