@@ -106,7 +106,6 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 		// ContractReaderQueryKeyNotFound,
 		// ContractReaderQueryKeyReturnsData,
 		ContractReaderQueryKeyReturnsDataAsValuesDotValue,
-		ContractReaderQueryKeyCanFilterWithValueComparator,
 		ContractReaderQueryKeyCanLimitResultsWithCursor,
 		ContractReaderQueryKeysReturnsDataTwoEventTypes,
 		ContractReaderQueryKeysNotFound,
