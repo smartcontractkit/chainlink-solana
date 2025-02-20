@@ -96,15 +96,12 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 		ContractReaderBatchGetLatestValue,
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder,
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
-
 		// events not yet supported
 		ContractReaderGetLatestValueGetsLatestForEvent,
 		ContractReaderGetLatestValueBasedOnConfidenceLevelForEvent,
 		ContractReaderGetLatestValueReturnsNotFoundWhenNotTriggeredForEvent,
 		ContractReaderGetLatestValueWithFilteringForEvent,
-		// query key not implemented yet
-		// ContractReaderQueryKeyNotFound,
-		// ContractReaderQueryKeyReturnsData,
+		// query key not fully implemented yet
 		ContractReaderQueryKeyReturnsDataAsValuesDotValue,
 		ContractReaderQueryKeyCanLimitResultsWithCursor,
 		ContractReaderQueryKeysReturnsDataTwoEventTypes,
