@@ -21,7 +21,7 @@ const (
 	txHashFieldName       = "tx_hash"
 	addressFieldName      = "address"
 	eventSigFieldName     = "event_sig"
-	defaultSort           = "block_number ASC, log_index ASC"
+	defaultSort           = "block_number DESC, log_index DESC"
 	subKeyValuesFieldName = "subkey_values"
 	subKeyValueArg        = "subkey_value"
 	subKeyIndexArgName    = "subkey_index"
@@ -412,12 +412,12 @@ func orderToString(dir query.SortDirection) (string, error) {
 }
 
 type addressFilter struct {
-	address solana.PublicKey
+	address PublicKey
 }
 
 func NewAddressFilter(address solana.PublicKey) query.Expression {
 	return query.Expression{
-		Primitive: &addressFilter{address: address},
+		Primitive: &addressFilter{address: PublicKey(address)},
 	}
 }
 
@@ -429,10 +429,10 @@ func (f *addressFilter) Accept(visitor primitives.Visitor) {
 }
 
 type eventSigFilter struct {
-	eventSig []byte
+	eventSig EventSignature
 }
 
-func NewEventSigFilter(sig []byte) query.Expression {
+func NewEventSigFilter(sig EventSignature) query.Expression {
 	return query.Expression{
 		Primitive: &eventSigFilter{eventSig: sig},
 	}
@@ -495,4 +495,23 @@ func makeComp(comp IndexedValueComparator, args *queryArgs, field, subfield, pat
 		cmp,
 		args.withIndexedField(field, comp.Value),
 	), nil
+}
+
+// Where is a query.Where wrapper that ignores the Key and returns a slice of query.Expression rather than
+// query.KeyFilter. If no expressions are provided, or an error occurs, an empty slice is returned.
+func Where(expressions ...query.Expression) ([]query.Expression, error) {
+	filter, err := query.Where(
+		"",
+		expressions...,
+	)
+
+	if err != nil {
+		return []query.Expression{}, err
+	}
+
+	if filter.Expressions == nil {
+		return []query.Expression{}, nil
+	}
+
+	return filter.Expressions, nil
 }

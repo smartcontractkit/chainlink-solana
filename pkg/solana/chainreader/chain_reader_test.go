@@ -16,10 +16,11 @@ import (
 	"github.com/cometbft/cometbft/libs/service"
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
-	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 
@@ -620,8 +621,9 @@ func newTestConfAndCodec(t *testing.T) (types.RemoteCodec, config.ContractReader
 				IDL: mustUnmarshalIDL(t, rawIDL),
 				Reads: map[string]config.ReadDefinition{
 					NamedMethod: {
-						ChainSpecificName: testutils.TestStructWithNestedStruct,
-						ReadType:          config.Account,
+						ChainSpecificName:       testutils.TestStructWithNestedStruct,
+						ReadType:                config.Account,
+						ErrOnMissingAccountData: true,
 						OutputModifications: codeccommon.ModifiersConfig{
 							&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},
 						},

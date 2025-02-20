@@ -8,13 +8,15 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 )
 
 type call struct {
-	Namespace, ReadName string
-	Params, ReturnVal   any
+	Namespace, ReadName     string
+	Params, ReturnVal       any
+	ErrOnMissingAccountData bool
 }
 
 type batchResultWithErr struct {
@@ -33,20 +35,21 @@ type MultipleAccountGetter interface {
 }
 
 // doMultiRead aggregate results from multiple PDAs from the same contract into one result.
-func doMultiRead(ctx context.Context, client MultipleAccountGetter, bdRegistry *bindingsRegistry, rv readValues, params, returnValue any) error {
+func doMultiRead(ctx context.Context, lggr logger.Logger, client MultipleAccountGetter, bdRegistry *bindingsRegistry, rv readValues, params, returnValue any) error {
 	batch := make([]call, len(rv.reads))
 	for idx, r := range rv.reads {
 		batch[idx] = call{
-			Namespace: rv.contract,
-			ReadName:  r.readName,
-			ReturnVal: returnValue,
+			Namespace:               rv.contract,
+			ReadName:                r.readName,
+			ReturnVal:               returnValue,
+			ErrOnMissingAccountData: r.errOnMissingAccountData,
 		}
 		if r.useParams {
 			batch[idx].Params = params
 		}
 	}
 
-	results, err := doMethodBatchCall(ctx, client, bdRegistry, batch)
+	results, err := doMethodBatchCall(ctx, lggr, client, bdRegistry, batch)
 	if err != nil {
 		return err
 	}
@@ -69,19 +72,44 @@ func doMultiRead(ctx context.Context, client MultipleAccountGetter, bdRegistry *
 	return nil
 }
 
-func doMethodBatchCall(ctx context.Context, client MultipleAccountGetter, bdRegistry *bindingsRegistry, batch []call) ([]batchResultWithErr, error) {
-	// Create the list of public keys to fetch
-	keys := make([]solana.PublicKey, len(batch))
+func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleAccountGetter, bdRegistry *bindingsRegistry, batch []call) ([]batchResultWithErr, error) {
+	results := make([]batchResultWithErr, len(batch))
+
+	// create the list of public keys to fetch
+	// Solana RPC expects at least an empty list, not nil
+	keys := []solana.PublicKey{}
+
+	// map batch call index to key index (some calls are event reads and will be handled by a different binding)
+	dataMap := make(map[int]int)
 	for idx, batchCall := range batch {
 		rBinding, err := bdRegistry.GetReader(batchCall.Namespace, batchCall.ReadName)
 		if err != nil {
 			return nil, fmt.Errorf("%w: read binding not found for contract: %q read: %q: %w", types.ErrInvalidConfig, batchCall.Namespace, batchCall.ReadName, err)
 		}
 
-		keys[idx], err = rBinding.GetAddress(ctx, batchCall.Params)
+		key, err := rBinding.GetAddress(ctx, batchCall.Params)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get address for contract: %q read: %q: %w", batchCall.Namespace, batchCall.ReadName, err)
 		}
+
+		eBinding, ok := rBinding.(eventBinding)
+		if ok {
+			results[idx] = batchResultWithErr{
+				address:   key.String(),
+				namespace: batchCall.Namespace,
+				readName:  batchCall.ReadName,
+				returnVal: batchCall.ReturnVal,
+			}
+
+			results[idx].err = eBinding.GetLatestValue(ctx, batchCall.Params, results[idx].returnVal)
+
+			continue
+		}
+
+		// map the idx to the key idx
+		dataMap[idx] = len(keys)
+
+		keys = append(keys, key)
 	}
 
 	// Fetch the account data
@@ -90,54 +118,64 @@ func doMethodBatchCall(ctx context.Context, client MultipleAccountGetter, bdRegi
 		return nil, err
 	}
 
-	results := make([]batchResultWithErr, len(batch))
-
 	// decode batch call results
 	for idx, batchCall := range batch {
+		dataIdx, ok := dataMap[idx]
+		if !ok {
+			return nil, fmt.Errorf("%w: unexpected data index state", types.ErrInternal)
+		}
+
 		results[idx] = batchResultWithErr{
-			address:   keys[idx].String(),
+			address:   keys[dataIdx].String(),
 			namespace: batchCall.Namespace,
 			readName:  batchCall.ReadName,
 			returnVal: batchCall.ReturnVal,
 		}
 
-		if data[idx] == nil || len(data[idx]) == 0 {
-			results[idx].err = ErrMissingAccountData
-
+		if len(data[idx]) == 0 {
+			if batchCall.ErrOnMissingAccountData {
+				results[idx].err = ErrMissingAccountData
+				continue
+			}
+			lggr.Infow("failed to find account, returning zero value instead", "namespace", batchCall.Namespace, "readName", batchCall.ReadName, "address", keys[dataIdx].String())
 			continue
 		}
 
 		rBinding, err := bdRegistry.GetReader(results[idx].namespace, results[idx].readName)
 		if err != nil {
 			results[idx].err = err
-
 			continue
 		}
 
-		results[idx].err = errors.Join(
-			decodeReturnVal(ctx, rBinding, data[idx], results[idx].returnVal),
-			results[idx].err)
+		results[idx].err = asValueDotValue(
+			ctx,
+			rBinding,
+			results[dataIdx].returnVal,
+			wrapDecodeValuer(rBinding, data[dataIdx]),
+		)
 	}
 
 	return results, nil
 }
 
-// decodeReturnVal checks if returnVal is a *values.Value vs. a normal struct pointer, and decodes accordingly.
-func decodeReturnVal(ctx context.Context, binding readBinding, raw []byte, returnVal any) error {
-	// If we are not dealing with a `*values.Value`, just decode directly.
+// asValueDotValue checks if returnVal is a *values.Value vs. a normal struct pointer, and decodes accordingly.
+func asValueDotValue(
+	ctx context.Context,
+	binding readBinding,
+	returnVal any,
+	op func(context.Context, any) error,
+) error {
 	ptrToValue, isValue := returnVal.(*values.Value)
 	if !isValue {
-		return binding.Decode(ctx, raw, returnVal)
+		return op(ctx, returnVal)
 	}
 
-	// Otherwise, we need to create an intermediate type, decode into it,
-	// wrap it, and set it back into *values.Value
 	contractType, err := binding.CreateType(false)
 	if err != nil {
 		return err
 	}
 
-	if err = binding.Decode(ctx, raw, contractType); err != nil {
+	if err = op(ctx, contractType); err != nil {
 		return err
 	}
 
@@ -149,4 +187,10 @@ func decodeReturnVal(ctx context.Context, binding readBinding, raw []byte, retur
 	*ptrToValue = value
 
 	return nil
+}
+
+func wrapDecodeValuer(binding readBinding, data []byte) func(context.Context, any) error {
+	return func(ctx context.Context, returnVal any) error {
+		return binding.Decode(ctx, data, returnVal)
+	}
 }

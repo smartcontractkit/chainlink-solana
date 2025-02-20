@@ -9,7 +9,7 @@ import (
 type read struct {
 	readName string
 	// useParams is used when this read is part of a multi read to determine if it should use parent read params.
-	useParams bool
+	useParams, errOnMissingAccountData bool
 }
 
 type readValues struct {

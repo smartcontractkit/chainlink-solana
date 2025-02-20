@@ -152,7 +152,7 @@ func TestAccountLookups(t *testing.T) {
 			IsWritable: chainwriter.MetaBool{Value: true},
 		}}
 		_, err := lookupConfig.AccountLookup.Resolve(testArgs)
-		require.Error(t, err)
+		require.ErrorIs(t, err, chainwriter.ErrLookupNotFoundAtLocation)
 	})
 
 	t.Run("AccountLookup works with MetaBool bitmap lookups", func(t *testing.T) {
@@ -372,8 +372,7 @@ func TestPDALookups(t *testing.T) {
 		}
 
 		_, err := pdaLookup.Resolve(ctx, args, nil, client.MultiClient{})
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "key not found")
+		require.ErrorIs(t, err, chainwriter.ErrGettingSeedAtLocation)
 	})
 
 	t.Run("PDALookup resolves valid PDA with address lookup seeds", func(t *testing.T) {
@@ -585,6 +584,21 @@ func TestLookupTables(t *testing.T) {
 		require.Contains(t, err.Error(), "error fetching account info for table") // Example error message
 	})
 
+	t.Run("Derived lookup table fails with invalid table name", func(t *testing.T) {
+		derivedTableMap := map[string]map[string][]*solana.AccountMeta{
+			"DerivedTable": {},
+		}
+		accountsFromLookupTable := chainwriter.Lookup{
+			AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
+				LookupTableName: "InvalidTable",
+				IncludeIndexes:  []int{},
+			},
+		}
+
+		_, err = accountsFromLookupTable.Resolve(ctx, nil, derivedTableMap, multiClient)
+		require.ErrorIs(t, err, chainwriter.ErrLookupTableNotFound)
+	})
+
 	t.Run("Static lookup table fails with invalid address", func(t *testing.T) {
 		invalidTable := chainwriter.GetRandomPubKey(t)
 
@@ -624,8 +638,15 @@ func TestLookupTables(t *testing.T) {
 		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, testArgs, lookupConfig)
 		require.NoError(t, err)
 
-		addresses, ok := derivedTableMap["DerivedTable"][table.String()]
-		require.True(t, ok)
+		accountsFromLookupTable := chainwriter.Lookup{
+			AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
+				LookupTableName: "DerivedTable",
+				IncludeIndexes:  []int{},
+			},
+		}
+
+		addresses, err := accountsFromLookupTable.Resolve(ctx, nil, derivedTableMap, multiClient)
+		require.NoError(t, err)
 		for i, address := range addresses {
 			require.Equal(t, pubKeys[i], address.PublicKey)
 		}
@@ -670,8 +691,15 @@ func TestLookupTables(t *testing.T) {
 		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, args, lookupConfig)
 		require.NoError(t, err)
 
-		addresses, ok := derivedTableMap["DerivedTable"][lookupTable.String()]
-		require.True(t, ok)
+		accountsFromLookupTable := chainwriter.Lookup{
+			AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
+				LookupTableName: "DerivedTable",
+				IncludeIndexes:  []int{},
+			},
+		}
+
+		addresses, err := accountsFromLookupTable.Resolve(ctx, args, derivedTableMap, multiClient)
+		require.NoError(t, err)
 		for i, address := range addresses {
 			require.Equal(t, lookupKeys[i], address.PublicKey)
 		}
