@@ -16,7 +16,7 @@ import (
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 )
 
-func Test_CCIPExecuteTransform(t *testing.T) {
+func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	ctx := tests.Context(t)
 	offrampAddress := chainwriter.GetRandomPubKey(t)
 	routerAddress := chainwriter.GetRandomPubKey(t)
@@ -78,7 +78,7 @@ func Test_CCIPExecuteTransform(t *testing.T) {
 	})
 }
 
-func Test_CCIPCommitTransform(t *testing.T) {
+func Test_CCIPCommitAccountTransform(t *testing.T) {
 	ctx := tests.Context(t)
 	offrampAddress := chainwriter.GetRandomPubKey(t)
 	key1 := chainwriter.GetRandomPubKey(t)
