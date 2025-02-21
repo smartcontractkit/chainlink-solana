@@ -2,6 +2,7 @@ package chainwriter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
@@ -26,10 +27,12 @@ type ReportPostTransform struct {
 	TokenIndexes   []byte
 }
 
-func FindTransform(id string) (func(context.Context, *SolanaChainWriterService, any, solana.AccountMetaSlice, string) (any, error), error) {
+func FindTransform(id string) (func(context.Context, *SolanaChainWriterService, any, solana.AccountMetaSlice, string) (any, solana.AccountMetaSlice, error), error) {
 	switch id {
-	case "CCIP":
-		return CCIPArgsTransform, nil
+	case "CCIPExecute":
+		return CCIPExecuteArgsTransform, nil
+	case "CCIPCommit":
+		return CCIPCommitAccountTransform, nil
 	default:
 		return nil, fmt.Errorf("transform not found")
 	}
@@ -37,11 +40,11 @@ func FindTransform(id string) (func(context.Context, *SolanaChainWriterService, 
 
 // This Transform function looks up the token pool addresses in the accounts slice and augments the args
 // with the indexes of the token pool addresses in the accounts slice.
-func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args any, accounts solana.AccountMetaSlice, toAddress string) (any, error) {
+func CCIPExecuteArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args any, accounts solana.AccountMetaSlice, toAddress string) (any, solana.AccountMetaSlice, error) {
 	// Fetch offramp config to use to fetch the router address
 	offrampProgramConfig, ok := cw.config.Programs[ccipconsts.ContractNameOffRamp]
 	if !ok {
-		return nil, fmt.Errorf("%s program not found in config", ccipconsts.ContractNameOffRamp)
+		return nil, nil, fmt.Errorf("%s program not found in config", ccipconsts.ContractNameOffRamp)
 	}
 	// PDA lookup to fetch router address
 	routerAddrLookup := PDALookups{
@@ -61,16 +64,16 @@ func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args a
 	}
 	accountMetas, err := routerAddrLookup.Resolve(ctx, nil, nil, cw.client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch the router program address from the reference addresses account: %w", err)
+		return nil, nil, fmt.Errorf("failed to fetch the router program address from the reference addresses account: %w", err)
 	}
 	if len(accountMetas) != 1 {
-		return nil, fmt.Errorf("expect 1 address to be returned for router address, received %d: %w", len(accountMetas), err)
+		return nil, nil, fmt.Errorf("expect 1 address to be returned for router address, received %d: %w", len(accountMetas), err)
 	}
 
 	// Fetch router config to use to fetch TokenAdminRegistry
 	routerProgramConfig, ok := cw.config.Programs[ccipconsts.ContractNameRouter]
 	if !ok {
-		return nil, fmt.Errorf("%s program not found in config", ccipconsts.ContractNameRouter)
+		return nil, nil, fmt.Errorf("%s program not found in config", ccipconsts.ContractNameRouter)
 	}
 
 	routerAddress := accountMetas[0].PublicKey
@@ -101,7 +104,7 @@ func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args a
 
 	tableMap, _, err := cw.ResolveLookupTables(ctx, args, TokenPoolLookupTable)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	registryTables := tableMap["PoolLookupTable"]
 	tokenPoolAddresses := []solana.PublicKey{}
@@ -114,7 +117,7 @@ func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args a
 		for _, address := range tokenPoolAddresses {
 			if account.PublicKey == address {
 				if i > 255 {
-					return nil, fmt.Errorf("index %d out of range for uint8", i)
+					return nil, nil, fmt.Errorf("index %d out of range for uint8", i)
 				}
 				tokenIndexes = append(tokenIndexes, uint8(i)) //nolint:gosec
 			}
@@ -122,12 +125,12 @@ func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args a
 	}
 
 	if len(tokenIndexes) != len(tokenPoolAddresses) {
-		return nil, fmt.Errorf("missing token pools in accounts")
+		return nil, nil, fmt.Errorf("missing token pools in accounts")
 	}
 
 	argsTyped, ok := args.(ReportPreTransform)
 	if !ok {
-		return nil, fmt.Errorf("args is not of type ReportPreTransform")
+		return nil, nil, fmt.Errorf("args is not of type ReportPreTransform")
 	}
 
 	argsTransformed := ReportPostTransform{
@@ -138,5 +141,24 @@ func CCIPArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args a
 		TokenIndexes:   tokenIndexes,
 	}
 
-	return argsTransformed, nil
+	return argsTransformed, accounts, nil
+}
+
+// This Transform function trims off the GlobalState account from commit transactions if there are no token or gas price updates
+func CCIPCommitAccountTransform(ctx context.Context, cw *SolanaChainWriterService, args any, accounts solana.AccountMetaSlice, toAddress string) (any, solana.AccountMetaSlice, error) {
+	var tokenPriceVals, gasPriceVals [][]byte
+	var err error
+	tokenPriceVals, err = GetValuesAtLocation(args, "Info.TokenPrices.TokenID")
+	if err != nil && !errors.Is(err, errFieldNotFound) {
+		return nil, nil, fmt.Errorf("error getting values at location: %w", err)
+	}
+	gasPriceVals, err = GetValuesAtLocation(args, "Info.GasPrices.ChainSel")
+	if err != nil && !errors.Is(err, errFieldNotFound) {
+		return nil, nil, fmt.Errorf("error getting values at location: %w", err)
+	}
+	transformedAccounts := accounts
+	if len(tokenPriceVals) == 0 && len(gasPriceVals) == 0 {
+		transformedAccounts = accounts[:len(accounts)-1]
+	}
+	return args, transformedAccounts, nil
 }

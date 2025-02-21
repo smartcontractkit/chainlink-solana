@@ -778,7 +778,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 							},
 						},
 						ChainSpecificName: "execute",
-						ArgsTransform:     "CCIP",
+						ArgsTransform:     "CCIPExecute",
 						LookupTables:      chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
 							{AccountConstant: &chainwriter.AccountConstant{
@@ -822,7 +822,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 							},
 						},
 						ChainSpecificName: "commit",
-						ArgsTransform:     "",
+						ArgsTransform:     "CCIPCommit",
 						LookupTables:      chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
 							{AccountConstant: &chainwriter.AccountConstant{
@@ -922,7 +922,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 		require.NoError(t, submitErr)
 	})
 
-	t.Run("CCIP commit is encoded successfully", func(t *testing.T) {
+	t.Run("CCIP commit is encoded successfully and ArgsTransform is applied correctly.", func(t *testing.T) {
 		// mock txm
 		txm := txmMocks.NewTxManager(t)
 		// initialize chain writer
@@ -963,6 +963,8 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 			dec := ag_binary.NewBorshDecoder(payload)
 			err := dec.Decode(&decoded)
 			require.NoError(t, err)
+			// The CCIPCommit ArgsTransform should remove the last account since no price updates were provided in the report
+			require.Len(t, tx.Message.Instructions[0].Accounts, 2)
 			return true
 		}), &txID, mock.Anything).Return(nil).Once()
 
