@@ -1131,7 +1131,12 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 								MaxLen: 32,
 							},
 						},
-						EventDefinitions: &config.EventDefinitions{},
+						EventDefinitions: &config.EventDefinitions{
+							IndexedField0: &config.IndexedField{
+								OffChainPath: "Field",
+								OnChainPath:  "Data.Field",
+							},
+						},
 					},
 					EventWithFilterName: {
 						ChainSpecificName: "TestEvent",
