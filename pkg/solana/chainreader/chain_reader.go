@@ -555,25 +555,45 @@ func (s *ContractReaderService) addAddressResponseHardCoderModifier(namespace st
 				hardCoder.OffChainValues[k] = address
 			}
 
-			idl, inputIDlType, outputIDLType := rb.GetIDLInfo()
-			parsed := &codec.ParsedTypes{
-				EncoderDefs: map[string]codec.Entry{},
-				DecoderDefs: map[string]codec.Entry{},
+			if err = s.injectModifier(namespace, rb.GetGenericName(), hardCoder); err != nil {
+				return err
 			}
-
-			readDef := rb.GetReadDefinition()
-			readDef.OutputModifications = append(readDef.OutputModifications, hardCoder)
-			if err = s.addReadToCodec(parsed, namespace, rb.GetGenericName(), idl, inputIDlType, outputIDLType, readDef); err != nil {
-				return fmt.Errorf("failed to set codec with address response hardcoder for read: %q: %w", rb.GetGenericName(), err)
-			}
-
-			newCodec, err := parsed.ToCodec()
-			if err != nil {
-				return fmt.Errorf("failed to create codec with address response hardcoder for read: %q: %w", rb.GetGenericName(), err)
-			}
-
-			rb.SetCodec(newCodec)
 		}
+	}
+	return nil
+}
+
+func (s *ContractReaderService) injectModifier(namespace, genericReadName string, modifierCfg commoncodec.ModifierConfig) error {
+	rBindings, err := s.bdRegistry.GetReaders(namespace)
+	if err != nil {
+		return fmt.Errorf("failed to get read bindings : %w", err)
+	}
+
+	for _, rb := range rBindings {
+		// if genericReadName is "" set modifier for every read on the namespace
+		if genericReadName != "" && rb.GetGenericName() != genericReadName {
+			continue
+		}
+
+		idl, inputIDlType, outputIDLType := rb.GetIDLInfo()
+		parsed := &codec.ParsedTypes{
+			EncoderDefs: map[string]codec.Entry{},
+			DecoderDefs: map[string]codec.Entry{},
+		}
+
+		readDef := rb.GetReadDefinition()
+		readDef.OutputModifications = append(readDef.OutputModifications, modifierCfg)
+		if err = s.addReadToCodec(parsed, namespace, rb.GetGenericName(), idl, inputIDlType, outputIDLType, readDef); err != nil {
+			return fmt.Errorf("failed to set codec with address response hardcoder for read: %q: %w", rb.GetGenericName(), err)
+		}
+
+		newCodec, err := parsed.ToCodec()
+		if err != nil {
+			return fmt.Errorf("failed to create codec with address response hardcoder for read: %q: %w", rb.GetGenericName(), err)
+		}
+
+		rb.SetCodec(newCodec)
+
 	}
 	return nil
 }

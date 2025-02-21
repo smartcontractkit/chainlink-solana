@@ -8,6 +8,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 
+	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
@@ -35,7 +36,7 @@ type MultipleAccountGetter interface {
 }
 
 // doMultiRead aggregate results from multiple PDAs from the same contract into one result.
-func doMultiRead(ctx context.Context, lggr logger.Logger, client MultipleAccountGetter, bdRegistry *bindingsRegistry, rv readValues, params, returnValue any) error {
+func (s *ContractReaderService) doMultiRead(ctx context.Context, lggr logger.Logger, client MultipleAccountGetter, bdRegistry *bindingsRegistry, rv readValues, params, returnValue any) error {
 	batch := make([]call, len(rv.reads))
 	for idx, r := range rv.reads {
 		batch[idx] = call{
@@ -49,7 +50,7 @@ func doMultiRead(ctx context.Context, lggr logger.Logger, client MultipleAccount
 		}
 	}
 
-	results, err := doMethodBatchCall(ctx, lggr, client, bdRegistry, batch)
+	results, err := s.doMethodBatchCall(ctx, lggr, client, bdRegistry, batch)
 	if err != nil {
 		return err
 	}
@@ -72,7 +73,7 @@ func doMultiRead(ctx context.Context, lggr logger.Logger, client MultipleAccount
 	return nil
 }
 
-func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleAccountGetter, bdRegistry *bindingsRegistry, batch []call) ([]batchResultWithErr, error) {
+func (s *ContractReaderService) doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleAccountGetter, bdRegistry *bindingsRegistry, batch []call) ([]batchResultWithErr, error) {
 	results := make([]batchResultWithErr, len(batch))
 
 	// create the list of public keys to fetch
@@ -87,6 +88,18 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 			return nil, fmt.Errorf("%w: read binding not found for contract: %q read: %q: %w", types.ErrInvalidConfig, batchCall.Namespace, batchCall.ReadName, err)
 		}
 
+		if rBinding.GetGenericName() == "..." {
+			// extract type param to decide if first or last location
+			firstLoc := commoncodec.ElementExtractorLocationFirst
+			mod1 := commoncodec.ElementExtractorFromOnchainModifierConfig{Extractions: map[string]*commoncodec.ElementExtractorLocation{"OcrConfig": &firstLoc}}
+			mod2 := commoncodec.ByteToBooleanModifierConfig{Fields: []string{"OcrConfig.ConfigInfo.IsSignatureVerificationEnabled"}}
+			if err = s.injectModifier(batchCall.Namespace, rBinding.GetGenericName(), &mod1); err != nil {
+				return nil, err
+			}
+			if err = s.injectModifier(batchCall.Namespace, rBinding.GetGenericName(), &mod2); err != nil {
+				return nil, err
+			}
+		}
 		key, err := rBinding.GetAddress(ctx, batchCall.Params)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get address for contract: %q read: %q: %w", batchCall.Namespace, batchCall.ReadName, err)
