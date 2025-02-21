@@ -191,7 +191,7 @@ func (b *eventReadBinding) Decode(ctx context.Context, bts []byte, outVal any) e
 }
 
 func (b *eventReadBinding) GetLatestValue(ctx context.Context, params, returnVal any) error {
-	itemType := codec.WrapItemType(true, b.namespace, b.genericName)
+	itemType := codec.WrapItemType(false, b.namespace, b.genericName)
 
 	pubKey, err := b.GetAddress(ctx, nil)
 	if err != nil {
@@ -277,7 +277,7 @@ func (b *eventReadBinding) QueryKey(
 }
 
 func (b *eventReadBinding) normalizeParams(value any, itemType string) (any, error) {
-	offChain, err := b.codec.CreateType(itemType, true)
+	offChain, err := b.codec.CreateType(itemType, false)
 	if err != nil {
 		return nil, fmt.Errorf("%w: failed to create type: %w", types.ErrInvalidType, err)
 	}
