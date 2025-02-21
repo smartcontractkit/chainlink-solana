@@ -298,7 +298,7 @@ func (b *eventReadBinding) extractFilterSubkeys(offChainParams any) ([]query.Exp
 	for offChainKey, idx := range b.indexedSubKeys.lookup {
 		itemType := codec.WrapItemType(true, b.namespace, b.genericName+"."+offChainKey)
 
-		fieldVal, err := valueForPath(reflect.ValueOf(offChainParams), offChainKey)
+		fieldVal, err := commoncodec.ValueForPath(reflect.ValueOf(offChainParams), offChainKey)
 		if err != nil {
 			return nil, fmt.Errorf("%w: no value for path %s; err: %w", types.ErrInternal, b.genericName+"."+offChainKey, err)
 		}
@@ -512,41 +512,4 @@ func (k *indexedSubkeys) indexForKey(key string) (uint64, bool) {
 	idx, ok := k.lookup[key]
 
 	return idx, ok
-}
-
-func valueForPath(from reflect.Value, itemType string) (any, error) {
-	if itemType == "" {
-		return from.Interface(), nil
-	}
-
-	switch from.Kind() {
-	case reflect.Pointer:
-		if from.IsNil() {
-			from = reflect.New(from.Type().Elem())
-		}
-
-		elem, err := valueForPath(from.Elem(), itemType)
-		if err != nil {
-			return nil, err
-		}
-
-		return elem, nil
-	case reflect.Array, reflect.Slice:
-		return nil, fmt.Errorf("%w: cannot extract a field from an array or slice", types.ErrInvalidType)
-	case reflect.Struct:
-		head, tail := commoncodec.ItemTyper(itemType).Next()
-
-		field := from.FieldByName(head)
-		if !field.IsValid() {
-			return nil, fmt.Errorf("%w: field not found for path %s and itemType %s", types.ErrInvalidType, from, itemType)
-		}
-
-		if tail == "" {
-			return field.Interface(), nil
-		}
-
-		return valueForPath(field, tail)
-	default:
-		return nil, fmt.Errorf("%w: cannot extract a field from kind %s", types.ErrInvalidType, from.Kind())
-	}
 }
