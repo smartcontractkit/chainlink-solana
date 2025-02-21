@@ -300,7 +300,7 @@ func (b *eventReadBinding) extractFilterSubkeys(offChainParams any) ([]query.Exp
 
 		fieldVal, err := valueForPath(reflect.ValueOf(offChainParams), offChainKey)
 		if err != nil {
-			return nil, fmt.Errorf("%w: no value for path %s", types.ErrInternal, b.genericName+"."+offChainKey)
+			return nil, fmt.Errorf("%w: no value for path %s; err: %w", types.ErrInternal, b.genericName+"."+offChainKey, err)
 		}
 
 		onChainValue, err := b.modifier.TransformToOnChain(fieldVal, itemType)
@@ -353,7 +353,7 @@ func (b *eventReadBinding) encodeComparator(comparator *primitives.Comparator) (
 		return query.Expression{}, fmt.Errorf("%w: unknown indexed subkey mapping %s", types.ErrInvalidConfig, comparator.Name)
 	}
 
-	itemType := strings.Join([]string{b.namespace, b.genericName, comparator.Name}, ".")
+	itemType := codec.WrapItemType(true, b.namespace, b.genericName+"."+comparator.Name)
 
 	for idx, comp := range comparator.ValueComparators {
 		// need to do a transform and then extract the value for the subkey
@@ -362,7 +362,7 @@ func (b *eventReadBinding) encodeComparator(comparator *primitives.Comparator) (
 			return query.Expression{}, err
 		}
 
-		comparator.ValueComparators[idx].Value = newValue
+		comparator.ValueComparators[idx].Value = reflect.Indirect(reflect.ValueOf(newValue)).Interface()
 	}
 
 	return logpoller.NewEventBySubKeyFilter(subKeyIndex, comparator.ValueComparators)
@@ -521,6 +521,10 @@ func valueForPath(from reflect.Value, itemType string) (any, error) {
 
 	switch from.Kind() {
 	case reflect.Pointer:
+		if from.IsNil() {
+			from = reflect.New(from.Type().Elem())
+		}
+
 		elem, err := valueForPath(from.Elem(), itemType)
 		if err != nil {
 			return nil, err

@@ -215,6 +215,10 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 	}
 
 	if results[0].err != nil {
+		if errors.Is(results[0].err, types.ErrNotFound) {
+			return types.ErrNotFound
+		}
+
 		return fmt.Errorf("%w: %s", types.ErrInternal, results[0].err)
 	}
 
