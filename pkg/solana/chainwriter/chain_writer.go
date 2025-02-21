@@ -384,7 +384,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 			return errorWithDebugID(fmt.Errorf("error finding transform function: %w", tfErr), debugID)
 		}
 		s.lggr.Debugw("Applying args transformation", "contract", contractName, "method", method)
-		args, err = transformFunc(ctx, s, args, accounts, toAddress)
+		args, accounts, err = transformFunc(ctx, s, args, accounts, toAddress)
 		if err != nil {
 			return errorWithDebugID(fmt.Errorf("error transforming args: %w", err), debugID)
 		}
