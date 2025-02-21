@@ -47,42 +47,38 @@ var (
 		Name:    "log_poller_query_duration",
 		Help:    "Measures duration of Log Poller's queries fetching logs",
 		Buckets: sqlLatencyBuckets,
-	}, []string{"solanaChainID", "query", "type"})
+	}, []string{"chainID", "query", "type"})
 	lpQueryDataSets = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "log_poller_query_dataset_size",
 		Help: "Measures size of the datasets returned by Log Poller's queries",
-	}, []string{"solanaChainID", "query", "type"})
+	}, []string{"chainID", "query", "type"})
 	lpLogsInserted = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "log_poller_logs_inserted",
 		Help: "Counter to track number of logs inserted by Log Poller",
-	}, []string{"solanaChainID"})
-	lpBlockInserted = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "log_poller_blocks_inserted",
-		Help: "Counter to track number of blocks inserted by Log Poller",
-	}, []string{"solanaChainID"})
+	}, []string{"chainID"})
 )
 
 // ObservedORM is a decorator layer for ORM used by LogPoller, responsible for pushing Prometheus metrics reporting duration and size of result set for the queries.
 // It doesn't change internal logic, because all calls are delegated to the origin ORM
 type ObservedORM struct {
 	ORM
-	queryDuration  *prometheus.HistogramVec
-	datasetSize    *prometheus.GaugeVec
-	logsInserted   *prometheus.CounterVec
-	blocksInserted *prometheus.CounterVec
-	chainId        string
+	queryDuration *prometheus.HistogramVec
+	datasetSize   *prometheus.GaugeVec
+	logsInserted  *prometheus.CounterVec
+	chainId       string
 }
+
+var _ ORM = &ObservedORM{}
 
 // NewObservedORM creates an observed version of log poller's ORM created by NewORM
 // Please see ObservedLogPoller for more details on how latencies are measured
 func NewObservedORM(chainID string, ds sqlutil.DataSource, lggr logger.Logger) *ObservedORM {
 	return &ObservedORM{
-		ORM:            NewORM(chainID, ds, lggr),
-		queryDuration:  lpQueryDuration,
-		datasetSize:    lpQueryDataSets,
-		logsInserted:   lpLogsInserted,
-		blocksInserted: lpBlockInserted,
-		chainId:        chainID,
+		ORM:           NewORM(chainID, ds, lggr),
+		queryDuration: lpQueryDuration,
+		datasetSize:   lpQueryDataSets,
+		logsInserted:  lpLogsInserted,
+		chainId:       chainID,
 	}
 }
 
@@ -90,7 +86,7 @@ func (o *ObservedORM) InsertLogs(ctx context.Context, logs []Log) error {
 	err := withObservedExec(o, "InsertLogs", create, func() error {
 		return o.ORM.InsertLogs(ctx, logs)
 	})
-	trackInsertedLogsAndBlock(o, logs, nil, err)
+	trackInsertedLogs(o, logs, err)
 	return err
 }
 
@@ -133,6 +129,12 @@ func (o *ObservedORM) SelectSeqNums(ctx context.Context) (map[int64]int64, error
 func (o *ObservedORM) FilteredLogs(ctx context.Context, filter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]Log, error) {
 	return withObservedQueryAndResults(o, queryName, func() ([]Log, error) {
 		return o.ORM.FilteredLogs(ctx, filter, limitAndSort, queryName)
+	})
+}
+
+func (o *ObservedORM) GetLatestBlock(ctx context.Context) (int64, error) {
+	return withObservedQuery(o, "GetLatestBlack", func() (int64, error) {
+		return o.ORM.GetLatestBlock(ctx)
 	})
 }
 
@@ -182,17 +184,11 @@ func withObservedExec(o *ObservedORM, query string, queryType queryType, exec fu
 	return exec()
 }
 
-func trackInsertedLogsAndBlock(o *ObservedORM, logs []Log, block *any, err error) {
+func trackInsertedLogs(o *ObservedORM, logs []Log, err error) {
 	if err != nil {
 		return
 	}
 	o.logsInserted.
 		WithLabelValues(o.chainId).
 		Add(float64(len(logs)))
-
-	if block != nil {
-		o.blocksInserted.
-			WithLabelValues(o.chainId).
-			Inc()
-	}
 }
