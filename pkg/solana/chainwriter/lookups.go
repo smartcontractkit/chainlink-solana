@@ -102,6 +102,7 @@ type ATALookup struct {
 	WalletAddress Lookup
 	TokenProgram  Lookup
 	MintAddress   Lookup
+	Optional      bool
 }
 
 func (l Lookup) validate() error {
