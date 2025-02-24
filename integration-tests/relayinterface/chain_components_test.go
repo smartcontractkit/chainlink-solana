@@ -91,14 +91,6 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 		ContractReaderGetLatestValueBasedOnConfidenceLevel,
 		ContractReaderGetLatestValueBasedOnConfidenceLevelForEvent,
 
-		// disable failing tests
-		ContractReaderBatchGetLatestValueSetsErrorsProperly,
-		ContractReaderGetLatestValue,
-		ContractReaderGetLatestValueAsValuesDotValue,
-		ContractReaderBatchGetLatestValue,
-		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder,
-		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
-
 		// QueryKeys not implemented
 		ContractReaderQueryKeysReturnsDataTwoEventTypes,
 		ContractReaderQueryKeysNotFound,
@@ -902,12 +894,7 @@ func (h *helper) runInitialize(
 		Value:   value,
 	}
 	SubmitTransactionToCW(t, &it, cw, "initialize", initArgs, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
-
-	storeStructArgs := StoreStructArgs{
-		TestIdx: testIdx,
-		Data:    testStruct,
-	}
-	SubmitTransactionToCW(t, &it, cw, MethodSettingStruct, storeStructArgs, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
+	SubmitTransactionToCW(t, &it, cw, MethodSettingStruct, testStruct, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
 }
 
 const (
@@ -1521,20 +1508,28 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 					MethodSettingStruct: {
 						FromAddress: fromAddress,
 						InputModifications: []commoncodec.ModifierConfig{
+							&commoncodec.HardCodeModifierConfig{
+								OnChainValues: map[string]any{
+									"TestIdx": idx,
+								},
+							},
+							&commoncodec.PropertyExtractorConfig{
+								FieldName: "Data",
+							},
 							&commoncodec.AddressBytesToStringModifierConfig{
-								Fields: []string{"Data.AccountStruct.AccountStr"},
+								Fields: []string{"AccountStruct.AccountStr"},
 							},
 							&commoncodec.HardCodeModifierConfig{
 								OnChainValues: map[string]any{
-									"Data.Padding0":                    []byte{},
-									"Data.Padding1":                    []byte{},
-									"Data.Padding2":                    []byte{},
-									"Data.NestedDynamicStruct.Padding": []byte{},
-									"Data.NestedStaticStruct.Padding":  []byte{},
+									"Padding0":                    []byte{},
+									"Padding1":                    []byte{},
+									"Padding2":                    []byte{},
+									"NestedDynamicStruct.Padding": []byte{},
+									"NestedStaticStruct.Padding":  []byte{},
 								},
 							},
 							&commoncodec.ConstrainedBytesToStringModifierConfig{
-								Fields: []string{"Data.DifferentField", "Data.NestedDynamicStruct.Inner.S"},
+								Fields: []string{"DifferentField", "NestedDynamicStruct.Inner.S"},
 								MaxLen: 32,
 							},
 						},
@@ -1652,22 +1647,31 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 					MethodSettingStruct: {
 						FromAddress: fromAddress,
 						InputModifications: []commoncodec.ModifierConfig{
+							&commoncodec.HardCodeModifierConfig{
+								OnChainValues: map[string]any{
+									"TestIdx": idx,
+								},
+							},
+							&commoncodec.PropertyExtractorConfig{
+								FieldName: "Data",
+							},
 							&commoncodec.AddressBytesToStringModifierConfig{
-								Fields: []string{"Data.AccountStruct.AccountStr"},
+								Fields: []string{"AccountStruct.AccountStr"},
 							},
 							&commoncodec.HardCodeModifierConfig{
 								OnChainValues: map[string]any{
-									"Data.Padding0":                    []byte{},
-									"Data.Padding1":                    []byte{},
-									"Data.Padding2":                    []byte{},
-									"Data.NestedDynamicStruct.Padding": []byte{},
-									"Data.NestedStaticStruct.Padding":  []byte{},
-									"Data.DifferentField":              copy(make([]byte, 32), []byte(testStruct.DifferentField)),
-									"Data.NestedDynamicStruct.Inner.S": copy(make([]byte, 32), []byte(testStruct.NestedDynamicStruct.Inner.S)),
+									"Padding0":                    []byte{},
+									"Padding1":                    []byte{},
+									"Padding2":                    []byte{},
+									"NestedDynamicStruct.Padding": []byte{},
+									"NestedStaticStruct.Padding":  []byte{},
+									"DifferentField":              copy(make([]byte, 32), testStruct.DifferentField),
+									"NestedDynamicStruct.Inner.S": copy(make([]byte, 32), testStruct.NestedDynamicStruct.Inner.S),
+									"TestIdx":                     idx,
 								},
 								OffChainValues: map[string]any{
-									"Data.DifferentField":              testStruct.DifferentField,
-									"Data.NestedDynamicStruct.Inner.S": testStruct.NestedDynamicStruct.Inner.S,
+									"DifferentField":              testStruct.DifferentField,
+									"NestedDynamicStruct.Inner.S": testStruct.NestedDynamicStruct.Inner.S,
 								},
 							},
 						},
