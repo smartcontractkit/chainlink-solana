@@ -17,7 +17,9 @@ func TestSolanaAddressModifier(t *testing.T) {
 
 	// Valid Solana address (32 bytes, Base58 encoded)
 	validAddressStr := "9nQhQ7iCyY5SgAX2Zm4DtxNh9Ubc4vbiLkiYbX43SDXY"
+	addressNotOnCurveStr := "8opHzTAnfzRpPEx21XtnrVTX28YQuCpAjcn1PczScKh"
 	validAddressBytes := solana.MustPublicKeyFromBase58(validAddressStr).Bytes()
+	addressNotOnCurveBytes := solana.MustPublicKeyFromBase58(addressNotOnCurveStr).Bytes()
 	invalidLengthAddressStr := "abc123"
 
 	t.Run("EncodeAddress encodes valid Solana address bytes", func(t *testing.T) {
@@ -58,10 +60,11 @@ func TestSolanaAddressModifier(t *testing.T) {
 		assert.Contains(t, err.Error(), commontypes.ErrInvalidType.Error())
 	})
 
-	t.Run("DecodeAddress returns error for valid length address not on the ed25519 curve", func(t *testing.T) {
-		_, err := modifier.DecodeAddress("AddressLookupTab1e11111111111111111111111111")
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), commontypes.ErrInvalidType.Error())
+	t.Run("DecodeAddress decodes address not on ed25519 curve", func(t *testing.T) {
+		decodedBytes, err := modifier.DecodeAddress(addressNotOnCurveStr)
+
+		require.NoError(t, err)
+		assert.Equal(t, addressNotOnCurveBytes, decodedBytes)
 	})
 
 	t.Run("Length returns 32 for Solana addresses", func(t *testing.T) {

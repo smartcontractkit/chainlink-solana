@@ -468,7 +468,7 @@ func (lp *Service) replayComplete(from, to int64) bool {
 	return true
 }
 
-func appendBuffered(ch <-chan Block, max int, blocks []Block) []Block {
+func appendBuffered(ch <-chan Block, maxNum int, blocks []Block) []Block {
 	for {
 		select {
 		case block, ok := <-ch:
@@ -477,7 +477,7 @@ func appendBuffered(ch <-chan Block, max int, blocks []Block) []Block {
 			}
 
 			blocks = append(blocks, block)
-			if len(blocks) >= max {
+			if len(blocks) >= maxNum {
 				return blocks
 			}
 		default:
