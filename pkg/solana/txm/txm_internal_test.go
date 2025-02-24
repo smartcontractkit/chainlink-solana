@@ -349,6 +349,11 @@ func TestTxm(t *testing.T) {
 				}).Return(&rpc.SimulateTransactionResult{
 					Err: tempErr,
 				}, nil).Once()
+				mc.On("GetTransaction", mock.Anything, mock.Anything).Return(&rpc.GetTransactionResult{
+					Meta: &rpc.TransactionMeta{
+						LogMessages: []string{"tx error log"},
+					},
+				}, nil).Once()
 				// all signature statuses are nil, handled automatically
 
 				// tx should be able to queue
@@ -939,6 +944,11 @@ func TestTxm_disabled_confirm_timeout_with_retention(t *testing.T) {
 		mc.On("SimulateTx", mock.Anything, signed(0, true, computeUnitLimitDefault), mock.Anything).Run(func(mock.Arguments) {
 			wg.Done()
 		}).Return(&rpc.SimulateTransactionResult{}, nil).Once()
+		mc.On("GetTransaction", mock.Anything, mock.Anything).Return(&rpc.GetTransactionResult{
+			Meta: &rpc.TransactionMeta{
+				LogMessages: []string{"tx error log"},
+			},
+		}, nil).Once()
 		statuses[sig] = func() (out *rpc.SignatureStatusesResult) {
 			defer wg.Done()
 			return &rpc.SignatureStatusesResult{Err: errors.New("InstructionError")}
