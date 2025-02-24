@@ -349,11 +349,6 @@ func TestTxm(t *testing.T) {
 				}).Return(&rpc.SimulateTransactionResult{
 					Err: tempErr,
 				}, nil).Once()
-				mc.On("GetTransaction", mock.Anything, mock.Anything).Return(&rpc.GetTransactionResult{
-					Meta: &rpc.TransactionMeta{
-						LogMessages: []string{"tx error log"},
-					},
-				}, nil).Once()
 				// all signature statuses are nil, handled automatically
 
 				// tx should be able to queue
