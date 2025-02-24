@@ -779,7 +779,48 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 						},
 						ChainSpecificName: "execute",
 						ArgsTransform:     "CCIPExecute",
-						LookupTables:      chainwriter.LookupTables{},
+						LookupTables: chainwriter.LookupTables{
+							DerivedLookupTables: []chainwriter.DerivedLookupTable{
+								{
+									Name: "PoolLookupTable",
+									Accounts: chainwriter.Lookup{
+										PDALookups: &chainwriter.PDALookups{
+											Name: "TokenAdminRegistry",
+											PublicKey: chainwriter.Lookup{
+												PDALookups: &chainwriter.PDALookups{
+													Name: ccipconsts.ContractNameRouter,
+													PublicKey: chainwriter.Lookup{
+														AccountConstant: &chainwriter.AccountConstant{Address: offrampAddr.String()},
+													},
+													Seeds: []chainwriter.Seed{
+														{Static: []byte("reference_addresses")},
+													},
+													// Reads the address from the reference addresses account
+													InternalField: chainwriter.InternalField{
+														TypeName: "ReferenceAddresses",
+														Location: "Router",
+														IDL:      ccipOfframpIDL,
+													},
+												},
+											},
+											Seeds: []chainwriter.Seed{
+												{Static: []byte("token_admin_registry")},
+												{Dynamic: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Address: destTokenAddr.String()}}},
+											},
+											IsSigner:   false,
+											IsWritable: false,
+											InternalField: chainwriter.InternalField{
+												TypeName: "TokenAdminRegistry",
+												Location: "LookupTable",
+												// TokenAdminRegistry is in the router program so need to provide the router's IDL
+												IDL: ccipRouterIDL,
+											},
+										},
+									},
+									Optional: true, // Lookup table is optional if DestTokenAddress is not present in report
+								},
+							},
+						},
 						Accounts: []chainwriter.Lookup{
 							{AccountConstant: &chainwriter.AccountConstant{
 								Name:    "testAcc1",
@@ -841,10 +882,6 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 					},
 				},
 				IDL: ccipOfframpIDL,
-			},
-			// Requires only the IDL for the CCIPArgsTransform to fetch the TokenAdminRegistry
-			ccipconsts.ContractNameRouter: {
-				IDL: ccipRouterIDL,
 			},
 		},
 	}
