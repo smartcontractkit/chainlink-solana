@@ -40,7 +40,6 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		poolKeysMeta := make([]*solana.AccountMeta, 0, 2)
 		for _, poolKey := range poolKeys {
 			poolKeysMeta = append(poolKeysMeta, &solana.AccountMeta{PublicKey: poolKey})
-
 		}
 		tableMap["PoolLookupTable"][lookupTablePubkey.String()] = poolKeysMeta
 

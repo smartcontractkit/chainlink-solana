@@ -756,8 +756,9 @@ func TestLookupTables(t *testing.T) {
 			Optional: true,
 		}
 
-		_, err = chainwriter.GetAddresses(ctx, nil, []chainwriter.Lookup{pdaWithAccountLookupSeed}, derivedTableMap, multiClient)
+		accounts, err := chainwriter.GetAddresses(ctx, nil, []chainwriter.Lookup{pdaWithAccountLookupSeed}, derivedTableMap, multiClient)
 		require.NoError(t, err)
+		require.Empty(t, accounts)
 	})
 }
 
