@@ -1011,7 +1011,7 @@ func (txm *Txm) fetchTransactionLogs(ctx context.Context, sig solana.Signature) 
 		txm.lggr.Debugw("failed to fetch transaction for its logs", "sig", sig)
 		return
 	}
-	if tx.Meta != nil {
+	if tx.Meta != nil && len(tx.Meta.LogMessages) > 0{
 		txm.lggr.Debugw("failed transaction logs", "logs", tx.Meta.LogMessages)
 	}
 }
