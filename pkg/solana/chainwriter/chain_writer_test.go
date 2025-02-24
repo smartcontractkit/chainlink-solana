@@ -946,7 +946,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 		encodedReport, err := json.Marshal(abstractReport)
 		require.NoError(t, err)
 
-		args := chainwriter.ReportPreTransform{
+		args := ReportPreTransform{
 			ReportContext: [2][32]byte{{0x01}, {0x02}},
 			Report:        encodedReport,
 			Info: ccipocr3.ExecuteReportInfo{

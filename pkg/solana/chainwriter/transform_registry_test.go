@@ -4,12 +4,20 @@ import (
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 )
+
+type ReportPreTransform struct {
+	ReportContext  [2][32]byte
+	Report         []byte
+	Info           ccipocr3.ExecuteReportInfo
+	AbstractReport ccip_offramp.ExecutionReportSingleChain
+}
 
 func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	ctx := tests.Context(t)
@@ -18,7 +26,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	poolKeys := []solana.PublicKey{destTokenAddr}
 	poolKeys = append(poolKeys, chainwriter.CreateTestPubKeys(t, 1)...)
 
-	args := chainwriter.ReportPreTransform{
+	args := ReportPreTransform{
 		Info: ccipocr3.ExecuteReportInfo{
 			AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
 				Messages: []ccipocr3.Message{{
@@ -62,6 +70,21 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		require.True(t, ok)
 		require.NotNil(t, typedArgs.TokenIndexes)
 		require.Len(t, typedArgs.TokenIndexes, 0)
+	})
+
+	t.Run("CCIPExecute ArgsTransform does not get args that conform to ReportPreTransform", func(t *testing.T) {
+		args := struct {
+			ReportContext [2][32]uint8
+			Report        []uint8
+		}{
+			ReportContext: [2][32]uint8{},
+			Report:        []uint8{},
+		}
+		transformedArgs, newAccounts, err := chainwriter.CCIPExecuteArgsTransform(ctx, args, accounts, nil)
+		require.NoError(t, err)
+		_, ok := transformedArgs.(chainwriter.ReportPostTransform)
+		require.True(t, ok)
+		require.Len(t, newAccounts, 2)
 	})
 }
 
