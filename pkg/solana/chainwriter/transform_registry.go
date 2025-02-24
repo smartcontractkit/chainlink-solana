@@ -7,7 +7,6 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
-	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -27,7 +26,7 @@ type ReportPostTransform struct {
 	TokenIndexes   []byte
 }
 
-func FindTransform(id string) (func(context.Context, *SolanaChainWriterService, any, solana.AccountMetaSlice, string) (any, solana.AccountMetaSlice, error), error) {
+func FindTransform(id string) (func(context.Context, any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta) (any, solana.AccountMetaSlice, error), error) {
 	switch id {
 	case "CCIPExecute":
 		return CCIPExecuteArgsTransform, nil
@@ -40,73 +39,26 @@ func FindTransform(id string) (func(context.Context, *SolanaChainWriterService, 
 
 // This Transform function looks up the token pool addresses in the accounts slice and augments the args
 // with the indexes of the token pool addresses in the accounts slice.
-func CCIPExecuteArgsTransform(ctx context.Context, cw *SolanaChainWriterService, args any, accounts solana.AccountMetaSlice, toAddress string) (any, solana.AccountMetaSlice, error) {
-	// Fetch offramp config to use to fetch the router address
-	offrampProgramConfig, ok := cw.config.Programs[ccipconsts.ContractNameOffRamp]
+func CCIPExecuteArgsTransform(ctx context.Context, args any, accounts solana.AccountMetaSlice, tableMap map[string]map[string][]*solana.AccountMeta) (any, solana.AccountMetaSlice, error) {
+	argsTyped, ok := args.(ReportPreTransform)
 	if !ok {
-		return nil, nil, fmt.Errorf("%s program not found in config", ccipconsts.ContractNameOffRamp)
+		return nil, nil, fmt.Errorf("args is not of type ReportPreTransform")
 	}
-	// PDA lookup to fetch router address
-	routerAddrLookup := PDALookups{
-		Name: "ReferenceAddresses",
-		PublicKey: Lookup{AccountConstant: &AccountConstant{
-			Address: toAddress,
-		}},
-		Seeds: []Seed{
-			{Static: []byte("reference_addresses")},
-		},
-		// Reads the router address from the reference addresses PDA
-		InternalField: InternalField{
-			TypeName: "ReferenceAddresses",
-			Location: "Router",
-			IDL:      offrampProgramConfig.IDL,
-		},
-	}
-	accountMetas, err := routerAddrLookup.Resolve(ctx, nil, nil, cw.client)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to fetch the router program address from the reference addresses account: %w", err)
-	}
-	if len(accountMetas) != 1 {
-		return nil, nil, fmt.Errorf("expect 1 address to be returned for router address, received %d: %w", len(accountMetas), err)
+	argsTransformed := ReportPostTransform{
+		ReportContext:  argsTyped.ReportContext,
+		Report:         argsTyped.Report,
+		AbstractReport: argsTyped.AbstractReport,
+		Info:           argsTyped.Info,
 	}
 
-	// Fetch router config to use to fetch TokenAdminRegistry
-	routerProgramConfig, ok := cw.config.Programs[ccipconsts.ContractNameRouter]
-	if !ok {
-		return nil, nil, fmt.Errorf("%s program not found in config", ccipconsts.ContractNameRouter)
+	registryTables, exists := tableMap["PoolLookupTable"]
+	// If PoolLookupTable does not exist in the table map, token indexes are not needed
+	// Return with empty TokenIndexes
+	if !exists {
+		argsTransformed.TokenIndexes = []byte{}
+		return argsTransformed, accounts, nil
 	}
 
-	routerAddress := accountMetas[0].PublicKey
-	TokenPoolLookupTable := LookupTables{
-		DerivedLookupTables: []DerivedLookupTable{
-			{
-				Name: "PoolLookupTable",
-				Accounts: Lookup{PDALookups: &PDALookups{
-					Name: "TokenAdminRegistry",
-					PublicKey: Lookup{AccountConstant: &AccountConstant{
-						Address: routerAddress.String(),
-					}},
-					Seeds: []Seed{
-						{Static: []byte("token_admin_registry")},
-						{Dynamic: Lookup{AccountLookup: &AccountLookup{Location: "Info.AbstractReports.Messages.TokenAmounts.DestTokenAddress"}}},
-					},
-					IsSigner:   false,
-					IsWritable: false,
-					InternalField: InternalField{
-						TypeName: "TokenAdminRegistry",
-						Location: "LookupTable",
-						IDL:      routerProgramConfig.IDL,
-					},
-				}},
-			},
-		},
-	}
-
-	tableMap, _, err := cw.ResolveLookupTables(ctx, args, TokenPoolLookupTable)
-	if err != nil {
-		return nil, nil, err
-	}
-	registryTables := tableMap["PoolLookupTable"]
 	tokenPoolAddresses := []solana.PublicKey{}
 	for _, table := range registryTables {
 		tokenPoolAddresses = append(tokenPoolAddresses, table[0].PublicKey)
@@ -128,24 +80,12 @@ func CCIPExecuteArgsTransform(ctx context.Context, cw *SolanaChainWriterService,
 		return nil, nil, fmt.Errorf("missing token pools in accounts")
 	}
 
-	argsTyped, ok := args.(ReportPreTransform)
-	if !ok {
-		return nil, nil, fmt.Errorf("args is not of type ReportPreTransform")
-	}
-
-	argsTransformed := ReportPostTransform{
-		ReportContext:  argsTyped.ReportContext,
-		Report:         argsTyped.Report,
-		AbstractReport: argsTyped.AbstractReport,
-		Info:           argsTyped.Info,
-		TokenIndexes:   tokenIndexes,
-	}
-
+	argsTransformed.TokenIndexes = tokenIndexes
 	return argsTransformed, accounts, nil
 }
 
 // This Transform function trims off the GlobalState account from commit transactions if there are no token or gas price updates
-func CCIPCommitAccountTransform(ctx context.Context, cw *SolanaChainWriterService, args any, accounts solana.AccountMetaSlice, toAddress string) (any, solana.AccountMetaSlice, error) {
+func CCIPCommitAccountTransform(ctx context.Context, args any, accounts solana.AccountMetaSlice, _ map[string]map[string][]*solana.AccountMeta) (any, solana.AccountMetaSlice, error) {
 	var tokenPriceVals, gasPriceVals [][]byte
 	var err error
 	tokenPriceVals, err = GetValuesAtLocation(args, "Info.TokenPrices.TokenID")

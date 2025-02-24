@@ -704,6 +704,62 @@ func TestLookupTables(t *testing.T) {
 			require.Equal(t, lookupKeys[i], address.PublicKey)
 		}
 	})
+
+	t.Run("Resolving optional derived lookup table does not return error", func(t *testing.T) {
+		// Deployed contract_reader_interface contract
+		programID := solana.MustPublicKeyFromBase58("6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE")
+
+		args := map[string]interface{}{
+			"seed1": []byte("lookup"),
+		}
+
+		lookupConfig := chainwriter.LookupTables{
+			DerivedLookupTables: []chainwriter.DerivedLookupTable{
+				{
+					Name: "DerivedTable",
+					Accounts: chainwriter.Lookup{PDALookups: &chainwriter.PDALookups{
+						Name:      "DataAccountPDA",
+						PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Name: "WriteTest", Address: programID.String()}},
+						Seeds: []chainwriter.Seed{
+							{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Name: "missing_seed", Location: "missing_seed"}}},
+						},
+						IsSigner:   false,
+						IsWritable: false,
+						InternalField: chainwriter.InternalField{
+							TypeName: "LookupTableDataAccount",
+							Location: "LookupTable",
+							IDL:      testContractIDL,
+						}},
+					},
+					Optional: true,
+				},
+			},
+		}
+
+		derivedTableMap, _, err := cw.ResolveLookupTables(ctx, args, lookupConfig)
+		require.NoError(t, err)
+
+		pdaWithAccountLookupSeed := chainwriter.Lookup{
+			PDALookups: &chainwriter.PDALookups{
+				PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Address: chainwriter.GetRandomPubKey(t).String()}},
+				Seeds: []chainwriter.Seed{
+					{
+						Dynamic: chainwriter.Lookup{
+							AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
+								LookupTableName: "DerivedTable",
+								IncludeIndexes:  []int{},
+							},
+						},
+					},
+				},
+			},
+			Optional: true,
+		}
+
+		accounts, err := chainwriter.GetAddresses(ctx, nil, []chainwriter.Lookup{pdaWithAccountLookupSeed}, derivedTableMap, multiClient)
+		require.NoError(t, err)
+		require.Empty(t, accounts)
+	})
 }
 
 func TestCreateATAs(t *testing.T) {
@@ -935,6 +991,31 @@ func TestCreateATAs(t *testing.T) {
 		ataInstructions, err = chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer, logger.Test(t))
 		require.NoError(t, err)
 		require.Empty(t, ataInstructions, "No new instructions should be returned if ATAs already exist")
+	})
+
+	t.Run("optional ATA creation does not return error if lookups fail", func(t *testing.T) {
+		lookups := []chainwriter.ATALookup{
+			{
+				Location: "Inner.Address",
+				WalletAddress: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+					Address: feePayer.String(),
+				}},
+				TokenProgram: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+					Address: chainwriter.GetRandomPubKey(t).String(),
+				}},
+				MintAddress: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{
+					Location: "Inner.BadLocation",
+				}},
+				Optional: true,
+			},
+		}
+		args := chainwriter.TestArgs{
+			Inner: []chainwriter.InnerArgs{{Address: chainwriter.GetRandomPubKey(t).Bytes()}},
+		}
+
+		ataInstructions, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer, logger.Test(t))
+		require.NoError(t, err)
+		require.Len(t, ataInstructions, 0)
 	})
 }
 
