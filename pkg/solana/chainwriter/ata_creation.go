@@ -41,7 +41,9 @@ func CreateATAs(ctx context.Context, args any, lookups []ATALookup, derivedTable
 			}
 		}
 		walletAddresses, err := GetAddresses(ctx, args, []Lookup{lookup.WalletAddress}, derivedTableMap, client)
-		if err != nil {
+		if lookup.Optional && isIgnorableError(err) {
+			continue
+		} else if err != nil {
 			return nil, fmt.Errorf("error resolving wallet address: %w", err)
 		}
 		if len(walletAddresses) != 1 {
@@ -50,12 +52,16 @@ func CreateATAs(ctx context.Context, args any, lookups []ATALookup, derivedTable
 		wallet := walletAddresses[0].PublicKey
 
 		tokenPrograms, err := GetAddresses(ctx, args, []Lookup{lookup.TokenProgram}, derivedTableMap, client)
-		if err != nil {
+		if lookup.Optional && isIgnorableError(err) {
+			continue
+		} else if err != nil {
 			return nil, fmt.Errorf("error resolving token program address: %w", err)
 		}
 
 		mints, err := GetAddresses(ctx, args, []Lookup{lookup.MintAddress}, derivedTableMap, client)
-		if err != nil {
+		if lookup.Optional && isIgnorableError(err) {
+			continue
+		} else if err != nil {
 			return nil, fmt.Errorf("error resolving mint address: %w", err)
 		}
 		if len(tokenPrograms) != len(mints) {
