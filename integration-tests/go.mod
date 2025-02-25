@@ -15,7 +15,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/rs/zerolog v1.33.0
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250212131315-e9b53b05b02a
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250206215114-fb6c3c35e8e3
+	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250210201649-d9b9b053905e
 	github.com/smartcontractkit/chainlink-common v0.4.2-0.20250224210553-dc2073fe0d21
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250213035259-e727e73f6181
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.51.0
@@ -221,7 +221,7 @@ require (
 	github.com/hashicorp/golang-lru v0.6.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hashicorp/yamux v0.1.1 // indirect
-	github.com/hdevalence/ed25519consensus v0.1.0 // indirect
+	github.com/hdevalence/ed25519consensus v0.2.0 // indirect
 	github.com/holiman/billy v0.0.0-20240216141850-2abb0c79d3c4 // indirect
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
 	github.com/holiman/uint256 v1.3.1 // indirect
