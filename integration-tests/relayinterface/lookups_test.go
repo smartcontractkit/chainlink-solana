@@ -1013,7 +1013,7 @@ func TestCreateATAs(t *testing.T) {
 			Inner: []chainwriter.InnerArgs{{Address: chainwriter.GetRandomPubKey(t).Bytes()}},
 		}
 
-		ataInstructions, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, testContractIDL, feePayer, logger.Test(t))
+		ataInstructions, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, feePayer, logger.Test(t))
 		require.NoError(t, err)
 		require.Len(t, ataInstructions, 0)
 	})
