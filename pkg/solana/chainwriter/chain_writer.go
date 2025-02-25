@@ -6,13 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"strings"
 
 	"github.com/gagliardetto/solana-go"
 	addresslookuptable "github.com/gagliardetto/solana-go/programs/address-lookup-table"
 	"github.com/gagliardetto/solana-go/rpc"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -235,83 +233,6 @@ func (s *SolanaChainWriterService) FilterLookupTableAddresses(
 	return filteredLookupTables
 }
 
-// CreateATAs first checks if a specified location exists, then checks if the accounts derived from the
-// ATALookups in the ChainWriter's configuration exist on-chain and creates them if they do not.
-func CreateATAs(ctx context.Context, args any, lookups []ATALookup, derivedTableMap map[string]map[string][]*solana.AccountMeta, client client.MultiClient, idl string, feePayer solana.PublicKey, logger logger.Logger) ([]solana.Instruction, error) {
-	createATAInstructions := []solana.Instruction{}
-	for _, lookup := range lookups {
-		// Check if location exists
-		if lookup.Location != "" {
-			_, err := GetValuesAtLocation(args, lookup.Location)
-			if err != nil {
-				// field doesn't exist, so ignore ATA creation
-				if errors.Is(err, errFieldNotFound) {
-					logger.Debugw("field not found, skipping ATA creation", "location", lookup.Location)
-					continue
-				}
-				return nil, fmt.Errorf("error getting values at location: %w", err)
-			}
-		}
-		walletAddresses, err := GetAddresses(ctx, args, []Lookup{lookup.WalletAddress}, derivedTableMap, client)
-		if lookup.Optional && isIgnorableError(err) {
-			continue
-		} else if err != nil {
-			return nil, fmt.Errorf("error resolving wallet address: %w", err)
-		}
-		if len(walletAddresses) != 1 {
-			return nil, fmt.Errorf("expected exactly one wallet address, got %d", len(walletAddresses))
-		}
-		wallet := walletAddresses[0].PublicKey
-
-		tokenPrograms, err := GetAddresses(ctx, args, []Lookup{lookup.TokenProgram}, derivedTableMap, client)
-		if lookup.Optional && isIgnorableError(err) {
-			continue
-		} else if err != nil {
-			return nil, fmt.Errorf("error resolving token program address: %w", err)
-		}
-
-		mints, err := GetAddresses(ctx, args, []Lookup{lookup.MintAddress}, derivedTableMap, client)
-		if lookup.Optional && isIgnorableError(err) {
-			continue
-		} else if err != nil {
-			return nil, fmt.Errorf("error resolving mint address: %w", err)
-		}
-		if len(tokenPrograms) != len(mints) {
-			return nil, fmt.Errorf("expected equal number of token programs and mints, got %d tokenPrograms and %d mints", len(tokenPrograms), len(mints))
-		}
-
-		for i := range tokenPrograms {
-			tokenProgram := tokenPrograms[i].PublicKey
-			mint := mints[i].PublicKey
-
-			ataAddress, _, err := tokens.FindAssociatedTokenAddress(tokenProgram, mint, wallet)
-			if err != nil {
-				return nil, fmt.Errorf("error deriving ATA: %w", err)
-			}
-
-			_, err = client.GetAccountInfoWithOpts(ctx, ataAddress, &rpc.GetAccountInfoOpts{
-				Encoding:   "base64",
-				Commitment: rpc.CommitmentFinalized,
-			})
-			if err == nil {
-				logger.Infow("ATA already exists, skipping creation.", "location", lookup.Location)
-				continue
-			}
-			if !strings.Contains(err.Error(), "not found") {
-				return nil, fmt.Errorf("error reading account info for ATA: %w", err)
-			}
-
-			ins, _, err := tokens.CreateAssociatedTokenAccount(tokenProgram, mint, wallet, feePayer)
-			if err != nil {
-				return nil, fmt.Errorf("error creating associated token account: %w", err)
-			}
-			createATAInstructions = append(createATAInstructions, ins)
-		}
-	}
-
-	return createATAInstructions, nil
-}
-
 // SubmitTransaction builds, encodes, and enqueues a transaction using the provided program
 // configuration and method details. It relies on the configured IDL, account lookups, and
 // lookup tables to gather the necessary accounts and data. The function retrieves the latest
@@ -373,10 +294,15 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("error parsing fee payer address: %w", err), debugID)
 	}
 
-	s.lggr.Debugw("Creating ATAs", "contract", contractName, "method", method)
-	createATAinstructions, err := CreateATAs(ctx, args, methodConfig.ATAs, derivedTableMap, s.client, programConfig.IDL, feePayer, s.lggr)
-	if err != nil {
-		return errorWithDebugID(fmt.Errorf("error resolving account addresses: %w", err), debugID)
+	if len(methodConfig.ATAs) > 0 {
+		s.lggr.Debugw("Creating ATAs", "contract", contractName, "method", method)
+		createATAInstructions, ataErr := CreateATAs(ctx, args, methodConfig.ATAs, derivedTableMap, s.client, feePayer, s.lggr)
+		if ataErr != nil {
+			return errorWithDebugID(fmt.Errorf("error resolving account addresses: %w", err), debugID)
+		}
+		if err = s.handleATACreation(ctx, createATAInstructions, methodConfig, contractName, method, feePayer); err != nil {
+			return errorWithDebugID(fmt.Errorf("error creating ATAs: %w", err), debugID)
+		}
 	}
 
 	s.lggr.Debugw("Filtering lookup table addresses", "contract", contractName, "method", method)
@@ -411,13 +337,6 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 
 	discriminator := GetDiscriminator(methodConfig.ChainSpecificName)
 	encodedPayload = append(discriminator[:], encodedPayload...)
-
-	if len(createATAinstructions) > 0 {
-		err = s.handleATACreation(ctx, createATAinstructions, methodConfig, contractName, method, feePayer)
-		if err != nil {
-			return errorWithDebugID(fmt.Errorf("error creating ATAs: %w", err), debugID)
-		}
-	}
 
 	// Fetch latest blockhash
 	blockhash, err := s.client.LatestBlockhash(ctx)

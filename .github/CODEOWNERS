@@ -13,7 +13,7 @@
 /pkg/solana @smartcontractkit/bix-framework @smartcontractkit/bix-build
 
 # e2e test ownership
-/integration-tests @smartcontractkit/qa @smartcontractkit/bix-build
+/integration-tests @smartcontractkit/qa @smartcontractkit/bix-build @smartcontractkit/bix-framework
 
 # gauntlet ownership
 /gauntlet @smartcontractkit/devx @smartcontractkit/bix-build
