@@ -41,6 +41,8 @@ var (
 	Instruction_Storeval = ag_binary.TypeID([8]byte{182, 242, 86, 70, 26, 41, 111, 133})
 
 	Instruction_Store = ag_binary.TypeID([8]byte{220, 28, 207, 235, 0, 234, 193, 246})
+
+	Instruction_StoreTokenAccount = ag_binary.TypeID([8]byte{101, 151, 158, 155, 161, 155, 28, 57})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -60,6 +62,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "Storeval"
 	case Instruction_Store:
 		return "Store"
+	case Instruction_StoreTokenAccount:
+		return "StoreTokenAccount"
 	default:
 		return ""
 	}
@@ -100,6 +104,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"store", (*Store)(nil),
+		},
+		{
+			"store_token_account", (*StoreTokenAccount)(nil),
 		},
 	},
 )
