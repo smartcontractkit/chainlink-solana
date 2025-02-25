@@ -179,7 +179,7 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 			output["OCRConfig"] = config
 
 			// weakdecode so the uint8 field is cast to bool
-			err = mapstructure.WeakDecode(output, results[dataIdx].returnVal)
+			err = mapstructure.WeakDecode(output, results[idx].returnVal)
 			if err != nil {
 				results[idx].err = err
 				continue
