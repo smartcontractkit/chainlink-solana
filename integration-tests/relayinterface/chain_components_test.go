@@ -250,7 +250,6 @@ func RunChainWriterTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInt
 				testIdx := binary.LittleEndian.AppendUint64([]byte{}, idx)
 				dataPDAAccount, _, err := solana.FindProgramAddress([][]byte{[]byte("data"), testIdx}, solana.MustPublicKeyFromBase58(bound.Address))
 				require.NoError(t, err)
-				fmt.Println("Data PDA Account", dataPDAAccount.Bytes())
 
 				// append random addresses to lookup table address list
 				lookupTableAddresses := make([]solana.PublicKey, 0, 10)

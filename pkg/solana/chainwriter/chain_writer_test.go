@@ -33,6 +33,7 @@ import (
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	feemocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/fees/mocks"
 	txmMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
+	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
 type Arguments struct {
@@ -927,7 +928,14 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 			require.Len(t, tokenIndexes, 1)
 			require.Equal(t, uint8(3), tokenIndexes[0])
 			return true
-		}), &txID, mock.Anything).Return(nil).Once()
+		}), &txID, mock.Anything, mock.AnythingOfType("utils.SetTxConfig")).Return(nil).Run(func(args mock.Arguments) {
+			setComputeLimit, ok := args[5].(txmutils.SetTxConfig)
+			require.True(t, ok)
+
+			txConfig := &txmutils.TxConfig{}
+			setComputeLimit(txConfig)
+			require.Equal(t, uint32(500), txConfig.ComputeUnitLimit)
+		}).Once()
 
 		// stripped back report just for purposes of example
 		abstractReport := ccipocr3.ExecutePluginReportSingleChain{
@@ -937,6 +945,9 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 						{
 							DestTokenAddress: destTokenAddr.Bytes(),
 						},
+					},
+					ExtraArgsDecoded: map[string]any{
+						"ComputeUnits": uint32(500),
 					},
 				},
 			},
