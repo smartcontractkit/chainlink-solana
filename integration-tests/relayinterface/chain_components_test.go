@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -250,7 +251,6 @@ func RunChainWriterTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInt
 				testIdx := binary.LittleEndian.AppendUint64([]byte{}, idx)
 				dataPDAAccount, _, err := solana.FindProgramAddress([][]byte{[]byte("data"), testIdx}, solana.MustPublicKeyFromBase58(bound.Address))
 				require.NoError(t, err)
-				fmt.Println("Data PDA Account", dataPDAAccount.Bytes())
 
 				// append random addresses to lookup table address list
 				lookupTableAddresses := make([]solana.PublicKey, 0, 10)
@@ -263,7 +263,6 @@ func RunChainWriterTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInt
 				lookupTableAddresses = append(lookupTableAddresses, dataPDAAccount)
 
 				lookupTableAddr := CreateTestLookupTable(ctx, t, it.Helper.SolanaClient(), *it.Helper.TXM(), it.Helper.Sender(), lookupTableAddresses)
-				fmt.Println("lookup table address", lookupTableAddr.String())
 				initLookupTableArgs := LookupTableArgs{
 					LookupTable: lookupTableAddr,
 				}
@@ -288,6 +287,41 @@ func RunChainWriterTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInt
 				assert.Equal(t, dataValue, prim)
 			},
 		},
+		{
+			Name: ChainWriterATASupportTest,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				cw := it.GetContractWriter(t)
+				contracts := it.GetBindings(t)
+
+				idx := it.getTestIdx(t.Name())
+				ctx := tests.Context(t)
+				bound := BindingsByName(contracts, AnyContractName)[0]
+				require.NoError(t, cr.Bind(ctx, contracts))
+
+				tokenProgram := solana.Token2022ProgramID
+				feePayerPk := solana.MustPrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1])
+				mint := utils.CreateRandomToken(t, feePayerPk, tokenProgram, it.Helper.RPC())
+
+				wallet, err := solana.NewRandomPrivateKey()
+				require.NoError(t, err)
+
+				ataAddress, _, err := tokens.FindAssociatedTokenAddress(tokenProgram, mint, wallet.PublicKey())
+				require.NoError(t, err)
+
+				args := StoreTokenAccountArgs{
+					TestIdx:      idx,
+					TokenAccount: ataAddress,
+					ATAInfo: ATAInfo{
+						Receiver:     wallet.PublicKey(),
+						Wallet:       wallet.PublicKey(),
+						TokenProgram: tokenProgram,
+						Mint:         mint,
+					},
+				}
+				SubmitTransactionToCW(t, it, cw, "storeTokenAccount", args, bound, types.Finalized)
+			},
+		},
 	}
 
 	RunTests(t, it, testCases)
@@ -302,6 +336,7 @@ const (
 	ContractReaderGetLatestValueUsingMultiReaderWithParmsReuse   = "Get latest value using multi reader with params reuse"
 	ContractReaderGetLatestValueGetTokenPrices                   = "Get latest value handles get token prices edge case"
 	ChainWriterLookupTableTest                                   = "Set contract value using a lookup table for addresses"
+	ChainWriterATASupportTest                                    = "Initialize ATA if one does not exist"
 )
 
 func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsInterfaceTester[T]) {
@@ -518,6 +553,7 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 type SolanaChainComponentsInterfaceTesterHelper[T WrappedTestingT[T]] interface {
 	Init(t T)
 	RPCClient() *chainreader.RPCClientWrapper
+	RPC() *rpc.Client
 	Context(t T) context.Context
 	Logger(t T) logger.Logger
 	GetPrimaryIDL(t T) []byte
@@ -702,6 +738,10 @@ func (h *helper) RPCClient() *chainreader.RPCClientWrapper {
 	return &chainreader.RPCClientWrapper{AccountReader: h.rpcClient}
 }
 
+func (h *helper) RPC() *rpc.Client {
+	return h.rpcClient
+}
+
 func (h *helper) TXM() *txm.TxManager {
 	return &h.txm
 }
@@ -802,6 +842,19 @@ type LookupTableArgs struct {
 type StoreStructArgs struct {
 	TestIdx uint64
 	Data    TestStruct
+}
+
+type StoreTokenAccountArgs struct {
+	TestIdx      uint64
+	TokenAccount solana.PublicKey
+	ATAInfo      ATAInfo
+}
+
+type ATAInfo struct {
+	Receiver     solana.PublicKey
+	Wallet       solana.PublicKey
+	TokenProgram solana.PublicKey
+	Mint         solana.PublicKey
 }
 
 func (h *helper) runInitialize(
@@ -1327,6 +1380,50 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								}},
 								Seeds: []chainwriter.Seed{
 									{Static: []byte("data")},
+									{Static: testIdx},
+								},
+								IsWritable: true,
+								IsSigner:   false,
+							}},
+							{AccountConstant: &chainwriter.AccountConstant{
+								Name:       "SystemProgram",
+								Address:    solana.SystemProgramID.String(),
+								IsWritable: false,
+								IsSigner:   false,
+							}},
+						},
+						DebugIDLocation: "",
+					},
+					"storeTokenAccount": {
+						FromAddress:       fromAddress,
+						ChainSpecificName: "storeTokenAccount",
+						ATAs: []chainwriter.ATALookup{
+							{
+								Location:      "ATAInfo.Receiver",
+								WalletAddress: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: "ATAInfo.Wallet"}},
+								TokenProgram:  chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: "ATAInfo.TokenProgram"}},
+								MintAddress:   chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: "ATAInfo.Mint"}},
+							},
+						},
+						Accounts: []chainwriter.Lookup{
+							{AccountConstant: &chainwriter.AccountConstant{
+								Name:       "Signer",
+								Address:    fromAddress,
+								IsSigner:   true,
+								IsWritable: true,
+							}},
+							{AccountLookup: &chainwriter.AccountLookup{
+								Location:   "TokenAccount",
+								IsWritable: chainwriter.MetaBool{Value: true},
+								IsSigner:   chainwriter.MetaBool{Value: false},
+							}},
+							{PDALookups: &chainwriter.PDALookups{
+								Name: "Account",
+								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+									Address: primaryProgramPubKey,
+								}},
+								Seeds: []chainwriter.Seed{
+									{Static: []byte("token_account")},
 									{Static: testIdx},
 								},
 								IsWritable: true,
