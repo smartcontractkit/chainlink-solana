@@ -10,19 +10,19 @@
 * @smartcontractkit/bix-build
 
 # offchain code ownership
-/pkg/solana @smartcontractkit/bix-framework
+/pkg/solana @smartcontractkit/bix-framework @smartcontractkit/bix-build
 
 # e2e test ownership
-/integration-tests @smartcontractkit/qa
+/integration-tests @smartcontractkit/qa @smartcontractkit/bix-build
 
 # gauntlet ownership
-/gauntlet @smartcontractkit/devx
+/gauntlet @smartcontractkit/devx @smartcontractkit/bix-build
 
 # monitoring ownership
-/pkg/monitoring @smartcontractkit/realtime
+/pkg/monitoring @smartcontractkit/realtime @smartcontractkit/bix-build
 
 # LOOP Plugin commands
-/pkg/solana/cmd/chainlink-solana @smartcontractkit/foundations
+/pkg/solana/cmd/chainlink-solana @smartcontractkit/foundations @smartcontractkit/bix-build
 
 # CI/CD
-/.github/** @smartcontractkit/releng 
+/.github/** @smartcontractkit/releng @smartcontractkit/bix-build
