@@ -384,7 +384,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	// Filter the lookup table addresses based on which accounts are actually used
 	filteredLookupTableMap := s.FilterLookupTableAddresses(accounts, derivedTableMap, staticTableMap)
 
-	computeLimit := uint32(0)
+	options := []txmutils.SetTxConfig{}
 	// Transform args if necessary
 	if methodConfig.ArgsTransform != "" {
 		transformFunc, tfErr := FindTransform(methodConfig.ArgsTransform)
@@ -392,7 +392,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 			return errorWithDebugID(fmt.Errorf("error finding transform function: %w", tfErr), debugID)
 		}
 		s.lggr.Debugw("Applying args transformation", "contract", contractName, "method", method)
-		args, accounts, computeLimit, err = transformFunc(ctx, args, accounts, derivedTableMap)
+		args, accounts, options, err = transformFunc(ctx, args, accounts, derivedTableMap)
 		if err != nil {
 			return errorWithDebugID(fmt.Errorf("error transforming args: %w", err), debugID)
 		}
@@ -439,10 +439,6 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 
 	s.lggr.Debugw("Sending main transaction", "contract", contractName, "method", method)
 
-	options := []txmutils.SetTxConfig{}
-	if computeLimit != 0 {
-		options = append(options, txmutils.SetComputeUnitLimit(computeLimit))
-	}
 	// Enqueue transaction
 	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, tx, &transactionID, blockhash.Value.LastValidBlockHeight, options...); err != nil {
 		return errorWithDebugID(fmt.Errorf("error enqueuing transaction: %w", err), debugID)

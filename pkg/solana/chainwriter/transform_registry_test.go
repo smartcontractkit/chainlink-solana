@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
+	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
 type ReportPreTransform struct {
@@ -30,6 +31,9 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 				Messages: []ccipocr3.Message{{
 					TokenAmounts: []ccipocr3.RampTokenAmount{{
 						DestTokenAddress: ccipocr3.UnknownAddress(destTokenAddr.Bytes()),
+						DestExecDataDecoded: map[string]any{
+							"destGasAmount": uint32(500),
+						},
 					}},
 					ExtraArgsDecoded: map[string]any{
 						"ComputeUnits": uint32(500),
@@ -52,10 +56,11 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		}
 		tableMap["PoolLookupTable"][lookupTablePubkey.String()] = poolKeysMeta
 
-		transformedArgs, newAccounts, computeUnits, err := chainwriter.CCIPExecuteArgsTransform(ctx, args, accounts, tableMap)
+		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, args, accounts, tableMap)
 		require.NoError(t, err)
 
-		require.Equal(t, computeUnits, uint32(500))
+		verifyTxOpts(t, options, true)
+
 		// Accounts should be unchanged
 		require.Len(t, newAccounts, 2)
 		typedArgs, ok := transformedArgs.(chainwriter.ReportPostTransform)
@@ -65,9 +70,9 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	})
 
 	t.Run("CCIPExecute ArgsTransform includes empty token indexes if lookup table not found", func(t *testing.T) {
-		transformedArgs, newAccounts, computeUnits, err := chainwriter.CCIPExecuteArgsTransform(ctx, args, accounts, nil)
+		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, args, accounts, nil)
 		require.NoError(t, err)
-		require.Equal(t, computeUnits, uint32(500))
+		verifyTxOpts(t, options, true)
 
 		// Accounts should be unchanged
 		require.Len(t, newAccounts, 2)
@@ -89,14 +94,21 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 						ExtraArgsDecoded: map[string]any{
 							"ComputeUnits": uint32(500),
 						},
+						TokenAmounts: []ccipocr3.RampTokenAmount{
+							{
+								DestExecDataDecoded: map[string]any{
+									"destGasAmount": uint32(500),
+								},
+							},
+						},
 					}},
 				}},
 			},
 		}
-		transformedArgs, newAccounts, computeUnits, err := chainwriter.CCIPExecuteArgsTransform(ctx, args, accounts, nil)
+		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, args, accounts, nil)
 		require.NoError(t, err)
 
-		require.Equal(t, computeUnits, uint32(500))
+		verifyTxOpts(t, options, true)
 		_, ok := transformedArgs.(chainwriter.ReportPostTransform)
 		require.True(t, ok)
 		require.Len(t, newAccounts, 2)
@@ -146,7 +158,8 @@ func Test_CCIPCommitAccountTransform(t *testing.T) {
 			},
 		}
 		accounts := []*solana.AccountMeta{{PublicKey: key1}, {PublicKey: key2}}
-		_, newAccounts, _, err := chainwriter.CCIPCommitAccountTransform(ctx, args, accounts, nil)
+		_, newAccounts, options, err := chainwriter.CCIPCommitAccountTransform(ctx, args, accounts, nil)
+		verifyTxOpts(t, options, false)
 		require.NoError(t, err)
 		require.Len(t, newAccounts, 2)
 	})
@@ -157,8 +170,27 @@ func Test_CCIPCommitAccountTransform(t *testing.T) {
 			Info: ccipocr3.CommitReportInfo{},
 		}
 		accounts := []*solana.AccountMeta{{PublicKey: key1}, {PublicKey: key2}}
-		_, newAccounts, _, err := chainwriter.CCIPCommitAccountTransform(ctx, args, accounts, nil)
+		_, newAccounts, options, err := chainwriter.CCIPCommitAccountTransform(ctx, args, accounts, nil)
+		verifyTxOpts(t, options, false)
+
 		require.NoError(t, err)
 		require.Len(t, newAccounts, 1)
 	})
+}
+
+func verifyTxOpts(t *testing.T, options []txmutils.SetTxConfig, exec bool) {
+	expectedLen := 1
+	if exec {
+		expectedLen = 2
+	}
+	require.Len(t, options, expectedLen)
+
+	txConfig := &txmutils.TxConfig{}
+	options[0](txConfig)
+	require.Equal(t, !exec, txConfig.EstimateComputeUnitLimit)
+
+	if exec {
+		options[1](txConfig)
+		require.Equal(t, uint32(2000), txConfig.ComputeUnitLimit)
+	}
 }

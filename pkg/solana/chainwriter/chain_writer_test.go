@@ -928,13 +928,19 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 			require.Len(t, tokenIndexes, 1)
 			require.Equal(t, uint8(3), tokenIndexes[0])
 			return true
-		}), &txID, mock.Anything, mock.AnythingOfType("utils.SetTxConfig")).Return(nil).Run(func(args mock.Arguments) {
-			setComputeLimit, ok := args[5].(txmutils.SetTxConfig)
+		}), &txID, mock.Anything, mock.AnythingOfType("utils.SetTxConfig"), mock.AnythingOfType("utils.SetTxConfig")).Return(nil).Run(func(args mock.Arguments) {
+			opt1, ok := args[5].(txmutils.SetTxConfig)
+			require.True(t, ok)
+
+			opt2, ok := args[6].(txmutils.SetTxConfig)
 			require.True(t, ok)
 
 			txConfig := &txmutils.TxConfig{}
-			setComputeLimit(txConfig)
-			require.Equal(t, uint32(500), txConfig.ComputeUnitLimit)
+			opt1(txConfig)
+			opt2(txConfig)
+
+			require.Equal(t, false, txConfig.EstimateComputeUnitLimit)
+			require.Equal(t, uint32(1700), txConfig.ComputeUnitLimit)
 		}).Once()
 
 		// stripped back report just for purposes of example
@@ -944,6 +950,9 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 					TokenAmounts: []ccipocr3.RampTokenAmount{
 						{
 							DestTokenAddress: destTokenAddr.Bytes(),
+							DestExecDataDecoded: map[string]any{
+								"destGasAmount": uint32(200),
+							},
 						},
 					},
 					ExtraArgsDecoded: map[string]any{
@@ -1014,7 +1023,14 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 			// The CCIPCommit ArgsTransform should remove the last account since no price updates were provided in the report
 			require.Len(t, tx.Message.Instructions[0].Accounts, 2)
 			return true
-		}), &txID, mock.Anything).Return(nil).Once()
+		}), &txID, mock.Anything, mock.AnythingOfType("utils.SetTxConfig")).Return(nil).Run(func(args mock.Arguments) {
+			opt, ok := args[5].(txmutils.SetTxConfig)
+			require.True(t, ok)
+			txConfig := &txmutils.TxConfig{}
+			opt(txConfig)
+
+			require.Equal(t, true, txConfig.EstimateComputeUnitLimit)
+		}).Once()
 
 		submitErr := cw.SubmitTransaction(ctx, ccipconsts.ContractNameOffRamp, ccipconsts.MethodCommit, args, txID, offrampAddr.String(), nil, nil)
 		require.NoError(t, submitErr)
