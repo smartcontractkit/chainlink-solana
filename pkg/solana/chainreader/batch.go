@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"reflect"
+	"strings"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/go-viper/mapstructure/v2"
@@ -13,6 +13,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
+
+	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
 
 type call struct {
@@ -157,7 +159,7 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 		}
 
 		// HACK: workaround for OffRampLatestConfigDetails: we need to use an input param to filter an array in the return values, not for seeds
-		if batchCall.ReadName == "OffRampLatestConfigDetails" {
+		if batchCall.ReadName == ccipconsts.MethodNameOffRampLatestConfigDetails {
 			params := batchCall.Params.(map[string]any)
 			ocrPluginType := params["ocrPluginType"].(uint8)
 
