@@ -56,7 +56,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		}
 		tableMap["PoolLookupTable"][lookupTablePubkey.String()] = poolKeysMeta
 
-		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, args, accounts, tableMap)
+		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteTransform(ctx, args, accounts, tableMap)
 		require.NoError(t, err)
 
 		verifyTxOpts(t, options, true)
@@ -70,7 +70,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	})
 
 	t.Run("CCIPExecute ArgsTransform includes empty token indexes if lookup table not found", func(t *testing.T) {
-		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, args, accounts, nil)
+		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteTransform(ctx, args, accounts, nil)
 		require.NoError(t, err)
 		verifyTxOpts(t, options, true)
 
@@ -105,7 +105,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 				}},
 			},
 		}
-		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, args, accounts, nil)
+		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteTransform(ctx, args, accounts, nil)
 		require.NoError(t, err)
 
 		verifyTxOpts(t, options, true)
@@ -124,7 +124,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 			Report:        []uint8{},
 			Info:          ccipocr3.ExecuteReportInfo{},
 		}
-		_, _, _, err := chainwriter.CCIPExecuteArgsTransform(ctx, args, accounts, nil)
+		_, _, _, err := chainwriter.CCIPExecuteTransform(ctx, args, accounts, nil)
 		require.Contains(t, err.Error(), "Expected 1 report with 1 message")
 	})
 
@@ -140,7 +140,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 				AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{}, {}},
 			},
 		}
-		_, _, _, err := chainwriter.CCIPExecuteArgsTransform(ctx, args, accounts, nil)
+		_, _, _, err := chainwriter.CCIPExecuteTransform(ctx, args, accounts, nil)
 		require.Contains(t, err.Error(), "Expected 1 report with 1 message")
 	})
 }
@@ -158,7 +158,7 @@ func Test_CCIPCommitAccountTransform(t *testing.T) {
 			},
 		}
 		accounts := []*solana.AccountMeta{{PublicKey: key1}, {PublicKey: key2}}
-		_, newAccounts, options, err := chainwriter.CCIPCommitAccountTransform(ctx, args, accounts, nil)
+		_, newAccounts, options, err := chainwriter.CCIPCommitTransform(ctx, args, accounts, nil)
 		verifyTxOpts(t, options, false)
 		require.NoError(t, err)
 		require.Len(t, newAccounts, 2)
@@ -170,7 +170,7 @@ func Test_CCIPCommitAccountTransform(t *testing.T) {
 			Info: ccipocr3.CommitReportInfo{},
 		}
 		accounts := []*solana.AccountMeta{{PublicKey: key1}, {PublicKey: key2}}
-		_, newAccounts, options, err := chainwriter.CCIPCommitAccountTransform(ctx, args, accounts, nil)
+		_, newAccounts, options, err := chainwriter.CCIPCommitTransform(ctx, args, accounts, nil)
 		verifyTxOpts(t, options, false)
 
 		require.NoError(t, err)

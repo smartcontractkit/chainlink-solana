@@ -7,8 +7,10 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/mitchellh/mapstructure"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 type ReportPostTransform struct {
@@ -24,9 +26,9 @@ const staticCuOverhead = 1000
 func FindTransform(id string) (func(context.Context, any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error), error) {
 	switch id {
 	case "CCIPExecute":
-		return CCIPExecuteArgsTransform, nil
+		return CCIPExecuteTransform, nil
 	case "CCIPCommit":
-		return CCIPCommitAccountTransform, nil
+		return CCIPCommitTransform, nil
 	default:
 		return nil, fmt.Errorf("transform not found")
 	}
@@ -34,7 +36,7 @@ func FindTransform(id string) (func(context.Context, any, solana.AccountMetaSlic
 
 // This Transform function looks up the token pool addresses in the accounts slice and augments the args
 // with the indexes of the token pool addresses in the accounts slice.
-func CCIPExecuteArgsTransform(ctx context.Context, args any, accounts solana.AccountMetaSlice, tableMap map[string]map[string][]*solana.AccountMeta) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
+func CCIPExecuteTransform(ctx context.Context, args any, accounts solana.AccountMetaSlice, tableMap map[string]map[string][]*solana.AccountMeta) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
 	var argsTransformed ReportPostTransform
 	err := mapstructure.Decode(args, &argsTransformed)
 	if err != nil {
@@ -99,7 +101,7 @@ func CCIPExecuteArgsTransform(ctx context.Context, args any, accounts solana.Acc
 }
 
 // This Transform function trims off the GlobalState account from commit transactions if there are no token or gas price updates
-func CCIPCommitAccountTransform(ctx context.Context, args any, accounts solana.AccountMetaSlice, _ map[string]map[string][]*solana.AccountMeta) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
+func CCIPCommitTransform(ctx context.Context, args any, accounts solana.AccountMetaSlice, _ map[string]map[string][]*solana.AccountMeta) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
 	var tokenPriceVals, gasPriceVals [][]byte
 	var err error
 	tokenPriceVals, err = GetValuesAtLocation(args, "Info.TokenPrices.TokenID")
