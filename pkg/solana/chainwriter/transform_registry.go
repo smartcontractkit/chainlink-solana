@@ -6,17 +6,10 @@ import (
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/mitchellh/mapstructure"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
-
-// TODO: make this type in the chainlink-common CW package
-type ReportPreTransform struct {
-	ReportContext  [2][32]byte
-	Report         []byte
-	Info           ccipocr3.ExecuteReportInfo
-	AbstractReport ccip_offramp.ExecutionReportSingleChain
-}
 
 type ReportPostTransform struct {
 	ReportContext  [2][32]byte
@@ -40,15 +33,10 @@ func FindTransform(id string) (func(context.Context, any, solana.AccountMetaSlic
 // This Transform function looks up the token pool addresses in the accounts slice and augments the args
 // with the indexes of the token pool addresses in the accounts slice.
 func CCIPExecuteArgsTransform(ctx context.Context, args any, accounts solana.AccountMetaSlice, tableMap map[string]map[string][]*solana.AccountMeta) (any, solana.AccountMetaSlice, error) {
-	argsTyped, ok := args.(ReportPreTransform)
-	if !ok {
-		return nil, nil, fmt.Errorf("args is not of type ReportPreTransform")
-	}
-	argsTransformed := ReportPostTransform{
-		ReportContext:  argsTyped.ReportContext,
-		Report:         argsTyped.Report,
-		AbstractReport: argsTyped.AbstractReport,
-		Info:           argsTyped.Info,
+	var argsTransformed ReportPostTransform
+	err := mapstructure.Decode(args, &argsTransformed)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	registryTables, exists := tableMap["PoolLookupTable"]
