@@ -742,7 +742,7 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	// validate expected key exists by trying to sign with it
 	// fee payer account is index 0 account
 	// https://github.com/gagliardetto/solana-go/blob/main/transaction.go#L252
-	_, err := txm.ks.Sign(ctx, tx.Message.AccountKeys[0].String(), nil)
+	_, err = txm.ks.Sign(ctx, tx.Message.AccountKeys[0].String(), nil)
 	if err != nil {
 		return fmt.Errorf("error in soltxm.Enqueue.GetKey: %w", err)
 	}
