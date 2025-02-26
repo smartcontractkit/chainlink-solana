@@ -1208,6 +1208,14 @@ func TestTxm_Enqueue(t *testing.T) {
 			assert.Error(t, txm.Enqueue(ctx, run.name, run.tx, nil, run.lastValidBlockHeight))
 		})
 	}
+
+	t.Run("duplicate tx ID does not error", func(t *testing.T) {
+		id := uuid.NewString()
+		err := txm.Enqueue(ctx, "", tx, &id, 100)
+		require.NoError(t, err)
+		err = txm.Enqueue(ctx, "", tx, &id, 100)
+		require.NoError(t, err)
+	})
 }
 
 func addSigAndLimitToTx(t *testing.T, keystore SimpleKeystore, pubkey solana.PublicKey, tx solana.Transaction, limit fees.ComputeUnitLimit) *solana.Transaction {
@@ -1790,4 +1798,91 @@ func TestTxm_OnReorg(t *testing.T) {
 			require.Equal(t, types.Finalized, status)
 		})
 	}
+}
+
+func TestTxm_GetTransactionStatus(t *testing.T) {
+	// set up configs needed in txm
+	lggr := logger.Test(t)
+	ctx := tests.Context(t)
+	_, cancel := context.WithCancel(ctx)
+
+	// set up configs needed in txm
+	estimator := "fixed"
+	id := "mocknet-" + estimator + "-" + uuid.NewString()
+
+	cfg := config.NewDefault()
+	cfg.Chain.FeeEstimatorMode = &estimator
+	// Enable retention timeout to keep transactions after finality or error
+	cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(5 * time.Second)
+	mc := mocks.NewReaderWriter(t)
+
+	// mock solana keystore
+	mkey := keyMocks.NewSimpleKeystore(t)
+
+	loader := utils.NewStaticLoader[client.ReaderWriter](mc)
+	txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
+
+	msg := pendingTx{id: uuid.NewString()}
+
+	// Create new tx in pending state
+	err := txm.txs.New(msg)
+	require.NoError(t, err)
+	state, err := txm.GetTransactionStatus(ctx, msg.id)
+	require.NoError(t, err)
+	require.Equal(t, commontypes.Pending, state)
+
+	// Move tx to broadcasted state
+	err = txm.txs.OnBroadcasted(msg)
+	require.NoError(t, err)
+	state, err = txm.GetTransactionStatus(ctx, msg.id)
+	require.NoError(t, err)
+	require.Equal(t, commontypes.Pending, state)
+
+	sig := randomSignature(t)
+	txm.txs.AddSignature(cancel, msg.id, sig)
+
+	// Move tx to processed state
+	msgId, err := txm.txs.OnProcessed(sig)
+	require.NoError(t, err)
+	require.Equal(t, msg.id, msgId)
+	state, err = txm.GetTransactionStatus(ctx, msg.id)
+	require.NoError(t, err)
+	require.Equal(t, commontypes.Unconfirmed, state)
+
+	// Move tx to confirmed state
+	msgId, err = txm.txs.OnConfirmed(sig)
+	require.NoError(t, err)
+	require.Equal(t, msg.id, msgId)
+	state, err = txm.GetTransactionStatus(ctx, msg.id)
+	require.NoError(t, err)
+	require.Equal(t, commontypes.Unconfirmed, state)
+
+	// Move tx to finalized state
+	msgId, err = txm.txs.OnFinalized(sig, 1*time.Second)
+	require.NoError(t, err)
+	require.Equal(t, msg.id, msgId)
+	state, err = txm.GetTransactionStatus(ctx, msg.id)
+	require.NoError(t, err)
+	require.Equal(t, commontypes.Finalized, state)
+
+	// Add errored tx
+	errMsg := pendingTx{id: uuid.NewString()}
+	err = txm.txs.OnPrebroadcastError(errMsg.id, 1*time.Second, txmutils.Errored, TxFailReject)
+	require.NoError(t, err)
+	state, err = txm.GetTransactionStatus(ctx, errMsg.id)
+	require.NoError(t, err)
+	require.Equal(t, commontypes.Failed, state)
+
+	// Add fatally errored tx
+	fatalMsg := pendingTx{id: uuid.NewString()}
+	err = txm.txs.OnPrebroadcastError(fatalMsg.id, 1*time.Second, txmutils.FatallyErrored, TxFailReject)
+	require.NoError(t, err)
+	state, err = txm.GetTransactionStatus(ctx, fatalMsg.id)
+	require.NoError(t, err)
+	require.Equal(t, commontypes.Fatal, state)
+
+	// Unknown tx returns error
+	state, err = txm.GetTransactionStatus(ctx, uuid.NewString())
+	require.Error(t, err)
+	require.Equal(t, commontypes.Unknown, state)
 }

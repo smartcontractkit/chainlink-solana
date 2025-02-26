@@ -149,9 +149,7 @@ func (s *SolanaChainWriterService) waitForTxFinality(ctx context.Context, transa
 			return fmt.Errorf("context ended while waiting for finality of transaction %s", transactionID)
 		case <-ticker.C:
 			status, err := s.txm.GetTransactionStatus(waitCtx, transactionID)
-			// Allow poll to continue if status not found for transaction since transactions are not immediately broadcasted
-			// Status check could have started before there is a status to report
-			if err != nil && !strings.Contains(err.Error(), "failed to find transaction") {
+			if err != nil {
 				return fmt.Errorf("error fetching transaction status: %w", err)
 			}
 			switch status {

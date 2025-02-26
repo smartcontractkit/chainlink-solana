@@ -68,8 +68,9 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 		txm.fee = fee
 
 		msg.cfg = txm.defaultTxConfig()
-
-		_, _, _, err := txm.sendWithRetry(tests.Context(t), msg)
+		err := txm.txs.New(msg)
+		require.NoError(t, err)
+		_, _, _, err = txm.sendWithRetry(tests.Context(t), msg)
 		require.NoError(t, err)
 
 		time.Sleep(txRetryDuration / 4 * 5)                                     // wait 1.25x longer of tx life to capture all logs

@@ -195,7 +195,7 @@ func (txm *Txm) sendWithRetry(ctx context.Context, msg pendingTx) (solanaGo.Tran
 	}
 
 	// Create new transaction in memory
-	if err := txm.txs.New(msg); err != nil {
+	if err := txm.txs.OnBroadcasted(msg); err != nil {
 		cancel()
 		return solanaGo.Transaction{}, "", solanaGo.Signature{}, fmt.Errorf("failed to create new transaction: %w", err)
 	}
@@ -516,7 +516,7 @@ func (txm *Txm) handleErrorSignatureStatus(ctx context.Context, sig solanaGo.Sig
 // - Processed -> Not Found
 //
 // When a signature re-org is detected, the following steps are taken:
-// - Remove the prior transaction, along with all associated signatures, and cancel the prior context.
+// - Revert the prior transaction state to Pending and remove all associated signatures, and cancel the prior context.
 // - Rebroadcast the prior transaction with a new blockhash and an updated compute unit price.
 func (txm *Txm) handleReorg(ctx context.Context, client client.ReaderWriter, sig solanaGo.Signature, status *rpc.SignatureStatusesResult) {
 	// Determine if a re-org has occurred
@@ -528,7 +528,7 @@ func (txm *Txm) handleReorg(ctx context.Context, client client.ReaderWriter, sig
 
 	// At this point, we have detected a re-org. We need to rebroadcast the tx.
 	txm.lggr.Debugw("re-org detected for transaction", "txID", txID, "signature", sig)
-	pTx, err := txm.getPendingTx(txID)
+	pTx, err := txm.txs.GetReorgTx(txID)
 	if err != nil {
 		txm.lggr.Errorw("failed to get pending tx for rebroadcast", "txID", txID, "error", err)
 		return
@@ -720,6 +720,20 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	if tx == nil {
 		return errors.New("error in soltxm.Enqueue: tx is nil pointer")
 	}
+
+	// Use transaction ID provided by caller if set
+	id := uuid.NewString()
+	if txID != nil && *txID != "" {
+		id = *txID
+	}
+
+	_, err := txm.txs.GetTxState(id)
+	// Transaction for ID already exists. No-op to avoid creating another tx for the same ID.
+	if err == nil {
+		txm.lggr.Infow("transaction already exists for ID", "id", id)
+		return nil
+	}
+
 	// validate account keys slice
 	if len(tx.Message.AccountKeys) == 0 {
 		return errors.New("error in soltxm.Enqueue: not enough account keys in tx")
@@ -728,7 +742,7 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	// validate expected key exists by trying to sign with it
 	// fee payer account is index 0 account
 	// https://github.com/gagliardetto/solana-go/blob/main/transaction.go#L252
-	_, err := txm.ks.Sign(ctx, tx.Message.AccountKeys[0].String(), nil)
+	_, err = txm.ks.Sign(ctx, tx.Message.AccountKeys[0].String(), nil)
 	if err != nil {
 		return fmt.Errorf("error in soltxm.Enqueue.GetKey: %w", err)
 	}
@@ -739,18 +753,12 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 		v(&cfg)
 	}
 
-	// Use transaction ID provided by caller if set
-	id := uuid.New().String()
-	if txID != nil && *txID != "" {
-		id = *txID
-	}
-
 	// Perform compute unit limit estimation after storing transaction
 	// If error found during simulation, transaction should be in storage to mark accordingly
 	if cfg.EstimateComputeUnitLimit {
-		computeUnitLimit, err := txm.EstimateComputeUnitLimit(ctx, tx, id)
-		if err != nil {
-			return fmt.Errorf("transaction failed simulation: %w", err)
+		computeUnitLimit, simErr := txm.EstimateComputeUnitLimit(ctx, tx, id)
+		if simErr != nil {
+			return fmt.Errorf("transaction failed simulation: %w", simErr)
 		}
 		// If estimation returns 0 compute unit limit without error, fallback to original config
 		if computeUnitLimit != 0 {
@@ -763,6 +771,14 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 		tx:                   *tx,
 		cfg:                  cfg,
 		lastValidBlockHeight: txLastValidBlockHeight,
+	}
+
+	err = txm.txs.New(msg)
+	// No-op if transaction already exists for provided ID
+	if err != nil && errors.Is(err, ErrIDAlreadyExists) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to store new transaction with ID %s: %w", id, err)
 	}
 
 	select {
@@ -782,7 +798,7 @@ func (txm *Txm) GetTransactionStatus(ctx context.Context, transactionID string) 
 	}
 
 	switch state {
-	case txmutils.Broadcasted:
+	case txmutils.Pending, txmutils.Broadcasted:
 		return commontypes.Pending, nil
 	case txmutils.Processed, txmutils.Confirmed:
 		return commontypes.Unconfirmed, nil
@@ -974,8 +990,8 @@ func (txm *Txm) InflightTxs() int {
 // Removes all signatures associated with the prior tx, cancels prior ctx, updates compute unit price and sets given blockhash for rebroadcasting.
 // Calls sendWithRetry directly to avoid enqueuing the transaction. It logs the error when rebroadcast fails and returns the new signature when successful.
 func (txm *Txm) rebroadcastWithGivenBlockhash(ctx context.Context, pTx pendingTx, blockhash solana.Hash, lastValidBlockHeight uint64) (solana.Signature, error) {
-	// Remove the previous tx from state
-	_, err := txm.txs.Remove(pTx.id)
+	// Revert tx state back to pending
+	err := txm.txs.RevertToPending(pTx.id)
 	if err != nil {
 		txm.lggr.Errorw("failed to remove tx", "id", pTx.id, "error", err)
 		return solana.Signature{}, err
@@ -1038,8 +1054,4 @@ func (txm *Txm) defaultTxConfig() txmutils.TxConfig {
 		ComputeUnitLimit:         txm.cfg.ComputeUnitLimitDefault(),
 		EstimateComputeUnitLimit: txm.cfg.EstimateComputeUnitLimit(),
 	}
-}
-
-func (txm *Txm) getPendingTx(txID string) (pendingTx, error) {
-	return txm.txs.GetPendingTx(txID)
 }
