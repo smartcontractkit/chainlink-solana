@@ -73,8 +73,7 @@ func TestCountersAreProperlyPopulatedForWrites(t *testing.T) {
 	ctx := tests.Context(t)
 	orm := createObservedORM(t, chainID)
 
-	filter := newRandomFilter(t)
-	filterID, err := orm.InsertFilter(tests.Context(t), filter)
+	filterID, err := orm.ORM.InsertFilter(tests.Context(t), newRandomFilter(t))
 	require.NoError(t, err)
 
 	logs := generateRandomLogs(t, filterID, 20)
