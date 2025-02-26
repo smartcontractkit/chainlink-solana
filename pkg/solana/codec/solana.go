@@ -308,8 +308,8 @@ func processFieldType(parentTypeName string, idlType IdlType, refs *codecRefs) (
 		return getCodecByStringType(idlType.GetString(), refs.builder)
 	case idlType.IsIdlTypeOption():
 		// Go doesn't have an `Option` type; use pointer to type instead
-		// this should be automatic in the codec
-		return processFieldType(parentTypeName, idlType.GetIdlTypeOption().Option, refs)
+		inner, err := processFieldType(parentTypeName, idlType.GetIdlTypeOption().Option, refs)
+		return NewOption(inner), err
 	case idlType.IsIdlTypeDefined():
 		return asDefined(parentTypeName, idlType.GetIdlTypeDefined(), refs)
 	case idlType.IsArray():
