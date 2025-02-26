@@ -167,7 +167,7 @@ func CreateTestLookupTable(ctx context.Context, t *testing.T, c *rpc.Client, sen
 	return table
 }
 
-func CreateRandomToken(t *testing.T, admin solana.PrivateKey, tokenProgram solana.PublicKey, client *rpc.Client) solana.PublicKey {
+func CreateRandomToken(t tests.TestingT, admin solana.PrivateKey, tokenProgram solana.PublicKey, client *rpc.Client) solana.PublicKey {
 	ctx := tests.Context(t)
 	mint, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)

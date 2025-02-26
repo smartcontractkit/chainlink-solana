@@ -169,6 +169,70 @@ func (obj *DataAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 	return nil
 }
 
+type TokenAccountData struct {
+	Idx     uint64
+	Bump    uint8
+	Account ag_solanago.PublicKey
+}
+
+var TokenAccountDataDiscriminator = [8]byte{2, 33, 148, 126, 200, 137, 98, 188}
+
+func (obj TokenAccountData) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(TokenAccountDataDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Idx` param:
+	err = encoder.Encode(obj.Idx)
+	if err != nil {
+		return err
+	}
+	// Serialize `Bump` param:
+	err = encoder.Encode(obj.Bump)
+	if err != nil {
+		return err
+	}
+	// Serialize `Account` param:
+	err = encoder.Encode(obj.Account)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *TokenAccountData) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(TokenAccountDataDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[2 33 148 126 200 137 98 188]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Idx`:
+	err = decoder.Decode(&obj.Idx)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Bump`:
+	err = decoder.Decode(&obj.Bump)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Account`:
+	err = decoder.Decode(&obj.Account)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type TestStruct struct {
 	Idx                 uint64
 	Bump                uint8

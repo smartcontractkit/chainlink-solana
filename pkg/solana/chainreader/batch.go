@@ -4,13 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
+
+	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
 
 type call struct {
@@ -81,6 +85,8 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 
 	// map batch call index to key index (some calls are event reads and will be handled by a different binding)
 	dataMap := make(map[int]int)
+	eventMap := make(map[int]struct{})
+
 	for idx, batchCall := range batch {
 		rBinding, err := bdRegistry.GetReader(batchCall.Namespace, batchCall.ReadName)
 		if err != nil {
@@ -102,6 +108,7 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 			}
 
 			results[idx].err = eBinding.GetLatestValue(ctx, batchCall.Params, results[idx].returnVal)
+			eventMap[idx] = struct{}{}
 
 			continue
 		}
@@ -120,6 +127,10 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 
 	// decode batch call results
 	for idx, batchCall := range batch {
+		if _, ok := eventMap[idx]; ok {
+			continue
+		}
+
 		dataIdx, ok := dataMap[idx]
 		if !ok {
 			return nil, fmt.Errorf("%w: unexpected data index state", types.ErrInternal)
@@ -144,6 +155,35 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 		rBinding, err := bdRegistry.GetReader(results[idx].namespace, results[idx].readName)
 		if err != nil {
 			results[idx].err = err
+			continue
+		}
+
+		// HACK: workaround for OffRampLatestConfigDetails: we need to use an input param to filter an array in the return values, not for seeds
+		if batchCall.ReadName == ccipconsts.MethodNameOffRampLatestConfigDetails {
+			params := batchCall.Params.(map[string]any)
+			ocrPluginType := params["ocrPluginType"].(uint8)
+
+			output := map[string]any{}
+			err := asValueDotValue(
+				ctx,
+				rBinding,
+				&output,
+				wrapDecodeValuer(rBinding, data[dataIdx]),
+			)
+			if err != nil {
+				results[idx].err = err
+				continue
+			}
+
+			config := reflect.Indirect(reflect.ValueOf(output["Ocr3"])).Index(int(ocrPluginType)).Interface()
+			output["OCRConfig"] = config
+
+			// weakdecode so the uint8 field is cast to bool
+			err = mapstructure.WeakDecode(output, results[idx].returnVal)
+			if err != nil {
+				results[idx].err = err
+				continue
+			}
 			continue
 		}
 

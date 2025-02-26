@@ -106,6 +106,20 @@ pub mod contract_reader_interface {
 
         Ok(())
     }
+
+    pub fn store_token_account(ctx: Context<StoreTokenAccount>, test_idx: u64) -> Result<()> {
+        let account = ctx.accounts.token_account.to_account_info();
+        require!(
+            !account.data_is_empty(),
+            TokenAccountError::UninitializedTokenAccount
+        );
+
+        let data = &mut ctx.accounts.data;
+        data.idx = test_idx;
+        data.account = account.key();
+        data.bump = ctx.bumps.data;
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -267,6 +281,30 @@ pub struct StoreVal<'info> {
     pub system_program: Program<'info, System>,
 }
 
+#[derive(Accounts)]
+#[instruction(test_idx: u64)]
+pub struct StoreTokenAccount<'info> {
+    /// Admin account that pays for PDA creation and signs the transaction
+    #[account(mut)]
+    pub admin: Signer<'info>,
+
+    /// CHECK: test
+    #[account(mut)]
+    pub token_account: UncheckedAccount<'info>,
+
+    // derived test PDA
+    #[account(
+        init_if_needed,
+        payer = admin,
+        space = size_of::<TokenAccountData>() + 8,
+        seeds=[b"token_account".as_ref(), test_idx.to_le_bytes().as_ref()],
+        bump)]
+    pub data: Account<'info, TokenAccountData>,
+
+    /// System Program required for PDA creation
+    pub system_program: Program<'info, System>,
+}
+
 #[account]
 pub struct LookupTableDataAccount {
     pub version: u8,                   // Version of the data account
@@ -282,6 +320,13 @@ pub struct DataAccount {
     pub bump: u8,
     pub u64_value: u64,
     pub u64_slice: Vec<u64>,
+}
+
+#[account]
+pub struct TokenAccountData {
+    pub idx: u64,
+    pub bump: u8,
+    pub account: Pubkey,
 }
 
 #[account(zero_copy)]
@@ -423,4 +468,10 @@ pub struct BillingTokenConfig {
 pub struct TimestampedPackedU224 {
     pub value: [u8; 28],
     pub timestamp: i64,
+}
+
+#[error_code]
+pub enum TokenAccountError {
+    #[msg("Uninitialized token account")]
+    UninitializedTokenAccount,
 }

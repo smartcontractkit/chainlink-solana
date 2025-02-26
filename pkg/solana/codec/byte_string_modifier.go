@@ -27,9 +27,9 @@ func (s SolanaAddressModifier) DecodeAddress(str string) ([]byte, error) {
 		return nil, fmt.Errorf("%w: failed to decode Base58 address: %s", commontypes.ErrInvalidType, err)
 	}
 
-	if !pubkey.IsOnCurve() {
-		return nil, fmt.Errorf("%w: address %q with length of %d is not on the ed25519 curve", commontypes.ErrInvalidType, str, len(str))
-	}
+	// PDAs are used extensively and do not exist on the ed25519 curve
+	// for this reason we ignore the IsOnCurve check and rely on the user to verify that the public key
+	// is on the curve or not if intended.
 
 	return pubkey.Bytes(), nil
 }

@@ -16,6 +16,8 @@ import (
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
+	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -42,7 +44,7 @@ type EventsReader interface {
 const ServiceName = "SolanaContractReader"
 
 // TODO NONEVM-1320 fix this edge case
-const GetTokenPrices = "GetTokenPrices"
+const GetTokenPrices = ccipconsts.MethodNameFeeQuoterGetTokenPrices
 
 type ContractReaderService struct {
 	types.UnimplementedContractReader
@@ -215,6 +217,10 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 	}
 
 	if results[0].err != nil {
+		if errors.Is(results[0].err, types.ErrNotFound) {
+			return types.ErrNotFound
+		}
+
 		return fmt.Errorf("%w: %s", types.ErrInternal, results[0].err)
 	}
 

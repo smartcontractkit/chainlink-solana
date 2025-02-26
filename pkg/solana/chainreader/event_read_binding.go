@@ -298,9 +298,9 @@ func (b *eventReadBinding) extractFilterSubkeys(offChainParams any) ([]query.Exp
 	for offChainKey, idx := range b.indexedSubKeys.lookup {
 		itemType := codec.WrapItemType(true, b.namespace, b.genericName+"."+offChainKey)
 
-		fieldVal, err := valueForPath(reflect.ValueOf(offChainParams), offChainKey)
+		fieldVal, err := commoncodec.ValueForPath(reflect.ValueOf(offChainParams), offChainKey)
 		if err != nil {
-			return nil, fmt.Errorf("%w: no value for path %s", types.ErrInternal, b.genericName+"."+offChainKey)
+			return nil, fmt.Errorf("%w: no value for path %s; err: %w", types.ErrInternal, b.genericName+"."+offChainKey, err)
 		}
 
 		onChainValue, err := b.modifier.TransformToOnChain(fieldVal, itemType)
@@ -353,7 +353,7 @@ func (b *eventReadBinding) encodeComparator(comparator *primitives.Comparator) (
 		return query.Expression{}, fmt.Errorf("%w: unknown indexed subkey mapping %s", types.ErrInvalidConfig, comparator.Name)
 	}
 
-	itemType := strings.Join([]string{b.namespace, b.genericName, comparator.Name}, ".")
+	itemType := codec.WrapItemType(true, b.namespace, b.genericName+"."+comparator.Name)
 
 	for idx, comp := range comparator.ValueComparators {
 		// need to do a transform and then extract the value for the subkey
@@ -362,7 +362,7 @@ func (b *eventReadBinding) encodeComparator(comparator *primitives.Comparator) (
 			return query.Expression{}, err
 		}
 
-		comparator.ValueComparators[idx].Value = newValue
+		comparator.ValueComparators[idx].Value = reflect.Indirect(reflect.ValueOf(newValue)).Interface()
 	}
 
 	return logpoller.NewEventBySubKeyFilter(subKeyIndex, comparator.ValueComparators)
@@ -512,37 +512,4 @@ func (k *indexedSubkeys) indexForKey(key string) (uint64, bool) {
 	idx, ok := k.lookup[key]
 
 	return idx, ok
-}
-
-func valueForPath(from reflect.Value, itemType string) (any, error) {
-	if itemType == "" {
-		return from.Interface(), nil
-	}
-
-	switch from.Kind() {
-	case reflect.Pointer:
-		elem, err := valueForPath(from.Elem(), itemType)
-		if err != nil {
-			return nil, err
-		}
-
-		return elem, nil
-	case reflect.Array, reflect.Slice:
-		return nil, fmt.Errorf("%w: cannot extract a field from an array or slice", types.ErrInvalidType)
-	case reflect.Struct:
-		head, tail := commoncodec.ItemTyper(itemType).Next()
-
-		field := from.FieldByName(head)
-		if !field.IsValid() {
-			return nil, fmt.Errorf("%w: field not found for path %s and itemType %s", types.ErrInvalidType, from, itemType)
-		}
-
-		if tail == "" {
-			return field.Interface(), nil
-		}
-
-		return valueForPath(field, tail)
-	default:
-		return nil, fmt.Errorf("%w: cannot extract a field from kind %s", types.ErrInvalidType, from.Kind())
-	}
 }

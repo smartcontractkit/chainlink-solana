@@ -168,7 +168,8 @@ func (c *Client) GetTransaction(ctx context.Context, txHash solana.Signature) (*
 	// Use txHash in the key so different signatures won't be merged on concurrent calls.
 	key := fmt.Sprintf("GetTransaction(%s)", txHash.String())
 	v, err, _ := c.requestGroup.Do(key, func() (interface{}, error) {
-		return c.rpc.GetTransaction(ctx, txHash, &rpc.GetTransactionOpts{Encoding: solana.EncodingBase64, Commitment: c.commitment})
+		version := MaxSupportTransactionVersion
+		return c.rpc.GetTransaction(ctx, txHash, &rpc.GetTransactionOpts{Encoding: solana.EncodingBase64, Commitment: c.commitment, MaxSupportedTransactionVersion: &version})
 	})
 	return v.(*rpc.GetTransactionResult), err
 }
