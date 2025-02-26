@@ -44,16 +44,16 @@ var (
 		float64(5 * time.Second),
 	}
 	lpQueryDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name:    "log_poller_query_duration",
+		Name:    "solana_log_poller_query_duration",
 		Help:    "Measures duration of Log Poller's queries fetching logs",
 		Buckets: sqlLatencyBuckets,
 	}, []string{"chainID", "query", "type"})
 	lpQueryDataSets = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "log_poller_query_dataset_size",
+		Name: "solana_log_poller_query_dataset_size",
 		Help: "Measures size of the datasets returned by Log Poller's queries",
 	}, []string{"chainID", "query", "type"})
 	lpLogsInserted = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "log_poller_logs_inserted",
+		Name: "solana_log_poller_logs_inserted",
 		Help: "Counter to track number of logs inserted by Log Poller",
 	}, []string{"chainID"})
 )
@@ -65,7 +65,7 @@ type ObservedORM struct {
 	queryDuration *prometheus.HistogramVec
 	datasetSize   *prometheus.GaugeVec
 	logsInserted  *prometheus.CounterVec
-	chainId       string
+	chainID       string
 }
 
 var _ ORM = &ObservedORM{}
@@ -78,7 +78,7 @@ func NewObservedORM(chainID string, ds sqlutil.DataSource, lggr logger.Logger) *
 		queryDuration: lpQueryDuration,
 		datasetSize:   lpQueryDataSets,
 		logsInserted:  lpLogsInserted,
-		chainId:       chainID,
+		chainID:       chainID,
 	}
 }
 
@@ -142,7 +142,7 @@ func withObservedQueryAndResults[T any](o *ObservedORM, queryName string, query 
 	results, err := withObservedQuery(o, queryName, query)
 	if err == nil {
 		o.datasetSize.
-			WithLabelValues(o.chainId, queryName, string(read)).
+			WithLabelValues(o.chainID, queryName, string(read)).
 			Set(float64(len(results)))
 	}
 	return results, err
@@ -152,12 +152,12 @@ func withObservedExecAndRowsAffected(o *ObservedORM, queryName string, queryType
 	queryStarted := time.Now()
 	rowsAffected, err := exec()
 	o.queryDuration.
-		WithLabelValues(o.chainId, queryName, string(queryType)).
+		WithLabelValues(o.chainID, queryName, string(queryType)).
 		Observe(float64(time.Since(queryStarted)))
 
 	if err == nil {
 		o.datasetSize.
-			WithLabelValues(o.chainId, queryName, string(queryType)).
+			WithLabelValues(o.chainID, queryName, string(queryType)).
 			Set(float64(rowsAffected))
 	}
 
@@ -168,7 +168,7 @@ func withObservedQuery[T any](o *ObservedORM, queryName string, query func() (T,
 	queryStarted := time.Now()
 	defer func() {
 		o.queryDuration.
-			WithLabelValues(o.chainId, queryName, string(read)).
+			WithLabelValues(o.chainID, queryName, string(read)).
 			Observe(float64(time.Since(queryStarted)))
 	}()
 	return query()
@@ -178,7 +178,7 @@ func withObservedExec(o *ObservedORM, query string, queryType queryType, exec fu
 	queryStarted := time.Now()
 	defer func() {
 		o.queryDuration.
-			WithLabelValues(o.chainId, query, string(queryType)).
+			WithLabelValues(o.chainID, query, string(queryType)).
 			Observe(float64(time.Since(queryStarted)))
 	}()
 	return exec()
@@ -189,6 +189,6 @@ func trackInsertedLogs(o *ObservedORM, logs []Log, err error) {
 		return
 	}
 	o.logsInserted.
-		WithLabelValues(o.chainId).
+		WithLabelValues(o.chainID).
 		Add(float64(len(logs)))
 }

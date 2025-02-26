@@ -100,10 +100,10 @@ func generateRandomLogs(t *testing.T, filterID int64, count int) []Log {
 	return logs
 }
 
-func createObservedORM(t *testing.T, chainId string) *ObservedORM {
+func createObservedORM(t *testing.T, chainID string) *ObservedORM {
 	lggr := logger.Test(t)
 	db := sqltest.NewDB(t, sqltest.TestURL(t))
-	return NewObservedORM(chainId, db, lggr)
+	return NewObservedORM(chainID, db, lggr)
 }
 
 func resetMetrics(lp ObservedORM) {
