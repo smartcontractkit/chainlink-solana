@@ -893,8 +893,10 @@ func (h *helper) runInitialize(
 		TestIdx: testIdx,
 		Value:   value,
 	}
-	SubmitTransactionToCW(t, &it, cw, "initialize", initArgs, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
-	SubmitTransactionToCW(t, &it, cw, MethodSettingStruct, testStruct, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
+	h.initOnce.Do(func() {
+		SubmitTransactionToCW(t, &it, cw, "initialize", initArgs, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
+		SubmitTransactionToCW(t, &it, cw, MethodSettingStruct, testStruct, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
+	})
 }
 
 const (

@@ -15,6 +15,10 @@ pub mod contract_reader_interface {
         account.idx = test_idx;
         account.bump = ctx.bumps.data;
 
+        let test_struct_account = &mut ctx.accounts.test_struct.load_init()?;
+        test_struct_account.idx = test_idx;
+        test_struct_account.bump = ctx.bumps.test_struct;
+
         Ok(())
     }
 
@@ -89,7 +93,7 @@ pub mod contract_reader_interface {
     }
 
     pub fn store(ctx: Context<StoreTestStruct>, test_idx: u64, data: TestStructData) -> Result<()> {
-        let test_struct_account = &mut ctx.accounts.test_struct.load_init()?;
+        let test_struct_account = &mut ctx.accounts.test_struct.load_mut()?;
 
         test_struct_account.idx = test_idx;
         test_struct_account.bump = ctx.bumps.test_struct;
@@ -146,6 +150,16 @@ pub struct Initialize<'info> {
         seeds=[b"data".as_ref(), test_idx.to_le_bytes().as_ref()],
         bump)]
     pub data: Account<'info, DataAccount>,
+
+    #[account(
+        init_if_needed,
+        payer = signer,
+        space = size_of::<TestStruct>() + 8,
+        seeds=[b"struct_data".as_ref(), test_idx.to_le_bytes().as_ref()],
+        bump
+    )]
+    pub test_struct: AccountLoader<'info, TestStruct>,
+
 
     pub system_program: Program<'info, System>,
 }

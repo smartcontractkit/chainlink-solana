@@ -17,7 +17,7 @@ type Createevent struct {
 	// [0] = [SIGNER] signer
 	//
 	// [1] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-"`
+	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewCreateeventInstructionBuilder creates a new `Createevent` instruction builder.
@@ -42,7 +42,7 @@ func (inst *Createevent) SetSignerAccount(signer ag_solanago.PublicKey) *Createe
 
 // GetSignerAccount gets the "signer" account.
 func (inst *Createevent) GetSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(0)
+	return inst.AccountMetaSlice[0]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
@@ -53,7 +53,7 @@ func (inst *Createevent) SetSystemProgramAccount(systemProgram ag_solanago.Publi
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *Createevent) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(1)
+	return inst.AccountMetaSlice[1]
 }
 
 func (inst Createevent) Build() *Instruction {
@@ -108,8 +108,8 @@ func (inst *Createevent) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("       signer", inst.AccountMetaSlice.Get(0)))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("       signer", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[1]))
 					})
 				})
 		})
