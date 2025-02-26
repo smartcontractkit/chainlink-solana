@@ -70,10 +70,11 @@ func TestMetricsAreProperlyPopulatedForWrites(t *testing.T) {
 }
 
 func TestCountersAreProperlyPopulatedForWrites(t *testing.T) {
+	sqltest.SkipInMemory(t)
+
 	ctx := tests.Context(t)
 	orm := createObservedORM(t, chainID)
-
-	filterID, err := orm.ORM.InsertFilter(tests.Context(t), newRandomFilter(t))
+	filterID, err := orm.InsertFilter(tests.Context(t), newRandomFilter(t))
 	require.NoError(t, err)
 
 	logs := generateRandomLogs(t, filterID, 20)
