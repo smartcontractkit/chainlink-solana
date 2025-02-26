@@ -149,22 +149,6 @@ func withObservedQueryAndResults[T any](o *ObservedORM, queryName string, query 
 	return results, err
 }
 
-func withObservedExecAndRowsAffected(o *ObservedORM, queryName string, queryType queryType, exec func() (int64, error)) (int64, error) {
-	queryStarted := time.Now()
-	rowsAffected, err := exec()
-	o.queryDuration.
-		WithLabelValues(o.chainID, queryName, string(queryType)).
-		Observe(float64(time.Since(queryStarted)))
-
-	if err == nil {
-		o.datasetSize.
-			WithLabelValues(o.chainID, queryName, string(queryType)).
-			Set(float64(rowsAffected))
-	}
-
-	return rowsAffected, err
-}
-
 func withObservedQuery[T any](o *ObservedORM, queryName string, query func() (T, error)) (T, error) {
 	queryStarted := time.Now()
 	defer func() {
