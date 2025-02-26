@@ -91,8 +91,9 @@ func (o *ObservedORM) InsertLogs(ctx context.Context, logs []Log) error {
 }
 
 func (o *ObservedORM) InsertFilter(ctx context.Context, filter Filter) (id int64, err error) {
-	return withObservedExecAndRowsAffected(o, "InsertFilter", create, func() (id int64, err error) {
-		return o.ORM.InsertFilter(ctx, filter)
+	return id, withObservedExec(o, "InsertFilter", create, func() (err error) {
+		id, err = o.ORM.InsertFilter(ctx, filter)
+		return err
 	})
 }
 
