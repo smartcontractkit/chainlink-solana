@@ -247,6 +247,13 @@ func createCodecType(
 			return name, nil, fmt.Errorf("%w: variants are not supported", commontypes.ErrInvalidConfig)
 		}
 		return name, refs.builder.Uint8(), nil
+	case IdlTypeDefTyKindCustom:
+		switch def.Type.Codec {
+		case "onramp_address":
+			return name, NewOnRampAddress(refs.builder), nil
+		default:
+			return name, nil, fmt.Errorf(unknownIDLFormat, commontypes.ErrInvalidConfig, def.Type.Codec)
+		}
 	default:
 		return name, nil, fmt.Errorf(unknownIDLFormat, commontypes.ErrInvalidConfig, def.Type.Kind)
 	}
