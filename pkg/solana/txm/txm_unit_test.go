@@ -51,7 +51,7 @@ func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 	loader := utils.NewStaticLoader[solanaClient.ReaderWriter](client)
 	txm := solanatxm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
 
-	t.Run("successfully sets estimated compute unit limit", func(t *testing.T) {
+	t.Run("successfully estimates compute unit limit", func(t *testing.T) {
 		usedCompute := uint64(100)
 		client.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{
 			Value: &rpc.LatestBlockhashResult{
@@ -74,7 +74,7 @@ func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 			UnitsConsumed: &usedCompute,
 		}, nil).Once()
 		tx := createTx(t, client, pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
-		computeUnitLimit, estimateErr := txm.EstimateComputeUnitLimit(ctx, tx, "")
+		computeUnitLimit, estimateErr := txm.EstimateComputeUnitLimit(ctx, tx, "", cfg.ComputeUnitLimitDefault())
 		require.NoError(t, estimateErr)
 		usedComputeWithBuffer := bigmath.AddPercentage(new(big.Int).SetUint64(usedCompute), solanatxm.EstimateComputeUnitLimitBuffer).Uint64()
 		require.Equal(t, usedComputeWithBuffer, uint64(computeUnitLimit))
@@ -89,7 +89,7 @@ func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 		}, nil).Once()
 		client.On("SimulateTx", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("failed to simulate")).Once()
 		tx := createTx(t, client, pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
-		_, estimateErr := txm.EstimateComputeUnitLimit(ctx, tx, "")
+		_, estimateErr := txm.EstimateComputeUnitLimit(ctx, tx, "", cfg.ComputeUnitLimitDefault())
 		require.Error(t, estimateErr)
 	})
 
@@ -104,11 +104,11 @@ func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 			Err: errors.New("InstructionError"),
 		}, nil).Once()
 		tx := createTx(t, client, pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
-		_, err = txm.EstimateComputeUnitLimit(ctx, tx, "")
+		_, err = txm.EstimateComputeUnitLimit(ctx, tx, "", cfg.ComputeUnitLimitDefault())
 		require.Error(t, err)
 	})
 
-	t.Run("simulation returns nil err with 0 compute unit limit", func(t *testing.T) {
+	t.Run("simulation returns error if simulated compute unit limit is 0", func(t *testing.T) {
 		client.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{
 			Value: &rpc.LatestBlockhashResult{
 				LastValidBlockHeight: 100,
@@ -119,9 +119,8 @@ func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 			Err: nil,
 		}, nil).Once()
 		tx := createTx(t, client, pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
-		computeUnitLimit, err := txm.EstimateComputeUnitLimit(ctx, tx, "")
-		require.NoError(t, err)
-		require.Equal(t, uint32(0), computeUnitLimit)
+		_, err := txm.EstimateComputeUnitLimit(ctx, tx, "", cfg.ComputeUnitLimitDefault())
+		require.Error(t, err)
 	})
 
 	t.Run("simulation returns max compute unit limit if adding buffer exceeds it", func(t *testing.T) {
@@ -147,9 +146,36 @@ func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 			UnitsConsumed: &usedCompute,
 		}, nil).Once()
 		tx := createTx(t, client, pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
-		computeUnitLimit, err := txm.EstimateComputeUnitLimit(ctx, tx, "")
+		computeUnitLimit, err := txm.EstimateComputeUnitLimit(ctx, tx, "", uint32(usedCompute))
 		require.NoError(t, err)
 		require.Equal(t, uint32(1_400_000), computeUnitLimit)
+	})
+
+	t.Run("simulation returns error if estimated compute unit limit exceeds the provided limit", func(t *testing.T) {
+		usedCompute := uint64(1_400_000)
+		client.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{
+			Value: &rpc.LatestBlockhashResult{
+				LastValidBlockHeight: 100,
+				Blockhash:            solana.Hash{},
+			},
+		}, nil).Once()
+		client.On("SimulateTx", mock.Anything, mock.IsType(&solana.Transaction{}), mock.IsType(&rpc.SimulateTransactionOpts{})).Run(func(args mock.Arguments) {
+			// Validate max compute unit limit is set in transaction
+			tx := args.Get(1).(*solana.Transaction)
+			limit, err := fees.ParseComputeUnitLimit(tx.Message.Instructions[len(tx.Message.Instructions)-1].Data)
+			require.NoError(t, err)
+			require.Equal(t, fees.ComputeUnitLimit(solanatxm.MaxComputeUnitLimit), limit)
+
+			// Validate signature verification is enabled
+			opts := args.Get(2).(*rpc.SimulateTransactionOpts)
+			require.True(t, opts.SigVerify)
+		}).Return(&rpc.SimulateTransactionResult{
+			Err:           nil,
+			UnitsConsumed: &usedCompute,
+		}, nil).Once()
+		tx := createTx(t, client, pubKey, pubKey, pubKeyReceiver, solana.LAMPORTS_PER_SOL)
+		_, err := txm.EstimateComputeUnitLimit(ctx, tx, "", cfg.ComputeUnitLimitDefault())
+		require.Error(t, err)
 	})
 }
 

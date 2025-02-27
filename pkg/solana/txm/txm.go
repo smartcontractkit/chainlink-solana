@@ -748,14 +748,11 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	// Perform compute unit limit estimation after storing transaction
 	// If error found during simulation, transaction should be in storage to mark accordingly
 	if cfg.EstimateComputeUnitLimit {
-		computeUnitLimit, err := txm.EstimateComputeUnitLimit(ctx, tx, id)
+		computeUnitLimit, err := txm.EstimateComputeUnitLimit(ctx, tx, id, cfg.ComputeUnitLimit)
 		if err != nil {
 			return fmt.Errorf("transaction failed simulation: %w", err)
 		}
-		// If estimation returns 0 compute unit limit without error, fallback to original config
-		if computeUnitLimit != 0 {
-			cfg.ComputeUnitLimit = computeUnitLimit
-		}
+		cfg.ComputeUnitLimit = computeUnitLimit
 	}
 
 	msg := pendingTx{
@@ -799,7 +796,7 @@ func (txm *Txm) GetTransactionStatus(ctx context.Context, transactionID string) 
 
 // EstimateComputeUnitLimit estimates the compute unit limit needed for a transaction.
 // It simulates the provided transaction to determine the used compute and applies a buffer to it.
-func (txm *Txm) EstimateComputeUnitLimit(ctx context.Context, tx *solanaGo.Transaction, id string) (uint32, error) {
+func (txm *Txm) EstimateComputeUnitLimit(ctx context.Context, tx *solanaGo.Transaction, id string, providedComputeUnitLimit uint32) (uint32, error) {
 	txCopy := *tx
 
 	// Set max compute unit limit when simulating a transaction to avoid getting an error for exceeding the default 200k compute unit limit
@@ -840,25 +837,35 @@ func (txm *Txm) EstimateComputeUnitLimit(ctx context.Context, tx *solanaGo.Trans
 			}
 			err := txm.txs.OnPrebroadcastError(id, txm.cfg.TxRetentionTimeout(), txState, errType)
 			if err != nil {
-				return 0, fmt.Errorf("failed to process error %v for tx ID %s: %w", res.Err, id, err)
+				return 0, fmt.Errorf("failed to mark tx ID %s as %s: %w", id, txState, err)
 			}
 		}
 		return 0, fmt.Errorf("simulated tx returned error: %v", res.Err)
 	}
 
 	if res.UnitsConsumed == nil || *res.UnitsConsumed == 0 {
-		txm.lggr.Debug("failed to get units consumed for tx")
-		// Do not return error to allow falling back to default compute unit limit
-		return 0, nil
+		// Return error if units consumed is not estimated since it is required to verify the provided limit
+		return 0, fmt.Errorf("failed to get units consumed for tx: %s", id)
 	}
 
 	unitsConsumed := *res.UnitsConsumed
 	// Add buffer to the used compute estimate
-	computeUnitLimit := bigmath.AddPercentage(new(big.Int).SetUint64(unitsConsumed), EstimateComputeUnitLimitBuffer).Uint64()
+	estimatedComputeUnitLimit := bigmath.AddPercentage(new(big.Int).SetUint64(unitsConsumed), EstimateComputeUnitLimitBuffer).Uint64()
 	// Ensure computeUnitLimit does not exceed the max compute unit limit for a transaction after adding buffer
-	computeUnitLimit = mathutil.Min(computeUnitLimit, MaxComputeUnitLimit)
+	estimatedComputeUnitLimit = mathutil.Min(estimatedComputeUnitLimit, MaxComputeUnitLimit)
 
-	return uint32(computeUnitLimit), nil //nolint // computeUnitLimit can only be a maximum of 1.4M
+	// Validate that the estimated compute unit limit does not exceed the provided limit
+	// If it does, mark the transaction as fatally errored to avoid broadcasting and wasting funds
+	if estimatedComputeUnitLimit > uint64(providedComputeUnitLimit) {
+		// NoFailure provided as the TxErrType since there isn't a metric to increment for this type of error
+		err := txm.txs.OnPrebroadcastError(id, txm.cfg.TxRetentionTimeout(), txmutils.FatallyErrored, NoFailure)
+		if err != nil {
+			return 0, fmt.Errorf("failed to mark tx ID %s as %s: %w", id, txmutils.FatallyErrored, err)
+		}
+		return 0, fmt.Errorf("estimated compute unit limit %d for tx ID %s exceeds the provided limit %d", estimatedComputeUnitLimit, id, providedComputeUnitLimit)
+	}
+
+	return uint32(estimatedComputeUnitLimit), nil //nolint // computeUnitLimit can only be a maximum of 1.4M
 }
 
 // simulateTx simulates transactions using the SimulateTx client method

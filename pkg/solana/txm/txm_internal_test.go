@@ -1037,7 +1037,8 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(3)
 
-		computeUnitConsumed := uint64(1_000_000)
+		// use low enough compute unit limit so it does not exceed the default limit with the buffer
+		computeUnitConsumed := uint64(100)
 		computeUnitLimit := fees.ComputeUnitLimit(uint32(bigmath.AddPercentage(new(big.Int).SetUint64(computeUnitConsumed), EstimateComputeUnitLimitBuffer).Uint64()))
 		mc.On("SendTx", mock.Anything, signed(0, true, computeUnitLimit)).Return(sig, nil)
 		// First simulation before broadcast with signature and max compute unit limit set
@@ -1073,7 +1074,7 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 		// send tx
 		testTxID := uuid.New().String()
 		lastValidBlockHeight := uint64(100)
-		assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
+		require.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
 		wg.Wait()
 
 		// no transactions stored inflight txs list
@@ -1103,7 +1104,7 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 
 		// tx should NOT be able to queue
 		lastValidBlockHeight := uint64(0)
-		assert.Error(t, txm.Enqueue(ctx, t.Name(), tx, nil, lastValidBlockHeight))
+		require.Error(t, txm.Enqueue(ctx, t.Name(), tx, nil, lastValidBlockHeight))
 	})
 
 	t.Run("simulation_returns_error", func(t *testing.T) {
@@ -1120,11 +1121,37 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 		txID := uuid.NewString()
 		lastValidBlockHeight := uint64(100)
 		// tx should NOT be able to queue
-		assert.Error(t, txm.Enqueue(ctx, t.Name(), tx, &txID, lastValidBlockHeight))
+		require.Error(t, txm.Enqueue(ctx, t.Name(), tx, &txID, lastValidBlockHeight))
 		// tx should be stored in-memory and moved to errored state
 		status, err := txm.GetTransactionStatus(ctx, txID)
 		require.NoError(t, err)
 		require.Equal(t, commontypes.Fatal, status)
+	})
+
+	t.Run("simulation_estimates_higher_limit_than_provided", func(t *testing.T) {
+		// Test tx is not discarded due to confirm timeout and tracked to finalization
+		// use unique val across tests to avoid collision during mocking
+		tx, _ := getTx(t, 1, mkey)
+		// add signature and compute unit limit to tx for simulation (excludes compute unit price)
+		simulateTx := addSigAndLimitToTx(t, mkey, solana.PublicKey{}, *tx, MaxComputeUnitLimit)
+		var wg sync.WaitGroup
+		wg.Add(3)
+
+		// use low enough compute unit limit so it does not exceed the default limit with the buffer
+		computeUnitConsumed := uint64(cfg.ComputeUnitLimitDefault())
+		// First simulation before broadcast that estimates compute units used
+		mc.On("SimulateTx", mock.Anything, simulateTx, mock.Anything).Run(func(mock.Arguments) {
+			wg.Done()
+		}).Return(&rpc.SimulateTransactionResult{UnitsConsumed: &computeUnitConsumed}, nil).Once()
+
+		// send tx
+		testTxID := uuid.New().String()
+		lastValidBlockHeight := uint64(100)
+		require.Error(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
+
+		status, err := txm.GetTransactionStatus(ctx, testTxID)
+		require.NoError(t, err)
+		require.Equal(t, types.Fatal, status)
 	})
 }
 
