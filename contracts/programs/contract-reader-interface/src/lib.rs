@@ -16,7 +16,6 @@ pub mod contract_reader_interface {
         account.bump = ctx.bumps.data;
 
         let test_struct_account = &mut ctx.accounts.test_struct.load_init()?;
-        test_struct_account.idx = test_idx;
         test_struct_account.bump = ctx.bumps.test_struct;
 
         Ok(())
@@ -93,20 +92,24 @@ pub mod contract_reader_interface {
     }
 
     pub fn store(ctx: Context<StoreTestStruct>, test_idx: u64, data: TestStructData) -> Result<()> {
-        let test_struct_account = &mut ctx.accounts.test_struct.load_mut()?;
+        let mut test_struct_account = ctx.accounts.test_struct.load_mut()?;
 
-        test_struct_account.idx = test_idx;
-        test_struct_account.bump = ctx.bumps.test_struct;
-
-        test_struct_account.field = data.field;
-        test_struct_account.oracle_id = data.oracle_id;
-        test_struct_account.oracle_ids = data.oracle_ids;
-        test_struct_account.accounts = data.accounts;
-        test_struct_account.different_field = data.different_field;
-        test_struct_account.big_field = data.big_field;
-        test_struct_account.account_struct = data.account_struct;
-        test_struct_account.nested_dynamic_struct = data.nested_dynamic_struct;
-        test_struct_account.nested_static_struct = data.nested_static_struct;
+        if data.nested_dynamic_struct.inner.i == 1 {
+            let mut test_struct2_account = ctx.accounts.test_struct2.load_init()?;
+            update_test_struct(
+                &mut test_struct2_account,
+                test_idx,
+                &data,
+                ctx.bumps.test_struct,
+            );
+        } else {
+            update_test_struct(
+                &mut test_struct_account,
+                test_idx,
+                &data,
+                ctx.bumps.test_struct,
+            );
+        }
 
         Ok(())
     }
@@ -122,6 +125,9 @@ pub mod contract_reader_interface {
         data.idx = test_idx;
         data.account = account.key();
         data.bump = ctx.bumps.data;
+
+        Ok(())
+    }
 
     pub fn createevent(_ctx: Context<Events>, data: TestStructData) -> Result<()> {
         emit!(TestEvent { data });
@@ -155,11 +161,10 @@ pub struct Initialize<'info> {
         init_if_needed,
         payer = signer,
         space = size_of::<TestStruct>() + 8,
-        seeds=[b"struct_data".as_ref(), test_idx.to_le_bytes().as_ref()],
+        seeds=[b"struct_data".as_ref(), 1u64.to_le_bytes().as_ref(), test_idx.to_le_bytes().as_ref()],
         bump
     )]
     pub test_struct: AccountLoader<'info, TestStruct>,
-
 
     pub system_program: Program<'info, System>,
 }
@@ -279,10 +284,19 @@ pub struct StoreTestStruct<'info> {
         init_if_needed,
         payer = signer,
         space = size_of::<TestStruct>() + 8,
-        seeds=[b"struct_data".as_ref(), test_idx.to_le_bytes().as_ref()],
+        seeds=[b"struct_data".as_ref(), 1u64.to_le_bytes().as_ref(), test_idx.to_le_bytes().as_ref()],
         bump
     )]
     pub test_struct: AccountLoader<'info, TestStruct>,
+
+    #[account(
+        init_if_needed,
+        payer = signer,
+        space = size_of::<TestStruct>() + 8,
+        seeds=[b"struct_data".as_ref(), 2u64.to_le_bytes().as_ref(), test_idx.to_le_bytes().as_ref()],
+        bump
+    )]
+    pub test_struct2: AccountLoader<'info, TestStruct>,
 
     pub system_program: Program<'info, System>,
 }
@@ -498,8 +512,28 @@ pub struct TimestampedPackedU224 {
 pub enum TokenAccountError {
     #[msg("Uninitialized token account")]
     UninitializedTokenAccount,
+}
 
 #[event]
 pub struct TestEvent {
     pub data: TestStructData,
+}
+
+fn update_test_struct(
+    test_struct: &mut TestStruct,
+    test_idx: u64,
+    data: &TestStructData,
+    bump: u8,
+) {
+    test_struct.idx = test_idx;
+    test_struct.bump = bump;
+    test_struct.field = data.field;
+    test_struct.oracle_id = data.oracle_id;
+    test_struct.oracle_ids = data.oracle_ids;
+    test_struct.accounts = data.accounts;
+    test_struct.different_field = data.different_field;
+    test_struct.big_field = data.big_field;
+    test_struct.account_struct = data.account_struct;
+    test_struct.nested_dynamic_struct = data.nested_dynamic_struct;
+    test_struct.nested_static_struct = data.nested_static_struct;
 }

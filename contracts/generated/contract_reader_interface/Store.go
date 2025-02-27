@@ -19,14 +19,16 @@ type Store struct {
 	//
 	// [1] = [WRITE] testStruct
 	//
-	// [2] = [] systemProgram
+	// [2] = [WRITE] testStruct2
+	//
+	// [3] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewStoreInstructionBuilder creates a new `Store` instruction builder.
 func NewStoreInstructionBuilder() *Store {
 	nd := &Store{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
 }
@@ -65,15 +67,26 @@ func (inst *Store) GetTestStructAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
+// SetTestStruct2Account sets the "testStruct2" account.
+func (inst *Store) SetTestStruct2Account(testStruct2 ag_solanago.PublicKey) *Store {
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(testStruct2).WRITE()
+	return inst
+}
+
+// GetTestStruct2Account gets the "testStruct2" account.
+func (inst *Store) GetTestStruct2Account() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[2]
+}
+
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *Store) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Store {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *Store) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[3]
 }
 
 func (inst Store) Build() *Instruction {
@@ -113,6 +126,9 @@ func (inst *Store) Validate() error {
 			return errors.New("accounts.TestStruct is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
+			return errors.New("accounts.TestStruct2 is not set")
+		}
+		if inst.AccountMetaSlice[3] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -134,10 +150,11 @@ func (inst *Store) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("       signer", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("   testStruct", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("  testStruct2", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
 					})
 				})
 		})
@@ -178,11 +195,13 @@ func NewStoreInstruction(
 	// Accounts:
 	signer ag_solanago.PublicKey,
 	testStruct ag_solanago.PublicKey,
+	testStruct2 ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *Store {
 	return NewStoreInstructionBuilder().
 		SetTestIdx(testIdx).
 		SetData(data).
 		SetSignerAccount(signer).
 		SetTestStructAccount(testStruct).
+		SetTestStruct2Account(testStruct2).
 		SetSystemProgramAccount(systemProgram)
 }

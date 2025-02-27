@@ -98,7 +98,7 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 		ContractReaderGetLatestValueAsValuesDotValue,
 		ContractReaderGetLatestValueNoArgumentsAndPrimitiveReturnAsValuesDotValue,
 		ContractReaderGetLatestValueNoArgumentsAndSliceReturnAsValueDotValue,
-		ContractReaderGetLatestValue,
+		//	ContractReaderGetLatestValue,
 		ContractReaderGetLatestValueWithHeadData,
 		ContractReaderGetLatestValueWithPrimitiveReturn,
 		ContractReaderGetLatestValueBasedOnConfidenceLevel,
@@ -927,10 +927,7 @@ func (h *helper) runInitialize(
 		TestIdx: testIdx,
 		Value:   value,
 	}
-	h.initOnce.Do(func() {
-		SubmitTransactionToCW(t, &it, cw, "initialize", initArgs, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
-		SubmitTransactionToCW(t, &it, cw, MethodSettingStruct, testStruct, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
-	})
+	SubmitTransactionToCW(t, &it, cw, "initialize", initArgs, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
 }
 
 const (
@@ -946,7 +943,13 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 	pdaDataPrefix := []byte("data")
 	pdaDataPrefix = binary.LittleEndian.AppendUint64(pdaDataPrefix, idx)
 	pdaStructDataPrefix := []byte("struct_data")
-	pdaStructDataPrefix = binary.LittleEndian.AppendUint64(pdaStructDataPrefix, idx)
+	pdaStructData1Prefix := make([]byte, len(pdaStructDataPrefix))
+	copy(pdaStructData1Prefix, pdaStructDataPrefix)
+	pdaStructData1Prefix = binary.LittleEndian.AppendUint64(pdaStructData1Prefix, 1)
+	pdaStructData1Prefix = binary.LittleEndian.AppendUint64(pdaStructData1Prefix, idx)
+	pdaStructData2Prefix := make([]byte, len(pdaStructData1Prefix))
+	copy(pdaStructData2Prefix, pdaStructData1Prefix)
+	binary.LittleEndian.PutUint64(pdaStructData2Prefix[11:19], 2)
 	uint64ReadDef := config.ReadDefinition{
 		ChainSpecificName: "DataAccount",
 		ReadType:          config.Account,
@@ -1094,7 +1097,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 						ChainSpecificName: "TestStruct",
 						ReadType:          config.Account,
 						PDADefinition: codec.PDATypeDef{
-							Prefix: pdaStructDataPrefix,
+							Prefix: pdaStructData1Prefix,
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
 							&commoncodec.HardCodeModifierConfig{
@@ -1113,8 +1116,20 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					},
 					MethodTakingLatestParamsReturningTestStruct: {
 						ChainSpecificName: "TestStruct",
+						InputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.HardCodeModifierConfig{
+								OnChainValues: map[string]any{"TestIdx": idx},
+							},
+						},
 						PDADefinition: codec.PDATypeDef{
 							Prefix: pdaStructDataPrefix,
+							Seeds: []codec.PDASeed{{
+								Name: "I",
+								Type: codec.IdlType{AsString: codec.IdlTypeU64},
+							}, {
+								Name: "TestIdx",
+								Type: codec.IdlType{AsString: codec.IdlTypeU64},
+							}},
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
 							&commoncodec.AddressBytesToStringModifierConfig{
@@ -1259,6 +1274,20 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								}},
 								Seeds: []chainwriter.Seed{
 									{Static: []byte("data")},
+									{Static: testIdx},
+								},
+								IsWritable: true,
+								IsSigner:   false,
+							}},
+							{PDALookups: &chainwriter.PDALookups{
+								Name: "Account",
+								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+									Name:    "ProgramID",
+									Address: primaryProgramPubKey,
+								}},
+								Seeds: []chainwriter.Seed{
+									{Static: []byte("struct_data")},
+									{Static: binary.LittleEndian.AppendUint64([]byte{}, 1)},
 									{Static: testIdx},
 								},
 								IsWritable: true,
@@ -1586,6 +1615,21 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								}},
 								Seeds: []chainwriter.Seed{
 									{Static: []byte("struct_data")},
+									{Static: binary.LittleEndian.AppendUint64([]byte{}, 1)},
+									{Static: testIdx},
+								},
+								IsWritable: true,
+								IsSigner:   false,
+							}},
+							{PDALookups: &chainwriter.PDALookups{
+								Name: "Account",
+								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+									Name:    "ProgramID",
+									Address: primaryProgramPubKey,
+								}},
+								Seeds: []chainwriter.Seed{
+									{Static: []byte("struct_data")},
+									{Static: binary.LittleEndian.AppendUint64([]byte{}, 2)},
 									{Static: testIdx},
 								},
 								IsWritable: true,
