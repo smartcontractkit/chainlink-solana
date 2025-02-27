@@ -91,37 +91,14 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 		ContractReaderGetLatestValueBasedOnConfidenceLevel,
 		ContractReaderGetLatestValueBasedOnConfidenceLevelForEvent,
 
-		// temporarily disable
-		ContractReaderGetLatestValueAsValuesDotValue,
-		ContractReaderGetLatestValueWithHeadData,
-		ContractReaderBatchGetLatestValueNoArgumentsPrimitiveReturn,
-		ContractReaderGetLatestValueAsValuesDotValue,
-		ContractReaderGetLatestValueNoArgumentsAndPrimitiveReturnAsValuesDotValue,
-		ContractReaderGetLatestValueNoArgumentsAndSliceReturnAsValueDotValue,
-		//	ContractReaderGetLatestValue,
-		ContractReaderGetLatestValueWithHeadData,
-		ContractReaderGetLatestValueWithPrimitiveReturn,
-		ContractReaderGetLatestValueBasedOnConfidenceLevel,
-		ContractReaderGetLatestValueFromMultipleContractsNamesSameFunction,
-		ContractReaderGetLatestValueWithModifiersUsingOwnMapstrctureOverrides,
-		ContractReaderGetLatestValueNoArgumentsAndSliceReturn,
-		ContractReaderGetLatestValueGetsLatestForEvent,
-		ContractReaderGetLatestValueBasedOnConfidenceLevelForEvent,
-		ContractReaderGetLatestValueReturnsNotFoundWhenNotTriggeredForEvent,
-		ContractReaderGetLatestValueWithFilteringForEvent,
-		ContractReaderBatchGetLatestValue,
-		ContractReaderBatchGetLatestValueNoArgumentsPrimitiveReturn,
-		ContractReaderBatchGetLatestValueMultipleContractNamesSameFunction,
-		ContractReaderBatchGetLatestValueNoArgumentsWithSliceReturn,
-		ContractReaderBatchGetLatestValueWithModifiersOwnMapstructureOverride,
+		// not needed by any product yet, and probably not the way we'd choose
+		// to implement things on solana
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder,
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
+
+		// TODO: not working yet
 		ContractReaderBatchGetLatestValueSetsErrorsProperly,
-		ContractReaderQueryKeyNotFound,
-		ContractReaderQueryKeyReturnsData,
-		ContractReaderQueryKeyReturnsDataAsValuesDotValue,
-		ContractReaderQueryKeyCanFilterWithValueComparator,
-		ContractReaderQueryKeyCanLimitResultsWithCursor,
+		ContractReaderBatchGetLatestValueWithModifiersOwnMapstructureOverride,
 
 		// QueryKeys not implemented
 		ContractReaderQueryKeysReturnsDataTwoEventTypes,
@@ -240,11 +217,9 @@ func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainCom
 			}},
 	}
 
-	if false {
-		RunTests(t, it, testCases)
-	}
+	RunTests(t, it, testCases)
 	RunContractReaderTests(t, it)
-	//RunChainWriterTests(t, it)
+	RunChainWriterTests(t, it)
 }
 
 func RunChainComponentsInLoopSolanaTests[T WrappedTestingT[T]](t T, it ChainComponentsInterfaceTester[T]) {
@@ -919,9 +894,7 @@ func (h *helper) runInitialize(
 	it.testContextMu.RLock()
 	defer it.testContextMu.RUnlock()
 	testIdx, exists := it.testContext[t.Name()]
-	if !exists {
-		return
-	}
+	require.True(t, exists, "ChainReader & ChainWriter configs must be initialized before contracts are initialized")
 
 	initArgs := DataAccountArgs{
 		TestIdx: testIdx,
