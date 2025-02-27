@@ -12,10 +12,12 @@ import (
 	"strings"
 	"testing"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
@@ -146,8 +148,6 @@ func traversePath(data any, path []string) ([]any, error) {
 		return []any{data}, nil
 	}
 
-	var result []any
-
 	val := reflect.ValueOf(data)
 
 	if val.Kind() == reflect.Ptr {
@@ -160,9 +160,12 @@ func traversePath(data any, path []string) ([]any, error) {
 		if !field.IsValid() {
 			return []any{}, errFieldNotFound
 		}
+		// Check if field needs to be decoded into a sruct before moving ahead. No-op if it does not need to be.
+		field = decodeIntoStruct(path[0], field)
 		return traversePath(field.Interface(), path[1:])
 
 	case reflect.Slice, reflect.Array:
+		var result []any
 		for i := 0; i < val.Len(); i++ {
 			element := val.Index(i).Interface()
 			elements, err := traversePath(element, path)
@@ -185,6 +188,24 @@ func traversePath(data any, path []string) ([]any, error) {
 	default:
 		return nil, errors.New("unexpected type encountered at path: " + path[0])
 	}
+}
+
+func decodeIntoStruct(fieldName string, data reflect.Value) reflect.Value {
+	// Return data as is if it is not a []byte
+	if data.Kind() != reflect.Slice && data.Kind() != reflect.Array {
+		return data
+	}
+	if data.Type().Elem().Kind() != reflect.Uint8 {
+		return data
+	}
+	switch fieldName{
+	case "ExtraArgs":
+		extraArgs := ccip_offramp.Any2SVMRampExtraArgs{}
+		bin.NewBorshDecoder(data.Bytes()).Decode(&extraArgs)
+		return reflect.ValueOf(extraArgs)
+	}
+	// Return data as is if field name does not match any types
+	return data
 }
 
 func InitializeDataAccount(
