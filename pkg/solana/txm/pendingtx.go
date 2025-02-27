@@ -22,13 +22,13 @@ var (
 )
 
 type PendingTxContext interface {
-	// New adds a new transaction in Pending state to the storage
+	// New adds a new transaction in AwaitingBroadcast state to the storage
 	New(msg pendingTx) error
 	// AddSignature adds a new signature to a broadcasted transaction in the pending transaction context.
 	// It associates the provided context and cancel function with the signature to manage retry and bumping cycles.
 	AddSignature(cancel context.CancelFunc, id string, sig solana.Signature) error
-	// RevertToPending reverts the transaction's status to Pending. It also removes context and related signatures from storage associated to given tx id if not in finalized or errored state
-	RevertToPending(id string) error
+	// RevertToAwaitingBroadcast reverts the transaction's status to AwaitingBroadcast. It also removes context and related signatures from storage associated to given tx id if not in finalized or errored state
+	RevertToAwaitingBroadcast(id string) error
 	// ListAllSigs returns all of the signatures being tracked for all transactions not yet finalized or errored
 	ListAllSigs() []solana.Signature
 	// ListAllExpiredBroadcastedTxs returns all the txes that are in broadcasted state and have expired for given block number compared against lastValidBlockHeight (last valid block number)
@@ -58,8 +58,8 @@ type PendingTxContext interface {
 	// 	- Processed -> Broadcasted || Not Found
 	// The function returns the transaction ID associated with the signature and a boolean indicating whether a re-org has occurred.
 	IsTxReorged(sig solana.Signature, currentState utils.TxState) (string, bool)
-	// GetReorgTx returns the pendingTx for the given ID if it exists
-	GetReorgTx(id string) (pendingTx, error)
+	// GetPendingTx returns the pendingTx for the given ID if it exists
+	GetPendingTx(id string) (pendingTx, error)
 }
 
 // finishedTx is used to store info required to track transactions to finality or error
@@ -92,7 +92,7 @@ type pendingTxContext struct {
 	cancelBy    map[string]context.CancelFunc
 	sigToTxInfo map[solana.Signature]txInfo
 
-	pendingTxs              map[string]pendingTx  // pending transactions awaiting broadcast
+	queuedTxs               map[string]pendingTx  // pending transactions awaiting broadcast
 	broadcastedProcessedTxs map[string]pendingTx  // broadcasted and processed transactions that may require retry and bumping
 	confirmedTxs            map[string]pendingTx  // transactions that require monitoring for re-org
 	finalizedErroredTxs     map[string]finishedTx // finalized and errored transactions held onto for status
@@ -105,7 +105,7 @@ func newPendingTxContext() *pendingTxContext {
 		cancelBy:    map[string]context.CancelFunc{},
 		sigToTxInfo: map[solana.Signature]txInfo{},
 
-		pendingTxs:              map[string]pendingTx{},
+		queuedTxs:               map[string]pendingTx{},
 		broadcastedProcessedTxs: map[string]pendingTx{},
 		confirmedTxs:            map[string]pendingTx{},
 		finalizedErroredTxs:     map[string]finishedTx{},
@@ -115,7 +115,7 @@ func newPendingTxContext() *pendingTxContext {
 func (c *pendingTxContext) New(tx pendingTx) error {
 	err := c.withReadLock(func() error {
 		// Check if ID already exists in any of the maps
-		if _, exists := c.pendingTxs[tx.id]; exists {
+		if _, exists := c.queuedTxs[tx.id]; exists {
 			return ErrIDAlreadyExists
 		}
 		if _, exists := c.broadcastedProcessedTxs[tx.id]; exists {
@@ -136,7 +136,7 @@ func (c *pendingTxContext) New(tx pendingTx) error {
 	// upgrade to write lock if id does not exist
 	_, err = c.withWriteLock(func() (string, error) {
 		// Check if ID already exists in any of the maps
-		if _, exists := c.pendingTxs[tx.id]; exists {
+		if _, exists := c.queuedTxs[tx.id]; exists {
 			return "", ErrIDAlreadyExists
 		}
 		if _, exists := c.broadcastedProcessedTxs[tx.id]; exists {
@@ -149,9 +149,9 @@ func (c *pendingTxContext) New(tx pendingTx) error {
 			return "", ErrIDAlreadyExists
 		}
 		tx.createTs = time.Now()
-		tx.state = utils.Pending
+		tx.state = utils.AwaitingBroadcast
 		// save to the pending map
-		c.pendingTxs[tx.id] = tx
+		c.queuedTxs[tx.id] = tx
 		return "", nil
 	})
 	return err
@@ -164,7 +164,7 @@ func (c *pendingTxContext) OnBroadcasted(tx pendingTx) error {
 			return ErrAlreadyInExpectedState
 		}
 		// Transactions should only move to pending from broadcasted
-		_, exists := c.pendingTxs[tx.id]
+		_, exists := c.queuedTxs[tx.id]
 		if !exists {
 			return ErrTransactionNotFound
 		}
@@ -177,7 +177,7 @@ func (c *pendingTxContext) OnBroadcasted(tx pendingTx) error {
 	// upgrade to write lock if id does not exist
 	_, err = c.withWriteLock(func() (string, error) {
 		// Check if pending map has tx
-		pendingMsg, exists := c.pendingTxs[tx.id]
+		pendingMsg, exists := c.queuedTxs[tx.id]
 		if !exists {
 			return tx.id, ErrTransactionNotFound
 		}
@@ -187,7 +187,7 @@ func (c *pendingTxContext) OnBroadcasted(tx pendingTx) error {
 		// save transaction to broadcasted map
 		c.broadcastedProcessedTxs[tx.id] = tx
 		// remove tx from pending map
-		delete(c.pendingTxs, tx.id)
+		delete(c.queuedTxs, tx.id)
 		return "", nil
 	})
 	return err
@@ -237,10 +237,10 @@ func (c *pendingTxContext) AddSignature(cancel context.CancelFunc, id string, si
 
 // returns the id if removed (otherwise returns empty string)
 // removes transactions from any state except finalized and errored
-func (c *pendingTxContext) RevertToPending(id string) error {
+func (c *pendingTxContext) RevertToAwaitingBroadcast(id string) error {
 	err := c.withReadLock(func() error {
 		// check if transaction already in the expected state
-		if tx, pendingExists := c.pendingTxs[id]; pendingExists && tx.state == utils.Pending {
+		if tx, pendingExists := c.queuedTxs[id]; pendingExists && tx.state == utils.AwaitingBroadcast {
 			return ErrAlreadyInExpectedState
 		}
 		// transaction should only revert to pending from broadcasted, processed, or confirmed state
@@ -278,8 +278,8 @@ func (c *pendingTxContext) RevertToPending(id string) error {
 		for _, s := range tx.signatures {
 			delete(c.sigToTxInfo, s)
 		}
-		tx.state = utils.Pending
-		c.pendingTxs[id] = tx
+		tx.state = utils.AwaitingBroadcast
+		c.queuedTxs[id] = tx
 		return id, nil
 	})
 	return err
@@ -507,7 +507,7 @@ func (c *pendingTxContext) OnPrebroadcastError(id string, retentionTimeout time.
 		if broadcastedExists || confirmedExists {
 			return "", ErrIDAlreadyExists
 		}
-		delete(c.pendingTxs, id)
+		delete(c.queuedTxs, id)
 		// If retention timeout set to 0, skip adding it to the errored map
 		if retentionTimeout == 0 {
 			return "", nil
@@ -591,7 +591,7 @@ func (c *pendingTxContext) OnError(sig solana.Signature, retentionTimeout time.D
 func (c *pendingTxContext) GetTxState(id string) (utils.TxState, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	if tx, exists := c.pendingTxs[id]; exists {
+	if tx, exists := c.queuedTxs[id]; exists {
 		return tx.state, nil
 	}
 	if tx, exists := c.broadcastedProcessedTxs[id]; exists {
@@ -662,7 +662,7 @@ func (c *pendingTxContext) IsTxReorged(sig solana.Signature, sigOnChainState uti
 	return txInfo.id, hasReorg
 }
 
-func (c *pendingTxContext) GetReorgTx(id string) (pendingTx, error) {
+func (c *pendingTxContext) GetPendingTx(id string) (pendingTx, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	var tx, tempTx pendingTx
@@ -741,8 +741,8 @@ func (c *pendingTxContextWithProm) OnConfirmed(sig solana.Signature) (string, er
 	return id, err
 }
 
-func (c *pendingTxContextWithProm) RevertToPending(id string) error {
-	return c.pendingTx.RevertToPending(id)
+func (c *pendingTxContextWithProm) RevertToAwaitingBroadcast(id string) error {
+	return c.pendingTx.RevertToAwaitingBroadcast(id)
 }
 
 func (c *pendingTxContextWithProm) ListAllSigs() []solana.Signature {
@@ -815,6 +815,6 @@ func (c *pendingTxContextWithProm) IsTxReorged(sig solana.Signature, currentSigS
 	return c.pendingTx.IsTxReorged(sig, currentSigState)
 }
 
-func (c *pendingTxContextWithProm) GetReorgTx(id string) (pendingTx, error) {
-	return c.pendingTx.GetReorgTx(id)
+func (c *pendingTxContextWithProm) GetPendingTx(id string) (pendingTx, error) {
+	return c.pendingTx.GetPendingTx(id)
 }

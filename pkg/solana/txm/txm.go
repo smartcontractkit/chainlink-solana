@@ -516,7 +516,7 @@ func (txm *Txm) handleErrorSignatureStatus(ctx context.Context, sig solanaGo.Sig
 // - Processed -> Not Found
 //
 // When a signature re-org is detected, the following steps are taken:
-// - Revert the prior transaction state to Pending and remove all associated signatures, and cancel the prior context.
+// - Revert the prior transaction state to AwaitingBroadcast and remove all associated signatures, and cancel the prior context.
 // - Rebroadcast the prior transaction with a new blockhash and an updated compute unit price.
 func (txm *Txm) handleReorg(ctx context.Context, client client.ReaderWriter, sig solanaGo.Signature, status *rpc.SignatureStatusesResult) {
 	// Determine if a re-org has occurred
@@ -528,7 +528,7 @@ func (txm *Txm) handleReorg(ctx context.Context, client client.ReaderWriter, sig
 
 	// At this point, we have detected a re-org. We need to rebroadcast the tx.
 	txm.lggr.Debugw("re-org detected for transaction", "txID", txID, "signature", sig)
-	pTx, err := txm.txs.GetReorgTx(txID)
+	pTx, err := txm.txs.GetPendingTx(txID)
 	if err != nil {
 		txm.lggr.Errorw("failed to get pending tx for rebroadcast", "txID", txID, "error", err)
 		return
@@ -798,7 +798,7 @@ func (txm *Txm) GetTransactionStatus(ctx context.Context, transactionID string) 
 	}
 
 	switch state {
-	case txmutils.Pending, txmutils.Broadcasted:
+	case txmutils.AwaitingBroadcast, txmutils.Broadcasted:
 		return commontypes.Pending, nil
 	case txmutils.Processed, txmutils.Confirmed:
 		return commontypes.Unconfirmed, nil
@@ -990,8 +990,8 @@ func (txm *Txm) InflightTxs() int {
 // Removes all signatures associated with the prior tx, cancels prior ctx, updates compute unit price and sets given blockhash for rebroadcasting.
 // Calls sendWithRetry directly to avoid enqueuing the transaction. It logs the error when rebroadcast fails and returns the new signature when successful.
 func (txm *Txm) rebroadcastWithGivenBlockhash(ctx context.Context, pTx pendingTx, blockhash solana.Hash, lastValidBlockHeight uint64) (solana.Signature, error) {
-	// Revert tx state back to pending
-	err := txm.txs.RevertToPending(pTx.id)
+	// Revert tx state back to AwaitingBroadcast
+	err := txm.txs.RevertToAwaitingBroadcast(pTx.id)
 	if err != nil {
 		txm.lggr.Errorw("failed to remove tx", "id", pTx.id, "error", err)
 		return solana.Signature{}, err

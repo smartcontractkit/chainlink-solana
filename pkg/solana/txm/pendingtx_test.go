@@ -868,7 +868,7 @@ func TestPendingTxContext_on_prebroadcast_error(t *testing.T) {
 	})
 }
 
-func TestPendingTxContext_RevertToPending(t *testing.T) {
+func TestPendingTxContext_RevertToAwaitingBroadcast(t *testing.T) {
 	t.Parallel()
 	_, cancel := context.WithCancel(tests.Context(t))
 
@@ -921,7 +921,7 @@ func TestPendingTxContext_RevertToPending(t *testing.T) {
 	require.Equal(t, erroredMsg.id, id)
 
 	// Revert broadcasted transaction back to pending
-	err = txs.RevertToPending(broadcastedID)
+	err = txs.RevertToAwaitingBroadcast(broadcastedID)
 	require.NoError(t, err)
 
 	// Check removed from broadcasted map
@@ -929,9 +929,9 @@ func TestPendingTxContext_RevertToPending(t *testing.T) {
 	require.False(t, exists)
 
 	// Check that it is moved back to the pending map
-	tx, exists := txs.pendingTxs[broadcastedMsg.id]
+	tx, exists := txs.queuedTxs[broadcastedMsg.id]
 	require.True(t, exists)
-	require.Equal(t, utils.Pending, tx.state)
+	require.Equal(t, utils.AwaitingBroadcast, tx.state)
 
 	// Check all signatures removed from sig map
 	_, exists = txs.sigToTxInfo[broadcastedSig1]
@@ -940,7 +940,7 @@ func TestPendingTxContext_RevertToPending(t *testing.T) {
 	require.False(t, exists)
 
 	// Revert processed transaction back to pending
-	err = txs.RevertToPending(processedID)
+	err = txs.RevertToAwaitingBroadcast(processedID)
 	require.NoError(t, err)
 
 	// Check removed from broadcasted map
@@ -952,12 +952,12 @@ func TestPendingTxContext_RevertToPending(t *testing.T) {
 	require.False(t, exists)
 
 	// Check that it is moved back to the pending map
-	tx, exists = txs.pendingTxs[processedMsg.id]
+	tx, exists = txs.queuedTxs[processedMsg.id]
 	require.True(t, exists)
-	require.Equal(t, utils.Pending, tx.state)
+	require.Equal(t, utils.AwaitingBroadcast, tx.state)
 
 	// Revert confirmed transaction back to pending
-	err = txs.RevertToPending(confirmedID)
+	err = txs.RevertToAwaitingBroadcast(confirmedID)
 	require.NoError(t, err)
 
 	// Check removed from confirmed map
@@ -965,20 +965,20 @@ func TestPendingTxContext_RevertToPending(t *testing.T) {
 	require.False(t, exists)
 
 	// Check that it is moved back to the pending map
-	tx, exists = txs.pendingTxs[confirmedMsg.id]
+	tx, exists = txs.queuedTxs[confirmedMsg.id]
 	require.True(t, exists)
-	require.Equal(t, utils.Pending, tx.state)
+	require.Equal(t, utils.AwaitingBroadcast, tx.state)
 
 	// Check all signatures removed from sig map
 	_, exists = txs.sigToTxInfo[confirmedSig]
 	require.False(t, exists)
 
-	// Check RevertToPending cannot be called on finalized transaction
-	err = txs.RevertToPending(finalizedID)
+	// Check RevertToAwaitingBroadcast cannot be called on finalized transaction
+	err = txs.RevertToAwaitingBroadcast(finalizedID)
 	require.Error(t, err)
 
 	// Check remove cannot be called on errored transaction
-	err = txs.RevertToPending(erroredID)
+	err = txs.RevertToAwaitingBroadcast(erroredID)
 	require.Error(t, err)
 
 	// Check sig list is empty after all removals
@@ -1499,7 +1499,7 @@ func TestPendingTxContext_GetReorgTx(t *testing.T) {
 	t.Run("successfully retrieve broadcasted transaction", func(t *testing.T) {
 		txID, _ := createTxAndAddSig(t, txs)
 
-		tx, err := txs.GetReorgTx(txID)
+		tx, err := txs.GetPendingTx(txID)
 		require.NoError(t, err)
 		require.Equal(t, txID, tx.id)
 		require.Equal(t, utils.Broadcasted, tx.state)
@@ -1510,7 +1510,7 @@ func TestPendingTxContext_GetReorgTx(t *testing.T) {
 		_, err := txs.OnProcessed(sig)
 		require.NoError(t, err)
 
-		tx, err := txs.GetReorgTx(txID)
+		tx, err := txs.GetPendingTx(txID)
 		require.NoError(t, err)
 		require.Equal(t, txID, tx.id)
 		require.Equal(t, utils.Processed, tx.state)
@@ -1523,14 +1523,14 @@ func TestPendingTxContext_GetReorgTx(t *testing.T) {
 		_, err = txs.OnConfirmed(sig)
 		require.NoError(t, err)
 
-		tx, err := txs.GetReorgTx(txID)
+		tx, err := txs.GetPendingTx(txID)
 		require.NoError(t, err)
 		require.Equal(t, txID, tx.id)
 		require.Equal(t, utils.Confirmed, tx.state)
 	})
 
 	t.Run("fail to retrieve non-existent transaction", func(t *testing.T) {
-		_, err := txs.GetReorgTx("non-existent-id")
+		_, err := txs.GetPendingTx("non-existent-id")
 		require.ErrorIs(t, err, ErrTransactionNotFound)
 	})
 }

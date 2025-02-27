@@ -23,7 +23,6 @@ import (
 	relayconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	bigmath "github.com/smartcontractkit/chainlink-common/pkg/utils/big_math"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
@@ -1124,7 +1123,7 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 		// tx should be stored in-memory and moved to errored state
 		status, err := txm.GetTransactionStatus(ctx, txID)
 		require.NoError(t, err)
-		require.Equal(t, commontypes.Fatal, status)
+		require.Equal(t, types.Fatal, status)
 	})
 }
 
@@ -1829,14 +1828,14 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 	require.NoError(t, err)
 	state, err := txm.GetTransactionStatus(ctx, msg.id)
 	require.NoError(t, err)
-	require.Equal(t, commontypes.Pending, state)
+	require.Equal(t, types.Pending, state)
 
 	// Move tx to broadcasted state
 	err = txm.txs.OnBroadcasted(msg)
 	require.NoError(t, err)
 	state, err = txm.GetTransactionStatus(ctx, msg.id)
 	require.NoError(t, err)
-	require.Equal(t, commontypes.Pending, state)
+	require.Equal(t, types.Pending, state)
 
 	sig := randomSignature(t)
 	txm.txs.AddSignature(cancel, msg.id, sig)
@@ -1847,7 +1846,7 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 	require.Equal(t, msg.id, msgId)
 	state, err = txm.GetTransactionStatus(ctx, msg.id)
 	require.NoError(t, err)
-	require.Equal(t, commontypes.Unconfirmed, state)
+	require.Equal(t, types.Unconfirmed, state)
 
 	// Move tx to confirmed state
 	msgId, err = txm.txs.OnConfirmed(sig)
@@ -1855,7 +1854,7 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 	require.Equal(t, msg.id, msgId)
 	state, err = txm.GetTransactionStatus(ctx, msg.id)
 	require.NoError(t, err)
-	require.Equal(t, commontypes.Unconfirmed, state)
+	require.Equal(t, types.Unconfirmed, state)
 
 	// Move tx to finalized state
 	msgId, err = txm.txs.OnFinalized(sig, 1*time.Second)
@@ -1863,7 +1862,7 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 	require.Equal(t, msg.id, msgId)
 	state, err = txm.GetTransactionStatus(ctx, msg.id)
 	require.NoError(t, err)
-	require.Equal(t, commontypes.Finalized, state)
+	require.Equal(t, types.Finalized, state)
 
 	// Add errored tx
 	errMsg := pendingTx{id: uuid.NewString()}
@@ -1871,7 +1870,7 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 	require.NoError(t, err)
 	state, err = txm.GetTransactionStatus(ctx, errMsg.id)
 	require.NoError(t, err)
-	require.Equal(t, commontypes.Failed, state)
+	require.Equal(t, types.Failed, state)
 
 	// Add fatally errored tx
 	fatalMsg := pendingTx{id: uuid.NewString()}
@@ -1879,10 +1878,10 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 	require.NoError(t, err)
 	state, err = txm.GetTransactionStatus(ctx, fatalMsg.id)
 	require.NoError(t, err)
-	require.Equal(t, commontypes.Fatal, state)
+	require.Equal(t, types.Fatal, state)
 
 	// Unknown tx returns error
 	state, err = txm.GetTransactionStatus(ctx, uuid.NewString())
 	require.Error(t, err)
-	require.Equal(t, commontypes.Unknown, state)
+	require.Equal(t, types.Unknown, state)
 }
