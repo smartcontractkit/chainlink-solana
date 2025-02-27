@@ -661,7 +661,7 @@ func (c *pendingTxContext) IsTxReorged(sig solana.Signature, sigOnChainState uti
 	return txInfo.id, hasReorg
 }
 
-func (c *pendingTxContext) GetReorgTx(id string) (pendingTx, error) {
+func (c *pendingTxContext) GetPendingTx(id string) (pendingTx, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	var tx, tempTx pendingTx
@@ -814,6 +814,6 @@ func (c *pendingTxContextWithProm) IsTxReorged(sig solana.Signature, currentSigS
 	return c.pendingTx.IsTxReorged(sig, currentSigState)
 }
 
-func (c *pendingTxContextWithProm) GetReorgTx(id string) (pendingTx, error) {
-	return c.pendingTx.GetReorgTx(id)
+func (c *pendingTxContextWithProm) GetPendingTx(id string) (pendingTx, error) {
+	return c.pendingTx.GetPendingTx(id)
 }

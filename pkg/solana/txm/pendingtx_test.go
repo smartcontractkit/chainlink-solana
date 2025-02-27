@@ -1499,7 +1499,7 @@ func TestPendingTxContext_GetReorgTx(t *testing.T) {
 	t.Run("successfully retrieve broadcasted transaction", func(t *testing.T) {
 		txID, _ := createTxAndAddSig(t, txs)
 
-		tx, err := txs.GetReorgTx(txID)
+		tx, err := txs.GetPendingTx(txID)
 		require.NoError(t, err)
 		require.Equal(t, txID, tx.id)
 		require.Equal(t, utils.Broadcasted, tx.state)
@@ -1510,7 +1510,7 @@ func TestPendingTxContext_GetReorgTx(t *testing.T) {
 		_, err := txs.OnProcessed(sig)
 		require.NoError(t, err)
 
-		tx, err := txs.GetReorgTx(txID)
+		tx, err := txs.GetPendingTx(txID)
 		require.NoError(t, err)
 		require.Equal(t, txID, tx.id)
 		require.Equal(t, utils.Processed, tx.state)
@@ -1523,14 +1523,14 @@ func TestPendingTxContext_GetReorgTx(t *testing.T) {
 		_, err = txs.OnConfirmed(sig)
 		require.NoError(t, err)
 
-		tx, err := txs.GetReorgTx(txID)
+		tx, err := txs.GetPendingTx(txID)
 		require.NoError(t, err)
 		require.Equal(t, txID, tx.id)
 		require.Equal(t, utils.Confirmed, tx.state)
 	})
 
 	t.Run("fail to retrieve non-existent transaction", func(t *testing.T) {
-		_, err := txs.GetReorgTx("non-existent-id")
+		_, err := txs.GetPendingTx("non-existent-id")
 		require.ErrorIs(t, err, ErrTransactionNotFound)
 	})
 }
