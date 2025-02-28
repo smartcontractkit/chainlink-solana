@@ -19,16 +19,14 @@ type Initialize struct {
 	//
 	// [1] = [WRITE] data
 	//
-	// [2] = [WRITE] testStruct
-	//
-	// [3] = [] systemProgram
+	// [2] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
 func NewInitializeInstructionBuilder() *Initialize {
 	nd := &Initialize{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
@@ -67,26 +65,15 @@ func (inst *Initialize) GetDataAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
-// SetTestStructAccount sets the "testStruct" account.
-func (inst *Initialize) SetTestStructAccount(testStruct ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(testStruct).WRITE()
-	return inst
-}
-
-// GetTestStructAccount gets the "testStruct" account.
-func (inst *Initialize) GetTestStructAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
-}
-
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *Initialize) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *Initialize) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice[2]
 }
 
 func (inst Initialize) Build() *Instruction {
@@ -126,9 +113,6 @@ func (inst *Initialize) Validate() error {
 			return errors.New("accounts.Data is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.TestStruct is not set")
-		}
-		if inst.AccountMetaSlice[3] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -150,11 +134,10 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("       signer", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("         data", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("   testStruct", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
@@ -195,13 +178,11 @@ func NewInitializeInstruction(
 	// Accounts:
 	signer ag_solanago.PublicKey,
 	data ag_solanago.PublicKey,
-	testStruct ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
 		SetTestIdx(testIdx).
 		SetValue(value).
 		SetSignerAccount(signer).
 		SetDataAccount(data).
-		SetTestStructAccount(testStruct).
 		SetSystemProgramAccount(systemProgram)
 }
