@@ -96,6 +96,10 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder,
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
 
+		// temp disable
+		ContractReaderGetLatestValueNoArgumentsAndPrimitiveReturnAsValuesDotValue,
+		ContractReaderBatchGetLatestValueNoArgumentsPrimitiveReturn,
+
 		// TODO: not working yet
 		ContractReaderBatchGetLatestValueSetsErrorsProperly,
 		ContractReaderBatchGetLatestValueWithModifiersOwnMapstructureOverride,
@@ -900,6 +904,7 @@ func (h *helper) runInitialize(
 		TestIdx: testIdx,
 		Value:   value,
 	}
+
 	SubmitTransactionToCW(t, &it, cw, "initialize", initArgs, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
 }
 

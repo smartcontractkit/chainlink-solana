@@ -15,10 +15,6 @@ pub mod contract_reader_interface {
         account.idx = test_idx;
         account.bump = ctx.bumps.data;
 
-        let test_struct_account = &mut ctx.accounts.test_struct.load_init()?;
-        test_struct_account.idx = test_idx;
-        test_struct_account.bump = ctx.bumps.test_struct;
-
         Ok(())
     }
 
@@ -93,16 +89,16 @@ pub mod contract_reader_interface {
     }
 
     pub fn store(ctx: Context<StoreTestStruct>, test_idx: u64, data: TestStructData) -> Result<()> {
-        if data.nested_dynamic_struct.inner.i == 1 {
-            let test_struct2_account = &mut ctx.accounts.test_struct2.load_init()?;
+        let test_struct_account = &mut ctx.accounts.test_struct.load_mut()?;
+        if test_struct_account.idx != 0 {
+            let test_struct_account2 = &mut ctx.accounts.test_struct2.load_mut()?;
             update_test_struct(
-                test_struct2_account,
+                test_struct_account2,
                 test_idx,
                 &data,
                 ctx.bumps.test_struct2,
             );
         } else {
-            let test_struct_account = &mut ctx.accounts.test_struct.load_mut()?;
             update_test_struct(test_struct_account, test_idx, &data, ctx.bumps.test_struct);
         }
 
