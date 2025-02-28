@@ -1133,8 +1133,8 @@ func TestGetTxState(t *testing.T) {
 	require.Equal(t, processedMsg.id, id)
 
 	// Check Processed state is returned
-	state, err = txs.GetTxState(processedMsg.id)
-	require.NoError(t, err)
+	state, exists := txs.GetTxState(processedMsg.id)
+	require.True(t, exists)
 	require.Equal(t, utils.Processed, state)
 
 	// Create new confirmed transaction
@@ -1146,8 +1146,8 @@ func TestGetTxState(t *testing.T) {
 	require.Equal(t, confirmedMsg.id, id)
 
 	// Check Confirmed state is returned
-	state, err = txs.GetTxState(confirmedMsg.id)
-	require.NoError(t, err)
+	state, exists = txs.GetTxState(confirmedMsg.id)
+	require.True(t, exists)
 	require.Equal(t, utils.Confirmed, state)
 
 	// Create new finalized transaction
@@ -1159,8 +1159,8 @@ func TestGetTxState(t *testing.T) {
 	require.Equal(t, finalizedMsg.id, id)
 
 	// Check Finalized state is returned
-	state, err = txs.GetTxState(finalizedMsg.id)
-	require.NoError(t, err)
+	state, exists = txs.GetTxState(finalizedMsg.id)
+	require.True(t, exists)
 	require.Equal(t, utils.Finalized, state)
 
 	// Create new errored transaction
@@ -1172,8 +1172,8 @@ func TestGetTxState(t *testing.T) {
 	require.Equal(t, erroredMsg.id, id)
 
 	// Check Errored state is returned
-	state, err = txs.GetTxState(erroredMsg.id)
-	require.NoError(t, err)
+	state, exists = txs.GetTxState(erroredMsg.id)
+	require.True(t, exists)
 	require.Equal(t, utils.Errored, state)
 
 	// Create new fatally errored transaction
@@ -1185,13 +1185,13 @@ func TestGetTxState(t *testing.T) {
 	require.Equal(t, fatallyErroredMsg.id, id)
 
 	// Check Errored state is returned
-	state, err = txs.GetTxState(fatallyErroredMsg.id)
-	require.NoError(t, err)
+	state, exists = txs.GetTxState(fatallyErroredMsg.id)
+	require.True(t, exists)
 	require.Equal(t, utils.FatallyErrored, state)
 
 	// Check NotFound state is returned if unknown id provided
-	state, err = txs.GetTxState("unknown id")
-	require.Error(t, err)
+	state, exists = txs.GetTxState("unknown id")
+	require.False(t, exists)
 	require.Equal(t, utils.NotFound, state)
 }
 

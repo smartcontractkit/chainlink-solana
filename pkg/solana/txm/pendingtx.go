@@ -3,7 +3,6 @@ package txm
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -49,7 +48,7 @@ type PendingTxContext interface {
 	// OnError marks transaction as errored, matches err type using enum, moves it from the broadcasted or confirmed map to finalized/errored map, removes signatures from signature map to stop confirmation checks
 	OnError(sig solana.Signature, retentionTimeout time.Duration, txState utils.TxState, errType TxErrType) (string, error)
 	// GetTxState returns the transaction state for the provided ID if it exists
-	GetTxState(id string) (utils.TxState, error)
+	GetTxState(id string) (utils.TxState, bool)
 	// TrimFinalizedErroredTxs removes transactions that have reached their retention time
 	TrimFinalizedErroredTxs() int
 	// IsTxReorged determines whether the given signature has experienced a re-org by comparing its in-memory state with its current on-chain state.
@@ -588,22 +587,22 @@ func (c *pendingTxContext) OnError(sig solana.Signature, retentionTimeout time.D
 	})
 }
 
-func (c *pendingTxContext) GetTxState(id string) (utils.TxState, error) {
+func (c *pendingTxContext) GetTxState(id string) (utils.TxState, bool) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	if tx, exists := c.queuedTxs[id]; exists {
-		return tx.state, nil
+		return tx.state, true
 	}
 	if tx, exists := c.broadcastedProcessedTxs[id]; exists {
-		return tx.state, nil
+		return tx.state, true
 	}
 	if tx, exists := c.confirmedTxs[id]; exists {
-		return tx.state, nil
+		return tx.state, true
 	}
 	if tx, exists := c.finalizedErroredTxs[id]; exists {
-		return tx.state, nil
+		return tx.state, true
 	}
-	return utils.NotFound, fmt.Errorf("failed to find transaction for id: %s", id)
+	return utils.NotFound, false
 }
 
 // TrimFinalizedErroredTxs deletes transactions from the finalized/errored map and the allTxs map after the retention period has passed
@@ -803,7 +802,7 @@ func incrementErrorMetrics(errType TxErrType, chainID string) {
 	promSolTxmErrorTxs.WithLabelValues(chainID).Inc()
 }
 
-func (c *pendingTxContextWithProm) GetTxState(id string) (utils.TxState, error) {
+func (c *pendingTxContextWithProm) GetTxState(id string) (utils.TxState, bool) {
 	return c.pendingTx.GetTxState(id)
 }
 

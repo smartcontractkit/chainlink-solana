@@ -727,9 +727,9 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 		id = *txID
 	}
 
-	_, err := txm.txs.GetTxState(id)
+	_, exists := txm.txs.GetTxState(id)
 	// Transaction for ID already exists. No-op to avoid creating another tx for the same ID.
-	if err == nil {
+	if exists {
 		txm.lggr.Infow("transaction already exists for ID", "id", id)
 		return nil
 	}
@@ -742,7 +742,7 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	// validate expected key exists by trying to sign with it
 	// fee payer account is index 0 account
 	// https://github.com/gagliardetto/solana-go/blob/main/transaction.go#L252
-	_, err = txm.ks.Sign(ctx, tx.Message.AccountKeys[0].String(), nil)
+	_, err := txm.ks.Sign(ctx, tx.Message.AccountKeys[0].String(), nil)
 	if err != nil {
 		return fmt.Errorf("error in soltxm.Enqueue.GetKey: %w", err)
 	}
@@ -792,9 +792,9 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 
 // GetTransactionStatus translates internal TXM transaction statuses to chainlink common statuses
 func (txm *Txm) GetTransactionStatus(ctx context.Context, transactionID string) (commontypes.TransactionStatus, error) {
-	state, err := txm.txs.GetTxState(transactionID)
-	if err != nil {
-		return commontypes.Unknown, fmt.Errorf("failed to find transaction with id %s: %w", transactionID, err)
+	state, exists := txm.txs.GetTxState(transactionID)
+	if !exists {
+		return commontypes.Unknown, fmt.Errorf("failed to find transaction with id %s", transactionID)
 	}
 
 	switch state {
@@ -809,7 +809,7 @@ func (txm *Txm) GetTransactionStatus(ctx context.Context, transactionID string) 
 	case txmutils.FatallyErrored:
 		return commontypes.Fatal, nil
 	default:
-		return commontypes.Unknown, fmt.Errorf("found unknown transaction state: %s", state.String())
+		return commontypes.Unknown, fmt.Errorf("found unknown transaction state for id %s: %s", transactionID, state.String())
 	}
 }
 
