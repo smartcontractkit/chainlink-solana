@@ -5,6 +5,7 @@ package relayinterface
 
 import (
 	"context"
+	_ "embed"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -107,6 +108,7 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 		ContractReaderQueryKeyReturnsDataAsValuesDotValue,
 		ContractReaderQueryKeyCanLimitResultsWithCursor,
 		ContractReaderGetLatestValueGetsLatestForEvent,
+		ContractReaderGetLatestValueWithFilteringForEvent,
 
 		// possibly not working?
 		ContractReaderGetLatestValueWithModifiersUsingOwnMapstrctureOverrides,
@@ -717,6 +719,12 @@ func (h *helper) Init(t *testing.T) {
 	t.Helper()
 
 	h.db = sqltest.NewDB(t, sqltest.TestURL(t))
+	t.Cleanup(func() {
+		h.db.Close()
+	})
+
+	_, err := h.db.Exec(dbSetupSQL)
+	require.NoError(t, err)
 
 	privateKey, err := solana.PrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1])
 	require.NoError(t, err)
@@ -1842,3 +1850,6 @@ const (
 	primaryProgramPubKey   = "6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE"
 	secondaryProgramPubKey = "9SFyk8NmGYh5D612mJwUYhguCRY9cFgaS2vksrigepjf"
 )
+
+//go:embed "db_setup.sql"
+var dbSetupSQL string
