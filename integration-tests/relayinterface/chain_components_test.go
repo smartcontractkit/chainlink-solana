@@ -96,12 +96,20 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder,
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
 
-		// temp disable
-		ContractReaderGetLatestValueNoArgumentsAndPrimitiveReturnAsValuesDotValue,
-		ContractReaderBatchGetLatestValueNoArgumentsPrimitiveReturn,
-
-		// TODO: not working yet
+		// this one "fails" because we return a struct with all zero alues if an account is not found,
+		// instead of reporting an error. We should change either solana or evm to match behavior
 		ContractReaderBatchGetLatestValueSetsErrorsProperly,
+
+		// requires external db connection
+		ContractReaderGetLatestValueReturnsNotFoundWhenNotTriggeredForEvent,
+		ContractReaderQueryKeyCanFilterWithValueComparator,
+		ContractReaderQueryKeyReturnsData,
+		ContractReaderQueryKeyReturnsDataAsValuesDotValue,
+		ContractReaderQueryKeyCanLimitResultsWithCursor,
+		ContractReaderGetLatestValueGetsLatestForEvent,
+
+		// possibly not working?
+		ContractReaderGetLatestValueWithModifiersUsingOwnMapstrctureOverrides,
 		ContractReaderBatchGetLatestValueWithModifiersOwnMapstructureOverride,
 
 		// QueryKeys not implemented
