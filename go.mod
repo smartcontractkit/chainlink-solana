@@ -1,6 +1,8 @@
 module github.com/smartcontractkit/chainlink-solana
 
-go 1.23.3
+go 1.24
+
+toolchain go1.24.0
 
 require (
 	github.com/cometbft/cometbft v0.37.5
@@ -18,7 +20,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/prometheus/client_golang v1.20.5
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250203132120-f0d42463e405
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250303180513-6bfa4f0a7b98
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250206215114-fb6c3c35e8e3
 	github.com/smartcontractkit/chainlink-common v0.4.2-0.20250224210553-dc2073fe0d21
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250211162441-3d6cea220efb
