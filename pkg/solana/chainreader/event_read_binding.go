@@ -2,6 +2,7 @@ package chainreader
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -373,7 +374,25 @@ func (b *eventReadBinding) decodeLogsIntoSequences(
 	logs []logpoller.Log,
 	into any,
 ) ([]types.Sequence, error) {
+	var (
+		wg  sync.WaitGroup
+		err error
+	)
+
 	sequences := make([]types.Sequence, len(logs))
+	chErrs := make(chan error, 1)
+	chDone := make(chan struct{}, 1)
+
+	go func() {
+		select {
+		case fErr := <-chErrs:
+			if fErr != nil {
+				err = errors.Join(err, fErr)
+			}
+		case <-chDone:
+			return
+		}
+	}()
 
 	for idx := range logs {
 		sequences[idx] = types.Sequence{
@@ -397,9 +416,22 @@ func (b *eventReadBinding) decodeLogsIntoSequences(
 		// create a new value of the same type as 'into' for the data to be extracted to
 		sequences[idx].Data = typeVal.Interface()
 
-		if err := b.decodeLog(ctx, &logs[idx], sequences[idx].Data); err != nil {
-			return nil, err
-		}
+		wg.Add(1)
+		go func(ctx context.Context, log *logpoller.Log, into any, errs chan error) {
+			defer wg.Done()
+
+			if lErr := b.decodeLog(ctx, log, into); lErr != nil {
+				errs <- lErr
+			}
+		}(ctx, &logs[idx], sequences[idx].Data, chErrs)
+	}
+
+	wg.Wait()
+
+	chDone <- struct{}{}
+
+	if err != nil {
+		return nil, err
 	}
 
 	return sequences, nil
