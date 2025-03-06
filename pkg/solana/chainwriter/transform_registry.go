@@ -79,9 +79,9 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 		// set is_writable according to token admin registry
 		for i := range table {
 			writable := string(writableBits[i]) == "1"
-			// skip first 11 accounts, since they are mandatory/not remaining_accounts
+			// skip first 14 accounts, since they are mandatory/not remaining_accounts
 			// skip 3 accounts since they indicate other accounts than lookup field
-			accounts[11+offset+3+i].IsWritable = writable
+			accounts[14+offset+3+i].IsWritable = writable
 		}
 
 		// calculate the token index
