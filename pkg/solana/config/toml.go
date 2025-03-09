@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"time"
 
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pelletier/go-toml/v2"
-	"golang.org/x/exp/slices"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
