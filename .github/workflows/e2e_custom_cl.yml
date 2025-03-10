@@ -318,7 +318,7 @@ jobs:
           # shellcheck disable=SC2086
           echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> $GITHUB_ENV
       - name: Run Tests
-        uses: smartcontractkit/.github/actions/ctf-run-tests@91995e4dd053581696702eec503ce2d2c8b8e753 # 0.6.1
+        uses: smartcontractkit/.github/actions/ctf-run-tests@29eb28c2dea7a14bf232a198fc1632c01adc3b8a # 0.3.0
         with:
           test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
@@ -333,6 +333,7 @@ jobs:
           artifacts_location: ./integration-tests/smoke/logs/
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
           cache_key_id: solana-e2e-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "false"
         env:
@@ -401,7 +402,7 @@ jobs:
           # shellcheck disable=SC2086
           echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> $GITHUB_ENV
       - name: Run Upgrade Test
-        uses: smartcontractkit/.github/actions/ctf-run-tests@91995e4dd053581696702eec503ce2d2c8b8e753 # 0.6.1
+        uses: smartcontractkit/.github/actions/ctf-run-tests@29eb28c2dea7a14bf232a198fc1632c01adc3b8a # 0.3.0
         with:
           test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2UpgradeSmoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
@@ -416,6 +417,7 @@ jobs:
           artifacts_location: ./integration-tests/smoke/logs/
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
           cache_key_id: solana-e2e-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "false"
         env:
