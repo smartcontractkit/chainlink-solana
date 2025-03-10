@@ -1588,6 +1588,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 				},
 			},
 		},
+		TxStatusTimeout: *commonconfig.MustNewDuration(30 * time.Second),
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -46,6 +47,8 @@ var (
 // nolint // ignoring naming suggestion
 type ChainWriterConfig struct {
 	Programs map[string]ProgramConfig `json:"programs"`
+	// used for ATA creation
+	TxStatusTimeout commonconfig.Duration `json:"txStatusTimeout"`
 }
 
 type ProgramConfig struct {

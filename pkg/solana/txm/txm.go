@@ -798,9 +798,9 @@ func (txm *Txm) GetTransactionStatus(ctx context.Context, transactionID string) 
 	}
 
 	switch state {
-	case txmutils.AwaitingBroadcast, txmutils.Broadcasted:
+	case txmutils.AwaitingBroadcast, txmutils.Broadcasted, txmutils.Processed:
 		return commontypes.Pending, nil
-	case txmutils.Processed, txmutils.Confirmed:
+	case txmutils.Confirmed:
 		return commontypes.Unconfirmed, nil
 	case txmutils.Finalized:
 		return commontypes.Finalized, nil

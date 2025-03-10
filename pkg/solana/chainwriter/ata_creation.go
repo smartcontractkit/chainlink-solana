@@ -137,7 +137,7 @@ func (s *SolanaChainWriterService) handleATACreation(ctx context.Context, create
 }
 
 func (s *SolanaChainWriterService) waitForTxStatus(ctx context.Context, transactionID string, desiredStatus types.TransactionStatus) error {
-	waitCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	waitCtx, cancel := context.WithTimeout(ctx, s.config.TxStatusTimeout.Duration())
 	defer cancel()
 
 	backoff := 1 * time.Second
