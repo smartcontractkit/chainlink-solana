@@ -139,7 +139,7 @@ func (l Lookup) Resolve(ctx context.Context, args any, derivedTableMap map[strin
 func (ac AccountConstant) Resolve() ([]*solana.AccountMeta, error) {
 	address, err := solana.PublicKeyFromBase58(ac.Address)
 	if err != nil {
-		return nil, fmt.Errorf("error getting account from constant: %w", err)
+		return nil, lookupErrWithName(ac.Name, fmt.Errorf("error getting account from constant: %w", err))
 	}
 	return []*solana.AccountMeta{
 		{
@@ -153,18 +153,18 @@ func (ac AccountConstant) Resolve() ([]*solana.AccountMeta, error) {
 func (al AccountLookup) Resolve(args any) ([]*solana.AccountMeta, error) {
 	derivedValues, err := GetValuesAtLocation(args, al.Location)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrLookupNotFoundAtLocation, err)
+		return nil, lookupErrWithName(al.Name, fmt.Errorf("%w: %v", ErrLookupNotFoundAtLocation, err))
 	}
 
 	var metas []*solana.AccountMeta
 	signerIndexes, err := resolveBitMap(al.IsSigner, args, len(derivedValues))
 	if err != nil {
-		return nil, err
+		return nil, lookupErrWithName(al.Name, fmt.Errorf("failed to resolve signer bit map: %w", err))
 	}
 
 	writerIndexes, err := resolveBitMap(al.IsWritable, args, len(derivedValues))
 	if err != nil {
-		return nil, err
+		return nil, lookupErrWithName(al.Name, fmt.Errorf("failed to resolve writer bit map: %w", err))
 	}
 
 	for i, address := range derivedValues {
@@ -230,7 +230,7 @@ func (alt AccountsFromLookupTable) Resolve(derivedTableMap map[string]map[string
 	for publicKey, metas := range innerMap {
 		for _, index := range alt.IncludeIndexes {
 			if index < 0 || index >= len(metas) {
-				return nil, fmt.Errorf("invalid index %d for account %s in lookup table %s", index, publicKey, alt.LookupTableName)
+				return nil, lookupErrWithName(alt.LookupTableName, fmt.Errorf("invalid index %d for account %s", index, publicKey))
 			}
 			result = append(result, metas[index])
 		}
@@ -242,17 +242,17 @@ func (alt AccountsFromLookupTable) Resolve(derivedTableMap map[string]map[string
 func (pda PDALookups) Resolve(ctx context.Context, args any, derivedTableMap map[string]map[string][]*solana.AccountMeta, client client.MultiClient) ([]*solana.AccountMeta, error) {
 	publicKeys, err := GetAddresses(ctx, args, []Lookup{pda.PublicKey}, derivedTableMap, client)
 	if err != nil {
-		return nil, fmt.Errorf("error getting public key for PDALookups: %w", err)
+		return nil, lookupErrWithName(pda.Name, fmt.Errorf("error getting public key for PDALookups: %w", err))
 	}
 
 	seeds, err := getSeedBytesCombinations(ctx, pda, args, derivedTableMap, client)
 	if err != nil {
-		return nil, fmt.Errorf("error getting seeds for PDALookups: %w", err)
+		return nil, lookupErrWithName(pda.Name, fmt.Errorf("error getting seeds for PDALookups: %w", err))
 	}
 
 	pdas, err := generatePDAs(publicKeys, seeds, pda)
 	if err != nil {
-		return nil, fmt.Errorf("error generating PDAs: %w", err)
+		return nil, lookupErrWithName(pda.Name, fmt.Errorf("error generating PDAs: %w", err))
 	}
 
 	if pda.InternalField.Location == "" {
@@ -268,37 +268,37 @@ func (pda PDALookups) Resolve(ctx context.Context, args any, derivedTableMap map
 		})
 
 		if err != nil || accountInfo == nil || accountInfo.Value == nil {
-			return nil, fmt.Errorf("error fetching account info for PDA account: %s, error: %w", accountMeta.PublicKey.String(), err)
+			return nil, lookupErrWithName(pda.Name, fmt.Errorf("error fetching account info for PDA account: %s, error: %w", accountMeta.PublicKey.String(), err))
 		}
 
 		var idlCodec codec.IDL
 		if err = json.Unmarshal([]byte(pda.InternalField.IDL), &idlCodec); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal IDL for PDA: %s, error: %w", pda.Name, err)
+			return nil, lookupErrWithName(pda.Name, fmt.Errorf("failed to unmarshal IDL: %w", err))
 		}
 
 		internalType := pda.InternalField.TypeName
 
 		idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeAccountDef, internalType, idlCodec)
 		if err != nil {
-			return nil, fmt.Errorf("error finding definition for type %s: %w", internalType, err)
+			return nil, lookupErrWithName(pda.Name, fmt.Errorf("error finding definition for type %s: %w", internalType, err))
 		}
 
 		input, err := codec.CreateCodecEntry(idlDef, internalType, idlCodec, nil)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create codec entry for method %s, error: %w", internalType, err)
+			return nil, lookupErrWithName(pda.Name, fmt.Errorf("failed to create codec entry for type %s, error: %w", internalType, err))
 		}
 
 		decoded, _, err := input.Decode(accountInfo.Value.Data.GetBinary())
 		if err != nil {
-			return nil, fmt.Errorf("error decoding account data: %w", err)
+			return nil, lookupErrWithName(pda.Name, fmt.Errorf("error decoding account data: %w", err))
 		}
 
 		value, err := GetValuesAtLocation(decoded, pda.InternalField.Location)
 		if err != nil {
-			return nil, fmt.Errorf("error getting value at location: %w", err)
+			return nil, lookupErrWithName(pda.Name, fmt.Errorf("error getting value at location %s: %w", pda.InternalField.Location, err))
 		}
 		if len(value) > 1 {
-			return nil, fmt.Errorf("multiple values found at location: %s", pda.InternalField.Location)
+			return nil, lookupErrWithName(pda.Name, fmt.Errorf("multiple values found at location %s", pda.InternalField.Location))
 		}
 
 		result = append(result, &solana.AccountMeta{
@@ -415,4 +415,8 @@ func generatePDAs(
 	}
 
 	return results, nil
+}
+
+func lookupErrWithName(name string, err error) error {
+	return fmt.Errorf("lookup: %s, err: %w", name, err)
 }
