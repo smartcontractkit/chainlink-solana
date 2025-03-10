@@ -156,7 +156,7 @@ func (s *SolanaChainWriterService) waitForTxStatus(ctx context.Context, transact
 			case types.Finalized, types.Unconfirmed, types.Pending:
 				if status >= desiredStatus {
 					// if status is equal to or greater than desired status, return
-					s.lggr.Debug("ATA transaction reached state", "status", status, "transactionID", transactionID)
+					s.lggr.Debugw("ATA transaction reached state", "status", status, "transactionID", transactionID)
 					return nil
 				}
 				// otherwise keep polling
