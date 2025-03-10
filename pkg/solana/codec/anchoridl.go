@@ -99,24 +99,21 @@ func (env *IdlAccountItem) UnmarshalJSON(data []byte) error {
 			return nil
 		}
 
-		// Multiple accounts:
-		if _, ok := v["accounts"]; ok {
-			if err := utilz.TranscodeJSON(temp, &env.IdlAccounts); err != nil {
-				return err
-			}
-		}
-		// Single account:
-		// TODO: check both isMut and isSigner
-		if _, ok := v["isMut"]; ok {
-			if err := utilz.TranscodeJSON(temp, &env.IdlAccount); err != nil {
-				return err
-			}
-		}
-	default:
-		return fmt.Errorf("Unknown kind: %s", spew.Sdump(temp))
-	}
+		_, hasAccounts := v["accounts"]
+		_, hasIsMut := v["isMut"]
 
-	return nil
+		if hasAccounts == hasIsMut {
+			return fmt.Errorf("invalid idl structure: expected exactly one of 'accounts' or 'isMut'")
+		}
+
+		if hasAccounts {
+			return utilz.TranscodeJSON(temp, &env.IdlAccounts)
+		}
+
+		return utilz.TranscodeJSON(temp, &env.IdlAccount)
+	default:
+		return fmt.Errorf("unknown kind: %s", spew.Sdump(temp))
+	}
 }
 
 func (env IdlAccountItem) MarshalJSON() ([]byte, error) {
