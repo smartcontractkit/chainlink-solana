@@ -129,38 +129,42 @@ func (s *SolanaChainWriterService) handleATACreation(ctx context.Context, create
 		return fmt.Errorf("error enqueuing transaction: %w", err)
 	}
 
-	err = s.waitForTxFinality(ctx, ataUUID)
+	err = s.waitForTxStatus(ctx, ataUUID, types.Unconfirmed)
 	if err != nil {
 		return fmt.Errorf("error waiting for ATA transaction finality: %w", err)
 	}
 	return nil
 }
 
-func (s *SolanaChainWriterService) waitForTxFinality(ctx context.Context, transactionID string) error {
+func (s *SolanaChainWriterService) waitForTxStatus(ctx context.Context, transactionID string, desiredStatus types.TransactionStatus) error {
 	waitCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
+	backoff := 1 * time.Second
 
 	for {
 		select {
 		case <-waitCtx.Done():
 			return fmt.Errorf("context ended while waiting for finality of transaction %s", transactionID)
-		case <-ticker.C:
+		case <-time.After(backoff):
 			status, err := s.txm.GetTransactionStatus(waitCtx, transactionID)
 			if err != nil {
 				return fmt.Errorf("error fetching transaction status: %w", err)
 			}
 			switch status {
-			case types.Finalized:
-				s.lggr.Debug("ATA transaction finalized", "transactionID", transactionID)
-				return nil
+			case types.Finalized, types.Unconfirmed:
+				if status >= desiredStatus {
+					// if status is equal to or greater than desired status, return
+					s.lggr.Debug("ATA transaction reached state", "status", status, "transactionID", transactionID)
+					return nil
+				}
+				// otherwise keep polling
 			case types.Failed, types.Fatal:
 				return fmt.Errorf("transaction %s failed", transactionID)
 			default:
 				// Keep polling
 			}
 		}
+		backoff *= 2
 	}
 }
