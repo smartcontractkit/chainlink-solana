@@ -141,6 +141,7 @@ func (s *SolanaChainWriterService) waitForTxStatus(ctx context.Context, transact
 	defer cancel()
 
 	backoff := 1 * time.Second
+	maxBackoff := 8 * time.Second
 
 	for {
 		select {
@@ -152,7 +153,7 @@ func (s *SolanaChainWriterService) waitForTxStatus(ctx context.Context, transact
 				return fmt.Errorf("error fetching transaction status: %w", err)
 			}
 			switch status {
-			case types.Finalized, types.Unconfirmed:
+			case types.Finalized, types.Unconfirmed, types.Pending:
 				if status >= desiredStatus {
 					// if status is equal to or greater than desired status, return
 					s.lggr.Debug("ATA transaction reached state", "status", status, "transactionID", transactionID)
@@ -166,5 +167,8 @@ func (s *SolanaChainWriterService) waitForTxStatus(ctx context.Context, transact
 			}
 		}
 		backoff *= 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
 	}
 }
