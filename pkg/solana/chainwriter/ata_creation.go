@@ -129,6 +129,7 @@ func (s *SolanaChainWriterService) handleATACreation(ctx context.Context, create
 		return fmt.Errorf("error enqueuing transaction: %w", err)
 	}
 
+	// Wait for ATA transaction to be confirmed (common Unconfirmed maps to Confirmed on Solana)
 	err = s.waitForTxStatus(ctx, ataUUID, types.Unconfirmed)
 	if err != nil {
 		return fmt.Errorf("error waiting for ATA transaction finality: %w", err)
