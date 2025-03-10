@@ -27,4 +27,17 @@ func TestIDLTypes_JSONMarshalUnmarshal(t *testing.T) {
 	t.Run("CCIP IDL", func(t *testing.T) {
 		ensureUnmarshal[IDL](t, solana.FetchCCIPOfframpIDL())
 	})
+
+	t.Run("IdlAccountItem - Invalid (both 'isMut' and 'accounts')", func(t *testing.T) {
+		raw := `{
+			"isMut": true,
+			"accounts": {
+				"name": "myAccounts",
+				"accounts": [{ "name": "subAccount" }]
+			}
+		}`
+		var item IdlAccountItem
+		err := json.Unmarshal([]byte(raw), &item)
+		require.Error(t, err)
+	})
 }
