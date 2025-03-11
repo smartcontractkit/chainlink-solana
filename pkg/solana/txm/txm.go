@@ -785,10 +785,13 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	// If a dependency transaction ID is provided, handle waiting and enqueuing asynchronously.
 	if cfg.DependencyTxID != "" {
 		go func(msg pendingTx, depID string) {
-			err := txm.waitForTxStatus(ctx, depID, types.Unconfirmed)
+			err := txm.waitForTxStatus(ctx, depID, types.Finalized)
 			if err != nil {
 				txm.lggr.Errorw("dependency transaction did not reach desired state", "dependencyTxID", depID, "error", err)
-				txm.txs.OnPrebroadcastError(msg.id, txm.cfg.TxRetentionTimeout(), txmutils.FatallyErrored, TxDependencyFail)
+				err = txm.txs.OnPrebroadcastError(msg.id, txm.cfg.TxRetentionTimeout(), txmutils.FatallyErrored, TxDependencyFail)
+				if err != nil {
+					txm.lggr.Errorw("failed to mark transaction as fatally errored", "id", msg.id, "error", err)
+				}
 				return
 			}
 			select {
@@ -811,7 +814,7 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 }
 
 func (txm *Txm) waitForTxStatus(ctx context.Context, transactionID string, desiredStatus types.TransactionStatus) error {
-	waitCtx, cancel := context.WithTimeout(ctx, txm.cfg.TxConfirmTimeout())
+	waitCtx, cancel := context.WithTimeout(ctx, txm.cfg.TxTimeout())
 	defer cancel()
 
 	backoff := 1 * time.Second

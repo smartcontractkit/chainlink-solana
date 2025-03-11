@@ -1846,7 +1846,7 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 	require.Equal(t, msg.id, msgId)
 	state, err = txm.GetTransactionStatus(ctx, msg.id)
 	require.NoError(t, err)
-	require.Equal(t, types.Unconfirmed, state)
+	require.Equal(t, types.Pending, state)
 
 	// Move tx to confirmed state
 	msgId, err = txm.txs.OnConfirmed(sig)
@@ -1906,7 +1906,7 @@ func TestTxm_DependencyTx(t *testing.T) {
 	txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
 	require.NoError(t, txm.Start(ctx))
 	t.Cleanup(func() { require.NoError(t, txm.Close()) })
-	
+
 	mc.On("SendTx", mock.Anything, mock.Anything).Return(solana.Signature{}, nil).Maybe()
 	mc.On("SimulateTx", mock.Anything, mock.Anything, mock.Anything).Return(&rpc.SimulateTransactionResult{}, nil).Maybe()
 	mc.On("SignatureStatuses", mock.Anything, mock.AnythingOfType("[]solana.Signature")).Return(
