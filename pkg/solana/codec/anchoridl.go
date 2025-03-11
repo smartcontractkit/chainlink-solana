@@ -139,6 +139,10 @@ func (env IdlAccountItem) MarshalJSON() ([]byte, error) {
 }
 
 func checkForIdlAccountsCycle(acc *IdlAccounts, visited map[*IdlAccounts]struct{}) error {
+	if acc == nil {
+		return nil
+	}
+
 	if _, exists := visited[acc]; exists {
 		return fmt.Errorf("cycle detected in IdlAccounts named %q", acc.Name)
 	}
