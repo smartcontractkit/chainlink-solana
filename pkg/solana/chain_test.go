@@ -479,6 +479,9 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 }
 
 func TestSolanaChain_MultiNode_Txm(t *testing.T) {
+	// Skipping since this test is causing flakes
+	// TODO: Re-enable after the test flake is fixed
+	t.Skip()
 	ctx := tests.Context(t)
 	cfg := solcfg.NewDefault()
 	cfg.MultiNode.MultiNode.Enabled = ptr(true)

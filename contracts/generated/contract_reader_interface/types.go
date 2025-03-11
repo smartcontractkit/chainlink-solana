@@ -336,3 +336,91 @@ func (obj *InnerStaticTestStruct) UnmarshalWithDecoder(decoder *ag_binary.Decode
 	}
 	return nil
 }
+
+type BillingTokenConfig struct {
+	Enabled                    bool
+	Mint                       ag_solanago.PublicKey
+	UsdPerToken                TimestampedPackedU224
+	PremiumMultiplierWeiPerEth uint64
+}
+
+func (obj BillingTokenConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Enabled` param:
+	err = encoder.Encode(obj.Enabled)
+	if err != nil {
+		return err
+	}
+	// Serialize `Mint` param:
+	err = encoder.Encode(obj.Mint)
+	if err != nil {
+		return err
+	}
+	// Serialize `UsdPerToken` param:
+	err = encoder.Encode(obj.UsdPerToken)
+	if err != nil {
+		return err
+	}
+	// Serialize `PremiumMultiplierWeiPerEth` param:
+	err = encoder.Encode(obj.PremiumMultiplierWeiPerEth)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *BillingTokenConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Enabled`:
+	err = decoder.Decode(&obj.Enabled)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Mint`:
+	err = decoder.Decode(&obj.Mint)
+	if err != nil {
+		return err
+	}
+	// Deserialize `UsdPerToken`:
+	err = decoder.Decode(&obj.UsdPerToken)
+	if err != nil {
+		return err
+	}
+	// Deserialize `PremiumMultiplierWeiPerEth`:
+	err = decoder.Decode(&obj.PremiumMultiplierWeiPerEth)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type TimestampedPackedU224 struct {
+	Value     [28]uint8
+	Timestamp int64
+}
+
+func (obj TimestampedPackedU224) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Value` param:
+	err = encoder.Encode(obj.Value)
+	if err != nil {
+		return err
+	}
+	// Serialize `Timestamp` param:
+	err = encoder.Encode(obj.Timestamp)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *TimestampedPackedU224) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Value`:
+	err = decoder.Decode(&obj.Value)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Timestamp`:
+	err = decoder.Decode(&obj.Timestamp)
+	if err != nil {
+		return err
+	}
+	return nil
+}

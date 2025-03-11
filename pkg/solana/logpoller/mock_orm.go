@@ -231,6 +231,63 @@ func (_c *MockORM_GetLatestBlock_Call) RunAndReturn(run func(context.Context) (i
 	return _c
 }
 
+// HasFilter provides a mock function with given fields: ctx, name
+func (_m *MockORM) HasFilter(ctx context.Context, name string) (bool, error) {
+	ret := _m.Called(ctx, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for HasFilter")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
+		return rf(ctx, name)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) bool); ok {
+		r0 = rf(ctx, name)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockORM_HasFilter_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasFilter'
+type MockORM_HasFilter_Call struct {
+	*mock.Call
+}
+
+// HasFilter is a helper method to define mock.On call
+//   - ctx context.Context
+//   - name string
+func (_e *MockORM_Expecter) HasFilter(ctx interface{}, name interface{}) *MockORM_HasFilter_Call {
+	return &MockORM_HasFilter_Call{Call: _e.mock.On("HasFilter", ctx, name)}
+}
+
+func (_c *MockORM_HasFilter_Call) Run(run func(ctx context.Context, name string)) *MockORM_HasFilter_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockORM_HasFilter_Call) Return(_a0 bool, _a1 error) *MockORM_HasFilter_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockORM_HasFilter_Call) RunAndReturn(run func(context.Context, string) (bool, error)) *MockORM_HasFilter_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // InsertFilter provides a mock function with given fields: ctx, filter
 func (_m *MockORM) InsertFilter(ctx context.Context, filter Filter) (int64, error) {
 	ret := _m.Called(ctx, filter)

@@ -28,18 +28,10 @@ func (w *RPCClientWrapper) GetMultipleAccountData(ctx context.Context, keys ...s
 	bts := make([][]byte, len(result.Value))
 
 	for idx, res := range result.Value {
-		if res == nil {
-			return nil, rpc.ErrNotFound
+		if res == nil || res.Data == nil || res.Data.GetBinary() == nil {
+			// any accounts that can't be resolved will be nil
+			continue
 		}
-
-		if res.Data == nil {
-			return nil, rpc.ErrNotFound
-		}
-
-		if res.Data.GetBinary() == nil {
-			return nil, rpc.ErrNotFound
-		}
-
 		bts[idx] = res.Data.GetBinary()
 	}
 

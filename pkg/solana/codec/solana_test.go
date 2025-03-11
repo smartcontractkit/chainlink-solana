@@ -30,7 +30,7 @@ func TestNewIDLAccountCodec(t *testing.T) {
 	bts, err := entry.Encode(ctx, expected, testutils.TestStructWithNestedStruct)
 
 	// length of fields + discriminator
-	require.Equal(t, 262, len(bts))
+	require.Equal(t, 263, len(bts))
 	require.NoError(t, err)
 
 	var decoded testutils.StructWithNestedStruct
@@ -73,7 +73,7 @@ func TestNewIDLDefinedTypesCodecCodec(t *testing.T) {
 	bts, err := entry.Encode(ctx, expected, testutils.TestStructWithNestedStructType)
 
 	// length of fields without a discriminator
-	require.Equal(t, 254, len(bts))
+	require.Equal(t, 255, len(bts))
 
 	require.NoError(t, err)
 

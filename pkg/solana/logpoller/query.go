@@ -125,7 +125,8 @@ func (q *queryArgs) withIsBackfilled(isBackfilled bool) *queryArgs {
 }
 
 func logsQuery(clause string) string {
-	return fmt.Sprintf(`SELECT %s FROM solana.logs %s`, strings.Join(logsFields[:], ", "), clause)
+	// TODO: using DISTINCT in a query is less efficient but required because of duplicate logs coming from multipler filters
+	return fmt.Sprintf(`SELECT DISTINCT %s FROM solana.logs %s`, strings.Join(logsFields[:], ", "), clause)
 }
 
 func filtersQuery(clause string) string {

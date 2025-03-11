@@ -247,6 +247,13 @@ func createCodecType(
 			return name, nil, fmt.Errorf("%w: variants are not supported", commontypes.ErrInvalidConfig)
 		}
 		return name, refs.builder.Uint8(), nil
+	case IdlTypeDefTyKindCustom:
+		switch def.Type.Codec {
+		case "onramp_address":
+			return name, NewOnRampAddress(refs.builder), nil
+		default:
+			return name, nil, fmt.Errorf(unknownIDLFormat, commontypes.ErrInvalidConfig, def.Type.Codec)
+		}
 	default:
 		return name, nil, fmt.Errorf(unknownIDLFormat, commontypes.ErrInvalidConfig, def.Type.Kind)
 	}
@@ -301,8 +308,8 @@ func processFieldType(parentTypeName string, idlType IdlType, refs *codecRefs) (
 		return getCodecByStringType(idlType.GetString(), refs.builder)
 	case idlType.IsIdlTypeOption():
 		// Go doesn't have an `Option` type; use pointer to type instead
-		// this should be automatic in the codec
-		return processFieldType(parentTypeName, idlType.GetIdlTypeOption().Option, refs)
+		inner, err := processFieldType(parentTypeName, idlType.GetIdlTypeOption().Option, refs)
+		return NewOption(inner), err
 	case idlType.IsIdlTypeDefined():
 		return asDefined(parentTypeName, idlType.GetIdlTypeDefined(), refs)
 	case idlType.IsArray():
@@ -350,6 +357,17 @@ func asDefined(parentTypeName string, definedName *IdlTypeDefined, refs *codecRe
 }
 
 func asArray(parentTypeName string, idlArray *IdlTypeArray, refs *codecRefs) (commonencodings.TypeCodec, error) {
+	if idlArray == nil {
+		return nil, fmt.Errorf("%w: field type cannot be nil", commontypes.ErrInvalidConfig)
+	}
+
+	// better to implement bytes to big int codec modifiers, but this works fine
+	if idlArray.Num == 28 && idlArray.Thing.AsString == IdlTypeU8 {
+		// nolint:gosec
+		// G115: integer overflow conversion int -&gt; uint
+		return binary.BigEndian().BigInt(uint(idlArray.Num), false)
+	}
+
 	codec, err := processFieldType(parentTypeName, idlArray.Thing, refs)
 	if err != nil {
 		return nil, err
@@ -419,7 +437,7 @@ func getUIntCodecByStringType(curType IdlTypeAsString, builder commonencodings.B
 	case IdlTypeU64:
 		return builder.Uint64(), nil
 	case IdlTypeU128:
-		return builder.BigInt(16, true)
+		return builder.BigInt(16, false)
 	default:
 		return nil, fmt.Errorf(unknownIDLFormat, commontypes.ErrInvalidConfig, curType)
 	}

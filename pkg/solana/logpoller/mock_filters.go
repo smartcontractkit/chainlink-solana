@@ -190,6 +190,53 @@ func (_c *mockFilters_GetFiltersToBackfill_Call) RunAndReturn(run func() []Filte
 	return _c
 }
 
+// HasFilter provides a mock function with given fields: ctx, name
+func (_m *mockFilters) HasFilter(ctx context.Context, name string) bool {
+	ret := _m.Called(ctx, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for HasFilter")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(context.Context, string) bool); ok {
+		r0 = rf(ctx, name)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// mockFilters_HasFilter_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasFilter'
+type mockFilters_HasFilter_Call struct {
+	*mock.Call
+}
+
+// HasFilter is a helper method to define mock.On call
+//   - ctx context.Context
+//   - name string
+func (_e *mockFilters_Expecter) HasFilter(ctx interface{}, name interface{}) *mockFilters_HasFilter_Call {
+	return &mockFilters_HasFilter_Call{Call: _e.mock.On("HasFilter", ctx, name)}
+}
+
+func (_c *mockFilters_HasFilter_Call) Run(run func(ctx context.Context, name string)) *mockFilters_HasFilter_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *mockFilters_HasFilter_Call) Return(_a0 bool) *mockFilters_HasFilter_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockFilters_HasFilter_Call) RunAndReturn(run func(context.Context, string) bool) *mockFilters_HasFilter_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // IncrementSeqNum provides a mock function with given fields: filterID
 func (_m *mockFilters) IncrementSeqNum(filterID int64) int64 {
 	ret := _m.Called(filterID)
@@ -513,6 +560,39 @@ func (_c *mockFilters_UnregisterFilter_Call) Return(_a0 error) *mockFilters_Unre
 }
 
 func (_c *mockFilters_UnregisterFilter_Call) RunAndReturn(run func(context.Context, string) error) *mockFilters_UnregisterFilter_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateStartingBlocks provides a mock function with given fields: startingBlocks
+func (_m *mockFilters) UpdateStartingBlocks(startingBlocks int64) {
+	_m.Called(startingBlocks)
+}
+
+// mockFilters_UpdateStartingBlocks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateStartingBlocks'
+type mockFilters_UpdateStartingBlocks_Call struct {
+	*mock.Call
+}
+
+// UpdateStartingBlocks is a helper method to define mock.On call
+//   - startingBlocks int64
+func (_e *mockFilters_Expecter) UpdateStartingBlocks(startingBlocks interface{}) *mockFilters_UpdateStartingBlocks_Call {
+	return &mockFilters_UpdateStartingBlocks_Call{Call: _e.mock.On("UpdateStartingBlocks", startingBlocks)}
+}
+
+func (_c *mockFilters_UpdateStartingBlocks_Call) Run(run func(startingBlocks int64)) *mockFilters_UpdateStartingBlocks_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(int64))
+	})
+	return _c
+}
+
+func (_c *mockFilters_UpdateStartingBlocks_Call) Return() *mockFilters_UpdateStartingBlocks_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *mockFilters_UpdateStartingBlocks_Call) RunAndReturn(run func(int64)) *mockFilters_UpdateStartingBlocks_Call {
 	_c.Call.Return(run)
 	return _c
 }

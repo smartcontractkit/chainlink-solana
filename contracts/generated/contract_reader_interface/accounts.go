@@ -13,6 +13,7 @@ type LookupTableDataAccount struct {
 	Administrator        ag_solanago.PublicKey
 	PendingAdministrator ag_solanago.PublicKey
 	LookupTable          ag_solanago.PublicKey
+	Bump                 uint8
 }
 
 var LookupTableDataAccountDiscriminator = [8]byte{220, 119, 44, 40, 237, 41, 223, 7}
@@ -40,6 +41,11 @@ func (obj LookupTableDataAccount) MarshalWithEncoder(encoder *ag_binary.Encoder)
 	}
 	// Serialize `LookupTable` param:
 	err = encoder.Encode(obj.LookupTable)
+	if err != nil {
+		return err
+	}
+	// Serialize `Bump` param:
+	err = encoder.Encode(obj.Bump)
 	if err != nil {
 		return err
 	}
@@ -77,6 +83,11 @@ func (obj *LookupTableDataAccount) UnmarshalWithDecoder(decoder *ag_binary.Decod
 	}
 	// Deserialize `LookupTable`:
 	err = decoder.Decode(&obj.LookupTable)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Bump`:
+	err = decoder.Decode(&obj.Bump)
 	if err != nil {
 		return err
 	}
@@ -152,6 +163,70 @@ func (obj *DataAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 	}
 	// Deserialize `U64Slice`:
 	err = decoder.Decode(&obj.U64Slice)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type TokenAccountData struct {
+	Idx     uint64
+	Bump    uint8
+	Account ag_solanago.PublicKey
+}
+
+var TokenAccountDataDiscriminator = [8]byte{2, 33, 148, 126, 200, 137, 98, 188}
+
+func (obj TokenAccountData) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(TokenAccountDataDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Idx` param:
+	err = encoder.Encode(obj.Idx)
+	if err != nil {
+		return err
+	}
+	// Serialize `Bump` param:
+	err = encoder.Encode(obj.Bump)
+	if err != nil {
+		return err
+	}
+	// Serialize `Account` param:
+	err = encoder.Encode(obj.Account)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *TokenAccountData) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(TokenAccountDataDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[2 33 148 126 200 137 98 188]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Idx`:
+	err = decoder.Decode(&obj.Idx)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Bump`:
+	err = decoder.Decode(&obj.Bump)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Account`:
+	err = decoder.Decode(&obj.Account)
 	if err != nil {
 		return err
 	}
@@ -476,6 +551,187 @@ func (obj *MultiRead2) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	}
 	// Deserialize `W`:
 	err = decoder.Decode(&obj.W)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type MultiRead3 struct {
+	A uint8
+	B int16
+	C bool
+}
+
+var MultiRead3Discriminator = [8]byte{101, 79, 212, 20, 10, 108, 241, 250}
+
+func (obj MultiRead3) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(MultiRead3Discriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `A` param:
+	err = encoder.Encode(obj.A)
+	if err != nil {
+		return err
+	}
+	// Serialize `B` param:
+	err = encoder.Encode(obj.B)
+	if err != nil {
+		return err
+	}
+	// Serialize `C` param:
+	err = encoder.Encode(obj.C)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *MultiRead3) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(MultiRead3Discriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[101 79 212 20 10 108 241 250]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `A`:
+	err = decoder.Decode(&obj.A)
+	if err != nil {
+		return err
+	}
+	// Deserialize `B`:
+	err = decoder.Decode(&obj.B)
+	if err != nil {
+		return err
+	}
+	// Deserialize `C`:
+	err = decoder.Decode(&obj.C)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type MultiRead4 struct {
+	U string
+	V bool
+	W [2]uint64
+}
+
+var MultiRead4Discriminator = [8]byte{86, 64, 108, 8, 241, 67, 105, 242}
+
+func (obj MultiRead4) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(MultiRead4Discriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `U` param:
+	err = encoder.Encode(obj.U)
+	if err != nil {
+		return err
+	}
+	// Serialize `V` param:
+	err = encoder.Encode(obj.V)
+	if err != nil {
+		return err
+	}
+	// Serialize `W` param:
+	err = encoder.Encode(obj.W)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *MultiRead4) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(MultiRead4Discriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[86 64 108 8 241 67 105 242]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `U`:
+	err = decoder.Decode(&obj.U)
+	if err != nil {
+		return err
+	}
+	// Deserialize `V`:
+	err = decoder.Decode(&obj.V)
+	if err != nil {
+		return err
+	}
+	// Deserialize `W`:
+	err = decoder.Decode(&obj.W)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type BillingTokenConfigWrapper struct {
+	Version uint8
+	Config  BillingTokenConfig
+}
+
+var BillingTokenConfigWrapperDiscriminator = [8]byte{63, 178, 72, 57, 171, 66, 44, 151}
+
+func (obj BillingTokenConfigWrapper) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(BillingTokenConfigWrapperDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `Config` param:
+	err = encoder.Encode(obj.Config)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *BillingTokenConfigWrapper) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(BillingTokenConfigWrapperDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[63 178 72 57 171 66 44 151]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Config`:
+	err = decoder.Decode(&obj.Config)
 	if err != nil {
 		return err
 	}

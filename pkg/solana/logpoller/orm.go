@@ -38,6 +38,29 @@ func (o *DSORM) Transact(ctx context.Context, fn func(*DSORM) error) (err error)
 // new returns a NewORM like o, but backed by ds.
 func (o *DSORM) new(ds sqlutil.DataSource) *DSORM { return NewORM(o.chainID, ds, o.lggr) }
 
+func (o *DSORM) HasFilter(ctx context.Context, name string) (bool, error) {
+	args, err := newQueryArgs(o.chainID).withField("name", name).toArgs()
+	if err != nil {
+		return false, err
+	}
+
+	query := `
+		SELECT id FROM solana.log_poller_filters
+			WHERE is_deleted = false AND chain_id = :chain_id AND name = :name LIMIT 1`
+
+	query, sqlArgs, err := o.ds.BindNamed(query, args)
+	if err != nil {
+		return false, err
+	}
+
+	var id int64
+	if err = o.ds.GetContext(ctx, &id, query, sqlArgs...); err != nil {
+		return false, err
+	}
+
+	return id >= 0, nil
+}
+
 // InsertFilter is idempotent.
 //
 // Each address/event pair must have a unique job id, so it may be removed when the job is deleted.
@@ -235,7 +258,25 @@ func (o *DSORM) FilteredLogs(ctx context.Context, filter []query.Expression, lim
 		return nil, err
 	}
 
-	return logs, nil
+	// We want each log returned to have a unique (BlockNumber, LogIndex)
+	// There can be duplicates if more than one filter is tracking the same log events.
+	// Keeping both and deduping here greatly simplifies log pruning & retention management
+	type Key struct {
+		blockNumber int64
+		logIndex    int64
+	}
+
+	seen := make(map[Key]struct{}, len(logs))
+	res := make([]Log, 0, len(logs))
+	for _, log := range logs {
+		key := Key{log.BlockNumber, log.LogIndex}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		res = append(res, log)
+	}
+	return res, nil
 }
 
 func (o *DSORM) GetLatestBlock(ctx context.Context) (int64, error) {

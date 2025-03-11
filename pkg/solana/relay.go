@@ -143,12 +143,7 @@ func (r *Relayer) NewContractWriter(_ context.Context, config []byte) (relaytype
 		return nil, fmt.Errorf("failed to unmarshall chain writer config err: %s", err)
 	}
 
-	solanaReader, err := r.chain.Reader()
-	if err != nil {
-		return nil, fmt.Errorf("failed to init solana reader err: %s", err)
-	}
-
-	return chainwriter.NewSolanaChainWriterService(r.lggr, solanaReader, r.chain.TxManager(), r.chain.FeeEstimator(), cfg)
+	return chainwriter.NewSolanaChainWriterService(r.lggr, *r.chain.MultiClient(), r.chain.TxManager(), r.chain.FeeEstimator(), cfg)
 }
 
 func (r *Relayer) NewContractReader(_ context.Context, chainReaderConfig []byte) (relaytypes.ContractReader, error) {

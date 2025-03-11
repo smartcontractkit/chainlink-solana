@@ -195,7 +195,7 @@ func (txm *Txm) sendWithRetry(ctx context.Context, msg pendingTx) (solanaGo.Tran
 	}
 
 	// Create new transaction in memory
-	if err := txm.txs.New(msg); err != nil {
+	if err := txm.txs.OnBroadcasted(msg); err != nil {
 		cancel()
 		return solanaGo.Transaction{}, "", solanaGo.Signature{}, fmt.Errorf("failed to create new transaction: %w", err)
 	}
@@ -448,7 +448,7 @@ func (txm *Txm) processConfirmations(ctx context.Context, client client.ReaderWr
 
 				// if signature has an error, end polling unless blockhash not found and expiration rebroadcast is enabled
 				if status.Err != nil {
-					txm.handleErrorSignatureStatus(sig, status)
+					txm.handleErrorSignatureStatus(ctx, sig, status)
 					continue
 				}
 
@@ -490,7 +490,7 @@ func (txm *Txm) handleNotFoundSignatureStatus(sig solanaGo.Signature) {
 // handleErrorSignatureStatus handles the case where a transaction signature has an error on-chain.
 // If the error is BlockhashNotFound and expiration rebroadcast is enabled, it skips error handling to allow rebroadcasting.
 // Otherwise, it marks the transaction as errored.
-func (txm *Txm) handleErrorSignatureStatus(sig solanaGo.Signature, status *rpc.SignatureStatusesResult) {
+func (txm *Txm) handleErrorSignatureStatus(ctx context.Context, sig solanaGo.Signature, status *rpc.SignatureStatusesResult) {
 	// We want to rebroadcast rather than drop tx if expiration rebroadcast is enabled when blockhash was not found.
 	// converting error to string so we are able to check if it contains the error message.
 	if status.Err != nil && strings.Contains(fmt.Sprintf("%v", status.Err), "BlockhashNotFound") && txm.cfg.TxExpirationRebroadcast() {
@@ -499,7 +499,7 @@ func (txm *Txm) handleErrorSignatureStatus(sig solanaGo.Signature, status *rpc.S
 
 	// Process error to determine the corresponding state and type.
 	// Skip marking as errored if error considered to not be a failure.
-	if txState, errType := txm.ProcessError(sig, status.Err, false); errType != NoFailure {
+	if txState, errType := txm.ProcessError(ctx, sig, status.Err, false); errType != NoFailure {
 		id, err := txm.txs.OnError(sig, txm.cfg.TxRetentionTimeout(), txState, errType)
 		if err != nil {
 			txm.lggr.Infow(fmt.Sprintf("failed to mark transaction as %s", txState.String()), "id", id, "signature", sig, "error", err)
@@ -516,7 +516,7 @@ func (txm *Txm) handleErrorSignatureStatus(sig solanaGo.Signature, status *rpc.S
 // - Processed -> Not Found
 //
 // When a signature re-org is detected, the following steps are taken:
-// - Remove the prior transaction, along with all associated signatures, and cancel the prior context.
+// - Revert the prior transaction state to AwaitingBroadcast and remove all associated signatures, and cancel the prior context.
 // - Rebroadcast the prior transaction with a new blockhash and an updated compute unit price.
 func (txm *Txm) handleReorg(ctx context.Context, client client.ReaderWriter, sig solanaGo.Signature, status *rpc.SignatureStatusesResult) {
 	// Determine if a re-org has occurred
@@ -528,7 +528,7 @@ func (txm *Txm) handleReorg(ctx context.Context, client client.ReaderWriter, sig
 
 	// At this point, we have detected a re-org. We need to rebroadcast the tx.
 	txm.lggr.Debugw("re-org detected for transaction", "txID", txID, "signature", sig)
-	pTx, err := txm.getPendingTx(txID)
+	pTx, err := txm.txs.GetPendingTx(txID)
 	if err != nil {
 		txm.lggr.Errorw("failed to get pending tx for rebroadcast", "txID", txID, "error", err)
 		return
@@ -668,7 +668,10 @@ func (txm *Txm) simulate() {
 			}
 			// Process error to determine the corresponding state and type.
 			// Certain errors can be considered not to be failures during simulation to allow the process to continue
-			if txState, errType := txm.ProcessError(msg.signatures[0], res.Err, true); errType != NoFailure {
+			if txState, errType := txm.ProcessError(ctx, msg.signatures[0], res.Err, true); errType != NoFailure {
+				if len(res.Logs) > 0 {
+					txm.lggr.Debugw("simulated transaction error logs", "logs", res.Logs)
+				}
 				id, err := txm.txs.OnError(msg.signatures[0], txm.cfg.TxRetentionTimeout(), txState, errType)
 				if err != nil {
 					txm.lggr.Errorw(fmt.Sprintf("failed to mark transaction as %s", txState.String()), "id", id, "err", err)
@@ -717,6 +720,20 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	if tx == nil {
 		return errors.New("error in soltxm.Enqueue: tx is nil pointer")
 	}
+
+	// Use transaction ID provided by caller if set
+	id := uuid.NewString()
+	if txID != nil && *txID != "" {
+		id = *txID
+	}
+
+	_, exists := txm.txs.GetTxState(id)
+	// Transaction for ID already exists. No-op to avoid creating another tx for the same ID.
+	if exists {
+		txm.lggr.Infow("transaction already exists for ID", "id", id)
+		return nil
+	}
+
 	// validate account keys slice
 	if len(tx.Message.AccountKeys) == 0 {
 		return errors.New("error in soltxm.Enqueue: not enough account keys in tx")
@@ -736,18 +753,12 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 		v(&cfg)
 	}
 
-	// Use transaction ID provided by caller if set
-	id := uuid.New().String()
-	if txID != nil && *txID != "" {
-		id = *txID
-	}
-
 	// Perform compute unit limit estimation after storing transaction
 	// If error found during simulation, transaction should be in storage to mark accordingly
 	if cfg.EstimateComputeUnitLimit {
-		computeUnitLimit, err := txm.EstimateComputeUnitLimit(ctx, tx, id)
-		if err != nil {
-			return fmt.Errorf("transaction failed simulation: %w", err)
+		computeUnitLimit, simErr := txm.EstimateComputeUnitLimit(ctx, tx, id)
+		if simErr != nil {
+			return fmt.Errorf("transaction failed simulation: %w", simErr)
 		}
 		// If estimation returns 0 compute unit limit without error, fallback to original config
 		if computeUnitLimit != 0 {
@@ -762,6 +773,14 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 		lastValidBlockHeight: txLastValidBlockHeight,
 	}
 
+	err = txm.txs.New(msg)
+	// No-op if transaction already exists for provided ID
+	if err != nil && errors.Is(err, ErrIDAlreadyExists) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to store new transaction with ID %s: %w", id, err)
+	}
+
 	select {
 	case txm.chSend <- msg:
 	default:
@@ -773,13 +792,13 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 
 // GetTransactionStatus translates internal TXM transaction statuses to chainlink common statuses
 func (txm *Txm) GetTransactionStatus(ctx context.Context, transactionID string) (commontypes.TransactionStatus, error) {
-	state, err := txm.txs.GetTxState(transactionID)
-	if err != nil {
-		return commontypes.Unknown, fmt.Errorf("failed to find transaction with id %s: %w", transactionID, err)
+	state, exists := txm.txs.GetTxState(transactionID)
+	if !exists {
+		return commontypes.Unknown, fmt.Errorf("failed to find transaction with id %s", transactionID)
 	}
 
 	switch state {
-	case txmutils.Broadcasted:
+	case txmutils.AwaitingBroadcast, txmutils.Broadcasted:
 		return commontypes.Pending, nil
 	case txmutils.Processed, txmutils.Confirmed:
 		return commontypes.Unconfirmed, nil
@@ -790,7 +809,7 @@ func (txm *Txm) GetTransactionStatus(ctx context.Context, transactionID string) 
 	case txmutils.FatallyErrored:
 		return commontypes.Fatal, nil
 	default:
-		return commontypes.Unknown, fmt.Errorf("found unknown transaction state: %s", state.String())
+		return commontypes.Unknown, fmt.Errorf("found unknown transaction state for id %s: %s", transactionID, state.String())
 	}
 }
 
@@ -831,7 +850,10 @@ func (txm *Txm) EstimateComputeUnitLimit(ctx context.Context, tx *solanaGo.Trans
 		}
 		// Process error to determine the corresponding state and type.
 		// Certain errors can be considered not to be failures during simulation to allow the process to continue
-		if txState, errType := txm.ProcessError(sig, res.Err, true); errType != NoFailure {
+		if txState, errType := txm.ProcessError(ctx, sig, res.Err, true); errType != NoFailure {
+			if len(res.Logs) > 0 {
+				txm.lggr.Debugw("simulated transaction error logs", "logs", res.Logs)
+			}
 			err := txm.txs.OnPrebroadcastError(id, txm.cfg.TxRetentionTimeout(), txState, errType)
 			if err != nil {
 				return 0, fmt.Errorf("failed to process error %v for tx ID %s: %w", res.Err, id, err)
@@ -875,7 +897,7 @@ func (txm *Txm) simulateTx(ctx context.Context, tx *solanaGo.Transaction) (res *
 }
 
 // ProcessError parses and handles relevant errors found in simulation results
-func (txm *Txm) ProcessError(sig solanaGo.Signature, resErr interface{}, simulation bool) (txState txmutils.TxState, errType TxErrType) {
+func (txm *Txm) ProcessError(ctx context.Context, sig solanaGo.Signature, resErr interface{}, simulation bool) (txState txmutils.TxState, errType TxErrType) {
 	if resErr != nil {
 		// handle various errors
 		// https://github.com/solana-labs/solana/blob/master/sdk/src/transaction/error.rs
@@ -914,6 +936,9 @@ func (txm *Txm) ProcessError(sig solanaGo.Signature, resErr interface{}, simulat
 		// transaction will encounter execution error/revert
 		case strings.Contains(errStr, "InstructionError"):
 			txm.lggr.Debugw("InstructionError", logValues...)
+			if !simulation {
+				txm.fetchTransactionLogs(ctx, sig)
+			}
 			return txmutils.FatallyErrored, errType
 		// transaction contains an invalid account reference
 		case strings.Contains(errStr, "InvalidAccountIndex"):
@@ -965,8 +990,8 @@ func (txm *Txm) InflightTxs() int {
 // Removes all signatures associated with the prior tx, cancels prior ctx, updates compute unit price and sets given blockhash for rebroadcasting.
 // Calls sendWithRetry directly to avoid enqueuing the transaction. It logs the error when rebroadcast fails and returns the new signature when successful.
 func (txm *Txm) rebroadcastWithGivenBlockhash(ctx context.Context, pTx pendingTx, blockhash solana.Hash, lastValidBlockHeight uint64) (solana.Signature, error) {
-	// Remove the previous tx from state
-	_, err := txm.txs.Remove(pTx.id)
+	// Revert tx state back to AwaitingBroadcast
+	err := txm.txs.RevertToAwaitingBroadcast(pTx.id)
 	if err != nil {
 		txm.lggr.Errorw("failed to remove tx", "id", pTx.id, "error", err)
 		return solana.Signature{}, err
@@ -987,6 +1012,24 @@ func (txm *Txm) rebroadcastWithGivenBlockhash(ctx context.Context, pTx pendingTx
 	}
 
 	return newSig, nil
+}
+
+// fetchTransactionLogs will fetch the logs for a transaction for better debugging
+// Do not fail or return error to avoid affecting normal processes just for better debug logs
+func (txm *Txm) fetchTransactionLogs(ctx context.Context, sig solana.Signature) {
+	client, err := txm.client.Get(ctx)
+	if err != nil {
+		txm.lggr.Errorw("failed to get client", "error", err)
+		return
+	}
+	tx, err := client.GetTransaction(ctx, sig)
+	if err != nil {
+		txm.lggr.Debugw("failed to fetch transaction for its logs", "sig", sig)
+		return
+	}
+	if tx.Meta != nil && len(tx.Meta.LogMessages) > 0 {
+		txm.lggr.Debugw("failed transaction logs", "logs", tx.Meta.LogMessages)
+	}
 }
 
 // Close close service
@@ -1011,8 +1054,4 @@ func (txm *Txm) defaultTxConfig() txmutils.TxConfig {
 		ComputeUnitLimit:         txm.cfg.ComputeUnitLimitDefault(),
 		EstimateComputeUnitLimit: txm.cfg.EstimateComputeUnitLimit(),
 	}
-}
-
-func (txm *Txm) getPendingTx(txID string) (pendingTx, error) {
-	return txm.txs.GetPendingTx(txID)
 }

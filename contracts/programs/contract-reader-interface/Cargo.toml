@@ -18,4 +18,5 @@ default = []
 [dependencies]
 solana-program = "1.17.25" # pin solana to 1.17
 anchor-lang = { version = "0.29.0", features = ["init-if-needed"] }
+anchor-spl = "0.29.0"
 bytemuck = "1.7"

@@ -23,6 +23,7 @@ type TxState int
 const (
 	NotFound TxState = iota
 	Errored
+	AwaitingBroadcast
 	Broadcasted
 	Processed
 	Confirmed
@@ -36,6 +37,8 @@ func (s TxState) String() string {
 		return "NotFound"
 	case Errored:
 		return "Errored"
+	case AwaitingBroadcast:
+		return "AwaitingBroadcast"
 	case Broadcasted:
 		return "Broadcasted"
 	case Processed:

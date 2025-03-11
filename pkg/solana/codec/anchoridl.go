@@ -165,8 +165,8 @@ type PDATypeDef struct {
 }
 
 type PDASeed struct {
-	Name string          `json:"name"`
-	Type IdlTypeAsString `json:"type"`
+	Name string  `json:"name"`
+	Type IdlType `json:"type"`
 }
 
 type IdlTypeAsString string
@@ -247,7 +247,7 @@ func (env *IdlType) UnmarshalJSON(data []byte) error {
 
 	switch v := temp.(type) {
 	case string:
-		env.asString = IdlTypeAsString(v)
+		env.AsString = IdlTypeAsString(v)
 	case map[string]interface{}:
 		if len(v) == 0 {
 			return nil
@@ -258,7 +258,7 @@ func (env *IdlType) UnmarshalJSON(data []byte) error {
 			if err := utilz.TranscodeJSON(temp, &target); err != nil {
 				return err
 			}
-			env.asIdlTypeVec = &target
+			env.AsIdlTypeVec = &target
 		}
 		if _, ok := v["option"]; ok {
 			var target IdlTypeOption
@@ -272,7 +272,7 @@ func (env *IdlType) UnmarshalJSON(data []byte) error {
 			if err := utilz.TranscodeJSON(temp, &target); err != nil {
 				return err
 			}
-			env.asIdlTypeDefined = &target
+			env.AsIdlTypeDefined = &target
 		}
 		if got, ok := v["array"]; ok {
 			if _, ok := got.([]interface{}); !ok {
@@ -289,7 +289,7 @@ func (env *IdlType) UnmarshalJSON(data []byte) error {
 
 			target.Num = int(arrVal[1].(float64))
 
-			env.asIdlTypeArray = &target
+			env.AsIdlTypeArray = &target
 		}
 	default:
 		return fmt.Errorf("Unknown kind: %s", spew.Sdump(temp))
@@ -300,50 +300,50 @@ func (env *IdlType) UnmarshalJSON(data []byte) error {
 
 // Wrapper type:
 type IdlType struct {
-	asString         IdlTypeAsString
-	asIdlTypeVec     *IdlTypeVec
+	AsString         IdlTypeAsString
+	AsIdlTypeVec     *IdlTypeVec
 	asIdlTypeOption  *IdlTypeOption
-	asIdlTypeDefined *IdlTypeDefined
-	asIdlTypeArray   *IdlTypeArray
+	AsIdlTypeDefined *IdlTypeDefined
+	AsIdlTypeArray   *IdlTypeArray
 }
 
 func NewIdlStringType(asString IdlTypeAsString) IdlType {
 	return IdlType{
-		asString: asString,
+		AsString: asString,
 	}
 }
 
 func (env *IdlType) IsString() bool {
-	return env.asString != ""
+	return env.AsString != ""
 }
 func (env *IdlType) IsIdlTypeVec() bool {
-	return env.asIdlTypeVec != nil
+	return env.AsIdlTypeVec != nil
 }
 func (env *IdlType) IsIdlTypeOption() bool {
 	return env.asIdlTypeOption != nil
 }
 func (env *IdlType) IsIdlTypeDefined() bool {
-	return env.asIdlTypeDefined != nil
+	return env.AsIdlTypeDefined != nil
 }
 func (env *IdlType) IsArray() bool {
-	return env.asIdlTypeArray != nil
+	return env.AsIdlTypeArray != nil
 }
 
 // Getters:
 func (env *IdlType) GetString() IdlTypeAsString {
-	return env.asString
+	return env.AsString
 }
 func (env *IdlType) GetIdlTypeVec() *IdlTypeVec {
-	return env.asIdlTypeVec
+	return env.AsIdlTypeVec
 }
 func (env *IdlType) GetIdlTypeOption() *IdlTypeOption {
 	return env.asIdlTypeOption
 }
 func (env *IdlType) GetIdlTypeDefined() *IdlTypeDefined {
-	return env.asIdlTypeDefined
+	return env.AsIdlTypeDefined
 }
 func (env *IdlType) GetArray() *IdlTypeArray {
-	return env.asIdlTypeArray
+	return env.AsIdlTypeArray
 }
 
 type IdlTypeDef struct {
@@ -356,6 +356,7 @@ type IdlTypeDefTyKind string
 const (
 	IdlTypeDefTyKindStruct IdlTypeDefTyKind = "struct"
 	IdlTypeDefTyKindEnum   IdlTypeDefTyKind = "enum"
+	IdlTypeDefTyKindCustom IdlTypeDefTyKind = "custom"
 )
 
 type IdlTypeDefTyStruct struct {
@@ -380,6 +381,7 @@ type IdlTypeDefTy struct {
 
 	Fields   *IdlTypeDefStruct   `json:"fields,omitempty"`
 	Variants IdlEnumVariantSlice `json:"variants,omitempty"`
+	Codec    string              `json:"codec,omitempty"`
 }
 
 type IdlEnumVariantSlice []IdlEnumVariant

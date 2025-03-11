@@ -38,7 +38,9 @@ import (
 
 type LogPoller interface {
 	Start(context.Context) error
+	Ready() error
 	Close() error
+	HasFilter(context.Context, string) bool
 	RegisterFilter(ctx context.Context, filter logpoller.Filter) error
 	UnregisterFilter(ctx context.Context, name string) error
 	FilteredLogs(context.Context, []query.Expression, query.LimitAndSort, string) ([]logpoller.Log, error)
@@ -54,6 +56,7 @@ type Chain interface {
 	FeeEstimator() fees.Estimator
 	// Reader returns a new Reader from the available list of nodes (if there are multiple, it will randomly select one)
 	Reader() (client.Reader, error)
+	MultiClient() *client.MultiClient
 }
 
 // DefaultRequestTimeout is the default Solana client timeout.
@@ -437,6 +440,10 @@ func (c *chain) Reader() (client.Reader, error) {
 	return c.getClient(ctx)
 }
 
+func (c *chain) MultiClient() *client.MultiClient {
+	return c.multiClient
+}
+
 func (c *chain) ChainID() string {
 	return c.id
 }
@@ -546,6 +553,9 @@ func (c *chain) Close() error {
 		if c.cfg.MultiNode.Enabled() {
 			c.lggr.Debug("Stopping multinode")
 			closeAll = append(closeAll, c.multiNode, c.txSender)
+		}
+		if c.lp.Ready() == nil {
+			c.lp.Close()
 		}
 		return services.CloseAll(closeAll...)
 	})
