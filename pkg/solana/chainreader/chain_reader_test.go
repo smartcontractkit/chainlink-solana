@@ -681,7 +681,7 @@ type mockedMultipleAccountGetter struct {
 }
 
 func (_m *mockedMultipleAccountGetter) GetMultipleAccountData(_ context.Context, keys ...solana.PublicKey) ([]*rpc.Account, error) {
-	var result []*rpc.Account
+	result := make([]*rpc.Account, len(keys))
 
 	for idx, key := range keys {
 		call, ok := _m.responseByAddress[key.String()]
