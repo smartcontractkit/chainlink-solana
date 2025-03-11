@@ -758,9 +758,11 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 	offrampAddr := chainwriter.GetRandomPubKey(t)
 	routerAddr := chainwriter.GetRandomPubKey(t)
 	destTokenAddr := chainwriter.GetRandomPubKey(t)
+	feeQuoterAddr := chainwriter.GetRandomPubKey(t)
 
 	poolKeys := []solana.PublicKey{destTokenAddr}
-	poolKeys = append(poolKeys, chainwriter.CreateTestPubKeys(t, 3)...)
+	poolKeys = append(poolKeys, chainwriter.CreateTestPubKeys(t, 6)...)
+	tokenAdminRegistryAddr := poolKeys[1]
 
 	// simplified CCIP Config - does not contain full account list
 	ccipCWConfig := chainwriter.ChainWriterConfig{
@@ -834,22 +836,6 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 								Name:    "testAcc3",
 								Address: chainwriter.GetRandomPubKey(t).String(),
 							}},
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "poolAddr1",
-								Address: poolKeys[0].String(),
-							}},
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "poolAddr2",
-								Address: poolKeys[1].String(),
-							}},
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "poolAddr3",
-								Address: poolKeys[2].String(),
-							}},
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "poolAddr4",
-								Address: poolKeys[3].String(),
-							}},
 						},
 					},
 					ccipconsts.MethodCommit: {
@@ -911,7 +897,9 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 		lookupTable := mockTokenAdminRegistryLookupTable(t, rw, pda)
 
 		mockFetchRouterAddress(t, rw, routerAddr, offrampAddr)
+		mockFetchFeeQuoterAddress(t, rw, feeQuoterAddr, offrampAddr)
 		mockFetchLookupTableAddresses(t, rw, lookupTable, poolKeys)
+		mockWritableIndexes(t, rw, tokenAdminRegistryAddr)
 
 		txID := uuid.NewString()
 		txm.On("Enqueue", mock.Anything, admin.String(), mock.MatchedBy(func(tx *solana.Transaction) bool {
@@ -933,6 +921,8 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 		abstractReport := ccipocr3.ExecutePluginReportSingleChain{
 			Messages: []ccipocr3.Message{
 				{
+					Receiver: chainwriter.GetRandomPubKey(t).Bytes(),
+					Header:   ccipocr3.RampMessageHeader{SourceChainSelector: ccipocr3.ChainSelector(1)},
 					TokenAmounts: []ccipocr3.RampTokenAmount{
 						{
 							DestTokenAddress: destTokenAddr.Bytes(),

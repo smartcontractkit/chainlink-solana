@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-solana/integration-tests
 
-go 1.24
+go 1.24.0
 
 replace github.com/smartcontractkit/chainlink-solana => ../
 
@@ -14,7 +14,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/rs/zerolog v1.33.0
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250212131315-e9b53b05b02a
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250228161950-00fcf87f3fcc
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250210201649-d9b9b053905e
 	github.com/smartcontractkit/chainlink-common v0.4.2-0.20250224210553-dc2073fe0d21
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250213035259-e727e73f6181
