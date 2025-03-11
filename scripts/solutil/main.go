@@ -17,7 +17,7 @@ func main() {
 		Description: "A collection of helper commands for Solana",
 		Commands: []*cli.Command{
 			{
-				Name:  "private-key",
+				Name:  "print-private-key",
 				Flags: []cli.Flag{&cli.StringFlag{Name: "path", Aliases: []string{"p"}, Required: false}},
 				Action: func(ctx *cli.Context) error {
 					keypairPath := ctx.String("path")
@@ -25,12 +25,16 @@ func main() {
 						keypairPath = filepath.Join(os.Getenv("HOME"), ".config", "solana", "id.json")
 					}
 
-					privKey, err := solana.PrivateKeyFromSolanaKeygenFile(keypairPath)
-					if err != nil {
+					if _, err := os.Stat(keypairPath); err != nil {
 						return cli.Exit(err, 1)
 					}
 
-					fmt.Fprint(ctx.App.Writer, privKey.String())
+					if privKey, err := solana.PrivateKeyFromSolanaKeygenFile(keypairPath); err != nil {
+						return cli.Exit(err, 1)
+					} else {
+						fmt.Fprint(ctx.App.Writer, privKey.String())
+					}
+
 					return nil
 				},
 			},
