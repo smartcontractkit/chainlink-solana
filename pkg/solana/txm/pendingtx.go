@@ -707,6 +707,7 @@ const (
 	TxFailDrop
 	TxFailSimRevert
 	TxFailSimOther
+	TxDependencyFail
 )
 
 func newPendingTxContextWithProm(id string) *pendingTxContextWithProm {

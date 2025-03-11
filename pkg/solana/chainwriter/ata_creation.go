@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -14,7 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 )
@@ -100,17 +98,17 @@ func CreateATAs(ctx context.Context, args any, lookups []ATALookup, derivedTable
 	return createATAInstructions, nil
 }
 
-func (s *SolanaChainWriterService) handleATACreation(ctx context.Context, createATAinstructions []solana.Instruction, methodConfig MethodConfig, contractName, method string, feePayer solana.PublicKey) error {
+func (s *SolanaChainWriterService) handleATACreation(ctx context.Context, createATAinstructions []solana.Instruction, methodConfig MethodConfig, contractName, method string, feePayer solana.PublicKey) (string, error) {
 	if len(createATAinstructions) == 0 {
-		return nil
+		return "", nil
 	}
 	blockhash, err := s.client.LatestBlockhash(ctx)
 	if err != nil {
-		return fmt.Errorf("error fetching latest blockhash: %w", err)
+		return "", fmt.Errorf("error fetching latest blockhash: %w", err)
 	}
 
 	if len(createATAinstructions) > maxAtas {
-		return fmt.Errorf("too many ATAs to create: %d, max allowed: %d", len(createATAinstructions), maxAtas)
+		return "", fmt.Errorf("too many ATAs to create: %d, max allowed: %d", len(createATAinstructions), maxAtas)
 	}
 	ataTx, ataErr := solana.NewTransaction(
 		createATAinstructions,
@@ -118,7 +116,7 @@ func (s *SolanaChainWriterService) handleATACreation(ctx context.Context, create
 		solana.TransactionPayer(feePayer),
 	)
 	if ataErr != nil {
-		return fmt.Errorf("error constructing ATA transaction: %w", err)
+		return "", fmt.Errorf("error constructing ATA transaction: %w", err)
 	}
 	ataUUID := fmt.Sprintf("ATA-%s", uuid.NewString())
 
@@ -126,50 +124,8 @@ func (s *SolanaChainWriterService) handleATACreation(ctx context.Context, create
 
 	// Enqueue ATA transaction
 	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, ataTx, &ataUUID, blockhash.Value.LastValidBlockHeight); err != nil {
-		return fmt.Errorf("error enqueuing transaction: %w", err)
+		return "", fmt.Errorf("error enqueuing transaction: %w", err)
 	}
 
-	// Wait for ATA transaction to be confirmed (common Unconfirmed maps to Confirmed on Solana)
-	err = s.waitForTxStatus(ctx, ataUUID, types.Unconfirmed)
-	if err != nil {
-		return fmt.Errorf("error waiting for ATA transaction finality: %w", err)
-	}
-	return nil
-}
-
-func (s *SolanaChainWriterService) waitForTxStatus(ctx context.Context, transactionID string, desiredStatus types.TransactionStatus) error {
-	waitCtx, cancel := context.WithTimeout(ctx, s.config.TxStatusTimeout.Duration())
-	defer cancel()
-
-	backoff := 1 * time.Second
-	maxBackoff := 8 * time.Second
-
-	for {
-		select {
-		case <-waitCtx.Done():
-			return fmt.Errorf("context ended while waiting for finality of transaction %s", transactionID)
-		case <-time.After(backoff):
-			status, err := s.txm.GetTransactionStatus(waitCtx, transactionID)
-			if err != nil {
-				return fmt.Errorf("error fetching transaction status: %w", err)
-			}
-			switch status {
-			case types.Finalized, types.Unconfirmed, types.Pending:
-				if status >= desiredStatus {
-					// if status is equal to or greater than desired status, return
-					s.lggr.Debugw("ATA transaction reached state", "status", status, "transactionID", transactionID)
-					return nil
-				}
-				// otherwise keep polling
-			case types.Failed, types.Fatal:
-				return fmt.Errorf("transaction %s failed", transactionID)
-			default:
-				// Keep polling
-			}
-		}
-		backoff *= 2
-		if backoff > maxBackoff {
-			backoff = maxBackoff
-		}
-	}
+	return ataUUID, nil
 }
