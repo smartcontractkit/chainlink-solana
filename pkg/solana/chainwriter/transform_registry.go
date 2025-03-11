@@ -101,11 +101,11 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 func CCIPCommitAccountTransform(ctx context.Context, client client.MultiClient, args any, accounts solana.AccountMetaSlice, _ map[string]map[string][]*solana.AccountMeta) (any, solana.AccountMetaSlice, error) {
 	var tokenPriceVals, gasPriceVals [][]byte
 	var err error
-	tokenPriceVals, err = GetValuesAtLocation(args, "Info.TokenPrices.TokenID")
+	tokenPriceVals, err = GetValuesAtLocation(args, "Info.TokenPriceUpdates.TokenID")
 	if err != nil && !errors.Is(err, errFieldNotFound) {
 		return nil, nil, fmt.Errorf("error getting values at location: %w", err)
 	}
-	gasPriceVals, err = GetValuesAtLocation(args, "Info.GasPrices.ChainSel")
+	gasPriceVals, err = GetValuesAtLocation(args, "Info.GasPriceUpdates.ChainSel")
 	if err != nil && !errors.Is(err, errFieldNotFound) {
 		return nil, nil, fmt.Errorf("error getting values at location: %w", err)
 	}
