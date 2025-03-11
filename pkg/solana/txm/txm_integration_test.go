@@ -255,7 +255,7 @@ func TestTxm_Integration_Reorg(t *testing.T) {
 				return false
 			}
 			if status == types.Unconfirmed {
-				pTx, errPtx := txmInstance.getPendingTx(txID)
+				pTx, errPtx := txmInstance.txs.GetPendingTx(txID)
 				if errPtx != nil || len(pTx.signatures) == 0 {
 					return false
 				}

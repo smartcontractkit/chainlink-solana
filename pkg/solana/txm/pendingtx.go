@@ -3,7 +3,6 @@ package txm
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
-	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
 var (
@@ -23,13 +21,13 @@ var (
 )
 
 type PendingTxContext interface {
-	// New adds a new transaction in Broadcasted state to the storage
+	// New adds a new transaction in AwaitingBroadcast state to the storage
 	New(msg pendingTx) error
 	// AddSignature adds a new signature to a broadcasted transaction in the pending transaction context.
 	// It associates the provided context and cancel function with the signature to manage retry and bumping cycles.
 	AddSignature(cancel context.CancelFunc, id string, sig solana.Signature) error
-	// Remove removes transaction, context and related signatures from storage associated to given tx id if not in finalized or errored state
-	Remove(id string) (string, error)
+	// RevertToAwaitingBroadcast reverts the transaction's status to AwaitingBroadcast. It also removes context and related signatures from storage associated to given tx id if not in finalized or errored state
+	RevertToAwaitingBroadcast(id string) error
 	// ListAllSigs returns all of the signatures being tracked for all transactions not yet finalized or errored
 	ListAllSigs() []solana.Signature
 	// ListAllExpiredBroadcastedTxs returns all the txes that are in broadcasted state and have expired for given block number compared against lastValidBlockHeight (last valid block number)
@@ -37,6 +35,8 @@ type PendingTxContext interface {
 	ListAllExpiredBroadcastedTxs(currBlockNumber uint64) []pendingTx
 	// Expired returns whether or not confirmation timeout amount of time has passed since creation
 	Expired(sig solana.Signature, confirmationTimeout time.Duration) bool
+	// OnBroadcasted marks transaction as Broadcasted and moves it from the pending map to the broadcast map
+	OnBroadcasted(msg pendingTx) error
 	// OnProcessed marks transactions as Processed
 	OnProcessed(sig solana.Signature) (string, error)
 	// OnConfirmed marks transaction as Confirmed and moves it from broadcast map to confirmed map
@@ -48,7 +48,7 @@ type PendingTxContext interface {
 	// OnError marks transaction as errored, matches err type using enum, moves it from the broadcasted or confirmed map to finalized/errored map, removes signatures from signature map to stop confirmation checks
 	OnError(sig solana.Signature, retentionTimeout time.Duration, txState utils.TxState, errType TxErrType) (string, error)
 	// GetTxState returns the transaction state for the provided ID if it exists
-	GetTxState(id string) (utils.TxState, error)
+	GetTxState(id string) (utils.TxState, bool)
 	// TrimFinalizedErroredTxs removes transactions that have reached their retention time
 	TrimFinalizedErroredTxs() int
 	// IsTxReorged determines whether the given signature has experienced a re-org by comparing its in-memory state with its current on-chain state.
@@ -56,7 +56,7 @@ type PendingTxContext interface {
 	// 	- Confirmed -> Processed || Broadcasted || Not Found
 	// 	- Processed -> Broadcasted || Not Found
 	// The function returns the transaction ID associated with the signature and a boolean indicating whether a re-org has occurred.
-	IsTxReorged(sig solana.Signature, currentState txmutils.TxState) (string, bool)
+	IsTxReorged(sig solana.Signature, currentState utils.TxState) (string, bool)
 	// GetPendingTx returns the pendingTx for the given ID if it exists
 	GetPendingTx(id string) (pendingTx, error)
 }
@@ -64,25 +64,25 @@ type PendingTxContext interface {
 // finishedTx is used to store info required to track transactions to finality or error
 type pendingTx struct {
 	tx                   solana.Transaction
-	cfg                  txmutils.TxConfig
+	cfg                  utils.TxConfig
 	signatures           []solana.Signature
 	id                   string
 	createTs             time.Time
-	state                txmutils.TxState
+	state                utils.TxState
 	lastValidBlockHeight uint64 // to track expiration, equivalent to last valid block number.
 }
 
 // finishedTx is used to store minimal info specifically for finalized or errored transactions for external status checks
 type finishedTx struct {
 	retentionTs time.Time
-	state       txmutils.TxState
+	state       utils.TxState
 }
 
 type txInfo struct {
 	// id of the transaction
 	id string
 	// state of the signature
-	state txmutils.TxState
+	state utils.TxState
 }
 
 var _ PendingTxContext = &pendingTxContext{}
@@ -91,6 +91,7 @@ type pendingTxContext struct {
 	cancelBy    map[string]context.CancelFunc
 	sigToTxInfo map[solana.Signature]txInfo
 
+	queuedTxs               map[string]pendingTx  // pending transactions awaiting broadcast
 	broadcastedProcessedTxs map[string]pendingTx  // broadcasted and processed transactions that may require retry and bumping
 	confirmedTxs            map[string]pendingTx  // transactions that require monitoring for re-org
 	finalizedErroredTxs     map[string]finishedTx // finalized and errored transactions held onto for status
@@ -103,6 +104,7 @@ func newPendingTxContext() *pendingTxContext {
 		cancelBy:    map[string]context.CancelFunc{},
 		sigToTxInfo: map[solana.Signature]txInfo{},
 
+		queuedTxs:               map[string]pendingTx{},
 		broadcastedProcessedTxs: map[string]pendingTx{},
 		confirmedTxs:            map[string]pendingTx{},
 		finalizedErroredTxs:     map[string]finishedTx{},
@@ -112,6 +114,9 @@ func newPendingTxContext() *pendingTxContext {
 func (c *pendingTxContext) New(tx pendingTx) error {
 	err := c.withReadLock(func() error {
 		// Check if ID already exists in any of the maps
+		if _, exists := c.queuedTxs[tx.id]; exists {
+			return ErrIDAlreadyExists
+		}
 		if _, exists := c.broadcastedProcessedTxs[tx.id]; exists {
 			return ErrIDAlreadyExists
 		}
@@ -130,6 +135,9 @@ func (c *pendingTxContext) New(tx pendingTx) error {
 	// upgrade to write lock if id does not exist
 	_, err = c.withWriteLock(func() (string, error) {
 		// Check if ID already exists in any of the maps
+		if _, exists := c.queuedTxs[tx.id]; exists {
+			return "", ErrIDAlreadyExists
+		}
 		if _, exists := c.broadcastedProcessedTxs[tx.id]; exists {
 			return "", ErrIDAlreadyExists
 		}
@@ -139,11 +147,46 @@ func (c *pendingTxContext) New(tx pendingTx) error {
 		if _, exists := c.finalizedErroredTxs[tx.id]; exists {
 			return "", ErrIDAlreadyExists
 		}
-		tx.signatures = []solana.Signature{}
 		tx.createTs = time.Now()
+		tx.state = utils.AwaitingBroadcast
+		// save to the pending map
+		c.queuedTxs[tx.id] = tx
+		return "", nil
+	})
+	return err
+}
+
+func (c *pendingTxContext) OnBroadcasted(tx pendingTx) error {
+	err := c.withReadLock(func() error {
+		// Check if transaction already in broadcasted state
+		if tempTx, exists := c.broadcastedProcessedTxs[tx.id]; exists && tempTx.state == utils.Broadcasted {
+			return ErrAlreadyInExpectedState
+		}
+		// Transactions should only move to pending from broadcasted
+		_, exists := c.queuedTxs[tx.id]
+		if !exists {
+			return ErrTransactionNotFound
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// upgrade to write lock if id does not exist
+	_, err = c.withWriteLock(func() (string, error) {
+		// Check if pending map has tx
+		pendingMsg, exists := c.queuedTxs[tx.id]
+		if !exists {
+			return tx.id, ErrTransactionNotFound
+		}
+		tx.signatures = []solana.Signature{}
+		tx.createTs = pendingMsg.createTs
 		tx.state = utils.Broadcasted
-		// save to the broadcasted map since transaction was just broadcasted
+		// save transaction to broadcasted map
 		c.broadcastedProcessedTxs[tx.id] = tx
+		// remove tx from pending map
+		delete(c.queuedTxs, tx.id)
 		return "", nil
 	})
 	return err
@@ -174,7 +217,7 @@ func (c *pendingTxContext) AddSignature(cancel context.CancelFunc, id string, si
 		if _, exists := c.broadcastedProcessedTxs[id]; !exists {
 			return "", ErrTransactionNotFound
 		}
-		c.sigToTxInfo[sig] = txInfo{id: id, state: txmutils.Broadcasted}
+		c.sigToTxInfo[sig] = txInfo{id: id, state: utils.Broadcasted}
 		tx := c.broadcastedProcessedTxs[id]
 		// save new signature
 		tx.signatures = append(tx.signatures, sig)
@@ -193,8 +236,13 @@ func (c *pendingTxContext) AddSignature(cancel context.CancelFunc, id string, si
 
 // returns the id if removed (otherwise returns empty string)
 // removes transactions from any state except finalized and errored
-func (c *pendingTxContext) Remove(id string) (string, error) {
+func (c *pendingTxContext) RevertToAwaitingBroadcast(id string) error {
 	err := c.withReadLock(func() error {
+		// check if transaction already in the expected state
+		if tx, pendingExists := c.queuedTxs[id]; pendingExists && tx.state == utils.AwaitingBroadcast {
+			return ErrAlreadyInExpectedState
+		}
+		// transaction should only revert to pending from broadcasted, processed, or confirmed state
 		_, broadcastedIDExists := c.broadcastedProcessedTxs[id]
 		_, confirmedIDExists := c.confirmedTxs[id]
 		// transaction does not exist in tx maps
@@ -204,11 +252,11 @@ func (c *pendingTxContext) Remove(id string) (string, error) {
 		return nil
 	})
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	// upgrade to write lock if sig does not exist
-	return c.withWriteLock(func() (string, error) {
+	_, err = c.withWriteLock(func() (string, error) {
 		var tx pendingTx
 		if tempTx, exists := c.broadcastedProcessedTxs[id]; exists {
 			tx = tempTx
@@ -229,8 +277,11 @@ func (c *pendingTxContext) Remove(id string) (string, error) {
 		for _, s := range tx.signatures {
 			delete(c.sigToTxInfo, s)
 		}
+		tx.state = utils.AwaitingBroadcast
+		c.queuedTxs[id] = tx
 		return id, nil
 	})
+	return err
 }
 
 func (c *pendingTxContext) ListAllSigs() []solana.Signature {
@@ -246,7 +297,7 @@ func (c *pendingTxContext) ListAllExpiredBroadcastedTxs(currBlockNumber uint64) 
 	defer c.lock.RUnlock()
 	expiredBroadcastedTxs := make([]pendingTx, 0, len(c.broadcastedProcessedTxs)) // worst case, all of them
 	for _, tx := range c.broadcastedProcessedTxs {
-		if tx.state == txmutils.Broadcasted && tx.lastValidBlockHeight < currBlockNumber {
+		if tx.state == utils.Broadcasted && tx.lastValidBlockHeight < currBlockNumber {
 			expiredBroadcastedTxs = append(expiredBroadcastedTxs, tx)
 		}
 	}
@@ -307,7 +358,7 @@ func (c *pendingTxContext) OnProcessed(sig solana.Signature) (string, error) {
 			return info.id, ErrTransactionNotFound
 		}
 		// update sig and tx to Processed
-		info.state, tx.state = txmutils.Processed, txmutils.Processed
+		info.state, tx.state = utils.Processed, utils.Processed
 		// save updated sig and tx back to the maps
 		c.sigToTxInfo[sig] = info
 		c.broadcastedProcessedTxs[info.id] = tx
@@ -323,7 +374,7 @@ func (c *pendingTxContext) OnConfirmed(sig solana.Signature) (string, error) {
 			return ErrSigDoesNotExist
 		}
 		// Check if transaction already in confirmed state
-		if tx, exists := c.confirmedTxs[info.id]; exists && tx.state == txmutils.Confirmed {
+		if tx, exists := c.confirmedTxs[info.id]; exists && tx.state == utils.Confirmed {
 			return ErrAlreadyInExpectedState
 		}
 		// Transactions should only move to confirmed from broadcasted/processed
@@ -352,7 +403,7 @@ func (c *pendingTxContext) OnConfirmed(sig solana.Signature) (string, error) {
 			delete(c.cancelBy, info.id)
 		}
 		// update sig and tx state to Confirmed
-		info.state, tx.state = txmutils.Confirmed, txmutils.Confirmed
+		info.state, tx.state = utils.Confirmed, utils.Confirmed
 		c.sigToTxInfo[sig] = info
 		// move tx to confirmed map
 		c.confirmedTxs[info.id] = tx
@@ -427,14 +478,12 @@ func (c *pendingTxContext) OnFinalized(sig solana.Signature, retentionTimeout ti
 }
 
 func (c *pendingTxContext) OnPrebroadcastError(id string, retentionTimeout time.Duration, txState utils.TxState, _ TxErrType) error {
-	// nothing to do if retention timeout is 0 since transaction is not stored yet.
-	if retentionTimeout == 0 {
-		return nil
-	}
 	err := c.withReadLock(func() error {
+		// check if transaction already in the expected state
 		if tx, exists := c.finalizedErroredTxs[id]; exists && tx.state == txState {
 			return ErrAlreadyInExpectedState
 		}
+		// check if transaction in higher state than pending, implying that the transaction has progressed past pre-broadcast errors
 		_, broadcastedExists := c.broadcastedProcessedTxs[id]
 		_, confirmedExists := c.confirmedTxs[id]
 		if broadcastedExists || confirmedExists {
@@ -456,6 +505,11 @@ func (c *pendingTxContext) OnPrebroadcastError(id string, retentionTimeout time.
 		_, confirmedExists := c.confirmedTxs[id]
 		if broadcastedExists || confirmedExists {
 			return "", ErrIDAlreadyExists
+		}
+		delete(c.queuedTxs, id)
+		// If retention timeout set to 0, skip adding it to the errored map
+		if retentionTimeout == 0 {
+			return "", nil
 		}
 		erroredTx := finishedTx{
 			state:       txState,
@@ -533,19 +587,22 @@ func (c *pendingTxContext) OnError(sig solana.Signature, retentionTimeout time.D
 	})
 }
 
-func (c *pendingTxContext) GetTxState(id string) (utils.TxState, error) {
+func (c *pendingTxContext) GetTxState(id string) (utils.TxState, bool) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
+	if tx, exists := c.queuedTxs[id]; exists {
+		return tx.state, true
+	}
 	if tx, exists := c.broadcastedProcessedTxs[id]; exists {
-		return tx.state, nil
+		return tx.state, true
 	}
 	if tx, exists := c.confirmedTxs[id]; exists {
-		return tx.state, nil
+		return tx.state, true
 	}
 	if tx, exists := c.finalizedErroredTxs[id]; exists {
-		return tx.state, nil
+		return tx.state, true
 	}
-	return utils.NotFound, fmt.Errorf("failed to find transaction for id: %s", id)
+	return utils.NotFound, false
 }
 
 // TrimFinalizedErroredTxs deletes transactions from the finalized/errored map and the allTxs map after the retention period has passed
@@ -576,7 +633,7 @@ func (c *pendingTxContext) TrimFinalizedErroredTxs() int {
 	return len(expiredIDs)
 }
 
-func (c *pendingTxContext) IsTxReorged(sig solana.Signature, sigOnChainState txmutils.TxState) (string, bool) {
+func (c *pendingTxContext) IsTxReorged(sig solana.Signature, sigOnChainState utils.TxState) (string, bool) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -590,12 +647,12 @@ func (c *pendingTxContext) IsTxReorged(sig solana.Signature, sigOnChainState txm
 	sigInMemoryState := txInfo.state
 	var hasReorg bool
 	switch sigInMemoryState {
-	case txmutils.Confirmed:
-		if sigOnChainState == txmutils.Processed || sigOnChainState == txmutils.Broadcasted || sigOnChainState == txmutils.NotFound {
+	case utils.Confirmed:
+		if sigOnChainState == utils.Processed || sigOnChainState == utils.Broadcasted || sigOnChainState == utils.NotFound {
 			hasReorg = true
 		}
-	case txmutils.Processed:
-		if sigOnChainState == txmutils.Broadcasted || sigOnChainState == txmutils.NotFound {
+	case utils.Processed:
+		if sigOnChainState == utils.Broadcasted || sigOnChainState == utils.NotFound {
 			hasReorg = true
 		}
 	default: // No reorg if the signature is not in a state that can be reorged
@@ -663,6 +720,10 @@ func (c *pendingTxContextWithProm) New(msg pendingTx) error {
 	return c.pendingTx.New(msg)
 }
 
+func (c *pendingTxContextWithProm) OnBroadcasted(msg pendingTx) error {
+	return c.pendingTx.OnBroadcasted(msg)
+}
+
 func (c *pendingTxContextWithProm) AddSignature(cancel context.CancelFunc, id string, sig solana.Signature) error {
 	return c.pendingTx.AddSignature(cancel, id, sig)
 }
@@ -679,8 +740,8 @@ func (c *pendingTxContextWithProm) OnConfirmed(sig solana.Signature) (string, er
 	return id, err
 }
 
-func (c *pendingTxContextWithProm) Remove(id string) (string, error) {
-	return c.pendingTx.Remove(id)
+func (c *pendingTxContextWithProm) RevertToAwaitingBroadcast(id string) error {
+	return c.pendingTx.RevertToAwaitingBroadcast(id)
 }
 
 func (c *pendingTxContextWithProm) ListAllSigs() []solana.Signature {
@@ -741,7 +802,7 @@ func incrementErrorMetrics(errType TxErrType, chainID string) {
 	promSolTxmErrorTxs.WithLabelValues(chainID).Inc()
 }
 
-func (c *pendingTxContextWithProm) GetTxState(id string) (utils.TxState, error) {
+func (c *pendingTxContextWithProm) GetTxState(id string) (utils.TxState, bool) {
 	return c.pendingTx.GetTxState(id)
 }
 
@@ -749,7 +810,7 @@ func (c *pendingTxContextWithProm) TrimFinalizedErroredTxs() int {
 	return c.pendingTx.TrimFinalizedErroredTxs()
 }
 
-func (c *pendingTxContextWithProm) IsTxReorged(sig solana.Signature, currentSigState txmutils.TxState) (string, bool) {
+func (c *pendingTxContextWithProm) IsTxReorged(sig solana.Signature, currentSigState utils.TxState) (string, bool) {
 	return c.pendingTx.IsTxReorged(sig, currentSigState)
 }
 
