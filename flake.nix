@@ -11,6 +11,7 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; overlays = [ rust-overlay.overlays.default ]; };
+        solanaUtil = pkgs.callPackage ./scripts/solutil/default.nix { system = system; pkgs = pkgs; };
         solanaPkgs = pkgs.callPackage ./solana.nix {};
       in rec {
         devShells = {
@@ -21,6 +22,7 @@
         packages = {
           solana-test-validator = solanaPkgs.solana-test-validator;
           solana-cli-env = solanaPkgs.solana-cli-env;
+          solana-utils = solanaUtil;
         };
     });
 }
