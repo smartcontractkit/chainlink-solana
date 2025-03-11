@@ -122,7 +122,7 @@ func (env IdlAccountItem) MarshalJSON() ([]byte, error) {
 	}
 
 	visited := make(map[*IdlAccounts]struct{})
-	if err := checkForIAccountsCycle(env.IdlAccounts, visited); err != nil {
+	if err := checkForIdlAccountsCycle(env.IdlAccounts, visited); err != nil {
 		return nil, err
 	}
 
@@ -138,7 +138,7 @@ func (env IdlAccountItem) MarshalJSON() ([]byte, error) {
 	return json.Marshal(result)
 }
 
-func checkForIAccountsCycle(acc *IdlAccounts, visited map[*IdlAccounts]struct{}) error {
+func checkForIdlAccountsCycle(acc *IdlAccounts, visited map[*IdlAccounts]struct{}) error {
 	if _, exists := visited[acc]; exists {
 		return fmt.Errorf("cycle detected in IdlAccounts named %q", acc.Name)
 	}
@@ -149,7 +149,7 @@ func checkForIAccountsCycle(acc *IdlAccounts, visited map[*IdlAccounts]struct{})
 			return fmt.Errorf("invalid nested structure: expected either IdlAccount or IdlAccounts to be defined")
 		}
 		if item.IdlAccounts != nil {
-			if err := checkForIAccountsCycle(item.IdlAccounts, visited); err != nil {
+			if err := checkForIdlAccountsCycle(item.IdlAccounts, visited); err != nil {
 				return err
 			}
 		}
