@@ -86,8 +86,16 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	}
 
 	t.Run("CCIPExecute ArgsTransform includes token indexes and sets the corresponding IsWritable flag", func(t *testing.T) {
+		mandatoryAccounts := chainwriter.CreateTestPubKeys(t, chainwriter.MandatoryExecuteAccounts)
+		userAccounts := chainwriter.CreateTestPubKeys(t, 4) // arbitrary number of user accounts
 		// Accounts list contains other accounts before token addresses
-		accounts := []*solana.AccountMeta{{PublicKey: chainwriter.GetRandomPubKey(t)}}
+		accounts := make([]*solana.AccountMeta, 0, len(mandatoryAccounts) + len(userAccounts))
+		for _, acc := range mandatoryAccounts {
+			accounts = append(accounts, &solana.AccountMeta{PublicKey: acc})
+		}
+		for _, acc := range userAccounts {
+			accounts = append(accounts, &solana.AccountMeta{PublicKey: acc})
+		}
 
 		tableMap := make(map[string]map[string][]*solana.AccountMeta)
 		tableMap["PoolLookupTable"] = make(map[string][]*solana.AccountMeta)
@@ -107,17 +115,21 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		require.True(t, ok)
 		require.NotNil(t, typedArgs.TokenIndexes)
 		require.Len(t, typedArgs.TokenIndexes, 2)
-		require.Len(t, newAccounts, 21) // 1 random account + 10 token accounts for TokenAmounts[0] + 10 token accounts for TokenAmounts[1]
+		// mandatory accounts + user accounts + 3 token accounts for TokenAmounts[0] + 7 pool keys + 3 token accounts for TokenAmounts[1] + 7 pool keys
+		require.Len(t, newAccounts, len(mandatoryAccounts) + len(userAccounts) + 3 + len(poolKeys) + 3 + len(poolKeys))
+		// Token indexes are relative to the remaining accounts which exclude the mandatory accounts at the beginning
+		remainingAccounts := newAccounts[chainwriter.MandatoryExecuteAccounts:]
+		require.Len(t, remainingAccounts, len(userAccounts) + 3 + len(poolKeys) + 3 + len(poolKeys))
 		for i, tokenIdx := range typedArgs.TokenIndexes {
 			startIdx := tokenIdx
 			var endIdx uint8
 			if i < len(typedArgs.TokenIndexes)-1 {
 				endIdx = typedArgs.TokenIndexes[i+1]
 			} else {
-				endIdx = uint8(len(newAccounts))
+				endIdx = uint8(len(remainingAccounts))
 			}
-			tokenAccounts := newAccounts[startIdx:endIdx]
-			require.Len(t, tokenAccounts, 10)
+			tokenAccounts := remainingAccounts[startIdx:endIdx]
+			require.Len(t, tokenAccounts, 3 + len(poolKeys)) // user token account + per chain token config + pool chain config + 7 pool keys
 			if i == 0 {
 				require.Equal(t, &solana.AccountMeta{PublicKey: userTokenAccount1, IsWritable: true}, tokenAccounts[0])
 				require.Equal(t, &solana.AccountMeta{PublicKey: perChainTokenConfig1}, tokenAccounts[1])
@@ -129,13 +141,13 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 			}
 			// Pool lookup accounts should have the proper write flags set for token accounts
 			for j := 3; j < len(tokenAccounts); j++ {
-				require.True(t, newAccounts[j].IsWritable)
+				require.True(t, tokenAccounts[j].IsWritable)
 			}
 		}
-		// Token addresses shifted by 1 due to other accounts in list
-		require.Equal(t, uint8(1), typedArgs.TokenIndexes[0])
-		// Token addresses shifted by 1 + 10 due to other accounts in list
-		require.Equal(t, uint8(11), typedArgs.TokenIndexes[1])
+		// Token addresses shifted by userAccounts since token index is relative to remaining accounts which include user accounts at the beginning
+		require.Equal(t, uint8(len(userAccounts)), typedArgs.TokenIndexes[0])
+		// Token addresses shifted by user accounts + the previous token accounts
+		require.Equal(t, uint8(len(userAccounts) + 10), typedArgs.TokenIndexes[1])
 	})
 
 	t.Run("CCIPExecute ArgsTransform includes empty token indexes if lookup table not found", func(t *testing.T) {
