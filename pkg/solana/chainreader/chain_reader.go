@@ -723,7 +723,7 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 		return nil
 	}
 
-	data, err := s.client.GetMultipleAccountData(ctx, pdaAddresses...)
+	accountsRes, err := s.client.GetMultipleAccountData(ctx, pdaAddresses...)
 	if err != nil {
 		return err
 	}
@@ -741,11 +741,16 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 			if _, hasValue := underlyingType.FieldByName("Value"); hasValue {
 				if _, hasTimestamp := underlyingType.FieldByName("Timestamp"); hasTimestamp {
 					sliceVal := reflect.MakeSlice(returnSliceVal.Type(), 0, 0)
-					for _, d := range data {
+					for _, accRes := range accountsRes {
 						var wrapper fee_quoter.BillingTokenConfigWrapper
 						// if we got back an empty account then the account must not exist yet, use zero value
-						if len(d) > 0 {
-							if err = wrapper.UnmarshalWithDecoder(bin.NewBorshDecoder(d)); err != nil {
+						var data []byte
+						if accRes != nil && accRes.Data != nil && accRes.Data.GetBinary() != nil {
+							data = accRes.Data.GetBinary()
+						}
+
+						if len(data) > 0 {
+							if err = wrapper.UnmarshalWithDecoder(bin.NewBorshDecoder(data)); err != nil {
 								return err
 							}
 						}
@@ -794,11 +799,16 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 		return fmt.Errorf("expected struct { Value *big.Int; Timestamp *int64 }, got %q", underlyingStruct.String())
 	}
 
-	for _, d := range data {
+	for _, accRes := range accountsRes {
 		var wrapper fee_quoter.BillingTokenConfigWrapper
-		// if we got back an empty account then the account must not exist yet, use zero value
-		if len(d) > 0 {
-			if err = wrapper.UnmarshalWithDecoder(bin.NewBorshDecoder(d)); err != nil {
+
+		var data []byte
+		if accRes != nil && accRes.Data != nil && accRes.Data.GetBinary() != nil {
+			data = accRes.Data.GetBinary()
+		}
+
+		if len(data) > 0 {
+			if err = wrapper.UnmarshalWithDecoder(bin.NewBorshDecoder(data)); err != nil {
 				return err
 			}
 		}

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -35,7 +36,7 @@ var (
 )
 
 type MultipleAccountGetter interface {
-	GetMultipleAccountData(context.Context, ...solana.PublicKey) ([][]byte, error)
+	GetMultipleAccountData(context.Context, ...solana.PublicKey) ([]*rpc.Account, error)
 }
 
 // doMultiRead aggregate results from multiple PDAs from the same contract into one result.
@@ -143,7 +144,7 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 			returnVal: batchCall.ReturnVal,
 		}
 
-		if len(data[idx]) == 0 {
+		if data[idx] == nil || data[idx].Data == nil || data[idx].Data.GetBinary() == nil || len(data[idx].Data.GetBinary()) == 0 {
 			if batchCall.ErrOnMissingAccountData {
 				results[idx].err = ErrMissingAccountData
 				continue
@@ -168,7 +169,7 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 				ctx,
 				rBinding,
 				&output,
-				wrapDecodeValuer(rBinding, data[dataIdx]),
+				wrapDecodeValuer(rBinding, data[dataIdx].Data.GetBinary()),
 			)
 			if err != nil {
 				results[idx].err = err
@@ -191,7 +192,7 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 			ctx,
 			rBinding,
 			results[dataIdx].returnVal,
-			wrapDecodeValuer(rBinding, data[dataIdx]),
+			wrapDecodeValuer(rBinding, data[dataIdx].Data.GetBinary()),
 		)
 	}
 

@@ -15,6 +15,7 @@ import (
 
 	"github.com/cometbft/cometbft/libs/service"
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -679,8 +680,8 @@ type mockedMultipleAccountGetter struct {
 	sequence          []mockedRPCCall
 }
 
-func (_m *mockedMultipleAccountGetter) GetMultipleAccountData(_ context.Context, keys ...solana.PublicKey) ([][]byte, error) {
-	result := make([][]byte, len(keys))
+func (_m *mockedMultipleAccountGetter) GetMultipleAccountData(_ context.Context, keys ...solana.PublicKey) ([]*rpc.Account, error) {
+	result := make([]*rpc.Account, len(keys))
 
 	for idx, key := range keys {
 		call, ok := _m.responseByAddress[key.String()]
@@ -690,7 +691,7 @@ func (_m *mockedMultipleAccountGetter) GetMultipleAccountData(_ context.Context,
 			continue
 		}
 
-		result[idx] = call.bts
+		result[idx] = &rpc.Account{Data: rpc.DataBytesOrJSONFromBytes(call.bts)}
 	}
 
 	return result, nil
