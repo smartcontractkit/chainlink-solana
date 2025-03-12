@@ -300,9 +300,9 @@ export default class ProposeOffchainConfig extends SolanaCommand {
 
     const txs: string[] = []
     for (let i = startingPoint; i < rawTx.length; i++) {
-      await this.simulateTx(signer, [rawTx[i]])
+      const overrides = await this.simulateTx(signer, [rawTx[i]])
       logger.loading(`Sending ${i}/${rawTx.length - 1}...`)
-      const txhash = await this.signAndSendRawTx([rawTx[i]])
+      const txhash = await this.signAndSendRawTx([rawTx[i]], undefined, overrides)
       txs.push(txhash)
     }
     logger.success(`Last tx Write offchain config set on tx ${txs[txs.length - 1]}`)

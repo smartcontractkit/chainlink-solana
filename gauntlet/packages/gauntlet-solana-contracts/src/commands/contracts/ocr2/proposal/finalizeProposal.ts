@@ -40,10 +40,10 @@ export default class FinalizeProposal extends SolanaCommand {
     const signer = this.wallet.publicKey
 
     const rawTx = await this.makeRawTransaction(signer)
-    await this.simulateTx(signer, rawTx)
+    const overrides = await this.simulateTx(signer, rawTx)
     await prompt(`Continue finalizing Config Proposal?`)
 
-    const txhash = await this.signAndSendRawTx(rawTx)
+    const txhash = await this.signAndSendRawTx(rawTx, undefined, overrides)
     logger.success(`Config Proposal finalized on tx ${txhash}`)
 
     return {

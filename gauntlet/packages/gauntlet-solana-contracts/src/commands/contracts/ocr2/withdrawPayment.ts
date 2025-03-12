@@ -79,10 +79,10 @@ export default class WithdrawPayment extends SolanaCommand {
     const signer = this.wallet.publicKey
 
     const rawTx = await this.makeRawTransaction(signer)
-    await this.simulateTx(signer, rawTx)
+    const overrides = await this.simulateTx(signer, rawTx)
 
     await this.beforeExecute()
-    const txhash = await this.signAndSendRawTx(rawTx)
+    const txhash = await this.signAndSendRawTx(rawTx, undefined, overrides)
     logger.success(`Payment withdrew on tx hash: ${txhash}`)
 
     return {

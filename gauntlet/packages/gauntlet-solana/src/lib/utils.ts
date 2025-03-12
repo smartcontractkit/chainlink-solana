@@ -1,9 +1,14 @@
 import { Transaction, TransactionInstruction, TransactionBlockhashCtor, ComputeBudgetProgram } from '@solana/web3.js'
 
+export interface Overrides {
+  price?: number;
+  units?: number;
+}
+
 export const makeTx = (
   rawTx: TransactionInstruction[],
   opts?: TransactionBlockhashCtor,
-  overrides: { price?: number; units?: number } = {},
+  overrides: Overrides = {},
 ): Transaction => {
   let initialTx = new Transaction(opts)
 

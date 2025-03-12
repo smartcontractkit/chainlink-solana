@@ -66,8 +66,12 @@ export default class SetWriter extends SolanaCommand {
   }
 
   execute = async () => {
-    const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
-    const txhash = await this.signAndSendRawTx(rawTx)
+    const signer = this.wallet.publicKey
+    const rawTx = await this.makeRawTransaction(signer)
+    const overrides = await this.simulateTx(signer, rawTx)
+
+    const txhash = await this.signAndSendRawTx(rawTx, undefined, overrides)
+
     const input = this.makeInput(this.flags.input)
     logger.success(`Writer set on tx hash: ${txhash}`)
 

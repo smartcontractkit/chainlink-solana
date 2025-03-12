@@ -127,10 +127,10 @@ export default class ProposeConfig extends SolanaCommand {
     await this.beforeExecute()
 
     const rawTx = await this.makeRawTransaction(signer)
-    await this.simulateTx(signer, rawTx)
+    const overrides = await this.simulateTx(signer, rawTx)
     await prompt(`Continue setting config on ${this.args[0].toString()}?`)
 
-    const txhash = await this.signAndSendRawTx(rawTx)
+    const txhash = await this.signAndSendRawTx(rawTx, undefined, overrides)
     logger.success(`Config set on tx ${txhash}`)
 
     return {

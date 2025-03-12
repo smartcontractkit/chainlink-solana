@@ -19,9 +19,9 @@ export default class CreateFeed extends SolanaCommand {
   static examples = ['yarn gauntlet store:create_feed --network=devnet --rdd=[PATH_TO_RDD] [AGGREGATOR_ADDRESS]']
 
   makeInput = (userInput): Input => {
+    console.log(userInput)
     if (userInput) return userInput as Input
     const aggregator = RDD.loadAggregator(this.args[0], this.flags.network, this.flags.rdd)
-
     return {
       store: aggregator.storeAccount,
       granularity: aggregator.granularity,
@@ -42,7 +42,7 @@ export default class CreateFeed extends SolanaCommand {
     const program = this.loadProgram(storeProgram.idl, address)
 
     const input = this.makeInput(this.flags.input)
-
+    console.log(input)
     const granularity = new BN(input.granularity)
     const liveLength = new BN(input.liveLength)
     const length = new BN(this.flags.length || input.liveLength) // default to no historical data, maximum is 140000 for f = 5 (16 oracles)
@@ -65,6 +65,9 @@ export default class CreateFeed extends SolanaCommand {
       - Total Account Size: ${feedAccountLength.toNumber()}
       - Feed Account: ${feed.toString()}
     `)
+
+    const test1 = await this.provider.connection.getMinimumBalanceForRentExemption(feedAccountLength.toNumber())
+    console.log("TEST1:" + test1)
 
     const transmissionsCreationInstruction = SystemProgram.createAccount({
       fromPubkey: signer,
@@ -91,11 +94,13 @@ export default class CreateFeed extends SolanaCommand {
     const program = this.loadProgram(storeProgram.idl, address)
 
     const feed = Keypair.generate()
-
-    const rawTxs = await this.makeRawTransaction(this.wallet.publicKey, feed.publicKey)
+    const signer = this.wallet.publicKey
+    
+    const rawTxs = await this.makeRawTransaction(signer, feed.publicKey)
     await prompt('Continue creating new Transmissions Feed?')
 
-    const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTxs, [feed])
+    const overrides = await this.simulateTx(signer, rawTxs)
+    const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTxs, [feed], overrides)
     logger.success(`Transmissions feed created at ${feed.publicKey}`)
     logger.success(`TX ${txhash}`)
 

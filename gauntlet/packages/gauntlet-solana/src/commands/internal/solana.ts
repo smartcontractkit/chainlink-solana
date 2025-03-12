@@ -8,20 +8,19 @@ import {
   PublicKey,
   TransactionSignature,
   TransactionInstruction,
-  sendAndConfirmRawTransaction,
+  sendAndConfirmRawTransaction
 } from '@solana/web3.js'
 import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { TransactionResponse } from '../types'
 import { ProgramError, parseIdlErrors, Idl, Program, AnchorProvider } from '@coral-xyz/anchor'
 import { SolanaWallet } from '../wallet'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
-import { makeTx } from '../../lib/utils'
+import { makeTx, Overrides } from '../../lib/utils'
 
 export default abstract class SolanaCommand extends WriteCommand<TransactionResponse> {
   wallet: SolanaWallet
   provider: AnchorProvider
   program: Program
-
   abstract execute: () => Promise<Result<TransactionResponse>>
   makeRawTransaction: (signer: PublicKey) => Promise<TransactionInstruction[]>
 
@@ -38,6 +37,33 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
   }
 
   static lamportsToSol = (lamports: number) => lamports / LAMPORTS_PER_SOL
+
+  getOptimalOverrides = async (rawTxs: TransactionInstruction[], initialFee: number = 1000, maxFee: number = 50000) => {
+    //const latestAcceptedTx = await getRecentPrioritizationFees(signer)
+    let fee = initialFee;
+    let overrides: Overrides = {}
+
+    while (fee <= maxFee) {
+        const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
+        overrides.price = fee
+        console.log(`Trying fee: ${fee} micro-lamports per compute unit`);
+        const tx = makeTx(
+          rawTxs,
+          {
+            blockhash,
+            lastValidBlockHeight,
+            feePayer: this.wallet.publicKey,
+          },
+          overrides,
+        )
+        const simulation = await this.simulateTxWithOverrides(tx)
+        if (simulation > 0) {
+         return overrides
+        }
+    }
+    console.log("Max fee reached without success.");
+    return {};
+  }
 
   loadProgram = (idl: Idl, address: string): Program<Idl> => {
     const program = new Program(idl, address, this.provider)
@@ -81,10 +107,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
   signAndSendRawTx = async (
     rawTxs: TransactionInstruction[],
     extraSigners?: Keypair[],
-    overrides: {
-      units?: number
-      price?: number
-    } = {},
+    overrides: Overrides = {},
   ): Promise<TransactionSignature> => {
     const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
 
@@ -126,21 +149,39 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     }
   }
 
-  simulateTx = async (signer: PublicKey, txInstructions: TransactionInstruction[], feePayer?: PublicKey) => {
+  simulateTxWithOverrides = async (tx: Transaction) => {
     try {
-      const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
-      const tx = makeTx(txInstructions, {
-        feePayer: feePayer || signer,
-        blockhash,
-        lastValidBlockHeight,
-      })
-      // simulating through connection allows to skip signing tx (useful when using Ledger device)
       const { value: simulationResponse } = await this.provider.connection.simulateTransaction(tx)
       if (simulationResponse.err) {
         throw new Error(JSON.stringify({ error: simulationResponse.err, logs: simulationResponse.logs }))
       }
       logger.success(`Tx simulation succeeded: ${simulationResponse.unitsConsumed} units consumed.`)
       return simulationResponse.unitsConsumed
+    } catch (e) {
+      logger.error(`Tx simulation failed: ${e.message}`)
+      return -1
+    }
+  }
+
+  simulateTx = async (signer: PublicKey, txInstructions: TransactionInstruction[], feePayer?: PublicKey, withPriorityFee: boolean = true) => {
+    try {
+      const overrides = withPriorityFee ? await this.getOptimalOverrides(txInstructions) : {}
+      const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
+      const tx = makeTx(txInstructions, 
+        {
+        feePayer: feePayer || signer,
+        blockhash,
+        lastValidBlockHeight,
+        },
+        overrides
+      )
+      // simulating through connection allows to skip signing tx (useful when using Ledger device)
+      const { value: simulationResponse } = await this.provider.connection.simulateTransaction(tx)
+      if (simulationResponse.err) {
+        throw new Error(JSON.stringify({ error: simulationResponse.err, logs: simulationResponse.logs }))
+      }
+      logger.success(`Tx simulation succeeded: ${simulationResponse.unitsConsumed} units consumed.`)
+      return overrides
     } catch (e) {
       const parsedError = JSON.parse(e.message)
       const errorCode = parsedError.error.InstructionError ? parsedError.error.InstructionError[1].Custom : -1

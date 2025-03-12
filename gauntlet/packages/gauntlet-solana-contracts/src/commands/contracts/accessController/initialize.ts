@@ -19,6 +19,7 @@ export default class Initialize extends SolanaCommand {
     const program = this.loadProgram(accessController.idl, address)
 
     const state = Keypair.generate()
+    console.log(this.wallet)
     const owner = this.wallet.payer
 
     console.log(`Initializing access controller contract with State at ${state.publicKey}...`)

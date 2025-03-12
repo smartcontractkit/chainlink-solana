@@ -14,6 +14,7 @@ export enum CONTRACT_TYPES {
 
 function load(network = DEFAULT_NETWORK, path = `${RDD_DIR}/directory-solana-${network}.json`) {
   try {
+    console.log(path)
     const buffer = readFileSync(path, 'utf8')
     const rdd = JSON.parse(buffer.toString())
     return rdd
