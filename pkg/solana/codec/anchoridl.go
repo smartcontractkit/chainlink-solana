@@ -99,29 +99,31 @@ func (env *IdlAccountItem) UnmarshalJSON(data []byte) error {
 			return nil
 		}
 
-		// Multiple accounts:
-		if _, ok := v["accounts"]; ok {
-			if err := utilz.TranscodeJSON(temp, &env.IdlAccounts); err != nil {
-				return err
-			}
-		}
-		// Single account:
-		// TODO: check both isMut and isSigner
-		if _, ok := v["isMut"]; ok {
-			if err := utilz.TranscodeJSON(temp, &env.IdlAccount); err != nil {
-				return err
-			}
-		}
-	default:
-		return fmt.Errorf("Unknown kind: %s", spew.Sdump(temp))
-	}
+		_, hasAccounts := v["accounts"]
+		_, hasIsMut := v["isMut"]
 
-	return nil
+		if hasAccounts == hasIsMut {
+			return fmt.Errorf("invalid idl structure: expected exactly one of 'accounts' or 'isMut'")
+		}
+
+		if hasAccounts {
+			return utilz.TranscodeJSON(temp, &env.IdlAccounts)
+		}
+
+		return utilz.TranscodeJSON(temp, &env.IdlAccount)
+	default:
+		return fmt.Errorf("unknown kind: %s", spew.Sdump(temp))
+	}
 }
 
 func (env IdlAccountItem) MarshalJSON() ([]byte, error) {
 	if (env.IdlAccount == nil) == (env.IdlAccounts == nil) {
 		return nil, fmt.Errorf("invalid structure: expected either IdlAccount or IdlAccounts to be defined")
+	}
+
+	visited := make(map[*IdlAccounts]struct{})
+	if err := checkForIdlAccountsCycle(env.IdlAccounts, visited); err != nil {
+		return nil, err
 	}
 
 	var result interface{}
@@ -134,6 +136,29 @@ func (env IdlAccountItem) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(result)
+}
+
+func checkForIdlAccountsCycle(acc *IdlAccounts, visited map[*IdlAccounts]struct{}) error {
+	if acc == nil {
+		return nil
+	}
+
+	if _, exists := visited[acc]; exists {
+		return fmt.Errorf("cycle detected in IdlAccounts named %q", acc.Name)
+	}
+	visited[acc] = struct{}{}
+
+	for _, item := range acc.Accounts {
+		if (item.IdlAccount == nil) == (item.IdlAccounts == nil) {
+			return fmt.Errorf("invalid nested structure: expected either IdlAccount or IdlAccounts to be defined")
+		}
+		if item.IdlAccounts != nil {
+			if err := checkForIdlAccountsCycle(item.IdlAccounts, visited); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 type IdlAccount struct {
