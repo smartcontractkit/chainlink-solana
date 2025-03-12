@@ -707,6 +707,7 @@ const (
 	TxFailDrop
 	TxFailSimRevert
 	TxFailSimOther
+	TxDependencyFail
 )
 
 func newPendingTxContextWithProm(id string) *pendingTxContextWithProm {
@@ -798,6 +799,8 @@ func incrementErrorMetrics(errType TxErrType, chainID string) {
 		promSolTxmSimRevertTxs.WithLabelValues(chainID).Inc()
 	case TxFailSimOther:
 		promSolTxmSimOtherTxs.WithLabelValues(chainID).Inc()
+	case TxDependencyFail:
+		promSolTxmDependencyFailTxs.WithLabelValues(chainID).Inc()
 	}
 	promSolTxmErrorTxs.WithLabelValues(chainID).Inc()
 }

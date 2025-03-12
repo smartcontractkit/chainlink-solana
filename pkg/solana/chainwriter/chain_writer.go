@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
+	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
@@ -294,13 +295,14 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("error parsing fee payer address: %w", err), debugID)
 	}
 
+	var ataUUID string
 	if len(methodConfig.ATAs) > 0 {
 		s.lggr.Debugw("Creating ATAs", "contract", contractName, "method", method)
 		createATAInstructions, ataErr := CreateATAs(ctx, args, methodConfig.ATAs, derivedTableMap, s.client, feePayer, s.lggr)
 		if ataErr != nil {
 			return errorWithDebugID(fmt.Errorf("error resolving account addresses: %w", err), debugID)
 		}
-		if err = s.handleATACreation(ctx, createATAInstructions, methodConfig, contractName, method, feePayer); err != nil {
+		if ataUUID, err = s.handleATACreation(ctx, createATAInstructions, methodConfig, contractName, method, feePayer); err != nil {
 			return errorWithDebugID(fmt.Errorf("error creating ATAs: %w", err), debugID)
 		}
 	}
@@ -353,10 +355,14 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error constructing transaction: %w", err), debugID)
 	}
+	options := []txmutils.SetTxConfig{}
+	if ataUUID != "" {
+		options = append(options, txmutils.SetDependencyTxID(ataUUID))
+	}
 
 	s.lggr.Debugw("Sending main transaction", "contract", contractName, "method", method)
 	// Enqueue transaction
-	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, tx, &transactionID, blockhash.Value.LastValidBlockHeight); err != nil {
+	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, tx, &transactionID, blockhash.Value.LastValidBlockHeight, options...); err != nil {
 		return errorWithDebugID(fmt.Errorf("error enqueuing transaction: %w", err), debugID)
 	}
 
