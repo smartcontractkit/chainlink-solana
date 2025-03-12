@@ -1,8 +1,8 @@
 import { Transaction, TransactionInstruction, TransactionBlockhashCtor, ComputeBudgetProgram } from '@solana/web3.js'
 
 export interface Overrides {
-  price?: number;
-  units?: number;
+  price?: number
+  units?: number
 }
 
 export const makeTx = (

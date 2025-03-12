@@ -8,7 +8,7 @@ import {
   PublicKey,
   TransactionSignature,
   TransactionInstruction,
-  sendAndConfirmRawTransaction
+  sendAndConfirmRawTransaction,
 } from '@solana/web3.js'
 import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { TransactionResponse } from '../types'
@@ -40,29 +40,29 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
 
   getOptimalOverrides = async (rawTxs: TransactionInstruction[], initialFee: number = 1000, maxFee: number = 50000) => {
     //const latestAcceptedTx = await getRecentPrioritizationFees(signer)
-    let fee = initialFee;
+    let fee = initialFee
     let overrides: Overrides = {}
 
     while (fee <= maxFee) {
-        const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
-        overrides.price = fee
-        console.log(`Trying fee: ${fee} micro-lamports per compute unit`);
-        const tx = makeTx(
-          rawTxs,
-          {
-            blockhash,
-            lastValidBlockHeight,
-            feePayer: this.wallet.publicKey,
-          },
-          overrides,
-        )
-        const simulation = await this.simulateTxWithOverrides(tx)
-        if (simulation > 0) {
-         return overrides
-        }
+      const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
+      overrides.price = fee
+      console.log(`Trying fee: ${fee} micro-lamports per compute unit`)
+      const tx = makeTx(
+        rawTxs,
+        {
+          blockhash,
+          lastValidBlockHeight,
+          feePayer: this.wallet.publicKey,
+        },
+        overrides,
+      )
+      const simulation = await this.simulateTxWithOverrides(tx)
+      if (simulation > 0) {
+        return overrides
+      }
     }
-    console.log("Max fee reached without success.");
-    return {};
+    console.log('Max fee reached without success.')
+    return {}
   }
 
   loadProgram = (idl: Idl, address: string): Program<Idl> => {
@@ -163,17 +163,23 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     }
   }
 
-  simulateTx = async (signer: PublicKey, txInstructions: TransactionInstruction[], feePayer?: PublicKey, withPriorityFee: boolean = true) => {
+  simulateTx = async (
+    signer: PublicKey,
+    txInstructions: TransactionInstruction[],
+    feePayer?: PublicKey,
+    withPriorityFee: boolean = true,
+  ) => {
     try {
       const overrides = withPriorityFee ? await this.getOptimalOverrides(txInstructions) : {}
       const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
-      const tx = makeTx(txInstructions, 
+      const tx = makeTx(
+        txInstructions,
         {
-        feePayer: feePayer || signer,
-        blockhash,
-        lastValidBlockHeight,
+          feePayer: feePayer || signer,
+          blockhash,
+          lastValidBlockHeight,
         },
-        overrides
+        overrides,
       )
       // simulating through connection allows to skip signing tx (useful when using Ledger device)
       const { value: simulationResponse } = await this.provider.connection.simulateTransaction(tx)

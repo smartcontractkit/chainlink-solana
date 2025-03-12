@@ -67,7 +67,7 @@ export default class CreateFeed extends SolanaCommand {
     `)
 
     const test1 = await this.provider.connection.getMinimumBalanceForRentExemption(feedAccountLength.toNumber())
-    console.log("TEST1:" + test1)
+    console.log('TEST1:' + test1)
 
     const transmissionsCreationInstruction = SystemProgram.createAccount({
       fromPubkey: signer,
@@ -95,7 +95,7 @@ export default class CreateFeed extends SolanaCommand {
 
     const feed = Keypair.generate()
     const signer = this.wallet.publicKey
-    
+
     const rawTxs = await this.makeRawTransaction(signer, feed.publicKey)
     await prompt('Continue creating new Transmissions Feed?')
 
