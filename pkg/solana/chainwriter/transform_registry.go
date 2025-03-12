@@ -101,7 +101,7 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 				return nil, nil, fmt.Errorf("encountered unexpected number of accounts, expected at least %d, got %d", MandatoryExecuteAccounts, len(accounts))
 			}
 			// Token indexes are relative to the remaining accounts which exclude mandatory accounts
-			tokenIndexes = append(tokenIndexes, uint8(len(accounts) - MandatoryExecuteAccounts)) //nolint:gosec
+			tokenIndexes = append(tokenIndexes, uint8(len(accounts)-MandatoryExecuteAccounts)) //nolint:gosec
 			// Append all token accounts for transfer
 			accounts = append(accounts,
 				&solana.AccountMeta{PublicKey: userTokenAccount, IsWritable: true},

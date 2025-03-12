@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -823,20 +824,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 								},
 							},
 						},
-						Accounts: []chainwriter.Lookup{
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "testAcc1",
-								Address: chainwriter.GetRandomPubKey(t).String(),
-							}},
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "testAcc2",
-								Address: chainwriter.GetRandomPubKey(t).String(),
-							}},
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "testAcc3",
-								Address: chainwriter.GetRandomPubKey(t).String(),
-							}},
-						},
+						Accounts: generateExecuteMandatoryAccounts(t),
 					},
 					ccipconsts.MethodCommit: {
 						FromAddress: admin.String(),
@@ -913,7 +901,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 			tokenIndexes := *decoded.TokenIndexes
 
 			require.Len(t, tokenIndexes, 1)
-			require.Equal(t, uint8(3), tokenIndexes[0])
+			require.Equal(t, uint8(0), tokenIndexes[0]) // no user accounts at the start of remaining accounts
 			return true
 		}), &txID, mock.Anything).Return(nil).Once()
 
@@ -1174,4 +1162,18 @@ func mockFetchRouterAddress(t *testing.T, rw *clientmocks.ReaderWriter, routerAd
 		RPCContext: rpc.RPCContext{},
 		Value:      &rpc.Account{Data: rpc.DataBytesOrJSONFromBytes(referenceAddressesBytes)},
 	}, nil)
+}
+
+func generateExecuteMandatoryAccounts(t *testing.T) []chainwriter.Lookup {
+	mandatoryAccounts := chainwriter.CreateTestPubKeys(t, chainwriter.MandatoryExecuteAccounts)
+	accountLookups := make([]chainwriter.Lookup, 0, len(mandatoryAccounts))
+	for i, acc := range mandatoryAccounts {
+		accountLookups = append(accountLookups,
+			chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+				Name:    fmt.Sprintf("testAcc%d", i),
+				Address: acc.String(),
+			}},
+		)
+	}
+	return accountLookups
 }
