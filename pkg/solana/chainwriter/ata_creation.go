@@ -123,7 +123,7 @@ func (s *SolanaChainWriterService) handleATACreation(ctx context.Context, create
 	s.lggr.Infow("Sending create ATA transaction", "contract", contractName, "method", method)
 
 	// Enqueue ATA transaction
-	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, ataTx, &ataUUID, blockhash.Value.LastValidBlockHeight); err != nil {
+	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, ataTx, &ataUUID, blockhash.Value.LastValidBlockHeight, txmutils.SetEstimateComputeUnitLimit(true)); err != nil {
 		return "", fmt.Errorf("error enqueuing transaction: %w", err)
 	}
 
