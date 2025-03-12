@@ -321,13 +321,13 @@ func TestTxm_Integration_DependencyTx(t *testing.T) {
 		depTx, lastValidBlockHeight := createTransaction(ctx, t, client, senderPubKey, receiverPubKey, amount, true)
 		require.NoError(t, txmInstance.Enqueue(ctx, "", depTx, &depTxID, lastValidBlockHeight))
 
-		status, err := txmInstance.waitForTxStatus(ctx, depTxID, types.Finalized)
-		require.NoError(t, err)
-		require.Equal(t, types.Finalized, status)
-
 		txID := "main-tx-id-success"
 		tx, lastValidBlockHeight := createTransaction(ctx, t, client, senderPubKey, receiverPubKey, amount, true)
 		require.NoError(t, txmInstance.Enqueue(ctx, depTxID, tx, &txID, lastValidBlockHeight, []txmutils.SetTxConfig{txmutils.SetDependencyTxID(depTxID)}...))
+
+		status, err := txmInstance.waitForTxStatus(ctx, depTxID, types.Finalized)
+		require.NoError(t, err)
+		require.Equal(t, types.Finalized, status)
 
 		status, err = txmInstance.waitForTxStatus(ctx, txID, types.Finalized)
 		require.NoError(t, err)
@@ -345,13 +345,13 @@ func TestTxm_Integration_DependencyTx(t *testing.T) {
 		depTx, lastValidBlockHeight := createTransaction(ctx, t, client, senderPubKey, receiverPubKey, 10000000000*solana.LAMPORTS_PER_SOL, true)
 		require.NoError(t, txmInstance.Enqueue(ctx, "", depTx, &depTxID, lastValidBlockHeight))
 
-		status, err := txmInstance.waitForTxStatus(ctx, depTxID, types.Finalized)
-		require.Error(t, err)
-		require.Equal(t, types.Fatal, status)
-
 		txID := "main-tx-id-fail"
 		tx, lastValidBlockHeight := createTransaction(ctx, t, client, senderPubKey, receiverPubKey, amount, true)
 		require.NoError(t, txmInstance.Enqueue(ctx, depTxID, tx, &txID, lastValidBlockHeight, []txmutils.SetTxConfig{txmutils.SetDependencyTxID(depTxID)}...))
+
+		status, err := txmInstance.waitForTxStatus(ctx, depTxID, types.Finalized)
+		require.Error(t, err)
+		require.Equal(t, types.Fatal, status)
 
 		status, err = txmInstance.waitForTxStatus(ctx, txID, types.Finalized)
 		require.Error(t, err)

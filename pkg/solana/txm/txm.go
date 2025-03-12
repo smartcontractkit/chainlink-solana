@@ -794,7 +794,7 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 				}
 				err = txm.txs.OnPrebroadcastError(msg.id, txm.cfg.TxRetentionTimeout(), errorStatus, TxDependencyFail)
 				if err != nil {
-					txm.lggr.Errorw("failed to mark transaction as fatally errored", "id", msg.id, "error", err)
+					txm.lggr.Errorw("failed to mark transaction as errored", "id", msg.id, "error", err)
 				}
 				return
 			}
