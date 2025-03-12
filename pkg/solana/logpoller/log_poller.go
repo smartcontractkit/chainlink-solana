@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/gagliardetto/solana-go/rpc/jsonrpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -146,7 +147,24 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 	}
 
 	var logs []Log
+
 	for filter := range matchingFilters {
+		var revertErr error
+		if blockData.Error != nil {
+			switch e := blockData.Error.(type) {
+			case *jsonrpc.RPCError:
+				revertErr = fmt.Errorf("JsonRpcError %d: %s", e.Code, e.Message)
+			case error:
+				revertErr = e
+			default:
+				revertErr = fmt.Errorf("unknown type: %v", e)
+				lp.lggr.Warnf("received unknown revert error type %T for log with blockData=%v", revertErr, blockData)
+			}
+			if !filter.IncludeReverted {
+				continue // unless explicitly requested, discard reverted logs
+			}
+		}
+
 		var logIndex int64
 		logIndex, err = makeLogIndex(blockData.TransactionIndex, blockData.TransactionLogIndex)
 		if err != nil {
@@ -158,6 +176,7 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 			lp.lggr.Critical(err.Error())
 			return err
 		}
+
 		log := Log{
 			FilterID:       filter.ID,
 			ChainID:        lp.orm.ChainID(),
@@ -168,6 +187,7 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 			Address:        filter.Address,
 			EventSig:       filter.EventSig,
 			TxHash:         Signature(blockData.TransactionHash),
+			Error:          revertErr,
 		}
 
 		log.Data, err = base64.StdEncoding.DecodeString(programEvent.Data)

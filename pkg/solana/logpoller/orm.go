@@ -87,8 +87,8 @@ func (o *DSORM) InsertFilter(ctx context.Context, filter Filter) (id int64, err 
 	// https://github.com/jmoiron/sqlx/issues/91, https://github.com/jmoiron/sqlx/issues/428
 	query := `
 		INSERT INTO solana.log_poller_filters
-		    (chain_id, name, address, event_name, event_sig, starting_block, event_idl, subkey_paths, retention, max_logs_kept, is_backfilled)
-	  		VALUES (:chain_id, :name, :address, :event_name, :event_sig, :starting_block, :event_idl, :subkey_paths, :retention, :max_logs_kept, :is_backfilled)
+		    (chain_id, name, address, event_name, event_sig, starting_block, event_idl, subkey_paths, retention, max_logs_kept, is_backfilled, include_reverted)
+			VALUES (:chain_id, :name, :address, :event_name, :event_sig, :starting_block, :event_idl, :subkey_paths, :retention, :max_logs_kept, :is_backfilled, :include_reverted)
 	  	ON CONFLICT (chain_id, name) WHERE NOT is_deleted DO UPDATE SET 
 	  	                                                        event_name = EXCLUDED.event_name,
 	  	                                                        starting_block = EXCLUDED.starting_block,
