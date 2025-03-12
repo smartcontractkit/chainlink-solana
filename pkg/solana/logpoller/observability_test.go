@@ -18,6 +18,7 @@ import (
 )
 
 func TestShouldPublishDurationInCaseOfError(t *testing.T) {
+	sqltest.SkipInMemory(t)
 	ctx := tests.Context(t)
 	orm := createObservedORM(t, "testChainID")
 	t.Cleanup(func() { resetMetrics(*orm) })
