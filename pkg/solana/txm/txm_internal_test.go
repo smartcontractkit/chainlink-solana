@@ -1893,8 +1893,8 @@ func TestTxm_DependencyTx(t *testing.T) {
 	id := "mocknet-dep-" + uuid.NewString()
 	cfg := config.NewDefault()
 	cfg.Chain.FeeEstimatorMode = &estimator
-	cfg.Chain.TxConfirmTimeout = relayconfig.MustNewDuration(3 * time.Second)
-	cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(5 * time.Second)
+	cfg.Chain.TxConfirmTimeout = relayconfig.MustNewDuration(30 * time.Second)
+	cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(50 * time.Second)
 
 	mc := mocks.NewReaderWriter(t)
 	mc.On("GetLatestBlock", mock.Anything).Return(&rpc.GetBlockResult{}, nil).Maybe()
@@ -1958,10 +1958,9 @@ func TestTxm_DependencyTx(t *testing.T) {
 		err := txm.Enqueue(ctx, "test-dep-failure", mainTx, &mainTxID, lastValidBlockHeight, []txmutils.SetTxConfig{txmutils.SetDependencyTxID(depID)}...)
 		require.NoError(t, err)
 
-		err = txm.waitForTxStatus(ctx, mainTxID, types.Finalized)
+		status, err := txm.waitForTxStatus(ctx, mainTxID, types.Finalized)
 		require.Error(t, err)
 
-		status, _ := txm.txs.GetTxState(mainTxID)
-		require.Equal(t, txmutils.FatallyErrored, status)
+		require.Equal(t, types.Failed, status)
 	})
 }

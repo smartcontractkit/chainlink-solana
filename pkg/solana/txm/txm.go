@@ -785,10 +785,14 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	// If a dependency transaction ID is provided, handle waiting and enqueuing asynchronously.
 	if cfg.DependencyTxID != "" {
 		go func(msg pendingTx, depID string) {
-			err := txm.waitForTxStatus(ctx, depID, types.Finalized)
+			status, err := txm.waitForTxStatus(ctx, depID, types.Finalized)
 			if err != nil {
 				txm.lggr.Errorw("dependency transaction did not reach desired state", "dependencyTxID", depID, "error", err)
-				err = txm.txs.OnPrebroadcastError(msg.id, txm.cfg.TxRetentionTimeout(), txmutils.FatallyErrored, TxDependencyFail)
+				errorStatus := txmutils.Errored
+				if status == types.Fatal {
+					errorStatus = txmutils.FatallyErrored
+				}
+				err = txm.txs.OnPrebroadcastError(msg.id, txm.cfg.TxRetentionTimeout(), errorStatus, TxDependencyFail)
 				if err != nil {
 					txm.lggr.Errorw("failed to mark transaction as fatally errored", "id", msg.id, "error", err)
 				}
@@ -813,8 +817,8 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	return nil
 }
 
-func (txm *Txm) waitForTxStatus(ctx context.Context, transactionID string, desiredStatus types.TransactionStatus) error {
-	waitCtx, cancel := context.WithTimeout(ctx, txm.cfg.TxTimeout())
+func (txm *Txm) waitForTxStatus(ctx context.Context, transactionID string, desiredStatus types.TransactionStatus) (types.TransactionStatus, error) {
+	waitCtx, cancel := context.WithTimeout(ctx, txm.cfg.TxConfirmTimeout())
 	defer cancel()
 
 	backoff := 1 * time.Second
@@ -823,20 +827,20 @@ func (txm *Txm) waitForTxStatus(ctx context.Context, transactionID string, desir
 	for {
 		select {
 		case <-waitCtx.Done():
-			return fmt.Errorf("context ended while waiting for finality of transaction %s", transactionID)
+			return types.Unknown, fmt.Errorf("context ended while waiting for finality of transaction %s", transactionID)
 		case <-time.After(backoff):
 			status, err := txm.GetTransactionStatus(waitCtx, transactionID)
 			if err != nil {
-				return fmt.Errorf("error fetching transaction status: %w", err)
+				return status, fmt.Errorf("error fetching transaction status: %w", err)
 			}
 			switch status {
 			case types.Failed, types.Fatal:
-				return fmt.Errorf("transaction %s failed", transactionID)
+				return status, fmt.Errorf("transaction %s failed", transactionID)
 			default:
 				if status >= desiredStatus {
 					// if status is equal to or greater than desired status, return
-					txm.lggr.Debugw("ATA transaction reached state", "status", status, "transactionID", transactionID)
-					return nil
+					txm.lggr.Debugw("transaction reached state", "status", status, "transactionID", transactionID)
+					return status, nil
 				}
 				// otherwise keep polling
 			}
