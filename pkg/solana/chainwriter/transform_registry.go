@@ -12,13 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-type ReportPostTransform struct {
-	ReportContext [2][32]byte
-	Report        []byte
-	Info          ccipocr3.ExecuteReportInfo
-	TokenIndexes  []byte
-}
-
 type ExtraDataDecoded struct {
 	// ExtraArgsDecoded contain message specific extra args.
 	ExtraArgsDecoded map[string]any
@@ -31,6 +24,7 @@ type SVMExecCallArgs struct {
 	Report        []byte                     `mapstructure:"Report"`
 	Info          ccipocr3.ExecuteReportInfo `mapstructure:"Info"`
 	ExtraData     ExtraDataDecoded           `mapstructure:"ExtraData"`
+	TokenIndexes  []byte                     `mapstructure:"TokenIndexes"`
 }
 
 type SVMCommitCallArgs struct {
@@ -59,30 +53,20 @@ func FindTransform(id string) (func(context.Context, any, solana.AccountMetaSlic
 // This Transform function looks up the token pool addresses in the accounts slice and augments the args
 // with the indexes of the token pool addresses in the accounts slice.
 func CCIPExecuteTransform(ctx context.Context, args any, accounts solana.AccountMetaSlice, tableMap map[string]map[string][]*solana.AccountMeta) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
-	var argsDecoded SVMExecCallArgs
-	err := mapstructure.Decode(args, &argsDecoded)
+	var argsTransformed SVMExecCallArgs
+	err := mapstructure.Decode(args, &argsTransformed)
 	if err != nil {
 		return nil, nil, []txmutils.SetTxConfig{}, err
 	}
 
-	argsTransformed := ReportPostTransform{
-		ReportContext: argsDecoded.ReportContext,
-		Report:        argsDecoded.Report,
-		Info:          argsDecoded.Info,
-	}
-
-	if len(argsTransformed.Info.AbstractReports) != 1 || len(argsTransformed.Info.AbstractReports[0].Messages) != 1 {
-		return nil, nil, []txmutils.SetTxConfig{}, fmt.Errorf("Expected 1 report with 1 message")
-	}
-
-	cu, ok := argsDecoded.ExtraData.ExtraArgsDecoded["computeUnits"].(uint32)
+	cu, ok := argsTransformed.ExtraData.ExtraArgsDecoded["computeUnits"].(uint32)
 	if !ok {
 		return nil, nil, []txmutils.SetTxConfig{}, fmt.Errorf("computeUnits not found in ExtraData")
 	}
 
 	computeUnits := StaticCuOverhead + cu
 
-	for _, execData := range argsDecoded.ExtraData.DestExecDataDecoded {
+	for _, execData := range argsTransformed.ExtraData.DestExecDataDecoded {
 		destGasAmount, ok := execData["destGasAmount"].(uint32)
 		if !ok {
 			return nil, nil, []txmutils.SetTxConfig{}, fmt.Errorf("DestGasAmount not found in ExtraData")

@@ -65,7 +65,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 
 		// Accounts should be unchanged
 		require.Len(t, newAccounts, 2)
-		typedArgs, ok := transformedArgs.(chainwriter.ReportPostTransform)
+		typedArgs, ok := transformedArgs.(chainwriter.SVMExecCallArgs)
 		require.True(t, ok)
 		require.NotNil(t, typedArgs.TokenIndexes)
 		require.Len(t, typedArgs.TokenIndexes, 1)
@@ -78,7 +78,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 
 		// Accounts should be unchanged
 		require.Len(t, newAccounts, 2)
-		typedArgs, ok := transformedArgs.(chainwriter.ReportPostTransform)
+		typedArgs, ok := transformedArgs.(chainwriter.SVMExecCallArgs)
 		require.True(t, ok)
 		require.NotNil(t, typedArgs.TokenIndexes)
 		require.Len(t, typedArgs.TokenIndexes, 0)
@@ -109,7 +109,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		require.NoError(t, err)
 
 		verifyTxOpts(t, options, true)
-		_, ok := transformedArgs.(chainwriter.ReportPostTransform)
+		_, ok := transformedArgs.(chainwriter.SVMExecCallArgs)
 		require.True(t, ok)
 		require.Len(t, newAccounts, 2)
 	})
@@ -125,23 +125,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 			Info:          ccipocr3.ExecuteReportInfo{},
 		}
 		_, _, _, err := chainwriter.CCIPExecuteTransform(ctx, args, accounts, nil)
-		require.Contains(t, err.Error(), "Expected 1 report with 1 message")
-	})
-
-	t.Run("CCIPExecute ArgsTransform fails with multiple reports", func(t *testing.T) {
-		args := struct {
-			ReportContext [2][32]uint8
-			Report        []uint8
-			Info          ccipocr3.ExecuteReportInfo
-		}{
-			ReportContext: [2][32]uint8{},
-			Report:        []uint8{},
-			Info: ccipocr3.ExecuteReportInfo{
-				AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{}, {}},
-			},
-		}
-		_, _, _, err := chainwriter.CCIPExecuteTransform(ctx, args, accounts, nil)
-		require.Contains(t, err.Error(), "Expected 1 report with 1 message")
+		require.Contains(t, err.Error(), "computeUnits not found in ExtraData")
 	})
 }
 
