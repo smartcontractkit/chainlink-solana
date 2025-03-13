@@ -29,7 +29,7 @@ var defaultConfigSet = Chain{
 	ComputeUnitPriceMax:      ptr(uint64(1_000)),
 	ComputeUnitPriceMin:      ptr(uint64(0)),
 	ComputeUnitPriceDefault:  ptr(uint64(0)),
-	FeeBumpPeriod:            config.MustNewDuration(3 * time.Second), // set to 0 to disable fee bumping
+	FeeBumpPeriod:            config.MustNewDuration(3 * time.Second), // WARNING: If FeeBumpPeriod is shorter than blockhash expiration, multiple valid transactions can exist in parallel. This can result in higher costs and can cause unexpected behaviors if contracts do not de-dupe txs. Set to 0 to disable fee bumping.
 	BlockHistoryPollPeriod:   config.MustNewDuration(5 * time.Second),
 	BlockHistorySize:         ptr(uint64(1)),       // 1: uses latest block; >1: Uses multiple blocks, where n is number of blocks. DISCLAIMER: 1:1 ratio between n and RPC calls.
 	ComputeUnitLimitDefault:  ptr(uint32(200_000)), // set to 0 to disable adding compute unit limit
