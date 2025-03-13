@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"solutil/utils"
 
 	"github.com/gagliardetto/solana-go"
 
@@ -36,6 +37,44 @@ func main() {
 					}
 
 					return nil
+				},
+			},
+			{
+				Name: "download-contract-artifacts",
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "outdir", Aliases: []string{"o"}, Required: false},
+					&cli.BoolFlag{Name: "verbose", Aliases: []string{"v"}, Required: false},
+					&cli.StringFlag{Name: "tag", Aliases: []string{"t"}, Required: false},
+				},
+				Action: func(ctx *cli.Context) error {
+					const owner = "smartcontractkit"
+					const repo = "chainlink-ccip"
+					const name = "artifacts.tar.gz"
+
+					dir := ctx.String("outdir")
+					if dir == "" {
+						if cwd, err := os.Getwd(); err != nil {
+							return cli.Exit(err, 1)
+						} else {
+							dir = cwd
+						}
+					}
+
+					tag := ctx.String("tag")
+					if tag == "" {
+						if t, err := utils.GetLatestReleaseFromGithub(ctx, owner, repo); err != nil {
+							return err
+						} else {
+							tag = t
+						}
+					}
+
+					verbose := ctx.Bool("verbose")
+					if err := utils.DownloadTarGzReleaseAssetFromGithub(ctx, owner, repo, name, tag, dir, verbose); err != nil {
+						return cli.Exit(err, 1)
+					} else {
+						return nil
+					}
 				},
 			},
 		},
