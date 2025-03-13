@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/rand"
 	"sync/atomic"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/gagliardetto/solana-go/rpc/jsonrpc"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -288,6 +290,7 @@ func TestProcess(t *testing.T) {
 			TransactionHash:     expectedLog.TxHash.ToSolana(),
 			TransactionIndex:    txIndex,
 			TransactionLogIndex: txLogIndex,
+			Error:               expectedLog.Error,
 		},
 		Data: base64.StdEncoding.EncodeToString(expectedLog.Data),
 	}
@@ -327,29 +330,69 @@ func TestProcess(t *testing.T) {
 		EventIdl:    idl,
 		SubkeyPaths: [][]string{{"A"}, {"B"}},
 	}
+	orm.EXPECT().ChainID().Return(chainID).Maybe()
 	orm.EXPECT().SelectFilters(mock.Anything).Return([]Filter{filter}, nil).Once()
 	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{}, nil).Once()
-	orm.EXPECT().ChainID().Return(chainID).Once()
 	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, f Filter) (int64, error) {
 		require.Equal(t, f, filter)
 		return filterID, nil
 	}).Once()
 
-	orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []Log) error {
-		require.Len(t, logs, 1)
-		log := logs[0]
-		assert.Equal(t, log, expectedLog)
-		return nil
-	})
 	err = lp.RegisterFilter(ctx, filter)
 	require.NoError(t, err)
 
-	err = lp.Process(ctx, ev)
-	require.NoError(t, err)
+	t.Run("accepts matching log", func(t *testing.T) {
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []Log) error {
+			require.Len(t, logs, 1)
+			log := logs[0]
+			assert.Equal(t, expectedLog, log)
+			return nil
+		}).Once()
+		err = lp.Process(ctx, ev)
+		assert.NoError(t, err)
+	})
+
+	ev.Error = &jsonrpc.RPCError{Code: -32000, Message: "Transaction simulation failed: Error processing Instruction 0: custom program error: 0x1"}
+
+	t.Run("ignores reverted log when IncludeReverted = false", func(t *testing.T) {
+		// Should ignore this log, since reverted logs are not included. Should not call InsertLogs
+		err = lp.Process(ctx, ev)
+		assert.NoError(t, err)
+	})
+
+	t.Run("accepts reverted log when IncludeReverted = true", func(t *testing.T) {
+		filter.IncludeReverted = true
+		expectedLog.Error = fmt.Errorf("JsonRpcError -32000: Transaction simulation failed: Error processing Instruction 0: custom program error: 0x1")
+		orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, f Filter) (int64, error) {
+			require.Equal(t, f, filter)
+			return filterID, nil
+		}).Once()
+		err = lp.RegisterFilter(ctx, filter)
+		require.NoError(t, err)
+
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []Log) error {
+			require.Len(t, logs, 1)
+			log := logs[0]
+			assert.Equal(t, expectedLog, log)
+			return nil
+		}).Once()
+
+		err = lp.Process(ctx, ev)
+		assert.NoError(t, err)
+	})
 
 	orm.EXPECT().MarkFilterDeleted(mock.Anything, mock.Anything).Return(nil).Once()
 	err = lp.UnregisterFilter(ctx, filter.Name)
 	require.NoError(t, err)
+
+	t.Run("ignores non-matching logs", func(t *testing.T) {
+		err = lp.Process(ctx, ev)
+		assert.NoError(t, err)
+
+		ev.Error = nil
+		err = lp.Process(ctx, ev)
+		assert.NoError(t, err)
+	})
 }
 
 func Test_LogPoller_Replay(t *testing.T) {

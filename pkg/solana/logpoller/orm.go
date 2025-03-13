@@ -78,6 +78,7 @@ func (o *DSORM) InsertFilter(ctx context.Context, filter Filter) (id int64, err 
 		withEventIDL(filter.EventIdl).
 		withSubKeyPaths(filter.SubkeyPaths).
 		withIsBackfilled(filter.IsBackfilled).
+		withIncludeReverted(filter.IncludeReverted).
 		toArgs()
 	if err != nil {
 		return 0, err
@@ -94,7 +95,8 @@ func (o *DSORM) InsertFilter(ctx context.Context, filter Filter) (id int64, err 
 	  	                                                        starting_block = EXCLUDED.starting_block,
 	  	                                                        retention = EXCLUDED.retention,
 	  	                                                        max_logs_kept = EXCLUDED.max_logs_kept,
-	  	                                                        is_backfilled = EXCLUDED.is_backfilled
+	  	                                                        is_backfilled = EXCLUDED.is_backfilled,
+	  	                                                        include_reverted = EXCLUDED.include_reverted
 		RETURNING id;`
 
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -170,9 +172,9 @@ func (o *DSORM) insertLogsWithinTx(ctx context.Context, logs []Log, tx sqlutil.D
 		}
 
 		query := `INSERT INTO solana.logs
-					(filter_id, chain_id, log_index, block_hash, block_number, block_timestamp, address, event_sig, subkey_values, tx_hash, data, created_at, expires_at, sequence_num)
+					(filter_id, chain_id, log_index, block_hash, block_number, block_timestamp, address, event_sig, subkey_values, tx_hash, data, created_at, expires_at, sequence_num, error)
 				VALUES
-					(:filter_id, :chain_id, :log_index, :block_hash, :block_number, :block_timestamp, :address, :event_sig, :subkey_values, :tx_hash, :data, NOW(), :expires_at, :sequence_num)
+					(:filter_id, :chain_id, :log_index, :block_hash, :block_number, :block_timestamp, :address, :event_sig, :subkey_values, :tx_hash, :data, NOW(), :expires_at, :sequence_num, :error)
 				ON CONFLICT DO NOTHING`
 
 		res, err := tx.NamedExecContext(ctx, query, logs[start:end])
