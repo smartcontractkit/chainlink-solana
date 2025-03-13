@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-solana/integration-tests
 
-go 1.23.3
+go 1.24
 
 replace github.com/smartcontractkit/chainlink-solana => ../
 

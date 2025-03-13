@@ -75,7 +75,6 @@ func TestLogPollerFilters(t *testing.T) {
 		for _, filter := range filters {
 			t.Run("Read/write filter: "+filter.Name, func(t *testing.T) {
 				ctx := tests.Context(t)
-				chainID := uuid.NewString()
 				dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 				orm := NewORM(chainID, dbx, lggr)
 				id, err := orm.InsertFilter(ctx, filter)
@@ -101,7 +100,6 @@ func TestLogPollerFilters(t *testing.T) {
 		}
 	})
 	t.Run("Updates non primary fields if name and chainID is not unique", func(t *testing.T) {
-		chainID := uuid.NewString()
 		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 		orm := NewORM(chainID, dbx, lggr)
 		filter := newRandomFilter(t)
@@ -121,7 +119,6 @@ func TestLogPollerFilters(t *testing.T) {
 		require.Equal(t, filter, dbFilter)
 	})
 	t.Run("Allows reuse name of a filter marked as deleted", func(t *testing.T) {
-		chainID := uuid.NewString()
 		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 		orm := NewORM(chainID, dbx, lggr)
 		filter := newRandomFilter(t)
@@ -153,7 +150,6 @@ func TestLogPollerFilters(t *testing.T) {
 	})
 	t.Run("Deletes log on parent filter deletion", func(t *testing.T) {
 		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
-		chainID := uuid.NewString()
 		orm := NewORM(chainID, dbx, lggr)
 		filter := newRandomFilter(t)
 		ctx := tests.Context(t)
@@ -191,7 +187,6 @@ func TestLogPollerFilters(t *testing.T) {
 
 	t.Run("MarkBackfilled updated corresponding field", func(t *testing.T) {
 		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
-		chainID := uuid.NewString()
 		orm := NewORM(chainID, dbx, lggr)
 
 		filter := newRandomFilter(t)
@@ -221,7 +216,6 @@ func TestLogPollerLogs(t *testing.T) {
 	t.Parallel()
 
 	lggr := logger.Test(t)
-	chainID := uuid.NewString()
 	dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 	orm := NewORM(chainID, dbx, lggr)
 

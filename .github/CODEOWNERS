@@ -19,7 +19,7 @@
 /gauntlet @smartcontractkit/devx @smartcontractkit/bix-build
 
 # monitoring ownership
-/pkg/monitoring @smartcontractkit/realtime
+/pkg/monitoring @smartcontractkit/realtime @smartcontractkit/bix-build
 
 # LOOP Plugin commands
 /pkg/solana/cmd/chainlink-solana @smartcontractkit/foundations @smartcontractkit/bix-build

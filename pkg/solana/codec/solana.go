@@ -247,6 +247,13 @@ func createCodecType(
 			return name, nil, fmt.Errorf("%w: variants are not supported", commontypes.ErrInvalidConfig)
 		}
 		return name, refs.builder.Uint8(), nil
+	case IdlTypeDefTyKindCustom:
+		switch def.Type.Codec {
+		case "onramp_address":
+			return name, NewOnRampAddress(refs.builder), nil
+		default:
+			return name, nil, fmt.Errorf(unknownIDLFormat, commontypes.ErrInvalidConfig, def.Type.Codec)
+		}
 	default:
 		return name, nil, fmt.Errorf(unknownIDLFormat, commontypes.ErrInvalidConfig, def.Type.Kind)
 	}
@@ -301,8 +308,8 @@ func processFieldType(parentTypeName string, idlType IdlType, refs *codecRefs) (
 		return getCodecByStringType(idlType.GetString(), refs.builder)
 	case idlType.IsIdlTypeOption():
 		// Go doesn't have an `Option` type; use pointer to type instead
-		// this should be automatic in the codec
-		return processFieldType(parentTypeName, idlType.GetIdlTypeOption().Option, refs)
+		inner, err := processFieldType(parentTypeName, idlType.GetIdlTypeOption().Option, refs)
+		return NewOption(inner), err
 	case idlType.IsIdlTypeDefined():
 		return asDefined(parentTypeName, idlType.GetIdlTypeDefined(), refs)
 	case idlType.IsArray():

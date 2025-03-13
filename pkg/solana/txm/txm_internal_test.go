@@ -23,7 +23,6 @@ import (
 	relayconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	bigmath "github.com/smartcontractkit/chainlink-common/pkg/utils/big_math"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
@@ -1124,7 +1123,7 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 		// tx should be stored in-memory and moved to errored state
 		status, err := txm.GetTransactionStatus(ctx, txID)
 		require.NoError(t, err)
-		require.Equal(t, commontypes.Fatal, status)
+		require.Equal(t, types.Fatal, status)
 	})
 }
 
@@ -1208,6 +1207,14 @@ func TestTxm_Enqueue(t *testing.T) {
 			assert.Error(t, txm.Enqueue(ctx, run.name, run.tx, nil, run.lastValidBlockHeight))
 		})
 	}
+
+	t.Run("duplicate tx ID does not error", func(t *testing.T) {
+		id := uuid.NewString()
+		err := txm.Enqueue(ctx, "", tx, &id, 100)
+		require.NoError(t, err)
+		err = txm.Enqueue(ctx, "", tx, &id, 100)
+		require.NoError(t, err)
+	})
 }
 
 func addSigAndLimitToTx(t *testing.T, keystore SimpleKeystore, pubkey solana.PublicKey, tx solana.Transaction, limit fees.ComputeUnitLimit) *solana.Transaction {
@@ -1790,4 +1797,170 @@ func TestTxm_OnReorg(t *testing.T) {
 			require.Equal(t, types.Finalized, status)
 		})
 	}
+}
+
+func TestTxm_GetTransactionStatus(t *testing.T) {
+	// set up configs needed in txm
+	lggr := logger.Test(t)
+	ctx := tests.Context(t)
+	_, cancel := context.WithCancel(ctx)
+
+	// set up configs needed in txm
+	estimator := "fixed"
+	id := "mocknet-" + estimator + "-" + uuid.NewString()
+
+	cfg := config.NewDefault()
+	cfg.Chain.FeeEstimatorMode = &estimator
+	// Enable retention timeout to keep transactions after finality or error
+	cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(5 * time.Second)
+	mc := mocks.NewReaderWriter(t)
+
+	// mock solana keystore
+	mkey := keyMocks.NewSimpleKeystore(t)
+
+	loader := utils.NewStaticLoader[client.ReaderWriter](mc)
+	txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
+
+	msg := pendingTx{id: uuid.NewString()}
+
+	// Create new tx in pending state
+	err := txm.txs.New(msg)
+	require.NoError(t, err)
+	state, err := txm.GetTransactionStatus(ctx, msg.id)
+	require.NoError(t, err)
+	require.Equal(t, types.Pending, state)
+
+	// Move tx to broadcasted state
+	err = txm.txs.OnBroadcasted(msg)
+	require.NoError(t, err)
+	state, err = txm.GetTransactionStatus(ctx, msg.id)
+	require.NoError(t, err)
+	require.Equal(t, types.Pending, state)
+
+	sig := randomSignature(t)
+	txm.txs.AddSignature(cancel, msg.id, sig)
+
+	// Move tx to processed state
+	msgId, err := txm.txs.OnProcessed(sig)
+	require.NoError(t, err)
+	require.Equal(t, msg.id, msgId)
+	state, err = txm.GetTransactionStatus(ctx, msg.id)
+	require.NoError(t, err)
+	require.Equal(t, types.Pending, state)
+
+	// Move tx to confirmed state
+	msgId, err = txm.txs.OnConfirmed(sig)
+	require.NoError(t, err)
+	require.Equal(t, msg.id, msgId)
+	state, err = txm.GetTransactionStatus(ctx, msg.id)
+	require.NoError(t, err)
+	require.Equal(t, types.Unconfirmed, state)
+
+	// Move tx to finalized state
+	msgId, err = txm.txs.OnFinalized(sig, 1*time.Second)
+	require.NoError(t, err)
+	require.Equal(t, msg.id, msgId)
+	state, err = txm.GetTransactionStatus(ctx, msg.id)
+	require.NoError(t, err)
+	require.Equal(t, types.Finalized, state)
+
+	// Add errored tx
+	errMsg := pendingTx{id: uuid.NewString()}
+	err = txm.txs.OnPrebroadcastError(errMsg.id, 1*time.Second, txmutils.Errored, TxFailReject)
+	require.NoError(t, err)
+	state, err = txm.GetTransactionStatus(ctx, errMsg.id)
+	require.NoError(t, err)
+	require.Equal(t, types.Failed, state)
+
+	// Add fatally errored tx
+	fatalMsg := pendingTx{id: uuid.NewString()}
+	err = txm.txs.OnPrebroadcastError(fatalMsg.id, 1*time.Second, txmutils.FatallyErrored, TxFailReject)
+	require.NoError(t, err)
+	state, err = txm.GetTransactionStatus(ctx, fatalMsg.id)
+	require.NoError(t, err)
+	require.Equal(t, types.Fatal, state)
+
+	// Unknown tx returns error
+	state, err = txm.GetTransactionStatus(ctx, uuid.NewString())
+	require.Error(t, err)
+	require.Equal(t, types.Unknown, state)
+}
+
+func TestTxm_DependencyTx(t *testing.T) {
+	ctx := tests.Context(t)
+	lggr := logger.Test(t)
+	estimator := "fixed"
+	id := "mocknet-dep-" + uuid.NewString()
+	cfg := config.NewDefault()
+	cfg.Chain.FeeEstimatorMode = &estimator
+	cfg.Chain.TxConfirmTimeout = relayconfig.MustNewDuration(30 * time.Second)
+	cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(50 * time.Second)
+
+	mc := mocks.NewReaderWriter(t)
+	mc.On("GetLatestBlock", mock.Anything).Return(&rpc.GetBlockResult{}, nil).Maybe()
+
+	mkey := keyMocks.NewSimpleKeystore(t)
+	mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{1}, nil)
+	loader := utils.NewStaticLoader[client.ReaderWriter](mc)
+
+	txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
+	require.NoError(t, txm.Start(ctx))
+	t.Cleanup(func() { require.NoError(t, txm.Close()) })
+
+	mc.On("SendTx", mock.Anything, mock.Anything).Return(solana.Signature{}, nil).Maybe()
+	mc.On("SimulateTx", mock.Anything, mock.Anything, mock.Anything).Return(&rpc.SimulateTransactionResult{}, nil).Maybe()
+	mc.On("SignatureStatuses", mock.Anything, mock.AnythingOfType("[]solana.Signature")).Return(
+		func(_ context.Context, sigs []solana.Signature) (out []*rpc.SignatureStatusesResult) {
+			for i := 0; i < len(sigs); i++ {
+				out = append(out, &rpc.SignatureStatusesResult{})
+			}
+			return out
+		}, nil,
+	).Maybe()
+
+	t.Run("DependencySuccess", func(t *testing.T) {
+		depID := "dep-tx-success"
+		depMsg := pendingTx{id: depID}
+		require.NoError(t, txm.txs.New(depMsg))
+
+		depSig := randomSignature(t)
+		dummyCancel := func() {}
+		err := txm.txs.OnBroadcasted(depMsg)
+		require.NoError(t, err)
+		require.NoError(t, txm.txs.AddSignature(dummyCancel, depID, depSig))
+		_, err = txm.txs.OnConfirmed(depSig)
+		require.NoError(t, err)
+		_, err = txm.txs.OnFinalized(depSig, 1*time.Second)
+		require.NoError(t, err)
+
+		mainTx, _ := getTx(t, 100, mkey)
+
+		mainTxID := uuid.NewString()
+		lastValidBlockHeight := uint64(100)
+		err = txm.Enqueue(ctx, "test-dep-success", mainTx, &mainTxID, lastValidBlockHeight, []txmutils.SetTxConfig{txmutils.SetDependencyTxID(depID)}...)
+		require.NoError(t, err)
+
+		status, err := txm.GetTransactionStatus(ctx, mainTxID)
+		require.NoError(t, err)
+
+		require.Equal(t, status, types.Pending)
+	})
+
+	t.Run("DependencyFailure", func(t *testing.T) {
+		depID := "dep-tx-failure"
+		depMsg := pendingTx{id: depID}
+		require.NoError(t, txm.txs.New(depMsg))
+		require.NoError(t, txm.txs.OnPrebroadcastError(depID, 1*time.Second, txmutils.Errored, TxFailReject))
+
+		mainTx, _ := getTx(t, 200, mkey)
+		mainTxID := uuid.NewString()
+		lastValidBlockHeight := uint64(100)
+		err := txm.Enqueue(ctx, "test-dep-failure", mainTx, &mainTxID, lastValidBlockHeight, []txmutils.SetTxConfig{txmutils.SetDependencyTxID(depID)}...)
+		require.NoError(t, err)
+
+		status, err := txm.waitForTxStatus(ctx, mainTxID, types.Finalized)
+		require.Error(t, err)
+
+		require.Equal(t, types.Failed, status)
+	})
 }

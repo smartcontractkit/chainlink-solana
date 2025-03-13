@@ -47,4 +47,8 @@ var (
 		Name: "solana_txm_tx_error_sim_other",
 		Help: "Number of transactions that failed simulation with an unrecognized error. Note: tx may still be included onchain",
 	}, []string{"chainID"})
+	promSolTxmDependencyFailTxs = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "solana_txm_tx_error_dependency",
+		Help: "Number of transactions that failed due to a dependency tx failing.",
+	}, []string{"chainID"})
 )

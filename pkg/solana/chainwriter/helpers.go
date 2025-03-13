@@ -112,16 +112,16 @@ func GetDebugIDAtLocation(args any, location string) (string, error) {
 		return "", errors.New("no debug ID found at location: " + location)
 	}
 	// there should only be one debug ID, others will be ignored.
-	debugID := string(debugIDList[0])
+	debugID := ccipocr3.Bytes32(debugIDList[0])
 
-	return debugID, nil
+	return debugID.String(), nil
 }
 
 func errorWithDebugID(err error, debugID string) error {
 	if debugID == "" {
 		return err
 	}
-	return fmt.Errorf("Debug ID: %s: Error: %s", debugID, err)
+	return fmt.Errorf("Debug ID: %s: Error: %w", debugID, err)
 }
 
 // traversePath recursively traverses the given structure based on the provided path.
