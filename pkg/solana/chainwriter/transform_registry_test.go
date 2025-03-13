@@ -25,21 +25,23 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	poolKeys := []solana.PublicKey{destTokenAddr}
 	poolKeys = append(poolKeys, chainwriter.CreateTestPubKeys(t, 1)...)
 
-	args := ReportPreTransform{
+	args := chainwriter.SVMExecCallArgs{
 		Info: ccipocr3.ExecuteReportInfo{
 			AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
 				Messages: []ccipocr3.Message{{
 					TokenAmounts: []ccipocr3.RampTokenAmount{{
 						DestTokenAddress: ccipocr3.UnknownAddress(destTokenAddr.Bytes()),
-						DestExecDataDecoded: map[string]any{
-							"destGasAmount": uint32(500),
-						},
 					}},
-					ExtraArgsDecoded: map[string]any{
-						"ComputeUnits": uint32(500),
-					},
 				}},
 			}},
+		},
+		ExtraData: chainwriter.ExtraDataDecoded{
+			ExtraArgsDecoded: map[string]any{
+				"computeUnits": uint32(500),
+			},
+			DestExecDataDecoded: []map[string]any{
+				{"destGasAmount": uint32(500)},
+			},
 		},
 	}
 
@@ -86,23 +88,21 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		args := struct {
 			ReportContext [2][32]uint8
 			Info          ccipocr3.ExecuteReportInfo
+			ExtraData     chainwriter.ExtraDataDecoded
 		}{
 			ReportContext: [2][32]uint8{},
 			Info: ccipocr3.ExecuteReportInfo{
 				AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
-					Messages: []ccipocr3.Message{{
-						ExtraArgsDecoded: map[string]any{
-							"ComputeUnits": uint32(500),
-						},
-						TokenAmounts: []ccipocr3.RampTokenAmount{
-							{
-								DestExecDataDecoded: map[string]any{
-									"destGasAmount": uint32(500),
-								},
-							},
-						},
-					}},
+					Messages: []ccipocr3.Message{{}},
 				}},
+			},
+			ExtraData: chainwriter.ExtraDataDecoded{
+				ExtraArgsDecoded: map[string]any{
+					"computeUnits": uint32(500),
+				},
+				DestExecDataDecoded: []map[string]any{
+					{"destGasAmount": uint32(500)},
+				},
 			},
 		}
 		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteTransform(ctx, args, accounts, nil)
@@ -154,7 +154,11 @@ func Test_CCIPCommitAccountTransform(t *testing.T) {
 			Info ccipocr3.CommitReportInfo
 		}{
 			Info: ccipocr3.CommitReportInfo{
-				TokenPrices: []ccipocr3.TokenPrice{{TokenID: ccipocr3.UnknownEncodedAddress(key1.String())}},
+				PriceUpdates: ccipocr3.PriceUpdates{
+					TokenPriceUpdates: []ccipocr3.TokenPrice{
+						{TokenID: ccipocr3.UnknownEncodedAddress(key1.String())},
+					},
+				},
 			},
 		}
 		accounts := []*solana.AccountMeta{{PublicKey: key1}, {PublicKey: key2}}
@@ -191,6 +195,6 @@ func verifyTxOpts(t *testing.T, options []txmutils.SetTxConfig, exec bool) {
 
 	if exec {
 		options[1](txConfig)
-		require.Equal(t, uint32(2000), txConfig.ComputeUnitLimit)
+		require.Equal(t, chainwriter.StaticCuOverhead+1000, txConfig.ComputeUnitLimit)
 	}
 }

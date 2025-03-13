@@ -940,7 +940,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 			opt2(txConfig)
 
 			require.Equal(t, false, txConfig.EstimateComputeUnitLimit)
-			require.Equal(t, uint32(1700), txConfig.ComputeUnitLimit)
+			require.Equal(t, chainwriter.StaticCuOverhead+700, txConfig.ComputeUnitLimit)
 		}).Once()
 
 		// stripped back report just for purposes of example
@@ -950,13 +950,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 					TokenAmounts: []ccipocr3.RampTokenAmount{
 						{
 							DestTokenAddress: destTokenAddr.Bytes(),
-							DestExecDataDecoded: map[string]any{
-								"destGasAmount": uint32(200),
-							},
 						},
-					},
-					ExtraArgsDecoded: map[string]any{
-						"ComputeUnits": uint32(500),
 					},
 				},
 			},
@@ -966,12 +960,20 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 		encodedReport, err := json.Marshal(abstractReport)
 		require.NoError(t, err)
 
-		args := ReportPreTransform{
+		args := chainwriter.SVMExecCallArgs{
 			ReportContext: [2][32]byte{{0x01}, {0x02}},
 			Report:        encodedReport,
 			Info: ccipocr3.ExecuteReportInfo{
 				MerkleRoots:     []ccipocr3.MerkleRootChain{},
 				AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{abstractReport},
+			},
+			ExtraData: chainwriter.ExtraDataDecoded{
+				ExtraArgsDecoded: map[string]any{
+					"computeUnits": uint32(500),
+				},
+				DestExecDataDecoded: []map[string]any{
+					{"destGasAmount": uint32(200)},
+				},
 			},
 		}
 

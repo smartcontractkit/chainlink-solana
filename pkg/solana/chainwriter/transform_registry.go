@@ -2,7 +2,6 @@ package chainwriter
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
@@ -20,8 +19,31 @@ type ReportPostTransform struct {
 	TokenIndexes  []byte
 }
 
+type ExtraDataDecoded struct {
+	// ExtraArgsDecoded contain message specific extra args.
+	ExtraArgsDecoded map[string]any
+	// DestExecDataDecoded contain token transfer specific extra args.
+	DestExecDataDecoded []map[string]any
+}
+
+type SVMExecCallArgs struct {
+	ReportContext [2][32]byte                `mapstructure:"ReportContext"`
+	Report        []byte                     `mapstructure:"Report"`
+	Info          ccipocr3.ExecuteReportInfo `mapstructure:"Info"`
+	ExtraData     ExtraDataDecoded           `mapstructure:"ExtraData"`
+}
+
+type SVMCommitCallArgs struct {
+	ReportContext [2][32]byte               `mapstructure:"ReportContext"`
+	Report        []byte                    `mapstructure:"Report"`
+	Rs            [][32]byte                `mapstructure:"Rs"`
+	Ss            [][32]byte                `mapstructure:"Ss"`
+	RawVs         [32]byte                  `mapstructure:"RawVs"`
+	Info          ccipocr3.CommitReportInfo `mapstructure:"Info"`
+}
+
 // TODO: replace with actual value from CCIP on-chain
-const staticCuOverhead = 1000
+const StaticCuOverhead uint32 = 120000
 
 func FindTransform(id string) (func(context.Context, any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error), error) {
 	switch id {
@@ -37,29 +59,35 @@ func FindTransform(id string) (func(context.Context, any, solana.AccountMetaSlic
 // This Transform function looks up the token pool addresses in the accounts slice and augments the args
 // with the indexes of the token pool addresses in the accounts slice.
 func CCIPExecuteTransform(ctx context.Context, args any, accounts solana.AccountMetaSlice, tableMap map[string]map[string][]*solana.AccountMeta) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
-	var argsTransformed ReportPostTransform
-	err := mapstructure.Decode(args, &argsTransformed)
+	var argsDecoded SVMExecCallArgs
+	err := mapstructure.Decode(args, &argsDecoded)
 	if err != nil {
 		return nil, nil, []txmutils.SetTxConfig{}, err
+	}
+
+	argsTransformed := ReportPostTransform{
+		ReportContext: argsDecoded.ReportContext,
+		Report:        argsDecoded.Report,
+		Info:          argsDecoded.Info,
 	}
 
 	if len(argsTransformed.Info.AbstractReports) != 1 || len(argsTransformed.Info.AbstractReports[0].Messages) != 1 {
 		return nil, nil, []txmutils.SetTxConfig{}, fmt.Errorf("Expected 1 report with 1 message")
 	}
 
-	// Compute Units: static cu overhead + svmExtraArgsV1.computeUnits + sum_per_token(tokenDestGasAmount)
-	cu := argsTransformed.Info.AbstractReports[0].Messages[0].ExtraArgsDecoded["ComputeUnits"]
-	if cu == nil {
-		return nil, nil, []txmutils.SetTxConfig{}, errors.New("missing ComputeUnits in ExtraArgs")
+	cu, ok := argsDecoded.ExtraData.ExtraArgsDecoded["computeUnits"].(uint32)
+	if !ok {
+		return nil, nil, []txmutils.SetTxConfig{}, fmt.Errorf("computeUnits not found in ExtraData")
 	}
-	computeUnits := staticCuOverhead + cu.(uint32)
 
-	for _, token := range argsTransformed.Info.AbstractReports[0].Messages[0].TokenAmounts {
-		destGasAmount := token.DestExecDataDecoded["destGasAmount"]
-		if destGasAmount == nil {
-			return nil, nil, []txmutils.SetTxConfig{}, fmt.Errorf("missing destGasAmount in DestExecData")
+	computeUnits := StaticCuOverhead + cu
+
+	for _, execData := range argsDecoded.ExtraData.DestExecDataDecoded {
+		destGasAmount, ok := execData["destGasAmount"].(uint32)
+		if !ok {
+			return nil, nil, []txmutils.SetTxConfig{}, fmt.Errorf("DestGasAmount not found in ExtraData")
 		}
-		computeUnits += destGasAmount.(uint32)
+		computeUnits += destGasAmount
 	}
 
 	options := []txmutils.SetTxConfig{
@@ -102,16 +130,15 @@ func CCIPExecuteTransform(ctx context.Context, args any, accounts solana.Account
 
 // This Transform function trims off the GlobalState account from commit transactions if there are no token or gas price updates
 func CCIPCommitTransform(ctx context.Context, args any, accounts solana.AccountMetaSlice, _ map[string]map[string][]*solana.AccountMeta) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
-	var tokenPriceVals, gasPriceVals [][]byte
-	var err error
-	tokenPriceVals, err = GetValuesAtLocation(args, "Info.TokenPrices.TokenID")
-	if err != nil && !errors.Is(err, errFieldNotFound) {
-		return nil, nil, []txmutils.SetTxConfig{}, fmt.Errorf("error getting values at location: %w", err)
+	var argsDecoded SVMCommitCallArgs
+	err := mapstructure.Decode(args, &argsDecoded)
+	if err != nil {
+		return nil, nil, []txmutils.SetTxConfig{}, err
 	}
-	gasPriceVals, err = GetValuesAtLocation(args, "Info.GasPrices.ChainSel")
-	if err != nil && !errors.Is(err, errFieldNotFound) {
-		return nil, nil, []txmutils.SetTxConfig{}, fmt.Errorf("error getting values at location: %w", err)
-	}
+
+	tokenPriceVals := argsDecoded.Info.TokenPriceUpdates
+	gasPriceVals := argsDecoded.Info.GasPriceUpdates
+
 	transformedAccounts := accounts
 	if len(tokenPriceVals) == 0 && len(gasPriceVals) == 0 {
 		transformedAccounts = accounts[:len(accounts)-1]
