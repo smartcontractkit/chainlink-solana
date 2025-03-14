@@ -252,7 +252,7 @@ func createCodecType(
 		case "onramp_address":
 			return name, NewOnRampAddress(refs.builder), nil
 		case "cross_chain_amount":
-			return name, NewCrossChainAmount(refs.builder), nil
+			return name, NewCrossChainAmount(), nil
 		default:
 			return name, nil, fmt.Errorf(unknownIDLFormat, commontypes.ErrInvalidConfig, def.Type.Codec)
 		}

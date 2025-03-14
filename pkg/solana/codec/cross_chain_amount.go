@@ -10,33 +10,39 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
-func NewCrossChainAmount(builder encodings.Builder) encodings.TypeCodec {
+const CrossChainAmountLength = 32
+
+func NewCrossChainAmount() encodings.TypeCodec {
 	return &crossChainAmount{}
 }
 
-type crossChainAmount struct {
-	intEncoder encodings.TypeCodec
-}
+type crossChainAmount struct {}
 
 var _ encodings.TypeCodec = &crossChainAmount{}
 
 func (d *crossChainAmount) Encode(value any, into []byte) ([]byte, error) {
-	bi, ok := value.(*big.Int)
-	if !ok {
-		return nil, fmt.Errorf("%w: expected []byte, got %T", types.ErrInvalidType, value)
-	}
+	var bi *big.Int
+	switch v := value.(type) {
+	case *big.Int:
+		bi = v
+	case cciptypes.BigInt:
+		bi = v.Int
+	default:
+		return nil, fmt.Errorf("%w: expected big.Int, got %T", types.ErrInvalidType, value)
+	}	
 
 	bytes := encodeBigIntToFixedLengthLE(bi, 32)
 	return append(into, bytes...), nil
 }
 
 func (d *crossChainAmount) Decode(encoded []byte) (any, []byte, error) {
-	// TODO: assert >= 32 remaining
-	buf := encoded[0:32]
-	encoded = encoded[32:]
-
-	bi := decodeLEToBigInt(buf)
-	return bi, encoded, nil
+	decoded, remaining, err := encodings.SafeDecode(encoded, CrossChainAmountLength, func(raw []byte) cciptypes.BigInt {
+		return decodeLEToBigInt(raw) 
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return decoded, remaining, nil
 }
 
 func encodeBigIntToFixedLengthLE(bi *big.Int, length int) []byte {
@@ -74,9 +80,9 @@ func (d *crossChainAmount) GetType() reflect.Type {
 }
 
 func (d *crossChainAmount) Size(val int) (int, error) {
-	return 32, nil
+	return CrossChainAmountLength, nil
 }
 
 func (d *crossChainAmount) FixedSize() (int, error) {
-	return 32, nil
+	return CrossChainAmountLength, nil
 }
