@@ -3,9 +3,9 @@
 ,
 }:
 
-pkgs.buildGoModule {
+pkgs.buildGo123Module {
   name = "solutil";
   src = ./.;
-  vendorHash = "sha256-se09IJLkE/qCs+VV0wE/9dooZnhtJrF97ABqmwk158c=";
+  vendorHash = "sha256-onIj3yhEc8UOeKyFGXkVCo7QLsvXb8tmgjEECmbg9iU=";
 }
 

@@ -1,11 +1,15 @@
 package main
 
 import (
+	"archive/tar"
+	_ "embed"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"solutil/utils"
+	"strings"
 
 	"github.com/gagliardetto/solana-go"
 
@@ -69,10 +73,80 @@ func main() {
 						}
 					}
 
-					verbose := ctx.Bool("verbose")
-					if err := utils.DownloadTarGzReleaseAssetFromGithub(ctx, owner, repo, name, tag, dir, verbose); err != nil {
+					err := utils.DownloadTarGzReleaseAssetFromGithub(ctx, owner, repo, name, tag, func(r *tar.Reader, h *tar.Header) error {
+						if h.Typeflag == tar.TypeReg && filepath.Ext(h.Name) == ".so" {
+							outPath := filepath.Join(dir, filepath.Base(h.Name))
+							if err := os.MkdirAll(filepath.Dir(outPath), os.ModePerm); err != nil {
+								return err
+							}
+
+							outFile, err := os.Create(outPath)
+							if err != nil {
+								return err
+							}
+							defer outFile.Close()
+
+							if _, err := io.Copy(outFile, r); err != nil {
+								return err
+							}
+
+							if ctx.Bool("verbose") {
+								fmt.Fprintf(ctx.App.Writer, "Extracted %s\n", outPath)
+							}
+						}
+						return nil
+					})
+
+					if err != nil {
 						return cli.Exit(err, 1)
 					} else {
+						return nil
+					}
+				},
+			},
+			{
+				Name: "get-dependency-version",
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "dependency", Aliases: []string{"d"}, Required: true},
+					&cli.StringFlag{Name: "path", Aliases: []string{"p"}, Required: false},
+				},
+				Action: func(ctx *cli.Context) error {
+					path := ctx.String("path")
+					if path == "" {
+						if cwd, err := os.Getwd(); err != nil {
+							return cli.Exit(err, 1)
+						} else {
+							path = filepath.Join(cwd, "go.mod")
+						}
+					}
+
+					dep, err := utils.GetDependencyVersion(path, ctx.String("dependency"))
+					if err != nil {
+						return cli.Exit(err, 1)
+					}
+
+					tokens := strings.Split(dep.Mod.Version, "-")
+					if len(tokens) == 3 {
+						fmt.Fprintln(ctx.App.Writer, tokens[2])
+					} else {
+						fmt.Fprintln(ctx.App.Writer, dep.Mod.Version)
+					}
+
+					return nil
+				},
+			},
+			{
+				Name: "get-long-sha",
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "owner", Aliases: []string{"o"}, Required: true},
+					&cli.StringFlag{Name: "repo", Aliases: []string{"r"}, Required: true},
+					&cli.StringFlag{Name: "sha", Aliases: []string{"s"}, Required: true},
+				},
+				Action: func(ctx *cli.Context) error {
+					if sha, err := utils.GetLongShaFromGithub(ctx, ctx.String("owner"), ctx.String("repo"), ctx.String("sha")); err != nil {
+						return cli.Exit(err, 1)
+					} else {
+						fmt.Fprintln(ctx.App.Writer, sha)
 						return nil
 					}
 				},

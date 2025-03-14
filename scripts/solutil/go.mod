@@ -1,12 +1,13 @@
 module solutil
 
-go 1.22
+go 1.23.0
 
-toolchain go1.22.7
+toolchain go1.23.2
 
 require (
 	github.com/gagliardetto/solana-go v1.12.0
 	github.com/urfave/cli/v2 v2.27.6
+	golang.org/x/mod v0.24.0
 )
 
 require (
