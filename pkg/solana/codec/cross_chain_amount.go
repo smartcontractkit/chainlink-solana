@@ -16,7 +16,7 @@ func NewCrossChainAmount() encodings.TypeCodec {
 	return &crossChainAmount{}
 }
 
-type crossChainAmount struct {}
+type crossChainAmount struct{}
 
 var _ encodings.TypeCodec = &crossChainAmount{}
 
@@ -29,7 +29,7 @@ func (d *crossChainAmount) Encode(value any, into []byte) ([]byte, error) {
 		bi = v.Int
 	default:
 		return nil, fmt.Errorf("%w: expected big.Int, got %T", types.ErrInvalidType, value)
-	}	
+	}
 
 	bytes := encodeBigIntToFixedLengthLE(bi, 32)
 	return append(into, bytes...), nil
@@ -37,7 +37,7 @@ func (d *crossChainAmount) Encode(value any, into []byte) ([]byte, error) {
 
 func (d *crossChainAmount) Decode(encoded []byte) (any, []byte, error) {
 	decoded, remaining, err := encodings.SafeDecode(encoded, CrossChainAmountLength, func(raw []byte) cciptypes.BigInt {
-		return decodeLEToBigInt(raw) 
+		return decodeLEToBigInt(raw)
 	})
 	if err != nil {
 		return nil, nil, err

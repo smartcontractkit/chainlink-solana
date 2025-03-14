@@ -4,9 +4,11 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
 func TestSolanaCrossChainAmountCodec(t *testing.T) {
@@ -34,7 +36,7 @@ func TestSolanaCrossChainAmountCodec(t *testing.T) {
 		encoded[0] = 1 // set first digit in LE encoded bytes to 1 for big.Into value of 1
 		decoded, remaining, err := ccaCodec.Decode(encoded)
 		require.NoError(t, err)
-		require.Len(t, remaining, len(encoded) - codec.CrossChainAmountLength)
+		require.Len(t, remaining, len(encoded)-codec.CrossChainAmountLength)
 		require.Equal(t, ccipocr3.NewBigInt(big.NewInt(1)), decoded)
 	})
 
