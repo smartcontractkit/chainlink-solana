@@ -804,6 +804,43 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		require.Error(t, err)
 		require.Equal(t, "", id)
 	})
+
+	t.Run("successfully clears out signature if transaction not found", func(t *testing.T) {
+		sig := randomSignature(t)
+		id := uuid.NewString()
+		txInfo := txInfo{
+			id: id,
+			state: utils.Confirmed,
+		}
+		txs.sigToTxInfo[sig] = txInfo
+
+		txId, err := txs.OnError(sig, retentionTimeout, utils.Errored, 0)
+		require.NoError(t, err)
+		require.Equal(t, id, txId)
+		_, exists := txs.sigToTxInfo[sig]
+		require.False(t, exists)
+	})
+
+	t.Run("successfully clears out signature and does not update existing error entry", func(t *testing.T) {
+		sig := randomSignature(t)
+		id := uuid.NewString()
+		txInfo := txInfo{
+			id: id,
+			state: utils.Errored,
+		}
+		txs.sigToTxInfo[sig] = txInfo
+		tx := finishedTx{retentionTs: time.Now().Add(retentionTimeout), state: utils.Errored}
+		txs.finalizedErroredTxs[id] = tx
+
+		txId, err := txs.OnError(sig, retentionTimeout, utils.FatallyErrored, 0)
+		require.NoError(t, err)
+		require.Equal(t, id, txId)
+		_, exists := txs.sigToTxInfo[sig]
+		require.False(t, exists) // signature should be cleared
+		erroredTx, erroredExists := txs.finalizedErroredTxs[id]
+		require.True(t, erroredExists) // errored tx should still exist in map
+		require.Equal(t, utils.Errored, erroredTx.state) // errored tx should retain the original state
+	})
 }
 
 func TestPendingTxContext_on_prebroadcast_error(t *testing.T) {
