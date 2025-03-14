@@ -99,10 +99,10 @@ export default class TransferPayeeship extends SolanaCommand {
     const signer = this.wallet.publicKey
 
     const rawTx = await this.makeRawTransaction(signer)
-    const overrides = await this.simulateTx(signer, rawTx)
+    await this.simulateTx(signer, rawTx)
     await this.beforeExecute()
 
-    const txhash = await this.signAndSendRawTx(rawTx, undefined, overrides)
+    const txhash = await this.signAndSendRawTx(rawTx)
     logger.success(`Payeeship transferred on tx hash: ${txhash}`)
 
     return {

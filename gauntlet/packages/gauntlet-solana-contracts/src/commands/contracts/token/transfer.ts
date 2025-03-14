@@ -55,10 +55,10 @@ export default class TransferToken extends SolanaCommand {
     const signer = this.wallet.publicKey
     const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
 
-    const overrides = await this.simulateTx(signer, rawTx)
+    await this.simulateTx(signer, rawTx)
 
     await prompt('Continue sending tokens?')
-    const txhash = await this.signAndSendRawTx(rawTx, undefined, overrides)
+    const txhash = await this.signAndSendRawTx(rawTx)
     logger.success(`Tokens sent on tx hash: ${txhash}`)
 
     return {
