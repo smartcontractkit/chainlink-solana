@@ -552,7 +552,7 @@ func (c *pendingTxContext) OnError(sig solana.Signature, retentionTimeout time.D
 			tx = tempTx
 		}
 		_, finalizedErroredExists := c.finalizedErroredTxs[info.id]
-		
+
 		// call cancel func + remove from map
 		if cancel, exists := c.cancelBy[info.id]; exists {
 			cancel() // cancel context
@@ -639,13 +639,13 @@ func (c *pendingTxContext) IsTxReorged(sig solana.Signature, sigOnChainState uti
 	defer c.lock.RUnlock()
 
 	// Grab in memory state of the signature
-	txInfo, exists := c.sigToTxInfo[sig]
+	info, exists := c.sigToTxInfo[sig]
 	if !exists {
 		return "", false
 	}
 
 	// Compare our in-memory state of the sig with the current on-chain state to determine if the sig had a regression
-	sigInMemoryState := txInfo.state
+	sigInMemoryState := info.state
 	var hasReorg bool
 	switch sigInMemoryState {
 	case utils.Confirmed:
@@ -659,7 +659,7 @@ func (c *pendingTxContext) IsTxReorged(sig solana.Signature, sigOnChainState uti
 	default: // No reorg if the signature is not in a state that can be reorged
 	}
 
-	return txInfo.id, hasReorg
+	return info.id, hasReorg
 }
 
 func (c *pendingTxContext) GetPendingTx(id string) (pendingTx, error) {
