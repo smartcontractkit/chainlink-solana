@@ -66,14 +66,14 @@ func main() {
 
 					tag := ctx.String("tag")
 					if tag == "" {
-						if t, err := utils.GetLatestReleaseFromGithub(ctx, owner, repo); err != nil {
+						if t, err := utils.GetLatestReleaseFromGithub(ctx.Context, owner, repo); err != nil {
 							return err
 						} else {
 							tag = t
 						}
 					}
 
-					err := utils.DownloadTarGzReleaseAssetFromGithub(ctx, owner, repo, name, tag, func(r *tar.Reader, h *tar.Header) error {
+					err := utils.DownloadTarGzReleaseAssetFromGithub(ctx.Context, owner, repo, name, tag, func(r *tar.Reader, h *tar.Header) error {
 						if h.Typeflag == tar.TypeReg && filepath.Ext(h.Name) == ".so" {
 							outPath := filepath.Join(dir, filepath.Base(h.Name))
 							if err := os.MkdirAll(filepath.Dir(outPath), os.ModePerm); err != nil {
@@ -143,7 +143,7 @@ func main() {
 					&cli.StringFlag{Name: "sha", Aliases: []string{"s"}, Required: true},
 				},
 				Action: func(ctx *cli.Context) error {
-					if sha, err := utils.GetLongShaFromGithub(ctx, ctx.String("owner"), ctx.String("repo"), ctx.String("sha")); err != nil {
+					if sha, err := utils.GetLongShaFromGithub(ctx.Context, ctx.String("owner"), ctx.String("repo"), ctx.String("sha")); err != nil {
 						return cli.Exit(err, 1)
 					} else {
 						fmt.Fprintln(ctx.App.Writer, sha)

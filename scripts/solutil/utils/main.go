@@ -3,6 +3,7 @@ package utils
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,7 +11,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/urfave/cli/v2"
 	"golang.org/x/mod/modfile"
 )
 
@@ -22,8 +22,29 @@ type GithubCommit struct {
 	Sha string `json:"sha"`
 }
 
+func withGetRequest[T any](ctx context.Context, url string, cb func(res *http.Response) (T, error)) (T, error) {
+	var empty T
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return empty, err
+	}
+
+	res, err := (&http.Client{}).Do(req)
+	if err != nil {
+		return empty, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return empty, fmt.Errorf("GET request failed with status code %d", res.StatusCode)
+	}
+
+	return cb(res)
+}
+
 func GetLatestReleaseFromGithub(
-	ctx *cli.Context,
+	ctx context.Context,
 	owner string,
 	repo string,
 ) (string, error) {
@@ -33,36 +54,17 @@ func GetLatestReleaseFromGithub(
 		repo,
 	)
 
-	req, err := http.NewRequestWithContext(ctx.Context, "GET", url, nil)
-	if err != nil {
-		return "", err
-	}
-
-	res, err := (&http.Client{}).Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to download release asset - request failed with status code %d", res.StatusCode)
-	}
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return "", err
-	}
-
-	var release GithubRelease
-	if err = json.Unmarshal(body, &release); err != nil {
-		return "", err
-	} else {
+	return withGetRequest(ctx, url, func(res *http.Response) (string, error) {
+		var release GithubRelease
+		if err := json.NewDecoder(res.Body).Decode(&release); err != nil {
+			return "", err
+		}
 		return release.TagName, nil
-	}
+	})
 }
 
 func GetLongShaFromGithub(
-	ctx *cli.Context,
+	ctx context.Context,
 	owner string,
 	repo string,
 	sha string,
@@ -74,40 +76,21 @@ func GetLongShaFromGithub(
 		sha,
 	)
 
-	req, err := http.NewRequestWithContext(ctx.Context, "GET", url, nil)
-	if err != nil {
-		return "", err
-	}
+	return withGetRequest(ctx, url, func(res *http.Response) (string, error) {
+		var parsed []GithubCommit
+		if err := json.NewDecoder(res.Body).Decode(&parsed); err != nil {
+			return "", err
+		}
 
-	res, err := (&http.Client{}).Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to retrieve long SHA - request failed with status code %d", res.StatusCode)
-	}
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return "", err
-	}
-
-	var parsed []GithubCommit
-	if err = json.Unmarshal(body, &parsed); err != nil {
-		return "", err
-	}
-
-	if len(parsed) == 0 {
-		return "", errors.New("failed to get long SHA")
-	} else {
+		if len(parsed) == 0 {
+			return "", errors.New("failed to get long SHA")
+		}
 		return parsed[0].Sha, nil
-	}
+	})
 }
 
 func DownloadTarGzReleaseAssetFromGithub(
-	ctx *cli.Context,
+	ctx context.Context,
 	owner string,
 	repo string,
 	name string,
@@ -122,42 +105,31 @@ func DownloadTarGzReleaseAssetFromGithub(
 		name,
 	)
 
-	req, err := http.NewRequestWithContext(ctx.Context, "GET", url, nil)
-	if err != nil {
-		return err
-	}
-
-	res, err := (&http.Client{}).Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to download release asset - request failed with status code %d", res.StatusCode)
-	}
-
-	gzipReader, err := gzip.NewReader(res.Body)
-	if err != nil {
-		return err
-	}
-	defer gzipReader.Close()
-
-	tarReader := tar.NewReader(gzipReader)
-	for {
-		header, err := tarReader.Next()
-		if err == io.EOF {
-			break
-		}
+	_, err := withGetRequest(ctx, url, func(res *http.Response) (any, error) {
+		gzipReader, err := gzip.NewReader(res.Body)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		if err := cb(tarReader, header); err != nil {
-			return err
-		}
-	}
+		defer gzipReader.Close()
 
-	return nil
+		tarReader := tar.NewReader(gzipReader)
+		for {
+			header, err := tarReader.Next()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				return nil, err
+			}
+			if err := cb(tarReader, header); err != nil {
+				return nil, err
+			}
+		}
+
+		return nil, nil
+	})
+
+	return err
 }
 
 func GetDependencyVersion(gomodPath string, dependency string) (*modfile.Require, error) {
