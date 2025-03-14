@@ -99,8 +99,8 @@ export default class CreateFeed extends SolanaCommand {
     const rawTxs = await this.makeRawTransaction(signer, feed.publicKey)
     await prompt('Continue creating new Transmissions Feed?')
 
-    const overrides = await this.simulateTx(signer, rawTxs)
-    const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTxs, [feed], overrides)
+    await this.simulateTx(signer, rawTxs)
+    const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTxs, [feed])
     logger.success(`Transmissions feed created at ${feed.publicKey}`)
     logger.success(`TX ${txhash}`)
 

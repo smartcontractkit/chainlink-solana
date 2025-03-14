@@ -50,9 +50,9 @@ export default class AcceptFeedOwnership extends SolanaCommand {
     const signer = this.wallet.publicKey
 
     const rawTx = await this.makeRawTransaction(signer)
-    const overrides = await this.simulateTx(signer, rawTx)
+    await this.simulateTx(signer, rawTx)
     await prompt(`Accepting ownership of feed/transmission state (${state}). Continue?`)
-    const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx, undefined, overrides)
+    const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, program.idl)(rawTx)
     logger.success(`Accepted ownership on tx hash: ${txhash}`)
     return {
       responses: [

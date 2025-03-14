@@ -14,6 +14,5 @@ export const makeTx = (
 
   if (overrides.price) initialTx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: overrides.price }))
   if (overrides.units) initialTx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: overrides.units }))
-
   return rawTx.reduce((tx, instruction) => tx.add(instruction), initialTx)
 }

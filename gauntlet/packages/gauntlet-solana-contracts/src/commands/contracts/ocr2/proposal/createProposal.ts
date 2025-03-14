@@ -50,10 +50,10 @@ export default class CreateProposal extends SolanaCommand {
 
     const proposal = Keypair.generate()
     const rawTx = await this.makeRawTransaction(signer, proposal.publicKey)
-    const overrides = await this.simulateTx(signer, rawTx)
+    await this.simulateTx(signer, rawTx)
     await prompt(`Continue creating config proposal?`)
 
-    const txhash = await this.signAndSendRawTx(rawTx, [proposal], overrides)
+    const txhash = await this.signAndSendRawTx(rawTx, [proposal])
     logger.success(`Config Proposal created on tx ${txhash}`)
     logger.line()
     logger.info('Use the Config Proposal ID in future proposal commands:')

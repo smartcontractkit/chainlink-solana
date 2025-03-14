@@ -9,6 +9,7 @@ import {
   TransactionSignature,
   TransactionInstruction,
   sendAndConfirmRawTransaction,
+  SendTransactionError,
 } from '@solana/web3.js'
 import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { TransactionResponse } from '../types'
@@ -38,7 +39,11 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
 
   static lamportsToSol = (lamports: number) => lamports / LAMPORTS_PER_SOL
 
-  getOptimalOverrides = async (rawTxs: TransactionInstruction[], initialFee: number = 1000, maxFee: number = 50000) => {
+  getOptimalOverrides = async (
+    rawTxs: TransactionInstruction[],
+    initialFee: number = 10000,
+    maxFee: number = 100000,
+  ) => {
     //const latestAcceptedTx = await getRecentPrioritizationFees(signer)
     let fee = initialFee
     let overrides: Overrides = {}
@@ -46,7 +51,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     while (fee <= maxFee) {
       const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
       overrides.price = fee
-      console.log(`Trying fee: ${fee} micro-lamports per compute unit`)
+      logger.info(`Trying fee: ${fee} micro-lamports per compute unit`)
       const tx = makeTx(
         rawTxs,
         {
@@ -60,6 +65,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       if (simulation > 0) {
         return overrides
       }
+      fee += 1000
     }
     console.log('Max fee reached without success.')
     return {}
@@ -107,7 +113,8 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
   signAndSendRawTx = async (
     rawTxs: TransactionInstruction[],
     extraSigners?: Keypair[],
-    overrides: Overrides = {},
+    withPriorityFee: Boolean = true,
+    overrides?: Overrides,
   ): Promise<TransactionSignature> => {
     const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
 
@@ -130,7 +137,17 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     }
     const signedTx = await this.wallet.signTransaction(tx)
     logger.loading('Sending tx...')
-    return await sendAndConfirmRawTransaction(this.provider.connection, signedTx.serialize())
+    try {
+      return await sendAndConfirmRawTransaction(this.provider.connection, signedTx.serialize())
+    } catch (error) {
+      // Retry mechanism
+      if (error instanceof SendTransactionError && error.message.includes('congestion') && withPriorityFee) {
+        overrides.price = overrides.price ? (overrides.price += 1000) : 1000
+        return this.signAndSendRawTx(rawTxs, extraSigners, true, overrides)
+      } else {
+        throw error
+      }
+    }
   }
 
   sendTxWithIDL = (sendAction: (...args: any) => Promise<TransactionSignature>, idl: Idl) => async (
@@ -155,6 +172,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       if (simulationResponse.err) {
         throw new Error(JSON.stringify({ error: simulationResponse.err, logs: simulationResponse.logs }))
       }
+      console.log(simulationResponse)
       logger.success(`Tx simulation succeeded: ${simulationResponse.unitsConsumed} units consumed.`)
       return simulationResponse.unitsConsumed
     } catch (e) {
@@ -163,31 +181,21 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     }
   }
 
-  simulateTx = async (
-    signer: PublicKey,
-    txInstructions: TransactionInstruction[],
-    feePayer?: PublicKey,
-    withPriorityFee: boolean = true,
-  ) => {
+  simulateTx = async (signer: PublicKey, txInstructions: TransactionInstruction[], feePayer?: PublicKey) => {
     try {
-      const overrides = withPriorityFee ? await this.getOptimalOverrides(txInstructions) : {}
       const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
-      const tx = makeTx(
-        txInstructions,
-        {
-          feePayer: feePayer || signer,
-          blockhash,
-          lastValidBlockHeight,
-        },
-        overrides,
-      )
+      const tx = makeTx(txInstructions, {
+        feePayer: feePayer || signer,
+        blockhash,
+        lastValidBlockHeight,
+      })
       // simulating through connection allows to skip signing tx (useful when using Ledger device)
       const { value: simulationResponse } = await this.provider.connection.simulateTransaction(tx)
       if (simulationResponse.err) {
         throw new Error(JSON.stringify({ error: simulationResponse.err, logs: simulationResponse.logs }))
       }
       logger.success(`Tx simulation succeeded: ${simulationResponse.unitsConsumed} units consumed.`)
-      return overrides
+      return simulationResponse.unitsConsumed
     } catch (e) {
       const parsedError = JSON.parse(e.message)
       const errorCode = parsedError.error.InstructionError ? parsedError.error.InstructionError[1].Custom : -1

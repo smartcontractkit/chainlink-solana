@@ -297,6 +297,7 @@ export default class AcceptProposal extends SolanaCommand {
     await this.beforeExecute()
 
     const rawTx = await this.makeRawTransaction(signer)
+
     await this.simulateTx(signer, rawTx)
     await prompt(`Continue accepting proposal of proposal ${this.input.proposalId} on aggregator ${this.args[0]}?`)
 

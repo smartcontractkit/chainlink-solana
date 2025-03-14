@@ -67,8 +67,8 @@ export const makeTransferOwnershipCommand = (
 
       const signer = this.wallet.publicKey
       const rawTx = await this.makeRawTransaction(signer)
-      const overrides = await this.simulateTx(signer, rawTx)
-      const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, this.program.idl)(rawTx, undefined, overrides)
+      await this.simulateTx(signer, rawTx)
+      const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, this.program.idl)(rawTx)
 
       logger.success(`Ownership transferred to ${new PublicKey(this.flags.to)} on tx ${txhash}`)
 
