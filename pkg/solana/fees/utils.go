@@ -63,7 +63,9 @@ func ParseBlock(res *rpc.GetBlockResult) (out BlockData, err error) {
 
 		// filter out consensus vote transactions
 		// consensus messages are included as txs within blocks
+		// validate AccountKeys has enough elements to index into ProgramIDIndex
 		if len(baseTx.Message.Instructions) == 1 &&
+			len(baseTx.Message.AccountKeys) > int(baseTx.Message.Instructions[0].ProgramIDIndex) &&
 			baseTx.Message.AccountKeys[baseTx.Message.Instructions[0].ProgramIDIndex] == solana.VoteProgramID {
 			continue
 		}
@@ -71,7 +73,9 @@ func ParseBlock(res *rpc.GetBlockResult) (out BlockData, err error) {
 		var price ComputeUnitPrice // default 0
 		for _, instruction := range baseTx.Message.Instructions {
 			// find instructions for compute budget program
-			if baseTx.Message.AccountKeys[instruction.ProgramIDIndex] == ComputeBudgetProgram {
+			// validate AccountKeys has enough elements to index into ProgramIDIndex
+			if len(baseTx.Message.AccountKeys) > int(instruction.ProgramIDIndex) &&
+				baseTx.Message.AccountKeys[instruction.ProgramIDIndex] == ComputeBudgetProgram {
 				parsed, parseErr := ParseComputeUnitPrice(instruction.Data)
 				// if compute unit price found, break instruction loop
 				// only one compute unit price tx is allowed

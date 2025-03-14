@@ -44,7 +44,7 @@ func sendTransaction(ctx context.Context, rpcClient *rpc.Client, t tests.Testing
 	signerAndPayer solana.PrivateKey, commitment rpc.CommitmentType, skipPreflight bool, opts ...TxModifier) *rpc.GetTransactionResult {
 	tx := CreateTx(ctx, t, rpcClient, instructions, signerAndPayer, commitment, opts...)
 
-	txsig, err := rpcClient.SendTransactionWithOpts(ctx, tx, rpc.TransactionOpts{SkipPreflight: skipPreflight, PreflightCommitment: rpc.CommitmentProcessed})
+	txsig, err := rpcClient.SendTransactionWithOpts(ctx, tx, rpc.TransactionOpts{SkipPreflight: skipPreflight, PreflightCommitment: commitment})
 	require.NoError(t, err)
 
 	var txStatus rpc.ConfirmationStatusType
@@ -71,7 +71,7 @@ func sendTransaction(ctx context.Context, rpcClient *rpc.Client, t tests.Testing
 
 func CreateTx(ctx context.Context, t tests.TestingT, rpcClient *rpc.Client, instructions []solana.Instruction,
 	signerAndPayer solana.PrivateKey, commitment rpc.CommitmentType, opts ...TxModifier) *solana.Transaction {
-	hashRes, err := rpcClient.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
+	hashRes, err := rpcClient.GetLatestBlockhash(ctx, commitment)
 	require.NoError(t, err)
 
 	tx, err := solana.NewTransaction(

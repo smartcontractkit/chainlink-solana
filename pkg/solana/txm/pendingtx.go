@@ -322,7 +322,7 @@ func (c *pendingTxContext) Expired(sig solana.Signature, confirmationTimeout tim
 	if tx, exists := c.confirmedTxs[info.id]; exists {
 		return time.Since(tx.createTs) > confirmationTimeout
 	}
-	return false // return expired = false if tx does not exist (likely cleaned up by something else previously)
+	return true // return expired = true even if tx does not exist to allow signature to be cleaned up
 }
 
 func (c *pendingTxContext) OnProcessed(sig solana.Signature) (string, error) {
@@ -524,17 +524,10 @@ func (c *pendingTxContext) OnPrebroadcastError(id string, retentionTimeout time.
 
 func (c *pendingTxContext) OnError(sig solana.Signature, retentionTimeout time.Duration, txState utils.TxState, _ TxErrType) (string, error) {
 	err := c.withReadLock(func() error {
-		info, sigExists := c.sigToTxInfo[sig]
-		if !sigExists {
+		// validate if signature exists
+		// skip checking tx existence to allow signature to get cleaned up
+		if _, sigExists := c.sigToTxInfo[sig]; !sigExists {
 			return ErrSigDoesNotExist
-		}
-		// transaction can transition from any non-finalized state
-		var broadcastedExists, confirmedExists bool
-		_, broadcastedExists = c.broadcastedProcessedTxs[info.id]
-		_, confirmedExists = c.confirmedTxs[info.id]
-		// transcation does not exist in any tx maps
-		if !broadcastedExists && !confirmedExists {
-			return ErrTransactionNotFound
 		}
 		return nil
 	})
@@ -548,6 +541,8 @@ func (c *pendingTxContext) OnError(sig solana.Signature, retentionTimeout time.D
 		if !exists {
 			return "", ErrSigDoesNotExist
 		}
+		// delete sig to avoid memory leak if corresponding tx is not found
+		delete(c.sigToTxInfo, sig)
 		var tx, tempTx pendingTx
 		var broadcastedExists, confirmedExists bool
 		if tempTx, broadcastedExists = c.broadcastedProcessedTxs[info.id]; broadcastedExists {
@@ -556,10 +551,8 @@ func (c *pendingTxContext) OnError(sig solana.Signature, retentionTimeout time.D
 		if tempTx, confirmedExists = c.confirmedTxs[info.id]; confirmedExists {
 			tx = tempTx
 		}
-		// transcation does not exist in any non-finalized maps
-		if !broadcastedExists && !confirmedExists {
-			return "", ErrTransactionNotFound
-		}
+		_, finalizedErroredExists := c.finalizedErroredTxs[info.id]
+
 		// call cancel func + remove from map
 		if cancel, exists := c.cancelBy[info.id]; exists {
 			cancel() // cancel context
@@ -570,11 +563,19 @@ func (c *pendingTxContext) OnError(sig solana.Signature, retentionTimeout time.D
 		// delete from confirmed map, if exists
 		delete(c.confirmedTxs, info.id)
 		// remove all related signatures from the sigToTxInfo map to skip picking up this tx in the confirmation logic
-		for _, s := range tx.signatures {
-			delete(c.sigToTxInfo, s)
+		if broadcastedExists || confirmedExists {
+			for _, s := range tx.signatures {
+				delete(c.sigToTxInfo, s)
+			}
 		}
 		// if retention duration is set to 0, skip adding transaction to the errored map
 		if retentionTimeout == 0 {
+			// sanity check - no transactions should be in finalized/errored map if retention is set to 0
+			delete(c.finalizedErroredTxs, info.id)
+			return info.id, nil
+		}
+		// avoid updating finalized/errored tx entry if one already exists
+		if finalizedErroredExists {
 			return info.id, nil
 		}
 		erroredTx := finishedTx{
@@ -638,13 +639,13 @@ func (c *pendingTxContext) IsTxReorged(sig solana.Signature, sigOnChainState uti
 	defer c.lock.RUnlock()
 
 	// Grab in memory state of the signature
-	txInfo, exists := c.sigToTxInfo[sig]
+	info, exists := c.sigToTxInfo[sig]
 	if !exists {
 		return "", false
 	}
 
 	// Compare our in-memory state of the sig with the current on-chain state to determine if the sig had a regression
-	sigInMemoryState := txInfo.state
+	sigInMemoryState := info.state
 	var hasReorg bool
 	switch sigInMemoryState {
 	case utils.Confirmed:
@@ -658,7 +659,7 @@ func (c *pendingTxContext) IsTxReorged(sig solana.Signature, sigOnChainState uti
 	default: // No reorg if the signature is not in a state that can be reorged
 	}
 
-	return txInfo.id, hasReorg
+	return info.id, hasReorg
 }
 
 func (c *pendingTxContext) GetPendingTx(id string) (pendingTx, error) {
