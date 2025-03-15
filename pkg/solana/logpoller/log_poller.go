@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"iter"
@@ -12,8 +13,6 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/gagliardetto/solana-go/rpc/jsonrpc"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
@@ -147,21 +146,18 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 	}
 
 	var logs []Log
-
 	for filter := range matchingFilters {
-		var revertErr error
+		var revertErr *string
 		if blockData.Error != nil {
-			switch e := blockData.Error.(type) {
-			case *jsonrpc.RPCError:
-				revertErr = fmt.Errorf("JsonRpcError %d: %s", e.Code, e.Message)
-			case error:
-				revertErr = e
-			default:
-				revertErr = fmt.Errorf("unknown type: %v", e)
-				lp.lggr.Warnf("received unknown revert error type %T for log with blockData=%v", revertErr, blockData)
-			}
 			if !filter.IncludeReverted {
-				continue // unless explicitly requested, discard reverted logs
+				continue
+			}
+			revertErr = new(string)
+			if j, err2 := json.Marshal(blockData.Error); err2 != nil {
+				*revertErr = fmt.Sprintf("%v", blockData.Error)
+				lp.lggr.Errorw("failed to marshal revert error", "revertErr", blockData.Error, "err", err2)
+			} else {
+				*revertErr = string(j)
 			}
 		}
 

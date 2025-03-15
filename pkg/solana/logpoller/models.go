@@ -41,5 +41,5 @@ type Log struct {
 	CreatedAt      time.Time
 	ExpiresAt      *time.Time
 	SequenceNum    int64
-	Error          error
+	Error          *string
 }

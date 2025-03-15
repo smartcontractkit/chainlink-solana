@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"math/rand"
 	"sync/atomic"
 	"testing"
@@ -14,7 +13,6 @@ import (
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/gagliardetto/solana-go/rpc/jsonrpc"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -290,7 +288,7 @@ func TestProcess(t *testing.T) {
 			TransactionHash:     expectedLog.TxHash.ToSolana(),
 			TransactionIndex:    txIndex,
 			TransactionLogIndex: txLogIndex,
-			Error:               expectedLog.Error,
+			Error:               nil,
 		},
 		Data: base64.StdEncoding.EncodeToString(expectedLog.Data),
 	}
@@ -352,7 +350,9 @@ func TestProcess(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	ev.Error = &jsonrpc.RPCError{Code: -32000, Message: "Transaction simulation failed: Error processing Instruction 0: custom program error: 0x1"}
+	jsonErr := []byte("{\"InstructionError\":[2,{\"Custom\":6001}]}")
+	err = json.Unmarshal(jsonErr, &ev.Error)
+	require.NoError(t, err)
 
 	t.Run("ignores reverted log when IncludeReverted = false", func(t *testing.T) {
 		// Should ignore this log, since reverted logs are not included. Should not call InsertLogs
@@ -360,15 +360,17 @@ func TestProcess(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	filter.IncludeReverted = true
+	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, f Filter) (int64, error) {
+		require.Equal(t, f, filter)
+		return filterID, nil
+	}).Once()
+	err = lp.RegisterFilter(ctx, filter)
+	require.NoError(t, err)
+
 	t.Run("accepts reverted log when IncludeReverted = true", func(t *testing.T) {
-		filter.IncludeReverted = true
-		expectedLog.Error = fmt.Errorf("JsonRpcError -32000: Transaction simulation failed: Error processing Instruction 0: custom program error: 0x1")
-		orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, f Filter) (int64, error) {
-			require.Equal(t, f, filter)
-			return filterID, nil
-		}).Once()
-		err = lp.RegisterFilter(ctx, filter)
-		require.NoError(t, err)
+		expectedLog.Error = new(string)
+		*expectedLog.Error = string(jsonErr)
 
 		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []Log) error {
 			require.Len(t, logs, 1)
