@@ -65,10 +65,7 @@ export default class CreateFeed extends SolanaCommand {
       - Total Account Size: ${feedAccountLength.toNumber()}
       - Feed Account: ${feed.toString()}
     `)
-
-    const test1 = await this.provider.connection.getMinimumBalanceForRentExemption(feedAccountLength.toNumber())
-    console.log('TEST1:' + test1)
-
+    
     const transmissionsCreationInstruction = SystemProgram.createAccount({
       fromPubkey: signer,
       newAccountPubkey: feed,
