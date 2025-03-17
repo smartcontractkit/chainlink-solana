@@ -10,6 +10,7 @@ import {
   TransactionInstruction,
   sendAndConfirmRawTransaction,
   SendTransactionError,
+  TransactionExpiredTimeoutError,
 } from '@solana/web3.js'
 import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { TransactionResponse } from '../types'
@@ -172,12 +173,26 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       return await sendAndConfirmRawTransaction(this.provider.connection, signedTx.serialize())
     } catch (error) {
       // Retry mechanism with greater priority fees
+      console.log('Error type:', error)
       if (error instanceof SendTransactionError && error.message.includes('congestion') && withPriorityFee) {
         overrides.price = overrides.price ? (overrides.price += 1000) : 1000
         logger.info(
           `Transaction Failed due to network congestion, increasing and retrying with ${overrides.price} micro Lamports priority fee`,
         )
         return this.signAndSendRawTx(rawTxs, extraSigners, true, overrides)
+      } else if (error instanceof TransactionExpiredTimeoutError) {
+        // Sometimes it takes longer to confirm or we need to retry check the transaction
+        // Do 3 retries
+        const signature = error.signature
+        for (let i = 0; i < 3; i++) {
+          const status = await this.provider.connection.getSignatureStatus(signature)
+          if (status.value && status.value.confirmationStatus == 'confirmed') {
+            return signature
+          }
+          // exponential
+          this.sleep(3000 ** i)
+        }
+        throw error
       } else {
         throw error
       }
