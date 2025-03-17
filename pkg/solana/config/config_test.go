@@ -8,7 +8,6 @@ import (
 )
 
 func TestValidateConfig(t *testing.T) {
-
 	t.Parallel()
 
 	t.Run("Null Node name", func(t *testing.T) {
