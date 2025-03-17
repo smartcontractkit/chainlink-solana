@@ -19,7 +19,6 @@ export default class CreateFeed extends SolanaCommand {
   static examples = ['yarn gauntlet store:create_feed --network=devnet --rdd=[PATH_TO_RDD] [AGGREGATOR_ADDRESS]']
 
   makeInput = (userInput): Input => {
-    console.log(userInput)
     if (userInput) return userInput as Input
     const aggregator = RDD.loadAggregator(this.args[0], this.flags.network, this.flags.rdd)
     return {
@@ -42,7 +41,6 @@ export default class CreateFeed extends SolanaCommand {
     const program = this.loadProgram(storeProgram.idl, address)
 
     const input = this.makeInput(this.flags.input)
-    console.log(input)
     const granularity = new BN(input.granularity)
     const liveLength = new BN(input.liveLength)
     const length = new BN(this.flags.length || input.liveLength) // default to no historical data, maximum is 140000 for f = 5 (16 oracles)
