@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
@@ -94,6 +95,14 @@ func (r *Relayer) HealthReport() map[string]error {
 	hp := map[string]error{r.Name(): r.Healthy()}
 	services.CopyHealth(hp, r.chain.HealthReport())
 	return hp
+}
+
+func (r *Relayer) Replay(fromBlock int64) error {
+	return r.chain.LogPoller().Replay(fromBlock)
+}
+
+func (r *Relayer) ReplayStatus() logpoller.ReplayStatus {
+	return r.chain.LogPoller().ReplayStatus()
 }
 
 func (r *Relayer) LatestHead(ctx context.Context) (relaytypes.Head, error) {
