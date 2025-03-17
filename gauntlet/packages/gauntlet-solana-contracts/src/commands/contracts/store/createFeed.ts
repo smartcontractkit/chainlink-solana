@@ -65,7 +65,7 @@ export default class CreateFeed extends SolanaCommand {
       - Total Account Size: ${feedAccountLength.toNumber()}
       - Feed Account: ${feed.toString()}
     `)
-    
+
     const transmissionsCreationInstruction = SystemProgram.createAccount({
       fromPubkey: signer,
       newAccountPubkey: feed,

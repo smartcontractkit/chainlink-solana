@@ -11,7 +11,7 @@ import {
   sendAndConfirmRawTransaction,
   SendTransactionError,
   TransactionExpiredTimeoutError,
-  SignatureStatus
+  SignatureStatus,
 } from '@solana/web3.js'
 import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { TransactionResponse } from '../types'
@@ -74,16 +74,16 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
   }
 
   isNetworkCongested = async (): Promise<boolean> => {
-    const slot = await this.provider.connection.getSlot();
+    const slot = await this.provider.connection.getSlot()
     // Get block times for current and previous slots
     try {
       const currentBlock = await this.provider.connection.getBlock(slot, {
-        maxSupportedTransactionVersion: 0
-      });
+        maxSupportedTransactionVersion: 0,
+      })
       const previousBlock = await this.provider.connection.getBlock(slot - 1, {
-          maxSupportedTransactionVersion: 0
-      });
-      const timeDiff = currentBlock.blockTime - previousBlock.blockTime; // Time difference in seconds
+        maxSupportedTransactionVersion: 0,
+      })
+      const timeDiff = currentBlock.blockTime - previousBlock.blockTime // Time difference in seconds
       // If time diff between blocks is greater than 1s then its congested
       const congested = timeDiff > 1
       return congested
@@ -95,7 +95,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     }
   }
 
-  sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+  sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
   loadProgram = (idl: Idl, address: string): Program<Idl> => {
     const program = new Program(idl, address, this.provider)
@@ -146,11 +146,11 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
 
     if (overrides.units) logger.info(`Sending transaction with custom unit limit: ${overrides.units}`)
     if (overrides.price) logger.info(`Sending transaction with custom unit price: ${overrides.price}`)
-    
+
     // check if network is congested
-    if (await this.isNetworkCongested() && !overrides.price) {
+    if ((await this.isNetworkCongested()) && !overrides.price) {
       // add Priority Fees if network is congested and no priority fees set
-      logger.info("Network is congested, trying transaction with priority fees")
+      logger.info('Network is congested, trying transaction with priority fees')
       overrides.price = 1000
       return await this.signAndSendRawTx(rawTxs, extraSigners, true, overrides)
     }
@@ -176,7 +176,9 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       // Retry mechanism with greater priority fees
       if (error instanceof SendTransactionError && error.message.includes('congestion') && withPriorityFee) {
         overrides.price = overrides.price ? (overrides.price += 1000) : 1000
-        logger.info(`Transaction Failed due to network congestion, increasing and retrying with ${overrides.price} micro Lamports priority fee`)
+        logger.info(
+          `Transaction Failed due to network congestion, increasing and retrying with ${overrides.price} micro Lamports priority fee`,
+        )
         return this.signAndSendRawTx(rawTxs, extraSigners, true, overrides)
       } else {
         throw error
