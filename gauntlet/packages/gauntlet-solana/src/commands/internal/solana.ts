@@ -9,9 +9,7 @@ import {
   TransactionSignature,
   TransactionInstruction,
   sendAndConfirmRawTransaction,
-  SendTransactionError,
-  TransactionExpiredTimeoutError,
-  SignatureStatus,
+  SendTransactionError
 } from '@solana/web3.js'
 import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { TransactionResponse } from '../types'
