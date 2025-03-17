@@ -9,7 +9,7 @@ import {
   TransactionSignature,
   TransactionInstruction,
   sendAndConfirmRawTransaction,
-  SendTransactionError
+  SendTransactionError,
 } from '@solana/web3.js'
 import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { TransactionResponse } from '../types'
