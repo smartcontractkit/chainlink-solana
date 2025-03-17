@@ -66,7 +66,7 @@ export const makeAcceptOwnershipCommand = (
 
       const signer = this.wallet.publicKey
       const rawTx = await this.makeRawTransaction(signer)
-      const overrides = await this.simulateTx(signer, rawTx)
+      await this.simulateTx(signer, rawTx)
       const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, this.program.idl)(rawTx, undefined, overrides)
 
       logger.success(`Accepted ownership on tx hash: ${txhash}`)
