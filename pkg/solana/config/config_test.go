@@ -17,7 +17,7 @@ func TestValidateConfig(t *testing.T) {
 			Name: nil,
 			URL:  url,
 		}
-		require.Error(t, node.ValidateConfig())
+		require.ErrorIs(t, node.ValidateConfig(), config.ErrMissing{Name: "Name", Msg: "required for all nodes"})
 	})
 	t.Run("Empty Node name", func(t *testing.T) {
 		t.Parallel()
@@ -27,7 +27,7 @@ func TestValidateConfig(t *testing.T) {
 			Name: &nodeName,
 			URL:  url,
 		}
-		require.Error(t, node.ValidateConfig())
+		require.ErrorIs(t, node.ValidateConfig(), config.ErrEmpty{Name: "Name", Msg: "required for all nodes"})
 	})
 	t.Run("Null Node URL", func(t *testing.T) {
 		t.Parallel()
@@ -36,7 +36,7 @@ func TestValidateConfig(t *testing.T) {
 			Name: &nodeName,
 			URL:  nil,
 		}
-		require.Error(t, node.ValidateConfig())
+		require.ErrorIs(t, node.ValidateConfig(), config.ErrMissing{Name: "URL", Msg: "required for all nodes"})
 	})
 	t.Run("Empty Node URL", func(t *testing.T) {
 		t.Parallel()
@@ -46,7 +46,7 @@ func TestValidateConfig(t *testing.T) {
 			Name: &nodeName,
 			URL:  url,
 		}
-		require.Error(t, node.ValidateConfig())
+		require.ErrorIs(t, node.ValidateConfig(), config.ErrEmpty{Name: "URL", Msg: "required for all nodes"})
 	})
 	t.Run("Valid config", func(t *testing.T) {
 		t.Parallel()
