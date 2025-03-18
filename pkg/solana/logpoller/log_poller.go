@@ -153,7 +153,7 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 			lp.lggr.Criticalw("failed to make log index", "err", err, "tx", programEvent.TransactionHash)
 			return err
 		}
-		if blockData.SlotNumber == math.MaxInt64 {
+		if blockData.SlotNumber > math.MaxInt64 {
 			err = fmt.Errorf("slot number %d out of range", blockData.SlotNumber)
 			lp.lggr.Critical(err.Error())
 			return err
@@ -163,7 +163,7 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 			ChainID:        lp.orm.ChainID(),
 			LogIndex:       logIndex,
 			BlockHash:      Hash(blockData.BlockHash),
-			BlockNumber:    int64(blockData.SlotNumber), //nolint:gosec
+			BlockNumber:    int64(blockData.SlotNumber),
 			BlockTimestamp: blockData.BlockTime.Time().UTC(),
 			Address:        filter.Address,
 			EventSig:       filter.EventSig,
