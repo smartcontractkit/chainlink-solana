@@ -81,8 +81,8 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 	// Append token accounts to the account list and track at which index accounts for each token transfer starts
 	for _, message := range aggregatedMessages {
 		receiver := message.Receiver
-		var sourceChainSelector []byte
-		binary.LittleEndian.AppendUint64(sourceChainSelector, uint64(message.Header.SourceChainSelector))
+		sourceChainSelector := make([]byte, 8)
+		binary.LittleEndian.PutUint64(sourceChainSelector, uint64(message.Header.SourceChainSelector))
 		for _, tokenAmount := range message.TokenAmounts {
 			destTokenAddress := tokenAmount.DestTokenAddress
 			userTokenAccount, err := getUserTokenAccount(receiver, tokenProgram.PublicKey, destTokenAddress)

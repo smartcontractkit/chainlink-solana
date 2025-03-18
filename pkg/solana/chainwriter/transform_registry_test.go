@@ -49,8 +49,8 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	feeQuoterAddr := chainwriter.GetRandomPubKey(t)
 	mockFetchFeeQuoterAddress(t, rw, feeQuoterAddr, offrampAddress)
 
-	var sourceChainSelBytes []byte
-	binary.LittleEndian.AppendUint64(sourceChainSelBytes, uint64(sourceChainSelector))
+	sourceChainSelBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(sourceChainSelBytes, uint64(sourceChainSelector))
 
 	userTokenAccount1, _, err := solana.FindProgramAddress([][]byte{receiver.Bytes(), tokenProgram.Bytes(), destTokenAddr1.Bytes()}, solana.SPLAssociatedTokenAccountProgramID)
 	require.NoError(t, err)
