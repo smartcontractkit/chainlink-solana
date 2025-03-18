@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -758,9 +759,11 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 	offrampAddr := chainwriter.GetRandomPubKey(t)
 	routerAddr := chainwriter.GetRandomPubKey(t)
 	destTokenAddr := chainwriter.GetRandomPubKey(t)
+	feeQuoterAddr := chainwriter.GetRandomPubKey(t)
 
 	poolKeys := []solana.PublicKey{destTokenAddr}
-	poolKeys = append(poolKeys, chainwriter.CreateTestPubKeys(t, 3)...)
+	poolKeys = append(poolKeys, chainwriter.CreateTestPubKeys(t, 6)...)
+	tokenAdminRegistryAddr := poolKeys[1]
 
 	// simplified CCIP Config - does not contain full account list
 	ccipCWConfig := chainwriter.ChainWriterConfig{
@@ -821,36 +824,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 								},
 							},
 						},
-						Accounts: []chainwriter.Lookup{
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "testAcc1",
-								Address: chainwriter.GetRandomPubKey(t).String(),
-							}},
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "testAcc2",
-								Address: chainwriter.GetRandomPubKey(t).String(),
-							}},
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "testAcc3",
-								Address: chainwriter.GetRandomPubKey(t).String(),
-							}},
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "poolAddr1",
-								Address: poolKeys[0].String(),
-							}},
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "poolAddr2",
-								Address: poolKeys[1].String(),
-							}},
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "poolAddr3",
-								Address: poolKeys[2].String(),
-							}},
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "poolAddr4",
-								Address: poolKeys[3].String(),
-							}},
-						},
+						Accounts: generateExecuteMandatoryAccounts(t),
 					},
 					ccipconsts.MethodCommit: {
 						FromAddress: admin.String(),
@@ -911,7 +885,9 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 		lookupTable := mockTokenAdminRegistryLookupTable(t, rw, pda)
 
 		mockFetchRouterAddress(t, rw, routerAddr, offrampAddr)
+		mockFetchFeeQuoterAddress(t, rw, feeQuoterAddr, offrampAddr)
 		mockFetchLookupTableAddresses(t, rw, lookupTable, poolKeys)
+		mockWritableIndexes(t, rw, tokenAdminRegistryAddr)
 
 		txID := uuid.NewString()
 		txm.On("Enqueue", mock.Anything, admin.String(), mock.MatchedBy(func(tx *solana.Transaction) bool {
@@ -925,7 +901,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 			tokenIndexes := *decoded.TokenIndexes
 
 			require.Len(t, tokenIndexes, 1)
-			require.Equal(t, uint8(3), tokenIndexes[0])
+			require.Equal(t, uint8(0), tokenIndexes[0]) // no user accounts at the start of remaining accounts
 			return true
 		}), &txID, mock.Anything).Return(nil).Once()
 
@@ -933,6 +909,8 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 		abstractReport := ccipocr3.ExecutePluginReportSingleChain{
 			Messages: []ccipocr3.Message{
 				{
+					Receiver: chainwriter.GetRandomPubKey(t).Bytes(),
+					Header:   ccipocr3.RampMessageHeader{SourceChainSelector: ccipocr3.ChainSelector(1)},
 					TokenAmounts: []ccipocr3.RampTokenAmount{
 						{
 							DestTokenAddress: destTokenAddr.Bytes(),
@@ -1184,4 +1162,18 @@ func mockFetchRouterAddress(t *testing.T, rw *clientmocks.ReaderWriter, routerAd
 		RPCContext: rpc.RPCContext{},
 		Value:      &rpc.Account{Data: rpc.DataBytesOrJSONFromBytes(referenceAddressesBytes)},
 	}, nil)
+}
+
+func generateExecuteMandatoryAccounts(t *testing.T) []chainwriter.Lookup {
+	mandatoryAccounts := chainwriter.CreateTestPubKeys(t, chainwriter.MandatoryExecuteAccounts)
+	accountLookups := make([]chainwriter.Lookup, 0, len(mandatoryAccounts))
+	for i, acc := range mandatoryAccounts {
+		accountLookups = append(accountLookups,
+			chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+				Name:    fmt.Sprintf("testAcc%d", i),
+				Address: acc.String(),
+			}},
+		)
+	}
+	return accountLookups
 }
