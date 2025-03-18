@@ -3,18 +3,19 @@ package chainreader
 import (
 	"context"
 	"fmt"
-	"sync"
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
-	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
 func TestBindings_CreateType(t *testing.T) {
@@ -111,18 +112,13 @@ func (_m *mockBinding) QueryKey(
 func Test_namespaceBinding_BindReaders(t *testing.T) {
 	type fields struct {
 		name    string
-		mu      sync.RWMutex
 		readers map[string]readBinding
 		bound   map[solana.PublicKey]bool
 	}
-	type args struct {
-		ctx     context.Context
-		address solana.PublicKey
-	}
-	tests := []struct {
+	tts := []struct {
 		name    string
 		fields  fields
-		args    args
+		address solana.PublicKey
 		wantErr bool
 	}{
 		{
@@ -132,10 +128,7 @@ func Test_namespaceBinding_BindReaders(t *testing.T) {
 				readers: make(map[string]readBinding),
 				bound:   make(map[solana.PublicKey]bool),
 			},
-			args: args{
-				ctx:     context.Background(),
-				address: solana.PublicKey{},
-			},
+			address: solana.PublicKey{},
 			wantErr: false,
 		},
 		{
@@ -151,10 +144,7 @@ func Test_namespaceBinding_BindReaders(t *testing.T) {
 				},
 				bound: make(map[solana.PublicKey]bool),
 			},
-			args: args{
-				ctx:     context.Background(),
-				address: solana.PublicKey{},
-			},
+			address: solana.PublicKey{},
 			wantErr: false,
 		},
 		{
@@ -175,10 +165,7 @@ func Test_namespaceBinding_BindReaders(t *testing.T) {
 				},
 				bound: make(map[solana.PublicKey]bool),
 			},
-			args: args{
-				ctx:     context.Background(),
-				address: solana.PublicKey{},
-			},
+			address: solana.PublicKey{},
 			wantErr: false,
 		},
 		{
@@ -201,22 +188,18 @@ func Test_namespaceBinding_BindReaders(t *testing.T) {
 				},
 				bound: make(map[solana.PublicKey]bool),
 			},
-			args: args{
-				ctx:     context.Background(),
-				address: solana.PublicKey{},
-			},
+			address: solana.PublicKey{},
 			wantErr: true,
 		},
 	}
-	for _, tt := range tests {
+	for _, tt := range tts {
 		t.Run(tt.name, func(t *testing.T) {
 			b := &namespaceBinding{
 				name:    tt.fields.name,
-				mu:      tt.fields.mu,
 				readers: tt.fields.readers,
 				bound:   tt.fields.bound,
 			}
-			err := b.BindReaders(tt.args.ctx, tt.args.address)
+			err := b.BindReaders(tests.Context(t), tt.address)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
