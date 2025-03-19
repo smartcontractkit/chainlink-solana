@@ -117,7 +117,7 @@ func (s *SolanaChainWriterService) handleATACreation(ctx context.Context, create
 		solana.TransactionPayer(feePayer),
 	)
 	if ataErr != nil {
-		return "", fmt.Errorf("error constructing ATA transaction: %w", err)
+		return "", fmt.Errorf("error constructing ATA transaction: %w", ataErr)
 	}
 	ataUUID := fmt.Sprintf("ATA-%s", uuid.NewString())
 
