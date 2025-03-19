@@ -122,7 +122,7 @@ pub mod contract_reader_interface {
         Ok(())
     }
 
-    pub fn create_event_and_fail(_ctx: Context<Initialize>) -> Result<()> {
+    pub fn create_event_and_fail(_ctx: Context<Events>) -> Result<()> {
         emit!(StateChangedEvent {
             new_state: "Pending".to_string()
         });

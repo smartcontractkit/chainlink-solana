@@ -21,6 +21,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc/ws"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/pg"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -69,7 +70,7 @@ func TestChainComponents(t *testing.T) {
 		helper := &helper{}
 		helper.Init(t)
 		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}}
-		DisableTests(it)
+		DisableTests(it, t)
 		it.Setup(t)
 		RunChainComponentsSolanaTests(t, it)
 	})
@@ -79,14 +80,14 @@ func TestChainComponents(t *testing.T) {
 		helper := &helper{}
 		helper.Init(t)
 		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}}
-		DisableTests(it)
+		DisableTests(it, t)
 		wrapped := commontestutils.WrapContractReaderTesterForLoop(it)
 		wrapped.Setup(t)
 		RunChainComponentsInLoopSolanaTests(t, wrapped)
 	})
 }
 
-func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
+func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T], t *testing.T) {
 	it.DisableTests([]string{
 		// solana is a no-op on confidence level
 		ContractReaderGetLatestValueBasedOnConfidenceLevel,
@@ -98,11 +99,12 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder,
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
 
-		// events not yet supported
+		// events not supported yet
 		ContractReaderGetLatestValueGetsLatestForEvent,
 		ContractReaderGetLatestValueBasedOnConfidenceLevelForEvent,
 		ContractReaderGetLatestValueReturnsNotFoundWhenNotTriggeredForEvent,
 		ContractReaderGetLatestValueWithFilteringForEvent,
+
 		// query key not implemented yet
 		// ContractReaderQueryKeyNotFound,
 		ContractReaderQueryKeyReturnsData,
@@ -116,6 +118,9 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 		ContractReaderQueryKeysCanFilterWithValueComparator,
 		ContractReaderQueryKeysCanLimitResultsWithCursor,
 	})
+	if sqltest.TestURL(t) == string(pg.InMemoryPostgres) {
+		it.DisableTests([]string{ContractReaderGetLatestValueIncludeReverted})
+	}
 }
 
 func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInterfaceTester[T]) {
@@ -340,7 +345,7 @@ const (
 	ContractReaderGetLatestValueWithAddressHardcodedIntoResponse = "Get latest value with AddressHardcoded into response"
 	ContractReaderGetLatestValueUsingMultiReaderWithParmsReuse   = "Get latest value using multi reader with params reuse"
 	ContractReaderGetLatestValueGetTokenPrices                   = "Get latest value handles get token prices edge case"
-	ContractReaderGetLatestValueIncludeReverted                  = "Query key includes reverted transactions when asked"
+	ContractReaderGetLatestValueIncludeReverted                  = "GetLatestValue includes reverted transactions when asked"
 	ChainWriterLookupTableTest                                   = "Set contract value using a lookup table for addresses"
 	ChainWriterATASupportTest                                    = "Initialize ATA if one does not exist"
 )
@@ -563,18 +568,41 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 
 				require.NoError(t, cr.Bind(ctx, bindings))
 
-				var newState string
-				err := cr.GetLatestValue(ctx, bound.ReadIdentifier(StateChangedEventName), primitives.Finalized, nil, &newState)
-				require.ErrorContains(t, err, "not found")
+				stateChangedEvent := struct {
+					NewState string
+				}{}
+				err := cr.GetLatestValue(ctx, bound.ReadIdentifier(StateChangedEventName), primitives.Finalized, nil, &stateChangedEvent)
+				require.ErrorContains(t, err, "NotFound")
 
-				SubmitTransactionToCW(t, it, cw, MethodTriggeringEventBeforeFailing, nil, bound, types.Finalized)
+				SubmitTransactionAndExpectFailure(t, it, cw, MethodTriggeringEventBeforeFailing, nil, bound)
 
-				err = cr.GetLatestValue(ctx, bound.ReadIdentifier(StateChangedEventName), primitives.Finalized, nil, &newState)
-				require.NoError(t, err)
+				assert.Eventually(t, func() bool {
+					err = cr.GetLatestValue(ctx, bound.ReadIdentifier(StateChangedEventName), primitives.Finalized, nil, &stateChangedEvent)
+					if err != nil {
+						//it.Helper.Logger().Debugw("Waiting for GetLatestValue to return successfully:", "err", err)
+						return false
+					}
+					assert.Equal(t, "Pending", stateChangedEvent.NewState)
+					return true
+				}, 5*time.Minute, time.Second, "Timed out while waiting for StateChangedEvent to show up on chain")
+				assert.NoError(t, err)
 			},
 		},
 	}
 	RunTests(t, it, testCases)
+}
+
+// Similar to SubmitTransactionToCW, but requires that the tx fails instead of succeeds.
+func SubmitTransactionAndExpectFailure[T TestingT[T]](t T, tester ChainComponentsInterfaceTester[T], cw types.ContractWriter, method string, args any, contract types.BoundContract) string {
+	tester.DirtyContracts()
+	txID := uuid.New().String()
+	err := cw.SubmitTransaction(tests.Context(t), contract.Name, method, args, txID, contract.Address, nil, big.NewInt(0))
+	require.NoError(t, err)
+
+	err = WaitForTransactionStatus(t, tester, cw, txID, types.Failed, false)
+	require.ErrorContains(t, err, "has failed or is fatal")
+
+	return txID
 }
 
 type SolanaChainComponentsInterfaceTesterHelper[T WrappedTestingT[T]] interface {

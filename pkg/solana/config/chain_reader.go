@@ -50,7 +50,6 @@ func (f PollingFilter) GetStartingBlock() int64 {
 }
 
 func (f PollingFilter) GetIncludeReverted() bool {
-
 	if f.IncludeReverted == nil {
 		return DefaultIncludeReverted
 	}
