@@ -316,10 +316,10 @@ func TestFilteredLogs(t *testing.T) {
 				{BlockNumber: 3, LogIndex: 0},
 			},
 			expected: []Log{
-				{BlockNumber: 1, LogIndex: 0},
-				{BlockNumber: 2, LogIndex: 1},
-				{BlockNumber: 2, LogIndex: 2},
 				{BlockNumber: 3, LogIndex: 0},
+				{BlockNumber: 2, LogIndex: 2},
+				{BlockNumber: 2, LogIndex: 1},
+				{BlockNumber: 1, LogIndex: 0},
 			},
 		},
 		{
@@ -330,11 +330,11 @@ func TestFilteredLogs(t *testing.T) {
 				{BlockNumber: 3, LogIndex: 2},
 			},
 			expected: []Log{
-				{BlockNumber: 1, LogIndex: 0},
-				{BlockNumber: 2, LogIndex: 1},
-				{BlockNumber: 2, LogIndex: 2},
-				{BlockNumber: 3, LogIndex: 0},
 				{BlockNumber: 3, LogIndex: 2},
+				{BlockNumber: 3, LogIndex: 0},
+				{BlockNumber: 2, LogIndex: 2},
+				{BlockNumber: 2, LogIndex: 1},
+				{BlockNumber: 1, LogIndex: 0},
 			},
 		},
 	}
@@ -358,7 +358,7 @@ func TestFilteredLogs(t *testing.T) {
 			l.ChainID = chainID
 			l.FilterID = filterID
 			l.BlockTimestamp = blockTimestamp
-			l.SubkeyValues = IndexedValues{}
+			l.SubkeyValues = nil
 			l.Data = data
 		}
 		t.Run(tt.name, func(t *testing.T) {
@@ -383,4 +383,9 @@ func sanitize(expected, actual *Log) {
 	// fill in fields populated by db write itself
 	expected.ID = actual.ID
 	expected.CreatedAt = actual.CreatedAt
+
+	// These are not returned by FilteredLogs
+	actual.SequenceNum = expected.SequenceNum
+	actual.FilterID = expected.FilterID
+	actual.SubkeyValues = expected.SubkeyValues
 }

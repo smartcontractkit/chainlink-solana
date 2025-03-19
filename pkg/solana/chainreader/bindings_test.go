@@ -2,6 +2,7 @@ package chainreader
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
@@ -12,6 +13,7 @@ import (
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -50,7 +52,10 @@ type mockBinding struct {
 	mock.Mock
 }
 
-func (_m *mockBinding) Bind(_ context.Context, _ solana.PublicKey) error { return nil }
+func (_m *mockBinding) Bind(ctx context.Context, address solana.PublicKey) error {
+	ret := _m.Called(ctx, address)
+	return ret.Error(0)
+}
 
 func (_m *mockBinding) Unbind(_ context.Context) error { return nil }
 
@@ -103,4 +108,104 @@ func (_m *mockBinding) QueryKey(
 	ret := _m.Called(a, b, c, d)
 
 	return ret.Get(0).([]types.Sequence), ret.Error(1)
+}
+
+func Test_namespaceBinding_BindReaders(t *testing.T) {
+	type fields struct {
+		name    string
+		readers map[string]readBinding
+		bound   map[solana.PublicKey]bool
+	}
+	tts := []struct {
+		name    string
+		fields  fields
+		address solana.PublicKey
+		wantErr bool
+	}{
+		{
+			name: "no readers",
+			fields: fields{
+				name:    "testNamespace",
+				readers: make(map[string]readBinding),
+				bound:   make(map[solana.PublicKey]bool),
+			},
+			address: solana.PublicKey{},
+			wantErr: false,
+		},
+		{
+			name: "single reader binds successfully",
+			fields: fields{
+				name: "testNamespace",
+				readers: map[string]readBinding{
+					"reader1": func() *mockBinding {
+						m := &mockBinding{}
+						m.On("Bind", mock.Anything, mock.Anything).Return(nil)
+						return m
+					}(),
+				},
+				bound: make(map[solana.PublicKey]bool),
+			},
+			address: solana.PublicKey{},
+			wantErr: false,
+		},
+		{
+			name: "multiple readers bind successfully",
+			fields: fields{
+				name: "testNamespace",
+				readers: map[string]readBinding{
+					"reader1": func() *mockBinding {
+						m := &mockBinding{}
+						m.On("Bind", mock.Anything, mock.Anything).Return(nil)
+						return m
+					}(),
+					"reader2": func() *mockBinding {
+						m := &mockBinding{}
+						m.On("Bind", mock.Anything, mock.Anything).Return(nil)
+						return m
+					}(),
+				},
+				bound: make(map[solana.PublicKey]bool),
+			},
+			address: solana.PublicKey{},
+			wantErr: false,
+		},
+		{
+			name: "reader bind returns error",
+			fields: fields{
+				name: "testNamespace",
+				readers: map[string]readBinding{
+					"reader1": func() *mockBinding {
+						m := &mockBinding{}
+						// Returns nil to show the first reader binds successfully
+						m.On("Bind", mock.Anything, mock.Anything).Return(nil)
+						return m
+					}(),
+					"reader2": func() *mockBinding {
+						m := &mockBinding{}
+						// Returns an error to simulate a bind failure
+						m.On("Bind", mock.Anything, mock.Anything).Return(fmt.Errorf("bind error"))
+						return m
+					}(),
+				},
+				bound: make(map[solana.PublicKey]bool),
+			},
+			address: solana.PublicKey{},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tts {
+		t.Run(tt.name, func(t *testing.T) {
+			b := &namespaceBinding{
+				name:    tt.fields.name,
+				readers: tt.fields.readers,
+				bound:   tt.fields.bound,
+			}
+			err := b.BindReaders(tests.Context(t), tt.address)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }

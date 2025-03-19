@@ -7,7 +7,6 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -103,11 +102,8 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 		if txWithMeta.Meta == nil {
 			return fmt.Errorf("expected transaction to have meta. signature: %s; slot: %d; idx: %d", tx.Signatures[0], j.slotNumber, idx)
 		}
-		if txWithMeta.Meta.Err != nil {
-			// silently skip as at the moment there is no way for us to filter transactions produced by our contracts
-			continue
-		}
 		detail.trxSig = tx.Signatures[0] // according to Solana docs fist signature is used as ID
+		detail.err = txWithMeta.Meta.Err
 
 		txEvents := j.messagesToEvents(txWithMeta.Meta.LogMessages, detail)
 		events = append(events, txEvents...)
@@ -140,6 +136,7 @@ func (j *getBlockJob) messagesToEvents(messages []string, detail eventDetail) []
 			event.TransactionHash = detail.trxSig
 			event.TransactionIndex = detail.trxIdx
 			event.TransactionLogIndex = logIdx
+			event.Error = detail.err
 
 			logIdx++
 			outputs.Events[i] = event
@@ -158,4 +155,5 @@ type eventDetail struct {
 	blockTime   solana.UnixTimeSeconds
 	trxIdx      int
 	trxSig      solana.Signature
+	err         interface{}
 }
