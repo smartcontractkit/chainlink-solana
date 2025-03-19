@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"iter"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go/rpc"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
@@ -147,6 +147,20 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 
 	var logs []Log
 	for filter := range matchingFilters {
+		var revertErr *string
+		if blockData.Error != nil {
+			if !filter.IncludeReverted {
+				continue
+			}
+			revertErr = new(string)
+			if j, err2 := json.Marshal(blockData.Error); err2 != nil {
+				*revertErr = fmt.Sprintf("%v", blockData.Error)
+				lp.lggr.Errorw("failed to marshal revert error", "revertErr", blockData.Error, "err", err2)
+			} else {
+				*revertErr = string(j)
+			}
+		}
+
 		var logIndex int64
 		logIndex, err = makeLogIndex(blockData.TransactionIndex, blockData.TransactionLogIndex)
 		if err != nil {
@@ -158,6 +172,7 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 			lp.lggr.Critical(err.Error())
 			return err
 		}
+
 		log := Log{
 			FilterID:       filter.ID,
 			ChainID:        lp.orm.ChainID(),
@@ -168,6 +183,7 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 			Address:        filter.Address,
 			EventSig:       filter.EventSig,
 			TxHash:         Signature(blockData.TransactionHash),
+			Error:          revertErr,
 		}
 
 		log.Data, err = base64.StdEncoding.DecodeString(programEvent.Data)
