@@ -326,7 +326,6 @@ func (env *IdlType) UnmarshalJSON(data []byte) error {
 			}
 
 			target.Num = int(arrVal[1].(float64))
-			typeFound = true
 			env.AsIdlTypeArray = &target
 		}
 	default:
