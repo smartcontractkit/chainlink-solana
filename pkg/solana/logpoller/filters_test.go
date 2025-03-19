@@ -1,6 +1,7 @@
 package logpoller
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -157,6 +158,52 @@ func TestFilters_RegisterFilter(t *testing.T) {
 				require.EqualError(t, err, ErrFilterNameConflict.Error())
 			})
 		}
+	})
+	t.Run("properly handles IncludeReverted field", func(t *testing.T) {
+		orm := NewMockORM(t)
+		fs := newFilters(lggr, orm)
+		addr := newRandomPublicKey(t)
+		eventSig := newRandomEventSignature(t)
+
+		filter1 := Filter{
+			ID:              1,
+			Name:            "existingFilter",
+			Address:         addr,
+			EventSig:        eventSig,
+			IncludeReverted: false,
+			IsBackfilled:    true,
+		}
+		orm.EXPECT().SelectFilters(mock.Anything).Return(
+			[]Filter{filter1}, nil).Once()
+		filter2 := Filter{
+			Name:            "new filter",
+			Address:         addr,
+			EventSig:        eventSig,
+			IncludeReverted: true,
+			IsBackfilled:    true,
+		}
+		orm.EXPECT().SelectSeqNums(mock.Anything).Return(nil, nil).Once()
+		err := fs.RegisterFilter(tests.Context(t), filter2)
+		require.ErrorContains(t, err, "conflicts with IncludeReverted=true", "shouldn't allow more than one value for IncludeReverted for an event")
+
+		orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, filter Filter) (int64, error) {
+			assert.True(t, filter.IncludeReverted, "IncludeReverted should be true now")
+			assert.False(t, filter.IsBackfilled, "new backfill should be triggered when IsReverted updated from false to true")
+			return 2, nil
+		}).Once()
+		filter1.IncludeReverted = true // update IncludeReverted field of filter1 to true
+		err = fs.RegisterFilter(tests.Context(t), filter1)
+		require.NoError(t, err)
+
+		orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, filter Filter) (int64, error) {
+			assert.True(t, filter.IncludeReverted)
+			assert.False(t, filter.IsBackfilled, "backfill should happen when new filter is added") // should trigger new backfill since reverted has been updated to true
+			return 3, nil
+		}).Once()
+
+		// should succeed this time
+		err = fs.RegisterFilter(tests.Context(t), filter2)
+		assert.NoError(t, err)
 	})
 	t.Run("Happy path", func(t *testing.T) {
 		orm := NewMockORM(t)
