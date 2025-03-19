@@ -23,6 +23,7 @@ type BlockData struct {
 	TransactionHash     solana.Signature
 	TransactionIndex    int
 	TransactionLogIndex uint
+	Error               interface{}
 }
 
 type ProgramLog struct {
