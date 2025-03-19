@@ -135,10 +135,7 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 	}
 
 	filter.ID = filterID
-	err = fl.addToIndices(filter, decoder)
-	if err != nil {
-		return fmt.Errorf("failed to add filter to indices: %w", err)
-	}
+	fl.addToIndices(filter, decoder)
 
 	return nil
 }
@@ -152,13 +149,12 @@ func newDecoder(filter Filter) (Decoder, error) {
 	return codec.EntryAsModifierRemoteCodec(cEntry, filter.EventName)
 }
 
-func (fl *filters) addToIndices(filter Filter, decoder Decoder) error {
+func (fl *filters) addToIndices(filter Filter, decoder Decoder) {
 	fl.filtersByID[filter.ID] = &filter
 
 	if _, ok := fl.filtersByName[filter.Name]; ok {
 		errMsg := fmt.Sprintf("invariant violation while loading from db: expected filters to have unique name: %s ", filter.Name)
 		fl.lggr.Critical(errMsg)
-		return errors.New(errMsg)
 	}
 
 	fl.decoders[filter.ID] = decoder
@@ -178,7 +174,6 @@ func (fl *filters) addToIndices(filter Filter, decoder Decoder) error {
 	if _, ok := filtersForEventSig[filter.ID]; ok {
 		errMsg := fmt.Sprintf("invariant violation while loading from db: expected filters to have unique ID: %d ", filter.ID)
 		fl.lggr.Critical(errMsg)
-		return errors.New(errMsg)
 	}
 
 	filtersForEventSig[filter.ID] = struct{}{}
@@ -189,7 +184,6 @@ func (fl *filters) addToIndices(filter Filter, decoder Decoder) error {
 	programID := filter.Address.ToSolana().String()
 	fl.knownPrograms[programID]++
 	fl.knownDiscriminators[filter.EventSig]++
-	return nil
 }
 
 // UnregisterFilter will mark the filter with the given name for pruning and async prune all corresponding logs.
@@ -466,10 +460,7 @@ func (fl *filters) LoadFilters(ctx context.Context) error {
 			return fmt.Errorf("failed to create decoder for filter %d: %w", filter.ID, err)
 		}
 
-		err = fl.addToIndices(filter, decoder)
-		if err != nil {
-			return fmt.Errorf("failed to add filter to indices: %w", err)
-		}
+		fl.addToIndices(filter, decoder)
 	}
 	fl.seqNums, err = fl.orm.SelectSeqNums(ctx)
 	if err != nil {
