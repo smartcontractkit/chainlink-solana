@@ -336,7 +336,7 @@ func (b *namespaceBinding) BindReaders(ctx context.Context, address solana.Publi
 		err = errors.Join(err, rb.Bind(ctx, address))
 	}
 
-	return nil
+	return err
 }
 
 func (b *namespaceBinding) Unbind(ctx context.Context, reg filterRegistrar) error {
