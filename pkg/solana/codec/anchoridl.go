@@ -288,7 +288,7 @@ func (env *IdlType) UnmarshalJSON(data []byte) error {
 			env.AsIdlTypeVec = &target
 		}
 		if _, ok := v["option"]; ok {
-			if typeFound == true {
+			if typeFound {
 				return fmt.Errorf("multiple types found for IdlType: %s", spew.Sdump(temp))
 			}
 			var target IdlTypeOption
@@ -297,8 +297,9 @@ func (env *IdlType) UnmarshalJSON(data []byte) error {
 			}
 			typeFound = true
 			env.asIdlTypeOption = &target
-		} else if _, ok := v["defined"]; ok {
-			if typeFound == true {
+		}
+		if _, ok := v["defined"]; ok {
+			if typeFound {
 				return fmt.Errorf("multiple types found for IdlType: %s", spew.Sdump(temp))
 			}
 			var target IdlTypeDefined
@@ -307,16 +308,17 @@ func (env *IdlType) UnmarshalJSON(data []byte) error {
 			}
 			typeFound = true
 			env.AsIdlTypeDefined = &target
-		} else if got, ok := v["array"]; ok {
-			if typeFound == true {
+		}
+		if got, ok := v["array"]; ok {
+			if typeFound {
 				return fmt.Errorf("multiple types found for IdlType: %s", spew.Sdump(temp))
 			}
 			if _, ok := got.([]interface{}); !ok {
-				panic(utilz.Sf("array is not in expected format:\n%s", spew.Sdump(got)))
+				return fmt.Errorf("array is not in expected format: %s", spew.Sdump(got))
 			}
 			arrVal := got.([]interface{})
 			if len(arrVal) != 2 {
-				panic(utilz.Sf("array is not of expected length:\n%s", spew.Sdump(got)))
+				return fmt.Errorf("array is not of expected length: %s", spew.Sdump(got))
 			}
 			var target IdlTypeArray
 			if err := utilz.TranscodeJSON(arrVal[0], &target.Thing); err != nil {
