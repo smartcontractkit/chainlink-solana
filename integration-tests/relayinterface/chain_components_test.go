@@ -20,6 +20,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/gagliardetto/solana-go/rpc/ws"
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -30,6 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontestutils "github.com/smartcontractkit/chainlink-common/pkg/loop/testutils"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
@@ -45,6 +47,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 	solanautils "github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
@@ -55,6 +58,8 @@ const (
 	AnyContractNameWithSharedAddress2 = AnyContractName + "Shared2"
 	AnyContractNameWithSharedAddress3 = AnyContractName + "Shared3"
 )
+
+var trueVal = true
 
 func TestChainComponents(t *testing.T) {
 	t.Parallel()
@@ -99,7 +104,7 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 		ContractReaderGetLatestValueReturnsNotFoundWhenNotTriggeredForEvent,
 		ContractReaderGetLatestValueWithFilteringForEvent,
 		// query key not implemented yet
-		ContractReaderQueryKeyNotFound,
+		// ContractReaderQueryKeyNotFound,
 		ContractReaderQueryKeyReturnsData,
 		ContractReaderQueryKeyReturnsDataAsValuesDotValue,
 		ContractReaderQueryKeyCanFilterWithValueComparator,
@@ -335,6 +340,7 @@ const (
 	ContractReaderGetLatestValueWithAddressHardcodedIntoResponse = "Get latest value with AddressHardcoded into response"
 	ContractReaderGetLatestValueUsingMultiReaderWithParmsReuse   = "Get latest value using multi reader with params reuse"
 	ContractReaderGetLatestValueGetTokenPrices                   = "Get latest value handles get token prices edge case"
+	ContractReaderGetLatestValueIncludeReverted                  = "Query key includes reverted transactions when asked"
 	ChainWriterLookupTableTest                                   = "Set contract value using a lookup table for addresses"
 	ChainWriterATASupportTest                                    = "Initialize ATA if one does not exist"
 )
@@ -546,6 +552,27 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 				assert.Equal(t, AnyValueToReadWithoutAnArgument, *returnValue.(*uint64))
 			},
 		},
+		{
+			Name: ContractReaderGetLatestValueIncludeReverted,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				cw := it.GetContractWriter(t)
+				bindings := it.GetBindings(t)
+				ctx := tests.Context(t)
+				bound := BindingsByName(bindings, AnyContractName)[0]
+
+				require.NoError(t, cr.Bind(ctx, bindings))
+
+				var newState string
+				err := cr.GetLatestValue(ctx, bound.ReadIdentifier(StateChangedEventName), primitives.Finalized, nil, &newState)
+				require.ErrorContains(t, err, "not found")
+
+				SubmitTransactionToCW(t, it, cw, MethodTriggeringEventBeforeFailing, nil, bound, types.Finalized)
+
+				err = cr.GetLatestValue(ctx, bound.ReadIdentifier(StateChangedEventName), primitives.Finalized, nil, &newState)
+				require.NoError(t, err)
+			},
+		},
 	}
 	RunTests(t, it, testCases)
 }
@@ -563,6 +590,7 @@ type SolanaChainComponentsInterfaceTesterHelper[T WrappedTestingT[T]] interface 
 	MultiClient() *client.MultiClient
 	SolanaClient() *client.Client
 	Sender() solana.PrivateKey
+	Database() *sqlx.DB
 }
 
 type WrappedTestingT[T any] interface {
@@ -602,13 +630,16 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GetAccountString(i int) strin
 
 func (it *SolanaChainComponentsInterfaceTester[T]) GetContractReader(t T) types.ContractReader {
 	contractReaderConfig := it.buildContractReaderConfig(t)
-	var events chainreader.EventsReader
+	chainID, err := it.Helper.MultiClient().ChainID(it.Helper.Context(t))
 
+	require.NoError(t, err)
+
+	orm := logpoller.NewORM(chainID.String(), it.Helper.Database(), it.Helper.Logger(t))
 	svc, err := chainreader.NewContractReaderService(
 		it.Helper.Logger(t),
 		it.Helper.RPCClient(),
 		contractReaderConfig,
-		events)
+		logpoller.New(logger.Sugared(it.Helper.Logger(t)), orm, it.Helper.MultiClient()))
 
 	require.NoError(t, err)
 	servicetest.Run(t, svc)
@@ -618,13 +649,16 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GetContractReader(t T) types.
 
 func (it *SolanaChainComponentsInterfaceTester[T]) GetContractReaderWithCustomCfg(t T, contractReaderConfig config.ContractReader) types.ContractReader {
 	ctx := it.Helper.Context(t)
-	var events chainreader.EventsReader
+	chainID, err := it.Helper.MultiClient().ChainID(it.Helper.Context(t))
 
+	require.NoError(t, err)
+
+	orm := logpoller.NewORM(chainID.String(), it.Helper.Database(), it.Helper.Logger(t))
 	svc, err := chainreader.NewContractReaderService(
 		it.Helper.Logger(t),
 		it.Helper.RPCClient(),
 		contractReaderConfig,
-		events)
+		logpoller.New(logger.Sugared(it.Helper.Logger(t)), orm, it.Helper.MultiClient()))
 
 	require.NoError(t, err)
 	require.NoError(t, svc.Start(ctx))
@@ -684,10 +718,13 @@ type helper struct {
 	txm                txm.TxManager
 	sc                 *client.Client
 	sender             solana.PrivateKey
+	db                 *sqlx.DB
 }
 
 func (h *helper) Init(t *testing.T) {
 	t.Helper()
+
+	h.db = sqltest.NewDB(t, sqltest.TestURL(t))
 
 	privateKey, err := solana.PrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1])
 	require.NoError(t, err)
@@ -696,6 +733,7 @@ func (h *helper) Init(t *testing.T) {
 	h.rpcURL, h.wsURL = utils.SetupTestValidatorWithAnchorPrograms(t, privateKey.PublicKey().String(), []string{"contract-reader-interface", "contract-reader-interface-secondary"})
 	h.wsClient, err = ws.Connect(tests.Context(t), h.wsURL)
 	h.rpcClient = rpc.New(h.rpcURL)
+	lggr := logger.Test(t)
 
 	require.NoError(t, err)
 
@@ -703,7 +741,7 @@ func (h *helper) Init(t *testing.T) {
 
 	cfg := config.NewDefault()
 	cfg.Chain.TxRetentionTimeout = commonconfig.MustNewDuration(10 * time.Minute)
-	solanaClient, err := client.NewClient(h.rpcURL, cfg, 5*time.Second, nil)
+	solanaClient, err := client.NewClient(h.rpcURL, cfg, 5*time.Second, lggr)
 	require.NoError(t, err)
 
 	h.sc = solanaClient
@@ -714,7 +752,6 @@ func (h *helper) Init(t *testing.T) {
 		sig, _ := privateKey.Sign(data)
 		return sig[:]
 	}, nil)
-	lggr := logger.Test(t)
 
 	txm := txm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
 	err = txm.Start(tests.Context(t))
@@ -830,6 +867,10 @@ func (h *helper) Sender() solana.PrivateKey {
 	return h.sender
 }
 
+func (h *helper) Database() *sqlx.DB {
+	return h.db
+}
+
 type DataAccountArgs struct {
 	TestIdx uint64
 	Value   uint64
@@ -896,6 +937,8 @@ const (
 	ReadWithAddressHardCodedIntoResponse = "ReadWithAddressHardCodedIntoResponse"
 	MultiReadWithParamsReuse             = "MultiReadWithParamsReuse"
 	GetTokenPrices                       = "GetTokenPrices"
+	StateChangedEventName                = "StateChangedEvent"
+	MethodTriggeringEventBeforeFailing   = "triggerEventAndFail"
 )
 
 func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T) config.ContractReader {
@@ -1090,6 +1133,15 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 							},
 							&commoncodec.AddressBytesToStringModifierConfig{
 								Fields: []string{"AccountStruct.AccountStr"},
+							},
+						},
+					},
+					StateChangedEventName: {
+						ChainSpecificName: "StateChangedEvent",
+						ReadType:          config.Event,
+						EventDefinitions: &config.EventDefinitions{
+							PollingFilter: &config.PollingFilter{
+								IncludeReverted: &trueVal,
 							},
 						},
 					},
@@ -1481,6 +1533,26 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								},
 								IsWritable: true,
 								IsSigner:   false,
+							}},
+							{AccountConstant: &chainwriter.AccountConstant{
+								Name:       "SystemProgram",
+								Address:    solana.SystemProgramID.String(),
+								IsWritable: false,
+								IsSigner:   false,
+							}},
+						},
+						DebugIDLocation: "",
+					},
+					MethodTriggeringEventBeforeFailing: {
+						FromAddress:       fromAddress,
+						ChainSpecificName: "createEventAndFail",
+						LookupTables:      chainwriter.LookupTables{},
+						Accounts: []chainwriter.Lookup{
+							{AccountConstant: &chainwriter.AccountConstant{
+								Name:       "Signer",
+								Address:    fromAddress,
+								IsSigner:   true,
+								IsWritable: true,
 							}},
 							{AccountConstant: &chainwriter.AccountConstant{
 								Name:       "SystemProgram",
