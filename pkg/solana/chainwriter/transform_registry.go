@@ -10,7 +10,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/mitchellh/mapstructure"
 
-	idl "github.com/smartcontractkit/chainlink-ccip/chains/solana"
+	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
@@ -19,30 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
-
-type ExtraDataDecoded struct {
-	// ExtraArgsDecoded contain message specific extra args.
-	ExtraArgsDecoded map[string]any
-	// DestExecDataDecoded contain token transfer specific extra args.
-	DestExecDataDecoded []map[string]any
-}
-
-type SVMExecCallArgs struct {
-	ReportContext [2][32]byte                `mapstructure:"ReportContext"`
-	Report        []byte                     `mapstructure:"Report"`
-	Info          ccipocr3.ExecuteReportInfo `mapstructure:"Info"`
-	ExtraData     ExtraDataDecoded           `mapstructure:"ExtraData"`
-	TokenIndexes  []byte                     `mapstructure:"TokenIndexes"`
-}
-
-type SVMCommitCallArgs struct {
-	ReportContext [2][32]byte               `mapstructure:"ReportContext"`
-	Report        []byte                    `mapstructure:"Report"`
-	Rs            [][32]byte                `mapstructure:"Rs"`
-	Ss            [][32]byte                `mapstructure:"Ss"`
-	RawVs         [32]byte                  `mapstructure:"RawVs"`
-	Info          ccipocr3.CommitReportInfo `mapstructure:"Info"`
-}
 
 // TODO: replace with exact value after CCIP testing is completed.
 const StaticCuOverhead uint32 = 100000
@@ -62,7 +38,7 @@ func FindTransform(id string) (func(context.Context, client.MultiClient, any, so
 // CCIPExecuteArgsTransform calculates required compute units, and appends any needed accounts by fetching pool lookup table entries.
 // It then updates token indexes based on appended PDAs and returns the transformed arguments, extended accounts slice, and cu tx configs.
 func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, args any, accounts solana.AccountMetaSlice, tableMap map[string]map[string][]*solana.AccountMeta, toAddress string) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
-	var argsTransformed SVMExecCallArgs
+	var argsTransformed ccipsolana.SVMExecCallArgs
 	err := mapstructure.Decode(args, &argsTransformed)
 	if err != nil {
 		return nil, nil, []txmutils.SetTxConfig{}, err
@@ -157,7 +133,7 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 
 // This Transform function trims off the GlobalState account from commit transactions if there are no token or gas price updates
 func CCIPCommitAccountTransform(ctx context.Context, client client.MultiClient, args any, accounts solana.AccountMetaSlice, _ map[string]map[string][]*solana.AccountMeta, _ string) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
-	var argsDecoded SVMCommitCallArgs
+	var argsDecoded ccipsolana.SVMCommitCallArgs
 	err := mapstructure.Decode(args, &argsDecoded)
 	if err != nil {
 		return nil, nil, []txmutils.SetTxConfig{}, err
@@ -222,7 +198,7 @@ func getFeeQuoterAddress(ctx context.Context, toAddress string, args any, tableM
 			InternalField: InternalField{
 				TypeName: "ReferenceAddresses",
 				Location: "FeeQuoter",
-				IDL:      idl.FetchCCIPOfframpIDL(),
+				IDL:      ccipsolana.FetchCCIPOfframpIDL(),
 			},
 		},
 	}

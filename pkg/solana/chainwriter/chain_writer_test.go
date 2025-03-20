@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 	idl "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
@@ -938,14 +939,14 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 		encodedReport, err := json.Marshal(abstractReport)
 		require.NoError(t, err)
 
-		args := chainwriter.SVMExecCallArgs{
+		args := ccipsolana.SVMExecCallArgs{
 			ReportContext: [2][32]byte{{0x01}, {0x02}},
 			Report:        encodedReport,
 			Info: ccipocr3.ExecuteReportInfo{
 				MerkleRoots:     []ccipocr3.MerkleRootChain{},
 				AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{abstractReport},
 			},
-			ExtraData: chainwriter.ExtraDataDecoded{
+			ExtraData: ccipsolana.ExtraDataDecoded{
 				ExtraArgsDecoded: map[string]any{
 					"computeUnits": uint32(500),
 				},

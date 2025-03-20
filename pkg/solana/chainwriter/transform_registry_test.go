@@ -9,6 +9,7 @@ import (
 	ag_binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -66,7 +67,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	poolChainConfig2, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_chainconfig"), sourceChainSelBytes, destTokenAddr2.Bytes()}, poolProgram)
 	require.NoError(t, err)
 
-	args := chainwriter.SVMExecCallArgs{
+	args := ccipsolana.SVMExecCallArgs{
 		Info: ccipocr3.ExecuteReportInfo{
 			AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
 				Messages: []ccipocr3.Message{{
@@ -83,7 +84,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 				},
 			}},
 		},
-		ExtraData: chainwriter.ExtraDataDecoded{
+		ExtraData: ccipsolana.ExtraDataDecoded{
 			ExtraArgsDecoded: map[string]any{
 				"computeUnits": uint32(500),
 			},
@@ -122,7 +123,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 
 		verifyTxOpts(t, options, true)
 
-		typedArgs, ok := transformedArgs.(chainwriter.SVMExecCallArgs)
+		typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
 		require.True(t, ok)
 		require.NotNil(t, typedArgs.TokenIndexes)
 		require.Len(t, typedArgs.TokenIndexes, 2)
@@ -169,7 +170,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 
 		// Accounts should be unchanged
 		require.Len(t, newAccounts, len(accounts))
-		typedArgs, ok := transformedArgs.(chainwriter.SVMExecCallArgs)
+		typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
 		require.True(t, ok)
 		require.NotNil(t, typedArgs.TokenIndexes)
 		require.Len(t, typedArgs.TokenIndexes, 0)
@@ -180,7 +181,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		args := struct {
 			ReportContext [2][32]uint8
 			Info          ccipocr3.ExecuteReportInfo
-			ExtraData     chainwriter.ExtraDataDecoded
+			ExtraData     ccipsolana.ExtraDataDecoded
 		}{
 			ReportContext: [2][32]uint8{},
 			Info: ccipocr3.ExecuteReportInfo{
@@ -188,7 +189,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 					Messages: []ccipocr3.Message{{}},
 				}},
 			},
-			ExtraData: chainwriter.ExtraDataDecoded{
+			ExtraData: ccipsolana.ExtraDataDecoded{
 				ExtraArgsDecoded: map[string]any{
 					"computeUnits": uint32(500),
 				},
@@ -201,7 +202,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		require.NoError(t, err)
 
 		verifyTxOpts(t, options, true)
-		_, ok := transformedArgs.(chainwriter.SVMExecCallArgs)
+		_, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
 		require.True(t, ok)
 		require.Len(t, newAccounts, len(accounts))
 	})
