@@ -44,8 +44,8 @@ type LogPoller interface {
 	RegisterFilter(ctx context.Context, filter logpoller.Filter) error
 	UnregisterFilter(ctx context.Context, name string) error
 	FilteredLogs(context.Context, []query.Expression, query.LimitAndSort, string) ([]logpoller.Log, error)
-	Replay(fromBlock int64) error
-	ReplayStatus() logpoller.ReplayStatus
+	Replay(fromBlock int64)
+	ReplayStatus() types.ReplayStatus
 }
 
 type Chain interface {
@@ -390,6 +390,10 @@ func (c *chain) ListNodeStatuses(ctx context.Context, pageSize int32, pageToken 
 
 func (c *chain) Transact(ctx context.Context, from, to string, amount *big.Int, balanceCheck bool) error {
 	return c.sendTx(ctx, from, to, amount, balanceCheck)
+}
+
+func (c *chain) Replay(fromBlock int64, args map[string]any) {
+	c.LogPoller().Replay(fromBlock)
 }
 
 func (c *chain) listNodeStatuses(start, end int) ([]types.NodeStatus, int, error) {

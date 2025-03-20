@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"iter"
 	"math"
 	"sync"
@@ -58,13 +59,13 @@ type filtersI interface {
 type ReplayInfo struct {
 	mut          sync.RWMutex
 	requestBlock int64
-	status       ReplayStatus
+	status       types.ReplayStatus
 }
 
 // hasRequest returns true if a new request has been received (since the last request completed),
 // whether or not it is pending yet
 func (r *ReplayInfo) hasRequest() bool {
-	return r.status == ReplayStatusRequested || r.status == ReplayStatusPending
+	return r.status == types.ReplayStatusRequested || r.status == types.ReplayStatusPending
 }
 
 type Service struct {
@@ -101,7 +102,7 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient) *Service {
 		},
 	}.NewServiceEngine(lggr)
 	lp.lggr = lp.eng.SugaredLogger
-	lp.replay.status = ReplayStatusNoRequest
+	lp.replay.status = types.ReplayStatusNoRequest
 
 	return lp
 }
@@ -237,7 +238,7 @@ func (lp *Service) UnregisterFilter(ctx context.Context, name string) error {
 // LogPoller run loop it will backfill all filters starting from fromBlock. If there
 // are new filters in the backfill queue, with an earlier StartingBlock, then they
 // will get backfilled from there instead.
-func (lp *Service) Replay(fromBlock int64) error {
+func (lp *Service) Replay(fromBlock int64) {
 	lp.replay.mut.Lock()
 	defer lp.replay.mut.Unlock()
 
@@ -245,15 +246,13 @@ func (lp *Service) Replay(fromBlock int64) error {
 		// Already requested, no further action required
 		lp.lggr.Warnf("Ignoring redundant request to replay from block %d, replay from block %d already requested",
 			fromBlock, lp.replay.requestBlock)
-		return nil
+		return
 	}
 	lp.filters.UpdateStartingBlocks(fromBlock)
 	lp.replay.requestBlock = fromBlock
-	if lp.replay.status != ReplayStatusPending {
-		lp.replay.status = ReplayStatusRequested
+	if lp.replay.status != types.ReplayStatusPending {
+		lp.replay.status = types.ReplayStatusRequested
 	}
-
-	return nil
 }
 
 // ReplayStatus returns the current replay status of LogPoller:
@@ -262,7 +261,7 @@ func (lp *Service) Replay(fromBlock int64) error {
 // Requested - a replay has been requested, but has not started yet
 // Pending - a replay is currently in progress
 // Complete - there was at least one replay executed since startup, but all have since completed
-func (lp *Service) ReplayStatus() ReplayStatus {
+func (lp *Service) ReplayStatus() types.ReplayStatus {
 	lp.replay.mut.RLock()
 	defer lp.replay.mut.RUnlock()
 	return lp.replay.status
@@ -306,7 +305,7 @@ func (lp *Service) checkForReplayRequest() bool {
 	}
 
 	lp.lggr.Infow("starting replay", "replayBlock", lp.replay.requestBlock)
-	lp.replay.status = ReplayStatusPending
+	lp.replay.status = types.ReplayStatusPending
 	return true
 }
 
@@ -461,10 +460,10 @@ func (lp *Service) replayComplete(from, to int64) bool {
 
 	if lp.replay.requestBlock < from {
 		// received a new request with lower block number while replaying, we'll process that next time
-		lp.replay.status = ReplayStatusRequested
+		lp.replay.status = types.ReplayStatusRequested
 		return false
 	}
-	lp.replay.status = ReplayStatusComplete
+	lp.replay.status = types.ReplayStatusComplete
 	return true
 }
 
