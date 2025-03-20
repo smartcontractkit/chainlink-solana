@@ -196,7 +196,7 @@ func TestAccountLookups(t *testing.T) {
 		// First 2 accounts are skipped because of startIndex
 		for i := 0; i < startIndex; i++ {
 			accounts[i] = &solana.AccountMeta{
-				PublicKey:  chainwriter.GetRandomPubKey(t),
+				PublicKey:  solanautils.GetRandomPubKey(t),
 				IsSigner:   false,
 				IsWritable: false,
 			}
@@ -205,7 +205,7 @@ func TestAccountLookups(t *testing.T) {
 		// Bitmap values only applied after startIndex
 		for i := startIndex; i < len(accounts); i++ {
 			accounts[i] = &solana.AccountMeta{
-				PublicKey:  chainwriter.GetRandomPubKey(t),
+				PublicKey:  solanautils.GetRandomPubKey(t),
 				IsSigner:   (i)%2 == 0,
 				IsWritable: (i)%2 == 0,
 			}
@@ -326,7 +326,7 @@ func TestAccountLookups(t *testing.T) {
 		accounts := [3]*solana.AccountMeta{}
 		for i := 0; i < 3; i++ {
 			accounts[i] = &solana.AccountMeta{
-				PublicKey:  chainwriter.GetRandomPubKey(t),
+				PublicKey:  solanautils.GetRandomPubKey(t),
 				IsWritable: true,
 			}
 		}
