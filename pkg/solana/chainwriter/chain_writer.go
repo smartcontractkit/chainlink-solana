@@ -311,6 +311,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	// Filter the lookup table addresses based on which accounts are actually used
 	filteredLookupTableMap := s.FilterLookupTableAddresses(accounts, derivedTableMap, staticTableMap)
 
+	options := []txmutils.SetTxConfig{}
 	// Transform args if necessary
 	if methodConfig.ArgsTransform != "" {
 		transformFunc, tfErr := FindTransform(methodConfig.ArgsTransform)
@@ -318,7 +319,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 			return errorWithDebugID(fmt.Errorf("error finding transform function: %w", tfErr), debugID)
 		}
 		s.lggr.Debugw("Applying args transformation", "contract", contractName, "method", method)
-		args, accounts, err = transformFunc(ctx, s.client, args, accounts, derivedTableMap, toAddress)
+		args, accounts, options, err = transformFunc(ctx, s.client, args, accounts, derivedTableMap, toAddress)
 		if err != nil {
 			return errorWithDebugID(fmt.Errorf("error transforming args: %w", err), debugID)
 		}
@@ -355,12 +356,12 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error constructing transaction: %w", err), debugID)
 	}
-	options := []txmutils.SetTxConfig{}
 	if ataUUID != "" {
 		options = append(options, txmutils.SetDependencyTxID(ataUUID))
 	}
 
 	s.lggr.Debugw("Sending main transaction", "contract", contractName, "method", method)
+
 	// Enqueue transaction
 	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, tx, &transactionID, blockhash.Value.LastValidBlockHeight, options...); err != nil {
 		return errorWithDebugID(fmt.Errorf("error enqueuing transaction: %w", err), debugID)

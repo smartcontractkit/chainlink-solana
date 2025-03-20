@@ -3,7 +3,6 @@ package chainwriter
 import (
 	"context"
 	"encoding/binary"
-	"errors"
 	"fmt"
 
 	bin "github.com/gagliardetto/binary"
@@ -11,26 +10,21 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/mitchellh/mapstructure"
 
-	idl "github.com/smartcontractkit/chainlink-ccip/chains/solana"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
+	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
+// TODO: replace with exact value after CCIP testing is completed.
+const StaticCuOverhead uint32 = 100000
 const MandatoryExecuteAccounts = 14
 
-type ReportPostTransform struct {
-	ReportContext  [2][32]byte
-	Report         []byte
-	Info           ccipocr3.ExecuteReportInfo
-	AbstractReport ccip_offramp.ExecutionReportSingleChain
-	TokenIndexes   []byte
-}
-
-func FindTransform(id string) (func(context.Context, client.MultiClient, any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta, string) (any, solana.AccountMetaSlice, error), error) {
+func FindTransform(id string) (func(context.Context, client.MultiClient, any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta, string) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error), error) {
 	switch id {
 	case "CCIPExecute":
 		return CCIPExecuteArgsTransform, nil
@@ -41,13 +35,33 @@ func FindTransform(id string) (func(context.Context, client.MultiClient, any, so
 	}
 }
 
-// This Transform function looks up the token pool addresses in the accounts slice and augments the args
-// with the indexes of the token pool addresses in the accounts slice.
-func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, args any, accounts solana.AccountMetaSlice, tableMap map[string]map[string][]*solana.AccountMeta, toAddress string) (any, solana.AccountMetaSlice, error) {
-	var argsTransformed ReportPostTransform
+// CCIPExecuteArgsTransform calculates required compute units, and appends any needed accounts by fetching pool lookup table entries.
+// It then updates token indexes based on appended PDAs and returns the transformed arguments, extended accounts slice, and cu tx configs.
+func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, args any, accounts solana.AccountMetaSlice, tableMap map[string]map[string][]*solana.AccountMeta, toAddress string) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
+	var argsTransformed ccipsolana.SVMExecCallArgs
 	err := mapstructure.Decode(args, &argsTransformed)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, []txmutils.SetTxConfig{}, err
+	}
+
+	cu, ok := argsTransformed.ExtraData.ExtraArgsDecoded["computeUnits"].(uint32)
+	if !ok {
+		return nil, nil, []txmutils.SetTxConfig{}, fmt.Errorf("computeUnits not found in ExtraData")
+	}
+
+	computeUnits := StaticCuOverhead + cu
+
+	for _, execData := range argsTransformed.ExtraData.DestExecDataDecoded {
+		destGasAmount, ok := execData["destGasAmount"].(uint32)
+		if !ok {
+			return nil, nil, []txmutils.SetTxConfig{}, fmt.Errorf("DestGasAmount not found in ExtraData")
+		}
+		computeUnits += destGasAmount
+	}
+
+	options := []txmutils.SetTxConfig{
+		txmutils.SetEstimateComputeUnitLimit(false),
+		txmutils.SetComputeUnitLimit(computeUnits),
 	}
 
 	registryTables, exists := tableMap["PoolLookupTable"]
@@ -55,13 +69,13 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 	// Return with empty TokenIndexes
 	if !exists {
 		argsTransformed.TokenIndexes = []byte{}
-		return argsTransformed, accounts, nil
+		return argsTransformed, accounts, options, nil
 	}
 
 	// Fetch all of the accounts in the pool lookup table with the proper IsWritable flag set
 	poolLookupAccounts, err := fetchPoolLookupAccounts(ctx, client, registryTables)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to fetch pool lookup accounts and set wrtiable flags: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to fetch pool lookup accounts and set wrtiable flags: %w", err)
 	}
 
 	var aggregatedMessages []ccipocr3.Message
@@ -71,7 +85,7 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 
 	feeQuoterAddress, err := getFeeQuoterAddress(ctx, toAddress, args, tableMap, client)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to fetch fee quoter address: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to fetch fee quoter address: %w", err)
 	}
 
 	var tokenIndexes []uint8
@@ -87,18 +101,18 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 			destTokenAddress := tokenAmount.DestTokenAddress
 			userTokenAccount, err := getUserTokenAccount(receiver, tokenProgram.PublicKey, destTokenAddress)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to calculate user token account PDA: %w", err)
+				return nil, nil, nil, fmt.Errorf("failed to calculate user token account PDA: %w", err)
 			}
 			perChainTokenConfig, err := getPerChainTokenConfig(sourceChainSelector, destTokenAddress, feeQuoterAddress)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to calculate per chain per token config PDA: %w", err)
+				return nil, nil, nil, fmt.Errorf("failed to calculate per chain per token config PDA: %w", err)
 			}
 			poolChainConfig, err := getPoolChainConfig(sourceChainSelector, destTokenAddress, poolProgram.PublicKey)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to calculate pool chain config PDA: %w", err)
+				return nil, nil, nil, fmt.Errorf("failed to calculate pool chain config PDA: %w", err)
 			}
 			if len(accounts) < MandatoryExecuteAccounts {
-				return nil, nil, fmt.Errorf("encountered unexpected number of accounts, expected at least %d, got %d", MandatoryExecuteAccounts, len(accounts))
+				return nil, nil, nil, fmt.Errorf("encountered unexpected number of accounts, expected at least %d, got %d", MandatoryExecuteAccounts, len(accounts))
 			}
 			// Token indexes are relative to the remaining accounts which exclude mandatory accounts
 			tokenIndexes = append(tokenIndexes, uint8(len(accounts)-MandatoryExecuteAccounts)) //nolint:gosec
@@ -114,26 +128,25 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 	}
 
 	argsTransformed.TokenIndexes = tokenIndexes
-	return argsTransformed, accounts, nil
+	return argsTransformed, accounts, options, nil
 }
 
 // This Transform function trims off the GlobalState account from commit transactions if there are no token or gas price updates
-func CCIPCommitAccountTransform(ctx context.Context, client client.MultiClient, args any, accounts solana.AccountMetaSlice, _ map[string]map[string][]*solana.AccountMeta, _ string) (any, solana.AccountMetaSlice, error) {
-	var tokenPriceVals, gasPriceVals [][]byte
-	var err error
-	tokenPriceVals, err = GetValuesAtLocation(args, "Info.TokenPriceUpdates.TokenID")
-	if err != nil && !errors.Is(err, errFieldNotFound) {
-		return nil, nil, fmt.Errorf("error getting values at location: %w", err)
+func CCIPCommitAccountTransform(ctx context.Context, client client.MultiClient, args any, accounts solana.AccountMetaSlice, _ map[string]map[string][]*solana.AccountMeta, _ string) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
+	var argsDecoded ccipsolana.SVMCommitCallArgs
+	err := mapstructure.Decode(args, &argsDecoded)
+	if err != nil {
+		return nil, nil, []txmutils.SetTxConfig{}, err
 	}
-	gasPriceVals, err = GetValuesAtLocation(args, "Info.GasPriceUpdates.ChainSel")
-	if err != nil && !errors.Is(err, errFieldNotFound) {
-		return nil, nil, fmt.Errorf("error getting values at location: %w", err)
-	}
+
+	tokenPriceVals := argsDecoded.Info.TokenPriceUpdates
+	gasPriceVals := argsDecoded.Info.GasPriceUpdates
+
 	transformedAccounts := accounts
 	if len(tokenPriceVals) == 0 && len(gasPriceVals) == 0 {
 		transformedAccounts = accounts[:len(accounts)-1]
 	}
-	return args, transformedAccounts, nil
+	return args, transformedAccounts, []txmutils.SetTxConfig{txmutils.SetEstimateComputeUnitLimit(true)}, nil
 }
 
 func fetchPoolLookupAccounts(ctx context.Context, client client.MultiClient, poolTables map[string][]*solana.AccountMeta) ([]*solana.AccountMeta, error) {
@@ -185,7 +198,7 @@ func getFeeQuoterAddress(ctx context.Context, toAddress string, args any, tableM
 			InternalField: InternalField{
 				TypeName: "ReferenceAddresses",
 				Location: "FeeQuoter",
-				IDL:      idl.FetchCCIPOfframpIDL(),
+				IDL:      ccipsolana.FetchCCIPOfframpIDL(),
 			},
 		},
 	}
