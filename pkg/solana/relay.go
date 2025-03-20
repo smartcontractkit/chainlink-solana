@@ -115,7 +115,7 @@ func (r *Relayer) Transact(ctx context.Context, from, to string, amount *big.Int
 	return r.chain.Transact(ctx, from, to, amount, balanceCheck)
 }
 
-func (r *Relayer) Replay(fromBlock int64, args map[string]any) {
+func (r *Relayer) Replay(fromBlock uint64, args map[string]any) {
 	r.chain.Replay(fromBlock, args)
 }
 
