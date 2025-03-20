@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 type ReportPreTransform struct {
@@ -38,16 +39,16 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		return rw, nil
 	})
 
-	receiver := chainwriter.GetRandomPubKey(t)
-	offrampAddress := chainwriter.GetRandomPubKey(t)
-	destTokenAddr1 := chainwriter.GetRandomPubKey(t)
-	destTokenAddr2 := chainwriter.GetRandomPubKey(t)
+	receiver := utils.GetRandomPubKey(t)
+	offrampAddress := utils.GetRandomPubKey(t)
+	destTokenAddr1 := utils.GetRandomPubKey(t)
+	destTokenAddr2 := utils.GetRandomPubKey(t)
 	poolKeys := chainwriter.CreateTestPubKeys(t, 7)
 	tokenAdminRegistryAddr := poolKeys[1]
 	poolProgram := poolKeys[2]
 	tokenProgram := poolKeys[6]
 	sourceChainSelector := ccipocr3.ChainSelector(1)
-	feeQuoterAddr := chainwriter.GetRandomPubKey(t)
+	feeQuoterAddr := utils.GetRandomPubKey(t)
 	mockFetchFeeQuoterAddress(t, rw, feeQuoterAddr, offrampAddress)
 
 	sourceChainSelBytes := make([]byte, 8)
@@ -108,7 +109,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 
 		tableMap := make(map[string]map[string][]*solana.AccountMeta)
 		tableMap["PoolLookupTable"] = make(map[string][]*solana.AccountMeta)
-		lookupTablePubkey := chainwriter.GetRandomPubKey(t)
+		lookupTablePubkey := utils.GetRandomPubKey(t)
 
 		poolKeysMeta := make([]*solana.AccountMeta, 0, len(poolKeys))
 		// second address in pool lookup table is expected to be the token admin registry address needed to fetch the WritableIndexes
@@ -163,7 +164,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	})
 
 	t.Run("CCIPExecute ArgsTransform includes empty token indexes if lookup table not found", func(t *testing.T) {
-		accounts := []*solana.AccountMeta{{PublicKey: chainwriter.GetRandomPubKey(t)}}
+		accounts := []*solana.AccountMeta{{PublicKey: utils.GetRandomPubKey(t)}}
 		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, args, accounts, nil, offrampAddress.String())
 		require.NoError(t, err)
 		verifyTxOpts(t, options, true)
@@ -177,7 +178,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	})
 
 	t.Run("CCIPExecute ArgsTransform does not get args that conform to ReportPreTransform", func(t *testing.T) {
-		accounts := []*solana.AccountMeta{{PublicKey: chainwriter.GetRandomPubKey(t)}}
+		accounts := []*solana.AccountMeta{{PublicKey: utils.GetRandomPubKey(t)}}
 		args := struct {
 			ReportContext [2][32]uint8
 			Info          ccipocr3.ExecuteReportInfo
@@ -208,7 +209,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	})
 
 	t.Run("CCIPExecute ArgsTransform fails with empty Info", func(t *testing.T) {
-		accounts := []*solana.AccountMeta{{PublicKey: chainwriter.GetRandomPubKey(t)}}
+		accounts := []*solana.AccountMeta{{PublicKey: utils.GetRandomPubKey(t)}}
 
 		args := struct {
 			ReportContext [2][32]uint8
@@ -233,8 +234,8 @@ func Test_CCIPCommitAccountTransform(t *testing.T) {
 		return rw, nil
 	})
 
-	key1 := chainwriter.GetRandomPubKey(t)
-	key2 := chainwriter.GetRandomPubKey(t)
+	key1 := utils.GetRandomPubKey(t)
+	key2 := utils.GetRandomPubKey(t)
 	t.Run("CCIPCommit ArgsTransform does not affect accounts if token prices exist", func(t *testing.T) {
 		args := struct {
 			Info ccipocr3.CommitReportInfo
@@ -284,11 +285,11 @@ func verifyTxOpts(t *testing.T, options []txmutils.SetTxConfig, exec bool) {
 }
 
 func mockWritableIndexes(t *testing.T, rw *clientmocks.ReaderWriter, tokenAdminRegistryAddr solana.PublicKey) {
-	lookupTablePubkey := chainwriter.GetRandomPubKey(t)
+	lookupTablePubkey := utils.GetRandomPubKey(t)
 	tokenAdminRegistry := ccip_router.TokenAdminRegistry{
 		Version:              1,
-		Administrator:        chainwriter.GetRandomPubKey(t),
-		PendingAdministrator: chainwriter.GetRandomPubKey(t),
+		Administrator:        utils.GetRandomPubKey(t),
+		PendingAdministrator: utils.GetRandomPubKey(t),
 		LookupTable:          lookupTablePubkey,
 		// set all accounts as writable
 		WritableIndexes: [2]ag_binary.Uint128{{Endianness: ag_binary.LE, Lo: math.MaxUint64, Hi: math.MaxUint64}},

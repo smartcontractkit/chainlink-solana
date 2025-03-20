@@ -36,6 +36,7 @@ import (
 	feemocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/fees/mocks"
 	txmMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 type Arguments struct {
@@ -88,7 +89,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 	}
 
 	// setup pda account with inner field lookup
-	programID := chainwriter.GetRandomPubKey(t)
+	programID := utils.GetRandomPubKey(t)
 	seed2 := []byte("seed2")
 	pda2 := mustFindPdaProgramAddress(t, [][]byte{seed2}, programID)
 	// mock data account response from program
@@ -127,8 +128,8 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 	}
 
 	t.Run("resolve addresses from different types of lookups", func(t *testing.T) {
-		constantAccountMeta.PublicKey = chainwriter.GetRandomPubKey(t)
-		accountLookupMeta.PublicKey = chainwriter.GetRandomPubKey(t)
+		constantAccountMeta.PublicKey = utils.GetRandomPubKey(t)
+		accountLookupMeta.PublicKey = utils.GetRandomPubKey(t)
 		// correlates to DerivedTable index in account lookup config
 		derivedTablePdaLookupMeta.PublicKey = storedPubKeys[0]
 
@@ -413,17 +414,17 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, chainwriter.ChainWriterConfig{})
 	require.NoError(t, err)
 
-	programID := chainwriter.GetRandomPubKey(t)
+	programID := utils.GetRandomPubKey(t)
 	seed1 := []byte("seed1")
 	pda1 := mustFindPdaProgramAddress(t, [][]byte{seed1}, programID)
 	// mock data account response from program
 	lookupTablePubkey := mockDataAccountLookupTable(t, rw, pda1)
 	// mock fetch lookup table addresses call
-	storedPubKey := chainwriter.GetRandomPubKey(t)
+	storedPubKey := utils.GetRandomPubKey(t)
 	unusedKeys := chainwriter.CreateTestPubKeys(t, 2)
 	mockFetchLookupTableAddresses(t, rw, lookupTablePubkey, append([]solana.PublicKey{storedPubKey}, unusedKeys...))
 
-	unusedProgramID := chainwriter.GetRandomPubKey(t)
+	unusedProgramID := utils.GetRandomPubKey(t)
 	seed2 := []byte("seed2")
 	unusedPda := mustFindPdaProgramAddress(t, [][]byte{seed2}, unusedProgramID)
 	// mock data account response from program
@@ -433,9 +434,9 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 	mockFetchLookupTableAddresses(t, rw, unusedLookupTable, unusedKeys)
 
 	// mock static lookup table calls
-	staticLookupTablePubkey1 := chainwriter.GetRandomPubKey(t)
+	staticLookupTablePubkey1 := utils.GetRandomPubKey(t)
 	mockFetchLookupTableAddresses(t, rw, staticLookupTablePubkey1, chainwriter.CreateTestPubKeys(t, 2))
-	staticLookupTablePubkey2 := chainwriter.GetRandomPubKey(t)
+	staticLookupTablePubkey2 := utils.GetRandomPubKey(t)
 	mockFetchLookupTableAddresses(t, rw, staticLookupTablePubkey2, chainwriter.CreateTestPubKeys(t, 2))
 
 	lookupTableConfig := chainwriter.LookupTables{
@@ -532,7 +533,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 		accountLookupConfig := []chainwriter.Lookup{
 			{AccountConstant: &chainwriter.AccountConstant{
 				Name:       "Constant",
-				Address:    chainwriter.GetRandomPubKey(t).String(),
+				Address:    utils.GetRandomPubKey(t).String(),
 				IsSigner:   false,
 				IsWritable: false,
 			}},
@@ -571,8 +572,8 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 	require.NoError(t, err)
 	admin := adminPk.PublicKey()
 
-	account1 := chainwriter.GetRandomPubKey(t)
-	account2 := chainwriter.GetRandomPubKey(t)
+	account1 := utils.GetRandomPubKey(t)
+	account2 := utils.GetRandomPubKey(t)
 
 	seed1 := []byte("seed1")
 	account3 := mustFindPdaProgramAddress(t, [][]byte{seed1}, solana.SystemProgramID)
@@ -588,7 +589,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 	mockFetchLookupTableAddresses(t, rw, derivedLookupTablePubkey, derivedLookupKeys)
 
 	// mock static lookup table call
-	staticLookupTablePubkey := chainwriter.GetRandomPubKey(t)
+	staticLookupTablePubkey := utils.GetRandomPubKey(t)
 	staticLookupKeys := chainwriter.CreateTestPubKeys(t, 2)
 	mockFetchLookupTableAddresses(t, rw, staticLookupTablePubkey, staticLookupKeys)
 
@@ -758,10 +759,10 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 	require.NoError(t, err)
 	admin := adminPk.PublicKey()
 
-	offrampAddr := chainwriter.GetRandomPubKey(t)
-	routerAddr := chainwriter.GetRandomPubKey(t)
-	destTokenAddr := chainwriter.GetRandomPubKey(t)
-	feeQuoterAddr := chainwriter.GetRandomPubKey(t)
+	offrampAddr := utils.GetRandomPubKey(t)
+	routerAddr := utils.GetRandomPubKey(t)
+	destTokenAddr := utils.GetRandomPubKey(t)
+	feeQuoterAddr := utils.GetRandomPubKey(t)
 
 	poolKeys := []solana.PublicKey{destTokenAddr}
 	poolKeys = append(poolKeys, chainwriter.CreateTestPubKeys(t, 6)...)
@@ -844,15 +845,15 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 						Accounts: []chainwriter.Lookup{
 							{AccountConstant: &chainwriter.AccountConstant{
 								Name:    "testAcc1",
-								Address: chainwriter.GetRandomPubKey(t).String(),
+								Address: utils.GetRandomPubKey(t).String(),
 							}},
 							{AccountConstant: &chainwriter.AccountConstant{
 								Name:    "testAcc2",
-								Address: chainwriter.GetRandomPubKey(t).String(),
+								Address: utils.GetRandomPubKey(t).String(),
 							}},
 							{AccountConstant: &chainwriter.AccountConstant{
 								Name:    "testAcc3",
-								Address: chainwriter.GetRandomPubKey(t).String(),
+								Address: utils.GetRandomPubKey(t).String(),
 							}},
 						},
 					},
@@ -924,7 +925,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 		abstractReport := ccipocr3.ExecutePluginReportSingleChain{
 			Messages: []ccipocr3.Message{
 				{
-					Receiver: chainwriter.GetRandomPubKey(t).Bytes(),
+					Receiver: utils.GetRandomPubKey(t).Bytes(),
 					Header:   ccipocr3.RampMessageHeader{SourceChainSelector: ccipocr3.ChainSelector(1)},
 					TokenAmounts: []ccipocr3.RampTokenAmount{
 						{
@@ -1131,11 +1132,11 @@ func mustFindPdaProgramAddress(t *testing.T, seeds [][]byte, programID solana.Pu
 }
 
 func mockDataAccountLookupTable(t *testing.T, rw *clientmocks.ReaderWriter, pda solana.PublicKey) solana.PublicKey {
-	lookupTablePubkey := chainwriter.GetRandomPubKey(t)
+	lookupTablePubkey := utils.GetRandomPubKey(t)
 	dataAccount := chainwriter.DataAccount{
 		Version:              1,
-		Administrator:        chainwriter.GetRandomPubKey(t),
-		PendingAdministrator: chainwriter.GetRandomPubKey(t),
+		Administrator:        utils.GetRandomPubKey(t),
+		PendingAdministrator: utils.GetRandomPubKey(t),
 		LookupTable:          lookupTablePubkey,
 	}
 	dataAccountBytes := mustBorshEncodeStruct(t, dataAccount)
@@ -1149,11 +1150,11 @@ func mockDataAccountLookupTable(t *testing.T, rw *clientmocks.ReaderWriter, pda 
 }
 
 func mockTokenAdminRegistryLookupTable(t *testing.T, rw *clientmocks.ReaderWriter, pda solana.PublicKey) solana.PublicKey {
-	lookupTablePubkey := chainwriter.GetRandomPubKey(t)
+	lookupTablePubkey := utils.GetRandomPubKey(t)
 	tokenAdminRegistry := ccip_router.TokenAdminRegistry{
 		Version:              1,
-		Administrator:        chainwriter.GetRandomPubKey(t),
-		PendingAdministrator: chainwriter.GetRandomPubKey(t),
+		Administrator:        utils.GetRandomPubKey(t),
+		PendingAdministrator: utils.GetRandomPubKey(t),
 		LookupTable:          lookupTablePubkey,
 		WritableIndexes:      [2]ag_binary.Uint128{},
 	}
