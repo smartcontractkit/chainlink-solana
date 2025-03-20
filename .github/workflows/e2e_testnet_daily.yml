@@ -174,11 +174,10 @@ jobs:
           enable-gap: false
           cache_key_id: solana-e2e-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "false"
-          # DEFAULT_CHAINLINK_IMAGE: ${{ env.CL_ECR }}
+          default_e2e_test_chainlink_image: ${{ env.CL_ECR }}
         env:
           E2E_TEST_COMMON_PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }} # default private key
           E2E_TEST_COMMON_RPC_URL: https://api.devnet.solana.com # default url
           E2E_TEST_COMMON_WS_URL: https://api.devnet.solana.com # default url
           E2E_TEST_SOLANA_SECRET: thisisatestingonlysecret
-          E2E_TEST_CHAINLINK_IMAGE: ${{ env.CL_ECR }}
           CHAINLINK_USER_TEAM: ${{ github.event.inputs.team || 'BIX' }}
