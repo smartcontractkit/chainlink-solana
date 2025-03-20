@@ -59,8 +59,8 @@ func FindTransform(id string) (func(context.Context, client.MultiClient, any, so
 	}
 }
 
-// This Transform function looks up the token pool addresses in the accounts slice and augments the args
-// with the indexes of the token pool addresses in the accounts slice.
+// CCIPExecuteArgsTransform calculates required compute units, and appends any needed accounts by fetching pool lookup table entries.
+// It then updates token indexes based on appended PDAs and returns the transformed arguments, extended accounts slice, and cu tx configs.
 func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, args any, accounts solana.AccountMetaSlice, tableMap map[string]map[string][]*solana.AccountMeta, toAddress string) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
 	var argsTransformed SVMExecCallArgs
 	err := mapstructure.Decode(args, &argsTransformed)
