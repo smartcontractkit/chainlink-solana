@@ -179,4 +179,5 @@ jobs:
           E2E_TEST_COMMON_RPC_URL: https://api.devnet.solana.com # default url
           E2E_TEST_COMMON_WS_URL: https://api.devnet.solana.com # default url
           E2E_TEST_SOLANA_SECRET: thisisatestingonlysecret
+          E2E_TEST_CHAINLINK_IMAGE: ${{ env.CL_ECR }}
           CHAINLINK_USER_TEAM: ${{ github.event.inputs.team || 'BIX' }}
