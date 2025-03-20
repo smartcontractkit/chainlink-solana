@@ -28,7 +28,7 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.29.0",
-    "@solana/web3.js": "^1.50.1"
+    "@solana/web3.js": "^1.91.3"
   },
   "devDependencies": {
     "@types/eslint": "^8.2.1",
