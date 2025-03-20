@@ -31,6 +31,7 @@ import (
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
+	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
 func TestTxm_Integration_ExpirationRebroadcast(t *testing.T) {
@@ -303,6 +304,61 @@ func TestTxm_Integration_Reorg(t *testing.T) {
 		status, errGetStatus = txmInstance.GetTransactionStatus(ctx, txID)
 		require.NoError(t, errGetStatus)
 		require.Equal(t, types.Finalized, status, "tx should be finalized after reorg")
+	})
+}
+
+func TestTxm_Integration_DependencyTx(t *testing.T) {
+	t.Parallel()
+
+	url := solanaClient.SetupLocalSolNode(t) // live validator
+	const amount = 1 * solana.LAMPORTS_PER_SOL
+	ctx, client, txmInstance, senderPubKey, receiverPubKey, observer := setup(t, url, true)
+
+	t.Run("Successfully executes with dependency tx", func(t *testing.T) {
+		t.Parallel()
+		depTxID := "dependency-tx-id-success"
+
+		depTx, lastValidBlockHeight := createTransaction(ctx, t, client, senderPubKey, receiverPubKey, amount, true)
+		require.NoError(t, txmInstance.Enqueue(ctx, "", depTx, &depTxID, lastValidBlockHeight))
+
+		txID := "main-tx-id-success"
+		tx, lastValidBlockHeight := createTransaction(ctx, t, client, senderPubKey, receiverPubKey, amount, true)
+		require.NoError(t, txmInstance.Enqueue(ctx, depTxID, tx, &txID, lastValidBlockHeight, []txmutils.SetTxConfig{txmutils.SetDependencyTxID(depTxID)}...))
+
+		status, err := txmInstance.waitForTxStatus(ctx, depTxID, types.Finalized)
+		require.NoError(t, err)
+		require.Equal(t, types.Finalized, status)
+
+		status, err = txmInstance.waitForTxStatus(ctx, txID, types.Finalized)
+		require.NoError(t, err)
+		require.Equal(t, types.Finalized, status)
+
+		logs := observer.FilterMessageSnippet("enqueued tx after dependency complete").Len()
+		require.Equal(t, 1, logs, "Expected dependency tx log message not found")
+	})
+
+	t.Run("Fails when dependency tx fails", func(t *testing.T) {
+		t.Parallel()
+		depTxID := "dependency-tx-id-fail"
+
+		// Create and enqueue a tx that will fail due to insufficient balance
+		depTx, lastValidBlockHeight := createTransaction(ctx, t, client, senderPubKey, receiverPubKey, 10000000000*solana.LAMPORTS_PER_SOL, true)
+		require.NoError(t, txmInstance.Enqueue(ctx, "", depTx, &depTxID, lastValidBlockHeight))
+
+		txID := "main-tx-id-fail"
+		tx, lastValidBlockHeight := createTransaction(ctx, t, client, senderPubKey, receiverPubKey, amount, true)
+		require.NoError(t, txmInstance.Enqueue(ctx, depTxID, tx, &txID, lastValidBlockHeight, []txmutils.SetTxConfig{txmutils.SetDependencyTxID(depTxID)}...))
+
+		status, err := txmInstance.waitForTxStatus(ctx, depTxID, types.Finalized)
+		require.Error(t, err)
+		require.Equal(t, types.Fatal, status)
+
+		status, err = txmInstance.waitForTxStatus(ctx, txID, types.Finalized)
+		require.Error(t, err)
+		require.Equal(t, types.Fatal, status)
+
+		logs := observer.FilterMessageSnippet("dependency transaction did not reach desired state").Len()
+		require.Equal(t, 1, logs, "Expected dependency tx failure log message not found")
 	})
 }
 

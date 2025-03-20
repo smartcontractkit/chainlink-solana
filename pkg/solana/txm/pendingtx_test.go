@@ -143,9 +143,9 @@ func TestPendingTxContext_OnBroadcasted(t *testing.T) {
 	addBroadcastedTxWithSigAndCancel(t, txs, msg, sig, cancel)
 
 	// Check it exists in signature map and mapped to the correct txID
-	txInfo, exists := txs.sigToTxInfo[sig]
+	info, exists := txs.sigToTxInfo[sig]
 	require.True(t, exists, "signature should exist in sigToID map")
-	require.Equal(t, msg.id, txInfo.id, "signature should map to correct transaction ID")
+	require.Equal(t, msg.id, info.id, "signature should map to correct transaction ID")
 
 	// Check it exists in broadcasted map and that sigs match
 	tx, exists := txs.broadcastedProcessedTxs[msg.id]
@@ -192,12 +192,12 @@ func TestPendingTxContext_add_signature(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check signature map
-		txInfo, exists := txs.sigToTxInfo[sig1]
+		info, exists := txs.sigToTxInfo[sig1]
 		require.True(t, exists)
-		require.Equal(t, msg.id, txInfo.id)
-		txInfo, exists = txs.sigToTxInfo[sig2]
+		require.Equal(t, msg.id, info.id)
+		info, exists = txs.sigToTxInfo[sig2]
 		require.True(t, exists)
-		require.Equal(t, msg.id, txInfo.id)
+		require.Equal(t, msg.id, info.id)
 
 		// Check broadcasted map
 		tx, exists := txs.broadcastedProcessedTxs[msg.id]
@@ -280,9 +280,9 @@ func TestPendingTxContext_on_broadcasted_processed(t *testing.T) {
 		require.Equal(t, msg.id, id)
 
 		// Check it exists in signature map
-		txInfo, exists := txs.sigToTxInfo[sig]
+		info, exists := txs.sigToTxInfo[sig]
 		require.True(t, exists)
-		require.Equal(t, msg.id, txInfo.id)
+		require.Equal(t, msg.id, info.id)
 
 		// Check it exists in broadcasted map
 		tx, exists := txs.broadcastedProcessedTxs[msg.id]
@@ -410,9 +410,9 @@ func TestPendingTxContext_on_confirmed(t *testing.T) {
 		require.Equal(t, msg.id, id)
 
 		// Check it exists in signature map
-		txInfo, exists := txs.sigToTxInfo[sig]
+		info, exists := txs.sigToTxInfo[sig]
 		require.True(t, exists)
-		require.Equal(t, msg.id, txInfo.id)
+		require.Equal(t, msg.id, info.id)
 
 		// Check it does not exist in broadcasted map
 		_, exists = txs.broadcastedProcessedTxs[msg.id]
@@ -803,6 +803,43 @@ func TestPendingTxContext_on_error(t *testing.T) {
 		id, err = txs.OnError(sig, retentionTimeout, utils.Errored, 0)
 		require.Error(t, err)
 		require.Equal(t, "", id)
+	})
+
+	t.Run("successfully clears out signature if transaction not found", func(t *testing.T) {
+		sig := randomSignature(t)
+		id := uuid.NewString()
+		info := txInfo{
+			id:    id,
+			state: utils.Confirmed,
+		}
+		txs.sigToTxInfo[sig] = info
+
+		txID, err := txs.OnError(sig, retentionTimeout, utils.Errored, 0)
+		require.NoError(t, err)
+		require.Equal(t, id, txID)
+		_, exists := txs.sigToTxInfo[sig]
+		require.False(t, exists)
+	})
+
+	t.Run("successfully clears out signature and does not update existing error entry", func(t *testing.T) {
+		sig := randomSignature(t)
+		id := uuid.NewString()
+		info := txInfo{
+			id:    id,
+			state: utils.Errored,
+		}
+		txs.sigToTxInfo[sig] = info
+		tx := finishedTx{retentionTs: time.Now().Add(retentionTimeout), state: utils.Errored}
+		txs.finalizedErroredTxs[id] = tx
+
+		txID, err := txs.OnError(sig, retentionTimeout, utils.FatallyErrored, 0)
+		require.NoError(t, err)
+		require.Equal(t, id, txID)
+		_, exists := txs.sigToTxInfo[sig]
+		require.False(t, exists) // signature should be cleared
+		erroredTx, erroredExists := txs.finalizedErroredTxs[id]
+		require.True(t, erroredExists)                   // errored tx should still exist in map
+		require.Equal(t, utils.Errored, erroredTx.state) // errored tx should retain the original state
 	})
 }
 

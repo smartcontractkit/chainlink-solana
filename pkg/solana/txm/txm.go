@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
 	bigmath "github.com/smartcontractkit/chainlink-common/pkg/utils/big_math"
@@ -781,6 +782,32 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 		return fmt.Errorf("failed to store new transaction with ID %s: %w", id, err)
 	}
 
+	// If a dependency transaction ID is provided, handle waiting and enqueuing asynchronously.
+	if cfg.DependencyTxID != "" {
+		go func(msg pendingTx, depID string) {
+			status, err := txm.waitForTxStatus(ctx, depID, types.Finalized)
+			if err != nil {
+				txm.lggr.Errorw("dependency transaction did not reach desired state", "dependencyTxID", depID, "error", err)
+				errorStatus := txmutils.Errored
+				if status == types.Fatal {
+					errorStatus = txmutils.FatallyErrored
+				}
+				err = txm.txs.OnPrebroadcastError(msg.id, txm.cfg.TxRetentionTimeout(), errorStatus, TxDependencyFail)
+				if err != nil {
+					txm.lggr.Errorw("failed to mark transaction as errored", "id", msg.id, "error", err)
+				}
+				return
+			}
+			select {
+			case txm.chSend <- msg:
+				txm.lggr.Debugw("enqueued tx after dependency complete", "txID", msg.id, "dependencyTxID", depID)
+			default:
+				txm.lggr.Errorw("failed to enqueue tx after dependency", "queueFull", len(txm.chSend) == MaxQueueLen, "tx", msg)
+			}
+		}(msg, cfg.DependencyTxID)
+		return nil
+	}
+
 	select {
 	case txm.chSend <- msg:
 	default:
@@ -788,6 +815,41 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 		return fmt.Errorf("failed to enqueue transaction for %s", accountID)
 	}
 	return nil
+}
+
+func (txm *Txm) waitForTxStatus(ctx context.Context, transactionID string, desiredStatus types.TransactionStatus) (types.TransactionStatus, error) {
+	waitCtx, cancel := context.WithTimeout(ctx, txm.cfg.TxConfirmTimeout())
+	defer cancel()
+
+	backoff := 1 * time.Second
+	maxBackoff := 8 * time.Second
+
+	for {
+		select {
+		case <-waitCtx.Done():
+			return types.Unknown, fmt.Errorf("context ended while waiting for finality of transaction %s", transactionID)
+		case <-time.After(backoff):
+			status, err := txm.GetTransactionStatus(waitCtx, transactionID)
+			if err != nil {
+				return status, fmt.Errorf("error fetching transaction status: %w", err)
+			}
+			switch status {
+			case types.Failed, types.Fatal:
+				return status, fmt.Errorf("transaction %s failed", transactionID)
+			default:
+				if status >= desiredStatus {
+					// if status is equal to or greater than desired status, return
+					txm.lggr.Debugw("transaction reached state", "status", status, "transactionID", transactionID)
+					return status, nil
+				}
+				// otherwise keep polling
+			}
+		}
+		backoff *= 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
+	}
 }
 
 // GetTransactionStatus translates internal TXM transaction statuses to chainlink common statuses
@@ -798,9 +860,9 @@ func (txm *Txm) GetTransactionStatus(ctx context.Context, transactionID string) 
 	}
 
 	switch state {
-	case txmutils.AwaitingBroadcast, txmutils.Broadcasted:
+	case txmutils.AwaitingBroadcast, txmutils.Broadcasted, txmutils.Processed:
 		return commontypes.Pending, nil
-	case txmutils.Processed, txmutils.Confirmed:
+	case txmutils.Confirmed:
 		return commontypes.Unconfirmed, nil
 	case txmutils.Finalized:
 		return commontypes.Finalized, nil
