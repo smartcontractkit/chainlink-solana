@@ -9,6 +9,7 @@ import (
 	ag_binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -19,13 +20,14 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
+	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 type ReportPreTransform struct {
-	ReportContext  [2][32]byte
-	Report         []byte
-	Info           ccipocr3.ExecuteReportInfo
-	AbstractReport ccip_offramp.ExecutionReportSingleChain
+	ReportContext [2][32]byte
+	Report        []byte
+	Info          ccipocr3.ExecuteReportInfo
 }
 
 func Test_CCIPExecuteArgsTransform(t *testing.T) {
@@ -37,16 +39,16 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		return rw, nil
 	})
 
-	receiver := chainwriter.GetRandomPubKey(t)
-	offrampAddress := chainwriter.GetRandomPubKey(t)
-	destTokenAddr1 := chainwriter.GetRandomPubKey(t)
-	destTokenAddr2 := chainwriter.GetRandomPubKey(t)
+	receiver := utils.GetRandomPubKey(t)
+	offrampAddress := utils.GetRandomPubKey(t)
+	destTokenAddr1 := utils.GetRandomPubKey(t)
+	destTokenAddr2 := utils.GetRandomPubKey(t)
 	poolKeys := chainwriter.CreateTestPubKeys(t, 7)
 	tokenAdminRegistryAddr := poolKeys[1]
 	poolProgram := poolKeys[2]
 	tokenProgram := poolKeys[6]
 	sourceChainSelector := ccipocr3.ChainSelector(1)
-	feeQuoterAddr := chainwriter.GetRandomPubKey(t)
+	feeQuoterAddr := utils.GetRandomPubKey(t)
 	mockFetchFeeQuoterAddress(t, rw, feeQuoterAddr, offrampAddress)
 
 	sourceChainSelBytes := make([]byte, 8)
@@ -66,7 +68,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	poolChainConfig2, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_chainconfig"), sourceChainSelBytes, destTokenAddr2.Bytes()}, poolProgram)
 	require.NoError(t, err)
 
-	args := ReportPreTransform{
+	args := ccipsolana.SVMExecCallArgs{
 		Info: ccipocr3.ExecuteReportInfo{
 			AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
 				Messages: []ccipocr3.Message{{
@@ -82,6 +84,14 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 					}},
 				},
 			}},
+		},
+		ExtraData: ccipsolana.ExtraDataDecoded{
+			ExtraArgsDecoded: map[string]any{
+				"computeUnits": uint32(500),
+			},
+			DestExecDataDecoded: []map[string]any{
+				{"destGasAmount": uint32(500)},
+			},
 		},
 	}
 
@@ -99,7 +109,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 
 		tableMap := make(map[string]map[string][]*solana.AccountMeta)
 		tableMap["PoolLookupTable"] = make(map[string][]*solana.AccountMeta)
-		lookupTablePubkey := chainwriter.GetRandomPubKey(t)
+		lookupTablePubkey := utils.GetRandomPubKey(t)
 
 		poolKeysMeta := make([]*solana.AccountMeta, 0, len(poolKeys))
 		// second address in pool lookup table is expected to be the token admin registry address needed to fetch the WritableIndexes
@@ -109,9 +119,12 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		}
 		tableMap["PoolLookupTable"][lookupTablePubkey.String()] = poolKeysMeta
 
-		transformedArgs, newAccounts, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, args, accounts, tableMap, offrampAddress.String())
+		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, args, accounts, tableMap, offrampAddress.String())
 		require.NoError(t, err)
-		typedArgs, ok := transformedArgs.(chainwriter.ReportPostTransform)
+
+		verifyTxOpts(t, options, true)
+
+		typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
 		require.True(t, ok)
 		require.NotNil(t, typedArgs.TokenIndexes)
 		require.Len(t, typedArgs.TokenIndexes, 2)
@@ -151,31 +164,64 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	})
 
 	t.Run("CCIPExecute ArgsTransform includes empty token indexes if lookup table not found", func(t *testing.T) {
-		accounts := []*solana.AccountMeta{{PublicKey: chainwriter.GetRandomPubKey(t)}}
-		transformedArgs, newAccounts, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, args, accounts, nil, offrampAddress.String())
+		accounts := []*solana.AccountMeta{{PublicKey: utils.GetRandomPubKey(t)}}
+		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, args, accounts, nil, offrampAddress.String())
 		require.NoError(t, err)
+		verifyTxOpts(t, options, true)
+
 		// Accounts should be unchanged
 		require.Len(t, newAccounts, len(accounts))
-		typedArgs, ok := transformedArgs.(chainwriter.ReportPostTransform)
+		typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
 		require.True(t, ok)
 		require.NotNil(t, typedArgs.TokenIndexes)
 		require.Len(t, typedArgs.TokenIndexes, 0)
 	})
 
 	t.Run("CCIPExecute ArgsTransform does not get args that conform to ReportPreTransform", func(t *testing.T) {
-		accounts := []*solana.AccountMeta{{PublicKey: chainwriter.GetRandomPubKey(t)}}
+		accounts := []*solana.AccountMeta{{PublicKey: utils.GetRandomPubKey(t)}}
+		args := struct {
+			ReportContext [2][32]uint8
+			Info          ccipocr3.ExecuteReportInfo
+			ExtraData     ccipsolana.ExtraDataDecoded
+		}{
+			ReportContext: [2][32]uint8{},
+			Info: ccipocr3.ExecuteReportInfo{
+				AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
+					Messages: []ccipocr3.Message{{}},
+				}},
+			},
+			ExtraData: ccipsolana.ExtraDataDecoded{
+				ExtraArgsDecoded: map[string]any{
+					"computeUnits": uint32(500),
+				},
+				DestExecDataDecoded: []map[string]any{
+					{"destGasAmount": uint32(500)},
+				},
+			},
+		}
+		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, args, accounts, nil, offrampAddress.String())
+		require.NoError(t, err)
+
+		verifyTxOpts(t, options, true)
+		_, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
+		require.True(t, ok)
+		require.Len(t, newAccounts, len(accounts))
+	})
+
+	t.Run("CCIPExecute ArgsTransform fails with empty Info", func(t *testing.T) {
+		accounts := []*solana.AccountMeta{{PublicKey: utils.GetRandomPubKey(t)}}
+
 		args := struct {
 			ReportContext [2][32]uint8
 			Report        []uint8
+			Info          ccipocr3.ExecuteReportInfo
 		}{
 			ReportContext: [2][32]uint8{},
 			Report:        []uint8{},
+			Info:          ccipocr3.ExecuteReportInfo{},
 		}
-		transformedArgs, newAccounts, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, args, accounts, nil, offrampAddress.String())
-		require.NoError(t, err)
-		_, ok := transformedArgs.(chainwriter.ReportPostTransform)
-		require.True(t, ok)
-		require.Len(t, newAccounts, len(accounts))
+		_, _, _, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, args, accounts, nil, offrampAddress.String())
+		require.Contains(t, err.Error(), "computeUnits not found in ExtraData")
 	})
 }
 
@@ -188,18 +234,23 @@ func Test_CCIPCommitAccountTransform(t *testing.T) {
 		return rw, nil
 	})
 
-	key1 := chainwriter.GetRandomPubKey(t)
-	key2 := chainwriter.GetRandomPubKey(t)
+	key1 := utils.GetRandomPubKey(t)
+	key2 := utils.GetRandomPubKey(t)
 	t.Run("CCIPCommit ArgsTransform does not affect accounts if token prices exist", func(t *testing.T) {
 		args := struct {
 			Info ccipocr3.CommitReportInfo
 		}{
 			Info: ccipocr3.CommitReportInfo{
-				PriceUpdates: ccipocr3.PriceUpdates{TokenPriceUpdates: []ccipocr3.TokenPrice{{TokenID: ccipocr3.UnknownEncodedAddress(key1.String())}}},
+				PriceUpdates: ccipocr3.PriceUpdates{
+					TokenPriceUpdates: []ccipocr3.TokenPrice{
+						{TokenID: ccipocr3.UnknownEncodedAddress(key1.String())},
+					},
+				},
 			},
 		}
 		accounts := []*solana.AccountMeta{{PublicKey: key1}, {PublicKey: key2}}
-		_, newAccounts, err := chainwriter.CCIPCommitAccountTransform(ctx, mc, args, accounts, nil, "")
+		_, newAccounts, options, err := chainwriter.CCIPCommitAccountTransform(ctx, mc, args, accounts, nil, "")
+		verifyTxOpts(t, options, false)
 		require.NoError(t, err)
 		require.Len(t, newAccounts, len(accounts))
 	})
@@ -210,18 +261,35 @@ func Test_CCIPCommitAccountTransform(t *testing.T) {
 			Info: ccipocr3.CommitReportInfo{},
 		}
 		accounts := []*solana.AccountMeta{{PublicKey: key1}, {PublicKey: key2}}
-		_, newAccounts, err := chainwriter.CCIPCommitAccountTransform(ctx, mc, args, accounts, nil, "")
+		_, newAccounts, _, err := chainwriter.CCIPCommitAccountTransform(ctx, mc, args, accounts, nil, "")
 		require.NoError(t, err)
 		require.Len(t, newAccounts, 1)
 	})
 }
 
+func verifyTxOpts(t *testing.T, options []txmutils.SetTxConfig, exec bool) {
+	expectedLen := 1
+	if exec {
+		expectedLen = 2
+	}
+	require.Len(t, options, expectedLen)
+
+	txConfig := &txmutils.TxConfig{}
+	options[0](txConfig)
+	require.Equal(t, !exec, txConfig.EstimateComputeUnitLimit)
+
+	if exec {
+		options[1](txConfig)
+		require.Equal(t, chainwriter.StaticCuOverhead+1000, txConfig.ComputeUnitLimit)
+	}
+}
+
 func mockWritableIndexes(t *testing.T, rw *clientmocks.ReaderWriter, tokenAdminRegistryAddr solana.PublicKey) {
-	lookupTablePubkey := chainwriter.GetRandomPubKey(t)
+	lookupTablePubkey := utils.GetRandomPubKey(t)
 	tokenAdminRegistry := ccip_router.TokenAdminRegistry{
 		Version:              1,
-		Administrator:        chainwriter.GetRandomPubKey(t),
-		PendingAdministrator: chainwriter.GetRandomPubKey(t),
+		Administrator:        utils.GetRandomPubKey(t),
+		PendingAdministrator: utils.GetRandomPubKey(t),
 		LookupTable:          lookupTablePubkey,
 		// set all accounts as writable
 		WritableIndexes: [2]ag_binary.Uint128{{Endianness: ag_binary.LE, Lo: math.MaxUint64, Hi: math.MaxUint64}},
