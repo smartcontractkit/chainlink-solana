@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
@@ -347,6 +348,27 @@ func TestProcess(t *testing.T) {
 		}).Once()
 		err = lp.Process(ctx, ev)
 		assert.NoError(t, err)
+	})
+
+	t.Run("populates expiresAt field when retention is set", func(t *testing.T) {
+		filter.Retention = 30 * time.Minute
+		orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, f Filter) (int64, error) {
+			require.Equal(t, f, filter)
+			return filterID, nil
+		}).Once()
+		err = lp.RegisterFilter(ctx, filter)
+		require.NoError(t, err)
+
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []Log) error {
+			require.Len(t, logs, 1)
+			log := logs[0]
+			assert.Less(t, time.Until(*log.ExpiresAt), 30*time.Minute) // should be slightly less than 30 minutes from now
+			assert.Greater(t, time.Until(*log.ExpiresAt), 29*time.Minute)
+			return nil
+		}).Once()
+		err = lp.Process(ctx, ev)
+		assert.NoError(t, err)
+		filter.Retention = 0
 	})
 
 	jsonErr := []byte("{\"InstructionError\":[2,{\"Custom\":6001}]}")
