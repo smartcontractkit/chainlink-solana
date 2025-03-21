@@ -106,7 +106,7 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 		ContractReaderGetLatestValueWithFilteringForEvent,
 
 		// query key not implemented yet
-		// ContractReaderQueryKeyNotFound,
+		ContractReaderQueryKeyNotFound,
 		ContractReaderQueryKeyReturnsData,
 		ContractReaderQueryKeyReturnsDataAsValuesDotValue,
 		ContractReaderQueryKeyCanFilterWithValueComparator,
