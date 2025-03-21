@@ -69,8 +69,8 @@ func TestChainComponents(t *testing.T) {
 		t.Parallel()
 		helper := &helper{}
 		helper.Init(t)
-		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}}
-		DisableTests(it, t)
+		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}, inMemoryDB: helper.InMemoryDB()}
+		DisableTests(it)
 		it.Setup(t)
 		RunChainComponentsSolanaTests(t, it)
 	})
@@ -79,15 +79,15 @@ func TestChainComponents(t *testing.T) {
 		t.Parallel()
 		helper := &helper{}
 		helper.Init(t)
-		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}}
-		DisableTests(it, t)
+		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}, inMemoryDB: helper.InMemoryDB()}
+		DisableTests(it)
 		wrapped := commontestutils.WrapContractReaderTesterForLoop(it)
 		wrapped.Setup(t)
 		RunChainComponentsInLoopSolanaTests(t, wrapped)
 	})
 }
 
-func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T], t *testing.T) {
+func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 	it.DisableTests([]string{
 		// solana is a no-op on confidence level
 		ContractReaderGetLatestValueBasedOnConfidenceLevel,
@@ -118,7 +118,7 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T], t *testi
 		ContractReaderQueryKeysCanFilterWithValueComparator,
 		ContractReaderQueryKeysCanLimitResultsWithCursor,
 	})
-	if sqltest.TestURL(t) == string(pg.InMemoryPostgres) {
+	if it.inMemoryDB {
 		it.DisableTests([]string{ContractReaderGetLatestValueIncludeReverted})
 	}
 }
@@ -632,6 +632,7 @@ type SolanaChainComponentsInterfaceTester[T WrappedTestingT[T]] struct {
 	testContext   map[string]uint64
 	testContextMu *sync.RWMutex
 	testIdx       *atomic.Uint64
+	inMemoryDB    bool
 }
 
 // ContractReaderConfig and ContractWriterConfig are created when GetContractReader and GetContractWriter are called, respectively,
@@ -747,12 +748,18 @@ type helper struct {
 	sc                 *client.Client
 	sender             solana.PrivateKey
 	db                 *sqlx.DB
+	inMemoryDB         bool
 }
 
 func (h *helper) Init(t *testing.T) {
 	t.Helper()
 
-	h.db = sqltest.NewDB(t, sqltest.TestURL(t))
+	dbURL := sqltest.TestURL(t)
+	h.db = sqltest.NewDB(t, dbURL)
+
+	if dbURL == pg.DriverInMemoryPostgres {
+		h.inMemoryDB = true
+	}
 
 	privateKey, err := solana.PrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1])
 	require.NoError(t, err)
@@ -797,6 +804,10 @@ func (h *helper) Init(t *testing.T) {
 
 	h.primaryProgramID = primaryPubkey
 	h.secondaryProgramID = secondaryPubkey
+}
+
+func (h *helper) InMemoryDB() bool {
+	return h.inMemoryDB
 }
 
 func (h *helper) RPCClient() *chainreader.RPCClientWrapper {
@@ -1039,7 +1050,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 		},
 	})
 
-	return config.ContractReader{
+	cfg := config.ContractReader{
 		Namespaces: map[string]config.ChainContractReader{
 			AnyContractName: {
 				IDL: idl,
@@ -1195,6 +1206,10 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 			AnyContractNameWithSharedAddress3: basicContractDef,
 		},
 	}
+	if it.inMemoryDB {
+		delete(cfg.Namespaces[AnyContractName].Reads, StateChangedEventName)
+	}
+	return cfg
 }
 
 const (
