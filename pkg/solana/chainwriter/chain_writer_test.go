@@ -46,7 +46,6 @@ type Arguments struct {
 }
 
 var ccipOfframpIDL = idl.FetchCCIPOfframpIDL()
-var ccipRouterIDL = idl.FetchCCIPRouterIDL()
 var ccipCommonIDL = idl.FetchCommonIDL()
 var testContractIDL = chainwriter.FetchTestContractIDL()
 
