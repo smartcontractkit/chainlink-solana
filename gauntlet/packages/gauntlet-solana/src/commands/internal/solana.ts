@@ -12,12 +12,14 @@ import {
   SendTransactionError,
   TransactionExpiredTimeoutError,
 } from '@solana/web3.js'
+
 import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { TransactionResponse } from '../types'
 import { ProgramError, parseIdlErrors, Idl, Program, AnchorProvider } from '@coral-xyz/anchor'
 import { SolanaWallet } from '../wallet'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
-import { makeTx, Overrides } from '../../lib/utils'
+import { makeTx, median, Overrides } from '../../lib/utils'
+import { parseBlock } from '../../lib/feeUtils'
 
 export default abstract class SolanaCommand extends WriteCommand<TransactionResponse> {
   wallet: SolanaWallet
@@ -40,58 +42,15 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
 
   static lamportsToSol = (lamports: number) => lamports / LAMPORTS_PER_SOL
 
-  getOptimalOverrides = async (
-    rawTxs: TransactionInstruction[],
-    initialFee: number = 10000,
-    maxFee: number = 100000,
-  ) => {
-    //const latestAcceptedTx = await getRecentPrioritizationFees(signer)
-    let fee = initialFee
-    let overrides: Overrides = {}
-
-    while (fee <= maxFee) {
-      const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
-      overrides.price = fee
-      logger.info(`Trying fee: ${fee} micro-lamports per compute unit`)
-      const tx = makeTx(
-        rawTxs,
-        {
-          blockhash,
-          lastValidBlockHeight,
-          feePayer: this.wallet.publicKey,
-        },
-        overrides,
-      )
-      const simulation = await this.simulateTxWithOverrides(tx)
-      if (simulation > 0) {
-        return overrides
-      }
-      fee += 1000
-    }
-    console.log('Max fee reached without success.')
-    return {}
-  }
-
-  isNetworkCongested = async (): Promise<boolean> => {
+  calculatePriceFromLatestBlock = async (): Promise<number> => {
     const slot = await this.provider.connection.getSlot()
-    // Get block times for current and previous slots
-    try {
-      const currentBlock = await this.provider.connection.getBlock(slot, {
-        maxSupportedTransactionVersion: 0,
-      })
-      const previousBlock = await this.provider.connection.getBlock(slot - 1, {
-        maxSupportedTransactionVersion: 0,
-      })
-      const timeDiff = currentBlock.blockTime - previousBlock.blockTime // Time difference in seconds
-      // If time diff between blocks is greater than 1s then its congested
-      const congested = timeDiff > 1
-      return congested
-    } catch (error) {
-      if (error.message.includes('failed to get confirmed block')) {
-        // Assume no congestion if we can't fetch block times
-        return false
-      }
-    }
+    const block = await this.provider.connection.getBlock(slot, {
+      maxSupportedTransactionVersion: 0,
+    })
+
+    const blockData = parseBlock(block)
+    // return median of priority fess used
+    return median(blockData.prices)
   }
 
   sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -143,16 +102,12 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
   ): Promise<TransactionSignature> => {
     const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
 
+    // Default send with priority fees found using block estimator utils if not set
+    if (!overrides.price) {
+      overrides.price = await this.calculatePriceFromLatestBlock()
+    }
     if (overrides.units) logger.info(`Sending transaction with custom unit limit: ${overrides.units}`)
     if (overrides.price) logger.info(`Sending transaction with custom unit price: ${overrides.price}`)
-
-    // check if network is congested
-    if ((await this.isNetworkCongested()) && !overrides.price) {
-      // add Priority Fees if network is congested and no priority fees set
-      logger.info('Network is congested, trying transaction with priority fees')
-      overrides.price = 1000
-      return await this.signAndSendRawTx(rawTxs, extraSigners, true, overrides)
-    }
 
     const tx = makeTx(
       rawTxs,
@@ -175,7 +130,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       // Retry mechanism with greater priority fees
       console.log('Error type:', error)
       if (error instanceof SendTransactionError && error.message.includes('congestion') && withPriorityFee) {
-        overrides.price = overrides.price ? (overrides.price += 1000) : 1000
+        overrides.price += 1000
         logger.info(
           `Transaction Failed due to network congestion, increasing and retrying with ${overrides.price} micro Lamports priority fee`,
         )
