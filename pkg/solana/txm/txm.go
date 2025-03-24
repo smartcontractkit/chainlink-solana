@@ -227,6 +227,7 @@ func (txm *Txm) buildTx(ctx context.Context, msg pendingTx, retryCount int) (sol
 
 	// Set compute unit limit if specified
 	if msg.cfg.ComputeUnitLimit != 0 {
+		txm.lggr.Infow("Setting compute unit limit", "limit", msg.cfg.ComputeUnitLimit)
 		if err := fees.SetComputeUnitLimit(&newTx, fees.ComputeUnitLimit(msg.cfg.ComputeUnitLimit)); err != nil {
 			return solanaGo.Transaction{}, fmt.Errorf("failed to add compute unit limit instruction: %w", err)
 		}
@@ -875,10 +876,59 @@ func (txm *Txm) GetTransactionStatus(ctx context.Context, transactionID string) 
 	}
 }
 
+func deepCopyTx(tx solana.Transaction) solana.Transaction {
+	// Clone the signatures.
+	sigs := make([]solana.Signature, len(tx.Signatures))
+	copy(sigs, tx.Signatures)
+
+	// Clone the message.
+	msg := tx.Message
+
+	// Deep-copy AccountKeys.
+	accountKeys := make([]solana.PublicKey, len(msg.AccountKeys))
+	copy(accountKeys, msg.AccountKeys)
+
+	// Deep-copy Instructions.
+	instructions := make([]solana.CompiledInstruction, len(msg.Instructions))
+	for i, instr := range msg.Instructions {
+		newInstr := solana.CompiledInstruction{
+			ProgramIDIndex: instr.ProgramIDIndex,
+			Accounts:       make([]uint16, len(instr.Accounts)),
+			Data:           make([]byte, len(instr.Data)),
+		}
+		copy(newInstr.Accounts, instr.Accounts)
+		copy(newInstr.Data, instr.Data)
+		instructions[i] = newInstr
+	}
+
+	// Deep-copy AddressTableLookups.
+	lookups := make([]solana.MessageAddressTableLookup, len(msg.AddressTableLookups))
+	for i, lookup := range msg.AddressTableLookups {
+		newLookup := solana.MessageAddressTableLookup{
+			AccountKey:      lookup.AccountKey,
+			WritableIndexes: make(solana.Uint8SliceAsNum, len(lookup.WritableIndexes)),
+			ReadonlyIndexes: make(solana.Uint8SliceAsNum, len(lookup.ReadonlyIndexes)),
+		}
+		copy(newLookup.WritableIndexes, lookup.WritableIndexes)
+		copy(newLookup.ReadonlyIndexes, lookup.ReadonlyIndexes)
+		lookups[i] = newLookup
+	}
+
+	// Reassemble the cloned message.
+	msg.AccountKeys = accountKeys
+	msg.Instructions = instructions
+	msg.AddressTableLookups = lookups
+
+	return solana.Transaction{
+		Signatures: sigs,
+		Message:    msg,
+	}
+}
+
 // EstimateComputeUnitLimit estimates the compute unit limit needed for a transaction.
 // It simulates the provided transaction to determine the used compute and applies a buffer to it.
 func (txm *Txm) EstimateComputeUnitLimit(ctx context.Context, tx *solanaGo.Transaction, id string) (uint32, error) {
-	txCopy := *tx
+	txCopy := deepCopyTx(*tx)
 
 	// Set max compute unit limit when simulating a transaction to avoid getting an error for exceeding the default 200k compute unit limit
 	if computeUnitLimitErr := fees.SetComputeUnitLimit(&txCopy, fees.ComputeUnitLimit(MaxComputeUnitLimit)); computeUnitLimitErr != nil {
