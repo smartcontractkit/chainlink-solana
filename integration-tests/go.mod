@@ -16,7 +16,7 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250321174931-193fcd25d0c1
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250322131411-c7a8d6a077bf
-	github.com/smartcontractkit/chainlink-common v0.5.1-0.20250319144518-218b4debc6c7
+	github.com/smartcontractkit/chainlink-common v0.5.1-0.20250324165504-162e0a9b502c
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250319160959-3d984cad7f91
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.52.0
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.0
@@ -430,7 +430,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20250219182151-9fdb1cabc7b2 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250219182151-9fdb1cabc7b2 // indirect
 	google.golang.org/grpc v1.70.0 // indirect
-	google.golang.org/protobuf v1.36.5 // indirect
+	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
