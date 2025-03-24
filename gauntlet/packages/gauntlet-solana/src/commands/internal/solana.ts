@@ -171,21 +171,6 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     }
   }
 
-  simulateTxWithOverrides = async (tx: Transaction) => {
-    try {
-      const { value: simulationResponse } = await this.provider.connection.simulateTransaction(tx)
-      if (simulationResponse.err) {
-        throw new Error(JSON.stringify({ error: simulationResponse.err, logs: simulationResponse.logs }))
-      }
-      console.log(simulationResponse)
-      logger.success(`Tx simulation succeeded: ${simulationResponse.unitsConsumed} units consumed.`)
-      return simulationResponse.unitsConsumed
-    } catch (e) {
-      logger.error(`Tx simulation failed: ${e.message}`)
-      return -1
-    }
-  }
-
   simulateTx = async (signer: PublicKey, txInstructions: TransactionInstruction[], feePayer?: PublicKey) => {
     try {
       const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
