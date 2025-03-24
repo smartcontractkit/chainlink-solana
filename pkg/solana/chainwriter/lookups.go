@@ -157,6 +157,11 @@ func (al AccountLookup) Resolve(args any) ([]*solana.AccountMeta, error) {
 		return nil, lookupErrWithName(al.Name, fmt.Errorf("%w: %v", ErrLookupNotFoundAtLocation, err))
 	}
 
+	if len(derivedValues) == 0 {
+		// early return, there's nothing to set
+		return nil, nil
+	}
+
 	var metas []*solana.AccountMeta
 	signerIndexes, err := resolveBitMap(al.IsSigner, args, len(derivedValues))
 	if err != nil {
