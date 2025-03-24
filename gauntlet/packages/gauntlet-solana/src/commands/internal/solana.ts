@@ -105,6 +105,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     // Default send with priority fees found using block estimator utils if not set
     if (!overrides.price) {
       overrides.price = await this.calculatePriceFromLatestBlock()
+      logger.info(`Found past median priority fees as: ${overrides.price}. Setting as Priority Fee`)
     }
     if (overrides.units) logger.info(`Sending transaction with custom unit limit: ${overrides.units}`)
     if (overrides.price) logger.info(`Sending transaction with custom unit price: ${overrides.price}`)
