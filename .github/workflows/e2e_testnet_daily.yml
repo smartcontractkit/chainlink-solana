@@ -178,6 +178,6 @@ jobs:
         env:
           E2E_TEST_COMMON_PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }} # default private key
           E2E_TEST_COMMON_RPC_URL: https://api.devnet.solana.com # default url
-          E2E_TEST_COMMON_WS_URL: https://api.devnet.solana.com # default url
+          E2E_TEST_COMMON_WS_URL: wss://api.devnet.solana.com # default url
           E2E_TEST_SOLANA_SECRET: thisisatestingonlysecret
           CHAINLINK_USER_TEAM: ${{ github.event.inputs.team || 'BIX' }}
