@@ -45,8 +45,9 @@ type AccountLookup struct {
 }
 
 type MetaBool struct {
-	Value          bool   `json:"value,omitempty"`
-	BitmapLocation string `json:"bitmapLocation,omitempty"`
+	Value          bool   `json:"value,omitempty"`          // bool value
+	BitmapLocation string `json:"bitmapLocation,omitempty"` // dot separated location of the bitmap
+	StartIndex     int    `json:"startIndex,omitempty"`     // used to specify which account the bitmap starts to correspond with
 }
 
 type Seed struct {
@@ -156,6 +157,11 @@ func (al AccountLookup) Resolve(args any) ([]*solana.AccountMeta, error) {
 		return nil, lookupErrWithName(al.Name, fmt.Errorf("%w: %v", ErrLookupNotFoundAtLocation, err))
 	}
 
+	if len(derivedValues) == 0 {
+		// early return, there's nothing to set
+		return nil, nil
+	}
+
 	var metas []*solana.AccountMeta
 	signerIndexes, err := resolveBitMap(al.IsSigner, args, len(derivedValues))
 	if err != nil {
@@ -171,7 +177,7 @@ func (al AccountLookup) Resolve(args any) ([]*solana.AccountMeta, error) {
 		// Resolve isSigner for this particular pubkey
 		isSigner := signerIndexes[i]
 
-		// Resolve isWritable
+		// Resolve isWritable for this particular pubkey
 		isWritable := writerIndexes[i]
 
 		metas = append(metas, &solana.AccountMeta{
@@ -201,9 +207,15 @@ func resolveBitMap(mb MetaBool, args any, length int) ([]bool, error) {
 		return []bool{}, fmt.Errorf("bitmap value is not a single value: %v, length: %d", bitmapVals, len(bitmapVals))
 	}
 
+	if mb.StartIndex < 0 || mb.StartIndex >= length {
+		return nil, fmt.Errorf("invalid MetaBool start index specified. startIndex: %d, derivedValuesLen: %d", mb.StartIndex, length)
+	}
+
 	bitmapInt := binary.LittleEndian.Uint64(bitmapVals[0])
-	for i := 0; i < length; i++ {
-		result[i] = bitmapInt&(1<<i) > 0
+	// Results default to false for indexes up to StartIndex
+	for i := mb.StartIndex; i < length; i++ {
+		// Offset index into bitmap by StartIndex so start of bitmap correlates to the StartIndex account
+		result[i] = bitmapInt&(1<<(i-mb.StartIndex)) > 0
 	}
 
 	return result, nil

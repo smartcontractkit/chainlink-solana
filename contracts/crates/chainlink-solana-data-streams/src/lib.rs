@@ -38,9 +38,9 @@ impl VerifierInstructions {
     /// * `program_id` - The public key of the verifier program.
     /// * `verifier_account` - The public key of the verifier account. The function [`Self::get_verifier_config_pda`] can be used to calculate this.
     /// * `access_controller_account` - The public key of the access controller account.
-    /// * `user` - The public key of the user - this account must be a signer
+    /// * `user` - The public key of the user - this account must be a signer.
     /// * `report_config_account` - The public key of the report configuration account. The function [`Self::get_config_pda`] can be used to calculate this.
-    /// * `signed_report` - The signed report data as a vector of bytes. Returned from data streams API/WS
+    /// * `signed_report` - Report bytes from Data Streams DON compressed in snappy format
     ///
     /// # Returns
     ///
@@ -82,7 +82,7 @@ impl VerifierInstructions {
     }
 
     /// Helper to compute the report config PDA account. This uses the first 32 bytes of the
-    /// uncompressed report as the seed. This is validated within the verifier program
+    /// raw uncompressed report as the seed. This is validated within the verifier program
     pub fn get_config_pda(report: &[u8], program_id: &Pubkey) -> Pubkey {
         Pubkey::find_program_address(&[&report[..32]], program_id).0
     }

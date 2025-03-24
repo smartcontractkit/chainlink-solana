@@ -1146,8 +1146,8 @@ func TestTxm_Enqueue(t *testing.T) {
 
 	// mock solana keystore
 	mkey := keyMocks.NewSimpleKeystore(t)
-	validKey := solana.PublicKeyFromBytes([]byte{1})
-	invalidKey := solana.PublicKeyFromBytes([]byte{2})
+	validKey := utils.GetRandomPubKey(t)
+	invalidKey := utils.GetRandomPubKey(t)
 	mkey.On("Sign", mock.Anything, validKey.String(), mock.Anything).Return([]byte{1}, nil)
 	mkey.On("Sign", mock.Anything, invalidKey.String(), mock.Anything).Return([]byte{}, relayconfig.KeyNotFoundError{ID: invalidKey.String(), KeyType: "Solana"})
 
@@ -1713,7 +1713,7 @@ func TestTxm_OnReorg(t *testing.T) {
 			latestBlockhashFunc := func() (*rpc.GetLatestBlockhashResult, error) {
 				return &rpc.GetLatestBlockhashResult{
 					Value: &rpc.LatestBlockhashResult{
-						Blockhash:            solana.HashFromBytes([]byte{2}),
+						Blockhash:            solana.HashFromBytes(utils.GetRandomPubKey(t).Bytes()),
 						LastValidBlockHeight: 2001,
 					},
 				}, nil

@@ -191,6 +191,20 @@ func TestGetBlockJob(t *testing.T) {
 					Program: "myProgram",
 					Data:    "log3",
 				},
+				{
+					BlockData: BlockData{
+						SlotNumber:          slotNumber,
+						BlockHeight:         height,
+						BlockHash:           block.Blockhash,
+						BlockTime:           blockTime,
+						TransactionHash:     solana.Signature{10, 11},
+						TransactionLogIndex: 0,
+						TransactionIndex:    2,
+						Error:               fmt.Errorf("some error"),
+					},
+					Program: "myProgram",
+					Data:    "log4",
+				},
 			},
 		}, result)
 		select {

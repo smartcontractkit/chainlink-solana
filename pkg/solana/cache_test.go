@@ -65,7 +65,7 @@ var (
 type mockRequest struct {
 	Method  string
 	Params  []json.RawMessage
-	ID      uint
+	ID      string
 	JSONRPC string
 }
 

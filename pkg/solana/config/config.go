@@ -166,8 +166,10 @@ func (n *Node) ValidateConfig() (err error) {
 	}
 	if n.URL == nil {
 		err = errors.Join(err, config.ErrMissing{Name: "URL", Msg: "required for all nodes"})
+	} else if n.URL.String() == "" {
+		err = errors.Join(err, config.ErrEmpty{Name: "URL", Msg: "required for all nodes"})
 	}
-	return
+	return err
 }
 
 func ptr[T any](t T) *T {
