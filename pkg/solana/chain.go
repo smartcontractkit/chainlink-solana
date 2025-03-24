@@ -392,8 +392,9 @@ func (c *chain) Transact(ctx context.Context, from, to string, amount *big.Int, 
 	return c.sendTx(ctx, from, to, amount, balanceCheck)
 }
 
-func (c *chain) Replay(fromBlock uint64, args map[string]any) {
+func (c *chain) Replay(ctx context.Context, fromBlock uint64, args map[string]any) error {
 	c.LogPoller().Replay(int64(fromBlock))
+	return nil
 }
 
 func (c *chain) listNodeStatuses(start, end int) ([]types.NodeStatus, int, error) {
