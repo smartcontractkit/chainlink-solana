@@ -229,16 +229,10 @@ func ToSnakeCase(s string) string {
 	return strings.ToLower(s)
 }
 
-func GetRandomPubKey(t *testing.T) solana.PublicKey {
-	privKey, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
-	return privKey.PublicKey()
-}
-
 func CreateTestPubKeys(t *testing.T, num int) solana.PublicKeySlice {
 	addresses := make([]solana.PublicKey, num)
 	for i := 0; i < num; i++ {
-		addresses[i] = GetRandomPubKey(t)
+		addresses[i] = utils.GetRandomPubKey(t)
 	}
 	return addresses
 }
