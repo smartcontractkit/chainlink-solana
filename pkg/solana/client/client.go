@@ -194,6 +194,15 @@ func (c *Client) GetMultipleAccountsWithOpts(ctx context.Context, accounts []sol
 	return c.rpc.GetMultipleAccountsWithOpts(ctx, accounts, opts)
 }
 
+func (c *Client) GetFirstAvailableBlock(ctx context.Context) (out uint64, err error) {
+	done := c.latency("first_available_block")
+	defer done()
+
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+	return c.rpc.GetFirstAvailableBlock(ctx)
+}
+
 func (c *Client) GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64) (out rpc.BlocksResult, err error) {
 	done := c.latency("blocks")
 	defer done()
