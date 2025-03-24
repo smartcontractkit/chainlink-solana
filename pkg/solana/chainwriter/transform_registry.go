@@ -60,8 +60,9 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 	}
 
 	options := []txmutils.SetTxConfig{
-		txmutils.SetEstimateComputeUnitLimit(false),
-		txmutils.SetComputeUnitLimit(computeUnits),
+		// TODO: enabling this currently causes a SanitizeFailure, re-enable when fixed
+		// txmutils.SetEstimateComputeUnitLimit(false),
+		// txmutils.SetComputeUnitLimit(computeUnits),
 	}
 
 	registryTables, exists := tableMap["PoolLookupTable"]
@@ -146,7 +147,13 @@ func CCIPCommitAccountTransform(ctx context.Context, client client.MultiClient, 
 	if len(tokenPriceVals) == 0 && len(gasPriceVals) == 0 {
 		transformedAccounts = accounts[:len(accounts)-1]
 	}
-	return args, transformedAccounts, []txmutils.SetTxConfig{txmutils.SetEstimateComputeUnitLimit(true)}, nil
+
+	options := []txmutils.SetTxConfig{
+		// TODO: enabling this currently causes a SanitizeFailure, re-enable when fixed
+		// txmutils.SetEstimateComputeUnitLimit(true)
+	}
+
+	return args, transformedAccounts, options, nil
 }
 
 func fetchPoolLookupAccounts(ctx context.Context, client client.MultiClient, poolTables map[string][]*solana.AccountMeta) ([]*solana.AccountMeta, error) {
