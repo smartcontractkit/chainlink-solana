@@ -392,8 +392,13 @@ func (c *chain) Transact(ctx context.Context, from, to string, amount *big.Int, 
 	return c.sendTx(ctx, from, to, amount, balanceCheck)
 }
 
-func (c *chain) Replay(ctx context.Context, fromBlock uint64, args map[string]any) error {
-	c.LogPoller().Replay(int64(fromBlock))
+func (c *chain) Replay(ctx context.Context, fromBlock string, args map[string]any) error {
+	from, err := strconv.ParseInt(fromBlock, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	c.LogPoller().Replay(from)
 	return nil
 }
 
